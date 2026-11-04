@@ -76,9 +76,12 @@ fm_slot_prepare_base() { # <project> <copy> <task-id>
 # (the one it prepared from, or the one its own guarded reset set), and the tree is clean as the
 # preparation required. A restoring checkout over a commit or an edit that landed in the slot
 # during the guard's observations would move that work off HEAD or out of the tree, and no ref
-# holds it. Then the slot is left exactly as found, and what changed is reported.
+# holds it. The original branch must also still be where it was, and no ignored file may sit at
+# a path the restored checkout tracks (ordinary status does not show ignored files; the check is
+# the one the reset guard uses). Then the slot is left exactly as found, and what changed is
+# reported.
 fm_slot_restore_base() { # <copy>
-  local head status
+  local head status dest ignored_out
   [ -n "$FM_SLOT_PREVIOUS_HEAD" ] || return 0
   head=$(git -C "$1" rev-parse --verify --quiet HEAD 2>/dev/null) || head=
   if [ -z "$head" ] || { [ "$head" != "$FM_SLOT_PREVIOUS_HEAD" ] && [ "$head" != "${FM_SLOT_RESET_HEAD:-}" ]; }; then
@@ -89,6 +92,22 @@ fm_slot_restore_base() { # <copy>
   if [ -n "$status" ]; then
     echo "error: the slot's tree changed since this spawn prepared it ($(printf '%s' "$status" | sed -n '1,3p' | tr '\n' ';')); leaving the slot exactly as found and not restoring its original checkout" >&2
     return 0
+  fi
+  dest=$FM_SLOT_PREVIOUS_HEAD
+  if [ -n "$FM_SLOT_PREVIOUS_BRANCH" ]; then
+    dest=$(git -C "$1" rev-parse --verify --quiet "refs/heads/$FM_SLOT_PREVIOUS_BRANCH^{commit}" 2>/dev/null) || dest=
+    if [ "$dest" != "$FM_SLOT_PREVIOUS_HEAD" ]; then
+      echo "error: the original branch $FM_SLOT_PREVIOUS_BRANCH is at ${dest:-nothing}, not where this spawn found it ($FM_SLOT_PREVIOUS_HEAD); leaving the slot exactly as found and not restoring its original checkout" >&2
+      return 0
+    fi
+  fi
+  if [ "$head" != "$dest" ]; then
+    # The checkout would change the tree. Ignored files are work the status above cannot see.
+    fm_slot_guard_begin "$1" "$dest" || return 0
+    ignored_out=$(fm_slot_guard_fact_ignored 1 2>&1) || {
+      echo "error: restoring the original checkout would overwrite ignored work in the slot (${ignored_out##*reset refused (}); leaving the slot exactly as found and not restoring its original checkout" >&2
+      return 0
+    }
   fi
   if [ -n "$FM_SLOT_PREVIOUS_BRANCH" ]; then
     git -C "$1" checkout --quiet "$FM_SLOT_PREVIOUS_BRANCH" --

@@ -1946,6 +1946,7 @@ SPAWN_BASE_REF=
 SPAWN_ORIGIN_DEFAULT=
 SPAWN_ORIGIN_DEFAULT_REF=
 SPAWN_ORIGIN_DEFAULT_SHA=
+SPAWN_ORIGIN_DEFAULT_FROM_REMOTE=0
 SPAWN_RECORD_REFS_MODE=
 SPAWN_RECORD_REFS_DEFAULT=
 SPAWN_RECORD_REFS_SHA=
@@ -4511,6 +4512,7 @@ spawn_fetch_base_evidence() {
   if [ -z "$default" ]; then
     default=$(spawn_remote_default_branch "$PROJ_ABS") || rc=$?
     origin_default=$default
+    SPAWN_ORIGIN_DEFAULT_FROM_REMOTE=1
   else
     origin_default=$(spawn_origin_default_name "$PROJ_ABS") || rc=$?
   fi
@@ -5138,9 +5140,17 @@ spawn_fetch_origin_tip() { # <worktree> <branch>
 # The current tip of origin's default branch, fetched into FETCH_HEAD only. The reset guard's
 # final pass calls it so containment is proved against the tip now, not the one fetched when
 # this spawn began (see FM_SLOT_GUARD_ANCHOR_REFRESH in the library's header).
+# A default that was resolved from the remote is resolved from the remote again here, so a remote
+# that switched its default branch between the observations is judged by its new default, not by
+# the branch that used to be the default. A name taken from the recorded origin/HEAD (a
+# --base-branch spawn) stays that name.
 spawn_refresh_origin_default_tip() {
-  [ -n "$SPAWN_ORIGIN_DEFAULT" ] || return 1
-  spawn_fetch_origin_tip "$FM_SLOT_GUARD_SLOT" "$SPAWN_ORIGIN_DEFAULT"
+  local name=$SPAWN_ORIGIN_DEFAULT
+  [ -n "$name" ] || return 1
+  if [ "$SPAWN_ORIGIN_DEFAULT_FROM_REMOTE" = 1 ]; then
+    name=$(spawn_remote_default_branch "$FM_SLOT_GUARD_SLOT") || return 1
+  fi
+  spawn_fetch_origin_tip "$FM_SLOT_GUARD_SLOT" "$name"
 }
 
 # The recorded-source recovery reset has no fresh base fetch of its own, but its guard needs the
@@ -5168,6 +5178,7 @@ spawn_fetch_recovery_origin_anchor() { # <worktree>
     return 1
   }
   SPAWN_ORIGIN_DEFAULT=$default
+  SPAWN_ORIGIN_DEFAULT_FROM_REMOTE=1
 }
 
 # Record the origin tip this spawn started from in the slot's remote-tracking refs, only
@@ -5245,6 +5256,7 @@ freshen_spawn_worktree_base() { # <worktree> [<base-branch>]
       SPAWN_ORIGIN_DEFAULT=$(spawn_origin_default_name "$worktree") || rc=$?
     else
       SPAWN_ORIGIN_DEFAULT=$(spawn_remote_default_branch "$worktree") || rc=$?
+      SPAWN_ORIGIN_DEFAULT_FROM_REMOTE=1
     fi
     case $rc in
       0) ;;

@@ -2508,6 +2508,17 @@ guard_recovery_fixture() { # <id> -> a refused first attempt with its dirt remov
   make_stopped_tmux "$CASE_DIR/stopped"
 }
 
+# An unrelated branch on the remote that a later default switch can point HEAD at.
+guard_publish_replacement_default_branch() {
+  git -C "$CASE_DIR/publisher" checkout --quiet --orphan replacement
+  git -C "$CASE_DIR/publisher" rm -rfq . 2>/dev/null || true
+  printf 'unrelated\n' >"$CASE_DIR/publisher/replacement.txt"
+  git -C "$CASE_DIR/publisher" add replacement.txt
+  git -C "$CASE_DIR/publisher" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm replacement
+  git -C "$CASE_DIR/publisher" push --quiet origin replacement
+  git -C "$CASE_DIR/publisher" checkout --quiet -f main
+}
+
 test_reset_guard_d_recorded_source_recovery_revalidates_origin() {
   local id out rc head_before parent
   # Case 1: origin is reachable. The recovery fetches its default tip, finds the slot's HEAD in it,
@@ -2555,8 +2566,139 @@ PY
   assert_contains "$out" 'head_not_contained' "D: the rewound default branch was not seen on the final pass"$'\n'"$out"
   [ ! -e "$CASE_DIR/relaunch.called" ] || fail 'D: the provisioner was reached after origin rewound its default branch'
   [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$head_before" ] || fail 'D: the slot was reset after origin rewound its default branch'
-  pass 'D: the recorded-source recovery reset fetches origin and judges against it, again on the final pass; unreachable origin or a rewound default refuses before reset or launch, reachable origin proceeds'
+  # Case 4 (round 4): the remote switches its DEFAULT BRANCH between the observations. The former default
+  # is unchanged and still holds the slot's HEAD, but the new default does not: the final pass must
+  # judge by the new default and refuse.
+  id="guard-d-default-switched-$$"
+  guard_recovery_fixture "$id"
+  guard_publish_replacement_default_branch
+  head_before=$(git -C "$POOL_DIR" rev-parse HEAD)
+  rc=0
+  out=$(FM_SLOT_RESET_GUARD_SEAM="git -C '$CASE_DIR/origin.git' symbolic-ref HEAD refs/heads/replacement" \
+    FM_TEST_PROVISION_CALLED="$CASE_DIR/relaunch.called" run_relaunch "$id" 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail 'D: a recovery admitted a worker after the remote switched its default branch'
+  assert_contains "$out" 'head_not_contained' "D: the switched default branch was not seen on the final pass"$'\n'"$out"
+  [ ! -e "$CASE_DIR/relaunch.called" ] || fail 'D: the provisioner was reached after the remote switched its default branch'
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$head_before" ] || fail 'D: the slot was reset after the remote switched its default branch'
+  # Case 5 (round 4): the same switch on the ordinary freshness path, with no --base-branch.
+  id="guard-d-fresh-default-switched-$$"
+  rec=$(make_case guard-d5 "$id")
+  read_case_record "$rec"
+  guard_publish_replacement_default_branch
+  guard_prefetch
+  rc=0
+  out=$(FM_SLOT_RESET_GUARD_SEAM="git -C '$CASE_DIR/origin.git' symbolic-ref HEAD refs/heads/replacement" \
+    FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" run_spawn "$id" --scout 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail 'D: a fresh spawn launched after the remote switched its default branch'
+  assert_contains "$out" 'head_not_contained' "D: the switched default branch was not seen on the final pass of a fresh spawn"$'\n'"$out"
+  [ ! -s "$CASE_DIR/launch.log" ] || fail 'D: a fresh spawn typed a launch after the remote switched its default branch'
+  pass 'D: the recorded-source recovery reset fetches origin and judges against it, again on the final pass; unreachable origin, a rewound default or a switched default refuses before reset or launch, reachable origin proceeds'
 }
+
+# Round 4, finding 1: the restoring checkout after a refusal must not overwrite ignored work either.
+# Ordinary status does not show ignored files, and the original branch may have moved since the
+# preparation. Either leaves the slot exactly as the refusal found it.
+test_reset_guard_restore_preserves_ignored_work_and_a_moved_branch() {
+  local rec id target
+  # The reviewer's case: between the observations an outside writer advances the original branch to a
+  # commit that tracks notes.local and writes ignored, unarchived bytes there. The guard refuses the
+  # ignored collision; the refusal cleanup must not check the moved branch out over those bytes.
+  id='guard-restore-moved-branch'
+  rec=$(make_guard_governed_case guard-rs1 "$id")
+  read_case_record "$rec"
+  guard_ignore notes.local
+  guard_publish_tracked notes.local $'target bytes\n'
+  target=$(git -C "$CASE_DIR/publisher" rev-parse main)
+  git -C "$POOL_DIR" checkout --quiet -b owner-topic "$INITIAL_SHA"
+  guard_write_manifest owner-topic "$INITIAL_SHA"
+  # The outside writer moves the original branch itself, so the refusal is compared against the state
+  # after that move: every other ref, the index and every file byte must be as the writer left them.
+  guard_snapshot "$POOL_DIR" "$CASE_DIR/before.snap"
+  rm -f -- "$CASE_DIR/launch.log"
+  GUARD_OUT=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" \
+    FM_SLOT_RESET_GUARD_SEAM="git -C '$POOL_DIR' update-ref refs/heads/owner-topic '$target'; printf 'private ignored work\\n' >'$POOL_DIR/notes.local'" \
+    run_spawn "$id" --scout --owned-path scripts) && fail 'round 4: the spawn launched on a slot with an ignored collision'
+  guard_snapshot "$POOL_DIR" "$CASE_DIR/after.snap"
+  assert_contains "$GUARD_OUT" 'reset refused (ignored_collision)' 'round 4: the refusal did not name the ignored collision'
+  [ ! -s "$CASE_DIR/launch.log" ] || fail 'round 4: the refusal typed a launch into the worker pane'
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$INITIAL_SHA" ] || fail 'round 4: HEAD moved off the prepared commit'
+  [ "$(git -C "$POOL_DIR" rev-parse refs/heads/owner-topic)" = "$target" ] || fail 'round 4: the outside writer'"'"'s branch move was undone'
+  assert_grep 'private ignored work' "$POOL_DIR/notes.local" 'round 4: the ignored work was overwritten'
+  assert_contains "$GUARD_OUT" 'leaving the slot exactly as found' 'round 4: the refusal did not report the slot as left as found'
+  diff <(guard_snapshot_refs "$CASE_DIR/before.snap" | grep -Ev ' refs/heads/owner-topic$| refs/fm/anchor/') \
+       <(guard_snapshot_refs "$CASE_DIR/after.snap" | grep -Ev ' refs/heads/owner-topic$| refs/fm/anchor/') >&2 \
+    || fail 'round 4: a ref other than the writer'"'"'s changed'
+  # The branch move alone (no ignored work in the way) is enough: the restore must not put the slot on a
+  # branch tip it did not find.
+  id='guard-restore-moved-branch-only'
+  rec=$(make_guard_governed_case guard-rs4 "$id")
+  read_case_record "$rec"
+  guard_publish_tracked moved.txt $'moved\n'
+  target=$(git -C "$CASE_DIR/publisher" rev-parse main)
+  git -C "$POOL_DIR" checkout --quiet -b owner-topic "$INITIAL_SHA"
+  guard_write_manifest owner-topic "$INITIAL_SHA"
+  rm -f -- "$CASE_DIR/launch.log"
+  GUARD_OUT=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" \
+    FM_SLOT_RESET_GUARD_SEAM="git -C '$POOL_DIR' update-ref refs/heads/owner-topic '$target'" \
+    run_spawn "$id" --scout --owned-path scripts) && fail 'round 4: the spawn launched after the original branch moved'
+  [ ! -s "$CASE_DIR/launch.log" ] || fail 'round 4: the refusal typed a launch into the worker pane'
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$INITIAL_SHA" ] || fail 'round 4: HEAD moved to the moved branch tip'
+  [ ! -e "$POOL_DIR/moved.txt" ] || fail 'round 4: the moved branch tip was checked out'
+  assert_contains "$GUARD_OUT" 'not where this spawn found it' 'round 4: the refusal did not report the moved original branch'
+  # Paired control: the same ignored collision with the branch where it was. HEAD stays, the ignored bytes stay.
+  id='guard-restore-stable-branch'
+  rec=$(make_guard_governed_case guard-rs2 "$id")
+  read_case_record "$rec"
+  guard_ignore notes.local
+  guard_publish_tracked notes.local $'target bytes\n'
+  git -C "$POOL_DIR" checkout --quiet -b owner-topic "$INITIAL_SHA"
+  guard_write_manifest owner-topic "$INITIAL_SHA"
+  rm -f -- "$CASE_DIR/launch.log"
+  GUARD_OUT=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" \
+    FM_SLOT_RESET_GUARD_SEAM="printf 'private ignored work\\n' >'$POOL_DIR/notes.local'" \
+    run_spawn "$id" --scout --owned-path scripts) && fail 'round 4 control: the spawn launched on a slot with an ignored collision'
+  assert_contains "$GUARD_OUT" 'reset refused (ignored_collision)' 'round 4 control: the refusal did not name the ignored collision'
+  [ ! -s "$CASE_DIR/launch.log" ] || fail 'round 4 control: the refusal typed a launch into the worker pane'
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$INITIAL_SHA" ] || fail 'round 4 control: HEAD moved'
+  [ "$(git -C "$POOL_DIR" symbolic-ref --short -q HEAD)" = owner-topic ] || fail 'round 4 control: the original branch was not restored where nothing was in the way'
+  assert_grep 'private ignored work' "$POOL_DIR/notes.local" 'round 4 control: the ignored work was overwritten'
+  # The clean restore control: a refusal with nothing changed still puts the original branch back.
+  id='guard-restore-clean'
+  rec=$(make_guard_governed_case guard-rs3 "$id")
+  read_case_record "$rec"
+  git -C "$POOL_DIR" checkout --quiet -b owner-topic "$INITIAL_SHA"
+  guard_write_manifest owner-topic "$INITIAL_SHA"
+  GUARD_OUT=$(FM_SLOT_RESET_GUARD_SEAM="printf '{ garbage' >'$GUARD_MANIFEST_FILE'" run_spawn "$id" --scout --owned-path scripts) && fail 'round 4 control: the rewritten manifest did not refuse'
+  [ "$(git -C "$POOL_DIR" symbolic-ref --short -q HEAD)" = owner-topic ] || fail 'round 4 control: the original branch was not restored'
+  # The function itself, on a slot the spawn's own reset has already moved: an ignored file at a path
+  # the original commit tracks would be overwritten by the restore, so it is left as found; with no
+  # such file it restores.
+  local repo old new
+  repo="$CASE_DIR/restore-unit"
+  git init -q "$repo"
+  git -C "$repo" -c user.name=t -c user.email=t@e.invalid commit -q --allow-empty -m empty
+  printf 'tracked in the original\n' >"$repo/keep.txt"
+  git -C "$repo" add keep.txt
+  git -C "$repo" -c user.name=t -c user.email=t@e.invalid commit -q -m original
+  old=$(git -C "$repo" rev-parse HEAD)
+  git -C "$repo" checkout -q -b owner-topic
+  git -C "$repo" rm -q keep.txt
+  git -C "$repo" -c user.name=t -c user.email=t@e.invalid commit -q -m 'reset target drops keep.txt'
+  new=$(git -C "$repo" rev-parse HEAD)
+  git -C "$repo" checkout -q --detach "$new"
+  git -C "$repo" branch -q -f owner-topic "$old"
+  printf 'keep.txt\n' >>"$repo/.git/info/exclude"
+  printf 'ignored work\n' >"$repo/keep.txt"
+  GUARD_OUT=$(bash -c '. "$1/bin/fm-slot-provision-lib.sh"; FM_SLOT_PREVIOUS_BRANCH=owner-topic FM_SLOT_PREVIOUS_HEAD=$3 FM_SLOT_RESET_HEAD=$4; fm_slot_restore_base "$2"' _ "$ROOT" "$repo" "$old" "$new" 2>&1)
+  [ "$(git -C "$repo" rev-parse HEAD)" = "$new" ] || fail 'round 4: the restore moved HEAD over ignored work'
+  assert_grep 'ignored work' "$repo/keep.txt" 'round 4: the restore overwrote ignored work'
+  assert_contains "$GUARD_OUT" 'would overwrite ignored work' 'round 4: the restore did not say it left ignored work alone'
+  rm -f "$repo/keep.txt"
+  bash -c '. "$1/bin/fm-slot-provision-lib.sh"; FM_SLOT_PREVIOUS_BRANCH=owner-topic FM_SLOT_PREVIOUS_HEAD=$3 FM_SLOT_RESET_HEAD=$4; fm_slot_restore_base "$2"' _ "$ROOT" "$repo" "$old" "$new" >/dev/null 2>&1
+  [ "$(git -C "$repo" symbolic-ref --short -q HEAD)" = owner-topic ] || fail 'round 4 control: the restore did not run with no ignored work in the way'
+  pass 'round 4: a refusal never restores over ignored work or a moved original branch; with nothing in the way it still restores'
+}
+
 
 
 
@@ -3400,5 +3542,6 @@ test_reset_guard_r4_origin_head_write_failure_refuses_before_the_reset
 test_reset_guard_a_governed_late_commit_is_not_orphaned
 test_reset_guard_c_partial_lsof_inventory_is_unknown
 test_reset_guard_d_recorded_source_recovery_revalidates_origin
+test_reset_guard_restore_preserves_ignored_work_and_a_moved_branch
 
 echo "# all fm-spawn-pool-base-freshen tests passed"

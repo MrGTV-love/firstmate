@@ -842,7 +842,7 @@
       "id": "pooled-copy-no-discard",
       "version": "2",
       "owner": "bin/fm-slot-provision-lib.sh",
-      "invariant": "A pooled slot is reset only after proof that it holds no unique work and no live holder. A refusal leaves the slot's HEAD, local branches, index, files and every other ref byte-identical, with one exception that changes no local work: the governed path adds refs/fm/anchor/<task>-<sha> to preserve a detached HEAD. The spawn records the origin tip in refs/remotes/origin/<b> and refs/remotes/origin/HEAD only after every check has cleared and right before the reset, so a refusal by any check moves no origin ref, and a failure of that step also refuses before the reset.",
+      "invariant": "A pooled slot is reset only after proof that it holds no unique work and no live holder. A refusal leaves the slot's HEAD, local branches, index, files and every other ref byte-identical, with one exception that changes no local work: the governed path adds refs/fm/anchor/<task>-<sha> to preserve a detached HEAD. The spawn records the origin tip in refs/remotes/origin/<b> and refs/remotes/origin/HEAD only after every check has cleared and right before the reset, so a refusal by any check moves no origin ref, and a failure of that step also refuses before the reset. A refusal's restoring checkout runs only while HEAD, the tree, the original branch and the ignored files are all unchanged.",
       "layer": "runtime-block",
       "source": "the slot's HEAD, owner branches, status, ignored entries, lifecycle manifest, lease and contention sources, and the working-directory list; decided by fm_slot_guard_observe in bin/fm-slot-provision-lib.sh",
       "trigger": "a pooled slot's HEAD or owner branch is not contained in origin's current default branch (the remote's ls-remote answer; with --base-branch, the recorded origin/HEAD, else ls-remote) as this spawn fetched it and fetched again on the final pass, never a --base-branch and never the slot's own remote-tracking ref, or the recorded base, its tree is dirty, an ignored entry collides with a path the reset target tracks, a process outside the spawn has its cwd in it, it is locked or leased to another holder (a process lease counts as this spawn's own only when the entry's recorded identity matches, the process is under this spawn or the acquired pane, and it started after this spawn did), lsof exits nonzero or lists a partial inventory, a pool state that was present at acquisition is gone, recent contention names it, any of those sources cannot be read, or the evidence changed before the reset",
@@ -869,6 +869,10 @@
         {
           "file": "bin/fm-slot-provision-lib.sh",
           "match": "fm_slot_guard_refuse unknown_git_read \"the slot's HEAD cannot be read\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "echo \"error: restoring the original checkout would overwrite ignored work in the slot (${ignored_out##*reset refused (}); leaving the slot exactly as found and not restoring its original checkout\" >&2"
         },
         {
           "file": "bin/fm-slot-provision-lib.sh",
