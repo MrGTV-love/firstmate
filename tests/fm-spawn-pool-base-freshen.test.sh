@@ -1541,12 +1541,20 @@ PY
 }
 
 # --- --successor-of: a declared successor reaches the project's provisioner ---
-# The provisioner here is a stub: it logs its argv, lists --supersedes in
-# --help only when asked, and writes no successor record of its own.
-write_successor_slot_owner() { # <repository> <advertise|silent>
+# The provisioner here is a stub: it logs its argv and lists --supersedes in
+# --help only when asked. "advertise" models a helper that also takes the verified
+# branch and head and binds its record to them; "verb" models today's helper, which
+# lists --supersedes alone. The stub writes a "<calls>.marked" file only where the
+# real helper would write its record: when the copy is still on that branch at that
+# commit or a descendant.
+write_successor_slot_owner() { # <repository> <advertise|verb|silent>
   mkdir -p "$1/scripts/git-stability"
   {
-    if [ "$2" = advertise ]; then printf 'ADVERTISE = True\n'; else printf 'ADVERTISE = False\n'; fi
+    case "$2" in
+      advertise) printf 'ADVERTISE = True\nBINDS = True\n' ;;
+      verb) printf 'ADVERTISE = True\nBINDS = False\n' ;;
+      *) printf 'ADVERTISE = False\nBINDS = False\n' ;;
+    esac
     cat <<'PY'
 import argparse
 import json
@@ -1562,6 +1570,9 @@ ap.add_argument("--owned-path", action="append", required=True)
 ap.add_argument("--base-source")
 if ADVERTISE:
     ap.add_argument("--supersedes")
+if BINDS:
+    ap.add_argument("--supersedes-branch")
+    ap.add_argument("--supersedes-head")
 calls = os.environ["FM_TEST_CALLS"]
 if "--help" in sys.argv[1:]:
     with open(calls + ".help", "a", encoding="utf-8") as log:
@@ -1588,8 +1599,28 @@ if "--help" in sys.argv[1:]:
     ap.parse_args()
 with open(calls, "a", encoding="utf-8") as log:
     log.write(json.dumps(sys.argv[1:]) + "\n")
+# FM_TEST_CALL_SWITCH=<repo>::<branch>: another actor moves a copy to a new branch
+# after the caller's final check and before this helper reads the copy.
+call_switch = os.environ.get("FM_TEST_CALL_SWITCH")
+if call_switch:
+    repo, moved = call_switch.split("::")
+    subprocess.run(["git", "-C", repo, "checkout", "-q", "-b", moved], check=True)
+# FM_TEST_CALL_COMMIT=<repo>: the predecessor commits on its own branch in that time.
+call_commit = os.environ.get("FM_TEST_CALL_COMMIT")
+if call_commit:
+    subprocess.run(["git", "-C", call_commit, "-c", "user.name=Tests", "-c", "user.email=tests@example.invalid",
+                    "commit", "-q", "--allow-empty", "-m", "predecessor work during the window"], check=True)
 a = ap.parse_args()
 mode = os.environ.get("FM_TEST_OWNER_MODE", "pass")
+if BINDS and a.supersedes:
+    def git(*args):
+        return subprocess.run(["git", "-C", a.supersedes, *args], capture_output=True, text=True)
+    on = git("symbolic-ref", "-q", "--short", "HEAD").stdout.strip()
+    held = git("merge-base", "--is-ancestor", a.supersedes_head, "HEAD").returncode == 0
+    if on != a.supersedes_branch or not held:
+        print(json.dumps({"state": "BLOCKED", "reason": "supersedes_not_on_verified_branch"}))
+        raise SystemExit(2)
+    Path(calls + ".marked").write_text(a.supersedes + "\n", encoding="utf-8")
 if mode == "refuse" or (mode == "refuse-supersedes" and getattr(a, "supersedes", None)):
     print(json.dumps({"state": "BLOCKED", "reason": "fixture_predecessor_not_live"}))
     raise SystemExit(2)
@@ -1659,6 +1690,7 @@ successor_real() { (cd -P -- "$1" && pwd -P); }
 run_successor_spawn() { # <arg>...: a fresh ship spawn of $SUCC_ID
   FM_TEST_CALLS="$CALLS" FM_TEST_OWNER_MODE="${OWNER_MODE:-pass}" FM_TEST_SLOT_RECORD="$CASE_DIR/manifest.json" \
     FM_TEST_HELP_SWITCH="${HELP_SWITCH:-}" FM_TEST_HELP_META="${HELP_META:-}" \
+    FM_TEST_CALL_SWITCH="${CALL_SWITCH:-}" FM_TEST_CALL_COMMIT="${CALL_COMMIT:-}" \
     FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" run_spawn "$SUCC_ID" --mode local-only --yolo off --owned-path README.md "$@"
 }
 
@@ -1677,19 +1709,24 @@ successor_calls() {
   if [ -f "$CALLS" ]; then wc -l < "$CALLS" | tr -d ' '; else echo 0; fi
 }
 
-# <call-number> <expected --supersedes value, or empty for none>
+# <call-number> <expected --supersedes value, or empty for none> [<branch> <head>]
+# A declared successor carries the verified branch and head beside --supersedes;
+# without them the predecessor's recorded branch and its current head are expected.
 successor_argv_ok() {
-  python3 - "$(sed -n "${1}p" "$CALLS")" "$2" "$SUCC_ID" <<'PY'
+  local want_branch=${3:-fm/pred-live} want_head=${4:-}
+  if [ -n "$2" ] && [ -z "$want_head" ]; then want_head=$(git -C "$2" rev-parse HEAD); fi
+  python3 - "$(sed -n "${1}p" "$CALLS")" "$2" "$SUCC_ID" "$want_branch" "$want_head" <<'PY'
 import json, sys
 argv = json.loads(sys.argv[1])
 want = sys.argv[2]
 flags = [x for x in argv if x.startswith('--')]
 base = ['--repo-root', '--worktree-path', '--owner-id', '--branch', '--base-sha', '--owned-path']
-assert flags == base + (['--supersedes'] if want else []), flags
+bound = ['--supersedes', '--supersedes-branch', '--supersedes-head']
+assert flags == base + (bound if want else []), flags
 assert argv[argv.index('--owner-id') + 1] == sys.argv[3], argv
 assert argv[argv.index('--branch') + 1] == 'fm/' + sys.argv[3], argv
 if want:
-    assert argv[-2:] == ['--supersedes', want], argv
+    assert argv[-6:] == ['--supersedes', want, '--supersedes-branch', sys.argv[4], '--supersedes-head', sys.argv[5]], argv
 PY
 }
 
@@ -1780,6 +1817,9 @@ test_successor_of_refuses_untrustworthy_predecessors() {
   successor_pred pred-live
   run_successor_refusal_row 'verb not advertised' "primary checkout $PROJECT_DIR to advertise --supersedes" --successor-of pred-live
   [ -f "$CALLS.help" ] || fail 'the advertise check never asked the provisioner'
+  make_successor_case verbonly verb
+  successor_pred pred-live
+  run_successor_refusal_row 'helper cannot bind' 'the provisioner cannot bind the verified branch' --successor-of pred-live
   make_successor_case none none
   successor_pred pred-live
   run_successor_refusal_row 'no provisioner' 'update that checkout, since the successor record needs the Vernant verb' --successor-of pred-live
@@ -1882,12 +1922,12 @@ test_successor_of_retained_retry() {
   pass 'a refused declaration is kept and retried with --supersedes; an admitted successor relaunches ordinarily'
 }
 
-# S1: with the predecessor-branch check or the advertise check removed, the
+# S1: with the predecessor-branch, advertise or bind-option check removed, the
 # matching refusal row stops refusing. The mutant is a copy of bin/, docs/ and .agents/ in the
 # scratch root; the unmutated copy first proves the row refuses there.
 test_successor_of_checks_are_load_bearing() {
   local mut="$TMP_ROOT/mutant" pattern row out rc expect
-  for row in branch advertise; do
+  for row in branch advertise bind; do
     rm -rf "$mut"
     mkdir -p "$mut"
     cp -R "$ROOT/bin" "$ROOT/docs" "$ROOT/.agents" "$mut/"
@@ -1898,14 +1938,23 @@ test_successor_of_checks_are_load_bearing() {
         expect='not its recorded branch' ;;
       advertise)
         # shellcheck disable=SC2016 # sed text, not shell expansion
-        pattern='s#^  fm_slot_advertises_supersedes "\$project" || {#  true || {#'
+        pattern='s#^  fm_slot_help_lists "\$help" --supersedes || {#  true || {#'
         expect='to advertise --supersedes' ;;
+      bind)
+        # shellcheck disable=SC2016 # sed text, not shell expansion
+        pattern='s#^  { fm_slot_help_lists "\$help" --supersedes-branch \&\& fm_slot_help_lists "\$help" --supersedes-head; } || {#  true || {#'
+        expect='cannot bind the verified branch' ;;
     esac
     # Control: the unmutated copy refuses the row.
     successor_mutation_case "$row"
     out=$(ROOT="$mut" run_successor_spawn --successor-of moved) || true
     assert_contains "$out" "$expect" "the $row control did not refuse"
     sed -i.bak "$pattern" "$mut/bin/fm-slot-provision-lib.sh"
+    if [ "$row" = advertise ]; then
+      # The bind-option check is a second guard on the same helper; remove it too.
+      # shellcheck disable=SC2016 # sed text, not shell expansion
+      sed -i.bak 's#^  { fm_slot_help_lists "\$help" --supersedes-branch \&\& fm_slot_help_lists "\$help" --supersedes-head; } || {#  true || {#' "$mut/bin/fm-slot-provision-lib.sh"
+    fi
     if [ "$row" = branch ]; then
       # The handover re-check is a second guard on the same branch; remove it too.
       # shellcheck disable=SC2016 # sed text, not shell expansion
@@ -1921,18 +1970,22 @@ test_successor_of_checks_are_load_bearing() {
     [ "$(successor_calls)" -ge 1 ] || fail "the mutated $row check never reached the provisioner, so the row does not discriminate: $out"
   done
   rm -rf "$mut"
-  pass 'removing the predecessor-branch check or the advertise check makes its refusal row stop refusing'
+  pass 'removing the predecessor-branch, advertise or bind-option check makes its refusal row stop refusing'
 }
 
-successor_mutation_case() { # <branch|advertise>
-  if [ "$1" = branch ]; then
-    make_successor_case "mut-$1" advertise
-    successor_pred moved
-    git -C "$CASE_DIR/pred-moved" checkout -q -b fm/moved-elsewhere
-  else
-    make_successor_case "mut-$1" silent
-    successor_pred moved
-  fi
+successor_mutation_case() { # <branch|advertise|bind>
+  case "$1" in
+    branch)
+      make_successor_case "mut-$1" advertise
+      successor_pred moved
+      git -C "$CASE_DIR/pred-moved" checkout -q -b fm/moved-elsewhere ;;
+    advertise)
+      make_successor_case "mut-$1" silent
+      successor_pred moved ;;
+    bind)
+      make_successor_case "mut-$1" verb
+      successor_pred moved ;;
+  esac
 }
 
 # Review finding 1: the proof binds to the recorded branch of the declared
@@ -1985,6 +2038,56 @@ test_successor_of_task_record_is_rechecked_at_handover() {
   [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$head" ] && [ "$(git -C "$POOL_DIR" branch --show-current)" = "$branch" ] \
     || fail 'the refusal did not restore the assigned checkout'
   pass 'a predecessor whose task record changes after preflight is refused before the provisioner'
+}
+
+# Review finding 1 of the final-head review: the record is bound to the branch and
+# head the final check verified, so a predecessor that switches branches while the
+# pane waits is refused by the provisioner and nothing is marked.
+test_successor_of_binds_the_verified_branch_and_head() {
+  local out rc=0 real head meta branch
+  # A legitimate successor: the verified branch and head are passed and the record is written.
+  make_successor_case bindok advertise
+  successor_pred pred-live
+  real=$(successor_real "$CASE_DIR/pred-pred-live")
+  head=$(git -C "$real" rev-parse HEAD)
+  out=$(run_successor_spawn --successor-of pred-live) || rc=$?
+  expect_code 0 "$rc" "a legitimate successor failed: $out"
+  successor_argv_ok 1 "$real" fm/pred-live "$head" || fail 'the verified branch and head did not reach the provisioner'
+  [ -s "$CALLS.marked" ] || fail 'a legitimate successor got no record from the helper'
+
+  # The predecessor commits on its own branch in the window: still a descendant, still admitted.
+  make_successor_case bindcommit advertise
+  successor_pred pred-live
+  real=$(successor_real "$CASE_DIR/pred-pred-live")
+  head=$(git -C "$real" rev-parse HEAD)
+  rc=0
+  out=$(CALL_COMMIT="$real" run_successor_spawn --successor-of pred-live) || rc=$?
+  expect_code 0 "$rc" "a predecessor that committed on its branch during the window was refused: $out"
+  [ "$(git -C "$real" rev-parse HEAD)" != "$head" ] || fail 'the helper stub did not commit, so the row is vacuous'
+  successor_argv_ok 1 "$real" fm/pred-live "$head" || fail 'the provisioner was not given the head the final check verified'
+  [ -s "$CALLS.marked" ] || fail 'a descendant of the verified head got no record'
+
+  # The predecessor switches branches after the final check: the helper refuses, nothing is marked.
+  make_successor_case bindswitch advertise
+  successor_pred pred-live
+  real=$(successor_real "$CASE_DIR/pred-pred-live")
+  head=$(git -C "$real" rev-parse HEAD)
+  meta="$HOME_DIR/state/$SUCC_ID.meta"
+  branch=$(git -C "$POOL_DIR" branch --show-current)
+  rc=0
+  out=$(CALL_SWITCH="$real::fm/unrelated" run_successor_spawn --successor-of pred-live) || rc=$?
+  [ "$rc" -ne 0 ] || fail 'a predecessor that switched branches after the final check was admitted'
+  assert_contains "$out" "slot provisioner refused task $SUCC_ID" 'the existing refusal error is missing'
+  assert_contains "$out" 'supersedes_not_on_verified_branch' 'the helper refusal was not preserved'
+  [ "$(git -C "$real" branch --show-current)" = fm/unrelated ] || fail 'the stub did not switch the predecessor, so the row is vacuous'
+  [ ! -e "$CALLS.marked" ] || fail 'a record was written for a predecessor on another branch'
+  [ "$(successor_calls)" = 1 ] || fail 'the provisioner was not called once'
+  successor_argv_ok 1 "$real" fm/pred-live "$head" || fail 'the provisioner was not given the verified branch and head'
+  [ ! -s "$LAUNCH_LOG" ] || fail 'a refused declaration started an agent'
+  [ "$(git -C "$POOL_DIR" branch --show-current)" = "$branch" ] || fail 'the refusal did not restore the assigned checkout'
+  assert_grep 'recovery=slot-provision-refused' "$meta" 'the refusal lost its recovery record'
+  [ "$(successor_meta_count "$SUCC_ID" pred-live)" = 1 ] || fail 'the recovery record lost the unfulfilled declaration'
+  pass 'the record is bound to the verified branch and head: a switch after the check is refused and marks nothing; a legitimate or advancing predecessor is admitted'
 }
 
 # Review finding 2: an id=repo batch never drops the declaration silently.
@@ -2130,6 +2233,7 @@ test_successor_of_retained_retry
 test_successor_of_checks_are_load_bearing
 test_successor_of_branch_is_rechecked_at_handover
 test_successor_of_task_record_is_rechecked_at_handover
+test_successor_of_binds_the_verified_branch_and_head
 test_successor_of_batch_is_refused
 test_successor_of_refuses_before_any_lock
 test_successor_of_fresh_respawn_keeps_declaration
