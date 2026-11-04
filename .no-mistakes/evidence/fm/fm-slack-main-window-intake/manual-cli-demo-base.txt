@@ -1,0 +1,44 @@
+## Disposable home: fixture 'intake' (owner U0TESTOWNER, allowlist U0TESTOWNER, DM history holds one old message 100.000100)
+
+$ /Users/charlesabrooker/tmp/fm-base-plus-tests.QkofgL/bin/fm-captain-hold.sh bind slack-dm
+bound: slack-dm -> (any)
+[exit 0]
+
+$ /Users/charlesabrooker/tmp/fm-base-plus-tests.QkofgL/bin/fm-slack-check.sh arm --replay /Users/charlesabrooker/tmp/fm-base-plus-tests.QkofgL/tests/fixtures/slack/intake/transcript.json
+armed: state/slack.check.sh
+[exit 0]
+intake_cursor after arm: 
+
+## Poll before any new message (old history must not be taken in)
+
+$ /Users/charlesabrooker/tmp/fm-base-plus-tests.QkofgL/bin/fm-slack-poll.sh --replay /Users/charlesabrooker/tmp/fm-base-plus-tests.QkofgL/tests/fixtures/slack/intake/transcript.json
+[exit 0]
+
+## Owner types one top-level DM; a stranger types one too
+
+$ /Users/charlesabrooker/tmp/fm-base-plus-tests.QkofgL/bin/fm-slack-poll.sh --replay /Users/charlesabrooker/tmp/fm-base-plus-tests.QkofgL/tests/fixtures/slack/intake/transcript.json
+[exit 0]
+digest of data/ config/ state/ (outside slack-watch) before=294dd39fddb4a27f after=294dd39fddb4a27f
+outbound calls so far:
+   {'method': 'conversations.open', 'channel': 'D0123456789'}
+   {'method': 'conversations.history', 'channel': 'D0123456789', 'thread_ts': None}
+
+## Second poll: no repeat
+
+$ /Users/charlesabrooker/tmp/fm-base-plus-tests.QkofgL/bin/fm-slack-poll.sh --replay /Users/charlesabrooker/tmp/fm-base-plus-tests.QkofgL/tests/fixtures/slack/intake/transcript.json
+[exit 0]
+
+## Hostile multi-line text through the standing check (what Firstmate's wake runs)
+
+$ /Users/charlesabrooker/tmp/fm-base-plus-tests.QkofgL/bin/fm-slack-check.sh check --replay /Users/charlesabrooker/tmp/fm-base-plus-tests.QkofgL/tests/fixtures/slack/intake/transcript.json
+[exit 0]
+
+$ /Users/charlesabrooker/tmp/fm-base-plus-tests.QkofgL/bin/fm-slack-check.sh check --replay /Users/charlesabrooker/tmp/fm-base-plus-tests.QkofgL/tests/fixtures/slack/intake/transcript.json
+[exit 0]
+
+## All outbound Slack calls (methods used, targets):
+   {'method': 'conversations.open', 'channel': 'D0123456789'}
+   {'method': 'conversations.history', 'channel': 'D0123456789', 'thread_ts': None}
+
+## Methods used:
+{'conversations.open': 1, 'conversations.history': 1}

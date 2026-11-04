@@ -1,0 +1,12 @@
+.........................................
+----------------------------------------------------------------------
+Ran 41 tests in 1.378s
+
+OK
+ok - INTAKE-1
+ok - INTAKE-2
+ok - INTAKE-3
+ok - INTAKE-4
+ok - INTAKE-5
+ok - all Slack watch checks
+bash $EV/intake-only-runner.sh  69.63s user 55.27s system 8% cpu 25:46.13 total

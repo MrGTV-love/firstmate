@@ -1,0 +1,2 @@
+ok - intake refusals hold
+bash tests/$t.test.sh  3.32s user 4.02s system 14% cpu 49.109 total
