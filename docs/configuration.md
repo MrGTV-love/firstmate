@@ -1121,12 +1121,14 @@ The renewal preserves the same argv and ancestors rather than resampling their v
 Every `process` row carries `first_observed_at`, copied unchanged from the first sighting as `gh`/`gh-axi` in that owner run, alongside its own `observed_at`.
 For a quota interval, use `first_observed_at <= interval_end` and the matching end time at or after the interval start, not the `observed_at` of a later `process` row or the OS process start: a process that execs into `gh` later was not observed as a caller earlier.
 A missing end leaves the overlap uncertain after the last sighting; these timestamps do not establish continuous observation across failed scans or downtime.
-A `process_end` row with the same pid, start identity and run id holds the time of the first successful scan that no longer lists that caller.
-Whenever the owner writes a `process_end` row, it writes one fresh `process` row for that caller at the same moment, with the saved projection and `first_observed_at` and no age threshold.
-Those two rows expire together, so a retained end row always joins a process row that connects the caller to the quota intervals up to that scan.
+A `process_end` row with the same pid, start identity and run id holds the time of the first successful scan that no longer lists that caller, connecting the retained process row to the quota intervals up to that scan.
+Prune keeps an ended caller's latest `process` row (same pid, start identity and run id) while its `process_end` row is retained, and every other row expires at 48 hours.
+That last `process` row can therefore outlive 48 hours by up to its 24-hour renewal interval, or by the failed-scan gap that delayed its end row, at most another 48 hours.
 No row is written per scan, and a failed scan ends nothing or renews nothing, so a `process_end` time can follow the real end by the failed or missing scans that `sampling` rows report.
 A caller still alive when the observer stops has no `process_end` row, nor has one that ends while no owner runs, so a retained `process` row with no matching end row shows a sighting and not how long the caller lived afterward; a new owner records a caller it finds alive as a new `process` row.
-Each row still expires on its own age; an observation gap longer than retention can leave a listed caller with no `process` row until the next successful scan writes a fresh one.
+At a normal stop the owner writes one fresh `process` row for each caller it has not seen end, with the saved projection and `first_observed_at` and no `process_end` row, because a stop does not show that a caller departed.
+A SIGKILL or a power loss writes no such row, so that caller's latest `process` row can expire at 48 hours while a quota row it overlapped is retained.
+An observation gap longer than retention can remove the process row before an end is observed.
 Temporal coincidence cannot prove that a caller spent the points of a quota interval, and missed, non-`gh`, or off-host consumers remain unknown.
 Arguments are a sanitized `ps` command-line projection, not lossless argv; arbitrary values and shell payloads are withheld.
 Its own start/stop commands manage only its private owner, quota child group, and owned `ps` children, never a shared service.

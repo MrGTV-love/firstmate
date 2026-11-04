@@ -63,10 +63,16 @@ as gh/gh-axi in this run, unchanged next to its own observed_at. Use
 first_observed_at <= interval_end, not a later row's observed_at, for interval overlap.
 No argv or ancestor projection is recomputed for a later row. One process_end row,
 with the pid, start identity, run id and time, follows when
-the first successful scan no longer lists that identity as a caller. Whenever the
-owner writes a process_end row, it writes one fresh process row for that caller at
-the same moment, with the saved projection and first_observed_at and no age
-threshold, so the two rows expire together. A failed scan
+the first successful scan no longer lists that identity as a caller. Prune keeps
+that caller's latest process row (same pid, start identity and run id) while its
+process_end row is retained, and every other row expires at 48 hours. So an ended
+caller's last process row can outlive 48 hours by up to its 24-hour renewal interval,
+or by the failed-scan gap that delayed its end row, at most another 48 hours. At a
+normal stop the owner writes one fresh process row for each caller it has not seen
+end, with the saved projection and first_observed_at and no process_end row, because
+a stop does not show that a caller departed. A SIGKILL or a power loss writes no such
+row, so that caller's latest process row can expire at 48 hours while a quota row it
+overlapped is retained. A failed scan
 ends nothing and no row is written per scan. A caller still alive when the observer
 stops has no process_end row, nor has one that ends while no owner runs, and a new
 owner records a caller it finds alive as a new process row. Payloads and
@@ -106,6 +112,9 @@ APPLICATION_ID = 0x464D4748
 LOG_LIMIT = 64 * 1024
 BUSY = 75
 SAMPLE_ERRORS = (OSError, subprocess.SubprocessError, RuntimeError)
+CALLER_FIELDS = ("pid", "start", "run_id")
+SAME_CALLER = " AND ".join(f"json_extract(other.payload,'$.{field}')=json_extract(observations.payload,'$.{field}')"
+                           for field in CALLER_FIELDS)
 QUOTA_JQ = '.resources.graphql | "used=\\(.used) reset=\\(.reset) limit=\\(.limit) remaining=\\(.remaining)"'
 QUOTA_BODY = re.compile(r'''^  body: ["']?used=(\d+) reset=(\d+) limit=(\d+|null) remaining=(\d+|null)["']?$''', re.MULTILINE)
 ROW = re.compile(r"\s*(\d+)\s+(\d+)\s+(\w{3}\s+\w{3}\s+\d+\s+\d\d:\d\d:\d\d\s+\d{4})\s+(.*)")
@@ -183,6 +192,8 @@ def database(root):
     db.execute(f"PRAGMA application_id={APPLICATION_ID}")
     db.execute("CREATE TABLE IF NOT EXISTS observations (observed REAL NOT NULL, kind TEXT NOT NULL, payload TEXT NOT NULL)")
     db.execute("CREATE INDEX IF NOT EXISTS observations_time ON observations(observed)")
+    caller = ",".join(f"json_extract(payload,'$.{field}')" for field in CALLER_FIELDS)
+    db.execute(f"CREATE INDEX IF NOT EXISTS observations_caller ON observations(kind,{caller})")
     db.commit()
     return db
 
@@ -194,7 +205,11 @@ def record(db, kind, payload, observed=None):
 
 
 def prune(db, now):
-    changed = db.execute("DELETE FROM observations WHERE observed < ?", (now - RETENTION,)).rowcount
+    changed = db.execute(f"""DELETE FROM observations WHERE observed < :cutoff AND NOT (kind='process'
+        AND EXISTS (SELECT 1 FROM observations other WHERE other.kind='process_end' AND {SAME_CALLER}
+                    AND other.observed >= :cutoff)
+        AND NOT EXISTS (SELECT 1 FROM observations other WHERE other.kind='process' AND {SAME_CALLER}
+                        AND other.rowid > observations.rowid))""", {"cutoff": now - RETENTION}).rowcount
     db.commit()
     # auto_vacuum reclaims expired payload pages at commit, without a full
     # database rewrite on the sampler's critical path.
@@ -433,8 +448,8 @@ def run(root, duration=None, ready=None, *, process_source=None):
                 found, current = process_records(finished.rows, seen)
                 observed = time.time()
                 for pid, start in sorted(seen.keys() - current):
-                    record(db, "process", seen.pop((pid, start))[1], observed)
                     record(db, "process_end", {"pid": pid, "start": start, "run_id": run_id}, observed)
+                    del seen[(pid, start)]
                 for item in found:
                     seen[(item["pid"], item["start"])] = (None, dict(item, run_id=run_id, first_observed_at=observed))
                 for identity, (stamp, item) in seen.items():
@@ -516,6 +531,9 @@ def run(root, duration=None, ready=None, *, process_source=None):
                 pass
             if scan is not None and scan.rows is not None:
                 finish_scan()
+            observed = time.time()
+            for _stamp, item in seen.values():
+                record(db, "process", item, observed)
             record(db, "sampling", {"run_id": run_id, "scans": scans, "failures": failures,
                                      "max_gap_seconds": max_gap, "process_interval": PROCESS_INTERVAL})
             record(db, "owner", {"run_id": run_id, "action": "stop"})
