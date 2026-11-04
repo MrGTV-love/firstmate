@@ -23,7 +23,9 @@
 # Refresh docs/verification/runtime-backends.md "omp identity" with this command:
 #   bash bin/fm-test-run.sh tests/fm-omp-identity-live-e2e.test.sh
 # An absent omp is reported explicitly (fm_live_gate), and a run that checked
-# nothing fails instead of passing.
+# nothing fails instead of passing. So does a run where PATH holds a Bun launcher
+# that is not first: only the first omp would be tested, so the guard names that
+# launcher and fails before it runs anything.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -53,6 +55,21 @@ if [ "$(uname -s)" != Darwin ]; then
 fi
 command -v python3 >/dev/null 2>&1 || fail "python3 is required"
 OMP=$(command -v omp)
+omp_identity() { # <omp path> -> the runtime and script lines; fails when the file derives no identity
+  FM_OMP_LAUNCHER="$1" python3 - "$IDENT" <<'PY' 2>&1
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("oi", sys.argv[1])
+oi = importlib.util.module_from_spec(spec); spec.loader.exec_module(oi)
+runtime, script = oi.installed_identity()
+print(runtime); print(script)
+PY
+}
+while IFS= read -r CANDIDATE; do
+  [ ! "$CANDIDATE" -ef "$OMP" ] || continue
+  if omp_identity "$CANDIDATE" >/dev/null; then
+    fail "OMP IDENTITY NOT CHECKED: the Bun launcher $CANDIDATE is not first on PATH, so $OMP would be tested in its place; put $CANDIDATE first and rerun"
+  fi
+done < <(type -ap omp)
 # Even `--version` runs under the scratch environment, so no operator agent directory or .env is read.
 mkdir -p "$SCRATCH/home" "$SCRATCH/wt"
 VERSION=$(env -i PATH="$PATH" HOME="$SCRATCH/home" OMP_SKIP_SETUP=1 "$OMP" --version 2>/dev/null | head -1)
@@ -64,14 +81,7 @@ drift() { fail "OMP IDENTITY DRIFT: $LABEL: $1"; }
 # Which shape is installed? A text launcher that execs a runtime on a script is the
 # derivable shape the identity rule exists for; a native binary is named omp itself.
 SHAPE=native
-if IDENTITY=$(python3 - "$IDENT" "$OMP" <<'PY' 2>&1
-import importlib.util, sys
-spec = importlib.util.spec_from_file_location("oi", sys.argv[1])
-oi = importlib.util.module_from_spec(spec); spec.loader.exec_module(oi)
-runtime, script = oi.installed_identity(sys.argv[2])
-print(runtime); print(script)
-PY
-); then
+if IDENTITY=$(omp_identity "$OMP"); then
   SHAPE=launcher
   RUNTIME=$(printf '%s\n' "$IDENTITY" | sed -n 1p)
   SCRIPT=$(printf '%s\n' "$IDENTITY" | sed -n 2p)

@@ -2086,7 +2086,7 @@ test_omp_bun_adoption_admits_the_installed_runtime() {
   [ "$rc" -ne 0 ] || fail "an unadopted restored Bun agent authorized interrupt: $out"
   out=$(run_continuation_control "$dir" "$id" adopt) || fail "the installed Bun runtime must adopt: $out"
   assert_contains "$out" "adopted: $id" "adoption reports its exact task"
-  start=$(python3 -I "$ROOT/bin/fm-omp-identity.py" startid "$pid")
+  start=$(python3 -I "$ROOT/bin/fm-proc-info.py" startid "$pid")
   jq -e --arg task "$dir/wt/recorded-session.jsonl" --argjson pid "$pid" --arg start "$start" \
     '. == {version:1,spawn_gen:"old",pid:$pid,task_session_file:$task,current_session_file:$task,start:$start}' \
     "$record" >/dev/null || fail "adoption must record the live pid, the preserved session and the adopted incarnation: $(cat "$record")"
@@ -2194,6 +2194,26 @@ test_omp_bun_adoption_never_overwrites_a_record_a_writer_may_own() {
   pass "omp bun adoption: a live Bun writer of any role or unreadable identity keeps its record; a dead or unrelated pid does not"
 }
 
+test_omp_adoption_native_omp_first_on_path_keeps_a_live_bun_writer() {
+  local dir id record out pid_a stub
+  bun_tree
+  stub="$BUN_TREE/runtime/node_modules/@oven/bun-darwin-aarch64/bin/bun"
+  prepare_omp_adoption native-first-live-writer
+  dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID record="$HERDR_CASE_DIR/home/state/$HERDR_CASE_ID.omp-session.json"
+  cp "$stub" "$dir/fakebin/omp"
+  bun_launch a-native-first --config "$dir/other.yml" --no-title 'another agent'
+  pid_a=$BUN_PID
+  jq --argjson pid "$pid_a" '.pid=$pid' "$record" > "$record.new" && mv "$record.new" "$record"
+  FM_OMP_LAUNCHER='' assert_adoption_refused "$dir" "$id" "$pid_a is a live omp process"
+  bun_stop_all
+  prepare_omp_adoption native-first-dead-writer
+  dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID record="$HERDR_CASE_DIR/home/state/$HERDR_CASE_ID.omp-session.json"
+  cp "$stub" "$dir/fakebin/omp"
+  out=$(FM_OMP_LAUNCHER='' run_continuation_control "$dir" "$id" adopt) || fail "a dead recorded writer must not block repair with a native omp first on PATH: $out"
+  jq -e '.pid == 2000000000' "$record" >/dev/null || fail "repair over a dead writer must record the live process: $(cat "$record")"
+  pass "omp adoption: with a native omp first on PATH a live Bun writer keeps its record and a dead writer does not"
+}
+
 test_omp_bun_adoption_does_not_overwrite_a_late_writer() {
   local dir id record line rc=0 out adopt_job a_record
   prepare_bun_adoption late-writer
@@ -2284,7 +2304,7 @@ test_omp_bun_adoption_needs_positive_live_session_evidence() {
   out=$(run_continuation_control "$dir" "$id" adopt) || fail "the proven Bun agent must adopt: $out"
   write_recovery_native_session "$dir/wt/personal-session.jsonl" "$dir/wt" "personal conversation"
   BUN_HOLD_FILE="$dir/wt/personal-session.jsonl" bun_launch session-recheck-q --config "$dir/session.yml" --no-title 'Read the brief'
-  pid_q=$BUN_PID start_q=$(python3 -I "$ROOT/bin/fm-omp-identity.py" startid "$pid_q")
+  pid_q=$BUN_PID start_q=$(python3 -I "$ROOT/bin/fm-proc-info.py" startid "$pid_q")
   # A record naming Q's own PID and incarnation, with the task's session still registered: Q writes another conversation.
   jq --argjson pid "$pid_q" --arg start "$start_q" '.pid=$pid | .start=$start' "$record" > "$record.new" && mv "$record.new" "$record"
   bun_present "$dir" "$pid_q"
@@ -2292,7 +2312,7 @@ test_omp_bun_adoption_needs_positive_live_session_evidence() {
   out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" interrupt) || rc=$?
   [ "$rc" -ne 0 ] || fail "a process writing another session was authorized through the recheck: $out"
   assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "the other session must receive no lifecycle input"
-  jq --argjson pid "$pid_p" --arg start "$(python3 -I "$ROOT/bin/fm-omp-identity.py" startid "$pid_p")" '.pid=$pid | .start=$start' "$record" > "$record.new" && mv "$record.new" "$record"
+  jq --argjson pid "$pid_p" --arg start "$(python3 -I "$ROOT/bin/fm-proc-info.py" startid "$pid_p")" '.pid=$pid | .start=$start' "$record" > "$record.new" && mv "$record.new" "$record"
   bun_present "$dir" "$pid_p"
   out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" interrupt) || fail "the proven case must still be controllable: $out"
   assert_contains "$out" "interrupt-delivered $id" "the paired proven case is admitted"
@@ -2308,6 +2328,7 @@ test_omp_adoption_bun_runtime() {
   test_omp_bun_adoption_admits_the_installed_runtime
   test_omp_bun_adoption_keeps_every_other_proof
   test_omp_bun_adoption_never_overwrites_a_record_a_writer_may_own
+  test_omp_adoption_native_omp_first_on_path_keeps_a_live_bun_writer
   test_omp_bun_adoption_does_not_overwrite_a_late_writer
   test_omp_bun_adoption_binds_the_adopted_incarnation
   test_omp_bun_adoption_needs_positive_live_session_evidence

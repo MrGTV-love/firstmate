@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """Recognize the installed omp's Bun runtime as the omp interactive agent.
 
-Usage: fm-omp-identity.py interactive (PID | --facts FILE) [--launcher PATH]
-       fm-omp-identity.py writer PID [--launcher PATH]
-       fm-omp-identity.py facts PID [--launcher PATH]
+Usage: fm-omp-identity.py interactive (PID | --facts FILE)
+       fm-omp-identity.py writer PID
+       fm-omp-identity.py facts PID
        fm-omp-identity.py holds (PID | --facts FILE) SESSION-FILE
-       fm-omp-identity.py startid PID
 
 Why this exists. The host's `omp` can be a /bin/sh launcher that `exec`s the Bun
 runtime on the installed omp entry script, so the live process is named `bun`
@@ -15,8 +14,7 @@ the single owner of that identity rule; bin/fm-launch-proof-lib.sh is its only
 production caller.
 
 Identity. The installed omp is derived from the launcher: `omp` on PATH, or
-the file named by FM_OMP_LAUNCHER (or --launcher), must be a text launcher whose
-only command is `exec "<runtime>" "<entry script>" "$@"`, optionally after plain
+the file named by FM_OMP_LAUNCHER, must be a text launcher whose only command is `exec "<runtime>" "<entry script>" "$@"`, optionally after plain
 NAME=value assignments the exec line expands. A launcher in any other form, a
 file that cannot be read, a runtime or script that does not exist, or a path
 whose real location leaves the launcher's own root is underivable, so nothing
@@ -54,8 +52,9 @@ Exit status. interactive: 0 the process is the installed omp's interactive
 agent (stdout is JSON carrying the incarnation `start`), 1 refused (a foreign
 executable or script, or another role), 2 unresolved (evidence unavailable).
 writer: 0 the process may own an omp session record (the installed omp in any
-role, or anything whose identity cannot be read), 1 it is positively another
-program. Reasons go to stderr. Nothing here reads a process environment, sends
+role, anything whose identity cannot be read, or anything at all when the
+installed omp cannot be derived, a native executable first on PATH included), 1
+it is positively another program. Reasons go to stderr. Nothing here reads a process environment, sends
 a signal, or touches any file but the launcher and the paths it names.
 """
 import json
@@ -108,10 +107,6 @@ class Underivable(Unresolved):
     """The installed omp identity cannot be derived."""
 
 
-class NativeLauncher(Underivable):
-    """The omp on PATH is a native executable, so no Bun-shaped omp exists on this host."""
-
-
 # --- the installed identity -------------------------------------------------
 
 def _expand(text, assigned):
@@ -126,23 +121,16 @@ def _expand(text, assigned):
     return out
 
 
-def installed_identity(launcher=None):
+def installed_identity():
     """Return (runtime_real, script_real) derived from the omp launcher."""
-    launcher = launcher or os.environ.get("FM_OMP_LAUNCHER") or shutil.which("omp")
+    launcher = os.environ.get("FM_OMP_LAUNCHER") or shutil.which("omp")
     if not launcher:
         raise Underivable("no omp launcher is available")
     try:
         with open(launcher, "rb") as handle:
-            raw = handle.read(65536)
-    except OSError:
+            text = handle.read(65536).decode("utf-8")
+    except (OSError, UnicodeDecodeError):
         raise Underivable("the omp launcher is not a readable text file") from None
-    try:
-        text = raw.decode("utf-8")
-        native = b"\0" in raw
-    except UnicodeDecodeError:
-        text, native = "", True
-    if native:
-        raise NativeLauncher("the omp launcher is a native executable, not a launcher script")
     assigned, command = {}, None
     for raw in text.splitlines():
         line = raw.strip()
@@ -490,26 +478,15 @@ def decide(facts, identity):
     decide_role(argv[2:], facts.get("stdin"))
 
 
-def _identity_or_none(launcher):
+def _identity_or_none():
     try:
-        return installed_identity(launcher)
+        return installed_identity()
     except Underivable as error:
         return error
 
 
 def main(argv):
     args = argv[1:]
-    launcher = None
-    if "--launcher" in args:
-        at = args.index("--launcher")
-        launcher = args[at + 1] if at + 1 < len(args) else None
-        del args[at:at + 2]
-    if len(args) == 2 and args[0] == "startid" and args[1].isdigit():
-        value = _read_fact("startid", args[1])
-        if not value:
-            return 2
-        print(value)
-        return 0
     if args[:1] == ["holds"]:
         writable = None
         if len(args) == 3 and args[1].isdigit():
@@ -538,7 +515,7 @@ def main(argv):
             facts["writable"] = json.loads(raw) if raw else None
         except ValueError:
             facts["writable"] = None
-        identity = _identity_or_none(launcher)
+        identity = _identity_or_none()
         if not isinstance(identity, Exception):
             facts["identity"] = {"runtime": identity[0], "script": identity[1]}
         print(json.dumps(facts))
@@ -558,15 +535,11 @@ def main(argv):
             return 2
         captured = facts.get("identity") if isinstance(facts, dict) else None
         identity = (captured["runtime"], captured["script"]) if isinstance(captured, dict) \
-            and captured.get("runtime") and captured.get("script") else _identity_or_none(launcher)
+            and captured.get("runtime") and captured.get("script") else _identity_or_none()
     else:
         facts = live_facts(args[1])
-        identity = _identity_or_none(launcher)
+        identity = _identity_or_none()
     if mode == "writer":
-        if isinstance(identity, NativeLauncher):
-            # A native omp is named omp, never bun: a Bun process is another program.
-            print(f"unrelated: {identity}", file=sys.stderr)
-            return 1
         if isinstance(identity, Exception):
             print(f"may own: {identity}", file=sys.stderr)
             return 0

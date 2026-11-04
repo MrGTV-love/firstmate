@@ -27,7 +27,7 @@ PROCINFO="$ROOT/bin/fm-proc-info.py"
 build_tree() { # <root> -> a runtime stub, an entry script and a launcher
   local root=$1 bun=$1/runtime/node_modules/@oven/bun-darwin-aarch64/bin
   mkdir -p "$bun" "$root/src/node_modules/@oh-my-pi/pi-coding-agent/src"
-  printf '#include <unistd.h>\nint main(void){alarm(900);for(;;)pause();}\n' > "$root/stub.c"
+  printf '#include <stdio.h>\n#include <string.h>\n#include <unistd.h>\nint main(int c,char**v){for(int i=1;i<c;i++)if(!strcmp(v[i],"--version")){puts("9.9.9");return 0;}alarm(900);for(;;)pause();}\n' > "$root/stub.c"
   cc -o "$bun/bun" "$root/stub.c" || fail "could not compile the runtime stand-in"
   : > "$root/src/node_modules/@oh-my-pi/pi-coding-agent/src/cli.ts"
   cat > "$root/omp" <<EOF
@@ -43,6 +43,11 @@ BUN="$TREE/runtime/node_modules/@oven/bun-darwin-aarch64/bin/bun"
 SCRIPT="$TREE/src/node_modules/@oh-my-pi/pi-coding-agent/src/cli.ts"
 export FM_OMP_LAUNCHER="$TREE/omp"
 REAL_BUN=$(python3 -I -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "$BUN")
+# A native omp stand-in: the compiled stub under the name omp.
+NATIVE_BIN="$TMP/native-bin"
+mkdir -p "$NATIVE_BIN"
+cp "$BUN" "$NATIVE_BIN/omp"
+native_first() { FM_OMP_LAUNCHER='' PATH="$NATIVE_BIN:$TREE:$PATH" "$@"; }
 
 # spawn.py holds a process's standard input (tty, open or empty pipe, null) and
 # execs argv with an optional different executable, then stays alive until killed.
@@ -282,7 +287,7 @@ test_live_processes_are_judged_by_their_actual_executable_and_script() {
   launch tty --config /x.yml --auto-approve --cwd /wt --no-title 'Read the brief'
   assert_verdict 0 "$SPAWNED" "the installed runtime on the installed script with a terminal is admitted"
   pid=$SPAWNED
-  [ "$(printf '%s' "$OUT" | jq -r .start)" = "$(python3 -I "$IDENT" startid "$pid")" ] || fail "the verdict must carry the process start identity"
+  [ "$(printf '%s' "$OUT" | jq -r .start)" = "$(python3 -I "$PROCINFO" startid "$pid")" ] || fail "the verdict must carry the process start identity"
   # a shell still running the launcher before its exec
   spawn tty /bin/sh /bin/sh -c 'sleep 600' "$TREE/omp"
   assert_verdict 1 "$SPAWNED" "a shell is not the runtime"
@@ -350,11 +355,11 @@ test_record_writer_check_fails_open_and_adoption_target_fails_closed() {
   fm_launch_proof_pid_is_omp "$pid" || fail "the installed Bun agent is an omp adoption target"
   [ -n "$FM_LAUNCH_PROOF_OMP_START" ] || fail "the predicate must hand back the incarnation it accepted"
   fm_launch_proof_pid_may_own_record "$pid" || fail "the installed Bun agent may own a record"
-  # A host whose omp is a native executable has no Bun-shaped omp: a Bun process is another program there.
+  # A native omp launcher names no installed Bun identity, so it proves nothing about a live Bun process.
   # shellcheck disable=SC2016 # the launcher text must keep its literal variables
   printf '#!/bin/sh\nexec "$HOME/bin/other" "$@"\n' > "$TMP/odd-writer-launcher"
   rc=0; FM_OMP_LAUNCHER="$BUN" python3 -I "$IDENT" writer "$pid" >/dev/null 2>&1 || rc=$?
-  [ "$rc" -eq 1 ] || fail "with a native omp launcher a Bun process is not a record writer (exit $rc)"
+  [ "$rc" -eq 0 ] || fail "a native omp launcher is not proof that no writer owns the record (exit $rc)"
   rc=0; FM_OMP_LAUNCHER="$TMP/odd-writer-launcher" python3 -I "$IDENT" writer "$pid" >/dev/null 2>&1 || rc=$?
   [ "$rc" -eq 0 ] || fail "an underivable launcher form is not proof that no writer owns the record (exit $rc)"
   launch tty __omp_worker_daemon_broker; pid=$SPAWNED
@@ -374,6 +379,27 @@ test_record_writer_check_fails_open_and_adoption_target_fails_closed() {
   ps() { return 1; }
   fm_launch_proof_pid_may_own_record 2000000001 && fail "a dead pid is no writer"
   pass "writer check fails open on any role or unreadable identity; adoption target fails closed; unrelated and dead pids may be replaced"
+}
+
+test_native_omp_first_on_path_never_clears_a_bun_writer() {
+  local pid foreign dead rc
+  # shellcheck source=bin/fm-launch-proof-lib.sh
+  . "$ROOT/bin/fm-backend.sh"; . "$ROOT/bin/fm-launch-proof-lib.sh"
+  ps() { case "$*" in '-p '*' -o comm=') python3 -I "$PROCINFO" comm "$2" ;; '-p '*' -o args=') python3 -I "$PROCINFO" args "$2" ;; *) return 1 ;; esac; }
+  [ "$(native_first python3 -I -c 'import shutil;print(shutil.which("omp"))')" = "$NATIVE_BIN/omp" ] \
+    || fail "the native stand-in must come first on PATH or the case is vacuous"
+  launch tty --config /x.yml --no-title 'brief'; pid=$SPAWNED
+  mkdir -p "$TMP/native-fb"; cp "$BUN" "$TMP/native-fb/bun"
+  spawn tty "$TMP/native-fb/bun" "$TMP/native-fb/bun" /elsewhere/cli.ts; foreign=$SPAWNED
+  native_first fm_launch_proof_pid_may_own_record "$pid" || fail "a live Bun omp with a native omp first on PATH may own the record"
+  native_first fm_launch_proof_pid_may_own_record "$foreign" || fail "with no derivable installed omp a Bun process cannot be proven unrelated"
+  fm_launch_proof_pid_may_own_record "$foreign" && fail "with a derivable installed omp the same foreign Bun is positively unrelated"
+  rc=0; native_first python3 -I "$IDENT" interactive "$pid" >/dev/null 2>&1 || rc=$?
+  [ "$rc" -eq 2 ] || fail "adoption stays closed when the first omp on PATH derives nothing (exit $rc)"
+  (exit 0) & dead=$!
+  wait "$dead"
+  native_first fm_launch_proof_pid_may_own_record "$dead" && fail "a proven-dead recorded writer stays free with a native omp first on PATH"
+  pass "native omp first on PATH: a live Bun process may own the record, adoption stays closed and a dead writer stays free"
 }
 
 # --- 7. the Herdr descendant walk ---------------------------------------------------
@@ -403,7 +429,24 @@ SH
   out=$(walk 2000000000 /x/bun '/x/bun /x/cli.ts'); [ "$out" = other ] || fail "a Bun descendant whose identity cannot be read must keep the pane occupied, got $out"
   out=$(walk "$foreignpid" "$dir/fb/bun" "$dir/fb/bun /elsewhere/cli.ts"); [ "$out" = shell ] || fail "an unrelated Bun job keeps today's outcome, got $out"
   out=$(walk 4243 less 'less x'); [ "$out" = shell ] || fail "a non-Bun descendant keeps today's outcome, got $out"
+  out=$(native_first walk "$bunpid" "$BUN" "$BUN $SCRIPT --no-title"); [ "$out" = other ] || fail "a live Bun omp descendant keeps the pane occupied with a native omp first on PATH, got $out"
+  out=$(native_first walk "$foreignpid" "$dir/fb/bun" "$dir/fb/bun /elsewhere/cli.ts"); [ "$out" = other ] || fail "with no derivable installed omp a Bun descendant keeps the pane occupied, got $out"
+  out=$(native_first walk '' bun ''); [ "$out" = shell ] || fail "a pane with no descendants stays agent-free with a native omp first on PATH, got $out"
   pass "walk: a live or unreadable Bun descendant keeps the pane occupied; an unrelated Bun job and an empty shell keep today's outcome"
+}
+
+test_live_guard_never_passes_while_a_bun_launcher_is_not_first() {
+  local base out rc=0
+  base=$(fm_test_base_path_sans "$PATH" omp)
+  guard() { # <PATH>
+    env -u FM_OMP_LAUNCHER -u FM_LIVE FM_OMP_IDENTITY_LIVE=1 PATH="$1" bash "$ROOT/tests/fm-omp-identity-live-e2e.test.sh" 2>&1
+  }
+  out=$(guard "$NATIVE_BIN:$TREE:$base") || rc=$?
+  [ "$rc" -ne 0 ] || fail "a native omp first must not let the live guard pass over a Bun launcher later on PATH: $out"
+  assert_contains "$out" "$TREE/omp" "the live guard names the Bun launcher it did not check"
+  out=$(guard "$TREE:$NATIVE_BIN:$base") || fail "the Bun launcher first must run the live guard to its end: $out"
+  out=$(guard "$NATIVE_BIN:$base") || fail "a native omp alone has no hidden launcher: $out"
+  pass "live guard: a Bun launcher that is not first is reported by name; a first launcher and a native omp alone both run"
 }
 
 test_classifier_keeps_its_names_and_the_bun_shape_stays_other() {
@@ -433,4 +476,6 @@ test_role_follows_the_cli_dispatch
 test_live_processes_are_judged_by_their_actual_executable_and_script
 test_fail_closed_runs_recover_when_the_evidence_returns
 test_record_writer_check_fails_open_and_adoption_target_fails_closed
+test_native_omp_first_on_path_never_clears_a_bun_writer
 test_descendant_walk_never_reports_a_live_bun_agent_as_agent_free
+test_live_guard_never_passes_while_a_bun_launcher_is_not_first

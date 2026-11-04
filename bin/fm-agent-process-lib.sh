@@ -39,9 +39,9 @@ fm_agent_process_names_are_bun() { # <comm> <argv0>
   return 1
 }
 
-# Succeeds when a bun-named live process may be the installed omp in any role or
-# its identity cannot be read; fails for a process that is positively another
-# program or not named bun. Fails open toward "may be omp" so that a worktree
+# Succeeds when a bun-named live process may be the installed omp in any role, its
+# identity cannot be read, or the installed omp cannot be derived; fails for a
+# process that is positively another program or not named bun. Fails open toward "may be omp" so that a worktree
 # holding an unreadable restored agent is never reported agent-free.
 fm_agent_process_bun_may_be_omp() { # <comm> <argv0> <pid>
   fm_agent_process_names_are_bun "$1" "$2" || return 1

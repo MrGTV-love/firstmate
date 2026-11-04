@@ -186,7 +186,7 @@ The resolved foreground process must also be omp by its readable process name or
 An omp launcher that execs the Bun runtime on the installed entry script leaves a process named `bun`, so the name never identifies it.
 [`bin/fm-omp-identity.py`](../bin/fm-omp-identity.py) owns that identity rule: the process's actual executable (the kernel's path, not an argument word) must resolve to the runtime the `omp` launcher names, its entry script must resolve to the launcher's script, its argument array must run the interactive role by a port of the CLI's own dispatch, and its standard input must be a terminal.
 A worker-role, print, protocol, subcommand or headless invocation of the same runtime is refused, and any evidence the rule cannot read leaves the process unproven.
-A launcher the rule cannot derive recognizes nothing.
+A launcher the rule cannot derive, a native `omp` first on `PATH` included, recognizes nothing and clears nothing: adoption refuses, a live Bun process named by the old record keeps that record, and a live Bun descendant keeps the pane occupied.
 A registration or a resume argument is not proof of a live session, so adoption of a Bun-shaped process also requires that it hold the registered task session file open for writing, which the installed omp's session writer keeps for the life of the session; a process that holds nothing, or another session, stays unadopted.
 Adoption through this rule records the adopted process's kernel start identity (`start`, seconds and microseconds) beside the PID, and every later lifecycle check requires the live process to still carry it, so a process that reuses the PID is not the adopted agent.
 Records adopted for a process named omp carry no start identity and keep their earlier behavior.

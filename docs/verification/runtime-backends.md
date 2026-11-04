@@ -1195,6 +1195,8 @@ Verified 2026-11-04 on macOS arm64 (Darwin 27.2.0), read-only, with the omp 18.1
 - On macOS, `omp` does not rename the kernel process: its `process.title` assignment is JavaScript-side only (`pi-utils/src/process-name.ts`), so `ps comm` stays the runtime path.
 - `fm-proc-info.py` reads the kernel facts the rule compares: `exe` (libproc `proc_pidpath`), `argv` (the raw argument array with boundaries), `startid` (kernel start time with microseconds) and `stdin` (file descriptor 0 as `tty`, `pipe`, `none` or `other`); `tests/fm-omp-identity.test.sh` exercises each on real processes, including two processes started inside one whole second.
 
+The same host also has a native Mach-O `omp` at `~/.local/bin/omp`, later on `PATH`; the guard tests only the first `omp`, so it fails and names any Bun launcher that is not first.
+
 The live result against the installed omp is not recorded here yet.
 The guard starts the installed omp bare on a pseudo-terminal under `env -i` with a scratch `HOME`, submits no prompt, and runs the identity rule and the descendant walk on it.
 Refresh this section with `bash bin/fm-test-run.sh tests/fm-omp-identity-live-e2e.test.sh` after any omp upgrade, and add the date, the omp version and the guard's printed `checked <n> invariants` line to the facts above.
