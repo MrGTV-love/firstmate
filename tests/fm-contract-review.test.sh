@@ -1277,6 +1277,33 @@ test_leak_check_reads_bare_file_names() {
   pass "a bare file name, with a revision, line reference or punctuation, is read as a path"
 }
 
+test_leak_check_judges_a_slash_path_with_no_extension() {
+  local rep="$TMP_ROOT/report21.md" line n=0
+  make_leak_world
+  printf 'no extension\n' >"$LEAK_ROOT/data/case/truth/r23-review"
+  printf 'spaced\n' >"$LEAK_ROOT/data/case/truth/r23 review.md"
+  # Compliant: slash prose that names no file is skipped.
+  printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- %s\n- N/A\n- Helpers/subagents: none\n\n## Findings\n' "$LEAK_PACK/contract.md" >"$rep"
+  run_check "$rep"
+  assert_equals 0 "$CHECK_RC" "slash prose was flagged: $CHECK_OUT"
+  assert_contains "$CHECK_OUT" "1 listed input(s)" "slash prose was counted as an input"
+  # Noncompliant: a list of slash prose alone names no input, so it is no list.
+  printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- N/A\n\n## Findings\n' >"$rep"
+  run_check "$rep"
+  assert_equals 3 "$CHECK_RC" "a list of slash prose alone was accepted"
+  assert_contains "$CHECK_OUT" "no Inputs read list" "a list of slash prose alone voided for another cause"
+  # Noncompliant: a real file or folder under the root, named with no extension or with a space, is judged.
+  # shellcheck disable=SC2016 # literal backticks in a report line
+  for line in '- data/case/truth/r23-review' '- data/case/truth/' '- data/case/truth/r23 review.md' '- `data/case/truth/r23 review.md`'; do
+    n=$((n + 1))
+    printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- %s\n%s\n\n## Findings\n' "$LEAK_PACK/contract.md" "$line" >"$rep"
+    run_check "$rep"
+    assert_equals 3 "$CHECK_RC" "slash path $n ($line) passed"
+    assert_contains "$CHECK_OUT" "INPUT LEAK" "slash path $n ($line) was not judged as a leak"
+  done
+  pass "a relative slash path with no extension or a space is judged when the root holds it"
+}
+
 test_tab_after_heading_hashes_is_a_heading() {
   local src="$TMP_ROOT/tb.md" pack manifest
   write_fixture_contract "$src"
@@ -1409,6 +1436,7 @@ fm_test_run_cases \
   test_longer_field_label_voids_as_structure \
   test_leak_check_accepts_bare_entrypoint_lines_after_the_list \
   test_leak_check_reads_bare_file_names \
+  test_leak_check_judges_a_slash_path_with_no_extension \
   test_tab_after_heading_hashes_is_a_heading \
   test_inline_backticks_do_not_open_a_fence \
   test_definition_of_done_in_every_heading_form \

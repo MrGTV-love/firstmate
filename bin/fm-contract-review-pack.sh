@@ -58,7 +58,9 @@
 #   heading of its own level or higher; text inside a code fence is never a heading.
 #   In the list, a line that starts with a path is checked when that path is one full
 #   path and nothing else on the line is path-like; a line with any other path-like text
-#   voids the round (REPORT STRUCTURE); other text is skipped.
+#   voids the round (REPORT STRUCTURE). A line that starts with a relative slash word with
+#   no extension (a folder, a file with no extension, a path with a space) is judged when
+#   the pack or the root holds that path; other text is skipped.
 #   A relative path is a pack file when the pack holds it, else a root path; with no root
 #   it is not authorized.
 #   An authorized input is judged by what it is: a file inside the pack, the
@@ -519,6 +521,20 @@ inputs_read() { # <report>
           if (state == 1 && !lead && low ~ fieldlabel) unheaded = 1
         }
         if (state == 1 && !lead && pathlike(L[i])) badpath = 1
+        # A line that starts with a relative slash word and no extension (a folder, a file
+        # with no extension, a path with a space) names a candidate: the check judges it
+        # when the pack or the root holds it, and skips it as prose otherwise.
+        if (state == 1 && !lead) {
+          w = L[i]
+          sub(/^[ \t]*([-*+]|[0-9]+[.)])[ \t]+/, "", w)
+          if (w ~ /^[`*"(<]*[^ \t]*\//) {
+            t = entry(L[i])
+            print "?\t" t
+            sub(/[ \t]+$/, "", w)
+            gsub(/^[`*"(<]+|[`*",;:.)>]+$/, "", w)
+            if (w != t) print "?\t" w
+          }
+        }
       }
       exit noheading ? 4 : unheaded ? 5 : badpath ? 6 : 0
     }
@@ -573,7 +589,7 @@ cmd_check() {
   log_real=''
   [ -z "$log" ] || log_real=$(real "$log")
   work_report=$(real "${REVIEW_WORK_ROOT:-$fmroot/data/review-lane/work}/$(basename "$(dirname "$pack")")-$(basename "$pack")/review.md")
-  local leaks=0 count=0 entry prev path revpath rel rev excluded x ok why loose
+  local leaks=0 count=0 entry prev path revpath rel rev excluded x ok why loose cand
   local list raw rc=0
   raw=$(inputs_read "$report") || rc=$?
   case $rc in
@@ -600,14 +616,20 @@ cmd_check() {
   fi
   while IFS= read -r entry; do
     [ -n "$entry" ] || continue
-    count=$((count + 1))
-    rev='' loose=0
+    rev='' loose=0 cand=0
+    case $entry in
+      "?	"*) cand=1; entry=${entry#"?	"} ;;
+    esac
     # A trailing line reference (path:12, path:12-40, path:L10-L40, path#L10) names the same file.
     prev=''
     while [ "$prev" != "$entry" ]; do
       prev=$entry
       entry=$(printf '%s' "$entry" | sed -E 's/(:[0-9]+(-[0-9]+)?|:L[0-9]+(-L?[0-9]+)?|#L[0-9]+(-L?[0-9]+)?)$//')
     done
+    if [ "$cand" = 1 ] && [ ! -e "$pack/$entry" ] && { [ -z "$root" ] || [ ! -e "$root/$entry" ]; }; then
+      continue
+    fi
+    count=$((count + 1))
     case "$entry" in
       http://* | https://*)
         if [ -n "$slug" ] && [ -n "$rubric_rev" ] &&
@@ -693,6 +715,11 @@ EOF
   fi
   if [ "$leaks" -gt 0 ]; then
     echo "ROUND VOID: $leaks input leak(s); rerun on a fresh pack, and do not count this round"
+    exit 3
+  fi
+  if [ "$count" = 0 ]; then
+    echo "INPUT LEAK: no Inputs read list in $report"
+    echo "ROUND VOID: the report must list every file the reviewer opened under Inputs read"
     exit 3
   fi
   echo "INPUT CLEAN: $count listed input(s), all authorized"
