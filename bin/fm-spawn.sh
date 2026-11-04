@@ -1946,6 +1946,10 @@ SPAWN_BASE_REF=
 SPAWN_ORIGIN_DEFAULT=
 SPAWN_ORIGIN_DEFAULT_REF=
 SPAWN_ORIGIN_DEFAULT_SHA=
+SPAWN_RECORD_REFS_MODE=
+SPAWN_RECORD_REFS_DEFAULT=
+SPAWN_RECORD_REFS_SHA=
+SPAWN_RECORD_REFS_BASE=
 SPAWN_GUARD_ANCHORS=()
 SPAWN_BASE_ERROR=
 SPAWN_BASE_DISCOVERED=0
@@ -5131,23 +5135,35 @@ spawn_fetch_origin_tip() { # <worktree> <branch>
   git -C "$1" rev-parse --verify --quiet 'FETCH_HEAD^{commit}' 2>/dev/null
 }
 
+# The current tip of origin's default branch, fetched into FETCH_HEAD only. The reset guard's
+# final pass calls it so containment is proved against the tip now, not the one fetched when
+# this spawn began (see FM_SLOT_GUARD_ANCHOR_REFRESH in the library's header).
+spawn_refresh_origin_default_tip() {
+  [ -n "$SPAWN_ORIGIN_DEFAULT" ] || return 1
+  spawn_fetch_origin_tip "$FM_SLOT_GUARD_SLOT" "$SPAWN_ORIGIN_DEFAULT"
+}
+
 # Record the origin tip this spawn started from in the slot's remote-tracking refs, only
 # forward by compare-and-set, and repoint refs/remotes/origin/HEAD at origin's default
-# branch. This runs only after fm_slot_guarded_reset has cleared and reset the slot: a
-# refusal before it writes no origin ref at all, so it leaves every ref byte-identical
-# (the one exception is the anchor the governed path adds for a detached HEAD).
+# branch. The reset guard runs this as its last step before the reset
+# (FM_SLOT_GUARD_BEFORE_RESET), after every check has cleared and never before: a refusal by
+# any check writes no origin ref at all, so it leaves every ref byte-identical (the one
+# exception is the anchor the governed path adds for a detached HEAD). Everything that can
+# fail is done first and is one write that either happens or changes nothing, so a failure
+# here refuses with the slot untouched; a failure after the reset could not say that. The
+# default branch's own ref is then advanced best effort, as it always was.
 spawn_record_origin_refs() { # <worktree> <prefetched|fetched> <default> <sha> <base-branch>
   local worktree=$1 mode=$2 default=$3 sha=$4 base=${5:-} current
-  spawn_advance_origin_ref "$worktree" "refs/remotes/origin/$default" "$sha"
   case "$mode" in
     prefetched)
-      [ "$SPAWN_BASE_DISCOVERED" = 1 ] || return 0
-      current=$(git -C "$worktree" symbolic-ref --quiet refs/remotes/origin/HEAD 2>/dev/null || true)
-      if [ "$current" != "refs/remotes/origin/$default" ] &&
-        { [ -z "$current" ] ||
-          ! git -C "$worktree" rev-parse --verify --quiet "$current" >/dev/null 2>&1 ||
-          spawn_origin_head_older_than "$worktree" "$SPAWN_BASE_DISCOVERED_AT"; }; then
-        git -C "$worktree" symbolic-ref refs/remotes/origin/HEAD "refs/remotes/origin/$default" 2>/dev/null || true
+      if [ "$SPAWN_BASE_DISCOVERED" = 1 ]; then
+        current=$(git -C "$worktree" symbolic-ref --quiet refs/remotes/origin/HEAD 2>/dev/null || true)
+        if [ "$current" != "refs/remotes/origin/$default" ] &&
+          { [ -z "$current" ] ||
+            ! git -C "$worktree" rev-parse --verify --quiet "$current" >/dev/null 2>&1 ||
+            spawn_origin_head_older_than "$worktree" "$SPAWN_BASE_DISCOVERED_AT"; }; then
+          git -C "$worktree" symbolic-ref refs/remotes/origin/HEAD "refs/remotes/origin/$default" 2>/dev/null || true
+        fi
       fi
       ;;
     fetched)
@@ -5155,10 +5171,18 @@ spawn_record_origin_refs() { # <worktree> <prefetched|fetched> <default> <sha> <
         [ "$(git -C "$worktree" symbolic-ref --quiet refs/remotes/origin/HEAD 2>/dev/null || true)" != "refs/remotes/origin/$default" ] &&
         ! git -C "$worktree" symbolic-ref refs/remotes/origin/HEAD "refs/remotes/origin/$default" 2>/dev/null; then
         echo "error: could not resolve origin's current default branch for pooled worktree '$worktree'; refusing to launch from a potentially stale base" >&2
+        FM_SLOT_GUARD_BEFORE_RESET_ERROR="origin/HEAD could not be pointed at origin's default branch"
         return 1
       fi
       ;;
   esac
+  spawn_advance_origin_ref "$worktree" "refs/remotes/origin/$default" "$sha"
+}
+
+# The reset guard's before-reset command: spawn_record_origin_refs with the values the
+# freshness path set for this reset.
+spawn_record_origin_refs_before_reset() { # <worktree>
+  spawn_record_origin_refs "$1" "$SPAWN_RECORD_REFS_MODE" "$SPAWN_RECORD_REFS_DEFAULT" "$SPAWN_RECORD_REFS_SHA" "$SPAWN_RECORD_REFS_BASE"
 }
 
 freshen_spawn_worktree_base() { # <worktree> [<base-branch>]
@@ -5232,8 +5256,13 @@ freshen_spawn_worktree_base() { # <worktree> [<base-branch>]
   fi
   spawn_reset_guard_anchors "$worktree"
   spawn_reset_guard_context
-  fm_slot_guarded_reset "$worktree" "$expected" "$target" ${SPAWN_GUARD_ANCHORS[@]+"${SPAWN_GUARD_ANCHORS[@]}"} || return 1
-  spawn_record_origin_refs "$worktree" "$origin_refs" "$default" "$origin_sha" "$base" || return 1
+  SPAWN_RECORD_REFS_MODE=$origin_refs SPAWN_RECORD_REFS_DEFAULT=$default SPAWN_RECORD_REFS_SHA=$origin_sha SPAWN_RECORD_REFS_BASE=$base
+  FM_SLOT_GUARD_ANCHOR_REFRESH=spawn_refresh_origin_default_tip
+  FM_SLOT_GUARD_BEFORE_RESET=spawn_record_origin_refs_before_reset
+  rc=0
+  fm_slot_guarded_reset "$worktree" "$expected" "$target" ${SPAWN_GUARD_ANCHORS[@]+"${SPAWN_GUARD_ANCHORS[@]}"} || rc=$?
+  FM_SLOT_GUARD_ANCHOR_REFRESH='' FM_SLOT_GUARD_BEFORE_RESET=''
+  [ "$rc" -eq 0 ] || return 1
   actual=$(git -C "$worktree" rev-parse --verify --quiet HEAD 2>/dev/null || true)
   if [ "$actual" != "$expected" ]; then
     echo "error: pooled worktree '$worktree' is at '${actual:-unknown}', not current '$target' ('$expected'); refusing to launch" >&2

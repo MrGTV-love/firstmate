@@ -842,10 +842,10 @@
       "id": "pooled-copy-no-discard",
       "version": "2",
       "owner": "bin/fm-slot-provision-lib.sh",
-      "invariant": "A pooled slot is reset only after proof that it holds no unique work and no live holder. A refusal leaves the slot's HEAD, local branches, index, files and every other ref byte-identical, with one exception that changes no local work: the governed path adds refs/fm/anchor/<task>-<sha> to preserve a detached HEAD. The spawn records the origin tip in refs/remotes/origin/<b> and refs/remotes/origin/HEAD only after the guarded reset, so a refusal moves no origin ref.",
+      "invariant": "A pooled slot is reset only after proof that it holds no unique work and no live holder. A refusal leaves the slot's HEAD, local branches, index, files and every other ref byte-identical, with one exception that changes no local work: the governed path adds refs/fm/anchor/<task>-<sha> to preserve a detached HEAD. The spawn records the origin tip in refs/remotes/origin/<b> and refs/remotes/origin/HEAD only after every check has cleared and right before the reset, so a refusal by any check moves no origin ref, and a failure of that step also refuses before the reset.",
       "layer": "runtime-block",
       "source": "the slot's HEAD, owner branches, status, ignored entries, lifecycle manifest, lease and contention sources, and the working-directory list; decided by fm_slot_guard_observe in bin/fm-slot-provision-lib.sh",
-      "trigger": "a pooled slot's HEAD or owner branch is not contained in origin's current default branch (the remote's ls-remote answer; with --base-branch, the recorded origin/HEAD, else ls-remote) as this spawn fetched it, never a --base-branch and never the slot's own remote-tracking ref, or the recorded base, its tree is dirty, an ignored entry collides with a path the reset target tracks, a process outside the spawn has its cwd in it, it is locked or leased to another holder, recent contention names it, any of those sources cannot be read, or the evidence changed before the reset",
+      "trigger": "a pooled slot's HEAD or owner branch is not contained in origin's current default branch (the remote's ls-remote answer; with --base-branch, the recorded origin/HEAD, else ls-remote) as this spawn fetched it and fetched again on the final pass, never a --base-branch and never the slot's own remote-tracking ref, or the recorded base, its tree is dirty, an ignored entry collides with a path the reset target tracks, a process outside the spawn has its cwd in it, it is locked or leased to another holder (a process lease counts as this spawn's own only when the entry's recorded identity matches and the process is in this spawn's lineage or the acquired pane's tree), a pool state that was present at acquisition is gone, recent contention names it, any of those sources cannot be read, or the evidence changed before the reset",
       "decision": "deny",
       "fail_direction": "closed",
       "remedy": "Preserve the task's current copy and endpoint; read the named reason in the refusal, resolve that cause with its owner (land or archive the work, release the holder), then retry bash bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on-or-off> without forcing or discarding work.",
@@ -1000,7 +1000,24 @@
         },
         {
           "file": "bin/fm-slot-provision-lib.sh",
-          "match": "fm_slot_guard_refuse holder_lease \"the pool entry '$name' is leased to live process $pid, which is not the acquisition this spawn recorded as its own\""
+          "match": "fm_slot_guard_refuse holder_lease \"the pool entry '$name' is leased to live process $pid, which is not the acquisition this spawn recorded as its own\"",
+          "count": 2
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse unknown_lease \"the slot was acquired as a pool slot but its pool state $state can no longer be read, so a holder cannot be ruled out\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse holder_lease \"the pool entry '$name' is leased to live process $pid, which was in the entry when the slot was claimed but is neither in this spawn's lineage nor in the acquired pane's tree, so nothing binds it to this spawn's acquisition\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse unknown_anchor \"the current tip of origin's default branch could not be observed again for the final check\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse before_reset_failed \"${FM_SLOT_GUARD_BEFORE_RESET_ERROR:-the step that must precede the reset failed}\""
         },
         {
           "file": "bin/fm-slot-provision-lib.sh",

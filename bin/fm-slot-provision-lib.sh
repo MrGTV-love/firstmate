@@ -299,8 +299,9 @@ EOF
 # index, the files and every other ref stay byte-identical, with one exception that
 # changes no local work: the governed path adds refs/fm/anchor/<task>-<sha> to preserve a
 # detached HEAD. The spawn records the origin tip in refs/remotes/origin/<b> and
-# refs/remotes/origin/HEAD only after this function has reset the slot, so a refusal moves
-# no origin ref.
+# refs/remotes/origin/HEAD only after every check here has cleared and right before the
+# reset (FM_SLOT_GUARD_BEFORE_RESET), so a refusal by any check moves no origin ref, and a
+# failure of that step refuses before the reset with the slot untouched.
 # The window between the final manifest read and the reset is a stated residual: a
 # writer that takes no lock can still change the slot in it.
 # The manifest, lease store and contention log are the governed project's
@@ -315,6 +316,14 @@ EOF
 #   FM_SLOT_GUARD_PANE_PID     the acquired endpoint's shell pid, or empty
 #   FM_SLOT_GUARD_PANE_RUNNER  the spawn's in-pane runner, for the in-pane cwd probe
 #   FM_SLOT_GUARD_REPORT_DIR   the task's data directory, where that probe reports
+#   FM_SLOT_GUARD_ANCHOR_REFRESH  a command that prints the current tip of origin's default
+#                              branch (it fetches it again); the final observation proves
+#                              containment against that tip, not against the one fetched
+#                              earlier, so a default branch that moved in between is seen
+#   FM_SLOT_GUARD_BEFORE_RESET a command run once, after every check has cleared and right
+#                              before the reset, for the caller's last reads and writes that
+#                              must not happen after it; it changes nothing when it fails, and
+#                              sets FM_SLOT_GUARD_BEFORE_RESET_ERROR to say why
 # FM_SLOT_RESET_GUARD_SEAM (test only) is run once between the two observations, and
 # FM_SLOT_RESET_GUARD_HOLDER_SEAM (test only) right after the final pass's holder probes.
 FM_SLOT_GUARD_PROJECT=
@@ -324,6 +333,12 @@ FM_SLOT_GUARD_PANE_PID=
 # The pool lease identity recorded when this spawn took the slot (see fm_slot_guard_record_lease_identity).
 FM_SLOT_GUARD_LEASE_PID=
 FM_SLOT_GUARD_LEASE_STARTED=
+# The pool slot's real path, recorded with that identity: once a slot was acquired as a pool
+# slot, a later observation that finds no pool state for it has lost its evidence and refuses.
+FM_SLOT_GUARD_POOL_REAL=
+FM_SLOT_GUARD_ANCHOR_REFRESH=
+FM_SLOT_GUARD_BEFORE_RESET=
+FM_SLOT_GUARD_BEFORE_RESET_ERROR=
 FM_SLOT_GUARD_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FM_SLOT_GUARD_REASON=
 FM_SLOT_GUARD_SLOT=
@@ -519,17 +534,21 @@ EOF
 # the manifest's base_sha. A preflight (strict 0) may judge nothing when none resolves;
 # the authoritative pass (strict 1) may not.
 fm_slot_guard_fact_anchors() { # <strict:0|1>
-  local strict=$1 anchor sha
+  local strict=$1 anchor sha recorded=()
   FM_SLOT_GUARD_ANCHOR_SHAS=()
   for anchor in ${FM_SLOT_GUARD_ANCHORS[@]+"${FM_SLOT_GUARD_ANCHORS[@]}"}; do
     sha=$(git -C "$FM_SLOT_GUARD_SLOT" rev-parse --verify --quiet "$anchor^{commit}" 2>/dev/null) || sha=
     [ -z "$sha" ] || FM_SLOT_GUARD_ANCHOR_SHAS+=("$sha")
+    # With a refresh command the final pass judges against a newer tip, which may legitimately
+    # differ from the first pass's: it is not part of what the two passes must record equal.
+    [ -n "$FM_SLOT_GUARD_ANCHOR_REFRESH" ] || [ -z "$sha" ] || recorded+=("$sha")
   done
   if [ -n "$FM_SLOT_GUARD_MANIFEST_BASE" ]; then
     sha=$(git -C "$FM_SLOT_GUARD_SLOT" rev-parse --verify --quiet "$FM_SLOT_GUARD_MANIFEST_BASE^{commit}" 2>/dev/null) || sha=
     [ -z "$sha" ] || FM_SLOT_GUARD_ANCHOR_SHAS+=("$sha")
+    [ -z "$sha" ] || recorded+=("$sha")
   fi
-  fm_slot_guard_record "anchors=${FM_SLOT_GUARD_ANCHOR_SHAS[*]-}"
+  fm_slot_guard_record "anchors=${recorded[*]-}"
   if [ "${#FM_SLOT_GUARD_ANCHOR_SHAS[@]}" -eq 0 ] && [ "$strict" = 1 ]; then
     fm_slot_guard_refuse unknown_anchor "neither the fetched origin default branch nor a recorded base resolves to a commit, so containment cannot be proved"
     return 1
@@ -912,14 +931,18 @@ EOF
 }
 
 # The lease identity this spawn recorded when it took the slot: the pool entry's owner_pid
-# and owner_started_at at the moment the slot's claim named this task (the spawn holds the
-# project lock then, so the entry is the spawn's own acquisition). It is the only thing that
-# marks a process lease as this spawn's; process ancestry never does.
+# and owner_started_at at the moment the slot's claim named this task. The claim names the
+# task, not the process, so the identity alone proves nothing: a live process that was
+# already in the entry would be recorded just the same. A process lease is this spawn's only
+# when the identity matches AND a probe binds that process to this spawn (it is in the
+# spawn's own lineage or in the acquired pane's tree); ancestry alone never marks it.
 fm_slot_guard_record_lease_identity() { # <slot>
   local real state entries path pid started
   FM_SLOT_GUARD_LEASE_PID=
   FM_SLOT_GUARD_LEASE_STARTED=
+  FM_SLOT_GUARD_POOL_REAL=
   real=$(CDPATH='' cd -- "$1" 2>/dev/null && pwd -P) || return 0
+  FM_SLOT_GUARD_POOL_REAL=$real
   state="${real%/*/*}/treehouse-state.json"
   [ -f "$state" ] && command -v jq >/dev/null 2>&1 || return 0
   entries=$(jq -r '.worktrees[]? | [(.path // "" | tostring), (.owner_pid // "" | tostring), (.owner_started_at // "" | tostring)] | join("\u001f")' "$state" 2>/dev/null) || return 0
@@ -940,8 +963,13 @@ EOF
 # own lease store adds its file lease, read as a plain file: a live holder, or one
 # that cannot be probed and has not expired, refuses.
 fm_slot_guard_fact_holders_lease() {
-  local state entries leased holder name path pid started verdict common out
+  local state entries leased holder name path pid started verdict common out recorded
   state="${FM_SLOT_GUARD_REAL%/*/*}/treehouse-state.json"
+  if ! fm_treehouse_pool_slot "$FM_SLOT_GUARD_PROJECT" "$FM_SLOT_GUARD_SLOT" &&
+    [ -n "$FM_SLOT_GUARD_POOL_REAL" ] && [ "$FM_SLOT_GUARD_POOL_REAL" -ef "$FM_SLOT_GUARD_REAL" ]; then
+    fm_slot_guard_refuse unknown_lease "the slot was acquired as a pool slot but its pool state $state can no longer be read, so a holder cannot be ruled out"
+    return 1
+  fi
   if fm_treehouse_pool_slot "$FM_SLOT_GUARD_PROJECT" "$FM_SLOT_GUARD_SLOT"; then
     if ! command -v jq >/dev/null 2>&1; then
       fm_slot_guard_refuse unknown_lease "jq is not installed, so the pool's lease state cannot be read"
@@ -959,16 +987,27 @@ fm_slot_guard_fact_holders_lease() {
         return 1
       fi
       [ -n "$pid" ] || continue
+      recorded=0
       if [ -n "$FM_SLOT_GUARD_LEASE_PID" ] && [ "$pid" = "$FM_SLOT_GUARD_LEASE_PID" ] &&
         { [ -z "$started" ] || [ "$started" = "$FM_SLOT_GUARD_LEASE_STARTED" ]; }; then
-        continue
+        recorded=1
       fi
       fm_slot_guard_probe_processes "$pid" || return 1
       verdict=$(printf '%s\n' "$FM_SLOT_GUARD_HOLDER_REPORT" | awk -F'\t' -v p="$pid" '$1 == "P" && $2 == p {print $3}')
       case "$verdict" in
         dead) ;;
+        own)
+          if [ "$recorded" != 1 ]; then
+            fm_slot_guard_refuse holder_lease "the pool entry '$name' is leased to live process $pid, which is not the acquisition this spawn recorded as its own"
+            return 1
+          fi
+          ;;
         *)
-          fm_slot_guard_refuse holder_lease "the pool entry '$name' is leased to live process $pid, which is not the acquisition this spawn recorded as its own"
+          if [ "$recorded" = 1 ]; then
+            fm_slot_guard_refuse holder_lease "the pool entry '$name' is leased to live process $pid, which was in the entry when the slot was claimed but is neither in this spawn's lineage nor in the acquired pane's tree, so nothing binds it to this spawn's acquisition"
+          else
+            fm_slot_guard_refuse holder_lease "the pool entry '$name' is leased to live process $pid, which is not the acquisition this spawn recorded as its own"
+          fi
           return 1
           ;;
       esac
@@ -1103,6 +1142,20 @@ fm_slot_guard_fact_holders() {
   fm_slot_guard_fact_holders_contention || return 1
 }
 
+# On the final pass, observe the current tip of origin's default branch again (the caller's
+# refresh command fetches it) and judge containment against that tip. The tip fetched when
+# the spawn started cannot see a default branch that moved since; if the tip cannot be
+# observed now, containment cannot be proved now, and the guard refuses.
+fm_slot_guard_refresh_anchors() {
+  local tip
+  [ -n "$FM_SLOT_GUARD_ANCHOR_REFRESH" ] || return 0
+  tip=$($FM_SLOT_GUARD_ANCHOR_REFRESH 2>/dev/null) && [ -n "$tip" ] || {
+    fm_slot_guard_refuse unknown_anchor "the current tip of origin's default branch could not be observed again for the final check"
+    return 1
+  }
+  FM_SLOT_GUARD_ANCHORS=("$tip")
+}
+
 # One full observation of the facts above, in order: the slow holder probes first,
 # so the git facts after them are the freshest reads before the reset. The caller
 # reads the manifest after it (fm_slot_guard_fact_manifest). Each line is one
@@ -1116,6 +1169,7 @@ fm_slot_guard_observe() { # <strict:0|1> [final]
   if [ "${2:-}" = final ] && [ -n "${FM_SLOT_RESET_GUARD_HOLDER_SEAM:-}" ]; then
     (eval "$FM_SLOT_RESET_GUARD_HOLDER_SEAM") || true
   fi
+  [ "${2:-}" != final ] || fm_slot_guard_refresh_anchors || return 1
   fm_slot_guard_fact_head || return 1
   fm_slot_guard_fact_owners || return 1
   fm_slot_guard_fact_anchors "$1" || return 1
@@ -1177,6 +1231,17 @@ fm_slot_guarded_reset() { # <slot> <target-sha> <target-label> <anchor>...
     [ "$FM_SLOT_GUARD_MANIFEST_BASE" != "$base_first" ]; then
     fm_slot_guard_refuse changed_since_first_read "the slot's lifecycle manifest changed between the first observation and the final one"
     return 1
+  fi
+  # The caller's last reads and writes that must not follow the reset run here, after every
+  # check has cleared. A refusal after the reset could not say the slot was left untouched,
+  # so whatever can fail is done and checked first. The hook either changes nothing and
+  # fails (a refusal with the slot untouched) or succeeds.
+  if [ -n "$FM_SLOT_GUARD_BEFORE_RESET" ]; then
+    FM_SLOT_GUARD_BEFORE_RESET_ERROR=
+    $FM_SLOT_GUARD_BEFORE_RESET "$slot" || {
+      fm_slot_guard_refuse before_reset_failed "${FM_SLOT_GUARD_BEFORE_RESET_ERROR:-the step that must precede the reset failed}"
+      return 1
+    }
   fi
   if ! git -C "$slot" reset --hard "$target" >/dev/null; then
     echo "error: could not reset pooled worktree '$slot' to '$label'; refusing to launch from a potentially stale base" >&2
