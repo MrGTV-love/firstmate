@@ -888,12 +888,13 @@ test_bare_url_done_note_with_missing_copy_needs_a_merge_proof() {
     esac
     [ "$proof" = none ] || chmod 0600 "$state/task-a.pr-poll-merge-notified"
     if [ "$proof" = merged ]; then
-      ( fm_pr_url_parse https://github.com/o/r/pull/9 \
-        && fm_pr_poll_merge_already_notified "$state" task-a "$FM_PR_PROVIDER" "$FM_PR_HOST" "$FM_PR_PATH" "$FM_PR_NUMBER" ) \
-        || fail "the merged-marker fixture does not match the PR it names"
+      if ! { fm_pr_url_parse https://github.com/o/r/pull/9 \
+        && fm_pr_poll_merge_already_notified "$state" task-a "$FM_PR_PROVIDER" "$FM_PR_HOST" "$FM_PR_PATH" "$FM_PR_NUMBER"; }; then
+        fail "the merged-marker fixture does not match the PR it names"
+      fi
     fi
     rc=0
-    # shellcheck source=bin/fm-dod-lib.sh
+    # shellcheck source=/dev/null
     out=$( . "$ROOT/bin/fm-dod-lib.sh"
       fm_dod_accept_ship_done ship direct-PR "$dir/gone" "$dir/project" "$line" "$state" task-a "$state/task-a.meta" ) || rc=$?
     if [ "$proof" = merged ]; then
@@ -1863,9 +1864,9 @@ SH
       'model=gpt-5.1-codex' \
       'mode=local-only'
     if [ "$artifact" = check.sh ]; then
-      counterpart=pr-poll
+      counterpart='pr-poll'
     else
-      counterpart=check.sh
+      counterpart='check.sh'
     fi
     mkdir "$dir/home/state/task-a.$artifact"
     printf 'directory sentinel\n' > "$dir/home/state/task-a.$artifact/sentinel"
