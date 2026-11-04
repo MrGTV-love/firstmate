@@ -3438,7 +3438,7 @@ test_over_strict_mutations_are_caught() {
   expect_caught closeout-foreign-not-allowed $orch '      "REFUSED: Vernant'"'"'s closeout driver did not release foreign copy "*" (exit "*"): "*"exact tree not covered"*) seen=1 ;;' '      "REFUSED: never") seen=1 ;;' scn_landing_refusal_via_closeout_foreign "foreign-copy closeout refusal"
   expect_caught closeout-own-not-allowed $orch '      "REFUSED: Vernant'"'"'s closeout driver did not release own nested copy "*" (exit "*"): "*"exact tree not covered"*) seen=1 ;;' '      "REFUSED: never") seen=1 ;;' scn_closeout_own_is_settled "own-nested-copy closeout refusal"
   expect_caught no-checksums $lib '      shasum -a 256 -- "$file" || exit 1' '      :' scn_scratch_copy_is_removed "checksum manifest"
-  expect_caught indexer-counts-as-use $lib '    if fm_mp_indexer_pid "$pid"; then' '    if false; then' scn_search_indexer_does_not_keep_the_copy "search-indexer exemption"
+  expect_caught indexer-counts-as-use $lib '    if fm_task_copy_indexer_pid "$pid"; then' '    if false; then' scn_search_indexer_does_not_keep_the_copy "search-indexer exemption"
   expect_caught pr-head-ignored $lib '  [ -z "$prsha" ] || extra=("$prsha")' '  extra=()' scn_pr_head_proves_a_squash_merged_commit "merged-PR-head proof"
   expect_caught landed-proof-needs-the-pr-head $lib '  if [ -n "$prsha" ] && git -C "$copy" merge-base --is-ancestor "$head" "$prsha" 2>/dev/null; then
     return 0

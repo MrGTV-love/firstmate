@@ -161,12 +161,11 @@ fm_task_copy_content_in_default() {  # <worktree> <project> [<default-branch>] [
 # refuses. Call it only after fm_task_copy_content_in_default compared and
 # answered no; on success FM_TASK_COPY_COMPARED names the ref and the merge base.
 fm_task_copy_content_in_default_history() {  # <worktree> [<head-ref>]
-  local worktree=$1 head=${2:-HEAD} name=${FM_TASK_COPY_COMPARED%% *} tip=${FM_TASK_COPY_COMPARED##* } base paths path want commits commit have found
+  local worktree=$1 head=${2:-HEAD} name=${FM_TASK_COPY_COMPARED%% *} tip=${FM_TASK_COPY_COMPARED##* } base path want commits commit have found complete=
   FM_TASK_COPY_UNASKED='the content check could not read the default branch history'
   [ -n "$tip" ] && base=$(git -C "$worktree" merge-base "$tip" "$head" 2>/dev/null) || return 1
-  paths=$(git -C "$worktree" -c core.quotepath=off diff-tree -r --name-only --no-renames "$base" "$head" 2>/dev/null) || return 1
-  while IFS= read -r path; do
-    [ -n "$path" ] || continue
+  while IFS= read -r -d '' path; do
+    [ -n "$path" ] || { complete=1; continue; }
     want=$(git -C "$worktree" --literal-pathspecs ls-tree "$head" -- "$path" 2>/dev/null) || return 1
     commits=$(git -C "$worktree" --literal-pathspecs rev-list --full-history "$base..$tip" -- "$path" 2>/dev/null) || return 1
     found=
@@ -178,9 +177,24 @@ fm_task_copy_content_in_default_history() {  # <worktree> [<head-ref>]
       fi
     done
     [ -n "$found" ] || { FM_TASK_COPY_UNASKED=; return 1; }
-  done <<< "$paths"
+  done < <(git -C "$worktree" diff-tree -r -z --name-only --no-renames "$base" "$head" 2>/dev/null && printf '\0')
+  [ -n "$complete" ] || return 1
   FM_TASK_COPY_UNASKED=
   FM_TASK_COPY_COMPARED="$name $base"
+}
+
+# A system search indexer (macOS Spotlight) holds a recently written tree open
+# for as long as a minute while it reads it. It only reads, deleting the tree
+# under it harms nothing, and counting it would keep nearly every fresh copy on a
+# Mac. A process that cannot be read is not one.
+fm_task_copy_indexer_pid() {  # <pid>
+  local comm
+  comm=$(ps -o comm= -p "$1" 2>/dev/null) || return 1
+  comm=${comm##*/}
+  case "$comm" in
+    mdworker|mdworker_shared|mds|mds_stores|mdsync) return 0 ;;
+  esac
+  return 1
 }
 
 # The porcelain status lines of <copy> that are its own uncommitted work:

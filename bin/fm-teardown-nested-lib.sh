@@ -19,14 +19,14 @@
 #     released wherever the hold applies (teardown_foreign_copy_hold_applies),
 #     and is preserved and released as above wherever it does not;
 #   - no other active task record names it, no process outside this teardown's
-#     own runs in it or holds a file in it open, and no live process outside
-#     this teardown's own is its
+#     own runs in it, no other process holds a file in it open (a macOS search
+#     indexer, which only reads, is exempt), and no live process outside this
+#     teardown's own is its
 #     lock launcher (a process is this teardown's own when it, or an ancestor by
 #     parent chain, has a cwd exactly at a root retire sweeps, and a pid that
 #     started after the lock file was written is recycled and owns nothing). The
 #     retire phase sends TERM to each such launcher and each such process running
-#     in the copy or holding a file in it open, waits a bounded time, and sends no
-#     KILL; one still alive
+#     in the copy, waits a bounded time, and sends no KILL; one still alive
 #     refuses the release, named by its pid. A process that is not this
 #     teardown's own is never signalled and refuses at once, named by its pid;
 #   - teardown_landed proves delivery or the recorded bundle alternative owned
@@ -820,13 +820,10 @@ teardown_foreign_copy_unowned() {  # <copy>
   while IFS=$'\t' read -r pid path; do
     [ -n "$pid" ] || continue
     case $'\n'"$pids" in *$'\n'"$pid"$'\t'*) continue ;; esac
-    if ! teardown_pid_is_task_own "$pid"; then
-      TEARDOWN_FOREIGN_RULE=process-open-file-owner
-      TEARDOWN_FOREIGN_PID=$pid
-      TEARDOWN_FOREIGN_WHY="process $pid holds $(fm_refuse_text "$path") open"
-      return 1
-    fi
-    teardown_foreign_proc_record "$pid"
+    TEARDOWN_FOREIGN_RULE=process-open-file-owner
+    TEARDOWN_FOREIGN_PID=$pid
+    TEARDOWN_FOREIGN_WHY="process $pid holds $(fm_refuse_text "$path") open"
+    return 1
   done <<< "$held"
   rc=0
   teardown_copy_lock_file "$copy" || rc=$?
@@ -899,7 +896,7 @@ teardown_foreign_copy_holdable() {  # <copy>
       done
       TEARDOWN_FOREIGN_RULE=process-cwd-owner
       TEARDOWN_FOREIGN_PID=${own%% *}
-      TEARDOWN_FOREIGN_WHY="process ${own// /, } of this teardown runs in it, holds a file in it open or launched its creation lock"
+      TEARDOWN_FOREIGN_WHY="process ${own// /, } of this teardown runs in it or launched its creation lock"
     fi
     TEARDOWN_FOREIGN_PROCS=(${TEARDOWN_FOREIGN_PROCS[@]+"${TEARDOWN_FOREIGN_PROCS[@]:0:$procs}"})
     return 1

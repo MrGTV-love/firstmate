@@ -51,11 +51,13 @@
 # commit refuses.
 # Squash merges collapse the branch's commits, so per-commit patch ids against main
 # no longer match, and a pipeline rebase can leave the local worktree diverged from
-# the PR head. A diverged copy is not treated as landed: path-set coverage, git
-# cherry, and merge-tree containment each fail to prove content landed without also
+# the PR head. Path-set coverage, git cherry, and merge-tree containment do not
+# make a diverged copy landed: each fails to prove content landed without also
 # accepting unlanded edits to the same paths. Teardown still accepts a merged PR
 # whose head contains the current local work (ancestor or equivalent patch ids),
-# or a clean content-in-default tree match. A copy left on pre-rebase commits
+# a clean content-in-default tree match, or, for a diverged copy, the history route
+# above; an edit whose exact content is in no default-branch commit still refuses.
+# A copy left on pre-rebase commits
 # (even ones pushed to another remote) is also accepted when every commit the PR
 # head and the default branch lack has a patch id among the PR head's own commits
 # and each merge commit is exactly what git produces from its parents; a refusal
@@ -294,14 +296,14 @@
 # no record of this task names is a foreign copy (Vernant's
 # start_task_worktree.py creates and locks one at <slot>/.claude/worktrees/<name>),
 # and teardown releases it only after it proves all of: no other active task
-# record names it; no process outside this teardown runs in it or holds a file
-# in it open, and no live
+# record names it; no process outside this teardown runs in it, no other process
+# holds a file in it open (a macOS search indexer, which only reads, is exempt),
+# and no live
 # process outside this teardown is its lock launcher (a process is teardown's
 # own when it, or an ancestor by parent chain, has a cwd exactly at a root retire
 # sweeps, and a launcher pid that started after the lock file was written is a
 # recycled pid and owns nothing); retire sends TERM to each such launcher and
-# each such process running in the copy or holding a file in it open, waits a
-# bounded time, and sends no KILL,
+# each such process running in the copy, waits a bounded time, and sends no KILL,
 # and one still alive refuses the release, named by its pid, while a process
 # that is not teardown's own is never signalled and refuses at once, named by its
 # pid; it is a clean worktree root, and each ignored file it holds is either
@@ -3696,9 +3698,15 @@ pids_with_cwd_under() {  # <dir>
 # The same for every process with any file open at or under $1, its working
 # directory included: one system-wide listing of open files, filtered by the
 # path prefix, never the recursive +D walk. One line per process, naming the
-# first matching path.
+# first matching path. A system search indexer only reads and is left out
+# (fm_task_copy_indexer_pid).
 pids_with_open_file_under() {  # <dir>
-  lsof_pids_under "$1" -nP -Fpfn
+  local out pid path
+  out=$(lsof_pids_under "$1" -nP -Fpfn) || return 1
+  while IFS=$'\t' read -r pid path; do
+    [ -n "$pid" ] || continue
+    fm_task_copy_indexer_pid "$pid" || printf '%s\t%s\n' "$pid" "$path"
+  done <<< "$out"
 }
 
 lsof_pids_under() {  # <dir> <lsof-arguments...>

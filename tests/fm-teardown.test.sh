@@ -1548,7 +1548,7 @@ content_case_treehouse() {  # <case>
 # tree still holds. No PR record, hold or bundle is needed.
 test_squash_landed_content_counts_in_every_shape_and_prints_its_base() {
   local case_dir rc shape
-  for shape in main-moved-on later-edit-same-lines; do
+  for shape in main-moved-on later-edit-same-lines later-edit-quoted-path; do
     case_dir=$(make_case "content-shape-$shape")
     write_meta "$case_dir" no-mistakes ship
     wt_commit_file "$case_dir" feature.txt hello "add feature"
@@ -1556,6 +1556,11 @@ test_squash_landed_content_counts_in_every_shape_and_prints_its_base() {
     case "$shape" in
       main-moved-on) land_on_origin_main "$case_dir" later.txt "main moved on" ;;
       later-edit-same-lines) land_on_origin_main "$case_dir" feature.txt "hello, then edited on main" ;;
+      later-edit-quoted-path)
+        wt_commit_file "$case_dir" 'we"ird' quoted "add a path git quotes"
+        land_on_origin_main "$case_dir" 'we"ird' quoted
+        land_on_origin_main "$case_dir" 'we"ird' "quoted, then edited on main"
+        ;;
     esac
     content_case_treehouse "$case_dir"
     rc=0
@@ -1564,7 +1569,7 @@ test_squash_landed_content_counts_in_every_shape_and_prints_its_base() {
     assert_grep 'landed by content: every change of ' "$case_dir/stderr" "content-shape-$shape: the proof was not named"
     case "$shape" in
       main-moved-on) assert_grep ' is already in remotes/origin/main (' "$case_dir/stderr" "content-shape-$shape: the base the proof used was not printed" ;;
-      later-edit-same-lines) assert_grep ' is in a commit of remotes/origin/main after merge base ' "$case_dir/stderr" "content-shape-$shape: the base the proof used was not printed" ;;
+      later-edit-*) assert_grep ' is in a commit of remotes/origin/main after merge base ' "$case_dir/stderr" "content-shape-$shape: the base the proof used was not printed" ;;
     esac
     assert_no_grep 'fm-captain-hold.sh hold' "$case_dir/stderr" "content-shape-$shape: an owner hold was printed"
     assert_absent "$case_dir/state/task-x1.meta" "content-shape-$shape: the task record survived"

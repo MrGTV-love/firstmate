@@ -582,7 +582,7 @@ fm_mp_prove_unused() {  # <real-copy> [<pane-pid>]
   out=${out% }
   kept=
   for pid in $out; do
-    if fm_mp_indexer_pid "$pid"; then
+    if fm_task_copy_indexer_pid "$pid"; then
       :
     elif [ -z "$FM_MP_PANE_SHELL" ] && fm_mp_pane_shell "$pid" "$pane" "$copy"; then
       FM_MP_PANE_SHELL=$pid
@@ -716,21 +716,10 @@ fm_mp_tree_parent() {  # <pid>
   done
 }
 
-# A system search indexer (macOS Spotlight) holds a recently written tree open
-# for as long as a minute while it reads it. It only reads, deleting the tree
-# under it harms nothing, and counting it would keep nearly every fresh copy on a
-# Mac. It and the task's own pane shell (fm_mp_pane_shell, which is ended before
-# the destroy) are the deliberate exceptions to "no process inside" (named in
-# docs/configuration.md); any other process, whatever it does, keeps the copy.
-fm_mp_indexer_pid() {  # <pid>
-  local comm
-  comm=$(ps -o comm= -p "$1" 2>/dev/null) || return 1
-  comm=${comm##*/}
-  case "$comm" in
-    mdworker|mdworker_shared|mds|mds_stores|mdsync) return 0 ;;
-  esac
-  return 1
-}
+# A system search indexer (fm_task_copy_indexer_pid) and the task's own pane shell
+# (fm_mp_pane_shell, which is ended before the destroy) are the deliberate
+# exceptions to "no process inside" (named in docs/configuration.md); any other
+# process, whatever it does, keeps the copy.
 
 # The pid of the shell that the task's terminal pane was started with, for the
 # backends that report it (tmux, herdr); nothing for any other backend or when
