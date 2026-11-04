@@ -294,6 +294,7 @@ esac
 . "$SCRIPT_DIR/fm-status-cap-lib.sh"
 # Fail closed before any fleet mutation: a no-mistakes gate agent must never
 # drive a crewmate's lifecycle (see bin/fm-gate-refuse-lib.sh).
+FM_GATE_EVENT_TASK=${1:-}
 fm_refuse_if_gate_agent
 
 if [ -z "${FM_HOME+x}" ] || [ -z "${FM_HOME:-}" ]; then
@@ -2769,9 +2770,12 @@ do_relaunch() {
   # account pin, allowlist, and backend that fm-spawn will use.
   fm_api_key_guard_launch_env_config "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" \
     || die "could not inspect the replacement launch environment before stopping $ID"
-  fm_api_key_guard "$TARGET_HARNESS" "$TARGET_API_KEY_ALLOW" "$TARGET_WORKER_ACCOUNT" \
-    "$FM_API_KEY_LAUNCH_ENV_ENABLED" "$FM_API_KEY_LAUNCH_ENV_NAMES" "$BACKEND" \
-    || die "refused before stopping $ID: an Anthropic credential would reach the replacement worker"
+  if ! fm_api_key_guard_quiet=1 fm_api_key_guard "$TARGET_HARNESS" "$TARGET_API_KEY_ALLOW" "$TARGET_WORKER_ACCOUNT" \
+    "$FM_API_KEY_LAUNCH_ENV_ENABLED" "$FM_API_KEY_LAUNCH_ENV_NAMES" "$BACKEND" 2>/dev/null; then
+    fm_api_key_guard "$TARGET_HARNESS" "$TARGET_API_KEY_ALLOW" "$TARGET_WORKER_ACCOUNT" \
+      "$FM_API_KEY_LAUNCH_ENV_ENABLED" "$FM_API_KEY_LAUNCH_ENV_NAMES" "$BACKEND" \
+      || die "refused before stopping $ID: an Anthropic credential would reach the replacement worker"
+  fi
   journal_write stopping "$note_line"
   exit_result=$(do_exit)
   journal_write exited "$note_line" "exit_result=$exit_result"

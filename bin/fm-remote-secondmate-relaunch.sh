@@ -97,6 +97,7 @@ fi
 RELAUNCH_ARGS=("$ID" "$HARNESS" "$MODEL" "$EFFORT")
 [ -z "$CAPTAIN_MODEL_PIN" ] || RELAUNCH_ARGS+=("--captain-model-pin=$CAPTAIN_MODEL_PIN")
 if [ "$(fm_compact_adviser_force_off)" = 1 ]; then
+  fm_compact_adviser_bypass_event "$ID"
   RELAUNCH_ARGS+=(--compact-adviser-disable)
 fi
 RELAUNCH_OUT=$("$SCRIPT_DIR/fm-on.sh" "$ID" fm-remote-secondmate-control.sh \

@@ -3288,6 +3288,25 @@ review_agent_select_detached() {
   REVIEW_SELECT_PID=$!
 }
 
+# Read-only guard workaround detection runs detached and single-flight for the
+# same reason: a slow worktree read must never hold the poll or its beacon.
+# Each heartbeat starts the next run, which publishes its report by rename to
+# state/.guard-workarounds-next, so a reader sees only a complete report. The
+# report is file output only: the watcher queues no wake for it.
+GUARD_WORKAROUND_PID=
+guard_workarounds_detached() {
+  local out="$STATE/.guard-workarounds-next"
+  if [ -n "$GUARD_WORKAROUND_PID" ]; then
+    kill -0 "$GUARD_WORKAROUND_PID" 2>/dev/null && return 0
+    wait "$GUARD_WORKAROUND_PID" 2>/dev/null || true
+    GUARD_WORKAROUND_PID=
+  fi
+  rm -f "$out"
+  { python3 "$SCRIPT_DIR/fm-guard-workarounds.py" --state "$STATE" >"$out.$$" \
+      && mv -f "$out.$$" "$out"; } </dev/null >/dev/null 2>&1 &
+  GUARD_WORKAROUND_PID=$!
+}
+
 # Finished-session cleanup, detached for the same reason as the ledgers above: a
 # sweep that runs teardown can take minutes, and the poll must keep advancing the
 # beacon. The sweep is single-flight on its own lock, and it only ever asks
@@ -4571,6 +4590,7 @@ while :; do
   [ "$hb" -gt "$HEARTBEAT_MAX" ] && hb=$HEARTBEAT_MAX
   if [ "$(age_of "$STATE/.last-heartbeat")" -ge "$hb" ]; then
     review_agent_select_detached
+    guard_workarounds_detached
     # Triage: in always-on mode a heartbeat is benign unless the cheap fleet-scan
     # turns up a captain-relevant status the per-wake path missed. Absorb the
     # no-change case (advance the schedule and back off exactly as wake() would,

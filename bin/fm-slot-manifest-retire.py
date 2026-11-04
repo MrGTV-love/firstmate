@@ -48,9 +48,10 @@ def run(args, project):
     return result.stdout.strip()
 
 
-def sweep_deny_event():
+def sweep_deny_event(owner=""):
     writer = Path(__file__).resolve().parent / "fm-guard-event.sh"
-    subprocess.run([str(writer), "teardown-unlanded", "deny", "--source-ok", "true"],
+    subprocess.run([str(writer), "teardown-unlanded", "deny", "--rule", "landed-work",
+                    "--task", owner, "--source-ok", "true"],
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
 
 
@@ -279,7 +280,7 @@ def main():
                             retire(args, slot, owner, branch, paths, proof_file)
                         except (Refusal, OSError, ValueError, KeyError, TypeError) as exc:
                             print(f"{name} owner={owner} slot={slot} landing=MERGED retire=REFUSED: {exc}")
-                            sweep_deny_event()
+                            sweep_deny_event(owner)
                             failed = True
             except (Refusal, OSError, ValueError, KeyError, TypeError) as exc:
                 print(f"{name} owner={record.get('owner_id', 'unknown') if isinstance(record, dict) else 'unknown'} landing=UNPROVEN: {exc}")
