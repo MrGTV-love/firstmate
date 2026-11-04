@@ -261,9 +261,9 @@ $1
 EOF
 }
 
-# The one wake of a task whose copy the closeout driver retained; the record
-# marks it sent only once the queue took it, so a failed append is raised again
-# by the next sweep.
+# The one wake of a task whose copy the closeout driver retained;
+# fm_closeout_retained_wake owns its sent marker and the rollback after a
+# failed append.
 # The caller holds the task's closeout lock.
 closeout_wake_now() {  # <task-id>
   local wt
