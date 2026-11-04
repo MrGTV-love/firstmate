@@ -1,0 +1,42 @@
+lab home: /Users/charlesabrooker/tmp/fm-lab.dehi_jk0 (marker: True)
+FM_HOME-only env; stripped: NO_MISTAKES_GATE FM_GATE_REFUSE_BYPASS FM_ROOT_OVERRIDE FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_CONFIG_OVERRIDE FM_PROJECTS_OVERRIDE
+--- case: missing gh-axi
+$ fm-github-accounting.py records --kind quota -> exit 0
+$ fm-github-accounting.py run --duration 16.5 -> exit 0
+PASS: missing gh-axi: owner run exits 0
+$ fm-github-accounting.py records --kind quota -> exit 0
+  [{"status": "unavailable", "reason": "command_unavailable", "exit_code": null, "graphql": null}, {"status": "unavailable", "reason": "command_unavailable", "exit_code": null, "graphql": null}]
+PASS: missing gh-axi: 2 ticks recorded unavailable
+PASS: missing gh-axi: reason=command_unavailable
+PASS: missing gh-axi: no zero or stale counter
+--- case: gh-axi exits 1
+$ fm-github-accounting.py records --kind quota -> exit 0
+$ fm-github-accounting.py run --duration 16.5 -> exit 0
+PASS: gh-axi exits 1: owner run exits 0
+$ fm-github-accounting.py records --kind quota -> exit 0
+  [{"status": "unavailable", "reason": null, "exit_code": 1, "graphql": {}}, {"status": "unavailable", "reason": null, "exit_code": 1, "graphql": {}}]
+PASS: gh-axi exits 1: 2 ticks recorded unavailable
+PASS: gh-axi exits 1: no zero or stale counter
+--- case: malformed body
+$ fm-github-accounting.py records --kind quota -> exit 0
+$ fm-github-accounting.py run --duration 16.5 -> exit 0
+PASS: malformed body: owner run exits 0
+$ fm-github-accounting.py records --kind quota -> exit 0
+  [{"status": "unavailable", "reason": null, "exit_code": 0, "graphql": {}}, {"status": "unavailable", "reason": null, "exit_code": 0, "graphql": {}}]
+PASS: malformed body: 2 ticks recorded unavailable
+PASS: malformed body: no zero or stale counter
+--- case: exhausted fixture
+$ fm-github-accounting.py records --kind quota -> exit 0
+$ fm-github-accounting.py run --duration 16.5 -> exit 0
+PASS: exhausted fixture: owner run exits 0
+$ fm-github-accounting.py records --kind quota -> exit 0
+  [{"status": "observed", "reason": null, "exit_code": 0, "graphql": {"limit": 5000, "remaining": 0, "reset": 1794000000, "used": 5000}}, {"status": "observed", "reason": null, "exit_code": 0, "graphql": {"limit": 5000, "remaining": 0, "reset": 1794000000, "used": 5000}}]
+PASS: exhausted fixture: 2 ticks recorded observed
+PASS: exhausted fixture: exhausted counters stored as read
+$ fm-github-accounting.py records --kind sampling -> exit 0
+PASS: process sampling continued in every case -- scans=215
+teardown owner stop -> exit 0 {"state": "stopped"}
+leftover processes naming the lab: []
+lab teardown -> exit 0
+lab removed: True
+RESULT PASS failures=0

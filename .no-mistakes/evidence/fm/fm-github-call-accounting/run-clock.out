@@ -1,0 +1,39 @@
+[clock-shift-attribution] lab home: /Users/charlesabrooker/tmp/fm-lab.pnfpdywa (marker: True)
+[clock-shift-attribution] FM_HOME-only env; stripped: NO_MISTAKES_GATE FM_GATE_REFUSE_BYPASS FM_ROOT_OVERRIDE FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_CONFIG_OVERRIDE FM_PROJECTS_OVERRIDE
+[clock-shift-attribution] PASS: continuous caller first sighted
+[clock-shift-attribution] clock moved to +36000 s; used fixture = 100
+[clock-shift-attribution] labeled quota transition: used fixture = 4999
+[clock-shift-attribution] PASS: two quota rows inside the later interval -- [[36015, 100], [36030, 4999]]
+[clock-shift-attribution] clock moved to +86500 s: renewal is due; exec caller goes now
+[clock-shift-attribution] PASS: renewal row written for the caller alive past 24 h
+[clock-shift-attribution] PASS: exec caller row appears after exec
+[clock-shift-attribution] clock moved to +172901 s: second renewal; next quota tick prunes the first sighting
+[clock-shift-attribution]   continuous process rows now (offset from first sighting): [86530, 172932]
+[clock-shift-attribution] PASS: first sighting expired by the owner's own 48 h prune
+[clock-shift-attribution] PASS: no per-scan rows: exactly 2 renewals retained
+[clock-shift-attribution] PASS: every renewal keeps first_observed_at and same projection
+[clock-shift-attribution] kill the continuous caller; keep the exec caller alive through stop
+[clock-shift-attribution] send SIGTERM to the owner: a normal stop
+[clock-shift-attribution] PASS: owner exits 0 on SIGTERM
+[clock-shift-attribution] $ fm-github-accounting.py records -> exit 0
+[clock-shift-attribution] PASS: cold reader finds the 4899-point interval
+[clock-shift-attribution]   interval (+36015..+36030) used_delta=4899
+[clock-shift-attribution]     caller {"argv": ["sh", "gh", "pr", "checks", "[REDACTED]", "[REDACTED]", "--body", "[REDACTED]", "-H", "[REDACTED]", "[REDACTED]", "[REDACTED]"], "parent": ["sh", "caller-parent", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]"], "first_offset": 0, "ended": true}
+[clock-shift-attribution] PASS: every retained process timestamp is later than the interval -- [86530, 172932]
+[clock-shift-attribution] PASS: continuous caller overlaps through first_observed_at
+[clock-shift-attribution] PASS: exec caller does not overlap the earlier interval -- exec pid 5689 first offset 86531
+[clock-shift-attribution] PASS: continuous caller has one end row that joins a retained row
+[clock-shift-attribution] PASS: exec caller still alive at stop has no end row and a stop row -- 3 rows
+[clock-shift-attribution] PASS: exec caller: OS start predates first sighting of the run, first_observed_at follows the exec -- os_start-F=-2 first-F=86531
+[clock-shift-attribution] PASS: no fixture secret in public records
+[clock-shift-attribution] PASS: no fixture secret in raw database bytes
+[clock-shift-attribution] $ fm-github-accounting.py prune -> exit 0 stdout={"removed": 18}
+[clock-shift-attribution] $ fm-github-accounting.py records -> exit 0
+[clock-shift-attribution] PASS: everything expires once all rows pass 48 h -- 0 rows left
+[clock-shift-attribution] teardown owner stop -> exit 0 {"state": "stopped"}
+[clock-shift-attribution] leftover processes naming the lab: []
+[clock-shift-attribution] lab teardown -> exit 0
+[clock-shift-attribution] lab removed: True
+[clock-shift-attribution] RESULT PASS failures=0
+TOTAL FAILURES 0
+clock exit 0

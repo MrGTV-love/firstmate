@@ -1,0 +1,34 @@
+lab home: /Users/charlesabrooker/tmp/fm-lab.fcp9p50q (marker: True)
+FM_HOME-only env; stripped: NO_MISTAKES_GATE FM_GATE_REFUSE_BYPASS FM_ROOT_OVERRIDE FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_CONFIG_OVERRIDE FM_PROJECTS_OVERRIDE
+--- zero-size file
+$ fm-github-accounting.py start -> exit 0 stdout={"state": "running", "pid": 9601, "run_id": "c92f2c5824fb40b8bfa439c32e87dddb", "started_at": 1793763354.273068}
+PASS: zero-size database: start succeeds
+$ fm-github-accounting.py stop -> exit 0 stdout={"state": "stopped"}
+PASS: zero-size database becomes this owner's database -- 0x464d4748
+--- nonempty non-database file
+$ fm-github-accounting.py start -> exit 1 stderr=fm-github-accounting: operation unavailable (check owner status/state permissions)
+PASS: text file: start exits 1
+$ fm-github-accounting.py prune -> exit 1 stderr=fm-github-accounting: operation unavailable (check owner status/state permissions)
+PASS: text file: prune exits 1
+$ fm-github-accounting.py records -> exit 1 stderr=fm-github-accounting: operation unavailable (check owner status/state permissions)
+PASS: text file: records exits 1
+PASS: text file: bytes unchanged
+--- foreign sqlite database
+$ fm-github-accounting.py start -> exit 1 stderr=fm-github-accounting: operation unavailable (check owner status/state permissions)
+PASS: foreign: start exits 1
+$ fm-github-accounting.py prune -> exit 1 stderr=fm-github-accounting: operation unavailable (check owner status/state permissions)
+PASS: foreign: prune exits 1
+$ fm-github-accounting.py records -> exit 1 stderr=fm-github-accounting: operation unavailable (check owner status/state permissions)
+PASS: foreign: records exits 1
+PASS: foreign: bytes unchanged
+owner.log: fm-github-accounting: operation unavailable (check owner status/state permissions)
+fm-github-accounting: operation unavailable (check owner status/state permissions)
+PASS: failed start names the fixed reason in owner.log and no path text
+--- symlink database
+$ fm-github-accounting.py start -> exit 1 stderr=fm-github-accounting: operation unavailable (check owner status/state permissions)
+PASS: symlink: start exits 1 and target unchanged
+teardown owner stop -> exit 0 {"state": "stopped"}
+leftover processes naming the lab: []
+lab teardown -> exit 0
+lab removed: True
+RESULT PASS failures=0

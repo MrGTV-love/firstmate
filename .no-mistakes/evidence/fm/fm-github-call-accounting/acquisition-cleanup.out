@@ -1,0 +1,58 @@
+FM_TEST_BEGIN 2026-11-04T03:55:12Z tests/fm-spawn-acquisition-cleanup.test.sh family=backend-dispatch expected_gate_skip=none
+ok - tmux successful launch retains its slot
+ok - tmux slow refusal returns its slot and ends its get subshell
+ok - tmux spawning refusal returns its slot and ends its get subshell
+ok - tmux foreign refusal returns its slot and ends its get subshell
+ok - tmux dirty refusal returns its slot and ends its get subshell
+ok - tmux a get that outlasts the old 60-poll window is accepted
+ok - tmux laterexit refusal returns its slot and ends its get subshell
+ok - tmux earlyexit refusal returns its slot and ends its get subshell
+ok - tmux clock refusal returns its slot and ends its get subshell
+ok - tmux gone refusal returns its slot and ends its get subshell
+ok - tmux cleanup stops its writing child before removing the socket directory
+ok - tmux provisioning runs in the acquired shell ancestry before admitting its worker
+ok - tmux busy provisioning wait is bounded and stops only its own helper before restoring the copy
+ok - tmux stalled provisioning wait is bounded and stops only its own helper before restoring the copy
+ok - tmux public relaunch recovers refusal with exact scope and prepared base while preserving prior ahead work
+FM_TEST_END 2026-11-04T03:57:30Z tests/fm-spawn-acquisition-cleanup.test.sh exit=0 duration_ms=137956 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6J668RNYVFTM5YF8JFYY1XC/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-11-04T03:57:30Z tests/fm-watch-checkpoint.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - quiet checkpoint exits 124 with a clean checkpoint line and no live lock
+ok - Perl fallback honors the cleanup bound before escalating an INT-ignoring direct watcher
+ok - an unusable Perl falls back to timeout or gtimeout and still runs the watcher
+ok - a checkpoint restores ignored INT before launching its watcher
+ok - a checkpoint launches its watcher from a code root whose path holds a space
+ok - a cancelled checkpoint forwards the cancel so its watcher releases the lock
+# group-kill ordinary stop_ms=361
+ok - a group-killed checkpoint still stops its watcher and frees the next checkpoint
+# group-kill delayed stop_ms=421
+ok - a group-killed checkpoint still stops a bound child that was slow to make its process group
+ok - an announced recovery is not reannounced by the next foreground checkpoint
+ok - a never-announced recovery still surfaces once from a foreground checkpoint
+ok - a queue append during a foreground checkpoint still resurfaces
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 27478.1793764677.PmdTMC
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  Unread wake(s) queued, but no live watcher process holds this home lock (last beat: 4s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-wake-tangle-root.C0pAIw/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+ok - checkpoint passes through a real watcher wake and leaves the queue for drain
+ok - checkpoint preserves watcher environment for registered custom checks
+ok - checkpoint: due checks progress before repeated unmanaged recovery, whose durable notice and cooldown survive
+ok - checkpoint rejects an existing watcher singleton as unowned
+ok - checkpoint: an opted-in home runs the host for the checkpoint's bound, raised only while away
+ok - checkpoint: a handed-back wake passes through, and a host stand-down or signal death is a failure
+ok - checkpoint: a Codex home without config/supervision-host, or with an off file, never runs the host
+ok - checkpoint: the real host ends its park at the checkpoint bound as a quiet checkpoint
+FM_TEST_END 2026-11-04T03:58:25Z tests/fm-watch-checkpoint.test.sh exit=0 duration_ms=54743 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6J668RNYVFTM5YF8JFYY1XC/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=2 failed=0 skipped_gate=0 duration_ms=193854
+FM_TEST_SUMMARY_FAMILY family=backend-dispatch count=1 duration_ms=137956 failed=0
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=54743 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-spawn-acquisition-cleanup.test.sh duration_ms=137956
+FM_TEST_SLOWEST rank=2 script=tests/fm-watch-checkpoint.test.sh duration_ms=54743
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6J668RNYVFTM5YF8JFYY1XC/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+exit 0

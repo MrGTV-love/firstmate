@@ -1,0 +1,61 @@
+lab home: /Users/charlesabrooker/tmp/fm-lab.q9foe4pu (marker: True)
+FM_HOME-only env; stripped: NO_MISTAKES_GATE FM_GATE_REFUSE_BYPASS FM_ROOT_OVERRIDE FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_CONFIG_OVERRIDE FM_PROJECTS_OVERRIDE
+$ fm-github-accounting.py status -> exit 0 stdout={"state": "stopped"}
+PASS: status before start reports stopped
+$ fm-github-accounting.py start -> exit 0 stdout={"state": "running", "pid": 38512, "run_id": "ead6d3156eff43b2a384b1757d41605d", "started_at": 1793763595.9937}
+PASS: start leaves a running owner -- {"state": "running", "pid": 38512, "run_id": "ead6d3156eff43b2a384b1757d41605d", "started_at": 1793763595.9937}
+$ fm-github-accounting.py start -> exit 0 stdout={"state": "running", "pid": 38512, "run_id": "ead6d3156eff43b2a384b1757d41605d", "started_at": 1793763595.9937}
+PASS: second start is idempotent (same run id, same pid)
+$ fm-github-accounting.py run --duration 1 -> exit 75 stderr=fm-github-accounting: busy (owner lock held); retry
+PASS: second run refuses busy=75
+$ fm-github-accounting.py records -> exit 75 stderr=fm-github-accounting: busy (owner lock held); retry
+PASS: records while the owner runs is busy=75
+$ fm-github-accounting.py prune -> exit 75 stderr=fm-github-accounting: busy (owner lock held); retry
+PASS: prune while the owner runs is busy=75
+PASS: private state modes -- 0o700 0o600
+killing the ending caller's group at about 20 s
+$ fm-github-accounting.py stop -> exit 0 stdout={"state": "stopped"}
+PASS: stop exits 0
+$ fm-github-accounting.py status -> exit 0 stdout={"state": "stopped"}
+PASS: status after stop reports stopped
+PASS: owner pid gone after stop
+$ fm-github-accounting.py records -> exit 0
+PASS: at least 3 observed REST rows -- 4 observed of 4
+  quota request_started_at=1793763595.997 source='REST rate_limit resources.graphql' endpoint=rate_limit graphql={'limit': 5000, 'remaining': 4430, 'reset': 1793764713, 'used': 570}
+  quota request_started_at=1793763611.113 source='REST rate_limit resources.graphql' endpoint=rate_limit graphql={'limit': 5000, 'remaining': 4429, 'reset': 1793764713, 'used': 571}
+  quota request_started_at=1793763626.236 source='REST rate_limit resources.graphql' endpoint=rate_limit graphql={'limit': 5000, 'remaining': 4421, 'reset': 1793764713, 'used': 579}
+  quota request_started_at=1793763641.375 source='REST rate_limit resources.graphql' endpoint=rate_limit graphql={'limit': 5000, 'remaining': 4416, 'reset': 1793764713, 'used': 584}
+PASS: rows carry used, reset, limit, remaining
+PASS: rows say REST rate_limit resources.graphql
+PASS: request gap is about 15 s -- [15.117, 15.123, 15.139]
+  sampling rows: [{"scans": 1, "failures": 0, "max_gap_seconds": 0.0}, {"scans": 49, "failures": 0, "max_gap_seconds": 0.349}, {"scans": 47, "failures": 0, "max_gap_seconds": 0.35}, {"scans": 48, "failures": 0, "max_gap_seconds": 0.35}, {"scans": 7, "failures": 0, "max_gap_seconds": 0.349}]
+PASS: real ps scans ran with 0 failures
+PASS: largest real scan gap inside the filed 0.5 s range in full intervals -- [0.349, 0.35, 0.35]
+PASS: survivor has a first sighting row and a stop row -- 2
+  survivor row: {"ancestor_end": "root", "ancestors": [{"argv": ["sh", "caller-parent", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]"], "pid": 37546, "ppid": 37235, "start": "Tue Nov 3 21:39:55 2026"}, {"argv": ["python3", "live_driver.py", "[REDACTED]", "[REDACTED]", "[REDACTED]"], "pid": 37235, "ppid": 35531, "start": "Tue Nov 3 21:39:55 2026"}, {"argv": ["zsh", "-c", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "-f", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "-f", "[REDACTED]", "[REDACTED]", "[RE
+PASS: survivor argv is sanitized -- ["sh", "gh", "pr", "checks", "[REDACTED]", "[REDACTED]", "--body", "[REDACTED]", "-H", "[REDACTED]", "[REDACTED]", "[REDACTED]"]
+PASS: survivor ancestors name its real parent
+PASS: survivor row holds pid, start, timestamps, source, run id
+PASS: stop row keeps first_observed_at and a later observed_at
+PASS: survivor has no end row
+PASS: ended caller has a process row
+  python-parent ancestor argv: ["python3", "-c", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]"]
+PASS: python -c payload withheld
+PASS: ended caller has one joined end row -- [{"kind": "process_end", "observed_at": 1793763616.6845582, "pid": 37623, "run_id": "ead6d3156eff43b2a384b1757d41605d", "start": "Tue Nov 3 21:39:55 2026"}]
+PASS: departure rows repeat the same projection -- 1 rows
+PASS: owner's own real gh-axi child is observed as a caller with its value withheld -- ["node", "gh-axi", "api", "rate_limit", "--jq", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "--full"]
+PASS: no fixture secret in public records
+PASS: no fixture secret in raw database bytes
+PASS: owner rows mark start and stop with cadence
+$ fm-github-accounting.py start -> exit 0 stdout={"state": "running", "pid": 70194, "run_id": "80cad42a8249411fa97049124cee6916", "started_at": 1793763643.993909}
+killing owner pid 70194 with SIGKILL
+$ fm-github-accounting.py status -> exit 0 stdout={"state": "stopped"}
+PASS: status after SIGKILL reports stopped
+$ fm-github-accounting.py start -> exit 0 stdout={"state": "running", "pid": 71058, "run_id": "167e8006df8345b4a7cbf89b1fd120a5", "started_at": 1793763644.816894}
+PASS: start after SIGKILL gives a new owner -- 167e8006df8345b4a7cbf89b1fd120a5
+$ fm-github-accounting.py stop -> exit 0 stdout={"state": "stopped"}
+teardown owner stop -> exit 0 {"state": "stopped"}
+leftover processes naming the lab: []
+lab teardown -> exit 0
+lab removed: True
+RESULT PASS failures=0

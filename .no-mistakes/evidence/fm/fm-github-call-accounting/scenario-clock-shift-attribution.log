@@ -1,0 +1,37 @@
+lab home: /Users/charlesabrooker/tmp/fm-lab.pnfpdywa (marker: True)
+FM_HOME-only env; stripped: NO_MISTAKES_GATE FM_GATE_REFUSE_BYPASS FM_ROOT_OVERRIDE FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_CONFIG_OVERRIDE FM_PROJECTS_OVERRIDE
+PASS: continuous caller first sighted
+clock moved to +36000 s; used fixture = 100
+labeled quota transition: used fixture = 4999
+PASS: two quota rows inside the later interval -- [[36015, 100], [36030, 4999]]
+clock moved to +86500 s: renewal is due; exec caller goes now
+PASS: renewal row written for the caller alive past 24 h
+PASS: exec caller row appears after exec
+clock moved to +172901 s: second renewal; next quota tick prunes the first sighting
+  continuous process rows now (offset from first sighting): [86530, 172932]
+PASS: first sighting expired by the owner's own 48 h prune
+PASS: no per-scan rows: exactly 2 renewals retained
+PASS: every renewal keeps first_observed_at and same projection
+kill the continuous caller; keep the exec caller alive through stop
+send SIGTERM to the owner: a normal stop
+PASS: owner exits 0 on SIGTERM
+$ fm-github-accounting.py records -> exit 0
+PASS: cold reader finds the 4899-point interval
+  interval (+36015..+36030) used_delta=4899
+    caller {"argv": ["sh", "gh", "pr", "checks", "[REDACTED]", "[REDACTED]", "--body", "[REDACTED]", "-H", "[REDACTED]", "[REDACTED]", "[REDACTED]"], "parent": ["sh", "caller-parent", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]"], "first_offset": 0, "ended": true}
+PASS: every retained process timestamp is later than the interval -- [86530, 172932]
+PASS: continuous caller overlaps through first_observed_at
+PASS: exec caller does not overlap the earlier interval -- exec pid 5689 first offset 86531
+PASS: continuous caller has one end row that joins a retained row
+PASS: exec caller still alive at stop has no end row and a stop row -- 3 rows
+PASS: exec caller: OS start predates first sighting of the run, first_observed_at follows the exec -- os_start-F=-2 first-F=86531
+PASS: no fixture secret in public records
+PASS: no fixture secret in raw database bytes
+$ fm-github-accounting.py prune -> exit 0 stdout={"removed": 18}
+$ fm-github-accounting.py records -> exit 0
+PASS: everything expires once all rows pass 48 h -- 0 rows left
+teardown owner stop -> exit 0 {"state": "stopped"}
+leftover processes naming the lab: []
+lab teardown -> exit 0
+lab removed: True
+RESULT PASS failures=0

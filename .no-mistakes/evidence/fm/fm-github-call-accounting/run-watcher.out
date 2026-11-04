@@ -1,0 +1,40 @@
+--- primary home: start, leave alone, recover from SIGKILL
+PASS: watcher cycle started an absent owner: run_id=247826097c954a99ba36aef53df6e9c5
+PASS: after more cycles the same owner runs
+PASS: healthy owner raised no wake
+SIGKILL sent to owner 53145
+PASS: next cycle recovered: new run_id=01756521ac374ae1a133c253ddae8dd6
+PASS: detached owner outlives its watcher
+{"state": "stopped"}
+PASS: owner stop works after watcher exit
+owner rows: [('start', '24782609'), ('start', '01756521'), ('stop', '01756521')]
+--- primary home: foreign database refused, one wake, silent hold, recovery
+check: github-accounting owner failed to start: exit=1; owner stderr: /Users/charlesabrooker/tmp/fm-watch-live.63RKpE/foreign/state/github-accounting/owner.log; retries every 3600s without another wake
+PASS: failed start wakes with the named reason
+PASS: one durable wake queued
+PASS: failed-start marker written
+PASS: foreign file bytes unchanged
+1793764459	1	check	github-accounting-start-failed	check: github-accounting owner failed to start: exit=1; owner stderr: /Users/charlesabrooker/tmp/fm-watch-live.63RKpE/foreign/state/github-accounting/owner.log; retries every 3600s without another wake
+PASS: real drain presents the failed start
+PASS: wake acknowledged
+PASS: restarted watcher keeps polling inside the hold
+PASS: no second wake inside the hold
+PASS: no new start attempt inside the hold
+PASS: after the operator moved the file, the retry started an owner
+watcher closed its cycle with: check: rearm-resurface
+marker still present after that exit (status never read)
+PASS: marker removed by the success after 3 s
+PASS: the next watcher's idempotent start left the running owner alone
+--- lab home: never starts the owner
+PASS: lab watcher kept polling
+PASS: lab home started no owner
+--- secondmate home: never starts the owner
+PASS: secondmate watcher kept polling
+PASS: secondmate home started no owner
+--- disabled home: never starts the owner
+PASS: disabled watcher kept polling
+PASS: disabled home started no owner
+leftover processes naming the scratch root: []
+scratch removed: yes
+RESULT failures=0
+exit 0

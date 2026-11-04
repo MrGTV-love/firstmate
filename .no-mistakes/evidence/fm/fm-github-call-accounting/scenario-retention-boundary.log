@@ -1,0 +1,16 @@
+lab home: /Users/charlesabrooker/tmp/fm-lab.fgslkbd0 (marker: True)
+FM_HOME-only env; stripped: NO_MISTAKES_GATE FM_GATE_REFUSE_BYPASS FM_ROOT_OVERRIDE FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_CONFIG_OVERRIDE FM_PROJECTS_OVERRIDE
+$ fm-github-accounting.py prune -> exit 0 stdout={"removed": 0}
+$ fm-github-accounting.py records -> exit 0
+before: ["at-boundary", "ended-earlier-row", "ended-latest-row", "kept-end", "newer", "old-process-end", "old-process-of-old-end", "older", "older-owner", "older-sampling", "other-run-same-pid", "plain-old-process"]
+$ fm-github-accounting.py prune -> exit 0 stdout={"removed": 8}
+$ fm-github-accounting.py records -> exit 0
+after: ["at-boundary", "ended-latest-row", "kept-end", "newer"]
+PASS: removed count is 8 (the 8 rows older than the cutoff that no retained end row keeps) -- {"removed": 8}
+PASS: exact survivors -- want ['at-boundary', 'ended-latest-row', 'kept-end', 'newer']
+PASS: unrelated state stays
+teardown owner stop -> exit 0 {"state": "stopped"}
+leftover processes naming the lab: []
+lab teardown -> exit 0
+lab removed: True
+RESULT PASS failures=0

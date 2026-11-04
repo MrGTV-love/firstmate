@@ -1,0 +1,99 @@
+[
+ {
+  "interval": [
+   36015,
+   36030
+  ],
+  "used_delta": 4899,
+  "fixture_callers": [
+   {
+    "pid": 5690,
+    "argv": [
+     "sh",
+     "gh",
+     "pr",
+     "checks",
+     "[REDACTED]",
+     "[REDACTED]",
+     "--body",
+     "[REDACTED]",
+     "-H",
+     "[REDACTED]",
+     "[REDACTED]",
+     "[REDACTED]"
+    ],
+    "parent": [
+     "sh",
+     "caller-parent",
+     "[REDACTED]",
+     "[REDACTED]",
+     "[REDACTED]",
+     "[REDACTED]"
+    ],
+    "first_observed_at": 1793763548.790436,
+    "end": 1793936495.317219,
+    "ended": true
+   }
+  ],
+  "other_host_callers_count": 1
+ },
+ {
+  "interval": [
+   36030,
+   172946
+  ],
+  "used_delta": 0,
+  "fixture_callers": [
+   {
+    "pid": 5690,
+    "argv": [
+     "sh",
+     "gh",
+     "pr",
+     "checks",
+     "[REDACTED]",
+     "[REDACTED]",
+     "--body",
+     "[REDACTED]",
+     "-H",
+     "[REDACTED]",
+     "[REDACTED]",
+     "[REDACTED]"
+    ],
+    "parent": [
+     "sh",
+     "caller-parent",
+     "[REDACTED]",
+     "[REDACTED]",
+     "[REDACTED]",
+     "[REDACTED]"
+    ],
+    "first_observed_at": 1793763548.790436,
+    "end": 1793936495.317219,
+    "ended": true
+   },
+   {
+    "pid": 5689,
+    "argv": [
+     "sh",
+     "gh",
+     "issue",
+     "list",
+     "--body",
+     "[REDACTED]"
+    ],
+    "parent": [
+     "python3",
+     "live_driver.py",
+     "[REDACTED]",
+     "[REDACTED]",
+     "[REDACTED]"
+    ],
+    "first_observed_at": 1793850079.9327412,
+    "end": null,
+    "ended": false
+   }
+  ],
+  "other_host_callers_count": 0
+ }
+]
