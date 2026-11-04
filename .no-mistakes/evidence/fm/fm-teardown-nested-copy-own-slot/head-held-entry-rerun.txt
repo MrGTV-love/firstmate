@@ -1,0 +1,23 @@
+ok - held close entry check, lease-no-command, plain record
+ok - held close entry check, lease-no-command, enclosing record
+ok - held close entry check, lease-fails, plain record
+ok - held close entry check, lease-fails, enclosing record
+ok - held close entry check, record-directory, plain record
+ok - held close entry check, record-directory, enclosing record
+ok - held close entry check, unrecorded-readonly, plain record
+ok - held close entry check, unrecorded-readonly, enclosing record
+ok - held close entry check, symlink-dangling, plain record
+ok - held close entry check, symlink-dangling, enclosing record
+ok - held close entry check, symlink-directory, plain record
+ok - held close entry check, symlink-directory, enclosing record
+ok - held close entry check, symlink-unrecorded-readonly, plain record
+ok - held close entry check, symlink-unrecorded-readonly, enclosing record
+ok - held close entry check, symlink-writable, plain record
+ok - held close entry check, symlink-writable, enclosing record
+ok - held close entry check, recorded-readonly, plain record
+ok - held close entry check, recorded-readonly, enclosing record
+ok - held close entry check, recorded-writable, plain record
+ok - held close entry check, recorded-writable, enclosing record
+ok - held close entry check, close, plain record
+ok - held close entry check, close, enclosing record
+rm: /Users/charlesabrooker/tmp/fm-teardown-tests.T0bXfX: Directory not empty

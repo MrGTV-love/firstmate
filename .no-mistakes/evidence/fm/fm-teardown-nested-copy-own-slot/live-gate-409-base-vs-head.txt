@@ -1,0 +1,179 @@
+NOTE: "code=2050eb6" (and any short sha other than fff7007a2) is a throwaway temp git repo holding base 9c5874baa bin/ plus head tests/; "code=fff7007a2" is the head worktree.
+### base-gate409-landed  code=2050eb6  shape=plain claim=mine variant=landed args=--force --drop-file
+record lines:
+  window=default:wG:pQ
+  endpoint_task_id=task-x1
+  worktree=/Users/charlesabrooker/tmp/fm-teardown-tests.9WtwxG/base-gate409-landed/pool/1/project/.claude/worktrees/task-x1-v2
+  branch=fm/task-x1-v2
+  project=/Users/charlesabrooker/tmp/fm-teardown-tests.9WtwxG/base-gate409-landed/project
+  kind=ship
+  mode=no-mistakes
+  spawn_gen=teardown-test-task-x1
+  tasktmp=/Users/charlesabrooker/tmp/fm-teardown-tests.9WtwxG/base-gate409-landed/tasktmp
+  backend=herdr
+  herdr_session=default
+  herdr_workspace_id=wG
+  herdr_tab_id=wG:tQ
+  herdr_pane_id=wG:pQ
+slot root HEAD: 3e3f93eb2f84b65fcc6e6954bdb5305393d49016
+BEFORE:
+  record (task-x1.meta):  present
+  inbox dir:              present
+  status file:            present
+  tasktmp dir:            present
+  nested copy:            present
+  slot claim file:         task=task-x1  home=/Users/charlesabrooker/tmp/fm-teardown-tests.9WtwxG/base-gate409-landed/home 
+  backlog-close marker:   present sha=0e947bca7a1b
+  return-pending marker:  present: spawn_gen=teardown-test-task-x1 slot= 
+  treehouse calls:        none
+  herdr pane closed:      no
+RUN: fm-teardown.sh task-x1 --force --drop-file <words>  -> exit 1
+stderr (REFUSED/error lines):
+  REFUSED: reserved pool slot  lost its durable lease; retaining the task record and contents
+stdout (last 3 lines):
+AFTER:
+  record (task-x1.meta):  present
+  inbox dir:              ABSENT
+  status file:            ABSENT
+  tasktmp dir:            ABSENT
+  nested copy:            present
+  slot claim file:         task=task-x1  home=/Users/charlesabrooker/tmp/fm-teardown-tests.9WtwxG/base-gate409-landed/home 
+  backlog-close marker:   ABSENT
+  return-pending marker:  present: spawn_gen=teardown-test-task-x1 slot= 
+  treehouse calls:        none
+  herdr pane closed:      yes
+
+### head-gate409-landed  code=fff7007a2  shape=plain claim=mine variant=landed args=--force --drop-file
+record lines:
+  window=default:wG:pQ
+  endpoint_task_id=task-x1
+  worktree=/Users/charlesabrooker/tmp/fm-teardown-tests.Pas6MH/head-gate409-landed/pool/1/project/.claude/worktrees/task-x1-v2
+  branch=fm/task-x1-v2
+  project=/Users/charlesabrooker/tmp/fm-teardown-tests.Pas6MH/head-gate409-landed/project
+  kind=ship
+  mode=no-mistakes
+  spawn_gen=teardown-test-task-x1
+  tasktmp=/Users/charlesabrooker/tmp/fm-teardown-tests.Pas6MH/head-gate409-landed/tasktmp
+  backend=herdr
+  herdr_session=default
+  herdr_workspace_id=wG
+  herdr_tab_id=wG:tQ
+  herdr_pane_id=wG:pQ
+slot root HEAD: d68f0bb00e90737389ecaf9690fb32dc21bb32be
+BEFORE:
+  record (task-x1.meta):  present
+  inbox dir:              present
+  status file:            present
+  tasktmp dir:            present
+  nested copy:            present
+  slot claim file:         task=task-x1  home=/Users/charlesabrooker/tmp/fm-teardown-tests.Pas6MH/head-gate409-landed/home 
+  backlog-close marker:   present sha=fb25b9e1c2b9
+  return-pending marker:  present: spawn_gen=teardown-test-task-x1 slot= 
+  treehouse calls:        none
+  herdr pane closed:      no
+RUN: fm-teardown.sh task-x1 --force --drop-file <words>  -> exit 0
+stderr (REFUSED/error lines):
+stdout (last 3 lines):
+  /Users/charlesabrooker/tmp/fm-teardown-tests.Pas6MH/head-gate409-landed/project: already current
+  teardown task-x1 complete (window default:wG:pQ; nested reassociated worktree /Users/charlesabrooker/tmp/fm-teardown-tests.Pas6MH/head-gate409-landed/pool/1/project/.claude/worktrees/task-x1-v2 removed and its pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.Pas6MH/head-gate409-landed/pool/1
+  Backlog: task-x1 just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-teardown-tests.Pas6MH/head-gate409-landed/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-teardown-tests.Pas6MH/head-gate409-landed/data/backlog.md - move task-x1 to Done, keep Done to the 1
+AFTER:
+  record (task-x1.meta):  ABSENT
+  inbox dir:              ABSENT
+  status file:            ABSENT
+  tasktmp dir:            ABSENT
+  nested copy:            ABSENT
+  slot claim file:        ABSENT
+  backlog-close marker:   ABSENT
+  return-pending marker:  ABSENT
+  treehouse calls:        return --force /Users/charlesabrooker/tmp/fm-teardown-tests.Pas6MH/head-gate409-landed/pool/1/project;
+  herdr pane closed:      yes
+
+### base-gate409-slot-unlanded  code=2050eb6  shape=plain claim=mine variant=slot-unlanded args=--force --drop-file
+record lines:
+  window=default:wG:pQ
+  endpoint_task_id=task-x1
+  worktree=/Users/charlesabrooker/tmp/fm-teardown-tests.LSWA9Y/base-gate409-slot-unlanded/pool/1/project/.claude/worktrees/task-x1-v2
+  branch=fm/task-x1-v2
+  project=/Users/charlesabrooker/tmp/fm-teardown-tests.LSWA9Y/base-gate409-slot-unlanded/project
+  kind=ship
+  mode=no-mistakes
+  spawn_gen=teardown-test-task-x1
+  tasktmp=/Users/charlesabrooker/tmp/fm-teardown-tests.LSWA9Y/base-gate409-slot-unlanded/tasktmp
+  backend=herdr
+  herdr_session=default
+  herdr_workspace_id=wG
+  herdr_tab_id=wG:tQ
+  herdr_pane_id=wG:pQ
+slot root HEAD: 03a03c66e2a0c9c4550081d608b86219d61568d1
+BEFORE:
+  record (task-x1.meta):  present
+  inbox dir:              present
+  status file:            present
+  tasktmp dir:            present
+  nested copy:            present
+  slot claim file:         task=task-x1  home=/Users/charlesabrooker/tmp/fm-teardown-tests.LSWA9Y/base-gate409-slot-unlanded/home 
+  backlog-close marker:   present sha=d21234bc3c83
+  return-pending marker:  present: spawn_gen=teardown-test-task-x1 slot= 
+  treehouse calls:        none
+  herdr pane closed:      no
+RUN: fm-teardown.sh task-x1 --force --drop-file <words>  -> exit 1
+stderr (REFUSED/error lines):
+  REFUSED: reserved pool slot  lost its durable lease; retaining the task record and contents
+stdout (last 3 lines):
+AFTER:
+  record (task-x1.meta):  present
+  inbox dir:              ABSENT
+  status file:            ABSENT
+  tasktmp dir:            ABSENT
+  nested copy:            present
+  slot claim file:         task=task-x1  home=/Users/charlesabrooker/tmp/fm-teardown-tests.LSWA9Y/base-gate409-slot-unlanded/home 
+  backlog-close marker:   ABSENT
+  return-pending marker:  present: spawn_gen=teardown-test-task-x1 slot= 
+  treehouse calls:        none
+  herdr pane closed:      yes
+
+### head-gate409-slot-unlanded  code=fff7007a2  shape=plain claim=mine variant=slot-unlanded args=--force --drop-file
+record lines:
+  window=default:wG:pQ
+  endpoint_task_id=task-x1
+  worktree=/Users/charlesabrooker/tmp/fm-teardown-tests.AUaxPd/head-gate409-slot-unlanded/pool/1/project/.claude/worktrees/task-x1-v2
+  branch=fm/task-x1-v2
+  project=/Users/charlesabrooker/tmp/fm-teardown-tests.AUaxPd/head-gate409-slot-unlanded/project
+  kind=ship
+  mode=no-mistakes
+  spawn_gen=teardown-test-task-x1
+  tasktmp=/Users/charlesabrooker/tmp/fm-teardown-tests.AUaxPd/head-gate409-slot-unlanded/tasktmp
+  backend=herdr
+  herdr_session=default
+  herdr_workspace_id=wG
+  herdr_tab_id=wG:tQ
+  herdr_pane_id=wG:pQ
+slot root HEAD: fff6c504d9ffd1204117b59a7b6cfd4272cc5b33
+BEFORE:
+  record (task-x1.meta):  present
+  inbox dir:              present
+  status file:            present
+  tasktmp dir:            present
+  nested copy:            present
+  slot claim file:         task=task-x1  home=/Users/charlesabrooker/tmp/fm-teardown-tests.AUaxPd/head-gate409-slot-unlanded/home 
+  backlog-close marker:   present sha=5f5a09ca67b4
+  return-pending marker:  present: spawn_gen=teardown-test-task-x1 slot= 
+  treehouse calls:        none
+  herdr pane closed:      no
+RUN: fm-teardown.sh task-x1 --force --drop-file <words>  -> exit 1
+stderr (REFUSED/error lines):
+  REFUSED: returning pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.AUaxPd/head-gate409-slot-unlanded/pool/1/project would sweep away task task-x1's claimed pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.AUaxPd/head-gate409-slot-unlanded/pool/1/project, whose HEAD fff6c504d9ffd1204117b59a7b6cfd4272cc5b33 is neither landed nor held by a refs/fm/anchor/task-x1-<sha> preservation anch
+stdout (last 3 lines):
+AFTER:
+  record (task-x1.meta):  present
+  inbox dir:              present
+  status file:            present
+  tasktmp dir:            present
+  nested copy:            present
+  slot claim file:         task=task-x1  home=/Users/charlesabrooker/tmp/fm-teardown-tests.AUaxPd/head-gate409-slot-unlanded/home 
+  backlog-close marker:   present sha=5f5a09ca67b4
+  return-pending marker:  present: spawn_gen=teardown-test-task-x1 slot= 
+  treehouse calls:        none
+  herdr pane closed:      no
+

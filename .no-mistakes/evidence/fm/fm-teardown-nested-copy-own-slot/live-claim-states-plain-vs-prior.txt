@@ -1,0 +1,457 @@
+### head-plain-other-landed  code=fff7007a2  shape=plain claim=other variant=landed 
+record lines:
+  window=default:wG:pQ
+  endpoint_task_id=task-x1
+  worktree=/Users/charlesabrooker/tmp/fm-teardown-tests.axUD2j/head-plain-other-landed/pool/1/project/.claude/worktrees/task-x1-v2
+  branch=fm/task-x1-v2
+  project=/Users/charlesabrooker/tmp/fm-teardown-tests.axUD2j/head-plain-other-landed/project
+  kind=ship
+  mode=no-mistakes
+  spawn_gen=teardown-test-task-x1
+  tasktmp=/Users/charlesabrooker/tmp/fm-teardown-tests.axUD2j/head-plain-other-landed/tasktmp
+  backend=herdr
+  herdr_session=default
+  herdr_workspace_id=wG
+  herdr_tab_id=wG:tQ
+  herdr_pane_id=wG:pQ
+slot root HEAD: c96f3ba43b4e3430713a63b5506280c78e53b8bf
+BEFORE:
+  record (task-x1.meta):  present
+  inbox dir:              present
+  status file:            present
+  tasktmp dir:            present
+  nested copy:            present
+  slot claim file:         task=other-task  home=/Users/charlesabrooker/tmp/fm-teardown-tests.axUD2j/head-plain-other-landed/home 
+  backlog-close marker:   present sha=e595e9e957d1
+  return-pending marker:  present: spawn_gen=teardown-test-task-x1 slot= 
+  treehouse calls:        none
+  herdr pane closed:      no
+RUN: fm-teardown.sh task-x1   -> exit 0
+stderr (REFUSED/error lines):
+stdout (last 3 lines):
+  /Users/charlesabrooker/tmp/fm-teardown-tests.axUD2j/head-plain-other-landed/project: already current
+  teardown task-x1 complete (window default:wG:pQ; reassociated worktree /Users/charlesabrooker/tmp/fm-teardown-tests.axUD2j/head-plain-other-landed/pool/1/project/.claude/worktrees/task-x1-v2 left in place, since it is not a pool slot)
+  Backlog: task-x1 just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-teardown-tests.axUD2j/head-plain-other-landed/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-teardown-tests.axUD2j/head-plain-other-landed/data/backlog.md - move task-x1 to Done, keep Done 
+AFTER:
+  record (task-x1.meta):  ABSENT
+  inbox dir:              ABSENT
+  status file:            ABSENT
+  tasktmp dir:            ABSENT
+  nested copy:            present
+  slot claim file:         task=other-task  home=/Users/charlesabrooker/tmp/fm-teardown-tests.axUD2j/head-plain-other-landed/home 
+  backlog-close marker:   ABSENT
+  return-pending marker:  ABSENT
+  treehouse calls:        none
+  herdr pane closed:      yes
+
+### head-enclosing-other-landed  code=fff7007a2  shape=enclosing claim=other variant=landed 
+record lines:
+  window=default:wG:pQ
+  endpoint_task_id=task-x1
+  worktree=/Users/charlesabrooker/tmp/fm-teardown-tests.fjvpJN/head-enclosing-other-landed/pool/1/project/.claude/worktrees/task-x1-v2
+  branch=fm/task-x1-v2
+  project=/Users/charlesabrooker/tmp/fm-teardown-tests.fjvpJN/head-enclosing-other-landed/project
+  kind=ship
+  mode=no-mistakes
+  spawn_gen=teardown-test-task-x1
+  prior_worktree=/Users/charlesabrooker/tmp/fm-teardown-tests.fjvpJN/head-enclosing-other-landed/pool/1/project
+  tasktmp=/Users/charlesabrooker/tmp/fm-teardown-tests.fjvpJN/head-enclosing-other-landed/tasktmp
+  backend=herdr
+  herdr_session=default
+  herdr_workspace_id=wG
+  herdr_tab_id=wG:tQ
+  herdr_pane_id=wG:pQ
+slot root HEAD: 6239271dc0eda6663fbe73b22d65e8db02d72d4d
+BEFORE:
+  record (task-x1.meta):  present
+  inbox dir:              present
+  status file:            present
+  tasktmp dir:            present
+  nested copy:            present
+  slot claim file:         task=other-task  home=/Users/charlesabrooker/tmp/fm-teardown-tests.fjvpJN/head-enclosing-other-landed/home 
+  backlog-close marker:   present sha=478c51ff099a
+  return-pending marker:  present: spawn_gen=teardown-test-task-x1 slot= 
+  treehouse calls:        none
+  herdr pane closed:      no
+RUN: fm-teardown.sh task-x1   -> exit 0
+stderr (REFUSED/error lines):
+stdout (last 3 lines):
+  teardown task-x1 complete (window default:wG:pQ; reassociated worktree /Users/charlesabrooker/tmp/fm-teardown-tests.fjvpJN/head-enclosing-other-landed/pool/1/project/.claude/worktrees/task-x1-v2 left in place, since it is not a pool slot)
+  notice: task-x1's prior copy /Users/charlesabrooker/tmp/fm-teardown-tests.fjvpJN/head-enclosing-other-landed/pool/1/project (from a reassociation) was left untouched; return or remove it only after confirming its contents are landed or unwanted
+  Backlog: task-x1 just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-teardown-tests.fjvpJN/head-enclosing-other-landed/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-teardown-tests.fjvpJN/head-enclosing-other-landed/data/backlog.md - move task-x1 to Done, ke
+AFTER:
+  record (task-x1.meta):  ABSENT
+  inbox dir:              ABSENT
+  status file:            ABSENT
+  tasktmp dir:            ABSENT
+  nested copy:            present
+  slot claim file:         task=other-task  home=/Users/charlesabrooker/tmp/fm-teardown-tests.fjvpJN/head-enclosing-other-landed/home 
+  backlog-close marker:   ABSENT
+  return-pending marker:  ABSENT
+  treehouse calls:        none
+  herdr pane closed:      yes
+
+### head-plain-none-landed  code=fff7007a2  shape=plain claim=none variant=landed 
+record lines:
+  window=default:wG:pQ
+  endpoint_task_id=task-x1
+  worktree=/Users/charlesabrooker/tmp/fm-teardown-tests.UEaDPH/head-plain-none-landed/pool/1/project/.claude/worktrees/task-x1-v2
+  branch=fm/task-x1-v2
+  project=/Users/charlesabrooker/tmp/fm-teardown-tests.UEaDPH/head-plain-none-landed/project
+  kind=ship
+  mode=no-mistakes
+  spawn_gen=teardown-test-task-x1
+  tasktmp=/Users/charlesabrooker/tmp/fm-teardown-tests.UEaDPH/head-plain-none-landed/tasktmp
+  backend=herdr
+  herdr_session=default
+  herdr_workspace_id=wG
+  herdr_tab_id=wG:tQ
+  herdr_pane_id=wG:pQ
+slot root HEAD: 2cf5756da3fe8cee728d965dad4bcdb7f2cddd69
+BEFORE:
+  record (task-x1.meta):  present
+  inbox dir:              present
+  status file:            present
+  tasktmp dir:            present
+  nested copy:            present
+  slot claim file:        ABSENT
+  backlog-close marker:   present sha=b748a85358ab
+  return-pending marker:  present: spawn_gen=teardown-test-task-x1 slot= 
+  treehouse calls:        none
+  herdr pane closed:      no
+RUN: fm-teardown.sh task-x1   -> exit 0
+stderr (REFUSED/error lines):
+stdout (last 3 lines):
+  /Users/charlesabrooker/tmp/fm-teardown-tests.UEaDPH/head-plain-none-landed/project: already current
+  teardown task-x1 complete (window default:wG:pQ; reassociated worktree /Users/charlesabrooker/tmp/fm-teardown-tests.UEaDPH/head-plain-none-landed/pool/1/project/.claude/worktrees/task-x1-v2 left in place, since it is not a pool slot)
+  Backlog: task-x1 just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-teardown-tests.UEaDPH/head-plain-none-landed/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-teardown-tests.UEaDPH/head-plain-none-landed/data/backlog.md - move task-x1 to Done, keep Done to
+AFTER:
+  record (task-x1.meta):  ABSENT
+  inbox dir:              ABSENT
+  status file:            ABSENT
+  tasktmp dir:            ABSENT
+  nested copy:            present
+  slot claim file:        ABSENT
+  backlog-close marker:   ABSENT
+  return-pending marker:  ABSENT
+  treehouse calls:        none
+  herdr pane closed:      yes
+
+### head-enclosing-none-landed  code=fff7007a2  shape=enclosing claim=none variant=landed 
+record lines:
+  window=default:wG:pQ
+  endpoint_task_id=task-x1
+  worktree=/Users/charlesabrooker/tmp/fm-teardown-tests.A4I6q3/head-enclosing-none-landed/pool/1/project/.claude/worktrees/task-x1-v2
+  branch=fm/task-x1-v2
+  project=/Users/charlesabrooker/tmp/fm-teardown-tests.A4I6q3/head-enclosing-none-landed/project
+  kind=ship
+  mode=no-mistakes
+  spawn_gen=teardown-test-task-x1
+  prior_worktree=/Users/charlesabrooker/tmp/fm-teardown-tests.A4I6q3/head-enclosing-none-landed/pool/1/project
+  tasktmp=/Users/charlesabrooker/tmp/fm-teardown-tests.A4I6q3/head-enclosing-none-landed/tasktmp
+  backend=herdr
+  herdr_session=default
+  herdr_workspace_id=wG
+  herdr_tab_id=wG:tQ
+  herdr_pane_id=wG:pQ
+slot root HEAD: 504efb6cb44dec13361045892716a47b302cbbd3
+BEFORE:
+  record (task-x1.meta):  present
+  inbox dir:              present
+  status file:            present
+  tasktmp dir:            present
+  nested copy:            present
+  slot claim file:        ABSENT
+  backlog-close marker:   present sha=56ddfe5ce017
+  return-pending marker:  present: spawn_gen=teardown-test-task-x1 slot= 
+  treehouse calls:        none
+  herdr pane closed:      no
+RUN: fm-teardown.sh task-x1   -> exit 0
+stderr (REFUSED/error lines):
+stdout (last 3 lines):
+  teardown task-x1 complete (window default:wG:pQ; reassociated worktree /Users/charlesabrooker/tmp/fm-teardown-tests.A4I6q3/head-enclosing-none-landed/pool/1/project/.claude/worktrees/task-x1-v2 left in place, since it is not a pool slot)
+  notice: task-x1's prior copy /Users/charlesabrooker/tmp/fm-teardown-tests.A4I6q3/head-enclosing-none-landed/pool/1/project (from a reassociation) was left untouched; return or remove it only after confirming its contents are landed or unwanted
+  Backlog: task-x1 just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-teardown-tests.A4I6q3/head-enclosing-none-landed/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-teardown-tests.A4I6q3/head-enclosing-none-landed/data/backlog.md - move task-x1 to Done, keep
+AFTER:
+  record (task-x1.meta):  ABSENT
+  inbox dir:              ABSENT
+  status file:            ABSENT
+  tasktmp dir:            ABSENT
+  nested copy:            present
+  slot claim file:        ABSENT
+  backlog-close marker:   ABSENT
+  return-pending marker:  ABSENT
+  treehouse calls:        none
+  herdr pane closed:      yes
+
+### head-plain-mine-copy-dirty  code=fff7007a2  shape=plain claim=mine variant=copy-dirty 
+record lines:
+  window=default:wG:pQ
+  endpoint_task_id=task-x1
+  worktree=/Users/charlesabrooker/tmp/fm-teardown-tests.Bf6OrM/head-plain-mine-copy-dirty/pool/1/project/.claude/worktrees/task-x1-v2
+  branch=fm/task-x1-v2
+  project=/Users/charlesabrooker/tmp/fm-teardown-tests.Bf6OrM/head-plain-mine-copy-dirty/project
+  kind=ship
+  mode=no-mistakes
+  spawn_gen=teardown-test-task-x1
+  tasktmp=/Users/charlesabrooker/tmp/fm-teardown-tests.Bf6OrM/head-plain-mine-copy-dirty/tasktmp
+  backend=herdr
+  herdr_session=default
+  herdr_workspace_id=wG
+  herdr_tab_id=wG:tQ
+  herdr_pane_id=wG:pQ
+slot root HEAD: 48288dce9485781ed6efbfe9b1faba8862a4b2dc
+BEFORE:
+  record (task-x1.meta):  present
+  inbox dir:              present
+  status file:            present
+  tasktmp dir:            present
+  nested copy:            present
+  slot claim file:         task=task-x1  home=/Users/charlesabrooker/tmp/fm-teardown-tests.Bf6OrM/head-plain-mine-copy-dirty/home 
+  backlog-close marker:   present sha=95f2780c2a03
+  return-pending marker:  present: spawn_gen=teardown-test-task-x1 slot= 
+  treehouse calls:        none
+  herdr pane closed:      no
+RUN: fm-teardown.sh task-x1   -> exit 1
+stderr (REFUSED/error lines):
+  REFUSED: worktree /Users/charlesabrooker/tmp/fm-teardown-tests.Bf6OrM/head-plain-mine-copy-dirty/pool/1/project/.claude/worktrees/task-x1-v2 has uncommitted changes.
+stdout (last 3 lines):
+AFTER:
+  record (task-x1.meta):  present
+  inbox dir:              present
+  status file:            present
+  tasktmp dir:            present
+  nested copy:            present
+  slot claim file:         task=task-x1  home=/Users/charlesabrooker/tmp/fm-teardown-tests.Bf6OrM/head-plain-mine-copy-dirty/home 
+  backlog-close marker:   present sha=95f2780c2a03
+  return-pending marker:  present: spawn_gen=teardown-test-task-x1 slot= 
+  treehouse calls:        none
+  herdr pane closed:      no
+
+### head-enclosing-mine-copy-dirty  code=fff7007a2  shape=enclosing claim=mine variant=copy-dirty 
+record lines:
+  window=default:wG:pQ
+  endpoint_task_id=task-x1
+  worktree=/Users/charlesabrooker/tmp/fm-teardown-tests.Ygzgf1/head-enclosing-mine-copy-dirty/pool/1/project/.claude/worktrees/task-x1-v2
+  branch=fm/task-x1-v2
+  project=/Users/charlesabrooker/tmp/fm-teardown-tests.Ygzgf1/head-enclosing-mine-copy-dirty/project
+  kind=ship
+  mode=no-mistakes
+  spawn_gen=teardown-test-task-x1
+  prior_worktree=/Users/charlesabrooker/tmp/fm-teardown-tests.Ygzgf1/head-enclosing-mine-copy-dirty/pool/1/project
+  tasktmp=/Users/charlesabrooker/tmp/fm-teardown-tests.Ygzgf1/head-enclosing-mine-copy-dirty/tasktmp
+  backend=herdr
+  herdr_session=default
+  herdr_workspace_id=wG
+  herdr_tab_id=wG:tQ
+  herdr_pane_id=wG:pQ
+slot root HEAD: 573adf5d60c2ba7512b55b0584021ff2f554a3fd
+BEFORE:
+  record (task-x1.meta):  present
+  inbox dir:              present
+  status file:            present
+  tasktmp dir:            present
+  nested copy:            present
+  slot claim file:         task=task-x1  home=/Users/charlesabrooker/tmp/fm-teardown-tests.Ygzgf1/head-enclosing-mine-copy-dirty/home 
+  backlog-close marker:   present sha=e86eba7d9f2b
+  return-pending marker:  present: spawn_gen=teardown-test-task-x1 slot= 
+  treehouse calls:        none
+  herdr pane closed:      no
+RUN: fm-teardown.sh task-x1   -> exit 1
+stderr (REFUSED/error lines):
+  REFUSED: worktree /Users/charlesabrooker/tmp/fm-teardown-tests.Ygzgf1/head-enclosing-mine-copy-dirty/pool/1/project/.claude/worktrees/task-x1-v2 has uncommitted changes.
+stdout (last 3 lines):
+AFTER:
+  record (task-x1.meta):  present
+  inbox dir:              present
+  status file:            present
+  tasktmp dir:            present
+  nested copy:            present
+  slot claim file:         task=task-x1  home=/Users/charlesabrooker/tmp/fm-teardown-tests.Ygzgf1/head-enclosing-mine-copy-dirty/home 
+  backlog-close marker:   present sha=e86eba7d9f2b
+  return-pending marker:  present: spawn_gen=teardown-test-task-x1 slot= 
+  treehouse calls:        none
+  herdr pane closed:      no
+
+### head-plain-other-copy-unlanded  code=fff7007a2  shape=plain claim=other variant=copy-unlanded 
+record lines:
+  window=default:wG:pQ
+  endpoint_task_id=task-x1
+  worktree=/Users/charlesabrooker/tmp/fm-teardown-tests.iODiDP/head-plain-other-copy-unlanded/pool/1/project/.claude/worktrees/task-x1-v2
+  branch=fm/task-x1-v2
+  project=/Users/charlesabrooker/tmp/fm-teardown-tests.iODiDP/head-plain-other-copy-unlanded/project
+  kind=ship
+  mode=no-mistakes
+  spawn_gen=teardown-test-task-x1
+  tasktmp=/Users/charlesabrooker/tmp/fm-teardown-tests.iODiDP/head-plain-other-copy-unlanded/tasktmp
+  backend=herdr
+  herdr_session=default
+  herdr_workspace_id=wG
+  herdr_tab_id=wG:tQ
+  herdr_pane_id=wG:pQ
+slot root HEAD: c134f1029295af42dcbca6b3e6063775c2d62404
+BEFORE:
+  record (task-x1.meta):  present
+  inbox dir:              present
+  status file:            present
+  tasktmp dir:            present
+  nested copy:            present
+  slot claim file:         task=other-task  home=/Users/charlesabrooker/tmp/fm-teardown-tests.iODiDP/head-plain-other-copy-unlanded/home 
+  backlog-close marker:   present sha=35a251a12477
+  return-pending marker:  present: spawn_gen=teardown-test-task-x1 slot= 
+  treehouse calls:        none
+  herdr pane closed:      no
+RUN: fm-teardown.sh task-x1   -> exit 1
+stderr (REFUSED/error lines):
+  REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+stdout (last 3 lines):
+AFTER:
+  record (task-x1.meta):  present
+  inbox dir:              present
+  status file:            present
+  tasktmp dir:            present
+  nested copy:            present
+  slot claim file:         task=other-task  home=/Users/charlesabrooker/tmp/fm-teardown-tests.iODiDP/head-plain-other-copy-unlanded/home 
+  backlog-close marker:   present sha=35a251a12477
+  return-pending marker:  present: spawn_gen=teardown-test-task-x1 slot= 
+  treehouse calls:        none
+  herdr pane closed:      no
+
+### head-enclosing-other-copy-unlanded  code=fff7007a2  shape=enclosing claim=other variant=copy-unlanded 
+record lines:
+  window=default:wG:pQ
+  endpoint_task_id=task-x1
+  worktree=/Users/charlesabrooker/tmp/fm-teardown-tests.xLpEf9/head-enclosing-other-copy-unlanded/pool/1/project/.claude/worktrees/task-x1-v2
+  branch=fm/task-x1-v2
+  project=/Users/charlesabrooker/tmp/fm-teardown-tests.xLpEf9/head-enclosing-other-copy-unlanded/project
+  kind=ship
+  mode=no-mistakes
+  spawn_gen=teardown-test-task-x1
+  prior_worktree=/Users/charlesabrooker/tmp/fm-teardown-tests.xLpEf9/head-enclosing-other-copy-unlanded/pool/1/project
+  tasktmp=/Users/charlesabrooker/tmp/fm-teardown-tests.xLpEf9/head-enclosing-other-copy-unlanded/tasktmp
+  backend=herdr
+  herdr_session=default
+  herdr_workspace_id=wG
+  herdr_tab_id=wG:tQ
+  herdr_pane_id=wG:pQ
+slot root HEAD: 4520808470b3069f5061fece796fbcc5a25a4f76
+BEFORE:
+  record (task-x1.meta):  present
+  inbox dir:              present
+  status file:            present
+  tasktmp dir:            present
+  nested copy:            present
+  slot claim file:         task=other-task  home=/Users/charlesabrooker/tmp/fm-teardown-tests.xLpEf9/head-enclosing-other-copy-unlanded/home 
+  backlog-close marker:   present sha=0e67f2a6fff7
+  return-pending marker:  present: spawn_gen=teardown-test-task-x1 slot= 
+  treehouse calls:        none
+  herdr pane closed:      no
+RUN: fm-teardown.sh task-x1   -> exit 1
+stderr (REFUSED/error lines):
+  REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+stdout (last 3 lines):
+AFTER:
+  record (task-x1.meta):  present
+  inbox dir:              present
+  status file:            present
+  tasktmp dir:            present
+  nested copy:            present
+  slot claim file:         task=other-task  home=/Users/charlesabrooker/tmp/fm-teardown-tests.xLpEf9/head-enclosing-other-copy-unlanded/home 
+  backlog-close marker:   present sha=0e67f2a6fff7
+  return-pending marker:  present: spawn_gen=teardown-test-task-x1 slot= 
+  treehouse calls:        none
+  herdr pane closed:      no
+
+### head-plain-mine-landed  code=fff7007a2  shape=plain claim=mine variant=landed 
+record lines:
+  window=default:wG:pQ
+  endpoint_task_id=task-x1
+  worktree=/Users/charlesabrooker/tmp/fm-teardown-tests.owsc4M/head-plain-mine-landed/pool/1/project/.claude/worktrees/task-x1-v2
+  branch=fm/task-x1-v2
+  project=/Users/charlesabrooker/tmp/fm-teardown-tests.owsc4M/head-plain-mine-landed/project
+  kind=ship
+  mode=no-mistakes
+  spawn_gen=teardown-test-task-x1
+  tasktmp=/Users/charlesabrooker/tmp/fm-teardown-tests.owsc4M/head-plain-mine-landed/tasktmp
+  backend=herdr
+  herdr_session=default
+  herdr_workspace_id=wG
+  herdr_tab_id=wG:tQ
+  herdr_pane_id=wG:pQ
+slot root HEAD: 3bdbc8fa28cef009f8d40b208fe3634371814138
+BEFORE:
+  record (task-x1.meta):  present
+  inbox dir:              present
+  status file:            present
+  tasktmp dir:            present
+  nested copy:            present
+  slot claim file:         task=task-x1  home=/Users/charlesabrooker/tmp/fm-teardown-tests.owsc4M/head-plain-mine-landed/home 
+  backlog-close marker:   present sha=a69395547b93
+  return-pending marker:  present: spawn_gen=teardown-test-task-x1 slot= 
+  treehouse calls:        none
+  herdr pane closed:      no
+RUN: fm-teardown.sh task-x1   -> exit 0
+stderr (REFUSED/error lines):
+stdout (last 3 lines):
+  /Users/charlesabrooker/tmp/fm-teardown-tests.owsc4M/head-plain-mine-landed/project: already current
+  teardown task-x1 complete (window default:wG:pQ; nested reassociated worktree /Users/charlesabrooker/tmp/fm-teardown-tests.owsc4M/head-plain-mine-landed/pool/1/project/.claude/worktrees/task-x1-v2 removed and its pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.owsc4M/head-plain-mine-landed/
+  Backlog: task-x1 just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-teardown-tests.owsc4M/head-plain-mine-landed/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-teardown-tests.owsc4M/head-plain-mine-landed/data/backlog.md - move task-x1 to Done, keep Done to
+AFTER:
+  record (task-x1.meta):  ABSENT
+  inbox dir:              ABSENT
+  status file:            ABSENT
+  tasktmp dir:            ABSENT
+  nested copy:            ABSENT
+  slot claim file:        ABSENT
+  backlog-close marker:   ABSENT
+  return-pending marker:  ABSENT
+  treehouse calls:        return --force /Users/charlesabrooker/tmp/fm-teardown-tests.owsc4M/head-plain-mine-landed/pool/1/project;
+  herdr pane closed:      yes
+
+### head-enclosing-mine-landed  code=fff7007a2  shape=enclosing claim=mine variant=landed 
+record lines:
+  window=default:wG:pQ
+  endpoint_task_id=task-x1
+  worktree=/Users/charlesabrooker/tmp/fm-teardown-tests.5hFcuM/head-enclosing-mine-landed/pool/1/project/.claude/worktrees/task-x1-v2
+  branch=fm/task-x1-v2
+  project=/Users/charlesabrooker/tmp/fm-teardown-tests.5hFcuM/head-enclosing-mine-landed/project
+  kind=ship
+  mode=no-mistakes
+  spawn_gen=teardown-test-task-x1
+  prior_worktree=/Users/charlesabrooker/tmp/fm-teardown-tests.5hFcuM/head-enclosing-mine-landed/pool/1/project
+  tasktmp=/Users/charlesabrooker/tmp/fm-teardown-tests.5hFcuM/head-enclosing-mine-landed/tasktmp
+  backend=herdr
+  herdr_session=default
+  herdr_workspace_id=wG
+  herdr_tab_id=wG:tQ
+  herdr_pane_id=wG:pQ
+slot root HEAD: 22fd2ae7350207290b6f7ce8a762224f10d3e602
+BEFORE:
+  record (task-x1.meta):  present
+  inbox dir:              present
+  status file:            present
+  tasktmp dir:            present
+  nested copy:            present
+  slot claim file:         task=task-x1  home=/Users/charlesabrooker/tmp/fm-teardown-tests.5hFcuM/head-enclosing-mine-landed/home 
+  backlog-close marker:   present sha=0a3e4dcf311a
+  return-pending marker:  present: spawn_gen=teardown-test-task-x1 slot= 
+  treehouse calls:        none
+  herdr pane closed:      no
+RUN: fm-teardown.sh task-x1   -> exit 0
+stderr (REFUSED/error lines):
+stdout (last 3 lines):
+  /Users/charlesabrooker/tmp/fm-teardown-tests.5hFcuM/head-enclosing-mine-landed/project: already current
+  teardown task-x1 complete (window default:wG:pQ; nested reassociated worktree /Users/charlesabrooker/tmp/fm-teardown-tests.5hFcuM/head-enclosing-mine-landed/pool/1/project/.claude/worktrees/task-x1-v2 removed and its pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.5hFcuM/head-enclosing-mine
+  Backlog: task-x1 just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-teardown-tests.5hFcuM/head-enclosing-mine-landed/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-teardown-tests.5hFcuM/head-enclosing-mine-landed/data/backlog.md - move task-x1 to Done, keep
+AFTER:
+  record (task-x1.meta):  ABSENT
+  inbox dir:              ABSENT
+  status file:            ABSENT
+  tasktmp dir:            ABSENT
+  nested copy:            ABSENT
+  slot claim file:        ABSENT
+  backlog-close marker:   ABSENT
+  return-pending marker:  ABSENT
+  treehouse calls:        return --force /Users/charlesabrooker/tmp/fm-teardown-tests.5hFcuM/head-enclosing-mine-landed/pool/1/project;
+  herdr pane closed:      yes
+

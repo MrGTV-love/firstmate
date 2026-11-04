@@ -1,0 +1,52 @@
+### head-clearfail-plain code=fff7007a2 shape=plain (backlog-close marker is a directory)
+BEFORE:
+  record: present  inbox: present  status: present  tasktmp: present  copy: present  claim: present
+  backlog-close: directory
+  return-pending: ABSENT
+  pool lease holder: task-x1
+  treehouse calls: none
+  tmux kill calls: 0
+RUN 1 -> exit 1
+  error: the previous pending backlog close for task-x1 could not be cleared (pending-close record is not a regular file at state/task-x1.backlog-close); refusing process cleanup
+AFTER RUN 1:
+  record: present  inbox: present  status: present  tasktmp: present  copy: present  claim: present
+  backlog-close: directory
+  return-pending: spawn_gen=teardown-test-task-x1 slot=pool/1/project 
+  pool lease holder: task-x1
+  treehouse calls: none
+  tmux kill calls: 0
+RUN 2 (bad marker removed) -> exit 0
+AFTER RUN 2:
+  record: ABSENT  inbox: ABSENT  status: ABSENT  tasktmp: ABSENT  copy: ABSENT  claim: ABSENT
+  backlog-close: ABSENT
+  return-pending: ABSENT
+  pool lease holder: task-x1
+  treehouse calls: return --force pool/1/project;
+  tmux kill calls: 1
+
+### head-clearfail-enclosing code=fff7007a2 shape=enclosing (backlog-close marker is a directory)
+BEFORE:
+  record: present  inbox: present  status: present  tasktmp: present  copy: present  claim: present
+  backlog-close: directory
+  return-pending: ABSENT
+  pool lease holder: task-x1
+  treehouse calls: none
+  tmux kill calls: 0
+RUN 1 -> exit 1
+  error: the previous pending backlog close for task-x1 could not be cleared (pending-close record is not a regular file at state/task-x1.backlog-close); refusing process cleanup
+AFTER RUN 1:
+  record: present  inbox: present  status: present  tasktmp: present  copy: present  claim: present
+  backlog-close: directory
+  return-pending: spawn_gen=teardown-test-task-x1 slot=pool/1/project 
+  pool lease holder: task-x1
+  treehouse calls: none
+  tmux kill calls: 0
+RUN 2 (bad marker removed) -> exit 0
+AFTER RUN 2:
+  record: ABSENT  inbox: ABSENT  status: ABSENT  tasktmp: ABSENT  copy: ABSENT  claim: ABSENT
+  backlog-close: ABSENT
+  return-pending: ABSENT
+  pool lease holder: task-x1
+  treehouse calls: return --force pool/1/project;
+  tmux kill calls: 1
+

@@ -1,0 +1,12 @@
+=== head fff7007a2: test_a_slot_with_no_foreign_copy_closes_and_returns_as_before run 1
+ok - a slot with no foreign copy closes and returns exactly as before and writes no held-copy record
+rc=0
+=== base 9c5874baa (unmodified): same test run 1
+ok - a slot with no foreign copy closes and returns exactly as before and writes no held-copy record
+rc=0
+=== head fff7007a2: test_a_slot_with_no_foreign_copy_closes_and_returns_as_before run 2
+ok - a slot with no foreign copy closes and returns exactly as before and writes no held-copy record
+rc=0
+=== base 9c5874baa (unmodified): same test run 2
+ok - a slot with no foreign copy closes and returns exactly as before and writes no held-copy record
+rc=0

@@ -1,0 +1,1 @@
+ok - a plain nested record whose commits a verified recorded bundle holds finishes as the prior shape does
