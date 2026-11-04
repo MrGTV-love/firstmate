@@ -1456,9 +1456,14 @@ if [ "$VERB" = adopt ]; then
   adoption_pid=$(printf '%s' "$adoption_record" | jq -r '.pid')
   adoption_recorded_pid=$(printf '%s' "$adoption_prior" \
     | jq -r '.pid | select(type == "number" and . > 1 and . == floor) | tostring' 2>/dev/null)
+  if [ "$adoption_recorded_pid" = "$adoption_pid" ] \
+    && [ -n "$(printf '%s' "$adoption_prior" | jq -r '.start // empty' 2>/dev/null)" ] \
+    && [ "$(printf '%s' "$adoption_prior" | jq -r '.start // empty')" != "$(printf '%s' "$adoption_record" | jq -r '.start // empty')" ]; then
+    echo "adopt note: the record's adopted process start identity differs from the live process, so the record is stale: another process now holds PID $adoption_pid; stop it or relaunch the task so a fresh launch writes a new record" >&2
+  fi
   [ "$adoption_recorded_pid" != "$adoption_pid" ] \
     || die "adopt refused: record proof needs a recorded PID other than the live foreground PID; the record already names $adoption_pid, so it was not changed"
-  if [ -n "$adoption_recorded_pid" ] && fm_launch_proof_pid_is_omp "$adoption_recorded_pid"; then
+  if [ -n "$adoption_recorded_pid" ] && fm_launch_proof_pid_may_own_record "$adoption_recorded_pid"; then
     echo "adopt refused: record proof needs the recorded PID to be gone or no longer an omp process; $adoption_recorded_pid is a live omp process, so the omp extension owns this record and it was not changed" >&2
     exit 1
   fi

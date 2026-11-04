@@ -2246,6 +2246,13 @@ fm_backend_herdr_pane_process_state_sample() {  # <session> <pane_id>
       printf 'agent'
       return 0
     fi
+    # A restored omp can still be alive here as its Bun runtime, which the
+    # classifier reads as `other`. A descendant that may be the installed omp, or
+    # whose identity cannot be read, keeps the pane occupied rather than agent-free.
+    if fm_agent_process_bun_may_be_omp "$name" "$argv0" "$pid"; then
+      printf 'other'
+      return 0
+    fi
   done <<EOF
 $(printf '%s\n' "$rows" | awk -v shell="$shell_pid" '
   {

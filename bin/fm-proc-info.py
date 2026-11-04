@@ -3,7 +3,7 @@
 
 Usage: fm-proc-info.py count-uid UID | ppid PID | pgid PID | comm PID | args PID |
        lstart PID | identity PID | cpu-tree PID | mem-tree PID | rss-tree PID |
-       table FIELDS | memory
+       table FIELDS | memory | exe PID | argv PID | startid PID | stdin PID
 
 memory prints a JSON RSS census with PID, PPID, kernel name, start time,
 resident bytes (null when unreadable), fleet attribution, and the run identity
@@ -13,6 +13,15 @@ run task:<id>; a kernel cwd inside a no-mistakes run worktree
 no-mistakes:<repo>/<run>; a kernel cwd within FM_MEMORY_FLEET_ROOT attributes
 without a run. Names alone never attribute. It prints no arguments,
 environment or cwd.
+
+exe, argv, startid and stdin are the read-only facts of the omp identity rule
+(bin/fm-omp-identity.py). exe prints the executable path the kernel reports for
+the process (libproc proc_pidpath), not an argument word. argv prints the raw
+argument vector as one JSON array, so argument boundaries survive. startid prints
+the kernel start time as SECONDS.MICROSECONDS, which tells apart two processes
+started inside one whole second, unlike lstart. stdin prints the kind of the
+process's file descriptor 0: tty (a /dev/ttysN terminal), pipe, none (closed) or
+other. Each prints nothing and exits 1 for a process or fact that cannot be read.
 
 count-uid prints how many processes have real user id UID. ppid and pgid print
 a process's parent and process group, comm its argv[0] and args its argv joined
@@ -60,6 +69,7 @@ failed read for an answer.
 import ctypes
 import json
 import os
+import re
 import signal
 import struct
 import subprocess
@@ -77,6 +87,11 @@ E_UID = 420
 P_WEXIT, SSTOP, SZOMB = 0x2000, 4, 5
 # proc_pidinfo PROC_PIDTASKINFO: struct proc_taskinfo and its pti_numrunning.
 PROC_PIDTASKINFO, TASKINFO_SIZE, PTI_NUMRUNNING = 4, 96, 88
+# libproc: proc_pidpath's buffer size, PROC_PIDLISTFDS and its struct proc_fdinfo,
+# the descriptor types, PROC_PIDFDVNODEPATHINFO, and vnode type VCHR.
+PROC_PIDPATHINFO_MAXSIZE = 4096
+PROC_PIDLISTFDS, PROC_FDINFO_SIZE, PROX_FDTYPE_VNODE, PROX_FDTYPE_PIPE = 1, 8, 1, 6
+PROC_PIDFDVNODEPATHINFO, VCHR = 2, 4
 DAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 TABLE_FIELDS = ("pid", "ppid", "pgid", "stat", "lstart", "command")
@@ -124,6 +139,11 @@ class VnodePathInfo(ctypes.Structure):
     _fields_ = [("cdir", VnodeInfoPath), ("rdir", VnodeInfoPath)]
 
 
+class VnodeFdInfoWithPath(ctypes.Structure):
+    _fields_ = [("openflags", ctypes.c_uint32), ("status", ctypes.c_uint32), ("offset", ctypes.c_int64),
+                ("fdtype", ctypes.c_int32), ("guardflags", ctypes.c_uint32), ("pvip", VnodeInfoPath)]
+
+
 def sysctl(*mib):
     names = (ctypes.c_int * len(mib))(*mib)
     size = ctypes.c_size_t(0)
@@ -156,7 +176,7 @@ def shown(word):
     return out.value.decode("ascii")
 
 
-def argv(pid):
+def raw_argv(pid):
     data = sysctl(CTL_KERN, KERN_PROCARGS2, pid)
     argc = struct.unpack_from("i", data, 0)[0]
     # The executable path and its padding precede argv.
@@ -164,7 +184,54 @@ def argv(pid):
     words = rest.split(b"\0")[:argc]
     if argc < 1 or len(words) < argc:
         raise LookupError(pid)
-    return [shown(word) for word in words]
+    return words
+
+
+def argv(pid):
+    return [shown(word) for word in raw_argv(pid)]
+
+
+def exe_path(pid):
+    kinfo(pid)
+    buffer = ctypes.create_string_buffer(PROC_PIDPATHINFO_MAXSIZE)
+    size = libc.proc_pidpath(pid, buffer, PROC_PIDPATHINFO_MAXSIZE)
+    if size <= 0:
+        raise LookupError(pid)
+    return os.fsdecode(buffer.raw[:size])
+
+
+def start_id(pid):
+    seconds, microseconds = process_identity(kinfo(pid))
+    return f"{seconds}.{microseconds:06d}"
+
+
+def stdin_kind(pid):
+    """Kind of file descriptor 0 from libproc, never from a path guess alone."""
+    kinfo(pid)
+    size = libc.proc_pidinfo(pid, PROC_PIDLISTFDS, ctypes.c_uint64(0), None, 0)
+    if size <= 0:
+        raise LookupError(pid)
+    buffer = ctypes.create_string_buffer(size + 64 * PROC_FDINFO_SIZE)
+    size = libc.proc_pidinfo(pid, PROC_PIDLISTFDS, ctypes.c_uint64(0), buffer, len(buffer))
+    if size < 0 or size % PROC_FDINFO_SIZE:
+        raise LookupError(pid)
+    kind = None
+    for offset in range(0, size, PROC_FDINFO_SIZE):
+        number, fdtype = struct.unpack_from("iI", buffer.raw, offset)
+        if number == 0:
+            kind = fdtype
+    if kind is None:
+        return "none"
+    if kind == PROX_FDTYPE_PIPE:
+        return "pipe"
+    if kind != PROX_FDTYPE_VNODE:
+        return "other"
+    info = VnodeFdInfoWithPath()
+    if libc.proc_pidfdinfo(pid, 0, PROC_PIDFDVNODEPATHINFO, ctypes.byref(info), ctypes.sizeof(info)) != ctypes.sizeof(info):
+        raise LookupError(pid)
+    path = os.fsdecode(info.pvip.path)
+    terminal = info.pvip.info.type == VCHR and re.fullmatch(r"/dev/ttys[0-9]+", path) is not None
+    return "tty" if terminal else "other"
 
 
 def kinfos(*selector):
@@ -477,6 +544,14 @@ def main(argv_):
             value = " ".join(argv(number))
         elif command == "cpu-tree":
             value = cpu_tree(number)
+        elif command == "exe":
+            value = exe_path(number)
+        elif command == "argv":
+            value = json.dumps([os.fsdecode(word) for word in raw_argv(number)])
+        elif command == "startid":
+            value = start_id(number)
+        elif command == "stdin":
+            value = stdin_kind(number)
         else:
             return 2
     except (OSError, LookupError, struct.error, IndexError):

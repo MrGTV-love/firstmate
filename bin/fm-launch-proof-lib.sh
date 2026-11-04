@@ -56,16 +56,61 @@ fm_launch_proof_pid_unpinned() { # <pid>
   ! printf '%s\n' "$environment" | grep -Eq '^FM_SPAWN_GEN=.+$'
 }
 
+# The omp identity rule for a process that is not named omp lives in
+# bin/fm-omp-identity.py: the installed omp can be a launcher that execs its Bun
+# runtime on the installed entry script, so the live process is named bun and its
+# script path and role carry the identity. A name match alone never recognizes it.
+_FM_LAUNCH_PROOF_OMP_IDENTITY="$_FM_LAUNCH_PROOF_DIR/fm-omp-identity.py"
+
+# Set by fm_launch_proof_pid_is_omp when the Bun script identity accepted the
+# process: the kernel start identity of that incarnation. Empty otherwise.
+# Callers must read it in the shell that called the predicate.
+FM_LAUNCH_PROOF_OMP_START=
+
 # Succeeds only for a live process whose readable executable name or argv[0]
-# has basename omp. Installation directory names are not identity. Prints nothing.
+# has basename omp, or whose actual executable and entry script are the installed
+# omp's Bun runtime run as its interactive agent (bin/fm-omp-identity.py).
+# Installation directory names are not identity. Prints nothing.
 fm_launch_proof_pid_is_omp() { # <pid>
+  local pid=$1 comm args name verdict
+  FM_LAUNCH_PROOF_OMP_START=
+  comm=$(LC_ALL=C ps -p "$pid" -o comm= 2>/dev/null) \
+    && args=$(LC_ALL=C ps -p "$pid" -o args= 2>/dev/null) || return 1
+  for name in "$comm" "${args%% *}"; do
+    [ "${name##*/}" != omp ] || return 0
+  done
+  fm_agent_process_names_are_bun "$comm" "${args%% *}" || return 1
+  verdict=$(python3 -I "$_FM_LAUNCH_PROOF_OMP_IDENTITY" interactive "$pid" 2>/dev/null) || return 1
+  FM_LAUNCH_PROOF_OMP_START=$(printf '%s' "$verdict" | jq -r '.start // empty' 2>/dev/null)
+  [ -n "$FM_LAUNCH_PROOF_OMP_START" ]
+}
+
+# Succeeds when a recorded session-record PID may still be a writer of that
+# record: a live omp by name, or a live bun-shaped process that is the installed
+# omp in ANY role or whose identity cannot be read. Uncertainty is not proof that
+# no writer owns the record, so this fails open toward "may own", the opposite
+# direction of fm_launch_proof_pid_is_omp. A dead or positively unrelated process
+# fails it. Prints nothing.
+fm_launch_proof_pid_may_own_record() { # <pid>
   local pid=$1 comm args name
   comm=$(LC_ALL=C ps -p "$pid" -o comm= 2>/dev/null) \
     && args=$(LC_ALL=C ps -p "$pid" -o args= 2>/dev/null) || return 1
   for name in "$comm" "${args%% *}"; do
     [ "${name##*/}" != omp ] || return 0
   done
-  return 1
+  fm_agent_process_bun_may_be_omp "$comm" "${args%% *}" "$pid"
+}
+
+# The kernel start identity (seconds.microseconds) of a live process. Prints it.
+# Whole-second start times are not an identity: two processes can start inside
+# one second and a reused PID would then match.
+fm_launch_proof_pid_start_id() { # <pid>
+  python3 -I "$_FM_LAUNCH_PROOF_OMP_IDENTITY" startid "$1" 2>/dev/null
+}
+
+# Succeeds only when both incarnations are readable and equal.
+fm_launch_proof_same_incarnation() { # <recorded-start> <live-start>
+  [ -n "$1" ] && [ -n "$2" ] && [ "$1" = "$2" ]
 }
 
 fm_launch_proof_herdr_pid() { # <meta> -> the attributed live foreground PID
@@ -150,7 +195,9 @@ fm_launch_proof_omp_adoption() { # <meta> -> candidate session-record JSON
     omp$'\t'/*) reference=${reference#*$'\t'} ;;
     *) echo 'adopt refused: session proof needs an absolute omp session-file registration' >&2; return 1 ;;
   esac
-  python3 - "$meta" "$pid" "$reference" <<'PY'
+  # The Bun identity predicate sets the incarnation in this shell; keep it for the record.
+  local start=$FM_LAUNCH_PROOF_OMP_START candidate
+  candidate=$(python3 - "$meta" "$pid" "$reference" <<'PY'
 import json
 import os
 from pathlib import Path
@@ -292,6 +339,13 @@ except (OSError, ValueError, TypeError, subprocess.SubprocessError):
     print(f"adopt refused: {message}", file=sys.stderr)
     sys.exit(1)
 PY
+  ) || return 1
+  # A record adopted through the Bun script identity binds the adopted incarnation,
+  # so a later process that reuses the PID is not taken for it.
+  if [ -n "$start" ]; then
+    candidate=$(printf '%s' "$candidate" | jq -c --arg start "$start" '. + {start: $start}') || return 1
+  fi
+  printf '%s\n' "$candidate"
 }
 
 fm_launch_proof_herdr() { # <meta> -> managed|unmanaged|unknown
@@ -301,7 +355,7 @@ fm_launch_proof_herdr() { # <meta> -> managed|unmanaged|unknown
 }
 
 fm_launch_proof_herdr_verdict() { # <meta> <pid> -> managed|unmanaged|unknown
-  local meta=$1 pid=$2 proof gen verdict record task_file current_file adopted refusal=unmanaged
+  local meta=$1 pid=$2 proof gen verdict record task_file current_file adopted recorded_start refusal=unmanaged
   proof=$(fm_meta_get "$meta" launch_proof)
   case "$proof" in
     env-v1|'') ;;
@@ -318,6 +372,14 @@ fm_launch_proof_herdr_verdict() { # <meta> <pid> -> managed|unmanaged|unknown
           type == "string" and startswith("/") and (explode | all(. >= 32))))' \
       "${meta%.meta}.omp-session.json" 2>/dev/null) \
       || { printf '%s' "$refusal"; return; }
+    # A record that binds an incarnation authorizes only that process: the same
+    # PID with another kernel start identity is a different process.
+    recorded_start=$(printf '%s' "$record" | jq -r '.start // empty')
+    if [ -n "$recorded_start" ] \
+      && ! fm_launch_proof_same_incarnation "$recorded_start" "$(fm_launch_proof_pid_start_id "$pid")"; then
+      printf '%s' "$refusal"
+      return
+    fi
     task_file=$(printf '%s' "$record" | jq -r '.task_session_file')
     current_file=$(printf '%s' "$record" | jq -r '.current_session_file')
     if [ ! -f "$task_file" ] || [ ! -f "$current_file" ] \
