@@ -455,7 +455,7 @@ test_leak_check_reads_prose_before_the_list_and_refuses_linked_files() {
     printf '%s\n\n' "$LEAK_PACK/contract.md"
     printf '%s\n' "$LEAK_PACK/target.md"
     printf '%s\n' "$LEAK_SKILLS/define-done-and-grading/SKILL.md"
-    printf '\nThat is the whole list.\n\n# Exit\n\nEXIT: needs-revision\nVERDICT: FAIL\n'
+    printf '\nThat is the whole list.\n\nEXIT: needs-revision\nVERDICT: FAIL\n'
   } >"$rep"
   run_check "$rep"
   assert_equals 0 "$CHECK_RC" "a list after a prose line was flagged: $CHECK_OUT"
@@ -487,29 +487,31 @@ test_leak_check_reads_prose_before_the_list_and_refuses_linked_files() {
 test_leak_check_reads_the_whole_list() {
   local rep="$TMP_ROOT/report6.md"
   make_leak_world
-  # Compliant: a prose bullet and a sub-heading inside the list are skipped, not the end of it.
+  # Compliant: group labels, a prose bullet and a sub-heading inside the list are skipped, not the end of it.
   {
-    printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n'
+    printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\nPack:\n'
     printf -- '- %s\n' "$LEAK_PACK/contract.md"
     printf -- '- the assess skill, read in full\n'
     printf '\n### References\n\n'
     printf -- '- %s\n' "$LEAK_SKILLS/assess-done-and-grade/SKILL.md"
+    printf '\nOther:\n'
     printf -- '- %s\n' "$LEAK_ROOT/bin/fm-spawn.sh"
-    printf '\n## Findings\n\n- %s is fine.\n\n## Exit\n\nEXIT: needs-revision\n' "$TMP_ROOT/sibling/pack/review.md"
+    printf '\n## Findings\n\n- %s is fine.\n\nEXIT: needs-revision\n' "$TMP_ROOT/sibling/pack/review.md"
   } >"$rep"
   run_check "$rep"
-  assert_equals 0 "$CHECK_RC" "a clean list with prose and a sub-heading was flagged: $CHECK_OUT"
-  assert_contains "$CHECK_OUT" "3 listed input(s)" "the list was not read to its end"
-  # Noncompliant: a group label inside the list is a report field with no heading.
+  assert_equals 0 "$CHECK_RC" "a grouped clean list was flagged: $CHECK_OUT"
+  assert_contains "$CHECK_OUT" "3 listed input(s)" "the grouped list was not read to its end"
+  # Noncompliant: a leak after a group label is read.
   {
     printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\nPack:\n'
     printf -- '- %s\n' "$LEAK_PACK/contract.md"
+    printf -- '- the assess skill\n'
     printf 'Other:\n'
     printf -- '- %s\n' "$TMP_ROOT/sibling/pack/review.md"
   } >"$rep"
   run_check "$rep"
-  assert_equals 3 "$CHECK_RC" "a list with a group label was accepted"
-  assert_contains "$CHECK_OUT" "REPORT STRUCTURE" "the group label did not void for structure"
+  assert_equals 3 "$CHECK_RC" "a leak after a group label was allowed"
+  assert_contains "$CHECK_OUT" "INPUT LEAK: $TMP_ROOT/sibling/pack/review.md" "the leak after a group label is not named"
   # The inline form has no heading of its own, so it voids the round.
   {
     printf 'VERDICT: FAIL head=abc\n\nInputs read: %s, %s\n' "$LEAK_PACK/contract.md" "$LEAK_PACK/target.md"
@@ -1226,6 +1228,32 @@ test_longer_field_label_voids_as_structure() {
   pass "a longer report field label voids for structure, not as a leak"
 }
 
+test_leak_check_accepts_bare_entrypoint_lines_after_the_list() {
+  local rep="$TMP_ROOT/report19.md" tail n=0
+  make_leak_world
+  # Compliant: every field under its own heading, Inputs read last, then the bare lines the entrypoint asks for.
+  for tail in 'VERDICT: FAIL' 'Protected class: no - the contract names no protected class.\nVERDICT: FAIL' \
+    'EXIT: needs-revision\n\nBasis: the decisions are identifiable; two criteria reject a correct worker.\n\nVERDICT: FAIL'; do
+    n=$((n + 1))
+    {
+      printf 'VERDICT: FAIL head=abc\n\n## Identity\n\nTerra, session unknown.\n\n## Criteria\n\n- A1: fail.\n\n## Findings\n\nF1 something.\n\n'
+      printf '## Inputs read\n\n%s\n%s\n\n' "$LEAK_PACK/contract.md" "$LEAK_PACK/target.md"
+      printf '%b\n' "$tail"
+    } >"$rep"
+    run_check "$rep"
+    assert_equals 0 "$CHECK_RC" "report $n ending with bare entrypoint lines was voided: $CHECK_OUT"
+    assert_contains "$CHECK_OUT" "2 listed input(s)" "report $n did not read the list"
+  done
+  # Noncompliant: a path-like line in the list still voids for structure.
+  {
+    printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n%s\nAlso skimmed %s for context.\n\nVERDICT: FAIL\n' "$LEAK_PACK/contract.md" "$TMP_ROOT/sibling/pack/review.md"
+  } >"$rep"
+  run_check "$rep"
+  assert_equals 3 "$CHECK_RC" "a path-like line in the list was accepted"
+  assert_contains "$CHECK_OUT" "REPORT STRUCTURE" "the path-like line did not void for structure"
+  pass "bare VERDICT, Protected class, EXIT and Basis lines after the list are accepted, and a stray path still voids"
+}
+
 test_inline_backticks_do_not_open_a_fence() {
   local src="$TMP_ROOT/ib.md" pack manifest
   write_fixture_contract "$src"
@@ -1338,6 +1366,7 @@ fm_test_run_cases \
   test_leak_check_without_root_refuses_a_relative_path_outside_the_pack \
   test_leak_check_voids_links_quotes_and_file_urls \
   test_longer_field_label_voids_as_structure \
+  test_leak_check_accepts_bare_entrypoint_lines_after_the_list \
   test_inline_backticks_do_not_open_a_fence \
   test_definition_of_done_in_every_heading_form \
   test_fences_and_headings_accept_up_to_three_spaces \

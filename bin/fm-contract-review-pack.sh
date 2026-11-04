@@ -51,12 +51,14 @@
 #   Each report field sits under a Markdown heading of its own (ATX, or setext at level 1
 #   or 2). An `Inputs read` bold line, `Label:` line or inline list with no heading voids
 #   the round (REPORT STRUCTURE, not INPUT LEAK) when it holds a path or the next
-#   non-blank line starts with a path, and is a mere mention otherwise; so does any bold
-#   or `Label:` line inside the list. The list runs to the next heading of its own level
-#   or higher; text inside a code fence is never a heading. In the list, a line that
-#   starts with a path is checked when that path is one full path and nothing else on the
-#   line is path-like; a line with any other path-like text voids the round (REPORT
-#   STRUCTURE); other text is skipped.
+#   non-blank line starts with a path, and is a mere mention otherwise; so does a bold
+#   or plain label inside the list that starts with a report field name (identity,
+#   criterion, escape, exit basis, Checks not performed, Findings, Notes); a bare
+#   VERDICT:, EXIT:, Basis: or Protected class: line is neither. The list runs to the next
+#   heading of its own level or higher; text inside a code fence is never a heading.
+#   In the list, a line that starts with a path is checked when that path is one full
+#   path and nothing else on the line is path-like; a line with any other path-like text
+#   voids the round (REPORT STRUCTURE); other text is skipped.
 #   A relative path is a pack file when the pack holds it, else a root path; with no root
 #   it is not authorized.
 #   An authorized input is judged by what it is: a file inside the pack, the
@@ -473,8 +475,8 @@ inputs_read() { # <report>
     END {
       name = "[*]*([0-9]+[.)][ \t]*)?[*]*inputs read[*[:space:]]*(\\([^)]*\\))?[*:[:space:]]*"
       label = "^[#*[:space:]-]*([0-9]+[.)][[:space:]]*)?[*]*inputs read[*]*(:|[*[:space:]]*(\\([^)]*\\))?[*:[:space:]]*$)"
-      field = "(checks not performed|findings|notes)"
-      fieldlabel = "^[ \t]*([-*+][ \t]+)?((\\*\\*|__)[^*_]+(\\*\\*|__)|[a-z][a-z0-9 ()'"'"'-]*:([ \t]|$)|" field "[ \t]*$)"
+      field = "(identity|criteri(on|a)|(outcome-|evidence-)?escape|exit basis|checks not performed|findings|notes)"
+      fieldlabel = "^[ \t]*([-*+][ \t]+)?((\\*\\*|__)" field "[^*_]*(\\*\\*|__)|" field "([a-z ()-]*:|[ \t]*$))"
       for (i = 1; i <= N; i++) {
         l = strip3(L[i])
         inf = fence
@@ -512,8 +514,8 @@ inputs_read() { # <report>
             continue
           }
           if (state == 1 && ((l ~ /^#+([ \t]|$)/ && hlevel(l) <= start) || (sl && sl <= start))) { state = 2; continue }
-          # A report field under a bold or `Label:` line, not a heading of its own, leaves
-          # the end of the list unknown and voids the round (exit 5).
+          # A bold or plain label that starts with a report field name, not a heading of its
+          # own, leaves the end of the list unknown and voids the round (exit 5).
           if (state == 1 && !lead && low ~ fieldlabel) unheaded = 1
         }
         if (state == 1 && !lead && pathlike(L[i])) badpath = 1
@@ -579,7 +581,7 @@ cmd_check() {
       if [ "$rc" = 4 ]; then
         echo "REPORT STRUCTURE: the Inputs read list in $report is not under its own heading"
       else
-        echo "REPORT STRUCTURE: a bold or Label: line inside the Inputs read list of $report is a report field not under its own heading"
+        echo "REPORT STRUCTURE: a report field label inside the Inputs read list of $report is not under its own heading"
       fi
       echo "ROUND VOID: report field not under its own heading; each report field needs a Markdown heading of its own at the level of Inputs read"
       exit 3
