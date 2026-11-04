@@ -154,7 +154,7 @@ It is neither a new finding nor a trigger for `stalled`.
 The same protection raised with a new counterexample is a new material finding.
 A finding that mixes a withdrawn or resolved demand with a new counterexample is split: the withdrawn part is closed by the record, and the new counterexample is a new material finding.
 A reviewer note that meets the finding test is a finding, whatever the reviewer called it.
-A report that says `EXIT: pass` while it holds such a note is reconciled to `needs-revision`.
+Such a note joins the round's findings in step 1 of "Deciding the exit", and step 5 decides the exit, so a report that says `EXIT: pass` while it holds one never stays `pass`.
 
 ### Cutting a criterion
 

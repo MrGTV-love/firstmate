@@ -27,7 +27,8 @@
 #   the build with exit 3 naming it, and nothing is written. So does a recognised title or
 #   level 1 to 3 heading outside a dropped section that names author history (findings,
 #   answered, response, self-check, all-green, revision log, or prior followed by findings,
-#   review, round, response, report or answers), and a code fence that never closes.
+#   review, round, response, report, revision or answers), and a code fence that never
+#   closes.
 #   Under a kept section, a sub-heading the builder does not recognise (an unknown
 #   level 3 heading, a level 4 or deeper heading or a bold-only line) stays in
 #   target.md where it is, and so does a preamble line it does not drop; each is
@@ -35,8 +36,9 @@
 #   dropped line in the manifest.
 #   The request and each context file go through the same filter and are copied
 #   whole; one that holds text the filter would drop (an author section or an author
-#   preamble line) is refused with exit 2, and one with a recognised or unrecognised
-#   heading that names author history is refused with exit 3.
+#   preamble line) is refused with exit 2, and one with any heading (its title, a level 1
+#   to 4 heading, setext or bold-only, in any section) that names author history is
+#   refused with exit 3.
 #   The manifest of excluded paths is <out-root>.excluded-paths, outside the pack.
 #   It always holds the real path of every input file (the contract, the request,
 #   each context file), the register and history paths when given, and every
@@ -45,10 +47,12 @@
 # check: reads the report's `Inputs read` list and, when given, the run log, and
 #   prints INPUT LEAK lines plus ROUND VOID (exit 3) when the list is missing or a
 #   listed path is not an authorized input; prints INPUT CLEAN (exit 0) otherwise.
-#   The list must sit under a Markdown heading of its own; an `Inputs read` bold line,
-#   `Label:` line or inline list with no heading voids the round. The list runs to the
-#   next heading of its own level or higher, and a line in it that does not start with a
-#   path is skipped.
+#   The list must sit under a Markdown heading of its own (ATX, or setext at level 1 or
+#   2); an `Inputs read` bold line, `Label:` line or inline list with no heading voids the
+#   round when it holds a path or a list item or path follows it, and is a mere mention
+#   otherwise. The list runs to the next heading of its own level or higher; text inside a
+#   code fence is never a heading. A line in it that does not start with a path is
+#   skipped; on a path line, every further absolute, `~` or <rev>: path is checked too.
 #   An authorized input is judged by what it is: a file inside the pack, the
 #   SKILL.md of the assess-done-and-grade or define-done-and-grading skill (no other
 #   file in either skill folder), the review rubric, or a file the manifest's root tracks (git ls-files, or
@@ -97,8 +101,9 @@ BLOCK_END='<!-- reviewer-block:end -->'
 # Section filter. Reads the contract on stdin, writes the kept text to the file
 # named by KEEP_OUT, the dropped section names to DROPPED_OUT, the unrecognised
 # level 1 and 2 headings to UNKNOWN_OUT, the kept but unrecognised sub-headings
-# and preamble lines to UNREC_OUT and the normalised title of every kept heading to
-# TITLES_OUT. Headings of level 1 and 2, ATX or setext, start a
+# and preamble lines to UNREC_OUT, the normalised title of every kept section heading to
+# TITLES_OUT and the text of every heading-shaped line outside a fence to HEADS_OUT.
+# Headings of level 1 and 2, ATX or setext, start a
 # section and must be recognised; a level 3 heading is dropped when it names an
 # author section. Text inside a code fence is never a heading, a backtick fence opens
 # only when no backtick follows its marker run on that line, a fence closes only
@@ -157,10 +162,13 @@ END {
         title = line
       }
     }
+    bold = !body && (line ~ /^[ \t]*\*\*[^*]+\*\*:?[ \t]*$/ || line ~ /^[ \t]*__[^_]+__:?[ \t]*$/)
+    if (level || bold) print (title != "" ? title : line) > HEADS_OUT
     if (level == 1 && !seen_heading) {
       seen_heading = 1
       if (classify(norm(title)) == "keep" && norm(title) ~ HIST) print title > UNKNOWN_OUT
-      keep_heading(line)
+      print line > KEEP_OUT
+      if (ul != "") print ul > KEEP_OUT
       continue
     }
     if (level == 1 || level == 2) {
@@ -190,7 +198,7 @@ END {
     }
     if (mode == "keep") {
       if (pre && tolower(line) ~ PREAMBLE_DROP) { print "preamble line: " line > DROPPED_OUT; continue }
-      if (level == 4 || (!body && (line ~ /^[ \t]*\*\*[^*]+\*\*:?[ \t]*$/ || line ~ /^[ \t]*__[^_]+__:?[ \t]*$/))) print line " (under: " ptitle ")" > UNREC_OUT
+      if (level == 4 || bold) print line " (under: " ptitle ")" > UNREC_OUT
       else if (pre && line !~ /^[ \t]*$/) print "preamble line: " line > UNREC_OUT
       print line > KEEP_OUT
     }
@@ -217,16 +225,17 @@ PREAMBLE_REFUSE="(^|[^a-z0-9])((authors?|workers?)[^a-z0-9]*s?[ ]+($PREAMBLE_TER
 # A heading that names author history anywhere in its text. "Prior" counts only before a
 # history noun, so free owner headings ("Current review authority", "Context (prior art)")
 # hold none of these terms.
-HISTORY_HEADING='(^|[^a-z0-9])(findings?|answered|responses?|self-checks?|all-green|revision logs?|prior (findings?|reviews?|rounds?|responses?|reports?|answers?))([^a-z0-9]|$)'
+HISTORY_HEADING='(^|[^a-z0-9])(findings?|answered|responses?|self-checks?|all-green|revision logs?|prior (findings?|reviews?|rounds?|responses?|reports?|revisions?|answers?))([^a-z0-9]|$)'
 
-filter_sections() { # <in> <keep-out> <dropped-out> <unknown-out> <unrecognised-out> <titles-out> [preamble-pattern]
-  local pre=${7:-$PREAMBLE_DROP}
+filter_sections() { # <in> <keep-out> <dropped-out> <unknown-out> <unrecognised-out> <titles-out> <heads-out> [preamble-pattern]
+  local pre=${8:-$PREAMBLE_DROP}
   : >"$2"
   : >"$3"
   : >"$4"
   : >"$5"
   : >"$6"
-  awk -v SRC="$1" -v KEEP_OUT="$2" -v DROPPED_OUT="$3" -v UNKNOWN_OUT="$4" -v UNREC_OUT="$5" -v TITLES_OUT="$6" \
+  : >"$7"
+  awk -v SRC="$1" -v KEEP_OUT="$2" -v DROPPED_OUT="$3" -v UNKNOWN_OUT="$4" -v UNREC_OUT="$5" -v TITLES_OUT="$6" -v HEADS_OUT="$7" \
     -v KEEP="$SECTION_KEEP" -v DROP="$SECTION_DROP" -v PREAMBLE_DROP="$pre" -v HIST="$HISTORY_HEADING" \
     "$SECTION_AWK" <"$1"
 }
@@ -276,7 +285,7 @@ cmd_build() {
   policy_block "$policy" >"$scratch/block" || die "policy must hold exactly one reviewer block between its marker lines: $policy"
   [ -s "$scratch/block" ] || die "policy reviewer block is empty: $policy"
 
-  filter_sections "$contract" "$scratch/keep" "$scratch/dropped" "$scratch/unknown" "$scratch/unrec" "$scratch/titles" || exit 3
+  filter_sections "$contract" "$scratch/keep" "$scratch/dropped" "$scratch/unknown" "$scratch/unrec" "$scratch/titles" "$scratch/heads" || exit 3
   if [ -s "$scratch/unknown" ]; then
     local name
     while IFS= read -r name; do
@@ -288,9 +297,9 @@ cmd_build() {
   grep -q '^definition of done' "$scratch/titles" || die "contract has no Definition Of Done section: $contract"
 
   for f in ${request:+"$request"} ${contexts[@]+"${contexts[@]}"}; do
-    filter_sections "$f" "$scratch/ctx.keep" "$scratch/ctx.dropped" "$scratch/ctx.unknown" "$scratch/ctx.unrec" "$scratch/ctx.titles" "$PREAMBLE_REFUSE" || exit 3
+    filter_sections "$f" "$scratch/ctx.keep" "$scratch/ctx.dropped" "$scratch/ctx.unknown" "$scratch/ctx.unrec" "$scratch/ctx.titles" "$scratch/ctx.heads" "$PREAMBLE_REFUSE" || exit 3
     [ ! -s "$scratch/ctx.dropped" ] || die "request or context file holds author text the builder would drop ($(head -1 "$scratch/ctx.dropped")): $f"
-    { cat "$scratch/ctx.unknown"; grep -v '^preamble line: ' "$scratch/ctx.unrec" | sed 's/ (under: [^)]*)$//'; } |
+    { cat "$scratch/ctx.heads"; grep -v '^preamble line: ' "$scratch/ctx.unrec" | sed 's/ (under: [^)]*)$//'; } |
       grep -iE "$HISTORY_HEADING" >"$scratch/ctx.history"
     if [ -s "$scratch/ctx.history" ]; then
       while IFS= read -r name; do
@@ -394,32 +403,82 @@ inputs_read() { # <report>
       gsub(/^[`*"(<]+|[`*",;:.)>]+$/, "", t)
       return t
     }
+    function emit(s,   t, n, k, tok) {
+      t = entry(s)
+      if (t != "") print t
+      sub(/^[ \t]*([-*+]|[0-9]+[.)])[ \t]+/, "", s)
+      n = split(s, tok, /[ \t,;]+/)
+      for (k = 2; k <= n; k++) {
+        gsub(/^[`*"(<]+|[`*",;:.)>]+$/, "", tok[k])
+        if (tok[k] ~ /^~?\/[A-Za-z0-9._-]/ || tok[k] ~ /^([0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]+|HEAD):[^:]/) print tok[k]
+      }
+    }
     function hlevel(s,   n) {
       n = 0
       while (substr(s, n + 1, 1) == "#") n++
       return n
     }
-    {
-      l = $0
-      sub(/^ ? ? ?/, "", l)
-      low = tolower(l)
+    function runlen(s, ch,   n) {
+      n = 0
+      while (substr(s, n + 1, 1) == ch) n++
+      return n
     }
-    # The list starts at a heading of its own. Any other `Inputs read` line (bold, a
-    # `Label:` line or an inline list) has no heading and voids the round (exit 4).
-    low ~ /^#+[ \t]+[*]*([0-9]+[.)][ \t]*)?[*]*inputs read[*[:space:]]*(\([^)]*\))?[*:[:space:]]*$/ { start = hlevel(l); state = 1; next }
-    low ~ /^[#*[:space:]-]*([0-9]+[.)][[:space:]]*)?[*]*inputs read[*]*(:|[*[:space:]]*(\([^)]*\))?[*:[:space:]]*$)/ { noheading = 1; next }
-    # Inside the list: every line up to the next heading of the same or a higher level is
-    # read, and a line that does not start with a path is skipped.
-    state == 1 {
-      if (l ~ /^#/ && hlevel(l) <= start) { state = 2; next }
-      line = $0
-      sub(/^[ \t]*([-*+]|[0-9]+[.)])[ \t]+/, "", line)
-      if (line ~ /^`?[^ \t`]*[\/]/ || line ~ /^`?~/ || line ~ /^`?[A-Za-z0-9_.-]+\.[A-Za-z0-9]+(`|[ \t]|$)/) {
-        t = entry($0)
-        if (t != "") print t
+    function strip3(s) {
+      sub(/^ ? ? ?/, "", s)
+      return s
+    }
+    function is_path(s) {
+      sub(/^[ \t]*([-*+]|[0-9]+[.)])[ \t]+/, "", s)
+      return s ~ /^`?[^ \t`]*[\/]/ || s ~ /^`?~/ || s ~ /^`?[A-Za-z0-9_.-]+\.[A-Za-z0-9]+(`|[ \t]|$)/
+    }
+    # The level of a setext heading whose title is line i, else 0.
+    function setext(i,   s) {
+      if (i >= N || body[i] || body[i + 1]) return 0
+      s = L[i]
+      if (s ~ /^[ \t]*$/ || s ~ /^(    |\t)/ || s ~ /^[ \t]*([-*+>|]|[0-9]+[.)])([ \t]|$)/ || strip3(s) ~ /^#/) return 0
+      if (L[i + 1] ~ /^ ? ? ?=+[ \t]*$/) return 1
+      if (L[i + 1] ~ /^ ? ? ?-+[ \t]*$/) return 2
+      return 0
+    }
+    { L[++N] = $0 }
+    END {
+      name = "[*]*([0-9]+[.)][ \t]*)?[*]*inputs read[*[:space:]]*(\\([^)]*\\))?[*:[:space:]]*"
+      label = "^[#*[:space:]-]*([0-9]+[.)][[:space:]]*)?[*]*inputs read[*]*(:|[*[:space:]]*(\\([^)]*\\))?[*:[:space:]]*$)"
+      for (i = 1; i <= N; i++) {
+        l = strip3(L[i])
+        inf = fence
+        if (fence) {
+          n = runlen(l, fch)
+          if (n >= flen && substr(l, n + 1) ~ /^[ \t]*$/) fence = 0
+        } else if (l ~ /^~~~/ || (l ~ /^```/ && substr(l, runlen(l, "`") + 1) !~ /`/)) {
+          fch = substr(l, 1, 1); flen = runlen(l, fch); fence = 1
+        }
+        body[i] = inf || fence
       }
+      for (i = 1; i <= N; i++) {
+        l = strip3(L[i])
+        low = tolower(l)
+        if (!body[i]) {
+          sl = setext(i)
+          # The list starts at a heading of its own, ATX or setext.
+          if (low ~ ("^#+[ \t]+" name "$")) { start = hlevel(l); state = 1; continue }
+          if (sl && low ~ ("^" name "$")) { start = sl; state = 1; i++; continue }
+          # Any other `Inputs read` line that holds a path, or that a list item or path
+          # follows, is a list with no heading and voids the round (exit 4).
+          if (low ~ label) {
+            rest = low
+            sub(/^.*inputs read[*]*:?[*]*[ \t]*/, "", rest)
+            for (j = i + 1; j <= N && L[j] ~ /^[ \t]*$/; j++) ;
+            if (is_path(rest) || (j <= N && (L[j] ~ /^[ \t]*([-*+]|[0-9]+[.)])[ \t]+/ || is_path(L[j])))) noheading = 1
+            continue
+          }
+          if (state == 1 && ((l ~ /^#/ && hlevel(l) <= start) || (sl && sl <= start))) { state = 2; continue }
+        }
+        # Inside the list a line that does not start with a path is skipped.
+        if (state == 1 && is_path(L[i])) emit(L[i])
+      }
+      exit noheading ? 4 : 0
     }
-    END { exit noheading ? 4 : 0 }
   ' "$1"
 }
 

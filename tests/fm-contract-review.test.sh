@@ -860,6 +860,118 @@ test_prior_counts_only_before_a_history_noun() {
   pass "prior counts as author history only before a history noun"
 }
 
+test_prior_revisions_heading_refused() {
+  local src="$TMP_ROOT/rv.md" in="$TMP_ROOT/rv-in.md" pack rc flag
+  write_fixture_contract "$src"
+  # Compliant: a kept heading that names revisions without "prior" builds.
+  printf '# Owner context\n\n## Context: revisions to the schema\n\nZZ-KEEP-RV-ZZ\n' >"$in"
+  build_pack pack --contract "$src" --request "$in" --context "$in" || fail "a kept revisions heading was refused: $(cat "$TMP_ROOT/build.err")"
+  # Noncompliant: "Context: prior revisions" refuses in a contract, a request and a context file.
+  awk '{ print } /^ZZ-KEEP-CONTEXT-ZZ/ { print ""; print "## Context: prior revisions"; print ""; print "ZZ-REV-ZZ rev 3 answered F1 by cutting E1." }' "$src" >"$src.tmp" && mv "$src.tmp" "$src"
+  rc=0
+  "$PACK_BIN" --contract "$src" --out-root "$TMP_ROOT/rv-out" >/dev/null 2>"$TMP_ROOT/rv.err" || rc=$?
+  assert_equals 3 "$rc" "a contract with 'Context: prior revisions' was accepted"
+  assert_absent "$TMP_ROOT/rv-out" "a refused contract left an output directory"
+  write_fixture_contract "$src"
+  printf '# Owner context\n\n## Context: prior revisions\n\nZZ-REV-ZZ rev 3 answered.\n' >"$in"
+  for flag in --request --context; do
+    rc=0
+    "$PACK_BIN" --contract "$src" "$flag" "$in" --out-root "$TMP_ROOT/rv-out" >/dev/null 2>"$TMP_ROOT/rv.err" || rc=$?
+    assert_equals 3 "$rc" "a $flag file with 'Context: prior revisions' was accepted"
+    assert_absent "$TMP_ROOT/rv-out" "a refused $flag file left an output directory"
+  done
+  pass "prior revisions is author history in every input"
+}
+
+test_author_history_heading_under_unrecognised_parent_or_title_refused() {
+  local src="$TMP_ROOT/up.md" in="$TMP_ROOT/up-in.md" pack rc n=0 case flag body
+  write_fixture_contract "$src"
+  # Compliant: a neutral sub-heading, bold line and title in a free owner file build.
+  printf '# Owner context\n\n## Main2632 routed amendment\n\n### Current owner ruling\n\n**Owner note**\n\nZZ-KEEP-UP-ZZ\n' >"$in"
+  build_pack pack --contract "$src" --request "$in" --context "$in" || fail "neutral owner headings were refused: $(cat "$TMP_ROOT/build.err")"
+  # Noncompliant: author history under an unrecognised parent, or as the file's title.
+  for case in \
+    'context|# Owner context\n\n## Main2632 routed amendment\n\n### My earlier findings and how I answered them\n\nZZ-A-ZZ F1 answered: fixed.\n' \
+    'context|# Owner context\n\n## Background\n\n**Earlier findings and my responses**\n\nZZ-E-ZZ F1 answered.\n' \
+    'context|# Earlier findings and how I answered them\n\nZZ-B-ZZ F1 was answered in rev 3.\n' \
+    'request|# Earlier findings and how I answered them\n\nZZ-B-ZZ F1 was answered in rev 3.\n'; do
+    n=$((n + 1))
+    flag=--${case%%|*}
+    body=${case#*|}
+    printf '%b' "$body" >"$in"
+    rc=0
+    "$PACK_BIN" --contract "$src" "$flag" "$in" --out-root "$TMP_ROOT/up-out$n" >/dev/null 2>"$TMP_ROOT/up.err" || rc=$?
+    assert_equals 3 "$rc" "case $n ($flag) with an author-history heading was accepted"
+    assert_contains "$(cat "$TMP_ROOT/up.err")" "author history" "case $n ($flag) refusal does not name the cause"
+    assert_absent "$TMP_ROOT/up-out$n" "a refused case $n left an output directory"
+  done
+  pass "author history under an unrecognised parent or in a file's title is refused"
+}
+
+test_title_is_not_the_definition_of_done() {
+  local src="$TMP_ROOT/td.md" pack rc=0
+  # Noncompliant: a title that names the Definition Of Done is not a Definition Of Done section.
+  printf '# Definition Of Done: d3 steer\n\n## REQUEST\n\nA request.\n' >"$src"
+  "$PACK_BIN" --contract "$src" --out-root "$TMP_ROOT/td-out" >/dev/null 2>"$TMP_ROOT/td.err" || rc=$?
+  assert_equals 2 "$rc" "a contract whose only Definition Of Done is its title was accepted"
+  assert_contains "$(cat "$TMP_ROOT/td.err")" "no Definition Of Done section" "the refusal names another cause"
+  assert_absent "$TMP_ROOT/td-out" "a refused contract left an output directory"
+  # Compliant: the same title over a real Definition Of Done section builds.
+  printf '# Definition Of Done: d3 steer\n\n## REQUEST\n\nA request.\n\n## Definition Of Done\n\n- A1 (mandatory): ZZ-KEEP-TD-ZZ\n' >"$src"
+  build_pack pack --contract "$src" || fail "a contract with a Definition Of Done section was refused: $(cat "$TMP_ROOT/build.err")"
+  assert_grep "ZZ-KEEP-TD-ZZ" "$pack/target.md" "the Definition Of Done text is missing"
+  pass "the title is not counted as the Definition Of Done section"
+}
+
+test_leak_check_reads_through_fences_and_setext_headings() {
+  local rep="$TMP_ROOT/report10.md" sib="$TMP_ROOT/sibling/pack/review.md"
+  make_leak_world
+  # Compliant: a fence with a # comment inside the list, and a later mention of Inputs read.
+  {
+    # shellcheck disable=SC2016 # literal backticks in generated Markdown
+    printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- %s\n\n```sh\n# from shell\n```\n\n- %s\n' "$LEAK_PACK/contract.md" "$LEAK_PACK/target.md"
+    printf '\n## Basis\n\nInputs read: as listed above.\n\nEXIT: needs-revision\n'
+  } >"$rep"
+  run_check "$rep"
+  assert_equals 0 "$CHECK_RC" "a clean list with a fence or a later mention was flagged: $CHECK_OUT"
+  assert_contains "$CHECK_OUT" "2 listed input(s)" "the list was not read past the fence"
+  # Noncompliant: a leak after the fenced # comment is still read.
+  {
+    # shellcheck disable=SC2016 # literal backticks in generated Markdown
+    printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- %s\n\n```sh\n# from shell\n```\n\n- %s\n' "$LEAK_PACK/contract.md" "$sib"
+    printf '\n## Findings\n\nEXIT: needs-revision\n'
+  } >"$rep"
+  run_check "$rep"
+  assert_equals 3 "$CHECK_RC" "a leak after a fenced # comment was allowed"
+  assert_contains "$CHECK_OUT" "INPUT LEAK: $sib" "the leak after the fence is not named"
+  # Compliant: a setext Inputs read heading is a heading of its own.
+  printf 'VERDICT: FAIL head=abc\n\nInputs read\n-----------\n\n- %s\n\nFindings\n--------\n\n- %s is fine.\n' "$LEAK_PACK/contract.md" "$sib" >"$rep"
+  run_check "$rep"
+  assert_equals 0 "$CHECK_RC" "a list under a setext heading was voided: $CHECK_OUT"
+  assert_contains "$CHECK_OUT" "1 listed input(s)" "the setext list did not end at the next setext heading"
+  # Noncompliant: a leak under a setext heading is read.
+  printf 'VERDICT: FAIL head=abc\n\nInputs read\n===========\n\n- %s\n- %s\n' "$LEAK_PACK/contract.md" "$sib" >"$rep"
+  run_check "$rep"
+  assert_equals 3 "$CHECK_RC" "a leak under a setext heading was allowed"
+  pass "the leak check reads through fences, accepts a setext heading and ignores a bare mention"
+}
+
+test_leak_check_reads_every_path_on_a_line() {
+  local rep="$TMP_ROOT/report11.md" sib="$TMP_ROOT/sibling/pack/review.md"
+  make_leak_world
+  # Compliant: two pack paths on one line, and prose with a slash, are clean.
+  printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- %s, %s (read and/or compared)\n\n## Findings\n' "$LEAK_PACK/contract.md" "$LEAK_PACK/target.md" >"$rep"
+  run_check "$rep"
+  assert_equals 0 "$CHECK_RC" "two clean paths on one line were flagged: $CHECK_OUT"
+  assert_contains "$CHECK_OUT" "2 listed input(s)" "the second path on the line was not read"
+  # Noncompliant: a leak as the second path on a line is read.
+  printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- %s, %s\n\n## Findings\n' "$LEAK_PACK/contract.md" "$sib" >"$rep"
+  run_check "$rep"
+  assert_equals 3 "$CHECK_RC" "a leak as the second path on a line was allowed"
+  assert_contains "$CHECK_OUT" "INPUT LEAK: $sib" "the second-path leak is not named"
+  pass "the leak check reads every absolute path on a list line"
+}
+
 test_inline_backticks_do_not_open_a_fence() {
   local src="$TMP_ROOT/ib.md" pack manifest
   write_fixture_contract "$src"
@@ -955,6 +1067,11 @@ fm_test_run_cases \
   test_recognised_heading_with_author_history_refused \
   test_author_history_in_every_heading_position_refused \
   test_prior_counts_only_before_a_history_noun \
+  test_prior_revisions_heading_refused \
+  test_author_history_heading_under_unrecognised_parent_or_title_refused \
+  test_title_is_not_the_definition_of_done \
+  test_leak_check_reads_through_fences_and_setext_headings \
+  test_leak_check_reads_every_path_on_a_line \
   test_inline_backticks_do_not_open_a_fence \
   test_definition_of_done_in_every_heading_form \
   test_fences_and_headings_accept_up_to_three_spaces \
