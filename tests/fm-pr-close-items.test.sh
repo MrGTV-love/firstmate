@@ -798,6 +798,17 @@ test_the_directive_parser_reads_real_lines_and_ignores_every_example() {
   out=$(printf '%s\n' $'\t```' 'Closes-backlog-item: after-tab' '```' 'Closes-backlog-item: tab-fenced' $'\t```' 'Closes-backlog-item: still-tab-fenced' \
     | lib_call fm_pr_closes_ids -)
   [ "$out" = after-tab ] || fail "parser: a tab-indented fence line opened or closed a fence: $(printf '%s' "$out" | tr '\n' ' ')"
+  out=$(printf '%s\n' 'Closes-backlog-item: real-one' '<!-- Example only, not a closure:' 'Closes-backlog-item: comment-example' '-->' \
+    'Closes-backlog-item: real-two' '<!-- one line -->' 'Closes-backlog-item: real-three' '  <!-- indented opener' 'Closes-backlog-item: indented-comment-example' 'end -->' \
+    '<!-- a `fence` word ``` is no fence inside a comment' 'Closes-backlog-item: tick-example' '-->' 'Closes-backlog-item: real-four' \
+    '```' '<!-- a comment opener inside a fence is only text' '```' 'Closes-backlog-item: real-five' \
+    '<!-- never closed' 'Closes-backlog-item: unclosed-comment-example' \
+    | lib_call fm_pr_closes_ids -)
+  [ "$out" = "$(printf '%s\n' real-one real-two real-three real-four real-five)" ] \
+    || fail "parser: an HTML comment example was read as a directive, or a real line after one was lost: $(printf '%s' "$out" | tr '\n' ' ')"
+  out=$(printf '%s\n' 'text review-name_. and review-dash- then x.y. end' | lib_call fm_pr_closes_prose_words - | tr '\n' ' ')
+  [ "$out" = 'text review-name_. review-name_ and review-dash- then x.y. x.y end ' ] \
+    || fail "parser: prose words lost an id's own spelling: $out"
   out=$(printf '%s\n' 'Train-member: https://github.com/a/b/pull/1' 'Train-member:  https://github.com/a/b/pull/2  ' 'Train-member: https://github.com/a/b/pull/1' \
     '  Train-member: https://github.com/a/b/pull/3' '| Train-member: https://github.com/a/b/pull/4 |' '   ```' 'Train-member: https://github.com/a/b/pull/5' '   ```' \
     | lib_call fm_pr_closes_members -)
@@ -1122,6 +1133,7 @@ test_f4_an_unlisted_forgejo_or_gitlab_member_is_reported_by_its_url() {
   assert_match "^actionable: close-at-merge: mentioned $member in the prose of $MR_URL: no item was closed for it" "$case_dir/stderr" "f4-gitlab: the unlisted member was silent"
   # Non-train negative: a body with no link names nothing.
   case_dir=$(make_forgejo_case "c2-f4-none-${CLOSE_PRUNE:-off}")
+  cx_add "$case_dir" unrelated-item
   set_json_field "$case_dir/pr-post.json" body "Plain change, nothing linked."
   rc=0
   merge_call "$case_dir" task-x1 "$FJ_URL" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
@@ -1156,7 +1168,13 @@ test_a_merge_with_directive_lines_and_an_unlistable_backlog_says_so_once() {
   printf '%s\n' 'Notes mention some-other-id in prose.' > "$case_dir/bodies/89"
   fake_unlistable_backlog "$case_dir"
   gh_merge "$case_dir" 89
-  assert_no_grep 'could not list the backlog' "$case_dir/stderr" "c1-unlistable-none: a body with no directive line reported the failed id check"
+  [ "$(grep -c 'could not list the backlog to check which ids the prose' "$case_dir/stderr")" = 1 ] \
+    || fail "c1-unlistable-none: a body with prose and no directive line did not report the skipped id check once"
+  case_dir=$(gh_case c1-unlistable-empty 86)
+  printf '%s\n' '```' 'only an example' '```' > "$case_dir/bodies/86"
+  fake_unlistable_backlog "$case_dir"
+  gh_merge "$case_dir" 86
+  assert_no_grep 'could not list the backlog' "$case_dir/stderr" "c1-unlistable-empty: a body with no prose reported a skipped id check it had no use for"
 
   case_dir=$(gh_case c1-unlistable 85)
   cx_add "$case_dir" unlistable-a
@@ -1165,7 +1183,100 @@ test_a_merge_with_directive_lines_and_an_unlistable_backlog_says_so_once() {
   gh_merge "$case_dir" 85
   [ "$(cx_state "$case_dir" unlistable-a)" = "done" ] || fail "c1-unlistable: the named item was not closed"
   [ "$(grep -c 'could not list the backlog to check which ids the prose' "$case_dir/stderr")" = 1 ] || fail "c1-unlistable: the failed id check was not reported exactly once"
-  pass "a failed backlog listing reports the skipped id check once and still closes the named item"
+  pass "a failed backlog listing reports the skipped id check once, with or without a directive line, and still closes the named item"
+}
+
+# Review 92093289 F1: a directive inside an HTML comment is an example. Only the real
+# directive closes; the example's item stays queued and its dependent keeps its edge.
+test_an_html_comment_example_closes_nothing_and_keeps_its_edge() {
+  local case_dir
+  case_dir=$(gh_case c1-html-comment 94)
+  cx_add "$case_dir" review-real
+  cx_add "$case_dir" review-comment-example
+  cx_add "$case_dir" review-waiting
+  cx "$case_dir" block review-waiting --by review-comment-example >/dev/null
+  printf '%s\n' 'Closes-backlog-item: review-real' '<!-- Example only, not a closure:' \
+    'Closes-backlog-item: review-comment-example' '-->' > "$case_dir/bodies/94"
+  gh_merge "$case_dir" 94
+  [ "$(cx_state "$case_dir" review-real)" = "done" ] || fail "f1-comment: the real directive did not close its item"
+  [ "$(cx_state "$case_dir" review-comment-example)" = queued ] || fail "f1-comment: an item named only inside an HTML comment was closed"
+  case "$(cx_deps "$case_dir" review-waiting)" in *review-comment-example*) ;; *) fail "f1-comment: the dependent lost its edge on an item that did not finish" ;; esac
+  assert_no_grep 'closed review-comment-example' "$case_dir/stdout" "f1-comment: the example's close was reported"
+  pass "F1: a directive inside an HTML comment closes nothing and keeps the dependent's edge, while the real directive closes"
+}
+
+# Review 92093289 F2: a train member's prose-only mention is reported, never closed; an id
+# its own directive names, and an id nothing mentions, stay silent.
+test_a_train_members_prose_only_mention_is_reported_and_never_closed() {
+  local case_dir
+  case_dir=$(gh_case c2-member-prose 95)
+  cx_add "$case_dir" member-directive
+  cx_add "$case_dir" member-prose-only
+  cx_add "$case_dir" unrelated-item
+  printf '%s\n' "Train-member: $REPO_URL/71" > "$case_dir/bodies/95"
+  printf '%s\n' 'This also fixes member-prose-only.' 'Closes-backlog-item: member-directive' 'The member-directive item is the main one.' > "$case_dir/bodies/71"
+  printf '%s\n' 71 >> "$case_dir/merged-prs"
+  gh_merge "$case_dir" 95
+  [ "$(cx_state "$case_dir" member-directive)" = "done" ] || fail "f2: the member's directive did not close its item"
+  [ "$(cx_state "$case_dir" member-prose-only)" = queued ] || fail "f2: a member's prose mention closed an item"
+  assert_match "^actionable: close-at-merge: mentioned member-prose-only in the prose of train member $REPO_URL/71: nothing was closed for it" "$case_dir/stderr" \
+    "f2: a member's prose-only mention was not reported"
+  [ "$(grep -c 'mentioned member-prose-only' "$case_dir/stderr")" = 1 ] || fail "f2: the mention was reported more than once"
+  assert_no_grep 'mentioned member-directive' "$case_dir/stderr" "f2: an id the member's own directive closed was reported as a mention"
+  assert_no_grep 'unrelated-item' "$case_dir/stderr" "f2: an id nothing mentions was reported"
+  pass "F2: a train member's prose-only mention is reported once and never closed; its directive id and an unrelated id stay silent"
+}
+
+# Review 92093289 F3: an id keeps its own spelling when the prose is checked (a trailing
+# underscore or hyphen belongs to it; a sentence's final period does not).
+test_a_mention_keeps_the_ids_own_spelling() {
+  local case_dir
+  case_dir=$(gh_case c1-mention-spelling 96)
+  cx_add "$case_dir" review-name_
+  cx_add "$case_dir" review-dash-
+  cx_add "$case_dir" review-normal
+  printf '%s\n' 'It touches review-name_, review-dash- and review-normal.' 'Last: review-normal.' > "$case_dir/bodies/96"
+  gh_merge "$case_dir" 96
+  assert_match '^actionable: close-at-merge: mentioned review-name_ in the prose of ' "$case_dir/stderr" "f3: an id with a trailing underscore was missed"
+  assert_match '^actionable: close-at-merge: mentioned review-dash- in the prose of ' "$case_dir/stderr" "f3: an id with a trailing hyphen was missed"
+  assert_match '^actionable: close-at-merge: mentioned review-normal in the prose of ' "$case_dir/stderr" "f3: a plain id was missed"
+  [ "$(grep -c 'mentioned review-normal' "$case_dir/stderr")" = 1 ] || fail "f3: an id mentioned twice was reported more than once"
+  for id in review-name_ review-dash- review-normal; do
+    [ "$(cx_state "$case_dir" "$id")" = queued ] || fail "f3: a mention closed $id"
+  done
+  pass "F3: a mention keeps the id's own spelling, trailing underscore and hyphen included, and is reported once"
+}
+
+# Contract C2: one member supplying both its own directive and a distinct task whose pr=
+# is that same member, and two listed members that share a number in different repositories.
+test_a_member_with_both_sources_and_two_listed_members_with_one_number() {
+  local case_dir
+  case_dir=$(gh_case c2-both-listed 97)
+  cx_add "$case_dir" both-from-body
+  cx_add "$case_dir" both-from-meta docs
+  cx_meta "$case_dir" both-from-meta docs "$REPO_URL/71"
+  printf '%s\n' 'Closes-backlog-item: both-from-body' > "$case_dir/bodies/71"
+  printf '%s\n' 71 >> "$case_dir/merged-prs"
+  printf '%s\n' "Train-member: $REPO_URL/71" > "$case_dir/bodies/97"
+  gh_merge "$case_dir" 97
+  [ "$(cx_state "$case_dir" both-from-body)" = "done" ] || fail "c2-both: the item the member's body names was not closed"
+  [ "$(cx_state "$case_dir" both-from-meta)" = "done" ] || fail "c2-both: the distinct task whose pr= is the same member was not closed"
+
+  case_dir=$(gh_case c2-two-repos 98)
+  cx_add "$case_dir" repo-a-body
+  cx_add "$case_dir" repo-b-body
+  cx_add "$case_dir" repo-a-meta docs
+  cx_add "$case_dir" repo-b-meta docs
+  cx_meta "$case_dir" repo-a-meta docs "https://github.com/example/repo-a/pull/5"
+  cx_meta "$case_dir" repo-b-meta docs "https://github.com/example/repo-b/pull/5"
+  printf '%s\n' 'Closes-backlog-item: repo-a-body' > "$case_dir/bodies/example_repo-a-5"
+  printf '%s\n' 'Closes-backlog-item: repo-b-body' > "$case_dir/bodies/example_repo-b-5"
+  printf '%s\n' 'Train-member: https://github.com/example/repo-a/pull/5' 'Train-member: https://github.com/example/repo-b/pull/5' > "$case_dir/bodies/98"
+  gh_merge "$case_dir" 98
+  for id in repo-a-body repo-b-body repo-a-meta repo-b-meta; do
+    [ "$(cx_state "$case_dir" "$id")" = "done" ] || fail "c2-two-repos: $id was not closed with both same-number members listed"
+  done
+  pass "a member's own directive and a distinct pr= task both close, and two listed members that share a number in different repositories both close by full URL"
 }
 
 # --- exact-head evidence with production merge prune on (contract C1, C3) ----------------
@@ -1307,6 +1418,10 @@ test_a_gitlab_or_forgejo_merge_naming_its_own_task_reports_the_live_record
 test_a_forgejo_train_closes_each_listed_member_source_and_reports_the_prose_link
 test_a_gitlab_train_reads_each_listed_member_and_reports_the_prose_link
 test_a_merge_with_directive_lines_and_an_unlistable_backlog_says_so_once
+test_an_html_comment_example_closes_nothing_and_keeps_its_edge
+test_a_train_members_prose_only_mention_is_reported_and_never_closed
+test_a_mention_keeps_the_ids_own_spelling
+test_a_member_with_both_sources_and_two_listed_members_with_one_number
 test_the_directive_parser_reads_real_lines_and_ignores_every_example
 test_a_gitlab_merge_reports_the_completion_paths_actual_result
 test_a_forgejo_merge_reports_the_completion_paths_actual_result

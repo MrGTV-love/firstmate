@@ -29,6 +29,10 @@
 #   a run of the same character at least as long, after at most three spaces, with only
 #   whitespace after it; a fence that never closes runs to the end of the body.
 #   Pipeline bodies quote text they do not own, so quoted examples stay examples.
+# - An HTML comment is an example too: every line from one that holds `<!--` through the
+#   line that holds `-->` (the same line when both are on it) is skipped, and a comment that
+#   never closes runs to the end of the body. The pipeline's own attestation comment is one
+#   line and hides nothing.
 # - A trailing carriage return is ignored, because GitHub bodies often use CRLF.
 # - Nothing else is read as a name: no table, heading, bullet, link or sentence ever
 #   closes an item or makes a member.
@@ -47,7 +51,7 @@
 FM_PR_CLOSES_ID_RE='[A-Za-z0-9._-]+'
 
 fm_pr_closes_unfenced() {  # <body-file|->
-  local line in_fence=0 char='' len=0 run
+  local line in_fence=0 in_comment=0 char='' len=0 run
   local open_re='^[ ]{0,3}(`{3,}|~{3,})(.*)$'
   local close_re='^[ ]{0,3}(`{3,}|~{3,})[[:space:]]*$'
   while IFS= read -r line || [ -n "$line" ]; do
@@ -57,6 +61,10 @@ fm_pr_closes_unfenced() {  # <body-file|->
         run=${BASH_REMATCH[1]}
         if [ "${run:0:1}" = "$char" ] && [ "${#run}" -ge "$len" ]; then in_fence=0; fi
       fi
+      continue
+    fi
+    if [ "$in_comment" = 1 ]; then
+      case "$line" in *'-->'*) in_comment=0 ;; esac
       continue
     fi
     if [[ "$line" =~ $open_re ]]; then
@@ -69,6 +77,12 @@ fm_pr_closes_unfenced() {  # <body-file|->
         continue
       fi
     fi
+    case "$line" in
+      *'<!--'*)
+        # The comment opens here and closes on this line only if `-->` follows the opener.
+        case "${line#*'<!--'}" in *'-->'*) ;; *) in_comment=1 ;; esac
+        continue ;;
+    esac
     printf '%s\n' "$line"
   done < <(if [ "${1:--}" = - ]; then cat; else cat -- "$1"; fi)
 }
@@ -134,13 +148,22 @@ fm_pr_closes_prose() {  # <body-file|->
   done < <(fm_pr_closes_unfenced "${1:--}")
 }
 
-# The distinct words of the prose, as item-id candidates (letters, digits, `.`, `_`, `-`,
-# with leading and trailing `.`, `_` and `-` trimmed).
+# The distinct words of the prose, as item-id candidates. A word keeps every character a
+# task id may hold (letters, digits, `.`, `_`, `-`), so an id that begins or ends with `_`
+# or `-` is found as spelled. Because a sentence can end right after an id, each word is
+# printed as written and, when that differs, once more with leading and trailing `.`
+# removed (an id never starts with `.`), so the caller can match either against its ids.
 fm_pr_closes_prose_words() {  # <body-file|->
   fm_pr_closes_prose "${1:--}" \
     | LC_ALL=C tr -c 'A-Za-z0-9._-' '\n' \
-    | sed -e 's/^[._-]*//' -e 's/[._-]*$//' \
-    | LC_ALL=C awk 'NF && !seen[$0]++'
+    | LC_ALL=C awk 'NF {
+        print
+        t = $0
+        sub(/^\.+/, "", t)
+        sub(/\.+$/, "", t)
+        if (t != "" && t != $0) print t
+      }' \
+    | LC_ALL=C awk '!seen[$0]++'
 }
 
 # Every pull request link in the prose, once each, in body order. A link to a page of a

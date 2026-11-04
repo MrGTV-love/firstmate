@@ -11,7 +11,7 @@
 # What it reads. The merged pull request's body, through bin/fm-pr-closes-lib.sh, which
 # owns the two directive lines that close anything: `Closes-backlog-item: <item-id>` and
 # `Train-member: <pull request URL>`. Nothing else in a body closes an item: a table, a
-# heading, a bullet, a link, a sentence or a fenced example names nothing. Each
+# heading, a bullet, a link, a sentence, a fenced example or an HTML comment names nothing. Each
 # `Train-member:` pull request is read the same way (its own `Closes-backlog-item:` lines),
 # and every task whose state/<task>.meta records pr= equal to that member's full URL is
 # considered too. Bodies are read from GitHub, GitLab and Forgejo, each member by its own
@@ -30,14 +30,17 @@
 #   - a column-0 line that starts with a directive word but does not fit its form, and a
 #     `Train-member:` value that is no pull request URL. A `Train-member:` line that names the
 #     merged pull request itself is ignored with its own `actionable:` line and is not counted;
-#   - in the merged pull request's own body only, never a train member's: an active, not-done
-#     backlog id that appears as a word in the prose, or a link in the prose to another pull
-#     request that no `Train-member:` line lists, is a `mentioned ...` line that says nothing
-#     was closed for it. An id a directive line, task record or old line already named gets no
-#     second line. The merging task's own id is left out, because its teardown owns that item.
-#     A pull request link is read for GitHub, GitLab and Forgejo alike. The id check reads the backlog
-#     once; when the backlog cannot be listed, a body with prose and a directive, old `Closes:`
-#     or malformed line gets one `actionable:` line saying so, and any other body gets none.
+#   - in the merged pull request's body and in each train member's body that was read: an
+#     active, not-done backlog id that appears as a word in the prose is a `mentioned ...`
+#     line that says nothing was closed for it. An id is matched as spelled (a leading or
+#     trailing `_` or `-` belongs to it; only a sentence's trailing `.` is dropped). An id
+#     a directive line, task record or old line already named gets no second line, and the
+#     merging task's own id is left out, because its teardown owns that item. A member's
+#     prose never closes anything. In the merged pull request's body only, a link in the
+#     prose to another pull request that no `Train-member:` line lists is also a
+#     `mentioned ...` line; links are read for GitHub, GitLab and Forgejo alike. The id check
+#     reads the backlog once; when the backlog cannot be listed, any body that has prose gets
+#     one `actionable:` line saying so, whether or not it holds a directive line.
 # The same read gives that pull request's merge state: when it is not merged (a hand run
 # with a pull request that is still open, or a state it cannot read), nothing is closed
 # and every named item in the active backlog that is not done yet is reported as not
@@ -265,6 +268,7 @@ report_old_form() {  # <body-file> <where>: queue the old `Closes:` lines, repor
 report_old_form "$WORK/body" "the body of $URL"
 
 n=0
+MEMBER_URLS=()
 MEMBER_SEEN=$'\n'
 while IFS= read -r candidate; do
   [ -n "$candidate" ] || continue
@@ -281,6 +285,7 @@ while IFS= read -r candidate; do
   case "$MEMBER_SEEN" in *$'\n'"$member"$'\n'*) continue ;; esac
   MEMBER_SEEN="$MEMBER_SEEN$member"$'\n'
   n=$((n + 1))
+  MEMBER_URLS[n]=$member
   if read_body "$member" "$WORK/member-$n"; then
     while IFS= read -r id; do
       [ -z "$id" ] || consider "$id" "$URL" "the body of train member $member"
@@ -308,23 +313,46 @@ while IFS=$'\t' read -r old where; do
   fi
 done < "$WORK/old-form"
 
-# Mentions outside the block: reported, never closed.
-if [ -n "$(fm_pr_closes_prose_words "$WORK/body" | sed -n '1p')" ]; then
+# Mentions outside the block: reported, never closed. The merged body and every train member
+# body that was read are checked, against one read of the backlog.
+MENTION_BODIES=("$WORK/body")
+MENTION_WHERE=("the prose of $URL")
+MENTION_HOW=("add a Closes-backlog-item: <id> line to the body if this merge finished it")
+m=1
+while [ "$m" -le "$n" ]; do
+  if [ -f "$WORK/member-$m" ]; then
+    MENTION_BODIES+=("$WORK/member-$m")
+    MENTION_WHERE+=("the prose of train member ${MEMBER_URLS[$m]}")
+    MENTION_HOW+=("add a Closes-backlog-item: <id> line to the train body or to that member's body if it finished the item")
+  fi
+  m=$((m + 1))
+done
+HAVE_WORDS=0
+for body in "${MENTION_BODIES[@]}"; do
+  [ -z "$(fm_pr_closes_prose_words "$body" | sed -n '1p')" ] || HAVE_WORDS=1
+done
+if [ "$HAVE_WORDS" = 1 ]; then
   if states=$(fm_backlog_row_states "$DATA" 2>/dev/null); then
     : > "$WORK/active-ids"
     while IFS= read -r row; do
       [ -n "$row" ] && [ "${row#*:}" != "done" ] || continue
       printf '%s\n' "${row%%:*}" >> "$WORK/active-ids"
-    done <<EOF
+    done <<ROWS
 $states
-EOF
+ROWS
     SEEN="$SEEN$TASK_ID"$'\n'
-    while IFS= read -r word; do
-      [ -n "$word" ] || continue
-      case "$SEEN" in *$'\n'"$word"$'\n'*) continue ;; esac
-      printf 'actionable: close-at-merge: mentioned %s in the prose of %s: nothing was closed for it; add a Closes-backlog-item: %s line to the body if this merge finished it\n' "$word" "$URL" "$word" >&2
-    done < <(fm_pr_closes_prose_words "$WORK/body" | grep -Fxf "$WORK/active-ids")
-  elif [ -n "$(fm_pr_closes_ids "$WORK/body"; fm_pr_closes_members "$WORK/body"; fm_pr_closes_legacy_ids "$WORK/body"; fm_pr_closes_malformed "$WORK/body")" ]; then
+    k=0
+    while [ "$k" -lt "${#MENTION_BODIES[@]}" ]; do
+      while IFS= read -r word; do
+        [ -n "$word" ] || continue
+        case "$SEEN" in *$'\n'"$word"$'\n'*) continue ;; esac
+        SEEN="$SEEN$word"$'\n'
+        printf 'actionable: close-at-merge: mentioned %s in %s: nothing was closed for it; %s\n' \
+          "$word" "${MENTION_WHERE[$k]}" "${MENTION_HOW[$k]//<id>/$word}" >&2
+      done < <(fm_pr_closes_prose_words "${MENTION_BODIES[$k]}" | grep -Fxf "$WORK/active-ids")
+      k=$((k + 1))
+    done
+  else
     printf 'actionable: close-at-merge: could not list the backlog to check which ids the prose of %s mentions, so none were checked\n' "$URL" >&2
   fi
 fi

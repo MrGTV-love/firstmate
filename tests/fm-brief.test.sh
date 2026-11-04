@@ -1635,6 +1635,7 @@ test_crewmate_scaffolds_require_stopping_private_services() {
   pass "fm-brief.sh: ship and scout scaffolds require stopping private services and naming them in the status line"
 }
 
+# shellcheck disable=SC2016 # Backticks in the asserted brief text are literal Markdown.
 test_ship_scaffolds_teach_the_closes_line() {
   local home mode forge id brief
   home="$TMP_ROOT/closes-line-home"
@@ -1658,7 +1659,9 @@ test_ship_scaffolds_teach_the_closes_line() {
       assert_grep 'A merge that bin/fm-pr-merge.sh confirms and records itself closes each named item' "$brief" "$mode/$forge ship brief did not say what the line does"
       assert_grep 'fm-pr-close-items-queued-and-polled-merges' "$brief" "$mode/$forge ship brief did not name the queued-merge gap"
       assert_grep 'ead the PR body back' "$brief" "$mode/$forge ship brief did not say to re-check the body"
-      assert_grep "then read the body again and confirm each line is there" "$brief" "$mode/$forge ship brief did not say to confirm the re-added lines"
+      assert_grep "then read the body again and confirm each of those lines is there" "$brief" "$mode/$forge ship brief did not say to confirm the re-added lines"
+      assert_grep 'any `Train-member:` line for a component that landed' "$brief" "$mode/$forge ship brief did not make the body repair cover the Train-member: lines of a merge train"
+      assert_grep "keep every one of them through the pipeline's body rewrite" "$brief" "$mode/$forge ship brief did not say that Train-member: lines must survive the pipeline body rewrite"
       if [ "$mode" = no-mistakes ]; then
         # The pipeline writes the PR body after the handoff, so the check belongs after the
         # CI-ready return point and before the CI-ready done, never before the handoff done.
@@ -1670,6 +1673,8 @@ test_ship_scaffolds_teach_the_closes_line() {
           || fail "$mode/$forge brief is missing a stage line the body check is ordered against"
         [ "$check" -gt "$ready" ] && [ "$check" -lt "$final" ] && [ "$check" -gt "$handoff" ] \
           || fail "$mode/$forge brief puts the PR body check outside the window after CI green"
+        sed -n "${check}p" "$brief" | grep -q 'one `Train-member:` line per component that landed' \
+          || fail "$mode/$forge brief's post-CI body check does not cover the Train-member: lines"
       else
         assert_grep 'as the last step before your final done' "$brief" "$mode/$forge ship brief did not order the body check last"
       fi

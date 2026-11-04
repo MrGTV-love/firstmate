@@ -1111,9 +1111,11 @@ A ship or scout task with a live record completes only through [`bin/fm-teardown
 A pull request that finishes a queued item names it with a `Closes-backlog-item: <item-id>` line in its body, and [`bin/fm-pr-merge.sh`](../bin/fm-pr-merge.sh) closes each named item through that same direct completion, with the merged pull request as proof, once it has proved and recorded the merge in that same call.
 A queued (`--auto`), forge-unconfirmed or externally seen merge runs no close, and the items its body names stay open; backlog item `fm-pr-close-items-queued-and-polled-merges` owns that gap.
 A merge train names each landed pull request with a `Train-member: <pull request URL>` line and closes its members' items too, with the train as the proof: each member's own `Closes-backlog-item:` lines, and any task whose `state/<task>.meta` records `pr=` equal to the full member URL.
-[`bin/fm-pr-closes-lib.sh`](../bin/fm-pr-closes-lib.sh)'s header is the one owner of the two directive lines, and only those lines close anything: a table, heading, bullet, link, sentence or fenced example closes nothing.
-When the merged pull request's body mentions, outside those lines, an active backlog id that no directive line, task record or old line names, or another pull request that no `Train-member:` line lists, it closes nothing for it, and the merge prints one `actionable:` line per mention.
-The merging task's own id is not reported, because its teardown owns that item, and a train member's body gets no mention check.
+[`bin/fm-pr-closes-lib.sh`](../bin/fm-pr-closes-lib.sh)'s header is the one owner of the two directive lines, and only those lines close anything: a table, heading, bullet, link, sentence, fenced example or HTML comment closes nothing.
+When the merged pull request's body, or the body of a train member the merge read, mentions outside those lines an active backlog id that no directive line, task record or old line names, it closes nothing for it, and the merge prints one `actionable:` line per mention; an id is matched as spelled, so a trailing `_` or `-` belongs to it.
+When the merged pull request's own body links another pull request that no `Train-member:` line lists, the merge prints one `actionable:` line per link too.
+The merging task's own id is not reported, because its teardown owns that item.
+When the backlog cannot be listed, the merge prints one `actionable:` line saying the id check was skipped for any body that has prose, with or without a directive line.
 An old `Closes: <item-id>` line and a malformed directive line are reported the same way.
 An old line is reported only when no directive line or task record names the same id, and an old line that names the merging task's own id is reported on stdout, not as `actionable:`, because its teardown closes it.
 A train body without `Train-member:` lines closes no member's items and keeps the manual close; its pull request links are reported as mentions.
