@@ -82,11 +82,13 @@
 # plus headroom, so one root at its bound still leaves room for small roots).
 # Each root is charged its own recorded peak, the larger of resident size and
 # physical footprint over its earlier complete analyses, kept per analysis mode
-# (full or fast) and repo-relative root path in the pool's history/ directory. The history lives in the pool, not the lint
-# cache, because the cache depends on HOME and is off for cold runs, and the
-# pool is the one directory every run of this user shares. A root with no
-# history is charged the per-root worst case (the 8 GiB resident watch bound,
-# or the address-space limit under the enforced envelope) until it has one.
+# (full or fast) and repo-relative root path in the pool's history/ directory.
+# The history lives in the pool, not the lint cache, because the cache depends
+# on HOME and is off in CI or under FM_LINT_CACHE_DIR=off, and the pool is the
+# one directory every run of this user shares.
+# A root with no history is charged the per-root worst case (the 8 GiB resident
+# watch bound, or the address-space limit under the enforced envelope) until it
+# has one.
 # A cold root takes its turn only when its charge plus every held root's
 # current charge fits the budget; a held root's current charge is the larger
 # of its charge at admission and what its tree holds now, read when the root

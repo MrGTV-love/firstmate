@@ -51,9 +51,10 @@ use File::Basename qw(dirname basename);
 # gate raises the root's record to the larger of the watch's peak and the
 # maximum resident size in FM_LINT_INTERNAL_ROOT_RSS_FILE; any other end leaves
 # the record alone, and a record is never lowered. Every slot.<n> file in the
-# directory counts toward the budget, beyond this run's count cap too. A pool that cannot be used (directory, lock, ticket, slot or queue
-# file) never lets the analysis run unbounded: the gate names the path and the
-# fix on stderr and exits 2.
+# directory counts toward the budget, beyond this run's count cap too.
+# A pool that cannot be used (directory, lock, ticket, slot or queue file) never
+# lets the analysis run unbounded: the gate names the path and the fix on stderr
+# and exits 2.
 # Admission retains the slot.* protocol so in-flight older gates remain bounded;
 # their records name no charge and are charged the worst case.
 # The high-resolution wait is written in milliseconds to <wait-file> before
