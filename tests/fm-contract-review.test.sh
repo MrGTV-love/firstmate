@@ -1135,6 +1135,88 @@ test_report_field_under_a_label_voids_as_structure() {
   pass "a report field under a label voids for structure, and a listed leak is still a leak"
 }
 
+test_exact_title_in_request_or_context_keeps_the_author_check() {
+  local src="$TMP_ROOT/xc.md" in="$TMP_ROOT/xc-in.md" pack rc title flag
+  write_fixture_contract "$src"
+  for title in Context Request; do
+    # Compliant: an exact section title over a neutral owner line builds.
+    printf '# %s\n\nZZ-KEEP-XC-ZZ the owner wants a thing.\n' "$title" >"$in"
+    build_pack pack --contract "$src" --request "$in" --context "$in" || fail "a '# $title' file with an owner line was refused: $(cat "$TMP_ROOT/build.err")"
+    # Noncompliant: an author line under the same title is still refused.
+    printf "# %s\n\nAuthor's all-green self-check: ZZ-AUTH everything passes.\n" "$title" >"$in"
+    for flag in --request --context; do
+      rc=0
+      "$PACK_BIN" --contract "$src" "$flag" "$in" --out-root "$TMP_ROOT/xc-out" >/dev/null 2>"$TMP_ROOT/xc.err" || rc=$?
+      assert_equals 2 "$rc" "a $flag file '# $title' with an author line was accepted"
+      assert_absent "$TMP_ROOT/xc-out" "a refused $flag file left an output directory"
+    done
+  done
+  pass "an exact section title in a request or context file keeps the author-line refusal"
+}
+
+test_leak_check_without_root_refuses_a_relative_path_outside_the_pack() {
+  local src="$TMP_ROOT/nr.md" rep="$TMP_ROOT/report16.md" pack body
+  make_leak_world
+  write_fixture_contract "$src"
+  build_pack pack --contract "$src" || fail "build without a root failed"
+  norootcheck() {
+    CHECK_RC=0
+    CHECK_OUT=$(REVIEW_SKILLS_DIR="$LEAK_SKILLS" REVIEW_RUBRIC="$LEAK_ROOT/docs/review-rubric.md" \
+      "$PACK_BIN" check --pack "$pack" --report "$rep" 2>&1) || CHECK_RC=$?
+  }
+  # Compliant: a pack file named relative to the pack is clean.
+  printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- target.md\n- %s\n\n## Findings\n' "$pack/contract.md" >"$rep"
+  norootcheck
+  assert_equals 0 "$CHECK_RC" "a relative pack file was flagged with no root: $CHECK_OUT"
+  # Noncompliant: a relative path that is not a pack file is a leak with no root.
+  for body in "- data/x/r23-review.md" "- also read data/x/r23-review.md"; do
+    printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- %s\n%s\n\n## Findings\n' "$pack/contract.md" "$body" >"$rep"
+    norootcheck
+    assert_equals 3 "$CHECK_RC" "'$body' passed with no root"
+    assert_contains "$CHECK_OUT" "not a pack file, and no root" "'$body' was flagged for another cause"
+  done
+  pass "with no root, a relative path that is not a pack file is a leak"
+}
+
+test_leak_check_reads_links_quotes_and_file_urls() {
+  local rep="$TMP_ROOT/report17.md" sib="$TMP_ROOT/sibling/pack/review.md" body n=0
+  make_leak_world
+  # Compliant: a Markdown-linked pack path is clean.
+  printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- [contract.md](%s)\n- %s\n\n## Findings\n' "$LEAK_PACK/contract.md" "$LEAK_PACK/target.md" >"$rep"
+  run_check "$rep"
+  assert_equals 0 "$CHECK_RC" "a linked pack path was flagged: $CHECK_OUT"
+  # Noncompliant: a sibling report behind a link, quotes or file:// is read.
+  # shellcheck disable=SC1111 # literal curly quotes in a report line
+  for body in "- Prior report: [review.md]($sib)" "- [sibling report]($sib)" "- also read '$sib'" \
+    "- also “${sib}”" "- see file://$sib"; do
+    n=$((n + 1))
+    printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- %s\n%s\n\n## Findings\n' "$LEAK_PACK/contract.md" "$body" >"$rep"
+    run_check "$rep"
+    assert_equals 3 "$CHECK_RC" "wrapped path $n ($body) passed"
+    assert_contains "$CHECK_OUT" "INPUT LEAK: $sib" "wrapped path $n is not named"
+  done
+  pass "a path behind a link, quotes or file:// is judged"
+}
+
+test_longer_field_label_voids_as_structure() {
+  local rep="$TMP_ROOT/report18.md" label n=0
+  make_leak_world
+  # Compliant: the longer field name as a heading of its own is clean.
+  printf 'VERDICT: INCOMPLETE head=abc\n\n## Inputs read\n\n- %s\n\n## Checks not performed and limits\n\n- A1 needs %s, not opened.\n' "$LEAK_PACK/target.md" "$LEAK_ROOT/data/case/truth/r23-review.md" >"$rep"
+  run_check "$rep"
+  assert_equals 0 "$CHECK_RC" "a longer field heading was voided: $CHECK_OUT"
+  # Noncompliant: the longer field name as a bold or plain label voids for structure.
+  for label in '**Checks not performed and limits**' '**Notes (not findings)**' 'Checks not performed and limits:'; do
+    n=$((n + 1))
+    printf 'VERDICT: INCOMPLETE head=abc\n\n## Inputs read\n\n- %s\n%s\n- A1 needs %s, not opened.\n' "$LEAK_PACK/target.md" "$label" "$LEAK_ROOT/data/case/truth/r23-review.md" >"$rep"
+    run_check "$rep"
+    assert_equals 3 "$CHECK_RC" "label $n ($label) was accepted"
+    assert_contains "$CHECK_OUT" "report field not under its own heading" "label $n did not void for structure"
+    assert_not_contains "$CHECK_OUT" "INPUT LEAK" "label $n was reported as a leak"
+  done
+  pass "a longer report field label voids for structure, not as a leak"
+}
+
 test_inline_backticks_do_not_open_a_fence() {
   local src="$TMP_ROOT/ib.md" pack manifest
   write_fixture_contract "$src"
@@ -1243,6 +1325,10 @@ fm_test_run_cases \
   test_exact_section_title_counts_as_a_section \
   test_exact_section_title_keeps_its_text \
   test_report_field_under_a_label_voids_as_structure \
+  test_exact_title_in_request_or_context_keeps_the_author_check \
+  test_leak_check_without_root_refuses_a_relative_path_outside_the_pack \
+  test_leak_check_reads_links_quotes_and_file_urls \
+  test_longer_field_label_voids_as_structure \
   test_inline_backticks_do_not_open_a_fence \
   test_definition_of_done_in_every_heading_form \
   test_fences_and_headings_accept_up_to_three_spaces \

@@ -55,8 +55,10 @@
 #   Checks not performed, Findings or Notes bold or `Label:` line inside the list. The list
 #   runs to the next heading of its own level or higher; text inside a code fence is never
 #   a heading. In the list, a line that starts with a path is checked, and so is every
-#   absolute, `~`, http(s), <rev>:<path> or relative dir/file.ext token on any line;
-#   other text is skipped.
+#   absolute, `~`, http(s), <rev>:<path> or relative dir/file.ext token on any line,
+#   with link brackets, quotes and file:// read as separators; other text is skipped.
+#   A relative path is a pack file when the pack holds it, else a root path; with no root
+#   it is not authorized.
 #   An authorized input is judged by what it is: a file inside the pack, the
 #   SKILL.md of the assess-done-and-grade or define-done-and-grading skill (no other
 #   file in either skill folder), the review rubric, or a file the manifest's root tracks (git ls-files, or
@@ -187,7 +189,7 @@ END {
       c = classify(norm(title))
       if (c == "drop") { pre = 0; parent = "drop"; ptitle = title; mode = "drop"; print title > DROPPED_OUT; continue }
       if (c == "keep" && norm(title) ~ HIST) print title > UNKNOWN_OUT
-      if (exact(norm(title))) { print norm(title) > TITLES_OUT; pre = 0; ptitle = title }
+      if (exact(norm(title))) { print norm(title) > TITLES_OUT; if (!STRICT) pre = 0; ptitle = title }
       print line > KEEP_OUT
       if (ul != "") print ul > KEEP_OUT
       continue
@@ -409,6 +411,7 @@ cmd_build() {
 
 # Print the entries of the report's `Inputs read` list, one per line.
 inputs_read() { # <report>
+  # shellcheck disable=SC1112 # literal curly quotes in the awk program
   awk '
     function entry(s,   t) {
       sub(/^[ \t]*([-*+]|[0-9]+[.)])[ \t]+/, "", s)
@@ -425,7 +428,9 @@ inputs_read() { # <report>
     }
     # A line that starts with a path gives its first entry; every further absolute, `~`,
     # http(s), <rev>:<path> or relative dir/file.ext token on the line is an entry too.
+    # Link brackets, quotes and file:// wrappers are separators.
     function emit(s, first,   t, n, k, tok) {
+      gsub(/\]\(|[()\[\]'"'"']|‘|’|“|”|file:\/\//, " ", s)
       if (first) {
         t = entry(s)
         if (t != "") print t
@@ -470,7 +475,7 @@ inputs_read() { # <report>
       name = "[*]*([0-9]+[.)][ \t]*)?[*]*inputs read[*[:space:]]*(\\([^)]*\\))?[*:[:space:]]*"
       label = "^[#*[:space:]-]*([0-9]+[.)][[:space:]]*)?[*]*inputs read[*]*(:|[*[:space:]]*(\\([^)]*\\))?[*:[:space:]]*$)"
       field = "(checks not performed|findings|notes)"
-      fieldlabel = "^[ \t]*([-*+][ \t]+)?((\\*\\*|__)" field "[ \t]*:?[ \t]*(\\*\\*|__)|" field "[ \t]*(:|$))"
+      fieldlabel = "^[ \t]*([-*+][ \t]+)?((\\*\\*|__)" field "[^*_]*(\\*\\*|__)|" field "([^:]*:|[ \t]*$))"
       for (i = 1; i <= N; i++) {
         l = strip3(L[i])
         inf = fence
@@ -561,7 +566,7 @@ cmd_check() {
   log_real=''
   [ -z "$log" ] || log_real=$(real "$log")
   work_report=$(real "${REVIEW_WORK_ROOT:-$fmroot/data/review-lane/work}/$(basename "$(dirname "$pack")")-$(basename "$pack")/review.md")
-  local leaks=0 count=0 entry prev path revpath rel rev excluded x ok why
+  local leaks=0 count=0 entry prev path revpath rel rev excluded x ok why loose
   local list raw rc=0
   raw=$(inputs_read "$report") || rc=$?
   if [ "$rc" = 4 ] || [ "$rc" = 5 ]; then
@@ -582,7 +587,7 @@ cmd_check() {
   while IFS= read -r entry; do
     [ -n "$entry" ] || continue
     count=$((count + 1))
-    rev=''
+    rev='' loose=0
     # A trailing line reference (path:12, path:12-40, path:L10-L40, path#L10) names the same file.
     prev=''
     while [ "$prev" != "$entry" ]; do
@@ -614,7 +619,7 @@ cmd_check() {
       *)
         if [ -z "$rev" ] && [ -e "$pack/$path" ]; then path="$pack/$path"
         elif [ -n "$root" ]; then path="$root/$path"
-        else path="$pack/$path"
+        else path="$pack/$path"; [ -n "$rev" ] || loose=1
         fi
         ;;
     esac
@@ -632,6 +637,8 @@ EOF
       ok=1
     elif [ -n "$excluded" ]; then
       why="excluded path $excluded"
+    elif [ "$loose" = 1 ]; then
+      why="relative path that is not a pack file, and no root"
     elif [ -z "$rev" ] && path_under "$path" "$pack"; then
       ok=1
     elif [ -z "$rev" ] && { [ "$path" = "$rubric_real" ] || [ "$path" = "$assess_dir/SKILL.md" ] || [ "$path" = "$define_dir/SKILL.md" ]; }; then
