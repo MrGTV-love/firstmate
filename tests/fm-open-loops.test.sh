@@ -1949,7 +1949,9 @@ for name in ('state', 'data', 'config', 'projects'):
 (v4 / 'data/backlog.md').write_text(
     '## In flight\n\n## Queued\n\n## Done\n'
     '- [x] fin-moot - Ruled moot (repo: firstmate) (kind: ship) (done 2026-07-12)\n  dropped\n'
-    '- [x] fin-moot-clean - Ruled moot with nothing left in its copy (repo: firstmate) (kind: ship) (done 2026-07-12)\n  dropped\n')
+    '- [x] fin-moot-clean - Ruled moot with nothing left in its copy (repo: firstmate) (kind: ship) (done 2026-07-12)\n  dropped\n'
+    '- [x] src-backlog - Closed on the backlog, deliverable not on record (repo: firstmate) (kind: ship) (done 2026-07-12)\n'
+    '  Delivered, awaiting acceptance\n')
 v4_origin = world / 'v4-origin.git'
 git_ = lambda *a, **k: subprocess.run(['git', *map(str, a)], check=True, capture_output=True, text=True, **k).stdout.strip()
 git_('init', '-q', '--bare', v4_origin)
@@ -2053,6 +2055,10 @@ v4_task('pend-ship', copy=world / 'v4-nowhere', note='delivered, branch pushed')
 pend_run = v4_copy('pend-run', work=False)
 v4_task('pend-run', copy=pend_run, note='handoff: pipeline starting', state='working', live=True)
 v4_task('pend-scout', kind='scout', copy=None, note='delivered, report pending review')
+# One task per source of a pending_acceptance row, so each row's evidence can be checked against its real source.
+v4_task('src-report', copy=world / 'v4-nowhere', note='delivered, branch pushed', state='unknown')
+v4_task('src-state', copy=world / 'v4-nowhere', verb='working', note='building', state='done')
+v4_task('src-backlog', copy=world / 'v4-nowhere', verb='working', note='building', state='paused')
 mate_home = world / 'v4-mate'
 for name in ('state', 'data', 'config', 'projects'):
     (mate_home / name).mkdir(parents=True)
@@ -2139,6 +2145,18 @@ for name in ('pend-ship', 'pend-scout'):
     assert row['owner'] == 'home:firstmate' and name in row['next_action'] and row['overdue'], row
     assert row['limit_seconds'] == DEFAULT_AGES_FOR_TEST['open_pr'], ('acceptance must follow the existing review age class', row)
     assert 'accept' in row['next_action'] or 'review' in row['next_action'], row
+# The evidence names the real source of the row: the last report, the task state, the closed backlog item, or each that holds.
+# It never claims a source that did not put the task there.
+sources = {'last report was done': 'the last report was done', 'task state is done': 'the task state is done',
+           'backlog item is closed': 'its backlog item is closed'}
+expected = {'src-report': {'last report was done'}, 'src-state': {'task state is done'}, 'src-backlog': {'backlog item is closed'},
+            'pend-ship': {'last report was done', 'task state is done'}, 'pend-scout': {'last report was done', 'task state is done'}}
+for name, held in expected.items():
+    row = acceptance.get(name)
+    assert row and row['owner'] == 'home:firstmate', ('each source needs its own owned row', name, mine(name))
+    named = {key for key, words in sources.items() if words in row['evidence']}
+    assert named == held, ('the evidence must name exactly the sources that hold', name, held, row['evidence'])
+    assert 'no accepted or landed deliverable is on record' in row['evidence'], row
 # A done claim the ship-done gate refused is firstmate's to resolve; one refused only because the no-mistakes daemon
 # is down is a wait and adds no row. A refusal because no run exists or the run is otherwise unreadable keeps its row,
 # also for a task whose PR another lane already merged.

@@ -1155,8 +1155,8 @@ class Collector:
         _, verb, open_decision, pause_limit, _, _ = self.report_status(ident)
         state = task["current_state"].get("state")
         detail = task["current_state"].get("detail") or ""
-        closed = any(r["id"] == ident and r.get("state") == "done" for r in self.backlog) \
-            or self.captain_dropped(task)
+        backlog_closed = any(r["id"] == ident and r.get("state") == "done" for r in self.backlog)
+        closed = backlog_closed or self.captain_dropped(task)
         done_refused = verb == "done" and state == "blocked" and not closed and NM_DAEMON_DOWN not in detail
         if not (closed or verb == "done" or state == "done") or open_decision or pause_limit \
                 or (state in ("working", "paused", "blocked", "parked") and not closed and not done_refused):
@@ -1208,9 +1208,13 @@ class Collector:
                   f"review and accept the delivered work of {ident}; its worker is still live")
         if refused:
             action = f"{action}; {refused}"
+        # The evidence names what put the task here: the last report, the task state, or the closed backlog item.
+        holds = [words for words, held in (("the last report was done", verb == "done"),
+                                           ("the task state is done", state == "done"),
+                                           ("its backlog item is closed", backlog_closed)) if held]
         self.add("pending_acceptance", ident, action, since, owner,
                  evidence=(f"last teardown refusal: {refusal}; " if refusal else "")
-                          + "the last report was done and no accepted or landed deliverable is on record"
+                          + " and ".join(holds) + ", and no accepted or landed deliverable is on record"
                           + ("; landing could not be read" if landed is None else ""))
 
     def attach_refusal(self, ident, pr_url, refusal, refused):
