@@ -3078,13 +3078,12 @@ route_world() {  # <name>
   mkdir -p "$HOMED/data" "$W/profiles"
 }
 
-# Vernant's creation lock naming a launcher that has finished.
+# Vernant's creation lock naming a launcher that has finished. The pid is one no
+# process can hold (above the kernel's pid range), as in the suite's other dead
+# launcher locks: a just-finished child's pid can be reused by a new process
+# during a long scenario, which the sweep then rightly holds as a live launcher.
 route_lock_dead() {  # <name>
-  local pid
-  sleep 0.1 &
-  pid=$!
-  wait "$pid" 2>/dev/null || true
-  git -C "$SLOT" worktree lock --reason "vernant-session-active owner=launcher:$pid launcher=$pid" "$(copy_path "$1")"
+  git -C "$SLOT" worktree lock --reason 'vernant-session-active owner=launcher:999999 launcher=999999' "$(copy_path "$1")"
 }
 
 route_record() {  # <name> <pr> <tip> <profile>
