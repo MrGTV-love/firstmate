@@ -488,7 +488,8 @@ For a singly recorded unleased slot with a unique state name, the refusal names 
 When an unleased entry's state name is duplicated or another entry names the same directory, the refusal instead requires `treehouse status` inspection and a repair report.
 Treehouse leases only the first entry with the requested name, so a lease cannot reliably clear a duplicate-entry refusal in either entry order, and the refusal does not describe a partly leased slot as unleased.
 No other refusal names a lease as its remedy.
-A refusal for a recovered-state lease points to `treehouse status` instead, because `treehouse lease` refuses a slot that is already leased.
+A refusal for a recovered-state lease names no lease, because `treehouse lease` refuses a slot that is already leased.
+On a proven treehouse it asks for `treehouse status` inspection and a repair report; on one without the proof it names the upgrade and defers `treehouse status` until after it, because on that build even a status read can run its own recovery and move the copy.
 An unleased slot that `treehouse status` does not list, because the project's pool moved to a new folder, does not stop a start, because `treehouse get` allocates from the current pool only; this is judged again at each start, so a folder that becomes current again is protected again.
 A missing-`jq` refusal says to install `jq` and retry, including when reached through secondmate home seeding.
 A refusal for a slot with no state entry or an unreadable state file points to `treehouse status` for inspection.
