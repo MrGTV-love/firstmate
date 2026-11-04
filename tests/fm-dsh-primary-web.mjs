@@ -55,7 +55,7 @@ const script = (file, body) => {
 };
 script('fm-turnend-guard.sh', 'exit 0');
 // The gate only delays the canonical writer so the release barrier is observable.
-script('fm-lock.sh', `printf '%s\\n' "\${1:-acquire}" >> "$FM_HOME/state/lock-calls"; while [ -f "$FM_HOME/state/release-gate" ]; do sleep 0.025; done; exec bash ${JSON.stringify(join(root, 'bin/fm-lock.sh'))} "$@"`);
+script('fm-lock.sh', `printf '%s\\n' "\${1:-acquire}" >> "$FM_HOME/state/lock-calls"; if [ "\${1:-}" = release ] && [ -f "$FM_HOME/state/release-fail" ]; then echo 'fixture release fault' >&2; exit 2; fi; while [ -f "$FM_HOME/state/release-gate" ]; do sleep 0.025; done; exec bash ${JSON.stringify(join(root, 'bin/fm-lock.sh'))} "$@"`);
 script('fm-sessionstart-run.sh', 'echo FORBIDDEN-HOT-STARTUP; exit 99');
 script('fm-wake-drain.sh', 'test "$1" = --queued; cat "$FM_HOME/state/queue"');
 script('fm-watch-arm.sh', 'echo "watcher: started pid=fixture"; while [ ! -f "$FM_HOME/state/release" ]; do read -r -t 0.02 _ || :; done; echo "check: tagged-native-wake"');
@@ -212,17 +212,37 @@ try {
   await delay(40);
   assert.equal(lockCalls().filter(call => call === 'release').length, 1, 'stale termination and HMR disposal must not release resumed ownership');
   assert.deepEqual(pair(), owned);
+  // A failed canonical release stays visible and leaves ownership in place,
+  // without poisoning the next legitimate same-ID attachment.
+  unlinkSync(join(home, 'state/release'));
+  const failing = host.plugin(bridge, {root: code, home, sessionId: target.id});
+  await failing.await();
+  await until(() => arms() === 4, 'the replacement re-attaches through its owned lock');
+  writeFileSync(join(home, 'state/release-fail'), '');
   await replacement.scope.dispose();
+  live.delete(replacement.id);
+  host.emit(scopeTarget(replacement, replacement), 'agent/disposed', {agent: replacement});
+  const events = () => readFileSync(join(home, 'state/.dsh-primary-events.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
+  await until(() => events().some(row => row.event === 'release-error'), 'a failed release must be recorded');
+  assert.match(events().find(row => row.event === 'release-error').detail, /fixture release fault/);
+  assert.deepEqual(pair(), owned, 'a failed release must fail closed without removing ownership');
+  unlinkSync(join(home, 'state/release-fail'));
+  const successor = agent(target.id);
+  writeFileSync(join(home, 'state/release'), '');
+  await host.serial(scopeTarget(successor, successor), 'agent/created', {agent: successor, source: 'resume'});
+  await until(() => successor.sent.length === 1, 'a later legitimate same-ID Agent must still attach and receive its followup');
+  assert.deepEqual(lockCalls().slice(-1), ['release'], 'the owned successor needs no further lock call');
+  await failing.dispose();
+  await successor.scope.dispose();
 
   // A genuine process-owned TUI profile still admits the legacy root/home
   // configuration and its future-created primary through the same native SDK.
   const tuiHome = join(fixture, 'owned-tui-home');
   primaryHome(tuiHome);
-  // The legacy session start (a recorder here) owns acquisition for this profile.
-  writeFileSync(join(tuiHome, 'state/.lock'), `${process.pid}\n`);
   writeFileSync(join(tuiHome, 'state/queue'), '8\t1\tcheck\tlegacy\twake\n');
   writeFileSync(join(tuiHome, 'state/release'), '');
-  script('fm-sessionstart-run.sh', "echo 'LEGACY SESSION START - fixture'");
+  // The legacy session start owns acquisition for this profile through the canonical writer.
+  script('fm-sessionstart-run.sh', 'bash "$(dirname "$0")/fm-lock.sh" >&2; echo "LEGACY SESSION START - fixture"');
   const tuiApp = new Context();
   let tuiHost;
   const tuiAgent = {id: 'legacy-TUI-fixture', session: {header: {cwd: tuiHome}}, sent: [],
@@ -237,7 +257,8 @@ try {
   tuiAgent.ctx = tuiScope.ctx;
   let tui;
   try {
-    Object.assign(process.env, {FM_DSH_HARNESS: 'dsh', DSH_PROFILE: 'dsh-tui', DSH_SESSION_ID: tuiAgent.id});
+    // A TUI launched from a Web conversation's shell inherits that conversation's identity.
+    Object.assign(process.env, {FM_DSH_HARNESS: 'dsh', DSH_PROFILE: 'web', DSH_SESSION_ID: 'session-parent-web', DSH_SHELL: '1'});
     tui = tuiHost.plugin(bridge, {root: code, home: tuiHome});
     await tui.await();
     await tuiHost.serial(scopeTarget(tuiAgent, tuiAgent), 'agent/created', {agent: tuiAgent, source: 'startup'});
@@ -245,7 +266,12 @@ try {
     const commands = readFileSync(join(tuiHome, 'state/commands'), 'utf8').trim().split('\n');
     assert.equal(commands.filter(row => row.startsWith('fm-sessionstart-run.sh')).length, 1);
     assert.equal(commands.filter(row => row.startsWith('fm-watch-arm.sh')).length, 1);
-    assert.equal(commands.filter(row => row.startsWith('fm-lock.sh')).length, 0, 'legacy TUI attachment never runs the Web acquire');
+    assert.deepEqual(readFileSync(join(tuiHome, 'state/lock-calls'), 'utf8').trim().split('\n'), ['acquire'], 'only legacy session start acquires; the TUI never runs the Web acquire');
+    assert.equal(readFileSync(join(tuiHome, 'state/.lock'), 'utf8'), `${process.pid}\n`);
+    assert.equal(existsSync(join(tuiHome, 'state/.lock-session')), false, 'an inherited Web identity must not tag the TUI lock');
+    const shell = spawnSync('bash', [join(code, 'bin/fm-dsh-primary.sh'), 'inspect', tuiHome], {encoding: 'utf8',
+      env: {...process.env, DSH_PROFILE: 'dsh-tui', DSH_SESSION_ID: tuiAgent.id, DSH_SHELL: '1'}});
+    assert.equal(shell.status, 0, `the TUI model's own shell must own its primary lock: ${shell.stderr}`);
   } finally {
     await tui?.dispose();
     await tuiScope.dispose();
@@ -255,8 +281,8 @@ try {
       else process.env[key] = ambient[key];
     }
   }
-  console.log('ok - actual SDK owned TUI profile preserves legacy root/home startup and one supervision followup');
-  console.log('ok - native Web existing/resumed Agent through real inspect and canonical lock: free/dead acquire, live foreign refusal, explicit env, no startup, one followup, true-termination release barrier, no HMR/stale release and scoped cleanup');
+  console.log('ok - actual SDK owned TUI profile preserves legacy root/home startup and one supervision followup, and ignores inherited Web identity');
+  console.log('ok - native Web existing/resumed Agent through real inspect and canonical lock: free/dead acquire, live foreign refusal, explicit env, no startup, one followup, true-termination release barrier, visible fail-closed release failure with later recovery, no HMR/stale release and scoped cleanup');
 } finally {
   const gate = join(home, 'state/release-gate');
   if (existsSync(gate)) { assert(home.startsWith(fixture + '/')); unlinkSync(gate); }

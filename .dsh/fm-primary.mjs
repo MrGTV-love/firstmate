@@ -23,12 +23,22 @@ const environment = (home, agent) => {
   // The legacy launcher owns its process. A Web host owns many sessions.
   if (!agent) Object.assign(process.env, paths);
   const env = {...process.env, ...paths};
+  for (const key of ['DSH_PROFILE', 'DSH_SESSION_ID', 'DSH_SHELL']) delete env[key];
   if (agent) {
     for (const key of ['CLAUDECODE', 'CLAUDE_PID', 'CLAUDE_CODE_SESSION_ID', 'PI_CODING_AGENT',
       'GROK_AGENT', 'FM_PI_HARNESS', 'FM_OMP_HARNESS', 'GEMINI_CLI', 'CURSOR_AGENT', 'CURSOR_INVOKED_AS', 'HERDR_ENV']) delete env[key];
     Object.assign(env, {FM_DSH_HARNESS: 'dsh', DSH_PROFILE: 'web', DSH_SESSION_ID: agent.id});
   }
   return env;
+};
+const record = (events, event, fields = {}) => {
+  appendFileSync(events, JSON.stringify({at: Date.now(), pid: process.pid, event, ...fields}) + '\n');
+  const rows = readFileSync(events, 'utf8').split('\n').filter(Boolean);
+  if (rows.length > 600) {
+    const temporary = `${events}.tmp.${process.pid}`;
+    writeFileSync(temporary, rows.slice(-400).join('\n') + '\n');
+    renameSync(temporary, events);
+  }
 };
 const runCommand = (root, home, env, children, script, args = [], input = '') => new Promise((accept, reject) => {
   const child = spawn('nice', ['-n', '20', 'bash', join(root, 'bin', script), ...args],
@@ -84,7 +94,9 @@ export async function apply(ctx, config) {
     releasing = releasing.then(async () => {
       const result = await runCommand(resolve(config.root), resolve(config.home),
         environment(resolve(config.home), agent), releases, 'fm-lock.sh', ['release']);
-      if (result.code !== 0 && result.code !== 1) throw new Error('Firstmate native lock release failed');
+      if (result.code !== 0 && result.code !== 1) throw new Error(`Firstmate native lock release failed: ${result.stderr || result.code}`);
+    }).catch(error => {
+      try { record(join(resolve(config.home), 'state', '.dsh-primary-events.jsonl'), 'release-error', {detail: String(error)}); } catch {}
     });
     return releasing;
   });
@@ -124,15 +136,7 @@ function primary(ctx, config) {
   previous?.();
   mkdirSync(state, {recursive: true});
   const events = join(state, '.dsh-primary-events.jsonl');
-  const log = (event, fields = {}) => {
-    appendFileSync(events, JSON.stringify({at: Date.now(), pid: process.pid, event, ...fields}) + '\n');
-    const rows = readFileSync(events, 'utf8').split('\n').filter(Boolean);
-    if (rows.length > 600) {
-      const temporary = `${events}.tmp.${process.pid}`;
-      writeFileSync(temporary, rows.slice(-400).join('\n') + '\n');
-      renameSync(temporary, events);
-    }
-  };
+  const log = (event, fields) => record(events, event, fields);
   const command = (script, args = [], input = '') => {
     if (disposed || (web && !current())) return Promise.reject(new Error('Firstmate attachment retired'));
     return runCommand(root, home, env, children, script, args, input);

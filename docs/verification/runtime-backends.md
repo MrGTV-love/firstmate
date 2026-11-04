@@ -4091,8 +4091,8 @@ It exited 0 with:
 
 ```text
 ok - actual SDK Web config without sessionId refuses before environment mutation or legacy subscription
-ok - actual SDK owned TUI profile preserves legacy root/home startup and one supervision followup
-ok - native Web existing/resumed Agent through real inspect and canonical lock: free/dead acquire, live foreign refusal, explicit env, no startup, one followup, true-termination release barrier, no HMR/stale release and scoped cleanup
+ok - actual SDK owned TUI profile preserves legacy root/home startup and one supervision followup, and ignores inherited Web identity
+ok - native Web existing/resumed Agent through real inspect and canonical lock: free/dead acquire, live foreign refusal, explicit env, no startup, one followup, true-termination release barrier, visible fail-closed release failure with later recovery, no HMR/stale release and scoped cleanup
 ```
 
 The missing-Web-session assertion fails against the unrepaired adapter: configuration is accepted, the process environment changes, legacy selection occurs and one recorder command runs.
