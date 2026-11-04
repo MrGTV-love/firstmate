@@ -341,21 +341,27 @@ test_launch_proof_recorded_native_identity() {
 
 # A restored claude agent is authorized only by positive, independent proof that it
 # is this task's own conversation. Every fact comes from stubbed readers (process
-# table, kernel cwd, process environment, Herdr), shaped like the recorded lane
-# vernant-d1-intake: `node <nvm bin>/teamclaude run -- --resume <id>` with
-# `claude --resume <id>` as its direct child in the same process group.
+# table, kernel cwd, process environment, Herdr): a restored `claude --resume <id>`
+# as the pane's foreground process. The recorded lane vernant-d1-intake shape,
+# `node <nvm bin>/teamclaude run -- --resume <id>` with claude as its direct child,
+# is refused: the forwarding-launcher allow-list is empty.
 test_launch_proof_claude_adoption() (
   local T="$TMP/claude-adopt" UUID=5a3eec19-de12-4999-bed2-bbd561089154 OTHER_UUID=0b4c1d2e-3f40-4a51-8b62-7c83d94ea5f6
   local LANE="$T/lane/firstmate" OPERATOR="$T/operator" STATE="$T/main-state" META out err rc DOORBELL
   mkdir -p "$T"
   META="$STATE/vernant-t1.meta"
   PIN_GEN=s1793120312.10459.5003
-  WRAPPER_ARGS="node $T/.nvm/bin/teamclaude run -- --resume $UUID"
 
   proc() { printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$@" >> "$T/procs"; }  # pid ppid pgid name argv0 args
   default_procs() {
     : > "$T/procs"
-    proc 53539 1 53539 node node "$WRAPPER_ARGS"
+    proc 53733 1 53733 2.1.316 claude "claude --resume $UUID"
+    proc 56557 53733 53733 railway railway 'railway mcp'
+    printf 53733 > "$T/fg-group"
+  }
+  wrapper_procs() { # <launcher-args>: the launcher leads the foreground group, claude is its direct child
+    : > "$T/procs"
+    proc 53539 1 53539 node node "$1"
     proc 53733 53539 53539 2.1.316 claude "claude --resume $UUID"
     proc 56557 53733 53539 railway railway 'railway mcp'
     printf 53539 > "$T/fg-group"
@@ -432,23 +438,50 @@ test_launch_proof_claude_adoption() (
     'transcripts live under the home with every non-alphanumeric character replaced'
 
   fresh_case
-  accepts 'compliant d1 shape (launcher, direct claude child, cwd, one claim, launch-brief tie)'
+  accepts 'compliant restored claude (bare harness, cwd, one claim, launch-brief tie)'
   assert_equals "$UUID" "$(printf '%s' "$out" | jq -r .session_id)" 'candidate names the live session'
-  assert_equals 53539 "$(printf '%s' "$out" | jq -r .pid)" 'candidate names the attributed launcher'
-  assert_equals 53733 "$(printf '%s' "$out" | jq -r .harness_pid)" 'candidate names the harness child'
+  assert_equals 53733 "$(printf '%s' "$out" | jq -r .pid)" 'the bare claude is the attributed process'
+  assert_equals 53733 "$(printf '%s' "$out" | jq -r .harness_pid)" 'the bare claude is its own harness'
   assert_equals launch-brief "$(printf '%s' "$out" | jq -r .tie)" 'tie is the launch-brief doorbell'
   # Later transcript content (reading and archiving inbox records) is not the tie: the twin of h3.
   { printf '{"type":"assistant","message":{"role":"assistant","content":"read the inbox"}}\n'
     printf '{"type":"user","timestamp":"2099-01-01T00:00:00.000Z","message":{"role":"user","content":"mv inbox/1.msg inbox/handled/"}}\n'; } >> "$(transcript_dir)/$UUID.jsonl"
   accepts 'the same later inbox activity does not change a launch-brief session'
-  pass 'a restored claude agent behind the TeamClaude launcher is adopted on positive proof'
+  pass 'a restored claude agent is adopted on positive proof'
 
-  # A bare restored claude (no launcher) is the recipient itself.
-  fresh_case
-  : > "$T/procs"; proc 53733 1 53733 2.1.316 claude "claude --resume $UUID"; printf 53733 > "$T/fg-group"
-  accepts 'a bare restored claude is its own recipient'
-  assert_equals 53733 "$(printf '%s' "$out" | jq -r .pid)" 'the bare claude is the attributed process'
-  pass 'a bare restored claude is accepted as its own recipient'
+  # The recorded d1 shape: TeamClaude is not on the (empty) forwarding allow-list.
+  fresh_case; wrapper_procs "node $T/.nvm/bin/teamclaude run -- --resume $UUID"
+  refuses 'listed forwarding launcher' '(c) the d1 shape behind a teamclaude run -- wrapper'
+  pass 'a restored claude behind the TeamClaude launcher refuses with its own cause'
+
+  # The retained launcher proof, exercised with a hypothetical entry in this subshell only.
+  FM_LAUNCH_PROOF_FORWARDING_LAUNCHERS=examplelauncher
+  WRAPPER_ARGS="node $T/.nvm/bin/examplelauncher run -- --resume $UUID"
+  fresh_case; wrapper_procs "$WRAPPER_ARGS"
+  accepts 'a listed launcher forwarding a direct claude child'
+  assert_equals 53539 "$(printf '%s' "$out" | jq -r .pid)" 'candidate names the attributed launcher'
+  assert_equals 53733 "$(printf '%s' "$out" | jq -r .harness_pid)" 'candidate names the harness child'
+  fresh_case; wrapper_procs "node $T/.nvm/bin/otherwrap run -- --resume $UUID"
+  refuses 'forwarding launcher' '(c) a launcher-shaped wrapper that is not on the allow-list'
+  fresh_case; wrapper_procs "node $T/.nvm/bin/examplelauncher status"
+  refuses 'forwarding launcher' '(c) the listed launcher without its "run --" form'
+  fresh_case; : > "$T/procs"
+  proc 53539 1 53539 node node "$WRAPPER_ARGS"; proc 53733 53539 53600 2.1.316 claude "claude --resume $UUID"
+  proc 53600 1 53539 helper helper 'helper'; printf 53539 > "$T/fg-group"
+  refuses 'direct child' '(c) the harness is outside the launcher process group'
+  fresh_case; : > "$T/procs"
+  proc 53539 1 53539 node node "$WRAPPER_ARGS"; proc 53540 53539 53539 sh sh 'sh -c wrapper'
+  proc 53733 53540 53539 2.1.316 claude "claude --resume $UUID"; printf 53539 > "$T/fg-group"
+  refuses 'direct child' '(c) the harness is a grandchild, not a direct child'
+  fresh_case; : > "$T/procs"
+  proc 53539 1 53539 node node "$WRAPPER_ARGS"; proc 53733 53539 53539 2.1.316 claude "claude --resume $OTHER_UUID"
+  printf 53539 > "$T/fg-group"
+  refuses 'forward exactly' '(c) the launcher forwards other arguments than the harness runs'
+  fresh_case; wrapper_procs "$WRAPPER_ARGS"; env_of 53539 'FM_SPAWN_GEN=s9.9.9
+'
+  refuses 'pinned to another launch generation' '(e) the launcher is pinned to another generation'
+  FM_LAUNCH_PROOF_FORWARDING_LAUNCHERS=''
+  pass 'the retained forwarding-launcher proof refuses every unproven launcher shape'
 
   # (a) pane
   fresh_case; : > "$T/pane-missing"
@@ -468,34 +501,17 @@ test_launch_proof_claude_adoption() (
   fresh_case; : > "$T/procs"; proc 777 1 777 python3 python3 'python3 /tmp/runner.py'
   proc 53733 777 777 2.1.316 claude "claude --resume $UUID"; printf 777 > "$T/fg-group"
   refuses 'forwarding launcher' '(c) an interpreter parent with a harness-shaped child'
-  fresh_case; WRAPPER_ARGS="node $T/.nvm/bin/otherwrap run -- --resume $UUID"; default_procs
-  refuses 'forwarding launcher' '(c) a launcher-shaped wrapper that is not on the allow-list'
-  fresh_case; WRAPPER_ARGS="node $T/.nvm/bin/teamclaude status"; default_procs
-  refuses 'forwarding launcher' '(c) the listed launcher without its "run --" form'
-  WRAPPER_ARGS="node $T/.nvm/bin/teamclaude run -- --resume $UUID"
-  fresh_case; : > "$T/procs"
-  proc 53539 1 53539 node node "$WRAPPER_ARGS"; proc 53733 53539 53600 2.1.316 claude "claude --resume $UUID"
-  proc 53600 1 53539 helper helper 'helper'
-  refuses 'direct child' '(c) the harness is outside the launcher process group'
-  fresh_case; : > "$T/procs"
-  proc 53539 1 53539 node node "$WRAPPER_ARGS"; proc 53540 53539 53539 sh sh 'sh -c wrapper'
-  proc 53733 53540 53539 2.1.316 claude "claude --resume $UUID"
-  refuses 'direct child' '(c) the harness is a grandchild, not a direct child'
-  fresh_case; : > "$T/procs"
-  proc 53539 1 53539 node node "$WRAPPER_ARGS"; proc 53733 53539 53539 2.1.316 claude "claude --resume $OTHER_UUID"
-  refuses 'forward exactly' '(c) the launcher forwards other arguments than the harness runs'
   # (d) kernel working directory
   fresh_case; printf '%s' "$T" > "$T/cwd-53733"
-  refuses 'cwd inside' '(d) the harness cwd is an unrelated directory'
+  refuses 'cwd to be this task' '(d) the harness cwd is an unrelated directory'
   fresh_case; mkdir -p "$T/other-home/firstmate"; printf '%s' "$T/other-home/firstmate" > "$T/cwd-53733"
-  refuses 'cwd inside' '(d) the harness cwd is another home'
+  refuses 'cwd to be this task' '(d) the harness cwd is another home'
+  fresh_case; mkdir -p "$LANE/sub"; printf '%s' "$LANE/sub" > "$T/cwd-53733"
+  refuses 'cwd to be this task' '(d) the harness cwd is a subdirectory of the recorded home'
   # (e) a process pinned to another generation
   fresh_case; env_of 53733 'FM_SPAWN_GEN=s9.9.9
 '
   refuses 'pinned to another launch generation' '(e) the harness is pinned to another generation'
-  fresh_case; env_of 53539 'FM_SPAWN_GEN=s9.9.9
-'
-  refuses 'pinned to another launch generation' '(e) the launcher is pinned to another generation'
   # a pin that matches belongs to the managed route, not to adoption
   fresh_case; env_of 53733 "FM_SPAWN_GEN=$PIN_GEN
 "
@@ -531,8 +547,7 @@ test_launch_proof_claude_adoption() (
 '
   refuses 'pinned to another launch generation' '(e) a helper in the harness group is pinned to another generation'
   # (h) the session tie
-  fresh_case; : > "$T/procs"
-  proc 53539 1 53539 node node "node $T/.nvm/bin/teamclaude run --"; proc 53733 53539 53539 2.1.316 claude 'claude'
+  fresh_case; : > "$T/procs"; proc 53733 1 53733 2.1.316 claude 'claude --model opus'; printf 53733 > "$T/fg-group"
   refuses 'no task-specific session tie' '(h) no session id on the harness argv'
   fresh_case; rm -f "$(transcript_dir)/$UUID.jsonl"
   refuses 'no task-specific session tie' '(h) no readable transcript'
@@ -581,10 +596,8 @@ test_launch_proof_claude_verdict_and_refusal() (
   PIN_GEN=s1793120312.10459.5003
   ps() {
     case "$*" in
-      '-axo pid=,ppid=,pgid=') printf '%s\n' '53539 1 53539' '53733 53539 53539' ;;
-      '-axo pid=,ppid=') printf '%s\n' '53539 1' '53733 53539' ;;
-      '-p 53539 -o comm=') echo node ;;
-      '-p 53539 -o args=') echo "node /n/bin/teamclaude run -- --resume $UUID" ;;
+      '-axo pid=,ppid=,pgid=') printf '%s\n' '53733 1 53733' ;;
+      '-axo pid=,ppid=') printf '%s\n' '53733 1' ;;
       '-p 53733 -o comm=') echo 2.1.316 ;;
       '-p 53733 -o args=') echo "claude --resume $UUID" ;;
       *) fail "unexpected ps query: $*" ;;
@@ -596,13 +609,13 @@ test_launch_proof_claude_verdict_and_refusal() (
     case "$*" in
       'lab pane get w1:p2') printf '{"result":{"pane":{"pane_id":"w1:p2"}}}' ;;
       'lab pane process-info --pane w1:p2')
-        printf '%s' '{"result":{"type":"pane_process_info","process_info":{"pane_id":"w1:p2","foreground_process_group_id":53539,"foreground_processes":[{"pid":53539,"name":"node","argv0":"node"},{"pid":53733,"name":"2.1.316","argv0":"claude"}]}}}' ;;
+        printf '%s' '{"result":{"type":"pane_process_info","process_info":{"pane_id":"w1:p2","foreground_process_group_id":53733,"foreground_processes":[{"pid":53733,"name":"2.1.316","argv0":"claude"}]}}}' ;;
       *) return 1 ;;
     esac
   }
-  meta_for() { # <harness> <launch_proof>
-    printf 'window=lab:w1:p2\nherdr_session=lab\nherdr_pane_id=w1:p2\nbackend=herdr\nharness=%s\nkind=secondmate\nspawn_gen=%s\nworktree=%s\nhome=%s\n' \
-      "$1" "$PIN_GEN" "$LANE" "$LANE" > "$META"
+  meta_for() { # <harness> <launch_proof> [<kind>]
+    printf 'window=lab:w1:p2\nherdr_session=lab\nherdr_pane_id=w1:p2\nbackend=herdr\nharness=%s\nkind=%s\nspawn_gen=%s\nworktree=%s\nhome=%s\n' \
+      "$1" "${3:-secondmate}" "$PIN_GEN" "$LANE" "$LANE" > "$META"
     [ -z "${2:-}" ] || printf 'launch_proof=%s\n' "$2" >> "$META"
   }
   fm_operational_record_write "$LANE/state" launch-brief 'task brief' DOORBELL
@@ -619,6 +632,16 @@ test_launch_proof_claude_verdict_and_refusal() (
   assert_contains "$out" 'environment was readable and carries no launch pin' 'the cause says the environment was readable and had no pin'
   assert_contains "$out" 'bin/fm-control.sh vernant-t1 adopt' 'the cause names the explicit route'
   assert_not_contains "$out" 'unreadable' 'the unpinned case is not called unreadable'
+  # adopt accepts only secondmates, so a ship or scout is never sent to it.
+  for kind in ship scout; do
+    meta_for claude env-v1 "$kind"
+    out=$(fm_launch_proof_herdr_refusal "$META") && fail "an unadopted unpinned claude $kind was authorized"
+    assert_contains "$out" 'unpinned native restore' "the $kind cause names an unpinned native restore"
+    assert_contains "$out" 'unmanaged restored worker: adopt supports secondmates only; Main inspects the pane and decides' \
+      "the $kind next action says adopt supports secondmates only"
+    assert_not_contains "$out" 'fm-control.sh vernant-t1 adopt' "a $kind is never told to run adopt"
+  done
+  meta_for claude env-v1
   # E1: an environment that cannot be read keeps the unreadable wording and its own next action.
   : > "$T/env-unreadable"
   assert_equals unknown "$(fm_launch_proof_herdr "$META")" 'an unreadable environment stays unknown'

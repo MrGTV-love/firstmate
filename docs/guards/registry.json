@@ -6942,7 +6942,7 @@
         },
         {
           "file": "bin/fm-launch-proof-lib.sh",
-          "match": "*) fm_launch_proof_adopt_refuse 'workspace proof needs the harness cwd inside this task'\"'\"'s recorded worktree'; return 1 ;;"
+          "match": "|| { fm_launch_proof_adopt_refuse 'workspace proof needs the harness cwd to be this task'\"'\"'s recorded home or worktree'; return 1; }"
         },
         {
           "file": "bin/fm-launch-proof-lib.sh",
@@ -6988,8 +6988,8 @@
       "owner": "bin/fm-secondmate-restart.sh",
       "invariant": "The secondmate restart sends no request, record or nudge to a live Herdr agent that is not positively attributed to the task.",
       "layer": "runtime-block",
-      "source": "the one launch-proof verdict owner (fm_launch_proof_herdr_refusal) read before the restart's pending-reply record, persistence request and fallback nudge; a pane whose agent is not alive stays with the control plane's own stopped-agent proofs",
-      "trigger": "restart of a local Herdr secondmate whose live agent is unmanaged or unreadable by the launch-proof owner",
+      "source": "the one launch-proof verdict owner (fm_launch_proof_herdr_refusal) read before the restart's pending-reply record, persistence request and fallback nudge; a pane whose agent is positively dead or missing stays with the control plane's own stopped-agent proofs",
+      "trigger": "restart of a local Herdr secondmate whose live agent is unmanaged or unreadable by the launch-proof owner, or whose Herdr backend does not load, endpoint does not validate, or agent state is neither alive nor positively dead or missing",
       "decision": "deny",
       "fail_direction": "closed",
       "remedy": "Leave the agent running; authorize it with FM_HOME=<home> bash bin/fm-control.sh <task> adopt when it is the task's own restored claude, or decide the lane by hand, then rerun the restart.",

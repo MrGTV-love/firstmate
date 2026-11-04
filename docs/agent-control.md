@@ -209,7 +209,8 @@ A switch to a personal conversation that Herdr has not yet registered is not see
 Run `FM_HOME=<home> bash bin/fm-control.sh <task-id> adopt` for a local Herdr claude secondmate whose agent Herdr restored natively after a reboot.
 Herdr restores the argv and not the launch environment, so the restored agent carries no launch pin.
 Its verdict is `unmanaged`, a readable environment without a matching pin, and never `unknown`, an environment that could not be read.
-Every lifecycle consumer says which, and for `unmanaged` it names this route as the next action.
+Every lifecycle consumer says which.
+For `unmanaged` it names this route as the next action for a secondmate; for a ship or scout it says `unmanaged restored worker: adopt supports secondmates only; Main inspects the pane and decides`, because the route accepts only secondmates.
 `adopt` is one verb for both harnesses: it has the omp route's caller gate, so only the lock-owning main Firstmate may run it and a worker, the supervision branch, or a session that does not own the home's lock is refused.
 It writes only `state/<task-id>.claude-adoption.json`, by rename under the task's metadata lock, and never changes `launch_proof`, `spawn_gen`, or any other field of the record.
 It sends no input and starts or stops nothing.
@@ -217,10 +218,11 @@ It sends no input and starts or stops nothing.
 
 - The recorded pane exists, and `window`, `herdr_session`, and `herdr_pane_id` agree.
 - One process is uniquely attributed in the pane, and it is the claude harness or a launcher on the fixed allow-list in the proof function.
-  The only entry is TeamClaude, `node <bin>/teamclaude run -- <harness arguments>`, which `config/claude-launcher` and `bin/fm-teamclaude-launch.sh` name and the restored lanes run.
-  The harness must be the launcher's only claude child, a direct child in its process group, and run exactly the forwarded arguments.
+  The allow-list is empty, so only a foreground process that is itself the claude harness is accepted.
+  The repository launcher `bin/fm-teamclaude-launch.sh` execs claude directly and avoids `teamclaude run`, and `config/` is host configuration, not repository evidence, so a restored lane behind a `teamclaude run --` wrapper is refused.
+  An entry needs Main's recorded confirmation before it is added; for a listed launcher the harness must be its only claude child, a direct child in its process group, and run exactly the forwarded arguments.
   An interpreter, shell, editor, or unlisted wrapper that merely has a harness-shaped descendant is not proven.
-- The harness's kernel working directory is inside the task's recorded worktree and not inside another record's as deep or deeper.
+- The harness's kernel working directory is exactly the task's recorded home or worktree; a subdirectory of either is refused.
 - No process in the tree carries a launch pin, and none carries one for another generation.
 - No other task record in this home or in a secondmate home it can read claims the pane, the home, or the worktree.
 - A task-specific session tie exists.

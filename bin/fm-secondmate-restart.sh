@@ -52,8 +52,8 @@
 # computed here in the primary and are identical for both.
 #
 # Before any effect (pending-reply record, persistence request, fallback nudge),
-# a local Herdr mate whose live agent the launch-proof owner cannot attribute to
-# its task is reported as unreached with the cause and receives none of them.
+# a local Herdr mate whose agent is not positively stopped and not attributed to
+# its task by the launch-proof owner is reported unreached and receives none.
 # Nothing here forces, stashes, or discards anything. bin/fm-control.sh owns the
 # restart transaction, its checkpoint, its journal, and its rollback; a refusal
 # before the agent is stopped leaves the mate running exactly as it was.

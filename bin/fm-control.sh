@@ -2705,7 +2705,7 @@ do_relaunch() {
         # A claude lane has no skip: an unadopted native restore keeps the
         # nonzero exit an unproven versioned launch always had.
         [ "$RECORDED_HARNESS" != claude ] \
-          || die "launch recovery for $ID found $(fm_launch_proof_refusal_cause unmanaged); no lifecycle action taken; $(fm_launch_proof_refusal_next unmanaged "$ID")"
+          || die "launch recovery for $ID found $(fm_launch_proof_refusal_cause unmanaged); no lifecycle action taken; $(fm_launch_proof_refusal_next unmanaged "$META")"
         echo "recovery-skipped $ID launch=unmanaged; no lifecycle action taken"
         return 0
         ;;
@@ -2714,7 +2714,7 @@ do_relaunch() {
           echo "recovery-skipped $ID launch=legacy-unproven"
           return 0
         fi
-        die "launch recovery for $ID cannot prove its live launch settings; no lifecycle action taken ($(fm_launch_proof_refusal_cause unknown); $(fm_launch_proof_refusal_next unknown "$ID"))"
+        die "launch recovery for $ID cannot prove its live launch settings; no lifecycle action taken ($(fm_launch_proof_refusal_cause unknown); $(fm_launch_proof_refusal_next unknown "$META"))"
         ;;
       *) die "invalid launch proof for $ID: $state" ;;
     esac

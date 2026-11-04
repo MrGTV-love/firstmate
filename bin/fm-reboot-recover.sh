@@ -10,7 +10,8 @@
 # Herdr's session-wide auto-resume setting is deliberately not changed.
 # Unknown versioned launch proof is reported as unreadable. An unadopted claude
 # whose readable environment carries no launch pin is reported as an unpinned
-# native restore with the explicit adopt route, and keeps the nonzero status.
+# native restore, with the explicit adopt route for a secondmate only, and keeps
+# the nonzero status.
 # A legacy record (no launch_proof)
 # keeps exit and relaunch: an unpinned legacy omp is reported as such, and other
 # legacy-unproven records skip.
@@ -141,7 +142,7 @@ for ((offset=0; offset<count && (ONE == 0 || selected == 0); offset++)); do
         continue
       fi
       notice "$id" "launch-unreadable $identity" \
-        "REBOOT_RECOVERY: $id: $(fm_launch_proof_refusal_cause unknown); no lifecycle action taken; $(fm_launch_proof_refusal_next unknown "$id")" && result=1
+        "REBOOT_RECOVERY: $id: $(fm_launch_proof_refusal_cause unknown); no lifecycle action taken; $(fm_launch_proof_refusal_next unknown "$meta")" && result=1
       continue
       ;;
     unmanaged)
@@ -154,7 +155,7 @@ for ((offset=0; offset<count && (ONE == 0 || selected == 0); offset++)); do
         # An unadopted native restore keeps the nonzero status an unproven
         # versioned launch always had; only its wording follows the true cause.
         notice "$id" "unmanaged $identity" \
-          "REBOOT_RECOVERY: $id: $(fm_launch_proof_refusal_cause unmanaged); no lifecycle action taken; $(fm_launch_proof_refusal_next unmanaged "$id")" && result=1
+          "REBOOT_RECOVERY: $id: $(fm_launch_proof_refusal_cause unmanaged); no lifecycle action taken; $(fm_launch_proof_refusal_next unmanaged "$meta")" && result=1
         continue
       fi
       notice "$id" "unmanaged $identity" \

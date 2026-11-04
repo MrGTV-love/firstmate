@@ -306,11 +306,12 @@ PY
 
 # Launchers that forward a native claude restore: `<launcher> run -- <harness
 # arguments>` with the harness as the launcher's direct child in its process
-# group. The only entry is the TeamClaude launcher (config/claude-launcher
-# names it; bin/fm-teamclaude-launch.sh documents the proxy). The recorded
-# restored lanes run `node <nvm bin>/teamclaude run -- --resume <id>`, which
-# is a host fact Main confirms before the list grows.
-FM_LAUNCH_PROOF_FORWARDING_LAUNCHERS='teamclaude'
+# group. The list is empty: the repository launcher bin/fm-teamclaude-launch.sh
+# execs claude directly and avoids `teamclaude run`, and config/ is host
+# configuration, not repository evidence. A restored lane behind a
+# `teamclaude run --` wrapper is therefore refused. An entry needs Main's
+# recorded confirmation before it is added.
+FM_LAUNCH_PROOF_FORWARDING_LAUNCHERS=''
 
 fm_launch_proof_adopt_refuse() { echo "adopt refused: $1" >&2; return 1; }
 
@@ -466,10 +467,8 @@ fm_launch_proof_claude_adoption() { # <meta> -> candidate adoption-record JSON
   # Kernel working directory of the harness: the task's recorded workspace.
   cwd=$(fm_launch_proof_pid_cwd "$harness_pid") \
     || { fm_launch_proof_adopt_refuse 'workspace proof needs the harness process'"'"'s kernel cwd'; return 1; }
-  case "$cwd/" in
-    "$root"/*) ;;
-    *) fm_launch_proof_adopt_refuse 'workspace proof needs the harness cwd inside this task'"'"'s recorded worktree'; return 1 ;;
-  esac
+  [ "$cwd" = "$home" ] || [ "$cwd" = "$root" ] \
+    || { fm_launch_proof_adopt_refuse 'workspace proof needs the harness cwd to be this task'"'"'s recorded home or worktree'; return 1; }
 
   # Generation and launch-pin proof, then unique ownership of pane and home.
   # Every process of the harness's group is part of the tree: a helper pinned to
@@ -652,9 +651,12 @@ fm_launch_proof_refusal_cause() { # <unmanaged|unknown>
   esac
 }
 
-fm_launch_proof_refusal_next() { # <unmanaged|unknown> <task-id>
-  case "$1" in
-    unmanaged) printf 'if it is this task'"'"'s own agent, the lock-owning main Firstmate can authorize it once with "bin/fm-control.sh %s adopt"' "$2" ;;
+# adopt accepts only a secondmate, so a ship or scout is never sent to it.
+fm_launch_proof_refusal_next() { # <unmanaged|unknown> <meta>
+  local id=${2##*/}
+  case "$1:$(fm_meta_get "$2" kind)" in
+    unmanaged:secondmate) printf 'if it is this task'"'"'s own agent, the lock-owning main Firstmate can authorize it once with "bin/fm-control.sh %s adopt"' "${id%.meta}" ;;
+    unmanaged:*) printf 'unmanaged restored worker: adopt supports secondmates only; Main inspects the pane and decides' ;;
     *) printf 'no foreground process could be attributed in the recorded pane, or its environment could not be read; retry once it can be read, or decide the lane by hand' ;;
   esac
 }
@@ -672,7 +674,7 @@ fm_launch_proof_herdr_refusal() { # <meta>
   [ "$verdict" != managed ] || return 0
   [ "$(fm_meta_get "$1" harness)" != claude ] \
     || printf '%s; %s' "$(fm_launch_proof_refusal_cause "$verdict")" \
-      "$(fm_launch_proof_refusal_next "$verdict" "$(basename -- "${1%.meta}")")"
+      "$(fm_launch_proof_refusal_next "$verdict" "$1")"
   return 1
 }
 

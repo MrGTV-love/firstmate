@@ -105,20 +105,36 @@ fm_secondmate_restart_capable() {  # <meta-file>
 # record, the persistence request, and the fallback nudge) all reach the pane,
 # so an agent the launch-proof owner cannot attribute receives none of them.
 # This reads the one verdict owner (bin/fm-launch-proof-lib.sh) and keeps the
-# control plane's exemption: a pane whose agent is not alive is governed by
-# fm-control's own stopped-agent proofs, unchanged. Remote placement is not
-# covered here: the host's fm-control decides it before the agent is stopped,
-# but after the persistence request, which stays open for the remote lanes.
+# control plane's exemption: a pane whose agent is positively dead or missing is
+# governed by fm-control's own stopped-agent proofs, unchanged. Any other state,
+# an endpoint that does not validate, or a backend that does not load is
+# unproven and refuses. Remote placement is not covered here: the host's
+# fm-control decides it before the agent is stopped, but after the persistence
+# request, which stays open for the remote lanes.
 # Returns 1 with FM_SECONDMATE_RESTART_REASON set when the agent is unproven.
 fm_secondmate_restart_attribution() {  # <meta-file>
-  local meta=$1 id cause
+  local meta=$1 id cause state
   [ "$FM_SECONDMATE_RESTART_PLACEMENT" = local ] && [ "$FM_SECONDMATE_RESTART_BACKEND" = herdr ] || return 0
   id=${meta##*/}; id=${id%.meta}
   # shellcheck source=bin/fm-launch-proof-lib.sh disable=SC1091
   . "$_FM_SECONDMATE_RESTART_LIB_DIR/fm-launch-proof-lib.sh"
-  fm_backend_source herdr || return 0
-  fm_backend_validate_task_endpoint "$meta" "$id" >/dev/null 2>&1 || return 0
-  [ "$(fm_backend_agent_state herdr "$FM_BACKEND_VALIDATED_TARGET")" = alive ] || return 0
+  if ! fm_backend_source herdr; then
+    FM_SECONDMATE_RESTART_REASON="the Herdr backend could not be loaded to attribute its agent, so no request or nudge was sent to it"
+    return 1
+  fi
+  if ! fm_backend_validate_task_endpoint "$meta" "$id" >/dev/null 2>&1; then
+    FM_SECONDMATE_RESTART_REASON="its recorded Herdr endpoint does not validate, so no request or nudge was sent to it"
+    return 1
+  fi
+  state=$(fm_backend_agent_state herdr "$FM_BACKEND_VALIDATED_TARGET")
+  case "$state" in
+    dead|missing) return 0 ;;
+    alive) ;;
+    *)
+      FM_SECONDMATE_RESTART_REASON="its Herdr agent state reads '$state' rather than a positively classified state, so no request or nudge was sent to it"
+      return 1
+      ;;
+  esac
   if cause=$(fm_launch_proof_herdr_refusal "$meta"); then
     return 0
   fi
