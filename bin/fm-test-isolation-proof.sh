@@ -26,16 +26,19 @@
 #   --jobs N     max concurrent workers (default: 4; min 1)
 #   --json path  write a pool-scoped machine-readable proof artifact after the
 #                run; fm_test_run_jobs_enabled is true only for a successful
-#                concurrent run within that pool's recorded admission cap
+#                concurrent run at the requested --jobs within that pool's
+#                recorded admission cap
 #   --list       print the proven candidate paths (one per line) and exit 0
 #   --list-exclusions
 #                print basename + reason for scripts deliberately kept serial
 #                relative to the scout-proposed parallel pool, then exit 0
 #   -h, --help   print this header
 #
-# Each worker takes one pass of the host-wide CPU pool (docs/cpu-pass-pool.md), so a
-# proof never runs more candidate scripts together than the pool holds; the wait is
-# left out of each recorded duration, and a proof inside a pass runs at most that many.
+# Before it starts, the proof takes min(--jobs, pool size) passes of the host-wide CPU
+# pool (docs/cpu-pass-pool.md) for its whole run and runs that many workers; a proof
+# already inside a pass takes none and runs at most that many. The concurrency it
+# prints and records is the number of workers it ran, and each worker runs with
+# FM_CPU_PASS_HELD=1, so a candidate's nested runner does not fan out.
 #
 # Isolation contract for each concurrent worker:
 #   - distinct mode-0700 temporary root under a proof-owned parent
@@ -60,6 +63,7 @@ set -eu
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
+ORIGINAL_ARGS=("$@")
 
 JOBS=4
 JSON_PATH=
@@ -403,12 +407,15 @@ fi
 
 [ "${#CANDIDATES[@]}" -gt 0 ] || die "candidate set is empty; refusing isolation proof"
 
-# Each proof worker runs one candidate script, so it takes one pass of the host-wide
-# CPU pool (docs/cpu-pass-pool.md) outside the duration it records. A proof already
-# inside a pass takes none and runs at most that many workers; without the pool
-# tool or python3 the workers run without a pass.
-exec 8>&2
-POOL_PASS=0
+for s in "${CANDIDATES[@]}"; do
+  [ -f "$s" ] || die "candidate not found: $s"
+done
+
+# The proof holds min(--jobs, pool size) passes of the host-wide CPU pool
+# (docs/cpu-pass-pool.md) for its whole run, taken before its clock starts. A proof
+# already inside a pass takes none and runs at most that many workers; without the
+# pool tool or python3 it runs without a pass.
+REQUESTED_JOBS=$JOBS
 if [ -n "${FM_CPU_PASS_HELD+x}" ]; then
   case "$FM_CPU_PASS_HELD" in
     ''|*[!0-9]*)
@@ -420,13 +427,16 @@ if [ -n "${FM_CPU_PASS_HELD+x}" ]; then
     log "reducing --jobs $JOBS to inherited FM_CPU_PASS_HELD=$FM_CPU_PASS_HELD"
     JOBS=$((10#$FM_CPU_PASS_HELD))
   fi
-elif [ -x "$ROOT/bin/fm-cpu-pass.sh" ] && [ -r "$ROOT/bin/fm-cpu-pass.py" ]; then
-  POOL_PASS=1
+elif [ -x "$ROOT/bin/fm-cpu-pass.sh" ] && [ -r "$ROOT/bin/fm-cpu-pass.py" ] \
+  && pool_size=$("$ROOT/bin/fm-cpu-pass.sh" size 2>/dev/null) \
+  && [[ "$pool_size" =~ ^[1-9][0-9]{0,5}$ ]]; then
+  passes=$JOBS
+  if [ "${#JOBS}" -gt 6 ] || [ "$JOBS" -gt "$pool_size" ]; then
+    passes=$pool_size
+  fi
+  exec "$ROOT/bin/fm-cpu-pass.sh" run --passes "$passes" --label "fm-test-isolation-proof --pool $POOL" -- \
+    "$ROOT/bin/fm-test-isolation-proof.sh" ${ORIGINAL_ARGS[@]+"${ORIGINAL_ARGS[@]}"}
 fi
-
-for s in "${CANDIDATES[@]}"; do
-  [ -f "$s" ] || die "candidate not found: $s"
-done
 
 PROOF_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/fm-isolation-proof.XXXXXX")
 chmod 0700 "$PROOF_ROOT" || die "could not chmod 0700 proof root $PROOF_ROOT"
@@ -551,23 +561,13 @@ for script in "${CANDIDATES[@]}"; do
     # Clear ambient fleet overrides so candidates cannot share a live home.
     unset FM_HOME FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_ROOT_OVERRIDE \
       FM_PROJECTS_OVERRIDE FM_CONFIG_OVERRIDE FM_BACKEND 2>/dev/null || true
+    export FM_CPU_PASS_HELD=1
     cd "$ROOT" || exit 1
     begin_ms=$(now_ms)
-    if [ "$POOL_PASS" -eq 1 ]; then
-      "$ROOT/bin/fm-cpu-pass.sh" run --label "fm-test-isolation-proof $script" --log-fd 8 \
-        --wait-file "$work/out/pass.wait" -- bash "$script" >"$work/out/output" 2>&1
-    else
-      bash "$script" >"$work/out/output" 2>&1
-    fi
+    bash "$script" >"$work/out/output" 2>&1
     rc=$?
     end_ms=$(now_ms)
     duration=$((end_ms - begin_ms))
-    queued=0
-    if [ -r "$work/out/pass.wait" ]; then
-      read -r queued <"$work/out/pass.wait" || queued=0
-      case "$queued" in ''|*[!0-9]*) queued=0 ;; esac
-    fi
-    duration=$((duration - queued))
     if [ "$duration" -lt 0 ]; then
       duration=0
     fi
@@ -628,7 +628,8 @@ if [ -n "$JSON_PATH" ]; then
   if "$ROOT/bin/fm-test-run.sh" --list-concurrent-safe-families | grep -Fxq "$POOL"; then
     jobs_max=$("$ROOT/bin/fm-test-run.sh" --concurrent-safe-family-jobs-max "$POOL")
   fi
-  if [ "$AGG_RC" -eq 0 ] && [ "$JOBS" -gt 1 ] && [ "$JOBS" -le "$jobs_max" ]; then
+  if [ "$AGG_RC" -eq 0 ] && [ "$JOBS" -gt 1 ] && [ "$JOBS" -eq "$REQUESTED_JOBS" ] \
+    && [ "$JOBS" -le "$jobs_max" ]; then
     jobs_enabled=1
   fi
   write_json_artifact "$JSON_PATH" \

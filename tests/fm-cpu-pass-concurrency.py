@@ -11,7 +11,7 @@ marker file for as long as it lives; a sampler process counts the markers whose 
 20 ms, so it sees grandchildren and a SIGKILLed worker leaves no phantom. The sampled maxima are
 printed per case. Settings: FM_CONC_N (pool size, default 4), FM_CONC_LANES and FM_CONC_ROUNDS
 (soak lanes, default 2 x N lanes and 5 rounds), FM_CONC_BURNERS (background burners, default 3), FM_CONC_WORK (CPU
-seconds of a soak worker, default 0.3), FM_CONC_LINT_EXIT=ignore (see the lint case).
+seconds of a soak worker, default 0.3).
 """
 import concurrent.futures
 import json
@@ -395,10 +395,7 @@ def case_lint():
     seen = world.sample_stop()
     case.measure(lint_runs=2, jobs_each=2, pool_size=2, sampled_max_workers_total=seen['peak_total'],
                  sampled_max_passes_held=seen['peak_held'], holder_labels=seen['labels'])
-    # FM_CONC_LINT_EXIT=ignore is for a copy of another commit that is not a clone, where lint's own literal
-    # check has no base to compare with; the sampled counts above are what that run is read for.
-    case.check(codes == [0, 0] or os.environ.get('FM_CONC_LINT_EXIT') == 'ignore',
-               'a lint run failed: %s %s' % (codes, [world.text('lint%d' % i) + world.text('lint%d' % i, 'out') for i in range(2)]))
+    case.check(codes == [0, 0], 'a lint run failed: %s %s' % (codes, [world.text('lint%d' % i) + world.text('lint%d' % i, 'out') for i in range(2)]))
     case.check(seen['peak_total'] <= 2, 'cold ShellChecks ran %d together on a pool of 2' % seen['peak_total'])
     case.check(any(label.startswith('fm-lint ') for label in seen['labels']), 'holder list never named fm-lint: %s' % seen['labels'])
     # A lint run inside a pass takes none and runs at most that many ShellChecks.
@@ -411,13 +408,39 @@ def case_lint():
     nested_code = wait_all([nested])
     nested_seen = inner.sample_stop()
     case.measure(nested_lint_inside_one_pass_max_workers=nested_seen['peak_total'])
-    case.check((nested_code == [0] or os.environ.get('FM_CONC_LINT_EXIT') == 'ignore') and nested_seen['peak_total'] <= 1, 'a lint run inside one pass ran %d ShellChecks together: %s' % (nested_seen['peak_total'], inner.text('nested')))
+    case.check(nested_code == [0] and nested_seen['peak_total'] <= 1, 'a lint run inside one pass ran %d ShellChecks together: %s' % (nested_seen['peak_total'], inner.text('nested')))
     case.check('reducing --jobs 2 to inherited FM_CPU_PASS_HELD=1' in inner.text('nested'), 'lint did not say it reduced its jobs')
     return case
 
 
+def proof_family_repo(world, scripts):
+    """A fixture repository whose stub runner names one concurrent-safe family of SCRIPTS, jobs max 4."""
+    path = world.folder / 'family-repo'
+    (path / 'bin').mkdir(parents=True)
+    (path / 'tests').mkdir()
+    for name in ('fm-test-isolation-proof.sh', 'fm-cpu-pass.sh', 'fm-cpu-pass.py'):
+        shutil.copy(repo / 'bin' / name, path / 'bin' / name)
+    (path / 'bin' / 'fm-test-run.sh').write_text('#!/usr/bin/env bash\n'
+                                                 'case "$1:${2:-}:${3:-}" in\n'
+                                                 '  --list-scheduled:--family:fam) printf "tests/%s\\n" ' + ' '.join(scripts) + ' ;;\n'
+                                                 '  --list-concurrent-safe-families::) echo fam ;;\n'
+                                                 '  --concurrent-safe-family-jobs-max:fam:) echo 4 ;;\n'
+                                                 '  *) exit 2 ;;\n'
+                                                 'esac\n')
+    (path / 'bin' / 'fm-test-run.sh').chmod(0o755)
+    for name in scripts:
+        (path / 'tests' / name).write_text('#!/usr/bin/env bash\n[ "$FM_CPU_PASS_HELD" = 1 ] || exit 3\n'
+                                           'exec "$FM_CONC_PYTHON" "$FM_CONC_WORKER" "$FM_CONC_ALIVE" proof 0.2\n')
+    return path
+
+
+def proof_markers(text):
+    return [line.split()[0] + ' ' + next(word for word in line.split() if word.startswith('concurrency='))
+            for line in text.splitlines() if line.startswith(('FM_ISOLATION_BEGIN ', 'FM_ISOLATION_SUMMARY '))]
+
+
 def case_isolation_proof():
-    """H2: the isolation proof's concurrent workers share the pool instead of adding to it."""
+    """H2: the isolation proof holds min(--jobs, pool size) passes and records only the concurrency it ran."""
     case = Case('H2 proof', 'bin/fm-test-isolation-proof.sh --jobs 4 over its candidate set, pool size 2')
     world = World('proof', cores=2)
     names = isolated_scripts(None)
@@ -431,7 +454,24 @@ def case_isolation_proof():
                  sampled_max_passes_held=seen['peak_held'], holder_labels=seen['labels'][:2])
     case.check(codes == [0], 'the proof failed: %s %s' % (codes, world.text('proof')[-300:]))
     case.check(seen['peak_total'] <= 2, 'the proof ran %d workers together on a pool of 2' % seen['peak_total'])
-    case.check(any(label.startswith('fm-test-isolation-proof tests/') for label in seen['labels']), 'holder list never named the proof: %s' % seen['labels'][:3])
+    case.check(any(label.startswith('fm-test-isolation-proof ') for label in seen['labels']), 'holder list never named the proof: %s' % seen['labels'][:3])
+    case.check(proof_markers(world.text('proof', 'out')) == ['FM_ISOLATION_BEGIN concurrency=2', 'FM_ISOLATION_SUMMARY concurrency=2'],
+               'the proof did not record the concurrency it ran: %s' % proof_markers(world.text('proof', 'out')))
+    # A family proof enables runner jobs only when it ran the --jobs it was asked for.
+    family = proof_family_repo(world, ['fm-fam-%d.test.sh' % index for index in range(4)])
+    for jobs, enabled in (('4', False), ('2', True)):
+        label = 'family%s' % jobs
+        artifact = world.folder / (label + '.json')
+        code = wait_all([world.launch(label, ['bash', str(family / 'bin' / 'fm-test-isolation-proof.sh'), '--pool', 'fam',
+                                              '--jobs', jobs, '--json', str(artifact)])])
+        recorded = json.loads(artifact.read_text()) if artifact.exists() else {}
+        case.measure(**{'family_jobs_%s_markers' % jobs: proof_markers(world.text(label, 'out')),
+                        'family_jobs_%s_jobs_enabled' % jobs: recorded.get('fm_test_run_jobs_enabled')})
+        case.check(code == [0], 'family proof --jobs %s failed: %s %s' % (jobs, code, world.text(label)[-300:]))
+        case.check(proof_markers(world.text(label, 'out')) == ['FM_ISOLATION_BEGIN concurrency=2', 'FM_ISOLATION_SUMMARY concurrency=2'],
+                   'family proof --jobs %s did not record concurrency=2: %s' % (jobs, world.text(label, 'out')[-300:]))
+        case.check(recorded.get('concurrency') == 2 and recorded.get('fm_test_run_jobs_enabled') is enabled,
+                   'family proof --jobs %s on a pool of 2 recorded %s' % (jobs, recorded))
     return case
 
 

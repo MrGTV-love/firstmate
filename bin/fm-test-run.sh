@@ -2742,7 +2742,7 @@ if [ "$CHECK_COVERAGE" -eq 1 ]; then
   if [ -z "${FM_CPU_PASS_HELD+x}" ] && [ -x "$ROOT/bin/fm-cpu-pass.sh" ] \
     && [ -r "$ROOT/bin/fm-cpu-pass.py" ] && command -v python3 >/dev/null 2>&1; then
     exec "$ROOT/bin/fm-cpu-pass.sh" run --label "fm-test-run --check-coverage" -- \
-      "${BASH_SOURCE[0]}" ${ORIGINAL_ARGS[@]+"${ORIGINAL_ARGS[@]}"}
+      "$ROOT/bin/fm-test-run.sh" ${ORIGINAL_ARGS[@]+"${ORIGINAL_ARGS[@]}"}
   fi
   run_coverage_guard
   exit $?

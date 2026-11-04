@@ -98,7 +98,7 @@
 # for a tick libproc did not answer in time) and names any attempt that gave
 # up its libproc reader, with the reason. Linux runs are never watched, and CI
 # runs under FM_LINT_REQUIRE_BOUNDS=1 keep their ulimit envelope.
-# The changed-root dependency scan takes one pass too. A cold root that has its host slot also takes one pass of the host-wide CPU pool
+# The changed-root dependency scan takes one pass too. A cold root takes one pass of the host-wide CPU pool before its host slot
 # (bin/fm-cpu-pass.sh; docs/cpu-pass-pool.md owns the protocol), so ShellChecks and
 # test scripts together never exceed the pool. A run already inside a pass
 # (FM_CPU_PASS_HELD above 0) takes none and runs at most that many workers.
@@ -353,9 +353,11 @@ fm_lint_exec_root() {  # <path> <stdout-file> <stderr-file> <rss-file> <seconds>
     gate_command=("${FM_LINT_PERL_BIN:-perl}" "$SELF_DIR/fm-lint-cache.pl" gate \
       "$FM_LINT_INTERNAL_SLOT_DIR" "$FM_LINT_INTERNAL_NCPU" "$FM_LINT_INTERNAL_RUN_ID" "$wait_file" --)
   fi
-  # A cold ShellCheck is CPU-bound, so after its memory slot it takes one pass of
+  # A cold ShellCheck is CPU-bound, so before its memory slot it takes one pass of
   # the host-wide CPU pool (docs/cpu-pass-pool.md), also outside the root deadline.
-  # A run already inside a pass takes none; its pass wait leaves the root's recorded time.
+  # The gate stays the direct parent of the watchdog or ShellCheck, so they inherit
+  # its slot and see its death. A run already inside a pass takes none; its pass
+  # wait leaves the root's recorded time.
   pass_command=()
   if [ -x "$SELF_DIR/fm-cpu-pass.sh" ] && [ -r "$SELF_DIR/fm-cpu-pass.py" ]; then
     pass_command=("$SELF_DIR/fm-cpu-pass.sh" run --label "fm-lint $path" --log-fd 8 \
@@ -369,13 +371,13 @@ fm_lint_exec_root() {  # <path> <stdout-file> <stderr-file> <rss-file> <seconds>
     # check still starts the same terminate-then-kill escalation; the worker
     # names itself as that owner before the launch, so a worker that dies while
     # the watchdog is still starting is detected too.
-    cold_command=(${gate_command[@]+"${gate_command[@]}"} ${pass_command[@]+"${pass_command[@]}"} "${FM_LINT_PERL_BIN:-perl}" -e 'setpgrp(0, 0) or die "setpgrp: $!"; exec @ARGV or die "exec: $!"' \
+    cold_command=(${pass_command[@]+"${pass_command[@]}"} ${gate_command[@]+"${gate_command[@]}"} "${FM_LINT_PERL_BIN:-perl}" -e 'setpgrp(0, 0) or die "setpgrp: $!"; exec @ARGV or die "exec: $!"' \
         "${BASH:-bash}" "$SELF" --internal-timed \
         "$seconds" "$FM_LINT_INTERNAL_GRACE" \
         "${BASH:-bash}" "$SELF" --internal-root "$rss_file" "$FM_LINT_INTERNAL_MEMORY_KIB" \
         "${analysis_command[@]}")
   else
-    cold_command=(${gate_command[@]+"${gate_command[@]}"} ${pass_command[@]+"${pass_command[@]}"} "${analysis_command[@]}")
+    cold_command=(${pass_command[@]+"${pass_command[@]}"} ${gate_command[@]+"${gate_command[@]}"} "${analysis_command[@]}")
   fi
   # Hits and identical concurrent misses need no host slot. Only the cache's
   # cold execution enters the gate, with the watchdog still inside admission.
