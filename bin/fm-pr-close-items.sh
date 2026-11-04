@@ -34,7 +34,7 @@
 #   - in the merged pull request's body and in each train member's body that was read: an
 #     active, not-done backlog id that appears as a word in the prose is a `mentioned ...`
 #     line that says nothing was closed for it. An id is matched as spelled (a leading or
-#     trailing `_` or `-` belongs to it; only a sentence's trailing `.` and one matched
+#     trailing `_` or `-` belongs to it; only leading and trailing `.` and one matched
 #     Markdown emphasis pair, `_id_` or `__id__`, are dropped). An id
 #     a directive line, task record or old line already named gets no second line, and the
 #     merging task's own id is left out, because its teardown owns that item. A member's
