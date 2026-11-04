@@ -1972,8 +1972,8 @@ def v4_copy(name, work=True, dirty=False):
         (path / 'scratch.txt').write_text('uncommitted\n')
     return path
 V4_PR = 'https://github.com/test/project/pull/'
-v4_states, v4_live, v4_prs = {}, [], {}
-def v4_task(name, kind='ship', copy=None, verb='done', note='delivered', pr=None, state='done', live=False, age=2 * 3600):
+v4_states, v4_details, v4_live, v4_prs = {}, {}, [], {}
+def v4_task(name, kind='ship', copy=None, verb='done', note='delivered', pr=None, state='done', live=False, age=2 * 3600, detail=None):
     lines = [f'kind={kind}', 'backend=tmux', f'window=sess:fm-{name}', 'harness=claude', 'mode=direct-PR']
     if copy is not None:
         lines.append(f'worktree={copy}')
@@ -1983,6 +1983,8 @@ def v4_task(name, kind='ship', copy=None, verb='done', note='delivered', pr=None
     (v4 / f'state/{name}.status').write_text(f'{verb} [at={now - age}]: {note}\n')
     os.utime(v4 / f'state/{name}.status', (now - age, now - age))
     v4_states[name] = state
+    if detail:
+        v4_details[name] = detail
     if live:
         v4_live.append(name)
 def v4_merged_pr(number, copy):
@@ -2026,6 +2028,12 @@ v4_task('unl-refused', copy=unl_refused, pr=14, note=f'{V4_PR}14 merged by anoth
 reap_refusal = 'REFUSED: t1 has commits the merged PR head does not contain; the ship deliverable is not landed'
 (v4 / 'state/.idle-reap').mkdir()
 (v4 / 'state/.idle-reap/unl-refused.refused').write_text(f'fm-idle-reap-refused-v1\n{now - 600}\ndone [at={now}]: merged\n{reap_refusal}\n')
+gate_refusal = 'named head 0123abc is unreachable outside the worker copy'
+v4_task('gate-refused', copy=v4_copy('gate-refused', work=False), note='delivered, branch pushed', state='blocked', live=True,
+        detail=gate_refusal)
+nm_down = 'the no-mistakes run for this copy could not be read, so its verification-plan evidence is unavailable'
+v4_task('gate-nm-down', copy=v4_copy('gate-nm-down', work=False), note='delivered, pipeline passed', state='blocked', live=True,
+        detail=nm_down)
 wait_paused = v4_copy('wait-paused', work=False)
 v4_task('wait-paused', copy=wait_paused, verb='paused', note='waiting on Main decision d1', state='paused', live=True, age=3000)
 wait_held = v4_copy('wait-held', work=False)
@@ -2063,13 +2071,15 @@ script(fake / 'tmux', '#!/usr/bin/env bash\ncase "$1" in\n'
        "  display-message) printf 'fakepane\\n' ;;\n"
        '  send-keys) printf \'%s\\n\' "$*" >> "$FM_SEND_LOG" ;;\nesac\n')
 script(code / 'bin/fm-crew-state.sh', '#!/usr/bin/env bash\ns=$(sed -n "s/^$1=//p" "$V4_STATES" | head -1)\n'
-       'printf "state: %s · source: pane · recorded\\n" "${s:-working}"\n')
+       'd=$(sed -n "s/^$1=//p" "$V4_DETAILS" | head -1)\n'
+       'printf "state: %s · source: pane · %s\\n" "${s:-working}" "${d:-recorded}"\n')
 (world / 'v4-states.txt').write_text(''.join(f'{n}={st}\n' for n, st in v4_states.items()))
+(world / 'v4-details.txt').write_text(''.join(f'{n}={d}\n' for n, d in v4_details.items()))
 env4 = dict(env, FM_HOME=str(v4), V4_GH=str(world / 'v4-gh.json'), V4_LIVE=str(world / 'v4-live.txt'),
-            V4_STATES=str(world / 'v4-states.txt'), FM_SILENCE_TEST_LIVENESS='alive',
+            V4_STATES=str(world / 'v4-states.txt'), V4_DETAILS=str(world / 'v4-details.txt'), FM_SILENCE_TEST_LIVENESS='alive',
             GIT_CONFIG_COUNT='1', GIT_CONFIG_KEY_0=f'url.{v4_origin}.insteadOf', GIT_CONFIG_VALUE_0='https://github.com/test/project.git')
-def ledger4():
-    done = subprocess.run([str(code / 'bin/fm-open-loops.sh'), '--json'], env=env4, text=True, capture_output=True, timeout=180)
+def ledger4(**extra):
+    done = subprocess.run([str(code / 'bin/fm-open-loops.sh'), '--json'], env=dict(env4, **extra), text=True, capture_output=True, timeout=180)
     assert done.returncode == 0, (done.stdout, done.stderr)
     return json.loads(done.stdout)
 report4 = ledger4()
@@ -2120,6 +2130,12 @@ for name in ('pend-ship', 'pend-scout'):
     assert row['owner'] == 'home:firstmate' and name in row['next_action'] and row['overdue'], row
     assert row['limit_seconds'] == DEFAULT_AGES_FOR_TEST['open_pr'], ('acceptance must follow the existing review age class', row)
     assert 'accept' in row['next_action'] or 'review' in row['next_action'], row
+# A done claim the ship-done gate refused is firstmate's to resolve; one refused only because its no-mistakes run
+# could not be read (the daemon is down) is a wait and adds no row.
+gate = acceptance.get('gate-refused')
+assert gate and gate['owner'] == 'firstmate', ('a refused done claim needs an owned row', mine('gate-refused'))
+assert 'resolve the refused done claim' in gate['next_action'] and gate_refusal in gate['next_action'], gate
+assert not any(r['category'] in ('pending_cleanup', 'pending_acceptance') for r in mine('gate-nm-down')), mine('gate-nm-down')
 # The rows come from the records alone, so a fresh process (a restart) finds the same obligations.
 again = ledger4()
 key = lambda rep: sorted((r['category'], r['subject'], r['owner'], r['next_action']) for r in rep['rows']
@@ -2130,6 +2146,16 @@ assert key(report4) == key(again) and key(again), 'a restart changed or lost a p
 after = ledger4()
 assert not [r for r in after['rows'] if r['subject'] == 'fin-merged' and r['category'] in ('pending_cleanup', 'pending_acceptance')]
 assert 'fin-content' in {r['subject'] for r in after['rows'] if r['category'] == 'pending_cleanup'}
+# One task whose status log cannot be read degrades only its own row: every later task keeps its row.
+content_status = v4 / 'state/fin-content.status'
+kept = content_status.read_text()
+content_status.write_text(''.join(f'working [at={now - 9000 + i}]: step {i} of the padded history\n' for i in range(120)) + kept)
+past = ledger4(FM_STATUS_CAP_BYTES='2048', FM_STATUS_CAP_RESERVE_BYTES='2048')
+content_status.write_text(kept)
+cover = [r for r in past['rows'] if r['category'] == 'coverage']
+assert cover and 'completion fin-content' in cover[0]['evidence'], ('the unreadable task must be named degraded', cover)
+later = {r['subject'] for r in past['rows'] if r['category'] in ('pending_cleanup', 'pending_acceptance')}
+assert {'fin-dirty', 'fin-moot', 'fin-moot-clean', 'fin-refused', 'gate-refused', 'pend-ship'} <= later, ('a later task lost its row', sorted(later))
 print('PASS: finished and unaccepted work with an open record keeps an owned ledger row; waits, unfinished work and an idle secondmate do not', flush=True)
 PY
 

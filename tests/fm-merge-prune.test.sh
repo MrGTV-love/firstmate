@@ -3582,6 +3582,41 @@ test_xlane_late_teardown_failure_reports_the_merge_once() {
   pass "a teardown that fails late keeps the merge-notified marker with the record, so the merge is reported once and the retry removes both"
 }
 
+# A teardown that fails late before any merge was reported leaves the merge poll
+# with the record, so the existing poll reports the merge once, reconciliation
+# registers nothing again, and the retried teardown removes both.
+test_xlane_late_teardown_failure_before_the_merge_report_keeps_the_poll() {
+  local rc=0 cursor
+  make_xlane_world
+  cursor="$STATE/.status-presentation-cursor"
+  printf 'done [at=%s]: PR %s head %s\n' "$NOW" "$XL_PR" "$XL_HEAD" >> "$STATE/t1.status"
+  xl_env "$BIN_DIR/fm-pr-check.sh" t1 "$XL_PR" > "$W/pr-check.out" 2>&1 || fail "the worker's fm-pr-check.sh was refused: $(cat "$W/pr-check.out")"
+  xl_merge_in_lane_m
+  [ ! -e "$STATE/t1.pr-poll-merge-notified" ] || fail "the merge was reported before the teardown"
+  cp "$cursor" "$W/cursor.saved" 2>/dev/null || : > "$W/cursor.saved"
+  printf 'bogus\tident\tnot-an-offset\t0\n' >> "$cursor"
+  xl_wait_control_free
+  xl_env FM_MERGE_PRUNE=0 "$W/bin/teardown-real" t1 > "$W/teardown.out" 2> "$W/teardown.err" || rc=$?
+  cp "$W/cursor.saved" "$cursor"
+  xl_print_state "after the late teardown failure before the merge report"
+  [ "$rc" -ne 0 ] || fail "the injected late failure did not stop teardown"
+  xl_has_event task.cleaned_up || fail "teardown stopped before its late steps: $(tail -3 "$W/teardown.err")"
+  grep -qx "pr=$XL_PR" "$STATE/t1.meta" || fail "the late failure did not leave pr= on the record"
+  [ -e "$STATE/t1.check.sh" ] || fail "the late failure removed the merge poll before the record was retired"
+  [ -z "$(xl_env bash "$ROOT/bin/fm-pr-ready-reconcile.sh" 2>&1)" ] || fail "reconciliation registered a record whose merge poll is still armed"
+  XL_MERGE_PRUNE=0 xl_supervise_until xl_merge_reported || { xl_print_state "late failure before the report"; fail "the kept poll did not report the merge"; }
+  XL_BOUND=8 XL_MERGE_PRUNE=0 xl_supervise_until false || true
+  [ "$(xl_event_count task.pr_ready)" -eq 1 ] || fail "the PR was registered twice: $(xl_ledger_events)"
+  [ "$(xl_event_count task.merged)" -eq 1 ] && [ "$(xl_merge_wakes)" -eq 1 ] || fail "the merge report is not single: $(xl_ledger_events)"
+  xl_wait_control_free
+  xl_plain_teardown "$W/retry.err" || fail "the retried teardown failed: $(tail -3 "$W/retry.err")"
+  [ ! -e "$STATE/t1.meta" ] && [ ! -e "$STATE/t1.check.sh" ] && [ ! -e "$STATE/t1.pr-poll-merge-notified" ] \
+    || fail "the retried teardown left the record, the poll or the marker"
+  assert_nothing_forced "xlane late failure before the report"
+  cleanup_workers
+  pass "a teardown that fails late before the merge report keeps the poll with the record, so the merge is reported once and the retry removes both"
+}
+
 # The protections still refuse when the cross-lane PR is merged and its branch
 # name, its link and a registered pr= all resolve.
 xl_protection_case() {  # <dirty|unlanded-commit|conflicting-owner>
@@ -4029,6 +4064,7 @@ ALL_TESTS=(
   test_xlane_open_or_closed_pr_keeps_the_record
   test_xlane_same_lane_path_completes_as_before
   test_xlane_late_teardown_failure_reports_the_merge_once
+  test_xlane_late_teardown_failure_before_the_merge_report_keeps_the_poll
   test_xlane_protections_still_refuse
   test_xlane_refused_prune_keeps_its_reason_on_the_ledger_row
   test_v5_missing_updates_restart_and_completed_review_cannot_strand_work
