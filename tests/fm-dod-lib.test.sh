@@ -1653,6 +1653,61 @@ ROWS
   pass "a done note names its PR as 'PR <url>' or as its first word, and nothing else"
 }
 
+# A no-mistakes status read that refuses a done claim names why: the daemon is
+# down (the status read failed and `daemon status` answers non-zero), no run
+# exists for the copy (no `run:` line, or the repository is not initialized), or
+# the run is otherwise unreadable. Only the first is the ledger's wait, so each
+# reason is its own text and only the daemon-down one names the daemon.
+test_nm_refusal_names_daemon_down_no_run_and_unreadable() {
+  local repo wt state meta fakebin mode want reason rc
+  repo="$TMP_ROOT/nmwhy-repo"
+  wt="$TMP_ROOT/nmwhy-wt"
+  state="$TMP_ROOT/nmwhy-state"
+  fakebin="$TMP_ROOT/nmwhy-bin"
+  mkdir -p "$state" "$fakebin"
+  fm_git_worktree "$repo" "$wt" fm/nmwhy
+  meta="$state/nmwhy.meta"
+  printf 'kind=ship\nmode=no-mistakes\nworktree=%s\nproject=%s\n' "$wt" "$repo" > "$meta"
+  cat > "$fakebin/no-mistakes" <<'SH'
+#!/usr/bin/env bash
+case "${1:-} ${2:-} ${FM_TEST_NM_WHY:-}" in
+  "axi status norun") printf 'branch: fm/nmwhy\n' ;;
+  "axi status uninit")
+    printf '%s\n' "error: repo not initialized (run 'no-mistakes init' first)"
+    exit 1 ;;
+  "axi status down"|"axi status unreadable")
+    printf '%s\n' 'error: status read failed'
+    exit 1 ;;
+  "daemon status unreadable") printf 'daemon: running\n' ;;
+  "daemon status "*) exit 1 ;;
+  *) exit 2 ;;
+esac
+SH
+  chmod +x "$fakebin/no-mistakes"
+  while IFS='|' read -r mode want; do
+    reason=$(PATH="$fakebin:$PATH" FM_TEST_NM_WHY="$mode" \
+      accept_done ship no-mistakes "$wt" "$repo" "done: PR https://github.com/o/r/pull/8 checks green" \
+        "$state" nmwhy "$meta"); rc=$?
+    [ "$rc" -eq 1 ] || fail "a $mode status read was judged $rc, not refused: $reason"
+    [ "$reason" = "$want, so its verification-plan evidence is unavailable" ] \
+      || fail "a $mode status read gave the wrong reason: $reason"
+    reason=$(PATH="$fakebin:$PATH" FM_TEST_NM_WHY="$mode" fm_dod_nm_custody_returned "$wt"); rc=$?
+    [ "$rc" -eq 1 ] || fail "custody was judged $rc after a $mode status read: $reason"
+    [ "$reason" = "$want, so its fixes cannot be proven recovered" ] \
+      || fail "custody after a $mode status read gave the wrong reason: $reason"
+    case "$mode:$reason" in
+      down:*"the no-mistakes daemon is down"*) ;;
+      down:*|*:*"daemon is down"*) fail "only a down daemon may name the daemon as the reason ($mode): $reason" ;;
+    esac
+  done <<'ROWS'
+down|the no-mistakes daemon is down and the run for this copy could not be read
+norun|no no-mistakes run exists for this copy
+uninit|no no-mistakes run exists for this copy
+unreadable|the no-mistakes run for this copy could not be read
+ROWS
+  pass "a refused no-mistakes read names a down daemon, a missing run and an unreadable run apart"
+}
+
 # Independent review readers may not hold a read grant for the rubric owner, so
 # the emitted launch role must carry its full text and refuse without it.
 test_worker_role_renders_shared_rubric() {
@@ -1681,5 +1736,7 @@ test_worker_role_renders_shared_rubric() {
 test_worker_role_renders_shared_rubric
 
 test_pr_url_from_done_note
+
+test_nm_refusal_names_daemon_down_no_run_and_unreadable
 
 echo "all fm-dod-lib tests passed"

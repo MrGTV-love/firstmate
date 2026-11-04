@@ -2031,9 +2031,18 @@ reap_refusal = 'REFUSED: t1 has commits the merged PR head does not contain; the
 gate_refusal = 'named head 0123abc is unreachable outside the worker copy'
 v4_task('gate-refused', copy=v4_copy('gate-refused', work=False), note='delivered, branch pushed', state='blocked', live=True,
         detail=gate_refusal)
-nm_down = 'the no-mistakes run for this copy could not be read, so its verification-plan evidence is unavailable'
+nm_down = 'the no-mistakes daemon is down and the run for this copy could not be read, so its verification-plan evidence is unavailable'
 v4_task('gate-nm-down', copy=v4_copy('gate-nm-down', work=False), note='delivered, pipeline passed', state='blocked', live=True,
         detail=nm_down)
+nm_unreadable = 'the no-mistakes run for this copy could not be read, so its verification-plan evidence is unavailable'
+v4_task('gate-nm-unreadable', copy=v4_copy('gate-nm-unreadable', work=False), note='delivered, pipeline passed', state='blocked',
+        live=True, detail=nm_unreadable)
+nm_norun = 'no no-mistakes run exists for this copy, so its verification-plan evidence is unavailable'
+v4_task('gate-nm-norun', copy=v4_copy('gate-nm-norun', work=False), note='delivered, pipeline passed', state='blocked', live=True,
+        detail=nm_norun)
+norun_merged = v4_copy('gate-nm-norun-merged', work=False); v4_merged_pr(15, norun_merged)
+v4_task('gate-nm-norun-merged', copy=norun_merged, pr=15, note=f'{V4_PR}15 merged by another lane', state='blocked', live=True,
+        detail=nm_norun)
 wait_paused = v4_copy('wait-paused', work=False)
 v4_task('wait-paused', copy=wait_paused, verb='paused', note='waiting on Main decision d1', state='paused', live=True, age=3000)
 wait_held = v4_copy('wait-held', work=False)
@@ -2130,11 +2139,14 @@ for name in ('pend-ship', 'pend-scout'):
     assert row['owner'] == 'home:firstmate' and name in row['next_action'] and row['overdue'], row
     assert row['limit_seconds'] == DEFAULT_AGES_FOR_TEST['open_pr'], ('acceptance must follow the existing review age class', row)
     assert 'accept' in row['next_action'] or 'review' in row['next_action'], row
-# A done claim the ship-done gate refused is firstmate's to resolve; one refused only because its no-mistakes run
-# could not be read (the daemon is down) is a wait and adds no row.
-gate = acceptance.get('gate-refused')
-assert gate and gate['owner'] == 'firstmate', ('a refused done claim needs an owned row', mine('gate-refused'))
-assert 'resolve the refused done claim' in gate['next_action'] and gate_refusal in gate['next_action'], gate
+# A done claim the ship-done gate refused is firstmate's to resolve; one refused only because the no-mistakes daemon
+# is down is a wait and adds no row. A refusal because no run exists or the run is otherwise unreadable keeps its row,
+# also for a task whose PR another lane already merged.
+for name, why in (('gate-refused', gate_refusal), ('gate-nm-unreadable', nm_unreadable), ('gate-nm-norun', nm_norun),
+                  ('gate-nm-norun-merged', nm_norun)):
+    gate = acceptance.get(name)
+    assert gate and gate['owner'] == 'firstmate', ('a refused done claim needs an owned row', name, mine(name))
+    assert 'resolve the refused done claim' in gate['next_action'] and why in gate['next_action'], gate
 assert not any(r['category'] in ('pending_cleanup', 'pending_acceptance') for r in mine('gate-nm-down')), mine('gate-nm-down')
 # The rows come from the records alone, so a fresh process (a restart) finds the same obligations.
 again = ledger4()

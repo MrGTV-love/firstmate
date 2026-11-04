@@ -31,8 +31,9 @@ DEFAULT_AGES = {
 }
 # Finished or unaccepted work with an open record adds rows, never a timer: each borrows an existing age class.
 AGE_CLASS = {"pending_cleanup": "interrupted_teardown", "pending_acceptance": "open_pr"}
-# bin/fm-dod-lib.sh's refusal of a done claim whose no-mistakes run could not be read (the daemon is down): a wait.
-NM_UNREADABLE = "the no-mistakes run for this copy could not be read"
+# bin/fm-dod-lib.sh's refusal of a done claim because the no-mistakes daemon is down: a wait. A refusal because no
+# run exists or the run is otherwise unreadable is not this wait and keeps its row.
+NM_DAEMON_DOWN = "the no-mistakes daemon is down"
 CHECK_IN_TEXT = ("Check in: report progress, blockers, and cross-workstream dependencies that need resolution. "
                  "Reply through your supervised status/report channel before acknowledging this inbox message; "
                  "secondmates must preserve the request correlation in their parent-channel reply. "
@@ -1155,7 +1156,7 @@ class Collector:
         detail = task["current_state"].get("detail") or ""
         closed = any(r["id"] == ident and r.get("state") == "done" for r in self.backlog) \
             or self.captain_dropped(task)
-        done_refused = verb == "done" and state == "blocked" and not closed and NM_UNREADABLE not in detail
+        done_refused = verb == "done" and state == "blocked" and not closed and NM_DAEMON_DOWN not in detail
         if not (closed or verb == "done" or state == "done") or open_decision or pause_limit \
                 or (state in ("working", "paused", "blocked", "parked") and not closed and not done_refused):
             self.attach_refusal(ident, pr_url, refusal, refused)
