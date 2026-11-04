@@ -198,9 +198,9 @@ test_launch_proof_recorded_native_identity() {
       process '["node","/installed/agent.js"]'
       expected=unknown
       [ "$harness" != omp ] || expected=unmanaged
-      # A versioned claude launch reports a readable environment without a matching
-      # pin as unmanaged; a legacy claude record keeps the pre-proof unknown verdict.
-      [ "$harness:$version" != claude:env-v1 ] || expected=unmanaged
+      # A versioned claude launch whose readable environment carries a pin for another
+      # generation reports pinned-elsewhere; a legacy claude record keeps unknown.
+      [ "$harness:$version" != claude:env-v1 ] || expected=pinned-elsewhere
       assert_proof "$expected" "$version mismatched live PID pin must never authenticate recorded $harness"
     done
   done
@@ -650,6 +650,19 @@ test_launch_proof_claude_verdict_and_refusal() (
   assert_contains "$out" 'decide the lane by hand' 'the unreadable case has its own next action'
   assert_not_contains "$out" 'unpinned native restore' 'the unreadable case is not reported as unpinned'
   rm -f "$T/env-unreadable"
+  # E3 (e): a pin for another launch generation is its own verdict, cause and next step.
+  printf 'FM_SPAWN_GEN=s9.9.9\n' > "$T/env-extra"
+  for kind in secondmate ship; do
+    meta_for claude env-v1 "$kind"
+    assert_equals pinned-elsewhere "$(fm_launch_proof_herdr "$META")" "a $kind claude pinned to another generation has its own verdict"
+    out=$(fm_launch_proof_herdr_refusal "$META") && fail "a $kind claude pinned to another generation was authorized"
+    assert_contains "$out" 'live agent is pinned to another launch generation' "the $kind cause names the foreign pin"
+    assert_contains "$out" 'adopt cannot authorize it; Main inspects the pane and decides the lane by hand' "the $kind next step is not adopt"
+    assert_not_contains "$out" 'unpinned native restore' "a $kind pinned process is not called unpinned"
+    assert_not_contains "$out" 'fm-control.sh vernant-t1 adopt' "a $kind pinned process is never sent to adopt"
+  done
+  rm -f "$T/env-extra"
+  meta_for claude env-v1
 
   # Adoption is a second route: the record authorizes only while every proof still holds.
   fm_launch_proof_claude_adoption "$META" > "$STATE/vernant-t1.claude-adoption.json" 2>/dev/null \
@@ -658,7 +671,7 @@ test_launch_proof_claude_verdict_and_refusal() (
   fm_launch_proof_herdr_authorizes "$META" || fail 'an adopted lane must authorize lifecycle input'
   # (i) the pane changed hands: any contradicted proof makes the record inert again.
   printf 'FM_SPAWN_GEN=s9.9.9\n' > "$T/env-extra"
-  assert_equals unmanaged "$(fm_launch_proof_herdr "$META")" 'a harness pinned elsewhere voids the adoption at use'
+  assert_equals pinned-elsewhere "$(fm_launch_proof_herdr "$META")" 'a harness pinned elsewhere voids the adoption at use'
   rm -f "$T/env-extra"
   jq '.session_id = "0b4c1d2e-3f40-4a51-8b62-7c83d94ea5f6"' "$STATE/vernant-t1.claude-adoption.json" > "$T/rec" && mv "$T/rec" "$STATE/vernant-t1.claude-adoption.json"
   assert_equals unmanaged "$(fm_launch_proof_herdr "$META")" 'a record naming another session voids the adoption'

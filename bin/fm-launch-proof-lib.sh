@@ -9,10 +9,12 @@
 # session-file identity authorize lifecycle, and a pin for another generation
 # never passes that recheck.
 # Native Herdr restore reconstructs argv, not the launch environment/settings.
-# Verdicts: managed|unmanaged|unknown. Only managed authorizes lifecycle action
-# for a proven record; a legacy record keeps its pre-proof attribution rule.
-# unmanaged: the environment was readable and carries no matching pin (omp, and
-# claude with a versioned launch proof). unknown: it could not be read.
+# Verdicts: managed|unmanaged|pinned-elsewhere|unknown. Only managed authorizes
+# lifecycle action for a proven record; a legacy record keeps its pre-proof
+# attribution rule. unmanaged: the environment was readable and carries no
+# matching pin (omp, and claude with a versioned launch proof). pinned-elsewhere:
+# a claude with a versioned launch proof whose readable environment carries a pin
+# for another launch generation. unknown: it could not be read.
 # A restored claude agent is adopted by fm_launch_proof_claude_adoption, a second
 # authorization route that rechecks its positive proofs at every use.
 # No endpoint discovery: callers supply this home's validated exact endpoint.
@@ -580,13 +582,13 @@ fm_launch_proof_claude_adopted() { # <meta> <pid>
   [ "$record" = "$fresh" ]
 }
 
-fm_launch_proof_herdr() { # <meta> -> managed|unmanaged|unknown
+fm_launch_proof_herdr() { # <meta> -> managed|unmanaged|pinned-elsewhere|unknown
   local pid
   pid=$(fm_launch_proof_herdr_pid "$1") || { printf unknown; return; }
   fm_launch_proof_herdr_verdict "$1" "$pid"
 }
 
-fm_launch_proof_herdr_verdict() { # <meta> <pid> -> managed|unmanaged|unknown
+fm_launch_proof_herdr_verdict() { # <meta> <pid> -> managed|unmanaged|pinned-elsewhere|unknown
   local meta=$1 pid=$2 proof gen verdict record task_file current_file adopted refusal=unmanaged
   proof=$(fm_meta_get "$meta" launch_proof)
   case "$proof" in
@@ -634,7 +636,9 @@ fm_launch_proof_herdr_verdict() { # <meta> <pid> -> managed|unmanaged|unknown
       # Only harnesses with an adoption route report a readable unpinned
       # environment as such; a legacy claude record keeps its pre-proof rule.
       case "$(fm_meta_get "$meta" harness):$proof" in
-        omp:*|claude:env-v1) printf unmanaged ;;
+        claude:env-v1)
+          if fm_launch_proof_pid_pinned_elsewhere "$pid" "$gen"; then printf pinned-elsewhere; else printf unmanaged; fi ;;
+        omp:*) printf unmanaged ;;
         *) printf unknown ;;
       esac
       ;;
@@ -643,18 +647,22 @@ fm_launch_proof_herdr_verdict() { # <meta> <pid> -> managed|unmanaged|unknown
 
 # The one wording for a refused live agent: the cause the verdict names and the
 # next action. unmanaged is a readable environment without a matching pin;
-# unknown is an environment that could not be read.
-fm_launch_proof_refusal_cause() { # <unmanaged|unknown>
+# pinned-elsewhere carries a pin for another launch generation; unknown is an
+# environment that could not be read.
+fm_launch_proof_refusal_cause() { # <unmanaged|pinned-elsewhere|unknown>
   case "$1" in
     unmanaged) printf 'live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record' ;;
+    pinned-elsewhere) printf 'live agent is pinned to another launch generation: its process environment carries a launch pin for a different spawn_gen than this record' ;;
     *) printf 'live launch settings are unreadable' ;;
   esac
 }
 
-# adopt accepts only a secondmate, so a ship or scout is never sent to it.
-fm_launch_proof_refusal_next() { # <unmanaged|unknown> <meta>
+# adopt accepts only a secondmate, so a ship or scout is never sent to it, and it
+# refuses a process pinned to another launch, so that process is never sent to it.
+fm_launch_proof_refusal_next() { # <unmanaged|pinned-elsewhere|unknown> <meta>
   local id=${2##*/}
   case "$1:$(fm_meta_get "$2" kind)" in
+    pinned-elsewhere:*) printf 'the process belongs to another launch and adopt cannot authorize it; Main inspects the pane and decides the lane by hand' ;;
     unmanaged:secondmate) printf 'if it is this task'"'"'s own agent, the lock-owning main Firstmate can authorize it once with "bin/fm-control.sh %s adopt"' "${id%.meta}" ;;
     unmanaged:*) printf 'unmanaged restored worker: adopt supports secondmates only; Main inspects the pane and decides' ;;
     *) printf 'no foreground process could be attributed in the recorded pane, or its environment could not be read; retry once it can be read, or decide the lane by hand' ;;

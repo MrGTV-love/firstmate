@@ -2709,6 +2709,9 @@ do_relaunch() {
         echo "recovery-skipped $ID launch=unmanaged; no lifecycle action taken"
         return 0
         ;;
+      pinned-elsewhere)
+        die "launch recovery for $ID found $(fm_launch_proof_refusal_cause pinned-elsewhere); no lifecycle action taken; $(fm_launch_proof_refusal_next pinned-elsewhere "$META")"
+        ;;
       unknown)
         if [ -z "$(fm_meta_get "$META" launch_proof)" ]; then
           echo "recovery-skipped $ID launch=legacy-unproven"

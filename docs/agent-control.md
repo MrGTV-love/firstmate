@@ -211,6 +211,7 @@ Herdr restores the argv and not the launch environment, so the restored agent ca
 Its verdict is `unmanaged`, a readable environment without a matching pin, and never `unknown`, an environment that could not be read.
 Every lifecycle consumer says which.
 For `unmanaged` it names this route as the next action for a secondmate; for a ship or scout it says `unmanaged restored worker: adopt supports secondmates only; Main inspects the pane and decides`, because the route accepts only secondmates.
+A claude whose readable environment carries a launch pin for another generation has its own verdict, `pinned-elsewhere`: every consumer says the live agent is pinned to another launch generation and never names this route, because adopt always refuses that process; Main inspects the pane and decides the lane by hand.
 `adopt` is one verb for both harnesses: it has the omp route's caller gate, so only the lock-owning main Firstmate may run it and a worker, the supervision branch, or a session that does not own the home's lock is refused.
 It writes only `state/<task-id>.claude-adoption.json`, by rename under the task's metadata lock, and never changes `launch_proof`, `spawn_gen`, or any other field of the record.
 It sends no input and starts or stops nothing.

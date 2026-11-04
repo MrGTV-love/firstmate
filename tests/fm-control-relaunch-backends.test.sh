@@ -1089,9 +1089,14 @@ test_reboot_recovery_refuses_non_omp_launches_without_mutation() {
           # environment without a matching pin is an unpinned native restore, and only an
           # environment that cannot be read is "unreadable". No input and no mutation are
           # still asserted below.
+          # A pin for another generation is not an unpinned restore: it names its own cause.
           if [ "$pin" = unreadable ]; then
             assert_contains "$out" "cannot prove its live launch settings" "$kind/$pin direct refusal must name unknown proof"
             assert_contains "$out" "live launch settings are unreadable" "$kind/$pin direct refusal must keep the unreadable cause"
+          elif [ "$pin" = mismatched ]; then
+            assert_contains "$out" "found $CLAUDE_PINNED_ELSEWHERE_CAUSE; no lifecycle action taken" \
+              "$kind/$pin direct refusal must name a pin for another launch generation"
+            assert_not_contains "$out" "unpinned native restore" "$kind/$pin direct refusal must not call a pinned process unpinned"
           else
             assert_contains "$out" "found live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record" \
               "$kind/$pin direct refusal must name an unpinned native restore"
@@ -1104,14 +1109,22 @@ test_reboot_recovery_refuses_non_omp_launches_without_mutation() {
           if [ "$pin" = unreadable ]; then
             assert_contains "$out" "REBOOT_RECOVERY: $id: live launch settings are unreadable; no lifecycle action taken" \
               "$kind/$pin sweep refusal must name unknown proof"
+          elif [ "$pin" = mismatched ]; then
+            assert_contains "$out" "REBOOT_RECOVERY: $id: $CLAUDE_PINNED_ELSEWHERE_CAUSE; no lifecycle action taken" \
+              "$kind/$pin sweep refusal must name a pin for another launch generation"
+            assert_not_contains "$out" "unpinned native restore" "$kind/$pin sweep refusal must not call a pinned process unpinned"
           else
             assert_contains "$out" "REBOOT_RECOVERY: $id: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken" \
               "$kind/$pin sweep refusal must name an unpinned native restore"
             assert_not_contains "$out" "unreadable" "$kind/$pin sweep refusal must not call a readable environment unreadable"
           fi
         fi
-        # adopt accepts only secondmates: a ship or scout is never told to run it.
-        if [ "$pin" != unreadable ]; then
+        # adopt accepts only secondmates and refuses a process pinned to another launch.
+        if [ "$pin" = mismatched ]; then
+          assert_contains "$out" "the process belongs to another launch and adopt cannot authorize it; Main inspects the pane and decides the lane by hand" \
+            "$kind/$mode/$pin must name its own next step"
+          assert_not_contains "$out" "$id adopt" "$kind/$mode/$pin must never suggest adopt"
+        elif [ "$pin" != unreadable ]; then
           if [ "$kind" = secondmate ]; then
             assert_contains "$out" "bin/fm-control.sh $id adopt" "$kind/$mode/$pin must name the explicit route"
           else
@@ -2166,6 +2179,7 @@ test_relaunch_without_a_usable_recorded_rule_keeps_prior_behavior() {
 # the empty forwarding-launcher allow-list refuses.
 CLAUDE_RESTORE_UUID=5a3eec19-de12-4999-bed2-bbd561089154
 CLAUDE_UNPINNED_CAUSE="live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record"
+CLAUDE_PINNED_ELSEWHERE_CAUSE="live agent is pinned to another launch generation: its process environment carries a launch pin for a different spawn_gen than this record"
 
 write_claude_transcript() { # <case-dir> <first-user-message> [seconds-after-now]
   local dir=$1 physical project ts
@@ -2352,6 +2366,45 @@ test_claude_restore_restart_decides_attribution_before_its_first_effect() {
   pass "claude restore: the restart decides attribution before any pending reply, inbox write, request or nudge"
 }
 
+test_claude_pinned_elsewhere_names_its_own_cause() {
+  prepare_claude_restore pinned-elsewhere
+  local CONTROL="$ROOT/bin/fm-control.sh"
+  local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID out rc verb meta_before
+  local next="the process belongs to another launch and adopt cannot authorize it; Main inspects the pane and decides the lane by hand"
+  grep -v '^spawn_gen=' "$dir/home/state/$id.meta" > "$dir/meta.new" && mv "$dir/meta.new" "$dir/home/state/$id.meta"
+  printf 'spawn_gen=A\n' >> "$dir/home/state/$id.meta"
+  printf B > "$dir/fake/recovery-spawn-gen"
+  meta_before=$(shasum -a 256 "$dir/home/state/$id.meta")
+  for verb in interrupt exit relaunch; do
+    claude_lifecycle_refusal "$dir" "$id" "$verb"
+    out=$CLAUDE_REFUSAL_OUT
+    assert_contains "$out" "$CLAUDE_PINNED_ELSEWHERE_CAUSE; $next" "$verb must name a pin for another launch generation"
+    assert_not_contains "$out" "unpinned native restore" "$verb must not call a pinned process unpinned"
+    assert_not_contains "$out" "$id adopt" "$verb must not suggest adopt"
+  done
+  rc=0
+  out=$(run_control "$dir" "$id" relaunch --recover-launch) || rc=$?
+  expect_code 1 "$rc" "inspecting a claude pinned elsewhere keeps its nonzero exit"$'\n'"$out"
+  assert_contains "$out" "launch recovery for $id found $CLAUDE_PINNED_ELSEWHERE_CAUSE; no lifecycle action taken; $next" \
+    "inspection must name a pin for another launch generation"
+  rc=0
+  out=$(CONTROL="$ROOT/bin/fm-reboot-recover.sh" run_control "$dir" recover) || rc=$?
+  expect_code 1 "$rc" "the reboot sweep keeps its nonzero exit for a claude pinned elsewhere"$'\n'"$out"
+  assert_contains "$out" "REBOOT_RECOVERY: $id: $CLAUDE_PINNED_ELSEWHERE_CAUSE; no lifecycle action taken; $next" \
+    "the sweep must name a pin for another launch generation"
+  assert_not_contains "$out" "$id adopt" "the sweep must not suggest adopt"
+  [ "$meta_before" = "$(shasum -a 256 "$dir/home/state/$id.meta")" ] || fail "refusals changed the task record"
+  claude_restart_unreached "$dir" "$id" "$ROOT/bin/fm-secondmate-restart.sh" \
+    "its live Herdr agent cannot be positively attributed to this task, so no request or nudge was sent to it: $CLAUDE_PINNED_ELSEWHERE_CAUSE; $next" \
+    "a restart of a claude pinned elsewhere"
+  assert_not_contains "$CLAUDE_REFUSAL_OUT" "$id adopt" "the restart must not suggest adopt"
+  rc=0
+  out=$(run_continuation_control "$dir" "$id" adopt) || rc=$?
+  [ "$rc" -ne 0 ] || fail "a claude pinned to another launch generation was adopted: $out"
+  assert_absent "$dir/home/state/$id.claude-adoption.json" "a refused adoption writes no record"
+  pass "claude pinned elsewhere: every consumer names a pin for another launch generation and never suggests adopt"
+}
+
 # Sets CLAUDE_REFUSAL_OUT. Runs <restart> on the case and asserts an unreached refusal
 # naming <cause> with no pending reply, inbox write, request or nudge.
 claude_restart_unreached() { # <case-dir> <id> <restart> <cause> <description>
@@ -2401,6 +2454,7 @@ test_claude_restore_adoption_refuses_the_teamclaude_wrapper
 test_claude_restore_adoption_caller_gate
 test_claude_restore_restart_decides_attribution_before_its_first_effect
 test_restart_refuses_an_unproven_agent_state
+test_claude_pinned_elsewhere_names_its_own_cause
 test_bounded_reboot_recovery_rotates_unmanaged_inspections_without_mutation
 test_bounded_reboot_recovery_notifies_each_unmanaged_identity_once
 test_bounded_reboot_recovery_advances_after_interrupted_inspection

@@ -12,6 +12,8 @@
 # whose readable environment carries no launch pin is reported as an unpinned
 # native restore, with the explicit adopt route for a secondmate only, and keeps
 # the nonzero status.
+# A claude whose readable environment carries a pin for another launch generation
+# is reported as pinned elsewhere, never sent to adopt, and keeps the nonzero status.
 # A legacy record (no launch_proof)
 # keeps exit and relaunch: an unpinned legacy omp is reported as such, and other
 # legacy-unproven records skip.
@@ -160,6 +162,11 @@ for ((offset=0; offset<count && (ONE == 0 || selected == 0); offset++)); do
       fi
       notice "$id" "unmanaged $identity" \
         "REBOOT_RECOVERY: $id: live launch is unmanaged; no lifecycle action taken" || true
+      ;;
+    pinned-elsewhere)
+      notice "$id" "pinned-elsewhere $identity" \
+        "REBOOT_RECOVERY: $id: $(fm_launch_proof_refusal_cause pinned-elsewhere); no lifecycle action taken; $(fm_launch_proof_refusal_next pinned-elsewhere "$meta")" && result=1
+      continue
       ;;
     *) result=1 ;;
   esac
