@@ -1,0 +1,12 @@
+labpred1 copy detached
+=== relaunch retry while the predecessor is not on its recorded branch
+$ bin/fm-spawn.sh labsucc4 --relaunch 
+WARNING: watcher still down (same stale episode; last beat: 1842s ago, grace 300s) - full banner already printed this episode.
+error: --successor-of labpred1 copy /Users/charlesabrooker/tmp/fm-labwork.emsXui/treehouse/.treehouse/vernant-0b6da8/1/vernant has a detached HEAD, not its recorded branch fm/labpred1
+error: --relaunch of labsucc4 keeps its unfulfilled successor declaration of labpred1 and cannot continue without it
+exit=1
+state/data: unchanged
+tmux windows: unchanged
+treehouse pool: unchanged
+state/labsucc4.meta byte-identical: the declaration is kept
+labpred1 copy back on fm/labpred1

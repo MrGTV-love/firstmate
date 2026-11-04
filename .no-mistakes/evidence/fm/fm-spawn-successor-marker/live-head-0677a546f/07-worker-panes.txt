@@ -1,0 +1,30 @@
+### tmux capture-pane fm-nmt-succ-pos
+bash-3.2$ cd -- '/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/2/vernant'
+bash-3.2$ export GOTMPDIR=/tmp/fm-nmt-succ-pos/gotmp
+bash-3.2$ export COMPACT_ADVISER_DISABLE=1
+bash-3.2$ export FM_TASK_ID=nmt-succ-pos
+bash-3.2$ . '/tmp/fm-nmt-succ-pos+80a4477a8e7e1423acf51b25262de881445f0f11b3de495dd16f66beba32d749/launch.s1793748970.79570.15675.sh'
+stub codex agent started in /Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/2/vernant
+### tmux capture-pane fm-nmt-succ-rec
+bash-3.2$ cd -- '/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/8/vernant'
+bash-3.2$ export GOTMPDIR=/tmp/fm-nmt-succ-rec/gotmp
+bash-3.2$ export COMPACT_ADVISER_DISABLE=1
+bash-3.2$ export FM_TASK_ID=nmt-succ-rec
+bash-3.2$ . '/tmp/fm-nmt-succ-rec+80a4477a8e7e1423acf51b25262de881445f0f11b3de495dd16f66beba32d749/launch.s1793750942.97563.270.sh'
+stub codex agent started in /Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/8/vernant
+### tmux capture-pane fm-nmt-succ-gone
+bash-3.2$ . '/tmp/fm-nmt-succ-gone+80a4477a8e7e1423acf51b25262de881445f0f11b3de495dd16f66beba32d749/launch.s1793751652.68021.18387.sh'
+stub codex agent started in /Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/9/vernant
+^C
+bash-3.2$ bash -- '/Users/charlesabrooker/tmp/fm-lab.bLgx2P/data/nmt-succ-gone/.slot-provision.fRy5dN/run'
+bash-3.2$ bash -- '/Users/charlesabrooker/tmp/fm-lab.bLgx2P/data/nmt-succ-gone/.slot-provision.vwgipe/run'
+bash-3.2$
+STUB-AGENT codex task=nmt-pred-a pwd=/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/1/vernant
+STUB-AGENT codex task=nmt-succ-pos pwd=/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/2/vernant
+STUB-AGENT codex task=nmt-pred-b pwd=/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/3/vernant
+STUB-AGENT codex task=nmt-succ-neg pwd=/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/4/vernant
+STUB-AGENT codex task=nmt-succ-other pwd=/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/5/vernant
+STUB-AGENT codex task=nmt-pred-c pwd=/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/6/vernant
+STUB-AGENT codex task=nmt-pred-d pwd=/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/7/vernant
+STUB-AGENT codex task=nmt-succ-rec pwd=/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/8/vernant
+STUB-AGENT codex task=nmt-succ-gone pwd=/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/9/vernant

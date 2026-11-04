@@ -1,0 +1,33 @@
+{
+  "already_landed_via_squash": false,
+  "carry_command": "git -C /Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/9/vernant cherry-pick --allow-empty --empty=keep 06a1855330d36d23d236f4ee2a62710b04ed4bae..7b0ab19b86d613e13bb086395fcf99da0d63c57c",
+  "carry_note": null,
+  "carry_status": "resolved",
+  "manual_carry_reason": null,
+  "manual_carry_required": false,
+  "net_delta_empty": false,
+  "owner_id": "nmt-succ-gone",
+  "predecessor_already_landed_count": 0,
+  "predecessor_branch": "fm/nmt-pred-d",
+  "predecessor_dirty": false,
+  "predecessor_dirty_paths": [],
+  "predecessor_dirty_total": 0,
+  "predecessor_head": "7b0ab19b86d613e13bb086395fcf99da0d63c57c",
+  "predecessor_merge_commit_count": 0,
+  "predecessor_unmerged_commits": [
+    {
+      "sha": "3b4cd6da74566e447408d9fd8dbb679beca9c435",
+      "subject": "nmt-pred-d 1"
+    },
+    {
+      "sha": "7b0ab19b86d613e13bb086395fcf99da0d63c57c",
+      "subject": "nmt-pred-d 2"
+    }
+  ],
+  "predecessor_unmerged_count": 2,
+  "recorded_at_iso": "2026-11-04T00:20:47Z",
+  "schema_version": "1.1.0",
+  "superseded_by_branch": "fm/nmt-succ-gone",
+  "superseded_by_worktree_path": "/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/9/vernant",
+  "superseded_worktree_path": "/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/7/vernant"
+}

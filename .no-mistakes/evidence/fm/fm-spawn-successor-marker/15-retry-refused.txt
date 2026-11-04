@@ -1,0 +1,9 @@
+made $CODEX_HOOK_STATE_DIR a regular file
+$ bin/fm-spawn.sh labsucc4 /Users/charlesabrooker/tmp/fm-lab.C9IU4w/projects/vernant --mode local-only --yolo off --owned-path README.md --harness 'sleep 86400' --successor-of labpred1
+WARNING: watcher still down (same stale episode; last beat: 1787s ago, grace 300s) - full banner already printed this episode.
+error: slot provisioner refused task labsucc4 (exit 2); no agent or ship transition admitted; report: /Users/charlesabrooker/tmp/fm-lab.C9IU4w/data/labsucc4/slot-provision-spawn.82801.json
+error: assigned copy /Users/charlesabrooker/tmp/fm-labwork.emsXui/treehouse/.treehouse/vernant-0b6da8/7/vernant and endpoint primary:fm-labsucc4 retained; no worker admitted
+exit=1
+recovery=slot-provision-refused
+successor_of=labpred1
+windows: bash fm-labpred1 fm-labpred2 fm-labsucc0 fm-labsucc1 fm-labsucc2 fm-labsucc3 fm-labsucc4 

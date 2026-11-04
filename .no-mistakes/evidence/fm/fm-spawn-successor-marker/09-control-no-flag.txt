@@ -1,0 +1,4 @@
+spawned labsucc0 harness=sleep kind=ship mode=local-only yolo=off window=primary:fm-labsucc0 worktree=/Users/charlesabrooker/tmp/fm-labwork.emsXui/treehouse/.treehouse/vernant-0b6da8/5/vernant
+exit=0
+--- state/labsucc0.meta successor_of lines: 0
+--- new marker files:        0

@@ -1,0 +1,39 @@
+$ bin/fm-spawn.sh labpred1 /Users/charlesabrooker/tmp/fm-lab.C9IU4w/projects/vernant --mode local-only --yolo off --owned-path README.md --harness 'sleep 86400' 
+notice: labpred1 ships mode=local-only while the standing posture for vernant is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+local-only source: local=main@1cf0e36bbbb1537c166c2809cda9f60b9f5a826c origin=main@06a1855330d36d23d236f4ee2a62710b04ed4bae selected=origin/main@06a1855330d36d23d236f4ee2a62710b04ed4bae
+{
+  "base_sha": "06a1855330d36d23d236f4ee2a62710b04ed4bae",
+  "branch": "fm/labpred1",
+  "manifest_path": "/Users/charlesabrooker/tmp/fm-labwork.emsXui/lifecycle/084783094b69b852.json",
+  "owned_paths": [
+    "README.md"
+  ],
+  "owner_id": "labpred1",
+  "state": "PASS",
+  "worktree_path": "/Users/charlesabrooker/tmp/fm-labwork.emsXui/treehouse/.treehouse/vernant-0b6da8/1/vernant"
+}
+skill selection for labpred1: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=sleep write_confinement=unconfined-macos-sleep
+spawned labpred1 harness=sleep kind=ship mode=local-only yolo=off window=primary:fm-labpred1 worktree=/Users/charlesabrooker/tmp/fm-labwork.emsXui/treehouse/.treehouse/vernant-0b6da8/1/vernant
+exit=0
+window=primary:fm-labpred1
+endpoint_task_id=labpred1
+worktree=/Users/charlesabrooker/tmp/fm-labwork.emsXui/treehouse/.treehouse/vernant-0b6da8/1/vernant
+project=/Users/charlesabrooker/tmp/fm-lab.C9IU4w/projects/vernant
+harness=sleep
+kind=ship
+mode=local-only
+yolo=off
+branch=fm/labpred1
+tasktmp=/tmp/fm-labpred1
+write_confinement=unconfined-macos-sleep
+slot_manifest=/Users/charlesabrooker/tmp/fm-labwork.emsXui/lifecycle/084783094b69b852.json
+slot_base_sha=06a1855330d36d23d236f4ee2a62710b04ed4bae
+slot_owned_path=README.md
+model=default
+effort=default
+jev_guard_policy=FIRSTMATE_JEV_GUARD_V1
+egress=[]
+skill_selection=undelivered
+skill_selection_reason=raw launch command has no supported brief transport
+spawn_gen=s1793744593.85787.10675

@@ -1,0 +1,37 @@
+=== LATER RELAUNCH of an admitted successor (nmt-succ-gone), after stopping its agent
+(stub agent stopped with Ctrl-C in its pane; the pane is an idle shell; the lab carry commits were reset off the branch so they do not trip the helper scope check; helper state dir = the one holding this task manifest)
+markers before: 1
+  | + bin/fm-spawn.sh nmt-succ-gone --relaunch
+  | notice: nmt-succ-gone ships mode=local-only while the standing posture for vernant is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+  | error: slot provisioner refused task nmt-succ-gone (exit 2); no agent or ship transition admitted; report: /Users/charlesabrooker/tmp/fm-lab.bLgx2P/data/nmt-succ-gone/slot-provision-spawn.82726.json
+  | error: assigned copy /Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/9/vernant and endpoint primary:fm-nmt-succ-gone retained; no worker admitted
+  relaunch exit=1
+  window=primary:fm-nmt-succ-gone
+  worktree=/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/9/vernant
+  branch=fm/nmt-succ-gone
+  slot_manifest=/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/locked/hook-state/worktree-lifecycle/3e94e08bc281c787.json
+  successor_of=nmt-pred-d
+markers after: 1; marker file unchanged: yes
+slot-provision-spawn.31173.json
+slot-provision-spawn.46254.json
+slot-provision-spawn.68021.json
+slot-provision-spawn.82726.json
+
+report:
+{
+  "blocked_reasons": [
+    "manifest_exists"
+  ],
+  "manifest_path": "/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/locked/hook-state/worktree-lifecycle/3e94e08bc281c787.json",
+  "reason": "manifest_exists",
+  "state": "BLOCKED"
+}
+
+=== CONTROL: later relaunch of an admitted task WITHOUT a successor declaration (nmt-succ-neg)
+(stub agent stopped with Ctrl-C; lab carry commits reset off the branch; helper state dir holds this task manifest)
+  | + bin/fm-spawn.sh nmt-succ-neg --relaunch
+  | error: slot provisioner refused task nmt-succ-neg (exit 2); no agent or ship transition admitted; report: /Users/charlesabrooker/tmp/fm-lab.bLgx2P/data/nmt-succ-neg/slot-provision-spawn.88210.json
+  | error: assigned copy /Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/4/vernant and endpoint primary:fm-nmt-succ-neg retained; no worker admitted
+  relaunch exit=1
+  newest report /Users/charlesabrooker/tmp/fm-lab.bLgx2P/data/nmt-succ-neg/slot-provision-spawn.88210.json:
+    BLOCKED manifest_exists

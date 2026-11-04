@@ -1,0 +1,75 @@
+=== POSITIVE: a declared successor of a live predecessor
+markers before: 0
++ bin/fm-spawn.sh nmt-succ-pos projects/vernant --mode local-only --yolo off --owned-path README.md --successor-of nmt-pred-a
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.bLgx2P
+warning: task nmt-succ-pos: /Users/charlesabrooker/tmp/fm-lab.bLgx2P/data/nmt-succ-pos/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-lab.bLgx2P/data/nmt-succ-pos/launch-brief.md records no ship branch; defaulting to legacy branch fm/nmt-succ-pos
+warning: /Users/charlesabrooker/tmp/fm-lab.bLgx2P/data/nmt-succ-pos/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: nmt-succ-pos ships mode=local-only while the standing posture for vernant is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 61s; no path/output progress for 56s; last path '/Users/charlesabrooker/tmp/fm-lab.bLgx2P/projects/vernant' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 128s; no path/output progress for 123s; last path '/Users/charlesabrooker/tmp/fm-lab.bLgx2P/projects/vernant' (it is the project checkout itself)
+local-only source: local=main@06a1855330d36d23d236f4ee2a62710b04ed4bae origin=main@06a1855330d36d23d236f4ee2a62710b04ed4bae selected=origin/main@06a1855330d36d23d236f4ee2a62710b04ed4bae
+{
+  "base_sha": "06a1855330d36d23d236f4ee2a62710b04ed4bae",
+  "branch": "fm/nmt-succ-pos",
+  "manifest_path": "/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/hook-state/worktree-lifecycle/de1a0acc5acc4a27.json",
+  "owned_paths": [
+    "README.md"
+  ],
+  "owner_id": "nmt-succ-pos",
+  "state": "PASS",
+  "worktree_path": "/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/2/vernant"
+}
+skill selection for nmt-succ-pos: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=codex write_confinement=unconfined-macos-codex
+spawned nmt-succ-pos harness=codex kind=ship mode=local-only yolo=off window=primary:fm-nmt-succ-pos worktree=/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/2/vernant
+spawn exit=0
+--- meta
+window=primary:fm-nmt-succ-pos
+worktree=/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/2/vernant
+branch=fm/nmt-succ-pos
+slot_manifest=/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/hook-state/worktree-lifecycle/de1a0acc5acc4a27.json
+successor_of=nmt-pred-a
+markers after: 1
+  marker e565421736dcf2cc.json {'schema_version': '1.1.0', 'carry_status': 'resolved', 'predecessor_branch': 'fm/nmt-pred-a', 'superseded_by_branch': 'fm/nmt-succ-pos'}
+  R-13 for nmt-succ-pos (fm/nmt-succ-pos): foreign=0 block=no
+
+=== NEGATIVE CONTROL: the same spawn without the flag
+predecessor nmt-pred-b: fm/nmt-pred-b
++ bin/fm-spawn.sh nmt-succ-neg projects/vernant --mode local-only --yolo off --owned-path README.md 
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.bLgx2P
+warning: task nmt-succ-neg: /Users/charlesabrooker/tmp/fm-lab.bLgx2P/data/nmt-succ-neg/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-lab.bLgx2P/data/nmt-succ-neg/launch-brief.md records no ship branch; defaulting to legacy branch fm/nmt-succ-neg
+warning: /Users/charlesabrooker/tmp/fm-lab.bLgx2P/data/nmt-succ-neg/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: nmt-succ-neg ships mode=local-only while the standing posture for vernant is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 60s; no path/output progress for 55s; last path '/Users/charlesabrooker/tmp/fm-lab.bLgx2P/projects/vernant' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 121s; no path/output progress for 116s; last path '/Users/charlesabrooker/tmp/fm-lab.bLgx2P/projects/vernant' (it is the project checkout itself)
+local-only source: local=main@06a1855330d36d23d236f4ee2a62710b04ed4bae origin=main@06a1855330d36d23d236f4ee2a62710b04ed4bae selected=origin/main@06a1855330d36d23d236f4ee2a62710b04ed4bae
+{
+  "base_sha": "06a1855330d36d23d236f4ee2a62710b04ed4bae",
+  "branch": "fm/nmt-succ-neg",
+  "manifest_path": "/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/hook-state/worktree-lifecycle/9a26e7b7c4e1a5ca.json",
+  "owned_paths": [
+    "README.md"
+  ],
+  "owner_id": "nmt-succ-neg",
+  "state": "PASS",
+  "worktree_path": "/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/4/vernant"
+}
+skill selection for nmt-succ-neg: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=codex write_confinement=unconfined-macos-codex
+spawned nmt-succ-neg harness=codex kind=ship mode=local-only yolo=off window=primary:fm-nmt-succ-neg worktree=/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/4/vernant
+spawn exit=0
+--- meta
+window=primary:fm-nmt-succ-neg
+worktree=/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/4/vernant
+branch=fm/nmt-succ-neg
+slot_manifest=/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/hook-state/worktree-lifecycle/9a26e7b7c4e1a5ca.json
+markers before=1 after=1
+  R-13 for nmt-succ-neg (fm/nmt-succ-neg): foreign=2 block=yes
+  R-13 says: **R-13 BLOCK** — branch `refs/heads/fm/nmt-succ-neg` (local_sha 0fb15f69) carries commits that are not its own.
+
+=== ADVERSARIAL: an existing marker for nmt-pred-a does not cover a different successor carrying nmt-pred-a
+spawn exit=0
+  R-13 for nmt-succ-other (fm/nmt-succ-other): foreign=2 block=yes
+  R-13 says: **R-13 BLOCK** — branch `refs/heads/fm/nmt-succ-other` (local_sha e4b5a6f4) carries commits that are not its own.

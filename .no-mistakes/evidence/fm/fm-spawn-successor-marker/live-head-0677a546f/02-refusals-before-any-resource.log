@@ -1,0 +1,48 @@
+
+=== ROW: predecessor copy on another branch
+  | + bin/fm-spawn.sh nmt-succ-x projects/vernant --mode local-only --yolo off --owned-path README.md --successor-of nmt-pred-a
+  | error: --successor-of nmt-pred-a copy /Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/1/vernant is on nmt-elsewhere, not its recorded branch fm/nmt-pred-a
+  exit=1
+  RESULT: PASS (nonzero exit, one error line naming the reason; state/, data/, tmux windows, treehouse leases and markers unchanged)
+
+=== ROW: predecessor copy has a detached HEAD
+  | + bin/fm-spawn.sh nmt-succ-x projects/vernant --mode local-only --yolo off --owned-path README.md --successor-of nmt-pred-a
+  | error: --successor-of nmt-pred-a copy /Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/1/vernant has a detached HEAD, not its recorded branch fm/nmt-pred-a
+  exit=1
+  RESULT: PASS (nonzero exit, one error line naming the reason; state/, data/, tmux windows, treehouse leases and markers unchanged)
+
+=== ROW: predecessor copy is gone
+  | + bin/fm-spawn.sh nmt-succ-x projects/vernant --mode local-only --yolo off --owned-path README.md --successor-of nmt-pred-a
+  | error: --successor-of nmt-pred-a copy /Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/1/vernant is gone; a successor record needs the live predecessor
+  exit=1
+  RESULT: PASS (nonzero exit, one error line naming the reason; state/, data/, tmux windows, treehouse leases and markers unchanged)
+
+=== ROW: predecessor has no task record
+  | + bin/fm-spawn.sh nmt-succ-x projects/vernant --mode local-only --yolo off --owned-path README.md --successor-of nmt-pred-a
+  | error: --successor-of nmt-pred-a has no task record in /Users/charlesabrooker/tmp/fm-lab.bLgx2P/state
+  exit=1
+  RESULT: PASS (nonzero exit, one error line naming the reason; state/, data/, tmux windows, treehouse leases and markers unchanged)
+
+=== ROW: primary checkout runs the pre-verb Vernant provisioner (no --supersedes in --help)
+  | + bin/fm-spawn.sh nmt-succ-x projects/vernant --mode local-only --yolo off --owned-path README.md --successor-of nmt-pred-a
+  | error: --successor-of needs the project's primary checkout /Users/charlesabrooker/tmp/fm-lab.bLgx2P/projects/vernant to advertise --supersedes on scripts/git-stability/provision_existing_slot.py; update that checkout, since the successor record needs the Vernant verb
+  exit=1
+  RESULT: PASS (nonzero exit, one error line naming the reason; state/, data/, tmux windows, treehouse leases and markers unchanged)
+
+=== ROW: flag where it means nothing (--scout, --relaunch, twice, self, id=repo batch)
++ bin/fm-spawn.sh nmt-succ-x projects/vernant --scout --successor-of nmt-pred-a
+  | error: --successor-of applies only to a fresh ship spawn, not a scout
+  exit=1
++ bin/fm-spawn.sh nmt-succ-x --relaunch --successor-of nmt-pred-a
+  | error: --successor-of applies only to a fresh ship spawn; a retained refusal keeps its declaration and --relaunch re-resolves it
+  exit=1
++ bin/fm-spawn.sh nmt-succ-x projects/vernant --mode local-only --yolo off --successor-of nmt-pred-a --successor-of nmt-pred-a
+  | error: --successor-of names one predecessor task
+  exit=1
++ bin/fm-spawn.sh nmt-succ-x projects/vernant --mode local-only --yolo off --owned-path README.md --successor-of nmt-succ-x
+  | error: --successor-of nmt-succ-x names the task itself
+  exit=1
++ bin/fm-spawn.sh nmt-succ-x=projects/vernant nmt-succ-y=projects/vernant --harness codex --mode local-only --yolo off --successor-of nmt-pred-a
+  | error: --successor-of applies to one task; spawn a declared successor on its own, not in an id=repo batch
+  exit=1
+  RESULT: PASS (every call refused; nothing changed)

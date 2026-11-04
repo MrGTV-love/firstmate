@@ -1,0 +1,33 @@
+made $CODEX_HOOK_STATE_DIR a regular file again
+=== relaunch retry while Vernant still refuses
+$ bin/fm-spawn.sh labsucc4 --relaunch --harness sleep 86400
+WARNING: watcher still down (same stale episode; last beat: 1894s ago, grace 300s) - full banner already printed this episode.
+{
+  "blocked_reasons": [
+    "supersedes_state_dir_refused"
+  ],
+  "reason": "supersedes_state_dir_refused",
+  "state": "BLOCKED",
+  "state_dir": "/Users/charlesabrooker/tmp/fm-labwork.emsXui/hookstate"
+}
+error: slot provisioner refused task labsucc4 (exit 2); no agent or ship transition admitted; report: /Users/charlesabrooker/tmp/fm-lab.C9IU4w/data/labsucc4/slot-provision-spawn.51493.json
+error: assigned copy /Users/charlesabrooker/tmp/fm-labwork.emsXui/treehouse/.treehouse/vernant-0b6da8/7/vernant and endpoint primary:fm-labsucc4 retained; no worker admitted
+exit=1
+--- state/labsucc4.meta:
+recovery=slot-provision-refused
+successor_of=labpred1
+restored $CODEX_HOOK_STATE_DIR
+=== relaunch retry with a live predecessor and a writable state dir
+$ bin/fm-spawn.sh labsucc4 --relaunch --harness sleep 86400
+WARNING: watcher still down (same stale episode; last beat: 1913s ago, grace 300s) - full banner already printed this episode.
+skill selection for labsucc4: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=sleep write_confinement=unconfined-macos-sleep
+spawned labsucc4 harness=sleep kind=ship mode=local-only yolo=off window=primary:fm-labsucc4 worktree=/Users/charlesabrooker/tmp/fm-labwork.emsXui/treehouse/.treehouse/vernant-0b6da8/7/vernant
+exit=0
+--- state/labsucc4.meta:
+branch=fm/labsucc4
+slot_manifest=/Users/charlesabrooker/tmp/fm-labwork.emsXui/lifecycle/8c0c35917206c073.json
+successor_of=labpred1
+--- markers:
+084783094b69b852.json owner=labsucc4 fm/labpred1 -> fm/labsucc4 2026-11-03T22:54:33Z
+ee165b54a811f9f1.json owner=labsucc2 fm/labpred2 -> fm/labsucc2 2026-11-03T22:29:41Z

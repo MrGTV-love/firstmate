@@ -1,0 +1,6 @@
+reset fm/labsucc0 back to base (it carried the same commit in an earlier row)
+reset fm/labsucc1 back to base (it carried the same commit in an earlier row)
+branches that reach 3f1c0151d: + fm/labpred1 + fm/labsucc4 
+=== R-13 for labsucc4 (admitted through the --relaunch retry; marker owner=labsucc4)
+R-13: main is not proven against the remote (origin does not resolve to the canonical github.com/MrGTV-love/vernant URL (git ls-remote --get-url origin)); judging against the local origin/main 06a1855330d3 with the strict base-equality check.
+R-13 exit=0

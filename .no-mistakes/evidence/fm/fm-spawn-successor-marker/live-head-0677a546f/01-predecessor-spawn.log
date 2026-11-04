@@ -1,0 +1,22 @@
++ bin/fm-spawn.sh nmt-pred-a projects/vernant --mode local-only --yolo off --owned-path README.md 
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.bLgx2P
+warning: task nmt-pred-a: /Users/charlesabrooker/tmp/fm-lab.bLgx2P/data/nmt-pred-a/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-lab.bLgx2P/data/nmt-pred-a/launch-brief.md records no ship branch; defaulting to legacy branch fm/nmt-pred-a
+warning: /Users/charlesabrooker/tmp/fm-lab.bLgx2P/data/nmt-pred-a/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: nmt-pred-a ships mode=local-only while the standing posture for vernant is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+local-only source: local=main@06a1855330d36d23d236f4ee2a62710b04ed4bae origin=main@06a1855330d36d23d236f4ee2a62710b04ed4bae selected=origin/main@06a1855330d36d23d236f4ee2a62710b04ed4bae
+{
+  "base_sha": "06a1855330d36d23d236f4ee2a62710b04ed4bae",
+  "branch": "fm/nmt-pred-a",
+  "manifest_path": "/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/hook-state/worktree-lifecycle/e565421736dcf2cc.json",
+  "owned_paths": [
+    "README.md"
+  ],
+  "owner_id": "nmt-pred-a",
+  "state": "PASS",
+  "worktree_path": "/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/1/vernant"
+}
+skill selection for nmt-pred-a: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=codex write_confinement=unconfined-macos-codex
+spawned nmt-pred-a harness=codex kind=ship mode=local-only yolo=off window=primary:fm-nmt-pred-a worktree=/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/1/vernant
+predecessor nmt-pred-a: copy=/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/1/vernant branch=fm/nmt-pred-a head=6a95a7066 nmt-pred-a 2

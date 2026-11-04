@@ -1,0 +1,5 @@
+. "$(dirname "$0")/common.sh"
+echo "=== CONTROL: later relaunch of an admitted task WITHOUT a successor declaration (nmt-succ-neg)"
+echo "(stub agent stopped with Ctrl-C; lab carry commits reset off the branch; helper state dir holds this task manifest)"
+relaunch nmt-succ-neg 2>&1 | grep -vE '^\s*("|[]\[{}])' | grep -v -e '^fm-gate' -e '^warning' -e '^waiting' -e '^notice' | sed 's/^/  | /'; echo "  relaunch exit=${PIPESTATUS[0]}"
+f=$(ls -t "$L"/data/nmt-succ-neg/slot-provision-spawn.*.json | head -1); echo "  newest report $f:"; python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); print("   ", r.get("state"), r.get("reason"))' "$f"

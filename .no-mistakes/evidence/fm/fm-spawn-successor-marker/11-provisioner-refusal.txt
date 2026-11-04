@@ -1,0 +1,32 @@
+made $CODEX_HOOK_STATE_DIR a regular file, so Vernant cannot create its state dir
+$ bin/fm-spawn.sh labsucc3 /Users/charlesabrooker/tmp/fm-lab.C9IU4w/projects/vernant --mode local-only --yolo off --owned-path README.md --harness 'sleep 86400' --successor-of labpred1
+WARNING: watcher still down (same stale episode; last beat: 727s ago, grace 300s) - full banner already printed this episode.
+notice: labsucc3 ships mode=local-only while the standing posture for vernant is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+local-only source: local=main@06a1855330d36d23d236f4ee2a62710b04ed4bae origin=main@06a1855330d36d23d236f4ee2a62710b04ed4bae selected=origin/main@06a1855330d36d23d236f4ee2a62710b04ed4bae
+{
+  "blocked_reasons": [
+    "supersedes_state_dir_refused"
+  ],
+  "reason": "supersedes_state_dir_refused",
+  "state": "BLOCKED",
+  "state_dir": "/Users/charlesabrooker/tmp/fm-labwork.emsXui/hookstate"
+}
+error: slot provisioner refused task labsucc3 (exit 2); no agent or ship transition admitted; report: /Users/charlesabrooker/tmp/fm-lab.C9IU4w/data/labsucc3/slot-provision-spawn.6677.json
+error: assigned copy /Users/charlesabrooker/tmp/fm-labwork.emsXui/treehouse/.treehouse/vernant-0b6da8/6/vernant and endpoint primary:fm-labsucc3 retained; no worker admitted
+exit=1
+--- state/labsucc3.meta (selected lines)
+worktree=/Users/charlesabrooker/tmp/fm-labwork.emsXui/treehouse/.treehouse/vernant-0b6da8/6/vernant
+recovery=slot-provision-refused
+branch=fm/labsucc3
+successor_of=labpred1
+slot_owned_path=README.md
+--- windows:
+bash
+fm-labpred1
+fm-labpred2
+fm-labsucc0
+fm-labsucc1
+fm-labsucc2
+fm-labsucc3
+--- agent processes for labsucc3 window:
+fm-labsucc3 zsh

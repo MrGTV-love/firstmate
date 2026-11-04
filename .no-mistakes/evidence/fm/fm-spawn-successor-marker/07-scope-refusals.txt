@@ -1,0 +1,37 @@
+=== --successor-of with --scout
+$ bin/fm-spawn.sh labsucc3 /Users/charlesabrooker/tmp/fm-lab.C9IU4w/projects/vernant --scout --harness sleep 86400 --successor-of labpred1
+error: --successor-of applies only to a fresh ship spawn, not a scout
+exit=1
+state/data: unchanged
+tmux windows: unchanged
+treehouse pool: unchanged
+=== --successor-of with --secondmate
+$ bin/fm-spawn.sh labsucc3 --secondmate --successor-of labpred1
+error: --successor-of applies only to a fresh ship spawn, not a secondmate
+exit=1
+state/data: unchanged
+tmux windows: unchanged
+treehouse pool: unchanged
+=== --successor-of with --relaunch
+$ bin/fm-spawn.sh labpred1 --relaunch --successor-of labpred2
+error: --successor-of applies only to a fresh ship spawn; a retained refusal keeps its declaration and --relaunch re-resolves it
+exit=1
+state/data: unchanged
+tmux windows: unchanged
+treehouse pool: unchanged
+=== --successor-of in an id=repo batch
+$ bin/fm-spawn.sh labsucc3=vernant labsuccA=vernant --mode local-only --yolo off --owned-path README.md --harness sleep 86400 --successor-of labpred1
+WARNING: watcher still down (same stale episode; last beat: 564s ago, grace 300s) - full banner already printed this episode.
+error: --successor-of applies to one task; spawn a declared successor on its own, not in an id=repo batch
+exit=1
+state/data: unchanged
+tmux windows: unchanged
+treehouse pool: unchanged
+=== --successor-of given twice
+$ bin/fm-spawn.sh labsucc3 /Users/charlesabrooker/tmp/fm-lab.C9IU4w/projects/vernant --mode local-only --yolo off --owned-path README.md --harness 'sleep 86400' --successor-of labpred1 --successor-of labpred1
+error: --successor-of names one predecessor task
+exit=1
+state/data: unchanged
+tmux windows: unchanged
+treehouse pool: unchanged
+markers:        1

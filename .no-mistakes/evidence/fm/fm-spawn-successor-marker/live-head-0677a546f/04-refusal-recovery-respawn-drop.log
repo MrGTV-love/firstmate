@@ -1,0 +1,93 @@
+predecessors: fm/nmt-pred-c fm/nmt-pred-d
+
+=== RECOVERY A: provisioner refusal, then --relaunch while the window lives
+  (helper state dir set to an unwritable /Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/locked/hook-state, so the real Vernant helper refuses)
+  | + bin/fm-spawn.sh nmt-succ-rec projects/vernant --mode local-only --yolo off --owned-path README.md --successor-of nmt-pred-c
+  | local-only source: local=main@06a1855330d36d23d236f4ee2a62710b04ed4bae origin=main@06a1855330d36d23d236f4ee2a62710b04ed4bae selected=origin/main@06a1855330d36d23d236f4ee2a62710b04ed4bae
+  | error: slot provisioner refused task nmt-succ-rec (exit 2); no agent or ship transition admitted; report: /Users/charlesabrooker/tmp/fm-lab.bLgx2P/data/nmt-succ-rec/slot-provision-spawn.91011.json
+  | error: assigned copy /Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/8/vernant and endpoint primary:fm-nmt-succ-rec retained; no worker admitted
+  spawn exit=1
+  --- retained record
+  window=primary:fm-nmt-succ-rec
+  worktree=/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/8/vernant
+  recovery=slot-provision-refused
+  branch=fm/nmt-succ-rec
+  successor_of=nmt-pred-c
+  markers in /Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/locked/hook-state: 0
+  tmux windows: bash fm-nmt-pred-a fm-nmt-succ-pos fm-nmt-pred-b fm-nmt-succ-neg fm-nmt-succ-other fm-nmt-pred-c fm-nmt-pred-d fm-nmt-succ-rec 
+  --- adversarial: a fresh spawn of the same id WITHOUT the flag (would drop the declaration)
+  | + bin/fm-spawn.sh nmt-succ-rec projects/vernant --mode local-only --yolo off --owned-path README.md 
+  | error: nmt-succ-rec keeps an unfulfilled successor declaration of nmt-pred-c; retry it with fm-spawn.sh nmt-succ-rec --relaunch while the window lives, or a fresh spawn naming the same --successor-of nmt-pred-c once it is gone
+  exit=1
+  state unchanged: yes
+  (helper state dir made writable again)
+  --- the supported retry while the window lives
+  | + bin/fm-spawn.sh nmt-succ-rec --relaunch
+  | skill selection for nmt-succ-rec: unavailable - no TypeSafe or OpenRouter key
+  | confinement audit: harness=codex write_confinement=unconfined-macos-codex
+  | spawned nmt-succ-rec harness=codex kind=ship mode=local-only yolo=off window=primary:fm-nmt-succ-rec worktree=/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/8/vernant
+  relaunch exit=0
+  --- admitted record
+  window=primary:fm-nmt-succ-rec
+  worktree=/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/8/vernant
+  branch=fm/nmt-succ-rec
+  slot_manifest=/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/locked/hook-state/worktree-lifecycle/0cd2dd9cabe1fa81.json
+  successor_of=nmt-pred-c
+  markers in /Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/locked/hook-state: 1
+  marker ad4724cf2671bf00.json {'schema_version': '1.1.0', 'carry_status': 'resolved', 'predecessor_branch': 'fm/nmt-pred-c', 'superseded_by_branch': 'fm/nmt-succ-rec'}
+  R-13 for nmt-succ-rec (fm/nmt-succ-rec): foreign=0 block=no
+  --- a later relaunch of the admitted successor (ordinary attestation)
+  | + bin/fm-spawn.sh nmt-succ-rec --relaunch
+  | error: task nmt-succ-rec's endpoint reads 'ambiguous'; a relaunch requires a positively agent-free endpoint (stop the agent first with bin/fm-control.sh nmt-succ-rec exit)
+  relaunch exit=1
+  window=primary:fm-nmt-succ-rec
+  worktree=/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/8/vernant
+  branch=fm/nmt-succ-rec
+  slot_manifest=/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/locked/hook-state/worktree-lifecycle/0cd2dd9cabe1fa81.json
+  successor_of=nmt-pred-c
+  markers in /Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/locked/hook-state: 1
+
+=== RECOVERY B: provisioner refusal, the window is gone, then a fresh spawn naming the same --successor-of
+  (helper state dir set to an unwritable /Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/locked/hook-state, so the real Vernant helper refuses)
+  | + bin/fm-spawn.sh nmt-succ-gone projects/vernant --mode local-only --yolo off --owned-path README.md --successor-of nmt-pred-d
+  | local-only source: local=main@06a1855330d36d23d236f4ee2a62710b04ed4bae origin=main@06a1855330d36d23d236f4ee2a62710b04ed4bae selected=origin/main@06a1855330d36d23d236f4ee2a62710b04ed4bae
+  | error: slot provisioner refused task nmt-succ-gone (exit 2); no agent or ship transition admitted; report: /Users/charlesabrooker/tmp/fm-lab.bLgx2P/data/nmt-succ-gone/slot-provision-spawn.31173.json
+  | error: assigned copy /Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/9/vernant and endpoint primary:fm-nmt-succ-gone retained; no worker admitted
+  spawn exit=1
+  window=primary:fm-nmt-succ-gone
+  worktree=/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/9/vernant
+  recovery=slot-provision-refused
+  branch=fm/nmt-succ-gone
+  successor_of=nmt-pred-d
+  tmux windows: bash fm-nmt-pred-a fm-nmt-succ-pos fm-nmt-pred-b fm-nmt-succ-neg fm-nmt-succ-other fm-nmt-pred-c fm-nmt-pred-d fm-nmt-succ-rec fm-nmt-succ-gone 
+  (killed window fm-nmt-succ-gone, as a reboot or a closed window would)
+  tmux windows: bash fm-nmt-pred-a fm-nmt-succ-pos fm-nmt-pred-b fm-nmt-succ-neg fm-nmt-succ-other fm-nmt-pred-c fm-nmt-pred-d fm-nmt-succ-rec 
+  (helper state dir made writable again)
+  --- --relaunch once the window is gone
+  | + bin/fm-spawn.sh nmt-succ-gone --relaunch
+  | error: configured backend 'tmux' is not herdr; refusing to replace task nmt-succ-gone's proven-gone tmux endpoint
+  relaunch exit=1
+  --- adversarial: fresh spawn WITHOUT the flag
+  | + bin/fm-spawn.sh nmt-succ-gone projects/vernant --mode local-only --yolo off --owned-path README.md 
+  | error: nmt-succ-gone keeps an unfulfilled successor declaration of nmt-pred-d; retry it with fm-spawn.sh nmt-succ-gone --relaunch while the window lives, or a fresh spawn naming the same --successor-of nmt-pred-d once it is gone
+  exit=1
+  --- adversarial: fresh spawn naming a DIFFERENT predecessor
+  | + bin/fm-spawn.sh nmt-succ-gone projects/vernant --mode local-only --yolo off --owned-path README.md --successor-of nmt-pred-b
+  | error: nmt-succ-gone keeps an unfulfilled successor declaration of nmt-pred-d; retry it with fm-spawn.sh nmt-succ-gone --relaunch while the window lives, or a fresh spawn naming the same --successor-of nmt-pred-d once it is gone
+  exit=1
+  state unchanged by both: yes
+  --- the second route: fresh spawn naming the same --successor-of
+  | + bin/fm-spawn.sh nmt-succ-gone projects/vernant --mode local-only --yolo off --owned-path README.md --successor-of nmt-pred-d
+  | local-only source: local=main@06a1855330d36d23d236f4ee2a62710b04ed4bae origin=main@06a1855330d36d23d236f4ee2a62710b04ed4bae selected=origin/main@06a1855330d36d23d236f4ee2a62710b04ed4bae
+  | skill selection for nmt-succ-gone: unavailable - no TypeSafe or OpenRouter key
+  | confinement audit: harness=codex write_confinement=unconfined-macos-codex
+  | spawned nmt-succ-gone harness=codex kind=ship mode=local-only yolo=off window=primary:fm-nmt-succ-gone worktree=/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/9/vernant
+  spawn exit=0
+  window=primary:fm-nmt-succ-gone
+  worktree=/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/pool/.treehouse/vernant-7a8d6e/9/vernant
+  branch=fm/nmt-succ-gone
+  slot_manifest=/Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/locked/hook-state/worktree-lifecycle/3e94e08bc281c787.json
+  successor_of=nmt-pred-d
+  markers in /Users/charlesabrooker/tmp/fm-lab-work.NBfwwR/locked/hook-state: 1
+  marker 3255cb4a0693fb51.json {'schema_version': '1.1.0', 'carry_status': 'resolved', 'predecessor_branch': 'fm/nmt-pred-d', 'superseded_by_branch': 'fm/nmt-succ-gone'}
+  R-13 for nmt-succ-gone (fm/nmt-succ-gone): foreign=0 block=no

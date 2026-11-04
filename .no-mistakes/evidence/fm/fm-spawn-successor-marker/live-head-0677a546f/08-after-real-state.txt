@@ -1,0 +1,11 @@
+# after the lab run and teardown
+Tue Nov  3 18:28:45 CST 2026
+## real default Vernant hook state dir: worktree-supersedence listing
+       4
+3018c16c082b109d5b115667de513e90bd6b714b  -
+## operator Vernant clone
+6eacf4c4534500769c86d357ad0184612cf6c3ea
+beb2202227f1674550f25c8bbb85aecbfcb4f995  -
+ff0121ed49dbd4dade12168012c7f64f17fdc020  -
+## default tmux server sessions (read-only)
+6b5a50afd6b3f4cb6eb5d8c39632e89608c10467  -

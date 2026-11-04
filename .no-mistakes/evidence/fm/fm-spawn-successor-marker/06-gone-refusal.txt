@@ -1,0 +1,16 @@
+removed labpred2 copy /Users/charlesabrooker/tmp/fm-labwork.emsXui/treehouse/.treehouse/vernant-0b6da8/2/vernant (git worktree remove --force)
+=== predecessor copy is gone
+$ bin/fm-spawn.sh labsucc3 /Users/charlesabrooker/tmp/fm-lab.C9IU4w/projects/vernant --mode local-only --yolo off --owned-path README.md --harness 'sleep 86400' --successor-of labpred2
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  3 task(s) in flight, but no watcher has a fresh beacon (last beat: 534s ago, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6HN2SACGPQ0JDT575QV98KC/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+error: --successor-of labpred2 copy /Users/charlesabrooker/tmp/fm-labwork.emsXui/treehouse/.treehouse/vernant-0b6da8/2/vernant is gone; a successor record needs the live predecessor
+exit=1
+state/data: unchanged
+tmux windows: unchanged
+treehouse pool: unchanged
+markers:        1

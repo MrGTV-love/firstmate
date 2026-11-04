@@ -1,0 +1,27 @@
+1:# Backlog
+3:## In flight
+9:## Queued
+11:- [ ] labsucc3 - lab labsucc3 (repo: vernant) (kind: ship) (since 2026-11-03)
+12:## Done
+restored $CODEX_HOOK_STATE_DIR
+fatal: cannot change to 'checkout': No such file or directory
+=== retry while predecessor is off its branch
+$ bin/fm-spawn.sh labsucc3 --relaunch 
+WARNING: watcher still down (same stale episode; last beat: 876s ago, grace 300s) - full banner already printed this episode.
+error: configured backend 'tmux' is not herdr; refusing to replace task labsucc3's proven-gone tmux endpoint
+exit=1
+state/data: unchanged
+tmux windows: unchanged
+treehouse pool: unchanged
+state/labsucc3.meta byte-identical: the declaration is kept
+fatal: cannot change to 'checkout': No such file or directory
+=== retry with a live predecessor
+$ bin/fm-spawn.sh labsucc3 --relaunch 
+WARNING: watcher still down (same stale episode; last beat: 894s ago, grace 300s) - full banner already printed this episode.
+error: configured backend 'tmux' is not herdr; refusing to replace task labsucc3's proven-gone tmux endpoint
+exit=1
+--- state/labsucc3.meta (selected lines)
+recovery=slot-provision-refused
+branch=fm/labsucc3
+successor_of=labpred1
+--- new marker files:

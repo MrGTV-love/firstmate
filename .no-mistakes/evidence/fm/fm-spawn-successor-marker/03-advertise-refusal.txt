@@ -1,0 +1,12 @@
+primary checkout HEAD: 1cf0e36bb docs(product-definition): full rule-7 START-HERE steward refresh (#3601)
+origin/main: 06a185533
+=== primary checkout lacks --supersedes (pre-verb Vernant)
+$ bin/fm-spawn.sh labsuccA /Users/charlesabrooker/tmp/fm-lab.C9IU4w/projects/vernant --mode local-only --yolo off --owned-path README.md --harness 'sleep 86400' --successor-of labpred1
+WARNING: watcher still down (same stale episode; last beat: 94s ago, grace 300s) - full banner already printed this episode.
+error: --successor-of needs the project's primary checkout /Users/charlesabrooker/tmp/fm-lab.C9IU4w/projects/vernant to advertise --supersedes on scripts/git-stability/provision_existing_slot.py; update that checkout, since the successor record needs the Vernant verb
+exit=1
+state/data: unchanged
+tmux windows: unchanged
+treehouse pool: unchanged
+no state/labsuccA.* files
+markers:        0

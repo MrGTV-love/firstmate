@@ -1,0 +1,29 @@
+{
+  "already_landed_via_squash": false,
+  "carry_command": "git -C /Users/charlesabrooker/tmp/fm-labwork.emsXui/treehouse/.treehouse/vernant-0b6da8/7/vernant cherry-pick --allow-empty --empty=keep 06a1855330d36d23d236f4ee2a62710b04ed4bae..3f1c0151d782414d426b713e284a5ace9b5fdc4c",
+  "carry_note": null,
+  "carry_status": "resolved",
+  "manual_carry_reason": null,
+  "manual_carry_required": false,
+  "net_delta_empty": false,
+  "owner_id": "labsucc4",
+  "predecessor_already_landed_count": 0,
+  "predecessor_branch": "fm/labpred1",
+  "predecessor_dirty": false,
+  "predecessor_dirty_paths": [],
+  "predecessor_dirty_total": 0,
+  "predecessor_head": "3f1c0151d782414d426b713e284a5ace9b5fdc4c",
+  "predecessor_merge_commit_count": 0,
+  "predecessor_unmerged_commits": [
+    {
+      "sha": "3f1c0151d782414d426b713e284a5ace9b5fdc4c",
+      "subject": "pred1: carried work"
+    }
+  ],
+  "predecessor_unmerged_count": 1,
+  "recorded_at_iso": "2026-11-03T22:54:33Z",
+  "schema_version": "1.1.0",
+  "superseded_by_branch": "fm/labsucc4",
+  "superseded_by_worktree_path": "/Users/charlesabrooker/tmp/fm-labwork.emsXui/treehouse/.treehouse/vernant-0b6da8/7/vernant",
+  "superseded_worktree_path": "/Users/charlesabrooker/tmp/fm-labwork.emsXui/treehouse/.treehouse/vernant-0b6da8/1/vernant"
+}

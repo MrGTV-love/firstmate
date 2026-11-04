@@ -1,0 +1,20 @@
+--- backlog line for labsucc3:
+11:- [ ] labsucc3 - lab labsucc3 (repo: vernant) (kind: ship) (since 2026-11-03)
+killed window fm-labsucc3 (simulated reboot / closed window)
+=== fresh spawn with NO flag over a kept successor declaration
+$ bin/fm-spawn.sh labsucc3 /Users/charlesabrooker/tmp/fm-lab.C9IU4w/projects/vernant --mode local-only --yolo off --owned-path README.md --harness 'sleep 86400' 
+WARNING: watcher still down (same stale episode; last beat: 830s ago, grace 300s) - full banner already printed this episode.
+error: labsucc3 keeps an unfulfilled successor declaration of labpred1; retry it with fm-spawn.sh labsucc3 --relaunch
+exit=1
+state/data: unchanged
+tmux windows: unchanged
+treehouse pool: unchanged
+=== fresh spawn naming a DIFFERENT predecessor over a kept declaration
+$ bin/fm-spawn.sh labsucc3 /Users/charlesabrooker/tmp/fm-lab.C9IU4w/projects/vernant --mode local-only --yolo off --owned-path README.md --harness 'sleep 86400' --successor-of labsucc1
+WARNING: watcher still down (same stale episode; last beat: 840s ago, grace 300s) - full banner already printed this episode.
+error: labsucc3 keeps an unfulfilled successor declaration of labpred1; retry it with fm-spawn.sh labsucc3 --relaunch
+exit=1
+state/data: unchanged
+tmux windows: unchanged
+treehouse pool: unchanged
+state/labsucc3.meta byte-identical to the refusal record

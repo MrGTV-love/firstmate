@@ -1,0 +1,49 @@
+labsucc4 agent (sleep) was stopped; the window and copy remain
+labpred1 copy detached: the predecessor is no longer a live successor source
+=== later relaunch of the ADMITTED successor labsucc4
+$ bin/fm-spawn.sh labsucc4 --relaunch --harness sleep 86400
+WARNING: watcher still down (same stale episode; last beat: 1976s ago, grace 300s) - full banner already printed this episode.
+error: slot provisioner refused task labsucc4 (exit 2); no agent or ship transition admitted; report: /Users/charlesabrooker/tmp/fm-lab.C9IU4w/data/labsucc4/slot-provision-spawn.54931.json
+error: assigned copy /Users/charlesabrooker/tmp/fm-labwork.emsXui/treehouse/.treehouse/vernant-0b6da8/7/vernant and endpoint primary:fm-labsucc4 retained; no worker admitted
+exit=1
+--- state/labsucc4.meta:
+bash: child setpgid (89341 to 89341): Operation not permitted
+slot_manifest=/Users/charlesabrooker/tmp/fm-labwork.emsXui/lifecycle/8c0c35917206c073.json
+successor_of=labpred1
+labpred1 marker unchanged: the relaunch sent no --supersedes
+labpred1 copy back on fm/labpred1
+
+=== R-13 for labsucc4 (/Users/charlesabrooker/tmp/fm-labwork.emsXui/treehouse/.treehouse/vernant-0b6da8/7/vernant)
+carried: 3f1c0151d pred1: carried work
+$ printf 'refs/heads/fm/labsucc4 3f1c0151d782414d426b713e284a5ace9b5fdc4c refs/heads/fm/labsucc4 0000…' | python3 scripts/hooks/pre_push_base_ref_staleness.py origin <lab origin>
+R-13: main is not proven against the remote (origin does not resolve to the canonical github.com/MrGTV-love/vernant URL (git ls-remote --get-url origin)); judging against the local origin/main 06a1855330d3 with the strict base-equality check.
+**R-13 BLOCK** — branch `refs/heads/fm/labsucc4` (local_sha 3f1c0151) carries commits that are not its own.
+**Why this fails (R-13 base-ref contamination gate):**
+  1 commit(s) in this branch's ancestry are not on the local `origin/main`
+  `06a18553` and are not this task's own: an unrecorded ref reaches
+  them too (for example `refs/heads/fm/labsucc0`). GitHub diffs a PR from its merge base with main,
+  so these commits would show in the PR as if they were YOUR work. This is
+  the PR #61 (2026-05-03) contamination pattern (a branch cut from a stale
+  LOCAL main). RCA: `docs/reviews/pr-61-contamination-rca-2026-05-03.md`
+
+  Foreign commits (newest first):
+    3f1c0151d pred1: carried work
+
+**How to proceed:**
+  Move only your own commits onto current `origin/main`:
+    git fetch origin
+    git rebase --onto origin/main 3f1c0151d782 fm/labsucc4
+  (When your commits are not all on top of the foreign ones, cut a fresh
+   branch from `origin/main` and cherry-pick only your own commits.)
+  If these commits ARE yours and a second ref of yours (a backup branch)
+  is what reaches them, that ref is why they read as foreign.
+
+  Single-session escape (use sparingly): set
+  `CLAUDE_ALLOW_STALE_BASE=1` in your environment for this push.
+
+  Preservation-only push (no PR intended): push a non-branch ref
+  instead — e.g. `git push origin <sha>:refs/preserve/<name>` — which
+  this gate does not block, because a non-branch ref cannot become a
+  PR and so cannot reproduce the contamination pattern.
+
+R-13 exit=1 (blocks)

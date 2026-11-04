@@ -1,0 +1,15 @@
+labsucc0 (spawned with NO --successor-of) agent stopped; window and copy remain
+=== later relaunch of the admitted NON-successor labsucc0
+$ bin/fm-spawn.sh labsucc0 --relaunch --harness sleep 86400
+WARNING: watcher still down (same stale episode; last beat: 2027s ago, grace 300s) - full banner already printed this episode.
+{
+  "blocked_reasons": [
+    "manifest_exists"
+  ],
+  "manifest_path": "/Users/charlesabrooker/tmp/fm-labwork.emsXui/lifecycle/a6e27e0567c13230.json",
+  "reason": "manifest_exists",
+  "state": "BLOCKED"
+}
+error: slot provisioner refused task labsucc0 (exit 2); no agent or ship transition admitted; report: /Users/charlesabrooker/tmp/fm-lab.C9IU4w/data/labsucc0/slot-provision-spawn.94065.json
+error: assigned copy /Users/charlesabrooker/tmp/fm-labwork.emsXui/treehouse/.treehouse/vernant-0b6da8/5/vernant and endpoint primary:fm-labsucc0 retained; no worker admitted
+exit=1

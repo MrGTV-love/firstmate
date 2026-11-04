@@ -1,0 +1,150 @@
+=== unsafe predecessor id
+$ bin/fm-spawn.sh labsucc2 /Users/charlesabrooker/tmp/fm-lab.C9IU4w/projects/vernant --mode local-only --yolo off --owned-path README.md --harness 'sleep 86400' --successor-of ../escape
+WARNING: watcher still down (same stale episode; last beat: 199s ago, grace 300s) - full banner already printed this episode.
+error: --successor-of needs a safe predecessor task id
+exit=1
+state/data: unchanged
+tmux windows: unchanged
+treehouse pool: unchanged
+=== predecessor is the task itself
+$ bin/fm-spawn.sh labsucc2 /Users/charlesabrooker/tmp/fm-lab.C9IU4w/projects/vernant --mode local-only --yolo off --owned-path README.md --harness 'sleep 86400' --successor-of labsucc2
+WARNING: watcher still down (same stale episode; last beat: 205s ago, grace 300s) - full banner already printed this episode.
+error: --successor-of labsucc2 names the task itself
+exit=1
+state/data: unchanged
+tmux windows: unchanged
+treehouse pool: unchanged
+=== predecessor has no task record
+$ bin/fm-spawn.sh labsucc2 /Users/charlesabrooker/tmp/fm-lab.C9IU4w/projects/vernant --mode local-only --yolo off --owned-path README.md --harness 'sleep 86400' --successor-of ghost
+WARNING: watcher still down (same stale episode; last beat: 213s ago, grace 300s) - full banner already printed this episode.
+error: --successor-of ghost has no task record in /Users/charlesabrooker/tmp/fm-lab.C9IU4w/state
+exit=1
+state/data: unchanged
+tmux windows: unchanged
+treehouse pool: unchanged
+=== predecessor copy on another branch
+$ bin/fm-spawn.sh labsucc2 /Users/charlesabrooker/tmp/fm-lab.C9IU4w/projects/vernant --mode local-only --yolo off --owned-path README.md --harness 'sleep 86400' --successor-of labpred1
+WARNING: watcher still down (same stale episode; last beat: 220s ago, grace 300s) - full banner already printed this episode.
+error: --successor-of labpred1 copy /Users/charlesabrooker/tmp/fm-labwork.emsXui/treehouse/.treehouse/vernant-0b6da8/1/vernant is on fm/labpred1-elsewhere, not its recorded branch fm/labpred1
+exit=1
+state/data: unchanged
+tmux windows: unchanged
+treehouse pool: unchanged
+=== predecessor copy has detached HEAD
+$ bin/fm-spawn.sh labsucc2 /Users/charlesabrooker/tmp/fm-lab.C9IU4w/projects/vernant --mode local-only --yolo off --owned-path README.md --harness 'sleep 86400' --successor-of labpred1
+WARNING: watcher still down (same stale episode; last beat: 225s ago, grace 300s) - full banner already printed this episode.
+error: --successor-of labpred1 copy /Users/charlesabrooker/tmp/fm-labwork.emsXui/treehouse/.treehouse/vernant-0b6da8/1/vernant has a detached HEAD, not its recorded branch fm/labpred1
+exit=1
+state/data: unchanged
+tmux windows: unchanged
+treehouse pool: unchanged
+restored labpred1 copy to fm/labpred1
+fatal: cannot change to 'worktree': No such file or directory
+=== predecessor copy is gone
+$ bin/fm-spawn.sh labsucc2 /Users/charlesabrooker/tmp/fm-lab.C9IU4w/projects/vernant --mode local-only --yolo off --owned-path README.md --harness 'sleep 86400' --successor-of labpred2
+WARNING: watcher still down (same stale episode; last beat: 235s ago, grace 300s) - full banner already printed this episode.
+notice: labsucc2 ships mode=local-only while the standing posture for vernant is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 62s; no path/output progress for 53s; last path '/Users/charlesabrooker/tmp/fm-lab.C9IU4w/projects/vernant' (it is the project checkout itself)
+local-only source: local=main@06a1855330d36d23d236f4ee2a62710b04ed4bae origin=main@06a1855330d36d23d236f4ee2a62710b04ed4bae selected=origin/main@06a1855330d36d23d236f4ee2a62710b04ed4bae
+{
+  "base_sha": "06a1855330d36d23d236f4ee2a62710b04ed4bae",
+  "branch": "fm/labsucc2",
+  "manifest_path": "/Users/charlesabrooker/tmp/fm-labwork.emsXui/lifecycle/7e39639a1e415fbd.json",
+  "owned_paths": [
+    "README.md"
+  ],
+  "owner_id": "labsucc2",
+  "state": "PASS",
+  "worktree_path": "/Users/charlesabrooker/tmp/fm-labwork.emsXui/treehouse/.treehouse/vernant-0b6da8/3/vernant"
+}
+skill selection for labsucc2: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=sleep write_confinement=unconfined-macos-sleep
+spawned labsucc2 harness=sleep kind=ship mode=local-only yolo=off window=primary:fm-labsucc2 worktree=/Users/charlesabrooker/tmp/fm-labwork.emsXui/treehouse/.treehouse/vernant-0b6da8/3/vernant
+exit=0
+find: state/.home-summary-refresh.lock.owner.SDgfcL: No such file or directory
+state/data: CHANGED
+16a17,18
+> data/labsucc2/launch-brief.md
+> data/labsucc2/slot-provision-spawn.18642.json
+20a23,30
+> state/.home-summary-refresh.lock
+> state/.home-summary-refresh.lock.owner.SDgfcL
+> state/.home-summary-refresh.lock.owner.SDgfcL/monitor-record
+> state/.home-summary-refresh.lock.owner.SDgfcL/pid
+> state/.home-summary-refresh.lock.steal
+> state/.home-summary-refresh.lock.steal.owner.2Ackb7
+> state/.home-summary-refresh.lock.steal.owner.2Ackb7/monitor-record
+> state/.home-summary-refresh.lock.steal.owner.2Ackb7/pid
+21a32,33
+> state/.lock-monitor.hold.RbVUgM
+> state/.lock-monitor.hold.qillzh
+61a74,91
+> state/labsucc2.git-hooks
+> state/labsucc2.git-hooks/applypatch-msg
+> state/labsucc2.git-hooks/commit-msg
+> state/labsucc2.git-hooks/post-applypatch
+> state/labsucc2.git-hooks/post-checkout
+> state/labsucc2.git-hooks/post-commit
+> state/labsucc2.git-hooks/post-merge
+> state/labsucc2.git-hooks/post-rewrite
+> state/labsucc2.git-hooks/pre-applypatch
+> state/labsucc2.git-hooks/pre-auto-gc
+> state/labsucc2.git-hooks/pre-commit
+> state/labsucc2.git-hooks/pre-merge-commit
+> state/labsucc2.git-hooks/pre-push
+> state/labsucc2.git-hooks/pre-rebase
+> state/labsucc2.git-hooks/prepare-commit-msg
+> state/labsucc2.git-hooks/sendemail-validate
+> state/labsucc2.launch-models
+> state/labsucc2.meta
+64,65c94,106
+< 1171851591 16227 state/memory-readings.jsonl
+< 1281320942 3876 state/home-summary.json
+---
+> 1134001071 763 state/labsucc2.git-hooks/applypatch-msg
+> 1134001071 763 state/labsucc2.git-hooks/post-applypatch
+> 1134001071 763 state/labsucc2.git-hooks/post-checkout
+> 1134001071 763 state/labsucc2.git-hooks/post-commit
+> 1134001071 763 state/labsucc2.git-hooks/post-merge
+> 1134001071 763 state/labsucc2.git-hooks/post-rewrite
+> 1134001071 763 state/labsucc2.git-hooks/pre-applypatch
+> 1134001071 763 state/labsucc2.git-hooks/pre-auto-gc
+> 1134001071 763 state/labsucc2.git-hooks/pre-merge-commit
+> 1134001071 763 state/labsucc2.git-hooks/pre-rebase
+> 1134001071 763 state/labsucc2.git-hooks/prepare-commit-msg
+> 1134001071 763 state/labsucc2.git-hooks/sendemail-validate
+> 1371407716 3768 state/home-summary.json
+66a108
+> 1572891227 1027 state/labsucc2.git-hooks/pre-commit
+68a111,112
+> 1901951661 23861 data/labsucc2/launch-brief.md
+> 2048832273 899 state/labsucc2.git-hooks/commit-msg
+69a114,115
+> 2179802539 73 state/.home-summary-refresh.lock.steal.owner.2Ackb7/monitor-record
+> 2199315430 33 state/labsucc2.launch-models
+72a119
+> 2316435514 234 state/.treehouse-project-d5a2dbe94a1baeb0f3a6c6a64ddefc13f837c734.lock.holds
+73a121
+> 2382179233 173 state/.lock-monitor.hold.RbVUgM
+78c126
+< 3120319369 155 state/.treehouse-project-d5a2dbe94a1baeb0f3a6c6a64ddefc13f837c734.lock.holds
+---
+> 3172656378 24409 state/memory-readings.jsonl
+79a128
+> 3240315123 763 state/labsucc2.meta
+95c144,145
+< 3588856892 510 data/backlog.md
+---
+> 366525823 6 state/.home-summary-refresh.lock.steal.owner.2Ackb7/pid
+> 3735475247 1215 state/labsucc2.git-hooks/pre-push
+98c148,149
+< 4192802898 2 state/.treehouse-project-d5a2dbe94a1baeb0f3a6c6a64ddefc13f837c734.lock.queue/sequence
+---
+> 3959627249 510 data/backlog.md
+> 4164007125 2 state/.treehouse-project-d5a2dbe94a1baeb0f3a6c6a64ddefc13f837c734.lock.queue/sequence
+111a163
+> 4263814132 385 data/labsucc2/slot-provision-spawn.18642.json
+tmux windows: CHANGED
+treehouse pool: CHANGED
+
+markers:        1
