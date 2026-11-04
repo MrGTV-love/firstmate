@@ -1,0 +1,49 @@
+# scenario: work-3528-prhead
+# lab home: /Users/charlesabrooker/tmp/fm-lab.4nK305
+# project: /Users/charlesabrooker/tmp/fm-live-train.SeZNpF/vernant-origin-clone (disposable blob:none clone of https://github.com/MrGTV-love/vernant, origin main 461f72451f2d298c3d74b0d45976c82c1376422c)
+# recorded pr: https://github.com/MrGTV-love/vernant/pull/3528
+# copy: /Users/charlesabrooker/tmp/fm-live-train.SeZNpF/copies/train-live-work-3528-prhead at 0b2e8a9f116efe9b9bbfc22b4df108e5a7be88e3, status lines: 0
+# command: FM_HOME=/Users/charlesabrooker/tmp/fm-lab.4nK305 PATH=<stubs: treehouse tmux docker no-mistakes>:$PATH  bin/fm-teardown.sh train-live-work-3528-prhead
+----- stdout+stderr -----
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.4nK305
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 2s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6K36FZCVEQ6HZ97VFD9BZ03/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+landed by a merged train: merged train PR https://github.com/MrGTV-love/vernant/pull/3599 lists https://github.com/MrGTV-love/vernant/pull/3528 at 0b2e8a9f116efe9b9bbfc22b4df108e5a7be88e3; https://github.com/MrGTV-love/vernant/pull/3528 itself is closed, not merged
+/Users/charlesabrooker/tmp/fm-live-train.SeZNpF/vernant-origin-clone: STUCK: on branch main with uncommitted changes, 0 commits behind origin/main - needs attention
+teardown train-live-work-3528-prhead complete (window firstmate:fm-train-live-work-3528-prhead, worktree /Users/charlesabrooker/tmp/fm-live-train.SeZNpF/copies/train-live-work-3528-prhead)
+Backlog: train-live-work-3528-prhead is closed in /Users/charlesabrooker/tmp/fm-lab.4nK305/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+----- end -----
+exit=0
+task record present after: no
+copy present after: yes
+treehouse calls: 1 return --force /Users/charlesabrooker/tmp/fm-live-train.SeZNpF/copies/train-live-work-3528-prhead;
+----- backlog row after -----
+task:
+  id: train-live-work-3528-prhead
+  title: "live train teardown check https://github.com/MrGTV-love/vernant/pull/3599"
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: "-"
+  closed: 2026-11-04
+  deps: none
+  links: "pr:https://github.com/MrGTV-love/vernant/pull/3599"
+  body: "closed by merge train: https://github.com/MrGTV-love/vernant/pull/3528"
+----- backlog.md Done section -----
+## Done
+- [x] train-live-work-3528-prhead - live train teardown check https://github.com/MrGTV-love/vernant/pull/3599 (kind: ship) (merged 2026-11-04)
+  closed by merge train: https://github.com/MrGTV-love/vernant/pull/3528
+# lab teardown: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6K36FZCVEQ6HZ97VFD9BZ03/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.4nK305 && rm -rf /Users/charlesabrooker/tmp/fm-lab.4nK305
+# lab removed: yes

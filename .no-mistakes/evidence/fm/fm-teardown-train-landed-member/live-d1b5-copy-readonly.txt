@@ -1,0 +1,5 @@
+real d1 B5 copy (read-only git reads):
+path: /Users/charlesabrooker/.treehouse/vernant-2ee7ec/212/vernant/.claude/worktrees/fm-vernant-d1-b5-organization-context-build-r4-l3
+HEAD: 5714eb0f19016970a2750666f28619d6d71ab5a4
+branch: fm/vernant-d1-b5-organization-context-build-r4-l3
+status --porcelain lines: 0

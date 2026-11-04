@@ -1,41 +1,26 @@
-# Test-phase evidence: fm-teardown-train-landed-member
+# Live validation: teardown accepts a ship landed by a merged merge-train PR
 
-Target commit 89a6d2ab2be936c996345118d3df00f809ba74a3. Base 012b72f34a60f615d8898b0dd508c4fc115bfa08.
-Every run drives the real `bin/fm-teardown.sh`. The home, state, data and pool are throwaway.
-No real copy, real home, or real backlog was torn down or written.
+Target commit: 1259aee14bdde8b9f4950da0f92a396b15108449 (base 9c5874baa019f4f14450901985fc46476b0dc64b).
 
-Real forge runs (read-only):
-- `real-forge-transcript.txt` (driver `drive-real-forge.sh`): record-only teardown, real `gh`
-  behind a filter that passes only `gh pr view` and `gh pr list`. Project = temp blobless Vernant clone.
-  - R1 PR 3528 (CLOSED) is accepted via merged train PR 3599. Backlog row: pr link = 3599, body
-    "closed by merge train: .../pull/3528".
-  - R2 PR 3567 (CLOSED, listed by no PR) is refused.
-  - R3 PR 3444 (CLOSED; merged PR 3451 names its URL and sha in prose, not "<url> at <sha>") is refused.
-- `real-d1b5-replica-transcript.txt` (driver `drive-real-d1b5-replica.sh`): a fresh lab worktree at the
-  real d1 B5 r4 copy HEAD 5714eb0f, task PR 3528, real forge reads.
-  - W1 no run record: refused, naming 0bb1ac955 and "not proven present in its head eab72358aa89".
-  - W2 a lab run record (input 5714eb0f, pushed 0b2e8a9f): accepted, naming 3599.
-  - Limit: the real d1 B5 r4 copy is accepted only if its real no-mistakes run record has these
-    values. The real state database was not read.
+How each live run works (live-driver-drive.sh):
+- The REAL bin/fm-teardown.sh runs in a fresh marked lab home (bin/fm-lab-home.sh env), torn down after each run.
+- The task's project is a disposable blob:none clone of https://github.com/MrGTV-love/vernant.
+- The REAL gh reads the REAL forge (read-only: pr view, pr list --search).
+- Only treehouse, tmux, docker and no-mistakes are stubs (the hard gates forbid the real ones). treehouse logs its calls.
+- No real copy was torn down. The real d1 B5 copy was only read with git (rev-parse, status, and a fetch FROM it into the disposable clone).
 
-Sandbox runs (temp git world, fake `gh`, logging `treehouse`):
-- `teardown-train-transcript.txt` (driver `drive.sh`): scenarios A to H with full stderr.
-  G2 (pipeline-input copy with run record on a verified train) is now accepted; it was refused in round 1.
-- `teardown-train-cases.txt`: 24 train cases in `tests/fm-teardown.test.sh`.
-- `own-pr-route-controls.txt`: own-PR, pipeline-input and content-proof controls (unchanged routes).
-- `pool-train-case.txt`, `backlog-close-shape-case.txt`, `captain-hold-retained-cases.txt`.
+| Run | Expected | Result |
+|---|---|---|
+| live-record-3528.txt | copy gone, PR 3528 CLOSED, train 3599 MERGED: accept; backlog row pr=3599, note "closed by merge train: .../3528" | exit 0, matches |
+| live-work-3528-prhead.txt | clean copy at PR head 0b2e8a9f: accept by train route | exit 0, train line printed, treehouse return called once |
+| live-work-d1b5-real-copy-head.txt | real d1 B5 copy head 5714eb0f: refuse (recorded ruling Main 3011 F1) | exit 1, names 0bb1ac955 not carried by train 3599 |
+| live-record-3567-unlisted.txt | real CLOSED PR listed by no PR: refuse | exit 1, "no PR found by the forge lists it at a 40-hex sha" |
+| live-work-3528-search-fails.txt | train search fails (injected, live-fault-search-gh.sh): unknown, never "not landed" | exit 1, "not known", "unknown, retry", guard source_ok=false |
+| live-work-3528-extra-unlanded-commit.txt | PR head + one unlanded commit: refuse naming it | exit 1, names 71a6f79c7 |
+| live-work-3528-dirty-copy.txt | dirty copy: existing dirty refusal first | exit 1, dirty refusal, no train read |
+| live-record-3528-captain-held.txt | captain-held row: teardown keeps it held; answer closes with train PR + member note | done row links 3599 and says "closed by merge train: .../3528" |
 
-`prior-round-0e44fe40/` holds round 1 evidence at the older head. It is kept for history only.
-
-Captain-held train close (sandbox, real `bin/fm-captain-hold.sh` and `bin/fm-teardown.sh`):
-- `captain-hold-train-marker.txt` (driver `drive-captain-hold-train-marker.sh`): a held ship's pending
-  retain record is set to the merge-train shape (`--pr .../pull/9 --note "closed by merge train: .../pull/7"`).
-  The captain answer succeeds. The row records pull/9 as its PR. pull/7 is never recorded as the PR.
-  The "closed by merge train" note does not reach the closed row (the answer applies only `--pr`).
-
-Reading notes:
-- R1 to R3: "treehouse.log: No such file" means treehouse was never called. That is expected for a
-  record-only teardown (no copy to return).
-- R1: the "STUCK ... uncommitted changes" line comes from the no-checkout lab clone used as the project.
-- W2: "copy present after: yes" is because treehouse is a logging stub; the stub got `return --force`.
-- Round 1 files were moved to `prior-round-0e44fe40/`. Nothing else was moved.
+Raw forge reads: live-forge-search-3528.json (search returns only 3599 MERGED into main), live-pr3599-body.md, live-pr3567.json.
+Real data fact: PR 3528 head 0b2e8a9f is NOT an ancestor of train head eab72358, so the flat-replay route (kept by Main 2863) is what accepts it.
+Fixture noise: "STUCK: on branch main with uncommitted changes" refers to the disposable --no-checkout clone, not the product.
+Suites (fake gh, not live): suite-*.txt and suite-summary.txt.

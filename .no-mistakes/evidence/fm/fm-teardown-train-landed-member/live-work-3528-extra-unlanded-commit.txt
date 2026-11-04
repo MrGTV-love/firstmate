@@ -1,0 +1,56 @@
+# scenario: work-3528-extra-unlanded-commit
+# lab home: /Users/charlesabrooker/tmp/fm-lab.21ndVW
+# project: /Users/charlesabrooker/tmp/fm-live-train.SeZNpF/vernant-origin-clone (disposable blob:none clone of https://github.com/MrGTV-love/vernant, origin main 461f72451f2d298c3d74b0d45976c82c1376422c)
+# recorded pr: https://github.com/MrGTV-love/vernant/pull/3528
+# copy: /Users/charlesabrooker/tmp/fm-live-train.SeZNpF/copies/train-live-work-3528-extra-unlanded-commit at 71a6f79c7d18a2a70d6c2102af132d75f10b23c7, status lines: 0
+# command: FM_HOME=/Users/charlesabrooker/tmp/fm-lab.21ndVW PATH=<stubs: treehouse tmux docker no-mistakes>:$PATH  bin/fm-teardown.sh train-live-work-3528-extra-unlanded-commit
+----- stdout+stderr -----
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.21ndVW
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 3s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6K36FZCVEQ6HZ97VFD9BZ03/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: bundle preservation unavailable: missing preservation record (regular nonsymlink file required): /Users/charlesabrooker/tmp/fm-lab.21ndVW/data/train-live-work-3528-extra-unlanded-commit/preservation-bundles.tsv.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in /Users/charlesabrooker/tmp/fm-lab.21ndVW/data/train-live-work-3528-extra-unlanded-commit/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+71a6f79c7 unlanded follow-up (live adversarial)
+commits whose change is not proven present in the merged PR head:
+71a6f79c7 unlanded follow-up (live adversarial)
+no merge-train proof:
+train PR https://github.com/MrGTV-love/vernant/pull/3599 is a verified train for https://github.com/MrGTV-love/vernant/pull/3528, but this copy's work is not proven present in its head eab72358aa89
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+----- end -----
+exit=1
+task record present after: yes
+copy present after: yes
+treehouse calls: 0 
+guard events (teardown-unlanded):
+{"guard":"teardown-unlanded","rule":"landed-work","decision":"deny","source_ok":true}
+fault injection bin: none
+----- backlog row after -----
+task:
+  id: train-live-work-3528-extra-unlanded-commit
+  title: live train teardown check
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: 2026-11-04
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+----- backlog.md Done section -----
+## Done
+# lab teardown: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6K36FZCVEQ6HZ97VFD9BZ03/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.21ndVW && rm -rf /Users/charlesabrooker/tmp/fm-lab.21ndVW
+# lab removed: yes

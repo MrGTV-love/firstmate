@@ -1,0 +1,50 @@
+# scenario: work-3528-search-fails
+# lab home: /Users/charlesabrooker/tmp/fm-lab.L1DQqa
+# project: /Users/charlesabrooker/tmp/fm-live-train.SeZNpF/vernant-origin-clone (disposable blob:none clone of https://github.com/MrGTV-love/vernant, origin main 461f72451f2d298c3d74b0d45976c82c1376422c)
+# recorded pr: https://github.com/MrGTV-love/vernant/pull/3528
+# copy: /Users/charlesabrooker/tmp/fm-live-train.SeZNpF/copies/train-live-work-3528-search-fails at 0b2e8a9f116efe9b9bbfc22b4df108e5a7be88e3, status lines: 0
+# command: FM_HOME=/Users/charlesabrooker/tmp/fm-lab.L1DQqa PATH=<stubs: treehouse tmux docker no-mistakes>:$PATH  bin/fm-teardown.sh train-live-work-3528-search-fails
+----- stdout+stderr -----
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.L1DQqa
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 3s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6K36FZCVEQ6HZ97VFD9BZ03/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: bundle preservation unavailable: copy has no unlanded tips of its own; existing delivery proof is still required.
+REFUSED: not known whether the ship deliverable is landed; a pushed branch alone is not completion.
+unknown, retry: the merge-train proof could not be read (the forge search for PRs listing https://github.com/MrGTV-love/vernant/pull/3528 failed); this is not a finding that the work is unlanded.
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+----- end -----
+exit=1
+task record present after: yes
+copy present after: yes
+treehouse calls: 0 
+guard events (teardown-unlanded):
+{"guard":"teardown-unlanded","rule":"landed-work","decision":"deny","source_ok":false}
+fault injection bin: /Users/charlesabrooker/tmp/fm-live-train.SeZNpF/fault-search
+----- backlog row after -----
+task:
+  id: train-live-work-3528-search-fails
+  title: live train teardown check
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: 2026-11-04
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+----- backlog.md Done section -----
+## Done
+# lab teardown: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6K36FZCVEQ6HZ97VFD9BZ03/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.L1DQqa && rm -rf /Users/charlesabrooker/tmp/fm-lab.L1DQqa
+# lab removed: yes

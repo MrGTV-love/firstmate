@@ -1,0 +1,57 @@
+# scenario: work-d1b5-real-copy-head
+# lab home: /Users/charlesabrooker/tmp/fm-lab.kKvlM2
+# project: /Users/charlesabrooker/tmp/fm-live-train.SeZNpF/vernant-origin-clone (disposable blob:none clone of https://github.com/MrGTV-love/vernant, origin main 461f72451f2d298c3d74b0d45976c82c1376422c)
+# recorded pr: https://github.com/MrGTV-love/vernant/pull/3528
+# copy: /Users/charlesabrooker/tmp/fm-live-train.SeZNpF/copies/train-live-work-d1b5-real-copy-head at 5714eb0f19016970a2750666f28619d6d71ab5a4, status lines: 0
+# command: FM_HOME=/Users/charlesabrooker/tmp/fm-lab.kKvlM2 PATH=<stubs: treehouse tmux docker no-mistakes>:$PATH  bin/fm-teardown.sh train-live-work-d1b5-real-copy-head
+----- stdout+stderr -----
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.kKvlM2
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 2s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6K36FZCVEQ6HZ97VFD9BZ03/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: bundle preservation unavailable: missing preservation record (regular nonsymlink file required): /Users/charlesabrooker/tmp/fm-lab.kKvlM2/data/train-live-work-d1b5-real-copy-head/preservation-bundles.tsv.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in /Users/charlesabrooker/tmp/fm-lab.kKvlM2/data/train-live-work-d1b5-real-copy-head/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+5714eb0f1 no-mistakes(ci): Cause (this PR's own code): commit 17b474b5a added vernant_engine/tests/unit/db/conftest.py::historical_database_url. That fixture gave each historical-replay module a copy of the database made with CREATE DATABASE <clone> TEMPLATE postgres. On the CI Supabase image, 2 other sessions always stay connected to `postgres`. Postgres refuses a template that has other sessions open, so all 14 modules that used the fixture failed at setup (68 errors, ObjectInUse, job 119616094550; the first module failed the same way). The copy approach cannot work on this lane. Original problem that 17b474b5a tried to fix (PR 3505, job 118584453309): unit/db ran before the B5 suite. Old-migration replays redefine public.soft_delete_session_with_review_snapshot without the B5 Case-snapshot delete. Because of that, test_persist_reopen_confirm_reuse_and_withdraw_preserve_old_receipts failed ('assert 1 == 0' at test_organization_context_persistence.py:296). That was the only failure: 569 passed. Invariant: the B5 persistence suite must run against the current migrated schema, and no historical replay may run before it in the same database. Sites that must hold it: (1) the CI pytest invocation in the job 'DB Integration (Live Postgres)', step 'Run live-DB integration tests'; (2) the 14 historical modules' live_database_url fixtures. Site 2 goes back to main's behavior. That behavior is safe once site 1 holds, because main's unit/db suite is green when it runs in sequence. Fix (removal-first): 1. Removed vernant_engine/tests/unit/db/conftest.py. Restored the 14 historical-replay modules to their base-commit content exactly (git diff against 4072273a8 for that directory is now empty). 2. In .github/workflows/ci.yml, the B5 persistence file now comes before vernant_engine/tests/unit/db/ in the 'Run live-DB integration tests' command. This makes it run on the freshly migrated database, before any replay. Added a comment that says why, and why per-module copies do not work there. No other CI value changed. The classname floors (including test_organization_context_persistence:13) are unchanged. Verification run locally (serial, nice -n 20, UV_NO_SYNC=1): - `pytest <persistence file> vernant_engine/tests/unit/db/ -m 'integration and not expensive' --collect-only -q`: exit 0. It collects 577 tests, the same 509+68 as CI. The 14 persistence tests come first and unit/db follows. - `actionlint .github/workflows/ci.yml`: exit 0. - `pytest -q vernant_engine/tests/unit/tools/test_account_erasure_release.py <persistence file>`: exit 0, 165 passed, 14 skipped. The 14 skipped are the persistence tests, which skip because there is no local disposable DB. - I checked that the persistence suite touches none of the tables that unit/db counts globally. Not verified locally: a full live Supabase run. I did not start a Supabase database container, because the user's own local 'vernant' Supabase stack is on this machine and I did not want to touch it. The next CI run of 'DB Integration (Live Postgres)' is the live proof
+04d80dfbb no-mistakes(document): Raise B5 persistence CI floor to 13
+488c997b5 no-mistakes(gate.review.push-checks-review): Extract save-disabled predicate to cut ProfileWorkspace complexity
+9aaae08a7 no-mistakes(review): Show withdrawn org legal name, sort listing, guard submit, refresh custody
+58d0b263d no-mistakes(review): Refuse saves on withdrawn orgs, hide their lines, fail listing visibly
+commits whose change is not proven present in the merged PR head:
+0bb1ac955 feat(organization-context): add the B5 per-organization profile with field provenance
+no merge-train proof:
+train PR https://github.com/MrGTV-love/vernant/pull/3599 is a verified train for https://github.com/MrGTV-love/vernant/pull/3528, but this copy's work is not proven present in its head eab72358aa89
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+----- end -----
+exit=1
+task record present after: yes
+copy present after: yes
+treehouse calls: 0 
+----- backlog row after -----
+task:
+  id: train-live-work-d1b5-real-copy-head
+  title: live train teardown check
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: 2026-11-04
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+----- backlog.md Done section -----
+## Done
+# lab teardown: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6K36FZCVEQ6HZ97VFD9BZ03/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.kKvlM2 && rm -rf /Users/charlesabrooker/tmp/fm-lab.kKvlM2
+# lab removed: yes
