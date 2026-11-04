@@ -483,7 +483,7 @@ fm_test_process_read() {  # <lstart|args|ppid|pgid> <pid>
   local field=$1 pid=$2 ps_bin=/bin/ps column value
   case "$pid" in '' | *[!0-9]*) return 1 ;; esac
   case "$field" in
-    args) column=command ;;
+    args) column='command' ;;
     lstart | ppid | pgid) column=$field ;;
     *) return 1 ;;
   esac
