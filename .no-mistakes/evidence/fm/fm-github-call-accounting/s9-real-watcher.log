@@ -1,0 +1,15 @@
+=== primary-like home (no marker)
+watcher started owner: run_id=ceb09543f4cf423d91ba981ed5f106aa pid=36850 state_dir=<home>/state/github-accounting exists=yes
+/Users/charlesabrooker/.no-mistakes/evidence/01M6HY67SMDHG0CZE4NE696MQG/s9-real-watcher.sh: line 31: /Users/charlesabrooker/tmp/fm-acct-s9.cnhkgL/primary/state/.wake-queue: No such file or directory
+after 3 more cycles: run_id unchanged=yes wake-queue bytes=0
+SIGKILL owner 36850
+next cycle recovered: new run_id=84e3882a0bee48d4bed2e48fb9f68746 differs=yes
+after watcher exit, owner state=running (detached owner outlives watcher)
+{"state": "stopped"}
+start-failed marker present: no
+=== failed real start in primary-like home: foreign db
+check: github-accounting owner failed to start: exit=1; owner stderr: <home>/state/github-accounting/owner.log; retries every 3600s without another wake
+queued wake rows: 1  marker present: yes
+=== marked lab home from bin/fm-lab-home.sh
+after 4 cycles: state/github-accounting exists=no
+done

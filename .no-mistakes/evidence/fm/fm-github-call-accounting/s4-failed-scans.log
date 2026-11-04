@@ -1,0 +1,14 @@
+[short-outage] ps made to fail at about 6 sim h
+[short-outage] ender caller killed at about 12 sim h, while scans fail
+[short-outage] ps restored at about 40 sim h
+[short-outage] owner exit=0 stderr bytes=       0
+[short-outage] survivor: process rows sim h [2.2, 41.5] process_end sim h []
+[short-outage] ender: process rows sim h [2.2] process_end sim h [41.5]
+[short-outage] sampling (sim h, scans, failures): [(0.1, 1, 0), (30.2, 45, 38), (48.6, 30, 19)]
+[long-outage] ps made to fail at about 6 sim h
+[long-outage] ender caller killed at about 12 sim h, while scans fail
+[long-outage] ps restored at about 64 sim h
+[long-outage] owner exit=0 stderr bytes=       0
+[long-outage] survivor: process rows sim h [65.3] process_end sim h []
+[long-outage] ender: process rows sim h [] process_end sim h [65.3]
+[long-outage] sampling (sim h, scans, failures): [(30.4, 46, 38), (60.6, 47, 47), (72.3, 17, 6)]

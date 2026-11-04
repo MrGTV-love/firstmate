@@ -1,0 +1,50 @@
+host=GTT-CB head=0b4dbf572c261a19405e490e618fc2481ee303e2 gh-axi=/opt/homebrew/bin/gh-axi
+--- start
+{"state": "running", "pid": 62256, "run_id": "c41884a0ffce4a0cbf42e2bbf8c0653c", "started_at": 1793751323.039446}
+exit=0
+fixture survivor gh pid=62890 ; fixture ender gh pid=62889
+--- end ender caller at +20s
+--- status
+{"state": "running", "pid": 62256, "run_id": "c41884a0ffce4a0cbf42e2bbf8c0653c", "started_at": 1793751323.039446}
+--- stop
+{"state": "stopped"}
+exit=0
+--- survivor still alive after stop (owner must not touch callers):
+alive=62890
+records exit=0
+--- independent REST read (one free call) for comparison
+used=236 reset=1793753897 limit=5000 remaining=4764
+--- private state modes
+700 <lab>/state/github-accounting
+600 <lab>/state/github-accounting/observations.sqlite
+600 <lab>/state/github-accounting/owner.lock
+600 <lab>/state/github-accounting/owner.log
+600 <lab>/state/github-accounting/start.lock
+600 <lab>/state/github-accounting/stop
+--- raw-byte secret check of db/log (0 matches expected)
+<lab>/state/github-accounting/observations.sqlite:0
+<lab>/state/github-accounting/owner.log:0
+--- kinds {'owner': 2, 'process': 14, 'process_end': 12, 'quota': 3, 'sampling': 4}
+--- quota rows
+{'status': 'observed', 'source': 'REST rate_limit resources.graphql', 'endpoint': 'rate_limit', 'host': 'github.com', 'exit_code': 0, 'request_started_at': 1793751323.0418491, 'graphql': {'limit': 5000, 'remaining': 4778, 'reset': 1793753897, 'used': 222}, 'reason': None}
+{'status': 'observed', 'source': 'REST rate_limit resources.graphql', 'endpoint': 'rate_limit', 'host': 'github.com', 'exit_code': 0, 'request_started_at': 1793751338.1364968, 'graphql': {'limit': 5000, 'remaining': 4774, 'reset': 1793753897, 'used': 226}, 'reason': None}
+{'status': 'observed', 'source': 'REST rate_limit resources.graphql', 'endpoint': 'rate_limit', 'host': 'github.com', 'exit_code': 0, 'request_started_at': 1793751353.246101, 'graphql': {'limit': 5000, 'remaining': 4766, 'reset': 1793753897, 'used': 234}, 'reason': None}
+quota gaps s: [15.095, 15.11]
+--- sampling rows
+{'scans': 1, 'failures': 0, 'max_gap_seconds': 0.0, 'process_interval': 0.2}
+{'scans': 49, 'failures': 0, 'max_gap_seconds': 0.34987304196693003, 'process_interval': 0.2}
+{'scans': 50, 'failures': 0, 'max_gap_seconds': 0.3473651669919491, 'process_interval': 0.2}
+{'scans': 28, 'failures': 0, 'max_gap_seconds': 0.3499135000165552, 'process_interval': 0.2}
+--- owner rows
+{'action': 'start', 'process_interval': 0.2, 'quota_interval': 15.0}
+{'action': 'stop', 'process_interval': None, 'quota_interval': None}
+--- fixture process rows
+{"pid": 62889, "start": "Tue Nov 3 18:15:23 2026", "argv": ["sh", "gh", "api", "graphql", "-f", "[REDACTED]"], "argv_source": "ps-command-line-projection", "ancestor_end": "root", "ancestors": [["sh", "wrapper-b.sh", "[REDACTED]", "[REDACTED]", "-f", "[REDACTED]"], ["sh", "wrapper-a.sh", "[REDACTED]", "[REDACTED]", "-f", "[REDACTED]"], ["launchd"]], "run_id_matches": true}
+{"pid": 62890, "start": "Tue Nov 3 18:15:23 2026", "argv": ["sh", "gh", "pr", "checks", "[REDACTED]", "[REDACTED]", "--body", "[REDACTED]", "[REDACTED]"], "argv_source": "ps-command-line-projection", "ancestor_end": "root", "ancestors": [["sh", "wrapper-b.sh", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "--body", "[REDACTED]", "[REDACTED]"], ["sh", "wrapper-a.sh", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "--body", "[REDACTED]", "[REDACTED]"], ["launchd"]], "run_id_matches": true}
+--- fixture process_end rows
+{'pid': 62889, 'start': 'Tue Nov 3 18:15:23 2026', 'seconds_after_kill': 0.346}
+survivor process_end rows (0 expected): 0  ender process_end rows (1 expected): 1
+--- other host gh/gh-axi rows: count=12 (of which owner's own quota child=4). Details are withheld from this log.
+owner-child example argv: ['node', 'gh-axi', 'api', 'rate_limit', '--jq', '[REDACTED]', '[REDACTED]', '[REDACTED]', '[REDACTED]', '[REDACTED]', '[REDACTED]', '--full'] parent: ['python3', 'fm-github-accounting.py', '[REDACTED]', '[REDACTED]', '[REDACTED]']
+all retained words of other rows free of '/' paths in argv values: True
+fixture dir path present in stored rows (0 expected): 0

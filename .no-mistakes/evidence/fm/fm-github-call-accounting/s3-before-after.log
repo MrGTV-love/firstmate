@@ -1,0 +1,50 @@
+== BEFORE: new regression test against owner at 98dee4bf (pre-F1)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Lists differ: [] != [(70, 86401), (71, 86401), (70, 172801), (71, 172801)]
+
+Second list contains 4 additional elements.
+First extra element 0:
+(70, 86401)
+
+- []
++ [(70, 86401), (71, 86401), (70, 172801), (71, 172801)]
+
+----------------------------------------------------------------------
+Ran 1 test in 0.500s
+
+FAILED (failures=1)
+== AFTER: same regression test against target head
+----------------------------------------------------------------------
+Ran 1 test in 0.763s
+
+OK
+== BEFORE: live clock run, owner at 98dee4bf
+at +8s real (pre-fix): kill ender's parent wrapper-b (pid 42835), so its ancestry changes; renewal must keep the saved chain
+at +30s real (pre-fix): end ender gh pid 43088 (about 60 simulated h)
+owner exit=0  stderr bytes=       0
+secret matches in db: 0
+survivor pid=43086: retained process rows at sim hours [] process_end at sim hours []
+  argv set: set()
+  ancestor set: set()
+ender pid=43088: retained process rows at sim hours [] process_end at sim hours [61.1]
+  argv set: set()
+  ancestor set: set()
+  end row joins retained process rows by pid+start+run_id: 0
+sampling failures: 0 owner rows: ['stop']
+oldest stored row sim h: 13.3  last prune tick sim h ~ 60.6 (48 h window is enforced at each tick)
+== AFTER: live clock run, owner at target head (recorded in the earlier pass of this same script)
+at +8s real (target): kill ender's parent wrapper-b (pid 92783), so its ancestry changes; renewal must keep the saved chain
+at +30s real (target): end ender gh pid 92861 (about 60 simulated h)
+owner exit=0  stderr bytes=       0
+secret matches in db: 0
+survivor pid=92862: retained process rows at sim hours [25.0, 49.3] process_end at sim hours []
+  argv set: {'["sh", "gh", "pr", "checks", "[REDACTED]", "--body", "[REDACTED]"]'}
+  ancestor set: {'[["sh", "wrapper-b.sh"], ["sh", "wrapper-a.sh"], ["launchd"]]'}
+  largest gap between retained rows, sim h: 24.27
+ender pid=92861: retained process rows at sim hours [25.0, 49.3] process_end at sim hours [61.1]
+  argv set: {'["sh", "gh", "run", "watch", "[REDACTED]", "--body", "[REDACTED]"]'}
+  ancestor set: {'[["sh", "wrapper-b.sh"], ["sh", "wrapper-a.sh"], ["launchd"]]'}
+  end row joins retained process rows by pid+start+run_id: 2
+  largest gap between retained rows, sim h: 24.27
+sampling failures: 0 owner rows: ['stop']
+oldest stored row sim h: 20.2  last prune tick sim h ~ 60.5 (48 h window is enforced at each tick)

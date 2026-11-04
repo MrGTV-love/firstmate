@@ -1,0 +1,24 @@
+{"removed": 0}
+first prune creates private db: exit=0
+--- cutoff convention: only rows strictly older than now-172800 expire. now=1794000000
+--- before
+process older-1s
+process_end older-1s
+quota older-1s
+process exact-48h
+process_end exact-48h
+process newer-1s
+quota newer-1s
+sampling fresh
+--- prune at fixed clock
+{"removed": 3}
+exit=0
+--- after
+process exact-48h
+process_end exact-48h
+process newer-1s
+quota newer-1s
+sampling fresh
+--- expired payload bytes left in the db file (0 expected): 0
+--- retained payload bytes present (1 expected): 1
+--- sentinels: sentinel-inside sentinel-outside

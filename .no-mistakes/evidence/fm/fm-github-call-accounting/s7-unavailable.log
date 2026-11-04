@@ -1,0 +1,20 @@
+[absent] start exit=0
+[absent] status while running: running
+[absent] quota: {'status': 'unavailable', 'reason': 'command_unavailable', 'exit_code': None, 'graphql': None}
+[absent] quota: {'status': 'unavailable', 'reason': 'command_unavailable', 'exit_code': None, 'graphql': None}
+[absent] scans 55 failures 0
+[fails] start exit=0
+[fails] status while running: running
+[fails] quota: {'status': 'unavailable', 'reason': None, 'exit_code': 1, 'graphql': {}}
+[fails] quota: {'status': 'unavailable', 'reason': None, 'exit_code': 1, 'graphql': {}}
+[fails] scans 57 failures 0
+[malformed] start exit=0
+[malformed] status while running: running
+[malformed] quota: {'status': 'unavailable', 'reason': None, 'exit_code': 0, 'graphql': {}}
+[malformed] quota: {'status': 'unavailable', 'reason': None, 'exit_code': 0, 'graphql': {}}
+[malformed] scans 55 failures 0
+[nulllimit] start exit=0
+[nulllimit] status while running: running
+[nulllimit] quota: {'status': 'observed', 'reason': None, 'exit_code': 0, 'graphql': {'reset': 1794000000, 'used': 7}}
+[nulllimit] quota: {'status': 'observed', 'reason': None, 'exit_code': 0, 'graphql': {'reset': 1794000000, 'used': 7}}
+[nulllimit] scans 57 failures 0

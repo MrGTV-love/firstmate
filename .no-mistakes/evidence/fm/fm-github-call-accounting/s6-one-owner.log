@@ -1,0 +1,61 @@
+--- status before
+{"state": "stopped"}
+  -> exit=0
+--- start
+{"state": "running", "pid": 48771, "run_id": "a3baf685926943b6b228f147056f083b", "started_at": 1793751593.825599}
+  -> exit=0
+--- start again (idempotent, same run_id)
+{"state": "running", "pid": 48771, "run_id": "a3baf685926943b6b228f147056f083b", "started_at": 1793751593.825599}
+  -> exit=0
+--- second run refused
+fm-github-accounting: busy (owner lock held); retry
+  -> exit=75
+--- records while running is busy
+fm-github-accounting: busy (owner lock held); retry
+  -> exit=75
+--- prune while running is busy
+fm-github-accounting: busy (owner lock held); retry
+  -> exit=75
+--- owner count for this home: 1
+--- stop
+{"state": "stopped"}
+  -> exit=0
+owner pid 48771 gone after stop
+--- stop again
+{"state": "stopped"}
+  -> exit=0
+--- start then SIGKILL then start: new run recovers
+{"state": "running", "pid": 49824, "run_id": "903dcb3ca9724a6d8aac1c1d9486851a", "started_at": 1793751596.957406}
+  -> exit=0
+{"state": "stopped"}
+  -> exit=0
+{"state": "running", "pid": 50432, "run_id": "1d7723b03d61420f99fb2eb519bacfc3", "started_at": 1793751597.817867}
+  -> exit=0
+{"state": "stopped"}
+  -> exit=0
+--- zero-size db from an interrupted start: start recovers
+{"state": "running", "pid": 50685, "run_id": "a6c340ddd40445b2bf2f26378aaa8728", "started_at": 1793751598.507228}
+  -> exit=0
+{"state": "stopped"}
+  -> exit=0
+  owner rows:        2
+  application_id 0x464d4748 auto_vacuum 1
+--- foreign nonempty db: start refused, bytes unchanged
+fm-github-accounting: operation unavailable (check owner status/state permissions)
+  -> exit=1
+  bytes identical
+{"state": "stopped"}
+  -> exit=0
+--- text nonempty db: start refused, bytes unchanged
+fm-github-accounting: operation unavailable (check owner status/state permissions)
+  -> exit=1
+  bytes identical
+{"state": "stopped"}
+  -> exit=0
+--- owner.log tail
+fm-github-accounting: operation unavailable (check owner status/state permissions)
+fm-github-accounting: operation unavailable (check owner status/state permissions)
+--- symlink db refused
+fm-github-accounting: operation unavailable (check owner status/state permissions)
+  -> exit=1
+  target not created

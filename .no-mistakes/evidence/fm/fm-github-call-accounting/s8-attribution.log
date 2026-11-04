@@ -1,0 +1,10 @@
+labels (held out from the reader): early=90735 spender=91406 short=98180 survivor=98988
+largest rise: used 4000 -> 5000 (remaining 0) in interval +15.1s
+pid=90735 excluded  first_seen=-14.5s end=-10.7s argv=sh gh issue list [REDACTED] [REDACTED] chain=wrapper-b.sh <- wrapper-a.sh
+pid=91406 CANDIDATE first_seen=-13.8s end=+17.1s argv=sh gh pr checks [REDACTED] [REDACTED] chain=wrapper-b.sh <- wrapper-a.sh
+pid=98180 CANDIDATE first_seen=+4.3s end=+8.1s argv=sh gh api graphql --paginate chain=wrapper-b.sh <- wrapper-a.sh
+pid=98988 CANDIDATE first_seen=+6.2s end=none-observed argv=sh gh run watch [REDACTED] chain=wrapper-b.sh <- wrapper-a.sh
+other local rows not shown: 1
+A candidate overlaps the interval in time. That is an observed fact, not proof that it spent the points.
+sampling gaps: max 0.350s failures 0
+secret matches in db: 0
