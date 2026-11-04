@@ -1553,9 +1553,12 @@ rows = []
 def fail(error):
     raise error
 for directory, names, files in os.walk(root, onerror=fail):
-    names[:] = [name for name in names if name != b".git"]
+    # Only the slot root's own Git metadata is left out; a .git deeper down is the slot's work.
+    at_root = directory == root
+    if at_root:
+        names[:] = [name for name in names if name != b".git"]
     for name in names + files:
-        if name == b".git":
+        if at_root and name == b".git":
             continue
         path = os.path.join(directory, name)
         info = os.lstat(path)
@@ -1711,6 +1714,23 @@ test_reset_guard_snapshot_witness() {
     || fail 'the newline-name witness changed the porcelain status'
   guard_refusal_diff "$CASE_DIR/nl-before.snap" "$CASE_DIR/nl-before.snap" "$CASE_DIR/nl-after.snap" "$POOL_DIR" "$id" 2>/dev/null \
     && fail 'the refusal comparison accepted changed bytes in a file whose name holds a newline'
+  # The reviewer's witness (R5): only the slot root's own Git metadata is outside the digest.
+  # A .git below the root is slot content; a change inside it is a change to the slot's work.
+  mkdir -p "$POOL_DIR/nested/.git"
+  printf 'AAAA\n' >"$POOL_DIR/nested/.git/notes.txt"
+  guard_snapshot "$POOL_DIR" "$CASE_DIR/nested-before.snap"
+  guard_snapshot "$POOL_DIR" "$CASE_DIR/nested-same.snap"
+  guard_refusal_diff "$CASE_DIR/nested-before.snap" "$CASE_DIR/nested-before.snap" "$CASE_DIR/nested-same.snap" "$POOL_DIR" "$id" \
+    || fail 'the refusal comparison rejected an unchanged nested .git (the passing case)'
+  printf 'BBBB\n' >"$POOL_DIR/nested/.git/notes.txt"
+  guard_snapshot "$POOL_DIR" "$CASE_DIR/nested-after.snap"
+  [ "$(sed -n '/--- status/,/--- files/p' "$CASE_DIR/nested-before.snap")" = "$(sed -n '/--- status/,/--- files/p' "$CASE_DIR/nested-after.snap")" ] \
+    || fail 'the nested .git witness changed the porcelain status, so it does not prove an equal-status change'
+  cmp -s "$CASE_DIR/nested-before.snap" "$CASE_DIR/nested-after.snap" \
+    && fail 'the snapshot could not see changed bytes in a nested .git'
+  guard_refusal_diff "$CASE_DIR/nested-before.snap" "$CASE_DIR/nested-before.snap" "$CASE_DIR/nested-after.snap" "$POOL_DIR" "$id" 2>/dev/null \
+    && fail 'the refusal comparison accepted changed bytes in a nested .git'
+  rm -rf -- "$POOL_DIR/nested"
   # An unreadable file fails the snapshot loudly (a skipped file would read as equal), unless
   # the user can read everything (root).
   if [ "$(id -u)" != 0 ]; then
@@ -1722,7 +1742,7 @@ test_reset_guard_snapshot_witness() {
     guard_refusal_diff "$CASE_DIR/unreadable.snap" "$CASE_DIR/unreadable.snap" "$CASE_DIR/unreadable.snap" "$POOL_DIR" "$id" 2>/dev/null \
       && fail 'the refusal comparison accepted a snapshot that failed its file digest'
   fi
-  pass 'the S7 snapshot comparison detects changed bytes under equal status (newline names included), an unreadable file, and every ref change beyond this task'"'"'s anchor'
+  pass 'the S7 snapshot comparison detects changed bytes under equal status (newline names and a nested .git included), an unreadable file, and every ref change beyond this task'"'"'s anchor'
 }
 
 # Run one blocking case: spawn, then require a non-zero exit, no launch, the
@@ -2128,63 +2148,208 @@ test_reset_guard_s4_foreign_lease() {
 }
 
 # A process lease is this spawn's own only by the identity recorded when it took the slot
-# (the pool entry's owner_pid at claim time), never by process ancestry.
+# (the pool entry's owner_pid at claim time) AND a probe that binds that process to this spawn
+# (its lineage or the acquired pane's tree); neither alone, and never ancestry alone.
 guard_set_lease_owner() { # <state-file> <pid>
   jq --argjson pid "$2" '.worktrees[0].owner_pid = $pid' "$1" >"$1.tmp" && mv "$1.tmp" "$1"
 }
 
+# A slot whose pool entry names, as its process lease, a process inside the acquired pane's tree:
+# the shape of this spawn's own acquisition (the pane's `treehouse get` subshell). Sets
+# PANE_SHELL, PANE_CHILD and LEASE_STATE; the fake tmux reports the shell as the pane pid.
+guard_owned_pane_slot() { # <case-name> <task-id>
+  local rec
+  rec=$(make_case "$1" "$2")
+  read_case_record "$rec"
+  lay_out_as_pool_slot
+  LEASE_STATE="$CASE_DIR/slots/treehouse-state.json"
+  PANE_SHELL=$(guard_start_pane_shell "$POOL_DIR" "$CASE_DIR/pane.ready")
+  printf '%s' "$PANE_SHELL" >"$CASE_DIR/pane.pid"
+  guard_wrap_tmux_pane_pid "$FAKEBIN_DIR" "$CASE_DIR/pane.pid"
+  PANE_CHILD=$(pgrep -P "$PANE_SHELL" | head -n 1)
+  [ -n "$PANE_CHILD" ] || fail 'the pane shell has no child to hold the lease'
+  printf '{"worktrees":[{"name":"1","path":"%s","owner_pid":%s}]}\n' "$POOL_DIR" "$PANE_CHILD" >"$LEASE_STATE"
+}
+
+guard_end_pane() { pkill -P "$PANE_SHELL" 2>/dev/null || true; kill "$PANE_SHELL" 2>/dev/null || true; }
+
 test_reset_guard_s4_process_lease_recorded_identity() {
-  local rec id state own other shell child
-  # The entry's owner at claim time is the spawn's own acquisition: it passes though that
-  # process is alive and in no lineage of the spawn.
-  id='guard-s4-lease-recorded'
-  rec=$(make_case guard-s4lrec "$id")
-  read_case_record "$rec"
-  lay_out_as_pool_slot
-  state="$CASE_DIR/slots/treehouse-state.json"
-  (cd / && exec sleep 600) >/dev/null 2>&1 </dev/null &
-  own=$!
-  printf '{"worktrees":[{"name":"1","path":"%s","owner_pid":%s}]}\n' "$POOL_DIR" "$own" >"$state"
-  guard_expect_launch S4 '(iii-b) the live process lease recorded as this spawn'"'"'s own acquisition' "$id" --scout
-  # The owner changes after the claim to another live process: refused.
+  local id other
+  # The owner changes after the claim to another live process outside the pane: refused.
   id='guard-s4-lease-swapped'
-  rec=$(make_case guard-s4lsw "$id")
-  read_case_record "$rec"
-  lay_out_as_pool_slot
-  state="$CASE_DIR/slots/treehouse-state.json"
+  guard_owned_pane_slot guard-s4lsw "$id"
   (cd / && exec sleep 600) >/dev/null 2>&1 </dev/null &
   other=$!
-  printf '{"worktrees":[{"name":"1","path":"%s","owner_pid":%s}]}\n' "$POOL_DIR" "$own" >"$state"
-  FM_SLOT_RESET_GUARD_SEAM="jq --argjson pid $other '.worktrees[0].owner_pid = \$pid' '$state' >'$state.tmp' && mv '$state.tmp' '$state'; guard_snapshot '$POOL_DIR' '$CASE_DIR/post-seam.snap'" \
+  FM_SLOT_RESET_GUARD_SEAM="jq --argjson pid $other '.worktrees[0].owner_pid = \$pid' '$LEASE_STATE' >'$LEASE_STATE.tmp' && mv '$LEASE_STATE.tmp' '$LEASE_STATE'; guard_snapshot '$POOL_DIR' '$CASE_DIR/post-seam.snap'" \
     guard_expect_refusal S4 '(iii-b) the lease owner changes after the claim to another live process' 'reset refused (holder_lease)' "$id" --scout
-  # The owner changes to a process inside the acquired pane's tree: ancestry does not exempt it.
+  guard_end_pane
+  kill "$other" 2>/dev/null || true
+  # The owner changes to another process inside the acquired pane's tree (the shell itself): ancestry does not exempt it.
   id='guard-s4-lease-pane-tree'
-  rec=$(make_case guard-s4lpt "$id")
-  read_case_record "$rec"
-  lay_out_as_pool_slot
-  state="$CASE_DIR/slots/treehouse-state.json"
-  shell=$(guard_start_pane_shell "$POOL_DIR" "$CASE_DIR/pane.ready")
-  printf '%s' "$shell" >"$CASE_DIR/pane.pid"
-  guard_wrap_tmux_pane_pid "$FAKEBIN_DIR" "$CASE_DIR/pane.pid"
-  child=$(pgrep -P "$shell" | head -n 1)
-  [ -n "$child" ] || fail 'the pane shell has no child to hold the lease'
-  printf '{"worktrees":[{"name":"1","path":"%s","owner_pid":%s}]}\n' "$POOL_DIR" "$own" >"$state"
-  FM_SLOT_RESET_GUARD_SEAM="jq --argjson pid $child '.worktrees[0].owner_pid = \$pid' '$state' >'$state.tmp' && mv '$state.tmp' '$state'; guard_snapshot '$POOL_DIR' '$CASE_DIR/post-seam.snap'" \
+  guard_owned_pane_slot guard-s4lpt "$id"
+  FM_SLOT_RESET_GUARD_SEAM="jq --argjson pid $PANE_SHELL '.worktrees[0].owner_pid = \$pid' '$LEASE_STATE' >'$LEASE_STATE.tmp' && mv '$LEASE_STATE.tmp' '$LEASE_STATE'; guard_snapshot '$POOL_DIR' '$CASE_DIR/post-seam.snap'" \
     guard_expect_refusal S4 '(iii-b) the lease owner is a live process inside the pane tree that is not the recorded acquisition' 'reset refused (holder_lease)' "$id" --scout
-  pkill -P "$shell" 2>/dev/null || true
-  kill "$shell" 2>/dev/null || true
+  guard_end_pane
   # The owner changes to a process that is gone: nothing holds the lease any more.
   id='guard-s4-lease-dead'
-  rec=$(make_case guard-s4ld "$id")
+  guard_owned_pane_slot guard-s4ld "$id"
+  FM_SLOT_RESET_GUARD_SEAM="jq --argjson pid 2147483000 '.worktrees[0].owner_pid = \$pid' '$LEASE_STATE' >'$LEASE_STATE.tmp' && mv '$LEASE_STATE.tmp' '$LEASE_STATE'" \
+    guard_expect_launch S4 '(iii-b) paired pass: the changed owner is a process that is gone' "$id" --scout
+  guard_end_pane
+  pass 'S4 (iii-b): a process lease is this spawn'"'"'s only by its recorded identity, never by ancestry'
+}
+
+# R2: the claim names the task, not the process, so a live process already named in the pool
+# entry is recorded just the same. It is this spawn's acquisition only if something binds it
+# to this spawn: here, that it sits in the acquired pane's tree.
+test_reset_guard_r2_preexisting_process_is_not_this_acquisition() {
+  local id foreign
+  # The reviewer's case: a live, independently started process, cwd outside the slot, is the
+  # entry's owner before the spawn begins. It refuses with the slot untouched.
+  id='guard-r2-foreign'
+  guard_owned_pane_slot guard-r2a "$id"
+  (cd / && exec sleep 600) >/dev/null 2>&1 </dev/null &
+  foreign=$!
+  guard_set_lease_owner "$LEASE_STATE" "$foreign"
+  guard_expect_refusal S4 '(R2) a live process that predates the spawn is named as the lease owner' 'reset refused (holder_lease)' "$id" --scout
+  assert_contains "$GUARD_OUT" 'nothing binds it to this spawn' 'R2: the refusal did not say why the recorded identity was not accepted'
+  guard_end_pane
+  kill "$foreign" 2>/dev/null || true
+  # Paired pass: the entry's owner is a process in the acquired pane's tree.
+  id='guard-r2-owned'
+  guard_owned_pane_slot guard-r2b "$id"
+  guard_expect_launch S4 '(R2) paired pass: the lease owner is a process in the acquired pane'"'"'s tree' "$id" --scout
+  guard_end_pane
+  # Paired pass: the entry's owner is gone.
+  id='guard-r2-gone'
+  guard_owned_pane_slot guard-r2c "$id"
+  guard_set_lease_owner "$LEASE_STATE" 2147483000
+  guard_expect_launch S4 '(R2) paired pass: the lease owner is a process that is gone' "$id" --scout
+  guard_end_pane
+  pass 'R2: a pre-existing foreign process lease refuses with nothing changed; an owned acquisition and a gone owner proceed'
+}
+
+# R3: a pool state file that disappears after the slot was acquired as a pool slot is a lost
+# lease source, not a clear one.
+test_reset_guard_r3_vanished_pool_state_is_unknown() {
+  local rec id state
+  id='guard-r3-vanish'
+  rec=$(make_case guard-r3a "$id")
   read_case_record "$rec"
   lay_out_as_pool_slot
   state="$CASE_DIR/slots/treehouse-state.json"
-  printf '{"worktrees":[{"name":"1","path":"%s","owner_pid":%s}]}\n' "$POOL_DIR" "$own" >"$state"
-  FM_SLOT_RESET_GUARD_SEAM="jq --argjson pid 2147483000 '.worktrees[0].owner_pid = \$pid' '$state' >'$state.tmp' && mv '$state.tmp' '$state'" \
-    guard_expect_launch S4 '(iii-b) paired pass: the changed owner is a process that is gone' "$id" --scout
-  kill "$own" "$other" 2>/dev/null || true
-  pass 'S4 (iii-b): a process lease is this spawn'"'"'s only by its recorded identity, never by ancestry'
+  FM_SLOT_RESET_GUARD_SEAM="rm -f '$state'; guard_snapshot '$POOL_DIR' '$CASE_DIR/post-seam.snap'" \
+    guard_expect_refusal S5 '(R3) the pool state file disappears between the observations' 'reset refused (unknown_lease)' "$id" --scout
+  assert_contains "$GUARD_OUT" 'no longer be read' 'R3: the refusal did not name the lost pool state'
+  # The unreadable form: the file is replaced by a directory.
+  id='guard-r3-unreadable'
+  rec=$(make_case guard-r3b "$id")
+  read_case_record "$rec"
+  lay_out_as_pool_slot
+  state="$CASE_DIR/slots/treehouse-state.json"
+  FM_SLOT_RESET_GUARD_SEAM="rm -f '$state'; mkdir '$state'; guard_snapshot '$POOL_DIR' '$CASE_DIR/post-seam.snap'" \
+    guard_expect_refusal S5 '(R3) the pool state file is replaced by a directory between the observations' 'reset refused (unknown_lease)' "$id" --scout
+  # Paired pass: the same slot with its state kept launches.
+  id='guard-r3-kept'
+  rec=$(make_case guard-r3c "$id")
+  read_case_record "$rec"
+  lay_out_as_pool_slot
+  FM_SLOT_RESET_GUARD_SEAM=':' guard_expect_launch S5 '(R3) paired pass: the pool state is unchanged' "$id" --scout
+  pass 'R3: a pool state that vanishes after acquisition refuses as unknown; the unchanged state launches'
 }
+
+# R4: a refusal after the reset cannot say the slot was left untouched. The step that must
+# precede the launch (pointing origin/HEAD at the default branch) is done before the reset, so
+# its failure refuses with the slot byte-identical.
+test_reset_guard_r4_origin_head_write_failure_refuses_before_the_reset() {
+  local rec id tip
+  id='guard-r4-fail'
+  rec=$(make_case guard-r4a "$id")
+  read_case_record "$rec"
+  make_sibling_clone_pool
+  git -C "$POOL_DIR" symbolic-ref -d refs/remotes/origin/HEAD
+  guard_install_git_shim "$FAKEBIN_DIR"
+  tip=$(git -C "$CASE_DIR/publisher" rev-parse HEAD)
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" != "$tip" ] || fail 'R4: the fixture slot is already at the origin tip, so a reset would not move it'
+  FM_TEST_GIT_FAIL='symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main' \
+    guard_expect_refusal S7 '(R4) origin/HEAD cannot be written' "could not resolve origin's current default branch" "$id" --mode no-mistakes --yolo off
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" != "$tip" ] || fail 'R4: the slot was reset although the step before it failed'
+  # Paired pass: the same slot without the injected failure resets, launches and points origin/HEAD.
+  id='guard-r4-ok'
+  rec=$(make_case guard-r4b "$id")
+  read_case_record "$rec"
+  make_sibling_clone_pool
+  git -C "$POOL_DIR" symbolic-ref -d refs/remotes/origin/HEAD
+  tip=$(git -C "$CASE_DIR/publisher" rev-parse HEAD)
+  guard_expect_launch S7 '(R4) paired pass: origin/HEAD is writable' "$id" --mode no-mistakes --yolo off
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$tip" ] || fail 'R4 control: the slot did not start from the origin tip'
+  [ "$(git -C "$POOL_DIR" symbolic-ref refs/remotes/origin/HEAD)" = refs/remotes/origin/main ] || fail 'R4 control: origin/HEAD does not name origin main'
+  pass 'R4: a failed origin/HEAD write refuses before the reset with the slot byte-identical; the writable control resets and launches'
+}
+
+# R1: containment is proved against the current tip of origin's default branch on the final
+# pass, so a default branch that moved back between the observations is seen.
+test_reset_guard_r1_default_branch_moves_between_observations() {
+  local rec id parent child
+  # Detached: the slot sits at origin main's tip; a --base-branch gives the reset a different target.
+  id='guard-r1-detached'
+  rec=$(make_case guard-r1a "$id")
+  read_case_record "$rec"
+  publish_feature_branch feature/x
+  git -C "$CASE_DIR/publisher" checkout --quiet main
+  parent=$(git -C "$CASE_DIR/publisher" rev-parse main)
+  guard_publish_tracked tip.txt $'tip\n'
+  child=$(git -C "$CASE_DIR/publisher" rev-parse main)
+  guard_prefetch
+  git -C "$POOL_DIR" checkout --quiet --detach "$child"
+  brief_with_base "$id" feature/x
+  FM_SLOT_RESET_GUARD_SEAM="git -C '$CASE_DIR/publisher' push --quiet --force origin '$parent:refs/heads/main'" \
+    guard_expect_refusal S1 '(R1) origin main moves back between the observations, detached HEAD' 'reset refused (head_not_contained)' "$id" --scout --base-branch feature/x
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$child" ] || fail 'R1: the detached HEAD moved'
+  # Attached: the slot's owner branch sits at the same tip.
+  id='guard-r1-attached'
+  rec=$(make_case guard-r1b "$id")
+  read_case_record "$rec"
+  publish_feature_branch feature/x
+  git -C "$CASE_DIR/publisher" checkout --quiet main
+  parent=$(git -C "$CASE_DIR/publisher" rev-parse main)
+  guard_publish_tracked tip.txt $'tip\n'
+  child=$(git -C "$CASE_DIR/publisher" rev-parse main)
+  guard_prefetch
+  git -C "$POOL_DIR" checkout --quiet -b owner-topic "$child"
+  brief_with_base "$id" feature/x
+  FM_SLOT_RESET_GUARD_SEAM="git -C '$CASE_DIR/publisher' push --quiet --force origin '$parent:refs/heads/main'" \
+    guard_expect_refusal S2 '(R1) origin main moves back between the observations, attached owner branch' 'reset refused (owner_branch_not_contained)' "$id" --scout --base-branch feature/x
+  [ "$(git -C "$POOL_DIR" rev-parse refs/heads/owner-topic)" = "$child" ] || fail 'R1: the owner branch moved'
+  # Paired pass: the default branch stays where it was.
+  id='guard-r1-stable'
+  rec=$(make_case guard-r1c "$id")
+  read_case_record "$rec"
+  publish_feature_branch feature/x
+  git -C "$CASE_DIR/publisher" checkout --quiet main
+  guard_publish_tracked tip.txt $'tip\n'
+  child=$(git -C "$CASE_DIR/publisher" rev-parse main)
+  guard_prefetch
+  git -C "$POOL_DIR" checkout --quiet --detach "$child"
+  brief_with_base "$id" feature/x
+  guard_expect_launch S1 '(R1) paired pass: the default branch does not move' "$id" --scout --base-branch feature/x
+  # Paired pass: the default branch moves FORWARD; the slot is still contained and launches.
+  id='guard-r1-forward'
+  rec=$(make_case guard-r1d "$id")
+  read_case_record "$rec"
+  publish_feature_branch feature/x
+  git -C "$CASE_DIR/publisher" checkout --quiet main
+  guard_publish_tracked tip.txt $'tip\n'
+  child=$(git -C "$CASE_DIR/publisher" rev-parse main)
+  guard_prefetch
+  git -C "$POOL_DIR" checkout --quiet --detach "$child"
+  brief_with_base "$id" feature/x
+  FM_SLOT_RESET_GUARD_SEAM="printf 'later\\n' >'$CASE_DIR/publisher/later.txt'; git -C '$CASE_DIR/publisher' add later.txt; git -C '$CASE_DIR/publisher' -c user.name=t -c user.email=t@example.invalid commit -qm later; git -C '$CASE_DIR/publisher' push --quiet origin main" \
+    guard_expect_launch S1 '(R1) paired pass: the default branch moves forward past the slot' "$id" --scout --base-branch feature/x
+  pass 'R1: a default branch that moves back between the observations refuses (detached and attached); a stable or forward-moving one launches'
+}
+
+
 
 test_reset_guard_s4_vernant_lease_and_contention() {
   local rec id holder common real name
@@ -2954,5 +3119,9 @@ test_reset_guard_f3_inaccessible_stores_are_unknown
 test_reset_guard_f4_unprobeable_lease_refuses
 test_reset_guard_f5_refusal_moves_no_origin_ref
 test_reset_guard_f6_refusal_check_sees_a_launch
+test_reset_guard_r1_default_branch_moves_between_observations
+test_reset_guard_r2_preexisting_process_is_not_this_acquisition
+test_reset_guard_r3_vanished_pool_state_is_unknown
+test_reset_guard_r4_origin_head_write_failure_refuses_before_the_reset
 
 echo "# all fm-spawn-pool-base-freshen tests passed"
