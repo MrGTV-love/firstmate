@@ -58,6 +58,9 @@ PID/start identities retain sanitized argv and the observed ancestor chain in a
 first-sighting process row. While successful scans still list that identity, its
 saved sanitized projection is repeated in one fresh process row once the latest
 row is 24 hours old, keeping it joinable within the unchanged 48-hour retention.
+Every process row keeps first_observed_at, the first time that identity was seen
+as gh/gh-axi in this run, unchanged next to its own observed_at. Use
+first_observed_at <= interval_end, not a renewal's observed_at, for interval overlap.
 No argv or ancestor projection is recomputed for a renewal. One process_end row,
 with the pid, start identity, run id and time, follows when
 the first successful scan no longer lists that identity as a caller; a failed scan
@@ -430,7 +433,7 @@ def run(root, duration=None, ready=None, *, process_source=None):
                     record(db, "process_end", {"pid": pid, "start": start, "run_id": run_id}, observed)
                     del seen[(pid, start)]
                 for item in found:
-                    seen[(item["pid"], item["start"])] = (None, dict(item, run_id=run_id))
+                    seen[(item["pid"], item["start"])] = (None, dict(item, run_id=run_id, first_observed_at=observed))
                 for identity, (stamp, item) in seen.items():
                     if stamp is None or observed - stamp >= RETENTION / 2:
                         record(db, "process", item, observed)

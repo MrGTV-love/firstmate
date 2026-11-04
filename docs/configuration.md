@@ -1108,6 +1108,9 @@ Its selected quota source is the REST `rate_limit` endpoint's `resources.graphql
 That source was explicitly selected instead of the original GraphQL-query/header proposal; a returned REST counter does not establish agreement between counter shards.
 A `process` row holds a locally sampled caller chain at its first sighting; while successful scans still list that identity, the owner renews the saved sanitized projection in one fresh `process` row once the latest row is 24 hours old.
 The renewal preserves the same argv and ancestors rather than resampling their values, so a caller that remains visible across the 48-hour retention keeps a joinable row.
+Every `process` row carries `first_observed_at`, copied unchanged from the first sighting as `gh`/`gh-axi` in that owner run, alongside its own `observed_at`.
+For a quota interval, use `first_observed_at <= interval_end` and the matching end time at or after the interval start, not the renewal timestamp or the OS process start: a process that execs into `gh` later was not observed as a caller earlier.
+A missing end leaves the overlap uncertain after the last sighting; these timestamps do not establish continuous observation across failed scans or downtime.
 A `process_end` row with the same pid, start identity and run id holds the time of the first successful scan that no longer lists that caller, connecting a retained process sighting to the quota intervals up to that scan.
 No row is written per scan, and a failed scan ends nothing or renews nothing, so a `process_end` time can follow the real end by the failed or missing scans that `sampling` rows report.
 A caller still alive when the observer stops has no `process_end` row, nor has one that ends while no owner runs, so a retained `process` row shows a first sighting or renewal and not how long the caller lived afterward; a new owner records a caller it finds alive as a new `process` row.

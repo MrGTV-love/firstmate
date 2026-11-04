@@ -231,6 +231,79 @@ owner["run"](owner["private_root"](),process_source=source)
         self.assertEqual(self.records("process"), [])
         self.assertEqual(self.records("process_end"), [])
 
+    def test_cold_reader_distinguishes_continuous_caller_from_later_exec(self):
+        # Labeled clock/table/quota inputs exercise the real owner and public
+        # records. The same PID/start exists before it execs into gh at 86401.
+        self.tool("gh-axi", '''while [ ! -e "$FIXTURE_ROOT/release-quota" ]; do sleep 0.01; done
+printf 'api_response:\\n  body: used=23 reset=1794000000 limit=5000 remaining=4977\\n'
+''')
+        launcher = self.root / "cold-reader-clock.py"
+        launcher.write_text('''import json,os,runpy,signal,sqlite3,sys,time
+from pathlib import Path
+base=1794000000
+elapsed=0
+real_monotonic=time.monotonic
+time.time=lambda:base+elapsed
+time.monotonic=lambda:real_monotonic()+elapsed
+owner=runpy.run_path(sys.argv[1])
+root=owner["private_root"]()
+step=0
+def source():
+    global step,elapsed
+    offsets=[35999,36000,36020,86401,122400,172802,172803,172804]
+    elapsed=offsets[step]
+    if elapsed>=36000:
+        Path(os.environ["FIXTURE_ROOT"],"release-quota").touch()
+    advance=True
+    if elapsed in (36000,36020):
+        with sqlite3.connect(root/"observations.sqlite") as db:
+            quota=[json.loads(row[0]) for row in db.execute("SELECT payload FROM observations WHERE kind='quota'")]
+        advance=any(row.get("status")=="observed" and row["observed_at"]==base+elapsed for row in quota)
+    table={10:(0,"fixture-parent",["python3","/fixture/caller.py","fixture-secret"]),
+           72:(10,"fixture-survivor",["/fixture/gh","pr","checks"])}
+    if elapsed<172803:
+        table[70]=(10,"fixture-continuous",["/fixture/gh","pr","checks"])
+        table[71]=(10,"fixture-exec",["/fixture/other"] if elapsed<86401 else ["/fixture/gh","issue","list"])
+    if step==len(offsets)-1:
+        os.kill(os.getpid(),signal.SIGTERM)
+    elif advance:
+        step+=1
+    return table
+owner["run"](root,process_source=source)
+''')
+        reply = subprocess.run([sys.executable, str(launcher), str(OWNER)], env=self.env, capture_output=True, text=True)
+        self.assertEqual(reply.returncode, 0, reply.stderr)
+        base = 1794000000
+        self.prune_at(base + 172804)
+        quota = [row for row in self.records("quota") if row.get("status") == "observed"]
+        interval_start, interval_end = base + 36000, base + 36020
+        self.assertTrue(any(row["observed_at"] == interval_start for row in quota), quota)
+        self.assertTrue(any(row["observed_at"] == interval_end for row in quota), quota)
+        # At 172804 the original 35999 row is still within 48 h. Move to
+        # cutoff=36000 too, when that row expires but both quota rows remain.
+        self.prune_at(base + 208800)
+        processes = self.records("process")
+        self.assertTrue(all(row["observed_at"] > interval_end for row in processes), processes)
+        ended = self.records("process_end")
+        self.assertEqual(sorted(row["pid"] for row in ended), [70, 71])
+        joined = []
+        for end in ended:
+            candidates = [row for row in processes if (row["pid"], row["start"], row["run_id"]) ==
+                          (end["pid"], end["start"], end["run_id"])]
+            self.assertTrue(candidates, end)
+            first = {row["first_observed_at"] for row in candidates}
+            self.assertEqual(first, {base + (35999 if end["pid"] == 70 else 86401)})
+            if min(first) <= interval_end and end["observed_at"] >= interval_start:
+                joined.append(end["pid"])
+        self.assertEqual(joined, [70])
+        self.assertNotIn("fixture-secret", json.dumps(processes))
+        self.assertTrue(all(row["ancestors"][0]["argv"] == ["python3", "caller.py", "[REDACTED]"]
+                            for row in processes))
+        self.assertEqual(self.records("owner")[-1]["action"], "stop")
+        self.prune_at(base + 172803 + 172801)
+        self.assertEqual(self.records("process"), [])
+        self.assertEqual(self.records("process_end"), [])
+
     def test_interpreter_flags_keep_script_names_and_withhold_payloads(self):
         launcher = self.root / "injected-forms.py"
         launcher.write_text('''import runpy,sys
