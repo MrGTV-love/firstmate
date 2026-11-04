@@ -71,6 +71,19 @@ if len(sys.argv) > 1 and os.path.basename(sys.argv[1]) in ('fm-cpu-pass.py', 'fm
                 raise RuntimeError('injected gate error after the agent started')
             return real_wait(self, timeout)
         subprocess.Popen.wait = broken_wait
+    if os.environ.get('CASE_SLEEP_BARRIER'):
+        import time, pathlib
+        real_sleep = time.sleep
+        def barrier_sleep(seconds):
+            # The first queue sleep holds until the test releases it, so a wait can cross the hold bound
+            # exactly while the start lock frees (independent review F6 probe seam).
+            marker = pathlib.Path(os.environ['CASE_FOLDER']) / 'sleeping'
+            if not marker.exists():
+                marker.touch()
+                while not (marker.parent / 'release-sleep').exists(): real_sleep(0.01)
+            else:
+                real_sleep(seconds)
+        time.sleep = barrier_sleep
     if os.environ.get('CASE_KILL_BEFORE_PID'):
         import signal
         real_write = os.write
@@ -1290,7 +1303,7 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
         finish(child)
 
     def identical_sibling():
-        # F2: a second start with identical arguments, not a descendant of the first, queues.
+        # F2 control: a second start with identical arguments from outside the first queues (also on 5d51fa8be).
         folder, db, env = case('fix-f2-sibling', cores=3)
         env.update(PATH=str(stay_bin) + os.pathsep + env['PATH'], FM_DURATION_FILE='off')
         first = launch(measured_run + ['env', 'A=1', guard_route, 'run', '--'] + fresh_shapes['intent'], env, folder / 'first')
@@ -1317,7 +1330,8 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
         # F2: two nested routes inside one admitted shell string: one consumes the grant, the other queues.
         folder, db, env = case('fix-f2-descendant', cores=3)
         env.update(PATH=str(stay_bin) + os.pathsep + env['PATH'], FM_DURATION_FILE='off')
-        two = '%s run -- no-mistakes axi run --intent a & %s run -- no-mistakes axi run --intent b; wait' % (guard_route, guard_route)
+        # Identical arguments, so 5d51fa8be's inherited digest exempted both.
+        two = '%s run -- no-mistakes axi run --intent goal & %s run -- no-mistakes axi run --intent goal; wait' % (guard_route, guard_route)
         outer = launch(measured_run + ['bash', '-c', two], env, folder / 'outer')
         wait_for(lambda: len(started(folder)) >= 1, 'first nested start')
         time.sleep(2.5)
@@ -1349,11 +1363,16 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
                 finish(child)
                 assert 'x:ci-waiting:' in (folder / 'f4.stderr').read_text(), (folder / 'f4.stderr').read_text()
             else:
-                try:
-                    wait_for(lambda: 'waiting: counted=1 projected=%d ' % (9 * GIB) in (folder / 'f4.stderr').read_text(), 'live agent keeps A')
-                finally:
-                    os.killpg(child.pid, signal.SIGTERM); child.wait()
-                assert not (folder / 'm').exists()
+                line = 'waiting: counted=1 projected=%d ' % (9 * GIB)
+                until = time.monotonic() + 10
+                while time.monotonic() < until and child.poll() is None and line not in (folder / 'f4.stderr').read_text():
+                    time.sleep(0.05)
+                running = child.poll() is None
+                if running:
+                    os.killpg(child.pid, signal.SIGTERM)
+                child.wait()
+                assert running and not (folder / 'm').exists(), ('a live agent at ci:running was read as idle',
+                                                                 (folder / 'f4.stderr').read_text())
 
     def handoff_kill():
         # F5: the gate dies at its pid handoff to the watcher; no agent may run on without it.
@@ -1369,16 +1388,19 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
         assert live_entries(folder, 'launch-*.lock') == 0
 
     def late_grant():
-        # F6: a fit reached only after the hold bound (budget 1 s - p99 0.8 s = 0.2 s) refuses; a timely one admits.
+        # F6: a fit reached only after a wait past the hold bound (budget 1 s - p99 0.8 s = 0.2 s) refuses;
+        # a fit after a short wait admits. The first queue sleep is held at a barrier while the lock is busy.
         import fcntl
-        for label, ci_ms, pause, admitted in (('late', (800,), 0.8, False), ('timely', (300,), 0.05, True)):
-            folder, db, env = gate_case('fix-f6-' + label, timeout='1s', ci_ms=ci_ms)
+        for label, pause, admitted in (('late', 0.45, False), ('timely', 0.05, True)):
+            folder, db, env = gate_case('fix-f6-' + label, timeout='1s', ci_ms=(800,))
             (folder / 'pool').mkdir(exist_ok=True)
             lock = os.open(str(folder / 'pool' / 'pipeline-start.lock'), os.O_RDWR | os.O_CREAT, 0o600)
             fcntl.flock(lock, fcntl.LOCK_EX)
-            child, log = gate(folder, env, 'x', mode='exit-0')
+            child, log = gate(folder, dict(env, CASE_SLEEP_BARRIER='1'), 'x', mode='exit-0')
+            wait_for(lambda: (folder / 'sleeping').exists(), 'gate reached its first queue sleep')
             time.sleep(pause)
             fcntl.flock(lock, fcntl.LOCK_UN); os.close(lock)
+            (folder / 'release-sleep').touch()
             code = child.wait(timeout=30)
             text = log.with_suffix('.stderr').read_text()
             if admitted:
@@ -1401,7 +1423,7 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
         assert 'held for capacity before its CI fix agent starts, waited ' in queue and 'another start is registering' in queue, queue
         assert 'run x (fm/x) admitted after ' in queue, queue
 
-    for name, body in (('F1 nested expanded start', nested_expanded), ('F2 identical sibling start', identical_sibling),
+    for name, body in (('F1 nested expanded start', nested_expanded), ('F2 control: identical start from elsewhere', identical_sibling),
                        ('F2 explicit reuse inside one admission', explicit_reuse), ('F2 second nested descendant', second_descendant),
                        ('F3 start words as data', data_words), ('F4 visible process at ci:running with no recorded pid', visible_agent),
                        ('F5 gate killed at the pid handoff', handoff_kill), ('F6 grant after the hold bound', late_grant),
