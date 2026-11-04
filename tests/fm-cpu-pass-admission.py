@@ -1116,7 +1116,8 @@ while not (folder / (run + '.release')).exists(): time.sleep(0.025)
     assert all(cause in queue for cause in ('unmapped worktree', 'ambiguous worktree', 'run database unreadable')), queue
     assert 'next action: ' in queue, queue
 
-    # A busy wake-queue lock never holds the gate: the refusal exits at once and its wake is spilled for the next drain.
+    # A busy wake-queue lock never holds the gate: the refusal exits at once and its wake is spilled to state/.wake-spill.<seq>,
+    # which the next append to that queue, or the watcher's next start, replays.
     holder = subprocess.Popen(['bash', '-c', '. "$1" && fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" && touch "$2" && sleep 60', 'bash',
                                str(repo / 'bin/fm-wake-lib.sh'), str(folder / 'queue-held')], env=env, start_new_session=True)
     children.append(holder)
@@ -1128,6 +1129,17 @@ while not (folder / (run + '.release')).exists(): time.sleep(0.025)
     assert time.monotonic() - started_at < 10 and wakes(folder) == before
     spilled = ''.join(p.read_text() for p in (folder / 'fmhome' / 'state').glob('.wake-spill.[0-9]*'))
     assert 'launch-gate-unmapped' in spilled and 'unmapped worktree' in spilled, spilled
+    # Gates that spill at the same moment take turns under durable.lock: one spill file per gate, none overwritten.
+    burst = []
+    for i in range(3):
+        (folder / ('elsewhere-%d' % i)).mkdir()
+        burst.append(gate(folder, env, 'nowhere', cwd=folder / ('elsewhere-%d' % i), log='unmapped-burst-%d' % i)[0])
+    for child in burst:
+        finish(child, 75)
+    spills = [p.read_text() for p in (folder / 'fmhome' / 'state').glob('.wake-spill.[0-9]*')]
+    assert len(spills) == 4, spills
+    for i in range(3):
+        assert len([text for text in spills if os.path.realpath(folder / ('elsewhere-%d' % i)) in text]) == 1, (i, spills)
     os.killpg(holder.pid, signal.SIGKILL)
     holder.wait()
 
