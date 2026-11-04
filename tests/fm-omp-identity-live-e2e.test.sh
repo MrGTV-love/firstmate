@@ -13,6 +13,7 @@
 # or its dispatch tables cannot silently turn a restored worker back into a
 # process no lifecycle verb can attribute.
 #
+# Pass FM_OMP_IDENTITY_LIVE=0 (or FM_LIVE=0) to keep it from starting the installed omp.
 # It spends no model tokens and reads no credential: omp starts bare, on a
 # pseudo-terminal, in a scratch worktree, under `env -i` with a scratch HOME (so
 # it has no key, no agent directory and no settings of the operator), no prompt is
@@ -52,7 +53,9 @@ if [ "$(uname -s)" != Darwin ]; then
 fi
 command -v python3 >/dev/null 2>&1 || fail "python3 is required"
 OMP=$(command -v omp)
-VERSION=$(omp --version 2>/dev/null | head -1)
+# Even `--version` runs under the scratch environment, so no operator agent directory or .env is read.
+mkdir -p "$SCRATCH/home" "$SCRATCH/wt"
+VERSION=$(env -i PATH="$PATH" HOME="$SCRATCH/home" OMP_SKIP_SETUP=1 "$OMP" --version 2>/dev/null | head -1)
 [ -n "$VERSION" ] || VERSION=unknown
 LABEL="omp $VERSION at $OMP"
 CHECKED=0
@@ -76,7 +79,6 @@ fi
 note "installed shape: $SHAPE ($LABEL)"
 
 # The pane: a pseudo-terminal holding the bare installed omp in a scratch worktree.
-mkdir -p "$SCRATCH/home" "$SCRATCH/wt"
 cat > "$SCRATCH/hold.py" <<'PY'
 import os, pty, signal, subprocess, sys, time
 pidfile, cwd, home, omp = sys.argv[1:5]

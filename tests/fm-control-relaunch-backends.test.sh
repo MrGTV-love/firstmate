@@ -2302,7 +2302,7 @@ test_omp_bun_adoption_needs_positive_live_session_evidence() {
 
 test_omp_adoption_bun_runtime() {
   if [ "$(uname -s)" != Darwin ] || ! command -v cc >/dev/null 2>&1; then
-    pass "omp bun adoption: skipped, needs macOS libproc and a C compiler"
+    printf '# skipped: omp bun adoption needs macOS libproc and a C compiler; nothing was checked here\n'
     return 0
   fi
   test_omp_bun_adoption_admits_the_installed_runtime
