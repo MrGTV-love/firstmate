@@ -2360,7 +2360,7 @@ owner_marker_cases() {  # <case-dir> <proof-label> <done-args-suffix...>
       rows="$rows- [ ] $id - $(ftitle "$id") (since 2026-11-01)"$'\n'"  $who $word was recorded here"$'\n'
     done
   done
-  for body in "Captain 2026 asked for this" "Owner: keep" "Captain: keep" \
+  for body in "Captain 2026 asked for this" "Captain 2027-01-06 asked to keep this" "Owner: keep" "Captain: keep" \
     "Captain's words 2026-10-19: yes on both" "Captain's ask: a workstream view" \
     "Captain chose 2026-10-20: this one" "Captain direction: one owner" \
     "Captain's words, 2026-10-20 (via /kun): this one" "Captain's ask 2026-09-22 on /bearings lavish: a view" \
