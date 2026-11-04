@@ -87,19 +87,22 @@ Pipeline starts:
     admitted. Nothing running is stopped, and waiting here only delays the start.
   - Admission is before COMMAND (including any measured execution wrapper).
     No burst passes or FM_CPU_PASS_HELD budget are assigned to pipeline starts.
-    With --only-fresh, a COMMAND that fresh_pipeline_start does not judge a new
-    run runs at once without admission. An admitted COMMAND receives
-    FM_PIPELINE_START_ADMITTED, a digest of the new run's no-mistakes arguments
-    as pipeline_start_arguments reads them; an inner route that would admit the
-    identical invocation again runs it at once, and any other start still queues.
-    Limit: a nested start the outer reading cannot see as the same one queues
-    behind the outer start's lock: a -c string whose words the shell changes in
-    a way this reading does not follow (an expansion such as ~, $VAR, $(...) or
-    a glob, a here-document, an alias or a function), or a script that starts
-    the run.
-    When that nested start is the outer start's only run, the outer never
-    registers a run, so the wait never ends until someone stops it, and every
-    later fresh start on the host waits behind it.
+    With --only-fresh, a COMMAND that start_route does not judge a new run runs
+    at once without admission. start_route follows only the executable
+    position (transparent wrappers, an interpreter or shell running a script, a
+    shell's -c command line and the admission routes themselves); any other
+    program's arguments are data. When the start runs behind another admission
+    route (fm-mem-guard.sh run, fm-duration.py run, pipeline-start), the
+    admission publishes one single-use grant-*.lock naming its own pid, locked
+    while it holds the start lock. A later start consumes it, and runs without
+    queueing again, only when that pid is one of its ancestors and nobody
+    consumed it before; every other start queues, a sibling elsewhere, a second
+    descendant or an identical invocation alike. The grant ends at registration
+    or when COMMAND returns.
+    Limit: a nested start that cannot prove the ancestry (one that detached to
+    another parent, or an inner route on a checkout without grants) queues behind
+    the outer start's lock; when it is the outer start's only run, both wait
+    until one is stopped.
   - A short start lock bridges the check-to-registration race until a new
     running run ID appears, or COMMAND returns. It does not reserve a run's
     lifetime or poll after registration; status changes release capacity.
@@ -136,15 +139,22 @@ Launch gate:
     240; all rows 156.83 min, about 83.2 min). At the bound, or on a mapping refusal, it does not start AGENT,
     prints one "launch-gate refused: <cause>: run <id>; <detail>; next action:
     <action>" line and exits 75; every number in it carries a unit suffix and
-    it uses none of the daemon's retry or fallback phrases. The first hold, an
-    admission after a hold and every refusal also append one check wake
-    (launch-gate-<run>) to the root home's wake queue through fm_wake_append.
+    it uses none of the daemon's retry or fallback phrases. A fit reached only
+    after a wait past the bound is refused too; a fit at the very first decision
+    is admitted, so a bound of 0 holds not at all. A hold (the first decision that
+    does not fit, or any other wait, such as start-lock contention, once the first
+    waiting notice is due after FIRST_NOTICE_SECS), an admission after a hold and
+    every refusal each append one check wake (launch-gate-<run>, naming the run,
+    the reason and the time waited) to the root home's wake queue through
+    fm_wake_append.
   - AGENT keeps stdin, stdout and stderr; SIGTERM, SIGINT and SIGHUP sent to the
     gate are forwarded to it; its exit status is returned and a death by signal
     is re-raised. A missing or non-executable AGENT returns 127 or 126. A
     forked watcher, holding only a pipe the gate writes, SIGKILLs AGENT (and the
-    process group the gate leads) if the gate dies without finishing; an
-    internal error after the start kills AGENT before the gate exits.
+    process group the gate leads) if the gate dies without finishing; the agent's
+    process execs only after the watcher holds its pid, so a gate that dies at
+    the handoff leaves no agent; an internal error after the start kills AGENT
+    before the gate exits.
 
 Exit status of `run`, `pipeline-start` and `launch-gate`: COMMAND's own status; 126 when
 COMMAND cannot be executed, 127 when it is not found, 125 for a usage error; launch-gate
