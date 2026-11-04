@@ -601,14 +601,13 @@ class Watch:
 
     def start_requests(self):
         """A plane armed before requests existed starts at the DM's latest message on its first poll, never at
-        its history, and whatever the per-poll cap leaves for other work; returns whether it started here."""
+        its history, and whatever the per-poll cap leaves for other work."""
         channel = self.state.get('channel')
         if not channel or self.state.get('intake_cursor') is not None:
-            return False
+            return
         latest = self.api.call('conversations.history', channel=channel, limit=1)
         self.state['intake_cursor'] = self.newest(latest.get('messages'))
         self.commit()
-        return True
 
     def prepare(self):
         if not self.bound():
@@ -932,9 +931,9 @@ class Watch:
             return
         # The starting point of requests is set before anything uses the per-poll cap, so that a busy first
         # upgraded poll cannot skip a request sent after it; a failed read is held back like a mirror failure.
-        started, start_error = False, None
+        start_error = None
         try:
-            started = self.start_requests()
+            self.start_requests()
         except SlackError as error:
             start_error = error
         remaining, deferred = self.resume()
@@ -970,10 +969,8 @@ class Watch:
                 deferred = deferred or error
         deferred = self.resolve() or deferred
         # Last, so that the replies on tracked threads and the resolutions are never held back by it.
-        # A poll that has just set the starting point takes nothing in; the next poll reads from it.
         try:
-            if not started:
-                self.take_requests(remaining)
+            self.take_requests(remaining)
         except SlackError as error:
             if str(error) not in THREAD_ERRORS:
                 raise
