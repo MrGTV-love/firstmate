@@ -3305,12 +3305,14 @@ TRAIN_MEMBER_HEAD=
 TRAIN_HEAD=
 TRAIN_COPY_HEAD=
 
-# setup_train_history <case-dir> <landing: none|squash> <copy: head|prerebase|inside|extra> [train: merge|flat|flat-missing]
+# setup_train_history <case-dir> <landing: none|squash|merge> <copy: head|prerebase|inside|extra> [train: merge|flat|flat-missing]
 # Builds the member PR head H (two commits on top of a moved main: feature.txt, then
 # feature2.txt), the train head (a merge of H plus a second member's commit), and
 # then moves the default branch
 # on by editing feature.txt, so the content-in-default proof can never match.
 #   landing squash: the default branch also holds the train's squash commit.
+#   landing merge: the train head is merged into the default branch by a merge commit.
+#   TRAIN_REVERT_MEMBER=1: the train's last commit reverts the member's feature.txt.
 #   train flat: the pipeline rebased the train flat, so it replays the member's two
 #     commits as new commits and does not contain H. flat-missing: it replays only
 #     the second, so one of the member's commits never reached the train.
@@ -3352,12 +3354,19 @@ setup_train_history() {
   printf '%s\n' second > "$tmp/second.txt"
   git -C "$tmp" add -- second.txt
   git -C "$tmp" commit -q -m "second member work"
+  if [ "${TRAIN_REVERT_MEMBER:-0}" = 1 ]; then
+    git -C "$tmp" rm -q -- feature.txt
+    git -C "$tmp" commit -q -m "revert member feature"
+  fi
   TRAIN_HEAD=$(git -C "$tmp" rev-parse HEAD)
   git -C "$tmp" push -q origin "HEAD:refs/pull/9/head"
   git -C "$tmp" checkout -q main
   if [ "$landing" = squash ]; then
     git -C "$tmp" merge -q --squash train >/dev/null
     git -C "$tmp" commit -q -m "train squash (#9)"
+    git -C "$tmp" push -q origin main
+  elif [ "$landing" = merge ]; then
+    git -C "$tmp" merge -q --no-ff --no-edit train >/dev/null
     git -C "$tmp" push -q origin main
   fi
   printf '%s\n' changed-on-main > "$tmp/feature.txt"

@@ -64,11 +64,12 @@
 # A member PR that a merge train carried ends CLOSED, not merged, when the train
 # lands by squash. It has landed when the forge shows a train PR MERGED into the
 # task's base whose body lists exactly this member's URL "at <40-hex sha>" with the
-# member PR's recorded head, whose head carries that sha (an ancestor, or every
-# commit of it replayed there by equivalent patch ids, as a flat pipeline rebase
-# leaves it), and whose head carries the copy's work by the same ancestor or
-# rebased-commit proof above (teardown_train_landed owns the rule), except that a
-# commit reachable from the default branch is not skipped: its own patch must be in
+# member PR's recorded head, whose head carries that sha, and whose head carries
+# the copy's work (teardown_train_landed owns the rule). Carried means both that the
+# change reaches the train head, as an ancestor or by every commit's equivalent patch
+# id (a flat pipeline rebase leaves it so), and that its net change is present in the
+# train head's final tree, so a train that reverted it before landing carries nothing.
+# A commit reachable from the default branch is not skipped: its own patch must be in
 # the train, because an ours merge makes a commit reachable without its change.
 # The no-mistakes run record is never a train proof: it shows what a run pushed,
 # not that the copy's own commits survived into the train. The record-only routes
@@ -2439,7 +2440,11 @@ rebased_commits_are_in_pr_head() {
   TEARDOWN_UNPROVEN_COMMITS=
   current=$(git -C "$dir" rev-parse --verify "$ref" 2>/dev/null) || return 1
   default_ref=$(landed_default_ref) || default_ref=
-  if [ -n "$default_ref" ]; then
+  if [ -n "${TEARDOWN_PATCH_PROOF_BASE:-}" ]; then
+    # The train route: the train's patches are those the member's own base does not
+    # hold, whether or not the default branch has since taken the train in.
+    pr_commits=$(git -C "$dir" rev-list --no-merges "$pr_head" --not "$TEARDOWN_PATCH_PROOF_BASE" -- 2>/dev/null) || return 1
+  elif [ -n "$default_ref" ]; then
     pr_commits=$(git -C "$dir" rev-list --no-merges "$pr_head" --not "$default_ref" -- 2>/dev/null) || return 1
   else
     base=$(git -C "$dir" merge-base "$current" "$pr_head" 2>/dev/null) || return 1
@@ -2454,11 +2459,11 @@ rebased_commits_are_in_pr_head() {
       | sed '/^$/d' \
       | sort -u
   ) || return 1
-  # The train route sets TEARDOWN_PATCH_PROOF_NO_DEFAULT_SKIP: a commit reachable
-  # from the default branch is then still proven by its own patch, because
-  # reachability alone does not say the train carried it (an `ours` merge puts a
-  # commit in the default history without its change).
-  [ -z "${TEARDOWN_PATCH_PROOF_NO_DEFAULT_SKIP:-}" ] || default_ref=
+  # The train route sets TEARDOWN_PATCH_PROOF_BASE: a commit reachable from the
+  # default branch is then still proven by its own patch, because reachability
+  # alone does not say the train carried it (an `ours` merge puts a commit in the
+  # default history without its change).
+  [ -z "${TEARDOWN_PATCH_PROOF_BASE:-}" ] || default_ref=
   candidates=$(git -C "$dir" rev-list "$current" --not "$pr_head" ${default_ref:+"$default_ref"} -- 2>/dev/null) || return 1
   [ -n "$candidates" ] || return 1
   while IFS= read -r commit; do
@@ -2698,16 +2703,20 @@ pr_is_merged() {
 # when the forge shows a train PR that is MERGED into the task's base (base_branch=
 # when recorded, else the default branch), whose body lists "<member PR URL> at
 # <40-hex sha>" for exactly this member, whose sha is the member PR's recorded head
-# (the forge's headRefOid), and whose head carries that sha: an ancestor of the train
-# head, or every commit of it replayed there with an equivalent patch id (a train
-# the pipeline rebased flat does not contain the member head itself). Work mode (a
-# copy in TEARDOWN_LANDED_DIR at TEARDOWN_LANDED_REF) must also be carried by that
-# train head; both tests are teardown_train_carries: an ancestor, or every commit
-# the train head does not hold proven by the rebased-patch proof pr_is_merged
-# applies to the PR head, except that a commit reachable from the default branch
-# is not skipped: reachability does not show the train carried it (an `ours` merge
-# puts a commit in the default history without its change), so its own patch must
-# be among the train head's. No run record stands in for that proof.
+# (the forge's headRefOid), and whose head carries that sha (a train the pipeline
+# rebased flat does not contain the member head itself). Work mode (a copy in
+# TEARDOWN_LANDED_DIR at TEARDOWN_LANDED_REF) must also be carried by that train
+# head; both tests are teardown_train_carries, which needs the change to reach the
+# train AND its net content to be in the train head's tree. Reaching is an ancestor,
+# or every commit the train head does not hold proven by the rebased-patch proof
+# pr_is_merged applies to the PR head, measured from the member's own base so a train
+# the default branch has since merged still counts; a commit reachable from the
+# default branch is not skipped (an `ours` merge puts a commit in the default history
+# without its change), so its own patch must be among the train's. Content present
+# means every path of the member's net change holds the same content at the train
+# head, or the reverse of that change applies cleanly to the train head's tree;
+# history alone is not enough, since a train can revert a commit it contains.
+# No run record stands in for that proof.
 # Record mode (copy gone or slot reassigned) reads no copy.
 # A train is found by searching the forge for the member URL, never by a title,
 # branch name or comment text, and every candidate is verified from its own fields.
@@ -2719,12 +2728,78 @@ TEARDOWN_TRAIN_ANNOUNCED=0
 # The first accepted train and its member, recorded on the backlog close.
 TEARDOWN_TRAIN_PR_URL=
 TEARDOWN_TRAIN_MEMBER_URL=
-# Is <ref> carried by <train head>: an ancestor of it, or its commits replayed there?
+# The base of the member's own change: the fork point of <ref> from the default
+# branch as it stood before the train landed there. A train merged into the default
+# branch by a merge commit is found on its first-parent history and its first parent
+# is used, so the member's commits, which that merge made reachable, still lie
+# above the base. A base equal to <ref> leaves no change to prove and is refused.
+teardown_train_member_base() {  # <ref> <train head>
+  local dir=${TEARDOWN_LANDED_DIR:-$WT} ref=$1 train=$2 default_ref via anchor base
+  default_ref=$(landed_default_ref) || return 1
+  anchor=$default_ref
+  if git -C "$dir" merge-base --is-ancestor "$train" "$default_ref" 2>/dev/null; then
+    via=$(git -C "$dir" rev-list --first-parent --ancestry-path "$train..$default_ref" -- 2>/dev/null | tail -n 1)
+    [ -z "$via" ] || anchor=$(git -C "$dir" rev-parse --verify --quiet "$via^1^{commit}" 2>/dev/null) || return 1
+  fi
+  base=$(git -C "$dir" merge-base "$ref" "$anchor" 2>/dev/null) || return 1
+  [ "$base" != "$(git -C "$dir" rev-parse --verify "$ref^{commit}" 2>/dev/null)" ] || return 1
+  printf '%s\n' "$base"
+}
+
+# Is the member's net change (<base> to <ref>) still in <train head>'s final tree?
+# Either every path the change touches holds the same content there, or the
+# reverse of the change applies cleanly to that tree, which also covers a train that
+# built further on the same paths. History alone is not enough: a train can contain
+# a commit, or replay its patch, and then revert it before it lands.
+teardown_train_content_present() {  # <ref> <train head> <base>
+  local dir=${TEARDOWN_LANDED_DIR:-$WT} ref=$1 train=$2 base=$3 idx rc=1
+  local -a paths=()
+  local path
+  while IFS= read -r -d '' path; do
+    paths+=("$path")
+  done < <(git -C "$dir" diff --name-only -z --no-renames "$base" "$ref" -- 2>/dev/null)
+  [ "${#paths[@]}" -gt 0 ] || return 1
+  if GIT_LITERAL_PATHSPECS=1 git -C "$dir" diff --quiet --no-renames "$ref" "$train" -- "${paths[@]}" 2>/dev/null; then
+    return 0
+  fi
+  idx=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-train-index.XXXXXX") || return 1
+  if GIT_INDEX_FILE=$idx git -C "$dir" read-tree "$train" 2>/dev/null \
+     && git -C "$dir" diff --binary --full-index --no-renames "$base" "$ref" -- 2>/dev/null \
+        | GIT_INDEX_FILE=$idx git -C "$dir" apply --cached -R --check 2>/dev/null; then
+    rc=0
+  fi
+  rm -f "$idx"
+  return "$rc"
+}
+
+# Is <ref> carried by <train head>? Both must hold: the change reaches the train, as an
+# ancestor or by every commit's patch replayed there, and its net content is present
+# in the train head's tree. The first failing fact is left in TEARDOWN_TRAIN_CARRY_WHY.
+TEARDOWN_TRAIN_CARRY_WHY=
 teardown_train_carries() {  # <ref> <train head>
-  local TEARDOWN_LANDED_REF=$1 TEARDOWN_PATCH_PROOF_NO_DEFAULT_SKIP=1
+  local base reached=0
+  local TEARDOWN_LANDED_REF=$1
   TEARDOWN_UNPROVEN_COMMITS=
-  git -C "${TEARDOWN_LANDED_DIR:-$WT}" merge-base --is-ancestor "$1" "$2" 2>/dev/null \
-    || rebased_commits_are_in_pr_head "$2"
+  TEARDOWN_TRAIN_CARRY_WHY=
+  base=$(teardown_train_member_base "$1" "$2") || {
+    TEARDOWN_TRAIN_CARRY_WHY="leaves no change to measure (no base separates it from the default branch)"
+    return 1
+  }
+  if git -C "${TEARDOWN_LANDED_DIR:-$WT}" merge-base --is-ancestor "$1" "$2" 2>/dev/null; then
+    reached=1
+  else
+    local TEARDOWN_PATCH_PROOF_BASE=$base
+    rebased_commits_are_in_pr_head "$2" && reached=1
+  fi
+  if [ "$reached" != 1 ]; then
+    TEARDOWN_TRAIN_CARRY_WHY="neither contains it nor carries every commit of it"
+    return 1
+  fi
+  if ! teardown_train_content_present "$1" "$2" "$base"; then
+    TEARDOWN_UNPROVEN_COMMITS=
+    TEARDOWN_TRAIN_CARRY_WHY="reaches it in history, but its net change is not present in the train head's final tree"
+    return 1
+  fi
 }
 
 teardown_train_landed() {  # work <member pr url or number> | record <member pr url>
@@ -2823,7 +2898,7 @@ for pr in prs:
     }
     if ! teardown_train_carries "$mhead" "$h"; then
       TEARDOWN_UNPROVEN_COMMITS=
-      why="${why}train PR $u lists $murl at ${mhead:0:12}, but the train head ${h:0:12} neither contains it nor carries every commit of it"$'\n'
+      why="${why}train PR $u lists $murl at ${mhead:0:12}, but the train head ${h:0:12} $TEARDOWN_TRAIN_CARRY_WHY"$'\n'
       continue
     fi
     if [ "$mode" = work ]; then
@@ -2832,7 +2907,7 @@ for pr in prs:
         return 1
       }
       if ! teardown_train_carries "$current" "$h"; then
-        why="${why}train PR $u is a verified train for $murl, but this copy's work is not proven present in its head ${h:0:12}"$'\n'
+        why="${why}train PR $u is a verified train for $murl, but this copy's work is not proven present in its head ${h:0:12} ($TEARDOWN_TRAIN_CARRY_WHY)"$'\n'
         continue
       fi
     fi

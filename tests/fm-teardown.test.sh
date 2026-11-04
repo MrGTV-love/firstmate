@@ -3866,6 +3866,85 @@ assert_train_refused() {  # <case-dir> <label> <fact> [unknown]
   [ -z "$head" ] || [ "$(git -C "$case_dir/wt" rev-parse HEAD)" = "$head" ] || fail "$label: refusal moved the copy's HEAD"
 }
 
+# The proof is about delivered content, not history: a train can contain a member's
+# commit, or replay its patch, and then revert the change before it lands.
+test_train_reverted_member_never_counts_as_carried() {
+  local landing shape
+  for landing in squash merge; do
+    for shape in merge flat; do
+      # A copy at the member head is reachable from a default branch that took the
+      # train in by a merge commit; the existing reachability proof then decides it.
+      [ "$landing-$shape" != merge-merge ] || continue
+      TRAIN_REVERT_MEMBER=1 train_case "train-reverted-$landing-$shape" "$landing" head "" "$shape"
+      git -C "$TRAIN_CASE/wt" cat-file -e "$TRAIN_HEAD:feature.txt" 2>/dev/null \
+        && fail "train-reverted-$landing-$shape: the train head still holds the member's file"
+      git -C "$TRAIN_CASE/wt" cat-file -e "$TRAIN_COPY_HEAD:feature.txt" 2>/dev/null \
+        || fail "train-reverted-$landing-$shape: the copy lacks the member's file"
+      if [ "$shape" = merge ]; then
+        git -C "$TRAIN_CASE/wt" merge-base --is-ancestor "$TRAIN_COPY_HEAD" "$TRAIN_HEAD" \
+          || fail "train-reverted-$landing-$shape: the copy is not an ancestor of the train head"
+      else
+        git -C "$TRAIN_CASE/wt" merge-base --is-ancestor "$TRAIN_COPY_HEAD" "$TRAIN_HEAD" \
+          && fail "train-reverted-$landing-$shape: the flattened copy is an ancestor of the train head"
+      fi
+      assert_train_refused "$TRAIN_CASE" "train-reverted-$landing-$shape" "net change is not present in the train head's final tree"
+      assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "train-reverted-$landing-$shape: the train was accepted"
+    done
+  done
+  TRAIN_REVERT_MEMBER=0
+  pass "a train that reverted the member's change before landing is refused in the copy route, by ancestry and by patch replay, squashed or merged"
+}
+
+test_train_reverted_member_is_refused_in_the_record_only_route() {
+  local landing shape
+  for landing in squash merge; do
+    for shape in merge flat; do
+      TRAIN_REVERT_MEMBER=1 train_absent_case "train-reverted-record-$landing-$shape" "$shape" "$landing"
+      assert_train_refused "$TRAIN_CASE" "train-reverted-record-$landing-$shape" "net change is not present in the train head's final tree"
+      assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "train-reverted-record-$landing-$shape: the train was accepted"
+      [ "$(backlog_row_state "$TRAIN_CASE")" = in_flight ] || fail "train-reverted-record-$landing-$shape: refusal closed the backlog"
+    done
+  done
+  TRAIN_REVERT_MEMBER=0
+  pass "a train that reverted the member's change before landing is refused in the record-only route too"
+}
+
+# A train landed by a merge commit keeps its patch-equivalence proof: its head is
+# reachable from the default branch, yet its patches still show what it carried.
+test_train_merge_commit_landed_carries_a_prerebase_copy() {
+  local shape
+  for shape in merge flat; do
+    train_case "train-mergecommit-prerebase-$shape" merge prerebase "" "$shape"
+    git -C "$TRAIN_CASE/wt" merge-base --is-ancestor "$TRAIN_HEAD" origin/main \
+      || fail "train-mergecommit-prerebase-$shape: the train head is not reachable from the default branch"
+    git -C "$TRAIN_CASE/wt" merge-base --is-ancestor "$TRAIN_COPY_HEAD" "$TRAIN_HEAD" \
+      && fail "train-mergecommit-prerebase-$shape: the pre-rebase copy is an ancestor of the train head"
+    assert_train_allowed "$TRAIN_CASE" "train-mergecommit-prerebase-$shape"
+  done
+  train_case train-mergecommit-head merge head "" flat
+  assert_train_allowed "$TRAIN_CASE" "train-mergecommit-head"
+  pass "a pre-rebase copy is carried by a train landed with a merge commit, although the train head is reachable from the default branch"
+}
+
+test_train_merge_commit_landed_carries_the_record_only_member() {
+  train_absent_case train-mergecommit-record flat merge
+  run_teardown "$TRAIN_CASE" > "$TRAIN_CASE/stdout" 2> "$TRAIN_CASE/stderr" \
+    || fail "train-mergecommit-record: a carried train was refused: $(cat "$TRAIN_CASE/stderr")"
+  assert_grep "$TRAIN_URL" "$TRAIN_CASE/stderr" "train-mergecommit-record: stderr did not name the train PR"
+  assert_absent "$TRAIN_CASE/state/task-x1.meta" "train-mergecommit-record: accepted teardown left the task record"
+  pass "the record-only route accepts a member whose train was landed with a merge commit"
+}
+
+test_train_merge_commit_landed_still_refuses_uncarried_work() {
+  train_case train-mergecommit-extra merge extra "" flat
+  git -C "$TRAIN_CASE/wt" merge-base --is-ancestor "$TRAIN_HEAD" origin/main \
+    || fail "train-mergecommit-extra: the train head is not reachable from the default branch"
+  assert_train_refused "$TRAIN_CASE" "train-mergecommit-extra" "copy's work is not proven present"
+  assert_grep "unmerged follow-up" "$TRAIN_CASE/stderr" "train-mergecommit-extra: refusal did not name the uncarried commit"
+  pass "a copy holding a commit the merge-commit-landed train never carried is refused"
+}
+
+
 test_train_member_closed_landed_by_merged_train_allows() {
   train_case train-merge-landed none head
   seed_backlog_in_flight "$TRAIN_CASE"
@@ -3978,6 +4057,8 @@ test_train_refuses_a_train_merged_into_another_branch() {
   train_case train-recorded-base none head release
   assert_train_refused "$TRAIN_CASE" "train-recorded-base-refuse" "merged into main, not this task's base release"
   train_case train-recorded-base-ok none head release
+  git -C "$TRAIN_CASE/origin.git" branch release main
+  git -C "$TRAIN_CASE/wt" fetch -q origin
   train_list "$TRAIN_CASE" 9 MERGED release "$TRAIN_HEAD" "$(train_body "$TRAIN_MEMBER_URL" "$TRAIN_MEMBER_HEAD")"
   assert_train_allowed "$TRAIN_CASE" "train-recorded-base-ok"
   pass "the train must be merged into the task's base: the default branch, or its recorded base_branch"
@@ -4059,8 +4140,8 @@ test_train_other_refusals_stay() {
 
 # The record-only route (the copy is gone) applies the same verified-train rule and
 # reads no copy: the recorded PR is CLOSED, so only the forge's train proof counts.
-train_absent_case() {  # <name> [<train shape>]
-  train_case "$1" none head "" "${2:-merge}"
+train_absent_case() {  # <name> [<train shape>] [<landing>]
+  train_case "$1" "${3:-none}" head "" "${2:-merge}"
   write_windowless_legacy_meta "$TRAIN_CASE" no-mistakes ship "$TRAIN_CASE/missing-wt"
   append_pr_meta_url "$TRAIN_CASE"
   seed_backlog_in_flight "$TRAIN_CASE"
@@ -4502,6 +4583,11 @@ test_train_control_open_member_is_not_landed_by_a_train
 test_train_control_merged_member_keeps_the_existing_route
 test_train_control_content_proof_still_accepts_a_closed_member
 test_train_other_refusals_stay
+test_train_reverted_member_never_counts_as_carried
+test_train_reverted_member_is_refused_in_the_record_only_route
+test_train_merge_commit_landed_carries_a_prerebase_copy
+test_train_merge_commit_landed_carries_the_record_only_member
+test_train_merge_commit_landed_still_refuses_uncarried_work
 test_train_record_only_route_without_a_copy
 test_train_member_removed_copy_in_pool_slot
 test_teardown_removes_pr_ready_refusal_marker
