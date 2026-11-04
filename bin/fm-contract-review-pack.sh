@@ -6,7 +6,7 @@
 #
 # usage:
 #   fm-contract-review-pack.sh [build] --contract <file> [--request <file>]
-#       [--context <file>]... [--root <repo-root>]
+#       [--context <file>]... --root <repo-root>
 #       [--exclude <path>]...
 #       [--register <path>] [--history <path>] [--policy <file>]
 #       [--out-root <dir>] [--label <text>]
@@ -58,11 +58,15 @@
 #   heading of its own level or higher; text inside a code fence is never a heading.
 #   In the list, a line that starts with a path is checked when that path is one full
 #   path and nothing else on the line is path-like; a line with any other path-like text
-#   voids the round (REPORT STRUCTURE). A line that starts with a relative slash word with
-#   no extension (a folder, a file with no extension, a path with a space) is judged when
-#   the pack or the root holds that path; other text is skipped.
-#   A relative path is a pack file when the pack holds it, else a root path; with no root
-#   it is not authorized.
+#   voids the round (REPORT STRUCTURE). Every other word on a list line that holds a "/"
+#   or a ".", and every run of up to six words that starts with one, is judged when the
+#   pack or the root holds that path (a file or folder, with or without an extension,
+#   spaced or mid-line); other text is skipped. Three shape rules remain, because a root
+#   lookup cannot replace them: a leading path is judged even when it does not exist; an
+#   absolute, `~`, http(s), <rev>:<path> or dir/file.ext text that is not the leading
+#   path voids the round, because it may point outside the root; and a word with no "/"
+#   or "." is never a candidate, because prose words would match top-level root names.
+#   A relative path is a pack file when the pack holds it, else a root path.
 #   An authorized input is judged by what it is: a file inside the pack, the
 #   SKILL.md of the assess-done-and-grade or define-done-and-grading skill (no other
 #   file in either skill folder), the review rubric, or a file the manifest's root tracks (git ls-files, or
@@ -294,13 +298,14 @@ cmd_build() {
     esac
   done
   [ -n "$contract" ] || die "--contract is required"
+  [ -n "$root" ] || die "--root is required: the repository checkout the reviewer reads, so the check can judge every listed path against it"
   [ -f "$contract" ] && [ -r "$contract" ] || die "contract file not readable: $contract"
   [ -z "$request" ] || { [ -f "$request" ] && [ -r "$request" ] || die "request file not readable: $request"; }
   local f
   for f in ${contexts[@]+"${contexts[@]}"}; do
     [ -f "$f" ] && [ -r "$f" ] || die "context file not readable: $f"
   done
-  [ -z "$root" ] || [ -d "$root" ] || die "root is not a directory: $root"
+  [ -d "$root" ] || die "root is not a directory: $root"
   [ -n "$policy" ] || policy=${FM_CONTRACT_REVIEW_POLICY:-$FM_ROOT/.agents/skills/contract-review/SKILL.md}
   [ -f "$policy" ] && [ -r "$policy" ] || die "policy file not readable: $policy"
 
@@ -393,7 +398,7 @@ cmd_build() {
   {
     echo "# fm-contract-review-pack manifest: paths the reviewer must never read"
     printf 'pack\t%s\n' "$(real "$pack")"
-    [ -z "$root" ] || printf 'root\t%s\n' "$(real "$root")"
+    printf 'root\t%s\n' "$(real "$root")"
     printf 'exclude\t%s\n' "$(real "$contract")"
     [ -z "$request" ] || printf 'exclude\t%s\n' "$(real "$request")"
     for f in ${contexts[@]+"${contexts[@]}"} ${excludes[@]+"${excludes[@]}"}; do
@@ -521,18 +526,23 @@ inputs_read() { # <report>
           if (state == 1 && !lead && low ~ fieldlabel) unheaded = 1
         }
         if (state == 1 && !lead && pathlike(L[i])) badpath = 1
-        # A line that starts with a relative slash word and no extension (a folder, a file
-        # with no extension, a path with a space) names a candidate: the check judges it
-        # when the pack or the root holds it, and skips it as prose otherwise.
-        if (state == 1 && !lead) {
+        # Every word on a list line that holds a "/" or a ".", and every run of up to six
+        # words that starts with one, is a candidate: the check judges it when the pack or
+        # the root holds that path, whatever its shape, and skips it otherwise.
+        if (state == 1) {
           w = L[i]
           sub(/^[ \t]*([-*+]|[0-9]+[.)])[ \t]+/, "", w)
-          if (w ~ /^[`*"(<]*[^ \t]*\//) {
-            t = entry(L[i])
-            print "?\t" t
-            sub(/[ \t]+$/, "", w)
-            gsub(/^[`*"(<]+|[`*",;:.)>]+$/, "", w)
-            if (w != t) print "?\t" w
+          n = split(w, tok, /[ \t]+/)
+          delete seen
+          for (k = 1; k <= n; k++) {
+            run = ""
+            for (m = k; m <= n && m < k + 6; m++) {
+              run = (m == k) ? tok[m] : run " " tok[m]
+              c = run
+              gsub(/^[`*"(<]+|[`*",;:.)>]+$/, "", c)
+              if (m == k && c !~ /[\/.]/) break
+              if (c != "" && !(c in seen) && !(lead && c == t)) { seen[c] = 1; print "?\t" c }
+            }
           }
         }
       }
@@ -573,6 +583,7 @@ cmd_check() {
 
   local root skills fmroot rubric rubric_real
   root=$(manifest_lines "$manifest" root | head -1)
+  [ -n "$root" ] || die "manifest has no root; rebuild the pack with --root: $manifest"
   skills=${REVIEW_SKILLS_DIR:-$HOME/.agents/skills}
   fmroot=${REVIEW_FM_ROOT:-$FM_ROOT}
   rubric=${REVIEW_RUBRIC:-$fmroot/docs/review-rubric.md}
@@ -589,7 +600,7 @@ cmd_check() {
   log_real=''
   [ -z "$log" ] || log_real=$(real "$log")
   work_report=$(real "${REVIEW_WORK_ROOT:-$fmroot/data/review-lane/work}/$(basename "$(dirname "$pack")")-$(basename "$pack")/review.md")
-  local leaks=0 count=0 entry prev path revpath rel rev excluded x ok why loose cand
+  local leaks=0 count=0 entry prev path revpath rel rev excluded x ok why
   local list raw rc=0
   raw=$(inputs_read "$report") || rc=$?
   case $rc in
@@ -616,9 +627,14 @@ cmd_check() {
   fi
   while IFS= read -r entry; do
     [ -n "$entry" ] || continue
-    rev='' loose=0 cand=0
+    rev=''
     case $entry in
-      "?	"*) cand=1; entry=${entry#"?	"} ;;
+      "?	"*)
+        entry=${entry#"?	"}
+        x=$entry
+        if [[ $x =~ ^(.*)(:[0-9]+(-[0-9]+)?|:L[0-9]+(-L?[0-9]+)?|#L[0-9]+(-L?[0-9]+)?)$ ]]; then x=${BASH_REMATCH[1]}; fi
+        [ -e "$pack/$x" ] || [ -e "$root/$x" ] || [ -L "$root/$x" ] || continue
+        ;;
     esac
     # A trailing line reference (path:12, path:12-40, path:L10-L40, path#L10) names the same file.
     prev=''
@@ -626,9 +642,6 @@ cmd_check() {
       prev=$entry
       entry=$(printf '%s' "$entry" | sed -E 's/(:[0-9]+(-[0-9]+)?|:L[0-9]+(-L?[0-9]+)?|#L[0-9]+(-L?[0-9]+)?)$//')
     done
-    if [ "$cand" = 1 ] && [ ! -e "$pack/$entry" ] && { [ -z "$root" ] || [ ! -e "$root/$entry" ]; }; then
-      continue
-    fi
     count=$((count + 1))
     case "$entry" in
       http://* | https://*)
@@ -654,8 +667,7 @@ cmd_check() {
       /* | "~"*) ;;
       *)
         if [ -z "$rev" ] && [ -e "$pack/$path" ]; then path="$pack/$path"
-        elif [ -n "$root" ]; then path="$root/$path"
-        else path="$pack/$path"; [ -n "$rev" ] || loose=1
+        else path="$root/$path"
         fi
         ;;
     esac
@@ -673,8 +685,6 @@ EOF
       ok=1
     elif [ -n "$excluded" ]; then
       why="excluded path $excluded"
-    elif [ "$loose" = 1 ]; then
-      why="relative path that is not a pack file, and no root"
     elif [ -z "$rev" ] && path_under "$path" "$pack"; then
       ok=1
     elif [ -z "$rev" ] && { [ "$path" = "$rubric_real" ] || [ "$path" = "$assess_dir/SKILL.md" ] || [ "$path" = "$define_dir/SKILL.md" ]; }; then
@@ -683,7 +693,7 @@ EOF
       ok=1
     elif [ -n "$rev" ] && [ "$revpath" = "docs/review-rubric.md" ]; then
       why="the review rubric at a revision other than the pinned one"
-    elif [ -n "$root" ]; then
+    else
       if [ -n "$rev" ]; then
         if env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_COMMON_DIR git -C "$root" cat-file -e "$rev:$revpath" 2>/dev/null; then ok=1; fi
       elif path_under "$path" "$root"; then

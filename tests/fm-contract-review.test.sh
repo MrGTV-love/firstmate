@@ -65,7 +65,7 @@ EOF
 build_pack() { # <out-var> [builder args...]: prints nothing, sets the named variable to the pack dir
   local __var=$1 __out
   shift
-  __out=$("$PACK_BIN" "$@" 2>"$TMP_ROOT/build.err") || return $?
+  __out=$("$PACK_BIN" --root "$ROOT" "$@" 2>"$TMP_ROOT/build.err") || return $?
   printf -v "$__var" '%s' "$__out"
 }
 
@@ -97,7 +97,7 @@ test_unrecognised_section_refused() {
 ## Notes from the author
 
 ZZ-UNKNOWN-ZZ something the builder has no rule for.'
-  "$PACK_BIN" --contract "$src" --out-root "$out_root" >"$TMP_ROOT/u.out" 2>"$TMP_ROOT/u.err" || rc=$?
+  "$PACK_BIN" --root "$ROOT" --contract "$src" --out-root "$out_root" >"$TMP_ROOT/u.out" 2>"$TMP_ROOT/u.err" || rc=$?
   assert_equals 3 "$rc" "an unrecognised section must exit 3"
   err=$(cat "$TMP_ROOT/u.err")
   assert_contains "$err" "unrecognised section: Notes from the author" "the unrecognised heading is not named"
@@ -183,7 +183,7 @@ EOF
   assert_no_grep "ZZ-SETEXT-DROP-ZZ" "$pack/target.md" "an author setext section reached the pack"
   grep -qxF "$(printf 'dropped\tRevision log')" "$manifest" || fail "the dropped setext section is not listed in the manifest"
   printf '\nOther Title\n===\n\nZZ-SETEXT-H1-ZZ text.\n' >>"$src"
-  "$PACK_BIN" --contract "$src" --out-root "$TMP_ROOT/st-out" >/dev/null 2>"$TMP_ROOT/st.err" || rc=$?
+  "$PACK_BIN" --root "$ROOT" --contract "$src" --out-root "$TMP_ROOT/st-out" >/dev/null 2>"$TMP_ROOT/st.err" || rc=$?
   assert_equals 3 "$rc" "an unrecognised setext section must exit 3"
   assert_contains "$(cat "$TMP_ROOT/st.err")" "unrecognised section: Other Title" "the unrecognised setext heading is not named"
   assert_absent "$TMP_ROOT/st-out" "a refused setext build left an output directory"
@@ -200,7 +200,7 @@ test_code_fences_close_on_their_own_marker() {
   assert_no_grep "ZZ-ALLGREEN-ZZ" "$pack/target.md" "an author section after a closed fence reached the pack"
   write_fixture_contract "$src"
   awk '{ print } /^- \*\*A1\*\*/ { print ""; print "```text"; print "never closed" }' "$src" >"$src.tmp" && mv "$src.tmp" "$src"
-  "$PACK_BIN" --contract "$src" --out-root "$TMP_ROOT/fc-out" >"$TMP_ROOT/fc.out" 2>"$TMP_ROOT/fc.err" || rc=$?
+  "$PACK_BIN" --root "$ROOT" --contract "$src" --out-root "$TMP_ROOT/fc-out" >"$TMP_ROOT/fc.out" 2>"$TMP_ROOT/fc.err" || rc=$?
   assert_equals 3 "$rc" "a contract with an unclosed fence must exit 3"
   assert_contains "$(cat "$TMP_ROOT/fc.err")" "never closes" "the unclosed fence is not named"
   assert_absent "$TMP_ROOT/fc-out" "an unclosed fence left an output directory"
@@ -233,12 +233,12 @@ test_pack_layout_and_fresh_parent() {
   [ ! -s "$pack/diff.patch" ] || fail "the diff slot is not empty"
   parent=$(dirname "$pack")
   assert_equals "pack" "$(ls -A "$parent")" "the pack's parent holds more than the pack"
-  "$PACK_BIN" --contract "$src" --out-root "$parent" >/dev/null 2>"$TMP_ROOT/l.err" || rc=$?
+  "$PACK_BIN" --root "$ROOT" --contract "$src" --out-root "$parent" >/dev/null 2>"$TMP_ROOT/l.err" || rc=$?
   assert_equals 2 "$rc" "a build into a directory that holds a pack must be refused"
   mkdir -p "$TMP_ROOT/l-review"
   printf 'old report\n' >"$TMP_ROOT/l-review/review.md"
   rc=0
-  "$PACK_BIN" --contract "$src" --out-root "$TMP_ROOT/l-review" >/dev/null 2>&1 || rc=$?
+  "$PACK_BIN" --root "$ROOT" --contract "$src" --out-root "$TMP_ROOT/l-review" >/dev/null 2>&1 || rc=$?
   assert_equals 2 "$rc" "a build into a directory that holds a review.md must be refused"
   assert_equals "old report" "$(cat "$TMP_ROOT/l-review/review.md")" "a refused build changed the existing report"
   pass "each pack is built fresh, alone in its parent, and never beside an earlier report"
@@ -248,23 +248,23 @@ test_fails_safe_on_bad_input() {
   local src="$TMP_ROOT/f.md" rc err
   write_fixture_contract "$src"
   rc=0
-  "$PACK_BIN" --contract "$TMP_ROOT/absent.md" --out-root "$TMP_ROOT/f1" >/dev/null 2>"$TMP_ROOT/f.err" || rc=$?
+  "$PACK_BIN" --root "$ROOT" --contract "$TMP_ROOT/absent.md" --out-root "$TMP_ROOT/f1" >/dev/null 2>"$TMP_ROOT/f.err" || rc=$?
   assert_equals 2 "$rc" "a missing contract must exit nonzero"
   assert_absent "$TMP_ROOT/f1" "a missing contract left an output directory"
   rc=0
-  "$PACK_BIN" --contract "$src" --policy "$TMP_ROOT/absent-policy.md" --out-root "$TMP_ROOT/f2" >/dev/null 2>&1 || rc=$?
+  "$PACK_BIN" --root "$ROOT" --contract "$src" --policy "$TMP_ROOT/absent-policy.md" --out-root "$TMP_ROOT/f2" >/dev/null 2>&1 || rc=$?
   assert_equals 2 "$rc" "an unreadable policy must exit nonzero"
   assert_absent "$TMP_ROOT/f2" "an unreadable policy left an output directory"
   printf '# No done here\n\n## REQUEST\n\nA request only.\n' >"$TMP_ROOT/nodod.md"
   rc=0
-  "$PACK_BIN" --contract "$TMP_ROOT/nodod.md" --out-root "$TMP_ROOT/f3" >/dev/null 2>"$TMP_ROOT/f.err" || rc=$?
+  "$PACK_BIN" --root "$ROOT" --contract "$TMP_ROOT/nodod.md" --out-root "$TMP_ROOT/f3" >/dev/null 2>"$TMP_ROOT/f.err" || rc=$?
   assert_equals 2 "$rc" "a contract with no Definition Of Done must exit nonzero"
   assert_absent "$TMP_ROOT/f3" "a contract with no Definition Of Done left an output directory"
   err=$(cat "$TMP_ROOT/f.err")
   [ "$(printf '%s\n' "$err" | wc -l | tr -d ' ')" = 1 ] || fail "the failure cause is not one line: $err"
   printf 'no markers here\n' >"$TMP_ROOT/badpolicy.md"
   rc=0
-  "$PACK_BIN" --contract "$src" --policy "$TMP_ROOT/badpolicy.md" --out-root "$TMP_ROOT/f4" >/dev/null 2>&1 || rc=$?
+  "$PACK_BIN" --root "$ROOT" --contract "$src" --policy "$TMP_ROOT/badpolicy.md" --out-root "$TMP_ROOT/f4" >/dev/null 2>&1 || rc=$?
   assert_equals 2 "$rc" "a policy with no reviewer block must exit nonzero"
   assert_absent "$TMP_ROOT/f4" "a policy with no reviewer block left an output directory"
   pass "bad input exits nonzero with a one-line cause and writes nothing"
@@ -274,7 +274,7 @@ test_context_file_with_author_section_refused() {
   local src="$TMP_ROOT/c.md" ctx="$TMP_ROOT/ctx.md" rc=0
   write_fixture_contract "$src"
   printf '# Owner context\n\nA neutral fact.\n\n## Author self-check\n\nZZ-ALLGREEN-ZZ\n' >"$ctx"
-  "$PACK_BIN" --contract "$src" --context "$ctx" --out-root "$TMP_ROOT/c-out" >/dev/null 2>&1 || rc=$?
+  "$PACK_BIN" --root "$ROOT" --contract "$src" --context "$ctx" --out-root "$TMP_ROOT/c-out" >/dev/null 2>&1 || rc=$?
   assert_equals 2 "$rc" "a context file that holds an author section must be refused"
   assert_absent "$TMP_ROOT/c-out" "a refused context file left an output directory"
   printf '# Owner context\n\nZZ-KEEP-CTXFILE-ZZ a neutral fact.\n' >"$ctx"
@@ -289,7 +289,7 @@ test_context_file_with_author_section_refused() {
     printf '%b' "$body" >"$bad"
     for flag in --request --context; do
       rc=0
-      "$PACK_BIN" --contract "$src" "$flag" "$bad" --out-root "$TMP_ROOT/c-bad$n$flag" >/dev/null 2>"$TMP_ROOT/c.err" || rc=$?
+      "$PACK_BIN" --root "$ROOT" --contract "$src" "$flag" "$bad" --out-root "$TMP_ROOT/c-bad$n$flag" >/dev/null 2>"$TMP_ROOT/c.err" || rc=$?
       assert_equals 2 "$rc" "$flag file $n with author text was accepted"
       assert_contains "$(cat "$TMP_ROOT/c.err")" "author text" "$flag file $n refusal does not name the cause"
       assert_absent "$TMP_ROOT/c-bad$n$flag" "a refused $flag file left an output directory"
@@ -570,12 +570,12 @@ test_export_root_mode_is_gone() {
   local src="$TMP_ROOT/x.md" rc
   write_fixture_contract "$src"
   rc=0
-  "$PACK_BIN" --contract "$src" --export-root "$ROOT" --out-root "$TMP_ROOT/x1" >/dev/null 2>&1 || rc=$?
+  "$PACK_BIN" --root "$ROOT" --contract "$src" --export-root "$ROOT" --out-root "$TMP_ROOT/x1" >/dev/null 2>&1 || rc=$?
   assert_equals 2 "$rc" "--export-root was accepted"
   assert_absent "$TMP_ROOT/x1" "a refused --export-root left an output directory"
   assert_absent "$TMP_ROOT/x1.root" "a refused --export-root left an export directory"
   rc=0
-  "$PACK_BIN" --contract "$src" --root "$ROOT" --rev HEAD --out-root "$TMP_ROOT/x2" >/dev/null 2>&1 || rc=$?
+  "$PACK_BIN" --root "$ROOT" --contract "$src" --root "$ROOT" --rev HEAD --out-root "$TMP_ROOT/x2" >/dev/null 2>&1 || rc=$?
   assert_equals 2 "$rc" "--rev was accepted"
   assert_absent "$TMP_ROOT/x2" "a refused --rev left an output directory"
   pass "the builder takes the repository root only as --root"
@@ -656,7 +656,7 @@ test_preamble_author_text_matches_whole_words() {
   for body in "Author's self-check: everything passes.\n" 'Worker self-check: all green.\n' 'Status: all-green after the author analysis.\n' 'Author: the worker.\n'; do
     printf '%b' "$body" >"$ctx"
     rc=0
-    "$PACK_BIN" --contract "$src" --context "$ctx" --out-root "$TMP_ROOT/pw-out" >/dev/null 2>&1 || rc=$?
+    "$PACK_BIN" --root "$ROOT" --contract "$src" --context "$ctx" --out-root "$TMP_ROOT/pw-out" >/dev/null 2>&1 || rc=$?
     assert_equals 2 "$rc" "a context file with author text ($body) was accepted"
     assert_absent "$TMP_ROOT/pw-out" "a refused context file left an output directory"
   done
@@ -717,7 +717,7 @@ test_fences_and_headings_accept_up_to_three_spaces() {
   # An indented fence that never closes still stops the build.
   write_fixture_contract "$src"
   awk '{ print } /^- \*\*A1\*\*/ { print ""; print "  ```text"; print "never closed" }' "$src" >"$src.tmp" && mv "$src.tmp" "$src"
-  "$PACK_BIN" --contract "$src" --out-root "$TMP_ROOT/sp-out" >/dev/null 2>&1 || rc=$?
+  "$PACK_BIN" --root "$ROOT" --contract "$src" --out-root "$TMP_ROOT/sp-out" >/dev/null 2>&1 || rc=$?
   assert_equals 3 "$rc" "an unclosed indented fence did not stop the build"
   pass "fences and headings accept up to three leading spaces and four spaces is code"
 }
@@ -739,7 +739,7 @@ test_request_or_context_with_author_history_heading_refused() {
     body=${case#*:}
     printf '%b' "$body" >"$in"
     rc=0
-    "$PACK_BIN" --contract "$src" "$flag" "$in" --out-root "$TMP_ROOT/hh-out$n" >/dev/null 2>"$TMP_ROOT/hh.err" || rc=$?
+    "$PACK_BIN" --root "$ROOT" --contract "$src" "$flag" "$in" --out-root "$TMP_ROOT/hh-out$n" >/dev/null 2>"$TMP_ROOT/hh.err" || rc=$?
     assert_equals 3 "$rc" "$flag file $n with an author-history heading was accepted"
     assert_contains "$(cat "$TMP_ROOT/hh.err")" "unrecognised section:" "$flag file $n refusal does not name the section"
     assert_absent "$TMP_ROOT/hh-out$n" "a refused $flag file $n left an output directory"
@@ -762,7 +762,7 @@ test_recognised_heading_with_author_history_refused() {
   write_fixture_contract "$src"
   awk '{ print } /^ZZ-KEEP-CONTEXT-ZZ/ { print ""; print "## Context and earlier findings"; print ""; print "ZZ-C-ZZ F1 answered; the all-green check passes." }' "$src" >"$src.tmp" && mv "$src.tmp" "$src"
   rc=0
-  "$PACK_BIN" --contract "$src" --out-root "$TMP_ROOT/rh-c" >/dev/null 2>"$TMP_ROOT/rh.err" || rc=$?
+  "$PACK_BIN" --root "$ROOT" --contract "$src" --out-root "$TMP_ROOT/rh-c" >/dev/null 2>"$TMP_ROOT/rh.err" || rc=$?
   assert_equals 3 "$rc" "a contract with a recognised author-history heading was accepted"
   assert_contains "$(cat "$TMP_ROOT/rh.err")" "unrecognised section: Context and earlier findings" "the contract refusal does not name the section"
   assert_absent "$TMP_ROOT/rh-c" "a refused contract left an output directory"
@@ -770,7 +770,7 @@ test_recognised_heading_with_author_history_refused() {
   printf '# Owner context\n\n## Context and earlier findings\n\nZZ-C-ZZ F1 answered.\n' >"$in"
   for flag in --request --context; do
     rc=0
-    "$PACK_BIN" --contract "$src" "$flag" "$in" --out-root "$TMP_ROOT/rh$flag" >/dev/null 2>"$TMP_ROOT/rh.err" || rc=$?
+    "$PACK_BIN" --root "$ROOT" --contract "$src" "$flag" "$in" --out-root "$TMP_ROOT/rh$flag" >/dev/null 2>"$TMP_ROOT/rh.err" || rc=$?
     assert_equals 3 "$rc" "a $flag file with a recognised author-history heading was accepted"
     assert_contains "$(cat "$TMP_ROOT/rh.err")" "unrecognised section: Context and earlier findings" "the $flag refusal does not name the section"
     assert_absent "$TMP_ROOT/rh$flag" "a refused $flag file left an output directory"
@@ -807,18 +807,18 @@ test_author_history_in_every_heading_position_refused() {
       contract)
         write_fixture_contract "$src"
         awk '{ print } /^- \*\*A1\*\*/ { print ""; print "### Context and earlier findings"; print ""; print "ZZ-C3-ZZ F1 answered." }' "$src" >"$src.tmp" && mv "$src.tmp" "$src"
-        "$PACK_BIN" --contract "$src" --out-root "$TMP_ROOT/hp-out$n" >/dev/null 2>"$TMP_ROOT/hp.err" || rc=$?
+        "$PACK_BIN" --root "$ROOT" --contract "$src" --out-root "$TMP_ROOT/hp-out$n" >/dev/null 2>"$TMP_ROOT/hp.err" || rc=$?
         ;;
       contract-title)
         write_fixture_contract "$src"
         awk 'NR == 1 { print "# Context and earlier findings: answered"; next } { print }' "$src" >"$src.tmp" && mv "$src.tmp" "$src"
-        "$PACK_BIN" --contract "$src" --out-root "$TMP_ROOT/hp-out$n" >/dev/null 2>"$TMP_ROOT/hp.err" || rc=$?
+        "$PACK_BIN" --root "$ROOT" --contract "$src" --out-root "$TMP_ROOT/hp-out$n" >/dev/null 2>"$TMP_ROOT/hp.err" || rc=$?
         ;;
       *)
         write_fixture_contract "$src"
         flag=--$kind
         printf '%b' "$body" >"$in"
-        "$PACK_BIN" --contract "$src" "$flag" "$in" --out-root "$TMP_ROOT/hp-out$n" >/dev/null 2>"$TMP_ROOT/hp.err" || rc=$?
+        "$PACK_BIN" --root "$ROOT" --contract "$src" "$flag" "$in" --out-root "$TMP_ROOT/hp-out$n" >/dev/null 2>"$TMP_ROOT/hp.err" || rc=$?
         ;;
     esac
     assert_equals 3 "$rc" "case $n ($kind) with author history in a heading was accepted"
@@ -845,7 +845,7 @@ test_prior_counts_only_before_a_history_noun() {
     printf '# Owner context\n\n## %s\n\nZZ-PRIOR-HIST-ZZ F1 answered.\n' "$heading" >"$in"
     for flag in --request --context; do
       rc=0
-      "$PACK_BIN" --contract "$src" "$flag" "$in" --out-root "$TMP_ROOT/pr-out" >/dev/null 2>"$TMP_ROOT/pr.err" || rc=$?
+      "$PACK_BIN" --root "$ROOT" --contract "$src" "$flag" "$in" --out-root "$TMP_ROOT/pr-out" >/dev/null 2>"$TMP_ROOT/pr.err" || rc=$?
       [ "$rc" != 0 ] || fail "a $flag file with '## $heading' was accepted"
       assert_absent "$TMP_ROOT/pr-out" "a refused $flag file with '## $heading' left an output directory"
     done
@@ -858,7 +858,7 @@ test_prior_counts_only_before_a_history_noun() {
     write_fixture_contract "$src"
     awk -v h="$heading" '{ print } /^ZZ-KEEP-CONTEXT-ZZ/ { print ""; print "## Context: " h; print ""; print "ZZ-PRIOR-HIST-ZZ F1 answered." }' "$src" >"$src.tmp" && mv "$src.tmp" "$src"
     rc=0
-    "$PACK_BIN" --contract "$src" --out-root "$TMP_ROOT/pr-out" >/dev/null 2>"$TMP_ROOT/pr.err" || rc=$?
+    "$PACK_BIN" --root "$ROOT" --contract "$src" --out-root "$TMP_ROOT/pr-out" >/dev/null 2>"$TMP_ROOT/pr.err" || rc=$?
     assert_equals 3 "$rc" "a contract with '## Context: $heading' was accepted"
     assert_absent "$TMP_ROOT/pr-out" "a refused contract left an output directory"
   done
@@ -874,14 +874,14 @@ test_prior_revisions_heading_refused() {
   # Noncompliant: "Context: prior revisions" refuses in a contract, a request and a context file.
   awk '{ print } /^ZZ-KEEP-CONTEXT-ZZ/ { print ""; print "## Context: prior revisions"; print ""; print "ZZ-REV-ZZ rev 3 answered F1 by cutting E1." }' "$src" >"$src.tmp" && mv "$src.tmp" "$src"
   rc=0
-  "$PACK_BIN" --contract "$src" --out-root "$TMP_ROOT/rv-out" >/dev/null 2>"$TMP_ROOT/rv.err" || rc=$?
+  "$PACK_BIN" --root "$ROOT" --contract "$src" --out-root "$TMP_ROOT/rv-out" >/dev/null 2>"$TMP_ROOT/rv.err" || rc=$?
   assert_equals 3 "$rc" "a contract with 'Context: prior revisions' was accepted"
   assert_absent "$TMP_ROOT/rv-out" "a refused contract left an output directory"
   write_fixture_contract "$src"
   printf '# Owner context\n\n## Context: prior revisions\n\nZZ-REV-ZZ rev 3 answered.\n' >"$in"
   for flag in --request --context; do
     rc=0
-    "$PACK_BIN" --contract "$src" "$flag" "$in" --out-root "$TMP_ROOT/rv-out" >/dev/null 2>"$TMP_ROOT/rv.err" || rc=$?
+    "$PACK_BIN" --root "$ROOT" --contract "$src" "$flag" "$in" --out-root "$TMP_ROOT/rv-out" >/dev/null 2>"$TMP_ROOT/rv.err" || rc=$?
     assert_equals 3 "$rc" "a $flag file with 'Context: prior revisions' was accepted"
     assert_absent "$TMP_ROOT/rv-out" "a refused $flag file left an output directory"
   done
@@ -905,7 +905,7 @@ test_author_history_heading_under_unrecognised_parent_or_title_refused() {
     body=${case#*|}
     printf '%b' "$body" >"$in"
     rc=0
-    "$PACK_BIN" --contract "$src" "$flag" "$in" --out-root "$TMP_ROOT/up-out$n" >/dev/null 2>"$TMP_ROOT/up.err" || rc=$?
+    "$PACK_BIN" --root "$ROOT" --contract "$src" "$flag" "$in" --out-root "$TMP_ROOT/up-out$n" >/dev/null 2>"$TMP_ROOT/up.err" || rc=$?
     assert_equals 3 "$rc" "case $n ($flag) with an author-history heading was accepted"
     assert_contains "$(cat "$TMP_ROOT/up.err")" "author history" "case $n ($flag) refusal does not name the cause"
     assert_absent "$TMP_ROOT/up-out$n" "a refused case $n left an output directory"
@@ -917,7 +917,7 @@ test_title_is_not_the_definition_of_done() {
   local src="$TMP_ROOT/td.md" pack rc=0
   # Noncompliant: a title that names the Definition Of Done is not a Definition Of Done section.
   printf '# Definition Of Done: d3 steer\n\n## REQUEST\n\nA request.\n' >"$src"
-  "$PACK_BIN" --contract "$src" --out-root "$TMP_ROOT/td-out" >/dev/null 2>"$TMP_ROOT/td.err" || rc=$?
+  "$PACK_BIN" --root "$ROOT" --contract "$src" --out-root "$TMP_ROOT/td-out" >/dev/null 2>"$TMP_ROOT/td.err" || rc=$?
   assert_equals 2 "$rc" "a contract whose only Definition Of Done is its title was accepted"
   assert_contains "$(cat "$TMP_ROOT/td.err")" "no Definition Of Done section" "the refusal names another cause"
   assert_absent "$TMP_ROOT/td-out" "a refused contract left an output directory"
@@ -1078,7 +1078,7 @@ test_author_section_under_any_heading_of_request_or_context_refused() {
       *) printf '# Owner\n\n## Context\n\n%s\n\nZZ-CTX-ZZ F1 was closed.\n' "$heading" >"$in" ;;
     esac
     rc=0
-    "$PACK_BIN" --contract "$src" --context "$in" --out-root "$TMP_ROOT/ah-out$n" >/dev/null 2>"$TMP_ROOT/ah.err" || rc=$?
+    "$PACK_BIN" --root "$ROOT" --contract "$src" --context "$in" --out-root "$TMP_ROOT/ah-out$n" >/dev/null 2>"$TMP_ROOT/ah.err" || rc=$?
     assert_equals 2 "$rc" "a context file with '$heading' was accepted"
     assert_contains "$(cat "$TMP_ROOT/ah.err")" "author text" "the '$heading' refusal does not name the cause"
     assert_absent "$TMP_ROOT/ah-out$n" "a refused context file left an output directory"
@@ -1097,7 +1097,7 @@ test_exact_section_title_counts_as_a_section() {
   assert_grep 'the request is the REQUEST section of `target.md`' "$pack/contract.md" "a REQUEST title was not named as the request"
   # Noncompliant: a prefixed title is not the section.
   printf '# Definition Of Done: d3 steer\n\n## REQUEST\n\nA request.\n' >"$src"
-  "$PACK_BIN" --contract "$src" --out-root "$TMP_ROOT/es-out" >/dev/null 2>&1 || rc=$?
+  "$PACK_BIN" --root "$ROOT" --contract "$src" --out-root "$TMP_ROOT/es-out" >/dev/null 2>&1 || rc=$?
   assert_equals 2 "$rc" "a prefixed Definition Of Done title counted as the section"
   pass "a title counts as a section only when it is exactly the section name"
 }
@@ -1162,7 +1162,7 @@ test_exact_title_in_request_or_context_keeps_the_author_check() {
     printf "# %s\n\nAuthor's all-green self-check: ZZ-AUTH everything passes.\n" "$title" >"$in"
     for flag in --request --context; do
       rc=0
-      "$PACK_BIN" --contract "$src" "$flag" "$in" --out-root "$TMP_ROOT/xc-out" >/dev/null 2>"$TMP_ROOT/xc.err" || rc=$?
+      "$PACK_BIN" --root "$ROOT" --contract "$src" "$flag" "$in" --out-root "$TMP_ROOT/xc-out" >/dev/null 2>"$TMP_ROOT/xc.err" || rc=$?
       assert_equals 2 "$rc" "a $flag file '# $title' with an author line was accepted"
       assert_absent "$TMP_ROOT/xc-out" "a refused $flag file left an output directory"
     done
@@ -1170,26 +1170,23 @@ test_exact_title_in_request_or_context_keeps_the_author_check() {
   pass "an exact section title in a request or context file keeps the author-line refusal"
 }
 
-test_leak_check_without_root_refuses_a_relative_path_outside_the_pack() {
-  local src="$TMP_ROOT/nr.md" rep="$TMP_ROOT/report16.md" pack body
+test_build_requires_a_root() {
+  local src="$TMP_ROOT/nr.md" rep="$TMP_ROOT/report16.md" pack rc=0
   make_leak_world
   write_fixture_contract "$src"
-  build_pack pack --contract "$src" || fail "build without a root failed"
-  norootcheck() {
-    CHECK_RC=0
-    CHECK_OUT=$(REVIEW_SKILLS_DIR="$LEAK_SKILLS" REVIEW_RUBRIC="$LEAK_ROOT/docs/review-rubric.md" \
-      "$PACK_BIN" check --pack "$pack" --report "$rep" 2>&1) || CHECK_RC=$?
-  }
-  # Compliant: a pack file named relative to the pack is clean.
+  # Noncompliant: a build with no --root is refused by name and writes nothing.
+  "$PACK_BIN" build --contract "$src" --out-root "$TMP_ROOT/nr-out" >/dev/null 2>"$TMP_ROOT/nr.err" || rc=$?
+  assert_equals 2 "$rc" "a build with no --root was accepted"
+  assert_contains "$(cat "$TMP_ROOT/nr.err")" "--root is required" "the refusal does not name --root"
+  assert_absent "$TMP_ROOT/nr-out" "a refused build left an output directory"
+  # Compliant: with a root, a pack file named relative to the pack is clean.
+  build_pack pack --contract "$src" --root "$LEAK_ROOT" || fail "build with a root failed: $(cat "$TMP_ROOT/build.err")"
   printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- target.md\n- %s\n\n## Findings\n' "$pack/contract.md" >"$rep"
-  norootcheck
-  assert_equals 0 "$CHECK_RC" "a relative pack file was flagged with no root: $CHECK_OUT"
-  # Noncompliant: a relative path that is not a pack file is a leak with no root.
-  printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- %s\n- data/x/r23-review.md\n\n## Findings\n' "$pack/contract.md" >"$rep"
-  norootcheck
-  assert_equals 3 "$CHECK_RC" "a relative path outside the pack passed with no root"
-  assert_contains "$CHECK_OUT" "not a pack file, and no root" "the relative path was flagged for another cause"
-  pass "with no root, a relative path that is not a pack file is a leak"
+  CHECK_RC=0
+  CHECK_OUT=$(REVIEW_SKILLS_DIR="$LEAK_SKILLS" REVIEW_RUBRIC="$LEAK_ROOT/docs/review-rubric.md" \
+    "$PACK_BIN" check --pack "$pack" --report "$rep" 2>&1) || CHECK_RC=$?
+  assert_equals 0 "$CHECK_RC" "a relative pack file was flagged: $CHECK_OUT"
+  pass "a build needs --root, and a relative pack file is clean"
 }
 
 test_leak_check_voids_links_quotes_and_file_urls() {
@@ -1283,7 +1280,7 @@ test_leak_check_judges_a_slash_path_with_no_extension() {
   printf 'no extension\n' >"$LEAK_ROOT/data/case/truth/r23-review"
   printf 'spaced\n' >"$LEAK_ROOT/data/case/truth/r23 review.md"
   # Compliant: slash prose that names no file is skipped.
-  printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- %s\n- N/A\n- Helpers/subagents: none\n\n## Findings\n' "$LEAK_PACK/contract.md" >"$rep"
+  printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- %s\n- N/A\n- Helpers/subagents: none\n\nEXIT: needs-revision\n\nVERDICT: FAIL\n' "$LEAK_PACK/contract.md" >"$rep"
   run_check "$rep"
   assert_equals 0 "$CHECK_RC" "slash prose was flagged: $CHECK_OUT"
   assert_contains "$CHECK_OUT" "1 listed input(s)" "slash prose was counted as an input"
@@ -1294,14 +1291,16 @@ test_leak_check_judges_a_slash_path_with_no_extension() {
   assert_contains "$CHECK_OUT" "no Inputs read list" "a list of slash prose alone voided for another cause"
   # Noncompliant: a real file or folder under the root, named with no extension or with a space, is judged.
   # shellcheck disable=SC2016 # literal backticks in a report line
-  for line in '- data/case/truth/r23-review' '- data/case/truth/' '- data/case/truth/r23 review.md' '- `data/case/truth/r23 review.md`'; do
+  for line in '- data/case/truth/r23-review' '- data/case/truth/' '- data/case/truth/r23 review.md' '- `data/case/truth/r23 review.md`' \
+    '- data/case/truth/r23 review.md (read in full)' '- data/case/truth/r23 review.md: read in full' \
+    '- also read data/case/truth/r23-review' '- also read data/case/truth/' '- searched data/ for reports'; do
     n=$((n + 1))
     printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- %s\n%s\n\n## Findings\n' "$LEAK_PACK/contract.md" "$line" >"$rep"
     run_check "$rep"
     assert_equals 3 "$CHECK_RC" "slash path $n ($line) passed"
     assert_contains "$CHECK_OUT" "INPUT LEAK" "slash path $n ($line) was not judged as a leak"
   done
-  pass "a relative slash path with no extension or a space is judged when the root holds it"
+  pass "a path the root holds is judged whatever its shape: no extension, a folder, a space or mid-line"
 }
 
 test_tab_after_heading_hashes_is_a_heading() {
@@ -1357,7 +1356,7 @@ test_definition_of_done_in_every_heading_form() {
   # Noncompliant: a Definition Of Done heading that sits only inside a code fence is no section.
   # shellcheck disable=SC2016 # literal text in a fixture
   printf '# Fixture\n\n## REQUEST\n\nA request.\n\n```text\n## Definition Of Done\n```\n' >"$src"
-  "$PACK_BIN" --contract "$src" --out-root "$TMP_ROOT/dd-out" >/dev/null 2>"$TMP_ROOT/dd.err" || rc=$?
+  "$PACK_BIN" --root "$ROOT" --contract "$src" --out-root "$TMP_ROOT/dd-out" >/dev/null 2>"$TMP_ROOT/dd.err" || rc=$?
   assert_equals 2 "$rc" "a contract whose only Definition Of Done heading is fenced was accepted"
   assert_contains "$(cat "$TMP_ROOT/dd.err")" "no Definition Of Done section" "the fenced-only contract was refused for another cause"
   assert_absent "$TMP_ROOT/dd-out" "a refused contract left an output directory"
@@ -1431,7 +1430,7 @@ fm_test_run_cases \
   test_exact_section_title_keeps_its_text \
   test_report_field_under_a_label_voids_as_structure \
   test_exact_title_in_request_or_context_keeps_the_author_check \
-  test_leak_check_without_root_refuses_a_relative_path_outside_the_pack \
+  test_build_requires_a_root \
   test_leak_check_voids_links_quotes_and_file_urls \
   test_longer_field_label_voids_as_structure \
   test_leak_check_accepts_bare_entrypoint_lines_after_the_list \

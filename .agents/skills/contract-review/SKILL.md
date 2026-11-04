@@ -33,7 +33,7 @@ Read those lines before the run, and move any author text they show out of the c
 Keep the register and every earlier report, review history and `truth` file outside the pack, and pass them to the builder with `--exclude` so the leak check refuses them.
 
 Run the review through the existing entrypoint, `data/review-lane/run-review.sh <pack> no-pr <head> <diff-file> <repo-root> [model]`, with the pack's `head.txt` value as the head and the pack's empty diff file.
-For `<repo-root>`, pass the repository checkout, and give the builder the same path as `--root`: the check then accepts only files that checkout tracks, so a gitignored file such as one under `config/` or `data/` is a leak.
+For `<repo-root>`, pass the repository checkout, and give the builder the same path as `--root`, which the builder requires: the check then accepts only files that checkout tracks, so a gitignored file such as one under `config/` or `data/` is a leak.
 Use a reviewer model outside the author's family.
 Never retry a model that failed; switch to another allowed model.
 Never run a review in a pack folder that already holds a report.
