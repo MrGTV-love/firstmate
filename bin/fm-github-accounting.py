@@ -70,7 +70,12 @@ caller's last process row can outlive 48 hours by up to its 24-hour renewal inte
 or by the failed-scan gap that delayed its end row, at most another 48 hours. At a
 normal stop the owner writes one fresh process row for each caller it has not seen
 end, with the saved projection and first_observed_at and no process_end row, because
-a stop does not show that a caller departed. A SIGKILL or a power loss writes no such
+a stop does not show that a caller departed. That row's observed_at is the stop time,
+not a new sighting: the same run's owner row with action=stop marks that time, and the
+caller may have ended unseen before it. With no end row, every successful scan in that
+run listed the caller, and the last sampling row with more scans than failures bounds
+the last successful scan to about one quota interval; a hung scan counts only as
+started, which widens that bound. A SIGKILL or a power loss writes no such
 row, so that caller's latest process row can expire at 48 hours while a quota row it
 overlapped is retained. A failed scan
 ends nothing and no row is written per scan. A caller still alive when the observer
