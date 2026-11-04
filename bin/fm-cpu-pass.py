@@ -775,17 +775,17 @@ def active_term(report: dict) -> Optional[Tuple[int, int]]:
 
 
 def project(available: int, rss: dict, counted: dict, steps: Optional[dict], launches: dict,
-            reservation: int, slack: int, term: int, self_run: Optional[str] = None,
-            launched: frozenset = frozenset()) -> dict:
+            reservation: int, slack: int, term: int, self_run: Optional[str] = None) -> dict:
     """The reservation fit for one more active run; a pure function of its facts.
 
     counted maps each counted run ID to its repo ID; rss is the reading's run map
     (keyed no-mistakes:<repo>/<run>); steps is open_steps() or None; launches maps
-    run IDs to their live launch-gate reservations; launched holds the run keys
-    whose tree has a process the no-mistakes daemon itself started (an agent or
-    a launcher, see daemon_launched). A run waiting on remote CI (open step ci,
-    status running, no recorded agent pid, no live launch and no daemon-started
-    process) reserves only the memory it holds. Every other counted or launched run reserves its
+    run IDs to their live launch-gate reservations. A run waiting on remote CI
+    (open step ci, status running, no recorded agent pid, no live launch) whose
+    tree the reading cannot see reserves nothing. Once any process of such a run
+    is visible it is never read as idle: an agent may have started before its pid
+    was recorded, whatever it is named, so it reserves its resident memory or A,
+    whichever is larger, like any active run. Every other counted or launched run reserves its
     resident memory or the active-run term A, whichever is larger, once its tree
     is visible, and its full R while the reading cannot see it yet. The new run
     reserves S. The waiting launch's own run (self_run) is a waiter: it adds only
@@ -797,8 +797,7 @@ def project(available: int, rss: dict, counted: dict, steps: Optional[dict], lau
         runs.setdefault(run, entry.get("repo"))
     held = 0
     for run in sorted(runs):
-        key = "no-mistakes:%s/%s" % (runs[run], run)
-        seen = rss.get(key)
+        seen = rss.get("no-mistakes:%s/%s" % (runs[run], run))
         size = seen["rss_bytes"] if seen and type(seen.get("rss_bytes")) is int else 0
         visible = bool(seen) and seen.get("processes", 0) > 0
         step = None if steps is None else steps.get(run)
@@ -809,7 +808,7 @@ def project(available: int, rss: dict, counted: dict, steps: Optional[dict], lau
             kind = "launched"
             demand = max(size, term) if visible else reservation
         elif (steps is not None and step is not None and step[0] == CI_STEP and step[1] == "running"
-              and step[2] is None and key not in launched):
+              and step[2] is None and not visible):
             kind, demand = "ci-waiting", size
         else:
             kind = "step-unreadable" if steps is None else ("no-open-step" if step is None else "active")
@@ -874,23 +873,6 @@ def host_observation(fresh: bool = False) -> dict:
     return _observed
 
 
-DAEMON_COMM = "no-mistakes"
-
-
-def daemon_launched(report: dict) -> frozenset:
-    """Run keys whose tree in the reading has a process whose parent is the no-mistakes daemon.
-
-    The daemon starts each agent (or the launcher that execs or gates it) as its
-    own child in the run worktree, so such a process proves a live agent round
-    whatever the agent's name; Claude Code's native binary, for one, is named by
-    its version (2.1.318 in the 2026-11-03 census). The daemon's own short-lived
-    commands there count as well, which only keeps a reservation, never drops one.
-    """
-    rows = report.get("processes") or []
-    daemons = {row.get("pid") for row in rows if row.get("comm") == DAEMON_COMM}
-    return frozenset(row["run"] for row in rows if row.get("run") and row.get("ppid") in daemons)
-
-
 def admission(reasons: List[str], report: Optional[dict], running: dict, counted: dict, steps: Optional[dict],
               launches: dict, cores: int, priority: str, self_run: Optional[str] = None,
               measured: Optional[Tuple[Tuple[int, int, int], Tuple[int, int]]] = None) -> Tuple[bool, str]:
@@ -909,8 +891,7 @@ def admission(reasons: List[str], report: Optional[dict], running: dict, counted
         limit = max(1, cores // 3)
         return others < limit, "counted=%d limit=%d basis=fallback priority=%s" % (others, limit, priority)
     (reservation, slack, qualifying), (term, readings) = measured
-    fit = project(report["available_bytes"], report["runs"], counted, steps, launches, reservation, slack, term, self_run,
-                  daemon_launched(report))
+    fit = project(report["available_bytes"], report["runs"], counted, steps, launches, reservation, slack, term, self_run)
     return fit["admit"], projection_text(fit, reservation, slack, term, qualifying, readings) + " priority=%s" % priority
 
 

@@ -84,7 +84,7 @@ projected  =   the reservations of the counted runs  +  S for the new run
 
 | A counted run that is | reserves | why |
 |---|---|---|
-| waiting on remote CI: its open step is `ci` with status `running`, no agent pid is recorded, no launch-gate reservation is live and no process in its tree was started by the no-mistakes daemon (the daemon starts each agent, or its launcher, as its own child, whatever the agent is named) | only the resident memory it holds (0 while no process of it is visible) | it uses memory again only when a fix round starts, and that agent starts only through the [launch gate](#launch-gate), which secures capacity first |
+| waiting on remote CI: its open step is `ci` with status `running`, no agent pid is recorded, no launch-gate reservation is live and the reading sees no process of it (a visible process may be an agent whose pid is not recorded yet, so it counts as active) | only the resident memory it holds (0 while no process of it is visible) | it uses memory again only when a fix round starts, and that agent starts only through the [launch gate](#launch-gate), which secures capacity first |
 | visible in the reading at any other step, or with a live launch-gate reservation | its resident memory or `A`, whichever is larger | startup memory alone is not its demand; memory above `A` is counted as it is, never capped at `R`, `S` or a recorded peak |
 | not visible yet: just registered, between steps, with an unreadable step, or a launch-gate start the reading cannot see | `R` | the reading cannot show what it will use, so it is never read as idle |
 

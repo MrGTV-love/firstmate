@@ -61,6 +61,16 @@ if len(sys.argv) > 1 and os.path.basename(sys.argv[1]) in ('fm-cpu-pass.py', 'fm
             return real_waitpid(pid, options)
         os.fork = recording_fork
         os.waitpid = broken_waitpid
+        import subprocess
+        real_wait = subprocess.Popen.wait
+        def broken_wait(self, timeout=None):
+            # A gate that waits through subprocess.Popen (as 5d51fa8be did) meets the same injected error.
+            if not raised and any('agent.py' in str(part) for part in self.args):
+                raised.append(self.pid)
+                while not glob.glob(os.path.join(os.environ['CASE_FOLDER'], '*.agent')): time.sleep(0.025)
+                raise RuntimeError('injected gate error after the agent started')
+            return real_wait(self, timeout)
+        subprocess.Popen.wait = broken_wait
     if os.environ.get('CASE_KILL_BEFORE_PID'):
         import signal
         real_write = os.write
@@ -571,8 +581,10 @@ try:
         if admitted:
             finish(child)
             held_now = visible[0][2] if visible else 0
+            # Unseen, the CI waiter reserves nothing; seen at 4 GiB (above A), it is counted at what it holds, uncapped.
+            entry = 'holding_only=[x:ci-waiting:0:unseen' if not visible else 'reserved=[x:active:%d' % held_now
             assert 'admitted: counted=1 projected=%d ' % (held_now + 8 * GIB) in log.read_text() and \
-                'holding_only=[x:ci-waiting:%d' % held_now in log.read_text(), (label, log.read_text())
+                entry in log.read_text(), (label, log.read_text())
         else:
             pending(folder, 1)
             wait_for(lambda: 'waiting: counted=1 projected=%d ' % (11 * GIB) in log.read_text(), label + ' keeps its reservation')
@@ -1325,12 +1337,13 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
         assert code == 0 and (folder / 'data.stdout').read_text() == 'no-mistakes axi run --intent goal ', (code, (folder / 'data.stderr').read_text())
 
     def visible_agent():
-        # F4: a process the daemon started in a ci:running run with no recorded pid is a live agent (A), not idle.
+        # F4: a visible process in a ci:running run with no recorded pid may be an agent the daemon has not
+        # recorded yet, so it reserves A, not its startup memory; the unseen CI waiter still reserves nothing.
         for label, launched_by_daemon, admitted in (('agent', True, False), ('no-agent', False, True)):
             folder, db, env = case('fix-f4-' + label, measured=True, available=int(8.5 * GIB))
             change(db, "INSERT INTO runs (id, status, repo_id) VALUES ('x', 'running', 'repo')")
             change(db, "INSERT INTO step_results (id, run_id, step_name, step_order, status, agent_pid) VALUES ('x-ci', 'x', 'ci', 1, 'running', NULL)")
-            facts(folder, available=int(8.5 * GIB), runs=[('repo', 'x', GIB // 5, launched_by_daemon)])
+            facts(folder, available=int(8.5 * GIB), runs=[('repo', 'x', GIB // 5, True)] if launched_by_daemon else [])
             child = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'm')], env, folder / 'f4')
             if admitted:
                 finish(child)
@@ -1390,7 +1403,7 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
 
     for name, body in (('F1 nested expanded start', nested_expanded), ('F2 identical sibling start', identical_sibling),
                        ('F2 explicit reuse inside one admission', explicit_reuse), ('F2 second nested descendant', second_descendant),
-                       ('F3 start words as data', data_words), ('F4 daemon-started agent at ci:running', visible_agent),
+                       ('F3 start words as data', data_words), ('F4 visible process at ci:running with no recorded pid', visible_agent),
                        ('F5 gate killed at the pid handoff', handoff_kill), ('F6 grant after the hold bound', late_grant),
                        ('F7 start-lock contention record', lock_contention_record)):
         fix_case(name, body)
