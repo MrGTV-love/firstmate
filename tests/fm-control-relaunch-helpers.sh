@@ -64,6 +64,24 @@ make_process_table_stub() { # <case-dir>
   cat > "$1/fakebin/ps" <<'SH'
 #!/usr/bin/env bash
 D=$FM_FAKE_DIR
+# A natively restored claude behind the TeamClaude launcher: the launcher is the
+# attributed foreground process and the harness is its direct child in its group.
+if [ -f "$D/claude-launcher" ]; then
+  uuid=$(cat "$D/claude-launcher")
+  launcher_args="node /host/nvm/bin/teamclaude run -- --resume $uuid"
+  [ ! -f "$D/claude-launcher-args" ] || launcher_args=$(cat "$D/claude-launcher-args")
+  child_args="claude --resume $uuid"
+  [ ! -f "$D/claude-child-args" ] || child_args=$(cat "$D/claude-child-args")
+  case "$*" in
+    '-axo pid=,ppid=') printf '2000000000 1\n2000000001 2000000000\n'; exit 0 ;;
+    '-axo pid=,ppid=,pgid=') printf '2000000000 1 2000000000\n2000000001 2000000000 2000000000\n'; exit 0 ;;
+    '-p 2000000000 -o comm=') printf 'node\n'; exit 0 ;;
+    '-p 2000000000 -o args=') printf '%s\n' "$launcher_args"; exit 0 ;;
+    '-p 2000000001 -o comm=') printf '2.1.316\n'; exit 0 ;;
+    '-p 2000000001 -o args=') printf '%s\n' "$child_args"; exit 0 ;;
+    '-p 2000000000 -o lstart='|'-p 2000000001 -o lstart=') printf 'Mon Oct 27 16:58:42 2026\n'; exit 0 ;;
+  esac
+fi
 # The one process a case stages as holding the task's worktree.
 if [ -f "$D/holder-pid" ] && [ "${1:-}" = -p ] && [ "${2:-}" = "$(cat "$D/holder-pid")" ]; then
   case "${3:-} ${4:-}" in
@@ -93,9 +111,11 @@ if [ "$#" = 2 ] && [ "$1" = - ]; then
   if [ -f "$D/herdr-pids/$pid" ]; then D=$(cat "$D/herdr-pids/$pid"); fi
   expected=2000000000
   [ ! -f "$D/recovery-pid" ] || expected=$(cat "$D/recovery-pid")
-  if [ -f "$D/recovery-case-id" ] && [ "$pid" = "$expected" ]; then
+  if [ -f "$D/recovery-case-id" ] \
+    && { [ "$pid" = "$expected" ] || { [ -f "$D/claude-launcher" ] && [ "$pid" = "$((expected + 1))" ]; }; }; then
     [ ! -f "$D/recovery-env-unreadable" ] || exit 1
     printf 'PATH=/test\n'
+    [ ! -f "$D/claude-home" ] || printf 'HOME=%s\n' "$(cat "$D/claude-home")"
     if [ -f "$D/launched-command" ]; then
       case "$(cat "$D/replacement-env" 2>/dev/null)" in
         missing) exit 0 ;;
@@ -128,7 +148,7 @@ SH
 D=$FM_FAKE_DIR
 if [ -f "$D/adoption-cwd" ] && [ "${*: -1}" = pn0 ]; then
   [ ! -f "$D/adoption-cwd-unreadable" ] || exit 1
-  printf 'p%s\0\nn%s\0\n' "$(cat "$D/recovery-pid")" "$(cat "$D/adoption-cwd")"
+  printf 'p%s\0\nn%s\0\n' "${4:-$(cat "$D/recovery-pid")}" "$(cat "$D/adoption-cwd")"
   exit 0
 fi
 encode_cwd() {
@@ -970,6 +990,14 @@ case "${1:-} ${2:-}" in
         if [ -f "$D/recovery-foreign-foreground" ]; then
           printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%s","shell_pid":4242,"foreground_processes":[{"pid":%s,"name":"python3","argv":["python3","-c","input()"],"cmdline":"python3 -c input()"}]}}}\n' \
             "$(cat "$D/herdr-pane")" "$pid"
+          exit 0
+        fi
+        if [ -f "$D/claude-launcher" ]; then
+          jq -nc --arg pane "$(cat "$D/herdr-pane")" \
+            '{result:{type:"pane_process_info",process_info:{pane_id:$pane,shell_pid:4242,
+              foreground_process_group_id:2000000000,
+              foreground_processes:[{pid:2000000000,name:"node",argv0:"node"},
+                {pid:2000000001,name:"2.1.316",argv0:"claude"}]}}}'
           exit 0
         fi
         harness=omp

@@ -51,6 +51,9 @@
 # request text, the bound, the failure vocabulary, and this report are all
 # computed here in the primary and are identical for both.
 #
+# Before any effect (pending-reply record, persistence request, fallback nudge),
+# a local Herdr mate whose live agent the launch-proof owner cannot attribute to
+# its task is reported as unreached with the cause and receives none of them.
 # Nothing here forces, stashes, or discards anything. bin/fm-control.sh owns the
 # restart transaction, its checkpoint, its journal, and its rollback; a refusal
 # before the agent is stopped leaves the mate running exactly as it was.
@@ -72,7 +75,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 
 usage() {
-  sed -n '2,65{s/^# \{0,1\}//;p;}' "$0"
+  sed -n '2,68{s/^# \{0,1\}//;p;}' "$0"
 }
 
 case "${1:-}" in
@@ -267,6 +270,14 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
   PLACEMENT[i]=$FM_SECONDMATE_RESTART_PLACEMENT
   HOST[i]=$FM_SECONDMATE_RESTART_HOST
   HARNESS[i]=$FM_SECONDMATE_RESTART_HARNESS
+  # Attribution is decided before any effect reaches the pane: an agent that is
+  # not positively this task's own gets no request, no record and no nudge.
+  if ! fm_secondmate_restart_attribution "$STATE/$id.meta"; then
+    PLAN[i]="refused"
+    REASON[i]=$FM_SECONDMATE_RESTART_REASON
+    i=$((i + 1))
+    continue
+  fi
   if [ "${PLACEMENT[i]}" = remote ]; then
     # A local relaunch re-resolves this home's durable secondmate pin on its own,
     # which is the one owner of that resolution. A remote one cannot: it runs in
@@ -328,6 +339,9 @@ i=0
 while [ "$i" -lt "${#IDS[@]}" ]; do
   if [ "${PLAN[i]}" = persisted-pending ]; then
     pending_count=$((pending_count + 1))
+  elif [ "${PLAN[i]}" = refused ]; then
+    report_unreached "${IDS[$i]}" "${REASON[i]}"
+    PLAN[i]="done"
   else
     fall_back_to_nudge "${IDS[$i]}" "${REASON[i]}"
     PLAN[i]="done"

@@ -22,7 +22,8 @@
 # --recover-launch is Herdr-only inspection under the control lock.
 # Managed and stopped agents are left untouched. Unmanaged live agents are
 # reported without lifecycle input; native restoration does not prove ownership.
-# Unknown proof on a versioned launch refuses. A legacy record (no launch_proof)
+# Unknown proof on a versioned launch refuses; an unadopted unpinned claude
+# refuses with its own cause. A legacy record (no launch_proof)
 # keeps exit and relaunch: an unpinned legacy omp is reported as such, and other
 # legacy-unproven launches skip.
 # This mode cannot change a profile or create a relaunch transaction.
@@ -76,7 +77,8 @@
 # record, instructions file, and slot claim already published.
 # docs/agent-control.md "Reassociating a task with a replacement
 # copy" owns every refusal and what each reader of the record does after it.
-# adopt repairs only a local Herdr omp task's state/<id>.omp-session.json,
+# adopt repairs a local Herdr omp task's state/<id>.omp-session.json (a claude
+# secondmate is authorized by its own record, below),
 # under the task's control and metadata locks. The lock-owning main Firstmate
 # alone may run it: a worker, the supervision branch, or a session that does
 # not own the home lock is refused, as for authorize-continuation and
@@ -111,6 +113,15 @@
 # harnesses and backends keep their existing proof rules.
 # docs/agent-control.md "Repairing a restored omp session record" owns the
 # operator contract and the residual risk of an unpinned adopted process.
+# For a local Herdr claude secondmate, adopt instead writes only
+# state/<id>.claude-adoption.json (never launch_proof, spawn_gen or another
+# field), under the same lock-owner gate, after fm_launch_proof_claude_adoption
+# proves the restored process is the task's own conversation: the attributed
+# claude harness (or a listed forwarding launcher around exactly one), its
+# kernel cwd, no launch pin, an exclusive pane and home claim, and a
+# task-specific session tie. Lifecycle readers rerun those proofs at every use;
+# a relaunch removes the spent record. docs/agent-control.md "Adopting a
+# restored claude agent" owns the contract and its residual risk.
 # --worktree <path> is shared by two verbs and parsed once: relaunch accepts a
 # prepared absolute destination for a ship relaunch, and reassociate names the
 # replacement copy the record moves to.
@@ -1440,8 +1451,31 @@ if [ "$VERB" = adopt ]; then
   . "$SCRIPT_DIR/fm-session-lock-lib.sh"
   fm_session_lock_owned_by_self "$STATE" \
     || die "session record adoption requires the actual lock-owning main Firstmate"
-  [ "$BACKEND" = herdr ] && [ "$RECORDED_HARNESS" = omp ] \
-    || die "adopt needs a local Herdr omp task; no session record was changed"
+  case "$BACKEND:$RECORDED_HARNESS" in
+    herdr:omp|herdr:claude) ;;
+    *) die "adopt needs a local Herdr omp or claude task; no record was changed" ;;
+  esac
+  if [ "$RECORDED_HARNESS" = claude ]; then
+    CONTROL_META_LOCK=$(fm_meta_lock_path "$META") || die "adopt needs the task metadata lock"
+    fm_lock_acquire_wait "$CONTROL_META_LOCK"
+    CONTROL_META_LOCK_HELD=1
+    fm_backend_validate_task_endpoint "$META" "$ID" || exit 1
+    adoption_record=$(fm_launch_proof_claude_adoption "$META") || exit 1
+    CONTROL_META_TMP=$(mktemp "$STATE/.$ID.claude-adoption.adopt.XXXXXX") \
+      || die "adopt needs a writable state directory"
+    printf '%s\n' "$adoption_record" > "$CONTROL_META_TMP" \
+      || die "adopt could not stage the adoption record"
+    # Refuse a changing foreground, session, or generation rather than publish
+    # a proof gathered for a different activation.
+    adoption_recheck=$(fm_launch_proof_claude_adoption "$META") || exit 1
+    [ "$adoption_record" = "$adoption_recheck" ] \
+      || die "adopt needs stable foreground, session, and generation proof; retry after they settle"
+    mv -f -- "$CONTROL_META_TMP" "$STATE/$ID.claude-adoption.json" \
+      || die "adopt could not publish the adoption record"
+    CONTROL_META_TMP=
+    printf 'adopted: %s\n' "$ID"
+    exit 0
+  fi
   CONTROL_META_LOCK=$(fm_meta_lock_path "$META") || die "adopt needs the task metadata lock"
   fm_lock_acquire_wait "$CONTROL_META_LOCK"
   CONTROL_META_LOCK_HELD=1
@@ -1493,8 +1527,12 @@ busy_verdict() {
   fm_busy_classify_meta "$META" "$ID" "$STATE"
 }
 
+# ATTRIBUTION_REFUSAL carries the cause a refusal names: the verdict is read once
+# by fm_launch_proof_herdr_refusal, and every refusing site appends its text.
+ATTRIBUTION_REFUSAL=''
 require_live_task_attribution() {
   local state=${1:-} absence
+  ATTRIBUTION_REFUSAL=''
   [ "$BACKEND" = herdr ] || return 0
   [ -n "$state" ] || state=$(agent_state)
   if [ "$state" = missing ]; then
@@ -1506,7 +1544,11 @@ require_live_task_attribution() {
     alive) ;;
     *) return 1 ;;
   esac
-  fm_launch_proof_herdr_authorizes "$META"
+  if ATTRIBUTION_REFUSAL=$(fm_launch_proof_herdr_refusal "$META"); then
+    ATTRIBUTION_REFUSAL=''
+    return 0
+  fi
+  return 1
 }
 
 # wait_agent_state <timeout> <wanted...>: poll until a wanted state is proven.
@@ -1727,7 +1769,7 @@ confirm_exit_picker() {
   [ "$state" = alive ] \
     || refuse_blocking_prompt "$dialog" "It was left as it was because the endpoint reads '$state' rather than a positively classified live agent."
   require_live_task_attribution alive \
-    || refuse_blocking_prompt "$dialog" "It was left as it was because the live agent cannot be positively attributed to this task."
+    || refuse_blocking_prompt "$dialog" "It was left as it was because the live agent cannot be positively attributed to this task${ATTRIBUTION_REFUSAL:+: $ATTRIBUTION_REFUSAL}."
   if ! exit_picker_visible; then
     EXIT_PICKER_WHY="the screen changed before the key could be sent"
     refuse_exit_picker "$dialog"
@@ -1891,7 +1933,7 @@ verify_interrupt_running() {
 do_interrupt() {
   local proof cancel
   require_live_task_attribution alive \
-    || die "task $ID cannot positively attribute its live Herdr agent to this task; refusing lifecycle input"
+    || die "task $ID cannot positively attribute its live Herdr agent to this task; refusing lifecycle input${ATTRIBUTION_REFUSAL:+: $ATTRIBUTION_REFUSAL}"
   cancel=$(deliver_interrupt) || return $?
   proof=$(verify_interrupt_running) || return $?
   printf '%s cancel=%s' "$proof" "$cancel"
@@ -2008,7 +2050,7 @@ do_exit() {
     *) die "task $ID's endpoint reads '$state' rather than a positively classified state; refusing to send a lifecycle command into an unattributed endpoint" ;;
   esac
   require_live_task_attribution alive \
-    || die "task $ID cannot positively attribute its live Herdr agent to this task; refusing lifecycle input"
+    || die "task $ID cannot positively attribute its live Herdr agent to this task; refusing lifecycle input${ATTRIBUTION_REFUSAL:+: $ATTRIBUTION_REFUSAL}"
   # A busy agent is interrupted first before the exit command is submitted.
   # The verdict is kept: exit_picker_answerable reads it, and it must be the one
   # taken before anything was sent.
@@ -2660,6 +2702,10 @@ do_relaunch() {
           echo "recovery-skipped $ID launch=legacy record; exit and relaunch are allowed"
           return 0
         fi
+        # A claude lane has no skip: an unadopted native restore keeps the
+        # nonzero exit an unproven versioned launch always had.
+        [ "$RECORDED_HARNESS" != claude ] \
+          || die "launch recovery for $ID found $(fm_launch_proof_refusal_cause unmanaged); no lifecycle action taken; $(fm_launch_proof_refusal_next unmanaged "$ID")"
         echo "recovery-skipped $ID launch=unmanaged; no lifecycle action taken"
         return 0
         ;;
@@ -2668,7 +2714,7 @@ do_relaunch() {
           echo "recovery-skipped $ID launch=legacy-unproven"
           return 0
         fi
-        die "launch recovery for $ID cannot prove its live launch settings; no lifecycle action taken"
+        die "launch recovery for $ID cannot prove its live launch settings; no lifecycle action taken ($(fm_launch_proof_refusal_cause unknown); $(fm_launch_proof_refusal_next unknown "$ID"))"
         ;;
       *) die "invalid launch proof for $ID: $state" ;;
     esac
@@ -2731,7 +2777,7 @@ do_relaunch() {
   # unattributable live Herdr agent stop an ordinary relaunch, still before any
   # checkpoint or lifecycle input.
   require_live_task_attribution \
-    || die "task $ID cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input"
+    || die "task $ID cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input${ATTRIBUTION_REFUSAL:+: $ATTRIBUTION_REFUSAL}"
   safe_checkpoint
   slot_copy=$WT
   [ "$RELOCATING" = 0 ] || slot_copy=$RELOCATE_DEST
@@ -2840,6 +2886,8 @@ do_relaunch() {
     die "the replacement agent for $ID did not come up within ${LAUNCH_WAIT}s (endpoint reads '$state')"
   }
   RELAUNCH_AGENT_CONFIRMED=1
+  # The replacement carries its own pin; an adoption of the old agent is spent.
+  rm -f -- "$STATE/$ID.claude-adoption.json"
 
   journal_write complete "$note_line" "exit_result=$exit_result"
   RELAUNCH_ACTIVE=0
@@ -2885,7 +2933,7 @@ case "$VERB" in
       *) die "task $ID's endpoint reads '$state' rather than a positively classified state; refusing to send a key into an unattributed endpoint" ;;
     esac
     require_live_task_attribution alive \
-      || die "task $ID cannot positively attribute its live Herdr agent to this task; refusing lifecycle input"
+      || die "task $ID cannot positively attribute its live Herdr agent to this task; refusing lifecycle input${ATTRIBUTION_REFUSAL:+: $ATTRIBUTION_REFUSAL}"
     dismiss_exit_picker
     echo "stayed $ID harness=$HARNESS backend=$BACKEND endpoint=$T verified=picker-closed agent=alive"
     ;;

@@ -198,6 +198,9 @@ test_launch_proof_recorded_native_identity() {
       process '["node","/installed/agent.js"]'
       expected=unknown
       [ "$harness" != omp ] || expected=unmanaged
+      # A versioned claude launch reports a readable environment without a matching
+      # pin as unmanaged; a legacy claude record keeps the pre-proof unknown verdict.
+      [ "$harness:$version" != claude:env-v1 ] || expected=unmanaged
       assert_proof "$expected" "$version mismatched live PID pin must never authenticate recorded $harness"
     done
   done
@@ -314,7 +317,11 @@ test_launch_proof_recorded_native_identity() {
   assert_proof unmanaged 'missing generation must not fall back to native launch attribution'
   proof_meta claude env-v1
   process '["claude","--resume","foreign"]'
-  assert_proof unknown 'missing incarnation for another harness must stay unknown'
+  assert_proof unmanaged 'a versioned claude launch with no pin is a readable unmanaged native restore'
+  proof_meta claude
+  assert_proof unknown 'a legacy claude record keeps the unknown verdict'
+  proof_meta codex env-v1
+  assert_proof unknown 'missing incarnation for a harness without an adoption route must stay unknown'
   proof_meta omp env-v2
   assert_proof unknown 'unsupported proof version must never fall back to native argv'
   proof_meta omp env-v1
@@ -331,7 +338,333 @@ test_launch_proof_recorded_native_identity() {
   pass 'native restoration stays unmanaged without argv, cwd or initial-message shortcuts'
 }
 
+
+# A restored claude agent is authorized only by positive, independent proof that it
+# is this task's own conversation. Every fact comes from stubbed readers (process
+# table, kernel cwd, process environment, Herdr), shaped like the recorded lane
+# vernant-d1-intake: `node <nvm bin>/teamclaude run -- --resume <id>` with
+# `claude --resume <id>` as its direct child in the same process group.
+test_launch_proof_claude_adoption() (
+  local T="$TMP/claude-adopt" UUID=5a3eec19-de12-4999-bed2-bbd561089154 OTHER_UUID=0b4c1d2e-3f40-4a51-8b62-7c83d94ea5f6
+  local LANE="$T/lane/firstmate" OPERATOR="$T/operator" STATE="$T/main-state" META out err rc DOORBELL
+  mkdir -p "$T"
+  META="$STATE/vernant-t1.meta"
+  PIN_GEN=s1793120312.10459.5003
+  WRAPPER_ARGS="node $T/.nvm/bin/teamclaude run -- --resume $UUID"
+
+  proc() { printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$@" >> "$T/procs"; }  # pid ppid pgid name argv0 args
+  default_procs() {
+    : > "$T/procs"
+    proc 53539 1 53539 node node "$WRAPPER_ARGS"
+    proc 53733 53539 53539 2.1.316 claude "claude --resume $UUID"
+    proc 56557 53733 53539 railway railway 'railway mcp'
+    printf 53539 > "$T/fg-group"
+  }
+  ps() {
+    case "$*" in
+      '-axo pid=,ppid=,pgid=') awk -F'\t' '{print $1, $2, $3}' "$T/procs" ;;
+      '-axo pid=,ppid=') awk -F'\t' '{print $1, $2}' "$T/procs" ;;
+      '-p '*' -o comm='*) awk -F'\t' -v p="$2" '$1 == p {print $4; found=1} END {exit !found}' "$T/procs" ;;
+      '-p '*' -o args='*) awk -F'\t' -v p="$2" '$1 == p {print $6; found=1} END {exit !found}' "$T/procs" ;;
+      *) fail "unexpected ps query: $*" ;;
+    esac
+  }
+  lsof() { # -w -a -p <pid> -d cwd -F pn0
+    [ -f "$T/cwd-$4" ] || return 1
+    printf 'p%s\0\nfcwd\0n%s\0\n' "$4" "$(cat "$T/cwd-$4")"
+  }
+  fm_remote_herdr_process_env() { [ -f "$T/env-$1" ] && cat "$T/env-$1"; }
+  fm_backend_herdr_cli() {
+    case "$*" in
+      'lab pane get w1:p2')
+        [ ! -f "$T/pane-missing" ] || return 1
+        printf '{"result":{"pane":{"pane_id":"w1:p2"}}}' ;;
+      'lab pane process-info --pane w1:p2')
+        awk -F'\t' -v g="$(cat "$T/fg-group")" '$3 == g' "$T/procs" | jq -Rsc --arg g "$(cat "$T/fg-group")" '
+          split("\n") | map(select(length > 0) | split("\t")) as $rows
+          | {result:{type:"pane_process_info",process_info:{pane_id:"w1:p2",
+              foreground_process_group_id:($g | tonumber),
+              foreground_processes:[$rows[] | {pid:(.[0] | tonumber), name:.[3], argv0:.[4]}]}}}' ;;
+      *) return 1 ;;
+    esac
+  }
+  env_of() { printf 'PATH=/usr/bin\nHOME=%s\n%s' "$OPERATOR" "${2:-}" > "$T/env-$1"; }
+  write_meta() {
+    printf 'window=lab:w1:p2\nherdr_session=lab\nherdr_pane_id=w1:p2\nbackend=herdr\nharness=claude\nkind=secondmate\nspawn_gen=%s\nlaunch_proof=env-v1\nworktree=%s\nhome=%s\n' \
+      "$PIN_GEN" "$LANE" "$LANE" > "$META"
+  }
+  transcript_dir() { printf '%s/.claude/projects/%s' "$OPERATOR" "$(fm_launch_proof_claude_project_dir "$LANE")"; }
+  write_transcript() { # <first-user-message> <seconds-after-now> [<uuid>]
+    local ts
+    mkdir -p "$(transcript_dir)"
+    ts=$(python3 -c 'import datetime,sys; print((datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=int(sys.argv[1]))).strftime("%Y-%m-%dT%H:%M:%S.000Z"))' "$2")
+    {
+      printf '{"type":"last-prompt","sessionId":"%s"}\n' "${3:-$UUID}"
+      jq -nc --arg text "$1" --arg ts "$ts" '{type:"user",timestamp:$ts,message:{role:"user",content:$text}}'
+      jq -nc '{type:"assistant",message:{role:"assistant",content:"ok"}}'
+    } > "$(transcript_dir)/${3:-$UUID}.jsonl"
+  }
+  fresh_case() {
+    rm -rf "$T/lane" "$STATE" "$T/operator" "$T"/env-* "$T"/cwd-* "$T/pane-missing"
+    mkdir -p "$LANE/state" "$STATE" "$OPERATOR"
+    default_procs
+    write_meta
+    env_of 53539; env_of 53733
+    printf '%s' "$LANE" > "$T/cwd-53733"; printf '%s' "$LANE" > "$T/cwd-53539"
+    fm_operational_record_write "$LANE/state" launch-brief 'task brief' DOORBELL
+    write_transcript "$DOORBELL" 30
+  }
+  adopt() { out=$(fm_launch_proof_claude_adoption "$META" 2>"$T/err") && rc=0 || rc=$?; err=$(cat "$T/err"); }
+  # FM_TEST_ROWS=1 prints one line per row (exit status and the printed cause) for the evidence record.
+  row() { [ -z "${FM_TEST_ROWS:-}" ] || printf 'ROW %-96s | exit %s | %s\n' "$1" "$rc" "$2"; }
+  accepts() { adopt; [ "$rc" = 0 ] || fail "$1: refused: $err"; row "$1" "authorized: $(printf '%s' "$out" | jq -c '{pid,harness_pid,tie}')"; }
+  refuses() { # <cause-substring> <description>
+    adopt
+    [ "$rc" != 0 ] || fail "$2: authorized: $out"
+    [ -z "$out" ] || fail "$2: printed a record while refusing"
+    assert_contains "$err" "$1" "$2"
+    row "$2" "$err"
+  }
+
+  # The recorded d1 transcript location, derived from its recorded home.
+  assert_equals -Users-charlesabrooker--treehouse-firstmate-7bab20-2-firstmate \
+    "$(fm_launch_proof_claude_project_dir /Users/charlesabrooker/.treehouse/firstmate-7bab20/2/firstmate)" \
+    'transcripts live under the home with every non-alphanumeric character replaced'
+
+  fresh_case
+  accepts 'compliant d1 shape (launcher, direct claude child, cwd, one claim, launch-brief tie)'
+  assert_equals "$UUID" "$(printf '%s' "$out" | jq -r .session_id)" 'candidate names the live session'
+  assert_equals 53539 "$(printf '%s' "$out" | jq -r .pid)" 'candidate names the attributed launcher'
+  assert_equals 53733 "$(printf '%s' "$out" | jq -r .harness_pid)" 'candidate names the harness child'
+  assert_equals launch-brief "$(printf '%s' "$out" | jq -r .tie)" 'tie is the launch-brief doorbell'
+  # Later transcript content (reading and archiving inbox records) is not the tie: the twin of h3.
+  { printf '{"type":"assistant","message":{"role":"assistant","content":"read the inbox"}}\n'
+    printf '{"type":"user","timestamp":"2099-01-01T00:00:00.000Z","message":{"role":"user","content":"mv inbox/1.msg inbox/handled/"}}\n'; } >> "$(transcript_dir)/$UUID.jsonl"
+  accepts 'the same later inbox activity does not change a launch-brief session'
+  pass 'a restored claude agent behind the TeamClaude launcher is adopted on positive proof'
+
+  # A bare restored claude (no launcher) is the recipient itself.
+  fresh_case
+  : > "$T/procs"; proc 53733 1 53733 2.1.316 claude "claude --resume $UUID"; printf 53733 > "$T/fg-group"
+  accepts 'a bare restored claude is its own recipient'
+  assert_equals 53733 "$(printf '%s' "$out" | jq -r .pid)" 'the bare claude is the attributed process'
+  pass 'a bare restored claude is accepted as its own recipient'
+
+  # (a) pane
+  fresh_case; : > "$T/pane-missing"
+  refuses 'pane to exist' '(a) the recorded pane does not exist'
+  # (b) foreground none / more than one
+  fresh_case; printf 99999 > "$T/fg-group"
+  refuses 'uniquely resolved' '(b) the foreground resolves to none'
+  fresh_case; : > "$T/procs"
+  proc 999 1 999 bash sh 'bash'; proc 70001 999 999 2.1.316 claude "claude --resume $UUID"
+  proc 70002 999 999 2.1.316 claude "claude --resume $OTHER_UUID"; printf 999 > "$T/fg-group"
+  refuses 'uniquely resolved' '(b) two agent candidates resolve to more than one'
+  # (c) foreground is neither the harness nor a proven forwarding launcher
+  fresh_case; : > "$T/procs"; proc 777 1 777 vim vim 'vim notes.txt'; printf 777 > "$T/fg-group"
+  refuses 'forwarding launcher' '(c) an editor holds the pane'
+  fresh_case; : > "$T/procs"; proc 777 1 777 bash bash 'bash'; printf 777 > "$T/fg-group"
+  refuses 'uniquely resolved' '(c) only a shell holds the pane'
+  fresh_case; : > "$T/procs"; proc 777 1 777 python3 python3 'python3 /tmp/runner.py'
+  proc 53733 777 777 2.1.316 claude "claude --resume $UUID"; printf 777 > "$T/fg-group"
+  refuses 'forwarding launcher' '(c) an interpreter parent with a harness-shaped child'
+  fresh_case; WRAPPER_ARGS="node $T/.nvm/bin/otherwrap run -- --resume $UUID"; default_procs
+  refuses 'forwarding launcher' '(c) a launcher-shaped wrapper that is not on the allow-list'
+  fresh_case; WRAPPER_ARGS="node $T/.nvm/bin/teamclaude status"; default_procs
+  refuses 'forwarding launcher' '(c) the listed launcher without its "run --" form'
+  WRAPPER_ARGS="node $T/.nvm/bin/teamclaude run -- --resume $UUID"
+  fresh_case; : > "$T/procs"
+  proc 53539 1 53539 node node "$WRAPPER_ARGS"; proc 53733 53539 53600 2.1.316 claude "claude --resume $UUID"
+  proc 53600 1 53539 helper helper 'helper'
+  refuses 'direct child' '(c) the harness is outside the launcher process group'
+  fresh_case; : > "$T/procs"
+  proc 53539 1 53539 node node "$WRAPPER_ARGS"; proc 53540 53539 53539 sh sh 'sh -c wrapper'
+  proc 53733 53540 53539 2.1.316 claude "claude --resume $UUID"
+  refuses 'direct child' '(c) the harness is a grandchild, not a direct child'
+  fresh_case; : > "$T/procs"
+  proc 53539 1 53539 node node "$WRAPPER_ARGS"; proc 53733 53539 53539 2.1.316 claude "claude --resume $OTHER_UUID"
+  refuses 'forward exactly' '(c) the launcher forwards other arguments than the harness runs'
+  # (d) kernel working directory
+  fresh_case; printf '%s' "$T" > "$T/cwd-53733"
+  refuses 'cwd inside' '(d) the harness cwd is an unrelated directory'
+  fresh_case; mkdir -p "$T/other-home/firstmate"; printf '%s' "$T/other-home/firstmate" > "$T/cwd-53733"
+  refuses 'cwd inside' '(d) the harness cwd is another home'
+  # (e) a process pinned to another generation
+  fresh_case; env_of 53733 'FM_SPAWN_GEN=s9.9.9
+'
+  refuses 'pinned to another launch generation' '(e) the harness is pinned to another generation'
+  fresh_case; env_of 53539 'FM_SPAWN_GEN=s9.9.9
+'
+  refuses 'pinned to another launch generation' '(e) the launcher is pinned to another generation'
+  # a pin that matches belongs to the managed route, not to adoption
+  fresh_case; env_of 53733 "FM_SPAWN_GEN=$PIN_GEN
+"
+  refuses 'without a usable launch pin' '(e) a matching pin needs no adoption'
+  # (f) another record claims the pane or the home
+  fresh_case
+  printf 'window=lab:w1:p2\nharness=claude\nworktree=%s\n' "$T/elsewhere" > "$STATE/other.meta"
+  refuses 'claimed by other.meta' '(f) another task claims the same pane'
+  fresh_case
+  printf 'window=lab:w9:p9\nharness=claude\nhome=%s\n' "$LANE" > "$STATE/other.meta"
+  refuses 'claimed by other.meta' '(f) another task claims the same home'
+  fresh_case
+  printf 'window=lab:w9:p9\nharness=claude\nworktree=%s\n' "$LANE" > "$STATE/other.meta"
+  refuses 'claimed by other.meta' '(f) another task claims the same worktree'
+  fresh_case
+  printf 'window=lab:w9:p9\nherdr_session=lab\nherdr_pane_id=w1:p2\nharness=claude\n' > "$STATE/other.meta"
+  refuses 'claimed by other.meta' '(f) another task claims the same Herdr session and pane id under a different window text'
+  fresh_case; ln -s "$LANE" "$T/lane-link"
+  printf 'window=lab:w9:p9\nharness=claude\nhome=%s\n' "$T/lane-link" > "$STATE/other.meta"
+  refuses 'claimed by other.meta' '(f) another task names the same home through a symlink'
+  rm -f "$T/lane-link"
+  fresh_case
+  printf 'kind=secondmate\nwindow=lab:w8:p8\nhome=%s\nworktree=%s\n' "$T/peer-home" "$T/peer-home" > "$STATE/peer.meta"
+  mkdir -p "$T/peer-home/state"
+  printf 'window=lab:w1:p2\nharness=claude\n' > "$T/peer-home/state/child.meta"
+  refuses 'claimed by child.meta' '(f) a record in another readable home claims the same pane'
+  # (g) the environment cannot be read
+  fresh_case; rm -f "$T/env-53733"
+  refuses 'without a usable launch pin' '(g) the harness environment cannot be read'
+  fresh_case; printf 'ONLY=1\n' > "$T/env-53733"
+  refuses 'without a usable launch pin' '(g) the environment carries neither PATH nor HOME'
+  fresh_case; env_of 56557 'FM_SPAWN_GEN=s9.9.9
+'
+  refuses 'pinned to another launch generation' '(e) a helper in the harness group is pinned to another generation'
+  # (h) the session tie
+  fresh_case; : > "$T/procs"
+  proc 53539 1 53539 node node "node $T/.nvm/bin/teamclaude run --"; proc 53733 53539 53539 2.1.316 claude 'claude'
+  refuses 'no task-specific session tie' '(h) no session id on the harness argv'
+  fresh_case; rm -f "$(transcript_dir)/$UUID.jsonl"
+  refuses 'no task-specific session tie' '(h) no readable transcript'
+  fresh_case; write_transcript "Please look at $LANE/state/operational-inbox and tell me what is there" 30
+  refuses 'no task-specific session tie' '(h) the first message only names the inbox'
+  fresh_case; mkdir -p "$T/foreign/state"; fm_operational_record_write "$T/foreign/state" launch-brief 'foreign brief' FOREIGN
+  write_transcript "$FOREIGN" 30
+  refuses 'no task-specific session tie' '(h) the doorbell names a record outside the task home'
+  fresh_case; rm -f "$LANE"/state/operational-inbox/*.msg
+  refuses 'no task-specific session tie' '(h) the doorbell names a record that no longer exists'
+  fresh_case; fm_operational_record_write "$LANE/state" session-start 'not a launch brief' OTHERBELL
+  write_transcript "$OTHERBELL" 30
+  refuses 'no task-specific session tie' '(h) the record is not of kind launch-brief'
+  fresh_case; write_transcript "$DOORBELL" -3600
+  refuses 'no task-specific session tie' '(h) the record is newer than the first message'
+  fresh_case; printf 'claude_session_id=%s\n' "$OTHER_UUID" >> "$META"
+  refuses 'recorded session id differs from the live session' '(h) a recorded id that differs from argv vetoes a valid doorbell'
+  fresh_case; printf 'claude_session_id=%s\n' "$UUID" >> "$META"; rm -f "$(transcript_dir)/$UUID.jsonl"
+  accepts '(T1) a recorded session id equal to the live id is a tie without a transcript'
+  assert_equals recorded "$(printf '%s' "$out" | jq -r .tie)" 'T1 is reported as the recorded tie'
+  # A malformed transcript refuses quietly: no traceback reaches the operator's terminal.
+  fresh_case; printf '%s\n' '{"type":"user","message":{"role":"user","content":[7]},"timestamp":"x"}' > "$(transcript_dir)/$UUID.jsonl"
+  refuses 'no task-specific session tie' '(h) a transcript whose first message has a malformed content item'
+  assert_not_contains "$err" Traceback 'a malformed transcript must not print a traceback'
+  fresh_case; printf '%s\n' '{"type":"user","message":{"role":"user","content":"hello"}}' > "$(transcript_dir)/$UUID.jsonl"
+  refuses 'no task-specific session tie' '(h) a transcript whose first message has no timestamp'
+  assert_not_contains "$err" Traceback 'a transcript without a timestamp must not print a traceback'
+  # (h3) the authentic personal diagnostic session
+  fresh_case
+  write_transcript "Where is the inbox? Is $LANE/state/operational-inbox the right place?" 30
+  { printf '{"type":"assistant","message":{"role":"assistant","content":"reading %s/state/operational-inbox"}}\n' "$LANE"
+    printf '{"type":"user","timestamp":"2099-01-01T00:00:00.000Z","message":{"role":"user","content":"archive the processed record into handled/"}}\n'; } >> "$(transcript_dir)/$UUID.jsonl"
+  mkdir -p "$LANE/state/operational-inbox/handled"
+  refuses 'no task-specific session tie' '(h3) a personal session reading and archiving the inbox is not the task'
+  # (h2) the task agent exited and a bare personal claude holds the same pane and home
+  fresh_case; : > "$T/procs"; proc 53733 1 53733 2.1.316 claude 'claude'; printf 53733 > "$T/fg-group"
+  refuses 'no task-specific session tie' '(h2) a bare personal claude in the same pane, home and cwd'
+  pass 'every missing, foreign or contradicting fact refuses the adoption with its own cause'
+)
+
+test_launch_proof_claude_verdict_and_refusal() (
+  local T="$TMP/claude-verdict" UUID=5a3eec19-de12-4999-bed2-bbd561089154
+  local LANE="$T/lane/firstmate" OPERATOR="$T/operator" STATE="$T/main-state" META DOORBELL out
+  mkdir -p "$T" "$LANE/state" "$STATE" "$OPERATOR"
+  META="$STATE/vernant-t1.meta"
+  PIN_GEN=s1793120312.10459.5003
+  ps() {
+    case "$*" in
+      '-axo pid=,ppid=,pgid=') printf '%s\n' '53539 1 53539' '53733 53539 53539' ;;
+      '-axo pid=,ppid=') printf '%s\n' '53539 1' '53733 53539' ;;
+      '-p 53539 -o comm=') echo node ;;
+      '-p 53539 -o args=') echo "node /n/bin/teamclaude run -- --resume $UUID" ;;
+      '-p 53733 -o comm=') echo 2.1.316 ;;
+      '-p 53733 -o args=') echo "claude --resume $UUID" ;;
+      *) fail "unexpected ps query: $*" ;;
+    esac
+  }
+  lsof() { printf 'p%s\0\nfcwd\0n%s\0\n' "$4" "$LANE"; }
+  fm_remote_herdr_process_env() { [ -f "$T/env-unreadable" ] && return 1; printf 'PATH=/usr/bin\nHOME=%s\n%s' "$OPERATOR" "$(cat "$T/env-extra" 2>/dev/null)"; }
+  fm_backend_herdr_cli() {
+    case "$*" in
+      'lab pane get w1:p2') printf '{"result":{"pane":{"pane_id":"w1:p2"}}}' ;;
+      'lab pane process-info --pane w1:p2')
+        printf '%s' '{"result":{"type":"pane_process_info","process_info":{"pane_id":"w1:p2","foreground_process_group_id":53539,"foreground_processes":[{"pid":53539,"name":"node","argv0":"node"},{"pid":53733,"name":"2.1.316","argv0":"claude"}]}}}' ;;
+      *) return 1 ;;
+    esac
+  }
+  meta_for() { # <harness> <launch_proof>
+    printf 'window=lab:w1:p2\nherdr_session=lab\nherdr_pane_id=w1:p2\nbackend=herdr\nharness=%s\nkind=secondmate\nspawn_gen=%s\nworktree=%s\nhome=%s\n' \
+      "$1" "$PIN_GEN" "$LANE" "$LANE" > "$META"
+    [ -z "${2:-}" ] || printf 'launch_proof=%s\n' "$2" >> "$META"
+  }
+  fm_operational_record_write "$LANE/state" launch-brief 'task brief' DOORBELL
+  mkdir -p "$OPERATOR/.claude/projects/$(fm_launch_proof_claude_project_dir "$LANE")"
+  jq -nc --arg text "$DOORBELL" --arg ts "$(python3 -c 'import datetime; print((datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=30)).strftime("%Y-%m-%dT%H:%M:%S.000Z"))')" \
+    '{type:"user",timestamp:$ts,message:{role:"user",content:$text}}' \
+    > "$OPERATOR/.claude/projects/$(fm_launch_proof_claude_project_dir "$LANE")/$UUID.jsonl"
+
+  # E1: a readable environment without a pin is an unpinned native restore, never "unreadable".
+  meta_for claude env-v1
+  assert_equals unmanaged "$(fm_launch_proof_herdr "$META")" 'a readable claude environment without a pin is unmanaged'
+  out=$(fm_launch_proof_herdr_refusal "$META") && fail 'an unadopted unpinned claude was authorized'
+  assert_contains "$out" 'unpinned native restore' 'the cause names an unpinned native restore'
+  assert_contains "$out" 'environment was readable and carries no launch pin' 'the cause says the environment was readable and had no pin'
+  assert_contains "$out" 'bin/fm-control.sh vernant-t1 adopt' 'the cause names the explicit route'
+  assert_not_contains "$out" 'unreadable' 'the unpinned case is not called unreadable'
+  # E1: an environment that cannot be read keeps the unreadable wording and its own next action.
+  : > "$T/env-unreadable"
+  assert_equals unknown "$(fm_launch_proof_herdr "$META")" 'an unreadable environment stays unknown'
+  out=$(fm_launch_proof_herdr_refusal "$META") && fail 'an unreadable claude environment was authorized'
+  assert_contains "$out" 'launch settings are unreadable' 'the unreadable cause is kept'
+  assert_contains "$out" 'decide the lane by hand' 'the unreadable case has its own next action'
+  assert_not_contains "$out" 'unpinned native restore' 'the unreadable case is not reported as unpinned'
+  rm -f "$T/env-unreadable"
+
+  # Adoption is a second route: the record authorizes only while every proof still holds.
+  fm_launch_proof_claude_adoption "$META" > "$STATE/vernant-t1.claude-adoption.json" 2>/dev/null \
+    || fail 'could not build the adoption record'
+  assert_equals managed "$(fm_launch_proof_herdr "$META")" 'an adopted record is managed while the proofs hold'
+  fm_launch_proof_herdr_authorizes "$META" || fail 'an adopted lane must authorize lifecycle input'
+  # (i) the pane changed hands: any contradicted proof makes the record inert again.
+  printf 'FM_SPAWN_GEN=s9.9.9\n' > "$T/env-extra"
+  assert_equals unmanaged "$(fm_launch_proof_herdr "$META")" 'a harness pinned elsewhere voids the adoption at use'
+  rm -f "$T/env-extra"
+  jq '.session_id = "0b4c1d2e-3f40-4a51-8b62-7c83d94ea5f6"' "$STATE/vernant-t1.claude-adoption.json" > "$T/rec" && mv "$T/rec" "$STATE/vernant-t1.claude-adoption.json"
+  assert_equals unmanaged "$(fm_launch_proof_herdr "$META")" 'a record naming another session voids the adoption'
+  fm_launch_proof_claude_adoption "$META" > "$STATE/vernant-t1.claude-adoption.json" 2>/dev/null
+  jq '.pid = 4242' "$STATE/vernant-t1.claude-adoption.json" > "$T/rec" && mv "$T/rec" "$STATE/vernant-t1.claude-adoption.json"
+  assert_equals unmanaged "$(fm_launch_proof_herdr "$META")" 'a record naming another process voids the adoption'
+  fm_launch_proof_claude_adoption "$META" > "$STATE/vernant-t1.claude-adoption.json" 2>/dev/null
+  printf 'spawn_gen=s2.2.2\n' >> "$META"
+  assert_equals unmanaged "$(fm_launch_proof_herdr "$META")" 'a new launch generation leaves the old adoption inert'
+  rm -f "$STATE/vernant-t1.claude-adoption.json"
+  meta_for claude env-v1
+  assert_equals unmanaged "$(fm_launch_proof_herdr "$META")" 'without a record the lane is unmanaged again'
+
+  # (j) legacy and other harnesses keep their pre-proof rules; (k) a matching pin is managed.
+  meta_for claude ''
+  assert_equals unknown "$(fm_launch_proof_herdr "$META")" 'a legacy claude record keeps the unknown verdict'
+  fm_launch_proof_herdr_authorizes "$META" || fail 'a legacy record must keep its pre-proof authorization'
+  meta_for codex env-v1
+  assert_equals unknown "$(fm_launch_proof_herdr "$META")" 'another harness without an adoption route keeps the unknown verdict'
+  meta_for claude env-v1
+  printf 'FM_SPAWN_GEN=%s\n' "$PIN_GEN" > "$T/env-extra"
+  assert_equals managed "$(fm_launch_proof_herdr "$META")" 'a matching pin is managed without any adoption'
+  fm_launch_proof_herdr_authorizes "$META" || fail 'a pinned claude must authorize lifecycle input'
+  pass 'claude verdicts: unpinned is unmanaged, adoption is rechecked at use, legacy and other harnesses are unchanged'
+)
+
 fm_test_only
 test_launch_proof_omp_executable_identity
 test_launch_proof_recorded_native_identity
 test_launch_proof_pinned_personal_switch
+test_launch_proof_claude_adoption
+test_launch_proof_claude_verdict_and_refusal

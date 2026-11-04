@@ -99,3 +99,29 @@ fm_secondmate_restart_capable() {  # <meta-file>
   FM_SECONDMATE_RESTART_HARNESS=$family
   return 0
 }
+
+# Decide, before the restart's first effect, whether a live local Herdr agent is
+# positively this task's own. The restart's first effects (the pending-reply
+# record, the persistence request, and the fallback nudge) all reach the pane,
+# so an agent the launch-proof owner cannot attribute receives none of them.
+# This reads the one verdict owner (bin/fm-launch-proof-lib.sh) and keeps the
+# control plane's exemption: a pane whose agent is not alive is governed by
+# fm-control's own stopped-agent proofs, unchanged. Remote placement is not
+# covered here: the host's fm-control decides it before the agent is stopped,
+# but after the persistence request, which stays open for the remote lanes.
+# Returns 1 with FM_SECONDMATE_RESTART_REASON set when the agent is unproven.
+fm_secondmate_restart_attribution() {  # <meta-file>
+  local meta=$1 id cause
+  [ "$FM_SECONDMATE_RESTART_PLACEMENT" = local ] && [ "$FM_SECONDMATE_RESTART_BACKEND" = herdr ] || return 0
+  id=${meta##*/}; id=${id%.meta}
+  # shellcheck source=bin/fm-launch-proof-lib.sh disable=SC1091
+  . "$_FM_SECONDMATE_RESTART_LIB_DIR/fm-launch-proof-lib.sh"
+  fm_backend_source herdr || return 0
+  fm_backend_validate_task_endpoint "$meta" "$id" >/dev/null 2>&1 || return 0
+  [ "$(fm_backend_agent_state herdr "$FM_BACKEND_VALIDATED_TARGET")" = alive ] || return 0
+  if cause=$(fm_launch_proof_herdr_refusal "$meta"); then
+    return 0
+  fi
+  FM_SECONDMATE_RESTART_REASON="its live Herdr agent cannot be positively attributed to this task, so no request or nudge was sent to it${cause:+: $cause}"
+  return 1
+}

@@ -3419,12 +3419,12 @@
         },
         {
           "file": "bin/fm-control.sh",
-          "match": "|| die \"task $ID cannot positively attribute its live Herdr agent to this task; refusing lifecycle input\"",
+          "match": "|| die \"task $ID cannot positively attribute its live Herdr agent to this task; refusing lifecycle input${ATTRIBUTION_REFUSAL:+: $ATTRIBUTION_REFUSAL}\"",
           "count": 3
         },
         {
           "file": "bin/fm-control.sh",
-          "match": "|| die \"task $ID cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input\""
+          "match": "|| die \"task $ID cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input${ATTRIBUTION_REFUSAL:+: $ATTRIBUTION_REFUSAL}\""
         }
       ]
     },
@@ -3589,7 +3589,7 @@
         },
         {
           "file": "bin/fm-control.sh",
-          "match": "|| refuse_blocking_prompt \"$dialog\" \"It was left as it was because the live agent cannot be positively attributed to this task.\""
+          "match": "|| refuse_blocking_prompt \"$dialog\" \"It was left as it was because the live agent cannot be positively attributed to this task${ATTRIBUTION_REFUSAL:+: $ATTRIBUTION_REFUSAL}.\""
         }
       ]
     },
@@ -6859,6 +6859,158 @@
       "instrumented": false,
       "status": "active",
       "layer_note": "deny without a guard event: the refusal exits 125 with the reason on stderr and never launches the command, so no run or start lock is left; a start that sees headroom used up waits in the queue and is not this refusal; tests/fm-cpu-pass.test.sh runs tests/fm-cpu-pass-admission.py, which proves the 125 exit with no start on a missing database and a garbage database, and proves the admitted start on readable sources; an unreadable memory or process observation does not refuse but pauses the start (pause-only backstop, proved in the same fixtures)"
+    },
+    {
+      "id": "claude-adopt-launch-proof",
+      "version": "1",
+      "owner": "bin/fm-launch-proof-lib.sh",
+      "invariant": "Claude adoption authorizes lifecycle input only to a restored process proven to be this task's own conversation, and rechecks every proof at each use.",
+      "layer": "runtime-block",
+      "source": "the recorded task endpoint, the unique attributed foreground process (the claude harness or a listed forwarding launcher whose direct child is the harness), the harness kernel working directory, the absence of any foreign launch pin, an exclusive pane and home claim, and the task-specific session tie (a recorded session id equal to the live one, or a transcript whose first user message is the launch-brief doorbell of a record in the task's own home)",
+      "trigger": "fm-control adopt of a restored claude agent as a task's agent unless all proofs hold, and any lifecycle reader that would authorize it from the adoption record without rechecking them",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Preserve the running agent and every record; establish the missing proof (or have a person supply the task's recorded claude_session_id) before retrying FM_HOME=<home> bash bin/fm-control.sh <task> adopt.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-launch-proof.test.sh",
+      "tier": "B",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "fm_launch_proof_adopt_refuse() { echo \"adopt refused: $1\" >&2; return 1; }"
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "|| { fm_launch_proof_adopt_refuse 'endpoint proof needs one recorded window'; return 1; }"
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "fm_launch_proof_adopt_refuse 'endpoint proof needs a local Herdr claude secondmate with a versioned launch proof, a spawn_gen, and window, herdr_session and herdr_pane_id that agree'"
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "|| { fm_launch_proof_adopt_refuse 'workspace proof needs one recorded home that exists'; return 1; }"
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "|| { fm_launch_proof_adopt_refuse 'workspace proof needs one recorded worktree that exists'; return 1; }"
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "fm_launch_proof_adopt_refuse 'endpoint proof needs the recorded pane to exist and be readable'; return 1"
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "|| { fm_launch_proof_adopt_refuse 'foreground proof needs one uniquely resolved live process in the recorded pane'; return 1; }"
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "|| { fm_launch_proof_adopt_refuse 'process proof needs a readable process table'; return 1; }"
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "|| { fm_launch_proof_adopt_refuse 'process proof needs the attributed foreground process to be readable'; return 1; }"
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "|| { fm_launch_proof_adopt_refuse 'process proof needs the attributed foreground process to be the claude harness or a listed forwarding launcher in the form \"<launcher> run -- <harness arguments>\"'; return 1; }"
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "[ -z \"$harness_pid\" ] || { fm_launch_proof_adopt_refuse 'process proof needs exactly one claude harness as the launcher'\"'\"'s direct child'; return 1; }"
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "|| { fm_launch_proof_adopt_refuse 'process proof needs the claude harness to be the launcher'\"'\"'s direct child in the launcher'\"'\"'s process group'; return 1; }"
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "|| { fm_launch_proof_adopt_refuse 'process proof needs the launcher to forward exactly the harness'\"'\"'s own arguments'; return 1; }"
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "|| { fm_launch_proof_adopt_refuse 'workspace proof needs the harness process'\"'\"'s kernel cwd'; return 1; }"
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "*) fm_launch_proof_adopt_refuse 'workspace proof needs the harness cwd inside this task'\"'\"'s recorded worktree'; return 1 ;;"
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "fm_launch_proof_adopt_refuse 'generation proof needs no process in the tree to be pinned to another launch generation'; return 1"
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "|| { fm_launch_proof_adopt_refuse 'launch-pin proof needs a positively readable environment without a usable launch pin; pinned or unreadable processes are not adoption candidates'; return 1; }"
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "fm_launch_proof_adopt_refuse \"unique-claim proof needs no other task record to claim this pane or home; claimed by $claim\"; return 1"
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "fm_launch_proof_adopt_refuse 'no task-specific session tie: the harness argv exposes no single session id'; return 1"
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "fm_launch_proof_adopt_refuse 'recorded session id differs from the live session; the task record names another conversation'; return 1"
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "|| { fm_launch_proof_adopt_refuse 'no task-specific session tie: the harness environment cannot be read to locate its transcript'; return 1; }"
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "fm_launch_proof_adopt_refuse 'no task-specific session tie: the session has no readable transcript whose first user message is a single line'; return 1"
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "fm_launch_proof_adopt_refuse 'no task-specific session tie: the first user message is not the launch-brief doorbell of a record in this task'\"'\"'s own home'; return 1"
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "fm_launch_proof_adopt_refuse 'no task-specific session tie: the launch-brief record is newer than the first user message'; return 1"
+        }
+      ]
+    },
+    {
+      "id": "secondmate-restart-attribution",
+      "version": "1",
+      "owner": "bin/fm-secondmate-restart.sh",
+      "invariant": "The secondmate restart sends no request, record or nudge to a live Herdr agent that is not positively attributed to the task.",
+      "layer": "runtime-block",
+      "source": "the one launch-proof verdict owner (fm_launch_proof_herdr_refusal) read before the restart's pending-reply record, persistence request and fallback nudge; a pane whose agent is not alive stays with the control plane's own stopped-agent proofs",
+      "trigger": "restart of a local Herdr secondmate whose live agent is unmanaged or unreadable by the launch-proof owner",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Leave the agent running; authorize it with FM_HOME=<home> bash bin/fm-control.sh <task> adopt when it is the task's own restored claude, or decide the lane by hand, then rerun the restart.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-control-relaunch-backends.test.sh",
+      "tier": "B",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-secondmate-restart.sh",
+          "match": "PLAN[i]=\"refused\""
+        }
+      ]
     }
   ],
   "excluded": [

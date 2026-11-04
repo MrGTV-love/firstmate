@@ -8,7 +8,10 @@
 # Remote secondmates and other backends keep their existing recovery owners.
 # Missing/stopped agents remain with their existing liveness recovery paths.
 # Herdr's session-wide auto-resume setting is deliberately not changed.
-# Unknown versioned launch proof is reported. A legacy record (no launch_proof)
+# Unknown versioned launch proof is reported as unreadable. An unadopted claude
+# whose readable environment carries no launch pin is reported as an unpinned
+# native restore with the explicit adopt route, and keeps the nonzero status.
+# A legacy record (no launch_proof)
 # keeps exit and relaunch: an unpinned legacy omp is reported as such, and other
 # legacy-unproven records skip.
 # Failed inspection is surfaced; an unbounded sweep continues inspecting records.
@@ -138,13 +141,20 @@ for ((offset=0; offset<count && (ONE == 0 || selected == 0); offset++)); do
         continue
       fi
       notice "$id" "launch-unreadable $identity" \
-        "REBOOT_RECOVERY: $id: live launch settings are unreadable; no lifecycle action taken" && result=1
+        "REBOOT_RECOVERY: $id: $(fm_launch_proof_refusal_cause unknown); no lifecycle action taken; $(fm_launch_proof_refusal_next unknown "$id")" && result=1
       continue
       ;;
     unmanaged)
       if [ -z "$(fm_meta_get "$meta" launch_proof)" ]; then
         notice "$id" "legacy $identity" \
           "REBOOT_RECOVERY: $id: legacy record; exit and relaunch are allowed" || true
+        continue
+      fi
+      if [ "$(fm_meta_get "$meta" harness)" = claude ]; then
+        # An unadopted native restore keeps the nonzero status an unproven
+        # versioned launch always had; only its wording follows the true cause.
+        notice "$id" "unmanaged $identity" \
+          "REBOOT_RECOVERY: $id: $(fm_launch_proof_refusal_cause unmanaged); no lifecycle action taken; $(fm_launch_proof_refusal_next unmanaged "$id")" && result=1
         continue
       fi
       notice "$id" "unmanaged $identity" \

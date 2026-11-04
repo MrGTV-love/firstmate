@@ -907,17 +907,22 @@ test_reboot_recovery_inspects_without_native_attribution() {
           verdict=unmanaged
           case "$scenario" in
             managed|managed-claude) verdict=managed ;;
-            unreadable|unknown-harness) verdict=unknown ;;
+            unreadable) verdict=unknown ;;
+            # A versioned claude launch whose readable environment carries no pin is
+            # an unpinned native restore, reported as such; a legacy record keeps unknown.
+            unknown-harness) verdict=unknown; [ "$proof" != env-v1 ] || verdict=unmanaged-claude ;;
           esac
           [ "$proof" != legacy ] || [ "$verdict" = managed ] || verdict=legacy-$verdict
           case "$mode/$verdict" in
             direct/managed) expected_out="recovery-skipped $id launch=managed" ;;
             direct/unmanaged) expected_out="recovery-skipped $id launch=unmanaged; no lifecycle action taken" ;;
             direct/unknown) expected_out="launch recovery for $id cannot prove its live launch settings; no lifecycle action taken" ;;
+            direct/unmanaged-claude) expected_out="launch recovery for $id found live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken" ;;
             direct/legacy-unmanaged) expected_out="recovery-skipped $id launch=legacy record; exit and relaunch are allowed" ;;
             direct/legacy-unknown) expected_out="recovery-skipped $id launch=legacy-unproven" ;;
             sweep/unmanaged) expected_out="REBOOT_RECOVERY: $id: live launch is unmanaged; no lifecycle action taken" ;;
             sweep/unknown) expected_out="REBOOT_RECOVERY: $id: live launch settings are unreadable; no lifecycle action taken" ;;
+            sweep/unmanaged-claude) expected_out="REBOOT_RECOVERY: $id: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken" ;;
             sweep/legacy-unmanaged) expected_out="REBOOT_RECOVERY: $id: legacy record; exit and relaunch are allowed" ;;
             *) expected_out= ;;
           esac
@@ -1058,7 +1063,7 @@ test_reboot_recovery_refuses_non_omp_launches_without_mutation() {
   local preserved=()
   for kind in ship scout secondmate; do
     for mode in direct sweep; do
-      for pin in missing mismatched; do
+      for pin in missing mismatched unreadable; do
         id="reboot-claude-$kind-$mode-$pin"
         recovery_case_or_skip "$id" "$id" || return 0
         id=$HERDR_CASE_ID
@@ -1067,6 +1072,7 @@ test_reboot_recovery_refuses_non_omp_launches_without_mutation() {
         printf 'harness=claude\nmodel=opus\neffort=high\n' >> "$dir/home/state/$id.meta"
         printf claude > "$dir/fake/recovery-harness"
         [ "$pin" != mismatched ] || printf other > "$dir/fake/recovery-spawn-gen"
+        [ "$pin" != unreadable ] || : > "$dir/fake/recovery-env-unreadable"
         gen=$("$ROOT/bin/fm-busy-event.sh" arm "$dir/home/state" "$id") || fail "could not arm retained non-omp fixture"
         printf 'busy_gen=%s\n' "$gen" >> "$dir/home/state/$id.meta"
         printf 'working: preserve the retained launch\n' > "$dir/home/state/$id.status"
@@ -1079,13 +1085,30 @@ test_reboot_recovery_refuses_non_omp_launches_without_mutation() {
         rc=0
         if [ "$mode" = direct ]; then
           out=$(run_control "$dir" "$id" relaunch --recover-launch) || rc=$?
-          assert_contains "$out" "cannot prove its live launch settings" "$kind/$pin direct refusal must name unknown proof"
+          # Old text "cannot prove its live launch settings" now names the cause: a readable
+          # environment without a matching pin is an unpinned native restore, and only an
+          # environment that cannot be read is "unreadable". No input and no mutation are
+          # still asserted below.
+          if [ "$pin" = unreadable ]; then
+            assert_contains "$out" "cannot prove its live launch settings" "$kind/$pin direct refusal must name unknown proof"
+            assert_contains "$out" "live launch settings are unreadable" "$kind/$pin direct refusal must keep the unreadable cause"
+          else
+            assert_contains "$out" "found live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record" \
+              "$kind/$pin direct refusal must name an unpinned native restore"
+            assert_not_contains "$out" "unreadable" "$kind/$pin direct refusal must not call a readable environment unreadable"
+          fi
         else
           CONTROL="$ROOT/bin/fm-reboot-recover.sh"
           out=$(run_control "$dir" recover) || rc=$?
           CONTROL="$ROOT/bin/fm-control.sh"
-          assert_contains "$out" "REBOOT_RECOVERY: $id: live launch settings are unreadable; no lifecycle action taken" \
-            "$kind/$pin sweep refusal must name unknown proof"
+          if [ "$pin" = unreadable ]; then
+            assert_contains "$out" "REBOOT_RECOVERY: $id: live launch settings are unreadable; no lifecycle action taken" \
+              "$kind/$pin sweep refusal must name unknown proof"
+          else
+            assert_contains "$out" "REBOOT_RECOVERY: $id: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken" \
+              "$kind/$pin sweep refusal must name an unpinned native restore"
+            assert_not_contains "$out" "unreadable" "$kind/$pin sweep refusal must not call a readable environment unreadable"
+          fi
         fi
         expect_code 1 "$rc" "$kind/$mode/$pin recovery must refuse a non-omp launch"$'\n'"$out"
         [ "$before" = "$(shasum -a 256 "${preserved[@]}")" ] \
@@ -2124,8 +2147,189 @@ test_relaunch_without_a_usable_recorded_rule_keeps_prior_behavior() {
   pass "relaunch treats an ambiguous or vanished recorded rule as no fallback and keeps prior behavior"
 }
 
+# --- native claude restore: the explicit adoption route --------------------------
+# The fixture is the recorded vernant-d1-intake shape on the existing fake Herdr:
+# `node <bin>/teamclaude run -- --resume <id>` is the attributed foreground process
+# and `claude --resume <id>` its direct child in the same process group, neither
+# carrying a launch pin, with the lane's own home as the harness working directory
+# and a transcript whose first user message is the launch-brief doorbell.
+CLAUDE_RESTORE_UUID=5a3eec19-de12-4999-bed2-bbd561089154
+CLAUDE_UNPINNED_CAUSE="live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record"
+
+write_claude_transcript() { # <case-dir> <first-user-message> [seconds-after-now]
+  local dir=$1 physical project ts
+  physical=$(cd -P "$dir/wt" && pwd -P)
+  project="$dir/claude-home/.claude/projects/$(printf '%s' "$physical" | sed 's/[^A-Za-z0-9]/-/g')"
+  mkdir -p "$project"
+  ts=$(python3 -c 'import datetime,sys; print((datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=int(sys.argv[1]))).strftime("%Y-%m-%dT%H:%M:%S.000Z"))' "${3:-30}")
+  {
+    jq -nc --arg id "$CLAUDE_RESTORE_UUID" '{type:"last-prompt",sessionId:$id}'
+    jq -nc --arg text "$2" --arg ts "$ts" '{type:"user",timestamp:$ts,message:{role:"user",content:$text}}'
+    jq -nc '{type:"assistant",message:{role:"assistant",content:"ready"}}'
+  } > "$project/$CLAUDE_RESTORE_UUID.jsonl"
+}
+
+prepare_claude_restore() { # <case-name>
+  recovery_case_or_skip "claude-restore-$1" "claude-restore-$1" || fail "claude restore needs jq"
+  local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID meta doorbell
+  meta="$dir/home/state/$id.meta"
+  prepare_herdr_recovery "$dir" "$id" secondmate
+  grep -v '^harness=' "$meta" > "$meta.new" && mv "$meta.new" "$meta"
+  printf 'harness=claude\n' >> "$meta"
+  printf '%s' "$CLAUDE_RESTORE_UUID" > "$dir/fake/claude-launcher"
+  mkdir -p "$dir/claude-home"
+  printf '%s' "$dir/claude-home" > "$dir/fake/claude-home"
+  printf '%s' "$dir/wt" > "$dir/fake/adoption-cwd"
+  fm_operational_record_write "$dir/wt/state" launch-brief 'task brief' doorbell
+  write_claude_transcript "$dir" "$doorbell"
+  make_continuation_owner_fixture "$dir"
+}
+
+# Sets CLAUDE_REFUSAL_OUT. It is called without command substitution: a fail inside
+# $(...) would exit only the subshell, and the guard assertions here must be able to
+# fail the test on their own.
+CLAUDE_REFUSAL_OUT=
+claude_lifecycle_refusal() { # <case-dir> <id> <verb>
+  local dir=$1 id=$2 verb=$3 out rc=0 sends_before
+  sends_before=$(grep -c 'pane send-' "$dir/fake/herdr-log" || true)
+  case "$verb" in
+    relaunch) out=$(run_control "$dir" "$id" relaunch --note "keep the lane") || rc=$? ;;
+    *) out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" "$verb") || rc=$? ;;
+  esac
+  expect_code 1 "$rc" "an unauthorized restored claude must refuse $verb"$'\n'"$out"
+  assert_contains "$out" "cannot positively attribute its live Herdr agent" "$verb must name the missing attribution"
+  [ "$(grep -c 'pane send-' "$dir/fake/herdr-log" || true)" = "$sends_before" ] \
+    || fail "$verb sent input to an unauthorized restored claude"
+  CLAUDE_REFUSAL_OUT=$out
+}
+
+test_claude_restore_adoption_and_consumers() {
+  prepare_claude_restore adoption
+  local CONTROL="$ROOT/bin/fm-control.sh"
+  local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID out rc verb meta_before
+  meta_before=$(shasum -a 256 "$dir/home/state/$id.meta")
+  # Before the route: every lifecycle consumer names the true cause and next action, and sends nothing.
+  for verb in interrupt exit relaunch; do
+    claude_lifecycle_refusal "$dir" "$id" "$verb"
+    out=$CLAUDE_REFUSAL_OUT
+    assert_contains "$out" "$CLAUDE_UNPINNED_CAUSE" "$verb must report an unpinned native restore"
+    assert_contains "$out" "bin/fm-control.sh $id adopt" "$verb must name the explicit route"
+    assert_not_contains "$out" "unreadable" "$verb must not call a readable environment unreadable"
+  done
+  rc=0
+  out=$(run_control "$dir" "$id" relaunch --recover-launch) || rc=$?
+  expect_code 1 "$rc" "inspecting an unadopted restored claude keeps its nonzero exit"$'\n'"$out"
+  assert_contains "$out" "launch recovery for $id found $CLAUDE_UNPINNED_CAUSE" "inspection must report the true cause"
+  rc=0
+  out=$(CONTROL="$ROOT/bin/fm-reboot-recover.sh" run_control "$dir" recover) || rc=$?
+  expect_code 1 "$rc" "the reboot sweep keeps its nonzero exit for an unadopted restored claude"$'\n'"$out"
+  assert_contains "$out" "REBOOT_RECOVERY: $id: $CLAUDE_UNPINNED_CAUSE; no lifecycle action taken" "the sweep must report the true cause"
+  assert_not_contains "$out" "unreadable" "the sweep must not call a readable environment unreadable"
+  [ "$meta_before" = "$(shasum -a 256 "$dir/home/state/$id.meta")" ] || fail "refusals changed the task record"
+  assert_absent "$dir/home/state/$id.claude-adoption.json" "no adoption record exists before the route"
+
+  # The route: one explicit, owner-only action; it writes only its own record.
+  out=$(run_continuation_control "$dir" "$id" adopt) || fail "a positively proven restored claude must adopt: $out"
+  assert_contains "$out" "adopted: $id" "adoption reports its exact task"
+  jq -e --arg gen old --arg uuid "$CLAUDE_RESTORE_UUID" \
+    '.version == 1 and .harness == "claude" and .spawn_gen == $gen and .pid == 2000000000 and .harness_pid == 2000000001 and .session_id == $uuid and .tie == "launch-brief"' \
+    "$dir/home/state/$id.claude-adoption.json" >/dev/null || fail "adoption record does not name the proven process, generation and session"
+  [ "$meta_before" = "$(shasum -a 256 "$dir/home/state/$id.meta")" ] || fail "adoption changed the task record (launch_proof or spawn_gen must stay as recorded)"
+  assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "adoption sends no lifecycle input"
+  # After the route: the sweep and the inspection report the managed state; interrupt is authorized.
+  rc=0
+  out=$(CONTROL="$ROOT/bin/fm-reboot-recover.sh" run_control "$dir" recover) || rc=$?
+  expect_code 0 "$rc" "an adopted lane is not reported by the sweep"$'\n'"$out"
+  [ -z "$out" ] || fail "an adopted lane must keep the managed silence, got: $out"
+  out=$(run_control "$dir" "$id" relaunch --recover-launch) || fail "inspection of an adopted lane: $out"
+  assert_contains "$out" "recovery-skipped $id launch=managed" "inspection must report the managed state"
+  out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" interrupt) || fail "an adopted lane must accept lifecycle input: $out"
+  assert_contains "$out" "interrupt-delivered $id" "adoption authorizes the lifecycle consumers"
+  # A pane that changed hands after the adoption refuses again, with the same true cause.
+  printf 'node /host/nvm/bin/otherwrap run -- --resume %s' "$CLAUDE_RESTORE_UUID" > "$dir/fake/claude-launcher-args"
+  claude_lifecycle_refusal "$dir" "$id" interrupt
+  out=$CLAUDE_REFUSAL_OUT
+  assert_contains "$out" "$CLAUDE_UNPINNED_CAUSE" "an invalidated adoption reports the true cause"
+  rc=0
+  out=$(CONTROL="$ROOT/bin/fm-reboot-recover.sh" run_control "$dir" recover) || rc=$?
+  expect_code 1 "$rc" "an invalidated adoption is reported again"$'\n'"$out"
+  assert_contains "$out" "REBOOT_RECOVERY: $id: $CLAUDE_UNPINNED_CAUSE" "the sweep reports the invalidated adoption"
+  pass "claude restore: unpinned is reported as such, one owner-only route adopts it, and every consumer rechecks it"
+}
+
+test_claude_restore_adoption_refuses_a_personal_session() {
+  prepare_claude_restore personal
+  local CONTROL="$ROOT/bin/fm-control.sh"
+  local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID out rc=0 meta_before
+  meta_before=$(shasum -a 256 "$dir/home/state/$id.meta")
+  # The authentic diagnostic session: it names the inbox and archives a record, but it is not the launch brief.
+  write_claude_transcript "$dir" "Is $dir/wt/state/operational-inbox the right place for the inbox?"
+  out=$(run_continuation_control "$dir" "$id" adopt) || rc=$?
+  [ "$rc" -ne 0 ] || fail "a personal session in the task pane and home was adopted: $out"
+  assert_contains "$out" "no task-specific session tie" "the refusal names the missing tie"
+  assert_absent "$dir/home/state/$id.claude-adoption.json" "a refused adoption writes no record"
+  assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "a refused adoption sends no input"
+  [ "$meta_before" = "$(shasum -a 256 "$dir/home/state/$id.meta")" ] || fail "a refused adoption changed the task record"
+  claude_lifecycle_refusal "$dir" "$id" interrupt
+  out=$CLAUDE_REFUSAL_OUT
+  assert_contains "$out" "$CLAUDE_UNPINNED_CAUSE" "a personal session stays refused with the true cause"
+  # A recorded session id that names another conversation vetoes even a valid doorbell.
+  prepare_claude_restore veto
+  dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
+  printf 'claude_session_id=0b4c1d2e-3f40-4a51-8b62-7c83d94ea5f6\n' >> "$dir/home/state/$id.meta"
+  rc=0
+  out=$(run_continuation_control "$dir" "$id" adopt) || rc=$?
+  [ "$rc" -ne 0 ] || fail "a record naming another session was adopted: $out"
+  assert_contains "$out" "recorded session id differs from the live session" "the veto names its cause"
+  assert_absent "$dir/home/state/$id.claude-adoption.json" "a vetoed adoption writes no record"
+  pass "claude restore: a personal session or a different recorded session is not adopted"
+}
+
+test_claude_restore_adoption_caller_gate() {
+  prepare_claude_restore caller-gate
+  local CONTROL="$ROOT/bin/fm-control.sh"
+  local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID out rc caller
+  for caller in worker branch not-owner; do
+    rc=0
+    case "$caller" in
+      worker) out=$(FM_FAKE_TASK_ID=$id run_continuation_control "$dir" "$id" adopt) || rc=$? ;;
+      branch) out=$(FM_FAKE_ACTOR=branch run_continuation_control "$dir" "$id" adopt) || rc=$? ;;
+      not-owner) printf '1\n' > "$dir/home/state/.lock"; out=$(run_continuation_control "$dir" "$id" adopt) || rc=$? ;;
+    esac
+    [ "$rc" -ne 0 ] || fail "$caller adopted a restored claude: $out"
+    assert_absent "$dir/home/state/$id.claude-adoption.json" "$caller refusal writes no record"
+  done
+  pass "claude restore: workers, the supervision branch and a non-owning session cannot adopt"
+}
+
+test_claude_restore_restart_decides_attribution_before_its_first_effect() {
+  prepare_claude_restore restart
+  local CONTROL="$ROOT/bin/fm-control.sh"
+  local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID out rc=0 state_before
+  state_before=$(cd "$dir/home/state" && find . -type f -exec shasum -a 256 {} + | sort)
+  # The real restart, real fm-send and real pending-reply code: nothing is stubbed.
+  out=$(CONTROL="$ROOT/bin/fm-secondmate-restart.sh" run_control "$dir" "$id") || rc=$?
+  expect_code 3 "$rc" "an unproven live agent is left unreached"$'\n'"$out"
+  assert_contains "$out" "unreached: $id: its live Herdr agent cannot be positively attributed to this task, so no request or nudge was sent to it: $CLAUDE_UNPINNED_CAUSE" \
+    "the restart must report the true cause"
+  assert_not_contains "$out" "nudged:" "an unproven agent gets no fallback nudge"
+  assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "no request, nudge or key reached the unproven pane"
+  [ "$state_before" = "$(cd "$dir/home/state" && find . -type f -exec shasum -a 256 {} + | sort)" ] \
+    || fail "the refused restart created or changed a record (pending reply, inbox or task state)"
+  # After the route the same restart passes attribution and proceeds into the persistence phase.
+  out=$(run_continuation_control "$dir" "$id" adopt) || fail "adopt before restart: $out"
+  rc=0
+  out=$(FM_SECONDMATE_PERSIST_WAIT=0 CONTROL="$ROOT/bin/fm-secondmate-restart.sh" run_control "$dir" "$id") || rc=$?
+  assert_not_contains "$out" "cannot be positively attributed" "an adopted lane passes the restart's attribution preflight"
+  pass "claude restore: the restart decides attribution before any pending reply, inbox write, request or nudge"
+}
+
 control_relaunch_test_cases=(
 test_omp_adoption
+test_claude_restore_adoption_and_consumers
+test_claude_restore_adoption_refuses_a_personal_session
+test_claude_restore_adoption_caller_gate
+test_claude_restore_restart_decides_attribution_before_its_first_effect
 test_bounded_reboot_recovery_rotates_unmanaged_inspections_without_mutation
 test_bounded_reboot_recovery_notifies_each_unmanaged_identity_once
 test_bounded_reboot_recovery_advances_after_interrupted_inspection
