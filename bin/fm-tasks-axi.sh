@@ -93,11 +93,15 @@
 # item (id, review-by left empty, objective, reason), because tasks-axi has no
 # field for them. The file is
 # checked writable before anything is filed, and an item whose line fails to
-# write is removed again. An add whose answer cannot be read gets its line for
-# the one new item the backlog then holds; when there is not exactly one, the
-# add names the items to check and removes nothing. A line that fails to write
-# and an answer tied to no single new item both exit 1, even though tasks-axi
-# accepted the add. An add whose title overlaps a Queued or In flight item,
+# write is removed again. Each add writes an attribution token, a hidden comment
+# line (`<!-- fm-add:<random> -->`) at the end of the new item's body. An add whose
+# answer cannot be read gets its line only for the one new item whose stored body
+# carries its own token; when no new item, or more than one, carries it, the add
+# names the items to check and removes nothing. The token is bookkeeping: the
+# add's answer shows the body without it (`null` or `""` for an add with no body),
+# and `done --duplicate-of` never copies it into the kept item. A line that fails
+# to write and an answer tied to no single new item both exit 1, even though
+# tasks-axi accepted the add. An add whose title overlaps a Queued or In flight item,
 # or one of the 50 newest Done items, is refused with the three best neighbours
 # and the two overrides as full commands: `--dup-of <kept-id>` appends the new
 # title and body to that kept item in the active backlog through `tasks-axi
@@ -109,6 +113,9 @@
 # or done archive that cannot be read stops the add. bin/fm-backlog-intake.py
 # owns the overlap rule, the Done window, and the owner-filed pattern; the
 # objective list is docs/objectives.md; docs/configuration.md states the rule.
+# The rule covers `add` and `create` only. A typed public-followup obligation that
+# bin/fm-public-followup.sh registers goes through `tasks-axi public-followup`, is
+# not a backlog work item, and needs no objective.
 #
 # Closing proofs. `done`/`close` also accepts two proofs that need no deliverable
 # and no owner words, for an item of any kind:
@@ -435,29 +442,65 @@ append_to_kept() {  # <kept-id> <origin label> <title> <body>
 # command substitution, so both values reach the caller.
 REMOTE_ITEM_STATE=
 REMOTE_ITEM_ERROR=
+IDENTITY_ERROR=
+# Parse one identity answer (stdout only). It must hold exactly the three lines
+# machine=<id>, data=/<path> and dev_ino=<d>:<i>, each once, and nothing else; any
+# other line means the answer is not an identity. Sets IDENT_MACHINE, IDENT_DATA,
+# and IDENT_DEVINO.
+IDENT_MACHINE=
+IDENT_DATA=
+IDENT_DEVINO=
+identity_parse() {  # <identity text>
+  local line seen=''
+  IDENT_MACHINE=
+  IDENT_DATA=
+  IDENT_DEVINO=
+  while IFS= read -r line; do
+    case "$line" in
+      machine=?*) case "$seen" in *m*) return 1 ;; esac; seen=${seen}m; IDENT_MACHINE=${line#machine=} ;;
+      data=/*) case "$seen" in *d*) return 1 ;; esac; seen=${seen}d; IDENT_DATA=${line#data=} ;;
+      dev_ino=*)
+        case "$seen" in *i*) return 1 ;; esac
+        [[ "${line#dev_ino=}" =~ ^[0-9]+:[0-9]+$ ]] || return 1
+        seen=${seen}i; IDENT_DEVINO=${line#dev_ino=} ;;
+      *) return 1 ;;
+    esac
+  done <<< "$1"
+  [ "${#seen}" -eq 3 ]
+}
+# Run one identity command, keeping stdout (the identity) apart from stderr (text
+# for the error message only), so a warning line can never change the comparison.
+# Sets IDENTITY_OUT and IDENTITY_ERR; returns the command's status.
+IDENTITY_OUT=
+IDENTITY_ERR=
+identity_capture() {  # <command...>
+  local errfile status
+  errfile=$(mktemp "${TMPDIR:-/tmp}/fm-tasks-axi-identity.XXXXXX" 2>/dev/null) || { IDENTITY_OUT=; IDENTITY_ERR='cannot create a scratch file'; return 1; }
+  IDENTITY_OUT=$("$@" 2>"$errfile" </dev/null)
+  status=$?
+  IDENTITY_ERR=$(cat -- "$errfile" 2>/dev/null)
+  rm -f -- "$errfile"
+  return "$status"
+}
 # A move may close the source item only when the target is proved to be a
 # different physical backlog. The proof is the backlog's own identity (machine,
 # canonical data directory, device and inode), read through the same transport
 # that reads the target's item, and never a host name or an address.
 # Returns 0 for a proved different backlog, 1 for the same backlog, and 2 when
 # either identity cannot be read. Sets IDENTITY_ERROR on 2.
-IDENTITY_ERROR=
-identity_complete() {  # <identity text>
-  printf '%s\n' "$1" | grep -q '^machine=.' || return 1
-  printf '%s\n' "$1" | grep -q '^data=/' || return 1
-  printf '%s\n' "$1" | grep -q '^dev_ino=[0-9]*:[0-9]*$'
-}
 remote_backlog_differs() {  # <home>
-  local mine theirs
+  local mine_m mine_d mine_i
   IDENTITY_ERROR=
-  mine=$(env -u FM_ROOT_OVERRIDE FM_HOME="$FM_HOME" FM_DATA_OVERRIDE="$DATA" "$SCRIPT_DIR/fm-backlog-identity.sh" 2>&1 </dev/null) \
-    || { IDENTITY_ERROR="cannot read this backlog's identity: $(printf '%s\n' "$mine" | sed -n '1p')"; return 2; }
-  theirs=$(env -u FM_ROOT_OVERRIDE FM_HOME="$FM_HOME" FM_DATA_OVERRIDE="$DATA" \
-    "$SCRIPT_DIR/fm-on.sh" "$1" fm-backlog-identity.sh 2>&1 </dev/null) \
-    || { IDENTITY_ERROR="cannot read $1's backlog identity: $(printf '%s\n' "$theirs" | sed -n '1p')"; return 2; }
-  if ! identity_complete "$mine"; then IDENTITY_ERROR="this backlog's identity is not complete"; return 2; fi
-  if ! identity_complete "$theirs"; then IDENTITY_ERROR="the identity answered by $1 is not complete"; return 2; fi
-  [ "$mine" != "$theirs" ]
+  identity_capture env -u FM_ROOT_OVERRIDE FM_HOME="$FM_HOME" FM_DATA_OVERRIDE="$DATA" "$SCRIPT_DIR/fm-backlog-identity.sh" \
+    || { IDENTITY_ERROR="cannot read this backlog's identity: $(printf '%s\n' "$IDENTITY_ERR" | sed -n '1p')"; return 2; }
+  identity_parse "$IDENTITY_OUT" || { IDENTITY_ERROR="this backlog's identity is not complete"; return 2; }
+  mine_m=$IDENT_MACHINE mine_d=$IDENT_DATA mine_i=$IDENT_DEVINO
+  identity_capture env -u FM_ROOT_OVERRIDE FM_HOME="$FM_HOME" FM_DATA_OVERRIDE="$DATA" \
+    "$SCRIPT_DIR/fm-on.sh" "$1" fm-backlog-identity.sh \
+    || { IDENTITY_ERROR="cannot read $1's backlog identity: $(printf '%s\n%s\n' "$IDENTITY_ERR" "$IDENTITY_OUT" | sed -n '/./{p;q;}')"; return 2; }
+  identity_parse "$IDENTITY_OUT" || { IDENTITY_ERROR="the identity answered by $1 is not complete"; return 2; }
+  # The same backlog only when all three values are equal.
+  [ "$mine_m" != "$IDENT_MACHINE" ] || [ "$mine_d" != "$IDENT_DATA" ] || [ "$mine_i" != "$IDENT_DEVINO" ]
 }
 
 remote_item_state() {  # <home> <item>
@@ -531,6 +574,9 @@ guard_closing_proof() {
     || backlog_source_stop backlog-close-item-eligible "cannot read $id: $(printf '%s\n' "$shown" | sed -n '1p')"
   title=$(printf '%s\n' "$shown" | intake_python field title) || title=
   body=$(printf '%s\n' "$shown" | intake_python field body) || body=
+  # The add's attribution token is bookkeeping, not text the filer wrote: it is
+  # never copied into the kept item.
+  body=$(printf '%s\n' "$body" | sed '/^<!-- fm-add:[0-9a-f]* -->$/d')
   guard_owner_items "$id" "$title" "$body"
   if [ -n "$kept" ]; then
     [[ "$kept" =~ ^[A-Za-z0-9._-]+$ ]] || fail "unsupported kept item id '$kept'"
@@ -811,7 +857,6 @@ list_ids() {
 # second writer's item is never recorded as this add's and never removed by it.
 ADD_NONCE=
 ADD_BODY_TMP=
-ADD_HAD_BODY=0
 
 # Rewrite ARGS so the body (from --body or --body-file, or empty) ends with the
 # token, through one scratch --body-file. A body given to a flag pair that cannot
@@ -832,7 +877,6 @@ tag_add_body() {
     i=$((i + 1))
   done
   if [ "$have_body" -gt 1 ]; then ADD_NONCE=; return 0; fi
-  ADD_HAD_BODY=$have_body
   ADD_BODY_TMP=$(mktemp "${TMPDIR:-/tmp}/fm-tasks-axi-body.XXXXXX" 2>/dev/null) || { ADD_NONCE=; return 0; }
   if [ -n "$body_file" ]; then
     cat -- "$body_file" > "$ADD_BODY_TMP" 2>/dev/null || { rm -f -- "$ADD_BODY_TMP"; ADD_BODY_TMP=; ADD_NONCE=; return 0; }
@@ -855,18 +899,34 @@ item_text() {  # <id>
 }
 
 # Print the add's answer without the token, so the caller sees what tasks-axi
-# would have printed for the body it gave (a body-less add still shows no body).
+# would have printed for the body it gave. The body field is decoded, the token's
+# line and the newline after it are removed, and the field is written back: an
+# add with no body of its own prints `"body": null` (--json) or `body: ""`, never
+# a bare newline, and `--body hello` prints "hello", not "hello\n". Any token
+# left in a shape that is not a body field is cut out as a last step.
 print_add_answer() {  # <captured-add-stdout-file>
   if [ -z "$ADD_NONCE" ]; then cat -- "$1"; return; fi
   python3 -I -c '
-import re, sys
+import json, re, sys
 text = sys.stdin.read()
-token = r"(?:\\n)?<!-- fm-add:" + re.escape(sys.argv[1]) + r" -->"
-text = re.sub(token, "", text)
-if sys.argv[2] == "0":
-    text = text.replace(chr(34) + "body" + chr(34) + ": " + chr(34) + chr(34), chr(34) + "body" + chr(34) + ": null")
+marker = "<!-- fm-add:" + sys.argv[1] + " -->"
+def field(m):
+    try:
+        value = json.loads(chr(34) + m.group(3) + chr(34))
+    except ValueError:
+        return m.group(0)
+    if marker not in value:
+        return m.group(0)
+    value = "\n".join(l for l in value.split("\n") if l != marker).rstrip("\n")
+    if value:
+        shown = json.dumps(value, ensure_ascii=False)
+    else:
+        shown = "null" if m.group(2).startswith(chr(34)) else chr(34) + chr(34)
+    return m.group(1) + m.group(2) + shown + m.group(4)
+text = re.sub(r"^(\s*)(\"body\": |body: )\"((?:[^\"\\]|\\.)*)\"(,?)$", field, text, flags=re.M)
+text = re.sub(r"(?:\\n)*" + re.escape(marker) + r"(?:\\n)*", "", text)
 sys.stdout.write(text)
-' "$ADD_NONCE" "$ADD_HAD_BODY" < "$1" || cat -- "$1"
+' "$ADD_NONCE" < "$1" || cat -- "$1"
 }
 
 # The add's own answer could not be read. Claim the item this invocation filed by

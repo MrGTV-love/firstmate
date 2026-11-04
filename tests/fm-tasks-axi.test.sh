@@ -1562,6 +1562,14 @@ test_moved_to_refuses_a_remote_alias_of_this_backlog() {
     assert_contains "$out" "this backlog itself" "$alias was not named as this backlog"
     [ "$(row_state "$dir" lb-item)" = " " ] || fail "the item closed on a move through $alias"
   done
+  # A line on standard error is not part of the identity: the loopback alias is still this backlog.
+  out=$(FM_SSH_BIN="$fakebin/fake-ssh" FAKE_REMOTE_PREFIX="" FAKE_SSH_STDERR='Warning: Permanently added localhost to the list of known hosts.' \
+    wrapper_from_code "$dir" "done" lb-item --moved-to sm-loop lb-item 2>&1) && fail "a stderr line made the loopback alias look like another backlog: $out"
+  assert_contains "$out" "this backlog itself" "a stderr line hid that the alias is this backlog"
+  [ "$(row_state "$dir" lb-item)" = " " ] || fail "the item closed on a move through a noisy loopback alias"
+  # An identity answer with any line besides the three is not an identity.
+  out=$(FAKE_SSH_MODE=identity-extra moved_close "$dir" lb-item sm-far lb-item) && fail "an identity with an extra line proved a move: $out"
+  assert_contains "$out" "cannot prove sm-far is a different backlog" "an identity with an extra line was not refused"
   # An identity that cannot be read or is not an identity proves nothing: nothing closes.
   out=$(FAKE_SSH_MODE=garbled moved_close "$dir" lb-item sm-far lb-item) && fail "a remote answer that is not an identity proved a move: $out"
   assert_contains "$out" "cannot prove sm-far is a different backlog" "an unreadable identity was not named"
@@ -1572,6 +1580,53 @@ test_moved_to_refuses_a_remote_alias_of_this_backlog() {
   out=$(moved_close "$dir" lb-item sm-far lb-item) || fail "the same path on another host was refused: $out"
   [ "$(row_state "$dir" lb-item)" = x ] || fail "the move to another host did not close the item"
   pass "a move closes the source only when the target's own identity, read through the transport, is a different backlog and the target holds the item open"
+}
+
+# The machine id must not depend on the caller's PATH: a remote shell often has no
+# /usr/sbin, and an id that differs by PATH would make one machine look like two.
+test_backlog_identity_does_not_depend_on_path() {
+  local dir with without
+  dir=$(make_split identity-path)
+  with=$(cd "$dir/code" && env -i PATH="$BASE_PATH" FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code" "$ROOT/bin/fm-backlog-identity.sh") \
+    || fail "the identity could not be read with the usual PATH"
+  without=$(cd "$dir/code" && env -i PATH=/usr/bin:/bin FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code" "$ROOT/bin/fm-backlog-identity.sh") \
+    || fail "the identity could not be read without /usr/sbin on PATH"
+  assert_contains "$with" "machine=" "the identity named no machine"
+  assert_equals "$with" "$without" "the identity changed when /usr/sbin left PATH"
+  pass "the backlog identity is the same whether or not /usr/sbin is on PATH"
+}
+
+# The attribution token is bookkeeping: the add's answer and a duplicate's copy
+# into the kept item never show it.
+test_add_token_stays_out_of_answers_and_copies() {
+  local dir out kept count
+  dir=$(make_split token-hidden)
+  out=$(wrapper_from_code "$dir" add tk-none "$(ftitle tk-none)" --objective O7 2>&1) || fail "a body-less add failed: $out"
+  assert_not_contains "$out" "fm-add" "a body-less add printed the token"
+  assert_contains "$out" 'body: ""' "a body-less add did not print an empty body"
+  assert_not_contains "$out" '\n' "a body-less add printed a stray newline in its body"
+  out=$(wrapper_from_code "$dir" add tk-json "$(ftitle tk-json)" --objective O7 --json 2>&1) || fail "a body-less JSON add failed: $out"
+  assert_not_contains "$out" "fm-add" "a body-less JSON add printed the token"
+  assert_contains "$out" '"body": null' "a body-less JSON add did not print a null body"
+  out=$(wrapper_from_code "$dir" add tk-body "$(ftitle tk-body)" --objective O7 --body hello 2>&1) || fail "an add with a body failed: $out"
+  assert_not_contains "$out" "fm-add" "an add with a body printed the token"
+  assert_contains "$out" 'body: "hello"' "an add with a body did not print exactly its body"
+  out=$(wrapper_from_code "$dir" add tk-bjson "$(ftitle tk-bjson)" --objective O7 --body hello --json 2>&1) || fail "a JSON add with a body failed: $out"
+  assert_contains "$out" '"body": "hello",' "a JSON add with a body did not print exactly its body"
+  assert_not_contains "$out" "fm-add" "a JSON add with a body printed the token"
+  # The token is still stored, so an unreadable answer can still be tied to its item.
+  assert_grep "fm-add:" "$dir/home/data/backlog.md" "the add no longer stores its attribution token"
+  # A duplicate closed into a kept item brings its text, not its token.
+  wrapper_from_code "$dir" add tk-kept "Normalize the archive header spacing" --objective O7 --body KEPT-BODY >/dev/null || fail "could not file the kept item"
+  wrapper_from_code "$dir" add tk-dup "Align heading gaps inside the done ledger" --objective O7 --body DUP-BODY >/dev/null || fail "could not file the duplicate"
+  wrapper_from_code "$dir" add tk-dup2 "Reorder fenced sections around nightly retention" --objective O7 >/dev/null || fail "could not file the body-less duplicate"
+  wrapper_from_code "$dir" "done" tk-dup --duplicate-of tk-kept >/dev/null 2>&1 || fail "the duplicate did not close"
+  wrapper_from_code "$dir" "done" tk-dup2 --duplicate-of tk-kept >/dev/null 2>&1 || fail "the body-less duplicate did not close"
+  kept=$(wrapper_from_code "$dir" show tk-kept --full) || fail "could not read the kept item"
+  assert_contains "$kept" "DUP-BODY" "the duplicate's body did not reach the kept item"
+  count=$(printf '%s\n' "$kept" | grep -o 'fm-add:' | wc -l | tr -d ' ')
+  assert_equals 1 "$count" "the kept item holds a token besides its own"
+  pass "the add's token never shows in its answer or in a duplicate's copy, and is still stored for recovery"
 }
 
 # A fake non-Markdown adapter: tasks-axi answers from files under .stubdata when
@@ -2164,6 +2219,12 @@ while IFS= read -r -d '' a; do argv+=("$a"); done < <(printf '%s' "$6" | base64 
 cmd=${argv[0]}
 [ "${FAKE_SSH_MODE:-}" != garbled-item ] || [ "$cmd" != fm-tasks-axi.sh ] || { echo 'welcome to far-box'; exit 0; }
 unset 'argv[0]'
+[ -z "${FAKE_SSH_STDERR:-}" ] || printf '%s\n' "$FAKE_SSH_STDERR" >&2
+if [ "${FAKE_SSH_MODE:-}" = identity-extra ] && [ "$cmd" = fm-backlog-identity.sh ]; then
+  env -i PATH="$PATH" HOME="$HOME" FM_HOME="${FAKE_REMOTE_PREFIX:-}$home" "$root/bin/$cmd" "${argv[@]}" || exit $?
+  echo 'extra=1'
+  exit 0
+fi
 exec env -i PATH="$PATH" HOME="$HOME" FM_HOME="${FAKE_REMOTE_PREFIX:-}$home" "$root/bin/$cmd" "${argv[@]}"
 SH
   chmod +x "$1/fake-ssh"
@@ -2185,7 +2246,7 @@ moved_close() {  # <case-dir> <item> <home> <dest-item>; runs the proof with the
   local dir=$1
   shift
   FM_SSH_BIN="$dir/fakebin/fake-ssh" FAKE_REMOTE_PREFIX="$dir/remote-fs" FAKE_SSH_MODE="${FAKE_SSH_MODE:-}" \
-    wrapper_from_code "$dir" "done" "$1" --moved-to "$2" "$3" 2>&1
+    FAKE_SSH_STDERR="${FAKE_SSH_STDERR:-}" wrapper_from_code "$dir" "done" "$1" --moved-to "$2" "$3" 2>&1
 }
 
 test_moved_to_closes_on_checked_proof() {
@@ -2635,6 +2696,8 @@ if [ "$HAVE_TASKS_AXI" = 1 ]; then
   test_duplicate_of_closes_on_checked_proof
   test_moved_to_closes_on_checked_proof
   test_moved_to_refuses_a_remote_alias_of_this_backlog
+  test_backlog_identity_does_not_depend_on_path
+  test_add_token_stays_out_of_answers_and_copies
   test_closing_proofs_keep_open_dependents_blocked
   test_closing_proofs_leave_the_owners_items_alone
   test_closing_proofs_serialize_with_holds_and_live_tasks || exit "$?"

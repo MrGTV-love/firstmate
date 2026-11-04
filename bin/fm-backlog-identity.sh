@@ -26,8 +26,10 @@ if [ -r /etc/machine-id ]; then
   machine=$(tr -d '[:space:]' < /etc/machine-id)
 elif [ -r /var/lib/dbus/machine-id ]; then
   machine=$(tr -d '[:space:]' < /var/lib/dbus/machine-id)
-elif command -v ioreg >/dev/null 2>&1; then
-  machine=$(ioreg -rd1 -c IOPlatformExpertDevice 2>/dev/null | awk -F'"' '/IOPlatformUUID/ { print $4; exit }')
+elif [ -x /usr/sbin/ioreg ]; then
+  # Absolute path: a remote shell's PATH often lacks /usr/sbin, and a machine id
+  # that differs by PATH would make one machine look like two.
+  machine=$(/usr/sbin/ioreg -rd1 -c IOPlatformExpertDevice 2>/dev/null | awk -F'"' '/IOPlatformUUID/ { print $4; exit }')
 fi
 [ -n "$machine" ] || machine=$(hostname 2>/dev/null) || machine=
 [ -n "$machine" ] || { printf 'error: cannot tell which machine this is\n' >&2; exit 1; }

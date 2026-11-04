@@ -455,7 +455,7 @@ The script header owns the flags, the refusals, and their exit status; [`bin/fm-
   An add names `--objective O1` to `O7`, the ids [`docs/objectives.md`](objectives.md) lists, or `--objective none --objective-reason "<why>"`.
   An unknown id, or `none` with no reason, is refused, and so is an add with no objective at all.
   Each filed item adds one tab-separated line to `data/backlog-review.tsv` in the data directory the add addresses: `id`, `review-by` (left empty), `objective`, and `reason`.
-  Each add ends the item's body with a hidden comment, `<!-- fm-add:<token> -->`, the attribution token of that one invocation; the add's printed answer does not show it.
+  Each add ends the item's body with a hidden comment, `<!-- fm-add:<token> -->`, the attribution token of that one invocation; the add's printed answer does not show it (an add with no body of its own prints `null` in `--json` and `body: ""` in text), and `done --duplicate-of` never copies it into the kept item.
   When tasks-axi's answer cannot be read, the wrapper claims a new item only if its stored body carries the token, so it never records or removes another writer's item.
   An add it cannot prove fails without changing anything and names the items to check.
   tasks-axi has no field for these values.
@@ -493,6 +493,7 @@ The script header owns the flags, the refusals, and their exit status; [`bin/fm-
   A move closes the source item only when two things are proved: the target is a different physical backlog, and the target's backlog holds the item open.
   The first proof is the backlog's own identity, which is the machine id, the canonical data directory and its device and inode, printed by [`bin/fm-backlog-identity.sh`](../bin/fm-backlog-identity.sh) and read through the same transport that reads the item, never judged from a host name or an address.
   The same machine, directory and inode is the same backlog, whatever name reaches it, and an identity that cannot be read or is not complete refuses the move.
+  Only standard output is the identity: it must be exactly the lines `machine=`, `data=` and `dev_ino=`, each once, and any other line makes the answer unreadable; standard error is kept apart for the error message and never enters the comparison.
   The same path on another machine is a different backlog.
   Both proofs stop at an item the owner filed, an item whose owner call is open, an item with a live task record, a closed item, and an item that still blocks an open item, and each refusal names what to do next.
   A proof close leaves the work open elsewhere, so the refusal names the open items it would release and tells the operator to re-point them first; the tool never re-points them itself.
@@ -511,6 +512,7 @@ A `--dup-of` escape agrees that the guard found a duplicate, so it writes an all
 A hold created by `bin/fm-captain-hold.sh hold` files through `bin/fm-tasks-axi.sh add` with `--objective none --objective-reason "captain hold record: tracks a captain decision, not a work item"`, so its objective row is recorded and the duplicate check applies; a duplicate refusal stops the hold and prints the neighbours.
 The refused hold then says not to use the printed `--dup-of` command, which would append the captain call to a work item, file nothing, and record no hold; to file it anyway, run the printed `--not-dup` command naming the neighbour you checked, prefixed with `BD_DUE_REQUIRED=false` because a captain call has no due date, then run the same hold command again.
 This applies to the teardown recovery commands, whose `Land or drop the bundle-preserved commits of <id>` titles overlap one another, and to calls filed through the `bin/fm-decision-hold.sh` shim.
+The objective rule covers `add` and `create` only: a typed `public-followup` obligation that `bin/fm-public-followup.sh` registers goes through `tasks-axi public-followup`, is not a backlog work item, and needs no objective.
 
 ### Which backlog receives a transition
 
