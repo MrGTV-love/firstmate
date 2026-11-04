@@ -2836,6 +2836,12 @@ PY
   git -C "$WT_DIR" add retained.txt
   git -C "$WT_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'unrelated previous task work'
   retained_head=$(git -C "$WT_DIR" rev-parse HEAD)
+  # This case is about the provisioner's refusal, not about the base reset. The reset guard
+  # refuses a slot whose branch carries a commit contained in neither origin's default branch
+  # nor a recorded base, so the previous task's work is landed on origin first; the unlanded
+  # case is the reset guard's own regression (tests/fm-spawn-pool-base-freshen.test.sh).
+  git -C "$PROJ_DIR" -c user.name=Tests -c user.email=tests@example.invalid merge -q --no-edit "wt-$id"
+  git -C "$PROJ_DIR" push -q origin main
   common=$(git -C "$WT_DIR" rev-parse --path-format=absolute --git-common-dir)
   printf 'foreign manifest bytes\n' > "$common/foreign-manifest"
 

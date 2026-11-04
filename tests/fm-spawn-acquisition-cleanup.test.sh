@@ -741,12 +741,17 @@ exec '$SLOT_CASE/native/codex' "\$@"
 SH
   chmod +x "$FAKEBIN/codex"
   "$REAL_TMUX" kill-window -t "firstmate:fm-$SLOT_ID"
-  slot_base=$(git -C "$SLOT_COPY" rev-parse HEAD)
   git -C "$SLOT_COPY" checkout -qb retained-ahead
   printf 'prior work must survive recovery\n' >> "$SLOT_COPY/README.md"
   git -C "$SLOT_COPY" add README.md
   git -C "$SLOT_COPY" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'fixture retained ahead work'
   prior_head=$(git -C "$SLOT_COPY" rev-parse HEAD)
+  # This case is about refusal recovery, not about the base reset. The reset guard refuses a
+  # slot whose branch carries a commit contained in neither origin's default branch nor a
+  # recorded base, so each commit of the prior work is landed on origin as it is made; the
+  # unlanded case is the reset guard's own regression (tests/fm-spawn-pool-base-freshen.test.sh).
+  git -C "$SLOT_PROJECT" merge -q --ff-only retained-ahead
+  git -C "$SLOT_PROJECT" push -q origin main
   cp "$SLOT_COPY/README.md" "$SLOT_CASE/prior-readme"
   cp "$SLOT_CASE/manifest.json" "$SLOT_CASE/manifest-before"
   touch "$SLOT_CASE/refuse"
@@ -769,6 +774,14 @@ SH
   git -C "$SLOT_COPY" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'fixture preserve initially dirty prior work'
   prior_head=$(git -C "$SLOT_COPY" rev-parse HEAD)
   cp "$SLOT_COPY/README.md" "$SLOT_CASE/prior-readme"
+  git -C "$SLOT_PROJECT" merge -q --ff-only retained-ahead
+  # Upstream then moves past the landed prior work, so the prepared baseline A
+  # is distinct from the prior ahead checkout the refusals must restore.
+  printf 'prepared baseline\n' > "$SLOT_PROJECT/baseline-change"
+  git -C "$SLOT_PROJECT" add baseline-change
+  git -C "$SLOT_PROJECT" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'fixture upstream moves past the prior work'
+  git -C "$SLOT_PROJECT" push -q origin main
+  slot_base=$(git -C "$SLOT_PROJECT" rev-parse HEAD)
   out=$(FM_ROOT_OVERRIDE='' FM_SPAWN_NO_GUARD=1 PATH="$FAKEBIN:$PATH" \
     bash "$ROOT/bin/fm-control.sh" "$RETRY_ID" relaunch --note 'Prior dirty work is committed; finish the original preparation without replacing its owner.' 2>&1)
   rc=$?
