@@ -6847,7 +6847,7 @@
       "trigger": "bin/fm-cpu-pass.sh pipeline-start, directly or through bin/fm-duration.py run or bin/fm-mem-guard.sh run on a fresh no-mistakes start, cannot use its pool directory or waiter files, cannot read the state database, or cannot read a positive CPU count before it launches the command",
       "decision": "deny",
       "fail_direction": "closed",
-      "remedy": "repair the source the error line names, then issue the same fresh start again: python3 bin/fm-duration.py run <key> -- no-mistakes axi run <inputs>",
+      "remedy": "repair the source the error line names, then issue the same fresh start again the same way: python3 bin/fm-duration.py run <key> -- no-mistakes axi run <inputs>, or bin/fm-mem-guard.sh run -- no-mistakes axi run <inputs>",
       "budget": 1,
       "telemetry": "state/guard-events.jsonl",
       "test": "tests/fm-cpu-pass.test.sh",

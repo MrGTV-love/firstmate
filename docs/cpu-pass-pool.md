@@ -149,12 +149,12 @@ The live launcher is captain-private host configuration outside this repository:
 
 Queued classes are ordered `merge-train`, `machinery`, `vernant-build`, then `other`, with arrival order within each class.
 Admission never preempts an already granted start or stops running work.
-The short start lock covers the observation-to-daemon-registration gap, so participating simultaneous starts cannot all spend the same observed headroom, and a burst of ready starts is admitted back to back while the formula fits, with no spacing between them.
+The short start lock covers the observation-to-daemon-registration gap, so participating simultaneous starts cannot all spend the same observed headroom, and a burst of ready starts is admitted back to back while the rule fits, with no spacing between them.
 The [engine header](../bin/fm-cpu-pass.py) owns the registration handoff, failure behavior and the limit of read-only coordination with starts that bypass it.
 Unusable run-database, CPU-count, memory or process observations do not imply an empty host.
 
 Every route that begins a new run joins this one queue, judged by the facts the no-mistakes CLI itself uses: `no-mistakes rerun` always creates a run, and `no-mistakes axi run` creates one only with an intent input (`--intent TEXT`, `--intent -`, `--intent-file PATH` or their `=` forms); without one it reattaches an active run or exits 2.
-The engine's `fresh_pipeline_start` finds the `no-mistakes` binary at any position and by basename, so a wrapper prefix (`env`, `fm-mem-guard.sh run --`, an absolute path) does not hide a start, as `env ... fm-mem-guard.sh run -- no-mistakes axi run --intent-file ...` once did.
+The engine's `fresh_pipeline_start` finds the `no-mistakes` binary at any position and by basename, so a wrapper prefix (`env`, `fm-mem-guard.sh run --`, an absolute path) does not hide a start.
 A shell's `-c` string, after the shell's other options (`bash -l -c`, `bash -o pipefail -c`), is read as a command line without its comments and redirections, split at its control operators and newlines, so `cd x&&no-mistakes axi run --intent ...` is a start too.
 `bin/fm-duration.py run` routes such a command through this owner before starting its execution clock; its `--pipeline-priority` option selects the class.
 `bin/fm-mem-guard.sh run` hands its command to `pipeline-start --only-fresh` after its own memory reading: a new run queues in class `other`, and every other command runs unchanged.
@@ -166,7 +166,7 @@ A nested start the outer reading cannot see as the same one queues behind the ou
 When that nested start is the outer start's only run, the outer never registers a run, so the wait never ends until someone stops it, and every later fresh start on the host waits behind it.
 Every route resolves the same pool directory from `HOME`, so every home and worker of one user shares one queue; a home whose checkout predates this route does not ask the queue at all until that home is updated.
 A fresh-start call that ends - killed, timed out, or by its harness command limit - before it prints `fm-cpu-pass: pipeline-start admitted` was still queued and created no run.
-Issue the same fresh start again through `bin/fm-duration.py run`, not a flagless reattach or a status read; the new request queues again from its own arrival time.
+Issue the same fresh start again the same way, through `bin/fm-duration.py run` or `bin/fm-mem-guard.sh run`, not a flagless reattach or a status read; the new request queues again from its own arrival time.
 The admitted line proves only that the client was launched, not that a run exists, so after it the worker reattaches normally.
 If that reattach refuses because no run is active and `no-mistakes axi status` shows no run created since the fresh-start call began, the start created no run and is issued again the same way; when status shows such a run, the worker reads its outcome and never starts another.
 Admission adds no inherited CPU-worker budget, reduces no worker counts and serializes none of a task's required checks.

@@ -15,7 +15,7 @@
 # reading in the invoking home's state. After that check, run hands COMMAND to
 # fm-cpu-pass.py pipeline-start --only-fresh: a command that begins a new
 # no-mistakes run (its engine's fresh_pipeline_start) queues there in class
-# other like every other fresh start; any other command runs unchanged.
+# other; any other command runs unchanged.
 # probe is the root local home's periodic host observation; elsewhere it does
 # nothing. It records the host's run and pressure calibration and queues
 # identifying check wakes through fm-wake-lib.sh in the root home's own queue.
