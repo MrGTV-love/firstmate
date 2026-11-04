@@ -1459,12 +1459,13 @@ teardown_retained_entry_ok() {  # <copy> <entry>
 # missing or different preserved entry returns 1. In adopt mode an entry the
 # preserve lacks is copied in and hashed (the preserve skips the .claude tree that
 # the driver may still call unique); a different one still returns 1, so a
-# preserved byte is never overwritten.
+# preserved byte is never overwritten. Returns 2 when anything cannot be listed,
+# copied, hashed or written, so no comparison was made.
 teardown_retained_cover() {  # <strict|adopt> <copy> <dir> <entry>...
   local mode=$1 copy=$2 dir=$3 p rel work rc=0
   shift 3
-  work=$(mktemp -d "${TMPDIR:-/tmp}/fm-retained-cover.XXXXXX") || return 1
-  teardown_retained_files "$copy" "$work/all" "$@" || rc=1
+  work=$(mktemp -d "${TMPDIR:-/tmp}/fm-retained-cover.XXXXXX") || return 2
+  teardown_retained_files "$copy" "$work/all" "$@" || rc=2
   : > "$work/reg"
   : > "$work/missing"
   if [ "$rc" = 0 ]; then
@@ -1472,13 +1473,13 @@ teardown_retained_cover() {  # <strict|adopt> <copy> <dir> <entry>...
       rel=${p#./}
       if [ ! -e "$dir/$rel" ] && [ ! -L "$dir/$rel" ]; then
         [ "$mode" = adopt ] || { rc=1; break; }
-        printf '%s\0' "$rel" >> "$work/missing" || { rc=1; break; }
+        printf '%s\0' "$rel" >> "$work/missing" || { rc=2; break; }
       fi
     done < "$work/all"
   fi
   # Adopted entries are copied in one pass, only where the preserve has nothing.
   if [ "$rc" = 0 ] && [ -s "$work/missing" ]; then
-    (set -o pipefail; cd "$copy" && tar -cf - --null -T "$work/missing" | tar -xpf - -C "$dir") || rc=1
+    (set -o pipefail; cd "$copy" && tar -cf - --null -T "$work/missing" | tar -xpf - -C "$dir") || rc=2
   fi
   if [ "$rc" = 0 ]; then
     while IFS= read -r -d '' p; do
@@ -1487,7 +1488,7 @@ teardown_retained_cover() {  # <strict|adopt> <copy> <dir> <entry>...
         { [ -L "$dir/$rel" ] && [ "$(readlink "$copy/$rel")" = "$(readlink "$dir/$rel")" ]; } || { rc=1; break; }
       elif [ -f "$copy/$rel" ]; then
         { [ -f "$dir/$rel" ] && [ ! -L "$dir/$rel" ]; } || { rc=1; break; }
-        printf '%s\0' "$p" >> "$work/reg" || { rc=1; break; }
+        printf '%s\0' "$p" >> "$work/reg" || { rc=2; break; }
       elif [ -p "$copy/$rel" ]; then
         [ -p "$dir/$rel" ] || { rc=1; break; }
       else
@@ -1497,10 +1498,10 @@ teardown_retained_cover() {  # <strict|adopt> <copy> <dir> <entry>...
     done < "$work/all"
   fi
   if [ "$rc" = 0 ]; then
-    teardown_retained_sums "$copy" "$work/reg" > "$work/copy.sums" || rc=1
+    teardown_retained_sums "$copy" "$work/reg" > "$work/copy.sums" || rc=2
   fi
   if [ "$rc" = 0 ]; then
-    teardown_retained_sums "$dir" "$work/reg" > "$work/dir.sums" || rc=1
+    teardown_retained_sums "$dir" "$work/reg" > "$work/dir.sums" || rc=2
   fi
   if [ "$rc" = 0 ]; then
     cmp -s "$work/copy.sums" "$work/dir.sums" || rc=1
@@ -1511,7 +1512,7 @@ teardown_retained_cover() {  # <strict|adopt> <copy> <dir> <entry>...
     LC_ALL=C comm -23 "$work/want" "$work/have" > "$work/unlisted"
     if [ -s "$work/unlisted" ]; then
       if [ "$mode" = adopt ]; then
-        cat "$work/unlisted" >> "$dir/SHA256SUMS" || rc=1
+        cat "$work/unlisted" >> "$dir/SHA256SUMS" || rc=2
       else
         rc=1
       fi
@@ -1640,12 +1641,13 @@ teardown_retained_preserve_check() {  # <strict|adopt> <copy> <dir>   (driver-na
 # no entry teardown_preserve_ignored selects) still hold the copy's bytes,
 # wherever the copy still has that entry? One that now differs can only refuse
 # after the driver, and the preserve's rebuild would drop it, so it refuses first.
+# Returns 1 for an entry that differs and 2 when the check could not be made.
 teardown_retained_preserve_current() {  # <copy>
   local copy=$1 dir p rel entry selected
   local -a held=() chosen=()
-  dir=$(teardown_retained_preserve_dir "$copy") || return 1
+  dir=$(teardown_retained_preserve_dir "$copy") || return 2
   [ -d "$dir" ] || return 0
-  selected=$(teardown_preservable_ignored "$copy") || return 1
+  selected=$(teardown_preservable_ignored "$copy") || return 2
   while IFS= read -r entry; do
     [ -z "$entry" ] || chosen+=("$entry")
   done <<< "$selected"
@@ -1909,10 +1911,19 @@ teardown_own_copy_dispose() {  # <slot> <copy>
   fi
   lock_hash=$(teardown_ignored_sha256 "$TEARDOWN_FOREIGN_LOCK_FILE") || lock_hash=
   identity=$(copy_identity "$copy") || identity=
-  if ! teardown_retained_preserve_current "$copy"; then
-    echo "REFUSED: ignored files of own nested copy $(fm_refuse_text "$copy") differ from the bytes already preserved for it in $(fm_refuse_text "$(teardown_retained_preserve_dir "$copy")"); Vernant's closeout driver was not asked, and the task was not closed." >&2
-    return 1
-  fi
+  rc=0
+  teardown_retained_preserve_current "$copy" || rc=$?
+  case "$rc" in
+    0) ;;
+    1)
+      echo "REFUSED: ignored files of own nested copy $(fm_refuse_text "$copy") differ from the bytes already preserved for it in $(fm_refuse_text "$(teardown_retained_preserve_dir "$copy")"); Vernant's closeout driver was not asked, and the task was not closed." >&2
+      return 1
+      ;;
+    *)
+      echo "REFUSED: the ignored files already preserved for own nested copy $(fm_refuse_text "$copy") in $(fm_refuse_text "$DATA/$ID/nested-copy-preserved") could not be read or checked against the copy; Vernant's closeout driver was not asked, and the task was not closed." >&2
+      return 1
+      ;;
+  esac
   teardown_preserve_ignored "$copy" || {
     teardown_refuse_copy ignored-bytes-preserved "the ignored files of own nested copy $copy could not be preserved in $DATA/$ID/nested-copy-preserved; it was not removed." "$copy"
     return 1
