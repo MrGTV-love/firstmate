@@ -1112,7 +1112,8 @@ A pull request that finishes a queued item names it with a `Closes-backlog-item:
 A queued (`--auto`), forge-unconfirmed or externally seen merge runs no close, and the items its body names stay open; backlog item `fm-pr-close-items-queued-and-polled-merges` owns that gap.
 A merge train names each landed pull request with a `Train-member: <pull request URL>` line and closes its members' items too, with the train as the proof: each member's own `Closes-backlog-item:` lines, and any task whose `state/<task>.meta` records `pr=` equal to the full member URL.
 [`bin/fm-pr-closes-lib.sh`](../bin/fm-pr-closes-lib.sh)'s header is the one owner of the two directive lines, and only those lines close anything: a table, heading, bullet, link, sentence or fenced example closes nothing.
-A body that mentions a backlog id or another pull request outside those lines closes nothing for it, and the merge prints one `actionable:` line per mention so nothing is silent.
+When the merged pull request's body mentions an active backlog id or another pull request outside those lines, it closes nothing for it, and the merge prints one `actionable:` line per mention.
+The merging task's own id is not reported, because its teardown owns that item, and a train member's body gets no mention check.
 An old `Closes: <item-id>` line, a malformed directive line and a train body written without the block are reported the same way; a train body without the block keeps the manual close.
 A ship or scout task that still has a live record stays open.
 When it is the merged pull request's own task, its own teardown closes it, so the merge only reports it; any other such task is reported as an `actionable:` line.

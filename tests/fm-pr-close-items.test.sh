@@ -178,6 +178,20 @@ test_no_directive_line_changes_no_item_and_prose_mentions_close_nothing() {
   pass "a body with no directive line closes nothing and reports each id and pull request it mentions in prose"
 }
 
+test_a_prose_mention_of_the_merging_task_is_not_reported_and_another_id_is() {
+  local case_dir
+  case_dir=$(gh_case c1-self-prose 87)
+  cx_add "$case_dir" task-x1
+  cx_add "$case_dir" other-prose-item
+  printf '%s\n' 'This finishes task-x1 and relates to other-prose-item.' > "$case_dir/bodies/87"
+  gh_merge "$case_dir" 87
+  [ "$(cx_state "$case_dir" task-x1)" != "done" ] || fail "c1-self-prose: a prose mention closed the merging task"
+  assert_no_grep 'mentioned task-x1' "$case_dir/stderr" "c1-self-prose: the merging task's own id was reported as a mention"
+  assert_match "^actionable: close-at-merge: mentioned other-prose-item in the prose of $REPO_URL/87: nothing was closed for it" "$case_dir/stderr" \
+    "c1-self-prose: another id in prose was not reported"
+  pass "a prose mention of the merging task prints no mention line, and another prose id still prints one"
+}
+
 test_an_unrecorded_merge_closes_nothing_and_lists_the_named_items() {
   local case_dir rc=0
   case_dir=$(gh_case c1-unrecorded 64)
@@ -1078,12 +1092,8 @@ test_f4_an_unlisted_forgejo_or_gitlab_member_is_reported_by_its_url() {
   pass "F4: an unlisted Forgejo or GitLab member is reported by its URL and closes nothing; a Train-member line closes it; a plain body is silent"
 }
 
-test_a_merge_with_directive_lines_and_an_unlistable_backlog_says_so_once() {
-  local case_dir
-  case_dir=$(gh_case c1-unlistable 85)
-  cx_add "$case_dir" unlistable-a
-  printf '%s\n' 'Closes-backlog-item: unlistable-a' '' 'Notes mention some-other-id in prose.' > "$case_dir/bodies/85"
-  cat > "$case_dir/fakebin/tasks-axi" <<SH
+fake_unlistable_backlog() {  # <case-dir>
+  cat > "$1/fakebin/tasks-axi" <<SH
 #!/usr/bin/env bash
 if [ "\${1:-}" = list ]; then
   echo "error: simulated list failure" >&2
@@ -1091,7 +1101,29 @@ if [ "\${1:-}" = list ]; then
 fi
 exec "$(command -v tasks-axi)" "\$@"
 SH
-  chmod +x "$case_dir/fakebin/tasks-axi"
+  chmod +x "$1/fakebin/tasks-axi"
+}
+
+test_a_merge_with_directive_lines_and_an_unlistable_backlog_says_so_once() {
+  local case_dir
+  case_dir=$(gh_case c1-unlistable-train 88)
+  printf '%s\n' "Train-member: $REPO_URL/9" '' 'Notes mention some-other-id in prose.' > "$case_dir/bodies/88"
+  printf '%s\n' 'This member names no item.' > "$case_dir/bodies/9"
+  printf '%s\n' 9 >> "$case_dir/merged-prs"
+  fake_unlistable_backlog "$case_dir"
+  gh_merge "$case_dir" 88
+  [ "$(grep -c 'could not list the backlog to check which ids the prose' "$case_dir/stderr")" = 1 ] || fail "c1-unlistable-train: a body with only a Train-member line did not report the failed id check once"
+
+  case_dir=$(gh_case c1-unlistable-none 89)
+  printf '%s\n' 'Notes mention some-other-id in prose.' > "$case_dir/bodies/89"
+  fake_unlistable_backlog "$case_dir"
+  gh_merge "$case_dir" 89
+  assert_no_grep 'could not list the backlog' "$case_dir/stderr" "c1-unlistable-none: a body with no directive line reported the failed id check"
+
+  case_dir=$(gh_case c1-unlistable 85)
+  cx_add "$case_dir" unlistable-a
+  printf '%s\n' 'Closes-backlog-item: unlistable-a' '' 'Notes mention some-other-id in prose.' > "$case_dir/bodies/85"
+  fake_unlistable_backlog "$case_dir"
   gh_merge "$case_dir" 85
   [ "$(cx_state "$case_dir" unlistable-a)" = "done" ] || fail "c1-unlistable: the named item was not closed"
   [ "$(grep -c 'could not list the backlog to check which ids the prose' "$case_dir/stderr")" = 1 ] || fail "c1-unlistable: the failed id check was not reported exactly once"
@@ -1212,6 +1244,7 @@ test_done_json_has_the_same_fields_and_values_as_tasks_axi_alone() {
 pr_close_test_cases=(
 test_closes_lines_close_each_eligible_item_and_report_the_rest
 test_a_merge_naming_its_own_task_reports_the_live_record
+test_a_prose_mention_of_the_merging_task_is_not_reported_and_another_id_is
 test_no_directive_line_changes_no_item_and_prose_mentions_close_nothing
 test_an_unrecorded_merge_closes_nothing_and_lists_the_named_items
 test_a_merge_the_watcher_recorded_first_still_closes_without_a_second_notice

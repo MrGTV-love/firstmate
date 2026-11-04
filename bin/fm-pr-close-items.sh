@@ -19,19 +19,20 @@
 # URL for a train), because a train's members close unmerged. A body with no directive
 # line closes nothing, a train body written before this block existed included; its items
 # are closed by hand as before.
-# Whatever the body says outside the block is reported, never closed, on stderr behind
+# These things in a body, outside the block, are reported, never closed, on stderr behind
 # `actionable:` (none of these lines changes the exit status or the summary counts unless
 # they say `not closed`):
 #   - an old `Closes: <item-id>` line is `not closed <id>`, naming the new form (it names an
 #     item, so it counts as left open);
 #   - a column-0 line that starts with a directive word but does not fit its form, and a
 #     `Train-member:` value that is no pull request URL, count as left open too;
-#   - an active, not-done backlog id that appears as a word in the prose, or a pull request
-#     link in the prose that is not a `Train-member:` line, is a `mentioned ...` line that
-#     says nothing was closed for it. A pull request link is read for GitHub, GitLab and
-#     Forgejo alike. The id check reads the backlog once; a body with no directive line
-#     gets no id check when the backlog cannot be listed, and one with a directive line
-#     gets one `actionable:` line saying so.
+#   - in the merged pull request's own body only, never a train member's: an active, not-done
+#     backlog id that appears as a word in the prose, or a pull request link in the prose that
+#     is not a `Train-member:` line, is a `mentioned ...` line that says nothing was closed for
+#     it. The merging task's own id is left out, because its teardown owns that item. A pull
+#     request link is read for GitHub, GitLab and Forgejo alike. The id check reads the backlog
+#     once; when the backlog cannot be listed, a body with prose and a directive, old `Closes:`
+#     or malformed line gets one `actionable:` line saying so, and any other body gets none.
 # The same read gives that pull request's merge state: when it is not merged (a hand run
 # with a pull request that is still open, or a state it cannot read), nothing is closed
 # and every named item in the active backlog that is not done yet is reported as not
@@ -301,12 +302,13 @@ if [ -n "$(fm_pr_closes_prose_words "$WORK/body" | sed -n '1p')" ]; then
     done <<EOF
 $states
 EOF
+    SEEN="$SEEN$TASK_ID"$'\n'
     while IFS= read -r word; do
       [ -n "$word" ] || continue
       case "$SEEN" in *$'\n'"$word"$'\n'*) continue ;; esac
       printf 'actionable: close-at-merge: mentioned %s in the prose of %s: nothing was closed for it; add a Closes-backlog-item: %s line to the body if this merge finished it\n' "$word" "$URL" "$word" >&2
     done < <(fm_pr_closes_prose_words "$WORK/body" | grep -Fxf "$WORK/active-ids")
-  elif [ "$SEEN" != $'\n' ] || [ "$LEFT" -gt 0 ]; then
+  elif [ -n "$(fm_pr_closes_ids "$WORK/body"; fm_pr_closes_members "$WORK/body"; fm_pr_closes_legacy_ids "$WORK/body"; fm_pr_closes_malformed "$WORK/body")" ]; then
     printf 'actionable: close-at-merge: could not list the backlog to check which ids the prose of %s mentions, so none were checked\n' "$URL" >&2
   fi
 fi
