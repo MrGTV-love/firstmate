@@ -834,7 +834,11 @@
         },
         {
           "file": "bin/fm-task-copy-lib.sh",
-          "match": "remedy=\"treehouse lease refuses a slot that is already leased; inspect it with: (cd '$project' && treehouse status)\""
+          "match": "remedy=\"Upgrade treehouse to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true, then retry;"
+        },
+        {
+          "file": "bin/fm-bootstrap.sh",
+          "match": "echo \"BOOTSTRAP_INFO: treehouse $FM_TASK_COPY_RECOVERED_CAPABILITY_REASON;"
         }
       ]
     },
@@ -2231,7 +2235,9 @@
         {
           "file": "bin/fm-teardown.sh",
           "match": "echo \"REFUSED: the foreign copies held in pool slot $was changed since they were proved, so the held close no longer applies. $TEARDOWN_PROOF_OUTCOME.\" >&2"
-        }
+        },
+        {"file": "bin/fm-teardown.sh", "match": "echo \"REFUSED: pool slot $TEARDOWN_UNCLAIMED_SLOT, which encloses task $ID's nested copy and carries no slot claim, was not returned"},
+        {"file": "bin/fm-teardown.sh", "match": "teardown_unclaimed_note \"treehouse refused the exact conditional return"}
       ]
     },
     {
@@ -6058,7 +6064,7 @@
       "owner": "bin/fm-teardown.sh",
       "sites": [
         {"file":"bin/fm-teardown.sh","match":"teardown-unlanded bypass"},
-        {"file": "bin/fm-teardown.sh", "match": "teardown-unlanded deny", "count": 6},
+        {"file": "bin/fm-teardown.sh", "match": "teardown-unlanded deny", "count": 7},
         {"file": "bin/fm-teardown-nested-lib.sh", "match": "teardown_bundle_refuse ", "count": 14},
         {"file": "bin/fm-teardown.sh", "match": "holds bundle-preserved commits that only its data/ keeps"},
         {"file": "bin/fm-teardown.sh", "match": "during cleanup admitted by recorded bundle $bundle", "count": 2},

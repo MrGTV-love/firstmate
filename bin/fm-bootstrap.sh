@@ -67,6 +67,11 @@
 #          landed in the primary instead of its own worktree; restore it per the line.
 #          treehouse is also MISSING when its installed version lacks
 #          "treehouse get --lease" support.
+#          A treehouse that supports --lease but does not prove persistent
+#          recovered leases (bin/fm-task-copy-lib.sh's capability probe) prints
+#          one non-blocking "BOOTSTRAP_INFO: treehouse ..." line naming the
+#          upgrade; allocation beside a recovered pool slot stays refused
+#          until then. The probe runs no status or lease and mutates no pool.
 #          no-mistakes is also MISSING when its installed version is older than
 #          1.46.0 (structured pipeline attestation floor; see CONTRIBUTING.md).
 #          The AXI-family floor policy is owned beside GH_AXI_MIN and
@@ -222,6 +227,10 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 . "$SCRIPT_DIR/fm-remote-readiness-lib.sh"
 # shellcheck source=bin/fm-primary-scope-lib.sh disable=SC1091
 . "$SCRIPT_DIR/fm-primary-scope-lib.sh"
+# The one owner of the persistent-recovered-lease capability probe
+# (fm_task_copy_treehouse_persists_recovered_leases), shared with allocation.
+# shellcheck source=bin/fm-task-copy-lib.sh disable=SC1091
+. "$SCRIPT_DIR/fm-task-copy-lib.sh"
 # Shared secondmate endpoint probe + guarded relaunch; the watcher's poll tick
 # drives the same library so session start and ordinary supervision recover
 # from identical evidence through an identical path.
@@ -1573,6 +1582,9 @@ detect_local_tools() {
   if fm_backend_list_contains "$TOOLS" treehouse \
     && command -v treehouse >/dev/null 2>&1 && ! treehouse_supports_lease; then
     echo "MISSING: treehouse (install: $(install_cmd treehouse))"
+  elif fm_backend_list_contains "$TOOLS" treehouse \
+    && command -v treehouse >/dev/null 2>&1 && ! fm_task_copy_treehouse_persists_recovered_leases; then
+    echo "BOOTSTRAP_INFO: treehouse $FM_TASK_COPY_RECOVERED_CAPABILITY_REASON; upgrade to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true, because until then a Treehouse recovered-state lease on a pool slot refuses every new copy for that project"
   fi
   if command -v no-mistakes >/dev/null 2>&1 && ! tool_version_at_least no-mistakes "$NO_MISTAKES_MIN"; then
     echo "MISSING: no-mistakes (install: $(install_cmd no-mistakes))"
