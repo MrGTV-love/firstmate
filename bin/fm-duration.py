@@ -1523,7 +1523,11 @@ def main():
                 # A pipeline-key command the parser finds no start in (xargs, a script, a variable): a fresh
                 # no-mistakes it reaches through PATH is admitted by the exec interception, in this class.
                 intercepted = cpu_pass.with_intercept(dict(os.environ), args.pipeline_priority)
-                os.environ.clear(); os.environ.update(intercepted)
+                if intercepted is not None:
+                    os.environ.clear(); os.environ.update(intercepted)
+                elif not cpu_pass.intercept_unavailable_passes(command):
+                    # The interception cannot be placed: hold the command as a fresh start rather than run it unjudged.
+                    fresh_pipeline = True
         if fresh_pipeline and not args.pipeline_admitted:
             # Admission precedes run(), its absolute/progress clocks and samples.
             # The existing pool owns priority, native observations and the short

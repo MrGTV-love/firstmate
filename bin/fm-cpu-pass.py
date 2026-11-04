@@ -62,11 +62,11 @@ Pipeline starts:
     resident memory the counted runs hold (never capped), or when no other run
     is counted (a one-start minimum). The projection is S for the new run plus,
     per counted run: only what it holds when it waits on remote CI (open step ci
-    in running, no recorded agent pid, no live launch reservation, and no
-    process of it carrying an agent's identity: the configured agent's command
-    resolved on PATH, its real file and the versions beside it; whatever the
-    process's parent; any visible process counts as an agent when that identity
-    cannot be derived) or while its launch gate waits in
+    in running, no live launch reservation, and positive proof that no agent
+    lives: either no process of it is visible and no agent pid is recorded, or
+    its recorded agent pid is dead and its round began more than
+    NO_PID_WINDOW_SECS ago; a visible tree with no recorded pid keeps A,
+    whatever its processes are named) or while its launch gate waits in
     this queue with no live launch reservation; its resident memory or A,
     whichever is larger, when the reading sees it; R while the reading cannot see it. S is the largest per-run peak of every recorded
     no-mistakes run with at least 2 readings, and R the 75th percentile (nearest
@@ -715,7 +715,7 @@ CI_STEP = "ci"
 
 
 def open_steps() -> Optional[dict]:
-    """Each running run's open step as (step name, status, recorded agent pid), or None when unreadable.
+    """Each running run's open step as (step name, status, recorded agent pid, round start), or None when unreadable.
 
     The open step is the highest-ordered step_results row in running or fixing.
     A run with no such row is absent. None never reads as idle: every run then
@@ -723,11 +723,11 @@ def open_steps() -> Optional[dict]:
     """
     try:
         rows = read_host_db(
-            "SELECT s.run_id, s.step_name, s.status, s.agent_pid FROM step_results s JOIN runs r ON r.id = s.run_id"
+            "SELECT s.run_id, s.step_name, s.status, s.agent_pid, s.round_started_at FROM step_results s JOIN runs r ON r.id = s.run_id"
             " WHERE r.status = 'running' AND s.status IN ('running', 'fixing') ORDER BY s.run_id, s.step_order")
     except (OSError, sqlite3.Error, ValueError):
         return None
-    return {run: (name, status, pid) for run, name, status, pid in rows}
+    return {run: (name, status, pid, started) for run, name, status, pid, started in rows}
 
 
 RESERVATION_QUANTILE = 0.75  # policy choice (Main 2473 ruling); the peaks it ranks are measured
@@ -850,98 +850,56 @@ def active_term(report: dict) -> Optional[Tuple[int, int]]:
         return None
 
 
-# The daemon's binary for each native agent name (no-mistakes fork 935aedf,
-# internal/config/config.go defaultBinary); agent: auto probes all of them.
-AGENT_BINARIES = {"claude": "claude", "codex": "codex", "grok": "grok", "rovodev": "acli",
-                  "opencode": "opencode", "pi": "pi", "copilot": "copilot", "antigravity": "agy"}
+# The time a step's round must have run before its recorded agent pid is judged:
+# the daemon records an agent's pid at the agent's start event and clears it at its
+# exit (no-mistakes fork 935aedf, internal/pipeline/executor.go:952-960), and sets
+# round_started_at when a step or fix round starts (internal/db/step.go:224-245).
+# A holding margin, not a measurement: inside it the run keeps A.
+NO_PID_WINDOW_SECS = 120
 
 
-def agent_identities() -> Optional[frozenset]:
-    """Process names an agent the daemon starts can carry, or None when they cannot be derived.
-
-    The agents are config.yaml's agent list (its absence is the daemon's own
-    default, agent: auto, every native agent); each is its binary and any
-    agent_path_override for it. Each is resolved on PATH to its real file: the
-    command name, every name along that resolution and, when the real file is
-    named otherwise (a versioned install such as Claude Code's
-    versions/2.1.318), every executable beside it, so an agent of an earlier
-    installed version is still known. A config that exists but cannot be read
-    or parsed gives None.
-    """
-    import re
-    import shutil
+def pid_dead(pid) -> Optional[bool]:
+    """True when no process has this pid, False when one does, None when that cannot be judged."""
+    if type(pid) is not int or pid <= 0:
+        return None
     try:
-        text = Path(NO_MISTAKES_CONFIG).expanduser().read_text()
-    except FileNotFoundError:
-        text = ""
-    except (OSError, ValueError):
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return True
+    except PermissionError:
+        return False
+    except OSError:
         return None
-    match = re.search(r"^agent:[ \t]*(.*)$", text, re.MULTILINE)
-    value = match.group(1).split("#", 1)[0].strip() if match else "auto"
-    if value.startswith("[") and value.endswith("]"):
-        names = [part.strip().strip("\"'") for part in value[1:-1].split(",") if part.strip()]
-    elif value:
-        names = [value.strip("\"'")]
-    else:
-        listed = re.match(r"\n((?:[ \t]+.*\n?)*)", text[match.end():])
-        names = re.findall(r"^[ \t]+-[ \t]*[\"']?([^\"'\s#]+)", listed.group(1) if listed else "", re.MULTILINE)
-    if not names:
-        return None
-    if names == ["auto"]:
-        names = list(AGENT_BINARIES)
-    block = re.search(r"^agent_path_override:[ \t]*(?:#.*)?\n((?:[ \t]+.*\n?)*)", text, re.MULTILINE)
-    overrides = dict(re.findall(r"^[ \t]+([A-Za-z0-9_:-]+):[ \t]*[\"']?([^\"'\s#]+)", block.group(1) if block else "", re.MULTILINE))
-    commands = [AGENT_BINARIES.get(name, name) for name in names] + [overrides[name] for name in names if name in overrides]
-    identities = set()
-    for command in commands:
-        identities.add(os.path.basename(command))
-        found = shutil.which(command)
-        if not found:
-            continue
-        identities.add(os.path.basename(found))
-        real = os.path.realpath(found)
-        identities.add(os.path.basename(real))
-        if os.path.basename(real) != os.path.basename(found):
-            try:
-                identities.update(entry.name for entry in os.scandir(os.path.dirname(real))
-                                  if entry.is_file() and os.access(entry.path, os.X_OK))
-            except OSError:
-                pass
-    return frozenset(identities)
+    return False
 
 
-def agent_runs(processes, identities: Optional[frozenset]) -> Optional[set]:
-    """Run keys whose tree holds a process carrying an agent identity, or None when that cannot be judged.
+def proven_agentless(step, now: float) -> bool:
+    """Positive proof that no agent of this CI step is alive: its recorded pid is dead, after the window.
 
-    None (no census, or identities that cannot be derived) makes every visible
-    process count as a possible agent. A process name the kernel cut to its
-    first 15 or more characters matches the identity it begins.
+    A step with no recorded pid, a live or unjudgeable pid, an unknown round
+    start, or a round younger than NO_PID_WINDOW_SECS is not proof.
     """
-    if not isinstance(processes, list) or identities is None:
-        return None
-
-    def agent(comm) -> bool:
-        return isinstance(comm, str) and any(comm == name or len(comm) >= 15 and name.startswith(comm) for name in identities)
-    return {row["run"] for row in processes if isinstance(row, dict) and row.get("run") and agent(row.get("comm"))}
+    started = step[3] if len(step) > 3 else None
+    return (step[2] is not None and type(started) is int and now - started > NO_PID_WINDOW_SECS
+            and pid_dead(step[2]) is True)
 
 
 def project(available: int, rss: dict, counted: dict, steps: Optional[dict], launches: dict,
             reservation: int, slack: int, term: int, self_run: Optional[str] = None,
-            waiting: frozenset = frozenset(), agents: Optional[set] = None) -> dict:
+            waiting: frozenset = frozenset(), now: Optional[float] = None) -> dict:
     """The reservation fit for one more active run; a pure function of its facts.
 
     counted maps each counted run ID to its repo ID; rss is the reading's run map
     (keyed no-mistakes:<repo>/<run>); steps is open_steps() or None; launches maps
-    run IDs to their live launch-gate reservations; agents is agent_runs() of
-    the reading's census, or None when it cannot be judged. A run waiting on
-    remote CI (open step ci, status running, no recorded agent pid, no live
-    launch) whose tree holds no agent reserves only the resident memory it
-    holds: nothing when the reading cannot see it, its processes' bytes
-    otherwise. A tree holding a process with an agent's identity is never read
-    as idle, whatever its parent: an agent may have started before its pid was
-    recorded, or outlived the daemon, so it reserves its resident memory or A,
-    whichever is larger, like any active run; when agents is None every visible
-    process counts as an agent. Every other counted or launched run reserves its
+    run IDs to their live launch-gate reservations; now is the decision's wall
+    clock (time.time() when None). A run waiting on remote CI (open step ci,
+    status running, no live launch) reserves only the resident memory it holds
+    in two cases: the reading cannot see its tree and no agent pid is recorded
+    (it holds nothing), or its recorded agent pid is dead and its round began
+    more than NO_PID_WINDOW_SECS ago (proven_agentless: its bytes). Every other
+    CI run keeps the active term: a visible tree with no recorded pid, a live or
+    unjudgeable pid, an unknown round start or a round inside the window is not
+    proof that no agent lives, whatever the processes are named. Every other counted or launched run reserves its
     resident memory or the active-run term A, whichever is larger, once its tree
     is visible, and its full R while the reading cannot see it yet. The new run
     reserves S. With no live launch, the waiting launch's own run (self_run) and
@@ -950,6 +908,7 @@ def project(available: int, rss: dict, counted: dict, steps: Optional[dict], lau
     the counted runs hold.
     """
     entries = []
+    clock = time.time() if now is None else now
     runs = dict(counted)
     for run, entry in launches.items():
         runs.setdefault(run, entry.get("repo"))
@@ -967,7 +926,7 @@ def project(available: int, rss: dict, counted: dict, steps: Optional[dict], lau
         elif run == self_run or run in waiting:
             kind, demand = "waiter", size
         elif (steps is not None and step is not None and step[0] == CI_STEP and step[1] == "running"
-              and step[2] is None and not (visible and (agents is None or key in agents))):
+              and ((step[2] is None and not visible) or proven_agentless(step, clock))):
             kind, demand = "ci-waiting", size
         else:
             kind = "step-unreadable" if steps is None else ("no-open-step" if step is None else "active")
@@ -1052,7 +1011,7 @@ def admission(reasons: List[str], report: Optional[dict], running: dict, counted
         return others < limit, "counted=%d limit=%d basis=fallback priority=%s" % (others, limit, priority)
     (reservation, slack, qualifying), (term, readings) = measured
     fit = project(report["available_bytes"], report["runs"], counted, steps, launches, reservation, slack, term, self_run,
-                  waiting, agent_runs(report.get("processes"), agent_identities()))
+                  waiting)
     return fit["admit"], projection_text(fit, reservation, slack, term, qualifying, readings) + " priority=%s" % priority
 
 
@@ -1312,24 +1271,36 @@ def intercept_dir() -> str:
     return directory
 
 
-def with_intercept(env: dict, priority: str) -> dict:
+def with_intercept(env: dict, priority: str) -> Optional[dict]:
     """COMMAND's environment for a route that admitted nothing: the interception first on PATH.
 
     A no-mistakes that COMMAND reaches through PATH, however it is wrapped
     (xargs, env -S, a shell variable, a script), then runs fm-cpu-pass.py
     exec-intercept, which judges the client's own argv by the fresh-run facts
-    and admits a new run once, in this route's class.
+    and admits a new run once, in this route's class. None when the
+    interception cannot be placed (the reason is printed): the caller then
+    holds the command as a start (intercept_unavailable_passes).
     """
     out = without_intercept(env)
     try:
         directory = intercept_dir()
     except OSError as exc:
-        log(2, "pipeline-start: cannot place the no-mistakes exec interception (%s); a fresh start reached "
-               "only through a form the parser does not model is not admitted" % exc)
-        return out
+        log(2, "pipeline-start: cannot place the no-mistakes exec interception (%s); the command is admitted as a "
+               "fresh start, because a start inside it could not otherwise be judged" % exc)
+        return None
     out["PATH"] = directory + (os.pathsep + out["PATH"] if out.get("PATH") else "")
     out[INTERCEPT_PRIORITY_ENV] = priority
     return out
+
+
+def intercept_unavailable_passes(command: List[str]) -> bool:
+    """Whether a command may still run unadmitted when the interception cannot be placed.
+
+    Only the no-mistakes client itself, judged no new run by its own argv (a
+    reattachment, response or status read), passes: whatever else a command
+    runs could hide a fresh start that nothing can judge, so it is held.
+    """
+    return bool(command) and os.path.basename(command[0]) == "no-mistakes" and not fresh_pipeline_start(command)
 
 
 def cmd_exec_intercept(args: argparse.Namespace) -> int:
@@ -1363,10 +1334,10 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
     if args.only_fresh and route is None:
         # A reattachment, response, status read or other command that is no new run; a fresh start it
         # reaches through PATH in a form the parser does not model meets the exec interception.
-        _restore_exec_signals()
-        if not getattr(args, "intercepted", False):
-            environment = with_intercept(environment, args.priority)
-        return exec_direct(command, environment, 2)
+        intercepted = environment if getattr(args, "intercepted", False) else with_intercept(environment, args.priority)
+        if intercepted is not None or intercept_unavailable_passes(command):
+            _restore_exec_signals()
+            return exec_direct(command, without_intercept(environment) if intercepted is None else intercepted, 2)
     # This start is admitted once here (or by its enclosing start): its client runs past the interception.
     environment = without_intercept(environment)
     admission_fd = grant_fd = None

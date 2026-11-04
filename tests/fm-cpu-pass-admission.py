@@ -214,7 +214,7 @@ def case(name, cores=18, running=0, load=0, measured=False, available=40 * GIB):
     with sqlite3.connect(db) as connection:
         connection.execute('CREATE TABLE runs (id TEXT PRIMARY KEY, status TEXT NOT NULL, ci_ready_at INTEGER, awaiting_agent_since INTEGER, repo_id TEXT, worktree_dir TEXT, branch TEXT)')
         # The daemon's step_results columns this owner reads (PRAGMA table_info of the host database).
-        connection.execute('CREATE TABLE step_results (id TEXT PRIMARY KEY, run_id TEXT NOT NULL, step_name TEXT NOT NULL, step_order INTEGER NOT NULL, status TEXT NOT NULL, agent_pid INTEGER)')
+        connection.execute('CREATE TABLE step_results (id TEXT PRIMARY KEY, run_id TEXT NOT NULL, step_name TEXT NOT NULL, step_order INTEGER NOT NULL, status TEXT NOT NULL, agent_pid INTEGER, round_started_at INTEGER)')
         connection.executemany('INSERT INTO runs (id, status) VALUES (?, ?)', [('baseline-' + str(i), 'running') for i in range(running)])
     load_file = folder / 'load.json'
     write_json(load_file, [0, load, 0])
@@ -223,17 +223,9 @@ def case(name, cores=18, running=0, load=0, measured=False, available=40 * GIB):
     if measured:
         calibrate(folder)
     (folder / 'fmhome').mkdir(exist_ok=True)
-    # The agent the daemon starts: claude on PATH resolves to a versioned install, as Claude Code's does
-    # (~/.local/bin/claude -> versions/2.1.318), so an agent process is named 2.1.318.
-    versions = folder / 'agent' / 'versions'
-    versions.mkdir(parents=True)
-    (versions / '2.1.318').write_text('#!/bin/sh\nexit 0\n')
-    (versions / '2.1.318').chmod(0o700)
-    (folder / 'agent' / 'bin').mkdir()
-    (folder / 'agent' / 'bin' / 'claude').symlink_to(versions / '2.1.318')
     env = dict(base, CASE_LOAD=str(load_file), CASE_DB=str(db), CASE_FOLDER=str(folder), FM_CPU_POOL_DIR=str(folder / 'pool'),
                CASE_CORES=str(cores), CASE_PROCS=str(folder / 'procs.json'), FM_MEMORY_FIXTURE_DIR=str(folder / 'native'),
-               FM_HOME=str(folder / 'fmhome'), PATH=str(folder / 'agent' / 'bin') + os.pathsep + base['PATH'])
+               FM_HOME=str(folder / 'fmhome'))
     return folder, db, env
 
 
@@ -602,9 +594,9 @@ try:
         if admitted:
             finish(child)
             held_now = visible[0][2] if visible else 0
-            # Unseen, the CI waiter reserves nothing; a leftover of it at 4 GiB (above A, reparented to launchd)
-            # is counted at what it holds, uncapped.
-            entry = 'holding_only=[x:ci-waiting:0:unseen' if not visible else 'holding_only=[x:ci-waiting:%d]' % held_now
+            # Unseen, the CI waiter reserves nothing; a visible tree of it at 4 GiB (above A) with no recorded pid is
+            # no proof that no agent lives (F1, Main 021), so it counts as active at what it holds, uncapped.
+            entry = 'holding_only=[x:ci-waiting:0:unseen' if not visible else 'reserved=[x:active:%d]' % held_now
             assert 'admitted: counted=1 projected=%d ' % (held_now + 8 * GIB) in log.read_text() and \
                 entry in log.read_text(), (label, log.read_text())
         else:
@@ -1523,28 +1515,26 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
             review[name] = 'FAIL: %s: %s' % (type(exc).__name__, str(exc)[:600])
 
     def idle_leftover():
-        # R1, corrected by D1 of the delta review: a CI waiter whose tree holds no agent charges only its bytes,
-        # whatever its processes' parents; a process carrying the agent's identity reserves A, attached or
-        # reparented to launchd; when the identity cannot be derived every visible process counts as an agent.
+        # F1 (delta review of 427dbb240, Main 021): a CI waiter is released to the bytes it holds only on positive
+        # proof that no agent lives: its recorded agent pid is dead and its round began outside the window. A visible
+        # tree with no recorded pid keeps A whatever its processes are named or parented (R1's and D1's releases
+        # by parentage and by name are withdrawn); so do a live pid and a dead pid inside the window.
         held = GIB // 5
-        for label, parent, comm, admitted in (('leftover', 1, 'sleep', True), ('leftover-tree', 'tree', 'sleep', True),
-                                              ('nonagent-live-parent', 50, 'sleep', True), ('agent', 50, '2.1.318', False),
-                                              ('agent-reparented', 1, '2.1.318', False), ('agent-older-version', 1, '2.1.317', False),
-                                              ('no-identity', 1, 'sleep', False)):
-            folder, db, env = case('review-r1-' + label, measured=True, available=int(8.5 * GIB))
-            if label == 'agent-older-version':  # an agent started before an update keeps the older install's name
-                (folder / 'agent' / 'versions' / '2.1.317').write_text('#!/bin/sh\nexit 0\n')
-                (folder / 'agent' / 'versions' / '2.1.317').chmod(0o700)
-            if label == 'no-identity':  # a config.yaml that exists but cannot be read
-                (folder / 'home' / '.no-mistakes' / 'config.yaml').mkdir(parents=True)
-                env['HOME'] = str(folder / 'home')
+        ended = subprocess.Popen(['true'])
+        ended.wait()
+        old, recent = int(time.time()) - 3600, int(time.time())
+        for label, comm, parent, pid, started, admitted in (
+                ('no-pid-sleep-reparented', 'sleep', 1, None, old, False), ('no-pid-sleep-live-parent', 'sleep', 50, None, old, False),
+                ('no-pid-node-agent', 'node', 50, None, old, False), ('no-pid-named-agent', '2.1.318', 50, None, old, False),
+                ('no-pid-unknown-round', 'sleep', 1, None, None, False), ('live-pid', 'node', 50, os.getpid(), old, False),
+                ('dead-pid-inside-window', 'sleep', 1, ended.pid, recent, False), ('dead-pid-proof', 'node', 50, ended.pid, old, True)):
+            folder, db, env = case('review-f1-' + label, measured=True, available=int(8.5 * GIB))
             change(db, "INSERT INTO runs (id, status, repo_id) VALUES ('x', 'running', 'repo')")
-            change(db, "INSERT INTO step_results (id, run_id, step_name, step_order, status, agent_pid) VALUES ('x-ci', 'x', 'ci', 1, 'running', NULL)")
+            change(db, "INSERT INTO step_results (id, run_id, step_name, step_order, status, agent_pid, round_started_at) "
+                       "VALUES ('x-ci', 'x', 'ci', 1, 'running', ?, ?)", (pid, started))
             facts(folder, available=int(8.5 * GIB), runs=[('repo', 'x', held)])
             rows = json.loads((folder / 'native' / 'processes.json').read_text())
-            rows[-1].update(comm=comm, ppid=1 if parent == 'tree' else parent)
-            if parent == 'tree':  # a child of the leftover is part of the same left-over tree
-                rows.append(dict(pid=300, ppid=rows[-1]['pid'], comm='node', started='s300', rss_bytes=0, fleet=True, run=rows[-1]['run']))
+            rows[-1].update(comm=comm, ppid=parent)
             (folder / 'native' / 'processes.json').write_text(json.dumps(rows))
             log = folder / 'r1.stderr'
             child = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'm')], env, folder / 'r1')
@@ -1562,6 +1552,64 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
                     os.killpg(child.pid, signal.SIGTERM)
                 child.wait()
                 assert running and line in log.read_text() and not (folder / 'm').exists(), (label, log.read_text())
+
+    def gate_node_agent():
+        # F1 at the launch gate: while run x shows a live node agent with no recorded pid, run y's fix agent
+        # holds (x keeps A); the same with a named agent; with x proven agentless y's agent starts.
+        ended = subprocess.Popen(['true'])
+        ended.wait()
+        old = int(time.time()) - 3600
+        for label, comm, pid, holds in (('node', 'node', None, True), ('named', '2.1.318', None, True), ('proven', 'node', ended.pid, False)):
+            folder, db, env = gate_case('review-f1-gate-' + label, available=int(8.5 * GIB),
+                                        runs=[('x', 'ci', 'running', pid), ('y', 'ci', 'running', None)])
+            change(db, "UPDATE step_results SET round_started_at = ?", (old,))
+            facts(folder, available=int(8.5 * GIB), runs=[('repo', 'x', GIB // 5)])
+            rows = json.loads((folder / 'native' / 'processes.json').read_text())
+            rows[-1].update(comm=comm, ppid=50)
+            (folder / 'native' / 'processes.json').write_text(json.dumps(rows))
+            child, log = gate(folder, env, 'y')
+            if holds:
+                wait_for(lambda: 'x:active:%d' % GIB in (folder / 'gate-y.stderr').read_text(), label + ': x keeps A at the gate')
+                time.sleep(0.5)
+                assert not (folder / 'y.agent').exists() and child.poll() is None, (label, (folder / 'gate-y.stderr').read_text())
+                os.killpg(child.pid, signal.SIGTERM)
+                child.wait(timeout=30)
+            else:
+                wait_for(lambda: (folder / 'y.agent').exists(), label + ': y starts once x is proven agentless')
+                assert 'x:ci-waiting:%d' % (GIB // 5) in (folder / 'gate-y.stderr').read_text(), (folder / 'gate-y.stderr').read_text()
+                (folder / 'y.release').touch()
+                finish(child)
+
+    def intercept_unplaceable():
+        # F4: when the exec interception cannot be placed (its directory exists but is 0777), a command the parser
+        # finds no start in is held as a start through both routes instead of running unjudged; a plain reattachment
+        # still passes. Control: the private 0700 directory, where the xargs start waits and runs once admitted.
+        import hashlib
+        target = os.path.realpath(str(repo / 'bin' / 'fm-cpu-pass.sh'))
+        name = 'fm-exec-intercept-%d-%s' % (os.getuid(), hashlib.sha256(target.encode()).hexdigest()[:12])
+        fed = lambda route: ['bash', '-c', 'printf "input\\n" | "$@"', 'feed'] + route + ['xargs', '-I', '{}', 'no-mistakes', 'axi', 'run', '--intent', 'goal']
+        for mode in (0o777, 0o700):
+            for route_name, route in (('mem-guard', mem_guard), ('measured', measured_run)):
+                label = '%s-%o' % (route_name, mode)
+                folder, db, env = case('review-f4-' + label, cores=3, running=1)
+                (folder / 'tmp' / name).mkdir(parents=True)
+                os.chmod(folder / 'tmp' / name, mode)
+                env.update(PATH=str(nm_bin) + os.pathsep + env['PATH'], FM_DURATION_FILE='off', TMPDIR=str(folder / 'tmp'), CASE_NAME='xargs-' + label)
+                child = launch(fed(route), env, folder / 'x')
+                pending(folder, 1)
+                time.sleep(0.3)
+                assert child.poll() is None and not (folder / 'order').exists(), (label, (folder / 'x.stderr').read_text())
+                if mode == 0o777:
+                    assert 'cannot place the no-mistakes exec interception' in (folder / 'x.stderr').read_text(), (folder / 'x.stderr').read_text()
+                change(db, "UPDATE runs SET status='completed' WHERE id='baseline-0'")
+                finish(child)
+                assert (folder / 'order').read_text().splitlines() == ['xargs-' + label], label
+                assert (folder / 'x.stderr').read_text().count('pipeline-start admitted') == 1, (label, (folder / 'x.stderr').read_text())
+                if mode == 0o777:
+                    # A plain reattachment still passes at once while the interception cannot be placed.
+                    change(db, "UPDATE runs SET ci_ready_at = 1 WHERE id = ?", ('xargs-' + label,))
+                    reattach = launch(route + ['no-mistakes', 'axi', 'run'], dict(env, CASE_NAME='reattach'), folder / 'r')
+                    assert reattach.wait(timeout=30) == 0 and 'pipeline-start admitted' not in (folder / 'r.stderr').read_text(), (folder / 'r.stderr').read_text()
 
     def wrapper_shapes():
         # R2: every wrapper form the parser models joins the queue once through each route; reattachment,
@@ -1785,7 +1833,9 @@ exec /bin/ln "$@"
                                  r'another start is registering', queue), queue
                 assert re.search(r'run x \(fm/x\) admitted after \d+\.\d\ds held: ', queue), queue
 
-    for name, body in (('R1 a CI waiter holding no agent', idle_leftover), ('R2 wrapper forms join the queue once', wrapper_shapes),
+    for name, body in (('F1 a CI waiter is released only on proof no agent lives', idle_leftover),
+                       ('F1 a live agent with no recorded pid holds the launch gate', gate_node_agent),
+                       ('F4 an unplaceable interception holds the start', intercept_unplaceable), ('R2 wrapper forms join the queue once', wrapper_shapes),
                        ('R2 env -S starts wait behind a full pool in class order', split_held_order),
                        ('D2 an xargs start meets the exec interception', xargs_interception),
                        ('R3 gate and watcher spills collide', watcher_collision),
