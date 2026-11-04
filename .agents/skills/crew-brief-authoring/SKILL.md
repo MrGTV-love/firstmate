@@ -18,6 +18,7 @@ Resolve the scaffold's `Egress needs` from the task's stated needs before dispat
 List any excluded work in the nested `### Out of scope` list, because independent review reads the list as the task's stated boundary.
 `bin/fm-dod-lib.sh` owns intent authoring without added speaker labels or direct address, its provenance markers, what a no-mistakes worker may pass as `--intent`, and the string's self-sufficiency rule.
 Keep additions task-specific rather than repeating lifecycle instructions, and alter generated sections only when the task genuinely differs from the standard shape.
+For work that adds or changes tests, hooks or validators, use the [existing intent-to-test criteria](../../../docs/review-rubric.md#intent-to-test-alignment) to shape the relevant Firstmate specification and verification, not to expand the captain's intent.
 
 Load `secondmate-provisioning` before creating or using a charter brief and preserve its idle-by-default and marked-return-channel contracts.
 Status appends are sparse supervisor-actionable events, not routine progress; `bin/fm-status-decision-lib.sh` owns keyed open and resolved semantics.
