@@ -44,8 +44,11 @@ use File::Basename qw(dirname basename);
 # and what its root holds now: its gate's whole process tree in one read of the
 # live process table, and the peak the macOS watch publishes beside the slot
 # (slot.<n>.peak, through FM_LINT_INTERNAL_SLOT_PEAK_FILE). The turn is taken
-# only if those charges fit the budget, or nothing is held, so a root larger
-# than the budget runs alone. A held slot is charged the worst case when its
+# only if those charges, plus the resident size of every native process named
+# shellcheck outside the held roots (another pool, another caller or a wrapper
+# script around the real ShellCheck, so no pool directory gives an independent
+# budget), plus the request's own charge fit the budget, or nothing is held and
+# no such outside ShellCheck runs, so a root larger than the budget runs alone. A held slot is charged the worst case when its
 # record names no charge or the table cannot be read. When the analysis
 # completes (no signal reached the gate, and it exited 0, 1, 98 or 251), the
 # gate raises the root's record to the larger of the watch's peak and the
@@ -92,9 +95,7 @@ if (($ARGV[0] // '') eq 'gate') {
         $why = 'unknown error' unless defined $why && length $why;
         $why =~ s/\s+\z//;
         print STDERR "fm-lint: host slot pool unusable at $path ($why); the host-wide ShellCheck memory bound cannot be enforced, "
-            . "so this analysis was not started. Make that path writable, remove it if it is damaged, or point "
-            . "FM_LINT_SLOT_DIR at a writable directory that every lint run shares "
-            . "(FM_LINT_SLOT_DIR=off runs without the host-wide bound).\n";
+            . "so this analysis was not started. Make that path writable, or remove it if it is damaged.\n";
         exit 2;
     };
     my $stopped_owners = sub {
@@ -104,16 +105,16 @@ if (($ARGV[0] // '') eq 'gate') {
         close $ps;
         return %stopped;
     };
-    # One read of the live process table: { pid => [ppid, resident KiB] }, or
+    # One read of the live process table: { pid => [ppid, resident KiB, name] }, or
     # undef when no source answers. ps first, then libproc through
     # fm-proc-info.py for a sandbox that refuses ps.
     my $process_table = sub {
         my %table;
         {
             no warnings 'exec';
-            if (open(my $ps, '-|', 'ps', '-axo', 'pid=,ppid=,rss=')) {
+            if (open(my $ps, '-|', 'ps', '-axo', 'pid=,ppid=,rss=,comm=')) {
                 while (my $line = <$ps>) {
-                    $table{$1} = [$2, $3 + 0] if $line =~ /\A\s*([0-9]+)\s+([0-9]+)\s+([0-9]+)\s*\z/;
+                    $table{$1} = [$2, $3 + 0, $4] if $line =~ /\A\s*([0-9]+)\s+([0-9]+)\s+([0-9]+)\s+(.*?)\s*\z/;
                 }
                 close $ps;
             }
@@ -132,7 +133,7 @@ if (($ARGV[0] // '') eq 'gate') {
                 for my $row (ref $rows eq 'ARRAY' ? @$rows : ()) {
                     next unless ref $row eq 'HASH' && defined $row->{pid} && defined $row->{ppid}
                         && defined $row->{rss_bytes};
-                    $table{$row->{pid}} = [$row->{ppid}, int($row->{rss_bytes} / 1024)];
+                    $table{$row->{pid}} = [$row->{ppid}, int($row->{rss_bytes} / 1024), $row->{comm} // ''];
                 }
             }
         }
@@ -162,6 +163,33 @@ if (($ARGV[0] // '') eq 'gate') {
             $charge = $worst_kib unless defined $charge;
             $charge = $max->($charge, $worst_kib) unless $table;
             $total += $max->($charge, $sum);
+        }
+        return $total;
+    };
+    # KiB resident in native processes named shellcheck that are not a descendant
+    # of a held slot's gate: ShellCheck this pool does not hold, from any other
+    # pool, caller or wrapper script. Stand-in analyses are named perl or bash
+    # and are not counted.
+    my $foreign = sub {
+        my ($table, @held) = @_;
+        return 0 unless $table;
+        my %children;
+        push @{$children{$table->{$_}[0]}}, $_ for keys %$table;
+        my %own;
+        for my $entry (@held) {
+            my ($pid) = @$entry;
+            my @queue = defined $pid ? ($pid) : ();
+            while (defined(my $member = shift @queue)) {
+                next if $own{$member}++ || !$table->{$member};
+                push @queue, @{$children{$member} // []};
+            }
+        }
+        my $total = 0;
+        for my $pid (keys %$table) {
+            next if $own{$pid} || $pid == $$;
+            my $name = $table->{$pid}[2] // '';
+            $name =~ s{.*/}{};
+            $total += $table->{$pid}[1] if $name eq 'shellcheck';
         }
         return $total;
     };
@@ -272,13 +300,17 @@ if (($ARGV[0] // '') eq 'gate') {
             } keys %oldest;
             if (defined $next && $oldest{$next} eq $ticket_path) {
                 # My turn. The memory budget decides, from a table read no older
-                # than a fifth of a second; an empty pool always admits one root.
+                # than a fifth of a second. It counts the held roots, the
+                # ShellCheck outside this pool and the new root; a root takes
+                # its turn alone only when no held root and no outside
+                # ShellCheck runs.
                 $charge_kib = ($history_path && $read_kib->($history_path)) || $worst_kib;
-                my $fits = !@charges;
+                my $now = Time::HiRes::time();
+                ($table, $table_at) = ($process_table->(), $now) if !defined $table_at || $now - $table_at >= 0.2;
+                my $outside = $foreign->($table, @charges);
+                my $fits = !@charges && !$outside;
                 if (!$fits) {
-                    my $now = Time::HiRes::time();
-                    ($table, $table_at) = ($process_table->(), $now) if !defined $table_at || $now - $table_at >= 0.2;
-                    $fits = $charged->($table, @charges) + $charge_kib <= $budget_kib;
+                    $fits = $charged->($table, @charges) + $outside + $charge_kib <= $budget_kib;
                 }
                 if ($fits) {
                     ($slot, $slot_path) = @{shift @free};

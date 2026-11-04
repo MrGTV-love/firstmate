@@ -25,8 +25,10 @@ INSTALLER="$ROOT/bin/fm-install-shellcheck.sh"
 REQUIRED=$("$LINT" --required-version)
 # Ordinary regressions must not read or populate the operator's shared cache.
 export FM_LINT_CACHE_DIR=off
-# Nor may they queue on the operator's shared host-wide ShellCheck slots.
-export FM_LINT_SLOT_DIR=off
+# A stand-in analysis keeps its pool state in its own run's scratch directory;
+# a real ShellCheck always uses the host pool, so no test sets FM_LINT_SLOT_DIR
+# for it.
+unset FM_LINT_SLOT_DIR
 
 # Official GitHub release asset sha256 values for shellcheck v0.11.0 .tar.xz
 # archives (https://github.com/koalaman/shellcheck/releases/tag/v0.11.0). Tests
@@ -369,7 +371,7 @@ fm_lint_assert_flag_log() {
 # E flock slot pool in the Perl helper     1           2             0                0 (chosen)
 # E supplies a host bound without a daemon or stale-lock reclamation protocol.
 # Supplied paired reproduction: identical workloads of six roots per run,
-# --jobs 2, gate disabled with FM_LINT_SLOT_DIR=off versus enabled with cap 3.
+# --jobs 2, an effectively unlimited pool versus a pool with cap 3.
 # Concurrent runs:                    1     4     8    16
 # Peak live ShellCheck, disabled:     2     8    16    32 (2 x runs)
 # Peak live ShellCheck, enabled:      2     3     3     3 (min(2 x runs, cap))
@@ -415,7 +417,7 @@ use warnings;
 use Time::HiRes qw(time sleep);
 if (\$ENV{FM_LINT_COUNT_HOLD} && (\$ARGV[0] // '') =~ m{/fm-lint-cache[.]pl\\z}
     && ((\$ARGV[1] // '') eq 'gate'
-        || ((\$ARGV[1] // '') eq 'check' && (\$ENV{FM_LINT_INTERNAL_SLOT_DIR} // 'off') eq 'off'))) {
+        )) {
     my \$dir = \$ENV{FM_LINT_COUNT_READY_DIR};
     open(my \$ready, '>', "\$dir/ready.\$\$") or die "\$!";
     close \$ready;

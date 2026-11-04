@@ -116,16 +116,22 @@
 # GiB each (14.4 GiB) also run one at a time.
 # Admission also needs a free slot among the count cap; fairness does not
 # increase host concurrency.
-# FM_LINT_SLOT_DIR defaults to /var/tmp/firstmate-lint-<uid>/lint-slots, which
-# does not depend on HOME or XDG_CACHE_HOME, so every run of one user on a host
-# meets in one pool; "off" disables the pool. Host load average never changes
-# admission, so unrelated machine load cannot starve lint.
-# Runs share a pool only when they use the same slot directory, so overrides must
-# select the same directory to share the host bound.
+# A real ShellCheck, a native executable (Mach-O or ELF), always uses the host
+# pool /var/tmp/firstmate-lint-<uid>/lint-slots, which does not depend on HOME,
+# XDG_CACHE_HOME or any setting, so every run of one user on a host meets in one
+# pool and one budget. FM_LINT_SLOT_DIR set to any other directory is refused
+# (exit 2) for a real ShellCheck, and FM_LINT_SLOT_DIR=off is refused for every
+# ShellCheck: no setting turns the host-wide bound off. Only a simulated
+# analysis, a script that is not a native ShellCheck such as a test's stand-in,
+# may keep its pool state apart, in another FM_LINT_SLOT_DIR or, when none is
+# set, in a scratch directory of its own run; every admission, in any
+# pool, also counts the memory of native shellcheck processes outside its own
+# held roots, so a wrapper script around the real ShellCheck cannot obtain a
+# separate budget. Host load average never changes admission, so unrelated
+# machine load cannot starve lint.
 # FM_LINT_HOST_SLOTS sets the count cap; unset or empty uses max(2, floor(ncpu/2)).
 # A nonempty FM_LINT_HOST_SLOTS or FM_LINT_HOST_RSS_KIB must be a positive
-# decimal integer without leading zeros, or lint exits 2, even with the pool
-# off. The per-root address-space limit is enforced only where ulimit -v works, and
+# decimal integer without leading zeros, or lint exits 2. The per-root address-space limit is enforced only where ulimit -v works, and
 # native macOS cannot enforce it.
 # On native macOS, where the enforced envelope below does not apply, each root's
 # process tree is instead watched for memory, the larger of its resident size
@@ -142,8 +148,7 @@
 # consume neither the root deadline nor its retry budget.
 # A pool that cannot be used (its directory, lock, ticket, slot or queue file)
 # never lets a root run unbounded: lint exits 2 before any root starts, or a gate
-# exits 2 for its root, naming the path and the fix. FM_LINT_SLOT_DIR=off is the
-# only way to run without the host-wide bound.
+# exits 2 for its root, naming the path and the fix.
 # The private gate's locking and process-lifetime invariants live in bin/fm-lint-cache.pl.
 # --partition 1of3/2of3/3of3 splits the entire canonical inventory across
 # three CI runners, each with those same concurrency-limited workers.
@@ -388,12 +393,10 @@ fm_lint_exec_root() {  # <path> <stdout-file> <stderr-file> <rss-file> <seconds>
   gate_command=()
   wait_file="$rss_file.wait"
   rm -f "$wait_file" "$rss_file.cache" "$rss_file.cache.wait"
-  if [ "${FM_LINT_INTERNAL_SLOT_DIR:-off}" != off ]; then
-    gate_command=(env "FM_LINT_INTERNAL_ROOT_KEY=${FM_LINT_INTERNAL_MODE:-full}:${path#"$ROOT"/}" \
-      "FM_LINT_INTERNAL_ROOT_RSS_FILE=$rss_file" \
-      "${FM_LINT_PERL_BIN:-perl}" "$SELF_DIR/fm-lint-cache.pl" gate \
-      "$FM_LINT_INTERNAL_SLOT_DIR" "$FM_LINT_INTERNAL_NCPU" "$FM_LINT_INTERNAL_RUN_ID" "$wait_file" --)
-  fi
+  gate_command=(env "FM_LINT_INTERNAL_ROOT_KEY=${FM_LINT_INTERNAL_MODE:-full}:${path#"$ROOT"/}" \
+    "FM_LINT_INTERNAL_ROOT_RSS_FILE=$rss_file" \
+    "${FM_LINT_PERL_BIN:-perl}" "$SELF_DIR/fm-lint-cache.pl" gate \
+    "$FM_LINT_INTERNAL_SLOT_DIR" "$FM_LINT_INTERNAL_NCPU" "$FM_LINT_INTERNAL_RUN_ID" "$wait_file" --)
   if [ "${FM_LINT_INTERNAL_BOUNDED:-none}" != none ]; then
     # The watchdog runs in a process group of its own (the same setpgrp hop the
     # workers use), so the owner's TERM-then-KILL group sweep cannot kill it
@@ -1913,8 +1916,33 @@ fi
 # Host-wide pool configuration; the header owns its public controls.
 # The default directory belongs to the user, not to HOME or XDG_CACHE_HOME, so
 # runs from different homes and sandboxes meet in one pool.
-HOST_POOL_ROOT=/var/tmp/firstmate-lint-$(id -u 2>/dev/null || printf 0)
-SLOT_DIR=${FM_LINT_SLOT_DIR:-$HOST_POOL_ROOT/lint-slots}
+# The shell's own UID, not the id command: no PATH entry can name another user.
+HOST_POOL_ROOT=/var/tmp/firstmate-lint-${UID:-0}
+HOST_POOL_DIR=$HOST_POOL_ROOT/lint-slots
+# A real ShellCheck is a native executable (Mach-O or ELF). A script, such as
+# a test's stand-in analysis, is simulated and may keep its pool state apart.
+fm_lint_native_executable() {  # <path>
+  local magic
+  magic=$(/usr/bin/od -An -tx1 -N4 "$1" 2>/dev/null) || return 1
+  magic=${magic//[[:space:]]/}
+  case "$magic" in
+    7f454c46|cffaedfe|cefaedfe|feedfacf|feedface|cafebabe|bebafeca) return 0 ;;
+  esac
+  return 1
+}
+SLOT_DIR=$HOST_POOL_DIR
+if [ -n "${FM_LINT_SLOT_DIR:-}" ]; then
+  if [ "$FM_LINT_SLOT_DIR" = off ]; then
+    printf 'fm-lint.sh: FM_LINT_SLOT_DIR=off is not supported: no setting turns the host-wide ShellCheck memory bound off. Unset FM_LINT_SLOT_DIR to use the host pool %s.\n' \
+      "$HOST_POOL_DIR" >&2
+    exit 2
+  elif [ "$FM_LINT_SLOT_DIR" != "$HOST_POOL_DIR" ] && fm_lint_native_executable "$SHELLCHECK_BIN"; then
+    printf 'fm-lint.sh: FM_LINT_SLOT_DIR=%s cannot move a real ShellCheck (%s) out of the host pool %s: only a stand-in analysis that is not a native ShellCheck may use another pool directory. Unset FM_LINT_SLOT_DIR.\n' \
+      "$FM_LINT_SLOT_DIR" "$SHELLCHECK_BIN" "$HOST_POOL_DIR" >&2
+    exit 2
+  fi
+  SLOT_DIR=$FM_LINT_SLOT_DIR
+fi
 for pool_pair in \
   "FM_LINT_HOST_SLOTS=${FM_LINT_HOST_SLOTS:-1}" \
   "FM_LINT_HOST_RSS_KIB=${FM_LINT_HOST_RSS_KIB:-1}"; do
@@ -1927,11 +1955,8 @@ for pool_pair in \
       ;;
   esac
 done
-NCPU=
-if [ "$SLOT_DIR" != off ]; then
-  NCPU=$(sysctl -n hw.ncpu 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null) || NCPU=
-  case "$NCPU" in ''|0*|*[!0-9]*) NCPU=1 ;; esac
-fi
+NCPU=$(sysctl -n hw.ncpu 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null) || NCPU=
+case "$NCPU" in ''|0*|*[!0-9]*) NCPU=1 ;; esac
 
 PROGRESS=0
 if [ -n "$PARTITION" ]; then
@@ -1939,6 +1964,12 @@ if [ -n "$PARTITION" ]; then
 fi
 
 TMP_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/fm-lint.XXXXXX") || exit 1
+# A simulated analysis (not a native ShellCheck) with no FM_LINT_SLOT_DIR keeps
+# its fixture pool state in this run's scratch directory, which is removed
+# with it; a real ShellCheck never gets one.
+if [ -z "${FM_LINT_SLOT_DIR:-}" ] && ! fm_lint_native_executable "$SHELLCHECK_BIN"; then
+  SLOT_DIR=$TMP_ROOT/slots
+fi
 ACTIVE_PIDS=()
 # shellcheck disable=SC2329 # Registered by the EXIT and signal traps below.
 fm_lint_stop_workers() {
@@ -2166,29 +2197,28 @@ fm_lint_wait_workers() {
 # A pool that cannot be used must stop the run before any root starts: the
 # host-wide memory bound would otherwise be lost silently. Each gate repeats the
 # check for its own files and refuses the same way (bin/fm-lint-cache.pl).
-if [ "$SLOT_DIR" != off ]; then
-  pool_problem=
-  if [ -z "${FM_LINT_SLOT_DIR:-}" ]; then
-    if [ -L "$HOST_POOL_ROOT" ]; then
-      pool_problem="$HOST_POOL_ROOT is a symbolic link"
-    else
-      ( umask 077; mkdir -p "$HOST_POOL_ROOT" ) 2>/dev/null
-      if [ ! -d "$HOST_POOL_ROOT" ]; then
-        pool_problem="$HOST_POOL_ROOT cannot be created"
-      elif [ ! -O "$HOST_POOL_ROOT" ]; then
-        pool_problem="$HOST_POOL_ROOT is owned by another user"
-      fi
+pool_problem=
+if [ "$SLOT_DIR" = "$HOST_POOL_DIR" ]; then
+  if [ -L "$HOST_POOL_ROOT" ]; then
+    pool_problem="$HOST_POOL_ROOT is a symbolic link"
+  else
+    ( umask 077; mkdir -p "$HOST_POOL_ROOT" ) 2>/dev/null
+    if [ ! -d "$HOST_POOL_ROOT" ]; then
+      pool_problem="$HOST_POOL_ROOT cannot be created"
+    elif [ ! -O "$HOST_POOL_ROOT" ]; then
+      pool_problem="$HOST_POOL_ROOT is owned by another user"
     fi
   fi
-  if [ -z "$pool_problem" ]; then
-    ( umask 077; mkdir -p "$SLOT_DIR" ) 2>/dev/null
-    { [ -d "$SLOT_DIR" ] && [ -w "$SLOT_DIR" ]; } || pool_problem="$SLOT_DIR is not a writable directory"
-  fi
-  if [ -n "$pool_problem" ]; then
-    printf 'fm-lint.sh: host slot pool unusable (%s); the host-wide ShellCheck memory bound cannot be enforced, so no root was started. Make that path writable, remove it if it is damaged, or point FM_LINT_SLOT_DIR at a writable directory that every lint run shares (FM_LINT_SLOT_DIR=off runs without the host-wide bound).\n' \
-      "$pool_problem" >&2
-    exit 2
-  fi
+fi
+if [ -z "$pool_problem" ]; then
+  ( umask 077; mkdir -p "$SLOT_DIR" ) 2>/dev/null
+  { [ -d "$SLOT_DIR" ] && [ -w "$SLOT_DIR" ]; } || pool_problem="$SLOT_DIR is not a writable directory"
+fi
+if [ -n "$pool_problem" ]; then
+  [ "$SLOT_DIR" = "$HOST_POOL_DIR" ] || pool_problem="FM_LINT_SLOT_DIR: $pool_problem"
+  printf 'fm-lint.sh: host slot pool unusable (%s); the host-wide ShellCheck memory bound cannot be enforced, so no root was started. Make that path writable or remove it if it is damaged.\n' \
+    "$pool_problem" >&2
+  exit 2
 fi
 
 if [ "$JOBS" -eq 1 ]; then
