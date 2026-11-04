@@ -6,6 +6,26 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Run as no-mistakes through a route's exec interception (the engine header,
+# "Pipeline starts"): the symlink leads back to this checkout's engine.
+if [ "${BASH_SOURCE[0]##*/}" = no-mistakes ]; then
+  intercept_dir=$SCRIPT_DIR
+  link=$(readlink "${BASH_SOURCE[0]}") || exit 127
+  SCRIPT_DIR="$(cd "$(dirname "$link")" && pwd)"
+  if command -v python3 >/dev/null 2>&1; then
+    exec python3 "$SCRIPT_DIR/fm-cpu-pass.py" exec-intercept -- "$@"
+  fi
+  # No Python: no admission is possible; run the real client past the interception.
+  kept=
+  IFS=: read -r -a entries <<<"$PATH"
+  for entry in "${entries[@]}"; do
+    [ "$entry" = "$intercept_dir" ] || kept=${kept:+$kept:}$entry
+  done
+  PATH=$kept
+  unset FM_PIPELINE_START_PRIORITY
+  exec no-mistakes "$@"
+fi
+
 if ! command -v python3 >/dev/null 2>&1 && [ "${1:-}" = run ]; then
   shift
   log_fd=2

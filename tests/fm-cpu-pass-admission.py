@@ -1628,6 +1628,45 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
             order.append(name)
             assert (folder / 'order').read_text().splitlines() == order, ((folder / 'order').read_text(), order)
 
+    def xargs_interception():
+        # D2 (delta review of fadebacc4): a fresh start the parser cannot see (xargs) meets the exec interception
+        # through every route: all three wait behind a full pool and are admitted once each in class order;
+        # through xargs a reattachment, a data command and an ordinary command are not queued.
+        import shlex
+        fed = lambda route: ['bash', '-c', 'printf "input\\n" | "$@"', 'feed'] + route + ['xargs', '-I', '{}', 'no-mistakes', 'axi', 'run', '--intent', 'goal']
+        folder, db, env = case('review-d2-xargs-held-order', cores=3, running=1)
+        env.update(PATH=str(nm_bin) + os.pathsep + env['PATH'], FM_DURATION_FILE='off')
+        first = launch(fed(mem_guard), dict(env, CASE_NAME='xargs-mem-guard-other'), folder / 'first')
+        pending(folder, 1)
+        second = launch(['bash', '-c', 'printf "input\\n" | ' + shlex.join(mem_guard + ['xargs', '-I', '{}', 'no-mistakes', 'axi', 'run', '--intent', 'goal'])],
+                        dict(env, CASE_NAME='xargs-shell-other'), folder / 'second')
+        pending(folder, 2)
+        third = launch(fed(measured_run), dict(env, CASE_NAME='xargs-measured-machinery'), folder / 'third')
+        pending(folder, 3)
+        assert not (folder / 'order').exists() and None is first.poll() is second.poll() is third.poll(), 'an xargs start ran past a full pool'
+        order = []
+        for name, child, log in (('xargs-measured-machinery', third, 'third'), ('xargs-mem-guard-other', first, 'first'),
+                                 ('xargs-shell-other', second, 'second')):
+            change(db, "UPDATE runs SET status='completed' WHERE id=?", (order[-1] if order else 'baseline-0',))
+            finish(child)
+            order.append(name)
+            assert (folder / 'order').read_text().splitlines() == order, ((folder / 'order').read_text(), order)
+            assert (folder / (log + '.stderr')).read_text().count('pipeline-start admitted') == 1, (name, (folder / (log + '.stderr')).read_text())
+        for name, words in (('reattach', ['no-mistakes', 'axi', 'run']), ('data', ['echo', 'no-mistakes', 'axi', 'run', '--intent', 'x']),
+                            ('ordinary', ['true'])):
+            for route_name, route in (('mem-guard', mem_guard), ('measured', measured_run)):
+                folder, db, env = case('review-d2-xargs-%s-%s' % (name, route_name), cores=3)
+                env.update(PATH=str(nm_bin) + os.pathsep + env['PATH'], FM_DURATION_FILE='off', CASE_NAME=name)
+                change(db, "INSERT INTO runs (id, status) VALUES ('existing', 'running')")
+                change(db, "UPDATE runs SET ci_ready_at = 1 WHERE id = 'existing'")  # active but not counted
+                child = launch(['bash', '-c', 'printf "input\\n" | "$@"', 'feed'] + route + ['xargs', '-I', '{}'] + words, env, folder / 'x')
+                code = child.wait(timeout=30)
+                text = (folder / 'x.stderr').read_text() + (folder / 'x.stdout').read_text()
+                with sqlite3.connect(db) as connection:
+                    new_rows = connection.execute("SELECT count(*) FROM runs WHERE id = ?", (name,)).fetchone()[0]
+                assert code == 0 and 'pipeline-start admitted' not in text and new_rows == 0, (name, route_name, code, text)
+                assert not list((folder / 'pool').glob('pipeline-waiter-*.lock')), (name, route_name)
+
     def wake_holder(env, folder):
         held, release = folder / 'held', folder / 'release-queue'
         holder = subprocess.Popen(['bash', '-c', '. "$1" && fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" && touch "$2" && '
@@ -1748,6 +1787,7 @@ exec /bin/ln "$@"
 
     for name, body in (('R1 a CI waiter holding no agent', idle_leftover), ('R2 wrapper forms join the queue once', wrapper_shapes),
                        ('R2 env -S starts wait behind a full pool in class order', split_held_order),
+                       ('D2 an xargs start meets the exec interception', xargs_interception),
                        ('R3 gate and watcher spills collide', watcher_collision),
                        ('D3 a collision replayed before the failed link returns', collision_then_replay), ('R3 controls: free lock, lone spill, replay', spill_controls),
                        ('R4 a short start-lock hold is recorded', short_hold_record)):

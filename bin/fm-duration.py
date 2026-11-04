@@ -15,8 +15,10 @@ Usage: fm-duration.py record KEY MILLISECONDS EXIT [--sample-id ID] [--uncalibra
 
 A command that begins a new no-mistakes run, as fm-cpu-pass.py's
 fresh_pipeline_start judges it (a rerun, or axi run with an intent input, behind
-any wrapper prefix), automatically enters that pipeline-start owner before any
-run clock or sample. --pipeline-priority chooses merge-train,
+the wrapper forms it models), automatically enters that pipeline-start owner
+before any run clock or sample; under a no-mistakes. key any other command runs
+with that engine's exec interception first on PATH, which admits a fresh
+no-mistakes the command itself reaches. --pipeline-priority chooses merge-train,
 machinery, vernant-build or other (default); docs/cpu-pass-pool.md owns policy.
 The admission owner re-executes this runner once with an internal argument that
 this runner consumes, so only that measured child skips requeueing; the wrapped
@@ -1506,12 +1508,22 @@ def main():
         if not command:
             parser.error('run requires -- COMMAND')
         fresh_pipeline = False
-        if any('no-mistakes' in part for part in command):
+        pipeline_key = args.key.startswith('no-mistakes.')
+        if pipeline_key or args.pipeline_admitted or any('no-mistakes' in part for part in command):
             # The admission owner decides what begins a new run, so every route shares one test.
             engine = importlib.util.spec_from_file_location('fm_cpu_pass', ROOT / 'bin/fm-cpu-pass.py')
             cpu_pass = importlib.util.module_from_spec(engine)
             engine.loader.exec_module(cpu_pass)
             fresh_pipeline = cpu_pass.fresh_pipeline_start(command)
+            if args.pipeline_admitted:
+                # Admitted once already: the client runs past the exec interception.
+                cleaned = cpu_pass.without_intercept(dict(os.environ))
+                os.environ.clear(); os.environ.update(cleaned)
+            elif pipeline_key and not fresh_pipeline:
+                # A pipeline-key command the parser finds no start in (xargs, a script, a variable): a fresh
+                # no-mistakes it reaches through PATH is admitted by the exec interception, in this class.
+                intercepted = cpu_pass.with_intercept(dict(os.environ), args.pipeline_priority)
+                os.environ.clear(); os.environ.update(intercepted)
         if fresh_pipeline and not args.pipeline_admitted:
             # Admission precedes run(), its absolute/progress clocks and samples.
             # The existing pool owns priority, native observations and the short

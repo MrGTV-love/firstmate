@@ -96,10 +96,19 @@ Pipeline starts:
     position (transparent wrappers with their options, env -S strings, an
     interpreter or shell running a script, a shell's -c command line and the
     admission routes themselves); any other program's arguments are data.
-    Limit: a start the parser does not model (another wrapper such as xargs,
-    sudo or timeout, the client under another name, env's own -S escapes or
-    ${VAR} expansion, a program name in a shell variable) is not recognized and
-    runs without admission. When the start runs behind another admission
+    A COMMAND it does not judge a new run runs with the exec interception
+    first on PATH (fm-mem-guard.sh run, and fm-duration.py run under a
+    no-mistakes. key): a private 0700 directory in the user's temporary
+    directory holding one symlink named no-mistakes to fm-cpu-pass.sh, which
+    runs exec-intercept: it judges the client's own argv by the same facts,
+    admits a new run once in the route's class (FM_PIPELINE_START_PRIORITY),
+    and runs the real client with every such directory removed from PATH. An
+    admitted start runs without the directory, so its client is not admitted
+    twice. Limit: an unmodeled wrapper handed the real client's absolute path,
+    or one that resets PATH (sudo, env -i), still starts a run unadmitted, and
+    a start outside both routes is reached by no code here; admission at run
+    creation in the no-mistakes fork is backlog task nm-run-creation-admission.
+    When the start runs behind another admission
     route (fm-mem-guard.sh run, fm-duration.py run, pipeline-start), the
     admission publishes one single-use grant-*.lock naming its own pid, locked
     while it holds the start lock. A later start consumes it, and runs without
@@ -1261,6 +1270,87 @@ def claim_grant(directory: str) -> Optional[int]:
     return None
 
 
+INTERCEPT_PRIORITY_ENV = "FM_PIPELINE_START_PRIORITY"
+INTERCEPT_TARGET = os.path.join(os.path.dirname(os.path.realpath(__file__)), "fm-cpu-pass.sh")
+
+
+def _is_intercept_dir(entry: str) -> bool:
+    link = os.path.join(entry, "no-mistakes")
+    return os.path.islink(link) and os.path.basename(os.path.realpath(link)) == "fm-cpu-pass.sh"
+
+
+def without_intercept(env: dict) -> dict:
+    """env with every exec-interception directory (of any checkout) removed from PATH."""
+    out = dict(env)
+    out.pop(INTERCEPT_PRIORITY_ENV, None)
+    if "PATH" in out:
+        out["PATH"] = os.pathsep.join(entry for entry in out["PATH"].split(os.pathsep) if not (entry and _is_intercept_dir(entry)))
+    return out
+
+
+def intercept_dir() -> str:
+    """This checkout's private directory holding one symlink named no-mistakes to fm-cpu-pass.sh.
+
+    It lives in the user's temporary directory, never in the pool, is created
+    0700 and used only when it is a real directory this user owns.
+    """
+    import hashlib
+    digest = hashlib.sha256(INTERCEPT_TARGET.encode()).hexdigest()[:12]
+    directory = os.path.join(tempfile.gettempdir(), "fm-exec-intercept-%d-%s" % (os.getuid(), digest))
+    with contextlib.suppress(FileExistsError):
+        os.mkdir(directory, 0o700)
+    info = os.lstat(directory)
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o022:
+        raise OSError("%s is not a private directory of this user" % directory)
+    link = os.path.join(directory, "no-mistakes")
+    if not (os.path.islink(link) and os.readlink(link) == INTERCEPT_TARGET):
+        temporary = "%s.%d" % (link, os.getpid())
+        with contextlib.suppress(FileNotFoundError):
+            os.unlink(temporary)
+        os.symlink(INTERCEPT_TARGET, temporary)
+        os.replace(temporary, link)
+    return directory
+
+
+def with_intercept(env: dict, priority: str) -> dict:
+    """COMMAND's environment for a route that admitted nothing: the interception first on PATH.
+
+    A no-mistakes that COMMAND reaches through PATH, however it is wrapped
+    (xargs, env -S, a shell variable, a script), then runs fm-cpu-pass.py
+    exec-intercept, which judges the client's own argv by the fresh-run facts
+    and admits a new run once, in this route's class.
+    """
+    out = without_intercept(env)
+    try:
+        directory = intercept_dir()
+    except OSError as exc:
+        log(2, "pipeline-start: cannot place the no-mistakes exec interception (%s); a fresh start reached "
+               "only through a form the parser does not model is not admitted" % exc)
+        return out
+    out["PATH"] = directory + (os.pathsep + out["PATH"] if out.get("PATH") else "")
+    out[INTERCEPT_PRIORITY_ENV] = priority
+    return out
+
+
+def cmd_exec_intercept(args: argparse.Namespace) -> int:
+    """Run as no-mistakes from the interception: admit a fresh start by its own argv, then exec the real client."""
+    import shutil
+    command = list(args.command)
+    if command[:1] == ["--"]:
+        command = command[1:]
+    priority = os.environ.get(INTERCEPT_PRIORITY_ENV, "other")
+    cleaned = without_intercept(dict(os.environ))
+    real = shutil.which("no-mistakes", path=cleaned.get("PATH", ""))
+    if real is None:
+        log(2, "command not found: no-mistakes")
+        return 127
+    os.environ.clear()
+    os.environ.update(cleaned)
+    return cmd_pipeline_start(argparse.Namespace(
+        command=[real] + command, only_fresh=True, intercepted=True,
+        priority=priority if priority in PIPELINE_PRIORITIES else "other"))
+
+
 def cmd_pipeline_start(args: argparse.Namespace) -> int:
     command = list(args.command)
     if command[:1] == ["--"]:
@@ -1271,9 +1361,14 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
     environment = dict(os.environ)
     route = start_route(command)
     if args.only_fresh and route is None:
-        # A reattachment, response, status read or other command that is no new run.
+        # A reattachment, response, status read or other command that is no new run; a fresh start it
+        # reaches through PATH in a form the parser does not model meets the exec interception.
         _restore_exec_signals()
+        if not getattr(args, "intercepted", False):
+            environment = with_intercept(environment, args.priority)
         return exec_direct(command, environment, 2)
+    # This start is admitted once here (or by its enclosing start): its client runs past the interception.
+    environment = without_intercept(environment)
     admission_fd = grant_fd = None
     grant_path = None
     try:
@@ -1669,6 +1764,8 @@ def build_parser() -> argparse.ArgumentParser:
     start.add_argument("--priority", choices=PIPELINE_PRIORITIES, default="other", help="start class in descending priority order")
     start.add_argument("--only-fresh", action="store_true", help="run COMMAND without admission unless it begins a new no-mistakes run")
     start.add_argument("command", nargs=argparse.REMAINDER, help="-- COMMAND [ARGS...]")
+    intercept = sub.add_parser("exec-intercept", help="run as no-mistakes from a route's exec interception (internal)")
+    intercept.add_argument("command", nargs=argparse.REMAINDER, help="-- ARGS of the no-mistakes client")
     gate = sub.add_parser("launch-gate", help="secure capacity for a CI fix agent before it starts (the agent launcher's final exec)")
     gate.add_argument("command", nargs=argparse.REMAINDER, help="-- AGENT [ARGS...]")
     status = sub.add_parser("status", help="report held and free passes")
@@ -1687,6 +1784,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return cmd_run(args)
     if args.action == "pipeline-start":
         return cmd_pipeline_start(args)
+    if args.action == "exec-intercept":
+        return cmd_exec_intercept(args)
     if args.action == "launch-gate":
         return cmd_launch_gate(args)
     if args.action == "status":
