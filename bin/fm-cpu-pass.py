@@ -452,34 +452,80 @@ SHELLS = ("sh", "bash", "zsh", "dash", "ksh")
 SHELL_OPERATOR_CHARS = "();<>|&\n"
 
 
-ADMITTED_ENV = "FM_PIPELINE_START_ADMITTED"
-
-
-def start_digest(command: List[str]) -> Optional[str]:
-    """A digest of the new run COMMAND begins (its no-mistakes arguments), or None when it begins none."""
-    import hashlib
-    arguments = pipeline_start_arguments(command)
-    if arguments is None:
-        return None
-    return hashlib.sha256("\0".join(arguments).encode("utf-8", "replace")).hexdigest()
-
-
-def already_admitted(command: List[str], env: dict) -> bool:
-    """Whether an enclosing admission already admitted this same start.
-
-    pipeline-start exports a digest of the start it admitted to COMMAND. A wrapper
-    inside that COMMAND which routes the identical no-mistakes invocation to
-    admission again (for example fm-mem-guard.sh run inside fm-duration.py run)
-    is that one start, not a second, so it runs without queueing again; any other
-    fresh start, nested or not, has another digest and still queues.
-    """
-    marker = env.get(ADMITTED_ENV)
-    return marker is not None and marker == start_digest(command)
+TRANSPARENT = ("env", "nice", "nohup", "command", "exec", "time", "stdbuf")
+ROUTES = ("fm-mem-guard.sh", "fm-duration.py", "fm-cpu-pass.sh", "fm-cpu-pass.py")
 
 
 def fresh_pipeline_start(command: List[str]) -> bool:
-    """Whether COMMAND begins a new no-mistakes run (see pipeline_start_arguments)."""
-    return pipeline_start_arguments(command) is not None
+    """Whether COMMAND begins a new no-mistakes run (see start_route)."""
+    return start_route(command) is not None
+
+
+def start_route(command: List[str]) -> Optional[Tuple[List[str], bool]]:
+    """(no-mistakes arguments, whether another admission route sits in between) of the new run COMMAND begins, or None.
+
+    Only the executable position counts: leading VAR=value words, the
+    transparent wrappers env, nice, nohup, command, exec, time and stdbuf with
+    their options, a Python interpreter or a shell running a script, a shell's -c string
+    (read as a command line, see shell_string_start) and the admission routes
+    fm-mem-guard.sh run --, fm-duration.py run KEY -- and fm-cpu-pass pipeline-start --
+    are followed to the program they run. Any other program's arguments are data,
+    so `printf no-mistakes axi run --intent x` is not a start. `no-mistakes rerun`
+    always creates a new run; `no-mistakes axi run` creates one only with an intent
+    input (--intent TEXT, --intent -, --intent-file PATH or their = forms). The
+    route flag is true when an admission route other than this admission's own
+    measured runner (fm-duration.py run --pipeline-admitted) runs the start.
+    """
+    routed = False
+    words = list(command)
+    while words:
+        while words and "=" in words[0] and words[0].split("=", 1)[0].isidentifier():
+            words = words[1:]
+        if not words:
+            return None
+        name = os.path.basename(words[0])
+        rest = words[1:]
+        if name == "no-mistakes":
+            fresh = rest[:1] == ["rerun"] or rest[:2] == ["axi", "run"] and any(
+                option in INTENT_OPTIONS or option.startswith(tuple(intent + "=" for intent in INTENT_OPTIONS))
+                for option in rest[2:])
+            return (rest, routed) if fresh else None
+        if name in TRANSPARENT:
+            valued = {"env": ("-u", "-C", "-S"), "nice": ("-n",), "stdbuf": ("-i", "-o", "-e")}.get(name, ())
+            while rest and (rest[0].startswith("-") or (name == "env" and "=" in rest[0])):
+                rest = rest[2:] if rest[0] in valued else rest[1:]
+            words = rest
+            continue
+        if name.rstrip("0123456789.").lower() == "python":
+            while rest and rest[0].startswith("-"):
+                if rest[0] in ("-c", "-m"):
+                    return None
+                rest = rest[1:]
+            words = rest
+            continue
+        if name in SHELLS:
+            string = shell_command_string(words, 0)
+            if string is None:
+                # A shell running a script file: the script is the program.
+                while rest and rest[0].startswith(("-", "+")) and rest[0] not in ("-", "--"):
+                    rest = rest[2:] if rest[0] in ("-o", "+o", "--rcfile", "--init-file") else rest[1:]
+                words = rest[1:] if rest[:1] == ["--"] else rest
+                continue
+            found = shell_string_start(string)
+            return None if found is None else (found[0], routed or found[1])
+        if name in ROUTES:
+            if name == "fm-mem-guard.sh" and rest[:2] == ["run", "--"]:
+                words, routed = rest[2:], True
+                continue
+            if name == "fm-duration.py" and rest[:1] == ["run"] and "--" in rest:
+                own = "--pipeline-admitted" in rest[:rest.index("--")]
+                words, routed = rest[rest.index("--") + 1:], routed or not own
+                continue
+            if name.startswith("fm-cpu-pass.") and rest[:1] == ["pipeline-start"] and "--" in rest:
+                words, routed = rest[rest.index("--") + 1:], True
+                continue
+        return None
+    return None
 
 
 def shell_command_string(command: List[str], index: int) -> Optional[str]:
@@ -515,8 +561,8 @@ def without_shell_comments(string: str) -> str:
     return "".join(kept)
 
 
-def shell_string_start(string: str) -> Optional[List[str]]:
-    """The first new run that one of the simple commands of a shell command string begins, if any.
+def shell_string_start(string: str) -> Optional[Tuple[List[str], bool]]:
+    """The first new run one of the simple commands of a shell command string begins, as start_route returns it.
 
     Comments and redirections (an operator with < or >, a file-descriptor number
     just before it and its target word) are not arguments; a control operator or
@@ -540,44 +586,14 @@ def shell_string_start(string: str) -> Optional[List[str]]:
                 simple.pop()
             target = True
         elif operator:
-            arguments = pipeline_start_arguments(simple)
-            if arguments is not None:
-                return arguments
+            found = start_route(simple)
+            if found is not None:
+                return found
             simple, target = [], False
         elif target:
             target = False
         else:
             simple.append(word)
-    return None
-
-
-def pipeline_start_arguments(command: List[str]) -> Optional[List[str]]:
-    """The no-mistakes arguments of the new run COMMAND begins, or None, judged by the facts the CLI itself uses.
-
-    `no-mistakes rerun` always creates a new run. `no-mistakes axi run` creates one
-    only with an intent input (--intent TEXT, --intent -, --intent-file PATH or
-    their = forms); without one it reattaches an active run or exits 2. The
-    no-mistakes binary is found at any position and by basename, so a wrapper
-    prefix (env, fm-mem-guard.sh run --, an absolute path) does not hide it; a
-    shell's -c string, after the shell's other options, is read as a command line
-    without its comments and redirections, split at its control operators and
-    newlines; other arguments are data. respond, status
-    and every other subcommand are not starts. This one reading decides both
-    whether a command is a start and the digest of the start an admission exports.
-    """
-    for index, part in enumerate(command):
-        name = os.path.basename(part)
-        if name == "no-mistakes":
-            rest = command[index + 1:]
-            fresh = rest[:1] == ["rerun"] or rest[:2] == ["axi", "run"] and any(
-                option in INTENT_OPTIONS or option.startswith(tuple(intent + "=" for intent in INTENT_OPTIONS))
-                for option in rest[2:])
-            return rest if fresh else None
-        if name in SHELLS:
-            string = shell_command_string(command, index)
-            if string is not None:
-                # A shell's -c string is a command line; any other argument is data, such as a commit message.
-                return shell_string_start(string)
     return None
 
 
@@ -749,14 +765,17 @@ def active_term(report: dict) -> Optional[Tuple[int, int]]:
 
 
 def project(available: int, rss: dict, counted: dict, steps: Optional[dict], launches: dict,
-            reservation: int, slack: int, term: int, self_run: Optional[str] = None) -> dict:
+            reservation: int, slack: int, term: int, self_run: Optional[str] = None,
+            launched: frozenset = frozenset()) -> dict:
     """The reservation fit for one more active run; a pure function of its facts.
 
     counted maps each counted run ID to its repo ID; rss is the reading's run map
     (keyed no-mistakes:<repo>/<run>); steps is open_steps() or None; launches maps
-    run IDs to their live launch-gate reservations. A run waiting on remote CI
-    (open step ci, status running, no recorded agent pid, no live launch) reserves
-    only the memory it holds. Every other counted or launched run reserves its
+    run IDs to their live launch-gate reservations; launched holds the run keys
+    whose tree has a process the no-mistakes daemon itself started (an agent or
+    a launcher, see daemon_launched). A run waiting on remote CI (open step ci,
+    status running, no recorded agent pid, no live launch and no daemon-started
+    process) reserves only the memory it holds. Every other counted or launched run reserves its
     resident memory or the active-run term A, whichever is larger, once its tree
     is visible, and its full R while the reading cannot see it yet. The new run
     reserves S. The waiting launch's own run (self_run) is a waiter: it adds only
@@ -768,7 +787,8 @@ def project(available: int, rss: dict, counted: dict, steps: Optional[dict], lau
         runs.setdefault(run, entry.get("repo"))
     held = 0
     for run in sorted(runs):
-        seen = rss.get("no-mistakes:%s/%s" % (runs[run], run))
+        key = "no-mistakes:%s/%s" % (runs[run], run)
+        seen = rss.get(key)
         size = seen["rss_bytes"] if seen and type(seen.get("rss_bytes")) is int else 0
         visible = bool(seen) and seen.get("processes", 0) > 0
         step = None if steps is None else steps.get(run)
@@ -778,7 +798,8 @@ def project(available: int, rss: dict, counted: dict, steps: Optional[dict], lau
         elif run in launches:
             kind = "launched"
             demand = max(size, term) if visible else reservation
-        elif steps is not None and step is not None and step[0] == CI_STEP and step[1] == "running" and step[2] is None:
+        elif (steps is not None and step is not None and step[0] == CI_STEP and step[1] == "running"
+              and step[2] is None and key not in launched):
             kind, demand = "ci-waiting", size
         else:
             kind = "step-unreadable" if steps is None else ("no-open-step" if step is None else "active")
@@ -843,6 +864,23 @@ def host_observation(fresh: bool = False) -> dict:
     return _observed
 
 
+DAEMON_COMM = "no-mistakes"
+
+
+def daemon_launched(report: dict) -> frozenset:
+    """Run keys whose tree in the reading has a process whose parent is the no-mistakes daemon.
+
+    The daemon starts each agent (or the launcher that execs or gates it) as its
+    own child in the run worktree, so such a process proves a live agent round
+    whatever the agent's name; Claude Code's native binary, for one, is named by
+    its version (2.1.318 in the 2026-11-03 census). The daemon's own short-lived
+    commands there count as well, which only keeps a reservation, never drops one.
+    """
+    rows = report.get("processes") or []
+    daemons = {row.get("pid") for row in rows if row.get("comm") == DAEMON_COMM}
+    return frozenset(row["run"] for row in rows if row.get("run") and row.get("ppid") in daemons)
+
+
 def admission(reasons: List[str], report: Optional[dict], running: dict, counted: dict, steps: Optional[dict],
               launches: dict, cores: int, priority: str, self_run: Optional[str] = None,
               measured: Optional[Tuple[Tuple[int, int, int], Tuple[int, int]]] = None) -> Tuple[bool, str]:
@@ -861,7 +899,8 @@ def admission(reasons: List[str], report: Optional[dict], running: dict, counted
         limit = max(1, cores // 3)
         return others < limit, "counted=%d limit=%d basis=fallback priority=%s" % (others, limit, priority)
     (reservation, slack, qualifying), (term, readings) = measured
-    fit = project(report["available_bytes"], report["runs"], counted, steps, launches, reservation, slack, term, self_run)
+    fit = project(report["available_bytes"], report["runs"], counted, steps, launches, reservation, slack, term, self_run,
+                  daemon_launched(report))
     return fit["admit"], projection_text(fit, reservation, slack, term, qualifying, readings) + " priority=%s" % priority
 
 
@@ -945,8 +984,12 @@ def wait_for_admission(directory: str, priority: str, self_run: Optional[str] = 
     """Queue one locked waiter entry in class order until admitted; return (start lock fd, before, reason, waited).
 
     The start lock is held on return. A bound in seconds raises HoldBound with the
-    last reason once that long passed without a grant; None waits without limit.
-    on_wait(reason) is called once, at the first wait that is not the registration handshake.
+    last reason once that long passed without a grant, and also refuses a grant
+    reached only after waiting past it (a fit at the very first decision, before
+    any wait, is still admitted, so a bound of 0 holds not at all); None waits
+    without limit. on_wait(reason, waited seconds) is called once, at the first
+    decision that does not fit or, for any other wait such as start-lock
+    contention, when the first waiting notice is due (FIRST_NOTICE_SECS).
     """
     waiter_fd = admission_fd = None
     waiter_path = None
@@ -959,6 +1002,7 @@ def wait_for_admission(directory: str, priority: str, self_run: Optional[str] = 
         admission_fd = open_lock(os.path.join(directory, "pipeline-start.lock"))
         next_notice = started + FIRST_NOTICE_SECS
         delay = POLL_MIN_SECS
+        waited = False
         while True:
             reason = "another start is registering"
             if try_lock(admission_fd):
@@ -971,6 +1015,8 @@ def wait_for_admission(directory: str, priority: str, self_run: Optional[str] = 
                         # A cached healthy reading may be stale: confirm with a new reading at the grant.
                         admit, reason = decide(before, counted, cores, priority, fresh=True, directory=directory,
                                                self_run=self_run)
+                    if admit and waited and bound is not None and time.monotonic() - started > bound:
+                        raise HoldBound("a fit came only after the hold bound passed: " + reason)
                     if admit:
                         result = (admission_fd, before, reason, time.monotonic() - started)
                         admission_fd = None
@@ -978,8 +1024,8 @@ def wait_for_admission(directory: str, priority: str, self_run: Optional[str] = 
                 else:
                     reason = "counted=%d priority=%s behind a higher-priority or earlier start" % (len(counted), priority)
                 fcntl.flock(admission_fd, fcntl.LOCK_UN)
-                if on_wait is not None:
-                    on_wait(reason)
+                if on_wait is not None and first == waiter_path:
+                    on_wait(reason, time.monotonic() - started)
                     on_wait = None
             now = time.monotonic()
             if bound is not None and now - started >= bound:
@@ -987,6 +1033,10 @@ def wait_for_admission(directory: str, priority: str, self_run: Optional[str] = 
             if now >= next_notice:
                 log(2, "%s waiting: %s" % ("launch-gate" if self_run else "pipeline-start", reason))
                 next_notice = now + NOTICE_EVERY_SECS
+                if on_wait is not None:
+                    on_wait(reason, now - started)
+                    on_wait = None
+            waited = True
             time.sleep(delay)
             delay = min(POLL_MAX_SECS, delay * 2)
     finally:
@@ -1000,6 +1050,67 @@ def wait_for_admission(directory: str, priority: str, self_run: Optional[str] = 
                 os.close(fd)
 
 
+def parent_pid(pid: int) -> int:
+    """PID's parent, from /proc where the platform has it, else from fm-proc-info.py's kernel reader."""
+    try:
+        with open("/proc/%d/stat" % pid, "rb") as handle:
+            return int(handle.read().rsplit(b")", 1)[1].split()[1])
+    except FileNotFoundError:
+        if sys.platform != "darwin":
+            raise
+    info = sibling("fm_proc_info", "fm-proc-info.py")
+    import struct
+    return struct.unpack_from("i", info.kinfo(pid), info.E_PPID)[0]
+
+
+def ancestors(pid: int) -> List[int]:
+    """The parent chain of PID up to init; a process that cannot be read ends the chain."""
+    chain: List[int] = []
+    while pid > 1 and len(chain) < 256:
+        try:
+            pid = parent_pid(pid)
+        except (OSError, LookupError, ValueError, IndexError, AttributeError):
+            break
+        chain.append(pid)
+    return chain
+
+
+def claim_grant(directory: str) -> Optional[int]:
+    """The pid of the enclosing admission whose single-use grant this process just consumed, or None.
+
+    An admission whose start runs behind another admission route publishes one
+    locked grant-*.lock naming its own pid. A later start consumes it only when
+    that pid is one of its ancestors and nobody consumed it before (an exclusive
+    .claimed file), so the one nested route of that start does not queue twice,
+    while any other start, a sibling elsewhere or a second descendant, queues.
+    """
+    mine = None
+    for path in Path(directory).glob("grant-*.lock"):
+        try:
+            fd = os.open(str(path), os.O_RDWR | getattr(os, "O_CLOEXEC", 0))
+        except FileNotFoundError:
+            continue
+        try:
+            if try_lock(fd):
+                path.unlink(missing_ok=True)
+                Path(str(path) + ".claimed").unlink(missing_ok=True)
+                continue
+            holder = json.loads(os.pread(fd, 65536, 0))["holder"]
+        except (ValueError, KeyError, TypeError):
+            continue
+        finally:
+            os.close(fd)
+        if mine is None:
+            mine = ancestors(os.getpid())
+        if holder in mine:
+            try:
+                os.close(os.open(str(path) + ".claimed", os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600))
+                return holder
+            except FileExistsError:
+                continue
+    return None
+
+
 def cmd_pipeline_start(args: argparse.Namespace) -> int:
     command = list(args.command)
     if command[:1] == ["--"]:
@@ -1008,20 +1119,37 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
         log(2, "pipeline-start needs a command after --")
         return 125
     environment = dict(os.environ)
-    if already_admitted(command, environment) or (args.only_fresh and not fresh_pipeline_start(command)):
-        # Already admitted by an enclosing owner, or (with --only-fresh) a
-        # reattachment, response, status read or other command that is no new run.
+    route = start_route(command)
+    if args.only_fresh and route is None:
+        # A reattachment, response, status read or other command that is no new run.
         return exec_direct(command, environment, 2)
-    digest = start_digest(command)
-    if digest is not None:
-        environment[ADMITTED_ENV] = digest
-    admission_fd = None
+    admission_fd = grant_fd = None
+    grant_path = None
     try:
         directory = pool_dir()
         ensure_pool_dir(directory)
+        if route is not None:
+            holder = claim_grant(directory)
+            if holder is not None:
+                log(2, "pipeline-start: this start was admitted by its enclosing start (pid %d); not queued again" % holder)
+                return exec_direct(command, environment, 2)
         admission_fd, before, reason, _ = wait_for_admission(directory, args.priority)
         log(2, "pipeline-start admitted: " + reason)
+        if route is not None and route[1]:
+            # The start runs behind another admission route: offer that one route this admission.
+            grant_fd, grant_path = publish_locked(directory, "grant-", {"holder": os.getpid(), "created_ns": time.time_ns()})
         registration_error = False
+
+        def release_grant() -> None:
+            nonlocal grant_fd, grant_path
+            if grant_path is not None:
+                for path in (grant_path, grant_path + ".claimed"):
+                    with contextlib.suppress(FileNotFoundError):
+                        os.unlink(path)
+                grant_path = None
+            if grant_fd is not None:
+                os.close(grant_fd)
+                grant_fd = None
 
         def registered() -> bool:
             nonlocal registration_error
@@ -1031,6 +1159,7 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
                 if new_runs:
                     # Serialize only the check-to-registration gap. The daemon
                     # owns status after this handoff; no lifetime watcher remains.
+                    release_grant()
                     fcntl.flock(admission_fd, fcntl.LOCK_UN)
                     return True
             except (OSError, sqlite3.Error, ValueError) as exc:
@@ -1048,8 +1177,13 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
         log(2, "pipeline-start refused: %s" % exc)
         return 125
     finally:
-        if admission_fd is not None:
-            os.close(admission_fd)
+        if grant_path is not None:
+            for path in (grant_path, grant_path + ".claimed"):
+                with contextlib.suppress(FileNotFoundError):
+                    os.unlink(path)
+        for fd in (grant_fd, admission_fd):
+            if fd is not None:
+                os.close(fd)
 
 
 NO_MISTAKES_CONFIG = "~/.no-mistakes/config.yaml"
@@ -1145,13 +1279,19 @@ def durable_line(text: str, key: str) -> None:
         log(2, "launch-gate: durable line not recorded (%s): %s" % (exc, text))
 
 
-def start_watched(command: List[str]) -> Tuple[subprocess.Popen, int]:
+def start_watched(command: List[str]) -> Tuple[int, int]:
     """Start the agent as this gate's child in its process group, with a watcher that kills it if the gate dies.
 
     macOS has no parent-death signal: a forked watcher blocks on a pipe only this
-    gate can write. A normal gate exit writes one byte first; end-of-file without
-    it means the gate died, and the watcher kills the agent at once (its whole
-    process group when the gate leads that group, as the daemon's launch does).
+    gate can write. The agent's child process waits for a go byte before it
+    execs, and the gate sends go only after the watcher holds the agent's pid, so
+    there is no moment when an agent runs that the watcher cannot name: a gate
+    that dies before go leaves a child that exits without starting the agent. A
+    normal gate exit writes one byte to the watcher first; end-of-file without it
+    means the gate died, and the watcher kills the agent at once, and the whole
+    process group when the gate leads it, as the daemon's launch does.
+    Returns (agent pid, watcher pipe); FileNotFoundError or PermissionError when
+    the agent cannot be executed.
     """
     gate = os.getpid()
     read_end, write_end = os.pipe()
@@ -1167,22 +1307,45 @@ def start_watched(command: List[str]) -> Tuple[subprocess.Popen, int]:
             for signum in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
                 signal.signal(signum, signal.SIG_IGN)
             agent = int(os.read(read_end, 32).decode() or 0)
-            if os.read(read_end, 1) != b"d" and agent:
-                with contextlib.suppress(OSError):
-                    os.kill(agent, signal.SIGKILL)
+            if os.read(read_end, 1) != b"d":
+                if agent:
+                    with contextlib.suppress(OSError):
+                        os.kill(agent, signal.SIGKILL)
                 if os.getpgid(0) == gate:
                     with contextlib.suppress(OSError):
                         os.killpg(gate, signal.SIGKILL)
         finally:
             os._exit(0)
     os.close(read_end)
-    try:
-        child = subprocess.Popen(command, close_fds=True, preexec_fn=_restore_default_signals)
-    except OSError:
-        os.write(write_end, b"0".ljust(32) + b"d")
+    go_read, go_write = os.pipe()
+    error_read, error_write = os.pipe()
+    child = os.fork()
+    if child == 0:  # pragma: no cover - exercised through the executable
+        try:
+            os.close(go_write)
+            os.close(error_read)
+            os.close(write_end)
+            _restore_default_signals()
+            if os.read(go_read, 1) != b"g":
+                os._exit(125)
+            os.execvp(command[0], command)
+        except OSError as exc:
+            os.write(error_write, str(exc.errno).encode())
+        finally:
+            os._exit(127)
+    for fd in (go_read, error_write):
+        os.close(fd)
+    os.write(write_end, str(child).encode().ljust(32))
+    os.write(go_write, b"g")
+    os.close(go_write)
+    failure = os.read(error_read, 32)
+    os.close(error_read)
+    if failure:
+        os.waitpid(child, 0)
+        os.write(write_end, b"d")
         os.close(write_end)
-        raise
-    os.write(write_end, str(child.pid).encode().ljust(32))
+        code = int(failure)
+        raise (FileNotFoundError if code == errno.ENOENT else PermissionError)(code, os.strerror(code), command[0])
     return child, write_end
 
 
@@ -1211,10 +1374,10 @@ def cmd_launch_gate(args: argparse.Namespace) -> int:
         bound, bound_text = hold_bound()
         held = []
 
-        def on_wait(reason: str) -> None:
+        def on_wait(reason: str, waited: float) -> None:
             held.append(reason)
-            durable_line("run %s (%s) held for capacity before its CI fix agent starts: %s; %s" % (
-                run, branch, reason, bound_text), "launch-gate-" + run)
+            durable_line("run %s (%s) held for capacity before its CI fix agent starts, waited %ds so far: %s; %s" % (
+                run, branch, waited, reason, bound_text), "launch-gate-" + run)
 
         try:
             admission_fd, _, reason, waited = wait_for_admission(directory, "other", run, bound, on_wait)
@@ -1231,7 +1394,7 @@ def cmd_launch_gate(args: argparse.Namespace) -> int:
             published_ns = time.time_ns()
             try:
                 child, watch_fd = start_watched(command)
-            except (FileNotFoundError, PermissionError) as exc:
+            except (FileNotFoundError, PermissionError, NotADirectoryError) as exc:
                 # The shell's statuses for an agent that cannot be launched, reported unchanged.
                 os.close(reservation_fd)
                 log(2, "launch-gate: agent %s: %s" % ("not found" if isinstance(exc, FileNotFoundError) else "not executable", command[0]))
@@ -1260,25 +1423,31 @@ def cmd_launch_gate(args: argparse.Namespace) -> int:
         return 75
 
 
-def wait_agent(child: subprocess.Popen, watch_fd: int, reservation_fd: int) -> int:
+def wait_child(pid: int) -> int:
+    """The agent's ending as subprocess reports it: its exit status, or minus the signal that ended it."""
+    while True:
+        _, status = os.waitpid(pid, 0)
+        if os.WIFEXITED(status):
+            return os.WEXITSTATUS(status)
+        if os.WIFSIGNALED(status):
+            return -os.WTERMSIG(status)
+
+
+def wait_agent(child: int, watch_fd: int, reservation_fd: int) -> int:
     """Forward signals to the agent, keep its reservation while it lives, and return or re-raise its own ending."""
     def forward(signum, _frame):
         with contextlib.suppress(OSError):
-            os.kill(child.pid, signum)
+            os.kill(child, signum)
 
     for signum in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
         signal.signal(signum, forward)
     try:
-        while True:
-            try:
-                code = child.wait()
-                break
-            except InterruptedError:  # pragma: no cover - PEP 475 retries
-                continue
+        code = wait_child(child)
     except BaseException:
         with contextlib.suppress(OSError):
-            child.kill()
-        child.wait()
+            os.kill(child, signal.SIGKILL)
+        with contextlib.suppress(OSError):
+            os.waitpid(child, 0)
         raise
     finally:
         os.close(reservation_fd)

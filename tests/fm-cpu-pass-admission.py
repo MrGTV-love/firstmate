@@ -44,15 +44,32 @@ if len(sys.argv) > 1 and os.path.basename(sys.argv[1]) in ('fm-cpu-pass.py', 'fm
         sys.platform = os.environ['CASE_PLATFORM']
     if os.environ.get('CASE_GATE_RAISE'):
         import subprocess
-        real_wait = subprocess.Popen.wait
-        def broken_wait(self, timeout=None):
-            if any('agent.py' in str(part) for part in self.args) and not getattr(self, 'raised', False):
-                self.raised = True
-                import glob, time
+        import glob, time
+        real_waitpid, real_fork, forked, raised = os.waitpid, os.fork, [], []
+        def recording_fork():
+            pid = real_fork()
+            if pid:
+                forked.append(pid)
+            return pid
+        def broken_waitpid(pid, options):
+            # The gate's first wait on its agent (its second fork; the first is the watcher)
+            # raises once the agent has started, as an internal gate error would.
+            if not raised and len(forked) >= 2 and pid == forked[1]:
+                raised.append(pid)
                 while not glob.glob(os.path.join(os.environ['CASE_FOLDER'], '*.agent')): time.sleep(0.025)
                 raise RuntimeError('injected gate error after the agent started')
-            return real_wait(self, timeout)
-        subprocess.Popen.wait = broken_wait
+            return real_waitpid(pid, options)
+        os.fork = recording_fork
+        os.waitpid = broken_waitpid
+    if os.environ.get('CASE_KILL_BEFORE_PID'):
+        import signal
+        real_write = os.write
+        def write_until_killed(fd, data):
+            # The gate dies at its pid handoff to the watcher (independent review F5 probe seam).
+            if len(data) == 32 and data.strip().isdigit():
+                os.kill(os.getpid(), signal.SIGKILL)
+            return real_write(fd, data)
+        os.write = write_until_killed
     connect = sqlite3.connect
     host = pathlib.Path('~/.no-mistakes/state.sqlite').expanduser().resolve().as_uri()
     def isolated(database, *args, **kwargs):
@@ -109,10 +126,13 @@ def facts(folder, available=40 * GIB, pressure=1, runs=(), total=128 * GIB, brok
         'Pages free: 1000.\nPages speculative: 100.\n'
         'Anonymous pages: 1048576.\nFile-backed pages: %d.\n'
         'Pages purgeable: 100.\nPages occupied by compressor: 32768.\n' % (available // 16384 - 1100))
-    rows = [dict(pid=101, ppid=1, comm='daemon', started='s101', rss_bytes=GIB, fleet=False, run=None)]
-    for index, (repo, run, rss) in enumerate(runs):
-        rows.append(dict(pid=200 + index, ppid=1, comm='node', started='s%d' % index, rss_bytes=rss, fleet=True,
-                         run='no-mistakes:%s/%s' % (repo, run)))
+    # pid 50 is the no-mistakes daemon; a run entry (repo, id, rss, True) is a process it started.
+    rows = [dict(pid=101, ppid=1, comm='daemon', started='s101', rss_bytes=GIB, fleet=False, run=None),
+            dict(pid=50, ppid=1, comm='no-mistakes', started='s50', rss_bytes=GIB // 8, fleet=False, run=None)]
+    for index, entry in enumerate(runs):
+        repo, run, rss = entry[:3]
+        rows.append(dict(pid=200 + index, ppid=50 if entry[3:] == (True,) else 1, comm='2.1.318' if entry[3:] == (True,) else 'node',
+                         started='s%d' % index, rss_bytes=rss, fleet=True, run='no-mistakes:%s/%s' % (repo, run)))
     (fixture / 'processes.json').write_text(json.dumps(rows))
 
 
@@ -1213,6 +1233,170 @@ while not (folder / (run + '.release')).exists(): time.sleep(0.025)
     finish(child, 1)
     wait_for(lambda: not alive(agent_pid), 'no agent after an internal error')
     assert live_entries(folder, 'launch-*.lock') == 0
+
+    # Independent review of 5d51fa8be (F1-F7): each case fails on that head and passes on the fix.
+    # Every case runs; the failures are collected and reported together.
+    fixround = {}
+
+    def fix_case(name, body):
+        try:
+            body()
+            fixround[name] = 'pass'
+        except Exception as exc:  # a hang or a refused assertion fails this case only
+            fixround[name] = 'FAIL: %s: %s' % (type(exc).__name__, str(exc)[:600])
+
+    stay_bin = root / 'staybin'
+    stay_bin.mkdir()
+    (stay_bin / 'no-mistakes').write_text('#!' + python + '\n' + """import os, pathlib, sqlite3, sys, time
+folder = pathlib.Path(os.environ['CASE_FOLDER']); name = os.environ.get('CASE_RUN', 'run') + '-' + str(os.getpid())
+with sqlite3.connect(folder / 'state.sqlite') as db:
+    db.execute("INSERT INTO runs (id, status) VALUES (?, 'running')", (name,))
+(folder / (name + '.started')).touch()
+while not (folder / 'release').exists(): time.sleep(0.025)
+with sqlite3.connect(folder / 'state.sqlite') as db:
+    db.execute("UPDATE runs SET status = 'completed' WHERE id = ?", (name,))
+""")
+    (stay_bin / 'no-mistakes').chmod(0o700)
+    guard_route = str(repo / 'bin/fm-mem-guard.sh')
+
+    def started(folder):
+        return sorted(p.name for p in folder.glob('*.started'))
+
+    def nested_expanded():
+        # F1: an outer measured start whose shell string runs the memory route with an expanded intent.
+        folder, db, env = case('fix-f1', cores=3)
+        env.update(PATH=str(stay_bin) + os.pathsep + env['PATH'], FM_DURATION_FILE='off')
+        child = launch(measured_run + ['bash', '-c', 'X=goal; %s run -- no-mistakes axi run --intent "$X"' % guard_route], env, folder / 'outer')
+        wait_for_or = time.monotonic() + 15
+        while time.monotonic() < wait_for_or and not started(folder):
+            time.sleep(0.05)
+        text = (folder / 'outer.stderr').read_text()
+        assert started(folder), ('nested start never ran', text, live_entries(folder))
+        assert text.count('pipeline-start admitted') == 1 and 'admitted by its enclosing start' in text, text
+        # An unrelated later start is not held behind it for good: it waits only for capacity (limit 1).
+        (folder / 'release').touch()
+        finish(child)
+
+    def identical_sibling():
+        # F2: a second start with identical arguments, not a descendant of the first, queues.
+        folder, db, env = case('fix-f2-sibling', cores=3)
+        env.update(PATH=str(stay_bin) + os.pathsep + env['PATH'], FM_DURATION_FILE='off')
+        first = launch(measured_run + ['env', 'A=1', guard_route, 'run', '--'] + fresh_shapes['intent'], env, folder / 'first')
+        wait_for(lambda: len(started(folder)) == 1, 'first start')
+        second = launch(measured_run + ['env', 'A=1', guard_route, 'run', '--'] + fresh_shapes['intent'], env, folder / 'second')
+        time.sleep(2.5)
+        assert len(started(folder)) == 1 and second.poll() is None, ('second identical start was not held', started(folder))
+        (folder / 'release').touch()
+        finish(first); finish(second)
+
+    def explicit_reuse():
+        # F2: an explicit pipeline-start of the same arguments inside an admitted start queues too.
+        folder, db, env = case('fix-f2-explicit', cores=3)
+        env.update(PATH=str(stay_bin) + os.pathsep + env['PATH'], FM_DURATION_FILE='off')
+        both = 'no-mistakes axi run --intent goal & %s pipeline-start -- no-mistakes axi run --intent goal; wait' % (repo / 'bin/fm-cpu-pass.sh')
+        outer = launch(cli + ['pipeline-start', '--', 'bash', '-c', both], env, folder / 'outer')
+        wait_for(lambda: len(started(folder)) >= 1, 'first start')
+        time.sleep(2.5)
+        assert len(started(folder)) == 1, ('a second start inside one admission was not held', started(folder))
+        (folder / 'release').touch()
+        finish(outer)
+
+    def second_descendant():
+        # F2: two nested routes inside one admitted shell string: one consumes the grant, the other queues.
+        folder, db, env = case('fix-f2-descendant', cores=3)
+        env.update(PATH=str(stay_bin) + os.pathsep + env['PATH'], FM_DURATION_FILE='off')
+        two = '%s run -- no-mistakes axi run --intent a & %s run -- no-mistakes axi run --intent b; wait' % (guard_route, guard_route)
+        outer = launch(measured_run + ['bash', '-c', two], env, folder / 'outer')
+        wait_for(lambda: len(started(folder)) >= 1, 'first nested start')
+        time.sleep(2.5)
+        assert len(started(folder)) == 1, ('the second nested start did not queue', started(folder))
+        (folder / 'release').touch()
+        finish(outer)
+
+    def data_words():
+        # F3: words of data that spell a start are not a start; the memory route runs the command unchanged.
+        folder, db, env = case('fix-f3', cores=3, running=1)
+        child = launch(mem_guard + ['printf', '%s ', 'no-mistakes', 'axi', 'run', '--intent', 'goal'], env, folder / 'data')
+        try:
+            code = child.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            os.killpg(child.pid, signal.SIGKILL); child.wait()
+            raise AssertionError('printf of start words waited at pipeline-start')
+        assert code == 0 and (folder / 'data.stdout').read_text() == 'no-mistakes axi run --intent goal ', (code, (folder / 'data.stderr').read_text())
+
+    def visible_agent():
+        # F4: a process the daemon started in a ci:running run with no recorded pid is a live agent (A), not idle.
+        for label, launched_by_daemon, admitted in (('agent', True, False), ('no-agent', False, True)):
+            folder, db, env = case('fix-f4-' + label, measured=True, available=int(8.5 * GIB))
+            change(db, "INSERT INTO runs (id, status, repo_id) VALUES ('x', 'running', 'repo')")
+            change(db, "INSERT INTO step_results (id, run_id, step_name, step_order, status, agent_pid) VALUES ('x-ci', 'x', 'ci', 1, 'running', NULL)")
+            facts(folder, available=int(8.5 * GIB), runs=[('repo', 'x', GIB // 5, launched_by_daemon)])
+            child = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'm')], env, folder / 'f4')
+            if admitted:
+                finish(child)
+                assert 'x:ci-waiting:' in (folder / 'f4.stderr').read_text(), (folder / 'f4.stderr').read_text()
+            else:
+                try:
+                    wait_for(lambda: 'waiting: counted=1 projected=%d ' % (9 * GIB) in (folder / 'f4.stderr').read_text(), 'live agent keeps A')
+                finally:
+                    os.killpg(child.pid, signal.SIGTERM); child.wait()
+                assert not (folder / 'm').exists()
+
+    def handoff_kill():
+        # F5: the gate dies at its pid handoff to the watcher; no agent may run on without it.
+        folder, db, env = gate_case('fix-f5')
+        child, log = gate(folder, dict(env, CASE_KILL_BEFORE_PID='1'), 'x')
+        child.wait(timeout=30)
+        time.sleep(1.5)
+        if (folder / 'x.agent').exists():
+            pid = json.loads((folder / 'x.agent').read_text())['pid']
+            if alive(pid):
+                os.kill(pid, signal.SIGKILL)
+                raise AssertionError('agent %d kept running after the gate died at the handoff' % pid)
+        assert live_entries(folder, 'launch-*.lock') == 0
+
+    def late_grant():
+        # F6: a fit reached only after the hold bound (budget 1 s - p99 0.8 s = 0.2 s) refuses; a timely one admits.
+        import fcntl
+        for label, ci_ms, pause, admitted in (('late', (800,), 0.8, False), ('timely', (300,), 0.05, True)):
+            folder, db, env = gate_case('fix-f6-' + label, timeout='1s', ci_ms=ci_ms)
+            (folder / 'pool').mkdir(exist_ok=True)
+            lock = os.open(str(folder / 'pool' / 'pipeline-start.lock'), os.O_RDWR | os.O_CREAT, 0o600)
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            child, log = gate(folder, env, 'x', mode='exit-0')
+            time.sleep(pause)
+            fcntl.flock(lock, fcntl.LOCK_UN); os.close(lock)
+            code = child.wait(timeout=30)
+            text = log.with_suffix('.stderr').read_text()
+            if admitted:
+                assert code == 0 and (folder / 'x.agent').exists(), (label, code, text)
+            else:
+                assert code == 75 and 'hold bound reached' in text and not (folder / 'x.agent').exists(), (label, code, text)
+
+    def lock_contention_record():
+        # F7: a hold on start-lock contention and the admission after it are both durably recorded.
+        import fcntl
+        folder, db, env = gate_case('fix-f7')
+        (folder / 'pool').mkdir(exist_ok=True)
+        lock = os.open(str(folder / 'pool' / 'pipeline-start.lock'), os.O_RDWR | os.O_CREAT, 0o600)
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        child, log = gate(folder, env, 'x', mode='exit-0')
+        time.sleep(2.6)
+        fcntl.flock(lock, fcntl.LOCK_UN); os.close(lock)
+        assert child.wait(timeout=30) == 0
+        queue = wakes(folder)
+        assert 'held for capacity before its CI fix agent starts, waited ' in queue and 'another start is registering' in queue, queue
+        assert 'run x (fm/x) admitted after ' in queue, queue
+
+    for name, body in (('F1 nested expanded start', nested_expanded), ('F2 identical sibling start', identical_sibling),
+                       ('F2 explicit reuse inside one admission', explicit_reuse), ('F2 second nested descendant', second_descendant),
+                       ('F3 start words as data', data_words), ('F4 daemon-started agent at ci:running', visible_agent),
+                       ('F5 gate killed at the pid handoff', handoff_kill), ('F6 grant after the hold bound', late_grant),
+                       ('F7 start-lock contention record', lock_contention_record)):
+        fix_case(name, body)
+    (root / 'fixround.json').write_text(json.dumps(fixround, indent=2))
+    print(json.dumps(dict(fixround=fixround)), flush=True)
+    assert all(value == 'pass' for value in fixround.values()), fixround
 
     print(json.dumps(dict(result='pass', spacing=dict(limit=SPACING_LIMIT, burst_gaps=[round(g, 3) for g in burst_gaps], burst_median=round(statistics.median(burst_gaps), 3), injected_gaps=[round(g, 3) for g in injected_gaps], injected_median=round(statistics.median(injected_gaps), 3), injected_rejection=injected_rejection), artifacts=str(root), native_cpu_count=os.cpu_count(), invocations=records)), flush=True)
 finally:

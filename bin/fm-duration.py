@@ -1511,7 +1511,7 @@ def main():
             engine = importlib.util.spec_from_file_location('fm_cpu_pass', ROOT / 'bin/fm-cpu-pass.py')
             cpu_pass = importlib.util.module_from_spec(engine)
             engine.loader.exec_module(cpu_pass)
-            fresh_pipeline = cpu_pass.fresh_pipeline_start(command) and not cpu_pass.already_admitted(command, os.environ)
+            fresh_pipeline = cpu_pass.fresh_pipeline_start(command)
         if fresh_pipeline and not args.pipeline_admitted:
             # Admission precedes run(), its absolute/progress clocks and samples.
             # The existing pool owns priority, native observations and the short
