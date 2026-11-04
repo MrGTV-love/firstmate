@@ -3612,7 +3612,7 @@ Changing `FM_SLACK_DM_USER` after the DM is established is refused with `dm_user
 A refused retarget changes nothing except the rows its read staged; those rows are delivered by the old owner's poll, and an empty journal alone never proves the old threads were read.
 `retarget` also refuses with `dm_user_changed_with_unread_requests` while the old DM still holds an owner request newer than its starting point that no poll has taken in; it only looks, and never takes a request in itself.
 An empty journal does not prove the old DM is drained, because a poll takes in at most the per-poll cap and further owner requests may still wait there.
-The poll also refuses a changed owner, so drain that work in this order: restore the old `FM_SLACK_DM_USER`, run `bin/fm-slack-poll.sh` until `retarget` accepts the change, set the new value, then run `disarm`, `retarget`, and `arm`.
+The poll also refuses a changed owner, so drain that work in this order: restore the old `FM_SLACK_DM_USER` and run `bin/fm-slack-poll.sh` with it, then set the new value, then run `disarm`, `retarget`, and `arm`.
 A poll can print nothing while work is still pending, so silence is not the signal.
 A `retarget` with the new value set that still refuses with `dm_user_changed_with_pending_work` or `dm_user_changed_with_unread_requests` means the old DM is not drained yet: restore the old value and poll again.
 If a pending row can never drain because its thread or channel is gone, the last resort is to run `bin/fm-slack-check.sh disarm`, check the pending rows in `state/slack-watch/state.json` by hand, and then remove `state/slack-watch/` to start a fresh DM.
@@ -3647,7 +3647,7 @@ The text is carried as labeled unverified data on one line, with controls and se
 A request reaches no record: it writes nothing outside `state/slack-watch/`, runs no repository script, and gives the captain-hold intake nothing.
 Firstmate handles the wake under `check-result-handling`.
 The starting point is the newest message in the DM when the DM is opened (by `arm`, or by a mirror or poll with an open call), or at the first poll of a plane armed before requests existed, which sets it before any other work uses the per-poll cap.
-Each `arm` starts again from the newest message, so a message typed before an arm is never taken in.
+Each `arm` starts again from the newest message, so a message typed before an arm is never taken in; when a request may still be waiting, run `bin/fm-slack-poll.sh` first.
 A new install first needs one app setting that the code cannot change: in the Firstmate Slack app's settings, App Home, Messages Tab, turn the Messages Tab on and allow users to send messages from it (while it is off, Slack itself refuses a message with "Sending messages to this app has been turned off.").
 Requests need no new scope or Slack method.
 A card that fits in 38,000 characters is posted whole; only an oversized card is budgeted, keeping short values whole and splitting the remaining space among the long ones, so every field heading, the option block, the answer line, and the tap-versus-type disagreement rule survive; the full decision remains in the local backlog.
