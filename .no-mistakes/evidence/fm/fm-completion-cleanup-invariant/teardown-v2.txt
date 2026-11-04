@@ -1,0 +1,4 @@
+ok - a detached copy with no pr= is judged landed through the record's branch (branch= or fm/<id>) and torn down
+ok - a detached copy holding a commit the merged PR lacks, or whose record branch matches a PR that lacks its work, is still refused and kept
+ok - a copy on a named branch is judged landed through that branch as before
+rc=0 elapsed=34s

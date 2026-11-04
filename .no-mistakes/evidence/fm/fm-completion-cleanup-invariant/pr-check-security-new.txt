@@ -1,0 +1,4 @@
+ok - fm-pr-check skips the named-head gate only for the forge's exact copy HEAD; a differing, failed, unreadable or unknown forge head still refuses
+test_named_head_gate_skips_only_an_exact_forge_head rc=0 elapsed=6s
+ok - a bare-URL done note with its copy gone is accepted only on the merge proof for its own PR
+test_bare_url_done_note_with_missing_copy_needs_a_merge_proof rc=0 elapsed=2s

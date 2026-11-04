@@ -1,0 +1,34 @@
+unregistered before housekeeping: record=open pr=none poll=none prune-record=none copy=present ledger=[]
+unregistered after supervision: record=gone pr=none poll=none prune-record=none copy=gone ledger=[task.status task.status task.pr_ready task.merged task.cleaned_up ]
+poll-never-published before housekeeping: record=open pr=https://github.com/acme/widget/pull/7 poll=none prune-record=none copy=present ledger=[]
+poll-never-published after supervision: record=gone pr=none poll=none prune-record=none copy=gone ledger=[task.status task.status task.pr_ready task.merged task.cleaned_up ]
+branch-pruned before housekeeping: record=open pr=none poll=none prune-record=none copy=present ledger=[]
+branch-pruned after supervision: record=gone pr=none poll=none prune-record=none copy=gone ledger=[task.status task.status task.pr_ready task.merged task.cleaned_up ]
+ok - a PR merged by another lane reaches its owning record: pr= from the done note (or the lost poll re-armed), the merge found at the forge, plain teardown, record, copy and poll gone, ledger shows merged and cleaned_up
+OPEN PR after supervision: record=open pr=https://github.com/acme/widget/pull/7 poll=armed prune-record=none copy=present ledger=[task.status task.status task.pr_ready ]
+CLOSED PR after supervision: record=open pr=https://github.com/acme/widget/pull/7 poll=armed prune-record=none copy=present ledger=[task.status task.status task.pr_ready ]
+ok - a PR that is open, or closed unmerged, leaves the record, the copy and the ledger as they were
+same lane: record=gone pr=none poll=none prune-record=none copy=gone ledger=[task.status task.status task.pr_ready task.merged task.cleaned_up ]
+ok - the same-lane path (fm-pr-check.sh, own-home fm-pr-merge.sh, prune) still ends pr_ready, merged, cleaned_up with the copy and record gone
+after the late teardown failure: record=open pr=https://github.com/acme/widget/pull/7 poll=none prune-record=none copy=present ledger=[task.status task.status task.pr_ready task.merged task.cleaned_up ]
+ok - a teardown that fails late keeps the merge-notified marker with the record, so the merge is reported once and the retry removes both
+after the late teardown failure before the merge report: record=open pr=https://github.com/acme/widget/pull/7 poll=armed prune-record=none copy=present ledger=[task.status task.status task.pr_ready task.cleaned_up ]
+ok - a teardown that fails late before the merge report keeps the poll with the record, so the merge is reported once and the retry removes both
+dirty: plain teardown exit 1; first refusal line: REFUSED: worktree /Users/charlesabrooker/tmp/fm-merge-prune.DYgm53/w9/th/pool1/1/repo has uncommitted changes.
+unlanded-commit: plain teardown exit 1; first refusal line: REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+conflicting-owner-pr-open: plain teardown exit 1; first refusal line: REFUSED: task t1's recorded copy /Users/charlesabrooker/tmp/fm-merge-prune.DYgm53/w11/th/pool1/1/repo was reassigned to task other-live, but its recorded PR is not confirmed merged and its own branch fm/t1 is not proved landed; its records stay in place.
+conflicting-owner-pr-merged: plain teardown exit 0; claimant copy=present claimant record=present
+ok - a merged cross-lane PR with a resolving branch, link and pr= never turns a changed file, an unlanded commit or a conflicting slot owner into a removal
+unlanded-commit: kept refusal: /Users/charlesabrooker/tmp/fm-merge-prune.DYgm53/w13/th/pool1/1/repo has 1 commit(s) on no remote
+unlanded_commit	firstmate	land this work through its PR, or obtain the captain's drop; plain bin/fm-teardown.sh t1 was refused: /Users/charlesabrooker/tmp/fm-merge-prune.DYgm53/w13/th/pool1/1/repo has 1 commit(s) on no remote; the owning home clears that cause and runs it again (dropping the work needs the captain's own words)
+dirty: kept refusal: REFUSED: worktree /Users/charlesabrooker/tmp/fm-merge-prune.DYgm53/w14/th/pool1/1/repo has uncommitted changes.
+pending_acceptance	home:firstmate	review and accept the delivered work of t1, or relaunch its worker with bin/fm-control.sh t1 relaunch if it is incomplete; plain bin/fm-teardown.sh t1 was refused: REFUSED: worktree /Users/charlesabrooker/tmp/fm-merge-prune.DYgm53/w14/th/pool1/1/repo has uncommitted changes.; the owning home clears that cause and runs it again (dropping the work needs the captain's own words)
+ok - a merged cross-lane PR whose copy still holds unlanded or changed work keeps the prune's refusal text on the task's ledger row
+task acceptance                                     cleanup                                        ledger row (category | owner | next action)
+A t1 PR 7 MERGED at the forge; ledger: merged       record gone, copy gone; ledger: cleaned_up     
+B t-b unaccepted: 1 unlanded commit, 1 uncommitted file none: record kept, copy kept                   missing_worker|t-b|firstmate|true|false|recover the assigned worker without discarding work;unlanded_commit|t-b|firstmate|false|false|land this work through its PR, or obtain the captain's drop
+C t-c wait intact: paused [at=1793775268]: waiting on Main decision d9 until 20 none: record kept                              
+D mate1 idle secondmate, silent 31h                    none: record kept                              
+E t-e review PASS by openai-codex/gpt-6.1-sol at head 1bb89049; PR 9 open at the forge none: record kept, pending merge               review_pass_not_merged|https://github.com/acme/widget/pull/9|firstmate|true|false|merge through bin/fm-pr-merge.sh under AGENTS.md section 7
+ok - five records survive silence, a restart and a completed review: A closed from the other lane's merge, B/C/D untouched and not stranded, E pending its merge with the review on record
+rc=0 elapsed=339s

@@ -1,0 +1,35 @@
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.5ZvVae
+real tmux on lab socket (TMUX_TMPDIR=/tmp/fml.z0xS3p):
+  fm-f3-down
+  fm-f3-norun
+  fm-f3-uninit
+  fm-f3-unreadable
+
+== real bin/fm-crew-state.sh per task
+f3-down        state: blocked · source: status-log · the no-mistakes run for this copy could not be read, so its verification-plan evidence is unavailable
+f3-norun       state: blocked · source: status-log · the no-mistakes run for this copy could not be read, so its verification-plan evidence is unavailable
+f3-uninit      state: blocked · source: status-log · the no-mistakes run for this copy could not be read, so its verification-plan evidence is unavailable
+f3-unreadable  state: blocked · source: status-log · the no-mistakes run for this copy could not be read, so its verification-plan evidence is unavailable
+
+== real bin/fm-open-loops.sh --json (rows for the f3-* tasks)
+open-loops rc=0
+  f3-down        category=silent_report owner=firstmate informational=True | check in: progress, blockers, cross-workstream dependencies
+  f3-norun       category=silent_report owner=firstmate informational=True | check in: progress, blockers, cross-workstream dependencies
+  f3-uninit      category=silent_report owner=firstmate informational=True | check in: progress, blockers, cross-workstream dependencies
+  f3-unreadable  category=silent_report owner=firstmate informational=True | check in: progress, blockers, cross-workstream dependencies
+degraded sources: none
+F3 CHAIN RESULT: FAIL
+
+== fake no-mistakes calls (mode, args)
+   4 down axi status
+   4 norun axi status
+   4 uninit axi status
+   4 unreadable axi status
+== forge double calls
+   1 api -i repos/test/project/pulls/21
+   1 api -i repos/test/project/pulls/22
+   1 api -i repos/test/project/pulls/23
+   1 api -i repos/test/project/pulls/24
+   1 api -i repos/test/project/pulls?state=open&per_page=100
+== teardown
+lab removed: /Users/charlesabrooker/tmp/fm-lab.5ZvVae

@@ -1,0 +1,28 @@
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.5z3Hw7
+real tmux on lab socket (TMUX_TMPDIR=/tmp/fml.9wG0Zu):
+  fm-f3-down
+  fm-f3-norun
+  fm-f3-uninit
+  fm-f3-unreadable
+
+== real bin/fm-crew-state.sh per task
+f3-down        state: unknown · source: run-step · run inventory unavailable; run id: 
+f3-norun       state: unknown · source: run-step · run inventory unavailable; run id: 
+f3-uninit      state: blocked · source: status-log · no no-mistakes run exists for this copy, so its verification-plan evidence is unavailable
+f3-unreadable  state: unknown · source: run-step · run inventory unavailable; run id: 
+
+== real bin/fm-open-loops.sh --json (rows for the f3-* tasks)
+open-loops rc=0
+  f3-down        category=pending_cleanup owner=home:firstmate informational=None | run plain bin/fm-teardown.sh f3-down; the record stays open until it succeeds
+  f3-down        category=silent_report owner=firstmate informational=True | check in: progress, blockers, cross-workstream dependencies
+  f3-norun       category=pending_cleanup owner=home:firstmate informational=None | run plain bin/fm-teardown.sh f3-norun; the record stays open until it succeeds
+  f3-norun       category=silent_report owner=firstmate informational=True | check in: progress, blockers, cross-workstream dependencies
+  f3-uninit      category=pending_acceptance owner=firstmate informational=None | resolve the refused done claim of f3-uninit: no no-mistakes run exists for this copy, so its verification-plan evidence is unavailable
+  f3-uninit      category=silent_report owner=firstmate informational=True | check in: progress, blockers, cross-workstream dependencies
+  f3-unreadable  category=pending_cleanup owner=home:firstmate informational=None | run plain bin/fm-teardown.sh f3-unreadable; the record stays open until it succeeds
+  f3-unreadable  category=silent_report owner=firstmate informational=True | check in: progress, blockers, cross-workstream dependencies
+degraded sources: none
+F3 CHAIN RESULT: FAIL
+
+== teardown
+lab removed: /Users/charlesabrooker/tmp/fm-lab.5z3Hw7

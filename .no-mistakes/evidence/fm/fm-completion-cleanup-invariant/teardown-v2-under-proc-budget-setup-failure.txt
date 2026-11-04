@@ -1,0 +1,25 @@
+fatal: not a git repository (or any of the parent directories): .git
+touch: /Users/charlesabrooker/tmp/fm-teardown-tests.9bNbRi/detached-landed-default-branch/state/.last-watcher-beat: No such file or directory
+tests/lib.sh: line 1506: /Users/charlesabrooker/tmp/fm-teardown-tests.9bNbRi/detached-landed-default-branch/state/task-x1.meta: No such file or directory
+tests/lib.sh: line 1508: /Users/charlesabrooker/tmp/fm-teardown-tests.9bNbRi/detached-landed-default-branch/state/task-x1.meta: No such file or directory
+tests/lib.sh: line 1508: /Users/charlesabrooker/tmp/fm-teardown-tests.9bNbRi/detached-landed-default-branch/state/task-x1.meta: No such file or directory
+tests/lib.sh: line 1508: /Users/charlesabrooker/tmp/fm-teardown-tests.9bNbRi/detached-landed-default-branch/state/task-x1.meta: No such file or directory
+tests/lib.sh: line 1508: /Users/charlesabrooker/tmp/fm-teardown-tests.9bNbRi/detached-landed-default-branch/state/task-x1.meta: No such file or directory
+tests/lib.sh: line 1508: /Users/charlesabrooker/tmp/fm-teardown-tests.9bNbRi/detached-landed-default-branch/state/task-x1.meta: No such file or directory
+tests/lib.sh: line 1508: /Users/charlesabrooker/tmp/fm-teardown-tests.9bNbRi/detached-landed-default-branch/state/task-x1.meta: No such file or directory
+tests/lib.sh: line 1508: /Users/charlesabrooker/tmp/fm-teardown-tests.9bNbRi/detached-landed-default-branch/state/task-x1.meta: No such file or directory
+tests/fm-teardown-helpers.sh: line 364: /Users/charlesabrooker/tmp/fm-teardown-tests.9bNbRi/detached-landed-default-branch/wt/feature.txt: No such file or directory
+fatal: cannot change to '/Users/charlesabrooker/tmp/fm-teardown-tests.9bNbRi/detached-landed-default-branch/wt': No such file or directory
+fatal: cannot change to '/Users/charlesabrooker/tmp/fm-teardown-tests.9bNbRi/detached-landed-default-branch/wt': No such file or directory
+fatal: cannot change to '/Users/charlesabrooker/tmp/fm-teardown-tests.9bNbRi/detached-landed-default-branch/wt': No such file or directory
+tests/fm-teardown-helpers.sh: line 388: /Users/charlesabrooker/tmp/fm-teardown-tests.9bNbRi/detached-landed-default-branch/fakebin/gh-axi: No such file or directory
+tests/fm-teardown-helpers.sh: line 398: /Users/charlesabrooker/tmp/fm-teardown-tests.9bNbRi/detached-landed-default-branch/fakebin/gh: No such file or directory
+chmod: /Users/charlesabrooker/tmp/fm-teardown-tests.9bNbRi/detached-landed-default-branch/fakebin/gh-axi: No such file or directory
+chmod: /Users/charlesabrooker/tmp/fm-teardown-tests.9bNbRi/detached-landed-default-branch/fakebin/gh: No such file or directory
+tests/fm-teardown.test.sh: line 519: /Users/charlesabrooker/tmp/fm-teardown-tests.9bNbRi/detached-landed-default-branch/fakebin/gh-axi: No such file or directory
+chmod: /Users/charlesabrooker/tmp/fm-teardown-tests.9bNbRi/detached-landed-default-branch/fakebin/gh-axi: No such file or directory
+fatal: cannot change to '/Users/charlesabrooker/tmp/fm-teardown-tests.9bNbRi/detached-landed-default-branch/wt': No such file or directory
+fatal: cannot change to '/Users/charlesabrooker/tmp/fm-teardown-tests.9bNbRi/detached-landed-default-branch/project': No such file or directory
+fatal: cannot change to '/Users/charlesabrooker/tmp/fm-teardown-tests.9bNbRi/detached-landed-default-branch/wt': No such file or directory
+not ok - default-branch: the copy is not detached
+rc=1 elapsed=3s
