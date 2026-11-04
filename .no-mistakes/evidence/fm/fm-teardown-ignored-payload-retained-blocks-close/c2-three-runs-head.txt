@@ -1,0 +1,33 @@
+teardown under test: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6KD5RFFHFKYJB9WJVF4WVWX/bin/fm-teardown.sh
+--- run 1 (slot cannot be leased): exit=1 driver-calls=1 tars=1 saved-outputs=0 task-record=present copy=present
+<case>/stderr:teardown: Vernant's closeout driver kept own nested copy <case>/pool/1/project/.claude/worktrees/fc-one; its ignored files are verified byte for byte in <case>/data/task-x1/nested-copy-preserved/197357c31b57b957db06417d29e11d4391f3f0806bb13f83d88d2339355029fa and the copy is untouched (record <case>/data/copy-sweep/retained/197357c31b57b957db06417d29e11d4391f3f0806bb13f83d88d2339355029fa)
+<case>/stderr:REFUSED: pool slot <case>/pool/1/project could not be durably leased, and a close that keeps own nested copy <case>/pool/1/project/.claude/worktrees/fc-one never leaves its slot without a durable lease, since a later treehouse get could reset it over the copy; the copy, the slot and the retained record stay as they are, and a retry asks the driver nothing.
+--- run 2 (copy unchanged): exit=1 driver-calls=1 tars=1 saved-outputs=0 task-record=present copy=present
+<case>/stderr:REFUSED: pool slot <case>/pool/1/project could not be durably leased, and a held close never leaves a pool slot without a durable lease, since a later treehouse get could reset it over the foreign copies it holds; nothing was removed.
+--- run 3 (one more unique ignored file): exit=1 driver-calls=2 tars=2 saved-outputs=0 task-record=present copy=present
+<case>/stderr:teardown: Vernant's closeout driver kept own nested copy <case>/pool/1/project/.claude/worktrees/fc-one; its ignored files are verified byte for byte in <case>/data/task-x1/nested-copy-preserved/197357c31b57b957db06417d29e11d4391f3f0806bb13f83d88d2339355029fa and the copy is untouched (record <case>/data/copy-sweep/retained/197357c31b57b957db06417d29e11d4391f3f0806bb13f83d88d2339355029fa)
+<case>/stderr:REFUSED: pool slot <case>/pool/1/project could not be durably leased, and a close that keeps own nested copy <case>/pool/1/project/.claude/worktrees/fc-one never leaves its slot without a durable lease, since a later treehouse get could reset it over the copy; the copy, the slot and the retained record stay as they are, and a retry asks the driver nothing.
+--- run 4 (lease available, copy unchanged since run 3): exit=0 driver-calls=2 tars=2 saved-outputs=0 task-record=gone copy=present
+<case>/stdout:notice: own nested copy <case>/pool/1/project/.claude/worktrees/fc-one was kept by Vernant's closeout driver and stays untouched in pool slot <case>/pool/1/project under a durable lease; its ignored files are verified byte for byte in <case>/data/task-x1/nested-copy-preserved/197357c31b57b957db06417d29e11d4391f3f0806bb13f83d88d2339355029fa and it is recorded in <case>/data/copy-sweep/retained/197357c31b57b957db06417d29e11d4391f3f0806bb13f83d88d2339355029fa.
+<case>/stdout:notice: no command removes a creation-locked retained copy today: its release depends on Vernant's closeout driver (owner: the Vernant lane, through Main), and the driver's --execute-cleanup only writes another archive and keeps the tree, so do not run it for this copy; nothing returns the slot automatically.
+<case>/stdout:teardown task-x1 complete (window firstmate:fm-task-x1; the task's own work is landed and its record is closed, but own nested copy <case>/pool/1/project/.claude/worktrees/fc-one was kept by Vernant's closeout driver and stays untouched in pool slot <case>/pool/1/project, reserved under a durable lease and unreturned; retained record: <case>/data/copy-sweep/retained/197357c31b57b957db06417d29e11d4391f3f0806bb13f83d88d2339355029fa)
+<case>/stdout:Backlog: task-x1 is closed in <case>/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+<case>/stderr:teardown: own nested copy <case>/pool/1/project/.claude/worktrees/fc-one is unchanged since the driver kept it (record <case>/data/copy-sweep/retained/197357c31b57b957db06417d29e11d4391f3f0806bb13f83d88d2339355029fa); the driver was not asked again
+--- retained record (present):
+lock-sha256=5abffb3a5cc5f6b983b0be633d8682684043df7ec800a6581671410a240e65dc
+copy=<case>/pool/1/project/.claude/worktrees/fc-one
+identity=1235543116:1793807958
+the closeout driver kept this copy (exit 3, cleanup_ignored_payload_archived_tree_retained); task task-x1 verified its ignored payload byte for byte in <case>/data/task-x1/nested-copy-preserved/197357c31b57b957db06417d29e11d4391f3f0806bb13f83d88d2339355029fa; the copy and its pool slot stay untouched and leased until a person decides their removal, which depends on Vernant's driver
+task=task-x1
+slot=<case>/pool/1/project
+preserve=<case>/data/task-x1/nested-copy-preserved/197357c31b57b957db06417d29e11d4391f3f0806bb13f83d88d2339355029fa
+reason=cleanup_ignored_payload_archived_tree_retained
+closed-at=2026-11-04T16:00:17Z
+head=671b3c9868b9c0679951fd69d086e5c26f45f634
+status-sha256=01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b
+payload-sha256=4fe3e56dc234f6b3c57df7ae778cf965cc76ed298f9f94adacf55556ccca647e
+unique=.claude/channel-outbox/a.jsonl
+unique=.claude/channel-outbox/b.jsonl
+unique=.claude/channel-outbox/c.jsonl
+--- backlog row: done
+--- slot lease file unchanged: no; pool return ran: no

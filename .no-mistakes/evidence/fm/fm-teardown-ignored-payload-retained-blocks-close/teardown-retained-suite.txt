@@ -1,0 +1,5 @@
+ok - a landed task whose own copy the driver keeps closes: the copy, the slot and its lease are untouched, the ignored files are verified byte for byte, and one record names the copy
+ok - a retry of an unchanged kept copy makes no driver call, writes no tar, no saved output and no second record, and closes once the slot can be leased
+ok - a kept-copy close in a slot a peer still works in refuses with the copy and its record named, and its retry asks the driver nothing
+ok - a kept copy whose adopted ignored bytes changed refuses before the driver on every retry, with no tar and no saved output, whether or not preservation selects other files
+ok - a kept copy whose ignored files, tracked status or HEAD changed is assessed afresh: still-eligible goes to the driver again, failing a proof refuses before any driver call

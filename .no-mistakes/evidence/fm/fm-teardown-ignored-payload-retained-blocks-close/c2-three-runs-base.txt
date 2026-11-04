@@ -1,0 +1,12 @@
+teardown under test: /tmp/fm-live-drive/base/bin/fm-teardown.sh
+--- run 1 (slot cannot be leased): exit=1 driver-calls=1 tars=1 saved-outputs=1 task-record=present copy=present
+<case>/stderr:REFUSED: Vernant's closeout driver did not release own nested copy <case>/pool/1/project/.claude/worktrees/fc-one (exit 3): full output: <case>/data/task-x1/vernant-closeout.Bkoc1G
+--- run 2 (copy unchanged): exit=1 driver-calls=2 tars=2 saved-outputs=2 task-record=present copy=present
+<case>/stderr:REFUSED: Vernant's closeout driver did not release own nested copy <case>/pool/1/project/.claude/worktrees/fc-one (exit 3): full output: <case>/data/task-x1/vernant-closeout.0LzF21
+--- run 3 (one more unique ignored file): exit=1 driver-calls=3 tars=3 saved-outputs=3 task-record=present copy=present
+<case>/stderr:REFUSED: Vernant's closeout driver did not release own nested copy <case>/pool/1/project/.claude/worktrees/fc-one (exit 3): full output: <case>/data/task-x1/vernant-closeout.uohYuq
+--- run 4 (lease available, copy unchanged since run 3): exit=1 driver-calls=4 tars=4 saved-outputs=4 task-record=present copy=present
+<case>/stderr:REFUSED: Vernant's closeout driver did not release own nested copy <case>/pool/1/project/.claude/worktrees/fc-one (exit 3): full output: <case>/data/task-x1/vernant-closeout.6aoHOj
+--- retained record (absent):
+--- backlog row: in_flight
+--- slot lease file unchanged: no; pool return ran: no

@@ -1,0 +1,24 @@
+teardown: exit=0 driver-calls=1 tars=1
+sweep report: exit=0 driver-calls=1 tars=1 record-unchanged=yes copy-intact=yes
+copy-sweep: mode=report containers=1 copies=1
+HELD-LOCKED	0.00 GiB	<case>/pool/1/project/.claude/worktrees/fc-one	driver retained this copy: the closeout driver kept this copy (exit 3, cleanup_ignored_payload_archived_tree_retained); task task-x1 verified its ignored payload byte for byte in <case>/data/task-x1/nested-copy-preserved/92a05d9cadd4426f5373048dcbe4038acee9d265ff802a76974078ff66d15390; the copy and its pool slot stay untouched and
+summary: HELD-LOCKED=1
+budget pool <case>/pool: 0.00 GiB of 60 GiB, ok
+budget container <case>/pool/1/project: 0.00 GiB of 20 GiB, ok
+regenerable: 0.00 GiB in 0 proven copies, 0 proven copies not sized
+sweep --apply: exit=0 driver-calls=1 tars=1 record-unchanged=yes copy-intact=yes
+copy-sweep: mode=apply containers=1 copies=1
+HELD-LOCKED	0.00 GiB	<case>/pool/1/project/.claude/worktrees/fc-one	driver retained this copy: the closeout driver kept this copy (exit 3, cleanup_ignored_payload_archived_tree_retained); task task-x1 verified its ignored payload byte for byte in <case>/data/task-x1/nested-copy-preserved/92a05d9cadd4426f5373048dcbe4038acee9d265ff802a76974078ff66d15390; the copy and its pool slot stay untouched and
+summary: HELD-LOCKED=1
+budget pool <case>/pool: 0.00 GiB of 60 GiB, ok
+budget container <case>/pool/1/project: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.00 reaped=0 freed=0.00
+sweep --apply: exit=0 driver-calls=1 tars=1 record-unchanged=yes copy-intact=yes
+copy-sweep: mode=apply containers=1 copies=1
+HELD-LOCKED	0.00 GiB	<case>/pool/1/project/.claude/worktrees/fc-one	driver retained this copy: the closeout driver kept this copy (exit 3, cleanup_ignored_payload_archived_tree_retained); task task-x1 verified its ignored payload byte for byte in <case>/data/task-x1/nested-copy-preserved/92a05d9cadd4426f5373048dcbe4038acee9d265ff802a76974078ff66d15390; the copy and its pool slot stay untouched and
+summary: HELD-LOCKED=1
+budget pool <case>/pool: 0.00 GiB of 60 GiB, ok
+budget container <case>/pool/1/project: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.00 reaped=0 freed=0.00

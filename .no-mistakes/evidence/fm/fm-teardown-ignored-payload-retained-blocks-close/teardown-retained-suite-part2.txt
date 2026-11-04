@@ -1,0 +1,5 @@
+ok - each other state of an own copy the driver keeps refuses with its cause and the same disposition with and without --force, and the clean input closes the same way with --force
+ok - a kept copy refused after the driver for another repository, a gone or escaping driver-named path, or a forced unlanded or dirty copy asks the driver once across two retries
+ok - a refused kept copy that changed, or whose cause no longer holds, goes to the driver again, and its refusal record goes
+ok - a driver that names 600 derived files as unique still closes the task, with every one verified byte for byte, copied into the preserve and listed once in the record
+rc=0

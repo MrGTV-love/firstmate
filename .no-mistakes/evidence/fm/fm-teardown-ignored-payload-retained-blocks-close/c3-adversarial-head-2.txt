@@ -1,0 +1,9 @@
+A: exit=0
+A: copy a.jsonl    sha256 7f8b1dfc466b6249 bytes=changed
+A: preserve a.jsonl sha256 7f8b1dfc466b6249 bytes=changed
+E forced unlanded run 1: exit=1 driver-calls=1 tars=1 saved-outputs=1 refusal-record=present task-record=present copy=present
+REFUSED: Vernant's closeout driver did not release own nested copy <case>/pool/1/project/.claude/worktrees/fc-one (exit 3): full output: <case>/data/task-x1/vernant-closeout.JgejFI
+E forced unlanded run 2: exit=1 driver-calls=1 tars=1 saved-outputs=1 refusal-record=present task-record=present copy=present
+REFUSED: own nested copy <case>/pool/1/project/.claude/worktrees/fc-one is unchanged since Vernant's closeout driver last kept it and teardown refused it: the copy is not proved landed and clean (record <case>/data/task-x1/closeout-refused/2c111708e2bf3722f76db27958484cc4f6b90a7bec5ddcfcb3ee6fc5faee
+E forced unlanded run 3: exit=1 driver-calls=1 tars=1 saved-outputs=1 refusal-record=present task-record=present copy=present
+REFUSED: own nested copy <case>/pool/1/project/.claude/worktrees/fc-one is unchanged since Vernant's closeout driver last kept it and teardown refused it: the copy is not proved landed and clean (record <case>/data/task-x1/closeout-refused/2c111708e2bf3722f76db27958484cc4f6b90a7bec5ddcfcb3ee6fc5faee

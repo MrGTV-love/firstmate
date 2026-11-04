@@ -1,0 +1,12 @@
+== lease record before the close:
+{"worktrees":[{"name":"1","path":"<case>/pool/1/project","leased":true,"lease_holder":"task-x1"}]}
+== close: exit=0 driver-calls=1 tars=1
+== lease record after the close:
+{"worktrees":[{"name":"1","path":"<case>/pool/1/project","leased":true,"lease_holder":"task-x1"}]}
+== slot claim after the close:
+task=task-x1
+home=<case>/home
+== teardown again for the closed task: exit=1 driver-calls=1 tars=1 record=present
+-- stdout:
+-- stderr:
+error: teardown refused: task record is not a regular file at <case>/state/task-x1.meta

@@ -1,0 +1,8 @@
+--- A: driver-named file a.jsonl changed after the preserve, run 1: exit=0 driver-calls=1 tars=1 task-record=gone copy=present retained-record=present backlog=done pool-return=none
+--- A: retry (copy unchanged since run 1): exit=1 driver-calls=1 tars=1 task-record=gone copy=present retained-record=present backlog=done pool-return=none
+--- D: copy has an unlanded content commit: exit=1 driver-calls=0 tars=0 task-record=present copy=present retained-record=absent backlog=in_flight pool-return=none
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+--- E: same copy, retry with --force --drop-file: exit=1 driver-calls=1 tars=1 task-record=present copy=present retained-record=absent backlog=in_flight pool-return=none
+REFUSED: returning pool slot <case>/pool/1/project would sweep away task task-x1's recorded prior_worktree <case>/pool/1/project/.claude/worktrees/fc-one, whose HEAD fe88b09947c47d3dac32f81a474f2c1f1a223b9d is neither landed nor held by a refs/fm/anchor/task-x1-<sha> preservation anchor; earlier cleanup steps already ran, but nothing was removed and the slot keeps its contents; --force does not waive this proof.
+REFUSED: Vernant's closeout driver did not release own nested copy <case>/pool/1/project/.claude/worktrees/fc-one (exit 3): full output: <case>/data/task-x1/vernant-closeout.v15M89
+--- G (probe): copy with one EMPTY commit not on the remote: exit=0 driver-calls=1 tars=1 task-record=gone copy=present retained-record=present backlog=done pool-return=none

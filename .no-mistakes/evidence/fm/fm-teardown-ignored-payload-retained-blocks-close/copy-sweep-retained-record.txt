@@ -1,0 +1,2 @@
+ok - a teardown-written retained record keeps the sweep from executing, preserving or removing the copy, shows one line as the hold reason, and is cleared with the copy
+rc=0
