@@ -648,6 +648,8 @@ case "\${1:-}" in
     jq -cn --arg h "$PROTECTED_HOLDER" '{schema_version:2,version:"v-fake",persistent_recovered_leases:true,recovered_quarantine_holder:\$h}'
     ;;
   status)
+    printf '%s\n' "\${TREEHOUSE_NO_UPDATE_CHECK:-unset}" >> "$CASE_DIR/status-update-check"
+    if IFS= read -r _; then printf 'stdin had data\n' >> "$CASE_DIR/status-stdin"; fi
     if [ "$mode" = adopting ]; then
       jq --arg old "$OLD_RECOVERED" --arg h "$PROTECTED_HOLDER" \
         '.worktrees |= map(if .leased == true and .lease_holder == \$old then .lease_holder = \$h else . end)' \
@@ -727,14 +729,17 @@ test_old_holder_is_adopted_and_old_session_exit_cannot_sweep() {
       assert_quarantine_intact "$timing: exit after the adopting status"
       : > "$CASE_DIR/treehouse-calls"
     fi
+    rm -f "$CASE_DIR/status-update-check" "$CASE_DIR/status-stdin"
     rc=0
-    out=$(run_retained_spawn "$name") || rc=$?
+    out=$(unset TREEHOUSE_NO_UPDATE_CHECK; run_retained_spawn "$name") || rc=$?
     expect_code 0 "$rc" "$timing: the spawn beside an adopted recovered slot failed"$'\n'"$out"
     assert_contains "$out" "spawned new-$name" "$timing: spawn did not launch"
     assert_grep "task=new-$name" "$CASE_DIR/pool/2/.fm-slot-owner" "$timing: spawn did not claim the free slot"
     [ ! -e "$CASE_DIR/treehouse-forbidden" ] || fail "$timing: the guard ran a lease, get or return: $(cat "$CASE_DIR/treehouse-calls")"
     if [ "$timing" = after ]; then
       assert_equals 1 "$(grep -c '^status' "$CASE_DIR/treehouse-calls")" "$timing: the guard did not adopt by exactly one status: $(cat "$CASE_DIR/treehouse-calls")"
+      assert_equals 1 "$(cat "$CASE_DIR/status-update-check")" "$timing: the adopting status ran with the update check on"
+      assert_absent "$CASE_DIR/status-stdin" "$timing: the adopting status did not get EOF stdin"
     else
       ! grep -q '^status' "$CASE_DIR/treehouse-calls" || fail "$timing: the guard ran status for an entry already on the protected holder"
     fi

@@ -4060,12 +4060,69 @@ test_unclaimed_release_concludes_runs_and_agents_on_the_slot() {
   pass 'the unclaimed-slot route aborts the parked run and retires the launch agent rooted in the slot before it returns the slot'
 }
 
+# The retirement runs ahead of the custody walk, so a root the read-only checks do
+# not show as this task's alone keeps its parked run and launch agent, and the walk
+# then refuses by name. Another task's copy may be in the slot, or the entry may
+# bind the root to nothing.
+test_unclaimed_refusal_leaves_runs_and_agents_on_the_slot() {
+  local provider shape kind cond case_dir out rc label agent_root slot_head
+  unc_providers "unclaimed-route refusal retirement on the real provider"
+  for provider in "${UNC_PROVIDERS[@]}"; do
+    for shape in ordinary:other-copy recovered:other-copy ordinary:other-record-prior ordinary:stray-repo ordinary:duplicate-entry ordinary:unreadable-state ordinary:legacy-lease; do
+      kind=${shape%%:*}
+      cond=${shape#*:}
+      unc_pool_case "unclaimed-keep-$kind-$cond" "$kind" "$provider" || fail "$provider $shape: cannot build the pool"
+      case_dir=$UNC_CASE
+      add_fake_launchctl "$case_dir"
+      agent_root="$UNC_A/.claude/nm/h"
+      mkdir -p "$agent_root"
+      git -C "$UNC_A" checkout -q fm/task-x1
+      label="$NM_AGENT_PREFIX.5107aa13"
+      add_nm_launch_agent "$case_dir" 5107aa13 "$agent_root"
+      : > "$case_dir/launchctl-loaded/$label"
+      slot_head=$(git -C "$UNC_A" rev-parse HEAD)
+      case "$cond" in
+        other-copy)
+          git -C "$case_dir/project" worktree add -q -b other-task "$UNC_A/.claude/worktrees/other" main
+          fm_write_meta "$case_dir/state/other.meta" "window=firstmate:fm-other" "endpoint_task_id=other" \
+            "worktree=$UNC_A/.claude/worktrees/other" "project=$case_dir/project" "kind=ship" "mode=no-mistakes" "spawn_gen=other"
+          ;;
+        other-record-prior)
+          fm_write_meta "$case_dir/state/other.meta" "window=firstmate:fm-other" "endpoint_task_id=other" \
+            "worktree=$case_dir/project" "prior_worktree=$UNC_A/.claude/nm" "project=$case_dir/project" \
+            "kind=ship" "mode=no-mistakes" "spawn_gen=other"
+          ;;
+        stray-repo) git clone -q "$case_dir/origin.git" "$UNC_A/.claude/worktrees/stray" ;;
+        duplicate-entry)
+          jq --arg p "$UNC_A" '.worktrees += [(.worktrees[] | select(.path == $p) | .name = "9")]' "$UNC_STATE" > "$UNC_STATE.tmp" && mv "$UNC_STATE.tmp" "$UNC_STATE"
+          ;;
+        unreadable-state) printf '{"worktrees":[{"name":"1"\n' > "$UNC_STATE" ;;
+        legacy-lease)
+          jq --arg p "$UNC_A" '(.worktrees[] | select(.path == $p)) |= del(.lease_id)' "$UNC_STATE" > "$UNC_STATE.tmp" && mv "$UNC_STATE.tmp" "$UNC_STATE"
+          ;;
+      esac
+      rc=0
+      out=$(FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+        FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$slot_head")" \
+        unc_run_teardown "$case_dir") || rc=$?
+      [ "$rc" -ne 0 ] || fail "$provider $shape: teardown completed although the slot must not be returned"$'\n'"$out"
+      assert_present "$case_dir/state/task-x1.meta" "$provider $shape: the task record was retired"
+      assert_no_grep 'bootout' "$case_dir/launchctl-calls" "$provider $shape: the launch agent rooted in the slot was unloaded before the refusal"
+      assert_present "$case_dir/launchagents/$label.plist" "$provider $shape: the launch agent plist was moved before the refusal"
+      assert_present "$case_dir/launchctl-loaded/$label" "$provider $shape: the launch agent was unloaded before the refusal"
+      [ ! -s "$case_dir/nm-abort.log" ] || fail "$provider $shape: the run parked in the slot was aborted before the refusal: $(cat "$case_dir/nm-abort.log")"
+    done
+  done
+  pass 'a slot root the read-only checks do not show as this task alone keeps its parked run and launch agent while the custody walk refuses'
+}
+
 teardown_test_cases=(
 test_unclaimed_enclosing_slot_is_released_by_exact_conditional_return
 test_unclaimed_release_interruptions_converge_and_never_clear_a_successor
 test_unclaimed_release_refuses_each_custody_condition
 test_unclaimed_slot_on_unproven_provider_stays_inert
 test_unclaimed_release_concludes_runs_and_agents_on_the_slot
+test_unclaimed_refusal_leaves_runs_and_agents_on_the_slot
 test_vernant_slot_manifest_retirement
 test_shared_project_lock_path_ignores_unresolvable_git_directory_in_cwd
 test_shared_slot_claim_release_survives_endpoint_refusal_and_bootstrap

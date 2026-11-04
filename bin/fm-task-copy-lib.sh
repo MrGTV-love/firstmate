@@ -828,7 +828,7 @@ fm_task_copy_current_pool_listing() {  # <project>
     return
   done
   if command -v treehouse >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
-    json=$(cd "$project" 2>/dev/null && treehouse status --json </dev/null 2>/dev/null) \
+    json=$(cd "$project" 2>/dev/null && TREEHOUSE_NO_UPDATE_CHECK=1 treehouse status --json </dev/null 2>/dev/null) \
       && jq -e 'type == "array"' <<<"$json" >/dev/null 2>&1 || json=
   fi
   FM_TASK_COPY_POOL_LISTING_PROJECTS+=("$project")

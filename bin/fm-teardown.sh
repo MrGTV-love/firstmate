@@ -4513,10 +4513,46 @@ teardown_unclaimed_read_lease() {  # bind | verify
     || { teardown_unclaimed_note "its lease changed (holder, lease id, or entry) since the checks, so a successor may hold it"; return 1; }
 }
 
+# The first Git repository under <slot>, ignored paths included, other than the
+# slot's own .git and whatever lies inside <own-copy>; empty when there is none.
+# Fails when the scan cannot complete.
+teardown_slot_other_repo() {  # <slot> [<own-copy>...]
+  local slot=$1 copy repos
+  local -a own=()
+  shift
+  for copy in "$@"; do
+    [ ! -e "$copy" ] || own+=(-o \( -samefile "$copy" -prune \))
+  done
+  repos=$(find -P "$slot" -mindepth 1 \( -path "$slot/.git" -prune \) ${own[@]+"${own[@]}"} -o \( -name .git -prune -print \) 2>/dev/null) || return 1
+  printf '%s\n' "${repos%%$'\n'*}"
+}
+
+# Whether read-only checks already show this task alone holds the planned slot's
+# root, so the root's parked run and launch agents are this task's to retire. They
+# are retired before project custody, ahead of the strict walk, so nothing bound
+# only by the walk may be touched: the entry must be this task's lease or a
+# recovered quarantine, and no peer, other record, or other Git repository may be
+# in the slot. Any failure leaves the root alone, and the walk then refuses by name.
+teardown_unclaimed_root_is_own() {
+  local slot=$TEARDOWN_UNCLAIMED_SLOT current prior repo
+  local -a own=()
+  fm_task_copy_pool_slot_lease "$slot" || return 1
+  [ "$FM_TASK_COPY_LEASE_STATE" = recovered ] || [ "$FM_TASK_COPY_LEASE_HOLDER" = "$ID" ] || return 1
+  ( teardown_slot_peers_detect "$slot"; [ "${#TEARDOWN_PEER_IDS[@]}" -eq 0 ] ) || return 1
+  ( require_exclusive_worktree_slot_record "$META" "$ID" "$STATE" "$slot" ) >/dev/null 2>&1 || return 1
+  if current=$(fm_task_copy_canonical_dir "$WT"); then
+    own+=("$current")
+  fi
+  while IFS= read -r prior; do
+    own+=("$prior")
+  done < <(fm_task_copy_priors_inside "$META" "$slot")
+  repo=$(teardown_slot_other_repo "$slot" ${own[@]+"${own[@]}"}) && [ -z "$repo" ]
+}
+
 # The strict custody walk and the root checks, repeated before each decision.
 teardown_unclaimed_prove_custody() {
-  local slot=$TEARDOWN_UNCLAIMED_SLOT current prior_real known copy pids changes change repos repo rc
-  local -a proofs=() own=()
+  local slot=$TEARDOWN_UNCLAIMED_SLOT current prior_real known copy pids changes change repo
+  local -a proofs=()
   fm_treehouse_slot_owner_state "$slot" "$ID"
   [ "$FM_TREEHOUSE_SLOT_OWNER" = absent ] \
     || { teardown_unclaimed_note "its slot claim is '$FM_TREEHOUSE_SLOT_OWNER', not absent"; return 1; }
@@ -4588,16 +4624,10 @@ teardown_unclaimed_prove_custody() {
     done
     [ "$known" = 1 ] || { teardown_unclaimed_note "its root holds changes that are not this task's own copies: ${change:3}"; return 1; }
   done <<< "$changes"
-  for copy in ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}; do
-    [ ! -e "$copy" ] || own+=(-o \( -samefile "$copy" -prune \))
-  done
-  rc=0
-  repos=$(find -P "$slot" -mindepth 1 \( -path "$slot/.git" -prune \) ${own[@]+"${own[@]}"} -o \( -name .git -prune -print \) 2>/dev/null) || rc=$?
-  if [ "$rc" -ne 0 ]; then
+  if ! repo=$(teardown_slot_other_repo "$slot" ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}); then
     teardown_unclaimed_note "its root could not be scanned for other Git repositories"
     return 1
   fi
-  repo=${repos%%$'\n'*}
   [ -z "$repo" ] || { teardown_unclaimed_note "its root holds Git repository ${repo%/.git}, which is not this task's own copy"; return 1; }
   if ! pids=$(pids_with_cwd_under "$slot"); then
     teardown_unclaimed_note "the live-process scan under it could not complete"
@@ -5223,7 +5253,7 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
         [ "$root" -ef "$WT" ] || swept+=("$root")
       done
       retired=("${swept[@]}")
-      if [ -n "$TEARDOWN_UNCLAIMED_SLOT" ]; then
+      if [ -n "$TEARDOWN_UNCLAIMED_SLOT" ] && teardown_unclaimed_root_is_own; then
         [ "$TEARDOWN_UNCLAIMED_SLOT" -ef "$WT" ] || retired+=("$TEARDOWN_UNCLAIMED_SLOT")
         while IFS= read -r root; do
           [ "$root" -ef "$WT" ] || retired+=("$root")
