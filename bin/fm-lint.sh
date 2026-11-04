@@ -69,26 +69,43 @@
 # or exit selection.
 # That bound is per run; only cold checks enter the host-wide pool, after cache
 # lookup and identical-miss serialization, so hits and duplicate waiters consume
-# no host slots. Cold roots share the pool per lint run, not per worker: a free
-# slot goes to the waiting run holding the fewest slots, then the run served
-# least recently, so a two-worker run cannot take two turns for each turn of a
-# one-worker run. Within a run, roots stay FIFO and newer roots cannot bypass an
-# older one. Killed waiters, and waiters stopped for a second while a slot sits
-# free, are skipped automatically. Admission needs only a free slot among the
-# cap; fairness does not increase host concurrency. After an update to this
+# no host slots and no memory budget. Cold roots share the pool per lint run, not
+# per worker: a free slot goes to the waiting run holding the fewest slots, then
+# the run served least recently, so a two-worker run cannot take two turns for
+# each turn of a one-worker run. Within a run, roots stay FIFO and newer roots
+# cannot bypass an older one. Killed waiters, and waiters stopped for a second
+# while a slot sits free, are skipped automatically. After an update to this
 # gate merges, restart in-flight lints that still run the older code.
-# FM_LINT_SLOT_DIR defaults to ${XDG_CACHE_HOME:-$HOME/.cache}/firstmate/lint-slots;
-# "off" disables the pool. Host load average never changes admission, so
-# unrelated machine load cannot starve lint.
-# Runs share a pool only when they use the same slot directory, so different
-# homes or overrides must select the same directory to share the host bound.
-# FM_LINT_HOST_SLOTS sets the cap; unset or empty uses max(2, floor(ncpu/2)).
-# A nonempty value must be a positive decimal integer without leading zeros,
-# or lint exits 2, even with the pool off. The cap is the only host-wide bound:
-# a lone default two-worker run keeps both workers unless an explicit cap of one
-# is selected. The CPU-derived default keeps the memory protection of the
-# original pool (some ShellChecks reach several GB); the per-root address-space
-# limit is enforced only where ulimit -v works, and native macOS cannot enforce it.
+# The pool bounds the resident memory of the ShellCheck processes this script
+# starts, host-wide, in bytes. FM_LINT_HOST_RSS_KIB is that budget (a positive
+# decimal KiB count, default 12582912 = 12 GiB, the
+# per-root bound plus one reserve and headroom, so a lone run is never held back). A cold root takes its turn only
+# when the held roots plus one reserve fit it: each held root is charged the
+# larger of FM_LINT_ROOT_RESERVE_KIB (default 2097152 = 2 GiB, also the charge
+# of a root not yet measured) and the resident size of its gate's whole process
+# tree, read from the live process table when the root asks for its turn. An
+# empty pool always admits one root, so a root larger than the budget runs alone
+# and queued roots wait rather than fail. Admission is the only control: a
+# running root is neither paused nor ended by the budget, so a root admitted on a
+# reading can grow past its charge up to its own per-root bound below, and the
+# aggregate can exceed the budget by that growth. Unreadable process tables
+# charge every held root and the new root the per-root worst case (the resident
+# watch bound, or the address-space limit under the enforced envelope).
+# Admission also needs a free slot among the count cap; fairness does not
+# increase host concurrency.
+# FM_LINT_SLOT_DIR defaults to /var/tmp/firstmate-lint-<uid>/lint-slots, which
+# does not depend on HOME or XDG_CACHE_HOME, so every run of one user on a host
+# meets in one pool; "off" disables the pool. Host load average never changes
+# admission, so unrelated machine load cannot starve lint.
+# Runs share a pool only when they use the same slot directory, so overrides must
+# select the same directory to share the host bound.
+# FM_LINT_HOST_SLOTS sets the count cap; unset or empty uses max(2, floor(ncpu/2)).
+# A nonempty FM_LINT_HOST_SLOTS, FM_LINT_HOST_RSS_KIB or FM_LINT_ROOT_RESERVE_KIB
+# must be a positive decimal integer without leading zeros, or lint exits 2, even
+# with the pool off. A lone default two-worker run keeps both workers unless an
+# explicit cap of one is selected, and holds at most two reserves of the budget.
+# The per-root address-space limit is enforced only where ulimit -v works, and
+# native macOS cannot enforce it.
 # On native macOS, where the enforced envelope below does not apply, each root's
 # process tree is instead watched for memory, the larger of its resident size
 # and its physical footprint (FM_LINT_ROOT_RSS_KIB, default 8388608 = 8 GiB, a
@@ -98,9 +115,14 @@
 # for a tick libproc did not answer in time) and names any attempt that gave
 # up its libproc reader, with the reason. Linux runs are never watched, and CI
 # runs under FM_LINT_REQUIRE_BOUNDS=1 keep their ulimit envelope.
+# ShellCheck started outside this script (an agent or a test running it
+# directly) is not charged to the pool and is not bounded by it.
 # Waiting roots queue rather than fail; both cache-key and host-slot queue time
 # consume neither the root deadline nor its retry budget.
-# Slot directory, file, or locking failures warn and run ungated rather than failing lint.
+# A pool that cannot be used (its directory, lock, ticket, slot or queue file)
+# never lets a root run unbounded: lint exits 2 before any root starts, or a gate
+# exits 2 for its root, naming the path and the fix. FM_LINT_SLOT_DIR=off is the
+# only way to run without the host-wide bound.
 # The private gate's locking and process-lifetime invariants live in bin/fm-lint-cache.pl.
 # --partition 1of3/2of3/3of3 splits the entire canonical inventory across
 # three CI runners, each with those same concurrency-limited workers.
@@ -1866,14 +1888,23 @@ if [ "$BOUND_MECH" = none ] && [ "$(uname)" = Darwin ]; then
 fi
 
 # Host-wide pool configuration; the header owns its public controls.
-SLOT_DIR=${FM_LINT_SLOT_DIR:-${XDG_CACHE_HOME:-${HOME:-${TMPDIR:-/tmp}}/.cache}/firstmate/lint-slots}
-case "${FM_LINT_HOST_SLOTS:-1}" in
-  ''|0*|*[!0-9]*)
-    printf 'fm-lint.sh: FM_LINT_HOST_SLOTS must be a positive integer, got %s.\n' \
-      "${FM_LINT_HOST_SLOTS:-}" >&2
-    exit 2
-    ;;
-esac
+# The default directory belongs to the user, not to HOME or XDG_CACHE_HOME, so
+# runs from different homes and sandboxes meet in one pool.
+HOST_POOL_ROOT=/var/tmp/firstmate-lint-$(id -u 2>/dev/null || printf 0)
+SLOT_DIR=${FM_LINT_SLOT_DIR:-$HOST_POOL_ROOT/lint-slots}
+for pool_pair in \
+  "FM_LINT_HOST_SLOTS=${FM_LINT_HOST_SLOTS:-1}" \
+  "FM_LINT_HOST_RSS_KIB=${FM_LINT_HOST_RSS_KIB:-1}" \
+  "FM_LINT_ROOT_RESERVE_KIB=${FM_LINT_ROOT_RESERVE_KIB:-1}"; do
+  case "${pool_pair#*=}" in
+    ''|0*|*[!0-9]*)
+      pool_name=${pool_pair%%=*}
+      printf 'fm-lint.sh: %s must be a positive integer, got %s.\n' \
+        "$pool_name" "${!pool_name:-}" >&2
+      exit 2
+      ;;
+  esac
+done
 NCPU=
 if [ "$SLOT_DIR" != off ]; then
   NCPU=$(sysctl -n hw.ncpu 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null) || NCPU=
@@ -2068,6 +2099,14 @@ fm_lint_run_worker() {  # <worker-index>
   )
   worker_env+=(FM_LINT_INTERNAL_CACHE="$CACHE_DIR" FM_LINT_INTERNAL_SLOT_DIR="$SLOT_DIR" FM_LINT_INTERNAL_NCPU="$NCPU")
   worker_env+=(FM_LINT_INTERNAL_RUN_ID="$$")
+  # The most one root can hold: its address-space limit under the enforced
+  # envelope, else the resident watch bound. The gate charges it when it cannot
+  # read the process table.
+  if [ "$BOUND_MECH" != none ]; then
+    worker_env+=(FM_LINT_INTERNAL_ROOT_CAP_KIB="$ROOT_MEMORY_KIB")
+  else
+    worker_env+=(FM_LINT_INTERNAL_ROOT_CAP_KIB="$ROOT_RSS_KIB")
+  fi
   if [ -n "$TELEMETRY" ] && [ -x /usr/bin/time ]; then
     if [ "$(uname)" = Darwin ]; then
       exec "$PERL_BIN" -e 'setpgrp(0, 0) or die "setpgrp: $!"; exec @ARGV or die "exec: $!"' \
@@ -2101,6 +2140,34 @@ fm_lint_wait_workers() {
     ACTIVE_PIDS=("${ACTIVE_PIDS[@]:1}")
   done
 }
+
+# A pool that cannot be used must stop the run before any root starts: the
+# host-wide memory bound would otherwise be lost silently. Each gate repeats the
+# check for its own files and refuses the same way (bin/fm-lint-cache.pl).
+if [ "$SLOT_DIR" != off ]; then
+  pool_problem=
+  if [ -z "${FM_LINT_SLOT_DIR:-}" ]; then
+    if [ -L "$HOST_POOL_ROOT" ]; then
+      pool_problem="$HOST_POOL_ROOT is a symbolic link"
+    else
+      ( umask 077; mkdir -p "$HOST_POOL_ROOT" ) 2>/dev/null
+      if [ ! -d "$HOST_POOL_ROOT" ]; then
+        pool_problem="$HOST_POOL_ROOT cannot be created"
+      elif [ ! -O "$HOST_POOL_ROOT" ]; then
+        pool_problem="$HOST_POOL_ROOT is owned by another user"
+      fi
+    fi
+  fi
+  if [ -z "$pool_problem" ]; then
+    ( umask 077; mkdir -p "$SLOT_DIR" ) 2>/dev/null
+    { [ -d "$SLOT_DIR" ] && [ -w "$SLOT_DIR" ]; } || pool_problem="$SLOT_DIR is not a writable directory"
+  fi
+  if [ -n "$pool_problem" ]; then
+    printf 'fm-lint.sh: host slot pool unusable (%s); the host-wide ShellCheck memory bound cannot be enforced, so no root was started. Make that path writable, remove it if it is damaged, or point FM_LINT_SLOT_DIR at a writable directory that every lint run shares (FM_LINT_SLOT_DIR=off runs without the host-wide bound).\n' \
+      "$pool_problem" >&2
+    exit 2
+  fi
+fi
 
 if [ "$JOBS" -eq 1 ]; then
   worker=0
