@@ -2626,12 +2626,15 @@ EOF
 # non-zero when the PR is not merged, the current work is not contained in the
 # PR head, no PR is found, or any forge read error occurs - the caller then
 # falls back to the content check. TEARDOWN_PR_SEEN_STATE is the GitHub state
-# this call read, empty when no GitHub view answered.
+# this call read, empty when no GitHub view answered, and TEARDOWN_PR_SEEN_TARGET
+# the PR URL or number that view read.
 TEARDOWN_PR_SEEN_STATE=
+TEARDOWN_PR_SEEN_TARGET=
 pr_is_merged() {
   local branch=$1 target view state remainder head resolved_url current landed=0
   local dir=${TEARDOWN_LANDED_DIR:-$WT} ref=${TEARDOWN_LANDED_REF:-HEAD}
   TEARDOWN_PR_SEEN_STATE=
+  TEARDOWN_PR_SEEN_TARGET=
   [ -d "$dir" ] || return 1
   if [ -n "$PR_URL" ]; then
     target=$PR_URL
@@ -2660,6 +2663,7 @@ pr_is_merged() {
     resolved_url=${remainder#*$'\t'}
     [ "$head" != "$remainder" ] || return 1
     TEARDOWN_PR_SEEN_STATE=$state
+    TEARDOWN_PR_SEEN_TARGET=$target
     case "$state" in
       MERGED|merged) ;;
       *) return 1 ;;
@@ -2957,10 +2961,8 @@ work_is_landed_proof() {
   [ -z "$FM_TASK_COPY_UNASKED" ] || TEARDOWN_LANDED_UNASKED=${TEARDOWN_LANDED_UNASKED:-$FM_TASK_COPY_UNASKED}
   # A closed PR that a merged train landed: the last proof, so it reads the forge only
   # when nothing else proves the work.
-  local train_target=$PR_URL
-  [ -n "$train_target" ] || train_target=$(pr_number_from_branch "$branch") || train_target=
-  if [ "$TEARDOWN_PR_SEEN_STATE" = CLOSED ] && [ -n "$train_target" ] \
-     && teardown_train_landed work "$train_target"; then
+  if [ "$TEARDOWN_PR_SEEN_STATE" = CLOSED ] \
+     && teardown_train_landed work "$TEARDOWN_PR_SEEN_TARGET"; then
     return 0
   fi
   [ -z "$TEARDOWN_TRAIN_UNASKED" ] || TEARDOWN_LANDED_UNASKED=${TEARDOWN_LANDED_UNASKED:-$TEARDOWN_TRAIN_UNASKED}
@@ -3529,11 +3531,13 @@ validate_worktree_teardown_safety() {
       TEARDOWN_RECORDED_PR_ONLY=1
       return 0
     fi
+    local record_train_unasked=$TEARDOWN_TRAIN_UNASKED
     branch=$(teardown_record_branch)
     if git -C "$PROJ" rev-parse --verify --quiet "refs/heads/$branch^{commit}" >/dev/null \
         && teardown_landed "$PROJ" "refs/heads/$branch" "$branch"; then
       return 0
     fi
+    TEARDOWN_TRAIN_UNASKED=${TEARDOWN_TRAIN_UNASKED:-$record_train_unasked}
     if [ "$TEARDOWN_SLOT_SHARED" = 1 ]; then
       echo "REFUSED: task $ID shares pool slot $TEARDOWN_SHARED_SLOT, but its recorded PR is not confirmed merged and its own branch $branch is not proved landed; its record and slot claim stay in place." >&2
       echo "Land this task's deliverable before re-running bin/fm-teardown.sh $ID; the shared slot will not be returned." >&2
@@ -3610,7 +3614,8 @@ validate_worktree_teardown_safety() {
       else
         echo "REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion." >&2
       fi
-    "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded deny --rule landed-work --task "$ID" --source-ok true 2>/dev/null || true
+    "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded deny --rule landed-work --task "$ID" \
+      --source-ok "$([ -n "$TEARDOWN_TRAIN_UNASKED" ] && echo false || echo true)" 2>/dev/null || true
       [ -z "$unpushed" ] || printf 'unpushed commits:\n%s\n' "$unpushed" >&2
       [ -z "$TEARDOWN_UNPROVEN_COMMITS" ] || printf 'commits whose change is not proven present in the merged PR head:\n%s\n' "$TEARDOWN_UNPROVEN_COMMITS" >&2
       [ -z "$TEARDOWN_PIPELINE_INPUT_REASON" ] || printf 'this copy is not proven to be the input of the pipeline run that produced the merged PR head:\n%s\n' "$TEARDOWN_PIPELINE_INPUT_REASON" >&2

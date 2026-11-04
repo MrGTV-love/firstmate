@@ -218,7 +218,7 @@ SH
 # verified-train rule as a removed copy, without reading the claimant's copy.
 test_reassigned_slot_train_member_retires_only_on_a_verified_train() {
   local row case_dir slot rc fact kind other=dddddddddddddddddddddddddddddddddddddddd
-  for row in verified wrong-sha open-train search-fails no-listing prefix-sha missing-sha wrong-base; do
+  for row in verified wrong-sha open-train search-fails search-then-view-fail no-listing prefix-sha missing-sha wrong-base; do
     train_case "reassigned-train-$row" none head
     case_dir=$TRAIN_CASE
     case "$row" in
@@ -231,6 +231,10 @@ test_reassigned_slot_train_member_retires_only_on_a_verified_train() {
         fact="is OPEN, not merged"; kind= ;;
       search-fails)
         : > "$case_dir/gh-fixture/list.fail"
+        fact="the forge search for PRs listing"; kind=unknown ;;
+      search-then-view-fail)
+        : > "$case_dir/gh-fixture/list.fail"
+        : > "$case_dir/gh-fixture/member-view.once"
         fact="the forge search for PRs listing"; kind=unknown ;;
       no-listing)
         printf '[]\n' > "$case_dir/gh-fixture/list.json"

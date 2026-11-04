@@ -4194,13 +4194,55 @@ test_train_flat_missing_with_a_stale_remote_ref_refuses() {
 # The train route reads the member again after pr_is_merged saw it CLOSED; a re-read
 # that fails is unknown, retry, never 'not landed' and never accepted.
 test_train_member_reread_failure_is_unknown() {
+  local events
   train_case train-reread-fails none head
   : > "$TRAIN_CASE/gh-fixture/member-view.once"
-  assert_train_refused "$TRAIN_CASE" "train-reread-fails" "could not be read again" unknown
+  events="$TRAIN_CASE/guard-events.jsonl"
+  FM_GUARD_EVENT_LOG="$events" assert_train_refused "$TRAIN_CASE" "train-reread-fails" "could not be read again" unknown
   assert_grep "REFUSED: not known whether the ship deliverable is landed" "$TRAIN_CASE/stderr" \
     "train-reread-fails: the refusal did not say the landing is unknown"
   assert_no_grep "pr list" "$TRAIN_CASE/gh-fixture/calls.log" "train-reread-fails: the train was searched after the member read failed"
-  pass "a failed re-read of the CLOSED member is unknown, retry"
+  assert_equals "deny:false" \
+    "$(jq -rs '[.[] | select(.guard == "teardown-unlanded") | "\(.decision):\(.source_ok)"] | join(" ")' "$events")" \
+    "train-reread-fails: an unread train proof was logged as a readable source"
+
+  # An answered refusal (no train lists the member) still logs a readable source.
+  train_case train-answered-guard none head
+  printf '[]\n' > "$TRAIN_CASE/gh-fixture/list.json"
+  events="$TRAIN_CASE/guard-events.jsonl"
+  FM_GUARD_EVENT_LOG="$events" assert_train_refused "$TRAIN_CASE" "train-answered-guard" "ship deliverable is not landed"
+  assert_equals "deny:true" \
+    "$(jq -rs '[.[] | select(.guard == "teardown-unlanded") | "\(.decision):\(.source_ok)"] | join(" ")' "$events")" \
+    "train-answered-guard: an answered refusal was logged as an unread source"
+  pass "a failed re-read of the CLOSED member is unknown, retry, and its guard event says the source was not readable"
+}
+
+# With no recorded pr=, pr_is_merged finds the member PR by its branch and sees it
+# CLOSED; the train route uses that same PR and does not look the branch up again,
+# so a later branch lookup that fails cannot turn the proof into 'not landed'.
+test_train_member_found_by_branch_is_not_looked_up_again() {
+  local case_dir
+  case_dir=$(make_case train-branch-lookup-once)
+  write_meta "$case_dir" no-mistakes ship
+  setup_train_history "$case_dir" none head
+  add_gh_train_fake "$case_dir" CLOSED "$TRAIN_MEMBER_HEAD"
+  train_default_list "$case_dir"
+  add_logging_treehouse "$case_dir"
+  cat > "$case_dir/fakebin/gh-axi" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> '$case_dir/gh-axi.log'
+case "\${1:-} \${2:-}" in
+  "pr list")
+    [ ! -e '$case_dir/gh-axi.seen' ] || { echo "error: forge unavailable" >&2 ; exit 1 ; }
+    : > '$case_dir/gh-axi.seen'
+    printf '%s\n' "count: 1 (showing first 1)" "pull_requests[1]{number,title,state}:" "  7,train member,closed" ; exit 0 ;;
+esac
+echo "error: pull request not found" >&2
+exit 1
+SH
+  chmod +x "$case_dir/fakebin/gh-axi"
+  assert_train_allowed "$case_dir" train-branch-lookup-once
+  pass "a member PR found by its branch is used by the train route without a second branch lookup"
 }
 
 # train_pipeline_input_case <name>: the live d1 B5 r4 shape. The copy is the input
@@ -4451,6 +4493,7 @@ test_train_flattened_rebase_carries_the_listed_head
 test_train_flattened_rebase_missing_a_member_commit_refuses
 test_train_flat_missing_with_a_stale_remote_ref_refuses
 test_train_member_reread_failure_is_unknown
+test_train_member_found_by_branch_is_not_looked_up_again
 test_train_dirty_copy_refuses_before_the_train_is_read
 test_train_refuses_a_train_that_is_not_merged
 test_train_refuses_a_train_merged_into_another_branch
