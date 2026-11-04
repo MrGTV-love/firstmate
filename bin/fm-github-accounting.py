@@ -72,10 +72,15 @@ normal stop the owner writes one fresh process row for each caller it has not se
 end, with the saved projection and first_observed_at and no process_end row, because
 a stop does not show that a caller departed. That row's observed_at is the stop time,
 not a new sighting: the same run's owner row with action=stop marks that time, and the
-caller may have ended unseen before it. With no end row, every successful scan in that
-run listed the caller, and the last sampling row with more scans than failures bounds
-the last successful scan to about one quota interval; a hung scan counts only as
-started, which widens that bound. A SIGKILL or a power loss writes no such
+caller may have ended unseen before it. With no end row, every successful scan the
+owner read after first_observed_at in that run listed the caller. A sampling row counts
+scans when they start and failures when they finish, so successful completions in its
+interval equal scans minus failures, plus or minus one scan in flight at an interval
+edge. A surplus of 2 or more proves a successful completion in that interval; a surplus
+of 1 or less does not: 0 or 1 neither proves nor excludes one, and -1 excludes one.
+These rows give the latest proven successful scan, not an exact last-success time. A
+hung scan counts as started and not as failed, and a failed scan in flight at the stop
+is never counted as failed. A SIGKILL or a power loss writes no such
 row, so that caller's latest process row can expire at 48 hours while a quota row it
 overlapped is retained. A failed scan
 ends nothing and no row is written per scan. A caller still alive when the observer
