@@ -84,7 +84,7 @@ projected  =   the reservations of the counted runs  +  S for the new run
 
 | A counted run that is | reserves | why |
 |---|---|---|
-| waiting on remote CI: its open step is `ci` with status `running`, no agent pid is recorded, no launch-gate reservation is live and the reading sees no process of it (a visible process may be an agent whose pid is not recorded yet, so it counts as active) | only the resident memory it holds (0 while no process of it is visible) | it uses memory again only when a fix round starts, and that agent starts only through the [launch gate](#launch-gate), which secures capacity first |
+| waiting on remote CI: its open step is `ci` with status `running`, no agent pid is recorded, no launch-gate reservation is live and no process of it has a parent that is a live process outside the run (such a process may be an agent whose pid is not recorded yet, whatever its name, so it counts as active; a leftover reparented to launchd cannot be driven further) | only the resident memory it holds (0 while no process of it is visible, a leftover's bytes otherwise) | it uses memory again only when a fix round starts, and that agent starts only through the [launch gate](#launch-gate), which secures capacity first |
 | waiting in its [launch gate](#launch-gate): a live launch-gate entry of it is queued in the pool and no launch-gate reservation of it is live, whatever its step or visibility | only the resident memory it holds | its agent has not started, and it reserves capacity only when its gate is admitted |
 | visible in the reading at any other step, or with a live launch-gate reservation | its resident memory or `A`, whichever is larger | startup memory alone is not its demand; memory above `A` is counted as it is, never capped at `R`, `S` or a recorded peak |
 | not visible yet: just registered, between steps, with an unreadable step, or a launch-gate start the reading cannot see | `R` | the reading cannot show what it will use, so it is never read as idle |
@@ -110,6 +110,7 @@ Measured on the root home's records of 2026-11-03 (373 readings, 347 of them wit
 At 12 visible runs the projection is at least 12 x 1.82 + 13.39 = 35.2 GiB, against 88 GiB under the previous rule, which reserved `R` for every counted run at once.
 The replay of every recorded reading against both rules, including the only pressure-2 episode (2026-11-02 21:11Z to 22:44Z), is in the task's private evidence; the pressure hold refuses every reading of that episode, and the rule alone never projects below the run memory a reading measured.
 The protection still has residuals: a run admitted just before pressure rises is not visible in the reading until it registers and grows, and an agent that raises its own memory after it starts is bounded by the next decision and the pressure hold, not by its reservation.
+A CI waiter is read by its process parents, not by names: while the daemon runs a short command in its worktree it counts as active at `A`, which errs toward holding, and an agent left running by a daemon that died, with no recorded pid, is reparented to launchd and counts only at its resident memory.
 
 Process count is not a reservation: a run's tree peaked at 34 processes against the host's 10,666 per-user cap, and every recorded pile-up was a runaway `bash` chain, not a run tree.
 Processes appear only in the backstop below.
@@ -145,9 +146,9 @@ The [engine header](../bin/fm-cpu-pass.py) owns its exact sequence, refusal text
 
 A refusal exits 75 with one line naming the cause and the next action; the daemon logs it as `warning: CI fix failed` and does not fail the run.
 Each refusal spends one of the run's `auto_fix.ci` attempts; after the last one the CI findings park as the ordinary ask-user decision, whose owner answers it once capacity has returned.
-Every hold (a decision that does not fit, or any other wait, such as start-lock contention, once the first waiting notice is due after 2 s), admission after a hold and refusal also appends one check wake naming the run, the reason and the time waited to the root home's wake queue, the durable record supervision drains.
+Every hold (the first time the gate is not admitted, whatever the cause: a decision that does not fit, a start ahead of it, or start-lock contention however short), admission after a hold and refusal also appends one check wake naming the run, the reason and the time waited to the root home's wake queue, the durable record supervision drains.
 The gate never waits for the wake queue's lock: when another process holds it, the wake is spilled to the root home's `state/.wake-spill.<seq>`, and the next append to that queue, or the watcher's next start, replays it.
-Gates record their wakes one at a time under `durable.lock` in the pool directory, so two gate spills never take the same file; a gate spill can still collide with the watcher's own spill.
+A spill is published by a hard link that never replaces an existing spill, so a gate's spill and the watcher's, or two gates', each keep their own file.
 The live launcher is captain-private host configuration outside this repository: the gate protects nothing until that one line is applied, and a fix-round agent launched through any other path is not gated.
 
 Queued classes are ordered `merge-train`, `machinery`, `vernant-build`, then `other`, with arrival order within each class.
@@ -156,14 +157,16 @@ The short start lock covers the observation-to-daemon-registration gap, so parti
 The [engine header](../bin/fm-cpu-pass.py) owns the registration handoff, failure behavior and the limit of read-only coordination with starts that bypass it.
 Unusable run-database, CPU-count, memory or process observations do not imply an empty host.
 
-Every route that begins a new run joins this one queue, judged by the facts the no-mistakes CLI itself uses: `no-mistakes rerun` always creates a run, and `no-mistakes axi run` creates one only with an intent input (`--intent TEXT`, `--intent -`, `--intent-file PATH` or their `=` forms); without one it reattaches an active run or exits 2.
-Only the executable position counts: leading `VAR=value` words, the wrappers `env`, `nice`, `nohup`, `command`, `exec`, `time` and `stdbuf`, a Python interpreter or shell running a script, and the admission routes themselves are followed to the program they run, so `env A=1 /abs/path/no-mistakes axi run --intent ...` is a start and `printf no-mistakes axi run --intent ...` is not.
+A route that begins a new run in a form the parser below recognizes joins this one queue, judged by the facts the no-mistakes CLI itself uses: `no-mistakes rerun` always creates a run, and `no-mistakes axi run` creates one only with an intent input (`--intent TEXT`, `--intent -`, `--intent-file PATH` or their `=` forms); without one it reattaches an active run or exits 2.
+Only the executable position counts: leading `VAR=value` words, the wrappers `env`, `nice`, `nohup`, `command`, `exec`, `time` and `stdbuf` with their options (clustered short options, a valued option's attached or next word, `--option=value`), a Python interpreter or shell running a script, and the admission routes themselves are followed to the program they run, so `env A=1 /abs/path/no-mistakes axi run --intent ...` is a start and `printf no-mistakes axi run --intent ...` is not.
+`env -S STRING` and `--split-string` read STRING's words, split as a shell splits a quoted line, in its place; `command -v` and `-V` only print a path, so they begin nothing.
+A start in a form the parser does not model is not recognized and runs without this admission: a program reached through any other wrapper (such as `xargs`, `sudo` or `timeout`), a client under another name (an alias or a link named otherwise), an `env -S` string that relies on `env`'s own escapes or `${VAR}` expansion, or a program name held in a shell variable; through `bin/fm-mem-guard.sh run` it still takes that route's memory reading.
 A shell's `-c` string, after the shell's other options (`bash -l -c`, `bash -o pipefail -c`), is read as a command line without its comments and redirections, split at its control operators and newlines, so `cd x&&no-mistakes axi run --intent ...` is a start too.
 `bin/fm-duration.py run` routes such a command through this owner before starting its execution clock; its `--pipeline-priority` option selects the class.
 `bin/fm-mem-guard.sh run` hands its command to `pipeline-start --only-fresh` after its own memory reading: a new run queues in class `other`, and every other command runs unchanged.
 Generated worker delivery instructions name both routes.
 Existing-run reattachment, responses and status reads do not requeue, restart a run or consume another start.
-Each start is admitted once.
+Each recognized start is admitted once.
 Only the measured runner the owner re-executes skips a second admission, through an internal argument it consumes.
 When the admitted start runs behind another route (for example `fm-duration.py run -- bash -c '... fm-mem-guard.sh run -- no-mistakes axi run --intent "$X"'`), the owner publishes one single-use grant naming its own process, and that nested route consumes it and runs without queueing again, because the owner is its ancestor; any other start, a second descendant, an identical invocation from elsewhere or one the wrapped client starts, still queues.
 A nested start that cannot prove that ancestry (one that detached to another parent, or an inner route on a checkout without grants) queues behind the owner's lock, and when it is the owner's only run both wait until one is stopped.

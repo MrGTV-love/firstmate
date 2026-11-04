@@ -62,10 +62,11 @@ Pipeline starts:
     resident memory the counted runs hold (never capped), or when no other run
     is counted (a one-start minimum). The projection is S for the new run plus,
     per counted run: only what it holds when it waits on remote CI (open step ci
-    in running, no recorded agent pid, no live launch reservation, no process
-    of it visible) or while its launch gate waits in this queue with no live
-    launch reservation; its resident memory or A, whichever is larger, when the
-    reading sees it; R while the reading cannot see it. S is the largest per-run peak of every recorded
+    in running, no recorded agent pid, no live launch reservation, and no
+    process of it whose parent is a live process outside the run, so only
+    leftovers reparented to launchd, if any) or while its launch gate waits in
+    this queue with no live launch reservation; its resident memory or A,
+    whichever is larger, when the reading sees it; R while the reading cannot see it. S is the largest per-run peak of every recorded
     no-mistakes run with at least 2 readings, and R the 75th percentile (nearest
     rank) of those peaks leaving out runs that are status-running with
     ci_ready_at IS NULL, read from the root home's .memory-calibration.json
@@ -90,9 +91,13 @@ Pipeline starts:
     No burst passes or FM_CPU_PASS_HELD budget are assigned to pipeline starts.
     With --only-fresh, a COMMAND that start_route does not judge a new run runs
     at once without admission. start_route follows only the executable
-    position (transparent wrappers, an interpreter or shell running a script, a
-    shell's -c command line and the admission routes themselves); any other
-    program's arguments are data. When the start runs behind another admission
+    position (transparent wrappers with their options, env -S strings, an
+    interpreter or shell running a script, a shell's -c command line and the
+    admission routes themselves); any other program's arguments are data.
+    Limit: a start the parser does not model (another wrapper such as xargs,
+    sudo or timeout, the client under another name, env's own -S escapes or
+    ${VAR} expansion, a program name in a shell variable) is not recognized and
+    runs without admission. When the start runs behind another admission
     route (fm-mem-guard.sh run, fm-duration.py run, pipeline-start), the
     admission publishes one single-use grant-*.lock naming its own pid, locked
     while it holds the start lock. A later start consumes it, and runs without
@@ -142,17 +147,15 @@ Launch gate:
     <action>" line and exits 75; every number in it carries a unit suffix and
     it uses none of the daemon's retry or fallback phrases. A fit reached only
     after a wait past the bound is refused too; a fit at the very first decision
-    is admitted, so a bound of 0 holds not at all. A hold (the first decision that
-    does not fit, or any other wait, such as start-lock contention, once the first
-    waiting notice is due after FIRST_NOTICE_SECS), an admission after a hold and
-    every refusal each append one check wake (launch-gate-<run>, naming the run,
-    the reason and the time waited) to the root home's wake queue through
-    fm_wake_pending_settle, which never waits for the queue lock: when it is
-    busy the wake is spilled to the root home's state/.wake-spill.<seq>, and
-    the next append to that queue, or the watcher's next start, replays it.
-    Gates record their wakes one at a time under the pool's durable.lock, so
-    two gate spills never take the same file; a gate spill can still collide
-    with the watcher's own spill.
+    is admitted, so a bound of 0 holds not at all. A hold (the first time the
+    gate is not admitted, whatever the cause: a decision that does not fit, a
+    start ahead of it, or start-lock contention however short), an admission
+    after a hold and every refusal each append one check wake
+    (launch-gate-<run>, naming the run, the reason and the time waited) to the
+    root home's wake queue through fm_wake_pending_settle, which never waits
+    for the queue lock: when it is busy the wake is spilled to the root home's
+    state/.wake-spill.<seq>, never over another producer's spill, and the next
+    append to that queue, or the watcher's next start, replays it.
   - AGENT keeps stdin, stdout and stderr; SIGTERM, SIGINT and SIGHUP sent to the
     gate are forwarded to it; its exit status is returned and a death by signal
     is re-raised. A missing or non-executable AGENT returns 127 or 126. A
@@ -474,8 +477,51 @@ SHELLS = ("sh", "bash", "zsh", "dash", "ksh")
 SHELL_OPERATOR_CHARS = "();<>|&\n"
 
 
-TRANSPARENT = ("env", "nice", "nohup", "command", "exec", "time", "stdbuf")
+# Wrappers that run their operand as the program: (short options that take a value, long options that do).
+# env -S/--split-string's value is a command line whose words take its place.
+TRANSPARENT = {"env": ("uCPS", ("--unset", "--chdir", "--split-string")), "nice": ("n", ("--adjustment",)),
+               "nohup": ("", ()), "command": ("", ()), "exec": ("a", ()), "time": ("of", ("--output", "--format")),
+               "stdbuf": ("ioe", ("--input", "--output", "--error"))}
 ROUTES = ("fm-mem-guard.sh", "fm-duration.py", "fm-cpu-pass.sh", "fm-cpu-pass.py")
+
+
+def wrapper_operands(name: str, rest: List[str]) -> Optional[Tuple[List[str], Optional[str]]]:
+    """(the words wrapper NAME runs as its program, an env split string to read first), or None when it runs none.
+
+    Short options may be clustered and a valued one takes the rest of its word
+    or the next word; a long option takes its =value or the next word. env also
+    skips NAME=value words and a lone -. command -v and -V only print where the
+    program is, so they run nothing.
+    """
+    short, valued = TRANSPARENT[name]
+    while rest:
+        word = rest[0]
+        if word == "--":
+            return rest[1:], None
+        if name == "env" and (word == "-" or not word.startswith("-") and "=" in word):
+            rest = rest[1:]
+            continue
+        if not word.startswith("-") or word == "-":
+            return rest, None
+        rest = rest[1:]
+        if word.startswith("--"):
+            option, equals, value = word.partition("=")
+            if option in valued and not equals:
+                value, rest = (rest[0] if rest else ""), rest[1:]
+            if option == "--split-string":
+                return rest, value
+            continue
+        for index, letter in enumerate(word[1:], 1):
+            if name == "command" and letter in "vV":
+                return None
+            if letter in short:
+                value = word[index + 1:]
+                if not value:
+                    value, rest = (rest[0] if rest else ""), rest[1:]
+                if name == "env" and letter == "S":
+                    return rest, value
+                break
+    return rest, None
 
 
 def fresh_pipeline_start(command: List[str]) -> bool:
@@ -488,7 +534,8 @@ def start_route(command: List[str]) -> Optional[Tuple[List[str], bool]]:
 
     Only the executable position counts: leading VAR=value words, the
     transparent wrappers env, nice, nohup, command, exec, time and stdbuf with
-    their options, a Python interpreter or a shell running a script, a shell's -c string
+    their options (wrapper_operands; env -S/--split-string's words read in its
+    place), a Python interpreter or a shell running a script, a shell's -c string
     (read as a command line, see shell_string_start) and the admission routes
     fm-mem-guard.sh run --, fm-duration.py run KEY -- and fm-cpu-pass pipeline-start --
     are followed to the program they run. Any other program's arguments are data,
@@ -513,10 +560,16 @@ def start_route(command: List[str]) -> Optional[Tuple[List[str], bool]]:
                 for option in rest[2:])
             return (rest, routed) if fresh else None
         if name in TRANSPARENT:
-            valued = {"env": ("-u", "-C", "-S"), "nice": ("-n",), "stdbuf": ("-i", "-o", "-e")}.get(name, ())
-            while rest and (rest[0].startswith("-") or (name == "env" and "=" in rest[0])):
-                rest = rest[2:] if rest[0] in valued else rest[1:]
-            words = rest
+            operands = wrapper_operands(name, rest)
+            if operands is None:
+                return None
+            words, split = operands
+            if split is not None:
+                import shlex
+                try:
+                    words = ["env"] + shlex.split(split) + words
+                except ValueError:
+                    return None  # env refuses an unbalanced split string and runs nothing
             continue
         if name.rstrip("0123456789.").lower() == "python":
             while rest and rest[0].startswith("-"):
@@ -786,19 +839,42 @@ def active_term(report: dict) -> Optional[Tuple[int, int]]:
         return None
 
 
+def attached_runs(processes) -> Optional[set]:
+    """Run keys whose tree holds a process a live owner outside the run is running, or None without a census.
+
+    A run process whose parent is neither another process of the same run nor
+    launchd (pid 1) was started by a live process outside the run, such as the
+    daemon's agent launch, the launch gate, or an agent the daemon has not
+    recorded yet, whatever its name. A tree whose every root was reparented to
+    launchd is left over from earlier work: no live owner can drive it further.
+    A parent pid that cannot be read counts as attached.
+    """
+    if not isinstance(processes, list):
+        return None
+    members: dict = {}
+    for row in processes:
+        if isinstance(row, dict) and row.get("run"):
+            members.setdefault(row["run"], set()).add(row.get("pid"))
+    return {row["run"] for row in processes if isinstance(row, dict) and row.get("run")
+            and (type(row.get("ppid")) is not int or row["ppid"] != 1 and row["ppid"] not in members[row["run"]])}
+
+
 def project(available: int, rss: dict, counted: dict, steps: Optional[dict], launches: dict,
             reservation: int, slack: int, term: int, self_run: Optional[str] = None,
-            waiting: frozenset = frozenset()) -> dict:
+            waiting: frozenset = frozenset(), attached: Optional[set] = None) -> dict:
     """The reservation fit for one more active run; a pure function of its facts.
 
     counted maps each counted run ID to its repo ID; rss is the reading's run map
     (keyed no-mistakes:<repo>/<run>); steps is open_steps() or None; launches maps
-    run IDs to their live launch-gate reservations. A run waiting on remote CI
+    run IDs to their live launch-gate reservations; attached is attached_runs()
+    of the reading's census, or None without one. A run waiting on remote CI
     (open step ci, status running, no recorded agent pid, no live launch) whose
-    tree the reading cannot see reserves nothing. Once any process of such a run
-    is visible it is never read as idle: an agent may have started before its pid
-    was recorded, whatever it is named, so it reserves its resident memory or A,
-    whichever is larger, like any active run. Every other counted or launched run reserves its
+    tree holds no attached process reserves only the resident memory it holds:
+    nothing when the reading cannot see it, the bytes of a left-over process
+    otherwise. Once its tree holds an attached process it is never read as idle:
+    an agent may have started before its pid was recorded, whatever it is named,
+    so it reserves its resident memory or A, whichever is larger, like any active
+    run; without a census every visible process counts as attached. Every other counted or launched run reserves its
     resident memory or the active-run term A, whichever is larger, once its tree
     is visible, and its full R while the reading cannot see it yet. The new run
     reserves S. With no live launch, the waiting launch's own run (self_run) and
@@ -812,7 +888,8 @@ def project(available: int, rss: dict, counted: dict, steps: Optional[dict], lau
         runs.setdefault(run, entry.get("repo"))
     held = 0
     for run in sorted(runs):
-        seen = rss.get("no-mistakes:%s/%s" % (runs[run], run))
+        key = "no-mistakes:%s/%s" % (runs[run], run)
+        seen = rss.get(key)
         size = seen["rss_bytes"] if seen and type(seen.get("rss_bytes")) is int else 0
         visible = bool(seen) and seen.get("processes", 0) > 0
         step = None if steps is None else steps.get(run)
@@ -823,7 +900,7 @@ def project(available: int, rss: dict, counted: dict, steps: Optional[dict], lau
         elif run == self_run or run in waiting:
             kind, demand = "waiter", size
         elif (steps is not None and step is not None and step[0] == CI_STEP and step[1] == "running"
-              and step[2] is None and not visible):
+              and step[2] is None and not (visible and (attached is None or key in attached))):
             kind, demand = "ci-waiting", size
         else:
             kind = "step-unreadable" if steps is None else ("no-open-step" if step is None else "active")
@@ -908,7 +985,7 @@ def admission(reasons: List[str], report: Optional[dict], running: dict, counted
         return others < limit, "counted=%d limit=%d basis=fallback priority=%s" % (others, limit, priority)
     (reservation, slack, qualifying), (term, readings) = measured
     fit = project(report["available_bytes"], report["runs"], counted, steps, launches, reservation, slack, term, self_run,
-                  waiting)
+                  waiting, attached_runs(report.get("processes")))
     return fit["admit"], projection_text(fit, reservation, slack, term, qualifying, readings) + " priority=%s" % priority
 
 
@@ -1003,9 +1080,10 @@ def wait_for_admission(directory: str, priority: str, self_run: Optional[str] = 
     last reason once that long passed without a grant, and also refuses a grant
     reached only after waiting past it (a fit at the very first decision, before
     any wait, is still admitted, so a bound of 0 holds not at all); None waits
-    without limit. on_wait(reason, waited seconds) is called once, at the first
-    decision that does not fit or, for any other wait such as start-lock
-    contention, when the first waiting notice is due (FIRST_NOTICE_SECS).
+    without limit. on_wait(reason, waited seconds) is called once, the first
+    time this waiter is not admitted, whatever the cause: a decision that does
+    not fit, a higher-priority or earlier start ahead of it, or start-lock
+    contention however short.
     """
     waiter_fd = admission_fd = None
     waiter_path = None
@@ -1041,18 +1119,15 @@ def wait_for_admission(directory: str, priority: str, self_run: Optional[str] = 
                 else:
                     reason = "counted=%d priority=%s behind a higher-priority or earlier start" % (len(counted), priority)
                 fcntl.flock(admission_fd, fcntl.LOCK_UN)
-                if on_wait is not None and first == waiter_path:
-                    on_wait(reason, time.monotonic() - started)
-                    on_wait = None
+            if on_wait is not None:
+                on_wait(reason, time.monotonic() - started)
+                on_wait = None
             now = time.monotonic()
             if bound is not None and now - started >= bound:
                 raise HoldBound(reason)
             if now >= next_notice:
                 log(2, "%s waiting: %s" % ("launch-gate" if self_run else "pipeline-start", reason))
                 next_notice = now + NOTICE_EVERY_SECS
-                if on_wait is not None:
-                    on_wait(reason, now - started)
-                    on_wait = None
             waited = True
             time.sleep(delay)
             delay = min(POLL_MAX_SECS, delay * 2)
@@ -1287,22 +1362,13 @@ def map_worktree(cwd: str) -> Tuple[str, str, str]:
 
 
 def durable_line(text: str, key: str) -> None:
-    """Append one check wake to the root home's queue without waiting for its lock, one gate at a time.
+    """Append one check wake to the root home's queue without waiting for its lock.
 
     When the queue lock is busy the wake is spilled to state/.wake-spill.<seq>,
-    which the next append to that queue, or the watcher's next start, replays.
-    durable.lock in the pool directory is held only around the append, which
-    never waits, so two gates never take the same spill file.
+    which the next append to that queue, or the watcher's next start, replays;
+    a spill never replaces another producer's spill (fm_wake_pending_settle).
     """
-    serial = None
     try:
-        try:
-            directory = pool_dir()
-            ensure_pool_dir(directory)
-            serial = open_lock(os.path.join(directory, "durable.lock"))
-            fcntl.flock(serial, fcntl.LOCK_EX)
-        except (PoolUnavailable, OSError):
-            pass
         home = root_home()
         subprocess.run(["bash", "-c", '. "$1" && FM_WAKE_PENDING_KIND=check FM_WAKE_PENDING_KEY=$2 FM_WAKE_PENDING_PAYLOAD=$3'
                         ' && fm_wake_pending_settle', "bash",
@@ -1311,9 +1377,6 @@ def durable_line(text: str, key: str) -> None:
                        stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=True)
     except (OSError, ValueError, subprocess.SubprocessError) as exc:
         log(2, "launch-gate: durable line not recorded (%s): %s" % (exc, text))
-    finally:
-        if serial is not None:
-            os.close(serial)
 
 
 def start_watched(command: List[str]) -> Tuple[int, int]:
@@ -1415,7 +1478,7 @@ def cmd_launch_gate(args: argparse.Namespace) -> int:
 
         def on_wait(reason: str, waited: float) -> None:
             held.append(reason)
-            durable_line("run %s (%s) held for capacity before its CI fix agent starts, waited %ds so far: %s; %s" % (
+            durable_line("run %s (%s) held for capacity before its CI fix agent starts, waited %.2fs so far: %s; %s" % (
                 run, branch, waited, reason, bound_text), "launch-gate-" + run)
 
         try:
@@ -1445,7 +1508,7 @@ def cmd_launch_gate(args: argparse.Namespace) -> int:
         log(2, "launch-gate admitted: %s %s admitted_ns=%d published_ns=%d agent_started_ns=%d unlocked_ns=%d" % (
             reason, bound_text, admitted_ns, published_ns, started_ns, unlocked_ns))
         if held:
-            durable_line("run %s (%s) admitted after %ds held: %s" % (run, branch, waited, reason), "launch-gate-" + run)
+            durable_line("run %s (%s) admitted after %.2fs held: %s" % (run, branch, waited, reason), "launch-gate-" + run)
         return wait_agent(child, watch_fd, reservation_fd)
     except LaunchRefused as refused:
         text = "launch-gate refused: %s: run %s; %s; next action: %s" % (

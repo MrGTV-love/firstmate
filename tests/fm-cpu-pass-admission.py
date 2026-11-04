@@ -594,8 +594,9 @@ try:
         if admitted:
             finish(child)
             held_now = visible[0][2] if visible else 0
-            # Unseen, the CI waiter reserves nothing; seen at 4 GiB (above A), it is counted at what it holds, uncapped.
-            entry = 'holding_only=[x:ci-waiting:0:unseen' if not visible else 'reserved=[x:active:%d' % held_now
+            # Unseen, the CI waiter reserves nothing; a leftover of it at 4 GiB (above A, reparented to launchd)
+            # is counted at what it holds, uncapped.
+            entry = 'holding_only=[x:ci-waiting:0:unseen' if not visible else 'holding_only=[x:ci-waiting:%d]' % held_now
             assert 'admitted: counted=1 projected=%d ' % (held_now + 8 * GIB) in log.read_text() and \
                 entry in log.read_text(), (label, log.read_text())
         else:
@@ -1129,7 +1130,7 @@ while not (folder / (run + '.release')).exists(): time.sleep(0.025)
     assert time.monotonic() - started_at < 10 and wakes(folder) == before
     spilled = ''.join(p.read_text() for p in (folder / 'fmhome' / 'state').glob('.wake-spill.[0-9]*'))
     assert 'launch-gate-unmapped' in spilled and 'unmapped worktree' in spilled, spilled
-    # Gates that spill at the same moment take turns under durable.lock: one spill file per gate, none overwritten.
+    # Gates that spill at the same moment each keep their own spill file: none is overwritten.
     burst = []
     for i in range(3):
         (folder / ('elsewhere-%d' % i)).mkdir()
@@ -1502,6 +1503,187 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
     (root / 'fixround.json').write_text(json.dumps(fixround, indent=2))
     print(json.dumps(dict(fixround=fixround)), flush=True)
     assert all(value == 'pass' for value in fixround.values()), fixround
+
+    # Independent review of 5e36d93ab (R1-R4): each case fails on that head and passes on the fix.
+    review = {}
+
+    def review_case(name, body):
+        try:
+            body()
+            review[name] = 'pass'
+        except Exception as exc:  # a hang or a refused assertion fails this case only
+            review[name] = 'FAIL: %s: %s' % (type(exc).__name__, str(exc)[:600])
+
+    def idle_leftover():
+        # R1: a CI waiter's leftover reparented to launchd holds only its bytes; a process a live owner outside
+        # the run started (the agent, whatever its name, or one the daemon has not recorded yet) reserves A.
+        held = GIB // 5
+        for label, parent, comm, admitted in (('leftover', 1, 'sleep', True), ('leftover-tree', 'tree', 'sleep', True),
+                                              ('attached-unnamed', 50, 'sleep', False), ('agent', 50, '2.1.318', False)):
+            folder, db, env = case('review-r1-' + label, measured=True, available=int(8.5 * GIB))
+            change(db, "INSERT INTO runs (id, status, repo_id) VALUES ('x', 'running', 'repo')")
+            change(db, "INSERT INTO step_results (id, run_id, step_name, step_order, status, agent_pid) VALUES ('x-ci', 'x', 'ci', 1, 'running', NULL)")
+            facts(folder, available=int(8.5 * GIB), runs=[('repo', 'x', held)])
+            rows = json.loads((folder / 'native' / 'processes.json').read_text())
+            rows[-1].update(comm=comm, ppid=1 if parent == 'tree' else parent)
+            if parent == 'tree':  # a child of the leftover is part of the same left-over tree
+                rows.append(dict(pid=300, ppid=rows[-1]['pid'], comm='node', started='s300', rss_bytes=0, fleet=True, run=rows[-1]['run']))
+            (folder / 'native' / 'processes.json').write_text(json.dumps(rows))
+            log = folder / 'r1.stderr'
+            child = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'm')], env, folder / 'r1')
+            if admitted:
+                finish(child)
+                assert 'admitted: counted=1 projected=%d ' % (held + 8 * GIB) in log.read_text() and \
+                    'holding_only=[x:ci-waiting:%d]' % held in log.read_text(), (label, log.read_text())
+            else:
+                line = 'waiting: counted=1 projected=%d ' % (9 * GIB)
+                until = time.monotonic() + 10
+                while time.monotonic() < until and child.poll() is None and line not in log.read_text():
+                    time.sleep(0.05)
+                running = child.poll() is None
+                if running:
+                    os.killpg(child.pid, signal.SIGTERM)
+                child.wait()
+                assert running and line in log.read_text() and not (folder / 'm').exists(), (label, log.read_text())
+
+    def wrapper_shapes():
+        # R2: every wrapper form the parser models joins the queue once through each route; reattachment,
+        # data and command -v do not. A form this host's binaries refuse is skipped and listed.
+        line = 'no-mistakes axi run --intent goal'
+
+        def accepted(command):
+            return subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+
+        fresh = {
+            'env-S': ['env', '-S', line], 'env-S-attached': ['env', '-S' + line], 'env-u-S': ['env', '-u', 'UNSET_X', '-S', line],
+            'env-S-quoted': ['env', '-S', "no-mistakes axi run --intent 'a goal'"],
+            'env-S-nested-route': ['env', '-S', 'bash %s run -- %s' % (repo / 'bin/fm-mem-guard.sh', line)],
+            'env-C': ['env', '-C', '/', 'no-mistakes', 'axi', 'run', '--intent', 'goal'],
+            'exec-a': ['bash', '-c', 'exec -a nm ' + line], 'nice-n': ['nice', '-n', '5'] + line.split(),
+        }
+        if accepted(['env', '--split-string=true']):
+            fresh['env-split-string'] = ['env', '--split-string=' + line]
+        if accepted(['env', '-P', '/bin', 'true']):
+            fresh['env-P'] = ['env', '-P', str(nm_bin), 'no-mistakes', 'axi', 'run', '--intent', 'goal']
+        if accepted(['time', '-o', os.devnull, 'true']):
+            fresh['time-o'] = ['time', '-o', os.devnull] + line.split()
+        if accepted(['stdbuf', '-oL', 'true']):
+            fresh['stdbuf-oL'] = ['stdbuf', '-oL'] + line.split()
+        others = {'env-S-reattach': ['env', '-S', 'no-mistakes axi run'],
+                  'env-S-data': ['env', '-S', 'echo no-mistakes axi run --intent x']}
+        if accepted(['command', '-v', 'true']):
+            others['command-v'] = ['command', '-v', 'no-mistakes']
+        import shlex
+        for route_name, wrap in (('measured', lambda shape: measured_run + shape), ('mem-guard', lambda shape: mem_guard + shape),
+                                 ('shell', lambda shape: ['bash', '-c', shlex.join(mem_guard + shape)])):
+            for name, shape in list(fresh.items()) + list(others.items()):
+                folder, db, env = case('review-r2-%s-%s' % (route_name, name), cores=3)
+                env.update(PATH=str(nm_bin) + os.pathsep + env['PATH'], CASE_NAME=name, FM_DURATION_FILE='off')
+                change(db, "INSERT INTO runs (id, status) VALUES ('existing', 'running')")
+                change(db, "UPDATE runs SET ci_ready_at = 1 WHERE id = 'existing'")  # active but not counted
+                child = launch(wrap(shape), env, folder / 'r2')
+                code = child.wait(timeout=30)
+                text = (folder / 'r2.stderr').read_text() + (folder / 'r2.stdout').read_text()
+                assert code == 0, (route_name, name, code, text)
+                with sqlite3.connect(db) as connection:
+                    new_rows = connection.execute("SELECT count(*) FROM runs WHERE id = ?", (name,)).fetchone()[0]
+                expected = 1 if name in fresh else 0
+                assert text.count('pipeline-start admitted') == expected and new_rows == expected, (route_name, name, text)
+
+    def wake_holder(env, folder):
+        held, release = folder / 'held', folder / 'release-queue'
+        holder = subprocess.Popen(['bash', '-c', '. "$1" && fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" && touch "$2" && '
+                                   'while [ ! -e "$3" ]; do sleep 0.05; done; fm_lock_release "$FM_WAKE_QUEUE_LOCK"',
+                                   'bash', str(repo / 'bin/fm-wake-lib.sh'), str(held), str(release)],
+                                  env=env, start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        children.append(holder)
+        wait_for(lambda: held.exists(), 'wake-queue lock held')
+        return holder, release
+
+    def refuse(env, folder, extra=None):
+        gate = subprocess.run(['bash', str(repo / 'bin/fm-cpu-pass.sh'), 'launch-gate', '--', '/bin/true'], env=dict(env, **(extra or {})),
+                              cwd=str(folder), stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=60)
+        assert gate.returncode == 75 and 'unmapped worktree' in gate.stderr, gate.stderr
+
+    def spills(folder):
+        return [p.read_text() for p in sorted((folder / 'fmhome' / 'state').glob('.wake-spill.[0-9]*'))]
+
+    def watcher_collision():
+        # R3: the watcher's real fm_wake_pending_settle takes the gate's spill number first; both records survive.
+        # The shim fires on whichever command publishes a spill (mv before the fix, ln after), so it tests the outcome.
+        folder, db, env = case('review-r3-collision', measured=True)
+        env['HOME'] = str(folder)
+        shim = folder / 'race-bin'
+        shim.mkdir()
+        script = ('#!/bin/sh\nreal=/bin/$(basename "$0")\nfor last do :; done\ncase "$last" in\n  */.wake-spill.[0-9]*)\n'
+                  '    if [ -z "${IN_WATCHER:-}" ] && mkdir "$CASE_FOLDER/first-publication" 2>/dev/null; then\n'
+                  '      IN_WATCHER=1 bash -c \'. "$1" && FM_WAKE_PENDING_KIND=check FM_WAKE_PENDING_KEY=watcher-test '
+                  'FM_WAKE_PENDING_PAYLOAD=watcher-test-event && fm_wake_pending_settle\' bash "$CASE_WAKE_LIB" || touch "$CASE_FOLDER/watcher-failed"\n'
+                  '    fi;;\nesac\nexec "$real" "$@"\n')
+        for name in ('mv', 'ln'):
+            (shim / name).write_text(script)
+            (shim / name).chmod(0o700)
+        holder, release = wake_holder(env, folder)
+        refuse(env, folder, dict(PATH=str(shim) + os.pathsep + env['PATH'], CASE_WAKE_LIB=str(repo / 'bin/fm-wake-lib.sh')))
+        release.touch()
+        holder.wait(timeout=30)
+        found = spills(folder)
+        assert (folder / 'first-publication').exists() and not (folder / 'watcher-failed').exists(), 'the collision never happened'
+        assert len(found) == 2 and sum('launch-gate-unmapped' in s for s in found) == 1 and sum('watcher-test-event' in s for s in found) == 1, found
+
+    def spill_controls():
+        # R3 controls: a free queue lock appends at once; a busy one spills one file; the next append replays it first.
+        folder, db, env = case('review-r3-free', measured=True)
+        env['HOME'] = str(folder)
+        refuse(env, folder)
+        assert 'launch-gate-unmapped' in wakes(folder) and not spills(folder), (wakes(folder), spills(folder))
+        folder, db, env = case('review-r3-spill', measured=True)
+        env['HOME'] = str(folder)
+        holder, release = wake_holder(env, folder)
+        refuse(env, folder)
+        found = spills(folder)
+        assert len(found) == 1 and 'launch-gate-unmapped' in found[0] and 'launch-gate-unmapped' not in wakes(folder), found
+        release.touch()
+        holder.wait(timeout=30)
+        subprocess.run(['bash', '-c', '. "$1" && fm_wake_append check later-key later-event', 'bash', str(repo / 'bin/fm-wake-lib.sh')],
+                       env=env, check=True, timeout=60)
+        queue = wakes(folder)
+        assert not spills(folder) and 0 <= queue.index('launch-gate-unmapped') < queue.index('later-event'), queue
+
+    def short_hold_record():
+        # R4: start-lock contention however short is a hold: the hold and the admission after it are recorded,
+        # each with run, reason and waited time; an admission at the first decision records nothing.
+        import fcntl
+        import re
+        for label, hold in (('short', 0.15), ('none', None)):
+            folder, db, env = gate_case('review-r4-' + label)
+            (folder / 'pool').mkdir(exist_ok=True)
+            lock = None
+            if hold is not None:
+                lock = os.open(str(folder / 'pool' / 'pipeline-start.lock'), os.O_RDWR | os.O_CREAT, 0o600)
+                fcntl.flock(lock, fcntl.LOCK_EX)
+            child, log = gate(folder, env, 'x', mode='exit-0')
+            if lock is not None:
+                wait_for(lambda: list((folder / 'pool').glob('pipeline-waiter-*.lock')), 'the gate queued')
+                time.sleep(hold)
+                fcntl.flock(lock, fcntl.LOCK_UN); os.close(lock)
+            assert child.wait(timeout=30) == 0, log.with_suffix('.stderr').read_text()
+            queue = wakes(folder)
+            if hold is None:
+                assert 'launch-gate' not in queue, queue
+            else:
+                assert re.search(r'run x \(fm/x\) held for capacity before its CI fix agent starts, waited \d+\.\d\ds so far: '
+                                 r'another start is registering', queue), queue
+                assert re.search(r'run x \(fm/x\) admitted after \d+\.\d\ds held: ', queue), queue
+
+    for name, body in (('R1 a CI waiter holding only a leftover', idle_leftover), ('R2 wrapper forms join the queue once', wrapper_shapes),
+                       ('R3 gate and watcher spills collide', watcher_collision), ('R3 controls: free lock, lone spill, replay', spill_controls),
+                       ('R4 a short start-lock hold is recorded', short_hold_record)):
+        review_case(name, body)
+    (root / 'review-5e36d93a.json').write_text(json.dumps(review, indent=2))
+    print(json.dumps(dict(review=review)), flush=True)
+    assert all(value == 'pass' for value in review.values()), review
+
 
     print(json.dumps(dict(result='pass', spacing=dict(limit=SPACING_LIMIT, burst_gaps=[round(g, 3) for g in burst_gaps], burst_median=round(statistics.median(burst_gaps), 3), injected_gaps=[round(g, 3) for g in injected_gaps], injected_median=round(statistics.median(injected_gaps), 3), injected_rejection=injected_rejection), artifacts=str(root), native_cpu_count=os.cpu_count(), invocations=records)), flush=True)
 finally:
