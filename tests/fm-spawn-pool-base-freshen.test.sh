@@ -2060,26 +2060,55 @@ test_successor_of_fresh_respawn_keeps_declaration() {
   pass 'a fresh spawn that does not name a kept successor declaration refuses and points to --relaunch'
 }
 
-test_successor_of_respawn_refusal_names_both_routes() {
-  local out rc=0
+# The refusal for a dropped declaration prints two retry routes. This follows the
+# printed fresh-spawn advice with its window gone and shows it recovers, while the
+# other route (--relaunch) refuses on the gone window.
+test_successor_of_gone_window_recovers_by_same_flag_spawn() {
+  local out rc=0 real meta advice_flag advice_pred
   make_successor_case routes advertise
   successor_pred pred-live
+  real=$(successor_real "$CASE_DIR/pred-pred-live")
+  meta="$HOME_DIR/state/$SUCC_ID.meta"
   out=$(OWNER_MODE=refuse-supersedes run_successor_spawn --successor-of pred-live) || rc=$?
   [ "$rc" -ne 0 ] || fail 'a refusing provisioner admitted the successor'
+  [ "$(successor_calls)" = 1 ] || fail 'the refused spawn did not call the provisioner once'
   "$FAKEBIN_DIR/tmux-real" kill-window -t "fm-$SUCC_ID" 2>/dev/null || true
+  : > "$LAUNCH_LOG"
+
+  # A fresh spawn with no flag refuses and prints the way out.
   rc=0
   out=$(run_successor_spawn) || rc=$?
   [ "$rc" -ne 0 ] || fail "a fresh spawn replaced an unfulfilled declaration: $out"
-  assert_contains "$out" "fm-spawn.sh $SUCC_ID --relaunch while the window lives" "the refusal does not name the --relaunch route: $out"
-  assert_contains "$out" "a fresh spawn naming the same --successor-of pred-live once it is gone" "the refusal does not name the same-flag respawn route: $out"
-  pass 'the respawn-drop refusal names --relaunch and the same-flag respawn'
+  advice_flag=$(printf '%s\n' "$out" | sed -n 's/.*a fresh spawn naming the same \(--successor-of\) [^ ]* once it is gone.*/\1/p')
+  advice_pred=$(printf '%s\n' "$out" | sed -n 's/.*a fresh spawn naming the same --successor-of \([^ ]*\) once it is gone.*/\1/p')
+  [ -n "$advice_flag" ] && [ -n "$advice_pred" ] || fail "the refusal prints no same-flag respawn route: $out"
+  [ "$(successor_calls)" = 1 ] || fail 'the refused fresh spawn reached the provisioner'
+
+  # The other printed route, --relaunch, refuses once the window is gone.
+  rc=0
+  out=$(FM_TEST_CALLS="$CALLS" FM_TEST_OWNER_MODE=pass FM_TEST_SLOT_RECORD="$CASE_DIR/manifest.json" \
+    FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" fm_test_run_spawn "$HOME_DIR" "$POOL_DIR" "$FAKEBIN_DIR" "$SUCC_ID" --relaunch) || rc=$?
+  [ "$rc" -ne 0 ] || fail "--relaunch replaced a proven-gone tmux endpoint: $out"
+  assert_contains "$out" 'proven-gone tmux endpoint' "--relaunch did not refuse as a proven-gone endpoint: $out"
+  [ "$(successor_calls)" = 1 ] || fail 'the refused --relaunch reached the provisioner'
+  [ ! -s "$LAUNCH_LOG" ] || fail 'the refused --relaunch started an agent'
+
+  # The printed same-flag respawn recovers: the provisioner gets --supersedes and the declaration is fulfilled.
+  rc=0
+  out=$(run_successor_spawn "$advice_flag" "$advice_pred") || rc=$?
+  expect_code 0 "$rc" "the printed same-flag respawn failed: $out"
+  [ "$(successor_calls)" = 2 ] || fail 'the same-flag respawn did not call the provisioner once'
+  successor_argv_ok 2 "$real" || fail 'the same-flag respawn did not pass the live predecessor copy'
+  [ "$(successor_meta_count "$SUCC_ID" pred-live)" = 1 ] || fail 'the same-flag respawn lost or duplicated successor_of'
+  assert_no_grep 'recovery=slot-provision-refused' "$meta" 'the same-flag respawn kept the refusal marker'
+  pass 'with the window gone, the printed same-flag respawn recovers and --relaunch refuses'
 }
 
 # Explicit selection keeps focused acquisition regressions independently runnable.
 if [ "$#" -gt 0 ]; then
   for selected_test in "$@"; do
     case "$selected_test" in
-      test_freshness_introduces_slot_owner|test_freshness_introduces_scout_slot_owner|test_freshness_slot_owner_requires_scope|test_freshness_present_slot_owner_refuses|test_freshness_absent_slot_owner_launches|test_freshness_removed_slot_owner_refuses|test_local_only_source_selection|test_local_only_source_binding|test_local_only_unprepared_retry|test_local_only_origin_early|test_local_only_origin_late|test_local_only_origin_freshness|test_local_only_origin_copy_missing|test_local_only_origin_primary_missing|test_local_only_equal_retry_selects_local|test_local_only_equal_retry_divergence|test_local_only_adopted_scope_retry|test_local_only_equal_retry_invalid_ref|test_legacy_relaunch_scope_adoption|test_successor_of_reaches_the_provisioner|test_successor_of_refuses_untrustworthy_predecessors|test_successor_of_scope|test_successor_of_retained_retry|test_successor_of_checks_are_load_bearing|test_successor_of_branch_is_rechecked_at_handover|test_successor_of_task_record_is_rechecked_at_handover|test_successor_of_batch_is_refused|test_successor_of_refuses_before_any_lock|test_successor_of_fresh_respawn_keeps_declaration|test_successor_of_respawn_refusal_names_both_routes) "$selected_test" ;;
+      test_freshness_introduces_slot_owner|test_freshness_introduces_scout_slot_owner|test_freshness_slot_owner_requires_scope|test_freshness_present_slot_owner_refuses|test_freshness_absent_slot_owner_launches|test_freshness_removed_slot_owner_refuses|test_local_only_source_selection|test_local_only_source_binding|test_local_only_unprepared_retry|test_local_only_origin_early|test_local_only_origin_late|test_local_only_origin_freshness|test_local_only_origin_copy_missing|test_local_only_origin_primary_missing|test_local_only_equal_retry_selects_local|test_local_only_equal_retry_divergence|test_local_only_adopted_scope_retry|test_local_only_equal_retry_invalid_ref|test_legacy_relaunch_scope_adoption|test_successor_of_reaches_the_provisioner|test_successor_of_refuses_untrustworthy_predecessors|test_successor_of_scope|test_successor_of_retained_retry|test_successor_of_checks_are_load_bearing|test_successor_of_branch_is_rechecked_at_handover|test_successor_of_task_record_is_rechecked_at_handover|test_successor_of_batch_is_refused|test_successor_of_refuses_before_any_lock|test_successor_of_fresh_respawn_keeps_declaration|test_successor_of_gone_window_recovers_by_same_flag_spawn) "$selected_test" ;;
       *) fail "unknown selected acquisition test: $selected_test" ;;
     esac
   done
@@ -2104,7 +2133,7 @@ test_successor_of_task_record_is_rechecked_at_handover
 test_successor_of_batch_is_refused
 test_successor_of_refuses_before_any_lock
 test_successor_of_fresh_respawn_keeps_declaration
-test_successor_of_respawn_refusal_names_both_routes
+test_successor_of_gone_window_recovers_by_same_flag_spawn
 test_local_only_origin_early
 test_local_only_origin_late
 test_local_only_origin_freshness
