@@ -23,7 +23,8 @@
 # Managed and stopped agents are left untouched. Unmanaged live agents are
 # reported without lifecycle input; native restoration does not prove ownership.
 # Unknown proof on a versioned launch refuses; an unadopted unpinned claude
-# refuses with its own cause. A legacy record (no launch_proof)
+# refuses with its own cause, and a claude pinned to another launch generation
+# refuses with its own cause and never names adopt. A legacy record (no launch_proof)
 # keeps exit and relaunch: an unpinned legacy omp is reported as such, and other
 # legacy-unproven launches skip.
 # This mode cannot change a profile or create a relaunch transaction.

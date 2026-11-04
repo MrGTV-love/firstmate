@@ -224,7 +224,7 @@ It sends no input and starts or stops nothing.
   An entry needs Main's recorded confirmation before it is added; for a listed launcher the harness must be its only claude child, a direct child in its process group, and run exactly the forwarded arguments.
   An interpreter, shell, editor, or unlisted wrapper that merely has a harness-shaped descendant is not proven.
 - The harness's kernel working directory is exactly the task's recorded home or worktree; a subdirectory of either is refused.
-- No process in the tree carries a launch pin, and none carries one for another generation.
+- Neither the attributed process nor the harness carries a launch pin, and no process in the harness's process group carries one for another generation.
 - No other task record in this home or in a secondmate home it can read claims the pane, the home, or the worktree.
 - A task-specific session tie exists.
   The harness argv names one `--resume` session id, and either the task's recorded `claude_session_id` equals it, or the first user message of that session's transcript is the launch-brief doorbell of a record that sits in the task's own `state/operational-inbox/`, that `bin/fm-operational-input.sh` identifies as kind `launch-brief`, and that is not newer than the message.
@@ -263,9 +263,9 @@ Without the matching pin, an omp process is unmanaged, including Herdr-native `o
 Resume arguments, native session-file headers, original launch briefs, task inbox paths, actual cwd, and current Herdr session registration never substitute for current-session proof on their own.
 For a launch-pinned omp process, an in-process switch to a personal conversation is unmanaged even when the PID, argv, environment, and original task session file are unchanged.
 An adopted process has no pin, so this switch protection does not cover it; see the [residual risk](#repairing-a-restored-omp-session-record).
-A versioned claude launch without a matching pin is also unmanaged, adopted only by the [claude route](#adopting-a-restored-claude-agent); a legacy claude record and every other recorded harness remain unknown with missing or mismatched pins.
+A versioned claude launch without a pin is also unmanaged, adopted only by the [claude route](#adopting-a-restored-claude-agent); one whose attributed process or process group carries a pin for another generation is `pinned-elsewhere`, and one whose record has no `spawn_gen` is unknown. A legacy claude record and every other recorded harness remain unknown with missing or mismatched pins.
 Unreadable environments, ambiguous foreground identity, and unsupported launch-proof versions also remain unknown.
-Neither unmanaged nor unknown proof authorizes lifecycle action for a record with `launch_proof`.
+No unmanaged, `pinned-elsewhere`, or unknown proof authorizes lifecycle action for a record with `launch_proof`.
 Every Herdr replacement must have matching managed-launch proof, including current-session proof for omp, before transaction completion.
 The normal failed-launch and published-record reconciliation rules below still apply.
 

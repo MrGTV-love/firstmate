@@ -2366,6 +2366,28 @@ test_claude_restore_restart_decides_attribution_before_its_first_effect() {
   pass "claude restore: the restart decides attribution before any pending reply, inbox write, request or nudge"
 }
 
+test_claude_restore_relaunch_after_adoption() {
+  prepare_claude_restore relaunch-adopted
+  local CONTROL="$ROOT/bin/fm-control.sh"
+  local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID out rc=0 gen pin
+  out=$(run_continuation_control "$dir" "$id" adopt) || fail "adopt before relaunch: $out"
+  assert_present "$dir/home/state/$id.claude-adoption.json" "adoption wrote its record"
+  out=$(run_control "$dir" "$id" relaunch --note "continue the adopted lane") || rc=$?
+  expect_code 0 "$rc" "an adopted claude lane must relaunch"$'\n'"$out"
+  assert_contains "$out" "relaunched $id" "the relaunch reports its task"
+  [ "$(journal_field "$dir" "$id" phase)" = complete ] || fail "the adopted relaunch did not complete"
+  gen=$(meta_field "$dir" "$id" spawn_gen)
+  [ -n "$gen" ] && [ "$gen" != old ] || fail "the adopted relaunch kept the old launch generation"
+  pin=$(FM_FAKE_DIR="$dir/fake" FM_HOME="$dir/home" "$dir/fakebin/python3" - 2000000000 </dev/null | sed -n 's/^FM_SPAWN_GEN=//p')
+  assert_equals "$gen" "$pin" "the replacement carries a pin for the new launch generation"
+  assert_absent "$dir/home/state/$id.claude-adoption.json" "the relaunch removes the spent adoption record"
+  rc=0
+  out=$(CONTROL="$ROOT/bin/fm-reboot-recover.sh" run_control "$dir" recover) || rc=$?
+  expect_code 0 "$rc" "the sweep accepts the managed replacement"$'\n'"$out"
+  [ -z "$out" ] || fail "the sweep must stay silent for the managed replacement, got: $out"
+  pass "claude restore: an adopted lane relaunches with a new pin, drops its adoption record and reads managed"
+}
+
 test_claude_pinned_elsewhere_names_its_own_cause() {
   prepare_claude_restore pinned-elsewhere
   local CONTROL="$ROOT/bin/fm-control.sh"
@@ -2453,6 +2475,7 @@ test_claude_restore_adoption_refuses_a_personal_session
 test_claude_restore_adoption_refuses_the_teamclaude_wrapper
 test_claude_restore_adoption_caller_gate
 test_claude_restore_restart_decides_attribution_before_its_first_effect
+test_claude_restore_relaunch_after_adoption
 test_restart_refuses_an_unproven_agent_state
 test_claude_pinned_elsewhere_names_its_own_cause
 test_bounded_reboot_recovery_rotates_unmanaged_inspections_without_mutation

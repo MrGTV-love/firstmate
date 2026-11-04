@@ -596,7 +596,7 @@ test_launch_proof_claude_verdict_and_refusal() (
   PIN_GEN=s1793120312.10459.5003
   ps() {
     case "$*" in
-      '-axo pid=,ppid=,pgid=') printf '%s\n' '53733 1 53733'; [ ! -f "$T/env-56557" ] || printf '%s\n' '56557 53733 53733' ;;
+      '-axo pid=,ppid=,pgid=') [ -f "$T/table-empty" ] && return 0; printf '%s\n' '53733 1 53733'; [ ! -f "$T/env-56557" ] || printf '%s\n' '56557 53733 53733' ;;
       '-axo pid=,ppid=') printf '%s\n' '53733 1' ;;
       '-p 53733 -o comm=') echo 2.1.316 ;;
       '-p 53733 -o args=') echo "claude --resume $UUID" ;;
@@ -663,7 +663,17 @@ test_launch_proof_claude_verdict_and_refusal() (
     assert_not_contains "$out" 'unpinned native restore' "a $kind pinned process is not called unpinned"
     assert_not_contains "$out" 'fm-control.sh vernant-t1 adopt' "a $kind pinned process is never sent to adopt"
   done
-  rm -f "$T/env-extra"
+  # The anchor's own foreign pin counts even when the process table lacks the anchor.
+  : > "$T/table-empty"
+  assert_equals pinned-elsewhere "$(fm_launch_proof_herdr "$META")" 'the anchor pin is read even without a process-table row'
+  rm -f "$T/table-empty" "$T/env-extra"
+  meta_for claude env-v1
+  # A record without spawn_gen never had its environment compared, so it is not called readable.
+  grep -v '^spawn_gen=' "$META" > "$T/meta-nogen" && mv "$T/meta-nogen" "$META"
+  assert_equals unknown "$(fm_launch_proof_herdr "$META")" 'a versioned claude record without spawn_gen is unknown'
+  out=$(fm_launch_proof_herdr_refusal "$META") && fail 'a versioned claude record without spawn_gen was authorized'
+  assert_not_contains "$out" 'environment was readable' 'a record without spawn_gen does not claim a readable environment'
+  assert_not_contains "$out" 'fm-control.sh vernant-t1 adopt' 'a record without spawn_gen is not sent to adopt'
   meta_for claude env-v1
   # A short-lived child in the agent's process group pinned to another generation:
   # adopt refuses that tree, so the verdict names the foreign pin, not adopt.

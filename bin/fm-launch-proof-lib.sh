@@ -60,8 +60,8 @@ fm_launch_proof_pid_pinned_elsewhere() { # <pid> <spawn-gen>
 # launch generation: the tree adoption refuses. Prints nothing.
 fm_launch_proof_tree_pinned_elsewhere() { # <spawn-gen> <process-table> <anchor-pid> [<pid>...]
   local gen=$1 table=$2 anchor=$3 kid
-  shift 2
-  for kid in $(awk -v g="$(awk -v p="$anchor" '$1 == p {print $3; exit}' <<< "$table")" 'g != "" && $3 == g {print $1}' <<< "$table") "$@"; do
+  shift 3
+  for kid in "$anchor" $(awk -v g="$(awk -v p="$anchor" '$1 == p {print $3; exit}' <<< "$table")" 'g != "" && $3 == g {print $1}' <<< "$table") "$@"; do
     ! fm_launch_proof_pid_pinned_elsewhere "$kid" "$gen" || return 0
   done
   return 1
@@ -648,6 +648,7 @@ fm_launch_proof_herdr_verdict() { # <meta> <pid> -> managed|unmanaged|pinned-els
       # environment as such; a legacy claude record keeps its pre-proof rule.
       case "$(fm_meta_get "$meta" harness):$proof" in
         claude:env-v1)
+          [ -n "$gen" ] || { printf unknown; return; }
           table=$(LC_ALL=C ps -axo pid=,ppid=,pgid= 2>/dev/null) || table=''
           if fm_launch_proof_tree_pinned_elsewhere "$gen" "$table" "$pid"; then printf pinned-elsewhere; else printf unmanaged; fi ;;
         omp:*) printf unmanaged ;;

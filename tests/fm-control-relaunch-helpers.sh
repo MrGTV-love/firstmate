@@ -1063,8 +1063,8 @@ case "${1:-} ${2:-}" in
     case "$payload" in
       ". '"*"'") staged=${payload#". '"}; staged=${staged%"'"}; [ ! -f "$staged" ] || payload=$(cat "$staged") ;;
     esac
-    if [ -f "$D/recovery-case-id" ] && [ "$payload" = /quit ]; then
-      : > "$D/exit-pending"
+    if [ -f "$D/recovery-case-id" ] && { [ "$payload" = /quit ] || [ "$payload" = /exit ]; }; then
+      printf '%s' "$payload" > "$D/exit-pending"
     fi
     case "$payload" in
       *'encode launch-brief'* | *'Firstmate operational input waiting: read'*)
@@ -1094,7 +1094,7 @@ case "${1:-} ${2:-}" in
   'pane read')
     if [ -f "$D/recovery-case-id" ]; then
       if [ -f "$D/exit-pending" ]; then
-        printf '╭── π > recovery╮\n╰─ /quit ─╯\n'
+        printf '╭── π > recovery╮\n╰─ %s ─╯\n' "$(cat "$D/exit-pending")"
       elif [ -f "$D/recovery-pending" ]; then
         printf '╭── π > recovery╮\n╰─ %s ─╯\n' "$(cat "$D/recovery-pending")"
       else
