@@ -4510,7 +4510,7 @@ teardown_unclaimed_read_lease() {  # bind | verify
 # The strict custody walk and the root checks, repeated before each decision.
 teardown_unclaimed_prove_custody() {
   local slot=$TEARDOWN_UNCLAIMED_SLOT current prior_real known copy pids changes change repos repo rc
-  local -a proofs=()
+  local -a proofs=() own=()
   fm_treehouse_slot_owner_state "$slot" "$ID"
   [ "$FM_TREEHOUSE_SLOT_OWNER" = absent ] \
     || { teardown_unclaimed_note "its slot claim is '$FM_TREEHOUSE_SLOT_OWNER', not absent"; return 1; }
@@ -4582,20 +4582,17 @@ teardown_unclaimed_prove_custody() {
     done
     [ "$known" = 1 ] || { teardown_unclaimed_note "its root holds changes that are not this task's own copies: ${change:3}"; return 1; }
   done <<< "$changes"
+  for copy in ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}; do
+    [ ! -e "$copy" ] || own+=(-o \( -samefile "$copy" -prune \))
+  done
   rc=0
-  repos=$(find -P "$slot" -mindepth 1 \( -path "$slot/.git" -prune \) -o \( -name .git -prune -print \) 2>/dev/null) || rc=$?
+  repos=$(find -P "$slot" -mindepth 1 \( -path "$slot/.git" -prune \) ${own[@]+"${own[@]}"} -o \( -name .git -prune -print \) 2>/dev/null) || rc=$?
   if [ "$rc" -ne 0 ]; then
     teardown_unclaimed_note "its root could not be scanned for other Git repositories"
     return 1
   fi
-  while IFS= read -r repo; do
-    [ -n "$repo" ] || continue
-    known=0
-    for copy in ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}; do
-      case "$repo" in "$copy"/*) known=1 ;; esac
-    done
-    [ "$known" = 1 ] || { teardown_unclaimed_note "its root holds Git repository ${repo%/.git}, which is not this task's own copy"; return 1; }
-  done <<< "$repos"
+  repo=${repos%%$'\n'*}
+  [ -z "$repo" ] || { teardown_unclaimed_note "its root holds Git repository ${repo%/.git}, which is not this task's own copy"; return 1; }
   if ! pids=$(pids_with_cwd_under "$slot"); then
     teardown_unclaimed_note "the live-process scan under it could not complete"
     return 1
