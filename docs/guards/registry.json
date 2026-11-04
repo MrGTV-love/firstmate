@@ -500,6 +500,10 @@
         },
         {
           "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: own nested copy $(fm_refuse_text \"$copy\") is unchanged since Vernant's closeout driver last kept it and teardown refused it: $(fm_refuse_text \"$TEARDOWN_REFUSED_REASON\") (record $(fm_refuse_text \"$TEARDOWN_REFUSED_RECORD\")); the driver was not asked again, and the task was not closed.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
           "match": "echo \"REFUSED: ignored files of own nested copy $(fm_refuse_text \"$copy\") differ from the bytes already preserved for it in $(fm_refuse_text \"$(teardown_retained_preserve_dir \"$copy\")\"); Vernant's closeout driver was not asked, and the task was not closed.\" >&2"
         },
         {

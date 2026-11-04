@@ -3065,6 +3065,12 @@ retained_record_path() {
   printf '%s/data/copy-sweep/retained/%s\n' "$FOREIGN_CASE" "$hash"
 }
 
+retained_refused_record_path() {
+  local hash
+  hash=$(printf '%s' "$FOREIGN_COPY" | shasum -a 256 | awk '{print $1}')
+  printf '%s/data/task-x1/closeout-refused/%s\n' "$FOREIGN_CASE" "$hash"
+}
+
 # A refused teardown of an own copy changed nothing: the copy is still locked and
 # registered, its branch, the task record, the slot claim and Treehouse's lease are
 # intact, and no pool return ran.

@@ -94,6 +94,11 @@ TEARDOWN_RETAINED_UNIQUE=
 TEARDOWN_RET_HEAD=
 TEARDOWN_RET_STATUS=
 TEARDOWN_RET_PAYLOAD=
+# The facts of the last matching record of a kept own copy that teardown refused
+# after the driver answered (see teardown_retained_refused_matches).
+TEARDOWN_REFUSED_RECORD=
+TEARDOWN_REFUSED_REASON=
+TEARDOWN_REFUSED_UNIQUE=
 # One "pid<TAB>birth identity<TAB>cwd" entry per live lock launcher or process
 # running in a copy that was proved to be this teardown's own; cwd is that of the
 # own process it was chosen through.
@@ -1614,7 +1619,8 @@ teardown_copy_retained() {  # <copy>
 
 # Is <copy>'s preserve complete? Every entry teardown_preserve_ignored selects and
 # every driver-named path (given on stdin) must be there byte for byte; in adopt
-# mode the driver-named ones the preserve lacks are copied in first.
+# mode the driver-named ones the preserve lacks are copied in first. Returns 3
+# when a driver-named path is not a plain path inside the copy, 1 otherwise.
 teardown_retained_preserve_check() {  # <strict|adopt> <copy> <dir>   (driver-named paths on stdin)
   local mode=$1 copy=$2 dir=$3 entry paths selected
   local -a named=() chosen=()
@@ -1625,7 +1631,7 @@ teardown_retained_preserve_check() {  # <strict|adopt> <copy> <dir>   (driver-na
   for entry in ${named[@]+"${named[@]}"}; do
     if ! teardown_retained_entry_ok "$copy" "$entry"; then
       echo "REFUSED: Vernant's closeout driver names ignored path $(fm_refuse_text "$entry") of own nested copy $(fm_refuse_text "$copy"), which is not a plain path inside the copy or no longer exists; the task was not closed." >&2
-      return 1
+      return 3
     fi
   done
   selected=$(teardown_preservable_ignored "$copy") || return 1
@@ -1691,6 +1697,103 @@ teardown_retained_confirm() {  # <slot> <copy>
   echo "teardown: own nested copy $(fm_refuse_text "$copy") is unchanged since the driver kept it (record $(fm_refuse_text "$TEARDOWN_RETAINED_RECORD")); the driver was not asked again" >&2
 }
 
+# The record of a kept own copy that teardown refused after the driver answered
+# for it: data/<task>/closeout-refused/<sha256 of the copy path>. Its first three
+# lines take the retained record's form (lock hash, copy, identity); key=value
+# lines add task, head, status-sha256, payload-sha256, named-sha256, reason,
+# refused-at and one unique line per driver-named path. A retry of the copy while
+# it still matches asks the driver nothing; any run that asks the driver first
+# deletes it.
+teardown_retained_refused_path() {  # <copy>
+  local hash
+  hash=$(printf '%s' "$1" | teardown_ignored_sha256) || return 1
+  printf '%s/%s/closeout-refused/%s\n' "$DATA" "$ID" "$hash"
+}
+
+# One SHA-256 over each driver-named path (on stdin) and whether it is still a
+# plain path inside <copy>.
+teardown_retained_named_state() {  # <copy>
+  local entry
+  while IFS= read -r entry; do
+    [ -n "$entry" ] || continue
+    if teardown_retained_entry_ok "$1" "$entry"; then
+      printf '%s\tok\n' "$entry"
+    else
+      printf '%s\tbad\n' "$entry"
+    fi
+  done | teardown_ignored_sha256
+}
+
+# Writes the refusal record of <copy> atomically, from a fresh
+# teardown_retained_snapshot, naming <reason>.
+teardown_retained_refused_write() {  # <copy> <lock-sha256> <identity> <paths> <reason>
+  local copy=$1 rec tmp named path
+  teardown_retained_snapshot "$copy" || return 1
+  named=$(printf '%s\n' "$4" | teardown_retained_named_state "$copy") || return 1
+  rec=$(teardown_retained_refused_path "$copy") || return 1
+  mkdir -p "${rec%/*}" || return 1
+  tmp=$(mktemp "${rec%/*}/.refused.XXXXXX") || return 1
+  {
+    printf 'lock-sha256=%s\ncopy=%s\nidentity=%s\n' "$2" "$copy" "$3"
+    printf 'task=%s\nhead=%s\nstatus-sha256=%s\npayload-sha256=%s\nnamed-sha256=%s\nreason=%s\nrefused-at=%s\n' \
+      "$ID" "$TEARDOWN_RET_HEAD" "$TEARDOWN_RET_STATUS" "$TEARDOWN_RET_PAYLOAD" "$named" "$5" \
+      "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    while IFS= read -r path; do
+      [ -z "$path" ] || printf 'unique=%s\n' "$path"
+    done <<< "$4"
+  } > "$tmp" || { rm -f "$tmp"; return 1; }
+  mv -- "$tmp" "$rec" || { rm -f "$tmp"; return 1; }
+}
+
+teardown_retained_refused_note() {  # <copy> <lock-sha256> <identity> <paths> <reason>
+  teardown_retained_refused_write "$@" \
+    || echo "warning: the refusal record of own nested copy $(fm_refuse_text "$1") could not be written, so a retry asks Vernant's closeout driver again." >&2
+}
+
+# True when <copy> has a refusal record that still describes it: the same copy
+# (path and identity), the same creation lock, this task, the HEAD, status and
+# ignored payload it recorded, and the same state of each driver-named path.
+# Sets TEARDOWN_REFUSED_RECORD, _REASON and _UNIQUE for a record that applies.
+teardown_retained_refused_matches() {  # <copy>
+  local copy=$1 rec hash='' rcopy='' identity='' actual unique
+  TEARDOWN_REFUSED_RECORD=
+  TEARDOWN_REFUSED_REASON=
+  TEARDOWN_REFUSED_UNIQUE=
+  rec=$(teardown_retained_refused_path "$copy") || return 1
+  { [ -f "$rec" ] && [ ! -L "$rec" ] && [ -r "$rec" ]; } || return 1
+  { IFS= read -r hash && IFS= read -r rcopy && IFS= read -r identity; } < "$rec" || true
+  [ "$rcopy" = "copy=$copy" ] || return 1
+  actual=$(copy_identity "$copy") || return 1
+  [ "$actual" = "${identity#identity=}" ] || return 1
+  actual=$(teardown_ignored_sha256 "$TEARDOWN_FOREIGN_LOCK_FILE") || return 1
+  [ "$actual" = "${hash#lock-sha256=}" ] || return 1
+  [ "$(teardown_retained_fields "$rec" task)" = "$ID" ] || return 1
+  teardown_retained_snapshot "$copy" || return 1
+  [ "$(teardown_retained_fields "$rec" head)" = "$TEARDOWN_RET_HEAD" ] || return 1
+  [ "$(teardown_retained_fields "$rec" status-sha256)" = "$TEARDOWN_RET_STATUS" ] || return 1
+  [ "$(teardown_retained_fields "$rec" payload-sha256)" = "$TEARDOWN_RET_PAYLOAD" ] || return 1
+  unique=$(teardown_retained_fields "$rec" unique)
+  actual=$(printf '%s\n' "$unique" | teardown_retained_named_state "$copy") || return 1
+  [ "$(teardown_retained_fields "$rec" named-sha256)" = "$actual" ] || return 1
+  TEARDOWN_REFUSED_RECORD=$rec
+  TEARDOWN_REFUSED_REASON=$(teardown_retained_fields "$rec" reason)
+  TEARDOWN_REFUSED_UNIQUE=$unique
+}
+
+# Does the cause of a matching refusal record still hold? The driver-free proofs
+# of teardown_retained_accept run again, each printing its cause, so a copy whose
+# work has landed since is not refused on the record alone; only the driver's
+# answer is taken from the record.
+teardown_retained_refused_holds() {  # <copy>
+  local copy=$1 entry
+  teardown_own_nested_other_repos || return 0
+  teardown_own_copy_disposable "$copy" || return 0
+  while IFS= read -r entry; do
+    [ -z "$entry" ] || teardown_retained_entry_ok "$copy" "$entry" || return 0
+  done <<< "$TEARDOWN_REFUSED_UNIQUE"
+  return 1
+}
+
 # The driver kept own nested copy <copy> (teardown_closeout_retained_paths held;
 # <paths> are the ignored paths it names unique). Judges the harm directly
 # instead of taking the refusal for unique work: the ordinary clean and landed
@@ -1700,7 +1803,7 @@ teardown_retained_confirm() {  # <slot> <copy>
 # checked. Only then does it write the retained record and return 0, leaving the
 # copy exactly as it was. Returns 1 after printing the cause; nothing is removed.
 teardown_retained_accept() {  # <slot> <copy> <lock-sha256> <identity> <paths>
-  local slot=$1 copy=$2 lock_hash=$3 identity=$4 paths=$5 dir before
+  local slot=$1 copy=$2 lock_hash=$3 identity=$4 paths=$5 dir before rc
   paths=$(printf '%s\n' "$paths" | sed 's#/*$##')
   if ! [[ $lock_hash =~ ^[0-9a-f]{64}$ ]] || ! [[ $identity =~ ^[0-9]+:[0-9]+$ ]]; then
     echo "REFUSED: the creation lock and identity of own nested copy $(fm_refuse_text "$copy") could not be read, so its retained state cannot be recorded; the task was not closed." >&2
@@ -1710,8 +1813,16 @@ teardown_retained_accept() {  # <slot> <copy> <lock-sha256> <identity> <paths>
     echo "REFUSED: own nested copy $(fm_refuse_text "$copy") is not the copy the driver was asked about any more; the task was not closed." >&2
     return 1
   fi
-  teardown_own_nested_other_repos || return 1
-  teardown_own_copy_disposable "$copy" || return 1
+  if ! teardown_own_nested_other_repos; then
+    teardown_retained_refused_note "$copy" "$lock_hash" "$identity" "$paths" \
+      "the task's nested copies hold another Git repository, or could not be scanned for one"
+    return 1
+  fi
+  if ! teardown_own_copy_disposable "$copy"; then
+    teardown_retained_refused_note "$copy" "$lock_hash" "$identity" "$paths" \
+      "the copy is not proved landed and clean"
+    return 1
+  fi
   dir=$(teardown_retained_preserve_dir "$copy") || return 1
   if ! teardown_retained_snapshot "$copy"; then
     echo "REFUSED: the state of own nested copy $(fm_refuse_text "$copy") could not be read, so its retained state cannot be recorded; the task was not closed." >&2
@@ -1724,7 +1835,14 @@ teardown_retained_accept() {  # <slot> <copy> <lock-sha256> <identity> <paths>
       return 1
     }
   fi
-  if ! teardown_retained_preserve_check adopt "$copy" "$dir" <<< "$paths"; then
+  rc=0
+  teardown_retained_preserve_check adopt "$copy" "$dir" <<< "$paths" || rc=$?
+  if [ "$rc" = 3 ]; then
+    teardown_retained_refused_note "$copy" "$lock_hash" "$identity" "$paths" \
+      "the driver names an ignored path that is not a plain path inside the copy or no longer exists"
+    return 1
+  fi
+  if [ "$rc" != 0 ]; then
     echo "REFUSED: the ignored files of own nested copy $(fm_refuse_text "$copy") that the driver names unique, or that preservation selects, are not held byte for byte in $(fm_refuse_text "$dir"); the task was not closed and the copy was not touched." >&2
     return 1
   fi
@@ -1899,7 +2017,7 @@ teardown_own_locked_copies_prove() {
 # creation lock holds, then releases and removes it. Returns 1 after printing a
 # refusal.
 teardown_own_copy_dispose() {  # <slot> <copy>
-  local slot=$1 copy=$2 rc=0 lock_hash='' identity='' paths
+  local slot=$1 copy=$2 rc=0 lock_hash='' identity='' paths refused
   teardown_copy_lock_file "$copy" || rc=$?
   if [ "$rc" != 0 ] || ! teardown_vernant_lock_pid "$TEARDOWN_FOREIGN_LOCK" >/dev/null; then
     echo "REFUSED: own nested copy $(fm_refuse_text "$copy") is not locked by Vernant's creation lock any more; it was not removed." >&2
@@ -1909,6 +2027,11 @@ teardown_own_copy_dispose() {  # <slot> <copy>
     teardown_retained_confirm "$slot" "$copy"
     return
   fi
+  if teardown_retained_refused_matches "$copy" && teardown_retained_refused_holds "$copy"; then
+    echo "REFUSED: own nested copy $(fm_refuse_text "$copy") is unchanged since Vernant's closeout driver last kept it and teardown refused it: $(fm_refuse_text "$TEARDOWN_REFUSED_REASON") (record $(fm_refuse_text "$TEARDOWN_REFUSED_RECORD")); the driver was not asked again, and the task was not closed." >&2
+    return 1
+  fi
+  refused=$(teardown_retained_refused_path "$copy") || refused=
   lock_hash=$(teardown_ignored_sha256 "$TEARDOWN_FOREIGN_LOCK_FILE") || lock_hash=
   identity=$(copy_identity "$copy") || identity=
   rc=0
@@ -1928,6 +2051,7 @@ teardown_own_copy_dispose() {  # <slot> <copy>
     teardown_refuse_copy ignored-bytes-preserved "the ignored files of own nested copy $copy could not be preserved in $DATA/$ID/nested-copy-preserved; it was not removed." "$copy"
     return 1
   }
+  [ -z "$refused" ] || rm -f -- "$refused"
   rc=0
   teardown_run_closeout "$slot" "$copy" || rc=$?
   if [ "$rc" != 0 ]; then

@@ -6620,14 +6620,14 @@ test_a_kept_copy_in_a_slot_a_peer_works_in_refuses_and_its_retry_asks_the_driver
   pass "a kept-copy close in a slot a peer still works in refuses with the copy and its record named, and its retry asks the driver nothing"
 }
 
-# retained_variant <variant> <plain|force>: the C1 fixture with one fact changed
+# retained_variant <variant> <plain|force> [label]: the C1 fixture with one fact changed
 # (or none, for c1-input), run with or without --force and the --drop-file it needs.
 # Sets RV_DISPOSITION to what survived and the exit class. When
 # FM_RETAINED_EVIDENCE names a file, appends the printed state to it.
 retained_variant() {
   local variant=$1 mode=$2 rc hash preserve inner exclude
   local -a driver_env=(FM_STUB_CLOSEOUT=retained)
-  make_retained_case "retained-$variant-$mode" enclosing
+  make_retained_case "retained-$variant-$mode${3:+-$3}" enclosing
   hash=$(printf '%s' "$FOREIGN_COPY" | shasum -a 256 | awk '{print $1}')
   preserve=$FOREIGN_CASE/data/task-x1/nested-copy-preserved/$hash
   case "$variant" in
@@ -6662,15 +6662,9 @@ retained_variant() {
       ;;
   esac
   held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY"
-  FOREIGN_TEARDOWN_ARGS=()
-  [ "$mode" = plain ] || FOREIGN_TEARDOWN_ARGS=(--force --drop-file "$(fm_test_drop_file)")
-  rc=0
-  run_foreign_teardown rc "${driver_env[@]}"
-  FOREIGN_TEARDOWN_ARGS=()
-  RV_DISPOSITION="exit=$([ "$rc" = 0 ] && echo 0 || echo nonzero) task-record=$([ -e "$FOREIGN_CASE/state/task-x1.meta" ] && echo kept || echo removed)"
-  RV_DISPOSITION="$RV_DISPOSITION backlog=$(backlog_row_state "$FOREIGN_CASE") copy=$([ -e "$FOREIGN_COPY/.git" ] && echo kept || echo gone)"
-  RV_DISPOSITION="$RV_DISPOSITION slot-returned=$([ -e "$FOREIGN_CASE/treehouse.log" ] && echo yes || echo no) record=$([ -e "$(retained_record_path)" ] && echo written || echo none)"
-  RV_DISPOSITION="$RV_DISPOSITION driver-calls=$(retained_call_count) tars=$(retained_tar_count)"
+  RV_DRIVER_ENV=("${driver_env[@]}")
+  retained_variant_run "$mode"
+  rc=$RV_RC
   if [ -n "${FM_RETAINED_EVIDENCE:-}" ]; then
     {
       printf '== %s (%s)\nexit status %s; %s\n' "$variant" "$mode" "$rc" "$RV_DISPOSITION"
@@ -6680,6 +6674,21 @@ retained_variant() {
       printf '\n'
     } >> "$FM_RETAINED_EVIDENCE"
   fi
+}
+
+# retained_variant_run <plain|force>: runs teardown once more on the current
+# variant case with its driver environment; sets RV_RC and RV_DISPOSITION.
+retained_variant_run() {
+  local rc=0
+  FOREIGN_TEARDOWN_ARGS=()
+  [ "$1" = plain ] || FOREIGN_TEARDOWN_ARGS=(--force --drop-file "$(fm_test_drop_file)")
+  run_foreign_teardown rc "${RV_DRIVER_ENV[@]}"
+  FOREIGN_TEARDOWN_ARGS=()
+  RV_RC=$rc
+  RV_DISPOSITION="exit=$([ "$rc" = 0 ] && echo 0 || echo nonzero) task-record=$([ -e "$FOREIGN_CASE/state/task-x1.meta" ] && echo kept || echo removed)"
+  RV_DISPOSITION="$RV_DISPOSITION backlog=$(backlog_row_state "$FOREIGN_CASE") copy=$([ -e "$FOREIGN_COPY/.git" ] && echo kept || echo gone)"
+  RV_DISPOSITION="$RV_DISPOSITION slot-returned=$([ -e "$FOREIGN_CASE/treehouse.log" ] && echo yes || echo no) record=$([ -e "$(retained_record_path)" ] && echo written || echo none)"
+  RV_DISPOSITION="$RV_DISPOSITION driver-calls=$(retained_call_count) tars=$(retained_tar_count)"
 }
 
 test_every_other_state_of_an_own_copy_the_driver_keeps_still_refuses() {
@@ -6709,11 +6718,63 @@ test_every_other_state_of_an_own_copy_the_driver_keeps_still_refuses() {
       # driver (the captain's authorization to discard assigned work), so the
       # driver is asked once here, as on the base; the kept copy is then refused by
       # the proofs the route repeats, with the same state surviving.
-      unlanded|dirty) assert_equals "${plain% driver-calls=*}" "${force% driver-calls=*}" "$variant: --force changed what survived: $force" ;;
+      unlanded|dirty) assert_equals "exit=nonzero task-record=kept backlog=in_flight copy=kept slot-returned=no record=none driver-calls=1 tars=1" "$force" "$variant: --force changed what survived: $force" ;;
       *) assert_equals "$plain" "$force" "$variant: --force changed the disposition: $force" ;;
     esac
   done
   pass "each other state of an own copy the driver keeps refuses with its cause and the same disposition with and without --force, and the clean input closes the same way with --force"
+}
+
+# A kept copy that teardown refuses after the driver answered, for a cause the
+# driver's answer cannot change, gets a refusal record: a retry of the unchanged
+# copy asks the driver nothing and writes no tar and no saved output.
+retained_refusal_count() {
+  find "$FOREIGN_CASE/data/task-x1" -maxdepth 1 -name 'vernant-closeout.*' 2>/dev/null | wc -l | tr -d ' '
+}
+
+test_a_stable_refusal_after_the_driver_asks_the_driver_nothing_on_retry() {
+  local entry variant mode run want outputs
+  want="exit=nonzero task-record=kept backlog=in_flight copy=kept slot-returned=no record=none driver-calls=1 tars=1"
+  for entry in other-repo:plain driver-path-gone:plain driver-path-escapes:plain unlanded:force dirty:force; do
+    variant=${entry%:*}
+    mode=${entry#*:}
+    retained_variant "$variant" "$mode" stable
+    assert_equals "$want" "$RV_DISPOSITION" "stable-$variant: run 1 wrong disposition"
+    assert_present "$(retained_refused_record_path)" "stable-$variant: run 1 wrote no refusal record"
+    outputs=$(retained_refusal_count)
+    for run in 2 3; do
+      retained_variant_run "$mode"
+      assert_equals "$want" "$RV_DISPOSITION" "stable-$variant: run $run asked the driver again or changed what survived"
+      assert_equals "$outputs" "$(retained_refusal_count)" "stable-$variant: run $run saved another driver output"
+      assert_grep 'the driver was not asked again' "$FOREIGN_CASE/stderr" "stable-$variant: run $run did not say the driver was not asked"
+      assert_grep "$(retained_field "$(retained_refused_record_path)" reason)" "$FOREIGN_CASE/stderr" "stable-$variant: run $run did not name the recorded cause"
+    done
+  done
+  pass "a kept copy refused after the driver for another repository, a gone or escaping driver-named path, or a forced unlanded or dirty copy asks the driver once across two retries"
+}
+
+test_a_refused_kept_copy_that_changed_or_whose_cause_went_is_asked_again() {
+  local rc
+  retained_variant other-repo plain changed
+  git -C "$FOREIGN_COPY/other-repo" -c user.email=t@t -c user.name=t commit -q --allow-empty -m inner
+  retained_variant_run plain
+  assert_equals "2 2" "$(retained_call_count) $(retained_tar_count)" "refused-changed: a changed copy was not asked again"
+  retained_variant_run plain
+  assert_equals "2 2" "$(retained_call_count) $(retained_tar_count)" "refused-changed: the new record did not hold for the unchanged retry"
+  rm -rf "$FOREIGN_COPY/other-repo"
+  retained_variant_run plain
+  expect_code 0 "$RV_RC" "refused-changed: the copy without the other repository must close: $(cat "$FOREIGN_CASE/stderr")"
+  assert_equals "3 3" "$(retained_call_count) $(retained_tar_count)" "refused-changed: the fixed copy was not asked again"
+  assert_absent "$(retained_refused_record_path)" "refused-changed: the refusal record outlived the driver's new answer"
+
+  retained_variant unlanded force landed
+  git -C "$FOREIGN_CASE/project" fetch -q "$FOREIGN_COPY" HEAD
+  git -C "$FOREIGN_CASE/project" update-ref refs/heads/main FETCH_HEAD
+  add_gh_pr_merged_for_head "$FOREIGN_CASE" "$(git -C "$FOREIGN_COPY" rev-parse HEAD)"
+  retained_variant_run plain
+  expect_code 0 "$RV_RC" "refused-landed: a copy whose work landed since must not be refused on the record alone: $(cat "$FOREIGN_CASE/stderr")"
+  assert_equals "2 2" "$(retained_call_count) $(retained_tar_count)" "refused-landed: the landed copy was not asked again"
+  pass "a refused kept copy that changed, or whose cause no longer holds, goes to the driver again, and its refusal record goes"
 }
 
 # The recorded d1 case names thousands of derived files (graphify-out/cache/*.json)
@@ -6950,6 +7011,8 @@ test_a_kept_copy_in_a_slot_a_peer_works_in_refuses_and_its_retry_asks_the_driver
 test_a_kept_copy_whose_adopted_bytes_changed_refuses_before_the_driver
 test_a_changed_kept_copy_is_assessed_afresh
 test_every_other_state_of_an_own_copy_the_driver_keeps_still_refuses
+test_a_stable_refusal_after_the_driver_asks_the_driver_nothing_on_retry
+test_a_refused_kept_copy_that_changed_or_whose_cause_went_is_asked_again
 test_a_driver_that_names_many_unique_paths_still_closes_after_verifying_each
 )
 
