@@ -415,8 +415,11 @@ fm_launch_proof_physical_path() { # <path>
 # the task's recorded pane is the task's own restored claude conversation. Every
 # fact below is positive and independent of the launch pin; prints the
 # candidate adoption record, or refuses on stderr naming the missing proof.
-fm_launch_proof_claude_adoption() { # <meta> -> candidate adoption-record JSON
-  local meta=$1 target session pane home root gen pid harness_pid table kids kid args
+# <session-id> and <tie> carry a tie already established for this task: the
+# owner's own statement (operator), or the tie a published adoption record names.
+# The live session must equal it; every other proof is still read live.
+fm_launch_proof_claude_adoption() { # <meta> [<session-id> <tie>] -> candidate adoption-record JSON
+  local meta=$1 proven=${2:-} proven_tie=${3:-} target session pane home root gen pid harness_pid table kids kid args
   local resume_count=0 session_id='' i recorded tie transcript config_dir claude_home env_text
   local first epoch message kind record mtime launcher_args harness_args claim peer_state cwd
   local peer_meta peer_home peer_states
@@ -525,7 +528,14 @@ fm_launch_proof_claude_adoption() { # <meta> -> candidate adoption-record JSON
     fm_launch_proof_adopt_refuse 'recorded session id differs from the live session; the task record names another conversation'; return 1
   fi
   tie=recorded
-  if [ -z "$recorded" ]; then
+  if [ -n "$proven" ]; then
+    [ "$proven" = "$session_id" ] \
+      || { fm_launch_proof_adopt_refuse 'no task-specific session tie: the live session is not the session this adoption names'; return 1; }
+    case "$proven_tie" in
+      recorded|launch-brief|operator) tie=$proven_tie ;;
+      *) fm_launch_proof_adopt_refuse 'no task-specific session tie: the adoption names no known tie'; return 1 ;;
+    esac
+  elif [ -z "$recorded" ]; then
     tie=launch-brief
     env_text=$(fm_remote_herdr_process_env "$harness_pid") \
       || { fm_launch_proof_adopt_refuse 'no task-specific session tie: the harness environment cannot be read to locate its transcript'; return 1; }
@@ -584,12 +594,16 @@ PY
 
 # Succeeds only when the task's adoption record names exactly the proof the live
 # system gives right now for <pid>. A record alone never licenses lifecycle input.
+# The session tie the record names stands once published, so inbox retention
+# cannot end an adoption; the live session must still be that one.
 fm_launch_proof_claude_adopted() { # <meta> <pid>
   local meta=$1 pid=$2 record fresh
   record=$(jq -cS --arg gen "$(fm_meta_get "$meta" spawn_gen)" --argjson pid "$pid" '
-    select(.version == 1 and .harness == "claude" and .spawn_gen == $gen and .pid == $pid)' \
+    select(.version == 1 and .harness == "claude" and .spawn_gen == $gen and .pid == $pid
+      and (.session_id | type == "string") and (.tie | type == "string"))' \
     "${meta%.meta}.claude-adoption.json" 2>/dev/null) && [ -n "$record" ] || return 1
-  fresh=$(fm_launch_proof_claude_adoption "$meta" 2>/dev/null | jq -cS . 2>/dev/null) || return 1
+  fresh=$(fm_launch_proof_claude_adoption "$meta" "$(jq -r .session_id <<< "$record")" "$(jq -r .tie <<< "$record")" \
+    2>/dev/null | jq -cS . 2>/dev/null) || return 1
   [ "$record" = "$fresh" ]
 }
 

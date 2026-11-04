@@ -721,6 +721,40 @@ test_launch_proof_claude_verdict_and_refusal() (
   printf 'FM_SPAWN_GEN=%s\n' "$PIN_GEN" > "$T/env-extra"
   assert_equals managed "$(fm_launch_proof_herdr "$META")" 'a matching pin is managed without any adoption'
   fm_launch_proof_herdr_authorizes "$META" || fail 'a pinned claude must authorize lifecycle input'
+  # Inbox retention never ends an adoption: the published tie stands while the live session is that one.
+  rm -f "$T/env-extra"
+  meta_for claude env-v1
+  fm_launch_proof_claude_adoption "$META" > "$STATE/vernant-t1.claude-adoption.json" 2>/dev/null \
+    || fail 'could not adopt before the prune'
+  local BRIEF_RECORD LATER
+  fm_operational_doorbell_path "$DOORBELL" BRIEF_RECORD || fail 'the doorbell names no record'
+  touch -t "$(date -v-8d +%Y%m%d%H%M 2>/dev/null || date -d '8 days ago' +%Y%m%d%H%M)" "$BRIEF_RECORD"
+  fm_operational_record_write "$LANE/state" away-supervisor 'later input' LATER || fail 'a later inbox write failed'
+  [ -n "$LATER" ] || fail 'the later inbox write returned no doorbell'
+  [ ! -e "$BRIEF_RECORD" ] || fail 'the 7-day prune kept the launch brief'
+  assert_equals managed "$(fm_launch_proof_herdr "$META")" 'an adoption outlives the pruned launch brief'
+  fm_launch_proof_herdr_authorizes "$META" || fail 'a pruned brief ended the adoption'
+  printf 'claude_session_id=0b4c1d2e-3f40-4a51-8b62-7c83d94ea5f6\n' >> "$META"
+  assert_equals unmanaged "$(fm_launch_proof_herdr "$META")" 'a differing recorded session id still vetoes a kept tie'
+  meta_for claude env-v1
+  : > "$T/env-unreadable"
+  assert_equals unknown "$(fm_launch_proof_herdr "$META")" 'a kept tie does not survive a contradicted live proof'
+  rm -f "$T/env-unreadable" "$STATE/vernant-t1.claude-adoption.json"
+  # A brief already past retention: only the owner's own statement of the live session ties it.
+  fm_launch_proof_claude_adoption "$META" >/dev/null 2>"$T/err" && fail 'a lane with a pruned brief adopted without a tie'
+  assert_contains "$(cat "$T/err")" 'no task-specific session tie' 'a pruned brief refuses with the missing tie'
+  out=$(fm_launch_proof_claude_adoption "$META" "$UUID" operator 2>/dev/null) || fail 'the owner statement of the live session must adopt'
+  assert_equals operator "$(printf '%s' "$out" | jq -r .tie)" 'the record names the operator tie'
+  fm_launch_proof_claude_adoption "$META" 0b4c1d2e-3f40-4a51-8b62-7c83d94ea5f6 operator >/dev/null 2>"$T/err" \
+    && fail 'a statement naming another session adopted'
+  assert_contains "$(cat "$T/err")" 'the live session is not the session this adoption names' 'a wrong statement names its cause'
+  printf 'claude_session_id=0b4c1d2e-3f40-4a51-8b62-7c83d94ea5f6\n' >> "$META"
+  fm_launch_proof_claude_adoption "$META" "$UUID" operator >/dev/null 2>"$T/err" && fail 'a statement overrode the recorded veto'
+  assert_contains "$(cat "$T/err")" 'recorded session id differs' 'the recorded veto wins over a statement'
+  meta_for claude env-v1
+  printf '%s\n' "$out" > "$STATE/vernant-t1.claude-adoption.json"
+  assert_equals managed "$(fm_launch_proof_herdr "$META")" 'an operator adoption is managed while the proofs hold'
+  rm -f "$STATE/vernant-t1.claude-adoption.json"
   pass 'claude verdicts: unpinned is unmanaged, adoption is rechecked at use, legacy and other harnesses are unchanged'
 )
 

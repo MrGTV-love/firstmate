@@ -2388,6 +2388,60 @@ test_claude_restore_relaunch_after_adoption() {
   pass "claude restore: an adopted lane relaunches with a new pin, drops its adoption record and reads managed"
 }
 
+# Ages the case's launch-brief record past the inbox retention and lets a later
+# inbox write prune it, as a secondmate spawning a worker does.
+prune_claude_launch_brief() { # <case-dir>
+  local dir=$1 record later
+  record=$(find "$dir/wt/state/operational-inbox" -maxdepth 1 -name '*.msg' | head -n 1)
+  [ -n "$record" ] || fail "the case has no launch-brief record to prune"
+  touch -t "$(date -v-8d +%Y%m%d%H%M 2>/dev/null || date -d '8 days ago' +%Y%m%d%H%M)" "$record"
+  fm_operational_record_write "$dir/wt/state" away-supervisor 'later input' later || fail "a later inbox write failed"
+  [ -n "$later" ] || fail "the later inbox write returned no doorbell"
+  [ ! -e "$record" ] || fail "the 7-day prune kept the launch brief"
+}
+
+test_claude_adoption_outlives_the_inbox_prune() {
+  prepare_claude_restore pruned-after-adopt
+  local CONTROL="$ROOT/bin/fm-control.sh"
+  local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID out rc=0
+  out=$(run_continuation_control "$dir" "$id" adopt) || fail "adopt before the prune: $out"
+  prune_claude_launch_brief "$dir"
+  out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" interrupt) || fail "a pruned brief ended the adoption for interrupt: $out"
+  assert_contains "$out" "interrupt-delivered $id" "interrupt stays authorized after the prune"
+  out=$(FM_SECONDMATE_PERSIST_WAIT=0 CONTROL="$ROOT/bin/fm-secondmate-restart.sh" run_control "$dir" "$id") || true
+  assert_not_contains "$out" "cannot be positively attributed" "the restart stays authorized after the prune"
+  out=$(run_control "$dir" "$id" relaunch --note "continue after the prune") || rc=$?
+  expect_code 0 "$rc" "relaunch stays authorized after the prune"$'\n'"$out"
+  assert_contains "$out" "relaunched $id" "the relaunch after the prune reports its task"
+  pass "claude restore: the 7-day inbox prune does not end an adoption for interrupt, the restart or relaunch"
+}
+
+test_claude_pruned_brief_adopts_only_on_the_owner_statement() {
+  prepare_claude_restore pruned-before-adopt
+  local CONTROL="$ROOT/bin/fm-control.sh"
+  local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID out rc
+  prune_claude_launch_brief "$dir"
+  rc=0; out=$(run_continuation_control "$dir" "$id" adopt) || rc=$?
+  [ "$rc" -ne 0 ] || fail "a lane whose brief was pruned adopted without a tie: $out"
+  assert_contains "$out" "no task-specific session tie" "the pruned brief refuses with the missing tie"
+  claude_lifecycle_refusal "$dir" "$id" exit
+  rc=0; out=$(run_continuation_control "$dir" "$id" adopt --session-id 0b4c1d2e-3f40-4a51-8b62-7c83d94ea5f6) || rc=$?
+  [ "$rc" -ne 0 ] || fail "a statement naming another session adopted: $out"
+  assert_contains "$out" "the live session is not the session this adoption names" "a wrong statement names its cause"
+  rc=0; out=$(FM_FAKE_TASK_ID=$id run_continuation_control "$dir" "$id" adopt --session-id "$CLAUDE_RESTORE_UUID") || rc=$?
+  [ "$rc" -ne 0 ] || fail "a worker adopted with a session statement: $out"
+  rc=0; out=$(run_control "$dir" "$id" relaunch --session-id "$CLAUDE_RESTORE_UUID" --note x) || rc=$?
+  [ "$rc" -ne 0 ] || fail "relaunch accepted a session statement: $out"
+  assert_contains "$out" "--session-id applies to 'adopt' only" "the statement belongs to adopt only"
+  assert_absent "$dir/home/state/$id.claude-adoption.json" "no refused statement wrote a record"
+  out=$(run_continuation_control "$dir" "$id" adopt --session-id "$CLAUDE_RESTORE_UUID") \
+    || fail "the owner statement of the live session must adopt: $out"
+  assert_contains "$out" "adopted: $id" "the stated adoption reports its task"
+  jq -e '.tie == "operator"' "$dir/home/state/$id.claude-adoption.json" >/dev/null || fail "the record does not name the operator tie"
+  out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" exit) || fail "a stated adoption must authorize exit: $out"
+  pass "claude restore: a lane whose brief is past retention adopts only on the owner's statement of the live session"
+}
+
 test_claude_pinned_elsewhere_names_its_own_cause() {
   prepare_claude_restore pinned-elsewhere
   local CONTROL="$ROOT/bin/fm-control.sh"
@@ -2442,6 +2496,30 @@ claude_restart_unreached() { # <case-dir> <id> <restart> <cause> <description>
   CLAUDE_REFUSAL_OUT=$out
 }
 
+# A raw-command mate has no verified restart mechanics, so the restart falls back
+# to the re-read nudge; that nudge still waits for the attribution decision.
+test_restart_attributes_before_a_raw_command_fallback_nudge() {
+  local CONTROL="$ROOT/bin/fm-control.sh" dir id out rc
+  prepare_claude_restore raw-command-live
+  dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
+  grep -v '^harness=' "$dir/home/state/$id.meta" > "$dir/meta.new" && mv "$dir/meta.new" "$dir/home/state/$id.meta"
+  printf 'harness=mytool\n' >> "$dir/home/state/$id.meta"
+  claude_restart_unreached "$dir" "$id" "$ROOT/bin/fm-secondmate-restart.sh" \
+    "its live Herdr agent cannot be positively attributed to this task, so no request or nudge was sent to it" \
+    "a raw-command mate with an unattributed live pane"
+  # A positively stopped mate keeps the existing fallback outcome.
+  prepare_claude_restore raw-command-stopped
+  dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
+  grep -v '^harness=' "$dir/home/state/$id.meta" > "$dir/meta.new" && mv "$dir/meta.new" "$dir/home/state/$id.meta"
+  printf 'harness=mytool\n' >> "$dir/home/state/$id.meta"
+  rm -f "$dir/fake/herdr-agent-live"
+  rc=0
+  out=$(CONTROL="$ROOT/bin/fm-secondmate-restart.sh" run_control "$dir" "$id") || rc=$?
+  assert_not_contains "$out" "cannot be positively attributed" "a stopped raw-command mate is not refused for attribution"
+  assert_contains "$out" "has no verified restart mechanics for a second mate" "a stopped raw-command mate keeps its capability outcome"
+  pass "restart: a raw-command fallback nudge is withheld from an unattributed live pane and kept for a stopped mate"
+}
+
 test_restart_refuses_an_unproven_agent_state() {
   local CONTROL="$ROOT/bin/fm-control.sh" dir id
   # The backend cannot load: a copy of bin/ without the Herdr adapter.
@@ -2476,7 +2554,10 @@ test_claude_restore_adoption_refuses_the_teamclaude_wrapper
 test_claude_restore_adoption_caller_gate
 test_claude_restore_restart_decides_attribution_before_its_first_effect
 test_claude_restore_relaunch_after_adoption
+test_claude_adoption_outlives_the_inbox_prune
+test_claude_pruned_brief_adopts_only_on_the_owner_statement
 test_restart_refuses_an_unproven_agent_state
+test_restart_attributes_before_a_raw_command_fallback_nudge
 test_claude_pinned_elsewhere_names_its_own_cause
 test_bounded_reboot_recovery_rotates_unmanaged_inspections_without_mutation
 test_bounded_reboot_recovery_notifies_each_unmanaged_identity_once

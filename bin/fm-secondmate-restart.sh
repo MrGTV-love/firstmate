@@ -264,6 +264,10 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
   EFFORT[i]=""
   if ! fm_secondmate_restart_capable "$STATE/$id.meta"; then
     REASON[i]=$FM_SECONDMATE_RESTART_REASON
+    if ! fm_secondmate_restart_attribution "$STATE/$id.meta"; then
+      PLAN[i]="refused"
+      REASON[i]=$FM_SECONDMATE_RESTART_REASON
+    fi
     i=$((i + 1))
     continue
   fi

@@ -5,7 +5,7 @@
 # Usage: fm-control.sh <task-id> interrupt
 #        fm-control.sh <task-id> exit
 #        fm-control.sh <task-id> stay
-#        fm-control.sh <task-id> adopt
+#        fm-control.sh <task-id> adopt [--session-id <claude-session-id>]
 #        fm-control.sh <task-id> authorize-continuation
 #        fm-control.sh <task-id> reassociate --worktree <replacement-copy>
 #                                            [--also <other-task>=<its-replacement-copy>]...
@@ -120,9 +120,11 @@
 # proves the restored process is the task's own conversation: the attributed
 # claude harness (or a listed forwarding launcher around exactly one), its
 # kernel cwd, no launch pin, an exclusive pane and home claim, and a
-# task-specific session tie. Lifecycle readers rerun those proofs at every use;
-# a relaunch removes the spent record. docs/agent-control.md "Adopting a
-# restored claude agent" owns the contract and its residual risk.
+# task-specific session tie. --session-id is the owner's own statement of that
+# tie for a claude lane whose launch brief is gone. Lifecycle readers rerun those
+# proofs at every use, keeping the published tie; a relaunch removes the spent
+# record. docs/agent-control.md "Adopting a restored claude agent" owns the
+# contract and its residual risk.
 # --worktree <path> is shared by two verbs and parsed once: relaunch accepts a
 # prepared absolute destination for a ship relaunch, and reassociate names the
 # replacement copy the record moves to.
@@ -477,6 +479,8 @@ RELOCATE_TO=
 RELOCATE_SET=0
 control_want_value=
 RECOVER_LAUNCH=0
+ADOPT_SESSION_ID=
+ADOPT_SESSION_ID_SET=0
 OWNED_PATHS=()
 ALSO_IDS=()
 ALSO_COPIES=()
@@ -512,6 +516,7 @@ for control_arg in "$@"; do
       worktree) RELOCATE_TO=$control_arg; RELOCATE_SET=1 ;;
       owned-path) OWNED_PATHS+=("$control_arg") ;;
       also) parse_also "$control_arg" ;;
+      session-id) ADOPT_SESSION_ID=$control_arg; ADOPT_SESSION_ID_SET=1 ;;
       note_file)
         [ -f "$control_arg" ] || die "--note-file '$control_arg' is not a readable file"
         NOTE=$(cat "$control_arg")
@@ -536,6 +541,8 @@ for control_arg in "$@"; do
     --owned-path=*) OWNED_PATHS+=("${control_arg#--owned-path=}") ;;
     --also) control_want_value=also ;;
     --also=*) parse_also "${control_arg#--also=}" ;;
+    --session-id) control_want_value=session-id ;;
+    --session-id=*) ADOPT_SESSION_ID=${control_arg#--session-id=}; ADOPT_SESSION_ID_SET=1 ;;
     --note) control_want_value=note ;;
     --note=*) NOTE=${control_arg#--note=}; NOTE_SET=1 ;;
     --note-file) control_want_value=note_file ;;
@@ -557,6 +564,10 @@ fi
 
 [ "${#ALSO_IDS[@]}" = 0 ] || [ "$VERB" = reassociate ] \
   || die "--also applies to 'reassociate' only"
+[ "$ADOPT_SESSION_ID_SET" = 0 ] || [ "$VERB" = adopt ] \
+  || die "--session-id applies to 'adopt' only"
+[ "$ADOPT_SESSION_ID_SET" = 0 ] || [[ $ADOPT_SESSION_ID =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]] \
+  || die "--session-id needs a lowercase claude session id (8-4-4-4-12 hexadecimal)"
 [ "${#OWNED_PATHS[@]}" = 0 ] || { [ "$VERB" = relaunch ] && [ "$RECOVER_LAUNCH" = 0 ]; } \
   || die "--owned-path applies to 'relaunch' only and cannot be combined with --recover-launch"
 if [ "$VERB" = reassociate ]; then
@@ -1456,19 +1467,21 @@ if [ "$VERB" = adopt ]; then
     herdr:omp|herdr:claude) ;;
     *) die "adopt needs a local Herdr omp or claude task; no record was changed" ;;
   esac
+  [ "$ADOPT_SESSION_ID_SET" = 0 ] || [ "$RECORDED_HARNESS" = claude ] \
+    || die "--session-id applies only to a claude adoption; no record was changed"
   if [ "$RECORDED_HARNESS" = claude ]; then
     CONTROL_META_LOCK=$(fm_meta_lock_path "$META") || die "adopt needs the task metadata lock"
     fm_lock_acquire_wait "$CONTROL_META_LOCK"
     CONTROL_META_LOCK_HELD=1
     fm_backend_validate_task_endpoint "$META" "$ID" || exit 1
-    adoption_record=$(fm_launch_proof_claude_adoption "$META") || exit 1
+    adoption_record=$(fm_launch_proof_claude_adoption "$META" ${ADOPT_SESSION_ID:+"$ADOPT_SESSION_ID" operator}) || exit 1
     CONTROL_META_TMP=$(mktemp "$STATE/.$ID.claude-adoption.adopt.XXXXXX") \
       || die "adopt needs a writable state directory"
     printf '%s\n' "$adoption_record" > "$CONTROL_META_TMP" \
       || die "adopt could not stage the adoption record"
     # Refuse a changing foreground, session, or generation rather than publish
     # a proof gathered for a different activation.
-    adoption_recheck=$(fm_launch_proof_claude_adoption "$META") || exit 1
+    adoption_recheck=$(fm_launch_proof_claude_adoption "$META" ${ADOPT_SESSION_ID:+"$ADOPT_SESSION_ID" operator}) || exit 1
     [ "$adoption_record" = "$adoption_recheck" ] \
       || die "adopt needs stable foreground, session, and generation proof; retry after they settle"
     mv -f -- "$CONTROL_META_TMP" "$STATE/$ID.claude-adoption.json" \

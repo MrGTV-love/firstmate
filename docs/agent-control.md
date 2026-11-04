@@ -230,10 +230,15 @@ It sends no input and starts or stops nothing.
   The harness argv names one `--resume` session id, and either the task's recorded `claude_session_id` equals it, or the first user message of that session's transcript is the launch-brief doorbell of a record that sits in the task's own `state/operational-inbox/`, that `bin/fm-operational-input.sh` identifies as kind `launch-brief`, and that is not newer than the message.
   A recorded `claude_session_id` that differs from the live id vetoes the adoption even when the doorbell holds.
   A first message that merely names the inbox, and anything the agent does later in the session, never counts, because a personal session in the same directory can produce both.
+  The operational inbox deletes records older than seven days, so a launch brief can be gone before the lane is adopted.
+  The lock-owning main Firstmate may then run `adopt --session-id <live-session-id>`: the id must equal the live `--resume` id, a differing recorded `claude_session_id` still vetoes it, and every other proof still holds.
+  This option is the owner's own statement that the live session is the task's, exactly like a recorded `claude_session_id`; it proves nothing more, so a personal session adopted this way is the owner's error.
+  The adoption record names its tie: `recorded`, `launch-brief`, or `operator` for that statement.
 
 **This widens what authorizes lifecycle control: a process with no launch pin can become managed.**
 The record alone licenses nothing.
 `fm_launch_proof_herdr_verdict` takes it as a second route and runs every proof above again against the live system at each use, so a pane that changed hands, a new process, another session, or a pin for another generation makes it inert at once.
+The session tie is the one exception: the recheck keeps the tie the published record names while the live `--resume` id is still that session, so the inbox's seven-day retention never ends an adoption.
 The record is bound to the task's `spawn_gen`, so a relaunch makes it inert, and `fm-control.sh` removes it once the replacement is confirmed.
 A teardown does not yet remove a leftover record, which stays inert.
 A genuinely unproven agent, including a personal session in the same pane, home, and directory, keeps its refusal on every consumer, and the secondmate restart decides that before its pending-reply record, persistence request, or fallback nudge.
