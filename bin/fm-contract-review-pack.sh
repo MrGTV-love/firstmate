@@ -42,9 +42,10 @@
 # check: reads the report's `Inputs read` list and, when given, the run log, and
 #   prints INPUT LEAK lines plus ROUND VOID (exit 3) when the list is missing or a
 #   listed path is not an authorized input; prints INPUT CLEAN (exit 0) otherwise.
-#   The list runs to the next heading of its own level or higher; a list with no heading
-#   of its own (a bold or `Label:` line) runs to the next line of that same label shape.
-#   A line in it that does not start with a path is skipped.
+#   The list must sit under a Markdown heading of its own; an `Inputs read` bold line,
+#   `Label:` line or inline list with no heading voids the round. The list runs to the
+#   next heading of its own level or higher, and a line in it that does not start with a
+#   path is skipped.
 #   An authorized input is judged by what it is: a file inside the pack, the
 #   SKILL.md of the assess-done-and-grade or define-done-and-grading skill (no other
 #   file in either skill folder), the review rubric, or a file the manifest's root tracks (git ls-files, or
@@ -92,10 +93,12 @@ BLOCK_END='<!-- reviewer-block:end -->'
 
 # Section filter. Reads the contract on stdin, writes the kept text to the file
 # named by KEEP_OUT, the dropped section names to DROPPED_OUT, the unrecognised
-# level 1 and 2 headings to UNKNOWN_OUT and the kept but unrecognised sub-headings
-# and preamble lines to UNREC_OUT. Headings of level 1 and 2, ATX or setext, start a
+# level 1 and 2 headings to UNKNOWN_OUT, the kept but unrecognised sub-headings
+# and preamble lines to UNREC_OUT and the normalised title of every kept heading to
+# TITLES_OUT. Headings of level 1 and 2, ATX or setext, start a
 # section and must be recognised; a level 3 heading is dropped when it names an
-# author section. Text inside a code fence is never a heading, a fence closes only
+# author section. Text inside a code fence is never a heading, a backtick fence opens
+# only when no backtick follows its marker run on that line, a fence closes only
 # on a run of its own marker at least as long as the opening one, and a fence still
 # open at the end exits 3.
 # shellcheck disable=SC2016 # awk program, not shell
@@ -120,6 +123,7 @@ function runlen(s, ch,   n) {
 }
 function keep_heading(s) {
   print s > KEEP_OUT
+  print norm(title) > TITLES_OUT
   if (ul != "") print ul > KEEP_OUT
 }
 { L[++N] = $0 }
@@ -133,7 +137,7 @@ END {
     if (fence) {
       n = runlen(rest, fch)
       if (n >= flen && substr(rest, n + 1) ~ /^[ \t]*$/) fence = 0
-    } else if (rest ~ /^```/ || rest ~ /^~~~/) {
+    } else if (rest ~ /^~~~/ || (rest ~ /^```/ && substr(rest, runlen(rest, "`") + 1) !~ /`/)) {
       fch = substr(rest, 1, 1); flen = runlen(rest, fch); fence = 1; fline = i
     }
     body = infence || fence
@@ -174,7 +178,7 @@ END {
       if (c == "drop") print title > DROPPED_OUT
       if (mode == "keep") {
         if (c == "unknown") print line " (under: " ptitle ")" > UNREC_OUT
-        print line > KEEP_OUT
+        keep_heading(line)
       }
       continue
     }
@@ -196,18 +200,22 @@ SECTION_KEEP="request|context|captain's intent|captain intent|rulings|terms|amen
 SECTION_DROP="author self-check|author's all-green|author all-green|all-green|author's|author notes|boundary dispositions|contract review|review history|revision log|revision history|self-check|prior findings|prior review|responses|response to|suggested attack|open findings|finding register|register"
 # A preamble line that holds author text. Whole words only, so Authority, Authorized and
 # Authoritative stay. The contract drops such a line wherever the word sits in it. A request
-# or context file is refused for the narrower author shapes, so the captain's own words
-# ("Author the policy once.") are not refused.
+# or context file is the captain's or Main's text, which may name these terms as its subject
+# ("Run a contract review"), so it is refused only for the author shapes: a term used as a
+# label (`Self-check:`, `Author:`), or a term attributed to an author or worker
+# (`Author's analysis`, `Worker self-check`).
 PREAMBLE_DROP='(^|[^a-z0-9])(authors?|contract review|all-green|self-check|review exit|prior findings?|revision log)([^a-z0-9]|$)|reviewed:'
-PREAMBLE_REFUSE='(^|[^a-z0-9])(authors?([^a-z0-9]s)?[ ]*(self-check|all-green|analysis|notes|candidate|disposition|finding|response|:)|contract review|all-green|self-check|review exit|prior findings?|revision log)([^a-z0-9]|$)|reviewed:'
+PREAMBLE_TERMS='self-checks?|all-green|contract reviews?|review exits?|prior findings?|revision logs?'
+PREAMBLE_REFUSE="(^|[^a-z0-9])((authors?|workers?)[^a-z0-9]*s?[ ]+($PREAMBLE_TERMS|analysis|notes?|candidates?|dispositions?|findings?|responses?)([^a-z0-9]|\$)|(authors?|$PREAMBLE_TERMS)[ ]*:)|reviewed:"
 
-filter_sections() { # <in> <keep-out> <dropped-out> <unknown-out> <unrecognised-out> [preamble-pattern]
-  local pre=${6:-$PREAMBLE_DROP}
+filter_sections() { # <in> <keep-out> <dropped-out> <unknown-out> <unrecognised-out> <titles-out> [preamble-pattern]
+  local pre=${7:-$PREAMBLE_DROP}
   : >"$2"
   : >"$3"
   : >"$4"
   : >"$5"
-  awk -v SRC="$1" -v KEEP_OUT="$2" -v DROPPED_OUT="$3" -v UNKNOWN_OUT="$4" -v UNREC_OUT="$5" \
+  : >"$6"
+  awk -v SRC="$1" -v KEEP_OUT="$2" -v DROPPED_OUT="$3" -v UNKNOWN_OUT="$4" -v UNREC_OUT="$5" -v TITLES_OUT="$6" \
     -v KEEP="$SECTION_KEEP" -v DROP="$SECTION_DROP" -v PREAMBLE_DROP="$pre" \
     "$SECTION_AWK" <"$1"
 }
@@ -257,7 +265,7 @@ cmd_build() {
   policy_block "$policy" >"$scratch/block" || die "policy must hold exactly one reviewer block between its marker lines: $policy"
   [ -s "$scratch/block" ] || die "policy reviewer block is empty: $policy"
 
-  filter_sections "$contract" "$scratch/keep" "$scratch/dropped" "$scratch/unknown" "$scratch/unrec" || exit 3
+  filter_sections "$contract" "$scratch/keep" "$scratch/dropped" "$scratch/unknown" "$scratch/unrec" "$scratch/titles" || exit 3
   if [ -s "$scratch/unknown" ]; then
     local name
     while IFS= read -r name; do
@@ -266,10 +274,10 @@ cmd_build() {
     echo "fm-contract-review-pack: no pack written; rename the section to a recognised one or add it to the builder" >&2
     exit 3
   fi
-  grep -qi '^#\{1,3\} definition of done' "$scratch/keep" || die "contract has no Definition Of Done section: $contract"
+  grep -q '^definition of done' "$scratch/titles" || die "contract has no Definition Of Done section: $contract"
 
   for f in ${request:+"$request"} ${contexts[@]+"${contexts[@]}"}; do
-    filter_sections "$f" "$scratch/ctx.keep" "$scratch/ctx.dropped" "$scratch/ctx.unknown" "$scratch/ctx.unrec" "$PREAMBLE_REFUSE" || exit 3
+    filter_sections "$f" "$scratch/ctx.keep" "$scratch/ctx.dropped" "$scratch/ctx.unknown" "$scratch/ctx.unrec" "$scratch/ctx.titles" "$PREAMBLE_REFUSE" || exit 3
     [ ! -s "$scratch/ctx.dropped" ] || die "request or context file holds author text the builder would drop ($(head -1 "$scratch/ctx.dropped")): $f"
   done
 
@@ -316,7 +324,7 @@ cmd_build() {
     if [ -n "$request" ]; then
       # shellcheck disable=SC2016 # literal backticks in generated Markdown
       printf 'The request is `request.md`.\n'
-    elif grep -qi '^#\{1,3\} request' "$pack/target.md"; then
+    elif grep -q '^request' "$scratch/titles"; then
       # shellcheck disable=SC2016 # literal backticks in generated Markdown
       printf 'There is no separate request file: the request is the REQUEST section of `target.md`.\n'
     fi
@@ -371,30 +379,19 @@ inputs_read() { # <report>
       while (substr(s, n + 1, 1) == "#") n++
       return n
     }
-    # The label shape of a list that has no heading of its own: 1 is a bold line, 2 is a
-    # `Label:` field line. The list ends at the next line of that same shape.
-    function shape_of(s) { return (s ~ /[*][*]/) ? 1 : 2 }
-    function same_shape(s) {
-      if (shape == 1) return s ~ /^[ \t]*[*][*][^*]+[*][*]:?([ \t]|$)/
-      return s ~ /^[ \t]*[A-Za-z][A-Za-z0-9 ()-]*:([ \t]|$)/
+    {
+      l = $0
+      sub(/^ ? ? ?/, "", l)
+      low = tolower(l)
     }
-    state == 0 && tolower($0) ~ /^[#*[:space:]-]*([0-9]+[.)][[:space:]]*)?inputs read[*[:space:]]*(\([^)]*\))?[*:[:space:]]*$/ { start = hlevel($0); shape = shape_of($0); state = 1; next }
-    state == 0 && tolower($0) ~ /^[#*[:space:]-]*([0-9]+[.)][[:space:]]*)?inputs read[*]*:[*]*[ \t]+[^ \t]/ {
-      start = hlevel($0)
-      shape = shape_of($0)
-      line = $0
-      sub(/^[^:]*:[*]*[ \t]+/, "", line)
-      n = split(line, parts, /,[ \t]*/)
-      for (i = 1; i <= n; i++) { t = entry(parts[i]); if (t != "") print t }
-      state = 1
-      next
-    }
-    # Inside the list: every line up to the next heading of the same or a higher level
-    # (any heading when the list has no heading of its own) is read, and a line that
-    # does not start with a path is skipped.
+    # The list starts at a heading of its own. Any other `Inputs read` line (bold, a
+    # `Label:` line or an inline list) has no heading and voids the round (exit 4).
+    low ~ /^#+[ \t]+[*]*([0-9]+[.)][ \t]*)?[*]*inputs read[*[:space:]]*(\([^)]*\))?[*:[:space:]]*$/ { start = hlevel(l); state = 1; next }
+    low ~ /^[#*[:space:]-]*([0-9]+[.)][[:space:]]*)?[*]*inputs read[*]*(:|[*[:space:]]*(\([^)]*\))?[*:[:space:]]*$)/ { noheading = 1; next }
+    # Inside the list: every line up to the next heading of the same or a higher level is
+    # read, and a line that does not start with a path is skipped.
     state == 1 {
-      if ($0 ~ /^#/ && (start == 0 || hlevel($0) <= start)) { state = 2; next }
-      if (start == 0 && same_shape($0)) { state = 2; next }
+      if (l ~ /^#/ && hlevel(l) <= start) { state = 2; next }
       line = $0
       sub(/^[ \t]*([-*+]|[0-9]+[.)])[ \t]+/, "", line)
       if (line ~ /^`?[^ \t`]*[\/]/ || line ~ /^`?~/ || line ~ /^`?[A-Za-z0-9_.-]+\.[A-Za-z0-9]+(`|[ \t]|$)/) {
@@ -402,6 +399,7 @@ inputs_read() { # <report>
         if (t != "") print t
       }
     }
+    END { exit noheading ? 4 : 0 }
   ' "$1"
 }
 
@@ -454,8 +452,14 @@ cmd_check() {
   [ -z "$log" ] || log_real=$(real "$log")
   work_report=$(real "${REVIEW_WORK_ROOT:-$fmroot/data/review-lane/work}/$(basename "$(dirname "$pack")")-$(basename "$pack")/review.md")
   local leaks=0 count=0 entry prev path revpath rel rev excluded x ok why
-  local list
-  list=$(inputs_read "$report" | grep -e '/' -e '\.' || true)
+  local list raw rc=0
+  raw=$(inputs_read "$report") || rc=$?
+  if [ "$rc" = 4 ]; then
+    echo "INPUT LEAK: an Inputs read list in $report has no heading of its own"
+    echo "ROUND VOID: the report must list every file the reviewer opened, one per line, under an Inputs read heading"
+    exit 3
+  fi
+  list=$(printf '%s\n' "$raw" | grep -e '/' -e '\.' || true)
   if [ -z "$list" ]; then
     echo "INPUT LEAK: no Inputs read list in $report"
     echo "ROUND VOID: the report must list every file the reviewer opened under Inputs read"

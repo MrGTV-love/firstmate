@@ -510,13 +510,14 @@ test_leak_check_reads_the_whole_list() {
   run_check "$rep"
   assert_equals 3 "$CHECK_RC" "a leak after a group label was allowed"
   assert_contains "$CHECK_OUT" "INPUT LEAK: $TMP_ROOT/sibling/pack/review.md" "the leak after a group label is not named"
-  # The inline form is followed by the lines under it.
+  # The inline form has no heading of its own, so it voids the round.
   {
     printf 'VERDICT: FAIL head=abc\n\nInputs read: %s, %s\n' "$LEAK_PACK/contract.md" "$LEAK_PACK/target.md"
     printf -- '- %s\n' "$TMP_ROOT/sibling/pack/review.md"
   } >"$rep"
   run_check "$rep"
   assert_equals 3 "$CHECK_RC" "a leak listed after the inline form was allowed"
+  assert_contains "$CHECK_OUT" "has no heading of its own" "the inline form did not void the round for its missing heading"
   pass "the leak check reads the whole Inputs read list to the next heading"
 }
 
@@ -632,7 +633,21 @@ test_preamble_author_text_matches_whole_words() {
   printf 'Authority: captain, 2026-11-02.\nAuthor the policy once.\n\nZZ-KEEP-CTXAUTH-ZZ a neutral fact.\n' >"$ctx"
   build_pack pack --contract "$src" --context "$ctx" --request "$ctx" || fail "a context file with Authority and a verb use of Author was refused: $(cat "$TMP_ROOT/build.err")"
   assert_grep "ZZ-KEEP-CTXAUTH-ZZ" "$pack/context-pw-ctx.md" "the context file was not copied whole"
-  local body
+  # Owner lines from the recorded mini r2, r4 and r5 contexts and a plain request name these
+  # terms as their subject; each stands alone as the preamble of its own file.
+  local body n=0
+  for body in \
+    "Main2167 requires task-named admission for new workers and fresh validation. Main2721 expressly admits this ONE fresh isolated contract review and preserves already-admitted implementation immediately after substantive contract PASS." \
+    "Review inputs are request/context/current DoD/grading/neutral assumptions only. Worker statements are self-checks, not independent evidence; missing mandatory evidence is not PASS." \
+    "Main2714: requirements include request/context, governing constraints and necessary safe/usable outcomes, not only repeated owner words. Missing mandatory evidence is not pass; self-check is not independent proof." \
+    "This acceptance contract was authored by OpenAI-family agents. Independent contract reviewer must be outside OpenAI." \
+    "No prior findings, responses or author conclusions are included." \
+    "Run a contract review on the d3 steer."; do
+    n=$((n + 1))
+    printf '%s\n' "$body" >"$ctx"
+    build_pack pack --contract "$src" --context "$ctx" --request "$ctx" || fail "owner line $n was refused as author text: $(cat "$TMP_ROOT/build.err")"
+    assert_grep "$body" "$pack/request.md" "owner line $n did not reach the pack"
+  done
   for body in "Author's self-check: everything passes.\n" 'Worker self-check: all green.\n' 'Status: all-green after the author analysis.\n' 'Author: the worker.\n'; do
     printf '%b' "$body" >"$ctx"
     rc=0
@@ -643,40 +658,36 @@ test_preamble_author_text_matches_whole_words() {
   pass "author text in a preamble matches whole words in both directions"
 }
 
-test_inputs_read_list_ends_at_the_next_label_of_its_shape() {
-  local rep="$TMP_ROOT/report8.md"
+test_inputs_read_list_needs_its_own_heading() {
+  local rep="$TMP_ROOT/report8.md" sib="$TMP_ROOT/sibling/pack/review.md" n=0 body
   make_leak_world
-  local shape
-  for shape in bold plain; do
-    if [ "$shape" = bold ]; then
-      head='**Inputs read**'
-      next='**Checks not performed**'
-    else
-      head='Inputs read:'
-      next='Checks not performed:'
-    fi
-    # Compliant: the check not performed names a file the reviewer did not open.
-    {
-      printf 'VERDICT: FAIL head=abc\n\n%s\n\n' "$head"
-      printf -- '- %s\n- %s\n\n' "$LEAK_PACK/contract.md" "$LEAK_PACK/target.md"
-      printf '%s\n\n' "$next"
-      printf -- '- %s: not opened; not an allowed input.\n' "$LEAK_ROOT/data/case/truth/r23-review.md"
-      printf '\nEXIT: needs-revision\n'
-    } >"$rep"
+  # Compliant: a list under its own heading ends at the next heading, so a check not performed
+  # that names a file the reviewer did not open is not read as an input.
+  {
+    printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n'
+    printf -- '- %s\n- %s\n\n' "$LEAK_PACK/contract.md" "$LEAK_PACK/target.md"
+    printf '## Checks not performed\n\n'
+    printf -- '- %s: not opened; not an allowed input.\n' "$LEAK_ROOT/data/case/truth/r23-review.md"
+    printf '\nEXIT: needs-revision\n'
+  } >"$rep"
+  run_check "$rep"
+  assert_equals 0 "$CHECK_RC" "a headed list was voided by its checks-not-performed section: $CHECK_OUT"
+  assert_contains "$CHECK_OUT" "2 listed input(s)" "the headed list did not end at the next heading"
+  # Noncompliant: a plain, bold or inline Inputs read list with no heading voids the round,
+  # here each with a leak after a group label that a label-shaped end would have hidden.
+  for body in \
+    "Inputs read:\n- $LEAK_PACK/contract.md\n\nRepository files:\n- $sib\n" \
+    "**Inputs read**\n- $LEAK_PACK/contract.md\n**Other**\n- $sib\n" \
+    "Inputs read: $LEAK_PACK/contract.md\nOther:\n- $sib\n" \
+    "Inputs read:\n- $LEAK_PACK/contract.md\nPrior report: $sib\n"; do
+    n=$((n + 1))
+    printf 'VERDICT: FAIL head=abc\n\n%b\nEXIT: needs-revision\n' "$body" >"$rep"
     run_check "$rep"
-    assert_equals 0 "$CHECK_RC" "a $shape-label report was voided by its checks-not-performed list: $CHECK_OUT"
-    assert_contains "$CHECK_OUT" "2 listed input(s)" "the $shape-label list did not end at the next label"
-    # Noncompliant: a leak inside the list is still read.
-    {
-      printf 'VERDICT: FAIL head=abc\n\n%s\n\n' "$head"
-      printf -- '- %s\n- %s\n\n' "$LEAK_PACK/contract.md" "$LEAK_ROOT/data/case/truth/r23-review.md"
-      printf '%s\n\nEXIT: needs-revision\n' "$next"
-    } >"$rep"
-    run_check "$rep"
-    assert_equals 3 "$CHECK_RC" "a leak inside a $shape-label list was allowed"
-    assert_contains "$CHECK_OUT" "INPUT LEAK: $LEAK_ROOT/data/case/truth/r23-review.md" "the $shape-label leak is not named"
+    assert_equals 3 "$CHECK_RC" "Inputs read list $n with no heading was accepted: $CHECK_OUT"
+    assert_contains "$CHECK_OUT" "has no heading of its own" "list $n did not void for its missing heading"
+    assert_contains "$CHECK_OUT" "ROUND VOID" "list $n did not void the round"
   done
-  pass "a bold or Label: Inputs read list ends at the next label of its own shape and still reads every entry before it"
+  pass "an Inputs read list must sit under its own heading, and one with no heading voids the round"
 }
 
 test_fences_and_headings_accept_up_to_three_spaces() {
@@ -704,6 +715,48 @@ test_fences_and_headings_accept_up_to_three_spaces() {
   "$PACK_BIN" --contract "$src" --out-root "$TMP_ROOT/sp-out" >/dev/null 2>&1 || rc=$?
   assert_equals 3 "$rc" "an unclosed indented fence did not stop the build"
   pass "fences and headings accept up to three leading spaces and four spaces is code"
+}
+
+test_inline_backticks_do_not_open_a_fence() {
+  local src="$TMP_ROOT/ib.md" pack manifest
+  write_fixture_contract "$src"
+  # Noncompliant: an inline code span of triple backticks is not a fence, so the author
+  # section after it is still a heading and is dropped.
+  awk '{ print } /^- \*\*A1\*\*/ { print ""; print "```npm test``` runs the suite."; print ""; print "## Author'"'"'s all-green candidate"; print ""; print "ZZ-ALLGREEN-INLINE-ZZ"; print ""; print "```bash"; print "echo ok"; print "```" }' "$src" >"$src.tmp" && mv "$src.tmp" "$src"
+  build_pack pack --contract "$src" || fail "build failed: $(cat "$TMP_ROOT/build.err")"
+  manifest="$(dirname "$pack").excluded-paths"
+  assert_no_grep "ZZ-ALLGREEN-INLINE-ZZ" "$pack/target.md" "an author section after an inline triple-backtick span reached the pack"
+  grep -qxF "$(printf "dropped\tAuthor's all-green candidate")" "$manifest" || fail "the author section after the inline span is not listed as dropped"
+  # shellcheck disable=SC2016 # literal backticks in a contract line
+  assert_grep '```npm test``` runs the suite.' "$pack/target.md" "the inline code span line was dropped"
+  # Compliant: a real backtick fence with an info string still hides a heading-shaped line.
+  write_fixture_contract "$src"
+  awk '{ print } /^- \*\*A1\*\*/ { print ""; print "```bash"; print "## Contract Review inside a bash fence"; print "```" }' "$src" >"$src.tmp" && mv "$src.tmp" "$src"
+  build_pack pack --contract "$src" || fail "build failed: $(cat "$TMP_ROOT/build.err")"
+  assert_grep "## Contract Review inside a bash fence" "$pack/target.md" "a heading-shaped line inside a real fence was treated as a heading"
+  pass "a triple-backtick code span is not a fence, and a real fence still hides headings"
+}
+
+test_definition_of_done_in_every_heading_form() {
+  local src="$TMP_ROOT/dd.md" pack rc=0 form
+  # Compliant: an indented ATX heading and a setext heading both carry the Definition Of Done,
+  # and an indented REQUEST heading is still named as the request.
+  for form in ' ## Definition Of Done' 'Definition Of Done
+------------------'; do
+    printf '# Fixture\n\n   ## REQUEST\n\nThe owner wants a thing.\n\n%s\n\n- A1 (mandatory): ZZ-KEEP-DOD-ZZ x\n' "$form" >"$src"
+    build_pack pack --contract "$src" || fail "a Definition Of Done under the heading form '$form' was refused: $(cat "$TMP_ROOT/build.err")"
+    assert_grep "ZZ-KEEP-DOD-ZZ" "$pack/target.md" "the Definition Of Done text is missing from the pack"
+    # shellcheck disable=SC2016 # literal backticks in generated Markdown
+    assert_grep 'the request is the REQUEST section of `target.md`' "$pack/contract.md" "an indented REQUEST heading was not named as the request"
+  done
+  # Noncompliant: a Definition Of Done heading that sits only inside a code fence is no section.
+  # shellcheck disable=SC2016 # literal text in a fixture
+  printf '# Fixture\n\n## REQUEST\n\nA request.\n\n```text\n## Definition Of Done\n```\n' >"$src"
+  "$PACK_BIN" --contract "$src" --out-root "$TMP_ROOT/dd-out" >/dev/null 2>"$TMP_ROOT/dd.err" || rc=$?
+  assert_equals 2 "$rc" "a contract whose only Definition Of Done heading is fenced was accepted"
+  assert_contains "$(cat "$TMP_ROOT/dd.err")" "no Definition Of Done section" "the fenced-only contract was refused for another cause"
+  assert_absent "$TMP_ROOT/dd-out" "a refused contract left an output directory"
+  pass "the Definition Of Done and REQUEST are found under every heading form the filter reads"
 }
 
 test_rubric_revision_is_pinned_with_a_root() {
@@ -754,7 +807,9 @@ fm_test_run_cases \
   test_export_root_mode_is_gone \
   test_leak_check_pinned_rubric_url_and_own_report \
   test_preamble_author_text_matches_whole_words \
-  test_inputs_read_list_ends_at_the_next_label_of_its_shape \
+  test_inputs_read_list_needs_its_own_heading \
+  test_inline_backticks_do_not_open_a_fence \
+  test_definition_of_done_in_every_heading_form \
   test_fences_and_headings_accept_up_to_three_spaces \
   test_rubric_revision_is_pinned_with_a_root \
   -- "$@"
