@@ -1106,10 +1106,12 @@ An owner that starts and then dies is restarted at the next cycle and raises no 
 A detached owner's stderr appends to `state/github-accounting/owner.log`, which `start` trims to its newest 32 KiB before a launch once it passes 64 KiB.
 Its selected quota source is the REST `rate_limit` endpoint's `resources.graphql` body through `gh-axi`, not the enforcing response headers used by the sweeps.
 That source was explicitly selected instead of the original GraphQL-query/header proposal; a returned REST counter does not establish agreement between counter shards.
-A `process` row holds a locally sampled caller chain at its first sighting, and a `process_end` row with the same pid and start identity holds the time of the first successful scan that no longer lists that caller, so the two rows connect a long-lived caller to the quota intervals between them.
-No row is written per scan, and a failed scan ends nothing, so a `process_end` time can follow the real end by the failed or missing scans that `sampling` rows report.
-A caller still alive when the observer stops has no `process_end` row, nor has one that ends while no owner runs, so its `process` row shows when it was first seen and not how long it lived; a new owner records a caller it finds alive as a new `process` row.
-Each row expires on its own age and a running owner writes a caller's `process` row only once, so a caller that lives past the 48-hour retention loses that row and its later `process_end` row can stand alone.
+A `process` row holds a locally sampled caller chain at its first sighting; while successful scans still list that identity, the owner renews the saved sanitized projection in one fresh `process` row once the latest row is 24 hours old.
+The renewal preserves the same argv and ancestors rather than resampling their values, so a caller that remains visible across the 48-hour retention keeps a joinable row.
+A `process_end` row with the same pid, start identity and run id holds the time of the first successful scan that no longer lists that caller, connecting a retained process sighting to the quota intervals up to that scan.
+No row is written per scan, and a failed scan ends nothing or renews nothing, so a `process_end` time can follow the real end by the failed or missing scans that `sampling` rows report.
+A caller still alive when the observer stops has no `process_end` row, nor has one that ends while no owner runs, so a retained `process` row shows a first sighting or renewal and not how long the caller lived afterward; a new owner records a caller it finds alive as a new `process` row.
+Each row still expires on its own age; an observation gap longer than retention can remove the process row before an end is observed.
 Temporal coincidence cannot prove that a caller spent the points of a quota interval, and missed, non-`gh`, or off-host consumers remain unknown.
 Arguments are a sanitized `ps` command-line projection, not lossless argv; arbitrary values and shell payloads are withheld.
 Its own start/stop commands manage only its private owner, quota child group, and owned `ps` children, never a shared service.

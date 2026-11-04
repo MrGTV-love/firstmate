@@ -54,8 +54,12 @@ remaining child processes, including a hung ps; a SIGKILL of the owner does not.
 run's process_source callable is a test
 seam returning {pid: (ppid, start_identity, argv_words)}; the default is ps.
 Injected rows prove output behavior, not actual host observations. New gh/gh-axi
-PID/start identities retain sanitized argv and the observed ancestor chain in one
-process row. One process_end row, with the pid, start identity and time, follows when
+PID/start identities retain sanitized argv and the observed ancestor chain in a
+first-sighting process row. While successful scans still list that identity, its
+saved sanitized projection is repeated in one fresh process row once the latest
+row is 24 hours old, keeping it joinable within the unchanged 48-hour retention.
+No argv or ancestor projection is recomputed for a renewal. One process_end row,
+with the pid, start identity and time, follows when
 the first successful scan no longer lists that identity as a caller; a failed scan
 ends nothing and no row is written per scan. A caller still alive when the observer
 stops has no process_end row, nor has one that ends while no owner runs, and a new
@@ -406,14 +410,14 @@ def run(root, duration=None, ready=None, *, process_source=None):
         for number in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
             signal.signal(number, stop_requested)
         child = stream = expired = scan = verdict = None
-        seen = set()
+        seen = {}
         scans = failures = 0
         max_gap = 0.0
         previous = None
         started = next_process = next_quota = time.monotonic()
 
         def finish_scan():
-            nonlocal scan, seen, failures
+            nonlocal scan, failures
             finished, scan = scan, None
             if isinstance(finished.error, SAMPLE_ERRORS):
                 failures += 1
@@ -421,11 +425,16 @@ def run(root, duration=None, ready=None, *, process_source=None):
                 raise finished.error
             else:
                 found, current = process_records(finished.rows, seen)
-                for pid, start in sorted(seen - current):
-                    record(db, "process_end", {"pid": pid, "start": start, "run_id": run_id})
+                observed = time.time()
+                for pid, start in sorted(seen.keys() - current):
+                    record(db, "process_end", {"pid": pid, "start": start, "run_id": run_id}, observed)
+                    del seen[(pid, start)]
                 for item in found:
-                    record(db, "process", dict(item, run_id=run_id))
-                seen = current
+                    seen[(item["pid"], item["start"])] = (None, dict(item, run_id=run_id))
+                for identity, (stamp, item) in seen.items():
+                    if stamp is None or observed - stamp >= RETENTION / 2:
+                        record(db, "process", item, observed)
+                        seen[identity] = (observed, item)
 
         try:
             prune(db, time.time())

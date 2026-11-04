@@ -180,6 +180,57 @@ def source():
         self.assertGreaterEqual(self.prune_at(end["observed_at"] + 172801), 1)
         self.assertEqual(self.records("process_end"), [])
 
+    def test_live_caller_keeps_joinable_rows_across_retention_and_departure(self):
+        # A controlled clock crosses 48 h while the same two caller identities
+        # remain visible. Later argv/ancestor changes must not replace the saved
+        # sanitized first-sighting projection when its process row is renewed.
+        launcher = self.root / "retention-clock.py"
+        launcher.write_text('''import os,runpy,signal,sys,time
+base=1794000000
+elapsed=0
+real_monotonic=time.monotonic
+time.time=lambda:base+elapsed
+time.monotonic=lambda:real_monotonic()+elapsed
+owner=runpy.run_path(sys.argv[1])
+scans=0
+def source():
+    global scans,elapsed
+    offsets=[0,1,86401,172801,172802,172803]
+    elapsed=offsets[min(scans,len(offsets)-1)]
+    scans+=1
+    argv=["/fixture/gh","pr","checks","--body","fixture-secret"] if scans<3 else ["/fixture/gh","issue","list"]
+    table={70:(10,"fixture-survivor",argv),
+           10:(0,"fixture-parent",["python3","/fixture/original.py" if scans<3 else "/fixture/changed.py"])}
+    if scans<5:
+        table[71]=(10,"fixture-ender",argv)
+    if scans>=6:
+        os.kill(os.getpid(),signal.SIGTERM)
+    return table
+owner["run"](owner["private_root"](),process_source=source)
+''')
+        reply = subprocess.run([sys.executable, str(launcher), str(OWNER)], env=self.env, capture_output=True, text=True)
+        self.assertEqual(reply.returncode, 0, reply.stderr)
+        rows = self.records("process")
+        self.assertEqual([(row["pid"], row["observed_at"] - 1794000000) for row in rows],
+                         [(70, 86401), (71, 86401), (70, 172801), (71, 172801)])
+        for row in rows:
+            self.assertEqual(row["argv"], ["gh", "pr", "checks", "--body", "[REDACTED]"])
+            self.assertEqual(row["ancestors"], [{"pid": 10, "ppid": 0, "start": "fixture-parent",
+                                                  "argv": ["python3", "original.py"]}])
+        self.assertNotIn("fixture-secret", json.dumps(rows))
+        ended = self.records("process_end")
+        self.assertEqual([(row["pid"], row["start"]) for row in ended], [(71, "fixture-ender")])
+        end = ended[0]
+        began = [row for row in rows if (row["pid"], row["start"], row["run_id"]) ==
+                 (end["pid"], end["start"], end["run_id"])]
+        self.assertEqual(end["observed_at"] - 1794000000, 172802)
+        self.assertEqual(began[-1]["observed_at"] - 1794000000, 172801)
+        self.assertEqual(self.records("owner")[-1]["action"], "stop")
+        # Renewal does not exempt either row kind from the original retention.
+        self.prune_at(end["observed_at"] + 172801)
+        self.assertEqual(self.records("process"), [])
+        self.assertEqual(self.records("process_end"), [])
+
     def test_interpreter_flags_keep_script_names_and_withhold_payloads(self):
         launcher = self.root / "injected-forms.py"
         launcher.write_text('''import runpy,sys
