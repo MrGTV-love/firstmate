@@ -809,6 +809,29 @@ test_the_directive_parser_reads_real_lines_and_ignores_every_example() {
   out=$(printf '%s\n' 'text review-name_. and review-dash- then x.y. end' | lib_call fm_pr_closes_prose_words - | tr '\n' ' ')
   [ "$out" = 'text review-name_. review-name_ and review-dash- then x.y. x.y end ' ] \
     || fail "parser: prose words lost an id's own spelling: $out"
+  out=$(printf '%s\n' 'Summary: skips every line after an unclosed `<!--` mention.' '' 'Closes-backlog-item: fm-a' \
+    "Train-member: https://github.com/o/r/pull/7" 'Also fm-b here.' > "$TMP_ROOT/unclosed-inline.md"; \
+    lib_call fm_pr_closes_ids "$TMP_ROOT/unclosed-inline.md"; lib_call fm_pr_closes_members "$TMP_ROOT/unclosed-inline.md"; \
+    lib_call fm_pr_closes_prose_words "$TMP_ROOT/unclosed-inline.md" | grep -Fx fm-b)
+  [ "$out" = "$(printf '%s\n' fm-a https://github.com/o/r/pull/7 fm-b)" ] \
+    || fail "parser: a mid-line <!-- with no close hid the directives and prose after it: $(printf '%s' "$out" | tr '\n' ' ')"
+  out=$(printf '%s\n' 'Closes-backlog-item: fm-x <!-- note -->' 'Closes-backlog-item: fm-y' | lib_call fm_pr_closes_malformed -)
+  [ "$out" = 'Closes-backlog-item: fm-x <!-- note -->' ] || fail "parser: a directive with a trailing comment was not reported as malformed: $out"
+  out=$(printf '%s\n' 'Closes-backlog-item: fm-x <!-- note -->' | lib_call fm_pr_closes_ids -)
+  [ -z "$out" ] || fail "parser: a directive with a trailing comment closed $out"
+  out=$(printf '%s\n' 'Example: <!--' 'Closes-backlog-item: hidden' '-->' 'Closes-backlog-item: shown' | lib_call fm_pr_closes_ids -)
+  [ "$out" = shown ] || fail "parser: a comment that opens mid-line and closes in its paragraph did not hide its lines: $(printf '%s' "$out" | tr '\n' ' ')"
+  out=$(printf '%s\n' 'Example: <!--' '' 'Closes-backlog-item: after-blank' '-->' | lib_call fm_pr_closes_ids -)
+  [ "$out" = after-blank ] || fail "parser: a mid-line <!-- hid lines past a blank line: $(printf '%s' "$out" | tr '\n' ' ')"
+  out=$(printf '%s\n' 'The rule: `<!--` opens one:' '```' '<!-- example' '-->' '```' 'Closes-backlog-item: after-fence' | lib_call fm_pr_closes_ids -)
+  [ "$out" = after-fence ] || fail "parser: a mid-line <!-- reached through a fence and lost the directive after it: $(printf '%s' "$out" | tr '\n' ' ')"
+  out=$(printf '%s\n' 'Summary: an unclosed `<!--` mention.' 'Closes-backlog-item: before-block' '<!-- attestation -->' 'Closes-backlog-item: after-block' | lib_call fm_pr_closes_ids -)
+  [ "$out" = "$(printf '%s\n' before-block after-block)" ] || fail "parser: a mid-line <!-- reached into a comment block and lost a directive: $(printf '%s' "$out" | tr '\n' ' ')"
+  out=$(printf '%s\n' 'This fixes _fm-c_ and __fm-d__, also _fm-e_. and foo_ too.' | lib_call fm_pr_closes_prose_words -)
+  for want in fm-c fm-d fm-e foo_; do
+    printf '%s\n' "$out" | grep -Fxq -- "$want" || fail "parser: prose words lost $want from an emphasis pair or its own spelling"
+  done
+  ! printf '%s\n' "$out" | grep -Fxq foo || fail "parser: a lone trailing underscore was stripped from foo_"
   out=$(printf '%s\n' 'Train-member: https://github.com/a/b/pull/1' 'Train-member:  https://github.com/a/b/pull/2  ' 'Train-member: https://github.com/a/b/pull/1' \
     '  Train-member: https://github.com/a/b/pull/3' '| Train-member: https://github.com/a/b/pull/4 |' '   ```' 'Train-member: https://github.com/a/b/pull/5' '   ```' \
     | lib_call fm_pr_closes_members -)
@@ -1154,7 +1177,7 @@ SH
   chmod +x "$1/fakebin/tasks-axi"
 }
 
-test_a_merge_with_directive_lines_and_an_unlistable_backlog_says_so_once() {
+test_a_merge_with_an_unlistable_backlog_says_so_once_per_body_with_prose() {
   local case_dir
   case_dir=$(gh_case c1-unlistable-train 88)
   printf '%s\n' "Train-member: $REPO_URL/9" '' 'Notes mention some-other-id in prose.' > "$case_dir/bodies/88"
@@ -1162,7 +1185,21 @@ test_a_merge_with_directive_lines_and_an_unlistable_backlog_says_so_once() {
   printf '%s\n' 9 >> "$case_dir/merged-prs"
   fake_unlistable_backlog "$case_dir"
   gh_merge "$case_dir" 88
-  [ "$(grep -c 'could not list the backlog to check which ids the prose' "$case_dir/stderr")" = 1 ] || fail "c1-unlistable-train: a body with only a Train-member line did not report the failed id check once"
+  [ "$(grep -c "could not list the backlog to check which ids the prose of $REPO_URL/88 mentions" "$case_dir/stderr")" = 1 ] \
+    || fail "c1-unlistable-train: the train body's prose did not report the failed id check once"
+  [ "$(grep -c "could not list the backlog to check which ids the prose of train member $REPO_URL/9 mentions" "$case_dir/stderr")" = 1 ] \
+    || fail "c1-unlistable-train: the member body's prose did not report the failed id check once"
+
+  case_dir=$(gh_case c1-unlistable-member-only 87)
+  printf '%s\n' "Train-member: $REPO_URL/9" > "$case_dir/bodies/87"
+  printf '%s\n' 'This member mentions some-other-id.' > "$case_dir/bodies/9"
+  printf '%s\n' 9 >> "$case_dir/merged-prs"
+  fake_unlistable_backlog "$case_dir"
+  gh_merge "$case_dir" 87
+  [ "$(grep -c 'could not list the backlog' "$case_dir/stderr")" = 1 ] || fail "c1-unlistable-member-only: the skipped id check was not reported exactly once"
+  assert_match "could not list the backlog to check which ids the prose of train member $REPO_URL/9 mentions" "$case_dir/stderr" \
+    "c1-unlistable-member-only: the notice did not name the member whose prose went unchecked"
+  assert_no_grep "the prose of $REPO_URL/87 mentions" "$case_dir/stderr" "c1-unlistable-member-only: the notice named the train body, which has no prose"
 
   case_dir=$(gh_case c1-unlistable-none 89)
   printf '%s\n' 'Notes mention some-other-id in prose.' > "$case_dir/bodies/89"
@@ -1183,7 +1220,7 @@ test_a_merge_with_directive_lines_and_an_unlistable_backlog_says_so_once() {
   gh_merge "$case_dir" 85
   [ "$(cx_state "$case_dir" unlistable-a)" = "done" ] || fail "c1-unlistable: the named item was not closed"
   [ "$(grep -c 'could not list the backlog to check which ids the prose' "$case_dir/stderr")" = 1 ] || fail "c1-unlistable: the failed id check was not reported exactly once"
-  pass "a failed backlog listing reports the skipped id check once, with or without a directive line, and still closes the named item"
+  pass "a failed backlog listing reports the skipped id check once for each body that has prose and names that body, with or without a directive line, and still closes the named item"
 }
 
 # Review 92093289 F1: a directive inside an HTML comment is an example. Only the real
@@ -1235,8 +1272,15 @@ test_a_mention_keeps_the_ids_own_spelling() {
   cx_add "$case_dir" review-name_
   cx_add "$case_dir" review-dash-
   cx_add "$case_dir" review-normal
-  printf '%s\n' 'It touches review-name_, review-dash- and review-normal.' 'Last: review-normal.' > "$case_dir/bodies/96"
+  cx_add "$case_dir" review-em-one
+  cx_add "$case_dir" review-em-two
+  cx_add "$case_dir" review-lone
+  printf '%s\n' 'It touches review-name_, review-dash- and review-normal.' 'Last: review-normal.' \
+    'Also _review-em-one_ and __review-em-two__, but review-lone_ is another word.' > "$case_dir/bodies/96"
   gh_merge "$case_dir" 96
+  assert_match '^actionable: close-at-merge: mentioned review-em-one in the prose of ' "$case_dir/stderr" "f3: an id in single-underscore emphasis was missed"
+  assert_match '^actionable: close-at-merge: mentioned review-em-two in the prose of ' "$case_dir/stderr" "f3: an id in double-underscore emphasis was missed"
+  assert_no_grep 'mentioned review-lone ' "$case_dir/stderr" "f3: a lone trailing underscore was stripped, so review-lone_ reported review-lone"
   assert_match '^actionable: close-at-merge: mentioned review-name_ in the prose of ' "$case_dir/stderr" "f3: an id with a trailing underscore was missed"
   assert_match '^actionable: close-at-merge: mentioned review-dash- in the prose of ' "$case_dir/stderr" "f3: an id with a trailing hyphen was missed"
   assert_match '^actionable: close-at-merge: mentioned review-normal in the prose of ' "$case_dir/stderr" "f3: a plain id was missed"
@@ -1417,7 +1461,7 @@ test_f4_an_unlisted_forgejo_or_gitlab_member_is_reported_by_its_url
 test_a_gitlab_or_forgejo_merge_naming_its_own_task_reports_the_live_record
 test_a_forgejo_train_closes_each_listed_member_source_and_reports_the_prose_link
 test_a_gitlab_train_reads_each_listed_member_and_reports_the_prose_link
-test_a_merge_with_directive_lines_and_an_unlistable_backlog_says_so_once
+test_a_merge_with_an_unlistable_backlog_says_so_once_per_body_with_prose
 test_an_html_comment_example_closes_nothing_and_keeps_its_edge
 test_a_train_members_prose_only_mention_is_reported_and_never_closed
 test_a_mention_keeps_the_ids_own_spelling

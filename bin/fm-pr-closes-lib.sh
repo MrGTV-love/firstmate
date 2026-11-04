@@ -29,10 +29,16 @@
 #   a run of the same character at least as long, after at most three spaces, with only
 #   whitespace after it; a fence that never closes runs to the end of the body.
 #   Pipeline bodies quote text they do not own, so quoted examples stay examples.
-# - An HTML comment is an example too: every line from one that holds `<!--` through the
-#   line that holds `-->` (the same line when both are on it) is skipped, and a comment that
-#   never closes runs to the end of the body. The pipeline's own attestation comment is one
-#   line and hides nothing.
+# - An HTML comment is an example too, read as CommonMark reads it. A line that starts with
+#   `<!--` after at most three spaces opens a comment block: that line through the first
+#   line that holds `-->` (the same line when `-->` follows the opener) is skipped, and a
+#   block that never closes runs to the end of the body. The pipeline's own attestation
+#   comment is one such line and hides nothing. A `<!--` later in a line is kept with its
+#   line; when it does not close on that line, the lines after it through the first line
+#   that holds `-->` are skipped, but only when that `-->` comes in the same paragraph (before
+#   the next blank line, fence line or line that opens a comment block); otherwise the `<!--`
+#   is plain text and hides nothing.
+#   So a directive line with a trailing comment is still reported as malformed.
 # - A trailing carriage return is ignored, because GitHub bodies often use CRLF.
 # - Nothing else is read as a name: no table, heading, bullet, link or sentence ever
 #   closes an item or makes a member.
@@ -40,7 +46,7 @@
 #   as is a column-0 line that starts with a directive word but does not fit its form
 #   (fm_pr_closes_malformed), so a misspelled block is never silent.
 #
-# Prose. The rest of the body (fm_pr_closes_prose) is every line outside a fence that does
+# Prose. The rest of the body (fm_pr_closes_prose) is every line not skipped above that does
 # not start at column 0 with a directive word or the old `Closes:`, so a malformed directive
 # line is reported as malformed, never as prose. bin/fm-pr-close-items.sh reads its words and
 # its pull request links only to report that something was mentioned and closed nothing.
@@ -51,11 +57,19 @@
 FM_PR_CLOSES_ID_RE='[A-Za-z0-9._-]+'
 
 fm_pr_closes_unfenced() {  # <body-file|->
-  local line in_fence=0 in_comment=0 char='' len=0 run
+  local line in_fence=0 in_comment=0 char='' len=0 run i=0 j count=0
   local open_re='^[ ]{0,3}(`{3,}|~{3,})(.*)$'
   local close_re='^[ ]{0,3}(`{3,}|~{3,})[[:space:]]*$'
+  local block_re='^[ ]{0,3}<!--'
+  local blank_re='^[[:space:]]*$'
+  local lines=()
   while IFS= read -r line || [ -n "$line" ]; do
-    line=${line%$'\r'}
+    lines[count]=${line%$'\r'}
+    count=$((count + 1))
+  done < <(if [ "${1:--}" = - ]; then cat; else cat -- "$1"; fi)
+  while [ "$i" -lt "$count" ]; do
+    line=${lines[i]}
+    i=$((i + 1))
     if [ "$in_fence" = 1 ]; then
       if [[ "$line" =~ $close_re ]]; then
         run=${BASH_REMATCH[1]}
@@ -77,14 +91,21 @@ fm_pr_closes_unfenced() {  # <body-file|->
         continue
       fi
     fi
+    if [[ "$line" =~ $block_re ]]; then
+      case "${line#*'<!--'}" in *'-->'*) ;; *) in_comment=1 ;; esac
+      continue
+    fi
+    printf '%s\n' "$line"
     case "$line" in
       *'<!--'*)
-        # The comment opens here and closes on this line only if `-->` follows the opener.
-        case "${line#*'<!--'}" in *'-->'*) ;; *) in_comment=1 ;; esac
-        continue ;;
+        case "${line##*'<!--'}" in *'-->'*) continue ;; esac
+        j=$i
+        while [ "$j" -lt "$count" ] && ! [[ "${lines[j]}" =~ $blank_re ]] && ! [[ "${lines[j]}" =~ $open_re ]] && ! [[ "${lines[j]}" =~ $block_re ]]; do
+          case "${lines[j]}" in *'-->'*) i=$((j + 1)); break ;; esac
+          j=$((j + 1))
+        done ;;
     esac
-    printf '%s\n' "$line"
-  done < <(if [ "${1:--}" = - ]; then cat; else cat -- "$1"; fi)
+  done
 }
 
 # fm_pr_closes_directive <word> <body-file|->: the value of each well-formed `<word>: value`
@@ -152,7 +173,9 @@ fm_pr_closes_prose() {  # <body-file|->
 # task id may hold (letters, digits, `.`, `_`, `-`), so an id that begins or ends with `_`
 # or `-` is found as spelled. Because a sentence can end right after an id, each word is
 # printed as written and, when that differs, once more with leading and trailing `.`
-# removed (an id never starts with `.`), so the caller can match either against its ids.
+# removed (an id never starts with `.`). When that word is wrapped in one matched Markdown
+# emphasis pair (`_x_` or `__x__`), it is printed once more without the pair; a lone
+# leading or trailing `_` stays. The caller can match any of these against its ids.
 fm_pr_closes_prose_words() {  # <body-file|->
   fm_pr_closes_prose "${1:--}" \
     | LC_ALL=C tr -c 'A-Za-z0-9._-' '\n' \
@@ -162,6 +185,10 @@ fm_pr_closes_prose_words() {  # <body-file|->
         sub(/^\.+/, "", t)
         sub(/\.+$/, "", t)
         if (t != "" && t != $0) print t
+        e = t
+        if (e ~ /^__.+__$/) e = substr(e, 3, length(e) - 4)
+        else if (e ~ /^_.+_$/) e = substr(e, 2, length(e) - 2)
+        if (e != "" && e != t) print e
       }' \
     | LC_ALL=C awk '!seen[$0]++'
 }

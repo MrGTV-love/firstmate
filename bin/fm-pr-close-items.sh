@@ -11,7 +11,8 @@
 # What it reads. The merged pull request's body, through bin/fm-pr-closes-lib.sh, which
 # owns the two directive lines that close anything: `Closes-backlog-item: <item-id>` and
 # `Train-member: <pull request URL>`. Nothing else in a body closes an item: a table, a
-# heading, a bullet, a link, a sentence, a fenced example or an HTML comment names nothing. Each
+# heading, a bullet, a link, a sentence, a fenced example or an HTML comment (read as the
+# library header says) names nothing. Each
 # `Train-member:` pull request is read the same way (its own `Closes-backlog-item:` lines),
 # and every task whose state/<task>.meta records pr= equal to that member's full URL is
 # considered too. Bodies are read from GitHub, GitLab and Forgejo, each member by its own
@@ -33,14 +34,15 @@
 #   - in the merged pull request's body and in each train member's body that was read: an
 #     active, not-done backlog id that appears as a word in the prose is a `mentioned ...`
 #     line that says nothing was closed for it. An id is matched as spelled (a leading or
-#     trailing `_` or `-` belongs to it; only a sentence's trailing `.` is dropped). An id
+#     trailing `_` or `-` belongs to it; only a sentence's trailing `.` and one matched
+#     Markdown emphasis pair, `_id_` or `__id__`, are dropped). An id
 #     a directive line, task record or old line already named gets no second line, and the
 #     merging task's own id is left out, because its teardown owns that item. A member's
 #     prose never closes anything. In the merged pull request's body only, a link in the
 #     prose to another pull request that no `Train-member:` line lists is also a
 #     `mentioned ...` line; links are read for GitHub, GitLab and Forgejo alike. The id check
-#     reads the backlog once; when the backlog cannot be listed, any body that has prose gets
-#     one `actionable:` line saying so, whether or not it holds a directive line.
+#     reads the backlog once; when the backlog cannot be listed, each body that has prose gets
+#     one `actionable:` line that names it, whether or not it holds a directive line.
 # The same read gives that pull request's merge state: when it is not merged (a hand run
 # with a pull request that is still open, or a state it cannot read), nothing is closed
 # and every named item in the active backlog that is not done yet is reported as not
@@ -327,11 +329,13 @@ while [ "$m" -le "$n" ]; do
   fi
   m=$((m + 1))
 done
-HAVE_WORDS=0
-for body in "${MENTION_BODIES[@]}"; do
-  [ -z "$(fm_pr_closes_prose_words "$body" | sed -n '1p')" ] || HAVE_WORDS=1
+PROSE_AT=()
+k=0
+while [ "$k" -lt "${#MENTION_BODIES[@]}" ]; do
+  [ -z "$(fm_pr_closes_prose_words "${MENTION_BODIES[$k]}" | sed -n '1p')" ] || PROSE_AT+=("$k")
+  k=$((k + 1))
 done
-if [ "$HAVE_WORDS" = 1 ]; then
+if [ "${#PROSE_AT[@]}" -gt 0 ]; then
   if states=$(fm_backlog_row_states "$DATA" 2>/dev/null); then
     : > "$WORK/active-ids"
     while IFS= read -r row; do
@@ -341,8 +345,7 @@ if [ "$HAVE_WORDS" = 1 ]; then
 $states
 ROWS
     SEEN="$SEEN$TASK_ID"$'\n'
-    k=0
-    while [ "$k" -lt "${#MENTION_BODIES[@]}" ]; do
+    for k in "${PROSE_AT[@]}"; do
       while IFS= read -r word; do
         [ -n "$word" ] || continue
         case "$SEEN" in *$'\n'"$word"$'\n'*) continue ;; esac
@@ -350,10 +353,11 @@ ROWS
         printf 'actionable: close-at-merge: mentioned %s in %s: nothing was closed for it; %s\n' \
           "$word" "${MENTION_WHERE[$k]}" "${MENTION_HOW[$k]//<id>/$word}" >&2
       done < <(fm_pr_closes_prose_words "${MENTION_BODIES[$k]}" | grep -Fxf "$WORK/active-ids")
-      k=$((k + 1))
     done
   else
-    printf 'actionable: close-at-merge: could not list the backlog to check which ids the prose of %s mentions, so none were checked\n' "$URL" >&2
+    for k in "${PROSE_AT[@]}"; do
+      printf 'actionable: close-at-merge: could not list the backlog to check which ids %s mentions, so none were checked\n' "${MENTION_WHERE[$k]}" >&2
+    done
   fi
 fi
 while IFS= read -r linked; do
