@@ -5143,6 +5143,33 @@ spawn_refresh_origin_default_tip() {
   spawn_fetch_origin_tip "$FM_SLOT_GUARD_SLOT" "$SPAWN_ORIGIN_DEFAULT"
 }
 
+# The recorded-source recovery reset has no fresh base fetch of its own, but its guard needs the
+# same proof as the fresh path: the current tip of origin's default branch, fetched now. With no
+# origin configured there is nothing to fetch and the guard judges from the manifest's base alone.
+# Origin evidence that is configured but unavailable refuses, before any reset or launch.
+spawn_fetch_recovery_origin_anchor() { # <worktree>
+  local worktree=$1 default rc=0
+  spawn_worktree_has_origin_config "$worktree" || return 0
+  default=$(spawn_remote_default_branch "$worktree") || rc=$?
+  case $rc in
+    0) ;;
+    2)
+      echo "error: could not fetch origin for pooled worktree '$worktree'; refusing to launch from a potentially stale base" >&2
+      return 1
+      ;;
+    *)
+      echo "error: could not resolve origin's current default branch for pooled worktree '$worktree'; refusing to launch from a potentially stale base" >&2
+      return 1
+      ;;
+  esac
+  SPAWN_ORIGIN_DEFAULT_SHA=$(spawn_fetch_origin_tip "$worktree" "$default") || {
+    SPAWN_ORIGIN_DEFAULT_SHA=
+    echo "error: could not fetch 'origin/$default' for pooled worktree '$worktree'; refusing to launch from a potentially stale base" >&2
+    return 1
+  }
+  SPAWN_ORIGIN_DEFAULT=$default
+}
+
 # Record the origin tip this spawn started from in the slot's remote-tracking refs, only
 # forward by compare-and-set, and repoint refs/remotes/origin/HEAD at origin's default
 # branch. The reset guard runs this as its last step before the reset
@@ -6686,10 +6713,16 @@ if [ "$KIND" != secondmate ] && { fm_slot_required "$PROJ_ABS" "$WT" || { [ "$RE
       if [ "$SPAWN_FRESH_SOURCE" = 0 ]; then
         # No worker was admitted and no prepared branch existed. Finish that
         # original immutable local plan, not a newly derived origin baseline.
+        spawn_fetch_recovery_origin_anchor "$WT" || spawn_slot_refused
         spawn_reset_guard_anchors "$WT"
         spawn_reset_guard_context
+        FM_SLOT_GUARD_ANCHOR_REFRESH=
+        [ -z "$SPAWN_ORIGIN_DEFAULT_SHA" ] || FM_SLOT_GUARD_ANCHOR_REFRESH=spawn_refresh_origin_default_tip
+        recovery_rc=0
         fm_slot_guarded_reset "$WT" "$SLOT_SOURCE_SHA" "$SLOT_SOURCE_REF" \
-          ${SPAWN_GUARD_ANCHORS[@]+"${SPAWN_GUARD_ANCHORS[@]}"} || spawn_slot_refused
+          ${SPAWN_GUARD_ANCHORS[@]+"${SPAWN_GUARD_ANCHORS[@]}"} || recovery_rc=$?
+        FM_SLOT_GUARD_ANCHOR_REFRESH=
+        [ "$recovery_rc" -eq 0 ] || spawn_slot_refused
         SLOT_FRESH_BASE=0
       fi
     fi

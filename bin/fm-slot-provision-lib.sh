@@ -19,6 +19,7 @@ FM_SLOT_BASE_REF=
 FM_SLOT_PREPARED_HEAD=
 FM_SLOT_PREVIOUS_BRANCH=
 FM_SLOT_PREVIOUS_HEAD=
+FM_SLOT_RESET_HEAD=
 
 fm_slot_required() { # <project> <copy>
   [ -f "$1/scripts/git-stability/provision_existing_slot.py" ] ||
@@ -58,6 +59,7 @@ fm_slot_prepare_base() { # <project> <copy> <task-id>
   branch=$(git -C "$copy" branch --show-current) || return 1
   FM_SLOT_PREVIOUS_BRANCH=$branch
   FM_SLOT_PREVIOUS_HEAD=$(git -C "$copy" rev-parse --verify HEAD) || return 1
+  FM_SLOT_RESET_HEAD=
   # The ordinary freshness owner resets HEAD. Detach first so it cannot move a
   # previous task's branch; preserve a detached tip through the existing owner.
   if [ -z "$branch" ]; then
@@ -69,8 +71,19 @@ fm_slot_prepare_base() { # <project> <copy> <task-id>
   git -C "$copy" checkout --quiet --detach || return 1
 }
 
+# Put the slot back on the checkout it had before preparation, but only while HEAD is still a
+# commit this spawn itself put there: the one it prepared from, or the one its own guarded reset
+# set. A restoring checkout from any other HEAD (a commit that landed in the slot during the
+# guard's observations) would move that work off HEAD and out of the tree, and no ref holds it.
+# Then the slot is left exactly as found, and the changed HEAD is reported.
 fm_slot_restore_base() { # <copy>
+  local head
   [ -n "$FM_SLOT_PREVIOUS_HEAD" ] || return 0
+  head=$(git -C "$1" rev-parse --verify --quiet HEAD 2>/dev/null) || head=
+  if [ -z "$head" ] || { [ "$head" != "$FM_SLOT_PREVIOUS_HEAD" ] && [ "$head" != "${FM_SLOT_RESET_HEAD:-}" ]; }; then
+    echo "error: the slot's HEAD is ${head:-unreadable}, not a commit this spawn put there (prepared from $FM_SLOT_PREVIOUS_HEAD); leaving the slot exactly as found and not restoring its original checkout" >&2
+    return 0
+  fi
   if [ -n "$FM_SLOT_PREVIOUS_BRANCH" ]; then
     git -C "$1" checkout --quiet "$FM_SLOT_PREVIOUS_BRANCH" --
   else
@@ -785,12 +798,15 @@ FM_SLOT_GUARD_REPORT_DIR=
 FM_SLOT_GUARD_HOLDER_REPORT=
 FM_SLOT_GUARD_PROBE_PY=$(cat <<'FMPROBEPY'
 import os, subprocess, sys
-slot, selfspec, pane = sys.argv[1:4]
-extra = sys.argv[4:]
+slot, selfspec, pane, spawn = sys.argv[1:5]
+extra = sys.argv[5:]
 if selfspec == "@self":
     selfpid = os.getpid()
     proc = subprocess.run(["lsof", "-n", "-P", "-w", "-d", "cwd", "-F", "pRcn"], capture_output=True, text=True, stdin=subprocess.DEVNULL)
-    if proc.returncode > 1 or not proc.stdout:
+    # Any failed exit is a failed or partial inventory, whatever rows it printed: a listing that
+    # lacks one holder still holds the probe's own process. Its stderr is kept for the report.
+    if proc.returncode != 0 or not proc.stdout:
+        sys.stderr.write("lsof exit %d: %s\n" % (proc.returncode, proc.stderr.strip()[:300]))
         sys.exit(5)
     data = proc.stdout
 else:
@@ -833,12 +849,42 @@ for _ in range(256):
 panepid = int(pane) if pane.isdigit() else None
 def own(pid):
     return pid in ancestors or reaches(pid, selfpid) or (panepid is not None and reaches(pid, panepid))
-# A pid asked about (a lease owner) is bound to this spawn only by descending from the probe or
-# the acquired pane's shell. The probe's own ancestors are the caller's chain (the supervisor,
-# the multiplexer): nothing ties those to this spawn's acquisition. Inside the acquired pane
-# (@self) the ancestors run up from the pane's shell, so there they count.
-def bound(pid):
-    return reaches(pid, selfpid) or (panepid is not None and reaches(pid, panepid)) or (selfspec == "@self" and pid in ancestors)
+# When a process started, in seconds since the epoch, or None when it cannot be read.
+def started_at(pid):
+    try:
+        if sys.platform == "darwin":
+            import ctypes, ctypes.util, struct
+            lib = ctypes.CDLL(ctypes.util.find_library("proc") or "/usr/lib/libproc.dylib")
+            buf = ctypes.create_string_buffer(136)
+            if lib.proc_pidinfo(pid, 3, 0, buf, 136) != 136:
+                return None
+            sec, usec = struct.unpack_from("<QQ", buf.raw, 120)
+            return sec + usec / 1e6
+        with open("/proc/%d/stat" % pid) as handle:
+            fields = handle.read().rsplit(")", 1)[1].split()
+        ticks = int(fields[19])
+        with open("/proc/stat") as handle:
+            boot = [int(line.split()[1]) for line in handle if line.startswith("btime ")][0]
+        return boot + ticks / os.sysconf("SC_CLK_TCK")
+    except Exception:
+        return None
+# A pid asked about (a lease owner) is this spawn's own acquisition only on evidence this spawn
+# creates itself: it descends from the probe or from the acquired pane's shell, AND it started
+# after this spawn did. Neither the task claim nor a copy of a pid taken after the claim is
+# evidence: a process that was already live in the pool entry, or already in the pane, would
+# carry both. The probe's own ancestors are the caller's chain (the supervisor, the multiplexer)
+# and are no evidence either. Inside the acquired pane (@self) the ancestors run up from the
+# pane's shell, so there they count as the tree. A start time that cannot be read is unknown.
+spawn_pid = int(spawn) if spawn.isdigit() else None
+spawn_started = started_at(spawn_pid) if spawn_pid is not None else None
+def acquisition(pid):
+    in_tree = reaches(pid, selfpid) or (panepid is not None and reaches(pid, panepid)) or (selfspec == "@self" and pid in ancestors)
+    if not in_tree:
+        return "foreign" if pid in rows else "unknown"
+    began = started_at(pid)
+    if spawn_started is None or began is None:
+        return "unknown"
+    return "own" if began > spawn_started else "preexisting"
 for pid, row in sorted(rows.items()):
     cwd = row["cwd"]
     if cwd and (cwd == slot or cwd.startswith(slot.rstrip("/") + "/")) and not own(pid):
@@ -855,7 +901,7 @@ for arg in extra:
         continue
     except PermissionError:
         pass
-    print("P\t%d\t%s" % (pid, "own" if bound(pid) else ("foreign" if pid in rows else "unknown")))
+    print("P\t%d\t%s" % (pid, acquisition(pid)))
 FMPROBEPY
 )
 
@@ -866,26 +912,30 @@ fm_slot_guard_probe_in_pane() { # [<pid>...]
   [ -n "$FM_SLOT_GUARD_PANE_RUNNER" ] && [ -d "$dir" ] || return 1
   script=$(mktemp "$dir/.slot-probe.py.XXXXXX") && report=$(mktemp "$dir/.slot-probe.out.XXXXXX") || return 1
   printf '%s\n' "$FM_SLOT_GUARD_PROBE_PY" >"$script"
-  "$FM_SLOT_GUARD_PANE_RUNNER" "$FM_SLOT_GUARD_PROJECT" "$report" "$script" "$FM_SLOT_GUARD_REAL" @self '' "$@" || rc=$?
+  "$FM_SLOT_GUARD_PANE_RUNNER" "$FM_SLOT_GUARD_PROJECT" "$report" "$script" "$FM_SLOT_GUARD_REAL" @self '' "$$" "$@" || rc=$?
   if [ "$rc" -eq 0 ]; then FM_SLOT_GUARD_HOLDER_REPORT=$(cat "$report"); fi
   rm -f -- "$script" "$report"
   return "$rc"
 }
 
 fm_slot_guard_probe_processes() { # [<pid>...]
-  local lsof_out rc=0
+  local lsof_out rc=0 lsof_err
   command -v lsof >/dev/null 2>&1 || {
     fm_slot_guard_refuse unknown_holder_probe "lsof is not installed, so processes inside the slot cannot be ruled out"
     return 1
   }
-  # lsof exits 1 when nothing matched a selection; a clean working-directory list
-  # always holds this process, so an empty or failed read proves nothing.
-  lsof_out=$(lsof -n -P -w -d cwd -F pRcn 2>/dev/null </dev/null) || rc=$?
-  if [ "$rc" -gt 1 ] || [ -z "$lsof_out" ]; then
-    fm_slot_guard_refuse unknown_holder_probe "lsof could not list the processes' working directories (exit $rc)"
+  # A clean working-directory list always holds this process and exits 0. Any other exit
+  # is a failed or partial inventory, whatever rows it printed, and proves nothing; an empty
+  # listing proves nothing either. The stderr is kept for the report.
+  lsof_err=$(mktemp "${TMPDIR:-/tmp}/fm-slot-guard-lsof.XXXXXX" 2>/dev/null) || lsof_err=/dev/null
+  lsof_out=$(lsof -n -P -w -d cwd -F pRcn 2>"$lsof_err" </dev/null) || rc=$?
+  if [ "$rc" -ne 0 ] || [ -z "$lsof_out" ]; then
+    fm_slot_guard_refuse unknown_holder_probe "lsof could not list the processes' working directories completely (exit $rc: $(head -c 300 "$lsof_err" 2>/dev/null | tr '\n' ' '))"
+    [ "$lsof_err" = /dev/null ] || rm -f -- "$lsof_err"
     return 1
   fi
-  FM_SLOT_GUARD_HOLDER_REPORT=$(printf '%s\n' "$lsof_out" | python3 -I -c "$FM_SLOT_GUARD_PROBE_PY" "$FM_SLOT_GUARD_REAL" "$$" "${FM_SLOT_GUARD_PANE_PID:-}" "$@") || {
+  [ "$lsof_err" = /dev/null ] || rm -f -- "$lsof_err"
+  FM_SLOT_GUARD_HOLDER_REPORT=$(printf '%s\n' "$lsof_out" | python3 -I -c "$FM_SLOT_GUARD_PROBE_PY" "$FM_SLOT_GUARD_REAL" "$$" "${FM_SLOT_GUARD_PANE_PID:-}" "$$" "$@") || {
     fm_slot_guard_refuse unknown_holder_probe "the working-directory listing could not be read (the spawn's own process is absent from it)"
     return 1
   }
@@ -939,10 +989,12 @@ EOF
 
 # The lease identity this spawn recorded when it took the slot: the pool entry's owner_pid
 # and owner_started_at at the moment the slot's claim named this task. The claim names the
-# task, not the process, so the identity alone proves nothing: a live process that was
-# already in the entry would be recorded just the same. A process lease is this spawn's only
-# when the identity matches AND a probe binds that process to this spawn (it is in the
-# spawn's own lineage or in the acquired pane's tree); ancestry alone never marks it.
+# task, not the process, and there is no record that this spawn acquired that process lease:
+# a live process that was already in the entry (or already in the pane) would be recorded just
+# the same. So the identity alone proves nothing. A process lease is this spawn's only when the
+# identity matches AND the probe finds the process under this spawn or the acquired pane AND the
+# process started after this spawn did: evidence this spawn creates itself. Any one of those
+# alone never marks it, and neither does ancestry.
 fm_slot_guard_record_pool_identity() { # <slot>
   FM_SLOT_GUARD_POOL_REAL=$(CDPATH='' cd -- "$1" 2>/dev/null && pwd -P) || FM_SLOT_GUARD_POOL_REAL=
 }
@@ -1013,7 +1065,7 @@ fm_slot_guard_fact_holders_lease() {
           ;;
         *)
           if [ "$recorded" = 1 ]; then
-            fm_slot_guard_refuse holder_lease "the pool entry '$name' is leased to live process $pid, which was in the entry when the slot was claimed but is neither in this spawn's lineage nor in the acquired pane's tree, so nothing binds it to this spawn's acquisition"
+            fm_slot_guard_refuse holder_lease "the pool entry '$name' is leased to live process $pid, which was in the entry when the slot was claimed, but nothing binds it to this spawn's acquisition: it is not a process that this spawn or the acquired pane started after this spawn began"
           else
             fm_slot_guard_refuse holder_lease "the pool entry '$name' is leased to live process $pid, which is not the acquisition this spawn recorded as its own"
           fi
@@ -1256,4 +1308,5 @@ fm_slot_guarded_reset() { # <slot> <target-sha> <target-label> <anchor>...
     echo "error: could not reset pooled worktree '$slot' to '$label'; refusing to launch from a potentially stale base" >&2
     return 1
   fi
+  FM_SLOT_RESET_HEAD=$(git -C "$slot" rev-parse --verify --quiet HEAD 2>/dev/null) || FM_SLOT_RESET_HEAD=
 }

@@ -2154,30 +2154,76 @@ guard_set_lease_owner() { # <state-file> <pid>
   jq --argjson pid "$2" '.worktrees[0].owner_pid = $pid' "$1" >"$1.tmp" && mv "$1.tmp" "$1"
 }
 
-# A slot whose pool entry names, as its process lease, a process inside the acquired pane's tree:
-# the shape of this spawn's own acquisition (the pane's `treehouse get` subshell). Sets
-# PANE_SHELL, PANE_CHILD and LEASE_STATE; the fake tmux reports the shell as the pane pid.
-guard_owned_pane_slot() { # <case-name> <task-id>
-  local rec
+# A pool slot with a pane whose shell the fake tmux reports as the pane pid. Sets PANE_SHELL,
+# LEASE_STATE and, for "existing", PANE_CHILD.
+#  existing: the pane shell and a child of it are live BEFORE the spawn starts, and the pool entry
+#            names that child as its process lease. Nothing this spawn did put it there.
+#  acquired: the pool entry names no owner until the spawn first calls tmux; then the (already
+#            running) pane shell starts a child of its own and records it in the entry, as the
+#            pane's `treehouse get` subshell would. That child starts after the spawn did.
+guard_pane_slot() { # <case-name> <task-id> <existing|acquired>
+  local rec acq
   rec=$(make_case "$1" "$2")
   read_case_record "$rec"
   lay_out_as_pool_slot
   LEASE_STATE="$CASE_DIR/slots/treehouse-state.json"
-  PANE_SHELL=$(guard_start_pane_shell "$POOL_DIR" "$CASE_DIR/pane.ready")
+  PANE_CHILD=
+  if [ "$3" = existing ]; then
+    PANE_SHELL=$(guard_start_pane_shell "$POOL_DIR" "$CASE_DIR/pane.ready")
+    PANE_CHILD=$(pgrep -P "$PANE_SHELL" | head -n 1)
+    [ -n "$PANE_CHILD" ] || fail 'the pane shell has no child to hold the lease'
+    printf '{"worktrees":[{"name":"1","path":"%s","owner_pid":%s}]}\n' "$POOL_DIR" "$PANE_CHILD" >"$LEASE_STATE"
+    printf '%s' "$PANE_SHELL" >"$CASE_DIR/pane.pid"
+    guard_wrap_tmux_pane_pid "$FAKEBIN_DIR" "$CASE_DIR/pane.pid"
+    return 0
+  fi
+  acq="$CASE_DIR/acq"
+  mkdir -p "$acq"
+  cat >"$acq/pane.sh" <<'SH'
+#!/usr/bin/env bash
+cd "$1" || exit 1
+: >"$2/ready0"
+while [ ! -e "$2/trigger" ]; do command sleep 0.05; done
+sleep 600 &
+child=$!
+jq --argjson pid "$child" '.worktrees[0].owner_pid = $pid' "$3" >"$3.tmp" && mv "$3.tmp" "$3"
+printf '%s' "$child" >"$2/child"
+: >"$2/ready"
+wait
+SH
+  bash "$acq/pane.sh" "$POOL_DIR" "$acq" "$LEASE_STATE" >/dev/null 2>&1 </dev/null &
+  PANE_SHELL=$!
+  for _ in $(seq 1 100); do [ -e "$acq/ready0" ] && break; command sleep 0.05; done
+  [ -e "$acq/ready0" ] || fail 'the acquiring pane never reached the slot'
   printf '%s' "$PANE_SHELL" >"$CASE_DIR/pane.pid"
-  guard_wrap_tmux_pane_pid "$FAKEBIN_DIR" "$CASE_DIR/pane.pid"
-  PANE_CHILD=$(pgrep -P "$PANE_SHELL" | head -n 1)
-  [ -n "$PANE_CHILD" ] || fail 'the pane shell has no child to hold the lease'
-  printf '{"worktrees":[{"name":"1","path":"%s","owner_pid":%s}]}\n' "$POOL_DIR" "$PANE_CHILD" >"$LEASE_STATE"
+  mv "$FAKEBIN_DIR/tmux" "$FAKEBIN_DIR/tmux.real"
+  cat >"$FAKEBIN_DIR/tmux" <<SH
+#!/usr/bin/env bash
+if mkdir "$acq/fired" 2>/dev/null; then
+  : >"$acq/trigger"
+  for i in \$(seq 1 200); do [ -e "$acq/ready" ] && break; command sleep 0.05; done
+fi
+case " \$* " in
+  *"#{pane_pid}"*) cat "$CASE_DIR/pane.pid"; exit 0 ;;
+esac
+exec "$FAKEBIN_DIR/tmux.real" "\$@"
+SH
+  chmod +x "$FAKEBIN_DIR/tmux"
 }
 
 guard_end_pane() { pkill -P "$PANE_SHELL" 2>/dev/null || true; kill "$PANE_SHELL" 2>/dev/null || true; }
 
 test_reset_guard_s4_process_lease_recorded_identity() {
   local id other
+  # The lease owner is the process this spawn's pane started (acquired during the spawn): launches.
+  id='guard-s4-lease-acquired'
+  guard_pane_slot guard-s4lac "$id" acquired
+  guard_expect_launch S4 '(iii-b) the lease owner is the process this spawn'"'"'s own pane started after the spawn began' "$id" --scout
+  [ -s "$CASE_DIR/acq/child" ] || fail 'S4 (iii-b): the pane never started its lease child, so the case proved nothing'
+  guard_end_pane
   # The owner changes after the claim to another live process outside the pane: refused.
   id='guard-s4-lease-swapped'
-  guard_owned_pane_slot guard-s4lsw "$id"
+  guard_pane_slot guard-s4lsw "$id" acquired
   (cd / && exec sleep 600) >/dev/null 2>&1 </dev/null &
   other=$!
   FM_SLOT_RESET_GUARD_SEAM="jq --argjson pid $other '.worktrees[0].owner_pid = \$pid' '$LEASE_STATE' >'$LEASE_STATE.tmp' && mv '$LEASE_STATE.tmp' '$LEASE_STATE'; guard_snapshot '$POOL_DIR' '$CASE_DIR/post-seam.snap'" \
@@ -2186,28 +2232,35 @@ test_reset_guard_s4_process_lease_recorded_identity() {
   kill "$other" 2>/dev/null || true
   # The owner changes to another process inside the acquired pane's tree (the shell itself): ancestry does not exempt it.
   id='guard-s4-lease-pane-tree'
-  guard_owned_pane_slot guard-s4lpt "$id"
+  guard_pane_slot guard-s4lpt "$id" acquired
   FM_SLOT_RESET_GUARD_SEAM="jq --argjson pid $PANE_SHELL '.worktrees[0].owner_pid = \$pid' '$LEASE_STATE' >'$LEASE_STATE.tmp' && mv '$LEASE_STATE.tmp' '$LEASE_STATE'; guard_snapshot '$POOL_DIR' '$CASE_DIR/post-seam.snap'" \
     guard_expect_refusal S4 '(iii-b) the lease owner is a live process inside the pane tree that is not the recorded acquisition' 'reset refused (holder_lease)' "$id" --scout
   guard_end_pane
   # The owner changes to a process that is gone: nothing holds the lease any more.
   id='guard-s4-lease-dead'
-  guard_owned_pane_slot guard-s4ld "$id"
+  guard_pane_slot guard-s4ld "$id" acquired
   FM_SLOT_RESET_GUARD_SEAM="jq --argjson pid 2147483000 '.worktrees[0].owner_pid = \$pid' '$LEASE_STATE' >'$LEASE_STATE.tmp' && mv '$LEASE_STATE.tmp' '$LEASE_STATE'" \
     guard_expect_launch S4 '(iii-b) paired pass: the changed owner is a process that is gone' "$id" --scout
   guard_end_pane
-  pass 'S4 (iii-b): a process lease is this spawn'"'"'s only by its recorded identity, never by ancestry'
+  pass 'S4 (iii-b): a process lease is this spawn'"'"'s only by its recorded identity plus evidence this spawn created, never by ancestry'
 }
 
-# R2: the claim names the task, not the process, so a live process already named in the pool
-# entry is recorded just the same. It is this spawn's acquisition only if something binds it
-# to this spawn: here, that it sits in the acquired pane's tree.
+# R2 / round-3 B: the claim names the task, not the process, and there is no record that this
+# spawn acquired a process lease. A live process already named in the pool entry is recorded just
+# the same, so the exemption rests only on evidence the spawn creates itself: the holder descends
+# from the spawn or the acquired pane AND started after this spawn did.
 test_reset_guard_r2_preexisting_process_is_not_this_acquisition() {
   local id foreign
-  # The reviewer's case: a live, independently started process, cwd outside the slot, is the
-  # entry's owner before the spawn begins. It refuses with the slot untouched.
+  # The reviewer's round-3 case: the pane and its child were live before the spawn began, and the
+  # pool entry names that child. Pane ancestry and a recorded copy of the pid do not make it ours.
+  id='guard-r2-preexisting-pane-child'
+  guard_pane_slot guard-r2p "$id" existing
+  guard_expect_refusal S4 '(B) the pane child that was live before the spawn began is the lease owner' 'reset refused (holder_lease)' "$id" --scout
+  assert_contains "$GUARD_OUT" 'nothing binds it to this spawn' 'B: the refusal did not say why the recorded identity was not accepted'
+  guard_end_pane
+  # A live, independently started process outside the pane is the entry's owner before the spawn begins.
   id='guard-r2-foreign'
-  guard_owned_pane_slot guard-r2a "$id"
+  guard_pane_slot guard-r2a "$id" existing
   (cd / && exec sleep 600) >/dev/null 2>&1 </dev/null &
   foreign=$!
   guard_set_lease_owner "$LEASE_STATE" "$foreign"
@@ -2218,22 +2271,23 @@ test_reset_guard_r2_preexisting_process_is_not_this_acquisition() {
   # An ancestor of the spawn (here the test shell, standing for the supervisor that runs it) is
   # not this spawn's acquisition either: nothing ties the caller's chain to the slot.
   id='guard-r2-ancestor'
-  guard_owned_pane_slot guard-r2d "$id"
+  guard_pane_slot guard-r2d "$id" existing
   guard_set_lease_owner "$LEASE_STATE" "$$"
   guard_expect_refusal S4 '(R2) the pool entry names an ancestor of the spawn as the lease owner' 'reset refused (holder_lease)' "$id" --scout
   guard_end_pane
-  # Paired pass: the entry's owner is a process in the acquired pane's tree.
+  # Paired pass: the lease owner is a child the acquired pane started after the spawn began.
   id='guard-r2-owned'
-  guard_owned_pane_slot guard-r2b "$id"
-  guard_expect_launch S4 '(R2) paired pass: the lease owner is a process in the acquired pane'"'"'s tree' "$id" --scout
+  guard_pane_slot guard-r2b "$id" acquired
+  guard_expect_launch S4 '(R2) paired pass: the lease owner is a process the acquired pane started after the spawn began' "$id" --scout
+  [ -s "$CASE_DIR/acq/child" ] || fail 'R2: the pane never started its lease child, so the pass case proved nothing'
   guard_end_pane
   # Paired pass: the entry's owner is gone.
   id='guard-r2-gone'
-  guard_owned_pane_slot guard-r2c "$id"
+  guard_pane_slot guard-r2c "$id" existing
   guard_set_lease_owner "$LEASE_STATE" 2147483000
   guard_expect_launch S4 '(R2) paired pass: the lease owner is a process that is gone' "$id" --scout
   guard_end_pane
-  pass 'R2: a pre-existing foreign process lease refuses with nothing changed; an owned acquisition and a gone owner proceed'
+  pass 'R2/B: a pre-existing process lease (foreign, ancestor or pane child) refuses with nothing changed; an acquisition made during the spawn and a gone owner proceed'
 }
 
 # R3: a pool state file that disappears after the slot was acquired as a pool slot is a lost
@@ -2293,6 +2347,190 @@ test_reset_guard_r4_origin_head_write_failure_refuses_before_the_reset() {
   [ "$(git -C "$POOL_DIR" symbolic-ref refs/remotes/origin/HEAD)" = refs/remotes/origin/main ] || fail 'R4 control: origin/HEAD does not name origin main'
   pass 'R4: a failed origin/HEAD write refuses before the reset with the slot byte-identical; the writable control resets and launches'
 }
+
+# A (round 3): a governed slot is prepared (its branch is left and HEAD detached) before the guard
+# looks. A commit that lands during the guard's observations is refused as uncontained; the refusal
+# must then leave that commit and its files exactly where they are. A restoring checkout of the
+# original branch from the new commit would move it off HEAD with no ref holding it.
+test_reset_guard_a_governed_late_commit_is_not_orphaned() {
+  local rec id late
+  # Detached slot: the late commit lands on the detached HEAD.
+  id='guard-a-detached'
+  rec=$(make_guard_governed_case guard-a1 "$id")
+  read_case_record "$rec"
+  guard_write_manifest - "$INITIAL_SHA"
+  FM_SLOT_RESET_GUARD_SEAM="printf 'late\\n' >'$POOL_DIR/late.txt'; git -C '$POOL_DIR' add late.txt; git -C '$POOL_DIR' -c user.name=t -c user.email=t@e.invalid commit -q -m late; guard_snapshot '$POOL_DIR' '$CASE_DIR/post-seam.snap'" \
+    guard_expect_refusal S5b '(A) a commit lands on a detached governed slot during the observations' 'reset refused (head_not_contained)' "$id" --scout --owned-path scripts
+  late=$(git -C "$POOL_DIR" log -1 --format=%s)
+  [ "$late" = late ] || fail "A: HEAD is no longer the late commit (now '$late')"
+  assert_present "$POOL_DIR/late.txt" 'A: the late commit file was removed from the tree'
+  assert_contains "$GUARD_OUT" 'not a commit this spawn put there' 'A: the refusal did not report the changed HEAD'
+  # Attached slot: the original branch must not be checked out over the late commit either.
+  id='guard-a-attached'
+  rec=$(make_guard_governed_case guard-a2 "$id")
+  read_case_record "$rec"
+  git -C "$POOL_DIR" checkout --quiet -b owner-topic "$INITIAL_SHA"
+  guard_write_manifest owner-topic "$INITIAL_SHA"
+  FM_SLOT_RESET_GUARD_SEAM="printf 'late\\n' >'$POOL_DIR/late.txt'; git -C '$POOL_DIR' add late.txt; git -C '$POOL_DIR' -c user.name=t -c user.email=t@e.invalid commit -q -m late; guard_snapshot '$POOL_DIR' '$CASE_DIR/post-seam.snap'" \
+    guard_expect_refusal S5b '(A) a commit lands on a governed slot whose branch was left for the preparation' 'reset refused' "$id" --scout --owned-path scripts
+  [ "$(git -C "$POOL_DIR" log -1 --format=%s)" = late ] || fail 'A: HEAD is no longer the late commit (attached slot)'
+  assert_present "$POOL_DIR/late.txt" 'A: the late commit file was removed from the tree (attached slot)'
+  [ "$(git -C "$POOL_DIR" rev-parse refs/heads/owner-topic)" = "$INITIAL_SHA" ] || fail 'A: the original branch ref moved'
+  # Control: a refusal that leaves HEAD where the preparation put it still restores the original branch
+  # and keeps the late edit (a checkout of the same commit discards nothing).
+  id='guard-a-restore'
+  rec=$(make_guard_governed_case guard-a3 "$id")
+  read_case_record "$rec"
+  git -C "$POOL_DIR" checkout --quiet -b owner-topic "$INITIAL_SHA"
+  guard_write_manifest owner-topic "$INITIAL_SHA"
+  GUARD_OUT=$(FM_SLOT_RESET_GUARD_SEAM="printf 'late edit\\n' >>'$POOL_DIR/README.md'" run_spawn "$id" --scout --owned-path scripts) && fail 'A control: the late edit did not refuse'
+  assert_contains "$GUARD_OUT" 'is not clean' 'A control: the refusal did not name the dirty tree'
+  [ "$(git -C "$POOL_DIR" symbolic-ref --short -q HEAD)" = owner-topic ] || fail 'A control: the original branch was not restored'
+  assert_grep 'late edit' "$POOL_DIR/README.md" 'A control: the late edit was lost'
+  # Control: with nothing wrong the same governed slot launches.
+  id='guard-a-stable'
+  rec=$(make_guard_governed_case guard-a4 "$id")
+  read_case_record "$rec"
+  git -C "$POOL_DIR" checkout --quiet -b owner-topic "$INITIAL_SHA"
+  guard_write_manifest owner-topic "$INITIAL_SHA"
+  GUARD_OUT=$(run_governed_spawn "$id") || fail "A control: a stable governed slot refused: $GUARD_OUT"
+  pass 'A: a late commit on a governed slot is kept when the guard refuses; the same-HEAD refusal still restores the branch; a stable slot launches'
+}
+
+# C (round 3): a nonzero lsof exit is a failed or partial inventory, whatever rows it printed. A listing
+# that omits a holder still holds the probe's own process, so the self-presence check cannot prove it
+# complete. A lsof that lists everything except one holder, warns and exits 1 stands for that.
+guard_write_partial_lsof() { # <dir> <omit-pid>
+  local real
+  real=$(command -v lsof)
+  mkdir -p "$1"
+  cat >"$1/lsof" <<SH
+#!/usr/bin/env bash
+out=\$("$real" "\$@")
+printf '%s\n' "\$out" | awk -v omit="$2" '/^p/{skip=(substr(\$0,2)==omit)} !skip{print}'
+echo 'lsof: WARNING: could not read every process (partial inventory)' >&2
+exit 1
+SH
+  chmod +x "$1/lsof"
+}
+
+test_reset_guard_c_partial_lsof_inventory_is_unknown() {
+  local rec id holder pane
+  # The outer probe: the listing omits the foreign holder.
+  id='guard-c-outer'
+  rec=$(make_case guard-c1 "$id")
+  read_case_record "$rec"
+  (cd "$POOL_DIR" && exec sleep 600) >/dev/null 2>&1 </dev/null &
+  holder=$!
+  guard_write_partial_lsof "$FAKEBIN_DIR" "$holder"
+  guard_expect_refusal S4 '(C) the outer lsof lists all but one holder and exits 1' 'reset refused (unknown_holder_probe)' "$id" --scout
+  assert_contains "$GUARD_OUT" 'exit 1' 'C: the refusal did not carry the lsof exit status'
+  assert_contains "$GUARD_OUT" 'partial inventory' 'C: the refusal did not carry the lsof stderr'
+  kill "$holder" 2>/dev/null || true
+  # Control: with the complete inventory the same holder is found and refuses by name.
+  id='guard-c-complete'
+  rec=$(make_case guard-c2 "$id")
+  read_case_record "$rec"
+  (cd "$POOL_DIR" && exec sleep 600) >/dev/null 2>&1 </dev/null &
+  holder=$!
+  guard_expect_refusal S4 '(C) control: the complete inventory names the holder' 'reset refused (holder_cwd)' "$id" --scout
+  kill "$holder" 2>/dev/null || true
+  wait "$holder" 2>/dev/null || true
+  guard_expect_launch S4 '(C) control: the complete inventory finds no holder' "$id" --scout
+  # The in-pane probe (a backend with no pane pid): the pane's lsof omits the holder.
+  id='guard-c-inpane'
+  rec=$(make_case guard-c3 "$id")
+  read_case_record "$rec"
+  (cd "$POOL_DIR" && exec sleep 600) >/dev/null 2>&1 </dev/null &
+  holder=$!
+  guard_write_partial_lsof "$CASE_DIR/pane-bin" "$holder"
+  pane=$(PATH="$CASE_DIR/pane-bin:$PATH" guard_start_pane_emulator "$POOL_DIR" "$CASE_DIR/emulator")
+  guard_wrap_tmux_into_pane "$FAKEBIN_DIR" "$CASE_DIR/emulator"
+  guard_expect_refusal S4 '(C) the in-pane lsof lists all but one holder and exits 1' 'reset refused (unknown_holder_probe)' "$id" --scout
+  kill "$holder" "$pane" 2>/dev/null || true
+  pass 'C: a failed or partial lsof inventory refuses as unknown on both probe routes; complete-inventory holder and no-holder controls stay'
+}
+
+# D (round 3): the recorded-source recovery reset (a retry of a task whose first attempt was refused
+# before preparation, with a qualified local plan on record) must prove origin as the fresh path does:
+# fetch its default tip now, judge containment against it, and refuse when that evidence is unavailable.
+# Setup, shared by both cases: a governed local-only slot refused once for a dirty tree before
+# preparation; the dirt is then removed and the recorded plan is unchanged.
+guard_recovery_fixture() { # <id> -> a refused first attempt with its dirt removed; sets D_SELECTED
+  local id=$1 rec rc=0 out
+  rec=$(make_case "$id" "$id")
+  read_case_record "$rec"
+  fm_test_fake_no_mistakes "$FAKEBIN_DIR"
+  fm_test_fake_gh "$FAKEBIN_DIR"
+  fm_test_fake_gh_axi "$FAKEBIN_DIR"
+  git -C "$PROJECT_DIR" fetch --quiet origin
+  git -C "$PROJECT_DIR" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
+  git -C "$PROJECT_DIR" merge --ff-only origin/main >/dev/null
+  write_refusing_slot_owner "$PROJECT_DIR"
+  git -C "$PROJECT_DIR" add scripts
+  git -C "$PROJECT_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'accepted local owner'
+  D_SELECTED=$(git -C "$PROJECT_DIR" rev-parse main)
+  printf 'preserve pre-existing assigned work\n' >"$POOL_DIR/README.md"
+  out=$(FM_TEST_PROVISION_CALLED="$CASE_DIR/provisioner.called" run_spawn "$id" --mode local-only --yolo off --owned-path README.md 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail 'D fixture: the dirty first attempt launched'
+  assert_contains "$out" 'dirty_worktree' 'D fixture: the first attempt did not refuse for the dirty tree'
+  assert_grep "slot_source_ref=refs/heads/main" "$HOME_DIR/state/$id.meta" 'D fixture: the refusal lost the qualified source'
+  git -C "$POOL_DIR" checkout --quiet -- README.md
+  make_stopped_tmux "$CASE_DIR/stopped"
+}
+
+test_reset_guard_d_recorded_source_recovery_revalidates_origin() {
+  local id out rc head_before parent
+  # Case 1: origin is reachable. The recovery fetches its default tip, finds the slot's HEAD in it,
+  # and proceeds to the project's provisioner (which this fixture makes refuse after the reset).
+  id="guard-d-reachable-$$"
+  guard_recovery_fixture "$id"
+  rc=0
+  out=$(FM_TEST_PROVISION_CALLED="$CASE_DIR/relaunch.called" run_relaunch "$id" 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail 'D: the refusing fixture provisioner admitted a worker'
+  assert_not_contains "$out" 'unknown_anchor' "D: a clean recovery with reachable origin was refused for want of an anchor"$'\n'"$out"
+  assert_contains "$out" 'fixture_provisioner_must_refuse' "D: the recovery did not reach the project provisioner"$'\n'"$out"
+  [ -e "$CASE_DIR/relaunch.called" ] || fail 'D: the provisioner was never called'
+  python3 - "$CASE_DIR/relaunch.called" "$D_SELECTED" <<'PY' || fail 'D: the provisioner was not given the recorded local source'
+import json, sys
+args = json.load(open(sys.argv[1]))
+assert args[args.index('--base-source') + 1] == 'local-default'
+assert args[args.index('--base-sha') + 1] == sys.argv[2]
+PY
+  # Case 2: a readable manifest base holds the slot's HEAD, but origin cannot be reached. Without the
+  # origin read the guard has an anchor and would reset; with it, the missing evidence refuses.
+  id="guard-d-unreachable-$$"
+  guard_recovery_fixture "$id"
+  guard_write_manifest - "$(git -C "$POOL_DIR" rev-parse HEAD)"
+  git -C "$PROJECT_DIR" remote set-url origin "file://$CASE_DIR/missing-origin.git"
+  head_before=$(git -C "$POOL_DIR" rev-parse HEAD)
+  rc=0
+  out=$(FM_TEST_PROVISION_CALLED="$CASE_DIR/relaunch.called" run_relaunch "$id" 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail 'D: a recovery with unreachable origin admitted a worker'
+  assert_contains "$out" 'could not fetch' "D: the refusal did not name the failed origin read"$'\n'"$out"
+  [ ! -e "$CASE_DIR/relaunch.called" ] || fail 'D: the provisioner was reached although origin evidence was unavailable'
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$head_before" ] || fail 'D: the slot was reset although origin evidence was unavailable'
+  # Case 3: origin is reachable at the first look, and its default branch moves back before the final
+  # look. The slot's HEAD sat at the old tip; the final pass must see the rewound branch and refuse.
+  id="guard-d-rewound-$$"
+  guard_recovery_fixture "$id"
+  parent=$(git -C "$CASE_DIR/publisher" rev-parse main)
+  guard_publish_tracked tip.txt $'tip\n'
+  guard_prefetch
+  git -C "$POOL_DIR" checkout --quiet --detach "$(git -C "$CASE_DIR/publisher" rev-parse main)"
+  head_before=$(git -C "$POOL_DIR" rev-parse HEAD)
+  rc=0
+  out=$(FM_SLOT_RESET_GUARD_SEAM="git -C '$CASE_DIR/publisher' push --quiet --force origin '$parent:refs/heads/main'" \
+    FM_TEST_PROVISION_CALLED="$CASE_DIR/relaunch.called" run_relaunch "$id" 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail 'D: a recovery admitted a worker after origin rewound its default branch'
+  assert_contains "$out" 'head_not_contained' "D: the rewound default branch was not seen on the final pass"$'\n'"$out"
+  [ ! -e "$CASE_DIR/relaunch.called" ] || fail 'D: the provisioner was reached after origin rewound its default branch'
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$head_before" ] || fail 'D: the slot was reset after origin rewound its default branch'
+  pass 'D: the recorded-source recovery reset fetches origin and judges against it, again on the final pass; unreachable origin or a rewound default refuses before reset or launch, reachable origin proceeds'
+}
+
+
+
 
 # R1: containment is proved against the current tip of origin's default branch on the final
 # pass, so a default branch that moved back between the observations is seen.
@@ -3130,5 +3368,8 @@ test_reset_guard_r1_default_branch_moves_between_observations
 test_reset_guard_r2_preexisting_process_is_not_this_acquisition
 test_reset_guard_r3_vanished_pool_state_is_unknown
 test_reset_guard_r4_origin_head_write_failure_refuses_before_the_reset
+test_reset_guard_a_governed_late_commit_is_not_orphaned
+test_reset_guard_c_partial_lsof_inventory_is_unknown
+test_reset_guard_d_recorded_source_recovery_revalidates_origin
 
 echo "# all fm-spawn-pool-base-freshen tests passed"
