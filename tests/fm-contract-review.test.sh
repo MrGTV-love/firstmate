@@ -312,7 +312,10 @@ make_leak_world() { # builds LEAK_* variables
   mkdir -p "$LEAK_ROOT/notes"
   printf 'a tracked plan\n' >"$LEAK_ROOT/notes/plan.md"
   write_fixture_contract "$LEAK_ROOT/sources/raw-contract.md"
-  printf 'data/\n' >"$LEAK_ROOT/.gitignore"
+  printf 'data/\nsecret.md\n.env\n' >"$LEAK_ROOT/.gitignore"
+  printf 'secret\n' >"$LEAK_ROOT/secret.md"
+  printf 'TOKEN=x\n' >"$LEAK_ROOT/.env"
+  printf 'readme\n' >"$LEAK_ROOT/README.md"
   printf 'an earlier review report\n' >"$LEAK_ROOT/data/case/truth/r23-review.md"
   printf 'assess\n' >"$LEAK_SKILLS/assess-done-and-grade/SKILL.md"
   printf 'define\n' >"$LEAK_SKILLS/define-done-and-grading/SKILL.md"
@@ -322,7 +325,7 @@ make_leak_world() { # builds LEAK_* variables
   printf 'define\n\nApply [Operational boundaries](OPERATIONAL-BOUNDARIES.md).\n' >"$LEAK_SKILLS/define-done-and-grading/SKILL.md"
   ln -s "$LEAK_SKILLS" "$TMP_ROOT/leak-skills-link"
   fm_git_init_commit "$LEAK_ROOT"
-  git -C "$LEAK_ROOT" add bin docs sources notes .gitignore
+  git -C "$LEAK_ROOT" add bin docs sources notes README.md .gitignore
   git -C "$LEAK_ROOT" -c user.name=t -c user.email=t@example.invalid commit -qm files
   LEAK_PACK=''
   build_pack LEAK_PACK --contract "$LEAK_ROOT/sources/raw-contract.md" --root "$LEAK_ROOT" \
@@ -1254,6 +1257,44 @@ test_leak_check_accepts_bare_entrypoint_lines_after_the_list() {
   pass "bare VERDICT, Protected class, EXIT and Basis lines after the list are accepted, and a stray path still voids"
 }
 
+test_leak_check_reads_bare_file_names() {
+  local rep="$TMP_ROOT/report20.md" line n=0
+  make_leak_world
+  # Compliant: a revision path to a bare tracked name is read, and prose with a slash is skipped.
+  printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- %s\n- HEAD:README.md\n- N/A\n- Helpers/subagents: none\n\n## Findings\n' "$LEAK_PACK/contract.md" >"$rep"
+  run_check "$rep"
+  assert_equals 0 "$CHECK_RC" "a bare revision path or slash prose was flagged: $CHECK_OUT"
+  assert_contains "$CHECK_OUT" "2 listed input(s)" "the bare revision path was not read"
+  # Noncompliant: a gitignored root file named bare, with a line reference, punctuation or as a dotfile, is a leak.
+  # shellcheck disable=SC2016 # literal backticks in a report line
+  for line in '- secret.md: read in full' '- secret.md:12' '- secret.md, read' '- .env' '- `.env`'; do
+    n=$((n + 1))
+    printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- %s\n%s\n\n## Findings\n' "$LEAK_PACK/contract.md" "$line" >"$rep"
+    run_check "$rep"
+    assert_equals 3 "$CHECK_RC" "bare name $n ($line) passed"
+    assert_contains "$CHECK_OUT" "INPUT LEAK" "bare name $n ($line) was not read as a leak"
+  done
+  pass "a bare file name, with a revision, line reference or punctuation, is read as a path"
+}
+
+test_tab_after_heading_hashes_is_a_heading() {
+  local src="$TMP_ROOT/tb.md" pack manifest
+  write_fixture_contract "$src"
+  # Noncompliant: a tab-separated author heading is still dropped and listed.
+  awk '{ print } /^- \*\*A1\*\*/ { print ""; print "##\tAuthor'"'"'s all-green candidate"; print ""; print "ZZ-TAB-ALLGREEN-ZZ"; print ""; print "###\tSelf-check"; print ""; print "ZZ-TAB-SELF-ZZ" }' "$src" >"$src.tmp" && mv "$src.tmp" "$src"
+  build_pack pack --contract "$src" || fail "build failed: $(cat "$TMP_ROOT/build.err")"
+  manifest="$(dirname "$pack").excluded-paths"
+  assert_no_grep "ZZ-TAB-ALLGREEN-ZZ" "$pack/target.md" "a tab-separated author heading reached the pack"
+  assert_no_grep "ZZ-TAB-SELF-ZZ" "$pack/target.md" "a tab-separated self-check heading reached the pack"
+  grep -qxF "$(printf "dropped\tAuthor's all-green candidate")" "$manifest" || fail "the tab-separated author heading is not listed as dropped"
+  # Compliant: a tab-separated kept heading keeps its text.
+  write_fixture_contract "$src"
+  awk '{ print } /^ZZ-KEEP-CONTEXT-ZZ/ { print ""; print "##\tAssumptions (more)"; print ""; print "ZZ-TAB-KEEP-ZZ" }' "$src" >"$src.tmp" && mv "$src.tmp" "$src"
+  build_pack pack --contract "$src" || fail "build failed: $(cat "$TMP_ROOT/build.err")"
+  assert_grep "ZZ-TAB-KEEP-ZZ" "$pack/target.md" "a tab-separated kept heading lost its text"
+  pass "a tab after the heading hashes makes a heading at every level"
+}
+
 test_inline_backticks_do_not_open_a_fence() {
   local src="$TMP_ROOT/ib.md" pack manifest
   write_fixture_contract "$src"
@@ -1367,6 +1408,8 @@ fm_test_run_cases \
   test_leak_check_voids_links_quotes_and_file_urls \
   test_longer_field_label_voids_as_structure \
   test_leak_check_accepts_bare_entrypoint_lines_after_the_list \
+  test_leak_check_reads_bare_file_names \
+  test_tab_after_heading_hashes_is_a_heading \
   test_inline_backticks_do_not_open_a_fence \
   test_definition_of_done_in_every_heading_form \
   test_fences_and_headings_accept_up_to_three_spaces \

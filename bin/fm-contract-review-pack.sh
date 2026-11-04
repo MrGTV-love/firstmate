@@ -169,9 +169,9 @@ END {
     level = 0; title = ""; ul = ""
     if (!body) {
       if (rest ~ /^####+[ \t]/) level = 4
-      else if (rest ~ /^### /) { level = 3; title = substr(rest, 5) }
-      else if (rest ~ /^## /) { level = 2; title = substr(rest, 4) }
-      else if (rest ~ /^# /) { level = 1; title = substr(rest, 3) }
+      else if (rest ~ /^###[ \t]/) { level = 3; title = rest; sub(/^###[ \t]+/, "", title) }
+      else if (rest ~ /^##[ \t]/) { level = 2; title = rest; sub(/^##[ \t]+/, "", title) }
+      else if (rest ~ /^#[ \t]/) { level = 1; title = rest; sub(/^#[ \t]+/, "", title) }
       else if (i < N && L[i + 1] ~ /^ ? ? ?(=+|-+)[ \t]*$/ && line !~ /^[ \t]*$/ && line !~ /^(    |\t)/ &&
         line !~ /^[ \t]*([-*+>|]|[0-9]+[.)])([ \t]|$)/) {
         ul = L[++i]
@@ -460,7 +460,7 @@ inputs_read() { # <report>
     }
     function is_path(s) {
       sub(/^[ \t]*([-*+]|[0-9]+[.)])[ \t]+/, "", s)
-      return s ~ /^`?[^ \t`]*[\/]/ || s ~ /^`?~/ || s ~ /^`?[A-Za-z0-9_.-]+\.[A-Za-z0-9]+(`|[ \t]|$)/
+      return s ~ /^[`*"(<]*(\/|\.\.?\/|~|https?:\/\/)/ || s ~ /^[`*"(<]*([A-Za-z0-9_.\/-]+:)?[A-Za-z0-9_.\/-]*\.[A-Za-z0-9]+([`*">]|[ \t:,;)#]|$)/
     }
     # The level of a setext heading whose title is line i, else 0.
     function setext(i,   s) {
