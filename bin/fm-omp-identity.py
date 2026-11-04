@@ -108,6 +108,10 @@ class Underivable(Unresolved):
     """The installed omp identity cannot be derived."""
 
 
+class NativeLauncher(Underivable):
+    """The omp on PATH is a native executable, so no Bun-shaped omp exists on this host."""
+
+
 # --- the installed identity -------------------------------------------------
 
 def _expand(text, assigned):
@@ -129,9 +133,16 @@ def installed_identity(launcher=None):
         raise Underivable("no omp launcher is available")
     try:
         with open(launcher, "rb") as handle:
-            text = handle.read(65536).decode("utf-8")
-    except (OSError, UnicodeDecodeError):
+            raw = handle.read(65536)
+    except OSError:
         raise Underivable("the omp launcher is not a readable text file") from None
+    try:
+        text = raw.decode("utf-8")
+        native = b"\0" in raw
+    except UnicodeDecodeError:
+        text, native = "", True
+    if native:
+        raise NativeLauncher("the omp launcher is a native executable, not a launcher script")
     assigned, command = {}, None
     for raw in text.splitlines():
         line = raw.strip()
@@ -552,6 +563,10 @@ def main(argv):
         facts = live_facts(args[1])
         identity = _identity_or_none(launcher)
     if mode == "writer":
+        if isinstance(identity, NativeLauncher):
+            # A native omp is named omp, never bun: a Bun process is another program.
+            print(f"unrelated: {identity}", file=sys.stderr)
+            return 1
         if isinstance(identity, Exception):
             print(f"may own: {identity}", file=sys.stderr)
             return 0

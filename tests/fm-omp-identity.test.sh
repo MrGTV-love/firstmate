@@ -336,7 +336,7 @@ test_fail_closed_runs_recover_when_the_evidence_returns() {
 
 # --- 6. record ownership and the library predicates -----------------------------
 test_record_writer_check_fails_open_and_adoption_target_fails_closed() {
-  local pid
+  local pid rc
   # shellcheck source=bin/fm-launch-proof-lib.sh
   . "$ROOT/bin/fm-backend.sh"; . "$ROOT/bin/fm-launch-proof-lib.sh"
   ps() { # a fake process table over scratch pids only, answering through the kernel reader
@@ -350,6 +350,13 @@ test_record_writer_check_fails_open_and_adoption_target_fails_closed() {
   fm_launch_proof_pid_is_omp "$pid" || fail "the installed Bun agent is an omp adoption target"
   [ -n "$FM_LAUNCH_PROOF_OMP_START" ] || fail "the predicate must hand back the incarnation it accepted"
   fm_launch_proof_pid_may_own_record "$pid" || fail "the installed Bun agent may own a record"
+  # A host whose omp is a native executable has no Bun-shaped omp: a Bun process is another program there.
+  # shellcheck disable=SC2016 # the launcher text must keep its literal variables
+  printf '#!/bin/sh\nexec "$HOME/bin/other" "$@"\n' > "$TMP/odd-writer-launcher"
+  rc=0; FM_OMP_LAUNCHER="$BUN" python3 -I "$IDENT" writer "$pid" >/dev/null 2>&1 || rc=$?
+  [ "$rc" -eq 1 ] || fail "with a native omp launcher a Bun process is not a record writer (exit $rc)"
+  rc=0; FM_OMP_LAUNCHER="$TMP/odd-writer-launcher" python3 -I "$IDENT" writer "$pid" >/dev/null 2>&1 || rc=$?
+  [ "$rc" -eq 0 ] || fail "an underivable launcher form is not proof that no writer owns the record (exit $rc)"
   launch tty __omp_worker_daemon_broker; pid=$SPAWNED
   fm_launch_proof_pid_is_omp "$pid" && fail "a worker-role Bun process is never an adoption target"
   fm_launch_proof_pid_may_own_record "$pid" || fail "a worker-role Bun process of the installed omp may still own a record, whatever its role"
