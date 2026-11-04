@@ -38,7 +38,7 @@ test_tmux_gone_endpoint_is_proven_despite_unrelated_servers() {
     expect_code 0 "$rc" "a gone recorded endpoint must be proven despite unrelated tmux servers ($shape)"$'\n'"$out"
     assert_contains "$out" endpoint-gone "exit should report proven absence ($shape)"
     rm -f "$dir/fake/list-count"
-    out=$(cd "$wt" && FM_FAKE_SESSION=fmlab run_control "$dir" "$id" relaunch --note "resume after reboot"); rc=$?
+    out=$(cd "$wt" && FM_FAKE_SESSION=$(herdr_owned_session "$id") run_control "$dir" "$id" relaunch --note "resume after reboot"); rc=$?
     expect_code 0 "$rc" "relaunch must proceed for a gone recorded endpoint ($shape)"$'\n'"$out"
     [ "$(meta_field "$dir" "$id" backend)" = herdr ] || fail "reclaim did not publish Herdr ($shape)"
     [ "$(meta_field "$dir" "$id" worktree)" = "$wt" ] || fail "reclaim changed the local copy ($shape)"
@@ -82,13 +82,13 @@ test_tmux_worktree_local_recovery_with_real_lsof() {
       assert_contains "$out" endpoint-gone "exit must prove the recorded endpoint gone"
       case "$entry" in
         relaunch)
-          out=$(cd "$wt" && FM_FAKE_SESSION=fmlab run_control "$dir" "$id" relaunch --note "resume after reboot"); rc=$?
+          out=$(cd "$wt" && FM_FAKE_SESSION=$(herdr_owned_session "$id") run_control "$dir" "$id" relaunch --note "resume after reboot"); rc=$?
           ;;
         reconcile-only)
-          out=$(cd "$wt" && FM_FAKE_SESSION=fmlab run_control "$dir" "$id" relaunch --reconcile-only --note "restore instruction owner"); rc=$?
+          out=$(cd "$wt" && FM_FAKE_SESSION=$(herdr_owned_session "$id") run_control "$dir" "$id" relaunch --reconcile-only --note "restore instruction owner"); rc=$?
           ;;
         direct)
-          out=$(cd "$wt" && FM_FAKE_SESSION=fmlab run_spawn "$dir" "$id" --relaunch --harness claude); rc=$?
+          out=$(cd "$wt" && FM_FAKE_SESSION=$(herdr_owned_session "$id") run_spawn "$dir" "$id" --relaunch --harness claude); rc=$?
           ;;
       esac
       expect_code 0 "$rc" "real lsof must permit $entry from the worktree $location"$'\n'"$out"
@@ -164,11 +164,12 @@ test_tmux_unreadable_evidence_refuses() {
 }
 
 test_tmux_no_server_reclaim_keeps_work_and_task() {
-  local dir second out rc head_before mode id wt first_id second_id first_endpoint
+  local dir second out rc head_before mode id wt first_id second_id first_endpoint session
   command -v jq >/dev/null 2>&1 || { echo 'skip - configured Herdr reclaim needs jq'; return; }
   for mode in server-dead session-missing; do
     first_id="rl82${mode}a"
     second_id="rl82${mode}b"
+    session=$(herdr_owned_session "rl82$mode")
     dir=$(new_case "tmux-sequential-reclaim-$mode" "$first_id")
     second=$(new_case "tmux-second-$mode" "$second_id")
     add_ship_task "$dir" "$first_id"
@@ -196,7 +197,7 @@ test_tmux_no_server_reclaim_keeps_work_and_task() {
       out=$(run_control "$dir" "$id" exit); rc=$?
       expect_code 0 "$rc" "no user tmux server should prove exit for $id"$'\n'"$out"
       assert_contains "$out" endpoint-gone "exit should report proven absence"
-      out=$(FM_FAKE_SESSION=fmlab run_control "$dir" "$id" relaunch --note "resume after reboot"); rc=$?
+      out=$(FM_FAKE_SESSION=$session run_control "$dir" "$id" relaunch --note "resume after reboot"); rc=$?
       expect_code 0 "$rc" "no user tmux server should permit Herdr reclaim for $id"$'\n'"$out"
       [ "$(meta_field "$dir" "$id" backend)" = herdr ] || fail "reclaim did not publish Herdr"
       [ "$(meta_field "$dir" "$id" endpoint_task_id)" = "$id" ] || fail "reclaim changed task identity"
@@ -211,9 +212,9 @@ test_tmux_no_server_reclaim_keeps_work_and_task() {
       assert_absent "$dir/fake/created-sessions" "Herdr reclaim started a tmux server"
       if [ "$id" = "$first_id" ]; then
         first_endpoint=$(meta_field "$dir" "$id" window)
-        [ "$first_endpoint" = 'fmlab:%9' ] || fail "first replacement has the wrong binding"
+        [ "$first_endpoint" = "$session:%9" ] || fail "first replacement has the wrong binding"
       else
-        [ "$(meta_field "$dir" "$id" window)" = 'fmlab:%10' ] || fail "second replacement has the wrong binding"
+        [ "$(meta_field "$dir" "$id" window)" = "$session:%10" ] || fail "second replacement has the wrong binding"
       fi
     done
     [ "$(meta_field "$dir" "$first_id" window)" = "$first_endpoint" ] || fail "second reclaim rebound the first task"
@@ -1121,22 +1122,22 @@ test_recovery_fixture_claims_only_owned_temp_directories() {
 }
 
 test_herdr_reclaim_adopts_a_pane_that_outlived_its_server() {
-  local dir id out rc=0 log stray
+  local dir id ses out rc=0 log stray
   recovery_case_or_skip gone-herdr rl68 || {
     echo "skip - herdr reclaim needs jq (the herdr adapter parses JSON with it)"
     return 0
   }
-  dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
+  dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID ses=$HERDR_CASE_SESSION
 
   out=$(run_spawn "$dir" "$id" --relaunch --harness claude) || rc=$?
   log=$(cat "$dir/fake/herdr-log")
   expect_code 0 "$rc" "a pane that outlived its stopped server is adoptable"$'\n'"$out"$'\n'"$log"
 
-  assert_contains "$log" "server --session fmlab" \
+  assert_contains "$log" "server --session $ses" \
     "the reclaim must bring the RECORDED session's server back before deciding anything"
-  [ "$(grep -c '^server --session fmlab$' <<<"$log")" = 1 ] \
+  [ "$(grep -c "^server --session $ses\$" <<<"$log")" = 1 ] \
     || fail "a proven stop must launch the recorded session's server exactly once: $log"
-  assert_contains "$log" "agent get %7 --session fmlab" \
+  assert_contains "$log" "agent get %7 --session $ses" \
     "the reclaim must re-read the recorded pane once its server is running"
   assert_not_contains "$log" "workspace create" \
     "adopting a preserved pane must not create a workspace"
@@ -1145,14 +1146,14 @@ test_herdr_reclaim_adopts_a_pane_that_outlived_its_server() {
   # Every call belongs to the session the record names. A rebind resolves its
   # container from the ambient session instead, which is how the preserved pane
   # ends up orphaned in a workspace nothing points at.
-  stray=$(printf '%s\n' "$log" | grep -v -- '--session fmlab$' | grep -v '^status --json$' || true)
+  stray=$(printf '%s\n' "$log" | grep -v -- "--session $ses\$" | grep -v '^status --json$' || true)
   [ -z "$stray" ] || fail "a herdr reclaim touched a session the record does not name: $stray"
-  assert_contains "$out" "window=fmlab:%7" "the reclaim should report the adopted endpoint"
+  assert_contains "$out" "window=$ses:%7" "the reclaim should report the adopted endpoint"
   [ "$(meta_field "$dir" "$id" herdr_pane_id)" = '%7' ] \
     || fail "the adopted record's pane id changed, got $(meta_field "$dir" "$id" herdr_pane_id)"
   [ "$(meta_field "$dir" "$id" herdr_tab_id)" = tab1 ] \
     || fail "the adopted record's tab id changed, got $(meta_field "$dir" "$id" herdr_tab_id)"
-  [ "$(meta_field "$dir" "$id" window)" = 'fmlab:%7' ] \
+  [ "$(meta_field "$dir" "$id" window)" = "$ses:%7" ] \
     || fail "the adopted record's endpoint moved, got $(meta_field "$dir" "$id" window)"
   assert_contains "$log" "pane send-text %7 " \
     "the replacement's launch brief must be delivered into the adopted pane"
@@ -1194,7 +1195,7 @@ s = socket.socket(socket.AF_UNIX); s.bind(sys.argv[1]); s.listen(8); time.sleep(
       expect_code 1 "$rc" "an unproven herdr stop ($mode) must refuse $entry"$'\n'"$out"$'\n'"$log"
       assert_not_contains "$log" "server --session" "an unproven herdr stop ($mode) must not launch a server through $entry"
       assert_not_contains "$log" "tab create" "an unproven herdr stop ($mode) must not mint a tab through $entry"
-      [ "$(meta_field "$dir" "$id" window)" = 'fmlab:%7' ] \
+      [ "$(meta_field "$dir" "$id" window)" = "$HERDR_CASE_SESSION:%7" ] \
         || fail "an unproven herdr stop ($mode) let $entry rewrite the recorded endpoint"
     done
   done
@@ -1215,33 +1216,33 @@ test_herdr_exit_reports_already_stopped_when_the_pane_outlived_its_server() {
     "the endpoint is there and idle, which is the ordinary already-stopped outcome"
   assert_not_contains "$out" "endpoint-gone" \
     "a pane that survived its server's restart was never gone"
-  [ "$(meta_field "$dir" "$id" window)" = 'fmlab:%7' ] \
+  [ "$(meta_field "$dir" "$id" window)" = "$HERDR_CASE_SESSION:%7" ] \
     || fail "exit must leave the recorded endpoint exactly as it found it"
   pass "fm-control exit: a herdr pane that outlived its stopped server is already-stopped, not gone"
 }
 
 test_herdr_rebind_stays_in_the_recorded_session() {
-  local dir id out rc=0 log
-  # The record names session `fmlab`; this seat has no ambient HERDR_SESSION, so
-  # the adapter's own default is `default`. The recorded pane does NOT come back
-  # with the server, so this reclaim really does rebind - and the rebind must
-  # land in `fmlab`, never in `default`.
-  recovery_case_or_skip gone-herdr-pin rl73 fmlab '%none' || {
+  local dir id ses out rc=0 log
+  # The record names this case's own session; this seat has no ambient
+  # HERDR_SESSION, so the adapter's own default is `default`. The recorded pane
+  # does NOT come back with the server, so this reclaim really does rebind - and
+  # the rebind must land in the recorded session, never in `default`.
+  recovery_case_or_skip gone-herdr-pin rl73 '' '%none' || {
     echo "skip - herdr rebind needs jq (the herdr adapter parses JSON with it)"
     return 0
   }
-  dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
+  dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID ses=$HERDR_CASE_SESSION
 
   out=$(run_spawn "$dir" "$id" --relaunch --harness claude) || rc=$?
   log=$(cat "$dir/fake/herdr-log")
   expect_code 0 "$rc" "a herdr pane that did not survive its server should be rebound"$'\n'"$out"$'\n'"$log"
 
   assert_contains "$log" "tab create" "a destroyed pane must be replaced by a fresh tab"
-  [ -z "$(grep -v -- '--session fmlab$' <<<"$log" | grep -v '^status --json$' || true)" ] \
+  [ -z "$(grep -v -- "--session $ses\$" <<<"$log" | grep -v '^status --json$' || true)" ] \
     || fail "the rebind used a herdr session the record does not name: $log"
-  [ "$(meta_field "$dir" "$id" herdr_session)" = fmlab ] \
+  [ "$(meta_field "$dir" "$id" herdr_session)" = "$ses" ] \
     || fail "the rebound record left its recorded herdr session, got $(meta_field "$dir" "$id" herdr_session)"
-  [ "$(meta_field "$dir" "$id" window)" = 'fmlab:%9' ] \
+  [ "$(meta_field "$dir" "$id" window)" = "$ses:%9" ] \
     || fail "the rebound endpoint should be the new pane in the recorded session, got $(meta_field "$dir" "$id" window)"
   [ "$(meta_field "$dir" "$id" herdr_pane_id)" = '%9' ] \
     || fail "the rebound record should name the pane the reclaim minted, got $(meta_field "$dir" "$id" herdr_pane_id)"
@@ -1273,7 +1274,7 @@ test_herdr_reclaim_refuses_an_agent_that_came_back() {
 
 test_herdr_reclaim_keeps_the_task_whole() {
   local dir id out rc=0 head_before
-  recovery_case_or_skip gone-herdr-work rl75 fmlab '%none' || {
+  recovery_case_or_skip gone-herdr-work rl75 '' '%none' || {
     echo "skip - herdr reclaim needs jq (the herdr adapter parses JSON with it)"
     return 0
   }
@@ -1325,10 +1326,11 @@ test_herdr_rebind_failure_from_a_plain_shell_names_the_real_cause() {
   local dir id out rc
   # No HERDR_* env at all, which is how an operator reclaims from ssh or cron.
   # The adapter's ambient session then reads `default` while the record names
-  # `fmlab`, but the cross-session launcher guard was never consulted - this
-  # seat claims no launcher pane, so placement fell back to the recorded
-  # session's labeled container and the container failed for its own reason.
-  recovery_case_or_skip gone-herdr-plain rl77 fmlab '%none' || {
+  # this case's own session, but the cross-session launcher guard was never
+  # consulted - this seat claims no launcher pane, so placement fell back to the
+  # recorded session's labeled container and the container failed for its own
+  # reason.
+  recovery_case_or_skip gone-herdr-plain rl77 '' '%none' || {
     echo "skip - herdr reclaim needs jq (the herdr adapter parses JSON with it)"
     return 0
   }
@@ -1337,7 +1339,7 @@ test_herdr_rebind_failure_from_a_plain_shell_names_the_real_cause() {
 
   out=$(run_spawn "$dir" "$id" --relaunch --harness claude); rc=$?
   expect_code 1 "$rc" "a container that cannot be ensured must refuse"$'\n'"$out"
-  assert_contains "$out" "fmlab" "the refusal should name the session the reclaim was targeting"
+  assert_contains "$out" "$HERDR_CASE_SESSION" "the refusal should name the session the reclaim was targeting"
   assert_not_contains "$out" "this seat is running in herdr session" \
     "a seat with no launcher pane never hit the cross-session guard, so the refusal must not blame one"
   assert_not_contains "$out" "a reclaim never moves a task to another session" \
@@ -1347,7 +1349,7 @@ test_herdr_rebind_failure_from_a_plain_shell_names_the_real_cause() {
 
 test_herdr_reclaim_of_a_secondmate_names_its_own_owner() {
   local dir id out rc
-  recovery_case_or_skip gone-herdr-secondmate rl76 fmlab '%none' || {
+  recovery_case_or_skip gone-herdr-secondmate rl76 '' '%none' || {
     echo "skip - herdr reclaim needs jq (the herdr adapter parses JSON with it)"
     return 0
   }
@@ -1612,7 +1614,7 @@ test_herdr_held_owner_refusal_and_exited_reconciliation() {
   rc=0
   out=$(run_control "$dir" "$id" relaunch --reconcile-only --note "Reconcile only.") || rc=$?
   expect_code 0 "$rc" "Herdr exited instruction owner should recover"$'\n'"$out"
-  [ "$(meta_field "$dir" "$id" window)" = "fmlab:%7" ] || fail "Herdr recovery changed endpoint"
+  [ "$(meta_field "$dir" "$id" window)" = "$HERDR_CASE_SESSION:%7" ] || fail "Herdr recovery changed endpoint"
   [ "$(meta_field "$dir" "$id" recovery)" = reconcile-only ] || fail "Herdr recovery lost scope"
   cmp -s "$dir/backlog-before" "$dir/home/data/backlog.md" || fail "Herdr recovery changed the hold"
   pass "Herdr shares pre-stop held admission and recovery-only exited-owner preservation"

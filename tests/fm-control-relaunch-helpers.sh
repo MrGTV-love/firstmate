@@ -1118,13 +1118,13 @@ claim_herdr_task_tmps() {  # <home> <id>
   done
 }
 
-# add_herdr_ship_task <case-dir> <id> [session] [surviving-pane]: a ship task
+# add_herdr_ship_task <case-dir> <id> <session> [surviving-pane]: a ship task
 # recorded on the herdr backend, with its server stopped so its endpoint
 # classifies `missing`. <surviving-pane> is the pane id the fake will answer for
 # once that server is back; default is the recorded one (it survived the
 # restart). Pass a different id to model a pane that genuinely did not.
-add_herdr_ship_task() {  # <case-dir> <id> [session] [surviving-pane]
-  local dir=$1 id=$2 ses=${3:-fmlab} survivor=${4:-'%7'}
+add_herdr_ship_task() {  # <case-dir> <id> <session> [surviving-pane]
+  local dir=$1 id=$2 ses=$3 survivor=${4:-'%7'}
   local home="$dir/home" proj="$dir/proj" wt="$dir/wt"
   claim_herdr_task_tmps "$home" "$id" \
     || fail "fixture task or launch temp directory already exists or cannot be claimed for $id"
@@ -1162,18 +1162,29 @@ EOF
   : > "$dir/fake/herdr-stopped"
 }
 
-herdr_case_or_skip() {  # <name> <id> [session] [surviving-pane]
+herdr_case_or_skip() {  # <name> <id> <session> [surviving-pane]
   HERDR_CASE_DIR=
   command -v jq >/dev/null 2>&1 || return 1
   HERDR_CASE_DIR=$(new_case "$1" "$2")
-  add_herdr_ship_task "$HERDR_CASE_DIR" "$2" "${3:-fmlab}" "${4:-%7}"
+  add_herdr_ship_task "$HERDR_CASE_DIR" "$2" "$3" "${4:-%7}"
   make_herdr_stub "$HERDR_CASE_DIR"
   return 0
 }
 
+# herdr_owned_session <tag>: a Herdr session name this case owns. Session names
+# are host-wide: the server-start absence proof
+# (bin/backends/herdr-server-start.py) refuses while ANY host process serves
+# the name, so a shared name lets another run's fake server fail this case.
+herdr_owned_session() {  # <tag>
+  printf 'fmlab-%s-%s-%s' "$$" "${TMP_ROOT##*.}" "$1"
+}
+
+# recovery_case_or_skip: an empty or omitted session is this case's own.
+# HERDR_CASE_SESSION names the session the record binds.
 recovery_case_or_skip() {  # <name> <id-suffix> [session] [surviving-pane]
   HERDR_CASE_ID="rcv-$$-${TMP_ROOT##*.}-$2"
-  herdr_case_or_skip "$1" "$HERDR_CASE_ID" "${3:-fmlab}" "${4:-%7}"
+  HERDR_CASE_SESSION=${3:-$(herdr_owned_session "$2")}
+  herdr_case_or_skip "$1" "$HERDR_CASE_ID" "$HERDR_CASE_SESSION" "${4:-%7}"
 }
 
 enable_teamclaude() {  # <case-dir>
