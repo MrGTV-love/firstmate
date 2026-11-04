@@ -785,7 +785,9 @@ scn_unignored_nested_clone_with_unpushed_work_is_kept() {
 # entry is the only ignored thing of its own throwaway repo; a trailing slash is
 # a directory holding one file. Other entries under .claude and .opencode are
 # left out on purpose: the prune is stricter there
-# (scn_unique_data_under_claude_or_opencode_is_kept). Two shapes are looser in
+# (scn_unique_data_under_claude_or_opencode_is_kept), and
+# .claude/commit-intent.json depends on its content
+# (scn_commit_intent_verdict_against_teardown). Two shapes are looser in
 # the prune, each its own named exception: a wholly ignored .tac/
 # (scn_wholly_ignored_tac_caches_are_the_named_exception) and the exact tooling
 # paths under data/ and state/
@@ -2329,6 +2331,476 @@ scn_unique_data_under_claude_or_opencode_is_kept() {
   return 0
 }
 
+# --- the spent Vernant CommitIntent: .claude/commit-intent.json -------------------
+#
+# Merged Vernant copies were kept for the one ignored file the trusted commit
+# helper leaves behind. The file is scratch only when it is a valid CommitIntent
+# that is spent: expired, or naming the task's recorded branch. Every other
+# shape of the file at that exact path keeps the copy; a file of that name
+# elsewhere gets no new treatment and the existing scratch, preserve and symlink
+# rules decide it. Fixtures use fixed timestamps.
+INTENT_EXPIRED=2000-01-01T00:00:00+00:00
+INTENT_FUTURE=2999-01-01T00:00:00+00:00
+
+intent_json() {  # <expires_at_iso> <branch>
+  jq -n --arg e "$1" --arg b "$2" '{artifacttype: "CommitIntent", schemaversion: "1.0.0", branch: $b,
+    head_sha: "cd916701e5388f24c741a905c7be6a1348cf4e03", owned_paths: ["docs/a.md"],
+    validators: ["ruff-check", "ruff-format-check"], expires_at_iso: $e, base_ref: "origin/main",
+    base_sha: "5b0a1a5417792a35526caa7b517ce13b187bd923", content_fingerprint: "c67ef77ed530"}'
+}
+
+put_intent() {  # <copy> <expires_at_iso> <branch> [<jq filter>]: <copy>/.claude/commit-intent.json
+  mkdir -p "$1/.claude"
+  intent_json "$2" "$3" | jq -c "${4:-.}" > "$1/.claude/commit-intent.json"
+}
+
+# A world whose .claude/ is ignored through the copy's own exclude file, and
+# whose task record names <branch> (default fm/t1; "-" records none).
+intent_world() {  # [<recorded branch>|-]
+  make_world
+  printf '%s\n' '.claude/' >> "$(git -C "$COPY" rev-parse --path-format=absolute --git-path info/exclude)"
+  [ "${1-fm/t1}" = - ] || printf 'branch=%s\n' "${1-fm/t1}" >> "$STATE/t1.meta"
+}
+
+intent_removed() {  # <label>
+  [ ! -e "$COPY" ] || why "$1: the copy was kept: $(rec_field t1 reason)" || return 1
+  [ "$(destroy_calls)" = 1 ] || why "$1: treehouse destroy was called $(destroy_calls) times, want 1" || return 1
+  [ "$(wake_count)" = 0 ] || why "$1: the removal raised a wake: $(cat "$STATE/.wake-queue")" || return 1
+  return 0
+}
+
+intent_kept() {  # <label> <text the wake must name>
+  [ -e "$COPY" ] || why "$1: the copy was removed" || return 1
+  [ "$(destroy_calls)" = 0 ] || why "$1: treehouse destroy was called" || return 1
+  [ "$(wake_count)" = 1 ] || why "$1: want exactly one wake, got $(wake_count)" || return 1
+  [ "$(rec_field t1 state)" = retained ] || why "$1: the record is not retained: $(cat "$STATE/t1.merge-prune" 2>/dev/null)" || return 1
+  grep -F "$COPY" "$STATE/.wake-queue" | grep -qF -- "$2" || why "$1: the wake does not name $2: $(cat "$STATE/.wake-queue")" || return 1
+  return 0
+}
+
+# fm_mp_prove_ignored on one copy: "<exit status>|<verdict>".
+intent_direct_verdict() {  # <real-copy> [<task branch>]
+  bash -c 'set -u; . "$1/fm-merge-prune-lib.sh"; FM_MP_TASK_BRANCH=${3-}; fm_mp_prove_ignored "$2" >/dev/null 2>&1; rc=$?; printf "%s|%s" "$rc" "$FM_MP_VERDICT"' _ "$BIN_DIR" "$1" "${2-}" 2>/dev/null
+}
+
+# A spent intent no longer keeps an otherwise reclaimable copy.
+#   fallback        expired, removed by the fallback after a teardown refusal
+#   returned        expired, removed with the slot teardown returned
+#   direct          expired, judged by fm_mp_prove_ignored alone
+#   branch          unexpired but naming the task's recorded branch, returned slot
+#   branch-fallback the same through the fallback
+#   branch-resume   the same, resumed from the prune record after the task record is gone
+scn_spent_intent_is_removed() {  # <variant>
+  local lock holder out
+  intent_world
+  case "$1" in
+    fallback) put_intent "$COPY" "$INTENT_EXPIRED" other/branch; go ;;
+    returned) put_intent "$COPY" "$INTENT_EXPIRED" other/branch; printf 'ok\n' > "$W/stub.mode"; go ;;
+    direct)
+      put_intent "$COPY" "$INTENT_EXPIRED" other/branch
+      out=$(intent_direct_verdict "$COPY")
+      case "$out" in 0\||0\|ok) return 0 ;; esac
+      why "fm_mp_prove_ignored on an expired intent said: $out" || return 1
+      ;;
+    branch) put_intent "$COPY" "$INTENT_FUTURE" fm/t1; printf 'ok\n' > "$W/stub.mode"; go ;;
+    branch-fallback) put_intent "$COPY" "$INTENT_FUTURE" fm/t1; go ;;
+    branch-resume)
+      put_intent "$COPY" "$INTENT_FUTURE" fm/t1
+      printf 'ok\n' > "$W/stub.mode"
+      lock=$(project_lock_path)
+      sleep 120 &
+      holder=$!
+      WORKER_PIDS+=("$holder")
+      mkdir "$lock"
+      printf '%s\n' "$holder" > "$lock/pid"
+      go
+      [ -e "$COPY" ] && [ ! -e "$STATE/t1.meta" ] || why "the first pass did not leave the returned copy with the task record gone" || return 1
+      [ "$(rec_field t1 branch)" = fm/t1 ] || why "the prune record does not keep the task's branch: $(cat "$STATE/t1.merge-prune")" || return 1
+      kill "$holder" 2>/dev/null || true
+      rm -rf "$lock"
+      set_rec t1 next_at 0
+      prune run t1 >/dev/null 2>&1
+      ;;
+  esac
+  intent_removed "$1" || return 1
+  return 0
+}
+
+scn_spent_intent_is_removed_by_the_fallback() { scn_spent_intent_is_removed fallback; }
+scn_spent_intent_is_removed_with_a_returned_slot() { scn_spent_intent_is_removed returned; }
+scn_spent_intent_passes_the_ignored_proof() { scn_spent_intent_is_removed direct; }
+scn_intent_naming_the_task_branch_is_removed_with_a_returned_slot() { scn_spent_intent_is_removed branch; }
+scn_intent_naming_the_task_branch_is_removed_by_the_fallback() { scn_spent_intent_is_removed branch-fallback; }
+scn_intent_naming_the_task_branch_is_removed_after_the_task_record_is_gone() { scn_spent_intent_is_removed branch-resume; }
+
+# The interpreter of the first python3 of 3.11 or later on PATH: python3
+# itself, else a versioned name. The owner reader runs on Python 3.12 or later,
+# and the prune reads the expiry only on 3.11 or later. Fails when there is none.
+python311() {
+  local p
+  for p in python3 python3.14 python3.13 python3.12 python3.11; do
+    command -v "$p" >/dev/null || continue
+    "$p" -I -c 'import sys; sys.exit(sys.version_info < (3, 11) or print(sys.executable))' 2>/dev/null && return 0
+  done
+  return 1
+}
+
+# Puts that python3 first on PATH for the prune, as $W/bin/python3.
+use_python311() {
+  local py
+  py=$(python311) || why "no python3 of 3.11 or later on PATH" || return 1
+  ln -sf "$py" "$W/bin/python3"
+}
+
+# Every valid spelling of a timezone-aware time that Vernant's reader accepts
+# is judged on its merits, end to end through a returned slot: expired ones are
+# spent by expiry, and a far-future one is spent only by naming the task's
+# recorded branch (the fallback is covered for one form of each).
+scn_spent_intent_alternate_date_forms_are_removed() {
+  local form
+  for form in 2000-01-01T00:00+00:00 2000-01-01T00:00:00+0000 '2000-01-01 00:00:00Z' 2000-01-01T00:00:00Z 2000-01-01T00:00:00.5+00:00 2000-01-01T00:00:00-05:00; do
+    intent_world
+    use_python311 || return 1
+    put_intent "$COPY" "$form" other/branch
+    printf 'ok\n' > "$W/stub.mode"
+    go
+    intent_removed "expired intent with expiry '$form'" || return 1
+  done
+  for form in 2999-01-01T00:00+00:00 2999-01-01T00:00:00+0000 '2999-01-01 00:00:00Z' 2999-01-01T00:00:00Z; do
+    intent_world
+    use_python311 || return 1
+    put_intent "$COPY" "$form" fm/t1
+    printf 'ok\n' > "$W/stub.mode"
+    go
+    intent_removed "unexpired intent naming the task branch with expiry '$form'" || return 1
+  done
+  intent_world
+  use_python311 || return 1
+  put_intent "$COPY" 2000-01-01T00:00+00:00 other/branch
+  go
+  intent_removed "fallback with expiry '2000-01-01T00:00+00:00'" || return 1
+  intent_world
+  use_python311 || return 1
+  put_intent "$COPY" '2999-01-01 00:00:00Z' fm/t1
+  go
+  intent_removed "fallback naming the task branch with expiry '2999-01-01 00:00:00Z'" || return 1
+  return 0
+}
+
+# The prune and Vernant's own reader (_parse_expiry: a non-blank string through
+# datetime.fromisoformat after Z becomes +00:00, with a timezone) must agree in
+# both directions on whether an intent is spent, for each expiry below with the
+# intent naming another branch and with it naming the task's branch. Both run
+# on a python3 of 3.11 or later, as the owner's required Python is.
+# prune=spent reader=refused would delete a copy on a file the owner rejects;
+# prune=keep reader=valid would keep a copy forever that the owner calls spent.
+scn_commit_intent_expiry_parity_with_the_owner_reader() {
+  make_world
+  use_python311 || return 1
+  cat > "$W/parity.py" <<'PY'
+import datetime, json, os, subprocess, sys
+bindir, work = sys.argv[1], sys.argv[2]
+os.makedirs(work, exist_ok=True)
+UTC = datetime.timezone.utc
+now = datetime.datetime.now(UTC)
+STAMPS = [
+    "2000-01-01T00:00:00+00:00", "2000-01-01T00:00+00:00", "2000-01-01T00:00:00+0000", "2000-01-01 00:00:00Z",
+    "2000-01-01T00:00:00Z", "2000-01-01T00:00:00.123456+00:00", "2000-01-01T00:00:00-05:00", "20000101T000000Z",
+    "2000-01-01T00Z", "2999-01-01T00:00:00+00:00", "2999-01-01T00:00+00:00", "2999-01-01 00:00:00Z",
+    "2999-01-01T00:00:00-05:00", "2000-01-01T00:00:00", "2000-01-01", "yesterday", "", "  ",
+    "2000-13-01T00:00:00Z", "2000-01-01T00:00:00+25:00", "2000-01-01T00:00:00 +00:00", 5, None, ["2000-01-01T00:00:00Z"],
+]
+
+def reader_expiry(value):
+    """Vernant scripts/hooks/commit_intent.py _parse_expiry: None when it refuses the value."""
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed.astimezone(UTC)
+
+both_spent = both_kept = 0
+problems = []
+for i, stamp in enumerate(STAMPS):
+    for names_task_branch in (False, True):
+        branch = "fm/t1" if names_task_branch else "other/branch"
+        payload = {
+            "artifacttype": "CommitIntent", "schemaversion": "1.0.0", "branch": branch,
+            "head_sha": "cd916701e5388f24c741a905c7be6a1348cf4e03", "owned_paths": ["docs/a.md"],
+            "validators": ["ruff-check"], "expires_at_iso": stamp,
+        }
+        path = os.path.join(work, "i%d-%d.json" % (i, names_task_branch))
+        with open(path, "w") as fh:
+            json.dump(payload, fh)
+        got = subprocess.run(
+            ["bash", "-c", 'set -u; . "$1/fm-merge-prune-lib.sh"; FM_MP_TASK_BRANCH=fm/t1; fm_mp_commit_intent_spent "$2"', "_", bindir, path],
+            capture_output=True,
+        ).returncode == 0
+        expires = reader_expiry(stamp)
+        want = expires is not None and (expires <= now or names_task_branch)
+        if got and not want:
+            problems.append("prune=spent reader=refused-or-unspent for expiry %r naming the task branch %s" % (stamp, names_task_branch))
+        elif want and not got:
+            problems.append("prune=keep reader=valid-and-spent for expiry %r naming the task branch %s" % (stamp, names_task_branch))
+        elif got:
+            both_spent += 1
+        else:
+            both_kept += 1
+if problems:
+    print("\n".join(problems))
+    sys.exit(1)
+if both_spent < 12 or both_kept < 12:
+    print("the cases do not cover both verdicts (%d spent, %d kept)" % (both_spent, both_kept))
+    sys.exit(1)
+PY
+  out=$(PATH="$W/bin:$PATH" python3 "$W/parity.py" "$BIN_DIR" "$W/parity-expiry" 2>&1) || why "$out" || return 1
+  return 0
+}
+
+# A prune whose python3 is older than 3.11 does not judge the expiry: an
+# expired, valid intent keeps the copy with one wake that says why. The stub
+# python3 answers the version probe as 3.10 and runs the real one otherwise.
+scn_older_python_keeps_an_expired_intent() {
+  local real
+  intent_world
+  real=$(command -v python3)
+  cat > "$W/bin/python3" <<SH
+#!/usr/bin/env bash
+if [ "\$#" = 3 ] && [ "\$1" = -I ] && [ "\$2" = -c ] && case "\$3" in *version_info*) true ;; *) false ;; esac; then
+  exec "$real" -I -c 'import sys; sys.version_info = (3, 10, 0, "final", 0); exec(sys.argv[1])' "\$3"
+fi
+exec "$real" "\$@"
+SH
+  chmod +x "$W/bin/python3"
+  put_intent "$COPY" "$INTENT_EXPIRED" other/branch
+  printf 'ok\n' > "$W/stub.mode"
+  go
+  intent_kept "expired intent under python3 3.10" "python3 is older than 3.11, so it does not judge the expiry" || return 1
+  intent_kept "expired intent under python3 3.10" .claude/commit-intent.json || return 1
+  return 0
+}
+
+# An intent that is not provably spent keeps the copy: unexpired and naming
+# another branch (a prefix of the task's, longer than it, different case), or
+# the task record names no branch.
+scn_unspent_intent_is_kept() {
+  local v
+  for v in other prefix longer case norecord returned-other; do
+    case "$v" in
+      norecord) intent_world - ;;
+      *) intent_world ;;
+    esac
+    case "$v" in
+      other|returned-other) put_intent "$COPY" "$INTENT_FUTURE" other/branch ;;
+      prefix) put_intent "$COPY" "$INTENT_FUTURE" fm/t ;;
+      longer) put_intent "$COPY" "$INTENT_FUTURE" fm/t1-extra ;;
+      case) put_intent "$COPY" "$INTENT_FUTURE" FM/T1 ;;
+      norecord) put_intent "$COPY" "$INTENT_FUTURE" fm/t1 ;;
+    esac
+    [ "$v" != returned-other ] || printf 'ok\n' > "$W/stub.mode"
+    go
+    intent_kept "unexpired intent ($v)" .claude/commit-intent.json || return 1
+  done
+  return 0
+}
+
+# A file that is not a valid CommitIntent keeps the copy, even when it is
+# expired and names the task's branch.
+scn_invalid_intent_is_kept() {
+  local v
+  for v in malformed array scalar empty type-missing type-wrong type-case \
+    expiry-missing expiry-number expiry-text expiry-blank expiry-date-only expiry-no-timezone \
+    schema-missing branch-missing head-missing owned-not-a-list validators-not-strings \
+    owned-empty validators-empty owned-blank validators-blank owned-absolute owned-parent \
+    directory; do
+    intent_world
+    case "$v" in
+      malformed) mkdir -p "$COPY/.claude"; printf '{"artifacttype": "CommitIntent",' > "$COPY/.claude/commit-intent.json" ;;
+      array) mkdir -p "$COPY/.claude"; printf '[]' > "$COPY/.claude/commit-intent.json" ;;
+      scalar) mkdir -p "$COPY/.claude"; printf '"CommitIntent"' > "$COPY/.claude/commit-intent.json" ;;
+      empty) mkdir -p "$COPY/.claude"; : > "$COPY/.claude/commit-intent.json" ;;
+      type-missing) put_intent "$COPY" "$INTENT_EXPIRED" fm/t1 'del(.artifacttype)' ;;
+      type-wrong) put_intent "$COPY" "$INTENT_EXPIRED" fm/t1 '.artifacttype = "ReviewIntent"' ;;
+      type-case) put_intent "$COPY" "$INTENT_EXPIRED" fm/t1 '.artifacttype = "commitintent"' ;;
+      expiry-missing) put_intent "$COPY" "$INTENT_EXPIRED" fm/t1 'del(.expires_at_iso)' ;;
+      expiry-number) put_intent "$COPY" "$INTENT_EXPIRED" fm/t1 '.expires_at_iso = 5' ;;
+      expiry-text) put_intent "$COPY" "$INTENT_EXPIRED" fm/t1 '.expires_at_iso = "yesterday"' ;;
+      expiry-blank) put_intent "$COPY" "$INTENT_EXPIRED" fm/t1 '.expires_at_iso = "  "' ;;
+      expiry-date-only) put_intent "$COPY" 2000-01-01 fm/t1 ;;
+      expiry-no-timezone) put_intent "$COPY" 2000-01-01T00:00:00 fm/t1 ;;
+      schema-missing) put_intent "$COPY" "$INTENT_EXPIRED" fm/t1 'del(.schemaversion)' ;;
+      branch-missing) put_intent "$COPY" "$INTENT_EXPIRED" fm/t1 'del(.branch)' ;;
+      head-missing) put_intent "$COPY" "$INTENT_EXPIRED" fm/t1 '.head_sha = ""' ;;
+      owned-not-a-list) put_intent "$COPY" "$INTENT_EXPIRED" fm/t1 '.owned_paths = "docs/a.md"' ;;
+      validators-not-strings) put_intent "$COPY" "$INTENT_EXPIRED" fm/t1 '.validators = [1]' ;;
+      owned-empty) put_intent "$COPY" "$INTENT_EXPIRED" fm/t1 '.owned_paths = []' ;;
+      validators-empty) put_intent "$COPY" "$INTENT_EXPIRED" fm/t1 '.validators = []' ;;
+      owned-blank) put_intent "$COPY" "$INTENT_EXPIRED" fm/t1 '.owned_paths = [" "]' ;;
+      validators-blank) put_intent "$COPY" "$INTENT_EXPIRED" fm/t1 '.validators = [""]' ;;
+      owned-absolute) put_intent "$COPY" "$INTENT_EXPIRED" fm/t1 '.owned_paths = ["/etc"]' ;;
+      owned-parent) put_intent "$COPY" "$INTENT_EXPIRED" fm/t1 '.owned_paths = ["../x"]' ;;
+      directory) mkdir -p "$COPY/.claude/commit-intent.json" ;;
+    esac
+    go
+    intent_kept "invalid intent ($v)" .claude/commit-intent.json || return 1
+  done
+  return 0
+}
+
+# A file the proof cannot read keeps the copy (not run as root: root reads it).
+scn_unreadable_intent_is_kept() {
+  intent_world
+  put_intent "$COPY" "$INTENT_EXPIRED" fm/t1
+  chmod 000 "$COPY/.claude/commit-intent.json"
+  [ ! -r "$COPY/.claude/commit-intent.json" ] || why "the fixture is readable" || return 1
+  go
+  chmod 600 "$COPY/.claude/commit-intent.json" 2>/dev/null || true
+  intent_kept "unreadable intent" .claude/commit-intent.json || return 1
+  return 0
+}
+
+# Only the exact path counts: the lookalike names and places below hold a spent
+# payload and still keep the copy under the existing rules (none is scratch).
+# A file of that name under an existing scratch directory, such as .tac/tmp or
+# node_modules, is scratch by those rules and is not covered here.
+scn_lookalike_intent_paths_are_kept() {
+  local v rel named
+  for v in bak old sub root; do
+    intent_world
+    case "$v" in
+      bak) rel=.claude/commit-intent.json.bak; named=$rel ;;
+      old) rel=.claude/commit-intent.old.json; named=$rel ;;
+      sub) rel=.claude/sub/commit-intent.json; named=.claude/sub ;;
+      root) rel=commit-intent.json; named=$rel; printf '%s\n' '/commit-intent.json' >> "$(git -C "$COPY" rev-parse --path-format=absolute --git-path info/exclude)" ;;
+    esac
+    mkdir -p "$COPY/$(dirname "$rel")"
+    intent_json "$INTENT_EXPIRED" fm/t1 > "$COPY/$rel"
+    go
+    intent_kept "lookalike path $rel" "$named" || return 1
+  done
+  return 0
+}
+
+# A spent intent never covers another unique ignored file in the same copy.
+scn_spent_intent_does_not_cover_another_ignored_file() {
+  local v named
+  for v in env private; do
+    intent_world
+    put_intent "$COPY" "$INTENT_EXPIRED" fm/t1
+    case "$v" in
+      env) printf 'secret\n' > "$COPY/.env.local"; named=.env.local ;;
+      private) mkdir -p "$COPY/.claude/private"; printf 'only here\n' > "$COPY/.claude/private/x"; named=.claude/private ;;
+    esac
+    go
+    intent_kept "spent intent beside $named" "$named" || return 1
+  done
+  return 0
+}
+
+# Unchanged: a symlink at an ignored path is scratch, whatever it points at.
+scn_symlinked_intent_path_stays_scratch() {
+  intent_world
+  mkdir -p "$COPY/.claude"
+  ln -s /nonexistent "$COPY/.claude/commit-intent.json"
+  go
+  intent_removed "symlink at the intent path" || return 1
+  return 0
+}
+
+# fm_mp_commit_intent_spent on one path under the suite's bounded runner: its
+# exit status, 124 when it did not return.
+intent_spent_status() {  # <path> [<task branch>]
+  bash -c 'set -u; . "$1/fm-timeout-lib.sh"; . "$1/fm-merge-prune-lib.sh"; FM_MP_TASK_BRANCH=${3-}; fm_run_bash_timeout 10 fm_mp_commit_intent_spent "$2"; printf "%s" "$?"' _ "$BIN_DIR" "$1" "${2-}" 2>/dev/null
+}
+
+# The predicate opens the path without following a symlink: a regular spent
+# intent is spent, and a symlink at the path to that same file is not.
+scn_symlinked_intent_is_refused_by_the_predicate() {
+  local d rc
+  make_world
+  d="$W/intent-link"
+  mkdir -p "$d/.claude"
+  intent_json "$INTENT_EXPIRED" other/branch > "$d/target.json"
+  cp "$d/target.json" "$d/.claude/commit-intent.json"
+  rc=$(intent_spent_status "$d/.claude/commit-intent.json")
+  [ "$rc" = 0 ] || why "a regular spent intent said $rc, want 0" || return 1
+  rm "$d/.claude/commit-intent.json"
+  ln -s ../target.json "$d/.claude/commit-intent.json"
+  rc=$(intent_spent_status "$d/.claude/commit-intent.json")
+  [ "$rc" = 1 ] || why "a symlink to a spent intent said $rc, want 1" || return 1
+  return 0
+}
+
+# The predicate reads only a regular file and never waits on a FIFO: a regular
+# spent intent is spent, and a FIFO at the path that holds the same bytes, with
+# no writer left, is refused at once.
+scn_fifo_intent_is_refused_by_the_predicate() {
+  local d rc writer
+  make_world
+  d="$W/intent-fifo"
+  mkdir -p "$d/.claude"
+  intent_json "$INTENT_EXPIRED" other/branch > "$d/.claude/commit-intent.json"
+  rc=$(intent_spent_status "$d/.claude/commit-intent.json")
+  [ "$rc" = 0 ] || why "a regular spent intent said $rc, want 0" || return 1
+  rm "$d/.claude/commit-intent.json"
+  mkfifo "$d/.claude/commit-intent.json"
+  intent_json "$INTENT_EXPIRED" other/branch > "$d/.claude/commit-intent.json" &
+  writer=$!
+  exec 8< "$d/.claude/commit-intent.json"
+  wait "$writer"
+  rc=$(intent_spent_status "$d/.claude/commit-intent.json")
+  exec 8<&-
+  [ "$rc" = 1 ] || why "a FIFO holding a spent intent said $rc, want 1 (124 is a hang)" || return 1
+  return 0
+}
+
+# A clone under .claude/worktrees is judged by the same rule on its own.
+scn_nested_copy_intent_is_judged_on_its_own() {
+  intent_world
+  make_nested .claude/worktrees/n1
+  put_intent "$COPY/.claude/worktrees/n1" "$INTENT_EXPIRED" other/branch
+  go
+  intent_removed "nested clone with a spent intent" || return 1
+  intent_world
+  make_nested .claude/worktrees/n1
+  put_intent "$COPY/.claude/worktrees/n1" "$INTENT_FUTURE" other/branch
+  go
+  intent_kept "nested clone with an unspent intent" .claude/worktrees/n1 || return 1
+  return 0
+}
+
+# Teardown skips every .claude/* entry. A spent intent is a case both classifiers
+# pass; an unspent or invalid intent and any other unique .claude entry pass
+# teardown and keep the copy in the prune, which is stricter by design.
+scn_commit_intent_verdict_against_teardown() {
+  local v d real entry want got
+  make_world
+  for v in spent unspent invalid private; do
+    d="$W/parity-intent/$v"
+    mkdir -p "$d"
+    entry=.claude/commit-intent.json
+    [ "$v" != private ] || entry=.claude/private/x
+    make_ignored_entry_repo "$d" "$entry"
+    case "$v" in
+      spent) put_intent "$d" "$INTENT_EXPIRED" other/branch ;;
+      unspent) put_intent "$d" "$INTENT_FUTURE" other/branch ;;
+      invalid) put_intent "$d" "$INTENT_EXPIRED" other/branch 'del(.artifacttype)' ;;
+    esac
+    real=$(cd "$d" && pwd -P)
+    [ -n "$(git -C "$real" ls-files -o -i --exclude-standard --directory)" ] || why "the fixture $v holds no ignored entry" || return 1
+    [ "$(teardown_ignored_verdict "$real")" = passes ] || why "teardown does not pass the $v shape" || return 1
+    want=passes
+    [ "$v" = spent ] || want=blocks
+    got=$(FM_MP_TASK_BRANCH=fm/t1 prune_ignored_verdict "$real")
+    [ "$got" = "$want" ] || why "for the $v shape teardown passes and the prune says ${got:-nothing}, want $want" || return 1
+  done
+  return 0
+}
+
 # A process probe that fails proves nothing about who holds the copy open. Real
 # lsof exits 1 with no output and no message when nothing is open (measured on
 # this Mac, also when something is), so that answer still passes.
@@ -2673,6 +3145,43 @@ test_fallback_keeps_a_linked_slot_with_its_own_unpushed_commit() { assert_scenar
 test_fallback_keeps_a_linked_slot_with_a_stash_of_its_own_branch() { assert_scenario scn_linked_slot_own_branch_stash_is_kept "in a linked worktree slot, a stash made on the copy's branch keeps it"; }
 test_fallback_keeps_a_clone_inside_a_scratch_directory_with_an_unpushed_commit() { assert_scenario scn_clone_inside_a_scratch_directory_keeps_the_slot "an independent clone under .venv or node_modules with a commit on no remote keeps the whole slot with one wake"; }
 test_fallback_keeps_unique_data_under_claude_and_opencode() { assert_scenario scn_unique_data_under_claude_or_opencode_is_kept "ignored data under .claude or .opencode that is not a hook file, a nested clone or on the preserve list keeps the copy with one wake"; }
+test_fallback_removes_a_copy_holding_only_an_expired_commit_intent() { assert_scenario scn_spent_intent_is_removed_by_the_fallback "a copy refused by a false positive whose only ignored file is an expired, valid .claude/commit-intent.json is removed with no wake"; }
+test_returned_slot_holding_only_an_expired_commit_intent_is_removed() { assert_scenario scn_spent_intent_is_removed_with_a_returned_slot "a returned slot whose only ignored file is an expired, valid .claude/commit-intent.json is removed with one destroy and no wake"; }
+test_ignored_proof_passes_an_expired_commit_intent() { assert_scenario scn_spent_intent_passes_the_ignored_proof "fm_mp_prove_ignored returns 0 with an empty or ok verdict for an expired, valid .claude/commit-intent.json"; }
+test_returned_slot_holding_a_commit_intent_naming_the_task_branch_is_removed() { assert_scenario scn_intent_naming_the_task_branch_is_removed_with_a_returned_slot "an unexpired intent naming the task's recorded branch is spent: the returned slot is removed with no wake"; }
+test_fallback_removes_a_copy_holding_a_commit_intent_naming_the_task_branch() { assert_scenario scn_intent_naming_the_task_branch_is_removed_by_the_fallback "an unexpired intent naming the task's recorded branch is spent through the fallback too"; }
+test_commit_intent_branch_survives_the_deletion_of_the_task_record() { assert_scenario scn_intent_naming_the_task_branch_is_removed_after_the_task_record_is_gone "the task's branch is kept in the prune record, so a retry after teardown deleted the task record still sees the intent as spent"; }
+test_fallback_keeps_an_unspent_commit_intent() { assert_scenario scn_unspent_intent_is_kept "an unexpired intent naming another branch (a prefix, a longer name, another case), or any intent when the task record names no branch, keeps the copy with one wake naming the file"; }
+test_fallback_keeps_an_invalid_commit_intent() { assert_scenario scn_invalid_intent_is_kept "a malformed, non-object, empty, mistyped, or incomplete intent, an empty or blank owned_paths or validators list, an owned path that is not repo-relative, and a directory at the path, keep the copy with one wake naming the file even when expired and naming the task's branch"; }
+test_fallback_keeps_an_unreadable_commit_intent() {
+  if [ "$(id -u)" = 0 ]; then
+    pass "an unreadable intent keeps the copy (skipped: the suite runs as root, which reads it)"
+    return 0
+  fi
+  assert_scenario scn_unreadable_intent_is_kept "an intent the proof cannot read keeps the copy with one wake naming the file"
+}
+test_fallback_keeps_lookalike_commit_intent_paths() { assert_scenario scn_lookalike_intent_paths_are_kept "a spent payload at .bak, .old.json, .claude/sub and the copy root keeps the copy with one wake"; }
+test_fallback_keeps_a_spent_commit_intent_beside_another_ignored_file() { assert_scenario scn_spent_intent_does_not_cover_another_ignored_file "a spent intent beside .env.local or .claude/private/x keeps the copy for the other file"; }
+test_fallback_still_treats_a_symlink_at_the_intent_path_as_scratch() { assert_scenario scn_symlinked_intent_path_stays_scratch "a symlink at .claude/commit-intent.json stays reclaimable as before"; }
+test_returned_slot_removes_a_commit_intent_in_any_valid_date_form() {
+  if ! python311 >/dev/null; then
+    printf 'skip: no python3 of 3.11 or later on PATH; the date-form removal scenario not run\n'
+    return 0
+  fi
+  assert_scenario scn_spent_intent_alternate_date_forms_are_removed "on python3 3.11 or later, expired intents and branch-matched unexpired intents are spent in every timezone-aware spelling Vernant's reader accepts (no seconds, +HHMM, a space for T, Z, fractions, other offsets), end to end"
+}
+test_commit_intent_expiry_agrees_with_the_owner_reader_both_ways() {
+  if ! python311 >/dev/null; then
+    printf 'skip: no python3 of 3.11 or later on PATH; the owner-reader parity scenario not run\n'
+    return 0
+  fi
+  assert_scenario scn_commit_intent_expiry_parity_with_the_owner_reader "on python3 3.11 or later, the prune calls an intent spent exactly when Vernant's reader would, and fails on prune=keep reader=valid as well as prune=spent reader=refused"
+}
+test_older_python_keeps_an_expired_commit_intent() { assert_scenario scn_older_python_keeps_an_expired_intent "a prune whose python3 is older than 3.11 keeps an expired, valid intent with one wake that names the interpreter reason"; }
+test_commit_intent_predicate_refuses_a_symlink() { assert_scenario scn_symlinked_intent_is_refused_by_the_predicate "fm_mp_commit_intent_spent says spent for a regular spent intent and refuses a symlink at the path to that file"; }
+test_commit_intent_predicate_refuses_a_fifo_without_hanging() { assert_scenario scn_fifo_intent_is_refused_by_the_predicate "fm_mp_commit_intent_spent says spent for a regular spent intent and refuses a FIFO holding the same bytes without hanging"; }
+test_fallback_judges_a_nested_clones_commit_intent_on_its_own() { assert_scenario scn_nested_copy_intent_is_judged_on_its_own "a nested clone with a spent intent goes with the slot and one with an unspent intent naming another branch keeps the whole copy"; }
+test_commit_intent_verdict_against_teardown_is_recorded() { assert_scenario scn_commit_intent_verdict_against_teardown "a spent intent passes both classifiers; an unspent or invalid intent and other unique .claude entries pass teardown and keep the copy in the prune"; }
 test_fallback_keeps_the_copy_when_the_process_probe_fails_after_listing() { assert_scenario scn_partial_process_probe_keeps_the_copy "a process probe that lists a process and then fails keeps the copy and retries"; }
 test_partial_process_table_proves_no_agent_gone() { assert_scenario scn_partial_process_table_proves_no_agent_gone "a process table that is only partly read (ps fails after printing rows) never shows the agent gone, in the reap admission and in the check before teardown"; }
 test_fallback_keeps_the_copy_when_the_process_probe_fails() { assert_scenario scn_failed_process_probe_keeps_the_copy "a process probe that exits with an error, or prints a message, keeps the copy and retries; a silent exit 1 with nothing open does not"; }
@@ -2857,6 +3366,30 @@ test_unsafe_mutations_are_caught() {
   expect_caught returned-ignored-not-proved $orch '  preserve_all "$real" "$dest" || return 1' '  :' scn_returned_copy_with_unique_ignored_file_is_kept "ignored-file proof of a returned copy"
   expect_caught returned-records-not-preserved $orch '  preserve_all "$real" "$dest" || return 1' '  :' scn_returned_copy_preserves_bug_evidence_first "preserve-list copy of a returned copy"
   expect_caught no-project-lock-for-the-returned-copy $orch '  if ! fm_project_lock_try "$plock" "merge-prune $ID" >/dev/null 2>&1; then' '  if false; then' scn_project_lock_busy_backs_off_for_the_returned_copy "project lock for the returned copy"
+  expect_caught intent-expiry-not-checked $lib '    if expires.astimezone(datetime.timezone.utc) <= now:' '    if True:' scn_unspent_intent_is_kept "expiry check of a CommitIntent"
+  expect_caught intent-artifact-type-not-checked $lib '    if not isinstance(doc, dict) or doc.get("artifacttype") != "CommitIntent":' '    if not isinstance(doc, dict):' scn_invalid_intent_is_kept "artifact-type check of a CommitIntent"
+  expect_caught intent-timezone-not-required $lib '    if expires.tzinfo is None:
+        sys.exit(1)' '    pass' scn_invalid_intent_is_kept "timezone requirement of a CommitIntent expiry"
+  expect_caught intent-symlink-followed $lib 'os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0)' 'os.O_RDONLY | os.O_NONBLOCK' scn_symlinked_intent_is_refused_by_the_predicate "no-follow open of a CommitIntent"
+  expect_caught intent-non-regular-file-read $lib '        if not stat.S_ISREG(os.fstat(fd).st_mode):' '        if False:' scn_fifo_intent_is_refused_by_the_predicate "regular-file check of a CommitIntent"
+  expect_caught intent-branch-compared-by-prefix $lib 'doc["branch"] == task_branch' 'doc["branch"].startswith(task_branch)' scn_unspent_intent_is_kept "exact branch comparison of a CommitIntent"
+  expect_caught intent-list-and-path-not-validated $lib '        if not isinstance(value, list) or not value or not all(isinstance(item, str) and item.strip() for item in value):
+            sys.exit(1)
+    for item in doc["owned_paths"]:
+        rel = item.strip()
+        if rel.startswith("./"):
+            rel = rel[2:]
+        pure = pathlib.PurePosixPath(rel)
+        if pure.is_absolute() or ".." in pure.parts or pure.as_posix() in ("", "."):
+            sys.exit(1)
+' '        if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+            sys.exit(1)
+' scn_invalid_intent_is_kept "non-empty list, non-blank item and repo-relative path checks of a CommitIntent"
+  expect_caught intent-shape-not-validated $lib '        if not isinstance(value, str) or not value.strip():' '        if False:' scn_invalid_intent_is_kept "string-field checks of a CommitIntent"
+  expect_caught intent-allowance-for-any-claude-name $lib '    .claude/commit-intent.json)
+      if fm_mp_commit_intent_spent "$copy/$rel"; then' '    .claude/commit-intent.json|.claude/commit-intent.json.bak)
+      if true; then' scn_lookalike_intent_paths_are_kept "exact-path rule of the CommitIntent allowance"
+  expect_caught intent-python-version-not-checked $lib "  python3 -I -c 'import sys; sys.exit(3 if sys.version_info < (3, 11) else 0)' >/dev/null 2>&1 || rc=\$?" '  :' scn_older_python_keeps_an_expired_intent "python3 version check before the CommitIntent expiry is judged"
   expect_caught wake-every-time $orch '  [ "$R_WAKE" = 0 ] || return 0' '  :' scn_changed_file_is_kept "one-wake rule"
   pass "mutation proof (unsafe direction): breaking any safety proof makes its keep case fail"
 }
@@ -2864,6 +3397,17 @@ test_unsafe_mutations_are_caught() {
 # shellcheck disable=SC2016 # Every mutation old/new text is literal shell source, never expanded here.
 test_over_strict_mutations_are_caught() {
   local lib=fm-merge-prune-lib.sh orch=fm-merge-prune.sh reap=fm-idle-reap-lib.sh
+  if python311 >/dev/null; then
+    expect_caught intent-date-form-restricted $lib '    expires = datetime.datetime.fromisoformat(stamp.replace("Z", "+00:00"))' '    expires = datetime.datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%S%z")' scn_spent_intent_alternate_date_forms_are_removed "reader-parity date parsing of a CommitIntent expiry"
+    expect_caught intent-date-form-restricted-parity $lib '    expires = datetime.datetime.fromisoformat(stamp.replace("Z", "+00:00"))' '    expires = datetime.datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%S%z")' scn_commit_intent_expiry_parity_with_the_owner_reader "two-way parity with the owner reader"
+  else
+    printf 'skip: no python3 of 3.11 or later on PATH; the intent-date-form-restricted mutation rows not run\n'
+  fi
+  expect_caught intent-allowance-removed $lib '      if fm_mp_commit_intent_spent "$copy/$rel"; then' '      if false; then' scn_spent_intent_is_removed_by_the_fallback "spent-intent allowance"
+  expect_caught intent-allowance-removed-for-a-returned-slot $lib '      if fm_mp_commit_intent_spent "$copy/$rel"; then' '      if false; then' scn_spent_intent_is_removed_with_a_returned_slot "spent-intent allowance for a returned slot"
+  expect_caught intent-branch-rule-removed $lib '    sys.exit(0 if task_branch and doc["branch"] == task_branch else 1)' '    sys.exit(1)' scn_intent_naming_the_task_branch_is_removed_with_a_returned_slot "naming-the-task-branch rule"
+  expect_caught intent-branch-not-saved-in-the-prune-record $orch '"$R_PROJECT")" "$R_RETURNED" "$(clean_detail "$R_BRANCH")" > "$tmp"' '"$R_PROJECT")" "$R_RETURNED" "" > "$tmp"' scn_intent_naming_the_task_branch_is_removed_after_the_task_record_is_gone "task branch kept in the prune record"
+  expect_caught intent-branch-not-handed-to-the-proof $lib '  python3 -I - "$1" "${FM_MP_TASK_BRANCH-}" <<' '  python3 -I - "$1" "" <<' scn_intent_naming_the_task_branch_is_removed_with_a_returned_slot "task branch handed to the proof"
   expect_caught no-scratch-names $lib '  if fm_mp_scratch_name "$name"; then' '  if false; then' scn_scratch_copy_is_removed "scratch patterns"
   expect_caught pane-launcher-never-accepted $lib '    if [ "$launcher" = 0 ] && [ "${comm##*/}" = treehouse ]' '    if false && [ "${comm##*/}" = treehouse ]' scn_deliberately_exited_worker_reads_as_stopped_only_for_the_prune "accepting the pane's one treehouse get"
   expect_caught no-claude-scratch $lib '    .claude/settings.local.json|.opencode/plugins/fm-busy-state.js) return 0 ;;' '    .opencode/plugins/fm-busy-state.js) return 0 ;;' scn_scratch_copy_is_removed ".claude hook-file rule"
@@ -4035,6 +4579,25 @@ ALL_TESTS=(
   test_fallback_never_destroys_a_reassigned_slot
   test_fallback_keeps_a_clone_inside_a_scratch_directory_with_an_unpushed_commit
   test_fallback_keeps_unique_data_under_claude_and_opencode
+  test_fallback_removes_a_copy_holding_only_an_expired_commit_intent
+  test_returned_slot_holding_only_an_expired_commit_intent_is_removed
+  test_ignored_proof_passes_an_expired_commit_intent
+  test_returned_slot_holding_a_commit_intent_naming_the_task_branch_is_removed
+  test_fallback_removes_a_copy_holding_a_commit_intent_naming_the_task_branch
+  test_commit_intent_branch_survives_the_deletion_of_the_task_record
+  test_fallback_keeps_an_unspent_commit_intent
+  test_fallback_keeps_an_invalid_commit_intent
+  test_fallback_keeps_an_unreadable_commit_intent
+  test_fallback_keeps_lookalike_commit_intent_paths
+  test_fallback_keeps_a_spent_commit_intent_beside_another_ignored_file
+  test_fallback_still_treats_a_symlink_at_the_intent_path_as_scratch
+  test_returned_slot_removes_a_commit_intent_in_any_valid_date_form
+  test_commit_intent_expiry_agrees_with_the_owner_reader_both_ways
+  test_older_python_keeps_an_expired_commit_intent
+  test_commit_intent_predicate_refuses_a_symlink
+  test_commit_intent_predicate_refuses_a_fifo_without_hanging
+  test_fallback_judges_a_nested_clones_commit_intent_on_its_own
+  test_commit_intent_verdict_against_teardown_is_recorded
   test_fallback_keeps_the_copy_when_the_process_probe_fails
   test_fallback_keeps_the_copy_when_the_process_probe_fails_after_listing
   test_partial_process_table_proves_no_agent_gone
