@@ -79,7 +79,10 @@
 # teardown's own list, scripts/hooks/_conformance_manifest.json included, plus
 # the exact tooling paths under data/ and state/ that bin/fm-merge-prune-lib.sh
 # lists; under .claude and .opencode only
-# Firstmate's own hook files, clones and scratch names are scratch, and the
+# Firstmate's own hook files, clones, scratch names and the one exact file
+# .claude/commit-intent.json when it is a valid Vernant CommitIntent that is
+# expired or names the task's recorded branch (kept in the prune record, because
+# teardown deletes the task record) are scratch, and the
 # search for nested copies enters dependency and environment trees), and has no
 # process inside. For a
 # linked worktree of the project the commit and stash proofs read only that
@@ -239,11 +242,12 @@ valid_id() {
 }
 
 # The record: one key=value per line, rewritten atomically.
-R_PR=; R_ATTEMPTS=0; R_NEXT=0; R_STATE=pending; R_REASON=; R_WAKE=0; R_COPY=; R_ARMED=0; R_PROJECT=; R_RETURNED=0
+R_PR=; R_ATTEMPTS=0; R_NEXT=0; R_STATE=pending; R_REASON=; R_WAKE=0; R_COPY=; R_ARMED=0; R_PROJECT=; R_RETURNED=0; R_BRANCH=
 
 rec_load() {  # <task-id>; 0 when a well-formed record was read
   local file="$STATE/$1.merge-prune" line version=
-  R_PR=; R_ATTEMPTS=0; R_NEXT=0; R_STATE=pending; R_REASON=; R_WAKE=0; R_COPY=; R_ARMED=0; R_PROJECT=; R_RETURNED=0
+  R_PR=; R_ATTEMPTS=0; R_NEXT=0; R_STATE=pending; R_REASON=; R_WAKE=0; R_COPY=; R_ARMED=0; R_PROJECT=; R_RETURNED=0; R_BRANCH=
+  FM_MP_TASK_BRANCH=
   [ -f "$file" ] && [ ! -L "$file" ] || return 1
   while IFS= read -r line || [ -n "$line" ]; do
     case "$line" in
@@ -258,9 +262,11 @@ rec_load() {  # <task-id>; 0 when a well-formed record was read
       armed_at=*) R_ARMED=${line#armed_at=} ;;
       project=*) R_PROJECT=${line#project=} ;;
       returned=*) R_RETURNED=${line#returned=} ;;
+      branch=*) R_BRANCH=${line#branch=} ;;
     esac
   done < "$file"
   [ "$version" = fm-merge-prune-v1 ] || return 1
+  FM_MP_TASK_BRANCH=$R_BRANCH
   case "$R_ATTEMPTS$R_NEXT$R_WAKE$R_ARMED$R_RETURNED" in ''|*[!0-9]*) return 1 ;; esac
   [ -n "$R_PR" ]
 }
@@ -268,8 +274,8 @@ rec_load() {  # <task-id>; 0 when a well-formed record was read
 rec_save() {  # <task-id>
   local file="$STATE/$1.merge-prune" tmp
   tmp=$(mktemp "$STATE/.merge-prune.XXXXXX") || return 1
-  if printf 'version=fm-merge-prune-v1\npr=%s\nattempts=%s\nnext_at=%s\nstate=%s\nreason=%s\nwake_sent=%s\ncopy=%s\narmed_at=%s\nproject=%s\nreturned=%s\n' \
-    "$R_PR" "$R_ATTEMPTS" "$R_NEXT" "$R_STATE" "$(clean_detail "$R_REASON")" "$R_WAKE" "$(clean_detail "$R_COPY")" "$R_ARMED" "$(clean_detail "$R_PROJECT")" "$R_RETURNED" > "$tmp" \
+  if printf 'version=fm-merge-prune-v1\npr=%s\nattempts=%s\nnext_at=%s\nstate=%s\nreason=%s\nwake_sent=%s\ncopy=%s\narmed_at=%s\nproject=%s\nreturned=%s\nbranch=%s\n' \
+    "$R_PR" "$R_ATTEMPTS" "$R_NEXT" "$R_STATE" "$(clean_detail "$R_REASON")" "$R_WAKE" "$(clean_detail "$R_COPY")" "$R_ARMED" "$(clean_detail "$R_PROJECT")" "$R_RETURNED" "$(clean_detail "$R_BRANCH")" > "$tmp" \
     && chmod 0600 "$tmp" && mv -f -- "$tmp" "$file"; then
     return 0
   fi
@@ -821,10 +827,18 @@ remove_returned_locked() {  # <real-copy> <detail>
 }
 
 attempt() {
-  local reason wt project
+  local reason wt project branch
   wt=$(fm_meta_get "$META" worktree)
   project=$(fm_meta_get "$META" project)
   R_PROJECT=$project
+  # The task's branch is read while the task record exists: teardown deletes it,
+  # and the proofs after teardown read the branch from the prune record.
+  branch=$(fm_meta_get "$META" branch)
+  if [ -n "$branch" ] && [ "$branch" != "$R_BRANCH" ]; then
+    R_BRANCH=$branch
+    rec_save "$ID" || true
+  fi
+  FM_MP_TASK_BRANCH=$R_BRANCH
   prove_nested_first || return 0
   run_teardown
   if [ "$TD_RC" -eq 0 ]; then
@@ -903,6 +917,7 @@ cmd_arm() {  # <task-id> [--run]
     fm_lock_release "$LOCK" || true
   else
     R_PR=$pr; R_ATTEMPTS=0; R_NEXT=$NOW; R_STATE=pending; R_REASON=; R_WAKE=0; R_COPY=; R_ARMED=$NOW
+    R_BRANCH=$(fm_meta_get "$META" branch)
     rec_save "$ID" || { fm_lock_release "$LOCK" || true; die "cannot write the prune record"; }
     fm_lock_release "$LOCK" || true
     log_line "armed for $pr"
