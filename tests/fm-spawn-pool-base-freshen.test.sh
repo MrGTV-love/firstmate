@@ -2215,6 +2215,13 @@ test_reset_guard_r2_preexisting_process_is_not_this_acquisition() {
   assert_contains "$GUARD_OUT" 'nothing binds it to this spawn' 'R2: the refusal did not say why the recorded identity was not accepted'
   guard_end_pane
   kill "$foreign" 2>/dev/null || true
+  # An ancestor of the spawn (here the test shell, standing for the supervisor that runs it) is
+  # not this spawn's acquisition either: nothing ties the caller's chain to the slot.
+  id='guard-r2-ancestor'
+  guard_owned_pane_slot guard-r2d "$id"
+  guard_set_lease_owner "$LEASE_STATE" "$$"
+  guard_expect_refusal S4 '(R2) the pool entry names an ancestor of the spawn as the lease owner' 'reset refused (holder_lease)' "$id" --scout
+  guard_end_pane
   # Paired pass: the entry's owner is a process in the acquired pane's tree.
   id='guard-r2-owned'
   guard_owned_pane_slot guard-r2b "$id"

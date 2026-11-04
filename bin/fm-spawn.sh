@@ -5131,7 +5131,7 @@ spawn_reset_preflight() { # <worktree> [<base-branch>]
 # Fetch one origin branch's tip into FETCH_HEAD only, writing no remote-tracking
 # ref (--refmap=), and print it.
 spawn_fetch_origin_tip() { # <worktree> <branch>
-  git -C "$1" fetch --quiet --refmap= origin "refs/heads/$2" || return 1
+  GIT_TERMINAL_PROMPT=0 git -C "$1" fetch --quiet --refmap= origin "refs/heads/$2" </dev/null || return 1
   git -C "$1" rev-parse --verify --quiet 'FETCH_HEAD^{commit}' 2>/dev/null
 }
 
@@ -6557,6 +6557,9 @@ fi
 # Record the pool lease identity of the slot this spawn holds (see the reset guard's header):
 # the claim names this task, so the entry's owner now is this spawn's own acquisition.
 if fm_treehouse_pool_slot "$PROJ_ABS" "$WT"; then
+  # Whatever the claim says, the slot is a pool slot now: the reset guard keeps that, so a pool
+  # state that is gone at its final observation is a lost lease source and not a clear one.
+  fm_slot_guard_record_pool_identity "$WT"
   fm_treehouse_slot_owner_state "$WT" "$ID"
   [ "$FM_TREEHOUSE_SLOT_OWNER" != mine ] || fm_slot_guard_record_lease_identity "$WT"
 fi

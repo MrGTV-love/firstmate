@@ -774,7 +774,8 @@ open(sys.argv[3], "wb").write(b"".join(item + b"\0" for item in sorted(found)))
 # The spawn's own lineage (its ancestors, its descendants) and the acquired
 # endpoint's pane tree are the only exclusions; a holder whose parent chain cannot
 # be followed counts as a holder. Arguments are extra pids whose ownership is
-# wanted: each is answered "own", "dead", "foreign" or "unknown".
+# wanted: each is answered "own" (bound to this spawn: it descends from the probe or from the
+# acquired pane's shell), "dead", "foreign" or "unknown".
 # The pane tree comes from the endpoint's pane pid (tmux, herdr). A backend that
 # reports none (zellij, cmux, orca) is probed once more from INSIDE the acquired
 # pane through the caller's runner: the pane's shell is then a real ancestor of the
@@ -832,6 +833,12 @@ for _ in range(256):
 panepid = int(pane) if pane.isdigit() else None
 def own(pid):
     return pid in ancestors or reaches(pid, selfpid) or (panepid is not None and reaches(pid, panepid))
+# A pid asked about (a lease owner) is bound to this spawn only by descending from the probe or
+# the acquired pane's shell. The probe's own ancestors are the caller's chain (the supervisor,
+# the multiplexer): nothing ties those to this spawn's acquisition. Inside the acquired pane
+# (@self) the ancestors run up from the pane's shell, so there they count.
+def bound(pid):
+    return reaches(pid, selfpid) or (panepid is not None and reaches(pid, panepid)) or (selfspec == "@self" and pid in ancestors)
 for pid, row in sorted(rows.items()):
     cwd = row["cwd"]
     if cwd and (cwd == slot or cwd.startswith(slot.rstrip("/") + "/")) and not own(pid):
@@ -848,7 +855,7 @@ for arg in extra:
         continue
     except PermissionError:
         pass
-    print("P\t%d\t%s" % (pid, "own" if own(pid) else ("foreign" if pid in rows else "unknown")))
+    print("P\t%d\t%s" % (pid, "own" if bound(pid) else ("foreign" if pid in rows else "unknown")))
 FMPROBEPY
 )
 
@@ -936,13 +943,15 @@ EOF
 # already in the entry would be recorded just the same. A process lease is this spawn's only
 # when the identity matches AND a probe binds that process to this spawn (it is in the
 # spawn's own lineage or in the acquired pane's tree); ancestry alone never marks it.
+fm_slot_guard_record_pool_identity() { # <slot>
+  FM_SLOT_GUARD_POOL_REAL=$(CDPATH='' cd -- "$1" 2>/dev/null && pwd -P) || FM_SLOT_GUARD_POOL_REAL=
+}
+
 fm_slot_guard_record_lease_identity() { # <slot>
   local real state entries path pid started
   FM_SLOT_GUARD_LEASE_PID=
   FM_SLOT_GUARD_LEASE_STARTED=
-  FM_SLOT_GUARD_POOL_REAL=
   real=$(CDPATH='' cd -- "$1" 2>/dev/null && pwd -P) || return 0
-  FM_SLOT_GUARD_POOL_REAL=$real
   state="${real%/*/*}/treehouse-state.json"
   [ -f "$state" ] && command -v jq >/dev/null 2>&1 || return 0
   entries=$(jq -r '.worktrees[]? | [(.path // "" | tostring), (.owner_pid // "" | tostring), (.owner_started_at // "" | tostring)] | join("\u001f")' "$state" 2>/dev/null) || return 0
