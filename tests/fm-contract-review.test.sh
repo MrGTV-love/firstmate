@@ -742,6 +742,37 @@ test_request_or_context_with_author_history_heading_refused() {
   pass "a request or context file whose unrecognised heading names author history is refused, and free owner headings build"
 }
 
+test_recognised_heading_with_author_history_refused() {
+  local src="$TMP_ROOT/rh.md" in="$TMP_ROOT/rh-in.md" pack rc flag
+  # Compliant: a kept heading with no author-history term builds in the contract, the request
+  # and a context file.
+  write_fixture_contract "$src"
+  awk '{ print } /^ZZ-KEEP-CONTEXT-ZZ/ { print ""; print "## Context (prior art)"; print ""; print "ZZ-KEEP-PRIORART-ZZ earlier tools." }' "$src" >"$src.tmp" && mv "$src.tmp" "$src"
+  printf '# Owner context\n\n## Context (prior art)\n\nZZ-KEEP-CTXART-ZZ earlier tools.\n' >"$in"
+  build_pack pack --contract "$src" --request "$in" --context "$in" || fail "a kept heading with no author-history term was refused: $(cat "$TMP_ROOT/build.err")"
+  assert_grep "ZZ-KEEP-PRIORART-ZZ" "$pack/target.md" "the prior-art section was dropped from the contract"
+  assert_grep "ZZ-KEEP-CTXART-ZZ" "$pack/request.md" "the prior-art request was not copied whole"
+  # Noncompliant: a recognised heading that names author history refuses the contract, the
+  # request and a context file, and writes no pack.
+  write_fixture_contract "$src"
+  awk '{ print } /^ZZ-KEEP-CONTEXT-ZZ/ { print ""; print "## Context and earlier findings"; print ""; print "ZZ-C-ZZ F1 answered; the all-green check passes." }' "$src" >"$src.tmp" && mv "$src.tmp" "$src"
+  rc=0
+  "$PACK_BIN" --contract "$src" --out-root "$TMP_ROOT/rh-c" >/dev/null 2>"$TMP_ROOT/rh.err" || rc=$?
+  assert_equals 3 "$rc" "a contract with a recognised author-history heading was accepted"
+  assert_contains "$(cat "$TMP_ROOT/rh.err")" "unrecognised section: Context and earlier findings" "the contract refusal does not name the section"
+  assert_absent "$TMP_ROOT/rh-c" "a refused contract left an output directory"
+  write_fixture_contract "$src"
+  printf '# Owner context\n\n## Context and earlier findings\n\nZZ-C-ZZ F1 answered.\n' >"$in"
+  for flag in --request --context; do
+    rc=0
+    "$PACK_BIN" --contract "$src" "$flag" "$in" --out-root "$TMP_ROOT/rh$flag" >/dev/null 2>"$TMP_ROOT/rh.err" || rc=$?
+    assert_equals 3 "$rc" "a $flag file with a recognised author-history heading was accepted"
+    assert_contains "$(cat "$TMP_ROOT/rh.err")" "unrecognised section: Context and earlier findings" "the $flag refusal does not name the section"
+    assert_absent "$TMP_ROOT/rh$flag" "a refused $flag file left an output directory"
+  done
+  pass "a recognised heading that names author history is refused in a contract, request or context file"
+}
+
 test_inline_backticks_do_not_open_a_fence() {
   local src="$TMP_ROOT/ib.md" pack manifest
   write_fixture_contract "$src"
@@ -834,6 +865,7 @@ fm_test_run_cases \
   test_preamble_author_text_matches_whole_words \
   test_inputs_read_list_needs_its_own_heading \
   test_request_or_context_with_author_history_heading_refused \
+  test_recognised_heading_with_author_history_refused \
   test_inline_backticks_do_not_open_a_fence \
   test_definition_of_done_in_every_heading_form \
   test_fences_and_headings_accept_up_to_three_spaces \

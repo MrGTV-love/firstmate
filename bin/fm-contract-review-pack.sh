@@ -24,8 +24,10 @@
 #   which is the layout data/review-lane/run-review.sh takes (pass diff.patch).
 #   The author's sections are dropped by heading. A level 1 or 2 heading (ATX `#`/`##`
 #   or setext, a title line over `===` or `---`) the builder does not recognise stops
-#   the build with exit 3 naming it, and nothing is written. So does a code fence that
-#   never closes.
+#   the build with exit 3 naming it, and nothing is written. So does a recognised level 1
+#   to 3 heading of a kept section that names author history (findings, answered,
+#   response, self-check, all-green, revision log, prior review or round), and a code
+#   fence that never closes.
 #   Under a kept section, a sub-heading the builder does not recognise (an unknown
 #   level 3 heading, a level 4 or deeper heading or a bold-only line) stays in
 #   target.md where it is, and so does a preamble line it does not drop; each is
@@ -33,9 +35,8 @@
 #   dropped line in the manifest.
 #   The request and each context file go through the same filter and are copied
 #   whole; one that holds text the filter would drop (an author section or an author
-#   preamble line) is refused with exit 2, and one whose unrecognised heading names
-#   author history (findings, answered, response, self-check, all-green, revision log,
-#   prior) is refused with exit 3.
+#   preamble line) is refused with exit 2, and one whose recognised or unrecognised
+#   heading names author history is refused with exit 3.
 #   The manifest of excluded paths is <out-root>.excluded-paths, outside the pack.
 #   It always holds the real path of every input file (the contract, the request,
 #   each context file), the register and history paths when given, and every
@@ -165,6 +166,7 @@ END {
       seen_heading = 1
       pre = 0
       c = classify(norm(title))
+      if (c == "keep" && norm(title) ~ HIST) c = "unknown"
       parent = c
       ptitle = title
       if (c == "keep") mode = "keep"
@@ -175,6 +177,7 @@ END {
     }
     if (level == 3) {
       c = classify(norm(title))
+      if (parent == "keep" && c == "keep" && norm(title) ~ HIST) { mode = "drop"; print title > UNKNOWN_OUT; continue }
       if (parent == "keep" && c != "drop") mode = "keep"
       else mode = "drop"
       if (c == "drop") print title > DROPPED_OUT
@@ -210,9 +213,10 @@ PREAMBLE_DROP='(^|[^a-z0-9])(authors?|contract review|all-green|self-check|revie
 PREAMBLE_TERMS='self-checks?|all-green|contract reviews?|review exits?|prior findings?|revision logs?'
 PREAMBLE_REFUSE="(^|[^a-z0-9])((authors?|workers?)[^a-z0-9]*s?[ ]+($PREAMBLE_TERMS|analysis|notes?|candidates?|dispositions?|findings?|responses?)([^a-z0-9]|\$)|(authors?|$PREAMBLE_TERMS)[ ]*:)|reviewed:"
 
-# An unrecognised heading in a request or context file that names author history anywhere
-# in its text. Free owner headings ("Current review authority") hold none of these words.
-HISTORY_HEADING='(^|[^a-z0-9])(findings?|answered|responses?|self-checks?|all-green|revision logs?|prior)([^a-z0-9]|$)'
+# A heading that names author history anywhere in its text: any heading of a request or
+# context file, and a recognised heading of a kept contract section. Free owner headings
+# ("Current review authority", "Context (prior art)") hold none of these words.
+HISTORY_HEADING='(^|[^a-z0-9])(findings?|answered|responses?|self-checks?|all-green|revision logs?|prior (reviews?|rounds?|reports?|revisions?|answers?))([^a-z0-9]|$)'
 
 filter_sections() { # <in> <keep-out> <dropped-out> <unknown-out> <unrecognised-out> <titles-out> [preamble-pattern]
   local pre=${7:-$PREAMBLE_DROP}
@@ -222,7 +226,7 @@ filter_sections() { # <in> <keep-out> <dropped-out> <unknown-out> <unrecognised-
   : >"$5"
   : >"$6"
   awk -v SRC="$1" -v KEEP_OUT="$2" -v DROPPED_OUT="$3" -v UNKNOWN_OUT="$4" -v UNREC_OUT="$5" -v TITLES_OUT="$6" \
-    -v KEEP="$SECTION_KEEP" -v DROP="$SECTION_DROP" -v PREAMBLE_DROP="$pre" \
+    -v KEEP="$SECTION_KEEP" -v DROP="$SECTION_DROP" -v PREAMBLE_DROP="$pre" -v HIST="$HISTORY_HEADING" \
     "$SECTION_AWK" <"$1"
 }
 
@@ -277,7 +281,7 @@ cmd_build() {
     while IFS= read -r name; do
       echo "fm-contract-review-pack: unrecognised section: $name" >&2
     done <"$scratch/unknown"
-    echo "fm-contract-review-pack: no pack written; rename the section to a recognised one or add it to the builder" >&2
+    echo "fm-contract-review-pack: no pack written; rename the section to a recognised one, move any author history out of it, or add it to the builder" >&2
     exit 3
   fi
   grep -q '^definition of done' "$scratch/titles" || die "contract has no Definition Of Done section: $contract"
