@@ -1136,9 +1136,10 @@ class Collector:
         A deliverable that is landed, delivered or ruled moot leaves the record awaiting plain teardown
         (pending_cleanup); a done report with no accepted deliverable and no other row for the task awaits
         acceptance (pending_acceptance). Both are derived from the records alone, so a restart finds the same
-        rows. A declared wait, an unanswered decision and a worker that is still running (a no-mistakes pipeline
-        runs after the handoff `done`) own the task's next move and add neither; a persistent secondmate is not in
-        self.tasks. A recorded teardown refusal stays on the task's own row, else on every row that covers the task.
+        rows. A declared wait, an unanswered decision and a worker that is still running on an item the backlog
+        has not closed (a no-mistakes pipeline runs after the handoff `done`) own the task's next move and add
+        neither; a persistent secondmate is not in self.tasks. A recorded teardown refusal stays on the task's own
+        row, else on every row that covers the task.
         """
         owner = "home:" + self.home_label()
         for task in self.tasks:
