@@ -972,6 +972,124 @@ test_leak_check_reads_every_path_on_a_line() {
   pass "the leak check reads every absolute path on a list line"
 }
 
+test_leak_check_reads_a_path_above_a_rule_or_hash_line() {
+  local rep="$TMP_ROOT/report12.md" sib="$TMP_ROOT/sibling/pack/review.md"
+  make_leak_world
+  # Compliant: bare paths with a rule under the last one, and a #-note that is not a heading.
+  printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n%s\n%s\n---\n\nEXIT: needs-revision\n' "$LEAK_PACK/contract.md" "$LEAK_PACK/target.md" >"$rep"
+  run_check "$rep"
+  assert_equals 0 "$CHECK_RC" "a clean list with a rule under its last path was flagged: $CHECK_OUT"
+  assert_contains "$CHECK_OUT" "2 listed input(s)" "the path above the rule was not read"
+  printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- %s\n#1 note\n- %s\n\n## Findings\n' "$LEAK_PACK/contract.md" "$LEAK_PACK/target.md" >"$rep"
+  run_check "$rep"
+  assert_equals 0 "$CHECK_RC" "a clean list with a #-note was flagged: $CHECK_OUT"
+  assert_contains "$CHECK_OUT" "2 listed input(s)" "the list ended at a #-note"
+  # Noncompliant: a leak directly above a rule, and a leak after a #-note, are read.
+  printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n%s\n%s\n---\n\nEXIT: needs-revision\n' "$LEAK_PACK/contract.md" "$sib" >"$rep"
+  run_check "$rep"
+  assert_equals 3 "$CHECK_RC" "a leak directly above a rule was allowed"
+  assert_contains "$CHECK_OUT" "INPUT LEAK: $sib" "the leak above the rule is not named"
+  printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- %s\n#1 note\n- %s\n\n## Findings\n' "$LEAK_PACK/contract.md" "$sib" >"$rep"
+  run_check "$rep"
+  assert_equals 3 "$CHECK_RC" "a leak after a #-note was allowed"
+  pass "a path above a rule line, or after a #-note, is still read"
+}
+
+test_leak_check_reads_paths_anywhere_on_a_list_line() {
+  local rep="$TMP_ROOT/report13.md" sib="$TMP_ROOT/sibling/pack/review.md" body n=0
+  make_leak_world
+  # Compliant: a labelled path, a table row and a revision path on prose lines are judged and clean.
+  {
+    printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- Pack contract: %s\n| %s | read |\n' "$LEAK_PACK/contract.md" "$LEAK_PACK/target.md"
+    printf -- '- also compared HEAD:bin/fm-spawn.sh, read and/or skimmed\n\n## Findings\n'
+  } >"$rep"
+  run_check "$rep"
+  assert_equals 0 "$CHECK_RC" "clean paths on prose or table lines were flagged: $CHECK_OUT"
+  assert_contains "$CHECK_OUT" "3 listed input(s)" "a path on a prose or table line was not read"
+  # Noncompliant: each of these lines names an input that is not authorized.
+  for body in "- Sibling report: $sib" "- also read $sib for context" "| $sib | read |" \
+    "- $LEAK_PACK/contract.md, https://example.com/review.md" "- $LEAK_PACK/contract.md, main:docs/x.md"; do
+    n=$((n + 1))
+    printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- %s\n%s\n\n## Findings\n' "$LEAK_PACK/target.md" "$body" >"$rep"
+    run_check "$rep"
+    assert_equals 3 "$CHECK_RC" "list line $n ($body) passed an unauthorized input"
+  done
+  pass "every absolute, URL or revision path on a list line is judged"
+}
+
+test_summary_mention_of_inputs_read_is_not_a_list() {
+  local rep="$TMP_ROOT/report14.md"
+  make_leak_world
+  # Compliant: a summary bullet that mentions Inputs read, then the headed list.
+  printf 'VERDICT: FAIL head=abc\n\n## Summary\n\n- Inputs read: see the section below.\n- Identity: Terra\n\n## Inputs read\n\n- %s\n\n## Findings\n' "$LEAK_PACK/contract.md" >"$rep"
+  run_check "$rep"
+  assert_equals 0 "$CHECK_RC" "a summary mention of Inputs read voided the round: $CHECK_OUT"
+  # Noncompliant: a bold Inputs read label followed by a path is a list with no heading.
+  printf 'VERDICT: FAIL head=abc\n\n**Inputs read**\n- %s\n\n## Inputs read\n\n- %s\n' "$LEAK_PACK/contract.md" "$LEAK_PACK/contract.md" >"$rep"
+  run_check "$rep"
+  assert_equals 3 "$CHECK_RC" "a bold Inputs read list with no heading was accepted"
+  assert_contains "$CHECK_OUT" "has no heading of its own" "the headless list did not void for its cause"
+  pass "a passing mention of Inputs read is not a list, and a headless list still voids"
+}
+
+test_author_section_title_drops() {
+  local src="$TMP_ROOT/at.md" pack manifest
+  # Noncompliant: a first title that names an author section is dropped with its text.
+  printf "# Author's all-green candidate\n\nZZ-ALLGREEN-T-ZZ all pass.\n\n## REQUEST\n\nA request.\n\n## Definition Of Done\n\n- A1 (mandatory): x\n" >"$src"
+  build_pack pack --contract "$src" || fail "build failed: $(cat "$TMP_ROOT/build.err")"
+  manifest="$(dirname "$pack").excluded-paths"
+  assert_no_grep "ZZ-ALLGREEN-T-ZZ" "$pack/target.md" "an author-section title kept its text"
+  grep -qxF "$(printf "dropped\tAuthor's all-green candidate")" "$manifest" || fail "the author-section title is not listed as dropped"
+  printf '### Note\n\n# Contract Review\n\nZZ-HIST-T-ZZ r3 F1.\n\n## Definition Of Done\n\n- A1 (mandatory): x\n' >"$src"
+  build_pack pack --contract "$src" || fail "build failed: $(cat "$TMP_ROOT/build.err")"
+  assert_no_grep "ZZ-HIST-T-ZZ" "$pack/target.md" "a Contract Review title after a level 3 heading kept its text"
+  # Compliant: a free title keeps its preamble.
+  printf '# Fixture contract\n\nZZ-KEEP-T-ZZ preamble.\n\n## Definition Of Done\n\n- A1 (mandatory): x\n' >"$src"
+  build_pack pack --contract "$src" || fail "build failed: $(cat "$TMP_ROOT/build.err")"
+  assert_grep "ZZ-KEEP-T-ZZ" "$pack/target.md" "a free title lost its preamble"
+  pass "a first title that names an author section drops with its text"
+}
+
+test_author_section_under_any_heading_of_request_or_context_refused() {
+  local src="$TMP_ROOT/ah.md" in="$TMP_ROOT/ah-in.md" pack rc heading n=0
+  write_fixture_contract "$src"
+  # Compliant: a neutral bold label and a prior-art section build.
+  printf '# Owner context\n\n## Context (prior art)\n\n**Review scope**\n\nZZ-KEEP-AH-ZZ\n' >"$in"
+  build_pack pack --contract "$src" --request "$in" --context "$in" || fail "neutral owner headings were refused: $(cat "$TMP_ROOT/build.err")"
+  # Noncompliant: an author section as a level 4 or bold heading, or as the file title.
+  for heading in "#### Contract Review" "**Contract Review**" "#### Author's analysis" "**Author's notes**" \
+    "#### Revision history" "**Review history**" "#TITLE Contract Review" "#TITLE Author's analysis" \
+    "#TITLE Review history" "#TITLE Revision history" "#TITLE Register"; do
+    n=$((n + 1))
+    case $heading in
+      "#TITLE "*) printf '# %s\n\nZZ-CTX-ZZ F1 was closed.\n' "${heading#\#TITLE }" >"$in" ;;
+      *) printf '# Owner\n\n## Context\n\n%s\n\nZZ-CTX-ZZ F1 was closed.\n' "$heading" >"$in" ;;
+    esac
+    rc=0
+    "$PACK_BIN" --contract "$src" --context "$in" --out-root "$TMP_ROOT/ah-out$n" >/dev/null 2>"$TMP_ROOT/ah.err" || rc=$?
+    assert_equals 2 "$rc" "a context file with '$heading' was accepted"
+    assert_contains "$(cat "$TMP_ROOT/ah.err")" "author text" "the '$heading' refusal does not name the cause"
+    assert_absent "$TMP_ROOT/ah-out$n" "a refused context file left an output directory"
+  done
+  pass "an author section under any heading of a request or context file is refused"
+}
+
+test_exact_section_title_counts_as_a_section() {
+  local src="$TMP_ROOT/es.md" pack rc=0
+  # Compliant: a title that is exactly a section name counts as that section.
+  printf '# Definition Of Done\n\n- A1 (mandatory): ZZ-KEEP-ES-ZZ x\n' >"$src"
+  build_pack pack --contract "$src" || fail "a Definition Of Done title was refused: $(cat "$TMP_ROOT/build.err")"
+  printf '# REQUEST\n\nThe owner wants a thing.\n\n# Definition Of Done\n\n- A1 (mandatory): x\n' >"$src"
+  build_pack pack --contract "$src" || fail "a REQUEST title was refused: $(cat "$TMP_ROOT/build.err")"
+  # shellcheck disable=SC2016 # literal backticks in generated Markdown
+  assert_grep 'the request is the REQUEST section of `target.md`' "$pack/contract.md" "a REQUEST title was not named as the request"
+  # Noncompliant: a prefixed title is not the section.
+  printf '# Definition Of Done: d3 steer\n\n## REQUEST\n\nA request.\n' >"$src"
+  "$PACK_BIN" --contract "$src" --out-root "$TMP_ROOT/es-out" >/dev/null 2>&1 || rc=$?
+  assert_equals 2 "$rc" "a prefixed Definition Of Done title counted as the section"
+  pass "a title counts as a section only when it is exactly the section name"
+}
+
 test_inline_backticks_do_not_open_a_fence() {
   local src="$TMP_ROOT/ib.md" pack manifest
   write_fixture_contract "$src"
@@ -1072,6 +1190,12 @@ fm_test_run_cases \
   test_title_is_not_the_definition_of_done \
   test_leak_check_reads_through_fences_and_setext_headings \
   test_leak_check_reads_every_path_on_a_line \
+  test_leak_check_reads_a_path_above_a_rule_or_hash_line \
+  test_leak_check_reads_paths_anywhere_on_a_list_line \
+  test_summary_mention_of_inputs_read_is_not_a_list \
+  test_author_section_title_drops \
+  test_author_section_under_any_heading_of_request_or_context_refused \
+  test_exact_section_title_counts_as_a_section \
   test_inline_backticks_do_not_open_a_fence \
   test_definition_of_done_in_every_heading_form \
   test_fences_and_headings_accept_up_to_three_spaces \
