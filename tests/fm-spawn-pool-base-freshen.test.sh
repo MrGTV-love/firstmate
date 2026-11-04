@@ -2188,6 +2188,8 @@ sleep 600 &
 child=$!
 jq --argjson pid "$child" '.worktrees[0].owner_pid = $pid' "$3" >"$3.tmp" && mv "$3.tmp" "$3"
 printf '%s' "$child" >"$2/child"
+sleep 600 &
+printf '%s' "$!" >"$2/child2"
 : >"$2/ready"
 wait
 SH
@@ -2230,6 +2232,13 @@ test_reset_guard_s4_process_lease_recorded_identity() {
     guard_expect_refusal S4 '(iii-b) the lease owner changes after the claim to another live process' 'reset refused (holder_lease)' "$id" --scout
   guard_end_pane
   kill "$other" 2>/dev/null || true
+  # The owner changes to a SECOND child the acquired pane started after the spawn began: it descends from
+  # the pane and is newer than the spawn, but it is not the identity recorded at the claim.
+  id='guard-s4-lease-second-child'
+  guard_pane_slot guard-s4l2c "$id" acquired
+  FM_SLOT_RESET_GUARD_SEAM="jq --argjson pid \$(cat '$CASE_DIR/acq/child2') '.worktrees[0].owner_pid = \$pid' '$LEASE_STATE' >'$LEASE_STATE.tmp' && mv '$LEASE_STATE.tmp' '$LEASE_STATE'; guard_snapshot '$POOL_DIR' '$CASE_DIR/post-seam.snap'" \
+    guard_expect_refusal S4 '(iii-b) the lease owner is a second pane child that is newer than the spawn but not the recorded acquisition' 'reset refused (holder_lease)' "$id" --scout
+  guard_end_pane
   # The owner changes to another process inside the acquired pane's tree (the shell itself): ancestry does not exempt it.
   id='guard-s4-lease-pane-tree'
   guard_pane_slot guard-s4lpt "$id" acquired
