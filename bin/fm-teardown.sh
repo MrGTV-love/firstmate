@@ -4592,13 +4592,14 @@ teardown_unclaimed_prove_custody() {
 
 # Whether this teardown plans the release of <slot>, the record's enclosing slot
 # with no slot claim (read-only, no custody needed). Without force, for a ship or
-# scout, and only when the slot is not provably someone else's or already free
-# with no interrupted release of this task's: an entry that is ordinary and held
-# by another task, or absent, or unleased with no return-pending marker naming
-# the slot, is left to the existing no-return behavior. Every other reading
-# (this task's own lease, with or without a lease id, a recovered quarantine, a
-# conflicting or unreadable entry, an interrupted release) is planned, so any
-# refusal there keeps the record and the retry obligation.
+# scout, on a treehouse that proves persistent recovered leases, and only when
+# the entry is this task's own lease with a lease id, a recovered quarantine, or
+# unleased with this task's return-pending marker naming the slot (an
+# interrupted release). Every other reading (another holder, a lease with no
+# lease id, a conflicting, unreadable, or absent entry) and an unproven treehouse
+# keep the existing no-return behavior: the copy stays in place and no
+# return-pending marker is written. Once planned, any refusal keeps the record
+# and the retry obligation.
 teardown_unclaimed_candidate() {  # <slot>
   local slot=$1 marked
   [ "$FORCE" != --force ] || return 1
@@ -4606,15 +4607,16 @@ teardown_unclaimed_candidate() {  # <slot>
   [ -n "$slot" ] || return 1
   fm_task_copy_pool_slot_lease "$slot" || true
   case "$FM_TASK_COPY_LEASE_STATE" in
-    ordinary|legacy) [ "$FM_TASK_COPY_LEASE_HOLDER" = "$ID" ] ;;
-    recovered|conflicting|unreadable) return 0 ;;
+    ordinary) [ "$FM_TASK_COPY_LEASE_HOLDER" = "$ID" ] || return 1 ;;
+    recovered) ;;
     unleased)
       fm_teardown_return_pending "$STATE" "$ID" || return 1
       marked=$(sed -n 's/^slot=//p' "$STATE/$ID.teardown-return-pending" 2>/dev/null | head -1)
-      [ -n "$marked" ] && [ "$(fm_task_copy_canonical_dir "$marked" 2>/dev/null)" = "$slot" ]
+      [ -n "$marked" ] && [ "$(fm_task_copy_canonical_dir "$marked" 2>/dev/null)" = "$slot" ] || return 1
       ;;
     *) return 1 ;;
   esac
+  fm_task_copy_treehouse_persists_recovered_leases
 }
 
 # Before project custody, take the root's landed-work proof the way the claimed
@@ -4631,8 +4633,6 @@ teardown_unclaimed_early_proof() {
 
 # Before own-copy cleanup, under project custody.
 teardown_unclaimed_slot_prove() {
-  fm_task_copy_treehouse_persists_recovered_leases \
-    || { teardown_unclaimed_note "the installed treehouse $FM_TASK_COPY_RECOVERED_CAPABILITY_REASON"; return 1; }
   teardown_unclaimed_read_lease bind || return 1
   teardown_unclaimed_prove_custody || return 1
 }
@@ -4656,8 +4656,6 @@ teardown_unclaimed_slot_cleanup() {
 teardown_unclaimed_slot_release() {
   local slot=$TEARDOWN_UNCLAIMED_SLOT out rc=0
   local -a args
-  fm_task_copy_treehouse_persists_recovered_leases \
-    || { teardown_unclaimed_note "the installed treehouse $FM_TASK_COPY_RECOVERED_CAPABILITY_REASON"; return 1; }
   teardown_unclaimed_read_lease verify || return 1
   teardown_unclaimed_prove_custody || return 1
   if [ "$TEARDOWN_UNCLAIMED_KIND" != unleased ]; then

@@ -3545,113 +3545,188 @@ PY
   pass 'Vernant retirement honors landing proof, recorded branch, lock-free forge proof, kept records, live owners, both copies, refusals, and old checkouts'
 }
 
-# --- Real-provider unclaimed enclosing-slot release (F2) -----------------------
-# These cases run bin/fm-teardown.sh WITHOUT --force against pools built by the
-# real treehouse named by FM_TEST_TREEHOUSE_PROVIDER (a binary that proves
-# persistent recovered leases; never installed, only symlinked into the case's own
-# fakebin through an argv-recording wrapper). The pool, HOME, XDG configuration and
-# TREEHOUSE_ROOT are the case's own; nothing under /Users/charlesabrooker/.treehouse
-# is read. Without the variable a case prints a loud named skip and checks nothing.
-REAL_RECOVERED_HOLDER='recovered: state file was corrupt or truncated; verify before reuse'
+# --- Unclaimed enclosing-slot release (F2) -------------------------------------
+# These cases run bin/fm-teardown.sh WITHOUT --force against pools served by each
+# provider in turn. The fake provider always runs: a script that answers
+# `capabilities --json` with the persistent-recovered-lease proof, prints its pool
+# for `pool-dir`, and implements `return <slot> --if-lease-holder <holder>
+# [--if-lease-id <id>]` on the fixture state file, refusing unless exactly one
+# entry is leased by that holder and lease id. The real treehouse named by
+# FM_TEST_TREEHOUSE_PROVIDER (a binary that proves persistent recovered leases;
+# never installed) runs as an extra smoke check; without it that pass prints a
+# loud named skip. Both are called only through the case's argv-recording
+# wrapper. The pool, HOME, XDG configuration and TREEHOUSE_ROOT are the case's
+# own; nothing under /Users/charlesabrooker/.treehouse is read.
+UNC_RECOVERED_HOLDER='recovered: state file was corrupt or truncated; verify before reuse'
+UNC_SUCCESSOR_ID=ffffffffffffffffffffffffffffffff
 
-real_provider_available() {  # <case-label>
-  if [ -z "${FM_TEST_TREEHOUSE_PROVIDER:-}" ] || [ ! -x "$FM_TEST_TREEHOUSE_PROVIDER" ]; then
-    printf 'skip - %s: FM_TEST_TREEHOUSE_PROVIDER names no executable treehouse; the real-provider case did NOT run\n' "$1"
-    return 1
+unc_providers() {  # <case-label>; sets UNC_PROVIDERS
+  UNC_PROVIDERS=(fake)
+  if [ -n "${FM_TEST_TREEHOUSE_PROVIDER:-}" ] && [ -x "$FM_TEST_TREEHOUSE_PROVIDER" ]; then
+    UNC_PROVIDERS+=(real)
+  else
+    printf 'skip - %s: FM_TEST_TREEHOUSE_PROVIDER names no executable treehouse; the real-provider pass did NOT run\n' "$1"
   fi
 }
 
-# real_pool_case <name> <a-lease: ordinary|recovered>
+unc_write_fake_provider() {  # <path> <pool-dir>
+  cat > "$1" <<SH
+#!/usr/bin/env bash
+state=$2/treehouse-state.json
+case "\${1:-}" in
+  capabilities) printf '%s\n' '{"schema_version":1,"version":"v-fake","persistent_recovered_leases":true}' ;;
+  pool-dir) printf '%s\n' "$2" ;;
+  return)
+    slot=\${2:-}
+    shift 2 || exit 2
+    holder= id= has_id=false
+    while [ \$# -gt 0 ]; do
+      case "\$1" in
+        --if-lease-holder) holder=\${2:-}; shift 2 || exit 2 ;;
+        --if-lease-id) id=\${2:-}; has_id=true; shift 2 || exit 2 ;;
+        *) echo "fake treehouse: unsupported return argument \$1" >&2; exit 2 ;;
+      esac
+    done
+    [ -n "\$holder" ] || { echo "fake treehouse: return needs --if-lease-holder" >&2; exit 2; }
+    jq -e --arg p "\$slot" --arg h "\$holder" --arg i "\$id" --argjson has "\$has_id" '
+      [.worktrees[] | select(.path == \$p)]
+      | length == 1 and (.[0] | .leased == true and .lease_holder == \$h and ((\$has | not) or .lease_id == \$i))' \
+      "\$state" >/dev/null \
+      || { echo "fake treehouse: \$slot is not leased by exactly that holder and lease id" >&2; exit 1; }
+    jq --arg p "\$slot" '(.worktrees[] | select(.path == \$p)) |= del(.leased, .lease_holder, .lease_id)' \
+      "\$state" > "\$state.tmp" && mv "\$state.tmp" "\$state"
+    ;;
+esac
+exit 0
+SH
+  chmod +x "$1"
+}
+
+# unc_pool_case <name> <a-lease: ordinary|recovered> <provider: fake|real>
 # Slot A holds task-x1 (leased ordinarily to it, or by the recovered literal) with
 # the task's nested copy inside it and no .fm-slot-owner claim; slot B is a
 # recovered quarantine holding a live non-ignored nested copy with an unlanded
-# commit. Sets REAL_CASE, REAL_ENV (a bash array of env assignments), REAL_A,
-# REAL_B, REAL_STATE, REAL_NESTED, REAL_B_COPY.
-real_pool_case() {
-  local name=$1 kind=$2 case_dir pool
-  case_dir=$(make_case "$name") || return 1
-  REAL_CASE=$case_dir
+# commit. Sets UNC_CASE, UNC_ENV (a bash array of env assignments), UNC_A,
+# UNC_B, UNC_STATE, UNC_NESTED, UNC_B_COPY.
+unc_pool_case() {
+  local name=$1 kind=$2 provider=$3 case_dir pool bin
+  case_dir=$(make_case "$name-$provider") || return 1
+  UNC_CASE=$case_dir
   mkdir -p "$case_dir/real-home" "$case_dir/real-xdg" "$case_dir/home/state"
+  UNC_ENV=(HOME="$case_dir/real-home" XDG_CONFIG_HOME="$case_dir/real-xdg" TREEHOUSE_NO_UPDATE_CHECK=1
+    TREEHOUSE_ROOT="$case_dir/real-root" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
+    GIT_AUTHOR_NAME=f GIT_AUTHOR_EMAIL=f@x.invalid GIT_COMMITTER_NAME=f GIT_COMMITTER_EMAIL=f@x.invalid)
+  if [ "$provider" = real ]; then
+    bin=$FM_TEST_TREEHOUSE_PROVIDER
+    UNC_A=$(cd "$case_dir/project" && env "${UNC_ENV[@]}" "$bin" get --no-fetch --lease --lease-holder task-x1 </dev/null 2>/dev/null) || return 1
+    UNC_B=$(cd "$case_dir/project" && env "${UNC_ENV[@]}" "$bin" get --no-fetch --lease --lease-holder sib </dev/null 2>/dev/null) || return 1
+    UNC_A=$(cd "$UNC_A" && pwd -P)
+    UNC_B=$(cd "$UNC_B" && pwd -P)
+    pool=${UNC_A%/*/*}
+  else
+    mkdir -p "$case_dir/pool/1" "$case_dir/pool/2"
+    pool=$(cd "$case_dir/pool" && pwd -P)
+    git -C "$case_dir/project" worktree add -q --detach "$pool/1/repo" main || return 1
+    git -C "$case_dir/project" worktree add -q --detach "$pool/2/repo" main || return 1
+    UNC_A=$pool/1/repo
+    UNC_B=$pool/2/repo
+    jq -n --arg a "$UNC_A" --arg b "$UNC_B" '{worktrees: [
+      {name: "1", path: $a, leased: true, lease_holder: "task-x1", lease_id: "11111111111111111111111111111111"},
+      {name: "2", path: $b, leased: true, lease_holder: "sib", lease_id: "22222222222222222222222222222222"}]}' \
+      > "$pool/treehouse-state.json" || return 1
+    bin=$case_dir/fake-provider
+    unc_write_fake_provider "$bin" "$pool"
+  fi
+  UNC_PROVIDER=$bin
+  UNC_STATE=$pool/treehouse-state.json
   # The wrapper records every argv. A one-shot $case/inject file makes the next
-  # `return` fail before it runs, fail after the real return succeeded, or change
-  # the entry's holder or lease id first (a successor taking the slot), and
-  # $case/capability-fail makes `capabilities` fail.
+  # `return` fail before it runs, fail after the provider's return succeeded, or
+  # change the entry's holder or lease id first (a successor taking the slot);
+  # $case/capability-fail makes `capabilities` fail and $case/capability-old
+  # answers it as an older treehouse that has no such command.
   cat > "$case_dir/fakebin/treehouse" <<SH
 #!/usr/bin/env bash
 printf '%s\n' "\$*" >> "$case_dir/treehouse.argv"
 if [ "\${1:-}" = capabilities ] && [ -e "$case_dir/capability-fail" ]; then exit 3; fi
+if [ "\${1:-}" = capabilities ] && [ -e "$case_dir/capability-old" ]; then
+  echo 'Error: unknown command "capabilities" for "treehouse"' >&2
+  exit 1
+fi
 if [ "\${1:-}" = return ] && [ -s "$case_dir/inject" ]; then
   mode=\$(cat "$case_dir/inject"); rm -f "$case_dir/inject"
   case "\$mode" in
     fail-before) echo "injected failure before return" >&2; exit 1 ;;
-    fail-after) "$FM_TEST_TREEHOUSE_PROVIDER" "\$@"; echo "injected failure after return" >&2; exit 1 ;;
-    successor-holder|successor-lease-id)
-      state=\$(ls "$case_dir"/real-root/.treehouse/*/treehouse-state.json)
-      if [ "\$mode" = successor-holder ]; then
-        jq --arg p "\$2" '(.worktrees[] | select(.path == \$p)) |= (.lease_holder = "successor" | .lease_id = "ffffffffffffffffffffffffffffffff")' "\$state" > "\$state.tmp"
-      else
-        jq --arg p "\$2" '(.worktrees[] | select(.path == \$p)) |= (.lease_id = "ffffffffffffffffffffffffffffffff")' "\$state" > "\$state.tmp"
-      fi
-      mv "\$state.tmp" "\$state"
-      ;;
+    fail-after) "$bin" "\$@"; echo "injected failure after return" >&2; exit 1 ;;
+    successor-holder|successor-lease-id) "$case_dir/successor" "\$mode" "\$2" ;;
   esac
 fi
-exec "$FM_TEST_TREEHOUSE_PROVIDER" "\$@"
+exec "$bin" "\$@"
 SH
-  chmod +x "$case_dir/fakebin/treehouse"
-  REAL_ENV=(HOME="$case_dir/real-home" XDG_CONFIG_HOME="$case_dir/real-xdg" TREEHOUSE_NO_UPDATE_CHECK=1
-    TREEHOUSE_ROOT="$case_dir/real-root" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
-    GIT_AUTHOR_NAME=f GIT_AUTHOR_EMAIL=f@x.invalid GIT_COMMITTER_NAME=f GIT_COMMITTER_EMAIL=f@x.invalid)
-  REAL_A=$(cd "$case_dir/project" && env "${REAL_ENV[@]}" "$FM_TEST_TREEHOUSE_PROVIDER" get --no-fetch --lease --lease-holder task-x1 </dev/null 2>/dev/null) || return 1
-  REAL_B=$(cd "$case_dir/project" && env "${REAL_ENV[@]}" "$FM_TEST_TREEHOUSE_PROVIDER" get --no-fetch --lease --lease-holder sib </dev/null 2>/dev/null) || return 1
-  REAL_A=$(cd "$REAL_A" && pwd -P)
-  REAL_B=$(cd "$REAL_B" && pwd -P)
-  pool=${REAL_A%/*/*}
-  REAL_STATE=$pool/treehouse-state.json
-  jq --arg r "$REAL_RECOVERED_HOLDER" --arg b "$REAL_B" --arg a "$REAL_A" --arg kind "$kind" '
+  cat > "$case_dir/successor" <<SH
+#!/usr/bin/env bash
+case "\$1" in
+  successor-holder) filter='.lease_holder = "successor" | .lease_id = "$UNC_SUCCESSOR_ID"' ;;
+  *) filter='.lease_id = "$UNC_SUCCESSOR_ID"' ;;
+esac
+jq --arg p "\$2" "(.worktrees[] | select(.path == \\\$p)) |= (\$filter)" "$UNC_STATE" > "$UNC_STATE.tmp"
+mv "$UNC_STATE.tmp" "$UNC_STATE"
+SH
+  chmod +x "$case_dir/fakebin/treehouse" "$case_dir/successor"
+  jq --arg r "$UNC_RECOVERED_HOLDER" --arg b "$UNC_B" --arg a "$UNC_A" --arg kind "$kind" '
     .worktrees |= map(
       if .path == $b then (.lease_holder = $r | del(.lease_id))
       elif .path == $a and $kind == "recovered" then (.lease_holder = $r | del(.lease_id))
-      else . end)' "$REAL_STATE" > "$REAL_STATE.tmp" && mv "$REAL_STATE.tmp" "$REAL_STATE" || return 1
-  REAL_NESTED=$REAL_A/.claude/worktrees/x
-  mkdir -p "$REAL_A/.claude/worktrees" "$REAL_B/.claude/worktrees"
-  git -C "$case_dir/project" worktree add -q -b fm/task-x1-v2 "$REAL_NESTED" main || return 1
-  REAL_B_COPY=$REAL_B/.claude/worktrees/b
-  git -C "$case_dir/project" worktree add -q -b other-work "$REAL_B_COPY" main || return 1
-  printf 'unlanded\n' > "$REAL_B_COPY/b.txt"
-  git -C "$REAL_B_COPY" add b.txt
-  git -C "$REAL_B_COPY" -c user.email=t@t -c user.name=t commit -q -m other-unlanded
+      else . end)' "$UNC_STATE" > "$UNC_STATE.tmp" && mv "$UNC_STATE.tmp" "$UNC_STATE" || return 1
+  UNC_NESTED=$UNC_A/.claude/worktrees/x
+  mkdir -p "$UNC_A/.claude/worktrees" "$UNC_B/.claude/worktrees"
+  git -C "$case_dir/project" worktree add -q -b fm/task-x1-v2 "$UNC_NESTED" main || return 1
+  UNC_B_COPY=$UNC_B/.claude/worktrees/b
+  git -C "$case_dir/project" worktree add -q -b other-work "$UNC_B_COPY" main || return 1
+  printf 'unlanded\n' > "$UNC_B_COPY/b.txt"
+  git -C "$UNC_B_COPY" add b.txt
+  git -C "$UNC_B_COPY" -c user.email=t@t -c user.name=t commit -q -m other-unlanded
   git -C "$case_dir/project" worktree remove --force "$case_dir/wt" 2>/dev/null || true
   fm_write_meta "$case_dir/state/task-x1.meta" \
     "window=firstmate:fm-task-x1" "endpoint_task_id=task-x1" \
-    "worktree=$REAL_NESTED" "branch=fm/task-x1-v2" "project=$case_dir/project" \
+    "worktree=$UNC_NESTED" "branch=fm/task-x1-v2" "project=$case_dir/project" \
     "kind=ship" "mode=no-mistakes" "spawn_gen=teardown-test-task-x1" \
-    "prior_worktree=$REAL_A"
+    "prior_worktree=$UNC_A"
+}
+
+# A successor takes slot A while teardown removes the task's own nested copy,
+# after the route bound the lease and before it verifies it: git is wrapped for
+# that one removal. <mode> is successor-holder or successor-lease-id.
+unc_successor_at_cleanup() {  # <case-dir> <mode>
+  local real_git
+  real_git=$(command -v git)
+  cat > "$1/fakebin/git" <<SH
+#!/usr/bin/env bash
+case "\$*" in
+  *" worktree remove --force $UNC_NESTED")
+    if [ ! -e "$1/cleanup-injected" ]; then
+      : > "$1/cleanup-injected"
+      "$1/successor" "$2" "$UNC_A"
+    fi
+    ;;
+esac
+exec "$real_git" "\$@"
+SH
+  chmod +x "$1/fakebin/git"
 }
 
 # Teardown with no force, in the case's isolated provider environment.
-real_run_teardown() {  # <case-dir>
+unc_run_teardown() {  # <case-dir>
   local case_dir=$1
   (
     local kv
-    for kv in "${REAL_ENV[@]}"; do
+    for kv in "${UNC_ENV[@]}"; do
       case "$kv" in HOME=*) ;; *) export "${kv?}" ;; esac
     done
     FM_HOME="$case_dir/home" run_teardown "$case_dir" 2>&1
   )
 }
 
-# A snapshot of one slot's lease tuple, HEAD and every file hash (git internals
-# excluded), for before/after equality.
-real_slot_snapshot() {  # <slot> <out-file>
-  {
-    jq -c --arg p "$1" '.worktrees[] | select(.path == $p) | [.name, .leased, .lease_holder, .lease_id]' "$REAL_STATE"
-    git -C "$1" rev-parse HEAD
-    (cd "$1" && find . -path ./.git -prune -o -type f -print | LC_ALL=C sort | while IFS= read -r f; do printf '%s ' "$f"; cksum < "$f"; done)
-  } > "$2"
-}
-
-real_copy_snapshot() {  # <copy> <out-file>
+unc_copy_snapshot() {  # <copy> <out-file>
   {
     git -C "$1" rev-parse HEAD
     git -C "$1" status --porcelain --untracked-files=all
@@ -3659,179 +3734,232 @@ real_copy_snapshot() {  # <copy> <out-file>
   } > "$2"
 }
 
-test_real_unclaimed_enclosing_slot_is_released_by_exact_conditional_return() {
-  local kind case_dir out rc lease_id
-  real_provider_available "R3/R6 real-provider release" || return 0
-  for kind in ordinary recovered; do
-    real_pool_case "real-release-$kind" "$kind" || fail "$kind: cannot build the real-provider pool"
-    case_dir=$REAL_CASE
-    lease_id=$(jq -r --arg p "$REAL_A" '.worktrees[] | select(.path == $p) | .lease_id // ""' "$REAL_STATE")
-    real_copy_snapshot "$REAL_B_COPY" "$case_dir/b-copy.before"
-    jq -c --arg p "$REAL_B" '.worktrees[] | select(.path == $p)' "$REAL_STATE" > "$case_dir/b-entry.before"
-    rc=0
-    out=$(real_run_teardown "$case_dir") || rc=$?
-    expect_code 0 "$rc" "$kind: teardown of the unclaimed enclosing slot failed"$'\n'"$out"
-    assert_absent "$case_dir/state/task-x1.meta" "$kind: the task record survived"
-    assert_absent "$case_dir/state/task-x1.teardown-return-pending" "$kind: the return-pending marker survived"
-    jq -e --arg p "$REAL_A" '.worktrees[] | select(.path == $p) | (.leased // false) == false' "$REAL_STATE" >/dev/null \
-      || fail "$kind: slot A is still leased: $(jq -c '.worktrees[]|[.name,.leased,.lease_holder]' "$REAL_STATE")"$'\n'"teardown output: $out"$'\n'"argv: $(cat "$case_dir/treehouse.argv" 2>/dev/null)"
-    if [ "$kind" = ordinary ]; then
-      grep -Fx "return $REAL_A --if-lease-holder task-x1 --if-lease-id $lease_id" "$case_dir/treehouse.argv" >/dev/null \
-        || fail "$kind: the exact conditional return was not issued: $(cat "$case_dir/treehouse.argv")"
-    else
-      grep -Fx "return $REAL_A --if-lease-holder $REAL_RECOVERED_HOLDER" "$case_dir/treehouse.argv" >/dev/null \
-        || fail "$kind: the recovered return was not issued by its holder literal: $(cat "$case_dir/treehouse.argv")"
-    fi
-    ! grep -E -- '--force|(^| )-f( |$)|--yes' "$case_dir/treehouse.argv" >/dev/null || fail "$kind: a forced or answered return was issued: $(cat "$case_dir/treehouse.argv")"
-    [ ! -e "$REAL_NESTED" ] || fail "$kind: the task's own nested copy survived"
-    real_copy_snapshot "$REAL_B_COPY" "$case_dir/b-copy.after"
-    cmp -s "$case_dir/b-copy.before" "$case_dir/b-copy.after" || fail "$kind: sibling B's nested copy changed"
-    jq -c --arg p "$REAL_B" '.worktrees[] | select(.path == $p)' "$REAL_STATE" | cmp -s - "$case_dir/b-entry.before" \
-      || fail "$kind: sibling B's lease entry changed"
-    ! compgen -G "${REAL_A%/*/*/*}/treehouse-recovered-backup-*" >/dev/null || fail "$kind: a recovered backup appeared"
-    # The released slot can be allocated again.
-    (cd "$case_dir/project" && env "${REAL_ENV[@]}" "$FM_TEST_TREEHOUSE_PROVIDER" get --no-fetch --lease --lease-holder next </dev/null) \
-      | grep -Fx "$REAL_A" >/dev/null || fail "$kind: the released slot was not allocatable"
-  done
-  pass 'R3/R6: teardown without force returns the retiring holder'"'"'s unclaimed enclosing slot by an exact conditional return, leaves the recovered sibling untouched, and the slot is allocatable'
+unc_a_entry() {  # prints slot A's lease tuple
+  jq -c --arg p "$UNC_A" '.worktrees[] | select(.path == $p) | [.name, .leased, .lease_holder, .lease_id]' "$UNC_STATE"
 }
 
-real_a_entry() {  # prints slot A's lease tuple
-  jq -c --arg p "$REAL_A" '.worktrees[] | select(.path == $p) | [.name, .leased, .lease_holder, .lease_id]' "$REAL_STATE"
-}
-
-real_return_count() {  # <case-dir> counts provider return calls
+unc_return_count() {  # <case-dir> counts provider return calls
   grep -c '^return ' "$1/treehouse.argv" 2>/dev/null || true
 }
 
-# R4: an interruption at either side of the return converges on retry without a
-# second reset, and a successor that takes the slot between the checks and the
-# provider's conditional release is never cleared.
-test_real_unclaimed_release_interruptions_converge_and_never_clear_a_successor() {
-  local mode case_dir out rc entry
-  real_provider_available "R4 real-provider interruptions" || return 0
-  for mode in fail-before fail-after successor-holder successor-lease-id; do
-    real_pool_case "real-interrupt-$mode" ordinary || fail "$mode: cannot build the real-provider pool"
-    case_dir=$REAL_CASE
-    real_copy_snapshot "$REAL_B_COPY" "$case_dir/b-copy.before"
-    jq -c --arg p "$REAL_B" '.worktrees[] | select(.path == $p)' "$REAL_STATE" > "$case_dir/b-entry.before"
-    printf '%s\n' "$mode" > "$case_dir/inject"
-    rc=0
-    out=$(real_run_teardown "$case_dir") || rc=$?
-    [ "$rc" -ne 0 ] || fail "$mode: teardown reported success despite the injected failure"$'\n'"$out"
-    assert_present "$case_dir/state/task-x1.meta" "$mode: the task record was retired despite the failure"
-    assert_present "$case_dir/state/task-x1.teardown-return-pending" "$mode: the return-pending marker was dropped despite the failure"
-    case "$mode" in
-      fail-before) jq -e '.[1] == true and .[2] == "task-x1"' <<<"$(real_a_entry)" >/dev/null || fail "$mode: the lease moved: $(real_a_entry)" ;;
-      fail-after) jq -e '.[1] == null' <<<"$(real_a_entry)" >/dev/null || fail "$mode: the real return did not run: $(real_a_entry)" ;;
-      successor-holder)
-        jq -e '.[1] == true and .[2] == "successor"' <<<"$(real_a_entry)" >/dev/null || fail "$mode: the successor's lease was cleared: $(real_a_entry)" ;;
-      successor-lease-id)
-        jq -e '.[1] == true and .[2] == "task-x1" and .[3] == "ffffffffffffffffffffffffffffffff"' <<<"$(real_a_entry)" >/dev/null \
-          || fail "$mode: the successor lease id was cleared: $(real_a_entry)" ;;
-    esac
-    case "$mode" in
-      successor-*) ;;
-      *)
-        rc=0
-        out=$(real_run_teardown "$case_dir") || rc=$?
-        expect_code 0 "$rc" "$mode: the retry did not converge"$'\n'"$out"
-        assert_absent "$case_dir/state/task-x1.meta" "$mode: the retry left the record"
-        assert_absent "$case_dir/state/task-x1.teardown-return-pending" "$mode: the retry left the return-pending marker"
-        jq -e '.[1] == null' <<<"$(real_a_entry)" >/dev/null || fail "$mode: the retry left the slot leased: $(real_a_entry)"
-        if [ "$mode" = fail-after ]; then
-          assert_equals 1 "$(real_return_count "$case_dir")" "$mode: the retry reset the slot a second time: $(cat "$case_dir/treehouse.argv")"
-        fi
-        ;;
-    esac
-    real_copy_snapshot "$REAL_B_COPY" "$case_dir/b-copy.after"
-    cmp -s "$case_dir/b-copy.before" "$case_dir/b-copy.after" || fail "$mode: sibling B's nested copy changed"
-    jq -c --arg p "$REAL_B" '.worktrees[] | select(.path == $p)' "$REAL_STATE" | cmp -s - "$case_dir/b-entry.before" \
-      || fail "$mode: sibling B's lease entry changed"
+test_unclaimed_enclosing_slot_is_released_by_exact_conditional_return() {
+  local provider kind case_dir out rc lease_id label
+  unc_providers "R3/R6 real-provider release"
+  for provider in "${UNC_PROVIDERS[@]}"; do
+    for kind in ordinary recovered; do
+      label="$provider $kind"
+      unc_pool_case "unclaimed-release-$kind" "$kind" "$provider" || fail "$label: cannot build the pool"
+      case_dir=$UNC_CASE
+      lease_id=$(jq -r --arg p "$UNC_A" '.worktrees[] | select(.path == $p) | .lease_id // ""' "$UNC_STATE")
+      unc_copy_snapshot "$UNC_B_COPY" "$case_dir/b-copy.before"
+      jq -c --arg p "$UNC_B" '.worktrees[] | select(.path == $p)' "$UNC_STATE" > "$case_dir/b-entry.before"
+      rc=0
+      out=$(unc_run_teardown "$case_dir") || rc=$?
+      expect_code 0 "$rc" "$label: teardown of the unclaimed enclosing slot failed"$'\n'"$out"
+      assert_absent "$case_dir/state/task-x1.meta" "$label: the task record survived"
+      assert_absent "$case_dir/state/task-x1.teardown-return-pending" "$label: the return-pending marker survived"
+      jq -e --arg p "$UNC_A" '.worktrees[] | select(.path == $p) | (.leased // false) == false' "$UNC_STATE" >/dev/null \
+        || fail "$label: slot A is still leased: $(jq -c '.worktrees[]|[.name,.leased,.lease_holder]' "$UNC_STATE")"$'\n'"teardown output: $out"$'\n'"argv: $(cat "$case_dir/treehouse.argv" 2>/dev/null)"
+      if [ "$kind" = ordinary ]; then
+        grep -Fx "return $UNC_A --if-lease-holder task-x1 --if-lease-id $lease_id" "$case_dir/treehouse.argv" >/dev/null \
+          || fail "$label: the exact conditional return was not issued: $(cat "$case_dir/treehouse.argv")"
+      else
+        grep -Fx "return $UNC_A --if-lease-holder $UNC_RECOVERED_HOLDER" "$case_dir/treehouse.argv" >/dev/null \
+          || fail "$label: the recovered return was not issued by its holder literal: $(cat "$case_dir/treehouse.argv")"
+      fi
+      assert_equals 1 "$(unc_return_count "$case_dir")" "$label: the slot was returned other than once: $(cat "$case_dir/treehouse.argv")"
+      ! grep -E -- '--force|(^| )-f( |$)|--yes' "$case_dir/treehouse.argv" >/dev/null || fail "$label: a forced or answered return was issued: $(cat "$case_dir/treehouse.argv")"
+      [ ! -e "$UNC_NESTED" ] || fail "$label: the task's own nested copy survived"
+      unc_copy_snapshot "$UNC_B_COPY" "$case_dir/b-copy.after"
+      cmp -s "$case_dir/b-copy.before" "$case_dir/b-copy.after" || fail "$label: sibling B's nested copy changed"
+      jq -c --arg p "$UNC_B" '.worktrees[] | select(.path == $p)' "$UNC_STATE" | cmp -s - "$case_dir/b-entry.before" \
+        || fail "$label: sibling B's lease entry changed"
+      [ "$provider" = real ] || continue
+      ! compgen -G "${UNC_A%/*/*/*}/treehouse-recovered-backup-*" >/dev/null || fail "$label: a recovered backup appeared"
+      # The released slot can be allocated again.
+      (cd "$case_dir/project" && env "${UNC_ENV[@]}" "$UNC_PROVIDER" get --no-fetch --lease --lease-holder next </dev/null) \
+        | grep -Fx "$UNC_A" >/dev/null || fail "$label: the released slot was not allocatable"
+    done
   done
-  pass 'R4: a failure before or after the exact return converges on retry without a second reset, and a successor lease or changed lease id is never cleared'
+  pass 'R3/R6: teardown without force returns the retiring holder'"'"'s unclaimed enclosing slot by an exact conditional return and leaves the recovered sibling untouched'
+}
+
+# R4: an interruption at either side of the return converges on retry without a
+# second reset, and a successor that takes the slot, before the route verifies
+# the lease or between that and the provider's conditional release, is never
+# cleared.
+test_unclaimed_release_interruptions_converge_and_never_clear_a_successor() {
+  local provider mode case_dir out rc
+  unc_providers "R4 real-provider interruptions"
+  for provider in "${UNC_PROVIDERS[@]}"; do
+    for mode in fail-before fail-after successor-holder successor-lease-id cleanup-successor-holder cleanup-successor-lease-id; do
+      unc_pool_case "unclaimed-interrupt-$mode" ordinary "$provider" || fail "$provider $mode: cannot build the pool"
+      case_dir=$UNC_CASE
+      unc_copy_snapshot "$UNC_B_COPY" "$case_dir/b-copy.before"
+      jq -c --arg p "$UNC_B" '.worktrees[] | select(.path == $p)' "$UNC_STATE" > "$case_dir/b-entry.before"
+      case "$mode" in
+        cleanup-*) unc_successor_at_cleanup "$case_dir" "${mode#cleanup-}" ;;
+        *) printf '%s\n' "$mode" > "$case_dir/inject" ;;
+      esac
+      rc=0
+      out=$(unc_run_teardown "$case_dir") || rc=$?
+      [ "$rc" -ne 0 ] || fail "$provider $mode: teardown reported success despite the injected failure"$'\n'"$out"
+      assert_present "$case_dir/state/task-x1.meta" "$provider $mode: the task record was retired despite the failure"
+      assert_present "$case_dir/state/task-x1.teardown-return-pending" "$provider $mode: the return-pending marker was dropped despite the failure"
+      case "$mode" in
+        fail-before) jq -e '.[1] == true and .[2] == "task-x1"' <<<"$(unc_a_entry)" >/dev/null || fail "$provider $mode: the lease moved: $(unc_a_entry)" ;;
+        fail-after) jq -e '.[1] == null' <<<"$(unc_a_entry)" >/dev/null || fail "$provider $mode: the provider's return did not run: $(unc_a_entry)" ;;
+        *successor-holder)
+          jq -e '.[1] == true and .[2] == "successor"' <<<"$(unc_a_entry)" >/dev/null || fail "$provider $mode: the successor's lease was cleared: $(unc_a_entry)" ;;
+        *successor-lease-id)
+          jq -e --arg id "$UNC_SUCCESSOR_ID" '.[1] == true and .[2] == "task-x1" and .[3] == $id' <<<"$(unc_a_entry)" >/dev/null \
+            || fail "$provider $mode: the successor lease id was cleared: $(unc_a_entry)" ;;
+      esac
+      case "$mode" in
+        cleanup-*)
+          assert_present "$case_dir/cleanup-injected" "$provider $mode: the successor was not injected during the own-copy cleanup"
+          assert_equals 0 "$(unc_return_count "$case_dir")" "$provider $mode: a return was issued over the successor's lease: $(cat "$case_dir/treehouse.argv")"
+          ;;
+        successor-*) ;;
+        *)
+          rc=0
+          out=$(unc_run_teardown "$case_dir") || rc=$?
+          expect_code 0 "$rc" "$provider $mode: the retry did not converge"$'\n'"$out"
+          assert_absent "$case_dir/state/task-x1.meta" "$provider $mode: the retry left the record"
+          assert_absent "$case_dir/state/task-x1.teardown-return-pending" "$provider $mode: the retry left the return-pending marker"
+          jq -e '.[1] == null' <<<"$(unc_a_entry)" >/dev/null || fail "$provider $mode: the retry left the slot leased: $(unc_a_entry)"
+          if [ "$mode" = fail-after ]; then
+            assert_equals 1 "$(unc_return_count "$case_dir")" "$provider $mode: the retry reset the slot a second time: $(cat "$case_dir/treehouse.argv")"
+          fi
+          ;;
+      esac
+      unc_copy_snapshot "$UNC_B_COPY" "$case_dir/b-copy.after"
+      cmp -s "$case_dir/b-copy.before" "$case_dir/b-copy.after" || fail "$provider $mode: sibling B's nested copy changed"
+      jq -c --arg p "$UNC_B" '.worktrees[] | select(.path == $p)' "$UNC_STATE" | cmp -s - "$case_dir/b-entry.before" \
+        || fail "$provider $mode: sibling B's lease entry changed"
+    done
+  done
+  pass 'R4: a failure before or after the exact return converges on retry without a second reset, and a successor lease or changed lease id, before or after the verify, is never cleared'
 }
 
 # R5: one custody or proof condition at a time. Each leaves slot A leased exactly
 # as it was, issues no return, moves no other work, and keeps the task record and
 # the return-pending marker for a retry.
-test_real_unclaimed_release_refuses_each_custody_condition() {
-  local cond case_dir out rc other pid before kind
-  real_provider_available "R5 real-provider custody refusals" || return 0
-  for cond in other-copy other-prior-record unregistered-copy unsafe-claim unavailable-home dirty-root unlanded-root live-process legacy-lease unreadable-state capability-failed duplicate-entry; do
-    kind=ordinary
-    real_pool_case "real-refuse-$cond" "$kind" || fail "$cond: cannot build the real-provider pool"
-    case_dir=$REAL_CASE
-    pid=
-    case "$cond" in
-      other-copy)
-        git -C "$case_dir/project" worktree add -q -b other-task "$REAL_A/.claude/worktrees/other" main
-        fm_write_meta "$case_dir/state/other.meta" "window=firstmate:fm-other" "endpoint_task_id=other" \
-          "worktree=$REAL_A/.claude/worktrees/other" "project=$case_dir/project" "kind=ship" "mode=no-mistakes" "spawn_gen=other"
-        ;;
-      other-prior-record)
-        git -C "$case_dir/project" worktree add -q -b other-prior "$REAL_A/.claude/worktrees/prior" main
-        fm_write_meta "$case_dir/state/other.meta" "window=firstmate:fm-other" "endpoint_task_id=other" \
-          "worktree=$case_dir/project" "prior_worktree=$REAL_A/.claude/worktrees/prior" "project=$case_dir/project" \
-          "kind=ship" "mode=no-mistakes" "spawn_gen=other"
-        ;;
-      unregistered-copy)
-        git clone -q "$case_dir/origin.git" "$REAL_A/.claude/worktrees/stray"
-        ;;
-      unsafe-claim)
-        printf 'garbage without task or home lines\n' > "${REAL_A%/*}/.fm-slot-owner"
-        ;;
-      unavailable-home)
-        mkdir -p "$case_dir/home/data"
-        printf -- '- ghost - ghost (home: %s; scope: fixture; projects: P; added 2026-10-08)\n' \
-          "$case_dir/missing-home" > "$case_dir/home/data/secondmates.md"
-        ;;
-      dirty-root) printf 'dirt\n' > "$REAL_A/dirt.txt" ;;
-      unlanded-root)
-        printf 'root work\n' > "$REAL_A/root-owned.txt"
-        git -C "$REAL_A" add root-owned.txt
-        git -C "$REAL_A" -c user.email=t@t -c user.name=t commit -q -m root-unlanded
-        ;;
-      live-process)
-        (cd "$REAL_A" && exec sleep 300) &
-        pid=$!
-        sleep 0.3
-        ;;
-      legacy-lease)
-        jq --arg p "$REAL_A" '(.worktrees[] | select(.path == $p)) |= del(.lease_id)' "$REAL_STATE" > "$REAL_STATE.tmp" && mv "$REAL_STATE.tmp" "$REAL_STATE"
-        ;;
-      unreadable-state) printf '{"worktrees":[{"name":"1"\n' > "$REAL_STATE.new"; cp "$REAL_STATE" "$case_dir/state-good.json"; cp "$REAL_STATE.new" "$REAL_STATE" ;;
-      capability-failed) : > "$case_dir/capability-fail" ;;
-      duplicate-entry)
-        jq --arg p "$REAL_A" '.worktrees += [(.worktrees[] | select(.path == $p) | .name = "9")]' "$REAL_STATE" > "$REAL_STATE.tmp" && mv "$REAL_STATE.tmp" "$REAL_STATE"
-        ;;
-    esac
-    before=$(cat "$REAL_STATE")
-    real_copy_snapshot "$REAL_B_COPY" "$case_dir/b-copy.before"
-    rc=0
-    out=$(real_run_teardown "$case_dir") || rc=$?
-    [ -z "$pid" ] || teardown_fixture_stop "$pid"
-    [ "$rc" -ne 0 ] || fail "$cond: teardown completed although the slot must not be returned"$'\n'"$out"
-    assert_present "$case_dir/state/task-x1.meta" "$cond: the task record was retired"
-    # An unreadable claim or an unavailable home refuses in the existing early
-    # checks, before any marker is written; every other condition refuses inside
-    # the release route, after the marker.
-    case "$cond" in
-      unsafe-claim|unavailable-home) ;;
-      *) assert_present "$case_dir/state/task-x1.teardown-return-pending" "$cond: the return-pending marker was dropped" ;;
-    esac
-    ! grep -q '^return ' "$case_dir/treehouse.argv" 2>/dev/null || fail "$cond: a return was issued: $(cat "$case_dir/treehouse.argv")"
-    [ "$(cat "$REAL_STATE")" = "$before" ] || fail "$cond: the pool state changed"
-    real_copy_snapshot "$REAL_B_COPY" "$case_dir/b-copy.after"
-    cmp -s "$case_dir/b-copy.before" "$case_dir/b-copy.after" || fail "$cond: sibling B's nested copy changed"
+test_unclaimed_release_refuses_each_custody_condition() {
+  local provider cond case_dir out rc pid before
+  unc_providers "R5 real-provider custody refusals"
+  for provider in "${UNC_PROVIDERS[@]}"; do
+    for cond in other-copy other-prior-record unregistered-copy unsafe-claim unavailable-home dirty-root unlanded-root live-process; do
+      unc_pool_case "unclaimed-refuse-$cond" ordinary "$provider" || fail "$provider $cond: cannot build the pool"
+      case_dir=$UNC_CASE
+      pid=
+      case "$cond" in
+        other-copy)
+          git -C "$case_dir/project" worktree add -q -b other-task "$UNC_A/.claude/worktrees/other" main
+          fm_write_meta "$case_dir/state/other.meta" "window=firstmate:fm-other" "endpoint_task_id=other" \
+            "worktree=$UNC_A/.claude/worktrees/other" "project=$case_dir/project" "kind=ship" "mode=no-mistakes" "spawn_gen=other"
+          ;;
+        other-prior-record)
+          git -C "$case_dir/project" worktree add -q -b other-prior "$UNC_A/.claude/worktrees/prior" main
+          fm_write_meta "$case_dir/state/other.meta" "window=firstmate:fm-other" "endpoint_task_id=other" \
+            "worktree=$case_dir/project" "prior_worktree=$UNC_A/.claude/worktrees/prior" "project=$case_dir/project" \
+            "kind=ship" "mode=no-mistakes" "spawn_gen=other"
+          ;;
+        unregistered-copy)
+          git clone -q "$case_dir/origin.git" "$UNC_A/.claude/worktrees/stray"
+          ;;
+        unsafe-claim)
+          printf 'garbage without task or home lines\n' > "${UNC_A%/*}/.fm-slot-owner"
+          ;;
+        unavailable-home)
+          mkdir -p "$case_dir/home/data"
+          printf -- '- ghost - ghost (home: %s; scope: fixture; projects: P; added 2026-10-08)\n' \
+            "$case_dir/missing-home" > "$case_dir/home/data/secondmates.md"
+          ;;
+        dirty-root) printf 'dirt\n' > "$UNC_A/dirt.txt" ;;
+        unlanded-root)
+          printf 'root work\n' > "$UNC_A/root-owned.txt"
+          git -C "$UNC_A" add root-owned.txt
+          git -C "$UNC_A" -c user.email=t@t -c user.name=t commit -q -m root-unlanded
+          ;;
+        live-process)
+          (cd "$UNC_A" && exec sleep 300) &
+          pid=$!
+          sleep 0.3
+          ;;
+      esac
+      before=$(cat "$UNC_STATE")
+      unc_copy_snapshot "$UNC_B_COPY" "$case_dir/b-copy.before"
+      rc=0
+      out=$(unc_run_teardown "$case_dir") || rc=$?
+      [ -z "$pid" ] || teardown_fixture_stop "$pid"
+      [ "$rc" -ne 0 ] || fail "$provider $cond: teardown completed although the slot must not be returned"$'\n'"$out"
+      assert_present "$case_dir/state/task-x1.meta" "$provider $cond: the task record was retired"
+      # An unreadable claim or an unavailable home refuses in the existing early
+      # checks, before any marker is written; every other condition refuses inside
+      # the release route, after the marker.
+      case "$cond" in
+        unsafe-claim|unavailable-home) ;;
+        *) assert_present "$case_dir/state/task-x1.teardown-return-pending" "$provider $cond: the return-pending marker was dropped" ;;
+      esac
+      ! grep -q '^return ' "$case_dir/treehouse.argv" 2>/dev/null || fail "$provider $cond: a return was issued: $(cat "$case_dir/treehouse.argv")"
+      [ "$(cat "$UNC_STATE")" = "$before" ] || fail "$provider $cond: the pool state changed"
+      unc_copy_snapshot "$UNC_B_COPY" "$case_dir/b-copy.after"
+      cmp -s "$case_dir/b-copy.before" "$case_dir/b-copy.after" || fail "$provider $cond: sibling B's nested copy changed"
+    done
   done
   pass 'R5: each custody or proof condition leaves the unclaimed slot leased and unreset, moves no other work, and keeps the record and return-pending marker for a retry'
 }
 
+# Outside the route: an unproven treehouse (no capabilities command, or a failing
+# probe, for an ordinary or a recovered lease), a lease with no lease id, an
+# unreadable state, and a duplicate entry keep the earlier behavior. Teardown
+# completes, leaves the reassociated copy and slot A in place, writes no
+# return-pending marker, and issues no return.
+test_unclaimed_slot_outside_route_keeps_copy_and_writes_no_marker() {
+  local provider cond case_dir out rc before kind
+  unc_providers "unclaimed-route gate on the real provider"
+  for provider in "${UNC_PROVIDERS[@]}"; do
+    for cond in capability-old capability-old-recovered capability-failed legacy-lease unreadable-state duplicate-entry; do
+      kind=ordinary
+      [ "$cond" != capability-old-recovered ] || kind=recovered
+      unc_pool_case "unclaimed-outside-$cond" "$kind" "$provider" || fail "$provider $cond: cannot build the pool"
+      case_dir=$UNC_CASE
+      case "$cond" in
+        capability-old*) : > "$case_dir/capability-old" ;;
+        capability-failed) : > "$case_dir/capability-fail" ;;
+        legacy-lease)
+          jq --arg p "$UNC_A" '(.worktrees[] | select(.path == $p)) |= del(.lease_id)' "$UNC_STATE" > "$UNC_STATE.tmp" && mv "$UNC_STATE.tmp" "$UNC_STATE"
+          ;;
+        unreadable-state) printf '{"worktrees":[{"name":"1"\n' > "$UNC_STATE" ;;
+        duplicate-entry)
+          jq --arg p "$UNC_A" '.worktrees += [(.worktrees[] | select(.path == $p) | .name = "9")]' "$UNC_STATE" > "$UNC_STATE.tmp" && mv "$UNC_STATE.tmp" "$UNC_STATE"
+          ;;
+      esac
+      before=$(cat "$UNC_STATE")
+      unc_copy_snapshot "$UNC_B_COPY" "$case_dir/b-copy.before"
+      unc_copy_snapshot "$UNC_NESTED" "$case_dir/nested.before"
+      rc=0
+      out=$(unc_run_teardown "$case_dir") || rc=$?
+      expect_code 0 "$rc" "$provider $cond: teardown outside the route must complete as before"$'\n'"$out"
+      assert_absent "$case_dir/state/task-x1.meta" "$provider $cond: the task record survived"
+      assert_absent "$case_dir/state/task-x1.teardown-return-pending" "$provider $cond: a return-pending marker was written outside the route"
+      ! grep -q '^return ' "$case_dir/treehouse.argv" 2>/dev/null || fail "$provider $cond: a return was issued: $(cat "$case_dir/treehouse.argv")"
+      [ "$(cat "$UNC_STATE")" = "$before" ] || fail "$provider $cond: the pool state changed"
+      unc_copy_snapshot "$UNC_NESTED" "$case_dir/nested.after"
+      cmp -s "$case_dir/nested.before" "$case_dir/nested.after" || fail "$provider $cond: the reassociated copy was not left in place"
+      unc_copy_snapshot "$UNC_B_COPY" "$case_dir/b-copy.after"
+      cmp -s "$case_dir/b-copy.before" "$case_dir/b-copy.after" || fail "$provider $cond: sibling B's nested copy changed"
+    done
+  done
+  pass 'outside the unclaimed-slot route (unproven treehouse, no lease id, unreadable or duplicate entry) teardown completes, keeps the reassociated copy, and writes no return-pending marker'
+}
+
 teardown_test_cases=(
-test_real_unclaimed_enclosing_slot_is_released_by_exact_conditional_return
-test_real_unclaimed_release_interruptions_converge_and_never_clear_a_successor
-test_real_unclaimed_release_refuses_each_custody_condition
+test_unclaimed_enclosing_slot_is_released_by_exact_conditional_return
+test_unclaimed_release_interruptions_converge_and_never_clear_a_successor
+test_unclaimed_release_refuses_each_custody_condition
+test_unclaimed_slot_outside_route_keeps_copy_and_writes_no_marker
 test_vernant_slot_manifest_retirement
 test_shared_project_lock_path_ignores_unresolvable_git_directory_in_cwd
 test_shared_slot_claim_release_survives_endpoint_refusal_and_bootstrap
