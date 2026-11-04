@@ -265,8 +265,12 @@
 #   the next spawn's claim replaces it.
 #   Before it queues for that lock, a fresh spawn discovers origin's default
 #   branch and fetches its tip, so no network call runs inside project custody.
-#   The tip lands in a ref private to this spawn process
-#   (refs/fm/spawn-base/<hash of the id>-<pid>, valid for every task id), never
+#   With --base-branch it fetches that branch's tip as the reset target and,
+#   when they differ, origin's default branch's tip as well, because the reset
+#   guard's containment anchor is always origin's default branch.
+#   Each tip lands in a ref private to this spawn process
+#   (refs/fm/spawn-base/<hash of the id>-<pid>, and that name with -default for
+#   origin's default when --base-branch names another branch), never
 #   in a shared remote-tracking ref or FETCH_HEAD, so concurrent fetches cannot
 #   race it. Under the lock the base refresh validates that immutable commit in
 #   the slot's own object store and resets to it. It moves the shared
@@ -278,8 +282,9 @@
 #   The base is therefore the tip this spawn itself fetched before it queued, at
 #   most its own queue wait old; a fetch failure still refuses, at the refresh's
 #   own position. A slot that does not share the project's objects (a sibling
-#   clone) falls back to fetching under the lock. The private ref is deleted
-#   when the spawn exits.
+#   clone) falls back to fetching under the lock, one branch at a time into
+#   FETCH_HEAD only, and moves origin/<branch> by the same forward-only
+#   compare-and-set. The private refs are deleted when the spawn exits.
 #   The local root is whatever bin/fm-wake-lib.sh's
 #   fm_firstmate_root_home resolves, so a home seeded from another machine anchors
 #   that lock itself rather than failing to resolve one;
@@ -601,10 +606,12 @@
 #   commit look contained, which is exactly why no remedy command is printed.
 #   A pooled slot is hard-reset only through fm_slot_guarded_reset, whose header in
 #   bin/fm-slot-provision-lib.sh owns the facts it proves first: HEAD and owner-branch
-#   tips contained in the fetched origin default or the manifest's base_sha, a clean
-#   tree, no ignored work at a path the reset target tracks, no live holder, every
-#   unknown refused, all re-proved right before the reset. A refusal leaves the slot
-#   untouched and names the fact and the slot path. The acquired pane's own shell is
+#   tips contained in origin's default branch (never a --base-branch) or the manifest's
+#   base_sha, a clean tree, no ignored work at a path the reset target tracks, no live
+#   holder, every unknown refused, all re-proved right before the reset. A refusal names
+#   the fact and the slot path and leaves HEAD, local branches, the index, the files and
+#   every other ref byte-identical, with the two exceptions that guard's header names.
+#   The acquired pane's own shell is
 #   excluded from the cwd check by its pane pid, which tmux and herdr report; on a
 #   backend that reports none (zellij, cmux, orca) the check is repeated from inside
 #   the acquired pane, where that shell is a true ancestor of the probe.
@@ -1936,6 +1943,10 @@ SPAWN_ACQUIRE_CEILING=1800
 SPAWN_SLOT_UNQUIESCED=0
 SPAWN_BASE_DEFAULT=
 SPAWN_BASE_REF=
+SPAWN_ORIGIN_DEFAULT=
+SPAWN_ORIGIN_DEFAULT_REF=
+SPAWN_ORIGIN_DEFAULT_SHA=
+SPAWN_GUARD_ANCHORS=()
 SPAWN_BASE_ERROR=
 SPAWN_BASE_DISCOVERED=0
 SPAWN_BASE_DISCOVERED_AT=
@@ -1987,6 +1998,10 @@ spawn_abort_cleanup() {
   if [ -n "$SPAWN_BASE_REF" ]; then
     git -C "$PROJ_ABS" update-ref -d "$SPAWN_BASE_REF" >/dev/null 2>&1 || true
     SPAWN_BASE_REF=
+  fi
+  if [ -n "$SPAWN_ORIGIN_DEFAULT_REF" ]; then
+    git -C "$PROJ_ABS" update-ref -d "$SPAWN_ORIGIN_DEFAULT_REF" >/dev/null 2>&1 || true
+    SPAWN_ORIGIN_DEFAULT_REF=
   fi
   if [ "$RELAUNCH_REPLACEMENT_PENDING" = 1 ] &&
     [ "$SPAWN_META_PUBLISH_STARTED" = 1 ] &&
@@ -4454,6 +4469,29 @@ spawn_worktree_has_origin_config() { # <worktree>
   return 1
 }
 
+# Origin's default branch as the remote advertises it now. Exits 2 when origin
+# cannot be reached and 1 when its answer names no advertised branch.
+spawn_remote_default_branch() { # <dir>
+  local advertised name
+  advertised=$(GIT_TERMINAL_PROMPT=0 git -C "$1" ls-remote --symref origin HEAD 'refs/heads/*' </dev/null 2>/dev/null) || return 2
+  name=$(printf '%s\n' "$advertised" | sed -n 's|^ref: refs/heads/\(.*\)[[:space:]]HEAD$|\1|p' | head -n 1)
+  [ -n "$name" ] || return 1
+  printf '%s\n' "$advertised" | awk -F'\t' -v b="refs/heads/$name" '$2 == b { found = 1 } END { exit !found }' || return 1
+  printf '%s' "$name"
+}
+
+# Origin's default branch for the reset guard: the recorded origin/HEAD, else the
+# remote's own answer. Never a --base-branch and never a local branch name.
+spawn_origin_default_name() { # <dir>
+  local ref
+  ref=$(git -C "$1" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null) || ref=
+  if [ -n "$ref" ]; then
+    printf '%s' "${ref#origin/}"
+    return 0
+  fi
+  spawn_remote_default_branch "$1"
+}
+
 # Network discovery and transfer of the base this spawn will start from. It
 # runs before the project lock so a slow or stalled remote never lengthens the
 # hold, and it writes no shared remote-tracking ref and no FETCH_HEAD: the
@@ -4462,23 +4500,25 @@ spawn_worktree_has_origin_config() { # <worktree>
 # kept and reported at the refresh's own position, after the refusals that
 # precede it, so no refusal order changes.
 spawn_fetch_base_evidence() {
-  local default=$BASE_BRANCH advertised
+  local default=$BASE_BRANCH origin_default rc=0
   SPAWN_BASE_ERROR=
   spawn_worktree_has_origin_config "$PROJ_ABS" || return 0
   SPAWN_BASE_HAS_ORIGIN=1
   if [ -z "$default" ]; then
-    if ! advertised=$(GIT_TERMINAL_PROMPT=0 git -C "$PROJ_ABS" ls-remote --symref origin HEAD 'refs/heads/*' </dev/null 2>/dev/null); then
-      SPAWN_BASE_ERROR="could not fetch origin"
-      return 0
-    fi
-    default=$(printf '%s\n' "$advertised" | sed -n 's|^ref: refs/heads/\(.*\)[[:space:]]HEAD$|\1|p' | head -n 1)
-    if [ -z "$default" ] || ! printf '%s\n' "$advertised" | awk -F'\t' -v b="refs/heads/$default" '$2 == b { found = 1 } END { exit !found }'; then
-      SPAWN_BASE_ERROR="could not resolve origin's current default branch"
-      return 0
-    fi
+    default=$(spawn_remote_default_branch "$PROJ_ABS") || rc=$?
+    origin_default=$default
+  else
+    origin_default=$(spawn_origin_default_name "$PROJ_ABS") || rc=$?
+  fi
+  case $rc in
+    0) ;;
+    2) SPAWN_BASE_ERROR="could not fetch origin"; return 0 ;;
+    *) SPAWN_BASE_ERROR="could not resolve origin's current default branch"; return 0 ;;
+  esac
+  [ -n "$BASE_BRANCH" ] || {
     SPAWN_BASE_DISCOVERED=1
     fm_epoch_seconds_to SPAWN_BASE_DISCOVERED_AT
-  fi
+  }
   SPAWN_BASE_REF="refs/fm/spawn-base/$(printf '%s' "$ID" | git hash-object --stdin)-${BASHPID:-$$}"
   if ! GIT_TERMINAL_PROMPT=0 git -C "$PROJ_ABS" fetch --quiet --no-write-fetch-head --refmap= origin \
       "+refs/heads/$default:$SPAWN_BASE_REF" </dev/null >/dev/null 2>&1; then
@@ -4490,6 +4530,18 @@ spawn_fetch_base_evidence() {
     return 0
   }
   SPAWN_BASE_DEFAULT=$default
+  SPAWN_ORIGIN_DEFAULT=$origin_default
+  SPAWN_ORIGIN_DEFAULT_SHA=$SPAWN_BASE_SHA
+  if [ "$origin_default" != "$default" ]; then
+    SPAWN_ORIGIN_DEFAULT_REF="$SPAWN_BASE_REF-default"
+    if ! GIT_TERMINAL_PROMPT=0 git -C "$PROJ_ABS" fetch --quiet --no-write-fetch-head --refmap= origin \
+        "+refs/heads/$origin_default:$SPAWN_ORIGIN_DEFAULT_REF" </dev/null >/dev/null 2>&1 ||
+      ! SPAWN_ORIGIN_DEFAULT_SHA=$(git -C "$PROJ_ABS" rev-parse --verify --quiet "$SPAWN_ORIGIN_DEFAULT_REF^{commit}" 2>/dev/null); then
+      SPAWN_ORIGIN_DEFAULT_SHA=
+      SPAWN_BASE_ERROR="could not fetch 'origin/$origin_default'"
+      return 0
+    fi
+  fi
   if [ "$KIND" = ship ] && [ "$MODE" = local-only ] && [ -z "$BASE_BRANCH" ]; then
     SPAWN_LOCAL_DEFAULT=$(default_branch "$PROJ_ABS") || SPAWN_LOCAL_DEFAULT=
     if [ "$SPAWN_LOCAL_DEFAULT" != "$default" ] ||
@@ -5047,32 +5099,40 @@ spawn_reset_guard_context() {
   FM_SLOT_GUARD_REPORT_DIR=$DATA/$ID
 }
 
-# The origin default branch's name for a look taken before this spawn fetches:
-# the evidence it already holds, else the copy's recorded origin/HEAD.
-spawn_reset_guard_default() { # <worktree> [<base-branch>]
-  local name=${SPAWN_BASE_DEFAULT:-${2:-}}
-  [ -n "$name" ] || name=$(default_branch "$1" 2>/dev/null) || name=
-  printf '%s' "$name"
+# The reset guard's containment anchors: origin's default branch, by its
+# remote-tracking ref and by the tip this spawn fetched of it. A --base-branch is
+# only the reset target, never an anchor. The guard adds the manifest's base_sha.
+spawn_reset_guard_anchors() { # <worktree>
+  local name=$SPAWN_ORIGIN_DEFAULT
+  SPAWN_GUARD_ANCHORS=()
+  [ -n "$name" ] || name=$(spawn_origin_default_name "$1") || name=
+  [ -z "$name" ] || SPAWN_GUARD_ANCHORS+=("refs/remotes/origin/$name")
+  [ -z "$SPAWN_ORIGIN_DEFAULT_SHA" ] || SPAWN_GUARD_ANCHORS+=("$SPAWN_ORIGIN_DEFAULT_SHA")
 }
 
 # The early look at a slot, before the first change this spawn makes to it (the
 # fetch, a detach, a preservation ref). fm_slot_guarded_reset is the authority.
 spawn_reset_preflight() { # <worktree> [<base-branch>]
-  local name target anchors=()
-  name=$(spawn_reset_guard_default "$1" "${2:-}")
-  [ -z "$name" ] || anchors+=("refs/remotes/origin/$name")
-  [ -z "${SPAWN_BASE_SHA:-}" ] || anchors+=("$SPAWN_BASE_SHA")
+  local target
+  spawn_reset_guard_anchors "$1"
   # The reset target as far as it is known before the fetch: the origin tip this
   # spawn already fetched into its private ref, else the copy's own origin ref.
   target=${SPAWN_SELECTED_BASE_SHA:-${SPAWN_BASE_SHA:-}}
-  [ -n "$target" ] || target=${anchors[0]:-HEAD}
+  [ -n "$target" ] || target=${2:+refs/remotes/origin/$2}
+  [ -n "$target" ] || target=${SPAWN_GUARD_ANCHORS[0]:-HEAD}
   spawn_reset_guard_context
-  fm_slot_reset_preflight "$1" "$target" ${anchors[@]+"${anchors[@]}"}
+  fm_slot_reset_preflight "$1" "$target" ${SPAWN_GUARD_ANCHORS[@]+"${SPAWN_GUARD_ANCHORS[@]}"}
+}
+
+# Fetch one origin branch's tip into FETCH_HEAD only, writing no remote-tracking
+# ref (--refmap=), and print it.
+spawn_fetch_origin_tip() { # <worktree> <branch>
+  git -C "$1" fetch --quiet --refmap= origin "refs/heads/$2" || return 1
+  git -C "$1" rev-parse --verify --quiet 'FETCH_HEAD^{commit}' 2>/dev/null
 }
 
 freshen_spawn_worktree_base() { # <worktree> [<base-branch>]
-  local worktree=$1 base=${2:-} default target expected actual current
-  local -a anchors=()
+  local worktree=$1 base=${2:-} default target expected actual current rc=0
   FM_SLOT_GUARD_DIRTY_DESCRIBER=describe_stale_submodule_pins
   fm_slot_guard_check_clean "$worktree" || return 1
   spawn_validate_local_base "$worktree" || return 1
@@ -5108,31 +5168,42 @@ freshen_spawn_worktree_base() { # <worktree> [<base-branch>]
       fi
     fi
   else
-    if ! git -C "$worktree" fetch --quiet origin; then
-      echo "error: could not fetch origin for pooled worktree '$worktree'; refusing to launch from a potentially stale base" >&2
-      return 1
-    fi
     if [ -n "$base" ]; then
-      default=$base
+      SPAWN_ORIGIN_DEFAULT=$(spawn_origin_default_name "$worktree") || rc=$?
     else
-      if ! git -C "$worktree" remote set-head origin --auto >/dev/null 2>&1; then
+      SPAWN_ORIGIN_DEFAULT=$(spawn_remote_default_branch "$worktree") || rc=$?
+    fi
+    case $rc in
+      0) ;;
+      2)
+        echo "error: could not fetch origin for pooled worktree '$worktree'; refusing to launch from a potentially stale base" >&2
+        return 1
+        ;;
+      *)
         echo "error: could not resolve origin's current default branch for pooled worktree '$worktree'; refusing to launch from a potentially stale base" >&2
         return 1
-      fi
-      default=$(default_branch "$worktree") || {
-        echo "error: could not determine origin's default branch for pooled worktree '$worktree'; refusing to launch from a potentially stale base" >&2
+        ;;
+    esac
+    default=${base:-$SPAWN_ORIGIN_DEFAULT}
+    target="origin/$default"
+    expected=$(spawn_fetch_origin_tip "$worktree" "$default") || {
+      echo "error: could not fetch '$target' for pooled worktree '$worktree'; refusing to launch from a potentially stale base" >&2
+      return 1
+    }
+    SPAWN_ORIGIN_DEFAULT_SHA=$expected
+    if [ "$SPAWN_ORIGIN_DEFAULT" != "$default" ]; then
+      SPAWN_ORIGIN_DEFAULT_SHA=$(spawn_fetch_origin_tip "$worktree" "$SPAWN_ORIGIN_DEFAULT") || {
+        echo "error: could not fetch 'origin/$SPAWN_ORIGIN_DEFAULT' for pooled worktree '$worktree'; refusing to launch from a potentially stale base" >&2
         return 1
       }
     fi
-    target="origin/$default"
-    if ! git -C "$worktree" fetch --quiet origin "+refs/heads/$default:refs/remotes/origin/$default"; then
-      echo "error: could not fetch '$target' for pooled worktree '$worktree'; refusing to launch from a potentially stale base" >&2
+    spawn_advance_origin_ref "$worktree" "refs/remotes/origin/$default" "$expected"
+    if [ -z "$base" ] &&
+      [ "$(git -C "$worktree" symbolic-ref --quiet refs/remotes/origin/HEAD 2>/dev/null || true)" != "refs/remotes/origin/$default" ] &&
+      ! git -C "$worktree" symbolic-ref refs/remotes/origin/HEAD "refs/remotes/origin/$default" 2>/dev/null; then
+      echo "error: could not resolve origin's current default branch for pooled worktree '$worktree'; refusing to launch from a potentially stale base" >&2
       return 1
     fi
-    expected=$(git -C "$worktree" rev-parse --verify --quiet "$target^{commit}" 2>/dev/null) || {
-      echo "error: '$target' is not a commit for pooled worktree '$worktree'; refusing to launch from a potentially stale base" >&2
-      return 1
-    }
   fi
   if [ -n "$SPAWN_SELECTED_BASE_SHA" ]; then
     expected=$SPAWN_SELECTED_BASE_SHA
@@ -5142,10 +5213,9 @@ freshen_spawn_worktree_base() { # <worktree> [<base-branch>]
     printf 'local-only source: local=%s@%s origin=%s@%s selected=%s@%s\n' \
       "$SPAWN_LOCAL_DEFAULT" "$SPAWN_LOCAL_SHA" "$SPAWN_BASE_DEFAULT" "$SPAWN_BASE_SHA" "$target" "$expected"
   fi
-  anchors=("refs/remotes/origin/$default")
-  [ -z "$SPAWN_BASE_SHA" ] || anchors+=("$SPAWN_BASE_SHA")
+  spawn_reset_guard_anchors "$worktree"
   spawn_reset_guard_context
-  fm_slot_guarded_reset "$worktree" "$expected" "$target" "${anchors[@]}" || return 1
+  fm_slot_guarded_reset "$worktree" "$expected" "$target" ${SPAWN_GUARD_ANCHORS[@]+"${SPAWN_GUARD_ANCHORS[@]}"} || return 1
   actual=$(git -C "$worktree" rev-parse --verify --quiet HEAD 2>/dev/null || true)
   if [ "$actual" != "$expected" ]; then
     echo "error: pooled worktree '$worktree' is at '${actual:-unknown}', not current '$target' ('$expected'); refusing to launch" >&2
@@ -6566,9 +6636,10 @@ if [ "$KIND" != secondmate ] && { fm_slot_required "$PROJ_ABS" "$WT" || { [ "$RE
       if [ "$SPAWN_FRESH_SOURCE" = 0 ]; then
         # No worker was admitted and no prepared branch existed. Finish that
         # original immutable local plan, not a newly derived origin baseline.
+        spawn_reset_guard_anchors "$WT"
         spawn_reset_guard_context
         fm_slot_guarded_reset "$WT" "$SLOT_SOURCE_SHA" "$SLOT_SOURCE_REF" \
-          "refs/remotes/origin/${SLOT_SOURCE_REF#refs/heads/}" || spawn_slot_refused
+          ${SPAWN_GUARD_ANCHORS[@]+"${SPAWN_GUARD_ANCHORS[@]}"} || spawn_slot_refused
         SLOT_FRESH_BASE=0
       fi
     fi

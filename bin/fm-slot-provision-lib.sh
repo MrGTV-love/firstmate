@@ -271,8 +271,11 @@ EOF
 # or untracked file at a path the reset target tracks. Before it runs, the
 # guard proves these facts about the slot, each from one removable fact call in
 # fm_slot_guard_observe, and refuses on the first fact it cannot prove:
-#   head_not_contained (S1)   a detached HEAD is not an ancestor of the fetched
-#                             origin default branch or the manifest's base_sha
+#   head_not_contained (S1)   a detached HEAD is not an ancestor of origin's
+#                             default branch (refs/remotes/origin/<origin default>,
+#                             named by origin/HEAD, else ls-remote, plus the tip the
+#                             spawn fetched of it; never a --base-branch) or of the
+#                             manifest's base_sha
 #   owner_branch_not_contained (S2)  the attached branch, or the branch the slot's
 #                             lifecycle manifest names, has an uncontained tip
 #   tree_not_clean (S3)       any tracked, staged or untracked change
@@ -288,9 +291,15 @@ EOF
 #   changed_since_first_read (S5b)  the facts are observed twice, the second pass
 #                             right before the reset, and the manifest bytes are
 #                             read again after it; any difference refuses.
-# A refusal runs no reset, checkout or ref move. The window between the final
-# manifest read and the reset is a stated residual: a writer that takes no lock
-# can still change the slot in it.
+# A refusal runs no reset and no checkout. On a refusal HEAD, local branches, the
+# index, the files and every other ref stay byte-identical, with exactly two
+# exceptions, neither of which changes local work, made by the spawn before its final
+# check: (1) the spawn's fetch moves refs/remotes/origin/<b>, where <b> is the branch it
+# fetched to start from (origin's default branch, or the --base-branch), only forward
+# by compare-and-set, and repoints refs/remotes/origin/HEAD at origin's default branch;
+# (2) the governed path adds refs/fm/anchor/<task>-<sha> to preserve a detached HEAD.
+# The window between the final manifest read and the reset is a stated residual: a
+# writer that takes no lock can still change the slot in it.
 # The manifest, lease store and contention log are the governed project's
 # (fm_slot_required): their layout is the one scripts/git_management/
 # worktree_lifecycle.py and scripts/hooks/_worktree_lease_core.py document. They are
@@ -488,8 +497,8 @@ EOF
   fm_slot_guard_record "manifest=$FM_SLOT_GUARD_MANIFEST branch=${FM_SLOT_GUARD_MANIFEST_BRANCH:--} base=${FM_SLOT_GUARD_MANIFEST_BASE:--}"
 }
 
-# Resolve the anchors: the caller's origin default ref (or object name) and the
-# manifest's base_sha. A preflight (strict 0) may judge nothing when none resolves;
+# Resolve the anchors: the caller's origin default branch ref and fetched tip, and
+# the manifest's base_sha. A preflight (strict 0) may judge nothing when none resolves;
 # the authoritative pass (strict 1) may not.
 fm_slot_guard_fact_anchors() { # <strict:0|1>
   local strict=$1 anchor sha
@@ -1065,8 +1074,9 @@ fm_slot_guard_begin() { # <slot> <target-sha> <anchor>...
 }
 
 # An early look before the spawn's first change to the slot (a fetch into the slot's
-# remote-tracking refs, a detach, an anchor ref). The target and anchors are the origin
-# tip the spawn already fetched into a private ref, so a refusal here moves no ref.
+# remote-tracking refs, a detach, an anchor ref). The target and the anchor tip are
+# the origin tips the spawn already fetched into private refs, so a refusal here
+# moves no ref.
 # It is not the authority: fm_slot_guarded_reset proves the same facts again after
 # the fetch. It may find no anchor or target yet and then judges only the rest.
 fm_slot_reset_preflight() { # <slot> <target> <anchor>...

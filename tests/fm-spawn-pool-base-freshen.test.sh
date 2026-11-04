@@ -1552,10 +1552,7 @@ guard_snapshot() { # <slot> <out>
     printf 'HEAD %s\n' "$(git -C "$slot" rev-parse HEAD)"
     printf 'SYMREF %s\n' "$(git -C "$slot" symbolic-ref -q HEAD || echo detached)"
     printf '%s\n' '--- show-ref'
-    # A snapshot taken by the seam while the spawn runs also sees the spawn's own private
-    # refs/fm/spawn-base/* ref, which the spawn deletes at exit; the before/after snapshots
-    # show it absent, so only that ref family is left out here.
-    git -C "$slot" show-ref | grep -v ' refs/fm/spawn-base/'
+    git -C "$slot" show-ref
     printf '%s\n' '--- index'
     git -C "$slot" ls-files -s --debug
     printf '%s\n' '--- status'
@@ -1575,6 +1572,49 @@ guard_snapshot() { # <slot> <out>
 }
 export -f guard_snapshot
 
+# A snapshot's refs section, one "<sha> <ref>" line each, and everything else.
+guard_snapshot_refs() { sed -n '/^--- show-ref$/,/^--- index$/p' "$1" | sed '1d;$d'; }
+guard_snapshot_rest() { sed '/^--- show-ref$/,/^--- index$/{/^--- index$/!d;}' "$1"; }
+
+# The S7 comparison of a refusal. HEAD, the index, the status and every file must equal
+# the reference (the state before the spawn, or right after a transition seam). Every ref
+# must equal its value before the spawn, with exactly two exceptions that change no local
+# work: refs/remotes/origin/<fetched branch> and refs/remotes/origin/HEAD may be created
+# or moved forward, and refs/fm/anchor/<task>-* may be added.
+guard_refusal_diff() { # <before> <reference> <after> <slot> <fetched-branch> <task-id>
+  local before=$1 reference=$2 after=$3 slot=$4 branch=$5 id=$6
+  if ! diff <(guard_snapshot_rest "$reference") <(guard_snapshot_rest "$after") >&2; then
+    echo 'HEAD, the index, the status or file bytes changed' >&2
+    return 1
+  fi
+  python3 - "$slot" "$branch" "$id" <(guard_snapshot_refs "$before") <(guard_snapshot_refs "$after") <<'PY'
+import subprocess, sys
+slot, branch, task, before_path, after_path = sys.argv[1:6]
+def refs(path):
+    found = {}
+    for line in open(path):
+        sha, _, ref = line.rstrip("\n").partition(" ")
+        found[ref] = sha
+    return found
+before, after = refs(before_path), refs(after_path)
+forward = {"refs/remotes/origin/" + branch, "refs/remotes/origin/HEAD"}
+bad = []
+for ref in sorted(set(before) | set(after)):
+    old, new = before.get(ref), after.get(ref)
+    if old == new:
+        continue
+    if ref in forward and new is not None and (
+            old is None or subprocess.run(["git", "-C", slot, "merge-base", "--is-ancestor", old, new]).returncode == 0):
+        continue
+    if ref.startswith("refs/fm/anchor/%s-" % task) and old is None:
+        continue
+    bad.append("%s: %s -> %s" % (ref, old or "absent", new or "absent"))
+if bad:
+    print("refs changed beyond the two allowed exceptions: " + "; ".join(bad), file=sys.stderr)
+    sys.exit(1)
+PY
+}
+
 # The S7 witness: one dirty file changes its bytes while HEAD, refs and porcelain
 # status stay equal. The comparison must see it.
 test_reset_guard_snapshot_witness() {
@@ -1592,11 +1632,42 @@ test_reset_guard_snapshot_witness() {
     || fail 'the witness changed the porcelain status'
   [ "$(sed -n '1,/--- index/p' "$CASE_DIR/before.snap")" = "$(sed -n '1,/--- index/p' "$CASE_DIR/after.snap")" ] \
     || fail 'the witness changed HEAD or refs'
+  guard_refusal_diff "$CASE_DIR/before.snap" "$CASE_DIR/before.snap" "$CASE_DIR/after.snap" "$POOL_DIR" main "$id" 2>/dev/null \
+    && fail 'the refusal comparison accepted a changed dirty file'
   if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
     printf 'EVIDENCE S7 witness: status equal, HEAD equal, refs equal, file digest differs; diff=%s\n' \
       "$(diff "$CASE_DIR/before.snap" "$CASE_DIR/after.snap" | tr '\n' '|')"
   fi
-  pass 'the S7 snapshot comparison detects changed bytes under equal status'
+  # The ref comparison: a forward origin move and an added anchor of this task pass; a moved
+  # local branch, a backward origin move and another task's anchor are each refused.
+  local base child
+  printf 'AAAA\n' >"$POOL_DIR/dirty.txt"
+  base=$(git -C "$POOL_DIR" rev-parse HEAD)
+  child=$(git -C "$POOL_DIR" commit-tree "$base^{tree}" -p "$base" -m child)
+  git -C "$POOL_DIR" branch witness-branch "$base"
+  git -C "$POOL_DIR" update-ref refs/remotes/origin/main "$base"
+  guard_snapshot "$POOL_DIR" "$CASE_DIR/before.snap"
+  git -C "$POOL_DIR" update-ref refs/remotes/origin/main "$child"
+  git -C "$POOL_DIR" update-ref "refs/fm/anchor/$id-$base" "$base"
+  guard_snapshot "$POOL_DIR" "$CASE_DIR/after.snap"
+  guard_refusal_diff "$CASE_DIR/before.snap" "$CASE_DIR/before.snap" "$CASE_DIR/after.snap" "$POOL_DIR" main "$id" \
+    || fail 'the refusal comparison rejected the two allowed exceptions'
+  git -C "$POOL_DIR" update-ref refs/heads/witness-branch "$child"
+  guard_snapshot "$POOL_DIR" "$CASE_DIR/branch.snap"
+  guard_refusal_diff "$CASE_DIR/before.snap" "$CASE_DIR/before.snap" "$CASE_DIR/branch.snap" "$POOL_DIR" main "$id" 2>/dev/null \
+    && fail 'the refusal comparison accepted a moved local branch'
+  git -C "$POOL_DIR" update-ref refs/heads/witness-branch "$base"
+  git -C "$POOL_DIR" update-ref refs/remotes/origin/main "$child"
+  guard_snapshot "$POOL_DIR" "$CASE_DIR/forward.snap"
+  git -C "$POOL_DIR" update-ref refs/remotes/origin/main "$base"
+  guard_snapshot "$POOL_DIR" "$CASE_DIR/backward.snap"
+  guard_refusal_diff "$CASE_DIR/forward.snap" "$CASE_DIR/forward.snap" "$CASE_DIR/backward.snap" "$POOL_DIR" main "$id" 2>/dev/null \
+    && fail 'the refusal comparison accepted a backward origin move'
+  git -C "$POOL_DIR" update-ref "refs/fm/anchor/other-task-$base" "$base"
+  guard_snapshot "$POOL_DIR" "$CASE_DIR/other-anchor.snap"
+  guard_refusal_diff "$CASE_DIR/backward.snap" "$CASE_DIR/backward.snap" "$CASE_DIR/other-anchor.snap" "$POOL_DIR" main "$id" 2>/dev/null \
+    && fail 'the refusal comparison accepted another task'"'"'s anchor'
+  pass 'the S7 snapshot comparison detects changed bytes under equal status and every ref change beyond the two exceptions'
 }
 
 # Run one blocking case: spawn, then require a non-zero exit, no launch, the
@@ -1620,10 +1691,8 @@ guard_expect_refusal() {
   # refusal must then leave exactly that state (the seam records it as post-seam.snap).
   reference="$CASE_DIR/before.snap"
   [ ! -f "$CASE_DIR/post-seam.snap" ] || reference="$CASE_DIR/post-seam.snap"
-  if ! cmp -s "$reference" "$CASE_DIR/after.snap"; then
-    diff "$reference" "$CASE_DIR/after.snap" >&2 || true
-    fail "$fact $label: the refusal changed the slot (HEAD, refs, index or file bytes)"
-  fi
+  guard_refusal_diff "$CASE_DIR/before.snap" "$reference" "$CASE_DIR/after.snap" "$POOL_DIR" "${GUARD_FETCHED_BRANCH:-main}" "$id" \
+    || fail "$fact $label: the refusal changed the slot (HEAD, refs, index or file bytes)"
   if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
     printf 'EVIDENCE %s | %s | exit=%s | reason=%s | slot=%s | HEAD+refs+index+files equal=yes (%s sha256 of before.snap)\n' \
       "$fact" "$label" "$status" "$code" "$POOL_DIR" "$(shasum -a 256 <"$CASE_DIR/before.snap" | cut -c1-16)"
@@ -1640,15 +1709,6 @@ guard_expect_launch() {
   if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
     printf 'EVIDENCE %s | %s | exit=0 | launched, slot HEAD now %s\n' "$fact" "$label" "$(git -C "$POOL_DIR" rev-parse --short HEAD)"
   fi
-}
-
-# A governed spawn anchors a detached HEAD (refs/fm/anchor/<task>-<sha>, a ref that only
-# preserves the commit) before the late refusals of S5b; nothing else may differ from the
-# state before the spawn.
-guard_assert_only_anchor_added() { # <label>
-  local extra
-  extra=$(diff "$CASE_DIR/before.snap" "$CASE_DIR/after.snap" | grep '^[<>]' | grep -v ' refs/fm/anchor/' || true)
-  [ -z "$extra" ] || fail "$1: the refusal changed more than the preservation anchor: $extra"
 }
 
 guard_prefetch() { git -C "$PROJECT_DIR" fetch --quiet origin; }
@@ -1961,7 +2021,6 @@ test_reset_guard_s3b_inventory_failure() {
   rec=$(make_case guard-s3b-iii "$id")
   read_case_record "$rec"
   guard_install_git_shim "$FAKEBIN_DIR"
-  guard_prefetch
   FM_TEST_GIT_FAIL='ls-files -o -i' guard_expect_refusal S3b '(iii) the ignored-entry inventory fails' 'reset refused (unknown_ignored_inventory)' "$id" --scout
   pass 'S3b (iii): an unreadable ignored-entry inventory refuses untouched'
 }
@@ -2108,8 +2167,7 @@ test_reset_guard_s4_vernant_lease_and_contention() {
 guard_start_pane_shell() { # <slot> <ready-file>  -> prints the shell's pid
   bash -c 'cd "$1" && touch "$2" && { sleep 600 & wait; }' _ "$1" "$2" >/dev/null 2>&1 </dev/null &
   printf '%s' "$!"
-  local i
-  for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+  for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
     [ -e "$2" ] && break
     command sleep 0.2
   done
@@ -2188,8 +2246,7 @@ done
 SH
   bash "$2/pane.sh" "$1" "$2" >/dev/null 2>&1 </dev/null &
   printf '%s' "$!"
-  local i
-  for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+  for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
     [ -e "$2/ready" ] && break
     command sleep 0.2
   done
@@ -2246,7 +2303,6 @@ test_reset_guard_s5_unknown_classes() {
   rec=$(make_case guard-s5git "$id")
   read_case_record "$rec"
   guard_install_git_shim "$FAKEBIN_DIR"
-  guard_prefetch
   FM_TEST_GIT_FAIL='merge-base --is-ancestor' guard_expect_refusal S5 'a failed git read (containment)' 'reset refused (unknown_git_read)' "$id" --scout
   # A failed fetch of the origin default branch.
   id='guard-s5-fetch'
@@ -2300,68 +2356,158 @@ test_reset_guard_s5b_transitions() {
   id='guard-s5b-edit'
   rec=$(make_case guard-s5b-i "$id")
   read_case_record "$rec"
-  guard_prefetch
   FM_SLOT_RESET_GUARD_SEAM="printf 'late edit\\n' >>'$POOL_DIR/README.md'; guard_snapshot '$POOL_DIR' '$CASE_DIR/post-seam.snap'" \
     guard_expect_refusal S5b '(i) a tracked edit appears after the first observation' 'is not clean' "$id" --scout
-  cmp -s "$CASE_DIR/post-seam.snap" "$CASE_DIR/after.snap" || fail 'S5b (i): the late edit was not byte-preserved'
   assert_grep 'late edit' "$POOL_DIR/README.md" 'S5b (i): the late edit was lost'
   # (ii) a new commit lands on HEAD.
   id='guard-s5b-commit'
   rec=$(make_case guard-s5b-ii "$id")
   read_case_record "$rec"
-  guard_prefetch
   FM_SLOT_RESET_GUARD_SEAM="git -C '$POOL_DIR' -c user.name=t -c user.email=t@e.invalid commit -q --allow-empty -m late; guard_snapshot '$POOL_DIR' '$CASE_DIR/post-seam.snap'" \
     guard_expect_refusal S5b '(ii) a new commit lands on HEAD after the first observation' 'reset refused (head_not_contained)' "$id" --scout
-  cmp -s "$CASE_DIR/post-seam.snap" "$CASE_DIR/after.snap" || fail 'S5b (ii): the late commit was not byte-preserved'
   # (iii) the lifecycle manifest is rewritten with unparsable bytes.
   id='guard-s5b-manifest'
   rec=$(make_guard_governed_case guard-s5b-iii "$id")
   read_case_record "$rec"
-  guard_prefetch
   guard_write_manifest - "$INITIAL_SHA"
   FM_SLOT_RESET_GUARD_SEAM="printf '{ garbage' >'$GUARD_MANIFEST_FILE'; guard_snapshot '$POOL_DIR' '$CASE_DIR/post-seam.snap'" \
     guard_expect_refusal S5b '(iii) the manifest is rewritten with unparsable bytes' 'reset refused (unknown_manifest)' "$id" --scout --owned-path scripts
-  cmp -s "$CASE_DIR/post-seam.snap" "$CASE_DIR/after.snap" || fail 'S5b (iii): the slot changed after the manifest rewrite'
-  guard_assert_only_anchor_added 'S5b (iii)'
   # (iii-b) the manifest names another base, with the bytes still parsable.
   id='guard-s5b-manifest-base'
   rec=$(make_guard_governed_case guard-s5b-iiib "$id")
   read_case_record "$rec"
-  guard_prefetch
   guard_write_manifest - "$INITIAL_SHA"
   FM_SLOT_RESET_GUARD_SEAM="python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); d[\"owner_id\"]=\"someone-else\"; json.dump(d,open(sys.argv[1],\"w\"))' '$GUARD_MANIFEST_FILE'; guard_snapshot '$POOL_DIR' '$CASE_DIR/post-seam.snap'" \
     guard_expect_refusal S5b '(iii-b) the manifest bytes change though still parsable' 'reset refused (changed_since_first_read)' "$id" --scout --owned-path scripts
-  guard_assert_only_anchor_added 'S5b (iii-b)'
   # (iv) a contention row appears after the first observation.
   id='guard-s5b-contention'
   rec=$(make_guard_governed_case guard-s5b-iv "$id")
   read_case_record "$rec"
-  guard_prefetch
   local common real
   common=$(git -C "$POOL_DIR" rev-parse --path-format=absolute --git-common-dir)
   real=$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$POOL_DIR")
   mkdir -p "$common/vernant-worktree-leases"
   FM_SLOT_RESET_GUARD_SEAM="printf '{\"worktree_id\":\"%s\",\"ts_iso\":\"%s\",\"session_id\":\"co\"}\\n' '$real' \"\$(date -u +%Y-%m-%dT%H:%M:%SZ)\" >'$common/vernant-worktree-leases/contention.jsonl'; guard_snapshot '$POOL_DIR' '$CASE_DIR/post-seam.snap'" \
     guard_expect_refusal S5b '(iv) a co-tenant contention row appears after the first observation' 'reset refused (holder_contention)' "$id" --scout --owned-path scripts
-  guard_assert_only_anchor_added 'S5b (iv)'
   # (v) a new ignored file appears at a path the target tracks.
   id='guard-s5b-ignored'
   rec=$(make_case guard-s5b-v "$id")
   read_case_record "$rec"
   guard_ignore notes.local
   guard_publish_tracked notes.local $'tracked\n'
-  guard_prefetch
   FM_SLOT_RESET_GUARD_SEAM="printf 'late ignored notes\\n' >'$POOL_DIR/notes.local'; guard_snapshot '$POOL_DIR' '$CASE_DIR/post-seam.snap'" \
     guard_expect_refusal S5b '(v) an ignored collision appears after the first observation' 'reset refused (ignored_collision)' "$id" --scout
-  cmp -s "$CASE_DIR/post-seam.snap" "$CASE_DIR/after.snap" || fail 'S5b (v): the late ignored file was not byte-preserved'
   # Control: stable evidence resets successfully, with the seam firing a harmless command.
   id='guard-s5b-control'
   rec=$(make_case guard-s5b-ctl "$id")
   read_case_record "$rec"
-  guard_prefetch
   FM_SLOT_RESET_GUARD_SEAM=true guard_expect_launch S5b 'control: stable evidence resets and launches' "$id" --scout
   [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$(git -C "$POOL_DIR" rev-parse origin/main)" ] || fail 'S5b control: the slot did not reach origin'
   pass 'S5b: a change after the first observation refuses with the work preserved, and stable evidence resets'
+}
+
+# A late refusal on a slot whose origin ref is behind: the fetch moved
+# refs/remotes/origin/main forward (exception 1) and nothing else changed.
+test_reset_guard_stale_origin_late_refusal() {
+  local rec id stale now
+  id='guard-stale-origin-late'
+  rec=$(make_case guard-stale-late "$id")
+  read_case_record "$rec"
+  guard_prefetch
+  stale=$(git -C "$POOL_DIR" rev-parse refs/remotes/origin/main)
+  guard_publish_tracked later.txt $'later\n'
+  FM_SLOT_RESET_GUARD_SEAM="printf 'late edit\\n' >>'$POOL_DIR/README.md'; guard_snapshot '$POOL_DIR' '$CASE_DIR/post-seam.snap'" \
+    guard_expect_refusal S7 'a late refusal on a slot whose origin ref was behind' 'is not clean' "$id" --scout
+  now=$(git -C "$POOL_DIR" rev-parse refs/remotes/origin/main)
+  [ "$now" != "$stale" ] || fail 'the stale-origin case did not move the origin ref, so it proves nothing'
+  [ "$now" = "$(git -C "$CASE_DIR/publisher" rev-parse HEAD)" ] || fail 'the origin ref did not reach the fetched tip'
+  git -C "$POOL_DIR" merge-base --is-ancestor "$stale" "$now" || fail 'the origin ref moved backward'
+  assert_grep 'late edit' "$POOL_DIR/README.md" 'the late edit was lost'
+  pass 'S7: a late refusal moves only the fetched origin ref forward and leaves everything else byte-identical'
+}
+
+# ---- S1/S2 anchor: origin's default branch, never a --base-branch ---------------------
+# Work held only in origin/X is not contained: X can be deleted after a squash merge.
+test_reset_guard_base_branch_is_not_an_anchor() {
+  local rec id held
+  id='guard-anchor-base-only'
+  rec=$(make_case guard-anchor-base "$id")
+  read_case_record "$rec"
+  publish_feature_branch feature/x
+  guard_prefetch
+  held=$(git -C "$POOL_DIR" rev-parse refs/remotes/origin/feature/x)
+  git -C "$POOL_DIR" checkout --quiet --detach "$held"
+  brief_with_base "$id" feature/x
+  GUARD_FETCHED_BRANCH=feature/x guard_expect_refusal S1 'HEAD held only in the --base-branch origin/X' \
+    'reset refused (head_not_contained)' "$id" --scout --base-branch feature/x
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$held" ] || fail 'the slot left the commit held only in origin/X'
+  pass 'S1: a HEAD contained only in a --base-branch is refused, because origin/X is no anchor'
+}
+
+# A clean slot contained in origin's default branch but past X's fork point passes.
+test_reset_guard_origin_default_anchors_base_branch_spawn() {
+  local rec id
+  id='guard-anchor-past-fork'
+  rec=$(make_case guard-anchor-fork "$id")
+  read_case_record "$rec"
+  git -C "$CASE_DIR/publisher" checkout --quiet -b feature/x "$INITIAL_SHA"
+  printf 'only on feature/x\n' >"$CASE_DIR/publisher/feature-only.txt"
+  git -C "$CASE_DIR/publisher" add feature-only.txt
+  git -C "$CASE_DIR/publisher" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm feature
+  git -C "$CASE_DIR/publisher" push --quiet origin feature/x
+  guard_prefetch
+  git -C "$POOL_DIR" checkout --quiet --detach refs/remotes/origin/main
+  git -C "$POOL_DIR" merge-base --is-ancestor HEAD refs/remotes/origin/feature/x \
+    && fail 'the fixture slot is not past the fork point of feature/x'
+  brief_with_base "$id" feature/x
+  guard_expect_launch S1 'a clean slot in origin main, past the fork point of the --base-branch' "$id" --scout --base-branch feature/x
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$(git -C "$POOL_DIR" rev-parse refs/remotes/origin/feature/x)" ] \
+    || fail 'the slot did not start from origin/feature/x'
+  pass 'S1: a slot contained in origin'"'"'s default branch passes a --base-branch spawn past that branch'"'"'s fork point'
+}
+
+# A pool that does not share the project's objects (a sibling clone) lacks the tip the
+# spawn fetched, so the refresh fetches under the lock into FETCH_HEAD only. It still
+# starts from the origin tip, with and without --base-branch, and moves no other ref.
+make_sibling_clone_pool() {
+  git -C "$PROJECT_DIR" worktree remove --force "$POOL_DIR"
+  git clone --quiet --no-local "$PROJECT_DIR" "$POOL_DIR"
+  git -C "$POOL_DIR" remote set-url origin "file://$CASE_DIR/origin.git"
+  git -C "$POOL_DIR" checkout --quiet --detach "$INITIAL_SHA"
+  git -C "$POOL_DIR" branch --quiet -D main
+}
+
+test_sibling_clone_pool_fetches_under_the_lock() {
+  local rec id out status tip refs_before refs_after
+  id='pool-sibling-default'
+  rec=$(make_case sibling-default "$id")
+  read_case_record "$rec"
+  make_sibling_clone_pool
+  tip=$(git -C "$CASE_DIR/publisher" rev-parse HEAD)
+  git -C "$POOL_DIR" cat-file -e "$tip^{commit}" 2>/dev/null && fail 'the sibling clone already holds the origin tip'
+  out=$(run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  expect_code 0 "$status" "a sibling-clone pool should refresh and launch"$'\n'"$out"
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$tip" ] || fail 'the sibling clone did not start from the origin tip'
+  [ "$(git -C "$POOL_DIR" rev-parse refs/remotes/origin/main)" = "$tip" ] || fail 'origin/main did not move forward to the fetched tip'
+  [ "$(git -C "$POOL_DIR" symbolic-ref refs/remotes/origin/HEAD)" = refs/remotes/origin/main ] || fail 'origin/HEAD does not name origin main'
+
+  id='pool-sibling-base'
+  rec=$(make_case sibling-base "$id")
+  read_case_record "$rec"
+  make_sibling_clone_pool
+  publish_feature_branch feature/hub
+  tip=$(git -C "$CASE_DIR/publisher" rev-parse HEAD)
+  brief_with_base "$id" feature/hub
+  refs_before=$(git -C "$POOL_DIR" show-ref | grep -v ' refs/remotes/origin/feature/hub$')
+  out=$(run_spawn "$id" --scout --base-branch feature/hub)
+  status=$?
+  expect_code 0 "$status" "a sibling-clone pool with --base-branch should refresh and launch"$'\n'"$out"
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$tip" ] || fail 'the sibling clone did not start from origin/feature/hub'
+  [ "$(git -C "$POOL_DIR" rev-parse refs/remotes/origin/feature/hub)" = "$tip" ] || fail 'origin/feature/hub was not recorded'
+  refs_after=$(git -C "$POOL_DIR" show-ref | grep -v ' refs/remotes/origin/feature/hub$')
+  [ "$refs_before" = "$refs_after" ] || fail "the --base-branch refresh moved another ref: $(diff <(printf '%s\n' "$refs_before") <(printf '%s\n' "$refs_after") | tr '\n' '|')"
+  pass 'a sibling-clone pool fetches under the lock and starts from the origin tip, with and without --base-branch'
 }
 
 # Explicit selection keeps focused regressions independently runnable by name.
@@ -2423,6 +2569,10 @@ test_stale_pin_carrying_real_work_is_not_called_stale
 test_stale_pin_beside_other_dirt_reports_one_verdict
 
 test_reset_guard_snapshot_witness
+test_reset_guard_stale_origin_late_refusal
+test_reset_guard_base_branch_is_not_an_anchor
+test_reset_guard_origin_default_anchors_base_branch_spawn
+test_sibling_clone_pool_fetches_under_the_lock
 test_reset_guard_s1_detached_extra_commit
 test_reset_guard_s1_manifest_base_anchor
 test_reset_guard_s2_attached_branch
