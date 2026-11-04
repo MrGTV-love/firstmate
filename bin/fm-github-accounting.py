@@ -60,10 +60,13 @@ saved sanitized projection is repeated in one fresh process row once the latest
 row is 24 hours old, keeping it joinable within the unchanged 48-hour retention.
 Every process row keeps first_observed_at, the first time that identity was seen
 as gh/gh-axi in this run, unchanged next to its own observed_at. Use
-first_observed_at <= interval_end, not a renewal's observed_at, for interval overlap.
-No argv or ancestor projection is recomputed for a renewal. One process_end row,
+first_observed_at <= interval_end, not a later row's observed_at, for interval overlap.
+No argv or ancestor projection is recomputed for a later row. One process_end row,
 with the pid, start identity, run id and time, follows when
-the first successful scan no longer lists that identity as a caller; a failed scan
+the first successful scan no longer lists that identity as a caller. Whenever the
+owner writes a process_end row, it writes one fresh process row for that caller at
+the same moment, with the saved projection and first_observed_at and no age
+threshold, so the two rows expire together. A failed scan
 ends nothing and no row is written per scan. A caller still alive when the observer
 stops has no process_end row, nor has one that ends while no owner runs, and a new
 owner records a caller it finds alive as a new process row. Payloads and
@@ -430,8 +433,8 @@ def run(root, duration=None, ready=None, *, process_source=None):
                 found, current = process_records(finished.rows, seen)
                 observed = time.time()
                 for pid, start in sorted(seen.keys() - current):
+                    record(db, "process", seen.pop((pid, start))[1], observed)
                     record(db, "process_end", {"pid": pid, "start": start, "run_id": run_id}, observed)
-                    del seen[(pid, start)]
                 for item in found:
                     seen[(item["pid"], item["start"])] = (None, dict(item, run_id=run_id, first_observed_at=observed))
                 for identity, (stamp, item) in seen.items():

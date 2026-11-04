@@ -97,7 +97,7 @@ printf '%s\n' "201 100 Sun Nov  1 13:00:$born 2026 /fixture/gh pr checks --body 
         rows = self.records("process")
         self.assertEqual([(row["pid"], row["start"]) for row in rows], [
             (201, "Sun Nov 1 13:00:01 2026"), (202, "Sun Nov 1 13:00:03 2026"),
-            (201, "Sun Nov 1 13:00:02 2026")])
+            (201, "Sun Nov 1 13:00:01 2026"), (201, "Sun Nov 1 13:00:02 2026")])
         self.assertEqual([(row["pid"], row["start"]) for row in self.records("process_end")],
                          [(201, "Sun Nov 1 13:00:01 2026")])
         first = rows[0]
@@ -133,7 +133,7 @@ owner["run"](owner["private_root"](),duration=0.8,process_source=source)
         self.assertEqual(reply.returncode, 0, reply.stderr)
         rows = self.records("process")
         self.assertEqual([(row["pid"], row["start"]) for row in rows],
-                         [(21, "fixture-start-one"), (21, "fixture-start-two")])
+                         [(21, "fixture-start-one"), (21, "fixture-start-one"), (21, "fixture-start-two")])
         for row in rows:
             self.assertEqual(row["argv"], ["sh", "gh", "pr", "checks", "--body", "[REDACTED]"])
             self.assertEqual([item["pid"] for item in row["ancestors"]], [10, 9])
@@ -164,7 +164,7 @@ def source():
 '''
         quota = [row for row in self.scaled_owner(None, setup=setup, source="source") if row["status"] == "observed"]
         rows = self.records("process")
-        self.assertEqual(sorted(row["pid"] for row in rows), [70, 71])
+        self.assertEqual(sorted(row["pid"] for row in rows), [70, 71, 71])
         ended = self.records("process_end")
         self.assertEqual([(row["pid"], row["start"]) for row in ended], [(71, "fixture-ender")])
         end = ended[0]
@@ -212,7 +212,7 @@ owner["run"](owner["private_root"](),process_source=source)
         self.assertEqual(reply.returncode, 0, reply.stderr)
         rows = self.records("process")
         self.assertEqual([(row["pid"], row["observed_at"] - 1794000000) for row in rows],
-                         [(70, 86401), (71, 86401), (70, 172801), (71, 172801)])
+                         [(70, 86401), (71, 86401), (70, 172801), (71, 172801), (71, 172802)])
         for row in rows:
             self.assertEqual(row["argv"], ["gh", "pr", "checks", "--body", "[REDACTED]"])
             self.assertEqual(row["ancestors"], [{"pid": 10, "ppid": 0, "start": "fixture-parent",
@@ -224,7 +224,8 @@ owner["run"](owner["private_root"](),process_source=source)
         began = [row for row in rows if (row["pid"], row["start"], row["run_id"]) ==
                  (end["pid"], end["start"], end["run_id"])]
         self.assertEqual(end["observed_at"] - 1794000000, 172802)
-        self.assertEqual(began[-1]["observed_at"] - 1794000000, 172801)
+        self.assertEqual(began[-1]["observed_at"], end["observed_at"])
+        self.assertEqual(began[-1]["first_observed_at"], began[0]["first_observed_at"])
         self.assertEqual(self.records("owner")[-1]["action"], "stop")
         # Renewal does not exempt either row kind from the original retention.
         self.prune_at(end["observed_at"] + 172801)
@@ -303,6 +304,81 @@ owner["run"](root,process_source=source)
         self.prune_at(base + 172803 + 172801)
         self.assertEqual(self.records("process"), [])
         self.assertEqual(self.records("process_end"), [])
+
+    def departed_caller(self, offsets, quota_offsets):
+        # Labeled clock/table/quota inputs drive the real owner. The caller is
+        # listed through quota_offsets, then gone from offsets[-2] onward. The
+        # clock holds each quota offset until its observed row is stored.
+        self.tool("gh-axi", """while [ ! -e "$FIXTURE_ROOT/release-quota" ]; do sleep 0.01; done
+printf 'api_response:\\n  body: used=23 reset=1794000000 limit=5000 remaining=4977\\n'
+""")
+        launcher = self.root / "departure-clock.py"
+        launcher.write_text(f"""import json,os,runpy,signal,sqlite3,sys,time
+from pathlib import Path
+base=1794000000
+offsets={offsets!r}
+quota_offsets={quota_offsets!r}
+elapsed=0
+real_monotonic=time.monotonic
+time.time=lambda:base+elapsed
+time.monotonic=lambda:real_monotonic()+elapsed
+owner=runpy.run_path(sys.argv[1])
+root=owner["private_root"]()
+step=0
+def source():
+    global step,elapsed
+    elapsed=offsets[step]
+    if elapsed>=quota_offsets[0]:
+        Path(os.environ["FIXTURE_ROOT"],"release-quota").touch()
+    advance=True
+    if elapsed in quota_offsets:
+        with sqlite3.connect(root/"observations.sqlite") as db:
+            quota=[json.loads(row[0]) for row in db.execute("SELECT payload FROM observations WHERE kind='quota'")]
+        advance=any(row.get("status")=="observed" and row["observed_at"]==base+elapsed for row in quota)
+    table={{10:(0,"fixture-parent",["python3","/fixture/caller.py","fixture-secret"])}}
+    if elapsed<offsets[-2]:
+        table[70]=(10,"fixture-caller",["/fixture/gh","pr","checks","--body","fixture-secret"])
+    if step==len(offsets)-1:
+        os.kill(os.getpid(),signal.SIGTERM)
+    elif advance:
+        step+=1
+    return table
+owner["run"](root,process_source=source)
+""")
+        reply = subprocess.run([sys.executable, str(launcher), str(OWNER)], env=self.env, capture_output=True, text=True)
+        self.assertEqual(reply.returncode, 0, reply.stderr)
+        self.assertEqual(self.records("owner")[-1]["action"], "stop")
+
+    def assertEndJoinsProcessAndOverlapsQuota(self, first, quota, end):
+        # A cold reader's join, using only the rows that strict 48 h prune retained.
+        base = 1794000000
+        observed = {row["observed_at"] for row in self.records("quota") if row.get("status") == "observed"}
+        self.assertIn(base + quota, observed)
+        ended = self.records("process_end")
+        self.assertEqual([(row["pid"], row["start"], row["observed_at"]) for row in ended],
+                         [(70, "fixture-caller", base + end)])
+        rows = self.records("process")
+        self.assertEqual([(row["pid"], row["start"], row["run_id"], row["observed_at"]) for row in rows],
+                         [(70, "fixture-caller", ended[0]["run_id"], base + end)])
+        row = rows[0]
+        self.assertEqual(row["first_observed_at"], base + first)
+        self.assertLessEqual(row["first_observed_at"], base + quota)
+        self.assertGreaterEqual(ended[0]["observed_at"], base + quota)
+        self.assertEqual(row["argv"], ["gh", "pr", "checks", "--body", "[REDACTED]"])
+        self.assertEqual(row["ancestors"][0]["argv"], ["python3", "caller.py", "[REDACTED]"])
+        self.assertEqual(set(ended[0]), {"pid", "start", "run_id", "observed_at", "kind"})
+        self.assertNotIn("fixture-secret", json.dumps(rows))
+
+    def test_end_row_keeps_a_process_row_when_its_caller_is_short_lived(self):
+        self.departed_caller([14, 15, 16, 17], [15])
+        self.assertGreaterEqual(self.prune_at(1794000000 + 15 + 172800), 1)
+        self.assertEndJoinsProcessAndOverlapsQuota(14, 15, 16)
+
+    def test_end_row_keeps_a_process_row_when_its_last_row_would_expire_first(self):
+        self.departed_caller([0, 72000, 82800, 82801], [0, 72000])
+        self.assertGreaterEqual(self.prune_at(1794000000 + 176400), 1)
+        self.assertEndJoinsProcessAndOverlapsQuota(0, 72000, 82800)
+        self.assertNotIn(1794000000, {row["observed_at"] for row in self.records("quota")})
 
     def test_interpreter_flags_keep_script_names_and_withhold_payloads(self):
         launcher = self.root / "injected-forms.py"
