@@ -59,7 +59,9 @@ elif kind == "pipe-empty":
     read, write = os.pipe(); os.close(write); stdin = read
 else:
     stdin = subprocess.DEVNULL
-child = subprocess.Popen(argv, executable=executable, stdin=stdin, stdout=subprocess.DEVNULL)
+hold = os.environ.get("HOLD_FILE")
+held = [os.open(hold, os.O_WRONLY | os.O_APPEND)] if hold else []
+child = subprocess.Popen(argv, executable=executable, stdin=stdin, stdout=subprocess.DEVNULL, pass_fds=held)
 signal.signal(signal.SIGTERM, lambda *_: (child.kill(), os._exit(0)))
 open(pidfile, "w").write(str(child.pid))
 time.sleep(600)
@@ -174,6 +176,32 @@ test_incarnation_tells_same_second_processes_apart() {
   lib=$a1
   : "$lib"
   pass "incarnation: the delivered start identity separates same-second processes; a whole-second source cannot"
+}
+
+# --- session binding: the process must hold the task's session file open --------------
+test_session_binding_needs_the_session_file_held_open_for_writing() {
+  local t="$TMP/session" pid rc
+  mkdir -p "$t"; : > "$t/task.jsonl"; : > "$t/personal.jsonl"
+  HOLD_FILE="$t/task.jsonl" launch tty --no-title; pid=$SPAWNED
+  python3 -I "$IDENT" holds "$pid" "$t/task.jsonl" || fail "a process holding the task session open for writing is tied to it"
+  rc=0; python3 -I "$IDENT" holds "$pid" "$t/personal.jsonl" || rc=$?
+  [ "$rc" -eq 1 ] || fail "a registration naming a session the process does not hold is not proof (exit $rc)"
+  # the wrong-live-session process: the same argv and cwd, but it holds a different session
+  HOLD_FILE="$t/personal.jsonl" launch tty --no-title
+  rc=0; python3 -I "$IDENT" holds "$SPAWNED" "$t/task.jsonl" || rc=$?
+  [ "$rc" -eq 1 ] || fail "a process that switched to another session is not tied to the task session (exit $rc)"
+  # a process holding nothing, and a process that cannot be read
+  launch tty --no-title
+  rc=0; python3 -I "$IDENT" holds "$SPAWNED" "$t/task.jsonl" || rc=$?
+  [ "$rc" -eq 1 ] || fail "a process with no session open is not tied to the task session (exit $rc)"
+  rc=0; python3 -I "$IDENT" holds 2000000000 "$t/task.jsonl" || rc=$?
+  [ "$rc" -eq 2 ] || fail "an unreadable process leaves the session unresolved (exit $rc)"
+  # replay over captured facts: the same answer without a live process
+  python3 -I "$IDENT" facts "$pid" > "$t/facts.json" || fail "facts must be capturable"
+  python3 -I "$IDENT" holds --facts "$t/facts.json" "$t/task.jsonl" || fail "captured facts keep the holding"
+  rc=0; python3 -I "$IDENT" holds --facts "$t/facts.json" "$t/personal.jsonl" || rc=$?
+  [ "$rc" -eq 1 ] || fail "captured facts keep the refusal for another session (exit $rc)"
+  pass "session binding: only a process holding the task session open for writing is tied to it; another session, none and unreadable are not"
 }
 
 # --- 3. the installed identity ----------------------------------------------------
@@ -390,6 +418,7 @@ test_classifier_keeps_its_names_and_the_bun_shape_stays_other() {
 
 fm_test_only
 test_classifier_keeps_its_names_and_the_bun_shape_stays_other
+test_session_binding_needs_the_session_file_held_open_for_writing
 test_proc_info_facts_are_kernel_facts
 test_incarnation_tells_same_second_processes_apart
 test_identity_derivation_fails_closed

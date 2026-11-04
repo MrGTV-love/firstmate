@@ -3,7 +3,7 @@
 
 Usage: fm-proc-info.py count-uid UID | ppid PID | pgid PID | comm PID | args PID |
        lstart PID | identity PID | cpu-tree PID | mem-tree PID | rss-tree PID |
-       table FIELDS | memory | exe PID | argv PID | startid PID | stdin PID
+       table FIELDS | memory | exe PID | argv PID | startid PID | stdin PID | writable PID
 
 memory prints a JSON RSS census with PID, PPID, kernel name, start time,
 resident bytes (null when unreadable), fleet attribution, and the run identity
@@ -21,7 +21,10 @@ argument vector as one JSON array, so argument boundaries survive. startid print
 the kernel start time as SECONDS.MICROSECONDS, which tells apart two processes
 started inside one whole second, unlike lstart. stdin prints the kind of the
 process's file descriptor 0: tty (a /dev/ttysN terminal), pipe, none (closed) or
-other. Each prints nothing and exits 1 for a process or fact that cannot be read.
+other. writable prints a JSON array with the device, inode and path of every regular
+file the process holds open for writing (a session writer keeps its file open for
+the life of the session, so this is kernel evidence of which session a process
+writes). Each prints nothing and exits 1 for a process or fact that cannot be read.
 
 count-uid prints how many processes have real user id UID. ppid and pgid print
 a process's parent and process group, comm its argv[0] and args its argv joined
@@ -91,7 +94,7 @@ PROC_PIDTASKINFO, TASKINFO_SIZE, PTI_NUMRUNNING = 4, 96, 88
 # the descriptor types, PROC_PIDFDVNODEPATHINFO, and vnode type VCHR.
 PROC_PIDPATHINFO_MAXSIZE = 4096
 PROC_PIDLISTFDS, PROC_FDINFO_SIZE, PROX_FDTYPE_VNODE, PROX_FDTYPE_PIPE = 1, 8, 1, 6
-PROC_PIDFDVNODEPATHINFO, VCHR = 2, 4
+PROC_PIDFDVNODEPATHINFO, VCHR, VREG, FWRITE = 2, 4, 1, 0x2
 DAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 TABLE_FIELDS = ("pid", "ppid", "pgid", "stat", "lstart", "command")
@@ -198,6 +201,30 @@ def exe_path(pid):
     if size <= 0:
         raise LookupError(pid)
     return os.fsdecode(buffer.raw[:size])
+
+
+def writable_files(pid):
+    """Regular files PID holds open for writing, from libproc: device, inode and path."""
+    kinfo(pid)
+    size = libc.proc_pidinfo(pid, PROC_PIDLISTFDS, ctypes.c_uint64(0), None, 0)
+    if size <= 0:
+        raise LookupError(pid)
+    buffer = ctypes.create_string_buffer(size + 64 * PROC_FDINFO_SIZE)
+    size = libc.proc_pidinfo(pid, PROC_PIDLISTFDS, ctypes.c_uint64(0), buffer, len(buffer))
+    if size < 0 or size % PROC_FDINFO_SIZE:
+        raise LookupError(pid)
+    found = []
+    for offset in range(0, size, PROC_FDINFO_SIZE):
+        number, fdtype = struct.unpack_from("iI", buffer.raw, offset)
+        if fdtype != PROX_FDTYPE_VNODE:
+            continue
+        info = VnodeFdInfoWithPath()
+        if libc.proc_pidfdinfo(pid, number, PROC_PIDFDVNODEPATHINFO, ctypes.byref(info), ctypes.sizeof(info)) != ctypes.sizeof(info):
+            continue  # the descriptor closed between the two reads
+        if info.openflags & FWRITE and info.pvip.info.type == VREG:
+            found.append({"fd": number, "dev": info.pvip.info.stat.dev, "ino": info.pvip.info.stat.ino,
+                          "path": os.fsdecode(info.pvip.path)})
+    return found
 
 
 def start_id(pid):
@@ -552,6 +579,8 @@ def main(argv_):
             value = start_id(number)
         elif command == "stdin":
             value = stdin_kind(number)
+        elif command == "writable":
+            value = json.dumps(writable_files(number))
         else:
             return 2
     except (OSError, LookupError, struct.error, IndexError):

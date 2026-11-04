@@ -1988,7 +1988,9 @@ if kind == "tty":
     master, slave = pty.openpty(); keep.append(master); stdin = slave
 else:
     stdin = subprocess.DEVNULL
-child = subprocess.Popen(sys.argv[4:], executable=executable, stdin=stdin, stdout=subprocess.DEVNULL)
+hold = os.environ.get("BUN_HOLD_FILE")
+held = [os.open(hold, os.O_WRONLY | os.O_APPEND)] if hold else []
+child = subprocess.Popen(sys.argv[4:], executable=executable, stdin=stdin, stdout=subprocess.DEVNULL, pass_fds=held)
 signal.signal(signal.SIGTERM, lambda *_: (child.kill(), os._exit(0)))
 open(pidfile, "w").write(str(child.pid))
 time.sleep(900)
@@ -2027,9 +2029,11 @@ bun_pair() { # <name> <args...>
 import os, pty, signal, subprocess, sys, time
 files, argv = sys.argv[1:3], sys.argv[3:]
 masters, children = [], []
+hold = os.environ.get("BUN_HOLD_FILE")
 for path in files:
     master, slave = pty.openpty(); masters.append(master)
-    children.append(subprocess.Popen(argv, stdin=slave, stdout=subprocess.DEVNULL))
+    held = [os.open(hold, os.O_WRONLY | os.O_APPEND)] if hold else []
+    children.append(subprocess.Popen(argv, stdin=slave, stdout=subprocess.DEVNULL, pass_fds=held))
 for path, child in zip(files, children):
     open(path, "w").write(str(child.pid))
 signal.signal(signal.SIGTERM, lambda *_: ([c.kill() for c in children], os._exit(0)))
@@ -2067,7 +2071,8 @@ prepare_bun_adoption() { # <case-name> [launch args...]
   prepare_omp_adoption "bun-$name"
   dir=$HERDR_CASE_DIR
   [ "$#" -gt 0 ] || set -- --config "$dir/session.yml" --auto-approve --cwd "$dir/wt/subdirectory" --no-title 'Read the brief'
-  bun_launch "$name" "$@"
+  # omp's session writer keeps the session file open for append for the life of the session.
+  BUN_HOLD_FILE="$dir/wt/recorded-session.jsonl" bun_launch "$name" "$@"
   bun_present "$dir" "$BUN_PID"
 }
 
@@ -2130,14 +2135,14 @@ test_omp_bun_adoption_keeps_every_other_proof() {
         assert_adoption_refused "$dir" "$id" 'process proof needs the resolved foreground process to be a readable omp process' ;;
       headless-input)
         bun_stop_all
-        bun_spawn headless-input null /bin/sh /bin/sh "$BUN_TREE/omp" --config "$dir/session.yml" --no-title 'a prompt'
+        BUN_HOLD_FILE="$dir/wt/recorded-session.jsonl" bun_spawn headless-input null /bin/sh /bin/sh "$BUN_TREE/omp" --config "$dir/session.yml" --no-title 'a prompt'
         bun_present "$dir" "$BUN_PID"
         assert_adoption_refused "$dir" "$id" 'process proof needs the resolved foreground process to be a readable omp process' ;;
       foreign-script)
         bun_stop_all
         mkdir -p "$dir/foreign"
         : > "$dir/foreign/cli.ts"
-        bun_spawn foreign-script tty "$BUN_TREE/runtime/node_modules/@oven/bun-darwin-aarch64/bin/bun" \
+        BUN_HOLD_FILE="$dir/wt/recorded-session.jsonl" bun_spawn foreign-script tty "$BUN_TREE/runtime/node_modules/@oven/bun-darwin-aarch64/bin/bun" \
           "$BUN_TREE/runtime/node_modules/@oven/bun-darwin-aarch64/bin/bun" "$dir/foreign/cli.ts" --no-title
         bun_present "$dir" "$BUN_PID"
         assert_adoption_refused "$dir" "$id" 'process proof needs the resolved foreground process to be a readable omp process' ;;
@@ -2165,7 +2170,7 @@ test_omp_bun_adoption_never_overwrites_a_record_a_writer_may_own() {
         rm -f "$dir/a/bun" ;;
     esac
     # The extension of A rewrites this record; B is the otherwise fully proven foreground target.
-    bun_launch "b-$shape" --config "$dir/session.yml" --auto-approve --cwd "$dir/wt/subdirectory" --no-title 'Read the brief'
+    BUN_HOLD_FILE="$dir/wt/recorded-session.jsonl" bun_launch "b-$shape" --config "$dir/session.yml" --auto-approve --cwd "$dir/wt/subdirectory" --no-title 'Read the brief'
     bun_present "$dir" "$BUN_PID"
     jq --argjson pid "$pid_a" '.pid=$pid' "$record" > "$record.new" && mv "$record.new" "$record"
     before=$(shasum -a 256 "$record")
@@ -2224,7 +2229,7 @@ test_omp_bun_adoption_binds_the_adopted_incarnation() {
   for try in 1 2 3 4 5 6 7 8; do
     prepare_omp_adoption "bun-incarnation-$try"
     dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID record="$HERDR_CASE_DIR/home/state/$HERDR_CASE_ID.omp-session.json"
-    bun_pair "incarnation-$try" --config "$dir/session.yml" --auto-approve --cwd "$dir/wt/subdirectory" --no-title 'Read the brief'
+    BUN_HOLD_FILE="$dir/wt/recorded-session.jsonl" bun_pair "incarnation-$try" --config "$dir/session.yml" --auto-approve --cwd "$dir/wt/subdirectory" --no-title 'Read the brief'
     pid_a=$BUN_PID_A pid_b=$BUN_PID_B
     if [ "$(python3 -I "$ROOT/bin/fm-proc-info.py" lstart "$pid_a")" = "$(python3 -I "$ROOT/bin/fm-proc-info.py" lstart "$pid_b")" ]; then
       same=1; break
@@ -2255,6 +2260,45 @@ test_omp_bun_adoption_binds_the_adopted_incarnation() {
   pass "omp bun adoption: a same-second replacement process with the adopted PID is not the adopted agent; the adopted incarnation still is"
 }
 
+test_omp_bun_adoption_needs_positive_live_session_evidence() {
+  local shape dir id record out rc pid_p pid_q start_q msg
+  msg='session proof needs the live Bun process to hold the registered task session file open for writing'
+  for shape in holds-nothing holds-another-session; do
+    prepare_omp_adoption "bun-session-$shape"
+    dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
+    write_recovery_native_session "$dir/wt/personal-session.jsonl" "$dir/wt" "personal conversation"
+    case "$shape" in
+      holds-nothing) bun_launch "$shape" --config "$dir/session.yml" --no-title 'Read the brief' ;;
+      holds-another-session)
+        BUN_HOLD_FILE="$dir/wt/personal-session.jsonl" bun_launch "$shape" --config "$dir/session.yml" --no-title 'Read the brief' ;;
+    esac
+    # Herdr still registers the task's session file (a stale registration), but the live process does not write it.
+    bun_present "$dir" "$BUN_PID"
+    assert_adoption_refused "$dir" "$id" "$msg"
+    bun_stop_all
+  done
+  # The lifecycle recheck reaches the same evidence for a record that already names the live PID.
+  prepare_bun_adoption session-recheck
+  dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID pid_p=$BUN_PID record="$HERDR_CASE_DIR/home/state/$HERDR_CASE_ID.omp-session.json"
+  out=$(run_continuation_control "$dir" "$id" adopt) || fail "the proven Bun agent must adopt: $out"
+  write_recovery_native_session "$dir/wt/personal-session.jsonl" "$dir/wt" "personal conversation"
+  BUN_HOLD_FILE="$dir/wt/personal-session.jsonl" bun_launch session-recheck-q --config "$dir/session.yml" --no-title 'Read the brief'
+  pid_q=$BUN_PID start_q=$(python3 -I "$ROOT/bin/fm-omp-identity.py" startid "$pid_q")
+  # A record naming Q's own PID and incarnation, with the task's session still registered: Q writes another conversation.
+  jq --argjson pid "$pid_q" --arg start "$start_q" '.pid=$pid | .start=$start' "$record" > "$record.new" && mv "$record.new" "$record"
+  bun_present "$dir" "$pid_q"
+  rc=0
+  out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" interrupt) || rc=$?
+  [ "$rc" -ne 0 ] || fail "a process writing another session was authorized through the recheck: $out"
+  assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "the other session must receive no lifecycle input"
+  jq --argjson pid "$pid_p" --arg start "$(python3 -I "$ROOT/bin/fm-omp-identity.py" startid "$pid_p")" '.pid=$pid | .start=$start' "$record" > "$record.new" && mv "$record.new" "$record"
+  bun_present "$dir" "$pid_p"
+  out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" interrupt) || fail "the proven case must still be controllable: $out"
+  assert_contains "$out" "interrupt-delivered $id" "the paired proven case is admitted"
+  bun_stop_all
+  pass "omp bun adoption: a registration is not proof of the live session; the process must hold the task session open, at adoption and at the recheck"
+}
+
 test_omp_adoption_bun_runtime() {
   if [ "$(uname -s)" != Darwin ] || ! command -v cc >/dev/null 2>&1; then
     pass "omp bun adoption: skipped, needs macOS libproc and a C compiler"
@@ -2265,6 +2309,7 @@ test_omp_adoption_bun_runtime() {
   test_omp_bun_adoption_never_overwrites_a_record_a_writer_may_own
   test_omp_bun_adoption_does_not_overwrite_a_late_writer
   test_omp_bun_adoption_binds_the_adopted_incarnation
+  test_omp_bun_adoption_needs_positive_live_session_evidence
 }
 
 test_omp_adoption() {

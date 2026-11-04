@@ -197,7 +197,7 @@ fm_launch_proof_omp_adoption() { # <meta> -> candidate session-record JSON
   esac
   # The Bun identity predicate sets the incarnation in this shell; keep it for the record.
   local start=$FM_LAUNCH_PROOF_OMP_START candidate
-  candidate=$(python3 - "$meta" "$pid" "$reference" <<'PY'
+  candidate=$(python3 - "$meta" "$pid" "$reference" "$start" "$_FM_LAUNCH_PROOF_OMP_IDENTITY" <<'PY'
 import json
 import os
 from pathlib import Path
@@ -330,6 +330,14 @@ try:
             "session proof needs an absolute task_session_file to preserve")
     require(Path(task).is_file() and os.path.samefile(task, live),
             "session proof needs the live session file to identify the preserved task session")
+    if len(sys.argv) > 5 and sys.argv[4]:
+        # A Bun-shaped process publishes nothing about its session and a registration is
+        # not proof of it, so the live process must hold the task's session file open for
+        # writing: omp's session writer keeps that descriptor for the life of the session.
+        held = subprocess.run([sys.executable, "-I", sys.argv[5], "holds", str(pid), str(live)],
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+        require(held.returncode == 0,
+                "session proof needs the live Bun process to hold the registered task session file open for writing; a registration alone is not proof of the live session")
     print(json.dumps(dict(version=1, spawn_gen=gen, pid=pid,
                           task_session_file=task, current_session_file=str(live))))
 except (OSError, ValueError, TypeError, subprocess.SubprocessError):

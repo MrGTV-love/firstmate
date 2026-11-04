@@ -4,6 +4,7 @@
 Usage: fm-omp-identity.py interactive (PID | --facts FILE) [--launcher PATH]
        fm-omp-identity.py writer PID [--launcher PATH]
        fm-omp-identity.py facts PID [--launcher PATH]
+       fm-omp-identity.py holds (PID | --facts FILE) SESSION-FILE
        fm-omp-identity.py startid PID
 
 Why this exists. The host's `omp` can be a /bin/sh launcher that `exec`s the Bun
@@ -38,6 +39,16 @@ the interactive role. Anything the port cannot settle is unresolved, never
 interactive. The flag and command tables below are a copy of the installed
 CLI's; tests/fm-omp-identity.test.sh pins them to a fixture and the live guard
 (tests/fm-omp-identity-live-e2e.test.sh) compares them to the installed source.
+
+Session binding. An unpinned process has no publication of the session it runs, and a
+registration or a resume argument is not proof of it (a conversation can switch
+after launch). The installed omp's session writer opens its session file for
+append once and keeps the descriptor for the life of the session
+(session/session-storage.ts, FileSessionStorageWriter), so `holds` reports whether the
+process holds a given regular file open for writing, by device and inode, read from
+the kernel (fm-proc-info.py writable). Exit 0 holds it, 1 does not, 2 unreadable.
+Adoption of a Bun-shaped process requires it, so a process that is not positively
+tied to the task's preserved session stays unadopted.
 
 Exit status. interactive: 0 the process is the installed omp's interactive
 agent (stdout is JSON carrying the incarnation `start`), 1 refused (a foreign
@@ -427,6 +438,18 @@ def live_facts(pid):
     return facts
 
 
+def holds_file(writable, path):
+    """True when one of the process's writable regular files is the file at path."""
+    try:
+        target = os.stat(path)
+    except OSError:
+        return False
+    if not isinstance(writable, list):
+        raise Unresolved("the process's open files cannot be read")
+    return any(isinstance(entry, dict) and entry.get("ino") == target.st_ino
+               and entry.get("dev") == (target.st_dev & 0xFFFFFFFF) for entry in writable)
+
+
 def decide(facts, identity):
     """Raise Refused or Unresolved unless facts are the installed omp's interactive agent."""
     runtime_real, script_real = identity
@@ -476,8 +499,34 @@ def main(argv):
             return 2
         print(value)
         return 0
+    if args[:1] == ["holds"]:
+        writable = None
+        if len(args) == 3 and args[1].isdigit():
+            raw = _read_fact("writable", args[1])
+            try:
+                writable = json.loads(raw) if raw else None
+            except ValueError:
+                writable = None
+        elif len(args) == 4 and args[1] == "--facts":
+            try:
+                with open(args[2], encoding="utf-8") as handle:
+                    writable = json.load(handle).get("writable")
+            except (OSError, ValueError, AttributeError):
+                writable = None
+        else:
+            print(__doc__.split("\n\n")[0], file=sys.stderr)
+            return 64
+        try:
+            return 0 if holds_file(writable, args[-1]) else 1
+        except Unresolved:
+            return 2
     if len(args) == 2 and args[0] == "facts" and args[1].isdigit():
         facts = live_facts(args[1])
+        raw = _read_fact("writable", args[1])
+        try:
+            facts["writable"] = json.loads(raw) if raw else None
+        except ValueError:
+            facts["writable"] = None
         identity = _identity_or_none(launcher)
         if not isinstance(identity, Exception):
             facts["identity"] = {"runtime": identity[0], "script": identity[1]}
