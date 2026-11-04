@@ -2709,8 +2709,9 @@ pr_is_merged() {
 # head; both tests are teardown_train_carries, which needs the change to reach the
 # train AND its net content to be in the train head's tree. Reaching is an ancestor,
 # or every commit the train head does not hold proven by the rebased-patch proof
-# pr_is_merged applies to the PR head, measured from the member's own base so a train
-# the default branch has since merged still counts; a commit reachable from the
+# pr_is_merged applies to the PR head, measured from the member's own base (the newest
+# commit of the default branch's first-parent line that the member holds, which an
+# `ours` merge cannot move) so a train the default branch has since merged still counts; a commit reachable from the
 # default branch is not skipped (an `ours` merge puts a commit in the default history
 # without its change), so its own patch must be among the train's. Content present
 # means every path of the member's net change holds the same content at the train
@@ -2728,20 +2729,24 @@ TEARDOWN_TRAIN_ANNOUNCED=0
 # The first accepted train and its member, recorded on the backlog close.
 TEARDOWN_TRAIN_PR_URL=
 TEARDOWN_TRAIN_MEMBER_URL=
-# The base of the member's own change: the fork point of <ref> from the default
-# branch as it stood before the train landed there. A train merged into the default
-# branch by a merge commit is found on its first-parent history and its first parent
-# is used, so the member's commits, which that merge made reachable, still lie
-# above the base. A base equal to <ref> leaves no change to prove and is refused.
-teardown_train_member_base() {  # <ref> <train head>
-  local dir=${TEARDOWN_LANDED_DIR:-$WT} ref=$1 train=$2 default_ref via anchor base
+# The base of the member's own change: the newest commit on the default branch's
+# FIRST-PARENT line that <ref> holds. The first-parent line is what was directly
+# integrated into the default branch (a squash, a fast-forward, or the first parent of
+# a merge). A commit that reached the default branch only as the second parent of a
+# merge is not on that line, so an `ours` merge, which makes a commit reachable
+# without its change, cannot move the base past it: that commit stays above the base
+# and its change must be present in the train. Using merge-base with the default
+# branch would let that merge fake the base. A base equal to <ref> leaves no change to
+# prove and is refused.
+teardown_train_member_base() {  # <ref>
+  local dir=${TEARDOWN_LANDED_DIR:-$WT} ref=$1 default_ref base
   default_ref=$(landed_default_ref) || return 1
-  anchor=$default_ref
-  if git -C "$dir" merge-base --is-ancestor "$train" "$default_ref" 2>/dev/null; then
-    via=$(git -C "$dir" rev-list --first-parent --ancestry-path "$train..$default_ref" -- 2>/dev/null | tail -n 1)
-    [ -z "$via" ] || anchor=$(git -C "$dir" rev-parse --verify --quiet "$via^1^{commit}" 2>/dev/null) || return 1
-  fi
-  base=$(git -C "$dir" merge-base "$ref" "$anchor" 2>/dev/null) || return 1
+  base=$({
+    git -C "$dir" rev-list "$ref" -- 2>/dev/null || exit 1
+    printf '%s\n' '--first-parent-line--'
+    git -C "$dir" rev-list --first-parent "$default_ref" -- 2>/dev/null || exit 1
+  } | awk '/^--first-parent-line--$/ { line = 1; next } !line { held[$0] = 1; next } held[$0] { print; exit }')
+  [ -n "$base" ] || return 1
   [ "$base" != "$(git -C "$dir" rev-parse --verify "$ref^{commit}" 2>/dev/null)" ] || return 1
   printf '%s\n' "$base"
 }
@@ -2781,7 +2786,7 @@ teardown_train_carries() {  # <ref> <train head>
   local TEARDOWN_LANDED_REF=$1
   TEARDOWN_UNPROVEN_COMMITS=
   TEARDOWN_TRAIN_CARRY_WHY=
-  base=$(teardown_train_member_base "$1" "$2") || {
+  base=$(teardown_train_member_base "$1") || {
     TEARDOWN_TRAIN_CARRY_WHY="leaves no change to measure (no base separates it from the default branch)"
     return 1
   }

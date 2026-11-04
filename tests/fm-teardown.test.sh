@@ -3945,6 +3945,61 @@ test_train_merge_commit_landed_still_refuses_uncarried_work() {
 }
 
 
+# An `ours` merge makes a commit K reachable from the default branch without its
+# change. The member is built on K and the train `ours`-merges the member head, so
+# the member head is an ancestor of the train; neither the train nor the default
+# branch ever holds K's file. Reachability, from the default branch or from the
+# train, is not delivered content.
+test_train_ours_merged_commit_is_never_taken_as_delivered() {
+  local landing
+  for landing in none squash; do
+    TRAIN_HIDDEN_OURS=1 train_case "train-ours-hidden-$landing" "$landing" head "" ours-flat
+    git -C "$TRAIN_CASE/wt" merge-base --is-ancestor "$TRAIN_MEMBER_HEAD" "$TRAIN_HEAD" \
+      || fail "train-ours-hidden-$landing: the member head is not an ancestor of the train"
+    git -C "$TRAIN_CASE/wt" merge-base --is-ancestor "$TRAIN_MEMBER_HEAD^^" origin/main \
+      || fail "train-ours-hidden-$landing: the hidden commit is not reachable from the default branch"
+    git -C "$TRAIN_CASE/wt" cat-file -e "$TRAIN_COPY_HEAD:hidden.txt" 2>/dev/null \
+      || fail "train-ours-hidden-$landing: the copy lacks the hidden change"
+    git -C "$TRAIN_CASE/wt" cat-file -e "$TRAIN_HEAD:hidden.txt" 2>/dev/null \
+      && fail "train-ours-hidden-$landing: the train holds the hidden change"
+    git -C "$TRAIN_CASE/wt" cat-file -e origin/main:hidden.txt 2>/dev/null \
+      && fail "train-ours-hidden-$landing: the default branch holds the hidden change"
+    assert_train_refused "$TRAIN_CASE" "train-ours-hidden-$landing" "net change is not present in the train head's final tree"
+    assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "train-ours-hidden-$landing: the train was accepted"
+  done
+  TRAIN_HIDDEN_OURS=0
+  pass "a copy built on a commit the default branch only ours-merged is refused though the train contains its head"
+}
+
+test_train_ours_merged_commit_is_refused_in_the_record_only_route() {
+  local landing
+  for landing in none squash; do
+    TRAIN_HIDDEN_OURS=1 train_absent_case "train-ours-hidden-record-$landing" ours-flat "$landing"
+    assert_train_refused "$TRAIN_CASE" "train-ours-hidden-record-$landing" "net change is not present in the train head's final tree"
+    assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "train-ours-hidden-record-$landing: the train was accepted"
+    [ "$(backlog_row_state "$TRAIN_CASE")" = in_flight ] || fail "train-ours-hidden-record-$landing: refusal closed the backlog"
+  done
+  TRAIN_HIDDEN_OURS=0
+  pass "the same ours-merged hidden commit is refused in the record-only route, which keeps the backlog row"
+}
+
+# The same history is accepted when the train really replays K, so the ours merge
+# does not make a genuinely carried member look unlanded.
+test_train_ours_merged_commit_is_carried_when_the_train_replays_it() {
+  TRAIN_HIDDEN_OURS=1 train_case train-ours-hidden-carried squash head "" flat-hidden
+  git -C "$TRAIN_CASE/wt" cat-file -e "$TRAIN_HEAD:hidden.txt" 2>/dev/null \
+    || fail "train-ours-hidden-carried: the train lacks the hidden change"
+  assert_train_allowed "$TRAIN_CASE" "train-ours-hidden-carried"
+  TRAIN_HIDDEN_OURS=0
+  TRAIN_HIDDEN_OURS=1 train_absent_case train-ours-hidden-carried-record flat-hidden squash
+  run_teardown "$TRAIN_CASE" > "$TRAIN_CASE/stdout" 2> "$TRAIN_CASE/stderr" \
+    || fail "train-ours-hidden-carried-record: a carried train was refused: $(cat "$TRAIN_CASE/stderr")"
+  assert_grep "$TRAIN_URL" "$TRAIN_CASE/stderr" "train-ours-hidden-carried-record: stderr did not name the train PR"
+  assert_absent "$TRAIN_CASE/state/task-x1.meta" "train-ours-hidden-carried-record: accepted teardown left the task record"
+  TRAIN_HIDDEN_OURS=0
+  pass "a train that replays the ours-merged commit as well carries the member, in the copy and record-only routes"
+}
+
 test_train_member_closed_landed_by_merged_train_allows() {
   train_case train-merge-landed none head
   seed_backlog_in_flight "$TRAIN_CASE"
@@ -4588,6 +4643,9 @@ test_train_reverted_member_is_refused_in_the_record_only_route
 test_train_merge_commit_landed_carries_a_prerebase_copy
 test_train_merge_commit_landed_carries_the_record_only_member
 test_train_merge_commit_landed_still_refuses_uncarried_work
+test_train_ours_merged_commit_is_never_taken_as_delivered
+test_train_ours_merged_commit_is_refused_in_the_record_only_route
+test_train_ours_merged_commit_is_carried_when_the_train_replays_it
 test_train_record_only_route_without_a_copy
 test_train_member_removed_copy_in_pool_slot
 test_teardown_removes_pr_ready_refusal_marker

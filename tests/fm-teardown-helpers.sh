@@ -3305,7 +3305,7 @@ TRAIN_MEMBER_HEAD=
 TRAIN_HEAD=
 TRAIN_COPY_HEAD=
 
-# setup_train_history <case-dir> <landing: none|squash|merge> <copy: head|prerebase|inside|extra> [train: merge|flat|flat-missing]
+# setup_train_history <case-dir> <landing: none|squash|merge> <copy: head|prerebase|inside|extra> [train: merge|flat|flat-missing|ours-flat|flat-hidden]
 # Builds the member PR head H (two commits on top of a moved main: feature.txt, then
 # feature2.txt), the train head (a merge of H plus a second member's commit), and
 # then moves the default branch
@@ -3313,6 +3313,11 @@ TRAIN_COPY_HEAD=
 #   landing squash: the default branch also holds the train's squash commit.
 #   landing merge: the train head is merged into the default branch by a merge commit.
 #   TRAIN_REVERT_MEMBER=1: the train's last commit reverts the member's feature.txt.
+#   TRAIN_HIDDEN_OURS=1: the member is built on a commit K (hidden.txt) that main took
+#     in by an `ours` merge, so K is reachable from main yet main never holds
+#     hidden.txt. Train ours-flat: the train `ours`-merges H, making H and K its
+#     ancestors, and replays only the member's two commits, so hidden.txt is never in
+#     the train. flat-hidden: the train replays K as well and really carries it.
 #   train flat: the pipeline rebased the train flat, so it replays the member's two
 #     commits as new commits and does not contain H. flat-missing: it replays only
 #     the second, so one of the member's commits never reached the train.
@@ -3334,7 +3339,21 @@ setup_train_history() {
   git -C "$tmp" add -- m.txt
   git -C "$tmp" commit -q -m "main moves"
   git -C "$tmp" push -q origin main
-  git -C "$tmp" checkout -q -b member
+  if [ "${TRAIN_HIDDEN_OURS:-0}" = 1 ]; then
+    # K: a commit whose change never lands. The default branch takes it in by an
+    # `ours` merge, so K is reachable from main but main's tree lacks hidden.txt;
+    # the member is built on K.
+    git -C "$tmp" checkout -q -b hidden
+    printf '%s\n' hidden > "$tmp/hidden.txt"
+    git -C "$tmp" add -- hidden.txt
+    git -C "$tmp" commit -q -m "hidden change"
+    git -C "$tmp" checkout -q main
+    git -C "$tmp" merge -q -s ours --no-edit hidden >/dev/null
+    git -C "$tmp" push -q origin main
+    git -C "$tmp" checkout -q -b member hidden
+  else
+    git -C "$tmp" checkout -q -b member
+  fi
   printf '%s\n' hello > "$tmp/feature.txt"
   git -C "$tmp" add -- feature.txt
   git -C "$tmp" commit -q -m "add feature"
@@ -3346,6 +3365,16 @@ setup_train_history() {
   git -C "$tmp" checkout -q -b train main
   case "$shape" in
     merge) git -C "$tmp" merge -q --no-ff --no-edit member ;;
+    ours-flat)
+      # The member head is an ancestor of the train, yet the train holds only the
+      # member's own two commits, replayed: the `ours` merge brings in no change.
+      git -C "$tmp" merge -q -s ours --no-edit member >/dev/null
+      GIT_COMMITTER_DATE="2030-01-01T00:00:00Z" git -C "$tmp" cherry-pick member~1 member >/dev/null
+      ;;
+    flat-hidden)
+      # Needs TRAIN_HIDDEN_OURS=1: the train replays K too, so it really carries it.
+      GIT_COMMITTER_DATE="2030-01-01T00:00:00Z" git -C "$tmp" cherry-pick hidden member~1 member >/dev/null
+      ;;
     flat) GIT_COMMITTER_DATE="2030-01-01T00:00:00Z" git -C "$tmp" cherry-pick member~1 member >/dev/null ;;
     flat-missing) GIT_COMMITTER_DATE="2030-01-01T00:00:00Z" git -C "$tmp" cherry-pick member >/dev/null ;;
     *) fail "setup_train_history: unknown train shape $shape" ;;
