@@ -179,7 +179,8 @@
 # The timeout is deliberate (FM_COPY_SWEEP_PLAN_TIMEOUT seconds, 120 by default):
 # the owner's rule holds a copy whose plan does not answer. The plan runs as a
 # process group of its own and the timeout kills that whole group, so neither the
-# driver nor anything it started outlives the sweep. A copy whose plan allows it
+# driver nor anything it started, nor the route's forge read, which runs in that
+# group too, outlives the sweep. A copy whose plan allows it
 # has its ignored entries, other than the regenerable class, preserved by the
 # teardown library's own preservation,
 # then released and removed by the driver as bin/fm-teardown.sh does it.
@@ -200,7 +201,11 @@
 # Exit 3 with cleanup_ignored_payload_archived_tree_retained is KEPT, not FAILED:
 # the run exits 0 and later runs neither preserve nor execute that copy again.
 # Exit 3 whose one JSON document refuses with cleanup_lease_conflict or
-# cleanup_skipped_live_or_unknown, which the driver names temporary, while the same
+# cleanup_skipped_live_or_unknown, which the driver names temporary (on the --pr
+# route that document is the lane's BLOCKED envelope with predicates_failed an
+# array holding cleanup_gate and worktree_removed the boolean false; a string, a
+# removal claim, a null or any other shape is not temporary and keeps the receipt),
+# while the same
 # copy still holds exactly the lock bytes the plan saw, released nothing: the run
 # exits 1 with the driver's words, removes the receipt and discards the preserve
 # directory this run built, so the next run plans, preserves and executes that copy
@@ -1411,6 +1416,9 @@ driver_plan_allows() {  # <clone> <copy>
   set -m
   (
     local r=0
+    # Job control stays off in here, so a background job of the plan (the forge
+    # read) is in the plan's group and the group kill below reaches it.
+    set +m
     TEARDOWN_CLOSEOUT_ROUTE_FILE=$dir/route teardown_run_closeout "$1" "$2" plan "$dir/verdict" || r=$?
     printf '%s' "$TEARDOWN_CLOSEOUT_OUT" > "$dir/out"
     printf '%s' "$r" > "$dir/rc"
@@ -1479,11 +1487,17 @@ release_still_proven() {  # <clone> <copy> <pool> <container> <HEAD> <lock-sha25
 
 # True when the driver's execute refusal is one the driver itself names
 # temporary: exit 3, and its whole answer is one JSON document refusing with
-# reason cleanup_lease_conflict or cleanup_skipped_live_or_unknown.
+# reason cleanup_lease_conflict or cleanup_skipped_live_or_unknown. On the --pr
+# route the document is the lane's BLOCKED envelope in its real shape: a
+# predicates_failed array that holds cleanup_gate, worktree_removed the boolean
+# false (it must not claim a removal), and the recovery reason. A string for
+# predicates_failed, a removal claim, a null or missing worktree_removed or any
+# other shape contradicts "nothing was released" and is not temporary, so the
+# retention receipt stays.
 execute_refusal_is_temporary() {  # <exit>
   [ "$1" = 3 ] || return 1
   if [ "$TEARDOWN_CLOSEOUT_ROUTE" = pr ]; then
-    printf '%s' "$TEARDOWN_CLOSEOUT_STDOUT" | jq -s -e 'length == 1 and (.[0] | type == "object" and .state == "BLOCKED" and (.predicates_failed | index("cleanup_gate")) != null and (.cleanup_recovery_reason == "cleanup_lease_conflict" or .cleanup_recovery_reason == "cleanup_skipped_live_or_unknown"))' >/dev/null 2>&1
+    printf '%s' "$TEARDOWN_CLOSEOUT_STDOUT" | jq -s -e 'length == 1 and (.[0] | type == "object" and .state == "BLOCKED" and (.predicates_failed | type) == "array" and (.predicates_failed | index("cleanup_gate")) != null and .worktree_removed == false and (.cleanup_recovery_reason == "cleanup_lease_conflict" or .cleanup_recovery_reason == "cleanup_skipped_live_or_unknown"))' >/dev/null 2>&1
     return
   fi
   printf '%s' "$TEARDOWN_CLOSEOUT_STDOUT" | jq -s -e 'length == 1 and (.[0] | type == "object" and .allowed == false and (.reason == "cleanup_lease_conflict" or .reason == "cleanup_skipped_live_or_unknown"))' >/dev/null 2>&1

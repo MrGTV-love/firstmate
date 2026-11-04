@@ -6558,7 +6558,7 @@ route_teardown_release_branch() {
 test_a_record_that_fails_a_condition_keeps_the_foreign_copy_and_never_reaches_the_driver() {
   local rc row phrase tip other second ok bad calls bad_pr
   other=$(printf '%040d' 0 | tr 0 b)
-  for row in tip-differs profile-missing profile-pr-mismatch pr-closed forge-fails forge-hangs merge-commit-absent \
+  for row in empty-row-first empty-row-after tip-differs profile-missing profile-pr-mismatch pr-closed forge-fails forge-hangs merge-commit-absent \
     merge-commit-off-main other-copy base-merge-off-base base-control; do
     route_teardown_world "route-condition-$row" foreign
     bad=$FOREIGN_COPY
@@ -6576,6 +6576,19 @@ test_a_record_that_fails_a_condition_keeps_the_foreign_copy_and_never_reaches_th
     route_set_pr "$FOREIGN_CASE/forge" 8 MERGED "$ROUTE_MERGE"
     route_teardown_record "$ok" 7
     case "$row" in
+      # A row that names this copy at its live tip with an empty PR and profile is
+      # not the owner's word: the copy is held whichever side of the valid row it is
+      # on (Main 010 F1; the first order is the reviewer's reproduction).
+      empty-row-first)
+        printf '%s\t%s\t\t\n' "$bad" "$tip" >> "$FOREIGN_CASE/data/supersedence-records.tsv"
+        route_teardown_record "$bad" 8
+        phrase="leaves the PR or the profile empty"
+        ;;
+      empty-row-after)
+        route_teardown_record "$bad" 8
+        printf '%s\t%s\t\t\n' "$bad" "$tip" >> "$FOREIGN_CASE/data/supersedence-records.tsv"
+        phrase="leaves the PR or the profile empty"
+        ;;
       tip-differs) route_teardown_record "$bad" 8 "$other"; phrase="names tip $other" ;;
       profile-missing) route_teardown_record "$bad" 8 "$tip" "$FOREIGN_CASE/profiles/missing.json"; phrase="is not a regular file" ;;
       profile-pr-mismatch)
@@ -6626,7 +6639,7 @@ test_a_record_that_fails_a_condition_keeps_the_foreign_copy_and_never_reaches_th
     [ "$row" = other-copy ] || assert_not_contains "$(route_teardown_calls "$bad")" "--pr" "$row: the bad copy reached the driver by the route"
     assert_absent "$FOREIGN_CASE/treehouse.log" "$row: the pool slot was returned beside a kept copy"
   done
-  pass "a teardown keeps a foreign copy whose record names another tip, a bad profile, a closed PR, an unreadable or hanging forge, or a merge commit that is missing or off the landing branch (origin/main, or the task's base_branch), with no driver call, after releasing a valid one; a PR merged onto the task's base routes"
+  pass "a teardown keeps a foreign copy whose record has an empty row at its tip before or after the valid row, names another tip, a bad profile, a closed PR, an unreadable or hanging forge, or a merge commit that is missing or off the landing branch (origin/main, or the task's base_branch), with no driver call, after releasing a valid one; a PR merged onto the task's base routes"
 }
 
 # Both of teardown's call sites: the driver would switch a primary checkout that is
@@ -6782,8 +6795,34 @@ SH
 # R5 for the teardown: the recorded cases, one real-Git world per row (the
 # generated commit of the world is the copy's tip). The staged table is private
 # Vernant data read in place; without it the case says it did not run.
+# A completing teardown ends with `fm-home-summary-refresh.sh --detach`, which
+# starts a detached worker that outlives the teardown (bin/fm-teardown.sh; the
+# only detached launch a teardown makes). This test runs a teardown per row and
+# ends the moment the last returns, so that worker could still be writing into its
+# case home while the suite's cleanup removes the tree: every row printed ok, then
+# `rm: ...: Directory not empty` and exit 1 (Main 010 F4; the same message ends
+# eight other teardown and sweep cases of the earlier suite runs, on base too). The
+# cleanup cannot stop the worker where `ps` is denied, because its reaper finds
+# processes through ps. So the test takes the launch itself: a `nohup` first on the
+# teardown's PATH answers for the refresh worker only, writes a marker in the
+# case's state and starts nothing; every other `nohup` runs for real. A completing
+# row must have left the marker, which proves the launch was reached and taken.
+route_table_nohup_stub() {  # <dir>
+  local real
+  real=$(command -v nohup) || return 1
+  mkdir -p "$1" || return 1
+  cat > "$1/nohup" <<SH
+#!/usr/bin/env bash
+case "\$*" in
+  *fm-home-summary-refresh.sh*) : > "\${FM_TEST_REFRESH_LAUNCH:?}"; exit 0 ;;
+esac
+exec "$real" "\$@"
+SH
+  chmod +x "$1/nohup"
+}
+
 test_the_recorded_cases_are_decided_by_their_records_in_teardown() {
-  local cases rows num tip cls pr state kind own label rc counts released=0 refused=0 never=0
+  local cases rows num tip cls pr state kind own label rc counts released=0 refused=0 never=0 stub
   cases=${FM_SUPERSEDENCE_CASES:-}
   if [ ! -f "$cases/d7-supersedence-table.md" ] || [ ! -f "$cases/d7-closeout-driver-report.md" ]; then
     pass "SKIPPED (not run): the staged d7 cases are not available; set FM_SUPERSEDENCE_CASES to the staged cases directory to decide the 26 rows and the PR 3446 twin"
@@ -6792,6 +6831,8 @@ test_the_recorded_cases_are_decided_by_their_records_in_teardown() {
   rows=$(route_table_rows "$cases")
   counts=$(route_table_counts "$rows")
   assert_equals "5/4/16/1" "$counts" "table: the staged table's class counts are not 5 twins, 4 ancestors, 16 closed-unmerged and 1 open"
+  stub=$TMP_ROOT/route-table-nohup
+  route_table_nohup_stub "$stub" || fail "table: could not write the nohup stub"
   while IFS=$'\t' read -r num tip cls pr state kind own; do
     label="row $num (tip $tip, class $cls, PR $pr $state, $kind)"
     route_teardown_world "route-table-$num" foreign
@@ -6803,16 +6844,17 @@ test_the_recorded_cases_are_decided_by_their_records_in_teardown() {
     else
       route_script_row "$FOREIGN_CASE" "${FOREIGN_COPY##*/}" allowed success "$pr"
     fi
-    run_foreign_teardown rc
+    FM_TEARDOWN_TEST_PATH="$stub:$PATH" run_foreign_teardown rc FM_TEST_REFRESH_LAUNCH="$FOREIGN_CASE/state/.test-refresh-launch"
     expect_code 1 "$rc" "$label: with no record the copy must be kept: $(cat "$FOREIGN_CASE/stderr")"
     assert_equals "$FOREIGN_SLOT|--cleanup-worktree $FOREIGN_COPY --execute-cleanup" "$(cat "$FOREIGN_CASE/closeout.log")" "$label: the call with no record is not the base call"
     assert_present "$FOREIGN_COPY/.git" "$label: the copy was removed with no record"
     printf 'table: %s: teardown, no record -> kept, plain call\n' "$label"
     rm -f "$FOREIGN_CASE/closeout.log"
     route_teardown_record "$FOREIGN_COPY" "$pr"
-    run_foreign_teardown rc
+    FM_TEARDOWN_TEST_PATH="$stub:$PATH" run_foreign_teardown rc FM_TEST_REFRESH_LAUNCH="$FOREIGN_CASE/state/.test-refresh-launch"
     if [ "$kind" = accept ]; then
       expect_code 0 "$rc" "$label: must be released by the route: $(cat "$FOREIGN_CASE/stderr")"
+      assert_present "$FOREIGN_CASE/state/.test-refresh-launch" "$label: the completing teardown never reached its detached refresh launch, so the stub that keeps a worker from outliving the case was not exercised"
       route_teardown_assert_execute "$FOREIGN_COPY" "$pr" "$label"
       assert_absent "$FOREIGN_COPY" "$label: the copy survived"
       released=$((released + 1))

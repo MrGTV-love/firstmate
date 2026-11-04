@@ -124,7 +124,8 @@ route_write_profile() {
 # route_install_gh <fakebin> <table-dir>: a `gh` that answers only the route's
 # read, `gh pr view <n> --repo acme/widgets --json <fields> -q ...`, from
 # <table-dir>/pr-<n> (state TAB merge-commit TAB head-branch; FAIL; HANG; GARBAGE)
-# and logs each such call to <table-dir>/gh.log.
+# and logs each such call to <table-dir>/gh.log. HANG records its pid in
+# <table-dir>/gh.pids and becomes `sleep`, so that pid is the sleeper's own.
 # Anything else goes to the fixture's own gh (kept as gh.base) or fails.
 route_install_gh() {
   local fakebin=$1 dir=$2
@@ -145,7 +146,7 @@ file="$dir/pr-\$3"
 [ -f "\$file" ] || { echo "no such pull request" >&2; exit 1; }
 case "\$(head -n 1 "\$file")" in
   FAIL) echo "forge unavailable" >&2; exit 1 ;;
-  HANG) sleep 30; exit 0 ;;
+  HANG) printf '%s\\n' "\$\$" >> "$dir/gh.pids"; exec sleep 30 ;;
   GARBAGE) echo "not a state row"; exit 0 ;;
   *) cat "\$file"; exit 0 ;;
 esac
@@ -273,7 +274,11 @@ route_assert_digest_sees() {
 # call's {"allowed": true}), silent, hang, retain (the dry-run envelope with the
 # ignored-payload retain key). Execute kinds: success, lie (the success envelope
 # after it unlocked the copy but left it in place), success-done (state DONE), blocked (a cleanup_tip_unbound refusal), retained
-# (the archived-tree-retained refusal), temporary (a lease conflict), allowed-doc.
+# (the archived-tree-retained refusal), temporary (a lease conflict), allowed-doc,
+# and four malformed or contradictory temporary refusals that must not read as one:
+# temporary-string (predicates_failed a string and worktree_removed true, the shape
+# Main 010 F3 reproduced), temporary-string-kept (a string, worktree_removed false),
+# temporary-removed (an array but worktree_removed true) and temporary-removed-null.
 route_script_row() {
   local dir=$1/ans/$2 pr=${5:-7}
   mkdir -p "$dir"
@@ -297,6 +302,10 @@ route_script_row() {
     blocked) route_envelope BLOCKED '["cleanup_gate"]' false '"cleanup_tip_unbound"' "$pr" > "$dir/exec.out"; printf 3 > "$dir/exec.exit" ;;
     retained) route_envelope BLOCKED '["cleanup_gate"]' false '"cleanup_ignored_payload_archived_tree_retained"' "$pr" > "$dir/exec.out"; printf 3 > "$dir/exec.exit" ;;
     temporary) route_envelope BLOCKED '["cleanup_gate"]' false '"cleanup_lease_conflict"' "$pr" > "$dir/exec.out"; printf 3 > "$dir/exec.exit" ;;
+    temporary-string) route_envelope BLOCKED '"cleanup_gate"' true '"cleanup_lease_conflict"' "$pr" > "$dir/exec.out"; printf 3 > "$dir/exec.exit" ;;
+    temporary-string-kept) route_envelope BLOCKED '"cleanup_gate"' false '"cleanup_lease_conflict"' "$pr" > "$dir/exec.out"; printf 3 > "$dir/exec.exit" ;;
+    temporary-removed) route_envelope BLOCKED '["cleanup_gate"]' true '"cleanup_lease_conflict"' "$pr" > "$dir/exec.out"; printf 3 > "$dir/exec.exit" ;;
+    temporary-removed-null) route_envelope BLOCKED '["cleanup_gate"]' null '"cleanup_lease_conflict"' "$pr" > "$dir/exec.out"; printf 3 > "$dir/exec.exit" ;;
     allowed-doc) echo '{"allowed": true}' > "$dir/exec.out"; printf 0 > "$dir/exec.exit" ;;
   esac
 }

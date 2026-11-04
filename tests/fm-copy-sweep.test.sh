@@ -3330,6 +3330,132 @@ SH
   pass "a plan never asks the driver while the slot's checkout is on the PR's head branch, so the slot's branch, HEAD, working tree and marker stay as they were, and a PR with another head branch still routes from that slot; the working-tree digest sees a switch to main, a tracked edit and an untracked file"
 }
 
+# A row that names this copy at its live tip but leaves the PR or the profile empty,
+# gives a PR that is no decimal integer, or disagrees with another such row is not
+# the owner's word, so the copy is held with no driver call whatever the order of
+# the rows. The scripted driver would allow every route call, so only Firstmate's
+# own check can keep a bad copy; a copy with one valid row in the same run routes.
+# The first variant in the first order is the reviewer's reproduction (Main 010 F1).
+test_a_matching_record_row_that_is_empty_or_conflicts_holds_the_copy_in_either_row_order() {
+  local variant order name tip bad phrase count n=0 line path
+  local -a variants=(empty-both empty-pr empty-profile non-integer-pr other-pr relative-profile) cases=() phrases=()
+  route_world route-matching-rows
+  route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE"
+  route_set_pr "$W/forge" 8 MERGED "$ROUTE_MERGE"
+  route_copy ok 7
+  for order in invalid-first valid-first; do
+    for variant in "${variants[@]}"; do
+      name=bad-$variant-$order
+      add_copy "$name"
+      route_lock_dead "$name"
+      route_script_row "$W" "$name" allowed success 7
+      tip=$(route_tip "$name")
+      path=$(copy_path "$name")
+      route_write_profile "$W/profiles/$name.json" 7 "$tip"
+      route_write_profile "$W/profiles/$name.8.json" 8 "$tip"
+      case "$variant" in
+        empty-both) bad=$(printf '%s\t%s\t\t' "$path" "$tip"); phrase="leaves the PR or the profile empty" ;;
+        empty-pr) bad=$(printf '%s\t%s\t\t%s' "$path" "$tip" "$W/profiles/$name.json"); phrase="leaves the PR or the profile empty" ;;
+        empty-profile) bad=$(printf '%s\t%s\t7\t' "$path" "$tip"); phrase="leaves the PR or the profile empty" ;;
+        non-integer-pr) bad=$(printf '%s\t%s\t8a\t%s' "$path" "$tip" "$W/profiles/$name.json"); phrase="'8a' is not a decimal integer" ;;
+        other-pr) bad=$(printf '%s\t%s\t8\t%s' "$path" "$tip" "$W/profiles/$name.8.json"); phrase="two records bind this copy at its tip to different PRs or profiles" ;;
+        relative-profile) bad=$(printf '%s\t%s\t7\t%s' "$path" "$tip" "profiles/$name.json"); phrase="two records bind this copy at its tip to different PRs or profiles" ;;
+      esac
+      if [ "$order" = invalid-first ]; then
+        printf '%s\n' "$bad" >> "$HOMED/data/supersedence-records.tsv"
+        route_record "$name" 7 "$tip" "$W/profiles/$name.json"
+      else
+        route_record "$name" 7 "$tip" "$W/profiles/$name.json"
+        printf '%s\n' "$bad" >> "$HOMED/data/supersedence-records.tsv"
+      fi
+      cases+=("$name")
+      phrases+=("$phrase")
+    done
+  done
+  FM_TEARDOWN_FORGE_TIMEOUT=2 FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT=100 route_sweep --apply
+  route_assert_released ok matching-rows
+  route_assert_calls ok 7 matching-rows
+  for name in "${cases[@]}"; do
+    line=$(route_line_of "$name")
+    count=$(route_calls_for "$name" | grep -c . || true)
+    printf 'matching rows %s: %s; driver calls for it: %s; reason: %s\n' "$name" \
+      "$([ -e "$(copy_path "$name")" ] && printf kept || printf RELEASED)" "$count" "$(printf '%s' "$line" | awk -F '\t' '{ print substr($NF, 1, 200) }')"
+    n=$((n + 1))
+  done
+  n=0
+  for name in "${cases[@]}"; do
+    route_assert_kept "$name" "$name"
+    assert_equals "" "$(route_calls_for "$name")" "$name: an invalid or conflicting matching row let the copy reach the driver"
+    assert_contains "$(route_line_of "$name")" "${phrases[$n]}" "$name: the reason does not name the failed condition"
+    n=$((n + 1))
+  done
+  pass "a row that names the copy at its live tip with an empty PR or profile, a PR that is no decimal integer, or a PR or profile that disagrees with another such row holds the copy with no driver call whether it comes before or after the valid row (${#cases[@]} cases), while a copy with one valid row is released in the same run"
+}
+
+# The forge read is bounded by the plan: when the plan's bound passes or the sweep
+# is stopped, the read stops with it (Main 010 F2). The fake forge records its pid
+# and becomes `sleep`, so the pid it records is the sleeper's own and a read that
+# outlives the plan is visible. The control is a forge that answers at once.
+forge_reads_are_gone() {  # <log-dir> <seconds>
+  local pid waited=0 alive
+  while [ "$waited" -le $(($2 * 10)) ]; do
+    alive=
+    if [ -f "$1/gh.pids" ]; then
+      while IFS= read -r pid; do
+        ! kill -0 "$pid" 2>/dev/null || alive="$alive $pid"
+      done < "$1/gh.pids"
+    fi
+    [ -n "$alive" ] || return 0
+    sleep 0.1
+    waited=$((waited + 1))
+  done
+  FORGE_ALIVE=$alive
+  return 1
+}
+
+test_a_plan_that_times_out_or_is_stopped_leaves_no_forge_read_running() {
+  local sweep waited=0 pid
+  FORGE_ALIVE=
+  route_world route-forge-lifetime
+  route_set_pr "$W/forge" 7 HANG
+  route_copy slow 7
+  FM_COPY_SWEEP_PLAN_TIMEOUT=3 FM_TEARDOWN_FORGE_TIMEOUT=25 route_sweep --apply
+  [ "$RC" = 0 ] || fail "forge lifetime: a held plan must not fail the run ($RC): $OUT"
+  route_assert_kept slow "forge lifetime"
+  assert_contains "$(route_line_of slow)" "did not answer within 3s" "forge lifetime: the plan's bound is not named"
+  assert_equals "" "$(route_calls_for slow)" "forge lifetime: the copy reached the driver while the forge read was unfinished"
+  [ -s "$W/forge/gh.pids" ] || fail "forge lifetime: the fake forge never ran"
+  forge_reads_are_gone "$W/forge" 3 || { for pid in $FORGE_ALIVE; do kill -s KILL "$pid" 2>/dev/null; done; fail "forge lifetime: the forge read outlived the sweep's plan bound (pid$FORGE_ALIVE)"; }
+  printf 'forge lifetime: plan bound 3s, forge bound 25s: kept, no driver call, forge pids %s gone within 3s of the sweep returning\n' "$(tr '\n' ' ' < "$W/forge/gh.pids")"
+  route_world route-forge-stopped
+  route_set_pr "$W/forge" 7 HANG
+  route_copy stopped 7
+  (
+    FM_COPY_SWEEP_PLAN_TIMEOUT=120 FM_TEARDOWN_FORGE_TIMEOUT=120 FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" \
+      sweep_cmd --apply > "$W/stopped.out" 2>&1
+  ) &
+  sweep=$!
+  while [ ! -s "$W/forge/gh.pids" ] && [ "$waited" -lt 100 ]; do
+    sleep 0.1
+    waited=$((waited + 1))
+  done
+  [ -s "$W/forge/gh.pids" ] || { kill "$sweep" 2>/dev/null; fail "forge lifetime: the forge read never started"; }
+  kill -s TERM "$sweep"
+  wait "$sweep" 2>/dev/null || true
+  forge_reads_are_gone "$W/forge" 3 || { for pid in $FORGE_ALIVE; do kill -s KILL "$pid" 2>/dev/null; done; fail "forge lifetime: the forge read outlived a sweep stopped during the plan (pid$FORGE_ALIVE)"; }
+  [ -e "$(copy_path stopped)" ] || fail "forge lifetime: a sweep stopped during the forge read removed the copy"
+  assert_equals "" "$(route_calls_for stopped)" "forge lifetime: a stopped sweep reached the driver"
+  printf 'forge lifetime: sweep stopped with TERM during the forge read: forge pids %s gone within 3s\n' "$(tr '\n' ' ' < "$W/forge/gh.pids")"
+  route_world route-forge-fast
+  route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE"
+  route_copy fast 7
+  FM_COPY_SWEEP_PLAN_TIMEOUT=3 FM_TEARDOWN_FORGE_TIMEOUT=25 route_sweep --apply
+  [ "$RC" = 0 ] || fail "forge lifetime control: the run failed ($RC): $OUT"
+  route_assert_released fast "forge lifetime control"
+  route_assert_calls fast 7 "forge lifetime control"
+  pass "a forge read that is still running when the plan's bound passes or the sweep is stopped ends with the plan, the copy is held with no driver call, and a forge that answers at once still routes"
+}
+
 # R3: the driver's answer is the only authority and is read in its real shape.
 # One world per stage keeps the run short: a control copy that is released and one
 # copy per scripted answer.
@@ -3430,6 +3556,82 @@ test_the_routes_answers_are_read_in_their_real_shape_and_fail_closed() {
   pass "a route plan proceeds only on exit 3 with the dry-run envelope and a route execute releases only on exit 0 with the success envelope and a removed copy; every other answer keeps the copy with the driver's words and the route named, with the receipt and release slot as for a plain execute and the retained-tree and temporary-refusal rules unchanged"
 }
 
+# A refusal is temporary only in the driver's valid, non-contradictory shape: the
+# --pr lane's BLOCKED envelope whose predicates_failed is an array that holds
+# cleanup_gate, with worktree_removed false (_compact_envelope in the real driver
+# prints a boolean there) and a recovery reason the driver names temporary. Any
+# other shape is not proof that nothing was released, so the retention receipt
+# stays (Main 010 F3). The first malformed kind is the reviewer's reproduction.
+test_a_malformed_or_contradictory_temporary_refusal_keeps_the_retention_receipt() {
+  local kind receipt line
+  local -a kinds=(temporary-string temporary-string-kept temporary-removed temporary-removed-null)
+  route_world route-temporary-shapes
+  route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE"
+  for kind in "${kinds[@]}" temporary; do
+    route_copy "x-$kind" 7 allowed "$kind"
+  done
+  FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT=100 route_sweep --apply
+  [ "$RC" = 1 ] || fail "temporary shapes: a refused execute must exit 1, got $RC: $OUT"
+  for kind in "${kinds[@]}" temporary; do
+    receipt="$HOMED/data/copy-sweep/retained/$(printf '%s' "$(copy_path "x-$kind")" | shasum -a 256 | awk '{print $1}')"
+    line=$(printf '%s\n' "$OUT" | grep -F "$(copy_path "x-$kind")" | head -n 3)
+    printf 'temporary shape %s: %s; receipt: %s\n' "$kind" "$(printf '%s' "$line" | head -n 1 | awk -F '\t' '{ print $1 ": " substr($NF, 1, 140) }')" "$([ -e "$receipt" ] && printf kept || printf cleared)"
+    assert_equals 2 "$(route_calls_for "x-$kind" | wc -l | tr -d ' ')" "temporary shape $kind: the driver was not asked once to plan and once to execute"
+    route_assert_kept "x-$kind" "temporary shape $kind"
+    if [ "$kind" = temporary ]; then
+      assert_absent "$receipt" "temporary shape $kind: the receipt of a valid temporary refusal was kept"
+    else
+      assert_present "$receipt" "temporary shape $kind: the retention receipt was cleared for a malformed or contradictory answer"
+      assert_contains "$line" "FAILED" "temporary shape $kind: not reported FAILED"
+    fi
+  done
+  # The message is printed once per recognised refusal and names the copy by a
+  # shortened path, so it is counted over the whole output: only the control reads.
+  assert_equals 1 "$(printf '%s\n' "$OUT" | grep -c 'names this refusal temporary')" "temporary shapes: a malformed answer was read as a temporary refusal, or the valid one was not"
+  pass "only the valid temporary refusal (BLOCKED, predicates_failed an array with cleanup_gate, worktree_removed false, a lease conflict) clears the retention receipt; a string predicates_failed, a removal claim or a null worktree_removed keeps the receipt and reports a failure"
+}
+
+# The two facts the hold matrix needs before it trusts a comparison: the prior
+# receipt of the retained-receipt class exists (the setup must have made it), and
+# the driver log holds no call of any kind for a held copy. Each returns a reason
+# instead of failing so the control below can show it fails (Main 010 F8).
+ROUTE_HOLD_WHY=
+route_hold_receipt_exists() {  # <copy-name>
+  local receipt
+  receipt=$HOMED/data/copy-sweep/retained/$(printf '%s' "$(copy_path "$1")" | shasum -a 256 | awk '{print $1}')
+  ROUTE_HOLD_WHY=
+  [ -f "$receipt" ] && return 0
+  ROUTE_HOLD_WHY="the prior receipt $receipt does not exist"
+  return 1
+}
+
+route_hold_driver_silent() {
+  ROUTE_HOLD_WHY=
+  [ ! -s "$W/closeout.log" ] && return 0
+  ROUTE_HOLD_WHY="the driver was invoked: $(head -n 2 "$W/closeout.log" | tr '\n' ' ')"
+  return 1
+}
+
+test_the_hold_matrix_checks_fail_without_a_receipt_and_after_any_driver_call() {
+  local receipt
+  route_world route-hold-checks
+  route_copy held 7
+  route_hold_receipt_exists held && fail "hold checks: a copy with no receipt passed the receipt check"
+  assert_contains "$ROUTE_HOLD_WHY" "does not exist" "hold checks: the missing receipt is not named"
+  route_hold_driver_silent || fail "hold checks: a world with no driver call failed the silence check: $ROUTE_HOLD_WHY"
+  printf '%s|--cleanup-worktree %s\n' "$SLOT" "$(copy_path held)" > "$W/closeout.log"
+  route_hold_driver_silent && fail "hold checks: a plain driver call passed the silence check"
+  printf '%s|--cleanup-worktree %s --pr 7\n' "$SLOT" "$(copy_path held)" > "$W/closeout.log"
+  route_hold_driver_silent && fail "hold checks: a route driver call passed the silence check"
+  : > "$W/closeout.log"
+  route_hold_driver_silent || fail "hold checks: an empty driver log failed the silence check: $ROUTE_HOLD_WHY"
+  receipt=$HOMED/data/copy-sweep/retained/$(printf '%s' "$(copy_path held)" | shasum -a 256 | awk '{print $1}')
+  mkdir -p "$(dirname "$receipt")"
+  printf 'x\n' > "$receipt"
+  route_hold_receipt_exists held || fail "hold checks: a present receipt failed the receipt check: $ROUTE_HOLD_WHY"
+  pass "the hold matrix's receipt check fails for a copy with no receipt, its silence check fails after a plain or a route driver call, and both pass in their good states"
+}
+
 # R4: every hold before the driver is asked still holds with a valid record.
 test_a_valid_record_releases_no_copy_that_the_sweep_holds_before_the_driver() {
   local class with without state_dir
@@ -3457,6 +3659,9 @@ test_a_valid_record_releases_no_copy_that_the_sweep_holds_before_the_driver() {
       retained-receipt)
         route_script_row "$W" held allowed blocked 7
         route_sweep --apply
+        # The receipt is the held class: it must exist before the two runs are
+        # compared, or the comparison holds nothing (Main 010 F8).
+        route_hold_receipt_exists held || fail "hold $class: $ROUTE_HOLD_WHY"
         rm -f "$W/closeout.log"
         ;;
     esac
@@ -3480,8 +3685,11 @@ test_a_valid_record_releases_no_copy_that_the_sweep_holds_before_the_driver() {
     printf 'hold %s: with a record: %s\n' "$class" "$(printf '%s' "$with" | awk -F '\t' '{ print $1 ": " substr($NF, 1, 160) }')"
     printf 'hold %s: without a record: %s\n' "$class" "$(printf '%s' "$without" | awk -F '\t' '{ print $1 ": " substr($NF, 1, 160) }')"
     route_assert_kept held "hold $class"
-    if [ -f "$W/closeout.log" ]; then
-      assert_not_contains "$(cat "$W/closeout.log")" "--pr" "hold $class: the route reached the driver for a held copy"
+    # A held copy is never asked: no driver call of any kind, plain or route, in
+    # either run (the log is empty or absent), not just no --pr.
+    route_hold_driver_silent || fail "hold $class: $ROUTE_HOLD_WHY"
+    if [ "$class" = retained-receipt ]; then
+      route_hold_receipt_exists held || fail "hold $class: the run cleared the receipt it was holding on: $ROUTE_HOLD_WHY"
     fi
     [ -z "${LIVE_PID:-}" ] || { kill "$LIVE_PID" 2>/dev/null || true; LIVE_PID=; }
   done
@@ -3671,8 +3879,12 @@ test_help_and_bad_calls
 test_the_route_comparator_accepts_both_orders_and_rejects_every_wrong_call
 test_a_record_makes_the_sweep_ask_the_driver_by_its_pr_route_and_no_record_changes_nothing
 test_a_record_that_fails_any_condition_keeps_the_copy_and_never_reaches_the_driver
+test_a_matching_record_row_that_is_empty_or_conflicts_holds_the_copy_in_either_row_order
+test_a_plan_that_times_out_or_is_stopped_leaves_no_forge_read_running
 test_a_plan_never_asks_the_driver_while_the_slots_checkout_is_on_the_prs_head_branch
 test_the_routes_answers_are_read_in_their_real_shape_and_fail_closed
+test_a_malformed_or_contradictory_temporary_refusal_keeps_the_retention_receipt
+test_the_hold_matrix_checks_fail_without_a_receipt_and_after_any_driver_call
 test_a_valid_record_releases_no_copy_that_the_sweep_holds_before_the_driver
 test_the_recorded_cases_are_decided_by_their_records_and_the_drivers_scripted_answers
 pass "fm-copy-sweep"
