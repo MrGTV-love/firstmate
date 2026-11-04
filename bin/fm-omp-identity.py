@@ -419,7 +419,7 @@ def decide_role(args, stdin):
 def _read_fact(command, pid):
     try:
         result = subprocess.run([sys.executable, "-I", PROC_INFO, command, str(pid)], stdout=subprocess.PIPE,
-                                stderr=subprocess.DEVNULL, check=False, timeout=20)
+                                stderr=subprocess.DEVNULL, check=False)
     except (OSError, subprocess.SubprocessError):
         return None
     if result.returncode != 0:

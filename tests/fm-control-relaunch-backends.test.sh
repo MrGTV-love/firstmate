@@ -2017,6 +2017,7 @@ bun_spawn() { # <name> <stdin-kind> <executable|-> <argv...> -> BUN_PID once the
 bun_launch() { # <name> <args...> : the launcher execs the stand-in runtime on a pseudo-terminal
   local name=$1
   shift
+  bun_tree
   bun_spawn "$name" tty /bin/sh /bin/sh "$BUN_TREE/omp" "$@"
 }
 # Two identical launches started back to back; BUN_PID_A and BUN_PID_B share one whole second unless the clock ticked.
