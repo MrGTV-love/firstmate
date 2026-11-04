@@ -313,6 +313,8 @@ EOF
 #   FM_SLOT_GUARD_TASK         this spawn's task id
 #   FM_SLOT_GUARD_ARCHIVE_ROOT the data directory holding */merge-prune-preserved
 #   FM_SLOT_GUARD_PANE_PID     the acquired endpoint's shell pid, or empty
+#   FM_SLOT_GUARD_PANE_RUNNER  the spawn's in-pane runner, for the in-pane cwd probe
+#   FM_SLOT_GUARD_REPORT_DIR   the task's data directory, where that probe reports
 # FM_SLOT_RESET_GUARD_SEAM (test only) is run once between the two observations, and
 # FM_SLOT_RESET_GUARD_HOLDER_SEAM (test only) right after the final pass's holder probes.
 FM_SLOT_GUARD_PROJECT=
