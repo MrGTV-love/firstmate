@@ -76,21 +76,39 @@
 # cannot bypass an older one. Killed waiters, and waiters stopped for a second
 # while a slot sits free, are skipped automatically. After an update to this
 # gate merges, restart in-flight lints that still run the older code.
-# The pool bounds the resident memory of the ShellCheck processes this script
-# starts, host-wide, in bytes. FM_LINT_HOST_RSS_KIB is that budget (a positive
-# decimal KiB count, default 12582912 = 12 GiB, the
-# per-root bound plus one reserve and headroom, so a lone run is never held back). A cold root takes its turn only
-# when the held roots plus one reserve fit it: each held root is charged the
-# larger of FM_LINT_ROOT_RESERVE_KIB (default 2097152 = 2 GiB, also the charge
-# of a root not yet measured) and the resident size of its gate's whole process
-# tree, read from the live process table when the root asks for its turn. An
-# empty pool always admits one root, so a root larger than the budget runs alone
-# and queued roots wait rather than fail. Admission is the only control: a
-# running root is neither paused nor ended by the budget, so a root admitted on a
-# reading can grow past its charge up to its own per-root bound below, and the
-# aggregate can exceed the budget by that growth. Unreadable process tables
-# charge every held root and the new root the per-root worst case (the resident
-# watch bound, or the address-space limit under the enforced envelope).
+# The pool bounds the memory of the ShellCheck processes this script starts,
+# host-wide, in bytes. FM_LINT_HOST_RSS_KIB is that budget (a positive decimal
+# KiB count, default 12582912 = 12 GiB: the 8 GiB per-root watch bound below
+# plus headroom, so one root at its bound still leaves room for small roots).
+# Each root is charged its own recorded peak, the larger of resident size and
+# physical footprint over its earlier runs, kept per repo-relative root path in
+# the pool's history/ directory. The history lives in the pool, not the lint
+# cache, because the cache depends on HOME and is off for cold runs, and the
+# pool is the one directory every run of this user shares. A root with no
+# history is charged the per-root worst case (the 8 GiB resident watch bound,
+# or the address-space limit under the enforced envelope) until it has one.
+# A cold root takes its turn only when its charge plus every held root's
+# current charge fits the budget; a held root's current charge is the larger
+# of its charge at admission and what its tree holds now, read when the root
+# asks for its turn. That reading is the live process table (resident size
+# only, from ps or libproc) and, where the macOS watch runs, the watch's own
+# peak of resident size and footprint. A held root is charged the worst case
+# when the table cannot be read or its record names no charge. An empty pool
+# always admits one root, so a root larger than the budget runs alone and
+# queued roots wait rather than fail. When a root ends, its record is raised to
+# the peak this run measured (the watch's peak and /usr/bin/time's maximum
+# resident size) if that is higher; a record is never lowered, so the narrower
+# memory retry cannot shrink it. A gate ended by KILL raises no record, and
+# without /usr/bin/time and the macOS watch no record forms, so every root stays
+# charged the worst case. The remaining worst case is the budget plus the sum of
+# each running root's excess over its record: on macOS the watch caps that
+# excess at 8 GiB minus the record; on Linux without the enforced envelope
+# nothing caps it. Reading the excess stops new admissions but does not shrink
+# a running root, which keeps its excess until it ends and its record is
+# raised. A lone default two-worker run keeps both workers only while
+# both roots' charges fit the budget: on a pool with no history it runs one
+# root at a time until its roots are recorded, and two recorded roots of 7.2
+# GiB each (14.4 GiB) also run one at a time.
 # Admission also needs a free slot among the count cap; fairness does not
 # increase host concurrency.
 # FM_LINT_SLOT_DIR defaults to /var/tmp/firstmate-lint-<uid>/lint-slots, which
@@ -100,11 +118,9 @@
 # Runs share a pool only when they use the same slot directory, so overrides must
 # select the same directory to share the host bound.
 # FM_LINT_HOST_SLOTS sets the count cap; unset or empty uses max(2, floor(ncpu/2)).
-# A nonempty FM_LINT_HOST_SLOTS, FM_LINT_HOST_RSS_KIB or FM_LINT_ROOT_RESERVE_KIB
-# must be a positive decimal integer without leading zeros, or lint exits 2, even
-# with the pool off. A lone default two-worker run keeps both workers unless an
-# explicit cap of one is selected, and holds at most two reserves of the budget.
-# The per-root address-space limit is enforced only where ulimit -v works, and
+# A nonempty FM_LINT_HOST_SLOTS or FM_LINT_HOST_RSS_KIB must be a positive
+# decimal integer without leading zeros, or lint exits 2, even with the pool
+# off. The per-root address-space limit is enforced only where ulimit -v works, and
 # native macOS cannot enforce it.
 # On native macOS, where the enforced envelope below does not apply, each root's
 # process tree is instead watched for memory, the larger of its resident size
@@ -368,7 +384,8 @@ fm_lint_exec_root() {  # <path> <stdout-file> <stderr-file> <rss-file> <seconds>
   wait_file="$rss_file.wait"
   rm -f "$wait_file" "$rss_file.cache" "$rss_file.cache.wait"
   if [ "${FM_LINT_INTERNAL_SLOT_DIR:-off}" != off ]; then
-    gate_command=("${FM_LINT_PERL_BIN:-perl}" "$SELF_DIR/fm-lint-cache.pl" gate \
+    gate_command=(env "FM_LINT_INTERNAL_ROOT_KEY=${path#"$ROOT"/}" "FM_LINT_INTERNAL_ROOT_RSS_FILE=$rss_file" \
+      "${FM_LINT_PERL_BIN:-perl}" "$SELF_DIR/fm-lint-cache.pl" gate \
       "$FM_LINT_INTERNAL_SLOT_DIR" "$FM_LINT_INTERNAL_NCPU" "$FM_LINT_INTERNAL_RUN_ID" "$wait_file" --)
   fi
   if [ "${FM_LINT_INTERNAL_BOUNDED:-none}" != none ]; then
@@ -1894,8 +1911,7 @@ HOST_POOL_ROOT=/var/tmp/firstmate-lint-$(id -u 2>/dev/null || printf 0)
 SLOT_DIR=${FM_LINT_SLOT_DIR:-$HOST_POOL_ROOT/lint-slots}
 for pool_pair in \
   "FM_LINT_HOST_SLOTS=${FM_LINT_HOST_SLOTS:-1}" \
-  "FM_LINT_HOST_RSS_KIB=${FM_LINT_HOST_RSS_KIB:-1}" \
-  "FM_LINT_ROOT_RESERVE_KIB=${FM_LINT_ROOT_RESERVE_KIB:-1}"; do
+  "FM_LINT_HOST_RSS_KIB=${FM_LINT_HOST_RSS_KIB:-1}"; do
   case "${pool_pair#*=}" in
     ''|0*|*[!0-9]*)
       pool_name=${pool_pair%%=*}
@@ -2100,8 +2116,8 @@ fm_lint_run_worker() {  # <worker-index>
   worker_env+=(FM_LINT_INTERNAL_CACHE="$CACHE_DIR" FM_LINT_INTERNAL_SLOT_DIR="$SLOT_DIR" FM_LINT_INTERNAL_NCPU="$NCPU")
   worker_env+=(FM_LINT_INTERNAL_RUN_ID="$$")
   # The most one root can hold: its address-space limit under the enforced
-  # envelope, else the resident watch bound. The gate charges it when it cannot
-  # read the process table.
+  # envelope, else the resident watch bound. The gate charges it for a root with
+  # no recorded peak, and for held roots when it cannot read the process table.
   if [ "$BOUND_MECH" != none ]; then
     worker_env+=(FM_LINT_INTERNAL_ROOT_CAP_KIB="$ROOT_MEMORY_KIB")
   else
