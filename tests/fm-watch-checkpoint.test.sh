@@ -270,7 +270,13 @@ SH
     fail "the bound child never reached its delayed process-group setup"
   }
   read -r child watchdog owner < "$home/slow-pgrp.mark"
-  watchdog_parent=$(ps -o ppid= -p "$watchdog" 2>/dev/null | tr -d ' ')
+  watchdog_parent=$(fm_test_process_read ppid "$watchdog") || {
+    kill -KILL -- "-$checkpoint_pid" "-$watchdog" "-$child" 2>/dev/null || true
+    kill -KILL "$child" "$watchdog" 2>/dev/null || true
+    wait "$checkpoint_pid" 2>/dev/null || true
+    fail 'could not observe the bound parent; ownership is unknown'
+  }
+  watchdog_parent=${watchdog_parent//[[:space:]]/}
   if [ "$owner" != "$checkpoint_pid" ] || [ "$watchdog_parent" != "$checkpoint_pid" ]; then
     kill -KILL -- "-$checkpoint_pid" "-$watchdog" "-$child" 2>/dev/null || true
     kill -KILL "$child" "$watchdog" 2>/dev/null || true

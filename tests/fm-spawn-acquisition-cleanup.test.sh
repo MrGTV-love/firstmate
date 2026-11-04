@@ -665,7 +665,14 @@ p.add_argument('--owned-path', action='append', required=True)
 a = p.parse_args()
 holder = int(pathlib.Path(os.environ['FM_TEST_SLOT_HOLDER']).read_text())
 parents = {}
-for row in subprocess.check_output(['ps', '-A', '-o', 'pid=,ppid='], text=True).splitlines():
+try:
+    table = subprocess.check_output(['ps', '-A', '-o', 'pid=,ppid='], text=True)
+except PermissionError:
+    table = subprocess.check_output([sys.executable, os.environ['FM_TEST_PROC_INFO'],
+                                     'table', 'pid,ppid'], text=True)
+if not table.strip():
+    raise RuntimeError('fixture process ancestry is unavailable')
+for row in table.splitlines():
     fields = row.split()
     if len(fields) == 2:
         parents[int(fields[0])] = int(fields[1])
@@ -689,6 +696,7 @@ PY
   printf 'MODE=success\nLEASE=%q\nPIDFILE=%q\nALLOW=%q\nARRIVED=%q\nDEST=%q\nTICKS=%q\n' \
     "$SLOT_CASE/lease" "$SLOT_CASE/get-pid" "$SLOT_CASE/allow" "$SLOT_CASE/arrived" "$SLOT_COPY" "$SLOT_CASE/ticks" > "$TMP_ROOT/get-config"
   : > "$SLOT_CASE/ticks"
+  "$REAL_TMUX" set-environment -g FM_TEST_PROC_INFO "$FM_TEST_PROC_INFO"
   "$REAL_TMUX" set-environment -g FM_TEST_SLOT_HOLDER "$SLOT_CASE/get-pid"
   "$REAL_TMUX" set-environment -g FM_TEST_SLOT_RECORD "$SLOT_CASE/manifest.json"
   fm_test_spawn_brief "$FM_HOME" "$SLOT_ID" 'Provision from the actual acquired pane before admission.'

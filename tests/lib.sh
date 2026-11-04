@@ -476,13 +476,30 @@ fm_test_track_process() {  # <pidfile> <command-needle>
   printf '%s\t%s\n' "$1" "$2" >> "$FM_TEST_PROCESS_REGISTRY"
 }
 
-fm_test_process_start() {
-  local pid=$1 ps_bin=/bin/ps start
+# Read a fixture process fact through ps, or the existing native reader when
+# confinement refuses to execute ps. A failed or empty read is never data.
+export FM_TEST_PROC_INFO="$ROOT/bin/fm-proc-info.py"
+fm_test_process_read() {  # <lstart|args|ppid|pgid> <pid>
+  local field=$1 pid=$2 ps_bin=/bin/ps column value
   case "$pid" in '' | *[!0-9]*) return 1 ;; esac
+  case "$field" in
+    args) column=command ;;
+    lstart | ppid | pgid) column=$field ;;
+    *) return 1 ;;
+  esac
   [ -x "$ps_bin" ] || ps_bin=/usr/bin/ps
-  start=$(LC_ALL=C "$ps_bin" -o lstart= -p "$pid" 2>/dev/null) || return 1
-  [ -n "$start" ] || return 1
-  printf '%s\n' "$start"
+  value=$(LC_ALL=C "$ps_bin" -o "$column=" -p "$pid" 2>/dev/null)
+  case $? in
+    0) ;;
+    126) value=$(LC_ALL=C python3 "$FM_TEST_PROC_INFO" "$field" "$pid") || return 1 ;;
+    *) return 1 ;;
+  esac
+  [ -n "$value" ] || return 1
+  printf '%s\n' "$value"
+}
+
+fm_test_process_start() {
+  fm_test_process_read lstart "$1"
 }
 
 fm_test_record_process() {
@@ -491,18 +508,17 @@ fm_test_record_process() {
   printf '%s\t%s\n' "$pid" "$start" > "$1"
 }
 
-export -f fm_test_process_start fm_test_record_process
+export -f fm_test_process_read fm_test_process_start fm_test_record_process
 
 fm_test_process_alive() {  # <pidfile> <command-needle>
-  local pid start live_start command ps_bin=/bin/ps
+  local pid start live_start command
   FM_TEST_PROCESS_PID=
   IFS=$'\t' read -r pid start 2>/dev/null < "$1" || return 1
   case "$pid" in '' | *[!0-9]*) return 1 ;; esac
   [ -n "$start" ] || return 1
   live_start=$(fm_test_process_start "$pid") || return 1
   [ "$live_start" = "$start" ] || return 1
-  [ -x "$ps_bin" ] || ps_bin=/usr/bin/ps
-  command=$("$ps_bin" -o command= -p "$pid" 2>/dev/null) || return 1
+  command=$(fm_test_process_read args "$pid") || return 1
   case "$command" in *"$2"*) FM_TEST_PROCESS_PID=$pid; return 0 ;; esac
   return 1
 }
@@ -513,7 +529,8 @@ fm_test_reap_processes() {
   while IFS=$'\t' read -r pidfile needle; do
     fm_test_process_alive "$pidfile" "$needle" || continue
     pid=$FM_TEST_PROCESS_PID
-    pgid=$(ps -o pgid= -p "$pid" 2>/dev/null | tr -d ' ')
+    pgid=$(fm_test_process_read pgid "$pid") || return 1
+    pgid=${pgid//[[:space:]]/}
     # Only a group the stub leads is its own to take down; a stub that shares
     # the test's group is signalled alone.
     if [ -n "$pgid" ] && [ "$pgid" = "$pid" ]; then

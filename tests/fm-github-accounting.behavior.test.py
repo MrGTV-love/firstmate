@@ -497,8 +497,9 @@ printf 'api_response:\\n  body: used=23 reset=1794000000 limit=5000 remaining=49
         self.assertIn("observed", [row["status"] for row in rows])
 
     def test_quiet_ps_is_killed_and_does_not_stop_the_quota_stream(self):
-        # Only the owner's table read hangs; the shared CPU sampler reads the real ps.
-        self.tool("ps", f'''[ "$1" != -axo ] || {{ printf '%s' "$$" > "$FIXTURE_ROOT/ps-pid"; exec sleep 600; }}
+        # Hang one owner scan, then remove the shim so CPU sampling invokes ps
+        # directly, including the product's PermissionError fallback when confined.
+        self.tool("ps", f'''[ "$1" != -axo ] || {{ rm -- "$0"; printf '%s' "$$" > "$FIXTURE_ROOT/ps-pid"; exec sleep 600; }}
 exec {shutil.which("ps")} "$@"
 ''')
         self.tool("gh-axi", ''': > "$FIXTURE_ROOT/quota-asked"
