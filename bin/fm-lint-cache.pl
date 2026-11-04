@@ -45,10 +45,12 @@ use File::Basename qw(dirname basename);
 # (slot.<n>.peak, through FM_LINT_INTERNAL_SLOT_PEAK_FILE). The turn is taken
 # only if those charges fit the budget, or nothing is held, so a root larger
 # than the budget runs alone. A held slot is charged the worst case when its
-# record names no charge or the table cannot be read. When the analysis ends,
-# the gate raises the root's record to the larger of the watch's peak and the
-# maximum resident size in FM_LINT_INTERNAL_ROOT_RSS_FILE; a record is never
-# lowered. A pool that cannot be used (directory, lock, ticket, slot or queue
+# record names no charge or the table cannot be read. When the analysis
+# completes (no signal reached the gate, and it exited 0, 1, 98 or 251), the
+# gate raises the root's record to the larger of the watch's peak and the
+# maximum resident size in FM_LINT_INTERNAL_ROOT_RSS_FILE; any other end leaves
+# the record alone, and a record is never lowered. Every slot.<n> file in the
+# directory counts toward the budget, beyond this run's count cap too. A pool that cannot be used (directory, lock, ticket, slot or queue
 # file) never lets the analysis run unbounded: the gate names the path and the
 # fix on stderr and exits 2.
 # Admission retains the slot.* protocol so in-flight older gates remain bounded;
@@ -172,7 +174,7 @@ if (($ARGV[0] // '') eq 'gate') {
         close $ps;
         return $found;
     };
-    my ($slot, $peak_file, $charge_kib, $waited_from, $ticket, $ticket_path, $ticket_number, $coordinator);
+    my ($slot, $slot_path, $peak_file, $charge_kib, $waited_from, $ticket, $ticket_path, $ticket_number, $coordinator);
     my ($blocked_at, $checked_at, $bypass);
     my ($passed, $passed_at, %stopped);
     eval { make_path($slot_dir, {mode => 0700}); 1 } or $refuse->($slot_dir, $@);
@@ -213,11 +215,18 @@ if (($ARGV[0] // '') eq 'gate') {
             open($ticket, '>>', $ticket_path) && flock($ticket, LOCK_EX | LOCK_NB)
                 or $refuse->($ticket_path, $!);
         }
-        my (@free, @slots);
-        for my $index (0 .. $cap - 1) {
+        my (@free, @slots, %indices);
+        opendir(my $listing, $slot_dir) or $refuse->($slot_dir, $!);
+        %indices = map { $_ => 1 } 0 .. $cap - 1, map { /\Aslot\.([0-9]+)\z/ ? $1 + 0 : () } readdir $listing;
+        closedir $listing;
+        for my $index (sort { $a <=> $b } keys %indices) {
             my $path = "$slot_dir/slot.$index";
             open(my $fh, '>>', $path) or $refuse->($path, $!);
-            if (flock($fh, LOCK_EX | LOCK_NB)) { push @free, [$fh, $path]; push @slots, [$path, 0]; next; }
+            if (flock($fh, LOCK_EX | LOCK_NB)) {
+                if ($index < $cap) { push @free, [$fh, $path]; } else { close $fh; }
+                push @slots, [$path, 0];
+                next;
+            }
             my $busy = $!{EWOULDBLOCK} || $!{EAGAIN} || $!{EINTR};
             my $why = $!;
             close $fh;
@@ -270,11 +279,11 @@ if (($ARGV[0] // '') eq 'gate') {
                     $fits = $charged->($table, @charges) + $charge_kib <= $budget_kib;
                 }
                 if ($fits) {
-                    ($slot, $peak_file) = @{shift @free};
-                    $peak_file .= '.peak';
+                    ($slot, $slot_path) = @{shift @free};
+                    $peak_file = "$slot_path.peak";
                     unlink $peak_file;
                     truncate($slot, 0) && syswrite($slot, "$run\t$ticket_number\t$$\t$charge_kib\n")
-                        or $refuse->("$slot_dir/slot", $!);
+                        or $refuse->($slot_path, $!);
                 }
             } elsif (defined $next) {
                 my $now = Time::HiRes::time();
@@ -300,7 +309,7 @@ if (($ARGV[0] // '') eq 'gate') {
     if ($slot && !defined fcntl($slot, F_SETFD, 0)) {
         my $why = $!;
         close $slot;
-        $refuse->("$slot_dir/slot", $why);
+        $refuse->($slot_path, $why);
     }
     if (open(my $fh, '>', $wait_file)) {
         printf {$fh} "%d\n", $waited_from ? (Time::HiRes::time() - $waited_from) * 1000 : 0;
@@ -319,9 +328,11 @@ if (($ARGV[0] // '') eq 'gate') {
     my $reaped;
     while (($reaped = waitpid($child, 0)) == -1 && $!{EINTR}) { }
     my $status = $reaped == $child ? $? : 127 << 8;
-    # Raise the root's record to this run's measured peak: the watch's peak of
-    # resident size and footprint, and /usr/bin/time's maximum resident size.
-    if ($history_path) {
+    # Raise the root's record to this complete analysis's measured peak: the
+    # watch's peak of resident size and footprint, and /usr/bin/time's maximum
+    # resident size.
+    my $code = ($status & 127) ? -1 : $status >> 8;
+    if ($history_path && !$caught && grep { $code == $_ } 0, 1, 98, 251) {
         my $peak = $read_kib->($peak_file);
         my $rss_file = $ENV{FM_LINT_INTERNAL_ROOT_RSS_FILE} // '';
         if (length $rss_file && open(my $fh, '<', $rss_file)) {

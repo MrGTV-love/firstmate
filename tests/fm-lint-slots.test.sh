@@ -696,13 +696,11 @@ test_slot_pool_can_be_disabled_or_misconfigured() {
   [ "$rc" -eq 2 ] || fail "a non-numeric FM_LINT_HOST_SLOTS exited $rc, expected 2"
   assert_contains "$out" "FM_LINT_HOST_SLOTS" "the refusal did not name the setting"
   [ ! -d "$tmp/slots" ] || fail "a refused run still created the slot directory"
-  for setting in FM_LINT_HOST_RSS_KIB; do
-    for value in zero 0 08 1.5; do
-      rc=0
-      out=$(env "$setting=$value" PATH="$tmp/bin:$PATH" FM_LINT_SLOT_DIR="$tmp/slots" "$LINT" "$tmp/a.sh" 2>&1) || rc=$?
-      [ "$rc" -eq 2 ] || fail "$setting=$value exited $rc, expected 2"
-      assert_contains "$out" "$setting" "the refusal did not name $setting"
-    done
+  for value in zero 0 08 1.5; do
+    rc=0
+    out=$(env FM_LINT_HOST_RSS_KIB="$value" PATH="$tmp/bin:$PATH" FM_LINT_SLOT_DIR="$tmp/slots" "$LINT" "$tmp/a.sh" 2>&1) || rc=$?
+    [ "$rc" -eq 2 ] || fail "FM_LINT_HOST_RSS_KIB=$value exited $rc, expected 2"
+    assert_contains "$out" "FM_LINT_HOST_RSS_KIB" "the refusal did not name FM_LINT_HOST_RSS_KIB"
   done
   [ ! -d "$tmp/slots" ] || fail "a refused run still created the slot directory"
   # An unusable pool is not a bound: the run stops before any root starts and
@@ -1141,18 +1139,49 @@ for my $case (['readable', $gate, {}, 3], ['unreadable', "$tmp/lonely/fm-lint-ca
     await("$dir/started.fresh", 10) or do { kill 'KILL', $fresh; die "the unrecorded root stayed queued in an empty pool\n" };
     release($dir, 'fresh', $fresh);
 }
+# 6. A gate stopped by a signal leaves no record, so the root's next request is
+# still charged the worst case.
+{
+    my $dir = "$tmp/signalled";
+    make_path("$dir/slots");
+    my $pid = launch($gate, $dir, 'cut', {FM_LINT_INTERNAL_ROOT_KEY => 'cut'}, 500, 500);
+    await("$dir/started.cut", 10) or do { kill 'KILL', $pid; die "the signalled root never started\n" };
+    kill 'TERM', $pid;
+    waitpid($pid, 0);
+    die "a signalled gate exited 0\n" unless $?;
+    die "a signalled analysis set a record: " . recorded($dir, 'cut') . "\n" if length recorded($dir, 'cut');
+}
+# 7. A held slot beyond this run's count cap still counts toward the budget.
+{
+    my $dir = "$tmp/beyond";
+    make_path("$dir/slots");
+    record($dir, 'small', 200000);
+    open(my $holder, '>>', "$dir/slots/slot.5") or die "$!";
+    flock($holder, LOCK_EX) or die "$!";
+    print {$holder} "wide\t1\t$$\t900000\n";
+    my $pid = launch($gate, $dir, 'narrow', {FM_LINT_HOST_SLOTS => 1, FM_LINT_HOST_RSS_KIB => 1000000,
+        FM_LINT_INTERNAL_ROOT_KEY => 'small'});
+    if (await("$dir/started.narrow", 1.5)) { kill 'KILL', $pid; die "a run with a cap of one ignored a slot held beyond its cap\n" }
+    close $holder;
+    await("$dir/started.narrow", 10) or do { kill 'KILL', $pid; die "the narrow run stayed queued after the wide holder ended\n" };
+    release($dir, 'narrow', $pid);
+}
 PL
-  pass "stale records are reclaimed, unknown records and an unreadable table are charged the worst case, a root with no record is charged the worst case, a root past its record is charged its current peak, and records only rise"
+  pass "stale records are reclaimed, unknown records and an unreadable table are charged the worst case, a root with no record is charged the worst case, a root past its record is charged its current peak, records only rise and only after a complete analysis, and slots beyond a run's cap count"
 }
 
 test_default_pool_is_one_directory_for_every_home() {
-  local tmp pool before after run
+  local tmp pool after run user
   tmp=$(fm_test_tmproot fm-lint-default-pool)
   mkdir -p "$tmp/bin"
   printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/a.sh"
   fm_lint_write_memory_shellcheck "$tmp/bin" 1 "$tmp/mem.starts"
-  pool="/var/tmp/firstmate-lint-$(id -u)/lint-slots"
-  before=$(cat "$pool/queue.next" 2>/dev/null || printf 0)
+  # A private user id keeps this test out of the live per-user pool.
+  user="fmtest-$$-$RANDOM"
+  printf '#!/bin/sh\nprintf "%%s\\n" %s\n' "$user" > "$tmp/bin/id"
+  chmod +x "$tmp/bin/id"
+  pool="/var/tmp/firstmate-lint-$user/lint-slots"
+  [ "$(PATH="$tmp/bin:$PATH" id -u)" = "$user" ] || fail "the private id stub did not answer"
   for run in 1 2; do
     mkdir -p "$tmp/home.$run/.cache"
     env -u FM_LINT_SLOT_DIR HOME="$tmp/home.$run" XDG_CACHE_HOME="$tmp/home.$run/.cache" FM_HOME="$tmp/fm.$run" \
@@ -1161,7 +1190,8 @@ test_default_pool_is_one_directory_for_every_home() {
     [ ! -e "$tmp/home.$run/.cache/firstmate/lint-slots" ] || fail "run $run still used a pool under its own HOME"
   done
   after=$(cat "$pool/queue.next" 2>/dev/null || printf 0)
-  [ "$((after - before))" -ge 2 ] || fail "two runs with different HOME values did not meet in $pool (tickets $before -> $after)"
+  rm -rf "/var/tmp/firstmate-lint-$user"
+  [ "$after" -ge 2 ] || fail "two runs with different HOME values did not meet in $pool ($after tickets)"
   pass "runs with different HOME and XDG_CACHE_HOME values take tickets in the same per-user pool"
 }
 

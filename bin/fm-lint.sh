@@ -81,8 +81,8 @@
 # KiB count, default 12582912 = 12 GiB: the 8 GiB per-root watch bound below
 # plus headroom, so one root at its bound still leaves room for small roots).
 # Each root is charged its own recorded peak, the larger of resident size and
-# physical footprint over its earlier runs, kept per repo-relative root path in
-# the pool's history/ directory. The history lives in the pool, not the lint
+# physical footprint over its earlier complete analyses, kept per analysis mode
+# (full or fast) and repo-relative root path in the pool's history/ directory. The history lives in the pool, not the lint
 # cache, because the cache depends on HOME and is off for cold runs, and the
 # pool is the one directory every run of this user shares. A root with no
 # history is charged the per-root worst case (the 8 GiB resident watch bound,
@@ -95,11 +95,14 @@
 # peak of resident size and footprint. A held root is charged the worst case
 # when the table cannot be read or its record names no charge. An empty pool
 # always admits one root, so a root larger than the budget runs alone and
-# queued roots wait rather than fail. When a root ends, its record is raised to
-# the peak this run measured (the watch's peak and /usr/bin/time's maximum
-# resident size) if that is higher; a record is never lowered, so the narrower
-# memory retry cannot shrink it. A gate ended by KILL raises no record, and
-# without /usr/bin/time and the macOS watch no record forms, so every root stays
+# queued roots wait rather than fail. When a root's analysis completes, its
+# record is raised to the peak this run measured (the watch's peak and
+# /usr/bin/time's maximum resident size) if that is higher; a record is never
+# lowered, so the narrower memory retry cannot shrink it. Complete means its
+# gate caught no signal and the analysis exited 0 or 1 (clean or findings), 98
+# (ended by the watch at its bound) or 251 (GHC heap exhaustion); a signal, a
+# deadline, a gate ended by KILL or any other end raises no record. Without
+# /usr/bin/time and the macOS watch no record forms, so every root stays
 # charged the worst case. The remaining worst case is the budget plus the sum of
 # each running root's excess over its record: on macOS the watch caps that
 # excess at 8 GiB minus the record; on Linux without the enforced envelope
@@ -384,7 +387,8 @@ fm_lint_exec_root() {  # <path> <stdout-file> <stderr-file> <rss-file> <seconds>
   wait_file="$rss_file.wait"
   rm -f "$wait_file" "$rss_file.cache" "$rss_file.cache.wait"
   if [ "${FM_LINT_INTERNAL_SLOT_DIR:-off}" != off ]; then
-    gate_command=(env "FM_LINT_INTERNAL_ROOT_KEY=${path#"$ROOT"/}" "FM_LINT_INTERNAL_ROOT_RSS_FILE=$rss_file" \
+    gate_command=(env "FM_LINT_INTERNAL_ROOT_KEY=${FM_LINT_INTERNAL_MODE:-full}:${path#"$ROOT"/}" \
+      "FM_LINT_INTERNAL_ROOT_RSS_FILE=$rss_file" \
       "${FM_LINT_PERL_BIN:-perl}" "$SELF_DIR/fm-lint-cache.pl" gate \
       "$FM_LINT_INTERNAL_SLOT_DIR" "$FM_LINT_INTERNAL_NCPU" "$FM_LINT_INTERNAL_RUN_ID" "$wait_file" --)
   fi
