@@ -152,6 +152,37 @@ fm_task_copy_content_in_default() {  # <worktree> <project> [<default-branch>] [
   [ "$merged_tree" = "$default_tree" ]
 }
 
+# The squash-landed shape the tree comparison above refuses once the default
+# branch edits a landed path again: every path <head> changed since its merge
+# base with the commit that comparison read holds, in some default-branch commit
+# after that base, exactly the entry (mode, type and object) it holds in <head>,
+# or is absent there as in <head>. Each commit's own tree decides, never
+# ancestry or merge reachability, so a path whose content is in no such commit
+# refuses. Call it only after fm_task_copy_content_in_default compared and
+# answered no; on success FM_TASK_COPY_COMPARED names the ref and the merge base.
+fm_task_copy_content_in_default_history() {  # <worktree> [<head-ref>]
+  local worktree=$1 head=${2:-HEAD} name=${FM_TASK_COPY_COMPARED%% *} tip=${FM_TASK_COPY_COMPARED##* } base paths path want commits commit have found
+  FM_TASK_COPY_UNASKED='the content check could not read the default branch history'
+  [ -n "$tip" ] && base=$(git -C "$worktree" merge-base "$tip" "$head" 2>/dev/null) || return 1
+  paths=$(git -C "$worktree" -c core.quotepath=off diff-tree -r --name-only --no-renames "$base" "$head" 2>/dev/null) || return 1
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    want=$(git -C "$worktree" --literal-pathspecs ls-tree "$head" -- "$path" 2>/dev/null) || return 1
+    commits=$(git -C "$worktree" --literal-pathspecs rev-list --full-history "$base..$tip" -- "$path" 2>/dev/null) || return 1
+    found=
+    for commit in $commits; do
+      have=$(git -C "$worktree" --literal-pathspecs ls-tree "$commit" -- "$path" 2>/dev/null) || return 1
+      if [ "${have%%$'\t'*}" = "${want%%$'\t'*}" ]; then
+        found=1
+        break
+      fi
+    done
+    [ -n "$found" ] || { FM_TASK_COPY_UNASKED=; return 1; }
+  done <<< "$paths"
+  FM_TASK_COPY_UNASKED=
+  FM_TASK_COPY_COMPARED="$name $base"
+}
+
 # The porcelain status lines of <copy> that are its own uncommitted work:
 # Firstmate's hook files do not count, and neither does the untracked entry of
 # each of the task's own <nested-copy> paths inside <copy>, since each of those

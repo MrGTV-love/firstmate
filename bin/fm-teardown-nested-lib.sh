@@ -19,12 +19,14 @@
 #     released wherever the hold applies (teardown_foreign_copy_hold_applies),
 #     and is preserved and released as above wherever it does not;
 #   - no other active task record names it, no process outside this teardown's
-#     own runs in it, and no live process outside this teardown's own is its
+#     own runs in it or holds a file in it open, and no live process outside
+#     this teardown's own is its
 #     lock launcher (a process is this teardown's own when it, or an ancestor by
 #     parent chain, has a cwd exactly at a root retire sweeps, and a pid that
 #     started after the lock file was written is recycled and owns nothing). The
 #     retire phase sends TERM to each such launcher and each such process running
-#     in the copy, waits a bounded time, and sends no KILL; one still alive
+#     in the copy or holding a file in it open, waits a bounded time, and sends no
+#     KILL; one still alive
 #     refuses the release, named by its pid. A process that is not this
 #     teardown's own is never signalled and refuses at once, named by its pid;
 #   - teardown_landed proves delivery or the recorded bundle alternative owned
@@ -43,7 +45,8 @@
 # inside the slot) were already proved clean and landed or anchored by the
 # caller. One of them that Vernant's creation lock holds is released the same
 # way, never by forcing the removal: its ignored files are preserved as above,
-# no process outside this teardown may run in it or be its live lock launcher,
+# no process outside this teardown may run in it, hold a file in it open or be
+# its live lock launcher,
 # and no other active record may name it; the driver then verifies the landing
 # again and refuses what it cannot prove. An own copy that is not locked is
 # removed as before.
@@ -73,7 +76,8 @@
 # and runs inside bin/fm-teardown.sh, whose globals (PROJ, ID, DATA, META,
 # STATE, WT, TASK_TMP, FORCE, KIND, LEGACY_RECORD_GIVEN, TEARDOWN_NESTED_COPIES,
 # TEARDOWN_RETURN_SLOT, TEARDOWN_PEER_SLOT, TEARDOWN_HELD_SLOT) and functions
-# (teardown_landed, pids_with_cwd_under, task_process_identity,
+# (teardown_landed, pids_with_cwd_under, pids_with_open_file_under,
+# task_process_identity,
 # task_process_identity_matches, task_record_process_signal) it uses.
 # bin/fm-copy-sweep.sh also calls teardown_preserve_ignored, with DATA set to its
 # data directory and ID to a per-release id, for a copy it proved on its own, and
@@ -131,6 +135,7 @@ teardown_copy_question() {  # <rule> <copy>
     copy-ignored-files) printf 'What owner-approved disposition covers the ignored files only %s holds (%s)? Keep the copy; no removal or discard is authorized.' "$2" "$TEARDOWN_FOREIGN_WHY" ;;
     copy-anchor-commit) printf 'Which commit does the existing preservation anchor protect, and does it cover %s (%s)? Keep the copy and the anchor; no overwrite is authorized.' "$2" "$TEARDOWN_FOREIGN_WHY" ;;
     process-cwd-owner) printf 'Which task or person owns process %s, which is running in %s? Stop it or tell me it is yours.' "${TEARDOWN_FOREIGN_PID:-unknown}" "$2" ;;
+    process-open-file-owner) printf 'Which task or person owns process %s, which holds a file in %s open? Stop it or tell me it is yours.' "${TEARDOWN_FOREIGN_PID:-unknown}" "$2" ;;
     lock-launcher-owner) printf 'Is launcher %s, named in the creation lock on %s, still running, and who owns it?' "${TEARDOWN_FOREIGN_PID:-unknown}" "$2" ;;
     creation-lock-owner) printf 'Who owns the creation lock on %s, and may it be released?' "$2" ;;
     nonforced-removal) printf 'What retained disposition covers the contents Git still protects in %s? Preserve this copy; no forced removal is authorized.' "$2" ;;
@@ -770,11 +775,11 @@ teardown_preserve_ignored() {  # <copy> [all|releasable]
   echo "teardown: preserved ignored files from $(fm_refuse_text "$copy") in $dest" >&2
 }
 
-# Does an active record, a running process, or a live lock launcher outside this
-# teardown own <copy>? Returns 1 with TEARDOWN_FOREIGN_WHY set when so or when
-# that cannot be told.
+# Does an active record, a process running in it or holding a file in it open,
+# or a live lock launcher outside this teardown own <copy>? Returns 1 with
+# TEARDOWN_FOREIGN_WHY set when so or when that cannot be told.
 teardown_foreign_copy_unowned() {  # <copy>
-  local copy=$1 rc=0 pids pid
+  local copy=$1 rc=0 pids pid held path
   TEARDOWN_OWN_SCANNED=0
   TEARDOWN_FOREIGN_PID=
   # shellcheck disable=SC2153 # STATE is bin/fm-teardown.sh's global, not a typo of a local.
@@ -807,6 +812,22 @@ teardown_foreign_copy_unowned() {  # <copy>
     fi
     teardown_foreign_proc_record "$pid"
   done <<< "$pids"
+  if ! held=$(pids_with_open_file_under "$copy"); then
+    TEARDOWN_FOREIGN_RULE=inspection-unavailable
+    TEARDOWN_FOREIGN_WHY="a scan for processes holding its files open failed"
+    return 1
+  fi
+  while IFS=$'\t' read -r pid path; do
+    [ -n "$pid" ] || continue
+    case $'\n'"$pids" in *$'\n'"$pid"$'\t'*) continue ;; esac
+    if ! teardown_pid_is_task_own "$pid"; then
+      TEARDOWN_FOREIGN_RULE=process-open-file-owner
+      TEARDOWN_FOREIGN_PID=$pid
+      TEARDOWN_FOREIGN_WHY="process $pid holds $(fm_refuse_text "$path") open"
+      return 1
+    fi
+    teardown_foreign_proc_record "$pid"
+  done <<< "$held"
   rc=0
   teardown_copy_lock_file "$copy" || rc=$?
   case "$rc" in
@@ -878,7 +899,7 @@ teardown_foreign_copy_holdable() {  # <copy>
       done
       TEARDOWN_FOREIGN_RULE=process-cwd-owner
       TEARDOWN_FOREIGN_PID=${own%% *}
-      TEARDOWN_FOREIGN_WHY="process ${own// /, } of this teardown runs in it or launched its creation lock"
+      TEARDOWN_FOREIGN_WHY="process ${own// /, } of this teardown runs in it, holds a file in it open or launched its creation lock"
     fi
     TEARDOWN_FOREIGN_PROCS=(${TEARDOWN_FOREIGN_PROCS[@]+"${TEARDOWN_FOREIGN_PROCS[@]:0:$procs}"})
     return 1
@@ -1331,7 +1352,7 @@ teardown_launcher_gone() {  # <pid> <lock-file>
 # that is gone, when the driver could not (teardown_driver_gap). Every one of
 # teardown's own proofs is made again first and the lock is read a second time
 # immediately before the unlock: the copy keeps its HEAD, no active record names
-# it, no process outside this teardown runs in it, the launcher is not running
+# it, no process runs in it or holds a file in it open, the launcher is not running
 # (or started after the lock was written), its landed or bundle proof holds, and
 # Git itself would remove it without force. The release is a non-forced
 # git worktree unlock followed by a non-forced git worktree remove, never a
@@ -1366,11 +1387,12 @@ teardown_dead_launcher_release() {  # <slot> <copy> <head> <foreign|own nested>
     return 1
   fi
   # The retire phase has already ended this teardown's own processes, so any
-  # process found running in the copy now, even one of this teardown's own,
-  # appeared since: none may be there at the unlock.
-  procs=$(pids_with_cwd_under "$copy") || { TEARDOWN_RELEASE_WHY='a scan for processes running in it failed'; return 1; }
+  # process found running in the copy or holding a file in it open now, even one
+  # of this teardown's own, appeared since: none may be there at the unlock.
+  procs=$(pids_with_open_file_under "$copy") || { TEARDOWN_RELEASE_WHY='a scan for processes holding its files open failed'; return 1; }
   if [ -n "$procs" ]; then
-    TEARDOWN_RELEASE_WHY="process ${procs%%$'\t'*} is running in it or launched its creation lock since the retire phase"
+    procs=${procs%%$'\n'*}
+    TEARDOWN_RELEASE_WHY="process ${procs%%$'\t'*} runs in it or holds $(fm_refuse_text "${procs#*$'\t'}") open since the retire phase"
     return 1
   fi
   teardown_landed "$copy" HEAD "" >/dev/null 2>&1 || { TEARDOWN_RELEASE_WHY='its landed-work proof no longer holds'; return 1; }
@@ -1391,7 +1413,6 @@ teardown_dead_launcher_release() {  # <slot> <copy> <head> <foreign|own nested>
     return 1
   fi
   echo "teardown: released creation lock '$lock' on $kind copy $copy (launcher $pid is gone; proof: $TEARDOWN_CLOSEOUT_PROOF) and removed it without force" >&2
-  { umask 077; mkdir -p "$DATA/$ID" && printf '%s\t%s\t%s\t%s\n' "$(date +%s)" "$copy" "$lock" "$TEARDOWN_CLOSEOUT_PROOF" >> "$DATA/$ID/creation-lock-releases.tsv"; } 2>/dev/null || true
 }
 
 # The credit, the driver, and, only for the residue the driver cannot release, the

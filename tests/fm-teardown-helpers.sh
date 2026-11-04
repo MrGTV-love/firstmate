@@ -834,6 +834,7 @@ add_lsof_no_holder() {
 #!/usr/bin/env bash
 case " $* " in
   *" -d cwd "*) exit 0 ;;
+  *" -Fpfn "*) exit 0 ;;
 esac
 exit 1
 SH
@@ -857,7 +858,7 @@ SH
 add_lsof_real_lock_queries() {
   cat > "$1/fakebin/lsof" <<'SH'
 #!/usr/bin/env bash
-case " $* " in *" -Fpn "*) exit 0 ;; esac
+case " $* " in *" -Fpn "*|*" -Fpfn "*) exit 0 ;; esac
 exec "${REAL_LSOF_FOR_TEST:?}" "$@"
 SH
   chmod +x "$1/fakebin/lsof"
@@ -3015,6 +3016,7 @@ start_foreign_session_case() {
 #!/usr/bin/env bash
 case " \$* " in
   *" -d cwd "*) if kill -0 $FOREIGN_AGENT 2>/dev/null; then printf 'p%s\nfcwd\nn%s\n' $FOREIGN_AGENT '$FOREIGN_SLOT'; fi; exit 0 ;;
+  *" -Fpfn "*) exit 0 ;;
 esac
 exit 1
 SH

@@ -43,7 +43,12 @@
 # squash-merge-then-delete-branch flow, where the branch's own commits live nowhere
 # on a remote yet the change is fully in main. A task whose meta records
 # base_branch= (bin/fm-spawn.sh) runs that content check against origin's copy of
-# its base branch instead of the default branch.
+# its base branch instead of the default branch. When that branch edited a
+# landed path again after the squash, the content still counts when every path
+# the copy changed since its merge base holds the copy's exact entry in some
+# default-branch commit after that base, read from that commit's own tree
+# (fm_task_copy_content_in_default_history); a path whose content is in no such
+# commit refuses.
 # Squash merges collapse the branch's commits, so per-commit patch ids against main
 # no longer match, and a pipeline rebase can leave the local worktree diverged from
 # the PR head. A diverged copy is not treated as landed: path-set coverage, git
@@ -289,12 +294,14 @@
 # no record of this task names is a foreign copy (Vernant's
 # start_task_worktree.py creates and locks one at <slot>/.claude/worktrees/<name>),
 # and teardown releases it only after it proves all of: no other active task
-# record names it; no process outside this teardown runs in it and no live
+# record names it; no process outside this teardown runs in it or holds a file
+# in it open, and no live
 # process outside this teardown is its lock launcher (a process is teardown's
 # own when it, or an ancestor by parent chain, has a cwd exactly at a root retire
 # sweeps, and a launcher pid that started after the lock file was written is a
 # recycled pid and owns nothing); retire sends TERM to each such launcher and
-# each such process running in the copy, waits a bounded time, and sends no KILL,
+# each such process running in the copy or holding a file in it open, waits a
+# bounded time, and sends no KILL,
 # and one still alive refuses the release, named by its pid, while a process
 # that is not teardown's own is never signalled and refuses at once, named by its
 # pid; it is a clean worktree root, and each ignored file it holds is either
@@ -322,9 +329,9 @@
 # proofs again, reads the lock and the process table once more immediately
 # before the unlock, and then releases the lock itself with a non-forced git
 # worktree unlock followed by a non-forced git worktree remove; a removal that
-# fails restores the lock. The release is printed with its lock text and proof
-# and recorded in data/<task>/creation-lock-releases.tsv. A live launcher, an
-# unreadable process table, a process in the copy or any other driver verdict
+# fails restores the lock. The release is printed with its lock text and proof.
+# A live launcher, an unreadable process table, a process that runs in the copy
+# or holds a file in it open, a failed scan for one, or any other driver verdict
 # keeps the copy locked and names that fact. An unlocked copy is removed with a
 # plain non-forced git worktree remove. Removal deletes the copy's checkout and the allow-listed ignored files
 # in it (symlinks, virtual environments, node_modules and tool caches,
@@ -2749,6 +2756,10 @@ work_is_landed_proof() {
     echo "teardown: landed by content: every change of $dir at ${ref:0:12} is already in ${FM_TASK_COPY_COMPARED%% *} (${FM_TASK_COPY_COMPARED##* })" >&2
     return 0
   fi
+  if [ -z "$FM_TASK_COPY_UNASKED" ] && fm_task_copy_content_in_default_history "$dir" "$ref"; then
+    echo "teardown: landed by content: every change of $dir at ${ref:0:12} is in a commit of ${FM_TASK_COPY_COMPARED%% *} after merge base ${FM_TASK_COPY_COMPARED##* }" >&2
+    return 0
+  fi
   [ -z "$FM_TASK_COPY_UNASKED" ] || TEARDOWN_LANDED_UNASKED=${TEARDOWN_LANDED_UNASKED:-$FM_TASK_COPY_UNASKED}
   return 1
 }
@@ -3679,10 +3690,23 @@ conclude_task_no_mistakes_run() {  # <worktree>
 # `lsof -a -d cwd` scan (never the recursive +D file-tree walk). Never $$.
 # Empty output when nothing matches; failure means no safe result was established.
 pids_with_cwd_under() {  # <dir>
-  local dir=$1 out pid path line
+  lsof_pids_under "$1" -a -d cwd -Fpn
+}
+
+# The same for every process with any file open at or under $1, its working
+# directory included: one system-wide listing of open files, filtered by the
+# path prefix, never the recursive +D walk. One line per process, naming the
+# first matching path.
+pids_with_open_file_under() {  # <dir>
+  lsof_pids_under "$1" -nP -Fpfn
+}
+
+lsof_pids_under() {  # <dir> <lsof-arguments...>
+  local dir=$1 out pid path line printed=
+  shift
   [ -n "$dir" ] && [ -d "$dir" ] || return 0
   dir=$(cd "$dir" && pwd -P) || return 1
-  out=$(lsof -a -d cwd -Fpn 2>/dev/null) || return 1
+  out=$(lsof "$@" 2>/dev/null) || return 1
   [ -n "$out" ] || return 0
   pid=
   while IFS= read -r line; do
@@ -3691,13 +3715,16 @@ pids_with_cwd_under() {  # <dir>
         pid=${line#p}
         case "$pid" in ''|*[!0-9]*) return 1 ;; esac
         ;;
-      fcwd) [ -n "$pid" ] || return 1 ;;
+      f*) [ -n "$pid" ] || return 1 ;;
       n*)
         [ -n "$pid" ] || return 1
         path=${line#n}
         case "$path" in
           "$dir"|"$dir"/*)
-            [ -n "$pid" ] && [ "$pid" != "$$" ] && printf '%s\t%s\n' "$pid" "$path"
+            if [ "$pid" != "$$" ] && [ "$pid" != "$printed" ]; then
+              printf '%s\t%s\n' "$pid" "$path"
+              printed=$pid
+            fi
             ;;
         esac
         ;;

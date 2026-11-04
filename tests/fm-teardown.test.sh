@@ -1543,41 +1543,54 @@ content_case_treehouse() {  # <case>
 
 # Content equal to the default branch counts as landed in every squash shape, with
 # the base it was compared with printed: the default branch moved on after the
-# squash. No PR record, hold or bundle is needed.
+# squash, or edited the squashed lines again later (the recorded
+# d2-synthesis-id-producer-decision shape), whose content the squash commit's own
+# tree still holds. No PR record, hold or bundle is needed.
 test_squash_landed_content_counts_in_every_shape_and_prints_its_base() {
   local case_dir rc shape
-  for shape in main-moved-on; do
+  for shape in main-moved-on later-edit-same-lines; do
     case_dir=$(make_case "content-shape-$shape")
     write_meta "$case_dir" no-mistakes ship
     wt_commit_file "$case_dir" feature.txt hello "add feature"
     land_on_origin_main "$case_dir" feature.txt hello
-    land_on_origin_main "$case_dir" later.txt "main moved on"
+    case "$shape" in
+      main-moved-on) land_on_origin_main "$case_dir" later.txt "main moved on" ;;
+      later-edit-same-lines) land_on_origin_main "$case_dir" feature.txt "hello, then edited on main" ;;
+    esac
     content_case_treehouse "$case_dir"
     rc=0
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     expect_code 0 "$rc" "content-shape-$shape: equal content must count as landed: $(cat "$case_dir/stderr")"
     assert_grep 'landed by content: every change of ' "$case_dir/stderr" "content-shape-$shape: the proof was not named"
-    assert_grep ' is already in remotes/origin/main (' "$case_dir/stderr" "content-shape-$shape: the base the proof used was not printed"
+    case "$shape" in
+      main-moved-on) assert_grep ' is already in remotes/origin/main (' "$case_dir/stderr" "content-shape-$shape: the base the proof used was not printed" ;;
+      later-edit-same-lines) assert_grep ' is in a commit of remotes/origin/main after merge base ' "$case_dir/stderr" "content-shape-$shape: the base the proof used was not printed" ;;
+    esac
     assert_no_grep 'fm-captain-hold.sh hold' "$case_dir/stderr" "content-shape-$shape: an owner hold was printed"
     assert_absent "$case_dir/state/task-x1.meta" "content-shape-$shape: the task record survived"
   done
-  pass 'content already in the default branch counts as landed after a squash, with the compared base printed and no hold, bundle or PR record'
+  pass 'content already in the default branch, at its tip or in a squash commit main later edited, counts as landed with the compared base printed and no hold, bundle or PR record'
 }
 
-# Nothing that differs counts: a later main edit of the same lines (the recorded
-# d2-synthesis-id-producer-decision shape), a tracked change, an untracked file,
-# a staged-only change, and a copy whose tree equals main only by coincidence on
-# unrelated history.
+# Nothing that differs counts: copy content that no default-branch commit holds
+# (beside a squash main later edited, or at a path main only ever held other
+# content at), a tracked change, an untracked file, a staged-only change, and a
+# copy whose tree equals main only by coincidence on unrelated history.
 test_squash_landed_content_refuses_whatever_differs() {
   local case_dir rc shape tmp
-  for shape in later-edit-same-lines tracked-change untracked staged-only unrelated-history; do
+  for shape in unique-beside-later-edit never-equal tracked-change untracked staged-only unrelated-history; do
     case_dir=$(make_case "content-differs-$shape")
     write_meta "$case_dir" no-mistakes ship
     wt_commit_file "$case_dir" feature.txt hello "add feature"
     case "$shape" in
-      later-edit-same-lines)
+      unique-beside-later-edit)
+        wt_commit_file "$case_dir" own.txt "only this copy holds this" "add unique work"
         land_on_origin_main "$case_dir" feature.txt hello
         land_on_origin_main "$case_dir" feature.txt "hello, then edited on main"
+        ;;
+      never-equal)
+        land_on_origin_main "$case_dir" feature.txt "main's own hello"
+        land_on_origin_main "$case_dir" feature.txt "main's hello, edited again"
         ;;
       tracked-change)
         land_on_origin_main "$case_dir" feature.txt hello
@@ -1612,7 +1625,7 @@ test_squash_landed_content_refuses_whatever_differs() {
     assert_no_grep 'landed by content' "$case_dir/stderr" "content-differs-$shape: the content proof accepted it"
     assert_present "$case_dir/state/task-x1.meta" "content-differs-$shape: the task record was removed"
   done
-  pass 'a later main edit of the same lines, a tracked change, an untracked file, a staged-only change and an unrelated-history coincidence are all refused'
+  pass 'copy content no default-branch commit holds, a tracked change, an untracked file, a staged-only change and an unrelated-history coincidence are all refused'
 }
 
 test_content_fallback_refreshes_stale_origin_ref() {
@@ -3718,6 +3731,7 @@ test_bundle_removed_copy_sweep_refuses_before_retire() {
 #!/usr/bin/env bash
 case " \$* " in
   *" -d cwd "*) printf '%s\n' "\$*" >> "$case_dir/lsof-cwd.log"; exit 0 ;;
+  *" -Fpfn "*) exit 0 ;;
 esac
 exit 1
 SH
@@ -3827,6 +3841,7 @@ SH
 #!/usr/bin/env bash
 case " \$* " in
   *" -d cwd "*) if kill -0 $pid 2>/dev/null; then printf 'p%s\nfcwd\nn%s\n' $pid '$FOREIGN_COPY'; fi; exit 0 ;;
+  *" -Fpfn "*) exit 0 ;;
 esac
 exit 1
 SH

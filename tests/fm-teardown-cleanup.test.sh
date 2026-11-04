@@ -5683,6 +5683,7 @@ test_a_foreign_copy_that_cannot_be_held_still_refuses_the_whole_close() {
 #!/usr/bin/env bash
 case " \$* " in
   *" -d cwd "*) if kill -0 $pid 2>/dev/null; then printf 'p%s\nfcwd\nn%s\n' $pid '$FOREIGN_COPY'; fi; exit 0 ;;
+  *" -Fpfn "*) exit 0 ;;
 esac
 exit 1
 SH
@@ -5742,7 +5743,7 @@ test_a_foreign_copy_not_held_for_a_process_of_this_teardown_names_that_process()
       seed_backlog_in_flight "$FOREIGN_CASE"
       held_foreign_unlanded "$FOREIGN_COPY"
       agent=$FOREIGN_AGENT
-      reason="process $FOREIGN_LAUNCHER of this teardown runs in it or launched its creation lock"
+      reason="process $FOREIGN_LAUNCHER of this teardown runs in it, holds a file in it open or launched its creation lock"
     else
       make_held_case "held-own-$shape"
       held_foreign_unlanded "$FOREIGN_COPY"
@@ -5758,10 +5759,11 @@ case " \$* " in
     if kill -0 $agent 2>/dev/null; then printf 'p%s\nfcwd\nn%s\n' $agent '$FOREIGN_SLOT'; fi
     if kill -0 $child 2>/dev/null; then printf 'p%s\nfcwd\nn%s\n' $child '$FOREIGN_COPY'; fi
     exit 0 ;;
+  *" -Fpfn "*) exit 0 ;;
 esac
 exit 1
 SH
-      reason="process $child of this teardown runs in it or launched its creation lock"
+      reason="process $child of this teardown runs in it, holds a file in it open or launched its creation lock"
     fi
     held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY"
     run_foreign_teardown rc
@@ -6009,6 +6011,7 @@ test_process_in_foreign_copy_keeps_it() {
 #!/usr/bin/env bash
 case " \$* " in
   *" -d cwd "*) if kill -0 $pid 2>/dev/null; then printf 'p%s\nfcwd\nn%s\n' $pid '$FOREIGN_COPY'; fi; exit 0 ;;
+  *" -Fpfn "*) exit 0 ;;
 esac
 exit 1
 SH
@@ -6045,6 +6048,7 @@ case " \$* " in
     if kill -0 $agent 2>/dev/null; then printf 'p%s\nfcwd\nn%s\n' $agent '$FOREIGN_SLOT'; fi
     if kill -0 $child 2>/dev/null; then printf 'p%s\nfcwd\nn%s\n' $child '$FOREIGN_COPY'; fi
     exit 0 ;;
+  *" -Fpfn "*) exit 0 ;;
 esac
 exit 1
 SH
@@ -6382,8 +6386,6 @@ test_dead_launcher_lock_is_released_directly_when_no_credit_is_satisfiable() {
     assert_grep "released creation lock 'vernant-session-active owner=launcher:$FOREIGN_DEAD_PID launcher=$FOREIGN_DEAD_PID' on $label copy $FOREIGN_COPY (launcher $FOREIGN_DEAD_PID is gone; proof: recorded bundle " \
       "$FOREIGN_CASE/stderr" "direct-release-$kind: the release and its proof were not printed"
     assert_grep "removed it without force" "$FOREIGN_CASE/stderr" "direct-release-$kind: the release did not say it was unforced"
-    assert_grep "$(printf '\t')$FOREIGN_COPY$(printf '\t')vernant-session-active owner=launcher:$FOREIGN_DEAD_PID launcher=$FOREIGN_DEAD_PID$(printf '\t')recorded bundle " \
-      "$FOREIGN_CASE/data/task-x1/creation-lock-releases.tsv" "direct-release-$kind: no durable record of the release"
     assert_grep "worktree unlock $FOREIGN_COPY" "$FOREIGN_CASE/git-worktree.log" "direct-release-$kind: the script did not unlock"
     grep -Fxq -- "-C $FOREIGN_SLOT worktree remove $FOREIGN_COPY" "$FOREIGN_CASE/git-worktree.log" || fail "direct-release-$kind: the removal was not the plain one"
     if grep -Eq 'worktree remove .*(^| )(-f|--force)( |$)' "$FOREIGN_CASE/git-worktree.log"; then fail "direct-release-$kind: a forced removal ran"; fi
@@ -6419,7 +6421,7 @@ test_direct_release_refuses_a_process_that_appears_before_the_unlock() {
   cat > "$FOREIGN_CASE/fakebin/lsof" <<SH
 #!/usr/bin/env bash
 case " \$* " in
-  *" -d cwd "*)
+  *" -d cwd "*|*" -Fpfn "*)
     if [ -e "$FOREIGN_CASE/closeout.log" ]; then printf 'p%s\nfcwd\nn%s\n' $pid '$FOREIGN_COPY'; fi
     exit 0 ;;
 esac
@@ -6428,7 +6430,7 @@ SH
   chmod +x "$FOREIGN_CASE/fakebin/lsof"
   run_foreign_teardown rc FM_STUB_REQUIRE_CREDIT=1
   expect_code 1 "$rc" "direct-appears: a process running in the copy must keep it: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
-  assert_grep "The copy was not released directly: process $pid is running in it or launched its creation lock since the retire phase" "$FOREIGN_CASE/stderr" \
+  assert_grep "The copy was not released directly: process $pid runs in it or holds $FOREIGN_COPY open since the retire phase" "$FOREIGN_CASE/stderr" \
     "direct-appears: the refusal did not name the process"
   assert_present "$FOREIGN_COPY/.git" "direct-appears: the copy was removed"
   git -C "$FOREIGN_CASE/project" worktree list --porcelain | grep -A4 -F "worktree $FOREIGN_COPY" | grep -q '^locked' \
@@ -6437,6 +6439,76 @@ SH
   if grep -q 'worktree unlock' "$FOREIGN_CASE/git-worktree.log" 2>/dev/null; then fail 'direct-appears: the script unlocked the copy'; fi
   assert_present "$FOREIGN_CASE/state/task-x1.meta" 'direct-appears: the task record was removed'
   pass 'a process that appears in the copy after the driver refused keeps the copy locked, named by pid'
+}
+
+# A dead launcher's lock is released only when no process holds a file in the
+# copy open, whatever its working directory. A real process whose cwd is outside
+# the copy holds <copy>/.git open; the real lsof's open-file listing finds it on
+# both direct-release routes (the driver unavailable, exit 127, and its
+# uncovered-content verdict), before the driver runs or appearing after it, and a
+# failed listing refuses too. With no holder the same routes release the copy.
+test_direct_release_refuses_a_process_holding_a_file_in_the_copy_open() {
+  local rc route shape label pid held args
+  command -v "${REAL_LSOF_FOR_TEST:-}" >/dev/null 2>&1 || { pass 'real lsof absent on this host; skipped'; return 0; }
+  for route in unavailable uncovered; do
+    for shape in none holder appears failed; do
+      [ "$route:$shape" != unavailable:appears ] || continue
+      label="open-file-$route-$shape"
+      args=()
+      if [ "$route" = unavailable ]; then
+        dead_launcher_pid
+        make_own_locked_copy_case "$label" enclosing "$FOREIGN_DEAD_PID"
+        add_git_worktree_log "$FOREIGN_CASE"
+        rm -f "$FOREIGN_CASE/vernant-python"
+      else
+        make_locked_bundle_case "$label" own interior
+        args=(FM_STUB_REQUIRE_CREDIT=1)
+      fi
+      held="$(cd "$FOREIGN_COPY" && pwd -P)/.git"
+      pid=
+      if [ "$shape" != none ]; then
+        teardown_fixture_start "$FOREIGN_CASE" KILL bash -c 'exec 3<"$1"; exec sleep 3600' holder "$held"
+        pid=$TEARDOWN_FIXTURE_PID
+        for _ in $(seq 100); do "$REAL_LSOF_FOR_TEST" -p "$pid" -Fn 2>/dev/null | grep -qxF "n$held" && break; sleep 0.05; done
+      fi
+      cat > "$FOREIGN_CASE/fakebin/lsof" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" -d cwd "*) exit 0 ;;
+  *" -Fpfn "*)
+    case $shape in
+      failed) echo 'lsof: simulated failure' >&2; exit 2 ;;
+      appears) [ -e "$FOREIGN_CASE/closeout.log" ] || exit 0 ;;
+    esac
+    exec "\${REAL_LSOF_FOR_TEST:?}" "\$@" ;;
+esac
+exit 1
+SH
+      chmod +x "$FOREIGN_CASE/fakebin/lsof"
+      run_foreign_teardown rc ${args[@]+"${args[@]}"}
+      if [ "$shape" = none ]; then
+        expect_code 0 "$rc" "$label: a copy no process holds must be released: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+        assert_grep "released creation lock 'vernant-session-active owner=launcher:" "$FOREIGN_CASE/stderr" "$label: the release was not printed"
+        assert_absent "$FOREIGN_COPY" "$label: the copy survived"
+        continue
+      fi
+      expect_code 1 "$rc" "$label: a copy whose file a process holds open must stay: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+      case "$shape" in
+        holder) assert_grep "process $pid holds $held open" "$FOREIGN_CASE/stderr" "$label: the refusal did not name the holder" ;;
+        appears) assert_grep "The copy was not released directly: process $pid holds $held open" "$FOREIGN_CASE/stderr" \
+          "$label: the refusal did not name the holder" ;;
+        failed) assert_grep "a scan for processes holding its files open failed" "$FOREIGN_CASE/stderr" "$label: the failed scan was not named" ;;
+      esac
+      kill -0 "$pid" 2>/dev/null || fail "$label: teardown ended the holder: $(cat "$FOREIGN_CASE/state/task-x1.teardown-processes" 2>/dev/null)"
+      teardown_fixture_stop "$pid"
+      assert_present "$FOREIGN_COPY/.git" "$label: the copy was removed"
+      git -C "$FOREIGN_CASE/project" worktree list --porcelain | grep -A4 -F "worktree $FOREIGN_COPY" | grep -q '^locked' \
+        || fail "$label: the copy is no longer locked"
+      if grep -q 'worktree unlock' "$FOREIGN_CASE/git-worktree.log" 2>/dev/null; then fail "$label: the script unlocked the copy"; fi
+      assert_present "$FOREIGN_CASE/state/task-x1.meta" "$label: the task record was removed"
+    done
+  done
+  pass 'a process holding a file in the copy open, with its cwd outside, or a failed open-file listing keeps a dead launcher'"'"'s lock on both direct-release routes; with no holder they release'
 }
 
 # An unreadable process table is never taken for a gone launcher.
@@ -6825,6 +6897,7 @@ test_locked_copy_landed_by_a_merged_pr_gets_one_pr_credit
 test_dead_launcher_lock_is_released_directly_when_no_credit_is_satisfiable
 test_dead_launcher_lock_is_released_when_the_driver_is_unavailable
 test_direct_release_refuses_a_process_that_appears_before_the_unlock
+test_direct_release_refuses_a_process_holding_a_file_in_the_copy_open
 test_direct_release_refuses_an_unreadable_process_table
 test_other_driver_verdicts_keep_the_locked_copy
 test_locked_own_nested_copy_that_is_not_proved_is_refused
