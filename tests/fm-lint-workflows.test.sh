@@ -537,6 +537,7 @@ printf '%s\n' "\$@" >> "$log"
 exit 0
 SH
   chmod +x "$fakebin/shellcheck"
+  fm_lint_hide_outside_shellcheck "$fakebin"
   diff_file="$tmp/diff.nul"
   : > "$diff_file"
 

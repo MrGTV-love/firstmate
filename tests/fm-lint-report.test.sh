@@ -44,6 +44,7 @@ sleep 60
 exit 0
 SH
   chmod +x "$fakebin/shellcheck"
+  fm_lint_hide_outside_shellcheck "$fakebin"
 
   # A 3s first attempt leaves about 3s of the 6s deadline, so the retry is
   # killed there; a fresh deadline would let the root run for about 9s.

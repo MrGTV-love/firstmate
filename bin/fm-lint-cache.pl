@@ -44,11 +44,11 @@ use File::Basename qw(dirname basename);
 # and what its root holds now: its gate's whole process tree in one read of the
 # live process table, and the peak the macOS watch publishes beside the slot
 # (slot.<n>.peak, through FM_LINT_INTERNAL_SLOT_PEAK_FILE). The turn is taken
-# only if those charges, plus the resident size of every native process named
+# only if those charges, plus the current resident size of every process named
 # shellcheck outside the held roots (another pool, another caller or a wrapper
-# script around the real ShellCheck, so no pool directory gives an independent
-# budget), plus the request's own charge fit the budget, or nothing is held and
-# no such outside ShellCheck runs, so a root larger than the budget runs alone. A held slot is charged the worst case when its
+# script around the real ShellCheck), plus the request's own charge fit the
+# budget, or nothing is held and no such outside ShellCheck runs, so a root larger
+# than the budget runs alone. A held slot is charged the worst case when its
 # record names no charge or the table cannot be read. When the analysis
 # completes (no signal reached the gate, and it exited 0, 1, 98 or 251), the
 # gate raises the root's record to the larger of the watch's peak and the
@@ -166,7 +166,7 @@ if (($ARGV[0] // '') eq 'gate') {
         }
         return $total;
     };
-    # KiB resident in native processes named shellcheck that are not a descendant
+    # KiB resident now in processes named shellcheck that are not a descendant
     # of a held slot's gate: ShellCheck this pool does not hold, from any other
     # pool, caller or wrapper script. Stand-in analyses are named perl or bash
     # and are not counted.

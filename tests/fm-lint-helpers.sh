@@ -29,6 +29,27 @@ export FM_LINT_CACHE_DIR=off
 # a real ShellCheck always uses the host pool, so no test sets FM_LINT_SLOT_DIR
 # for it.
 unset FM_LINT_SLOT_DIR
+FM_LINT_REAL_PS=$(command -v ps)
+
+# fm_lint_hide_outside_shellcheck <fakebin>: a ps for a stand-in analysis in an
+# isolated pool. Admission counts every process named shellcheck outside its held
+# roots, so a real one elsewhere on the host would change this fixture's result.
+# In the gate's process table read this ps drops those rows, except the pid in
+# FM_TEST_COUNTED_SHELLCHECK_PID; every other call is plain ps.
+fm_lint_hide_outside_shellcheck() {
+  cat > "$1/ps" <<SH
+#!/bin/sh
+[ "\$*" = '-axo pid=,ppid=,rss=,comm=' ] || exec "$FM_LINT_REAL_PS" "\$@"
+"$FM_LINT_REAL_PS" "\$@" | /usr/bin/awk -v counted="\${FM_TEST_COUNTED_SHELLCHECK_PID:-}" '{
+  name = \$0
+  sub(/^ *[0-9]+ +[0-9]+ +[0-9]+ +/, "", name)
+  sub(/ +\$/, "", name)
+  sub(/.*\//, "", name)
+  if (name != "shellcheck" || \$1 == counted) print
+}'
+SH
+  chmod +x "$1/ps"
+}
 
 # Official GitHub release asset sha256 values for shellcheck v0.11.0 .tar.xz
 # archives (https://github.com/koalaman/shellcheck/releases/tag/v0.11.0). Tests
@@ -270,6 +291,7 @@ printf '%s\n' "\$@" >> "$log"
 exit 0
 SH
   chmod +x "$fakebin/shellcheck"
+  fm_lint_hide_outside_shellcheck "$fakebin"
 }
 
 # fm_lint_bounds_supported: the platform pair the bounded per-root envelope
@@ -348,6 +370,7 @@ printf '%s\n' "$target" >> "${FM_TEST_STUB_LOG:-/dev/null}"
 exit 0
 SH
   chmod +x "$fakebin/shellcheck"
+  fm_lint_hide_outside_shellcheck "$fakebin"
 }
 
 fm_lint_assert_flag_log() {

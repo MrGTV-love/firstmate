@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # bin/fm-lint.sh's host slots and resource bounds: deterministic job
 # completion, the CPU-derived host cap, waiter and admission fairness,
-# cache hits that skip the pool, disabled or failing slot state, per-root
+# cache hits that skip the pool, refused or failing slot state, per-root
 # deadlines, a named memory-limit death and its retry without external sources.
 # Changed-file selection lives in tests/fm-lint.test.sh; modes and installer
 # refusals in tests/fm-lint-policy.test.sh; memory fallback and evidence,
@@ -570,8 +570,9 @@ PL
 test_slow_ps_does_not_hold_admission_against_the_next_root() {
   local tmp real_ps
   tmp=$(fm_test_tmproot fm-lint-slot-slow-ps)
-  real_ps=$(command -v ps)
-  mkdir -p "$tmp/bin"
+  mkdir -p "$tmp/bin" "$tmp/hide"
+  fm_lint_hide_outside_shellcheck "$tmp/hide"
+  real_ps="$tmp/hide/ps"
   # The waiter's owner check (ps -p) does not return until the next root has
   # started, or for 30 s. A check made while holding admission.lock locks that
   # root out for the whole time.
@@ -783,7 +784,7 @@ PL
   pass "a content-identical cached success finishes while all host slots remain occupied"
 }
 
-test_slot_pool_can_be_disabled_or_misconfigured() {
+test_slot_pool_cannot_be_disabled_and_refuses_bad_settings() {
   local tmp rc out
   tmp=$(fm_lint_slot_fixture fm-lint-slots-off)
   # No setting turns the host-wide bound off: FM_LINT_SLOT_DIR=off is refused by
@@ -822,7 +823,7 @@ test_slot_pool_can_be_disabled_or_misconfigured() {
   assert_contains "$out" "FM_LINT_SLOT_DIR" "the refusal did not name the fix"
   assert_not_contains "$out" "running without the host-wide ShellCheck bound" "an unusable pool still ran unbounded"
   [ ! -s "$tmp/refused.starts" ] || fail "an unusable pool still started ShellCheck"
-  pass "the slot pool can be disabled, rejects bad settings, and refuses an unusable directory instead of running unbounded"
+  pass "the slot pool cannot be disabled, rejects bad settings, and refuses an unusable directory instead of running unbounded"
 }
 
 test_real_shellcheck_cannot_leave_the_host_pool_and_outside_memory_is_counted() {
@@ -839,7 +840,24 @@ test_real_shellcheck_cannot_leave_the_host_pool_and_outside_memory_is_counted() 
     assert_contains "$out" "cannot move a real ShellCheck" "the refusal did not say a real ShellCheck cannot leave the host pool"
     assert_contains "$out" "FM_LINT_SLOT_DIR=$tmp/elsewhere" "the refusal did not name the setting and its value"
     [ ! -e "$tmp/elsewhere" ] || fail "the refused real-ShellCheck run created the other pool directory"
+    # A ShellCheck that od cannot read is real: only a read #! makes a stand-in.
+    mkdir -p "$tmp/unreadable-bin"
+    cp "$(command -v shellcheck)" "$tmp/unreadable-bin/shellcheck"
+    chmod 111 "$tmp/unreadable-bin/shellcheck"
+    rc=0
+    out=$(PATH="$tmp/unreadable-bin:$PATH" FM_LINT_SLOT_DIR="$tmp/elsewhere" "$LINT" "$tmp/a.sh" 2>&1) || rc=$?
+    [ "$rc" -eq 2 ] || fail "an unreadable ShellCheck with FM_LINT_SLOT_DIR elsewhere exited $rc, expected 2"$'\n'"$out"
+    assert_contains "$out" "cannot move a real ShellCheck" "an unreadable ShellCheck was treated as a stand-in"
   fi
+  # A ShellCheck that does not start with #! is real too.
+  mkdir -p "$tmp/plain-bin"
+  printf 'printf "version: 0.11.0\\n"\n' > "$tmp/plain-bin/shellcheck"
+  chmod +x "$tmp/plain-bin/shellcheck"
+  rc=0
+  out=$(PATH="$tmp/plain-bin:$PATH" FM_LINT_SLOT_DIR="$tmp/elsewhere" "$LINT" "$tmp/a.sh" 2>&1) || rc=$?
+  [ "$rc" -eq 2 ] || fail "a ShellCheck without #! with FM_LINT_SLOT_DIR elsewhere exited $rc, expected 2"$'\n'"$out"
+  assert_contains "$out" "cannot move a real ShellCheck" "a ShellCheck without #! was treated as a stand-in"
+  [ ! -e "$tmp/elsewhere" ] || fail "a refused run created the other pool directory"
   # (3) A stand-in with an isolated fixture pool runs and completes.
   fm_lint_write_memory_shellcheck "$tmp/bin" 1 "$tmp/mem.starts"
   : > "$tmp/mem.starts"
@@ -848,9 +866,10 @@ test_real_shellcheck_cannot_leave_the_host_pool_and_outside_memory_is_counted() 
   [ "$rc" -eq 0 ] || fail "a stand-in run with an isolated fixture pool failed (rc=$rc)"$'\n'"$out"
   [ "$(wc -l < "$tmp/mem.starts" | tr -d ' ')" -eq 1 ] || fail "the stand-in with an isolated fixture pool did not run"
   # (2) A wrapper around the real ShellCheck is a stand-in to the pool choice, but
-  # native processes named shellcheck outside its pool are counted: while the real
+  # processes named shellcheck outside its pool are counted: while the real
   # ShellCheck waits on an open input (resident well above a 4 MiB budget), an
-  # isolated pool does not admit the wrapper, although its own pool is empty.
+  # isolated pool does not admit the wrapper, although its own pool is empty. Only
+  # that one real process stays visible, so another on the host cannot change this.
   pinned_ready || { pass "a real ShellCheck cannot leave the host pool (SKIP the outside-memory case: ShellCheck $REQUIRED not resolved)"; return; }
   mkfifo "$tmp/hold"
   shellcheck - < "$tmp/hold" > /dev/null 2>&1 &
@@ -858,14 +877,14 @@ test_real_shellcheck_cannot_leave_the_host_pool_and_outside_memory_is_counted() 
   exec 9> "$tmp/hold"
   sleep 2
   : > "$tmp/mem.starts"
-  PATH="$tmp/bin:$PATH" FM_TEST_MEM_HOLD=0.2 FM_LINT_SLOT_DIR="$tmp/isolated-pool" FM_LINT_HOST_SLOTS=9 \
-    FM_LINT_HOST_RSS_KIB=4096 "$LINT" "$tmp/a.sh" > "$tmp/wrapper.out" 2>&1 9>&- &
+  PATH="$tmp/bin:$PATH" FM_TEST_COUNTED_SHELLCHECK_PID="$outside" FM_TEST_MEM_HOLD=0.2 \
+    FM_LINT_SLOT_DIR="$tmp/isolated-pool" FM_LINT_HOST_SLOTS=9 FM_LINT_HOST_RSS_KIB=4096 "$LINT" "$tmp/a.sh" > "$tmp/wrapper.out" 2>&1 9>&- &
   pid=$!
   sleep 4
   if [ -s "$tmp/mem.starts" ]; then
     exec 9>&-
     kill "$outside" "$pid" 2>/dev/null || true
-    fail "a run in an isolated pool started while a native shellcheck outside it held more than the 4 MiB budget"
+    fail "a run in an isolated pool started while a real shellcheck outside it held more than the 4 MiB budget"
   fi
   exec 9>&-
   wait "$outside" 2>/dev/null || true
@@ -875,7 +894,7 @@ test_real_shellcheck_cannot_leave_the_host_pool_and_outside_memory_is_counted() 
     sleep 0.2
   done
   wait "$pid" || fail "the isolated-pool run failed after the outside shellcheck ended"$'\n'"$(cat "$tmp/wrapper.out")"
-  pass "a real ShellCheck cannot leave the host pool, native shellcheck outside a pool counts against its budget, and a stand-in keeps its fixture pool"
+  pass "a real ShellCheck cannot leave the host pool, real shellcheck outside a pool counts against its budget, and a stand-in keeps its fixture pool"
 }
 
 test_slot_file_failures_refuse_and_never_run_unbounded() {
@@ -987,6 +1006,7 @@ close \$spans;
 exit(length(\$block) ? 0 : 1);
 PL
   chmod +x "$1/shellcheck"
+  fm_lint_hide_outside_shellcheck "$1"
 }
 
 # fm_lint_memory_runs <tmp> <fakebin> <runs> [VAR=value...]: start <runs> lint
@@ -1132,11 +1152,12 @@ test_root_larger_than_the_budget_runs_alone_and_a_killed_run_frees_its_charge() 
 test_memory_charge_survives_unknown_records_and_an_unreadable_table() {
   local tmp
   tmp=$(fm_test_tmproot fm-lint-memory-state)
-  mkdir -p "$tmp/shim" "$tmp/lonely"
+  mkdir -p "$tmp/shim" "$tmp/lonely" "$tmp/hide"
   printf '#!/bin/sh\nexit 1\n' > "$tmp/shim/ps"
   chmod +x "$tmp/shim/ps"
+  fm_lint_hide_outside_shellcheck "$tmp/hide"
   cp "$ROOT/bin/fm-lint-cache.pl" "$tmp/lonely/fm-lint-cache.pl"
-  perl - "$ROOT/bin/fm-lint-cache.pl" "$tmp" <<'PL' || fail "memory charge state regression failed"
+  PATH="$tmp/hide:$PATH" perl - "$ROOT/bin/fm-lint-cache.pl" "$tmp" <<'PL' || fail "memory charge state regression failed"
 use strict;
 use warnings;
 use Digest::SHA qw(sha256_hex);
@@ -1377,24 +1398,26 @@ test_fast_record_does_not_lower_the_full_charge() {
 }
 
 test_default_pool_is_one_directory_for_every_home() {
-  local tmp pool before after run
+  local tmp pool run fixture mark
   # The real ShellCheck: its pool is always the live per-user host pool, which no
-  # PATH entry, HOME or setting can change, so the test only reads its counter.
+  # PATH entry, HOME or setting can change. Each run leaves a history record that
+  # only its own fixture path can name, and the test removes that record.
   pinned_ready || { pass "SKIP (ShellCheck $REQUIRED not resolved): default pool for every HOME"; return; }
   tmp=$(fm_test_tmproot fm-lint-default-pool)
-  printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/a.sh"
   pool="/var/tmp/firstmate-lint-$(id -u)/lint-slots"
-  before=$(cat "$pool/queue.next" 2>/dev/null || printf 0)
   for run in 1 2; do
+    fixture="$tmp/run.$run.sh"
+    printf '#!/usr/bin/env bash\nexit 0\n' > "$fixture"
     mkdir -p "$tmp/home.$run/.cache"
     env -u FM_LINT_SLOT_DIR HOME="$tmp/home.$run" XDG_CACHE_HOME="$tmp/home.$run/.cache" FM_HOME="$tmp/fm.$run" \
-      "$LINT" --jobs 1 "$tmp/a.sh" >/dev/null 2>&1 \
+      "$LINT" --jobs 1 --telemetry "$tmp/run.$run.tsv" "$fixture" >/dev/null 2>&1 \
       || fail "a lint run with the default pool failed (home $run)"
     [ ! -e "$tmp/home.$run/.cache/firstmate/lint-slots" ] || fail "run $run still used a pool under its own HOME"
+    mark="$pool/history/$(perl -MDigest::SHA=sha256_hex -e 'print sha256_hex($ARGV[0])' "full:$fixture")"
+    [ -s "$mark" ] || fail "run $run with its own HOME, XDG_CACHE_HOME and FM_HOME left no record in $pool"
+    rm -f "$mark"
   done
-  after=$(cat "$pool/queue.next" 2>/dev/null || printf 0)
-  [ "$((after - before))" -ge 2 ] || fail "two runs with different HOME values did not meet in $pool (tickets $before -> $after)"
-  pass "runs with different HOME and XDG_CACHE_HOME values take tickets in the same per-user pool"
+  pass "runs with different HOME, XDG_CACHE_HOME and FM_HOME values record in the same per-user pool"
 }
 
 test_slot_survives_gate_death() {
@@ -2528,7 +2551,7 @@ test_stopped_admission_coordinator_does_not_freeze_free_capacity
 test_slow_ps_does_not_hold_admission_against_the_next_root
 test_queue_scan_survives_odd_slot_paths_and_vanishing_tickets
 test_cached_success_does_not_wait_for_host_slots
-test_slot_pool_can_be_disabled_or_misconfigured
+test_slot_pool_cannot_be_disabled_and_refuses_bad_settings
 test_slot_file_failures_refuse_and_never_run_unbounded
 test_real_shellcheck_cannot_leave_the_host_pool_and_outside_memory_is_counted
 test_memory_budget_bounds_the_aggregate_across_homes

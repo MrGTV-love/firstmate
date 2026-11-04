@@ -89,15 +89,17 @@
 # A root with no history is charged the per-root worst case (the 8 GiB resident
 # watch bound, or the address-space limit under the enforced envelope) until it
 # has one.
-# A cold root takes its turn only when its charge plus every held root's
-# current charge fits the budget; a held root's current charge is the larger
+# A cold root takes its turn only when its charge, every held root's current
+# charge and the resident size of every process named shellcheck outside the
+# held roots together fit the budget; a held root's current charge is the larger
 # of its charge at admission and what its tree holds now, read when the root
 # asks for its turn. That reading is the live process table (resident size
 # only, from ps or libproc) and, where the macOS watch runs, the watch's own
 # peak of resident size and footprint. A held root is charged the worst case
-# when the table cannot be read or its record names no charge. An empty pool
-# always admits one root, so a root larger than the budget runs alone and
-# queued roots wait rather than fail. When a root's analysis completes, its
+# when the table cannot be read or its record names no charge. With nothing held
+# and no outside ShellCheck running, one root is always admitted, so a root larger
+# than the budget runs alone once outside ShellCheck has ended, and queued roots
+# wait rather than fail. When a root's analysis completes, its
 # record is raised to the peak this run measured (the watch's peak and
 # /usr/bin/time's maximum resident size) if that is higher; a record is never
 # lowered, so the narrower memory retry cannot shrink it. Complete means its
@@ -111,24 +113,26 @@
 # nothing caps it. Reading the excess stops new admissions but does not shrink
 # a running root, which keeps its excess until it ends and its record is
 # raised. A lone default two-worker run keeps both workers only while
-# both roots' charges fit the budget: on a pool with no history it runs one
-# root at a time until its roots are recorded, and two recorded roots of 7.2
-# GiB each (14.4 GiB) also run one at a time.
+# both roots' charges and any outside ShellCheck fit the budget: on a pool with
+# no history it runs one root at a time until its roots are recorded, and two
+# recorded roots of 7.2 GiB each (14.4 GiB) also run one at a time.
 # Admission also needs a free slot among the count cap; fairness does not
 # increase host concurrency.
-# A real ShellCheck, a native executable (Mach-O or ELF), always uses the host
-# pool /var/tmp/firstmate-lint-<uid>/lint-slots, which does not depend on HOME,
+# A real ShellCheck always uses the host pool
+# /var/tmp/firstmate-lint-<uid>/lint-slots, which does not depend on HOME,
 # XDG_CACHE_HOME or any setting, so every run of one user on a host meets in one
-# pool and one budget. FM_LINT_SLOT_DIR set to any other directory is refused
-# (exit 2) for a real ShellCheck, and FM_LINT_SLOT_DIR=off is refused for every
-# ShellCheck: no setting turns the host-wide bound off. Only a simulated
-# analysis, a script that is not a native ShellCheck such as a test's stand-in,
-# may keep its pool state apart, in another FM_LINT_SLOT_DIR or, when none is
-# set, in a scratch directory of its own run; every admission, in any
-# pool, also counts the memory of native shellcheck processes outside its own
-# held roots, so a wrapper script around the real ShellCheck cannot obtain a
-# separate budget. Host load average never changes admission, so unrelated
-# machine load cannot starve lint.
+# pool and one budget. A ShellCheck is simulated only when /usr/bin/od reads #! as
+# its first two bytes, as in a test's stand-in script; any other result, a failed
+# read included, makes it real. FM_LINT_SLOT_DIR set to any other directory is
+# refused (exit 2) for a real ShellCheck, and FM_LINT_SLOT_DIR=off is refused for
+# every ShellCheck: no setting turns the host-wide bound off. Only a simulated
+# analysis may keep its pool state apart, in another FM_LINT_SLOT_DIR or, when none
+# is set, in a scratch directory of its own run. A wrapper script around the real
+# ShellCheck is simulated too. Every admission, in any pool, counts the processes
+# named shellcheck outside its own held roots at their current resident size, not
+# at their charge, so a wrapper in its own pool can still be admitted beside a
+# host-pool root that holds a large charge and little resident memory. Host load
+# average never changes admission, so unrelated machine load cannot starve lint.
 # FM_LINT_HOST_SLOTS sets the count cap; unset or empty uses max(2, floor(ncpu/2)).
 # A nonempty FM_LINT_HOST_SLOTS or FM_LINT_HOST_RSS_KIB must be a positive
 # decimal integer without leading zeros, or lint exits 2. The per-root address-space limit is enforced only where ulimit -v works, and
@@ -143,7 +147,8 @@
 # up its libproc reader, with the reason. Linux runs are never watched, and CI
 # runs under FM_LINT_REQUIRE_BOUNDS=1 keep their ulimit envelope.
 # ShellCheck started outside this script (an agent or a test running it
-# directly) is not charged to the pool and is not bounded by it.
+# directly) holds no slot and is not bounded by the pool; each admission counts
+# it at its current resident size.
 # Waiting roots queue rather than fail; both cache-key and host-slot queue time
 # consume neither the root deadline nor its retry budget.
 # A pool that cannot be used (its directory, lock, ticket, slot or queue file)
@@ -1919,16 +1924,12 @@ fi
 # The shell's own UID, not the id command: no PATH entry can name another user.
 HOST_POOL_ROOT=/var/tmp/firstmate-lint-${UID:-0}
 HOST_POOL_DIR=$HOST_POOL_ROOT/lint-slots
-# A real ShellCheck is a native executable (Mach-O or ELF). A script, such as
-# a test's stand-in analysis, is simulated and may keep its pool state apart.
-fm_lint_native_executable() {  # <path>
+# A ShellCheck is simulated, and may keep its pool state apart, only when od
+# reads #! as its first two bytes; any other result makes it real.
+fm_lint_simulated_analysis() {  # <path>
   local magic
-  magic=$(/usr/bin/od -An -tx1 -N4 "$1" 2>/dev/null) || return 1
-  magic=${magic//[[:space:]]/}
-  case "$magic" in
-    7f454c46|cffaedfe|cefaedfe|feedfacf|feedface|cafebabe|bebafeca) return 0 ;;
-  esac
-  return 1
+  magic=$(/usr/bin/od -An -tx1 -N2 "$1" 2>/dev/null) || return 1
+  [ "${magic//[[:space:]]/}" = 2321 ]
 }
 SLOT_DIR=$HOST_POOL_DIR
 if [ -n "${FM_LINT_SLOT_DIR:-}" ]; then
@@ -1936,8 +1937,8 @@ if [ -n "${FM_LINT_SLOT_DIR:-}" ]; then
     printf 'fm-lint.sh: FM_LINT_SLOT_DIR=off is not supported: no setting turns the host-wide ShellCheck memory bound off. Unset FM_LINT_SLOT_DIR to use the host pool %s.\n' \
       "$HOST_POOL_DIR" >&2
     exit 2
-  elif [ "$FM_LINT_SLOT_DIR" != "$HOST_POOL_DIR" ] && fm_lint_native_executable "$SHELLCHECK_BIN"; then
-    printf 'fm-lint.sh: FM_LINT_SLOT_DIR=%s cannot move a real ShellCheck (%s) out of the host pool %s: only a stand-in analysis that is not a native ShellCheck may use another pool directory. Unset FM_LINT_SLOT_DIR.\n' \
+  elif [ "$FM_LINT_SLOT_DIR" != "$HOST_POOL_DIR" ] && ! fm_lint_simulated_analysis "$SHELLCHECK_BIN"; then
+    printf 'fm-lint.sh: FM_LINT_SLOT_DIR=%s cannot move a real ShellCheck (%s) out of the host pool %s: only a stand-in script, a file that starts with #!, may use another pool directory. Unset FM_LINT_SLOT_DIR.\n' \
       "$FM_LINT_SLOT_DIR" "$SHELLCHECK_BIN" "$HOST_POOL_DIR" >&2
     exit 2
   fi
@@ -1964,10 +1965,10 @@ if [ -n "$PARTITION" ]; then
 fi
 
 TMP_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/fm-lint.XXXXXX") || exit 1
-# A simulated analysis (not a native ShellCheck) with no FM_LINT_SLOT_DIR keeps
-# its fixture pool state in this run's scratch directory, which is removed
-# with it; a real ShellCheck never gets one.
-if [ -z "${FM_LINT_SLOT_DIR:-}" ] && ! fm_lint_native_executable "$SHELLCHECK_BIN"; then
+# A simulated analysis with no FM_LINT_SLOT_DIR keeps its fixture pool state in
+# this run's scratch directory, which is removed with it; a real ShellCheck
+# never gets one.
+if [ -z "${FM_LINT_SLOT_DIR:-}" ] && fm_lint_simulated_analysis "$SHELLCHECK_BIN"; then
   SLOT_DIR=$TMP_ROOT/slots
 fi
 ACTIVE_PIDS=()
