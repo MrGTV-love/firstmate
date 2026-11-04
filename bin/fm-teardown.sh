@@ -905,10 +905,11 @@ teardown_friction_outcome retried
 # The pool slot of <project> that encloses a record's current copy without
 # being it: the slot that strictly contains the copy or, once the copy is gone,
 # the record's own prior_worktree= pool slot that encloses its recorded path,
-# else the pool slot that strictly contains that path through its nearest
-# existing ancestor - what a nested teardown leaves when it stops after removing
-# that copy. The place decides it, never a prior_worktree= line; who the slot
-# claim names is teardown_nested_slot's question.
+# else, for a record that is not a scout, the pool slot that strictly contains
+# that absolute path through its nearest existing ancestor - what a nested
+# teardown leaves when it stops after removing that copy. No prior_worktree= line
+# is needed to find it; who the slot claim names is teardown_nested_slot's
+# question.
 teardown_record_enclosing_slot() {  # <meta> <project> <worktree>
   local meta=$1 project=$2 worktree=$3 copy line prior prior_real tail=
   if copy=$(fm_task_copy_canonical_dir "$worktree"); then
@@ -2000,7 +2001,8 @@ teardown_preserves_reassociated_copy() {
 }
 
 # A ship's current copy that is not itself a pool slot but sits inside one,
-# whatever the record's lines say; a scout or secondmate keeps its own route.
+# whatever the record's lines say; a scout, a secondmate or an Orca task keeps
+# its own route.
 # Its slot is the one owner above's answer.
 teardown_current_copy_nested_in_slot() {  # <meta> <kind> <backend> <project> <worktree>
   [ "$2" != secondmate ] && [ "$2" != scout ] && [ "$3" != orca ] || return 1
@@ -4586,19 +4588,20 @@ teardown_owns_worktree() {
 }
 
 # A pool return resets the whole slot, so it sweeps away every copy of this
-# task that lies inside the slot. Two reassociated shapes put one there: a
-# current copy nested inside the slot the task still claims (the slot is then
-# its prior copy), and a prior copy nested inside the slot that is its current
-# copy. Neither refuses outright, because the record could then never be
-# retired. Instead each own copy the return would sweep, other than the current
-# copy the ordinary landed-work test covers, must be a clean worktree root
-# whose HEAD is landed or held by this task's preservation anchor
-# (refs/fm/anchor/<task>-<sha>, written by bin/fm-control.sh reassociate).
+# task that lies inside the slot. Two shapes put one there: a current copy
+# nested inside the slot the task still claims (the slot is then its prior copy,
+# or a ship's record names no prior copy at all), and a prior copy nested inside
+# the slot that is its current copy. Neither refuses outright, because the record
+# could then never be retired. Instead each own copy the return would sweep,
+# other than the current copy the ordinary landed-work test covers, must be a
+# clean worktree root whose HEAD is landed or held by this task's preservation
+# anchor (refs/fm/anchor/<task>-<sha>, written by bin/fm-control.sh reassociate).
 # --force does not waive that proof: no captain words cover a prior copy.
 #
 # teardown_nested_slot is the one owner of that lifecycle, so a re-run after any
-# refusal derives its input from the record's branch= and prior_worktree=, never
-# from the nested copy still existing:
+# refusal derives its input from the record's branch= and the slot
+# teardown_record_enclosing_slot finds from it, never from the nested copy still
+# existing:
 #   prove    Phase A, no side effects. The slot and every own copy nested in it
 #            are clean and landed or anchored, and the claim is this task's.
 #   landed   Phase A for a nested copy an earlier teardown already removed: its
