@@ -1,0 +1,23 @@
+== L1. full pool: a cold fm-lint.sh root queues for a pass (named fm-lint <path>) and finishes after release
+  fm-lint rc=0; filler ended at 1793806106.54; lint finished at 1793806132.41
+  lint stderr:
+    fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+    fm-lint.sh: full ShellCheck extended analysis enabled
+  lint stdout:
+
+== L1b. free pool: holder list while two cold roots run (sampled)
+  fm-lint rc=0
+  distinct holder labels seen:
+    label=fm-lint bin/fm-test-isolation-proof.sh
+
+== L2. nested inside one pass: --jobs 2 is reduced to 1
+    fm-lint.sh: reducing --jobs 2 to inherited FM_CPU_PASS_HELD=1
+  status during nested run is not needed: a nested run takes no pass. Pool now:
+pool=18 held=0 free=18 dir=/tmp/fmman.pvWXbf/pool3
+
+== L3. malformed FM_CPU_PASS_HELD is refused
+  FM_CPU_PASS_HELD='many' rc=125 : fm-lint.sh: FM_CPU_PASS_HELD must be a nonnegative decimal integer.
+  FM_CPU_PASS_HELD='' rc=125 : fm-lint.sh: FM_CPU_PASS_HELD must be a nonnegative decimal integer.
+
+## note added after the run
+L1 in this file shows no wait line: on this loaded host (load5 ~60) fm-lint start-up took longer than the 20 s filler, so the root reached the pool after the filler ended. manual-lint-pass-queue.txt re-drives L1 with a filler that holds until the root is seen waiting: the root printed a wait notice, stayed blocked, then got its pass and finished rc=0 after release.

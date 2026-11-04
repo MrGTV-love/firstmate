@@ -1,0 +1,81 @@
+== pool size (host-derived): 18
+
+== A. pass waiter starts by itself when the holder ends (no approval, no timer)
+pool=18 held=18 free=0 dir=/tmp/fmman.pvWXbf/pool
+slot-0 pid=96015 passes=18 since=1793805791 label=manual-filler
+slot-1 pid=96015 passes=18 since=1793805791 label=manual-filler
+slot-2 pid=96015 passes=18 since=1793805791 label=manual-filler
+slot-3 pid=96015 passes=18 since=1793805791 label=manual-filler
+slot-4 pid=96015 passes=18 since=1793805791 label=manual-filler
+slot-5 pid=96015 passes=18 since=1793805791 label=manual-filler
+slot-6 pid=96015 passes=18 since=1793805791 label=manual-filler
+slot-7 pid=96015 passes=18 since=1793805791 label=manual-filler
+slot-8 pid=96015 passes=18 since=1793805791 label=manual-filler
+slot-9 pid=96015 passes=18 since=1793805791 label=manual-filler
+slot-10 pid=96015 passes=18 since=1793805791 label=manual-filler
+slot-11 pid=96015 passes=18 since=1793805791 label=manual-filler
+slot-12 pid=96015 passes=18 since=1793805791 label=manual-filler
+slot-13 pid=96015 passes=18 since=1793805791 label=manual-filler
+slot-14 pid=96015 passes=18 since=1793805791 label=manual-filler
+slot-15 pid=96015 passes=18 since=1793805791 label=manual-filler
+slot-16 pid=96015 passes=18 since=1793805791 label=manual-filler
+slot-17 pid=96015 passes=18 since=1793805791 label=manual-filler
+  waiter: waiter started; FM_CPU_PASS_HELD=1
+  waiter elapsed from submit: 8.56 s (filler held for ~5 s more after submit)
+  --wait-file ms: 0
+pool=18 held=0 free=18 dir=/tmp/fmman.pvWXbf/pool
+
+== B. per-key slot waiter is NOT admitted by elapsed time (FM_TEST_SLOT_WAIT_SECONDS=1, holder runs 8 s)
+  status while holder runs (fm-duration run test.* takes a pass):
+    pool=18 held=1 free=17 dir=/tmp/fmman.pvWXbf/pool
+    slot-0 pid=99352 passes=1 since=1793805834 label=fm-duration run test.manual.key
+  at +3 s (past the 1 s retired wait) waiter still queued: YES
+  waiter finished after 15.89 s; holder ran ~7 s after waiter submit
+  holder output:
+    calibration: "0 of 5 samples for test.manual.key on Mac-Studio.local"
+    fallback: "no destructive deadline; collect samples"
+    holder-start
+    progress: "test.manual.key elapsed=0.1s output_bytes=13 tree_cpu=0.00s"
+    holder-end
+  waiter output:
+    calibration: "1 of 5 samples for test.manual.key on Mac-Studio.local"
+    fallback: "no destructive deadline; collect samples"
+    waiter-ran
+    progress: "test.manual.key elapsed=0.0s output_bytes=11 tree_cpu=0.00s"
+
+== C. SIGKILLed holder frees its passes at once; the queued waiter starts
+/tmp/fmman.pvWXbf/drv/manual.sh: line 48:  2771 Killed: 9               bin/fm-cpu-pass.sh run --passes "$S" --label victim -- sleep 60
+  after SIGKILL of holder, waiter done in 5.08 s: after-victim-started 
+pool=18 held=0 free=18 dir=/tmp/fmman.pvWXbf/pool
+
+== D. unusable pool (pool path is a regular file) runs the command once with a notice
+fm-cpu-pass: running degraded without a CPU pass: pool directory /tmp/fmman.pvWXbf/pool-file is unusable: [Errno 17] File exists: '/tmp/fmman.pvWXbf/pool-file'
+ran degraded FM_CPU_PASS_HELD=0
+  rc=0
+fm-duration: running test.manual.degraded without a CPU pass: pool directory /tmp/fmman.pvWXbf/pool-file is unusable: [Errno 17] File exists: '/tmp/fmman.pvWXbf/pool-file'
+calibration: "0 of 5 samples for test.manual.degraded on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+fm-duration ran degraded FM_CPU_PASS_HELD=0
+  rc=0
+
+== E. FM_TEST_KEY_SLOTS=0 off switch: three copies of one key run together
+  live fm-duration run test.manual.off processes: 4
+  calibration: "0 of 5 samples for test.manual.off on Mac-Studio.local"
+  fallback: "no destructive deadline; collect samples"
+  calibration: "0 of 5 samples for test.manual.off on Mac-Studio.local"
+  fallback: "no destructive deadline; collect samples"
+  calibration: "0 of 5 samples for test.manual.off on Mac-Studio.local"
+  fallback: "no destructive deadline; collect samples"
+  progress: "test.manual.off elapsed=1.0s output_bytes=0 tree_cpu=0.00s"
+  copy-done
+  progress: "test.manual.off elapsed=1.1s output_bytes=0 tree_cpu=0.00s"
+  copy-done
+  progress: "test.manual.off elapsed=1.1s output_bytes=0 tree_cpu=0.00s"
+  copy-done
+
+## note added after the run (read before trusting the timings above)
+Python start-up on this host takes 1.5-4 s (load5 ~60), which skews the timings in this file.
+- A: "--wait-file ms: 0" and 8.56 s elapsed mean the waiter reached the pool after the filler had ended. See manual-pass-wait-and-kill-timed.txt (A2: waited 10376 ms, started 1.21 s after the filler ended).
+- B: the "+3 s still queued" check may have run before the waiter reached the queue. See slot-wait-base-vs-head.txt, which uses in-command time stamps (base admits the waiter while the holder runs; head waits until the holder ends).
+- C: superseded by C2 in manual-pass-wait-and-kill-timed.txt (waiter started 0.67 s after SIGKILL of the holder).
+- E: the count of 4 includes the bash -c wrapper. The proof is the three ~1.0 s elapsed progress lines from three 2 s sleeps running together.

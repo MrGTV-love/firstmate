@@ -1,0 +1,11 @@
+[base] holder ran 1793806443.65..1793806455.75; waiter command started at 1793806446.19
+[base] waiter started WHILE the holder still ran (admitted by elapsed time)
+[base] waiter slot messages:
+    fm-duration: waiting 1s for a free slot of test.cmp.key (limit 1, FM_TEST_KEY_SLOTS; gives up after 1s); holders: pid=13342 alive held 3s
+    fm-duration: waited 1s for a free slot of test.cmp.key (limit 1); running it without a slot
+
+[head] holder ran 1793806457.16..1793806469.25; waiter command started at 1793806470.44
+[head] waiter started only after the holder ended
+[head] waiter slot messages:
+    fm-duration: waiting 3s for a free slot of test.cmp.key (limit 1, FM_TEST_KEY_SLOTS); holders: pid=54089 alive held 5s
+    fm-duration: got a slot of test.cmp.key after 12s

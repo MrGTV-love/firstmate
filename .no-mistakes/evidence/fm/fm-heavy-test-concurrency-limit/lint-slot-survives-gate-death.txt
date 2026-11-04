@@ -1,0 +1,5 @@
+analysis ran
+analysis ran
+analysis ran
+ok - slot open and non-contention coordinator/scan lock failures warn and run ungated
+ok - inherited slots prevent overlap after gate death and allow admission after watchdog cleanup

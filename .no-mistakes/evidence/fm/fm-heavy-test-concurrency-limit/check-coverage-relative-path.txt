@@ -1,0 +1,6 @@
+cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6KGZA89X5J59RQDGKQNFSYT/tests
+$ ../bin/fm-test-run.sh --check-coverage
+FM_TEST_COVERAGE ok total=390 parallel=31 parallel_max_ms=3088788 parallel_imbalance_ms=26570 parallel_unhinted=0 parallel_jobs=3 parallel_effective_jobs=3 parallel_makespan_ms=1030514 parallel_budget_ms=1200000 serial=341 serial_shards=25 serial_unhinted=9 serial_max_ms=1158566 serial_budget_ms=1200000 serial_indivisible_ms=1005601 herdr=18
+rc=0
+holder labels seen while it ran:
+label=fm-test-run --check-coverage

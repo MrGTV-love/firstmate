@@ -1,0 +1,10 @@
+== L1 (re-drive). filler holds all 18 passes until the lint root is seen waiting
+  lint still running and blocked 4.4 s after start: OK
+  wait notice present: 1
+  released at 1793806216.50; lint rc=0 finished at 1793806256.92 (40.4 s after release)
+  lint stderr:
+    fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+    fm-lint.sh: full ShellCheck extended analysis enabled
+    fm-cpu-pass: waiting 2s for 1 CPU pass(es) for fm-lint bin/fm-cpu-pass.sh: all passes in use; pool size 18; holders: pid=99728 passes=18 since=1793806209 label=filler; pid=99728 passes=18 since=1793806209 label=filler; pid=99728 passes=18 since=1793806209 label=filler; pid=99728 passes=18 since=
+    fm-cpu-pass: got 1 CPU pass(es) for fm-lint bin/fm-cpu-pass.sh after 3s
+pool=18 held=0 free=18 dir=/tmp/fmman.pvWXbf/pool4

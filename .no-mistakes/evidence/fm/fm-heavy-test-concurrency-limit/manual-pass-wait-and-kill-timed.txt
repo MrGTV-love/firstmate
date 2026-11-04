@@ -1,0 +1,20 @@
+== A2. waiter queued behind a full pool starts when the filler ends
+  status 8 s after the waiter was submitted (filler still holds every pass):
+    pool=18 held=0 free=18 dir=/tmp/fmman.pvWXbf/pool2
+  waiter already started: BAD
+  filler command ended at 1793805993.17; waiter command started at 1793805994.38; gap 1.21 s
+  --wait-file ms: 10376
+  waiter stderr:
+    fm-cpu-pass: waiting 2s for 1 CPU pass(es) for waiter: all passes in use; pool size 18; holders: pid=77816 passes=18 since=1793805977 label=filler; pid=77816 passes=18 since=1793805977 label=filler; pid=77816 passes=18 since=1793805977 label=filler; pid=77816 passes=18 since=1793805977 label=filler; pid=77816 passes=18 since=1793805977 label=filler; and 13 more
+    fm-cpu-pass: got 1 CPU pass(es) for waiter after 10s
+pool=18 held=0 free=18 dir=/tmp/fmman.pvWXbf/pool2
+
+== C2. SIGKILL the holder: the queued waiter starts at once
+  waiter queued before kill: OK
+/tmp/fmman.pvWXbf/drv/timed.sh: line 32: 63190 Killed: 9               bin/fm-cpu-pass.sh run --passes "$S" --label victim -- sleep 120
+  SIGKILL at 1793806022.10; waiter command started at 1793806022.77; gap 0.67 s
+  waiter stderr:
+pool=18 held=0 free=18 dir=/tmp/fmman.pvWXbf/pool2
+
+## note added after the run
+A2 line "waiter already started: BAD" is a driver timing artifact: on this loaded host (load5 ~60, python start-up 1.5-4 s) the status call itself returned after the filler had ended. The stamps prove the order: the waiter printed a wait notice naming the filler at 2 s, waited 10376 ms, and its command started 1.21 s after the filler command ended.

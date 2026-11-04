@@ -1,0 +1,96 @@
+CASE H3abc: nested runners: K outer runners x p passes, inner --jobs 6 over 8 scripts, pool size 2
+  outer_runners = 3
+  passes_each = 1
+  pool_size = 2
+  inner_jobs_requested = 6
+  scripts_each = 8
+  sampled_max_workers_total = 2
+  sampled_max_per_outer = {'outer2': 1, 'outer0': 1, 'outer1': 1}
+  sampled_max_passes_held = 2
+  samples = 1154
+  sampler_gap_p99_ms = 465
+  sampler_gap_max_ms = 664
+  RESULT: PASS
+CASE H3d: a malformed FM_CPU_PASS_HELD fails the participant that finds it
+  exit_codes = {'fm-cpu-pass.sh run [many]': 125, 'fm-cpu-pass.sh run [empty]': 125, 'fm-test-run.sh [many]': 125, 'fm-test-run.sh [empty]': 125, 'fm-duration.py gate [many]': 125, 'fm-duration.py gate [empty]': 125, 'fm-duration.py run [many]': 125, 'fm-duration.py run [empty]': 125, 'fm-lint.sh [many]': 125, 'fm-lint.sh [empty]': 125}
+  RESULT: PASS
+CASE H2/H3 brief route: 3 x pool size different suites started as fm-duration.py run test.<suite> -- <command>, pool size 2
+  requests = 6
+  pool_size = 2
+  sampled_max_workers_total = 2
+  sampled_max_passes_held = 2
+  holder_labels = ['fm-duration run test.suite0', 'fm-duration run test.suite1', 'fm-duration run test.suite2', 'fm-duration run test.suite3', 'fm-duration run test.suite4', 'fm-duration run test.suite5']
+  RESULT: PASS
+CASE H2 runner: an unnested fm-test-run.sh script takes a pass named in the holder list
+  sampled_max_workers_total = 2
+  sampled_max_passes_held = 2
+  holder_labels = ['fm-test-run tests/fm-arm-pretool-check.test.sh', 'fm-test-run tests/fm-backend-herdr.test.sh']
+  RESULT: PASS
+CASE H2 lint: two lint runs (--jobs 2) of 4 cold roots each, ShellCheck stub is a busy loop, pool size 2
+  lint_runs = 2
+  jobs_each = 2
+  pool_size = 2
+  sampled_max_workers_total = 2
+  sampled_max_passes_held = 2
+  holder_labels = ['fm-lint /tmp/fmconc.tZ1mVK/concurrency-27o0yqa2/lint/root0-0.sh', 'fm-lint /tmp/fmconc.tZ1mVK/concurrency-27o0yqa2/lint/root0-1.sh', 'fm-lint /tmp/fmconc.tZ1mVK/concurrency-27o0yqa2/lint/root0-2.sh', 'fm-lint /tmp/fmconc.tZ1mVK/concurrency-27o0yqa2/lint/root0-3.sh', 'fm-lint /tmp/fmconc.tZ1mVK/concurrency-27o0yqa2/lint/root1-0.sh', 'fm-lint /tmp/fmconc.tZ1mVK/concurrency-27o0yqa2/lint/root1-1.sh', 'fm-lint /tmp/fmconc.tZ1mVK/concurrency-27o0yqa2/lint/root1-2.sh', 'fm-lint /tmp/fmconc.tZ1mVK/concurrency-27o0yqa2/lint/root1-3.sh']
+  nested_lint_inside_one_pass_max_workers = 1
+  RESULT: PASS
+CASE H2 proof: bin/fm-test-isolation-proof.sh --jobs 4 over its candidate set, pool size 2
+  proof_jobs_requested = 4
+  pool_size = 2
+  candidates = 31
+  sampled_max_workers_total = 2
+  sampled_max_passes_held = 2
+  holder_labels = ['fm-test-isolation-proof --pool portable']
+  family_jobs_4_markers = ['FM_ISOLATION_BEGIN concurrency=2', 'FM_ISOLATION_SUMMARY concurrency=2']
+  family_jobs_4_jobs_enabled = False
+  family_jobs_2_markers = ['FM_ISOLATION_BEGIN concurrency=2', 'FM_ISOLATION_SUMMARY concurrency=2']
+  family_jobs_2_jobs_enabled = True
+  RESULT: PASS
+CASE H4: a waiter starts when a holder ends, not when time passes; an unusable pool runs the command and says so
+  wait_variable_seconds = 1
+  holder_seconds = 6
+  waiter_ran_after_start_s = 6.34
+  waiter_ran_after_holder_end_s = 0.0
+  fake_clock_default_setting = admitted=True sleeps=60 fake_hours=10.0
+  unusable_pool = {'fm-cpu-pass.sh run': (0, 'held=0', 1), 'fm-duration.py run': (0, 'held=0', 1)}
+  off_switch_copies_alive_together = 3
+  slot_pass_cycle_exit_codes = [0, 0]
+  slot_pass_cycle_seconds = 2.0
+  RESULT: PASS
+CASE H5: burst of 3 x pool size + 2 one-pass requests drains; SIGKILLed holder and waiters free the queue
+  requests = 8
+  pool_size = 2
+  sampled_max_workers_total = 2
+  sampled_max_passes_held = 2
+  arrival_order = q00 q01 q02 q03 q04 q05 q06 q07
+  start_order = q01 q00 q02 q06 q03 q07 q05 q04
+  completed = 8
+  sigkill_holder_to_next_start_s = 0.16
+  behind_killed_collector_exit = [0]
+  final_status = held=0 free=2 size=2
+  final_queue_entries = []
+  all_passes_collectable_at_once = True
+  RESULT: PASS
+CASE H7a: sandbox soak: 4 lanes x 5 rounds, pool size 2, 1 pass-less burners, forced load 500
+  lanes = 4
+  rounds_per_lane = 5
+  pool_size = 2
+  background_burners_without_passes = 1
+  forced_load_average = 500
+  window_seconds = 113.9
+  sampled_max_workers_total = 2
+  sampled_max_passes_held = 2
+  samples = 671
+  sampler_gap_p99_ms = 313
+  sampler_gap_max_ms = 578
+  heavy_completed = 20 of 20
+  brief_route_completed = 40 of 40
+  light_starts_completed = 20 of 20
+  light_starts_admitted_at_once_counted_0 = 20
+  light_starts_with_a_wait_line = 0
+  sample_light_start_record = fm-cpu-pass: pipeline-start admitted: counted=0 limit=1 basis=fallback priority=other
+  final_status = held=0 free=2
+  final_queue_entries = []
+  RESULT: PASS
+SUMMARY: 9 cases, 0 failed
