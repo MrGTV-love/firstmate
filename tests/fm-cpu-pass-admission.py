@@ -1411,11 +1411,13 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
         assert live_entries(folder, 'launch-*.lock') == 0
 
     def late_grant():
-        # F6: a fit reached only after a wait past the hold bound (budget 1 s - p99 0.8 s = 0.2 s) refuses;
+        # F6: a fit reached only after a wait past the hold bound (budget 3 s - p99 0.8 s = 2.2 s) refuses;
         # a fit after a short wait admits. The first queue sleep is held at a barrier while the lock is busy.
+        # The bound covers the gate's own start and two decisions; a 0.2 s bound refused the timely case
+        # on a host at load 55 of 18 cores, so the bound leaves room for that overhead.
         import fcntl
-        for label, pause, admitted in (('late', 0.45, False), ('timely', 0.05, True)):
-            folder, db, env = gate_case('fix-f6-' + label, timeout='1s', ci_ms=(800,))
+        for label, pause, admitted in (('late', 2.6, False), ('timely', 0.05, True)):
+            folder, db, env = gate_case('fix-f6-' + label, timeout='3s', ci_ms=(800,))
             (folder / 'pool').mkdir(exist_ok=True)
             lock = os.open(str(folder / 'pool' / 'pipeline-start.lock'), os.O_RDWR | os.O_CREAT, 0o600)
             fcntl.flock(lock, fcntl.LOCK_EX)
