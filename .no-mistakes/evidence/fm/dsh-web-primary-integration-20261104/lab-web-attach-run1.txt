@@ -1,0 +1,17 @@
+# real lab Web server pid(s):
+84509 node /opt/homebrew/bin/dsh --profile web --patch /Users/charlesabrooker/tmp/fm-labweb.IuTKOJ/runtime/base.yml --patch /Users/charlesabrooker/tmp/fm-labweb.IuTKOJ/runtime/fm.yml --no-open --host 
+# state/.lock
+84509
+# state/.lock-session
+dsh-web:session-598722b5-2a65-46fa-889f-64c6d9e42f94
+# .dsh-primary-events.jsonl
+{"at":1793807776944,"pid":84509,"event":"attached","session":"session-598722b5-2a65-46fa-889f-64c6d9e42f94"}
+{"at":1793807777370,"pid":84509,"event":"acquire","code":0}
+{"at":1793807779951,"pid":84509,"event":"turnend-guard","code":2}
+{"at":1793807780105,"pid":84509,"event":"watcher-close","code":1}
+{"at":1793807783353,"pid":84509,"event":"turnend-guard","code":2}
+{"at":1793807783364,"pid":84509,"event":"followup","kind":"guard","id":"fa9e7780-4919-41f6-9368-8f7c12d29edc"}
+{"at":1793807906135,"pid":84509,"event":"turn-end","seq":282}
+{"at":1793807908627,"pid":84509,"event":"turnend-guard","code":2}
+{"at":1793807908785,"pid":84509,"event":"watcher-close","code":1}
+{"at":1793807913040,"pid":84509,"event":"turnend-guard","code":2}

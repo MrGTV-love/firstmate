@@ -1,0 +1,21 @@
+# inherited identity present in the real dsh CLI process env (DSH_* only)
+DSH_SHELL=1
+DSH_PROFILE=web
+DSH_SESSION_ID=parent-web-inherited-1234
+# lab process tree
+30416 30371 node /opt/homebrew/bin/dsh-tui --patch /Users/charlesabrooker/tmp/fm-lab.DCVgZa/state/dsh-primary.dsh/1793806908.30416/launch.yml -- Reply with the single word READY. Do not run any tools.
+44437 30416 /opt/homebrew/Cellar/node/26.4.0/bin/node /Users/charlesabrooker/tmp/fm-lab.DCVgZa/state/dsh-primary.dsh/1793806908.30416/dsh/profiles/dsh-tui/node_modules/@deepseek-harness-tui/dsh-tui/bi
+44833 44437 node /opt/homebrew/bin/dsh --profile dsh-tui --patch /Users/charlesabrooker/tmp/fm-lab.DCVgZa/state/dsh-primary.dsh/1793806908.30416/launch.yml -- -- Reply with the single word READY. Do n
+# state/.lock
+44833
+# state/.lock-session
+<absent>
+# .dsh-primary-events.jsonl
+{"at":1793806952856,"pid":44833,"event":"startup","session":"2f5ec1bb-1106-4baa-83fa-871de09b5fa0"}
+{"at":1793806977123,"pid":44833,"event":"turnend-guard","code":0}
+{"at":1793806979995,"pid":44833,"event":"turn-end","seq":20}
+{"at":1793806982422,"pid":44833,"event":"turnend-guard","code":0}
+{"at":1793807010508,"pid":44833,"event":"turn-end","seq":37}
+{"at":1793807010873,"pid":44833,"event":"turnend-guard","code":0}
+# fm-lock.sh status (outside)
+lock: held by live harness pid 44833

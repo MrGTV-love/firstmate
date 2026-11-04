@@ -1,0 +1,20 @@
+# real installed modern CLI and legacy TUI
+PASS(0): fm_dsh_script_path /opt/homebrew/bin/dsh
+PASS(0): fm_dsh_cli_script_path /opt/homebrew/bin/dsh
+PASS(0): fm_dsh_tui_script_path /opt/homebrew/bin/dsh-tui
+REJECTED(as expected): fm_dsh_cli_script_path /opt/homebrew/bin/dsh-tui
+live server argv: node /opt/homebrew/bin/dsh web
+PASS(0): fm_dsh_args_are_dsh node /opt/homebrew/bin/dsh web
+PASS(0): fm_harness_process_matches node node /opt/homebrew/bin/dsh web
+# real unrelated Node bins must not be DSH
+REJECTED(as expected): fm_dsh_args_are_dsh node /opt/homebrew/bin/acpx web
+REJECTED(as expected): fm_harness_process_matches node node /opt/homebrew/bin/acpx web
+REJECTED(as expected): fm_dsh_args_are_dsh node /opt/homebrew/bin/backpass web
+REJECTED(as expected): fm_harness_process_matches node node /opt/homebrew/bin/backpass web
+REJECTED(as expected): fm_dsh_args_are_dsh node /opt/homebrew/bin/gemini web
+REJECTED(as expected): fm_harness_process_matches node node /opt/homebrew/bin/gemini web
+REJECTED(as expected): fm_dsh_args_are_dsh node /opt/homebrew/bin/gh-axi web
+REJECTED(as expected): fm_harness_process_matches node node /opt/homebrew/bin/gh-axi web
+# relative path and later-argument decoy
+REJECTED(as expected): fm_dsh_args_are_dsh node bin/dsh web
+REJECTED(as expected): fm_dsh_args_are_dsh node /opt/homebrew/bin/gemini /opt/homebrew/bin/dsh

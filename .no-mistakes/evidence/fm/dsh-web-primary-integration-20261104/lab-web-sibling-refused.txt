@@ -1,0 +1,26 @@
+  uid=g62:59_0 "Run exactly this one shell command and show its full output, nothing else: bash /Users/charlesabrooker/tmp/fm-labweb.IuTKOJ/sibling-probe.sh"
+  uid=g62:59_1 "10:03"
+  uid=g62:59_2 button "Copy"
+  uid=g62:61_0 status atomic live="polite" relevant="additions text"
+    uid=g62:61_1 "Completed"
+  uid=g62:61_2 button "Completed in 1m 8s" expandable
+  uid=g62:61_3 "Full output of the command:"
+  uid=g62:61_4 "Code block"
+  uid=g62:61_5 button "Wrap lines" pressed
+  uid=g62:61_6 button "Copy"
+  uid=g62:61_7 "PROFILE=web SID=session-0c8f1151-c7c3-4b89-979f-5a93f7522358 SHELL=1
+acquire_rc=1
+release_rc=1
+[stderr]
+error: another live firstmate session holds the lock (pid 84509, session dsh-web:session-598722b5-2a65-46fa-889f-64c6d9e42f94); operate read-only until resolved
+error: cannot release another or unverified native session lock"
+  uid=g62:61_8 "It then exceeded the 60s foreground timeout and continued as background job "
+  uid=g62:61_9 "bash-1e7be5323c3d4966"
+  uid=g62:61_10 ", which finished with exit code 0 and added:"
+  uid=g62:61_11 "Code block"
+  uid=g62:61_12 button "Wrap lines" pressed
+  uid=g62:61_13 button "Copy"
+  uid=g62:61_14 "inspect_rc=4
+84509
+dsh-web:session-598722b5-2a65-46fa-889f-64c6d9e42f94"
+  uid=g62:61_15 "Note: the script reported that a different live session (pid 84509) holds the lock, so it's operating read-only."

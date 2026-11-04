@@ -1,0 +1,350 @@
+
+  ⏺ READY
+
+  ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+  ⌸ ❯                                                                                                                                                                                                ⛶
+  ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+                                                                                                                                                                                       8.5k/1.0M 0.9%
+   deepseek-v4-flash · low · cache 0.0% · ≈¥0.01 idle · fm-lab.DCVgZa                                                                                                            ctx 0.9% (8.5k/1.0m)
+    completed off the startup path in 4s: GitHub authentication, recorded Herdr launch recovery, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, project clone refresh
+    with its drift reporting, and inactive terminal-outcome reconciliation.
+    NEEDS_GH_AUTH
+    These ran AFTER the sections above were composed, so re-read any record a line here names.
+
+    ================================================================================
+    CONTEXT
+    ================================================================================
+
+    data/projects.md
+    --------------------------------------------------------------------------------
+    ABSENT
+
+    data/secondmates.md
+    --------------------------------------------------------------------------------
+    ABSENT
+
+    data/captain.md
+    --------------------------------------------------------------------------------
+    ABSENT
+
+    data/captain-shared.md (shared, main-authoritative, read-only in secondmate homes)
+    --------------------------------------------------------------------------------
+    ABSENT
+
+    data/learnings.md
+    --------------------------------------------------------------------------------
+    ABSENT
+
+    ================================================================================
+    NEXT STEP
+    ================================================================================
+    Follow the supervision operating instructions block above for harness 'dsh'.
+    This script never starts supervision itself.
+
+    The digest above is complete for this session start. The READ-ONCE CONTRACT
+    section near the top of it governs what may still be read from disk.
+
+  ❯ Reply with the single word READY. Do not run any tools.
+
+  ⏺ READY
+
+  ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+  ⌸ ❯ Run exactly this one shell command and show its full output, nothing else: echo PROFILE=$DSH_PROFILE SID=$DSH_SESSION_ID; bash                                                                 ⛶
+      /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6K90YMSXHSZZH1B18V5SJ1Q/bin/fm-lock.sh; echo lock_rc=$?; bash
+      /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6K90YMSXHSZZH1B18V5SJ1Q/bin/fm-dsh-primary.sh inspect $FM_HOME; echo inspect_rc=$?; cat $FM_HOME/state/.lock; cat
+      $FM_HOME/state/.lock-session 2>/dev/null || echo no-sidecar
+  ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+                                                                                                                                                                                       8.5k/1.0M 0.9%
+   deepseek-v4-flash · low · cache 0.0% · ≈¥0.01 idle · fm-lab.DCVgZa                                                                                                            ctx 0.9% (8.5k/1.0m)
+    NEEDS_GH_AUTH
+    These ran AFTER the sections above were composed, so re-read any record a line here names.
+
+    ================================================================================
+    CONTEXT
+    ================================================================================
+
+    data/projects.md
+    --------------------------------------------------------------------------------
+    ABSENT
+
+    data/secondmates.md
+    --------------------------------------------------------------------------------
+    ABSENT
+
+    data/captain.md
+    --------------------------------------------------------------------------------
+    ABSENT
+
+    data/captain-shared.md (shared, main-authoritative, read-only in secondmate homes)
+    --------------------------------------------------------------------------------
+    ABSENT
+
+    data/learnings.md
+    --------------------------------------------------------------------------------
+    ABSENT
+
+    ================================================================================
+    NEXT STEP
+    ================================================================================
+    Follow the supervision operating instructions block above for harness 'dsh'.
+    This script never starts supervision itself.
+
+    The digest above is complete for this session start. The READ-ONCE CONTRACT
+    section near the top of it governs what may still be read from disk.
+
+  ❯ Reply with the single word READY. Do not run any tools.
+
+  ⏺ READY
+
+  ❯ Run exactly this one shell command and show its full output, nothing else: echo PROFILE=$DSH_PROFILE SID=$DSH_SESSION_ID; bash
+    /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6K90YMSXHSZZH1B18V5SJ1Q/bin/fm-lock.sh; echo lock_rc=$?; bash
+    /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6K90YMSXHSZZH1B18V5SJ1Q/bin/fm-dsh-primary.sh inspect $FM_HOME; echo inspect_rc=$?; cat $FM_HOME/state/.lock; cat
+    $FM_HOME/state/.lock-session 2>/dev/null || echo no-sidecar
+
+  • Bash(echo PROFILE=$DSH_PROFILE SID=$DSH_SESSION_ID; bash /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6K90YMSXHSZZH1B18V5SJ1Q/bin/fm-lock.sh; echo lock_rc=$?; bash  · 1s
+        /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6K90YMSXHSZZH1B18V5SJ1Q/bin/fm-dsh-primary.sh inspect $FM_HOME; echo inspect_rc=$?; cat $FM_HOME/state/.lock; cat
+        $FM_HOME/state/.lock-session 2>/dev/null || echo no-sidecar)
+   ⎿ PROFILE=dsh-tui SID=2f5ec1bb-1106-4baa-83fa-871de09b5fa0
+     lock acquired: harness pid 44833
+     lock_rc=0
+     … +4 lines (ctrl+o to expand)
+
+  ⏺ ┌─ code ──────────────────────────────────────────────────
+    │ PROFILE=dsh-tui SID=2f5ec1bb-1106-4baa-83fa-871de09b5fa0
+    │ lock acquired: harness pid 44833
+    │ lock_rc=0
+    │ idle
+    │ inspect_rc=0
+    │ 44833
+    │ no-sidecar
+
+  ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+  ⌸ ❯                                                                                                                                                                                                ⛶
+  ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+                                                                                                                                                                                       9.1k/1.0M 0.9%
+   deepseek-v4-flash · low · cache 97.8% · ≈¥0.01 idle · fm-lab.DCVgZa                                                                                                           ctx 0.9% (9.1k/1.0m)
+    --------------------------------------------------------------------------------
+    ABSENT
+
+    data/learnings.md
+    --------------------------------------------------------------------------------
+    ABSENT
+
+    ================================================================================
+    NEXT STEP
+    ================================================================================
+    Follow the supervision operating instructions block above for harness 'dsh'.
+    This script never starts supervision itself.
+
+    The digest above is complete for this session start. The READ-ONCE CONTRACT
+    section near the top of it governs what may still be read from disk.
+
+  ❯ Reply with the single word READY. Do not run any tools.
+
+  ⏺ READY
+
+  ❯ Run exactly this one shell command and show its full output, nothing else: echo PROFILE=$DSH_PROFILE SID=$DSH_SESSION_ID; bash
+    /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6K90YMSXHSZZH1B18V5SJ1Q/bin/fm-lock.sh; echo lock_rc=$?; bash
+    /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6K90YMSXHSZZH1B18V5SJ1Q/bin/fm-dsh-primary.sh inspect $FM_HOME; echo inspect_rc=$?; cat $FM_HOME/state/.lock; cat
+    $FM_HOME/state/.lock-session 2>/dev/null || echo no-sidecar
+
+  • Bash(echo PROFILE=$DSH_PROFILE SID=$DSH_SESSION_ID; bash /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6K90YMSXHSZZH1B18V5SJ1Q/bin/fm-lock.sh; echo lock_rc=$?; bash  · 1s
+        /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6K90YMSXHSZZH1B18V5SJ1Q/bin/fm-dsh-primary.sh inspect $FM_HOME; echo inspect_rc=$?; cat $FM_HOME/state/.lock; cat
+        $FM_HOME/state/.lock-session 2>/dev/null || echo no-sidecar)
+   ⎿ PROFILE=dsh-tui SID=2f5ec1bb-1106-4baa-83fa-871de09b5fa0
+     lock acquired: harness pid 44833
+     lock_rc=0
+     … +4 lines (ctrl+o to expand)
+
+  ⏺ ┌─ code ──────────────────────────────────────────────────
+    │ PROFILE=dsh-tui SID=2f5ec1bb-1106-4baa-83fa-871de09b5fa0
+    │ lock acquired: harness pid 44833
+    │ lock_rc=0
+    │ idle
+    │ inspect_rc=0
+    │ 44833
+    │ no-sidecar
+
+  ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+  ⌸ ❯                                                                                                                                                                                                ⛶
+  ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+                                                                                                                                                                                       9.1k/1.0M 0.9%
+   deepseek-v4-flash · low · cache 97.8% · ≈¥0.01 idle · fm-lab.DCVgZa                                                                                                           ctx 0.9% (9.1k/1.0m)
+    --------------------------------------------------------------------------------
+    ABSENT
+
+    ================================================================================
+    NEXT STEP
+    ================================================================================
+    Follow the supervision operating instructions block above for harness 'dsh'.
+    This script never starts supervision itself.
+
+    The digest above is complete for this session start. The READ-ONCE CONTRACT
+    section near the top of it governs what may still be read from disk.
+
+  ❯ Reply with the single word READY. Do not run any tools.
+
+  ⏺ READY
+
+  ❯ Run exactly this one shell command and show its full output, nothing else: echo PROFILE=$DSH_PROFILE SID=$DSH_SESSION_ID; bash
+    /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6K90YMSXHSZZH1B18V5SJ1Q/bin/fm-lock.sh; echo lock_rc=$?; bash
+    /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6K90YMSXHSZZH1B18V5SJ1Q/bin/fm-dsh-primary.sh inspect $FM_HOME; echo inspect_rc=$?; cat $FM_HOME/state/.lock; cat
+    $FM_HOME/state/.lock-session 2>/dev/null || echo no-sidecar
+
+  • Bash(echo PROFILE=$DSH_PROFILE SID=$DSH_SESSION_ID; bash /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6K90YMSXHSZZH1B18V5SJ1Q/bin/fm-lock.sh; echo lock_rc=$?; bash  · 1s
+        /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6K90YMSXHSZZH1B18V5SJ1Q/bin/fm-dsh-primary.sh inspect $FM_HOME; echo inspect_rc=$?; cat $FM_HOME/state/.lock; cat
+        $FM_HOME/state/.lock-session 2>/dev/null || echo no-sidecar)
+   ⎿ PROFILE=dsh-tui SID=2f5ec1bb-1106-4baa-83fa-871de09b5fa0
+     lock acquired: harness pid 44833
+     lock_rc=0
+     … +4 lines (ctrl+o to expand)
+
+  ⏺ ┌─ code ──────────────────────────────────────────────────
+    │ PROFILE=dsh-tui SID=2f5ec1bb-1106-4baa-83fa-871de09b5fa0
+    │ lock acquired: harness pid 44833
+    │ lock_rc=0
+    │ idle
+    │ inspect_rc=0
+    │ 44833
+    │ no-sidecar
+
+  ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+  ⌸ ❯ /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6K90YMSXHSZZH1B18V5SJ1Q/bin/fm-lock.sh; echo immediate_rc=$?; cat /Users/charlesabrooker/tmp/fm-lab.DCVgZa/state/.lock; bash     ⛶
+      /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6K90YMSXHSZZH1B18V5SJ1Q/bin/fm-dsh-primary.sh inspect $FM_HOME; echo inspect_rc=$?; printf '30416\n' >
+      /Users/charlesabrooker/tmp/fm-lab.DCVgZa/state/.lock; bash /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6K90YMSXHSZZH1B18V5SJ1Q/bin/fm-lock.sh; echo outer_rc=$?; cat
+      /Users/charlesabrooker/tmp/fm-lab.DCVgZa/state/.lock; bash /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6K90YMSXHSZZH1B18V5SJ1Q/bin/fm-dsh-primary.sh inspect $FM_HOME;
+      echo inspect_outer_rc=$?; printf '44833\n' > /Users/charlesabrooker/tmp/fm-lab.DCVgZa/state/.lock; bash /Users/charlesabrooker/.no-mistakes/worktrees
+  ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+                                                                                                                                                                                       9.1k/1.0M 0.9%
+   deepseek-v4-flash · low · cache 97.8% · ≈¥0.01 idle · fm-lab.DCVgZa                                                                                                           ctx 0.9% (9.1k/1.0m)
+    --------------------------------------------------------------------------------
+    ABSENT
+
+    ================================================================================
+    NEXT STEP
+    ================================================================================
+    Follow the supervision operating instructions block above for harness 'dsh'.
+    This script never starts supervision itself.
+
+    The digest above is complete for this session start. The READ-ONCE CONTRACT
+    section near the top of it governs what may still be read from disk.
+
+  ❯ Reply with the single word READY. Do not run any tools.
+
+  ⏺ READY
+
+  ❯ Run exactly this one shell command and show its full output, nothing else: echo PROFILE=$DSH_PROFILE SID=$DSH_SESSION_ID; bash
+    /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6K90YMSXHSZZH1B18V5SJ1Q/bin/fm-lock.sh; echo lock_rc=$?; bash
+    /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6K90YMSXHSZZH1B18V5SJ1Q/bin/fm-dsh-primary.sh inspect $FM_HOME; echo inspect_rc=$?; cat $FM_HOME/state/.lock; cat
+    $FM_HOME/state/.lock-session 2>/dev/null || echo no-sidecar
+
+  • Bash(echo PROFILE=$DSH_PROFILE SID=$DSH_SESSION_ID; bash /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6K90YMSXHSZZH1B18V5SJ1Q/bin/fm-lock.sh; echo lock_rc=$?; bash  · 1s
+        /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6K90YMSXHSZZH1B18V5SJ1Q/bin/fm-dsh-primary.sh inspect $FM_HOME; echo inspect_rc=$?; cat $FM_HOME/state/.lock; cat
+        $FM_HOME/state/.lock-session 2>/dev/null || echo no-sidecar)
+   ⎿ PROFILE=dsh-tui SID=2f5ec1bb-1106-4baa-83fa-871de09b5fa0
+     lock acquired: harness pid 44833
+     lock_rc=0
+     … +4 lines (ctrl+o to expand)
+
+  ⏺ ┌─ code ──────────────────────────────────────────────────
+    │ PROFILE=dsh-tui SID=2f5ec1bb-1106-4baa-83fa-871de09b5fa0
+    │ lock acquired: harness pid 44833
+    │ lock_rc=0
+    │ idle
+    │ inspect_rc=0
+    │ 44833
+    │ no-sidecar
+
+  ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+  ⌸ ❯ /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6K90YMSXHSZZH1B18V5SJ1Q/bin/fm-dsh-primary.sh inspect $FM_HOME; echo inspect_rc=$?; printf '30416\n' >                           ⛶
+      /Users/charlesabrooker/tmp/fm-lab.DCVgZa/state/.lock; bash /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6K90YMSXHSZZH1B18V5SJ1Q/bin/fm-lock.sh; echo outer_rc=$?; cat
+      /Users/charlesabrooker/tmp/fm-lab.DCVgZa/state/.lock; bash /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6K90YMSXHSZZH1B18V5SJ1Q/bin/fm-dsh-primary.sh inspect $FM_HOME;
+      echo inspect_outer_rc=$?; printf '44833\n' > /Users/charlesabrooker/tmp/fm-lab.DCVgZa/state/.lock; bash
+      /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6K90YMSXHSZZH1B18V5SJ1Q/bin/fm-lock.sh; echo restored_rc=$?
+  ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+                                                                                                                                                                                       9.1k/1.0M 0.9%
+   deepseek-v4-flash · low · cache 97.8% · ≈¥0.01 idle · fm-lab.DCVgZa                                                                                                           ctx 0.9% (9.1k/1.0m)
+
+    data/learnings.md
+    --------------------------------------------------------------------------------
+    ABSENT
+
+    ================================================================================
+    NEXT STEP
+    ================================================================================
+    Follow the supervision operating instructions block above for harness 'dsh'.
+    This script never starts supervision itself.
+
+    The digest above is complete for this session start. The READ-ONCE CONTRACT
+    section near the top of it governs what may still be read from disk.
+
+  ❯ Reply with the single word READY. Do not run any tools.
+
+  ⏺ READY
+
+  ❯ Run exactly this one shell command and show its full output, nothing else: echo PROFILE=$DSH_PROFILE SID=$DSH_SESSION_ID; bash
+    /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6K90YMSXHSZZH1B18V5SJ1Q/bin/fm-lock.sh; echo lock_rc=$?; bash
+    /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6K90YMSXHSZZH1B18V5SJ1Q/bin/fm-dsh-primary.sh inspect $FM_HOME; echo inspect_rc=$?; cat $FM_HOME/state/.lock; cat
+    $FM_HOME/state/.lock-session 2>/dev/null || echo no-sidecar
+
+  • Bash(echo PROFILE=$DSH_PROFILE SID=$DSH_SESSION_ID; bash /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6K90YMSXHSZZH1B18V5SJ1Q/bin/fm-lock.sh; echo lock_rc=$?; bash  · 1s
+        /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6K90YMSXHSZZH1B18V5SJ1Q/bin/fm-dsh-primary.sh inspect $FM_HOME; echo inspect_rc=$?; cat $FM_HOME/state/.lock; cat
+        $FM_HOME/state/.lock-session 2>/dev/null || echo no-sidecar)
+   ⎿ PROFILE=dsh-tui SID=2f5ec1bb-1106-4baa-83fa-871de09b5fa0
+     lock acquired: harness pid 44833
+     lock_rc=0
+     … +4 lines (ctrl+o to expand)
+
+  ⏺ ┌─ code ──────────────────────────────────────────────────
+    │ PROFILE=dsh-tui SID=2f5ec1bb-1106-4baa-83fa-871de09b5fa0
+    │ lock acquired: harness pid 44833
+    │ lock_rc=0
+    │ idle
+    │ inspect_rc=0
+    │ 44833
+    │ no-sidecar
+
+  ❯ Run exactly this one shell command and show its full output, nothing else: printf '44437\n' > /Users/charlesabrooker/tmp/fm-lab.DCVgZa/state/.lock; bash
+    /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6K90YMSXHSZZH1B18V5SJ1Q/bin/fm-lock.sh; echo immediate_rc=$?; cat /Users/charlesabrooker/tmp/fm-lab.DCVgZa/state/.lock; bash
+    /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6K90YMSXHSZZH1B18V5SJ1Q/bin/fm-dsh-primary.sh inspect $FM_HOME; echo inspect_rc=$?; printf '30416\n' >
+    /Users/charlesabrooker/tmp/fm-lab.DCVgZa/state/.lock; bash /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6K90YMSXHSZZH1B18V5SJ1Q/bin/fm-lock.sh; echo outer_rc=$?; cat
+    /Users/charlesabrooker/tmp/fm-lab.DCVgZa/state/.lock; bash /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6K90YMSXHSZZH1B18V5SJ1Q/bin/fm-dsh-primary.sh inspect $FM_HOME; echo
+    inspect_outer_rc=$?; printf '44833\n' > /Users/charlesabrooker/tmp/fm-lab.DCVgZa/state/.lock; bash /Users/charlesabrooker/ … 98 chars folded (click or ctrl+o to expand)
+
+  ⚓ Thinking · 3s (ctrl+o to expand)
+
+  • Bash(printf '44437\n' > /Users/charlesabrooker/tmp/fm-lab.DCVgZa/state/.lock; bash /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6K90YMSXHSZZH1B18V5SJ1Q/bin/fm-lock.sh; echo   ·
+        immediate_rc=$?; cat /Users/charlesabrooker/tmp/fm-lab.DCVgZa/state/.lock; bash /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6K90YMSXHSZZH1B18V5SJ1Q/bin/fm-dsh-primary.sh9s
+        inspect $FM_HOME; echo inspect_rc=$?; printf '30416\n' > /Users/charlesabrooker/tmp/fm-lab.DCVgZa/state/.lock; bash
+        /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6K90YMSXHSZZH1B18V5SJ1Q/bin/fm-lock.sh; echo outer_rc=$?; cat /Users/charlesabrooker/tmp/fm-lab.DCVgZa/state/.lock; bash
+        /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6K90YMSXHSZZH1B18V5SJ1Q/bin/fm-dsh-primary.sh inspect $FM_HOME; echo inspect_outer_rc=$?; printf '44833\n' >
+        /Users/charlesabrooker/tmp/fm-lab.DCVgZa/state/.lock; bash /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6K90YMSXHSZZH1B18V5SJ1Q/bin/fm-lock. … 23 chars folded (click or
+        ctrl+o to expand))
+   ⎿ lock acquired: harness pid 44437
+     immediate_rc=0
+     44437
+     … +9 lines (ctrl+o to expand)
+
+  ⏺ ┌─ code ────────────────────────────────────────────────────────────────────────────────────────────
+    │ lock acquired: harness pid 44437
+    │ immediate_rc=0
+    │ 44437
+    │ idle
+    │ inspect_rc=0
+    │ outer_rc=1
+    │ 30416
+    │ inspect_outer_rc=4
+    │ lock acquired: harness pid 44833
+    │ restored_rc=0
+    │ [stderr]
+    │ error: another live firstmate session holds the lock (pid 30416); operate read-only until resolved
+
+  ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+  ⌸ ❯                                                                                                                                                                                                ⛶
+  ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+                                                                                                                                                                                        10k/1.0M 1.0%
+   deepseek-v4-flash · low · cache 97.8% · ≈¥0.01 idle · fm-lab.DCVgZa                                                                                                            ctx 1.0% (10k/1.0m)
+
+
+
+

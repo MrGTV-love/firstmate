@@ -1,0 +1,6 @@
+# same sessionId, but session cwd differs from plugin home: real server, real resume, model replied RESUMED
+"home":"/Users/charlesabrooker/tmp/fm-labweb.IuTKOJ/deepseek-harness-default-workspace"
+{"type":"session","version":4,"id":"session-598722b5-2a65-46fa-889f-64c6d9e42f94","createdAt":1793807550063,"cwd":"/Users/charlesabrooker/tmp/fm-labweb.IuTKOJ/deepseek-harness/default-workspace","isSeeded":false,"delegationDepth":0,"agentPreset":"standard"}
+# state after resume (no .lock, no .lock-session, no events):
+.fm-lab-tmux-dir
+demo.meta

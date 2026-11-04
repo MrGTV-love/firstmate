@@ -1,0 +1,19 @@
+# restart: old server pid 84509 dead; new lab server:
+56549 node /opt/homebrew/bin/dsh --profile web --patch /Users/charlesabrooker/tmp/fm-labweb.IuTKOJ/runtime/base.yml --patch /Users/charlesabrooker/tmp/fm-labweb.IuTKOJ/runtime/fm.yml --no-open --host 
+# lock pair after resumed attach
+56549
+dsh-web:session-598722b5-2a65-46fa-889f-64c6d9e42f94
+# events from new server
+{"at":1793808559689,"pid":56549,"event":"attached","session":"session-598722b5-2a65-46fa-889f-64c6d9e42f94"}
+{"at":1793808578438,"pid":56549,"event":"acquire","code":0}
+{"at":1793808585283,"pid":56549,"event":"turnend-guard","code":2}
+{"at":1793808592694,"pid":56549,"event":"turn-end","seq":296}
+{"at":1793808594131,"pid":56549,"event":"turn-end","seq":304}
+{"at":1793808597422,"pid":56549,"event":"watcher-ready","arm":41769}
+{"at":1793808597906,"pid":56549,"event":"turnend-guard","code":2}
+{"at":1793808598376,"pid":56549,"event":"turnend-guard","code":0}
+{"at":1793808602627,"pid":56549,"event":"turnend-guard","code":0}
+{"at":1793808629627,"pid":56549,"event":"watcher-close","code":0}
+{"at":1793808633428,"pid":56549,"event":"wake-delivery","rows":["1793808603\t1","1793808625\t2"]}
+{"at":1793808633563,"pid":56549,"event":"followup","kind":"watcher","id":"492ea3f9-23ec-4884-b895-3863e74b6655"}
+# watcher tree

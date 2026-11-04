@@ -1,0 +1,15 @@
+== test_detection_anchored_names_argv_and_marker_precedence
+ok - fm-harness: dsh detects by anchored name or script argv, including nested native startup; its marker needs real dsh ancestry
+exit=0
+== test_modern_cli_finite_chain_and_relative_argv
+ok - modern CLI: finite 17-link chains work, cycles and observer-relative argv stay out
+exit=0
+== test_modern_cli_lock_boundary
+ok - session lock: modern DSH is the nearest host and cannot own its outer Claude lock
+exit=0
+== test_legacy_tui_launcher_lock_survives_modern_recognition
+ok - session lock: a live TUI keeps its pre-recognition immediate launcher lock; sibling and non-immediate launchers stay foreign
+exit=0
+== test_lock_identity_and_tmux_liveness_name_dsh
+ok - session lock and process classification: dsh is anchored, decoys stay out
+exit=0
