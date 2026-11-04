@@ -1,0 +1,11 @@
+base export: git archive 012b72f34 bin -> /tmp/nm-base-export.hqXL
+== P1(a) PR 365 live case: 11 counted (4 CI waiters, no agent, 0 RSS), R 5.77 GiB, S 13.39 GiB, available 32.82 GiB, pressure 1
+  finished_within_8s=False exit=None elapsed=8.09s stdout=''
+    [p1a err] fm-cpu-pass: pipeline-start waiting: counted=11 need=88723286911 budget=40361946642 reservation=6195490324 slack=14377403023 runs_measured=4 priority=machinery
+  (killed after 8 s: it was still waiting)
+
+== P1(b) 2026-11-03 14:14Z record: 12 runs holding 20.1 GiB, 25.27 GiB available, pressure 1
+  finished_within_8s=False exit=None elapsed=8.09s
+    [p1b err] fm-cpu-pass: pipeline-start waiting: counted=12 need=94918777235 budget=47610228244 reservation=6195490324 slack=14377403023 runs_measured=4 priority=other
+  (killed after 8 s: it was still waiting)
+

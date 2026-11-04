@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6HRSST07GNEPHQKD50X7SAV/tests/fm-cpu-pass-admission.py", line 786, in <module>
+    finish(cancelled, 130)
+    ~~~~~~^^^^^^^^^^^^^^^^
+  File "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6HRSST07GNEPHQKD50X7SAV/tests/fm-cpu-pass-admission.py", line 206, in finish
+    actual = child.wait(timeout=30)
+  File "/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/subprocess.py", line 1280, in wait
+    return self._wait(timeout=timeout)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/subprocess.py", line 2058, in _wait
+    raise TimeoutExpired(self.args, timeout)
+subprocess.TimeoutExpired: Command '['bash', '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6HRSST07GNEPHQKD50X7SAV/bin/fm-cpu-pass.sh', 'pipeline-start', '--priority', 'merge-train', '--', 'touch', '/Users/charlesabrooker/tmp/fm-cpu-pass.5QYvfT/admission-s4tl9iwc/interrupt/cancelled']' timed out after 30 seconds
+not ok - pipeline admission and child-descriptor regression failed
+exit=1 secs=322

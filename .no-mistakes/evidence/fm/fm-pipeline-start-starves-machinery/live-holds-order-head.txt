@@ -1,0 +1,35 @@
+== P4 holds: native pressure 2 holds a fitting start; pressure back to 1 admits it by itself (no signal, no human)
+  pressure 2: running=True marker_exists=False
+    [p2 err] fm-cpu-pass: pipeline-start waiting: overload: memory: native memory pressure level 2 (2 or higher defers) counted=0 priority=other
+  pressure 1: exit=0 within=0.84s marker_exists=True
+    [p2 err] fm-cpu-pass: pipeline-start admitted: counted=0 projected=14377403023 budget=42949672960 available=42949672960 held=0 reservation=6195490324 active_term=1953340270 slack=14377403023 runs_measured=4 readings_measured=1 reserved=[none] holding_only=[none] priority=other
+== P4 holds: unreadable memory facts hold; restored facts admit
+  facts unreadable: running=True marker_exists=False
+    [br err] fm-cpu-pass: pipeline-start waiting: overload: memory: memory: [Errno 2] No such file or directory: '/private/tmp/nm-live-head.gfZ1/hold-broken/native/sysctl'; memory: processes: [Errno 2] No such file or directory: '/private/tmp/nm-live-head.gfZ1/hold-broken/native/processes.json' counted=0 priority=other
+  facts restored: exit=0 marker_exists=True
+
+== P5(a) class order: other, vernant-build, machinery, merge-train queue behind a failing fit; admitted merge-train, machinery, vernant-build, other
+  queued: waiter_entries=4 order_file_exists=False
+    [q-other err] fm-cpu-pass: pipeline-start waiting: counted=1 priority=other behind a higher-priority or earlier start
+Traceback (most recent call last):
+  File "/Users/charlesabrooker/.no-mistakes/evidence/01M6HRSST07GNEPHQKD50X7SAV/live_driver.py", line 499, in <module>
+    globals()[s]()
+    ~~~~~~~~~~~~^^
+  File "/Users/charlesabrooker/.no-mistakes/evidence/01M6HRSST07GNEPHQKD50X7SAV/live_driver.py", line 263, in class_order
+    say('  admitted order: %s exits=%s' % ((case / 'order').read_text().split(), [p.poll() for p in ps]))
+                                           ~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/pathlib/_local.py", line 546, in read_text
+    return PathBase.read_text(self, encoding, errors, newline)
+           ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/pathlib/_abc.py", line 632, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/pathlib/_local.py", line 537, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/private/tmp/nm-live-head.gfZ1/order/order'
+== P5(a) class order: other, vernant-build, machinery, merge-train queue behind a failing fit; admitted merge-train, machinery, vernant-build, other
+  queued: waiter_entries=4 order_file_exists=False
+    [q-other err] fm-cpu-pass: pipeline-start waiting: counted=1 priority=other behind a higher-priority or earlier start
+  admitted order: ['nm-merge-train', 'nm-machinery', 'nm-vernant-build', 'nm-other'] exits=[0, 0, 0, 0]
+

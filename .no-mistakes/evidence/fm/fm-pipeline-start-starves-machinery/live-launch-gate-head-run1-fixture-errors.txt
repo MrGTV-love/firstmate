@@ -1,0 +1,33 @@
+== P9(a) first proof: unmapped, ambiguous and unreadable-database launches refuse with exit 75 and a cause line; never pass through
+  unmapped: exit=75 agent_started=False stderr='fm-cpu-pass: launch-gate refused: unmapped worktree: run unknown; no run records /private/tmp/nm-live-head3.RhDj/lg-unmapped/elsewhere; next action: launch the agent from a run worktree; a launch outside any run is not gated work'
+  durable wake lines: ['1793751929\t1\tcheck\tlaunch-gate-unmapped\tcheck: launch-gate: launch-gate refused: unmapped worktree: run unknown; no run records /private/tmp/nm-live-head3.RhDj/lg-unmapped/elsewhere; next action: launch the agent from a run worktree; a launch outside any run is not gated work']
+  ambiguous: exit=75 agent_started=False stderr='fm-cpu-pass: launch-gate refused: ambiguous worktree: run unknown; runs run-x,run-y all record /private/tmp/nm-live-head3.RhDj/lg-ambiguous/worktree; next action: resolve which run owns this worktree; the next fix round enters the gate again'
+  unreadable db: exit=75 agent_started=False stderr='fm-cpu-pass: launch-gate refused: run database unreadable: run unknown; unable to open database file; next action: restore read access to the run database; the next fix round enters the gate again'
+== P9(b) non-CI step passes through at once, unchanged, exit code returned
+  review step: exit=7 secs=1.96 stdout='agent got prompt: review prompt args=[-p --model x] cwd=/private/tmp/nm-live-head3.RhDj/lg-review/worktree'
+  stderr='fm-cpu-pass: launch-gate run=run-x branch=fm/x step=review:running agent_pid=None attempt=4169:1793751938199722000' pool_launch_entries=[]
+== P9(c) CI step that fits: admitted, reservation published before the lock release, agent not waited on; stdin and exit status pass through
+  while agent lives: launch reservation entries=['launch-ld4p0iot.lock']
+  exit=1 stdout='agent got prompt: fix the CI args=[-p] cwd=/private/tmp/nm-live-head3.RhDj/lg-ci-fit/worktree'
+    [fit err] fm-cpu-pass: launch-gate run=run-x branch=fm/x step=ci:running agent_pid=None attempt=9446:1793751940768522000
+    [fit err] fm-cpu-pass: launch-gate admitted: counted=1 projected=14377403023 budget=42949672960 available=42949672960 held=0 reservation=6195490324 active_term=1953340270 slack=14377403023 runs_measured=4 readings_measured=1 reserved=[none] holding_only=[run-x:waiter:0:unseen] priority=other hold_bound=14340s budget=14400s ci_fix_p99=60s admitted_ns=1793751941112420000 published_ns=1793751941177976000 agent_started_ns=1793751941221461000 unlocked_ns=1793751941221464000
+  order: admitted<=published<=agent_started<=unlocked: True (published->unlocked 43.5 ms)
+  after exit: launch entries left (live-locked)=0
+== P10(a) two CI-waiting runs resume together, room for one full R: first admitted, second waits, second admitted by itself when the first agent exits
+  t+1.5s: g1_admitted=True g2_admitted=True g2_waiting=True g1_waiting=False
+  both finished: g1 exit=0 g2 exit=0
+    [g1 err] fm-cpu-pass: launch-gate admitted: counted=2 projected=20572893347 budget=21474836480 available=21474836480 held=0 reservation=6195490324 active_term=1953340270 slack=14377403023 runs_measured=4 readings_measured=1 reserved=[run-z:launched:6195490324:unseen] holding_only=[run-x:waiter:0:unseen] priority=other hold_bound=14340s budget=14400s ci_fix_p99=60s admitted_ns=1793751948550714000 published_ns=1793751948561104000 agent_started_ns=1793751948702561000 unlocked_ns=1793751948702565000
+    [g2 err] fm-cpu-pass: launch-gate admitted: counted=2 projected=14377403023 budget=21474836480 available=21474836480 held=0 reservation=6195490324 active_term=1953340270 slack=14377403023 runs_measured=4 readings_measured=1 reserved=[none] holding_only=[run-x:ci-waiting:0:unseen,run-z:waiter:0:unseen] priority=other hold_bound=14340s budget=14400s ci_fix_p99=60s admitted_ns=1793751948040792000 published_ns=1793751948041194000 agent_started_ns=1793751948107614000 unlocked_ns=1793751948107616000
+  durable wake lines: []
+== P9(e) hold bound: agent_timeout 3m, completed CI-fix p99 2m55s -> bound 5 s; no fit -> refused at the bound with exit 75, agent never started
+  exit=0 held=3.6s agent_started=True
+  daemon retry/fallback phrases in refusal: []
+  durable wake lines: []
+  live entries left: waiters=0 launches=0
+== P9(g) signals: SIGTERM to the gate reaches the agent; its status comes back
+  gate exit=143 agent_saw='got-TERM' launch entries live after=0
+== P9(g) gate SIGKILLed alone after the admit: the watcher kills the agent, nothing is left
+  agents before kill=3, agents gone within 5 s=True, launch entries live=0
+== P11(e) agent that cannot launch: missing agent returns 127, entries released
+  exit=127 stderr_tail=' launch-gate run=run-x branch=fm/x step=ci:running agent_pid=None attempt=86594:1793751971269276000\nfm-cpu-pass: launch-gate: agent not found: /private/tmp/nm-live-head3.RhDj/lg-missing/no-such-claude' launch entries live=0
+

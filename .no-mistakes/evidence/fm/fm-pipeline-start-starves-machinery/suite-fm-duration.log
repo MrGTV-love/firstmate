@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "<stdin>", line 139, in <module>
+AssertionError: measured: "advisory host=Mac-Studio.local p99=1000ms margin=3 samples=5 measured=3s bound=0s"
+progress: "advisory elapsed=1.1s output_bytes=0 tree_cpu=0.01s"
+
+exit=1 secs=93

@@ -1,0 +1,25 @@
+== P6(f) fresh starts through bin/fm-mem-guard.sh run join the pipeline-start queue; reattach and other commands do not
+  fresh plain-intent       queued=True still_running=True run_registered=False
+  fresh intent-file-eq     queued=True still_running=True run_registered=False
+  fresh intent-stdin       queued=True still_running=True run_registered=False
+  fresh reordered-abs      queued=True still_running=True run_registered=False
+  fresh rerun              queued=True still_running=True run_registered=False
+  fresh bash-l-c-redirect  queued=True still_running=True run_registered=False
+  fresh sh-e-c-touching    queued=True still_running=True run_registered=False
+  not-a-start reattach-wait   ran_at_once=True exit=0 queued=False stdout='stand-in no-mistakes: reattach/other args=[axi run --wait]'
+  not-a-start respond         ran_at_once=True exit=0 queued=False stdout='stand-in no-mistakes: reattach/other args=[axi respond --action approve]'
+  not-a-start status          ran_at_once=True exit=0 queued=False stdout='stand-in no-mistakes: reattach/other args=[axi status]'
+  not-a-start other-command   ran_at_once=True exit=0 queued=False stdout='hello-unchanged'
+  not-a-start no-intent-exit2 ran_at_once=True exit=2 queued=False stdout=''
+
+== P6 PR 366 shape through bin/fm-duration.py run: fresh start enters pipeline-start (base printed no pipeline-start line)
+  finished=True exit=0
+    [pr366 err] fm-cpu-pass: pipeline-start admitted: counted=0 projected=14377403023 budget=42949672960 available=42949672960 held=0 reservation=6195490324 active_term=1953340270 slack=14377403023 runs_measured=4 readings_measured=1 reserved=[none] holding_only=[none] priority=other
+    [pr366 out] stand-in no-mistakes: started fresh run nm-pr366 args=[axi run --intent-file /private/tmp/nm-live-head2.kiH8/pr366/intent.txt --verification-plan /private/tmp/nm-live-head2.kiH8/pr366/intent.txt] FM_PIPELINE_START_ADMITTED=68d767ced9b92235835d88a22192adf46f1ef2cc8535cc3c45617318b8154a3a
+== R2-1 nested route with a literal 2>&1 inside a shell -c string: no deadlock, one admission
+  finished_within_20s=True exit=0 pipeline-start_admitted_lines=1 waiting_lines=0
+    [nested out] stand-in no-mistakes: started fresh run nm-nested args=[axi run --intent-file /private/tmp/nm-live-head2.kiH8/pr366/intent.txt] FM_PIPELINE_START_ADMITTED=ad1dd1f0a383a33ccc3501ab43c3666cbd8862da1dd3aa61716e691f8bf2f265
+== R2-1 reverse nesting: fm-mem-guard.sh run -- bash -c "fm-duration.py run k -- no-mistakes axi run --intent x # c"
+  finished_within_20s=True exit=0
+    [reverse out] stand-in no-mistakes: started fresh run nm-reverse args=[axi run --intent x] FM_PIPELINE_START_ADMITTED=2cc5fd29d79404c1a8f2eaba9d145fe6bf789c5aeda02efa1e9894333f38bc21
+

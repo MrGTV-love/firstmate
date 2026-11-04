@@ -1,0 +1,6 @@
+synthetic load: 18 x yes on 18 logical CPUs; load={ 52.20 58.42 67.00 }
+repo=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6HRSST07GNEPHQKD50X7SAV mode=fallback iterations=50 hangs=0 exit_codes={130: 50} worst_exit_secs=0.51 survivor_still_queued=True cancelled_command_ran=False
+repo=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6HRSST07GNEPHQKD50X7SAV mode=measured iterations=50 hangs=0 exit_codes={130: 50} worst_exit_secs=0.45 survivor_still_queued=True cancelled_command_ran=False
+repo=/private/tmp/nm-base-export.hqXL mode=fallback iterations=50 hangs=0 exit_codes={130: 50} worst_exit_secs=0.44 survivor_still_queued=True cancelled_command_ran=False
+repo=/private/tmp/nm-base-export.hqXL mode=measured iterations=50 hangs=0 exit_codes={130: 50} worst_exit_secs=0.48 survivor_still_queued=True cancelled_command_ran=False
+load at end={ 70.64 64.35 67.94 }

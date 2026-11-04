@@ -1,0 +1,9 @@
+base export /tmp/nm-base-export.hqXL
+== P6 PR 366 shape through bin/fm-duration.py run: fresh start enters pipeline-start (base printed no pipeline-start line)
+  finished=True exit=0
+    [pr366 out] stand-in no-mistakes: started fresh run nm-pr366 args=[axi run --intent-file /private/tmp/nm-live-base2.t6SH/pr366/intent.txt --verification-plan /private/tmp/nm-live-base2.t6SH/pr366/intent.txt] FM_PIPELINE_START_ADMITTED=unset
+== R2-1 nested route with a literal 2>&1 inside a shell -c string: no deadlock, one admission
+  finished_within_20s=True exit=0 pipeline-start_admitted_lines=0 waiting_lines=0
+    [nested out] stand-in no-mistakes: started fresh run nm-nested args=[axi run --intent-file /private/tmp/nm-live-base2.t6SH/pr366/intent.txt] FM_PIPELINE_START_ADMITTED=unset
+== R2-1 reverse nesting: fm-mem-guard.sh run -- bash -c "fm-duration.py run k -- no-mistakes axi run --intent x # c"
+  finished_within_20s=True exit=0

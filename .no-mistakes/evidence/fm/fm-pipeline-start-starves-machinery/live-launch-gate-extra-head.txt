@@ -1,0 +1,25 @@
+== P11(a) isolated copy of the live launcher: TeamClaude env lines stubbed (no node, no proxy call), only the final exec routed through the gate
+  diff live -> copy:
+    10c10
+    < tc_env=$("$node_bin" "$tc_js" env --mitm 2>/dev/null)
+    ---
+    > tc_env='export HTTPS_PROXY=http://127.0.0.1:9; export NODE_EXTRA_CA_CERTS=/private/tmp/nm-live-head5.IDov/lg-copy/ca.pem'  # sandbox stub: no TeamClaude call
+    17c17
+    < exec /Users/charlesabrooker/.local/bin/claude "$@"
+    ---
+    > exec bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6HRSST07GNEPHQKD50X7SAV/bin/fm-cpu-pass.sh launch-gate -- /private/tmp/nm-live-head5.IDov/lg-copy/claude "$@"
+  copy run (CI step): exit=0 stdout='agent got prompt: ci fix prompt args=[-p --output-format stream-json] cwd=/private/tmp/nm-live-head5.IDov/lg-copy/worktree'
+    [stderr] fm-cpu-pass: launch-gate admitted: counted=1 projected=14377403023 budget=42949672960 available=42949672960 held=0 reservation=6195490324 active_term=1953340270 slack=14377403023 runs_measured=4 readings_measured=1 reserved=[none] holding_only=[run-x:waiter:0: ...99=60s admitted_ns=1793753163906264000 published_ns=1793753163906951000 agent_started_ns=1793753163915634000 unlocked_ns=1793753163915640000
+  live launcher sha256 before=8ffcecc7c41a34b311874e73a139226caeabf427dfa322cd421b28d04ae3a985 after=8ffcecc7c41a34b311874e73a139226caeabf427dfa322cd421b28d04ae3a985 unchanged=True
+== P9(g)/P11(e) caller cancel mid-hold: group kill while the gate waits leaves no live waiter or lock; the next launch is admitted
+  holding: running=True live waiters=1
+  after group SIGKILL: live waiters=0 live launches=0 start lock free=True agent started=False
+  next launch after cancel: exit=0 secs=1.31 admitted=True
+== P10(d) dead holder: a gate SIGKILLed mid-run (its agent killed by the watcher) leaves an inert launch entry that reserves nothing
+  first gate admitted, live launch entries=1
+  after SIGKILL of the gate alone: launch files on disk=['launch-o7wdnlpk.lock'] live=0 agent processes=[]
+  second run (would wait if the dead entry still reserved R): exit=0 secs=1.39 admitted_without_wait=False
+    [stderr] fm-cpu-pass: launch-gate admitted: counted=2 projected=14377403023 budget=17179869184 available=17179869184 held=0 reservation=6195490324 active_term=1953340270 slack=14377403023 runs_measured=4 readings_measured=1 reserved=[none] holding_only=[run-x:ci-waiting:0:unseen,run-z:waiter:0:unseen] priority=other hold_bound=14340s bud
+  launch files left after scan=['launch-0rnucvgb.lock']
+
+NOTE (reviewer): admitted_without_wait=False above is a driver check bug: the admit line's 'ci-waiting' token matched the substring 'waiting'. The stderr shows no 'launch-gate waiting' line, admission took 1.39 s, and the dead run-x entry is read as ci-waiting (holding nothing), not as a launched reservation.
