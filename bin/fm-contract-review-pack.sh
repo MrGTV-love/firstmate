@@ -48,13 +48,15 @@
 # check: reads the report's `Inputs read` list and, when given, the run log, and
 #   prints INPUT LEAK lines plus ROUND VOID (exit 3) when the list is missing or a
 #   listed path is not an authorized input; prints INPUT CLEAN (exit 0) otherwise.
-#   The list must sit under a Markdown heading of its own (ATX, or setext at level 1 or
-#   2); an `Inputs read` bold line, `Label:` line or inline list with no heading voids the
-#   round when it holds a path or the next non-blank line starts with a path, and is a
-#   mere mention otherwise. The list runs to the next heading of its own level or higher;
-#   text inside a code fence is never a heading. In the list, a line that starts with a
-#   path is checked, and so is every absolute, `~`, http(s) or <rev>:<path> token on any
-#   line; other text is skipped.
+#   Each report field sits under a Markdown heading of its own (ATX, or setext at level 1
+#   or 2). An `Inputs read` bold line, `Label:` line or inline list with no heading voids
+#   the round (REPORT STRUCTURE, not INPUT LEAK) when it holds a path or the next
+#   non-blank line starts with a path, and is a mere mention otherwise; so does a
+#   Checks not performed, Findings or Notes bold or `Label:` line inside the list. The list
+#   runs to the next heading of its own level or higher; text inside a code fence is never
+#   a heading. In the list, a line that starts with a path is checked, and so is every
+#   absolute, `~`, http(s), <rev>:<path> or relative dir/file.ext token on any line;
+#   other text is skipped.
 #   An authorized input is judged by what it is: a file inside the pack, the
 #   SKILL.md of the assess-done-and-grade or define-done-and-grading skill (no other
 #   file in either skill folder), the review rubric, or a file the manifest's root tracks (git ls-files, or
@@ -185,7 +187,7 @@ END {
       c = classify(norm(title))
       if (c == "drop") { pre = 0; parent = "drop"; ptitle = title; mode = "drop"; print title > DROPPED_OUT; continue }
       if (c == "keep" && norm(title) ~ HIST) print title > UNKNOWN_OUT
-      if (exact(norm(title))) print norm(title) > TITLES_OUT
+      if (exact(norm(title))) { print norm(title) > TITLES_OUT; pre = 0; ptitle = title }
       print line > KEEP_OUT
       if (ul != "") print ul > KEEP_OUT
       continue
@@ -422,7 +424,7 @@ inputs_read() { # <report>
       return t
     }
     # A line that starts with a path gives its first entry; every further absolute, `~`,
-    # http(s) or <rev>:<path> token on the line is an entry too.
+    # http(s), <rev>:<path> or relative dir/file.ext token on the line is an entry too.
     function emit(s, first,   t, n, k, tok) {
       if (first) {
         t = entry(s)
@@ -432,7 +434,8 @@ inputs_read() { # <report>
       n = split(s, tok, /[ \t,;|]+/)
       for (k = first ? 2 : 1; k <= n; k++) {
         gsub(/^[`*"(<]+|[`*",;:.)>]+$/, "", tok[k])
-        if (tok[k] ~ /^~?\/[A-Za-z0-9._-]/ || tok[k] ~ /^https?:\/\// || tok[k] ~ /^[A-Za-z0-9][A-Za-z0-9_.\/-]*:[A-Za-z0-9_.~-][^:]*[\/.]/) print tok[k]
+        if (tok[k] ~ /^~?\/[A-Za-z0-9._-]/ || tok[k] ~ /^https?:\/\// || tok[k] ~ /^[A-Za-z0-9][A-Za-z0-9_.\/-]*:[A-Za-z0-9_.~-][^:]*[\/.]/ ||
+          tok[k] ~ /^(\.\.?\/)?[A-Za-z0-9_.-]+(\/[A-Za-z0-9_.-]+)*\/[A-Za-z0-9_.-]+\.[A-Za-z0-9]+$/) print tok[k]
       }
     }
     function hlevel(s,   n) {
@@ -466,6 +469,8 @@ inputs_read() { # <report>
     END {
       name = "[*]*([0-9]+[.)][ \t]*)?[*]*inputs read[*[:space:]]*(\\([^)]*\\))?[*:[:space:]]*"
       label = "^[#*[:space:]-]*([0-9]+[.)][[:space:]]*)?[*]*inputs read[*]*(:|[*[:space:]]*(\\([^)]*\\))?[*:[:space:]]*$)"
+      field = "(checks not performed|findings|notes)"
+      fieldlabel = "^[ \t]*([-*+][ \t]+)?((\\*\\*|__)" field "[ \t]*:?[ \t]*(\\*\\*|__)|" field "[ \t]*(:|$))"
       for (i = 1; i <= N; i++) {
         l = strip3(L[i])
         inf = fence
@@ -497,10 +502,13 @@ inputs_read() { # <report>
             continue
           }
           if (state == 1 && ((l ~ /^#+([ \t]|$)/ && hlevel(l) <= start) || (sl && sl <= start))) { state = 2; continue }
+          # Another report field under a bold or plain label, not a heading of its own,
+          # leaves the end of the list unknown and voids the round (exit 5).
+          if (state == 1 && low ~ fieldlabel) unheaded = 1
         }
         if (state == 1 && !lead) emit(L[i], 0)
       }
-      exit noheading ? 4 : 0
+      exit noheading ? 4 : unheaded ? 5 : 0
     }
   ' "$1"
 }
@@ -556,9 +564,13 @@ cmd_check() {
   local leaks=0 count=0 entry prev path revpath rel rev excluded x ok why
   local list raw rc=0
   raw=$(inputs_read "$report") || rc=$?
-  if [ "$rc" = 4 ]; then
-    echo "INPUT LEAK: an Inputs read list in $report has no heading of its own"
-    echo "ROUND VOID: the report must list every file the reviewer opened, one per line, under an Inputs read heading"
+  if [ "$rc" = 4 ] || [ "$rc" = 5 ]; then
+    if [ "$rc" = 4 ]; then
+      echo "REPORT STRUCTURE: the Inputs read list in $report is not under its own heading"
+    else
+      echo "REPORT STRUCTURE: a Checks not performed, Findings or Notes field inside the Inputs read list of $report is not under its own heading"
+    fi
+    echo "ROUND VOID: report field not under its own heading; each report field needs a Markdown heading of its own at the level of Inputs read"
     exit 3
   fi
   list=$(printf '%s\n' "$raw" | grep -e '/' -e '\.' || true)

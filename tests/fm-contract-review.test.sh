@@ -517,7 +517,7 @@ test_leak_check_reads_the_whole_list() {
   } >"$rep"
   run_check "$rep"
   assert_equals 3 "$CHECK_RC" "a leak listed after the inline form was allowed"
-  assert_contains "$CHECK_OUT" "has no heading of its own" "the inline form did not void the round for its missing heading"
+  assert_contains "$CHECK_OUT" "not under its own heading" "the inline form did not void the round for its missing heading"
   pass "the leak check reads the whole Inputs read list to the next heading"
 }
 
@@ -684,7 +684,7 @@ test_inputs_read_list_needs_its_own_heading() {
     printf 'VERDICT: FAIL head=abc\n\n%b\nEXIT: needs-revision\n' "$body" >"$rep"
     run_check "$rep"
     assert_equals 3 "$CHECK_RC" "Inputs read list $n with no heading was accepted: $CHECK_OUT"
-    assert_contains "$CHECK_OUT" "has no heading of its own" "list $n did not void for its missing heading"
+    assert_contains "$CHECK_OUT" "not under its own heading" "list $n did not void for its missing heading"
     assert_contains "$CHECK_OUT" "ROUND VOID" "list $n did not void the round"
   done
   pass "an Inputs read list must sit under its own heading, and one with no heading voids the round"
@@ -1001,14 +1001,16 @@ test_leak_check_reads_paths_anywhere_on_a_list_line() {
   # Compliant: a labelled path, a table row and a revision path on prose lines are judged and clean.
   {
     printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- Pack contract: %s\n| %s | read |\n' "$LEAK_PACK/contract.md" "$LEAK_PACK/target.md"
-    printf -- '- also compared HEAD:bin/fm-spawn.sh, read and/or skimmed\n\n## Findings\n'
+    printf -- '- also compared HEAD:bin/fm-spawn.sh, read and/or skimmed\n- also read bin/fm-spawn.sh\n\n## Findings\n'
   } >"$rep"
   run_check "$rep"
   assert_equals 0 "$CHECK_RC" "clean paths on prose or table lines were flagged: $CHECK_OUT"
-  assert_contains "$CHECK_OUT" "3 listed input(s)" "a path on a prose or table line was not read"
+  assert_contains "$CHECK_OUT" "4 listed input(s)" "a path on a prose or table line was not read"
   # Noncompliant: each of these lines names an input that is not authorized.
   for body in "- Sibling report: $sib" "- also read $sib for context" "| $sib | read |" \
-    "- $LEAK_PACK/contract.md, https://example.com/review.md" "- $LEAK_PACK/contract.md, main:docs/x.md"; do
+    "- $LEAK_PACK/contract.md, https://example.com/review.md" "- $LEAK_PACK/contract.md, main:docs/x.md" \
+    "- Sibling report: data/case/truth/r23-review.md" "- also read data/case/truth/r23-review.md" \
+    "| data/case/truth/r23-review.md | read |" "- Pack: ../tmp.other/pack/review.md"; do
     n=$((n + 1))
     printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- %s\n%s\n\n## Findings\n' "$LEAK_PACK/target.md" "$body" >"$rep"
     run_check "$rep"
@@ -1028,7 +1030,7 @@ test_summary_mention_of_inputs_read_is_not_a_list() {
   printf 'VERDICT: FAIL head=abc\n\n**Inputs read**\n- %s\n\n## Inputs read\n\n- %s\n' "$LEAK_PACK/contract.md" "$LEAK_PACK/contract.md" >"$rep"
   run_check "$rep"
   assert_equals 3 "$CHECK_RC" "a bold Inputs read list with no heading was accepted"
-  assert_contains "$CHECK_OUT" "has no heading of its own" "the headless list did not void for its cause"
+  assert_contains "$CHECK_OUT" "not under its own heading" "the headless list did not void for its cause"
   pass "a passing mention of Inputs read is not a list, and a headless list still voids"
 }
 
@@ -1088,6 +1090,49 @@ test_exact_section_title_counts_as_a_section() {
   "$PACK_BIN" --contract "$src" --out-root "$TMP_ROOT/es-out" >/dev/null 2>&1 || rc=$?
   assert_equals 2 "$rc" "a prefixed Definition Of Done title counted as the section"
   pass "a title counts as a section only when it is exactly the section name"
+}
+
+test_exact_section_title_keeps_its_text() {
+  local src="$TMP_ROOT/et.md" pack manifest
+  # Compliant: criteria and a request under an exact section title stay, whatever words they use.
+  printf '# Definition Of Done\n\n- E3 (mandatory): ZZ-KEEP-E3-ZZ a worker self-check is not verification\n- A2 (mandatory): ZZ-KEEP-A2-ZZ the author names the head\n' >"$src"
+  build_pack pack --contract "$src" || fail "build failed: $(cat "$TMP_ROOT/build.err")"
+  assert_grep "ZZ-KEEP-E3-ZZ" "$pack/target.md" "a criterion under a Definition Of Done title was dropped"
+  assert_grep "ZZ-KEEP-A2-ZZ" "$pack/target.md" "a criterion naming the author under a Definition Of Done title was dropped"
+  printf '# REQUEST\n\nZZ-KEEP-RQ-ZZ Run a contract review of the steer; the author must not see it.\n\n## Definition Of Done\n\n- A1 (mandatory): x\n' >"$src"
+  build_pack pack --contract "$src" || fail "build failed: $(cat "$TMP_ROOT/build.err")"
+  assert_grep "ZZ-KEEP-RQ-ZZ" "$pack/target.md" "the request under a REQUEST title was dropped"
+  # Noncompliant: the same author line under a free title is preamble and is dropped and listed.
+  printf '# Fixture contract\n\nZZ-DROP-PRE-ZZ a worker self-check says all pass.\n\n## Definition Of Done\n\n- A1 (mandatory): x\n' >"$src"
+  build_pack pack --contract "$src" || fail "build failed: $(cat "$TMP_ROOT/build.err")"
+  manifest="$(dirname "$pack").excluded-paths"
+  assert_no_grep "ZZ-DROP-PRE-ZZ" "$pack/target.md" "an author preamble line under a free title reached the pack"
+  assert_grep "preamble line: ZZ-DROP-PRE-ZZ" "$manifest" "the dropped preamble line is not listed"
+  pass "an exact section title keeps its text, and a free title's preamble is still filtered"
+}
+
+test_report_field_under_a_label_voids_as_structure() {
+  local rep="$TMP_ROOT/report15.md"
+  make_leak_world
+  # Compliant: Checks not performed under its own heading names a not-allowed file.
+  printf 'VERDICT: INCOMPLETE head=abc\n\n## Inputs read\n\n- %s\n\n## Checks not performed\n\n- A1 needs %s, which is not an allowed input; not opened.\n\nEXIT: needs-revision\n' "$LEAK_PACK/target.md" "$LEAK_ROOT/data/case/truth/r23-review.md" >"$rep"
+  run_check "$rep"
+  assert_equals 0 "$CHECK_RC" "a compliant incomplete report was voided: $CHECK_OUT"
+  # Noncompliant: the same field under a bold label voids for structure, not as a leak.
+  printf 'VERDICT: INCOMPLETE head=abc\n\n## Inputs read\n\n- %s\n\n**Checks not performed**\n- A1 needs %s, which is not an allowed input; not opened.\n\nEXIT: needs-revision\n' "$LEAK_PACK/target.md" "$LEAK_ROOT/data/case/truth/r23-review.md" >"$rep"
+  run_check "$rep"
+  assert_equals 3 "$CHECK_RC" "a report field under a bold label was accepted"
+  assert_contains "$CHECK_OUT" "report field not under its own heading" "the structure cause is not named"
+  assert_not_contains "$CHECK_OUT" "INPUT LEAK" "a structure fault was reported as a leak"
+  printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- %s\nNotes: none.\n' "$LEAK_PACK/target.md" >"$rep"
+  run_check "$rep"
+  assert_equals 3 "$CHECK_RC" "a Notes label inside the list was accepted"
+  # Noncompliant: a real leak under the Inputs read heading is still a leak.
+  printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- %s\n- %s\n\n## Checks not performed\n\nnone\n' "$LEAK_PACK/target.md" "$LEAK_ROOT/data/case/truth/r23-review.md" >"$rep"
+  run_check "$rep"
+  assert_equals 3 "$CHECK_RC" "a leak under the Inputs read heading was allowed"
+  assert_contains "$CHECK_OUT" "INPUT LEAK" "a leak was not reported as a leak"
+  pass "a report field under a label voids for structure, and a listed leak is still a leak"
 }
 
 test_inline_backticks_do_not_open_a_fence() {
@@ -1196,6 +1241,8 @@ fm_test_run_cases \
   test_author_section_title_drops \
   test_author_section_under_any_heading_of_request_or_context_refused \
   test_exact_section_title_counts_as_a_section \
+  test_exact_section_title_keeps_its_text \
+  test_report_field_under_a_label_voids_as_structure \
   test_inline_backticks_do_not_open_a_fence \
   test_definition_of_done_in_every_heading_form \
   test_fences_and_headings_accept_up_to_three_spaces \
