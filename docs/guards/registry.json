@@ -2925,7 +2925,7 @@
       "invariant": "Destructive teardown retains a replayable backlog transition before removing task records.",
       "layer": "runtime-block",
       "source": "the task's current metadata, ownership/copy/process inventory, pending outcomes and lock-bound cleanup proofs; existing decision points: site:bin/fm-teardown.sh:7ae25c53b5",
-      "trigger": "refuses destructive teardown when the pending backlog transition is not replayable or the previous pending close marker cannot be cleared",
+      "trigger": "refuses destructive teardown when the pending backlog transition is not replayable, or the previous pending close marker path is not a removable regular file (refused at entry, before any lease or marker write) or cannot be cleared",
       "decision": "deny",
       "fail_direction": "closed",
       "remedy": "Preserve the task and its records; have the owner satisfy the named custody or completion prerequisite, then retry FM_HOME=<home> bash bin/fm-teardown.sh <task> without force.",
@@ -2949,6 +2949,10 @@
         {
           "file": "bin/fm-teardown.sh",
           "match": "echo \"error: the previous pending backlog $BACKLOG_TRANSITION for $ID could not be cleared ($FM_BACKLOG_TRANSITION_ERROR); refusing process cleanup\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"error: the previous pending backlog $BACKLOG_TRANSITION for $ID could not be cleared ($FM_BACKLOG_TRANSITION_ERROR); refusing before any lease or marker write\" >&2"
         }
       ]
     },
