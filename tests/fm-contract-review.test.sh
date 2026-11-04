@@ -717,6 +717,31 @@ test_fences_and_headings_accept_up_to_three_spaces() {
   pass "fences and headings accept up to three leading spaces and four spaces is code"
 }
 
+test_request_or_context_with_author_history_heading_refused() {
+  local src="$TMP_ROOT/hh.md" in="$TMP_ROOT/hh-in.md" pack rc n=0 case flag body
+  write_fixture_contract "$src"
+  # Compliant: free owner headings from the recorded mini r2 context still build.
+  printf '# Current authoritative amendments and neutral context\n\n## Main2632 \342\200\224 exact routed amendment\n\nZZ-KEEP-AMEND-ZZ owner text.\n\n## Current review authority\n\nMain2648 admits one fresh review; priority 0.\n' >"$in"
+  build_pack pack --contract "$src" --context "$in" --request "$in" || fail "free owner headings were refused: $(cat "$TMP_ROOT/build.err")"
+  assert_grep "ZZ-KEEP-AMEND-ZZ" "$pack/context-hh-in.md" "the owner context was not copied whole"
+  # Noncompliant: an unrecognised heading that names author history, at the top level or as a
+  # sub-heading of a kept section, refuses the request or context file.
+  for case in 'context:# Owner context\n\n## Context\n\nneutral\n\n## Earlier findings and how I answered them\n\nZZ-PRIOR-CTX-ZZ F1 answered.\n' \
+    'request:# Request\n\nThe owner wants a thing.\n\n## My earlier findings\n\nZZ-PRIOR-REQ-ZZ\n' \
+    'context:# Owner context\n\n## Context\n\nneutral\n\n### What the reviewer said and my response\n\nZZ-PRIOR-SUB-ZZ\n'; do
+    n=$((n + 1))
+    flag=--${case%%:*}
+    body=${case#*:}
+    printf '%b' "$body" >"$in"
+    rc=0
+    "$PACK_BIN" --contract "$src" "$flag" "$in" --out-root "$TMP_ROOT/hh-out$n" >/dev/null 2>"$TMP_ROOT/hh.err" || rc=$?
+    assert_equals 3 "$rc" "$flag file $n with an author-history heading was accepted"
+    assert_contains "$(cat "$TMP_ROOT/hh.err")" "unrecognised section:" "$flag file $n refusal does not name the section"
+    assert_absent "$TMP_ROOT/hh-out$n" "a refused $flag file $n left an output directory"
+  done
+  pass "a request or context file whose unrecognised heading names author history is refused, and free owner headings build"
+}
+
 test_inline_backticks_do_not_open_a_fence() {
   local src="$TMP_ROOT/ib.md" pack manifest
   write_fixture_contract "$src"
@@ -808,6 +833,7 @@ fm_test_run_cases \
   test_leak_check_pinned_rubric_url_and_own_report \
   test_preamble_author_text_matches_whole_words \
   test_inputs_read_list_needs_its_own_heading \
+  test_request_or_context_with_author_history_heading_refused \
   test_inline_backticks_do_not_open_a_fence \
   test_definition_of_done_in_every_heading_form \
   test_fences_and_headings_accept_up_to_three_spaces \

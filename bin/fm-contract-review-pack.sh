@@ -33,7 +33,9 @@
 #   dropped line in the manifest.
 #   The request and each context file go through the same filter and are copied
 #   whole; one that holds text the filter would drop (an author section or an author
-#   preamble line) is refused with exit 2.
+#   preamble line) is refused with exit 2, and one whose unrecognised heading names
+#   author history (findings, answered, response, self-check, all-green, revision log,
+#   prior) is refused with exit 3.
 #   The manifest of excluded paths is <out-root>.excluded-paths, outside the pack.
 #   It always holds the real path of every input file (the contract, the request,
 #   each context file), the register and history paths when given, and every
@@ -208,6 +210,10 @@ PREAMBLE_DROP='(^|[^a-z0-9])(authors?|contract review|all-green|self-check|revie
 PREAMBLE_TERMS='self-checks?|all-green|contract reviews?|review exits?|prior findings?|revision logs?'
 PREAMBLE_REFUSE="(^|[^a-z0-9])((authors?|workers?)[^a-z0-9]*s?[ ]+($PREAMBLE_TERMS|analysis|notes?|candidates?|dispositions?|findings?|responses?)([^a-z0-9]|\$)|(authors?|$PREAMBLE_TERMS)[ ]*:)|reviewed:"
 
+# An unrecognised heading in a request or context file that names author history anywhere
+# in its text. Free owner headings ("Current review authority") hold none of these words.
+HISTORY_HEADING='(^|[^a-z0-9])(findings?|answered|responses?|self-checks?|all-green|revision logs?|prior)([^a-z0-9]|$)'
+
 filter_sections() { # <in> <keep-out> <dropped-out> <unknown-out> <unrecognised-out> <titles-out> [preamble-pattern]
   local pre=${7:-$PREAMBLE_DROP}
   : >"$2"
@@ -279,6 +285,15 @@ cmd_build() {
   for f in ${request:+"$request"} ${contexts[@]+"${contexts[@]}"}; do
     filter_sections "$f" "$scratch/ctx.keep" "$scratch/ctx.dropped" "$scratch/ctx.unknown" "$scratch/ctx.unrec" "$scratch/ctx.titles" "$PREAMBLE_REFUSE" || exit 3
     [ ! -s "$scratch/ctx.dropped" ] || die "request or context file holds author text the builder would drop ($(head -1 "$scratch/ctx.dropped")): $f"
+    { cat "$scratch/ctx.unknown"; grep -v '^preamble line: ' "$scratch/ctx.unrec" | sed 's/ (under: [^)]*)$//'; } |
+      grep -iE "$HISTORY_HEADING" >"$scratch/ctx.history"
+    if [ -s "$scratch/ctx.history" ]; then
+      while IFS= read -r name; do
+        echo "fm-contract-review-pack: unrecognised section: $name (author history in $f)" >&2
+      done <"$scratch/ctx.history"
+      echo "fm-contract-review-pack: no pack written; move the author history out of the request or context file" >&2
+      exit 3
+    fi
   done
 
   # Out root: fresh mktemp -d unless a nonexistent or empty directory is named.
