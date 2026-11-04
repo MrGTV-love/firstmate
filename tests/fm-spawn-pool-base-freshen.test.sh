@@ -2156,8 +2156,10 @@ guard_set_lease_owner() { # <state-file> <pid>
 
 # A pool slot with a pane whose shell the fake tmux reports as the pane pid. Sets PANE_SHELL,
 # LEASE_STATE and, for "existing", PANE_CHILD.
-#  existing: the pane shell and a child of it are live BEFORE the spawn starts, and the pool entry
-#            names that child as its process lease. Nothing this spawn did put it there.
+#  existing: the pane shell and a child of it (cwd outside the slot) are live BEFORE the spawn
+#            starts, and the pool entry names that child as its process lease. Nothing this spawn
+#            did put it there.
+#  existing-cwd: the same, but the pre-existing child holds the slot as its cwd.
 #  acquired: the pool entry names no owner until the spawn first calls tmux; then the (already
 #            running) pane shell starts a child of its own and records it in the entry, as the
 #            pane's `treehouse get` subshell would. That child starts after the spawn did.
@@ -2168,8 +2170,12 @@ guard_pane_slot() { # <case-name> <task-id> <existing|acquired>
   lay_out_as_pool_slot
   LEASE_STATE="$CASE_DIR/slots/treehouse-state.json"
   PANE_CHILD=
-  if [ "$3" = existing ]; then
-    PANE_SHELL=$(guard_start_pane_shell "$POOL_DIR" "$CASE_DIR/pane.ready")
+  if [ "$3" = existing ] || [ "$3" = existing-cwd ]; then
+    if [ "$3" = existing ]; then
+      PANE_SHELL=$(guard_start_pane_shell_away "$POOL_DIR" "$CASE_DIR/pane.ready")
+    else
+      PANE_SHELL=$(guard_start_pane_shell "$POOL_DIR" "$CASE_DIR/pane.ready")
+    fi
     PANE_CHILD=$(pgrep -P "$PANE_SHELL" | head -n 1)
     [ -n "$PANE_CHILD" ] || fail 'the pane shell has no child to hold the lease'
     printf '{"worktrees":[{"name":"1","path":"%s","owner_pid":%s}]}\n' "$POOL_DIR" "$PANE_CHILD" >"$LEASE_STATE"
@@ -2598,6 +2604,258 @@ PY
 # Round 4, finding 1: the restoring checkout after a refusal must not overwrite ignored work either.
 # Ordinary status does not show ignored files, and the original branch may have moved since the
 # preparation. Either leaves the slot exactly as the refusal found it.
+# Round 5, the common cause: a destructive-operation inventory that missed routes, and checks that
+# were specific to a route. The structure now is one primitive (fm_slot_guarded_git). This test
+# fails if a git command that can change a slot's HEAD, index, tree or ignored files appears anywhere
+# in the files that touch a pooled slot except inside that primitive, whatever its spelling:
+# git -C x checkout, command git, git -c k=v switch, a git whose subcommand is a variable.
+GUARD_INVENTORY_PY=$(cat <<'FMINVENTORYPY'
+import re, sys
+MUTATING = r"(?:checkout|switch|reset|restore|clean|stash|read-tree|merge|rebase|cherry-pick|apply|am|pull|commit|rm|mv|add|update-index|checkout-index|worktree\s+(?:add|remove|move|prune)|branch\s+-[a-zA-Z]+|submodule\s+(?:update|init))"
+OPT = r"(?:\s+(?:-C\s+\S+|-c\s+\S+|--[a-z-]+(?:=\S+)?))*"
+LEAD = r"(?:^|[\s(;&|!{])(?:command\s+|exec\s+|env\s+(?:\S+=\S+\s+)*)?"
+literal = re.compile(LEAD + r"git" + OPT + r"\s+" + MUTATING + r"(?:\s|$)")
+variable = re.compile(LEAD + r"git" + OPT + r"\s+[\"']?\$")
+ref_only = re.compile(LEAD + r"git" + OPT + r"\s+(?:update-ref|symbolic-ref\s+(?!-q|--quiet|--short)\S|branch\s+-[dD])")
+def quoted_text(raw, match):
+    # A match inside a double-quoted string is prose, not a command, unless a command
+    # substitution has opened inside that string.
+    prefix = raw[:match.start() + 1]
+    if prefix.count('"') % 2 == 0:
+        return False
+    return (chr(36) + chr(40)) not in prefix[prefix.rfind(chr(34)):]
+def hits(regex, raw):
+    return any(not quoted_text(raw, m) for m in regex.finditer(raw))
+mode = sys.argv[1]
+found = []
+for path in sys.argv[2:]:
+    inside = False
+    for number, line in enumerate(open(path, encoding="utf-8", errors="replace"), 1):
+        raw = line.rstrip("\n")
+        if re.match(r"^fm_slot_guarded_git\(\)", raw):
+            inside = True
+        stripped = raw.strip()
+        if stripped.startswith("#"):
+            if inside and raw == "}":
+                inside = False
+            continue
+        if inside:
+            if raw == "}":
+                inside = False
+            elif mode == "inventory" and (hits(literal, raw) or hits(variable, raw)):
+                print("PRIMITIVE %s:%d %s" % (path, number, stripped))
+            continue
+        if mode == "inventory" and hits(ref_only, raw):
+            print("REF-ONLY %s:%d %s" % (path, number, stripped))
+        elif hits(literal, raw) or hits(variable, raw):
+            found.append("%s:%d: %s" % (path, number, stripped))
+if mode == "scan":
+    for item in found:
+        print(item)
+FMINVENTORYPY
+)
+
+test_reset_guard_inventory_no_unguarded_slot_change() {
+  local out files f
+  # The files that run git on a pooled slot: spawn, the slot library, the task-copy library and promotion.
+  files=("$ROOT/bin/fm-spawn.sh" "$ROOT/bin/fm-slot-provision-lib.sh" "$ROOT/bin/fm-task-copy-lib.sh" "$ROOT/bin/fm-promote.sh")
+  out=$(python3 -I -c "$GUARD_INVENTORY_PY" scan "${files[@]}")
+  [ -z "$out" ] || fail "a git command that can change a slot appears outside fm_slot_guarded_git:"$'\n'"$out"
+  # The scanner sees every spelling it must (two-sided): a stray call in any of these is found.
+  f="$TMP_ROOT/stray.sh"
+  cat >"$f" <<'SH'
+git -C "$copy" checkout --quiet main
+x=$(command git -C "$copy" reset --hard HEAD)
+git -C "$copy" -c core.autocrlf=false switch -c other
+env GIT_DIR=x git -C "$copy" clean -fdx
+if git -C "$copy" restore --source=HEAD .; then :; fi
+git -C "$copy" "$subcommand" --force
+git -C "$copy" stash push -u
+git -C "$copy" worktree remove --force x
+SH
+  out=$(python3 -I -c "$GUARD_INVENTORY_PY" scan "$f" | wc -l | tr -d ' ')
+  [ "$out" = 8 ] || fail "the inventory scanner found $out of the 8 stray slot-changing spellings"
+  cat >"$f" <<'SH'
+# git -C "$copy" checkout main  (a comment)
+git -C "$copy" status --porcelain
+git -C "$copy" rev-parse HEAD
+echo "run: git checkout -b branch"
+x=$(git -C "$copy" symbolic-ref -q HEAD)
+SH
+  out=$(python3 -I -c "$GUARD_INVENTORY_PY" scan "$f")
+  [ -z "$out" ] || fail "the inventory scanner flagged read-only or quoted text: $out"
+  # The primitive itself holds exactly the two git runs of its two cases and nothing else mutating.
+  out=$(python3 -I -c "$GUARD_INVENTORY_PY" inventory "${files[@]}" | grep -c '^PRIMITIVE')
+  [ "$out" = 2 ] || fail "fm_slot_guarded_git holds $out git runs, not its two"
+  # Spawn sources the fast-forward library but never calls it on a slot; that library's reset and
+  # merge belong to project-clone fleet sync.
+  ! grep -v '^[[:space:]]*#' "$ROOT/bin/fm-spawn.sh" | grep -q 'fm_ff_' || fail 'fm-spawn.sh calls the fast-forward library, which is not in the slot inventory'
+  if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
+    python3 -I -c "$GUARD_INVENTORY_PY" inventory "${files[@]}" | sed "s#$ROOT/##" | sed 's/^/EVIDENCE INVENTORY /'
+  fi
+  pass 'inventory: no git command that can change a slot appears outside fm_slot_guarded_git; the scanner finds every spelling'
+}
+
+# Local counterpart of tests/fm-spawn-dispatch-profile.test.sh test_governed_slot_refuses_before_admission_and_preserves_work
+# (which needs a sandbox this shell lacks): a governed slot on a previous task's branch, whose work is
+# landed on origin, is refused by the project's provisioner after the guarded reset. The refusal must
+# restore the original branch through the shared guard and keep the previous work.
+test_reset_guard_restore_after_provisioner_refusal_keeps_previous_work() {
+  local rec id retained_head
+  id='guard-restore-provisioner-refusal'
+  rec=$(make_guard_governed_case guard-rp "$id")
+  read_case_record "$rec"
+  git -C "$POOL_DIR" checkout --quiet -b wt-previous "$INITIAL_SHA"
+  printf 'retained work\n' >"$POOL_DIR/retained.txt"
+  git -C "$POOL_DIR" add retained.txt
+  git -C "$POOL_DIR" -c user.name=t -c user.email=t@e.invalid commit -q -m 'previous task work'
+  retained_head=$(git -C "$POOL_DIR" rev-parse HEAD)
+  git -C "$PROJECT_DIR" fetch --quiet origin
+  git -C "$PROJECT_DIR" -c user.name=t -c user.email=t@e.invalid merge -q --no-edit origin/main
+  git -C "$PROJECT_DIR" -c user.name=t -c user.email=t@e.invalid merge -q --no-edit wt-previous
+  git -C "$PROJECT_DIR" push -q origin main
+  rm -f -- "$CASE_DIR/launch.log"
+  GUARD_OUT=$(FM_TEST_SLOT_REFUSE=1 run_governed_spawn "$id") && fail 'a refusing provisioner admitted the worker'
+  assert_contains "$GUARD_OUT" 'fixture_owner_refused_legacy_scope' 'the spawn lost the provisioner refusal'
+  [ ! -s "$CASE_DIR/launch.log" ] || fail 'a refused provisioner sent a harness launch'
+  [ "$(git -C "$POOL_DIR" rev-parse refs/heads/wt-previous)" = "$retained_head" ] || fail 'the reset moved the previous task branch'
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$retained_head" ] || fail 'the refused spawn did not restore the assigned checkout'
+  [ "$(git -C "$POOL_DIR" symbolic-ref --short -q HEAD)" = wt-previous ] || fail 'the refused spawn did not restore the previous branch'
+  assert_present "$POOL_DIR/retained.txt" 'the refused spawn lost retained work'
+  assert_grep 'recovery=slot-provision-refused' "$HOME_DIR/state/$id.meta" 'the refused spawn lost retained-copy custody'
+  pass 'a governed spawn refused by the provisioner restores the previous branch through the shared guard and keeps the retained work'
+}
+
+# Round 5, finding F2: a --base-branch spawn judges containment by the remote's default branch as it
+# is on the final observation, not by the name the spawn started from. The remote switches its
+# default branch between the observations; the former default is unchanged and still holds the slot.
+test_reset_guard_f2_base_branch_spawn_sees_a_switched_default() {
+  local rec id child
+  id='guard-f2-switched'
+  rec=$(make_case guard-f2a "$id")
+  read_case_record "$rec"
+  publish_feature_branch feature/x
+  git -C "$CASE_DIR/publisher" checkout --quiet main
+  guard_publish_tracked tip.txt $'tip\n'
+  child=$(git -C "$CASE_DIR/publisher" rev-parse main)
+  guard_publish_replacement_default_branch
+  guard_prefetch
+  git -C "$POOL_DIR" checkout --quiet --detach "$child"
+  brief_with_base "$id" feature/x
+  FM_SLOT_RESET_GUARD_SEAM="git -C '$CASE_DIR/origin.git' symbolic-ref HEAD refs/heads/replacement" \
+    guard_expect_refusal S1 '(F2) the remote switches its default branch under a --base-branch spawn' 'reset refused (head_not_contained)' "$id" --scout --base-branch feature/x
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$child" ] || fail 'F2: the slot moved after the remote switched its default branch'
+  # Stable control: the same spawn, the default branch where it was.
+  id='guard-f2-stable'
+  rec=$(make_case guard-f2b "$id")
+  read_case_record "$rec"
+  publish_feature_branch feature/x
+  git -C "$CASE_DIR/publisher" checkout --quiet main
+  guard_publish_tracked tip.txt $'tip\n'
+  child=$(git -C "$CASE_DIR/publisher" rev-parse main)
+  guard_publish_replacement_default_branch
+  guard_prefetch
+  git -C "$POOL_DIR" checkout --quiet --detach "$child"
+  brief_with_base "$id" feature/x
+  guard_expect_launch S1 '(F2) control: the same --base-branch spawn with a stable default branch' "$id" --scout --base-branch feature/x
+  pass 'F2: a --base-branch spawn judges by the remote default as it is on the final observation; a switched default refuses, a stable one launches'
+}
+
+# Round 5, finding F1: a refused, prepared task's retry checks the prepared branch out. That checkout
+# changes the slot's tree, so it carries the shared guard's proof like a reset does. A governed slot
+# refused once by the project's provisioner (leaving a prepared branch whose tip tracks notes.local),
+# then relaunched with something in the way.
+guard_prepared_retry_fixture() { # <name> <id>   sets RETRY_META; leaves the slot at its earlier commit
+  local rec
+  rec=$(make_guard_governed_case "$1" "$2")
+  read_case_record "$rec"
+  guard_ignore notes.local
+  guard_publish_tracked notes.local $'target bytes\n'
+  GUARD_OUT=$(FM_TEST_SLOT_REFUSE=1 run_governed_spawn "$2") && fail "F1 fixture: the first spawn was admitted although the provisioner refuses"
+  RETRY_META="$HOME_DIR/state/$2.meta"
+  assert_grep 'recovery=slot-provision-refused' "$RETRY_META" 'F1 fixture: the refusal kept no recovery record'
+  assert_grep 'slot_prepared_head=' "$RETRY_META" 'F1 fixture: the refusal kept no prepared head'
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$INITIAL_SHA" ] || fail 'F1 fixture: the refused slot did not return to its earlier commit'
+  make_stopped_tmux "$CASE_DIR/stopped"
+}
+
+guard_prepared_retry() { # <id> <refuse:0|1>  -> GUARD_OUT, RETRY_RC
+  local refuse_env=''
+  [ "$2" != 1 ] || refuse_env=1
+  rm -f -- "$CASE_DIR/launch.log"
+  RETRY_RC=0
+  GUARD_OUT=$(FM_TEST_SLOT_REFUSE=$refuse_env FM_TEST_PROVISION_CALLED="$CASE_DIR/relaunch.called" FM_TEST_SLOT_RECORD="$CASE_DIR/slot-record.json" \
+    FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" run_relaunch "$1" 2>&1) || RETRY_RC=$?
+}
+
+test_reset_guard_f1_prepared_retry_is_guarded() {
+  local id holder common
+  # Collision: ignored, unarchived bytes sit at a path the prepared branch tracks.
+  id='guard-f1-collision'
+  guard_prepared_retry_fixture guard-f1a "$id"
+  printf 'private ignored work\n' >"$POOL_DIR/notes.local"
+  guard_prepared_retry "$id" 1
+  [ "$RETRY_RC" -ne 0 ] || fail 'F1: the retry was admitted over ignored work'
+  assert_contains "$GUARD_OUT" 'ignored_collision' "F1: the retry did not name the ignored collision"$'\n'"$GUARD_OUT"
+  [ ! -s "$CASE_DIR/launch.log" ] || fail 'F1: the refused retry typed a launch'
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$INITIAL_SHA" ] || fail 'F1: the refused retry moved HEAD'
+  assert_grep 'private ignored work' "$POOL_DIR/notes.local" 'F1: the refused retry overwrote ignored work'
+  # The same collision, with a provisioner that would accept: it must not launch either.
+  guard_prepared_retry "$id" 0
+  [ "$RETRY_RC" -ne 0 ] || fail 'F1: an accepting provisioner admitted the retry over ignored work'
+  [ ! -s "$CASE_DIR/launch.log" ] || fail 'F1: the accepted-provisioner retry typed a launch over ignored work'
+  assert_grep 'private ignored work' "$POOL_DIR/notes.local" 'F1: the accepting retry overwrote ignored work'
+  # Noncollision control: ignored work at a path nothing tracks survives, and the retry launches.
+  id='guard-f1-noncollision'
+  guard_prepared_retry_fixture guard-f1b "$id"
+  guard_ignore other.local
+  printf 'private ignored work\n' >"$POOL_DIR/other.local"
+  guard_prepared_retry "$id" 0
+  [ "$RETRY_RC" -eq 0 ] || fail "F1 control: a retry with ignored work at a noncolliding path refused: $GUARD_OUT"
+  [ -s "$CASE_DIR/launch.log" ] || fail 'F1 control: the retry typed no launch'
+  assert_grep 'private ignored work' "$POOL_DIR/other.local" 'F1 control: the noncolliding ignored work was lost'
+  # An owner branch whose tip no anchor contains.
+  id='guard-f1-uncontained-owner'
+  guard_prepared_retry_fixture guard-f1c "$id"
+  git -C "$POOL_DIR" branch previous-owner "$INITIAL_SHA"
+  git -C "$POOL_DIR" worktree list >/dev/null
+  git -C "$PROJECT_DIR" -c user.name=t -c user.email=t@e.invalid commit-tree "$INITIAL_SHA^{tree}" -p "$INITIAL_SHA" -m 'unlanded owner work' >"$CASE_DIR/owner.sha"
+  git -C "$PROJECT_DIR" update-ref refs/heads/previous-owner "$(cat "$CASE_DIR/owner.sha")"
+  guard_write_manifest previous-owner "$INITIAL_SHA"
+  guard_prepared_retry "$id" 0
+  [ "$RETRY_RC" -ne 0 ] || fail 'F1: the retry was admitted with an uncontained owner branch'
+  assert_contains "$GUARD_OUT" 'owner_branch_not_contained' "F1: the retry did not name the uncontained owner"$'\n'"$GUARD_OUT"
+  [ ! -s "$CASE_DIR/launch.log" ] || fail 'F1: the uncontained-owner retry typed a launch'
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$INITIAL_SHA" ] || fail 'F1: the uncontained-owner retry moved HEAD'
+  # An unparsable manifest.
+  id='guard-f1-manifest'
+  guard_prepared_retry_fixture guard-f1d "$id"
+  guard_write_manifest - - $'{ this is not json'
+  guard_prepared_retry "$id" 0
+  [ "$RETRY_RC" -ne 0 ] || fail 'F1: the retry was admitted with an unparsable manifest'
+  assert_contains "$GUARD_OUT" 'unknown_manifest' "F1: the retry did not name the unreadable manifest"$'\n'"$GUARD_OUT"
+  [ ! -s "$CASE_DIR/launch.log" ] || fail 'F1: the unparsable-manifest retry typed a launch'
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$INITIAL_SHA" ] || fail 'F1: the unparsable-manifest retry moved HEAD'
+  # A live process outside the spawn with its cwd in the slot.
+  id='guard-f1-holder'
+  guard_prepared_retry_fixture guard-f1e "$id"
+  (cd "$POOL_DIR" && exec sleep 600) >/dev/null 2>&1 </dev/null &
+  holder=$!
+  guard_prepared_retry "$id" 0
+  kill "$holder" 2>/dev/null || true
+  [ "$RETRY_RC" -ne 0 ] || fail 'F1: the retry was admitted with a live foreign cwd holder'
+  assert_contains "$GUARD_OUT" 'holder_cwd' "F1: the retry did not name the holder"$'\n'"$GUARD_OUT"
+  [ ! -s "$CASE_DIR/launch.log" ] || fail 'F1: the holder retry typed a launch'
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$INITIAL_SHA" ] || fail 'F1: the holder retry moved HEAD'
+  # Control: the same slot with nothing in the way retries and launches.
+  id='guard-f1-clear'
+  guard_prepared_retry_fixture guard-f1f "$id"
+  guard_prepared_retry "$id" 0
+  [ "$RETRY_RC" -eq 0 ] || fail "F1 control: a clear prepared retry refused: $GUARD_OUT"
+  [ -s "$CASE_DIR/launch.log" ] || fail 'F1 control: the clear retry typed no launch'
+  pass 'F1: a prepared retry carries the shared guard: ignored collision, uncontained owner, unparsable manifest and a live holder each refuse with the slot untouched; the noncolliding and clear retries launch'
+}
+
 test_reset_guard_restore_preserves_ignored_work_and_a_moved_branch() {
   local rec id target
   # The reviewer's case: between the observations an outside writer advances the original branch to a
@@ -2689,12 +2947,12 @@ test_reset_guard_restore_preserves_ignored_work_and_a_moved_branch() {
   git -C "$repo" branch -q -f owner-topic "$old"
   printf 'keep.txt\n' >>"$repo/.git/info/exclude"
   printf 'ignored work\n' >"$repo/keep.txt"
-  GUARD_OUT=$(bash -c '. "$1/bin/fm-slot-provision-lib.sh"; FM_SLOT_PREVIOUS_BRANCH=owner-topic FM_SLOT_PREVIOUS_HEAD=$3 FM_SLOT_RESET_HEAD=$4; fm_slot_restore_base "$2"' _ "$ROOT" "$repo" "$old" "$new" 2>&1)
+  GUARD_OUT=$(bash -c '. "$1/bin/fm-slot-provision-lib.sh"; FM_SLOT_PREVIOUS_BRANCH=owner-topic FM_SLOT_PREVIOUS_HEAD=$3 FM_SLOT_RESET_HEAD=$4 FM_SLOT_GUARD_STANDING_ANCHORS=("$4"); fm_slot_restore_base "$2"' _ "$ROOT" "$repo" "$old" "$new" 2>&1)
   [ "$(git -C "$repo" rev-parse HEAD)" = "$new" ] || fail 'round 4: the restore moved HEAD over ignored work'
   assert_grep 'ignored work' "$repo/keep.txt" 'round 4: the restore overwrote ignored work'
-  assert_contains "$GUARD_OUT" 'would overwrite ignored work' 'round 4: the restore did not say it left ignored work alone'
+  assert_contains "$GUARD_OUT" 'ignored_collision' 'round 4: the restore did not say the guard refused over ignored work'
   rm -f "$repo/keep.txt"
-  bash -c '. "$1/bin/fm-slot-provision-lib.sh"; FM_SLOT_PREVIOUS_BRANCH=owner-topic FM_SLOT_PREVIOUS_HEAD=$3 FM_SLOT_RESET_HEAD=$4; fm_slot_restore_base "$2"' _ "$ROOT" "$repo" "$old" "$new" >/dev/null 2>&1
+  bash -c '. "$1/bin/fm-slot-provision-lib.sh"; FM_SLOT_PREVIOUS_BRANCH=owner-topic FM_SLOT_PREVIOUS_HEAD=$3 FM_SLOT_RESET_HEAD=$4 FM_SLOT_GUARD_STANDING_ANCHORS=("$4"); fm_slot_restore_base "$2"' _ "$ROOT" "$repo" "$old" "$new" >/dev/null 2>&1
   [ "$(git -C "$repo" symbolic-ref --short -q HEAD)" = owner-topic ] || fail 'round 4 control: the restore did not run with no ignored work in the way'
   pass 'round 4: a refusal never restores over ignored work or a moved original branch; with nothing in the way it still restores'
 }
@@ -2816,6 +3074,17 @@ guard_start_pane_shell() { # <slot> <ready-file>  -> prints the shell's pid
   [ -e "$2" ] || fail 'the pane shell never reached the slot'
 }
 
+# A pane shell in the slot whose child works elsewhere (cwd outside the slot).
+guard_start_pane_shell_away() { # <slot> <ready-file>  -> prints the shell's pid
+  bash -c 'cd "$1" && touch "$2" && { (cd / && exec sleep 600) & wait; }' _ "$1" "$2" >/dev/null 2>&1 </dev/null &
+  printf '%s' "$!"
+  for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+    [ -e "$2" ] && break
+    command sleep 0.2
+  done
+  [ -e "$2" ] || fail 'the pane shell never reached the slot'
+}
+
 guard_wrap_tmux_pane_pid() { # <fakebin> <file-holding-the-pid>
   mv "$1/tmux" "$1/tmux.real"
   cat >"$1/tmux" <<SH
@@ -2830,16 +3099,25 @@ SH
 
 test_reset_guard_s4_pane_pid_exemption() {
   local rec id shell foreign bystander
-  # Healthy control: the pane shell and its child hold the slot cwd; the endpoint reports the shell's pid.
+  # Healthy control: the pane shell predates the spawn and is excluded by the endpoint pane pid; the
+  # child it starts after the spawn began (the acquisition) holds the slot cwd and is excluded too.
   id='guard-s4-pane-pid'
-  rec=$(make_case guard-s4pane "$id")
-  read_case_record "$rec"
-  shell=$(guard_start_pane_shell "$POOL_DIR" "$CASE_DIR/pane.ready")
-  printf '%s' "$shell" >"$CASE_DIR/pane.pid"
-  guard_wrap_tmux_pane_pid "$FAKEBIN_DIR" "$CASE_DIR/pane.pid"
-  guard_expect_launch S4 'the acquired pane shell and its child hold the slot cwd and are excluded by the endpoint pane pid' "$id" --scout
-  pkill -P "$shell" 2>/dev/null || true
-  kill "$shell" 2>/dev/null || true
+  guard_pane_slot guard-s4pane "$id" acquired
+  guard_expect_launch S4 'the acquired pane shell, and the child it started after the spawn began, hold the slot cwd and are excluded' "$id" --scout
+  [ -s "$CASE_DIR/acq/child" ] || fail 'S4: the pane never started its child, so the control proved nothing'
+  guard_end_pane
+  # Round 5 (F3): a child that was already live in the pane when the spawn began, holding the slot cwd,
+  # descends from the pane's shell but is not this spawn's. It refuses, with the slot untouched.
+  id='guard-s4-pane-pid-preexisting'
+  guard_pane_slot guard-s4panepre "$id" existing-cwd
+  guard_expect_refusal S4 '(F3) a pane child that was live before the spawn began holds the slot cwd' 'reset refused (holder_cwd)' "$id" --scout
+  guard_end_pane
+  # Paired pass: the same pane shell and pre-existing child, but the child works outside the slot.
+  id='guard-s4-pane-pid-preexisting-away'
+  guard_pane_slot guard-s4panepa "$id" existing
+  printf '{"worktrees":[{"name":"1","path":"%s"}]}\n' "$POOL_DIR" >"$LEASE_STATE"
+  guard_expect_launch S4 '(F3) paired pass: the pre-existing pane child works outside the slot' "$id" --scout
+  guard_end_pane
   # Paired refusal: the same holders, but the endpoint reports some other pid.
   id='guard-s4-pane-pid-mismatch'
   rec=$(make_case guard-s4panemis "$id")
@@ -2856,7 +3134,7 @@ test_reset_guard_s4_pane_pid_exemption() {
   id='guard-s4-pane-pid-foreign'
   rec=$(make_case guard-s4panefor "$id")
   read_case_record "$rec"
-  shell=$(guard_start_pane_shell "$POOL_DIR" "$CASE_DIR/pane.ready")
+  shell=$(guard_start_pane_shell_away "$POOL_DIR" "$CASE_DIR/pane.ready")
   printf '%s' "$shell" >"$CASE_DIR/pane.pid"
   guard_wrap_tmux_pane_pid "$FAKEBIN_DIR" "$CASE_DIR/pane.pid"
   (cd "$POOL_DIR" && exec sleep 600) &
@@ -2864,7 +3142,7 @@ test_reset_guard_s4_pane_pid_exemption() {
   guard_expect_refusal S4 'a foreign holder beside the excluded pane shell' 'reset refused (holder_cwd)' "$id" --scout
   pkill -P "$shell" 2>/dev/null || true
   kill "$foreign" "$shell" 2>/dev/null || true
-  pass 'S4: the pane shell is excluded by the endpoint pane pid, a mismatching pid or a foreign holder still refuses'
+  pass 'S4: the pane shell and a child it started after the spawn began are excluded by the endpoint pane pid; a pre-existing child, a mismatching pid or a foreign holder still refuses'
 }
 
 # A backend that reports no pane pid (zellij, cmux, orca): the pane is a real shell that runs the
@@ -3543,5 +3821,9 @@ test_reset_guard_a_governed_late_commit_is_not_orphaned
 test_reset_guard_c_partial_lsof_inventory_is_unknown
 test_reset_guard_d_recorded_source_recovery_revalidates_origin
 test_reset_guard_restore_preserves_ignored_work_and_a_moved_branch
+test_reset_guard_f1_prepared_retry_is_guarded
+test_reset_guard_f2_base_branch_spawn_sees_a_switched_default
+test_reset_guard_inventory_no_unguarded_slot_change
+test_reset_guard_restore_after_provisioner_refusal_keeps_previous_work
 
 echo "# all fm-spawn-pool-base-freshen tests passed"

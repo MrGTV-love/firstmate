@@ -68,7 +68,7 @@ fm_slot_prepare_base() { # <project> <copy> <task-id>
       return 1
     }
   fi
-  git -C "$copy" checkout --quiet --detach || return 1
+  fm_slot_guarded_git "$copy" "$FM_SLOT_PREVIOUS_HEAD" 'a detached HEAD' '' -- checkout --quiet --detach || return 1
 }
 
 # Put the slot back on the checkout it had before preparation, but only while neither HEAD nor
@@ -76,12 +76,12 @@ fm_slot_prepare_base() { # <project> <copy> <task-id>
 # (the one it prepared from, or the one its own guarded reset set), and the tree is clean as the
 # preparation required. A restoring checkout over a commit or an edit that landed in the slot
 # during the guard's observations would move that work off HEAD or out of the tree, and no ref
-# holds it. The original branch must also still be where it was, and no ignored file may sit at
-# a path the restored checkout tracks (ordinary status does not show ignored files; the check is
-# the one the reset guard uses). Then the slot is left exactly as found, and what changed is
-# reported.
+# holds it. The original branch must also still be where it was, and the checkout itself goes
+# through the shared guard (fm_slot_guarded_git), which also refuses ignored files the checkout
+# would overwrite (ordinary status does not show them). Then the slot is left exactly as found,
+# and what changed is reported.
 fm_slot_restore_base() { # <copy>
-  local head status dest ignored_out
+  local head status dest guard_out rc=0
   [ -n "$FM_SLOT_PREVIOUS_HEAD" ] || return 0
   head=$(git -C "$1" rev-parse --verify --quiet HEAD 2>/dev/null) || head=
   if [ -z "$head" ] || { [ "$head" != "$FM_SLOT_PREVIOUS_HEAD" ] && [ "$head" != "${FM_SLOT_RESET_HEAD:-}" ]; }; then
@@ -101,19 +101,17 @@ fm_slot_restore_base() { # <copy>
       return 0
     fi
   fi
-  if [ "$head" != "$dest" ]; then
-    # The checkout would change the tree. Ignored files are work the status above cannot see.
-    fm_slot_guard_begin "$1" "$dest" || return 0
-    ignored_out=$(fm_slot_guard_fact_ignored 1 2>&1) || {
-      echo "error: restoring the original checkout would overwrite ignored work in the slot (${ignored_out##*reset refused (}); leaving the slot exactly as found and not restoring its original checkout" >&2
-      return 0
-    }
-  fi
+  # The restoring checkout is one more slot change: the shared guard judges it (if the tree would
+  # change, with the full proof, so ignored work in the way refuses it). A refusal leaves the slot as found.
   if [ -n "$FM_SLOT_PREVIOUS_BRANCH" ]; then
-    git -C "$1" checkout --quiet "$FM_SLOT_PREVIOUS_BRANCH" --
+    guard_out=$(fm_slot_guarded_git "$1" "$dest" "the original branch $FM_SLOT_PREVIOUS_BRANCH" "refs/heads/$FM_SLOT_PREVIOUS_BRANCH" -- checkout --quiet "$FM_SLOT_PREVIOUS_BRANCH" -- 2>&1) || rc=$?
   else
-    git -C "$1" checkout --quiet --detach "$FM_SLOT_PREVIOUS_HEAD"
+    guard_out=$(fm_slot_guarded_git "$1" "$dest" 'the original detached HEAD' '' -- checkout --quiet --detach "$FM_SLOT_PREVIOUS_HEAD" 2>&1) || rc=$?
   fi
+  if [ "$rc" -ne 0 ]; then
+    echo "error: the shared guard refused to restore the slot's original checkout (${guard_out##*reset refused (}); leaving the slot exactly as found" >&2
+  fi
+  return 0
 }
 
 fm_slot_resume_prepared() { # <project> <copy> <task-id> <branch> <prepared-head>
@@ -132,7 +130,7 @@ fm_slot_resume_prepared() { # <project> <copy> <task-id> <branch> <prepared-head
     return 1
   }
   fm_slot_prepare_base "$project" "$copy" "$id" || return 1
-  git -C "$copy" checkout --quiet "$branch" -- || return 1
+  fm_slot_guarded_git "$copy" "$expected" "the prepared task branch $branch" "refs/heads/$branch" -- checkout --quiet "$branch" -- || return 1
   if [ "$(git -C "$copy" rev-parse --verify HEAD)" != "$expected" ]; then
     fm_slot_restore_base "$copy" || true
     echo "error: prepared task branch $branch moved during recovery; no worker admitted" >&2
@@ -194,9 +192,9 @@ fm_slot_provision() { # <runner> <project> <copy> <task-id> <branch> <report> <l
         echo "error: existing task branch $branch is not at the assigned copy's HEAD; refusing to reset or overwrite it" >&2
         return 1
       }
-      git -C "$copy" checkout --quiet "$branch" -- || return 1
+      fm_slot_guarded_git "$copy" "$old_head" "the task branch $branch" "refs/heads/$branch" -- checkout --quiet "$branch" -- || return 1
     else
-      git -C "$copy" checkout --quiet -b "$branch" -- || return 1
+      fm_slot_guarded_git "$copy" "$old_head" "a new task branch $branch" '' -- checkout --quiet -b "$branch" -- || return 1
       FM_SLOT_CREATED=1
       FM_SLOT_CREATED_FROM=$old_branch
     fi
@@ -245,9 +243,9 @@ PY
   if [ "$rc" -ne 0 ]; then
     if [ "$old_branch" != "$branch" ]; then
       if [ -n "$old_branch" ]; then
-        git -C "$copy" checkout --quiet "$old_branch" -- || true
+        fm_slot_guarded_git "$copy" "$old_head" "the original branch $old_branch" "refs/heads/$old_branch" -- checkout --quiet "$old_branch" -- || true
       else
-        git -C "$copy" checkout --quiet --detach "$old_head" || true
+        fm_slot_guarded_git "$copy" "$old_head" 'the original detached HEAD' '' -- checkout --quiet --detach "$old_head" || true
       fi
     fi
     echo "error: slot provisioner refused task $id (exit $rc); no agent or ship transition admitted; report: $report" >&2
@@ -375,6 +373,8 @@ FM_SLOT_GUARD_LEASE_STARTED=
 # slot, a later observation that finds no pool state for it has lost its evidence and refuses.
 FM_SLOT_GUARD_POOL_REAL=
 FM_SLOT_GUARD_ANCHOR_REFRESH=
+FM_SLOT_GUARD_STANDING_ANCHORS=()
+FM_SLOT_GUARD_CURRENT_OP=
 FM_SLOT_GUARD_BEFORE_RESET=
 FM_SLOT_GUARD_BEFORE_RESET_ERROR=
 FM_SLOT_GUARD_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -873,8 +873,22 @@ for _ in range(256):
     ancestors.add(pid)
     pid = parent(pid)
 panepid = int(pane) if pane.isdigit() else None
+# A process under the acquired pane belongs to this spawn only if it started after the spawn did:
+# a child that was already live in the pane when the spawn began is somebody else's holder, even
+# though it descends from the pane's shell. The pane's own shell (the endpoint this spawn holds)
+# and this spawn's own lineage are the other exclusions. A start time that cannot be read is no
+# proof of ownership.
 def own(pid):
-    return pid in ancestors or reaches(pid, selfpid) or (panepid is not None and reaches(pid, panepid))
+    if pid in ancestors or reaches(pid, selfpid):
+        return True
+    if panepid is None:
+        return False
+    if pid == panepid:
+        return True
+    if not reaches(pid, panepid):
+        return False
+    began = started_at(pid)
+    return spawn_started is not None and began is not None and began > spawn_started
 # When a process started, in seconds since the epoch, or None when it cannot be read.
 def started_at(pid):
     try:
@@ -1259,7 +1273,7 @@ fm_slot_guard_observe() { # <strict:0|1> [final]
   FM_SLOT_GUARD_RECORD=
   FM_SLOT_GUARD_REASON=
   fm_slot_guard_fact_holders || return 1
-  if [ "${2:-}" = final ] && [ -n "${FM_SLOT_RESET_GUARD_HOLDER_SEAM:-}" ]; then
+  if [ "${2:-}" = final ] && [ "$FM_SLOT_GUARD_CURRENT_OP" = reset ] && [ -n "${FM_SLOT_RESET_GUARD_HOLDER_SEAM:-}" ]; then
     (eval "$FM_SLOT_RESET_GUARD_HOLDER_SEAM") || true
   fi
   [ "${2:-}" != final ] || fm_slot_guard_refresh_anchors || return 1
@@ -1299,24 +1313,65 @@ fm_slot_reset_preflight() { # <slot> <target> <anchor>...
   fm_slot_guard_observe 0
 }
 
-# The guarded reset. Both observations (the final one probes the holders first, then
-# re-reads every git fact), the manifest bytes read again, then the one
-# destroying command.
-fm_slot_guarded_reset() { # <slot> <target-sha> <target-label> <anchor>...
-  local slot=$1 target=$2 label=$3 first manifest_first branch_first base_first
-  shift 3
-  fm_slot_guard_begin "$slot" "$target" "$@" || return 1
+# The one place a git command that can change the slot's HEAD, index, tree or ignored files
+# runs. Every such command in spawn, promotion and slot provisioning goes through here
+# (tests/fm-spawn-pool-base-freshen.test.sh, test_reset_guard_inventory_no_unguarded_slot_change,
+# fails if one appears anywhere else). <target> is the commit the slot's tree becomes; <target-ref>,
+# when not empty, is the ref the command will name, which must still resolve to <target> on the
+# final look. The git arguments come after "--": reset --hard <target>, or checkout ...
+#
+# Two cases, decided by what the command can do, not by who calls:
+#  - <target> is the commit HEAD already is: the command cannot change a tree or lose a commit
+#    (it detaches, or attaches a branch at HEAD). It needs only a clean tree and HEAD still at
+#    <target> right before it runs.
+#  - Otherwise the full proof: both observations (the final one probes the holders first and
+#    resolves the remote's current default again, then re-reads every git fact), the manifest
+#    bytes read again, the caller's last step, then the command.
+# A refusal runs nothing and leaves the slot as found. The anchors come from
+# FM_SLOT_GUARD_STANDING_ANCHORS, set by the caller before its first slot change.
+fm_slot_guarded_git() { # <slot> <target-commit> <label> <target-ref-or-empty> -- <git-arg>...
+  local slot=$1 target=$2 label=$3 target_ref=$4 first manifest_first branch_first base_first head ref_tip
+  shift 4
+  [ "${1:-}" = -- ] && shift
+  FM_SLOT_GUARD_CURRENT_OP=${1:-}
+  case "$FM_SLOT_GUARD_CURRENT_OP" in
+    reset|checkout) ;;
+    *)
+      FM_SLOT_GUARD_SLOT=$slot
+      fm_slot_guard_refuse unknown_git_read "the shared guard does not run 'git ${1:-}' on a slot"
+      return 1
+      ;;
+  esac
+  fm_slot_guard_begin "$slot" "$target" ${FM_SLOT_GUARD_STANDING_ANCHORS[@]+"${FM_SLOT_GUARD_STANDING_ANCHORS[@]}"} || return 1
+  head=$(git -C "$slot" rev-parse --verify --quiet HEAD 2>/dev/null) || head=
+  if [ -n "$head" ] && [ "$head" = "$target" ] && [ "$FM_SLOT_GUARD_CURRENT_OP" = checkout ]; then
+    fm_slot_guard_fact_clean || return 1
+    head=$(git -C "$slot" rev-parse --verify --quiet HEAD 2>/dev/null) || head=
+    if [ "$head" != "$target" ]; then
+      fm_slot_guard_refuse changed_since_first_read "the slot's HEAD changed before the command ran"
+      return 1
+    fi
+    git -C "$slot" "$@"
+    return $?
+  fi
   fm_slot_guard_fact_manifest || return 1
   manifest_first=$FM_SLOT_GUARD_MANIFEST branch_first=$FM_SLOT_GUARD_MANIFEST_BRANCH base_first=$FM_SLOT_GUARD_MANIFEST_BASE
   fm_slot_guard_observe 1 || return 1
   first=$FM_SLOT_GUARD_RECORD
-  if [ -n "${FM_SLOT_RESET_GUARD_SEAM:-}" ]; then
+  if [ "$FM_SLOT_GUARD_CURRENT_OP" = reset ] && [ -n "${FM_SLOT_RESET_GUARD_SEAM:-}" ]; then
     (eval "$FM_SLOT_RESET_GUARD_SEAM") || true
   fi
   fm_slot_guard_observe 1 final || return 1
   if [ "$FM_SLOT_GUARD_RECORD" != "$first" ]; then
     fm_slot_guard_refuse changed_since_first_read "the slot's HEAD, owner branches or anchors changed between the first observation and the final one"
     return 1
+  fi
+  if [ -n "$target_ref" ]; then
+    ref_tip=$(git -C "$slot" rev-parse --verify --quiet "$target_ref^{commit}" 2>/dev/null) || ref_tip=
+    if [ "$ref_tip" != "$target" ]; then
+      fm_slot_guard_refuse changed_since_first_read "$target_ref no longer points at the commit this command was proved for"
+      return 1
+    fi
   fi
   fm_slot_guard_fact_manifest || return 1
   if [ "$FM_SLOT_GUARD_MANIFEST" != "$manifest_first" ] ||
@@ -1325,20 +1380,30 @@ fm_slot_guarded_reset() { # <slot> <target-sha> <target-label> <anchor>...
     fm_slot_guard_refuse changed_since_first_read "the slot's lifecycle manifest changed between the first observation and the final one"
     return 1
   fi
-  # The caller's last reads and writes that must not follow the reset run here, after every
+  # The reset caller's last reads and writes that must not follow the reset run here, after every
   # check has cleared. A refusal after the reset could not say the slot was left untouched,
   # so whatever can fail is done and checked first. The hook either changes nothing and
   # fails (a refusal with the slot untouched) or succeeds.
-  if [ -n "$FM_SLOT_GUARD_BEFORE_RESET" ]; then
+  if [ "$FM_SLOT_GUARD_CURRENT_OP" = reset ] && [ -n "$FM_SLOT_GUARD_BEFORE_RESET" ]; then
     FM_SLOT_GUARD_BEFORE_RESET_ERROR=
     $FM_SLOT_GUARD_BEFORE_RESET "$slot" || {
       fm_slot_guard_refuse before_reset_failed "${FM_SLOT_GUARD_BEFORE_RESET_ERROR:-the step that must precede the reset failed}"
       return 1
     }
   fi
-  if ! git -C "$slot" reset --hard "$target" >/dev/null; then
-    echo "error: could not reset pooled worktree '$slot' to '$label'; refusing to launch from a potentially stale base" >&2
+  if ! git -C "$slot" "$@" >/dev/null; then
+    echo "error: could not $([ "$FM_SLOT_GUARD_CURRENT_OP" = reset ] && echo reset || echo 'check out') pooled worktree '$slot' to '$label'; refusing to launch from a potentially stale base" >&2
     return 1
   fi
-  FM_SLOT_RESET_HEAD=$(git -C "$slot" rev-parse --verify --quiet HEAD 2>/dev/null) || FM_SLOT_RESET_HEAD=
+  if [ "$FM_SLOT_GUARD_CURRENT_OP" = reset ]; then
+    FM_SLOT_RESET_HEAD=$(git -C "$slot" rev-parse --verify --quiet HEAD 2>/dev/null) || FM_SLOT_RESET_HEAD=
+  fi
+}
+
+# The guarded reset: fm_slot_guarded_git for "reset --hard <target>", with the caller's anchors.
+fm_slot_guarded_reset() { # <slot> <target-sha> <target-label> <anchor>...
+  local slot=$1 target=$2 label=$3
+  shift 3
+  FM_SLOT_GUARD_STANDING_ANCHORS=("$@")
+  fm_slot_guarded_git "$slot" "$target" "$label" '' -- reset --hard "$target"
 }

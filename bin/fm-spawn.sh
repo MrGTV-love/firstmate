@@ -604,7 +604,10 @@
 #   containment test reads local refs only and never fetches, so this gate stays
 #   usable offline; a stale remote-tracking ref can therefore make an unpushed
 #   commit look contained, which is exactly why no remedy command is printed.
-#   A pooled slot is hard-reset only through fm_slot_guarded_reset, whose header in
+#   Every git command that can change a pooled slot's HEAD, index, tree or ignored files (the
+#   reset, the refusal-time restore, the retry's checkout onto a prepared branch, the detach and
+#   branch checkouts of provisioning) runs through fm_slot_guarded_git, and a test fails if one
+#   appears anywhere else. The reset is fm_slot_guarded_reset, whose header in
 #   bin/fm-slot-provision-lib.sh owns the facts it proves first: HEAD and owner-branch
 #   tips contained in origin's default branch (never a --base-branch) or the manifest's
 #   base_sha, a clean tree, no ignored work at a path the reset target tracks, no live
@@ -1946,7 +1949,6 @@ SPAWN_BASE_REF=
 SPAWN_ORIGIN_DEFAULT=
 SPAWN_ORIGIN_DEFAULT_REF=
 SPAWN_ORIGIN_DEFAULT_SHA=
-SPAWN_ORIGIN_DEFAULT_FROM_REMOTE=0
 SPAWN_RECORD_REFS_MODE=
 SPAWN_RECORD_REFS_DEFAULT=
 SPAWN_RECORD_REFS_SHA=
@@ -4512,7 +4514,6 @@ spawn_fetch_base_evidence() {
   if [ -z "$default" ]; then
     default=$(spawn_remote_default_branch "$PROJ_ABS") || rc=$?
     origin_default=$default
-    SPAWN_ORIGIN_DEFAULT_FROM_REMOTE=1
   else
     origin_default=$(spawn_origin_default_name "$PROJ_ABS") || rc=$?
   fi
@@ -5097,6 +5098,12 @@ spawn_endpoint_shell_pid() {
 
 # The context fm-slot-provision-lib.sh's reset guard reads (see its header).
 spawn_reset_guard_context() {
+  # The standing context for every slot change this spawn makes, not only the reset: the
+  # anchors, and the final-pass refresh that resolves the remote's current default again.
+  spawn_reset_guard_anchors "$WT"
+  FM_SLOT_GUARD_STANDING_ANCHORS=(${SPAWN_GUARD_ANCHORS[@]+"${SPAWN_GUARD_ANCHORS[@]}"})
+  FM_SLOT_GUARD_ANCHOR_REFRESH=
+  [ -z "$SPAWN_ORIGIN_DEFAULT_SHA" ] || FM_SLOT_GUARD_ANCHOR_REFRESH=spawn_refresh_origin_default_tip
   FM_SLOT_GUARD_PROJECT=$PROJ_ABS
   FM_SLOT_GUARD_TASK=$ID
   FM_SLOT_GUARD_ARCHIVE_ROOT=$DATA
@@ -5140,16 +5147,13 @@ spawn_fetch_origin_tip() { # <worktree> <branch>
 # The current tip of origin's default branch, fetched into FETCH_HEAD only. The reset guard's
 # final pass calls it so containment is proved against the tip now, not the one fetched when
 # this spawn began (see FM_SLOT_GUARD_ANCHOR_REFRESH in the library's header).
-# A default that was resolved from the remote is resolved from the remote again here, so a remote
-# that switched its default branch between the observations is judged by its new default, not by
-# the branch that used to be the default. A name taken from the recorded origin/HEAD (a
-# --base-branch spawn) stays that name.
+# The remote's current default branch, resolved from the remote again and its tip fetched into
+# FETCH_HEAD only. The reset guard's final pass calls it for every slot change, so containment is
+# proved against the default as it is now: a remote that switched its default between the
+# observations is judged by the new default, whatever name this spawn started from.
 spawn_refresh_origin_default_tip() {
-  local name=$SPAWN_ORIGIN_DEFAULT
-  [ -n "$name" ] || return 1
-  if [ "$SPAWN_ORIGIN_DEFAULT_FROM_REMOTE" = 1 ]; then
-    name=$(spawn_remote_default_branch "$FM_SLOT_GUARD_SLOT") || return 1
-  fi
+  local name
+  name=$(spawn_remote_default_branch "$FM_SLOT_GUARD_SLOT") || return 1
   spawn_fetch_origin_tip "$FM_SLOT_GUARD_SLOT" "$name"
 }
 
@@ -5178,7 +5182,6 @@ spawn_fetch_recovery_origin_anchor() { # <worktree>
     return 1
   }
   SPAWN_ORIGIN_DEFAULT=$default
-  SPAWN_ORIGIN_DEFAULT_FROM_REMOTE=1
 }
 
 # Record the origin tip this spawn started from in the slot's remote-tracking refs, only
@@ -5256,7 +5259,6 @@ freshen_spawn_worktree_base() { # <worktree> [<base-branch>]
       SPAWN_ORIGIN_DEFAULT=$(spawn_origin_default_name "$worktree") || rc=$?
     else
       SPAWN_ORIGIN_DEFAULT=$(spawn_remote_default_branch "$worktree") || rc=$?
-      SPAWN_ORIGIN_DEFAULT_FROM_REMOTE=1
     fi
     case $rc in
       0) ;;
@@ -5293,14 +5295,12 @@ freshen_spawn_worktree_base() { # <worktree> [<base-branch>]
     printf 'local-only source: local=%s@%s origin=%s@%s selected=%s@%s\n' \
       "$SPAWN_LOCAL_DEFAULT" "$SPAWN_LOCAL_SHA" "$SPAWN_BASE_DEFAULT" "$SPAWN_BASE_SHA" "$target" "$expected"
   fi
-  spawn_reset_guard_anchors "$worktree"
   spawn_reset_guard_context
   SPAWN_RECORD_REFS_MODE=$origin_refs SPAWN_RECORD_REFS_DEFAULT=$default SPAWN_RECORD_REFS_SHA=$origin_sha SPAWN_RECORD_REFS_BASE=$base
-  FM_SLOT_GUARD_ANCHOR_REFRESH=spawn_refresh_origin_default_tip
   FM_SLOT_GUARD_BEFORE_RESET=spawn_record_origin_refs_before_reset
   rc=0
   fm_slot_guarded_reset "$worktree" "$expected" "$target" ${SPAWN_GUARD_ANCHORS[@]+"${SPAWN_GUARD_ANCHORS[@]}"} || rc=$?
-  FM_SLOT_GUARD_ANCHOR_REFRESH='' FM_SLOT_GUARD_BEFORE_RESET=''
+  FM_SLOT_GUARD_BEFORE_RESET=''
   [ "$rc" -eq 0 ] || return 1
   actual=$(git -C "$worktree" rev-parse --verify --quiet HEAD 2>/dev/null || true)
   if [ "$actual" != "$expected" ]; then
@@ -6710,6 +6710,10 @@ if [ "$KIND" != secondmate ] && { fm_slot_required "$PROJ_ABS" "$WT" || { [ "$RE
   elif [ "$(fm_meta_get "$RELAUNCH_META" recovery)" = slot-provision-refused ]; then
     prepared_head=$(fm_meta_get "$RELAUNCH_META" slot_prepared_head)
     if [ -n "$prepared_head" ]; then
+      # The retry's checkout onto the prepared branch changes the slot's tree, so it carries the
+      # same proof as a reset: origin's default tip fetched now, then the shared guard's checks.
+      spawn_fetch_recovery_origin_anchor "$WT" || spawn_slot_refused
+      spawn_reset_guard_context
       fm_slot_resume_prepared "$PROJ_ABS" "$WT" "$ID" "$BRANCH" "$prepared_head" || spawn_slot_refused
     else
       # No agent was admitted and preparation itself had not completed.
@@ -6726,15 +6730,9 @@ if [ "$KIND" != secondmate ] && { fm_slot_required "$PROJ_ABS" "$WT" || { [ "$RE
         # No worker was admitted and no prepared branch existed. Finish that
         # original immutable local plan, not a newly derived origin baseline.
         spawn_fetch_recovery_origin_anchor "$WT" || spawn_slot_refused
-        spawn_reset_guard_anchors "$WT"
         spawn_reset_guard_context
-        FM_SLOT_GUARD_ANCHOR_REFRESH=
-        [ -z "$SPAWN_ORIGIN_DEFAULT_SHA" ] || FM_SLOT_GUARD_ANCHOR_REFRESH=spawn_refresh_origin_default_tip
-        recovery_rc=0
         fm_slot_guarded_reset "$WT" "$SLOT_SOURCE_SHA" "$SLOT_SOURCE_REF" \
-          ${SPAWN_GUARD_ANCHORS[@]+"${SPAWN_GUARD_ANCHORS[@]}"} || recovery_rc=$?
-        FM_SLOT_GUARD_ANCHOR_REFRESH=
-        [ "$recovery_rc" -eq 0 ] || spawn_slot_refused
+          ${SPAWN_GUARD_ANCHORS[@]+"${SPAWN_GUARD_ANCHORS[@]}"} || spawn_slot_refused
         SLOT_FRESH_BASE=0
       fi
     fi
