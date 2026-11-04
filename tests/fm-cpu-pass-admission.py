@@ -1590,6 +1590,27 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
                 expected = 1 if name in fresh else 0
                 assert text.count('pipeline-start admitted') == expected and new_rows == expected, (route_name, name, text)
 
+    def split_held_order():
+        # R2 held path and class order: env -S starts through all three routes wait behind a full pool, and
+        # when it frees the machinery start (measured route) goes first, then the class-other starts in queue order.
+        import shlex
+        folder, db, env = case('review-r2-held-order', cores=3, running=1)
+        env.update(PATH=str(nm_bin) + os.pathsep + env['PATH'], FM_DURATION_FILE='off')
+        split = ['env', '-S', 'no-mistakes axi run --intent goal']
+        first = launch(mem_guard + split, dict(env, CASE_NAME='split-mem-guard-other'), folder / 'first')
+        pending(folder, 1)
+        second = launch(['bash', '-c', shlex.join(mem_guard + split)], dict(env, CASE_NAME='split-shell-other'), folder / 'second')
+        pending(folder, 2)
+        third = launch(measured_run + split, dict(env, CASE_NAME='split-measured-machinery'), folder / 'third')
+        pending(folder, 3)
+        assert not (folder / 'order').exists() and None is first.poll() is second.poll() is third.poll(), 'a split start ran past a full pool'
+        order = []
+        for name, child in (('split-measured-machinery', third), ('split-mem-guard-other', first), ('split-shell-other', second)):
+            change(db, "UPDATE runs SET status='completed' WHERE id=?", (order[-1] if order else 'baseline-0',))
+            finish(child)
+            order.append(name)
+            assert (folder / 'order').read_text().splitlines() == order, ((folder / 'order').read_text(), order)
+
     def wake_holder(env, folder):
         held, release = folder / 'held', folder / 'release-queue'
         holder = subprocess.Popen(['bash', '-c', '. "$1" && fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" && touch "$2" && '
@@ -1677,6 +1698,7 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
                 assert re.search(r'run x \(fm/x\) admitted after \d+\.\d\ds held: ', queue), queue
 
     for name, body in (('R1 a CI waiter holding only a leftover', idle_leftover), ('R2 wrapper forms join the queue once', wrapper_shapes),
+                       ('R2 env -S starts wait behind a full pool in class order', split_held_order),
                        ('R3 gate and watcher spills collide', watcher_collision), ('R3 controls: free lock, lone spill, replay', spill_controls),
                        ('R4 a short start-lock hold is recorded', short_hold_record)):
         review_case(name, body)
