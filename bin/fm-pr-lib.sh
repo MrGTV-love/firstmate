@@ -1569,8 +1569,9 @@ fm_pr_poll_merge_mark_notified() {  # <state> <id> <provider> <host> <path> <num
   fi
 }
 
-# Removed at teardown alongside the other per-task PR-poll artifacts
-# (bin/fm-teardown.sh) so a retired task id leaves no residue behind.
+# Removed by bin/fm-teardown.sh only after the task record itself is removed, so
+# a retired task id leaves no residue behind; while the record still exists the
+# marker tells bin/fm-pr-ready-reconcile.sh the merge was already delivered.
 fm_pr_poll_merge_notified_remove() {  # <state> <id>
   local state=$1 id=$2 marker
   fm_pr_task_id_valid "$id" || return 1

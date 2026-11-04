@@ -2291,6 +2291,8 @@ validate_pr_poll_cleanup() {
   fi
 }
 
+# Callers run this only after the busy-state and status retire steps succeed, so
+# a teardown that fails earlier leaves the merge poll in place for its PR.
 remove_pr_poll_artifacts() {
   local state_dir=$1 id=$2
   validate_pr_poll_cleanup "$state_dir" "$id" || return 1
