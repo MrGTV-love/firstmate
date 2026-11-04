@@ -1,0 +1,419 @@
+
+=== [head-7e2dde771] adversarial refusal 'nested-token' through idle: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  ok       no closeout wake (got 0)
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+    args=t1|admission=1|prune=|memo_at_call=1
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head-7e2dde771] adversarial refusal 'nested-token' through idle: no record, no hold: PASS
+
+=== [head-7e2dde771] adversarial refusal 'nested-token' through prune: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  ok       no closeout wake (got 0)
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=1|memo_at_call=0
+    args=t1|admission=1|prune=1|memo_at_call=0
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+    1793755490	1	check	merge-prune:t1	check: merge-prune kept /private<scratch>/worlds/head-7e2dde771-adv-nested-token-prune-2/th/pool1/1/repo for t1: REFUSED: Vernant's closeout driver did not release own nested copy /private<scratch>/worlds/head-7e2dde771-adv-nested-token-prune-2/nested-copy (exit 3): full output: /U
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head-7e2dde771] adversarial refusal 'nested-token' through prune: no record, no hold: PASS
+
+=== [head-7e2dde771] adversarial refusal 'mixed' through idle: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  ok       no closeout wake (got 0)
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+    args=t1|admission=1|prune=|memo_at_call=1
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head-7e2dde771] adversarial refusal 'mixed' through idle: no record, no hold: PASS
+
+=== [head-7e2dde771] adversarial refusal 'mixed' through prune: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  ok       no closeout wake (got 0)
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=1|memo_at_call=0
+    args=t1|admission=1|prune=1|memo_at_call=0
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+    1793755546	1	check	merge-prune:t1	check: merge-prune kept /private<scratch>/worlds/head-7e2dde771-adv-mixed-prune-4/th/pool1/1/repo for t1: REFUSED: Vernant's closeout driver did not release own nested copy /private<scratch>/worlds/head-7e2dde771-adv-mixed-prune-4/nested-copy (exit 3): full output: /Users/charlesab
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head-7e2dde771] adversarial refusal 'mixed' through prune: no record, no hold: PASS
+
+=== [head-7e2dde771] adversarial refusal 'broken-json' through idle: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  ok       no closeout wake (got 0)
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+    args=t1|admission=1|prune=|memo_at_call=1
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head-7e2dde771] adversarial refusal 'broken-json' through idle: no record, no hold: PASS
+
+=== [head-7e2dde771] adversarial refusal 'broken-json' through prune: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  ok       no closeout wake (got 0)
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=1|memo_at_call=0
+    args=t1|admission=1|prune=1|memo_at_call=0
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+    1793755590	1	check	merge-prune:t1	check: merge-prune kept /private<scratch>/worlds/head-7e2dde771-adv-broken-json-prune-6/th/pool1/1/repo for t1: REFUSED: Vernant's closeout driver did not release own nested copy /private<scratch>/worlds/head-7e2dde771-adv-broken-json-prune-6/nested-copy (exit 3): full output: /Use
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head-7e2dde771] adversarial refusal 'broken-json' through prune: no record, no hold: PASS
+
+=== [head-7e2dde771] adversarial refusal 'no-json' through idle: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  ok       no closeout wake (got 0)
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+    args=t1|admission=1|prune=|memo_at_call=1
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head-7e2dde771] adversarial refusal 'no-json' through idle: no record, no hold: PASS
+
+=== [head-7e2dde771] adversarial refusal 'no-json' through prune: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  ok       no closeout wake (got 0)
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=1|memo_at_call=0
+    args=t1|admission=1|prune=1|memo_at_call=0
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+    1793755651	1	check	merge-prune:t1	check: merge-prune kept /private<scratch>/worlds/head-7e2dde771-adv-no-json-prune-8/th/pool1/1/repo for t1: REFUSED: Vernant's closeout driver did not release own nested copy /private<scratch>/worlds/head-7e2dde771-adv-no-json-prune-8/nested-copy (exit 3): full output: /Users/charl
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head-7e2dde771] adversarial refusal 'no-json' through prune: no record, no hold: PASS
+
+=== [head-7e2dde771] adversarial refusal 'exit1' through idle: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  ok       no closeout wake (got 0)
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+    args=t1|admission=1|prune=|memo_at_call=1
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head-7e2dde771] adversarial refusal 'exit1' through idle: no record, no hold: PASS
+
+=== [head-7e2dde771] adversarial refusal 'exit1' through prune: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  ok       no closeout wake (got 0)
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=1|memo_at_call=0
+    args=t1|admission=1|prune=1|memo_at_call=0
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+    1793755744	1	check	merge-prune:t1	check: merge-prune kept /private<scratch>/worlds/head-7e2dde771-adv-exit1-prune-10/th/pool1/1/repo for t1: REFUSED: Vernant's closeout driver did not release own nested copy /private<scratch>/worlds/head-7e2dde771-adv-exit1-prune-10/nested-copy (exit 1): full output: /Users/charles
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head-7e2dde771] adversarial refusal 'exit1' through prune: no record, no hold: PASS
+
+=== [head-7e2dde771] adversarial refusal 'not-a-repo' through idle: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  ok       no closeout wake (got 0)
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+    args=t1|admission=1|prune=|memo_at_call=1
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head-7e2dde771] adversarial refusal 'not-a-repo' through idle: no record, no hold: PASS
+
+=== [head-7e2dde771] adversarial refusal 'not-a-repo' through prune: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  ok       no closeout wake (got 0)
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=1|memo_at_call=0
+    args=t1|admission=1|prune=1|memo_at_call=0
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+    1793755806	1	check	merge-prune:t1	check: merge-prune kept /private<scratch>/worlds/head-7e2dde771-adv-not-a-repo-prune-12/th/pool1/1/repo for t1: REFUSED: Vernant's closeout driver did not release own nested copy /private<scratch>/worlds/head-7e2dde771-adv-not-a-repo-prune-12/not-a-repo (exit 3): full output: /User
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head-7e2dde771] adversarial refusal 'not-a-repo' through prune: no record, no hold: PASS
+
+=== [head-7e2dde771] adversarial refusal 'missing-named' through idle: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  ok       no closeout wake (got 0)
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+    args=t1|admission=1|prune=|memo_at_call=1
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head-7e2dde771] adversarial refusal 'missing-named' through idle: no record, no hold: PASS
+
+=== [head-7e2dde771] adversarial refusal 'missing-named' through prune: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  ok       no closeout wake (got 0)
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=1|memo_at_call=0
+    args=t1|admission=1|prune=1|memo_at_call=0
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+    1793755865	1	check	merge-prune:t1	check: merge-prune kept /private<scratch>/worlds/head-7e2dde771-adv-missing-named-prune-14/th/pool1/1/repo for t1: REFUSED: Vernant's closeout driver did not release own nested copy /private<scratch>/worlds/head-7e2dde771-adv-missing-named-prune-14/no-such-dir (exit 3): full output
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head-7e2dde771] adversarial refusal 'missing-named' through prune: no record, no hold: PASS
+
+=== [head-7e2dde771] adversarial refusal 'missing-task-copy' through idle: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  ok       no closeout wake (got 0)
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+    args=t1|admission=1|prune=|memo_at_call=1
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head-7e2dde771] adversarial refusal 'missing-task-copy' through idle: no record, no hold: PASS
+
+=== [head-7e2dde771] adversarial refusal 'missing-task-copy' through prune: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  ok       no closeout wake (got 0)
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=1|memo_at_call=0
+    args=t1|admission=1|prune=1|memo_at_call=0
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head-7e2dde771] adversarial refusal 'missing-task-copy' through prune: no record, no hold: PASS
+
+=== [head-7e2dde771] the wake queue cannot take the wake (idle): raised again once, no second teardown
+  ok       record says wake not sent (got wake_sent=0)
+  ok       wake raised after repair (got 1)
+  ok       record says wake sent (got wake_sent=1)
+  ok       no second wake (got 1)
+  ok       one teardown (got 1)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+  admission results:
+    admission=admitted
+  record /private<scratch>/worlds/head-7e2dde771-wakefail-idle-17/home/state/.closeout-retained/t1:
+    fm-closeout-retained-v1
+    1793755942
+    cleanup_ignored_payload_archived_tree_retained
+    wake_sent=1
+    533f7903980d2a70b3fcc426ae3d9c66c858c608 e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 /private<scratch>/worlds/head-7e2dde771-wakefail-idle-17/th/pool1/1/repo
+    0b211b8e8ad7318b2371f468eafa64705ef72ddd e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 /private<scratch>/worlds/head-7e2dde771-wakefail-idle-17/nested-copy
+  wake queue rows naming the copy:
+    1793755942	2	check	idle-reap:t1	check: idle-reap kept /private<scratch>/worlds/head-7e2dde771-wakefail-idle-17/th/pool1/1/repo for t1: the closeout driver retained the copy and archived its ignored files; it is not retried while the copy is unchanged; a human or Main decides the release
+  stand-in archives on disk: 1 (1024 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head-7e2dde771] the wake queue cannot take the wake (idle): raised again once, no second teardown: PASS
+
+=== [head-7e2dde771] the wake queue cannot take the wake (prune): raised again once, no second teardown
+  ok       record says wake not sent (got wake_sent=0)
+  ok       wake raised after repair (got 1)
+  ok       record says wake sent (got wake_sent=1)
+  ok       no second wake (got 1)
+  ok       one teardown (got 1)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=1|memo_at_call=0
+  admission results:
+    admission=admitted
+  record /private<scratch>/worlds/head-7e2dde771-wakefail-prune-18/home/state/.closeout-retained/t1:
+    fm-closeout-retained-v1
+    1793755961
+    cleanup_ignored_payload_archived_tree_retained
+    wake_sent=1
+    171b76879cb6328a7c1c7c91a26754fa76eb39f0 e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 /private<scratch>/worlds/head-7e2dde771-wakefail-prune-18/th/pool1/1/repo
+    3f4f933e17baac3edbe093dd64c96b225daf4258 e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 /private<scratch>/worlds/head-7e2dde771-wakefail-prune-18/nested-copy
+  wake queue rows naming the copy:
+    1793755960	2	check	merge-prune:t1	check: merge-prune kept /private<scratch>/worlds/head-7e2dde771-wakefail-prune-18/th/pool1/1/repo for t1: the closeout driver retained the copy and archived its ignored files; it is not retried while the copy is unchanged; a human or Main decides the release
+  stand-in archives on disk: 1 (1024 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head-7e2dde771] the wake queue cannot take the wake (prune): raised again once, no second teardown: PASS
+
+=== [head-7e2dde771] two sweeps overlap for real (idle-first, teardown takes 4 s): one attempt and one wake
+  ok       first sweep is inside teardown (got 1)
+  merge-prune log tail:
+    2026-11-04T01:32:49Z armed for https://github.com/acme/widget/pull/7
+    2026-11-04T01:32:53Z another cleanup sweep is working on the task's copy; the next due attempt looks again
+  ok       second sweep did not start a teardown (got 1)
+  ok       record written by the first sweep (got yes)
+  ok       later sweeps: one teardown in all (got 1)
+  ok       one wake in all (got 1)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+  admission results:
+    admission=admitted
+  record /private<scratch>/worlds/head-7e2dde771-overlap-idle-first-19/home/state/.closeout-retained/t1:
+    fm-closeout-retained-v1
+    1793755987
+    cleanup_ignored_payload_archived_tree_retained
+    wake_sent=1
+    1231d20d08a6ef521333f11761f2dab90d1016f6 e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 /private<scratch>/worlds/head-7e2dde771-overlap-idle-first-19/th/pool1/1/repo
+    d27f9d77acb1cd86055f672ccbc16979ba1fc45a e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 /private<scratch>/worlds/head-7e2dde771-overlap-idle-first-19/nested-copy
+  wake queue rows naming the copy:
+    1793755986	1	check	idle-reap:t1	check: idle-reap kept /private<scratch>/worlds/head-7e2dde771-overlap-idle-first-19/th/pool1/1/repo for t1: the closeout driver retained the copy and archived its ignored files; it is not retried while the copy is unchanged; a human or Main decides the release
+  stand-in archives on disk: 1 (1024 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head-7e2dde771] two sweeps overlap for real (idle-first, teardown takes 4 s): one attempt and one wake: PASS
+
+=== [head-7e2dde771] two sweeps overlap for real (prune-first, teardown takes 4 s): one attempt and one wake
+  ok       first sweep is inside teardown (got 1)
+  idle-reap rows of the second sweep:
+    lock-skipped	t1	-	-	another cleanup sweep is working on the task's copy; the next sweep looks again
+  ok       second sweep did not start a teardown (got 1)
+  ok       record written by the first sweep (got yes)
+  ok       later sweeps: one teardown in all (got 1)
+  ok       one wake in all (got 1)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=1|memo_at_call=0
+  admission results:
+    admission=admitted
+  record /private<scratch>/worlds/head-7e2dde771-overlap-prune-first-20/home/state/.closeout-retained/t1:
+    fm-closeout-retained-v1
+    1793756024
+    cleanup_ignored_payload_archived_tree_retained
+    wake_sent=1
+    8d2bd2ff34ed32e9e8fd76e27a98b0ecae47789b e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 /private<scratch>/worlds/head-7e2dde771-overlap-prune-first-20/th/pool1/1/repo
+    17b0980dd9bed0db1625790778b37b7ae9373f2a e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 /private<scratch>/worlds/head-7e2dde771-overlap-prune-first-20/nested-copy
+  wake queue rows naming the copy:
+    1793756019	1	check	merge-prune:t1	check: merge-prune kept /private<scratch>/worlds/head-7e2dde771-overlap-prune-first-20/th/pool1/1/repo for t1: the closeout driver retained the copy and archived its ignored files; it is not retried while the copy is unchanged; a human or Main decides the release
+  stand-in archives on disk: 1 (1024 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head-7e2dde771] two sweeps overlap for real (prune-first, teardown takes 4 s): one attempt and one wake: PASS
+
+=== [head-7e2dde771] a sweep killed while it holds the closeout lock does not block the task for ever
+  ok       the next sweep recovered the lock and made its attempt (got 2)
+  ok       record exists (got yes)
+  lock dir: 
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+    args=t1|admission=1|prune=1|memo_at_call=0
+  admission results:
+    admission=admitted
+  record /private<scratch>/worlds/head-7e2dde771-lockdead-21/home/state/.closeout-retained/t1:
+    fm-closeout-retained-v1
+    1793756071
+    cleanup_ignored_payload_archived_tree_retained
+    wake_sent=1
+    cfbe815917550a60e9053c86cfccc5ea885cfabe e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 /private<scratch>/worlds/head-7e2dde771-lockdead-21/th/pool1/1/repo
+    643c7568c54dda6d1c4ad85fe03cffd3d7d50053 e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 /private<scratch>/worlds/head-7e2dde771-lockdead-21/nested-copy
+  wake queue rows naming the copy:
+    1793756070	1	check	merge-prune:t1	check: merge-prune kept /private<scratch>/worlds/head-7e2dde771-lockdead-21/th/pool1/1/repo for t1: the closeout driver retained the copy and archived its ignored files; it is not retried while the copy is unchanged; a human or Main decides the release
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head-7e2dde771] a sweep killed while it holds the closeout lock does not block the task for ever: PASS

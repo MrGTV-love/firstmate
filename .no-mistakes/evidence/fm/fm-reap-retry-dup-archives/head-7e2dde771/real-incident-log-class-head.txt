@@ -1,0 +1,5 @@
+command: source bin/fm-idle-reap-lib.sh; fm_closeout_retained_class "$(cat <log>)"  (tree: git archive 7e2dde771)
+log: real incident log,   358167 bytes,       11 lines (unmodified copy)
+incident: recognised as retained class; named copies: /Users/charlesabrooker/.treehouse/vernant-2ee7ec/126/vernant/.claude/worktrees/fm-vernant-d1-intake-limits-estimate-l2
+neg-toplevel: not recognised
+neg-extra: not recognised

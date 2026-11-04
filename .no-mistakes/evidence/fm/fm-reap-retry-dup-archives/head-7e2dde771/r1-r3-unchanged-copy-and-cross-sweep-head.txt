@@ -1,0 +1,212 @@
+
+=== [head-7e2dde771] idle-reap own: three sweeps over six hours on an unchanged copy
+  ok       first sweep runs teardown once (got 1)
+  ok       first sweep wrote the record (got yes)
+  ok       second sweep, memo past six hours: no new teardown (got 1)
+  scan row: refused	t1	ship	7228	the closeout driver retained the copy and archived its ignored files; it is not retried while the copy is unchanged; a human or Main decides the release
+  ok       scan class (got refused)
+  ok       scan detail says unchanged and retained (got yes)
+  ok       third sweep, one more day: no new teardown (got 1)
+  ok       exactly one wake names the copy (got 1)
+  ok       stand-in archives written (got 1)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+  admission results:
+    admission=admitted
+  record /private<scratch>/worlds/head-7e2dde771-idle3-own-1/home/state/.closeout-retained/t1:
+    fm-closeout-retained-v1
+    1793754626
+    cleanup_ignored_payload_archived_tree_retained
+    wake_sent=1
+    c339e9bec4559d29aa05cfff9806eb4d224d498c e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 /private<scratch>/worlds/head-7e2dde771-idle3-own-1/th/pool1/1/repo
+    6ad523101c78c605a0cee87543615e2a8c06bad2 e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 /private<scratch>/worlds/head-7e2dde771-idle3-own-1/nested-copy
+  wake queue rows naming the copy:
+    1793754626	1	check	idle-reap:t1	check: idle-reap kept /private<scratch>/worlds/head-7e2dde771-idle3-own-1/th/pool1/1/repo for t1: the closeout driver retained the copy and archived its ignored files; it is not retried while the copy is unchanged; a human or Main decides the release
+  stand-in archives on disk: 1 (1024 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head-7e2dde771] idle-reap own: three sweeps over six hours on an unchanged copy: PASS
+
+=== [head-7e2dde771] idle-reap foreign: three sweeps over six hours on an unchanged copy
+  ok       first sweep runs teardown once (got 1)
+  ok       first sweep wrote the record (got yes)
+  ok       second sweep, memo past six hours: no new teardown (got 1)
+  scan row: refused	t1	ship	7252	the closeout driver retained the copy and archived its ignored files; it is not retried while the copy is unchanged; a human or Main decides the release
+  ok       scan class (got refused)
+  ok       scan detail says unchanged and retained (got yes)
+  ok       third sweep, one more day: no new teardown (got 1)
+  ok       exactly one wake names the copy (got 1)
+  ok       stand-in archives written (got 1)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+  admission results:
+    admission=admitted
+  record /private<scratch>/worlds/head-7e2dde771-idle3-foreign-2/home/state/.closeout-retained/t1:
+    fm-closeout-retained-v1
+    1793754649
+    cleanup_ignored_payload_archived_tree_retained
+    wake_sent=1
+    2d64e67efaf245b1825461375707a5c380f821f7 e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 /private<scratch>/worlds/head-7e2dde771-idle3-foreign-2/th/pool1/1/repo
+    961877e5c7c64d2f9df787278f0b6e1bca0182fe e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 /private<scratch>/worlds/head-7e2dde771-idle3-foreign-2/nested-copy
+  wake queue rows naming the copy:
+    1793754648	1	check	idle-reap:t1	check: idle-reap kept /private<scratch>/worlds/head-7e2dde771-idle3-foreign-2/th/pool1/1/repo for t1: the closeout driver retained the copy and archived its ignored files; it is not retried while the copy is unchanged; a human or Main decides the release
+  stand-in archives on disk: 1 (1024 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head-7e2dde771] idle-reap foreign: three sweeps over six hours on an unchanged copy: PASS
+
+=== [head-7e2dde771] idle-reap unsaved: three sweeps over six hours on an unchanged copy
+  ok       first sweep runs teardown once (got 1)
+  ok       first sweep wrote the record (got yes)
+  ok       second sweep, memo past six hours: no new teardown (got 1)
+  scan row: refused	t1	ship	7275	the closeout driver retained the copy and archived its ignored files; it is not retried while the copy is unchanged; a human or Main decides the release
+  ok       scan class (got refused)
+  ok       scan detail says unchanged and retained (got yes)
+  ok       third sweep, one more day: no new teardown (got 1)
+  ok       exactly one wake names the copy (got 1)
+  ok       stand-in archives written (got 1)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+  admission results:
+    admission=admitted
+  record /private<scratch>/worlds/head-7e2dde771-idle3-unsaved-3/home/state/.closeout-retained/t1:
+    fm-closeout-retained-v1
+    1793754674
+    cleanup_ignored_payload_archived_tree_retained
+    wake_sent=1
+    532dc9fabc1320a08b6b8d762a044065851e5aa5 e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 /private<scratch>/worlds/head-7e2dde771-idle3-unsaved-3/th/pool1/1/repo
+    e432935ec61a298d29d72ea2e7e9b28fb807d6d3 e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 /private<scratch>/worlds/head-7e2dde771-idle3-unsaved-3/nested-copy
+  wake queue rows naming the copy:
+    1793754673	1	check	idle-reap:t1	check: idle-reap kept /private<scratch>/worlds/head-7e2dde771-idle3-unsaved-3/th/pool1/1/repo for t1: the closeout driver retained the copy and archived its ignored files; it is not retried while the copy is unchanged; a human or Main decides the release
+  stand-in archives on disk: 1 (1024 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head-7e2dde771] idle-reap unsaved: three sweeps over six hours on an unchanged copy: PASS
+
+=== [head-7e2dde771] merge-prune own: run --now, run --now, sweep when due on an unchanged copy
+  ok       first run calls teardown once (got 1)
+  ok       record state (got retained)
+  ok       later attempts: no new teardown (got 1)
+  ok       record state stays (got retained)
+  ok       copy stays (got yes)
+  ok       exactly one wake names the copy (got 1)
+  ok       stand-in archives written (got 1)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=1|memo_at_call=0
+  admission results:
+    admission=admitted
+  record /private<scratch>/worlds/head-7e2dde771-prune3-own-4/home/state/.closeout-retained/t1:
+    fm-closeout-retained-v1
+    1793754703
+    cleanup_ignored_payload_archived_tree_retained
+    wake_sent=1
+    90a21b3ccdf009869e4c01578ba4dc7a9e0d6200 e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 /private<scratch>/worlds/head-7e2dde771-prune3-own-4/th/pool1/1/repo
+    b83a7cddb9c1c16784ffcfc9983041e85ebd7a67 e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 /private<scratch>/worlds/head-7e2dde771-prune3-own-4/nested-copy
+  wake queue rows naming the copy:
+    1793754703	1	check	merge-prune:t1	check: merge-prune kept /private<scratch>/worlds/head-7e2dde771-prune3-own-4/th/pool1/1/repo for t1: the closeout driver retained the copy and archived its ignored files; it is not retried while the copy is unchanged; a human or Main decides the release
+  stand-in archives on disk: 1 (1024 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head-7e2dde771] merge-prune own: run --now, run --now, sweep when due on an unchanged copy: PASS
+
+=== [head-7e2dde771] merge-prune foreign: run --now, run --now, sweep when due on an unchanged copy
+  ok       first run calls teardown once (got 1)
+  ok       record state (got retained)
+  ok       later attempts: no new teardown (got 1)
+  ok       record state stays (got retained)
+  ok       copy stays (got yes)
+  ok       exactly one wake names the copy (got 1)
+  ok       stand-in archives written (got 1)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=1|memo_at_call=0
+  admission results:
+    admission=admitted
+  record /private<scratch>/worlds/head-7e2dde771-prune3-foreign-5/home/state/.closeout-retained/t1:
+    fm-closeout-retained-v1
+    1793754720
+    cleanup_ignored_payload_archived_tree_retained
+    wake_sent=1
+    ce625f9bd5cd6951a72dc2dadacad2e71802bcae e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 /private<scratch>/worlds/head-7e2dde771-prune3-foreign-5/th/pool1/1/repo
+    90efd268d476869b9894d70273f25b6b0fc8a9f2 e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 /private<scratch>/worlds/head-7e2dde771-prune3-foreign-5/nested-copy
+  wake queue rows naming the copy:
+    1793754720	1	check	merge-prune:t1	check: merge-prune kept /private<scratch>/worlds/head-7e2dde771-prune3-foreign-5/th/pool1/1/repo for t1: the closeout driver retained the copy and archived its ignored files; it is not retried while the copy is unchanged; a human or Main decides the release
+  stand-in archives on disk: 1 (1024 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head-7e2dde771] merge-prune foreign: run --now, run --now, sweep when due on an unchanged copy: PASS
+
+=== [head-7e2dde771] merge-prune unsaved: run --now, run --now, sweep when due on an unchanged copy
+  ok       first run calls teardown once (got 1)
+  ok       record state (got retained)
+  ok       later attempts: no new teardown (got 1)
+  ok       record state stays (got retained)
+  ok       copy stays (got yes)
+  ok       exactly one wake names the copy (got 1)
+  ok       stand-in archives written (got 1)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=1|memo_at_call=0
+  admission results:
+    admission=admitted
+  record /private<scratch>/worlds/head-7e2dde771-prune3-unsaved-6/home/state/.closeout-retained/t1:
+    fm-closeout-retained-v1
+    1793754761
+    cleanup_ignored_payload_archived_tree_retained
+    wake_sent=1
+    a369f9cd14d02f806910a0f7769a40fce83cd6c8 e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 /private<scratch>/worlds/head-7e2dde771-prune3-unsaved-6/th/pool1/1/repo
+    fea215bdbf09746e1dc77f5f563cb1e173958332 e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 /private<scratch>/worlds/head-7e2dde771-prune3-unsaved-6/nested-copy
+  wake queue rows naming the copy:
+    1793754761	1	check	merge-prune:t1	check: merge-prune kept /private<scratch>/worlds/head-7e2dde771-prune3-unsaved-6/th/pool1/1/repo for t1: the closeout driver retained the copy and archived its ignored files; it is not retried while the copy is unchanged; a human or Main decides the release
+  stand-in archives on disk: 1 (1024 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head-7e2dde771] merge-prune unsaved: run --now, run --now, sweep when due on an unchanged copy: PASS
+
+=== [head-7e2dde771] both sweeps (idle-prune), then the wake is consumed and both sweep again
+  ok       one teardown across both sweeps (got 1)
+  ok       one wake across both sweeps (got 1)
+  wake-queue before drain:
+    1793754802	1	check	idle-reap:t1	check: idle-reap kept /private<scratch>/worlds/head-7e2dde771-cross-idle-prune-7/th/pool1/1/repo for t1: the closeout driver retained the copy and archived its ignored files; it is not retried while the copy is unchanged; a human or Main decides the release
+  ok       after drain: no new teardown (got 1)
+  ok       after drain: no new wake (got 0)
+  ok       copy stays (got yes)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+  admission results:
+    admission=admitted
+  record /private<scratch>/worlds/head-7e2dde771-cross-idle-prune-7/home/state/.closeout-retained/t1:
+    fm-closeout-retained-v1
+    1793754803
+    cleanup_ignored_payload_archived_tree_retained
+    wake_sent=1
+    350189abd997312425dfc1aea22c2f08cbce4e5e e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 /private<scratch>/worlds/head-7e2dde771-cross-idle-prune-7/th/pool1/1/repo
+    dc995a6720334fc6768cbab841dd5e085a229d21 e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 /private<scratch>/worlds/head-7e2dde771-cross-idle-prune-7/nested-copy
+  wake queue rows naming the copy:
+  stand-in archives on disk: 1 (1024 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head-7e2dde771] both sweeps (idle-prune), then the wake is consumed and both sweep again: PASS
+
+=== [head-7e2dde771] both sweeps (prune-idle), then the wake is consumed and both sweep again
+  ok       one teardown across both sweeps (got 1)
+  ok       one wake across both sweeps (got 1)
+  wake-queue before drain:
+    1793754849	1	check	merge-prune:t1	check: merge-prune kept /private<scratch>/worlds/head-7e2dde771-cross-prune-idle-8/th/pool1/1/repo for t1: the closeout driver retained the copy and archived its ignored files; it is not retried while the copy is unchanged; a human or Main decides the release
+  ok       after drain: no new teardown (got 1)
+  ok       after drain: no new wake (got 0)
+  ok       copy stays (got yes)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=1|memo_at_call=0
+  admission results:
+    admission=admitted
+  record /private<scratch>/worlds/head-7e2dde771-cross-prune-idle-8/home/state/.closeout-retained/t1:
+    fm-closeout-retained-v1
+    1793754850
+    cleanup_ignored_payload_archived_tree_retained
+    wake_sent=1
+    6c89d825c24f2603135f509b647c5faf0988c091 e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 /private<scratch>/worlds/head-7e2dde771-cross-prune-idle-8/th/pool1/1/repo
+    ed8cba849f768f73d09bb5e7b6d47b0173b572ff e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 /private<scratch>/worlds/head-7e2dde771-cross-prune-idle-8/nested-copy
+  wake queue rows naming the copy:
+  stand-in archives on disk: 1 (1024 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head-7e2dde771] both sweeps (prune-idle), then the wake is consumed and both sweep again: PASS

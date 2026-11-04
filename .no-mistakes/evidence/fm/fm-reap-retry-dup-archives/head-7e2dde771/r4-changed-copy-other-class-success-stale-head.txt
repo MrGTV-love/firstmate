@@ -1,0 +1,281 @@
+
+=== [head-7e2dde771] idle-reap: copy changed by commit, retried at once through real admission (fresh memo, same status line)
+  ok       first sweep runs teardown once (got 1)
+  ok       memo is fresh and on disk (got yes)
+  ok       second sweep starts teardown (got 2)
+  ok       memo was gone when teardown was called (got 0)
+  ok       real admission on the second call (got admission=admitted)
+  ok       a new record exists (got yes)
+  ok       record has a new fingerprint (got yes)
+  ok       two wakes name the copy in all (got 2)
+  ok       next sweep holds the new fingerprint (got 2)
+  ok       no third wake (got 2)
+  second sweep rows:
+    teardown-refused	t1	-	-	REFUSED: Vernant's closeout driver did not release own nested copy /private<scratch>/worlds/head-7e2dde771-changed-commit-1/nested-copy (exit 3): full output: /Users/charlesabrooker/.treehouse/firstmate-7bab20/2/firstmate/data/vern.
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+    args=t1|admission=1|prune=|memo_at_call=0
+  admission results:
+    admission=admitted
+    admission=admitted
+  record /private<scratch>/worlds/head-7e2dde771-changed-commit-1/home/state/.closeout-retained/t1:
+    fm-closeout-retained-v1
+    1793754913
+    cleanup_ignored_payload_archived_tree_retained
+    wake_sent=1
+    07ed6d88945d9644600fcc914b35a1afc2209ae7 e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 /private<scratch>/worlds/head-7e2dde771-changed-commit-1/th/pool1/1/repo
+    73a2e3a1ce2f115efb783b0411881c723eefd657 e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 /private<scratch>/worlds/head-7e2dde771-changed-commit-1/nested-copy
+  wake queue rows naming the copy:
+    1793754899	1	check	idle-reap:t1	check: idle-reap kept /private<scratch>/worlds/head-7e2dde771-changed-commit-1/th/pool1/1/repo for t1: the closeout driver retained the copy and archived its ignored files; it is not retried while the copy is unchanged; a human or Main decides the release
+    1793754912	2	check	idle-reap:t1	check: idle-reap kept /private<scratch>/worlds/head-7e2dde771-changed-commit-1/th/pool1/1/repo for t1: the closeout driver retained the copy and archived its ignored files; it is not retried while the copy is unchanged; a human or Main decides the release
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head-7e2dde771] idle-reap: copy changed by commit, retried at once through real admission (fresh memo, same status line): PASS
+
+=== [head-7e2dde771] idle-reap: copy changed by untracked, retried at once through real admission (fresh memo, same status line)
+  ok       first sweep runs teardown once (got 1)
+  ok       memo is fresh and on disk (got yes)
+  ok       second sweep starts teardown (got 2)
+  ok       memo was gone when teardown was called (got 0)
+  ok       real admission on the second call (got admission=admitted)
+  ok       a new record exists (got yes)
+  ok       record has a new fingerprint (got yes)
+  ok       two wakes name the copy in all (got 2)
+  ok       next sweep holds the new fingerprint (got 2)
+  ok       no third wake (got 2)
+  second sweep rows:
+    teardown-refused	t1	-	-	REFUSED: Vernant's closeout driver did not release own nested copy /private<scratch>/worlds/head-7e2dde771-changed-untracked-2/nested-copy (exit 3): full output: /Users/charlesabrooker/.treehouse/firstmate-7bab20/2/firstmate/data/v.
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+    args=t1|admission=1|prune=|memo_at_call=0
+  admission results:
+    admission=admitted
+    admission=admitted
+  record /private<scratch>/worlds/head-7e2dde771-changed-untracked-2/home/state/.closeout-retained/t1:
+    fm-closeout-retained-v1
+    1793754955
+    cleanup_ignored_payload_archived_tree_retained
+    wake_sent=1
+    c3b2f903a38c0b38f31d8873ef1f4178d5a55115 9797793877cf7f3760f8848dc2b8756f8d88dac3 /private<scratch>/worlds/head-7e2dde771-changed-untracked-2/th/pool1/1/repo
+    458525b172379066f9a4a23ecc737c5633798209 e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 /private<scratch>/worlds/head-7e2dde771-changed-untracked-2/nested-copy
+  wake queue rows naming the copy:
+    1793754944	1	check	idle-reap:t1	check: idle-reap kept /private<scratch>/worlds/head-7e2dde771-changed-untracked-2/th/pool1/1/repo for t1: the closeout driver retained the copy and archived its ignored files; it is not retried while the copy is unchanged; a human or Main decides the release
+    1793754955	2	check	idle-reap:t1	check: idle-reap kept /private<scratch>/worlds/head-7e2dde771-changed-untracked-2/th/pool1/1/repo for t1: the closeout driver retained the copy and archived its ignored files; it is not retried while the copy is unchanged; a human or Main decides the release
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head-7e2dde771] idle-reap: copy changed by untracked, retried at once through real admission (fresh memo, same status line): PASS
+
+=== [head-7e2dde771] idle-reap: copy changed by modified, retried at once through real admission (fresh memo, same status line)
+  ok       first sweep runs teardown once (got 1)
+  ok       memo is fresh and on disk (got yes)
+  ok       second sweep starts teardown (got 2)
+  ok       memo was gone when teardown was called (got 0)
+  ok       real admission on the second call (got admission=admitted)
+  ok       a new record exists (got yes)
+  ok       record has a new fingerprint (got yes)
+  ok       two wakes name the copy in all (got 2)
+  ok       next sweep holds the new fingerprint (got 2)
+  ok       no third wake (got 2)
+  second sweep rows:
+    teardown-refused	t1	-	-	REFUSED: Vernant's closeout driver did not release own nested copy /private<scratch>/worlds/head-7e2dde771-changed-modified-3/nested-copy (exit 3): full output: /Users/charlesabrooker/.treehouse/firstmate-7bab20/2/firstmate/data/ve.
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+    args=t1|admission=1|prune=|memo_at_call=0
+  admission results:
+    admission=admitted
+    admission=admitted
+  record /private<scratch>/worlds/head-7e2dde771-changed-modified-3/home/state/.closeout-retained/t1:
+    fm-closeout-retained-v1
+    1793755027
+    cleanup_ignored_payload_archived_tree_retained
+    wake_sent=1
+    532505c85cefb9ef8ac67531c785ec7031d55361 8d48393ff370dd32a5ee616072ec6b20d630ef89 /private<scratch>/worlds/head-7e2dde771-changed-modified-3/th/pool1/1/repo
+    4ad4de2628172b5a7d4335f8533055f133d7acbc e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 /private<scratch>/worlds/head-7e2dde771-changed-modified-3/nested-copy
+  wake queue rows naming the copy:
+    1793754969	1	check	idle-reap:t1	check: idle-reap kept /private<scratch>/worlds/head-7e2dde771-changed-modified-3/th/pool1/1/repo for t1: the closeout driver retained the copy and archived its ignored files; it is not retried while the copy is unchanged; a human or Main decides the release
+    1793755025	2	check	idle-reap:t1	check: idle-reap kept /private<scratch>/worlds/head-7e2dde771-changed-modified-3/th/pool1/1/repo for t1: the closeout driver retained the copy and archived its ignored files; it is not retried while the copy is unchanged; a human or Main decides the release
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head-7e2dde771] idle-reap: copy changed by modified, retried at once through real admission (fresh memo, same status line): PASS
+
+=== [head-7e2dde771] a copy named by the refusal changes: both sweeps retry; merge-prune also retries a changed task copy
+  ok       idle-reap: changed named copy is retried (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+    args=t1|admission=1|prune=|memo_at_call=0
+  admission results:
+    admission=admitted
+    admission=admitted
+  record /private<scratch>/worlds/head-7e2dde771-changed-nested-idle-4/home/state/.closeout-retained/t1:
+    fm-closeout-retained-v1
+    1793755094
+    cleanup_ignored_payload_archived_tree_retained
+    wake_sent=1
+    4b9d090aad7e26eaa9acf76109b00f2c9aaf2dd2 e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 /private<scratch>/worlds/head-7e2dde771-changed-nested-idle-4/th/pool1/1/repo
+    a137c465544311b161e220d5609b8df9e4ee0810 6ae861b816c7b1bf03eaf6c0fea29c257d42f3c4 /private<scratch>/worlds/head-7e2dde771-changed-nested-idle-4/nested-copy
+  wake queue rows naming the copy:
+    1793755084	1	check	idle-reap:t1	check: idle-reap kept /private<scratch>/worlds/head-7e2dde771-changed-nested-idle-4/th/pool1/1/repo for t1: the closeout driver retained the copy and archived its ignored files; it is not retried while the copy is unchanged; a human or Main decides the release
+    1793755093	2	check	idle-reap:t1	check: idle-reap kept /private<scratch>/worlds/head-7e2dde771-changed-nested-idle-4/th/pool1/1/repo for t1: the closeout driver retained the copy and archived its ignored files; it is not retried while the copy is unchanged; a human or Main decides the release
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+  ok       merge-prune: changed named copy is retried (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=1|memo_at_call=0
+    args=t1|admission=1|prune=1|memo_at_call=0
+  admission results:
+    admission=admitted
+    admission=admitted
+  record /private<scratch>/worlds/head-7e2dde771-changed-nested-prune-5/home/state/.closeout-retained/t1:
+    fm-closeout-retained-v1
+    1793755143
+    cleanup_ignored_payload_archived_tree_retained
+    wake_sent=1
+    b587217713d6c606fe87d94a3017fbc82cbdc832 e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 /private<scratch>/worlds/head-7e2dde771-changed-nested-prune-5/th/pool1/1/repo
+    f77a69d82597c3000a7eb85e1e8541c5cb6e0910 6ae861b816c7b1bf03eaf6c0fea29c257d42f3c4 /private<scratch>/worlds/head-7e2dde771-changed-nested-prune-5/nested-copy
+  wake queue rows naming the copy:
+    1793755128	1	check	merge-prune:t1	check: merge-prune kept /private<scratch>/worlds/head-7e2dde771-changed-nested-prune-5/th/pool1/1/repo for t1: the closeout driver retained the copy and archived its ignored files; it is not retried while the copy is unchanged; a human or Main decides the release
+    1793755142	2	check	merge-prune:t1	check: merge-prune kept /private<scratch>/worlds/head-7e2dde771-changed-nested-prune-5/th/pool1/1/repo for t1: the closeout driver retained the copy and archived its ignored files; it is not retried while the copy is unchanged; a human or Main decides the release
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+  ok       merge-prune: new commit is retried (got 2)
+  ok       merge-prune: new refusal raises a second wake (got 2)
+  ok       merge-prune: new fingerprint is held (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=1|memo_at_call=0
+    args=t1|admission=1|prune=1|memo_at_call=0
+  admission results:
+    admission=admitted
+    admission=admitted
+  record /private<scratch>/worlds/head-7e2dde771-changed-task-prune-6/home/state/.closeout-retained/t1:
+    fm-closeout-retained-v1
+    1793755193
+    cleanup_ignored_payload_archived_tree_retained
+    wake_sent=1
+    c5b82e62b3c775dae2d637b2b2a8c469003a7619 e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 /private<scratch>/worlds/head-7e2dde771-changed-task-prune-6/th/pool1/1/repo
+    3fc39a9f8aaf31975d906de848945e13bc637a4f e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 /private<scratch>/worlds/head-7e2dde771-changed-task-prune-6/nested-copy
+  wake queue rows naming the copy:
+    1793755182	1	check	merge-prune:t1	check: merge-prune kept /private<scratch>/worlds/head-7e2dde771-changed-task-prune-6/th/pool1/1/repo for t1: the closeout driver retained the copy and archived its ignored files; it is not retried while the copy is unchanged; a human or Main decides the release
+    1793755193	2	check	merge-prune:t1	check: merge-prune kept /private<scratch>/worlds/head-7e2dde771-changed-task-prune-6/th/pool1/1/repo for t1: the closeout driver retained the copy and archived its ignored files; it is not retried while the copy is unchanged; a human or Main decides the release
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head-7e2dde771] a copy named by the refusal changes: both sweeps retry; merge-prune also retries a changed task copy: PASS
+
+=== [head-7e2dde771] another refusal class keeps its six-hour retry and makes no record
+  ok       idle-reap: first call (got 1)
+  ok       idle-reap: no record (got no)
+  ok       idle-reap: no closeout wake (got 0)
+  ok       idle-reap: fresh memo still holds (got 1)
+  ok       idle-reap: aged memo retries (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+    args=t1|admission=1|prune=|memo_at_call=1
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+  stand-in archives on disk: 0 (0 KB)
+  copy still exists: yes; destroy calls: 0
+  ok       merge-prune: first call (got 1)
+  ok       merge-prune: no record (got no)
+  ok       merge-prune: due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=1|memo_at_call=0
+    args=t1|admission=1|prune=1|memo_at_call=0
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+    1793755244	1	check	merge-prune:t1	check: merge-prune kept /private<scratch>/worlds/head-7e2dde771-other-prune-8/th/pool1/1/repo for t1: REFUSED: no-mistakes run for t1 is still parked after axi abort
+  stand-in archives on disk: 0 (0 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head-7e2dde771] another refusal class keeps its six-hour retry and makes no record: PASS
+
+=== [head-7e2dde771] a teardown that completes clears the record and memo
+  ok       record after refusal (got yes)
+  ok       idle-reap: retried (got 2)
+  ok       idle-reap: record gone (got no)
+  ok       idle-reap: memo gone (got no)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+    args=t1|admission=1|prune=|memo_at_call=0
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+    1793755338	1	check	idle-reap:t1	check: idle-reap kept /private<scratch>/worlds/head-7e2dde771-ok-idle-9/th/pool1/1/repo for t1: the closeout driver retained the copy and archived its ignored files; it is not retried while the copy is unchanged; a human or Main decides the release
+  stand-in archives on disk: 1 (1024 KB)
+  copy still exists: yes; destroy calls: 0
+  ok       record after refusal (got yes)
+  ok       merge-prune: retried (got 2)
+  ok       merge-prune: record gone (got no)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=1|memo_at_call=0
+    args=t1|admission=1|prune=1|memo_at_call=0
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+    1793755384	1	check	merge-prune:t1	check: merge-prune kept /private<scratch>/worlds/head-7e2dde771-ok-prune-10/th/pool1/1/repo for t1: the closeout driver retained the copy and archived its ignored files; it is not retried while the copy is unchanged; a human or Main decides the release
+  stand-in archives on disk: 1 (1024 KB)
+  copy still exists: yes; destroy calls: 1
+RESULT [head-7e2dde771] a teardown that completes clears the record and memo: PASS
+
+=== [head-7e2dde771] a record whose task is gone is removed by the next reap; a live task keeps its record
+  ok       stale record removed (got no)
+  ok       live record kept (got yes)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+  admission results:
+    admission=admitted
+  record /private<scratch>/worlds/head-7e2dde771-stale-11/home/state/.closeout-retained/t1:
+    fm-closeout-retained-v1
+    1793755407
+    cleanup_ignored_payload_archived_tree_retained
+    wake_sent=1
+    e18301330c49f04f215d91e40fb731f75849c34f e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 /private<scratch>/worlds/head-7e2dde771-stale-11/th/pool1/1/repo
+    73d5d24a7505e5f24dab097338c51131f6634bcb e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 /private<scratch>/worlds/head-7e2dde771-stale-11/nested-copy
+  wake queue rows naming the copy:
+    1793755407	1	check	idle-reap:t1	check: idle-reap kept /private<scratch>/worlds/head-7e2dde771-stale-11/th/pool1/1/repo for t1: the closeout driver retained the copy and archived its ignored files; it is not retried while the copy is unchanged; a human or Main decides the release
+  stand-in archives on disk: 1 (1024 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head-7e2dde771] a record whose task is gone is removed by the next reap; a live task keeps its record: PASS
+
+=== [head-7e2dde771] a refusal-named copy whose path has a space is still recognised and held
+  ok       one teardown (got 1)
+  ok       one wake (got 1)
+  ok       a change in that copy lifts the hold (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+    args=t1|admission=1|prune=|memo_at_call=0
+  admission results:
+    admission=admitted
+    admission=admitted
+  record /private<scratch>/worlds/head-7e2dde771-space-12/home/state/.closeout-retained/t1:
+    fm-closeout-retained-v1
+    1793755429
+    cleanup_ignored_payload_archived_tree_retained
+    wake_sent=1
+    1d13bc6f9203fd08d84d1b95eca460aad09f7559 e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 /private<scratch>/worlds/head-7e2dde771-space-12/th/pool1/1/repo
+    74bbe57d5e170ca0ac118eececcfc2a31dfb7b67 6ae861b816c7b1bf03eaf6c0fea29c257d42f3c4 /private<scratch>/worlds/head-7e2dde771-space-12/nested copy
+  wake queue rows naming the copy:
+    1793755416	1	check	idle-reap:t1	check: idle-reap kept /private<scratch>/worlds/head-7e2dde771-space-12/th/pool1/1/repo for t1: the closeout driver retained the copy and archived its ignored files; it is not retried while the copy is unchanged; a human or Main decides the release
+    1793755429	2	check	idle-reap:t1	check: idle-reap kept /private<scratch>/worlds/head-7e2dde771-space-12/th/pool1/1/repo for t1: the closeout driver retained the copy and archived its ignored files; it is not retried while the copy is unchanged; a human or Main decides the release
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head-7e2dde771] a refusal-named copy whose path has a space is still recognised and held: PASS
