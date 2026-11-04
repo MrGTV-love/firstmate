@@ -1650,7 +1650,7 @@ teardown_retained_preserve_check() {  # <strict|adopt> <copy> <dir>   (driver-na
 # Returns 1 for an entry that differs and 2 when the check could not be made.
 teardown_retained_preserve_current() {  # <copy>
   local copy=$1 dir p rel entry selected
-  local -a held=() chosen=()
+  local -a adopted_paths=() chosen=()
   dir=$(teardown_retained_preserve_dir "$copy") || return 2
   [ -d "$dir" ] || return 0
   selected=$(teardown_preservable_ignored "$copy") || return 2
@@ -1664,10 +1664,10 @@ teardown_retained_preserve_current() {  # <copy>
       case "$rel" in "$entry"|"$entry"/*) continue 2 ;; esac
     done
     [ -e "$copy/$rel" ] || [ -L "$copy/$rel" ] || continue
-    held+=("$rel")
+    adopted_paths+=("$rel")
   done < <(find -P "$dir" ! -type d -print0)
-  [ "${#held[@]}" -gt 0 ] || return 0
-  teardown_retained_cover strict "$copy" "$dir" "${held[@]}"
+  [ "${#adopted_paths[@]}" -gt 0 ] || return 0
+  teardown_retained_cover strict "$copy" "$dir" "${adopted_paths[@]}"
 }
 
 # Does any own nested copy of the task have a retained record that still applies?
