@@ -73,41 +73,50 @@ A counted run is a `runs` row with `status = 'running' AND ci_ready_at IS NULL A
 A CI-ready run that is only monitoring its PR, and a run parked waiting for its agent, are still `running` but are not counted.
 A run that leaves `running`, reaches CI-ready or parks for its agent releases its count implicitly; no daemon-lifetime lease or watcher is installed.
 
-### Admission formula
+### Admission rule
 
 Subject to the one-start minimum and pause-only backstop below, the first waiter in class order is admitted when, in bytes:
 
 ```text
-(counted + 1) x R + S  <=  B          where  B = available_bytes + held
+projected  <=  budget        where  budget = available_bytes + held
+projected  =   the reservations of the counted runs  +  S for the new run
 ```
+
+| A counted run that is | reserves | why |
+|---|---|---|
+| waiting on remote CI: its open step is `ci` with status `running`, no agent pid is recorded, no launch-gate reservation is live and the reading sees no process of it (a visible process may be an agent whose pid is not recorded yet, so it counts as active) | only the resident memory it holds (0 while no process of it is visible) | it uses memory again only when a fix round starts, and that agent starts only through the [launch gate](#launch-gate), which secures capacity first |
+| waiting in its [launch gate](#launch-gate): a live launch-gate entry of it is queued in the pool and no launch-gate reservation of it is live, whatever its step or visibility | only the resident memory it holds | its agent has not started, and it reserves capacity only when its gate is admitted |
+| visible in the reading at any other step, or with a live launch-gate reservation | its resident memory or `A`, whichever is larger | startup memory alone is not its demand; memory above `A` is counted as it is, never capped at `R`, `S` or a recorded peak |
+| not visible yet: just registered, between steps, with an unreadable step, or a launch-gate start the reading cannot see | `R` | the reading cannot show what it will use, so it is never read as idle |
 
 | Symbol | Meaning | Source |
 |---|---|---|
-| `counted` | counted runs, as defined above | the run database, read now |
-| `R` | the reservation of one run: the 75th percentile (nearest rank) of the per-run peak resident memory of recorded no-mistakes runs, leaving out runs still running that are not CI-ready yet, so their peak may still rise | `peak_bytes` of every `no-mistakes:` entry with at least 2 samples in the root home's `state/.memory-calibration.json`, written by `bin/fm-mem-guard.sh probe`, leaving out every run whose `runs` row is `status = 'running'` with `ci_ready_at IS NULL`, parked or not; CI-ready running runs are ranked |
-| `S` | slack for one run reaching its tail: the largest peak of every such entry, running or not (a peak so far is a lower bound, so it never makes `S` too low) | same record, no run left out |
+| `R` | one run's reservation while the reading cannot see it: the 75th percentile (nearest rank) of the per-run peak resident memory of recorded no-mistakes runs, leaving out runs still running that are not CI-ready yet, so their peak may still rise | `peak_bytes` of every `no-mistakes:` entry with at least 2 samples in the root home's `state/.memory-calibration.json`, written by `bin/fm-mem-guard.sh probe`, leaving out every run whose `runs` row is `status = 'running'` with `ci_ready_at IS NULL`, parked or not; CI-ready running runs are ranked |
+| `S` | the new run, which may reach the largest peak recorded for any run | the largest peak of every such entry, running or not (a peak so far is a lower bound, so it never makes `S` too low) |
+| `A` | the active-run term: the largest per-run concurrent demand of every run but the largest, `(sum - largest) / (count - 1)` over each error-free reading of this host and RAM size that saw at least 2 no-mistakes run trees, rounded up | the root home's `state/memory-readings.jsonl`, read-only and re-read when it changes |
 | `available_bytes` | free, file-backed and purgeable pages, never compressed or swapped memory | one `bin/fm-mem-guard.py` `admission_sample()` reading: a waiting start may reuse one up to 2 s old, but each grant takes a new reading, with the process-count reading, so a signal that turns bad after a healthy read cannot admit |
-| `held` | resident memory the counted runs hold now, summed over their process trees with each run's share capped at `R`; a run the reading cannot see yet holds 0 | the same reading, keyed `no-mistakes:<repo_id>/<run id>` |
+| `held` | resident memory the counted runs hold now, summed over their process trees and never capped; a run the reading cannot see yet holds 0 | the same reading, keyed `no-mistakes:<repo_id>/<run id>` |
 
-`B` combines available memory with the portion of each counted run's reservation already held, so the inequality checks whether the remaining reservations for counted runs, the new run and one tail run fit in available memory.
-A run that holds more than `R` adds only `R` to `B`, so its excess is never treated as free memory for new starts.
-A run that is registered but not yet visible in the reading therefore reserves its whole `R` in the next decision.
-With no counted run, one start is admitted even when the inequality does not fit, a one-start minimum, so a large `S` or a low `available_bytes` never holds an idle host closed; the pause-only backstop below still pauses that start.
-The record belongs to the host: it must name this host and its RAM size.
-The owning home is `FM_HOME`, else the `FM_DURATION_HOME` that `bin/fm-spawn.sh` exports to workers, else the checkout holding the engine; a secondmate home reads its root home's record, found by `fm_firstmate_root_home` in `bin/fm-secondmate-parent-lib.sh`, the same walk the record's writer uses; a walk that fails takes the fallback below.
-`R` and `S` are measurements; taking the 75th percentile as the reservation is a policy choice (Main 2473 ruling), made after replaying it against the recorded readings (the captain-private record `data/fm-admission-measured-reservations/measurements.md` holds the readings, per-phase peaks, the five proc-guard pile-up censuses and the replay under the capped-`held` formula).
-Measured: the record frozen at epoch 1793568514 (41 readings over 5.3 hours) held 13 `no-mistakes:` entries with at least 2 samples; their largest peak, `S`, is 8.06 GiB, and `S` under the shipped rule is that value because `S` takes every qualifying entry.
-Estimated: the replay of those 41 readings under the shipped formula, with `held` capped per run at `R`, takes `R` as the 75th percentile of all 13 runs, 3.988 GiB, because the run database keeps no history of past run status and so the rule that leaves runs not CI-ready yet out of `R` cannot be replayed.
-On that replay the capacity (the largest `counted + 1` the formula admits) was 5 at minimum, 7 at median and 8 at maximum across the readings, against a fixed 6 under the previous count limit; the reading at 17:40 UTC stays at 7, so a start is admitted while `counted` is at most 6.
-`R` and `S` re-derive from every probe, and the pause-only backstop, not a larger guess, is what bounds the tail.
-Those peaks are tree snapshots and lower bounds; native memory pressure never reached level 2 in that window, so no measured margin exists and the formula keeps none.
+A counted run's resident memory appears in both `projected` and `budget`, so memory a run holds is never treated as free for new starts, and only the part of its reservation it does not hold yet must fit in `available_bytes`.
+The open step is the highest-ordered `step_results` row in `running` or `fixing`, read with the run rows.
+With no other counted run, one start is admitted even when the rule does not fit, a one-start minimum, so a large `S` or a low `available_bytes` never holds an idle host closed; the pause-only backstop below still pauses that start.
+The admission and waiting lines print every input: the counted runs, each run's reservation and why (`reserved=[run:kind:bytes]`, `holding_only=[...]`, `:unseen` for a run the reading cannot see), the projection, the budget, `R`, `A`, `S` and the class.
+The records belong to the host: they must name this host and its RAM size.
+The owning home is `FM_HOME`, else the `FM_DURATION_HOME` that `bin/fm-spawn.sh` exports to workers, else the checkout holding the engine; a secondmate home reads its root home's records, found by `fm_firstmate_root_home` in `bin/fm-secondmate-parent-lib.sh`, the same walk the records' writer uses; a walk that fails takes the fallback below.
+
+`R` and `S` are measurements, and taking the 75th percentile as `R` is a policy choice (Main 2473 ruling).
+`A` is a measurement with no chosen margin: because `S` covers one run at the largest recorded peak, `k x A + S` is at least the summed run memory of every recorded reading with `k` runs, so the projection never falls below what the record measured in use together.
+Measured on the root home's records of 2026-11-03 (373 readings, 347 of them with at least 2 runs): `A` is 1.82 GiB and `S` 13.39 GiB; the most run memory recorded at once was 20.1 GiB, with 10 and with 12 runs.
+At 12 visible runs the projection is at least 12 x 1.82 + 13.39 = 35.2 GiB, against 88 GiB under the previous rule, which reserved `R` for every counted run at once.
+The replay of every recorded reading against both rules, including the only pressure-2 episode (2026-11-02 21:11Z to 22:44Z), is in the task's private evidence; the pressure hold refuses every reading of that episode, and the rule alone never projects below the run memory a reading measured.
+The protection still has residuals: a run admitted just before pressure rises is not visible in the reading until it registers and grows, and an agent that raises its own memory after it starts is bounded by the next decision and the pressure hold, not by its reservation.
 
 Process count is not a reservation: a run's tree peaked at 34 processes against the host's 10,666 per-user cap, and every recorded pile-up was a runaway `bash` chain, not a run tree.
 Processes appear only in the backstop below.
 
 ### Fallback
 
-With fewer than 2 recorded runs left to rank for `R`, a record for another host or RAM size, an unreadable record, or no native memory facts on this platform, the start is admitted while `counted < max(1, floor(logical CPUs / 3))`.
+With fewer than 2 recorded runs left to rank for `R`, a calibration or readings record for another host or RAM size, an unreadable record, no recorded reading of this host with at least 2 runs for `A`, or no native memory facts on this platform, the start is admitted while `counted < max(1, floor(logical CPUs / 3))`.
 That is the previous count limit, kept only until the host has measured runs; a missing record never refuses a start and never reads as an empty host.
 
 ### Pause-only backstop
@@ -118,21 +127,49 @@ While either signal reports an actual overload, or cannot be read, no new start 
 - `bin/fm-proc-guard.py` reports a pile-up (user process count above its fixed 60 % warning line of the host's per-user cap, a proc-guard constant) or cannot read the count or, on macOS, the per-user cap.
 
 Nothing running is stopped, paused or reprioritised.
-This backstop covers the tail the reservation does not: a run that exceeds `R`, and process pile-ups.
+This backstop covers the tail the reservation does not: a run that grows past what it reserves, memory used outside the runs, and process pile-ups.
 It only delays a start; the unreadable run database or CPU count still refuses with 125.
+
+### Launch gate
+
+A run waiting on remote CI reserves nothing beyond what it holds, so its capacity is secured when its fix round resumes, before the fix agent starts.
+`bin/fm-cpu-pass.sh launch-gate -- AGENT [ARGS...]` is the agent launcher's final exec: the daemon starts the launcher named by `agent_path_override` in `~/.no-mistakes/config.yaml` in the run worktree, and the launcher's last line `exec <firstmate>/bin/fm-cpu-pass.sh launch-gate -- <agent> "$@"` keeps the gate as the agent's parent.
+The [engine header](../bin/fm-cpu-pass.py) owns its exact sequence, refusal text, hold bound and process hygiene; in short:
+
+1. It maps its working directory to exactly one `runs.worktree_dir`; an unmapped or ambiguous directory or an unreadable database refuses, visibly, and never passes through.
+2. A launch for any step other than `ci` runs the agent at once, unchanged, because that run is already counted.
+3. A `ci` launch waits in this same class-ordered queue in class `other` and asks this same rule for one more active run, with its own run and every other run whose gate waits in the queue counted as waiters.
+4. On admission it publishes the run's reservation, a lock file it holds for the agent's life, under the start lock, then starts the agent at once without waiting for it to appear in memory, then releases the lock.
+   Every later decision counts that run at `R` while it is invisible and at its resident memory or `A` afterwards, until the agent's process tree has exited.
+5. It holds at most the daemon's per-invocation agent budget minus the 99th percentile of completed CI-fix invocation durations, and refuses at that bound, including a fit that comes only after a wait past it; a fit at the very first decision is admitted, so a bound of 0 holds not at all.
+
+A refusal exits 75 with one line naming the cause and the next action; the daemon logs it as `warning: CI fix failed` and does not fail the run.
+Each refusal spends one of the run's `auto_fix.ci` attempts; after the last one the CI findings park as the ordinary ask-user decision, whose owner answers it once capacity has returned.
+Every hold (a decision that does not fit, or any other wait, such as start-lock contention, once the first waiting notice is due after 2 s), admission after a hold and refusal also appends one check wake naming the run, the reason and the time waited to the root home's wake queue, the durable record supervision drains.
+The gate never waits for the wake queue's lock: when another process holds it, the wake is spilled to the root home's `state/.wake-spill.<seq>`, and the next append to that queue, or the watcher's next start, replays it.
+Gates record their wakes one at a time under `durable.lock` in the pool directory, so two gate spills never take the same file; a gate spill can still collide with the watcher's own spill.
+The live launcher is captain-private host configuration outside this repository: the gate protects nothing until that one line is applied, and a fix-round agent launched through any other path is not gated.
 
 Queued classes are ordered `merge-train`, `machinery`, `vernant-build`, then `other`, with arrival order within each class.
 Admission never preempts an already granted start or stops running work.
-The short start lock covers the observation-to-daemon-registration gap, so participating simultaneous starts cannot all spend the same observed headroom, and a burst of ready starts is admitted back to back while the formula fits, with no spacing between them.
+The short start lock covers the observation-to-daemon-registration gap, so participating simultaneous starts cannot all spend the same observed headroom, and a burst of ready starts is admitted back to back while the rule fits, with no spacing between them.
 The [engine header](../bin/fm-cpu-pass.py) owns the registration handoff, failure behavior and the limit of read-only coordination with starts that bypass it.
 Unusable run-database, CPU-count, memory or process observations do not imply an empty host.
 
-`bin/fm-duration.py run` automatically routes fresh `no-mistakes axi run` inputs and `no-mistakes rerun` through that owner before starting its execution clock; its `--pipeline-priority` option selects the class.
-Generated worker delivery instructions name this measured route for fresh starts across harnesses and runtime backends, and also name the [memory-checked route](configuration.md#host-memory-admission), which skips this pool.
-Existing-run reattachment and responses do not requeue, restart a run or consume another start.
-Only the measured runner the owner re-executes skips a second admission, through an internal argument it consumes; the wrapped client and every descendant receive no exemption, so a nested fresh start queues like any other.
+Every route that begins a new run joins this one queue, judged by the facts the no-mistakes CLI itself uses: `no-mistakes rerun` always creates a run, and `no-mistakes axi run` creates one only with an intent input (`--intent TEXT`, `--intent -`, `--intent-file PATH` or their `=` forms); without one it reattaches an active run or exits 2.
+Only the executable position counts: leading `VAR=value` words, the wrappers `env`, `nice`, `nohup`, `command`, `exec`, `time` and `stdbuf`, a Python interpreter or shell running a script, and the admission routes themselves are followed to the program they run, so `env A=1 /abs/path/no-mistakes axi run --intent ...` is a start and `printf no-mistakes axi run --intent ...` is not.
+A shell's `-c` string, after the shell's other options (`bash -l -c`, `bash -o pipefail -c`), is read as a command line without its comments and redirections, split at its control operators and newlines, so `cd x&&no-mistakes axi run --intent ...` is a start too.
+`bin/fm-duration.py run` routes such a command through this owner before starting its execution clock; its `--pipeline-priority` option selects the class.
+`bin/fm-mem-guard.sh run` hands its command to `pipeline-start --only-fresh` after its own memory reading: a new run queues in class `other`, and every other command runs unchanged.
+Generated worker delivery instructions name both routes.
+Existing-run reattachment, responses and status reads do not requeue, restart a run or consume another start.
+Each start is admitted once.
+Only the measured runner the owner re-executes skips a second admission, through an internal argument it consumes.
+When the admitted start runs behind another route (for example `fm-duration.py run -- bash -c '... fm-mem-guard.sh run -- no-mistakes axi run --intent "$X"'`), the owner publishes one single-use grant naming its own process, and that nested route consumes it and runs without queueing again, because the owner is its ancestor; any other start, a second descendant, an identical invocation from elsewhere or one the wrapped client starts, still queues.
+A nested start that cannot prove that ancestry (one that detached to another parent, or an inner route on a checkout without grants) queues behind the owner's lock, and when it is the owner's only run both wait until one is stopped.
+Every route resolves the same pool directory from `HOME`, so every home and worker of one user shares one queue; a home whose checkout predates this route does not ask the queue at all until that home is updated.
 A fresh-start call that ends - killed, timed out, or by its harness command limit - before it prints `fm-cpu-pass: pipeline-start admitted` was still queued and created no run.
-Issue the same fresh start again through `bin/fm-duration.py run`, not a flagless reattach or a status read; the new request queues again from its own arrival time.
+Issue the same fresh start again the same way, through `bin/fm-duration.py run` or `bin/fm-mem-guard.sh run`, not a flagless reattach or a status read; the new request queues again from its own arrival time.
 The admitted line proves only that the client was launched, not that a run exists, so after it the worker reattaches normally.
 If that reattach refuses because no run is active and `no-mistakes axi status` shows no run created since the fresh-start call began, the start created no run and is issued again the same way; when status shows such a run, the worker reads its outcome and never starts another.
 Admission adds no inherited CPU-worker budget, reduces no worker counts and serializes none of a task's required checks.

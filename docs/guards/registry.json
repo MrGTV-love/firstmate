@@ -142,6 +142,7 @@
     "slack-dm-retarget-pending-work",
     "open-loops-one-deferral",
     "pipeline-start-unreadable-source",
+    "launch-gate-capacity-before-agent",
     "merge-required-reported",
     "merge-landing-tree-tested",
     "merge-auto-not-armed",
@@ -6843,10 +6844,10 @@
       "invariant": "a Firstmate-driven fresh no-mistakes start never launches without a readable run database and CPU count",
       "layer": "runtime-block",
       "source": "the pool directory's pipeline-start.lock and waiter files, the runs rows of ~/.no-mistakes/state.sqlite opened read-only, and the native CPU count, read by cmd_pipeline_start in bin/fm-cpu-pass.py",
-      "trigger": "bin/fm-cpu-pass.sh pipeline-start, directly or through bin/fm-duration.py run on a fresh no-mistakes start, cannot use its pool directory or waiter files, cannot read the state database, or cannot read a positive CPU count before it launches the command",
+      "trigger": "bin/fm-cpu-pass.sh pipeline-start, directly or through bin/fm-duration.py run or bin/fm-mem-guard.sh run on a fresh no-mistakes start, cannot use its pool directory or waiter files, cannot read the state database, or cannot read a positive CPU count before it launches the command",
       "decision": "deny",
       "fail_direction": "closed",
-      "remedy": "repair the source the error line names, then issue the same fresh start again: python3 bin/fm-duration.py run <key> -- no-mistakes axi run <inputs>",
+      "remedy": "repair the source the error line names, then issue the same fresh start again the same way: python3 bin/fm-duration.py run <key> -- no-mistakes axi run <inputs>, or bin/fm-mem-guard.sh run -- no-mistakes axi run <inputs>",
       "budget": 1,
       "telemetry": "state/guard-events.jsonl",
       "test": "tests/fm-cpu-pass.test.sh",
@@ -6859,6 +6860,40 @@
       "instrumented": false,
       "status": "active",
       "layer_note": "deny without a guard event: the refusal exits 125 with the reason on stderr and never launches the command, so no run or start lock is left; a start that sees headroom used up waits in the queue and is not this refusal; tests/fm-cpu-pass.test.sh runs tests/fm-cpu-pass-admission.py, which proves the 125 exit with no start on a missing database and a garbage database, and proves the admitted start on readable sources; an unreadable memory or process observation does not refuse but pauses the start (pause-only backstop, proved in the same fixtures)"
+    },
+    {
+      "id": "launch-gate-capacity-before-agent",
+      "version": "1",
+      "owner": "bin/fm-cpu-pass.py",
+      "sites": [
+        {
+          "file": "bin/fm-cpu-pass.py",
+          "match": "launch-gate refused: %s: run %s; %s; next action: %s"
+        },
+        {
+          "file": "bin/fm-cpu-pass.py",
+          "match": "launch-gate refused: gate error: run %s; %s; next action:"
+        }
+      ],
+      "invariant": "a no-mistakes CI fix agent launched through the gate starts only after the pipeline-start rule admits one more active run for its run",
+      "layer": "runtime-block",
+      "source": "the launch's working directory mapped to runs.worktree_dir and its open step in ~/.no-mistakes/state.sqlite opened read-only, the pipeline-start rule's memory and process reading, agent_timeout in ~/.no-mistakes/config.yaml and completed step ci agent_invocations durations, read by cmd_launch_gate in bin/fm-cpu-pass.py",
+      "trigger": "bin/fm-cpu-pass.sh launch-gate, the agent launcher's final exec, cannot map its directory to exactly one run, cannot read the run database, or finds no fit for a ci launch within its hold bound",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "repair the cause the refusal line names (for a hold bound, wait until capacity returns), then answer the run's parked CI decision with no-mistakes axi respond --action fix; its next fix round enters bin/fm-cpu-pass.sh launch-gate again",
+      "budget": 3,
+      "telemetry": "state/.wake-queue; a wake written while the queue lock is busy waits in state/.wake-spill.<seq> until the next append to that queue, or the watcher's next start, replays it",
+      "test": "tests/fm-cpu-pass.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "layer_note": "deny without a guard event: the refusal exits 75 with one line naming the cause and the next action and never starts the agent; the daemon logs it as warning: CI fix failed, spends one auto_fix.ci attempt and parks the CI findings as an ask-user decision after the last one; each refusal, first hold and admission after a hold appends a launch-gate check wake to the root home's queue; a ci launch that waits for capacity inside its bound is a hold, not this refusal; tests/fm-cpu-pass-admission.py proves the three mapping refusals, the bound refusal and the absence of the daemon's retry phrases; the gate protects nothing until the captain approves the one launcher line"
     }
   ],
   "excluded": [

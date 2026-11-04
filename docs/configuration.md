@@ -2305,7 +2305,7 @@ On macOS, project capacity is also subject to the [memory guard's admission cont
 Its engine header owns the measured signals and every derivation; do not reuse the legacy diagnostic percentage defaults as admission thresholds.
 Every fresh spawn, including a new secondmate, reads host memory once and defers with exit 75 while native memory pressure is level 2 or higher or a required reading is unavailable.
 The generated worker brief names two routes for a new no-mistakes run.
-A start through `bin/fm-mem-guard.sh run -- no-mistakes axi run` takes the same reading and can defer with the same exit 75, and the worker then writes the `paused:` status described below; this route skips the CPU pass pool.
+A start through `bin/fm-mem-guard.sh run -- no-mistakes axi run` takes the same reading and can defer with the same exit 75, and the worker then writes the `paused:` status described below; after that reading, a command that begins a new run also joins the [CPU pass pool's start admission](cpu-pass-pool.md#fresh-pipeline-starts) in class `other`, and any other command runs unchanged.
 A start through `bin/fm-duration.py run --pipeline-priority <class>` goes through the [CPU pass pool](cpu-pass-pool.md#fresh-pipeline-starts) (`pipeline-start`), which owns start admission on that route.
 A relaunch, or a respawn of a secondmate whose task record the home still holds, is recovery of existing work and is never refused.
 An unexpected native pressure level below 1 is an unreadable measurement, not a healthy one.
@@ -2314,7 +2314,7 @@ Each reading also records available memory (free, file-backed and purgeable page
 They come only from this host's own records: the root home's watcher probe records, in `state/.memory-calibration.json`, the largest resident process-tree total of every real run it observes, either a Firstmate task or a no-mistakes run, with its sample count, first and last time, largest gap between samples and samples with unreadable resident sizes, and the most available memory it has seen at native pressure 2 or higher.
 The one-run peak is the largest peak of any run seen in at least two readings, and the margin is that most available memory under pressure; until both exist the reading names the missing inputs, and Firstmate never seeds or guesses either number or ships a universal cap.
 For `admit` these are recordings, not an admission statistic: one pressured sample sets the margin until the host name or RAM size changes, and a run's processes that cannot be attributed or read, such as pipeline work outside the run's worktree or another user's unreadable resident size, are omissions, so a recorded peak is a lower bound.
-A fresh no-mistakes run start through `bin/fm-duration.py run` uses recorded run peaks through the [CPU pass pool's start admission](cpu-pass-pool.md#fresh-pipeline-starts).
+A fresh no-mistakes run start, through either route, uses recorded run peaks and readings through the [CPU pass pool's start admission](cpu-pass-pool.md#fresh-pipeline-starts).
 No exhaustion experiment or stress run is needed or recommended; the records come from real work.
 
 The non-fleet RSS alarm baseline is separate: a missing, invalid or other-host baseline never defers work, and the root home reports that missing calibration once as a check wake.

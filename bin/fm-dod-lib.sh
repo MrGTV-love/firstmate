@@ -1074,6 +1074,7 @@ The installed no-mistakes input reads a nonempty UTF-8 file as separate run evid
 Start each NEW run through \`FM_HOME=$home_q $memory_q run -- no-mistakes axi run\`, appending the unchanged intent and verification-plan arguments, not the bare run command.
 That path records a fresh host memory reading immediately before exec and refuses the new run with exit 75 while native memory pressure is high or its readings are unavailable; it never stops existing work.
 If it exits 75, do not retry it on your own: keep your branch and commits, append one \`paused:\` status line that quotes the printed reading's \`pressure_level\`, \`available_bytes\`, \`unused_bytes\`, \`compressor_bytes\`, \`swap_used_bytes\` and \`reasons\` as an external host-memory wait for firstmate to re-admit, then end your turn and start the run again only when firstmate tells you to.
+After a healthy memory reading, a new run joins the host pipeline-start queue: it may wait there (\`fm-cpu-pass: pipeline-start waiting\`) or refuse with exit 125 when the run database cannot be read, and a call that ends before it prints \`fm-cpu-pass: pipeline-start admitted\` created no run, so issue the same fresh start again the same way rather than a flagless reattach.
 Reattach to existing runs and answer gates directly with no-mistakes; those calls must remain usable under pressure.
 
 EOF
