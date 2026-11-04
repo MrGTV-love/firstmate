@@ -1,0 +1,259 @@
+10:36:01
+
+==== 5 --duplicate-of closes on proof ====
+  d1 token=fm-add:cc99289e6fd97a8eca5b0e4f k1 token=fm-add:a978394781e3cc38610c5ca6
+$ bin/fm-tasks-axi.sh done d1 --duplicate-of k1 
+  | ok: done d1 -> Done
+  | help[1]:
+  |   - Run `tasks-axi ready` to dispatch work unblocked by this
+  rc=0
+  CHECK ok
+  backlog| - [ ] k1 - Topaz gondola fennel axle (repo: notes) (kind: ship) (since 2026-11-04)
+  backlog|   kept one
+  backlog|   <!-- fm-add:a978394781e3cc38610c5ca6 -->
+  backlog| 
+  backlog|   ---
+  backlog| --
+  backlog| - [x] d1 - Crimson walrus tulip bushing (repo: notes) (kind: ship) (done 2026-11-04)
+  backlog|   dup body words
+  backlog|   <!-- fm-add:cc99289e6fd97a8eca5b0e4f -->
+  backlog|   duplicate of k1
+  FACT FAILED: row closed with the proof note (row or its body line)
+  | task:
+  |   id: k1
+  |   title: Topaz gondola fennel axle
+  |   state: queued
+  |   blocked: no
+  |   blocked_by: none
+  |   held: no
+  |   hold_reason: "-"
+  |   hold_kind: "-"
+  |   hold_until: "-"
+  |   kind: ship
+  |   repo: notes
+  |   priority: "-"
+  |   created: 2026-11-04
+  |   closed: "-"
+  |   deps: none
+  |   links: none
+  |   body: "kept one\n<!-- fm-add:a978394781e3cc38610c5ca6 -->\n\n---\nMerged from duplicate d1: Crimson walrus tulip bushing\ndup body words"
+  FACT ok: kept item got duplicate title
+  FACT ok: kept item got duplicate body
+  FACT ok: d1 had a token before the close
+  FACT ok: kept item holds no copy of d1's token
+  FACT FAILED: show k1 prints no fm-add token
+  FACT ok: k1 still open
+
+==== 5b --duplicate-of refusals ====
+$ bin/fm-tasks-axi.sh done o1 --duplicate-of k1 
+  | REFUSED: guard=backlog-close-item-eligible rule=owner-filed missing=the owner's words
+  | human-only-exit: does the owner close o1, and in what words?
+  | fm-tasks-axi: o1 quotes the owner or captain, so it is the owner's own item; only the owner's words close it: get them, then record them with bin/fm-tasks-axi.sh done o1 --drop-file <words-file>
+  rc=2
+  CHECK ok
+$ bin/fm-tasks-axi.sh done o2 --duplicate-of k1 
+  | REFUSED: guard=backlog-close-item-eligible rule=owner-filed missing=the owner's words
+  | human-only-exit: does the owner close o2, and in what words?
+  | fm-tasks-axi: o2 quotes the owner or captain, so it is the owner's own item; only the owner's words close it: get them, then record them with bin/fm-tasks-axi.sh done o2 --drop-file <words-file>
+  rc=2
+  CHECK ok
+  FACT ok: owner items stay open
+$ bin/fm-tasks-axi.sh done o-neg --duplicate-of k1 
+  | ok: done o-neg -> Done
+  | help[1]:
+  |   - Run `tasks-axi ready` to dispatch work unblocked by this
+  rc=0
+  CHECK ok
+$ bin/fm-captain-hold.sh hold h1 --reason Lab\ fixture:\ should\ this\ stay\ open\? 
+  | h1
+  rc=0
+  CHECK ok
+$ bin/fm-tasks-axi.sh done h1 --duplicate-of k1 
+  | REFUSED: guard=backlog-close-item-eligible rule=open-owner-call missing=the owner's answer to this call
+  | human-only-exit: what is the owner's answer to the call h1?
+  | fm-tasks-axi: h1 is an open owner call; answer it with bin/fm-captain-hold.sh answer h1 --decision-file <the owner's words>, or reconcile it with bin/fm-captain-hold.sh reconcile close h1
+  rc=2
+  CHECK ok
+$ bin/fm-tasks-axi.sh done l1 --duplicate-of k1 
+  | REFUSED: guard=backlog-close-item-eligible rule=live-task missing=an item with no live task record
+  | completing-command: FM_FRICTION_OPERATION_ID=aa1730bc-64bf-4367-8c49-21fdba703465 FM_FRICTION_EPISODE_ID=aa1730bc-64bf-4367-8c49-21fdba703465 bin/fm-teardown.sh l1
+  | fm-tasks-axi: l1 has a live task record; complete it with bin/fm-teardown.sh l1, which owns the landing proof
+  rc=2
+  CHECK ok
+$ bin/fm-tasks-axi.sh done c1 --duplicate-of c2 
+  | REFUSED: guard=backlog-close-duplicate-of rule=kept-not-open missing=a Queued or In flight kept item
+  | completing-command: FM_FRICTION_OPERATION_ID=fa940b04-ac65-4702-a166-2ae007f4287d FM_FRICTION_EPISODE_ID=fa940b04-ac65-4702-a166-2ae007f4287d bin/fm-tasks-axi.sh done c1 --duplicate-of <kept-id>
+  | fm-tasks-axi: the kept item c2 is not Queued or In flight; a duplicate closes into open work only
+  rc=2
+  CHECK ok
+$ bin/fm-tasks-axi.sh done c1 --duplicate-of nope-missing 
+  | REFUSED: guard=backlog-close-duplicate-of rule=kept-missing missing=a kept item in this backlog
+  | completing-command: FM_FRICTION_OPERATION_ID=057ca198-d32b-46bd-a2d8-3c29500958f8 FM_FRICTION_EPISODE_ID=057ca198-d32b-46bd-a2d8-3c29500958f8 bin/fm-tasks-axi.sh done c1 --duplicate-of <kept-id>
+  | fm-tasks-axi: the kept item nope-missing does not exist in this backlog
+  rc=2
+  CHECK ok
+$ bin/fm-tasks-axi.sh done c1 --duplicate-of c1 
+  | REFUSED: guard=backlog-close-duplicate-of rule=kept-is-self missing=a kept item other than this one
+  | completing-command: FM_FRICTION_OPERATION_ID=01ecfdcc-49b4-44c2-bfd1-34ae84865764 FM_FRICTION_EPISODE_ID=01ecfdcc-49b4-44c2-bfd1-34ae84865764 bin/fm-tasks-axi.sh done c1 --duplicate-of <kept-id>
+  | fm-tasks-axi: an item cannot be a duplicate of itself
+  rc=2
+  CHECK ok
+$ bin/fm-tasks-axi.sh done dep1 --duplicate-of k1 
+  | REFUSED: guard=backlog-close-item-eligible rule=open-dependents missing=no open item blocked by this one
+  | completing-command: FM_FRICTION_OPERATION_ID=0855d995-5dec-4b59-8da8-853017b41b50 FM_FRICTION_EPISODE_ID=0855d995-5dec-4b59-8da8-853017b41b50 bin/fm-tasks-axi.sh unblock <dependent> --by dep1
+  | fm-tasks-axi: dep1 still blocks open items: dep2. Closing it would release them while its work is still open, so nothing was closed. Re-point every one first, held or not: bin/fm-tasks-axi.sh block <dependent> --by k1, then bin/fm-tasks-axi.sh unblock <dep
+  rc=2
+  CHECK ok
+  FACT ok: c1 and dep1 stay open after every refusal
+$ bin/fm-tasks-axi.sh done c1 --duplicate-of k1 --pr https://github.com/MrGTV-love/firstmate/pull/367 
+  | fm-tasks-axi: a duplicate or moved item closes on its own proof; do not combine --duplicate-of or --moved-to with --pr, --report, --drop-file, or --note
+  rc=2
+  CHECK ok
+$ bin/fm-tasks-axi.sh done c1 --duplicate-of k1 
+  | ok: done c1 -> Done
+  | help[1]:
+  |   - Run `tasks-axi ready` to dispatch work unblocked by this
+  rc=0
+  CHECK ok
+$ bin/fm-tasks-axi.sh done c1 --duplicate-of k1 
+  | REFUSED: guard=backlog-close-item-eligible rule=item-closed missing=an open item to close
+  | completing-command: FM_FRICTION_OPERATION_ID=6828ce73-bace-43bb-94d1-35e7271d7e83 FM_FRICTION_EPISODE_ID=6828ce73-bace-43bb-94d1-35e7271d7e83 bin/fm-tasks-axi.sh show c1
+  | fm-tasks-axi: c1 is already closed
+  rc=2
+  CHECK ok
+
+==== 6 --moved-to closes on proof (local home) ====
+$ bin/fm-tasks-axi.sh done m1 --moved-to sm-none dest-open 
+  | REFUSED: guard=backlog-close-moved-to rule=home-not-registered missing=one registered home
+  | completing-command: FM_FRICTION_OPERATION_ID=a2ef84c5-6b26-46af-a315-c79539076d2a FM_FRICTION_EPISODE_ID=a2ef84c5-6b26-46af-a315-c79539076d2a bin/fm-tasks-axi.sh done m1 --moved-to <home> <item-id>
+  | fm-tasks-axi: sm-none is not one registered home in $LAB_A/data/secondmates.md
+  rc=2
+  CHECK ok
+$ bin/fm-tasks-axi.sh done m1 --moved-to sm-twice dest-open 
+  | REFUSED: guard=backlog-close-moved-to rule=home-not-registered missing=one registered home
+  | completing-command: FM_FRICTION_OPERATION_ID=88ba5f78-2dc3-4bef-b409-479393c04f87 FM_FRICTION_EPISODE_ID=88ba5f78-2dc3-4bef-b409-479393c04f87 bin/fm-tasks-axi.sh done m1 --moved-to <home> <item-id>
+  | fm-tasks-axi: sm-twice is not one registered home in $LAB_A/data/secondmates.md
+  rc=2
+  CHECK ok
+$ bin/fm-tasks-axi.sh done m1 --moved-to sm-b dest-absent 
+  | REFUSED: guard=backlog-close-moved-to rule=item-missing missing=the item in the new home
+  | completing-command: FM_FRICTION_OPERATION_ID=4d7977cd-28ed-4ad5-bd28-d6b037567c7c FM_FRICTION_EPISODE_ID=4d7977cd-28ed-4ad5-bd28-d6b037567c7c bin/fm-tasks-axi.sh done m1 --moved-to sm-b <item-id>
+  | fm-tasks-axi: sm-b's backlog has no item dest-absent
+  rc=2
+  CHECK ok
+$ bin/fm-tasks-axi.sh done m1 --moved-to sm-b dest-done 
+  | REFUSED: guard=backlog-close-moved-to rule=item-not-open missing=an open item in the new home
+  | completing-command: FM_FRICTION_OPERATION_ID=cbc58681-c517-48f0-a3e3-f19e95b14ad0 FM_FRICTION_EPISODE_ID=cbc58681-c517-48f0-a3e3-f19e95b14ad0 bin/fm-tasks-axi.sh done m1 --moved-to sm-b <item-id>
+  | fm-tasks-axi: sm-b's item dest-done is not open (Queued or In flight); moved work must be open in the new home
+  rc=2
+  CHECK ok
+$ bin/fm-tasks-axi.sh done m1 --moved-to sm-self m1 
+  | REFUSED: guard=backlog-close-moved-to rule=same-backlog missing=a different backlog
+  | completing-command: FM_FRICTION_OPERATION_ID=477829b4-33f4-4044-b7a6-32f4f0c66dea FM_FRICTION_EPISODE_ID=477829b4-33f4-4044-b7a6-32f4f0c66dea bin/fm-tasks-axi.sh done m1 --moved-to <home> <item-id>
+  | fm-tasks-axi: sm-self is this backlog itself; a moved item must live in a different backlog
+  rc=2
+  CHECK ok
+$ bin/fm-tasks-axi.sh done m1 --moved-to sm-link m1 
+  | REFUSED: guard=backlog-close-moved-to rule=same-backlog missing=a different backlog
+  | completing-command: FM_FRICTION_OPERATION_ID=5d2102fe-0650-4f17-99c2-f339398ae16c FM_FRICTION_EPISODE_ID=5d2102fe-0650-4f17-99c2-f339398ae16c bin/fm-tasks-axi.sh done m1 --moved-to <home> <item-id>
+  | fm-tasks-axi: sm-link is this backlog itself; a moved item must live in a different backlog
+  rc=2
+  CHECK ok
+$ timeout 120 bin/fm-tasks-axi.sh done m1 --moved-to sm-unreach dest-open 
+  | fm-tasks-axi: cannot prove sm-unreach is a different backlog, so nothing was closed: cannot read sm-unreach's backlog identity: ssh: Could not resolve hostname fm-lab-no-such-host.invalid: nodename nor servname provided, or not known
+  rc=2
+  CHECK ok
+  FACT ok: m1 still open after every refusal
+$ bin/fm-tasks-axi.sh done o1 --moved-to sm-b dest-open 
+  | REFUSED: guard=backlog-close-item-eligible rule=owner-filed missing=the owner's words
+  | human-only-exit: does the owner close o1, and in what words?
+  | fm-tasks-axi: o1 quotes the owner or captain, so it is the owner's own item; only the owner's words close it: get them, then record them with bin/fm-tasks-axi.sh done o1 --drop-file <words-file>
+  rc=2
+  CHECK ok
+$ bin/fm-tasks-axi.sh done h1 --moved-to sm-b dest-open 
+  | REFUSED: guard=backlog-close-item-eligible rule=open-owner-call missing=the owner's answer to this call
+  | human-only-exit: what is the owner's answer to the call h1?
+  | fm-tasks-axi: h1 is an open owner call; answer it with bin/fm-captain-hold.sh answer h1 --decision-file <the owner's words>, or reconcile it with bin/fm-captain-hold.sh reconcile close h1
+  rc=2
+  CHECK ok
+$ bin/fm-tasks-axi.sh done l1 --moved-to sm-b dest-open 
+  | REFUSED: guard=backlog-close-item-eligible rule=live-task missing=an item with no live task record
+  | completing-command: FM_FRICTION_OPERATION_ID=d7e5c92a-1489-4bec-836d-4b40c2e27733 FM_FRICTION_EPISODE_ID=d7e5c92a-1489-4bec-836d-4b40c2e27733 bin/fm-teardown.sh l1
+  | fm-tasks-axi: l1 has a live task record; complete it with bin/fm-teardown.sh l1, which owns the landing proof
+  rc=2
+  CHECK ok
+  FACT ok: o1 h1 l1 stay open
+$ bin/fm-tasks-axi.sh done m1 --moved-to sm-b dest-open 
+  | ok: done m1 -> Done
+  | help[1]:
+  |   - Run `tasks-axi ready` to dispatch work unblocked by this
+  rc=0
+  CHECK ok
+  backlog| - [x] m1 - Saddle heron dill sprag (repo: notes) (kind: ship) (done 2026-11-04)
+  backlog|   <!-- fm-add:f925217a2cb2680f590ac8a2 -->
+  backlog|   moved to sm-b as dest-open
+  FACT ok: closed row records the proof (row or its body line)
+  FACT ok: peer item still open
+  FACT ok: peer backlog unchanged by the move
+
+==== final source backlog (close) ====
+  | ## In flight
+  | 
+  | ## Queued
+  | - [ ] k1 - Topaz gondola fennel axle (repo: notes) (kind: ship) (since 2026-11-04)
+  |   kept one
+  |   <!-- fm-add:a978394781e3cc38610c5ca6 -->
+  | 
+  |   ---
+  |   Merged from duplicate d1: Crimson walrus tulip bushing
+  |   dup body words
+  | 
+  |   ---
+  |   Merged from duplicate o-neg: Teal badger gravel lock
+  |   the lock decision
+  | 
+  |   ---
+  |   Merged from duplicate c1: Bronze ibis nutmeg clevis
+  | 
+  | - [ ] o1 - Amber lizard pumice coupler (repo: notes) (kind: ship) (since 2026-11-04)
+  |   Captain 2027-01-06 asked for this item.
+  |   <!-- fm-add:c4ce5925f8dd59cff0126e6f -->
+  | 
+  | - [ ] o2 - Indigo ostrich clover bracket (repo: notes) (kind: ship) (since 2026-11-04)
+  |   Owner 2026-10-08: please do this.
+  |   <!-- fm-add:3400ec4c28eec831dd0a2248 -->
+  | 
+  | - [ ] h1 - Olive cougar marigold shim (repo: notes) (kind: ship) (since 2026-11-04) (hold: fm-hold-v1:TGFiIGZpeHR1cmU6IHNob3VsZCB0aGlzIHN0YXkgb3Blbj8=) (hold-ki
+  |   Captain hold set: 2026-11-04T16:42:44Z
+  | 
+  |   <!-- fm-add:48951804857254e01725ecf4 -->
+  | - [ ] l1 - Pewter gibbon saffron rivet (repo: notes) (kind: ship) (since 2026-11-04)
+  |   <!-- fm-add:0bdd3f4941e12dea03c3a870 -->
+  | 
+  | - [ ] dep1 - Slate puffin thyme yoke (repo: notes) (kind: ship) (since 2026-11-04)
+  |   <!-- fm-add:6426ee55928398424c5b12c1 -->
+  | 
+  | - [ ] dep2 - Coral magpie sorrel tappet blocked-by: dep1 (repo: notes) (kind: ship) (since 2026-11-04)
+  |   <!-- fm-add:59c730b26e80a0ce05ba2385 -->
+  | ## Done
+  | - [x] m1 - Saddle heron dill sprag (repo: notes) (kind: ship) (done 2026-11-04)
+  |   <!-- fm-add:f925217a2cb2680f590ac8a2 -->
+  |   moved to sm-b as dest-open
+  | - [x] c1 - Bronze ibis nutmeg clevis (repo: notes) (kind: ship) (done 2026-11-04)
+  |   <!-- fm-add:ad61ee4e7fd5dcd0071b413f -->
+  |   duplicate of k1
+  | - [x] c2 - Ivory marmot basil gimbal (done 2026-11-04)
+  |   <!-- fm-add:9cc050eb055cee4a3d40fc0d -->
+  | - [x] o-neg - Teal badger gravel lock (repo: notes) (kind: ship) (done 2026-11-04)
+  |   the lock decision
+  |   <!-- fm-add:d75f0a20c75a6712f8fa280f -->
+  |   duplicate of k1
+  | - [x] d1 - Crimson walrus tulip bushing (repo: notes) (kind: ship) (done 2026-11-04)
+  |   dup body words
+  |   <!-- fm-add:cc99289e6fd97a8eca5b0e4f -->
+  |   duplicate of k1
+
+RESULT part=close checks_ok=37 checks_failed=2
+labs removed
+exit=0
+10:52:32

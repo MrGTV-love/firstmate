@@ -1,0 +1,246 @@
+10:36:01
+
+==== 7 existing proofs unchanged ====
+$ bin/fm-tasks-axi.sh done p1 
+  | fm-tasks-axi: completion needs proof of the deliverable: --report (scout), a merged --pr (ship), or --drop-file with the captain's words
+  rc=2
+  CHECK ok
+$ bin/fm-tasks-axi.sh done p1 --pr https://github.com/MrGTV-love/firstmate/pull/376 
+  | fm-tasks-axi: the pull request has not merged: https://github.com/MrGTV-love/firstmate/pull/376
+  rc=2
+  CHECK ok
+  FACT ok: open PR did not close p1
+$ bin/fm-tasks-axi.sh done p1 --pr https://github.com/MrGTV-love/firstmate/pull/367 
+  | ok: done p1 -> Done (pr https://github.com/MrGTV-love/firstmate/pull/367)
+  | help[1]:
+  |   - Run `tasks-axi ready` to dispatch work unblocked by this
+  rc=0
+  CHECK ok
+$ bin/fm-tasks-axi.sh done p2 
+  | fm-tasks-axi: completion needs proof of the deliverable: --report (scout), a merged --pr (ship), or --drop-file with the captain's words
+  rc=2
+  CHECK ok
+$ bin/fm-tasks-axi.sh done p2 --report data/p2/missing-report.md 
+  | fm-tasks-axi: the report has not been written: $LAB_A/data/p2/missing-report.md
+  rc=2
+  CHECK ok
+$ bin/fm-tasks-axi.sh done p2 --report data/p2/report.md 
+  | ok: done p2 -> Done (report data/p2/report.md)
+  | help[1]:
+  |   - Run `tasks-axi ready` to dispatch work unblocked by this
+  rc=0
+  CHECK ok
+$ bin/fm-tasks-axi.sh done p3 --drop-file $LAB_A/words.txt --pr https://github.com/MrGTV-love/firstmate/pull/367 
+  | fm-tasks-axi: a captain's drop is its own completion; do not combine --drop-file with --pr, --report, or --note
+  rc=2
+  CHECK ok
+$ bin/fm-tasks-axi.sh done p3 --drop-file $LAB_A/words.txt 
+  | ok: done p3 -> Done
+  | help[1]:
+  |   - Run `tasks-axi ready` to dispatch work unblocked by this
+  rc=0
+  CHECK ok
+  backlog| - [x] p3 - Sable bison anise tenon (repo: notes) (kind: ship) (done 2026-11-04)
+  backlog| - [x] p2 - Umber lemur tarragon collet data/p2/report.md (repo: notes) (kind: scout) (reported 2026-11-04)
+  backlog| - [x] p1 - Russet hyena caraway detent https://github.com/MrGTV-love/firstmate/pull/367 (repo: notes) (kind: ship) (merged 2026-11-04)
+  FACT ok: owner words retained
+
+==== 8 captain-hold caller ====
+$ bin/fm-captain-hold.sh hold hold-new --reason Lab\ fixture\ question\? --title Vermilion\ wombat\ fenugreek\ gusset --repo notes 
+  | hold-new
+  rc=0
+  CHECK ok
+  tsv| hold-new		none	captain hold record: tracks a captain decision, not a work item
+  FACT ok: hold row in tsv with objective none
+$ bin/fm-captain-hold.sh hold hold-dup --reason Lab\ fixture\ question\ two\? --title Vermilion\ wombat\ fenugreek\ gusset\ review --repo notes 
+  | REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+  | human-only-exit: is this add the same work as hold-new?
+  | fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+  |   hold-new (Queued, overlap 0.80) Vermilion wombat fenugreek gusset
+  | Judge them, then run the add again with one of these two overrides (each still needs --objective):
+  |   the work is the same - append this title and body to hold-new and file nothing:
+  |     bin/fm-tasks-axi.sh add hold-dup Vermilion\ wombat\ fenugreek\ gusset\ review --kind captain --repo notes --objective none --objective-reason captain\ hold\ record:\ tracks\ a\ captain\ decision\,\ not\ a\ work\ item --dup-of hold-new
+  |   the work is different from hold-new - file it:
+  |     bin/fm-tasks-axi.sh add hold-dup Vermilion\ wombat\ fenugreek\ gusset\ review --kind captain --repo notes --objective none --objective-reason captain\ hold\ record:\ tracks\ a\ captain\ decision\,\ not\ a\ work\ item --not-dup hold-new
+  | fm-captain-hold: the duplicate check stopped task hold-dup, so nothing was held. Do not run the --dup-of command above: it would append this captain call to a work item, file nothing, and record no hold. To file it anyway, run the --not-dup command above n
+  | fm-captain-hold: could not create task hold-dup
+  rc=1
+  CHECK ok
+  FACT ok: hold-dup was not filed
+
+==== 9 fm-duration.py repeated timeout filing ====
+$ python3 bin/fm-duration.py record lab.ka 5 124 --timed-out 
+  | 
+  rc=0
+  CHECK ok
+  FACT ok: one timeout files nothing
+$ python3 bin/fm-duration.py record lab.ka 6 124 --timed-out 
+  | timeout_work: "fm-timeout-551d673aa66f3fc4"
+  rc=0
+  CHECK ok
+  backlog| - [ ] fm-timeout-551d673aa66f3fc4 - Measure and repair repeated timeout: MrGTV-love/firstmate lab.ka (repo: firstmate) (kind: ship) (since 2026-11-04)
+  FACT ok: item filed with objective O7
+$ python3 bin/fm-duration.py record lab.ka 7 124 --timed-out 
+  | 
+  rc=0
+  CHECK ok
+  FACT ok: third timeout filed no second item
+  repo() = MrGTV-love/firstmate
+$ bin/fm-tasks-axi.sh add fm-timeout-0therh0st0000kb Measure\ and\ repair\ repeated\ timeout:\ MrGTV-love/firstmate\ lab.kb --kind ship --repo firstmate --objective O7 --body Filed\ by\ other-host. --not-dup fm-timeout-551d673aa66f3fc4 
+  | ok: added fm-timeout-0therh0st0000kb (ship, repo firstmate) -> Queued
+  | task:
+  |   id: fm-timeout-0therh0st0000kb
+  |   title: "Measure and repair repeated timeout: MrGTV-love/firstmate lab.kb"
+  |   state: queued
+  |   blocked: no
+  |   blocked_by: none
+  |   held: no
+  |   hold_reason: "-"
+  |   hold_kind: "-"
+  |   hold_until: "-"
+  |   kind: ship
+  |   repo: firstmate
+  |   priority: "-"
+  |   created: 2026-11-04
+  |   closed: "-"
+  |   deps: none
+  |   links: none
+  |   body: "Filed by other-host."
+  | help[2]:
+  |   - Run `tasks-axi start fm-timeout-0therh0st0000kb` to move it to in flight
+  |   - Run `tasks-axi block fm-timeout-0therh0st0000kb --by <other>` to record a dependency
+  rc=0
+  CHECK ok
+$ python3 bin/fm-duration.py record lab.kb 5 124 --timed-out 
+  | 
+  rc=0
+  CHECK ok
+$ python3 bin/fm-duration.py record lab.kb 9 124 --timed-out 
+  | timeout_work: "fm-timeout-0therh0st0000kb"
+  rc=0
+  CHECK ok
+  | task:
+  |   id: fm-timeout-0therh0st0000kb
+  |   title: "Measure and repair repeated timeout: MrGTV-love/firstmate lab.kb"
+  |   state: queued
+  |   blocked: no
+  |   blocked_by: none
+  |   held: no
+  |   hold_reason: "-"
+  |   hold_kind: "-"
+  |   hold_until: "-"
+  |   kind: ship
+  |   repo: firstmate
+  |   priority: "-"
+  |   created: 2026-11-04
+  |   closed: "-"
+  |   deps: none
+  |   links: none
+  |   body: "Filed by other-host.\n<!-- fm-add:7dae404f1efa52b7e2f63f8a -->\n\n---\nMerged from a duplicate filing: Measure and repair repeated timeout: MrGTV-love/firstmate lab.kb\nRepeated timeout for command key lab.kb in repository MrGTV-love/firstmate on 
+  FACT ok: occurrence appended names this host
+  FACT ok: occurrence appended carries the bounds
+  FACT ok: no new item for lab.kb
+$ sh -c python3\ \'bin/fm-duration.py\'\ record\ lab.kd\ 5\ 124\ --timed-out\ \&\&\ python3\ \'bin/fm-duration.py\'\ record\ lab.kd\ 6\ 124\ --timed-out 
+  | timeout_work: "fm-timeout-f626bdf37f86a412"
+  rc=0
+  CHECK ok
+  FACT ok: lab.kd filed a third item (only fm-timeout- neighbours, before any hand-filed item)
+$ bin/fm-tasks-axi.sh add hand-1 Repair\ repeated\ timeout\ lab.kc\ limit --objective O7 --not-dup fm-timeout-551d673aa66f3fc4 
+  | ok: added hand-1 -> Queued
+  | task:
+  |   id: hand-1
+  |   title: Repair repeated timeout lab.kc limit
+  |   state: queued
+  |   blocked: no
+  |   blocked_by: none
+  |   held: no
+  |   hold_reason: "-"
+  |   hold_kind: "-"
+  |   hold_until: "-"
+  |   kind: task
+  |   repo: "-"
+  |   priority: "-"
+  |   created: 2026-11-04
+  |   closed: "-"
+  |   deps: none
+  |   links: none
+  |   body: ""
+  | help[2]:
+  |   - Run `tasks-axi start hand-1` to move it to in flight
+  |   - Run `tasks-axi block hand-1 --by <other>` to record a dependency
+  rc=0
+  CHECK ok
+$ python3 bin/fm-duration.py record lab.kc 5 124 --timed-out 
+  | 
+  rc=0
+  CHECK ok
+$ python3 bin/fm-duration.py record lab.kc 6 124 --timed-out 
+  | error: "timeout work could not be filed: hand-1 may be the same work filed by hand; REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours\nhuman-only-exit: is this add the same work as fm-timeout-551d673aa66
+  rc=1
+  CHECK ok
+  FACT ok: nothing filed for lab.kc
+$ bin/fm-tasks-axi.sh done hand-1 --keep 0 
+  | ok: done hand-1 -> Done; pruned 4
+  | help[1]:
+  |   - Run `tasks-axi ready` to dispatch work unblocked by this
+  rc=0
+  CHECK ok
+  FACT ok: hand-1 is in the archive only
+$ python3 bin/fm-duration.py record lab.kc 7 124 --timed-out 
+  | error: "timeout work could not be filed: hand-1 may be the same work filed by hand; REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours\nhuman-only-exit: is this add the same work as fm-timeout-551d673aa66
+  rc=1
+  CHECK ok
+  FACT ok: still nothing filed for lab.kc
+
+==== 10 ledger ====
+  | $LAB_A/state/friction.jsonl
+  | $LAB_A/state/guard-events.jsonl
+  | $LAB_A/data/command-durations.jsonl
+  | {"schema":"fm-friction.v1","event_id":"86eb1a9e-0c6a-429f-afed-6824b9b6dfb8","at":"2026-11-04T16:40:47.283Z","guard_id":"backlog-intake-duplicate","rule_id":"title-overlap","guard_revision":"sha256:ee8ca0743f8898aea1e47a
+  | {"schema":"fm-friction.v1","event_id":"6248b051-32cb-497b-80bc-c57db344870a","at":"2026-11-04T16:42:48.909Z","guard_id":"backlog-intake-duplicate","rule_id":"title-overlap","guard_revision":"sha256:ee8ca0743f8898aea1e47a
+  | {"schema":"fm-friction.v1","event_id":"5d388e3a-9f7a-4255-b46a-450148a6dd06","at":"2026-11-04T16:43:20.587Z","guard_id":"backlog-intake-duplicate","rule_id":"title-overlap","guard_revision":"sha256:ee8ca0743f8898aea1e47a
+  | {"schema":"fm-friction.v1","event_id":"2ed706a3-68ce-4fbb-9379-34ebfecb1147","at":"2026-11-04T16:45:20.111Z","guard_id":"backlog-intake-duplicate","rule_id":"title-overlap","guard_revision":"sha256:ee8ca0743f8898aea1e47a
+  | {"schema":"fm-friction.v1","event_id":"9c83ce25-ff68-44ac-ab9e-4938c855fcf2","at":"2026-11-04T16:45:58.182Z","guard_id":"backlog-intake-duplicate","rule_id":"title-overlap","guard_revision":"sha256:ee8ca0743f8898aea1e47a
+  | {"ts":"2026-11-04T16:44:48Z","guard":"backlog-intake-not-dup","rule":"backlog-intake-not-dup","task":"","version":"1","system":"firstmate","session":"$LAB_A:94b86c62-b0b1-4559-b2e3-7cf08
+  | {"ts":"2026-11-04T16:44:48Z","guard":"backlog-intake-duplicate","rule":"backlog-intake-duplicate","task":"","version":"1","system":"firstmate","session":"$LAB_A:94b86c62-b0b1-4559-b2e3-7
+  | {"ts":"2026-11-04T16:45:04Z","guard":"backlog-intake-objective","rule":"backlog-intake-objective","task":"","version":"1","system":"firstmate","session":"$LAB_A:94b86c62-b0b1-4559-b2e3-7
+  | {"ts":"2026-11-04T16:45:19Z","guard":"backlog-intake-duplicate","rule":"backlog-intake-duplicate","task":"","version":"1","system":"firstmate","session":"$LAB_A:94b86c62-b0b1-4559-b2e3-7
+  | {"ts":"2026-11-04T16:45:54Z","guard":"backlog-intake-objective","rule":"backlog-intake-objective","task":"","version":"1","system":"firstmate","session":"$LAB_A:94b86c62-b0b1-4559-b2e3-7
+  | {"ts":"2026-11-04T16:45:57Z","guard":"backlog-intake-duplicate","rule":"backlog-intake-duplicate","task":"","version":"1","system":"firstmate","session":"$LAB_A:94b86c62-b0b1-4559-b2e3-7
+  | {"host":"Mac-Studio.local","repo":"MrGTV-love/firstmate","key":"lab.kc","duration_ms":5,"exit":124,"recorded_at":"2026-11-04T16:44:53.811302+00:00","load_start":null,"load_end":80.14208984375,"cpus":18,"sample_id":null,"
+  | {"host":"Mac-Studio.local","repo":"MrGTV-love/firstmate","key":"lab.kc","event":"timeout","duration_ms":5,"event_id":null,"recorded_at":"2026-11-04T16:44:53.831483+00:00"}
+  | {"host":"Mac-Studio.local","repo":"MrGTV-love/firstmate","key":"lab.kc","duration_ms":6,"exit":124,"recorded_at":"2026-11-04T16:44:58.010074+00:00","load_start":null,"load_end":82.29248046875,"cpus":18,"sample_id":null,"
+  | {"host":"Mac-Studio.local","repo":"MrGTV-love/firstmate","key":"lab.kc","event":"timeout","duration_ms":6,"event_id":null,"recorded_at":"2026-11-04T16:44:58.020021+00:00"}
+  | {"host":"Mac-Studio.local","repo":"MrGTV-love/firstmate","key":"lab.kc","duration_ms":7,"exit":124,"recorded_at":"2026-11-04T16:45:50.933133+00:00","load_start":null,"load_end":70.6943359375,"cpus":18,"sample_id":null,"c
+  | {"host":"Mac-Studio.local","repo":"MrGTV-love/firstmate","key":"lab.kc","event":"timeout","duration_ms":7,"event_id":null,"recorded_at":"2026-11-04T16:45:50.938267+00:00"}
+
+==== final source backlog (rest) ====
+  | ## In flight
+  | 
+  | ## Queued
+  | - [ ] hold-new - Vermilion wombat fenugreek gusset (repo: notes) (kind: captain) (since 2026-11-04) (hold: fm-hold-v1:TGFiIGZpeHR1cmUgcXVlc3Rpb24/) (hold-kind: 
+  |   Captain hold set: 2026-11-04T16:39:10Z
+  | 
+  |   <!-- fm-add:af30ca645278087474391788 -->
+  | - [ ] fm-timeout-551d673aa66f3fc4 - Measure and repair repeated timeout: MrGTV-love/firstmate lab.ka (repo: firstmate) (kind: ship) (since 2026-11-04)
+  |   Repeated timeout for command key lab.ka in repository MrGTV-love/firstmate on host Mac-Studio.local. Observed lower bounds (ms): 5, 6. Measure completion late
+  |   <!-- fm-add:5873aa45e39d729728a16ce5 -->
+  | 
+  | - [ ] fm-timeout-0therh0st0000kb - Measure and repair repeated timeout: MrGTV-love/firstmate lab.kb (repo: firstmate) (kind: ship) (since 2026-11-04)
+  |   Filed by other-host.
+  |   <!-- fm-add:7dae404f1efa52b7e2f63f8a -->
+  | 
+  |   ---
+  |   Merged from a duplicate filing: Measure and repair repeated timeout: MrGTV-love/firstmate lab.kb
+  |   Repeated timeout for command key lab.kb in repository MrGTV-love/firstmate on host Mac-Studio.local. Observed lower bounds (ms): 5, 9. Measure completion late
+  | 
+  | - [ ] fm-timeout-f626bdf37f86a412 - Measure and repair repeated timeout: MrGTV-love/firstmate lab.kd (repo: firstmate) (kind: ship) (since 2026-11-04)
+  |   Repeated timeout for command key lab.kd in repository MrGTV-love/firstmate on host Mac-Studio.local. Observed lower bounds (ms): 5, 6. Measure completion late
+  |   <!-- fm-add:b1cc32b380d238fa7f98a153 -->
+  | 
+  | ## Done
+
+RESULT part=rest checks_ok=36 checks_failed=0
+labs removed
+exit=0
+10:46:04

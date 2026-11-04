@@ -1,0 +1,16 @@
+$ python3 bin/fm-duration.py record lab.ka 5 124 --timed-out
+  rc=0
+$ python3 bin/fm-duration.py record lab.ka 6 124 --timed-out
+  | timeout_work: "fm-timeout-551d673aa66f3fc4"
+  rc=0
+$ python3 bin/fm-duration.py record lab.kd 5 124 --timed-out
+  rc=0
+$ python3 bin/fm-duration.py record lab.kd 6 124 --timed-out
+  | timeout_work: "fm-timeout-f626bdf37f86a412"
+  rc=0
+  backlog| - [ ] fm-timeout-551d673aa66f3fc4 - Measure and repair repeated timeout: MrGTV-love/firstmate lab.ka (repo: firstmate) (kind: ship) (since 2026-11-04)
+  backlog| - [ ] fm-timeout-f626bdf37f86a412 - Measure and repair repeated timeout: MrGTV-love/firstmate lab.kd (repo: firstmate) (kind: ship) (since 2026-11-04)
+  tsv| fm-timeout-551d673aa66f3fc4		O7	
+  tsv| fm-timeout-f626bdf37f86a412		O7	
+  FACT ok: two keys filed two items
+labs removed

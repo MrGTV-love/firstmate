@@ -1,0 +1,195 @@
+
+==== 4 last 50 Done window, active and archive ====
+  seeded through tasks-axi: active Done rows=10 archived rows=41
+  FACT ok: win-oldest is in the archive, not the active list
+$ bin/fm-tasks-axi.sh add win-keep Hazel\ dynamo\ plover\ winch --objective O7 
+  | ok: added win-keep -> Queued
+  | task:
+  |   id: win-keep
+  |   title: Hazel dynamo plover winch
+  |   state: queued
+  |   blocked: no
+  |   blocked_by: none
+  |   held: no
+  |   hold_reason: "-"
+  |   hold_kind: "-"
+  |   hold_until: "-"
+  |   kind: task
+  |   repo: "-"
+  |   priority: "-"
+  |   created: 2026-11-04
+  |   closed: "-"
+  |   deps: none
+  |   links: none
+  |   body: ""
+  | help[2]:
+  |   - Run `tasks-axi start win-keep` to move it to in flight
+  |   - Run `tasks-axi block win-keep --by <other>` to record a dependency
+  rc=0
+  CHECK ok
+$ bin/fm-tasks-axi.sh done win-keep --keep 0 
+  | ok: done win-keep -> Done; pruned 11
+  | help[1]:
+  |   - Run `tasks-axi ready` to dispatch work unblocked by this
+  rc=0
+  CHECK ok
+  FACT ok: win-keep is not in the active list
+  FACT ok: win-keep is in the archive
+  now: win-oldest is Done row 52 counted from the newest (win-keep, win-50 .. win-1, win-oldest)
+$ bin/fm-tasks-axi.sh add win-new Hazel\ dynamo\ plover\ winch\ refit --objective O7 
+  | REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+  | human-only-exit: is this add the same work as win-keep?
+  | fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+  |   win-keep (Done, archived, overlap 0.80) Hazel dynamo plover winch
+  | Judge them, then run the add again with one of these two overrides (each still needs --objective):
+  |   (every neighbour is Done and archived, so --dup-of has no item to append to)
+  |   the work is different from win-keep - file it:
+  |     bin/fm-tasks-axi.sh add win-new Hazel\ dynamo\ plover\ winch\ refit --objective O7 --not-dup win-keep
+  rc=2
+  CHECK ok
+  FACT ok: refused add left backlog.md unchanged
+$ bin/fm-tasks-axi.sh add win-new Hazel\ dynamo\ plover\ winch\ refit --objective O7 --dup-of win-keep 
+  | REFUSED: guard=backlog-intake-dup-of rule=kept-archived missing=a kept item in the active backlog
+  | completing-command: FM_FRICTION_OPERATION_ID=3216b188-32da-46c8-a913-af87a2f2b184 FM_FRICTION_EPISODE_ID=3216b188-32da-46c8-a913-af87a2f2b184 bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id> --not-dup win-keep
+  | fm-tasks-axi: the kept item win-keep is Done and archived, and an archived item cannot take an appended note; nothing was filed or appended. If the new item is the same work, nothing needs filing; if it is different work, file it with --not-dup win-keep
+  rc=2
+  CHECK ok
+$ bin/fm-tasks-axi.sh add win-new Hazel\ dynamo\ plover\ winch\ refit --objective O7 --not-dup win-keep 
+  | ok: added win-new -> Queued
+  | task:
+  |   id: win-new
+  |   title: Hazel dynamo plover winch refit
+  |   state: queued
+  |   blocked: no
+  |   blocked_by: none
+  |   held: no
+  |   hold_reason: "-"
+  |   hold_kind: "-"
+  |   hold_until: "-"
+  |   kind: task
+  |   repo: "-"
+  |   priority: "-"
+  |   created: 2026-11-04
+  |   closed: "-"
+  |   deps: none
+  |   links: none
+  |   body: ""
+  | help[2]:
+  |   - Run `tasks-axi start win-new` to move it to in flight
+  |   - Run `tasks-axi block win-new --by <other>` to record a dependency
+  rc=0
+  CHECK ok
+  FACT ok: --not-dup on an archived neighbour files it
+$ bin/fm-tasks-axi.sh add win-act Copper\ narwhal\ sage\ lathe --objective O7 
+  | ok: added win-act -> Queued
+  | task:
+  |   id: win-act
+  |   title: Copper narwhal sage lathe
+  |   state: queued
+  |   blocked: no
+  |   blocked_by: none
+  |   held: no
+  |   hold_reason: "-"
+  |   hold_kind: "-"
+  |   hold_until: "-"
+  |   kind: task
+  |   repo: "-"
+  |   priority: "-"
+  |   created: 2026-11-04
+  |   closed: "-"
+  |   deps: none
+  |   links: none
+  |   body: ""
+  | help[2]:
+  |   - Run `tasks-axi start win-act` to move it to in flight
+  |   - Run `tasks-axi block win-act --by <other>` to record a dependency
+  rc=0
+  CHECK ok
+$ bin/fm-tasks-axi.sh done win-act 
+  | ok: done win-act -> Done
+  | help[1]:
+  |   - Run `tasks-axi ready` to dispatch work unblocked by this
+  rc=0
+  CHECK ok
+  FACT ok: win-act is Done in the active list
+$ bin/fm-tasks-axi.sh add win-act2 Copper\ narwhal\ sage\ lathe\ rebuild --objective O7 
+  | REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+  | human-only-exit: is this add the same work as win-act?
+  | fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+  |   win-act (Done, overlap 0.80) Copper narwhal sage lathe
+  | Judge them, then run the add again with one of these two overrides (each still needs --objective):
+  |   the work is the same - append this title and body to win-act and file nothing:
+  |     bin/fm-tasks-axi.sh add win-act2 Copper\ narwhal\ sage\ lathe\ rebuild --objective O7 --dup-of win-act
+  |   the work is different from win-act - file it:
+  |     bin/fm-tasks-axi.sh add win-act2 Copper\ narwhal\ sage\ lathe\ rebuild --objective O7 --not-dup win-act
+  rc=2
+  CHECK ok
+$ bin/fm-tasks-axi.sh add win-act2 Copper\ narwhal\ sage\ lathe\ rebuild --objective O7 --dup-of win-act 
+  | ok: merged into win-act (nothing filed)
+  rc=0
+  CHECK ok
+  | task:
+  |   id: win-act
+  |   title: Copper narwhal sage lathe
+  |   state: done
+  |   blocked: no
+  |   blocked_by: none
+  |   held: no
+  |   hold_reason: "-"
+  |   hold_kind: "-"
+  |   hold_until: "-"
+  |   kind: task
+  |   repo: "-"
+  |   priority: "-"
+  |   created: "-"
+  |   closed: 2026-11-04
+  |   deps: none
+  |   links: none
+  |   body: "<!-- fm-add:d882848fa88098217f3ac788 -->\n\n---\nMerged from a duplicate filing: Copper narwhal sage lathe rebuild"
+$ bin/fm-tasks-axi.sh add win-free Aardvark\ juniper\ cobbler\ ratchet\ refit --objective O7 
+  | ok: added win-free -> Queued
+  | task:
+  |   id: win-free
+  |   title: Aardvark juniper cobbler ratchet refit
+  |   state: queued
+  |   blocked: no
+  |   blocked_by: none
+  |   held: no
+  |   hold_reason: "-"
+  |   hold_kind: "-"
+  |   hold_until: "-"
+  |   kind: task
+  |   repo: "-"
+  |   priority: "-"
+  |   created: 2026-11-04
+  |   closed: "-"
+  |   deps: none
+  |   links: none
+  |   body: ""
+  | help[2]:
+  |   - Run `tasks-axi start win-free` to move it to in flight
+  |   - Run `tasks-axi block win-free --by <other>` to record a dependency
+  rc=0
+  CHECK ok
+  FACT ok: a Done row older than the newest 50 does not stop the add
+
+==== final source backlog (window) ====
+  | ## In flight
+  | 
+  | ## Queued
+  | - [ ] win-new - Hazel dynamo plover winch refit (since 2026-11-04)
+  |   <!-- fm-add:79b4b06e58e19dad3e254dd3 -->
+  | 
+  | - [ ] win-free - Aardvark juniper cobbler ratchet refit (since 2026-11-04)
+  |   <!-- fm-add:98db4917048312d2c11f2ff7 -->
+  | 
+  | ## Done
+  | - [x] win-act - Copper narwhal sage lathe (done 2026-11-04)
+  |   <!-- fm-add:d882848fa88098217f3ac788 -->
+  | 
+  |   ---
+  |   Merged from a duplicate filing: Copper narwhal sage lathe rebuild
+  | 
+
+RESULT part=window checks_ok=17 checks_failed=0
+labs removed

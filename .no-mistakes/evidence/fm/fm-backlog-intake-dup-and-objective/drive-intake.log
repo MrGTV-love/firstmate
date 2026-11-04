@@ -1,0 +1,400 @@
+
+==== 1 objective required ====
+$ bin/fm-tasks-axi.sh add obj-a Alpha\ zebra\ quokka\ widget 
+  | REFUSED: guard=backlog-intake-objective rule=objective-missing missing=an objective
+  | completing-command: FM_FRICTION_OPERATION_ID=a838731f-2c64-468c-aba0-d03db414ffda FM_FRICTION_EPISODE_ID=a838731f-2c64-468c-aba0-d03db414ffda bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id>
+  | fm-tasks-axi: add needs the objective the item serves: --objective <id> with one of O1 O2 O3 O4 O5 O6 O7 (docs/objectives.md), or --objective none --objective-reason "<why no objective applies>"
+  rc=2
+  CHECK ok
+  FACT ok: refused add filed nothing
+$ bin/fm-tasks-axi.sh add obj-a Alpha\ zebra\ quokka\ widget --objective O9 
+  | REFUSED: guard=backlog-intake-objective rule=objective-unknown missing=an objective docs/objectives.md lists
+  | completing-command: FM_FRICTION_OPERATION_ID=d16ea263-7b0e-453f-a681-1700d98397b4 FM_FRICTION_EPISODE_ID=d16ea263-7b0e-453f-a681-1700d98397b4 bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id>
+  | fm-tasks-axi: unknown objective 'O9'; use one of O1 O2 O3 O4 O5 O6 O7 (docs/objectives.md), or --objective none --objective-reason "<why>"
+  rc=2
+  CHECK ok
+$ bin/fm-tasks-axi.sh add obj-a Alpha\ zebra\ quokka\ widget --objective none 
+  | REFUSED: guard=backlog-intake-objective rule=reason-missing missing=a reason for no objective
+  | completing-command: FM_FRICTION_OPERATION_ID=d2692688-88a8-409d-ba74-a667064eccf4 FM_FRICTION_EPISODE_ID=d2692688-88a8-409d-ba74-a667064eccf4 bin/fm-tasks-axi.sh add <id> <title> --objective none --objective-reason <why>
+  | fm-tasks-axi: --objective none needs --objective-reason "<why no objective applies>"
+  rc=2
+  CHECK ok
+  FACT ok: unknown id and none-without-reason filed nothing
+$ bin/fm-tasks-axi.sh add obj-a Alpha\ zebra\ quokka\ widget --objective O3 --kind ship --repo notes 
+  | ok: added obj-a (ship, repo notes) -> Queued
+  | task:
+  |   id: obj-a
+  |   title: Alpha zebra quokka widget
+  |   state: queued
+  |   blocked: no
+  |   blocked_by: none
+  |   held: no
+  |   hold_reason: "-"
+  |   hold_kind: "-"
+  |   hold_until: "-"
+  |   kind: ship
+  |   repo: notes
+  |   priority: "-"
+  |   created: 2026-11-04
+  |   closed: "-"
+  |   deps: none
+  |   links: none
+  |   body: ""
+  | help[2]:
+  |   - Run `tasks-axi start obj-a` to move it to in flight
+  |   - Run `tasks-axi block obj-a --by <other>` to record a dependency
+  rc=0
+  CHECK ok
+$ bin/fm-tasks-axi.sh add obj-b Lantern\ parsley\ orbit\ gadget --objective none --objective-reason fixture\ with\ no\ objective 
+  | ok: added obj-b -> Queued
+  | task:
+  |   id: obj-b
+  |   title: Lantern parsley orbit gadget
+  |   state: queued
+  |   blocked: no
+  |   blocked_by: none
+  |   held: no
+  |   hold_reason: "-"
+  |   hold_kind: "-"
+  |   hold_until: "-"
+  |   kind: task
+  |   repo: "-"
+  |   priority: "-"
+  |   created: 2026-11-04
+  |   closed: "-"
+  |   deps: none
+  |   links: none
+  |   body: ""
+  | help[2]:
+  |   - Run `tasks-axi start obj-b` to move it to in flight
+  |   - Run `tasks-axi block obj-b --by <other>` to record a dependency
+  rc=0
+  CHECK ok
+$ bin/fm-tasks-axi.sh create obj-c Violet\ harbor\ cactus\ sprocket --objective=O7 
+  | ok: added obj-c -> Queued
+  | task:
+  |   id: obj-c
+  |   title: Violet harbor cactus sprocket
+  |   state: queued
+  |   blocked: no
+  |   blocked_by: none
+  |   held: no
+  |   hold_reason: "-"
+  |   hold_kind: "-"
+  |   hold_until: "-"
+  |   kind: task
+  |   repo: "-"
+  |   priority: "-"
+  |   created: 2026-11-04
+  |   closed: "-"
+  |   deps: none
+  |   links: none
+  |   body: ""
+  | help[2]:
+  |   - Run `tasks-axi start obj-c` to move it to in flight
+  |   - Run `tasks-axi block obj-c --by <other>` to record a dependency
+  rc=0
+  CHECK ok
+$ bin/fm-tasks-axi.sh task add obj-d --title Marble\ tundra\ pepper\ flange --objective O1 
+  | ok: added obj-d -> Queued
+  | task:
+  |   id: obj-d
+  |   title: Marble tundra pepper flange
+  |   state: queued
+  |   blocked: no
+  |   blocked_by: none
+  |   held: no
+  |   hold_reason: "-"
+  |   hold_kind: "-"
+  |   hold_until: "-"
+  |   kind: task
+  |   repo: "-"
+  |   priority: "-"
+  |   created: 2026-11-04
+  |   closed: "-"
+  |   deps: none
+  |   links: none
+  |   body: ""
+  | help[2]:
+  |   - Run `tasks-axi start obj-d` to move it to in flight
+  |   - Run `tasks-axi block obj-d --by <other>` to record a dependency
+  rc=0
+  CHECK ok
+$ bin/fm-tasks-axi.sh add --mint Saffron\ beacon\ walnut\ gasket --objective O6 
+  | ok: added saffron-beacon-walnut-gasket-ed -> Queued
+  | task:
+  |   id: saffron-beacon-walnut-gasket-ed
+  |   title: Saffron beacon walnut gasket
+  |   state: queued
+  |   blocked: no
+  |   blocked_by: none
+  |   held: no
+  |   hold_reason: "-"
+  |   hold_kind: "-"
+  |   hold_until: "-"
+  |   kind: task
+  |   repo: "-"
+  |   priority: "-"
+  |   created: 2026-11-04
+  |   closed: "-"
+  |   deps: none
+  |   links: none
+  |   body: ""
+  | help[2]:
+  |   - Run `tasks-axi start saffron-beacon-walnut-gasket-ed` to move it to in flight
+  |   - Run `tasks-axi block saffron-beacon-walnut-gasket-ed --by <other>` to record a dependency
+  rc=0
+  CHECK ok
+--- data/backlog-review.tsv
+  | obj-a		O3	
+  | obj-b		none	fixture with no objective
+  | obj-c		O7	
+  | obj-d		O1	
+  | saffron-beacon-walnut-gasket-ed		O6	
+  FACT ok: O3 row lands in tsv
+  FACT ok: none row keeps its reason
+  FACT ok: create alias row
+  FACT ok: task add --title row
+  FACT ok: mint row names O6
+
+==== 1b answer shows no token ====
+$ bin/fm-tasks-axi.sh add tok-a Quartz\ meadow\ ribbon\ piston --objective O7 --json 
+  | {
+  |   "ok": true,
+  |   "action": "add",
+  |   "task": {
+  |     "id": "tok-a",
+  |     "title": "Quartz meadow ribbon piston",
+  |     "state": "queued",
+  |     "kind": null,
+  |     "repo": null,
+  |     "priority": null,
+  |     "created": "2026-11-04",
+  |     "closed": null,
+  |     "deps": [],
+  |     "hold": null,
+  |     "links": [],
+  |     "body": null,
+  |     "blocked": false,
+  |     "blocked_by": [],
+  |     "held": false
+  |   }
+  | }
+  rc=0
+  CHECK ok
+  | {
+  |   "ok": true,
+  |   "action": "add",
+  |   "task": {
+  |     "id": "tok-b",
+  |     "title": "Cobalt ferret anchor spindle",
+  |     "state": "queued",
+  |     "kind": null,
+  |     "repo": null,
+  |     "priority": null,
+  |     "created": "2026-11-04",
+  |     "closed": null,
+  |     "deps": [],
+  |     "hold": null,
+  |     "links": [],
+  |     "body": "hello",
+  |     "blocked": false,
+  |     "blocked_by": [],
+  |     "held": false
+  |   }
+  | }
+  FACT ok: --body hello answers hello
+
+==== 2 duplicate check at intake ====
+$ bin/fm-tasks-axi.sh add dup-kept Repair\ nightly\ storage\ cleanup\ job --objective O7 --kind ship --repo notes --body kept\ body\ line 
+  | ok: added dup-kept (ship, repo notes) -> Queued
+  | task:
+  |   id: dup-kept
+  |   title: Repair nightly storage cleanup job
+  |   state: queued
+  |   blocked: no
+  |   blocked_by: none
+  |   held: no
+  |   hold_reason: "-"
+  |   hold_kind: "-"
+  |   hold_until: "-"
+  |   kind: ship
+  |   repo: notes
+  |   priority: "-"
+  |   created: 2026-11-04
+  |   closed: "-"
+  |   deps: none
+  |   links: none
+  |   body: "kept body line"
+  | help[2]:
+  |   - Run `tasks-axi start dup-kept` to move it to in flight
+  |   - Run `tasks-axi block dup-kept --by <other>` to record a dependency
+  rc=0
+  CHECK ok
+$ bin/fm-tasks-axi.sh add dup-new Repair\ nightly\ storage\ cleanup\ script --objective O7 --kind ship --repo notes 
+  | REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+  | human-only-exit: is this add the same work as dup-kept?
+  | fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+  |   dup-kept (Queued, overlap 0.67) Repair nightly storage cleanup job
+  | Judge them, then run the add again with one of these two overrides (each still needs --objective):
+  |   the work is the same - append this title and body to dup-kept and file nothing:
+  |     /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6KE3RZ1KCH4VF5QF2ZPT3Y6/bin/fm-tasks-axi.sh add dup-new Repair\ nightly\ storage\ cleanup\ script --objective O7 --kind ship --repo notes --dup-of dup-kept
+  |   the work is different from dup-kept - file it:
+  |     /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6KE3RZ1KCH4VF5QF2ZPT3Y6/bin/fm-tasks-axi.sh add dup-new Repair\ nightly\ storage\ cleanup\ script --objective O7 --kind ship --repo notes --not-dup dup-kept
+  rc=2
+  CHECK ok
+  FACT ok: refusal names the kept neighbour
+  FACT ok: refusal prints --dup-of override
+  FACT ok: refused adds left backlog.md unchanged
+$ bin/fm-tasks-axi.sh add dup-new Repair\ nightly\ storage\ cleanup\ script --objective O7 --not-dup obj-a 
+  | REFUSED: guard=backlog-intake-not-dup rule=not-a-neighbour missing=a neighbour of this title
+  | completing-command: FM_FRICTION_OPERATION_ID=53da448d-95fa-4943-8aed-b3ec08256887 FM_FRICTION_EPISODE_ID=53da448d-95fa-4943-8aed-b3ec08256887 bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id> --not-dup <neighbour-id>
+  | fm-tasks-axi: --not-dup obj-a names an item whose title does not overlap this one enough to be a neighbour; nothing was filed
+  rc=2
+  CHECK ok
+$ bin/fm-tasks-axi.sh add dup-new Repair\ nightly\ storage\ cleanup\ script --objective O7 --not-dup dup-kept --dup-of dup-kept 
+  | fm-tasks-axi: give --dup-of or --not-dup, not both
+  rc=2
+  CHECK ok
+$ bin/fm-tasks-axi.sh add dup-new Repair\ nightly\ storage\ cleanup\ script --objective O7 --kind ship --repo notes --body extra\ occurrence\ detail --dup-of dup-kept 
+  | ok: merged into dup-kept (nothing filed)
+  rc=0
+  CHECK ok
+  FACT ok: --dup-of files nothing
+  FACT ok: --dup-of leaves no new row
+  | task:
+  |   id: dup-kept
+  |   title: Repair nightly storage cleanup job
+  |   state: queued
+  |   blocked: no
+  |   blocked_by: none
+  |   held: no
+  |   hold_reason: "-"
+  |   hold_kind: "-"
+  |   hold_until: "-"
+  |   kind: ship
+  |   repo: notes
+  |   priority: "-"
+  |   created: 2026-11-04
+  |   closed: "-"
+  |   deps: none
+  |   links: none
+  |   body: "kept body line\n<!-- fm-add:d7f4cf8068df6d78f22f6fa3 -->\n\n---\nMerged from a duplicate filing: Repair nightly storage cleanup script\nextra occurrence detail"
+  FACT ok: kept item got the new title
+  FACT ok: kept item got the new body
+$ bin/fm-tasks-axi.sh add dup-not Repair\ nightly\ storage\ cleanup\ rotation --objective O7 --kind ship --repo notes --not-dup dup-kept 
+  | ok: added dup-not (ship, repo notes) -> Queued
+  | task:
+  |   id: dup-not
+  |   title: Repair nightly storage cleanup rotation
+  |   state: queued
+  |   blocked: no
+  |   blocked_by: none
+  |   held: no
+  |   hold_reason: "-"
+  |   hold_kind: "-"
+  |   hold_until: "-"
+  |   kind: ship
+  |   repo: notes
+  |   priority: "-"
+  |   created: 2026-11-04
+  |   closed: "-"
+  |   deps: none
+  |   links: none
+  |   body: ""
+  | help[2]:
+  |   - Run `tasks-axi start dup-not` to move it to in flight
+  |   - Run `tasks-axi block dup-not --by <other>` to record a dependency
+  rc=0
+  CHECK ok
+  FACT ok: --not-dup files the item
+  FACT ok: --not-dup row in tsv
+$ bin/fm-tasks-axi.sh add dup-free Emerald\ kiosk\ trombone\ valve --objective O7 
+  | ok: added dup-free -> Queued
+  | task:
+  |   id: dup-free
+  |   title: Emerald kiosk trombone valve
+  |   state: queued
+  |   blocked: no
+  |   blocked_by: none
+  |   held: no
+  |   hold_reason: "-"
+  |   hold_kind: "-"
+  |   hold_until: "-"
+  |   kind: task
+  |   repo: "-"
+  |   priority: "-"
+  |   created: 2026-11-04
+  |   closed: "-"
+  |   deps: none
+  |   links: none
+  |   body: ""
+  | help[2]:
+  |   - Run `tasks-axi start dup-free` to move it to in flight
+  |   - Run `tasks-axi block dup-free --by <other>` to record a dependency
+  rc=0
+  CHECK ok
+  FACT ok: unrelated title is filed with no prompt
+
+==== 3 no bypass of add checks ====
+$ bin/fm-tasks-axi.sh add byp-x Repair\ nightly\ storage\ cleanup\ script --force 
+  | REFUSED: guard=backlog-intake-objective rule=objective-missing missing=an objective
+  | completing-command: FM_FRICTION_OPERATION_ID=0e1809e4-9014-4caa-ae86-0b3922b190e6 FM_FRICTION_EPISODE_ID=0e1809e4-9014-4caa-ae86-0b3922b190e6 bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id>
+  | fm-tasks-axi: add needs the objective the item serves: --objective <id> with one of O1 O2 O3 O4 O5 O6 O7 (docs/objectives.md), or --objective none --objective-reason "<why no objective applies>"
+  rc=2
+  CHECK ok
+$ bin/fm-tasks-axi.sh add byp-x Repair\ nightly\ storage\ cleanup\ script --yes 
+  | REFUSED: guard=backlog-intake-objective rule=objective-missing missing=an objective
+  | completing-command: FM_FRICTION_OPERATION_ID=2efba107-cae1-4b44-b5b9-193574504a6b FM_FRICTION_EPISODE_ID=2efba107-cae1-4b44-b5b9-193574504a6b bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id>
+  | fm-tasks-axi: add needs the objective the item serves: --objective <id> with one of O1 O2 O3 O4 O5 O6 O7 (docs/objectives.md), or --objective none --objective-reason "<why no objective applies>"
+  rc=2
+  CHECK ok
+$ bin/fm-tasks-axi.sh add byp-x Repair\ nightly\ storage\ cleanup\ script --no-check 
+  | REFUSED: guard=backlog-intake-objective rule=objective-missing missing=an objective
+  | completing-command: FM_FRICTION_OPERATION_ID=a688dbc1-4310-4fde-a988-7761d89255c8 FM_FRICTION_EPISODE_ID=a688dbc1-4310-4fde-a988-7761d89255c8 bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id>
+  | fm-tasks-axi: add needs the objective the item serves: --objective <id> with one of O1 O2 O3 O4 O5 O6 O7 (docs/objectives.md), or --objective none --objective-reason "<why no objective applies>"
+  rc=2
+  CHECK ok
+$ bin/fm-tasks-axi.sh add byp-x Repair\ nightly\ storage\ cleanup\ script --skip-intake 
+  | REFUSED: guard=backlog-intake-objective rule=objective-missing missing=an objective
+  | completing-command: FM_FRICTION_OPERATION_ID=1f90da0d-78a1-4145-a06d-1a8c4c52b02c FM_FRICTION_EPISODE_ID=1f90da0d-78a1-4145-a06d-1a8c4c52b02c bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id>
+  | fm-tasks-axi: add needs the objective the item serves: --objective <id> with one of O1 O2 O3 O4 O5 O6 O7 (docs/objectives.md), or --objective none --objective-reason "<why no objective applies>"
+  rc=2
+  CHECK ok
+$ bin/fm-tasks-axi.sh add byp-x Repair\ nightly\ storage\ cleanup\ script --no-objective 
+  | REFUSED: guard=backlog-intake-objective rule=objective-missing missing=an objective
+  | completing-command: FM_FRICTION_OPERATION_ID=7712a47b-5e09-4d6a-81fd-626653bcf168 FM_FRICTION_EPISODE_ID=7712a47b-5e09-4d6a-81fd-626653bcf168 bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id>
+  | fm-tasks-axi: add needs the objective the item serves: --objective <id> with one of O1 O2 O3 O4 O5 O6 O7 (docs/objectives.md), or --objective none --objective-reason "<why no objective applies>"
+  rc=2
+  CHECK ok
+$ env FM_GATE_REFUSE_BYPASS=1 FM_TASKS_AXI_NO_INTAKE=1 FM_INTAKE_BYPASS=1 FM_SKIP_INTAKE=1 bin/fm-tasks-axi.sh add byp-y Repair\ nightly\ storage\ cleanup\ script 
+  | REFUSED: guard=backlog-intake-objective rule=objective-missing missing=an objective
+  | completing-command: FM_FRICTION_OPERATION_ID=d2d2d2df-f4dc-4d3e-8fde-504e37f44c24 FM_FRICTION_EPISODE_ID=d2d2d2df-f4dc-4d3e-8fde-504e37f44c24 bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id>
+  | fm-tasks-axi: add needs the objective the item serves: --objective <id> with one of O1 O2 O3 O4 O5 O6 O7 (docs/objectives.md), or --objective none --objective-reason "<why no objective applies>"
+  rc=2
+  CHECK ok
+$ env FM_GATE_REFUSE_BYPASS=1 FM_INTAKE_BYPASS=1 bin/fm-tasks-axi.sh add byp-y Repair\ nightly\ storage\ cleanup\ script --objective O7 
+  | REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+  | human-only-exit: is this add the same work as dup-kept?
+  | fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+  |   dup-kept (Queued, overlap 0.67) Repair nightly storage cleanup job
+  |   dup-not (Queued, overlap 0.67) Repair nightly storage cleanup rotation
+  | Judge them, then run the add again with one of these two overrides (each still needs --objective):
+  |   the work is the same - append this title and body to dup-kept and file nothing:
+  |     /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6KE3RZ1KCH4VF5QF2ZPT3Y6/bin/fm-tasks-axi.sh add byp-y Repair\ nightly\ storage\ cleanup\ script --objective O7 --dup-of dup-kept
+  |   the work is different from dup-kept - file it:
+  |     /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6KE3RZ1KCH4VF5QF2ZPT3Y6/bin/fm-tasks-axi.sh add byp-y Repair\ nightly\ storage\ cleanup\ script --objective O7 --not-dup dup-kept
+  rc=2
+  CHECK ok
+  FACT ok: no bypass spelling filed a row
+
+==== 4 last 50 Done window, active and archive ====
+  | total 40
+  | drwxr-xr-x  6 charlesabrooker  staff   192 Nov  4 09:14 .
+  | drwx------  7 charlesabrooker  staff   224 Nov  4 08:54 ..
+  | -rw-r--r--  1 charlesabrooker  staff   778 Nov  4 09:13 backlog-review.tsv
+  | -rw-r--r--  1 charlesabrooker  staff  2381 Nov  4 09:14 backlog.md
+  | -rw-r--r--  1 charlesabrooker  staff  5208 Nov  4 09:14 done-archive.md
+  | -rw-r--r--  1 charlesabrooker  staff   182 Nov  4 08:57 note-archive.md
+  active rows win-: 10
+  archived rows win-: 41
