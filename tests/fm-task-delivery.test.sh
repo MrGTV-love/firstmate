@@ -520,9 +520,9 @@ test_promotion_delivers_the_real_definition_of_done() {
   cat > "$sendroot/bin/fm-send.sh" <<'STUB'
 #!/usr/bin/env bash
 # Capture the message a promoted worker would receive, instead of steering one.
-# The printed command must state its choice for an open keyed decision: arg 2 is --answers-none.
-[ "$2" = "--answers-none" ] || exit 64
-printf '%s' "$3" > "$FM_TEST_CAPTURE"
+# The printed command carries no answers flag: the target and the text only.
+[ "$#" -eq 2 ] || exit 64
+printf '%s' "$2" > "$FM_TEST_CAPTURE"
 STUB
   chmod +x "$sendroot/bin/fm-send.sh"
 
@@ -628,8 +628,8 @@ test_promotion_teaches_the_closes_line_only_where_a_pr_body_exists() {
   mkdir -p "$home/state" "$sendroot/bin"
   cat > "$sendroot/bin/fm-send.sh" <<'STUB'
 #!/usr/bin/env bash
-[ "$2" = "--answers-none" ] || exit 64
-printf '%s' "$3" > "$FM_TEST_CAPTURE"
+[ "$#" -eq 2 ] || exit 64
+printf '%s' "$2" > "$FM_TEST_CAPTURE"
 STUB
   chmod +x "$sendroot/bin/fm-send.sh"
   for mode in no-mistakes direct-PR local-only; do
@@ -651,6 +651,35 @@ STUB
     fi
   done
   pass "promotion teaches the Closes: line in the delivered text and the relaunch brief for PR modes only"
+}
+
+# A promotion often answers the scout's own keyed question, so the delivery command
+# promotion prints states no answers choice: run as printed against the real
+# fm-send.sh, it refuses while the key is open and names it, and the sender chooses.
+test_promotion_delivery_command_makes_the_sender_choose() {
+  local home id out cmd err rc fakebin
+  home="$TMP_ROOT/promote-choice/home"
+  fakebin="$TMP_ROOT/promote-choice/fakebin"
+  id=promote-choice-c1
+  mkdir -p "$home/state" "$fakebin"
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$fakebin/tmux"
+  chmod +x "$fakebin/tmux"
+  printf 'window=fm-%s\nkind=scout\nworktree=/tmp/wt\n' "$id" > "$home/state/$id.meta"
+  FM_HOME="$home" "$BRIEF" "$id" fixture-project --scout >/dev/null 2>&1 \
+    || fail "scout brief generation should succeed"
+  fill_brief_subsections "$home/data/$id/brief.md" "Build what the scout found." "Keep the scope."
+  printf 'needs-decision [key=ship-it]: should I build it?\n' > "$home/state/$id.status"
+  out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$PROMOTE" "$id" --mode no-mistakes --yolo off 2>&1) \
+    || fail "promotion should succeed: $out"
+  cmd=$(printf '%s\n' "$out" | sed -n 's/^next: //p' | grep 'fm-send\.sh')
+  [ -n "$cmd" ] || fail "promotion printed no delivery command: $out"
+  err="$TMP_ROOT/promote-choice/send.err"
+  ( cd "$ROOT" && PATH="$fakebin:$PATH" FM_SEND_SETTLE=0 eval "$cmd" ) >/dev/null 2>"$err"
+  rc=$?
+  [ "$rc" -eq 1 ] || fail "the printed delivery command should refuse while ship-it is open (rc=$rc): $(cat "$err")"
+  assert_grep "[key=ship-it] needs-decision" "$err" "the refusal did not name the open key"
+  assert_absent "$home/state/$id.inbox" "the refused delivery command wrote a steering record"
+  pass "fm-promote: the printed delivery command states no choice, so fm-send refuses while a key is open and names it"
 }
 
 test_promotion_persists_the_selected_ship_branch() {
@@ -1924,8 +1953,8 @@ test_promotion_carries_the_forge_binding() {
   printf '%s\n' '- proj [no-mistakes forge=gerrit] - fixture (added 2026-01-01)' > "$home/data/projects.md"
   cat > "$sendroot/bin/fm-send.sh" <<'STUB'
 #!/usr/bin/env bash
-[ "$2" = "--answers-none" ] || exit 64
-printf '%s' "$3" > "$FM_TEST_CAPTURE"
+[ "$#" -eq 2 ] || exit 64
+printf '%s' "$2" > "$FM_TEST_CAPTURE"
 STUB
   chmod +x "$sendroot/bin/fm-send.sh"
 
@@ -1999,8 +2028,8 @@ EOF
   mkdir -p "$sendroot/bin"
   cat > "$sendroot/bin/fm-send.sh" <<'STUB'
 #!/usr/bin/env bash
-[ "$2" = "--answers-none" ] || exit 64
-printf '%s' "$3" > "$FM_TEST_CAPTURE"
+[ "$#" -eq 2 ] || exit 64
+printf '%s' "$2" > "$FM_TEST_CAPTURE"
 STUB
   chmod +x "$sendroot/bin/fm-send.sh"
   id="forge-forgejo-p1"
@@ -2136,6 +2165,7 @@ test_promote_requires_and_records_the_delivery_contract
 test_promote_refuses_a_symlinked_task_record
 test_promotion_delivers_the_real_definition_of_done
 test_promotion_teaches_the_closes_line_only_where_a_pr_body_exists
+test_promotion_delivery_command_makes_the_sender_choose
 test_promotion_persists_the_selected_ship_branch
 test_promotion_branch_command_is_shell_safe
 test_local_merge_uses_the_recorded_ship_branch

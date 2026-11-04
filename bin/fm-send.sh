@@ -515,10 +515,6 @@ while :; do
     shift
     ;;
   --answers-none)
-    [ "$ANSWERS_NONE" = 0 ] || {
-      echo "error: duplicate --answers-none" >&2
-      exit 1
-    }
     ANSWERS_NONE=1
     shift
     ;;

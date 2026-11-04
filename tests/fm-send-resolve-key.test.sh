@@ -1156,10 +1156,12 @@ test_answers_none_with_resolve_key_is_contradictory() {
   assert_equals "$before" "$(tree_state "$home")" "a contradictory pair changes nothing durable"
   send_capture "$fb" "$home" "$log" "$err" t1 --resolve-key k1 --answers-none "both"; rc=$?
   expect_code 1 "$rc" "the flag pair is refused in the other order too"
-  send_capture "$fb" "$home" "$log" "$err" t1 --answers-none --answers-none "twice"; rc=$?
-  expect_code 1 "$rc" "a duplicated --answers-none is refused like a duplicated --resolve-key"
   assert_equals "$before" "$(tree_state "$home")" "refusals change nothing durable"
-  pass "fm-send: --answers-none together with --resolve-key is refused as contradictory"
+  send_capture "$fb" "$home" "$log" "$err" t1 --answers-none --answers-none "twice"; rc=$?
+  expect_code 0 "$rc" "a repeated --answers-none states one choice and is delivered"
+  grep -qF "twice" "$home/state/t1.inbox/001.msg" || fail "the repeated-flag send did not reach the record"
+  assert_contains "$(drain_out "$home")" "[key=k1]" "a repeated --answers-none leaves k1 open"
+  pass "fm-send: --answers-none together with --resolve-key is refused as contradictory; a repeated --answers-none is one choice"
 }
 
 test_mistyped_or_closed_key_is_not_turned_into_a_none_send() {
