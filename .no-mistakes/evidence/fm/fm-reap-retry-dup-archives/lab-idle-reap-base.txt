@@ -1,0 +1,71 @@
+# BEFORE: same lab drive with bin/ exported from base 9c5874baa (fix absent). Admission block still from the worktree's unchanged bin/fm-teardown.sh.
+lab home: /Users/charlesabrooker/tmp/fm-lab.AZLPas (marked lab, plain FM_HOME, no overrides)
+bin under test: /Users/charlesabrooker/tmp/fm-exports.YNyWxI/base/bin (42d71baf9 worktree; base export when the path is not the worktree)
+
+== U: an unchanged retained copy ==
+sweep 1 (first refusal)                                    cl_calls=1 archives=1 wake_rows_naming_copy=0 record=none memo=present
+sweep 2 (fresh memo, unchanged)                            cl_calls=1 archives=1 wake_rows_naming_copy=0 record=none memo=present
+sweep 3 (memo aged 100000s > 21600s)                       cl_calls=2 archives=2 wake_rows_naming_copy=0 record=none memo=present
+sweep 4 (clock a further day)                              cl_calls=3 archives=3 wake_rows_naming_copy=0 record=none memo=present
+scan row: refused | REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-lab.AZLPas/slot/vernant/.claude/worktrees/fm-cl-l2 (exit 3): full output: /Users/charlesabrooker/tmp/fm-lab.AZLPas/data/cl/vernant-closeout.iOg...
+grep: /Users/charlesabrooker/tmp/fm-lab.AZLPas/state/.wake-queue: No such file or directory
+wake row: 
+record:
+sed: /Users/charlesabrooker/tmp/fm-lab.AZLPas/state/.closeout-retained/cl: No such file or directory
+archive sha256s:
+  9c29b6cb12c1372f02842a0c25de989ca5d98c59512f0e614d96acb189466976  cl-preservation-1.tar
+  9c29b6cb12c1372f02842a0c25de989ca5d98c59512f0e614d96acb189466976  cl-preservation-2.tar
+  9c29b6cb12c1372f02842a0c25de989ca5d98c59512f0e614d96acb189466976  cl-preservation-3.tar
+
+== D: the wake is consumed with the real bin/fm-wake-drain.sh ==
+  (no ack command printed; emptying the lab queue file instead)
+  pending rows after ack: 0
+sweep 5 (wake consumed, memo aged, unchanged)              cl_calls=4 archives=4 wake_rows_naming_copy=0 record=none memo=present
+  queue rows naming the copy before sweep 5: 0, after: 0; pending after: 0
+
+== C: the copy changes (new commit); memo is the old aged one ==
+  memo age before sweep 6: 4s
+sweep 6 (HEAD changed)                                     cl_calls=4 archives=4 wake_rows_naming_copy=0 record=none memo=present
+  sweep 6 row: refused | REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-lab.AZLPas/slot/vernant/.claude/w
+== C2: an untracked file appears right after sweep 6's refusal (memo FRESH, < 6h) ==
+  memo age before sweep 7: 6s
+sweep 7 (status changed, fresh memo)                       cl_calls=4 archives=4 wake_rows_naming_copy=0 record=none memo=present
+  sweep 7 row: refused | REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-lab.AZLPas/slot/vernant/.claude/w
+== C3: a tracked file is modified right after sweep 7 (memo FRESH) ==
+  memo age before sweep 8: 8s
+sweep 8 (status changed, fresh memo)                       cl_calls=4 archives=4 wake_rows_naming_copy=0 record=none memo=present
+  sweep 8 row: refused | REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-lab.AZLPas/slot/vernant/.claude/w
+  closeout-class tries admitted by teardown's real admission block so far: 4
+sweep 9 (unchanged since sweep 8, memo aged: held)         cl_calls=5 archives=5 wake_rows_naming_copy=0 record=none memo=present
+
+== O: another refusal class keeps its 6h retry ==
+ot sweep 1: calls=1 record=none wakes_naming_copy=0
+ot sweep 2 (fresh memo): calls=1
+ot sweep 3 (memo aged): calls=2 record=none
+
+== B: boundary: more edits to an already-modified tracked file (HEAD and git status unchanged) ==
+sweep 9b (same HEAD, same status line set, memo aged)      cl_calls=6 archives=6 wake_rows_naming_copy=0 record=none memo=present
+  git status --porcelain:  M README.md;?? new.txt;
+
+== S: a teardown that completes clears the record ==
+sweep 10 (changed copy, teardown exits 0)                  cl_calls=6 archives=6 wake_rows_naming_copy=0 record=none memo=present
+  task meta: present; closeout record files left: 0
+
+final teardown call log:
+  1793765364 call id=cl mode=closeout memo_present_at_call=0 admission_marker=1
+    admitted id=cl
+  1793765368 call id=cl mode=closeout memo_present_at_call=1 admission_marker=1
+    admitted id=cl
+  1793765371 call id=cl mode=closeout memo_present_at_call=1 admission_marker=1
+    admitted id=cl
+  1793765400 call id=cl mode=closeout memo_present_at_call=1 admission_marker=1
+    admitted id=cl
+  1793765410 call id=cl mode=closeout memo_present_at_call=1 admission_marker=1
+    admitted id=cl
+  1793765415 call id=ot mode=refuse memo_present_at_call=0 admission_marker=1
+    admitted id=ot
+  1793765427 call id=ot mode=refuse memo_present_at_call=1 admission_marker=1
+    admitted id=ot
+  1793765432 call id=cl mode=closeout memo_present_at_call=1 admission_marker=1
+    admitted id=cl
+lab torn down: yes

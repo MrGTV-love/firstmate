@@ -1,0 +1,27 @@
+# Real recorded closeout outputs through the real teardown printer and the new class check
+# The plan's named log vernant-d1-intake-limits-estimate-teardown.log is gone from data/main2662-disk; these real driver outputs replace it.
+
+source file: /Users/charlesabrooker/.treehouse/firstmate-7bab20/2/firstmate/data/vernant-d1-intake-limits-estimate/vernant-closeout.xNMHas
+source bytes: 346538  sha256: 5cd43520fba1293d
+source top-level reason: cleanup_ignored_payload_archived_tree_retained
+printed teardown output: 3 lines; line lengths: 226 372 346168 
+printed refusal line: REFUSED: Vernant's closeout driver did not release own nested copy /lab/slot/vernant/.claude/worktrees/fm-lab-task-l2 (exit 3): full output: <scratch>/data/lab-task/vernant-closeout.6SzLsH
+fm_closeout_retained_class: RECOGNISED (retained class); named copies: /lab/slot/vernant/.claude/worktrees/fm-lab-task-l2
+negative (top-level reason swapped, retained token still nested in 0 line(s)): not recognised, as required
+
+source file: /Users/charlesabrooker/.treehouse/firstmate-7bab20/2/firstmate/data/vernant-d1-docx-pptx-internal-figures-copy/vernant-closeout.ziksIQ
+source bytes: 472408  sha256: 6519b4f479f6d810
+source top-level reason: cleanup_ignored_payload_archived_tree_retained
+printed teardown output: 3 lines; line lengths: 226 370 472040 
+printed refusal line: REFUSED: Vernant's closeout driver did not release own nested copy /lab/slot/vernant/.claude/worktrees/fm-lab-task-l2 (exit 3): full output: <scratch>/data/lab-task/vernant-closeout.iVH63s
+fm_closeout_retained_class: RECOGNISED (retained class); named copies: /lab/slot/vernant/.claude/worktrees/fm-lab-task-l2
+negative (top-level reason swapped, retained token still nested in 0 line(s)): not recognised, as required
+
+source file: /Users/charlesabrooker/.treehouse/firstmate-7bab20/2/firstmate/data/vernant-d1-pr3031-review-followups/vernant-closeout.zOetwn
+source bytes: 17226  sha256: 82438b1c74b881ef
+source top-level reason: cleanup_ignored_payload_archived_tree_retained
+printed teardown output: 3 lines; line lengths: 223 372 16856 
+printed refusal line: REFUSED: Vernant's closeout driver did not release foreign copy /lab/slot/vernant/.claude/worktrees/fm-lab-task-l2 (exit 3): full output: <scratch>/data/lab-task/vernant-closeout.Lzhr9v
+fm_closeout_retained_class: RECOGNISED (retained class); named copies: /lab/slot/vernant/.claude/worktrees/fm-lab-task-l2
+negative (top-level reason swapped, retained token still nested in 0 line(s)): not recognised, as required
+

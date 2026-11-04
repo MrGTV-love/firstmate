@@ -1,0 +1,11 @@
+42d71baf91e6233d97ee716ca39ba0d48bf90b6e
+# tests/fm-idle-session-reap.test.sh with only its test_closeout_* cases invoked (filtered copy outside the worktree; full file too slow at load ~55)
+ok - the closeout driver's archives follow the copy's changes: one for an unchanged copy however many sweeps run, one more for each change
+ok - a stale closeout record is pruned by the first reap, with or without the refusal memo directory
+ok - an unchanged copy the closeout driver retained is not offered to teardown again, in all three producer forms, and raises one wake
+ok - the one closeout wake does not depend on the queue and is raised again after a failed append
+ok - a copy whose HEAD or status changed is retried by the next sweep, and its new refusal raises a new wake
+ok - other refusal classes, nested tokens, unparsable output, mixed refusals and unreadable copies keep today's retry
+ok - a completed teardown clears the closeout record, and a stale record is pruned
+bash $S/closeout-only.test.sh  17.08s user 33.76s system 23% cpu 3:39.36 total
+exit=0
