@@ -62,10 +62,10 @@ Pipeline starts:
     resident memory the counted runs hold (never capped), or when no other run
     is counted (a one-start minimum). The projection is S for the new run plus,
     per counted run: only what it holds when it waits on remote CI (open step ci
-    in running, no recorded agent pid, no live launch reservation) or while its
-    launch gate waits in this queue with no live launch reservation; its
-    resident memory or A, whichever is larger, when the reading sees it; R
-    while the reading cannot see it. S is the largest per-run peak of every recorded
+    in running, no recorded agent pid, no live launch reservation, no process
+    of it visible) or while its launch gate waits in this queue with no live
+    launch reservation; its resident memory or A, whichever is larger, when the
+    reading sees it; R while the reading cannot see it. S is the largest per-run peak of every recorded
     no-mistakes run with at least 2 readings, and R the 75th percentile (nearest
     rank) of those peaks leaving out runs that are status-running with
     ci_ready_at IS NULL, read from the root home's .memory-calibration.json
@@ -147,7 +147,8 @@ Launch gate:
     waiting notice is due after FIRST_NOTICE_SECS), an admission after a hold and
     every refusal each append one check wake (launch-gate-<run>, naming the run,
     the reason and the time waited) to the root home's wake queue through
-    fm_wake_append.
+    fm_wake_pending_settle, which never waits for the queue lock: when it is
+    busy the wake is spilled for the next drain to replay.
   - AGENT keeps stdin, stdout and stderr; SIGTERM, SIGINT and SIGHUP sent to the
     gate are forwarded to it; its exit status is returned and a death by signal
     is re-raised. A missing or non-executable AGENT returns 127 or 126. A
@@ -386,6 +387,12 @@ def _restore_default_signals() -> None:
         signal.signal(signum, signal.SIG_DFL)
 
 
+def _restore_exec_signals() -> None:
+    for name in ("SIGPIPE", "SIGXFSZ"):
+        if hasattr(signal, name):
+            signal.signal(getattr(signal, name), signal.SIG_DFL)
+
+
 def exec_direct(command: List[str], env: dict, log_fd: int) -> int:
     if log_fd > 2:
         try:
@@ -393,6 +400,7 @@ def exec_direct(command: List[str], env: dict, log_fd: int) -> int:
         except OSError:
             pass
     try:
+        _restore_exec_signals()
         os.execvpe(command[0], command, env)
     except FileNotFoundError:
         log(2, "command not found: %s" % command[0])
@@ -1274,10 +1282,11 @@ def map_worktree(cwd: str) -> Tuple[str, str, str]:
 
 
 def durable_line(text: str, key: str) -> None:
-    """Append one check wake to the root home's queue, which supervision drains; never blocks the launch decision."""
+    """Append one check wake to the root home's queue, or spill it there when the queue lock is busy; never waits for that lock."""
     try:
         home = root_home()
-        subprocess.run(["bash", "-c", '. "$1" && fm_wake_append check "$2" "$3"', "bash",
+        subprocess.run(["bash", "-c", '. "$1" && FM_WAKE_PENDING_KIND=check FM_WAKE_PENDING_KEY=$2 FM_WAKE_PENDING_PAYLOAD=$3'
+                        ' && fm_wake_pending_settle', "bash",
                         str(Path(__file__).with_name("fm-wake-lib.sh")), key, "check: launch-gate: " + text],
                        env=dict(os.environ, FM_HOME=str(home)), stdin=subprocess.DEVNULL,
                        stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=True)
@@ -1332,6 +1341,7 @@ def start_watched(command: List[str]) -> Tuple[int, int]:
             os.close(error_read)
             os.close(write_end)
             _restore_default_signals()
+            _restore_exec_signals()
             if os.read(go_read, 1) != b"g":
                 os._exit(125)
             os.execvp(command[0], command)

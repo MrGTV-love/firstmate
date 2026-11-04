@@ -1116,6 +1116,34 @@ while not (folder / (run + '.release')).exists(): time.sleep(0.025)
     assert all(cause in queue for cause in ('unmapped worktree', 'ambiguous worktree', 'run database unreadable')), queue
     assert 'next action: ' in queue, queue
 
+    # A busy wake-queue lock never holds the gate: the refusal exits at once and its wake is spilled for the next drain.
+    holder = subprocess.Popen(['bash', '-c', '. "$1" && fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" && touch "$2" && sleep 60', 'bash',
+                               str(repo / 'bin/fm-wake-lib.sh'), str(folder / 'queue-held')], env=env, start_new_session=True)
+    children.append(holder)
+    wait_for(lambda: (folder / 'queue-held').exists(), 'wake-queue lock held')
+    before = wakes(folder)
+    started_at = time.monotonic()
+    child, log = gate(folder, env, 'nowhere', cwd=folder / 'elsewhere', log='unmapped-busy')
+    finish(child, 75)
+    assert time.monotonic() - started_at < 10 and wakes(folder) == before
+    spilled = ''.join(p.read_text() for p in (folder / 'fmhome' / 'state').glob('.wake-spill.[0-9]*'))
+    assert 'launch-gate-unmapped' in spilled and 'unmapped worktree' in spilled, spilled
+    os.killpg(holder.pid, signal.SIGKILL)
+    holder.wait()
+
+    # The agent and every passthrough start with SIGPIPE at its default, as a shell's exec leaves it.
+    def pipe_status(command, env, cwd):
+        out = root / ('pipe-%d' % len(records))
+        probe = ['bash', '-c', 'yes | head -1 >/dev/null; echo "${PIPESTATUS[0]}" > "$1"', 'probe', str(out)]
+        records.append(dict(command=command + probe))
+        subprocess.run(command + probe, env=env, cwd=str(cwd), stdin=subprocess.DEVNULL, timeout=30, check=True)
+        return out.read_text().strip()
+    folder, db, env = gate_case('gate-sigpipe', runs=(('x', 'ci', 'running', None), ('y', 'review', 'fixing', 77)))
+    launch_gate = ['bash', str(repo / 'bin/fm-cpu-pass.sh'), 'launch-gate', '--']
+    assert pipe_status(launch_gate, env, folder / 'wt-x') == '141'
+    assert pipe_status(launch_gate, env, folder / 'wt-y') == '141'
+    assert pipe_status(['bash', str(repo / 'bin/fm-mem-guard.sh'), 'run', '--'], env, folder) == '141'
+
     # Scope: another step of a counted run passes through at once, even on a full host.
     folder, db, env = gate_case('gate-scope', available=GIB, runs=(('x', 'review', 'fixing', 77),))
     child, log = gate(folder, env, 'x', mode='exit-0')
@@ -1441,7 +1469,7 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
         lock = os.open(str(folder / 'pool' / 'pipeline-start.lock'), os.O_RDWR | os.O_CREAT, 0o600)
         fcntl.flock(lock, fcntl.LOCK_EX)
         child, log = gate(folder, env, 'x', mode='exit-0')
-        time.sleep(2.6)
+        wait_for(lambda: 'launch-gate waiting: another start is registering' in log.with_suffix('.stderr').read_text(), 'contention notice')
         fcntl.flock(lock, fcntl.LOCK_UN); os.close(lock)
         assert child.wait(timeout=30) == 0
         queue = wakes(folder)
