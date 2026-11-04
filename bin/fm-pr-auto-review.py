@@ -31,7 +31,9 @@ A pass for a kind=ship task in mode no-mistakes or direct-PR that records a GitH
      bin/fm-pr-merge.sh <task> <url> with no other argument, never an override, waiver or captain word,
      and a captain-word basis is left to Main. Otherwise `fm-review-record.py plan` names the author
      families still uncovered and one read is requested for them. While the PR sits in a merge
-     queue that fm-pr-merge.sh reported, nothing is called again until the queue lets it go.
+     queue that fm-pr-merge.sh reported, nothing is called again while the forge reports it queued; once
+     the forge reports it out of the queue and still open, the head is held for Main once with one wake and
+     fm-pr-merge.sh is never called again for that head, and a merged PR still ends merged.
 Counting rule: for one head and one reader model there is at most one request, whether it is
 outstanding, finished or failed, so a repeat pass, a restart or a second caller makes no duplicate.
 While a read is outstanding no further read is requested for that head. A model whose read failed
@@ -70,8 +72,9 @@ none the read is never recorded, the head is held as `served model unknown` for 
 read is requested for it. Main's runner prints that line only when one model served every reply and
 prints nothing otherwise, so a read it cannot vouch for holds for Main.
 Before any reader is dispatched the contract must be complete: a non-empty brief.md, at least one
-non-empty Definition Of Done (dod.md or data/dod/<task>.md) and every `DoD file:` it names under data/;
-otherwise the head is held as `review pack not built: contract source missing: <names>` and nothing runs.
+non-empty Definition Of Done (the brief's `## Definition Of Done (task)` section, the file its unfenced in-section
+`DoD file:` line names under data/, or data/dod/<task>.md, all read through bin/fm-dod-lib.sh's section reader) and
+that named file; otherwise the head is held as `review pack not built: contract source missing: <names>` and nothing runs.
 The protected-class decision reads every review row recorded for the exact head, whoever recorded it:
 any yes, missing or malformed answer, any report that is gone or no longer matches its recorded digest,
 and any unreadable history holds the merge, and a later `no` never clears an earlier answer. A recorded
@@ -244,8 +247,12 @@ def gh_view(url):
     return view if isinstance(view, dict) and SHA.fullmatch(str(view.get("headRefOid", ""))) else None
 
 
-def still_queued(url):
-    """False only when the forge answers that the PR has left the merge queue; the query is bin/fm-pr-merge.sh's."""
+def queue_state(url):
+    """`open` only when the forge answers that the PR is open, unmerged and out of the merge queue; otherwise `wait`.
+
+    The query is bin/fm-pr-merge.sh's. An unreadable answer, a PR still queued and a PR that has merged
+    since the pass read it all wait: the next pass reads the forge again and finds the real state.
+    """
     owner, repo, number = PR_URL.fullmatch(url).groups()
     result = run(["gh", "api", "graphql", "-f",
                   "query=query($owner:String!,$repo:String!,$number:Int!){repository(owner:$owner,name:$repo)"
@@ -253,7 +260,8 @@ def still_queued(url):
                   "-F", f"owner={owner}", "-F", f"repo={repo}", "-F", f"number={number}", "--jq",
                   '.data.repository.pullRequest | "state=" + (.state // ""), "merged=" + (.merged | tostring), '
                   '"queued=" + (.isInMergeQueue | tostring), "base=" + (.baseRefName // "")'])
-    return not (result.returncode == 0 and "queued=false" in result.stdout.splitlines())
+    answer = result.stdout.splitlines() if result.returncode == 0 else []
+    return "open" if {"state=OPEN", "merged=false", "queued=false"} <= set(answer) else "wait"
 
 
 def checks_not_green(rollup):
@@ -633,38 +641,65 @@ def collect(home, task, url, sha, base, side, meta):
     return outstanding
 
 
+def brief_dod(brief):
+    """(present, span, pointer) for the brief's Definition Of Done, read by bin/fm-dod-lib.sh, the one owner of that section.
+
+    present: the `## Definition Of Done (task)` heading exists outside a fence. span: the lines through
+    `## How You're Graded`. pointer: the unfenced `DoD file: <absolute path>` line inside that span, if any.
+    Returns None when the reader itself failed, which the caller reports as a missing source.
+    """
+    script = ('. "$1/fm-dod-lib.sh" || exit 3; fm_brief_heading_present "$2" "$FM_TASK_DOD_SECTION_TITLE" || exit 4; '
+              'fm_brief_task_dod_file "$2"; printf "\\0"; '
+              'fm_brief_heading_span "$2" "$FM_TASK_DOD_SECTION_TITLE" "$FM_TASK_DOD_GRADED_TITLE"')
+    done = run(["bash", "-c", script, "fm-pr-auto-review", str(BIN), str(brief)])
+    if done.returncode == 4:
+        return False, "", ""
+    if done.returncode != 0 or "\0" not in done.stdout:
+        return None
+    pointer, span = done.stdout.split("\0", 1)
+    return True, span, pointer.strip()
+
+
 def contract_text(home, task):
     """(text, absent): the brief, its Definition Of Done and every steering message, which is what the reader judges against.
 
     absent names each required source that is missing or empty: the brief, at least one Definition Of
-    Done (dod.md or data/dod/<task>.md) and every file the brief or a DoD names on an unfenced
-    `DoD file: <absolute path>` line under data/. Steering messages are optional. A pointer outside data/ is never read.
+    Done and the file a DoD pointer names. A Definition Of Done is the brief's own section, or the file
+    its unfenced in-section `DoD file: <absolute path>` line names (which then replaces the section, as
+    bin/fm-dod-lib.sh reads it), or data/dod/<task>.md. A pointer outside data/ is never read.
+    Steering messages are optional.
     """
-    sources = [("brief.md", home.data / task / "brief.md"), ("dod.md", home.data / task / "dod.md"),
-               (f"dod/{task}.md", home.data / "dod" / f"{task}.md")]
+    brief = home.data / task / "brief.md"
     data_root = Path(os.path.realpath(home.data))
-    parts, seen, visited, absent, dod = [], set(), set(), [], False
+    text = brief.read_text(encoding="utf-8", errors="replace") if brief.is_file() else ""
+    parts, absent, dod, pointer, seen = [], [], False, "", set()
+    sources = [(f"dod/{task}.md", home.data / "dod" / f"{task}.md")]
+    if text.strip():
+        parts.append(f"<!-- brief.md -->\n{text}")
+        seen.add(text)
+        section = brief_dod(brief)
+        if section is None:
+            absent.append("the Definition Of Done reader (bin/fm-dod-lib.sh) failed")
+        else:
+            present, span, pointer = section
+            dod = present and not pointer and bool(span.strip())
+            target = Path(os.path.realpath(pointer)) if pointer else None
+            if target is not None and data_root in target.parents:
+                sources.insert(0, (f"DoD file {target.name}", target))
+    else:
+        absent.append("brief.md")
     for name, path in sources:
-        real = os.path.realpath(path)
-        if real in visited:
-            continue
-        visited.add(real)
-        text = path.read_text(encoding="utf-8", errors="replace") if path.is_file() else ""
-        if not text.strip():
-            if name == "brief.md" or name.startswith("DoD file "):
+        body = path.read_text(encoding="utf-8", errors="replace") if path.is_file() else ""
+        if not body.strip():
+            if name.startswith("DoD file "):
                 absent.append(name)
             continue
-        dod = dod or name != "brief.md"
-        # A brief may point at its finished criteria; only a file under the home's data directory is read.
-        for match in re.finditer(r"(?m)^DoD file: (/\S+)\s*$", text):
-            target = Path(os.path.realpath(match.group(1)))
-            if data_root in target.parents:
-                sources.append((f"DoD file {target.name}", target))
-        if text not in seen:
-            seen.add(text)
-            parts.append(f"<!-- {name} -->\n{text}")
+        dod = True
+        if body not in seen:
+            seen.add(body)
+            parts.append(f"<!-- {name} -->\n{body}")
     if not dod:
-        absent.append("a Definition Of Done (dod.md or dod/<task>.md)")
+        absent.append("a Definition Of Done (the brief's section, a DoD file it names, or dod/<task>.md)")
     for folder in (home.state / f"{task}.inbox" / "handled", home.state / f"{task}.inbox"):
         for message in sorted(folder.glob("*.msg")) if folder.is_dir() else []:
             body = message.read_text(encoding="utf-8", errors="replace").split("\n--\n", 1)[-1]
@@ -789,7 +824,15 @@ def advance(home, task, url, meta, side):
     if head.get("outcome") or str(view.get("state", "")).upper() != "OPEN":
         side.save()
         return
-    if side.data.get("phase", {}).get("head") == sha and side.data["phase"]["state"] == "queued" and still_queued(url):
+    if head.get("left_queue"):
+        return  # held for Main once: fm-pr-merge.sh is not called again for this head
+    if side.data.get("phase", {}).get("head") == sha and side.data["phase"]["state"] == "queued":
+        if queue_state(url) == "wait":
+            return
+        head["left_queue"] = True
+        phase(side, sha, "held", "left the merge queue and is still open")
+        emit(home, task, side, sha, "left-queue", f"held: {url} at {sha[:12]} left the merge queue and is still open; the merge is Main's",
+             f"{url} left the merge queue at {sha[:12]} and is still open; not queued again, Main decides why and whether to merge it")
         return
     ensure_objects(meta, sha, base)
     if collect(home, task, url, sha, base, side, meta) or head.get("outcome"):

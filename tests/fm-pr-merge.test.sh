@@ -2379,13 +2379,8 @@ auto_case() {  # <name> [ship author model]; echoes the case dir
   fm_write_meta "$case_dir/state/task-x1.meta" "window=fm-task-x1" "worktree=$case_dir/wt" \
     "project=$case_dir/project" "kind=ship" "model=$author" "branch=fm/fixture" "mode=no-mistakes" "pr=$AUTO_URL"
   mkdir -p "$case_dir/home/data/task-x1" "$case_dir/runner"
-  printf '# Brief\n## Captain'\''s intent\nFixture intent.\n' > "$case_dir/home/data/task-x1/brief.md"
-  printf '## Definition Of Done\nG1 fixture item.\n' > "$case_dir/home/data/task-x1/dod.md"
-  mkdir -p "$case_dir/home/data/dod"
-  printf 'Exact contract fixture.\nDoD file: %s\n' "$case_dir/home/data/extra-dod.md" > "$case_dir/home/data/dod/task-x1.md"
-  printf 'Pointed criteria fixture.\nDoD file: %s\n' "$case_dir/home/data/extra-dod.md" > "$case_dir/home/data/extra-dod.md"
-  printf 'DoD file: %s\n' "$case_dir/outside-dod.md" >> "$case_dir/home/data/task-x1/brief.md"
-  printf 'Outside the data directory.\n' > "$case_dir/outside-dod.md"
+  # The default layout: bin/fm-brief.sh scaffolds the Definition Of Done as an inline section of brief.md.
+  auto_write_brief "$case_dir" 'G1 fixture item.'
   mkdir -p "$case_dir/state/task-x1.inbox/handled"
   printf 'schema=fm-task-inbox.v1\nat=x\n--\nMain ruling fixture.\n' > "$case_dir/state/task-x1.inbox/handled/001.msg"
   cat > "$case_dir/home/config/crew-dispatch.json" <<JSON
@@ -2398,6 +2393,15 @@ JSON
 }
 
 auto_mode() { mkdir -p "$1/runner"; printf '%s\n' "$3" > "$1/runner/$(auto_slug "$2").mode"; }
+
+# <case_dir> [<section-body>]: rewrite the task brief; with a body it carries the scaffolded
+# `## Definition Of Done (task)` section through `## How You're Graded`, without one it has neither.
+auto_write_brief() {
+  {
+    printf '# Brief\n## Captain'\''s intent\nFixture intent.\n'
+    [ $# -lt 2 ] || printf '\n## Definition Of Done (task)\n%s\n\n## How You'\''re Graded\nGraded by the fixture.\n' "$2"
+  } > "$1/home/data/task-x1/brief.md"
+}
 
 auto_helper() {  # <case_dir> <verb> [env...]: run bin/fm-pr-auto-review.py <verb> task-x1 in the sandbox
   local case_dir=$1 verb=$2 saved=$PR_MERGE rc=0
@@ -2465,12 +2469,8 @@ test_auto_review_green_uncovered_pr_is_read_recorded_and_merged() {
     || fail "green-uncovered: the brief is not in the contract text"
   grep -qF 'G1 fixture item' "$case_dir"/state/.pr-auto-review/task-x1.d/*/contract.md \
     || fail "green-uncovered: the Definition Of Done is not in the contract text"
-  for needle in 'Exact contract fixture' 'Pointed criteria fixture' 'Main ruling fixture'; do
-    grep -qF "$needle" "$case_dir"/state/.pr-auto-review/task-x1.d/*/contract.md \
-      || fail "green-uncovered: the contract text omits '$needle' (data/dod/<task>.md, a DoD file pointer, or a steering message)"
-  done
-  ! grep -qF 'Outside the data directory' "$case_dir"/state/.pr-auto-review/task-x1.d/*/contract.md \
-    || fail "green-uncovered: a DoD file pointer outside data/ must not be read"
+  grep -qF 'Main ruling fixture' "$case_dir"/state/.pr-auto-review/task-x1.d/*/contract.md \
+    || fail "green-uncovered: the steering message is not in the contract text"
   grep -qF 'ci: status=COMPLETED conclusion=SUCCESS' "$case_dir"/state/.pr-auto-review/task-x1.d/*/ci-evidence.md \
     || fail "green-uncovered: the check runs at the head are not in the CI evidence"
   # A repeated pass while the read is out, and again after it returned, requests nothing more.
@@ -2939,6 +2939,44 @@ test_auto_review_waits_on_a_merge_queue_and_keeps_heads_it_needs() {
   pass "a queued PR reads queued and is not merged again until the forge resolves it, and pruning never drops the head being read"
 }
 
+test_auto_review_holds_a_head_that_leaves_the_merge_queue_still_open() {
+  local case_dir
+  # fm-pr-merge.sh queues the PR; someone removes it from the queue by hand, so the PR is open and out of the queue.
+  case_dir=$(auto_case left-queue)
+  write_github_outcome "$case_dir" OPEN false true main
+  auto_step "$case_dir"; auto_wait "$case_dir"; auto_step "$case_dir"
+  expect_code 1 "$(auto_merges "$case_dir")" "left-queue: one merge call queues the PR"
+  expect_code "queued $AUTO_URL" "$(auto_state "$case_dir")" "left-queue: the PR reads queued"
+  expect_code 0 "$(auto_count ':left-queue' "$case_dir/state/.wake-queue")" "left-queue: no wake while the PR stays queued"
+  write_github_outcome "$case_dir" OPEN false false main
+  auto_step "$case_dir"; auto_step "$case_dir"; auto_step "$case_dir"
+  expect_code 1 "$(auto_merges "$case_dir")" "left-queue: fm-pr-merge.sh must not be called again for a head that left the queue"
+  expect_code 1 "$(auto_count ':left-queue' "$case_dir/state/.wake-queue")" "left-queue: Main is woken once"
+  expect_code "held: left the merge queue and is still open" "$(auto_state "$case_dir")" "left-queue: the state reads held"
+  expect_code 1 "$(auto_notes "$case_dir" 'left the merge queue')" "left-queue: one event"
+  assert_grep "$AUTO_URL" "$case_dir/state/.wake-queue" "left-queue: the wake names the full PR URL"
+  # A new head is judged fresh: its read is requested.
+  auto_push "$case_dir"
+  auto_step "$case_dir"; auto_wait "$case_dir"
+  expect_code 2 "$(auto_calls "$case_dir")" "left-queue: a new head must be read on its own"
+  expect_code 1 "$(auto_count ':left-queue' "$case_dir/state/.wake-queue")" "left-queue: the new head adds no left-queue wake"
+  auto_dump "$case_dir" "queue exit held once"
+  # A head that left the queue because it merged still ends merged, with no hold and no wake.
+  case_dir=$(auto_case left-queue-merged)
+  write_github_outcome "$case_dir" OPEN false true main
+  auto_step "$case_dir"; auto_wait "$case_dir"; auto_step "$case_dir"
+  write_github_outcome "$case_dir" MERGED true false main
+  auto_step "$case_dir"; auto_step "$case_dir"
+  expect_code "queued $AUTO_URL" "$(auto_state "$case_dir")" "left-queue-merged: a PR the forge now reports merged is not held while the view still reads open"
+  expect_code 0 "$(auto_count ':left-queue' "$case_dir/state/.wake-queue")" "left-queue-merged: no hold wake"
+  jq '.state = "MERGED"' "$case_dir/github-view.json" > "$case_dir/v" && mv "$case_dir/v" "$case_dir/github-view.json"
+  auto_step "$case_dir"
+  expect_code "merged $AUTO_URL" "$(auto_state "$case_dir")" "left-queue-merged: the merged head ends merged"
+  expect_code 1 "$(auto_merges "$case_dir")" "left-queue-merged: still one merge call"
+  expect_code 0 "$(auto_count ':left-queue' "$case_dir/state/.wake-queue")" "left-queue-merged: no hold wake after the merge"
+  pass "a head that leaves the merge queue still open is held once with one wake and never merged again; a head that merged still ends merged"
+}
+
 test_auto_review_events_reach_the_fleet_ledger() {
   local case_dir
   case_dir=$(auto_case ledger)
@@ -3102,13 +3140,15 @@ test_auto_review_reaches_the_merge_gate_on_a_recorded_routine_pass() {
 test_auto_review_incomplete_review_pack_is_held_and_never_dispatched() {
   local case_dir scenario n
   # F2: a contract source that is absent holds the head and surfaces it; no reader is dispatched.
-  for scenario in no-brief empty-brief no-dod missing-pointer; do
+  for scenario in no-brief empty-brief no-dod dod-md missing-pointer empty-pointer; do
     case_dir=$(auto_case "pack-$scenario")
     case $scenario in
       no-brief) rm "$case_dir/home/data/task-x1/brief.md" ;;
       empty-brief) : > "$case_dir/home/data/task-x1/brief.md" ;;
-      no-dod) rm "$case_dir/home/data/task-x1/dod.md" "$case_dir/home/data/dod/task-x1.md" ;;
-      missing-pointer) rm "$case_dir/home/data/extra-dod.md" ;;
+      no-dod) auto_write_brief "$case_dir" ;;
+      dod-md) auto_write_brief "$case_dir"; printf '## Definition Of Done\nG1 fixture item.\n' > "$case_dir/home/data/task-x1/dod.md" ;;
+      missing-pointer) auto_write_brief "$case_dir" "DoD file: $case_dir/home/data/missing-dod.md" ;;
+      empty-pointer) auto_write_brief "$case_dir" "DoD file: $case_dir/home/data/empty-dod.md"; : > "$case_dir/home/data/empty-dod.md" ;;
     esac
     auto_step "$case_dir"; auto_step "$case_dir"
     expect_code 0 "$(auto_calls "$case_dir")" "pack-$scenario: no reader may be dispatched on an incomplete contract"
@@ -3128,6 +3168,42 @@ test_auto_review_incomplete_review_pack_is_held_and_never_dispatched() {
   auto_step "$case_dir"; auto_wait "$case_dir"
   expect_code 1 "$(auto_calls "$case_dir")" "pack-repaired: the complete contract is read on the same head"
   pass "an incomplete review pack is held with its missing source and never dispatched; a complete or repaired one is read"
+}
+
+test_auto_review_reads_the_definition_of_done_as_fm_dod_lib_does() {
+  local case_dir scenario contract
+  for scenario in inline fenced-pointer pointer outside-pointer dod-file-only; do
+    case_dir=$(auto_case "dod-$scenario")
+    mkdir -p "$case_dir/home/data/dod"
+    printf 'Outside the data directory.\n' > "$case_dir/outside-dod.md"
+    case $scenario in
+      inline) ;;
+      fenced-pointer)
+        # An example pointer in a code fence names nothing, even when its target does not exist.
+        auto_write_brief "$case_dir" "$(printf 'G1 fixture item.\n\n```text\nDoD file: %s\n```' "$case_dir/home/data/missing-dod.md")" ;;
+      pointer)
+        printf 'Pointed criteria fixture.\n' > "$case_dir/home/data/dod/task-x1.md"
+        auto_write_brief "$case_dir" "DoD file: $case_dir/home/data/dod/task-x1.md" ;;
+      outside-pointer)
+        printf 'Exact contract fixture.\n' > "$case_dir/home/data/dod/task-x1.md"
+        auto_write_brief "$case_dir" "DoD file: $case_dir/outside-dod.md" ;;
+      dod-file-only)
+        printf 'Exact contract fixture.\n' > "$case_dir/home/data/dod/task-x1.md"
+        auto_write_brief "$case_dir" ;;
+    esac
+    auto_step "$case_dir"; auto_wait "$case_dir"
+    expect_code 1 "$(auto_calls "$case_dir")" "dod-$scenario: exactly one read is requested"
+    case $(auto_state "$case_dir") in "held: "*) fail "dod-$scenario: the head must not be held, got: $(auto_state "$case_dir")" ;; esac
+    contract=$(cat "$case_dir"/state/.pr-auto-review/task-x1.d/*/contract.md)
+    case $scenario in
+      inline|fenced-pointer) printf '%s' "$contract" | grep -qF 'G1 fixture item' || fail "dod-$scenario: the inline Definition Of Done is not in the contract" ;;
+      pointer) printf '%s' "$contract" | grep -qF 'Pointed criteria fixture' || fail "dod-$scenario: the named DoD file is not in the contract" ;;
+      outside-pointer|dod-file-only) printf '%s' "$contract" | grep -qF 'Exact contract fixture' || fail "dod-$scenario: data/dod/<task>.md is not in the contract" ;;
+    esac
+    ! printf '%s' "$contract" | grep -qF 'Outside the data directory' || fail "dod-$scenario: a DoD file pointer outside data/ must not be read"
+    auto_dump "$case_dir" "DoD presence: $scenario"
+  done
+  pass "a Definition Of Done is the brief's own section, the file its unfenced in-section pointer names under data/, or data/dod/<task>.md; a fenced or outside pointer names nothing"
 }
 
 test_auto_review_judges_each_check_before_spending_a_read() {
@@ -3227,10 +3303,12 @@ test_auto_review_survives_slow_hung_and_killed_readers
 test_auto_review_leaves_the_away_record_to_the_merge_script
 test_auto_review_trusts_only_a_structured_served_model
 test_auto_review_waits_on_a_merge_queue_and_keeps_heads_it_needs
+test_auto_review_holds_a_head_that_leaves_the_merge_queue_still_open
 test_auto_review_events_reach_the_fleet_ledger
 test_auto_review_protected_class_counts_every_recorded_review
 test_auto_review_reaches_the_merge_gate_on_a_recorded_routine_pass
 test_auto_review_incomplete_review_pack_is_held_and_never_dispatched
+test_auto_review_reads_the_definition_of_done_as_fm_dod_lib_does
 test_auto_review_judges_each_check_before_spending_a_read
 test_auto_review_treats_a_failed_runner_exit_as_a_failed_read
 test_auto_review_retries_a_wake_that_failed_to_append
