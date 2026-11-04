@@ -1,0 +1,18 @@
+# firstmate head: bf9e28ddf71f0d09348b2dc143d06cb366582993
+# vernant origin/main checked out in temp clone: 28252512b3b1a4b1dec5ba746f4fb61f30f653be
+Wed Nov  4 05:56:45 CST 2026
+positive spawn exit=0
+markers in the temp state dir after the flagged spawn: 1
+marker: {'schema_version': '1.1.0', 'carry_status': 'resolved', 'predecessor_branch': 'fm/pred-live', 'superseded_by_branch': 'fm/succ-e2e-pos-1-94841'}
+flagged successor, predecessor commits carried: foreign=0 block=no
+no-flag spawn exit=0
+markers in the temp state dir after the unflagged spawn: 0
+unflagged successor, predecessor commits carried: foreign=2 block=yes
+refused spawn exit=1
+helper refusal: supersedes_state_dir_refused
+retry with a detached predecessor exit=1
+retry after restoring the predecessor exit=0
+markers in the temp state dir after the retry: 1
+recovered successor, predecessor commits carried: foreign=0 block=no
+ok - F6: a successor spawned through fm-spawn gets a marker the landed Vernant R-13 accepts; without the flag it blocks; the refused retry records it
+exit=0

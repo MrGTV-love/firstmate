@@ -1,0 +1,11 @@
+ok - --successor-of hands one resolved --supersedes to the provisioner and records successor_of; no flag changes nothing
+ok - --successor-of refuses every untrustworthy predecessor before any resource is used
+ok - --successor-of refuses scouts, secondmates, relaunches and a second predecessor, changing nothing
+ok - a refused declaration is kept and retried with --supersedes; an admitted successor relaunches ordinarily
+ok - removing the predecessor-branch check or the advertise check makes its refusal row stop refusing
+ok - a predecessor that leaves its recorded branch after preflight is refused before the provisioner and mints nothing
+ok - a predecessor whose task record changes after preflight is refused before the provisioner
+ok - an id=repo batch refuses --successor-of instead of dropping it
+ok - a refused declaration leaves a pre-existing stale lock and every state file untouched
+ok - a fresh spawn that does not name a kept successor declaration refuses and points to --relaunch
+ok - with the window gone, the printed same-flag respawn recovers and --relaunch refuses
