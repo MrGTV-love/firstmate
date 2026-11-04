@@ -51,12 +51,12 @@
 #   Each report field sits under a Markdown heading of its own (ATX, or setext at level 1
 #   or 2). An `Inputs read` bold line, `Label:` line or inline list with no heading voids
 #   the round (REPORT STRUCTURE, not INPUT LEAK) when it holds a path or the next
-#   non-blank line starts with a path, and is a mere mention otherwise; so does a
-#   Checks not performed, Findings or Notes bold or `Label:` line inside the list. The list
-#   runs to the next heading of its own level or higher; text inside a code fence is never
-#   a heading. In the list, a line that starts with a path is checked, and so is every
-#   absolute, `~`, http(s), <rev>:<path> or relative dir/file.ext token on any line,
-#   with link brackets, quotes and file:// read as separators; other text is skipped.
+#   non-blank line starts with a path, and is a mere mention otherwise; so does any bold
+#   or `Label:` line inside the list. The list runs to the next heading of its own level
+#   or higher; text inside a code fence is never a heading. In the list, a line that
+#   starts with a path is checked when that path is one full path and nothing else on the
+#   line is path-like; a line with any other path-like text voids the round (REPORT
+#   STRUCTURE); other text is skipped.
 #   A relative path is a pack file when the pack holds it, else a root path; with no root
 #   it is not authorized.
 #   An authorized input is judged by what it is: a file inside the pack, the
@@ -411,7 +411,6 @@ cmd_build() {
 
 # Print the entries of the report's `Inputs read` list, one per line.
 inputs_read() { # <report>
-  # shellcheck disable=SC1112 # literal curly quotes in the awk program
   awk '
     function entry(s,   t) {
       sub(/^[ \t]*([-*+]|[0-9]+[.)])[ \t]+/, "", s)
@@ -426,22 +425,22 @@ inputs_read() { # <report>
       gsub(/^[`*"(<]+|[`*",;:.)>]+$/, "", t)
       return t
     }
-    # A line that starts with a path gives its first entry; every further absolute, `~`,
-    # http(s), <rev>:<path> or relative dir/file.ext token on the line is an entry too.
-    # Link brackets, quotes and file:// wrappers are separators.
-    function emit(s, first,   t, n, k, tok) {
-      gsub(/\]\(|[()\[\]'"'"']|‘|’|“|”|file:\/\//, " ", s)
-      if (first) {
-        t = entry(s)
-        if (t != "") print t
-      }
+    # The text after the leading entry of a line that starts with a path.
+    function rest_of(s,   r) {
       sub(/^[ \t]*([-*+]|[0-9]+[.)])[ \t]+/, "", s)
-      n = split(s, tok, /[ \t,;|]+/)
-      for (k = first ? 2 : 1; k <= n; k++) {
-        gsub(/^[`*"(<]+|[`*",;:.)>]+$/, "", tok[k])
-        if (tok[k] ~ /^~?\/[A-Za-z0-9._-]/ || tok[k] ~ /^https?:\/\// || tok[k] ~ /^[A-Za-z0-9][A-Za-z0-9_.\/-]*:[A-Za-z0-9_.~-][^:]*[\/.]/ ||
-          tok[k] ~ /^(\.\.?\/)?[A-Za-z0-9_.-]+(\/[A-Za-z0-9_.-]+)*\/[A-Za-z0-9_.-]+\.[A-Za-z0-9]+$/) print tok[k]
+      sub(/^[ \t]+/, "", s)
+      if (substr(s, 1, 1) == "`") {
+        r = substr(s, 2)
+        r = index(r, "`") ? substr(r, index(r, "`") + 1) : ""
+      } else {
+        r = match(s, /[ \t]/) ? substr(s, RSTART) : ""
       }
+      return r
+    }
+    # Text that holds an absolute, `~`, http(s), <rev>:<path> or relative dir/file.ext path.
+    function pathlike(s) {
+      return s ~ /(^|[^A-Za-z0-9_.-])~?\/[A-Za-z0-9._-]/ || s ~ /[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\.[A-Za-z0-9]+/ ||
+        s ~ /https?:\/\// || s ~ /(^|[^A-Za-z0-9])([0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]+|HEAD):[^ \t:]/
     }
     function hlevel(s,   n) {
       n = 0
@@ -475,7 +474,7 @@ inputs_read() { # <report>
       name = "[*]*([0-9]+[.)][ \t]*)?[*]*inputs read[*[:space:]]*(\\([^)]*\\))?[*:[:space:]]*"
       label = "^[#*[:space:]-]*([0-9]+[.)][[:space:]]*)?[*]*inputs read[*]*(:|[*[:space:]]*(\\([^)]*\\))?[*:[:space:]]*$)"
       field = "(checks not performed|findings|notes)"
-      fieldlabel = "^[ \t]*([-*+][ \t]+)?((\\*\\*|__)" field "[^*_]*(\\*\\*|__)|" field "([^:]*:|[ \t]*$))"
+      fieldlabel = "^[ \t]*([-*+][ \t]+)?((\\*\\*|__)[^*_]+(\\*\\*|__)|[a-z][a-z0-9 ()'"'"'-]*:([ \t]|$)|" field "[ \t]*$)"
       for (i = 1; i <= N; i++) {
         l = strip3(L[i])
         inf = fence
@@ -490,8 +489,14 @@ inputs_read() { # <report>
       for (i = 1; i <= N; i++) {
         l = strip3(L[i])
         low = tolower(l)
+        # Inside the list, a line that starts with a path names exactly one full path and
+        # nothing else path-like; any other line holds no path. Else the round voids (exit 6).
         lead = state == 1 && is_path(L[i])
-        if (lead) emit(L[i], 1)
+        if (lead) {
+          t = entry(L[i])
+          if (t !~ /^[A-Za-z0-9_.~\/:#@+%-]+$/ || pathlike(rest_of(L[i]))) badpath = 1
+          else print t
+        }
         if (!body[i]) {
           sl = setext(i)
           # The list starts at a heading of its own, ATX or setext.
@@ -507,13 +512,13 @@ inputs_read() { # <report>
             continue
           }
           if (state == 1 && ((l ~ /^#+([ \t]|$)/ && hlevel(l) <= start) || (sl && sl <= start))) { state = 2; continue }
-          # Another report field under a bold or plain label, not a heading of its own,
-          # leaves the end of the list unknown and voids the round (exit 5).
-          if (state == 1 && low ~ fieldlabel) unheaded = 1
+          # A report field under a bold or `Label:` line, not a heading of its own, leaves
+          # the end of the list unknown and voids the round (exit 5).
+          if (state == 1 && !lead && low ~ fieldlabel) unheaded = 1
         }
-        if (state == 1 && !lead) emit(L[i], 0)
+        if (state == 1 && !lead && pathlike(L[i])) badpath = 1
       }
-      exit noheading ? 4 : unheaded ? 5 : 0
+      exit noheading ? 4 : unheaded ? 5 : badpath ? 6 : 0
     }
   ' "$1"
 }
@@ -569,15 +574,22 @@ cmd_check() {
   local leaks=0 count=0 entry prev path revpath rel rev excluded x ok why loose
   local list raw rc=0
   raw=$(inputs_read "$report") || rc=$?
-  if [ "$rc" = 4 ] || [ "$rc" = 5 ]; then
-    if [ "$rc" = 4 ]; then
-      echo "REPORT STRUCTURE: the Inputs read list in $report is not under its own heading"
-    else
-      echo "REPORT STRUCTURE: a Checks not performed, Findings or Notes field inside the Inputs read list of $report is not under its own heading"
-    fi
-    echo "ROUND VOID: report field not under its own heading; each report field needs a Markdown heading of its own at the level of Inputs read"
-    exit 3
-  fi
+  case $rc in
+    4 | 5)
+      if [ "$rc" = 4 ]; then
+        echo "REPORT STRUCTURE: the Inputs read list in $report is not under its own heading"
+      else
+        echo "REPORT STRUCTURE: a bold or Label: line inside the Inputs read list of $report is a report field not under its own heading"
+      fi
+      echo "ROUND VOID: report field not under its own heading; each report field needs a Markdown heading of its own at the level of Inputs read"
+      exit 3
+      ;;
+    6)
+      echo "REPORT STRUCTURE: a line in the Inputs read list of $report holds a path that is not its one leading full path"
+      echo "ROUND VOID: list one full path per line under Inputs read, with nothing else path-like on the line"
+      exit 3
+      ;;
+  esac
   list=$(printf '%s\n' "$raw" | grep -e '/' -e '\.' || true)
   if [ -z "$list" ]; then
     echo "INPUT LEAK: no Inputs read list in $report"

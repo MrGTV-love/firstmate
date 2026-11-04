@@ -40,7 +40,7 @@ Never run a review in a pack folder that already holds a report.
 
 After the run, run `bin/fm-contract-review-pack.sh check`.
 A report with no `Inputs read` list, or a listed path that is not an authorized input, is an `INPUT LEAK`.
-A report field (`Inputs read`, or `Checks not performed`, `Findings` or `Notes` inside the `Inputs read` list) under a bold or plain label instead of a heading of its own is a `REPORT STRUCTURE` fault, and it voids the round the same way.
+A report field under a bold or plain label instead of a heading of its own (an `Inputs read` list with no heading, or any bold or `Label:` line inside the list), and a list line that holds a path other than its one leading full path, are `REPORT STRUCTURE` faults, and each voids the round the same way.
 A leaked round is void: it is not a round, it is not recorded in the register, and it is rerun on a fresh pack.
 An authorized input is judged by what it is, not by the folder it sits in: the pack's own files, the three named references, and a file tracked by the passed repository root.
 An excluded path is refused even when it is tracked or sits under the root.
@@ -123,8 +123,8 @@ A documentary or record-only stage is judged on code, written specification or r
 A worker declaration, an author's analysis and a green self-run are context, never verification.
 
 Report these fields.
-Put `Inputs read`, `Findings`, `Notes` and `Checks not performed` each under a Markdown heading of its own, all at the same level; a bold or plain label is not a heading.
-- `Inputs read`: every file you opened, one full path per line, under a Markdown heading of its own named `Inputs read`.
+Put every field below under a Markdown heading of its own, all at the level of `Inputs read`; a bold or plain label is not a heading.
+- `Inputs read`: every file you opened, one full path per line and nothing else path-like on the line, under a Markdown heading of its own named `Inputs read`.
 - Your identity, model and session ID when known.
 - Each criterion by id with its judgment.
 - Outcome-escape and evidence-escape candidates, each with its disposition.

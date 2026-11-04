@@ -309,6 +309,8 @@ make_leak_world() { # builds LEAK_* variables
   printf '#!/bin/sh\n' >"$LEAK_ROOT/bin/fm-spawn.sh"
   printf 'rubric\n' >"$LEAK_ROOT/docs/review-rubric.md"
   printf 'tracked excluded file\n' >"$LEAK_ROOT/sources/notes.md"
+  mkdir -p "$LEAK_ROOT/notes"
+  printf 'a tracked plan\n' >"$LEAK_ROOT/notes/plan.md"
   write_fixture_contract "$LEAK_ROOT/sources/raw-contract.md"
   printf 'data/\n' >"$LEAK_ROOT/.gitignore"
   printf 'an earlier review report\n' >"$LEAK_ROOT/data/case/truth/r23-review.md"
@@ -320,7 +322,7 @@ make_leak_world() { # builds LEAK_* variables
   printf 'define\n\nApply [Operational boundaries](OPERATIONAL-BOUNDARIES.md).\n' >"$LEAK_SKILLS/define-done-and-grading/SKILL.md"
   ln -s "$LEAK_SKILLS" "$TMP_ROOT/leak-skills-link"
   fm_git_init_commit "$LEAK_ROOT"
-  git -C "$LEAK_ROOT" add bin docs sources .gitignore
+  git -C "$LEAK_ROOT" add bin docs sources notes .gitignore
   git -C "$LEAK_ROOT" -c user.name=t -c user.email=t@example.invalid commit -qm files
   LEAK_PACK=''
   build_pack LEAK_PACK --contract "$LEAK_ROOT/sources/raw-contract.md" --root "$LEAK_ROOT" \
@@ -453,7 +455,7 @@ test_leak_check_reads_prose_before_the_list_and_refuses_linked_files() {
     printf '%s\n\n' "$LEAK_PACK/contract.md"
     printf '%s\n' "$LEAK_PACK/target.md"
     printf '%s\n' "$LEAK_SKILLS/define-done-and-grading/SKILL.md"
-    printf '\nThat is the whole list.\n\nEXIT: needs-revision\nVERDICT: FAIL\n'
+    printf '\nThat is the whole list.\n\n# Exit\n\nEXIT: needs-revision\nVERDICT: FAIL\n'
   } >"$rep"
   run_check "$rep"
   assert_equals 0 "$CHECK_RC" "a list after a prose line was flagged: $CHECK_OUT"
@@ -485,31 +487,29 @@ test_leak_check_reads_prose_before_the_list_and_refuses_linked_files() {
 test_leak_check_reads_the_whole_list() {
   local rep="$TMP_ROOT/report6.md"
   make_leak_world
-  # Group labels, a prose bullet and sub-headings inside the list are skipped, not the end of it.
+  # Compliant: a prose bullet and a sub-heading inside the list are skipped, not the end of it.
   {
-    printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\nPack:\n'
+    printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n'
     printf -- '- %s\n' "$LEAK_PACK/contract.md"
     printf -- '- the assess skill, read in full\n'
     printf '\n### References\n\n'
     printf -- '- %s\n' "$LEAK_SKILLS/assess-done-and-grade/SKILL.md"
-    printf '\nOther:\n'
     printf -- '- %s\n' "$LEAK_ROOT/bin/fm-spawn.sh"
-    printf '\n## Findings\n\n- %s is fine.\n\nEXIT: needs-revision\n' "$TMP_ROOT/sibling/pack/review.md"
+    printf '\n## Findings\n\n- %s is fine.\n\n## Exit\n\nEXIT: needs-revision\n' "$TMP_ROOT/sibling/pack/review.md"
   } >"$rep"
   run_check "$rep"
-  assert_equals 0 "$CHECK_RC" "a grouped clean list was flagged: $CHECK_OUT"
-  assert_contains "$CHECK_OUT" "3 listed input(s)" "the grouped list was not read to its end"
-  # The same shapes with a leak after a group label or a prose bullet.
+  assert_equals 0 "$CHECK_RC" "a clean list with prose and a sub-heading was flagged: $CHECK_OUT"
+  assert_contains "$CHECK_OUT" "3 listed input(s)" "the list was not read to its end"
+  # Noncompliant: a group label inside the list is a report field with no heading.
   {
     printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\nPack:\n'
     printf -- '- %s\n' "$LEAK_PACK/contract.md"
-    printf -- '- the assess skill\n'
     printf 'Other:\n'
     printf -- '- %s\n' "$TMP_ROOT/sibling/pack/review.md"
   } >"$rep"
   run_check "$rep"
-  assert_equals 3 "$CHECK_RC" "a leak after a group label was allowed"
-  assert_contains "$CHECK_OUT" "INPUT LEAK: $TMP_ROOT/sibling/pack/review.md" "the leak after a group label is not named"
+  assert_equals 3 "$CHECK_RC" "a list with a group label was accepted"
+  assert_contains "$CHECK_OUT" "REPORT STRUCTURE" "the group label did not void for structure"
   # The inline form has no heading of its own, so it voids the round.
   {
     printf 'VERDICT: FAIL head=abc\n\nInputs read: %s, %s\n' "$LEAK_PACK/contract.md" "$LEAK_PACK/target.md"
@@ -956,20 +956,22 @@ test_leak_check_reads_through_fences_and_setext_headings() {
   pass "the leak check reads through fences, accepts a setext heading and ignores a bare mention"
 }
 
-test_leak_check_reads_every_path_on_a_line() {
-  local rep="$TMP_ROOT/report11.md" sib="$TMP_ROOT/sibling/pack/review.md"
+test_leak_check_voids_a_second_path_on_a_line() {
+  local rep="$TMP_ROOT/report11.md" sib="$TMP_ROOT/sibling/pack/review.md" second
   make_leak_world
-  # Compliant: two pack paths on one line, and prose with a slash, are clean.
-  printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- %s, %s (read and/or compared)\n\n## Findings\n' "$LEAK_PACK/contract.md" "$LEAK_PACK/target.md" >"$rep"
+  # Compliant: one full path per line, and prose with a slash, are clean.
+  printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- %s\n- %s\n- read and/or compared\n\n## Findings\n' "$LEAK_PACK/contract.md" "$LEAK_PACK/target.md" >"$rep"
   run_check "$rep"
-  assert_equals 0 "$CHECK_RC" "two clean paths on one line were flagged: $CHECK_OUT"
-  assert_contains "$CHECK_OUT" "2 listed input(s)" "the second path on the line was not read"
-  # Noncompliant: a leak as the second path on a line is read.
-  printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- %s, %s\n\n## Findings\n' "$LEAK_PACK/contract.md" "$sib" >"$rep"
-  run_check "$rep"
-  assert_equals 3 "$CHECK_RC" "a leak as the second path on a line was allowed"
-  assert_contains "$CHECK_OUT" "INPUT LEAK: $sib" "the second-path leak is not named"
-  pass "the leak check reads every absolute path on a list line"
+  assert_equals 0 "$CHECK_RC" "one path per line was flagged: $CHECK_OUT"
+  assert_contains "$CHECK_OUT" "2 listed input(s)" "a path line was not read"
+  # Noncompliant: a second path on a line voids for structure, whether or not it is allowed.
+  for second in "$LEAK_PACK/target.md" "$sib"; do
+    printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- %s, %s\n\n## Findings\n' "$LEAK_PACK/contract.md" "$second" >"$rep"
+    run_check "$rep"
+    assert_equals 3 "$CHECK_RC" "a second path ($second) on a line was accepted"
+    assert_contains "$CHECK_OUT" "REPORT STRUCTURE" "a second path on a line did not void for structure"
+  done
+  pass "a list line holds one full path, and a second path voids the round"
 }
 
 test_leak_check_reads_a_path_above_a_rule_or_hash_line() {
@@ -995,28 +997,31 @@ test_leak_check_reads_a_path_above_a_rule_or_hash_line() {
   pass "a path above a rule line, or after a #-note, is still read"
 }
 
-test_leak_check_reads_paths_anywhere_on_a_list_line() {
+test_leak_check_voids_a_path_that_is_not_the_leading_entry() {
   local rep="$TMP_ROOT/report13.md" sib="$TMP_ROOT/sibling/pack/review.md" body n=0
   make_leak_world
-  # Compliant: a labelled path, a table row and a revision path on prose lines are judged and clean.
+  # Compliant: each line leads with one full path (with a line reference or a revision), or holds none.
   {
-    printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- Pack contract: %s\n| %s | read |\n' "$LEAK_PACK/contract.md" "$LEAK_PACK/target.md"
-    printf -- '- also compared HEAD:bin/fm-spawn.sh, read and/or skimmed\n- also read bin/fm-spawn.sh\n\n## Findings\n'
+    printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- %s\n- HEAD:bin/fm-spawn.sh\n' "$LEAK_PACK/contract.md"
+    printf -- '- bin/fm-spawn.sh\n- notes/plan.md:12\n- read and/or skimmed\n\n## Findings\n'
   } >"$rep"
   run_check "$rep"
-  assert_equals 0 "$CHECK_RC" "clean paths on prose or table lines were flagged: $CHECK_OUT"
-  assert_contains "$CHECK_OUT" "4 listed input(s)" "a path on a prose or table line was not read"
-  # Noncompliant: each of these lines names an input that is not authorized.
+  assert_equals 0 "$CHECK_RC" "leading full paths were flagged: $CHECK_OUT"
+  assert_contains "$CHECK_OUT" "4 listed input(s)" "a leading path was not read"
+  # Noncompliant: a path that is not the line's leading entry voids for structure, never clean.
   for body in "- Sibling report: $sib" "- also read $sib for context" "| $sib | read |" \
     "- $LEAK_PACK/contract.md, https://example.com/review.md" "- $LEAK_PACK/contract.md, main:docs/x.md" \
     "- Sibling report: data/case/truth/r23-review.md" "- also read data/case/truth/r23-review.md" \
-    "| data/case/truth/r23-review.md | read |" "- Pack: ../tmp.other/pack/review.md"; do
+    "| data/case/truth/r23-review.md | read |" "- Pack: ../tmp.other/pack/review.md" \
+    "- also see:$sib" "- ran cat --file=$sib" "- also _${sib}_" "- also {$sib}" \
+    "- Findings in target.md:12 were checked against bin/fm-spawn.sh"; do
     n=$((n + 1))
     printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- %s\n%s\n\n## Findings\n' "$LEAK_PACK/target.md" "$body" >"$rep"
     run_check "$rep"
-    assert_equals 3 "$CHECK_RC" "list line $n ($body) passed an unauthorized input"
+    assert_equals 3 "$CHECK_RC" "list line $n ($body) was accepted"
+    assert_contains "$CHECK_OUT" "REPORT STRUCTURE" "list line $n ($body) did not void for structure"
   done
-  pass "every absolute, URL or revision path on a list line is judged"
+  pass "a path that is not a line's one leading entry voids the round for structure"
 }
 
 test_summary_mention_of_inputs_read_is_not_a_list() {
@@ -1127,6 +1132,12 @@ test_report_field_under_a_label_voids_as_structure() {
   printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- %s\nNotes: none.\n' "$LEAK_PACK/target.md" >"$rep"
   run_check "$rep"
   assert_equals 3 "$CHECK_RC" "a Notes label inside the list was accepted"
+  # Noncompliant: any other report field under a bold label right after the list voids for structure.
+  printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- %s\n**Criterion judgments**\n- A1: unjudged; it needs data/case/truth/r23-review.md, which is not an allowed input.\n\n## Checks not performed\n\nnone\n' "$LEAK_PACK/contract.md" >"$rep"
+  run_check "$rep"
+  assert_equals 3 "$CHECK_RC" "a criterion field under a bold label was accepted"
+  assert_contains "$CHECK_OUT" "report field not under its own heading" "the criterion field did not void for structure"
+  assert_not_contains "$CHECK_OUT" "INPUT LEAK" "the criterion field was reported as a leak"
   # Noncompliant: a real leak under the Inputs read heading is still a leak.
   printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- %s\n- %s\n\n## Checks not performed\n\nnone\n' "$LEAK_PACK/target.md" "$LEAK_ROOT/data/case/truth/r23-review.md" >"$rep"
   run_check "$rep"
@@ -1169,33 +1180,31 @@ test_leak_check_without_root_refuses_a_relative_path_outside_the_pack() {
   norootcheck
   assert_equals 0 "$CHECK_RC" "a relative pack file was flagged with no root: $CHECK_OUT"
   # Noncompliant: a relative path that is not a pack file is a leak with no root.
-  for body in "- data/x/r23-review.md" "- also read data/x/r23-review.md"; do
-    printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- %s\n%s\n\n## Findings\n' "$pack/contract.md" "$body" >"$rep"
-    norootcheck
-    assert_equals 3 "$CHECK_RC" "'$body' passed with no root"
-    assert_contains "$CHECK_OUT" "not a pack file, and no root" "'$body' was flagged for another cause"
-  done
+  printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- %s\n- data/x/r23-review.md\n\n## Findings\n' "$pack/contract.md" >"$rep"
+  norootcheck
+  assert_equals 3 "$CHECK_RC" "a relative path outside the pack passed with no root"
+  assert_contains "$CHECK_OUT" "not a pack file, and no root" "the relative path was flagged for another cause"
   pass "with no root, a relative path that is not a pack file is a leak"
 }
 
-test_leak_check_reads_links_quotes_and_file_urls() {
+test_leak_check_voids_links_quotes_and_file_urls() {
   local rep="$TMP_ROOT/report17.md" sib="$TMP_ROOT/sibling/pack/review.md" body n=0
   make_leak_world
-  # Compliant: a Markdown-linked pack path is clean.
-  printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- [contract.md](%s)\n- %s\n\n## Findings\n' "$LEAK_PACK/contract.md" "$LEAK_PACK/target.md" >"$rep"
+  # Compliant: plain full paths are clean.
+  printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- %s\n- %s\n\n## Findings\n' "$LEAK_PACK/contract.md" "$LEAK_PACK/target.md" >"$rep"
   run_check "$rep"
-  assert_equals 0 "$CHECK_RC" "a linked pack path was flagged: $CHECK_OUT"
-  # Noncompliant: a sibling report behind a link, quotes or file:// is read.
+  assert_equals 0 "$CHECK_RC" "plain pack paths were flagged: $CHECK_OUT"
+  # Noncompliant: a path behind a link, quotes or file:// voids for structure, never clean.
   # shellcheck disable=SC1111 # literal curly quotes in a report line
-  for body in "- Prior report: [review.md]($sib)" "- [sibling report]($sib)" "- also read '$sib'" \
-    "- also “${sib}”" "- see file://$sib"; do
+  for body in "- [contract.md]($LEAK_PACK/contract.md)" "- Prior report: [review.md]($sib)" "- [sibling report]($sib)" \
+    "- also read '$sib'" "- also “${sib}”" "- see file://$sib"; do
     n=$((n + 1))
-    printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- %s\n%s\n\n## Findings\n' "$LEAK_PACK/contract.md" "$body" >"$rep"
+    printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- %s\n%s\n\n## Findings\n' "$LEAK_PACK/target.md" "$body" >"$rep"
     run_check "$rep"
-    assert_equals 3 "$CHECK_RC" "wrapped path $n ($body) passed"
-    assert_contains "$CHECK_OUT" "INPUT LEAK: $sib" "wrapped path $n is not named"
+    assert_equals 3 "$CHECK_RC" "wrapped path $n ($body) was accepted"
+    assert_contains "$CHECK_OUT" "REPORT STRUCTURE" "wrapped path $n did not void for structure"
   done
-  pass "a path behind a link, quotes or file:// is judged"
+  pass "a path behind a link, quotes or file:// voids the round for structure"
 }
 
 test_longer_field_label_voids_as_structure() {
@@ -1316,9 +1325,9 @@ fm_test_run_cases \
   test_author_history_heading_under_unrecognised_parent_or_title_refused \
   test_title_is_not_the_definition_of_done \
   test_leak_check_reads_through_fences_and_setext_headings \
-  test_leak_check_reads_every_path_on_a_line \
+  test_leak_check_voids_a_second_path_on_a_line \
   test_leak_check_reads_a_path_above_a_rule_or_hash_line \
-  test_leak_check_reads_paths_anywhere_on_a_list_line \
+  test_leak_check_voids_a_path_that_is_not_the_leading_entry \
   test_summary_mention_of_inputs_read_is_not_a_list \
   test_author_section_title_drops \
   test_author_section_under_any_heading_of_request_or_context_refused \
@@ -1327,7 +1336,7 @@ fm_test_run_cases \
   test_report_field_under_a_label_voids_as_structure \
   test_exact_title_in_request_or_context_keeps_the_author_check \
   test_leak_check_without_root_refuses_a_relative_path_outside_the_pack \
-  test_leak_check_reads_links_quotes_and_file_urls \
+  test_leak_check_voids_links_quotes_and_file_urls \
   test_longer_field_label_voids_as_structure \
   test_inline_backticks_do_not_open_a_fence \
   test_definition_of_done_in_every_heading_form \
