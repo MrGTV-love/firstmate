@@ -98,9 +98,10 @@
 # for a tick libproc did not answer in time) and names any attempt that gave
 # up its libproc reader, with the reason. Linux runs are never watched, and CI
 # runs under FM_LINT_REQUIRE_BOUNDS=1 keep their ulimit envelope.
-# The changed-root dependency scan takes one pass too. A cold root takes one pass of the host-wide CPU pool before its host slot
+# A cold root takes one pass of the host-wide CPU pool before its host slot
 # (bin/fm-cpu-pass.sh; docs/cpu-pass-pool.md owns the protocol), so ShellChecks and
-# test scripts together never exceed the pool. A run already inside a pass
+# test scripts together never exceed the pool. The changed-root dependency scan
+# takes one pass too. A run already inside a pass
 # (FM_CPU_PASS_HELD above 0) takes none and runs at most that many workers.
 # Waiting roots queue rather than fail; cache-key, host-slot and CPU-pass queue time
 # consume neither the root deadline nor its retry budget.

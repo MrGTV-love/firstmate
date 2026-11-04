@@ -136,9 +136,10 @@
 # configuration, including one that sources no test helper of its own;
 # tests/git-config-helpers.sh owns that contract and its limits.
 #
-# An unnested --check-coverage takes one pass for its whole scan. An unnested runner takes one pass per executed script from the host-wide pool
+# An unnested runner takes one pass per executed script from the host-wide pool
 # (bin/fm-cpu-pass.sh; docs/cpu-pass-pool.md owns the protocol), outside its
 # per-script bound, so participating test bursts across worktrees take turns.
+# An unnested --check-coverage takes one pass for its whole scan.
 # A runner already inside a pass (FM_CPU_PASS_HELD set) takes no additional pass
 # and runs at most that many concurrent scripts, reporting a reduced --jobs on stderr.
 # The marker must be a nonnegative decimal integer or execution exits 125;

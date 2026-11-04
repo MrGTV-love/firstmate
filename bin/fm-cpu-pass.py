@@ -13,7 +13,7 @@ exits with COMMAND's status (128+n when a signal n ended it).
 `status` reports how many passes are held and by whom; `size` prints the pool
 size so a caller can size its own worker count (for example pytest -n).
 
-The pool bounds CPU-heavy bursts (test suites and their workers), not agents
+The pool bounds CPU-heavy bursts (test suites, their workers and lint roots), not agents
 or sessions: interactive work never asks for a pass and is never queued.
 docs/cpu-pass-pool.md owns the cross-repository protocol this command
 implements: pool directory and size, slot and turnstile locks, the

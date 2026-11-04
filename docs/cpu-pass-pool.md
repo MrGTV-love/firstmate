@@ -64,12 +64,12 @@ bin/fm-cpu-pass.sh size
 A repository that cannot assume a Firstmate checkout implements the protocol directly with its language's `flock`, as rules 1-8 describe.
 The [`bin/fm-test-run.sh` header](../bin/fm-test-run.sh) owns Firstmate's runner integration.
 
-Firstmate's own heavy entry points take passes outside their timing and bounds:
+Firstmate's own heavy entry points take passes outside their timing and bounds; each script's header owns the details:
 
-- `bin/fm-test-run.sh` takes one per executed script, and one for a whole `--check-coverage` scan; a nested runner takes none.
-- `bin/fm-duration.py run test.<key>`, the route the generated worker instructions name for an individual suite, takes one after its per-key slot and before its clock; `gate` takes none because its caller takes its own inside the slot.
-- `bin/fm-lint.sh` takes one per cold ShellCheck root before its host slot and one for the changed-root dependency scan, and inside a pass runs at most that many roots.
-- `bin/fm-test-isolation-proof.sh` takes min(`--jobs`, pool size) for its whole run and runs that many workers, each with `FM_CPU_PASS_HELD=1`; inside a pass it takes none and runs at most that many. It records only that count as its concurrency, and enables runner jobs only when that count is the requested `--jobs`.
+- `bin/fm-test-run.sh` takes one per executed script, and one for a whole `--check-coverage` scan.
+- `bin/fm-duration.py run test.<key>`, the route the generated worker instructions name for an individual suite, takes one after its per-key slot and before its clock.
+- `bin/fm-lint.sh` takes one per cold ShellCheck root and one for the changed-root dependency scan.
+- `bin/fm-test-isolation-proof.sh` takes min(`--jobs`, pool size) for its whole run; its header owns how it counts and records concurrency.
 
 A pass holder never waits for a per-key slot ([configuration.md](configuration.md#test-slots-per-key-fm_test_key_slots)), so a slot holder waiting for a pass cannot deadlock against it.
 Waiting for a pass or a slot is by capacity alone: no elapsed time admits a waiter.
