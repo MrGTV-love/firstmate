@@ -1,0 +1,13 @@
+/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6JK33X6SZF5FC17V86YEX9B/tests/lib.sh: line 526: 76799 Killed: 9               sleep 61250
+reap rc=0
+PASS live second entry reaped after a dead first entry
+PASS registry removed
+PASS rc 0: nothing still alive with unknown group
+ps read: Wed Nov  4 00:55:13 2026    
+rc=0
+## real tests/lib.sh helpers under sandbox-exec (setuid ps refused): native reader, gone PID fails
+lstart=Wed Nov 4 00:55:15 2026
+args=sleep 30
+ppid=76918
+pgid=51949
+gone-pid=rc=1

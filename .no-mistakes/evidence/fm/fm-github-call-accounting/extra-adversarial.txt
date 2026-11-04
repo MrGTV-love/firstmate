@@ -1,0 +1,33 @@
+## privacy matrix: real ps, real chains; canary in every payload shape
+owner exit on SIGINT 0
+{"argv": ["sh", "gh", "api", "--header=[REDACTED]", "[REDACTED]", "[REDACTED]"], "parent": ["python3", "s_extra.py"]}
+{"argv": ["sh", "gh", "api", "[REDACTED]", "[REDACTED]", "--paginate", "[REDACTED]"], "parent": ["python3", "s_extra.py"]}
+{"argv": ["sh", "gh", "auth", "[REDACTED]", "[REDACTED]", "[REDACTED]"], "parent": ["python3", "s_extra.py"]}
+{"argv": ["sh", "gh", "pr", "view"], "parent": ["bash", "--norc", "-c", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]"]}
+{"argv": ["sh", "gh", "issue", "list"], "parent": ["python3", "s_extra.py"]}
+{"argv": ["sh", "gh", "run", "view"], "parent": ["python3", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]"]}
+PASS control: canaries in live ps hits=18
+PASS no canary in records or any owner file 
+PASS each shape produced caller rows 6
+PASS SIGINT is a normal stop: action=stop written 
+## SIGTERM and SIGHUP
+PASS SIGTERM: exit 0 with stop row 0
+PASS SIGHUP: exit 0 with stop row 0
+## CLI validation
+PASS run --duration 0 rejected exit 2 2
+PASS run --duration -1 rejected exit 2 2
+PASS run --duration inf rejected exit 2 2
+PASS run --duration nan rejected exit 2 2
+PASS start --duration 5 rejected exit 2 2
+PASS status --kind quota rejected exit 2 2
+PASS bogus rejected exit 2 2
+## unsafe state directory
+PASS symlinked state dir: start exit 1, target empty fm-github-accounting: operation unavailable (check owner status/state permissions)
+PASS symlinked state dir: status exit 1, target empty fm-github-accounting: operation unavailable (check owner status/state permissions)
+PASS symlinked state dir: prune exit 1, target empty fm-github-accounting: operation unavailable (check owner status/state permissions)
+## denied ps (sandbox-exec refuses setuid /bin/ps): visible failure, never empty data
+exit 0 ''
+sampling scans/failures [(1, 0), (9, 9)]
+PASS denied ps: failures counted, no process rows invented, no end rows 
+PASS denied ps: quota stream still observed 
+PASS denied ps: owner exits 0 and caller untouched 

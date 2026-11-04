@@ -1,0 +1,34 @@
+## A primary home: watcher starts the real owner, which sees a real caller
+PASS absent owner started by a watcher cycle
+status: {"state": "running", "pid": 53724, "run_id": "39aba5d5fa6d402196fe5eefc0e9abad", "started_at": 1793775272.441893}
+PASS running owner left alone across cycles
+PASS healthy owner raises no wake
+PASS SIGKILLed owner recovered at next cycle with new run_id
+plain stop: {"state": "stopped"}
+PASS documented: a plain stop lasts only until the next cycle
+PASS detached owner outlives its watcher
+PASS a restarted watcher runs normally beside the live owner
+PASS a restarted watcher leaves the live owner alone
+PASS observer lifecycle left the caller alone
+caller process rows across runs: 5
+PASS watcher-started owner recorded the real caller by real ps
+/Users/charlesabrooker/tmp/fm-acct-live-watch.5MOBrw/primary/gh: line 12: 52603 Killed: 9               sleep 600
+## B homes that must never start the real owner
+lab marker: fm-lab-home v1
+owner_pid=51986
+owner_identity=Wed Nov  4 00:54:30 2026     bash s_watch.sh
+PASS lab: watcher polled at least 4 cycles
+PASS lab: no owner state was created (real owner never ran)
+PASS secondmate: watcher polled at least 4 cycles
+PASS secondmate: no owner state was created (real owner never ran)
+PASS switch-off: watcher polled at least 4 cycles
+PASS switch-off: no owner state was created (real owner never ran)
+## C foreign database: one wake, reason in owner.log, no loop
+watcher stdout: check: github-accounting owner failed to start: exit=1; owner stderr: /Users/charlesabrooker/tmp/fm-acct-live-watch.5MOBrw/foreign/state/github-accounting/owner.log; retries every 3600s without another wake
+owner.log: fm-github-accounting: operation unavailable (check owner status/state permissions)
+PASS failed start closes the cycle with a named wake
+PASS exactly one durable wake row
+PASS foreign database unchanged
+PASS hold marker exists
+exit status of failures: 0
+rc=0

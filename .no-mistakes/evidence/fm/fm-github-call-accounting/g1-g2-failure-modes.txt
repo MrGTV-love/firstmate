@@ -1,0 +1,30 @@
+## gh-axi absent from PATH: None
+run exit 0 [('unavailable', 'command_unavailable', None, None)]
+PASS missing gh-axi: reason=command_unavailable, no counter fields, owner exit 0 
+start exit 0 {"state": "running", "pid": 74850, "run_id": "897ce37e32e845a89c01ffda34cee614", "started_at": 1793774585.417881}
+PASS missing gh-axi does not fail start 
+stop {"state": "stopped"}
+fail-then-ok [('unavailable', None, 1, {}), ('observed', None, 0, {'reset': 1794000000, 'used': 7})]
+PASS nonzero exit is unavailable even with a parseable body; not zero or stale 
+PASS recovery observed; null limit/remaining are absent, not 0 
+garbage [('unavailable', None, 0, {})]
+PASS garbage body is unavailable, no fields 
+no-progress [('unavailable', 'timeout', -9, {}), ('observed', None, 0, {'limit': 5000, 'remaining': 4992, 'reset': 1794000000, 'used': 8})]
+PASS hung quota child: reason=timeout then a fresh observed row 
+PASS hung child's whole group is gone 
+pending [('pending', None, None, None)] elapsed=17.3
+PASS slow request: next tick is pending with same pid, no second request 
+PASS normal stop kills the hung quota group 
+PASS control: hung fake ps is running 
+stop with hung ps 0 {"state": "stopped"} took 0.32s
+PASS stop returns quickly with ps hung 
+PASS hung ps ended by owner exit 
+quota under hung ps [('observed', None, 0, {'limit': 5000, 'remaining': 4989, 'reset': 1794000000, 'used': 11}), ('observed', None, 0, {'limit': 5000, 'remaining': 4988, 'reset': 1794000000, 'used': 12})]
+PASS quota stream not delayed by hung ps (2 observed rows in 17 s) 
+sampling under hung ps [(1, 0, 0.0), (0, 0, 0.0), (0, 0, 0.0)]
+PASS failed scans write no end for a caller killed during the gap 
+PASS first good scan writes the end, later than the real kill by the failed gap real kill to end row=3.56s
+c2 rows observed_at-first: [0.0, 5.89] sampling scans/failures [(1, 0), (18, 15)]
+PASS stop during failed scans: c2 has stop row, no end row, first_observed_at unchanged 
+PASS stop row's observed_at matches owner action=stop, not a scan 
+PASS sampling rows report the failures 

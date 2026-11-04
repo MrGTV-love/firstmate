@@ -1,0 +1,21 @@
+# real owner + real gh-axi + real ps; disposable FM_HOME; run --duration 17 (two REST rate_limit reads)
+gh-axi on PATH: /opt/homebrew/bin/gh-axi
+run exit 0 stderr ''
+quota {'status': 'observed', 'source': 'REST rate_limit resources.graphql', 'endpoint': 'rate_limit', 'host': 'github.com', 'exit_code': 0, 'graphql': {'limit': 5000, 'remaining': 4414, 'reset': 1793775535, 'used': 586}, 'request_started_at': 1793774486.51817, 'observed_at': 1793774487.164072}
+quota {'status': 'observed', 'source': 'REST rate_limit resources.graphql', 'endpoint': 'rate_limit', 'host': 'github.com', 'exit_code': 0, 'graphql': {'limit': 5000, 'remaining': 4411, 'reset': 1793775535, 'used': 589}, 'request_started_at': 1793774501.615766, 'observed_at': 1793774502.309702}
+PASS two quota rows 
+PASS both observed, int fields 
+PASS request gap about 15 s gap=15.098
+PASS provenance names REST resources.graphql 
+independent read after run: api_response:
+  body: 589 1793775535 5000
+  truncated: false
+PASS independent read shows same limit and reset (reset can roll only at a window edge) 
+owner's own quota child rows seen by the real sampler: 7
+{"ancestor_end": "root", "ancestors": [["Python", "fm-github-accounting.py", "[REDACTED]", "[REDACTED]", "[REDACTED]"], ["python3", "s_quota_real.py"], ["timeout", "[REDACTED]", "[REDACTED]", "[REDACTED]"], "...5 more"], "argv": ["node", "gh-axi", "api", "rate_limit", "--jq", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "--full"], "argv_source": "ps-command-line-projection", "first_observed_at": 1793774486.723095, "kind": "process", "observed_at": 1793774486.723095, "pid": 94316, "ppid": 94261, "run_id": "63e7a7878f9445969c50b42a0493b6c3", "start": "Wed Nov 4 00:41:26 2026"}
+{"ancestor_end": "root", "ancestors": [["Python", "fm-github-accounting.py", "[REDACTED]", "[REDACTED]", "[REDACTED]"], ["python3", "s_retention.py"], ["timeout", "[REDACTED]", "[REDACTED]", "[REDACTED]"], "...5 more"], "argv": ["sh", "gh-axi", "api", "rate_limit", "--jq", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "--full"], "argv_source": "ps-command-line-projection", "first_observed_at": 1793774486.962462, "kind": "process", "observed_at": 1793774486.962462, "pid": 94331, "ppid": 94263, "run_id": "63e7a7878f9445969c50b42a0493b6c3", "start": "Wed Nov 4 00:41:26 2026"}
+PASS real gh-axi child recorded with owner in its chain, args withheld 
+sampling [{'scans': 1, 'failures': 0, 'max_gap_seconds': 0.0}, {'scans': 49, 'failures': 0, 'max_gap_seconds': 0.3499805419705808}, {'scans': 6, 'failures': 0, 'max_gap_seconds': 0.3488636671099812}]
+PASS real ps: no sampling failures 
+PASS real ps scan gap within 0.05-0.5 s max_gap=0.350
+kinds: ['owner', 'process', 'process_end', 'quota', 'sampling'] note: host caller rows stayed in the disposable DB and are not copied here

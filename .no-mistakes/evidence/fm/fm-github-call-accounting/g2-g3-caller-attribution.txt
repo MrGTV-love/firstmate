@@ -1,0 +1,28 @@
+owner running running
+owner exit 0
+LABELED FIXTURE quota values: [(0.7, 'observed', 100), (15.5, 'observed', 4200), (30.6, 'observed', 4990), (45.6, 'observed', 5000)]
+PASS 4 quota rows on the 15 s cadence 
+A {"ancestor_end": "root", "ancestors": [["sh", "mid.sh", "[REDACTED]", "[REDACTED]"], ["sh", "top.sh"], "...7 more"], "argv": ["sh", "gh-axi", "api", "graphql", "-f", "[REDACTED]", "[REDACTED]", "-H", "[REDACTED]", "[REDACTED]", "[REDACTED]", "--jq=[REDACTED]", "[REDACTED]"], "argv_source": "ps-command-line-projection", "first_observed_at": 1793774490.9552372, "kind": "process", "observed_at": 1793774490.9552372, "pid": 131, "ppid": 98857, "run_id": "03c361d5f09c492b8d8fae932ea22c4b", "start": "Wed Nov 4 00:41:30 2026"}
+B {"ancestor_end": "root", "ancestors": [["python3", "-c", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]"], ["python3", "s_attrib.py"], "...6 more"], "argv": ["sh", "gh", "issue", "list", "[REDACTED]", "[REDACTED]"], "argv_source": "ps-command-line-projection", "first_observed_at": 1793774490.330448, "kind": "process", "observed_at": 1793774490.330448, "pid": 98439, "ppid": 98390, "run_id": "03c361d5f09c492b8d8fae932ea22c4b", "start": "Wed Nov 4 00:41:29 2026"}
+C {"ancestor_end": "root", "ancestors": [["python3", "s_attrib.py"], ["timeout", "[REDACTED]", "[REDACTED]", "[REDACTED]"], "...5 more"], "argv": ["sh", "gh-axi", "pr", "list", "--repo", "[REDACTED]"], "argv_source": "ps-command-line-projection", "first_observed_at": 1793774510.657673, "kind": "process", "observed_at": 1793774510.657673, "pid": 98384, "ppid": 94099, "run_id": "03c361d5f09c492b8d8fae932ea22c4b", "start": "Wed Nov 4 00:41:29 2026"}
+D {"ancestor_end": "root", "ancestors": [["python3", "s_attrib.py"], ["timeout", "[REDACTED]", "[REDACTED]", "[REDACTED]"], "...5 more"], "argv": ["sh", "gh-axi", "api", "rate_limit"], "argv_source": "ps-command-line-projection", "first_observed_at": 1793774518.9436631, "kind": "process", "observed_at": 1793774518.9436631, "pid": 22431, "ppid": 94099, "run_id": "03c361d5f09c492b8d8fae932ea22c4b", "start": "Wed Nov 4 00:41:58 2026"}
+D {"ancestor_end": "root", "ancestors": [["python3", "s_attrib.py"], ["timeout", "[REDACTED]", "[REDACTED]", "[REDACTED]"], "...5 more"], "argv": ["sh", "gh-axi", "api", "rate_limit"], "argv_source": "ps-command-line-projection", "first_observed_at": 1793774518.9436631, "kind": "process", "observed_at": 1793774533.706064, "pid": 22431, "ppid": 94099, "run_id": "03c361d5f09c492b8d8fae932ea22c4b", "start": "Wed Nov 4 00:41:58 2026"}
+PASS A argv kept command words and option names, values withheld ['sh', 'gh-axi', 'api', 'graphql', '-f', '[REDACTED]', '[REDACTED]', '-H', '[REDACTED]', '[REDACTED]', '[REDACTED]', '--jq=[REDACTED]', '[REDACTED]']
+PASS A ancestor chain names mid.sh then top.sh 
+PASS A ancestor_end reached root root
+PASS A identity has pid and start 
+PASS A has process_end after its kill kill at t=20.1
+PASS D (alive at stop) has a stop row and no process_end 
+PASS D stop row observed_at equals stop time from action=stop row; first_observed_at unchanged 
+interval 1: t=0.7..15.5 used_delta=4100 fixtures: {'A': True, 'C': False, 'D': False}
+interval 2: t=15.5..30.6 used_delta=790 fixtures: {'A': True, 'C': True, 'D': False}
+interval 3: t=30.6..45.6 used_delta=10 fixtures: {'A': False, 'C': False, 'D': True}
+PASS cold reader: interval 1 has A, not C (exec later), not D 
+PASS cold reader: interval 2 has A and C, not D 
+PASS cold reader: interval 3 has D as uncertain, not A or C 
+PASS exec caller first_observed_at is after exec (t>=22), not process start (t~3) first_observed_at t=24.2
+sampling [(1, 0, 0.0), (48, 0, 0.35), (47, 0, 0.349), (49, 0, 0.35), (5, 0, 0.344)]
+PASS sampling failures 0 and gap <= 0.5 s 
+PASS no canary bytes anywhere in owner state or in records output []
+PASS control: real ps output carried the canaries while callers ran canary hits in a separate ps read=10
+PASS state dir 0700, db 0600 0o700 0o600

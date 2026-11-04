@@ -1,0 +1,35 @@
+## part 1: exact 48 h boundary through the prune CLI, frozen clock
+before ['older', 'at_cutoff', 'newer']
+prune 0 {"removed": 1}
+after ['at_cutoff', 'newer'] | cutoff convention: strictly older than now-172800 expires; exactly 48 h stays
+PASS older expired, at-cutoff and newer stay 
+PASS unrelated files untouched 
+## part 2: continuous caller across >172801 s, real owner, real ps, real caller, shifted clock
+first sighting first_observed_at 1793774585.24
+process rows before first prune [0, 86401, 172817]
+process rows after the quota-tick prune [86401, 172817]
+PASS scan cost: no per-scan rows (2 retained after >150 scans) 
+retained process rows, seconds after first sighting: [86401, 172817] end: [172838]
+PASS first sighting expired; renewals remain 
+PASS every retained row still carries the original first_observed_at 
+PASS renewals repeat the same sanitized argv and ancestors ['sh', 'gh-axi', 'api', 'graphql', '-f', '[REDACTED]']
+PASS end row joins by pid, start and run_id 
+PASS cold-reader overlap: an in-window quota row before the retained rows' observed_at overlaps via first_observed_at first_quota_offset=86416
+## part 3: prune keeps an ended caller's latest row while its end row is retained
+latest process row to end row gap=21.2s
+prune 0 {"removed": 32}
+after prune at cutoff between latest row and end row: process [172817] end 1
+PASS latest row kept past 48 h because its end row is in the window; older renewal gone 
+prune 0 {"removed": 10}
+PASS after the end row expires, both go: no unbounded archive 
+PASS sentinel outside the owner's records untouched 
+PASS expired payload bytes gone from the database file; canary never present 
+## part 4: refusal of files this owner does not own
+foreign sqlite start exit 1 stderr 'fm-github-accounting: operation unavailable (check owner status/state permissions)' 
+PASS foreign sqlite: refused unchanged, fixed line, owner stopped 
+nonempty non-database start exit 1 stderr 'fm-github-accounting: operation unavailable (check owner status/state permissions)' 
+PASS nonempty non-database: refused unchanged, fixed line, owner stopped 
+zero-size start exit 0 stderr '' {"state": "running", "pid": 98331, "run_id": "c3096b0f6b934e
+PASS zero-size treated as new, owner starts 
+symlinked db start exit 1 stderr 'fm-github-accounting: operation unavailable (check owner status/state permissions)' 
+PASS symlinked db: refused unchanged, fixed line, owner stopped 

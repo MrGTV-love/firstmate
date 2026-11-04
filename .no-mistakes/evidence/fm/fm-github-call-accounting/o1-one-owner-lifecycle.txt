@@ -1,0 +1,26 @@
+PASS --help documents the contract 
+status before start {"state": "stopped"}
+start 0 {"state": "running", "pid": 94355, "run_id": "abfbe44c681c4a8e964e91ada623ab61", "started_at": 1793774486.699691}
+start again 0 {"state": "running", "pid": 94355, "run_id": "abfbe44c681c4a8e964e91ada623ab61", "started_at": 1793774486.699691}
+PASS repeat start is idempotent: same run_id and pid 
+PASS 6 parallel starts: exit 0 or 75 only, one owner [0, 0, 0, 0, 0, 0]
+second run 75 fm-github-accounting: busy (owner lock held); retry
+PASS second run refused with 75 
+PASS records while running exits 75 fm-github-accounting: busy (owner lock held); retry
+PASS prune while running exits 75 fm-github-accounting: busy (owner lock held); retry
+PASS status reports the same owner {'state': 'running', 'pid': 94355, 'run_id': 'abfbe44c681c4a8e964e91ada623ab61', 'started_at': 1793774486.699691}
+stop 0 {"state": "stopped"}
+PASS stop ends the owner pid 
+PASS status then stopped 
+PASS observer stop left the caller and an unrelated process alive 
+row kinds {'owner': 2, 'sampling': 2, 'process': 10, 'process_end': 6, 'quota': 1}
+PASS one database holds quota, process, sampling and owner rows 
+PASS start and stop owner rows 
+PASS stop when stopped is a no-op exit 0 
+## SIGKILL then recovery
+start after SIGKILL 0 {"state": "running", "pid": 98965, "run_id": "3a2d11811f3145779eeda01ebe302b28", "started_at": 1793774490.155057}
+PASS fresh owner after SIGKILL, new run_id 
+caller rows by run: {'abfbe4': 2, '5e0c9d': 1, '3a2d11': 2}
+PASS SIGKILLed run wrote no stop rows, new owner records the alive caller as a new row 
+PASS SIGKILLed run has no action=stop owner row 
+PASS callers still alive after all of it 
