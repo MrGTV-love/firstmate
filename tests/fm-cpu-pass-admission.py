@@ -1196,6 +1196,29 @@ while not (folder / (run + '.release')).exists(): time.sleep(0.025)
     facts(folder, available=int(8.5 * GIB))
     finish(later)
 
+    # Gates that wait together, in the daemon's fix-time state: each run's ci step is fixing with the
+    # gate's pid recorded and the gate visible at 0.1 GiB. Another run's waiting gate adds only what it
+    # holds, so the first fits (8 + 0.4 of 8.9 GiB; counting the others at A would be 11.1) and each
+    # later one starts by itself once the run before it is a CI waiter again.
+    tenth = GIB // 10
+    names = ('a', 'b', 'c', 'd')
+    folder, db, env = gate_case('gate-waiters', available=int(8.5 * GIB), runs=[(r, 'ci', 'fixing', 4242) for r in names])
+    facts(folder, available=int(8.5 * GIB), pressure=2, runs=[('repo', r, tenth) for r in names])
+    gates = {}
+    for run in names:
+        gates[run] = gate(folder, env, run)[0]
+        wait_for(lambda: live_entries(folder) == len(gates), run + ' queued')
+    facts(folder, available=int(8.5 * GIB), runs=[('repo', r, tenth) for r in names])
+    for index, run in enumerate(names):
+        wait_for(lambda: (folder / (run + '.agent')).exists(), run + ' starts by itself')
+        assert not any((folder / (later + '.agent')).exists() for later in names[index + 1:]), run
+        text = (folder / ('gate-%s.stderr' % run)).read_text()
+        assert all('%s:waiter:%d' % (later, tenth) in text for later in names[index + 1:]), text
+        (folder / (run + '.release')).touch()
+        finish(gates[run])
+        change(db, "UPDATE step_results SET status = 'running', agent_pid = NULL WHERE run_id = ?", (run,))
+        facts(folder, available=int(8.5 * GIB), runs=[('repo', r, tenth) for r in names[index + 1:]])
+
     # Dead holders and retries: an unlocked launch record reserves nothing and is removed; two live
     # attempts of one run hold one reservation.
     folder, db, env = gate_case('gate-holders', available=12 * GIB, runs=[('x', 'ci', 'running', None)])

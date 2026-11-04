@@ -62,9 +62,10 @@ Pipeline starts:
     resident memory the counted runs hold (never capped), or when no other run
     is counted (a one-start minimum). The projection is S for the new run plus,
     per counted run: only what it holds when it waits on remote CI (open step ci
-    in running, no recorded agent pid, no live launch reservation); its resident
-    memory or A, whichever is larger, when the reading sees it; R while the
-    reading cannot see it. S is the largest per-run peak of every recorded
+    in running, no recorded agent pid, no live launch reservation) or while its
+    launch gate waits in this queue with no live launch reservation; its
+    resident memory or A, whichever is larger, when the reading sees it; R
+    while the reading cannot see it. S is the largest per-run peak of every recorded
     no-mistakes run with at least 2 readings, and R the 75th percentile (nearest
     rank) of those peaks leaving out runs that are status-running with
     ci_ready_at IS NULL, read from the root home's .memory-calibration.json
@@ -775,7 +776,8 @@ def active_term(report: dict) -> Optional[Tuple[int, int]]:
 
 
 def project(available: int, rss: dict, counted: dict, steps: Optional[dict], launches: dict,
-            reservation: int, slack: int, term: int, self_run: Optional[str] = None) -> dict:
+            reservation: int, slack: int, term: int, self_run: Optional[str] = None,
+            waiting: frozenset = frozenset()) -> dict:
     """The reservation fit for one more active run; a pure function of its facts.
 
     counted maps each counted run ID to its repo ID; rss is the reading's run map
@@ -788,8 +790,10 @@ def project(available: int, rss: dict, counted: dict, steps: Optional[dict], lau
     whichever is larger, like any active run. Every other counted or launched run reserves its
     resident memory or the active-run term A, whichever is larger, once its tree
     is visible, and its full R while the reading cannot see it yet. The new run
-    reserves S. The waiting launch's own run (self_run) is a waiter: it adds only
-    what it holds. Budget is available memory plus what the counted runs hold.
+    reserves S. With no live launch, the waiting launch's own run (self_run) and
+    every run in waiting (a run whose launch gate is queued in the pool) are
+    waiters: each adds only what it holds. Budget is available memory plus what
+    the counted runs hold.
     """
     entries = []
     runs = dict(counted)
@@ -802,11 +806,11 @@ def project(available: int, rss: dict, counted: dict, steps: Optional[dict], lau
         visible = bool(seen) and seen.get("processes", 0) > 0
         step = None if steps is None else steps.get(run)
         held += size
-        if run == self_run:
-            kind, demand = "waiter", size
-        elif run in launches:
+        if run in launches:
             kind = "launched"
             demand = max(size, term) if visible else reservation
+        elif run == self_run or run in waiting:
+            kind, demand = "waiter", size
         elif (steps is not None and step is not None and step[0] == CI_STEP and step[1] == "running"
               and step[2] is None and not visible):
             kind, demand = "ci-waiting", size
@@ -875,7 +879,8 @@ def host_observation(fresh: bool = False) -> dict:
 
 def admission(reasons: List[str], report: Optional[dict], running: dict, counted: dict, steps: Optional[dict],
               launches: dict, cores: int, priority: str, self_run: Optional[str] = None,
-              measured: Optional[Tuple[Tuple[int, int, int], Tuple[int, int]]] = None) -> Tuple[bool, str]:
+              measured: Optional[Tuple[Tuple[int, int, int], Tuple[int, int]]] = None,
+              waiting: frozenset = frozenset()) -> Tuple[bool, str]:
     """The complete admission rule over one reading's facts: holds first, then the fit or the count fallback.
 
     measured, when given, supplies ((R, S, runs measured), (A, readings measured))
@@ -891,17 +896,20 @@ def admission(reasons: List[str], report: Optional[dict], running: dict, counted
         limit = max(1, cores // 3)
         return others < limit, "counted=%d limit=%d basis=fallback priority=%s" % (others, limit, priority)
     (reservation, slack, qualifying), (term, readings) = measured
-    fit = project(report["available_bytes"], report["runs"], counted, steps, launches, reservation, slack, term, self_run)
+    fit = project(report["available_bytes"], report["runs"], counted, steps, launches, reservation, slack, term, self_run,
+                  waiting)
     return fit["admit"], projection_text(fit, reservation, slack, term, qualifying, readings) + " priority=%s" % priority
 
 
 def decide(running: dict, counted: dict, cores: int, priority: str, fresh: bool = False,
-           directory: Optional[str] = None, self_run: Optional[str] = None) -> Tuple[bool, str]:
+           directory: Optional[str] = None, self_run: Optional[str] = None,
+           waiting: frozenset = frozenset()) -> Tuple[bool, str]:
     """(admit, one-line reason) for the first waiter, from the running and counted runs and the host reading."""
     seen = host_observation(fresh)
     launches = live_launches(directory) if directory else {}
     steps = open_steps() if seen["memory"] is not None else None
-    return admission(seen["reasons"], seen["memory"], running, counted, steps, launches, cores, priority, self_run)
+    return admission(seen["reasons"], seen["memory"], running, counted, steps, launches, cores, priority, self_run,
+                     waiting=waiting)
 
 
 def pipeline_observation() -> Tuple[dict, int]:
@@ -947,9 +955,13 @@ def publish_locked(directory: str, prefix: str, entry: dict) -> Tuple[int, str]:
     return fd, final
 
 
-def first_pipeline_waiter(directory: str) -> str:
-    """Locked entries are live waiters; a dead waiter's unlocked file is inert."""
+def first_pipeline_waiter(directory: str) -> Tuple[str, frozenset]:
+    """The first live waiter's path and the run IDs of every live launch-gate waiter.
+
+    Locked entries are live waiters; a dead waiter's unlocked file is inert.
+    """
     entries = []
+    runs = set()
     for path in Path(directory).glob("pipeline-waiter-*.lock"):
         try:
             fd = os.open(str(path), os.O_RDWR | getattr(os, "O_CLOEXEC", 0))
@@ -961,9 +973,11 @@ def first_pipeline_waiter(directory: str) -> str:
                 continue
             entry = json.loads(os.pread(fd, 65536, 0))
             entries.append((PIPELINE_PRIORITIES.index(entry["priority"]), entry["queued_ns"], str(path)))
+            if entry.get("run"):
+                runs.add(entry["run"])
         finally:
             os.close(fd)
-    return min(entries)[2] if entries else ""
+    return (min(entries)[2] if entries else ""), frozenset(runs)
 
 
 class HoldBound(Exception):
@@ -999,13 +1013,14 @@ def wait_for_admission(directory: str, priority: str, self_run: Optional[str] = 
             if try_lock(admission_fd):
                 before, cores = pipeline_observation()
                 counted = {run: repo for run, (repo, is_counted, _) in before.items() if is_counted}
-                first = first_pipeline_waiter(directory)
+                first, waiting = first_pipeline_waiter(directory)
                 if first == waiter_path:
-                    admit, reason = decide(before, counted, cores, priority, directory=directory, self_run=self_run)
+                    admit, reason = decide(before, counted, cores, priority, directory=directory, self_run=self_run,
+                                           waiting=waiting)
                     if admit:
                         # A cached healthy reading may be stale: confirm with a new reading at the grant.
                         admit, reason = decide(before, counted, cores, priority, fresh=True, directory=directory,
-                                               self_run=self_run)
+                                               self_run=self_run, waiting=waiting)
                     if admit and waited and bound is not None and time.monotonic() - started > bound:
                         raise HoldBound("a fit came only after the hold bound passed: " + reason)
                     if admit:

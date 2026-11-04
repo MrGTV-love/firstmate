@@ -85,6 +85,7 @@ projected  =   the reservations of the counted runs  +  S for the new run
 | A counted run that is | reserves | why |
 |---|---|---|
 | waiting on remote CI: its open step is `ci` with status `running`, no agent pid is recorded, no launch-gate reservation is live and the reading sees no process of it (a visible process may be an agent whose pid is not recorded yet, so it counts as active) | only the resident memory it holds (0 while no process of it is visible) | it uses memory again only when a fix round starts, and that agent starts only through the [launch gate](#launch-gate), which secures capacity first |
+| waiting in its [launch gate](#launch-gate): a live launch-gate entry of it is queued in the pool and no launch-gate reservation of it is live, whatever its step or visibility | only the resident memory it holds | its agent has not started, and it reserves capacity only when its gate is admitted |
 | visible in the reading at any other step, or with a live launch-gate reservation | its resident memory or `A`, whichever is larger | startup memory alone is not its demand; memory above `A` is counted as it is, never capped at `R`, `S` or a recorded peak |
 | not visible yet: just registered, between steps, with an unreadable step, or a launch-gate start the reading cannot see | `R` | the reading cannot show what it will use, so it is never read as idle |
 
@@ -137,7 +138,7 @@ The [engine header](../bin/fm-cpu-pass.py) owns its exact sequence, refusal text
 
 1. It maps its working directory to exactly one `runs.worktree_dir`; an unmapped or ambiguous directory or an unreadable database refuses, visibly, and never passes through.
 2. A launch for any step other than `ci` runs the agent at once, unchanged, because that run is already counted.
-3. A `ci` launch waits in this same class-ordered queue in class `other` and asks this same rule for one more active run, with its own run counted as a waiter.
+3. A `ci` launch waits in this same class-ordered queue in class `other` and asks this same rule for one more active run, with its own run and every other run whose gate waits in the queue counted as waiters.
 4. On admission it publishes the run's reservation, a lock file it holds for the agent's life, under the start lock, then starts the agent at once without waiting for it to appear in memory, then releases the lock.
    Every later decision counts that run at `R` while it is invisible and at its resident memory or `A` afterwards, until the agent's process tree has exited.
 5. It holds at most the daemon's per-invocation agent budget minus the 99th percentile of completed CI-fix invocation durations, and refuses at that bound, including a fit that comes only after a wait past it; a fit at the very first decision is admitted, so a bound of 0 holds not at all.
