@@ -1167,6 +1167,26 @@ teardown_own_nested_other_repos() {
   done
 }
 
+# Whether the record already holds a line for this task, the slot, <copy> and
+# <reason> (both as fm_refuse_text renders them): the one test that decides a
+# held copy needs no append, shared by the write and by the entry check.
+teardown_held_copy_recorded() {  # <slot> <copy> <reason>
+  [ -f "$DATA/held-foreign-copies.log" ] && FM_HELD_ID=$ID FM_HELD_SLOT=$1 FM_HELD_COPY=$2 FM_HELD_WHY=$3 awk -F'\t' \
+    '$2 == ENVIRON["FM_HELD_ID"] && $3 == ENVIRON["FM_HELD_SLOT"] && $4 == ENVIRON["FM_HELD_COPY"] && $5 == ENVIRON["FM_HELD_WHY"] { f = 1 } END { exit !f }' "$DATA/held-foreign-copies.log" 2>/dev/null
+}
+
+# The record rule the write and the entry check share: the record is acceptable
+# when it is an existing regular writable file, reached directly or through a
+# symlink to an existing regular writable file, or when it does not exist and its
+# directory is writable. A dangling symlink is refused, because appending through
+# it would create a file at the link target; a directory or another kind of file
+# is refused too. This test decides the shape part of that rule; each caller
+# decides whether its needed append is writable.
+teardown_held_copies_record_shape_ok() {  # <record>
+  [ -e "$1" ] || [ -L "$1" ] || return 0
+  [ -f "$1" ]
+}
+
 # Appends each held foreign copy of the last proof to the record
 # data/held-foreign-copies.log: UTC time, closing task id, slot path, copy path
 # and the exact reason, tab separated. bin/fm-teardown.sh calls it once every
@@ -1176,23 +1196,6 @@ teardown_own_nested_other_repos() {
 # again, so a rerun after a later refusal adds nothing. The record is only ever
 # appended to here; nothing returns the slot or removes a held copy on its own,
 # and a held copy goes only on the owner's word naming it.
-# Whether the record already holds a line for this task, the slot, <copy> and
-# <reason> (both as fm_refuse_text renders them): the one test that decides a
-# held copy needs no append, shared by the write and by the entry check.
-teardown_held_copy_recorded() {  # <slot> <copy> <reason>
-  [ -f "$DATA/held-foreign-copies.log" ] && FM_HELD_ID=$ID FM_HELD_SLOT=$1 FM_HELD_COPY=$2 FM_HELD_WHY=$3 awk -F'\t' \
-    '$2 == ENVIRON["FM_HELD_ID"] && $3 == ENVIRON["FM_HELD_SLOT"] && $4 == ENVIRON["FM_HELD_COPY"] && $5 == ENVIRON["FM_HELD_WHY"] { f = 1 } END { exit !f }' "$DATA/held-foreign-copies.log" 2>/dev/null
-}
-
-# Whether <record> has a shape an append can go through: it is absent, or it
-# resolves to a regular file (a symlink to one included). A directory, another
-# kind of file, or a dangling symlink has not. The one test the write and the
-# entry check share; whether a needed append is writable is each caller's.
-teardown_held_copies_record_shape_ok() {  # <record>
-  [ -e "$1" ] || [ -L "$1" ] || return 0
-  [ -f "$1" ]
-}
-
 teardown_held_copies_record() {
   local record="$DATA/held-foreign-copies.log" entry copy why slot stamp rc=0
   [ "${#TEARDOWN_FOREIGN_HELD[@]}" -gt 0 ] || return 0
