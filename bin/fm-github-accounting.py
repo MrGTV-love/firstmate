@@ -59,7 +59,7 @@ first-sighting process row. While successful scans still list that identity, its
 saved sanitized projection is repeated in one fresh process row once the latest
 row is 24 hours old, keeping it joinable within the unchanged 48-hour retention.
 No argv or ancestor projection is recomputed for a renewal. One process_end row,
-with the pid, start identity and time, follows when
+with the pid, start identity, run id and time, follows when
 the first successful scan no longer lists that identity as a caller; a failed scan
 ends nothing and no row is written per scan. A caller still alive when the observer
 stops has no process_end row, nor has one that ends while no owner runs, and a new
