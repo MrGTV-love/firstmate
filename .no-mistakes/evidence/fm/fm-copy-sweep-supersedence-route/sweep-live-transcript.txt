@@ -1,0 +1,115 @@
+
+===== HEAD: records file ($FM_HOME/data/supersedence-records.tsv) =====
+<world>/th/pool1/1/repo/.claude/worktrees/twin	6b3a8ebc3009e03c15a98f67ccfe9ee0a8be129c	7	<world>/profiles/twin.json
+<world>/th/pool1/1/repo/.claude/worktrees/closed	5061d809abb7287578eac6150414aa0227580024	8	<world>/profiles/closed.json
+<world>/th/pool1/1/repo/.claude/worktrees/refused	52d24102162ac7c066757df49b99ed0dba04188d	9	<world>/profiles/refused.json
+<world>/th/pool1/1/repo/.claude/worktrees/stale	bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb	7	<world>/profiles/stale.json
+
+===== HEAD: fm-copy-sweep.sh (report only, no --apply) =====
+copy-sweep: mode=report containers=1 copies=5
+PENDING-DRIVER	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/closed	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 999999 is gone; driver verdict not checked in report mode, not yet proven removable
+PENDING-DRIVER	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/plain	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 999999 is gone; driver verdict not checked in report mode, not yet proven removable
+PENDING-DRIVER	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/refused	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 999999 is gone; driver verdict not checked in report mode, not yet proven removable
+PENDING-DRIVER	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/stale	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 999999 is gone; driver verdict not checked in report mode, not yet proven removable
+PENDING-DRIVER	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/twin	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 999999 is gone; driver verdict not checked in report mode, not yet proven removable
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=5
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool <world>/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container <world>/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+regenerable: 0.00 GiB in 0 proven copies, 0 proven copies not sized
+rc=0
+
+===== HEAD: driver calls after report-only run =====
+(none)
+
+===== HEAD: fm-copy-sweep.sh --apply =====
+copy-sweep: mode=apply containers=1 copies=4
+HELD-LOCKED	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/closed	its supersedence record cannot be used (the closeout driver was not asked): the forge shows PR 8 as CLOSED, not MERGED
+HELD-LOCKED	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/plain	its closeout driver would not release it (exit 3): verification_stale_or_uncovered_paths: {"allowed": false, "reason": "verification_stale_or_uncovered_paths"}
+HELD-LOCKED	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/refused	its closeout driver would not release it (exit 3): cleanup_tip_unbound: supersedence route (--pr 9): the plan did not answer with exit 3 and the dry-run envelope (BLOCKED, cleanup_not_executed only) {"base_ref":"origin/main","base_strategy":"merge-base","branch_delete":null,"branch_reap":null,"cleanup_recovery_reason":"cleanup_tip_unbound","cleanup_requested":true,"evidence_digest":"0","launch_cwd":null,"next_command":"scripted","owner":"agent","pr":9,"predicates_failed":["cleanup_gate"],"primary_checkout_repair":null,"state":"BLOCKED","worktree_removed":false}
+HELD-LOCKED	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/stale	its supersedence record cannot be used (the closeout driver was not asked): the record names tip bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb but the copy is at 9d2edb8880bc13d3efad8bf6c94816ace867d3cf
+REMOVED	<world>/th/pool1/1/repo/.claude/worktrees/twin	branch fm/twin at 6b3a8ebc3009, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 999999 is gone)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=4
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool <world>/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container <world>/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=5 GiB=0.00 reaped=1 freed=0.00
+rc=0
+
+===== HEAD: driver argv log (cwd|argv) =====
+<world>/th/pool1/1/repo|--cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/twin --pr 7 --supersedence-profile <world>/profiles/twin.json --no-evidence-files
+<world>/th/pool1/1/repo|--cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/twin --execute-cleanup --pr 7 --supersedence-profile <world>/profiles/twin.json --no-evidence-files
+<world>/th/pool1/1/repo|--cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/refused --pr 9 --supersedence-profile <world>/profiles/refused.json --no-evidence-files
+<world>/th/pool1/1/repo|--cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/plain
+
+===== HEAD: forge reads (gh.log) =====
+pr view 7 --repo acme/widgets --json state,mergeCommit,headRefName -q [.state, (.mergeCommit.oid // ""), .headRefName] | join("\t")
+pr view 7 --repo acme/widgets --json state,mergeCommit,headRefName -q [.state, (.mergeCommit.oid // ""), .headRefName] | join("\t")
+pr view 9 --repo acme/widgets --json state,mergeCommit,headRefName -q [.state, (.mergeCommit.oid // ""), .headRefName] | join("\t")
+pr view 8 --repo acme/widgets --json state,mergeCommit,headRefName -q [.state, (.mergeCommit.oid // ""), .headRefName] | join("\t")
+
+===== HEAD: copies still on disk / registered =====
+twin     on-disk=no registered=no
+closed   on-disk=yes registered=yes
+refused  on-disk=yes registered=yes
+stale    on-disk=yes registered=yes
+plain    on-disk=yes registered=yes
+
+===== BASE (9c5874baa) fm-copy-sweep.sh --apply, same world shape =====
+copy-sweep: mode=apply containers=1 copies=5
+HELD-LOCKED	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/closed	its closeout driver would not release it (exit 3): verification_stale_or_uncovered_paths: {"allowed": false, "reason": "verification_stale_or_uncovered_paths"}
+HELD-LOCKED	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/plain	its closeout driver would not release it (exit 3): verification_stale_or_uncovered_paths: {"allowed": false, "reason": "verification_stale_or_uncovered_paths"}
+HELD-LOCKED	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/refused	its closeout driver would not release it (exit 3): verification_stale_or_uncovered_paths: {"allowed": false, "reason": "verification_stale_or_uncovered_paths"}
+HELD-LOCKED	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/stale	its closeout driver would not release it (exit 3): verification_stale_or_uncovered_paths: {"allowed": false, "reason": "verification_stale_or_uncovered_paths"}
+HELD-LOCKED	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/twin	its closeout driver would not release it (exit 3): verification_stale_or_uncovered_paths: {"allowed": false, "reason": "verification_stale_or_uncovered_paths"}
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=5
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool <world>/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container <world>/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=5 GiB=0.00 reaped=0 freed=0.00
+rc=0
+
+===== BASE: driver argv log (cwd|argv) =====
+<world>/th/pool1/1/repo|--cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/twin
+<world>/th/pool1/1/repo|--cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/stale
+<world>/th/pool1/1/repo|--cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/refused
+<world>/th/pool1/1/repo|--cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/plain
+<world>/th/pool1/1/repo|--cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/closed
+
+===== BASE: copies still on disk =====
+twin     on-disk=yes
+closed   on-disk=yes
+refused  on-disk=yes
+stale    on-disk=yes
+plain    on-disk=yes
+
+===== no-record copy argv: head vs base =====
+head: …/.claude/worktrees/plain
+base: …/.claude/worktrees/plain
+SAME shape (only the world path differs)

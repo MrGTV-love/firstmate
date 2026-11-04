@@ -1,0 +1,126 @@
+argv: route-argv-foreign: execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: route-argv-enclosing: execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: route-argv-reverse: execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+ok - a record makes teardown's foreign and own nested release ask the driver with exactly the --pr route's options from the slot clone, and a copy with no record is asked exactly as before
+argv: tip-differs control: execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-two --execute-cleanup --pr 7 --supersedence-profile <case>/profiles/fc-two.json --no-evidence-files
+condition tip-differs: kept; refusal:   the supersedence record for <case>/pool/1/project/.claude/worktrees/fc-one cannot be used: the record names tip bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb but the copy is at 99e331d7bf73d5616b8e57283ad2066ae7793800; Vernant's closeout driver was not called
+argv: profile-missing control: execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-two --execute-cleanup --pr 7 --supersedence-profile <case>/profiles/fc-two.json --no-evidence-files
+condition profile-missing: kept; refusal:   the supersedence record for <case>/pool/1/project/.claude/worktrees/fc-one cannot be used: the profile <case>/profiles/missing.json is not a regular file (a symlink or a missing path does not qualify); Vernant's closeout driver was not called
+argv: profile-pr-mismatch control: execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-two --execute-cleanup --pr 7 --supersedence-profile <case>/profiles/fc-two.json --no-evidence-files
+condition profile-pr-mismatch: kept; refusal:   the supersedence record for <case>/pool/1/project/.claude/worktrees/fc-one cannot be used: the profile <case>/profiles/wrong.json names PR 99, not PR 8; Vernant's closeout driver was not called
+argv: pr-closed control: execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-two --execute-cleanup --pr 7 --supersedence-profile <case>/profiles/fc-two.json --no-evidence-files
+condition pr-closed: kept; refusal:   the supersedence record for <case>/pool/1/project/.claude/worktrees/fc-one cannot be used: the forge shows PR 8 as CLOSED, not MERGED; Vernant's closeout driver was not called
+argv: forge-fails control: execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-two --execute-cleanup --pr 7 --supersedence-profile <case>/profiles/fc-two.json --no-evidence-files
+condition forge-fails: kept; refusal:   the supersedence record for <case>/pool/1/project/.claude/worktrees/fc-one cannot be used: the forge read of PR 8 failed (exit 1; unknown, not merged); Vernant's closeout driver was not called
+argv: forge-hangs control: execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-two --execute-cleanup --pr 7 --supersedence-profile <case>/profiles/fc-two.json --no-evidence-files
+condition forge-hangs: kept; refusal:   the supersedence record for <case>/pool/1/project/.claude/worktrees/fc-one cannot be used: the forge read of PR 8 timed out after 2s (unknown, not merged); Vernant's closeout driver was not called
+argv: merge-commit-absent control: execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-two --execute-cleanup --pr 7 --supersedence-profile <case>/profiles/fc-two.json --no-evidence-files
+condition merge-commit-absent: kept; refusal:   the supersedence record for <case>/pool/1/project/.claude/worktrees/fc-one cannot be used: the merge commit bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb of PR 8 is not in the clone (not landed); Vernant's closeout driver was not called
+argv: merge-commit-off-main control: execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-two --execute-cleanup --pr 7 --supersedence-profile <case>/profiles/fc-two.json --no-evidence-files
+condition merge-commit-off-main: kept; refusal:   the supersedence record for <case>/pool/1/project/.claude/worktrees/fc-one cannot be used: the merge commit d26caf36bb85dd583980f2588f4eec333a75e0c1 of PR 8 is not on origin/main (not landed); Vernant's closeout driver was not called
+argv: other-copy control: execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-two --execute-cleanup --pr 7 --supersedence-profile <case>/profiles/fc-two.json --no-evidence-files
+condition other-copy: kept; refusal: REFUSED: Vernant's closeout driver did not release foreign copy <case>/pool/1/project/.claude/worktrees/fc-one (exit 3): full output: <case>/data/task-x1/vernant-closeout.BH36ve
+argv: base-merge-off-base control: execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-two --execute-cleanup --pr 7 --supersedence-profile <case>/profiles/fc-two.json --no-evidence-files
+condition base-merge-off-base: kept; refusal:   the supersedence record for <case>/pool/1/project/.claude/worktrees/fc-one cannot be used: the merge commit 3608324ddaf49e9193734560ea424101399d3c2b of PR 8 is not on origin/release (not landed); Vernant's closeout driver was not called
+argv: base-control control: execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-two --execute-cleanup --pr 7 --supersedence-profile <case>/profiles/fc-two.json --no-evidence-files
+argv: base-control: execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 8 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+ok - a teardown keeps a foreign copy whose record names another tip, a bad profile, a closed PR, an unreadable or hanging forge, or a merge commit that is missing or off the landing branch (origin/main, or the task's base_branch), with no driver call, after releasing a valid one; a PR merged onto the task's base routes
+ok - a teardown's foreign and own nested release keep the copy, with no driver call, while the primary checkout is on the PR's head branch, and leave that checkout's branch and working tree as they were; the working-tree digest sees a switch to main, a tracked edit and an untracked file
+argv: answer success-done: execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+answer success-done: exit 0; 
+argv: answer blocked: execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+answer blocked: exit 1; REFUSED: Vernant's closeout driver did not release foreign copy <case>/pool/1/project/.claude/worktrees/fc-one (exit 3): full output: <case>/data/task-x1/vernant-closeout.xOcBxg
+    route words:   supersedence route (--pr 7): the execute did not answer with exit 0 and the success envelope (DONE or DONE_WITH_SUPERSEDENCE, no failed predicate, worktree_removed true)
+argv: answer retained: execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+answer retained: exit 1; REFUSED: Vernant's closeout driver did not release foreign copy <case>/pool/1/project/.claude/worktrees/fc-one (exit 3): full output: <case>/data/task-x1/vernant-closeout.tnY9WP
+    route words:   supersedence route (--pr 7): the driver keeps a tree with unique ignored files after archiving them and never removes it automatically
+argv: answer allowed-doc: execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+answer allowed-doc: exit 1; REFUSED: Vernant's closeout driver did not release foreign copy <case>/pool/1/project/.claude/worktrees/fc-one (exit 1): full output: <case>/data/task-x1/vernant-closeout.7XBDoP
+    route words:   supersedence route (--pr 7): the execute did not answer with exit 0 and the success envelope (DONE or DONE_WITH_SUPERSEDENCE, no failed predicate, worktree_removed true)
+argv: answer lie: execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+answer lie: exit 1; REFUSED: foreign copy <case>/pool/1/project/.claude/worktrees/fc-one is still present or registered after its release; the pool slot was not returned.
+ok - a teardown releases a copy by the route only on exit 0 with the success envelope and a removed copy; a BLOCKED answer, the plain call's answer shape, a retained tree or a copy left in place refuses with the driver's words and the route named
+hold missing-interpreter: exit 1 with and without a record; refusal: REFUSED: Vernant's closeout driver did not release foreign copy <case>/pool/1/project/.claude/worktrees/fc-one (exit 127): full output: <case>/data/task-x1/vernant-closeout.<id>
+hold untracked-file: exit 1 with and without a record; refusal: REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=copy-preserved missing=foreign copy <case>/pool/1/project/.claude/worktrees/fc-one stays in pool slot <case>/pool/1/project: it has uncommitted or untracke
+ok - a foreign copy with a missing driver interpreter or an untracked file is held exactly as with no record, and the driver is never asked
+hold process-inside: exit 1 with and without a record; refusal: REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=process-cwd-owner missing=foreign copy <case>/pool/1/project/.claude/worktrees/fc-one stays in pool slot <case>/pool/1/project: process 36141 is running in
+hold live-launcher: exit 1 with and without a record; refusal: REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=lock-launcher-owner missing=foreign copy <case>/pool/1/project/.claude/worktrees/fc-one stays in pool slot <case>/pool/1/project: its creation-lock launche
+ok - a foreign copy with a process in it or a live lock launcher is held exactly as with no record, and the driver is never asked
+table: row 1 (tip 723e1da4d1, class b, PR 2957 CLOSED, reject): teardown, no record -> kept, plain call
+table: row 1 (tip 723e1da4d1, class b, PR 2957 CLOSED, reject): teardown, record -> kept by the forge check, driver never called
+table: row 2 (tip 1e0e320fa7, class b, PR 2959 CLOSED, reject): teardown, no record -> kept, plain call
+table: row 2 (tip 1e0e320fa7, class b, PR 2959 CLOSED, reject): teardown, record -> kept by the forge check, driver never called
+table: row 3 (tip 47d3ef8702, class b, PR 3081 MERGED, reject): teardown, no record -> kept, plain call
+argv: row 3 (tip 47d3ef8702, class b, PR 3081 MERGED, reject): execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 3081 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+table: row 3 (tip 47d3ef8702, class b, PR 3081 MERGED, reject): teardown, record -> route used, driver refused, kept (misattributed-record negative)
+table: row 4 (tip b2e7058f61, class a, PR 3405 MERGED, accept): teardown, no record -> kept, plain call
+argv: row 4 (tip b2e7058f61, class a, PR 3405 MERGED, accept): execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 3405 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+table: row 4 (tip b2e7058f61, class a, PR 3405 MERGED, accept): teardown, record -> released by the route (scripted allowing envelope)
+table: row 5 (tip 3889c93fd4, class b, PR 3405 MERGED, reject): teardown, no record -> kept, plain call
+argv: row 5 (tip 3889c93fd4, class b, PR 3405 MERGED, reject): execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 3405 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+table: row 5 (tip 3889c93fd4, class b, PR 3405 MERGED, reject): teardown, record -> route used, driver refused, kept (misattributed-record negative)
+table: row 6 (tip f6921351a0, class b, PR 3405 MERGED, reject): teardown, no record -> kept, plain call
+argv: row 6 (tip f6921351a0, class b, PR 3405 MERGED, reject): execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 3405 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+table: row 6 (tip f6921351a0, class b, PR 3405 MERGED, reject): teardown, record -> route used, driver refused, kept (misattributed-record negative)
+table: row 7 (tip e9cfc54f73, class b, PR 3405 MERGED, reject): teardown, no record -> kept, plain call
+argv: row 7 (tip e9cfc54f73, class b, PR 3405 MERGED, reject): execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 3405 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+table: row 7 (tip e9cfc54f73, class b, PR 3405 MERGED, reject): teardown, record -> route used, driver refused, kept (misattributed-record negative)
+table: row 8 (tip c58c3a8a5f, class b, PR 3262 CLOSED, reject): teardown, no record -> kept, plain call
+table: row 8 (tip c58c3a8a5f, class b, PR 3262 CLOSED, reject): teardown, record -> kept by the forge check, driver never called
+table: row 9 (tip 395404d704, class a, PR 3405 MERGED, accept): teardown, no record -> kept, plain call
+argv: row 9 (tip 395404d704, class a, PR 3405 MERGED, accept): execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 3405 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+table: row 9 (tip 395404d704, class a, PR 3405 MERGED, accept): teardown, record -> released by the route (scripted allowing envelope)
+table: row 10 (tip a88081c4f1, class b, PR 3070 MERGED, reject): teardown, no record -> kept, plain call
+argv: row 10 (tip a88081c4f1, class b, PR 3070 MERGED, reject): execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 3070 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+table: row 10 (tip a88081c4f1, class b, PR 3070 MERGED, reject): teardown, record -> route used, driver refused, kept (misattributed-record negative)
+table: row 11 (tip a0af025671, class other (history), PR 3257 MERGED, accept): teardown, no record -> kept, plain call
+argv: row 11 (tip a0af025671, class other (history), PR 3257 MERGED, accept): execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 3257 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+table: row 11 (tip a0af025671, class other (history), PR 3257 MERGED, accept): teardown, record -> released by the route (scripted allowing envelope)
+table: row 12 (tip f6a5ccb8f6, class a, PR 3015 MERGED, accept): teardown, no record -> kept, plain call
+argv: row 12 (tip f6a5ccb8f6, class a, PR 3015 MERGED, accept): execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 3015 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+table: row 12 (tip f6a5ccb8f6, class a, PR 3015 MERGED, accept): teardown, record -> released by the route (scripted allowing envelope)
+table: row 13 (tip ed54c73f23, class other (history), PR 3077 MERGED, accept): teardown, no record -> kept, plain call
+argv: row 13 (tip ed54c73f23, class other (history), PR 3077 MERGED, accept): execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 3077 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+table: row 13 (tip ed54c73f23, class other (history), PR 3077 MERGED, accept): teardown, record -> released by the route (scripted allowing envelope)
+table: row 14 (tip 2caf50331d, class other (history), PR 3082 MERGED, accept): teardown, no record -> kept, plain call
+argv: row 14 (tip 2caf50331d, class other (history), PR 3082 MERGED, accept): execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 3082 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+table: row 14 (tip 2caf50331d, class other (history), PR 3082 MERGED, accept): teardown, record -> released by the route (scripted allowing envelope)
+table: row 15 (tip 011c4ab137, class b, PR 3082 MERGED, reject): teardown, no record -> kept, plain call
+argv: row 15 (tip 011c4ab137, class b, PR 3082 MERGED, reject): execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 3082 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+table: row 15 (tip 011c4ab137, class b, PR 3082 MERGED, reject): teardown, record -> route used, driver refused, kept (misattributed-record negative)
+table: row 16 (tip 0c4e77b08c, class other (history), PR 3046 MERGED, accept): teardown, no record -> kept, plain call
+argv: row 16 (tip 0c4e77b08c, class other (history), PR 3046 MERGED, accept): execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 3046 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+table: row 16 (tip 0c4e77b08c, class other (history), PR 3046 MERGED, accept): teardown, record -> released by the route (scripted allowing envelope)
+table: row 17 (tip 4bc7fa9612, class b, PR 3005 MERGED, reject): teardown, no record -> kept, plain call
+argv: row 17 (tip 4bc7fa9612, class b, PR 3005 MERGED, reject): execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 3005 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+table: row 17 (tip 4bc7fa9612, class b, PR 3005 MERGED, reject): teardown, record -> route used, driver refused, kept (misattributed-record negative)
+table: row 18 (tip c48285a237, class a, PR 3005 MERGED, accept): teardown, no record -> kept, plain call
+argv: row 18 (tip c48285a237, class a, PR 3005 MERGED, accept): execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 3005 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+table: row 18 (tip c48285a237, class a, PR 3005 MERGED, accept): teardown, record -> released by the route (scripted allowing envelope)
+table: row 19 (tip e7008be298, class b, PR 2984 CLOSED, reject): teardown, no record -> kept, plain call
+table: row 19 (tip e7008be298, class b, PR 2984 CLOSED, reject): teardown, record -> kept by the forge check, driver never called
+table: row 20 (tip 5ad6b47e8a, class b, PR 2980 CLOSED, reject): teardown, no record -> kept, plain call
+table: row 20 (tip 5ad6b47e8a, class b, PR 2980 CLOSED, reject): teardown, record -> kept by the forge check, driver never called
+table: row 21 (tip 44b1ae84cf, class b, PR 2964 CLOSED, reject): teardown, no record -> kept, plain call
+table: row 21 (tip 44b1ae84cf, class b, PR 2964 CLOSED, reject): teardown, record -> kept by the forge check, driver never called
+table: row 22 (tip d35135b3a7, class b, PR 2970 MERGED, reject): teardown, no record -> kept, plain call
+argv: row 22 (tip d35135b3a7, class b, PR 2970 MERGED, reject): execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 2970 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+table: row 22 (tip d35135b3a7, class b, PR 2970 MERGED, reject): teardown, record -> route used, driver refused, kept (misattributed-record negative)
+table: row 23 (tip 45e730b51a, class b, PR 3511 OPEN, reject): teardown, no record -> kept, plain call
+table: row 23 (tip 45e730b51a, class b, PR 3511 OPEN, reject): teardown, record -> kept by the forge check, driver never called
+table: row 24 (tip dd8a6d6b37, class other, PR 3435 OPEN, reject): teardown, no record -> kept, plain call
+table: row 24 (tip dd8a6d6b37, class other, PR 3435 OPEN, reject): teardown, record -> kept by the forge check, driver never called
+table: row 25 (tip 8eef3602ce, class b, PR 3189 MERGED, reject): teardown, no record -> kept, plain call
+argv: row 25 (tip 8eef3602ce, class b, PR 3189 MERGED, reject): execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 3189 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+table: row 25 (tip 8eef3602ce, class b, PR 3189 MERGED, reject): teardown, record -> route used, driver refused, kept (misattributed-record negative)
+table: row 26 (tip 06b81183cc, class a, PR 3149 MERGED, accept): teardown, no record -> kept, plain call
+argv: row 26 (tip 06b81183cc, class a, PR 3149 MERGED, accept): execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 3149 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+table: row 26 (tip 06b81183cc, class a, PR 3149 MERGED, accept): teardown, record -> released by the route (scripted allowing envelope)
+table: row adopt-existing-branch (tip 4a5f15ca, class twin, PR 3446 MERGED, accept): teardown, no record -> kept, plain call
+argv: row adopt-existing-branch (tip 4a5f15ca, class twin, PR 3446 MERGED, accept): execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 3446 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+table: row adopt-existing-branch (tip 4a5f15ca, class twin, PR 3446 MERGED, accept): teardown, record -> released by the route (scripted allowing envelope)
+ok - the staged cases through teardown: 5 twins, 4 ancestors and the PR 3446 twin are released through the route and 17 reject rows are kept with or without a record (reduced evidence: scripted driver answers)
+rm: /Users/charlesabrooker/tmp/fm-teardown-tests.90MEUa/route-table-adopt-existing-branch/state: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-teardown-tests.90MEUa/route-table-adopt-existing-branch: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-teardown-tests.90MEUa: Directory not empty
+bash tests/fm-teardown-cleanup.test.sh         132.76s user 249.05s system 63% cpu 10:04.49 total

@@ -1,0 +1,152 @@
+ok - the argv comparator accepts the canonical and the plain call's prefix order and rejects an added option, a missing or wrong binding and a duplicate
+argv: route-argv: plan: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/twin --pr 7 --supersedence-profile <world>/profiles/twin.json --no-evidence-files
+argv: route-argv: execute: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/twin --execute-cleanup --pr 7 --supersedence-profile <world>/profiles/twin.json --no-evidence-files
+ok - a record makes the sweep's plan and execute ask the driver with exactly the --pr route's options from the slot clone, and a copy with no record is asked exactly as before
+argv: conditions: plan: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/ok --pr 7 --supersedence-profile <world>/profiles/ok.json --no-evidence-files
+argv: conditions: execute: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/ok --execute-cleanup --pr 7 --supersedence-profile <world>/profiles/ok.json --no-evidence-files
+condition tip-differs: kept; driver calls for it: 0; reason: its supersedence record cannot be used (the closeout driver was not asked): the record names tip bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb but the copy is at c751bd7410a6a29ed63fbd3418bef48171814874
+condition tip-prefix: kept; driver calls for it: 0; reason: its supersedence record cannot be used (the closeout driver was not asked): the record names tip d89107c1af0f0f0ed4d08ae018d1f2ee6589800 but the copy is at d89107c1af0f0f0ed4d08ae018d1f2ee65898009
+condition tip-moves: kept; driver calls for it: 1; reason: clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 999999 is gone
+the copy was left: REFUSED: /Users/charlesabrooker/tmp/fm-copy-sweep.toP8W8/route-conditions/th/pool1/1/repo/.claude/worktrees/bad-tip-moves is no longer proven after its plan: HELD-UNPUSHED, 1 commit(s) are on no remote
+condition pr-not-integer: kept; driver calls for it: 0; reason: its supersedence record cannot be used (the closeout driver was not asked): the record's PR field '8a' is not a decimal integer
+condition profile-relative: kept; driver calls for it: 0; reason: its supersedence record cannot be used (the closeout driver was not asked): the profile path 'profiles/bad-profile-relative.json' is not absolute
+condition profile-missing: kept; driver calls for it: 0; reason: its supersedence record cannot be used (the closeout driver was not asked): the profile /Users/charlesabrooker/tmp/fm-copy-sweep.toP8W8/route-conditions/profiles/bad-profile-missing.json is not a regular file (a symlink 
+condition profile-symlink: kept; driver calls for it: 0; reason: its supersedence record cannot be used (the closeout driver was not asked): the profile /Users/charlesabrooker/tmp/fm-copy-sweep.toP8W8/route-conditions/profiles/bad-profile-symlink.json is not a regular file (a symlink 
+condition profile-not-json: kept; driver calls for it: 0; reason: its supersedence record cannot be used (the closeout driver was not asked): the profile /Users/charlesabrooker/tmp/fm-copy-sweep.toP8W8/route-conditions/profiles/bad-profile-not-json.json cannot be read as a JSON object
+condition profile-pr-mismatch: kept; driver calls for it: 0; reason: its supersedence record cannot be used (the closeout driver was not asked): the profile /Users/charlesabrooker/tmp/fm-copy-sweep.toP8W8/route-conditions/profiles/bad-profile-pr-mismatch.json names PR 99, not PR 109
+condition profile-tip-mismatch: kept; driver calls for it: 0; reason: its supersedence record cannot be used (the closeout driver was not asked): the profile /Users/charlesabrooker/tmp/fm-copy-sweep.toP8W8/route-conditions/profiles/bad-profile-tip-mismatch.json binds superseded_tip_sha bbb
+condition profile-tip-absent: kept; driver calls for it: 0; reason: its supersedence record cannot be used (the closeout driver was not asked): the profile /Users/charlesabrooker/tmp/fm-copy-sweep.toP8W8/route-conditions/profiles/bad-profile-tip-absent.json binds superseded_tip_sha none,
+condition pr-closed: kept; driver calls for it: 0; reason: its supersedence record cannot be used (the closeout driver was not asked): the forge shows PR 112 as CLOSED, not MERGED
+condition pr-open: kept; driver calls for it: 0; reason: its supersedence record cannot be used (the closeout driver was not asked): the forge shows PR 113 as OPEN, not MERGED
+condition forge-fails: kept; driver calls for it: 0; reason: its supersedence record cannot be used (the closeout driver was not asked): the forge read of PR 114 failed (exit 1; unknown, not merged)
+condition forge-hangs: kept; driver calls for it: 0; reason: its supersedence record cannot be used (the closeout driver was not asked): the forge read of PR 115 timed out after 2s (unknown, not merged)
+condition forge-garbage: kept; driver calls for it: 0; reason: its supersedence record cannot be used (the closeout driver was not asked): the forge answer for PR 116 cannot be parsed (unknown, not merged)
+condition no-merge-commit: kept; driver calls for it: 0; reason: its supersedence record cannot be used (the closeout driver was not asked): the forge shows PR 117 MERGED but reports no merge commit
+condition merge-commit-absent: kept; driver calls for it: 0; reason: its supersedence record cannot be used (the closeout driver was not asked): the merge commit bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb of PR 118 is not in the clone (not landed)
+condition merge-commit-off-main: kept; driver calls for it: 0; reason: its supersedence record cannot be used (the closeout driver was not asked): the merge commit 10c986b33ffd116dfd3dda529ca182afd2119fa7 of PR 119 is not on origin/main (not landed)
+condition short-record: kept; driver calls for it: 0; reason: its supersedence record cannot be used (the closeout driver was not asked): a record naming the copy has 3 tab-separated fields, not four
+condition conflicting-records: kept; driver calls for it: 0; reason: its supersedence record cannot be used (the closeout driver was not asked): two records bind this copy at its tip to different PRs or profiles
+condition other-copy: kept; driver calls for it: 1; reason: its closeout driver would not release it (exit 3): verification_stale_or_uncovered_paths: {"allowed": false, "reason": "verification_stale_or_uncovered_paths"}
+condition pr-closes-after-plan: kept; driver calls for it: 1; reason: clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 999999 is gone
+the copy was left: /Users/charlesabrooker/tmp/fm-copy-sweep.toP8W8/route-conditions/th/pool1/1/repo/.claude/worktrees/bad-pr-closes-after-plan was not released: its supersedence record cannot be used (the closeout driver
+ok - a record that names another tip or a prefix, moves the tip after the plan, has a bad PR field, profile or forge answer, or names a merge commit that is missing or off origin/main keeps the copy, with no driver call, while a valid record in the same run is released (23 conditions)
+argv: route-head-branch: plan: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/control --pr 8 --supersedence-profile <world>/profiles/control.json --no-evidence-files
+argv: route-head-branch: execute: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/control --execute-cleanup --pr 8 --supersedence-profile <world>/profiles/control.json --no-evidence-files
+ok - a plan never asks the driver while the slot's checkout is on the PR's head branch, so the slot's branch, HEAD, working tree and marker stay as they were, and a PR with another head branch still routes from that slot; the working-tree digest sees a switch to main, a tracked edit and an untracked file
+plan answer refuse: kept (HELD-LOCKED); driver calls: 1 (the plan); reason: its closeout driver would not release it (exit 3): verification_stale_or_uncovered_paths: supersedence route (--pr 7): the plan did not answer with exit 3 and the dry-run envelope (BLOCKED, cleanup_no
+plan answer two: kept (HELD-LOCKED); driver calls: 1 (the plan); reason: its closeout driver would not release it (exit 3): supersedence route (--pr 7): the plan did not answer with exit 3 and the dry-run envelope (BLOCKED, cleanup_not_executed only) {"base_ref":"origin/ma
+plan answer done: kept (HELD-LOCKED); driver calls: 1 (the plan); reason: its closeout driver would not release it (exit 1): supersedence route (--pr 7): the plan did not answer with exit 3 and the dry-run envelope (BLOCKED, cleanup_not_executed only) {"base_ref":"origin/ma
+plan answer error: kept (HELD-LOCKED); driver calls: 1 (the plan); reason: its closeout driver would not release it (exit 2): supersedence route (--pr 7): the plan did not answer with exit 3 and the dry-run envelope (BLOCKED, cleanup_not_executed only) closeout_pr: failed: P
+plan answer unbound: kept (HELD-LOCKED); driver calls: 1 (the plan); reason: its closeout driver would not release it (exit 3): cleanup_tip_unbound: supersedence route (--pr 7): the plan did not answer with exit 3 and the dry-run envelope (BLOCKED, cleanup_not_executed only) {
+plan answer allowed-doc: kept (HELD-LOCKED); driver calls: 1 (the plan); reason: its closeout driver would not release it (exit 1): supersedence route (--pr 7): the plan did not answer with exit 3 and the dry-run envelope (BLOCKED, cleanup_not_executed only) {"allowed": true}
+plan answer silent: kept (HELD-LOCKED); driver calls: 1 (the plan); reason: its closeout driver would not release it (exit 1): supersedence route (--pr 7): the plan did not answer with exit 3 and the dry-run envelope (BLOCKED, cleanup_not_executed only)
+plan answer hang: kept (HELD-LOCKED); driver calls: 1 (the plan); reason: its closeout driver did not answer within 2s
+plan answer retain: kept (HELD-LOCKED); driver calls: 1 (the plan); reason: its closeout driver would not release it (exit 3): supersedence route (--pr 7): the driver keeps a tree with unique ignored files after archiving them and never removes it automatically {"ignored_payl
+plan answer allowed (the dry-run envelope, exit 3): proceeds; the control copy was released
+execute answer success-done: REMOVED: branch fm/x-success-done at 60f000ffc4c4, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 999999 is gone)
+execute answer blocked: REAPABLE-DRIVER: clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 999999 is gone
+FAILED: the copy was left: REFUSED: Vernant's closeout driver did not release /Users/charlesabrooker/tmp/fm-copy-sweep.toP8W8/route-execute-answers/th/pool1/1/repo/.claude/worktrees/x-blocked (exit 3): cleanu
+    route words: supersedence route (--pr 7): the execute did not answer with exit 0 and the success envelope (DONE or DONE_WITH_SUPERSEDENCE, no failed predicate, worktree_removed true)
+execute answer retained: HELD-LOCKED: REFUSED: Vernant's closeout driver did not release /Users/charlesabrooker/tmp/fm-copy-sweep.toP8W8/route-execute-answers/th/pool1/1/repo/.claude/worktrees/x-retained (exit 3): cleanup_ignored_payload_
+KEPT: REFUSED: Vernant's closeout driver did not release /Users/charlesabrooker/tmp/fm-copy-sweep.toP8W8/route-execute-answers/th/pool1/1/repo/.claude/worktrees/x-retained (exit 3): cleanup_ignored_payload_
+    route words: supersedence route (--pr 7): the driver keeps a tree with unique ignored files after archiving them and never removes it automatically?{"base_ref":"origin/main","base_st
+execute answer lie: REAPABLE-DRIVER: clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 999999 is gone
+FAILED: it is still present or registered after its removal
+execute answer allowed-doc: REAPABLE-DRIVER: clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 999999 is gone
+FAILED: the copy was left: REFUSED: Vernant's closeout driver did not release /Users/charlesabrooker/tmp/fm-copy-sweep.toP8W8/route-execute-answers/th/pool1/1/repo/.claude/worktrees/x-allowed-doc (exit 1): su
+    route words: supersedence route (--pr 7): the execute did not answer with exit 0 and the success envelope (DONE or DONE_WITH_SUPERSEDENCE, no failed predicate, worktree_removed true)
+execute answer temporary: REAPABLE-DRIVER: clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 999999 is gone
+FAILED: the copy was left: REFUSED: Vernant's closeout driver did not release /Users/charlesabrooker/tmp/fm-copy-sweep.toP8W8/route-execute-answers/th/pool1/1/repo/.claude/worktrees/x-temporary (exit 3): clea
+    route words: supersedence route (--pr 7): the execute did not answer with exit 0 and the success envelope (DONE or DONE_WITH_SUPERSEDENCE, no failed predicate, worktree_removed true)
+ok - a route plan proceeds only on exit 3 with the dry-run envelope and a route execute releases only on exit 0 with the success envelope and a removed copy; every other answer keeps the copy with the driver's words and the route named, with the receipt and release slot as for a plain execute and the retained-tree and temporary-refusal rules unchanged
+hold dirty: with a record: HELD-DIRTY: 1 uncommitted or untracked path(s), first: ?? untracked.txt
+hold dirty: without a record: HELD-DIRTY: 1 uncommitted or untracked path(s), first: ?? untracked.txt
+hold unpushed: with a record: HELD-UNPUSHED: 1 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is
+hold unpushed: without a record: HELD-UNPUSHED: 1 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is
+hold live: with a record: HELD-LIVE-TASK: task live-task's active record names it as its worktree
+hold live: without a record: HELD-LIVE-TASK: task live-task's active record names it as its worktree
+hold orphan: with a record: ORPHAN-NO-RECORD: it is not a readable git worktree root
+hold orphan: without a record: ORPHAN-NO-RECORD: it is not a readable git worktree root
+hold live-launcher: with a record: HELD-LOCKED: worktree lock: vernant-session-active owner=launcher:48797 launcher=48797 (launcher 48797 is alive; start age=<n>s; lock mtime=1793797988)
+hold live-launcher: without a record: HELD-LOCKED: worktree lock: vernant-session-active owner=launcher:48797 launcher=48797 (launcher 48797 is alive; start age=<n>s; lock mtime=1793797988)
+hold no-interpreter: with a record: HELD-LOCKED: worktree lock: vernant-session-active owner=launcher:999999 launcher=999999 (launcher 999999 is gone; only Vernant's closeout driver releases it); closeout driv
+hold no-interpreter: without a record: HELD-LOCKED: worktree lock: vernant-session-active owner=launcher:999999 launcher=999999 (launcher 999999 is gone; only Vernant's closeout driver releases it); closeout driv
+hold retained-receipt: with a record: HELD-LOCKED: driver retained this copy: exit 3: cleanup_tip_unbound: supersedence route (--pr 7): the execute did not answer with exit 0 and the success envelope (DONE or DO
+hold retained-receipt: without a record: HELD-LOCKED: driver retained this copy: exit 3: cleanup_tip_unbound: supersedence route (--pr 7): the execute did not answer with exit 0 and the success envelope (DONE or DO
+ok - a dirty, unpushed, live-task, orphaned, live-launcher, no-interpreter or retained-receipt copy is held exactly as it is with no record, and the route never reaches the driver for it
+table: row 1 (tip 723e1da4d1, class b, PR 2957 CLOSED, reject): no record -> kept, plain call, base reason
+table: row 2 (tip 1e0e320fa7, class b, PR 2959 CLOSED, reject): no record -> kept, plain call, base reason
+table: row 3 (tip 47d3ef8702, class b, PR 3081 MERGED, reject): no record -> kept, plain call, base reason
+table: row 4 (tip b2e7058f61, class a, PR 3405 MERGED, accept): no record -> kept, plain call, base reason
+table: row 5 (tip 3889c93fd4, class b, PR 3405 MERGED, reject): no record -> kept, plain call, base reason
+table: row 6 (tip f6921351a0, class b, PR 3405 MERGED, reject): no record -> kept, plain call, base reason
+table: row 7 (tip e9cfc54f73, class b, PR 3405 MERGED, reject): no record -> kept, plain call, base reason
+table: row 8 (tip c58c3a8a5f, class b, PR 3262 CLOSED, reject): no record -> kept, plain call, base reason
+table: row 9 (tip 395404d704, class a, PR 3405 MERGED, accept): no record -> kept, plain call, base reason
+table: row 10 (tip a88081c4f1, class b, PR 3070 MERGED, reject): no record -> kept, plain call, base reason
+table: row 11 (tip a0af025671, class other (history), PR 3257 MERGED, accept): no record -> kept, plain call, base reason
+table: row 12 (tip f6a5ccb8f6, class a, PR 3015 MERGED, accept): no record -> kept, plain call, base reason
+table: row 13 (tip ed54c73f23, class other (history), PR 3077 MERGED, accept): no record -> kept, plain call, base reason
+table: row 14 (tip 2caf50331d, class other (history), PR 3082 MERGED, accept): no record -> kept, plain call, base reason
+table: row 15 (tip 011c4ab137, class b, PR 3082 MERGED, reject): no record -> kept, plain call, base reason
+table: row 16 (tip 0c4e77b08c, class other (history), PR 3046 MERGED, accept): no record -> kept, plain call, base reason
+table: row 17 (tip 4bc7fa9612, class b, PR 3005 MERGED, reject): no record -> kept, plain call, base reason
+table: row 18 (tip c48285a237, class a, PR 3005 MERGED, accept): no record -> kept, plain call, base reason
+table: row 19 (tip e7008be298, class b, PR 2984 CLOSED, reject): no record -> kept, plain call, base reason
+table: row 20 (tip 5ad6b47e8a, class b, PR 2980 CLOSED, reject): no record -> kept, plain call, base reason
+table: row 21 (tip 44b1ae84cf, class b, PR 2964 CLOSED, reject): no record -> kept, plain call, base reason
+table: row 22 (tip d35135b3a7, class b, PR 2970 MERGED, reject): no record -> kept, plain call, base reason
+table: row 23 (tip 45e730b51a, class b, PR 3511 OPEN, reject): no record -> kept, plain call, base reason
+table: row 24 (tip dd8a6d6b37, class other, PR 3435 OPEN, reject): no record -> kept, plain call, base reason
+table: row 25 (tip 8eef3602ce, class b, PR 3189 MERGED, reject): no record -> kept, plain call, base reason
+table: row 26 (tip 06b81183cc, class a, PR 3149 MERGED, accept): no record -> kept, plain call, base reason
+table: row adopt-existing-branch (tip 4a5f15ca, class twin, PR 3446 MERGED, accept): no record -> kept, plain call, base reason
+table: row 1 (tip 723e1da4d1, class b, PR 2957 CLOSED, reject): record -> kept by the forge check, driver never called
+table: row 2 (tip 1e0e320fa7, class b, PR 2959 CLOSED, reject): record -> kept by the forge check, driver never called
+table: row 3 (tip 47d3ef8702, class b, PR 3081 MERGED, reject): record naming the nearest merged PR (misattributed-record negative) -> route used, driver refused, kept
+argv: row 4 (tip b2e7058f61, class a, PR 3405 MERGED, accept): plan: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-4 --pr 3405 --supersedence-profile <world>/profiles/row-4.json --no-evidence-files
+argv: row 4 (tip b2e7058f61, class a, PR 3405 MERGED, accept): execute: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-4 --execute-cleanup --pr 3405 --supersedence-profile <world>/profiles/row-4.json --no-evidence-files
+table: row 4 (tip b2e7058f61, class a, PR 3405 MERGED, accept): record -> released by the route (scripted allowing envelopes)
+table: row 5 (tip 3889c93fd4, class b, PR 3405 MERGED, reject): record naming the nearest merged PR (misattributed-record negative) -> route used, driver refused, kept
+table: row 6 (tip f6921351a0, class b, PR 3405 MERGED, reject): record naming the nearest merged PR (misattributed-record negative) -> route used, driver refused, kept
+table: row 7 (tip e9cfc54f73, class b, PR 3405 MERGED, reject): record naming the nearest merged PR (misattributed-record negative) -> route used, driver refused, kept
+table: row 8 (tip c58c3a8a5f, class b, PR 3262 CLOSED, reject): record -> kept by the forge check, driver never called
+argv: row 9 (tip 395404d704, class a, PR 3405 MERGED, accept): plan: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-9 --pr 3405 --supersedence-profile <world>/profiles/row-9.json --no-evidence-files
+argv: row 9 (tip 395404d704, class a, PR 3405 MERGED, accept): execute: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-9 --execute-cleanup --pr 3405 --supersedence-profile <world>/profiles/row-9.json --no-evidence-files
+table: row 9 (tip 395404d704, class a, PR 3405 MERGED, accept): record -> released by the route (scripted allowing envelopes)
+table: row 10 (tip a88081c4f1, class b, PR 3070 MERGED, reject): record naming the nearest merged PR (misattributed-record negative) -> route used, driver refused, kept
+argv: row 11 (tip a0af025671, class other (history), PR 3257 MERGED, accept): plan: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-11 --pr 3257 --supersedence-profile <world>/profiles/row-11.json --no-evidence-files
+argv: row 11 (tip a0af025671, class other (history), PR 3257 MERGED, accept): execute: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-11 --execute-cleanup --pr 3257 --supersedence-profile <world>/profiles/row-11.json --no-evidence-files
+table: row 11 (tip a0af025671, class other (history), PR 3257 MERGED, accept): record -> released by the route (scripted allowing envelopes)
+argv: row 12 (tip f6a5ccb8f6, class a, PR 3015 MERGED, accept): plan: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-12 --pr 3015 --supersedence-profile <world>/profiles/row-12.json --no-evidence-files
+argv: row 12 (tip f6a5ccb8f6, class a, PR 3015 MERGED, accept): execute: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-12 --execute-cleanup --pr 3015 --supersedence-profile <world>/profiles/row-12.json --no-evidence-files
+table: row 12 (tip f6a5ccb8f6, class a, PR 3015 MERGED, accept): record -> released by the route (scripted allowing envelopes)
+argv: row 13 (tip ed54c73f23, class other (history), PR 3077 MERGED, accept): plan: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-13 --pr 3077 --supersedence-profile <world>/profiles/row-13.json --no-evidence-files
+argv: row 13 (tip ed54c73f23, class other (history), PR 3077 MERGED, accept): execute: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-13 --execute-cleanup --pr 3077 --supersedence-profile <world>/profiles/row-13.json --no-evidence-files
+table: row 13 (tip ed54c73f23, class other (history), PR 3077 MERGED, accept): record -> released by the route (scripted allowing envelopes)
+argv: row 14 (tip 2caf50331d, class other (history), PR 3082 MERGED, accept): plan: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-14 --pr 3082 --supersedence-profile <world>/profiles/row-14.json --no-evidence-files
+argv: row 14 (tip 2caf50331d, class other (history), PR 3082 MERGED, accept): execute: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-14 --execute-cleanup --pr 3082 --supersedence-profile <world>/profiles/row-14.json --no-evidence-files
+table: row 14 (tip 2caf50331d, class other (history), PR 3082 MERGED, accept): record -> released by the route (scripted allowing envelopes)
+table: row 15 (tip 011c4ab137, class b, PR 3082 MERGED, reject): record naming the nearest merged PR (misattributed-record negative) -> route used, driver refused, kept
+argv: row 16 (tip 0c4e77b08c, class other (history), PR 3046 MERGED, accept): plan: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-16 --pr 3046 --supersedence-profile <world>/profiles/row-16.json --no-evidence-files
+argv: row 16 (tip 0c4e77b08c, class other (history), PR 3046 MERGED, accept): execute: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-16 --execute-cleanup --pr 3046 --supersedence-profile <world>/profiles/row-16.json --no-evidence-files
+table: row 16 (tip 0c4e77b08c, class other (history), PR 3046 MERGED, accept): record -> released by the route (scripted allowing envelopes)
+table: row 17 (tip 4bc7fa9612, class b, PR 3005 MERGED, reject): record naming the nearest merged PR (misattributed-record negative) -> route used, driver refused, kept
+argv: row 18 (tip c48285a237, class a, PR 3005 MERGED, accept): plan: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-18 --pr 3005 --supersedence-profile <world>/profiles/row-18.json --no-evidence-files
+argv: row 18 (tip c48285a237, class a, PR 3005 MERGED, accept): execute: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-18 --execute-cleanup --pr 3005 --supersedence-profile <world>/profiles/row-18.json --no-evidence-files
+table: row 18 (tip c48285a237, class a, PR 3005 MERGED, accept): record -> released by the route (scripted allowing envelopes)
+table: row 19 (tip e7008be298, class b, PR 2984 CLOSED, reject): record -> kept by the forge check, driver never called
+table: row 20 (tip 5ad6b47e8a, class b, PR 2980 CLOSED, reject): record -> kept by the forge check, driver never called
+table: row 21 (tip 44b1ae84cf, class b, PR 2964 CLOSED, reject): record -> kept by the forge check, driver never called
+table: row 22 (tip d35135b3a7, class b, PR 2970 MERGED, reject): record naming the nearest merged PR (misattributed-record negative) -> route used, driver refused, kept
+table: row 23 (tip 45e730b51a, class b, PR 3511 OPEN, reject): record -> kept by the forge check, driver never called
+table: row 24 (tip dd8a6d6b37, class other, PR 3435 OPEN, reject): record -> kept by the forge check, driver never called
+table: row 25 (tip 8eef3602ce, class b, PR 3189 MERGED, reject): record naming the nearest merged PR (misattributed-record negative) -> route used, driver refused, kept
+argv: row 26 (tip 06b81183cc, class a, PR 3149 MERGED, accept): plan: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-26 --pr 3149 --supersedence-profile <world>/profiles/row-26.json --no-evidence-files
+argv: row 26 (tip 06b81183cc, class a, PR 3149 MERGED, accept): execute: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-26 --execute-cleanup --pr 3149 --supersedence-profile <world>/profiles/row-26.json --no-evidence-files
+table: row 26 (tip 06b81183cc, class a, PR 3149 MERGED, accept): record -> released by the route (scripted allowing envelopes)
+argv: row adopt-existing-branch (tip 4a5f15ca, class twin, PR 3446 MERGED, accept): plan: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-adopt-existing-branch --pr 3446 --supersedence-profile <world>/profiles/row-adopt-existing-branch.json --no-evidence-files
+argv: row adopt-existing-branch (tip 4a5f15ca, class twin, PR 3446 MERGED, accept): execute: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-adopt-existing-branch --execute-cleanup --pr 3446 --supersedence-profile <world>/profiles/row-adopt-existing-branch.json --no-evidence-files
+table: row adopt-existing-branch (tip 4a5f15ca, class twin, PR 3446 MERGED, accept): record -> released by the route (scripted allowing envelopes)
+ok - the staged cases: 5 twins, 4 ancestors and the PR 3446 twin are released through the route and 17 reject rows are kept with or without a record (reduced evidence: scripted driver answers, generated sandbox commits)
+ok - fm-copy-sweep route subset
