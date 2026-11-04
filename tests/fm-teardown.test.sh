@@ -1535,6 +1535,86 @@ SH
   pass "the content-landed fallback checks a task's recorded base branch, not the default branch"
 }
 
+# A fixture treehouse that succeeds, so the content cases reach removal.
+content_case_treehouse() {  # <case>
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$1/fakebin/treehouse"
+  chmod +x "$1/fakebin/treehouse"
+}
+
+# Content equal to the default branch counts as landed in every squash shape, with
+# the base it was compared with printed: the default branch moved on after the
+# squash. No PR record, hold or bundle is needed.
+test_squash_landed_content_counts_in_every_shape_and_prints_its_base() {
+  local case_dir rc shape
+  for shape in main-moved-on; do
+    case_dir=$(make_case "content-shape-$shape")
+    write_meta "$case_dir" no-mistakes ship
+    wt_commit_file "$case_dir" feature.txt hello "add feature"
+    land_on_origin_main "$case_dir" feature.txt hello
+    land_on_origin_main "$case_dir" later.txt "main moved on"
+    content_case_treehouse "$case_dir"
+    rc=0
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "content-shape-$shape: equal content must count as landed: $(cat "$case_dir/stderr")"
+    assert_grep 'landed by content: every change of ' "$case_dir/stderr" "content-shape-$shape: the proof was not named"
+    assert_grep ' is already in remotes/origin/main (' "$case_dir/stderr" "content-shape-$shape: the base the proof used was not printed"
+    assert_no_grep 'fm-captain-hold.sh hold' "$case_dir/stderr" "content-shape-$shape: an owner hold was printed"
+    assert_absent "$case_dir/state/task-x1.meta" "content-shape-$shape: the task record survived"
+  done
+  pass 'content already in the default branch counts as landed after a squash, with the compared base printed and no hold, bundle or PR record'
+}
+
+# Nothing that differs counts: a later main edit of the same lines (the recorded
+# d2-synthesis-id-producer-decision shape), a tracked change, an untracked file,
+# a staged-only change, and a copy whose tree equals main only by coincidence on
+# unrelated history.
+test_squash_landed_content_refuses_whatever_differs() {
+  local case_dir rc shape tmp
+  for shape in later-edit-same-lines tracked-change untracked staged-only unrelated-history; do
+    case_dir=$(make_case "content-differs-$shape")
+    write_meta "$case_dir" no-mistakes ship
+    wt_commit_file "$case_dir" feature.txt hello "add feature"
+    case "$shape" in
+      later-edit-same-lines)
+        land_on_origin_main "$case_dir" feature.txt hello
+        land_on_origin_main "$case_dir" feature.txt "hello, then edited on main"
+        ;;
+      tracked-change)
+        land_on_origin_main "$case_dir" feature.txt hello
+        printf 'edited\n' >> "$case_dir/wt/feature.txt"
+        ;;
+      untracked)
+        land_on_origin_main "$case_dir" feature.txt hello
+        printf 'stray\n' > "$case_dir/wt/stray.txt"
+        ;;
+      staged-only)
+        land_on_origin_main "$case_dir" feature.txt hello
+        printf 'staged\n' > "$case_dir/wt/staged.txt"
+        git -C "$case_dir/wt" add staged.txt
+        ;;
+      unrelated-history)
+        tmp="$case_dir/_land"
+        git clone -q "$case_dir/origin.git" "$tmp"
+        printf 'hello\n' > "$tmp/feature.txt"
+        git -C "$tmp" add -- feature.txt
+        git -C "$tmp" -c user.email=t@t -c user.name=t commit -q -m 'main gets the content'
+        git -C "$tmp" push -q origin HEAD:main
+        rm -rf "$tmp"
+        git -C "$case_dir/wt" fetch -q origin
+        tmp=$(git -C "$case_dir/wt" commit-tree "$(git -C "$case_dir/wt" rev-parse refs/remotes/origin/main^{tree})" -m 'same tree, other history')
+        git -C "$case_dir/wt" reset -q --hard "$tmp"
+        ;;
+    esac
+    content_case_treehouse "$case_dir"
+    rc=0
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    [ "$rc" -ne 0 ] || fail "content-differs-$shape: differing content counted as landed"
+    assert_no_grep 'landed by content' "$case_dir/stderr" "content-differs-$shape: the content proof accepted it"
+    assert_present "$case_dir/state/task-x1.meta" "content-differs-$shape: the task record was removed"
+  done
+  pass 'a later main edit of the same lines, a tracked change, an untracked file, a staged-only change and an unrelated-history coincidence are all refused'
+}
+
 test_content_fallback_refreshes_stale_origin_ref() {
   local case_dir rc
   case_dir=$(make_case content-stale-ref)
@@ -2644,15 +2724,8 @@ test_fractional_legacy_retry_wait_refuses_without_arithmetic_error() {
 # Bundle fixtures use only this suite's temporary repositories and data.
 # The command sequence here is the supported recipe in fm-teardown.sh's header.
 record_preservation_bundle() {  # <case> <copy> <bundle> [revision...]
-  local case_dir=$1 copy=$2 bundle=$3 digest tips
-  shift 3
-  mkdir -p "${bundle%/*}" "$case_dir/data/task-x1"
-  git -C "$copy" bundle create "$bundle" "$@" 2>/dev/null || return 1
-  git -C "$copy" bundle verify "$bundle" >/dev/null 2>&1 || return 1
-  digest=$(shasum -a 256 "$bundle" | awk '{print $1}')
-  tips=$(git bundle list-heads "$bundle" | awk '{print $1}' | LC_ALL=C sort -u | paste -sd ' ' -)
-  printf '%s\t%s\t%s\n' "$bundle" "$digest" "$tips" > "$case_dir/data/task-x1/preservation-bundles.tsv"
-  hold_bundle_call "$case_dir"
+  record_fixture_bundle "$@" || return 1
+  hold_bundle_call "$1"
 }
 
 run_captain_hold() {  # <case> <arg>...
@@ -3269,8 +3342,6 @@ test_bundle_kept_ship_keeps_its_row_held_for_the_captain() {
     expect_code 0 "$rc" "bundle-row-$shape: a verified bundle must allow ordinary teardown: $(cat "$case_dir/stderr")"
     assert_absent "$NESTED_COPY" "bundle-row-$shape: the preserved copy was not removed"
     assert_absent "$case_dir/state/task-x1.meta" "bundle-row-$shape: the task was not retired"
-    assert_grep "land-or-drop call for bundle $BUNDLE_PATH is held on task task-x1" "$case_dir/stderr" \
-      "bundle-row-$shape: teardown did not name the captain's call"
     shown=$(tasks-axi show task-x1 --full --file "$case_dir/data/backlog.md") || fail "bundle-row-$shape: cannot read the row"
     [ "$(backlog_row_state "$case_dir")" != "done" ] || fail "bundle-row-$shape: the row was closed: $shown"
     printf '%s\n' "$shown" | grep -Eq '^  hold_kind: *captain$' || fail "bundle-row-$shape: the call is no longer held: $shown"
@@ -3316,85 +3387,68 @@ test_bundle_kept_ship_records_no_landing_in_the_ledger() {
   pass 'ledger on: a bundle-kept ship is retained, and its answered close records no landing evidence'
 }
 
-# The bundle route needs the captain's call already filed. Without it teardown
-# refuses, files nothing, and prints the exact command; running that command
-# lets a retry pass. A row already held on another question keeps its question
-# and the call is a separate held task.
-test_bundle_route_requires_the_captains_call() {
-  local shape case_dir rc command head tips tip id
-  for shape in unheld other-question absent; do
+# The bundle route no longer needs the captain's call filed: an attended
+# teardown of a copy whose every locally-only tip a verified bundle holds closes
+# on the bundle note, prints no hold command, and creates, changes or releases no
+# hold. A row already held on another question keeps its question and is
+# retained, as before, with no separate held task filed for the bundle.
+test_bundle_route_needs_no_captains_call() {
+  local shape case_dir rc head tips tip stored hash snapshot
+  for shape in unheld other-question; do
     make_bundle_copy_case "bundle-call-$shape"
     case_dir=$NESTED_CASE
     head=$(git -C "$NESTED_COPY" rev-parse HEAD)
     tips=$(cut -f3 "$case_dir/data/task-x1/preservation-bundles.tsv")
+    hash=$(cut -f2 "$case_dir/data/task-x1/preservation-bundles.tsv")
     case "$shape" in
       unheld)
         tasks-axi unhold task-x1 --file "$case_dir/data/backlog.md" >/dev/null || fail 'cannot release the fixture hold'
-        id=task-x1
         ;;
       other-question)
         run_captain_hold "$case_dir" hold task-x1 --owner captain --reason 'Merge PR 7 now?' >/dev/null \
           || fail 'cannot hold the row on another question'
-        id=task-x1-bundle
-        ;;
-      absent)
-        printf '%s\n' '# Backlog' '' '## In flight' '' '## Queued' '' '## Done' > "$case_dir/data/backlog.md"
-        id=task-x1
         ;;
     esac
-    cp "$case_dir/data/backlog.md" "$case_dir/backlog.before"
     rc=0
     FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-    expect_code 1 "$rc" "bundle-call-$shape: a bundle with no captain's call must refuse: $(cat "$case_dir/stderr")"
-    assert_grep 'REFUSED: the ship deliverable is not landed' "$case_dir/stderr" "bundle-call-$shape: original refusal changed"
-    assert_present "$NESTED_COPY/work.txt" "bundle-call-$shape: copy was removed"
-    assert_present "$case_dir/state/task-x1.meta" "bundle-call-$shape: task record was removed"
-    cmp -s "$case_dir/backlog.before" "$case_dir/data/backlog.md" || fail "bundle-call-$shape: teardown changed the backlog"
-    command=$(sed -n -e 's/^Hold it for the captain, then retry ordinary teardown: //p' \
-      -e 's/^File the land-or-drop call as its own task, then retry ordinary teardown: //p' \
-      -e 's/^File the land-or-drop call as its row, then retry ordinary teardown: //p' "$case_dir/stderr")
-    [ -n "$command" ] || fail "bundle-call-$shape: no hold command printed: $(cat "$case_dir/stderr")"
-    if [ "$shape" = absent ]; then
-      [[ "$command" == 'bin/fm-captain-hold.sh hold task-x1 --title Land\ or\ drop\ the\ bundle-preserved\ commits\ of\ task-x1 --repo project --owner captain --reason '* ]] \
-        || fail "bundle-call-$shape: the command is not the single hold-with-title form: $command"
-      [[ "$command" != *'&&'* && "$command" != *fm-tasks-axi.sh* ]] \
-        || fail "bundle-call-$shape: the command chains another step: $command"
-    else
-      [[ "$command" == "bin/fm-captain-hold.sh hold $id "* ]] || fail "bundle-call-$shape: the command holds the wrong task: $command"
-    fi
-    (
-      cd "$ROOT"
-      export FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" FM_DATA_OVERRIDE="$case_dir/data" \
-        FM_CONFIG_OVERRIDE="$case_dir/config" PATH="$case_dir/fakebin:$PATH"
-      eval "$command"
-    ) > "$case_dir/hold.out" 2>&1 || fail "bundle-call-$shape: the printed command failed: $command: $(cat "$case_dir/hold.out")"
-    decoded_backlog "$case_dir" > "$case_dir/backlog.decoded" || fail "bundle-call-$shape: cannot decode the hold reason"
-    assert_grep "unlanded commits of task-x1, tips $head:" "$case_dir/backlog.decoded" \
-      "bundle-call-$shape: the call does not name the copy's unlanded tip"
-    for tip in $tips; do
-      assert_grep "$tip" "$case_dir/backlog.decoded" "bundle-call-$shape: the call does not name recorded tip $tip"
-    done
-    rc=0
-    FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-    expect_code 0 "$rc" "bundle-call-$shape: the filed call must let teardown pass: $(cat "$case_dir/stderr")"
+    expect_code 0 "$rc" "bundle-call-$shape: a verified bundle needs no filed captain call: $(cat "$case_dir/stderr")"
     assert_absent "$NESTED_COPY" "bundle-call-$shape: the preserved copy was not removed"
-    assert_grep "is held on task $id" "$case_dir/stderr" "bundle-call-$shape: teardown did not name the call's task"
-    tasks-axi show "$id" --full --file "$case_dir/data/backlog.md" | grep -Eq '^  hold_kind: *captain$' \
-      || fail "bundle-call-$shape: the call $id did not stay open and held"
-    tasks-axi show task-x1 --full --file "$case_dir/data/backlog.md" | grep -Eq '^  hold_kind: *captain$' \
-      || fail "bundle-call-$shape: the work row did not stay held"
-    [ "$shape" != absent ] || tasks-axi show task-x1 --full --file "$case_dir/data/backlog.md" | grep -Eq '^  repo: *project$' \
-      || fail "bundle-call-$shape: the filed call row lost the ship's project: $(tasks-axi show task-x1 --full --file "$case_dir/data/backlog.md")"
-    [ "$shape" != other-question ] || assert_grep 'Merge PR 7 now?' "$case_dir/backlog.decoded" \
-      "bundle-call-$shape: the row's own question was replaced"
+    assert_absent "$case_dir/state/task-x1.meta" "bundle-call-$shape: the task was not retired"
+    assert_no_grep 'fm-captain-hold.sh hold' "$case_dir/stderr" "bundle-call-$shape: a hold command was printed"
+    assert_no_grep 'land-or-drop' "$case_dir/stderr" "bundle-call-$shape: the captain was asked a land-or-drop question"
+    stored="$case_dir/data/task-x1/preserved-bundles/$hash.bundle"
+    assert_present "$stored" "bundle-call-$shape: the stored bundle is missing after the close"
+    assert_grep "preserved unlanded commits in bundle $stored sha256=$hash" "$case_dir/stderr" "bundle-call-$shape: the close did not name the stored bundle"
+    git -C "$case_dir/restored.git" init -q --bare 2>/dev/null || { rm -rf "$case_dir/restored.git"; git init -q --bare "$case_dir/restored.git"; }
+    git -C "$case_dir/restored.git" fetch -q "$stored" "$head:refs/heads/recovered" || fail "bundle-call-$shape: the stored bundle cannot restore the tip"
+    assert_equals 'recoverable work' "$(git -C "$case_dir/restored.git" show recovered:work.txt)" "bundle-call-$shape: the restored tip lost the work"
+    for tip in $tips; do
+      git -C "$case_dir/restored.git" cat-file -e "$tip^{commit}" 2>/dev/null || fail "bundle-call-$shape: recorded tip $tip does not restore"
+    done
+    case "$shape" in
+      unheld)
+        [ "$(backlog_row_state "$case_dir")" = done ] || fail 'bundle-call-unheld: the row was not closed'
+        assert_grep "preserved in bundle $stored, not landed" "$case_dir/data/backlog.md" 'bundle-call-unheld: the close note is missing'
+        assert_no_grep 'hold_kind: *captain' "$case_dir/data/backlog.md" 'bundle-call-unheld: a captain hold exists'
+        snapshot=$(bundle_case_snapshot "$case_dir") || fail 'bundle-call-unheld: fleet snapshot failed'
+        assert_equals '[]' "$(bundle_case_landed_ids "$snapshot")" 'bundle-call-unheld: the bundle close is listed as landed'
+        ;;
+      other-question)
+        tasks-axi show task-x1 --full --file "$case_dir/data/backlog.md" | grep -Eq '^  hold_kind: *captain$' \
+          || fail 'bundle-call-other-question: the row lost its own hold'
+        decoded_backlog "$case_dir" > "$case_dir/backlog.decoded" || fail 'bundle-call-other-question: cannot decode'
+        assert_grep 'Merge PR 7 now?' "$case_dir/backlog.decoded" 'bundle-call-other-question: the row question was replaced'
+        tasks-axi show task-x1-bundle --file "$case_dir/data/backlog.md" >/dev/null 2>&1 \
+          && fail 'bundle-call-other-question: a separate held task was filed'
+        ;;
+    esac
   done
-  pass 'the bundle route refuses until the captain'"'"'s land-or-drop call is held, prints the command that files it, and passes once it is'
+  pass 'a verified bundle closes an attended teardown with no captain call, no hold command and a restorable stored bundle'
 }
 
-# A home whose backlog transition does not apply has no row that can hold the
-# captain's call: the bundle route refuses there and prints no command that
-# could not pass.
-test_bundle_route_refuses_where_no_row_can_hold_the_call() {
+# A home whose backlog transition does not apply has no row to close, and the
+# bundle route does not need one: the copy is preserved and removed there too.
+test_bundle_route_passes_where_no_row_exists() {
   local shape case_dir rc
   for shape in manual orca; do
     make_bundle_copy_case "bundle-no-row-$shape"
@@ -3405,16 +3459,14 @@ test_bundle_route_refuses_where_no_row_can_hold_the_call() {
     esac
     rc=0
     FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-    expect_code 1 "$rc" "bundle-no-row-$shape: the bundle route must refuse: $(cat "$case_dir/stderr")"
-    assert_grep "no backlog row can hold the captain's land-or-drop call in this home" "$case_dir/stderr" \
-      "bundle-no-row-$shape: the refusal does not name the missing row"
-    assert_grep 'REFUSED: the ship deliverable is not landed' "$case_dir/stderr" "bundle-no-row-$shape: original refusal changed"
-    assert_no_grep 'fm-captain-hold.sh hold' "$case_dir/stderr" "bundle-no-row-$shape: a hold command that cannot pass was printed"
-    assert_no_grep 'fm-tasks-axi.sh add' "$case_dir/stderr" "bundle-no-row-$shape: an add command that cannot pass was printed"
-    assert_present "$NESTED_COPY/work.txt" "bundle-no-row-$shape: copy was removed"
-    assert_present "$case_dir/state/task-x1.meta" "bundle-no-row-$shape: task record was removed"
+    expect_code 0 "$rc" "bundle-no-row-$shape: the bundle route must pass without a backlog row: $(cat "$case_dir/stderr")"
+    assert_no_grep 'fm-captain-hold.sh hold' "$case_dir/stderr" "bundle-no-row-$shape: a hold command was printed"
+    assert_no_grep 'fm-tasks-axi.sh add' "$case_dir/stderr" "bundle-no-row-$shape: an add command was printed"
+    assert_absent "$NESTED_COPY" "bundle-no-row-$shape: the preserved copy was not removed"
+    assert_present "$case_dir/data/task-x1/preserved-bundles/$(cut -f2 "$case_dir/data/task-x1/preservation-bundles.tsv").bundle" \
+      "bundle-no-row-$shape: the stored bundle is missing after the close"
   done
-  pass 'the bundle route refuses in a manual-backlog home and an Orca cleanup recovery, printing no command that cannot pass'
+  pass 'the bundle route passes in a manual-backlog home and an Orca cleanup recovery, which have no row to hold a call'
 }
 
 # Work the ordinary landing proof accepts never needs the captain's call, even
@@ -3872,6 +3924,8 @@ test_pr_check_records_remote_head_when_local_lags
 test_content_in_default_fallback_allows
 test_teardown_removes_pr_ready_refusal_marker
 test_content_fallback_uses_recorded_base_branch
+test_squash_landed_content_counts_in_every_shape_and_prints_its_base
+test_squash_landed_content_refuses_whatever_differs
 test_content_fallback_refreshes_stale_origin_ref
 test_dirty_worktree_refuses
 test_untracked_only_refusal_diagnostic
@@ -3930,8 +3984,8 @@ test_unattended_teardown_refuses_bundle_only_copy
 test_bundle_close_note_is_not_removal_authority
 test_bundle_kept_ship_keeps_its_row_held_for_the_captain
 test_bundle_kept_ship_records_no_landing_in_the_ledger
-test_bundle_route_requires_the_captains_call
-test_bundle_route_refuses_where_no_row_can_hold_the_call
+test_bundle_route_needs_no_captains_call
+test_bundle_route_passes_where_no_row_exists
 test_landed_work_never_needs_the_captains_call
 test_bundle_hint_needs_unlanded_tips
 test_bundle_needs_the_copys_own_unlanded_tip

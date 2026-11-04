@@ -122,6 +122,8 @@ fm_task_copy_default_branch() {
 # merge conflict is that comparison's answer. With no-fetch the same rule reads
 # the refs already here: merge-tree adds objects only, and no ref or worktree moves.
 FM_TASK_COPY_UNASKED=
+# The ref and commit the last content check compared with, for the caller to print.
+FM_TASK_COPY_COMPARED=
 fm_task_copy_content_in_default() {  # <worktree> <project> [<default-branch>] [<head-ref>] [no-fetch]
   local worktree=$1 project=$2 name=${3:-} head=${4:-HEAD} fetch=${5:-} ref default_tree merged_tree
   FM_TASK_COPY_UNASKED='the content check could not compare with the default branch'
@@ -140,6 +142,7 @@ fm_task_copy_content_in_default() {  # <worktree> <project> [<default-branch>] [
   fi
   default_tree=$(git -C "$worktree" rev-parse --quiet --verify "$ref^{tree}" 2>/dev/null) || return 1
   [ -n "$default_tree" ] || return 1
+  FM_TASK_COPY_COMPARED="${ref#refs/} $(git -C "$worktree" rev-parse --quiet --verify "$ref^{commit}" 2>/dev/null)"
   merged_tree=$(git -C "$worktree" merge-tree --write-tree "$ref" "$head" 2>/dev/null) || {
     [ "$?" != 1 ] || FM_TASK_COPY_UNASKED=
     return 1

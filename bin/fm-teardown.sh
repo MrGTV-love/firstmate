@@ -112,29 +112,19 @@
 # while it holds an ignored file outside teardown_preservable_ignored's allow-list:
 # land the task's commit to leave the bundle route, or move the file out.
 # Landed-only cleanup and --force keep their existing rules.
-# Those commits still go to the captain to land or drop, so the bundle route
-# also requires the captain's call to be filed already: this task's backlog row
-# must be held for the captain, and an open captain-held task in this home
-# (this row, or a separate one when this row is held on another question) must
-# have a hold reason that names the bundle path and every recorded tip in full.
-# Teardown only reads held rows; it never creates or changes a hold. Without
-# that call it refuses and prints the exact bin/fm-captain-hold.sh hold command
-# (with --title and the ship's --repo when the task has no row, so it files a
-# captain-kind row under that project), whose reason
-# names the copy's unlanded tips apart from the bundle's recorded advertised
-# tips, since an advertised tip may already be landed. A home whose backlog
-# transition does not apply (Orca cleanup recovery or a manual backlog) has no
-# row that can hold the call, and a closed row cannot be held, so the route
-# refuses there with that predicate and no command. Work that the
-# ordinary landing proof accepts never reaches this requirement. The held row
-# then takes the captain-held retention described above, recording
-# "Deliverable of the finished work: preserved in bundle <bundle path>, not
-# landed", never a PR or "local main". A later proof that changes the close's
-# links restages the pending close. The captain's answer closes the row with no
-# note, and its captain hold kind keeps it out of Recently Landed; a replay
-# that finds the hold already released closes it on the bundle note, which
-# bin/fm-landed-lib.sh keeps out of Recently Landed without marking it a drop.
-# A Vernant-locked copy still needs its driver's independent landing verdict.
+# No captain call is filed first: the preserved commits are recoverable from the
+# stored bundle, so the attended route is a safe leftover that teardown closes
+# itself, and it never creates, changes or releases a captain hold. A row
+# already held for the captain takes the captain-held retention described above,
+# recording "Deliverable of the finished work: preserved in bundle <bundle
+# path>, not landed", never a PR or "local main", and the captain's answer closes
+# it with no note. Any other row, or a replay that finds the hold already
+# released, closes on the note "preserved in bundle <bundle path>, not landed",
+# which bin/fm-landed-lib.sh keeps out of Recently Landed without marking it a
+# drop. A later proof that changes the close's links restages the pending close.
+# The route needs no backlog row, so it also passes in a manual-backlog home and
+# an Orca cleanup recovery. A Vernant-locked copy keeps its driver's independent
+# landing verdict whenever the driver can run (see the creation-lock paragraph).
 # To create a self-contained bundle and its record (no creator is run by teardown),
 # choose an absolute source bundle path (temporary locations are supported),
 # set copy, task and FM_HOME explicitly, then run under bash:
@@ -145,16 +135,14 @@
 #   digest=$(shasum -a 256 "$bundle" | awk '{print $1}') &&
 #   tips=$(git bundle list-heads "$bundle" | awk '{print $1}' | LC_ALL=C sort -u | paste -sd ' ' -) &&
 #   printf '%s\t%s\t%s\n' "$bundle" "$digest" "$tips" > "$FM_HOME/data/$task/preservation-bundles.tsv"
-# then file the captain's call with the command a refusal prints, for example
-#   bin/fm-captain-hold.sh hold "$task" --owner captain \
-#     --reason "Land or drop the unlanded commits of $task: preserved in bundle $bundle, recorded tips $tips."
-# The original record remains the held call's identity; its SHA-256 names the
+# then run ordinary attended teardown; no captain call is filed first.
+# The original record stays the identity of the preservation; its SHA-256 names the
 # fixed stored path, which the close note also names. The original bundle may be
 # deleted after admission. Keep data/<task> until the commits are no longer
 # needed; ordinary task cleanup retains it. Retiring a firstmate home (a
 # secondmate home, or a forced child home) refuses before any removal while any
 # data/*/preserved-bundles/*.bundle remains in it, and lists each one: remove a
-# stored bundle once its land-or-drop call is answered, or move it to a durable
+# stored bundle once its preserved commits are landed or no longer needed, or move it to a durable
 # location outside that home and update its record. Restore from the stored path:
 # git -C <restore-repo> fetch <stored-bundle-path> <tip-sha>:refs/heads/recovered.
 # The PR itself is resolved from the task's recorded pr= when present, or - when
@@ -318,11 +306,27 @@
 # recorded bundle stays, with the reason written, and refuses the close unless
 # the held-copy rule below applies.
 # A copy locked by Vernant's creation lock (vernant-session-active
-# owner=launcher:<pid> launcher=<pid>) is released and removed by Vernant's own
+# owner=<id> launcher=<pid>) is released and removed by Vernant's own
 # driver, scripts/git-stability/closeout_pr.py --cleanup-worktree <copy>
 # --execute-cleanup, run from the slot (FM_TEARDOWN_VERNANT_PYTHON names the
-# interpreter); an unlocked copy is removed with a plain non-forced git worktree
-# remove. Removal deletes the copy's checkout and the allow-listed ignored files
+# interpreter) with the one credit teardown proved, printed before the call:
+# --pr <N> when a merged pull request holds the whole copy head, else
+# --bundle-record <file> when a verified recorded bundle holds it and every
+# commit of git rev-list HEAD --not --remotes is both recorded and advertised as
+# a bundle head (the record is built by teardown from its own proof in a private
+# file under data/<task>, and removed after the call), else none; the driver
+# rejects the two together. When the driver or its interpreter is unavailable
+# (exit 127), or it names the verdict verification_stale_or_uncovered_paths, and
+# the lock names a launcher that is gone (absent from a readable process table,
+# or a pid that started after the lock was written), teardown makes its own
+# proofs again, reads the lock and the process table once more immediately
+# before the unlock, and then releases the lock itself with a non-forced git
+# worktree unlock followed by a non-forced git worktree remove; a removal that
+# fails restores the lock. The release is printed with its lock text and proof
+# and recorded in data/<task>/creation-lock-releases.tsv. A live launcher, an
+# unreadable process table, a process in the copy or any other driver verdict
+# keeps the copy locked and names that fact. An unlocked copy is removed with a
+# plain non-forced git worktree remove. Removal deletes the copy's checkout and the allow-listed ignored files
 # in it (symlinks, virtual environments, node_modules and tool caches,
 # .DS_Store, Firstmate's hook files, regenerable build caches, and anything
 # ignored under its .claude and .opencode trees); any other ignored entry is
@@ -347,7 +351,7 @@
 # as before.
 # Apart from the held-copy rule below, every other case, including a half-removed
 # copy, refuses as before; --force never waives these proofs. The by-hand route
-# is in docs/agent-control.md.
+# for the facts that remain is in docs/agent-control.md.
 # Held copies. A foreign copy that is clean, owned by no record, process or live
 # launcher, and held back only by ignored files that exist nowhere else or by a
 # HEAD that is not proved landed does not stop the close of a task whose own copy
@@ -2741,7 +2745,10 @@ work_is_landed_proof() {
     fi
   fi
   pr_is_merged "$branch" && return 0
-  fm_task_copy_content_in_default "$dir" "$PROJ" "${BASE_BRANCH:-}" "$ref" && return 0
+  if fm_task_copy_content_in_default "$dir" "$PROJ" "${BASE_BRANCH:-}" "$ref"; then
+    echo "teardown: landed by content: every change of $dir at ${ref:0:12} is already in ${FM_TASK_COPY_COMPARED%% *} (${FM_TASK_COPY_COMPARED##* })" >&2
+    return 0
+  fi
   [ -z "$FM_TASK_COPY_UNASKED" ] || TEARDOWN_LANDED_UNASKED=${TEARDOWN_LANDED_UNASKED:-$FM_TASK_COPY_UNASKED}
   return 1
 }
@@ -5225,7 +5232,7 @@ EOF
   if [ "${#stored[@]}" -gt 0 ]; then
     echo "REFUSED: $label $abs_home_path holds bundle-preserved commits that only its data/ keeps:" >&2
     printf '  %s\n' "${stored[@]}" >&2
-    echo "Remove each stored bundle once its land-or-drop call is answered, or move it to a durable location outside this home and update data/<task>/preservation-bundles.tsv; then retry teardown." >&2
+    echo "Remove each stored bundle once its preserved commits are landed or no longer needed, or move it to a durable location outside this home and update data/<task>/preservation-bundles.tsv; then retry teardown." >&2
     return 1
   fi
   printf '%s\n' "$abs_home_path"

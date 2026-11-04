@@ -2599,14 +2599,85 @@ if [ -n "\${FM_STUB_CLOSEOUT_OUTPUT:-}" ]; then
   cat "\$FM_STUB_CLOSEOUT_OUTPUT" >&2
 fi
 if [ "\${FM_STUB_CLOSEOUT:-ok}" != ok ]; then
-  echo '{"allowed": false, "reason": "stub_refusal"}'
+  echo '{"allowed": false, "reason": "'"\${FM_STUB_REASON:-stub_refusal}"'"}'
   exit 3
 fi
-case "\$2" in "$tmp_real"/*) ;; *) echo "stub refuses a path outside the scratch root" >&2; exit 4 ;; esac
-git worktree unlock "\$2" && git worktree remove "\$2"
+# Models the real driver's argument gate and credit rule: --pr with
+# --bundle-record is rejected before either is read, and with FM_STUB_REQUIRE_CREDIT
+# set a copy whose commits no credit covers is refused as uncovered tracked
+# content. A record is copied to closeout.record so the test can read what teardown built.
+copy_arg=\$2
+credits=0
+for argument in "\$@"; do
+  case "\$argument" in --pr|--bundle-record) credits=\$((credits + 1)) ;; esac
+done
+if [ "\$credits" -gt 1 ]; then
+  echo "closeout_pr: failed: --bundle-record requires standalone normal --cleanup-worktree" >&2
+  exit 2
+fi
+while [ "\$#" -gt 0 ]; do
+  if [ "\$1" = --bundle-record ]; then
+    cp "\$2" "$case_dir/closeout.record" 2>/dev/null || { echo "closeout_pr: failed: bundle record not found" >&2; exit 2; }
+    credited=1
+  fi
+  [ "\$1" != --pr ] || credited=1
+  shift
+done
+if [ -n "\${FM_STUB_REQUIRE_CREDIT:-}" ] && [ "\${credited:-0}" != 1 ]; then
+  echo '{"allowed": false, "reason": "verification_stale_or_uncovered_paths"}'
+  exit 3
+fi
+case "\$copy_arg" in "$tmp_real"/*) ;; *) echo "stub refuses a path outside the scratch root" >&2; exit 4 ;; esac
+git worktree unlock "\$copy_arg" && git worktree remove "\$copy_arg"
 SH
   printf '#!/usr/bin/env bash\nexec bash "$@"\n' > "$case_dir/vernant-python"
   chmod +x "$case_dir/vernant-python"
+}
+
+# A self-contained bundle of <copy> at <bundle> and a one-line preservation
+# record for task-x1, as the header of bin/fm-teardown.sh describes, with no
+# captain hold filed.
+record_fixture_bundle() {  # <case> <copy> <bundle> [revision...]
+  local case_dir=$1 copy=$2 bundle=$3 digest tips
+  shift 3
+  mkdir -p "${bundle%/*}" "$case_dir/data/task-x1"
+  git -C "$copy" bundle create "$bundle" "$@" 2>/dev/null || return 1
+  git -C "$copy" bundle verify "$bundle" >/dev/null 2>&1 || return 1
+  digest=$(shasum -a 256 "$bundle" | awk '{print $1}')
+  tips=$(git bundle list-heads "$bundle" | awk '{print $1}' | LC_ALL=C sort -u | paste -sd ' ' -)
+  printf '%s\t%s\t%s\n' "$bundle" "$digest" "$tips" > "$case_dir/data/task-x1/preservation-bundles.tsv"
+}
+
+# A fake process table in the case's fakebin: <dead-pid> is absent, as macOS
+# reports a pid that is gone (empty stdout, exit 1), and every other query goes to
+# the real ps. With FM_FAKE_PS_UNREADABLE=1 a query for <dead-pid> fails as an
+# unreadable table does.
+add_fake_ps_table() {  # <case> <dead-pid>
+  local case_dir=$1 dead=$2
+  cat > "$case_dir/fakebin/ps" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = -p ] && [ "\${2:-}" = $dead ]; then
+  if [ "\${FM_FAKE_PS_UNREADABLE:-0}" = 1 ]; then echo "ps: simulated unreadable process table" >&2; exit 2; fi
+  exit 1
+fi
+exec "\${REAL_PS_FOR_TEST:?}" "\$@"
+SH
+  chmod +x "$case_dir/fakebin/ps"
+}
+
+# A git wrapper in the case's fakebin that records every worktree and removal
+# command's arguments in <case>/git-worktree.log, then runs the real git.
+add_git_worktree_log() {  # <case>
+  local case_dir=$1
+  cat > "$case_dir/fakebin/git" <<SH
+#!/usr/bin/env bash
+args=("\$@")
+for argument in "\$@"; do
+  if [ "\$argument" = worktree ]; then printf '%s\n' "\$*" >> "$case_dir/git-worktree.log"; break; fi
+done
+exec "\${REAL_GIT_FOR_TEST:?}" "\${args[@]}"
+SH
+  chmod +x "$case_dir/fakebin/git"
 }
 
 # A pid that exited, so a creation lock naming it has no live launcher.

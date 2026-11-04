@@ -5061,8 +5061,9 @@ test_a_held_close_removes_only_the_tasks_own_nested_copy() {
         || fail "held-own-nested-$shape-$locked: the foreign copy changed"
       assert_present "$second/unlanded.txt" "held-own-nested-$shape-$locked: the foreign copy's unique file is gone"
       if [ "$locked" = locked ]; then
-        assert_equals "$FOREIGN_SLOT|--cleanup-worktree $FOREIGN_COPY --execute-cleanup" "$(cat "$FOREIGN_CASE/closeout.log")" \
-          "held-own-nested-$shape-$locked: the driver was not run once, for the own copy only"
+        # The recorded PR 7 is merged and holds the copy head, so it is the credit.
+        assert_equals "$FOREIGN_SLOT|--cleanup-worktree $FOREIGN_COPY --pr 7 --execute-cleanup" "$(cat "$FOREIGN_CASE/closeout.log")" \
+          "held-own-nested-$shape-$locked: the driver was not run once, for the own copy only, with the merged PR as its credit"
       else
         assert_absent "$FOREIGN_CASE/closeout.log" "held-own-nested-$shape-$locked: the closeout driver ran for an unlocked copy"
       fi
@@ -6136,7 +6137,7 @@ test_closeout_uses_the_slots_default_interpreter() {
   pass "without FM_TEARDOWN_VERNANT_PYTHON the driver runs under the slot's own .venv interpreter"
 }
 
-test_missing_closeout_driver_or_interpreter_leaves_the_copy_in_place() {
+test_missing_closeout_driver_or_interpreter_releases_a_dead_launchers_lock() {
   local rc shape
   for shape in driver interpreter; do
     dead_launcher_pid
@@ -6147,13 +6148,13 @@ test_missing_closeout_driver_or_interpreter_leaves_the_copy_in_place() {
     else
       run_foreign_teardown rc FM_TEARDOWN_VERNANT_PYTHON="$FOREIGN_CASE/no-such-python"
     fi
-    expect_code 1 "$rc" "missing-$shape: a locked copy with no driver to release it must refuse: $(cat "$FOREIGN_CASE/stderr")"
-    assert_grep "did not release foreign copy $FOREIGN_COPY (exit 127)" "$FOREIGN_CASE/stderr" \
-      "missing-$shape: the refusal did not report the unavailable driver"
-    assert_grep "is not available" "$FOREIGN_CASE/stderr" "missing-$shape: the refusal did not say what was missing"
-    assert_foreign_copy_untouched "missing-$shape"
+    expect_code 0 "$rc" "missing-$shape: a landed copy under a dead launcher's lock must close with no driver: $(cat "$FOREIGN_CASE/stderr")"
+    assert_grep "released creation lock 'vernant-session-active owner=launcher:$FOREIGN_DEAD_PID launcher=$FOREIGN_DEAD_PID' on foreign copy $FOREIGN_COPY" "$FOREIGN_CASE/stderr" \
+      "missing-$shape: the script's own release was not reported"
+    assert_absent "$FOREIGN_COPY" "missing-$shape: the copy survived"
+    assert_absent "$FOREIGN_CASE/closeout.log" "missing-$shape: the missing driver ran"
   done
-  pass "a Vernant-locked copy refuses and stays when its closeout driver or interpreter is missing"
+  pass "a landed foreign copy under a dead launcher's lock is released by the script when its closeout driver or interpreter is missing"
 }
 
 test_foreign_copy_nested_in_another_is_removed_first() {
@@ -6255,6 +6256,216 @@ test_live_launcher_outside_the_task_keeps_its_locked_own_copy() {
     "own-live-launcher: the refusal did not name the launcher"
   assert_own_locked_copy_untouched own-live-launcher
   pass "a live lock launcher outside the task keeps a locked own copy and is named by pid"
+}
+
+# make_locked_bundle_case <name> <own|prior|foreign> <single|interior>: a Vernant-locked
+# copy (own: the task's worktree= copy nested in its slot; prior: its prior_worktree= copy;
+# foreign: a copy no record names); a Vernant-locked
+# copy whose launcher is gone, one commit (single) or two (interior) ahead of the
+# landed main, held only by a recorded verified bundle with no captain hold filed.
+# single bundles the branch and main, so the head and its only locally-only
+# commit are advertised; interior bundles only the branch, so the first commit is
+# restored by the tip but is not itself an advertised head (the driver's claim
+# rule refuses it while teardown's maximal-tip proof accepts it). Sets
+# FOREIGN_* and BUNDLE_PATH.
+make_locked_bundle_case() {
+  local name=$1 kind=$2 shape=$3
+  dead_launcher_pid
+  case "$kind" in
+    own) make_own_locked_copy_case "$name" enclosing "$FOREIGN_DEAD_PID" ;;
+    prior) make_own_locked_copy_case "$name" reverse "$FOREIGN_DEAD_PID" ;;
+    *) make_foreign_copy_case "$name" "$FOREIGN_DEAD_PID" ;;
+  esac
+  printf 'one\n' > "$FOREIGN_COPY/work1.txt"
+  git -C "$FOREIGN_COPY" add work1.txt
+  git -C "$FOREIGN_COPY" commit -qm 'unpublished one'
+  if [ "$shape" = interior ]; then
+    printf 'two\n' > "$FOREIGN_COPY/work2.txt"
+    git -C "$FOREIGN_COPY" add work2.txt
+    git -C "$FOREIGN_COPY" commit -qm 'unpublished two'
+  fi
+  BUNDLE_PATH="$FOREIGN_CASE/bundles/work.bundle"
+  if [ "$shape" = interior ]; then
+    record_fixture_bundle "$FOREIGN_CASE" "$FOREIGN_COPY" "$BUNDLE_PATH" fm/task-x1-v2 || fail "$name: cannot create the bundle fixture"
+  else
+    record_fixture_bundle "$FOREIGN_CASE" "$FOREIGN_COPY" "$BUNDLE_PATH" --all || fail "$name: cannot create the bundle fixture"
+  fi
+  add_git_worktree_log "$FOREIGN_CASE"
+}
+
+# The stored bundle restores every commit of the copy in a fresh repository after
+# the copy and the source bundle are gone.
+assert_bundle_restores_copy_commits() {  # <label> <commit>...
+  local label=$1 hash stored restored commit
+  shift
+  hash=$(cut -f2 "$FOREIGN_CASE/data/task-x1/preservation-bundles.tsv")
+  stored="$FOREIGN_CASE/data/task-x1/preserved-bundles/$hash.bundle"
+  assert_present "$stored" "$label: the stored bundle is missing after the close"
+  restored="$FOREIGN_CASE/restored-$label.git"
+  rm -rf "$restored"
+  git init -q --bare "$restored"
+  git -C "$restored" fetch -q "$stored" "$1:refs/heads/recovered" || fail "$label: the stored bundle cannot restore the tip"
+  for commit in "$@"; do
+    git -C "$restored" cat-file -e "$commit^{commit}" 2>/dev/null || fail "$label: commit $commit does not restore from the stored bundle"
+  done
+  git -C "$restored" fsck --strict --no-dangling >/dev/null 2>&1 || fail "$label: the restored repository fails fsck"
+}
+
+# A locked copy held only by a verified bundle is passed to the driver with
+# exactly one credit, --bundle-record, built from teardown's own proof. The
+# driver stub refuses any copy no credit covers, as the real driver does.
+test_locked_copy_held_by_a_bundle_gets_one_bundle_record_credit() {
+  local rc kind head hash stored
+  for kind in own prior foreign; do
+    make_locked_bundle_case "bundle-credit-$kind" "$kind" single
+    head=$(git -C "$FOREIGN_COPY" rev-parse HEAD)
+    hash=$(cut -f2 "$FOREIGN_CASE/data/task-x1/preservation-bundles.tsv")
+    stored="$FOREIGN_CASE/data/task-x1/preserved-bundles/$hash.bundle"
+    run_foreign_teardown rc FM_STUB_REQUIRE_CREDIT=1
+    expect_code 0 "$rc" "bundle-credit-$kind: a bundle-held locked copy must close with no owner step: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -8)"
+    [ "$(wc -l < "$FOREIGN_CASE/closeout.log" | tr -d ' ')" = 1 ] || fail "bundle-credit-$kind: the driver was not run once"
+    grep -Eq "^$FOREIGN_SLOT\\|--cleanup-worktree $FOREIGN_COPY --bundle-record $FOREIGN_CASE/data/task-x1/closeout-bundle-record\\.[A-Za-z0-9]+ --execute-cleanup\$" \
+      "$FOREIGN_CASE/closeout.log" || fail "bundle-credit-$kind: the driver did not get exactly the bundle record credit"
+    assert_no_grep ' --pr ' "$FOREIGN_CASE/closeout.log" "bundle-credit-$kind: a pull-request credit was passed beside the record"
+    assert_equals "$stored" "$(jq -r .bundle_path "$FOREIGN_CASE/closeout.record")" "bundle-credit-$kind: the record names another bundle"
+    assert_equals "$hash" "$(jq -r .sha256 "$FOREIGN_CASE/closeout.record")" "bundle-credit-$kind: the record carries another digest"
+    jq -e --arg head "$head" '.unpushed_commit_tips | index($head) != null' "$FOREIGN_CASE/closeout.record" >/dev/null \
+      || fail "bundle-credit-$kind: the record does not list the copy head"
+    [ -z "$(find "$FOREIGN_CASE/data/task-x1" -name 'closeout-bundle-record.*' 2>/dev/null)" ] \
+      || fail "bundle-credit-$kind: the temporary record outlived the call"
+    assert_grep "closeout credit for $FOREIGN_COPY: --bundle-record" "$FOREIGN_CASE/stderr" "bundle-credit-$kind: the credit was not printed"
+    assert_no_grep 'released creation lock' "$FOREIGN_CASE/stderr" "bundle-credit-$kind: the direct release ran although the driver could release"
+    assert_no_grep 'fm-captain-hold.sh hold' "$FOREIGN_CASE/stderr" "bundle-credit-$kind: a hold command was printed"
+    assert_absent "$FOREIGN_COPY" "bundle-credit-$kind: the copy survived"
+    assert_absent "$FOREIGN_CASE/state/task-x1.meta" "bundle-credit-$kind: the task record survived"
+    assert_bundle_restores_copy_commits "bundle-credit-$kind" "$head"
+  done
+  pass 'a bundle-held Vernant-locked copy (own nested, prior or foreign) closes through the driver with exactly one --bundle-record credit built from the proved record'
+}
+
+# A merged pull request that holds the whole copy head is the credit, even with a
+# recorded bundle beside it: the driver rejects the pair.
+test_locked_copy_landed_by_a_merged_pr_gets_one_pr_credit() {
+  local rc head
+  make_locked_bundle_case pr-credit own single
+  head=$(git -C "$FOREIGN_COPY" rev-parse HEAD)
+  git -C "$FOREIGN_COPY" push -q origin "HEAD:refs/pull/7/head"
+  append_pr_meta_url "$FOREIGN_CASE"
+  add_gh_pr_merged_for_head "$FOREIGN_CASE" "$head"
+  run_foreign_teardown rc FM_STUB_REQUIRE_CREDIT=1
+  expect_code 0 "$rc" "pr-credit: a locked copy held by a merged PR must close: $(cat "$FOREIGN_CASE/stderr")"
+  assert_equals "$FOREIGN_SLOT|--cleanup-worktree $FOREIGN_COPY --pr 7 --execute-cleanup" "$(cat "$FOREIGN_CASE/closeout.log")" \
+    "pr-credit: the driver did not get exactly the pull-request credit"
+  assert_absent "$FOREIGN_CASE/closeout.record" "pr-credit: a bundle record reached the driver beside --pr"
+  assert_grep "--pr 7 (the merged pull request holds HEAD" "$FOREIGN_CASE/stderr" "pr-credit: the credit was not printed"
+  assert_absent "$FOREIGN_COPY" "pr-credit: the copy survived"
+  pass 'a locked copy whose whole head a merged pull request holds is passed --pr and never a bundle record beside it'
+}
+
+# A bundle whose branch tip restores an interior commit is accepted by teardown's
+# maximal-tip proof but not credited by the driver. For a dead launcher the copy
+# is released by the script itself, without force and without an owner command.
+test_dead_launcher_lock_is_released_directly_when_no_credit_is_satisfiable() {
+  local rc kind first head label
+  for kind in own prior foreign; do
+    label='own nested'
+    [ "$kind" != foreign ] || label=foreign
+    make_locked_bundle_case "direct-release-$kind" "$kind" interior
+    head=$(git -C "$FOREIGN_COPY" rev-parse HEAD)
+    first=$(git -C "$FOREIGN_COPY" rev-parse HEAD^)
+    run_foreign_teardown rc FM_STUB_REQUIRE_CREDIT=1
+    expect_code 0 "$rc" "direct-release-$kind: a dead launcher's lock on a proved copy must not need the owner: $(cat "$FOREIGN_CASE/stderr")"
+    assert_equals "$FOREIGN_SLOT|--cleanup-worktree $FOREIGN_COPY --execute-cleanup" "$(cat "$FOREIGN_CASE/closeout.log")" \
+      "direct-release-$kind: the driver was not tried once, with no credit"
+    assert_grep "closeout credit for $FOREIGN_COPY: none (commit $first is not a recorded and advertised head of the bundle)" "$FOREIGN_CASE/stderr" \
+      "direct-release-$kind: the unmet credit was not named: $(grep -h 'closeout credit' "$FOREIGN_CASE/stderr")"
+    assert_grep "released creation lock 'vernant-session-active owner=launcher:$FOREIGN_DEAD_PID launcher=$FOREIGN_DEAD_PID' on $label copy $FOREIGN_COPY (launcher $FOREIGN_DEAD_PID is gone; proof: recorded bundle " \
+      "$FOREIGN_CASE/stderr" "direct-release-$kind: the release and its proof were not printed"
+    assert_grep "removed it without force" "$FOREIGN_CASE/stderr" "direct-release-$kind: the release did not say it was unforced"
+    assert_grep "$(printf '\t')$FOREIGN_COPY$(printf '\t')vernant-session-active owner=launcher:$FOREIGN_DEAD_PID launcher=$FOREIGN_DEAD_PID$(printf '\t')recorded bundle " \
+      "$FOREIGN_CASE/data/task-x1/creation-lock-releases.tsv" "direct-release-$kind: no durable record of the release"
+    assert_grep "worktree unlock $FOREIGN_COPY" "$FOREIGN_CASE/git-worktree.log" "direct-release-$kind: the script did not unlock"
+    grep -Fxq -- "-C $FOREIGN_SLOT worktree remove $FOREIGN_COPY" "$FOREIGN_CASE/git-worktree.log" || fail "direct-release-$kind: the removal was not the plain one"
+    if grep -Eq 'worktree remove .*(^| )(-f|--force)( |$)' "$FOREIGN_CASE/git-worktree.log"; then fail "direct-release-$kind: a forced removal ran"; fi
+    assert_no_grep 'run git worktree unlock' "$FOREIGN_CASE/stderr" "direct-release-$kind: an owner command was printed"
+    assert_absent "$FOREIGN_COPY" "direct-release-$kind: the copy survived"
+    assert_absent "$FOREIGN_CASE/state/task-x1.meta" "direct-release-$kind: the task record survived"
+    assert_bundle_restores_copy_commits "direct-release-$kind" "$head" "$first"
+  done
+  pass 'a proved copy locked by a gone launcher, which no driver credit covers, is unlocked and removed by the script without force and stays restorable'
+}
+
+# The driver or its interpreter being unavailable leaves a dead launcher's lock
+# as the only obstacle to a landed copy: the script releases it.
+test_dead_launcher_lock_is_released_when_the_driver_is_unavailable() {
+  local rc
+  dead_launcher_pid
+  make_own_locked_copy_case driver-unavailable enclosing "$FOREIGN_DEAD_PID"
+  add_git_worktree_log "$FOREIGN_CASE"
+  rm -f "$FOREIGN_CASE/vernant-python"
+  run_foreign_teardown rc
+  expect_code 0 "$rc" "driver-unavailable: a landed copy under a dead launcher's lock must close: $(cat "$FOREIGN_CASE/stderr")"
+  assert_grep 'proof: the landed-work rule)' "$FOREIGN_CASE/stderr" "driver-unavailable: the release was not printed"
+  assert_grep "worktree unlock $FOREIGN_COPY" "$FOREIGN_CASE/git-worktree.log" "driver-unavailable: the script did not unlock"
+  assert_absent "$FOREIGN_COPY" "driver-unavailable: the copy survived"
+  pass 'a landed copy under a dead launcher'"'"'s lock is released by the script when the closeout driver cannot run'
+}
+
+# Every check is made again before the unlock: a process that starts running in
+# the copy after the driver refused keeps the copy locked and registered.
+test_direct_release_refuses_a_process_that_appears_before_the_unlock() {
+  local rc pid=999991
+  make_locked_bundle_case direct-appears own interior
+  cat > "$FOREIGN_CASE/fakebin/lsof" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" -d cwd "*)
+    if [ -e "$FOREIGN_CASE/closeout.log" ]; then printf 'p%s\nfcwd\nn%s\n' $pid '$FOREIGN_COPY'; fi
+    exit 0 ;;
+esac
+exit 1
+SH
+  chmod +x "$FOREIGN_CASE/fakebin/lsof"
+  run_foreign_teardown rc FM_STUB_REQUIRE_CREDIT=1
+  expect_code 1 "$rc" "direct-appears: a process running in the copy must keep it: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+  assert_grep "The copy was not released directly: process $pid is running in it or launched its creation lock since the retire phase" "$FOREIGN_CASE/stderr" \
+    "direct-appears: the refusal did not name the process"
+  assert_present "$FOREIGN_COPY/.git" "direct-appears: the copy was removed"
+  git -C "$FOREIGN_CASE/project" worktree list --porcelain | grep -A4 -F "worktree $FOREIGN_COPY" | grep -q '^locked' \
+    || fail 'direct-appears: the copy is no longer locked'
+  assert_absent "$FOREIGN_CASE/git-worktree.log.unlock" 'direct-appears: marker'
+  if grep -q 'worktree unlock' "$FOREIGN_CASE/git-worktree.log" 2>/dev/null; then fail 'direct-appears: the script unlocked the copy'; fi
+  assert_present "$FOREIGN_CASE/state/task-x1.meta" 'direct-appears: the task record was removed'
+  pass 'a process that appears in the copy after the driver refused keeps the copy locked, named by pid'
+}
+
+# An unreadable process table is never taken for a gone launcher.
+test_direct_release_refuses_an_unreadable_process_table() {
+  local rc
+  make_locked_bundle_case direct-unreadable-ps own interior
+  add_fake_ps_table "$FOREIGN_CASE" "$FOREIGN_DEAD_PID"
+  run_foreign_teardown rc FM_STUB_REQUIRE_CREDIT=1 FM_FAKE_PS_UNREADABLE=1
+  expect_code 1 "$rc" "direct-unreadable-ps: an unreadable process table must keep the copy: $(cat "$FOREIGN_CASE/stderr")"
+  assert_present "$FOREIGN_COPY/.git" "direct-unreadable-ps: the copy was removed"
+  if grep -q 'worktree unlock' "$FOREIGN_CASE/git-worktree.log" 2>/dev/null; then fail 'direct-unreadable-ps: the script unlocked the copy'; fi
+  pass 'a process table that cannot be read never releases a locked copy'
+}
+
+# Only the driver being unavailable, or its named uncredited-content verdict,
+# hands a copy to the direct release. Any other verdict keeps the copy locked.
+test_other_driver_verdicts_keep_the_locked_copy() {
+  local rc reason
+  for reason in cleanup_skipped_live_or_unknown cleanup_lease_conflict stub_refusal; do
+    make_locked_bundle_case "driver-verdict-$reason" own single
+    run_foreign_teardown rc FM_STUB_CLOSEOUT=refuse FM_STUB_REASON="$reason"
+    expect_code 1 "$rc" "driver-verdict-$reason: the driver's verdict must keep the copy: $(cat "$FOREIGN_CASE/stderr")"
+    assert_grep "The copy was not released directly: the driver's verdict is not one a direct release may take over" "$FOREIGN_CASE/stderr" \
+      "driver-verdict-$reason: the refusal did not say why the script did not take over"
+    assert_grep "\"reason\": \"$reason\"" "$FOREIGN_CASE/stderr" "driver-verdict-$reason: the driver's fact was not shown"
+    assert_no_grep 'worktree unlock' "$FOREIGN_CASE/git-worktree.log" "driver-verdict-$reason: the script unlocked the copy"
+    assert_present "$FOREIGN_COPY/.git" "driver-verdict-$reason: the copy was removed"
+  done
+  pass 'a driver verdict about a live tenant, a lease or anything else keeps the locked copy, and the driver'"'"'s own fact is shown'
 }
 
 test_locked_own_nested_copy_that_is_not_proved_is_refused() {
@@ -6604,11 +6815,18 @@ test_two_foreign_copies_are_released_together_or_not_at_all
 test_foreign_copy_nested_in_another_is_removed_first
 test_foreign_copy_is_released_before_the_project_lock_wait
 test_closeout_uses_the_slots_default_interpreter
-test_missing_closeout_driver_or_interpreter_leaves_the_copy_in_place
+test_missing_closeout_driver_or_interpreter_releases_a_dead_launchers_lock
 test_closeout_refusal_and_foreign_locks_leave_the_copy_in_place
 test_locked_own_nested_copy_is_released_by_the_closeout_driver
 test_locked_own_nested_copy_with_a_recycled_launcher_pid_is_released
 test_live_launcher_outside_the_task_keeps_its_locked_own_copy
+test_locked_copy_held_by_a_bundle_gets_one_bundle_record_credit
+test_locked_copy_landed_by_a_merged_pr_gets_one_pr_credit
+test_dead_launcher_lock_is_released_directly_when_no_credit_is_satisfiable
+test_dead_launcher_lock_is_released_when_the_driver_is_unavailable
+test_direct_release_refuses_a_process_that_appears_before_the_unlock
+test_direct_release_refuses_an_unreadable_process_table
+test_other_driver_verdicts_keep_the_locked_copy
 test_locked_own_nested_copy_that_is_not_proved_is_refused
 test_locked_own_nested_copy_with_unique_ignored_file_is_preserved_and_released
 test_locked_own_nested_copy_stays_when_a_foreign_copy_is_refused

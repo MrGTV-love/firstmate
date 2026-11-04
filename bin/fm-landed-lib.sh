@@ -30,14 +30,13 @@
 #
 # A row closed by a captain's drop carries the fixed note "dropped" and is never
 # a delivery, whatever other links it retains. A ship row whose commits only a
-# verified bundle holds is not a drop either: teardown removes such a copy only
-# while the row is held for the captain's land-or-drop call, and keeps it open
-# and held. The captain's answer closes it with no note, and its captain hold
-# kind keeps it out of Recently Landed. A replay that finds the hold already
-# released, or a close by hand, leaves the note "preserved in bundle <path>, not
-# landed" with no artifact; bundle_not_landed keeps such a row out of Recently
-# Landed without marking it captain_drop, so nothing reads it as the captain's
-# decision. The check needs a Done row with no PR or report and the note as its
+# verified bundle holds is not a drop either: a row held for the captain's
+# land-or-drop call stays open and held, and the captain's answer closes it with
+# no note, its captain hold kind keeping it out of Recently Landed. A row that is
+# not held, or a replay that finds the hold already released, closes on the note
+# "preserved in bundle <path>, not landed" with no artifact; bundle_not_landed
+# keeps such a row out of Recently Landed without marking it captain_drop, so
+# nothing reads it as the captain's decision. The check needs a Done row with no PR or report and the note as its
 # last body line. Restarting the row through bin/fm-backlog-transition-lib.sh retires the
 # note to "Historical preserved in bundle ...", as it retires "dropped", so a
 # row closed again with a PR, a report, another note or no flag is judged on

@@ -49,10 +49,13 @@
 # removed as before.
 # A copy locked by Vernant's creation lock is released and removed by Vernant's
 # own driver (closeout_pr.py --cleanup-worktree <copy> --execute-cleanup, run
-# from the slot with FM_TEARDOWN_VERNANT_PYTHON or <slot>/.venv/bin/python). An
+# from the slot with FM_TEARDOWN_VERNANT_PYTHON or <slot>/.venv/bin/python) with
+# the one credit teardown_closeout_credit proved (--pr or --bundle-record, never
+# both), and, for the residue the driver cannot release, by
+# teardown_dead_launcher_release. bin/fm-teardown.sh's header owns that rule. An
 # unlocked copy is removed with a plain non-forced git worktree remove. A lock in
-# any other format, a driver refusal, or a copy still registered afterwards
-# refuses. Removal deletes the copy's checkout and the allow-listed ignored files
+# any other format, a live launcher, a driver refusal outside that residue, or a
+# copy still registered afterwards refuses. Removal deletes the copy's checkout and the allow-listed ignored files
 # in it (symlinks, virtual environments, node_modules and tool caches,
 # .DS_Store, Firstmate's hook files, regenerable build caches, and anything
 # ignored under its .claude and .opencode trees); it loses no commit, because
@@ -603,108 +606,6 @@ teardown_bundle_record() {
   TEARDOWN_BUNDLE_RECORD_TIPS="${recorded[*]}"
 }
 
-# The captain's land-or-drop question for commits only a bundle holds. It names
-# the copy's unlanded tips apart from the record's advertised tips, since the
-# bundle may also advertise tips that are already landed.
-teardown_bundle_hold_reason() {  # <bundle> <unlanded-tips> <recorded-tips>
-  printf 'Land or drop the unlanded commits of %s, tips %s: they are preserved in bundle %s, whose record lists advertised tips %s; an advertised tip may already be landed.' \
-    "$ID" "$2" "$1" "$3"
-}
-
-# Prints the id of an open task held for the captain whose hold reason names
-# <bundle> and every <tip>. Returns 1 when none does, and 2 when the held rows
-# cannot be read completely.
-teardown_bundle_captain_call() {  # <bundle> <tip>...
-  local listed
-  listed=$(fm_backlog_row_list "$DATA" --state held --fields hold_kind,hold_reason 2>/dev/null) || return 2
-  printf '%s\n' "$listed" | fm_hold_reason_decode_stream toon | perl -MJSON::PP -e '
-    use strict;
-    use warnings;
-    my ($bundle, @tips) = @ARGV;
-    my $json = JSON::PP->new->allow_nonref;
-    my (@names, $count, $declared, $match);
-    my $parsed = 0;
-    while (my $line = <STDIN>) {
-      chomp $line;
-      if ($line =~ /^count: (\d+)$/) { $count = $1; next; }
-      if ($line =~ /^tasks\[(\d+)\]\{([^}]*)\}:$/) { $declared = $1; @names = split /,/, $2; next; }
-      if ($line !~ /^  (.*)$/) { @names = (); next; }
-      next unless @names;
-      my @fields = $1 =~ /("(?:[^"\\]|\\.)*"|[^,]+)/g;
-      exit 2 unless @fields == @names;
-      $parsed++;
-      my %row;
-      @row{@names} = map { /^"/ ? $json->decode($_) : $_ } @fields;
-      next if ($row{state} // "") eq "done" || ($row{hold_kind} // "") ne "captain";
-      my $reason = $row{hold_reason} // "";
-      next if index($reason, $bundle) < 0 || grep { index($reason, $_) < 0 } @tips;
-      $match //= $row{id};
-    }
-    exit 2 unless defined $count && $parsed == $count && (!defined $declared || $declared == $parsed);
-    exit 1 unless defined $match;
-    print "$match\n";
-  ' "$@"
-}
-
-# The bundle route requires the captain's land-or-drop call to be filed: this
-# task's row is held for the captain, and an open captain-held task's reason
-# names the bundle and every recorded tip. Teardown never files it. A home whose
-# backlog transition does not apply (Orca cleanup recovery or a manual backlog)
-# has no row that can hold the call, so the route refuses there, and a closed
-# row cannot be held; neither prints a command that could not pass.
-teardown_bundle_require_captain_call() {  # <bundle> <unlanded-tips> <recorded-tips>
-  local call rc=0 reason held=0 title
-  local -a repo=()
-  if [ "${TEARDOWN_BACKLOG_APPLIES:-0}" != 1 ]; then
-    teardown_bundle_refuse "$1: no backlog row can hold the captain's land-or-drop call in this home"
-    return 1
-  fi
-  [ "${TEARDOWN_BACKLOG_TRANSITION:-close}" != retain ] || held=1
-  # shellcheck disable=SC2086 # Recorded tips are full hex object names.
-  call=$(teardown_bundle_captain_call "$1" $3) || rc=$?
-  if [ "$rc" = 0 ] && [ "$held" = 1 ]; then
-    echo "teardown: the captain's land-or-drop call for bundle $1 is held on task $call" >&2
-    return 0
-  fi
-  if [ "$rc" -ge 2 ]; then
-    teardown_bundle_refuse "$1: the captain's held calls cannot be read completely"
-    return 1
-  fi
-  reason=$(teardown_bundle_hold_reason "$1" "$2" "$3")
-  title="Land or drop the bundle-preserved commits of $ID"
-  if [ "$held" = 1 ]; then
-    teardown_bundle_refuse "$1: task $ID is held for the captain on another question, and no open captain-held task's hold reason names the bundle and every recorded tip"
-    {
-      printf 'File the land-or-drop call as its own task, then retry ordinary teardown:'
-      printf ' %q' bin/fm-captain-hold.sh hold "$ID-bundle" --title "$title" \
-        --origin "$ID" --owner captain --reason "$reason"
-      printf '\n'
-    } >&2
-  elif fm_backlog_row_probe "$DATA" "$ID"; then
-    if [ "${FM_BACKLOG_ROW_STATE%% *}" = "done" ]; then
-      teardown_bundle_refuse "$1: task $ID's backlog row is closed, so it cannot hold the captain's land-or-drop call"
-      return 1
-    fi
-    teardown_bundle_refuse "$1: task $ID is not held for the captain's land-or-drop call naming the bundle and every recorded tip"
-    {
-      printf 'Hold it for the captain, then retry ordinary teardown:'
-      printf ' %q' bin/fm-captain-hold.sh hold "$ID" --owner captain --reason "$reason"
-      printf '\n'
-    } >&2
-  elif [ "$FM_BACKLOG_ROW_RESULT" = not_found ]; then
-    [ -z "${PROJ:-}" ] || repo=(--repo "${PROJ##*/}")
-    teardown_bundle_refuse "$1: task $ID has no backlog row to hold the captain's land-or-drop call naming the bundle and every recorded tip"
-    {
-      printf 'File the land-or-drop call as its row, then retry ordinary teardown:'
-      printf ' %q' bin/fm-captain-hold.sh hold "$ID" --title "$title" ${repo[@]+"${repo[@]}"} --owner captain --reason "$reason"
-      printf '\n'
-    } >&2
-  else
-    teardown_bundle_refuse "$1: task $ID's backlog row cannot be read"
-  fi
-  return 1
-}
-
 # Admission owns a durable copy, not the lifetime of the operator's source.
 # Stage beside the destination and publish only after the copied bytes survive
 # every removal root and Git verification. Later proofs reuse the stored copy at
@@ -819,7 +720,6 @@ teardown_bundle_preserved() {  # <copy> <ref> [hint]
     fi
   fi
   if [ -z "$TEARDOWN_BUNDLE_REASON" ]; then
-    teardown_bundle_require_captain_call "$source" "$(printf '%s' "$required" | paste -sd ' ' -)" "$tips" || return 1
     if teardown_bundle_store "$copy" "$bundle" "$hash"; then
       echo "teardown: preserved unlanded commits in bundle $TEARDOWN_BUNDLE_STORED sha256=$hash tips=$tips (source $source)" >&2
       TEARDOWN_BUNDLE_ACCEPTED=$TEARDOWN_BUNDLE_STORED
@@ -1237,6 +1137,13 @@ teardown_foreign_procs_retire() {
   done
 }
 
+# The one credit the driver is passed for the next teardown_run_closeout, chosen
+# by teardown_closeout_credit from teardown's own proofs: empty, "--pr <N>" or
+# "--bundle-record <file>", never both (the driver rejects the pair). Callers
+# that prove nothing (bin/fm-copy-sweep.sh) leave it empty.
+TEARDOWN_CLOSEOUT_CREDIT=()
+TEARDOWN_CLOSEOUT_CREDIT_FILE=
+
 # Runs Vernant's closeout driver on <copy>: it releases its own creation lock
 # and removes the copy. With "plan" it omits --execute-cleanup, so the driver
 # only says whether it would. TEARDOWN_CLOSEOUT_STDOUT is verdict input;
@@ -1267,7 +1174,7 @@ teardown_run_closeout() {  # <slot> <copy> [plan] [stdout-capture-file]
   TEARDOWN_CLOSEOUT_OUT=$(
     set -o pipefail
     local status=0
-    { ( cd "$slot" && "$py" "$driver" --cleanup-worktree "$copy" ${execute:+"$execute"} ) | tee "$capture"; } 2>&1 || status=$?
+    { ( cd "$slot" && "$py" "$driver" --cleanup-worktree "$copy" ${TEARDOWN_CLOSEOUT_CREDIT[@]+"${TEARDOWN_CLOSEOUT_CREDIT[@]}"} ${execute:+"$execute"} ) | tee "$capture"; } 2>&1 || status=$?
     printf '.'
     exit "$status"
   ) || rc=$?
@@ -1294,6 +1201,219 @@ teardown_closeout_refusal() {  # <foreign|own nested> <copy> <driver-exit>
   while IFS= read -r line || [ -n "$line" ]; do
     printf '  %s\n' "$(fm_refuse_text "$line")" >&2
   done < <(printf '%s' "$TEARDOWN_CLOSEOUT_OUT" | tail -n 20)
+  [ -z "${TEARDOWN_RELEASE_WHY:-}" ] || printf '  The copy was not released directly: %s.\n' "$(fm_refuse_text "$TEARDOWN_RELEASE_WHY")" >&2
+}
+
+# The merged-PR number whose merged head holds the whole HEAD of <copy>, or
+# failure. bin/fm-teardown.sh's merged-PR proof runs in a subshell, so the task's
+# own PR_URL is never overwritten by a lookup made for another copy.
+teardown_credit_pr() {  # <copy> <head>
+  local copy=$1 head=$2 branch url
+  declare -F pr_is_merged >/dev/null 2>&1 || return 1
+  branch=$(git -C "$copy" symbolic-ref --quiet --short HEAD 2>/dev/null) || branch=
+  url=$(
+    TEARDOWN_LANDED_DIR=$copy TEARDOWN_LANDED_REF=$head
+    pr_is_merged "$branch" >/dev/null 2>&1 && printf '%s' "$PR_URL"
+  ) || return 1
+  [[ "$url" =~ ^https://github[.]com/[^/]+/[^/]+/pull/([0-9]+)$ ]] || return 1
+  printf '%s' "${BASH_REMATCH[1]}"
+}
+
+# Teardown's own bundle proof for <copy>, then the driver's narrower claim rule:
+# it credits a bundle only when every commit of git rev-list HEAD --not --remotes
+# is both recorded and advertised as a head of the bundle, while teardown's proof
+# only needs every maximal tip. Sets TEARDOWN_CREDIT_RECORD to a private record
+# file in the schema the driver reads, built from teardown's proved record and its stored bundle, or
+# fails with TEARDOWN_CREDIT_WHY naming the unmet fact. TEARDOWN_CREDIT_BUNDLE
+# names the stored bundle whenever teardown's own proof holds.
+TEARDOWN_CREDIT_WHY=
+TEARDOWN_CREDIT_BUNDLE=
+TEARDOWN_CREDIT_RECORD=
+teardown_credit_bundle() {  # <copy> <head>
+  local copy=$1 head=$2 saved_accepted=${TEARDOWN_BUNDLE_ACCEPTED:-} saved_reason=${TEARDOWN_BUNDLE_REASON:-}
+  local stored hash tips unpushed advertised commit record rc=0
+  TEARDOWN_CREDIT_BUNDLE=
+  TEARDOWN_CREDIT_RECORD=
+  teardown_bundle_attended || { TEARDOWN_CREDIT_WHY='unattended teardown has no bundle route'; return 1; }
+  [ -f "$DATA/$ID/preservation-bundles.tsv" ] || { TEARDOWN_CREDIT_WHY='no preservation record'; return 1; }
+  teardown_bundle_preserved "$copy" "$head" >/dev/null 2>&1 || rc=$?
+  stored=$TEARDOWN_BUNDLE_ACCEPTED
+  hash=$TEARDOWN_BUNDLE_RECORD_HASH
+  tips=$TEARDOWN_BUNDLE_RECORD_TIPS
+  TEARDOWN_BUNDLE_ACCEPTED=$saved_accepted
+  TEARDOWN_BUNDLE_REASON=$saved_reason
+  if [ "$rc" != 0 ] || [ -z "$stored" ]; then
+    TEARDOWN_CREDIT_WHY='no verified bundle holds this copy'
+    return 1
+  fi
+  TEARDOWN_CREDIT_BUNDLE=$stored
+  unpushed=$(git -C "$copy" rev-list "$head" --not --remotes 2>/dev/null) || { TEARDOWN_CREDIT_WHY='locally-only commits cannot be listed'; return 1; }
+  advertised=$(git -C "$copy" bundle list-heads "$stored" 2>/dev/null | awk '{print $1}') || advertised=
+  while IFS= read -r commit; do
+    [ -n "$commit" ] || continue
+    case " $tips " in *" $commit "*) ;; *) TEARDOWN_CREDIT_WHY="commit $commit is not a recorded and advertised head of the bundle"; return 1 ;; esac
+    case $'\n'"$advertised"$'\n' in *$'\n'"$commit"$'\n'*) ;; *) TEARDOWN_CREDIT_WHY="commit $commit is not a recorded and advertised head of the bundle"; return 1 ;; esac
+  done <<< "$unpushed"
+  [ -n "$unpushed" ] || { TEARDOWN_CREDIT_WHY='the copy has no locally-only commit'; return 1; }
+  case "/$DATA/$ID/" in */data/*) ;; *) TEARDOWN_CREDIT_WHY='the task data directory is not under a data directory'; return 1 ;; esac
+  record=$(umask 077; mktemp "$DATA/$ID/closeout-bundle-record.XXXXXX") || { TEARDOWN_CREDIT_WHY='the bundle record cannot be written'; return 1; }
+  if ! jq -n --arg bundle "$stored" --arg sha "$hash" --arg tips "$tips" \
+      '{bundle_path: $bundle, sha256: $sha, unpushed_commit_tips: ($tips | split(" "))}' > "$record" 2>/dev/null; then
+    rm -f -- "$record"
+    TEARDOWN_CREDIT_WHY='the bundle record cannot be written'
+    return 1
+  fi
+  TEARDOWN_CREDIT_RECORD=$record
+}
+
+# Chooses the one credit for the driver from teardown's own proofs, once per
+# call, and prints it: --pr <N> when a merged pull request holds the whole copy
+# head, else --bundle-record <file> when a verified bundle does and meets the
+# driver's claim rule, else none. Never both: the driver rejects the pair.
+TEARDOWN_CLOSEOUT_PROOF=
+teardown_closeout_credit() {  # <copy>
+  local copy=$1 head pr
+  TEARDOWN_CLOSEOUT_CREDIT=()
+  TEARDOWN_CLOSEOUT_CREDIT_FILE=
+  TEARDOWN_CREDIT_WHY=
+  TEARDOWN_CREDIT_BUNDLE=
+  TEARDOWN_CLOSEOUT_PROOF='the landed-work rule'
+  head=$(git -C "$copy" rev-parse --verify 'HEAD^{commit}' 2>/dev/null) || head=
+  if [ -z "$head" ]; then
+    echo "teardown: closeout credit for $copy: none (HEAD cannot be resolved)" >&2
+  elif pr=$(teardown_credit_pr "$copy" "$head"); then
+    TEARDOWN_CLOSEOUT_CREDIT=(--pr "$pr")
+    TEARDOWN_CLOSEOUT_PROOF="merged pull request $pr"
+    echo "teardown: closeout credit for $copy: --pr $pr (the merged pull request holds HEAD ${head:0:12})" >&2
+  elif teardown_credit_bundle "$copy" "$head"; then
+    TEARDOWN_CLOSEOUT_CREDIT=(--bundle-record "$TEARDOWN_CREDIT_RECORD")
+    TEARDOWN_CLOSEOUT_CREDIT_FILE=$TEARDOWN_CREDIT_RECORD
+    TEARDOWN_CLOSEOUT_PROOF="recorded bundle $TEARDOWN_CREDIT_BUNDLE"
+    echo "teardown: closeout credit for $copy: --bundle-record $TEARDOWN_CREDIT_RECORD (bundle $TEARDOWN_CREDIT_BUNDLE holds every locally-only commit)" >&2
+  else
+    [ -z "$TEARDOWN_CREDIT_BUNDLE" ] || TEARDOWN_CLOSEOUT_PROOF="recorded bundle $TEARDOWN_CREDIT_BUNDLE"
+    echo "teardown: closeout credit for $copy: none${TEARDOWN_CREDIT_WHY:+ ($TEARDOWN_CREDIT_WHY)}" >&2
+  fi
+}
+
+teardown_closeout_credit_discard() {
+  [ -z "$TEARDOWN_CLOSEOUT_CREDIT_FILE" ] || rm -f -- "$TEARDOWN_CLOSEOUT_CREDIT_FILE"
+  TEARDOWN_CLOSEOUT_CREDIT=()
+  TEARDOWN_CLOSEOUT_CREDIT_FILE=
+}
+
+# Is the driver's refusal one that leaves a dead launcher's lock as the only
+# thing between a proved copy and its removal? Only the driver or its interpreter
+# being unavailable, or its named verdict that tracked content is uncredited
+# (verification_stale_or_uncovered_paths), qualifies; a live tenant, a lease
+# conflict, an occupied directory or any other verdict keeps the copy.
+teardown_driver_gap() {  # <driver-exit>
+  [ "$1" != 127 ] || return 0
+  printf '%s' "$TEARDOWN_CLOSEOUT_STDOUT" | jq -e -s \
+    'length >= 1 and (.[-1] | type == "object" and .allowed == false and .reason == "verification_stale_or_uncovered_paths")' >/dev/null 2>&1
+}
+
+# Is the creation-lock launcher <pid> gone? Returns 0 when it is absent from a
+# complete process table or started after the lock was written (a recycled pid),
+# 1 when it may still be running, and 2 when the process table cannot be read.
+# An unreadable table is never taken for absence.
+teardown_launcher_gone() {  # <pid> <lock-file>
+  local rc=0
+  fm_task_copy_launcher_state "$1" || rc=$?
+  case "$rc" in
+    1) return 0 ;;
+    0) ! teardown_lock_launcher_may_be_live "$1" "$2" ;;
+    *) return 2 ;;
+  esac
+}
+
+# Releases and removes a proved copy whose Vernant creation lock names a launcher
+# that is gone, when the driver could not (teardown_driver_gap). Every one of
+# teardown's own proofs is made again first and the lock is read a second time
+# immediately before the unlock: the copy keeps its HEAD, no active record names
+# it, no process outside this teardown runs in it, the launcher is not running
+# (or started after the lock was written), its landed or bundle proof holds, and
+# Git itself would remove it without force. The release is a non-forced
+# git worktree unlock followed by a non-forced git worktree remove, never a
+# forced removal; a removal that fails after the unlock puts the lock back.
+# Returns 1 with TEARDOWN_RELEASE_WHY naming the fact that kept the copy.
+TEARDOWN_RELEASE_WHY=
+teardown_dead_launcher_release() {  # <slot> <copy> <head> <foreign|own nested>
+  local slot=$1 copy=$2 head=$3 kind=$4 lock pid lock_file rc=0 now gone procs
+  TEARDOWN_RELEASE_WHY=
+  teardown_copy_lock_file "$copy" || { TEARDOWN_RELEASE_WHY='its lock state cannot be read'; return 1; }
+  lock=$TEARDOWN_FOREIGN_LOCK
+  lock_file=$TEARDOWN_FOREIGN_LOCK_FILE
+  pid=$(teardown_vernant_lock_pid "$lock") || { TEARDOWN_RELEASE_WHY="its lock is not Vernant's creation lock (${lock:-no reason given})"; return 1; }
+  gone=0
+  teardown_launcher_gone "$pid" "$lock_file" || gone=$?
+  case "$gone" in
+    0) ;;
+    1) TEARDOWN_RELEASE_WHY="its creation-lock launcher process $pid may still be running"; return 1 ;;
+    *) TEARDOWN_RELEASE_WHY="the process table cannot be read, so launcher $pid is not proved gone"; return 1 ;;
+  esac
+  now=$(git -C "$copy" rev-parse --verify 'HEAD^{commit}' 2>/dev/null) || now=
+  [ -n "$now" ] && [ "$now" = "$head" ] || { TEARDOWN_RELEASE_WHY='its HEAD changed after the landing proof'; return 1; }
+  if [ "$kind" = 'own nested' ]; then
+    FM_TASK_COPY_RELEASED_PRIOR_RETIRING=$META
+    teardown_foreign_copy_unowned "$copy" || rc=1
+    FM_TASK_COPY_RELEASED_PRIOR_RETIRING=
+  else
+    teardown_foreign_copy_unowned "$copy" || rc=1
+  fi
+  if [ "$rc" != 0 ]; then
+    TEARDOWN_RELEASE_WHY=${TEARDOWN_FOREIGN_WHY:-its ownership cannot be proved}
+    return 1
+  fi
+  # The retire phase has already ended this teardown's own processes, so any
+  # process found running in the copy now, even one of this teardown's own,
+  # appeared since: none may be there at the unlock.
+  procs=$(pids_with_cwd_under "$copy") || { TEARDOWN_RELEASE_WHY='a scan for processes running in it failed'; return 1; }
+  if [ -n "$procs" ]; then
+    TEARDOWN_RELEASE_WHY="process ${procs%%$'\t'*} is running in it or launched its creation lock since the retire phase"
+    return 1
+  fi
+  teardown_landed "$copy" HEAD "" >/dev/null 2>&1 || { TEARDOWN_RELEASE_WHY='its landed-work proof no longer holds'; return 1; }
+  if teardown_copy_git_protects "$copy"; then
+    TEARDOWN_RELEASE_WHY='it holds content Git would not remove without force'
+    return 1
+  fi
+  # The lock and the launcher are read once more, immediately before the unlock.
+  teardown_copy_lock_file "$copy" && [ "$TEARDOWN_FOREIGN_LOCK" = "$lock" ] \
+    || { TEARDOWN_RELEASE_WHY='its lock changed before the release'; return 1; }
+  gone=0
+  teardown_launcher_gone "$pid" "$TEARDOWN_FOREIGN_LOCK_FILE" || gone=$?
+  [ "$gone" = 0 ] || { TEARDOWN_RELEASE_WHY="its creation-lock launcher process $pid appeared, or could not be read, before the release"; return 1; }
+  git -C "$slot" worktree unlock "$copy" >/dev/null 2>&1 || { TEARDOWN_RELEASE_WHY='git worktree unlock failed'; return 1; }
+  if ! git -C "$slot" worktree remove "$copy" >/dev/null 2>&1; then
+    git -C "$slot" worktree lock --reason "$lock" "$copy" >/dev/null 2>&1 || true
+    TEARDOWN_RELEASE_WHY='git worktree remove (without force) failed; its lock was restored'
+    return 1
+  fi
+  echo "teardown: released creation lock '$lock' on $kind copy $copy (launcher $pid is gone; proof: $TEARDOWN_CLOSEOUT_PROOF) and removed it without force" >&2
+  { umask 077; mkdir -p "$DATA/$ID" && printf '%s\t%s\t%s\t%s\n' "$(date +%s)" "$copy" "$lock" "$TEARDOWN_CLOSEOUT_PROOF" >> "$DATA/$ID/creation-lock-releases.tsv"; } 2>/dev/null || true
+}
+
+# The credit, the driver, and, only for the residue the driver cannot release, the
+# direct release of a dead launcher's lock. Returns the driver's exit code when
+# nothing released the copy; TEARDOWN_RELEASE_WHY then names why the direct
+# release did not apply.
+teardown_closeout_release() {  # <slot> <copy> <foreign|own nested>
+  local slot=$1 copy=$2 kind=$3 rc=0 head
+  TEARDOWN_RELEASE_WHY=
+  head=$(git -C "$copy" rev-parse --verify 'HEAD^{commit}' 2>/dev/null) || head=
+  teardown_closeout_credit "$copy"
+  teardown_run_closeout "$slot" "$copy" || rc=$?
+  teardown_closeout_credit_discard
+  [ "$rc" != 0 ] || return 0
+  if teardown_driver_gap "$rc"; then
+    if teardown_dead_launcher_release "$slot" "$copy" "$head" "$kind"; then
+      return 0
+    fi
+  else
+    TEARDOWN_RELEASE_WHY="the driver's verdict is not one a direct release may take over"
+  fi
+  return "$rc"
 }
 
 # Is <copy> still on disk or registered in <slot>? Failure to list counts as yes.
@@ -1343,7 +1463,7 @@ teardown_foreign_copy_dispose() {  # <slot> <copy>
         return 1
       fi
       rc=0
-      teardown_run_closeout "$slot" "$copy" || rc=$?
+      teardown_closeout_release "$slot" "$copy" foreign || rc=$?
       if [ "$rc" != 0 ]; then
         teardown_closeout_refusal foreign "$copy" "$rc"
         return 1
@@ -1449,7 +1569,7 @@ teardown_own_copy_dispose() {  # <slot> <copy>
     return 1
   }
   rc=0
-  teardown_run_closeout "$slot" "$copy" || rc=$?
+  teardown_closeout_release "$slot" "$copy" 'own nested' || rc=$?
   if [ "$rc" != 0 ]; then
     teardown_closeout_refusal 'own nested' "$copy" "$rc"
     return 1
