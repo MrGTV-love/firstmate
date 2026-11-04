@@ -130,11 +130,6 @@ ZZ-SUB-L4-ZZ text under a level 4 heading.
 
 ZZ-SUB-BOLD-ZZ text under a bold-only line.
 
-Contract Review
----
-
-ZZ-SUB-SETEXT-ZZ text under a setext heading.
-
 ### Author self-check
 
 ZZ-ALLGREEN-ZZ a recognised author section.
@@ -142,7 +137,7 @@ EOF
   build_pack pack --contract "$src" || fail "builder refused a contract with unrecognised sub-headings: $(cat "$TMP_ROOT/build.err")"
   target="$pack/target.md"
   manifest="$(dirname "$pack").excluded-paths"
-  for m in ZZ-PREAMBLE-ZZ ZZ-SUB-L3-ZZ ZZ-SUB-L4-ZZ ZZ-SUB-BOLD-ZZ ZZ-SUB-SETEXT-ZZ; do
+  for m in ZZ-PREAMBLE-ZZ ZZ-SUB-L3-ZZ ZZ-SUB-L4-ZZ ZZ-SUB-BOLD-ZZ; do
     assert_grep "$m" "$target" "text under an unrecognised heading or preamble line was dropped: $m"
   done
   assert_no_grep "ZZ-ALLGREEN-ZZ" "$target" "a recognised author sub-section reached the pack"
@@ -150,12 +145,67 @@ EOF
   for m in "### Earlier findings and how I answered them (under: Definition Of Done)" \
     "#### Author's all-green candidate (under: Definition Of Done)" \
     "**Contract Review** (under: Definition Of Done)" \
-    "Contract Review (setext heading, under: Definition Of Done)" \
     "preamble line: ZZ-PREAMBLE-ZZ a neutral preamble line."; do
     grep -qxF "$(printf 'unrecognised\t%s' "$m")" "$manifest" || fail "the manifest does not list as unrecognised: $m"
   done
   assert_not_contains "$(cat "$manifest")" "$(printf 'unrecognised\t- **A1**')" "a criterion line was listed as a heading"
   pass "an unrecognised sub-heading or preamble line stays in the pack and the manifest lists it"
+}
+
+test_setext_headings_are_sections() {
+  local src="$TMP_ROOT/st.md" pack manifest rc=0
+  cat >"$src" <<'EOF'
+# Fixture contract
+
+## Definition Of Done
+
+- **A1** (mandatory): ZZ-KEEP-DOD-ZZ the thing exists.
+
+## Contract Review
+
+ZZ-HISTORY-ZZ an earlier round.
+
+How You're Graded
+-----------------
+
+ZZ-SETEXT-KEEP-ZZ graded text.
+
+Revision log
+============
+
+ZZ-SETEXT-DROP-ZZ an author log.
+EOF
+  build_pack pack --contract "$src" || fail "a contract with setext sections was refused: $(cat "$TMP_ROOT/build.err")"
+  manifest="$(dirname "$pack").excluded-paths"
+  assert_grep "ZZ-SETEXT-KEEP-ZZ" "$pack/target.md" "a recognised setext section after a dropped section was dropped"
+  assert_grep "How You're Graded" "$pack/target.md" "the setext heading of a kept section is missing"
+  assert_no_grep "ZZ-HISTORY-ZZ" "$pack/target.md" "the dropped section before the setext heading reached the pack"
+  assert_no_grep "ZZ-SETEXT-DROP-ZZ" "$pack/target.md" "an author setext section reached the pack"
+  grep -qxF "$(printf 'dropped\tRevision log')" "$manifest" || fail "the dropped setext section is not listed in the manifest"
+  printf '\nOther Title\n===\n\nZZ-SETEXT-H1-ZZ text.\n' >>"$src"
+  "$PACK_BIN" --contract "$src" --out-root "$TMP_ROOT/st-out" >/dev/null 2>"$TMP_ROOT/st.err" || rc=$?
+  assert_equals 3 "$rc" "an unrecognised setext section must exit 3"
+  assert_contains "$(cat "$TMP_ROOT/st.err")" "unrecognised section: Other Title" "the unrecognised setext heading is not named"
+  assert_absent "$TMP_ROOT/st-out" "a refused setext build left an output directory"
+  pass "a setext heading is a section, classified like a level 1 or 2 heading"
+}
+
+test_code_fences_close_on_their_own_marker() {
+  local src="$TMP_ROOT/fc.md" pack rc=0
+  write_fixture_contract "$src"
+  awk '{ print } /^- \*\*A1\*\*/ { print ""; print "~~~text"; print "ZZ-KEEP-FENCE-ZZ"; print "```"; print "## Contract Review inside a fence"; print "~~~" }' "$src" >"$src.tmp" && mv "$src.tmp" "$src"
+  build_pack pack --contract "$src" || fail "a contract with a closed fence was refused: $(cat "$TMP_ROOT/build.err")"
+  assert_grep "ZZ-KEEP-FENCE-ZZ" "$pack/target.md" "text inside a closed fence was dropped"
+  assert_grep "## Contract Review inside a fence" "$pack/target.md" "a heading-shaped line inside a fence was treated as a heading"
+  assert_no_grep "ZZ-ALLGREEN-ZZ" "$pack/target.md" "an author section after a closed fence reached the pack"
+  write_fixture_contract "$src"
+  awk '{ print } /^- \*\*A1\*\*/ { print ""; print "```text"; print "never closed" }' "$src" >"$src.tmp" && mv "$src.tmp" "$src"
+  "$PACK_BIN" --contract "$src" --out-root "$TMP_ROOT/fc-out" >"$TMP_ROOT/fc.out" 2>"$TMP_ROOT/fc.err" || rc=$?
+  assert_equals 3 "$rc" "a contract with an unclosed fence must exit 3"
+  assert_contains "$(cat "$TMP_ROOT/fc.err")" "never closes" "the unclosed fence is not named"
+  assert_absent "$TMP_ROOT/fc-out" "an unclosed fence left an output directory"
+  [ ! -s "$TMP_ROOT/fc.out" ] || fail "an unclosed fence printed a pack path"
+  pass "a fence closes only on its own marker, and an unclosed fence stops the build"
 }
 
 test_single_source_policy_block() {
@@ -231,7 +281,21 @@ test_context_file_with_author_section_refused() {
   build_pack pack --contract "$src" --context "$ctx" --request "$ctx" || fail "build with a clean context failed"
   assert_present "$pack/context-ctx.md" "context file missing from the pack"
   assert_present "$pack/request.md" "request file missing from the pack"
-  pass "a context file with an author section is refused and a clean one is copied"
+  local bad="$TMP_ROOT/bad-input.md" n=0 body
+  for body in '# Request\n\nThe owner wants a thing.\n\n## Author'"'"'s all-green candidate\n\nZZ-ALLGREEN-ZZ\n' \
+    'Author'"'"'s all-green self-check: everything passes.\n\nThe owner wants a thing.\n' \
+    '# Owner context\n\n## Notes\n\n### Prior findings\n\nZZ-PRIOR-FINDING-ZZ\n'; do
+    n=$((n + 1))
+    printf '%b' "$body" >"$bad"
+    for flag in --request --context; do
+      rc=0
+      "$PACK_BIN" --contract "$src" "$flag" "$bad" --out-root "$TMP_ROOT/c-bad$n$flag" >/dev/null 2>"$TMP_ROOT/c.err" || rc=$?
+      assert_equals 2 "$rc" "$flag file $n with author text was accepted"
+      assert_contains "$(cat "$TMP_ROOT/c.err")" "author text" "$flag file $n refusal does not name the cause"
+      assert_absent "$TMP_ROOT/c-bad$n$flag" "a refused $flag file left an output directory"
+    done
+  done
+  pass "a request or context file with author text is refused and a clean one is copied"
 }
 
 # --- the input-leak check ---------------------------------------------------
@@ -418,6 +482,64 @@ test_leak_check_reads_prose_before_the_list_and_refuses_linked_files() {
   pass "the leak check reads a list that follows a prose line and authorizes no skill file but SKILL.md"
 }
 
+test_leak_check_reads_the_whole_list() {
+  local rep="$TMP_ROOT/report6.md"
+  make_leak_world
+  # Group labels, a prose bullet and sub-headings inside the list are skipped, not the end of it.
+  {
+    printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\nPack:\n'
+    printf -- '- %s\n' "$LEAK_PACK/contract.md"
+    printf -- '- the assess skill, read in full\n'
+    printf '\n### References\n\n'
+    printf -- '- %s\n' "$LEAK_SKILLS/assess-done-and-grade/SKILL.md"
+    printf '\nOther:\n'
+    printf -- '- %s\n' "$LEAK_ROOT/bin/fm-spawn.sh"
+    printf '\n## Findings\n\n- %s is fine.\n\nEXIT: needs-revision\n' "$TMP_ROOT/sibling/pack/review.md"
+  } >"$rep"
+  run_check "$rep"
+  assert_equals 0 "$CHECK_RC" "a grouped clean list was flagged: $CHECK_OUT"
+  assert_contains "$CHECK_OUT" "3 listed input(s)" "the grouped list was not read to its end"
+  # The same shapes with a leak after a group label or a prose bullet.
+  {
+    printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\nPack:\n'
+    printf -- '- %s\n' "$LEAK_PACK/contract.md"
+    printf -- '- the assess skill\n'
+    printf 'Other:\n'
+    printf -- '- %s\n' "$TMP_ROOT/sibling/pack/review.md"
+  } >"$rep"
+  run_check "$rep"
+  assert_equals 3 "$CHECK_RC" "a leak after a group label was allowed"
+  assert_contains "$CHECK_OUT" "INPUT LEAK: $TMP_ROOT/sibling/pack/review.md" "the leak after a group label is not named"
+  # The inline form is followed by the lines under it.
+  {
+    printf 'VERDICT: FAIL head=abc\n\nInputs read: %s, %s\n' "$LEAK_PACK/contract.md" "$LEAK_PACK/target.md"
+    printf -- '- %s\n' "$TMP_ROOT/sibling/pack/review.md"
+  } >"$rep"
+  run_check "$rep"
+  assert_equals 3 "$CHECK_RC" "a leak listed after the inline form was allowed"
+  pass "the leak check reads the whole Inputs read list to the next heading"
+}
+
+test_leak_check_pins_the_rubric_revision() {
+  local rep="$TMP_ROOT/report7.md" rev pack
+  make_leak_world
+  rev=$(git -C "$LEAK_ROOT" log -1 --format=%H -- docs/review-rubric.md)
+  build_pack pack --contract "$LEAK_ROOT/sources/raw-contract.md" || fail "build without a root failed"
+  rubric_check() { # <entry>
+    write_report "$rep" "$pack/contract.md" "$1"
+    CHECK_RC=0
+    CHECK_OUT=$(REVIEW_FM_ROOT="$LEAK_ROOT" REVIEW_SKILLS_DIR="$LEAK_SKILLS" REVIEW_RUBRIC="$LEAK_ROOT/docs/review-rubric.md" \
+      "$PACK_BIN" check --pack "$pack" --report "$rep" 2>&1) || CHECK_RC=$?
+  }
+  rubric_check "$rev:docs/review-rubric.md"
+  assert_equals 0 "$CHECK_RC" "the pinned rubric revision was flagged: $CHECK_OUT"
+  rubric_check "no-such-rev:docs/review-rubric.md"
+  assert_equals 3 "$CHECK_RC" "an unknown revision of the rubric was allowed"
+  rubric_check "HEAD:docs/review-rubric.md"
+  assert_equals 3 "$CHECK_RC" "a revision name other than the pinned one was allowed"
+  pass "a revision path to the rubric is allowed only at the pinned revision"
+}
+
 test_pack_names_only_the_request_it_holds() {
   local src="$TMP_ROOT/rq.md" ctx="$TMP_ROOT/rq-request.md" with without none
   write_fixture_contract "$src"
@@ -499,6 +621,8 @@ fm_test_run_cases \
   test_markers_kept_and_dropped \
   test_unrecognised_section_refused \
   test_unrecognised_subheadings_stay_and_are_listed \
+  test_setext_headings_are_sections \
+  test_code_fences_close_on_their_own_marker \
   test_single_source_policy_block \
   test_pack_layout_and_fresh_parent \
   test_fails_safe_on_bad_input \
@@ -507,6 +631,8 @@ fm_test_run_cases \
   test_leak_check_revision_paths_and_excluded_directories \
   test_leak_check_reads_common_report_shapes \
   test_leak_check_reads_prose_before_the_list_and_refuses_linked_files \
+  test_leak_check_reads_the_whole_list \
+  test_leak_check_pins_the_rubric_revision \
   test_pack_names_only_the_request_it_holds \
   test_export_root_mode_is_gone \
   test_leak_check_pinned_rubric_url_and_own_report \

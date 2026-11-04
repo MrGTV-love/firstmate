@@ -28,6 +28,7 @@ Its header owns the arguments, the section rules and the exit codes.
 It copies the reviewer block below byte for byte into the pack's `contract.md`, so a rule changes in this file and nowhere else.
 It builds the pack in a directory it creates fresh, drops the author's sections, refuses a top-level section it does not recognise, and writes a manifest of excluded paths outside the pack.
 It never drops contract text without listing it: a sub-heading or preamble line it does not recognise stays in the pack where it is, and the manifest lists it as unrecognised.
+It refuses a contract whose code fence never closes, and a request or context file that holds author text.
 Read those lines before the run, and move any author text they show out of the contract.
 Keep the register and every earlier report, review history and `truth` file outside the pack, and pass them to the builder with `--exclude` so the leak check refuses them.
 
@@ -77,7 +78,7 @@ They do not replace that step, and a finding it yields is reported in the same f
   Such a record is context, never verification.
   A criterion that accepts one as its verification is a finding.
 
-Exit: `EXIT: pass` when no R1-R4 finding stands.
+Exit: `EXIT: pass` when every criterion was judged and no R1-R4 finding stands.
 `EXIT: needs-revision` when a fixable finding stands.
 `EXIT: conflicting` when repairing a finding would break another binding requirement; cite both.
 You see one round, so you never report `stalled`.
@@ -197,6 +198,7 @@ Decide one exit for each round, in this order.
 No round number, finding count, word count or timer decides any exit.
 
 1. Reconcile the report: apply the finding test to every note, and set aside a finding the register shows closed by a recorded withdrawal or owner resolution.
+   Record each criterion the review left unjudged and each needed check it did not perform; any one of them makes the review incomplete.
 2. Classify each remaining finding as new, a recurrence (equivalent requirement and failing result to a recorded one), or repair-induced (caused by the immediately preceding repair).
 3. Close each earlier finding that the fresh clean review no longer finds.
 4. The round has progress when at least one earlier finding closed by independent verification, or at least one finding is newly substantiated, not equivalent to a recorded one, and not repair-induced.
@@ -204,8 +206,8 @@ No round number, finding count, word count or timer decides any exit.
 5. Take the first test that holds:
    - `conflicting`: two binding requirements, each from the request, a ruling, the brief or a governing constraint, call for incompatible results, repairing a finding would break one of them, and nothing in the record as it stood at the end of the round says which governs.
      A settlement made after the round does not change that round's exit.
-   - `pass`: no substantiated finding remains, and the register supports closure of the earlier ones.
-   - `needs-revision`: substantiated findings remain, and the round has progress.
+   - `pass`: the review is complete, no substantiated finding remains, and the register supports closure of the earlier ones.
+   - `needs-revision`: substantiated findings remain and the round has progress, or no substantiated finding remains and the review is incomplete.
    - `stalled`: substantiated findings remain, and the round has no progress.
 
 A round with progress is never `stalled`, whatever else it found.
@@ -220,6 +222,7 @@ This skill sets no budget or limit of its own.
 
 - `pass`: approve and hand off.
 - `needs-revision`: disposition each finding, repair each material one the smallest way that works, try each repair on a compliant and a noncompliant case, and run a fresh clean review on a fresh pack.
+  When the review was incomplete, supply the named input and run a fresh review.
 - `stalled`: change the approach and make no further patch of the same kind.
   Report to Main in one message the competing readings and the texts in dispute, and ask one ruling for each dispute.
 - `conflicting`: stop.
