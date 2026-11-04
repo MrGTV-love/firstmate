@@ -3152,7 +3152,7 @@ test_auto_review_incomplete_review_pack_is_held_and_never_dispatched() {
     esac
     auto_step "$case_dir"; auto_step "$case_dir"
     expect_code 0 "$(auto_calls "$case_dir")" "pack-$scenario: no reader may be dispatched on an incomplete contract"
-    n=$(ls -d "$case_dir"/state/.pr-auto-review/task-x1.d/*.run 2>/dev/null | wc -l | tr -d ' ')
+    n=$(find "$case_dir/state/.pr-auto-review/task-x1.d" -maxdepth 1 -type d -name '*.run' 2>/dev/null | wc -l | tr -d ' ')
     expect_code 0 "$n" "pack-$scenario: no request may be written"
     expect_code 0 "$(auto_merges "$case_dir")" "pack-$scenario: nothing may merge"
     case $(auto_state "$case_dir") in "held: review pack not built: "*) ;;
@@ -3180,7 +3180,7 @@ test_auto_review_reads_the_definition_of_done_as_fm_dod_lib_does() {
       inline) ;;
       fenced-pointer)
         # An example pointer in a code fence names nothing, even when its target does not exist.
-        auto_write_brief "$case_dir" "$(printf 'G1 fixture item.\n\n```text\nDoD file: %s\n```' "$case_dir/home/data/missing-dod.md")" ;;
+        auto_write_brief "$case_dir" "$(printf 'G1 fixture item.\n\n%stext\nDoD file: %s\n%s' "\`\`\`" "$case_dir/home/data/missing-dod.md" "\`\`\`")" ;;
       pointer)
         printf 'Pointed criteria fixture.\n' > "$case_dir/home/data/dod/task-x1.md"
         auto_write_brief "$case_dir" "DoD file: $case_dir/home/data/dod/task-x1.md" ;;
