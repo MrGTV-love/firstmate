@@ -219,7 +219,7 @@ SH
 test_reassigned_slot_train_member_retires_only_on_a_verified_train() {
   local row case_dir slot rc fact kind other=dddddddddddddddddddddddddddddddddddddddd
   for row in verified wrong-sha open-train search-fails search-then-view-fail no-listing prefix-sha missing-sha wrong-base; do
-    train_case "reassigned-train-$row" none head
+    train_case "reassigned-train-$row" squash head
     case_dir=$TRAIN_CASE
     case "$row" in
       verified) fact=$TRAIN_URL; kind= ;;

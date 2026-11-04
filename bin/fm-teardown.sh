@@ -2807,6 +2807,32 @@ teardown_train_carries() {  # <ref> <train head>
   fi
 }
 
+# Does the train's landing commit hold <ref>'s net change? The forge names the
+# commit that landed a MERGED train. It must be a 40-hex id on the default branch's
+# first-parent line, and its tree must hold the change as teardown_train_content_present
+# defines it. A landing id the forge did not give, or an object this clone lacks, is 2
+# (unknown, retry: the forge or the fetched default branch is behind); any other failure is 1 with the fact in TEARDOWN_TRAIN_CARRY_WHY.
+# Later default-branch commits do not count against it: only this commit's tree is read.
+teardown_train_landing_holds() {  # <ref> <landing commit>
+  local dir=${TEARDOWN_LANDED_DIR:-$WT} ref=$1 landing=$2 default_ref base
+  TEARDOWN_TRAIN_CARRY_WHY=
+  fm_pr_head_valid "$landing" || return 2
+  default_ref=$(landed_default_ref) || return 2
+  git -C "$dir" cat-file -e "$landing^{commit}" 2>/dev/null || return 2
+  if ! git -C "$dir" rev-list --first-parent "$default_ref" -- 2>/dev/null | grep -qxF -- "$landing"; then
+    TEARDOWN_TRAIN_CARRY_WHY="is not on the first-parent line of the default branch"
+    return 1
+  fi
+  base=$(teardown_train_member_base "$ref") || {
+    TEARDOWN_TRAIN_CARRY_WHY="leaves no change to measure (no base separates it from the default branch)"
+    return 1
+  }
+  teardown_train_content_present "$ref" "$landing" "$base" || {
+    TEARDOWN_TRAIN_CARRY_WHY="does not hold the member's net change in its tree"
+    return 1
+  }
+}
+
 teardown_train_landed() {  # work <member pr url or number> | record <member pr url>
   local mode=$1 target=$2 view state remainder mhead murl base found list candidates
   local n u s b h shas why='' current
@@ -2840,7 +2866,7 @@ teardown_train_landed() {  # work <member pr url or number> | record <member pr 
     return 1
   }
   list=$(cd "$dir" && gh pr list --repo "$repo" --state all --search "\"$murl\" in:body" \
-    --json number,url,state,baseRefName,headRefOid,body --limit 30 2>/dev/null) || {
+    --json number,url,state,baseRefName,headRefOid,mergeCommit,body --limit 30 2>/dev/null) || {
     TEARDOWN_TRAIN_UNASKED="the forge search for PRs listing $murl failed"
     return 1
   }
@@ -2859,7 +2885,8 @@ pattern = re.compile(r"(?<![A-Za-z0-9/._-])" + re.escape(url) + r"[ \t]+at[ \t]+
 for pr in prs:
     try:
         shas = sorted(set(pattern.findall(pr.get("body") or "")))
-        fields = [str(pr["number"]), pr["url"], pr["state"], pr["baseRefName"], pr["headRefOid"], ",".join(shas)]
+        landing = (pr.get("mergeCommit") or {}).get("oid") or "none"
+        fields = [str(pr["number"]), pr["url"], pr["state"], pr["baseRefName"], pr["headRefOid"], ",".join(shas), str(landing)]
     except (AttributeError, KeyError, TypeError):
         print("unreadable")
         sys.exit(0)
@@ -2871,7 +2898,7 @@ for pr in prs:
     return 1
   fi
   found=0
-  while IFS=$'\t' read -r n u s b h shas; do
+  while IFS=$'\t' read -r n u s b h shas landing; do
     [ -n "$n" ] || continue
     found=1
     if [ "$s" != MERGED ]; then
@@ -2915,6 +2942,26 @@ for pr in prs:
         why="${why}train PR $u is a verified train for $murl, but this copy's work is not proven present in its head ${h:0:12} ($TEARDOWN_TRAIN_CARRY_WHY)"$'\n'
         continue
       fi
+    fi
+    # The train's landing commit, as the forge names it, must hold the same change:
+    # a train can be recorded merged by a merge that left its content out.
+    teardown_train_landing_holds "$mhead" "$landing"
+    case $? in
+      0) ;;
+      2)
+        TEARDOWN_TRAIN_UNASKED="the landing commit ${landing:0:12} of train PR $u is not readable here (fetch the default branch and retry)"
+        return 1
+        ;;
+      *)
+        why="${why}train PR $u lists $murl, but its landing commit ${landing:0:12} $TEARDOWN_TRAIN_CARRY_WHY"$'\n'
+        continue
+        ;;
+    esac
+    if [ "$mode" = work ]; then
+      teardown_train_landing_holds "$current" "$landing" || {
+        why="${why}train PR $u is a verified train for $murl, but its landing commit ${landing:0:12} does not hold this copy's work ($TEARDOWN_TRAIN_CARRY_WHY)"$'\n'
+        continue
+      }
     fi
     if [ "$TEARDOWN_TRAIN_ANNOUNCED" = 0 ]; then
       TEARDOWN_TRAIN_ANNOUNCED=1

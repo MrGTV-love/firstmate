@@ -3952,7 +3952,7 @@ test_train_merge_commit_landed_still_refuses_uncarried_work() {
 # train, is not delivered content.
 test_train_ours_merged_commit_is_never_taken_as_delivered() {
   local landing
-  for landing in none squash; do
+  for landing in squash; do
     TRAIN_HIDDEN_OURS=1 train_case "train-ours-hidden-$landing" "$landing" head "" ours-flat
     git -C "$TRAIN_CASE/wt" merge-base --is-ancestor "$TRAIN_MEMBER_HEAD" "$TRAIN_HEAD" \
       || fail "train-ours-hidden-$landing: the member head is not an ancestor of the train"
@@ -3973,7 +3973,7 @@ test_train_ours_merged_commit_is_never_taken_as_delivered() {
 
 test_train_ours_merged_commit_is_refused_in_the_record_only_route() {
   local landing
-  for landing in none squash; do
+  for landing in squash merge; do
     TRAIN_HIDDEN_OURS=1 train_absent_case "train-ours-hidden-record-$landing" ours-flat "$landing"
     assert_train_refused "$TRAIN_CASE" "train-ours-hidden-record-$landing" "net change is not present in the train head's final tree"
     assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "train-ours-hidden-record-$landing: the train was accepted"
@@ -4000,8 +4000,60 @@ test_train_ours_merged_commit_is_carried_when_the_train_replays_it() {
   pass "a train that replays the ours-merged commit as well carries the member, in the copy and record-only routes"
 }
 
+# The forge names the commit that landed a MERGED train. That commit must be on the
+# default branch's first-parent line and must hold the member's net change: a train
+# can be recorded merged by a merge that took none of its content in.
+test_train_landing_commit_without_the_change_is_refused() {
+  local shape rc
+  # Copy route, flat train only: a train merged by an `ours` merge makes its head, and
+  # a member head inside it, reachable from the default branch, and the existing
+  # default-reachability proof (not the train route) then decides that copy.
+  for shape in flat; do
+    train_case "train-landing-ours-$shape" ours head "" "$shape"
+    git -C "$TRAIN_CASE/wt" cat-file -e "$TRAIN_LANDING_COMMIT:feature2.txt" 2>/dev/null \
+      && fail "train-landing-ours-$shape: the landing commit holds the member's file"
+    git -C "$TRAIN_CASE/wt" cat-file -e "$TRAIN_HEAD:feature2.txt" 2>/dev/null \
+      || fail "train-landing-ours-$shape: the train head lacks the member's file"
+    run_teardown "$TRAIN_CASE" > "$TRAIN_CASE/stdout" 2> "$TRAIN_CASE/stderr" && rc=0 || rc=$?
+    expect_code 1 "$rc" "train-landing-ours-$shape: teardown must refuse"$'\n'"$(cat "$TRAIN_CASE/stderr")"
+    assert_grep "landing commit" "$TRAIN_CASE/stderr" "train-landing-ours-$shape: refusal did not name the landing commit"
+    assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "train-landing-ours-$shape: the train was accepted"
+    assert_absent "$TRAIN_CASE/treehouse.log" "train-landing-ours-$shape: refused teardown returned the slot"
+    assert_present "$TRAIN_CASE/state/task-x1.meta" "train-landing-ours-$shape: refusal removed the task record"
+  done
+  for shape in flat merge; do
+    train_absent_case "train-landing-ours-record-$shape" "$shape" ours
+    assert_train_refused "$TRAIN_CASE" "train-landing-ours-record-$shape" "landing commit"
+    assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "train-landing-ours-record-$shape: the train was accepted"
+    [ "$(backlog_row_state "$TRAIN_CASE")" = in_flight ] || fail "train-landing-ours-record-$shape: refusal closed the backlog"
+  done
+  pass "a merged train whose landing commit holds none of the member's change is refused in the copy and record-only routes"
+}
+
+test_train_landing_commit_off_the_default_line_is_refused() {
+  train_absent_case train-landing-offline flat squash
+  TRAIN_LANDING_COMMIT=$TRAIN_HEAD train_default_list "$TRAIN_CASE"
+  assert_train_refused "$TRAIN_CASE" "train-landing-offline" "is not on the first-parent line of the default branch"
+  assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "train-landing-offline: the train was accepted"
+  pass "a landing commit that is not on the default branch's first-parent line is refused"
+}
+
+test_train_landing_commit_unreadable_is_unknown_not_unlanded() {
+  local row id
+  for row in missing absent-object; do
+    train_absent_case "train-landing-$row" flat squash
+    case "$row" in
+      missing) id= ;;
+      absent-object) id=dddddddddddddddddddddddddddddddddddddddd ;;
+    esac
+    TRAIN_LANDING_COMMIT=$id train_default_list "$TRAIN_CASE"
+    assert_train_refused "$TRAIN_CASE" "train-landing-$row" "landing commit" unknown
+  done
+  pass "a landing commit the forge did not give, or this clone lacks, is unknown (retry), never unlanded"
+}
+
 test_train_member_closed_landed_by_merged_train_allows() {
-  train_case train-merge-landed none head
+  train_case train-merge-landed squash head
   seed_backlog_in_flight "$TRAIN_CASE"
   : > "$TRAIN_CASE/config/fleet-ledger"
   assert_train_allowed "$TRAIN_CASE" "train-merge-landed"
@@ -4011,7 +4063,7 @@ test_train_member_closed_landed_by_merged_train_allows() {
 }
 
 test_train_member_prerebase_copy_allows() {
-  train_case train-prerebase none prerebase
+  train_case train-prerebase squash prerebase
   [ "$TRAIN_COPY_HEAD" != "$TRAIN_MEMBER_HEAD" ] || fail "train-prerebase: the copy is not a pre-rebase head"
   assert_train_allowed "$TRAIN_CASE" "train-prerebase"
   pass "a pre-rebase copy whose patches the train head carries is accepted by the patch proof"
@@ -4026,7 +4078,7 @@ test_train_member_squash_landed_allows() {
 }
 
 test_train_member_copy_inside_train_allows() {
-  train_case train-inside none inside
+  train_case train-inside squash inside
   [ "$TRAIN_COPY_HEAD" != "$TRAIN_MEMBER_HEAD" ] || fail "train-inside: the copy is at the listed head"
   git -C "$TRAIN_CASE/wt" merge-base --is-ancestor "$TRAIN_MEMBER_HEAD" "$TRAIN_COPY_HEAD" \
     || fail "train-inside: the copy is not later than the listed head"
@@ -4037,7 +4089,7 @@ test_train_member_copy_inside_train_allows() {
 test_train_refuses_when_no_merged_pr_lists_the_member() {
   local row body
   for row in empty other-member prefix-of-another-number no-sha; do
-    train_case "train-nolist-$row" none head
+    train_case "train-nolist-$row" squash head
     case "$row" in
       empty) printf '[]\n' > "$TRAIN_CASE/gh-fixture/list.json" ;;
       other-member)
@@ -4058,17 +4110,17 @@ test_train_refuses_when_no_merged_pr_lists_the_member() {
 
 test_train_refuses_a_listing_that_is_not_the_members_head() {
   local other=dddddddddddddddddddddddddddddddddddddddd
-  train_case train-wrong-sha none head
+  train_case train-wrong-sha squash head
   train_list "$TRAIN_CASE" 9 MERGED main "$TRAIN_HEAD" "$(train_body "$TRAIN_MEMBER_URL" "$other")"
   assert_train_refused "$TRAIN_CASE" "train-wrong-sha" "not the member PR's recorded head"
 
   # The member moved on after the train was built: the listed sha is no longer its head.
-  train_case train-moved-member none head
+  train_case train-moved-member squash head
   printf '%s\n' "$other" > "$TRAIN_CASE/gh-fixture/member-head"
   assert_train_refused "$TRAIN_CASE" "train-moved-member" "not the member PR's recorded head"
 
   # The listed sha is the member's head, but the train head does not contain it.
-  train_case train-not-contained none head
+  train_case train-not-contained squash head
   git -C "$TRAIN_CASE/wt" -c user.email=t@t -c user.name=t commit -q --allow-empty -m "member moved on"
   printf '%s\n' "$(git -C "$TRAIN_CASE/wt" rev-parse HEAD)" > "$TRAIN_CASE/gh-fixture/member-head"
   train_list "$TRAIN_CASE" 9 MERGED main "$TRAIN_HEAD" \
@@ -4078,7 +4130,7 @@ test_train_refuses_a_listing_that_is_not_the_members_head() {
 }
 
 test_train_refuses_copy_work_the_train_does_not_carry() {
-  train_case train-extra none extra
+  train_case train-extra squash extra
   assert_train_refused "$TRAIN_CASE" "train-extra" "whose change is not proven present in the merged PR head"
   assert_grep "unmerged follow-up" "$TRAIN_CASE/stderr" "train-extra: refusal did not name the unmerged commit"
   assert_grep "copy's work is not proven present" "$TRAIN_CASE/stderr" "train-extra: refusal did not name the train fact"
@@ -4086,7 +4138,7 @@ test_train_refuses_copy_work_the_train_does_not_carry() {
 }
 
 test_train_dirty_copy_refuses_before_the_train_is_read() {
-  train_case train-dirty none head
+  train_case train-dirty squash head
   printf '%s\n' scratch > "$TRAIN_CASE/wt/scratch.txt"
   assert_train_refused "$TRAIN_CASE" "train-dirty" "has uncommitted changes"
   assert_absent "$TRAIN_CASE/gh-fixture/calls.log" "train-dirty: the forge was read for a dirty copy"
@@ -4096,7 +4148,7 @@ test_train_dirty_copy_refuses_before_the_train_is_read() {
 test_train_refuses_a_train_that_is_not_merged() {
   local state
   for state in OPEN CLOSED; do
-    train_case "train-$state" none head
+    train_case "train-$state" squash head
     train_list "$TRAIN_CASE" 9 "$state" main "$TRAIN_HEAD" "$(train_body "$TRAIN_MEMBER_URL" "$TRAIN_MEMBER_HEAD")"
     assert_train_refused "$TRAIN_CASE" "train-$state" "is $state, not merged"
   done
@@ -4104,14 +4156,14 @@ test_train_refuses_a_train_that_is_not_merged() {
 }
 
 test_train_refuses_a_train_merged_into_another_branch() {
-  train_case train-other-base none head
+  train_case train-other-base squash head
   train_list "$TRAIN_CASE" 9 MERGED develop "$TRAIN_HEAD" "$(train_body "$TRAIN_MEMBER_URL" "$TRAIN_MEMBER_HEAD")"
   assert_train_refused "$TRAIN_CASE" "train-other-base" "merged into develop, not this task's base main"
 
   # A task that records its own base_branch is judged against that branch.
-  train_case train-recorded-base none head release
+  train_case train-recorded-base squash head release
   assert_train_refused "$TRAIN_CASE" "train-recorded-base-refuse" "merged into main, not this task's base release"
-  train_case train-recorded-base-ok none head release
+  train_case train-recorded-base-ok squash head release
   git -C "$TRAIN_CASE/origin.git" branch release main
   git -C "$TRAIN_CASE/wt" fetch -q origin
   train_list "$TRAIN_CASE" 9 MERGED release "$TRAIN_HEAD" "$(train_body "$TRAIN_MEMBER_URL" "$TRAIN_MEMBER_HEAD")"
@@ -4121,17 +4173,17 @@ test_train_refuses_a_train_merged_into_another_branch() {
 
 test_train_unreadable_forge_is_unknown_never_accepted() {
   # The search fails.
-  train_case train-search-fails none head
+  train_case train-search-fails squash head
   : > "$TRAIN_CASE/gh-fixture/list.fail"
   assert_train_refused "$TRAIN_CASE" "train-search-fails" "the forge search for PRs listing" unknown
 
   # The search answers with something that is not a list.
-  train_case train-search-garbled none head
+  train_case train-search-garbled squash head
   printf 'not json\n' > "$TRAIN_CASE/gh-fixture/list.json"
   assert_train_refused "$TRAIN_CASE" "train-search-garbled" "returned nothing readable" unknown
 
   # The train head cannot be fetched.
-  TRAIN_PREFETCH_TRAIN=0 train_case train-fetch-fails none head
+  TRAIN_PREFETCH_TRAIN=0 train_case train-fetch-fails squash head
   git -C "$TRAIN_CASE/origin.git" update-ref -d refs/pull/9/head
   git -C "$TRAIN_CASE/wt" cat-file -e "$TRAIN_HEAD^{commit}" 2>/dev/null \
     && fail "train-fetch-fails: the train head was already in the copy"
@@ -4140,7 +4192,7 @@ test_train_unreadable_forge_is_unknown_never_accepted() {
 }
 
 test_train_control_open_member_is_not_landed_by_a_train() {
-  train_case train-open-member none head
+  train_case train-open-member squash head
   printf 'OPEN\n' > "$TRAIN_CASE/gh-fixture/member-state"
   assert_train_refused "$TRAIN_CASE" "train-open-member" "ship deliverable is not landed"
   assert_no_grep "pr list" "$TRAIN_CASE/gh-fixture/calls.log" "train-open-member: the train was searched for an open PR"
@@ -4148,7 +4200,7 @@ test_train_control_open_member_is_not_landed_by_a_train() {
 }
 
 test_train_control_merged_member_keeps_the_existing_route() {
-  train_case train-merged-member none head
+  train_case train-merged-member squash head
   printf 'MERGED\n' > "$TRAIN_CASE/gh-fixture/member-state"
   run_teardown "$TRAIN_CASE" > "$TRAIN_CASE/stdout" 2> "$TRAIN_CASE/stderr" \
     || fail "train-merged-member: a merged member was refused: $(cat "$TRAIN_CASE/stderr")"
@@ -4196,7 +4248,7 @@ test_train_other_refusals_stay() {
 # The record-only route (the copy is gone) applies the same verified-train rule and
 # reads no copy: the recorded PR is CLOSED, so only the forge's train proof counts.
 train_absent_case() {  # <name> [<train shape>] [<landing>]
-  train_case "$1" "${3:-none}" head "" "${2:-merge}"
+  train_case "$1" "${3:-squash}" head "" "${2:-merge}"
   write_windowless_legacy_meta "$TRAIN_CASE" no-mistakes ship "$TRAIN_CASE/missing-wt"
   append_pr_meta_url "$TRAIN_CASE"
   seed_backlog_in_flight "$TRAIN_CASE"
@@ -4261,7 +4313,7 @@ test_train_member_removed_copy_in_pool_slot() {
     make_nested_slot_case "train-nested-$row" enclosing .claude/worktrees/bundled
     case_dir=$NESTED_CASE
     ln -s "$NESTED_COPY" "$case_dir/wt"
-    setup_train_history "$case_dir" none head
+    setup_train_history "$case_dir" squash head
     rm "$case_dir/wt"
     git -C "$case_dir/project" worktree remove --force "$NESTED_COPY"
     assert_absent "$NESTED_COPY" "train-nested-$row: setup did not remove the nested copy"
@@ -4331,7 +4383,7 @@ test_train_flat_missing_with_a_stale_remote_ref_refuses() {
 # that fails is unknown, retry, never 'not landed' and never accepted.
 test_train_member_reread_failure_is_unknown() {
   local events
-  train_case train-reread-fails none head
+  train_case train-reread-fails squash head
   : > "$TRAIN_CASE/gh-fixture/member-view.once"
   events="$TRAIN_CASE/guard-events.jsonl"
   FM_GUARD_EVENT_LOG="$events" assert_train_refused "$TRAIN_CASE" "train-reread-fails" "could not be read again" unknown
@@ -4343,7 +4395,7 @@ test_train_member_reread_failure_is_unknown() {
     "train-reread-fails: an unread train proof was logged as a readable source"
 
   # An answered refusal (no train lists the member) still logs a readable source.
-  train_case train-answered-guard none head
+  train_case train-answered-guard squash head
   printf '[]\n' > "$TRAIN_CASE/gh-fixture/list.json"
   events="$TRAIN_CASE/guard-events.jsonl"
   FM_GUARD_EVENT_LOG="$events" assert_train_refused "$TRAIN_CASE" "train-answered-guard" "ship deliverable is not landed"
@@ -4360,7 +4412,7 @@ test_train_member_found_by_branch_is_not_looked_up_again() {
   local case_dir
   case_dir=$(make_case train-branch-lookup-once)
   write_meta "$case_dir" no-mistakes ship
-  setup_train_history "$case_dir" none head
+  setup_train_history "$case_dir" squash head
   add_gh_train_fake "$case_dir" CLOSED "$TRAIN_MEMBER_HEAD"
   train_default_list "$case_dir"
   add_logging_treehouse "$case_dir"
@@ -4410,7 +4462,7 @@ train_pipeline_input_case() {
 # default branch has, and a run record ties exactly this copy to the listed head.
 test_train_run_record_never_stands_in_for_carried_work() {
   local copy_head rows
-  train_case train-record-dropped-input none extra
+  train_case train-record-dropped-input squash extra
   copy_head=$(git -C "$TRAIN_CASE/wt" rev-parse HEAD)
   write_nm_run_record "$TRAIN_CASE" 01RUNDROPPED "$TRAIN_MEMBER_URL" "$copy_head" "$TRAIN_MEMBER_HEAD"
   assert_train_refused "$TRAIN_CASE" "train-record-dropped-input" "copy's work is not proven present"
@@ -4475,7 +4527,7 @@ train_hide_commit() {
   git -C "$tmp" config user.email t@t
   git -C "$tmp" config user.name t
   git -C "$tmp" fetch -q origin refs/pull/7/head
-  git -C "$tmp" checkout -q -b hidden origin/main~1
+  git -C "$tmp" checkout -q -b hidden "$(git -C "$tmp" rev-list -1 --grep='^main moves$' origin/main)"
   printf '%s\n' hidden > "$tmp/extra.txt"
   git -C "$tmp" add -- extra.txt
   git -C "$tmp" commit -q -m "hidden follow-up"
@@ -4501,7 +4553,7 @@ train_hide_commit() {
 test_train_ours_merged_commit_in_a_copy_never_counts_as_carried() {
   local copy_head
   # Copy route: the copy is K plus the member's replayed commits.
-  train_case train-ours-copy none head "" flat
+  train_case train-ours-copy squash head "" flat
   train_hide_commit "$TRAIN_CASE" copy
   git -C "$TRAIN_CASE/wt" reset -q --hard "$HIDDEN_COPY_HEAD"
   copy_head=$(git -C "$TRAIN_CASE/wt" rev-parse HEAD)
@@ -4533,12 +4585,12 @@ test_train_ours_merged_commit_in_a_member_never_counts_as_carried() {
 # default history holds an ours merge of some unrelated commit.
 test_train_flat_carried_work_is_accepted_beside_an_ours_merge() {
   local tmp
-  train_case train-ours-carried none head "" flat
+  train_case train-ours-carried squash head "" flat
   tmp="$TRAIN_CASE/_other"
   git clone -q "$TRAIN_CASE/origin.git" "$tmp"
   git -C "$tmp" config user.email t@t
   git -C "$tmp" config user.name t
-  git -C "$tmp" checkout -q -b unrelated origin/main~1
+  git -C "$tmp" checkout -q -b unrelated "$(git -C "$tmp" rev-list -1 --grep='^main moves$' origin/main)"
   printf '%s\n' other > "$tmp/other.txt"
   git -C "$tmp" add -- other.txt
   git -C "$tmp" commit -q -m "unrelated work"
@@ -4646,6 +4698,9 @@ test_train_merge_commit_landed_still_refuses_uncarried_work
 test_train_ours_merged_commit_is_never_taken_as_delivered
 test_train_ours_merged_commit_is_refused_in_the_record_only_route
 test_train_ours_merged_commit_is_carried_when_the_train_replays_it
+test_train_landing_commit_without_the_change_is_refused
+test_train_landing_commit_off_the_default_line_is_refused
+test_train_landing_commit_unreadable_is_unknown_not_unlanded
 test_train_record_only_route_without_a_copy
 test_train_member_removed_copy_in_pool_slot
 test_teardown_removes_pr_ready_refusal_marker

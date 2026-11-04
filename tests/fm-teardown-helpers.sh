@@ -3305,13 +3305,17 @@ TRAIN_MEMBER_HEAD=
 TRAIN_HEAD=
 TRAIN_COPY_HEAD=
 
-# setup_train_history <case-dir> <landing: none|squash|merge> <copy: head|prerebase|inside|extra> [train: merge|flat|flat-missing|ours-flat|flat-hidden]
+# setup_train_history <case-dir> <landing: none|squash|merge|ours> <copy: head|prerebase|inside|extra> [train: merge|flat|flat-missing|ours-flat|flat-hidden]
 # Builds the member PR head H (two commits on top of a moved main: feature.txt, then
 # feature2.txt), the train head (a merge of H plus a second member's commit), and
 # then moves the default branch
 # on by editing feature.txt, so the content-in-default proof can never match.
 #   landing squash: the default branch also holds the train's squash commit.
 #   landing merge: the train head is merged into the default branch by a merge commit.
+#   landing ours: the train head is `ours`-merged into the default branch, so it is
+#     reachable there but the default branch holds none of its change.
+#   TRAIN_LANDING_COMMIT is the commit the fake forge reports as the train's mergeCommit
+#   (empty for landing none, which a real merged train never is).
 #   TRAIN_REVERT_MEMBER=1: the train's last commit reverts the member's feature.txt.
 #   TRAIN_HIDDEN_OURS=1: the member is built on a commit K (hidden.txt) that main took
 #     in by an `ours` merge, so K is reachable from main yet main never holds
@@ -3390,13 +3394,21 @@ setup_train_history() {
   TRAIN_HEAD=$(git -C "$tmp" rev-parse HEAD)
   git -C "$tmp" push -q origin "HEAD:refs/pull/9/head"
   git -C "$tmp" checkout -q main
+  TRAIN_LANDING_COMMIT=
   if [ "$landing" = squash ]; then
     git -C "$tmp" merge -q --squash train >/dev/null
     git -C "$tmp" commit -q -m "train squash (#9)"
     git -C "$tmp" push -q origin main
+    TRAIN_LANDING_COMMIT=$(git -C "$tmp" rev-parse HEAD)
   elif [ "$landing" = merge ]; then
     git -C "$tmp" merge -q --no-ff --no-edit train >/dev/null
     git -C "$tmp" push -q origin main
+    TRAIN_LANDING_COMMIT=$(git -C "$tmp" rev-parse HEAD)
+  elif [ "$landing" = ours ]; then
+    # The forge records the train merged, but the merge took no change in.
+    git -C "$tmp" merge -q -s ours --no-edit train >/dev/null
+    git -C "$tmp" push -q origin main
+    TRAIN_LANDING_COMMIT=$(git -C "$tmp" rev-parse HEAD)
   fi
   printf '%s\n' changed-on-main > "$tmp/feature.txt"
   git -C "$tmp" add -- feature.txt
@@ -3460,7 +3472,9 @@ SH
 train_list() {
   jq -n --argjson number "$2" --arg url "https://github.com/example/repo/pull/$2" \
     --arg state "$3" --arg base "$4" --arg head "$5" --arg body "$6" \
-    '[{number: $number, url: $url, state: $state, baseRefName: $base, headRefOid: $head, body: $body}]' \
+    --arg landing "${TRAIN_LANDING_COMMIT:-}" \
+    '[{number: $number, url: $url, state: $state, baseRefName: $base, headRefOid: $head,
+       mergeCommit: (if $state == "MERGED" and $landing != "" then {oid: $landing} else null end), body: $body}]' \
     > "$1/gh-fixture/list.json"
 }
 
