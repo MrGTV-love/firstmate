@@ -1115,6 +1115,7 @@ A merge train names each landed pull request with a `Train-member: <pull request
 When the merged pull request's body mentions an active backlog id or another pull request outside those lines, it closes nothing for it, and the merge prints one `actionable:` line per mention.
 The merging task's own id is not reported, because its teardown owns that item, and a train member's body gets no mention check.
 An old `Closes: <item-id>` line, a malformed directive line and a train body written without the block are reported the same way; a train body without the block keeps the manual close.
+An old line is reported only when no directive line or task record names the same id, and an old line that names the merging task's own id is reported on stdout, not as `actionable:`, because its teardown closes it.
 A ship or scout task that still has a live record stays open.
 When it is the merged pull request's own task, its own teardown closes it, so the merge only reports it; any other such task is reported as an `actionable:` line.
 A task of any other kind that still has a live record closes like any other named item.

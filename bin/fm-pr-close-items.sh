@@ -20,12 +20,15 @@
 # line closes nothing, a train body written before this block existed included; its items
 # are closed by hand as before.
 # These things in a body, outside the block, are reported, never closed, on stderr behind
-# `actionable:` (none of these lines changes the exit status or the summary counts unless
-# they say `not closed`):
-#   - an old `Closes: <item-id>` line is `not closed <id>`, naming the new form (it names an
-#     item, so it counts as left open);
+# `actionable:`. The first two kinds count as left open, so they add to the summary's left
+# open count and make the exit status 3; a `mentioned ...` line changes neither:
+#   - an old `Closes: <item-id>` line is `not closed <id>`, naming the new form. It is reported
+#     only after every body and task record has been read, and only when no directive line or
+#     task record named the same id, so that source decides the item. An old line that names
+#     the merging task's own id is a stdout line instead, not counted, saying its own teardown
+#     closes it;
 #   - a column-0 line that starts with a directive word but does not fit its form, and a
-#     `Train-member:` value that is no pull request URL, count as left open too;
+#     `Train-member:` value that is no pull request URL;
 #   - in the merged pull request's own body only, never a train member's: an active, not-done
 #     backlog id that appears as a word in the prose, or a pull request link in the prose that
 #     is not a `Train-member:` line, is a `mentioned ...` line that says nothing was closed for
@@ -68,7 +71,8 @@
 # item's cleared blocked-by edge is a `close-at-merge: unblocked:` line on stdout; an edge
 # it could not clear is an `actionable: close-at-merge:` line on stderr.
 # Exit 0 when every named item was closed or was already done; exit 3 when any item was
-# left open or a train member's body could not be read; exit 1 when the merged pull
+# left open, a malformed directive line or a `Train-member:` value that is no pull request
+# URL was ignored, or a train member's body could not be read; exit 1 when the merged pull
 # request's own body cannot be read (the line names the pull request URL and the read
 # error); exit 2 on a bad request. bin/fm-pr-merge.sh ignores the exit status:
 # no close outcome ever changes the merge result.
@@ -243,13 +247,11 @@ while IFS= read -r id; do
   [ -z "$id" ] || consider "$id" "$URL" "the body of $URL"
 done < <(fm_pr_closes_ids "$WORK/body")
 
-report_old_form() {  # <body-file> <where>: the old `Closes:` lines and malformed directive lines
+: > "$WORK/old-form"
+report_old_form() {  # <body-file> <where>: queue the old `Closes:` lines, report malformed directive lines
   local old line
   while IFS= read -r old; do
-    [ -n "$old" ] || continue
-    case "$SEEN" in *$'\n'"$old"$'\n'*) continue ;; esac
-    SEEN="$SEEN$old"$'\n'
-    left_open "$old" "$2 names it with a Closes: line, which closes nothing; write 'Closes-backlog-item: $old' on a line of its own in the body, then retry: $0 $TASK_ID $URL"
+    [ -z "$old" ] || printf '%s\t%s\n' "$old" "$2" >> "$WORK/old-form"
   done < <(fm_pr_closes_legacy_ids "$1")
   while IFS= read -r line; do
     [ -n "$line" ] || continue
@@ -291,6 +293,17 @@ while IFS= read -r candidate; do
     consider "$task" "$URL" "the task record that holds train member $member"
   done < <(tasks_recording_pr "$member")
 done < <(fm_pr_closes_members "$WORK/body")
+
+while IFS=$'\t' read -r old where; do
+  [ -n "$old" ] || continue
+  case "$SEEN" in *$'\n'"$old"$'\n'*) continue ;; esac
+  SEEN="$SEEN$old"$'\n'
+  if [ "$old" = "$TASK_ID" ]; then
+    printf 'close-at-merge: %s names the merging task %s with a Closes: line, which closes nothing; its own teardown closes it\n' "$where" "$old"
+  else
+    left_open "$old" "$where names it with a Closes: line, which closes nothing; write 'Closes-backlog-item: $old' on a line of its own in the body, then retry: $0 $TASK_ID $URL"
+  fi
+done < "$WORK/old-form"
 
 # Mentions outside the block: reported, never closed.
 if [ -n "$(fm_pr_closes_prose_words "$WORK/body" | sed -n '1p')" ]; then

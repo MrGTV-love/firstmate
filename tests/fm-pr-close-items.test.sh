@@ -4,7 +4,7 @@
 # finished item stops blocking the items that waited on it.
 #
 # bin/fm-pr-close-items.sh owns the close contract and bin/fm-pr-closes-lib.sh owns the
-# `Closes:` syntax and the train member list. Every case runs the real tasks-axi against
+# directive lines (`Closes-backlog-item:` and `Train-member:`). Every case runs the real tasks-axi against
 # the case's own fixture backlog through the real bin/fm-pr-merge.sh, with forge fakes
 # from tests/fm-pr-merge-helpers.sh. No case reads or writes a live backlog.
 # Shared fixtures: tests/fm-pr-merge-helpers.sh.
@@ -190,6 +190,41 @@ test_a_prose_mention_of_the_merging_task_is_not_reported_and_another_id_is() {
   assert_match "^actionable: close-at-merge: mentioned other-prose-item in the prose of $REPO_URL/87: nothing was closed for it" "$case_dir/stderr" \
     "c1-self-prose: another id in prose was not reported"
   pass "a prose mention of the merging task prints no mention line, and another prose id still prints one"
+}
+
+test_an_old_form_line_naming_the_merging_task_is_left_to_its_teardown() {
+  local case_dir
+  case_dir=$(gh_case c1-self-old 93)
+  printf '%s\n' 'Closes: task-x1' 'Closes: other-old' > "$case_dir/bodies/93"
+  gh_merge "$case_dir" 93
+  assert_match '^close-at-merge: the body of .* names the merging task task-x1 with a Closes: line, which closes nothing; its own teardown closes it' "$case_dir/stdout" \
+    "c1-self-old: the merging task's old line was not reported on stdout"
+  assert_no_grep 'not closed task-x1' "$case_dir/stderr" "c1-self-old: the merging task's old line was reported as actionable"
+  assert_match "^actionable: close-at-merge: not closed other-old: .*Closes: line, which closes nothing" "$case_dir/stderr" \
+    "c1-self-old: another old-form id was not reported as actionable"
+  assert_grep 'close-at-merge: 0 closed, 1 left open' "$case_dir/stdout" "c1-self-old: the merging task's old line was counted as left open"
+  pass "an old Closes: line naming the merging task is left to its teardown, uncounted, while another old line is still actionable"
+}
+
+test_an_old_form_line_never_blocks_another_source_for_the_same_id() {
+  local case_dir base=$REPO_URL
+  case_dir=$(gh_case c2-old-a 94)
+  cx_add "$case_dir" a-item docs
+  cx_meta "$case_dir" a-item docs "$base/71"
+  printf '%s\n' "Train-member: $base/71" > "$case_dir/bodies/94"
+  printf '%s\n' 'Closes: a-item' > "$case_dir/bodies/71"
+  gh_merge "$case_dir" 94
+  [ "$(cx_state "$case_dir" a-item)" = "done" ] || fail "c2-old-a: a member's old line kept the task that holds its URL open"
+  assert_no_grep 'not closed a-item' "$case_dir/stderr" "c2-old-a: an id another source closed was reported as an old line"
+
+  case_dir=$(gh_case c2-old-b 95)
+  cx_add "$case_dir" b-item
+  printf '%s\n' 'Closes: b-item' "Train-member: $base/72" > "$case_dir/bodies/95"
+  printf '%s\n' 'Closes-backlog-item: b-item' > "$case_dir/bodies/72"
+  gh_merge "$case_dir" 95
+  [ "$(cx_state "$case_dir" b-item)" = "done" ] || fail "c2-old-b: the train's old line kept a member's named item open"
+  assert_no_grep 'not closed b-item' "$case_dir/stderr" "c2-old-b: an id a member closed was reported as an old line"
+  pass "an old Closes: line never stops a directive or a task record from closing the same id"
 }
 
 test_an_unrecorded_merge_closes_nothing_and_lists_the_named_items() {
@@ -760,6 +795,9 @@ test_the_directive_parser_reads_real_lines_and_ignores_every_example() {
     || fail "parser: unexpected ids: $(printf '%s' "$out" | tr '\n' ' ')"
   out=$(printf '%s\n' 'Closes-backlog-item: unclosed' '```' 'Closes-backlog-item: never-closed' 'Closes-backlog-item: also-never' | lib_call fm_pr_closes_ids -)
   [ "$out" = unclosed ] || fail "parser: a fence that never closes did not run to the end: $out"
+  out=$(printf '%s\n' $'\t```' 'Closes-backlog-item: after-tab' '```' 'Closes-backlog-item: tab-fenced' $'\t```' 'Closes-backlog-item: still-tab-fenced' \
+    | lib_call fm_pr_closes_ids -)
+  [ "$out" = after-tab ] || fail "parser: a tab-indented fence line opened or closed a fence: $(printf '%s' "$out" | tr '\n' ' ')"
   out=$(printf '%s\n' 'Train-member: https://github.com/a/b/pull/1' 'Train-member:  https://github.com/a/b/pull/2  ' 'Train-member: https://github.com/a/b/pull/1' \
     '  Train-member: https://github.com/a/b/pull/3' '| Train-member: https://github.com/a/b/pull/4 |' '   ```' 'Train-member: https://github.com/a/b/pull/5' '   ```' \
     | lib_call fm_pr_closes_members -)
@@ -1245,6 +1283,8 @@ pr_close_test_cases=(
 test_closes_lines_close_each_eligible_item_and_report_the_rest
 test_a_merge_naming_its_own_task_reports_the_live_record
 test_a_prose_mention_of_the_merging_task_is_not_reported_and_another_id_is
+test_an_old_form_line_naming_the_merging_task_is_left_to_its_teardown
+test_an_old_form_line_never_blocks_another_source_for_the_same_id
 test_no_directive_line_changes_no_item_and_prose_mentions_close_nothing
 test_an_unrecorded_merge_closes_nothing_and_lists_the_named_items
 test_a_merge_the_watcher_recorded_first_still_closes_without_a_second_notice

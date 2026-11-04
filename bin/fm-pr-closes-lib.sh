@@ -47,8 +47,8 @@ FM_PR_CLOSES_ID_RE='[A-Za-z0-9._-]+'
 
 fm_pr_closes_unfenced() {  # <body-file|->
   local line in_fence=0 char='' len=0 run
-  local open_re='^[[:space:]]{0,3}(`{3,}|~{3,})(.*)$'
-  local close_re='^[[:space:]]{0,3}(`{3,}|~{3,})[[:space:]]*$'
+  local open_re='^[ ]{0,3}(`{3,}|~{3,})(.*)$'
+  local close_re='^[ ]{0,3}(`{3,}|~{3,})[[:space:]]*$'
   while IFS= read -r line || [ -n "$line" ]; do
     line=${line%$'\r'}
     if [ "$in_fence" = 1 ]; then
