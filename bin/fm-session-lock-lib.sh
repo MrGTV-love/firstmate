@@ -307,6 +307,25 @@ fm_session_lock_anchor_pid() {
   _fm_harness_outermost_pid "$pids"
 }
 
+# Print the pids a legacy (untagged) lock may record for this session: the
+# ancestry list $1, plus the immediate dsh-tui launcher parent of a nearest
+# modern DSH CLI. Earlier recognition stopped at that launcher, so a TUI
+# primary already running when recognition updated still records it. Only the
+# exact structural parent qualifies: never a sibling, a further ancestor, or a
+# parent the modern CLI predicate itself matches.
+_fm_session_lock_owner_pids() {  # <ancestry-pids>
+  local nearest=${1%%$'\n'*} args parent
+  printf '%s\n' "$1"
+  args=$(fm_session_lock_proc args "$nearest") || return 0
+  fm_dsh_args_are_dsh "$args" fm_dsh_cli_script_path || return 0
+  parent=$(fm_session_lock_proc ppid "$nearest" | tr -d ' ')
+  case "$parent" in ''|*[!0-9]*) return 0 ;; esac
+  args=$(fm_session_lock_proc args "$parent") || return 0
+  fm_dsh_args_are_dsh "$args" fm_dsh_tui_script_path || return 0
+  fm_dsh_args_are_dsh "$args" fm_dsh_cli_script_path && return 0
+  printf '%s\n' "$parent"
+}
+
 # True when state dir $1 holds a session lock that this process's session owns:
 # the recorded pid is ANY harness ancestor of the current process, or the lock
 # was recorded by this same trusted Claude session and its recorded pid is still
@@ -336,7 +355,7 @@ fm_session_lock_owned_by_self() {
   while IFS= read -r pid; do
     [ "$pid" = "$lock_pid" ] && return 0
   done <<EOF
-$pids
+$(_fm_session_lock_owner_pids "$pids")
 EOF
   fm_session_lock_same_session "$state" "$pids" || return 1
   fm_harness_pid_alive "$lock_pid"
@@ -367,7 +386,7 @@ fm_session_lock_foreign_owner_live() {
   while IFS= read -r pid; do
     [ "$pid" = "$lock_pid" ] && return 1
   done <<EOF
-$pids
+$(_fm_session_lock_owner_pids "$pids")
 EOF
   fm_session_lock_same_session "$state" "$pids" && return 1
   # shellcheck disable=SC2034 # Output global, read by the sourcing guard caller.

@@ -54,7 +54,6 @@ export async function apply(ctx, config) {
     throw new Error('Firstmate Web attachment requires a native sessionId and Web agent registry');
   }
   const mounted = new WeakMap();
-  const terminated = new WeakSet();
   const releases = new Set();
   let releasing = Promise.resolve();
   let closing = false;
@@ -81,8 +80,7 @@ export async function apply(ctx, config) {
   };
   ctx.on('agent/created', ({agent}) => attach(agent));
   ctx.on('agent/disposed', ({agent}) => {
-    if (closing || !mounted.has(agent) || terminated.has(agent) || ctx.agents.get(agent.id)) return;
-    terminated.add(agent);
+    if (closing || !mounted.has(agent) || ctx.agents.get(agent.id)) return;
     releasing = releasing.then(async () => {
       const result = await runCommand(resolve(config.root), resolve(config.home),
         environment(resolve(config.home), agent), releases, 'fm-lock.sh', ['release']);
@@ -392,6 +390,9 @@ function primary(ctx, config) {
   });
   if (web) {
     log('attached', {session: agent.id});
-    return ensure().catch(failure);
+    return command('fm-dsh-primary.sh', ['inspect', home]).then(async inspect => {
+      if (inspect.code === 4) log('acquire', {code: (await command('fm-lock.sh')).code});
+      return ensure();
+    }).catch(failure);
   }
 }

@@ -1,10 +1,26 @@
 // Native-SDK scope regression, invoked by fm-dsh-primary.test.sh when an SDK is supplied.
 import assert from 'node:assert/strict';
-import {mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, unlinkSync, realpathSync} from 'node:fs';
+import {mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, unlinkSync, realpathSync, readdirSync, rmSync, symlinkSync} from 'node:fs';
+import {execFileSync, spawn, spawnSync} from 'node:child_process';
 import {join, resolve} from 'node:path';
 import {createRequire} from 'node:module';
 import {pathToFileURL} from 'node:url';
 const [root, temporary, anchor] = process.argv.slice(2);
+if (!process.env.FM_NATIVE_WEB_FIXTURE) {
+  // Re-enter as the nearest modern DSH server argv, so the real ownership
+  // commands resolve this fixture process as their shared native Web host.
+  const server = mkdtempSync(join(temporary, 'native-web-server-'));
+  const entry = join(server, 'node_modules/@deepseek-ai/dsh/lib/bin.js');
+  mkdirSync(join(entry, '..'), {recursive: true});
+  writeFileSync(entry, `import(${JSON.stringify(import.meta.url)});\n`);
+  const env = {...process.env, FM_NATIVE_WEB_FIXTURE: '1'};
+  for (const key of Object.keys(env)) {
+    if (/^(CLAUDE|DSH_|FM_TEST_)/.test(key) || ['FM_DSH_HARNESS', 'PI_CODING_AGENT', 'GROK_AGENT', 'FM_PI_HARNESS',
+      'FM_OMP_HARNESS', 'GEMINI_CLI', 'CURSOR_AGENT', 'CURSOR_INVOKED_AS'].includes(key)) delete env[key];
+  }
+  const result = spawnSync(process.execPath, [entry, root, temporary, anchor], {env, stdio: 'inherit'});
+  assert.equal(result.status, 0, 'native Web SDK scenario must pass');
+} else {
 const sdk = createRequire(resolve(anchor));
 const {Context} = await import(pathToFileURL(sdk.resolve('@deepseek-ai/cordis')));
 const {createScope, scopeTarget} = await import(pathToFileURL(sdk.resolve('@deepseek-ai/dsh-scope')));
@@ -20,18 +36,38 @@ async function until(predicate, detail) {
 const fixture = mkdtempSync(join(temporary, 'native-web-'));
 const code = join(fixture, 'clean-code'), home = join(fixture, 'operational-home');
 mkdirSync(join(code, 'bin'), {recursive: true});
-mkdirSync(join(home, 'state'), {recursive: true});
+// Real ownership, inspection and claim-lock code; only the arm, guard, startup
+// and queue read below are recorders.
+for (const entry of readdirSync(join(root, 'bin'))) symlinkSync(join(root, 'bin', entry), join(code, 'bin', entry));
+const primaryHome = dir => {
+  mkdirSync(join(dir, 'state'), {recursive: true});
+  mkdirSync(join(dir, 'bin'), {recursive: true});
+  execFileSync('git', ['init', '-q', dir]);
+  writeFileSync(join(dir, 'AGENTS.md'), 'fixture\n');
+  // An in-flight task is what makes the real inspection request supervision.
+  writeFileSync(join(dir, 'state/demo.meta'), 'fixture\n');
+};
+primaryHome(home);
 const records = join(home, 'state/commands');
-const script = (file, body) => writeFileSync(join(code, 'bin', file), `#!/usr/bin/env bash\nset -eu\nprintf '%s|%s|%s|%s|%s\\n' ${JSON.stringify(file)} "$PWD" "$FM_HOME" "\${DSH_SESSION_ID-}" "\${FM_DSH_HARNESS-}" >> "$FM_HOME/state/commands"\n${body}\n`);
-script('fm-dsh-primary.sh', 'test ! -f "$FM_HOME/state/foreign" || exit 4; echo watch');
+const script = (file, body) => {
+  rmSync(join(code, 'bin', file), {force: true});
+  writeFileSync(join(code, 'bin', file), `#!/usr/bin/env bash\nset -eu\nprintf '%s|%s|%s|%s|%s\\n' ${JSON.stringify(file)} "$PWD" "$FM_HOME" "\${DSH_SESSION_ID-}" "\${FM_DSH_HARNESS-}" >> "$FM_HOME/state/commands"\n${body}\n`);
+};
 script('fm-turnend-guard.sh', 'exit 0');
-script('fm-lock.sh', 'test "$1" = release; while [ -f "$FM_HOME/state/release-gate" ]; do sleep 0.025; done; echo released > "$FM_HOME/state/released"');
+// The gate only delays the canonical writer so the release barrier is observable.
+script('fm-lock.sh', `printf '%s\\n' "\${1:-acquire}" >> "$FM_HOME/state/lock-calls"; while [ -f "$FM_HOME/state/release-gate" ]; do sleep 0.025; done; exec bash ${JSON.stringify(join(root, 'bin/fm-lock.sh'))} "$@"`);
 script('fm-sessionstart-run.sh', 'echo FORBIDDEN-HOT-STARTUP; exit 99');
 script('fm-wake-drain.sh', 'test "$1" = --queued; cat "$FM_HOME/state/queue"');
-// Only this recorder is launched; no production arm, host, startup or fleet code runs.
-writeFileSync(join(code, 'bin/fm-timeout-lib.sh'), 'fm_exec_owned() { shift; "$@"; }\n');
 script('fm-watch-arm.sh', 'echo "watcher: started pid=fixture"; while [ ! -f "$FM_HOME/state/release" ]; do read -r -t 0.02 _ || :; done; echo "check: tagged-native-wake"');
 writeFileSync(join(home, 'state/queue'), '7\t1\tcheck\tfixture\tnative-wake\n');
+const lockFile = join(home, 'state/.lock'), sidecar = join(home, 'state/.lock-session');
+const pair = () => existsSync(lockFile) || existsSync(sidecar)
+  ? [existsSync(lockFile) ? readFileSync(lockFile, 'utf8') : '', existsSync(sidecar) ? readFileSync(sidecar, 'utf8') : ''] : undefined;
+const lockCalls = () => existsSync(join(home, 'state/lock-calls')) ? readFileSync(join(home, 'state/lock-calls'), 'utf8').trim().split('\n') : [];
+const arms = () => readFileSync(records, 'utf8').split('\n').filter(row => row.startsWith('fm-watch-arm.sh')).length;
+const inspect = id => spawnSync('bash', [join(code, 'bin/fm-dsh-primary.sh'), 'inspect', home], {encoding: 'utf8',
+  env: {...process.env, FM_HOME: home, FM_ROOT_OVERRIDE: home, FM_STATE_OVERRIDE: join(home, 'state'),
+    FM_CONFIG_OVERRIDE: join(home, 'config'), FM_DSH_HARNESS: 'dsh', DSH_PROFILE: 'web', DSH_SESSION_ID: id}});
 const ambient = {...process.env};
 const app = new Context();
 let host;
@@ -52,9 +88,13 @@ function agent(id, header = {}) {
 const target = agent('session-explicit-primary');
 const sibling = agent('session-sibling');
 const child = agent('session-child', {origin: 'subagent', delegationDepth: 1});
+const owned = [String(process.pid) + '\n', `dsh-web:${target.id}\n`];
 let siblingEvents = 0;
 const unrelated = sibling.ctx.plugin({name: 'original-contribution', apply(ctx) {ctx.on('agent/status', () => {siblingEvents++;});}});
 await unrelated.await();
+symlinkSync('/bin/bash', join(fixture, 'claude'));
+const foreign = spawn(join(fixture, 'claude'), ['-c', 'read -r _'], {stdio: ['pipe', 'ignore', 'ignore']});
+const foreignExit = new Promise(done => foreign.once('exit', done));
 let mounted;
 try {
   // Actual host identity, not a missing config field, decides whether legacy
@@ -69,19 +109,23 @@ try {
   assert.deepEqual({refused,
     environmentUntouched: Object.keys({...ambient, ...process.env}).every(key => ambient[key] === process.env[key]),
     commands: existsSync(records) ? readFileSync(records, 'utf8').trim().split('\n').length : 0,
+    ownership: pair(),
     legacySelected: existsSync(join(home, 'state/.dsh-primary-events.jsonl'))
       && readFileSync(join(home, 'state/.dsh-primary-events.jsonl'), 'utf8').trim().split('\n').map(JSON.parse).some(row => row.event === 'startup')},
-    {refused: true, environmentUntouched: true, commands: 0, legacySelected: false},
-    'a Web root/home config without sessionId must refuse before environment mutation or legacy future-CWD selection');
+    {refused: true, environmentUntouched: true, commands: 0, ownership: undefined, legacySelected: false},
+    'a Web root/home config without sessionId must refuse before environment mutation, ownership or legacy future-CWD selection');
   console.log('ok - actual SDK Web config without sessionId refuses before environment mutation or legacy subscription');
+  assert.equal(inspect(target.id).status, 4, 'the real inspection refuses an unowned free home');
   mounted = host.plugin(bridge, {root: code, home, sessionId: target.id});
   await mounted.await();
   assert.equal(Object.keys({...ambient, ...process.env}).every(key => ambient[key] === process.env[key]), true, 'attaching a Web bridge must not poison process.env');
-  await until(() => existsSync(records), 'attach-existing must inspect ownership without a fresh agent/created event');
+  assert.deepEqual(pair(), owned, 'attaching to a free home acquires the exact native pair through the canonical writer');
+  assert.deepEqual(lockCalls(), ['acquire']);
+  assert.equal(inspect(target.id).stdout.trim(), 'watch', 'the real inspection accepts the attached native owner');
+  await until(() => existsSync(records) && arms() === 1, 'attach-existing must inspect ownership and arm without a fresh agent/created event');
   await host.serial(scopeTarget(target, target), 'agent/created', {agent: target, source: 'resume'});
   await host.serial(scopeTarget(sibling, sibling), 'agent/created', {agent: sibling, source: 'startup'});
   await host.serial(scopeTarget(child, child), 'agent/created', {agent: child, source: 'startup'});
-  await until(() => readFileSync(records, 'utf8').includes('fm-watch-arm.sh'), 'owned target must start only its fake command recorder');
   const duplicate = host.plugin(bridge, {root: code, home, sessionId: target.id});
   await assert.rejects(duplicate.await(), /home already has a native primary attachment/);
   await duplicate.dispose();
@@ -91,10 +135,11 @@ try {
   assert.equal(sibling.sent.length + child.sent.length, 0, 'siblings and children must not receive the primary wake');
   const rows = readFileSync(records, 'utf8').trim().split('\n');
   assert(!rows.some(row => row.startsWith('fm-sessionstart-run.sh')), 'hot attach must never replay startup');
-  assert.equal(rows.filter(row => row.startsWith('fm-watch-arm.sh')).length, 1, 'duplicate target creation must not duplicate arms');
+  assert.equal(arms(), 1, 'duplicate target creation must not duplicate arms');
   assert(rows.every(row => row.endsWith(`|${home}|${target.id}|dsh`)), 'every recorder must receive target-specific home/session/harness');
   assert(rows.every(row => realpathSync(row.split('|')[1]) === realpathSync(home)), 'commands run in operational home, not clean code root');
   await mounted.dispose();
+  assert.deepEqual(pair(), owned, 'contribution/HMR disposal must never release a still-live primary');
   const stoppedCount = rows.length;
   host.emit(scopeTarget(target, target), 'session/event', target.session, {type: 'turn/end', seq: 1});
   await delay(40);
@@ -112,53 +157,69 @@ try {
     delete target.session.header.origin;
     delete target.session.header.delegationDepth;
   }
-  // A foreign canonical ownership verdict must remain read-only, even for the exact target.
-  writeFileSync(join(home, 'state/foreign'), 'foreign-live-owner');
+  // A live foreign owner stays byte-identical and read-only, even for the exact target.
+  writeFileSync(lockFile, `${foreign.pid}\n`);
+  writeFileSync(sidecar, 'foreign-claude-session\n');
+  const foreignPair = pair();
   const denied = host.plugin(bridge, {root: code, home, sessionId: target.id});
   await denied.await();
   await delay(40);
-  assert.equal(readFileSync(records, 'utf8').split('\n').filter(row => row.startsWith('fm-watch-arm.sh')).length, 1);
+  assert.deepEqual(pair(), foreignPair, 'canonical acquire must refuse a live foreign owner');
+  assert.deepEqual(lockCalls(), ['acquire', 'acquire']);
+  assert.equal(arms(), 1);
   assert.equal(target.sent.length, 1, 'ownership refusal must not send a forced continuation');
   await denied.dispose();
   assert.equal(Object.keys({...ambient, ...process.env}).every(key => ambient[key] === process.env[key]), true);
-  // Retire an old live identity while its own recorder is pending, then resume
-  // the same durable ID with a new Agent object. Old work must not wake either.
+  // A restarted server leaves the same durable ID beside its dead old pid.
+  foreign.stdin.end();
+  await foreignExit;
+  writeFileSync(lockFile, `${foreign.pid}\n`);
+  writeFileSync(sidecar, `dsh-web:${target.id}\n`);
+  assert.equal(inspect(target.id).status, 4, 'the same ID on a dead old server is not current ownership');
   assert(home.startsWith(fixture + '/'));
-  unlinkSync(join(home, 'state/foreign'));
   unlinkSync(join(home, 'state/release'));
   const resumedMount = host.plugin(bridge, {root: code, home, sessionId: target.id});
   await resumedMount.await();
-  await until(() => readFileSync(records, 'utf8').split('\n').filter(row => row.startsWith('fm-watch-arm.sh')).length === 2, 'second isolated fake recorder must start');
-  assert.equal(readFileSync(records, 'utf8').split('\n').filter(row => row.startsWith('fm-lock.sh')).length, 0, 'contribution/HMR disposal must never release a still-live primary');
+  assert.deepEqual(pair(), owned, 'a restarted server reclaims the dead same-ID lock canonically');
+  await until(() => arms() === 2, 'the reclaimed attachment must arm again');
+  // Retire an old live identity while its own release is pending, then resume
+  // the same durable ID with a new Agent object. Old work must not wake either.
   const gate = join(home, 'state/release-gate');
   writeFileSync(gate, 'held');
   await target.scope.dispose();
   live.delete(target.id);
-  // Match native teardown: scope first, exact registry detach, then paired emit.
+  // Match native teardown: scope first, exact registry detach, then its single paired emit.
   host.emit(scopeTarget(target, target), 'agent/disposed', {agent: target});
-  host.emit(scopeTarget(target, target), 'agent/disposed', {agent: target});
-  await until(() => readFileSync(records, 'utf8').includes('fm-lock.sh'), 'true root termination must invoke the canonical release owner');
+  await until(() => lockCalls().length === 4, 'true root termination must invoke the canonical release owner');
+  assert.equal(lockCalls()[3], 'release');
   const replacement = agent(target.id);
   writeFileSync(join(home, 'state/release'), '');
   const resumed = host.serial(scopeTarget(replacement, replacement), 'agent/created', {agent: replacement, source: 'resume'});
   await delay(40);
-  assert.equal(readFileSync(records, 'utf8').split('\n').filter(row => row.startsWith('fm-watch-arm.sh')).length, 2, 'same-ID resume must wait for the old canonical release');
+  assert.equal(arms(), 2, 'same-ID resume must wait for the old canonical release');
+  assert.deepEqual(pair(), owned, 'the gated release has not run yet');
   assert.equal(replacement.sent.length, 0);
   unlinkSync(gate);
   await resumed;
+  assert.deepEqual(lockCalls(), ['acquire', 'acquire', 'acquire', 'release', 'acquire'], 'the successor finds the released home unowned and acquires it');
+  assert.deepEqual(pair(), owned);
   await host.serial(scopeTarget(replacement, replacement), 'agent/created', {agent: replacement, source: 'resume'});
   await until(() => replacement.sent.length === 1, 'new same-ID Agent must receive its own single followup');
   assert.equal(target.sent.length, 1, 'retired Agent must not receive late completion');
-  assert.equal(readFileSync(records, 'utf8').split('\n').filter(row => row.startsWith('fm-watch-arm.sh')).length, 3);
+  assert.equal(arms(), 3);
   host.emit(scopeTarget(target, target), 'agent/disposed', {agent: target});
   await resumedMount.dispose();
-  assert.equal(readFileSync(records, 'utf8').split('\n').filter(row => row.startsWith('fm-lock.sh')).length, 1, 'duplicate/stale termination and HMR disposal must not release resumed ownership');
+  await delay(40);
+  assert.equal(lockCalls().filter(call => call === 'release').length, 1, 'stale termination and HMR disposal must not release resumed ownership');
+  assert.deepEqual(pair(), owned);
   await replacement.scope.dispose();
 
   // A genuine process-owned TUI profile still admits the legacy root/home
   // configuration and its future-created primary through the same native SDK.
   const tuiHome = join(fixture, 'owned-tui-home');
-  mkdirSync(join(tuiHome, 'state'), {recursive: true});
+  primaryHome(tuiHome);
+  // The legacy session start (a recorder here) owns acquisition for this profile.
+  writeFileSync(join(tuiHome, 'state/.lock'), `${process.pid}\n`);
   writeFileSync(join(tuiHome, 'state/queue'), '8\t1\tcheck\tlegacy\twake\n');
   writeFileSync(join(tuiHome, 'state/release'), '');
   script('fm-sessionstart-run.sh', "echo 'LEGACY SESSION START - fixture'");
@@ -184,6 +245,7 @@ try {
     const commands = readFileSync(join(tuiHome, 'state/commands'), 'utf8').trim().split('\n');
     assert.equal(commands.filter(row => row.startsWith('fm-sessionstart-run.sh')).length, 1);
     assert.equal(commands.filter(row => row.startsWith('fm-watch-arm.sh')).length, 1);
+    assert.equal(commands.filter(row => row.startsWith('fm-lock.sh')).length, 0, 'legacy TUI attachment never runs the Web acquire');
   } finally {
     await tui?.dispose();
     await tuiScope.dispose();
@@ -194,13 +256,16 @@ try {
     }
   }
   console.log('ok - actual SDK owned TUI profile preserves legacy root/home startup and one supervision followup');
-  console.log('ok - native Web existing/resumed Agent, explicit env, no startup, one followup, true-termination release barrier, no HMR/stale release, foreign refusal and scoped cleanup');
+  console.log('ok - native Web existing/resumed Agent through real inspect and canonical lock: free/dead acquire, live foreign refusal, explicit env, no startup, one followup, true-termination release barrier, no HMR/stale release and scoped cleanup');
 } finally {
   const gate = join(home, 'state/release-gate');
   if (existsSync(gate)) { assert(home.startsWith(fixture + '/')); unlinkSync(gate); }
+  foreign.kill('SIGTERM');
+  foreign.stdin.end();
   await mounted?.dispose();
   await target.scope.dispose();
   await sibling.scope.dispose();
   await child.scope.dispose();
   await owner.dispose();
+}
 }

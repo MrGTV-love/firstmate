@@ -6,7 +6,9 @@ For a launch-owned TUI primary, `bin/fm-dsh-primary.sh` loads `.dsh/fm-primary.m
 For an existing native Web conversation, load that same module through the Web profile's native contribution loader with `root` selecting the code root, `home` selecting the operational home, and an explicit `sessionId` selecting the existing or resumed root Agent.
 The actual Web host requires that session identity before changing any environment or subscribing to legacy startup; a missing identity is an error, not a request to select the next same-directory Agent.
 Attachment requires the exact session id and matching home working directory, excludes delegated Agents, and scopes command environments and native follow-ups to that Agent without changing the shared server's environment.
-The canonical session lock must already belong to the exact tagged native session on its nearest DSH server; attachment never takes a live foreign lock or grants authority from the shared PID alone.
+Ownership requires both the nearest DSH server and the exact tagged native session recorded beside the canonical session lock; the shared PID alone never grants authority.
+When attachment finds a primary home whose lock this session does not currently hold, including a resume after true termination released the lock or a server restart left a dead recorded server, it runs the canonical `bin/fm-lock.sh` acquire once; that reclaims only a free or dead lock and refuses every live foreign owner, and a non-primary home is never acquired.
+A refused attachment stays read-only without a follow-up; a foreign owner that exits later is reclaimed only by the next attachment.
 Hot attachment inspects and arms existing supervision without replaying session start or replacing the conversation.
 A bare DSH frontend is detectable, but is not a supervised Firstmate primary unless the plugin is loaded.
 Only launch-owned TUI startup runs the shared session-start entry point from `agent/created`; its first step waits for the ordered digest ahead of the opening prompt.

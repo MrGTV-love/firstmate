@@ -82,6 +82,17 @@ if (!process.env.FM_NATIVE_LOCK_FIXTURE) {
   assert.equal(readFileSync(sidecar, 'utf8').trim(), 'dsh-web:native-next-primary');
   assert.notEqual(release().status, 0, 'a stale old-session release must not erase the next primary');
   assert.equal(release({DSH_SESSION_ID: 'native-next-primary'}).status, 0);
+  // A restarted server leaves the same durable ID beside its dead old server pid.
+  const dead = spawnSync('bash', ['-c', 'echo "$$"'], {encoding: 'utf8'}).stdout.trim();
+  writeFileSync(lock, `${dead}\n`);
+  writeFileSync(sidecar, 'dsh-web:native-A\n');
+  assert.notEqual(owned().status, 0, 'the same ID on a dead old server is not current ownership');
+  result = acquire();
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(readFileSync(lock, 'utf8').trim(), String(process.pid), 'canonical acquire reclaims the dead old server pid');
+  assert.equal(readFileSync(sidecar, 'utf8').trim(), 'dsh-web:native-A');
+  assert.equal(owned().status, 0);
+  assert.equal(release().status, 0);
   // A live foreign Claude lock remains byte-identical; this stands for the real handoff prerequisite.
   writeFileSync(lock, process.env.FM_NATIVE_FOREIGN_PID + '\n');
   writeFileSync(sidecar, 'foreign-claude-session\n');
@@ -93,5 +104,5 @@ if (!process.env.FM_NATIVE_LOCK_FIXTURE) {
   assert.notEqual(release().status, 0, 'native cleanup must not release a live foreign owner');
   assert.equal(readFileSync(lock, 'utf8'), process.env.FM_NATIVE_FOREIGN_PID + '\n');
   assert.equal(readFileSync(sidecar, 'utf8'), 'foreign-claude-session\n');
-  console.log('ok - canonical native acquire/reconfirm/owned-release, next-primary progress, same-PID sibling/child refusal, stale-release refusal, closer-harness rejection, foreign owner preserved');
+  console.log('ok - canonical native acquire/reconfirm/owned-release, next-primary progress, same-PID sibling/child refusal, stale-release refusal, dead old-server same-ID reclaim, closer-harness rejection, foreign owner preserved');
 }

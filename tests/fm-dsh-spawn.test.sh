@@ -205,6 +205,64 @@ SH
   pass "session lock: modern DSH is the nearest host and cannot own its outer Claude lock"
 }
 
+test_legacy_tui_launcher_lock_survives_modern_recognition() {
+  local bin out sibling
+  bin=$(make_dsh_processes "$TMP_ROOT/legacy-launcher-procs")
+  cat > "$bin/tui-probe.sh" <<'SH'
+#!/usr/bin/env bash
+set -eu
+. "$1/bin/fm-session-lock-lib.sh"
+state=$2
+mkdir -p "$state"
+cli=$FM_ANCESTRY_FIXTURE_PID
+parent=$(ps -o ppid= -p "$cli" | tr -d ' ')
+[ "$(fm_harness_ancestry_pids)" = "$cli" ]
+[ "$(fm_session_lock_anchor_pid)" = "$cli" ]
+if [ "$3" = direct ]; then
+  printf '%s\n' "$parent" > "$state/.lock"
+  fm_session_lock_owned_by_self "$state"
+  if fm_session_lock_foreign_owner_live "$state"; then exit 1; fi
+  out=$(FM_STATE_OVERRIDE="$state" bash "$1/bin/fm-lock.sh")
+  [ "$out" = "lock acquired: harness pid $parent" ]
+  [ "$(cat "$state/.lock")" = "$parent" ]
+  printf '%s\n' "$4" > "$state/.lock"
+  if fm_session_lock_owned_by_self "$state"; then exit 2; fi
+  fm_session_lock_foreign_owner_live "$state"
+  printf 'old launcher owns; live sibling launcher is foreign\n'
+else
+  launcher=$(ps -o ppid= -p "$parent" | tr -d ' ')
+  for pid in "$parent" "$launcher"; do
+    printf '%s\n' "$pid" > "$state/.lock"
+    if fm_session_lock_owned_by_self "$state"; then exit 3; fi
+  done
+  fm_session_lock_foreign_owner_live "$state"
+  printf 'a non-immediate launcher is foreign\n'
+fi
+SH
+  printf '%s\n' '#!/usr/bin/env bash' "exec \"$bin/node\" \"$bin/cli-bin/dsh\" bash \"$bin/tui-probe.sh\" \"$ROOT\" \"$TMP_ROOT/legacy-launcher-state\" direct \"\$FM_SIBLING_LAUNCHER\"" > "$bin/direct-cli.sh"
+  printf '%s\n' '#!/usr/bin/env bash' "\"$bin/node\" \"$bin/cli-bin/dsh\" bash \"$bin/tui-probe.sh\" \"$ROOT\" \"$TMP_ROOT/legacy-launcher-gap-state\" gap" ':' > "$bin/gap-cli.sh"
+  printf '%s\n' '#!/usr/bin/env bash' 'read -r _' > "$bin/hold.sh"
+  chmod +x "$bin/direct-cli.sh" "$bin/gap-cli.sh" "$bin/hold.sh"
+  local -a clean=(env -u PI_CODING_AGENT -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GROK_AGENT -u GEMINI_CLI
+    -u DSH_PROFILE -u DSH_SESSION_ID -u DSH_SHELL -u CLAUDECODE
+    -u FM_OMP_HARNESS -u FM_DSH_HARNESS -u CLAUDE_PID -u CLAUDE_CODE_SESSION_ID -u FM_STATE_OVERRIDE)
+  mkfifo "$bin/hold"
+  "${clean[@]}" "$bin/node" "$bin/node_modules/@deepseek-harness-tui/dsh-tui/bin/dsh-tui.js" "$bin/hold.sh" < "$bin/hold" &
+  sibling=$!
+  exec 3> "$bin/hold"
+  out=$("${clean[@]}" FM_SIBLING_LAUNCHER="$sibling" "$bin/node" \
+    "$bin/node_modules/@deepseek-harness-tui/dsh-tui/bin/dsh-tui.js" "$bin/direct-cli.sh") || out="probe failed: $out"
+  [ "$out" = 'old launcher owns; live sibling launcher is foreign' ] \
+    || fail "a live TUI must keep its recorded immediate dsh-tui launcher lock, and only that one, got '$out'"
+  out=$("${clean[@]}" "$bin/node" "$bin/node_modules/@deepseek-harness-tui/dsh-tui/bin/dsh-tui.js" "$bin/gap-cli.sh") \
+    || out="probe failed: $out"
+  [ "$out" = 'a non-immediate launcher is foreign' ] \
+    || fail "a dsh-tui launcher that is not the CLI's immediate parent must stay foreign, got '$out'"
+  exec 3>&-
+  wait "$sibling" 2>/dev/null || :
+  pass "session lock: a live TUI keeps its pre-recognition immediate launcher lock; sibling and non-immediate launchers stay foreign"
+}
+
 test_lock_identity_and_tmux_liveness_name_dsh() {
   local bin
   bin=$(make_dsh_processes "$TMP_ROOT/modern-classify-procs")
@@ -996,6 +1054,7 @@ fm_test_only
 test_detection_anchored_names_argv_and_marker_precedence
 test_modern_cli_finite_chain_and_relative_argv
 test_modern_cli_lock_boundary
+test_legacy_tui_launcher_lock_survives_modern_recognition
 test_lock_identity_and_tmux_liveness_name_dsh
 test_tmux_agent_state_names_dsh
 test_busy_classify_follows_the_launch_session_log
