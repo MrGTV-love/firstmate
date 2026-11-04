@@ -1185,6 +1185,20 @@ skip-runner: pi-signed is not installed, so its pin check was not exercised
 
 The guard submits no prompt and spends no tokens, so it runs by default wherever a runner is installed; rerun it after every Claude or Pi upgrade.
 
+## omp identity as its Bun runtime
+
+The installed omp can be a text launcher that execs the Bun runtime on an entry script, so the live process is named `bun` and only its executable path, script and role identify it.
+[`bin/fm-omp-identity.py`](../../bin/fm-omp-identity.py) owns that identity rule for [`bin/fm-launch-proof-lib.sh`](../../bin/fm-launch-proof-lib.sh) and the Herdr descendant walk.
+Verified 2026-11-04 on macOS arm64 (Darwin 27.2.0), read-only, with the omp 18.15.0 source launcher at `~/.bun/bin/omp`:
+- The launcher is a 378-byte `/bin/sh` text file whose only command is `exec "$R/runtime/node_modules/@oven/bun-darwin-aarch64/bin/bun" "$R/src/node_modules/@oh-my-pi/pi-coding-agent/src/cli.ts" "$@"` after `R=<root>`, and the rule derives the runtime and entry script from it.
+- The installed CLI's subcommand names, string-valued flags and value-less flags in `cli-commands.ts` and `cli/flag-tables.ts` equal the copy the role rule ports (compared by the same extraction `tests/fm-omp-identity-live-e2e.test.sh` runs: all three sets equal).
+- On macOS, `omp` does not rename the kernel process: its `process.title` assignment is JavaScript-side only (`pi-utils/src/process-name.ts`), so `ps comm` stays the runtime path.
+- `fm-proc-info.py` reads the kernel facts the rule compares: `exe` (libproc `proc_pidpath`), `argv` (the raw argument array with boundaries), `startid` (kernel start time with microseconds) and `stdin` (file descriptor 0 as `tty`, `pipe`, `none` or `other`); `tests/fm-omp-identity.test.sh` exercises each on real processes, including two processes started inside one whole second.
+
+The live result against the installed omp is not recorded here yet.
+The guard starts the installed omp bare on a pseudo-terminal under `env -i` with a scratch `HOME`, submits no prompt, and runs the identity rule and the descendant walk on it.
+Refresh this section with `bash bin/fm-test-run.sh tests/fm-omp-identity-live-e2e.test.sh` after any omp upgrade, and add the date, the omp version and the guard's printed `checked <n> invariants` line to the facts above.
+
 ## omp worker memory posture
 
 Verified 2026-10-06 on macOS arm64 with omp 18.6.3.
