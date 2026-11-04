@@ -1,0 +1,9 @@
+message bytes: 9251
+head exit=0 seconds=647
+base exit=0 seconds=657
+--- h1 status
+needs-decision [key=ship-it]: build it?
+resolved [key=ship-it]: answered: Line 1 of a long answer with some words to make it about
+--- b1 status
+needs-decision [key=ship-it]: build it?
+resolved [key=ship-it]: answered: Line 1 of a long answer with some words to make it about

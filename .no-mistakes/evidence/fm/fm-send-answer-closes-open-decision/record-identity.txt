@@ -1,0 +1,19 @@
+head bare send exit=0
+base bare send exit=0
+--- head record
+schema=fm-task-inbox.v1
+at=2026-11-04T15:12:23Z
+--
+plain steer text
+second line
+--- base record
+schema=fm-task-inbox.v1
+at=2026-11-04T15:12:34Z
+--
+plain steer text
+second line
+RECORDS BYTE-IDENTICAL EXCEPT THE at= WRITE STAMP: yes (79 vs 79 bytes)
+full diff: 2c2
+full diff: < at=2026-11-04T15:12:23Z
+full diff: ---
+full diff: > at=2026-11-04T15:12:34Z

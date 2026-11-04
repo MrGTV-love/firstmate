@@ -1,0 +1,29 @@
+lab home: /Users/charlesabrooker/tmp/fm-lab.g3JyBv
+/Users/charlesabrooker/.no-mistakes/evidence/01M6KC29FZG4H105VMMGGBPFEN/drive-promote.sh: line 41: fm_test_dod_item: command not found
+$ bin/fm-promote.sh scout-c1 --mode no-mistakes --yolo off
+exit=0
+next: FM_HOME=/Users/charlesabrooker/tmp/fm-lab.g3JyBv bin/fm-send.sh fm-scout-c1 "$(cat /Users/charlesabrooker/tmp/fm-lab.g3JyBv/data/scout-c1/ship-instructions.md)"
+
+===== run the printed next: command as printed
+$ FM_HOME=/Users/charlesabrooker/tmp/fm-lab.g3JyBv bin/fm-send.sh fm-scout-c1 "$(cat /Users/charlesabrooker/tmp/fm-lab.g3JyBv/data/scout-c1/ship-instructions.md)"
+exit=1
+error: scout-c1 has open keyed decisions in /Users/charlesabrooker/tmp/fm-lab.g3JyBv/state/scout-c1.status, and this send states no choice. Refusing it; nothing was sent. Open keys:
+  [key=ship-it] needs-decision
+Resend with --resolve-key <key> (repeatable; this send answers that key and closes it), or with --answers-none (this send answers none of them and every key stays open). Rule: the bin/fm-send.sh header, "Decision closure".
+--- inbox
+(no inbox dir)
+--- pane
+
+===== sender chooses: resend with --resolve-key ship-it
+$ FM_HOME=/Users/charlesabrooker/tmp/fm-lab.g3JyBv bin/fm-send.sh fm-scout-c1 --resolve-key ship-it "$(cat /Users/charlesabrooker/tmp/fm-lab.g3JyBv/data/scout-c1/ship-instructions.md)"
+exit=0
+--- status
+needs-decision [key=ship-it]: should I build it?
+resolved [key=ship-it]: answered: Your scout task has been promoted to a ship task, mode=no-mistakes. Your window, worktree, and context stay as they are; only 
+--- inbox
+001.msg
+handled
+--- pane
+: Firstmate instruction waiting: 'scout-c1.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+--- drain
+(drain lists no open decision)

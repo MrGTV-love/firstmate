@@ -1,0 +1,457 @@
+lab home: /Users/charlesabrooker/tmp/fm-lab.Xfwghh
+################ D1 base reproduces the defect
+
+===== BASE bare send to task with open k1,k2
+$ fm-send.sh b1 go with REST   [base]
+exit=0
+--- stdout
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Xfwghh
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the requested message WILL still be sent.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base.eOlq26/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+--- status file b1
+needs-decision [key=k1]: pick REST or RPC
+blocked [key=k2]: need the staging token
+--- inbox records
+b1.inbox/001.msg
+--- pane text
+: Firstmate instruction waiting: 'b1.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+--- pending-replies
+(none)
+--- drain
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+b1 [key=k1] needs-decision: pick REST or RPC
+b1 [key=k2] blocked: need the staging token
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'; a send that answers none of them passes --answers-none instead (rule: bin/fm-send.sh header)
+
+################ D1(a) head bare send refuses
+
+===== HEAD bare send to task with open k1,k2
+$ fm-send.sh t1 go with REST   [head]
+exit=1
+--- stdout
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Xfwghh
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: t1 has open keyed decisions in /Users/charlesabrooker/tmp/fm-lab.Xfwghh/state/t1.status, and this send states no choice. Refusing it; nothing was sent. Open keys:
+  [key=k1] needs-decision
+  [key=k2] blocked
+Resend with --resolve-key <key> (repeatable; this send answers that key and closes it), or with --answers-none (this send answers none of them and every key stays open). Rule: the bin/fm-send.sh header, "Decision closure".
+--- status file t1
+needs-decision [key=k1]: pick REST or RPC
+blocked [key=k2]: need the staging token
+--- inbox records
+(no inbox dir)
+--- pane text
+--- pending-replies
+(none)
+--- drain
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+b1 [key=k1] needs-decision: pick REST or RPC
+b1 [key=k2] blocked: need the staging token
+t1 [key=k1] needs-decision: pick REST or RPC
+t1 [key=k2] blocked: need the staging token
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'; a send that answers none of them passes --answers-none instead (rule: bin/fm-send.sh header)
+
+===== HEAD bare send via legacy fm-<id> label
+$ fm-send.sh fm-t1 go with REST   [head]
+exit=1
+--- stdout
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Xfwghh
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: t1 has open keyed decisions in /Users/charlesabrooker/tmp/fm-lab.Xfwghh/state/t1.status, and this send states no choice. Refusing it; nothing was sent. Open keys:
+  [key=k1] needs-decision
+  [key=k2] blocked
+Resend with --resolve-key <key> (repeatable; this send answers that key and closes it), or with --answers-none (this send answers none of them and every key stays open). Rule: the bin/fm-send.sh header, "Decision closure".
+--- status file t1
+needs-decision [key=k1]: pick REST or RPC
+blocked [key=k2]: need the staging token
+--- inbox records
+(no inbox dir)
+--- pane text
+--- pending-replies
+(none)
+--- drain
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+b1 [key=k1] needs-decision: pick REST or RPC
+b1 [key=k2] blocked: need the staging token
+t1 [key=k1] needs-decision: pick REST or RPC
+t1 [key=k2] blocked: need the staging token
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'; a send that answers none of them passes --answers-none instead (rule: bin/fm-send.sh header)
+
+################ D2(c) contradictory pair
+
+===== HEAD --answers-none + --resolve-key
+$ fm-send.sh t1 --answers-none --resolve-key k1 go with REST   [head]
+exit=1
+--- stdout
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Xfwghh
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: --answers-none and --resolve-key contradict each other: a send either answers the named key(s) or answers none of the open decisions. Refusing the pair; nothing was sent.
+--- status file t1
+needs-decision [key=k1]: pick REST or RPC
+blocked [key=k2]: need the staging token
+--- inbox records
+(no inbox dir)
+--- pane text
+--- pending-replies
+(none)
+--- drain
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+b1 [key=k1] needs-decision: pick REST or RPC
+b1 [key=k2] blocked: need the staging token
+t1 [key=k1] needs-decision: pick REST or RPC
+t1 [key=k2] blocked: need the staging token
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'; a send that answers none of them passes --answers-none instead (rule: bin/fm-send.sh header)
+
+################ D2(e) mistyped key, head vs base
+
+===== HEAD mistyped --resolve-key
+$ fm-send.sh t1 --resolve-key k9 go with REST   [head]
+exit=1
+--- stdout
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Xfwghh
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: --resolve-key 'k9': no open decision or blocker with that key in /Users/charlesabrooker/tmp/fm-lab.Xfwghh/state/t1.status, and no captain-held task 'k9' or 't1-decision-k9' still open (already closed or mistyped). Re-check the OPEN DECISIONS listing, then resend without that key or with the right one; nothing was sent.
+
+===== BASE mistyped --resolve-key
+$ fm-send.sh t1 --resolve-key k9 go with REST   [base]
+exit=1
+--- stdout
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Xfwghh
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: --resolve-key 'k9': no open decision or blocker with that key in /Users/charlesabrooker/tmp/fm-lab.Xfwghh/state/t1.status, and no captain-held task 'k9' or 't1-decision-k9' still open (already closed or mistyped). Re-check the OPEN DECISIONS listing, then resend without that key or with the right one; nothing was sent.
+--- status file t1
+needs-decision [key=k1]: pick REST or RPC
+blocked [key=k2]: need the staging token
+--- inbox records
+(no inbox dir)
+--- pane text
+--- pending-replies
+(none)
+--- drain
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+b1 [key=k1] needs-decision: pick REST or RPC
+b1 [key=k2] blocked: need the staging token
+t1 [key=k1] needs-decision: pick REST or RPC
+t1 [key=k2] blocked: need the staging token
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'; a send that answers none of them passes --answers-none instead (rule: bin/fm-send.sh header)
+
+################ D2(b) none-flag delivers, keys stay open
+
+===== HEAD --answers-none
+$ fm-send.sh t1 --answers-none routine check-in: please post status   [head]
+exit=0
+--- stdout
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Xfwghh
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+--- status file t1
+needs-decision [key=k1]: pick REST or RPC
+blocked [key=k2]: need the staging token
+--- inbox records
+t1.inbox/001.msg
+--- pane text
+: Firstmate instruction waiting: 't1.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+--- pending-replies
+(none)
+--- drain
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+b1 [key=k1] needs-decision: pick REST or RPC
+b1 [key=k2] blocked: need the staging token
+t1 [key=k1] needs-decision: pick REST or RPC
+t1 [key=k2] blocked: need the staging token
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'; a send that answers none of them passes --answers-none instead (rule: bin/fm-send.sh header)
+--- record body
+schema=fm-task-inbox.v1
+at=2026-11-04T14:53:17Z
+--
+routine check-in: please post status
+################ D2(a) --resolve-key k1 closes k1 only
+
+===== HEAD --resolve-key k1
+$ fm-send.sh t1 --resolve-key k1 go with REST   [head]
+exit=0
+--- stdout
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Xfwghh
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+--- status file t1
+needs-decision [key=k1]: pick REST or RPC
+blocked [key=k2]: need the staging token
+resolved [key=k1]: answered: go with REST
+--- inbox records
+t1.inbox/001.msg
+t1.inbox/002.msg
+--- pane text
+: Firstmate instruction waiting: 't1.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 't1.inbox/002.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+--- pending-replies
+(none)
+--- drain
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+b1 [key=k1] needs-decision: pick REST or RPC
+b1 [key=k2] blocked: need the staging token
+t1 [key=k2] blocked: need the staging token
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'; a send that answers none of them passes --answers-none instead (rule: bin/fm-send.sh header)
+
+################ repeated --answers-none accepted
+
+===== HEAD --answers-none --answers-none
+$ fm-send.sh t1 --answers-none --answers-none second routine steer   [head]
+exit=0
+--- stdout
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Xfwghh
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+--- status file t1
+needs-decision [key=k1]: pick REST or RPC
+blocked [key=k2]: need the staging token
+resolved [key=k1]: answered: go with REST
+--- inbox records
+t1.inbox/001.msg
+t1.inbox/002.msg
+t1.inbox/003.msg
+--- pane text
+: Firstmate instruction waiting: 't1.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 't1.inbox/002.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 't1.inbox/003.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+--- pending-replies
+(none)
+--- drain
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+b1 [key=k1] needs-decision: pick REST or RPC
+b1 [key=k2] blocked: need the staging token
+t1 [key=k2] blocked: need the staging token
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'; a send that answers none of them passes --answers-none instead (rule: bin/fm-send.sh header)
+
+################ D3(c) --key and explicit backend target not subject
+
+===== HEAD --key Enter to task with open k2
+$ fm-send.sh t1 --key Enter   [head]
+exit=0
+--- stdout
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Xfwghh
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+===== HEAD explicit backend target lab:fm-t1 (matches meta) text
+$ fm-send.sh lab:fm-t1 explicit endpoint text   [head]
+exit=1
+--- stdout
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Xfwghh
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: text not submitted to lab:fm-t1 (delivery unconfirmed; verdict=unknown; tried explicit target 'lab:fm-t1' matched /Users/charlesabrooker/tmp/fm-lab.Xfwghh/state/t1.meta; backend=tmux)
+--- status file t1
+needs-decision [key=k1]: pick REST or RPC
+blocked [key=k2]: need the staging token
+resolved [key=k1]: answered: go with REST
+--- inbox records
+t1.inbox/001.msg
+t1.inbox/002.msg
+t1.inbox/003.msg
+--- pane text
+: Firstmate instruction waiting: 't1.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 't1.inbox/002.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 't1.inbox/003.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+explicit endpoint text
+--- pending-replies
+(none)
+--- drain
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+b1 [key=k1] needs-decision: pick REST or RPC
+b1 [key=k2] blocked: need the staging token
+t1 [key=k2] blocked: need the staging token
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'; a send that answers none of them passes --answers-none instead (rule: bin/fm-send.sh header)
+
+################ typed plane (leading /) subject to the rule
+
+===== HEAD bare /help to task with open k2
+$ fm-send.sh t1 /help   [head]
+exit=1
+--- stdout
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Xfwghh
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: t1 has open keyed decisions in /Users/charlesabrooker/tmp/fm-lab.Xfwghh/state/t1.status, and this send states no choice. Refusing it; nothing was sent. Open keys:
+  [key=k2] blocked
+Resend with --resolve-key <key> (repeatable; this send answers that key and closes it), or with --answers-none (this send answers none of them and every key stays open). Rule: the bin/fm-send.sh header, "Decision closure".
+
+===== HEAD --answers-none /help
+$ fm-send.sh t1 --answers-none /help   [head]
+exit=1
+--- stdout
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Xfwghh
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: text not submitted to lab:fm-t1 (delivery unconfirmed; verdict=unknown; tried meta=/Users/charlesabrooker/tmp/fm-lab.Xfwghh/state/t1.meta; backend=from-meta)
+--- status file t1
+needs-decision [key=k1]: pick REST or RPC
+blocked [key=k2]: need the staging token
+resolved [key=k1]: answered: go with REST
+--- inbox records
+t1.inbox/001.msg
+t1.inbox/002.msg
+t1.inbox/003.msg
+--- pane text
+: Firstmate instruction waiting: 't1.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 't1.inbox/002.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 't1.inbox/003.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+explicit endpoint text
+/help
+--- pending-replies
+(none)
+--- drain
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+b1 [key=k1] needs-decision: pick REST or RPC
+b1 [key=k2] blocked: need the staging token
+t1 [key=k2] blocked: need the staging token
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'; a send that answers none of them passes --answers-none instead (rule: bin/fm-send.sh header)
+
+################ D1(e) reserved pending-reply key
+
+===== HEAD bare send to task with open reserved key
+$ fm-send.sh r1 reply now   [head]
+exit=1
+--- stdout
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Xfwghh
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: r1 has open keyed decisions in /Users/charlesabrooker/tmp/fm-lab.Xfwghh/state/r1.status, and this send states no choice. Refusing it; nothing was sent. Open keys:
+  [key=pending-reply-abcdef0123456789] blocked
+Resend with --resolve-key <key> (repeatable; this send answers that key and closes it), or with --answers-none (this send answers none of them and every key stays open). Rule: the bin/fm-send.sh header, "Decision closure".
+--- status file r1
+blocked [key=pending-reply-abcdef0123456789]: pending-reply-missed: secondmate reply overdue
+--- inbox records
+(no inbox dir)
+--- pane text
+--- pending-replies
+(none)
+--- drain
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+b1 [key=k1] needs-decision: pick REST or RPC
+b1 [key=k2] blocked: need the staging token
+r1 [key=pending-reply-abcdef0123456789] blocked: pending-reply-missed: secondmate reply overdue
+t1 [key=k2] blocked: need the staging token
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'; a send that answers none of them passes --answers-none instead (rule: bin/fm-send.sh header)
+
+===== HEAD --answers-none to reserved key task
+$ fm-send.sh r1 --answers-none reply now   [head]
+exit=0
+--- stdout
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Xfwghh
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+--- status file r1
+blocked [key=pending-reply-abcdef0123456789]: pending-reply-missed: secondmate reply overdue
+--- inbox records
+r1.inbox/001.msg
+--- pane text
+: Firstmate instruction waiting: 'r1.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+--- pending-replies
+(none)
+--- drain
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+b1 [key=k1] needs-decision: pick REST or RPC
+b1 [key=k2] blocked: need the staging token
+r1 [key=pending-reply-abcdef0123456789] blocked: pending-reply-missed: secondmate reply overdue
+t1 [key=k2] blocked: need the staging token
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'; a send that answers none of them passes --answers-none instead (rule: bin/fm-send.sh header)
+
+===== HEAD --resolve-key reserved key
+$ fm-send.sh r1 --resolve-key pending-reply-abcdef0123456789 reply now   [head]
+exit=0
+--- stdout
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Xfwghh
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+--- status file r1
+blocked [key=pending-reply-abcdef0123456789]: pending-reply-missed: secondmate reply overdue
+resolved [key=pending-reply-abcdef0123456789]: pending-reply-resolved: task=r1 pending-reply-id=abcdef0123456789 via=operator-resolve-key reply now
+--- inbox records
+r1.inbox/001.msg
+r1.inbox/002.msg
+--- pane text
+: Firstmate instruction waiting: 'r1.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 'r1.inbox/002.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+--- pending-replies
+(none)
+--- drain
+r1 resolved [key=pending-reply-abcdef0123456789] [at=1793804095]: pending-reply-resolved: task=r1 pending-reply-id=abcdef0123456789 via=operator-resolve-key reply now
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+b1 [key=k1] needs-decision: pick REST or RPC
+b1 [key=k2] blocked: need the staging token
+t1 [key=k2] blocked: need the staging token
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'; a send that answers none of them passes --answers-none instead (rule: bin/fm-send.sh header)
+
+################ D1 paired: no open decision, byte-identical record head vs base
+
+===== HEAD bare send, no open decision
+$ fm-send.sh n1 plain steer text   [head]
+exit=0
+--- stdout
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Xfwghh
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+===== BASE bare send, no open decision
+$ fm-send.sh n2 plain steer text   [base]
+exit=0
+--- stdout
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Xfwghh
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+--- head record: /Users/charlesabrooker/tmp/fm-lab.Xfwghh/state/n1.inbox/001.msg
+0000000    s   c   h   e   m   a   =   f   m   -   t   a   s   k   -   i
+0000020    n   b   o   x   .   v   1  \n   a   t   =   2   0   2   6   -
+0000040    1   1   -   0   4   T   1   4   :   5   5   :   1   3   Z  \n
+0000060    -   -  \n   p   l   a   i   n       s   t   e   e   r       t
+0000100    e   x   t                                                    
+0000103
+--- base record: /Users/charlesabrooker/tmp/fm-lab.Xfwghh/state/n2.inbox/001.msg
+0000000    s   c   h   e   m   a   =   f   m   -   t   a   s   k   -   i
+0000020    n   b   o   x   .   v   1  \n   a   t   =   2   0   2   6   -
+0000040    1   1   -   0   4   T   1   4   :   5   5   :   3   6   Z  \n
+0000060    -   -  \n   p   l   a   i   n       s   t   e   e   r       t
+0000100    e   x   t                                                    
+0000103
+RECORDS BYTE-IDENTICAL: no
+2c2
+< at=2026-11-04T14:55:13Z
+---
+> at=2026-11-04T14:55:36Z
+
+===== HEAD --answers-none, no open decision
+$ fm-send.sh n1 --answers-none plain steer text 2   [head]
+exit=0
+--- stdout
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Xfwghh
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+--- status file n1
+working: busy
+resolved [key=old]: answered: done
+--- inbox records
+n1.inbox/001.msg
+n1.inbox/002.msg
+--- pane text
+: Firstmate instruction waiting: 'n1.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 'n1.inbox/002.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+--- pending-replies
+(none)
+--- drain
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+b1 [key=k1] needs-decision: pick REST or RPC
+b1 [key=k2] blocked: need the staging token
+t1 [key=k2] blocked: need the staging token
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'; a send that answers none of them passes --answers-none instead (rule: bin/fm-send.sh header)

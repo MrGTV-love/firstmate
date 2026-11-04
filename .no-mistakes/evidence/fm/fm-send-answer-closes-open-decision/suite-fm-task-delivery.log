@@ -1,0 +1,4 @@
+ok - scaffold headings cannot hide active spec placeholders; fenced examples remain valid
+ok - complete CRLF briefs preserve admission and intent; NUL briefs fail explicitly
+ok - fm-spawn: fresh ships/scouts refuse empty or pointer-only asks and admit substantive asks
+ok - fm-promote: a promoted plan labels scout DoD and exclusions as context under the ship intent

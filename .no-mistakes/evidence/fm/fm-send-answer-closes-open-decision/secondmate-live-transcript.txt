@@ -1,0 +1,63 @@
+lab home: /Users/charlesabrooker/tmp/fm-lab.n1BCAK
+===== start
+--- pending-replies: 0 file(s)
+--- inbox records: 0
+--- status
+--- drain
+(no open decision)
+
+===== bare send, no open key: delivered, creates one expectation
+$ fm-send.sh sm1 status of phase 7?
+exit=0
+--- pending-replies: 1 file(s)
+pending-replies/5aef12f68e2ec044
+--- inbox records: 1
+--- status
+--- drain
+(no open decision)
+
+===== bare send again, an expectation open but no status entry: still delivered
+$ fm-send.sh sm1 and phase 8?
+exit=0
+--- pending-replies: 2 file(s)
+pending-replies/12a19dec8a1bfc8a
+pending-replies/5aef12f68e2ec044
+--- inbox records: 2
+--- status
+--- drain
+(no open decision)
+
+===== open key added, bare send: refuses, no new expectation, no record
+$ fm-send.sh sm1 and phase 9?
+exit=1
+error: sm1 has open keyed decisions in /Users/charlesabrooker/tmp/fm-lab.n1BCAK/state/sm1.status, and this send states no choice. Refusing it; nothing was sent. Open keys:
+  [key=audit-scope] needs-decision
+Resend with --resolve-key <key> (repeatable; this send answers that key and closes it), or with --answers-none (this send answers none of them and every key stays open). Rule: the bin/fm-send.sh header, "Decision closure".
+--- pending-replies: 2 file(s)
+pending-replies/12a19dec8a1bfc8a
+pending-replies/5aef12f68e2ec044
+--- inbox records: 2
+--- status
+needs-decision [key=audit-scope]: whole repo or one package
+--- drain
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+sm1 [key=audit-scope] needs-decision: whole repo or one package
+
+===== --answers-none: delivered with marker, key stays open
+$ fm-send.sh sm1 --answers-none and phase 9?
+exit=0
+--- pending-replies: 3 file(s)
+pending-replies/12a19dec8a1bfc8a
+pending-replies/5aef12f68e2ec044
+pending-replies/600e2b4cf8479198
+--- inbox records: 3
+--- status
+needs-decision [key=audit-scope]: whole repo or one package
+--- drain
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+sm1 [key=audit-scope] needs-decision: whole repo or one package
+--- newest record body
+schema=fm-task-inbox.v1
+at=2026-11-04T15:11:03Z
+--
+[fm-from-firstmate]⁣corr=600e2b4cf8479198 and phase 9?

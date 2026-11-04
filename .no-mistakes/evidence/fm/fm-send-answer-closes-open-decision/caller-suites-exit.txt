@@ -1,0 +1,7 @@
+tests/fm-secondmate-sync.test.sh exit=1
+tests/fm-secondmate-reconcile.test.sh exit=0
+tests/fm-backlog-handoff.test.sh exit=0
+tests/fm-pending-reply.test.sh exit=0
+tests/fm-secondmate-restart.test.sh exit=0
+tests/fm-open-loops.test.sh exit=143
+tests/fm-open-loops.test.sh stopped by tester after its check-in block passed (no FAIL lines; rest unrelated)

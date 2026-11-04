@@ -1,0 +1,8 @@
+### tests/fm-send-resolve-key.test.sh
+exit=0
+38
+ok - fm-send --resolve-key: the close happens at enqueue, surviving a failed doorbell
+ok - fm-send --resolve-key: a failed enqueue never closes the decision
+ok - fm-send --resolve-key: a failed remote transport never closes the decision
+ok - fm-send --resolve-key: failed-close recovery commands safely quote operator text and paths
+### tests/fm-task-delivery.test.sh
