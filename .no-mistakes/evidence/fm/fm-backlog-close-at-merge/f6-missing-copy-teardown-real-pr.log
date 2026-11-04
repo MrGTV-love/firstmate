@@ -1,0 +1,3 @@
+missing-copy proof source: real gh read of https://github.com/MrGTV-love/firstmate/pull/367
+ok - a missing-copy teardown closes the item on a merged PR proof read from the forge and clears its dependents (real gh read of https://github.com/MrGTV-love/firstmate/pull/367)
+exit=0

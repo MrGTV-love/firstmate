@@ -1,0 +1,25 @@
+-- before:
+  blocker    state=queued   deps=none
+  other      state=queued   deps=none
+  w-one      state=queued   deps="blocked-by:blocker"
+  w-two      state=queued   deps="blocked-by:blocker,blocked-by:other"
+  raw-blocker state=queued   deps=none
+  w-raw      state=queued   deps="blocked-by:raw-blocker"
+-- ready queue before: w-blocker 
+$ bin/fm-tasks-axi.sh done blocker --pr https://github.com/MrGTV-love/firstmate/pull/367
+ok: done blocker -> Done (pr https://github.com/MrGTV-love/firstmate/pull/367)
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+unblocked: w-one no longer waits on blocker; no stored blocked-by edge remains
+unblocked: w-two no longer waits on blocker; it still waits on other
+[exit 0]
+$ tasks-axi done raw-blocker   (raw tasks-axi, not the Firstmate route)
+[exit 0]
+-- after:
+  blocker    state=done     deps=none
+  other      state=queued   deps=none
+  w-one      state=queued   deps=none
+  w-two      state=queued   deps="blocked-by:other"
+  raw-blocker state=done     deps=none
+  w-raw      state=queued   deps="blocked-by:raw-blocker"
+lab removed: /Users/charlesabrooker/tmp/fm-lab.XCNRrh

@@ -1,0 +1,33 @@
+-- c-member-339 and c-member-356 (docs) have live meta pr= rows of the real 362 Component table
+-- directive lines in the real 362 body (column 0):
+   none
+-- Component table rows in the real body:
+170:| https://github.com/MrGTV-love/firstmate/pull/356 | `8d7e5d1254fdd66a25227b
+171:| https://github.com/MrGTV-love/firstmate/pull/339 | `3b530bbc4befda3bab3030
+172:| https://github.com/MrGTV-love/firstmate/pull/352 | `f455622033a51bd217aa68
+173:| https://github.com/MrGTV-love/firstmate/pull/349 | `f64d484af613bf5123baad
+174:| https://github.com/MrGTV-love/firstmate/pull/359 | `78bb3bced2a3111f348271
+175:| https://github.com/MrGTV-love/firstmate/pull/358 | `d826cb7debd40f6ae35209
+176:| https://github.com/MrGTV-love/firstmate/pull/360 | `fc1b2ef31b5a6d84430cf0
+$ bin/fm-pr-close-items.sh fm-merge-train-9 https://github.com/MrGTV-love/firstmate/pull/362
+[stderr] actionable: close-at-merge: mentioned https://github.com/MrGTV-love/firstmate/pull/358 in the prose of https://github.com/MrGTV-love/firstmate/pull/362: no item was closed for it; list it as a Train-member: line if it landed with this merge
+[stderr] actionable: close-at-merge: mentioned https://github.com/MrGTV-love/firstmate/pull/339 in the prose of https://github.com/MrGTV-love/firstmate/pull/362: no item was closed for it; list it as a Train-member: line if it landed with this merge
+[stderr] actionable: close-at-merge: mentioned https://github.com/MrGTV-love/firstmate/pull/364 in the prose of https://github.com/MrGTV-love/firstmate/pull/362: no item was closed for it; list it as a Train-member: line if it landed with this merge
+[stderr] actionable: close-at-merge: mentioned https://github.com/MrGTV-love/firstmate/pull/356 in the prose of https://github.com/MrGTV-love/firstmate/pull/362: no item was closed for it; list it as a Train-member: line if it landed with this merge
+[stderr] actionable: close-at-merge: mentioned https://github.com/MrGTV-love/firstmate/pull/349 in the prose of https://github.com/MrGTV-love/firstmate/pull/362: no item was closed for it; list it as a Train-member: line if it landed with this merge
+[stderr] actionable: close-at-merge: mentioned https://github.com/MrGTV-love/firstmate/pull/352 in the prose of https://github.com/MrGTV-love/firstmate/pull/362: no item was closed for it; list it as a Train-member: line if it landed with this merge
+[stderr] actionable: close-at-merge: mentioned https://github.com/MrGTV-love/firstmate/pull/359 in the prose of https://github.com/MrGTV-love/firstmate/pull/362: no item was closed for it; list it as a Train-member: line if it landed with this merge
+[stderr] actionable: close-at-merge: mentioned https://github.com/MrGTV-love/firstmate/pull/360 in the prose of https://github.com/MrGTV-love/firstmate/pull/362: no item was closed for it; list it as a Train-member: line if it landed with this merge
+[stderr] actionable: close-at-merge: mentioned https://github.com/MrGTV-love/firstmate/pull/347 in the prose of https://github.com/MrGTV-love/firstmate/pull/362: no item was closed for it; list it as a Train-member: line if it landed with this merge
+[stderr] actionable: close-at-merge: mentioned https://github.com/MrGTV-love/firstmate/pull/361 in the prose of https://github.com/MrGTV-love/firstmate/pull/362: no item was closed for it; list it as a Train-member: line if it landed with this merge
+[stderr] actionable: close-at-merge: mentioned https://github.com/MrGTV-love/firstmate/pull/353 in the prose of https://github.com/MrGTV-love/firstmate/pull/362: no item was closed for it; list it as a Train-member: line if it landed with this merge
+[stderr] actionable: close-at-merge: mentioned https://github.com/o/r/pull/347 in the prose of https://github.com/MrGTV-love/firstmate/pull/362: no item was closed for it; list it as a Train-member: line if it landed with this merge
+[stderr] actionable: close-at-merge: mentioned https://github.com/o/r/pull/9 in the prose of https://github.com/MrGTV-love/firstmate/pull/362: no item was closed for it; list it as a Train-member: line if it landed with this merge
+[exit 0]
+  c-member-339     state=queued
+  c-member-356     state=queued
+  fm-merge-train-9 state=queued
+== gh calls:
+real-gh pr view https://github.com/MrGTV-love/firstmate/pull/362 --json body,state --jq (.state // "") + "\n" + (.body // "")
+lab removed: /Users/charlesabrooker/tmp/fm-lab.pEgNUg
+lab gone: yes

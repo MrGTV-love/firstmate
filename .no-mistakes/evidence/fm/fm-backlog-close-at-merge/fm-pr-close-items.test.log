@@ -1,0 +1,51 @@
+ok - a merge closes each named eligible item with the merged PR URL and reports the one it left open
+ok - a merge that names its own task reports the live-record refusal and still succeeds
+ok - a prose mention of the merging task prints no mention line, and another prose id still prints one
+ok - an old Closes: line naming the merging task is left to its teardown, uncounted, while another old line is still actionable
+ok - an old Closes: line never stops a directive or a task record from closing the same id
+ok - a body with no directive line closes nothing and reports each id and pull request it mentions in prose
+ok - a merge whose outcome cannot be recorded runs no close and lists the named items
+ok - a merge the watcher already recorded still closes its items and sends no second notice
+ok - an unreadable merged body leaves the merge unchanged and names the URL and the error
+ok - each failure kind is reported with its reason, none stops the next item, and holds win
+ok - a hold placed after the close step's last look is caught inside the completion lock
+ok - a repeat of the close step changes nothing, with the task record present and after it is gone
+ok - a rerun after a partial close only reports the closed item and closes the rest
+ok - a hand run with a pull request that is not merged closes nothing and reports each named item
+ok - a train closes its Train-member lines' items from bodies and from pr=, never an excluded PR's, whatever decorative layout the body also holds
+ok - a train body without its own Closes-backlog-item line still closes the members' items
+ok - an unreadable member is reported by URL while the item behind its pr= still closes
+ok - a Train-member line that is no pull request URL, or is the train itself, is reported and the valid member still closes
+ok - members match by the full URL, never by number
+ok - F1: an excluded descendant Component table closes nothing, keeps its item and edge, and is reported; a Train-member line closes the member
+ok - F2: a fence indented three spaces keeps its Closes-backlog-item and Train-member lines examples, and the real directive still closes
+ok - F3: a negated exclusion heading no longer decides anything; the unlisted member is reported and a Train-member line closes it
+ok - F4: an unlisted Forgejo or GitLab member is reported by its URL and closes nothing; a Train-member line closes it; a plain body is silent
+ok - a GitLab or Forgejo merge that names its own In-flight task reports the live-record refusal and still succeeds
+ok - a Forgejo train closes the items of its listed members from bodies and pr=, never a prose-only PR or another repository's number, and reports the prose link
+ok - a GitLab train reads each listed member, never a prose-only merge request, and reports the prose link
+ok - a failed backlog listing reports the skipped id check once and still closes the named item
+ok - the parser takes the two directive forms, and reads no example, indented line, table cell, quote or malformed line as one
+ok - a GitLab merge reports the completion path's actual result per item and still succeeds
+ok - a Forgejo merge reports the completion path's actual result per item and still succeeds
+ok - a dependent whose id the list prints in quotes still loses the finished edge
+ok - completing a blocker clears its edge on every wrapper route, keeps other blockers and holds, and reports the dependents
+ok - the task noun forms and a typed public-followup completion clear the finished edge
+ok - a typed completion clears the edge when the row is archived at once and reports a failed read back
+ok - a help call on a typed completion asks nobody to act
+ok - a merge reports a cleared edge on stdout and a failed clear behind actionable: on stderr
+ok - answering a captain call clears the call's edge from its dependents
+ok - withdrawing a captain call clears the call's edge from its dependents
+ok - an explicit data root gets the same blocker clear
+ok - a merge closes each named eligible item with the merged PR URL and reports the one it left open
+ok - a merge that names its own task reports the live-record refusal and still succeeds
+ok - a GitLab merge reports the completion path's actual result per item and still succeeds
+ok - a Forgejo merge reports the completion path's actual result per item and still succeeds
+ok - a GitLab or Forgejo merge that names its own In-flight task reports the live-record refusal and still succeeds
+ok - a Forgejo train closes the items of its listed members from bodies and pr=, never a prose-only PR or another repository's number, and reports the prose link
+ok - a GitLab train reads each listed member, never a prose-only merge request, and reports the prose link
+ok - with production merge prune on and a busy teardown, GitHub, GitLab and Forgejo merges close, report and defer as with prune off
+ok - a second bin/fm-pr-merge.sh run on the merged PR changes nothing, with the task record present and after prune removed it
+ok - a typed record-delivery completion through the wrapper clears the finished edge and keeps another blocker
+ok - done --json through the wrapper has the same fields and values as tasks-axi alone
+exit=0

@@ -1,0 +1,255 @@
+== lab home: /Users/charlesabrooker/tmp/fm-lab.wnwMXh (marker: . .. .fm-lab-home .tasks.toml config data projects state )
+
+######## Scenario A: merged PR 367 body names items with Closes-backlog-item lines
+-- body:
+## Summary
+
+This change also fixes a-prose in passing. It is the lab-merging task.
+
+| Item | Note |
+| --- | --- |
+| a-table | a table mention |
+
+### a-heading
+
+See [a-link](https://example.com/a-link) for context.
+
+```text
+Closes-backlog-item: a-fenced
+```
+	```
+Closes-backlog-item: a-after-tab
+
+  Closes-backlog-item: a-indented
+Closes-backlog-item: a-one
+Closes-backlog-item: a-two
+Closes-backlog-item: a-held
+Closes-backlog-item: no-such-item
+Closes: a-oldform
+Closes: lab-merging
+Closes-backlog-item: bad id here
+-- before:
+  lab-merging      state=queued     deps=none
+  a-after-tab      state=queued     deps=none
+  a-one            state=queued     deps=none
+  a-two            state=queued     deps=none
+  a-held           state=queued     deps=none
+  a-prose          state=queued     deps=none
+  a-table          state=queued     deps=none
+  a-heading        state=queued     deps=none
+  a-link           state=queued     deps=none
+  a-fenced         state=queued     deps=none
+  a-indented       state=queued     deps=none
+  a-oldform        state=queued     deps=none
+  d-only           state=queued     deps="blocked-by:a-one"
+  d-two            state=queued     deps="blocked-by:a-one,blocked-by:a-other"
+  123              state=queued     deps="blocked-by:a-two"
+$ bin/fm-pr-close-items.sh lab-merging https://github.com/MrGTV-love/firstmate/pull/367
+close-at-merge: closed a-after-tab with https://github.com/MrGTV-love/firstmate/pull/367 (named by the body of https://github.com/MrGTV-love/firstmate/pull/367)
+close-at-merge: closed a-one with https://github.com/MrGTV-love/firstmate/pull/367 (named by the body of https://github.com/MrGTV-love/firstmate/pull/367)
+close-at-merge: unblocked: d-only no longer waits on a-one; no stored blocked-by edge remains
+close-at-merge: unblocked: d-two no longer waits on a-one; it still waits on a-other
+close-at-merge: closed a-two with https://github.com/MrGTV-love/firstmate/pull/367 (named by the body of https://github.com/MrGTV-love/firstmate/pull/367)
+close-at-merge: unblocked: 123 no longer waits on a-two; no stored blocked-by edge remains
+close-at-merge: the body of https://github.com/MrGTV-love/firstmate/pull/367 names the merging task lab-merging with a Closes: line, which closes nothing; its own teardown closes it
+close-at-merge: 3 closed, 4 left open
+[stderr] actionable: close-at-merge: not closed a-held: it is an open owner call: a-held is an open owner call (a captain hold); resolve it with bin/fm-captain-hold.sh before completing it
+[stderr] actionable: close-at-merge: not closed no-such-item: unknown id named by the body of https://github.com/MrGTV-love/firstmate/pull/367; no item with that id is in the active backlog (an archived item is not read), and none was created
+[stderr] actionable: close-at-merge: ignored a malformed directive line in the body of https://github.com/MrGTV-love/firstmate/pull/367: Closes-backlog-item: bad id here; the forms are one Closes-backlog-item: <item-id> or Train-member: <pull request URL> per line
+[stderr] actionable: close-at-merge: not closed a-oldform: the body of https://github.com/MrGTV-love/firstmate/pull/367 names it with a Closes: line, which closes nothing; write 'Closes-backlog-item: a-oldform' on a line of its own in the body, then retry: bin/fm-pr-close-items.sh lab-merging https://github.com/MrGTV-love/firstmate/pull/367
+[stderr] actionable: close-at-merge: mentioned a-prose in the prose of https://github.com/MrGTV-love/firstmate/pull/367: nothing was closed for it; add a Closes-backlog-item: a-prose line to the body if this merge finished it
+[stderr] actionable: close-at-merge: mentioned a-table in the prose of https://github.com/MrGTV-love/firstmate/pull/367: nothing was closed for it; add a Closes-backlog-item: a-table line to the body if this merge finished it
+[stderr] actionable: close-at-merge: mentioned a-heading in the prose of https://github.com/MrGTV-love/firstmate/pull/367: nothing was closed for it; add a Closes-backlog-item: a-heading line to the body if this merge finished it
+[stderr] actionable: close-at-merge: mentioned a-link in the prose of https://github.com/MrGTV-love/firstmate/pull/367: nothing was closed for it; add a Closes-backlog-item: a-link line to the body if this merge finished it
+[stderr] actionable: close-at-merge: mentioned a-indented in the prose of https://github.com/MrGTV-love/firstmate/pull/367: nothing was closed for it; add a Closes-backlog-item: a-indented line to the body if this merge finished it
+[exit 3]
+-- after:
+  lab-merging      state=queued     deps=none
+  a-after-tab      state=done       deps=none
+  a-one            state=done       deps=none
+  a-two            state=done       deps=none
+  a-held           state=queued     deps=none
+  a-prose          state=queued     deps=none
+  a-table          state=queued     deps=none
+  a-heading        state=queued     deps=none
+  a-link           state=queued     deps=none
+  a-fenced         state=queued     deps=none
+  a-indented       state=queued     deps=none
+  a-oldform        state=queued     deps=none
+  d-only           state=queued     deps=none
+  d-two            state=queued     deps="blocked-by:a-other"
+  123              state=queued     deps=none
+-- no-such-item created? 0 line(s) in backlog
+-- proof lines for 367 in backlog: 3
+
+######## Scenario A-rerun: same merge again (idempotent)
+$ bin/fm-pr-close-items.sh lab-merging https://github.com/MrGTV-love/firstmate/pull/367
+close-at-merge: a-after-tab is already done
+close-at-merge: a-one is already done
+close-at-merge: a-two is already done
+close-at-merge: the body of https://github.com/MrGTV-love/firstmate/pull/367 names the merging task lab-merging with a Closes: line, which closes nothing; its own teardown closes it
+close-at-merge: 0 closed, 4 left open
+[stderr] actionable: close-at-merge: not closed a-held: it is an open owner call: a-held is an open owner call (a captain hold); resolve it with bin/fm-captain-hold.sh before completing it
+[stderr] actionable: close-at-merge: not closed no-such-item: unknown id named by the body of https://github.com/MrGTV-love/firstmate/pull/367; no item with that id is in the active backlog (an archived item is not read), and none was created
+[stderr] actionable: close-at-merge: ignored a malformed directive line in the body of https://github.com/MrGTV-love/firstmate/pull/367: Closes-backlog-item: bad id here; the forms are one Closes-backlog-item: <item-id> or Train-member: <pull request URL> per line
+[stderr] actionable: close-at-merge: not closed a-oldform: the body of https://github.com/MrGTV-love/firstmate/pull/367 names it with a Closes: line, which closes nothing; write 'Closes-backlog-item: a-oldform' on a line of its own in the body, then retry: bin/fm-pr-close-items.sh lab-merging https://github.com/MrGTV-love/firstmate/pull/367
+[stderr] actionable: close-at-merge: mentioned a-prose in the prose of https://github.com/MrGTV-love/firstmate/pull/367: nothing was closed for it; add a Closes-backlog-item: a-prose line to the body if this merge finished it
+[stderr] actionable: close-at-merge: mentioned a-table in the prose of https://github.com/MrGTV-love/firstmate/pull/367: nothing was closed for it; add a Closes-backlog-item: a-table line to the body if this merge finished it
+[stderr] actionable: close-at-merge: mentioned a-heading in the prose of https://github.com/MrGTV-love/firstmate/pull/367: nothing was closed for it; add a Closes-backlog-item: a-heading line to the body if this merge finished it
+[stderr] actionable: close-at-merge: mentioned a-link in the prose of https://github.com/MrGTV-love/firstmate/pull/367: nothing was closed for it; add a Closes-backlog-item: a-link line to the body if this merge finished it
+[stderr] actionable: close-at-merge: mentioned a-indented in the prose of https://github.com/MrGTV-love/firstmate/pull/367: nothing was closed for it; add a Closes-backlog-item: a-indented line to the body if this merge finished it
+[exit 3]
+-- proof lines for 367 in backlog: 3
+
+######## Scenario A-partial: owner releases a-held, rerun closes only the rest
+$ bin/fm-pr-close-items.sh lab-merging https://github.com/MrGTV-love/firstmate/pull/367
+close-at-merge: a-after-tab is already done
+close-at-merge: a-one is already done
+close-at-merge: a-two is already done
+close-at-merge: closed a-held with https://github.com/MrGTV-love/firstmate/pull/367 (named by the body of https://github.com/MrGTV-love/firstmate/pull/367)
+close-at-merge: the body of https://github.com/MrGTV-love/firstmate/pull/367 names the merging task lab-merging with a Closes: line, which closes nothing; its own teardown closes it
+close-at-merge: 1 closed, 3 left open
+[stderr] actionable: close-at-merge: not closed no-such-item: unknown id named by the body of https://github.com/MrGTV-love/firstmate/pull/367; no item with that id is in the active backlog (an archived item is not read), and none was created
+[stderr] actionable: close-at-merge: ignored a malformed directive line in the body of https://github.com/MrGTV-love/firstmate/pull/367: Closes-backlog-item: bad id here; the forms are one Closes-backlog-item: <item-id> or Train-member: <pull request URL> per line
+[stderr] actionable: close-at-merge: not closed a-oldform: the body of https://github.com/MrGTV-love/firstmate/pull/367 names it with a Closes: line, which closes nothing; write 'Closes-backlog-item: a-oldform' on a line of its own in the body, then retry: bin/fm-pr-close-items.sh lab-merging https://github.com/MrGTV-love/firstmate/pull/367
+[stderr] actionable: close-at-merge: mentioned a-prose in the prose of https://github.com/MrGTV-love/firstmate/pull/367: nothing was closed for it; add a Closes-backlog-item: a-prose line to the body if this merge finished it
+[stderr] actionable: close-at-merge: mentioned a-table in the prose of https://github.com/MrGTV-love/firstmate/pull/367: nothing was closed for it; add a Closes-backlog-item: a-table line to the body if this merge finished it
+[stderr] actionable: close-at-merge: mentioned a-heading in the prose of https://github.com/MrGTV-love/firstmate/pull/367: nothing was closed for it; add a Closes-backlog-item: a-heading line to the body if this merge finished it
+[stderr] actionable: close-at-merge: mentioned a-link in the prose of https://github.com/MrGTV-love/firstmate/pull/367: nothing was closed for it; add a Closes-backlog-item: a-link line to the body if this merge finished it
+[stderr] actionable: close-at-merge: mentioned a-indented in the prose of https://github.com/MrGTV-love/firstmate/pull/367: nothing was closed for it; add a Closes-backlog-item: a-indented line to the body if this merge finished it
+[exit 3]
+  a-one            state=done       deps=none
+  a-two            state=done       deps=none
+  a-held           state=done       deps=none
+-- proof lines for 367 in backlog: 4
+
+######## Scenario B: merged train PR 362 with Train-member lines
+-- train body:
+Train 9 lab body.
+
+Also related: https://github.com/MrGTV-love/firstmate/pull/358 was kept out.
+
+| Component | Head |
+| --- | --- |
+| https://github.com/MrGTV-love/firstmate/pull/352 | abc |
+
+Train-member: https://github.com/MrGTV-love/firstmate/pull/360
+Train-member: https://github.com/MrGTV-love/firstmate/pull/359
+Train-member: https://github.com/MrGTV-love/firstmate/pull/356
+Train-member: not-a-url
+Closes: b-member-a
+Train-member: https://github.com/MrGTV-love/firstmate/pull/362
+-- body of 360:
+Member 360.
+Closes-backlog-item: b-member-a
+-- body of 359:
+Member 359 names nothing new, but mentions b-member-x in prose.
+Closes: b-meta-docs
+-- body of 356:
+Member 356.
+Closes-backlog-item: b-member-c
+-- body of 352:
+Table-only PR 352.
+Closes-backlog-item: b-table-only
+-- body of 358:
+Prose-only PR 358.
+Closes-backlog-item: b-prose-only
+-- meta: b-meta-docs pr=https://github.com/MrGTV-love/firstmate/pull/359 (docs, live); b-ship-live pr=https://github.com/MrGTV-love/firstmate/pull/356 (ship, live)
+$ bin/fm-pr-close-items.sh lab-train https://github.com/MrGTV-love/firstmate/pull/362
+close-at-merge: closed b-member-a with https://github.com/MrGTV-love/firstmate/pull/362 (named by the body of train member https://github.com/MrGTV-love/firstmate/pull/360)
+close-at-merge: closed b-meta-docs with https://github.com/MrGTV-love/firstmate/pull/362 (named by the task record that holds train member https://github.com/MrGTV-love/firstmate/pull/359)
+close-at-merge: closed b-member-c with https://github.com/MrGTV-love/firstmate/pull/362 (named by the body of train member https://github.com/MrGTV-love/firstmate/pull/356)
+close-at-merge: 3 closed, 2 left open
+[stderr] actionable: close-at-merge: not closed b-ship-live: bin/fm-tasks-axi.sh done did not close it: b-ship-live has a live task record; complete it with bin/fm-teardown.sh b-ship-live, which owns the landing proof
+[stderr] actionable: close-at-merge: could not use Train-member not-a-url: it is not a GitHub, GitLab or Forgejo pull request URL, so nothing was closed for it
+[stderr] actionable: close-at-merge: ignored Train-member https://github.com/MrGTV-love/firstmate/pull/362: it is the merged pull request itself
+[stderr] actionable: close-at-merge: mentioned https://github.com/MrGTV-love/firstmate/pull/358 in the prose of https://github.com/MrGTV-love/firstmate/pull/362: no item was closed for it; list it as a Train-member: line if it landed with this merge
+[stderr] actionable: close-at-merge: mentioned https://github.com/MrGTV-love/firstmate/pull/352 in the prose of https://github.com/MrGTV-love/firstmate/pull/362: no item was closed for it; list it as a Train-member: line if it landed with this merge
+[exit 3]
+-- after:
+  b-member-a       state=done       deps=none
+  b-member-x       state=queued     deps=none
+  b-member-c       state=done       deps=none
+  b-meta-docs      state=done       deps=none
+  b-ship-live      state=queued     deps=none
+  b-table-only     state=queued     deps=none
+  b-prose-only     state=queued     deps=none
+  backlog: 22:- [x] b-member-c - item b-member-c https://github.com/MrGTV-love/firstmate/pull/362 (kind: ship) (merged 2026-11-03)
+  backlog: 23:- [x] b-meta-docs - item b-meta-docs https://github.com/MrGTV-love/firstmate/pull/362 (kind: docs) (merged 2026-11-03)
+  backlog: 24:- [x] b-member-a - item b-member-a https://github.com/MrGTV-love/firstmate/pull/362 (kind: ship) (merged 2026-11-03)
+
+######## Scenario C: the REAL body of merged train PR 362 (no Train-member line, Component table)
+-- c-member-339 (docs) has live meta pr=https://github.com/MrGTV-love/firstmate/pull/339, a row of the real Component table
+sed: 1: "s/(.{400}).*/\1 .../
+": RE error: maximum repetition exceeds 255
+  fm-merge-train-9 state=queued     deps=none
+  c-member-339     state=queued     deps=none
+
+######## Scenario D: hand run with an OPEN PR (373)
+$ bin/fm-pr-close-items.sh lab-open https://github.com/MrGTV-love/firstmate/pull/373
+close-at-merge: 0 closed, 1 left open
+[stderr] actionable: close-at-merge: not closed d-open: https://github.com/MrGTV-love/firstmate/pull/373 is not merged, so nothing was closed (named by the body of https://github.com/MrGTV-love/firstmate/pull/373); retry once it has merged: bin/fm-pr-close-items.sh lab-open https://github.com/MrGTV-love/firstmate/pull/373
+[exit 3]
+  d-open           state=queued     deps=none
+
+######## Scenario E: merge the forge confirmed but could not record (--not-recorded)
+$ bin/fm-pr-close-items.sh --not-recorded lab-norec https://github.com/MrGTV-love/firstmate/pull/366
+close-at-merge: 0 closed, 1 left open
+[stderr] actionable: close-at-merge: not closed e-item: the merge of https://github.com/MrGTV-love/firstmate/pull/366 was not recorded, so nothing was closed (named by the body of https://github.com/MrGTV-love/firstmate/pull/366); retry: bin/fm-pr-close-items.sh lab-norec https://github.com/MrGTV-love/firstmate/pull/366
+[exit 3]
+  e-item           state=queued     deps=none
+
+== backlog file at end:
+## In flight
+
+## Queued
+- [ ] lab-merging - item lab-merging (kind: ship) (since 2026-11-03)
+
+- [ ] a-prose - item a-prose (kind: ship) (since 2026-11-03)
+- [ ] a-table - item a-table (kind: ship) (since 2026-11-03)
+- [ ] a-heading - item a-heading (kind: ship) (since 2026-11-03)
+- [ ] a-link - item a-link (kind: ship) (since 2026-11-03)
+- [ ] a-fenced - item a-fenced (kind: ship) (since 2026-11-03)
+- [ ] a-indented - item a-indented (kind: ship) (since 2026-11-03)
+- [ ] a-oldform - item a-oldform (kind: ship) (since 2026-11-03)
+- [ ] a-other - item a-other (kind: ship) (since 2026-11-03)
+- [ ] d-only - item d-only (kind: ship) (since 2026-11-03)
+- [ ] d-two - item d-two blocked-by: a-other (kind: ship) (since 2026-11-03)
+- [ ] 123 - item 123 (kind: ship) (since 2026-11-03)
+- [ ] b-member-x - item b-member-x (kind: ship) (since 2026-11-03)
+- [ ] b-table-only - item b-table-only (kind: ship) (since 2026-11-03)
+- [ ] b-prose-only - item b-prose-only (kind: ship) (since 2026-11-03)
+- [ ] b-ship-live - item b-ship-live (kind: ship) (since 2026-11-03)
+- [ ] fm-merge-train-9 - item fm-merge-train-9 (kind: ship) (since 2026-11-03)
+- [ ] c-member-339 - item c-member-339 (kind: docs) (since 2026-11-03)
+- [ ] d-open - item d-open (kind: ship) (since 2026-11-03)
+- [ ] e-item - item e-item (kind: ship) (since 2026-11-03)
+## Done
+- [x] b-member-c - item b-member-c https://github.com/MrGTV-love/firstmate/pull/362 (kind: ship) (merged 2026-11-03)
+- [x] b-meta-docs - item b-meta-docs https://github.com/MrGTV-love/firstmate/pull/362 (kind: docs) (merged 2026-11-03)
+- [x] b-member-a - item b-member-a https://github.com/MrGTV-love/firstmate/pull/362 (kind: ship) (merged 2026-11-03)
+- [x] a-held - item a-held https://github.com/MrGTV-love/firstmate/pull/367 (kind: ship) (merged 2026-11-03)
+- [x] a-two - item a-two https://github.com/MrGTV-love/firstmate/pull/367 (kind: docs) (merged 2026-11-03)
+- [x] a-one - item a-one https://github.com/MrGTV-love/firstmate/pull/367 (kind: ship) (merged 2026-11-03)
+- [x] a-after-tab - item a-after-tab https://github.com/MrGTV-love/firstmate/pull/367 (kind: ship) (merged 2026-11-03)
+
+== gh calls (lab-body = lab body file; real-gh = real GitHub read):
+lab-body https://github.com/MrGTV-love/firstmate/pull/367
+real-gh api /repos/MrGTV-love/firstmate/pulls/367 --method GET --jq "merged=" + ((.merged_at != null)|tostring)
+real-gh api /repos/MrGTV-love/firstmate/pulls/367 --method GET --jq "merged=" + ((.merged_at != null)|tostring)
+lab-body https://github.com/MrGTV-love/firstmate/pull/367
+lab-body https://github.com/MrGTV-love/firstmate/pull/367
+real-gh api /repos/MrGTV-love/firstmate/pulls/367 --method GET --jq "merged=" + ((.merged_at != null)|tostring)
+lab-body https://github.com/MrGTV-love/firstmate/pull/362
+lab-body https://github.com/MrGTV-love/firstmate/pull/360
+real-gh api /repos/MrGTV-love/firstmate/pulls/362 --method GET --jq "merged=" + ((.merged_at != null)|tostring)
+lab-body https://github.com/MrGTV-love/firstmate/pull/359
+lab-body https://github.com/MrGTV-love/firstmate/pull/356
+real-gh api /repos/MrGTV-love/firstmate/pulls/362 --method GET --jq "merged=" + ((.merged_at != null)|tostring)
+real-gh pr view https://github.com/MrGTV-love/firstmate/pull/362 --json body,state --jq (.state // "") + "\n" + (.body // "")
+lab-body https://github.com/MrGTV-love/firstmate/pull/373
+lab-body https://github.com/MrGTV-love/firstmate/pull/366
+
+== teardown (EXIT trap)
+lab removed: /Users/charlesabrooker/tmp/fm-lab.wnwMXh
+lab gone: yes

@@ -1,0 +1,27 @@
+MERGED
+## Summary
+
+This change also fixes a-prose in passing. It is the lab-merging task.
+
+| Item | Note |
+| --- | --- |
+| a-table | a table mention |
+
+### a-heading
+
+See [a-link](https://example.com/a-link) for context.
+
+```text
+Closes-backlog-item: a-fenced
+```
+	```
+Closes-backlog-item: a-after-tab
+
+  Closes-backlog-item: a-indented
+Closes-backlog-item: a-one
+Closes-backlog-item: a-two
+Closes-backlog-item: a-held
+Closes-backlog-item: no-such-item
+Closes: a-oldform
+Closes: lab-merging
+Closes-backlog-item: bad id here

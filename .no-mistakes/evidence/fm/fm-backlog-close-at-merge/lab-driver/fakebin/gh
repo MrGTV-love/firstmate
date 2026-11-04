@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Lab body source. Only `gh pr view <url> --json body,state ...` for a URL that has a
+# file in $LAB_BODIES is answered here: line 1 of the file is the state, the rest the body.
+# Every other gh call (and every URL without a file) goes to the real gh, read-only.
+REAL_GH=/opt/homebrew/bin/gh
+if [ "${1:-}" = pr ] && [ "${2:-}" = view ] && [ "${4:-}" = --json ] && [ "${5:-}" = body,state ] && [ -n "${LAB_BODIES:-}" ]; then
+  key=$(printf '%s' "$3" | sed 's#^https://github.com/##; s#/#_#g')
+  if [ -f "$LAB_BODIES/$key" ]; then
+    printf 'lab-body %s\n' "$3" >> "${LAB_GH_LOG:-/dev/null}"
+    cat "$LAB_BODIES/$key"
+    exit 0
+  fi
+fi
+printf 'real-gh %s\n' "$*" >> "${LAB_GH_LOG:-/dev/null}"
+exec "$REAL_GH" "$@"

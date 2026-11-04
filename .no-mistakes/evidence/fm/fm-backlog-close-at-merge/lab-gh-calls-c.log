@@ -1,0 +1,3 @@
+real-gh pr view https://github.com/MrGTV-love/firstmate/pull/362 --json body --jq .body
+real-gh pr view https://github.com/MrGTV-love/firstmate/pull/362 --json body --jq .body
+real-gh pr view https://github.com/MrGTV-love/firstmate/pull/362 --json body,state --jq (.state // "") + "\n" + (.body // "")

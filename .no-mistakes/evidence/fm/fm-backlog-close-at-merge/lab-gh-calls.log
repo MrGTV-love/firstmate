@@ -1,0 +1,15 @@
+lab-body https://github.com/MrGTV-love/firstmate/pull/367
+real-gh api /repos/MrGTV-love/firstmate/pulls/367 --method GET --jq "merged=" + ((.merged_at != null)|tostring)
+real-gh api /repos/MrGTV-love/firstmate/pulls/367 --method GET --jq "merged=" + ((.merged_at != null)|tostring)
+lab-body https://github.com/MrGTV-love/firstmate/pull/367
+lab-body https://github.com/MrGTV-love/firstmate/pull/367
+real-gh api /repos/MrGTV-love/firstmate/pulls/367 --method GET --jq "merged=" + ((.merged_at != null)|tostring)
+lab-body https://github.com/MrGTV-love/firstmate/pull/362
+lab-body https://github.com/MrGTV-love/firstmate/pull/360
+real-gh api /repos/MrGTV-love/firstmate/pulls/362 --method GET --jq "merged=" + ((.merged_at != null)|tostring)
+lab-body https://github.com/MrGTV-love/firstmate/pull/359
+lab-body https://github.com/MrGTV-love/firstmate/pull/356
+real-gh api /repos/MrGTV-love/firstmate/pulls/362 --method GET --jq "merged=" + ((.merged_at != null)|tostring)
+real-gh pr view https://github.com/MrGTV-love/firstmate/pull/362 --json body,state --jq (.state // "") + "\n" + (.body // "")
+lab-body https://github.com/MrGTV-love/firstmate/pull/373
+lab-body https://github.com/MrGTV-love/firstmate/pull/366

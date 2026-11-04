@@ -1,0 +1,16 @@
+$ FM_HOME=<lab> bin/fm-brief.sh lab-brief-no-mistakes alpha --mode no-mistakes
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.CwBw9I/data/lab-brief-no-mistakes/brief.md (ship, mode=no-mistakes; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE})
+-- lines in the generated brief that teach the block (no-mistakes):
+140:That first `done:` is the handoff that starts the pipeline, which owns the push; it is not a request to push from this copy.
+141:Name the backlog items your change finishes: put `Closes-backlog-item: lab-brief-no-mistakes` on a line of its own, exactly that form with nothing else on the line, in your commit message, and add one such line for each other queued backlog item the change fixes. Only those lines close anything:
+192:After /no-mistakes reports CI green (the CI-ready return point - do not wait for it to keep monitoring in the background until merge), read the PR back from the forge and confirm it is not a draft (`gh-axi pr view <number>` must print `draft: no`, where <number> is the PR number from your PR URL
+194:Before that done, check the PR body for the lines that close backlog items (at least `Closes-backlog-item: lab-brief-no-mistakes`), because the pipeline wrote the body after your commit. Read the PR body back with `gh-axi pr view <number> --full`; if any `Closes-backlog-item:` line is missing, w
+-- old 'Closes: <task-id>' form present: 0 line(s)
+
+$ FM_HOME=<lab> bin/fm-brief.sh lab-brief-direct-pr alpha --mode direct-PR
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.CwBw9I/data/lab-brief-direct-pr/brief.md (ship, mode=direct-PR; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE})
+-- lines in the generated brief that teach the block (direct-PR):
+139:Name the backlog items your change finishes: put `Closes-backlog-item: lab-brief-direct-pr` on a line of its own, exactly that form with nothing else on the line, in your commit message and in the PR body, and add one such line for each other queued backlog item the change fixes. Only those line
+-- old 'Closes: <task-id>' form present: 0 line(s)
+
+lab removed: /Users/charlesabrooker/tmp/fm-lab.CwBw9I
