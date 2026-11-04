@@ -148,7 +148,11 @@ Launch gate:
     every refusal each append one check wake (launch-gate-<run>, naming the run,
     the reason and the time waited) to the root home's wake queue through
     fm_wake_pending_settle, which never waits for the queue lock: when it is
-    busy the wake is spilled for the next drain to replay.
+    busy the wake is spilled to the root home's state/.wake-spill.<seq>, and
+    the next append to that queue, or the watcher's next start, replays it.
+    Gates record their wakes one at a time under the pool's durable.lock, so
+    two gate spills never take the same file; a gate spill can still collide
+    with the watcher's own spill.
   - AGENT keeps stdin, stdout and stderr; SIGTERM, SIGINT and SIGHUP sent to the
     gate are forwarded to it; its exit status is returned and a death by signal
     is re-raised. A missing or non-executable AGENT returns 127 or 126. A
@@ -400,7 +404,6 @@ def exec_direct(command: List[str], env: dict, log_fd: int) -> int:
         except OSError:
             pass
     try:
-        _restore_exec_signals()
         os.execvpe(command[0], command, env)
     except FileNotFoundError:
         log(2, "command not found: %s" % command[0])
@@ -1136,6 +1139,7 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
     route = start_route(command)
     if args.only_fresh and route is None:
         # A reattachment, response, status read or other command that is no new run.
+        _restore_exec_signals()
         return exec_direct(command, environment, 2)
     admission_fd = grant_fd = None
     grant_path = None
@@ -1146,6 +1150,7 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
             holder = claim_grant(directory)
             if holder is not None:
                 log(2, "pipeline-start: this start was admitted by its enclosing start (pid %d); not queued again" % holder)
+                _restore_exec_signals()
                 return exec_direct(command, environment, 2)
         admission_fd, before, reason, _ = wait_for_admission(directory, args.priority)
         log(2, "pipeline-start admitted: " + reason)
@@ -1282,8 +1287,22 @@ def map_worktree(cwd: str) -> Tuple[str, str, str]:
 
 
 def durable_line(text: str, key: str) -> None:
-    """Append one check wake to the root home's queue, or spill it there when the queue lock is busy; never waits for that lock."""
+    """Append one check wake to the root home's queue without waiting for its lock, one gate at a time.
+
+    When the queue lock is busy the wake is spilled to state/.wake-spill.<seq>,
+    which the next append to that queue, or the watcher's next start, replays.
+    durable.lock in the pool directory is held only around the append, which
+    never waits, so two gates never take the same spill file.
+    """
+    serial = None
     try:
+        try:
+            directory = pool_dir()
+            ensure_pool_dir(directory)
+            serial = open_lock(os.path.join(directory, "durable.lock"))
+            fcntl.flock(serial, fcntl.LOCK_EX)
+        except (PoolUnavailable, OSError):
+            pass
         home = root_home()
         subprocess.run(["bash", "-c", '. "$1" && FM_WAKE_PENDING_KIND=check FM_WAKE_PENDING_KEY=$2 FM_WAKE_PENDING_PAYLOAD=$3'
                         ' && fm_wake_pending_settle', "bash",
@@ -1292,6 +1311,9 @@ def durable_line(text: str, key: str) -> None:
                        stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=True)
     except (OSError, ValueError, subprocess.SubprocessError) as exc:
         log(2, "launch-gate: durable line not recorded (%s): %s" % (exc, text))
+    finally:
+        if serial is not None:
+            os.close(serial)
 
 
 def start_watched(command: List[str]) -> Tuple[int, int]:
@@ -1384,6 +1406,7 @@ def cmd_launch_gate(args: argparse.Namespace) -> int:
             step[2] if step else "none", os.getpid(), time.time_ns()))
         if step is not None and step[0] != CI_STEP:
             # Another step of a run already counted as active: unchanged, at once.
+            _restore_exec_signals()
             return exec_direct(command, dict(os.environ), 2)
         directory = pool_dir()
         ensure_pool_dir(directory)

@@ -6883,7 +6883,7 @@
       "fail_direction": "closed",
       "remedy": "repair the cause the refusal line names (for a hold bound, wait until capacity returns), then answer the run's parked CI decision with no-mistakes axi respond --action fix; its next fix round enters bin/fm-cpu-pass.sh launch-gate again",
       "budget": 3,
-      "telemetry": "state/.wake-queue",
+      "telemetry": "state/.wake-queue; a wake written while the queue lock is busy waits in state/.wake-spill.<seq> until the next append to that queue, or the watcher's next start, replays it",
       "test": "tests/fm-cpu-pass.test.sh",
       "tier": "C",
       "harm": "reversible",

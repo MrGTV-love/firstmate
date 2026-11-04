@@ -1143,6 +1143,11 @@ while not (folder / (run + '.release')).exists(): time.sleep(0.025)
     assert pipe_status(launch_gate, env, folder / 'wt-x') == '141'
     assert pipe_status(launch_gate, env, folder / 'wt-y') == '141'
     assert pipe_status(['bash', str(repo / 'bin/fm-mem-guard.sh'), 'run', '--'], env, folder) == '141'
+    # The test-pass pool's direct execs keep the base disposition: SIGPIPE stays ignored, so yes exits 1 on EPIPE.
+    pass_run = ['bash', str(repo / 'bin/fm-cpu-pass.sh'), 'run', '--']
+    (folder / 'not-a-pool').write_text('')
+    assert pipe_status(pass_run, dict(env, FM_CPU_PASS_HELD='1'), folder) == '1'
+    assert pipe_status(pass_run, dict(env, FM_CPU_POOL_DIR=str(folder / 'not-a-pool')), folder) == '1'
 
     # Scope: another step of a counted run passes through at once, even on a full host.
     folder, db, env = gate_case('gate-scope', available=GIB, runs=(('x', 'review', 'fixing', 77),))

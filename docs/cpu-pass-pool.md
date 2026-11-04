@@ -146,7 +146,8 @@ The [engine header](../bin/fm-cpu-pass.py) owns its exact sequence, refusal text
 A refusal exits 75 with one line naming the cause and the next action; the daemon logs it as `warning: CI fix failed` and does not fail the run.
 Each refusal spends one of the run's `auto_fix.ci` attempts; after the last one the CI findings park as the ordinary ask-user decision, whose owner answers it once capacity has returned.
 Every hold (a decision that does not fit, or any other wait, such as start-lock contention, once the first waiting notice is due after 2 s), admission after a hold and refusal also appends one check wake naming the run, the reason and the time waited to the root home's wake queue, the durable record supervision drains.
-The gate never waits for the wake queue's lock: when another process holds it, the wake is spilled to the root home's state directory and the next drain replays it.
+The gate never waits for the wake queue's lock: when another process holds it, the wake is spilled to the root home's `state/.wake-spill.<seq>`, and the next append to that queue, or the watcher's next start, replays it.
+Gates record their wakes one at a time under `durable.lock` in the pool directory, so two gate spills never take the same file; a gate spill can still collide with the watcher's own spill.
 The live launcher is captain-private host configuration outside this repository: the gate protects nothing until that one line is applied, and a fix-round agent launched through any other path is not gated.
 
 Queued classes are ordered `merge-train`, `machinery`, `vernant-build`, then `other`, with arrival order within each class.
