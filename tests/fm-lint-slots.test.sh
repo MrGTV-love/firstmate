@@ -566,6 +566,92 @@ PL
   pass "a gate stopped while owning admission does not freeze free capacity"
 }
 
+test_slow_ps_does_not_hold_admission_against_the_next_root() {
+  local tmp real_ps
+  tmp=$(fm_test_tmproot fm-lint-slot-slow-ps)
+  real_ps=$(command -v ps)
+  mkdir -p "$tmp/bin"
+  # The waiter's owner check (ps -p) does not return until the next root has
+  # started, or for 30 s. A check made while holding admission.lock locks that
+  # root out for the whole time.
+  cat > "$tmp/bin/ps" <<SH
+#!/bin/sh
+case " \$* " in
+  *" -p "*)
+    : > "$tmp/p-called"
+    i=0
+    until grep -q next "$tmp/order" 2>/dev/null; do
+      i=\$((i + 1))
+      if [ "\$i" -ge 600 ]; then : > "$tmp/p-timed-out"; break; fi
+      sleep 0.05
+    done
+    ;;
+esac
+exec "$real_ps" "\$@"
+SH
+  chmod +x "$tmp/bin/ps"
+  perl - "$ROOT/bin/fm-lint-cache.pl" "$tmp" <<'PL' || fail "slow ps admission regression failed"
+use strict;
+use warnings;
+use POSIX qw(WNOHANG);
+use Time::HiRes qw(time sleep);
+my ($gate, $tmp) = @ARGV;
+# Free count slots, but a budget that holds one root: the root after the first
+# keeps its turn, and the root behind it keeps checking on that root's owner.
+local $ENV{FM_LINT_HOST_SLOTS} = 4;
+local $ENV{FM_LINT_HOST_RSS_KIB} = 1000000;
+local $ENV{FM_LINT_INTERNAL_ROOT_CAP_KIB} = 800000;
+local $ENV{PATH} = "$tmp/bin:$ENV{PATH}";
+my $note = 'open(my $fh, ">>", "$ARGV[0]/order") or die "$!"; print {$fh} "$ARGV[1]\n"; close $fh;';
+my $hold = 'for (1 .. 1200) { last if -e "$ARGV[0]/p-called"; select(undef, undef, undef, 0.05); }';
+sub spawn {
+    my ($label, $code) = @_;
+    my $pid = fork();
+    die "fork: $!" unless defined $pid;
+    if (!$pid) {
+        exec $^X, $gate, 'gate', "$tmp/slots", 18, 'run', "$tmp/$label.wait", '--', $^X, '-e', $code, $tmp, $label;
+        die "exec: $!";
+    }
+    return $pid;
+}
+sub until_seen {
+    my ($what, $test) = @_;
+    my $deadline = time() + 30;
+    until ($test->()) {
+        die "$what\n" if time() > $deadline;
+        sleep 0.01;
+    }
+}
+my @pids;
+my $error;
+eval {
+    push @pids, spawn('first', "$note $hold");
+    until_seen('the first root never started', sub { -s "$tmp/order" });
+    push @pids, spawn('next', $note);
+    until_seen('the next root never queued', sub { grep { /\.run\z/ } glob "$tmp/slots/queue.*" });
+    push @pids, spawn('later', $note);
+    my $deadline = time() + 90;
+    for my $pid (@pids) {
+        while (waitpid($pid, WNOHANG) == 0) {
+            die "a gate did not finish\n" if time() > $deadline;
+            sleep 0.01;
+        }
+        die "a gate ended with status $?\n" if $?;
+    }
+    @pids = ();
+    die "the waiter never checked on the owner of the next root\n" unless -e "$tmp/p-called";
+    die "a waiter's ps kept the next root out of admission\n" if -e "$tmp/p-timed-out";
+    open(my $fh, '<', "$tmp/order") or die "$!";
+    my $order = join '', <$fh>;
+    die "admission order was $order\n" unless $order eq "first\nnext\nlater\n";
+};
+$error = $@;
+for my $pid (@pids) { kill 'KILL', $pid; waitpid($pid, 0); }
+die $error if $error;
+PL
+  pass "a waiter's slow ps does not keep the next root out of admission"
+}
+
 test_queue_scan_survives_odd_slot_paths_and_vanishing_tickets() {
   local tmp
   tmp=$(fm_test_tmproot fm-lint-slot-queue-scan)
@@ -2367,6 +2453,7 @@ test_host_waiters_make_progress_without_barging
 test_unequal_runs_share_scarce_slots_per_run
 test_stopped_head_waiter_does_not_block_the_queue
 test_stopped_admission_coordinator_does_not_freeze_free_capacity
+test_slow_ps_does_not_hold_admission_against_the_next_root
 test_queue_scan_survives_odd_slot_paths_and_vanishing_tickets
 test_cached_success_does_not_wait_for_host_slots
 test_slot_pool_can_be_disabled_or_misconfigured

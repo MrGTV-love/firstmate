@@ -29,9 +29,10 @@ use File::Basename qw(dirname basename);
 # in its slot file, and a free slot goes to the waiting run holding the fewest
 # slots, then the run served least recently, then the oldest ticket. Within a
 # run, tickets stay FIFO, so every waiting run and request makes progress. A head
-# ticket whose owner has been stopped for a second is skipped; one ps call checks
-# every waiting owner, and only after a free slot has stayed unclaimed for that
-# second. A waiter that has been unable to take admission.lock for a second looks,
+# ticket whose owner has been stopped for a second is skipped; one ps call, made
+# without admission.lock so a slow ps cannot keep the next root out, checks every
+# waiting owner, and only after a free slot has stayed unclaimed for that second.
+# A waiter that has been unable to take admission.lock for a second looks,
 # at most once a second, for a stopped gate on this slot directory; if one exists,
 # its owner may hold the lock, so the waiter scans without the lock. Slot flocks
 # alone enforce the capacity count.
@@ -215,7 +216,7 @@ if (($ARGV[0] // '') eq 'gate') {
             open($ticket, '>>', $ticket_path) && flock($ticket, LOCK_EX | LOCK_NB)
                 or $refuse->($ticket_path, $!);
         }
-        my (@free, @slots, %indices);
+        my (@free, @slots, %indices, @check_owners);
         opendir(my $listing, $slot_dir) or $refuse->($slot_dir, $!);
         %indices = map { $_ => 1 } 0 .. $cap - 1, map { /\Aslot\.([0-9]+)\z/ ? $1 + 0 : () } readdir $listing;
         closedir $listing;
@@ -290,8 +291,7 @@ if (($ARGV[0] // '') eq 'gate') {
                 if (($passed // '') ne $oldest{$next}) {
                     ($passed, $passed_at) = ($oldest{$next}, $now);
                 } elsif ($now - $passed_at >= 1) {
-                    %stopped = $stopped_owners->(sort keys %owners);
-                    $passed_at = $now;
+                    @check_owners = sort keys %owners;
                 }
             }
         }
@@ -302,6 +302,10 @@ if (($ARGV[0] // '') eq 'gate') {
             undef $ticket;
         }
         flock($coordinator, LOCK_UN);
+        if (@check_owners) {
+            %stopped = $stopped_owners->(@check_owners);
+            $passed_at = Time::HiRes::time();
+        }
         Time::HiRes::sleep(0.1) unless $slot || $caught;
     }
     if ($ticket) { unlink($ticket_path); close $ticket; }
