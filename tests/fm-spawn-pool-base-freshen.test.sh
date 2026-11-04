@@ -1546,6 +1546,32 @@ PY
 # S7: guard_snapshot records HEAD, every ref, the index, the status and a
 # path-sorted sha256 of every file outside .git (tracked, untracked and ignored).
 # A refusal must leave all of it equal; equal status is not equal work.
+GUARD_DIGEST_PY='
+import hashlib, os, stat, sys
+root = os.fsencode(sys.argv[1])
+rows = []
+def fail(error):
+    raise error
+for directory, names, files in os.walk(root, onerror=fail):
+    names[:] = [name for name in names if name != b".git"]
+    for name in names + files:
+        if name == b".git":
+            continue
+        path = os.path.join(directory, name)
+        info = os.lstat(path)
+        rel = os.path.relpath(path, root)
+        if stat.S_ISLNK(info.st_mode):
+            rows.append((rel, "L %r -> %r" % (rel, os.readlink(path))))
+        elif stat.S_ISREG(info.st_mode):
+            with open(path, "rb") as handle:
+                digest = hashlib.sha256(handle.read()).hexdigest()
+            rows.append((rel, "%s  %r" % (digest, rel)))
+        elif not stat.S_ISDIR(info.st_mode):
+            rows.append((rel, "O %r mode=%o" % (rel, stat.S_IFMT(info.st_mode))))
+for _, line in sorted(rows):
+    print(line)
+'
+export GUARD_DIGEST_PY
 guard_snapshot() { # <slot> <out>
   local slot=$1 out=$2
   {
@@ -1558,16 +1584,10 @@ guard_snapshot() { # <slot> <out>
     printf '%s\n' '--- status'
     git -C "$slot" status --porcelain=v1 --untracked-files=all --ignored
     printf '%s\n' '--- files'
-    (
-      cd "$slot" || exit 1
-      find . -name .git -prune -o \( -type f -o -type l \) -print | LC_ALL=C sort | while IFS= read -r f; do
-        if [ -L "$f" ]; then
-          printf 'L %s -> %s\n' "$f" "$(readlink "$f")"
-        else
-          printf '%s  %s\n' "$(shasum -a 256 <"$f" | cut -d' ' -f1)" "$f"
-        fi
-      done
-    )
+    # One walk in bytes, so a name holding a newline or any other byte is one entry and its
+    # own bytes are hashed. A file that cannot be read fails the snapshot loudly: a skipped
+    # file would let an unreadable change pass as equal.
+    python3 -I -c "$GUARD_DIGEST_PY" "$slot" || printf '%s\n' 'SNAPSHOT-FAILED: the file digest could not be taken'
   } >"$out" 2>&1
 }
 export -f guard_snapshot
@@ -1578,18 +1598,25 @@ guard_snapshot_rest() { sed '/^--- show-ref$/,/^--- index$/{/^--- index$/!d;}' "
 
 # The S7 comparison of a refusal. HEAD, the index, the status and every file must equal
 # the reference (the state before the spawn, or right after a transition seam). Every ref
-# must equal its value before the spawn, with exactly two exceptions that change no local
-# work: refs/remotes/origin/<fetched branch> and refs/remotes/origin/HEAD may be created
-# or moved forward, and refs/fm/anchor/<task>-* may be added.
-guard_refusal_diff() { # <before> <reference> <after> <slot> <fetched-branch> <task-id>
-  local before=$1 reference=$2 after=$3 slot=$4 branch=$5 id=$6
+# must equal its value before the spawn, with exactly one exception that changes no local
+# work: refs/fm/anchor/<task>-* may be added. The spawn writes no origin ref (neither
+# refs/remotes/origin/<branch> nor refs/remotes/origin/HEAD) before the guard has cleared,
+# so a refusal moves none. A snapshot that failed to take its file digest is no snapshot.
+guard_refusal_diff() { # <before> <reference> <after> <slot> <task-id>
+  local before=$1 reference=$2 after=$3 id=$5 snap
+  for snap in "$before" "$reference" "$after"; do
+    if grep -q '^SNAPSHOT-FAILED' "$snap"; then
+      echo "a snapshot could not take its file digest: $snap" >&2
+      return 1
+    fi
+  done
   if ! diff <(guard_snapshot_rest "$reference") <(guard_snapshot_rest "$after") >&2; then
     echo 'HEAD, the index, the status or file bytes changed' >&2
     return 1
   fi
-  python3 - "$slot" "$branch" "$id" <(guard_snapshot_refs "$before") <(guard_snapshot_refs "$after") <<'PY'
-import subprocess, sys
-slot, branch, task, before_path, after_path = sys.argv[1:6]
+  python3 -I - "$id" <(guard_snapshot_refs "$before") <(guard_snapshot_refs "$after") <<'PY'
+import sys
+task, before_path, after_path = sys.argv[1:4]
 def refs(path):
     found = {}
     for line in open(path):
@@ -1597,20 +1624,16 @@ def refs(path):
         found[ref] = sha
     return found
 before, after = refs(before_path), refs(after_path)
-forward = {"refs/remotes/origin/" + branch, "refs/remotes/origin/HEAD"}
 bad = []
 for ref in sorted(set(before) | set(after)):
     old, new = before.get(ref), after.get(ref)
     if old == new:
         continue
-    if ref in forward and new is not None and (
-            old is None or subprocess.run(["git", "-C", slot, "merge-base", "--is-ancestor", old, new]).returncode == 0):
-        continue
     if ref.startswith("refs/fm/anchor/%s-" % task) and old is None:
         continue
     bad.append("%s: %s -> %s" % (ref, old or "absent", new or "absent"))
 if bad:
-    print("refs changed beyond the two allowed exceptions: " + "; ".join(bad), file=sys.stderr)
+    print("refs changed beyond the one allowed exception (this task's anchor): " + "; ".join(bad), file=sys.stderr)
     sys.exit(1)
 PY
 }
@@ -1632,14 +1655,14 @@ test_reset_guard_snapshot_witness() {
     || fail 'the witness changed the porcelain status'
   [ "$(sed -n '1,/--- index/p' "$CASE_DIR/before.snap")" = "$(sed -n '1,/--- index/p' "$CASE_DIR/after.snap")" ] \
     || fail 'the witness changed HEAD or refs'
-  guard_refusal_diff "$CASE_DIR/before.snap" "$CASE_DIR/before.snap" "$CASE_DIR/after.snap" "$POOL_DIR" main "$id" 2>/dev/null \
+  guard_refusal_diff "$CASE_DIR/before.snap" "$CASE_DIR/before.snap" "$CASE_DIR/after.snap" "$POOL_DIR" "$id" 2>/dev/null \
     && fail 'the refusal comparison accepted a changed dirty file'
   if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
     printf 'EVIDENCE S7 witness: status equal, HEAD equal, refs equal, file digest differs; diff=%s\n' \
       "$(diff "$CASE_DIR/before.snap" "$CASE_DIR/after.snap" | tr '\n' '|')"
   fi
-  # The ref comparison: a forward origin move and an added anchor of this task pass; a moved
-  # local branch, a backward origin move and another task's anchor are each refused.
+  # The ref comparison: an added anchor of this task passes; a moved local branch, any origin
+  # ref move (forward or backward) and another task's anchor are each refused.
   local base child
   printf 'AAAA\n' >"$POOL_DIR/dirty.txt"
   base=$(git -C "$POOL_DIR" rev-parse HEAD)
@@ -1647,27 +1670,58 @@ test_reset_guard_snapshot_witness() {
   git -C "$POOL_DIR" branch witness-branch "$base"
   git -C "$POOL_DIR" update-ref refs/remotes/origin/main "$base"
   guard_snapshot "$POOL_DIR" "$CASE_DIR/before.snap"
-  git -C "$POOL_DIR" update-ref refs/remotes/origin/main "$child"
   git -C "$POOL_DIR" update-ref "refs/fm/anchor/$id-$base" "$base"
   guard_snapshot "$POOL_DIR" "$CASE_DIR/after.snap"
-  guard_refusal_diff "$CASE_DIR/before.snap" "$CASE_DIR/before.snap" "$CASE_DIR/after.snap" "$POOL_DIR" main "$id" \
-    || fail 'the refusal comparison rejected the two allowed exceptions'
+  guard_refusal_diff "$CASE_DIR/before.snap" "$CASE_DIR/before.snap" "$CASE_DIR/after.snap" "$POOL_DIR" "$id" \
+    || fail 'the refusal comparison rejected the one allowed exception'
   git -C "$POOL_DIR" update-ref refs/heads/witness-branch "$child"
   guard_snapshot "$POOL_DIR" "$CASE_DIR/branch.snap"
-  guard_refusal_diff "$CASE_DIR/before.snap" "$CASE_DIR/before.snap" "$CASE_DIR/branch.snap" "$POOL_DIR" main "$id" 2>/dev/null \
+  guard_refusal_diff "$CASE_DIR/before.snap" "$CASE_DIR/before.snap" "$CASE_DIR/branch.snap" "$POOL_DIR" "$id" 2>/dev/null \
     && fail 'the refusal comparison accepted a moved local branch'
   git -C "$POOL_DIR" update-ref refs/heads/witness-branch "$base"
   git -C "$POOL_DIR" update-ref refs/remotes/origin/main "$child"
   guard_snapshot "$POOL_DIR" "$CASE_DIR/forward.snap"
+  guard_refusal_diff "$CASE_DIR/before.snap" "$CASE_DIR/before.snap" "$CASE_DIR/forward.snap" "$POOL_DIR" "$id" 2>/dev/null \
+    && fail 'the refusal comparison accepted a forward move of refs/remotes/origin/main'
+  git -C "$POOL_DIR" update-ref refs/remotes/origin/feature/x "$child"
+  guard_snapshot "$POOL_DIR" "$CASE_DIR/branch-ref.snap"
+  guard_refusal_diff "$CASE_DIR/forward.snap" "$CASE_DIR/forward.snap" "$CASE_DIR/branch-ref.snap" "$POOL_DIR" "$id" 2>/dev/null \
+    && fail 'the refusal comparison accepted a new refs/remotes/origin/feature/x'
+  git -C "$POOL_DIR" update-ref -d refs/remotes/origin/feature/x
   git -C "$POOL_DIR" update-ref refs/remotes/origin/main "$base"
   guard_snapshot "$POOL_DIR" "$CASE_DIR/backward.snap"
-  guard_refusal_diff "$CASE_DIR/forward.snap" "$CASE_DIR/forward.snap" "$CASE_DIR/backward.snap" "$POOL_DIR" main "$id" 2>/dev/null \
+  guard_refusal_diff "$CASE_DIR/forward.snap" "$CASE_DIR/forward.snap" "$CASE_DIR/backward.snap" "$POOL_DIR" "$id" 2>/dev/null \
     && fail 'the refusal comparison accepted a backward origin move'
   git -C "$POOL_DIR" update-ref "refs/fm/anchor/other-task-$base" "$base"
   guard_snapshot "$POOL_DIR" "$CASE_DIR/other-anchor.snap"
-  guard_refusal_diff "$CASE_DIR/backward.snap" "$CASE_DIR/backward.snap" "$CASE_DIR/other-anchor.snap" "$POOL_DIR" main "$id" 2>/dev/null \
+  guard_refusal_diff "$CASE_DIR/backward.snap" "$CASE_DIR/backward.snap" "$CASE_DIR/other-anchor.snap" "$POOL_DIR" "$id" 2>/dev/null \
     && fail 'the refusal comparison accepted another task'"'"'s anchor'
-  pass 'the S7 snapshot comparison detects changed bytes under equal status and every ref change beyond the two exceptions'
+  # The reviewer's witness (F6): an untracked file whose NAME holds a newline changes its bytes
+  # while status, HEAD and refs stay equal. The old line-split digest hashed nothing for it.
+  git -C "$POOL_DIR" update-ref -d "refs/fm/anchor/other-task-$base"
+  git -C "$POOL_DIR" update-ref -d "refs/fm/anchor/$id-$base"
+  printf 'AAAA\n' >"$POOL_DIR/private"$'\n'"work"
+  guard_snapshot "$POOL_DIR" "$CASE_DIR/nl-before.snap"
+  printf 'BBBB\n' >"$POOL_DIR/private"$'\n'"work"
+  guard_snapshot "$POOL_DIR" "$CASE_DIR/nl-after.snap"
+  cmp -s "$CASE_DIR/nl-before.snap" "$CASE_DIR/nl-after.snap" \
+    && fail 'the snapshot could not see changed bytes in a file whose name holds a newline'
+  [ "$(sed -n '/--- status/,/--- files/p' "$CASE_DIR/nl-before.snap")" = "$(sed -n '/--- status/,/--- files/p' "$CASE_DIR/nl-after.snap")" ] \
+    || fail 'the newline-name witness changed the porcelain status'
+  guard_refusal_diff "$CASE_DIR/nl-before.snap" "$CASE_DIR/nl-before.snap" "$CASE_DIR/nl-after.snap" "$POOL_DIR" "$id" 2>/dev/null \
+    && fail 'the refusal comparison accepted changed bytes in a file whose name holds a newline'
+  # An unreadable file fails the snapshot loudly (a skipped file would read as equal), unless
+  # the user can read everything (root).
+  if [ "$(id -u)" != 0 ]; then
+    printf 'secret\n' >"$POOL_DIR/unreadable.txt"
+    chmod 000 "$POOL_DIR/unreadable.txt"
+    guard_snapshot "$POOL_DIR" "$CASE_DIR/unreadable.snap"
+    chmod 600 "$POOL_DIR/unreadable.txt"
+    grep -q '^SNAPSHOT-FAILED' "$CASE_DIR/unreadable.snap" || fail 'an unreadable file did not fail the snapshot'
+    guard_refusal_diff "$CASE_DIR/unreadable.snap" "$CASE_DIR/unreadable.snap" "$CASE_DIR/unreadable.snap" "$POOL_DIR" "$id" 2>/dev/null \
+      && fail 'the refusal comparison accepted a snapshot that failed its file digest'
+  fi
+  pass 'the S7 snapshot comparison detects changed bytes under equal status (newline names included), an unreadable file, and every ref change beyond this task'"'"'s anchor'
 }
 
 # Run one blocking case: spawn, then require a non-zero exit, no launch, the
@@ -1678,20 +1732,24 @@ guard_expect_refusal() {
   local fact=$1 label=$2 code=$3 id=$4 status=0 reference
   shift 4
   guard_snapshot "$POOL_DIR" "$CASE_DIR/before.snap"
-  GUARD_OUT=$(run_spawn "$id" "$@") || status=$?
+  # The launch log records every line the spawn types into the worker's pane; a refusal must
+  # leave it empty. guard_expect_launch reads the same log, so the observation is proven able
+  # to see a launch.
+  rm -f -- "$CASE_DIR/launch.log"
+  GUARD_OUT=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" run_spawn "$id" "$@") || status=$?
   guard_snapshot "$POOL_DIR" "$CASE_DIR/after.snap"
   [ "$status" -ne 0 ] || fail "$fact $label: the spawn launched on a slot that should refuse"$'\n'"$GUARD_OUT"
   assert_contains "$GUARD_OUT" "$code" "$fact $label: the refusal did not name $code"$'\n'"$GUARD_OUT"
   assert_contains "$GUARD_OUT" "$POOL_DIR" "$fact $label: the refusal did not name the slot path"
-  if [ ! -s "$CASE_DIR/launch.log" ] && [ -e "$HOME_DIR/state/$id.meta" ] &&
-    ! grep -q '^recovery=slot-provision-refused' "$HOME_DIR/state/$id.meta"; then
+  [ ! -s "$CASE_DIR/launch.log" ] || fail "$fact $label: the refusal still typed a launch into the worker pane"$'\n'"$(cat "$CASE_DIR/launch.log")"
+  if [ -e "$HOME_DIR/state/$id.meta" ] && ! grep -q '^recovery=slot-provision-refused' "$HOME_DIR/state/$id.meta"; then
     fail "$fact $label: a worker record was published"
   fi
   # A transition case changes the slot itself after the first observation; the
   # refusal must then leave exactly that state (the seam records it as post-seam.snap).
   reference="$CASE_DIR/before.snap"
   [ ! -f "$CASE_DIR/post-seam.snap" ] || reference="$CASE_DIR/post-seam.snap"
-  guard_refusal_diff "$CASE_DIR/before.snap" "$reference" "$CASE_DIR/after.snap" "$POOL_DIR" "${GUARD_FETCHED_BRANCH:-main}" "$id" \
+  guard_refusal_diff "$CASE_DIR/before.snap" "$reference" "$CASE_DIR/after.snap" "$POOL_DIR" "$id" \
     || fail "$fact $label: the refusal changed the slot (HEAD, refs, index or file bytes)"
   if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
     printf 'EVIDENCE %s | %s | exit=%s | reason=%s | slot=%s | HEAD+refs+index+files equal=yes (%s sha256 of before.snap)\n' \
@@ -1704,8 +1762,10 @@ guard_expect_refusal() {
 guard_expect_launch() {
   local fact=$1 label=$2 id=$3 status=0
   shift 3
-  GUARD_OUT=$(run_spawn "$id" "$@") || status=$?
+  rm -f -- "$CASE_DIR/launch.log"
+  GUARD_OUT=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" run_spawn "$id" "$@") || status=$?
   expect_code 0 "$status" "$fact $label: a slot with clear evidence should launch"$'\n'"$GUARD_OUT"
+  [ -s "$CASE_DIR/launch.log" ] || fail "$fact $label: the spawn exited 0 but typed no launch into the worker pane, so the launch observation is blind"
   if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
     printf 'EVIDENCE %s | %s | exit=0 | launched, slot HEAD now %s\n' "$fact" "$label" "$(git -C "$POOL_DIR" rev-parse --short HEAD)"
   fi
