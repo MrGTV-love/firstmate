@@ -1263,7 +1263,7 @@ test_nested_rerun_matrix_refusal_at_each_phase() {
     rc=0
     FM_HOME="$case_dir/home" FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" \
       run_teardown "$case_dir" > "$case_dir/stdout2" 2> "$case_dir/stderr2" || rc=$?
-    [ -z "$pid" ] || { kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true; }
+    [ -z "$pid" ] || teardown_fixture_stop "$pid"
     expect_code 0 "$rc" "$label: a plain re-run must finish: $(cat "$case_dir/stderr2")"
     assert_grep "return --force $NESTED_SLOT" "$case_dir/treehouse.log" "$label: the re-run did not return the slot"
     assert_absent "$case_dir/pool/1/.fm-slot-owner" "$label: the slot claim survived the task"
@@ -3742,6 +3742,23 @@ unc_return_count() {  # <case-dir> counts provider return calls
   grep -c '^return ' "$1/treehouse.argv" 2>/dev/null || true
 }
 
+# Teardown sends the provider nothing but the capability probe, the pool-dir
+# read, and the exact conditional return of slot A: never a lease, get, status,
+# forced return, or a return of another slot.
+unc_assert_only_route_commands() {  # <case-dir> <label>
+  local line
+  [ -e "$1/treehouse.argv" ] || return 0
+  while IFS= read -r line; do
+    case "$line" in
+      'capabilities --json'|pool-dir) ;;
+      "return $UNC_A --if-lease-holder "*)
+        case "$line" in *--force*|*" -f"*|*--yes*) fail "$2: a forced or answered return was sent: $line" ;; esac
+        ;;
+      *) fail "$2: teardown sent the provider an unexpected command: $line" ;;
+    esac
+  done < "$1/treehouse.argv"
+}
+
 test_unclaimed_enclosing_slot_is_released_by_exact_conditional_return() {
   local provider kind case_dir out rc lease_id label
   unc_providers "R3/R6 real-provider release"
@@ -3769,6 +3786,10 @@ test_unclaimed_enclosing_slot_is_released_by_exact_conditional_return() {
       fi
       assert_equals 1 "$(unc_return_count "$case_dir")" "$label: the slot was returned other than once: $(cat "$case_dir/treehouse.argv")"
       ! grep -E -- '--force|(^| )-f( |$)|--yes' "$case_dir/treehouse.argv" >/dev/null || fail "$label: a forced or answered return was issued: $(cat "$case_dir/treehouse.argv")"
+      unc_assert_only_route_commands "$case_dir" "$label"
+      grep -Fx "teardown task-x1 complete (window firstmate:fm-task-x1; nested reassociated worktree $UNC_NESTED removed and its unclaimed pool slot $UNC_A returned by its exact lease)" <<<"$out" >/dev/null \
+        || fail "$label: the completion line did not report the returned slot"$'\n'"$out"
+      ! grep -F "prior copy $UNC_A " <<<"$out" >/dev/null || fail "$label: the returned slot was reported as a prior copy left untouched"$'\n'"$out"
       [ ! -e "$UNC_NESTED" ] || fail "$label: the task's own nested copy survived"
       unc_copy_snapshot "$UNC_B_COPY" "$case_dir/b-copy.after"
       cmp -s "$case_dir/b-copy.before" "$case_dir/b-copy.after" || fail "$label: sibling B's nested copy changed"
@@ -3833,6 +3854,7 @@ test_unclaimed_release_interruptions_converge_and_never_clear_a_successor() {
           fi
           ;;
       esac
+      unc_assert_only_route_commands "$case_dir" "$provider $mode"
       unc_copy_snapshot "$UNC_B_COPY" "$case_dir/b-copy.after"
       cmp -s "$case_dir/b-copy.before" "$case_dir/b-copy.after" || fail "$provider $mode: sibling B's nested copy changed"
       jq -c --arg p "$UNC_B" '.worktrees[] | select(.path == $p)' "$UNC_STATE" | cmp -s - "$case_dir/b-entry.before" \
@@ -3849,7 +3871,7 @@ test_unclaimed_release_refuses_each_custody_condition() {
   local provider cond case_dir out rc pid before
   unc_providers "R5 real-provider custody refusals"
   for provider in "${UNC_PROVIDERS[@]}"; do
-    for cond in other-copy other-prior-record unregistered-copy unsafe-claim unavailable-home dirty-root unlanded-root live-process; do
+    for cond in other-copy other-prior-record unregistered-copy ignored-unregistered-copy unsafe-claim unavailable-home dirty-root unlanded-root live-process; do
       unc_pool_case "unclaimed-refuse-$cond" ordinary "$provider" || fail "$provider $cond: cannot build the pool"
       case_dir=$UNC_CASE
       pid=
@@ -3868,6 +3890,10 @@ test_unclaimed_release_refuses_each_custody_condition() {
         unregistered-copy)
           git clone -q "$case_dir/origin.git" "$UNC_A/.claude/worktrees/stray"
           ;;
+        ignored-unregistered-copy)
+          printf '.claude/\n' >> "$(git -C "$UNC_A" rev-parse --git-path info/exclude)"
+          git clone -q "$case_dir/origin.git" "$UNC_A/.claude/worktrees/stray"
+          ;;
         unsafe-claim)
           printf 'garbage without task or home lines\n' > "${UNC_A%/*}/.fm-slot-owner"
           ;;
@@ -3883,8 +3909,8 @@ test_unclaimed_release_refuses_each_custody_condition() {
           git -C "$UNC_A" -c user.email=t@t -c user.name=t commit -q -m root-unlanded
           ;;
         live-process)
-          (cd "$UNC_A" && exec sleep 300) &
-          pid=$!
+          teardown_fixture_start "$UNC_A" KILL sleep 300
+          pid=$TEARDOWN_FIXTURE_PID
           sleep 0.3
           ;;
       esac
@@ -3904,6 +3930,7 @@ test_unclaimed_release_refuses_each_custody_condition() {
       esac
       ! grep -q '^return ' "$case_dir/treehouse.argv" 2>/dev/null || fail "$provider $cond: a return was issued: $(cat "$case_dir/treehouse.argv")"
       [ "$(cat "$UNC_STATE")" = "$before" ] || fail "$provider $cond: the pool state changed"
+      unc_assert_only_route_commands "$case_dir" "$provider $cond"
       unc_copy_snapshot "$UNC_B_COPY" "$case_dir/b-copy.after"
       cmp -s "$case_dir/b-copy.before" "$case_dir/b-copy.after" || fail "$provider $cond: sibling B's nested copy changed"
     done
@@ -3946,6 +3973,7 @@ test_unclaimed_slot_outside_route_keeps_copy_and_writes_no_marker() {
       assert_absent "$case_dir/state/task-x1.teardown-return-pending" "$provider $cond: a return-pending marker was written outside the route"
       ! grep -q '^return ' "$case_dir/treehouse.argv" 2>/dev/null || fail "$provider $cond: a return was issued: $(cat "$case_dir/treehouse.argv")"
       [ "$(cat "$UNC_STATE")" = "$before" ] || fail "$provider $cond: the pool state changed"
+      unc_assert_only_route_commands "$case_dir" "$provider $cond"
       unc_copy_snapshot "$UNC_NESTED" "$case_dir/nested.after"
       cmp -s "$case_dir/nested.before" "$case_dir/nested.after" || fail "$provider $cond: the reassociated copy was not left in place"
       unc_copy_snapshot "$UNC_B_COPY" "$case_dir/b-copy.after"

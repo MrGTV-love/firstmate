@@ -659,6 +659,7 @@ test_real_provider_recovered_slot_allows_free_slot_allocation() {
     printf 'skip - real-provider recovered-slot allocation: FM_TEST_TREEHOUSE_PROVIDER names no executable treehouse; the case did NOT run\n'
     return 0
   fi
+  (
   for order in recovered-first free-first; do
     name="real-provider-$order"
     CASE_DIR="$TMP_ROOT/$name"
@@ -717,6 +718,7 @@ test_real_provider_recovered_slot_allows_free_slot_allocation() {
       || fail "$order: the recovered entry changed after the real get"
     ! compgen -G "$pool/../treehouse-recovered-backup-*" >/dev/null || fail "$order: the real get left a recovered backup"
   done
+  ) || exit 1
   pass "against the real provider a recovered quarantine holding a current copy stays untouched while the spawn and the following get take the free slot, in both state orders"
 }
 

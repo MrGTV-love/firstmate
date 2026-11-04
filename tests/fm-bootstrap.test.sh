@@ -1027,6 +1027,28 @@ test_treehouse_recovered_capability_diagnostic() {
     grep -Fxq 'capabilities --json' "$calls" || fail "$answer: bootstrap never ran the capability probe"
   done
 
+  # Without jq the probe cannot run, so the line names jq, not a treehouse upgrade.
+  case_dir="$TMP_ROOT/capability-no-jq"
+  mkdir -p "$case_dir/home/config"
+  printf '%s\n' manual > "$case_dir/home/config/backlog-backend"
+  fakebin=$(make_fake_toolchain "$case_dir")
+  cat > "$case_dir/no-jq.bash" <<'SH'
+command() {
+  if [ "${1:-}" = -v ] && [ "${2:-}" = jq ]; then
+    return 1
+  fi
+  builtin command "$@"
+}
+jq() {
+  return 127
+}
+SH
+  out=$(PATH="$fakebin:$BASE_PATH" BASH_ENV="$case_dir/no-jq.bash" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
+    FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh")
+  assert_contains "$out" "BOOTSTRAP_INFO: treehouse cannot be probed for persistent recovered leases because jq is not installed; install jq" \
+    "no-jq: the diagnostic did not name jq as the remedy"
+  assert_not_contains "$out" "upgrade to a build" "no-jq: the diagnostic named a treehouse upgrade although jq is the cause"
+
   case_dir="$TMP_ROOT/capability-proven"
   mkdir -p "$case_dir/home/config"
   printf '%s\n' manual > "$case_dir/home/config/backlog-backend"

@@ -1584,7 +1584,9 @@ detect_local_tools() {
     echo "MISSING: treehouse (install: $(install_cmd treehouse))"
   elif fm_backend_list_contains "$TOOLS" treehouse \
     && command -v treehouse >/dev/null 2>&1 && ! fm_task_copy_treehouse_persists_recovered_leases; then
-    echo "BOOTSTRAP_INFO: treehouse $FM_TASK_COPY_RECOVERED_CAPABILITY_REASON; upgrade to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true, because until then a Treehouse recovered-state lease on a pool slot refuses every new copy for that project"
+    local recovered_remedy="upgrade to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true"
+    command -v jq >/dev/null 2>&1 || recovered_remedy="install jq so that capability can be probed"
+    echo "BOOTSTRAP_INFO: treehouse $FM_TASK_COPY_RECOVERED_CAPABILITY_REASON; $recovered_remedy, because until then a Treehouse recovered-state lease on a pool slot refuses every new copy for that project"
   fi
   if command -v no-mistakes >/dev/null 2>&1 && ! tool_version_at_least no-mistakes "$NO_MISTAKES_MIN"; then
     echo "MISSING: no-mistakes (install: $(install_cmd no-mistakes))"

@@ -4509,7 +4509,7 @@ teardown_unclaimed_read_lease() {  # bind | verify
 
 # The strict custody walk and the root checks, repeated before each decision.
 teardown_unclaimed_prove_custody() {
-  local slot=$TEARDOWN_UNCLAIMED_SLOT current prior_real known copy pids changes change
+  local slot=$TEARDOWN_UNCLAIMED_SLOT current prior_real known copy pids changes change repos repo rc
   local -a proofs=()
   fm_treehouse_slot_owner_state "$slot" "$ID"
   [ "$FM_TREEHOUSE_SLOT_OWNER" = absent ] \
@@ -4582,6 +4582,20 @@ teardown_unclaimed_prove_custody() {
     done
     [ "$known" = 1 ] || { teardown_unclaimed_note "its root holds changes that are not this task's own copies: ${change:3}"; return 1; }
   done <<< "$changes"
+  rc=0
+  repos=$(find -P "$slot" -mindepth 1 \( -path "$slot/.git" -prune \) -o \( -name .git -prune -print \) 2>/dev/null) || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    teardown_unclaimed_note "its root could not be scanned for other Git repositories"
+    return 1
+  fi
+  while IFS= read -r repo; do
+    [ -n "$repo" ] || continue
+    known=0
+    for copy in ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}; do
+      case "$repo" in "$copy"/*) known=1 ;; esac
+    done
+    [ "$known" = 1 ] || { teardown_unclaimed_note "its root holds Git repository ${repo%/.git}, which is not this task's own copy"; return 1; }
+  done <<< "$repos"
   if ! pids=$(pids_with_cwd_under "$slot"); then
     teardown_unclaimed_note "the live-process scan under it could not complete"
     return 1
@@ -4654,8 +4668,8 @@ teardown_unclaimed_slot_cleanup() {
 
 # After own-copy cleanup, still under project custody.
 teardown_unclaimed_slot_release() {
-  local slot=$TEARDOWN_UNCLAIMED_SLOT out rc=0
-  local -a args
+  local slot=$TEARDOWN_UNCLAIMED_SLOT out rc=0 prior prior_real
+  local -a args kept=()
   teardown_unclaimed_read_lease verify || return 1
   teardown_unclaimed_prove_custody || return 1
   if [ "$TEARDOWN_UNCLAIMED_KIND" != unleased ]; then
@@ -4675,6 +4689,14 @@ teardown_unclaimed_slot_release() {
   fm_task_copy_pool_slot_lease "$slot" || true
   [ "$FM_TASK_COPY_LEASE_STATE" = unleased ] \
     || { teardown_unclaimed_note "its pool entry reads '$FM_TASK_COPY_LEASE_STATE' after the return, not unleased"; return 1; }
+  for prior in ${TEARDOWN_PRIOR_COPIES[@]+"${TEARDOWN_PRIOR_COPIES[@]}"}; do
+    prior_real=$(fm_task_copy_canonical_dir "$prior") || prior_real=$prior
+    case "$prior_real" in
+      "$slot"|"$slot"/*) ;;
+      *) kept+=("$prior") ;;
+    esac
+  done
+  TEARDOWN_PRIOR_COPIES=(${kept[@]+"${kept[@]}"})
   teardown_unclaimed_slot_forget
   return 0
 }
@@ -7154,6 +7176,8 @@ elif [ -n "$TEARDOWN_PEER_SLOT" ] && teardown_owns_worktree; then
   echo "teardown $ID complete (window ${T:-none}; nested reassociated worktree $WT removed; pool slot $TEARDOWN_PEER_SLOT left in place, since task ${TEARDOWN_PEER_IDS[*]} still works in it)"
 elif [ -n "$TEARDOWN_ENCLOSING_SLOT" ] && teardown_owns_worktree; then
   echo "teardown $ID complete (window ${T:-none}; nested reassociated worktree $WT removed and its pool slot $TEARDOWN_ENCLOSING_SLOT returned)"
+elif [ -n "$TEARDOWN_UNCLAIMED_SLOT" ]; then
+  echo "teardown $ID complete (window ${T:-none}; nested reassociated worktree $WT removed and its unclaimed pool slot $TEARDOWN_UNCLAIMED_SLOT returned by its exact lease)"
 elif [ "$TEARDOWN_KEEP_COPY" = 1 ] && [ -n "$TEARDOWN_RECORD_SLOT" ] && [ ! -d "$WT" ]; then
   echo "teardown $ID complete (window ${T:-none}; nested reassociated worktree $WT was already removed by an earlier teardown, and its pool slot $TEARDOWN_RECORD_SLOT is no longer this task's, so it was left alone)"
 elif [ "$TEARDOWN_KEEP_COPY" = 1 ]; then
