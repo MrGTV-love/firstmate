@@ -4448,7 +4448,9 @@ teardown_release_enclosing_slot() {
 #      entry back as unleased;
 #   5. only then does the caller retire the task record and its return-pending
 #      marker. Any refusal keeps both for a retry.
-# A recovered quarantine (no lease id) is released by its holder literal alone.
+# A recovered quarantine (no lease id) is released by its holder literal alone;
+# an entry still on the old literal is first adopted under the protected one by
+# one treehouse status, so the return names the holder the provider keeps.
 # Only a treehouse that proves persistent recovered leases
 # (fm_task_copy_treehouse_persists_recovered_leases) is used, because only then
 # does a failed or stale return leave every sibling untouched. A slot already
@@ -4478,6 +4480,10 @@ teardown_unclaimed_step() {  # prove | release
 teardown_unclaimed_read_lease() {  # bind | verify
   local slot=$TEARDOWN_UNCLAIMED_SLOT
   fm_task_copy_pool_slot_lease "$slot" || true
+  if [ "$1" = bind ] && [ "$FM_TASK_COPY_LEASE_HOLDER" = "$FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER" ]; then
+    fm_task_copy_current_pool_listing "$PROJ" || true
+    fm_task_copy_pool_slot_lease "$slot" || true
+  fi
   case "$FM_TASK_COPY_LEASE_STATE" in
     ordinary)
       [ "$FM_TASK_COPY_LEASE_HOLDER" = "$ID" ] \
@@ -4603,31 +4609,31 @@ teardown_unclaimed_prove_custody() {
 
 # Whether this teardown plans the release of <slot>, the record's enclosing slot
 # with no slot claim (read-only, no custody needed). Without force, for a ship or
-# scout, on a treehouse that proves persistent recovered leases, and only when
-# the entry is this task's own lease with a lease id, a recovered quarantine, or
-# unleased with this task's return-pending marker naming the slot (an
-# interrupted release). Every other reading (another holder, a lease with no
-# lease id, a conflicting, unreadable, or absent entry) and an unproven treehouse
-# keep the existing no-return behavior: the copy stays in place and no
-# return-pending marker is written. Once planned, any refusal keeps the record
+# scout. An unproven treehouse or a failed capability probe stays inert: the copy
+# stays in place and no return-pending marker is written. On a proven treehouse
+# an entry provably someone else's or already free with no interrupted release of
+# this task's (another holder, absent, unleased with no marker naming the slot)
+# keeps that same no-return behavior. Every other reading (this task's own lease,
+# with or without a lease id, a recovered quarantine, a conflicting or unreadable
+# entry, an interrupted release) is planned, so any refusal there keeps the record
 # and the retry obligation.
 teardown_unclaimed_candidate() {  # <slot>
   local slot=$1 marked
   [ "$FORCE" != --force ] || return 1
   case "$KIND" in ship|scout) ;; *) return 1 ;; esac
   [ -n "$slot" ] || return 1
+  fm_task_copy_treehouse_persists_recovered_leases || return 1
   fm_task_copy_pool_slot_lease "$slot" || true
   case "$FM_TASK_COPY_LEASE_STATE" in
-    ordinary) [ "$FM_TASK_COPY_LEASE_HOLDER" = "$ID" ] || return 1 ;;
-    recovered) ;;
+    ordinary|legacy) [ "$FM_TASK_COPY_LEASE_HOLDER" = "$ID" ] ;;
+    recovered|conflicting|unreadable) return 0 ;;
     unleased)
       fm_teardown_return_pending "$STATE" "$ID" || return 1
       marked=$(sed -n 's/^slot=//p' "$STATE/$ID.teardown-return-pending" 2>/dev/null | head -1)
-      [ -n "$marked" ] && [ "$(fm_task_copy_canonical_dir "$marked" 2>/dev/null)" = "$slot" ] || return 1
+      [ -n "$marked" ] && [ "$(fm_task_copy_canonical_dir "$marked" 2>/dev/null)" = "$slot" ]
       ;;
     *) return 1 ;;
   esac
-  fm_task_copy_treehouse_persists_recovered_leases
 }
 
 # Before project custody, take the root's landed-work proof the way the claimed
@@ -4658,7 +4664,7 @@ teardown_unclaimed_slot_forget() {
 
 # The task's own proven copies, removed through the existing nested-copy path.
 teardown_unclaimed_slot_cleanup() {
-  [ ! -d "$WT" ] || require_worktree_teardown_safety
+  [ ! -d "$WT" ] || validate_worktree_teardown_safety || exit 1
   teardown_own_locked_copies_release || exit 1
   teardown_remove_own_nested_copies "before returning pool slot $TEARDOWN_UNCLAIMED_SLOT"
 }
@@ -5081,7 +5087,7 @@ teardown_nested_slot_reprove_after_lock() {
 
 teardown_nested_slot() {  # prove | landed | retire | reprove | return
   local phase=$1 current prior prior_real copy known root branch teardown_slot post_lock_check
-  local -a kept=() proofs=() swept=() still=()
+  local -a kept=() proofs=() swept=() retired=() still=()
   case "$phase" in
     prove)
       [ "$KIND" != secondmate ] || return 0
@@ -5216,10 +5222,17 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
           ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}; do
         [ "$root" -ef "$WT" ] || swept+=("$root")
       done
-      for root in "${swept[@]}"; do
+      retired=("${swept[@]}")
+      if [ -n "$TEARDOWN_UNCLAIMED_SLOT" ]; then
+        [ "$TEARDOWN_UNCLAIMED_SLOT" -ef "$WT" ] || retired+=("$TEARDOWN_UNCLAIMED_SLOT")
+        while IFS= read -r root; do
+          [ "$root" -ef "$WT" ] || retired+=("$root")
+        done < <(fm_task_copy_priors_inside "$META" "$TEARDOWN_UNCLAIMED_SLOT")
+      fi
+      for root in "${retired[@]}"; do
         conclude_task_no_mistakes_run "$root" || exit 1
       done
-      for root in "${swept[@]}"; do
+      for root in "${retired[@]}"; do
         retire_task_private_nm_launch_agents "$root" || exit 1
       done
       teardown_foreign_procs_retire || exit 1

@@ -834,7 +834,11 @@
         },
         {
           "file": "bin/fm-task-copy-lib.sh",
-          "match": "remedy=\"Upgrade treehouse to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true, then retry;"
+          "match": "remedy=\"Upgrade treehouse to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true and a recovered_quarantine_holder, then retry;"
+        },
+        {
+          "file": "bin/fm-task-copy-lib.sh",
+          "match": "remedy=\"Report this entry for repair: run (cd '$project' && treehouse status) with the installed treehouse"
         },
         {
           "file": "bin/fm-bootstrap.sh",

@@ -45,9 +45,10 @@ unset TMUX TMUX_PANE HERDR_ENV HERDR_PANE_ID HERDR_SESSION HERDR_SOCKET_PATH \
 
 # A fake toolchain where every required tool is present and gh is authenticated.
 # treehouse's `get --help` advertises --lease only when FM_FAKE_TREEHOUSE_LEASE_HELP=1.
-# Its `capabilities --json` proves persistent recovered leases unless
-# FM_FAKE_TREEHOUSE_CAPABILITY names another answer (false, malformed, unknown,
-# failing, or none for an empty success); every call is appended to
+# Its `capabilities --json` proves persistent recovered leases and publishes a
+# protected holder unless FM_FAKE_TREEHOUSE_CAPABILITY names another answer
+# (false, malformed, unknown, failing, none for an empty success, or no-holder
+# for a schema 1 build without recovered_quarantine_holder); every call is appended to
 # FM_FAKE_TREEHOUSE_LOG when set, so a case can prove bootstrap ran no pool command.
 make_fake_toolchain() {
   local dir=$1 fakebin
@@ -76,8 +77,9 @@ SH
 [ -z "${FM_FAKE_TREEHOUSE_LOG:-}" ] || printf '%s\n' "$*" >> "$FM_FAKE_TREEHOUSE_LOG"
 if [ "${1:-}" = capabilities ]; then
   case "${FM_FAKE_TREEHOUSE_CAPABILITY:-proven}" in
-    proven) printf '%s\n' '{"schema_version":1,"version":"v-fake","persistent_recovered_leases":true}' ;;
-    false) printf '%s\n' '{"schema_version":1,"version":"v-fake","persistent_recovered_leases":false}' ;;
+    proven) printf '%s\n' '{"schema_version":2,"version":"v-fake","persistent_recovered_leases":true,"recovered_quarantine_holder":"quarantined: fixture"}' ;;
+    no-holder) printf '%s\n' '{"schema_version":1,"version":"v-fake","persistent_recovered_leases":true}' ;;
+    false) printf '%s\n' '{"schema_version":2,"version":"v-fake","persistent_recovered_leases":false,"recovered_quarantine_holder":"quarantined: fixture"}' ;;
     malformed) printf '%s\n' 'not json' ;;
     none) ;;
     failing) exit 3 ;;
@@ -1009,7 +1011,7 @@ test_treehouse_lease_check_follows_resolved_backend() {
 # probe runs nothing but `capabilities`.
 test_treehouse_recovered_capability_diagnostic() {
   local case_dir fakebin out calls answer
-  for answer in unknown none malformed false failing; do
+  for answer in unknown none malformed false failing no-holder; do
     case_dir="$TMP_ROOT/capability-$answer"
     mkdir -p "$case_dir/home/config"
     printf '%s\n' manual > "$case_dir/home/config/backlog-backend"

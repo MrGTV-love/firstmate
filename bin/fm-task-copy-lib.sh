@@ -524,52 +524,63 @@ fm_task_copy_enclosing_pool_slot() {  # <project> <canonical-path>
   return 1
 }
 
-# The lease holder Treehouse writes on every entry it rebuilds from a corrupt
-# or truncated state file. A Treehouse that proves persistent recovered leases
-# (fm_task_copy_treehouse_persists_recovered_leases) never frees such an entry
-# or moves its contents as a side effect of another command; only an exact,
-# conditional treehouse return releases it. Treehouse 3.1.x without that proof
-# frees it on its own, under the state lock of whichever pool command runs next
-# (treehouse get included), once the slot is idle, tracked-clean, and landed.
+# The old lease holder Treehouse wrote on every entry it rebuilt from a corrupt
+# or truncated state file. Treehouse 3.1.x frees such an entry on its own, under
+# the state lock of whichever pool command runs next (treehouse get included),
+# once the slot is idle, tracked-clean, and landed, and the exit of a session of
+# that binary still does so after a newer one is installed. The capability alone
+# therefore excludes no old writer: an entry is durable only once it carries the
+# protected holder a proven treehouse publishes
+# (FM_TASK_COPY_RECOVERED_QUARANTINE_HOLDER), which an old session ignores.
 FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER='recovered: state file was corrupt or truncated; verify before reuse'
 
 # Whether the installed treehouse proves that a recovered lease is a persistent
-# quarantine, so a surviving recovered entry is a durable exclusion exactly like
-# an ordinary lease. The single owner of the probe: allocation
-# (fm_task_copy_pool_slots_hold_no_current_copy) and bootstrap both call it.
+# quarantine and publishes the protected holder it keeps such an entry under. The
+# single owner of the probe: allocation
+# (fm_task_copy_pool_slots_hold_no_current_copy), teardown's unclaimed-slot route,
+# and bootstrap all call it.
 # It runs `treehouse capabilities --json` once per resolved treehouse path and
 # keeps the verdict for the process. The command resolves no pool and takes no
 # lock, so it runs from a neutral directory with the update check disabled and no
 # stdin. It never calls status or lease as a diagnostic. Proven only when the
-# output is one JSON object with schema_version 1 and
-# persistent_recovered_leases true; an unknown command (an older Treehouse), a
-# failing run, malformed output, a missing or false field, and a missing jq are
-# all not proven. Never derived from the version string.
-# Sets FM_TASK_COPY_RECOVERED_CAPABILITY_REASON to a clause following "the
-# installed treehouse" when the capability is not proven.
+# output is one JSON object with schema_version 2, persistent_recovered_leases
+# true, and recovered_quarantine_holder a non-empty string that is not the old
+# holder; an unknown command (an older Treehouse), a failing run, malformed
+# output, a missing or false field, and a missing jq are all not proven. Never
+# derived from the version string.
+# Sets FM_TASK_COPY_RECOVERED_QUARANTINE_HOLDER to the published holder when
+# proven, or empty, and FM_TASK_COPY_RECOVERED_CAPABILITY_REASON to a clause
+# following "the installed treehouse" when the capability is not proven.
 # Returns 0 when proven, 1 otherwise.
 FM_TASK_COPY_RECOVERED_CAPABILITY_BIN=
 FM_TASK_COPY_RECOVERED_CAPABILITY_VERDICT=
 FM_TASK_COPY_RECOVERED_CAPABILITY_REASON=
+FM_TASK_COPY_RECOVERED_QUARANTINE_HOLDER=
 fm_task_copy_treehouse_persists_recovered_leases() {
-  local bin out
+  local bin out holder
   bin=$(command -v treehouse 2>/dev/null) || bin=
   if [ -z "$bin" ]; then
+    FM_TASK_COPY_RECOVERED_QUARANTINE_HOLDER=
     FM_TASK_COPY_RECOVERED_CAPABILITY_REASON="is not installed, so persistent recovered leases are not proven"
     return 1
   fi
   if [ "$bin" != "$FM_TASK_COPY_RECOVERED_CAPABILITY_BIN" ] || [ -z "$FM_TASK_COPY_RECOVERED_CAPABILITY_VERDICT" ]; then
     FM_TASK_COPY_RECOVERED_CAPABILITY_BIN=$bin
     FM_TASK_COPY_RECOVERED_CAPABILITY_REASON=
+    FM_TASK_COPY_RECOVERED_QUARANTINE_HOLDER=
     if ! command -v jq >/dev/null 2>&1; then
       FM_TASK_COPY_RECOVERED_CAPABILITY_VERDICT=no
       FM_TASK_COPY_RECOVERED_CAPABILITY_REASON="cannot be probed for persistent recovered leases because jq is not installed"
     elif out=$(cd / && TREEHOUSE_NO_UPDATE_CHECK=1 "$bin" capabilities --json </dev/null 2>/dev/null) \
-        && jq -e -s 'length == 1 and (.[0] | type == "object" and .schema_version == 1 and .persistent_recovered_leases == true)' <<<"$out" >/dev/null 2>&1; then
+        && holder=$(jq -e -r -s --arg old "$FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER" '
+          if length == 1 and (.[0] | type == "object" and .schema_version == 2 and .persistent_recovered_leases == true
+              and (.recovered_quarantine_holder | type == "string" and length > 0 and . != $old))
+          then .[0].recovered_quarantine_holder else false end' <<<"$out" 2>/dev/null); then
       FM_TASK_COPY_RECOVERED_CAPABILITY_VERDICT=yes
+      FM_TASK_COPY_RECOVERED_QUARANTINE_HOLDER=$holder
     else
       FM_TASK_COPY_RECOVERED_CAPABILITY_VERDICT=no
-      FM_TASK_COPY_RECOVERED_CAPABILITY_REASON="does not prove persistent recovered leases (treehouse capabilities --json did not report persistent_recovered_leases: true)"
+      FM_TASK_COPY_RECOVERED_CAPABILITY_REASON="does not prove persistent recovered leases (treehouse capabilities --json did not report schema_version 2, persistent_recovered_leases: true and a protected recovered_quarantine_holder)"
     fi
   fi
   [ "$FM_TASK_COPY_RECOVERED_CAPABILITY_VERDICT" = yes ]
@@ -585,10 +596,10 @@ fm_task_copy_treehouse_persists_recovered_leases() {
 # an ordinary lease holds; a
 # recovered lease (FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER) holds here only when
 # <slot> is one of the given local Firstmate <home> directories, since a home
-# freed and handed out is lost whole, nested copies or not. Every other
-# recovered slot reports state recovered; only the allocation guard treats that
-# as a hold, and only on a Treehouse that proves persistent recovered leases. Reading the state
-# needs jq; without it, with an unreadable state file, with no entry for
+# freed and handed out is lost whole, nested copies or not. Every other slot on
+# that old holder reports state recovered, which holds nothing: an old session's
+# exit can still free it. A leased entry under any other holder, the protected
+# quarantine holder included, is an ordinary hold. Reading the state needs jq; without it, with an unreadable state file, with no entry for
 # <slot>, or with any relative or TSV-escaped entry path in the state, the slot
 # is not proved held.
 # Sets FM_TASK_COPY_SLOT_NAME to the slot's name in Treehouse state (the name
@@ -722,7 +733,9 @@ fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
 # relative or TSV-escaped entry path anywhere in the state leaves the slot
 # unproved, exactly as fm_task_copy_pool_slot_held does.
 # Sets FM_TASK_COPY_LEASE_STATE to ordinary (leased, holder, nonempty lease id),
-# recovered (leased by FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER, any lease id),
+# recovered (leased by FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER or the protected
+# FM_TASK_COPY_RECOVERED_QUARANTINE_HOLDER, any lease id; the caller runs the
+# capability probe first so the protected holder is known),
 # legacy (leased, ordinary holder, no lease id), unleased, conflicting (more
 # than one entry names the slot), absent (no entry names it), or unreadable
 # (missing jq, unreadable state, or an unsupported entry path);
@@ -770,7 +783,9 @@ fm_task_copy_pool_slot_lease() {  # <slot>
     FM_TASK_COPY_LEASE_STATE=unleased
     return 1
   fi
-  if [ "$FM_TASK_COPY_LEASE_HOLDER" = "$FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER" ]; then
+  if [ "$FM_TASK_COPY_LEASE_HOLDER" = "$FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER" ] \
+      || { [ -n "$FM_TASK_COPY_RECOVERED_QUARANTINE_HOLDER" ] \
+        && [ "$FM_TASK_COPY_LEASE_HOLDER" = "$FM_TASK_COPY_RECOVERED_QUARANTINE_HOLDER" ]; }; then
     FM_TASK_COPY_LEASE_STATE=recovered
     return 0
   fi
@@ -873,7 +888,13 @@ fm_task_copy_slot_in_current_pool() {  # <project> <slot> <state-name>
 # nor is an unleased slot in a superseded pool folder
 # (fm_task_copy_slot_in_current_pool), which is judged again at each call, and a
 # slot a task merely left is not a record's current copy, so none of them
-# stops the allocation. A uniquely recorded unleased slot names the treehouse
+# stops the allocation. A slot still on the old recovered holder is not durable
+# even on a proven treehouse, because an old session's exit sweeps exactly that
+# holder: on a proven treehouse one treehouse status, run once per process
+# (fm_task_copy_current_pool_listing), adopts it under the protected holder at
+# its first state lock, lease kept and nothing moved, and the state is read
+# again; a slot still on the old holder refuses. Recovered leases are never
+# converted to firm leases here. A uniquely recorded unleased slot names the treehouse
 # lease command that holds it in place without touching it; teardown's
 # treehouse return releases that lease with the slot. Conflicting records
 # instead need inspection and repair: lease selects only the first matching
@@ -900,6 +921,12 @@ fm_task_copy_pool_slots_hold_no_current_copy() {  # <project> <record-state>
       copy=$(fm_task_copy_canonical_dir "$copy") || continue
       slot=$(fm_task_copy_enclosing_pool_slot "$project" "$copy") || continue
       fm_task_copy_pool_slot_held "$slot" ${homes[@]+"${homes[@]}"} || true
+      if [ "$FM_TASK_COPY_SLOT_STATE" = recovered ] && fm_task_copy_treehouse_persists_recovered_leases; then
+        fm_task_copy_current_pool_listing "$project" || true
+        FM_TASK_COPY_POOL_STATE_FILE=
+        FM_TASK_COPY_POOL_STATE_ENTRIES=
+        fm_task_copy_pool_slot_held "$slot" ${homes[@]+"${homes[@]}"} || true
+      fi
       id=$(basename "$meta" .meta)
       case "$FM_TASK_COPY_SLOT_STATE" in
         held) continue ;;
@@ -916,14 +943,13 @@ fm_task_copy_pool_slots_hold_no_current_copy() {  # <project> <record-state>
           remedy="Inspect the pool with: (cd '$project' && treehouse status); report the conflicting entries for repair before retrying. A lease cannot reliably clear this conflict."
           ;;
         recovered)
-          # A Treehouse that proves persistent recovered leases never frees or
-          # moves this slot as a side effect of treehouse get, so the surviving
-          # lease is as durable an exclusion as an ordinary one.
           if fm_task_copy_treehouse_persists_recovered_leases; then
-            continue
+            FM_TASK_COPY_SLOT_REASON="$FM_TASK_COPY_SLOT_REASON, and treehouse status did not rewrite it to the protected holder '$FM_TASK_COPY_RECOVERED_QUARANTINE_HOLDER', so the exit of an older Treehouse session could still free the slot and move the copy"
+            remedy="Report this entry for repair: run (cd '$project' && treehouse status) with the installed treehouse and confirm the entry's holder before retrying; treehouse lease refuses a slot that is already leased."
+          else
+            FM_TASK_COPY_SLOT_REASON="$FM_TASK_COPY_SLOT_REASON, and the installed treehouse $FM_TASK_COPY_RECOVERED_CAPABILITY_REASON, so its own recovery could free the slot and move the copy"
+            remedy="Upgrade treehouse to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true and a recovered_quarantine_holder, then retry; treehouse lease refuses a slot that is already leased. Inspect the pool only after the upgrade, because on the installed treehouse even a status read can run its own recovery and move the copy: (cd '$project' && treehouse status)"
           fi
-          FM_TASK_COPY_SLOT_REASON="$FM_TASK_COPY_SLOT_REASON, and the installed treehouse $FM_TASK_COPY_RECOVERED_CAPABILITY_REASON, so its own recovery could free the slot and move the copy"
-          remedy="Upgrade treehouse to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true, then retry; treehouse lease refuses a slot that is already leased. Inspect the pool only after the upgrade, because on the installed treehouse even a status read can run its own recovery and move the copy: (cd '$project' && treehouse status)"
           ;;
         escaped|relative)
           remedy="Have the pool owner remove or rename the offending entry so its recorded path is absolute and contains no TSV-escaped characters, then retry; a lease does not clear this refusal. A real path containing those characters remains unsupported while the entry exists."
