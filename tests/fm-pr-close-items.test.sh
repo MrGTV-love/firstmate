@@ -835,6 +835,10 @@ test_the_directive_parser_reads_real_lines_and_ignores_every_example() {
     'Intro <!-- a' '***' 'Closes-backlog-item: after-break' '-->' | lib_call fm_pr_closes_ids -)
   [ "$out" = "$(printf '%s\n' after-heading after-quote after-item after-break)" ] \
     || fail "parser: a mid-line <!-- reached past a heading, quote, list item or thematic break: $(printf '%s' "$out" | tr '\n' ' ')"
+  out=$(printf '%s\n' 'Intro <!-- a' '===' 'Closes-backlog-item: after-setext' '-->' \
+    'Intro <!-- a' '--' 'Closes-backlog-item: after-dash-setext' '-->' | lib_call fm_pr_closes_ids -)
+  [ "$out" = "$(printf '%s\n' after-setext after-dash-setext)" ] \
+    || fail "parser: a mid-line <!-- reached past a setext underline: $(printf '%s' "$out" | tr '\n' ' ')"
   out=$(printf '%s\n' 'Intro <!-- start' '## Backlog' 'Closes-backlog-item: fm-c x' 'end -->' | lib_call fm_pr_closes_malformed -)
   [ "$out" = 'Closes-backlog-item: fm-c x' ] || fail "parser: a malformed directive after a heading that ends the paragraph was hidden: $out"
   out=$(printf '%s\n' '<!-->' 'Closes-backlog-item: after-empty' '<!--->' 'Closes-backlog-item: after-dash' 'a <!--> b' 'Closes-backlog-item: after-inline' \

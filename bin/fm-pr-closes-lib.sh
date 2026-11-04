@@ -37,8 +37,8 @@
 #   `<!--` later in a line, outside a backtick code span, is kept with its line; when it does
 #   not close on that line, the lines after it through the first line that holds `-->` are
 #   skipped, but only when that `-->` comes in the same paragraph, before the next blank
-#   line, fence line, comment-block line, ATX heading, `>` quote, list item or thematic
-#   break; otherwise the `<!--` is plain text and hides nothing. So a directive line with a
+#   line, fence line, comment-block line, ATX heading, `>` quote, list item, thematic
+#   break or setext underline (a line of only `=` or only `-`); otherwise the `<!--` is plain text and hides nothing. So a directive line with a
 #   trailing comment is still reported as malformed.
 # - A trailing carriage return is ignored, because GitHub bodies often use CRLF.
 # - Nothing else is read as a name: no table, heading, bullet, link or sentence ever
@@ -115,7 +115,7 @@ fm_pr_closes_unfenced() {
   local open_re='^[ ]{0,3}(`{3,}|~{3,})(.*)$'
   local close_re='^[ ]{0,3}(`{3,}|~{3,})[[:space:]]*$'
   local block_re='^[ ]{0,3}<!--'
-  local stop_re='^[[:space:]]*$|^[ ]{0,3}(#{1,6}([[:space:]]|$)|>|[-+*]([[:space:]]|$)|[0-9]{1,9}[.)]([[:space:]]|$)|(\*[[:space:]]*){3,}$|(-[[:space:]]*){3,}$|(_[[:space:]]*){3,}$|<!--|`{3,}|~{3,})'
+  local stop_re='^[[:space:]]*$|^[ ]{0,3}(#{1,6}([[:space:]]|$)|>|[-+*]([[:space:]]|$)|[0-9]{1,9}[.)]([[:space:]]|$)|(\*[[:space:]]*){3,}$|(-[[:space:]]*){3,}$|(_[[:space:]]*){3,}$|(=+|-+)[[:space:]]*$|<!--|`{3,}|~{3,})'
   local lines=()
   while IFS= read -r line || [ -n "$line" ]; do
     lines[count]=${line%$'\r'}
