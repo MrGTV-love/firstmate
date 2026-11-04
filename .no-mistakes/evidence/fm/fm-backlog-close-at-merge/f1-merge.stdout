@@ -1,0 +1,14 @@
+armed: state/task-f1.check.sh
+close-at-merge: closed docs-codespan with https://localhost/labadmin/lab/pulls/1 (named by the body of https://localhost/labadmin/lab/pulls/1)
+close-at-merge: closed docs-heading with https://localhost/labadmin/lab/pulls/1 (named by the body of https://localhost/labadmin/lab/pulls/1)
+close-at-merge: closed docs-empty-comment with https://localhost/labadmin/lab/pulls/1 (named by the body of https://localhost/labadmin/lab/pulls/1)
+close-at-merge: closed docs-unclosed with https://localhost/labadmin/lab/pulls/1 (named by the body of https://localhost/labadmin/lab/pulls/1)
+close-at-merge: closed docs-after-tab with https://localhost/labadmin/lab/pulls/1 (named by the body of https://localhost/labadmin/lab/pulls/1)
+close-at-merge: closed docs-alpha with https://localhost/labadmin/lab/pulls/1 (named by the body of https://localhost/labadmin/lab/pulls/1)
+close-at-merge: unblocked: dep-two no longer waits on docs-alpha; no stored blocked-by edge remains
+close-at-merge: unblocked: dep-held no longer waits on docs-alpha; no stored blocked-by edge remains
+close-at-merge: closed docs-beta with https://localhost/labadmin/lab/pulls/1 (named by the body of https://localhost/labadmin/lab/pulls/1)
+close-at-merge: unblocked: dep-one no longer waits on docs-beta; it still waits on docs-other
+close-at-merge: docs-done is already done
+close-at-merge: not closed task-f1: bin/fm-tasks-axi.sh done did not close it: task-f1 has a live task record; complete it with bin/fm-teardown.sh task-f1, which owns the landing proof
+close-at-merge: 7 closed, 6 left open

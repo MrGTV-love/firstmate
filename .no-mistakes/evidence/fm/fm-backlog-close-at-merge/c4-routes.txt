@@ -1,0 +1,81 @@
+--- wrapper done
+ok: done r-done -> Done
+unblocked: dep-of-r-done no longer waits on r-done; no stored blocked-by edge remains
+deps=none
+--- wrapper close
+ok: done r-close -> Done
+unblocked: dep-of-r-close no longer waits on r-close; no stored blocked-by edge remains
+deps=none
+--- task noun done
+ok: done r-noun -> Done
+unblocked: dep-of-r-noun no longer waits on r-noun; no stored blocked-by edge remains
+deps=none
+--- scout report
+deps="blocked-by:r-scout"
+--- ship drop-file
+ok: done r-drop -> Done
+unblocked: dep-of-r-drop no longer waits on r-drop; no stored blocked-by edge remains
+deps=none
+--- refused completion keeps edge
+fm-tasks-axi: completion needs proof of the deliverable: --report (scout), a merged --pr (ship), or --drop-file with the captain's words
+rc=0 deps="blocked-by:r-refused"
+--- second blocker and hold stay
+unblocked: dep-both no longer waits on r-a; it still waits on r-b
+  hold_kind: future
+  deps: "blocked-by:r-b"
+--- --json keeps fields
+{"ok":true,"action":"done","id":"r-json","state":"done"}
+unblocked: dep-of-r-json no longer waits on r-json; no stored blocked-by edge remains
+--- --keep 0
+ok: done r-keep -> Done; pruned 7
+unblocked: dep-of-r-keep no longer waits on r-keep; no stored blocked-by edge remains
+deps=none
+error: "Task \"r-keep\" not found in this backlog"
+--- --no-prune
+ok: done r-nop -> Done
+unblocked: dep-of-r-nop no longer waits on r-nop; no stored blocked-by edge remains
+deps=none
+--- captain answer closes
+fm-captain-hold: captain-held task r-ans is absent from this home's configured backlog (data directory /Users/charlesabrooker/tmp/fm-lab.yPjbDl/data)
+deps=none state=
+--- public-followup waive
+add-rc=0
+unblocked: dep-of-pf no longer waits on pf-1; no stored blocked-by edge remains
+deps=none
+--- teardown of a missing copy, real gh proof on merged PR 362
+td-rc=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.yPjbDl
+REFUSED: tmux endpoint 'fm-r-teardown' is malformed or does not belong to task r-teardown; preserving task state.
+deps="blocked-by:r-teardown" state=in_flight
+--- raw tasks-axi done leaves the edge (the documented limit)
+deps="blocked-by:r-raw"
+--- beads backend with no bd executable
+fm-tasks-axi: cannot identify the task being completed: error: "Unsupported backend \"beads\" — P1 ships the markdown backend only"
+rc=0
+--- scout report retried, unfiltered
+error: Task report link must be a data/<id>/report.md path
+code: VALIDATION_ERROR
+deps="blocked-by:r-scout" state=queued
+--- scout report inside the home
+error: Task report link must be a data/<id>/report.md path
+code: VALIDATION_ERROR
+deps="blocked-by:r-scout2"
+--- captain answer closes
+unblocked: dep-of-r-ans no longer waits on r-ans; no stored blocked-by edge remains
+answered: r-ans
+deps=none state=done
+--- scout report with data/<id>/report.md
+ok: done r-scout2 -> Done (report data/r-scout2/report.md)
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+unblocked: dep-of-r-scout2 no longer waits on r-scout2; no stored blocked-by edge remains
+deps=none state=done
+--- teardown of a missing copy, real gh proof on merged PR 362
+td-rc=0
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.yPjbDl
+unblocked: dep-of-r-teardown no longer waits on r-teardown; no stored blocked-by edge remains
+/tmp/fm-forge-lab.UfHJT7/gone-project: skipped: no origin remote
+teardown r-teardown complete (window firstmate:fm-r-teardown, worktree /tmp/fm-forge-lab.UfHJT7/gone-copy, legacy record accepted without spawn_gen: endpoint missing, incarnation legacy-20261104T125655Z-57293)
+Backlog: r-teardown is closed in /Users/charlesabrooker/tmp/fm-lab.yPjbDl/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+deps=none state=done
+ls: /Users/charlesabrooker/tmp/fm-lab.yPjbDl/state/r-teardown.meta: No such file or directory

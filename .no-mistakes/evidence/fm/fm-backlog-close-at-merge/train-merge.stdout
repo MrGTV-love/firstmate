@@ -1,0 +1,9 @@
+armed: state/task-train.check.sh
+close-at-merge: closed docs-m1 with https://localhost/labadmin/lab/pulls/4 (named by the body of train member https://localhost/labadmin/lab/pulls/2)
+close-at-merge: unblocked: dep-m1 no longer waits on docs-m1; no stored blocked-by edge remains
+close-at-merge: closed docs-metaA with https://localhost/labadmin/lab/pulls/4 (named by the task record that holds train member https://localhost/labadmin/lab/pulls/2)
+close-at-merge: closed docs-shared with https://localhost/labadmin/lab/pulls/4 (named by the body of train member https://localhost/labadmin/lab/pulls/3)
+close-at-merge: closed docs-m2task with https://localhost/labadmin/lab/pulls/4 (named by the task record that holds train member https://localhost/labadmin/lab/pulls/3)
+close-at-merge: closed docs-lab2meta with https://localhost/labadmin/lab/pulls/4 (named by the task record that holds train member https://localhost/labadmin/lab2/pulls/2)
+close-at-merge: the body of https://localhost/labadmin/lab/pulls/4 names the merging task task-train with a Closes: line, which closes nothing; its own teardown closes it
+close-at-merge: 5 closed, 2 left open

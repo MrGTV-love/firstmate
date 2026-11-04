@@ -1,0 +1,21 @@
+br-nm rc=0 args=--mode no-mistakes
+  Closes-backlog-item count=2  Train-member count=2  read-back=1
+br-direct rc=0 args=--mode direct-PR
+  Closes-backlog-item count=1  Train-member count=1  read-back=1
+br-local rc=0 args=--mode local-only
+  Closes-backlog-item count=0  Train-member count=0  read-back=0
+br-scout rc=0 args=--scout
+  Closes-backlog-item count=0  Train-member count=0  read-back=0
+br-gerrit rc=0 args=--mode direct-PR --forge gerrit
+  Closes-backlog-item count=0  Train-member count=0  read-back=0
+br-forgejo rc=0 args=--mode direct-PR --forge forgejo
+  Closes-backlog-item count=1  Train-member count=1  read-back=1
+br-nm-forgejo rc=0 args=--mode no-mistakes --forge forgejo
+  Closes-backlog-item count=2  Train-member count=2  read-back=1
+
+=== no-mistakes brief lines
+141:Name the backlog items your change finishes: put `Closes-backlog-item: br-nm` on a line of its own, exactly that form with nothing else on the line, in your commit message, and add one such line for each other queued backlog item the change fixes. Only those lines close anything: prose, a table or a quoted example closes nothing. If your PR is a merge train, add one `Train-member: <PR URL>` line of its own for each component pull request that landed in it, and keep every one of them through the pipeline's body rewrite: a train body that loses its member lines closes no member item. A merge that bin/fm-pr-merge.sh confirms and records itself closes each named item from the PR body (a queued, --auto or externally seen merge does not; backlog item fm-pr-close-items-queued-and-polled-merges owns that gap). The pipeline writes the PR body after this handoff, so you check the body only after /no-mistakes reports CI green, as described below.
+194:Before that done, check the PR body for the lines that close backlog items (at least `Closes-backlog-item: br-nm`) and, for a merge train, for one `Train-member:` line per component that landed, because the pipeline wrote the body after your commit. Read the PR body back with `gh-axi pr view <number> --full`; if any `Closes-backlog-item:` line is missing, or (for a merge train) any `Train-member:` line for a component that landed, write the whole body, with the missing lines added, to a file and run `gh-axi pr edit <number> --body-file <file>`, then read the body again and confirm each of those lines is there. This edits only the PR body: commit nothing.
+
+=== direct-PR brief lines
+139:Name the backlog items your change finishes: put `Closes-backlog-item: br-direct` on a line of its own, exactly that form with nothing else on the line, in your commit message and in the PR body, and add one such line for each other queued backlog item the change fixes. Only those lines close anything: prose, a table or a quoted example closes nothing. If your PR is a merge train, add one `Train-member: <PR URL>` line of its own for each component pull request that landed in it, and keep every one of them through the pipeline's body rewrite: a train body that loses its member lines closes no member item. A merge that bin/fm-pr-merge.sh confirms and records itself closes each named item (a queued, --auto or externally seen merge does not; backlog item fm-pr-close-items-queued-and-polled-merges owns that gap). The pipeline can rewrite the PR body after your commit, so as the last step before your final done, Read the PR body back with `gh-axi pr view <number> --full`; if any `Closes-backlog-item:` line is missing, or (for a merge train) any `Train-member:` line for a component that landed, write the whole body, with the missing lines added, to a file and run `gh-axi pr edit <number> --body-file <file>`, then read the body again and confirm each of those lines is there.

@@ -1,0 +1,2 @@
+armed: state/task-x1.check.sh
+rerun merge rc=1

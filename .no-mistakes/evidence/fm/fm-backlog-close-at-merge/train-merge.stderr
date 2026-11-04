@@ -1,0 +1,9 @@
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+verified: https://localhost/labadmin/lab/pulls/4 is open and mergeable, with a successful combined status at head 9ad528f7fc77c8f7964f0e40278bba0ab1d5d0d4
+review: PASS
+actionable: close-at-merge: could not read the body of train member https://localhost/labadmin/lab/pulls/999 (jq: error (at <stdin>:0): the forge answered: not found); retry: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6K4E9BYJJZ36HH5NXZ89DKF/bin/fm-pr-close-items.sh task-train https://localhost/labadmin/lab/pulls/4
+actionable: close-at-merge: could not use Train-member not-a-url: it is not a GitHub, GitLab or Forgejo pull request URL, so nothing was closed for it
+actionable: close-at-merge: ignored Train-member https://localhost/labadmin/lab/pulls/4: it is the merged pull request itself
+actionable: close-at-merge: mentioned docs-m1prose in the prose of train member https://localhost/labadmin/lab/pulls/2: nothing was closed for it; add a Closes-backlog-item: docs-m1prose line to the train body or to that member's body if it finished the item
+actionable: close-at-merge: mentioned https://localhost/labadmin/lab/pulls/77 in the prose of https://localhost/labadmin/lab/pulls/4: no item was closed for it; list it as a Train-member: line if it landed with this merge

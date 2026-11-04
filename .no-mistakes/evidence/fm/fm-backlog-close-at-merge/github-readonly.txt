@@ -1,0 +1,43 @@
+=== G1 real open PR 358, real gh: nothing closes
+actionable: close-at-merge: not closed fm-backlog-close-at-merge: https://github.com/MrGTV-love/firstmate/pull/358 is not merged, so nothing was closed (named by the body of https://github.com/MrGTV-love/firstmate/pull/358); retry once it has merged: bin/fm-pr-close-items.sh lab-g1 https://github.com/MrGTV-love/firstmate/pull/358
+actionable: close-at-merge: not closed fm-backlog-finished-blocker-auto-clear: https://github.com/MrGTV-love/firstmate/pull/358 is not merged, so nothing was closed (named by the body of https://github.com/MrGTV-love/firstmate/pull/358); retry once it has merged: bin/fm-pr-close-items.sh lab-g1 https://github.com/MrGTV-love/firstmate/pull/358
+actionable: close-at-merge: mentioned a-one in the prose of https://github.com/MrGTV-love/firstmate/pull/358: nothing was closed for it; add a Closes-backlog-item: a-one line to the body if this merge finished it
+actionable: close-at-merge: mentioned a-after-tab in the prose of https://github.com/MrGTV-love/firstmate/pull/358: nothing was closed for it; add a Closes-backlog-item: a-after-tab line to the body if this merge finished it
+actionable: close-at-merge: mentioned https://github.com/MrGTV-love/firstmate/pull/367 in the prose of https://github.com/MrGTV-love/firstmate/pull/358: no item was closed for it; list it as a Train-member: line if it landed with this merge
+actionable: close-at-merge: mentioned https://github.com/MrGTV-love/vernant/pull/3578 in the prose of https://github.com/MrGTV-love/firstmate/pull/358: no item was closed for it; list it as a Train-member: line if it landed with this merge
+close-at-merge: 0 closed, 2 left open
+rc=3
+fm-backlog-close-at-merge:  state: queued  deps: none 
+fm-backlog-finished-blocker-auto-clear:  state: queued  deps: none 
+a-one:  state: queued  deps: none 
+dep-g1:  state: queued  deps: "blocked-by:fm-backlog-close-at-merge" 
+=== G2 real merged train PR 362 (no Train-member lines): nothing closes, mentions only
+actionable: close-at-merge: mentioned https://github.com/MrGTV-love/firstmate/pull/358 in the prose of https
+actionable: close-at-merge: mentioned https://github.com/MrGTV-love/firstmate/pull/339 in the prose of https
+actionable: close-at-merge: mentioned https://github.com/MrGTV-love/firstmate/pull/364 in the prose of https
+actionable: close-at-merge: mentioned https://github.com/MrGTV-love/firstmate/pull/356 in the prose of https
+actionable: close-at-merge: mentioned https://github.com/MrGTV-love/firstmate/pull/349 in the prose of https
+actionable: close-at-merge: mentioned https://github.com/MrGTV-love/firstmate/pull/352 in the prose of https
+actionable: close-at-merge: mentioned https://github.com/MrGTV-love/firstmate/pull/359 in the prose of https
+actionable: close-at-merge: mentioned https://github.com/MrGTV-love/firstmate/pull/360 in the prose of https
+actionable: close-at-merge: mentioned https://github.com/MrGTV-love/firstmate/pull/347 in the prose of https
+actionable: close-at-merge: mentioned https://github.com/MrGTV-love/firstmate/pull/361 in the prose of https
+actionable: close-at-merge: mentioned https://github.com/MrGTV-love/firstmate/pull/353 in the prose of https
+actionable: close-at-merge: mentioned https://github.com/o/r/pull/347 in the prose of https
+lines=      13
+fm-merge-train-9: queued
+lab-g2-member: queued
+=== G3 real proof: ship item done --pr real merged PR 362 clears a blocker; open PR 358 is refused
+fm-tasks-axi: the pull request has not merged: https://github.com/MrGTV-love/firstmate/pull/358
+open-rc=2
+ok: done ship-real -> Done (pr https://github.com/MrGTV-love/firstmate/pull/362)
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+unblocked: dep-real no longer waits on ship-real; it still waits on ship-open
+merged-rc=0
+  deps: "blocked-by:ship-open"
+  state: done
+  links: "pr:https://github.com/MrGTV-love/firstmate/pull/362"
+=== G4 a GitLab URL is refused as proof (no forge needed)
+fm-tasks-axi: only a GitHub pull request can be proved merged here; complete other deliveries with bin/fm-teardown.sh or record the captain's drop
+gl-rc=2

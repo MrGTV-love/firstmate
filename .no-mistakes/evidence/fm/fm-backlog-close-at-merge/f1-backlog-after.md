@@ -1,0 +1,28 @@
+## In flight
+- [ ] task-f1 - item task-f1 (kind: ship) (since 2026-11-04)
+
+## Queued
+- [ ] docs-fenced - item docs-fenced (kind: docs) (since 2026-11-04)
+- [ ] docs-comment - item docs-comment (kind: docs) (since 2026-11-04)
+- [ ] docs-trailing - item docs-trailing (kind: docs) (since 2026-11-04)
+- [ ] docs-held - item docs-held (kind: docs) (since 2026-11-04) (hold: owner decision pending) (hold-kind: captain)
+- [ ] docs-legacy - item docs-legacy (kind: docs) (since 2026-11-04)
+- [ ] docs-emph - item docs-emph (kind: docs) (since 2026-11-04)
+- [ ] foo - item foo (kind: docs) (since 2026-11-04)
+- [ ] docs-hidden - item docs-hidden (kind: docs) (since 2026-11-04)
+- [ ] docs-after - item docs-after (kind: docs) (since 2026-11-04)
+- [ ] docs-other - item docs-other (kind: docs) (since 2026-11-04)
+- [ ] dep-one - item dep-one blocked-by: docs-other (kind: docs) (since 2026-11-04)
+- [ ] dep-two - item dep-two (kind: docs) (since 2026-11-04)
+- [ ] dep-fenced - item dep-fenced blocked-by: docs-fenced (kind: docs) (since 2026-11-04)
+- [ ] dep-held - item dep-held (kind: docs) (since 2026-11-04) (hold: parked for later) (hold-kind: parked)
+- [ ] ship-a - item ship-a (kind: ship) (since 2026-11-04)
+## Done
+- [x] docs-beta - item docs-beta https://localhost/labadmin/lab/pulls/1 (kind: docs) (merged 2026-11-04)
+- [x] docs-alpha - item docs-alpha https://localhost/labadmin/lab/pulls/1 (kind: docs) (merged 2026-11-04)
+- [x] docs-after-tab - item docs-after-tab https://localhost/labadmin/lab/pulls/1 (kind: docs) (merged 2026-11-04)
+- [x] docs-unclosed - item docs-unclosed https://localhost/labadmin/lab/pulls/1 (kind: docs) (merged 2026-11-04)
+- [x] docs-empty-comment - item docs-empty-comment https://localhost/labadmin/lab/pulls/1 (kind: docs) (merged 2026-11-04)
+- [x] docs-heading - item docs-heading https://localhost/labadmin/lab/pulls/1 (kind: docs) (merged 2026-11-04)
+- [x] docs-codespan - item docs-codespan https://localhost/labadmin/lab/pulls/1 (kind: docs) (merged 2026-11-04)
+- [x] docs-done - item docs-done (kind: docs) (done 2026-11-04)

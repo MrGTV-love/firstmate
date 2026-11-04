@@ -1,0 +1,11 @@
+[ids]
+fm-backlog-close-at-merge
+fm-backlog-finished-blocker-auto-clear
+[members]
+[legacy]
+fm-backlog-close-at-merge
+fm-backlog-finished-blocker-auto-clear
+[malformed]
+[prose PR links]
+https://github.com/MrGTV-love/firstmate/pull/367
+https://github.com/MrGTV-love/vernant/pull/3578

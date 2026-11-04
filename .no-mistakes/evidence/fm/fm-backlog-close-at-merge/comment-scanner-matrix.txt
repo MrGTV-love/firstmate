@@ -1,0 +1,39 @@
+[PASS] guard: line-start-free opener hides up to close rc=0 want=[c1-shown] got=[c1-shown]
+[PASS] code span opener above directive rc=0 want=[c2-real] got=[c2-real]
+[PASS] list item code span opener rc=0 want=[c3-real] got=[c3-real]
+[PASS] double backtick span opener rc=0 want=[c4-real] got=[c4-real]
+[PASS] ATX heading stops the scan rc=0 want=[c5-real] got=[c5-real]
+[PASS] quote line stops the scan rc=0 want=[c6-real] got=[c6-real]
+[PASS] list start stops the scan rc=0 want=[c7-real] got=[c7-real]
+[PASS] numbered list stops the scan rc=0 want=[c8-real] got=[c8-real]
+[PASS] thematic break stops the scan rc=0 want=[c9-real] got=[c9-real]
+[PASS] malformed between stops is still reported rc=3 want=[] got=[]
+[PASS] empty comment closes itself rc=0 want=[c11-real] got=[c11-real]
+[PASS] dash empty comment closes itself rc=0 want=[c12-real] got=[c12-real]
+[PASS] unclosed block runs to the end rc=0 want=[c13-before] got=[c13-before]
+[PASS] mid-line plain text with no close rc=0 want=[c14-real] got=[c14-real]
+[PASS] fence stops the scan and stays an example rc=0 want=[c15-real] got=[c15-real]
+[PASS] same-line comment text is not prose rc=0 want=[] got=[]
+[PASS] text after a multi-line close is prose rc=0 want=[] got=[]
+[PASS] block-closing line tail is prose rc=0 want=[] got=[]
+[PASS] two comments on one line then open rc=0 want=[] got=[]
+[FAIL] setext underline ends a paragraph rc=0 want=[c20-real] got=[]
+[PASS] tab fence is not a fence rc=0 want=[c21-real] got=[c21-real]
+[PASS] four-space fence is not a fence rc=0 want=[c22-real] got=[c22-real]
+[PASS] three-space fence is a fence rc=0 want=[] got=[]
+[PASS] longer close needed rc=0 want=[c24-real] got=[c24-real]
+[PASS] tilde fence not closed by backticks rc=0 want=[] got=[]
+[PASS] attestation style comment hides nothing rc=0 want=[c26-real] got=[c26-real]
+cases=26 fails=1
+--- stderr of [malformed between stops is still reported] (PR 24)
+ignored a malformed directive line in the body of https://localhost/labadmin/lab/pulls/24: Closes-backlog-item: c10-real extra
+--- stderr of [same-line comment text is not prose] (PR 30)
+mentioned c16-visible in the prose of https://localhost/labadmin/lab/pulls/30
+--- stderr of [text after a multi-line close is prose] (PR 31)
+mentioned c17-after in the prose of https://localhost/labadmin/lab/pulls/31
+--- stderr of [block-closing line tail is prose] (PR 32)
+mentioned c18-tail in the prose of https://localhost/labadmin/lab/pulls/32
+--- stderr of [two comments on one line then open] (PR 33)
+mentioned c19-one in the prose of https://localhost/labadmin/lab/pulls/33
+mentioned c19-two in the prose of https://localhost/labadmin/lab/pulls/33
+--- stderr of [setext underline ends a paragraph] (PR 34)

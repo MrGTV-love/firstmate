@@ -1,0 +1,1 @@
+actionable: close-at-merge: not closed docs-nr1: the merge of https://localhost/labadmin/lab/pulls/6 was not recorded, so nothing was closed (named by the body of https://localhost/labadmin/lab/pulls/6); retry: bin/fm-pr-close-items.sh task-z https://localhost/labadmin/lab/pulls/6

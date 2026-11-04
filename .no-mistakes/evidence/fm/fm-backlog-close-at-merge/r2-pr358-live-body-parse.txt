@@ -1,0 +1,9 @@
+PR 358 live body (read-only gh read, 2026-11-04T14:04:02Z), parsed by bin/fm-pr-closes-lib.sh at c37ae5c72
+== fm_pr_closes_ids
+fm-backlog-close-at-merge
+fm-backlog-finished-blocker-auto-clear
+== fm_pr_closes_members
+== fm_pr_closes_legacy_ids
+fm-backlog-close-at-merge
+fm-backlog-finished-blocker-auto-clear
+== fm_pr_closes_malformed

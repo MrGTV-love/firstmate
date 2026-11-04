@@ -1,0 +1,4 @@
+close-at-merge: closed docs-cap-answered with https://localhost/labadmin/lab/pulls/11 (named by the body of https://localhost/labadmin/lab/pulls/11)
+close-at-merge: closed docs-valid-last with https://localhost/labadmin/lab/pulls/11 (named by the body of https://localhost/labadmin/lab/pulls/11)
+close-at-merge: unblocked: dep-valid no longer waits on docs-valid-last; no stored blocked-by edge remains
+close-at-merge: 2 closed, 4 left open

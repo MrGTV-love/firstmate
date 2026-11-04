@@ -1,0 +1,2 @@
+armed: state/task-unrec.check.sh
+close-at-merge: 0 closed, 1 left open

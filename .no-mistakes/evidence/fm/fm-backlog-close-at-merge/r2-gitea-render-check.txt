@@ -1,0 +1,33 @@
+PR 20 body: Intro <!-- a | === | Closes-backlog-item: c20-real | -->
+  gitea renders (comments removed), visible directives: [Closes-backlog-item: c20-real ]
+  html: <h1 id="user-content-intro----a">Intro &lt;!-- a</h1> <p dir="auto">Closes-backlog-item: c20-real --&gt;</p>
+PR 27 body: Intro <!-- a | -- | Closes-backlog-item: s1-real | -->
+  gitea renders (comments removed), visible directives: [Closes-backlog-item: s1-real ]
+  html: <h2 id="user-content-intro----a">Intro &lt;!-- a</h2> <p dir="auto">Closes-backlog-item: s1-real --&gt;</p>
+PR 28 body: Intro <!-- a |    === | Closes-backlog-item: s2-real | -->
+  gitea renders (comments removed), visible directives: [Closes-backlog-item: s2-real ]
+  html: <h1 id="user-content-intro----a">Intro &lt;!-- a</h1> <p dir="auto">Closes-backlog-item: s2-real --&gt;</p>
+PR 29 body: Intro <!-- a | ===    | Closes-backlog-item: s3-real | -->
+  gitea renders (comments removed), visible directives: [Closes-backlog-item: s3-real ]
+  html: <h1 id="user-content-intro----a">Intro &lt;!-- a</h1> <p dir="auto">Closes-backlog-item: s3-real --&gt;</p>
+PR 30 body: Intro <!-- a |     === | Closes-backlog-item: s4-hidden | -->
+  gitea renders (comments removed), visible directives: []
+  html: <p dir="auto">Intro </p>
+PR 31 body: Intro <!-- a | = = = | Closes-backlog-item: s5-hidden | -->
+  gitea renders (comments removed), visible directives: []
+  html: <p dir="auto">Intro </p>
+PR 32 body: Intro <!-- a | === | Closes-backlog-item: s6-real extra | -->
+  gitea renders (comments removed), visible directives: [Closes-backlog-item: s6-real ]
+  html: <h1 id="user-content-intro----a">Intro &lt;!-- a</h1> <p dir="auto">Closes-backlog-item: s6-real extra --&gt;</p>
+PR 33 body: <!-- | === | Closes-backlog-item: s7-hidden | -->
+  gitea renders (comments removed), visible directives: []
+  html: 
+PR 34 body: <!-- | -- | Closes-backlog-item: s8-hidden | -->
+  gitea renders (comments removed), visible directives: []
+  html: 
+PR 35 body: Intro <!-- a | -- end --> | Closes-backlog-item: s9-real
+  gitea renders (comments removed), visible directives: [Closes-backlog-item: s9-real ]
+  html: <p dir="auto">Intro  Closes-backlog-item: s9-real</p>
+PR 36 body: Intro <!-- a | Closes-backlog-item: s10-hidden | --> | Closes-backlog-item: s10-real
+  gitea renders (comments removed), visible directives: [Closes-backlog-item: s10-real ]
+  html: <p dir="auto">Intro  Closes-backlog-item: s10-real</p>

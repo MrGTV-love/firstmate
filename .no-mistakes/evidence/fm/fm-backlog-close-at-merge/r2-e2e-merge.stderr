@@ -1,0 +1,11 @@
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6K4E9BYJJZ36HH5NXZ89DKF/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+verified: https://localhost/labadmin/lab/pulls/41 is open and mergeable, with a successful combined status at head 3fb6c0214c31197d3dfc434e0fc67866eb0eac1f
+review: PASS
+actionable: close-at-merge: not closed docs-legacy: the body of https://localhost/labadmin/lab/pulls/41 names it with a Closes: line, which closes nothing; write 'Closes-backlog-item: docs-legacy' on a line of its own in the body, then retry: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6K4E9BYJJZ36HH5NXZ89DKF/bin/fm-pr-close-items.sh task-x1 https://localhost/labadmin/lab/pulls/41
+actionable: close-at-merge: mentioned docs-prose in the prose of https://localhost/labadmin/lab/pulls/41: nothing was closed for it; add a Closes-backlog-item: docs-prose line to the body if this merge finished it

@@ -1,0 +1,132 @@
+[PASS] guard: mid-line opener hides only up to its close  (PR 1, merge http 200) rc=0 want_rc=0 want=[c1-shown] got=[c1-shown] 
+    body: Example: <!-- | Closes-backlog-item: c1-hidden | --> | Closes-backlog-item: c1-shown
+    out: close-at-merge: closed c1-shown with https://localhost/labadmin/lab/pulls/1 (named by the body of https://localhost/labadmin/lab/pulls/1)
+    out: close-at-merge: 1 closed, 0 left open
+[PASS] code span opener above directive  (PR 2, merge http 200) rc=0 want_rc=0 want=[c2-real] got=[c2-real] 
+    body: The rule: a line with `<!--` | Closes-backlog-item: c2-real | ends at `-->`.
+    out: close-at-merge: closed c2-real with https://localhost/labadmin/lab/pulls/2 (named by the body of https://localhost/labadmin/lab/pulls/2)
+    out: close-at-merge: 1 closed, 0 left open
+[PASS] list item code span opener  (PR 3, merge http 200) rc=0 want_rc=0 want=[c3-real] got=[c3-real] 
+    body: - quote: `<!--` | Closes-backlog-item: c3-real | - and `-->`
+    out: close-at-merge: closed c3-real with https://localhost/labadmin/lab/pulls/3 (named by the body of https://localhost/labadmin/lab/pulls/3)
+    out: close-at-merge: 1 closed, 0 left open
+[PASS] double backtick span opener  (PR 4, merge http 200) rc=0 want_rc=0 want=[c4-real] got=[c4-real] 
+    body: Uses ``<!--`` here | Closes-backlog-item: c4-real | then -->
+    out: close-at-merge: closed c4-real with https://localhost/labadmin/lab/pulls/4 (named by the body of https://localhost/labadmin/lab/pulls/4)
+    out: close-at-merge: 1 closed, 0 left open
+[PASS] ATX heading stops the scan  (PR 5, merge http 200) rc=0 want_rc=0 want=[c5-real] got=[c5-real] 
+    body: Intro <!-- start | ## Backlog | Closes-backlog-item: c5-real | end -->
+    out: close-at-merge: closed c5-real with https://localhost/labadmin/lab/pulls/5 (named by the body of https://localhost/labadmin/lab/pulls/5)
+    out: close-at-merge: 1 closed, 0 left open
+[PASS] quote line stops the scan  (PR 6, merge http 200) rc=0 want_rc=0 want=[c6-real] got=[c6-real] 
+    body: Intro <!-- a | > quote | Closes-backlog-item: c6-real | -->
+    out: close-at-merge: closed c6-real with https://localhost/labadmin/lab/pulls/6 (named by the body of https://localhost/labadmin/lab/pulls/6)
+    out: close-at-merge: 1 closed, 0 left open
+[PASS] list start stops the scan  (PR 7, merge http 200) rc=0 want_rc=0 want=[c7-real] got=[c7-real] 
+    body: Intro <!-- a | - item | Closes-backlog-item: c7-real | -->
+    out: close-at-merge: closed c7-real with https://localhost/labadmin/lab/pulls/7 (named by the body of https://localhost/labadmin/lab/pulls/7)
+    out: close-at-merge: 1 closed, 0 left open
+[PASS] numbered list stops the scan  (PR 8, merge http 200) rc=0 want_rc=0 want=[c8-real] got=[c8-real] 
+    body: Intro <!-- a | 1. item | Closes-backlog-item: c8-real | -->
+    out: close-at-merge: closed c8-real with https://localhost/labadmin/lab/pulls/8 (named by the body of https://localhost/labadmin/lab/pulls/8)
+    out: close-at-merge: 1 closed, 0 left open
+[PASS] thematic break stops the scan  (PR 9, merge http 200) rc=0 want_rc=0 want=[c9-real] got=[c9-real] 
+    body: Intro <!-- a | *** | Closes-backlog-item: c9-real | -->
+    out: close-at-merge: closed c9-real with https://localhost/labadmin/lab/pulls/9 (named by the body of https://localhost/labadmin/lab/pulls/9)
+    out: close-at-merge: 1 closed, 0 left open
+[PASS] malformed between stops is still reported  (PR 10, merge http 200) rc=3 want_rc=3 want=[] got=[] 
+    body: Intro <!-- start | ## Backlog | Closes-backlog-item: c10-real extra | end -->
+    out: close-at-merge: 0 closed, 1 left open
+    err: actionable: close-at-merge: ignored a malformed directive line in the body of https://localhost/labadmin/lab/pulls/10: Closes-backlog-item: c10-real extra; the forms are one Closes-backlog-item: <item-id> or Train-member: <pull request URL> per line
+[PASS] empty comment closes itself  (PR 11, merge http 200) rc=0 want_rc=0 want=[c11-real] got=[c11-real] 
+    body: <!--> | Closes-backlog-item: c11-real
+    out: close-at-merge: closed c11-real with https://localhost/labadmin/lab/pulls/11 (named by the body of https://localhost/labadmin/lab/pulls/11)
+    out: close-at-merge: 1 closed, 0 left open
+[PASS] dash empty comment closes itself  (PR 12, merge http 200) rc=0 want_rc=0 want=[c12-real] got=[c12-real] 
+    body: <!---> | Closes-backlog-item: c12-real
+    out: close-at-merge: closed c12-real with https://localhost/labadmin/lab/pulls/12 (named by the body of https://localhost/labadmin/lab/pulls/12)
+    out: close-at-merge: 1 closed, 0 left open
+[PASS] unclosed line-start block runs to the end  (PR 13, merge http 200) rc=0 want_rc=0 want=[c13-before] got=[c13-before] 
+    body: Closes-backlog-item: c13-before | <!-- | Closes-backlog-item: c13-after
+    out: close-at-merge: closed c13-before with https://localhost/labadmin/lab/pulls/13 (named by the body of https://localhost/labadmin/lab/pulls/13)
+    out: close-at-merge: 1 closed, 0 left open
+[PASS] mid-line opener with no close is plain text  (PR 14, merge http 200) rc=0 want_rc=0 want=[c14-real] got=[c14-real] 
+    body: Intro <!-- never closed | Closes-backlog-item: c14-real
+    out: close-at-merge: closed c14-real with https://localhost/labadmin/lab/pulls/14 (named by the body of https://localhost/labadmin/lab/pulls/14)
+    out: close-at-merge: 1 closed, 0 left open
+[PASS] fence stops the scan and stays an example  (PR 15, merge http 200) rc=0 want_rc=0 want=[c15-real] got=[c15-real] 
+    body: Intro <!-- a | ``` | Closes-backlog-item: c15-fenced | ``` | Closes-backlog-item: c15-real | -->
+    out: close-at-merge: closed c15-real with https://localhost/labadmin/lab/pulls/15 (named by the body of https://localhost/labadmin/lab/pulls/15)
+    out: close-at-merge: 1 closed, 0 left open
+[PASS] same-line comment text is not prose  (PR 16, merge http 200) rc=0 want_rc=0 want=[] got=[] 
+    body: Fixes it. <!-- see c16-hidden and https://localhost/labadmin/lab/pulls/12 --> c16-visible
+    err: actionable: close-at-merge: mentioned c16-visible in the prose of https://localhost/labadmin/lab/pulls/16: nothing was closed for it; add a Closes-backlog-item: c16-visible line to the body if this merge finished it
+[PASS] text after a multi-line close is prose  (PR 17, merge http 200) rc=0 want_rc=0 want=[] got=[] 
+    body: Note <!-- x | Text --> see c17-after here
+    err: actionable: close-at-merge: mentioned c17-after in the prose of https://localhost/labadmin/lab/pulls/17: nothing was closed for it; add a Closes-backlog-item: c17-after line to the body if this merge finished it
+[PASS] block-closing line tail is prose  (PR 18, merge http 200) rc=0 want_rc=0 want=[] got=[] 
+    body: <!-- | hidden c18-hidden | --> tail c18-tail
+    err: actionable: close-at-merge: mentioned c18-tail in the prose of https://localhost/labadmin/lab/pulls/18: nothing was closed for it; add a Closes-backlog-item: c18-tail line to the body if this merge finished it
+[PASS] two comments on one line then open  (PR 19, merge http 200) rc=0 want_rc=0 want=[] got=[] 
+    body: a <!-- x --> c19-one <!-- y --> c19-two <!-- z | hidden c19-hidden | -->
+    err: actionable: close-at-merge: mentioned c19-one in the prose of https://localhost/labadmin/lab/pulls/19: nothing was closed for it; add a Closes-backlog-item: c19-one line to the body if this merge finished it
+    err: actionable: close-at-merge: mentioned c19-two in the prose of https://localhost/labadmin/lab/pulls/19: nothing was closed for it; add a Closes-backlog-item: c19-two line to the body if this merge finished it
+[PASS] setext === underline ends a paragraph (round-1 T1)  (PR 20, merge http 200) rc=0 want_rc=0 want=[c20-real] got=[c20-real] 
+    body: Intro <!-- a | === | Closes-backlog-item: c20-real | -->
+    out: close-at-merge: closed c20-real with https://localhost/labadmin/lab/pulls/20 (named by the body of https://localhost/labadmin/lab/pulls/20)
+    out: close-at-merge: 1 closed, 0 left open
+[PASS] tab fence is not a fence  (PR 21, merge http 200) rc=0 want_rc=0 want=[c21-real] got=[c21-real] 
+    body: <TAB>``` | Closes-backlog-item: c21-real
+    out: close-at-merge: closed c21-real with https://localhost/labadmin/lab/pulls/21 (named by the body of https://localhost/labadmin/lab/pulls/21)
+    out: close-at-merge: 1 closed, 0 left open
+[PASS] four-space fence is not a fence  (PR 22, merge http 200) rc=0 want_rc=0 want=[c22-real] got=[c22-real] 
+    body:     ``` | Closes-backlog-item: c22-real
+    out: close-at-merge: closed c22-real with https://localhost/labadmin/lab/pulls/22 (named by the body of https://localhost/labadmin/lab/pulls/22)
+    out: close-at-merge: 1 closed, 0 left open
+[PASS] three-space fence is a fence  (PR 23, merge http 200) rc=0 want_rc=0 want=[] got=[] 
+    body:    ``` | Closes-backlog-item: c23-fenced |    ```
+[PASS] longer close needed  (PR 24, merge http 200) rc=0 want_rc=0 want=[c24-real] got=[c24-real] 
+    body: ```` | ``` | Closes-backlog-item: c24-fenced | ```` | Closes-backlog-item: c24-real
+    out: close-at-merge: closed c24-real with https://localhost/labadmin/lab/pulls/24 (named by the body of https://localhost/labadmin/lab/pulls/24)
+    out: close-at-merge: 1 closed, 0 left open
+[PASS] tilde fence not closed by backticks  (PR 25, merge http 200) rc=0 want_rc=0 want=[] got=[] 
+    body: ~~~ | ``` | Closes-backlog-item: c25-fenced
+[PASS] attestation style comment hides nothing  (PR 26, merge http 200) rc=0 want_rc=0 want=[c26-real] got=[c26-real] 
+    body: <!-- no-mistakes attestation: abc --> | Closes-backlog-item: c26-real
+    out: close-at-merge: closed c26-real with https://localhost/labadmin/lab/pulls/26 (named by the body of https://localhost/labadmin/lab/pulls/26)
+    out: close-at-merge: 1 closed, 0 left open
+[PASS] setext -- (dash) underline ends a paragraph  (PR 27, merge http 200) rc=0 want_rc=0 want=[s1-real] got=[s1-real] 
+    body: Intro <!-- a | -- | Closes-backlog-item: s1-real | -->
+    out: close-at-merge: closed s1-real with https://localhost/labadmin/lab/pulls/27 (named by the body of https://localhost/labadmin/lab/pulls/27)
+    out: close-at-merge: 1 closed, 0 left open
+[PASS] setext === with three leading spaces  (PR 28, merge http 200) rc=0 want_rc=0 want=[s2-real] got=[s2-real] 
+    body: Intro <!-- a |    === | Closes-backlog-item: s2-real | -->
+    out: close-at-merge: closed s2-real with https://localhost/labadmin/lab/pulls/28 (named by the body of https://localhost/labadmin/lab/pulls/28)
+    out: close-at-merge: 1 closed, 0 left open
+[PASS] setext === with trailing spaces  (PR 29, merge http 200) rc=0 want_rc=0 want=[s3-real] got=[s3-real] 
+    body: Intro <!-- a | ===    | Closes-backlog-item: s3-real | -->
+    out: close-at-merge: closed s3-real with https://localhost/labadmin/lab/pulls/29 (named by the body of https://localhost/labadmin/lab/pulls/29)
+    out: close-at-merge: 1 closed, 0 left open
+[PASS] adversarial: four-space === is no underline, comment still hides  (PR 30, merge http 200) rc=0 want_rc=0 want=[] got=[] 
+    body: Intro <!-- a |     === | Closes-backlog-item: s4-hidden | -->
+[PASS] adversarial: '= = =' is no underline, comment still hides  (PR 31, merge http 200) rc=0 want_rc=0 want=[] got=[] 
+    body: Intro <!-- a | = = = | Closes-backlog-item: s5-hidden | -->
+[PASS] malformed directive after === is reported  (PR 32, merge http 200) rc=3 want_rc=3 want=[] got=[] 
+    body: Intro <!-- a | === | Closes-backlog-item: s6-real extra | -->
+    out: close-at-merge: 0 closed, 1 left open
+    err: actionable: close-at-merge: ignored a malformed directive line in the body of https://localhost/labadmin/lab/pulls/32: Closes-backlog-item: s6-real extra; the forms are one Closes-backlog-item: <item-id> or Train-member: <pull request URL> per line
+[PASS] guard: line-start comment block with === still hides  (PR 33, merge http 200) rc=0 want_rc=0 want=[] got=[] 
+    body: <!-- | === | Closes-backlog-item: s7-hidden | -->
+[PASS] guard: line-start comment block with -- still hides  (PR 34, merge http 200) rc=0 want_rc=0 want=[] got=[] 
+    body: <!-- | -- | Closes-backlog-item: s8-hidden | -->
+[PASS] guard: '-- end -->' still closes the comment  (PR 35, merge http 200) rc=0 want_rc=0 want=[s9-real] got=[s9-real] 
+    body: Intro <!-- a | -- end --> | Closes-backlog-item: s9-real
+    out: close-at-merge: closed s9-real with https://localhost/labadmin/lab/pulls/35 (named by the body of https://localhost/labadmin/lab/pulls/35)
+    out: close-at-merge: 1 closed, 0 left open
+[PASS] guard: plain mid-line comment still hides its directive  (PR 36, merge http 200) rc=0 want_rc=0 want=[s10-real] got=[s10-real] 
+    body: Intro <!-- a | Closes-backlog-item: s10-hidden | --> | Closes-backlog-item: s10-real
+    out: close-at-merge: closed s10-real with https://localhost/labadmin/lab/pulls/36 (named by the body of https://localhost/labadmin/lab/pulls/36)
+    out: close-at-merge: 1 closed, 0 left open
+[PASS] guard: a fenced === example stays an example  (PR 37, merge http 200) rc=0 want_rc=0 want=[] got=[] 
+    body: ``` | Intro <!-- a | === | Closes-backlog-item: s11-fenced | --> | ```
+cases=37 fails=0 head=c37ae5c72cdbd94f90b86883e033d6621e4385cc

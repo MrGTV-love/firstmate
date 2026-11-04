@@ -1,0 +1,21 @@
+5,7d4
+< - [ ] docs-alpha - item docs-alpha (kind: docs) (since 2026-11-04)
+< 
+< - [ ] docs-beta - item docs-beta (kind: docs) (since 2026-11-04)
+9d5
+< - [ ] docs-setext - item docs-setext (kind: docs) (since 2026-11-04)
+13,14d8
+< - [ ] docs-member - item docs-member (kind: docs) (since 2026-11-04)
+< - [ ] docs-membermeta - item docs-membermeta (kind: docs) (since 2026-11-04)
+16,17c10,11
+< - [ ] dep-one - dep one blocked-by: docs-beta blocked-by: docs-other (kind: docs) (since 2026-11-04)
+< - [ ] dep-two - dep two blocked-by: docs-alpha (kind: docs) (since 2026-11-04)
+---
+> - [ ] dep-one - dep one blocked-by: docs-other (kind: docs) (since 2026-11-04)
+> - [ ] dep-two - dep two (kind: docs) (since 2026-11-04)
+19a14,18
+> - [x] docs-membermeta - item docs-membermeta https://localhost/labadmin/lab/pulls/41 (kind: docs) (merged 2026-11-04)
+> - [x] docs-member - item docs-member https://localhost/labadmin/lab/pulls/41 (kind: docs) (merged 2026-11-04)
+> - [x] docs-setext - item docs-setext https://localhost/labadmin/lab/pulls/41 (kind: docs) (merged 2026-11-04)
+> - [x] docs-beta - item docs-beta https://localhost/labadmin/lab/pulls/41 (kind: docs) (merged 2026-11-04)
+> - [x] docs-alpha - item docs-alpha https://localhost/labadmin/lab/pulls/41 (kind: docs) (merged 2026-11-04)

@@ -1,0 +1,12 @@
+armed: state/task-x1.check.sh
+close-at-merge: closed docs-alpha with https://localhost/labadmin/lab/pulls/41 (named by the body of https://localhost/labadmin/lab/pulls/41)
+close-at-merge: unblocked: dep-two no longer waits on docs-alpha; no stored blocked-by edge remains
+close-at-merge: closed docs-beta with https://localhost/labadmin/lab/pulls/41 (named by the body of https://localhost/labadmin/lab/pulls/41)
+close-at-merge: unblocked: dep-one no longer waits on docs-beta; it still waits on docs-other
+close-at-merge: not closed task-x1: bin/fm-tasks-axi.sh done did not close it: task-x1 has a live task record; complete it with bin/fm-teardown.sh task-x1, which owns the landing proof
+close-at-merge: closed docs-setext with https://localhost/labadmin/lab/pulls/41 (named by the body of https://localhost/labadmin/lab/pulls/41)
+close-at-merge: closed docs-member with https://localhost/labadmin/lab/pulls/41 (named by the body of train member https://localhost/labadmin/lab/pulls/40)
+close-at-merge: closed docs-membermeta with https://localhost/labadmin/lab/pulls/41 (named by the task record that holds train member https://localhost/labadmin/lab/pulls/40)
+close-at-merge: 5 closed, 2 left open
+merge rc=0
+{"number":41,"state":"closed","merged":true,"merge_commit_sha":"7337ec5010b803e504daa1c83dd693e7c8b58fbc"}

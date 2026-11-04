@@ -1,0 +1,6 @@
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+verified: https://localhost/labadmin/lab/pulls/14 is open and mergeable, with a successful combined status at head e698966bb7492c59ce87357306b1013af1aa8fbe
+review: PASS
+actionable: merged https://localhost/labadmin/lab/pulls/14 but could not record the outcome for supervision
+actionable: close-at-merge: not closed docs-unrec: the merge of https://localhost/labadmin/lab/pulls/14 was not recorded, so nothing was closed (named by the body of https://localhost/labadmin/lab/pulls/14); retry: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6K4E9BYJJZ36HH5NXZ89DKF/bin/fm-pr-close-items.sh task-unrec https://localhost/labadmin/lab/pulls/14

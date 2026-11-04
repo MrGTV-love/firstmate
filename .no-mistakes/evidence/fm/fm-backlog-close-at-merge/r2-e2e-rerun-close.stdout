@@ -1,0 +1,10 @@
+close-at-merge: docs-alpha is already done
+close-at-merge: docs-beta is already done
+close-at-merge: not closed task-x1: bin/fm-tasks-axi.sh done did not close it: task-x1 has a live task record; complete it with bin/fm-teardown.sh task-x1, which owns the landing proof
+close-at-merge: docs-setext is already done
+close-at-merge: docs-member is already done
+close-at-merge: docs-membermeta is already done
+close-at-merge: 0 closed, 2 left open
+rerun close rc=3
+rerun: backlog unchanged
+proof links to the train in backlog: 5
