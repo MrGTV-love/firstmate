@@ -92,9 +92,11 @@ Pipeline starts:
     FM_PIPELINE_START_ADMITTED, a digest of the new run's no-mistakes arguments
     as pipeline_start_arguments reads them; an inner route that would admit the
     identical invocation again runs it at once, and any other start still queues.
-    Limit: a nested start the outer reading cannot see as the same one (a -c
-    string whose text a shell expansion changes, such as ~, $VAR, $(...) or a
-    glob, or a script that starts the run) queues behind the outer start's lock.
+    Limit: a nested start the outer reading cannot see as the same one queues
+    behind the outer start's lock: a -c string whose words the shell changes in
+    a way this reading does not follow (an expansion such as ~, $VAR, $(...) or
+    a glob, a here-document, an alias or a function), or a script that starts
+    the run.
     When that nested start is the outer start's only run, the outer never
     registers a run, so the wait never ends until someone stops it, and every
     later fresh start on the host waits behind it.
@@ -494,11 +496,35 @@ def shell_command_string(command: List[str], index: int) -> Optional[str]:
     return None
 
 
+def without_shell_comments(string: str) -> str:
+    """STRING without its comments: an unquoted # that begins a word, up to the next newline."""
+    kept: List[str] = []
+    quote, index, word_start = "", 0, True
+    while index < len(string):
+        char = string[index]
+        if char == "#" and word_start:
+            end = string.find("\n", index)
+            index = len(string) if end < 0 else end
+            continue
+        step = 2 if char == "\\" and quote != "'" else 1
+        kept.append(string[index:index + step])
+        if char in "'\"" and quote in ("", char):
+            quote = "" if quote else char
+        word_start = not quote and char in " \t\r" + SHELL_OPERATOR_CHARS
+        index += step
+    return "".join(kept)
+
+
 def shell_string_start(string: str) -> Optional[List[str]]:
-    """The first new run that one of the simple commands of a shell command string begins, if any."""
+    """The first new run that one of the simple commands of a shell command string begins, if any.
+
+    Comments and redirections (an operator with < or >, a file-descriptor number
+    just before it and its target word) are not arguments; a control operator or
+    newline ends a simple command.
+    """
     import shlex
     try:
-        lexer = shlex.shlex(string, posix=True, punctuation_chars=SHELL_OPERATOR_CHARS)
+        lexer = shlex.shlex(without_shell_comments(string), posix=True, punctuation_chars=SHELL_OPERATOR_CHARS)
         lexer.whitespace = " \t\r"
         lexer.whitespace_split = True
         lexer.commenters = ""
@@ -506,12 +532,20 @@ def shell_string_start(string: str) -> Optional[List[str]]:
     except ValueError:
         return None
     simple: List[str] = []
+    target = False
     for word in words + [";"]:
-        if word and not word.strip(SHELL_OPERATOR_CHARS):
+        operator = bool(word) and not word.strip(SHELL_OPERATOR_CHARS)
+        if operator and ("<" in word or ">" in word):
+            if simple and simple[-1].isdigit():
+                simple.pop()
+            target = True
+        elif operator:
             arguments = pipeline_start_arguments(simple)
             if arguments is not None:
                 return arguments
-            simple = []
+            simple, target = [], False
+        elif target:
+            target = False
         else:
             simple.append(word)
     return None
@@ -526,7 +560,8 @@ def pipeline_start_arguments(command: List[str]) -> Optional[List[str]]:
     no-mistakes binary is found at any position and by basename, so a wrapper
     prefix (env, fm-mem-guard.sh run --, an absolute path) does not hide it; a
     shell's -c string, after the shell's other options, is read as a command line
-    split at its control operators, newlines and redirections; other arguments are data. respond, status
+    without its comments and redirections, split at its control operators and
+    newlines; other arguments are data. respond, status
     and every other subcommand are not starts. This one reading decides both
     whether a command is a start and the digest of the start an admission exports.
     """

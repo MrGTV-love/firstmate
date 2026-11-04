@@ -914,6 +914,9 @@ with (folder / 'order').open('a') as out: out.write(os.environ['CASE_NAME'] + '\
         # A route nested in an admitted route's shell string is that one start: it never queues behind itself.
         'nested-mem-guard': ['sh', '-c', 'bash MEMGUARD_PLACEHOLDER run -- no-mistakes axi run --intent goal'],
         'nested-measured': ['sh', '-c', 'PYTHON_PLACEHOLDER DURATION_PLACEHOLDER run no-mistakes.inner -- no-mistakes axi run --intent goal'],
+        # Redirections and comments are not the client's arguments, so the nested route still sees the one start.
+        'nested-redirect': ['sh', '-c', 'bash MEMGUARD_PLACEHOLDER run -- no-mistakes axi run --intent goal 2>&1 | cat # note'],
+        'nested-quoted-hash': ['sh', '-c', "bash MEMGUARD_PLACEHOLDER run -- no-mistakes axi run --intent '#1 goal' x#y 2>/dev/null"],
         'rerun': ['no-mistakes', 'rerun'],
         # PR 366's recorded fresh start (nm-r2-1.log): fm-duration around env around fm-mem-guard.sh run.
         'pr-366': ['env', 'FM_HOME=HOME_PLACEHOLDER'] + mem_guard[1:] + ['no-mistakes', 'axi', 'run', '--intent-file', str(intent),
@@ -931,6 +934,7 @@ with (folder / 'order').open('a') as out: out.write(os.environ['CASE_NAME'] + '\
         # A later simple command's words are not the reattachment's arguments.
         'shell-later-command': (['sh', '-c', 'no-mistakes axi run; echo --intent'], 0, True),
         'shell-later-line': (['sh', '-c', 'no-mistakes axi run\necho --intent'], 0, True),
+        'shell-commented-start': (['sh', '-c', 'true # no-mistakes axi run --intent goal'], 0, True),
     }
     for route_name, route in (('measured', measured_run), ('mem-guard', mem_guard)):
         for name, shape in list(fresh_shapes.items()) + [(n, v[0]) for n, v in not_starts.items()]:
