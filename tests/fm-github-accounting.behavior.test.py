@@ -169,9 +169,8 @@ def source():
         ended = self.records("process_end")
         self.assertEqual([(row["pid"], row["start"]) for row in ended], [(71, "fixture-ender")])
         end = ended[0]
-        self.assertEqual(set(end), {"pid", "start", "run_id", "observed_at", "kind"})
         began = next(row for row in rows if row["pid"] == 71)
-        self.assertEqual(end["run_id"], began["run_id"])
+        self.assertEqual((end["run_id"], end["epoch"]), (began["run_id"], began["epoch"]))
         self.assertLess(began["observed_at"], quota[1]["observed_at"])
         self.assertLess(quota[2]["observed_at"], end["observed_at"])
         self.assertGreaterEqual(sum(row["failures"] for row in self.records("sampling")), 1)
@@ -222,8 +221,8 @@ owner["run"](owner["private_root"](),process_source=source)
         ended = self.records("process_end")
         self.assertEqual([(row["pid"], row["start"]) for row in ended], [(71, "fixture-ender")])
         end = ended[0]
-        began = [row for row in rows if (row["pid"], row["start"], row["run_id"]) ==
-                 (end["pid"], end["start"], end["run_id"])]
+        began = [row for row in rows if (row["pid"], row["start"], row["run_id"], row["epoch"]) ==
+                 (end["pid"], end["start"], end["run_id"], end["epoch"])]
         self.assertEqual(end["observed_at"] - 1794000000, 172802)
         self.assertEqual(began[-1]["observed_at"] - 1794000000, 172801)
         self.assertEqual(began[-1]["first_observed_at"], began[0]["first_observed_at"])
@@ -294,8 +293,8 @@ owner["run"](root,process_source=source)
         self.assertEqual(sorted(row["pid"] for row in ended), [70, 71])
         joined = []
         for end in ended:
-            candidates = [row for row in processes if (row["pid"], row["start"], row["run_id"]) ==
-                          (end["pid"], end["start"], end["run_id"])]
+            candidates = [row for row in processes if (row["pid"], row["start"], row["run_id"], row["epoch"]) ==
+                          (end["pid"], end["start"], end["run_id"], end["epoch"])]
             self.assertTrue(candidates, end)
             first = {row["first_observed_at"] for row in candidates}
             self.assertEqual(first, {base + (35999 if end["pid"] == 70 else 86401)})
@@ -307,6 +306,83 @@ owner["run"](root,process_source=source)
                             for row in processes))
         self.assertEqual(self.records("owner")[-1]["action"], "stop")
         self.prune_at(base + 172804 + 172801)
+        self.assertEqual(self.records("process"), [])
+        self.assertEqual(self.records("process_end"), [])
+
+    def repeated_caller_epochs(self):
+        # Labeled PID 42 leaves gh and re-enters with the same OS birth identity.
+        # Only the process table, wall clock and quota inputs are fixtures.
+        launcher = self.root / "epoch-clock.py"
+        launcher.write_text('''import os,runpy,signal,sys,time
+base=1794000000
+elapsed=0
+real_monotonic=time.monotonic
+time.time=lambda:base+elapsed
+time.monotonic=lambda:real_monotonic()+elapsed
+owner=runpy.run_path(sys.argv[1])
+step=0
+def source():
+    global step,elapsed
+    offsets=[10,60,80,100,110,120,130]
+    elapsed=offsets[step]
+    argv=["/fixture/gh","pr","checks","--body","fixture-secret"] if elapsed<100 else (
+        ["/fixture/gh","issue","list"] if elapsed==110 else ["/fixture/other"])
+    table={42:(10,"same-start",argv),
+           10:(0,"fixture-parent",["python3","/fixture/caller.py","fixture-secret"])}
+    if step==len(offsets)-1:
+        os.kill(os.getpid(),signal.SIGTERM)
+    else:
+        step+=1
+    return table
+owner["run"](owner["private_root"](),process_source=source)
+''')
+        reply = subprocess.run([sys.executable, str(launcher), str(OWNER)], env=self.env,
+                               capture_output=True, text=True)
+        self.assertEqual(reply.returncode, 0, reply.stderr)
+        base = 1794000000
+        db = sqlite3.connect(self.state / "github-accounting/observations.sqlite")
+        for offset in (60, 75, 101, 105, 111, 115):
+            stamp = base + offset
+            payload = {"observed_at": stamp, "kind": "quota", "status": "observed",
+                       "source": "labeled epoch fixture", "graphql": {"used": offset}}
+            db.execute("INSERT INTO observations VALUES (?,?,?)", (stamp, "quota", json.dumps(payload)))
+        db.commit()
+        db.close()
+
+    def test_repeated_caller_epochs_keep_each_retained_interval(self):
+        self.repeated_caller_epochs()
+        base = 1794000000
+        for stage in ("before", "after"):
+            with self.subTest(stage=stage):
+                if stage == "after":
+                    self.prune_at(base + 172851)  # Strict cutoff 51.
+                processes = self.records("process")
+                self.assertEqual([(row["first_observed_at"] - base, row["argv"]) for row in processes],
+                                 [(10, ["gh", "pr", "checks", "--body", "[REDACTED]"]),
+                                  (110, ["gh", "issue", "list"])])
+                self.assertNotIn("fixture-secret", json.dumps(processes))
+                self.assertTrue(all(row["ancestors"][0]["argv"] ==
+                                    ["python3", "caller.py", "[REDACTED]"] for row in processes))
+                ends = self.records("process_end")
+                self.assertEqual([row["observed_at"] - base for row in ends], [100, 120])
+                # Only the epoch joins a particular sighting to its particular end.
+                key = lambda row: (row["pid"], row["start"], row["run_id"], row["epoch"])
+                ended = {key(row): row["observed_at"] for row in ends}
+                self.assertEqual(len(ended), 2)
+                for begin, finish, expected in ((60, 75, [["gh", "pr", "checks", "--body", "[REDACTED]"]]),
+                                                (101, 105, []), (111, 115, [["gh", "issue", "list"]])):
+                    hits = [row["argv"] for row in processes if row["first_observed_at"] <= base + finish
+                            and ended[key(row)] >= base + begin]
+                    self.assertEqual(hits, expected)
+                quotas = self.records("quota")
+                self.assertTrue(all(any(row["observed_at"] == base + offset for row in quotas)
+                                    for offset in (60, 75, 101, 105, 111, 115)))
+        # Each ended epoch's retained projection expires with its own end, not
+        # with a later epoch's end or a later renewal of the same OS process.
+        self.prune_at(base + 172901)  # cutoff 101: only the second end survives.
+        self.assertEqual([row["argv"] for row in self.records("process")], [["gh", "issue", "list"]])
+        self.assertEqual([row["observed_at"] - base for row in self.records("process_end")], [120])
+        self.prune_at(base + 172921)
         self.assertEqual(self.records("process"), [])
         self.assertEqual(self.records("process_end"), [])
 
@@ -365,8 +441,9 @@ owner["run"](root,process_source=source)
                          [(70, "fixture-caller", base + retained)])
         row = rows[0]
         ended = self.records("process_end")
-        self.assertEqual([(item["pid"], item["start"], item["run_id"], item["observed_at"]) for item in ended],
-                         [] if end is None else [(70, "fixture-caller", row["run_id"], base + end)])
+        self.assertEqual([(item["pid"], item["start"], item["run_id"], item["epoch"], item["observed_at"])
+                          for item in ended],
+                         [] if end is None else [(70, "fixture-caller", row["run_id"], row["epoch"], base + end)])
         self.assertEqual(row["first_observed_at"], base + first)
         self.assertLessEqual(row["first_observed_at"], base + quota)
         self.assertGreaterEqual(retained if end is None else end, quota)
@@ -409,7 +486,8 @@ owner["run"](root,process_source=source)
         db = sqlite3.connect(self.state / "github-accounting/observations.sqlite")
         for kind, pid, start, run_id, stamp in rows:
             db.execute("INSERT INTO observations VALUES (?,?,?)", (stamp, kind, json.dumps(
-                {"pid": pid, "start": start, "run_id": run_id, "observed_at": stamp, "kind": kind})))
+                {"pid": pid, "start": start, "run_id": run_id, "epoch": 1,
+                 "observed_at": stamp, "kind": kind})))
         db.commit()
         db.close()
         self.assertEqual(self.prune_at(now), 6)

@@ -53,18 +53,20 @@ later request has no verdict until ps recovers. An owner that exits normally end
 remaining child processes, including a hung ps; a SIGKILL of the owner does not.
 run's process_source callable is a test
 seam returning {pid: (ppid, start_identity, argv_words)}; the default is ps.
-Injected rows prove output behavior, not actual host observations. New gh/gh-axi
-PID/start identities retain sanitized argv and the observed ancestor chain in a
-first-sighting process row. While successful scans still list that identity, its
-saved sanitized projection is repeated in one fresh process row once the latest
-row is 24 hours old, keeping it joinable within the unchanged 48-hour retention.
-Every process row keeps first_observed_at, the first time that identity was seen
-as gh/gh-axi in this run, unchanged next to its own observed_at. Use
-first_observed_at <= interval_end, not a later row's observed_at, for interval overlap.
-No argv or ancestor projection is recomputed for a later row. One process_end row,
-with the pid, start identity, run id and time, follows when
-the first successful scan no longer lists that identity as a caller. Prune keeps
-that caller's latest process row (same pid, start identity and run id) while its
+Injected rows prove output behavior, not actual host observations. A new observed
+gh/gh-axi epoch retains sanitized argv and the ancestor chain in a first-sighting
+process row. Each sighting after a successful scan ended the prior epoch gets a
+new integer epoch within its owner run, even for the same PID/start identity.
+While successful scans still list that caller, its saved sanitized projection is
+repeated in one fresh process row once the latest row is 24 hours old, keeping it
+joinable within the unchanged 48-hour retention. Every process row keeps
+first_observed_at, the first time that epoch was seen as gh/gh-axi, unchanged next
+to its own observed_at. Use first_observed_at <= interval_end, not a later row's
+observed_at, for interval overlap. No argv or ancestor projection is recomputed
+for a renewal. One process_end row with the same pid, start identity, run_id and
+epoch follows when the first successful scan no longer lists that caller.
+Join only on (pid, start, run_id, epoch); separate epochs must never share an end
+or projection. Prune keeps each epoch's latest process row while its matching
 process_end row is retained, and every other row expires at 48 hours. So an ended
 caller's last process row can outlive 48 hours by up to its 24-hour renewal interval,
 or by the failed-scan gap that delayed its end row, at most another 48 hours. At a
@@ -122,7 +124,7 @@ APPLICATION_ID = 0x464D4748
 LOG_LIMIT = 64 * 1024
 BUSY = 75
 SAMPLE_ERRORS = (OSError, subprocess.SubprocessError, RuntimeError)
-CALLER_FIELDS = ("pid", "start", "run_id")
+CALLER_FIELDS = ("pid", "start", "run_id", "epoch")
 SAME_CALLER = " AND ".join(f"json_extract(other.payload,'$.{field}')=json_extract(observations.payload,'$.{field}')"
                            for field in CALLER_FIELDS)
 QUOTA_JQ = '.resources.graphql | "used=\\(.used) reset=\\(.reset) limit=\\(.limit) remaining=\\(.remaining)"'
@@ -442,13 +444,14 @@ def run(root, duration=None, ready=None, *, process_source=None):
             signal.signal(number, stop_requested)
         child = stream = expired = scan = verdict = None
         seen = {}
+        epoch = 0
         scans = failures = 0
         max_gap = 0.0
         previous = None
         started = next_process = next_quota = time.monotonic()
 
         def finish_scan():
-            nonlocal scan, failures
+            nonlocal scan, failures, epoch
             finished, scan = scan, None
             if isinstance(finished.error, SAMPLE_ERRORS):
                 failures += 1
@@ -458,10 +461,12 @@ def run(root, duration=None, ready=None, *, process_source=None):
                 found, current = process_records(finished.rows, seen)
                 observed = time.time()
                 for pid, start in sorted(seen.keys() - current):
-                    record(db, "process_end", {"pid": pid, "start": start, "run_id": run_id}, observed)
-                    del seen[(pid, start)]
+                    _stamp, item = seen.pop((pid, start))
+                    record(db, "process_end", {field: item[field] for field in CALLER_FIELDS}, observed)
                 for item in found:
-                    seen[(item["pid"], item["start"])] = (None, dict(item, run_id=run_id, first_observed_at=observed))
+                    epoch += 1
+                    seen[(item["pid"], item["start"])] = (None, dict(item, run_id=run_id, epoch=epoch,
+                                                                  first_observed_at=observed))
                 for identity, (stamp, item) in seen.items():
                     if stamp is None or observed - stamp >= RETENTION / 2:
                         record(db, "process", item, observed)

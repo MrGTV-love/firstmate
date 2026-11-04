@@ -1118,11 +1118,13 @@ Its selected quota source is the REST `rate_limit` endpoint's `resources.graphql
 That source was explicitly selected instead of the original GraphQL-query/header proposal; a returned REST counter does not establish agreement between counter shards.
 A `process` row holds a locally sampled caller chain at its first sighting; while successful scans still list that identity, the owner renews the saved sanitized projection in one fresh `process` row once the latest row is 24 hours old.
 The renewal preserves the same argv and ancestors rather than resampling their values, so a caller that remains visible across the 48-hour retention keeps a joinable row.
-Every `process` row carries `first_observed_at`, copied unchanged from the first sighting as `gh`/`gh-axi` in that owner run, alongside its own `observed_at`.
+Every `process` row carries `first_observed_at`, copied unchanged from the first sighting of that `gh`/`gh-axi` epoch, alongside its own `observed_at`.
+Join process projections and ends only by `(pid, start, run_id, epoch)`, as defined in the owner's header; a successful scan that stops listing a caller ends that epoch, and a later return gets a distinct epoch even for the same PID/start/run.
+Renewals and a normal-stop row keep their epoch; never merge distinct epochs by PID/start/run or carry one epoch's argv or end into another.
 For a quota interval, use `first_observed_at <= interval_end` and the matching end time at or after the interval start, not the `observed_at` of a later `process` row or the OS process start: a process that execs into `gh` later was not observed as a caller earlier.
 A missing end leaves the overlap uncertain after the last successful scan that listed the caller, which a stop row's `observed_at` does not show; these timestamps do not establish continuous observation across failed scans or downtime.
-A `process_end` row with the same pid, start identity and run id holds the time of the first successful scan that no longer lists that caller, connecting the retained process row to the quota intervals up to that scan.
-Prune keeps an ended caller's latest `process` row (same pid, start identity and run id) while its `process_end` row is retained, and every other row expires at 48 hours.
+A `process_end` row holds the time of the first successful scan that no longer lists that caller, connecting its matching epoch's retained process row to the quota intervals up to that scan.
+Prune keeps each ended epoch's latest `process` row while its matching `process_end` row is retained, independently of other epochs of the same OS process, and every other row expires at 48 hours.
 That last `process` row can therefore outlive 48 hours by up to its 24-hour renewal interval, or by the failed-scan gap that delayed its end row, at most another 48 hours.
 No row is written per scan, and a failed scan ends nothing or renews nothing, so a `process_end` time can follow the real end by the failed or missing scans that `sampling` rows report.
 A caller still alive when the observer stops has no `process_end` row, nor has one that ends while no owner runs, so a retained `process` row with no matching end row shows a first sighting, a renewal or a stop, and not how long the caller lived afterward; a new owner records a caller it finds alive as a new `process` row.
