@@ -107,6 +107,57 @@ ZZ-UNKNOWN-ZZ something the builder has no rule for.'
   pass "an unrecognised section stops the build, names the section and writes no pack"
 }
 
+test_unrecognised_subheadings_stay_and_are_listed() {
+  local src="$TMP_ROOT/sub.md" pack manifest target m
+  cat >"$src" <<'EOF'
+# Fixture contract
+
+ZZ-PREAMBLE-ZZ a neutral preamble line.
+
+## Definition Of Done
+
+- **A1** (mandatory): ZZ-KEEP-DOD-ZZ the thing exists.
+
+### Earlier findings and how I answered them
+
+ZZ-SUB-L3-ZZ text under an unknown level 3 heading.
+
+#### Author's all-green candidate
+
+ZZ-SUB-L4-ZZ text under a level 4 heading.
+
+**Contract Review**
+
+ZZ-SUB-BOLD-ZZ text under a bold-only line.
+
+Contract Review
+---
+
+ZZ-SUB-SETEXT-ZZ text under a setext heading.
+
+### Author self-check
+
+ZZ-ALLGREEN-ZZ a recognised author section.
+EOF
+  build_pack pack --contract "$src" || fail "builder refused a contract with unrecognised sub-headings: $(cat "$TMP_ROOT/build.err")"
+  target="$pack/target.md"
+  manifest="$(dirname "$pack").excluded-paths"
+  for m in ZZ-PREAMBLE-ZZ ZZ-SUB-L3-ZZ ZZ-SUB-L4-ZZ ZZ-SUB-BOLD-ZZ ZZ-SUB-SETEXT-ZZ; do
+    assert_grep "$m" "$target" "text under an unrecognised heading or preamble line was dropped: $m"
+  done
+  assert_no_grep "ZZ-ALLGREEN-ZZ" "$target" "a recognised author sub-section reached the pack"
+  grep -qxF "$(printf 'dropped\tAuthor self-check')" "$manifest" || fail "the dropped sub-section is not listed in the manifest"
+  for m in "### Earlier findings and how I answered them (under: Definition Of Done)" \
+    "#### Author's all-green candidate (under: Definition Of Done)" \
+    "**Contract Review** (under: Definition Of Done)" \
+    "Contract Review (setext heading, under: Definition Of Done)" \
+    "preamble line: ZZ-PREAMBLE-ZZ a neutral preamble line."; do
+    grep -qxF "$(printf 'unrecognised\t%s' "$m")" "$manifest" || fail "the manifest does not list as unrecognised: $m"
+  done
+  assert_not_contains "$(cat "$manifest")" "$(printf 'unrecognised\t- **A1**')" "a criterion line was listed as a heading"
+  pass "an unrecognised sub-heading or preamble line stays in the pack and the manifest lists it"
+}
+
 test_single_source_policy_block() {
   local src="$TMP_ROOT/s.md" pack pack2 policy2="$TMP_ROOT/policy2.md"
   write_fixture_contract "$src"
@@ -329,7 +380,7 @@ test_leak_check_reads_common_report_shapes() {
   pass "the leak check reads numbered headings and line references without voiding a clean round"
 }
 
-test_leak_check_reads_prose_before_the_list_and_linked_files() {
+test_leak_check_reads_prose_before_the_list_and_refuses_linked_files() {
   local rep="$TMP_ROOT/report4.md"
   make_leak_world
   # Prose between the heading and the first path, blank lines between paths, prose after the list.
@@ -338,12 +389,20 @@ test_leak_check_reads_prose_before_the_list_and_linked_files() {
     printf '%s\n\n' "$LEAK_PACK/contract.md"
     printf '%s\n' "$LEAK_PACK/target.md"
     printf '%s\n' "$LEAK_SKILLS/define-done-and-grading/SKILL.md"
-    printf '%s\n' "$LEAK_SKILLS/define-done-and-grading/OPERATIONAL-BOUNDARIES.md"
     printf '\nThat is the whole list.\n\nEXIT: needs-revision\nVERDICT: FAIL\n'
   } >"$rep"
   run_check "$rep"
-  assert_equals 0 "$CHECK_RC" "a list after a prose line, or a file the skill links, was flagged: $CHECK_OUT"
-  assert_contains "$CHECK_OUT" "4 listed input(s)" "the list after the prose line was not read in full"
+  assert_equals 0 "$CHECK_RC" "a list after a prose line was flagged: $CHECK_OUT"
+  assert_contains "$CHECK_OUT" "3 listed input(s)" "the list after the prose line was not read in full"
+  # A file the skill's SKILL.md links is not one of the three named references.
+  {
+    printf 'VERDICT: FAIL head=abc\n\n# Inputs read\n\nPaths follow.\n\n'
+    printf '%s\n' "$LEAK_PACK/contract.md"
+    printf '%s\n' "$LEAK_SKILLS/define-done-and-grading/OPERATIONAL-BOUNDARIES.md"
+  } >"$rep"
+  run_check "$rep"
+  assert_equals 3 "$CHECK_RC" "a file the skill links was authorized"
+  assert_contains "$CHECK_OUT" "INPUT LEAK" "no INPUT LEAK line for a file the skill links"
   # A file in the skill folder that its SKILL.md does not link is still a leak.
   {
     printf 'VERDICT: FAIL head=abc\n\n# Inputs read\n\nPaths follow.\n\n'
@@ -356,7 +415,7 @@ test_leak_check_reads_prose_before_the_list_and_linked_files() {
   printf 'VERDICT: FAIL head=abc\n\n# Inputs read\n\nNone recorded.\n\nEXIT: needs-revision\n' >"$rep"
   run_check "$rep"
   assert_equals 3 "$CHECK_RC" "a heading with no paths was accepted"
-  pass "the leak check reads a list that follows a prose line and authorizes only files the skill links"
+  pass "the leak check reads a list that follows a prose line and authorizes no skill file but SKILL.md"
 }
 
 test_pack_names_only_the_request_it_holds() {
@@ -379,70 +438,19 @@ test_pack_names_only_the_request_it_holds() {
   pass "the pack names a request only where the pack or the contract holds one"
 }
 
-test_export_root_is_tracked_only_and_the_check_keeps_its_strictness() {
-  local repo="$TMP_ROOT/exp-repo" src pack xroot rep="$TMP_ROOT/exp-report.md" rev
-  rm -rf "$repo"
-  mkdir -p "$repo/bin" "$repo/data" "$repo/config" "$repo/docs"
-  printf '#!/bin/sh\n' >"$repo/bin/tool.sh"
-  printf 'rubric\n' >"$repo/docs/review-rubric.md"
-  printf 'private config\n' >"$repo/config/private.json"
-  printf 'earlier report\n' >"$repo/data/earlier-review.md"
-  printf 'tracked notes\n' >"$repo/docs/notes.md"
-  printf 'config/\ndata/\n' >"$repo/.gitignore"
-  write_fixture_contract "$repo/docs/contract-src.md"
-  fm_git_init_commit "$repo"
-  git -C "$repo" add .gitignore bin docs
-  git -C "$repo" -c user.name=t -c user.email=t@example.invalid commit -qm files
-  rev=$(git -C "$repo" rev-parse HEAD)
-  # A tracked file changed after the revision must not appear in the export of that revision.
-  printf 'later\n' >"$repo/bin/later.sh"
-  git -C "$repo" add bin/later.sh
-  git -C "$repo" -c user.name=t -c user.email=t@example.invalid commit -qm later
-  src="$repo/docs/contract-src.md"
-  build_pack pack --contract "$src" --export-root "$repo" --rev "$rev" --exclude "$repo/docs/notes.md" \
-    || fail "export build failed: $(cat "$TMP_ROOT/build.err")"
-  xroot="$(dirname "$pack").root"
-  assert_present "$xroot/bin/tool.sh" "a tracked file is missing from the export"
-  assert_absent "$xroot/bin/later.sh" "a file from a later revision is in the export"
-  assert_absent "$xroot/config/private.json" "a gitignored config file is in the export"
-  assert_absent "$xroot/data/earlier-review.md" "a gitignored report is in the export"
-  assert_absent "$xroot/docs/notes.md" "a tracked file the caller excluded is in the export"
-  assert_absent "$xroot/docs/contract-src.md" "the contract source is in the export"
-  assert_equals "pack" "$(ls -A "$(dirname "$pack")")" "the export sits inside the pack's parent"
-  assert_grep "root=$xroot" "$TMP_ROOT/build.err" "the export root is not announced"
-  # Clean: pack file and an exported tracked file.
-  write_report "$rep" "$pack/contract.md" "$xroot/bin/tool.sh"
-  CHECK_RC=0
-  CHECK_OUT=$("$PACK_BIN" check --pack "$pack" --report "$rep" 2>&1) || CHECK_RC=$?
-  assert_equals 0 "$CHECK_RC" "an exported tracked file was flagged: $CHECK_OUT"
-  # Leaks: the original gitignored path, the original excluded path, and an unexported path in the export directory.
-  write_report "$rep" "$pack/contract.md" "$repo/config/private.json"
-  CHECK_RC=0
-  CHECK_OUT=$("$PACK_BIN" check --pack "$pack" --report "$rep" 2>&1) || CHECK_RC=$?
-  assert_equals 3 "$CHECK_RC" "a read of the original gitignored file was allowed"
-  write_report "$rep" "$pack/contract.md" "$repo/docs/notes.md"
-  CHECK_RC=0
-  CHECK_OUT=$("$PACK_BIN" check --pack "$pack" --report "$rep" 2>&1) || CHECK_RC=$?
-  assert_equals 3 "$CHECK_RC" "a read of the original excluded file was allowed"
-  write_report "$rep" "$pack/contract.md" "$repo/bin/tool.sh"
-  CHECK_RC=0
-  CHECK_OUT=$("$PACK_BIN" check --pack "$pack" --report "$rep" 2>&1) || CHECK_RC=$?
-  assert_equals 3 "$CHECK_RC" "a read in the original checkout was allowed beside the export"
-  # A revision path is judged against the source repository.
-  write_report "$rep" "$pack/contract.md" "${rev}:bin/tool.sh"
-  CHECK_RC=0
-  CHECK_OUT=$("$PACK_BIN" check --pack "$pack" --report "$rep" 2>&1) || CHECK_RC=$?
-  assert_equals 0 "$CHECK_RC" "a revision path tracked at that revision was flagged: $CHECK_OUT"
-  # Refusals.
-  CHECK_RC=0
-  "$PACK_BIN" --contract "$src" --export-root "$repo" --root "$repo" --out-root "$TMP_ROOT/exp-bad1" >/dev/null 2>&1 || CHECK_RC=$?
-  assert_equals 2 "$CHECK_RC" "--root and --export-root together were accepted"
-  CHECK_RC=0
-  "$PACK_BIN" --contract "$src" --export-root "$repo" --rev no-such-rev --out-root "$TMP_ROOT/exp-bad2" >/dev/null 2>&1 || CHECK_RC=$?
-  assert_equals 2 "$CHECK_RC" "an unknown revision was accepted"
-  assert_absent "$TMP_ROOT/exp-bad2" "a refused export left an output directory"
-  assert_absent "$TMP_ROOT/exp-bad2.root" "a refused export left an export directory"
-  pass "the export root holds only tracked files at the revision, minus excluded paths, and the check keeps its strictness"
+test_export_root_mode_is_gone() {
+  local src="$TMP_ROOT/x.md" rc
+  write_fixture_contract "$src"
+  rc=0
+  "$PACK_BIN" --contract "$src" --export-root "$ROOT" --out-root "$TMP_ROOT/x1" >/dev/null 2>&1 || rc=$?
+  assert_equals 2 "$rc" "--export-root was accepted"
+  assert_absent "$TMP_ROOT/x1" "a refused --export-root left an output directory"
+  assert_absent "$TMP_ROOT/x1.root" "a refused --export-root left an export directory"
+  rc=0
+  "$PACK_BIN" --contract "$src" --root "$ROOT" --rev HEAD --out-root "$TMP_ROOT/x2" >/dev/null 2>&1 || rc=$?
+  assert_equals 2 "$rc" "--rev was accepted"
+  assert_absent "$TMP_ROOT/x2" "a refused --rev left an output directory"
+  pass "the builder takes the repository root only as --root"
 }
 
 test_leak_check_pinned_rubric_url_and_own_report() {
@@ -490,6 +498,7 @@ test_leak_check_pinned_rubric_url_and_own_report() {
 fm_test_run_cases \
   test_markers_kept_and_dropped \
   test_unrecognised_section_refused \
+  test_unrecognised_subheadings_stay_and_are_listed \
   test_single_source_policy_block \
   test_pack_layout_and_fresh_parent \
   test_fails_safe_on_bad_input \
@@ -497,8 +506,8 @@ fm_test_run_cases \
   test_leak_check_judges_what_a_path_is \
   test_leak_check_revision_paths_and_excluded_directories \
   test_leak_check_reads_common_report_shapes \
-  test_leak_check_reads_prose_before_the_list_and_linked_files \
+  test_leak_check_reads_prose_before_the_list_and_refuses_linked_files \
   test_pack_names_only_the_request_it_holds \
-  test_export_root_is_tracked_only_and_the_check_keeps_its_strictness \
+  test_export_root_mode_is_gone \
   test_leak_check_pinned_rubric_url_and_own_report \
   -- "$@"

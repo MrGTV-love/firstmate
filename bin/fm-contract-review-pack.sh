@@ -6,7 +6,7 @@
 #
 # usage:
 #   fm-contract-review-pack.sh [build] --contract <file> [--request <file>]
-#       [--context <file>]... [--root <repo-root> | --export-root <repo> [--rev <rev>]]
+#       [--context <file>]... [--root <repo-root>]
 #       [--exclude <path>]...
 #       [--register <path>] [--history <path>] [--policy <file>]
 #       [--out-root <dir>] [--label <text>]
@@ -22,13 +22,13 @@
 #   without the author's sections), request.md and context-<name> for each
 #   --request and --context file, head.txt, ci-evidence.md and an empty diff.patch,
 #   which is the layout data/review-lane/run-review.sh takes (pass diff.patch).
-#   The author's sections are dropped by heading. A heading the builder does not
-#   recognise stops the build with exit 3 naming it, and nothing is written.
-#   --export-root builds the repository root as a tracked-only snapshot: `git archive
-#   <rev>` (default HEAD) of <repo> is extracted into <out-root>.root, outside the pack,
-#   and every path the caller excluded is removed from it. Pass that directory (printed
-#   on stderr as root=...) as the entrypoint's repository-root argument. Gitignored files
-#   do not exist under it. The manifest records it as tracked by construction.
+#   The author's sections are dropped by heading. A level 1 or 2 heading the builder
+#   does not recognise stops the build with exit 3 naming it, and nothing is written.
+#   Under a kept section, a sub-heading the builder does not recognise (an unknown
+#   level 3 heading, a level 4 or deeper heading, a bold-only line or a setext
+#   heading) stays in target.md where it is, and so does a preamble line it does not
+#   drop; each is listed in the manifest as unrecognised. No contract text is dropped
+#   without a dropped line in the manifest.
 #   The manifest of excluded paths is <out-root>.excluded-paths, outside the pack.
 #   It always holds the real path of every input file (the contract, the request,
 #   each context file), the register and history paths when given, and every
@@ -38,9 +38,8 @@
 #   prints INPUT LEAK lines plus ROUND VOID (exit 3) when the list is missing or a
 #   listed path is not an authorized input; prints INPUT CLEAN (exit 0) otherwise.
 #   An authorized input is judged by what it is: a file inside the pack, the
-#   SKILL.md of the assess-done-and-grade or define-done-and-grading skill and a
-#   top-level file that SKILL.md links by a relative markdown link (not the
-#   backups and notes it does not link), the review rubric, or a file the manifest's root tracks (git ls-files, or
+#   SKILL.md of the assess-done-and-grade or define-done-and-grading skill (no other
+#   file in either skill folder), the review rubric, or a file the manifest's root tracks (git ls-files, or
 #   <rev>:<path> that git can read). A path in the manifest's excluded set is
 #   refused even when it is tracked. A gitignored file is not tracked.
 #   Two exact exemptions: the pinned rubric read by URL (raw.githubusercontent.com or
@@ -83,10 +82,11 @@ BLOCK_BEGIN='<!-- reviewer-block:begin -->'
 BLOCK_END='<!-- reviewer-block:end -->'
 
 # Section filter. Reads the contract on stdin, writes the kept text to the file
-# named by KEEP_OUT, the dropped section names to DROPPED_OUT and the unrecognised
-# headings to UNKNOWN_OUT. Headings of level 1 and 2 start a section and must be
-# recognised; a level 3 heading under a kept section is dropped when it names an
-# author section. Text inside a code fence is never a heading.
+# named by KEEP_OUT, the dropped section names to DROPPED_OUT, the unrecognised
+# level 1 and 2 headings to UNKNOWN_OUT and the kept but unrecognised sub-headings
+# and preamble lines to UNREC_OUT. Headings of level 1 and 2 start a section and
+# must be recognised; a level 3 heading under a kept section is dropped when it
+# names an author section. Text inside a code fence is never a heading.
 # shellcheck disable=SC2016 # awk program, not shell
 SECTION_AWK='
 function norm(t) {
@@ -102,13 +102,16 @@ function classify(t,   i, n, parts) {
   for (i = 1; i <= n; i++) if (parts[i] != "" && index(t, parts[i]) == 1) return "keep"
   return "unknown"
 }
-BEGIN { mode = "keep"; parent = "keep"; seen_heading = 0; fence = 0; pre = 1 }
+BEGIN { mode = "keep"; parent = "keep"; ptitle = "preamble"; seen_heading = 0; fence = 0; pre = 1; prev = "" }
 {
   line = $0
+  last = prev
+  prev = line
   if (line ~ /^(```|~~~)/) fence = !fence
   level = 0
   if (!fence) {
-    if (line ~ /^### /) level = 3
+    if (line ~ /^####+[ \t]/) level = 4
+    else if (line ~ /^### /) level = 3
     else if (line ~ /^## /) level = 2
     else if (line ~ /^# /) level = 1
   }
@@ -123,6 +126,7 @@ BEGIN { mode = "keep"; parent = "keep"; seen_heading = 0; fence = 0; pre = 1 }
     t = norm(substr(line, level + 2))
     c = classify(t)
     parent = c
+    ptitle = substr(line, level + 2)
     if (c == "keep") mode = "keep"
     else if (c == "drop") { mode = "drop"; print substr(line, level + 2) > DROPPED_OUT }
     else { mode = "drop"; print substr(line, level + 2) > UNKNOWN_OUT }
@@ -131,13 +135,20 @@ BEGIN { mode = "keep"; parent = "keep"; seen_heading = 0; fence = 0; pre = 1 }
   }
   if (level == 3) {
     t = norm(substr(line, 5))
-    if (parent == "keep" && classify(t) != "drop") mode = "keep"
+    c = classify(t)
+    if (parent == "keep" && c != "drop") mode = "keep"
     else { mode = "drop"; if (parent == "keep") print substr(line, 5) > DROPPED_OUT }
-    if (mode == "keep") print line > KEEP_OUT
+    if (mode == "keep") {
+      if (c == "unknown") print line " (under: " ptitle ")" > UNREC_OUT
+      print line > KEEP_OUT
+    }
     next
   }
   if (mode == "keep") {
     if (pre && tolower(line) ~ PREAMBLE_DROP) { print "preamble line: " line > DROPPED_OUT; next }
+    if (!fence && (level == 4 || line ~ /^[ \t]*\*\*[^*]+\*\*:?[ \t]*$/ || line ~ /^[ \t]*__[^_]+__:?[ \t]*$/)) print line " (under: " ptitle ")" > UNREC_OUT
+    else if (!fence && line ~ /^[ \t]*(=+|-+)[ \t]*$/ && last !~ /^[ \t]*$/ && last !~ /^#/) print last " (setext heading, under: " ptitle ")" > UNREC_OUT
+    else if (pre && line !~ /^[ \t]*$/) print "preamble line: " line > UNREC_OUT
     print line > KEEP_OUT
   }
 }
@@ -147,11 +158,12 @@ SECTION_KEEP="request|context|captain's intent|captain intent|rulings|terms|amen
 SECTION_DROP="author self-check|author's all-green|author all-green|all-green|author's|author notes|boundary dispositions|contract review|review history|revision log|revision history|self-check|prior findings|prior review|responses|response to|suggested attack|open findings|finding register|register"
 PREAMBLE_DROP='contract review|reviewed:|all-green|self-check|review exit|prior finding|revision log'
 
-filter_sections() { # <in> <keep-out> <dropped-out> <unknown-out>
+filter_sections() { # <in> <keep-out> <dropped-out> <unknown-out> <unrecognised-out>
   : >"$2"
   : >"$3"
   : >"$4"
-  awk -v KEEP_OUT="$2" -v DROPPED_OUT="$3" -v UNKNOWN_OUT="$4" \
+  : >"$5"
+  awk -v KEEP_OUT="$2" -v DROPPED_OUT="$3" -v UNKNOWN_OUT="$4" -v UNREC_OUT="$5" \
     -v KEEP="$SECTION_KEEP" -v DROP="$SECTION_DROP" -v PREAMBLE_DROP="$PREAMBLE_DROP" \
     "$SECTION_AWK" <"$1"
 }
@@ -165,7 +177,7 @@ policy_block() { # <policy> -> block with marker lines on stdout, nonzero unless
 }
 
 cmd_build() {
-  local contract='' request='' root='' policy='' out_root='' label='' export_repo='' export_rev=HEAD export_dir='' export_sha=''
+  local contract='' request='' root='' policy='' out_root='' label=''
   local -a contexts=() excludes=()
   while [ $# -gt 0 ]; do
     case "$1" in
@@ -173,8 +185,6 @@ cmd_build() {
       --request) [ $# -ge 2 ] || die "--request needs a file"; request=$2; shift 2 ;;
       --context) [ $# -ge 2 ] || die "--context needs a file"; contexts+=("$2"); shift 2 ;;
       --root) [ $# -ge 2 ] || die "--root needs a directory"; root=$2; shift 2 ;;
-      --export-root) [ $# -ge 2 ] || die "--export-root needs a repository"; export_repo=$2; shift 2 ;;
-      --rev) [ $# -ge 2 ] || die "--rev needs a revision"; export_rev=$2; shift 2 ;;
       --exclude | --register | --history)
         [ $# -ge 2 ] || die "$1 needs a path"; excludes+=("$2"); shift 2 ;;
       --policy) [ $# -ge 2 ] || die "--policy needs a file"; policy=$2; shift 2 ;;
@@ -192,11 +202,6 @@ cmd_build() {
     [ -f "$f" ] && [ -r "$f" ] || die "context file not readable: $f"
   done
   [ -z "$root" ] || [ -d "$root" ] || die "root is not a directory: $root"
-  [ -z "$export_repo" ] || [ -z "$root" ] || die "use --root or --export-root, not both"
-  if [ -n "$export_repo" ]; then
-    [ -d "$export_repo" ] || die "export-root is not a directory: $export_repo"
-    export_sha=$(env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_COMMON_DIR git -C "$export_repo" rev-parse --verify "$export_rev^{commit}" 2>/dev/null) || die "not a commit in $export_repo: $export_rev"
-  fi
   [ -n "$policy" ] || policy=${FM_CONTRACT_REVIEW_POLICY:-$FM_ROOT/.agents/skills/contract-review/SKILL.md}
   [ -f "$policy" ] && [ -r "$policy" ] || die "policy file not readable: $policy"
 
@@ -208,7 +213,7 @@ cmd_build() {
   policy_block "$policy" >"$scratch/block" || die "policy must hold exactly one reviewer block between its marker lines: $policy"
   [ -s "$scratch/block" ] || die "policy reviewer block is empty: $policy"
 
-  filter_sections "$contract" "$scratch/keep" "$scratch/dropped" "$scratch/unknown"
+  filter_sections "$contract" "$scratch/keep" "$scratch/dropped" "$scratch/unknown" "$scratch/unrec"
   if [ -s "$scratch/unknown" ]; then
     local name
     while IFS= read -r name; do
@@ -220,7 +225,7 @@ cmd_build() {
   grep -qi '^#\{1,3\} definition of done' "$scratch/keep" || die "contract has no Definition Of Done section: $contract"
 
   for f in ${contexts[@]+"${contexts[@]}"}; do
-    filter_sections "$f" "$scratch/ctx.keep" "$scratch/ctx.dropped" "$scratch/ctx.unknown"
+    filter_sections "$f" "$scratch/ctx.keep" "$scratch/ctx.dropped" "$scratch/ctx.unknown" "$scratch/ctx.unrec"
     if [ -s "$scratch/ctx.dropped" ] && grep -qv '^preamble line:' "$scratch/ctx.dropped"; then
       die "context file holds an author section: $f"
     fi
@@ -247,16 +252,6 @@ cmd_build() {
   # shellcheck disable=SC2064
   trap "rm -rf '$scratch'; rm -f '$manifest'; if [ $created_root = 1 ]; then rm -rf '$out_root'; else rm -rf '$pack'; fi" EXIT
   mkdir "$pack" || die "cannot create pack directory: $pack"
-  if [ -n "$export_repo" ]; then
-    export_dir="$out_root.root"
-    [ ! -e "$export_dir" ] || die "export directory already exists: $export_dir"
-    # shellcheck disable=SC2064
-    trap "rm -rf '$scratch' '$export_dir'; rm -f '$manifest'; if [ $created_root = 1 ]; then rm -rf '$out_root'; else rm -rf '$pack'; fi" EXIT
-    mkdir "$export_dir" || die "cannot create export directory: $export_dir"
-    env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_COMMON_DIR git -C "$export_repo" archive "$export_sha" | tar -x -C "$export_dir" || die "cannot export $export_rev of $export_repo"
-    export_dir=$(cd "$export_dir" && pwd -P)
-    root=$export_dir
-  fi
 
   cp "$scratch/keep" "$pack/target.md"
   [ -z "$request" ] || cp "$request" "$pack/request.md"
@@ -294,11 +289,6 @@ cmd_build() {
     echo "# fm-contract-review-pack manifest: paths the reviewer must never read"
     printf 'pack\t%s\n' "$(real "$pack")"
     [ -z "$root" ] || printf 'root\t%s\n' "$(real "$root")"
-    if [ -n "$export_repo" ]; then
-      printf 'tree\t%s\n' "$(real "$export_dir")"
-      printf 'source\t%s\n' "$(real "$export_repo")"
-      printf 'sourcerev\t%s\n' "$export_sha"
-    fi
     printf 'exclude\t%s\n' "$(real "$contract")"
     [ -z "$request" ] || printf 'exclude\t%s\n' "$(real "$request")"
     for f in ${contexts[@]+"${contexts[@]}"} ${excludes[@]+"${excludes[@]}"}; do
@@ -307,21 +297,14 @@ cmd_build() {
     while IFS= read -r f; do
       printf 'dropped\t%s\n' "$f"
     done <"$scratch/dropped"
+    while IFS= read -r f; do
+      printf 'unrecognised\t%s\n' "$f"
+    done <"$scratch/unrec"
   } >"$manifest"
-  if [ -n "$export_repo" ]; then
-    local src_real x rel
-    src_real=$(real "$export_repo")
-    while IFS= read -r x; do
-      [ -n "$x" ] || continue
-      case "$x" in "$src_real"/*) rel=${x#"$src_real"/}; rm -rf "${export_dir:?}/$rel" ;; esac
-    done <<EXCL
-$(manifest_lines "$manifest" exclude)
-EXCL
-  fi
 
   # shellcheck disable=SC2064
   trap "rm -rf '$scratch'" EXIT
-  echo "fm-contract-review-pack: pack=$pack head=$head diff=diff.patch manifest=$manifest${export_dir:+ root=$export_dir}" >&2
+  echo "fm-contract-review-pack: pack=$pack head=$head diff=diff.patch manifest=$manifest" >&2
   printf '%s\n' "$pack"
 }
 
@@ -378,25 +361,6 @@ path_under() { # <path> <dir>: true when path equals dir or lies below it
   return 1
 }
 
-# True when <path> is a top-level file of a named skill directory that the skill's own
-# SKILL.md links by a relative markdown link (for example the operational-boundaries
-# note the define-done-and-grading skill tells its reader to apply). Backups, dotfiles
-# and anything the SKILL.md does not link stay refused.
-skill_linked() { # <path> <dir>...
-  local path=$1 dir name
-  shift
-  for dir in "$@"; do
-    [ -f "$dir/SKILL.md" ] || continue
-    [ "$(dirname "$path")" = "$dir" ] || continue
-    name=$(basename "$path")
-    case "$name" in .* | SKILL.md) continue ;; esac
-    if grep -oE '\]\(([A-Za-z0-9_.-]+)\)' "$dir/SKILL.md" | sed -E 's/^\]\((.*)\)$/\1/' | grep -qxF -- "$name"; then
-      return 0
-    fi
-  done
-  return 1
-}
-
 cmd_check() {
   local pack='' report='' log='' manifest=''
   while [ $# -gt 0 ]; do
@@ -417,10 +381,8 @@ cmd_check() {
   [ -f "$manifest" ] && [ -r "$manifest" ] || die "manifest not readable: $manifest"
   [ "$(manifest_lines "$manifest" pack | head -1)" = "$pack" ] || die "manifest does not belong to this pack: $manifest"
 
-  local root tree source_repo skills fmroot rubric rubric_real
+  local root skills fmroot rubric rubric_real
   root=$(manifest_lines "$manifest" root | head -1)
-  tree=$(manifest_lines "$manifest" tree | head -1)
-  source_repo=$(manifest_lines "$manifest" source | head -1)
   skills=${REVIEW_SKILLS_DIR:-$HOME/.agents/skills}
   fmroot=${REVIEW_FM_ROOT:-$FM_ROOT}
   rubric=${REVIEW_RUBRIC:-$fmroot/docs/review-rubric.md}
@@ -501,18 +463,8 @@ EOF
       ok=1
     elif [ -z "$rev" ] && { [ "$path" = "$rubric_real" ] || [ "$path" = "$assess_dir/SKILL.md" ] || [ "$path" = "$define_dir/SKILL.md" ]; }; then
       ok=1
-    elif [ -z "$rev" ] && skill_linked "$path" "$assess_dir" "$define_dir"; then
-      ok=1
     elif [ -n "$rev" ] && [ "$revpath" = "docs/review-rubric.md" ]; then
       ok=1
-    elif [ -n "$tree" ]; then
-      if [ -n "$rev" ]; then
-        if env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_COMMON_DIR git -C "$source_repo" cat-file -e "$rev:$revpath" 2>/dev/null; then ok=1; fi
-      elif path_under "$path" "$tree"; then
-        ok=1
-      else
-        why="outside the tracked-only export (and not a pack file or named reference)"
-      fi
     elif [ -n "$root" ]; then
       if [ -n "$rev" ]; then
         if env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_COMMON_DIR git -C "$root" cat-file -e "$rev:$revpath" 2>/dev/null; then ok=1; fi

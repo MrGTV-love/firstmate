@@ -26,11 +26,13 @@ Run `bin/fm-contract-review-pack.sh` for every contract review.
 It is the only code path that builds reviewer input.
 Its header owns the arguments, the section rules and the exit codes.
 It copies the reviewer block below byte for byte into the pack's `contract.md`, so a rule changes in this file and nowhere else.
-It builds the pack in a directory it creates fresh, drops the author's sections, refuses a section it does not recognise, and writes a manifest of excluded paths outside the pack.
+It builds the pack in a directory it creates fresh, drops the author's sections, refuses a top-level section it does not recognise, and writes a manifest of excluded paths outside the pack.
+It never drops contract text without listing it: a sub-heading or preamble line it does not recognise stays in the pack where it is, and the manifest lists it as unrecognised.
+Read those lines before the run, and move any author text they show out of the contract.
 Keep the register and every earlier report, review history and `truth` file outside the pack, and pass them to the builder with `--exclude` so the leak check refuses them.
 
 Run the review through the existing entrypoint, `data/review-lane/run-review.sh <pack> no-pr <head> <diff-file> <repo-root> [model]`, with the pack's `head.txt` value as the head and the pack's empty diff file.
-For `<repo-root>`, build the snapshot with the builder's `--export-root <repo> [--rev <rev>]` and pass the directory it prints as `root=`: it holds only tracked files, so a gitignored file such as `config/` or `data/` cannot be reached under it.
+For `<repo-root>`, pass the repository checkout, and give the builder the same path as `--root`: the check then accepts only files that checkout tracks, so a gitignored file such as one under `config/` or `data/` is a leak.
 Use a reviewer model outside the author's family.
 Never retry a model that failed; switch to another allowed model.
 Never run a review in a pack folder that already holds a report.
@@ -95,11 +97,11 @@ The meaning of each exit is in the define-done-and-grading skill, section "Revie
 
 Allowed inputs, and only these:
 - Every file in this folder.
-- The assess-done-and-grade skill, the pinned rubric and the define-done-and-grading skill, which this review names as references to read, and the files those two skills link to by a relative link.
+- The assess-done-and-grade skill, the pinned rubric and the define-done-and-grading skill, which this review names as references to read.
 - A file that the repository root named in your instructions tracks, read only to check that a criterion can run.
 
 Open nothing else.
-Do not search or list a skill folder: backups, hidden files and notes in it are not inputs.
+Do not search or list a skill folder: no file in it other than its `SKILL.md` is an input.
 Any helper or subagent you start is bound by this list, and what it opens belongs in your `Inputs read`.
 A report, review, register, history, earlier folder, sibling folder, transcript or copy of the contract from elsewhere is not an input.
 If a task needs a file that is not allowed, say so in the report as a check not performed.
