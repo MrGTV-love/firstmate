@@ -1,0 +1,24 @@
+❯ : Firstmate operational input waiting: read '/Users/charlesabrooker/tmp/fm-la
+  b.mwwIfO/state/operational-inbox/1793752731-3f01b5a5ef18fe6a.msg' and handle
+  its contents as Firstmate operational input.
+
+  Read 1 file, ran 2 shell commands
+
+⏺ Done. The README title now reads # Notes library.
+
+  - What changed: line 1 of README.md only. The diff shows 1 line added and 1
+    removed in 1 file.
+  - Where it is: committed on branch fm/labrc-docs.
+  - Worktree: clean.
+  - Status file: I added the done line.
+  - Not done: I did not push, open a PR, or merge. That was not in scope.
+
+  You have nothing to do now. Firstmate can merge the branch.
+
+✻ Worked for 22s · done 6:39 PM
+  tmux detected · scroll with PgUp/PgDn · or add 'set -g mouse on' to ~/.tmux…
+────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────
+  Sonnet 5.5 ░░░░░░░░░░ 5% 57k/1.0M fm/labrc-docs notes:033da1d0
+  ⏵⏵ bypass permissions on (shift+tab to cycle)

@@ -1,0 +1,7 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.mwwIfO
+local-only source: local=main@daa35dbf20302a85427d889672b4874a0b3c3dcc origin=main@daa35dbf20302a85427d889672b4874a0b3c3dcc selected=origin/main@daa35dbf20302a85427d889672b4874a0b3c3dcc
+skill selection for labrc-docs: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=claude write_confinement=seatbelt-v1
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+spawned labrc-docs harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-labrc-docs worktree=/Users/charlesabrooker/tmp/fm-lab.mwwIfO/treehouse/.treehouse/notes-92de0f/1/notes

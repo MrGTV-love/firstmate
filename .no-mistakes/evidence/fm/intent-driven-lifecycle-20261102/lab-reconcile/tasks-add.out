@@ -1,0 +1,22 @@
+ok: added labrc-docs (ship, repo notes) -> Queued
+task:
+  id: labrc-docs
+  title: lab labrc-docs
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: notes
+  priority: "-"
+  created: 2026-11-03
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start labrc-docs` to move it to in flight
+  - Run `tasks-axi block labrc-docs --by <other>` to record a dependency

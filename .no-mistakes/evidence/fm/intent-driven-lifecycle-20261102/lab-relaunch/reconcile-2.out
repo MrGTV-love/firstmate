@@ -1,0 +1,6 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.4r0t2w
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.4r0t2w
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: task labrl-docs's endpoint is in '/Users/charlesabrooker/tmp/fm-lab.4r0t2w/projects/notes', not its recorded worktree '/Users/charlesabrooker/tmp/fm-lab.4r0t2w/treehouse/.treehouse/notes-d1b676/1/notes'; refusing to relaunch an agent outside the copy holding its work
+error: the replacement agent for labrl-docs could not be launched on claude
+error: labrl-docs's agent was stopped but the replacement did not launch; no agent is running, and its work plus the recorded progress note are preserved at /Users/charlesabrooker/tmp/fm-lab.4r0t2w/treehouse/.treehouse/notes-d1b676/1/notes

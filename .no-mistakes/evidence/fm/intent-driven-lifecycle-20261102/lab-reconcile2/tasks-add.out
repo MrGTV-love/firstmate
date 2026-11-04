@@ -1,0 +1,22 @@
+ok: added labr2-docs (ship, repo notes) -> Queued
+task:
+  id: labr2-docs
+  title: lab labr2-docs
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: notes
+  priority: "-"
+  created: 2026-11-03
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start labr2-docs` to move it to in flight
+  - Run `tasks-axi block labr2-docs --by <other>` to record a dependency

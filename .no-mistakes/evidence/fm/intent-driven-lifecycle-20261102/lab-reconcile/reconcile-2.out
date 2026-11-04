@@ -1,0 +1,6 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.mwwIfO
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.mwwIfO
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: configured backend 'tmux' is not herdr; refusing to replace task labrc-docs's proven-gone tmux endpoint
+error: the replacement agent for labrc-docs could not be launched on claude
+error: labrc-docs's agent was stopped but the replacement did not launch; no agent is running, and its work plus the recorded progress note are preserved at /Users/charlesabrooker/tmp/fm-lab.mwwIfO/treehouse/.treehouse/notes-92de0f/1/notes

@@ -1,0 +1,179 @@
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/624bc6fbd7a5/01M6HK714J4FATY5VQP1RB486C/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-11-03T21:49:06Z tests/fm-task-delivery.test.sh family=pure-contract-unit expected_gate_skip=none
+FM_TEST_BEGIN 2026-11-03T21:49:06Z tests/fm-dod-lib.test.sh family=pure-contract-unit expected_gate_skip=none
+ok - CRLF criteria and exclusions survive; NUL briefs and external criteria refuse explicitly
+ok - verification plans carry actual criteria, exclusions and rubric without broadening intent
+ok - missing shared rubric refuses verification-plan construction
+ok - fenced DoD-file examples do not refuse actual criteria
+ok - unfenced DoD-file directives after fenced examples remain authoritative and require structured items
+ok - mandatory items require unique ids, every --shape field nonempty, and a known Authority; fences and empty sections are refused
+ok - scout done: is not gated
+ok - unpushed ship done: is refused
+ok - no-mistakes pre-validation done: is not gated
+ok - named head on a remote-tracking ref is accepted
+ok - a moved remote branch that lacks the named head is refused
+ok - a 40-hex token in the note is not the named head
+ok - a recorded merged PR satisfies the gate after prune
+ok - the merged-PR short-circuit applies only to the recorded PR the done line names
+ok - a recorded forge head needs task-bound plan evidence and still binds the named PR; only merged-with-missing-copy cleanup is evidence-free
+ok - a pipeline fix commit past the worker head binds by ancestry or the recorded pr_head; a diverged head does not
+ok - a recorded Gerrit change is direct-PR publication proof while no-mistakes still requires custody and task-bound validation
+ok - a silent run read is unknown (2) and a slow, working one is answered by the evidence gate
+ok - a direct-PR recorded head does not cover a later unpushed commit
+ok - CI-ready notes require checks green and an actual PR reference
+ok - no-mistakes CI-ready done: with extra text is gated
+ok - keyed and spaced ship done: lines are gated
+ok - local-only linked named branch is reachable from the project clone
+ok - local-only detached HEAD only in the disposable copy is refused
+ok - standalone local-only done: requires the named head in the project clone
+ok - non-done lines are not gated
+ok - fenced and indented Captain lines are not authorized intent
+ok - PR-based DoD draft check uses gh-axi
+ok - a task owns several PRs only on positive evidence in its own records
+ok - promotion keeps a scout's recorded base branch and refuses local-only for it
+ok - the dispatch verdict lists every leftover Task and Definition of Done token in one pass
+ok - a fully filled brief passes the dispatch verdict with no output
+ok - the verification plan carries the stated exclusions
+ok - the exclusion list does not satisfy an empty Firstmate spec
+ok - spec content survives the exclusion list
+ok - the dispatch verdict reports an empty DoD file with its path
+ok - the dispatch verdict lists every token a DoD file still holds
+ok - the task-only dispatch scope skips the Definition of Done and the full scope checks it
+ok - promotion lists every Task placeholder in one refusal with its scout-time boundary and the repair
+ok - external-forge direct-PR is refused with the exact supported-forge diagnostic
+ok - external-forge direct-PR instructions are refused without publishing a brief
+ok - worker role names the skill and its fallback skill file
+ok - worker role renders the shared rubric and refuses without it
+all fm-dod-lib tests passed
+FM_TEST_END 2026-11-03T21:52:37Z tests/fm-dod-lib.test.sh exit=0 duration_ms=209763 gate_skip=false
+ok - scaffold headings cannot hide active spec placeholders; fenced examples remain valid
+ok - complete CRLF briefs preserve admission and intent; NUL briefs fail explicitly
+ok - fm-spawn: fresh ships/scouts refuse empty or pointer-only asks and admit substantive asks
+ok - fm-promote: a promoted plan labels scout DoD and exclusions as context under the ship intent
+ok - fm-spawn/fm-promote: authorized intent preserves exact words and refuses operator-address lines
+ok - fm-spawn: every legacy worker receives scoped role instructions without changing project or primary instructions
+ok - fm-spawn: a ship spawn requires a valid explicit mode and yolo before anything is created
+ok - fm-spawn: scout and secondmate spawns refuse ship delivery flags
+ok - fm-spawn: the brief's recorded mode and the spawn's explicit mode must agree
+ok - fm-spawn: a rigor downgrade against the registered posture is announced, never blocked
+ok - fm-spawn: a scout spawn resolves no delivery posture from the registry
+ok - fm-promote: promotion requires the delivery contract and records it exactly once
+ok - fm-promote: a symlinked task record is refused and its target is left untouched
+ok - fm-promote: a promoted worker receives the same mode-specific delivery contract a briefed one does
+ok - promotion teaches the Closes: line in the delivered text and the relaunch brief for PR modes only
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/624bc6fbd7a5/01M6HK714J4FATY5VQP1RB486C/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ok - fm-promote: a selected branch prefix reaches both worker instructions and durable task state
+Switched to a new branch '$(touch${IFS}/Users/charlesabrooker/tmp/fm-test-run.06dGas/w1/tmp/fm-task-delivery.NqgZsr/promote-branch-shell-safe-marker)/promote-branch-safe-e3'
+ok - fm-promote: ref-format-valid shell metacharacters stay literal in promotion branch commands
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/624bc6fbd7a5/01M6HK714J4FATY5VQP1RB486C/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ok - fm-merge-local: a registry change cannot redirect an in-flight local-only task
+ok - fm-project-mode: the registry lookup matches a whole multi-word name, not just its first token
+ok - fm-project-mode: the conditional policy is accepted, mapped for mechanical callers, and readable raw
+ok - fm-project-mode: the forge binds from its own token and is reported only through --forge
+ok - fm-project-mode: only a malformed forge binding refuses; every other token keeps its old tolerance
+ok - forge=gerrit: yolo is refused with its reason, never silently dropped
+ok - forge=gerrit: no-mistakes runs with its forge steps skipped, recovers its fixes, then publishes one change
+ok - forge=gerrit: direct-PR publishes one squashed change and a stack is refused with its reason
+ok - fm-spawn: a registered forge must reach the worker's brief
+ok - fm-spawn: the brief must carry the spawn's selected ship branch, and the selection is validated before anything is created
+ok - fm-spawn: a ship branch that deviates from the registered prefix is announced, never blocked
+ok - fm-spawn: a registry forge token the parser refuses stops the launch, reason included
+ok - fm-promote: a promoted worker receives the project's registered forge contract with no flag to remember
+ok - forge=forgejo: spawn agreement and promotion carry the binding, name tea, and keep yolo
+ok - fm-spawn/fm-promote: leftover Task placeholders are refused until both subsections are filled
+ok - fm-spawn: a leftover task Definition of Done placeholder is refused, a filled one proceeds
+ok - fm-spawn: the Definition of Done check reads the whole section and matches placeholders only where the scaffold puts them
+ok - fm-spawn: a DoD file line outside the task Definition of Done section is ignored
+ok - fm-spawn: a DoD file line inside the task section naming a finished criteria file is the only Definition of Done escape
+ok - fm-project-mode: --branch-prefix resolves order-independently and defaults to the legacy fm/ prefix
+warning: re-init: ignored --initial-branch=main
+ok - governed promotion preserves scout metadata, instructions, checkout and work on refusal, and a retry after the scout advances reaches the project owner
+warning: re-init: ignored --initial-branch=main
+warning: re-init: ignored --initial-branch=main
+ok - refused promotion preserves a pre-existing task branch and one that gained work
+warning: re-init: ignored --initial-branch=main
+ok - refused detached promotion removes only its own alias, and a retry after the scout advances reaches the project owner
+warning: re-init: ignored --initial-branch=main
+ok - refused promotion preserves a task branch the project declared before attestation refused it
+warning: re-init: ignored --initial-branch=main
+ok - promotion refuses to override recorded slot scope before provisioning or rewriting the record
+# all fm-task-delivery tests passed
+FM_TEST_END 2026-11-03T22:22:10Z tests/fm-task-delivery.test.sh exit=0 duration_ms=1983413 gate_skip=false
+FM_TEST_BEGIN 2026-11-03T22:22:11Z tests/fm-control-relaunch.test.sh family=backend-dispatch expected_gate_skip=none
+ok - fm-control relaunch: a manual-backlog home records one backlog skip per relaunch
+ok - fm-control relaunch: a same-harness relaunch replaces the agent in the same endpoint and worktree
+ok - fm-control relaunch: unsupported omp preserves the running agent and task
+ok - fm-control relaunch: missing dsh models and DeepSeek-through-omp refuse before stopping
+ok - fm-control relaunch: a config dsh secondmate keeps or refuses to discard its bound dsh profile, else carries the DSH session's bound model, and refuses without one before stopping
+ok - omp relaunch billing admission preserves agents before refusal and accepts subscription routes
+ok - fm-control relaunch: pending composer text refuses before the exit command is typed
+ok - fm-control relaunch: an unreadable composer fails safe before the exit command is typed
+# evidence begin: linked-home relaunch
+$ bin/fm-control.sh rl42 relaunch --note "continue from linked home"
+warning: /Users/charlesabrooker/tmp/fm-control-relaunch.nTTfJX/linked-home-4228/home/data/rl42/launch-brief.md records no ship branch; defaulting to legacy branch fm/rl42
+warning: /Users/charlesabrooker/tmp/fm-control-relaunch.nTTfJX/linked-home-4228/home/data/rl42/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+skill selection for rl42: unavailable - no TypeSafe or OpenRouter key
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+relaunched rl42 harness=claude from=claude model=default effort=default backend=tmux endpoint=fmses:fm-rl42 worktree=/Users/charlesabrooker/tmp/fm-control-relaunch.nTTfJX/linked-home-4228/wt
+exit=0
+worker HEAD before=17ca79ea324a6a25725c514d32c6e85e1b08fd4a after=17ca79ea324a6a25725c514d32c6e85e1b08fd4a
+saved task metadata:
+window=fmses:fm-rl42
+endpoint_task_id=rl42
+worktree=/Users/charlesabrooker/tmp/fm-control-relaunch.nTTfJX/linked-home-4228/wt
+project=/Users/charlesabrooker/tmp/fm-control-relaunch.nTTfJX/linked-home-4228/secondmate
+harness=claude
+kind=ship
+mode=no-mistakes
+yolo=off
+branch=fm/rl42
+tasktmp=/tmp/fm-rl42
+write_confinement=seatbelt-v1
+claude_session_id=f92d3bc8-d1a5-475d-8ea2-bcf464c07efe
+model=default
+effort=default
+skill_selection=unavailable
+skill_selection_reason=no TypeSafe or OpenRouter key
+busy_gen=g1793744888.53094.12101
+spawn_gen=s1793744897.38620.11075
+control_relaunch_tx=24488.20261103T222619Z.15426
+worker status:
+ M task.txt
+preserved task.txt:
+committed task work
+unfinished task work
+worker FETCH_HEAD absent
+# evidence end
+ok - fm-control relaunch: a linked spawning home preserves committed and unfinished work in the recorded copy
+ok - fm-control relaunch: durable task metadata survives replacement launch publication
+ok - fm-control relaunch: a recorded PR with a later egress grant stays parseable for PR monitoring with tracing off
+ok - fm-control relaunch: a recorded PR with a later egress grant stays parseable for PR monitoring with tracing on
+process-identity probe: live=1 supplied_marker=1 helper_exit=1 wrapper=35765 unrelated=35770
+ok - fm-control relaunch: an exited setup cannot satisfy the actual preparation marker
+ok - fm-control relaunch: delivery and concurrent task metadata publication serialize
+ok - fm-control relaunch: disabling tracing clears metadata and pane context
+ok - fm-control relaunch: progress and the Firstmate-worktree worker identity reach the replacement
+ok - fm-control relaunch: a ship task refuses without the progress note its replacement needs
+ok - fm-control relaunch: switching harness is one ordinary relaunch, and the old wiring goes with the old agent
+ok - fm-control relaunch: a harness switch resets model and effort unless they are named too
+ok - fm-control relaunch: a prefixed recorded harness can switch adapters transactionally
+ok - fm-control relaunch: a prefixed command requires an explicit replacement harness
+ok - fm-control relaunch: a same-harness relaunch keeps the profile axes it was running with
+ok - native Ultra relaunch preserves its profile and rejects an unsupported model before stopping
+ok - fm-control relaunch: roles resolve, and retired or catalog-absent ids refuse through the model index before the stop
+ok - relaunch freezes role, stand-in, and literal membership across authentication and replacement
+ok - unpinned indexed relaunch discloses unknown context before stopping without supervisor catalog evidence
+ok - fm-control relaunch: a signed-out worker account pin refuses before the old agent stops

@@ -1,0 +1,21 @@
+lab=/Users/charlesabrooker/tmp/fm-lab.4r0t2w socket=/tmp/fml.R7bJTn owner_pid=45011 self=45011
+== fm-spawn labrl-docs (normal Claude login)
+spawn exit=0
+spawned labrl-docs harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-labrl-docs worktree=/Users/charlesabrooker/tmp/fm-lab.4r0t2w/treehouse/.treehouse/notes-d1b676/1/notes
+== fm-control relaunch (retry while composer busy)
+try=1 relaunch exit=0: 
+relaunch: exit=0 note=1 cue=1
+relaunch order: role=1 cue=10 section=26
+== stop the replacement owner, then reconcile-only relaunch
+meta: window=firstmate:fm-labrl-docs
+  state: in_flight
+stopping pane child 59875: treehouse get
+try=1 reconcile-only exit=1: error: task labrl-docs's endpoint is in '/Users/charlesabrooker/tmp/fm-lab.4r0t2w/projects/notes', not its recorded worktree '/Users/charlesabrooker/tmp/fm-lab.4r0t2w/treehouse/.treehouse/notes-d1b676
+try=2 reconcile-only exit=1: error: task labrl-docs's endpoint is in '/Users/charlesabrooker/tmp/fm-lab.4r0t2w/projects/notes', not its recorded worktree '/Users/charlesabrooker/tmp/fm-lab.4r0t2w/treehouse/.treehouse/notes-d1b676
+try=3 reconcile-only exit=1: error: task labrl-docs's endpoint is in '/Users/charlesabrooker/tmp/fm-lab.4r0t2w/projects/notes', not its recorded worktree '/Users/charlesabrooker/tmp/fm-lab.4r0t2w/treehouse/.treehouse/notes-d1b676
+reconcile: exit=1 recovery= cue=1
+reconcile order: role=1 cue=10(count 1) recovery-contract=60
+== teardown
+lab teardown exit=0
+lab-left: none socket-left: none procs-left: 
+settings.json unchanged: yes

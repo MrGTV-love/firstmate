@@ -1,0 +1,3 @@
+process-identity probe: live=1 supplied_marker=1 helper_exit=1 wrapper=74906 unrelated=74912
+ok - fm-control relaunch: an exited setup cannot satisfy the actual preparation marker
+exit=0

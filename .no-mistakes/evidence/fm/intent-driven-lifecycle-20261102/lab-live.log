@@ -1,0 +1,128 @@
+lab=/Users/charlesabrooker/tmp/fm-lab.zOwe5E socket=/tmp/fml.HzasSO
+owner_pid=23729 self=23729
+== fm-brief labitt-test
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.zOwe5E/data/labitt-test/brief.md (ship, mode=local-only; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE})
+== fm-spawn labitt-test
+spawn exit=0
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.zOwe5E
+local-only source: local=main@aaf60865b3f968985eff919d5c52d1b04e275ff4 origin=main@aaf60865b3f968985eff919d5c52d1b04e275ff4 selected=origin/main@aaf60865b3f968985eff919d5c52d1b04e275ff4
+skill selection for labitt-test: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=claude write_confinement=seatbelt-v1
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+spawned labitt-test harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-labitt-test worktree=/Users/charlesabrooker/tmp/fm-lab.zOwe5E/treehouse/.treehouse/notes-82c540/1/notes
+== fm-brief labitt-docs
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.zOwe5E/data/labitt-docs/brief.md (ship, mode=local-only; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE})
+== fm-spawn labitt-docs
+spawn exit=0
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/624bc6fbd7a5/01M6HK714J4FATY5VQP1RB486C/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+local-only source: local=main@aaf60865b3f968985eff919d5c52d1b04e275ff4 origin=main@aaf60865b3f968985eff919d5c52d1b04e275ff4 selected=origin/main@aaf60865b3f968985eff919d5c52d1b04e275ff4
+skill selection for labitt-docs: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=claude write_confinement=seatbelt-v1
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+spawned labitt-docs harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-labitt-docs worktree=/Users/charlesabrooker/tmp/fm-lab.zOwe5E/treehouse/.treehouse/notes-82c540/2/notes
+labitt-test cue-count=1 rubric-section=1 unverified-in-section=0
+order: role=1 cue=10 section=26 outcomes=40
+labitt-test window=firstmate:fm-labitt-test
+--- labitt-test pane (last 25 lines)
+cdc2d5a24cb55566a3b8f47481d49eabab792e3048/launch.s1793750966.37872.24078.sh'
+Welcome to Claude Code v2.1.318
+ Let's get started.
+ Choose the text style that looks best with your terminal
+ To change this later, run /theme
+     Auto (match terminal)
+ ❯ ✔ Dark mode
+     Light mode
+     Dark mode (colorblind-friendly)
+     Light mode (colorblind-friendly)
+     Dark mode (ANSI colors only)
+     Light mode (ANSI colors only)
+ ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+  1  function greet() {
+  2 -  console.log("Hello, World!");
+  2 +  console.log("Hello, Claude!");
+  3  }
+ ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+  Syntax theme: Monokai Extended (ctrl+t to disable)
+labitt-test meta: worktree=/Users/charlesabrooker/tmp/fm-lab.zOwe5E/treehouse/.treehouse/notes-82c540/1/notes
+labitt-test meta: harness=claude
+labitt-test meta: branch=fm/labitt-test
+labitt-docs cue-count=1 rubric-section=1 unverified-in-section=0
+order: role=1 cue=10 section=26 outcomes=40
+labitt-docs window=firstmate:fm-labitt-docs
+--- labitt-docs pane (last 25 lines)
+cdc2d5a24cb55566a3b8f47481d49eabab792e3048/launch.s1793751297.87501.6092.sh'
+Welcome to Claude Code v2.1.318
+ Let's get started.
+ Choose the text style that looks best with your terminal
+ To change this later, run /theme
+     Auto (match terminal)
+ ❯ ✔ Dark mode
+     Light mode
+     Dark mode (colorblind-friendly)
+     Light mode (colorblind-friendly)
+     Dark mode (ANSI colors only)
+     Light mode (ANSI colors only)
+ ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+  1  function greet() {
+  2 -  console.log("Hello, World!");
+  2 +  console.log("Hello, Claude!");
+  3  }
+ ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+  Syntax theme: Monokai Extended (ctrl+t to disable)
+labitt-docs meta: worktree=/Users/charlesabrooker/tmp/fm-lab.zOwe5E/treehouse/.treehouse/notes-82c540/2/notes
+labitt-docs meta: harness=claude
+labitt-docs meta: branch=fm/labitt-docs
+proc: 82758 claude --session-id 16220c4c-0a1e-4daf-b023-772c251b6e96 --dangerously-skip-permissions --add-dir /Users/charlesabrooker/tmp/fm-lab.zOwe5E/state/operational-inbox --add-dir /Users/charlesabrooker/tmp/fm-lab.zOwe5E/state/labitt-test.inbox --add-dir /Users/charlesabrooker/tmp/fm-lab.zOwe5E/data/labitt-test --add-dir /Users/charlesabrooker/.no-mistakes/worktrees/624bc6fbd7a5/01M6HK714J4FATY5VQP
+proc: 55954 claude --session-id 08b6a8e3-a201-4507-a1cb-787027290756 --dangerously-skip-permissions --add-dir /Users/charlesabrooker/tmp/fm-lab.zOwe5E/state/operational-inbox --add-dir /Users/charlesabrooker/tmp/fm-lab.zOwe5E/state/labitt-docs.inbox --add-dir /Users/charlesabrooker/tmp/fm-lab.zOwe5E/data/labitt-docs --add-dir /Users/charlesabrooker/.no-mistakes/worktrees/624bc6fbd7a5/01M6HK714J4FATY5VQP
+== relaunch labitt-test via fm-control
+relaunch exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.zOwe5E
+error: task labitt-test's composer visibly holds pending text; refusing to type the /exit exit command because it would concatenate onto that text. Clear or submit the pending text, then retry 'relaunch'
+error: relaunch of labitt-test failed while stopping the old agent, which is still running; its original instructions were restored
+after relaunch cue-count=1 note=0
+== verification plan for a no-mistakes brief
+brief exit=0
+plan exit=0
+plan: section=1 unverified-in-section=0 pending=3
+== teardown
+rm: /Users/charlesabrooker/tmp/fm-lab.zOwe5E/state/labitt-test.git-hooks/pre-rebase: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.zOwe5E/state/labitt-test.git-hooks/pre-applypatch: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.zOwe5E/state/labitt-test.git-hooks/pre-auto-gc: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.zOwe5E/state/labitt-test.git-hooks/pre-merge-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.zOwe5E/state/labitt-test.git-hooks/post-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.zOwe5E/state/labitt-test.git-hooks/sendemail-validate: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.zOwe5E/state/labitt-test.git-hooks/applypatch-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.zOwe5E/state/labitt-test.git-hooks/prepare-commit-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.zOwe5E/state/labitt-test.git-hooks/post-checkout: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.zOwe5E/state/labitt-test.git-hooks/post-applypatch: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.zOwe5E/state/labitt-test.git-hooks/post-rewrite: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.zOwe5E/state/labitt-test.git-hooks/commit-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.zOwe5E/state/labitt-test.git-hooks/pre-push: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.zOwe5E/state/labitt-test.git-hooks/post-merge: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.zOwe5E/state/labitt-test.git-hooks/pre-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.zOwe5E/state/labitt-test.git-hooks: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-lab.zOwe5E/state/labitt-docs.git-hooks/pre-rebase: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.zOwe5E/state/labitt-docs.git-hooks/pre-applypatch: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.zOwe5E/state/labitt-docs.git-hooks/pre-auto-gc: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.zOwe5E/state/labitt-docs.git-hooks/pre-merge-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.zOwe5E/state/labitt-docs.git-hooks/post-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.zOwe5E/state/labitt-docs.git-hooks/sendemail-validate: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.zOwe5E/state/labitt-docs.git-hooks/applypatch-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.zOwe5E/state/labitt-docs.git-hooks/prepare-commit-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.zOwe5E/state/labitt-docs.git-hooks/post-checkout: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.zOwe5E/state/labitt-docs.git-hooks/post-applypatch: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.zOwe5E/state/labitt-docs.git-hooks/post-rewrite: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.zOwe5E/state/labitt-docs.git-hooks/commit-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.zOwe5E/state/labitt-docs.git-hooks/pre-push: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.zOwe5E/state/labitt-docs.git-hooks/post-merge: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.zOwe5E/state/labitt-docs.git-hooks/pre-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.zOwe5E/state/labitt-docs.git-hooks: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-lab.zOwe5E/state: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-lab.zOwe5E: Directory not empty
+teardown-check: ls: /tmp/fml.HzasSO: No such file or directory
+teardown-check: /Users/charlesabrooker/tmp/fm-lab.zOwe5E
+treehouse-new: 
+tmp-fm-new: fm-charter-ask+c5a7047aff765dd790035aa0a98b83614f5bf86d55d3ec612bce7f143b705e77 fm-env-absent+a53e8f75b39b83b44af2334d1d270deabc647af923a510a1bc77d783d6fc566a fm-env-default-codex+d5cbab1b867073e1cbc3f0b2dd428f0055d089f006635701011a080359ddd199 fm-env-empty+8dc438a7436166f0ea24d5db8c158fbc36dc1f1cd732d9361d0ab7d03efaf214 fm-env-enabled+e99b4815845d91913fe5824b64464feb0f9af325e348a26c3ebc6fae8c1c3b6e fm-env-missing-config+71a951991be90976bb071dac4dca896da782685d592b692cf2fb945fca466082 fm-env-secondmate+fbdb464a32a9a193d8b8db673ed78d2a2115cd457b7209bf819e2e72302200aa fm-guard-s5b-control+18123fa1262b05b39c067a619c0e1f7dc03c94a6998e5d078f608edf3f764263 fm-lab-recovery.06KHEu fm-lab-recovery.405RU4 fm-lab-recovery.55RbRg fm-lab-recovery.D3Tb0d fm-lab-recovery.D4gxkj fm-lab-recovery.DW1HIv fm-lab-recovery.EIpWxA fm-lab-recovery.EXmqBt fm-lab-recovery.EpYK69 fm-lab-recovery.HCPGeX fm-lab-recovery.KCw8M3 fm-lab-recovery.KONplE fm-lab-recovery.KrZ463 fm-lab-recovery.SyTLSS fm-lab-recovery.X52JWR fm-lab-recovery.Y99uZI fm-lab-recovery.bzjouX fm-lab-recovery.eRon3Q fm-lab-recovery.fLaIng fm-lab-recovery.fjxWf2 fm-lab-recovery.hJU1J3 fm-lab-recovery.hQBrZW fm-lab-recovery.hzfysn fm-lab-recovery.iBpSt1 fm-lab-recovery.ia4Csa fm-lab-recovery.jTQcpF fm-lab-recovery.kdvNCy fm-lab-recovery.p8yD18 fm-lab-recovery.qSNhlQ fm-lab-recovery.xWqAx7 fm-lab-recovery.y6JAeq fm-labitt-docs+0bc679353bc8b02f600543cdc2d5a24cb55566a3b8f47481d49eabab792e3048 fm-labitt-test+0bc679353bc8b02f600543cdc2d5a24cb55566a3b8f47481d49eabab792e3048 fm-model-role-secondmate-z26+4e96ce79debc92808ae1989f4f7ec6be739e43ab3eb9ba437c468910682e6f63 fm-model-role-z24+7e86445f68b0bfce5cb908b58982267e5fa2b8fdf1545ddd9eaa305e1a017a76 fm-nmt-succ-rec fm-nmt-succ-rec+80a4477a8e7e1423acf51b25262de881445f0f11b3de495dd16f66beba32d749 fm-pool-current-base-r1+0a32c38ac999eb829b2970bb8b8a390f3438ef46a2e0fd9ec858141405573028 fm-pool-local-dirty-1793750919-61094 fm-pool-local-dirty-1793750919-61094+9c0575ebb1e6b2b1bd3ace27e77c8587a323385ef9622310762d28d3d47d1c37 fm-pool-local-no-origin-1793751223-61094 fm-pool-local-no-origin-1793751223-61094+97418ce2091d831b98b9cb9b7e7d410cfb4b5fee153ed6d88dc401e94e695450 fm-pool-local-publish-1793750962-61094 fm-pool-local-publish-1793750962-61094+dd38123f7830c7c189b103f3669b42c83a31e90b716dd2b0d919a893bd74f968 fm-pool-local-scout-1793751061-61094 fm-pool-local-scout-1793751061-61094+fe904541b8b91edaa0c085bceef2895c67c8de618f9efa69962a48e850989a2c fm-rcv-48538-g5E25q-native-env-v1-direct-different-cwd fm-rcv-48538-g5E25q-native-env-v1-direct-different-cwd+78473af98a145c41f7876bca6a226b9db2bd46758203ea9ce7155695aea9cc82 fm-rcv-48538-g5E25q-native-env-v1-direct-different-resume fm-rcv-48538-g5E25q-native-env-v1-direct-different-resume+377cb3754e79925e874cf178fda88236521815342af0e35f5a19c6f01fffe6df fm-rcv-48538-g5E25q-native-env-v1-direct-header-only fm-rcv-48538-g5E25q-native-env-v1-direct-header-only+1b4c1d9bc68ebee316cef2eb8eeaeae7074fec66d20a533f182616bce6fbee74 fm-rcv-48538-g5E25q-native-env-v1-direct-historical-startup fm-rcv-48538-g5E25q-native-env-v1-direct-historical-startup+f2f6af49ee58fe885b5a03052cf5ffb034c53dd85e316bee61af5fdf32d6f53e fm-rcv-48538-g5E25q-native-env-v1-direct-in-process-personal fm-rcv-48538-g5E25q-native-env-v1-direct-in-process-personal+64e8724dca12e73727045a6123c700e4da00c14c4937ba33f13d4f5875ea8a64 fm-rcv-48538-g5E25q-native-env-v1-direct-managed fm-rcv-48538-g5E25q-native-env-v1-direct-managed+489c1e8fde7e1c02e29d159de9c9f6a5d7a70e7f41b6e5ffa1d94c6aaa917133 fm-rcv-48538-g5E25q-native-env-v1-direct-managed-claude fm-rcv-48538-g5E25q-native-env-v1-direct-managed-claude+db7699600d8869033788a50c7ee02f5621106333994ee95ef0aa22867be9db42 fm-rcv-48538-g5E25q-native-env-v1-direct-mismatched fm-rcv-48538-g5E25q-native-env-v1-direct-mismatched+93bd6b2ac2db64218df34bf4dacbbe1288fc1c3e0667be256bc3900919970460 fm-rcv-48538-g5E25q-native-env-v1-direct-missing-registration fm-rcv-48538-g5E25q-native-env-v1-direct-missing-registration+e335bd5e0241978160f3817175ed01fb2e27bf57488eee2a303d421054fc71be fm-rcv-48538-g5E25q-native-env-v1-direct-pinned-personal fm-rcv-48538-g5E25q-native-env-v1-direct-pinned-personal+64803e22c41ffc5ab463ac4d3e8d6ac2ef7a2d53376d020320765f7c7c44d41d fm-rcv-48538-g5E25q-native-env-v1-direct-unknown-harness fm-rcv-48538-g5E25q-native-env-v1-direct-unknown-harness+43a9883304bf055f052325ab83349608346299d82dccf5a066dc7b57ac1a1552 fm-rcv-48538-g5E25q-native-env-v1-direct-unreadable fm-rcv-48538-g5E25q-native-env-v1-direct-unreadable+a1f846ff8868aa6bfe3551ae6503b6af4fd068500b4c0a039e41d5281d087f0a fm-rcv-48538-g5E25q-native-env-v1-sweep-different-cwd fm-rcv-48538-g5E25q-native-env-v1-sweep-different-cwd+eb981658de13ba3e2c849b30ce0ac9518a28956e531d01246da18ac9b4b28787 fm-rcv-48538-g5E25q-native-env-v1-sweep-different-resume fm-rcv-48538-g5E25q-native-env-v1-sweep-different-resume+cc9b7d50f3c7cacc941c85057a047ee8a92717de2f70e6fbf5ad495cfcd18810 fm-rcv-48538-g5E25q-native-env-v1-sweep-in-process-personal fm-rcv-48538-g5E25q-native-env-v1-sweep-in-process-personal+99e184e31e09c34cd84ad9c6fdcaa45329f04f214da279e10d350edd6756f9d7 fm-rcv-48538-g5E25q-native-env-v1-sweep-pinned-personal fm-rcv-48538-g5E25q-native-env-v1-sweep-pinned-personal+e644ad610a166d038d545270aa9b5b8a2ba9978db435c6924060e75e0b8cf99d fm-rcv-48538-g5E25q-personal-env-v1-direct-different-cwd fm-rcv-48538-g5E25q-personal-env-v1-direct-different-cwd+faa4b80f989509bd127981206bc00fac9b2ef0629f35ee8d7feb501195a2952e fm-rcv-48538-g5E25q-personal-env-v1-direct-different-resume fm-rcv-48538-g5E25q-personal-env-v1-direct-different-resume+d3fcbace49e31c8d634b3026a428ad506d0cfc5e714b03e042ea2c168d8d5e40 fm-rcv-48538-g5E25q-personal-env-v1-direct-header-only fm-rcv-48538-g5E25q-personal-env-v1-direct-header-only+51a30dd79ed623b3c7c76b9579903cecdc083ff9017d88bc011bde54f44f66f8 fm-rcv-48538-g5E25q-personal-env-v1-direct-historical-startup fm-rcv-48538-g5E25q-personal-env-v1-direct-historical-startup+6e47adb88e99794fd710fc3214631077b0732c8d239f7e8845db8d01eb4c6ba8 fm-rcv-48538-g5E25q-personal-env-v1-direct-in-process-personal fm-rcv-48538-g5E25q-personal-env-v1-direct-in-process-personal+7e257ba042e6325f85626529556ef2dedafb4a2803fa4850261666ae5781863f fm-rcv-48538-g5E25q-personal-env-v1-direct-managed fm-rcv-48538-g5E25q-personal-env-v1-direct-managed+1bab8644d2130ebabc4ee5a141e06c6861fb8899fc40c16f660e6fd0124931b5 fm-rcv-48538-g5E25q-personal-env-v1-direct-managed-claude fm-rcv-48538-g5E25q-personal-env-v1-direct-managed-claude+6abf482c4f83c6e75c18e2a863e831da307fac1dea3f6738d6ad01a031924535 fm-rcv-48538-g5E25q-personal-env-v1-direct-mismatched fm-rcv-48538-g5E25q-personal-env-v1-direct-mismatched+6e53d48f4b609512483854af0b612f0d18fc9c7ba34c141a2fbc2cd3c59166b8 fm-rcv-48538-g5E25q-personal-env-v1-direct-missing-registration fm-rcv-48538-g5E25q-personal-env-v1-direct-missing-registration+9c5839255717524bab4b1ca063d274699a7be7e90218e68736c23d9055fe7bf7 fm-rcv-48538-g5E25q-personal-env-v1-direct-pinned-personal fm-rcv-48538-g5E25q-personal-env-v1-direct-pinned-personal+c53865860f84fce71d9c3a0ed1810e2532bd59f1f7aa39f5a1dccaba2939c350 fm-rcv-48538-g5E25q-personal-env-v1-direct-unknown-harness fm-rcv-48538-g5E25q-personal-env-v1-direct-unknown-harness+6290e4413f4b43de83a6d5110d647ceb58a38d5b6590b250665aec96e5ab896e fm-rcv-48538-g5E25q-personal-env-v1-direct-unreadable fm-rcv-48538-g5E25q-personal-env-v1-direct-unreadable+4218c6c6e6cc6f9de9b22b8b82ff0659c64ed0bdb9acc0d18a83afbe9ff7c503 fm-rcv-48538-g5E25q-personal-env-v1-sweep-different-cwd fm-rcv-48538-g5E25q-personal-env-v1-sweep-different-cwd+daefe87e72947fef8ba9bd969929b282c0b698265a1488092d4754d1083ff4e4 fm-rcv-48538-g5E25q-personal-env-v1-sweep-different-resume fm-rcv-48538-g5E25q-personal-env-v1-sweep-different-resume+b92e46a8a0f6aa97ed0a65aae6dd9237771ff2bd04867520099c3de8ad518629 fm-rcv-48538-g5E25q-personal-env-v1-sweep-in-process-personal fm-rcv-48538-g5E25q-personal-env-v1-sweep-in-process-personal+cf0f46b0d228a40ab721023e13df7e748f8be13f1c274297b661c66fb2ced940 fm-rlrecover-both fm-rlrecover-both+fc169bfe6b76b14f8addd6177c54d3548deffbe355f3e2b7c2b2ff9e29375ad9 fm-rlrecover-dependency fm-rlrecover-dependency+bb1023e91b1de7e998e68d8a13c7064beaf7c64d50f6f81bfcc092558d8af44a fm-rlrecover-exit fm-rlrecover-held fm-rlrecover-held+1e544be77a4387c07c65d62640e0683c698c8625f9153d48b8e401c627064c1f fm-role-launch-heading-no-mistakes+06f1d31937ae8742d70ff2e0635f1fa1433b10e16a08acee7990801b9ab1db98 fm-role-launch-legacy-direct-PR+68f462cac46d49c97680a9b45a11e2b0f32f2f1e1f13f4df9d8b529db17af814 fm-role-launch-legacy-no-mistakes+34785d05b03b4190c89a06116a185b4221dd3588d2da1796ae1a97f3c3cd5ecf fm-tc7+2947dd2665efe57a9e199ee71d873f6f9930edde3ff0665ce00d79c1fbf71497 

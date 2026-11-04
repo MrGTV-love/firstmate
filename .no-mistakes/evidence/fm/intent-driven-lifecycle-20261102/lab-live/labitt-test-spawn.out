@@ -1,0 +1,7 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.zOwe5E
+local-only source: local=main@aaf60865b3f968985eff919d5c52d1b04e275ff4 origin=main@aaf60865b3f968985eff919d5c52d1b04e275ff4 selected=origin/main@aaf60865b3f968985eff919d5c52d1b04e275ff4
+skill selection for labitt-test: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=claude write_confinement=seatbelt-v1
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+spawned labitt-test harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-labitt-test worktree=/Users/charlesabrooker/tmp/fm-lab.zOwe5E/treehouse/.treehouse/notes-82c540/1/notes

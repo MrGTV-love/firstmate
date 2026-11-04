@@ -1,0 +1,24 @@
+
+ ▐▛███▛█   Claude Code v2.1.318
+▝▜██████▀  Sonnet 5.5 with low effort · Claude Ultra
+ ▝▝   ▝▝   ~/tmp/fm-lab.Q4DIqS/treehouse/.treehouse/notes-3ae313/1/notes
+
+
+❯ : Firstmate operational input waiting: read '/Users/charlesabrooker/tmp/fm-la
+  b.Q4DIqS/state/operational-inbox/1793753052-05ef1f451cc9520f.msg' and handle
+  its contents as Firstmate operational input.
+
+  Running sed -i '' '1s/.*/# Notes library/' README.md && g…
+  ⎿  $ sed -i '' '1s/.*/# Notes library/' README.md && git commit -qam "Fix
+     README title" && head -1 README.md && git diff --stat HEAD~1 && git status
+     --short; E=$(date +%s); '/Users/charlesabrooker/.no-mistakes/worktrees/624b
+     c6fbd7a5/01M6HK714J4FATY5VQP1RB486C/bin/fm-status-append.sh'
+     '/Users/charlesab…
+
+· Caramelizing… (33s · ↓ 717 tokens)
+  tmux focus-events off · add 'set -g focus-events on' to ~/.tmux.conf and re…
+────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────
+  Sonnet 5.5 ░░░░░░░░░░ 5% 51k/1.0M fm/labr2-docs notes:2026380b
+  ⏵⏵ bypass permissions on (shift+tab to cycle)

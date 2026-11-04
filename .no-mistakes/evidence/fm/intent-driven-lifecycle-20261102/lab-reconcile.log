@@ -1,0 +1,20 @@
+lab=/Users/charlesabrooker/tmp/fm-lab.mwwIfO socket=/tmp/fml.ubXlIM owner_pid=16752 self=16752
+== fm-spawn labrc-docs (normal Claude login)
+spawn exit=0
+spawned labrc-docs harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-labrc-docs worktree=/Users/charlesabrooker/tmp/fm-lab.mwwIfO/treehouse/.treehouse/notes-92de0f/1/notes
+== wait for the worker to finish its turn
+== stop the replacement owner, then reconcile-only relaunch
+meta: window=firstmate:fm-labrc-docs
+  state: in_flight
+stopping pane child 77601: treehouse get
+can't find window: fm-labrc-docs
+pane path: /Users/charlesabrooker/.no-mistakes/worktrees/624bc6fbd7a5/01M6HK714J4FATY5VQP1RB486C worktree=/Users/charlesabrooker/tmp/fm-lab.mwwIfO/treehouse/.treehouse/notes-92de0f/1/notes
+try=1 reconcile-only exit=1: error: configured backend 'tmux' is not herdr; refusing to replace task labrc-docs's proven-gone tmux endpoint
+try=2 reconcile-only exit=1: error: configured backend 'tmux' is not herdr; refusing to replace task labrc-docs's proven-gone tmux endpoint
+try=3 reconcile-only exit=1: error: configured backend 'tmux' is not herdr; refusing to replace task labrc-docs's proven-gone tmux endpoint
+reconcile: exit=1 recovery= cue=1
+reconcile order: role=1 cue=10(count 1) recovery-contract=0
+== teardown
+lab teardown exit=0
+lab-left: none socket-left: none procs-left: 
+settings.json unchanged: yes
