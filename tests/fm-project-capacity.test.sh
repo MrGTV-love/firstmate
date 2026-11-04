@@ -1378,7 +1378,21 @@ SH
         cat > "$case_dir/fakebin/lsof" <<'SH'
 #!/usr/bin/env bash
 [ ! -f "$FM_SLOW_META" ] || delay || exit 1
-# The cwd inventory succeeded and contains no task processes.
+# The cwd inventory succeeded and contains no task processes. A real one always
+# lists its caller; asked for parent pids (-F pRcn, the spawn reset guard's form),
+# it lists the caller's whole parent chain, none of it in a slot.
+case " $* " in
+  *' pRcn '*)
+    pid=$$ hops=0
+    while [ "$pid" -gt 1 ] && [ "$hops" -lt 64 ]; do
+      ppid=$(/bin/ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')
+      [ -n "$ppid" ] || break
+      printf 'p%s\nR%s\nn/\n' "$pid" "$ppid"
+      pid=$ppid hops=$((hops + 1))
+    done
+    exit 0
+    ;;
+esac
 case " $* " in *' -d cwd '*) exit 0 ;; esac
 exit 1
 SH

@@ -840,15 +840,15 @@
     },
     {
       "id": "pooled-copy-no-discard",
-      "version": "1",
-      "owner": "bin/fm-spawn.sh",
-      "invariant": "Refreshing a pooled launch base never discards dirty or stale-submodule content.",
+      "version": "2",
+      "owner": "bin/fm-slot-provision-lib.sh",
+      "invariant": "A pooled slot is reset only after proof that it holds no unique work and no live holder. A refusal leaves the slot's HEAD, local branches, index, files and every other ref byte-identical, with exactly two exceptions that change no local work: (1) the spawn's fetch moves refs/remotes/origin/<b>, where <b> is the branch it fetched to start from (origin's default branch, or the --base-branch), only forward by compare-and-set, and repoints refs/remotes/origin/HEAD at origin's default branch; (2) the governed path adds refs/fm/anchor/<task>-<sha> to preserve a detached HEAD.",
       "layer": "runtime-block",
-      "source": "git status --porcelain and the checked-out submodule pins of the pooled copy; existing decision points: site:bin/fm-spawn.sh:6eceab4636",
-      "trigger": "refreshing a pooled worktree's base when it is dirty or has a stale submodule checkout; leaves it untouched",
+      "source": "the slot's HEAD, owner branches, status, ignored entries, lifecycle manifest, lease and contention sources, and the working-directory list; decided by fm_slot_guard_observe in bin/fm-slot-provision-lib.sh",
+      "trigger": "a pooled slot's HEAD or owner branch is not contained in origin's current default branch (the remote's ls-remote answer; with --base-branch, the recorded origin/HEAD, else ls-remote), by refs/remotes/origin/<that branch> and the tip this spawn fetched of it, never a --base-branch, or the recorded base, its tree is dirty, an ignored entry collides with a path the reset target tracks, a process outside the spawn has its cwd in it, it is locked or leased to another holder, recent contention names it, any of those sources cannot be read, or the evidence changed before the reset",
       "decision": "deny",
       "fail_direction": "closed",
-      "remedy": "Preserve the task's current copy and endpoint; repair the named prerequisite with its owner, then retry bash bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on-or-off> without forcing or discarding work.",
+      "remedy": "Preserve the task's current copy and endpoint; read the named reason in the refusal, resolve that cause with its owner (land or archive the work, release the holder), then retry bash bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on-or-off> without forcing or discarding work.",
       "budget": 1,
       "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
       "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
@@ -863,12 +863,180 @@
       "status": "active",
       "sites": [
         {
-          "file": "bin/fm-spawn.sh",
-          "match": "echo \"error: pooled worktree '$worktree' has a stale submodule checkout, not uncommitted work; refusing to launch and leaving it untouched\" >&2"
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "echo \"error: pooled worktree '$FM_SLOT_GUARD_SLOT' reset refused ($1): $2; the slot was left untouched and nothing was launched\" >&2"
         },
         {
-          "file": "bin/fm-spawn.sh",
-          "match": "echo \"error: pooled worktree '$worktree' is not clean; refusing to discard uncommitted work while refreshing its base\" >&2"
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse unknown_git_read \"the slot's HEAD cannot be read\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse unknown_git_read \"the attached branch $ref has no readable tip\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse unknown_git_read \"the slot's HEAD symbolic ref cannot be read\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse unknown_git_read \"the manifest's branch $manifest_ref cannot be read\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse unknown_manifest \"the slot's git common directory cannot be read, so its lifecycle manifest cannot be located\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse unknown_manifest \"the slot's lifecycle manifest is unreadable ($out)\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse unknown_manifest \"the slot's lifecycle manifest names an invalid branch\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse unknown_manifest \"the slot's lifecycle manifest read gave an unexpected answer\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse unknown_anchor \"neither the fetched origin default branch nor a recorded base resolves to a commit, so containment cannot be proved\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse head_not_contained \"the detached HEAD ${FM_SLOT_GUARD_HEAD:0:12} is not contained in the fetched origin default branch or the recorded base, so a reset would orphan its commits\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse unknown_git_read \"containment of the detached HEAD cannot be read\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse owner_branch_not_contained \"owner branch ${FM_SLOT_GUARD_OWNER_REFS[$i]} at ${FM_SLOT_GUARD_OWNER_TIPS[$i]:0:12} is not contained in the fetched origin default branch or the recorded base, so a reset or branch change would lose its commits\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse unknown_git_read \"containment of owner branch ${FM_SLOT_GUARD_OWNER_REFS[$i]} cannot be read\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "echo \"error: could not inspect pooled worktree '$FM_SLOT_GUARD_SLOT' before refreshing its base (reset refused: unknown_git_read); the slot was left untouched\" >&2"
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "echo \"error: pooled worktree '$FM_SLOT_GUARD_SLOT' has a stale submodule checkout, not uncommitted work; refusing to launch and leaving it untouched\" >&2"
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "echo \"error: pooled worktree '$FM_SLOT_GUARD_SLOT' is not clean; refusing to discard uncommitted work while refreshing its base (reset refused: tree_not_clean: $(printf '%s\\n' \"$status\" | sed -n '1,3p' | tr '\\n' ';'))\" >&2"
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse unknown_ignored_inventory \"a scratch file for the ignored-entry inventory cannot be created\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse unknown_ignored_inventory \"the slot's ignored entries cannot be listed\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse unknown_ignored_inventory \"the slot's path-comparison settings cannot be read\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse unknown_ignored_inventory \"the reset target's tracked paths cannot be listed\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse unknown_ignored_inventory \"the ignored entries could not be compared with the reset target\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse ignored_collision \"ignored work at a path the reset target tracks would be overwritten and no verified archive holds it: $bad\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse unknown_holder_probe \"lsof is not installed, so processes inside the slot cannot be ruled out\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse unknown_holder_probe \"the working-directory probe could not run inside the acquired pane\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse unknown_holder_probe \"lsof could not list the processes' working directories (exit $rc)\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse unknown_holder_probe \"the working-directory listing could not be read (the spawn's own process is absent from it)\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse holder_cwd \"a process outside this spawn's lineage and its own endpoint has its working directory in the slot: $holders\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse unknown_lock \"the worktree list cannot be read, so a lock on the slot cannot be ruled out\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse unknown_lock \"the slot is not in its repository's worktree list, so a lock on it cannot be ruled out\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse holder_worktree_lock \"a git worktree lock is held on the slot\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse unknown_lease \"jq is not installed, so the pool's lease state cannot be read\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse unknown_lease \"the pool's lease state $state cannot be read\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse holder_lease \"the pool entry '$name' is leased to '${holder:-an unnamed holder}', not to this task\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse holder_lease \"the pool entry '$name' is leased to live process $pid, which is not the acquisition this spawn recorded as its own\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse unknown_lease \"the git common directory cannot be read, so the project's lease store cannot be located\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse unknown_lease \"the project's lease store is unreadable ($out)\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "*) fm_slot_guard_refuse holder_lease \"the project's lease store records $out\"; return 1 ;;"
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse unknown_contention \"the git common directory cannot be read, so the contention log cannot be located\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse unknown_contention \"the contention log is unreadable ($out)\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse holder_contention \"the project's contention log records $out\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse unknown_git_read \"the slot directory cannot be entered\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse changed_since_first_read \"the slot's HEAD, owner branches or anchors changed between the first observation and the final one\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse changed_since_first_read \"the slot's lifecycle manifest changed between the first observation and the final one\""
         }
       ]
     },
@@ -1821,11 +1989,7 @@
         },
         {
           "file": "bin/fm-spawn.sh",
-          "match": "echo \"error: '$target' is not a commit for pooled worktree '$worktree'; refusing to launch from a potentially stale base\" >&2"
-        },
-        {
-          "file": "bin/fm-spawn.sh",
-          "match": "echo \"error: could not determine origin's default branch for pooled worktree '$worktree'; refusing to launch from a potentially stale base\" >&2"
+          "match": "echo \"error: could not fetch 'origin/$SPAWN_ORIGIN_DEFAULT' for pooled worktree '$worktree'; refusing to launch from a potentially stale base\" >&2"
         },
         {
           "file": "bin/fm-spawn.sh",
@@ -1837,15 +2001,16 @@
         },
         {
           "file": "bin/fm-spawn.sh",
-          "match": "echo \"error: could not reset pooled worktree '$worktree' to '$target'; refusing to launch from a potentially stale base\" >&2"
-        },
-        {
-          "file": "bin/fm-spawn.sh",
-          "match": "echo \"error: could not resolve origin's current default branch for pooled worktree '$worktree'; refusing to launch from a potentially stale base\" >&2"
+          "match": "echo \"error: could not resolve origin's current default branch for pooled worktree '$worktree'; refusing to launch from a potentially stale base\" >&2",
+          "count": 2
         },
         {
           "file": "bin/fm-spawn.sh",
           "match": "echo \"error: pooled worktree '$worktree' is at '${actual:-unknown}', not current '$target' ('$expected'); refusing to launch\" >&2"
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "echo \"error: could not reset pooled worktree '$slot' to '$label'; refusing to launch from a potentially stale base\" >&2"
         }
       ]
     },
