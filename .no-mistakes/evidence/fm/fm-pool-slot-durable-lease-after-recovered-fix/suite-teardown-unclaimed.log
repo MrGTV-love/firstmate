@@ -1,0 +1,13 @@
+skip - R3/R6 real-provider release: /Users/charlesabrooker/firstmate/data/fm-pool-slot-recovered-quarantine-provider/scratch/bin/treehouse publishes no recovered_quarantine_holder; the real-provider pass did NOT run
+ok - R3/R6: teardown without force returns the retiring holder's unclaimed enclosing slot by an exact conditional return and leaves the recovered sibling untouched
+skip - R4 real-provider interruptions: /Users/charlesabrooker/firstmate/data/fm-pool-slot-recovered-quarantine-provider/scratch/bin/treehouse publishes no recovered_quarantine_holder; the real-provider pass did NOT run
+ok - R4: a failure before or after the exact return converges on retry without a second reset, and a successor lease or changed lease id, before or after the verify, is never cleared
+skip - R5 real-provider custody refusals: /Users/charlesabrooker/firstmate/data/fm-pool-slot-recovered-quarantine-provider/scratch/bin/treehouse publishes no recovered_quarantine_holder; the real-provider pass did NOT run
+ok - R5: each custody or proof condition leaves the unclaimed slot leased and unreset, moves no other work, and keeps the record and return-pending marker for a retry
+skip - unclaimed-route gate on the real provider: /Users/charlesabrooker/firstmate/data/fm-pool-slot-recovered-quarantine-provider/scratch/bin/treehouse publishes no recovered_quarantine_holder; the real-provider pass did NOT run
+ok - on an unproven treehouse the unclaimed-slot route stays inert: teardown completes, keeps the reassociated copy, and writes no return-pending marker
+skip - unclaimed-route retirement on the real provider: /Users/charlesabrooker/firstmate/data/fm-pool-slot-recovered-quarantine-provider/scratch/bin/treehouse publishes no recovered_quarantine_holder; the real-provider pass did NOT run
+ok - the unclaimed-slot route aborts the parked run and retires the launch agent rooted in the slot before it returns the slot
+skip - unclaimed-route refusal retirement on the real provider: /Users/charlesabrooker/firstmate/data/fm-pool-slot-recovered-quarantine-provider/scratch/bin/treehouse publishes no recovered_quarantine_holder; the real-provider pass did NOT run
+ok - a slot root the read-only checks do not show as this task alone keeps its parked run and launch agent while the custody walk refuses
+exit=0

@@ -1,0 +1,3 @@
+/Users/charlesabrooker/.local/bin/treehouse
+v3.1.7-fm.8759019
+d1888b40b2472f27726b74d1e62136c0f6aa8deafc513bae1221710bcc43efbf  /Users/charlesabrooker/.local/bin/treehouse

@@ -1,0 +1,9 @@
+### ordinary-old on v3.1.7-fm.b5d2805: teardown exit=0
+slot A entry: ["1",true,"task-x1","2b3c1e43b17d57bb94dccc2e33d2ab96"]
+provider argv: capabilities --json;
+inert: no return, no marker, pool state + sibling B + own nested copy unchanged, no backup: OK
+### recovered-old on v3.1.7-fm.b5d2805: teardown exit=0
+slot A entry: ["1",true,"recovered: state file was corrupt or truncated; verify before reuse",null]
+provider argv: capabilities --json;
+inert: no return, no marker, pool state + sibling B + own nested copy unchanged, no backup: OK
+ALL LIVE TEARDOWN UNPROVEN-PROVIDER CASES PASSED
