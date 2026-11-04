@@ -897,7 +897,7 @@ test_proven_capability_does_not_relax_other_refusals() {
 # were, and the real `treehouse get` that follows must hand out B. Without the
 # variable the case prints a loud named skip and checks nothing.
 test_real_provider_recovered_slot_allows_free_slot_allocation() {
-  local name=real-provider order start out rc a b entry state pool recovered
+  local recovered
   if [ -z "${FM_TEST_TREEHOUSE_PROVIDER:-}" ] || [ ! -x "$FM_TEST_TREEHOUSE_PROVIDER" ]; then
     printf 'skip - real-provider recovered-slot allocation: FM_TEST_TREEHOUSE_PROVIDER names no executable treehouse; the case did NOT run\n'
     return 0
@@ -908,7 +908,14 @@ test_real_provider_recovered_slot_allows_free_slot_allocation() {
     printf 'skip - real-provider recovered-slot allocation: %s publishes no recovered_quarantine_holder; the case did NOT run\n' "$FM_TEST_TREEHOUSE_PROVIDER"
     return 0
   fi
-  (
+  ( real_provider_recovered_slot_cases ) || exit 1
+  pass "against the real provider a recovered quarantine holding a current copy stays untouched while the spawn and the following get take the free slot, in both state orders"
+}
+
+# The cases of the test above. It runs them in a subshell, so their exports and
+# fixture globals stay there.
+real_provider_recovered_slot_cases() {
+  local name order start out rc a b entry state pool
   for start in protected old; do
   for order in recovered-first free-first; do
     name="real-provider-$start-$order"
@@ -980,8 +987,6 @@ test_real_provider_recovered_slot_allows_free_slot_allocation() {
     ! compgen -G "$pool/../treehouse-recovered-backup-*" >/dev/null || fail "$order: the real get left a recovered backup"
   done
   done
-  ) || exit 1
-  pass "against the real provider a recovered quarantine holding a current copy stays untouched while the spawn and the following get take the free slot, in both state orders"
 }
 
 test_nested_copy_in_leased_slot_allows_allocation() {

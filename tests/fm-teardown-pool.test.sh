@@ -3999,7 +3999,7 @@ test_unclaimed_slot_on_unproven_provider_stays_inert() {
   for provider in "${UNC_PROVIDERS[@]}"; do
     for cond in capability-old capability-old-recovered capability-failed capability-no-holder; do
       kind=ordinary-old
-      [ "$cond" != capability-old-recovered ] || kind=recovered-old
+      [ "$cond" != capability-old-recovered ] || kind="recovered-old"
       unc_pool_case "unclaimed-outside-$cond" "$kind" "$provider" || fail "$provider $cond: cannot build the pool"
       case_dir=$UNC_CASE
       case "$cond" in
