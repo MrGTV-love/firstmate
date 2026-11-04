@@ -28,12 +28,14 @@
 #     the merging task's own id is a stdout line instead, not counted, saying its own teardown
 #     closes it;
 #   - a column-0 line that starts with a directive word but does not fit its form, and a
-#     `Train-member:` value that is no pull request URL;
+#     `Train-member:` value that is no pull request URL. A `Train-member:` line that names the
+#     merged pull request itself is ignored with its own `actionable:` line and is not counted;
 #   - in the merged pull request's own body only, never a train member's: an active, not-done
-#     backlog id that appears as a word in the prose, or a pull request link in the prose that
-#     is not a `Train-member:` line, is a `mentioned ...` line that says nothing was closed for
-#     it. The merging task's own id is left out, because its teardown owns that item. A pull
-#     request link is read for GitHub, GitLab and Forgejo alike. The id check reads the backlog
+#     backlog id that appears as a word in the prose, or a link in the prose to another pull
+#     request that no `Train-member:` line lists, is a `mentioned ...` line that says nothing
+#     was closed for it. An id a directive line, task record or old line already named gets no
+#     second line. The merging task's own id is left out, because its teardown owns that item.
+#     A pull request link is read for GitHub, GitLab and Forgejo alike. The id check reads the backlog
 #     once; when the backlog cannot be listed, a body with prose and a directive, old `Closes:`
 #     or malformed line gets one `actionable:` line saying so, and any other body gets none.
 # The same read gives that pull request's merge state: when it is not merged (a hand run
@@ -52,7 +54,8 @@
 #     included): FM_TASKS_AXI_REFUSE_OPEN_CALL, set only here, makes it refuse one inside
 #     the lock it holds while it completes the item, so a hold placed before the close
 #     takes effect wins. An open owner call, a live task record of a ship or scout item, a
-#     scout item, a proof it cannot verify (a non-GitHub pull request) or any other refusal
+#     scout item, a proof it refuses (a ship item accepts only a GitHub pull request, and
+#     no item accepts a GitLab merge request URL) or any other refusal
 #     is reported with its first line. A ship or scout item with a live record stays open:
 #     the merged pull request's own task is left for its own teardown to close, and any
 #     other stays open until someone acts on the report. A live item of any other kind

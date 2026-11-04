@@ -36,8 +36,9 @@
 #   as is a column-0 line that starts with a directive word but does not fit its form
 #   (fm_pr_closes_malformed), so a misspelled block is never silent.
 #
-# Prose. The rest of the body (fm_pr_closes_prose) is every line outside a fence that is
-# not a directive or an old `Closes:` line. bin/fm-pr-close-items.sh reads its words and
+# Prose. The rest of the body (fm_pr_closes_prose) is every line outside a fence that does
+# not start at column 0 with a directive word or the old `Closes:`, so a malformed directive
+# line is reported as malformed, never as prose. bin/fm-pr-close-items.sh reads its words and
 # its pull request links only to report that something was mentioned and closed nothing.
 #
 # Every reader takes a body file path (or `-` for standard input) and prints one value per

@@ -1112,14 +1112,15 @@ A pull request that finishes a queued item names it with a `Closes-backlog-item:
 A queued (`--auto`), forge-unconfirmed or externally seen merge runs no close, and the items its body names stay open; backlog item `fm-pr-close-items-queued-and-polled-merges` owns that gap.
 A merge train names each landed pull request with a `Train-member: <pull request URL>` line and closes its members' items too, with the train as the proof: each member's own `Closes-backlog-item:` lines, and any task whose `state/<task>.meta` records `pr=` equal to the full member URL.
 [`bin/fm-pr-closes-lib.sh`](../bin/fm-pr-closes-lib.sh)'s header is the one owner of the two directive lines, and only those lines close anything: a table, heading, bullet, link, sentence or fenced example closes nothing.
-When the merged pull request's body mentions an active backlog id or another pull request outside those lines, it closes nothing for it, and the merge prints one `actionable:` line per mention.
+When the merged pull request's body mentions, outside those lines, an active backlog id that no directive line, task record or old line names, or another pull request that no `Train-member:` line lists, it closes nothing for it, and the merge prints one `actionable:` line per mention.
 The merging task's own id is not reported, because its teardown owns that item, and a train member's body gets no mention check.
-An old `Closes: <item-id>` line, a malformed directive line and a train body written without the block are reported the same way; a train body without the block keeps the manual close.
+An old `Closes: <item-id>` line and a malformed directive line are reported the same way.
 An old line is reported only when no directive line or task record names the same id, and an old line that names the merging task's own id is reported on stdout, not as `actionable:`, because its teardown closes it.
+A train body without `Train-member:` lines closes no member's items and keeps the manual close; its pull request links are reported as mentions.
 A ship or scout task that still has a live record stays open.
 When it is the merged pull request's own task, its own teardown closes it, so the merge only reports it; any other such task is reported as an `actionable:` line.
 A task of any other kind that still has a live record closes like any other named item.
-[`bin/fm-pr-close-items.sh`](../bin/fm-pr-close-items.sh)'s header owns what it closes and the reason it reports for each item it leaves open, an unknown id, a finished item and an open captain call among them.
+[`bin/fm-pr-close-items.sh`](../bin/fm-pr-close-items.sh)'s header owns what it closes and the reason it reports for each item it leaves open, an unknown id, a finished item, an open captain call and a proof the completion refuses among them.
 A close that fails never undoes or fails the merge, and a repeat run changes nothing.
 An item that moves to Done through `bin/fm-tasks-axi.sh` (`done`, `close`, or a typed `public-followup` completion), a backlog transition such as teardown's, or a captain-hold `answer`, `withdraw` or `reconcile close` also leaves every other active item's blocked-by list, and the cleared items are reported; an item with another unfinished blocker keeps waiting on it, and [`bin/fm-backlog-transition-lib.sh`](../bin/fm-backlog-transition-lib.sh) owns that clear.
 A raw `tasks-axi done` skips this clear, and so does teardown in a home where the backlog transition gate does not apply.
