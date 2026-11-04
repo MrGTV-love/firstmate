@@ -6559,27 +6559,33 @@ test_a_changed_kept_copy_is_assessed_afresh() {
 # of them changes, the preserve can never match after the driver, so every
 # retry refuses before the driver and writes no tar and no saved output.
 test_a_kept_copy_whose_adopted_bytes_changed_refuses_before_the_driver() {
-  local rc run
-  make_retained_case retained-adopted enclosing
-  rm -f "$FOREIGN_COPY/notes/unique.dat"
-  held_plain_get_slot "$FOREIGN_CASE"
-  held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY"
-  : > "$FOREIGN_CASE/no-lease-command"
-  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
-  expect_code 1 "$rc" "retained-adopted: run 1 must refuse for the lease: $(cat "$FOREIGN_CASE/stderr")"
-  assert_grep 'could not be durably leased' "$FOREIGN_CASE/stderr" "retained-adopted: run 1 did not reach the lease check"
-  assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-adopted: run 1 should have asked the driver once"
-  printf 'changed\n' > "$FOREIGN_COPY/.claude/channel-outbox/a.jsonl"
-  for run in 2 3; do
+  local rc run shape label preserve before
+  for shape in claude-only with-selected; do
+    label=retained-adopted-$shape
+    make_retained_case "$label" enclosing
+    [ "$shape" = with-selected ] || rm -f "$FOREIGN_COPY/notes/unique.dat"
+    held_plain_get_slot "$FOREIGN_CASE"
+    held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY"
+    : > "$FOREIGN_CASE/no-lease-command"
     run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
-    expect_code 1 "$rc" "retained-adopted: run $run must refuse: $(cat "$FOREIGN_CASE/stderr")"
-    assert_grep "differ from the bytes already preserved" "$FOREIGN_CASE/stderr" "retained-adopted: run $run did not name the cause"
-    assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-adopted: run $run asked the driver again"
-    assert_absent "$FOREIGN_CASE/data/task-x1/vernant-closeout."* "retained-adopted: run $run saved a driver output"
-    assert_present "$FOREIGN_CASE/state/task-x1.meta" "retained-adopted: run $run removed the task record"
-    assert_present "$FOREIGN_COPY/.git" "retained-adopted: run $run removed the copy"
+    expect_code 1 "$rc" "$label: run 1 must refuse for the lease: $(cat "$FOREIGN_CASE/stderr")"
+    assert_grep 'could not be durably leased' "$FOREIGN_CASE/stderr" "$label: run 1 did not reach the lease check"
+    assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "$label: run 1 should have asked the driver once"
+    preserve=$FOREIGN_CASE/data/task-x1/nested-copy-preserved/$(printf '%s' "$FOREIGN_COPY" | shasum -a 256 | awk '{print $1}')
+    before=$(shasum -a 256 "$preserve/.claude/channel-outbox/a.jsonl" | awk '{print $1}')
+    printf 'changed\n' > "$FOREIGN_COPY/.claude/channel-outbox/a.jsonl"
+    for run in 2 3; do
+      run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+      expect_code 1 "$rc" "$label: run $run must refuse: $(cat "$FOREIGN_CASE/stderr")"
+      assert_grep "differ from the bytes already preserved" "$FOREIGN_CASE/stderr" "$label: run $run did not name the cause"
+      assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "$label: run $run asked the driver again"
+      assert_absent "$FOREIGN_CASE/data/task-x1/vernant-closeout."* "$label: run $run saved a driver output"
+      assert_present "$FOREIGN_CASE/state/task-x1.meta" "$label: run $run removed the task record"
+      assert_present "$FOREIGN_COPY/.git" "$label: run $run removed the copy"
+      assert_equals "$before" "$(shasum -a 256 "$preserve/.claude/channel-outbox/a.jsonl" 2>/dev/null | awk '{print $1}')" "$label: run $run dropped or replaced the adopted bytes"
+    done
   done
-  pass "a kept copy whose adopted ignored bytes changed refuses before the driver on every retry, with no tar and no saved output"
+  pass "a kept copy whose adopted ignored bytes changed refuses before the driver on every retry, with no tar and no saved output, whether or not preservation selects other files"
 }
 
 # A kept copy in a slot another live task still works in (the peer route) cannot
