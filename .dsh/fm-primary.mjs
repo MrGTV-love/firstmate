@@ -6,6 +6,7 @@ import { appendFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } fr
 import { resolve, join } from 'node:path';
 
 export const name = 'firstmate-primary';
+export const inject = ['agents'];
 const instances = new Map();
 const message = text => Object.freeze({id: randomUUID(), role: 'user',
   source: Object.freeze({kind: 'user'}),
@@ -15,18 +16,93 @@ const aborted = signal => new Promise(accept => {
   else signal.addEventListener('abort', accept, {once: true});
 });
 
-export function apply(ctx, config) {
+const environment = (home, agent) => {
+  const paths = {FM_HOME: home, FM_ROOT_OVERRIDE: home,
+    FM_STATE_OVERRIDE: join(home, 'state'), FM_CONFIG_OVERRIDE: join(home, 'config'),
+    FM_DATA_OVERRIDE: join(home, 'data'), FM_PROJECTS_OVERRIDE: join(home, 'projects')};
+  // The legacy launcher owns its process. A Web host owns many sessions.
+  if (!agent) Object.assign(process.env, paths);
+  const env = {...process.env, ...paths};
+  if (agent) {
+    for (const key of ['CLAUDECODE', 'CLAUDE_PID', 'CLAUDE_CODE_SESSION_ID', 'PI_CODING_AGENT',
+      'GROK_AGENT', 'FM_PI_HARNESS', 'FM_OMP_HARNESS', 'GEMINI_CLI', 'CURSOR_AGENT', 'CURSOR_INVOKED_AS', 'HERDR_ENV']) delete env[key];
+    Object.assign(env, {FM_DSH_HARNESS: 'dsh', DSH_PROFILE: 'web', DSH_SESSION_ID: agent.id});
+  }
+  return env;
+};
+const runCommand = (root, home, env, children, script, args = [], input = '') => new Promise((accept, reject) => {
+  const child = spawn('nice', ['-n', '20', 'bash', join(root, 'bin', script), ...args],
+    {cwd: home, env, stdio: ['pipe', 'pipe', 'pipe']});
+  children.add(child);
+  let stdout = '';
+  let stderr = '';
+  child.stdout.on('data', chunk => { stdout += chunk; });
+  child.stderr.on('data', chunk => { stderr += chunk; });
+  child.on('error', reject);
+  child.on('close', code => { children.delete(child); accept({code, stdout, stderr}); });
+  child.stdin.on('error', () => {});
+  child.stdin.end(input);
+});
+
+// The shared Web host always requires an explicit native sessionId. Only a
+// non-Web launch-owned runtime may retain the legacy root/home startup contract.
+export async function apply(ctx, config) {
+  const web = ctx.get?.('profileContext')?.name === 'web';
+  if (!web && config.sessionId === undefined) return primary(ctx, config);
+  if (!web || typeof config.sessionId !== 'string' || !config.sessionId.trim()
+    || !ctx.get('agents')) {
+    throw new Error('Firstmate Web attachment requires a native sessionId and Web agent registry');
+  }
+  const mounted = new WeakMap();
+  const terminated = new WeakSet();
+  const releases = new Set();
+  let releasing = Promise.resolve();
+  let closing = false;
+  // Root termination emits agent/disposed only after scope teardown and exact
+  // registry detach. Plugin/HMR teardown alone never emits that ownership edge.
+  ctx.effect(() => () => { closing = true; return releasing; });
+  const attach = agent => {
+    if (agent.id !== config.sessionId) return;
+    const header = agent.session.header;
+    if (typeof header.cwd !== 'string' || resolve(header.cwd) !== resolve(config.home)
+      || header.origin === 'subagent' || (header.delegationDepth ?? 0) > 0) return;
+    if (mounted.has(agent)) return mounted.get(agent);
+    const ready = (async () => {
+      // A delayed old release must finish before a same-ID resume can own or arm.
+      await releasing;
+      if (closing || ctx.agents.get(agent.id) !== agent) return;
+      const fiber = agent.ctx.plugin({name: 'firstmate-primary-session',
+        apply: scoped => primary(scoped, {...config, agent})});
+      ctx.effect(() => () => fiber.dispose());
+      await fiber.await();
+    })();
+    mounted.set(agent, ready);
+    return ready;
+  };
+  ctx.on('agent/created', ({agent}) => attach(agent));
+  ctx.on('agent/disposed', ({agent}) => {
+    if (closing || !mounted.has(agent) || terminated.has(agent) || ctx.agents.get(agent.id)) return;
+    terminated.add(agent);
+    releasing = releasing.then(async () => {
+      const result = await runCommand(resolve(config.root), resolve(config.home),
+        environment(resolve(config.home), agent), releases, 'fm-lock.sh', ['release']);
+      if (result.code !== 0 && result.code !== 1) throw new Error('Firstmate native lock release failed');
+    });
+    return releasing;
+  });
+  const existing = ctx.agents.get(config.sessionId);
+  if (existing) await attach(existing);
+}
+
+function primary(ctx, config) {
   const root = resolve(config.root);
   const home = resolve(config.home);
   const state = join(home, 'state');
-  // Every native tool call must inherit this primary's home, never the
-  // launching parent's home (especially for secondmates).
-  Object.assign(process.env, {FM_HOME: home, FM_ROOT_OVERRIDE: home,
-    FM_STATE_OVERRIDE: state, FM_CONFIG_OVERRIDE: join(home, 'config'),
-    FM_DATA_OVERRIDE: join(home, 'data'), FM_PROJECTS_OVERRIDE: join(home, 'projects')});
-  const env = {...process.env};
+  const web = config.agent !== undefined;
+  const env = environment(home, config.agent);
   let disposed = false;
-  let agent;
+  let agent = config.agent;
+  const current = () => !disposed && agent && (!web || ctx.agents.get(agent.id) === agent);
   let arm;
   let checking = false;
   let checkAgain = false;
@@ -46,6 +122,7 @@ export function apply(ctx, config) {
   const rowKeys = text => text.trim().split('\n').filter(Boolean).map(line => line.split('\t').slice(0, 2).join('\t'));
   const children = new Set();
   const previous = instances.get(home);
+  if (web && previous) throw new Error('Firstmate home already has a native primary attachment');
   previous?.();
   mkdirSync(state, {recursive: true});
   const events = join(state, '.dsh-primary-events.jsonl');
@@ -58,21 +135,12 @@ export function apply(ctx, config) {
       renameSync(temporary, events);
     }
   };
-  const command = (script, args = [], input = '') => new Promise((accept, reject) => {
-    const child = spawn('nice', ['-n', '20', 'bash', join(root, 'bin', script), ...args],
-      {cwd: home, env, stdio: ['pipe', 'pipe', 'pipe']});
-    children.add(child);
-    let stdout = '';
-    let stderr = '';
-    child.stdout.on('data', chunk => { stdout += chunk; });
-    child.stderr.on('data', chunk => { stderr += chunk; });
-    child.on('error', reject);
-    child.on('close', code => { children.delete(child); accept({code, stdout, stderr}); });
-    child.stdin.on('error', () => {});
-    child.stdin.end(input);
-  });
+  const command = (script, args = [], input = '') => {
+    if (disposed || (web && !current())) return Promise.reject(new Error('Firstmate attachment retired'));
+    return runCommand(root, home, env, children, script, args, input);
+  };
   const send = (text, kind) => {
-    if (disposed || !agent) return;
+    if (!current()) return;
     const input = message(text);
     ownMessages.add(input.id);
     if (kind === 'watcher') wakeMessages.add(input.id);
@@ -86,6 +154,7 @@ export function apply(ctx, config) {
   };
   const failed = error => `Firstmate DSH primary supervision failed: ${String(error)}. Run bin/fm-wake-drain.sh first and follow the emitted recovery protocol.`;
   const failure = error => {
+    if (disposed || (web && !current())) return;
     log('error', {detail: String(error)});
     if (!guardNudged) {
       guardNudged = true;
@@ -106,7 +175,7 @@ export function apply(ctx, config) {
     }
   };
   const startArm = mode => {
-    if (disposed || arm || failedArm) return;
+    if (!current() || arm || failedArm) return;
     const child = spawn('nice', ['-n', '20', 'bash', '-c', '. "$1"; shift; fm_exec_owned "$@"',
       'fm-dsh-primary-watch', join(root, 'bin', 'fm-timeout-lib.sh'), env.FM_WATCHER_CLEANUP_LOCK_BOUND || '2',
       'bash', join(root, 'bin', mode === 'host' ? 'fm-supervision-host.sh' : 'fm-watch-arm.sh'), ...(mode === 'host' ? ['park'] : [])],
@@ -126,10 +195,15 @@ export function apply(ctx, config) {
     child.stderr.on('data', receive);
     child.on('error', error => { log('arm-error', {detail: String(error)}); });
     child.on('close', async code => {
-      if (arm !== child || disposed) return;
+      if (arm !== child || !current()) return;
       arm = undefined;
       log('watcher-close', {code});
       try {
+        if (web) {
+          const inspect = await command('fm-dsh-primary.sh', ['inspect', home]);
+          if (!current() || inspect.code === 3 || inspect.code === 4) return;
+          if (inspect.code !== 0) throw new Error('Firstmate ownership recheck failed');
+        }
         if (code !== 0 || /watcher: FAILED/.test(output)) {
           failedArm = true;
           await repair(output);
@@ -155,11 +229,12 @@ export function apply(ctx, config) {
     });
   };
   async function ensure() {
-    if (disposed || !agent) return;
+    if (!current()) return;
     if (checking) { checkAgain = true; return; }
     checking = true;
     try {
       const inspect = await command('fm-dsh-primary.sh', ['inspect', home]);
+      if (!current()) return;
       if (inspect.code === 3 || inspect.code === 4) {
         log('read-only', {code: inspect.code});
         return;
@@ -200,7 +275,7 @@ export function apply(ctx, config) {
   };
   instances.set(home, stop);
   ctx.effect(() => stop);
-  ctx.on('agent/created', async ({agent: created}) => {
+  if (!web) ctx.on('agent/created', async ({agent: created}) => {
     const header = created.session.header;
     if (disposed || agent === created || typeof header.cwd !== 'string'
       || resolve(header.cwd) !== home || header.origin === 'subagent' || (header.delegationDepth ?? 0) > 0) return;
@@ -286,7 +361,7 @@ export function apply(ctx, config) {
     return {kind: 'enter', messages: [...first, ...decision.messages]};
   });
   ctx.on('session/event', (session, event) => {
-    if (session !== agent?.session) return;
+    if (!current() || session !== agent.session) return;
     if (event.type === 'user/message') {
       const id = event.data?.id;
       if (holdingIds?.has(id)) { holding = undefined; holdingIds = undefined; }
@@ -315,4 +390,8 @@ export function apply(ctx, config) {
     if (removed !== agent) return;
     agent = undefined;
   });
+  if (web) {
+    log('attached', {session: agent.id});
+    return ensure().catch(failure);
+  }
 }

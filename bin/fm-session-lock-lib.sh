@@ -6,11 +6,10 @@
 # bin/fm-lock.sh uses it to acquire and inspect state/.lock and its
 # state/.lock-session sidecar; bin/fm-claude-stop-autoarm.sh uses it to prove a
 # Stop hook fires inside the lock-owning primary session before it may arm or
-# rewake. Two signals decide ownership, either one sufficient: the recorded pid
-# is a member of this process's contiguous harness ancestry, or the trusted
-# Claude session id below matches the id recorded beside a live lock. Neither
-# signal ever fails open: no id, no sidecar, an untrusted id, or a different
-# recorded id leaves the ancestry verdict exactly as it was.
+# rewake. Legacy sessions own by verified harness ancestry or a trusted Claude
+# session id beside a live lock. Native Web sessions share a server process,
+# so they require BOTH that server ancestry and the exact tagged native session
+# sidecar. A missing or different native identity never falls back to PID trust.
 # This file is sourced by scripts and has no side effects on source.
 
 # Cursor process identity is NOT expressible as a command-name pattern and is
@@ -210,11 +209,28 @@ fm_harness_pid_alive() {
 # non-goal. Two genuinely different live sessions sharing one id is not a
 # supported state (Claude refuses to resume a running session under its id).
 
-# Print the Claude session id this process may own with, or return 1. $1 is the
+# A native Web identity belongs only to the nearest verified DSH host, never
+# to another harness that inherited its shell environment.
+fm_session_lock_is_native_web() {  # [<ancestry-pids>]
+  local pids=${1:-} args
+  [ "${DSH_PROFILE:-}" = web ] || return 1
+  [ -n "$pids" ] || pids=$(fm_harness_ancestry_pids) || return 1
+  args=$(fm_session_lock_proc args "${pids%%$'\n'*}") || return 1
+  fm_dsh_args_are_dsh "$args"
+}
+
+# Print the trusted Claude or tagged native DSH session id, or return 1. $1 is the
 # ancestry list an earlier walk already produced, so a caller that walked once
 # need not walk again.
 fm_session_lock_trusted_session_id() {  # [<ancestry-pids>]
   local id=${CLAUDE_CODE_SESSION_ID:-} claude_pid=${CLAUDE_PID:-} pids=${1:-} pid comm args
+  if fm_session_lock_is_native_web "$pids"; then
+    id=${DSH_SESSION_ID:-}
+    case "$id" in ''|*[!A-Za-z0-9._-]*) return 1 ;; esac
+    [ "${DSH_SHELL:-}" = 1 ] || [ "${FM_DSH_HARNESS:-}" = dsh ] || return 1
+    printf 'dsh-web:%s\n' "$id"
+    return 0
+  fi
   [ -n "$id" ] || return 1
   case "$id" in *$'\n'*|*$'\r'*) return 1 ;; esac
   case "$claude_pid" in ''|*[!0-9]*) return 1 ;; esac
@@ -258,6 +274,16 @@ fm_session_lock_same_session() {  # <state> [<ancestry-pids>]
   [ "$recorded" = "$trusted" ]
 }
 
+# A Web server hosts many sessions. Neither its PID nor an inherited identity
+# may bypass the canonical sidecar; tagged locks stay strict for every caller.
+fm_session_lock_requires_native_id() {  # <state>
+  local recorded
+  fm_session_lock_is_native_web && return 0
+  recorded=$(fm_session_lock_recorded_session_id "$1") || return 1
+  case "$recorded" in dsh-web:*) return 0 ;; esac
+  return 1
+}
+
 # Print the pid bin/fm-lock.sh records on lock line 1 for this session. For a
 # Claude session with a trusted id that is CLAUDE_PID, the model-loop process:
 # never the shared transient daemon and never a front-end that outlives the
@@ -269,6 +295,11 @@ fm_session_lock_same_session() {  # <state> [<ancestry-pids>]
 fm_session_lock_anchor_pid() {
   local pids
   pids=$(fm_harness_ancestry_pids) || return 1
+  if fm_session_lock_is_native_web "$pids"; then
+    fm_session_lock_trusted_session_id "$pids" >/dev/null || return 1
+    printf '%s\n' "${pids%%$'\n'*}"
+    return 0
+  fi
   if fm_session_lock_trusted_session_id "$pids" >/dev/null; then
     printf '%s\n' "$CLAUDE_PID"
     return 0
@@ -295,6 +326,13 @@ fm_session_lock_owned_by_self() {
     ''|*[!0-9]*) return 1 ;;
   esac
   pids=$(fm_harness_ancestry_pids) || return 1
+  if fm_session_lock_requires_native_id "$state"; then
+    fm_session_lock_same_session "$state" "$pids" || return 1
+    # Same durable ID on a different still-live server is not a handoff.
+    [ "$lock_pid" = "${pids%%$'\n'*}" ] || return 1
+    fm_harness_pid_alive "$lock_pid"
+    return
+  fi
   while IFS= read -r pid; do
     [ "$pid" = "$lock_pid" ] && return 0
   done <<EOF
@@ -320,6 +358,11 @@ fm_session_lock_foreign_owner_live() {
     ''|*[!0-9]*) return 1 ;;
   esac
   fm_harness_pid_alive "$lock_pid" || return 1
+  if fm_session_lock_requires_native_id "$state"; then
+    fm_session_lock_owned_by_self "$state" && return 1
+    FM_SESSION_LOCK_FOREIGN_OWNER_PID=$lock_pid
+    return 0
+  fi
   pids=$(fm_harness_ancestry_pids) || return 1
   while IFS= read -r pid; do
     [ "$pid" = "$lock_pid" ] && return 1

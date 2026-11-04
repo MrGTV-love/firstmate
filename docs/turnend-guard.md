@@ -276,12 +276,12 @@ The registrations in detail:
 
 ### DSH native passive boundary
 
-The primary launch patch mounts `.dsh/fm-primary.mjs` through DSH's native Cordis composition; a bare `dsh-tui` does not automatically load it.
+The launch-owned TUI patch or an explicitly session-bound native Web contribution mounts `.dsh/fm-primary.mjs` through DSH's native Cordis composition; a bare frontend does not automatically load it.
 Its durable `turn/end` callback invokes the same guard, and an unhealthy primary starts or attaches through the existing watcher singleton.
 A failed arm produces at most one native `agent.followup` until an external user message resets that episode's budget.
 Accepted watcher messages are not consumption evidence: the bridge waits for the delivered epoch/sequence rows to disappear through the ordinary acknowledgement before re-arming, so a pending row cannot spin duplicate turns.
 DSH cannot veto a completed turn through this event; the bounded follow-up is its strongest equivalent, not a blocking Stop hook.
-The [DSH supervision protocol](supervision-protocols/dsh.md) owns normal operation and recovery, and `tests/fm-dsh-primary-live-e2e.test.sh` exercises the actual native callbacks and terminal lifecycle.
+The [DSH supervision protocol](supervision-protocols/dsh.md) owns normal operation and recovery; `tests/fm-dsh-primary-live-e2e.test.sh` exercises the actual TUI callbacks and terminal lifecycle, not existing-conversation Web delivery.
 
 ### Claude and Codex blocking
 

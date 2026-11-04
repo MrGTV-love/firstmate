@@ -4077,6 +4077,29 @@ The guard bounds synthetic failure continuations; it cannot prevent a completed 
 Native automatic in-place compaction has no separate tracked startup re-emit callback, and the live guard does not exercise plugin hot reload or an away supervision-host session.
 The [DSH protocol](../supervision-protocols/dsh.md) and [session-start contract](../sessionstart-nudge.md#dsh) own those operating boundaries.
 
+### Native Web SDK attachment fixtures
+
+Verified on 2026-11-04 with the installed `@deepseek-ai/dsh` 0.2.1-rc.2 dependency tree and Node v26.4.0.
+The following model-free command uses that installation's actual Cordis `Context` and `createScope` primitives with synthetic Agents and isolated command recorders:
+
+```sh
+bin/fm-proc-budget.sh -- node tests/fm-dsh-primary-web.mjs \
+  "$PWD" <temporary-directory> <installed-dsh-package.json>
+```
+
+It exited 0 with:
+
+```text
+ok - actual SDK Web config without sessionId refuses before environment mutation or legacy subscription
+ok - actual SDK owned TUI profile preserves legacy root/home startup and one supervision followup
+ok - native Web existing/resumed Agent, explicit env, no startup, one followup, true-termination release barrier, no HMR/stale release, foreign refusal and scoped cleanup
+```
+
+The missing-Web-session assertion fails against the unrepaired adapter: configuration is accepted, the process environment changes, legacy selection occurs and one recorder command runs.
+These SDK fixtures establish composition behavior, not a real native Web model turn, live profile activation, or automatic worker-result delivery into an existing GUI conversation.
+`tests/fm-dsh-primary.test.sh` includes them when `FM_DSH_SDK_ANCHOR` selects an installed DSH package, and explicitly reports the SDK fixture skip when none is supplied.
+The preceding TUI lifecycle evidence is not Web delivery evidence; the [DSH protocol](../supervision-protocols/dsh.md) owns the separate activation path.
+
 ## Busy inbox escalation
 
 Verified at `2026-10-03T19:20:07Z` on commit `23b0232908a5adc7fbf7339ef48c34a091a7a799` with Claude Code `2.1.288 (Claude Code)` on Herdr `0.9.1`, protocol `22`, in a named isolated lab session through `bin/fm-herdr-lab.sh`.
