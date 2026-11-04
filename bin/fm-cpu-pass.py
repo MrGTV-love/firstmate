@@ -857,7 +857,11 @@ def active_term(report: dict) -> Optional[Tuple[int, int]]:
 # the daemon records an agent's pid at the agent's start event and clears it at its
 # exit (no-mistakes fork 935aedf, internal/pipeline/executor.go:952-960), and sets
 # round_started_at when a step or fix round starts (internal/db/step.go:224-245).
-# A holding margin, not a measurement: inside it the run keeps A.
+# Evidence: in all 5 native fork-harness launches (p11 refuse3 and admit2) the gate's
+# first database read already saw its own pid recorded as agent_pid, and that read
+# follows the engine's start, which takes at most 0.113 s here (10 timed runs of
+# fm-cpu-pass.py size); inside the window the run keeps A.
+# measured: value=120 date=2026-11-04 host=Mac-Studio.local margin=1000
 NO_PID_WINDOW_SECS = 120
 
 
