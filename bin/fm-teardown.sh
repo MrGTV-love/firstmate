@@ -2946,7 +2946,9 @@ TEARDOWN_RECORDED_PR_ONLY=0
 # remove: its parent is authorized, and anything at the path is a regular file.
 # It is the shape half of fm_backlog_record_remove, tested here from the state at
 # entry so a path the clear is certain to refuse is refused before the slot lease
-# and the return-pending marker. Sets FM_BACKLOG_TRANSITION_ERROR on a refusal.
+# and the return-pending marker: inside the backlog-transition block for any
+# close, and, when no backlog transition applies, for a ship that takes the
+# nested-slot route. Sets FM_BACKLOG_TRANSITION_ERROR on a refusal.
 teardown_pending_close_record_usable() {  # <marker-path>
   local marker=$1
   fm_backlog_record_parent_authorized "$marker" "pending-close record target" "$STATE" || return 1
@@ -6460,10 +6462,13 @@ fi
 # copies it holds; a slot in a superseded pool folder is leased by its exact
 # path. This task's misdirected leases are released after the reservation and
 # the held-copy record checks below.
-# The clear of the previous pending-close record below runs for every close, so a
-# path it cannot remove is refused here, before the lease and the marker. With a
-# backlog transition the path was already checked above.
-if [ "$TEARDOWN_BACKLOG_APPLIES" != 1 ] \
+# A ship on the nested-slot route is the case whose refusal came after the lease
+# and the marker: the clear of the previous pending-close record below always
+# refuses a path that is not a removable regular file, so that path is refused
+# here, before the lease and the marker. With a backlog transition the path was
+# already checked above. Other routes keep the order they had.
+if [ "$KIND" = ship ] && [ "$TEARDOWN_BACKLOG_APPLIES" != 1 ] \
+   && { [ -n "$TEARDOWN_ENCLOSING_SLOT" ] || [ "${#TEARDOWN_NESTED_COPIES[@]}" -gt 0 ]; } \
    && ! teardown_pending_close_record_usable "$(fm_backlog_close_marker_path "$STATE" "$ID")"; then
   echo "error: the previous pending backlog $BACKLOG_TRANSITION for $ID could not be cleared ($FM_BACKLOG_TRANSITION_ERROR); refusing before any lease or marker write" >&2
   exit 1
