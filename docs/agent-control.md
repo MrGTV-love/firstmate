@@ -363,7 +363,7 @@ The output shows every copy path, slot path and reason with control characters r
 A task whose own nested copy Vernant's closeout driver keeps (exit 3, `cleanup_ignored_payload_archived_tree_retained`) closes instead of refusing on every retry.
 Asking the driver again can only add archives: each `--execute-cleanup` call writes one more timestamped tar of the same ignored files under the slot's `.claude/bug-evidence/worktree-preservation/` and keeps the tree.
 So teardown judges the harm itself, and the driver's refusal alone is no longer read as unique work.
-The driver's answer must be one JSON document that refuses with that reason, names no uncovered path of any kind, and says it kept this copy.
+The driver's answer must be one JSON document that refuses with that reason, names no uncovered path of any kind, and, when it names the tree it kept, names this copy.
 The copy must pass the ordinary clean and landed proof again, and must hold no other Git repository.
 Every ignored file the driver names unique, and every ignored file teardown's preservation selects, must be held with the same SHA-256 in `data/<task>/nested-copy-preserved/<sha256 of the copy path>/`; teardown compares the bytes and never takes the driver's JSON as proof.
 A driver-named path that preservation skips by design, such as one under `.claude`, is copied into that preserve when it is absent there and never over a different preserved byte.

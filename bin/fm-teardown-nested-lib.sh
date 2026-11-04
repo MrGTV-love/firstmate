@@ -1529,8 +1529,8 @@ teardown_retained_cover() {  # <strict|adopt> <copy> <dir> <entry>...
 
 # True when the closeout just run answered as the recorded retained case: exit 3
 # is the caller's, and its stdout is one JSON document that refuses with the
-# retained reason, names no uncovered path of any kind and says which tree it
-# kept. Anything else is an ordinary driver refusal. Prints the driver-named
+# retained reason, names no uncovered path of any kind and, when it names the
+# tree it kept, names this copy. Anything else is an ordinary driver refusal. Prints the driver-named
 # unique ignored paths, one per line, and sets nothing else.
 teardown_closeout_retained_paths() {  # <copy>
   local copy=$1 kept
