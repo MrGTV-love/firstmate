@@ -1014,6 +1014,51 @@ test_nested_entry_refusals_change_nothing() {
   pass "an entry refusal for the slot root's unlanded commit or the nested copy's dirt changes nothing, for a prior and a plain record"
 }
 
+# A pending-close record path that is not a regular file is decidable at entry:
+# the later clear of the previous pending-close record always refuses it, so the
+# refusal must come before the slot lease and before any marker write, for both
+# record shapes, whether the path is a directory or a dangling link. Once the bad
+# path is removed, the same teardown closes: the reservation-time marker and the
+# late-refusal recovery are untouched (test_nested_slot_reproof_refusal_is_rerunnable).
+assert_nested_unusable_pending_close_refused_at_entry() {  # <plain|enclosing> <directory|dangling-link>
+  local shape=$1 form=$2 case_dir rc=0 fragment label="nested-pending-close-$2-$1"
+  nested_fixture "$label" "$shape" mine landed
+  case_dir=$NESTED_CASE
+  case "$form" in
+    directory) mkdir "$case_dir/state/task-x1.backlog-close"; fragment="is not a regular file" ;;
+    dangling-link) ln -s no-such-record "$case_dir/state/task-x1.backlog-close"; fragment="resolves through a different final path" ;;
+  esac
+  nested_snapshot "$case_dir" "$case_dir/snapshot.before"
+  nested_run "$case_dir" || rc=$?
+  assert_nested_refused_untouched "$case_dir" "$rc" "$label" "$fragment"
+  assert_absent "$case_dir/state/task-x1.teardown-return-pending" "$label: a return-pending marker was written"
+  rm -rf "$case_dir/state/task-x1.backlog-close"
+  rc=0
+  nested_run "$case_dir" || rc=$?
+  expect_code 0 "$rc" "$label: the retry after the bad record is removed must close: $(tail -3 "$case_dir/stderr")"
+  assert_nested_closed "$case_dir" "$label"
+}
+
+test_nested_pending_close_directory_refuses_at_entry_plain() {
+  assert_nested_unusable_pending_close_refused_at_entry plain directory
+  pass "a pending-close path that is a directory refuses a plain nested close before any lease or marker write, and the retry closes"
+}
+
+test_nested_pending_close_directory_refuses_at_entry_enclosing() {
+  assert_nested_unusable_pending_close_refused_at_entry enclosing directory
+  pass "a pending-close path that is a directory refuses a prior-shape nested close before any lease or marker write, and the retry closes"
+}
+
+test_nested_pending_close_dangling_link_refuses_at_entry_plain() {
+  assert_nested_unusable_pending_close_refused_at_entry plain dangling-link
+  pass "a pending-close path that is a dangling link refuses a plain nested close before any lease or marker write, and the retry closes"
+}
+
+test_nested_pending_close_dangling_link_refuses_at_entry_enclosing() {
+  assert_nested_unusable_pending_close_refused_at_entry enclosing dangling-link
+  pass "a pending-close path that is a dangling link refuses a prior-shape nested close before any lease or marker write, and the retry closes"
+}
+
 # The plain shape gets the prior shape's disposition for every claim state and
 # fixture: the same exit class, the same removals, the same number of slot
 # returns and the same markers.
@@ -3740,6 +3785,10 @@ test_nested_slot_reproof_refusal_is_rerunnable
 test_plain_nested_copy_in_own_slot_is_removed_and_slot_returned
 test_plain_nested_copy_in_own_slot_is_removed_with_force_and_drop_file
 test_nested_entry_refusals_change_nothing
+test_nested_pending_close_directory_refuses_at_entry_plain
+test_nested_pending_close_directory_refuses_at_entry_enclosing
+test_nested_pending_close_dangling_link_refuses_at_entry_plain
+test_nested_pending_close_dangling_link_refuses_at_entry_enclosing
 test_plain_nested_disposition_equals_the_prior_shape
 test_scout_with_a_plain_nested_copy_keeps_its_own_route
 test_gate_409_recorded_case_tears_down

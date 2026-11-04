@@ -2942,6 +2942,18 @@ teardown_is_dropping() {
 # main, and every other ship carries the PR recorded on its own record.
 BACKLOG_DONE_ARGS=()
 TEARDOWN_RECORDED_PR_ONLY=0
+# Whether the previous pending-close record path is one the later clear can
+# remove: its parent is authorized, and anything at the path is a regular file.
+# It is the shape half of fm_backlog_record_remove, tested here from the state at
+# entry so a path the clear is certain to refuse is refused before the slot lease
+# and the return-pending marker. Sets FM_BACKLOG_TRANSITION_ERROR on a refusal.
+teardown_pending_close_record_usable() {  # <marker-path>
+  local marker=$1
+  fm_backlog_record_parent_authorized "$marker" "pending-close record target" "$STATE" || return 1
+  { [ ! -e "$marker" ] && [ ! -L "$marker" ]; } \
+    || fm_backlog_record_present "$marker" "pending-close record target" "$STATE"
+}
+
 backlog_done_args() {
   local data_relative
   BACKLOG_DONE_ARGS=()
@@ -6413,9 +6425,7 @@ if [ "$TEARDOWN_BACKLOG_APPLIES" = 1 ]; then
     exit 1
   }
   BACKLOG_CLOSE_MARKER=$(fm_backlog_close_marker_path "$STATE" "$ID") || exit 1
-  if ! fm_backlog_record_parent_authorized "$BACKLOG_CLOSE_MARKER" "pending-close record target" "$STATE" \
-     || { { [ -e "$BACKLOG_CLOSE_MARKER" ] || [ -L "$BACKLOG_CLOSE_MARKER" ]; } \
-          && ! fm_backlog_record_present "$BACKLOG_CLOSE_MARKER" "pending-close record target" "$STATE"; }; then
+  if ! teardown_pending_close_record_usable "$BACKLOG_CLOSE_MARKER"; then
     echo "error: the pending backlog $BACKLOG_TRANSITION for $ID could not be recorded ($FM_BACKLOG_TRANSITION_ERROR); retaining every durable task record" >&2
     exit 1
   fi
@@ -6450,6 +6460,14 @@ fi
 # copies it holds; a slot in a superseded pool folder is leased by its exact
 # path. This task's misdirected leases are released after the reservation and
 # the held-copy record checks below.
+# The clear of the previous pending-close record below runs for every close, so a
+# path it cannot remove is refused here, before the lease and the marker. With a
+# backlog transition the path was already checked above.
+if [ "$TEARDOWN_BACKLOG_APPLIES" != 1 ] \
+   && ! teardown_pending_close_record_usable "$(fm_backlog_close_marker_path "$STATE" "$ID")"; then
+  echo "error: the previous pending backlog $BACKLOG_TRANSITION for $ID could not be cleared ($FM_BACKLOG_TRANSITION_ERROR); refusing before any lease or marker write" >&2
+  exit 1
+fi
 [ "$KIND" = secondmate ] || teardown_held_copies_record_or_refuse check || exit 1
 if [ "$TREEHOUSE_SLOT_LOCK_REQUIRED" = 1 ] && teardown_owns_worktree && [ -z "$TEARDOWN_PEER_SLOT" ]; then
   teardown_acquire_project_lock || exit $?

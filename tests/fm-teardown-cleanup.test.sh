@@ -5462,6 +5462,12 @@ held_entry_case() {  # <label> <plain|enclosing> <scenario>
       # A user who can write a read-only file (root) cannot show this refusal.
       if [ -w "$data/held-foreign-copies.log" ]; then HELD_RC=skip; return 0; fi
       ;;
+    no-backlog-pending-close-directory)
+      # No backlog data applies, so only the clear of the previous pending-close
+      # record would refuse this path: it must be refused at entry.
+      rm -f "$FOREIGN_CASE/data/backlog.md" "$FOREIGN_CASE/state/task-x1.backlog-close"
+      mkdir "$FOREIGN_CASE/state/task-x1.backlog-close"
+      ;;
     symlink-dangling) ln -s no-such-target "$data/held-foreign-copies.log" ;;
     symlink-directory) mkdir "$data/real-held-dir"; ln -s real-held-dir "$data/held-foreign-copies.log" ;;
     symlink-writable)
@@ -5496,6 +5502,17 @@ held_entry_scenario() {  # <plain|enclosing> <scenario>
       ;;
     record-directory | unrecorded-readonly | symlink-dangling | symlink-directory | symlink-unrecorded-readonly)
       held_entry_refused "$label" "REFUSED: the held-copy record $data/held-foreign-copies.log could not be written"
+      ;;
+    no-backlog-pending-close-directory)
+      expect_code 1 "$HELD_RC" "$label: the held close must refuse at entry: $(cat "$FOREIGN_CASE/stderr")"
+      assert_grep "is not a regular file" "$FOREIGN_CASE/stderr" "$label: the refusal did not name its cause"
+      [ -d "$FOREIGN_CASE/state/task-x1.backlog-close" ] || fail "$label: the refusal removed the bad pending-close path"
+      cmp -s "$FOREIGN_CASE/return-pending.before" "$FOREIGN_CASE/state/task-x1.teardown-return-pending" || fail "$label: the refusal changed the return-pending record"
+      jq -e '.worktrees[0].leased == false' "$FOREIGN_CASE/pool/treehouse-state.json" >/dev/null || fail "$label: the refusal took a lease"
+      assert_absent "$data/held-foreign-copies.log" "$label: a refused close wrote a held-copy record"
+      assert_present "$FOREIGN_COPY" "$label: the task's own nested copy was removed"
+      assert_present "$FOREIGN_CASE/state/task-x1.meta" "$label: the task record was removed"
+      held_assert_untouched "$label" "$FOREIGN_CASE" "$HELD_COPY"
       ;;
     symlink-writable)
       expect_code 0 "$HELD_RC" "$label: a symlink to a writable record must let the close finish: $(cat "$FOREIGN_CASE/stderr")"
@@ -5596,6 +5613,16 @@ test_held_entry_symlink_writable_plain() {
 test_held_entry_symlink_writable_enclosing() {
   held_entry_scenario enclosing symlink-writable
   pass "held close entry check, symlink-writable, enclosing record"
+}
+
+test_held_entry_no_backlog_pending_close_directory_plain() {
+  held_entry_scenario plain no-backlog-pending-close-directory
+  pass "held close entry check, no-backlog-pending-close-directory, plain record"
+}
+
+test_held_entry_no_backlog_pending_close_directory_enclosing() {
+  held_entry_scenario enclosing no-backlog-pending-close-directory
+  pass "held close entry check, no-backlog-pending-close-directory, enclosing record"
 }
 
 test_held_entry_recorded_readonly_plain() {
@@ -6788,6 +6815,8 @@ test_held_entry_symlink_unrecorded_readonly_plain
 test_held_entry_symlink_unrecorded_readonly_enclosing
 test_held_entry_symlink_writable_plain
 test_held_entry_symlink_writable_enclosing
+test_held_entry_no_backlog_pending_close_directory_plain
+test_held_entry_no_backlog_pending_close_directory_enclosing
 test_held_entry_recorded_readonly_plain
 test_held_entry_recorded_readonly_enclosing
 test_held_entry_recorded_writable_plain
