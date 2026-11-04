@@ -637,6 +637,14 @@ export FM_PROCEVENT_CLAIM_ROOT
   && printf '%s\n%s\n%s\n%s\n' "${FM_PROCEVENT_CLAIM_ROOT%/claims}/no-detector-home" "$$" \
     fm-test-held "$FM_TEST_OWNER_IDENTITY" > "$FM_PROCEVENT_CLAIM_ROOT/proc-guard.claim") || return 1
 
+# A fixture that clears FM_HOME makes bin/fm-guard-event.sh fall back to the code
+# checkout's own state/guard-events.jsonl, so fake bypass and allow rows would
+# land in a live home's metrics. A suite that has not chosen a log writes guard
+# events to this shell's private log instead; an explicit caller value is kept,
+# and a case that reads a specific log sets FM_GUARD_EVENT_LOG itself.
+FM_GUARD_EVENT_LOG=${FM_GUARD_EVENT_LOG:-"$FM_TEST_SHELL_DIR/guard-events.jsonl"}
+export FM_GUARD_EVENT_LOG
+
 trap fm_test_cleanup EXIT
 trap 'fm_test_cleanup; exit 130' INT
 trap 'fm_test_cleanup; exit 143' TERM

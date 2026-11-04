@@ -46,6 +46,16 @@ test_batch_dispatches_every_pair() {
   printf '%s\n' "$out" | grep -F 'batch: FAILED to spawn nope-batch-b-z2 (projects/none-b)' >/dev/null \
     || fail "second pair was not dispatched/reported (loop stopped early?)"
   pass "batch dispatch re-execs and reports every id=repo pair"
+
+  # Each pair re-exec is internal: only the operator's own switch on the
+  # parent records a watcher-guard escape, and each pair still reaches the guard.
+  FM_GUARD_EVENT_LOG="$TMP_ROOT/batch-events.jsonl" \
+    run_ship_spawn nope-batch-c-z3=projects/none-c nope-batch-d-z4=projects/none-d >/dev/null
+  jq -se '([.[] | select(.rule == "FM_SPAWN_NO_GUARD")] | length == 1 and .[0].task == "" and .[0].override == true)
+    and ([.[] | select(.task == "nope-batch-c-z3")] | length > 0)
+    and ([.[] | select(.task == "nope-batch-d-z4")] | length > 0)' "$TMP_ROOT/batch-events.jsonl" >/dev/null \
+    || fail "batch pair re-execs were recorded as operator escapes: $(cat "$TMP_ROOT/batch-events.jsonl" 2>/dev/null)"
+  pass "batch pair re-execs are internal while the operator's switch is still recorded"
 }
 
 # Boundary cases for batch detection. Each row:
@@ -143,8 +153,35 @@ test_scout_batch_refuses_delivery_flags() {
   pass "scout batch refuses ship delivery flags instead of ignoring them"
 }
 
+# A spawn with FM_HOME cleared falls back to the code checkout's own guard log.
+# The shared harness default must keep the suite's bypass rows out of it.
+test_cleared_home_bypass_spares_code_root_log() {
+  local code_log="$ROOT/state/guard-events.jsonl" before after
+  before=$(cksum < "$code_log" 2>/dev/null || printf 'absent')
+  FM_ROOT='' run_spawn nope-batch-log-z13 projects/none-log --mode no-mistakes --yolo off >/dev/null
+  after=$(cksum < "$code_log" 2>/dev/null || printf 'absent')
+  assert_equals "$before" "$after" "a cleared-home spawn wrote to the code checkout's guard log"
+  jq -se 'any(.[]; .task == "nope-batch-log-z13")' "$FM_GUARD_EVENT_LOG" >/dev/null \
+    || fail "the cleared-home spawn was not recorded in the suite's own log: $(cat "$FM_GUARD_EVENT_LOG" 2>/dev/null)"
+  pass "a cleared-home bypass writes the suite's own guard log, not the code checkout's"
+}
+
 test_batch_dispatches_every_pair
 test_batch_mode_boundaries
 test_batch_requires_the_shared_delivery_contract
 test_scout_batch_refuses_delivery_flags
 test_projects_path_scoping
+test_cleared_home_bypass_spares_code_root_log
+
+# The harness default applies only when no log was chosen: an explicit caller
+# value survives sourcing tests/lib.sh and receives the suite's events.
+test_explicit_guard_log_survives_the_harness() {
+  local explicit="$TMP_ROOT/explicit-guard-events.jsonl"
+  FM_GUARD_EVENT_LOG="$explicit" bash -c '. "$1/tests/lib.sh"; "$1/bin/fm-guard-event.sh" gexplicit bypass --task explicit-z14 --override' \
+    _ "$ROOT" || fail "the explicit-log probe failed"
+  jq -se 'length == 1 and .[0].task == "explicit-z14"' "$explicit" >/dev/null \
+    || fail "an explicit FM_GUARD_EVENT_LOG was replaced by the harness default: $(cat "$explicit" 2>/dev/null)"
+  pass "an explicit guard log survives the shared harness default"
+}
+
+test_explicit_guard_log_survives_the_harness

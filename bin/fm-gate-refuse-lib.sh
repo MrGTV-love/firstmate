@@ -59,7 +59,8 @@
 # .no-mistakes/repos/*.git, and possibly NO_MISTAKES_GATE set) - the exact
 # environment this guard refuses. So both signals would fire during firstmate's
 # own validation and break unrelated tests. FM_GATE_REFUSE_BYPASS=1 makes the
-# guard a no-op; firstmate's shared test helpers (tests/lib.sh and the backend
+# guard a no-op and records each activation as a gate-agent-containment bypass
+# event; firstmate's shared test helpers (tests/lib.sh and the backend
 # safety helpers) export it for temp-sandbox fleet tests. The disposable lab
 # primary recipe in .no-mistakes.yaml uses the marked-home allowance instead.
 # This does NOT weaken the boundary against the real hazard: the threat is a
@@ -138,6 +139,7 @@ fm_gate_lab_permitted() {
 fm_is_gate_agent() {
   local anchor=${1:-.} common
   if [ "${FM_GATE_REFUSE_BYPASS:-}" = 1 ]; then
+    fm_gate_refuse_event bypass --rule FM_GATE_REFUSE_BYPASS --override
     return 1
   fi
   if [ "${NO_MISTAKES_GATE+x}" = x ]; then
@@ -162,7 +164,7 @@ fm_is_gate_agent() {
 fm_gate_refuse_event() {
   local dir
   dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd) || return 0
-  "$dir/fm-guard-event.sh" gate-agent-containment deny --source-ok true 2>/dev/null || true
+  "$dir/fm-guard-event.sh" gate-agent-containment "${1:-deny}" --rule gate-context --task "${FM_GATE_EVENT_TASK:-${ID:-${FM_TASK_ID:-}}}" "${@:2}" --source-ok true 2>/dev/null || true
 }
 
 # fm_refuse_if_gate_agent: exit FM_GATE_REFUSE_EXIT with a clear stderr message if
@@ -171,8 +173,12 @@ fm_gate_refuse_event() {
 # session, a permitted lab home, or when firstmate's own test harness sets
 # FM_GATE_REFUSE_BYPASS=1 (see the header).
 fm_refuse_if_gate_agent() {
-  fm_is_gate_agent "${1:-.}" || return 0
+  if ! fm_is_gate_agent "${1:-.}"; then
+    [ "${FM_GATE_REFUSE_BYPASS:-}" = 1 ] || [ -n "${FM_CONTROL_RELAUNCH_TX:-}" ] || fm_gate_refuse_event allow
+    return 0
+  fi
   if fm_gate_lab_permitted; then
+    fm_gate_refuse_event allow --actor gate
     echo "fm-gate-refuse: gate agent lifecycle permitted only against lab home $FM_HOME" >&2
     return 0
   fi
@@ -184,6 +190,6 @@ fm_refuse_if_gate_agent() {
   # shellcheck disable=SC2016 # Print the command for the caller to expand, not this process.
   echo 'error: the one permitted escape is a disposable lab home: run `eval "$(bin/fm-lab-home.sh env)"`, then re-run this call with that FM_HOME' >&2
   echo 'error: a real home is intentionally unavailable to a gate agent, because a gate call against it would mutate the fleet it is reviewing.' >&2
-  fm_gate_refuse_event
+  fm_gate_refuse_event deny --actor gate
   exit "$FM_GATE_REFUSE_EXIT"
 }

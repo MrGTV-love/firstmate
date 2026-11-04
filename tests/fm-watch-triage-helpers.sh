@@ -2371,6 +2371,47 @@ SH
   pass "late signals keep original stale routing and wake once independently, including Main-owned stale rows"
 }
 
+# The arm caller acts on stderr close, so a slow detector must not hold that pipe
+# after the watcher that started it has ended.
+test_guard_workaround_detector_releases_watcher_stderr() {
+  local dir state fakebin real_python pid i
+  dir=$(make_case guard-workaround-stderr); state="$dir/state"; fakebin="$dir/fakebin"
+  real_python=$(command -v python3)
+  cat > "$fakebin/python3" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in
+  */fm-guard-workarounds.py)
+    : > "$dir/detector-started"
+    while [ ! -e "$dir/detector-release" ]; do sleep 0.1; done
+    exit 0
+    ;;
+esac
+exec "$real_python" "\$@"
+SH
+  chmod +x "$fakebin/python3"
+  : > "$state/.last-heartbeat"
+  set_mtime "$(( $(date +%s) - 60 ))" "$state/.last-heartbeat"
+  (
+    watch_bg "$state" "$fakebin" /dev/null env FM_HOME="$dir" FM_HEARTBEAT=1 2>&1 >/dev/null | cat > "$dir/stderr.out"
+    : > "$dir/stderr-closed"
+  ) &
+  i=0
+  while [ ! -e "$dir/detector-started" ]; do
+    i=$((i + 1)); [ "$i" -lt 1200 ] || { : > "$dir/detector-release"; fail "the watcher never started the detector"; }
+    sleep 0.05
+  done
+  pid=$(cat "$state/.watch.lock/pid" 2>/dev/null || true)
+  [ -z "$pid" ] || kill -TERM "$pid" 2>/dev/null || true
+  i=0
+  while [ ! -e "$dir/stderr-closed" ]; do
+    i=$((i + 1)); [ "$i" -lt 600 ] || { : > "$dir/detector-release"; fail "the running detector held the watcher's stderr open after the watcher ended"; }
+    sleep 0.05
+  done
+  : > "$dir/detector-release"
+  wait 2>/dev/null || true
+  pass "a running workaround detector does not hold the watcher's stderr"
+}
+
 test_heartbeat_late_signal_retains_fleet_scope() {
   local dir state fakebin out next_out quiet_out pid id real_touch
   dir=$(make_case heartbeat-late-signal); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"

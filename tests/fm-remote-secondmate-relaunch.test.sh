@@ -751,6 +751,8 @@ rm "$TMP/host-root/bin/fm-control.sh"
 cat > "$TMP/host-root/bin/fm-control.sh" <<'SH'
 #!/usr/bin/env bash
 printf '%s\n' "$@" > "$FM_FAKE_SOURCE_HOME/../host-control.args"
+printf '%s|%s\n' "${FM_SKIP_SECONDMATE_INHERIT-unset}" "${FM_SKIP_SECONDMATE_SYNC-unset}" \
+  > "$FM_FAKE_SOURCE_HOME/../host-control.skips"
 SH
 chmod +x "$TMP/host-root/bin/fm-control.sh"
 reset_meta
@@ -775,6 +777,8 @@ assert_contains "$HOST_ARGS" $'--model\n'"$STALE_PIN" \
   "the host-side fm-control did not receive the requested model"
 assert_grep "model=$STALE_PIN" "$HOME_DIR/state/ios.meta" \
   "the parent record did not pick up the confirmed model"
+[ "$(cat "$TMP/host-control.skips")" = 'internal|internal' ] \
+  || fail "the host-local relaunch did not mark its convergence skips as internal plumbing: $(cat "$TMP/host-control.skips")"
 pass "a captain pin passed to the remote relaunch wrapper reaches the host-side fm-control"
 
 echo "ALL TESTS PASSED"

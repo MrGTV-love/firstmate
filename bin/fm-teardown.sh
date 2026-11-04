@@ -1385,6 +1385,7 @@ if [ "$TEARDOWN_CLEANUP_RECOVERY" != orca ]; then
       exit 1
     fi
     TEARDOWN_BACKLOG_SKIP_REASON=$FM_BACKLOG_TRANSITION_SKIP
+    fm_backlog_transition_skip_event "$ID"
   fi
 fi
 if [ "$TEARDOWN_BACKLOG_APPLIES" = 1 ]; then
@@ -3350,7 +3351,7 @@ validate_worktree_teardown_safety() {
       return "$TEARDOWN_WORKTREE_SAFETY_LOCK_BLOCKED"
     fi
     echo "REFUSED: cannot inspect worktree $WT for uncommitted changes." >&2
-    "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded deny --source-ok true 2>/dev/null || true
+    "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded deny --rule landed-work --task "$ID" --source-ok true 2>/dev/null || true
     echo "Restore the git index state, or get the captain's explicit OK to discard, then --force." >&2
     return 1
   fi
@@ -3362,7 +3363,7 @@ validate_worktree_teardown_safety() {
       return "$TEARDOWN_WORKTREE_SAFETY_LOCK_BLOCKED"
     fi
     echo "REFUSED: cannot inspect worktree $WT for commits not on a remote." >&2
-    "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded deny --source-ok true 2>/dev/null || true
+    "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded deny --rule landed-work --task "$ID" --source-ok true 2>/dev/null || true
     echo "Restore the git index state, or get the captain's explicit OK to discard, then --force." >&2
     return 1
   fi
@@ -3370,7 +3371,7 @@ validate_worktree_teardown_safety() {
 
   if [ -n "$dirty" ]; then
     echo "REFUSED: worktree $WT has uncommitted changes." >&2
-    "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded deny --source-ok true 2>/dev/null || true
+    "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded deny --rule landed-work --task "$ID" --source-ok true 2>/dev/null || true
     report_worktree_dirt "$dirty"
     echo "Commit them (or get the captain's explicit OK to discard, then --force)." >&2
     return 1
@@ -3382,7 +3383,7 @@ validate_worktree_teardown_safety() {
     fi
     if ! work_is_landed "$branch"; then
       echo "REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion." >&2
-    "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded deny --source-ok true 2>/dev/null || true
+    "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded deny --rule landed-work --task "$ID" --source-ok true 2>/dev/null || true
       [ -z "$unpushed" ] || printf 'unpushed commits:\n%s\n' "$unpushed" >&2
       [ -z "$TEARDOWN_UNPROVEN_COMMITS" ] || printf 'commits whose change is not proven present in the merged PR head:\n%s\n' "$TEARDOWN_UNPROVEN_COMMITS" >&2
       [ -z "$TEARDOWN_PIPELINE_INPUT_REASON" ] || printf 'this copy is not proven to be the input of the pipeline run that produced the merged PR head:\n%s\n' "$TEARDOWN_PIPELINE_INPUT_REASON" >&2
@@ -4987,7 +4988,7 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
       teardown_slot=${TEARDOWN_ENCLOSING_SLOT:-$WT}
       branch=$(git -C "$teardown_slot" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)
       teardown_retire_slot_manifest "$teardown_slot" || {
-        "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded deny --source-ok true 2>/dev/null || true
+        "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded deny --rule landed-work --task "$ID" --source-ok true 2>/dev/null || true
         exit 1
       }
       if [ "$branch" != "HEAD" ]; then
@@ -6316,6 +6317,14 @@ if [ -n "$X_REQUEST" ]; then
 fi
 
 require_worktree_teardown_safety
+case "$KIND" in
+  secondmate|scout) ;;
+  *)
+    if [ "$FORCE" = --force ]; then
+      "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded bypass --rule landed-work --task "$ID" --override --cleared-by force 2>/dev/null || true
+    fi
+    ;;
+esac
 
 TEARDOWN_HERDR_SESSION=
 TEARDOWN_HERDR_PANE=
@@ -6608,7 +6617,7 @@ if [ "$BACKEND" = orca ] && [ "$KIND" != secondmate ]; then
   if teardown_owns_worktree && [ -d "$WT" ]; then
     branch=$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)
     teardown_retire_slot_manifest "$WT" || {
-      "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded deny --source-ok true 2>/dev/null || true
+      "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded deny --rule landed-work --task "$ID" --source-ok true 2>/dev/null || true
       exit 1
     }
     if [ "$branch" != "HEAD" ]; then
@@ -6847,6 +6856,10 @@ else
 fi
 fm_lock_release "$META_LOCK"
 META_LOCK_HELD=0
+case "$KIND:$FORCE" in
+  secondmate:*|scout:*|*:--force) ;;
+  *) "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded allow --rule landed-work --task "$ID" 2>/dev/null || true ;;
+esac
 # Opt-in fleet activity ledger (docs/fleet-ledger.md): the item is now Done, so
 # record when it closed and on what evidence. A retained (captain-held) item
 # returned to Queued is not a completion and writes nothing. A close the next
