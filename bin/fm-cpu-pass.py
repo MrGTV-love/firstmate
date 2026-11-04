@@ -104,10 +104,13 @@ Pipeline starts:
     admits a new run once in the route's class (FM_PIPELINE_START_PRIORITY),
     and runs the real client with every such directory removed from PATH. An
     admitted start runs without the directory, so its client is not admitted
-    twice. Limit: an unmodeled wrapper handed the real client's absolute path,
-    or one that resets PATH (sudo, env -i), still starts a run unadmitted, and
-    a start outside both routes is reached by no code here; admission at run
-    creation in the no-mistakes fork is backlog task nm-run-creation-admission.
+    twice. Limit: the requirement that every new run is admitted whatever its
+    formatting is not met here: a second fresh start inside an admitted
+    command, fm-duration.py run under a key outside no-mistakes., an unmodeled
+    wrapper handed the real client's absolute path, one that resets PATH (sudo,
+    env -i), and a start outside both routes still run unadmitted; it is met
+    only when admission at run creation in the no-mistakes fork, backlog task
+    nm-run-creation-admission, lands.
     When the start runs behind another admission
     route (fm-mem-guard.sh run, fm-duration.py run, pipeline-start), the
     admission publishes one single-use grant-*.lock naming its own pid, locked
