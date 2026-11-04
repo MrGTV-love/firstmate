@@ -524,21 +524,26 @@ fm_test_process_alive() {  # <pidfile> <command-needle>
 }
 
 fm_test_reap_processes() {
-  local pidfile needle pid pgid
+  local pidfile needle pid pgid rc=0
   [ -f "$FM_TEST_PROCESS_REGISTRY" ] || return 0
   while IFS=$'\t' read -r pidfile needle; do
     fm_test_process_alive "$pidfile" "$needle" || continue
     pid=$FM_TEST_PROCESS_PID
-    pgid=$(fm_test_process_read pgid "$pid") || return 1
+    pgid=$(fm_test_process_read pgid "$pid") || pgid=
     pgid=${pgid//[[:space:]]/}
     # Only a group the stub leads is its own to take down; a stub that shares
-    # the test's group is signalled alone.
+    # the test's group, or whose group is unknown, is signalled alone.
     if [ -n "$pgid" ] && [ "$pgid" = "$pid" ]; then
       kill -KILL -- "-$pgid" 2>/dev/null || true
     fi
     kill -KILL "$pid" 2>/dev/null || true
+    if [ -z "$pgid" ] && ! fm_test_process_read pgid "$pid" >/dev/null &&
+      fm_test_process_alive "$pidfile" "$needle"; then
+      rc=1
+    fi
   done < "$FM_TEST_PROCESS_REGISTRY"
   rm -f "$FM_TEST_PROCESS_REGISTRY"
+  return "$rc"
 }
 
 # Default ceiling for blocking fixtures that use this exported setting.
@@ -597,7 +602,8 @@ fm_test_cleanup() {
   # check groups that are outside the test shell's job tree.
   fm_test_reap_watchers
   fm_test_reap_jobs
-  fm_test_reap_processes
+  fm_test_reap_processes ||
+    printf 'fm_test_cleanup: a tracked process is still alive with an unknown process group\n' >&2 || true
   fm_test_reap_procevent_homes
   fm_test_reap_fixture_processes
   for d in "${FM_TEST_CLEANUP_DIRS[@]:-}"; do
