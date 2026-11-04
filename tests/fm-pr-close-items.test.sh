@@ -823,10 +823,34 @@ test_the_directive_parser_reads_real_lines_and_ignores_every_example() {
   [ "$out" = shown ] || fail "parser: a comment that opens mid-line and closes in its paragraph did not hide its lines: $(printf '%s' "$out" | tr '\n' ' ')"
   out=$(printf '%s\n' 'Example: <!--' '' 'Closes-backlog-item: after-blank' '-->' | lib_call fm_pr_closes_ids -)
   [ "$out" = after-blank ] || fail "parser: a mid-line <!-- hid lines past a blank line: $(printf '%s' "$out" | tr '\n' ' ')"
-  out=$(printf '%s\n' 'The rule: `<!--` opens one:' '```' '<!-- example' '-->' '```' 'Closes-backlog-item: after-fence' | lib_call fm_pr_closes_ids -)
+  out=$(printf '%s\n' 'The rule: <!-- opens one:' '```' '<!-- example' '-->' '```' 'Closes-backlog-item: after-fence' | lib_call fm_pr_closes_ids -)
   [ "$out" = after-fence ] || fail "parser: a mid-line <!-- reached through a fence and lost the directive after it: $(printf '%s' "$out" | tr '\n' ' ')"
-  out=$(printf '%s\n' 'Summary: an unclosed `<!--` mention.' 'Closes-backlog-item: before-block' '<!-- attestation -->' 'Closes-backlog-item: after-block' | lib_call fm_pr_closes_ids -)
+  out=$(printf '%s\n' 'Summary: an unclosed <!-- mention.' 'Closes-backlog-item: before-block' '<!-- attestation -->' 'Closes-backlog-item: after-block' | lib_call fm_pr_closes_ids -)
   [ "$out" = "$(printf '%s\n' before-block after-block)" ] || fail "parser: a mid-line <!-- reached into a comment block and lost a directive: $(printf '%s' "$out" | tr '\n' ' ')"
+  out=$(printf '%s\n' 'The rule: a line with `<!--`' 'Closes-backlog-item: span-a' 'ends at `-->`.' \
+    '- quote: `<!--`' 'Closes-backlog-item: span-b' '- and `-->`' | lib_call fm_pr_closes_ids -)
+  [ "$out" = "$(printf '%s\n' span-a span-b)" ] || fail "parser: a <!-- inside a code span hid the directive below it: $(printf '%s' "$out" | tr '\n' ' ')"
+  out=$(printf '%s\n' 'Intro <!-- start' '## Backlog' 'Closes-backlog-item: after-heading' 'end -->' \
+    'Intro <!-- a' '> quote' 'Closes-backlog-item: after-quote' '-->' 'Intro <!-- a' '- item' 'Closes-backlog-item: after-item' '-->' \
+    'Intro <!-- a' '***' 'Closes-backlog-item: after-break' '-->' | lib_call fm_pr_closes_ids -)
+  [ "$out" = "$(printf '%s\n' after-heading after-quote after-item after-break)" ] \
+    || fail "parser: a mid-line <!-- reached past a heading, quote, list item or thematic break: $(printf '%s' "$out" | tr '\n' ' ')"
+  out=$(printf '%s\n' 'Intro <!-- start' '## Backlog' 'Closes-backlog-item: fm-c x' 'end -->' | lib_call fm_pr_closes_malformed -)
+  [ "$out" = 'Closes-backlog-item: fm-c x' ] || fail "parser: a malformed directive after a heading that ends the paragraph was hidden: $out"
+  out=$(printf '%s\n' '<!-->' 'Closes-backlog-item: after-empty' '<!--->' 'Closes-backlog-item: after-dash' 'a <!--> b' 'Closes-backlog-item: after-inline' \
+    | lib_call fm_pr_closes_ids -)
+  [ "$out" = "$(printf '%s\n' after-empty after-dash after-inline)" ] || fail "parser: an empty comment did not close on its own line: $(printf '%s' "$out" | tr '\n' ' ')"
+  out=$(printf '%s\n' 'Fixes it. <!-- see fm-hidden and https://github.com/o/r/pull/12 -->' > "$TMP_ROOT/comment-prose.md"; \
+    lib_call fm_pr_closes_prose_words "$TMP_ROOT/comment-prose.md"; lib_call fm_pr_closes_prose_prs "$TMP_ROOT/comment-prose.md")
+  [ "$(printf '%s\n' "$out" | grep -c 'fm-hidden\|pull/12')" = 0 ] || fail "parser: the text of a same-line comment was read as prose: $(printf '%s' "$out" | tr '\n' ' ')"
+  out=$(printf '%s\n' 'Note <!-- x-hidden' 'Text --> see fm-after here' | lib_call fm_pr_closes_prose_words -)
+  printf '%s\n' "$out" | grep -Fxq fm-after || fail "parser: the text after a comment's --> was not read as prose"
+  ! printf '%s\n' "$out" | grep -Fxq x-hidden || fail "parser: the text inside a multi-line comment was read as prose"
+  out=$(printf '%s\n' '<!-- note --> see fm-y' '<!-- multi fm-in-block' 'end --> see fm-z' | lib_call fm_pr_closes_prose_words -)
+  for want in fm-y fm-z; do
+    printf '%s\n' "$out" | grep -Fxq "$want" || fail "parser: the text after a comment block's --> lost $want"
+  done
+  ! printf '%s\n' "$out" | grep -Fxq fm-in-block || fail "parser: the text inside a comment block was read as prose"
   out=$(printf '%s\n' 'This fixes _fm-c_ and __fm-d__, also _fm-e_. and foo_ too.' | lib_call fm_pr_closes_prose_words -)
   for want in fm-c fm-d fm-e foo_; do
     printf '%s\n' "$out" | grep -Fxq -- "$want" || fail "parser: prose words lost $want from an emphasis pair or its own spelling"
@@ -1291,6 +1315,20 @@ test_a_mention_keeps_the_ids_own_spelling() {
   pass "F3: a mention keeps the id's own spelling, trailing underscore and hyphen included, and is reported once"
 }
 
+# Review R11-2: text inside an HTML comment is no mention; the text after its --> is.
+test_a_mention_inside_a_comment_is_not_reported_and_one_after_it_is() {
+  local case_dir
+  case_dir=$(gh_case c1-comment-prose 98)
+  cx_add "$case_dir" review-hidden
+  cx_add "$case_dir" review-after
+  printf '%s\n' "Fixes it. <!-- see review-hidden and $REPO_URL/12 -->" 'Note <!-- also review-hidden' 'Text --> see review-after here' > "$case_dir/bodies/98"
+  gh_merge "$case_dir" 98
+  assert_no_grep 'mentioned review-hidden' "$case_dir/stderr" "r11-2: an id inside a comment was reported as a mention"
+  assert_no_grep "mentioned $REPO_URL/12" "$case_dir/stderr" "r11-2: a link inside a comment was reported as a mention"
+  assert_match '^actionable: close-at-merge: mentioned review-after in the prose of ' "$case_dir/stderr" "r11-2: an id after a comment's --> was missed"
+  pass "a mention inside an HTML comment is not reported, and one after the comment's --> is"
+}
+
 # Contract C2: one member supplying both its own directive and a distinct task whose pr=
 # is that same member, and two listed members that share a number in different repositories.
 test_a_member_with_both_sources_and_two_listed_members_with_one_number() {
@@ -1465,6 +1503,7 @@ test_a_merge_with_an_unlistable_backlog_says_so_once_per_body_with_prose
 test_an_html_comment_example_closes_nothing_and_keeps_its_edge
 test_a_train_members_prose_only_mention_is_reported_and_never_closed
 test_a_mention_keeps_the_ids_own_spelling
+test_a_mention_inside_a_comment_is_not_reported_and_one_after_it_is
 test_a_member_with_both_sources_and_two_listed_members_with_one_number
 test_the_directive_parser_reads_real_lines_and_ignores_every_example
 test_a_gitlab_merge_reports_the_completion_paths_actual_result

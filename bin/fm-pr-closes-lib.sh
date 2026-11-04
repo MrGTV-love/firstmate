@@ -31,14 +31,15 @@
 #   Pipeline bodies quote text they do not own, so quoted examples stay examples.
 # - An HTML comment is an example too, read as CommonMark reads it. A line that starts with
 #   `<!--` after at most three spaces opens a comment block: that line through the first
-#   line that holds `-->` (the same line when `-->` follows the opener) is skipped, and a
-#   block that never closes runs to the end of the body. The pipeline's own attestation
-#   comment is one such line and hides nothing. A `<!--` later in a line is kept with its
-#   line; when it does not close on that line, the lines after it through the first line
-#   that holds `-->` are skipped, but only when that `-->` comes in the same paragraph (before
-#   the next blank line, fence line or line that opens a comment block); otherwise the `<!--`
-#   is plain text and hides nothing.
-#   So a directive line with a trailing comment is still reported as malformed.
+#   line that holds `-->` (the same line when `-->` follows the `<!`, so `<!-->` and
+#   `<!--->` close at once) is skipped, and a block that never closes runs to the end of the
+#   body. The pipeline's own attestation comment is one such line and hides nothing. A
+#   `<!--` later in a line, outside a backtick code span, is kept with its line; when it does
+#   not close on that line, the lines after it through the first line that holds `-->` are
+#   skipped, but only when that `-->` comes in the same paragraph, before the next blank
+#   line, fence line, comment-block line, ATX heading, `>` quote, list item or thematic
+#   break; otherwise the `<!--` is plain text and hides nothing. So a directive line with a
+#   trailing comment is still reported as malformed.
 # - A trailing carriage return is ignored, because GitHub bodies often use CRLF.
 # - Nothing else is read as a name: no table, heading, bullet, link or sentence ever
 #   closes an item or makes a member.
@@ -46,9 +47,10 @@
 #   as is a column-0 line that starts with a directive word but does not fit its form
 #   (fm_pr_closes_malformed), so a misspelled block is never silent.
 #
-# Prose. The rest of the body (fm_pr_closes_prose) is every line not skipped above that does
-# not start at column 0 with a directive word or the old `Closes:`, so a malformed directive
-# line is reported as malformed, never as prose. bin/fm-pr-close-items.sh reads its words and
+# Prose. The rest of the body (fm_pr_closes_prose) is the text a reader sees on every line not
+# skipped above (the text inside a comment left out, the text after a comment's `-->` kept)
+# that does not start at column 0 with a directive word or the old `Closes:`, so a malformed
+# directive line is reported as malformed, never as prose. bin/fm-pr-close-items.sh reads its words and
 # its pull request links only to report that something was mentioned and closed nothing.
 #
 # Every reader takes a body file path (or `-` for standard input) and prints one value per
@@ -56,12 +58,64 @@
 
 FM_PR_CLOSES_ID_RE='[A-Za-z0-9._-]+'
 
-fm_pr_closes_unfenced() {  # <body-file|->
-  local line in_fence=0 in_comment=0 char='' len=0 run i=0 j count=0
+# fm_pr_closes_inline <text>: read one line's inline code spans and HTML comments left to
+# right. FM_PR_CLOSES_VIS is the text with each comment replaced by a space. When a `<!--`
+# outside a code span does not close on the line, FM_PR_CLOSES_OPEN is 1 and
+# FM_PR_CLOSES_HEAD is the text before it (FM_PR_CLOSES_VIS then keeps it as plain text).
+fm_pr_closes_inline() {
+  local rest=$1 out='' pre_t pre_c run s pre r found tick='`'
+  FM_PR_CLOSES_OPEN=0
+  FM_PR_CLOSES_HEAD=
+  while :; do
+    pre_t=${rest%%"$tick"*}
+    pre_c=${rest%%'<!--'*}
+    if [ "${#pre_t}" -lt "${#pre_c}" ]; then
+      out=$out$pre_t
+      rest=${rest:${#pre_t}}
+      run=${rest%%[!\`]*}
+      s=${rest:${#run}}
+      found=$run
+      while [[ "$s" == *"$tick"* ]]; do
+        pre=${s%%"$tick"*}
+        s=${s:${#pre}}
+        r=${s%%[!\`]*}
+        s=${s:${#r}}
+        found=$found$pre$r
+        if [ "${#r}" = "${#run}" ]; then
+          out=$out$found
+          rest=$s
+          found=
+          break
+        fi
+      done
+      if [ -n "$found" ]; then
+        out=$out$run
+        rest=${rest:${#run}}
+      fi
+    elif [ "${#pre_c}" -lt "${#rest}" ]; then
+      out=$out$pre_c
+      rest=${rest:$((${#pre_c} + 2))}
+      case "$rest" in
+        *'-->'*) out="$out "; rest=${rest#*'-->'} ;;
+        *) FM_PR_CLOSES_OPEN=1; FM_PR_CLOSES_HEAD=$out; out="$out<!$rest"; break ;;
+      esac
+    else
+      out=$out$rest
+      break
+    fi
+  done
+  FM_PR_CLOSES_VIS=$out
+}
+
+# fm_pr_closes_unfenced <body-file|-> [prose]: every line outside a fence and an HTML comment.
+# With `prose`, only the text a reader sees: comment text is left out and the text after any
+# comment's `-->` on its closing line is kept, on a line of its own after a space.
+fm_pr_closes_unfenced() {
+  local mode=${2:-lines} line seg in_fence=0 in_comment=0 char='' len=0 run i=0 j k count=0
   local open_re='^[ ]{0,3}(`{3,}|~{3,})(.*)$'
   local close_re='^[ ]{0,3}(`{3,}|~{3,})[[:space:]]*$'
   local block_re='^[ ]{0,3}<!--'
-  local blank_re='^[[:space:]]*$'
+  local stop_re='^[[:space:]]*$|^[ ]{0,3}(#{1,6}([[:space:]]|$)|>|[-+*]([[:space:]]|$)|[0-9]{1,9}[.)]([[:space:]]|$)|(\*[[:space:]]*){3,}$|(-[[:space:]]*){3,}$|(_[[:space:]]*){3,}$|<!--|`{3,}|~{3,})'
   local lines=()
   while IFS= read -r line || [ -n "$line" ]; do
     lines[count]=${line%$'\r'}
@@ -78,7 +132,11 @@ fm_pr_closes_unfenced() {  # <body-file|->
       continue
     fi
     if [ "$in_comment" = 1 ]; then
-      case "$line" in *'-->'*) in_comment=0 ;; esac
+      case "$line" in
+        *'-->'*)
+          in_comment=0
+          if [ "$mode" = prose ]; then fm_pr_closes_inline " ${line#*'-->'}"; printf '%s\n' "$FM_PR_CLOSES_VIS"; fi ;;
+      esac
       continue
     fi
     if [[ "$line" =~ $open_re ]]; then
@@ -92,19 +150,34 @@ fm_pr_closes_unfenced() {  # <body-file|->
       fi
     fi
     if [[ "$line" =~ $block_re ]]; then
-      case "${line#*'<!--'}" in *'-->'*) ;; *) in_comment=1 ;; esac
+      seg=${line#*'<!'}
+      case "$seg" in
+        *'-->'*) if [ "$mode" = prose ]; then fm_pr_closes_inline " ${seg#*'-->'}"; printf '%s\n' "$FM_PR_CLOSES_VIS"; fi ;;
+        *) in_comment=1 ;;
+      esac
       continue
     fi
-    printf '%s\n' "$line"
-    case "$line" in
-      *'<!--'*)
-        case "${line##*'<!--'}" in *'-->'*) continue ;; esac
-        j=$i
-        while [ "$j" -lt "$count" ] && ! [[ "${lines[j]}" =~ $blank_re ]] && ! [[ "${lines[j]}" =~ $open_re ]] && ! [[ "${lines[j]}" =~ $block_re ]]; do
-          case "${lines[j]}" in *'-->'*) i=$((j + 1)); break ;; esac
-          j=$((j + 1))
-        done ;;
-    esac
+    case "$line" in *'<!--'*) ;; *) printf '%s\n' "$line"; continue ;; esac
+    [ "$mode" = prose ] || printf '%s\n' "$line"
+    seg=$line
+    while :; do
+      fm_pr_closes_inline "$seg"
+      j=-1
+      if [ "$FM_PR_CLOSES_OPEN" = 1 ]; then
+        k=$i
+        while [ "$k" -lt "$count" ] && ! [[ "${lines[k]}" =~ $stop_re ]]; do
+          case "${lines[k]}" in *'-->'*) j=$k; break ;; esac
+          k=$((k + 1))
+        done
+      fi
+      if [ "$j" -lt 0 ]; then
+        [ "$mode" != prose ] || printf '%s\n' "$FM_PR_CLOSES_VIS"
+        break
+      fi
+      [ "$mode" != prose ] || printf '%s\n' "$FM_PR_CLOSES_HEAD"
+      i=$((j + 1))
+      seg=" ${lines[j]#*'-->'}"
+    done
   done
 }
 
@@ -166,7 +239,7 @@ fm_pr_closes_prose() {  # <body-file|->
   local directive_re='^(Closes-backlog-item|Train-member|Closes):'
   while IFS= read -r line; do
     [[ "$line" =~ $directive_re ]] || printf '%s\n' "$line"
-  done < <(fm_pr_closes_unfenced "${1:--}")
+  done < <(fm_pr_closes_unfenced "${1:--}" prose)
 }
 
 # The distinct words of the prose, as item-id candidates. A word keeps every character a
