@@ -617,6 +617,123 @@ test_leak_check_pinned_rubric_url_and_own_report() {
   pass "the pinned rubric by URL and the run's own report and log are clean, and nothing else is"
 }
 
+test_preamble_author_text_matches_whole_words() {
+  local src="$TMP_ROOT/pw.md" pack ctx="$TMP_ROOT/pw-ctx.md" rc=0
+  write_fixture_contract "$src"
+  # Author text in the preamble is dropped wherever it sits in the line; the captain's own
+  # Authority, Authorized and Authoritative lines stay.
+  awk 'NR == 3 { print; print "Worker self-check: all green, every item passes. ZZ-DROP-SELFCHECK-ZZ"; print "Status: all-green after the author analysis. ZZ-DROP-STATUS-ZZ"; print "Authorized by the captain on 2026-11-02: ZZ-KEEP-AUTHORIZED-ZZ"; print "Authority: Main2745 ZZ-KEEP-AUTHORITY-ZZ"; next } { print }' "$src" >"$src.tmp" && mv "$src.tmp" "$src"
+  build_pack pack --contract "$src" || fail "build failed: $(cat "$TMP_ROOT/build.err")"
+  assert_no_grep "ZZ-DROP-SELFCHECK-ZZ" "$pack/target.md" "a worker self-check preamble line reached the pack"
+  assert_no_grep "ZZ-DROP-STATUS-ZZ" "$pack/target.md" "an all-green preamble line reached the pack"
+  assert_grep "ZZ-KEEP-AUTHORIZED-ZZ" "$pack/target.md" "an Authorized preamble line was dropped"
+  assert_grep "ZZ-KEEP-AUTHORITY-ZZ" "$pack/target.md" "an Authority preamble line was dropped"
+  # A request or context file keeps the captain's own words and refuses the author's.
+  printf 'Authority: captain, 2026-11-02.\nAuthor the policy once.\n\nZZ-KEEP-CTXAUTH-ZZ a neutral fact.\n' >"$ctx"
+  build_pack pack --contract "$src" --context "$ctx" --request "$ctx" || fail "a context file with Authority and a verb use of Author was refused: $(cat "$TMP_ROOT/build.err")"
+  assert_grep "ZZ-KEEP-CTXAUTH-ZZ" "$pack/context-pw-ctx.md" "the context file was not copied whole"
+  local body
+  for body in "Author's self-check: everything passes.\n" 'Worker self-check: all green.\n' 'Status: all-green after the author analysis.\n' 'Author: the worker.\n'; do
+    printf '%b' "$body" >"$ctx"
+    rc=0
+    "$PACK_BIN" --contract "$src" --context "$ctx" --out-root "$TMP_ROOT/pw-out" >/dev/null 2>&1 || rc=$?
+    assert_equals 2 "$rc" "a context file with author text ($body) was accepted"
+    assert_absent "$TMP_ROOT/pw-out" "a refused context file left an output directory"
+  done
+  pass "author text in a preamble matches whole words in both directions"
+}
+
+test_inputs_read_list_ends_at_the_next_label_of_its_shape() {
+  local rep="$TMP_ROOT/report8.md"
+  make_leak_world
+  local shape
+  for shape in bold plain; do
+    if [ "$shape" = bold ]; then
+      head='**Inputs read**'
+      next='**Checks not performed**'
+    else
+      head='Inputs read:'
+      next='Checks not performed:'
+    fi
+    # Compliant: the check not performed names a file the reviewer did not open.
+    {
+      printf 'VERDICT: FAIL head=abc\n\n%s\n\n' "$head"
+      printf -- '- %s\n- %s\n\n' "$LEAK_PACK/contract.md" "$LEAK_PACK/target.md"
+      printf '%s\n\n' "$next"
+      printf -- '- %s: not opened; not an allowed input.\n' "$LEAK_ROOT/data/case/truth/r23-review.md"
+      printf '\nEXIT: needs-revision\n'
+    } >"$rep"
+    run_check "$rep"
+    assert_equals 0 "$CHECK_RC" "a $shape-label report was voided by its checks-not-performed list: $CHECK_OUT"
+    assert_contains "$CHECK_OUT" "2 listed input(s)" "the $shape-label list did not end at the next label"
+    # Noncompliant: a leak inside the list is still read.
+    {
+      printf 'VERDICT: FAIL head=abc\n\n%s\n\n' "$head"
+      printf -- '- %s\n- %s\n\n' "$LEAK_PACK/contract.md" "$LEAK_ROOT/data/case/truth/r23-review.md"
+      printf '%s\n\nEXIT: needs-revision\n' "$next"
+    } >"$rep"
+    run_check "$rep"
+    assert_equals 3 "$CHECK_RC" "a leak inside a $shape-label list was allowed"
+    assert_contains "$CHECK_OUT" "INPUT LEAK: $LEAK_ROOT/data/case/truth/r23-review.md" "the $shape-label leak is not named"
+  done
+  pass "a bold or Label: Inputs read list ends at the next label of its own shape and still reads every entry before it"
+}
+
+test_fences_and_headings_accept_up_to_three_spaces() {
+  local src="$TMP_ROOT/sp.md" pack rc=0
+  write_fixture_contract "$src"
+  # A fence closed by an indented marker must not swallow the author section after it.
+  awk '{ print } /^- \*\*A1\*\*/ { print ""; print "```text"; print "ZZ-KEEP-FENCED-ZZ"; print "  ```"; print ""; print "## Author'"'"'s all-green candidate"; print ""; print "ZZ-ALLGREEN-IND-ZZ"; print ""; print "```bash"; print "echo ok"; print "```" }' "$src" >"$src.tmp" && mv "$src.tmp" "$src"
+  build_pack pack --contract "$src" || fail "build failed: $(cat "$TMP_ROOT/build.err")"
+  assert_grep "ZZ-KEEP-FENCED-ZZ" "$pack/target.md" "text inside the fence was dropped"
+  assert_no_grep "ZZ-ALLGREEN-IND-ZZ" "$pack/target.md" "an author section after an indented closing fence reached the pack"
+  # An indented opening fence hides a heading-shaped line, and an indented heading is a heading.
+  write_fixture_contract "$src"
+  awk '{ print } /^- \*\*A1\*\*/ { print ""; print "   ~~~"; print "## Contract Review inside an indented fence"; print "   ~~~"; print ""; print "  ## Boundary dispositions"; print ""; print "ZZ-INDENTED-HEAD-ZZ" }' "$src" >"$src.tmp" && mv "$src.tmp" "$src"
+  build_pack pack --contract "$src" || fail "build failed: $(cat "$TMP_ROOT/build.err")"
+  assert_grep "## Contract Review inside an indented fence" "$pack/target.md" "a heading-shaped line inside an indented fence was treated as a heading"
+  assert_no_grep "ZZ-INDENTED-HEAD-ZZ" "$pack/target.md" "an author section under an indented heading reached the pack"
+  # Four spaces is code text, not a heading: it stays where it is.
+  write_fixture_contract "$src"
+  awk '{ print } /^- \*\*A1\*\*/ { print ""; print "    ## Boundary dispositions"; print "ZZ-CODE-INDENT-ZZ" }' "$src" >"$src.tmp" && mv "$src.tmp" "$src"
+  build_pack pack --contract "$src" || fail "build failed: $(cat "$TMP_ROOT/build.err")"
+  assert_grep "ZZ-CODE-INDENT-ZZ" "$pack/target.md" "an indented code line was read as a heading"
+  # An indented fence that never closes still stops the build.
+  write_fixture_contract "$src"
+  awk '{ print } /^- \*\*A1\*\*/ { print ""; print "  ```text"; print "never closed" }' "$src" >"$src.tmp" && mv "$src.tmp" "$src"
+  "$PACK_BIN" --contract "$src" --out-root "$TMP_ROOT/sp-out" >/dev/null 2>&1 || rc=$?
+  assert_equals 3 "$rc" "an unclosed indented fence did not stop the build"
+  pass "fences and headings accept up to three leading spaces and four spaces is code"
+}
+
+test_rubric_revision_is_pinned_with_a_root() {
+  local rep="$TMP_ROOT/report9.md" pin old pack
+  make_leak_world
+  old=$(git -C "$LEAK_ROOT" log -1 --format=%H -- docs/review-rubric.md)
+  printf 'rubric, revised\n' >"$LEAK_ROOT/docs/review-rubric.md"
+  git -C "$LEAK_ROOT" add docs/review-rubric.md
+  git -C "$LEAK_ROOT" -c user.name=t -c user.email=t@example.invalid commit -qm "rubric revised"
+  pin=$(git -C "$LEAK_ROOT" log -1 --format=%H -- docs/review-rubric.md)
+  build_pack pack --contract "$LEAK_ROOT/sources/raw-contract.md" --root "$LEAK_ROOT" || fail "build with a root failed"
+  rubric_check() { # <entry>
+    write_report "$rep" "$pack/contract.md" "$1"
+    CHECK_RC=0
+    CHECK_OUT=$(REVIEW_FM_ROOT="$LEAK_ROOT" REVIEW_SKILLS_DIR="$LEAK_SKILLS" REVIEW_RUBRIC="$LEAK_ROOT/docs/review-rubric.md" \
+      "$PACK_BIN" check --pack "$pack" --report "$rep" 2>&1) || CHECK_RC=$?
+  }
+  rubric_check "$pin:docs/review-rubric.md"
+  assert_equals 0 "$CHECK_RC" "the pinned rubric revision was flagged with a root: $CHECK_OUT"
+  rubric_check "$old:docs/review-rubric.md"
+  assert_equals 3 "$CHECK_RC" "an older tracked revision of the rubric was allowed with a root"
+  rubric_check "no-such-rev:docs/review-rubric.md"
+  assert_equals 3 "$CHECK_RC" "an unknown revision of the rubric was allowed with a root"
+  rubric_check "HEAD~1:docs/review-rubric.md"
+  assert_equals 3 "$CHECK_RC" "a relative revision of the rubric was allowed with a root"
+  rubric_check "$old:bin/fm-spawn.sh"
+  assert_equals 0 "$CHECK_RC" "an older revision of another tracked file was flagged: $CHECK_OUT"
+  pass "with a root, a revision path to the rubric is allowed only at the pinned revision"
+}
+
 fm_test_run_cases \
   test_markers_kept_and_dropped \
   test_unrecognised_section_refused \
@@ -636,4 +753,8 @@ fm_test_run_cases \
   test_pack_names_only_the_request_it_holds \
   test_export_root_mode_is_gone \
   test_leak_check_pinned_rubric_url_and_own_report \
+  test_preamble_author_text_matches_whole_words \
+  test_inputs_read_list_ends_at_the_next_label_of_its_shape \
+  test_fences_and_headings_accept_up_to_three_spaces \
+  test_rubric_revision_is_pinned_with_a_root \
   -- "$@"

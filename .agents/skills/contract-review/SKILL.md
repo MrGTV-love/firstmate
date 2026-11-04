@@ -207,10 +207,14 @@ No round number, finding count, word count or timer decides any exit.
    - `conflicting`: two binding requirements, each from the request, a ruling, the brief or a governing constraint, call for incompatible results, repairing a finding would break one of them, and nothing in the record as it stood at the end of the round says which governs.
      A settlement made after the round does not change that round's exit.
    - `pass`: the review is complete, no substantiated finding remains, and the register supports closure of the earlier ones.
-   - `needs-revision`: substantiated findings remain and the round has progress, or no substantiated finding remains and the review is incomplete.
+   - `stalled`, reason "needed input not allowed": no substantiated finding remains, the review is incomplete, and a check it did not perform needs an input that is not an allowed input (an excluded path, a gitignored file, a report, or anything else outside the allowed inputs).
+     A fresh review would list the same check again, so no progress is possible without a change.
+   - `needs-revision`: substantiated findings remain and the round has progress, or no substantiated finding remains and the review is incomplete because of an input that is allowed but was not supplied.
    - `stalled`: substantiated findings remain, and the round has no progress.
 
-A round with progress is never `stalled`, whatever else it found.
+A round with progress is never `stalled`, whatever else it found, except for the "needed input not allowed" reason above, which progress does not change.
+When a round holds substantiated findings and also a check that needs an input that is not allowed, the exit follows the findings; the author repairs the findings and sends the not-allowed check to Main in the same report.
+The reviewer reports such an incomplete round as `EXIT: needs-revision` and never reports `stalled`; the reconcile step in item 1 sets the exit to `stalled`.
 A round recorded before this policy existed is decided on its content, and any leak it contained is recorded as its cause.
 The reviewer reports `pass`, `needs-revision` or `conflicting`.
 The author or Main decides `stalled` from the register.
@@ -222,9 +226,11 @@ This skill sets no budget or limit of its own.
 
 - `pass`: approve and hand off.
 - `needs-revision`: disposition each finding, repair each material one the smallest way that works, try each repair on a compliant and a noncompliant case, and run a fresh clean review on a fresh pack.
-  When the review was incomplete, supply the named input and run a fresh review.
+  When the review was incomplete because of an allowed input that was not supplied, supply the named input and run a fresh review.
 - `stalled`: change the approach and make no further patch of the same kind.
   Report to Main in one message the competing readings and the texts in dispute, and ask one ruling for each dispute.
+  When the reason is "needed input not allowed", Main allows the input, or the author changes the criterion's evidence form to one the allowed inputs can show; a fresh review follows either.
+  Never run another `needs-revision` loop on the same missing input.
 - `conflicting`: stop.
   Cite both binding requirements, report to Main for the decision, and do not repair or start another round.
 

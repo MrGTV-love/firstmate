@@ -42,8 +42,9 @@
 # check: reads the report's `Inputs read` list and, when given, the run log, and
 #   prints INPUT LEAK lines plus ROUND VOID (exit 3) when the list is missing or a
 #   listed path is not an authorized input; prints INPUT CLEAN (exit 0) otherwise.
-#   The list runs to the next heading of its own level or higher; a line in it that
-#   does not start with a path is skipped.
+#   The list runs to the next heading of its own level or higher; a list with no heading
+#   of its own (a bold or `Label:` line) runs to the next line of that same label shape.
+#   A line in it that does not start with a path is skipped.
 #   An authorized input is judged by what it is: a file inside the pack, the
 #   SKILL.md of the assess-done-and-grade or define-done-and-grading skill (no other
 #   file in either skill folder), the review rubric, or a file the manifest's root tracks (git ls-files, or
@@ -126,20 +127,22 @@ END {
   mode = "keep"; parent = "keep"; ptitle = "preamble"; seen_heading = 0; fence = 0; pre = 1
   for (i = 1; i <= N; i++) {
     line = L[i]
+    match(line, /^ ? ? ?/)
+    rest = substr(line, RLENGTH + 1)
     infence = fence
     if (fence) {
-      n = runlen(line, fch)
-      if (n >= flen && substr(line, n + 1) ~ /^[ \t]*$/) fence = 0
-    } else if (line ~ /^```/ || line ~ /^~~~/) {
-      fch = substr(line, 1, 1); flen = runlen(line, fch); fence = 1; fline = i
+      n = runlen(rest, fch)
+      if (n >= flen && substr(rest, n + 1) ~ /^[ \t]*$/) fence = 0
+    } else if (rest ~ /^```/ || rest ~ /^~~~/) {
+      fch = substr(rest, 1, 1); flen = runlen(rest, fch); fence = 1; fline = i
     }
     body = infence || fence
     level = 0; title = ""; ul = ""
     if (!body) {
-      if (line ~ /^####+[ \t]/) level = 4
-      else if (line ~ /^### /) { level = 3; title = substr(line, 5) }
-      else if (line ~ /^## /) { level = 2; title = substr(line, 4) }
-      else if (line ~ /^# /) { level = 1; title = substr(line, 3) }
+      if (rest ~ /^####+[ \t]/) level = 4
+      else if (rest ~ /^### /) { level = 3; title = substr(rest, 5) }
+      else if (rest ~ /^## /) { level = 2; title = substr(rest, 4) }
+      else if (rest ~ /^# /) { level = 1; title = substr(rest, 3) }
       else if (i < N && L[i + 1] ~ /^ ? ? ?(=+|-+)[ \t]*$/ && line !~ /^[ \t]*$/ && line !~ /^(    |\t)/ &&
         line !~ /^[ \t]*([-*+>|]|[0-9]+[.)])([ \t]|$)/) {
         ul = L[++i]
@@ -191,15 +194,21 @@ END {
 
 SECTION_KEEP="request|context|captain's intent|captain intent|rulings|terms|amendment|definition of done|how you're graded|how you are graded|assumptions|decisive scenario|out of scope|known limits|hard gates|execution constraints|honesty rule|supporting"
 SECTION_DROP="author self-check|author's all-green|author all-green|all-green|author's|author notes|boundary dispositions|contract review|review history|revision log|revision history|self-check|prior findings|prior review|responses|response to|suggested attack|open findings|finding register|register"
-PREAMBLE_DROP='^[^a-z0-9]*(author|contract review|all-green|self-check|review exit|prior finding|revision log)|reviewed:'
+# A preamble line that holds author text. Whole words only, so Authority, Authorized and
+# Authoritative stay. The contract drops such a line wherever the word sits in it. A request
+# or context file is refused for the narrower author shapes, so the captain's own words
+# ("Author the policy once.") are not refused.
+PREAMBLE_DROP='(^|[^a-z0-9])(authors?|contract review|all-green|self-check|review exit|prior findings?|revision log)([^a-z0-9]|$)|reviewed:'
+PREAMBLE_REFUSE='(^|[^a-z0-9])(authors?([^a-z0-9]s)?[ ]*(self-check|all-green|analysis|notes|candidate|disposition|finding|response|:)|contract review|all-green|self-check|review exit|prior findings?|revision log)([^a-z0-9]|$)|reviewed:'
 
-filter_sections() { # <in> <keep-out> <dropped-out> <unknown-out> <unrecognised-out>
+filter_sections() { # <in> <keep-out> <dropped-out> <unknown-out> <unrecognised-out> [preamble-pattern]
+  local pre=${6:-$PREAMBLE_DROP}
   : >"$2"
   : >"$3"
   : >"$4"
   : >"$5"
   awk -v SRC="$1" -v KEEP_OUT="$2" -v DROPPED_OUT="$3" -v UNKNOWN_OUT="$4" -v UNREC_OUT="$5" \
-    -v KEEP="$SECTION_KEEP" -v DROP="$SECTION_DROP" -v PREAMBLE_DROP="$PREAMBLE_DROP" \
+    -v KEEP="$SECTION_KEEP" -v DROP="$SECTION_DROP" -v PREAMBLE_DROP="$pre" \
     "$SECTION_AWK" <"$1"
 }
 
@@ -260,7 +269,7 @@ cmd_build() {
   grep -qi '^#\{1,3\} definition of done' "$scratch/keep" || die "contract has no Definition Of Done section: $contract"
 
   for f in ${request:+"$request"} ${contexts[@]+"${contexts[@]}"}; do
-    filter_sections "$f" "$scratch/ctx.keep" "$scratch/ctx.dropped" "$scratch/ctx.unknown" "$scratch/ctx.unrec" || exit 3
+    filter_sections "$f" "$scratch/ctx.keep" "$scratch/ctx.dropped" "$scratch/ctx.unknown" "$scratch/ctx.unrec" "$PREAMBLE_REFUSE" || exit 3
     [ ! -s "$scratch/ctx.dropped" ] || die "request or context file holds author text the builder would drop ($(head -1 "$scratch/ctx.dropped")): $f"
   done
 
@@ -362,9 +371,17 @@ inputs_read() { # <report>
       while (substr(s, n + 1, 1) == "#") n++
       return n
     }
-    state == 0 && tolower($0) ~ /^[#*[:space:]-]*([0-9]+[.)][[:space:]]*)?inputs read[*[:space:]]*(\([^)]*\))?[*:[:space:]]*$/ { start = hlevel($0); state = 1; next }
+    # The label shape of a list that has no heading of its own: 1 is a bold line, 2 is a
+    # `Label:` field line. The list ends at the next line of that same shape.
+    function shape_of(s) { return (s ~ /[*][*]/) ? 1 : 2 }
+    function same_shape(s) {
+      if (shape == 1) return s ~ /^[ \t]*[*][*][^*]+[*][*]:?([ \t]|$)/
+      return s ~ /^[ \t]*[A-Za-z][A-Za-z0-9 ()-]*:([ \t]|$)/
+    }
+    state == 0 && tolower($0) ~ /^[#*[:space:]-]*([0-9]+[.)][[:space:]]*)?inputs read[*[:space:]]*(\([^)]*\))?[*:[:space:]]*$/ { start = hlevel($0); shape = shape_of($0); state = 1; next }
     state == 0 && tolower($0) ~ /^[#*[:space:]-]*([0-9]+[.)][[:space:]]*)?inputs read[*]*:[*]*[ \t]+[^ \t]/ {
       start = hlevel($0)
+      shape = shape_of($0)
       line = $0
       sub(/^[^:]*:[*]*[ \t]+/, "", line)
       n = split(line, parts, /,[ \t]*/)
@@ -377,6 +394,7 @@ inputs_read() { # <report>
     # does not start with a path is skipped.
     state == 1 {
       if ($0 ~ /^#/ && (start == 0 || hlevel($0) <= start)) { state = 2; next }
+      if (start == 0 && same_shape($0)) { state = 2; next }
       line = $0
       sub(/^[ \t]*([-*+]|[0-9]+[.)])[ \t]+/, "", line)
       if (line ~ /^`?[^ \t`]*[\/]/ || line ~ /^`?~/ || line ~ /^`?[A-Za-z0-9_.-]+\.[A-Za-z0-9]+(`|[ \t]|$)/) {
@@ -502,6 +520,8 @@ EOF
       ok=1
     elif [ -n "$rev" ] && [ -n "$rubric_rev" ] && [ "$rev" = "$rubric_rev" ] && [ "$revpath" = "docs/review-rubric.md" ]; then
       ok=1
+    elif [ -n "$rev" ] && [ "$revpath" = "docs/review-rubric.md" ]; then
+      why="the review rubric at a revision other than the pinned one"
     elif [ -n "$root" ]; then
       if [ -n "$rev" ]; then
         if env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_COMMON_DIR git -C "$root" cat-file -e "$rev:$revpath" 2>/dev/null; then ok=1; fi
