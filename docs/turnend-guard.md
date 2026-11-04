@@ -108,6 +108,7 @@ The current session owns the lock when either of these holds:
 That second signal keeps a background Claude session owning its own lock after the transient helper chain between its hooks and its recorded owner is recycled.
 The library's header owns the trust gate (`CLAUDE_PID` must be a Claude-shaped member of the current run).
 `bin/fm-lock.sh` owns the sidecar and the line-1 anchor it records for such a session.
+A lock tagged with a native DSH Web session id never takes either path alone: it requires both the recorded server ancestry and that exact tagged id, as the library header records.
 
 A Claude session that does not own the lock cannot arm or repair the home without stealing the live owner's lock, so blocking it would create an unbounded loop.
 The lock-owning session remains responsible for restoring supervision.
