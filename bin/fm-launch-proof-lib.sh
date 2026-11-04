@@ -13,8 +13,9 @@
 # lifecycle action for a proven record; a legacy record keeps its pre-proof
 # attribution rule. unmanaged: the environment was readable and carries no
 # matching pin (omp, and claude with a versioned launch proof). pinned-elsewhere:
-# a claude with a versioned launch proof whose readable environment carries a pin
-# for another launch generation. unknown: it could not be read.
+# a claude with a versioned launch proof whose attributed process, or a process in
+# its process group, carries a pin for another launch generation. unknown: it
+# could not be read.
 # A restored claude agent is adopted by fm_launch_proof_claude_adoption, a second
 # authorization route that rechecks its positive proofs at every use.
 # No endpoint discovery: callers supply this home's validated exact endpoint.
@@ -52,6 +53,18 @@ fm_launch_proof_pid_pinned_elsewhere() { # <pid> <spawn-gen>
   printf '%s\n' "$environment" | grep -Eq '^(PATH|HOME)=' || return 1
   pinned=$(printf '%s\n' "$environment" | sed -n 's/^FM_SPAWN_GEN=//p')
   [ -n "$pinned" ] && [ "$pinned" != "$gen" ]
+}
+
+# Succeeds when <anchor>, any process of its process group in <process-table>
+# (pid ppid pgid rows), or any other listed process carries a pin for another
+# launch generation: the tree adoption refuses. Prints nothing.
+fm_launch_proof_tree_pinned_elsewhere() { # <spawn-gen> <process-table> <anchor-pid> [<pid>...]
+  local gen=$1 table=$2 anchor=$3 kid
+  shift 2
+  for kid in $(awk -v g="$(awk -v p="$anchor" '$1 == p {print $3; exit}' <<< "$table")" 'g != "" && $3 == g {print $1}' <<< "$table") "$@"; do
+    ! fm_launch_proof_pid_pinned_elsewhere "$kid" "$gen" || return 0
+  done
+  return 1
 }
 
 # Publication eligibility is stricter than a lifecycle verdict: an unknown
@@ -475,11 +488,9 @@ fm_launch_proof_claude_adoption() { # <meta> -> candidate adoption-record JSON
   # Generation and launch-pin proof, then unique ownership of pane and home.
   # Every process of the harness's group is part of the tree: a helper pinned to
   # another launch belongs to a different incarnation.
-  for kid in $(awk -v g="$(awk -v p="$harness_pid" '$1 == p {print $3; exit}' <<< "$table")" '$3 == g {print $1}' <<< "$table") $pid $harness_pid; do
-    if fm_launch_proof_pid_pinned_elsewhere "$kid" "$gen"; then
-      fm_launch_proof_adopt_refuse 'generation proof needs no process in the tree to be pinned to another launch generation'; return 1
-    fi
-  done
+  if fm_launch_proof_tree_pinned_elsewhere "$gen" "$table" "$harness_pid" "$pid"; then
+    fm_launch_proof_adopt_refuse 'generation proof needs no process in the tree to be pinned to another launch generation'; return 1
+  fi
   for kid in $pid $harness_pid; do
     fm_launch_proof_pid_unpinned "$kid" \
       || { fm_launch_proof_adopt_refuse 'launch-pin proof needs a positively readable environment without a usable launch pin; pinned or unreadable processes are not adoption candidates'; return 1; }
@@ -589,7 +600,7 @@ fm_launch_proof_herdr() { # <meta> -> managed|unmanaged|pinned-elsewhere|unknown
 }
 
 fm_launch_proof_herdr_verdict() { # <meta> <pid> -> managed|unmanaged|pinned-elsewhere|unknown
-  local meta=$1 pid=$2 proof gen verdict record task_file current_file adopted refusal=unmanaged
+  local meta=$1 pid=$2 proof gen verdict record task_file current_file adopted refusal=unmanaged table
   proof=$(fm_meta_get "$meta" launch_proof)
   case "$proof" in
     env-v1|'') ;;
@@ -637,7 +648,8 @@ fm_launch_proof_herdr_verdict() { # <meta> <pid> -> managed|unmanaged|pinned-els
       # environment as such; a legacy claude record keeps its pre-proof rule.
       case "$(fm_meta_get "$meta" harness):$proof" in
         claude:env-v1)
-          if fm_launch_proof_pid_pinned_elsewhere "$pid" "$gen"; then printf pinned-elsewhere; else printf unmanaged; fi ;;
+          table=$(LC_ALL=C ps -axo pid=,ppid=,pgid= 2>/dev/null) || table=''
+          if fm_launch_proof_tree_pinned_elsewhere "$gen" "$table" "$pid"; then printf pinned-elsewhere; else printf unmanaged; fi ;;
         omp:*) printf unmanaged ;;
         *) printf unknown ;;
       esac
@@ -647,12 +659,12 @@ fm_launch_proof_herdr_verdict() { # <meta> <pid> -> managed|unmanaged|pinned-els
 
 # The one wording for a refused live agent: the cause the verdict names and the
 # next action. unmanaged is a readable environment without a matching pin;
-# pinned-elsewhere carries a pin for another launch generation; unknown is an
+# pinned-elsewhere has a pin for another launch generation in its tree; unknown is an
 # environment that could not be read.
 fm_launch_proof_refusal_cause() { # <unmanaged|pinned-elsewhere|unknown>
   case "$1" in
     unmanaged) printf 'live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record' ;;
-    pinned-elsewhere) printf 'live agent is pinned to another launch generation: its process environment carries a launch pin for a different spawn_gen than this record' ;;
+    pinned-elsewhere) printf 'live agent is pinned to another launch generation: a process in its tree carries a launch pin for a different spawn_gen than this record' ;;
     *) printf 'live launch settings are unreadable' ;;
   esac
 }

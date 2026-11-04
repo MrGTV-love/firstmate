@@ -200,7 +200,7 @@ test_launch_proof_recorded_native_identity() {
       [ "$harness" != omp ] || expected=unmanaged
       # A versioned claude launch whose readable environment carries a pin for another
       # generation reports pinned-elsewhere; a legacy claude record keeps unknown.
-      [ "$harness:$version" != claude:env-v1 ] || expected=pinned-elsewhere
+      [ "$harness:$version" != claude:env-v1 ] || expected='pinned-elsewhere'
       assert_proof "$expected" "$version mismatched live PID pin must never authenticate recorded $harness"
     done
   done
@@ -596,7 +596,7 @@ test_launch_proof_claude_verdict_and_refusal() (
   PIN_GEN=s1793120312.10459.5003
   ps() {
     case "$*" in
-      '-axo pid=,ppid=,pgid=') printf '%s\n' '53733 1 53733' ;;
+      '-axo pid=,ppid=,pgid=') printf '%s\n' '53733 1 53733'; [ ! -f "$T/env-56557" ] || printf '%s\n' '56557 53733 53733' ;;
       '-axo pid=,ppid=') printf '%s\n' '53733 1' ;;
       '-p 53733 -o comm=') echo 2.1.316 ;;
       '-p 53733 -o args=') echo "claude --resume $UUID" ;;
@@ -604,7 +604,9 @@ test_launch_proof_claude_verdict_and_refusal() (
     esac
   }
   lsof() { printf 'p%s\0\nfcwd\0n%s\0\n' "$4" "$LANE"; }
-  fm_remote_herdr_process_env() { [ -f "$T/env-unreadable" ] && return 1; printf 'PATH=/usr/bin\nHOME=%s\n%s' "$OPERATOR" "$(cat "$T/env-extra" 2>/dev/null)"; }
+  fm_remote_herdr_process_env() {
+    [ "$1" != 56557 ] || { cat "$T/env-56557"; return; }
+    [ -f "$T/env-unreadable" ] && return 1; printf 'PATH=/usr/bin\nHOME=%s\n%s' "$OPERATOR" "$(cat "$T/env-extra" 2>/dev/null)"; }
   fm_backend_herdr_cli() {
     case "$*" in
       'lab pane get w1:p2') printf '{"result":{"pane":{"pane_id":"w1:p2"}}}' ;;
@@ -663,6 +665,20 @@ test_launch_proof_claude_verdict_and_refusal() (
   done
   rm -f "$T/env-extra"
   meta_for claude env-v1
+  # A short-lived child in the agent's process group pinned to another generation:
+  # adopt refuses that tree, so the verdict names the foreign pin, not adopt.
+  printf 'PATH=/usr/bin\nHOME=%s\nFM_SPAWN_GEN=s9.9.9\n' "$OPERATOR" > "$T/env-56557"
+  assert_equals pinned-elsewhere "$(fm_launch_proof_herdr "$META")" 'a group child pinned to another generation is pinned-elsewhere'
+  out=$(fm_launch_proof_herdr_refusal "$META") && fail 'a claude with a foreign-pinned group child was authorized'
+  assert_contains "$out" 'live agent is pinned to another launch generation' 'the group child cause names the foreign pin'
+  assert_not_contains "$out" 'fm-control.sh vernant-t1 adopt' 'a foreign-pinned tree is never sent to adopt'
+  fm_launch_proof_claude_adoption "$META" >/dev/null 2>"$T/adopt-err" && fail 'adopt accepted a foreign-pinned tree'
+  assert_contains "$(cat "$T/adopt-err")" 'pinned to another launch generation' 'adopt refuses the same tree'
+  rm -f "$T/env-56557"
+  assert_equals unmanaged "$(fm_launch_proof_herdr "$META")" 'without the pinned child the plain restore is unmanaged again'
+  out=$(fm_launch_proof_herdr_refusal "$META") && fail 'an unadopted unpinned claude was authorized'
+  assert_contains "$out" 'unpinned native restore' 'the plain restore keeps its cause'
+  assert_contains "$out" 'bin/fm-control.sh vernant-t1 adopt' 'the plain restore keeps the adopt advice'
 
   # Adoption is a second route: the record authorizes only while every proof still holds.
   fm_launch_proof_claude_adoption "$META" > "$STATE/vernant-t1.claude-adoption.json" 2>/dev/null \

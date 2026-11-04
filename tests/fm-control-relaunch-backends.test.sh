@@ -2179,7 +2179,7 @@ test_relaunch_without_a_usable_recorded_rule_keeps_prior_behavior() {
 # the empty forwarding-launcher allow-list refuses.
 CLAUDE_RESTORE_UUID=5a3eec19-de12-4999-bed2-bbd561089154
 CLAUDE_UNPINNED_CAUSE="live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record"
-CLAUDE_PINNED_ELSEWHERE_CAUSE="live agent is pinned to another launch generation: its process environment carries a launch pin for a different spawn_gen than this record"
+CLAUDE_PINNED_ELSEWHERE_CAUSE="live agent is pinned to another launch generation: a process in its tree carries a launch pin for a different spawn_gen than this record"
 
 write_claude_transcript() { # <case-dir> <first-user-message> [seconds-after-now]
   local dir=$1 physical project ts
