@@ -1188,18 +1188,19 @@ The guard submits no prompt and spends no tokens, so it runs by default wherever
 ## omp identity as its Bun runtime
 
 The installed omp can be a text launcher that execs the Bun runtime on an entry script, so the live process is named `bun` and only its executable path, script and role identify it.
-[`bin/fm-omp-identity.py`](../../bin/fm-omp-identity.py) owns that identity rule for [`bin/fm-launch-proof-lib.sh`](../../bin/fm-launch-proof-lib.sh) and the Herdr descendant walk.
-Verified 2026-11-04 on macOS arm64 (Darwin 27.2.0), read-only, with the omp 18.15.0 source launcher at `~/.bun/bin/omp`:
-- The launcher is a 378-byte `/bin/sh` text file whose only command is `exec "$R/runtime/node_modules/@oven/bun-darwin-aarch64/bin/bun" "$R/src/node_modules/@oh-my-pi/pi-coding-agent/src/cli.ts" "$@"` after `R=<root>`, and the rule derives the runtime and entry script from it.
+[`bin/fm-omp-identity.py`](../../bin/fm-omp-identity.py) owns that identity rule for [`bin/fm-launch-proof-lib.sh`](../../bin/fm-launch-proof-lib.sh) and the Herdr descendant walk, and it reads the identity from the live process, never from a launcher or `PATH`.
+Verified 2026-11-04 on macOS arm64 (Darwin 27.2.0), read-only, against the omp 18.15.0 tree at `~/.local/share/omp-promax-fix`:
+- The runtime package is `@oven/bun-darwin-aarch64` with `bin/bun`, and the script package is `@oh-my-pi/pi-coding-agent` with `src/cli.ts`, `src/cli-commands.ts` and `src/main.ts`.
 - The installed CLI's subcommand names, string-valued flags and value-less flags in `cli-commands.ts` and `cli/flag-tables.ts` equal the copy the role rule ports (compared by the same extraction `tests/fm-omp-identity-live-e2e.test.sh` runs: all three sets equal).
 - On macOS, `omp` does not rename the kernel process: its `process.title` assignment is JavaScript-side only (`pi-utils/src/process-name.ts`), so `ps comm` stays the runtime path.
 - `fm-proc-info.py` reads the kernel facts the rule compares: `exe` (libproc `proc_pidpath`), `argv` (the raw argument array with boundaries), `startid` (kernel start time with microseconds) and `stdin` (file descriptor 0 as `tty`, `pipe`, `none` or `other`); `tests/fm-omp-identity.test.sh` exercises each on real processes, including two processes started inside one whole second.
 
-The same host also has a native Mach-O `omp` at `~/.local/bin/omp`, later on `PATH`; the guard tests only the first `omp`, so it fails and names any Bun launcher that is not first.
+Both `omp` files on that host's `PATH` (`~/.bun/bin/omp` and `~/.local/bin/omp`) are native Mach-O binaries, and the text launcher `~/.local/share/omp-promax-fix/omp-promax` is not on `PATH`.
+When the first `omp` is native, the guard starts a text launcher from later on `PATH` or the file named by `FM_OMP_IDENTITY_LIVE_LAUNCHER`, which only chooses what to start and never decides identity; it names that launcher in its output, and with no text launcher it ends with a named `skip:` line.
 
 The live result against the installed omp is not recorded here yet.
 The guard starts the installed omp bare on a pseudo-terminal under `env -i` with a scratch `HOME`, submits no prompt, and runs the identity rule and the descendant walk on it.
-Refresh this section with `bash bin/fm-test-run.sh tests/fm-omp-identity-live-e2e.test.sh` after any omp upgrade, and add the date, the omp version and the guard's printed `checked <n> invariants` line to the facts above.
+Refresh this section with `FM_OMP_IDENTITY_LIVE_LAUNCHER=~/.local/share/omp-promax-fix/omp-promax bash bin/fm-test-run.sh tests/fm-omp-identity-live-e2e.test.sh` after any omp upgrade, and add the date, the omp version and the guard's printed `checked <n> invariants` line to the facts above.
 
 ## omp worker memory posture
 

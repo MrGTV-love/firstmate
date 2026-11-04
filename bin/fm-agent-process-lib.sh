@@ -25,9 +25,10 @@ unset _FM_AGENT_PROCESS_LIB_DIR
 # The installed omp can run as its Bun runtime, so the process is named bun and
 # fm_agent_process_classify_name reads it as `other`. That classification is left
 # alone on purpose: a bare bun match would claim every Bun program. Identity for
-# that shape is owned by bin/fm-omp-identity.py, which compares the process's actual
-# executable and entry script with the installed omp. These two helpers are the
-# only way the callers consult it.
+# that shape is owned by bin/fm-omp-identity.py, which reads the process's actual
+# executable and entry script. fm_agent_process_bun_may_be_omp below is how the
+# record-owner check and the Herdr descendant walk consult it (`writer`);
+# bin/fm-launch-proof-lib.sh calls `interactive` and `holds` itself.
 
 # Succeeds when a readable name or argv[0] has basename bun. A cheap gate before
 # the identity rule; it recognizes nothing by itself.
@@ -39,13 +40,16 @@ fm_agent_process_names_are_bun() { # <comm> <argv0>
   return 1
 }
 
-# Succeeds when a bun-named live process may be the installed omp in any role, its
-# identity cannot be read, or the installed omp cannot be derived; fails for a
-# process that is positively another program or not named bun. Fails open toward "may be omp" so that a worktree
-# holding an unreadable restored agent is never reported agent-free.
+# Succeeds when a bun-named live process may be the installed omp in any role or
+# anything stops the identity rule from settling it; fails only for a process not
+# named bun or one the rule positively reads as another program (exit 1). A crash or
+# a missing python3 is not that proof, so a worktree holding an unreadable restored
+# agent is never reported agent-free.
 fm_agent_process_bun_may_be_omp() { # <comm> <argv0> <pid>
+  local rc=0
   fm_agent_process_names_are_bun "$1" "$2" || return 1
-  python3 -I "$_FM_AGENT_PROCESS_OMP_IDENTITY" writer "$3" >/dev/null 2>&1
+  python3 -I "$_FM_AGENT_PROCESS_OMP_IDENTITY" writer "$3" >/dev/null 2>&1 || rc=$?
+  [ "$rc" -ne 1 ]
 }
 
 # fm_agent_process_classify_name: the single owner of the process-name

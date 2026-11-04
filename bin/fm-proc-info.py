@@ -203,8 +203,8 @@ def exe_path(pid):
     return os.fsdecode(buffer.raw[:size])
 
 
-def writable_files(pid):
-    """Regular files PID holds open for writing, from libproc: device, inode and path."""
+def _fd_list(pid):
+    """(descriptor, type) pairs of PID's open file descriptors, from libproc."""
     kinfo(pid)
     size = libc.proc_pidinfo(pid, PROC_PIDLISTFDS, ctypes.c_uint64(0), None, 0)
     if size <= 0:
@@ -213,9 +213,13 @@ def writable_files(pid):
     size = libc.proc_pidinfo(pid, PROC_PIDLISTFDS, ctypes.c_uint64(0), buffer, len(buffer))
     if size < 0 or size % PROC_FDINFO_SIZE:
         raise LookupError(pid)
+    return [struct.unpack_from("iI", buffer.raw, offset) for offset in range(0, size, PROC_FDINFO_SIZE)]
+
+
+def writable_files(pid):
+    """Regular files PID holds open for writing, from libproc: device, inode and path."""
     found = []
-    for offset in range(0, size, PROC_FDINFO_SIZE):
-        number, fdtype = struct.unpack_from("iI", buffer.raw, offset)
+    for number, fdtype in _fd_list(pid):
         if fdtype != PROX_FDTYPE_VNODE:
             continue
         info = VnodeFdInfoWithPath()
@@ -234,19 +238,7 @@ def start_id(pid):
 
 def stdin_kind(pid):
     """Kind of file descriptor 0 from libproc, never from a path guess alone."""
-    kinfo(pid)
-    size = libc.proc_pidinfo(pid, PROC_PIDLISTFDS, ctypes.c_uint64(0), None, 0)
-    if size <= 0:
-        raise LookupError(pid)
-    buffer = ctypes.create_string_buffer(size + 64 * PROC_FDINFO_SIZE)
-    size = libc.proc_pidinfo(pid, PROC_PIDLISTFDS, ctypes.c_uint64(0), buffer, len(buffer))
-    if size < 0 or size % PROC_FDINFO_SIZE:
-        raise LookupError(pid)
-    kind = None
-    for offset in range(0, size, PROC_FDINFO_SIZE):
-        number, fdtype = struct.unpack_from("iI", buffer.raw, offset)
-        if number == 0:
-            kind = fdtype
+    kind = dict(_fd_list(pid)).get(0)
     if kind is None:
         return "none"
     if kind == PROX_FDTYPE_PIPE:

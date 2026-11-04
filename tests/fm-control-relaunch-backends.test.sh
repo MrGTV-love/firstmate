@@ -1973,7 +1973,12 @@ bun_tree() { # one scratch installation per run
   mkdir -p "$bin" "$BUN_TREE/src/node_modules/@oh-my-pi/pi-coding-agent/src"
   printf '#include <unistd.h>\nint main(void){alarm(900);for(;;)pause();}\n' > "$BUN_TREE/stub.c"
   cc -o "$bin/bun" "$BUN_TREE/stub.c" || fail "could not compile the runtime stand-in"
-  : > "$BUN_TREE/src/node_modules/@oh-my-pi/pi-coding-agent/src/cli.ts"
+  printf '{"name":"@oven/bun-darwin-aarch64"}\n' > "${bin%/bin}/package.json"
+  local package="$BUN_TREE/src/node_modules/@oh-my-pi/pi-coding-agent"
+  printf '{"name":"@oh-my-pi/pi-coding-agent"}\n' > "$package/package.json"
+  : > "$package/src/cli.ts"
+  : > "$package/src/cli-commands.ts"
+  : > "$package/src/main.ts"
   cat > "$BUN_TREE/omp" <<LAUNCHER
 #!/bin/sh
 R=$BUN_TREE
@@ -1995,7 +2000,6 @@ signal.signal(signal.SIGTERM, lambda *_: (child.kill(), os._exit(0)))
 open(pidfile, "w").write(str(child.pid))
 time.sleep(900)
 PY
-  export FM_OMP_LAUNCHER="$BUN_TREE/omp"
 }
 bun_spawn() { # <name> <stdin-kind> <executable|-> <argv...> -> BUN_PID once the exec settled
   local name=$1 kind=$2 exe=$3 file="$TMP_ROOT/bun-$1.pid"
@@ -2204,14 +2208,20 @@ test_omp_adoption_native_omp_first_on_path_keeps_a_live_bun_writer() {
   bun_launch a-native-first --config "$dir/other.yml" --no-title 'another agent'
   pid_a=$BUN_PID
   jq --argjson pid "$pid_a" '.pid=$pid' "$record" > "$record.new" && mv "$record.new" "$record"
-  FM_OMP_LAUNCHER='' assert_adoption_refused "$dir" "$id" "$pid_a is a live omp process"
+  assert_adoption_refused "$dir" "$id" "$pid_a is a live omp process"
   bun_stop_all
   prepare_omp_adoption native-first-dead-writer
   dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID record="$HERDR_CASE_DIR/home/state/$HERDR_CASE_ID.omp-session.json"
   cp "$stub" "$dir/fakebin/omp"
-  out=$(FM_OMP_LAUNCHER='' run_continuation_control "$dir" "$id" adopt) || fail "a dead recorded writer must not block repair with a native omp first on PATH: $out"
+  out=$(run_continuation_control "$dir" "$id" adopt) || fail "a dead recorded writer must not block repair with a native omp first on PATH: $out"
   jq -e '.pid == 2000000000' "$record" >/dev/null || fail "repair over a dead writer must record the live process: $(cat "$record")"
-  pass "omp adoption: with a native omp first on PATH a live Bun writer keeps its record and a dead writer does not"
+  prepare_bun_adoption native-first-target
+  dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
+  cp "$stub" "$dir/fakebin/omp"
+  out=$(run_continuation_control "$dir" "$id" adopt) || fail "the verdict on a Bun target must not depend on the omp on PATH: $out"
+  assert_contains "$out" "adopted: $id" "a native omp first on PATH does not stop adoption of a proven Bun target"
+  bun_stop_all
+  pass "omp adoption: with a native omp first on PATH a live Bun writer keeps its record, a dead writer does not, and a proven Bun target adopts"
 }
 
 test_omp_bun_adoption_does_not_overwrite_a_late_writer() {

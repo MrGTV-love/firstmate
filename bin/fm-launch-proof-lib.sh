@@ -87,8 +87,7 @@ fm_launch_proof_pid_is_omp() { # <pid>
 
 # Succeeds when a recorded session-record PID may still be a writer of that
 # record: a live omp by name, or a live bun-shaped process that is the installed
-# omp in ANY role, whose identity cannot be read, or for which the installed omp
-# cannot be derived, a native omp first on PATH included. Uncertainty is not proof that
+# omp in ANY role or whose identity cannot be settled. Uncertainty is not proof that
 # no writer owns the record, so this fails open toward "may own", the opposite
 # direction of fm_launch_proof_pid_is_omp. A dead or positively unrelated process
 # fails it. Prints nothing.

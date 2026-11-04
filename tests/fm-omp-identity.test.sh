@@ -29,7 +29,12 @@ build_tree() { # <root> -> a runtime stub, an entry script and a launcher
   mkdir -p "$bun" "$root/src/node_modules/@oh-my-pi/pi-coding-agent/src"
   printf '#include <stdio.h>\n#include <string.h>\n#include <unistd.h>\nint main(int c,char**v){for(int i=1;i<c;i++)if(!strcmp(v[i],"--version")){puts("9.9.9");return 0;}alarm(900);for(;;)pause();}\n' > "$root/stub.c"
   cc -o "$bun/bun" "$root/stub.c" || fail "could not compile the runtime stand-in"
-  : > "$root/src/node_modules/@oh-my-pi/pi-coding-agent/src/cli.ts"
+  printf '{"name":"@oven/bun-darwin-aarch64"}\n' > "${bun%/bin}/package.json"
+  local package="$root/src/node_modules/@oh-my-pi/pi-coding-agent"
+  printf '{"name":"@oh-my-pi/pi-coding-agent"}\n' > "$package/package.json"
+  : > "$package/src/cli.ts"
+  : > "$package/src/cli-commands.ts"
+  : > "$package/src/main.ts"
   cat > "$root/omp" <<EOF
 #!/bin/sh
 # stand-in omp launcher shaped like the host's
@@ -41,13 +46,12 @@ EOF
 TREE="$TMP/tree"; build_tree "$TREE"
 BUN="$TREE/runtime/node_modules/@oven/bun-darwin-aarch64/bin/bun"
 SCRIPT="$TREE/src/node_modules/@oh-my-pi/pi-coding-agent/src/cli.ts"
-export FM_OMP_LAUNCHER="$TREE/omp"
 REAL_BUN=$(python3 -I -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "$BUN")
 # A native omp stand-in: the compiled stub under the name omp.
 NATIVE_BIN="$TMP/native-bin"
 mkdir -p "$NATIVE_BIN"
 cp "$BUN" "$NATIVE_BIN/omp"
-native_first() { FM_OMP_LAUNCHER='' PATH="$NATIVE_BIN:$TREE:$PATH" "$@"; }
+native_first() { PATH="$NATIVE_BIN:$PATH" "$@"; }
 
 # spawn.py holds a process's standard input (tty, open or empty pipe, null) and
 # execs argv with an optional different executable, then stays alive until killed.
@@ -87,7 +91,7 @@ time.sleep(600)
 PY
 FIXTURE_N=0
 spawn() { # <stdin-kind> <executable|-> <argv...> -> $SPAWNED (pid) after the exec settled
-  local kind=$1 exe=$2 file expect
+  local kind=$1 exe=$2 file
   shift 2
   FIXTURE_N=$((FIXTURE_N + 1)); file="$TMP/pid.$FIXTURE_N"
   [ "$exe" != - ] || exe=
@@ -96,12 +100,10 @@ spawn() { # <stdin-kind> <executable|-> <argv...> -> $SPAWNED (pid) after the ex
   for _ in $(seq 1 100); do [ -s "$file" ] && break; sleep 0.05; done
   [ -s "$file" ] || fail "fixture process was not started"
   SPAWNED=$(cat "$file")
-  expect=${FM_SPAWN_EXPECT_EXE:-}
   for _ in $(seq 1 100); do
     [ "$(python3 -I "$PROCINFO" exe "$SPAWNED" 2>/dev/null)" != /bin/sh ] && break
     sleep 0.05
   done
-  : "$expect"
   HOLDERS+=("$SPAWNED")
 }
 launch() { # <stdin-kind> <omp args...> : the launcher execs the stand-in, as the host's does
@@ -162,7 +164,7 @@ distinguishes() { # <start-id function> : succeeds when it tells the same-second
   [ -n "$a" ] && [ -n "$b" ] && [ "$a" != "$b" ]
 }
 test_incarnation_tells_same_second_processes_apart() {
-  local lib a1 a2 mutant_distinguishes=no
+  local a1 a2 mutant_distinguishes=no
   # shellcheck source=bin/fm-launch-proof-lib.sh
   . "$ROOT/bin/fm-backend.sh"; . "$ROOT/bin/fm-launch-proof-lib.sh"
   same_second_pair
@@ -178,8 +180,6 @@ test_incarnation_tells_same_second_processes_apart() {
   whole_second() { python3 -I "$PROCINFO" lstart "$1"; }
   ! distinguishes whole_second && mutant_distinguishes=no || mutant_distinguishes=yes
   [ "$mutant_distinguishes" = no ] || fail "a whole-second start source must fail the same-second check"
-  lib=$a1
-  : "$lib"
   pass "incarnation: the delivered start identity separates same-second processes; a whole-second source cannot"
 }
 
@@ -209,41 +209,127 @@ test_session_binding_needs_the_session_file_held_open_for_writing() {
   pass "session binding: only a process holding the task session open for writing is tied to it; another session, none and unreadable are not"
 }
 
-# --- 3. the installed identity ----------------------------------------------------
-test_identity_derivation_fails_closed() {
-  local t="$TMP/derive"
-  mkdir -p "$t/out"
-  facts() { # <exe> <argv-json> <stdin> -> a facts file
-    printf '{"pid":1,"start":"1.000001","exe":"%s","argv":%s,"stdin":"%s"}' "$1" "$2" "$3" > "$t/facts.json"
+# --- 3. the installed identity, read from the process's own tree -----------------
+tree_launch() { # <tree> <args...> -> SPAWNED: the tree's own runtime on its own script, on a terminal
+  local tree=$1
+  shift
+  spawn tty /bin/sh /bin/sh "$tree/omp" "$@"
+}
+assert_tree() { # <expected-interactive-exit> <expected-writer-exit> <pid> <message>
+  local rc=0
+  python3 -I "$IDENT" interactive "$3" >/dev/null 2>&1 || rc=$?
+  [ "$rc" -eq "$1" ] || fail "$4: expected interactive exit $1, got $rc"
+  rc=0
+  python3 -I "$IDENT" writer "$3" >/dev/null 2>&1 || rc=$?
+  [ "$rc" -eq "$2" ] || fail "$4: expected writer exit $2, got $rc"
+}
+test_identity_comes_from_the_process_tree() {
+  local t="$TMP/trees" name script_pkg runtime_pkg
+  mkdir -p "$t"
+  build_tree "$t/good"
+  tree_launch "$t/good" --no-title
+  assert_tree 0 0 "$SPAWNED" "a process of a complete omp tree is the interactive agent"
+  runtime_pkg=runtime/node_modules/@oven/bun-darwin-aarch64
+  script_pkg=src/node_modules/@oh-my-pi/pi-coding-agent
+
+  build_tree "$t/wrong-script-package"
+  printf '{"name":"some-other-package"}\n' > "$t/wrong-script-package/$script_pkg/package.json"
+  tree_launch "$t/wrong-script-package" --no-title
+  assert_tree 1 1 "$SPAWNED" "a wrong script package name is another program"
+
+  build_tree "$t/wrong-runtime-package"
+  printf '{"name":"not-bun"}\n' > "$t/wrong-runtime-package/$runtime_pkg/package.json"
+  tree_launch "$t/wrong-runtime-package" --no-title
+  assert_tree 1 1 "$SPAWNED" "a wrong runtime package name is another program"
+
+  for name in cli-commands.ts main.ts; do
+    build_tree "$t/missing-$name"
+    rm "$t/missing-$name/$script_pkg/src/$name"
+    tree_launch "$t/missing-$name" --no-title
+    assert_tree 1 1 "$SPAWNED" "a missing $name marker is another program"
+  done
+
+  build_tree "$t/no-package"
+  rm "$t/no-package/$script_pkg/package.json"
+  tree_launch "$t/no-package" --no-title
+  assert_tree 1 1 "$SPAWNED" "a cli.ts outside any omp package is another program"
+
+  build_tree "$t/malformed"
+  printf 'not json' > "$t/malformed/$script_pkg/package.json"
+  tree_launch "$t/malformed" --no-title
+  assert_tree 2 0 "$SPAWNED" "a package.json that cannot be parsed is unresolved, and may still own a record"
+
+  build_tree "$t/unreadable"
+  chmod 000 "$t/unreadable/$script_pkg/package.json"
+  if [ ! -r "$t/unreadable/$script_pkg/package.json" ]; then
+    tree_launch "$t/unreadable" --no-title
+    assert_tree 2 0 "$SPAWNED" "an unreadable package.json is unresolved, and may still own a record"
+  fi
+  chmod 644 "$t/unreadable/$script_pkg/package.json"
+
+  build_tree "$t/removed"
+  tree_launch "$t/removed" --no-title
+  rm "$t/removed/$script_pkg/src/cli.ts"
+  assert_tree 2 0 "$SPAWNED" "a script that no longer exists is unresolved, and a live process of it may still own a record"
+
+  build_tree "$t/not-bun"
+  cp "$t/not-bun/$runtime_pkg/bin/bun" "$t/not-bun/$runtime_pkg/bin/node"
+  spawn tty "$t/not-bun/$runtime_pkg/bin/node" "$t/not-bun/$runtime_pkg/bin/node" "$t/not-bun/$script_pkg/src/cli.ts" --no-title
+  assert_tree 1 1 "$SPAWNED" "the genuine script on an executable not named bun is another program"
+
+  mkdir -p "$t/loose/bin"; cp "$BUN" "$t/loose/bin/bun"
+  spawn tty "$t/loose/bin/bun" "$t/loose/bin/bun" "$t/good/$script_pkg/src/cli.ts" --no-title
+  assert_tree 1 1 "$SPAWNED" "the genuine script on a bun outside a runtime package is another program"
+  pass "identity: the process's own tree decides; a wrong package or a missing marker is foreign, and unreadable evidence is unresolved"
+}
+
+test_captured_facts_replay_without_the_tree() {
+  local t="$TMP/replay" rc
+  mkdir -p "$t"
+  build_tree "$t/tree"
+  tree_launch "$t/tree" --no-title
+  python3 -I "$IDENT" facts "$SPAWNED" > "$t/good.json" || fail "facts must be capturable"
+  tree_launch "$t/tree" __omp_worker_daemon_broker
+  python3 -I "$IDENT" facts "$SPAWNED" > "$t/worker.json" || fail "facts must be capturable"
+  cp "$BUN" "$t/foreign-runtime"
+  spawn tty "$t/foreign-runtime" "$t/tree/runtime/node_modules/@oven/bun-darwin-aarch64/bin/bun" \
+    "$t/tree/src/node_modules/@oh-my-pi/pi-coding-agent/src/cli.ts" --no-title
+  python3 -I "$IDENT" facts "$SPAWNED" > "$t/foreign.json" || fail "facts must be capturable"
+  python3 -I -c 'import json,sys;f=json.load(open(sys.argv[1]));f.pop("exe");json.dump(f,open(sys.argv[2],"w"))' "$t/good.json" "$t/no-exe.json"
+  python3 -I -c 'import json,sys;f=json.load(open(sys.argv[1]));f.pop("evidence");json.dump(f,open(sys.argv[2],"w"))' "$t/good.json" "$t/no-evidence.json"
+  rm -rf "$t/tree"
+  replay() { # <file> <interactive-exit> <writer-exit> <message>
+    rc=0; python3 -I "$IDENT" interactive --facts "$t/$1" >/dev/null 2>&1 || rc=$?
+    [ "$rc" -eq "$2" ] || fail "replay: $4: expected interactive exit $2, got $rc"
+    rc=0; python3 -I "$IDENT" writer --facts "$t/$1" >/dev/null 2>&1 || rc=$?
+    [ "$rc" -eq "$3" ] || fail "replay: $4: expected writer exit $3, got $rc"
   }
-  facts "$BUN" "[\"$BUN\",\"$SCRIPT\",\"--no-title\"]" tty
-  python3 -I "$IDENT" interactive --facts "$t/facts.json" >/dev/null 2>&1 || fail "the derived identity must admit the compliant facts"
-  # a launcher naming another runtime: the process no longer matches
-  sed "s#^R=.*#R=$t/other#" "$TREE/omp" > "$t/other-launcher"
-  FM_OMP_LAUNCHER="$t/other-launcher" python3 -I "$IDENT" interactive --facts "$t/facts.json" >/dev/null 2>&1 && fail "a launcher for a missing tree must admit nothing"
-  # a launcher that cannot be read, is binary, is another form, or leaves its own tree
-  FM_OMP_LAUNCHER="$t/missing" python3 -I "$IDENT" interactive --facts "$t/facts.json" >/dev/null 2>&1 && fail "an unreadable launcher must admit nothing"
-  FM_OMP_LAUNCHER="$BUN" python3 -I "$IDENT" interactive --facts "$t/facts.json" >/dev/null 2>&1 && fail "a binary launcher must admit nothing"
-  # shellcheck disable=SC2016 # the launcher text must keep its literal variables
-  printf '#!/bin/sh\nexec "$HOME/bin/other" "$@"\n' > "$t/odd"
-  FM_OMP_LAUNCHER="$t/odd" python3 -I "$IDENT" interactive --facts "$t/facts.json" >/dev/null 2>&1 && fail "another launcher form must admit nothing"
-  mkdir -p "$t/evil"; : > "$t/evil/cli.ts"
-  build_tree "$t/linked"
-  rm "$t/linked/src/node_modules/@oh-my-pi/pi-coding-agent/src/cli.ts"
-  ln -s "$t/evil/cli.ts" "$t/linked/src/node_modules/@oh-my-pi/pi-coding-agent/src/cli.ts"
-  facts "$t/linked/runtime/node_modules/@oven/bun-darwin-aarch64/bin/bun" "[\"x\",\"$t/linked/src/node_modules/@oh-my-pi/pi-coding-agent/src/cli.ts\"]" tty
-  FM_OMP_LAUNCHER="$t/linked/omp" python3 -I "$IDENT" interactive --facts "$t/facts.json" >/dev/null 2>&1 && fail "an installed path that links outside its tree must admit nothing"
-  pass "identity: a changed, unreadable, binary, foreign-form or tree-escaping launcher recognizes nothing"
+  replay good.json 0 0 "the genuine process replays as recognized with its tree gone"
+  replay worker.json 1 0 "a worker role replays as refused, and may still own a record"
+  replay foreign.json 1 1 "a foreign executable presenting the installed words replays as another program"
+  replay no-exe.json 2 0 "a capture without the executable path is unresolved"
+  replay no-evidence.json 2 0 "a capture without the tree evidence is unresolved"
+  replay missing.json 2 0 "a capture that cannot be read is unresolved"
+  pass "replay: a capture is judged from its stored evidence alone, with the tree gone"
 }
 
 # --- 4. the role, from the installed CLI's own dispatch -------------------------
+ROLE_BASE=
 role() { # <expected-exit> <stdin> <description> -- <omp args...>
-  local expected=$1 stdin=$2 description=$3 rc=0 args
+  local expected=$1 stdin=$2 description=$3 rc=0
   shift 4
-  if [ "$stdin" = - ]; then stdin=null; else stdin="\"$stdin\""; fi
-  args=$(python3 -I -c 'import json,sys;print(json.dumps(sys.argv[1:]))' "$@")
-  printf '{"pid":1,"start":"1.000001","exe":"%s","argv":%s,"stdin":%s}' "$BUN" \
-    "$(python3 -I -c 'import json,sys;print(json.dumps([sys.argv[1],sys.argv[2]]+json.loads(sys.argv[3])))' "$BUN" "$SCRIPT" "$args")" "$stdin" > "$TMP/role.json"
+  if [ -z "$ROLE_BASE" ]; then
+    launch tty --no-title
+    ROLE_BASE="$TMP/role-base.json"
+    python3 -I "$IDENT" facts "$SPAWNED" > "$ROLE_BASE" || fail "role: the base facts must be capturable"
+  fi
+  python3 -I - "$ROLE_BASE" "$TMP/role.json" "$stdin" "$@" <<'PY' || fail "role: could not write the case facts"
+import json, sys
+facts = json.load(open(sys.argv[1]))
+facts["argv"] = facts["argv"][:2] + sys.argv[4:]
+facts["stdin"] = None if sys.argv[3] == "-" else sys.argv[3]
+json.dump(facts, open(sys.argv[2], "w"))
+PY
   python3 -I "$IDENT" interactive --facts "$TMP/role.json" >"$TMP/role.out" 2>&1 || rc=$?
   [ "$rc" -eq "$expected" ] || fail "role: $description: expected exit $expected, got $rc ($(cat "$TMP/role.out"))"
 }
@@ -281,7 +367,7 @@ test_role_follows_the_cli_dispatch() {
 
 # --- 5. real processes ---------------------------------------------------------
 test_live_processes_are_judged_by_their_actual_executable_and_script() {
-  local foreign other t="$TMP/live" pid
+  local foreign t="$TMP/live" pid
   mkdir -p "$t"
   # the compliant restored agent
   launch tty --config /x.yml --auto-approve --cwd /wt --no-title 'Read the brief'
@@ -316,32 +402,37 @@ test_live_processes_are_judged_by_their_actual_executable_and_script() {
   launch pipe-empty --no-title; assert_verdict 1 "$SPAWNED" "empty closed input is not a terminal"
   launch tty --system-prompt 'hello --mode rpc'; assert_verdict 0 "$SPAWNED" "one argument value containing --mode rpc is the interactive agent"
   launch tty --system-prompt hello --mode rpc; assert_verdict 1 "$SPAWNED" "separate --mode rpc words are protocol mode"
-  other=$SPAWNED; : "$other"
   # an exited process names nothing
   assert_verdict 2 2000000000 "a missing process is unresolved"
   pass "live processes: actual executable, resolved script and role decide; foreign look-alikes, helpers and headless runs are refused"
 }
 
 test_fail_closed_runs_recover_when_the_evidence_returns() {
-  local t="$TMP/fail" pid rc=0
+  local t="$TMP/fail" pid helper foreign rc=0 script_pkg=src/node_modules/@oh-my-pi/pi-coding-agent
   mkdir -p "$t"
-  launch tty --no-title; pid=$SPAWNED
-  FM_OMP_LAUNCHER="$t/missing" verdict "$pid" || rc=$?
-  [ "$rc" -ne 0 ] || fail "an unreadable launcher must not admit the compliant process"
-  printf '#!/bin/sh\nexec "$@"\n' > "$t/odd"
-  rc=0; FM_OMP_LAUNCHER="$t/odd" verdict "$pid" || rc=$?
-  [ "$rc" -ne 0 ] || fail "an underivable launcher must not admit the compliant process"
-  assert_verdict 0 "$pid" "the same process is admitted again once the launcher is derivable"
-  # a foreign process and a helper stay refused whatever the launcher state
-  launch tty __omp_worker_daemon_broker
-  rc=0; FM_OMP_LAUNCHER="$t/missing" verdict "$SPAWNED" || rc=$?
-  [ "$rc" -ne 0 ] || fail "a helper must be refused with the launcher unreadable"
-  pass "fail closed: an unreadable or underivable launcher admits nothing and the compliant process is admitted again once it returns"
+  build_tree "$t/tree"
+  spawn tty /bin/sh /bin/sh "$t/tree/omp" --no-title; pid=$SPAWNED
+  spawn tty /bin/sh /bin/sh "$t/tree/omp" __omp_worker_daemon_broker; helper=$SPAWNED
+  cp "$BUN" "$t/foreign-runtime"
+  spawn tty "$t/foreign-runtime" "$t/foreign-runtime" "$t/tree/$script_pkg/src/cli.ts" --no-title; foreign=$SPAWNED
+  mv "$t/tree/$script_pkg/package.json" "$t/saved.json"
+  printf 'not json' > "$t/tree/$script_pkg/package.json"
+  rc=0; verdict "$pid" || rc=$?
+  [ "$rc" -eq 2 ] || fail "unreadable evidence must leave the compliant process unresolved (exit $rc)"
+  rc=0; verdict "$helper" || rc=$?
+  [ "$rc" -ne 0 ] || fail "a helper must be refused with the evidence unreadable"
+  rc=0; verdict "$foreign" || rc=$?
+  [ "$rc" -ne 0 ] || fail "a foreign process must be refused with the evidence unreadable"
+  mv "$t/saved.json" "$t/tree/$script_pkg/package.json"
+  assert_verdict 0 "$pid" "the same process is admitted again once the evidence returns"
+  assert_verdict 1 "$helper" "a helper stays refused once the evidence returns"
+  assert_verdict 1 "$foreign" "a foreign process stays refused once the evidence returns"
+  pass "fail closed: unreadable evidence admits nothing and the compliant process is admitted again once it returns"
 }
 
 # --- 6. record ownership and the library predicates -----------------------------
 test_record_writer_check_fails_open_and_adoption_target_fails_closed() {
-  local pid rc
+  local pid
   # shellcheck source=bin/fm-launch-proof-lib.sh
   . "$ROOT/bin/fm-backend.sh"; . "$ROOT/bin/fm-launch-proof-lib.sh"
   ps() { # a fake process table over scratch pids only, answering through the kernel reader
@@ -355,13 +446,6 @@ test_record_writer_check_fails_open_and_adoption_target_fails_closed() {
   fm_launch_proof_pid_is_omp "$pid" || fail "the installed Bun agent is an omp adoption target"
   [ -n "$FM_LAUNCH_PROOF_OMP_START" ] || fail "the predicate must hand back the incarnation it accepted"
   fm_launch_proof_pid_may_own_record "$pid" || fail "the installed Bun agent may own a record"
-  # A native omp launcher names no installed Bun identity, so it proves nothing about a live Bun process.
-  # shellcheck disable=SC2016 # the launcher text must keep its literal variables
-  printf '#!/bin/sh\nexec "$HOME/bin/other" "$@"\n' > "$TMP/odd-writer-launcher"
-  rc=0; FM_OMP_LAUNCHER="$BUN" python3 -I "$IDENT" writer "$pid" >/dev/null 2>&1 || rc=$?
-  [ "$rc" -eq 0 ] || fail "a native omp launcher is not proof that no writer owns the record (exit $rc)"
-  rc=0; FM_OMP_LAUNCHER="$TMP/odd-writer-launcher" python3 -I "$IDENT" writer "$pid" >/dev/null 2>&1 || rc=$?
-  [ "$rc" -eq 0 ] || fail "an underivable launcher form is not proof that no writer owns the record (exit $rc)"
   launch tty __omp_worker_daemon_broker; pid=$SPAWNED
   fm_launch_proof_pid_is_omp "$pid" && fail "a worker-role Bun process is never an adoption target"
   fm_launch_proof_pid_may_own_record "$pid" || fail "a worker-role Bun process of the installed omp may still own a record, whatever its role"
@@ -373,7 +457,7 @@ test_record_writer_check_fails_open_and_adoption_target_fails_closed() {
   spawn tty /bin/sh /bin/sh -c 'sleep 600'
   ps() { case "$*" in '-p '*' -o comm=') python3 -I "$PROCINFO" comm "$2" ;; '-p '*' -o args=') python3 -I "$PROCINFO" args "$2" ;; esac; }
   fm_launch_proof_pid_may_own_record "$SPAWNED" && fail "an unrelated shell is not a record writer"
-  cp "$BUN" "$TMP/foreign-bun"; mkdir -p "$TMP/fb"; cp "$BUN" "$TMP/fb/bun"
+  mkdir -p "$TMP/fb"; cp "$BUN" "$TMP/fb/bun"
   spawn tty "$TMP/fb/bun" "$TMP/fb/bun" /elsewhere/cli.ts
   fm_launch_proof_pid_may_own_record "$SPAWNED" && fail "a positively read foreign bun is an unrelated reused pid"
   ps() { return 1; }
@@ -381,7 +465,7 @@ test_record_writer_check_fails_open_and_adoption_target_fails_closed() {
   pass "writer check fails open on any role or unreadable identity; adoption target fails closed; unrelated and dead pids may be replaced"
 }
 
-test_native_omp_first_on_path_never_clears_a_bun_writer() {
+test_verdict_does_not_depend_on_the_omp_on_path() {
   local pid foreign dead rc
   # shellcheck source=bin/fm-launch-proof-lib.sh
   . "$ROOT/bin/fm-backend.sh"; . "$ROOT/bin/fm-launch-proof-lib.sh"
@@ -391,15 +475,60 @@ test_native_omp_first_on_path_never_clears_a_bun_writer() {
   launch tty --config /x.yml --no-title 'brief'; pid=$SPAWNED
   mkdir -p "$TMP/native-fb"; cp "$BUN" "$TMP/native-fb/bun"
   spawn tty "$TMP/native-fb/bun" "$TMP/native-fb/bun" /elsewhere/cli.ts; foreign=$SPAWNED
+  native_first fm_launch_proof_pid_is_omp "$pid" || fail "a native omp first on PATH must not stop recognition of the Bun agent"
   native_first fm_launch_proof_pid_may_own_record "$pid" || fail "a live Bun omp with a native omp first on PATH may own the record"
-  native_first fm_launch_proof_pid_may_own_record "$foreign" || fail "with no derivable installed omp a Bun process cannot be proven unrelated"
-  fm_launch_proof_pid_may_own_record "$foreign" && fail "with a derivable installed omp the same foreign Bun is positively unrelated"
-  rc=0; native_first python3 -I "$IDENT" interactive "$pid" >/dev/null 2>&1 || rc=$?
-  [ "$rc" -eq 2 ] || fail "adoption stays closed when the first omp on PATH derives nothing (exit $rc)"
+  rc=0; native_first fm_launch_proof_pid_may_own_record "$foreign" || rc=$?
+  [ "$rc" -ne 0 ] || fail "a positively foreign Bun stays unrelated with a native omp first on PATH"
   (exit 0) & dead=$!
   wait "$dead"
-  native_first fm_launch_proof_pid_may_own_record "$dead" && fail "a proven-dead recorded writer stays free with a native omp first on PATH"
-  pass "native omp first on PATH: a live Bun process may own the record, adoption stays closed and a dead writer stays free"
+  rc=0; native_first fm_launch_proof_pid_may_own_record "$dead" || rc=$?
+  [ "$rc" -ne 0 ] || fail "a proven-dead recorded writer stays free with a native omp first on PATH"
+  pass "PATH: a native omp first changes nothing: the Bun agent is recognized, a foreign Bun stays unrelated and a dead writer stays free"
+}
+
+test_a_helper_failure_is_never_proof_of_no_writer() {
+  local t="$TMP/crash" pid foreign rc
+  mkdir -p "$t/no-python" "$t/fb"
+  # shellcheck source=bin/fm-agent-process-lib.sh
+  . "$ROOT/bin/fm-agent-process-lib.sh"
+  cat > "$t/run.py" <<'PY'
+import importlib.util, os, sys
+spec = importlib.util.spec_from_file_location("oi", sys.argv[1])
+oi = importlib.util.module_from_spec(spec); spec.loader.exec_module(oi)
+kind, args = sys.argv[2], sys.argv[3:]
+def boom(*_args, **_kwargs):
+    raise RuntimeError("simulated crash")
+def no_strict_type_error(*_args, **_kwargs):
+    raise TypeError("realpath() got an unexpected keyword argument 'strict'")
+real = os.path.realpath
+if kind == "decide-crash":
+    oi.decide = boom
+elif kind == "realpath-type-error":
+    os.path.realpath = no_strict_type_error
+elif kind == "python-3.9-realpath":
+    os.path.realpath = lambda path: real(path)
+sys.exit(oi.main(["fm-omp-identity.py", *args]))
+PY
+  launch tty --no-title; pid=$SPAWNED
+  cp "$BUN" "$t/fb/bun"
+  spawn tty "$t/fb/bun" "$t/fb/bun" /elsewhere/cli.ts; foreign=$SPAWNED
+  for kind in decide-crash realpath-type-error; do
+    rc=0; python3 -I "$t/run.py" "$IDENT" "$kind" writer "$pid" >/dev/null 2>&1 || rc=$?
+    [ "$rc" -eq 0 ] || fail "writer under $kind must answer may own (exit $rc)"
+    rc=0; python3 -I "$t/run.py" "$IDENT" "$kind" writer "$foreign" >/dev/null 2>&1 || rc=$?
+    [ "$rc" -eq 0 ] || fail "writer under $kind has no proof even for a foreign Bun (exit $rc)"
+    rc=0; python3 -I "$t/run.py" "$IDENT" "$kind" interactive "$pid" >/dev/null 2>&1 || rc=$?
+    [ "$rc" -eq 2 ] || fail "interactive under $kind is unresolved, never admitted (exit $rc)"
+  done
+  python3 -I "$t/run.py" "$IDENT" python-3.9-realpath interactive "$pid" >/dev/null 2>&1 \
+    || fail "a Python whose realpath has no strict argument must still recognize the agent"
+  rc=0; python3 -I "$t/run.py" "$IDENT" python-3.9-realpath writer "$foreign" >/dev/null 2>&1 || rc=$?
+  [ "$rc" -eq 1 ] || fail "a Python whose realpath has no strict argument must still prove a foreign Bun (exit $rc)"
+  PATH="$t/no-python" fm_agent_process_bun_may_be_omp bun bun "$foreign" \
+    || fail "with python3 missing a Bun process must read as may own"
+  rc=0; fm_agent_process_bun_may_be_omp bun bun "$foreign" || rc=$?
+  [ "$rc" -eq 1 ] || fail "with python3 present the same foreign Bun is unrelated, or the case is vacuous (exit $rc)"
+  pass "helper failure: a crash, a TypeError or a missing python3 is may-own in the writer check and never admits an adoption"
 }
 
 # --- 7. the Herdr descendant walk ---------------------------------------------------
@@ -430,23 +559,38 @@ SH
   out=$(walk "$foreignpid" "$dir/fb/bun" "$dir/fb/bun /elsewhere/cli.ts"); [ "$out" = shell ] || fail "an unrelated Bun job keeps today's outcome, got $out"
   out=$(walk 4243 less 'less x'); [ "$out" = shell ] || fail "a non-Bun descendant keeps today's outcome, got $out"
   out=$(native_first walk "$bunpid" "$BUN" "$BUN $SCRIPT --no-title"); [ "$out" = other ] || fail "a live Bun omp descendant keeps the pane occupied with a native omp first on PATH, got $out"
-  out=$(native_first walk "$foreignpid" "$dir/fb/bun" "$dir/fb/bun /elsewhere/cli.ts"); [ "$out" = other ] || fail "with no derivable installed omp a Bun descendant keeps the pane occupied, got $out"
+  out=$(native_first walk "$foreignpid" "$dir/fb/bun" "$dir/fb/bun /elsewhere/cli.ts"); [ "$out" = shell ] || fail "an unrelated Bun job keeps today's outcome with a native omp first on PATH, got $out"
   out=$(native_first walk '' bun ''); [ "$out" = shell ] || fail "a pane with no descendants stays agent-free with a native omp first on PATH, got $out"
   pass "walk: a live or unreadable Bun descendant keeps the pane occupied; an unrelated Bun job and an empty shell keep today's outcome"
 }
 
-test_live_guard_never_passes_while_a_bun_launcher_is_not_first() {
-  local base out rc=0
+test_live_guard_starts_a_bun_omp_or_ends_with_a_named_skip() {
+  local base out mutant
   base=$(fm_test_base_path_sans "$PATH" omp)
   guard() { # <PATH>
-    env -u FM_OMP_LAUNCHER -u FM_LIVE FM_OMP_IDENTITY_LIVE=1 PATH="$1" bash "$ROOT/tests/fm-omp-identity-live-e2e.test.sh" 2>&1
+    env -u FM_LIVE FM_OMP_IDENTITY_LIVE=1 PATH="$1" bash "$ROOT/tests/fm-omp-identity-live-e2e.test.sh" 2>&1
   }
-  out=$(guard "$NATIVE_BIN:$TREE:$base") || rc=$?
-  [ "$rc" -ne 0 ] || fail "a native omp first must not let the live guard pass over a Bun launcher later on PATH: $out"
-  assert_contains "$out" "$TREE/omp" "the live guard names the Bun launcher it did not check"
+  out=$(guard "$NATIVE_BIN:$TREE:$base") || fail "a native omp first must not stop the guard from starting the later Bun launcher: $out"
+  assert_contains "$out" "$TREE/omp" "the live guard names the Bun launcher that is not first"
+  assert_contains "$out" "checked " "the guard exercised the Bun rule on the later launcher"
   out=$(guard "$TREE:$NATIVE_BIN:$base") || fail "the Bun launcher first must run the live guard to its end: $out"
-  out=$(guard "$NATIVE_BIN:$base") || fail "a native omp alone has no hidden launcher: $out"
-  pass "live guard: a Bun launcher that is not first is reported by name; a first launcher and a native omp alone both run"
+  assert_contains "$out" "checked " "the guard exercised the Bun rule on the first launcher"
+  out=$(FM_OMP_IDENTITY_LIVE_LAUNCHER="$TREE/omp" guard "$NATIVE_BIN:$base") || fail "the named launcher must run the live guard to its end: $out"
+  assert_contains "$out" "checked " "the guard exercised the Bun rule on the named launcher"
+  out=$(guard "$NATIVE_BIN:$base") || fail "a native omp alone must skip, not fail: $out"
+  case "$out" in skip:*) ;; *) fail "a native omp alone must end with a skip line, not a pass: $out" ;; esac
+  assert_not_contains "$out" "checked " "a native omp alone checks nothing and claims nothing"
+  # A guard that cannot fail proves nothing: a rule that rejects the installed shape must fail it.
+  mutant="$TMP/mutant-root"
+  mkdir -p "$mutant/tests" "$mutant/bin"
+  cp "$ROOT/tests/fm-omp-identity-live-e2e.test.sh" "$ROOT/tests/lib.sh" "$mutant/tests/"
+  cp "$PROCINFO" "$mutant/bin/"
+  sed 's/^SCRIPT_PACKAGE = .*/SCRIPT_PACKAGE = "not-the-omp-package"/' "$ROOT/bin/fm-omp-identity.py" > "$mutant/bin/fm-omp-identity.py"
+  if out=$(env -u FM_LIVE FM_OMP_IDENTITY_LIVE=1 PATH="$TREE:$NATIVE_BIN:$base" bash "$mutant/tests/fm-omp-identity-live-e2e.test.sh" 2>&1); then
+    fail "a rule that rejects the installed shape must fail the live guard: $out"
+  fi
+  assert_contains "$out" "OMP IDENTITY DRIFT" "the guard reports the drift by name"
+  pass "live guard: it starts a Bun launcher wherever PATH or the named file holds one, fails when the rule rejects it, and skips by name with a native omp alone"
 }
 
 test_classifier_keeps_its_names_and_the_bun_shape_stays_other() {
@@ -471,11 +615,13 @@ test_classifier_keeps_its_names_and_the_bun_shape_stays_other
 test_session_binding_needs_the_session_file_held_open_for_writing
 test_proc_info_facts_are_kernel_facts
 test_incarnation_tells_same_second_processes_apart
-test_identity_derivation_fails_closed
+test_identity_comes_from_the_process_tree
+test_captured_facts_replay_without_the_tree
 test_role_follows_the_cli_dispatch
 test_live_processes_are_judged_by_their_actual_executable_and_script
 test_fail_closed_runs_recover_when_the_evidence_returns
 test_record_writer_check_fails_open_and_adoption_target_fails_closed
-test_native_omp_first_on_path_never_clears_a_bun_writer
+test_verdict_does_not_depend_on_the_omp_on_path
+test_a_helper_failure_is_never_proof_of_no_writer
 test_descendant_walk_never_reports_a_live_bun_agent_as_agent_free
-test_live_guard_never_passes_while_a_bun_launcher_is_not_first
+test_live_guard_starts_a_bun_omp_or_ends_with_a_named_skip

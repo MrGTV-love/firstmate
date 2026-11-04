@@ -2,7 +2,7 @@
 """Recognize the installed omp's Bun runtime as the omp interactive agent.
 
 Usage: fm-omp-identity.py interactive (PID | --facts FILE)
-       fm-omp-identity.py writer PID
+       fm-omp-identity.py writer (PID | --facts FILE)
        fm-omp-identity.py facts PID
        fm-omp-identity.py holds (PID | --facts FILE) SESSION-FILE
 
@@ -10,19 +10,24 @@ Why this exists. The host's `omp` can be a /bin/sh launcher that `exec`s the Bun
 runtime on the installed omp entry script, so the live process is named `bun`
 and only its argument vector names omp. A name match cannot recognize that
 process, and a bare `bun` match would admit every Bun program. This helper is
-the single owner of that identity rule; bin/fm-launch-proof-lib.sh is its only
-production caller.
+the single owner of that identity rule. bin/fm-launch-proof-lib.sh calls
+`interactive` and `holds`; bin/fm-agent-process-lib.sh calls `writer` for the
+record-owner check and the Herdr descendant walk.
 
-Identity. The installed omp is derived from the launcher: `omp` on PATH, or
-the file named by FM_OMP_LAUNCHER, must be a text launcher whose only command is `exec "<runtime>" "<entry script>" "$@"`, optionally after plain
-NAME=value assignments the exec line expands. A launcher in any other form, a
-file that cannot be read, a runtime or script that does not exist, or a path
-whose real location leaves the launcher's own root is underivable, so nothing
-is recognized (fail closed). No version is pinned. A process is the installed
-omp only when ALL of these hold: its kernel executable path (fm-proc-info.py
-exe, never an argument word) resolves to the installed runtime; the argument
-after argv[0] resolves to the installed entry script; and its role is the
-interactive agent.
+Identity. The installed omp is read from the live process, never from a launcher
+or from PATH, so an `omp update` that replaces a launcher cannot change the verdict
+on a process that is already running. No version is pinned. A process is the
+installed omp's interactive agent only when ALL of these hold: its kernel executable
+path (fm-proc-info.py exe, never an argument word) resolves to a regular executable
+file named bun, in a directory named bin whose parent holds a package.json with a name
+starting @oven/bun-; argv[1] is an absolute path that resolves to a file named cli.ts
+in a directory named src, whose parent holds a regular package.json named
+@oh-my-pi/pi-coding-agent and the regular files src/cli-commands.ts and src/main.ts;
+its role is the interactive agent; and its standard input is a terminal. A readable
+tree that fails a check is positively another program. Anything that cannot be read,
+or an executable or script path that no longer exists, is unresolved, never
+interactive. `facts` stores what it read in the record's `evidence`, and every verdict
+is judged from that record alone, so a capture replays without the tree.
 
 Role. The role is decided by a port of the installed CLI's own dispatch, over
 the argument ARRAY so boundaries survive: profile-flag extraction
@@ -52,22 +57,23 @@ Exit status. interactive: 0 the process is the installed omp's interactive
 agent (stdout is JSON carrying the incarnation `start`), 1 refused (a foreign
 executable or script, or another role), 2 unresolved (evidence unavailable).
 writer: 0 the process may own an omp session record (the installed omp in any
-role, anything whose identity cannot be read, or anything at all when the
-installed omp cannot be derived, a native executable first on PATH included), 1
-it is positively another program. Reasons go to stderr. Nothing here reads a process environment, sends
-a signal, or touches any file but the launcher and the paths it names.
+role, anything whose identity cannot be read, or any unexpected failure of this
+helper), 1 it is positively another program. Reasons go to stderr. Nothing here
+reads a process environment, sends a signal, or reads any file but the package
+files beside the process's own executable and script.
 """
 import json
 import os
-import re
-import shlex
-import shutil
+import stat
 import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PROC_INFO = os.path.join(HERE, "fm-proc-info.py")
 
+RUNTIME_PACKAGE_PREFIX = "@oven/bun-"
+SCRIPT_PACKAGE = "@oh-my-pi/pi-coding-agent"
+SCRIPT_MARKERS = (os.path.join("src", "cli-commands.ts"), os.path.join("src", "main.ts"))
 SELECTOR_PREFIX = "__omp_worker_"
 BOUNDARY_ARG = "--omp-profile-boundary"
 STRING_VALUE_FLAGS = frozenset("""--cwd --config --add-dir --mode --fork --provider --model --smol --slow --goal
@@ -101,76 +107,6 @@ class Foreign(Refused):
 
 class Unresolved(Exception):
     """The evidence cannot settle the question; the caller must not admit."""
-
-
-class Underivable(Unresolved):
-    """The installed omp identity cannot be derived."""
-
-
-# --- the installed identity -------------------------------------------------
-
-def _expand(text, assigned):
-    def sub(match):
-        name = match.group(1) or match.group(2)
-        if name not in assigned:
-            raise Underivable("launcher expands an unknown variable")
-        return assigned[name]
-    out = re.sub(r"\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))", sub, text)
-    if "$" in out or "`" in out or "\\" in out:
-        raise Underivable("launcher uses an unsupported expansion")
-    return out
-
-
-def installed_identity():
-    """Return (runtime_real, script_real) derived from the omp launcher."""
-    launcher = os.environ.get("FM_OMP_LAUNCHER") or shutil.which("omp")
-    if not launcher:
-        raise Underivable("no omp launcher is available")
-    try:
-        with open(launcher, "rb") as handle:
-            text = handle.read(65536).decode("utf-8")
-    except (OSError, UnicodeDecodeError):
-        raise Underivable("the omp launcher is not a readable text file") from None
-    assigned, command = {}, None
-    for raw in text.splitlines():
-        line = raw.strip()
-        if not line or line.startswith("#"):
-            continue
-        match = re.fullmatch(r"([A-Za-z_][A-Za-z0-9_]*)=(.*)", line)
-        if match and command is None:
-            value = match.group(2)
-            if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
-                value = value[1:-1]
-            assigned[match.group(1)] = _expand(value, assigned)
-        elif line.startswith("exec ") and command is None:
-            command = line
-        else:
-            raise Underivable("the omp launcher has a line this rule does not read")
-    if command is None:
-        raise Underivable("the omp launcher has no exec line")
-    try:
-        words = shlex.split(command, posix=True)
-    except ValueError:
-        raise Underivable("the omp launcher exec line cannot be split") from None
-    if len(words) != 4 or words[0] != "exec" or words[3] != "$@":
-        raise Underivable("the omp launcher exec line is not `exec <runtime> <script> \"$@\"`")
-    runtime, script = _expand(words[1], assigned), _expand(words[2], assigned)
-    if not (os.path.isabs(runtime) and os.path.isabs(script)):
-        raise Underivable("the omp launcher paths are not absolute")
-    try:
-        runtime_real, script_real = os.path.realpath(runtime, strict=True), os.path.realpath(script, strict=True)
-        root = os.path.commonpath((runtime, script))
-        root_real = os.path.realpath(root, strict=True)
-    except (OSError, ValueError):
-        raise Underivable("the omp launcher names a runtime or script that does not exist") from None
-    if not (os.path.isfile(runtime_real) and os.path.isfile(script_real)):
-        raise Underivable("the omp launcher runtime or script is not a file")
-    # A link at an installed path that leaves the installed tree would let the
-    # identity follow it to an attacker-chosen file.
-    for real in (runtime_real, script_real):
-        if root_real == os.sep or not real.startswith(root_real + os.sep):
-            raise Underivable("the omp launcher paths resolve outside the installed tree")
-    return runtime_real, script_real
 
 
 # --- the CLI's own dispatch, ported ----------------------------------------
@@ -426,6 +362,60 @@ def _read_fact(command, pid):
     return result.stdout.decode("utf-8", "surrogateescape").rstrip("\n") or None
 
 
+def _regular(path):
+    """True for a regular file, False for anything else or nothing there, None when unreadable."""
+    try:
+        return stat.S_ISREG(os.lstat(path).st_mode)
+    except (FileNotFoundError, NotADirectoryError):
+        return False
+    except OSError:
+        return None
+
+
+def _existing_real(path):
+    """The real path of a path that exists, None when it does not or cannot be read."""
+    real = os.path.realpath(path)
+    try:
+        os.lstat(real)
+    except OSError:
+        return None
+    return real
+
+
+def _package_name(directory):
+    """The name in directory's regular package.json; "" when it has none; None when unreadable."""
+    path = os.path.join(directory, "package.json")
+    regular = _regular(path)
+    if not regular:
+        return "" if regular is False else None
+    try:
+        with open(path, encoding="utf-8") as handle:
+            name = json.load(handle).get("name")
+    except (OSError, ValueError, AttributeError):
+        return None
+    return name if isinstance(name, str) else ""
+
+
+def read_evidence(exe, argv):
+    """What the tree around the process's own executable and script shows."""
+    evidence = {}
+    exe_real = _existing_real(exe) if exe else None
+    if exe_real:
+        regular = _regular(exe_real)
+        evidence.update(exe_real=exe_real, exe_regular_executable=regular and os.access(exe_real, os.X_OK),
+                        runtime_package=_package_name(os.path.dirname(os.path.dirname(exe_real))))
+    script_real = None
+    if isinstance(argv, list) and len(argv) > 1 and os.path.isabs(argv[1]):
+        script_real = _existing_real(argv[1])
+    if script_real:
+        root = os.path.dirname(os.path.dirname(script_real))
+        markers = [_regular(os.path.join(root, marker)) for marker in SCRIPT_MARKERS]
+        evidence.update(script_real=script_real, script_regular=_regular(script_real),
+                        script_package=_package_name(root),
+                        script_markers=False if False in markers else None if None in markers else True)
+    return evidence
+
+
 def live_facts(pid):
     facts = {"pid": int(pid), "start": _read_fact("startid", pid), "exe": _read_fact("exe", pid),
              "stdin": _read_fact("stdin", pid)}
@@ -434,6 +424,7 @@ def live_facts(pid):
         facts["argv"] = json.loads(raw) if raw else None
     except ValueError:
         facts["argv"] = None
+    facts["evidence"] = read_evidence(facts["exe"], facts["argv"])
     return facts
 
 
@@ -449,40 +440,82 @@ def holds_file(writable, path):
                and entry.get("dev") == (target.st_dev & 0xFFFFFFFF) for entry in writable)
 
 
-def decide(facts, identity):
+def _settled(value, what):
+    if value is None:
+        raise Unresolved(f"{what} cannot be read")
+    return value
+
+
+def decide(facts):
     """Raise Refused or Unresolved unless facts are the installed omp's interactive agent."""
-    runtime_real, script_real = identity
-    exe, argv = facts.get("exe"), facts.get("argv")
+    exe, argv, evidence = facts.get("exe"), facts.get("argv"), facts.get("evidence")
     if not facts.get("start"):
         raise Unresolved("the process start identity cannot be read")
     if not exe:
         raise Unresolved("the actual executable path cannot be read")
     if not isinstance(argv, list) or not all(isinstance(word, str) for word in argv):
         raise Unresolved("the argument vector cannot be read with its boundaries")
-    try:
-        exe_real = os.path.realpath(exe, strict=True)
-    except OSError:
-        raise Unresolved("the actual executable path does not resolve") from None
-    if exe_real != runtime_real:
-        raise Foreign("the executable is not the installed omp runtime")
+    if not isinstance(evidence, dict):
+        raise Unresolved("the installed tree evidence cannot be read")
+    exe_real = _settled(evidence.get("exe_real"), "the actual executable path")
+    if os.path.basename(exe_real) != "bun" or os.path.basename(os.path.dirname(exe_real)) != "bin":
+        raise Foreign("the executable is not a bun in a bin directory")
+    if not _settled(evidence.get("exe_regular_executable"), "the executable file"):
+        raise Foreign("the executable is not a regular executable file")
+    if not _settled(evidence.get("runtime_package"), "the runtime package").startswith(RUNTIME_PACKAGE_PREFIX):
+        raise Foreign("the executable is not in a Bun runtime package")
     if len(argv) < 2:
-        raise Foreign("the installed runtime runs no script")
+        raise Foreign("the runtime runs no script")
     if not os.path.isabs(argv[1]):
         raise Unresolved("the script argument is not an absolute path")
-    try:
-        script = os.path.realpath(argv[1], strict=True)
-    except OSError:
-        raise Foreign("the script argument does not resolve to the installed entry script") from None
-    if script != script_real:
-        raise Foreign("the script is not the installed omp entry script")
+    script_real = _settled(evidence.get("script_real"), "the script path")
+    if os.path.basename(script_real) != "cli.ts" or os.path.basename(os.path.dirname(script_real)) != "src":
+        raise Foreign("the script is not a cli.ts in a src directory")
+    if not _settled(evidence.get("script_regular"), "the script file"):
+        raise Foreign("the script is not a regular file")
+    if _settled(evidence.get("script_package"), "the script package") != SCRIPT_PACKAGE:
+        raise Foreign("the script is not in the omp package")
+    if not _settled(evidence.get("script_markers"), "the omp package files"):
+        raise Foreign("the omp package lacks its command and main files")
     decide_role(argv[2:], facts.get("stdin"))
 
 
-def _identity_or_none():
+def _valid_source(source):
+    return (len(source) == 1 and source[0].isdigit()) or (len(source) == 2 and source[0] == "--facts")
+
+
+def _load_facts(source):
+    if source[0] == "--facts":
+        with open(source[1], encoding="utf-8") as handle:
+            return json.load(handle)
+    return live_facts(source[0])
+
+
+def _writer(source):
     try:
-        return installed_identity()
-    except Underivable as error:
-        return error
+        decide(_load_facts(source))
+    except Foreign as error:
+        print(f"unrelated: {error}", file=sys.stderr)
+        return 1
+    except Exception as error:
+        print(f"may own: {error}", file=sys.stderr)
+        return 0
+    print("may own: the installed omp interactive agent", file=sys.stderr)
+    return 0
+
+
+def _interactive(source):
+    try:
+        facts = _load_facts(source)
+        decide(facts)
+    except Refused as error:
+        print(f"refused: {error}", file=sys.stderr)
+        return 1
+    except Exception as error:
+        print(f"unresolved: {error}", file=sys.stderr)
+        return 2
+    print(json.dumps({"verdict": "interactive", "start": facts["start"], "pid": facts.get("pid")}))
+    return 0
 
 
 def main(argv):
@@ -515,61 +548,15 @@ def main(argv):
             facts["writable"] = json.loads(raw) if raw else None
         except ValueError:
             facts["writable"] = None
-        identity = _identity_or_none()
-        if not isinstance(identity, Exception):
-            facts["identity"] = {"runtime": identity[0], "script": identity[1]}
         print(json.dumps(facts))
         return 0
-    valid = ((len(args) == 2 and args[0] in ("interactive", "writer") and args[1].isdigit())
-             or (len(args) == 3 and args[:2] == ["interactive", "--facts"]))
-    if not valid:
-        print(__doc__.split("\n\n")[0], file=sys.stderr)
-        return 64
-    mode = args[0]
-    if args[1] == "--facts":
-        try:
-            with open(args[2], encoding="utf-8") as handle:
-                facts = json.load(handle)
-        except (OSError, ValueError):
-            print("unresolved: the captured facts cannot be read", file=sys.stderr)
-            return 2
-        captured = facts.get("identity") if isinstance(facts, dict) else None
-        identity = (captured["runtime"], captured["script"]) if isinstance(captured, dict) \
-            and captured.get("runtime") and captured.get("script") else _identity_or_none()
-    else:
-        facts = live_facts(args[1])
-        identity = _identity_or_none()
-    if mode == "writer":
-        if isinstance(identity, Exception):
-            print(f"may own: {identity}", file=sys.stderr)
-            return 0
-        try:
-            decide(facts, identity)
-        except Foreign as error:
-            print(f"unrelated: {error}", file=sys.stderr)
-            return 1
-        except Refused as error:
-            # Another role of the installed omp may still own the record.
-            print(f"may own: {error}", file=sys.stderr)
-            return 0
-        except Unresolved as error:
-            print(f"may own: {error}", file=sys.stderr)
-            return 0
-        print("may own: the installed omp interactive agent", file=sys.stderr)
-        return 0
-    if isinstance(identity, Exception):
-        print(f"unresolved: {identity}", file=sys.stderr)
-        return 2
-    try:
-        decide(facts, identity)
-    except Refused as error:
-        print(f"refused: {error}", file=sys.stderr)
-        return 1
-    except Unresolved as error:
-        print(f"unresolved: {error}", file=sys.stderr)
-        return 2
-    print(json.dumps({"verdict": "interactive", "start": facts["start"], "pid": facts.get("pid")}))
-    return 0
+    source = args[1:]
+    if args[:1] == ["writer"] and _valid_source(source):
+        return _writer(source)
+    if args[:1] == ["interactive"] and _valid_source(source):
+        return _interactive(source)
+    print(__doc__.split("\n\n")[0], file=sys.stderr)
+    return 64
 
 
 if __name__ == "__main__":
