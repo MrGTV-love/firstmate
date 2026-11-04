@@ -2146,7 +2146,7 @@ for name, why in (('gate-refused', gate_refusal), ('gate-nm-unreadable', nm_unre
                   ('gate-nm-norun-merged', nm_norun)):
     gate = acceptance.get(name)
     assert gate and gate['owner'] == 'firstmate', ('a refused done claim needs an owned row', name, mine(name))
-    assert 'resolve the refused done claim' in gate['next_action'] and why in gate['next_action'], gate
+    assert "resolve the ship-done gate's refusal of the done claim" in gate['next_action'] and why in gate['next_action'], gate
 assert not any(r['category'] in ('pending_cleanup', 'pending_acceptance') for r in mine('gate-nm-down')), mine('gate-nm-down')
 # The rows come from the records alone, so a fresh process (a restart) finds the same obligations.
 again = ledger4()

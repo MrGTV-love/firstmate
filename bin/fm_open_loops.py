@@ -1150,7 +1150,7 @@ class Collector:
         ident = task["id"]
         pr_url = task["pr"].get("url")
         refusal = self.teardown_refusal(ident)
-        refused = (f"plain bin/fm-teardown.sh {ident} was refused: {refusal}; the owning home clears that cause and "
+        refused = (f"plain bin/fm-teardown.sh {ident} ended in a refusal: {refusal}; the owning home clears that cause and "
                    "runs it again (dropping the work needs the captain's own words)") if refusal else ""
         _, verb, open_decision, pause_limit, _, _ = self.report_status(ident)
         state = task["current_state"].get("state")
@@ -1167,10 +1167,10 @@ class Collector:
             if self.covering_rows(ident, pr_url):
                 self.attach_refusal(ident, pr_url, refusal, refused)
                 return
-            self.add("pending_acceptance", ident, f"resolve the refused done claim of {ident}: {detail}"
+            self.add("pending_acceptance", ident, f"resolve the ship-done gate's refusal of the done claim of {ident}: {detail}"
                      + (f"; {refused}" if refused else ""), since, "firstmate",
                      evidence=(f"last teardown refusal: {refusal}; " if refusal else "")
-                              + "the last report was done and the ship-done gate refused it")
+                              + "the last report was done and the ship-done gate did not accept it")
             return
         landed = self.source("finished deliverable " + ident, self.deliverable_landed, task)
         if landed:
@@ -1194,7 +1194,7 @@ class Collector:
                               f"words are recorded at {words}: Main needs the captain's own words before an attended "
                               f"bin/fm-teardown.sh {ident} --force --drop-file")
                 if refusal:
-                    action = f"{action}; the last plain teardown was refused: {refusal}"
+                    action = f"{action}; the last plain teardown ended in a refusal: {refusal}"
             self.add("pending_cleanup", ident, action, merged_at or since, row_owner,
                      evidence=(f"last teardown refusal: {refusal}; " if refusal else "")
                               + f"finished: {why}; the record is still open")
