@@ -1,0 +1,4 @@
+$ bash tests/fm-lint-slots.test.sh test_unbounded_root_over_resident_bound_is_ended_and_retried_narrower
+start 2026-11-04T20:41:32Z load: load averages: 35.97 35.72 37.98
+not ok - the root was not ended at the bound: lint waited out the growing process
+rc=1 wall=23s

@@ -1,0 +1,4 @@
+$ bash tests/fm-lint-slots.test.sh test_slot_file_failures_refuse_and_never_run_unbounded
+start 2026-11-04T20:40:14Z load: load averages: 52.94 36.60 38.43
+ok - slot open, counter and non-contention coordinator/scan lock failures refuse naming the path and never run the analysis
+rc=0 wall=12s

@@ -1,0 +1,11 @@
+not ok - a stand-in lint run failed (rc=143)
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+tests/fm-lint-slots.test.sh: line 904: [: : integer expression expected
+not ok - a pool with no records ran  roots at once, more than two recorded roots fit: 

@@ -1,0 +1,4 @@
+$ bash tests/fm-lint-slots.test.sh test_slot_survives_gate_death
+start 2026-11-04T20:39:48Z load: load averages: 40.00 33.13 37.31
+ok - inherited slots prevent overlap after gate death and allow admission after watchdog cleanup
+rc=0 wall=26s

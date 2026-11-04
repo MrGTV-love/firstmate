@@ -1,0 +1,4 @@
+Rule set before reading any stall-driver output (2026-11-04):
+- pass: all 12 roots finish in the 900 s limit, and the longest gap between two root starts is under 60 s.
+- stall: a timeout, or a gap of 60 s or more with slots free.
+- A base control (FM_LINT_HOST_SLOTS=2, same ps delays) decides old path versus new path.

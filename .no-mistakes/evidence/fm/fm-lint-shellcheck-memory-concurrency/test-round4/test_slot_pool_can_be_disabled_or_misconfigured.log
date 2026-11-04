@@ -1,0 +1,4 @@
+$ bash tests/fm-lint-slots.test.sh test_slot_pool_can_be_disabled_or_misconfigured
+start 2026-11-04T20:40:26Z load: load averages: 53.46 37.25 38.65
+ok - the slot pool can be disabled, rejects bad settings, and refuses an unusable directory instead of running unbounded
+rc=0 wall=28s

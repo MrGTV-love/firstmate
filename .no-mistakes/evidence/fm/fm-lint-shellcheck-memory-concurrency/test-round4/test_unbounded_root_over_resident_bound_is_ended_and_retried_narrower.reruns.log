@@ -1,0 +1,12 @@
+$ rerun 1: bash tests/fm-lint-slots.test.sh test_unbounded_root_over_resident_bound_is_ended_and_retried_narrower
+start 2026-11-04T20:44:28Z load: load averages: 28.15 32.31 36.13
+ok - a root over the resident-memory bound is ended and retried narrower with the roots log marking it
+rc=0 wall=10s
+$ rerun 2: bash tests/fm-lint-slots.test.sh test_unbounded_root_over_resident_bound_is_ended_and_retried_narrower
+start 2026-11-04T20:44:38Z load: load averages: 25.67 31.64 35.85
+ok - a root over the resident-memory bound is ended and retried narrower with the roots log marking it
+rc=0 wall=11s
+$ rerun 3: bash tests/fm-lint-slots.test.sh test_unbounded_root_over_resident_bound_is_ended_and_retried_narrower
+start 2026-11-04T20:44:50Z load: load averages: 24.39 31.17 35.64
+ok - a root over the resident-memory bound is ended and retried narrower with the roots log marking it
+rc=0 wall=10s

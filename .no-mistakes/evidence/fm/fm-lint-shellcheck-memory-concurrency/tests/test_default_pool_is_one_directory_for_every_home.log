@@ -1,0 +1,1 @@
+ok - runs with different HOME and XDG_CACHE_HOME values take tickets in the same per-user pool

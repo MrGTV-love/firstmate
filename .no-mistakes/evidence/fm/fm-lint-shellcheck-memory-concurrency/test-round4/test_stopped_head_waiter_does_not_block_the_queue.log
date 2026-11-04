@@ -1,0 +1,4 @@
+$ bash tests/fm-lint-slots.test.sh test_stopped_head_waiter_does_not_block_the_queue
+start 2026-11-04T20:36:08Z load: load averages: 25.73 30.30 38.06
+ok - a stopped head waiter is skipped while a slot is free and is admitted once resumed
+rc=0 wall=13s

@@ -1,0 +1,4 @@
+$ bash tests/fm-lint-slots.test.sh test_default_pool_is_one_directory_for_every_home
+start 2026-11-04T19:29:06Z load: load averages: 78.24 61.77 64.07
+ok - runs with different HOME and XDG_CACHE_HOME values take tickets in the same per-user pool
+rc=0 wall=31s

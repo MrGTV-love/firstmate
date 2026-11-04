@@ -1,0 +1,4 @@
+$ bash tests/fm-lint-slots.test.sh test_memory_failure_retries_without_external_sources
+start 2026-11-04T20:41:55Z load: load averages: 37.22 36.03 38.04
+ok - memory failures retry without source following, exclude cross-file codes, and preserve a real fallback finding
+rc=0 wall=16s

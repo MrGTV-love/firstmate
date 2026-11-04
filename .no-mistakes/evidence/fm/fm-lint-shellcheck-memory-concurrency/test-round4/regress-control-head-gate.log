@@ -1,0 +1,3 @@
+$ (same subset tree, head gate) bash tests/fm-lint-slots.test.sh test_slow_ps_does_not_hold_admission_against_the_next_root
+ok - a waiter's slow ps does not keep the next root out of admission
+rc=0 wall=14s

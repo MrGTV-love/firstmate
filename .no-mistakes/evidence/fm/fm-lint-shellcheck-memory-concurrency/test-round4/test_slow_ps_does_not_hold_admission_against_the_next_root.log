@@ -1,0 +1,4 @@
+$ bash tests/fm-lint-slots.test.sh test_slow_ps_does_not_hold_admission_against_the_next_root
+start 2026-11-04T20:35:50Z load: load averages: 25.19 30.52 38.31
+ok - a waiter's slow ps does not keep the next root out of admission
+rc=0 wall=18s

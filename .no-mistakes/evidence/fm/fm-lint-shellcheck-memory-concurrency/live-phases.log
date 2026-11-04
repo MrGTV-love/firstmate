@@ -1,0 +1,14 @@
+[p0] pressure level before: 1
+p0-head-unbudgeted: wall=87.4s peak_sum_max_rss_footprint_kib=706240 (690 MiB) peak_sum_rss_kib=706240 peak_concurrent=8 samples=451
+  peak sample: 25.92	7	706240	706240	89763:103680/90688,96382:110576/97856,77654:110928/97888,99213:82912/70176,3630:83936/71200,97475:103408/90688,85006:110800/97856
+max sampler gap: 0.72s
+run 1 exit 1
+run 2 exit 1
+run 3 exit 1
+run 4 exit 1
+history records (KiB):
+  626c31c32dcb 112160
+  c0d0c5b2ed70 105008
+  e1e41042c5c5 107024
+max record from p0 pool: 112160 KiB; budget = 2.5x = 280400 KiB
+[p1] pressure level before: 1

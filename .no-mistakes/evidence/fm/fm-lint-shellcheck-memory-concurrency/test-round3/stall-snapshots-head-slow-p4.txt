@@ -1,0 +1,142 @@
+== snapshot 1 19:32:07 roots_done=       2 no_end_for=60s load=71.37 63.50 64.07
+4
+queue.00000000000000000002.13926.6728
+queue.00000000000000000004.27518.6728
+queue.00000000000000000005.18648.6976
+queue.00000000000000000006.18646.6976
+slot.0: 6895	3	18704	8388608
+slot.0.peak: 1264
+slot.1: 
+slot.2: 
+slot.3: 
+slot.4: 
+slot.5: 
+slot.6: 
+slot.7: 
+slot.8: 
+-- holders of admission.lock (open, flock owner not shown)
+13926 18646 18648 18702 20410 20537 27518 
+-- slot.0 openers
+perl 27518
+-- ps children of gates
+6516 6467 01:12
+10632 9881 01:10
+13926 10632 01:09
+17518 10744 01:08
+17543 10880 01:08
+17823 10797 01:08
+18646 17518 01:07
+18648 17823 01:07
+18702 17543 01:07
+18977 16906 01:07
+19033 16889 01:07
+20410 18977 01:07
+20537 19033 01:06
+27106 9862 01:04
+27518 27106 01:04
+40974 13926    00:04 /bin/ps -axww -o pid=,stat=,command=
+41769 18598    00:03 /bin/sh /tmp/fm-t3-stall.80974/head-slow-ps-2/bin/ps -axww -o pid=,st
+43461 18666    00:02 /bin/sh /tmp/fm-t3-stall.80974/head-slow-ps-2/bin/ps -axww -o pid=,st
+43857 18702    00:02 /bin/sh /tmp/fm-t3-stall.80974/head-slow-p4/bin/ps -axww -o pid=,stat
+44199 27518    00:02 /bin/sh /tmp/fm-t3-stall.80974/head-slow-p4/bin/ps -o pid=,stat= -p 1
+44809 14092    00:01 /bin/sh /tmp/fm-t3-stall.80974/head-slow-ps-2/bin/ps -axww -o pid=,st
+45255 35403    00:01 /bin/sh /tmp/fm-t3-stall.80974/head-slow-ps-2/bin/ps -axww -o pid=,st
+45325 20410    00:01 /bin/sh /tmp/fm-t3-stall.80974/head-slow-p4/bin/ps -axww -o pid=,stat
+45566 18663    00:01 /bin/sh /tmp/fm-t3-stall.80974/head-slow-ps-2/bin/ps -axww -o pid=,st
+45578 18648    00:01 /bin/sh /tmp/fm-t3-stall.80974/head-slow-p4/bin/ps -axww -o pid=,stat
+45732 18646    00:01 /bin/sh /tmp/fm-t3-stall.80974/head-slow-p4/bin/ps -axww -o pid=,stat
+46163 20537    00:01 /bin/sh /tmp/fm-t3-stall.80974/head-slow-p4/bin/ps -axww -o pid=,stat
+46387 45267    00:01 /bin/ps -o pid=,stat= -p 14092,18598,18663,18666,35403
+47601  6516    00:00 /bin/ps -axo pid=,ppid=,etime=,command=
+== snapshot 2 19:33:08 roots_done=       2 no_end_for=60s load=52.81 59.56 62.56
+6
+queue.00000000000000000002.13926.6728
+queue.00000000000000000004.27518.6728
+queue.00000000000000000005.18648.6976
+queue.00000000000000000006.18646.6976
+queue.00000000000000000007.20537.6818
+queue.00000000000000000008.20410.6818
+slot.0: 6895	3	18704	8388608
+slot.0.peak: 1264
+slot.1: 
+slot.2: 
+slot.3: 
+slot.4: 
+slot.5: 
+slot.6: 
+slot.7: 
+slot.8: 
+-- holders of admission.lock (open, flock owner not shown)
+13926 18646 18648 18702 20410 20537 27518 
+-- slot.0 openers
+perl 27518
+-- ps children of gates
+6516 6467 02:16
+10632 9881 02:14
+13926 10632 02:13
+17518 10744 02:12
+17543 10880 02:12
+17823 10797 02:12
+18646 17518 02:11
+18648 17823 02:11
+18702 17543 02:11
+18977 16906 02:11
+19033 16889 02:11
+20410 18977 02:11
+20537 19033 02:10
+27106 9862 02:08
+27518 27106 02:08
+71097 20410    00:04 /bin/ps -axww -o pid=,stat=,command=
+78312 18646    00:02 /bin/sh /tmp/fm-t3-stall.80974/head-slow-p4/bin/ps -axww -o pid=,stat
+78813 13926    00:02 /bin/sh /tmp/fm-t3-stall.80974/head-slow-p4/bin/ps -axww -o pid=,stat
+78880 45267    00:02 /bin/sh /tmp/fm-t3-stall.80974/head-slow-ps-2/bin/ps -axww -o pid=,st
+78883 18702    00:02 /bin/sh /tmp/fm-t3-stall.80974/head-slow-p4/bin/ps -axww -o pid=,stat
+80247 27518    00:01 /bin/sh /tmp/fm-t3-stall.80974/head-slow-p4/bin/ps -o pid=,stat= -p 1
+80355 64140    00:01 ps -o pid=,stat= -p 64081,64083,64084,64136,64142,64144
+80364  7347    00:01 /bin/ps -o pid=,stat= -p 45267,51603
+80484 18648    00:01 /bin/sh /tmp/fm-t3-stall.80974/head-slow-p4/bin/ps -axww -o pid=,stat
+80489 20537    00:01 /bin/sh /tmp/fm-t3-stall.80974/head-slow-p4/bin/ps -axww -o pid=,stat
+80839 64083    00:00 ps -axww -o pid=,stat=,command=
+80937  6516    00:00 /bin/ps -axo pid=,ppid=,etime=,command=
+81132 64084    00:00 ps -axww -o pid=,stat=,command=
+81350 64144    00:00 ps -axww -o pid=,stat=,command=
+== snapshot 3 19:34:39 roots_done=       5 no_end_for=60s load=46.32 55.89 60.85
+3
+queue.00000000000000000004.27518.6728
+queue.00000000000000000006.18646.6976
+queue.00000000000000000008.20410.6818
+slot.0: 6728	2	13926	38432
+slot.0.peak: 1264
+slot.1: 6976	5	18648	38432
+slot.1.peak: 1264
+slot.2: 6818	7	20537	38352
+slot.2.peak: 1264
+slot.3: 
+slot.4: 
+slot.5: 
+slot.6: 
+slot.7: 
+slot.8: 
+-- holders of admission.lock (open, flock owner not shown)
+18646 18702 20410 27518 28118 
+-- slot.0 openers
+perl 20410
+-- ps children of gates
+6516 6467 03:43
+17518 10744 03:39
+17543 10880 03:39
+18646 17518 03:38
+18702 17543 03:38
+18977 16906 03:38
+20410 18977 03:38
+27106 9862 03:35
+27518 27106 03:35
+28027 16889 01:02
+28118 28027 01:02
+55622 18646    00:03 /bin/sh /tmp/fm-t3-stall.80974/head-slow-p4/bin/ps -axww -o pid=,stat
+55694 28118    00:03 /bin/sh /tmp/fm-t3-stall.80974/head-slow-p4/bin/ps -axww -o pid=,stat
+55724 27518    00:03 /bin/sh /tmp/fm-t3-stall.80974/head-slow-p4/bin/ps -axww -o pid=,stat
+55812 18702    00:03 /bin/sh /tmp/fm-t3-stall.80974/head-slow-p4/bin/ps -axww -o pid=,stat
+56068 20410    00:03 /bin/sh /tmp/fm-t3-stall.80974/head-slow-p4/bin/ps -o pid=,stat= -p 1
+60413 49500    00:00 ps -o pid=,stat= -p 49491,49492,49510,57315,57341
+60435  6516    00:00 /bin/ps -axo pid=,ppid=,etime=,command=

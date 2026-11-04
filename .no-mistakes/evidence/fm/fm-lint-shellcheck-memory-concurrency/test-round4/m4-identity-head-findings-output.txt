@@ -1,0 +1,38 @@
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+
+In /tmp/fm-r4-lab.8aKux0/m4/fx/findings.sh line 4:
+echo $x
+     ^-- SC2086 (info): Double quote to prevent globbing and word splitting.
+
+Did you mean:
+echo "$x"
+
+
+In /tmp/fm-r4-lab.8aKux0/m4/fx/findings.sh line 5:
+if [ $x = 1 ]; then for f in $(ls); do echo $f; done; fi
+     ^-- SC2086 (info): Double quote to prevent globbing and word splitting.
+                             ^---^ SC2045 (error): Iterating over ls output is fragile. Use globs.
+                                            ^-- SC2086 (info): Double quote to prevent globbing and word splitting.
+
+Did you mean:
+if [ "$x" = 1 ]; then for f in $(ls); do echo "$f"; done; fi
+
+
+In /tmp/fm-r4-lab.8aKux0/m4/fx/findings.sh line 6:
+unused=1
+^----^ SC2034 (warning): unused appears unused. Verify use (or export if used externally).
+
+
+In /tmp/fm-r4-lab.8aKux0/m4/fx/findings.sh line 7:
+cd /tmp
+^-----^ SC2164 (warning): Use 'cd ... || exit' or 'cd ... || return' in case cd fails.
+
+Did you mean:
+cd /tmp || exit
+
+For more information:
+  https://www.shellcheck.net/wiki/SC2045 -- Iterating over ls output is fragi...
+  https://www.shellcheck.net/wiki/SC2034 -- unused appears unused. Verify use...
+  https://www.shellcheck.net/wiki/SC2164 -- Use 'cd ... || exit' or 'cd ... |...
+ledger: "/private/tmp/fm-r4-lab.8aKux0/headtree/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"

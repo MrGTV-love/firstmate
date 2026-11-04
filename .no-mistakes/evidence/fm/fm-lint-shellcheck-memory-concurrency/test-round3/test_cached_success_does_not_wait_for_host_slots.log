@@ -1,0 +1,4 @@
+$ bash tests/fm-lint-slots.test.sh test_cached_success_does_not_wait_for_host_slots
+start 2026-11-04T19:30:44Z load: load averages: 57.44 58.26 62.40
+ok - a content-identical cached success finishes while all host slots remain occupied
+rc=0 wall=65s

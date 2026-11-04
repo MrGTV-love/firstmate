@@ -1,0 +1,65 @@
+Wed Nov  4 18:42:06 UTC 2026
+12:42  up 10:37, 1 user, load averages: 92.86 103.12 104.07
+== ps timing
+real 0.49
+user 0.00
+sys 0.04
+real 3.92
+user 0.02
+sys 0.08
+== pool /Users/charlesabrooker/tmp/fm-lint-memory-budget.rVkeZf/shared
+total 16
+drwx------  21 charlesabrooker  staff  672 Nov  4 12:23 .
+drwx------  23 charlesabrooker  staff  736 Nov  4 12:18 ..
+-rw-r--r--   1 charlesabrooker  staff    0 Nov  4 12:18 admission.lock
+drwx------   4 charlesabrooker  staff  128 Nov  4 12:24 history
+-rw-r--r--   1 charlesabrooker  staff    0 Nov  4 12:19 queue.00000000000000000004.42448.4716
+-rw-r--r--   1 charlesabrooker  staff    0 Nov  4 12:19 queue.00000000000000000005.33306.4830
+-rw-r--r--   1 charlesabrooker  staff    0 Nov  4 12:22 queue.00000000000000000006.5682.4743
+-rw-r--r--   1 charlesabrooker  staff    0 Nov  4 12:22 queue.00000000000000000007.27755.4830
+-rw-r--r--   1 charlesabrooker  staff    0 Nov  4 12:22 queue.00000000000000000008.33527.4743
+-rw-r--r--   1 charlesabrooker  staff    0 Nov  4 12:23 queue.00000000000000000009.41986.4716
+-rw-r--r--   1 charlesabrooker  staff    0 Nov  4 12:23 queue.00000000000000000010.75775.4758
+-rw-r--r--   1 charlesabrooker  staff    3 Nov  4 12:23 queue.next
+-rw-r--r--   1 charlesabrooker  staff   20 Nov  4 12:23 slot.0
+-rw-r--r--   1 charlesabrooker  staff    0 Nov  4 12:18 slot.1
+-rw-r--r--   1 charlesabrooker  staff    0 Nov  4 12:18 slot.2
+-rw-r--r--   1 charlesabrooker  staff    0 Nov  4 12:18 slot.3
+-rw-r--r--   1 charlesabrooker  staff    0 Nov  4 12:18 slot.4
+-rw-r--r--   1 charlesabrooker  staff    0 Nov  4 12:18 slot.5
+-rw-r--r--   1 charlesabrooker  staff    0 Nov  4 12:18 slot.6
+-rw-r--r--   1 charlesabrooker  staff    0 Nov  4 12:18 slot.7
+-rw-r--r--   1 charlesabrooker  staff    0 Nov  4 12:18 slot.8
+/Users/charlesabrooker/tmp/fm-lint-memory-budget.rVkeZf/shared/slot.0: 4758	2	25841	262144
+/Users/charlesabrooker/tmp/fm-lint-memory-budget.rVkeZf/shared/slot.1: 
+/Users/charlesabrooker/tmp/fm-lint-memory-budget.rVkeZf/shared/slot.2: 
+/Users/charlesabrooker/tmp/fm-lint-memory-budget.rVkeZf/shared/slot.3: 
+/Users/charlesabrooker/tmp/fm-lint-memory-budget.rVkeZf/shared/slot.4: 
+/Users/charlesabrooker/tmp/fm-lint-memory-budget.rVkeZf/shared/slot.5: 
+/Users/charlesabrooker/tmp/fm-lint-memory-budget.rVkeZf/shared/slot.6: 
+/Users/charlesabrooker/tmp/fm-lint-memory-budget.rVkeZf/shared/slot.7: 
+/Users/charlesabrooker/tmp/fm-lint-memory-budget.rVkeZf/shared/slot.8: 
+== history
+137856
+136656
+== spans
+36572 1793816342.200022 1793816343.256148
+72549 1793816354.033474 1793816355.201815
+65950 1793816636.895255 1793816637.999286
+== lsof slot.0 / admission.lock
+COMMAND   PID            USER   FD   TYPE DEVICE SIZE/OFF       NODE NAME
+perl     5682 charlesabrooker    3w   REG   1,15        0 1241839755 /Users/charlesabrooker/tmp/fm-lint-memory-budget.rVkeZf/shared/admission.lock
+perl    27755 charlesabrooker    3w   REG   1,15        0 1241839755 /Users/charlesabrooker/tmp/fm-lint-memory-budget.rVkeZf/shared/admission.lock
+perl    33306 charlesabrooker    3w   REG   1,15        0 1241839755 /Users/charlesabrooker/tmp/fm-lint-memory-budget.rVkeZf/shared/admission.lock
+perl    33527 charlesabrooker    3w   REG   1,15        0 1241839755 /Users/charlesabrooker/tmp/fm-lint-memory-budget.rVkeZf/shared/admission.lock
+perl    33527 charlesabrooker    5w   REG   1,15       20 1241839759 /Users/charlesabrooker/tmp/fm-lint-memory-budget.rVkeZf/shared/slot.0
+perl    41986 charlesabrooker    3w   REG   1,15        0 1241839755 /Users/charlesabrooker/tmp/fm-lint-memory-budget.rVkeZf/shared/admission.lock
+perl    42448 charlesabrooker    3w   REG   1,15        0 1241839755 /Users/charlesabrooker/tmp/fm-lint-memory-budget.rVkeZf/shared/admission.lock
+perl    75775 charlesabrooker    3w   REG   1,15        0 1241839755 /Users/charlesabrooker/tmp/fm-lint-memory-budget.rVkeZf/shared/admission.lock
+== gate children
+47692 75775    00:05 R    (ps)
+47809 42448    00:05 R    (ps)
+48392 27755    00:05 R    (ps)
+49456 33306    00:04 R    ps -o pid=,stat= -p 27755,33527,41986,42448,5682,75775
+50474 41986    00:04 R    ps -axww -o pid=,stat=,command=
+51176  5682    00:03 R    ps -axww -o pid=,stat=,command=

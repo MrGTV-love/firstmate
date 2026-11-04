@@ -1,0 +1,4 @@
+$ bash tests/fm-lint-slots.test.sh test_root_larger_than_the_budget_runs_alone_and_a_killed_run_frees_its_charge
+start 2026-11-04T19:23:41Z load: load averages: 54.38 51.10 63.98
+ok - a root larger than the budget runs alone, and a killed run frees its charge and leaves no ticket
+rc=0 wall=80s

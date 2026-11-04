@@ -1,0 +1,7 @@
+head-real-ps         longest_start_gap_s=11.3 wall=40s timed_out=0 exit_codes= 0 0 0 0
+head-slow-ps         longest_start_gap_s=94.2 wall=272s timed_out=0 exit_codes= 0 0 0 0
+head-slow-ps-2       longest_start_gap_s=78.3 wall=200s timed_out=0 exit_codes= 0 0 0 0
+head-slow-p4         longest_start_gap_s=149.4 wall=276s timed_out=0 exit_codes= 0 0 0 0
+base-cap2-real-ps    longest_start_gap_s=2.5 wall=50s timed_out=0 exit_codes= 0 0 0 0
+base-cap2-slow-ps    longest_start_gap_s=3.6 wall=50s timed_out=0 exit_codes= 0 0 0 0
+base-cap2-slow-p4    longest_start_gap_s=4.8 wall=50s timed_out=0 exit_codes= 0 0 0 0

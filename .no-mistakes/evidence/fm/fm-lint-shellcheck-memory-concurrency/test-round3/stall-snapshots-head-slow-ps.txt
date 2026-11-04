@@ -1,0 +1,69 @@
+== snapshot 1 19:29:27 roots_done=      12 no_end_for=60s load=70.58 61.33 63.84
+0
+slot.0: 7077	11	70925	38400
+slot.0.peak: 1264
+slot.1: 7621	12	86381	38400
+slot.1.peak: 1264
+slot.2: 
+slot.3: 
+slot.4: 
+slot.5: 
+slot.6: 
+slot.7: 
+slot.8: 
+-- holders of admission.lock (open, flock owner not shown)
+
+-- slot.0 openers
+-- ps children of gates
+34468 1 01:47
+42307 34468    00:01 /bin/ps -axo pid=,ppid=,etime=,command=
+== snapshot 2 19:30:27 roots_done=      12 no_end_for=60s load=51.38 57.14 62.08
+0
+slot.0: 7077	11	70925	38400
+slot.0.peak: 1264
+slot.1: 7621	12	86381	38400
+slot.1.peak: 1264
+slot.2: 
+slot.3: 
+slot.4: 
+slot.5: 
+slot.6: 
+slot.7: 
+slot.8: 
+-- holders of admission.lock (open, flock owner not shown)
+
+-- slot.0 openers
+-- ps children of gates
+34468 1 03:01
+85628 34468    00:00 /bin/ps -axo pid=,ppid=,etime=,command=
+== snapshot 3 19:31:29 roots_done=      12 no_end_for=60s load=75.93 62.96 63.91
+0
+slot.0: 7077	11	70925	38400
+slot.0.peak: 1264
+slot.1: 7621	12	86381	38400
+slot.1.peak: 1264
+slot.2: 
+slot.3: 
+slot.4: 
+slot.5: 
+slot.6: 
+slot.7: 
+slot.8: 
+-- holders of admission.lock (open, flock owner not shown)
+
+-- slot.0 openers
+-- ps children of gates
+34468 1 03:59
+85206 18702    00:04 /bin/sh /tmp/fm-t3-stall.80974/head-slow-p4/bin/ps -axww -o pid=,stat
+85217 13926    00:04 /bin/sh /tmp/fm-t3-stall.80974/head-slow-p4/bin/ps -axww -o pid=,stat
+85268 18666    00:04 /bin/sh /tmp/fm-t3-stall.80974/head-slow-ps-2/bin/ps -axww -o pid=,st
+85848 18598    00:03 /bin/sh /tmp/fm-t3-stall.80974/head-slow-ps-2/bin/ps -axww -o pid=,st
+87094 20537    00:03 /bin/sh /tmp/fm-t3-stall.80974/head-slow-p4/bin/ps -axww -o pid=,stat
+87616 20410    00:03 /bin/sh /tmp/fm-t3-stall.80974/head-slow-p4/bin/ps -axww -o pid=,stat
+87898 18663    00:03 /bin/sh /tmp/fm-t3-stall.80974/head-slow-ps-2/bin/ps -axww -o pid=,st
+87942 35403    00:03 /bin/sh /tmp/fm-t3-stall.80974/head-slow-ps-2/bin/ps -axww -o pid=,st
+88008 14092    00:03 /bin/sh /tmp/fm-t3-stall.80974/head-slow-ps-2/bin/ps -axww -o pid=,st
+89061 45267    00:02 /bin/ps -o pid=,stat= -p 14092,18598,18663,18666,35403
+89601 27518    00:02 /bin/sh /tmp/fm-t3-stall.80974/head-slow-p4/bin/ps -o pid=,stat= -p 1
+92278 18648    00:01 /bin/sh /tmp/fm-t3-stall.80974/head-slow-p4/bin/ps -axww -o pid=,stat
+92326 34468    00:01 /bin/ps -axo pid=,ppid=,etime=,command=

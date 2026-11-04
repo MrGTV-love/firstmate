@@ -1,0 +1,6 @@
+Rule set before reading any stall-driver output (2026-11-04):
+- pass: all 12 roots finish in the 900 s limit, and the longest gap between two root starts is under 60 s.
+- stall: a timeout, or a gap of 60 s or more with slots free.
+- A base control (FM_LINT_HOST_SLOTS=2, same ps delays) decides old path versus new path.
+Round 4 addition, written before the head-all-4s row finished:
+- head-all-4s (-axo delayed 4 s, far past the 0.49 s measured at load about 100) is a probe outside the rule. A stall there is an info note about the turn-holder's table read under admission.lock. It does not fail the scenario.

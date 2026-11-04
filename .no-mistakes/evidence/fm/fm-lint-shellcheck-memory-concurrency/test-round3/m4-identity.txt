@@ -1,0 +1,21 @@
+base list rc=0
+base list 1of3 rc=0
+base list 2of3 rc=0
+base list 3of3 rc=0
+base clean rc=0
+base findings rc=1
+base findings-fast rc=1
+head list rc=0
+head list 1of3 rc=0
+head list 2of3 rc=0
+head list 3of3 rc=0
+head clean rc=0
+head findings rc=1
+head findings-fast rc=1
+same list.txt (     692 lines)
+same list.1of3.txt (     231 lines)
+same list.2of3.txt (     230 lines)
+same list.3of3.txt (     231 lines)
+same clean.txt (       3 lines)
+same findings.txt (      53 lines)
+same findings-fast.txt (      53 lines)

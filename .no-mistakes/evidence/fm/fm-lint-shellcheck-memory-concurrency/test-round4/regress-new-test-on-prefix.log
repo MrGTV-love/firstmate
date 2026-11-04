@@ -1,0 +1,4 @@
+$ (pre-fix bin, head test) bash tests/fm-lint-slots.test.sh test_slow_ps_does_not_hold_admission_against_the_next_root
+a gate did not finish
+not ok - slow ps admission regression failed
+rc=1 wall=100s

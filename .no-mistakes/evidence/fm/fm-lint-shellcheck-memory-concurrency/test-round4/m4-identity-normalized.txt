@@ -1,0 +1,22 @@
+Compare with each tree's own path replaced by TREE (the duration ledger line names its tree):
+same list (     692 lines)
+same list.1of3 (     231 lines)
+same list.2of3 (     230 lines)
+same list.3of3 (     231 lines)
+same clean (       3 lines)
+same findings (      38 lines)
+same findings-fast (      38 lines)
+base list rc=0
+base list.1of3 rc=0
+base list.2of3 rc=0
+base list.3of3 rc=0
+base clean rc=0
+base findings rc=1
+base findings-fast rc=1
+headtree list rc=0
+headtree list.1of3 rc=0
+headtree list.2of3 rc=0
+headtree list.3of3 rc=0
+headtree clean rc=0
+headtree findings rc=1
+headtree findings-fast rc=1

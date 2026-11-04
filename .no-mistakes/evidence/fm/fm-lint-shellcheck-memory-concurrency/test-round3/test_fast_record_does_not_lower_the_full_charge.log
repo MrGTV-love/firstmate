@@ -1,0 +1,4 @@
+$ bash tests/fm-lint-slots.test.sh test_fast_record_does_not_lower_the_full_charge
+start 2026-11-04T19:27:21Z load: load averages: 60.08 52.22 61.35
+ok - a --fast record charges later fast requests only; a full request of the same root is still charged the worst case
+rc=0 wall=105s

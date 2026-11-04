@@ -1,0 +1,4 @@
+$ bash tests/fm-lint-slots.test.sh test_memory_charge_survives_unknown_records_and_an_unreadable_table
+start 2026-11-04T19:25:01Z load: load averages: 50.05 50.44 62.56
+ok - stale records are reclaimed, unknown records and an unreadable table are charged the worst case, a root with no record is charged the worst case, a root past its record is charged its current peak, records only rise and only after a complete analysis, and slots beyond a run's cap count
+rc=0 wall=53s

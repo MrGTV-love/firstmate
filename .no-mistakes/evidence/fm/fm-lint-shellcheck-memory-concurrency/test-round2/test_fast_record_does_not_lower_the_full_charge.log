@@ -1,0 +1,1 @@
+ok - a --fast record charges later fast requests only; a full request of the same root is still charged the worst case

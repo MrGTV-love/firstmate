@@ -1,0 +1,49 @@
+### budget zero
+$ FM_LINT_HOST_RSS_KIB=0 FM_LINT_SLOT_DIR=/tmp/fmlint-live/pool-r
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: FM_LINT_HOST_RSS_KIB must be a positive integer, got 0.
+exit=2
+
+### budget leading zero
+$ FM_LINT_HOST_RSS_KIB=08 FM_LINT_SLOT_DIR=/tmp/fmlint-live/pool-r
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: FM_LINT_HOST_RSS_KIB must be a positive integer, got 08.
+exit=2
+
+### budget non-numeric
+$ FM_LINT_HOST_RSS_KIB=12GiB FM_LINT_SLOT_DIR=/tmp/fmlint-live/pool-r
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: FM_LINT_HOST_RSS_KIB must be a positive integer, got 12GiB.
+exit=2
+
+### budget invalid with pool off
+$ FM_LINT_HOST_RSS_KIB=abc FM_LINT_SLOT_DIR=off
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: FM_LINT_HOST_RSS_KIB must be a positive integer, got abc.
+exit=2
+
+### slot dir under a regular file
+$ FM_LINT_SLOT_DIR=/tmp/fmlint-live/blk/file/slots
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: host slot pool unusable (/tmp/fmlint-live/blk/file/slots is not a writable directory); the host-wide ShellCheck memory bound cannot be enforced, so no root was started. Make that path writable, remove it if it is damaged, or point FM_LINT_SLOT_DIR at a writable directory that every lint run shares (FM_LINT_SLOT_DIR=off runs without the host-wide bound).
+exit=2
+
+### slot dir mode 000
+$ FM_LINT_SLOT_DIR=/tmp/fmlint-live/locked
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: host slot pool unusable (/tmp/fmlint-live/locked is not a writable directory); the host-wide ShellCheck memory bound cannot be enforced, so no root was started. Make that path writable, remove it if it is damaged, or point FM_LINT_SLOT_DIR at a writable directory that every lint run shares (FM_LINT_SLOT_DIR=off runs without the host-wide bound).
+exit=2
+
+fixture shellcheck processes seen during refusals: 0
+pool-r not created
+### BASE 9c5874ba, slot dir under a regular file
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint: host slot directory unavailable; running without the host-wide ShellCheck bound
+exit=0

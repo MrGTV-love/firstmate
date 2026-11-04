@@ -1,0 +1,1 @@
+ok - the slot pool can be disabled, rejects bad settings, and refuses an unusable directory instead of running unbounded

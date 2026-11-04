@@ -1,0 +1,265 @@
+rc=0 most=2
+-- spans
+56659 1793819070.939289 1793819075.040024
+58243 1793819071.693773 1793819075.765750
+68601 1793819076.252034 1793819080.387420
+-- roots
+format	fm-lint-roots-v1
+meta	shellcheck_version	0.11.0
+meta	platform	Darwin arm64
+meta	image_os	unknown
+meta	image_version	unknown
+meta	mode	full
+meta	partition	all
+meta	jobs	2
+meta	bounds_enforced	0
+meta	root_deadline_seconds	unbounded
+meta	root_kill_grace_seconds	unbounded
+meta	root_memory_limit_kib	unbounded
+meta	timing_mechanism	none
+begin	2	/tmp/fmdbg-lone.6dU6/b.sh	1	full	1793819070601
+begin	1	/tmp/fmdbg-lone.6dU6/a.sh	0	full	1793819070609
+end	2	/tmp/fmdbg-lone.6dU6/b.sh	1	full	1793819070601	1793819075307	4701	0	ok	136720	1	1	57.65	56.39	libproc:4,ps:0
+end	1	/tmp/fmdbg-lone.6dU6/a.sh	0	full	1793819070609	1793819075888	4562	0	ok	136656	1	1	57.65	56.39	libproc:4,ps:0
+begin	3	/tmp/fmdbg-lone.6dU6/c.sh	0	full	1793819075963
+end	3	/tmp/fmdbg-lone.6dU6/c.sh	0	full	1793819075963	1793819081368	5404	0	ok	136656	1	1	56.39	55.08	libproc:4,ps:0
+meta	roots_begun	3
+meta	roots_completed	3
+meta	roots_unfinished	0
+meta	result_exit	0
+137952
+137888
+137888
+rc=0 most=2
+-- spans
+28124 1793819099.413126 1793819103.484663
+30088 1793819100.061141 1793819104.160900
+41589 1793819104.459999 1793819108.488735
+-- roots
+format	fm-lint-roots-v1
+meta	shellcheck_version	0.11.0
+meta	platform	Darwin arm64
+meta	image_os	unknown
+meta	image_version	unknown
+meta	mode	full
+meta	partition	all
+meta	jobs	2
+meta	bounds_enforced	0
+meta	root_deadline_seconds	unbounded
+meta	root_kill_grace_seconds	unbounded
+meta	root_memory_limit_kib	unbounded
+meta	timing_mechanism	none
+begin	1	/tmp/fmdbg-lone.6dU6/a.sh	0	full	1793819099148
+begin	2	/tmp/fmdbg-lone.6dU6/b.sh	1	full	1793819099149
+end	1	/tmp/fmdbg-lone.6dU6/a.sh	0	full	1793819099148	1793819103549	4392	0	ok	136736	1	1	56.42	56.07	libproc:4,ps:0
+begin	3	/tmp/fmdbg-lone.6dU6/c.sh	0	full	1793819103594
+end	2	/tmp/fmdbg-lone.6dU6/b.sh	1	full	1793819099149	1793819104488	5022	0	ok	136672	1	1	56.42	56.07	libproc:4,ps:0
+end	3	/tmp/fmdbg-lone.6dU6/c.sh	0	full	1793819103594	1793819108584	4764	0	ok	136720	1	1	56.07	54.78	libproc:4,ps:0
+meta	roots_begun	3
+meta	roots_completed	3
+meta	roots_unfinished	0
+meta	result_exit	0
+rc=0 most=2
+-- spans
+99815 1793819177.945399 1793819182.014439
+4901 1793819180.224742 1793819184.294093
+10224 1793819183.326313 1793819187.424145
+-- roots
+format	fm-lint-roots-v1
+meta	shellcheck_version	0.11.0
+meta	platform	Darwin arm64
+meta	image_os	unknown
+meta	image_version	unknown
+meta	mode	full
+meta	partition	all
+meta	jobs	2
+meta	bounds_enforced	0
+meta	root_deadline_seconds	unbounded
+meta	root_kill_grace_seconds	unbounded
+meta	root_memory_limit_kib	unbounded
+meta	timing_mechanism	none
+begin	2	/tmp/fmdbg-lone.6dU6/b.sh	1	full	1793819175178
+begin	1	/tmp/fmdbg-lone.6dU6/a.sh	0	full	1793819175136
+end	1	/tmp/fmdbg-lone.6dU6/a.sh	0	full	1793819175136	1793819182265	7074	0	ok	136640	1	1	79.43	76.22	libproc:4,ps:0
+begin	3	/tmp/fmdbg-lone.6dU6/c.sh	0	full	1793819182491
+end	2	/tmp/fmdbg-lone.6dU6/b.sh	1	full	1793819175178	1793819184425	7753	0	ok	136736	1	1	79.43	76.22	libproc:4,ps:0
+end	3	/tmp/fmdbg-lone.6dU6/c.sh	0	full	1793819182491	1793819187672	5077	0	ok	136656	1	1	76.22	76.36	libproc:4,ps:0
+meta	roots_begun	3
+meta	roots_completed	3
+meta	roots_unfinished	0
+meta	result_exit	0
+rc=0 most=2
+-- spans
+64692 1793819211.256787 1793819215.343128
+65946 1793819212.270534 1793819216.334341
+76709 1793819217.274688 1793819221.348936
+-- roots
+format	fm-lint-roots-v1
+meta	shellcheck_version	0.11.0
+meta	platform	Darwin arm64
+meta	image_os	unknown
+meta	image_version	unknown
+meta	mode	full
+meta	partition	all
+meta	jobs	2
+meta	bounds_enforced	0
+meta	root_deadline_seconds	unbounded
+meta	root_kill_grace_seconds	unbounded
+meta	root_memory_limit_kib	unbounded
+meta	timing_mechanism	none
+begin	2	/tmp/fmdbg-lone.6dU6/b.sh	1	full	1793819210429
+begin	1	/tmp/fmdbg-lone.6dU6/a.sh	0	full	1793819210432
+end	1	/tmp/fmdbg-lone.6dU6/a.sh	0	full	1793819210432	1793819215665	5213	0	ok	136672	1	1	72.11	73.54	libproc:4,ps:0
+begin	3	/tmp/fmdbg-lone.6dU6/c.sh	0	full	1793819216234
+end	2	/tmp/fmdbg-lone.6dU6/b.sh	1	full	1793819210429	1793819216768	5446	0	ok	136720	1	1	72.11	74.62	libproc:4,ps:0
+end	3	/tmp/fmdbg-lone.6dU6/c.sh	0	full	1793819216234	1793819222045	5779	0	ok	136784	1	1	73.54	78.49	libproc:4,ps:0
+meta	roots_begun	3
+meta	roots_completed	3
+meta	roots_unfinished	0
+meta	result_exit	0
+rc=0 most=2
+-- spans
+54103 1793819262.405987 1793819266.475157
+55251 1793819262.907743 1793819266.968679
+67248 1793819268.116390 1793819272.202502
+-- roots
+format	fm-lint-roots-v1
+meta	shellcheck_version	0.11.0
+meta	platform	Darwin arm64
+meta	image_os	unknown
+meta	image_version	unknown
+meta	mode	full
+meta	partition	all
+meta	jobs	2
+meta	bounds_enforced	0
+meta	root_deadline_seconds	unbounded
+meta	root_kill_grace_seconds	unbounded
+meta	root_memory_limit_kib	unbounded
+meta	timing_mechanism	none
+begin	1	/tmp/fmdbg-lone.6dU6/a.sh	0	full	1793819261733
+begin	2	/tmp/fmdbg-lone.6dU6/b.sh	1	full	1793819261769
+end	1	/tmp/fmdbg-lone.6dU6/a.sh	0	full	1793819261733	1793819266632	4890	0	ok	136656	1	1	82.48	82.48	libproc:4,ps:0
+begin	3	/tmp/fmdbg-lone.6dU6/c.sh	0	full	1793819266910
+end	2	/tmp/fmdbg-lone.6dU6/b.sh	1	full	1793819261769	1793819267292	5194	0	ok	136672	1	1	82.48	81.64	libproc:4,ps:0
+end	3	/tmp/fmdbg-lone.6dU6/c.sh	0	full	1793819266910	1793819272432	5505	0	ok	136784	1	1	81.64	80.87	libproc:4,ps:0
+meta	roots_begun	3
+meta	roots_completed	3
+meta	roots_unfinished	0
+meta	result_exit	0
+rc=0 most=2
+-- spans
+12889 1793819287.272670 1793819291.350658
+13465 1793819287.561190 1793819291.632333
+22914 1793819292.145752 1793819296.217889
+-- roots
+format	fm-lint-roots-v1
+meta	shellcheck_version	0.11.0
+meta	platform	Darwin arm64
+meta	image_os	unknown
+meta	image_version	unknown
+meta	mode	full
+meta	partition	all
+meta	jobs	2
+meta	bounds_enforced	0
+meta	root_deadline_seconds	unbounded
+meta	root_kill_grace_seconds	unbounded
+meta	root_memory_limit_kib	unbounded
+meta	timing_mechanism	none
+begin	2	/tmp/fmdbg-lone.6dU6/b.sh	1	full	1793819286324
+begin	1	/tmp/fmdbg-lone.6dU6/a.sh	0	full	1793819286328
+end	2	/tmp/fmdbg-lone.6dU6/b.sh	1	full	1793819286324	1793819291530	5200	0	ok	136656	1	1	80.44	79.76	libproc:4,ps:0
+end	1	/tmp/fmdbg-lone.6dU6/a.sh	0	full	1793819286328	1793819291746	4817	0	ok	136656	1	1	80.44	78.58	libproc:4,ps:0
+begin	3	/tmp/fmdbg-lone.6dU6/c.sh	0	full	1793819291801
+end	3	/tmp/fmdbg-lone.6dU6/c.sh	0	full	1793819291801	1793819296281	4478	0	ok	136640	1	1	78.58	78.58	libproc:4,ps:0
+meta	roots_begun	3
+meta	roots_completed	3
+meta	roots_unfinished	0
+meta	result_exit	0
+rc=0 most=2
+-- spans
+55565 1793819307.152093 1793819311.222468
+56009 1793819307.423901 1793819311.491568
+66814 1793819311.734137 1793819315.762498
+-- roots
+format	fm-lint-roots-v1
+meta	shellcheck_version	0.11.0
+meta	platform	Darwin arm64
+meta	image_os	unknown
+meta	image_version	unknown
+meta	mode	full
+meta	partition	all
+meta	jobs	2
+meta	bounds_enforced	0
+meta	root_deadline_seconds	unbounded
+meta	root_kill_grace_seconds	unbounded
+meta	root_memory_limit_kib	unbounded
+meta	timing_mechanism	none
+begin	1	/tmp/fmdbg-lone.6dU6/a.sh	0	full	1793819306605
+begin	2	/tmp/fmdbg-lone.6dU6/b.sh	1	full	1793819306617
+end	1	/tmp/fmdbg-lone.6dU6/a.sh	0	full	1793819306605	1793819311371	4765	0	ok	136656	1	1	77.69	79.15	libproc:4,ps:0
+begin	3	/tmp/fmdbg-lone.6dU6/c.sh	0	full	1793819311414
+end	2	/tmp/fmdbg-lone.6dU6/b.sh	1	full	1793819306617	1793819311553	4774	0	ok	136624	1	1	77.69	79.15	libproc:4,ps:0
+end	3	/tmp/fmdbg-lone.6dU6/c.sh	0	full	1793819311414	1793819315901	4481	0	ok	136656	1	1	79.15	78.90	libproc:4,ps:0
+meta	roots_begun	3
+meta	roots_completed	3
+meta	roots_unfinished	0
+meta	result_exit	0
+rc=0 most=2
+-- spans
+15328 1793819331.564723 1793819335.639023
+15559 1793819331.737533 1793819335.817289
+23593 1793819336.206675 1793819340.278471
+-- roots
+format	fm-lint-roots-v1
+meta	shellcheck_version	0.11.0
+meta	platform	Darwin arm64
+meta	image_os	unknown
+meta	image_version	unknown
+meta	mode	full
+meta	partition	all
+meta	jobs	2
+meta	bounds_enforced	0
+meta	root_deadline_seconds	unbounded
+meta	root_kill_grace_seconds	unbounded
+meta	root_memory_limit_kib	unbounded
+meta	timing_mechanism	none
+begin	1	/tmp/fmdbg-lone.6dU6/a.sh	0	full	1793819331238
+begin	2	/tmp/fmdbg-lone.6dU6/b.sh	1	full	1793819331238
+end	1	/tmp/fmdbg-lone.6dU6/a.sh	0	full	1793819331238	1793819335692	4450	0	ok	136656	1	1	80.18	79.05	libproc:4,ps:0
+begin	3	/tmp/fmdbg-lone.6dU6/c.sh	0	full	1793819335851
+end	2	/tmp/fmdbg-lone.6dU6/b.sh	1	full	1793819331238	1793819335966	4654	0	ok	136736	1	1	80.18	79.05	libproc:4,ps:0
+end	3	/tmp/fmdbg-lone.6dU6/c.sh	0	full	1793819335851	1793819340560	4706	0	ok	136800	1	1	79.05	77.92	libproc:4,ps:0
+meta	roots_begun	3
+meta	roots_completed	3
+meta	roots_unfinished	0
+meta	result_exit	0
+rc=0 most=2
+-- spans
+65087 1793819396.528519 1793819400.583019
+67523 1793819397.561155 1793819401.702058
+83064 1793819403.053422 1793819407.124122
+-- roots
+format	fm-lint-roots-v1
+meta	shellcheck_version	0.11.0
+meta	platform	Darwin arm64
+meta	image_os	unknown
+meta	image_version	unknown
+meta	mode	full
+meta	partition	all
+meta	jobs	2
+meta	bounds_enforced	0
+meta	root_deadline_seconds	unbounded
+meta	root_kill_grace_seconds	unbounded
+meta	root_memory_limit_kib	unbounded
+meta	timing_mechanism	none
+begin	2	/tmp/fmdbg-lone.6dU6/b.sh	1	full	1793819396036
+begin	1	/tmp/fmdbg-lone.6dU6/a.sh	0	full	1793819396046
+end	2	/tmp/fmdbg-lone.6dU6/b.sh	1	full	1793819396036	1793819400726	4684	0	ok	136656	1	1	104.46	102.34	libproc:4,ps:0
+end	1	/tmp/fmdbg-lone.6dU6/a.sh	0	full	1793819396046	1793819402147	5559	0	ok	136624	1	1	104.46	100.55	libproc:4,ps:0
+begin	3	/tmp/fmdbg-lone.6dU6/c.sh	0	full	1793819402302
+end	3	/tmp/fmdbg-lone.6dU6/c.sh	0	full	1793819402302	1793819407492	5162	0	ok	136672	1	1	100.55	99.46	libproc:4,ps:0
+meta	roots_begun	3
+meta	roots_completed	3
+meta	roots_unfinished	0
+meta	result_exit	0
+budget=344880

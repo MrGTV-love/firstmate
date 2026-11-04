@@ -1,0 +1,4 @@
+$ bash tests/fm-lint-slots.test.sh test_unequal_runs_share_scarce_slots_per_run
+start 2026-11-04T20:36:39Z load: load averages: 24.79 29.68 37.57
+ok - a two-worker run and a one-worker run alternate turns on a scarce pool
+rc=0 wall=32s

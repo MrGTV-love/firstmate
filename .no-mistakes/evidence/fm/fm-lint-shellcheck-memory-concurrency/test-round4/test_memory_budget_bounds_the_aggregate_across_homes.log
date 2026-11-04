@@ -1,0 +1,4 @@
+$ bash tests/fm-lint-slots.test.sh test_memory_budget_bounds_the_aggregate_across_homes
+start 2026-11-04T20:37:11Z load: load averages: 24.71 29.12 37.09
+ok - four runs with four HOME values stay within the memory budget with and without records, run two recorded roots at once, and finish all 12 roots (unbudgeted: 8 12; no records: 2 12; records: 2 12)
+rc=0 wall=97s

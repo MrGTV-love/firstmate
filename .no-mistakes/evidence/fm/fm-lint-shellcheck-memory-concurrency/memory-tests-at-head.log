@@ -1,0 +1,6 @@
+ok - a content-identical cached success finishes while all host slots remain occupied
+ok - the slot pool can be disabled, rejects bad settings, and refuses an unusable directory instead of running unbounded
+ok - slot open, counter and non-contention coordinator/scan lock failures refuse naming the path and never run the analysis
+not ok - a lone run with recorded roots peaked at 1 stand-ins, expected its two workers: 136000 1 3
+bash tests/fm-lint-slots.test.sh         test_slot_survives_gate_death    44.87s user 74.31s system 32% cpu 6:02.60 total
+rc=1

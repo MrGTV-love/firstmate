@@ -1,0 +1,1 @@
+ok - stale records are reclaimed, unknown records and an unreadable table are charged the worst case, a root with no record is charged the worst case, a root past its record is charged its current peak, records only rise and only after a complete analysis, and slots beyond a run's cap count

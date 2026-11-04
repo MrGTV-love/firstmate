@@ -1,0 +1,3 @@
+roots_done=12 most_at_once=2
+start_offsets_s: 0.5 2.1 2.8 3.6 4.3 8.5 9.2 10.8 11.4 15.3 17.8 18.2
+label=head-slow-p4-2 ps_delays(axww=4,p=4,axo=0.5) wall=22s timed_out=0 exit_codes= 0 0 0 0 load=16.35 19.28 27.53 extra=

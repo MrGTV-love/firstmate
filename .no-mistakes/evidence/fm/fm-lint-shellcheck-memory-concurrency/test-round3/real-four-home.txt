@@ -1,0 +1,5 @@
+control-nobudget budget_kib=100000000 root_limit_kib=2097152 wall=29s exit_codes= 0 0 0 0 analyses=12 most_at_once=8 largest_overlapping_sum_kib=2240592 largest_root_kib=280720 pressure_after=1 load=55.15 60.13 62.77
+largest record from the control: 294144 KiB
+empty-budgeted budget_kib=735360 root_limit_kib=588288 wall=88s exit_codes= 0 0 0 0 analyses=12 most_at_once=2 largest_overlapping_sum_kib=562448 largest_root_kib=281760 pressure_after=1 load=46.52 56.09 60.95
+history-budgeted budget_kib=735360 root_limit_kib=588288 wall=44s exit_codes= 0 0 0 0 analyses=12 most_at_once=2 largest_overlapping_sum_kib=562448 largest_root_kib=281744 pressure_after=1 load=47.19 54.88 60.27
+DONE

@@ -1,0 +1,11 @@
+test_memory_budget_bounds_the_aggregate_across_homes STOPPED by me after ~25 min: 3 of 12 cold-step roots started, admission stalled (see stall-snapshot.txt, stall-finding.md)
+test_memory_budget_bounds_the_aggregate_across_homes rc=1 1758s
+test_root_larger_than_the_budget_runs_alone_and_a_killed_run_frees_its_charge rc=0 373s
+test_memory_charge_survives_unknown_records_and_an_unreadable_table rc=0 80s
+test_fast_record_does_not_lower_the_full_charge rc=0 162s
+test_default_pool_is_one_directory_for_every_home rc=0 112s
+test_unbounded_root_over_resident_bound_is_ended_and_retried_narrower rc=1 103s
+driver rc=0
+DONE
+budget-final rc=0 248s
+budget-final2 rc=0 128s
