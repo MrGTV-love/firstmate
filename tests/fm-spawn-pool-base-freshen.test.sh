@@ -2281,6 +2281,12 @@ test_reset_guard_r2_preexisting_process_is_not_this_acquisition() {
   guard_expect_launch S4 '(R2) paired pass: the lease owner is a process the acquired pane started after the spawn began' "$id" --scout
   [ -s "$CASE_DIR/acq/child" ] || fail 'R2: the pane never started its lease child, so the pass case proved nothing'
   guard_end_pane
+  # Paired pass: the lease is released (the entry names no owner at all).
+  id='guard-r2-released'
+  guard_pane_slot guard-r2r "$id" existing
+  printf '{"worktrees":[{"name":"1","path":"%s"}]}\n' "$POOL_DIR" >"$LEASE_STATE"
+  guard_expect_launch S4 '(B) paired pass: the lease is released, the entry names no owner' "$id" --scout
+  guard_end_pane
   # Paired pass: the entry's owner is gone.
   id='guard-r2-gone'
   guard_pane_slot guard-r2c "$id" existing
@@ -2349,9 +2355,10 @@ test_reset_guard_r4_origin_head_write_failure_refuses_before_the_reset() {
 }
 
 # A (round 3): a governed slot is prepared (its branch is left and HEAD detached) before the guard
-# looks. A commit that lands during the guard's observations is refused as uncontained; the refusal
-# must then leave that commit and its files exactly where they are. A restoring checkout of the
-# original branch from the new commit would move it off HEAD with no ref holding it.
+# looks. A commit or an edit that lands during the guard's observations is refused; the refusal
+# must then leave that work exactly where it is. A restoring checkout of the original branch from
+# the new commit would move it off HEAD with no ref holding it. The restoring checkout runs only
+# while neither HEAD nor the tree has changed since the preparation.
 test_reset_guard_a_governed_late_commit_is_not_orphaned() {
   local rec id late
   # Detached slot: the late commit lands on the detached HEAD.
@@ -2376,17 +2383,28 @@ test_reset_guard_a_governed_late_commit_is_not_orphaned() {
   [ "$(git -C "$POOL_DIR" log -1 --format=%s)" = late ] || fail 'A: HEAD is no longer the late commit (attached slot)'
   assert_present "$POOL_DIR/late.txt" 'A: the late commit file was removed from the tree (attached slot)'
   [ "$(git -C "$POOL_DIR" rev-parse refs/heads/owner-topic)" = "$INITIAL_SHA" ] || fail 'A: the original branch ref moved'
-  # Control: a refusal that leaves HEAD where the preparation put it still restores the original branch
-  # and keeps the late edit (a checkout of the same commit discards nothing).
-  id='guard-a-restore'
+  # A late edit (the tree changed, HEAD did not): also left exactly as found, still detached, edit kept.
+  id='guard-a-edit'
   rec=$(make_guard_governed_case guard-a3 "$id")
   read_case_record "$rec"
   git -C "$POOL_DIR" checkout --quiet -b owner-topic "$INITIAL_SHA"
   guard_write_manifest owner-topic "$INITIAL_SHA"
-  GUARD_OUT=$(FM_SLOT_RESET_GUARD_SEAM="printf 'late edit\\n' >>'$POOL_DIR/README.md'" run_spawn "$id" --scout --owned-path scripts) && fail 'A control: the late edit did not refuse'
-  assert_contains "$GUARD_OUT" 'is not clean' 'A control: the refusal did not name the dirty tree'
+  FM_SLOT_RESET_GUARD_SEAM="printf 'late edit\\n' >>'$POOL_DIR/README.md'; guard_snapshot '$POOL_DIR' '$CASE_DIR/post-seam.snap'" \
+    guard_expect_refusal S5b '(A) an edit lands on a governed slot whose branch was left for the preparation' 'is not clean' "$id" --scout --owned-path scripts
+  [ -z "$(git -C "$POOL_DIR" symbolic-ref --short -q HEAD)" ] || fail 'A: the original branch was checked out over a changed tree'
+  assert_grep 'late edit' "$POOL_DIR/README.md" 'A: the late edit was lost'
+  assert_contains "$GUARD_OUT" 'tree changed since this spawn prepared it' 'A: the refusal did not report the changed tree'
+  # Control: a refusal that leaves HEAD and the tree as the preparation left them still restores the
+  # original branch (here the manifest is rewritten with unparsable bytes after the first look).
+  id='guard-a-restore'
+  rec=$(make_guard_governed_case guard-a5 "$id")
+  read_case_record "$rec"
+  git -C "$POOL_DIR" checkout --quiet -b owner-topic "$INITIAL_SHA"
+  guard_write_manifest owner-topic "$INITIAL_SHA"
+  GUARD_OUT=$(FM_SLOT_RESET_GUARD_SEAM="printf '{ garbage' >'$GUARD_MANIFEST_FILE'" run_spawn "$id" --scout --owned-path scripts) && fail 'A control: the rewritten manifest did not refuse'
+  assert_contains "$GUARD_OUT" 'unknown_manifest' 'A control: the refusal did not name the unreadable manifest'
   [ "$(git -C "$POOL_DIR" symbolic-ref --short -q HEAD)" = owner-topic ] || fail 'A control: the original branch was not restored'
-  assert_grep 'late edit' "$POOL_DIR/README.md" 'A control: the late edit was lost'
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$INITIAL_SHA" ] || fail 'A control: HEAD moved'
   # Control: with nothing wrong the same governed slot launches.
   id='guard-a-stable'
   rec=$(make_guard_governed_case guard-a4 "$id")
@@ -2394,7 +2412,7 @@ test_reset_guard_a_governed_late_commit_is_not_orphaned() {
   git -C "$POOL_DIR" checkout --quiet -b owner-topic "$INITIAL_SHA"
   guard_write_manifest owner-topic "$INITIAL_SHA"
   GUARD_OUT=$(run_governed_spawn "$id") || fail "A control: a stable governed slot refused: $GUARD_OUT"
-  pass 'A: a late commit on a governed slot is kept when the guard refuses; the same-HEAD refusal still restores the branch; a stable slot launches'
+  pass 'A: a late commit or edit on a governed slot is kept when the guard refuses; a refusal with HEAD and tree unchanged still restores the branch; a stable slot launches'
 }
 
 # C (round 3): a nonzero lsof exit is a failed or partial inventory, whatever rows it printed. A listing
@@ -2447,6 +2465,8 @@ test_reset_guard_c_partial_lsof_inventory_is_unknown() {
   pane=$(PATH="$CASE_DIR/pane-bin:$PATH" guard_start_pane_emulator "$POOL_DIR" "$CASE_DIR/emulator")
   guard_wrap_tmux_into_pane "$FAKEBIN_DIR" "$CASE_DIR/emulator"
   guard_expect_refusal S4 '(C) the in-pane lsof lists all but one holder and exits 1' 'reset refused (unknown_holder_probe)' "$id" --scout
+  assert_contains "$GUARD_OUT" 'lsof exit 1' 'C: the in-pane refusal did not carry the lsof exit status'
+  assert_contains "$GUARD_OUT" 'partial inventory' 'C: the in-pane refusal did not carry the lsof stderr'
   kill "$holder" "$pane" 2>/dev/null || true
   pass 'C: a failed or partial lsof inventory refuses as unknown on both probe routes; complete-inventory holder and no-holder controls stay'
 }

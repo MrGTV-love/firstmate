@@ -71,17 +71,23 @@ fm_slot_prepare_base() { # <project> <copy> <task-id>
   git -C "$copy" checkout --quiet --detach || return 1
 }
 
-# Put the slot back on the checkout it had before preparation, but only while HEAD is still a
-# commit this spawn itself put there: the one it prepared from, or the one its own guarded reset
-# set. A restoring checkout from any other HEAD (a commit that landed in the slot during the
-# guard's observations) would move that work off HEAD and out of the tree, and no ref holds it.
-# Then the slot is left exactly as found, and the changed HEAD is reported.
+# Put the slot back on the checkout it had before preparation, but only while neither HEAD nor
+# the tree has changed since this spawn left them: HEAD is still a commit this spawn put there
+# (the one it prepared from, or the one its own guarded reset set), and the tree is clean as the
+# preparation required. A restoring checkout over a commit or an edit that landed in the slot
+# during the guard's observations would move that work off HEAD or out of the tree, and no ref
+# holds it. Then the slot is left exactly as found, and what changed is reported.
 fm_slot_restore_base() { # <copy>
-  local head
+  local head status
   [ -n "$FM_SLOT_PREVIOUS_HEAD" ] || return 0
   head=$(git -C "$1" rev-parse --verify --quiet HEAD 2>/dev/null) || head=
   if [ -z "$head" ] || { [ "$head" != "$FM_SLOT_PREVIOUS_HEAD" ] && [ "$head" != "${FM_SLOT_RESET_HEAD:-}" ]; }; then
     echo "error: the slot's HEAD is ${head:-unreadable}, not a commit this spawn put there (prepared from $FM_SLOT_PREVIOUS_HEAD); leaving the slot exactly as found and not restoring its original checkout" >&2
+    return 0
+  fi
+  status=$(git -C "$1" status --porcelain=v1 --untracked-files=all --ignore-submodules=none 2>/dev/null) || status='unreadable'
+  if [ -n "$status" ]; then
+    echo "error: the slot's tree changed since this spawn prepared it ($(printf '%s' "$status" | sed -n '1,3p' | tr '\n' ';')); leaving the slot exactly as found and not restoring its original checkout" >&2
     return 0
   fi
   if [ -n "$FM_SLOT_PREVIOUS_BRANCH" ]; then
@@ -796,6 +802,7 @@ open(sys.argv[3], "wb").write(b"".join(item + b"\0" for item in sorted(found)))
 FM_SLOT_GUARD_PANE_RUNNER=
 FM_SLOT_GUARD_REPORT_DIR=
 FM_SLOT_GUARD_HOLDER_REPORT=
+FM_SLOT_GUARD_PROBE_ERROR=
 FM_SLOT_GUARD_PROBE_PY=$(cat <<'FMPROBEPY'
 import os, subprocess, sys
 slot, selfspec, pane, spawn = sys.argv[1:5]
@@ -912,8 +919,14 @@ fm_slot_guard_probe_in_pane() { # [<pid>...]
   [ -n "$FM_SLOT_GUARD_PANE_RUNNER" ] && [ -d "$dir" ] || return 1
   script=$(mktemp "$dir/.slot-probe.py.XXXXXX") && report=$(mktemp "$dir/.slot-probe.out.XXXXXX") || return 1
   printf '%s\n' "$FM_SLOT_GUARD_PROBE_PY" >"$script"
+  FM_SLOT_GUARD_PROBE_ERROR=
   "$FM_SLOT_GUARD_PANE_RUNNER" "$FM_SLOT_GUARD_PROJECT" "$report" "$script" "$FM_SLOT_GUARD_REAL" @self '' "$$" "$@" || rc=$?
-  if [ "$rc" -eq 0 ]; then FM_SLOT_GUARD_HOLDER_REPORT=$(cat "$report"); fi
+  if [ "$rc" -eq 0 ]; then
+    FM_SLOT_GUARD_HOLDER_REPORT=$(cat "$report")
+  else
+    # The pane's helper wrote its stdout and stderr to the report; keep its words for the refusal.
+    FM_SLOT_GUARD_PROBE_ERROR=$(head -c 300 "$report" 2>/dev/null | tr '\n' ' ')
+  fi
   rm -f -- "$script" "$report"
   return "$rc"
 }
@@ -944,7 +957,7 @@ fm_slot_guard_probe_processes() { # [<pid>...]
   # Something is not attributed and no pane pid is known: judge it again from inside the pane.
   [ -n "$FM_SLOT_GUARD_PANE_RUNNER" ] || return 0
   fm_slot_guard_probe_in_pane "$@" || {
-    fm_slot_guard_refuse unknown_holder_probe "the working-directory probe could not run inside the acquired pane"
+    fm_slot_guard_refuse unknown_holder_probe "the working-directory probe could not run inside the acquired pane (${FM_SLOT_GUARD_PROBE_ERROR:-no report})"
     return 1
   }
 }

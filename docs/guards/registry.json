@@ -960,7 +960,7 @@
         },
         {
           "file": "bin/fm-slot-provision-lib.sh",
-          "match": "fm_slot_guard_refuse unknown_holder_probe \"the working-directory probe could not run inside the acquired pane\""
+          "match": "fm_slot_guard_refuse unknown_holder_probe \"the working-directory probe could not run inside the acquired pane (${FM_SLOT_GUARD_PROBE_ERROR:-no report})\""
         },
         {
           "file": "bin/fm-slot-provision-lib.sh",
