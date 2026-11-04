@@ -377,6 +377,9 @@ CONTROL_LOCK_HELD=0
 CONTROL_META_LOCK=
 CONTROL_META_LOCK_HELD=0
 CONTROL_META_TMP=
+# Adopt claims the session record by rename before it publishes (see the adopt verb).
+CONTROL_RECORD_CLAIM=
+CONTROL_RECORD_PATH=
 CONTROL_PROJECT_LOCK=
 CONTROL_PROJECT_LOCK_HELD=0
 REASSOCIATE_ACTIVE=0
@@ -399,6 +402,11 @@ control_cleanup() {
     reassociate_rollback || true
   fi
   [ -z "$CONTROL_META_TMP" ] || rm -f "$CONTROL_META_TMP"
+  if [ -n "$CONTROL_RECORD_CLAIM" ]; then
+    # An interrupted adopt gives the claimed record back unless a writer already replaced it.
+    [ -e "$CONTROL_RECORD_PATH" ] || ln -- "$CONTROL_RECORD_CLAIM" "$CONTROL_RECORD_PATH" 2>/dev/null || true
+    rm -f -- "$CONTROL_RECORD_CLAIM"
+  fi
   [ -z "$RELAUNCH_PAIR_DIR" ] || rm -rf -- "$RELAUNCH_PAIR_DIR"
   if [ "$CONTROL_META_LOCK_HELD" = 1 ]; then
     CONTROL_META_LOCK_HELD=0
@@ -1481,8 +1489,22 @@ if [ "$VERB" = adopt ]; then
   [ "$adoption_record" = "$adoption_recheck" ] \
     && [ "$adoption_prior" = "$(cat "$STATE/$ID.omp-session.json" 2>/dev/null)" ] \
     || die "adopt needs stable foreground, session, and generation proof; retry after they settle"
-  mv -f -- "$CONTROL_META_TMP" "$STATE/$ID.omp-session.json" \
-    || die "adopt could not publish the session record; original record preserved"
+  # The omp extension rewrites the record by rename and without these locks, so a
+  # writer can publish after the last comparison. Claim the record by an atomic
+  # rename, confirm the claimed bytes are the compared ones, and install the new
+  # record only where nothing exists: a writer that published in the gap keeps its
+  # record, and a record that changed is handed back instead of overwritten.
+  CONTROL_RECORD_PATH="$STATE/$ID.omp-session.json"
+  CONTROL_RECORD_CLAIM="$STATE/.$ID.omp-session.claim.$$"
+  mv -- "$CONTROL_RECORD_PATH" "$CONTROL_RECORD_CLAIM" \
+    || die "adopt could not claim the session record; original record preserved"
+  if [ "$adoption_prior" != "$(cat "$CONTROL_RECORD_CLAIM" 2>/dev/null)" ]; then
+    die "adopt needs stable foreground, session, and generation proof; retry after they settle"
+  fi
+  ln -- "$CONTROL_META_TMP" "$CONTROL_RECORD_PATH" 2>/dev/null \
+    || die "adopt refused: another writer published the session record while adoption claimed it; that record was not overwritten"
+  rm -f -- "$CONTROL_RECORD_CLAIM" "$CONTROL_META_TMP"
+  CONTROL_RECORD_CLAIM=
   CONTROL_META_TMP=
   printf 'adopted: %s\n' "$ID"
   exit 0

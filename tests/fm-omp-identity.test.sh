@@ -27,7 +27,7 @@ PROCINFO="$ROOT/bin/fm-proc-info.py"
 build_tree() { # <root> -> a runtime stub, an entry script and a launcher
   local root=$1 bun=$1/runtime/node_modules/@oven/bun-darwin-aarch64/bin
   mkdir -p "$bun" "$root/src/node_modules/@oh-my-pi/pi-coding-agent/src"
-  printf '#include <unistd.h>\nint main(void){for(;;)pause();}\n' > "$root/stub.c"
+  printf '#include <unistd.h>\nint main(void){alarm(900);for(;;)pause();}\n' > "$root/stub.c"
   cc -o "$bun/bun" "$root/stub.c" || fail "could not compile the runtime stand-in"
   : > "$root/src/node_modules/@oh-my-pi/pi-coding-agent/src/cli.ts"
   cat > "$root/omp" <<EOF
@@ -43,12 +43,11 @@ BUN="$TREE/runtime/node_modules/@oven/bun-darwin-aarch64/bin/bun"
 SCRIPT="$TREE/src/node_modules/@oh-my-pi/pi-coding-agent/src/cli.ts"
 export FM_OMP_LAUNCHER="$TREE/omp"
 REAL_BUN=$(python3 -I -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "$BUN")
-REAL_SCRIPT=$(python3 -I -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "$SCRIPT")
 
 # spawn.py holds a process's standard input (tty, open or empty pipe, null) and
 # execs argv with an optional different executable, then stays alive until killed.
 cat > "$TMP/spawn.py" <<'PY'
-import os, pty, subprocess, sys, time
+import os, pty, signal, subprocess, sys, time
 kind, pidfile, executable = sys.argv[1], sys.argv[2], sys.argv[3] or None
 argv = sys.argv[4:]
 keep = []
@@ -61,7 +60,22 @@ elif kind == "pipe-empty":
 else:
     stdin = subprocess.DEVNULL
 child = subprocess.Popen(argv, executable=executable, stdin=stdin, stdout=subprocess.DEVNULL)
+signal.signal(signal.SIGTERM, lambda *_: (child.kill(), os._exit(0)))
 open(pidfile, "w").write(str(child.pid))
+time.sleep(600)
+PY
+# pair.py starts two identical launches back to back, so both start inside one whole
+# second unless the clock ticks between them (the caller then retries).
+cat > "$TMP/pair.py" <<'PY'
+import os, pty, signal, subprocess, sys, time
+files, argv = sys.argv[1:3], sys.argv[3:]
+masters, children = [], []
+for path in files:
+    master, slave = pty.openpty(); masters.append(master)
+    children.append(subprocess.Popen(argv, stdin=slave, stdout=subprocess.DEVNULL))
+for path, child in zip(files, children):
+    open(path, "w").write(str(child.pid))
+signal.signal(signal.SIGTERM, lambda *_: ([c.kill() for c in children], os._exit(0)))
 time.sleep(600)
 PY
 FIXTURE_N=0
@@ -117,10 +131,18 @@ test_proc_info_facts_are_kernel_facts() {
 
 # --- 2. incarnation: two processes inside one whole second ---------------------
 same_second_pair() { # sets PAIR_A and PAIR_B started inside one whole second
-  local try a b
-  for try in 1 2 3 4 5 6 7 8; do
-    launch tty --no-title; a=$SPAWNED
-    launch tty --no-title; b=$SPAWNED
+  local a b file_a file_b
+  for _ in 1 2 3 4 5 6 7 8; do
+    FIXTURE_N=$((FIXTURE_N + 1)); file_a="$TMP/pair.$FIXTURE_N.a"; file_b="$TMP/pair.$FIXTURE_N.b"
+    python3 -I "$TMP/pair.py" "$file_a" "$file_b" /bin/sh "$TREE/omp" --no-title &
+    HOLDERS+=($!)
+    for _ in $(seq 1 100); do [ -s "$file_a" ] && [ -s "$file_b" ] && break; sleep 0.05; done
+    a=$(cat "$file_a"); b=$(cat "$file_b")
+    HOLDERS+=("$a" "$b")
+    for _ in $(seq 1 100); do
+      [ "$(python3 -I "$PROCINFO" exe "$a" 2>/dev/null)" != /bin/sh ] && [ "$(python3 -I "$PROCINFO" exe "$b" 2>/dev/null)" != /bin/sh ] && break
+      sleep 0.05
+    done
     if [ "$(python3 -I "$PROCINFO" lstart "$a")" = "$(python3 -I "$PROCINFO" lstart "$b")" ]; then
       PAIR_A=$a PAIR_B=$b; return 0
     fi
@@ -169,6 +191,7 @@ test_identity_derivation_fails_closed() {
   # a launcher that cannot be read, is binary, is another form, or leaves its own tree
   FM_OMP_LAUNCHER="$t/missing" python3 -I "$IDENT" interactive --facts "$t/facts.json" >/dev/null 2>&1 && fail "an unreadable launcher must admit nothing"
   FM_OMP_LAUNCHER="$BUN" python3 -I "$IDENT" interactive --facts "$t/facts.json" >/dev/null 2>&1 && fail "a binary launcher must admit nothing"
+  # shellcheck disable=SC2016 # the launcher text must keep its literal variables
   printf '#!/bin/sh\nexec "$HOME/bin/other" "$@"\n' > "$t/odd"
   FM_OMP_LAUNCHER="$t/odd" python3 -I "$IDENT" interactive --facts "$t/facts.json" >/dev/null 2>&1 && fail "another launcher form must admit nothing"
   mkdir -p "$t/evil"; : > "$t/evil/cli.ts"
@@ -348,7 +371,25 @@ SH
   pass "walk: a live or unreadable Bun descendant keeps the pane occupied; an unrelated Bun job and an empty shell keep today's outcome"
 }
 
+test_classifier_keeps_its_names_and_the_bun_shape_stays_other() {
+  # shellcheck source=bin/fm-agent-process-lib.sh
+  . "$ROOT/bin/fm-agent-process-lib.sh"
+  [ "$(fm_agent_process_classify_name omp)" = agent ] || fail "omp is an agent"
+  [ "$(fm_agent_process_classify_name /opt/omp/bin/omp)" = agent ] || fail "an omp path is an agent"
+  [ "$(fm_agent_process_classify_name ompd)" = other ] || fail "ompd is not an agent"
+  [ "$(fm_agent_process_classify_name comp)" = other ] || fail "comp is not an agent"
+  [ "$(fm_agent_process_classify_name bun)" = other ] || fail "a bare bun stays other: a name match would claim every Bun program"
+  [ "$(fm_agent_process_classify bun "$BUN" "$BUN $SCRIPT --no-title")" = other ] || fail "the installed Bun shape keeps its classification; identity is the identity rule's"
+  [ "$(fm_agent_process_classify bun "$BUN" "$BUN $SCRIPT __omp_worker_daemon_broker")" = other ] || fail "a worker-role invocation stays other"
+  [ "$(fm_agent_process_classify zsh -zsh -zsh)" = shell ] || fail "a login shell stays a shell"
+  [ "$(fm_agent_process_classify claude claude 'claude --resume x')" = agent ] || fail "another harness keeps its name"
+  fm_agent_process_bun_may_be_omp zsh zsh 1 && fail "only bun-named processes reach the identity rule"
+  fm_agent_process_bun_may_be_omp ompd ompd 1 && fail "ompd never reaches the identity rule"
+  pass "classifier: every recognized name keeps its verdict and the installed Bun shape stays other, owned by the identity rule"
+}
+
 fm_test_only
+test_classifier_keeps_its_names_and_the_bun_shape_stays_other
 test_proc_info_facts_are_kernel_facts
 test_incarnation_tells_same_second_processes_apart
 test_identity_derivation_fails_closed

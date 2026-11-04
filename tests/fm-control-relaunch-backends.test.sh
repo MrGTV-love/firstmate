@@ -1958,6 +1958,315 @@ test_omp_adoption_publication_race() {
   test_omp_adoption_unreadable_personal_session_anchor
 }
 
+# --- the installed omp as its Bun runtime ------------------------------------
+# bin/fm-omp-identity.py recognizes a process named bun by its actual executable,
+# resolved entry script and role. These cases run real stand-in processes (a
+# compiled "bun", a launcher that execs it as the host's does, a pseudo-terminal
+# on standard input) inside the existing fake Herdr model; nothing is stubbed in
+# the identity rule itself. tests/fm-omp-identity.test.sh pins the rule alone.
+BUN_TREE=
+BUN_PIDS=()
+bun_tree() { # one scratch installation per run
+  [ -z "$BUN_TREE" ] || return 0
+  BUN_TREE="$TMP_ROOT/bun-tree"
+  local bin="$BUN_TREE/runtime/node_modules/@oven/bun-darwin-aarch64/bin"
+  mkdir -p "$bin" "$BUN_TREE/src/node_modules/@oh-my-pi/pi-coding-agent/src"
+  printf '#include <unistd.h>\nint main(void){alarm(900);for(;;)pause();}\n' > "$BUN_TREE/stub.c"
+  cc -o "$bin/bun" "$BUN_TREE/stub.c" || fail "could not compile the runtime stand-in"
+  : > "$BUN_TREE/src/node_modules/@oh-my-pi/pi-coding-agent/src/cli.ts"
+  cat > "$BUN_TREE/omp" <<LAUNCHER
+#!/bin/sh
+R=$BUN_TREE
+exec "\$R/runtime/node_modules/@oven/bun-darwin-aarch64/bin/bun" "\$R/src/node_modules/@oh-my-pi/pi-coding-agent/src/cli.ts" "\$@"
+LAUNCHER
+  chmod +x "$BUN_TREE/omp"
+  cat > "$BUN_TREE/spawn.py" <<'PY'
+import os, pty, signal, subprocess, sys, time
+kind, pidfile, executable = sys.argv[1], sys.argv[2], sys.argv[3] or None
+keep = []
+if kind == "tty":
+    master, slave = pty.openpty(); keep.append(master); stdin = slave
+else:
+    stdin = subprocess.DEVNULL
+child = subprocess.Popen(sys.argv[4:], executable=executable, stdin=stdin, stdout=subprocess.DEVNULL)
+signal.signal(signal.SIGTERM, lambda *_: (child.kill(), os._exit(0)))
+open(pidfile, "w").write(str(child.pid))
+time.sleep(900)
+PY
+  export FM_OMP_LAUNCHER="$BUN_TREE/omp"
+}
+bun_spawn() { # <name> <stdin-kind> <executable|-> <argv...> -> BUN_PID once the exec settled
+  local name=$1 kind=$2 exe=$3 file="$TMP_ROOT/bun-$1.pid"
+  shift 3
+  bun_tree
+  [ "$exe" != - ] || exe=
+  rm -f "$file"
+  python3 -I "$BUN_TREE/spawn.py" "$kind" "$file" "$exe" "$@" &
+  BUN_PIDS+=($!)
+  for _ in $(seq 1 100); do [ -s "$file" ] && break; sleep 0.05; done
+  [ -s "$file" ] || fail "the stand-in process $name did not start"
+  BUN_PID=$(cat "$file")
+  for _ in $(seq 1 100); do
+    [ "$(python3 -I "$ROOT/bin/fm-proc-info.py" exe "$BUN_PID" 2>/dev/null)" != /bin/sh ] && break
+    sleep 0.05
+  done
+  BUN_PIDS+=("$BUN_PID")
+}
+bun_launch() { # <name> <args...> : the launcher execs the stand-in runtime on a pseudo-terminal
+  local name=$1
+  shift
+  bun_spawn "$name" tty /bin/sh /bin/sh "$BUN_TREE/omp" "$@"
+}
+# Two identical launches started back to back; BUN_PID_A and BUN_PID_B share one whole second unless the clock ticked.
+bun_pair() { # <name> <args...>
+  local name=$1 file_a="$TMP_ROOT/bun-$1.a" file_b="$TMP_ROOT/bun-$1.b"
+  shift
+  bun_tree
+  rm -f "$file_a" "$file_b"
+  python3 -I - "$file_a" "$file_b" /bin/sh "$BUN_TREE/omp" "$@" <<'PY' &
+import os, pty, signal, subprocess, sys, time
+files, argv = sys.argv[1:3], sys.argv[3:]
+masters, children = [], []
+for path in files:
+    master, slave = pty.openpty(); masters.append(master)
+    children.append(subprocess.Popen(argv, stdin=slave, stdout=subprocess.DEVNULL))
+for path, child in zip(files, children):
+    open(path, "w").write(str(child.pid))
+signal.signal(signal.SIGTERM, lambda *_: ([c.kill() for c in children], os._exit(0)))
+time.sleep(900)
+PY
+  BUN_PIDS+=($!)
+  for _ in $(seq 1 100); do [ -s "$file_a" ] && [ -s "$file_b" ] && break; sleep 0.05; done
+  [ -s "$file_a" ] && [ -s "$file_b" ] || fail "the stand-in pair $name did not start"
+  BUN_PID_A=$(cat "$file_a") BUN_PID_B=$(cat "$file_b")
+  BUN_PIDS+=("$BUN_PID_A" "$BUN_PID_B")
+  for _ in $(seq 1 100); do
+    [ "$(python3 -I "$ROOT/bin/fm-proc-info.py" exe "$BUN_PID_A" 2>/dev/null)" != /bin/sh ] \
+      && [ "$(python3 -I "$ROOT/bin/fm-proc-info.py" exe "$BUN_PID_B" 2>/dev/null)" != /bin/sh ] && break
+    sleep 0.05
+  done
+}
+bun_stop_all() {
+  local pid
+  for pid in "${BUN_PIDS[@]:-}"; do [ -z "$pid" ] || kill "$pid" 2>/dev/null || true; done
+  BUN_PIDS=()
+}
+# Point the fake Herdr pane at a real stand-in process (the foreground, its ps view, its argv).
+bun_present() { # <case-dir> <pid>
+  local dir=$1 pid=$2
+  printf '%s' "$pid" > "$dir/fake/recovery-pid"
+  printf '%s' "$pid" > "$dir/fake/holder-pid"
+  python3 -I "$ROOT/bin/fm-proc-info.py" exe "$pid" > "$dir/fake/holder-comm"
+  python3 -I "$ROOT/bin/fm-proc-info.py" args "$pid" > "$dir/fake/holder-args"
+  python3 -I "$ROOT/bin/fm-proc-info.py" argv "$pid" > "$dir/fake/recovery-process-argv"
+  printf bun > "$dir/fake/recovery-harness"
+}
+prepare_bun_adoption() { # <case-name> [launch args...]
+  local name=$1 dir
+  shift
+  prepare_omp_adoption "bun-$name"
+  dir=$HERDR_CASE_DIR
+  [ "$#" -gt 0 ] || set -- --config "$dir/session.yml" --auto-approve --cwd "$dir/wt/subdirectory" --no-title 'Read the brief'
+  bun_launch "$name" "$@"
+  bun_present "$dir" "$BUN_PID"
+}
+
+test_omp_bun_adoption_admits_the_installed_runtime() {
+  local dir id out rc=0 record pid start meta_before
+  prepare_bun_adoption admit
+  dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID pid=$BUN_PID record="$HERDR_CASE_DIR/home/state/$HERDR_CASE_ID.omp-session.json"
+  meta_before=$(cat "$dir/home/state/$id.meta")
+  out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" interrupt) || rc=$?
+  [ "$rc" -ne 0 ] || fail "an unadopted restored Bun agent authorized interrupt: $out"
+  out=$(run_continuation_control "$dir" "$id" adopt) || fail "the installed Bun runtime must adopt: $out"
+  assert_contains "$out" "adopted: $id" "adoption reports its exact task"
+  start=$(python3 -I "$ROOT/bin/fm-omp-identity.py" startid "$pid")
+  jq -e --arg task "$dir/wt/recorded-session.jsonl" --argjson pid "$pid" --arg start "$start" \
+    '. == {version:1,spawn_gen:"old",pid:$pid,task_session_file:$task,current_session_file:$task,start:$start}' \
+    "$record" >/dev/null || fail "adoption must record the live pid, the preserved session and the adopted incarnation: $(cat "$record")"
+  assert_equals "$meta_before" "$(cat "$dir/home/state/$id.meta")" "adoption never changes metadata"
+  assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "successful adoption sends no lifecycle input"
+  out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" interrupt) || fail "the adopted Bun agent must be controllable: $out"
+  assert_contains "$out" "interrupt-delivered $id" "the lifecycle verbs attribute the adopted agent"
+  rc=0
+  out=$(run_continuation_control "$dir" "$id" adopt) || rc=$?
+  [ "$rc" -ne 0 ] || fail "a second adopt of the same process must keep refusing: $out"
+  assert_contains "$out" "the record already names $pid, so it was not changed" "second adopt keeps the same-process refusal"
+  bun_stop_all
+  pass "omp bun adoption: the installed runtime adopts, binds its incarnation, is attributed afterwards, and a repeat adopt keeps its refusal"
+}
+
+test_omp_bun_adoption_keeps_every_other_proof() {
+  local shape dir id record
+  for shape in missing-pane ambiguous other-generation-pin same-generation-pin unreadable-pin no-registration generation-mismatch protocol-role headless-input foreign-script; do
+    case "$shape" in
+      protocol-role) prepare_bun_adoption "$shape" --mode rpc ;;
+      *) prepare_bun_adoption "$shape" ;;
+    esac
+    dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID record="$HERDR_CASE_DIR/home/state/$HERDR_CASE_ID.omp-session.json"
+    case "$shape" in
+      missing-pane)
+        printf '%%8' > "$dir/fake/herdr-pane"
+        assert_adoption_refused "$dir" "$id" 'endpoint proof needs the recorded pane' ;;
+      ambiguous)
+        : > "$dir/fake/adoption-ambiguous"
+        assert_adoption_refused "$dir" "$id" 'foreground proof needs one uniquely resolved live process' ;;
+      other-generation-pin)
+        printf other > "$dir/fake/recovery-spawn-gen"
+        assert_adoption_refused "$dir" "$id" 'generation proof needs the live process not to be pinned to another launch generation' ;;
+      same-generation-pin)
+        printf old > "$dir/fake/recovery-spawn-gen"
+        assert_adoption_refused "$dir" "$id" 'launch-pin proof needs a positively readable environment without a usable launch pin' ;;
+      unreadable-pin)
+        : > "$dir/fake/recovery-env-unreadable"
+        assert_adoption_refused "$dir" "$id" 'launch-pin proof needs a positively readable environment without a usable launch pin' ;;
+      no-registration)
+        : > "$dir/fake/recovery-registration-missing"
+        assert_adoption_refused "$dir" "$id" 'session proof needs a readable omp session-file registration on the recorded pane' ;;
+      generation-mismatch)
+        jq '.spawn_gen="other"' "$record" > "$record.new" && mv "$record.new" "$record"
+        assert_adoption_refused "$dir" "$id" 'existing record spawn_gen to equal metadata spawn_gen' ;;
+      protocol-role)
+        assert_adoption_refused "$dir" "$id" 'process proof needs the resolved foreground process to be a readable omp process' ;;
+      headless-input)
+        bun_stop_all
+        bun_spawn headless-input null /bin/sh /bin/sh "$BUN_TREE/omp" --config "$dir/session.yml" --no-title 'a prompt'
+        bun_present "$dir" "$BUN_PID"
+        assert_adoption_refused "$dir" "$id" 'process proof needs the resolved foreground process to be a readable omp process' ;;
+      foreign-script)
+        bun_stop_all
+        mkdir -p "$dir/foreign"
+        : > "$dir/foreign/cli.ts"
+        bun_spawn foreign-script tty "$BUN_TREE/runtime/node_modules/@oven/bun-darwin-aarch64/bin/bun" \
+          "$BUN_TREE/runtime/node_modules/@oven/bun-darwin-aarch64/bin/bun" "$dir/foreign/cli.ts" --no-title
+        bun_present "$dir" "$BUN_PID"
+        assert_adoption_refused "$dir" "$id" 'process proof needs the resolved foreground process to be a readable omp process' ;;
+    esac
+    bun_stop_all
+  done
+  pass "omp bun adoption: endpoint, foreground, pin, registration, generation, role, input and script proofs each still refuse with their own message"
+}
+
+test_omp_bun_adoption_never_overwrites_a_record_a_writer_may_own() {
+  local shape dir id record out before pid_a
+  for shape in protocol-writer interactive-writer unreadable-writer; do
+    prepare_bun_adoption "writer-$shape"
+    dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID record="$HERDR_CASE_DIR/home/state/$HERDR_CASE_ID.omp-session.json"
+    pid_a=
+    case "$shape" in
+      protocol-writer) bun_launch "a-$shape" --mode rpc; pid_a=$BUN_PID ;;
+      interactive-writer) bun_launch "a-$shape" --config "$dir/other.yml" --no-title 'another agent'; pid_a=$BUN_PID ;;
+      unreadable-writer)
+        # A live Bun process whose executable file is gone: its identity cannot be read.
+        mkdir -p "$dir/a"
+        cp "$BUN_TREE/runtime/node_modules/@oven/bun-darwin-aarch64/bin/bun" "$dir/a/bun"
+        bun_spawn "a-$shape" tty "$dir/a/bun" "$dir/a/bun" "$dir/a/cli.ts"
+        pid_a=$BUN_PID
+        rm -f "$dir/a/bun" ;;
+    esac
+    # The extension of A rewrites this record; B is the otherwise fully proven foreground target.
+    bun_launch "b-$shape" --config "$dir/session.yml" --auto-approve --cwd "$dir/wt/subdirectory" --no-title 'Read the brief'
+    bun_present "$dir" "$BUN_PID"
+    jq --argjson pid "$pid_a" '.pid=$pid' "$record" > "$record.new" && mv "$record.new" "$record"
+    before=$(shasum -a 256 "$record")
+    assert_adoption_refused "$dir" "$id" "$pid_a is a live omp process, so the omp extension owns this record"
+    assert_equals "$before" "$(shasum -a 256 "$record")" "the writer's record stays byte-identical"
+    assert_equals 0 "$(find "$dir/home/state" -name '.*omp-session*' | wc -l | tr -d ' ')" "a refused adoption leaves no staged record"
+    bun_stop_all
+  done
+  # Controls: a dead pid and a positively unrelated reused pid do not own the record.
+  for shape in dead-pid unrelated-pid; do
+    prepare_bun_adoption "writer-$shape"
+    dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID record="$HERDR_CASE_DIR/home/state/$HERDR_CASE_ID.omp-session.json"
+    if [ "$shape" = unrelated-pid ]; then
+      jq --argjson pid "$$" '.pid=$pid' "$record" > "$record.new" && mv "$record.new" "$record"
+    fi
+    out=$(run_continuation_control "$dir" "$id" adopt) || fail "a $shape record must not block repair: $out"
+    assert_contains "$out" "adopted: $id" "repair over a $shape record reports its exact task"
+    bun_stop_all
+  done
+  pass "omp bun adoption: a live Bun writer of any role or unreadable identity keeps its record; a dead or unrelated pid does not"
+}
+
+test_omp_bun_adoption_does_not_overwrite_a_late_writer() {
+  local dir id record line rc=0 out adopt_job a_record
+  prepare_bun_adoption late-writer
+  dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID record="$HERDR_CASE_DIR/home/state/$HERDR_CASE_ID.omp-session.json"
+  arm_adoption_barrier "$dir" "$id"
+  exec 6<> "$dir/fake/barrier-events"
+  (
+    rc=0
+    run_continuation_control "$dir" "$id" adopt > "$dir/adopt.out" || rc=$?
+    printf 'done %s\n' "$rc" > "$dir/fake/barrier-events"
+  ) &
+  adopt_job=$!
+  read -r line <&6
+  [ "$line" = 'reached mv' ] || fail "adoption never reached publication: $line"
+  # A different live writer publishes its record after B's last comparison.
+  a_record=$(jq -c '.pid=2000000002 | .current_session_file=.task_session_file' "$record")
+  printf '%s\n' "$a_record" > "$dir/home/state/.late-writer.tmp"
+  /bin/mv -f "$dir/home/state/.late-writer.tmp" "$record"
+  printf 'go\n' > "$dir/fake/barrier-resume"
+  read -r line <&6
+  case "$line" in 'done '*) rc=${line#done } ;; *) fail "adoption ended unexpectedly: $line" ;; esac
+  wait "$adopt_job"
+  exec 6>&-
+  out=$(cat "$dir/adopt.out")
+  [ "$rc" -ne 0 ] || fail "adoption overwrote or ignored a record published after its last comparison: $out"
+  assert_equals "$a_record" "$(cat "$record")" "the concurrently published record must not be overwritten"
+  assert_equals 0 "$(find "$dir/home/state" -name '.*omp-session*' | wc -l | tr -d ' ')" "a refused adoption leaves no staged or claimed record"
+  bun_stop_all
+  pass "omp bun adoption: a record published after the last comparison is never overwritten"
+}
+
+test_omp_bun_adoption_binds_the_adopted_incarnation() {
+  local dir id record out rc pid_a pid_b same=0 try
+  for try in 1 2 3 4 5 6 7 8; do
+    prepare_omp_adoption "bun-incarnation-$try"
+    dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID record="$HERDR_CASE_DIR/home/state/$HERDR_CASE_ID.omp-session.json"
+    bun_pair "incarnation-$try" --config "$dir/session.yml" --auto-approve --cwd "$dir/wt/subdirectory" --no-title 'Read the brief'
+    pid_a=$BUN_PID_A pid_b=$BUN_PID_B
+    if [ "$(python3 -I "$ROOT/bin/fm-proc-info.py" lstart "$pid_a")" = "$(python3 -I "$ROOT/bin/fm-proc-info.py" lstart "$pid_b")" ]; then
+      same=1; break
+    fi
+    bun_stop_all
+  done
+  [ "$same" = 1 ] || fail "could not start two stand-in processes inside one whole second"
+  bun_present "$dir" "$pid_a"
+  out=$(run_continuation_control "$dir" "$id" adopt) || fail "the installed Bun runtime must adopt: $out"
+  # B now holds the adopted PID: the record that names it still binds A's start identity.
+  jq --argjson pid "$pid_b" '.pid=$pid' "$record" > "$record.new" && mv "$record.new" "$record"
+  bun_present "$dir" "$pid_b"
+  rc=0
+  out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" interrupt) || rc=$?
+  [ "$rc" -ne 0 ] || fail "a replacement process with the adopted PID and session was taken for the adopted agent: $out"
+  assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "the replacement incarnation must receive no lifecycle input"
+  rc=0
+  out=$(run_continuation_control "$dir" "$id" adopt) || rc=$?
+  [ "$rc" -ne 0 ] || fail "an explicit adopt over a record naming the live PID must keep refusing: $out"
+  assert_contains "$out" "the record already names $pid_b, so it was not changed" "the equal-PID refusal stays"
+  assert_contains "$out" 'the record is stale' "the refusal tells the operator the record is stale and what to do"
+  # Paired control in the same fixture: the adopted incarnation itself is still admitted.
+  jq --argjson pid "$pid_a" '.pid=$pid' "$record" > "$record.new" && mv "$record.new" "$record"
+  bun_present "$dir" "$pid_a"
+  out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" interrupt) || fail "the adopted incarnation must still be controllable: $out"
+  assert_contains "$out" "interrupt-delivered $id" "A unchanged is admitted"
+  bun_stop_all
+  pass "omp bun adoption: a same-second replacement process with the adopted PID is not the adopted agent; the adopted incarnation still is"
+}
+
+test_omp_adoption_bun_runtime() {
+  if [ "$(uname -s)" != Darwin ] || ! command -v cc >/dev/null 2>&1; then
+    pass "omp bun adoption: skipped, needs macOS libproc and a C compiler"
+    return 0
+  fi
+  test_omp_bun_adoption_admits_the_installed_runtime
+  test_omp_bun_adoption_keeps_every_other_proof
+  test_omp_bun_adoption_never_overwrites_a_record_a_writer_may_own
+  test_omp_bun_adoption_does_not_overwrite_a_late_writer
+  test_omp_bun_adoption_binds_the_adopted_incarnation
+}
+
 test_omp_adoption() {
   test_omp_adoption_matching_workspace
   test_omp_adoption_foreign_workspace
@@ -1974,6 +2283,7 @@ test_omp_adoption() {
   test_omp_adoption_live_recorded_pid
   test_omp_adoption_reused_recorded_pid
   test_omp_adoption_publication_race
+  test_omp_adoption_bun_runtime
 }
 
 test_quota_exhaustion_relaunches_only_a_permitted_route() {
