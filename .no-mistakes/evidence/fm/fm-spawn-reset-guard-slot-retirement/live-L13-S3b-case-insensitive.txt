@@ -1,0 +1,62 @@
+# live lab case: L13-S3b-case-insensitive
+# head: 832cd61774fd7c83a24b4648580bbffe4632f3b1
+# FM_HOME=/Users/charlesabrooker/tmp/fm-lab.us6gw0 (marked lab home)  TMUX_TMPDIR=/tmp/fml.cV0kiU  tmux socket: -L fm-lab
+# scratch: /tmp/fm-lab-scratch.aOTekB  TREEHOUSE_ROOT=/tmp/fm-lab-scratch.aOTekB/pool  treehouse v3.1.7-fm.8759019
+# action script (/tmp/fm-lab-driver/act-s3b-case.sh):
+#   # S3b case-insensitive: ignored private notes at Notes.local (capital N); the target tracks notes.local.
+#   printf 'Notes.local\n' >> "$(git -C "$1" rev-parse --git-common-dir)/info/exclude"
+#   printf 'private ignored Notes - must survive\n' > "$1/Notes.local"
+#   echo "core.ignorecase=$(git -C "$1" config core.ignorecase)"
+#   git -C "$1" ls-files -o -i --exclude-standard
+# pre-spawn origin publish (/tmp/fm-lab-driver/pre-s3b-same.sh):
+#   # S3b same path: origin starts tracking notes.local; the project ignores notes.local.
+#   /tmp/fm-lab-driver/publish.sh "$1" notes.local 'tracked by origin' force
+#   printf 'notes.local\n' >> "$1/project/.git/info/exclude"
+# treehouse get runs through /tmp/fm-lab-driver/bin/treehouse (real treehouse get --no-fetch) so the slot is cut stale
+
+## $ bin/fm-spawn.sh lab-L13-S3b-case-insensitive /tmp/fm-lab-scratch.aOTekB/project --scout
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.us6gw0
+warning: task lab-L13-S3b-case-insensitive: /Users/charlesabrooker/tmp/fm-lab.us6gw0/data/lab-L13-S3b-case-insensitive/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+error: pooled worktree '/private/tmp/fm-lab-scratch.aOTekB/pool/.treehouse/project-c59d57/1/project' reset refused (ignored_collision): ignored work at a path the reset target tracks would be overwritten and no verified archive holds it: Notes.local; the slot was left untouched and nothing was launched
+EXIT=1
+
+## seeding action log
+core.ignorecase=true
+Notes.local
+
+## slot: /private/tmp/fm-lab-scratch.aOTekB/pool/.treehouse/project-c59d57/1/project
+origin/main tip (bare origin): d796982ef6af3427f7ba38b00dbece4323a8e69b
+slot HEAD after spawn: e777fd6b0ed447c8666e0a511cbd92f7ef3a123c
+
+## tmux windows on lab server
+primary:bash cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6HSPCJNFEMN8N3ZF46DWQ85 cmd=bash
+
+## worker window screen
+can't find window: fm-lab-L13-S3b-case-insensitive
+
+## stub harness launch log
+(no harness launched)
+
+## slot snapshot diff: seeded state (before spawn) vs after spawn  [HEAD, show-ref, index digest, sha256 of every file outside .git]
+5d4
+< d796982ef6af3427f7ba38b00dbece4323a8e69b refs/fm/spawn-base/4df0588563febc2500a45d324eb24143bd8449e5-95564
+
+## seeded snapshot
+--- HEAD
+e777fd6b0ed447c8666e0a511cbd92f7ef3a123c
+detached
+--- show-ref
+d796982ef6af3427f7ba38b00dbece4323a8e69b refs/fm/spawn-base/4df0588563febc2500a45d324eb24143bd8449e5-95564
+e777fd6b0ed447c8666e0a511cbd92f7ef3a123c refs/heads/main
+e777fd6b0ed447c8666e0a511cbd92f7ef3a123c refs/remotes/origin/HEAD
+e777fd6b0ed447c8666e0a511cbd92f7ef3a123c refs/remotes/origin/main
+--- index
+bd794025f16c76c505bd6bf506d42dda2feabe0c7304611bda689e903c380236  -
+--- files
+42320d69347054581f5521f173cf8c60cccc5f9d79cf84367ba1e4d8dec00cd7  ./Notes.local
+f34848ca92665c342abd5816c9e3eda0e82180671195362bcd0080544a3bc2ac  ./README.md
+
+## post check
+core.ignorecase in slot: true
+Notes.local bytes after spawn: private ignored Notes - must survive
+target tree tracks: README.md 

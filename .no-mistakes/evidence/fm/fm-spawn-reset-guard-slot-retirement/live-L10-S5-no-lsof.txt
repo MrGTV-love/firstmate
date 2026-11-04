@@ -1,0 +1,51 @@
+# live lab case: L10-S5-no-lsof
+# head: 832cd61774fd7c83a24b4648580bbffe4632f3b1
+# FM_HOME=/Users/charlesabrooker/tmp/fm-lab.tCZ4df (marked lab home)  TMUX_TMPDIR=/tmp/fml.evdt37  tmux socket: -L fm-lab
+# scratch: /tmp/fm-lab-scratch.CxNwiN  TREEHOUSE_ROOT=/tmp/fm-lab-scratch.CxNwiN/pool  treehouse v3.1.7-fm.8759019
+# action script (/tmp/fm-lab-driver/act-none.sh):
+#   # no seeding: a clean stale slot
+#   true
+# pre-spawn origin publish (/tmp/fm-lab-driver/pre-advance.sh):
+#   # Advance origin/main before the spawn; the project's local origin refs stay stale.
+#   /tmp/fm-lab-driver/publish.sh "$1" advanced.txt 'advanced before spawn'
+# treehouse get runs through /tmp/fm-lab-driver/bin/treehouse (real treehouse get --no-fetch) so the slot is cut stale
+# spawn env: PATH="$(printf %s "$PATH" | sed "s#:/usr/sbin:#:/tmp/fm-lab-driver/nolsof:#")"
+
+## $ bin/fm-spawn.sh lab-L10-S5-no-lsof /tmp/fm-lab-scratch.CxNwiN/project --scout
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.tCZ4df
+warning: task lab-L10-S5-no-lsof: /Users/charlesabrooker/tmp/fm-lab.tCZ4df/data/lab-L10-S5-no-lsof/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+error: pooled worktree '/private/tmp/fm-lab-scratch.CxNwiN/pool/.treehouse/project-a01b86/1/project' reset refused (unknown_holder_probe): lsof is not installed, so processes inside the slot cannot be ruled out; the slot was left untouched and nothing was launched
+EXIT=1
+
+## seeding action log
+
+## slot: /private/tmp/fm-lab-scratch.CxNwiN/pool/.treehouse/project-a01b86/1/project
+origin/main tip (bare origin): daf26e4bbc86ca2b90d68b77f9db9b856304c82e
+slot HEAD after spawn: 495da10f8f526e2dc291c02bc8734c9207fbec69
+
+## tmux windows on lab server
+primary:bash cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6HSPCJNFEMN8N3ZF46DWQ85 cmd=bash
+
+## worker window screen
+can't find window: fm-lab-L10-S5-no-lsof
+
+## stub harness launch log
+(no harness launched)
+
+## slot snapshot diff: seeded state (before spawn) vs after spawn  [HEAD, show-ref, index digest, sha256 of every file outside .git]
+5d4
+< daf26e4bbc86ca2b90d68b77f9db9b856304c82e refs/fm/spawn-base/5344689cfd8b350c580afd9787abc5c54a8ec372-27571
+
+## seeded snapshot
+--- HEAD
+495da10f8f526e2dc291c02bc8734c9207fbec69
+detached
+--- show-ref
+daf26e4bbc86ca2b90d68b77f9db9b856304c82e refs/fm/spawn-base/5344689cfd8b350c580afd9787abc5c54a8ec372-27571
+495da10f8f526e2dc291c02bc8734c9207fbec69 refs/heads/main
+495da10f8f526e2dc291c02bc8734c9207fbec69 refs/remotes/origin/HEAD
+495da10f8f526e2dc291c02bc8734c9207fbec69 refs/remotes/origin/main
+--- index
+9e2ab68382466a109e37c4482a9461de7a9330288224798f8dff8628fd35e936  -
+--- files
+f34848ca92665c342abd5816c9e3eda0e82180671195362bcd0080544a3bc2ac  ./README.md

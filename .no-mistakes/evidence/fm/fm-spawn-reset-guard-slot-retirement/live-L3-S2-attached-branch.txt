@@ -1,0 +1,57 @@
+# live lab case: L3-S2-attached-branch
+# head: 832cd61774fd7c83a24b4648580bbffe4632f3b1
+# FM_HOME=/Users/charlesabrooker/tmp/fm-lab.4SiRs7 (marked lab home)  TMUX_TMPDIR=/tmp/fml.r57ERN  tmux socket: -L fm-lab
+# scratch: /tmp/fm-lab-scratch.oelAvL  TREEHOUSE_ROOT=/tmp/fm-lab-scratch.oelAvL/pool  treehouse v3.1.7-fm.8759019
+# action script (/tmp/fm-lab-driver/act-s2.sh):
+#   # S2: slot attached to a branch with one commit that is in no anchor.
+#   git -C "$1" switch -q -c lab/owner-branch
+#   printf 'owner branch work\n' > "$1/owner.txt"
+#   git -C "$1" add owner.txt
+#   git -C "$1" -c user.name=lab -c user.email=lab@example.invalid commit -qm 'owner branch commit'
+#   git -C "$1" rev-parse lab/owner-branch
+# pre-spawn origin publish (/tmp/fm-lab-driver/pre-advance.sh):
+#   # Advance origin/main before the spawn; the project's local origin refs stay stale.
+#   /tmp/fm-lab-driver/publish.sh "$1" advanced.txt 'advanced before spawn'
+# treehouse get runs through /tmp/fm-lab-driver/bin/treehouse (real treehouse get --no-fetch) so the slot is cut stale
+
+## $ bin/fm-spawn.sh lab-L3-S2-attached-branch /tmp/fm-lab-scratch.oelAvL/project --scout
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.4SiRs7
+warning: task lab-L3-S2-attached-branch: /Users/charlesabrooker/tmp/fm-lab.4SiRs7/data/lab-L3-S2-attached-branch/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+error: pooled worktree '/private/tmp/fm-lab-scratch.oelAvL/pool/.treehouse/project-130636/1/project' reset refused (owner_branch_not_contained): owner branch refs/heads/lab/owner-branch at 277561fb4ee3 is not contained in the fetched origin default branch or the recorded base, so a reset or branch change would lose its commits; the slot was left untouched and nothing was launched
+EXIT=1
+
+## seeding action log
+277561fb4ee36f8e8573b9bb14e533945139638c
+
+## slot: /private/tmp/fm-lab-scratch.oelAvL/pool/.treehouse/project-130636/1/project
+origin/main tip (bare origin): 78434ceb349a34b404ac5793e208469899f9bc4d
+slot HEAD after spawn: 277561fb4ee36f8e8573b9bb14e533945139638c
+
+## tmux windows on lab server
+primary:bash cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6HSPCJNFEMN8N3ZF46DWQ85 cmd=bash
+
+## worker window screen
+can't find window: fm-lab-L3-S2-attached-branch
+
+## stub harness launch log
+(no harness launched)
+
+## slot snapshot diff: seeded state (before spawn) vs after spawn  [HEAD, show-ref, index digest, sha256 of every file outside .git]
+5d4
+< 78434ceb349a34b404ac5793e208469899f9bc4d refs/fm/spawn-base/4136ebd27e9f2a6eff870f2f6db2cc4caa5a52fe-72901
+
+## seeded snapshot
+--- HEAD
+277561fb4ee36f8e8573b9bb14e533945139638c
+refs/heads/lab/owner-branch
+--- show-ref
+78434ceb349a34b404ac5793e208469899f9bc4d refs/fm/spawn-base/4136ebd27e9f2a6eff870f2f6db2cc4caa5a52fe-72901
+277561fb4ee36f8e8573b9bb14e533945139638c refs/heads/lab/owner-branch
+61dffe1e4a5f8bf588c4d43c22b1b3fafebc17c3 refs/heads/main
+61dffe1e4a5f8bf588c4d43c22b1b3fafebc17c3 refs/remotes/origin/HEAD
+61dffe1e4a5f8bf588c4d43c22b1b3fafebc17c3 refs/remotes/origin/main
+--- index
+6b9ee0e43a9311362c6f3f44d1e904c406a4c9b2d806454d601ab4954937faf2  -
+--- files
+f34848ca92665c342abd5816c9e3eda0e82180671195362bcd0080544a3bc2ac  ./README.md
+6b13c960775a08bb94a3902efcd45fda51fcbb97288c5df1bb15ee70d03d46d8  ./owner.txt

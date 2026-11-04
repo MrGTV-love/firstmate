@@ -1,0 +1,61 @@
+# live lab case: L12-S5b-commit-after-holder-probe
+# head: 832cd61774fd7c83a24b4648580bbffe4632f3b1
+# FM_HOME=/Users/charlesabrooker/tmp/fm-lab.qPVcLy (marked lab home)  TMUX_TMPDIR=/tmp/fml.ZZPJvq  tmux socket: -L fm-lab
+# scratch: /tmp/fm-lab-scratch.hEQlnw  TREEHOUSE_ROOT=/tmp/fm-lab-scratch.hEQlnw/pool  treehouse v3.1.7-fm.8759019
+# action script (/tmp/fm-lab-driver/act-none.sh):
+#   # no seeding: a clean stale slot
+#   true
+# pre-spawn origin publish (/tmp/fm-lab-driver/pre-advance.sh):
+#   # Advance origin/main before the spawn; the project's local origin refs stay stale.
+#   /tmp/fm-lab-driver/publish.sh "$1" advanced.txt 'advanced before spawn'
+# treehouse get runs through /tmp/fm-lab-driver/bin/treehouse (real treehouse get --no-fetch) so the slot is cut stale
+# spawn env: FM_SLOT_RESET_GUARD_HOLDER_SEAM='git -C "$FM_SLOT_GUARD_SLOT" -c user.name=lab -c user.email=l@e.invalid commit -q --allow-empty -m late-after-holder-probe'
+
+## $ bin/fm-spawn.sh lab-L12-S5b-commit-after-holder-probe /tmp/fm-lab-scratch.hEQlnw/project --scout
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.qPVcLy
+warning: task lab-L12-S5b-commit-after-holder-probe: /Users/charlesabrooker/tmp/fm-lab.qPVcLy/data/lab-L12-S5b-commit-after-holder-probe/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+error: pooled worktree '/private/tmp/fm-lab-scratch.hEQlnw/pool/.treehouse/project-054276/1/project' reset refused (head_not_contained): the detached HEAD 9e2a0885fee3 is not contained in the fetched origin default branch or the recorded base, so a reset would orphan its commits; the slot was left untouched and nothing was launched
+EXIT=1
+
+## seeding action log
+
+## slot: /private/tmp/fm-lab-scratch.hEQlnw/pool/.treehouse/project-054276/1/project
+origin/main tip (bare origin): ef7ddef4a0bf1c86144240336b7b84d7b23354c9
+slot HEAD after spawn: 9e2a0885fee3fa07370da213560da6915fead2fb
+
+## tmux windows on lab server
+primary:bash cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6HSPCJNFEMN8N3ZF46DWQ85 cmd=bash
+
+## worker window screen
+can't find window: fm-lab-L12-S5b-commit-after-holder-probe
+
+## stub harness launch log
+(no harness launched)
+
+## slot snapshot diff: seeded state (before spawn) vs after spawn  [HEAD, show-ref, index digest, sha256 of every file outside .git]
+2c2
+< 0b2bf8d23448ac0ed24153f6ae2f3382f80249c0
+---
+> 9e2a0885fee3fa07370da213560da6915fead2fb
+5d4
+< ef7ddef4a0bf1c86144240336b7b84d7b23354c9 refs/fm/spawn-base/f5c632a0927b5049000e1e925c2ac49c4e4d35f3-73191
+7,8c6,7
+< 0b2bf8d23448ac0ed24153f6ae2f3382f80249c0 refs/remotes/origin/HEAD
+< 0b2bf8d23448ac0ed24153f6ae2f3382f80249c0 refs/remotes/origin/main
+---
+> ef7ddef4a0bf1c86144240336b7b84d7b23354c9 refs/remotes/origin/HEAD
+> ef7ddef4a0bf1c86144240336b7b84d7b23354c9 refs/remotes/origin/main
+
+## seeded snapshot
+--- HEAD
+0b2bf8d23448ac0ed24153f6ae2f3382f80249c0
+detached
+--- show-ref
+ef7ddef4a0bf1c86144240336b7b84d7b23354c9 refs/fm/spawn-base/f5c632a0927b5049000e1e925c2ac49c4e4d35f3-73191
+0b2bf8d23448ac0ed24153f6ae2f3382f80249c0 refs/heads/main
+0b2bf8d23448ac0ed24153f6ae2f3382f80249c0 refs/remotes/origin/HEAD
+0b2bf8d23448ac0ed24153f6ae2f3382f80249c0 refs/remotes/origin/main
+--- index
+780eb6b3fe142575612383e91d1360215ce25fad73cdf7017d3f810bb0677c3e  -
+--- files
+f34848ca92665c342abd5816c9e3eda0e82180671195362bcd0080544a3bc2ac  ./README.md

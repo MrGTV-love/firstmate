@@ -1,0 +1,6 @@
+#!/bin/bash
+# Lab wrapper: the real treehouse, but `get` skips its own fetch so the slot is cut
+# from the project's (stale) local origin refs and the spawn's reset moves it forward.
+real=/Users/charlesabrooker/.local/bin/treehouse
+if [ "${1:-}" = get ]; then shift; exec "$real" get --no-fetch "$@"; fi
+exec "$real" "$@"

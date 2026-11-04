@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+printf 'stub harness started pid=%s cwd=%s argc=%s\n' "$$" "$PWD" "$#" >> /tmp/fm-lab-driver/launch.log
+echo $$ >> /tmp/fm-lab-driver/stub.pids
+exec sleep 3600

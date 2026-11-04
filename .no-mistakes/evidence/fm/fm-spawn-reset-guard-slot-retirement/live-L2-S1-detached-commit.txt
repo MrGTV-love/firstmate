@@ -1,0 +1,55 @@
+# live lab case: L2-S1-detached-commit
+# head: 832cd61774fd7c83a24b4648580bbffe4632f3b1
+# FM_HOME=/Users/charlesabrooker/tmp/fm-lab.IDDMYM (marked lab home)  TMUX_TMPDIR=/tmp/fml.NVBfvF  tmux socket: -L fm-lab
+# scratch: /tmp/fm-lab-scratch.P40Cad  TREEHOUSE_ROOT=/tmp/fm-lab-scratch.P40Cad/pool  treehouse v3.1.7-fm.8759019
+# action script (/tmp/fm-lab-driver/act-s1.sh):
+#   # S1: unique work = one extra commit on the slot's detached HEAD.
+#   printf 'unique detached work\n' > "$1/unique.txt"
+#   git -C "$1" add unique.txt
+#   git -C "$1" -c user.name=lab -c user.email=lab@example.invalid commit -qm 'unique detached commit'
+#   git -C "$1" rev-parse HEAD
+# pre-spawn origin publish (/tmp/fm-lab-driver/pre-advance.sh):
+#   # Advance origin/main before the spawn; the project's local origin refs stay stale.
+#   /tmp/fm-lab-driver/publish.sh "$1" advanced.txt 'advanced before spawn'
+# treehouse get runs through /tmp/fm-lab-driver/bin/treehouse (real treehouse get --no-fetch) so the slot is cut stale
+
+## $ bin/fm-spawn.sh lab-L2-S1-detached-commit /tmp/fm-lab-scratch.P40Cad/project --scout
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.IDDMYM
+warning: task lab-L2-S1-detached-commit: /Users/charlesabrooker/tmp/fm-lab.IDDMYM/data/lab-L2-S1-detached-commit/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+error: pooled worktree '/private/tmp/fm-lab-scratch.P40Cad/pool/.treehouse/project-75606c/1/project' reset refused (head_not_contained): the detached HEAD cd72b7a5bc5b is not contained in the fetched origin default branch or the recorded base, so a reset would orphan its commits; the slot was left untouched and nothing was launched
+EXIT=1
+
+## seeding action log
+cd72b7a5bc5b7739b7556205973bdf2f2bc2991e
+
+## slot: /private/tmp/fm-lab-scratch.P40Cad/pool/.treehouse/project-75606c/1/project
+origin/main tip (bare origin): 9ccabd410910492c9b1074c7242ca8048d437765
+slot HEAD after spawn: cd72b7a5bc5b7739b7556205973bdf2f2bc2991e
+
+## tmux windows on lab server
+primary:bash cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6HSPCJNFEMN8N3ZF46DWQ85 cmd=bash
+
+## worker window screen
+can't find window: fm-lab-L2-S1-detached-commit
+
+## stub harness launch log
+(no harness launched)
+
+## slot snapshot diff: seeded state (before spawn) vs after spawn  [HEAD, show-ref, index digest, sha256 of every file outside .git]
+5d4
+< 9ccabd410910492c9b1074c7242ca8048d437765 refs/fm/spawn-base/b23bcb9cdf98a00f226796e7b8b8bcac473b4212-90572
+
+## seeded snapshot
+--- HEAD
+cd72b7a5bc5b7739b7556205973bdf2f2bc2991e
+detached
+--- show-ref
+9ccabd410910492c9b1074c7242ca8048d437765 refs/fm/spawn-base/b23bcb9cdf98a00f226796e7b8b8bcac473b4212-90572
+5261af4d77e258d837e54894a46d81a7272120e1 refs/heads/main
+5261af4d77e258d837e54894a46d81a7272120e1 refs/remotes/origin/HEAD
+5261af4d77e258d837e54894a46d81a7272120e1 refs/remotes/origin/main
+--- index
+f9d0eb260c498cb75939465a6111092c82d706c0a61d3a91753e0e4cf6fb05de  -
+--- files
+f34848ca92665c342abd5816c9e3eda0e82180671195362bcd0080544a3bc2ac  ./README.md
+d73d8c558612d9c5159d5f88400761d0085228e36c4a03a970e3d410c62dc9c5  ./unique.txt

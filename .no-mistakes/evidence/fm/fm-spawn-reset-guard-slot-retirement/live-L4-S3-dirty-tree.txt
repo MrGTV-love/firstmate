@@ -1,0 +1,55 @@
+# live lab case: L4-S3-dirty-tree
+# head: 832cd61774fd7c83a24b4648580bbffe4632f3b1
+# FM_HOME=/Users/charlesabrooker/tmp/fm-lab.HZ2063 (marked lab home)  TMUX_TMPDIR=/tmp/fml.rMktcK  tmux socket: -L fm-lab
+# scratch: /tmp/fm-lab-scratch.BrAMAf  TREEHOUSE_ROOT=/tmp/fm-lab-scratch.BrAMAf/pool  treehouse v3.1.7-fm.8759019
+# action script (/tmp/fm-lab-driver/act-s3.sh):
+#   # S3: tracked edit + untracked file inside an untracked directory.
+#   printf 'dirty tracked edit\n' >> "$1/README.md"
+#   mkdir -p "$1/newdir/sub"; printf 'untracked work\n' > "$1/newdir/sub/draft.txt"
+#   git -C "$1" status --porcelain --untracked-files=all
+# pre-spawn origin publish (/tmp/fm-lab-driver/pre-advance.sh):
+#   # Advance origin/main before the spawn; the project's local origin refs stay stale.
+#   /tmp/fm-lab-driver/publish.sh "$1" advanced.txt 'advanced before spawn'
+# treehouse get runs through /tmp/fm-lab-driver/bin/treehouse (real treehouse get --no-fetch) so the slot is cut stale
+
+## $ bin/fm-spawn.sh lab-L4-S3-dirty-tree /tmp/fm-lab-scratch.BrAMAf/project --scout
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.HZ2063
+warning: task lab-L4-S3-dirty-tree: /Users/charlesabrooker/tmp/fm-lab.HZ2063/data/lab-L4-S3-dirty-tree/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+error: pooled worktree '/private/tmp/fm-lab-scratch.BrAMAf/pool/.treehouse/project-c167f5/1/project' is not clean; refusing to discard uncommitted work while refreshing its base (reset refused: tree_not_clean:  M README.md;?? newdir/sub/draft.txt;)
+EXIT=1
+
+## seeding action log
+ M README.md
+?? newdir/sub/draft.txt
+
+## slot: /private/tmp/fm-lab-scratch.BrAMAf/pool/.treehouse/project-c167f5/1/project
+origin/main tip (bare origin): ad5acddc4cd9142d88c22b0a045d7fd386e2fc52
+slot HEAD after spawn: 592f3a16ed788fed283f17a4cb4c66926bb95c49
+
+## tmux windows on lab server
+primary:bash cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6HSPCJNFEMN8N3ZF46DWQ85 cmd=bash
+
+## worker window screen
+can't find window: fm-lab-L4-S3-dirty-tree
+
+## stub harness launch log
+(no harness launched)
+
+## slot snapshot diff: seeded state (before spawn) vs after spawn  [HEAD, show-ref, index digest, sha256 of every file outside .git]
+5d4
+< ad5acddc4cd9142d88c22b0a045d7fd386e2fc52 refs/fm/spawn-base/c7dbc020a9bca79bd3a12bc66e9893335523e6a3-44365
+
+## seeded snapshot
+--- HEAD
+592f3a16ed788fed283f17a4cb4c66926bb95c49
+detached
+--- show-ref
+ad5acddc4cd9142d88c22b0a045d7fd386e2fc52 refs/fm/spawn-base/c7dbc020a9bca79bd3a12bc66e9893335523e6a3-44365
+592f3a16ed788fed283f17a4cb4c66926bb95c49 refs/heads/main
+592f3a16ed788fed283f17a4cb4c66926bb95c49 refs/remotes/origin/HEAD
+592f3a16ed788fed283f17a4cb4c66926bb95c49 refs/remotes/origin/main
+--- index
+221f558ed295fea07182a60de8890639424fd882d347df91e03821ce0e95fc80  -
+--- files
+8c990d858b1f92a79257b16d7bc362fe3f14d602ed12520696e1cd8c38ce3990  ./README.md
+f7a503a2a286b8753301d2261e0f0f1445ea39c8acbc8d7f88aaf5b3ffc68ab5  ./newdir/sub/draft.txt

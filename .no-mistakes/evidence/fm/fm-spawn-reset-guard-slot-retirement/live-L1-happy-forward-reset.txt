@@ -1,0 +1,82 @@
+# live lab case: L1-happy-forward-reset
+# head: 832cd61774fd7c83a24b4648580bbffe4632f3b1
+# FM_HOME=/Users/charlesabrooker/tmp/fm-lab.RaS7Ij (marked lab home)  TMUX_TMPDIR=/tmp/fml.rZfnRn  tmux socket: -L fm-lab
+# scratch: /tmp/fm-lab-scratch.u7zm7G  TREEHOUSE_ROOT=/tmp/fm-lab-scratch.u7zm7G/pool  treehouse v3.1.7-fm.8759019
+# action script (/tmp/fm-lab-driver/act-none.sh):
+#   # no seeding: a clean stale slot
+#   true
+# pre-spawn origin publish (/tmp/fm-lab-driver/pre-advance.sh):
+#   # Advance origin/main before the spawn; the project's local origin refs stay stale.
+#   /tmp/fm-lab-driver/publish.sh "$1" advanced.txt 'advanced before spawn'
+# treehouse get runs through /tmp/fm-lab-driver/bin/treehouse (real treehouse get --no-fetch) so the slot is cut stale
+
+## $ bin/fm-spawn.sh lab-L1-happy-forward-reset /tmp/fm-lab-scratch.u7zm7G/project --scout
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.RaS7Ij
+warning: task lab-L1-happy-forward-reset: /Users/charlesabrooker/tmp/fm-lab.RaS7Ij/data/lab-L1-happy-forward-reset/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+skill selection for lab-L1-happy-forward-reset: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=codex write_confinement=unconfined-macos-codex
+spawned lab-L1-happy-forward-reset harness=codex kind=scout window=primary:fm-lab-L1-happy-forward-reset worktree=/private/tmp/fm-lab-scratch.u7zm7G/pool/.treehouse/project-38b6d3/1/project
+EXIT=0
+
+## seeding action log
+
+## slot: /private/tmp/fm-lab-scratch.u7zm7G/pool/.treehouse/project-38b6d3/1/project
+origin/main tip (bare origin): 3cbaf880af01fa1b62618b888706d66b1d31cf1b
+slot HEAD after spawn: 3cbaf880af01fa1b62618b888706d66b1d31cf1b
+
+## tmux windows on lab server
+primary:bash cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6HSPCJNFEMN8N3ZF46DWQ85 cmd=bash
+primary:fm-lab-L1-happy-forward-reset cwd=/private/tmp/fm-lab-scratch.u7zm7G/pool/.treehouse/project-38b6d3/1/project cmd=bash
+
+## worker window screen
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+bash-3.2$ treehouse get
+🌳 Setting up worktree...
+🌳 Entered worktree at /private/tmp/fm-lab-scratch.u7zm7G/pool/.treehouse/project-38b6d3/1/project. Type 'exit' to return.
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+bash-3.2$ cd -- '/private/tmp/fm-lab-scratch.u7zm7G/pool/.treehouse/project-38b6d3/1/project'
+bash-3.2$ export GOTMPDIR=/tmp/fm-lab-L1-happy-forward-reset/gotmp
+bash-3.2$ export COMPACT_ADVISER_DISABLE=1
+bash-3.2$ export FM_TASK_ID=lab-L1-happy-forward-reset
+bash-3.2$ . '/tmp/fm-lab-L1-happy-forward-reset+ac72280bd23e6a7ae1f1ebf0b9eaf32e4a6672022afaf58e4ab757535ae07cc8/launch.s1793759297.31927.17223.sh'
+
+## stub harness launch log
+stub harness started pid=67511 cwd=/private/tmp/fm-lab-scratch.u7zm7G/pool/.treehouse/project-38b6d3/1/project argc=6
+
+## slot snapshot diff: seeded state (before spawn) vs after spawn  [HEAD, show-ref, index digest, sha256 of every file outside .git]
+2c2
+< 5c5763c198fc324b024fd8b9bc0ca377b921fb5d
+---
+> 3cbaf880af01fa1b62618b888706d66b1d31cf1b
+5d4
+< 3cbaf880af01fa1b62618b888706d66b1d31cf1b refs/fm/spawn-base/0eb6a552f650b6562f1a12df887a584527cea792-31927
+7,8c6,7
+< 5c5763c198fc324b024fd8b9bc0ca377b921fb5d refs/remotes/origin/HEAD
+< 5c5763c198fc324b024fd8b9bc0ca377b921fb5d refs/remotes/origin/main
+---
+> 3cbaf880af01fa1b62618b888706d66b1d31cf1b refs/remotes/origin/HEAD
+> 3cbaf880af01fa1b62618b888706d66b1d31cf1b refs/remotes/origin/main
+10c9
+< 044bbb6784faee081319cf777db272c0fbce7f4551b665c2ef25d2791763b24b  -
+---
+> 1693a7e85251d2b5b2ab1b6cc83ad1dc4941d023d9d578add3746c560be9aa1a  -
+12a12
+> 105ec251921381e8a65a48256aa06fceabdd15ff91391f65d6bf11d67f0b362b  ./advanced.txt
+
+## seeded snapshot
+--- HEAD
+5c5763c198fc324b024fd8b9bc0ca377b921fb5d
+detached
+--- show-ref
+3cbaf880af01fa1b62618b888706d66b1d31cf1b refs/fm/spawn-base/0eb6a552f650b6562f1a12df887a584527cea792-31927
+5c5763c198fc324b024fd8b9bc0ca377b921fb5d refs/heads/main
+5c5763c198fc324b024fd8b9bc0ca377b921fb5d refs/remotes/origin/HEAD
+5c5763c198fc324b024fd8b9bc0ca377b921fb5d refs/remotes/origin/main
+--- index
+044bbb6784faee081319cf777db272c0fbce7f4551b665c2ef25d2791763b24b  -
+--- files
+f34848ca92665c342abd5816c9e3eda0e82180671195362bcd0080544a3bc2ac  ./README.md

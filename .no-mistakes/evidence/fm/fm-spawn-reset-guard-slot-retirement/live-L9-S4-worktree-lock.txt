@@ -1,0 +1,52 @@
+# live lab case: L9-S4-worktree-lock
+# head: 832cd61774fd7c83a24b4648580bbffe4632f3b1
+# FM_HOME=/Users/charlesabrooker/tmp/fm-lab.hIPI8T (marked lab home)  TMUX_TMPDIR=/tmp/fml.ookZwb  tmux socket: -L fm-lab
+# scratch: /tmp/fm-lab-scratch.cMeJQL  TREEHOUSE_ROOT=/tmp/fm-lab-scratch.cMeJQL/pool  treehouse v3.1.7-fm.8759019
+# action script (/tmp/fm-lab-driver/act-s4-lock.sh):
+#   # S4: a git worktree lock on the slot.
+#   git -C "$1" worktree lock --reason 'lab: another tool holds this slot' "$1"
+#   git -C "$1" worktree list --porcelain | grep -A4 "$1" | grep locked
+# pre-spawn origin publish (/tmp/fm-lab-driver/pre-advance.sh):
+#   # Advance origin/main before the spawn; the project's local origin refs stay stale.
+#   /tmp/fm-lab-driver/publish.sh "$1" advanced.txt 'advanced before spawn'
+# treehouse get runs through /tmp/fm-lab-driver/bin/treehouse (real treehouse get --no-fetch) so the slot is cut stale
+
+## $ bin/fm-spawn.sh lab-L9-S4-worktree-lock /tmp/fm-lab-scratch.cMeJQL/project --scout
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hIPI8T
+warning: task lab-L9-S4-worktree-lock: /Users/charlesabrooker/tmp/fm-lab.hIPI8T/data/lab-L9-S4-worktree-lock/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+error: pooled worktree '/private/tmp/fm-lab-scratch.cMeJQL/pool/.treehouse/project-002239/1/project' reset refused (holder_worktree_lock): a git worktree lock is held on the slot; the slot was left untouched and nothing was launched
+EXIT=1
+
+## seeding action log
+locked lab: another tool holds this slot
+
+## slot: /private/tmp/fm-lab-scratch.cMeJQL/pool/.treehouse/project-002239/1/project
+origin/main tip (bare origin): dc4dca05615d2c4cc3278d8da5879a066696dc7e
+slot HEAD after spawn: 03e373227791294d911ad0585f9e4d186ca0e748
+
+## tmux windows on lab server
+primary:bash cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6HSPCJNFEMN8N3ZF46DWQ85 cmd=bash
+
+## worker window screen
+can't find window: fm-lab-L9-S4-worktree-lock
+
+## stub harness launch log
+(no harness launched)
+
+## slot snapshot diff: seeded state (before spawn) vs after spawn  [HEAD, show-ref, index digest, sha256 of every file outside .git]
+5d4
+< dc4dca05615d2c4cc3278d8da5879a066696dc7e refs/fm/spawn-base/d026ce3db0e87567104a28f7b646fd0c08d7d5fc-63039
+
+## seeded snapshot
+--- HEAD
+03e373227791294d911ad0585f9e4d186ca0e748
+detached
+--- show-ref
+dc4dca05615d2c4cc3278d8da5879a066696dc7e refs/fm/spawn-base/d026ce3db0e87567104a28f7b646fd0c08d7d5fc-63039
+03e373227791294d911ad0585f9e4d186ca0e748 refs/heads/main
+03e373227791294d911ad0585f9e4d186ca0e748 refs/remotes/origin/HEAD
+03e373227791294d911ad0585f9e4d186ca0e748 refs/remotes/origin/main
+--- index
+99a6aa8ff002fd9da2f6f01036199865ccc7d05e6e45a7f07da1238dc01da7f6  -
+--- files
+f34848ca92665c342abd5816c9e3eda0e82180671195362bcd0080544a3bc2ac  ./README.md

@@ -1,0 +1,62 @@
+# live lab case: L8-S4-cwd-holder
+# head: 832cd61774fd7c83a24b4648580bbffe4632f3b1
+# FM_HOME=/Users/charlesabrooker/tmp/fm-lab.W6slVm (marked lab home)  TMUX_TMPDIR=/tmp/fml.etk7t5  tmux socket: -L fm-lab
+# scratch: /tmp/fm-lab-scratch.2QblLD  TREEHOUSE_ROOT=/tmp/fm-lab-scratch.2QblLD/pool  treehouse v3.1.7-fm.8759019
+# action script (/tmp/fm-lab-driver/act-s4-holder.sh):
+#   # S4: ask the driver to start an unrelated process with its cwd in the slot.
+#   touch "$FM_LAB_SCRATCH/.need-holder"
+#   for _ in $(seq 1 60); do [ -e "$FM_LAB_SCRATCH/.holder-go" ] && break; sleep 0.5; done
+#   ls "$FM_LAB_SCRATCH"
+# pre-spawn origin publish (/tmp/fm-lab-driver/pre-advance.sh):
+#   # Advance origin/main before the spawn; the project's local origin refs stay stale.
+#   /tmp/fm-lab-driver/publish.sh "$1" advanced.txt 'advanced before spawn'
+# treehouse get runs through /tmp/fm-lab-driver/bin/treehouse (real treehouse get --no-fetch) so the slot is cut stale
+# driver started unrelated holder pid 32576 with cwd /private/tmp/fm-lab-scratch.2QblLD/pool/.treehouse/project-98e52d/1/project
+
+## $ bin/fm-spawn.sh lab-L8-S4-cwd-holder /tmp/fm-lab-scratch.2QblLD/project --scout
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.W6slVm
+warning: task lab-L8-S4-cwd-holder: /Users/charlesabrooker/tmp/fm-lab.W6slVm/data/lab-L8-S4-cwd-holder/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+error: pooled worktree '/private/tmp/fm-lab-scratch.2QblLD/pool/.treehouse/project-98e52d/1/project' reset refused (holder_cwd): a process outside this spawn's lineage and its own endpoint has its working directory in the slot: sleep(32576); the slot was left untouched and nothing was launched
+EXIT=1
+
+## seeding action log
+action.log
+origin.git
+pool
+pre.log
+project
+publisher
+seed
+slot-path
+spawn.out
+
+## slot: /private/tmp/fm-lab-scratch.2QblLD/pool/.treehouse/project-98e52d/1/project
+origin/main tip (bare origin): bdc12696d74bfd1fc554aca8127b0c953ba2eecf
+slot HEAD after spawn: 810f63f1bae9cef262401b9b1c8b5f5c687063d4
+
+## tmux windows on lab server
+primary:bash cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6HSPCJNFEMN8N3ZF46DWQ85 cmd=bash
+
+## worker window screen
+can't find window: fm-lab-L8-S4-cwd-holder
+
+## stub harness launch log
+(no harness launched)
+
+## slot snapshot diff: seeded state (before spawn) vs after spawn  [HEAD, show-ref, index digest, sha256 of every file outside .git]
+5d4
+< bdc12696d74bfd1fc554aca8127b0c953ba2eecf refs/fm/spawn-base/63d432ce1995c4f41ccb1678d316f463c08acd0b-3714
+
+## seeded snapshot
+--- HEAD
+810f63f1bae9cef262401b9b1c8b5f5c687063d4
+detached
+--- show-ref
+bdc12696d74bfd1fc554aca8127b0c953ba2eecf refs/fm/spawn-base/63d432ce1995c4f41ccb1678d316f463c08acd0b-3714
+810f63f1bae9cef262401b9b1c8b5f5c687063d4 refs/heads/main
+810f63f1bae9cef262401b9b1c8b5f5c687063d4 refs/remotes/origin/HEAD
+810f63f1bae9cef262401b9b1c8b5f5c687063d4 refs/remotes/origin/main
+--- index
+aae634b792d70e84cb96afbbcdc5d4ffaf72dbc97fdc250864fb8e6affeaa85b  -
+--- files
+f34848ca92665c342abd5816c9e3eda0e82180671195362bcd0080544a3bc2ac  ./README.md

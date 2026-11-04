@@ -1,0 +1,19 @@
+#!/bin/bash
+# Lab pane shell. When treehouse get opens its subshell inside a pool slot, step out
+# of the slot (so the spawn keeps waiting), run the case's seeding action once against
+# the slot, snapshot it, then return into the slot and hand over to a plain bash.
+here=$(pwd -P); root=$(cd "${TREEHOUSE_ROOT:-/nonexistent}" 2>/dev/null && pwd -P || echo /nonexistent)
+case "$here/" in
+  "$root/"*)
+    if [ -n "${FM_LAB_ACTION:-}" ] && [ ! -e "$FM_LAB_SCRATCH/.action-done" ]; then
+      cd / || exit 1
+      touch "$FM_LAB_SCRATCH/.action-done"
+      printf '%s\n' "$here" > "$FM_LAB_SCRATCH/slot-path"
+      (cd / && FM_LAB_SLOT="$here" bash "$FM_LAB_ACTION" "$here") > "$FM_LAB_SCRATCH/action.log" 2>&1 || echo "action failed $?" >> "$FM_LAB_SCRATCH/action.log"
+      /tmp/fm-lab-driver/snap.sh "$here" > "$FM_LAB_SCRATCH/before.snap" 2>&1
+      touch "$FM_LAB_SCRATCH/.seeded"
+      cd "$here" || exit 1
+    fi
+    ;;
+esac
+exec /bin/bash --noprofile --norc "$@"

@@ -1,0 +1,54 @@
+# live lab case: L5-S3b-same-path
+# head: 832cd61774fd7c83a24b4648580bbffe4632f3b1
+# FM_HOME=/Users/charlesabrooker/tmp/fm-lab.H7u1gd (marked lab home)  TMUX_TMPDIR=/tmp/fml.6IAEFK  tmux socket: -L fm-lab
+# scratch: /tmp/fm-lab-scratch.fCykm4  TREEHOUSE_ROOT=/tmp/fm-lab-scratch.fCykm4/pool  treehouse v3.1.7-fm.8759019
+# action script (/tmp/fm-lab-driver/act-s3b-file.sh):
+#   # S3b: ignored private notes at notes.local in the slot.
+#   printf 'private ignored notes - must survive\n' > "$1/notes.local"
+#   git -C "$1" ls-files -o -i --exclude-standard
+# pre-spawn origin publish (/tmp/fm-lab-driver/pre-s3b-same.sh):
+#   # S3b same path: origin starts tracking notes.local; the project ignores notes.local.
+#   /tmp/fm-lab-driver/publish.sh "$1" notes.local 'tracked by origin' force
+#   printf 'notes.local\n' >> "$1/project/.git/info/exclude"
+# treehouse get runs through /tmp/fm-lab-driver/bin/treehouse (real treehouse get --no-fetch) so the slot is cut stale
+
+## $ bin/fm-spawn.sh lab-L5-S3b-same-path /tmp/fm-lab-scratch.fCykm4/project --scout
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.H7u1gd
+warning: task lab-L5-S3b-same-path: /Users/charlesabrooker/tmp/fm-lab.H7u1gd/data/lab-L5-S3b-same-path/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+error: pooled worktree '/private/tmp/fm-lab-scratch.fCykm4/pool/.treehouse/project-1dd152/1/project' reset refused (ignored_collision): ignored work at a path the reset target tracks would be overwritten and no verified archive holds it: notes.local; the slot was left untouched and nothing was launched
+EXIT=1
+
+## seeding action log
+notes.local
+
+## slot: /private/tmp/fm-lab-scratch.fCykm4/pool/.treehouse/project-1dd152/1/project
+origin/main tip (bare origin): 5c5c29348ef657e7661af8a72987c34dd2644e5a
+slot HEAD after spawn: d8bf19fd2b248a43c208ef8f8c62131e4d60af40
+
+## tmux windows on lab server
+primary:bash cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6HSPCJNFEMN8N3ZF46DWQ85 cmd=bash
+
+## worker window screen
+can't find window: fm-lab-L5-S3b-same-path
+
+## stub harness launch log
+(no harness launched)
+
+## slot snapshot diff: seeded state (before spawn) vs after spawn  [HEAD, show-ref, index digest, sha256 of every file outside .git]
+5d4
+< 5c5c29348ef657e7661af8a72987c34dd2644e5a refs/fm/spawn-base/01578836e83d16277f3c715289887ffc44d0751a-40775
+
+## seeded snapshot
+--- HEAD
+d8bf19fd2b248a43c208ef8f8c62131e4d60af40
+detached
+--- show-ref
+5c5c29348ef657e7661af8a72987c34dd2644e5a refs/fm/spawn-base/01578836e83d16277f3c715289887ffc44d0751a-40775
+d8bf19fd2b248a43c208ef8f8c62131e4d60af40 refs/heads/main
+d8bf19fd2b248a43c208ef8f8c62131e4d60af40 refs/remotes/origin/HEAD
+d8bf19fd2b248a43c208ef8f8c62131e4d60af40 refs/remotes/origin/main
+--- index
+ed34c38e0db812faed71bea01aa6884bfa6e74bef330a393b5fd8518fecf78fc  -
+--- files
+f34848ca92665c342abd5816c9e3eda0e82180671195362bcd0080544a3bc2ac  ./README.md
+debfa70dd2be71c74ec44845e8f75f44ee5e86541c9798645954d79b0092cb14  ./notes.local

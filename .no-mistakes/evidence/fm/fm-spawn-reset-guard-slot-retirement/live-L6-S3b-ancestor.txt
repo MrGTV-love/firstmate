@@ -1,0 +1,54 @@
+# live lab case: L6-S3b-ancestor
+# head: 832cd61774fd7c83a24b4648580bbffe4632f3b1
+# FM_HOME=/Users/charlesabrooker/tmp/fm-lab.FJGXoT (marked lab home)  TMUX_TMPDIR=/tmp/fml.9cgoAO  tmux socket: -L fm-lab
+# scratch: /tmp/fm-lab-scratch.JwPxsX  TREEHOUSE_ROOT=/tmp/fm-lab-scratch.JwPxsX/pool  treehouse v3.1.7-fm.8759019
+# action script (/tmp/fm-lab-driver/act-s3b-file.sh):
+#   # S3b: ignored private notes at notes.local in the slot.
+#   printf 'private ignored notes - must survive\n' > "$1/notes.local"
+#   git -C "$1" ls-files -o -i --exclude-standard
+# pre-spawn origin publish (/tmp/fm-lab-driver/pre-s3b-anc.sh):
+#   # S3b ancestor: origin starts tracking notes.local/entry.txt; the project ignores notes.local.
+#   /tmp/fm-lab-driver/publish.sh "$1" notes.local/entry.txt 'tracked entry' force
+#   printf 'notes.local\n' >> "$1/project/.git/info/exclude"
+# treehouse get runs through /tmp/fm-lab-driver/bin/treehouse (real treehouse get --no-fetch) so the slot is cut stale
+
+## $ bin/fm-spawn.sh lab-L6-S3b-ancestor /tmp/fm-lab-scratch.JwPxsX/project --scout
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.FJGXoT
+warning: task lab-L6-S3b-ancestor: /Users/charlesabrooker/tmp/fm-lab.FJGXoT/data/lab-L6-S3b-ancestor/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+error: pooled worktree '/private/tmp/fm-lab-scratch.JwPxsX/pool/.treehouse/project-17f7fe/1/project' reset refused (ignored_collision): ignored work at a path the reset target tracks would be overwritten and no verified archive holds it: notes.local; the slot was left untouched and nothing was launched
+EXIT=1
+
+## seeding action log
+notes.local
+
+## slot: /private/tmp/fm-lab-scratch.JwPxsX/pool/.treehouse/project-17f7fe/1/project
+origin/main tip (bare origin): 0b415217a3cfd328ca89d6cc08dc185ce11e4399
+slot HEAD after spawn: 42503e85e3fd796896ef57f9c0344817b5593c95
+
+## tmux windows on lab server
+primary:bash cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6HSPCJNFEMN8N3ZF46DWQ85 cmd=bash
+
+## worker window screen
+can't find window: fm-lab-L6-S3b-ancestor
+
+## stub harness launch log
+(no harness launched)
+
+## slot snapshot diff: seeded state (before spawn) vs after spawn  [HEAD, show-ref, index digest, sha256 of every file outside .git]
+5d4
+< 0b415217a3cfd328ca89d6cc08dc185ce11e4399 refs/fm/spawn-base/9dd2d012c30842259f41b88dabf622599f086cd9-31883
+
+## seeded snapshot
+--- HEAD
+42503e85e3fd796896ef57f9c0344817b5593c95
+detached
+--- show-ref
+0b415217a3cfd328ca89d6cc08dc185ce11e4399 refs/fm/spawn-base/9dd2d012c30842259f41b88dabf622599f086cd9-31883
+42503e85e3fd796896ef57f9c0344817b5593c95 refs/heads/main
+42503e85e3fd796896ef57f9c0344817b5593c95 refs/remotes/origin/HEAD
+42503e85e3fd796896ef57f9c0344817b5593c95 refs/remotes/origin/main
+--- index
+01bd715fe5e364da20657eca01187620c5bb6d0a91a8b4fe554cd07d9a832b7d  -
+--- files
+f34848ca92665c342abd5816c9e3eda0e82180671195362bcd0080544a3bc2ac  ./README.md
+debfa70dd2be71c74ec44845e8f75f44ee5e86541c9798645954d79b0092cb14  ./notes.local

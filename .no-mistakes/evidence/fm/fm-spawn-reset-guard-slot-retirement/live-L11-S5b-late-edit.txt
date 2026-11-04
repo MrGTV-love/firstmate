@@ -1,0 +1,61 @@
+# live lab case: L11-S5b-late-edit
+# head: 832cd61774fd7c83a24b4648580bbffe4632f3b1
+# FM_HOME=/Users/charlesabrooker/tmp/fm-lab.qapq7B (marked lab home)  TMUX_TMPDIR=/tmp/fml.1sGHre  tmux socket: -L fm-lab
+# scratch: /tmp/fm-lab-scratch.AurSU5  TREEHOUSE_ROOT=/tmp/fm-lab-scratch.AurSU5/pool  treehouse v3.1.7-fm.8759019
+# action script (/tmp/fm-lab-driver/act-none.sh):
+#   # no seeding: a clean stale slot
+#   true
+# pre-spawn origin publish (/tmp/fm-lab-driver/pre-advance.sh):
+#   # Advance origin/main before the spawn; the project's local origin refs stay stale.
+#   /tmp/fm-lab-driver/publish.sh "$1" advanced.txt 'advanced before spawn'
+# treehouse get runs through /tmp/fm-lab-driver/bin/treehouse (real treehouse get --no-fetch) so the slot is cut stale
+# spawn env: FM_SLOT_RESET_GUARD_SEAM='printf "late edit\n" >> "$FM_SLOT_GUARD_SLOT/README.md"'
+
+## $ bin/fm-spawn.sh lab-L11-S5b-late-edit /tmp/fm-lab-scratch.AurSU5/project --scout
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.qapq7B
+warning: task lab-L11-S5b-late-edit: /Users/charlesabrooker/tmp/fm-lab.qapq7B/data/lab-L11-S5b-late-edit/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+error: pooled worktree '/private/tmp/fm-lab-scratch.AurSU5/pool/.treehouse/project-79bb14/1/project' is not clean; refusing to discard uncommitted work while refreshing its base (reset refused: tree_not_clean:  M README.md;)
+EXIT=1
+
+## seeding action log
+
+## slot: /private/tmp/fm-lab-scratch.AurSU5/pool/.treehouse/project-79bb14/1/project
+origin/main tip (bare origin): 17be6650f48fab48936a10d0c7ef1e7e062e1623
+slot HEAD after spawn: 323c052e3cdb3839f9971aabca1a466eb85ba3cd
+
+## tmux windows on lab server
+primary:bash cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6HSPCJNFEMN8N3ZF46DWQ85 cmd=bash
+
+## worker window screen
+can't find window: fm-lab-L11-S5b-late-edit
+
+## stub harness launch log
+(no harness launched)
+
+## slot snapshot diff: seeded state (before spawn) vs after spawn  [HEAD, show-ref, index digest, sha256 of every file outside .git]
+5d4
+< 17be6650f48fab48936a10d0c7ef1e7e062e1623 refs/fm/spawn-base/31aa14a5f7ea518f0a626f1540910143e4ececdc-18672
+7,8c6,7
+< 323c052e3cdb3839f9971aabca1a466eb85ba3cd refs/remotes/origin/HEAD
+< 323c052e3cdb3839f9971aabca1a466eb85ba3cd refs/remotes/origin/main
+---
+> 17be6650f48fab48936a10d0c7ef1e7e062e1623 refs/remotes/origin/HEAD
+> 17be6650f48fab48936a10d0c7ef1e7e062e1623 refs/remotes/origin/main
+12c11
+< f34848ca92665c342abd5816c9e3eda0e82180671195362bcd0080544a3bc2ac  ./README.md
+---
+> d5b1fc4a27f5a58c9002d8df8a0a0de036f40e76608875261509ab225cc09d74  ./README.md
+
+## seeded snapshot
+--- HEAD
+323c052e3cdb3839f9971aabca1a466eb85ba3cd
+detached
+--- show-ref
+17be6650f48fab48936a10d0c7ef1e7e062e1623 refs/fm/spawn-base/31aa14a5f7ea518f0a626f1540910143e4ececdc-18672
+323c052e3cdb3839f9971aabca1a466eb85ba3cd refs/heads/main
+323c052e3cdb3839f9971aabca1a466eb85ba3cd refs/remotes/origin/HEAD
+323c052e3cdb3839f9971aabca1a466eb85ba3cd refs/remotes/origin/main
+--- index
+7071f8d91d2f8bdb6f4132b0bc5c7d134a17fffa7fb2af0c0a98f24a5e8bc512  -
+--- files
+f34848ca92665c342abd5816c9e3eda0e82180671195362bcd0080544a3bc2ac  ./README.md
