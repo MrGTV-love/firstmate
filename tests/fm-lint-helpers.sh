@@ -437,16 +437,44 @@ PL
   chmod +x "$fakebin/perl"
 }
 
+# fm_lint_pool_sized_bin <dir>: a python3 stand-in that reports FM_LINT_TEST_POOL_CPUS as
+# the CPU count to bin/fm-cpu-pass.py alone (the technique of tests/fm-cpu-pass.test.sh).
+# The pool takes its size from the host's CPU count, so a host-slot test that needs every
+# contender to reach the slot gate sizes the pool for its contenders instead of trusting
+# the machine it runs on. Every contender still takes a real pass from the private pool.
+fm_lint_pool_sized_bin() {  # <dir>
+  local real_python
+  real_python=$(python3 -c 'import sys; print(sys.executable)') || return 1
+  mkdir -p "$1"
+  {
+    printf '#!%s\n' "$real_python"
+    cat <<'PY'
+import os, runpy, sys
+if len(sys.argv) > 1 and os.path.basename(sys.argv[1]) == "fm-cpu-pass.py":
+    if os.environ.get("FM_LINT_TEST_POOL_CPUS"):
+        os.cpu_count = lambda: int(os.environ["FM_LINT_TEST_POOL_CPUS"])
+    sys.argv = sys.argv[1:]
+    runpy.run_path(sys.argv[0], run_name="__main__")
+else:
+    os.execv(sys.executable, [sys.executable] + sys.argv[1:])
+PY
+  } > "$1/python3"
+  chmod +x "$1/python3"
+}
+
 fm_lint_concurrent_runs() {
   local runs=$1 tmp=$2 fakebin=$3 expected=$4 run pid rc=0 ready_rc=0
   local -a pids roots
   roots=("$tmp/a.sh" "$tmp/b.sh" "$tmp/c.sh" "$tmp/d.sh")
   rm -f "$tmp/peak.release"
-  rm -rf "$tmp/contenders"
+  rm -rf "$tmp/contenders" "$tmp/pool"
   mkdir -p "$tmp/contenders"
+  fm_lint_pool_sized_bin "$tmp/pool-bin" || fail "no python3 to size the CPU pass pool for the concurrent runs"
   for run in $(seq 1 "$runs"); do
-    FM_LINT_COUNT_HOLD=1 FM_LINT_COUNT_READY_DIR="$tmp/contenders" \
-      PATH="$fakebin:$PATH" "$LINT" --jobs 2 "${roots[@]}" > "$tmp/run.$run.out" 2>&1 &
+    # Two ShellCheck workers per run: a pool of that many passes never binds before the slot gate.
+    FM_LINT_TEST_POOL_CPUS=$((2 * runs)) FM_CPU_POOL_DIR="$tmp/pool" \
+      FM_LINT_COUNT_HOLD=1 FM_LINT_COUNT_READY_DIR="$tmp/contenders" \
+      PATH="$fakebin:$tmp/pool-bin:$PATH" "$LINT" --jobs 2 "${roots[@]}" > "$tmp/run.$run.out" 2>&1 &
     pids+=("$!")
   done
   perl - "$tmp/peak" "$expected" "$tmp/contenders" "$((2 * runs))" <<'PL' || ready_rc=$?

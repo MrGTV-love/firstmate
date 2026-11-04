@@ -78,15 +78,17 @@
 # cap; fairness does not increase host concurrency. After an update to this
 # gate merges, restart in-flight lints that still run the older code.
 # FM_LINT_SLOT_DIR defaults to ${XDG_CACHE_HOME:-$HOME/.cache}/firstmate/lint-slots;
-# "off" disables the pool. Host load average never changes admission, so
+# "off" disables this slot pool, not the CPU pass pool below. Host load average
+# never changes admission, so
 # unrelated machine load cannot starve lint.
 # Runs share a pool only when they use the same slot directory, so different
 # homes or overrides must select the same directory to share the host bound.
 # FM_LINT_HOST_SLOTS sets the cap; unset or empty uses max(2, floor(ncpu/2)).
 # A nonempty value must be a positive decimal integer without leading zeros,
-# or lint exits 2, even with the pool off. The cap is the only host-wide bound:
-# a lone default two-worker run keeps both workers unless an explicit cap of one
-# is selected. The CPU-derived default keeps the memory protection of the
+# or lint exits 2, even with the pool off. The cap is the only host-wide bound on
+# ShellCheck memory; the CPU pass pool below bounds CPU separately and never reads
+# this cap. A lone default two-worker run keeps both workers unless an explicit
+# cap of one is selected or the CPU pool has fewer than two passes. The CPU-derived default keeps the memory protection of the
 # original pool (some ShellChecks reach several GB); the per-root address-space
 # limit is enforced only where ulimit -v works, and native macOS cannot enforce it.
 # On native macOS, where the enforced envelope below does not apply, each root's
