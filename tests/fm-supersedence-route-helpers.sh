@@ -169,7 +169,8 @@ route_set_pr() {
 # answer d7 reported for these copies (allowed false,
 # verification_stale_or_uncovered_paths, exit 3); with --pr a plan answers
 # plan.out/plan.exit (after plan.hook, or hanging while plan.hang exists), an
-# execute answers exec.out/exec.exit after removing the copy when exec.remove exists.
+# execute answers exec.out/exec.exit (after exec.hook) after removing the copy
+# when exec.remove exists.
 route_install_row_driver() {
   local slot=$1 log=$2
   mkdir -p "$log/ans"
@@ -196,6 +197,7 @@ if [ "\${3:-}" != --execute-cleanup ]; then
   cat "\$dir/plan.out"
   exit "\$(cat "\$dir/plan.exit")"
 fi
+[ ! -e "\$dir/exec.hook" ] || bash "\$dir/exec.hook" "\$2" || exit 4
 if [ -e "\$dir/exec.unlock" ]; then
   git worktree unlock "\$2" || exit 4
 fi
@@ -206,6 +208,61 @@ fi
 cat "\$dir/exec.out"
 exit "\$(cat "\$dir/exec.exit")"
 SH
+}
+
+# route_checkout_digest <checkout>: the sha256 of a checkout's working tree, byte
+# for byte: every path outside .git with each file's content hash (a symlink's
+# target), then `git status --porcelain`, so tracked, modified and untracked files
+# all count. A checkout nested inside it (a directory holding a .git entry) is a
+# working tree of its own and is left out, so a nested copy released in the same
+# run does not change the digest.
+route_checkout_digest() {
+  (
+    cd "$1" || exit 1
+    nested=()
+    while IFS= read -r n; do
+      [ "$n" = ./.git ] || nested+=("${n%/.git}")
+    done < <(find . -name .git -prune -print | LC_ALL=C sort)
+    prune=(-path ./.git)
+    skip=()
+    for n in ${nested[@]+"${nested[@]}"}; do
+      prune+=(-o -path "$n")
+      skip+=(":(exclude)${n#./}")
+    done
+    find . \( "${prune[@]}" \) -prune -o -print | LC_ALL=C sort | while IFS= read -r f; do
+      if [ -L "$f" ]; then
+        printf 'L %s %s\n' "$f" "$(readlink "$f")"
+      elif [ -f "$f" ]; then
+        printf 'F %s %s\n' "$f" "$(shasum -a 256 < "$f" | awk '{print $1}')"
+      else
+        printf 'D %s\n' "$f"
+      fi
+    done
+    printf -- '--- status\n'
+    git status --porcelain=v1 --untracked-files=all -- . ${skip[@]+"${skip[@]}"}
+  ) | shasum -a 256 | awk '{print $1}'
+}
+
+# route_assert_digest_sees <checkout> <label>: the control that proves the digest
+# can fail. A switch to main (what the driver's DONE-state finish does to a
+# primary checkout on the PR's head branch), a tracked edit and an untracked file
+# each change it; the checkout is put back after each.
+route_assert_digest_sees() {
+  local checkout=$1 label=$2 before branch file
+  before=$(route_checkout_digest "$checkout")
+  branch=$(git -C "$checkout" branch --show-current)
+  git -C "$checkout" checkout -q main
+  [ "$(route_checkout_digest "$checkout")" != "$before" ] || fail "$label: the digest missed a switch from $branch to main"
+  git -C "$checkout" checkout -q "$branch"
+  file=$(git -C "$checkout" ls-files | head -n 1)
+  [ -n "$file" ] || fail "$label: the checkout has no tracked file to edit"
+  printf 'planted\n' >> "$checkout/$file"
+  [ "$(route_checkout_digest "$checkout")" != "$before" ] || fail "$label: the digest missed an edit of the tracked file $file"
+  git -C "$checkout" checkout -q -- "$file"
+  printf 'planted\n' > "$checkout/route-digest-planted.txt"
+  [ "$(route_checkout_digest "$checkout")" != "$before" ] || fail "$label: the digest missed an untracked file"
+  rm -f "$checkout/route-digest-planted.txt"
+  assert_equals "$before" "$(route_checkout_digest "$checkout")" "$label: the checkout was not put back after the digest control"
 }
 
 # route_script_row <log-dir> <copy-name> <plan-kind> <execute-kind> [<pr>]: the

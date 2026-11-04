@@ -6631,24 +6631,39 @@ test_a_record_that_fails_a_condition_keeps_the_foreign_copy_and_never_reaches_th
 
 # Both of teardown's call sites: the driver would switch a primary checkout that is
 # on the PR's head branch, so a teardown keeps the copy without asking the driver.
+# The head branch carries a file main lacks, and the scripted execute does that
+# switch, so the digest of the primary checkout's working tree, compared before and
+# after the teardown, shows whether the driver was let near it.
 test_a_teardown_never_asks_the_driver_while_the_primary_checkout_is_on_the_prs_head_branch() {
-  local rc shape head
+  local rc shape head primary tree
   for shape in foreign enclosing reverse; do
     route_teardown_world "route-head-branch-$shape" "$shape"
-    head=$(git -C "$FOREIGN_CASE/project" branch --show-current)
-    [ -n "$head" ] || fail "route-head-branch-$shape: the fixture's primary checkout is detached, so this row proves nothing"
+    primary=$FOREIGN_CASE/project
+    head=fm/pr-7-head
+    git -C "$primary" checkout -q -b "$head"
+    printf 'only on the head branch\n' > "$primary/pr-7-head.txt"
+    git -C "$primary" add pr-7-head.txt
+    git -C "$primary" commit -qm "a commit main lacks"
     route_set_pr "$FOREIGN_CASE/forge" 7 MERGED "$ROUTE_MERGE" "$head"
     route_script_row "$FOREIGN_CASE" "${FOREIGN_COPY##*/}" allowed success 7
+    cat > "$FOREIGN_CASE/ans/${FOREIGN_COPY##*/}/exec.hook" <<SH
+#!/usr/bin/env bash
+[ "\$(git -C "$primary" branch --show-current)" = "$head" ] || exit 0
+git -C "$primary" checkout -q main
+SH
     route_teardown_record "$FOREIGN_COPY" 7
+    tree=$(route_checkout_digest "$primary")
     run_foreign_teardown rc
+    assert_equals "$tree" "$(route_checkout_digest "$primary")" "route-head-branch-$shape: the teardown changed the primary checkout's working tree"
     expect_code 1 "$rc" "route-head-branch-$shape: the copy must be kept: $(cat "$FOREIGN_CASE/stderr")"
     assert_present "$FOREIGN_COPY/.git" "route-head-branch-$shape: the copy was removed"
     assert_grep "head branch $head" "$FOREIGN_CASE/stderr" "route-head-branch-$shape: the refusal does not name the head branch"
     assert_equals "" "$(route_teardown_calls "$FOREIGN_COPY")" "route-head-branch-$shape: the copy reached the driver"
-    assert_equals "$head" "$(git -C "$FOREIGN_CASE/project" branch --show-current)" "route-head-branch-$shape: the primary checkout moved"
+    assert_equals "$head" "$(git -C "$primary" branch --show-current)" "route-head-branch-$shape: the primary checkout moved"
     assert_absent "$FOREIGN_CASE/treehouse.log" "route-head-branch-$shape: the pool slot was returned beside a kept copy"
+    route_assert_digest_sees "$primary" "route-head-branch-$shape"
   done
-  pass "a teardown's foreign and own nested release keep the copy, with no driver call, while the primary checkout is on the PR's head branch"
+  pass "a teardown's foreign and own nested release keep the copy, with no driver call, while the primary checkout is on the PR's head branch, and leave that checkout's branch and working tree as they were; the working-tree digest sees a switch to main, a tracked edit and an untracked file"
 }
 
 # R3 for the teardown: the execute is judged by its real shape.

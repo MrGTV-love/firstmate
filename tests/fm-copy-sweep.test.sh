@@ -3292,11 +3292,16 @@ test_a_record_that_fails_any_condition_keeps_the_copy_and_never_reaches_the_driv
 # checkout that is on the PR's head branch and writes its closeout-state marker
 # before Firstmate reads the answer. The twin's scripted driver does what the real
 # one does in that state, so only Firstmate's own check can keep the slot as it was.
+# The head branch carries a file main lacks, so that switch would change the slot's
+# working tree, and the digest of that tree is compared before and after the run.
 test_a_plan_never_asks_the_driver_while_the_slots_checkout_is_on_the_prs_head_branch() {
-  local head before line
+  local head before line tree
   route_world route-head-branch
   head=fm/pr-7-head
   git -C "$SLOT" checkout -q -b "$head"
+  printf 'only on the head branch\n' > "$SLOT/pr-7-head.txt"
+  git -C "$SLOT" add pr-7-head.txt
+  git -C "$SLOT" commit -qm "a commit main lacks"
   before=$(git -C "$SLOT" rev-parse HEAD)
   route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE" "$head"
   route_set_pr "$W/forge" 8 MERGED "$ROUTE_MERGE"
@@ -3308,7 +3313,9 @@ test_a_plan_never_asks_the_driver_while_the_slots_checkout_is_on_the_prs_head_br
 git -C "$SLOT" checkout -q main
 : > "$SLOT/.git/closeout-state-marker"
 SH
+  tree=$(route_checkout_digest "$SLOT")
   route_sweep --apply
+  assert_equals "$tree" "$(route_checkout_digest "$SLOT")" "route-head-branch: the plan changed the slot's working tree"
   [ "$RC" = 0 ] || fail "route-head-branch: the run failed ($RC): $OUT"
   assert_equals "$head" "$(git -C "$SLOT" branch --show-current)" "route-head-branch: the plan switched the slot's branch"
   assert_equals "$before" "$(git -C "$SLOT" rev-parse HEAD)" "route-head-branch: the plan moved the slot's HEAD"
@@ -3319,7 +3326,8 @@ SH
   assert_contains "$line" "is on PR 7's head branch $head" "route-head-branch: the reason does not name the head branch"
   route_assert_released control route-head-branch
   route_assert_calls control 8 route-head-branch
-  pass "a plan never asks the driver while the slot's checkout is on the PR's head branch, so the slot's branch, HEAD and marker stay as they were, and a PR with another head branch still routes from that slot"
+  route_assert_digest_sees "$SLOT" route-head-branch
+  pass "a plan never asks the driver while the slot's checkout is on the PR's head branch, so the slot's branch, HEAD, working tree and marker stay as they were, and a PR with another head branch still routes from that slot; the working-tree digest sees a switch to main, a tracked edit and an untracked file"
 }
 
 # R3: the driver's answer is the only authority and is read in its real shape.
