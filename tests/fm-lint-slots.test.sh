@@ -796,13 +796,16 @@ PL
 # analysis that holds a known resident size. FM_TEST_MEM_DELAY sets how many
 # seconds it waits after it starts before it allocates (default 0), and
 # FM_TEST_MEM_HOLD how many seconds it holds the memory (default 1.5). A
-# --version call answers before it allocates.
+# --version call answers before it allocates. It appends its pid to
+# <start-log> once it holds the memory, and "<pid> <held from> <held until>"
+# to <start-log>.spans when it ends.
 fm_lint_write_memory_shellcheck() {
   mkdir -p "$1"
   cat > "$1/shellcheck" <<PL
 #!/usr/bin/env perl
 use strict;
 use warnings;
+use Time::HiRes qw(time);
 BEGIN {
     if ((\$ARGV[0] // '') eq '--version') {
         print "ShellCheck - shell script analysis tool\nversion: 0.11.0\n";
@@ -811,10 +814,14 @@ BEGIN {
     select(undef, undef, undef, \$ENV{FM_TEST_MEM_DELAY} // 0);
 }
 my \$block = 'x' x ($2 * 1048576);
+my \$held = time();
 open(my \$log, '>>', '$3') or die "\$!";
 print {\$log} "\$\$\n";
 close \$log;
 select(undef, undef, undef, \$ENV{FM_TEST_MEM_HOLD} // 1.5);
+open(my \$spans, '>>', '$3.spans') or die "\$!";
+printf {\$spans} "%d %.6f %.6f\n", \$\$, \$held, time();
+close \$spans;
 exit(length(\$block) ? 0 : 1);
 PL
   chmod +x "$1/shellcheck"
@@ -822,38 +829,15 @@ PL
 
 # fm_lint_memory_runs <tmp> <fakebin> <runs> [VAR=value...]: start <runs> lint
 # runs at once, each with its own HOME, XDG_CACHE_HOME and FM_HOME and three
-# roots, while a sampler reads the resident size of every stand-in analysis
-# four times a second. Prints "<peak KiB> <peak concurrent> <started>".
+# roots. Prints "<peak concurrent> <started>": the most stand-in analyses that
+# held their memory at the same moment, taken from their own start and end
+# times rather than from a sampler, and how many started.
 fm_lint_memory_runs() {
-  local tmp=$1 fakebin=$2 runs=$3 run rc=0 pid sampler
+  local tmp=$1 fakebin=$2 runs=$3 run rc=0 pid most
   local -a pids
   shift 3
   : > "$tmp/mem.starts"
-  rm -f "$tmp/mem.peak"
-  perl - "$fakebin/shellcheck" "$tmp/mem.peak" <<'PL' &
-use strict;
-use warnings;
-use Time::HiRes qw(sleep);
-my ($stub, $out) = @ARGV;
-my ($peak, $most) = (0, 0);
-$SIG{TERM} = sub { exit 0 };
-while (1) {
-    my ($sum, $count) = (0, 0);
-    if (open(my $ps, '-|', 'ps', '-axo', 'rss=,command=')) {
-        while (<$ps>) {
-            next unless /\A\s*([0-9]+)\s+\S*perl\S*\s+\Q$stub\E(?:\s|\z)/;
-            next if /\s--version\s*\z/;
-            $sum += $1;
-            $count++;
-        }
-        close $ps;
-    }
-    ($peak, $most) = ($sum > $peak ? $sum : $peak, $count > $most ? $count : $most);
-    if (open(my $fh, '>', $out)) { print {$fh} "$peak $most\n"; close $fh; }
-    sleep 0.25;
-}
-PL
-  sampler=$!
+  : > "$tmp/mem.starts.spans"
   for run in $(seq 1 "$runs"); do
     mkdir -p "$tmp/home.$run/.cache" "$tmp/fm.$run"
     env FM_TEST_MEM_HOLD="${FM_TEST_MEM_HOLD:-4}" "$@" HOME="$tmp/home.$run" XDG_CACHE_HOME="$tmp/home.$run/.cache" FM_HOME="$tmp/fm.$run" \
@@ -863,11 +847,12 @@ PL
   for pid in "${pids[@]}"; do
     wait "$pid" || rc=$?
   done
-  sleep 0.6
-  kill "$sampler" 2>/dev/null || true
-  wait "$sampler" 2>/dev/null || true
   [ "$rc" -eq 0 ] || fail "a stand-in lint run failed (rc=$rc)"$'\n'"$(cat "$tmp"/mem.run.*.out)"
-  printf '%s %s\n' "$(cat "$tmp/mem.peak")" "$(wc -l < "$tmp/mem.starts" | tr -d ' ')"
+  most=$(perl -ane 'push @e, [$F[1], 1], [$F[2], -1];
+    END { my ($n, $m) = (0, 0);
+      for (sort { $a->[0] <=> $b->[0] || $a->[1] <=> $b->[1] } @e) { $n += $_->[1]; $m = $n if $n > $m }
+      print "$m\n" }' "$tmp/mem.starts.spans")
+  printf '%s %s\n' "$most" "$(wc -l < "$tmp/mem.starts" | tr -d ' ')"
 }
 
 # fm_lint_max_recorded_peak <slot-dir>: the largest root peak (KiB) the pool's
@@ -898,18 +883,22 @@ test_memory_budget_bounds_the_aggregate_across_homes() {
   { [ "$record" -gt 0 ] && [ "$record" -lt "$limit" ]; } \
     || fail "the unbudgeted runs recorded a stand-in peak of $record KiB, expected above 0 and below $limit"
   # Two recorded stand-ins fit the budget and three do not; two unrecorded ones
-  # (charged the watch bound) do not.
+  # (charged the watch bound) do not. The aggregate at any moment is the number
+  # of stand-ins whose own start and end times overlap, each at the recorded
+  # stand-in peak.
   budget=$((record * 5 / 2))
-  peak=${baseline%% *}
+  read -r most starts <<<"$baseline"
+  peak=$((most * record))
   [ "$peak" -gt $((budget + record)) ] \
-    || fail "four unbudgeted runs peaked at only $peak KiB, so this test cannot show a bound: $baseline"
+    || fail "four unbudgeted runs peaked at only $peak KiB ($most at once), so this test cannot show a bound: $baseline"
   # A pool with no records charges each root the watch bound until its first
   # copy ends, so the aggregate stays within the budget although each stand-in
   # waits after its admission before it allocates, and no reading taken at
   # admission sees its memory.
   cold=$(fm_lint_memory_runs "$tmp" "$tmp/bin" 4 FM_LINT_SLOT_DIR="$tmp/shared" FM_LINT_HOST_SLOTS=9 \
     FM_LINT_HOST_RSS_KIB="$budget" FM_LINT_ROOT_RSS_KIB="$limit" FM_TEST_MEM_DELAY=0.5 FM_TEST_MEM_HOLD=1)
-  read -r peak most starts <<<"$cold"
+  read -r most starts <<<"$cold"
+  peak=$((most * record))
   [ "$peak" -le $((budget + 16384)) ] \
     || fail "four runs with no records reached $peak KiB of stand-in memory, above the $budget KiB budget: $cold"
   [ "$most" -le 2 ] || fail "a pool with no records ran $most roots at once, more than two recorded roots fit: $cold"
@@ -918,15 +907,19 @@ test_memory_budget_bounds_the_aggregate_across_homes() {
   # aggregate stays within the budget although each allocates after admission.
   warm=$(fm_lint_memory_runs "$tmp" "$tmp/bin" 4 FM_LINT_SLOT_DIR="$tmp/shared" FM_LINT_HOST_SLOTS=9 \
     FM_LINT_HOST_RSS_KIB="$budget" FM_LINT_ROOT_RSS_KIB="$limit" FM_TEST_MEM_DELAY=0.5 FM_TEST_MEM_HOLD=1.5)
-  read -r peak most starts <<<"$warm"
+  read -r most starts <<<"$warm"
+  peak=$((most * record))
   [ "$peak" -le $((budget + 16384)) ] \
     || fail "four runs with records reached $peak KiB of stand-in memory, above the $budget KiB budget: $warm"
   [ "$most" -eq 2 ] || fail "recorded roots ran $most at once, expected the two that fit the budget: $warm"
   [ "$starts" -eq 12 ] || fail "$starts of 12 recorded roots completed under the budget: $warm"
-  # A lone run keeps its two workers once its roots are recorded.
+  # A lone run keeps its two workers once its roots are recorded. Each stand-in
+  # holds its memory for eight seconds, so a second worker that starts seconds
+  # late on a loaded host still overlaps the first; a gate that admits them one
+  # at a time still leaves no overlap.
   lone=$(fm_lint_memory_runs "$tmp" "$tmp/bin" 1 FM_LINT_SLOT_DIR="$tmp/shared" FM_LINT_HOST_SLOTS=9 \
-    FM_LINT_HOST_RSS_KIB="$budget" FM_LINT_ROOT_RSS_KIB="$limit" FM_TEST_MEM_HOLD=1.5)
-  read -r peak most starts <<<"$lone"
+    FM_LINT_HOST_RSS_KIB="$budget" FM_LINT_ROOT_RSS_KIB="$limit" FM_TEST_MEM_HOLD=8)
+  read -r most starts <<<"$lone"
   [ "$most" -eq 2 ] || fail "a lone run with recorded roots peaked at $most stand-ins, expected its two workers: $lone"
   pass "four runs with four HOME values stay within the memory budget with and without records, run two recorded roots at once, and finish all 12 roots (unbudgeted: $baseline; no records: $cold; records: $warm)"
 }
@@ -941,8 +934,8 @@ test_root_larger_than_the_budget_runs_alone_and_a_killed_run_frees_its_charge() 
   # A budget smaller than one root: each root still runs, one at a time.
   out=$(fm_lint_memory_runs "$tmp" "$tmp/bin" 1 FM_LINT_SLOT_DIR="$tmp/alone" \
     FM_LINT_HOST_SLOTS=9 FM_LINT_HOST_RSS_KIB=$((stand / 2)))
-  [ "$(printf '%s' "$out" | cut -d' ' -f2)" -eq 1 ] || fail "a root larger than the budget did not run alone: $out"
-  [ "$(printf '%s' "$out" | cut -d' ' -f3)" -eq 3 ] || fail "a root larger than the budget did not complete every root: $out"
+  [ "$(printf '%s' "$out" | cut -d' ' -f1)" -eq 1 ] || fail "a root larger than the budget did not run alone: $out"
+  [ "$(printf '%s' "$out" | cut -d' ' -f2)" -eq 3 ] || fail "a root larger than the budget did not complete every root: $out"
   # A run killed while it holds the only admissible charge frees it for the waiter.
   : > "$tmp/mem.starts"
   FM_TEST_MEM_HOLD=60 FM_LINT_SLOT_DIR="$tmp/kill" FM_LINT_HOST_SLOTS=9 FM_LINT_HOST_RSS_KIB=$((stand * 3 / 2)) \
