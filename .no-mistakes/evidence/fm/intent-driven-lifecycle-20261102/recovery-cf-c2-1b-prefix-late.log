@@ -1,0 +1,11 @@
+== pre-fix fixture (archive+fresh git), late collider on its shared constant: tree=/tmp/fm-nm-prefix.slNTyp/fm collider=fmnmcf4298 when=late/after=3 head=1e631ec dirty=0 ==
+not ok - a pane that outlived its stopped server is adoptable
+error: task rcv-31134-Nnse0S-rl68's recorded endpoint fmnmcf4298:%7 reads 'missing', but the recorded herdr session server could not be safely ensured. An endpoint that cannot be proven absent may still hold a live agent on this task's worktree; refusing rather than launching a second agent into it
+pane get %7 --session fmnmcf4298
+status --json --session fmnmcf4298
+status --json --session fmnmcf4298
+status --json --session fmnmcf4298
+status --json --session fmnmcf4298: expected exit 0, got 1
+== pre-fix fixture (archive+fresh git), late collider on its shared constant: case exit=1
+collider: 38950 bash /tmp/fm-nm-collide.0kNe2y/herdr server --session fmnmcf4298
+watcher reaped

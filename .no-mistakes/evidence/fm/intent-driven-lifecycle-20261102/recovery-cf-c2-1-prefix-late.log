@@ -1,0 +1,13 @@
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+== pre-fix fixture, late collider on its shared constant: tree=/tmp/fm-nm-prefix.cqg6Py/fm collider=fmnmcf47691 when=late/after=3 head= dirty=0 ==
+not ok - a pane that outlived its stopped server is adoptable
+error: task rcv-90026-YBzFdb-rl68's recorded endpoint fmnmcf47691:%7 reads 'missing', but the recorded herdr session server could not be safely ensured. An endpoint that cannot be proven absent may still hold a live agent on this task's worktree; refusing rather than launching a second agent into it
+pane get %7 --session fmnmcf47691
+status --json --session fmnmcf47691
+status --json --session fmnmcf47691
+status --json --session fmnmcf47691
+status --json --session fmnmcf47691: expected exit 0, got 1
+== pre-fix fixture, late collider on its shared constant: case exit=1
+collider: 97536 bash /tmp/fm-nm-collide.QJyTl1/herdr server --session fmnmcf47691
+watcher reaped

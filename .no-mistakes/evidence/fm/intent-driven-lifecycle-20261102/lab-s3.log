@@ -1,0 +1,10 @@
+head=8b64863c4fb49c32ec307603a63ce0540b86a79b
+lab=/Users/charlesabrooker/tmp/fm-lab.Q2YikG
+nm brief exit=0
+plan exit=0
+plan: alignment_section=1 review_outcomes=1 unverified_anywhere=0
+grading line 'pass, fail, or unresolved': 1; 'is pending, never pass': 1
+alignment before outcomes: yes
+rubric lines missing from plan: 0 of 36
+== teardown
+teardown exit=0 lab-left: none worktree changed paths: 0

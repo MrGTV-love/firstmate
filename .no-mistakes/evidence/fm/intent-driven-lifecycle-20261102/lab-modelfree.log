@@ -1,0 +1,65 @@
+head=8b64863c4fb49c32ec307603a63ce0540b86a79b
+lab=/Users/charlesabrooker/tmp/fm-lab.gnxa2M tmux=/tmp/fml.pWWzml
+== scenario 2: base-commit fm-brief vs head fm-brief (docs-only task)
+base brief exit=0
+head brief exit=0
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.gnxa2M/data/mfhead-docs/brief.md (ship, mode=local-only; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE})
+placeholders identical (base vs head)
+docs brief base-vs-head diff exit=0 lines=0
+head docs brief mentions intent-to-test: 0
+== scenario 3: verification plan for a no-mistakes brief
+nm brief exit=0
+plan exit=1
+plan: alignment_section=0 review_outcomes=0 unverified_anywhere=0
+plan grading line present: 0; downstream pending line: 0
+  missing: # Shared review rubric
+  missing: This file owns the review criteria for Firstmate-dispatched no-mistakes runs and independent review lanes.
+  missing: It does not change the selected delivery path, review authority, or merge policy.
+  missing: - Compare the change against the captain's concrete ask, the task Definition Of Done, and the out-of-scope list.
+  missing: - Grade every DoD mandatory item by its id as pass, fail, or unresolved, with the evidence for that grade; identify missing criteria or evidence explicitly rather than inventing requirements.
+  missing: - Grade an item fail only on demonstrated noncompliance; grade an item that could not be assessed unresolved, and name the missing evidence or decision.
+  missing: - Evidence that only a downstream step can produce is pending, never pass; list the item as pending with the downstream step and the evidence still owed named.
+  missing: - A green pipeline counts only for what its checks ran; pipeline readiness is not final acceptance.
+  missing: - Treat the DoD and exclusions as author-supplied verification evidence, not additional captain intent or authority to widen the ask.
+  missing: - Check correctness, regressions, safety boundaries, and the claimed verification against the diff and the available execution records.
+  missing: ## Intent-to-test alignment
+  missing: - Assess verification evidence collectively and proportionately against the captain's concrete ask and the task Definition Of Done (DoD), not the implementation's explanation; no single test needs to prove the entire outcome.
+  missing: - Ask whether stated intent could be violated while all tests pass, or whether compliant behavior could fail these checks:
+  missing:   - For a finding, name the requirement, a concrete plausible false-pass or false-rejection path, and the evidence needed to distinguish it; do not invent requirements or demand universal coverage.
+  missing: - Establish external guarantees through observable outcomes and verification independent of the mechanism under test, including relevant harm prevention and legitimate completion:
+  missing:   - Internal records and mocks remain valid mechanism evidence, and persisted state may itself be the intended output, but internal agreement alone does not establish an external guarantee.
+  missing: - Preserve the semantic acceptance contract, not literal test code:
+  missing:   - Builders may revise mechanism assertions, fixtures, APIs, or test oracles with justification and independent review showing the existing obligations remain protected.
+  missing:   - Green end-to-end tests alone do not authorize weakening a unit assertion that protects an obligation.
+  missing:   - Builders may not redefine, remove, or weaken accepted outcomes or their required protection to obtain a pass; changing accepted outcomes or granting waivers requires escalating to Main for the owner.
+  missing: - Distinguish a demonstrated intent-breaking defect from missing evidence for a mandatory DoD item:
+  missing:   - Apply the existing review outcomes, guard-reassessment requirements, and scope-escalation rules below.
+  missing: ## Review outcomes
+  missing: Each finding takes one of these outcomes:
+  missing: - A failed DoD mandatory item: block.
+  missing: - A mandatory item whose evidence can only be produced downstream of this review, for example after merge, install or release: listed by id as pending with the evidence still owed.
+  missing:   It is never graded pass and does not by itself block the verdict for proceeding; the review's PASS means every item assessable now passed, not final acceptance, and the pending items stay open until that downstream evidence exists.
+  missing: - Any other unresolved mandatory item, such as one assessable now but not assessed, one missing its evidence, or one with an open contract question: block until its evidence or the owner's decision is obtained.
+  missing: - A real defect that breaks the stated intent, even when no DoD item names it: block.
+  missing: - An improvement outside the DoD: a follow-up note, never a block.
+  missing: - A change that lets a guard permit more than before, such as an added exception, allow-list entry, trust carve-out, relaxed threshold or widened scope: block with verdict FAIL, even outside the DoD where the follow-up-note outcome would otherwise apply, unless the PR cites a recorded reassessment of that guard's harm model, such as `data/<id>/report.md`, and the change follows it.
+  missing: - Removing a guard rule that such a recorded reassessment recommends: not a block.
+  missing: - A fix that would add scope beyond the intent: escalate to Main for the owner; never build it silently.
+  missing: ## PR body claims
+  missing: - Every factual claim in a PR body must be backed by a record: the diff, a test, a check link, or a verification-plan row id.
+  missing: - When a record does not prove a claim, delete or narrow the claim to what the record proves, never merely re-word it.
+rubric lines missing from plan: 36 of 36
+== scenarios 1 and 7: generated worker role (fm_brief_worker_role, the interface fm-spawn.sh embeds in launch-brief.md)
+role render exit=0
+order: role=1 cue_line=10 cue_count=1 rubric_section=26 outcomes=40
+order check exit=0
+unverified in role: 0
+rubric lines missing from role: 0 of 36
+== scenario 1/7 base comparison: base role has no cue
+base role exit=0 base cue_count=0 base alignment_section=0
+== adversarial: role rendered from a root whose rubric lacks the alignment section
+neg role exit=0 alignment_section=0 (cue still points at 'below'; shows the cue depends on the rubric owner)
+== teardown: /Users/charlesabrooker/.no-mistakes/worktrees/624bc6fbd7a5/01M6JWCK13QKYX35VNMKYBVERE/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.gnxa2M && rm -rf /Users/charlesabrooker/tmp/fm-lab.gnxa2M
+teardown exit=0
+lab-left: none
+worktree changed paths: 0

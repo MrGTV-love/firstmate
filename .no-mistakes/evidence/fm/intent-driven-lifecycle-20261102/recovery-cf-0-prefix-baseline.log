@@ -1,0 +1,3 @@
+== pre-fix fixture, no collider: tree=/tmp/fm-nm-prefix.7Duue0/fm collider=none when=steady/after=3 head=8b64863c dirty=2 ==
+ok - reclaim: a herdr pane that outlived its stopped server is adopted, never orphaned beside a new tab
+== pre-fix fixture, no collider: case exit=0

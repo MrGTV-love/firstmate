@@ -1,0 +1,5 @@
+== fixed fixture at c2be9593, late collider on another run's same-shape session: tree=/Users/charlesabrooker/.no-mistakes/worktrees/624bc6fbd7a5/01M6JWCK13QKYX35VNMKYBVERE collider=fmlab-99999-ZzOther-rl68 when=late/after=3 head=c2be9593 dirty=0 ==
+ok - reclaim: a herdr pane that outlived its stopped server is adopted, never orphaned beside a new tab
+== fixed fixture at c2be9593, late collider on another run's same-shape session: case exit=0
+collider: 33465 bash /tmp/fm-nm-collide.GpYZZg/herdr server --session fmlab-99999-ZzOther-rl68
+watcher reaped

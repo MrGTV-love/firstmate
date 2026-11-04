@@ -1,0 +1,11 @@
+== fixed fixture, late collider on the case's own session (safety refusal): tree=/Users/charlesabrooker/.no-mistakes/worktrees/624bc6fbd7a5/01M6JWCK13QKYX35VNMKYBVERE collider=own when=late/after=3 head=8b64863c dirty=3 ==
+not ok - a pane that outlived its stopped server is adoptable
+error: task rcv-50205-KHYhud-rl68's recorded endpoint fmlab-50205-KHYhud-rl68:%7 reads 'missing', but the recorded herdr session server could not be safely ensured. An endpoint that cannot be proven absent may still hold a live agent on this task's worktree; refusing rather than launching a second agent into it
+pane get %7 --session fmlab-50205-KHYhud-rl68
+status --json --session fmlab-50205-KHYhud-rl68
+status --json --session fmlab-50205-KHYhud-rl68
+status --json --session fmlab-50205-KHYhud-rl68
+status --json --session fmlab-50205-KHYhud-rl68: expected exit 0, got 1
+== fixed fixture, late collider on the case's own session (safety refusal): case exit=1
+collider: 54949 bash /tmp/fm-nm-collide.nZlRIG/herdr server --session fmlab-50205-KHYhud-rl68
+watcher reaped

@@ -1,0 +1,5 @@
+calibration: "0 of 5 samples for test.tests/fm-task-delivery.test.sh on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+progress: "test.tests/fm-task-delivery.test.sh elapsed=1.0s output_bytes=0 tree_cpu=0.96s"
+FM_TEST_BEGIN 2026-11-04T10:05:56Z tests/fm-task-delivery.test.sh family=pure-contract-unit expected_gate_skip=none
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/624bc6fbd7a5/01M6JWCK13QKYX35VNMKYBVERE/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"

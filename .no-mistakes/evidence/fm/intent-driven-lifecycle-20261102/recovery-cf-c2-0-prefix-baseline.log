@@ -1,0 +1,19 @@
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+== pre-fix fixture, no collider: tree=/tmp/fm-nm-prefix.cqg6Py/fm collider=none when=steady/after=3 head= dirty=0 ==
+not ok - a pane that outlived its stopped server is adoptable
+warning: /private/tmp/fm-nm-collide.lVgoYA/tmp/fm-control-relaunch.EDF0Zc/gone-herdr-29531/home/data/rcv-75762-EDF0Zc-rl68/launch-brief.md records no ship branch; defaulting to legacy branch fm/rcv-75762-EDF0Zc-rl68
+warning: /private/tmp/fm-nm-collide.lVgoYA/tmp/fm-control-relaunch.EDF0Zc/gone-herdr-29531/home/data/rcv-75762-EDF0Zc-rl68/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+error: spawn refused for rcv-75762-EDF0Zc-rl68: cannot determine whether /private/tmp/fm-nm-collide.lVgoYA/tmp/fm-control-relaunch.EDF0Zc/gone-herdr-29531/proj shares firstmate's history (the code root /tmp/fm-nm-prefix.cqg6Py/fm has no readable history, or a shallow clone shares no root commit); fetch full history (git fetch --unshallow) before dispatching publishing work
+pane get %7 --session fmnmcf47691
+status --json --session fmnmcf47691
+status --json --session fmnmcf47691
+status --json --session fmnmcf47691
+status --json --session fmnmcf47691
+server --session fmnmcf47691
+status --json --session fmnmcf47691
+status --json --session fmnmcf47691
+pane get %7 --session fmnmcf47691
+agent get %7 --session fmnmcf47691
+pane process-info --pane %7 --session fmnmcf47691: expected exit 0, got 1
+== pre-fix fixture, no collider: case exit=1

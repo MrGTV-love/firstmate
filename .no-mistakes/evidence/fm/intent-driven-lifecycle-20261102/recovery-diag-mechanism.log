@@ -1,0 +1,9 @@
+== mechanism: herdr-server-start.py --prove-absent, owned session fmnmown-93409 ==
+-- no collider
+exit=0
+-- collider pid=93948: bash bash /tmp/fm-nm-collide.Qb97fY/herdr server --session fmnmown-93409
+error: Herdr session absence is unproven: Herdr server process 93948 is still alive
+exit=1
+-- same collider, different owned session fmnmown-93409x
+exit=0
+collider wait status=143

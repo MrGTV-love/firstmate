@@ -1,0 +1,8 @@
+head=c2be9593474c6e561bbae42ca343e23fceef7a38
+== control: unmodified disposable copy
+fm-doc-audience-check: ok surfaces=156 local_links=1771
+exit=0
+== negative: rubric heading renamed
+fm-doc-audience-check: unresolved local anchor in .agents/skills/crew-brief-authoring/SKILL.md: ../../../docs/review-rubric.md#intent-to-test-alignment
+exit=1
+left: none

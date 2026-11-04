@@ -1,0 +1,9 @@
+collider: 33941 bash /tmp/fm-nm-collide.TRzJOs/herdr server --session fmnmcf88822
+== pre-fix fixture, collider on its shared constant: tree=/tmp/fm-nm-prefix.tboa4O collider=fmnmcf88822 head=archive ==
+not ok - a pane that outlived its stopped server is adoptable
+error: task rcv-36079-KyefkQ-rl68's endpoint reads 'unreadable'; a relaunch requires a positively agent-free endpoint (stop the agent first with bin/fm-control.sh rcv-36079-KyefkQ-rl68 exit)
+pane get %7 --session fmnmcf88822
+status --json --session fmnmcf88822
+status --json --session fmnmcf88822: expected exit 0, got 1
+== pre-fix fixture, collider on its shared constant: case exit=1
+collider 33941 wait=143

@@ -1,0 +1,32 @@
+{
+  "families": [
+    {
+      "count": 1,
+      "duration_ms": 1041647,
+      "failed": 0,
+      "name": "backend-dispatch"
+    }
+  ],
+  "finished_at": "2026-11-04T12:41:10Z",
+  "run_id": "fm-test-run-1793795025137-15308",
+  "scripts": [
+    {
+      "cpu_ms": 705500,
+      "duration_ms": 1041647,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "backend-dispatch",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-control-relaunch-recovery.test.sh"
+    }
+  ],
+  "selection": "scripts;jobs=1",
+  "started_at": "2026-11-04T12:23:45Z",
+  "summary": {
+    "duration_ms": 1045185,
+    "failed": 0,
+    "skipped_gate": 0,
+    "total": 1
+  }
+}
