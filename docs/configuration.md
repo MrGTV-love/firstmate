@@ -1625,7 +1625,7 @@ devin is verified for crewmate and scout launches only; a secondmate is refused 
 
 Its private worker config disables Claude Code imports (including the captain's hooks) and, unless the home sets `config/keep-ai-trailers` (see "Commit attribution"), Devin commit attribution without editing user or project config; [`fm-devin-config.sh`](../bin/fm-devin-config.sh) owns these enforced settings and [Devin verification](verification/devin.md) owns the live evidence and observed model availability.
 
-dsh (DeepSeek Harness through `dsh-tui`) uses the native primary plugin for main and secondmate sessions and keeps worker launches separate; [its adapter reference](../.agents/skills/harness-adapters/references/harness/dsh.md) owns the launch, model, busy-state, and composer contracts, and [runtime verification](verification/runtime-backends.md#deepseek-harness-dsh-tui) owns the live evidence.
+dsh uses the native primary plugin for launch-owned `dsh-tui` main and secondmate sessions and explicitly bound existing native Web conversations, keeping terminal worker launches separate; [the DSH protocol](supervision-protocols/dsh.md) owns primary activation, [its adapter reference](../.agents/skills/harness-adapters/references/harness/dsh.md) owns launch, model, detection, busy-state and composer contracts, and [runtime verification](verification/runtime-backends.md#deepseek-harness-dsh-tui) owns the evidence.
 
 ### Verification and primary supervision
 
