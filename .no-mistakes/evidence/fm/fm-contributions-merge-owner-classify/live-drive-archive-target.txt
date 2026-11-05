@@ -1,0 +1,20 @@
+== firstmate root: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6P75W3WSEN252SRYQSSR5RQ
+
+S13 captain verdict on task call-8; hold answered; row retired to the done archive (done_keep=1)
+  fm-captain-hold.sh hold call-8 --title Captain call https://github.com/o/r/pull/8 --reason choose contract --repo sample: ok
+  recorded captain verdict for call-8
+  [S13-before-answer] row: actor=captain | reason=choose contract | hold=call-8
+  [S13-before-answer] summary: counts.captain=1 captain_list=1 proven_clear=false unreadable=0
+  fm-captain-hold.sh answer call-8 --decision-file /Users/charlesabrooker/tmp/fm-live-target.3Blo/s13/ev.txt: ok
+  call-8 in backlog.md: 0  in done-archive.md: 1
+  fm-captain-hold.sh archived-resolution call-8 -> {"id":"call-8","hold_answered":true,"hold_resolved_at":"2026-11-05T19:53:23Z"}
+ (exit 0)
+  fm-captain-hold.sh archived-resolution filler -> (exit 1)
+  [S13-archived] row: actor=fleet | reason=route the independent review | hold=-
+  [S13-archived] summary: counts.captain=0 captain_list=0 proven_clear=true unreadable=0
+
+S14 legacy captain verdict (no at field) then hold answered --release (Main 789 Decision 1=A: stays owner call)
+  fm-captain-hold.sh hold delivery --reason legacy choose X: ok
+  fm-captain-hold.sh answer delivery --decision-file /Users/charlesabrooker/tmp/fm-live-target.3Blo/s14/ev.txt --release: ok
+  [S14] row: actor=captain | reason=legacy choose X | hold=-
+  [S14] summary: counts.captain=1 captain_list=1 proven_clear=false unreadable=0

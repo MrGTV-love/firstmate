@@ -1,0 +1,81 @@
+== firstmate root: /Users/charlesabrooker/tmp/fm-base-src.WwFo (37a733cb)
+
+S1 green PR, fresh base, NO review record
+  [S1] row: actor=captain | reason=checks green; merge approval needed | hold=-
+  [S1] summary: counts.captain=1 captain_list=1 proven_clear=false unreadable=0
+  [S1] /bearings --json: contributions.counts={"captain":1,"fleet":0,"maintainer":0,"nobody":0} captain=[{"url":"https://github.com/o/r/pull/8","reason":"checks green; merge approval needed","hold":null}]
+
+S2 green PR, base behind main by 3 commits (stale base), qualifying PASS present
+  recorded review: PASS by sonnet at head d132d719
+  [S2] row: actor=captain | reason=checks green; merge approval needed | hold=-
+  [S2] summary: counts.captain=1 captain_list=1 proven_clear=false unreadable=0
+
+S3 green PR, fresh base, qualifying PASS (sonnet reader vs gpt-5.1 author) at exact head
+  recorded review: PASS by sonnet at head 9204a614
+  [S3] row: actor=captain | reason=checks green; merge approval needed | hold=-
+  [S3] summary: counts.captain=1 captain_list=1 proven_clear=false unreadable=0
+  [S3] /bearings --json: contributions.counts={"captain":1,"fleet":0,"maintainer":0,"nobody":0} captain=[{"url":"https://github.com/o/r/pull/8","reason":"checks green; merge approval needed","hold":null}]
+
+S4a PASS from same model family as the author (not qualifying)
+  recorded review: PASS by gpt-5.1 at head fc949cc2
+  [S4a] row: actor=captain | reason=checks green; merge approval needed | hold=-
+  [S4a] summary: counts.captain=1 captain_list=1 proven_clear=false unreadable=0
+S4b PASS recorded for a different head
+  recorded review: PASS by sonnet at head bbbbbbbb
+  [S4b] row: actor=captain | reason=checks green; merge approval needed | hold=-
+  [S4b] summary: counts.captain=1 captain_list=1 proven_clear=false unreadable=0
+S4c FAIL verdict at exact head
+  recorded review: FAIL by sonnet at head 09884a87
+  [S4c] row: actor=captain | reason=checks green; merge approval needed | hold=-
+  [S4c] summary: counts.captain=1 captain_list=1 proven_clear=false unreadable=0
+
+S5 real live owner hold on a green PR with a qualifying PASS
+  recorded review: PASS by sonnet at head eb87f045
+  fm-captain-hold.sh hold delivery --reason pick API shape A or B: ok
+  [S5] row: actor=captain | reason=pick API shape A or B | hold=delivery
+  [S5] summary: counts.captain=1 captain_list=1 proven_clear=false unreadable=0
+  [S5] /bearings --json: contributions.counts={"captain":1,"fleet":0,"maintainer":0,"nobody":0} captain=[{"url":"https://github.com/o/r/pull/8","reason":"pick API shape A or B","hold":"delivery"}]
+
+S6 hold answered with --release (answered decision)
+  fm-captain-hold.sh hold delivery --reason pick API shape A or B: ok
+  fm-captain-hold.sh answer delivery --decision-file /Users/charlesabrooker/tmp/fm-live-base.pTpn/s6/decision.txt --release: ok
+  [S6] row: actor=captain | reason=checks green; merge approval needed | hold=-
+  [S6] summary: counts.captain=1 captain_list=1 proven_clear=false unreadable=0
+S6b same task held again with a new live hold
+  fm-captain-hold.sh hold delivery --reason new owner question: ok
+  [S6b] row: actor=captain | reason=new owner question | hold=delivery
+  [S6b] summary: counts.captain=1 captain_list=1 proven_clear=false unreadable=0
+
+S7 dated hold (--until 2099-01-01, explicit pause)
+  fm-captain-hold.sh hold delivery --reason wait for vendor --until 2099-01-01: ok
+  [S7] row: actor=captain | reason=checks green; merge approval needed | hold=-
+  [S7] summary: counts.captain=1 captain_list=1 proven_clear=false unreadable=0
+
+S8 worker declared 'paused:' wait, no hold
+  [S8] row: actor=captain | reason=checks green; merge approval needed | hold=-
+  [S8] summary: counts.captain=1 captain_list=1 proven_clear=false unreadable=0
+
+S9 recorded owner decision: captain-actor verdict on current head, no hold
+  recorded captain verdict (at=none)
+  [S9] row: actor=fleet | reason=record the unresolved arbitration as a captain hold | hold=-
+  [S9] summary: counts.captain=0 captain_list=0 proven_clear=true unreadable=0
+S9b owner decision answered: hold filed then answered --release after the verdict
+  fm-captain-hold.sh hold delivery --reason owner must choose X or Y: ok
+  fm-captain-hold.sh answer delivery --decision-file /Users/charlesabrooker/tmp/fm-live-base.pTpn/s9/decision.txt --release: ok
+  [S9b] row: actor=fleet | reason=record the unresolved arbitration as a captain hold | hold=-
+  [S9b] summary: counts.captain=0 captain_list=0 proven_clear=true unreadable=0
+
+S10a compare read fails (base freshness unknown), qualifying PASS present
+  recorded review: PASS by sonnet at head 9edf84ba
+  [S10a] row: actor=captain | reason=checks green; merge approval needed | hold=-
+  [S10a] summary: counts.captain=1 captain_list=1 proven_clear=false unreadable=0
+S10b verifier missing (PASS fact unknown), fresh base
+  [S10b] row: actor=captain | reason=checks green; merge approval needed | hold=-
+  [S10b] summary: counts.captain=1 captain_list=1 proven_clear=false unreadable=0
+S10c base branch name with a slash (release/1.0), qualifying PASS
+  recorded review: PASS by sonnet at head 2e2eb6fd
+  [S10c] row: actor=captain | reason=checks green; merge approval needed | hold=-
+  [S10c] summary: counts.captain=1 captain_list=1 proven_clear=false unreadable=0
+
+S11 away merge authority unchanged: not tested here (covered by test_away_merge_action)
+

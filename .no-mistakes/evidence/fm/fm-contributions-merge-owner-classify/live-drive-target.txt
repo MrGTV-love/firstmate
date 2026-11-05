@@ -1,0 +1,94 @@
+== firstmate root: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6P75W3WSEN252SRYQSSR5RQ (eb1c034d)
+
+S1 green PR, fresh base, NO review record
+  [S1] row: actor=fleet | reason=route the independent review | hold=-
+  [S1] summary: counts.captain=0 captain_list=0 proven_clear=true unreadable=0
+  [S1] /bearings --json: contributions.counts={"captain":0,"fleet":1,"maintainer":0,"nobody":0} captain=[]
+
+S2 green PR, base behind main by 3 commits (stale base), qualifying PASS present
+  recorded review: PASS by sonnet at head d49d634a
+  [S2] row: actor=fleet | reason=update the branch; base is stale | hold=-
+  [S2] summary: counts.captain=0 captain_list=0 proven_clear=true unreadable=0
+
+S3 green PR, fresh base, qualifying PASS (sonnet reader vs gpt-5.1 author) at exact head
+  recorded review: PASS by sonnet at head b465f6a1
+  [S3] row: actor=fleet | reason=merge under the standing merge rule | hold=-
+  [S3] summary: counts.captain=0 captain_list=0 proven_clear=true unreadable=0
+  [S3] /bearings --json: contributions.counts={"captain":0,"fleet":1,"maintainer":0,"nobody":0} captain=[]
+
+S4a PASS from same model family as the author (not qualifying)
+  recorded review: PASS by gpt-5.1 at head 95a42fee
+  [S4a] row: actor=fleet | reason=route the independent review | hold=-
+  [S4a] summary: counts.captain=0 captain_list=0 proven_clear=true unreadable=0
+S4b PASS recorded for a different head
+  recorded review: PASS by sonnet at head bbbbbbbb
+  [S4b] row: actor=fleet | reason=route the independent review | hold=-
+  [S4b] summary: counts.captain=0 captain_list=0 proven_clear=true unreadable=0
+S4c FAIL verdict at exact head
+  recorded review: FAIL by sonnet at head 6b5b2228
+  [S4c] row: actor=fleet | reason=route the independent review | hold=-
+  [S4c] summary: counts.captain=0 captain_list=0 proven_clear=true unreadable=0
+
+S5 real live owner hold on a green PR with a qualifying PASS
+  recorded review: PASS by sonnet at head 6e8f9e46
+  fm-captain-hold.sh hold delivery --reason pick API shape A or B: ok
+  [S5] row: actor=captain | reason=pick API shape A or B | hold=delivery
+  [S5] summary: counts.captain=1 captain_list=1 proven_clear=false unreadable=0
+  [S5] /bearings --json: contributions.counts={"captain":1,"fleet":0,"maintainer":0,"nobody":0} captain=[{"url":"https://github.com/o/r/pull/8","reason":"pick API shape A or B","hold":"delivery"}]
+
+S6 hold answered with --release (answered decision)
+  fm-captain-hold.sh hold delivery --reason pick API shape A or B: ok
+  fm-captain-hold.sh answer delivery --decision-file /Users/charlesabrooker/tmp/fm-live-target.3Blo/s6/decision.txt --release: ok
+  [S6] row: actor=fleet | reason=route the independent review | hold=-
+  [S6] summary: counts.captain=0 captain_list=0 proven_clear=true unreadable=0
+S6b same task held again with a new live hold
+  fm-captain-hold.sh hold delivery --reason new owner question: ok
+  [S6b] row: actor=captain | reason=new owner question | hold=delivery
+  [S6b] summary: counts.captain=1 captain_list=1 proven_clear=false unreadable=0
+
+S7 dated hold (--until 2099-01-01, explicit pause)
+  fm-captain-hold.sh hold delivery --reason wait for vendor --until 2099-01-01: ok
+  [S7] row: actor=fleet | reason=route the independent review | hold=-
+  [S7] summary: counts.captain=0 captain_list=0 proven_clear=true unreadable=0
+
+S8 worker declared 'paused:' wait, no hold
+  [S8] row: actor=fleet | reason=route the independent review | hold=-
+  [S8] summary: counts.captain=0 captain_list=0 proven_clear=true unreadable=0
+
+S9 recorded owner decision: captain-actor verdict on current head, no hold
+  recorded captain verdict (at=2026-09-16T08:00:00Z)
+  [S9] row: actor=captain | reason=owner must choose X or Y | hold=-
+  [S9] summary: counts.captain=1 captain_list=1 proven_clear=false unreadable=0
+S9b owner decision answered: hold filed then answered --release after the verdict
+  fm-captain-hold.sh hold delivery --reason owner must choose X or Y: ok
+  fm-captain-hold.sh answer delivery --decision-file /Users/charlesabrooker/tmp/fm-live-target.3Blo/s9/decision.txt --release: ok
+  [S9b] row: actor=fleet | reason=route the independent review | hold=-
+  [S9b] summary: counts.captain=0 captain_list=0 proven_clear=true unreadable=0
+
+S10a compare read fails (base freshness unknown), qualifying PASS present
+  recorded review: PASS by sonnet at head b8de0668
+  [S10a] row: actor=fleet | reason=base freshness unknown; refresh the base comparison | hold=-
+  [S10a] summary: counts.captain=0 captain_list=0 proven_clear=true unreadable=0
+S10b verifier missing (PASS fact unknown), fresh base
+  [S10b] row: actor=fleet | reason=PASS fact unknown; recheck the independent review | hold=-
+  [S10b] summary: counts.captain=0 captain_list=0 proven_clear=true unreadable=0
+S10c base branch name with a slash (release/1.0), qualifying PASS
+  recorded review: PASS by sonnet at head 0d0d0458
+  [S10c] row: actor=fleet | reason=merge under the standing merge rule | hold=-
+  [S10c] summary: counts.captain=0 captain_list=0 proven_clear=true unreadable=0
+  compare path requested: compare/release%2F1.0...0d0d0458bef4509e7af0bbf03acd4dfab290d300?per_page=1
+
+S11 away merge authority unchanged: not tested here (covered by test_away_merge_action)
+
+S12 forge call log for S3 home (read-only check): every distinct call shape
+  gh api repos/o/r
+  gh api repos/o/r/commits/<sha>/check-runs?filter=all&per_page=100
+  gh api repos/o/r/commits/<sha>/statuses?per_page=100
+  gh api repos/o/r/compare/main...<sha>?per_page=1
+  gh api repos/o/r/issues/8/comments?per_page=100
+  gh api repos/o/r/pulls/8
+  gh api repos/o/r/pulls/8/comments?per_page=100
+  gh api repos/o/r/pulls/8/reviews?per_page=100
+  gh pr view https://github.com/o/r/pull/8 --json headRefOid,reviewDecision
+  only api GET reads and pr view seen
+  no write method or mutating gh verb in any scenario call log

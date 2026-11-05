@@ -1,0 +1,116 @@
+=== test_ordinary_merge_ownership
+ok - ordinary green ownership follows the real exact-head review-only verifier
+exit=0
+=== test_observed_merge_check_precedence
+ok - a qualifying PASS cannot bypass observed failed, pending or missing checks or merge permissions
+exit=0
+=== test_merge_base_observation
+ok - live encoded-base comparisons refresh stale and unknown facts before verdicts
+exit=0
+=== test_merge_verifier_unknowns
+ok - missing, stalled, corrupt, unbound and unavailable review answers remain fleet unknowns; progressing reads succeed
+exit=0
+=== test_merge_saved_facts_and_freshness
+ok - saved fact binding, pre-fact compatibility, quota degradation and configured freshness boundaries fail safe and recover
+exit=0
+=== test_merge_hold_lifecycle
+hold variant: live
+hold variant: answered
+hold variant: dated
+hold variant: aged
+hold variant: blocked
+hold variant: paused
+ok - real live holds alone reach the owner; answered, dated, blocked, aged and paused work stays fleet
+exit=0
+=== test_away_merge_action
+ok - away rows name a stale base and a missing PASS and keep the posture reason otherwise
+exit=0
+=== test_captain_verdict_settled_lifecycle
+settled verdict variant: control
+settled verdict variant: answer-release
+settled verdict variant: answer-close
+settled verdict variant: withdraw
+settled verdict variant: reconcile
+settled verdict variant: paused
+ok - a captain verdict stays an owner call until its own answer, withdrawal, reconcile close or declared pause settles it
+exit=0
+=== test_captain_verdict_unsettled_rows_stay_with_owner
+unsettled verdict variant: newer-verdict
+unsettled verdict variant: legacy-verdict
+unsettled verdict variant: aged
+unsettled verdict variant: blocked
+unsettled verdict variant: other-row
+unsettled verdict variant: reheld-aged
+ok - an answer older than the verdict, a legacy verdict without a time, an aged or blocked hold, or another row never settles a captain verdict
+exit=0
+=== test_captain_verdict_order_and_pair_binding
+ok - an answer settles only verdicts recorded no later than it, per task-and-URL record, across teardown
+exit=0
+=== test_captain_verdict_archived_row
+archived verdict variant: answer
+archived verdict variant: withdraw
+archived verdict variant: reconcile
+archived verdict variant: unanswered
+ok - an archived answer, withdrawal or reconcile close settles its verdict; an archived row with no resolution does not
+exit=0
+=== test_shared_url_live_hold_outranks_verdict
+ok - a live hold keeps its id ahead of a captain verdict in either task-name order
+exit=0
+=== test_shared_url_label_follows_facts
+ok - a shared URL row follows the owners facts in either task-name order
+exit=0
+=== test_merge_precedence_matrix
+no-review	fleet	route the independent review
+base-unknown	fleet	base freshness unknown; refresh the base comparison
+base-stale	fleet	update the branch; base is stale
+base-stale-pass	fleet	update the branch; base is stale
+qualified	fleet	merge under the standing merge rule
+pass-unknown	fleet	PASS fact unknown; recheck the independent review
+verdict-stale-base	fleet	update the branch; base is stale
+verdict-fresh-base	fleet	merge this head now
+verdict-unknown-base	fleet	merge this head now
+verdict-captain	captain	choose
+verdict-maintainer	maintainer	awaiting maintainer
+verdict-maintainer-no-pass	maintainer	awaiting maintainer
+verdict-maintainer-stale-base	maintainer	awaiting maintainer
+verdict-nobody	nobody	no action
+verdict-nobody-no-pass	nobody	no action
+verdict-nobody-stale-base	nobody	no action
+review-required-stale-base	fleet	update the branch; base is stale
+review-required-no-pass	fleet	route the independent review
+review-required-pass	maintainer	review required
+review-required-unknown	maintainer	review required
+cannot-merge-stale-base	fleet	update the branch; base is stale
+cannot-merge-no-pass	fleet	route the independent review
+cannot-merge-pass	maintainer	delivery awaits the maintainer
+cannot-merge-unknown	maintainer	delivery awaits the maintainer
+changes	fleet	forge requests changes
+failed	fleet	checks failed
+missing	fleet	check lane has no verdict
+pending	fleet	checks still running
+no-checks	fleet	no reported checks; readiness unconfirmed
+draft	fleet	draft delivery
+conflict	fleet	mergeability conflicting
+merged	nobody	forge reports merged
+closed	nobody	forge reports closed
+stale-observation	fleet	contribution not recently checked
+stale-verdict	fleet	STALE maintainer verdict; reassess the current head
+signal	fleet	incoming maintainer signal needs triage
+issue	maintainer	awaiting issue triage
+ok - classifier branch precedence keeps ordinary actions distinct; only live holds and recorded owner decisions are owner calls
+exit=0
+=== test_actor_coverage
+ok - only required-captain contributions are rows; other actors are counted
+exit=0
+=== test_away_yolo_is_fleet_work
+ok - away yolo delivery is fleet work without granting merge authority
+exit=0
+=== test_done_task_open_pr_still_observed
+ok - an open PR linked from a done task keeps being observed
+exit=0
+=== test_low_quota_poll_keeps_last_observation_marked_stale
+ok - below the floor the poll keeps the last observation stale with the reset time, once, and resumes after the reset
+exit=0
+=== test_repeated_poll_reads_unchanged_prs_conditionally
+ok - a repeated poll answers unchanged PR reads with 304s and still sees a changed resource
+exit=0
