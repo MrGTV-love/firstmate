@@ -25,27 +25,32 @@ INSTALLER="$ROOT/bin/fm-install-shellcheck.sh"
 REQUIRED=$("$LINT" --required-version)
 # Ordinary regressions must not read or populate the operator's shared cache.
 export FM_LINT_CACHE_DIR=off
-# A stand-in analysis keeps its pool state in its own run's scratch directory;
-# a real ShellCheck always uses the host pool, so no test sets FM_LINT_SLOT_DIR
-# for it.
+# No test sets FM_LINT_SLOT_DIR globally: a real ShellCheck uses the host pool,
+# and a test with a stand-in analysis sets its own fixture pool directory.
 unset FM_LINT_SLOT_DIR
 FM_LINT_REAL_PS=$(command -v ps)
 
-# fm_lint_hide_outside_shellcheck <fakebin>: a ps for a stand-in analysis in an
-# isolated pool. Admission counts every process named shellcheck outside its held
-# roots, so a real one elsewhere on the host would change this fixture's result.
-# In the gate's process table read this ps drops those rows, except the pid in
-# FM_TEST_COUNTED_SHELLCHECK_PID; every other call is plain ps.
+# fm_lint_hide_outside_shellcheck <fakebin>: a ps for a stand-in analysis in a
+# fixture pool. Admission and the growth guard read every lint gate on the host
+# and every process named shellcheck, so a real lint or a real ShellCheck elsewhere
+# would change this fixture's result. In the gate's process table read this ps
+# drops the rows of processes named shellcheck, except the pid in
+# FM_TEST_COUNTED_SHELLCHECK_PID, and the rows of gates that use another pool
+# directory (FM_TEST_GATE_POOL_PREFIX, when set, names every pool directory it
+# keeps by a common prefix); every other call is plain ps.
 fm_lint_hide_outside_shellcheck() {
   cat > "$1/ps" <<SH
 #!/bin/sh
-[ "\$*" = '-axo pid=,ppid=,rss=,comm=' ] || exec "$FM_LINT_REAL_PS" "\$@"
-"$FM_LINT_REAL_PS" "\$@" | /usr/bin/awk -v counted="\${FM_TEST_COUNTED_SHELLCHECK_PID:-}" '{
-  name = \$0
-  sub(/^ *[0-9]+ +[0-9]+ +[0-9]+ +/, "", name)
-  sub(/ +\$/, "", name)
+[ "\$*" = '-axww -o pid=,ppid=,rss=,etime=,command=' ] || exec "$FM_LINT_REAL_PS" "\$@"
+"$FM_LINT_REAL_PS" "\$@" | /usr/bin/awk -v counted="\${FM_TEST_COUNTED_SHELLCHECK_PID:-}" -v pool="\${FM_TEST_GATE_POOL_PREFIX:-\${FM_LINT_INTERNAL_SLOT_DIR:-}}" '{
+  cmd = \$0
+  sub(/^ *[0-9]+ +[0-9]+ +[0-9]+ +[0-9:-]+ +/, "", cmd)
+  name = cmd
+  sub(/ .*/, "", name)
   sub(/.*\//, "", name)
-  if (name != "shellcheck" || \$1 == counted) print
+  if (name == "shellcheck" && \$1 != counted) next
+  if (cmd ~ /fm-lint-cache[.]pl gate / && index(cmd, " gate " pool " ") == 0) next
+  print
 }'
 SH
   chmod +x "$1/ps"

@@ -70,10 +70,10 @@ if (($ARGV[0] // '') eq 'gate') {
     die "fm-lint-gate: invalid private invocation\n"
         unless defined $dashes && $dashes eq '--' && @command && ($ncpu // '') =~ /\A[1-9][0-9]*\z/
             && ($run // '') =~ /\A[A-Za-z0-9_-]{1,64}\z/;
-    my ($child, $caught);
+    my ($child, $caught, %paused);
     my %signal_number = (HUP => 1, INT => 2, TERM => 15);
     for my $name (keys %signal_number) {
-        $SIG{$name} = sub { $caught = $name; kill 'TERM', $child if $child; };
+        $SIG{$name} = sub { $caught = $name; kill 'CONT', keys %paused; kill 'TERM', $child if $child; };
     }
     my $cap = ($ENV{FM_LINT_HOST_SLOTS} // '') =~ /\A[1-9][0-9]*\z/ ? $ENV{FM_LINT_HOST_SLOTS} + 0
         : ($ncpu >> 1) > 2 ? ($ncpu >> 1) : 2;
@@ -106,16 +106,22 @@ if (($ARGV[0] // '') eq 'gate') {
         close $ps;
         return %stopped;
     };
-    # One read of the live process table: { pid => [ppid, resident KiB, name] }, or
-    # undef when no source answers. ps first, then libproc through
-    # fm-proc-info.py for a sandbox that refuses ps.
+    # One read of the live process table: { pid => [ppid, resident KiB, name,
+    # command, start seconds] }, or undef when no source answers. ps first, then
+    # libproc through fm-proc-info.py for a sandbox that refuses ps.
     my $process_table = sub {
         my %table;
+        my $now = time();
         {
             no warnings 'exec';
-            if (open(my $ps, '-|', 'ps', '-axo', 'pid=,ppid=,rss=,comm=')) {
+            if (open(my $ps, '-|', 'ps', '-axww', '-o', 'pid=,ppid=,rss=,etime=,command=')) {
                 while (my $line = <$ps>) {
-                    $table{$1} = [$2, $3 + 0, $4] if $line =~ /\A\s*([0-9]+)\s+([0-9]+)\s+([0-9]+)\s+(.*?)\s*\z/;
+                    next unless $line =~ /\A\s*([0-9]+)\s+([0-9]+)\s+([0-9]+)\s+(?:(?:([0-9]+)-)?(?:([0-9]+):)?([0-9]+):([0-9]+))\s+(.*?)\s*\z/s;
+                    my ($pid, $ppid, $rss, $days, $hours, $minutes, $seconds, $command) = ($1, $2, $3, $4, $5, $6, $7, $8);
+                    my $age = (($days // 0) * 24 + ($hours // 0)) * 3600 + $minutes * 60 + $seconds;
+                    my $name = (split ' ', $command)[0] // '';
+                    $name =~ s{.*/}{};
+                    $table{$pid} = [$ppid, $rss + 0, $name, $command, $now - $age];
                 }
                 close $ps;
             }
@@ -125,7 +131,14 @@ if (($ARGV[0] // '') eq 'gate') {
         my $helper = dirname(abs_path($0)) . '/fm-proc-info.py';
         if (-r $helper) {
             no warnings 'exec';
-            if (open(my $py, '-|', $ENV{FM_LINT_INTERNAL_PYTHON} || 'python3', $helper, 'memory')) {
+            my $python = $ENV{FM_LINT_INTERNAL_PYTHON} || 'python3';
+            my %command;
+            if (open(my $py, '-|', $python, $helper, 'table', 'pid,ppid,command')) {
+                while (my $line = <$py>) { $command{$1} = $3 if $line =~ /\A\s*([0-9]+)\s+([0-9]+)\s+(.*?)\s*\z/s; }
+                close $py;
+            }
+            require Time::Piece;
+            if (open(my $py, '-|', $python, $helper, 'memory')) {
                 local $/;
                 my $json = <$py>;
                 close $py;
@@ -134,7 +147,9 @@ if (($ARGV[0] // '') eq 'gate') {
                 for my $row (ref $rows eq 'ARRAY' ? @$rows : ()) {
                     next unless ref $row eq 'HASH' && defined $row->{pid} && defined $row->{ppid}
                         && defined $row->{rss_bytes};
-                    $table{$row->{pid}} = [$row->{ppid}, int($row->{rss_bytes} / 1024), $row->{comm} // ''];
+                    my $started = eval { my $t = $row->{started}; $t =~ s/\s+/ /g; Time::Piece->strptime($t, '%a %b %e %H:%M:%S %Y')->epoch } // 0;
+                    $table{$row->{pid}} = [$row->{ppid}, int($row->{rss_bytes} / 1024), $row->{comm} // '',
+                        $command{$row->{pid}} // ($row->{comm} // ''), $started];
                 }
             }
         }
@@ -167,30 +182,53 @@ if (($ARGV[0] // '') eq 'gate') {
         }
         return $total;
     };
-    # KiB resident now in processes named shellcheck that are not a descendant
-    # of a held slot's gate: ShellCheck this pool does not hold, from any other
-    # pool, caller or wrapper script. Stand-in analyses are named perl or bash
-    # and are not counted.
-    my $foreign = sub {
-        my ($table, @held) = @_;
-        return 0 unless $table;
+    # Every lint gate on the host, whatever pool it uses, the processes below
+    # it, and every other process named shellcheck: the table reduced to
+    # { total => KiB in all of them, gates => { gate pid => [process set, start] },
+    #   outside => KiB not in a gate's tree }.
+    my $host_view = sub {
+        my ($table) = @_;
+        return undef unless $table;
         my %children;
         push @{$children{$table->{$_}[0]}}, $_ for keys %$table;
+        my (%gates, %in_tree, %running);
+        for my $pid (keys %$table) {
+            # A gate is a perl running this script's gate mode; a process that only
+            # carries those words later in its arguments (check, timeout) is not one.
+            next unless ($table->{$pid}[3] // '') =~ m{\A\S*perl\S*\s+(?:-\S+\s+)*\S*fm-lint-cache\.pl\s+gate\s};
+            my (@queue, %set) = ($pid);
+            while (defined(my $member = shift @queue)) {
+                next if $set{$member}++ || !$table->{$member};
+                push @queue, @{$children{$member} // []};
+            }
+            $gates{$pid} = [\%set, $table->{$pid}[4]];
+            $in_tree{$_} = 1 for keys %set;
+            # A gate that has not started its command holds nothing: waiting
+            # gates must not count each other, or none would ever be admitted.
+            $running{$_} = 1 for keys(%set) > 1 ? keys %set : ();
+        }
+        my ($total, $named) = (0, 0);
+        $total += $table->{$_}[1] for keys %running;
+        for my $pid (keys %$table) {
+            next if $in_tree{$pid} || $table->{$pid}[2] ne 'shellcheck';
+            $named += $table->{$pid}[1];
+        }
+        return {total => $total + $named, named => $named, gates => \%gates};
+    };
+    # KiB resident in lint trees of other pools and in processes named
+    # shellcheck outside every gate: memory this pool does not hold.
+    my $foreign = sub {
+        my ($table, @held) = @_;
+        my $view = $host_view->($table) or return 0;
         my %own;
         for my $entry (@held) {
             my ($pid) = @$entry;
-            my @queue = defined $pid ? ($pid) : ();
-            while (defined(my $member = shift @queue)) {
-                next if $own{$member}++ || !$table->{$member};
-                push @queue, @{$children{$member} // []};
-            }
+            $own{$_} = 1 for defined $pid && $view->{gates}{$pid} ? keys %{$view->{gates}{$pid}[0]} : ();
         }
-        my $total = 0;
-        for my $pid (keys %$table) {
-            next if $own{$pid} || $pid == $$;
-            my $name = $table->{$pid}[2] // '';
-            $name =~ s{.*/}{};
-            $total += $table->{$pid}[1] if $name eq 'shellcheck';
+        my $total = $view->{named};
+        for my $gate (keys %{$view->{gates}}) {
+            next if $gate == $$ || $own{$gate} || keys(%{$view->{gates}{$gate}[0]}) < 2;
+            for my $pid (keys %{$view->{gates}{$gate}[0]}) { $total += $table->{$pid}[1] unless $own{$pid}; }
         }
         return $total;
     };
@@ -363,9 +401,47 @@ if (($ARGV[0] // '') eq 'gate') {
         POSIX::_exit(127);
     }
     kill 'TERM', $child if $caught;
+    # Growth guard. Admission is a reading at one moment; a root admitted small
+    # can grow later, and so can every other root admitted with it. While the
+    # lint trees of every pool on the host, plus any other process named
+    # shellcheck, hold more than the budget, this gate stops (SIGSTOP) the
+    # analysis processes of its own tree unless it belongs to the oldest running
+    # gate, and resumes them as soon as the total fits again or its gate becomes
+    # the oldest. A stopped process keeps what it holds but cannot grow, and the
+    # oldest running gate is never stopped (unless processes named shellcheck
+    # outside every gate alone hold the budget), so the aggregate exceeds the
+    # budget by at most what the oldest root grows by, and every root finishes.
+    my $guard_busy;
+    my $resume = sub { for my $pid (keys %paused) { kill 'CONT', $pid; delete $paused{$pid}; } };
+    my $guard = sub {
+        return if $caught || $guard_busy;
+        $guard_busy = 1;
+        my $table = $process_table->();
+        my $view = $table && $host_view->($table);
+        my $mine = $view && $view->{gates}{$$};
+        if (!$mine) { $guard_busy = 0; return; }
+        my ($oldest) = sort { $view->{gates}{$a}[1] <=> $view->{gates}{$b}[1] || $a <=> $b }
+            grep { keys(%{$view->{gates}{$_}[0]}) > 1 } keys %{$view->{gates}};
+        my $over = $view->{total} > $budget_kib;
+        if ($over && (!defined $oldest || $oldest != $$ || $view->{named} >= $budget_kib)) {
+            for my $pid (keys %{$mine->[0]}) {
+                next if $pid == $$ || $paused{$pid};
+                my $row = $table->{$pid} or next;
+                next if $row->[1] < 8192 || $row->[3] =~ m{fm-lint-cache\.pl|fm-lint\.sh};
+                $paused{$pid} = 1 if kill 'STOP', $pid;
+            }
+        } elsif (%paused) {
+            $resume->();
+        }
+        $guard_busy = 0;
+    };
+    $SIG{ALRM} = sub { local ($?, $!); $guard->() };
+    Time::HiRes::setitimer(Time::HiRes::ITIMER_REAL(), 0.5, 0.5);
     my $reaped;
     while (($reaped = waitpid($child, 0)) == -1 && $!{EINTR}) { }
     my $status = $reaped == $child ? $? : 127 << 8;
+    Time::HiRes::setitimer(Time::HiRes::ITIMER_REAL(), 0, 0);
+    $resume->();
     # Raise the root's record to this complete analysis's measured peak: the
     # watch's peak of resident size and footprint, and /usr/bin/time's maximum
     # resident size.

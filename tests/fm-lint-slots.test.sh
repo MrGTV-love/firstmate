@@ -826,75 +826,167 @@ test_slot_pool_cannot_be_disabled_and_refuses_bad_settings() {
   pass "the slot pool cannot be disabled, rejects bad settings, and refuses an unusable directory instead of running unbounded"
 }
 
-test_real_shellcheck_cannot_leave_the_host_pool_and_outside_memory_is_counted() {
-  local tmp rc out outside pid deadline
-  tmp=$(fm_test_tmproot fm-lint-host-pool)
-  mkdir -p "$tmp/bin" "$tmp/outside"
+# fm_lint_write_stepping_shellcheck <fakebin> <steps> <MiB per step> <seconds per step> <log>:
+# a stand-in analysis that takes its memory in steps after it starts, then holds
+# it for FM_TEST_MEM_HOLD seconds (default 2); with FM_TEST_GROW_AFTER set it
+# waits for that many stand-ins to have started before it grows. It appends "start <pid> <time>",
+# "mem <pid> <time> <MiB held>" after each step and "end <pid> <time>" to <log>,
+# so the memory held at any moment is known without sampling.
+fm_lint_write_stepping_shellcheck() {
+  mkdir -p "$1"
+  cat > "$1/shellcheck" <<PL
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use Time::HiRes qw(time sleep);
+BEGIN {
+    if ((\$ARGV[0] // '') eq '--version') {
+        print "ShellCheck - shell script analysis tool\nversion: 0.11.0\n";
+        exit 0;
+    }
+}
+my \$log = '$5';
+sub note { open(my \$fh, '>>', \$log) or die "\$!"; printf {\$fh} "%s %d %.6f%s\n", shift, \$\$, time(), @_ ? " \$_[0]" : ''; close \$fh; }
+note('start');
+# Grow only once FM_TEST_GROW_AFTER stand-ins have started, so every run is
+# admitted small before any of them grows.
+if (my \$peers = \$ENV{FM_TEST_GROW_AFTER}) {
+    my \$deadline = time() + 60;
+    while (time() < \$deadline) {
+        open(my \$fh, '<', \$log) or last;
+        my \$n = () = grep { /^start / } <\$fh>;
+        close \$fh;
+        last if \$n >= \$peers;
+        sleep 0.05;
+    }
+}
+my @blocks;
+for my \$step (1 .. $2) {
+    push @blocks, 'x' x ($3 * 1048576);
+    note('mem', \$step * $3);
+    sleep $4;
+}
+sleep \$ENV{FM_TEST_MEM_HOLD} // 2;
+note('end');
+exit 0;
+PL
+  chmod +x "$1/shellcheck"
+  fm_lint_hide_outside_shellcheck "$1"
+}
+
+# fm_lint_peak_held <log>: the most MiB held at one moment by the stand-ins that
+# logged to <log> (each holds its last reported size from its first report until
+# its end), and the most that were alive at once. Prints "<MiB> <alive>".
+fm_lint_peak_held() {
+  perl -ane '
+    if ($F[0] eq "start") { push @e, [$F[2], 0, $F[1], 0]; }
+    elsif ($F[0] eq "mem") { push @e, [$F[2], 1, $F[1], $F[3]]; }
+    elsif ($F[0] eq "end") { push @e, [$F[2], 2, $F[1], 0]; }
+    END {
+      my (%held, %alive, $peak, $most);
+      for (sort { $a->[0] <=> $b->[0] } @e) {
+        my ($t, $kind, $pid, $mib) = @$_;
+        if ($kind == 0) { $alive{$pid} = 1; }
+        elsif ($kind == 1) { $held{$pid} = $mib; }
+        else { delete $alive{$pid}; delete $held{$pid}; }
+        my $sum = 0; $sum += $_ for values %held;
+        $peak = $sum if !defined $peak || $sum > $peak;
+        my $n = keys %alive; $most = $n if !defined $most || $n > $most;
+      }
+      printf "%d %d\n", $peak // 0, $most // 0;
+    }' "$1"
+}
+
+test_growing_roots_are_held_to_the_budget_across_pools() {
+  local tmp run rc pid peak most pids budget history key
+  local -a all
+  tmp=$(fm_test_tmproot fm-lint-growth)
+  mkdir -p "$tmp/bin"
   printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/a.sh"
-  # (1) A real ShellCheck with any other pool directory is refused by name and
-  # starts nothing; no directory is created.
-  if pinned_ready; then
+  # Each stand-in takes 4 MiB every 0.25 s for 4 s (64 MiB) after its lint run
+  # admits it. Four runs from four HOME values each use their own pool directory,
+  # and each pool already holds a 16 MiB record for the root, so all four are
+  # admitted at once, small, and then grow together.
+  fm_lint_write_stepping_shellcheck "$tmp/bin" 16 4 0.25 "$tmp/growth.log"
+  key=$(printf "full:%s" "$(cd -P "$tmp" && pwd -P)/a.sh" | perl -MDigest::SHA=sha256_hex -ne 'print sha256_hex($_)')
+  for budget in 131072 100000000; do
+    : > "$tmp/growth.log"
+    pids=()
+    for run in 1 2 3 4; do
+      history="$tmp/pool.$budget.$run/history"
+      mkdir -p "$history" "$tmp/home.$run/.cache"
+      printf '16384\n' > "$history/$key"
+      env HOME="$tmp/home.$run" XDG_CACHE_HOME="$tmp/home.$run/.cache" FM_HOME="$tmp/fm.$run" \
+        FM_LINT_SLOT_DIR="$tmp/pool.$budget.$run" FM_LINT_HOST_SLOTS=9 FM_LINT_HOST_RSS_KIB="$budget" \
+        FM_LINT_ROOT_RSS_KIB=262144 FM_TEST_GATE_POOL_PREFIX="$tmp/pool.$budget." FM_TEST_GROW_AFTER=4 PATH="$tmp/bin:$PATH" \
+        "$LINT" --jobs 1 "$tmp/a.sh" > "$tmp/growth.$budget.$run.out" 2>&1 &
+      pids+=("$!")
+    done
     rc=0
-    out=$(FM_LINT_SLOT_DIR="$tmp/elsewhere" "$LINT" "$tmp/a.sh" 2>&1) || rc=$?
-    [ "$rc" -eq 2 ] || fail "a real ShellCheck with FM_LINT_SLOT_DIR elsewhere exited $rc, expected 2"$'\n'"$out"
-    assert_contains "$out" "cannot move a real ShellCheck" "the refusal did not say a real ShellCheck cannot leave the host pool"
-    assert_contains "$out" "FM_LINT_SLOT_DIR=$tmp/elsewhere" "the refusal did not name the setting and its value"
-    [ ! -e "$tmp/elsewhere" ] || fail "the refused real-ShellCheck run created the other pool directory"
-    # A ShellCheck that od cannot read is real: only a read #! makes a stand-in.
-    mkdir -p "$tmp/unreadable-bin"
-    cp "$(command -v shellcheck)" "$tmp/unreadable-bin/shellcheck"
-    chmod 111 "$tmp/unreadable-bin/shellcheck"
-    rc=0
-    out=$(PATH="$tmp/unreadable-bin:$PATH" FM_LINT_SLOT_DIR="$tmp/elsewhere" "$LINT" "$tmp/a.sh" 2>&1) || rc=$?
-    [ "$rc" -eq 2 ] || fail "an unreadable ShellCheck with FM_LINT_SLOT_DIR elsewhere exited $rc, expected 2"$'\n'"$out"
-    assert_contains "$out" "cannot move a real ShellCheck" "an unreadable ShellCheck was treated as a stand-in"
-  fi
-  # A ShellCheck that does not start with #! is real too.
-  mkdir -p "$tmp/plain-bin"
-  printf 'printf "version: 0.11.0\\n"\n' > "$tmp/plain-bin/shellcheck"
-  chmod +x "$tmp/plain-bin/shellcheck"
+    for pid in "${pids[@]}"; do wait "$pid" || rc=$?; done
+    [ "$rc" -eq 0 ] || fail "a growing run failed under budget $budget (rc=$rc)"$'\n'"$(cat "$tmp"/growth.$budget.*.out)"
+    read -r peak most <<<"$(fm_lint_peak_held "$tmp/growth.log")"
+    all+=("$budget:$peak:$most")
+    if [ "$budget" -eq 131072 ]; then
+      # The budget is 128 MiB; one root grows to 64 MiB beyond its interpreter, so
+      # budget plus one root is 192 MiB.
+      [ "$peak" -le 192 ] || fail "four growing roots in four pools held $peak MiB, above the 128 MiB budget plus one 64 MiB root: ${all[*]}"
+      [ "$(grep -c '^end ' "$tmp/growth.log")" -eq 4 ] || fail "not every growing root finished under the budget: ${all[*]}"
+    else
+      # The control: with no effective budget the same roots stack.
+      [ "$peak" -gt 192 ] || fail "four growing roots held only $peak MiB without a budget, so this test cannot show a bound: ${all[*]}"
+    fi
+  done
+  pass "growing roots from four pools stay within the budget plus one root and all finish; without a budget they stack (${all[*]} as budget:peak MiB:alive)"
+}
+
+test_a_wrapper_around_the_real_shellcheck_shares_the_host_wide_memory_bound() {
+  local tmp rc out outside pid deadline real before after
+  pinned_ready || { pass "SKIP (ShellCheck $REQUIRED not resolved): wrapper around the real ShellCheck"; return; }
+  tmp=$(fm_test_tmproot fm-lint-wrapper)
+  mkdir -p "$tmp/bin"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/a.sh"
+  real=$(command -v shellcheck)
+  printf '#!/bin/sh\n[ "${1:-}" = --version ] || : > "%s/analysis.marker"\nexec "%s" "$@"\n' "$tmp" "$real" > "$tmp/bin/shellcheck"
+  chmod +x "$tmp/bin/shellcheck"
+  fm_lint_hide_outside_shellcheck "$tmp/bin"
+  # Compliant: a one-line wrapper with no pool setting goes through the shared
+  # host pool, takes a ticket there and makes no scratch pool of its own.
+  before=$(cat "/var/tmp/firstmate-lint-$(id -u)/lint-slots/queue.next" 2>/dev/null || printf 0)
   rc=0
-  out=$(PATH="$tmp/plain-bin:$PATH" FM_LINT_SLOT_DIR="$tmp/elsewhere" "$LINT" "$tmp/a.sh" 2>&1) || rc=$?
-  [ "$rc" -eq 2 ] || fail "a ShellCheck without #! with FM_LINT_SLOT_DIR elsewhere exited $rc, expected 2"$'\n'"$out"
-  assert_contains "$out" "cannot move a real ShellCheck" "a ShellCheck without #! was treated as a stand-in"
-  [ ! -e "$tmp/elsewhere" ] || fail "a refused run created the other pool directory"
-  # (3) A stand-in with an isolated fixture pool runs and completes.
-  fm_lint_write_memory_shellcheck "$tmp/bin" 1 "$tmp/mem.starts"
-  : > "$tmp/mem.starts"
-  rc=0
-  out=$(PATH="$tmp/bin:$PATH" FM_TEST_MEM_HOLD=0.2 FM_LINT_SLOT_DIR="$tmp/fixture-pool" "$LINT" "$tmp/a.sh" 2>&1) || rc=$?
-  [ "$rc" -eq 0 ] || fail "a stand-in run with an isolated fixture pool failed (rc=$rc)"$'\n'"$out"
-  [ "$(wc -l < "$tmp/mem.starts" | tr -d ' ')" -eq 1 ] || fail "the stand-in with an isolated fixture pool did not run"
-  # (2) A wrapper around the real ShellCheck is a stand-in to the pool choice, but
-  # processes named shellcheck outside its pool are counted: while the real
-  # ShellCheck waits on an open input (resident well above a 4 MiB budget), an
-  # isolated pool does not admit the wrapper, although its own pool is empty. Only
-  # that one real process stays visible, so another on the host cannot change this.
-  pinned_ready || { pass "a real ShellCheck cannot leave the host pool (SKIP the outside-memory case: ShellCheck $REQUIRED not resolved)"; return; }
+  out=$(env -u FM_LINT_SLOT_DIR PATH="$tmp/bin:$PATH" TMPDIR="$tmp" FM_LINT_HOST_RSS_KIB=1000000000 "$LINT" --jobs 1 "$tmp/a.sh" 2>&1) || rc=$?
+  [ "$rc" -eq 0 ] || fail "the wrapper run failed (rc=$rc)"$'\n'"$out"
+  [ -e "$tmp/analysis.marker" ] || fail "the wrapper never ran the real analysis"
+  after=$(cat "/var/tmp/firstmate-lint-$(id -u)/lint-slots/queue.next" 2>/dev/null || printf 0)
+  [ "$((after - before))" -ge 1 ] || fail "the wrapper run took no ticket in the host pool (tickets $before -> $after)"
+  [ -z "$(find "$tmp" -maxdepth 2 -name slots -print -quit)" ] || fail "the wrapper run made a pool of its own under its scratch directory"
+  # Harmful: the same wrapper pointed at its own pool, while a real ShellCheck
+  # outside it holds more than the 4 MiB budget, is not admitted although its pool
+  # is empty, and runs once the outside one ends.
+  rm -f "$tmp/analysis.marker"
   mkfifo "$tmp/hold"
-  shellcheck - < "$tmp/hold" > /dev/null 2>&1 &
+  "$real" - < "$tmp/hold" > /dev/null 2>&1 &
   outside=$!
   exec 9> "$tmp/hold"
   sleep 2
-  : > "$tmp/mem.starts"
-  PATH="$tmp/bin:$PATH" FM_TEST_COUNTED_SHELLCHECK_PID="$outside" FM_TEST_MEM_HOLD=0.2 \
-    FM_LINT_SLOT_DIR="$tmp/isolated-pool" FM_LINT_HOST_SLOTS=9 FM_LINT_HOST_RSS_KIB=4096 "$LINT" "$tmp/a.sh" > "$tmp/wrapper.out" 2>&1 9>&- &
+  PATH="$tmp/bin:$PATH" FM_TEST_COUNTED_SHELLCHECK_PID="$outside" FM_LINT_SLOT_DIR="$tmp/own-pool" FM_LINT_HOST_SLOTS=9 \
+    FM_LINT_HOST_RSS_KIB=4096 "$LINT" "$tmp/a.sh" > "$tmp/wrapper.out" 2>&1 9>&- &
   pid=$!
   sleep 4
-  if [ -s "$tmp/mem.starts" ]; then
+  if [ -e "$tmp/analysis.marker" ]; then
     exec 9>&-
     kill "$outside" "$pid" 2>/dev/null || true
-    fail "a run in an isolated pool started while a real shellcheck outside it held more than the 4 MiB budget"
+    fail "a wrapper in its own pool started while a real shellcheck outside it held more than the 4 MiB budget"
   fi
   exec 9>&-
   wait "$outside" 2>/dev/null || true
   deadline=$((SECONDS + 30))
-  until [ -s "$tmp/mem.starts" ]; do
-    [ "$SECONDS" -lt "$deadline" ] || { kill "$pid" 2>/dev/null || true; fail "the isolated-pool run stayed queued after the outside shellcheck ended"; }
+  until [ -e "$tmp/analysis.marker" ]; do
+    [ "$SECONDS" -lt "$deadline" ] || { kill "$pid" 2>/dev/null || true; fail "the wrapper stayed queued after the outside shellcheck ended"; }
     sleep 0.2
   done
-  wait "$pid" || fail "the isolated-pool run failed after the outside shellcheck ended"$'\n'"$(cat "$tmp/wrapper.out")"
-  pass "a real ShellCheck cannot leave the host pool, real shellcheck outside a pool counts against its budget, and a stand-in keeps its fixture pool"
+  wait "$pid" || fail "the wrapper run failed after the outside shellcheck ended"$'\n'"$(cat "$tmp/wrapper.out")"
+  pass "a wrapper around the real ShellCheck uses the host pool by default and is held back by real shellcheck memory outside its own pool"
 }
 
 test_slot_file_failures_refuse_and_never_run_unbounded() {
@@ -2553,7 +2645,8 @@ test_queue_scan_survives_odd_slot_paths_and_vanishing_tickets
 test_cached_success_does_not_wait_for_host_slots
 test_slot_pool_cannot_be_disabled_and_refuses_bad_settings
 test_slot_file_failures_refuse_and_never_run_unbounded
-test_real_shellcheck_cannot_leave_the_host_pool_and_outside_memory_is_counted
+test_growing_roots_are_held_to_the_budget_across_pools
+test_a_wrapper_around_the_real_shellcheck_shares_the_host_wide_memory_bound
 test_memory_budget_bounds_the_aggregate_across_homes
 test_root_larger_than_the_budget_runs_alone_and_a_killed_run_frees_its_charge
 test_memory_charge_survives_unknown_records_and_an_unreadable_table
