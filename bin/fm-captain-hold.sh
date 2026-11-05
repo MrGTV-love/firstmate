@@ -241,11 +241,14 @@
 # (a process-event source id, for example). The binding is a private record
 # under `state/decision-bindings/`; a source with no binding feeds nothing, so
 # this whole path is opt-in per source and an unbound source behaves as if it
-# did not exist. A channel that checks the binding and then acts on the answer holds
-# `state/decision-bindings/` shared across both steps, and `unbind` takes it exclusive
-# to remove the record: nothing is delivered through a source once its `unbind` has
-# returned. `unbind` waits at most FM_BINDING_UNBIND_WAIT seconds (default 60) for a
-# step already under way, then removes the record anyway and says so on stderr.
+# did not exist. The Slack request path checks the binding and then delivers (the
+# acknowledgement post and the request wake print) while it holds
+# `state/decision-bindings/` shared, and `unbind` takes it exclusive to remove the
+# record: no Slack request delivery already past its binding check is completed once
+# `unbind` has returned. Other channels (the Slack answer path, process-event feeds)
+# check the binding as before and are not held. `unbind` waits at most
+# FM_BINDING_UNBIND_WAIT seconds (default 60) for a delivery already under way, then
+# removes the record anyway and says so on stderr.
 # `bind` deliberately does not require the source to exist yet,
 # so a channel can be bound BEFORE it is armed. The optional second argument
 # exists only for legacy pre-collapse records and callers: a concrete origin is
@@ -2291,9 +2294,9 @@ command_unbind() {
   [ "$#" -eq 1 ] || { usage >&2; exit 2; }
   validate_source_id "$source"
   dest=$(binding_path "$source")
-  # A channel that checks the binding and then acts on the answer holds BINDING_DIR shared across both steps, so
-  # the removal waits for such a step to end: nothing is delivered through the source after this returns. The wait
-  # is bounded; past it the binding is removed anyway and the caller is told, so an unbind is never refused.
+  # The Slack request path holds BINDING_DIR shared across its binding check and the post or print it allows, so
+  # the removal waits for such a delivery to end: none completes after this returns. Other channels are not held. The
+  # wait is bounded; past it the binding is removed anyway and the caller is told, so an unbind is never refused.
   if [ -d "$BINDING_DIR" ]; then
     perl -e '
       use strict; use warnings; use Fcntl qw(:flock);

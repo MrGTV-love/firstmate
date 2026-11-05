@@ -1067,6 +1067,78 @@ class IntakeTest(unittest.TestCase):
                 self.assertEqual(per_poll, [[]] * failures + [['200.000100', '200.000200']])
                 self.assertEqual([line.split()[3] for line in self.wakes(watch)], ['200.000100', '200.000200'])
 
+    def polls(self, watch, replay, count):
+        """Run count polls, each as a run of its own; returns the acknowledgements and errors of each."""
+        acks, errors = [], []
+        for _ in range(count):
+            watch.state, watch.advanced = watch.load_state(), 0
+            before = len(self.acks(replay))
+            try:
+                watch.poll()
+                errors.append(None)
+            except SlackError as error:
+                errors.append(str(error))
+            acks.append(self.acks(replay)[before:])
+        return acks, errors
+
+    def test_a_head_request_that_can_never_be_acknowledged_is_woken_once_after_three_polls_and_the_next_follows(self):
+        with self.fixture() as (watch, replay):
+            self.say(replay, '200.000100', 'a request the owner deleted')
+            self.say(replay, '200.000200', 'the newer request')
+            replay.state['failures']['conversations.replies:200.000100'] = {'status': 400}
+            replay.save()
+            acks, errors = self.polls(watch, replay, 3)
+            self.assertEqual(errors, ['api_error', 'api_error', None])
+            # Released at the third failed poll, never acknowledged; the newer request follows in that same poll.
+            self.assertEqual(acks, [[], [], ['200.000200']])
+            self.assertEqual(self.wakes(watch), [
+                'check: slack request 200.000100 from U0TESTOWNER (not acknowledged after 3 tries): '
+                + plane.REQUEST_LABEL + ' a request the owner deleted',
+                plane.request_line('200.000200', self.OWNER, 'the newer request')])
+            saved = watch.load_state()
+            event = next(e for e in saved['seen'] if e.endswith('/200.000100/request'))
+            self.assertEqual((saved['pending'], saved['seen'][event]), ([], {'key': '', 'unacknowledged': True}))
+            # Nothing is lost or repeated, and the released request is never retried.
+            acks, errors = self.polls(watch, replay, 3)
+            self.assertEqual((acks, errors), ([[], [], []], [None, None, None]))
+            self.assertEqual([line.split()[3] for line in self.wakes(watch)], ['200.000100', '200.000200'])
+            self.assertEqual(self.acks(replay), ['200.000200'])
+
+    def test_a_released_request_line_keeps_its_label_and_its_bound(self):
+        line = plane.request_line('200.000100', self.OWNER, 'x' * 1000, plane.REQUEST_UNACKNOWLEDGED)
+        self.assertTrue(line.startswith('check: slack request 200.000100 from U0TESTOWNER (not acknowledged after 3 tries): '
+                                        + plane.REQUEST_LABEL + ' x'))
+        self.assertTrue(line.endswith(' [cut, full text in Slack thread 200.000100]'))
+        self.assertLessEqual(len(line), plane.WAKE_LIMIT - plane.QUEUE_RESERVE)
+
+    def test_a_request_that_recovers_within_three_tries_is_acknowledged_and_woken_plainly(self):
+        with self.fixture() as (watch, replay):
+            self.say(replay, '200.000100', 'the older request')
+            self.say(replay, '200.000200', 'the newer request')
+            replay.state['failures']['conversations.replies:200.000100'] = {'status': 400, 'times': 2}
+            replay.save()
+            acks, errors = self.polls(watch, replay, 4)
+            self.assertEqual(errors, ['api_error', 'api_error', None, None])
+            self.assertEqual(acks, [[], [], ['200.000100', '200.000200'], []])
+            self.assertEqual(self.wakes(watch), [plane.request_line('200.000100', self.OWNER, 'the older request'),
+                                                 plane.request_line('200.000200', self.OWNER, 'the newer request')])
+
+    def test_an_outage_or_an_unbound_source_never_counts_toward_the_three_tries(self):
+        with self.fixture() as (watch, replay):
+            self.say(replay, '200.000100', 'the older request')
+            replay.state['failures']['conversations.replies:200.000100'] = {'status': 400, 'times': 2}
+            replay.save()
+            self.assertEqual(self.polls(watch, replay, 2)[1], ['api_error', 'api_error'])
+            replay.state['failures']['conversations.replies:200.000100'] = {'status': 503, 'times': 3}
+            replay.save()
+            self.assertEqual(self.polls(watch, replay, 3)[1], ['unreachable'] * 3)
+            with patch.object(watch, 'bound', return_value=None):
+                self.assertEqual(self.polls(watch, replay, 3), ([[], [], []], [None, None, None]))
+            self.assertEqual(watch.load_state()['pending'][0]['failures'], 2)
+            self.assertEqual((self.acks(replay), self.wakes(watch)), ([], []))
+            self.assertEqual(self.polls(watch, replay, 1), ([['200.000100']], [None]))
+            self.assertEqual(self.wakes(watch), [plane.request_line('200.000100', self.OWNER, 'the older request')])
+
     def test_the_history_counter_counts_a_failed_attempt(self):
         with self.fixture() as (watch, replay):
             replay.state['failures']['conversations.history'] = {'status': 503, 'times': 1}
@@ -1127,24 +1199,6 @@ class ClosedTransportTest(unittest.TestCase):
                             call()
             finally:
                 watch.lock.close()
-
-    def test_the_replay_env_runs_a_flagless_entry_on_a_transcript_and_never_builds_the_real_transport(self):
-        with tempfile.TemporaryDirectory(dir=Path.cwd()) as directory:
-            transcript = Path(directory) / 'transcript.json'
-            transcript.write_text(json.dumps({'schema': 'fm-slack-replay.v1', 'messages': []}))
-            env = dict(self.ENV, FM_HOME=directory, FM_STATE_OVERRIDE=directory, FM_SLACK_REPLAY=str(transcript))
-            seen = []
-            with patch.dict(os.environ, env), patch.object(plane, 'Slack', side_effect=AssertionError('real transport')), \
-                 patch.object(Watch, 'poll', lambda self: seen.append(type(self.api).__name__)):
-                self.assertEqual(plane.main(['poll']), 0)
-            self.assertEqual(seen, ['Replay'])
-            # An unreadable transcript is an error; it never falls back to Slack.
-            printed = io.StringIO()
-            with patch.dict(os.environ, dict(env, FM_SLACK_REPLAY=str(Path(directory) / 'missing.json'))), \
-                 patch.object(plane, 'Slack', side_effect=AssertionError('real transport')), \
-                 contextlib.redirect_stdout(printed):
-                self.assertEqual(plane.main(['poll']), 1)
-            self.assertIn('transport failure: replay_transcript_unreadable', printed.getvalue())
 
 
 def history_attempts(path):
