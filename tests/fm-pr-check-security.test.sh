@@ -212,7 +212,9 @@ case " $* " in
   *" api repos/"*)
     printf '%s\n' '{"permissions":{"push":false}}'
     ;;
-  *" headRefOid "*) printf '%s\n' "${FM_TEST_GH_HEAD:-0123456789abcdef0123456789abcdef01234567}" ;;
+  *" headRefOid "*)
+    [ "${FM_TEST_GH_HEAD_FAIL:-0}" = 0 ] || exit 1
+    printf '%s\n' "${FM_TEST_GH_HEAD:-0123456789abcdef0123456789abcdef01234567}" ;;
   *" state "*)
     [ "${FM_TEST_GH_FAIL:-0}" = 0 ] || exit 1
     [ -z "${FM_TEST_GH_STATE_STARTED:-}" ] || : > "$FM_TEST_GH_STATE_STARTED"
@@ -824,6 +826,85 @@ test_multi_pr_task_registration_still_refuses_a_local_only_head() {
     || fail "the registration refusal did not name the local-only head: $(cat "$dir/stderr")"
   [ ! -e "$dir/home/state/task-a.check.sh" ] || fail "the refused registration still armed a poll"
   pass "fm-pr-check registration refuses a multi-PR task's local-only head; only a merge call judges the PR's head"
+}
+
+# The named-head gate is skipped only when the forge reports this copy's exact
+# HEAD as the PR's head, because the forge then holds that commit. A head only in
+# the copy is refused when the forge reports another head, when the forge read
+# fails or yields no valid head, and when the forge's head is a commit neither the
+# copy nor any remote ref knows; the exact match registers with no remote ref.
+test_named_head_gate_skips_only_an_exact_forge_head() {
+  local dir pushed later case rc
+  for case in differs read-fails unreadable neither exact; do
+    dir=$(make_case "named-head-gate-$case")
+    fm_write_meta "$dir/home/state/task-a.meta" \
+      "window=firstmate:fm-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
+      "project=$dir/project" "kind=ship" "model=gpt-5.1-codex" "mode=direct-PR"
+    pushed=$(git -C "$dir/wt" rev-parse HEAD)
+    git -C "$dir/wt" commit -q --allow-empty -m 'only in the copy'
+    later=$(git -C "$dir/wt" rev-parse HEAD)
+    [ -z "$(git -C "$dir/wt" for-each-ref --contains "$later" refs/remotes)" ] \
+      || fail "$case: a remote ref already holds the copy's HEAD"
+    rc=0
+    case "$case" in
+      differs) FM_TEST_GH_HEAD=$pushed run_check_entry "$dir" task-a https://github.com/o/r/pull/4 ;;
+      read-fails) FM_TEST_GH_HEAD_FAIL=1 run_check_entry "$dir" task-a https://github.com/o/r/pull/4 ;;
+      unreadable) FM_TEST_GH_HEAD=not-a-head run_check_entry "$dir" task-a https://github.com/o/r/pull/4 ;;
+      neither) FM_TEST_GH_HEAD=0123456789abcdef0123456789abcdef01234567 run_check_entry "$dir" task-a https://github.com/o/r/pull/4 ;;
+      exact) FM_TEST_GH_HEAD=$later run_check_entry "$dir" task-a https://github.com/o/r/pull/4 ;;
+    esac > "$dir/stdout" 2> "$dir/stderr" || rc=$?
+    if [ "$case" = exact ]; then
+      [ "$rc" -eq 0 ] || fail "exact: the forge's exact copy HEAD was refused: $(cat "$dir/stderr")"
+      grep -qxF 'pr=https://github.com/o/r/pull/4' "$dir/home/state/task-a.meta" || fail "exact: pr= was not recorded"
+      grep -qxF "pr_head=$later" "$dir/home/state/task-a.meta" || fail "exact: pr_head is not the forge's head"
+      [ -f "$dir/home/state/task-a.check.sh" ] || fail "exact: no merge poll was armed"
+      continue
+    fi
+    [ "$rc" -ne 0 ] || fail "$case: a head held only by the copy was registered"
+    grep -Fq "named head $later is unreachable outside the worker copy" "$dir/stderr" \
+      || fail "$case: the refusal did not name the copy-only head: $(cat "$dir/stderr")"
+    ! grep -q '^pr=' "$dir/home/state/task-a.meta" || fail "$case: the refusal still recorded pr="
+    [ ! -e "$dir/home/state/task-a.check.sh" ] || fail "$case: the refusal still armed a poll"
+  done
+  pass "fm-pr-check skips the named-head gate only for the forge's exact copy HEAD; a differing, failed, unreadable or unknown forge head still refuses"
+}
+
+# A done note that leads with the PR URL names that PR to the completion gate.
+# With the copy gone it is accepted only on the merge poll's proof that this PR
+# merged; with no proof, or a proof for another PR, it still refuses.
+test_bare_url_done_note_with_missing_copy_needs_a_merge_proof() {
+  local dir state line rc out proof
+  dir=$(make_case bare-url-missing-copy)
+  state="$dir/home/state"
+  fm_write_meta "$state/task-a.meta" \
+    "window=firstmate:fm-task-a" "endpoint_task_id=task-a" "worktree=$dir/gone" \
+    "project=$dir/project" "kind=ship" "model=gpt-5.1-codex" "mode=direct-PR"
+  line='done [at=1] [key=close-evidence]: https://github.com/o/r/pull/9 merged by another lane'
+  for proof in none other-pr merged; do
+    rm -f "$state/task-a.pr-poll-merge-notified"
+    case "$proof" in
+      other-pr) printf 'fm-pr-poll-merge-notified-v1\ngithub\ngithub.com\no/r\n10\n' > "$state/task-a.pr-poll-merge-notified" ;;
+      merged) printf 'fm-pr-poll-merge-notified-v1\ngithub\ngithub.com\no/r\n9\n' > "$state/task-a.pr-poll-merge-notified" ;;
+    esac
+    [ "$proof" = none ] || chmod 0600 "$state/task-a.pr-poll-merge-notified"
+    if [ "$proof" = merged ]; then
+      if ! { fm_pr_url_parse https://github.com/o/r/pull/9 \
+        && fm_pr_poll_merge_already_notified "$state" task-a "$FM_PR_PROVIDER" "$FM_PR_HOST" "$FM_PR_PATH" "$FM_PR_NUMBER"; }; then
+        fail "the merged-marker fixture does not match the PR it names"
+      fi
+    fi
+    rc=0
+    # shellcheck source=/dev/null
+    out=$( . "$ROOT/bin/fm-dod-lib.sh"
+      fm_dod_accept_ship_done ship direct-PR "$dir/gone" "$dir/project" "$line" "$state" task-a "$state/task-a.meta" ) || rc=$?
+    if [ "$proof" = merged ]; then
+      [ "$rc" -eq 0 ] || fail "a bare-URL done note was refused for a merged PR whose copy is gone: $out"
+    else
+      [ "$rc" -eq 1 ] || fail "$proof: a bare-URL done note with no copy and no merge proof was accepted (rc=$rc)"
+      case "$out" in *"worktree missing"*) ;; *) fail "$proof: the refusal did not name the missing copy: $out" ;; esac
+    fi
+  done
+  pass "a bare-URL done note with its copy gone is accepted only on the merge proof for its own PR"
 }
 
 test_registration_identity_revalidation() {
@@ -1783,9 +1864,9 @@ SH
       'model=gpt-5.1-codex' \
       'mode=local-only'
     if [ "$artifact" = check.sh ]; then
-      counterpart=pr-poll
+      counterpart='pr-poll'
     else
-      counterpart=check.sh
+      counterpart='check.sh'
     fi
     mkdir "$dir/home/state/task-a.$artifact"
     printf 'directory sentinel\n' > "$dir/home/state/task-a.$artifact/sentinel"
@@ -3882,6 +3963,8 @@ test_secondmate_record_refuses_a_pr_watch
 test_unpushed_named_head_refuses_registration
 test_direct_pr_unpushed_commit_refuses_registration
 test_multi_pr_task_registration_still_refuses_a_local_only_head
+test_named_head_gate_skips_only_an_exact_forge_head
+test_bare_url_done_note_with_missing_copy_needs_a_merge_proof
 test_registration_identity_revalidation
 test_valid_recording_and_merge_derivation
 test_rejected_metacharacter_bytes_are_inert

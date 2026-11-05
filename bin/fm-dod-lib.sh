@@ -1371,15 +1371,24 @@ fm_dod_should_gate_ship_done() {  # <kind> <mode> <line>
   esac
 }
 
-# The PR/MR URL from a `done: PR <url>...` note, or empty.
+# The PR/MR URL a `done:` note names, or empty: the word after `PR `, or the
+# note's first word when that word is itself a pull request, merge request or
+# change URL (a close-evidence note leads with it). A URL later in the note, an
+# issue URL and a note with no URL name no PR. The bare form is judged by
+# fm_pr_url_parse in a subshell, so the caller's FM_PR_* values stay as they were.
 fm_dod_pr_url_from_done_note() {  # <note>
   local note=$1 url
   case "$note" in
-    PR\ https://*|PR\ http://*) ;;
+    PR\ https://*|PR\ http://*)
+      url=${note#PR }
+      url=${url%% *}
+      ;;
+    https://*)
+      url=${note%% *}
+      ( fm_pr_url_parse "$url" ) || return 1
+      ;;
     *) return 1 ;;
   esac
-  url=${note#PR }
-  url=${url%% *}
   printf '%s\n' "$url"
 }
 
@@ -1497,16 +1506,38 @@ fm_dod_nm_expected_plan() {  # <state> <task-id>
 # interval), never by a wall clock. Returns 0 with the status on stdout; 2 when
 # the read went silent, which is unknown rather than a failed run (the caller
 # says so, sets FM_NM_READ_STALLED so later reads in its process are unknown at
-# once, and the read is tried again later); 1 when the status is unreadable.
+# once, and the read is tried again later); 3 when no run exists for the copy
+# (the status answers with no `run:` line, or the repository is not initialized
+# for no-mistakes); 4 when the read failed and a bounded `no-mistakes daemon
+# status` then answers non-zero, the daemon-down rule bin/fm-crew-state.sh's
+# nm_daemon_answered_down uses; 1 when the status is otherwise unreadable.
+# fm_dod_nm_unread_reason words each refusal.
 fm_dod_nm_status_out() {  # <worktree>
-  local wt=$1 out rc=0 stall=${FM_DOD_NM_STALL_SECS:-}
+  local wt=$1 out rc=0 probe=0 stall=${FM_DOD_NM_STALL_SECS:-}
   case "$stall" in ''|*[!0-9]*|0*) stall=$(fm_progress_quiet_secs) ;; esac
   out=$(FM_NM_READ_PROGRESS=1 fm_nm_run_checked "$wt" "$stall" axi status) || rc=$?
   [ "$rc" -ne 124 ] || return 2
-  if [ "$rc" -ne 0 ] || ! printf '%s\n' "$out" | grep -q '^run:'; then
-    return 1
+  if [ "$rc" -eq 0 ]; then
+    printf '%s\n' "$out" | grep -q '^run:' || return 3
+    printf '%s\n' "$out"
+    return 0
   fi
-  printf '%s\n' "$out"
+  [ "$(fm_nm_strip_quotes "$(fm_nm_field "$out" error)")" != "repo not initialized (run 'no-mistakes init' first)" ] || return 3
+  FM_NM_READ_PROGRESS=1 fm_nm_run_checked "$wt" "$stall" daemon status >/dev/null || probe=$?
+  case "$probe" in 0|124) return 1 ;; esac
+  return 4
+}
+
+# Reason line for a status read that refused with code <rc> from
+# fm_dod_nm_status_out. Only the daemon-down line says "the no-mistakes daemon
+# is down": bin/fm_open_loops.py treats a done claim refused for that reason
+# alone as a wait, and keeps a row for no run and for an unreadable run.
+fm_dod_nm_unread_reason() {  # <rc> <consequence>
+  case "$1" in
+    3) printf '%s\n' "no no-mistakes run exists for this copy, so $2" ;;
+    4) printf '%s\n' "the no-mistakes daemon is down and the run for this copy could not be read, so $2" ;;
+    *) printf '%s\n' "the no-mistakes run for this copy could not be read, so $2" ;;
+  esac
 }
 
 # Reason line for a status read that went silent: unknown, not a verdict.
@@ -1533,7 +1564,7 @@ fm_dod_nm_evidence_required() {  # <worktree> <state> <task-id> [meta]
     fm_dod_nm_unanswered "its verification-plan evidence"
     return 2
   elif [ "$rc" -ne 0 ]; then
-    printf '%s\n' "the no-mistakes run for this copy could not be read, so its verification-plan evidence is unavailable"
+    fm_dod_nm_unread_reason "$rc" "its verification-plan evidence is unavailable"
     return 1
   fi
   [ -z "$meta" ] || recorded=$(fm_dod_meta_value "$meta" pr_head)
@@ -1553,8 +1584,10 @@ fm_dod_nm_evidence_required() {  # <worktree> <state> <task-id> [meta]
 # and a copy that publishes before recovering has a server patch set that agrees
 # with its own unfixed HEAD - the published-tree check alone accepts it. Trees
 # are compared rather than ancestry because the publish stamps a Change-Id and
-# rewrites the branch's messages. An unreadable status refuses, as an unreadable
-# change does. 1 when refused; stdout then holds a one-line reason.
+# rewrites the branch's messages. A status with no run, an unreadable status
+# and a down daemon each refuse, as an unreadable change does, with the reason
+# fm_dod_nm_unread_reason gives. 1 when refused; stdout then holds a one-line
+# reason.
 fm_dod_nm_custody_returned() {  # <worktree>
   local wt=$1 out outcome code pipeline_head head_tree pipeline_tree rc=0
   out=$(fm_dod_nm_status_out "$wt") || rc=$?
@@ -1563,7 +1596,7 @@ fm_dod_nm_custody_returned() {  # <worktree>
     fm_dod_nm_unanswered "whether its fixes are recovered"
     return 2
   elif [ "$rc" -ne 0 ]; then
-    printf '%s\n' "the no-mistakes run for this copy could not be read, so its fixes cannot be proven recovered"
+    fm_dod_nm_unread_reason "$rc" "its fixes cannot be proven recovered"
     return 1
   fi
   outcome=$(fm_nm_strip_quotes "$(fm_nm_field "$out" outcome)")

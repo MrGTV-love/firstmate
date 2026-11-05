@@ -160,9 +160,11 @@
 # The PR itself is resolved from the task's recorded pr= when present, or - when
 # no pr= was ever recorded (e.g. a yolo-authorized merge on a repo with no PR CI,
 # where the usual "checks green" fm-pr-check.sh trigger never fires) - by looking
-# up a merged PR whose head branch matches the worktree's branch, fetching its head
-# via refs/pull/<n>/head when the branch itself was deleted. So a missing pr= never
-# by itself causes a false refusal of landed work.
+# up a merged PR whose head branch matches the worktree's branch (a detached copy
+# uses the record's own branch=, else fm/<id>), fetching its head via
+# refs/pull/<n>/head when the branch itself was deleted. The lookup only finds the
+# PR; the containment proofs still decide whether this copy's work is in its head.
+# So a missing pr= never by itself causes a false refusal of landed work.
 # A gh lookup error falls back to the content check; if that is also inconclusive,
 # teardown refuses rather than risk discarding unlanded work.
 # Uncommitted changes are never landed; dirty refusals distinguish untracked-only
@@ -2289,11 +2291,12 @@ validate_pr_poll_cleanup() {
   fi
 }
 
+# Callers run this only after the busy-state and status retire steps succeed, so
+# a teardown that fails earlier leaves the merge poll in place for its PR.
 remove_pr_poll_artifacts() {
   local state_dir=$1 id=$2
   validate_pr_poll_cleanup "$state_dir" "$id" || return 1
   fm_pr_poll_retirement_recover_one "$state_dir" "$id" "$SCRIPT_DIR/fm-pr-poll.sh" || return 1
-  fm_pr_poll_merge_notified_remove "$state_dir" "$id" || return 1
   rm -f "$state_dir/$id.check.sh" "$state_dir/$id.pr-poll" \
     "$state_dir/$id.pr-poll-registration" "$state_dir/$id.pr-poll-retirement" \
     "$state_dir/$id.merge-authority" "$state_dir/$id.check-trust" \
@@ -3379,6 +3382,10 @@ validate_worktree_teardown_safety() {
     branch=${TEARDOWN_WORKTREE_BRANCH_FOR_SAFETY:-}
     if [ -z "$branch" ]; then
       branch=$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)
+      # A detached copy (a direct-PR slot copy has no local branch) names no
+      # branch in HEAD, so the PR lookup uses the record's own: branch=, else
+      # fm/<id>. Only the lookup changes; the same containment proof decides.
+      [ "$branch" != HEAD ] || branch=$(teardown_record_branch)
       TEARDOWN_WORKTREE_BRANCH_FOR_SAFETY=$branch
     fi
     if ! work_is_landed "$branch"; then
@@ -6070,13 +6077,13 @@ cleanup_firstmate_home_children() {
     fi
     remove_grok_turnend_auth "$sub_state" "$child_id" || return 1
     remove_kimi_turnend_auth "$sub_state" "$child_id" || return 1
-    remove_pr_poll_artifacts "$sub_state" "$child_id" || return 1
     child_busy_gen=$(meta_value "$child_meta" busy_gen)
     if [ -z "$child_busy_gen" ]; then
       child_busy_gen=$(cat "$sub_state/$child_id.busy-gen" 2>/dev/null || true)
     fi
     retire_busy_state "$sub_state" "$child_id" "$child_busy_gen" || return 1
     status_retire_presentation_task "$sub_state" "$child_id" || return 1
+    remove_pr_poll_artifacts "$sub_state" "$child_id" || return 1
     fm_wake_queue_prune_task "$sub_state" "$child_id" "$child_t" 2>/dev/null || true
     if [ "$child_pool_return" = 1 ]; then
       teardown_mark_return_pending "$child_wt" "$child_id" || return 1
@@ -6138,6 +6145,7 @@ cleanup_firstmate_home_children() {
       fi
     fi
     fm_backlog_atomic_transition remove "$sub_state/$child_id.meta" "task record" "$sub_state" || return 1
+    fm_pr_poll_merge_notified_remove "$sub_state" "$child_id" || return 1
     [ "$DESCENDANT_LEGACY_CUSTODY" = 1 ] || teardown_release_descendant_project_locks || return 1
     rm -f "$sub_state/$child_id.turn-ended" "$sub_state/$child_id.progress" \
       "$(fm_wake_signal_seen_path "$sub_state" "$sub_state/$child_id.turn-ended")" \
@@ -6724,12 +6732,12 @@ fm_backend_clear_transition "$BACKEND" "$STATE" "$T" || true
 if [ -n "$LAUNCH_HOME_TOKEN" ]; then
   rm -rf "/tmp/fm-$ID+$LAUNCH_HOME_TOKEN"
 fi
-remove_pr_poll_artifacts "$STATE" "$ID" || exit 1
 retire_busy_state "$STATE" "$ID" "$BUSY_GEN" || exit 1
 # Opt-in fleet activity ledger (docs/fleet-ledger.md), before the status log is
 # retired so its last lines are captured; off costs one file test.
 [ ! -e "$CONFIG/fleet-ledger" ] || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/fm-fleet-ledger.sh" cleaned_up "$ID" || true
 status_retire_presentation_task "$STATE" "$ID" || exit 1
+remove_pr_poll_artifacts "$STATE" "$ID" || exit 1
 fm_wake_queue_prune_task "$STATE" "$ID" "$T" 2>/dev/null || true
 rm -f "$STATE/$ID.turn-ended" "$STATE/$ID.progress" \
   "$(fm_wake_signal_seen_path "$STATE" "$STATE/$ID.turn-ended")" \
@@ -6819,6 +6827,7 @@ if [ -n "$TEARDOWN_DEFERRED_POOL_CLEANUP" ]; then
   fi
   fm_backlog_atomic_transition remove "$META" "task record" "$STATE" || exit 1
   TEARDOWN_META_REMOVED=1
+  fm_pr_poll_merge_notified_remove "$STATE" "$ID" || exit 1
   teardown_release_project_lock || exit 1
 fi
 [ -z "$TEARDOWN_HELD_SLOT" ] || ! teardown_owns_worktree || teardown_held_copies_report
@@ -6856,6 +6865,7 @@ else
 fi
 fm_lock_release "$META_LOCK"
 META_LOCK_HELD=0
+fm_pr_poll_merge_notified_remove "$STATE" "$ID" || exit 1
 case "$KIND:$FORCE" in
   secondmate:*|scout:*|*:--force) ;;
   *) "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded allow --rule landed-work --task "$ID" 2>/dev/null || true ;;

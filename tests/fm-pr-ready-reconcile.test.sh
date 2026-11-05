@@ -53,7 +53,7 @@ case "$*" in
     else printf '{"isDraft":false}\n'; fi ;;
   *'--json headRefOid'*)
     if [ -f "$FM_READY_CASE/forge-head" ]; then cat "$FM_READY_CASE/forge-head";
-    else git -C "$FM_READY_CASE/project" rev-parse HEAD; fi ;;
+    else git -C "$FM_READY_CASE/project" rev-parse refs/remotes/origin/main; fi ;;
   *) printf '[]\n' ;;
 esac
 SH
@@ -229,6 +229,8 @@ out=$(run_pass)
 [ "$(refusal_wakes ready)" -eq 1 ] || fail "a changed guard banner queued a second wake for the same refusal: $out"
 ! grep -q 'banner' "$CASE/home/state/.wake-queue" || fail 'guard banner leaked into the refusal wake'
 printf '%s\n' "$out" | grep -q 'registration refused: error: ' || fail "refusal line does not carry the registrar error: $out"
+printf '%s\n' "$out" | grep -qF "named head $(git -C "$CASE/project" rev-parse HEAD) is unreachable outside the worker copy" \
+  || fail "refusal line does not name the unpublished head: $out"
 pass 'a changing fm-guard.sh banner neither re-wakes the same refusal nor enters its reason'
 
 # The 2026-10-20 shape: the run is green and names its PR, but the worker never
@@ -482,10 +484,16 @@ for rejection in draft unreachable unreadable-forge; do
     git -C "$CASE/project" commit -q --allow-empty -m unpublished
     HEAD=$(git -C "$CASE/project" rev-parse HEAD)
   fi
-  [ "$rejection" != unreadable-forge ] || : > "$CASE/unreadable-forge"
+  if [ "$rejection" = unreadable-forge ]; then
+    # The no-mistakes pipeline pushed this head to the forge, which no local ref names.
+    printf '%s\n' "$HEAD" > "$CASE/forge-head"
+    : > "$CASE/unreadable-forge"
+  fi
   before=$(shasum -a 256 "$CASE/home/state/ready.meta")
   out=$(run_pass)
   [ "$(printf '%s\n' "$out" | grep -c 'registration refused:')" -eq 1 ] || fail "$rejection refusal not printed exactly once"
+  [ "$rejection" != unreachable ] || printf '%s\n' "$out" | grep -qF "named head $HEAD is unreachable outside the worker copy" \
+    || fail "unreachable refusal does not name the unpublished head: $out"
   assert_unregistered ready
   [ "$before" = "$(shasum -a 256 "$CASE/home/state/ready.meta")" ] || fail "$rejection refusal changed record"
   calls_before=$(wc -l < "$CASE/gh.calls")
@@ -592,3 +600,61 @@ done
 stop_watcher
 assert_registered ready
 pass 'hung forge call is killed at the pass limit and the next watcher tick registers the ready ship'
+
+# The 2026-10-18 shape: the worker's done note leads with the PR's URL instead of
+# `PR <url>`. It names the same PR, so the pass registers it exactly as for the
+# `PR ` form, and a note that does not start with a PR or MR URL registers nothing.
+make_case done-note-forms
+write_ship pr-form ship direct-PR
+write_ship bare-url ship direct-PR
+write_ship prose-url ship direct-PR
+write_ship issue-url ship direct-PR
+write_ship no-url ship direct-PR
+printf 'done [at=1792479210]: PR %s head %s\n' "$URL" "$HEAD" > "$CASE/home/state/pr-form.status"
+printf 'done [at=1792479210] [key=close-evidence]: %s merged by another lane\n' "$URL" > "$CASE/home/state/bare-url.status"
+printf 'done [at=1792479210]: closed, see %s\n' "$URL" > "$CASE/home/state/prose-url.status"
+printf 'done [at=1792479210]: https://github.com/example/project/issues/42 closed\n' > "$CASE/home/state/issue-url.status"
+printf 'done [at=1792479210]: closed with no link\n' > "$CASE/home/state/no-url.status"
+out=$(run_pass)
+assert_registered pr-form
+assert_registered bare-url
+assert_unregistered prose-url
+assert_unregistered issue-url
+assert_unregistered no-url
+pass 'a done note leading with the PR URL registers like the PR form; a URL later in the note, an issue URL and no URL do not'
+
+# A record whose pr= is already set but whose merge poll was never published (the
+# registrar was interrupted between the two) is handed to the registrar again for
+# that recorded PR. It registers once: the re-arm writes the one pr_ready event
+# the interrupted call never wrote, and later passes find the poll and call nothing.
+make_case lost-poll-rearm
+: > "$CASE/home/config/fleet-ledger"
+write_ship lost ship direct-PR
+printf 'pr=%s\n' "$URL" >> "$CASE/home/state/lost.meta"
+pr_ready_events() {
+  { grep -h '"task":"lost"' "$CASE/home/state/fleet-ledger.jsonl" 2>/dev/null || true; } | grep -c '"event":"task.pr_ready"' || true
+}
+out=$(run_pass)
+printf '%s\n' "$out" | grep -qxF "pr-ready: lost: re-armed the merge poll for $URL" || fail "the lost poll was not re-armed: $out"
+assert_registered lost
+[ "$(pr_ready_events)" -eq 1 ] || fail "the re-arm did not write exactly one pr_ready event"
+poll_before=$(shasum -a 256 "$CASE/home/state/lost.check.sh" "$CASE/home/state/lost.pr-poll" "$CASE/home/state/lost.pr-poll-registration")
+calls_before=$(wc -l < "$CASE/gh.calls")
+for again in 1 2; do
+  out=$(run_pass)
+  [ -z "$out" ] || fail "pass $again after the re-arm reported again: $out"
+done
+[ "$calls_before" -eq "$(wc -l < "$CASE/gh.calls")" ] || fail 'a record with a published poll reached the registrar again'
+[ "$poll_before" = "$(shasum -a 256 "$CASE/home/state/lost.check.sh" "$CASE/home/state/lost.pr-poll" "$CASE/home/state/lost.pr-poll-registration")" ] \
+  || fail 'a later pass replaced the published poll'
+[ "$(pr_ready_events)" -eq 1 ] || fail 'a later pass wrote a second pr_ready event'
+[ "$(grep -c '^pr=' "$CASE/home/state/lost.meta")" -eq 1 ] || fail 'the record holds more than one pr='
+# A registration file left without its check is part of a published poll, not a lost one.
+make_case partial-poll
+write_ship partial ship direct-PR
+printf 'pr=%s\n' "$URL" >> "$CASE/home/state/partial.meta"
+printf 'fm-pr-poll-registration-v2\n' > "$CASE/home/state/partial.pr-poll-registration"
+out=$(run_pass)
+[ -z "$out" ] && [ ! -s "$CASE/gh.calls" ] || fail "a partly published poll was re-armed: $out"
+[ ! -e "$CASE/home/state/partial.check.sh" ] || fail 'a partly published poll gained a second check'
+pass 'a lost poll is re-armed once with one pr_ready event; a published or partly published poll is never registered again'

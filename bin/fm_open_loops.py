@@ -29,6 +29,11 @@ DEFAULT_AGES = {
     "failed_task": 1800, "stalled_worker": 3600, "unlanded_commit": 86400,
     "open_pr": 3600, "review_pass_not_merged": 600, "red_check": 0, "coverage": 0, "silent_report": 900,
 }
+# Finished or unaccepted work with an open record adds rows, never a timer: each borrows an existing age class.
+AGE_CLASS = {"pending_cleanup": "interrupted_teardown", "pending_acceptance": "open_pr"}
+# bin/fm-dod-lib.sh's refusal of a done claim because the no-mistakes daemon is down: a wait. A refusal because no
+# run exists or the run is otherwise unreadable is not this wait and keeps its row.
+NM_DAEMON_DOWN = "the no-mistakes daemon is down"
 CHECK_IN_TEXT = ("Check in: report progress, blockers, and cross-workstream dependencies that need resolution. "
                  "Reply through your supervised status/report channel before acknowledging this inbox message; "
                  "secondmates must preserve the request correlation in their parent-channel reply. "
@@ -299,7 +304,7 @@ class Collector:
         """An informational row is visible context, never an obligation: it is not overdue at any age."""
         identity = hashlib.sha256(f"{self.home}\0{category}\0{subject}".encode()).hexdigest()[:24]
         age = None if since is None or since > self.now else self.now - since
-        limit = self.ages[category]
+        limit = self.ages[AGE_CLASS.get(category, category)]
         row = dict(id=identity, category=category, subject=str(subject), owner=owner,
                    next_action=action, age_seconds=age, limit_seconds=limit,
                    overdue=not informational and (age is None or age >= limit), evidence=str(evidence)[:400])
@@ -691,8 +696,10 @@ class Collector:
         return any(record["id"] == task["id"] and record.get("captain_drop") for record in self.backlog)
 
     def deliverable_landed(self, task):
-        if self.captain_dropped(task):
-            return True
+        return self.captain_dropped(task) or self.copy_landed(task)
+
+    def copy_landed(self, task):
+        """The task's own report or copy carries its deliverable, whatever a recorded ruling says."""
         if task["kind"] == "scout":
             report = self.data / task["id"] / "report.md"
             return report.is_file() and not report.is_symlink() and report.stat().st_size > 0
@@ -1077,6 +1084,143 @@ class Collector:
                 value = line[len("spawn_gen="):]
         return value
 
+    def home_label(self):
+        """The home that owns this ledger's records: a secondmate's id in its own home, else the primary."""
+        if self.lane:
+            first = (self.home / ".fm-secondmate-home").read_text().splitlines()[:1]
+            return re.sub(r"\s", "", first[0]) if first else "secondmate"
+        return "firstmate"
+
+    def teardown_refusal(self, task_id):
+        """The newest refusal of this task's plain teardown on record, or empty.
+
+        Two owners record one: bin/fm-merge-prune.sh keeps it in state/<id>.merge-prune (state=retained), and
+        bin/fm-idle-session-reap.sh in state/.idle-reap/<id>.refused (fm-idle-reap-refused-v1: epoch, status line,
+        reason). A manual teardown records nothing.
+        """
+        found = []
+        prune = self.state / (task_id + ".merge-prune")
+        try:
+            fields = dict(line.split("=", 1) for line in prune.read_text().splitlines() if "=" in line)
+            if fields.get("state") == "retained" and fields.get("reason"):
+                found.append((mtime(prune) or 0, fields["reason"]))
+        except OSError:
+            pass
+        try:
+            memo = (self.state / ".idle-reap" / (task_id + ".refused")).read_text().splitlines()
+            if len(memo) >= 4 and memo[0] == "fm-idle-reap-refused-v1" and memo[3] and memo[1].isdigit():
+                found.append((int(memo[1]), memo[3]))
+        except OSError:
+            pass
+        return max(found)[1] if found else ""
+
+    def covering_rows(self, ident, pr_url):
+        """The rows another source already raised for this task: its own subject, a keyed subject, or its PR."""
+        return [r for r in self.rows.values() if r["category"] not in ("silent_report", "coverage")
+                and (r["subject"] == ident or r["subject"].startswith(ident + ":") or (pr_url and r["subject"] == pr_url))]
+
+    def finished_class(self, task):
+        """Why a task whose deliverable is landed counts as finished, in words for the row's evidence."""
+        if self.captain_dropped(task):
+            return "a recorded ruling drops or supersedes it", None
+        if task["kind"] == "scout":
+            return "its scout report is delivered", None
+        pr = self.pr_state(task["pr"]["url"]) if task["pr"].get("url") else None
+        if pr and pr.get("merged_at"):
+            return "its PR merged: " + task["pr"]["url"], epoch(pr.get("merged_at"))
+        return "its work is already on the default branch", None
+
+    def completion_rows(self):
+        """Every open record whose work was reported done has a row until its record is gone.
+
+        A deliverable that is landed, delivered or ruled moot leaves the record awaiting plain teardown
+        (pending_cleanup); a done report with no accepted deliverable and no other row for the task awaits
+        acceptance (pending_acceptance). Both are derived from the records alone, so a restart finds the same
+        rows. A declared wait, an unanswered decision and a worker that is still running on an item the backlog
+        has not closed (a no-mistakes pipeline runs after the handoff `done`) own the task's next move and add
+        neither; a persistent secondmate is not in self.tasks. A recorded teardown refusal stays on the task's own
+        row, else on every row that covers the task.
+        """
+        owner = "home:" + self.home_label()
+        for task in self.tasks:
+            self.source("completion " + task["id"], self.completion_row, task, owner)
+
+    def completion_row(self, task, owner):
+        """One task's completion row; see completion_rows."""
+        ident = task["id"]
+        pr_url = task["pr"].get("url")
+        refusal = self.teardown_refusal(ident)
+        refused = (f"plain bin/fm-teardown.sh {ident} ended in a refusal: {refusal}; the owning home clears that cause and "
+                   "runs it again (dropping the work needs the captain's own words)") if refusal else ""
+        _, verb, open_decision, pause_limit, _, _ = self.report_status(ident)
+        state = task["current_state"].get("state")
+        detail = task["current_state"].get("detail") or ""
+        closed = any(r["id"] == ident and r.get("state") == "done" for r in self.backlog) \
+            or self.captain_dropped(task)
+        done_refused = verb == "done" and state == "blocked" and not closed and NM_DAEMON_DOWN not in detail
+        if not (closed or verb == "done" or state == "done") or open_decision or pause_limit \
+                or (state in ("working", "paused", "blocked", "parked") and not closed and not done_refused):
+            self.attach_refusal(ident, pr_url, refusal, refused)
+            return
+        since = mtime(self.state / (ident + ".status")) or mtime(self.state / (ident + ".meta"))
+        if done_refused:
+            if self.covering_rows(ident, pr_url):
+                self.attach_refusal(ident, pr_url, refusal, refused)
+                return
+            self.add("pending_acceptance", ident, f"resolve the ship-done gate's refusal of the done claim of {ident}: {detail}"
+                     + (f"; {refused}" if refused else ""), since, "firstmate",
+                     evidence=(f"last teardown refusal: {refusal}; " if refusal else "")
+                              + "the last report was done and the ship-done gate did not accept it")
+            return
+        landed = self.source("finished deliverable " + ident, self.deliverable_landed, task)
+        if landed:
+            why, merged_at = self.finished_class(task)
+            row_owner = owner
+            action = f"run plain bin/fm-teardown.sh {ident}; the record stays open until it succeeds"
+            if task["kind"] == "scout":
+                action = f"accept the delivered report, then run plain bin/fm-teardown.sh {ident}; the record stays open until it succeeds"
+            if refused:
+                action = refused
+            if self.captain_dropped(task) and task["kind"] != "scout" \
+                    and not self.source("dropped copy " + ident, self.copy_landed, task):
+                words = self.data / ident / "captain-drop.md"
+                row_owner = "firstmate"
+                if words.is_file() and not words.is_symlink() and words.stat().st_size > 0:
+                    action = (f"Main runs bin/fm-teardown.sh {ident} --force --drop-file {words} attended, citing the "
+                              "recorded drop ruling, because the copy holds work no PR or default branch carries; "
+                              "the ledger never runs it")
+                else:
+                    action = (f"the copy of {ident} holds work no PR or default branch carries and no captain's drop "
+                              f"words are recorded at {words}: Main needs the captain's own words before an attended "
+                              f"bin/fm-teardown.sh {ident} --force --drop-file")
+                if refusal:
+                    action = f"{action}; the last plain teardown ended in a refusal: {refusal}"
+            self.add("pending_cleanup", ident, action, merged_at or since, row_owner,
+                     evidence=(f"last teardown refusal: {refusal}; " if refusal else "")
+                              + f"finished: {why}; the record is still open")
+            return
+        if self.covering_rows(ident, pr_url):
+            self.attach_refusal(ident, pr_url, refusal, refused)
+            return
+        gone = task["endpoint"].get("exists") is False or task["endpoint"].get("agent_alive") in ("dead", "missing")
+        action = (f"review and accept the delivered work of {ident}, or relaunch its worker with "
+                  f"bin/fm-control.sh {ident} relaunch if it is incomplete" if gone else
+                  f"review and accept the delivered work of {ident}; its worker is still live")
+        if refused:
+            action = f"{action}; {refused}"
+        self.add("pending_acceptance", ident, action, since, owner,
+                 evidence=(f"last teardown refusal: {refusal}; " if refusal else "")
+                          + "the last report was done and no accepted or landed deliverable is on record"
+                          + ("; landing could not be read" if landed is None else ""))
+
+    def attach_refusal(self, ident, pr_url, refusal, refused):
+        """A recorded teardown refusal stays on every row that already covers the task."""
+        if not refusal:
+            return
+        for row in self.covering_rows(ident, pr_url):
+            row["next_action"] = f"{row['next_action']}; {refused}"
+            row["evidence"] = f"last teardown refusal: {refusal}; {row['evidence']}"[:400]
+
     def interrupted_teardown_rows(self):
         """A teardown that closed a pool task but has not returned its slot leaves a record naming that task."""
         for marker in self.state_files:
@@ -1120,6 +1264,7 @@ class Collector:
         self.source("questions", self.question_rows)
         self.source("board answers", self.board_answer_rows)
         self.source("interrupted teardowns", self.interrupted_teardown_rows)
+        self.source("completion", self.completion_rows)
         if self.degraded:
             self.add("coverage", "ledger degraded", "restore the unreadable sources and rerun the reconciler",
                      None, evidence="; ".join(self.degraded))

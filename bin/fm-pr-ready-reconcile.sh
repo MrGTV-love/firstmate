@@ -2,11 +2,17 @@
 # Register this home's unrecorded ready ship PRs through fm-pr-check.sh.
 # Usage: fm-pr-ready-reconcile.sh
 # Every pass admits at most eight task records, rotating after the last admitted
-# record. Only kind=ship with mode=no-mistakes or direct-PR and no pr= is eligible.
+# record. Only kind=ship with mode=no-mistakes or direct-PR is eligible: one with no
+# pr= is registered from its ready note below, and one whose recorded pr= has no
+# published merge poll (the registrar was interrupted between committing pr= and
+# publishing the poll) is registered again for that recorded PR, unless a merge
+# notification, a pending poll retirement, an armed prune or a pending slot return
+# says the poll ended on purpose. That re-arm is the same registrar call, so the
+# merge poll then finds a merge nobody told this home about.
 # Read at most the final 64 KiB / 200 lines of each eligible status log. The
 # window comes from fm-status-event-lib.sh and the ready gate from fm-dod-lib.sh,
 # not a second status grammar, and the PR is the one the ready note declares as
-# `PR <url>`.
+# `PR <url>` or as its first word (the note's own URL, bin/fm-dod-lib.sh).
 # The newest ready declaration in that window wins, even when subsequent
 # resolution notes follow it. A no-mistakes ship with no ready declaration is
 # registered when fm-crew-state.sh reads its run as `checks green: PR ready for
@@ -88,9 +94,21 @@ crew_state_ready_url() {  # <id>
   printf '%s' "${component##*: }"
 }
 
+# 0 when <id> has a recorded pr= but no part of a merge poll was ever published and
+# nothing marks the poll as ended: a merge-notified marker, a pending retirement,
+# an armed prune record, a pending slot return and any published poll file
+# (sidecar, registration or check) all leave the record alone.
+pr_poll_lost() {  # <id>
+  local id=$1 suffix
+  for suffix in pr-poll-merge-notified pr-poll-retirement merge-prune teardown-return-pending check.sh pr-poll pr-poll-registration; do
+    [ ! -e "$STATE/$id.$suffix" ] && [ ! -L "$STATE/$id.$suffix" ] || return 1
+  done
+  return 0
+}
+
 # Metadata is read once, without sourcing worker-controlled bytes.
 reconcile_one() {  # <meta> <id>
-  local meta=$1 id=$2 line kind='' mode='' pr='' note url=''
+  local meta=$1 id=$2 line kind='' mode='' pr='' note url='' registered='registered'
   local ready='' refusal="$CACHE/$2.refused" refused_at output age previous='' rc=0
   if [ ! -f "$meta" ] || [ -L "$meta" ] || [ ! -r "$meta" ]; then
     printf 'pr-ready: %s: unreadable task record; skipped\n' "$id"
@@ -107,15 +125,20 @@ reconcile_one() {  # <meta> <id>
       pr=*) pr=${line#pr=} ;;
     esac
   done <<< "$output"
-  [ "$kind" = ship ] && [ -z "$pr" ] || return 0
+  [ "$kind" = ship ] || return 0
   case "$mode" in no-mistakes|direct-PR) ;; *) return 0 ;; esac
+  [ -z "$pr" ] || pr_poll_lost "$id" || return 0
   if [ -e "$refusal" ] || [ -L "$refusal" ]; then
     refused_at=$(_fm_status_file_mtime "$refusal") || refused_at=0
     age=$(($(date +%s) - ${refused_at:-0}))
     [ "$age" -lt 0 ] || [ "$age" -ge "$REFUSAL_RETRY_SECS" ] || return 0
   fi
   output=
-  if [ -e "$STATE/$id.status" ] || [ -L "$STATE/$id.status" ]; then
+  if [ -n "$pr" ]; then
+    # The PR is already recorded: only its merge poll is missing.
+    url=$pr
+    registered='re-armed the merge poll for'
+  elif [ -e "$STATE/$id.status" ] || [ -L "$STATE/$id.status" ]; then
     if [ ! -f "$STATE/$id.status" ] || [ -L "$STATE/$id.status" ] || [ ! -r "$STATE/$id.status" ] \
       || ! tail -c 65536 "$STATE/$id.status" > "$SCRATCH" 2>/dev/null; then
       printf 'pr-ready: %s: unreadable status log; skipped\n' "$id"
@@ -130,7 +153,9 @@ reconcile_one() {  # <meta> <id>
     fm_dod_should_gate_ship_done ship "$mode" "$line" || continue
     ready=$line
   done <<< "$output"
-  if [ -n "$ready" ]; then
+  if [ -n "$pr" ]; then
+    :
+  elif [ -n "$ready" ]; then
     status_line_note "$ready" note
     url=$(fm_dod_pr_url_from_done_note "$note") || return 0
   else
@@ -145,7 +170,7 @@ reconcile_one() {  # <meta> <id>
   if output=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DOD_NM_STALL_SECS="$CREW_STATE_STALL_SECS" \
     "$SCRIPT_DIR/fm-pr-check.sh" "$id" "$url" 2>&1); then
     rm -f -- "$refusal"
-    printf 'pr-ready: %s: registered %s\n' "$id" "$url"
+    printf 'pr-ready: %s: %s %s\n' "$id" "$registered" "$url"
   elif [ "$?" -eq 75 ]; then
     # The run did not answer, so nothing was refused: no new wake, and the last
     # refusal memo stays as it is, so a repeat of that refusal is not woken twice;
