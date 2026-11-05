@@ -192,7 +192,8 @@ if (($ARGV[0] // '') eq 'gate') {
     # it, and every other process named shellcheck: the table reduced to
     # { total => KiB in all of them, gates => { gate pid => [process set, start,
     #   running] }, outside => KiB not in a gate's tree }. A gate's own table and
-    # owner reads (ps, fm-proc-info.py table or memory) are not in its set, so a
+    # owner reads (ps, fm-proc-info.py table or memory, also seen as a bare or
+    # parenthesized command name or a <defunct> row) are not in its set, so a
     # gate runs only once its command has started.
     my $host_view = sub {
         my ($table) = @_;
@@ -205,7 +206,7 @@ if (($ARGV[0] // '') eq 'gate') {
             # carries those words later in its arguments (check, timeout) is not one.
             next unless ($table->{$pid}[3] // '') =~ m{\A\S*perl\S*\s+(?:-\S+\s+)*\S*fm-lint-cache\.pl\s+gate\s};
             my (@queue, %set) = grep {
-                ($table->{$_}[3] // '') !~ m{\A(?:\S*/)?ps\s|\A\S*sh\s+\S*/ps\s|\A\S*(?i:python)\S*\s+(?:-\S+\s+)*\S*fm-proc-info\.py\s+(?:table|memory)\b}
+                ($table->{$_}[3] // '') !~ m{\A(?:\S*/)?ps\s|\A\S*sh\s+\S*/ps\s|\A\S*(?i:python)\S*\s+(?:-\S+\s+)*\S*fm-proc-info\.py\s+(?:table|memory)\b|\A\(?\S*(?i:python)\S*\)?\z|\A\(\S+\)\z|\A(?:\[\S+\]\s+)?<defunct>\z}
             } @{$children{$pid} // []};
             $set{$pid} = 1;
             while (defined(my $member = shift @queue)) {
@@ -446,7 +447,7 @@ if (($ARGV[0] // '') eq 'gate') {
                 next if $pid == $$ || $paused{$pid};
                 my $row = $table->{$pid} or next;
                 next if $row->[1] < 8192
-                    || $row->[3] =~ m{\A\S*(?i:perl|bash|python)\S*\s+(?:-\S+\s+)*\S*(?:fm-lint-cache\.pl|fm-lint\.sh|fm-proc-info\.py)\b};
+                    || $row->[3] =~ m{\A\S*(?i:perl|bash|python)\S*\s+(?:-\S+\s+)*\S*(?:fm-lint-cache\.pl|fm-lint\.sh|fm-proc-info\.py)\b|\A\(?\S*(?i:python)\S*\)?\z};
                 $paused{$pid} = 1 if kill 'STOP', $pid;
             }
         } elsif (%paused) {

@@ -940,6 +940,109 @@ test_growing_roots_are_held_to_the_budget_across_pools() {
   pass "growing roots from four pools stay within the budget plus one root and all finish; without a budget they stack (${all[*]} as budget:peak MiB:alive)"
 }
 
+# fm_lint_child_of <parent-pid> <command>: the pid of a direct child of
+# <parent-pid> whose whole command is <command>, waiting up to 10 s.
+fm_lint_child_of() {
+  local deadline=$((SECONDS + 10)) pid
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    pid=$(ps -axo pid=,ppid=,command= | awk -v parent="$1" -v want="$2" '{
+      pid = $1; ppid = $2; $1 = ""; $2 = ""; sub(/^ +/, ""); sub(/ +$/, "")
+      if (ppid == parent && $0 == want) { print pid; exit }
+    }')
+    [ -n "$pid" ] && { printf '%s\n' "$pid"; return 0; }
+    sleep 0.1
+  done
+  return 1
+}
+
+test_a_waiting_gate_reading_the_table_never_stops_a_younger_running_root() {
+  local tmp py waiter runner deadline helper
+  py=$(python3 -c 'import os, sys; print(os.path.realpath(sys.executable))' 2>/dev/null) \
+    || { pass "SKIP (python3 not resolved): a waiting gate's table read"; return; }
+  tmp=$(fm_test_tmproot fm-lint-waiting-reader)
+  mkdir -p "$tmp/refuse" "$tmp/hide" "$tmp/gate" "$tmp/MacOS"
+  printf '#!/bin/sh\nexit 1\n' > "$tmp/refuse/ps"
+  chmod +x "$tmp/refuse/ps"
+  ln -s "$py" "$tmp/MacOS/Python"
+  cp "$ROOT/bin/fm-lint-cache.pl" "$tmp/gate/fm-lint-cache.pl"
+  printf 'import time\ntime.sleep(60)\n' > "$tmp/gate/fm-proc-info.py"
+  fm_lint_hide_outside_shellcheck "$tmp/hide"
+  # The older gate's turn reads the process table through the libproc helper
+  # beside it, because ps is refused; that helper runs under an interpreter named
+  # Python and does not answer for 60 s, so the gate waits with that one child.
+  PATH="$tmp/refuse:$PATH" FM_LINT_INTERNAL_PYTHON="$tmp/MacOS/Python" FM_LINT_HOST_RSS_KIB=1000000 \
+    perl "$tmp/gate/fm-lint-cache.pl" gate "$tmp/waiting-pool" 2 waiting "$tmp/waiting.wait" -- true &
+  waiter=$!
+  helper=$(fm_lint_child_of "$waiter" "$tmp/MacOS/Python $tmp/gate/fm-proc-info.py table pid,ppid,command") \
+    || { kill -KILL "$waiter" 2>/dev/null; fail "the waiting gate never started its table read"; }
+  sleep 1.2
+  # The younger gate runs a root of 80 MiB against a 40000 KiB budget. Only a
+  # gate that is not the oldest running gate stops its own root, so this root
+  # must run to its end while the older gate still waits.
+  PATH="$tmp/hide:$PATH" FM_TEST_GATE_POOL_PREFIX="$tmp/" FM_LINT_HOST_RSS_KIB=40000 FM_LINT_INTERNAL_ROOT_CAP_KIB=1024 \
+    perl "$ROOT/bin/fm-lint-cache.pl" gate "$tmp/running-pool" 2 running "$tmp/running.wait" -- \
+    perl -e '$x = "x" x (80 * 1048576); select(undef, undef, undef, 3); exit 0' &
+  runner=$!
+  deadline=$((SECONDS + 20))
+  while kill -0 "$runner" 2>/dev/null && [ "$SECONDS" -lt "$deadline" ]; do sleep 0.2; done
+  if kill -0 "$runner" 2>/dev/null; then
+    pkill -KILL -P "$runner" 2>/dev/null; kill -KILL "$runner" 2>/dev/null
+    pkill -KILL -P "$waiter" 2>/dev/null; kill -KILL "$waiter" 2>/dev/null
+    wait "$runner" "$waiter" 2>/dev/null
+    fail "a younger root over the budget was held back while an older gate only waited on its table read"
+  fi
+  wait "$runner" || fail "the younger root failed while an older gate waited on its table read"
+  kill -0 "$helper" 2>/dev/null || fail "the older gate's table read ended before the younger root, so this test proved nothing"
+  pkill -KILL -P "$waiter" 2>/dev/null; kill -KILL "$waiter" 2>/dev/null
+  wait "$waiter" 2>/dev/null
+  pass "a waiting gate whose only child is its own table read is not the oldest running gate, so a younger root over the budget runs on"
+}
+
+test_growth_guard_never_stops_the_watch_reader() {
+  local tmp py older younger deadline rows reader standin reader_stopped=0 standin_stopped=0
+  [ "$(uname)" = Darwin ] || { pass "SKIP (not macOS): the resident watch's reader runs only on macOS"; return; }
+  py=$(python3 -c 'import os, sys; print(os.path.realpath(sys.executable))' 2>/dev/null) \
+    || { pass "SKIP (python3 not resolved): the resident watch's reader"; return; }
+  tmp=$(fm_test_tmproot fm-lint-guard-reader)
+  mkdir -p "$tmp/MacOS" "$tmp/hide"
+  # The reader runs under an interpreter named Python, as the Command Line Tools
+  # and python.org installs show it.
+  ln -s "$py" "$tmp/MacOS/Python"
+  fm_lint_hide_outside_shellcheck "$tmp/hide"
+  PATH="$tmp/hide:$PATH" FM_TEST_GATE_POOL_PREFIX="$tmp/" FM_LINT_HOST_RSS_KIB=1000000000 \
+    perl "$ROOT/bin/fm-lint-cache.pl" gate "$tmp/older-pool" 2 older "$tmp/older.wait" -- perl -e 'sleep 30' &
+  older=$!
+  fm_lint_child_of "$older" "perl -e sleep 30" > /dev/null || { kill -KILL "$older" 2>/dev/null; fail "the older gate never started its root"; }
+  sleep 1.2
+  # The younger gate is not the oldest and its watched root of 80 MiB is over its
+  # 40000 KiB budget, so its guard stops that root; it must never stop the
+  # watch's own reader.
+  PATH="$tmp/hide:$PATH" FM_TEST_GATE_POOL_PREFIX="$tmp/" FM_LINT_HOST_RSS_KIB=40000 FM_LINT_INTERNAL_ROOT_CAP_KIB=1024 \
+    FM_LINT_INTERNAL_PYTHON="$tmp/MacOS/Python" \
+    perl "$ROOT/bin/fm-lint-cache.pl" gate "$tmp/younger-pool" 2 younger "$tmp/younger.wait" -- \
+    perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 8388608 "$tmp/rss" -- \
+    perl -e '$x = "x" x (80 * 1048576); sleep 20' &
+  younger=$!
+  deadline=$((SECONDS + 8))
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    rows=$(ps -axo pid=,stat=,command=)
+    reader=$(printf '%s\n' "$rows" | awk -v want="$tmp/MacOS/Python" '$3 == want && $5 == "mem-tree" { print $2 }')
+    standin=$(printf '%s\n' "$rows" | awk '$3 == "perl" && $4 == "-e" && index($0, "80 * 1048576") { print $2 }')
+    case "$reader" in *T*) reader_stopped=1 ;; esac
+    case "$standin" in *T*) standin_stopped=1 ;; esac
+    sleep 0.1
+  done
+  kill -TERM "$younger" 2>/dev/null
+  wait "$younger" 2>/dev/null
+  pkill -KILL -P "$older" 2>/dev/null; kill -KILL "$older" 2>/dev/null
+  wait "$older" 2>/dev/null
+  [ "$standin_stopped" -eq 1 ] || fail "the guard never stopped the root over the budget, so this test proved nothing"
+  [ "$reader_stopped" -eq 0 ] || fail "the growth guard stopped the resident watch's reader"
+  ! grep -q '^rss_reader_unavailable=' "$tmp/rss" 2>/dev/null \
+    || fail "the resident watch lost its reader under the growth guard: $(cat "$tmp/rss")"
+  pass "the growth guard stops a root over the budget but never the resident watch's reader, also under an interpreter named Python"
+}
+
 test_a_wrapper_around_the_real_shellcheck_shares_the_host_wide_memory_bound() {
   local tmp rc out outside pid deadline real fixture mark
   pinned_ready || { pass "SKIP (ShellCheck $REQUIRED not resolved): wrapper around the real ShellCheck"; return; }
@@ -2650,6 +2753,8 @@ test_cached_success_does_not_wait_for_host_slots
 test_slot_pool_cannot_be_disabled_and_refuses_bad_settings
 test_slot_file_failures_refuse_and_never_run_unbounded
 test_growing_roots_are_held_to_the_budget_across_pools
+test_a_waiting_gate_reading_the_table_never_stops_a_younger_running_root
+test_growth_guard_never_stops_the_watch_reader
 test_a_wrapper_around_the_real_shellcheck_shares_the_host_wide_memory_bound
 test_memory_budget_bounds_the_aggregate_across_homes
 test_root_larger_than_the_budget_runs_alone_and_a_killed_run_frees_its_charge
