@@ -25,7 +25,31 @@ def valid_record:
       and (if $kind == "pr" then (.head | sha) and (.draft | type == "boolean")
         and (.mergeable | IN("mergeable","conflicting","unknown")) and (.can_merge | type == "boolean")
         and (.review_decision | IN("","APPROVED","CHANGES_REQUESTED","REVIEW_REQUIRED"))
+        and (.base_sha == null or (.base_sha | sha))
+        and (.base_containment == null or (.base_containment |
+          (.tip | sha) and (.built_on | sha)
+          and (.behind_by | type == "number" and . >= 0 and . == floor)))
+        and (.review_verification == null or (.review_verification | type == "object"))
         else (.ready | type == "boolean") end))))) catch false;
+# A typed verifier answer is evidence, not an independently implemented review policy.
+def review_state($fact; $url; $head; $task; $base):
+  try (if $fact.pr != $url or $fact.head != $head or $fact.task != $task
+      or ($base | sha | not) or $fact.base != $base
+      or $fact.answer.schema != "fm-review-verification.v1" then "unknown"
+    elif $fact.answer.ok == false and $fact.answer.error.kind == "not-qualified" then "not-qualified"
+    elif $fact.answer.ok == true and $fact.answer.basis == "independent-review"
+      and $fact.answer.pr == $url and $fact.answer.head == $head
+      and ($fact.answer.at | type == "number" and . >= 0 and . == floor)
+      and ($fact.answer.reader_model | type == "string" and length > 0)
+      and ($fact.answer.reader_family | type == "string" and length > 0)
+      and ($fact.answer.author_groups | type == "object" and length > 0)
+    then "qualified" else "unknown" end) catch "unknown";
+def ordinary_merge_action($o; $review):
+  if $o.base_containment == null then {actor:"fleet",reason:"base freshness unknown; refresh the base comparison"}
+  elif $o.base_containment.behind_by > 0 then {actor:"fleet",reason:"update the branch; base is stale"}
+  elif $review == "not-qualified" then {actor:"fleet",reason:"route the independent review"}
+  elif $review != "qualified" then {actor:"fleet",reason:"PASS fact unknown; recheck the independent review"}
+  else {actor:"fleet",reason:"merge under the standing merge rule"} end;
 def known($input; $saved):
   ([($input.tasks // [])[] | select(.kind != "secondmate")
      | select(.pr.url | canonical_url) | {task:.id,url:.pr.url}]
@@ -89,13 +113,18 @@ def projected($input; $saved; $now; $max_age):
        elif ($checks | length) == 0 then {actor:"fleet",reason:"no reported checks; readiness unconfirmed"}
        elif ($pending | length) > 0 then {actor:"fleet",reason:"checks still running"}
        elif $o.review_decision == "CHANGES_REQUESTED" then {actor:"fleet",reason:"forge requests changes"}
+       elif $verdict != null and $verdict.actor == "fleet"
+         and $o.can_merge == true and $o.review_decision != "REVIEW_REQUIRED"
+         and $merge_authority != "away" and ($o.base_containment.behind_by // 0) > 0 then
+         ordinary_merge_action($o; "unknown")
        elif $verdict != null and $verdict.actor == "fleet" then {actor:"fleet",reason:$verdict.summary}
        elif $verdict != null and $verdict.actor == "captain" then
          {actor:"fleet",reason:"record the unresolved arbitration as a captain hold"}
        elif $o.review_decision == "REVIEW_REQUIRED" then {actor:"maintainer",reason:"review required"}
        elif $o.can_merge == true and $merge_authority == "away" then
          {actor:"fleet",reason:"checks green; merge is authorized by delivery posture"}
-       elif $o.can_merge == true then {actor:"captain",reason:"checks green; merge approval needed"}
+       elif $o.can_merge == true then
+         ordinary_merge_action($o; review_state($o.review_verification; $k.url; $observed_head; $k.task; $o.base_sha))
        else {actor:"maintainer",reason:"delivery awaits the maintainer"} end) as $action
     | $k + {kind:($record.kind // (if ($k.url | contains("/issues/")) then "issue" else "pr" end)),
          checked_at:$record.checked_at,checked:$fresh,final:$final,head:($observed_head // $recorded_head // $o.head),verdict:$verdict,reviews:$reviews,

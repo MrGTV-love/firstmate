@@ -124,8 +124,9 @@ case "$*" in
   'pr view '*headRefOid*) cat "$FORGE/head" ;;
   'pr view '*state*) printf 'OPEN\n' ;;
   'api repos/o/r/pulls/8'|'api repos/o/r/pulls/9'|'api repos/o/r/pulls/10')
-    jq -n --arg head "$(cat "$FORGE/head")" --arg state "$(cat "$FORGE/state" 2>/dev/null || printf open)" '
-      {state:(if $state == "open" then "open" else "closed" end),user:{login:"author"},head:{sha:$head},draft:false,
+    jq -n --arg head "$(cat "$FORGE/head")" --arg state "$(cat "$FORGE/state" 2>/dev/null || printf open)" \
+      --arg base "$(cat "$FORGE/base" 2>/dev/null || true)" --arg ref "$(cat "$FORGE/base-ref" 2>/dev/null || true)" '
+      {base:{sha:$base,ref:$ref},state:(if $state == "open" then "open" else "closed" end),user:{login:"author"},head:{sha:$head},draft:false,
        mergeable:(if $state == "open" then true else null end),
        merged_at:(if $state == "merged" then "2026-09-16T07:00:00Z" else null end)}' ;;
   'api repos/o/r/issues/9')
@@ -135,9 +136,18 @@ case "$*" in
   'api repos/o/r/pulls/'*'/reviews?'*) jq -c . "$FORGE/reviews.json" ;;
   'api repos/o/r/pulls/'*'/comments?'*) jq -c . "$FORGE/inline.json" ;;
   'api repos/o/r/commits/'*'/check-runs?'*)
+    if [ -f "$FORGE/checks.json" ]; then cat "$FORGE/checks.json"; exit 0; fi
     printf '{"check_runs":[{"name":"test","id":1,"status":"completed","conclusion":"success","started_at":"2026-09-16T08:00:00Z"}]}\n' ;;
   'api repos/o/r/commits/'*'/statuses?'*) printf '[]\n' ;;
-  'api repos/o/r') printf '{"permissions":{"push":false}}\n' ;;
+  'api repos/o/r/compare/'*)
+    [ ! -e "$FORGE/compare-fail" ] || exit 1
+    if [ -e "$FORGE/compare-corrupt" ]; then printf '{}\n'; exit 0; fi
+    expected=$(jq -rn --rawfile ref "$FORGE/base-ref" '$ref | rtrimstr("\n") | @uri')
+    [ "$*" = "api repos/o/r/compare/$expected...$(cat "$FORGE/head")?per_page=1" ] || exit 1
+    jq -n --arg base "$(cat "$FORGE/base-tip" 2>/dev/null || cat "$FORGE/base")" \
+      --arg built "$(cat "$FORGE/base")" --argjson behind "$(cat "$FORGE/behind")" \
+      '{base_commit:{sha:$base},merge_base_commit:{sha:$built},behind_by:$behind}' ;;
+  'api repos/o/r') jq -n --argjson push "$(cat "$FORGE/push" 2>/dev/null || printf false)" '{permissions:{push:$push}}' ;;
   *) printf 'unexpected gh fixture call: %s\n' "$*" >&2; exit 1 ;;
 esac
 SH
@@ -150,7 +160,7 @@ with_home() {
   PATH="$home/fakebin:$PATH" FORGE="$home/forge" HEAD_A="$HEAD_A" GH_SHIM_LOG="$home/forge/shim.log" \
     FM_HOME="$home" FM_ROOT_OVERRIDE="$home/root" FM_STATE_OVERRIDE="$home/state" \
     FM_DATA_OVERRIDE="$home/data" FM_CONFIG_OVERRIDE="$home/config" \
-    FM_CONTRIBUTIONS_NOW="$NOW" "$@"
+    NM_HOME="$home/nm-home" FM_SNAPSHOT_NOW="${FM_SNAPSHOT_NOW:-$NOW}" FM_CONTRIBUTIONS_NOW="$NOW" "$@"
 }
 
 registered_checks() {
@@ -1598,8 +1608,372 @@ test_http_shim_preserves_backend_failures() {
   pass 'HTTP and passthrough shims preserve backend failures without a successful response'
 }
 
+# Ordinary merge ownership is exercised through poll and the saved-record projection.
+merge_snapshot() {
+  local home=$1
+  with_home "$home" bash "$ROOT/bin/fm-fleet-snapshot.sh" --contribution-input > "$home/input.json" || return
+  with_home "$home" bash "$ROOT/bin/fm-contributions.sh" snapshot "$home/input.json" --all
+}
+
+expect_merge_action() { # home reason [actor]
+  local out
+  out=$(merge_snapshot "$1") || fail 'merge snapshot failed'
+  printf '%s' "$out" | jq -e --arg reason "$2" --arg actor "${3:-fleet}" '
+    .unreadable_records == 0 and .rows[0].actor == $actor and .rows[0].reason == $reason
+    and (if $actor == "fleet" then .counts.captain == 0 and .captain == []
+      and (if .complete then .proven_clear else (.proven_clear | not) end) else true end)' >/dev/null \
+    || fail "unexpected merge action ($2): $out"
+}
+
+merge_home() {
+  local home=$1
+  forge_home "$home"
+  fm_git_init_commit "$home/wt"
+  git -C "$home/wt" rev-parse HEAD > "$home/forge/base"
+  git -C "$home/wt" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' \
+    commit -q --allow-empty -m 'ship implementation'
+  git -C "$home/wt" rev-parse HEAD > "$home/forge/head"
+  printf 'main\n' > "$home/forge/base-ref"
+  printf '0\n' > "$home/forge/behind"
+  printf 'true\n' > "$home/forge/push"
+  printf 'worktree=%s/wt\nkind=ship\nmodel=gpt-5.1\nbranch=fm/fixture\nmode=direct-PR\n' "$home" > "$home/state/delivery.meta"
+  fm_test_empty_pipeline_db "$home/nm-home"
+  ln -s "$ROOT/bin/fm-review-record.py" "$home/root/bin/fm-review-record.py"
+}
+
+merge_review() { # home verdict [reader] [head] [escalation]
+  local home=$1 verdict=$2 reader=${3:-sonnet} head=${4:-$(cat "$1/forge/head")} escalation=${5:-no}
+  printf 'VERDICT: %s head=%s\nIndependent review.\n' "$verdict" "$head" > "$home/report.md"
+  with_home "$home" "$ROOT/bin/fm-review-record.py" review --pr https://github.com/o/r/pull/8 \
+    --head "$head" --verdict "$verdict" --reader-model "$reader" --author-groups '{"all":["gpt-5.1"]}' \
+    --loosens-deny-allow-list no --widens-guard "$escalation" --customer-data-billing-spend no \
+    --report "$home/report.md" >/dev/null || fail 'could not record review'
+}
+
+merge_poll() {
+  with_home "$1" bash "$ROOT/bin/fm-contributions.sh" poll >/dev/null || fail 'merge poll failed'
+}
+
+test_ordinary_merge_ownership() {
+  local home
+  home=$(new_home ordinary-merge)
+  merge_home "$home"
+  merge_poll "$home"
+  expect_merge_action "$home" 'route the independent review'
+  # Cache publication shares the quota lock; seed the resources sequentially
+  # so a loaded host cannot turn this local-review test into a cache-lock test.
+  local endpoint head
+  head=$(cat "$home/forge/head")
+  for endpoint in repos/o/r/pulls/8 'repos/o/r/issues/8/comments?per_page=100' \
+    'repos/o/r/pulls/8/reviews?per_page=100' 'repos/o/r/pulls/8/comments?per_page=100' \
+    "repos/o/r/commits/$head/check-runs?filter=all&per_page=100" \
+    "repos/o/r/commits/$head/statuses?per_page=100" repos/o/r "repos/o/r/compare/main...$head?per_page=1"; do
+    with_home "$home" bash "$ROOT/bin/fm-gh-rest.sh" get "$endpoint" >/dev/null || fail 'cache preparation failed'
+  done
+  : > "$home/forge/shim.log"
+  merge_review "$home" PASS
+  merge_poll "$home"
+  expect_merge_action "$home" 'merge under the standing merge rule'
+  assert_equals 0 "$(shim_count "$home" counted)" 'unchanged REST resources were unexpectedly reread'
+  [ "$(shim_count "$home" not-modified)" -ge 8 ] || fail 'the cached observation did not reuse every REST resource'
+  merge_review "$home" FAIL
+  merge_poll "$home"
+  expect_merge_action "$home" 'route the independent review'
+  merge_review "$home" PASS sonnet "$HEAD_B"
+  merge_poll "$home"
+  expect_merge_action "$home" 'route the independent review'
+  merge_review "$home" PASS gpt-5.1
+  merge_poll "$home"
+  expect_merge_action "$home" 'route the independent review'
+  merge_review "$home" PASS sonnet '' yes
+  merge_poll "$home"
+  expect_merge_action "$home" 'route the independent review'
+  rm "$home/state/review-records.jsonl"
+  with_home "$home" "$ROOT/bin/fm-review-record.py" captain-word --pr https://github.com/o/r/pull/8 \
+    --head "$(cat "$home/forge/head")" --words 'Merge this head.' >/dev/null || fail 'word fixture failed'
+  merge_poll "$home"
+  expect_merge_action "$home" 'route the independent review'
+  pass 'ordinary green ownership follows the real exact-head review-only verifier'
+}
+
+test_observed_merge_check_precedence() {
+  local home state reason
+  home=$(new_home merge-checks)
+  merge_home "$home"
+  merge_review "$home" PASS
+  while IFS='|' read -r state reason; do
+    jq -n --arg state "$state" '{check_runs:[{name:"test",id:1,started_at:"2026-09-16T08:00:00Z",
+      status:(if $state == "pending" then "in_progress" else "completed" end),
+      conclusion:(if $state == "pending" or $state == "missing" then null else $state end)}]}' > "$home/forge/checks.json"
+    merge_poll "$home"
+    expect_merge_action "$home" "$reason"
+  done <<'CHECKS'
+failure|checks failed
+pending|checks still running
+missing|check lane has no verdict
+CHECKS
+  rm "$home/forge/checks.json"
+  printf 'false\n' > "$home/forge/push"
+  merge_poll "$home"
+  expect_merge_action "$home" 'delivery awaits the maintainer' maintainer
+  pass 'a qualifying PASS cannot bypass observed failed, pending or missing checks or merge permissions'
+}
+
+test_merge_base_observation() {
+  local home
+  home=$(new_home merge-base)
+  merge_home "$home"
+  merge_review "$home" PASS
+  merge_poll "$home"
+  expect_merge_action "$home" 'merge under the standing merge rule'
+  # A branch tip can advance without any change to the pull resource's base SHA.
+  printf '%s\n' "$HEAD_B" > "$home/forge/base-tip"
+  printf '1\n' > "$home/forge/behind"
+  merge_poll "$home"
+  expect_merge_action "$home" 'update the branch; base is stale'
+  mutate_record "$home" delivery '.records[0].verdict={head:.records[0].observation.head,actor:"fleet",source:"review",summary:"merge this head now"}'
+  merge_poll "$home"
+  expect_merge_action "$home" 'update the branch; base is stale'
+  printf '0\n' > "$home/forge/behind"
+  merge_poll "$home"
+  expect_merge_action "$home" 'merge this head now'
+  mutate_record "$home" delivery '.records[0].verdict=null'
+  printf 'release/1.0\n' > "$home/forge/base-ref"
+  merge_poll "$home"
+  expect_merge_action "$home" 'merge under the standing merge rule'
+  touch "$home/forge/compare-corrupt"
+  merge_poll "$home"
+  expect_merge_action "$home" 'base freshness unknown; refresh the base comparison'
+  rm "$home/forge/compare-corrupt"
+  touch "$home/forge/compare-fail"
+  merge_poll "$home"
+  expect_merge_action "$home" 'base freshness unknown; refresh the base comparison'
+  jq -e '.records[0].observation.base_containment == null' "$home/data/delivery/contributions.json" >/dev/null \
+    || fail 'failed comparison reused an old fresh fact'
+  pass 'live encoded-base comparisons refresh stale and unknown facts before verdicts'
+}
+
+review_wrapper() {
+  local home=$1
+  rm "$home/root/bin/fm-review-record.py"
+  printf '#!/usr/bin/env bash\nRECORD=%q\n' "$ROOT/bin/fm-review-record.py" > "$home/root/bin/fm-review-record.py"
+  cat >> "$home/root/bin/fm-review-record.py" <<'SH'
+printf '%s\n' "$@" > "$FORGE/review-argv"
+case "$(cat "$FORGE/verifier-mode" 2>/dev/null || true)" in
+  fail) exit 1 ;;
+  stall) sleep 90; exit 1 ;;
+  progress) for ((n=0; n<7; n++)); do printf 'verifying\n' >&2; sleep 1; done ;;
+  corrupt) printf 'not JSON\n'; exit 0 ;;
+  payload) cat "$FORGE/verifier-payload"; exit "$(cat "$FORGE/verifier-exit")" ;;
+esac
+exec "$RECORD" "$@"
+SH
+  chmod +x "$home/root/bin/fm-review-record.py"
+}
+
+test_merge_verifier_unknowns() {
+  local home mode payload
+  home=$(new_home verifier-unknowns)
+  merge_home "$home"
+  merge_review "$home" PASS
+  review_wrapper "$home"
+  merge_poll "$home"
+  expect_merge_action "$home" 'merge under the standing merge rule'
+  printf '%s\n' verify --pr https://github.com/o/r/pull/8 --head "$(cat "$home/forge/head")" \
+    --task delivery --base "$(cat "$home/forge/base")" --review-only --json > "$home/expected-argv"
+  cmp -s "$home/expected-argv" "$home/forge/review-argv" || fail 'verifier request is not bound to the landing base and head'
+  for mode in fail corrupt stall; do
+    printf '%s\n' "$mode" > "$home/forge/verifier-mode"
+    merge_poll "$home"
+    expect_merge_action "$home" 'PASS fact unknown; recheck the independent review'
+  done
+  printf 'progress\n' > "$home/forge/verifier-mode"
+  merge_poll "$home"
+  expect_merge_action "$home" 'merge under the standing merge rule'
+  jq '.records[0].observation.review_verification.answer' "$home/data/delivery/contributions.json" > "$home/good-answer.json"
+  for payload in '.schema="wrong"' '.basis="captain-word"' '.head="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"' '.pr="https://github.com/o/r/pull/99"'; do
+    jq "$payload" "$home/good-answer.json" > "$home/forge/verifier-payload"
+    printf 'payload\n' > "$home/forge/verifier-mode"
+    printf '0\n' > "$home/forge/verifier-exit"
+    merge_poll "$home"
+    expect_merge_action "$home" 'PASS fact unknown; recheck the independent review'
+  done
+  printf '{"schema":"fm-review-verification.v1","ok":false,"error":{"kind":"unavailable","message":"unreadable"}}\n' > "$home/forge/verifier-payload"
+  printf '1\n' > "$home/forge/verifier-exit"
+  merge_poll "$home"
+  expect_merge_action "$home" 'PASS fact unknown; recheck the independent review'
+  rm "$home/root/bin/fm-review-record.py"
+  merge_poll "$home"
+  expect_merge_action "$home" 'PASS fact unknown; recheck the independent review'
+  ln -s "$ROOT/bin/fm-review-record.py" "$home/root/bin/fm-review-record.py"
+  printf 'worktree=%s/missing\nkind=ship\nmodel=gpt-5.1\n' "$home" > "$home/state/delivery.meta"
+  merge_poll "$home"
+  expect_merge_action "$home" 'PASS fact unknown; recheck the independent review'
+  pass 'missing, stalled, corrupt, unbound and unavailable review answers remain fleet unknowns; progressing reads succeed'
+}
+
+test_merge_saved_facts_and_freshness() {
+  local home initial
+  home=$(new_home saved-merge-facts)
+  merge_home "$home"
+  merge_review "$home" PASS
+  merge_poll "$home"
+  cp "$home/data/delivery/contributions.json" "$home/good.json"
+  mutate_record "$home" delivery '.records[0].observation.review_verification.head="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"'
+  expect_merge_action "$home" 'PASS fact unknown; recheck the independent review'
+  mutate_record "$home" delivery '.records[0].observation.review_verification={}'
+  expect_merge_action "$home" 'PASS fact unknown; recheck the independent review'
+  mutate_record "$home" delivery 'del(.records[0].observation.base_containment,.records[0].observation.base_sha,.records[0].observation.review_verification)'
+  expect_merge_action "$home" 'base freshness unknown; refresh the base comparison'
+  cp "$home/good.json" "$home/data/delivery/contributions.json"
+  initial=$NOW
+  NOW=2026-09-16T08:15:00Z
+  expect_merge_action "$home" 'merge under the standing merge rule'
+  NOW=2026-09-16T08:15:01Z
+  expect_merge_action "$home" 'contribution not recently checked'
+  FM_CONTRIBUTIONS_MAX_AGE=1800 expect_merge_action "$home" 'merge under the standing merge rule'
+  NOW=2026-09-16T08:30:01Z
+  FM_CONTRIBUTIONS_MAX_AGE=1800 expect_merge_action "$home" 'contribution not recently checked'
+  merge_poll "$home"
+  expect_merge_action "$home" 'merge under the standing merge rule'
+  mutate_record "$home" delivery '.records[0].observation.review_verification="malformed"'
+  merge_snapshot "$home" | jq -e '.unreadable_records == 1 and .counts.captain == 0 and .counts.fleet == 1' >/dev/null \
+    || fail 'malformed new facts bypassed strict saved-record degradation'
+  cp "$home/good.json" "$home/data/delivery/contributions.json"
+  NOW=$initial
+  set_quota "$home" 400 "$(( $(date +%s) + 3600 ))"
+  merge_poll "$home"
+  merge_snapshot "$home" | jq -e '.rows[0].actor == "fleet" and (.rows[0].reason | contains("quota low"))' >/dev/null \
+    || fail 'quota refusal kept old facts merge-ready'
+  pass 'saved fact binding, pre-fact compatibility, quota degradation and configured freshness boundaries fail safe and recover'
+}
+
+test_merge_hold_lifecycle() {
+  local home variant at out
+  for variant in live answered dated aged blocked paused; do
+    home=$(new_home "merge-hold-$variant")
+    merge_home "$home"
+    if [ "$variant" = live ]; then merge_review "$home" PASS; fi
+    merge_poll "$home"
+    at=$NOW
+    [ "$variant" != aged ] || at=2026-08-01T00:00:00Z
+    if [ "$variant" = dated ]; then
+      FM_CAPTAIN_HOLD_NOW="$at" with_home "$home" bash "$ROOT/bin/fm-captain-hold.sh" hold delivery --reason 'choose contract' --until 2099-01-01 >/dev/null || fail 'dated hold failed'
+    elif [ "$variant" != paused ]; then
+      FM_CAPTAIN_HOLD_NOW="$at" with_home "$home" bash "$ROOT/bin/fm-captain-hold.sh" hold delivery --reason 'choose contract' >/dev/null || fail 'real hold failed'
+    fi
+    case "$variant" in
+      live)
+        expect_merge_action "$home" 'choose contract' captain
+        out=$(merge_snapshot "$home")
+        printf '%s' "$out" | jq -e '.rows[0].hold == "delivery" and .counts.captain == 1 and (.proven_clear | not)' >/dev/null || fail 'live hold identity missing'
+        ;;
+      answered)
+        printf 'Use the accepted contract.\n' > "$home/decision.txt"
+        with_home "$home" bash "$ROOT/bin/fm-captain-hold.sh" answer delivery --decision-file "$home/decision.txt" --release >/dev/null || fail 'answer failed'
+        expect_merge_action "$home" 'route the independent review'
+        FM_CAPTAIN_HOLD_NOW=2026-09-16T08:00:01Z with_home "$home" bash "$ROOT/bin/fm-captain-hold.sh" hold delivery --reason 'new choice' >/dev/null || fail 're-hold failed'
+        FM_SNAPSHOT_NOW=2026-09-16T08:01:00Z expect_merge_action "$home" 'new choice' captain ;;
+      aged)
+        expect_merge_action "$home" 'route the independent review'
+        FM_SNAPSHOT_UNDATED_HOLD_AGE_DAYS=100 expect_merge_action "$home" 'choose contract' captain ;;
+      blocked)
+        with_home "$home" bash "$ROOT/bin/fm-tasks-axi.sh" add dependency 'Unfinished dependency' --kind ship --repo sample >/dev/null || fail 'add blocker failed'
+        with_home "$home" bash "$ROOT/bin/fm-tasks-axi.sh" block delivery --by dependency >/dev/null || fail 'block failed'
+        expect_merge_action "$home" 'route the independent review' ;;
+      paused)
+        printf 'paused: waiting for external CI\n' > "$home/state/delivery.status"
+        expect_merge_action "$home" 'route the independent review' ;;
+      *) expect_merge_action "$home" 'route the independent review' ;;
+    esac
+    printf 'hold variant: %s\n' "$variant"
+  done
+  # A live hold on either owner wins without creating duplicate contribution rows.
+  record "$home" duplicate 8 open mergeable
+  expect_merge_action "$home" 'route the independent review'
+  FM_CAPTAIN_HOLD_NOW="$NOW" with_home "$home" bash "$ROOT/bin/fm-captain-hold.sh" hold duplicate --reason 'shared choice' >/dev/null || fail 'shared hold failed'
+  expect_merge_action "$home" 'shared choice' captain
+  merge_snapshot "$home" | jq -e '.known == 1 and .rows[0].tasks == ["delivery","duplicate"]' >/dev/null || fail 'shared URL produced duplicate rows'
+  pass 'real live holds alone reach the owner; answered, dated, blocked, aged and paused work stays fleet'
+}
+
+test_merge_precedence_matrix() {
+  local home id number=20 actor reason mutation out
+  home=$(new_home merge-matrix)
+  while IFS='|' read -r id actor reason mutation; do
+    record "$home" "$id" "$number" open mergeable
+    mutate_record "$home" "$id" '.records[0].observation += {can_merge:true,base_sha:"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",base_containment:{tip:"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",built_on:"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",behind_by:0}}'
+    mutate_record "$home" "$id" '.records[0].observation.review_verification={pr:.records[0].url,head:.records[0].observation.head,task:.task,base:.records[0].observation.base_sha,answer:{schema:"fm-review-verification.v1",ok:true,basis:"independent-review",pr:.records[0].url,head:.records[0].observation.head,at:1,reader_model:"sonnet",reader_family:"anthropic",author_groups:{ship:[{model:"gpt-5.1",family:"openai"}]}}}'
+    mutate_record "$home" "$id" "$mutation"
+    number=$((number + 1))
+  done <<'CASES'
+no-review|fleet|route the independent review|.records[0].observation.review_verification={pr:.records[0].url,head:.records[0].observation.head,task:.task,base:.records[0].observation.base_sha,answer:{schema:"fm-review-verification.v1",ok:false,error:{kind:"not-qualified",message:"absent"}}}
+base-unknown|fleet|base freshness unknown; refresh the base comparison|del(.records[0].observation.base_containment)
+base-stale|fleet|update the branch; base is stale|.records[0].observation.base_containment.behind_by=1 | .records[0].observation.review_verification=null
+base-stale-pass|fleet|update the branch; base is stale|.records[0].observation.base_containment.behind_by=1
+qualified|fleet|merge under the standing merge rule|.
+pass-unknown|fleet|PASS fact unknown; recheck the independent review|.records[0].observation.review_verification=null
+verdict-stale-base|fleet|update the branch; base is stale|.records[0].observation.base_containment.behind_by=1 | .records[0].verdict={head:.records[0].observation.head,source:"review",actor:"fleet",summary:"merge this head now"}
+verdict-fresh-base|fleet|merge this head now|.records[0].verdict={head:.records[0].observation.head,source:"review",actor:"fleet",summary:"merge this head now"}
+verdict-unknown-base|fleet|merge this head now|del(.records[0].observation.base_containment) | .records[0].verdict={head:.records[0].observation.head,source:"review",actor:"fleet",summary:"merge this head now"}
+verdict-captain|fleet|record the unresolved arbitration as a captain hold|.records[0].verdict={head:.records[0].observation.head,source:"review",actor:"captain",summary:"choose"}
+review-required|maintainer|review required|.records[0].observation.review_decision="REVIEW_REQUIRED" | .records[0].observation.base_containment.behind_by=1
+cannot-merge|maintainer|delivery awaits the maintainer|.records[0].observation.can_merge=false | .records[0].observation.base_containment.behind_by=1
+changes|fleet|forge requests changes|.records[0].observation.review_decision="CHANGES_REQUESTED"
+failed|fleet|checks failed|.records[0].observation.checks[0].conclusion="failure"
+missing|fleet|check lane has no verdict|.records[0].observation.checks[0].conclusion=null
+pending|fleet|checks still running|.records[0].observation.checks[0].status="in_progress"
+no-checks|fleet|no reported checks; readiness unconfirmed|.records[0].observation.checks=[]
+draft|fleet|draft delivery|.records[0].observation.draft=true
+conflict|fleet|mergeability conflicting|.records[0].observation.mergeable="conflicting"
+merged|nobody|forge reports merged|.records[0].observation.state="merged"
+closed|nobody|forge reports closed|.records[0].observation.state="closed"
+stale-observation|fleet|contribution not recently checked|.records[0].checked_at="2026-09-15T08:00:00Z"
+stale-verdict|fleet|STALE maintainer verdict; reassess the current head|.records[0].verdict={head:"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",source:"review",actor:"fleet",summary:"old"}
+signal|fleet|incoming maintainer signal needs triage|.records[0].pending=[{token:"comment:1"}]
+issue|maintainer|awaiting issue triage|.records[0].kind="issue" | .records[0].observation.ready=false
+CASES
+  out=$(merge_snapshot "$home") || fail 'precedence snapshot failed'
+  while IFS='|' read -r id actor reason; do
+    printf '%s' "$out" | jq -e --arg task "$id" --arg actor "$actor" --arg reason "$reason" '
+      .rows[] | select(.task == $task) | .actor == $actor and .reason == $reason' >/dev/null \
+      || fail "precedence changed for $id: $out"
+  done <<'EXPECTED'
+no-review|fleet|route the independent review
+base-unknown|fleet|base freshness unknown; refresh the base comparison
+base-stale|fleet|update the branch; base is stale
+base-stale-pass|fleet|update the branch; base is stale
+qualified|fleet|merge under the standing merge rule
+pass-unknown|fleet|PASS fact unknown; recheck the independent review
+verdict-stale-base|fleet|update the branch; base is stale
+verdict-fresh-base|fleet|merge this head now
+verdict-unknown-base|fleet|merge this head now
+verdict-captain|fleet|record the unresolved arbitration as a captain hold
+review-required|maintainer|review required
+cannot-merge|maintainer|delivery awaits the maintainer
+changes|fleet|forge requests changes
+failed|fleet|checks failed
+missing|fleet|check lane has no verdict
+pending|fleet|checks still running
+no-checks|fleet|no reported checks; readiness unconfirmed
+draft|fleet|draft delivery
+conflict|fleet|mergeability conflicting
+merged|nobody|forge reports merged
+closed|nobody|forge reports closed
+stale-observation|fleet|contribution not recently checked
+stale-verdict|fleet|STALE maintainer verdict; reassess the current head
+signal|fleet|incoming maintainer signal needs triage
+issue|maintainer|awaiting issue triage
+EXPECTED
+  printf '%s' "$out" | jq -r '.rows[] | [.task,.actor,.reason] | @tsv'
+  bearings "$home" | jq -e '.contributions.counts.captain == 0 and .contributions.captain == []' >/dev/null \
+    || fail 'Bearings still shows merge ownership as owner choices'
+  pass 'classifier branch precedence keeps ordinary actions distinct and only live holds can be owner calls'
+}
+
+fm_test_only
 failures=0
-for test_name in test_actor_coverage test_stale_verdict test_unchecked_is_not_silence test_newest_check_has_no_verdict test_comment_wake test_review_wake test_inline_wake test_ready_issue_wake test_fresh_issue_requires_maintainer test_missing_lane_remains_missing test_partial_freshness_keeps_measured_rows test_malformed_record_cannot_prove_silence test_issue_timeline_and_exact_ack test_verdict_retains_judged_head test_verdict_actor_values_are_discoverable test_observed_replacement_refreshes_verdict test_unobserved_head_leaves_verdict_unknown test_away_yolo_is_fleet_work test_away_yolo_cross_home_is_fleet_work test_retired_and_unsupported_coverage test_unsupported_forge_is_not_fleet_work test_held_unsupported_forge_is_not_captain_work test_shared_contribution_signal_wakes_once test_watcher_keeps_diagnostics_separate_from_contribution_wakes test_expired_child_unsupported_forge_stays_unmeasured test_watcher_surfaces_new_contribution_once test_home_summary_coverage test_unreadable_pending_is_not_empty test_record_task_identity_matches_dirname_basename test_read_only_views_create_no_state test_clock_jump_does_not_refuse_a_read test_genuine_failure_after_clock_jump_is_unavailable test_shared_url_observed_once test_terminal_contribution_settles test_late_owner_inherits_terminal_observation test_interrupted_multi_owner_poll_settles_every_owner test_done_task_open_pr_still_observed test_all_urls_are_attempted_without_reservation test_three_second_pr_reads_complete_fresh_in_one_cycle test_progressing_reads_survive_fivefold_slowdown test_unsupported_url_first_does_not_abort_the_pass test_quota_reason_is_the_refusal_line test_reads_record_their_samples_when_the_poll_ends test_first_unknown_read_defers_the_rest_of_the_pass test_always_silent_url_does_not_starve_the_others test_stop_while_writing_the_order_leaves_no_temporary test_retired_pr_poll_starts_a_new_stop_episode test_every_disarm_path_starts_a_new_stop_episode test_reads_are_independent_of_watcher_interval test_watcher_stopped_check_rings_queued_row_next_pass test_unavailable_forge_records_error_and_wakes_once_per_episode test_late_owner_keeps_failure_episode_suppressed test_retire_ends_observation_of_a_gone_contribution test_late_owner_of_a_retired_final_contribution_is_not_retired test_retire_is_idempotent_and_refuses_unknown_pairs test_repeated_poll_reads_unchanged_prs_conditionally test_low_quota_poll_keeps_last_observation_marked_stale test_failure_after_quota_episode_wakes test_late_owners_keep_quota_episode_suppressed test_low_quota_wave_guards_graphql_and_marks_every_tail_owner test_successful_issue_wave_marks_unmeasured_tail_owners test_http_shim_preserves_backend_failures; do
+for test_name in test_ordinary_merge_ownership test_observed_merge_check_precedence test_merge_base_observation test_merge_verifier_unknowns test_merge_saved_facts_and_freshness test_merge_hold_lifecycle test_merge_precedence_matrix test_actor_coverage test_stale_verdict test_unchecked_is_not_silence test_newest_check_has_no_verdict test_comment_wake test_review_wake test_inline_wake test_ready_issue_wake test_fresh_issue_requires_maintainer test_missing_lane_remains_missing test_partial_freshness_keeps_measured_rows test_malformed_record_cannot_prove_silence test_issue_timeline_and_exact_ack test_verdict_retains_judged_head test_verdict_actor_values_are_discoverable test_observed_replacement_refreshes_verdict test_unobserved_head_leaves_verdict_unknown test_away_yolo_is_fleet_work test_away_yolo_cross_home_is_fleet_work test_retired_and_unsupported_coverage test_unsupported_forge_is_not_fleet_work test_held_unsupported_forge_is_not_captain_work test_shared_contribution_signal_wakes_once test_watcher_keeps_diagnostics_separate_from_contribution_wakes test_expired_child_unsupported_forge_stays_unmeasured test_watcher_surfaces_new_contribution_once test_home_summary_coverage test_unreadable_pending_is_not_empty test_record_task_identity_matches_dirname_basename test_read_only_views_create_no_state test_clock_jump_does_not_refuse_a_read test_genuine_failure_after_clock_jump_is_unavailable test_shared_url_observed_once test_terminal_contribution_settles test_late_owner_inherits_terminal_observation test_interrupted_multi_owner_poll_settles_every_owner test_done_task_open_pr_still_observed test_all_urls_are_attempted_without_reservation test_three_second_pr_reads_complete_fresh_in_one_cycle test_progressing_reads_survive_fivefold_slowdown test_unsupported_url_first_does_not_abort_the_pass test_quota_reason_is_the_refusal_line test_reads_record_their_samples_when_the_poll_ends test_first_unknown_read_defers_the_rest_of_the_pass test_always_silent_url_does_not_starve_the_others test_stop_while_writing_the_order_leaves_no_temporary test_retired_pr_poll_starts_a_new_stop_episode test_every_disarm_path_starts_a_new_stop_episode test_reads_are_independent_of_watcher_interval test_watcher_stopped_check_rings_queued_row_next_pass test_unavailable_forge_records_error_and_wakes_once_per_episode test_late_owner_keeps_failure_episode_suppressed test_retire_ends_observation_of_a_gone_contribution test_late_owner_of_a_retired_final_contribution_is_not_retired test_retire_is_idempotent_and_refuses_unknown_pairs test_repeated_poll_reads_unchanged_prs_conditionally test_low_quota_poll_keeps_last_observation_marked_stale test_failure_after_quota_episode_wakes test_late_owners_keep_quota_episode_suppressed test_low_quota_wave_guards_graphql_and_marks_every_tail_owner test_successful_issue_wave_marks_unmeasured_tail_owners test_http_shim_preserves_backend_failures; do
   ( "$test_name" ) || failures=$((failures + 1))
 done
 [ "$failures" -eq 0 ] || fail "$failures contribution regressions"
