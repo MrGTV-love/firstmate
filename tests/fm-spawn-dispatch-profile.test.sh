@@ -237,7 +237,7 @@ test_non_cursor_launch_clears_inherited_cursor_markers() {
   status=$?
   expect_code 0 "$status" "claude spawn under Cursor markers should succeed"
   launch=$(cat "$LAUNCH_LOG")
-  env_out="$CASE_DIR/claude-env"
+  env_out="$WT_DIR/claude-env"
   fm_fake_claude_recording "$FAKEBIN_DIR"
   fm_eval_launch "$launch" "$WT_DIR" "$FAKEBIN_DIR" \
     "FM_FAKE_CLAUDE_ENV_LOG=$env_out" CURSOR_AGENT=1 CURSOR_INVOKED_AS=cursor-agent GEMINI_CLI=1 \
@@ -1486,7 +1486,7 @@ test_lavish_server_address_is_exported_to_worker_launch() {
   status=$?
   expect_code 0 "$status" "a configured Lavish server address should allow the worker spawn"
   launch=$(cat "$LAUNCH_LOG")
-  env_out="$CASE_DIR/claude-env"
+  env_out="$WT_DIR/claude-env"
   fm_fake_claude_recording "$FAKEBIN_DIR"
   fm_eval_launch "$launch" "$WT_DIR" "$FAKEBIN_DIR" \
     "FM_FAKE_CLAUDE_ENV_LOG=$env_out" LAVISH_AXI_HOST=destination.example \
@@ -1502,13 +1502,14 @@ test_lavish_absent_config_preserves_destination_ambient() {
   rec=$(make_spawn_case profile-lavish-ambient claude "$id")
   read_case_record "$rec"
   pane_log="$CASE_DIR/pane.log"
-  seen="$CASE_DIR/lavish-seen"
+  : > "$pane_log"
+  seen="$WT_DIR/lavish-seen"
   cat > "$FAKEBIN_DIR/claude" <<SH
 #!/usr/bin/env bash
 printf '%s\n' "\${LAVISH_AXI_HOST-unset}" > '$seen'
 SH
   chmod +x "$FAKEBIN_DIR/claude"
-  out=$(FM_FAKE_PANE_LOG="$pane_log" \
+  out=$(FM_TEST_PANE_LOG="$pane_log" \
     run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
   status=$?
   expect_code 0 "$status" "an absent Lavish host configuration should allow the worker spawn"
@@ -1733,7 +1734,7 @@ test_raw_claude_nested_launches_exclude_supervisor_memory() {
       out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" "$raw")
       status=$?
       expect_code 0 "$status" "$launcher raw Claude spawn with $source settings should succeed"$'\n'"$out"
-      env_out="$CASE_DIR/raw-claude-env"
+      env_out="$WT_DIR/raw-claude-env"
       fm_eval_launch "$(cat "$LAUNCH_LOG")" "$WT_DIR" "$FAKEBIN_DIR" "FM_FAKE_CLAUDE_ENV_LOG=$env_out" \
         || fail "$launcher raw Claude launch with $source settings failed"
       {
@@ -2146,14 +2147,6 @@ SH
   done
 }
 
-fm_test_only
-test_launch_environment_allowlist
-test_default_launch_keeps_only_the_harness_route
-test_launch_environment_invalid_config_refuses
-test_launch_environment_inaccessible_config_refuses
-test_launch_environment_inherited_by_secondmate
-test_launch_environment_inheritance_preserves_on_source_errors
-
 test_worker_launch_delivers_role_scope() {
   local rec id out launch kind prompt envelope encoded brief_kind brief content first_line role_line task_line inbox token
   for brief_kind in heading legacy scaffold; do
@@ -2221,6 +2214,8 @@ SH
     assert_grep "Never inspect or change any other home's endpoint namespace" "$prompt" "$kind command weakened cross-home isolation"
     assert_grep "skill name does not resolve in this session, read \`$ROOT/.agents/skills/firstmate-coding-guidelines/SKILL.md\` instead." "$prompt" \
       "$kind command did not name the Firstmate skill file as the fallback"
+    [ "$(grep -cF 'use the existing Intent-to-test alignment criteria in the shared review rubric below during implementation and verification' "$prompt")" -eq 1 ] \
+      || fail "$brief_kind $kind did not deliver the existing-criteria implementation/verification route exactly once"
     assert_grep 'brief for' "$prompt" "$kind command lost the task"
     [ "$(grep -c '^# Current worker role contract$' "$prompt")" -eq 1 ] ||
       fail "$brief_kind $kind duplicated the delivered worker contract"
@@ -2243,9 +2238,10 @@ SH
 # Execute the staged launch with a model-free argv probe instead of parsing a
 # snapshot of the launcher's shell implementation.
 claude_launch_arg() {  # <launch> <settings|brief|config-dir|permissions|model|effort|control-channel|tui-mode> [VAR=val ...]
-  local launch=$1 kind=$2 probe
+  local launch=$1 kind=$2 probe rc=0
   shift 2
-  probe=$(fm_test_tmproot fm-claude-launch-arg)
+  # The confined fake worker may write only its own task-owned probe output.
+  probe=$(mktemp -d "$WT_DIR/.fm-claude-launch-arg.XXXXXX") || return 1
   cat > "$probe/claude" <<'SH'
 #!/bin/sh
 [ ! -f "${0%/*}/.fm-fake-config" ] || . "${0%/*}/.fm-fake-config"
@@ -2303,8 +2299,10 @@ printf '%s' "$last"
 SH
   chmod +x "$probe/claude"
   fm_eval_launch "$launch" "$WT_DIR" "$probe" \
-    FM_FAKE_ARG_KIND="$kind" "FM_FAKE_ARG_EXECUTED=$probe/executed" "$@" || return $?
-  [ -f "$probe/executed" ]
+    FM_FAKE_ARG_KIND="$kind" "FM_FAKE_ARG_EXECUTED=$probe/executed" "$@" || rc=$?
+  if [ "$rc" -eq 0 ] && [ ! -f "$probe/executed" ]; then rc=1; fi
+  fm_test_remove_tree "$probe"
+  return "$rc"
 }
 
 claude_settings_json_arg() { claude_launch_arg "$1" settings; }
@@ -2452,80 +2450,6 @@ test_secondmate_model_pin_resolves_through_the_model_index() {
   pass "a config/secondmate-harness model pin resolves roles and refuses retired ids through the model index"
 }
 
-test_model_index_resolves_launch_and_refuses_retired_literals
-test_secondmate_model_pin_resolves_through_the_model_index
-test_worker_launch_delivers_role_scope
-test_no_profile_keeps_claude_profile_defaults
-test_claude_launch_brief_publishes_record_doorbell
-test_claude_secondmate_launch_brief_publishes_into_its_own_home
-test_claude_spawn_refuses_when_the_brief_record_cannot_publish
-test_non_cursor_launch_clears_inherited_cursor_markers
-test_relative_home_overrides_launch_with_absolute_cross_process_paths
-test_home_defaults_preserve_absolute_or_resolve_relative_paths
-test_absolute_override_spelling_is_preserved_in_launch_paths
-test_unresolvable_relative_overrides_fail_loudly
-test_active_dispatch_profile_requires_explicit_harness_for_ship
-test_active_dispatch_profile_requires_explicit_harness_for_scout
-test_active_dispatch_profile_allows_explicit_harness
-test_active_dispatch_profile_allows_positional_harness
-test_active_dispatch_profile_allows_raw_launch_command
-test_chained_raw_launch_strips_ai_trailer_in_every_step
-test_claude_threads_model_and_effort
-test_codex_threads_model_and_effort
-test_codex_threads_model_and_max_effort
-test_codex_omits_max_effort_for_unsupported_model
-test_codex_crewmate_launch_disables_the_hook_layer
-test_codex_secondmate_launch_keeps_the_hook_layer
-test_grok_threads_model_and_reasoning_effort
-test_grok_omits_invalid_max_reasoning_effort
-test_grok_omits_invalid_xhigh_reasoning_effort
-test_cursor_threads_model_workspace_and_omits_effort_axis
-test_cursor_refuses_model_absent_from_live_catalog
-test_cursor_failed_catalog_probe_does_not_block_spawn
-test_opencode_threads_model_and_effort_variant
-test_opencode_without_effort_keeps_launch_config_unchanged
-test_opencode_emits_variant_for_openai_family_effort
-test_opencode_omits_variant_when_model_family_lacks_effort
-test_native_effort_validator_keeps_axes_separate
-test_native_pi_ultra_is_explicit_and_model_scoped
-test_batch_preserves_native_ultra
-test_pi_scout_launch_enters_recorded_worktree
-test_pi_threads_model_and_max_effort
-test_pi_tui_mode_probe_is_safe_for_old_and_new_pi
-test_pi_signed_threads_shared_pi_profile_and_preserves_identity
-test_pi_signed_missing_binary_refuses_before_endpoint_or_metadata
-test_pi_signed_persistent_secondmate_uses_pi_extensions_and_identity
-test_pi_seeded_secondmate_preapproves_project_trust
-test_pi_worker_launch_omits_seeded_home_approve
-test_pi_approve_probe_omits_unsupported_flag
-test_pi_exclude_tools_reach_ship_and_scout_launches
-test_pi_exclude_tools_worker_registry_reports
-test_pi_exclude_tools_absent_and_empty_lists
-test_exclude_tools_non_pi_runtime_refuses_non_empty_list
-test_pi_exclude_tools_malformed_entry_refuses_before_endpoint
-test_pi_exclude_tools_read_failure_refuses_before_launch
-test_pi_exclude_tools_do_not_leak_across_homes_or_to_secondmates
-test_batch_forwards_shared_profile_flags
-test_claude_forwards_firstmate_config_dir_when_set
-test_lavish_server_address_is_exported_to_worker_launch
-test_lavish_absent_config_preserves_destination_ambient
-test_claude_permission_mode_auto_swaps_only_the_permission_flag
-test_claude_permission_mode_auto_reaches_scout_launch
-test_claude_worker_launch_covers_task_channel_dirs
-test_claude_permission_mode_invalid_refuses_before_endpoint_or_metadata
-test_claude_task_launch_carries_control_channel_authority
-test_claude_secondmate_launch_omits_task_control_channel_authority
-test_claude_crewmate_launch_carries_the_attribution_policy
-test_claude_worker_nested_under_a_firstmate_home_excludes_its_memory_files
-test_claude_worker_nested_under_a_secondmate_home_excludes_its_memory_files
-test_claude_worker_outside_any_firstmate_home_gets_no_exclusion
-test_claude_worker_keeps_its_own_root_memory_files
-test_raw_claude_nested_launches_exclude_supervisor_memory
-test_keep_ai_trailers_omits_attribution_settings_and_strip_hooks
-test_home_local_keep_ai_trailers_reaches_secondmate_crew_launches
-test_claude_secondmate_launch_carries_the_attribution_policy
-test_active_dispatch_profile_does_not_block_secondmate_launch
-
 # --- config/claude-launcher -------------------------------------------------
 
 # make_teamclaude_case <name> <id> -> a claude case whose home selects TeamClaude.
@@ -2547,7 +2471,7 @@ test_teamclaude_launcher_proxies_a_fresh_claude_spawn() {
   out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
   status=$?
   expect_code 0 "$status" "a TeamClaude claude spawn should succeed while the proxy answers"$'\n'"$out"
-  fm_test_assert_teamclaude_launch "$FAKEBIN_DIR" "$(cat "$LAUNCH_LOG")" "fresh ship spawn"
+  fm_test_assert_teamclaude_launch "$FAKEBIN_DIR" "$(cat "$LAUNCH_LOG")" "fresh ship spawn" "$WT_DIR/claude-env"
   pass "config/claude-launcher=teamclaude: a fresh claude spawn reaches claude with the TeamClaude proxy"
 }
 
@@ -2563,7 +2487,7 @@ test_absent_claude_launcher_keeps_the_direct_launch() {
   out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
   status=$?
   expect_code 0 "$status" "a claude spawn with no launcher file should succeed"$'\n'"$out"
-  env_out="$CASE_DIR/claude-env"
+  env_out="$WT_DIR/claude-env"
   fm_test_teamclaude_launch_env "$FAKEBIN_DIR" "$(cat "$LAUNCH_LOG")" "$env_out" \
     || fail "the direct launch command failed"
   [ -s "$env_out" ] || fail "the direct launch never started claude"
@@ -2628,8 +2552,8 @@ test_teamclaude_launcher_proxies_a_raw_claude_launch() {
   out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" 'claude --model opus')
   status=$?
   expect_code 0 "$status" "a raw claude launch should succeed while the proxy answers"$'\n'"$out"
-  fm_test_assert_teamclaude_launch "$FAKEBIN_DIR" "$(cat "$LAUNCH_LOG")" "raw claude launch"
-  env_out="$CASE_DIR/claude-env"
+  fm_test_assert_teamclaude_launch "$FAKEBIN_DIR" "$(cat "$LAUNCH_LOG")" "raw claude launch" "$WT_DIR/claude-proxy-env"
+  env_out="$WT_DIR/claude-env"
   fm_test_teamclaude_launch_env "$FAKEBIN_DIR" "$(cat "$LAUNCH_LOG")" "$env_out" \
     || fail "the raw TeamClaude launch command failed: $(cat "$LAUNCH_LOG")"
   [ "$(fm_test_claude_session_args "$env_out.args" "$HOME_DIR/state/$id.meta")" = "$(printf '%s\n' --model opus)" ] \
@@ -2647,7 +2571,7 @@ test_teamclaude_config_paths_reach_only_teamclaude() {
     run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
   status=$?
   expect_code 0 "$status" "absolute TeamClaude configuration paths should be accepted"$'\n'"$out"
-  env_out="$CASE_DIR/claude-env"
+  env_out="$WT_DIR/claude-env"
   fm_test_teamclaude_launch_env "$FAKEBIN_DIR" "$(cat "$LAUNCH_LOG")" "$env_out" \
     || fail "the TeamClaude launch command failed: $(cat "$LAUNCH_LOG")"
   grep -Fqx "XDG_CONFIG_HOME=$CASE_DIR/xdg" "$env_out.teamclaude" \
@@ -2756,8 +2680,8 @@ test_teamclaude_snapshot_overrides_stale_pane_configuration() {
     expect_code 0 "$status" "$scenario: $launch_kind spawn must use caller configuration"$'\n'"$out"
     [ "$(cat "$preflight")" = "$(printf '%s\n' "status|$expected" "env|$expected")" ] \
       || fail "$scenario: preflight must read caller selector presence, values, proxy and CA: $(cat "$preflight")"
-    pane_log="$CASE_DIR/pane-teamclaude.log"
-    env_out="$CASE_DIR/pane-claude.env"
+    pane_log="$WT_DIR/pane-teamclaude.log"
+    env_out="$WT_DIR/pane-claude.env"
     : > "$pane_log"
     : > "$env_out"
     bash_dir=$(fm_test_bash_only_dir "$CASE_DIR")
@@ -2807,16 +2731,6 @@ test_teamclaude_launcher_is_inherited_by_secondmates() {
     || fail "a secondmate home did not inherit config/claude-launcher"
   pass "config/claude-launcher is inherited by secondmate homes"
 }
-
-test_teamclaude_launcher_proxies_a_fresh_claude_spawn
-test_absent_claude_launcher_keeps_the_direct_launch
-test_teamclaude_launcher_proxies_a_claude_secondmate_launch
-test_teamclaude_launcher_refusals_leave_no_task
-test_teamclaude_config_paths_reach_only_teamclaude
-test_teamclaude_snapshot_overrides_stale_pane_configuration
-test_teamclaude_launcher_proxies_a_raw_claude_launch
-test_teamclaude_launcher_is_inherited_by_secondmates
-test_default_secondmate_launch_survives_unsafe_routing_sources
 
 test_governed_slot_refuses_before_admission_and_preserves_work() {
   local rec id=slot-refused out status retained_head common
@@ -2870,6 +2784,95 @@ test_governed_slot_requires_explicit_scope_before_refresh() {
   pass 'governed spawn requires explicit scope before refreshing or admitting a worker'
 }
 
+fm_test_only
+test_launch_environment_allowlist
+test_default_launch_keeps_only_the_harness_route
+test_launch_environment_invalid_config_refuses
+test_launch_environment_inaccessible_config_refuses
+test_launch_environment_inherited_by_secondmate
+test_launch_environment_inheritance_preserves_on_source_errors
+test_model_index_resolves_launch_and_refuses_retired_literals
+test_secondmate_model_pin_resolves_through_the_model_index
+test_worker_launch_delivers_role_scope
+test_no_profile_keeps_claude_profile_defaults
+test_claude_launch_brief_publishes_record_doorbell
+test_claude_secondmate_launch_brief_publishes_into_its_own_home
+test_claude_spawn_refuses_when_the_brief_record_cannot_publish
+test_non_cursor_launch_clears_inherited_cursor_markers
+test_relative_home_overrides_launch_with_absolute_cross_process_paths
+test_home_defaults_preserve_absolute_or_resolve_relative_paths
+test_absolute_override_spelling_is_preserved_in_launch_paths
+test_unresolvable_relative_overrides_fail_loudly
+test_active_dispatch_profile_requires_explicit_harness_for_ship
+test_active_dispatch_profile_requires_explicit_harness_for_scout
+test_active_dispatch_profile_allows_explicit_harness
+test_active_dispatch_profile_allows_positional_harness
+test_active_dispatch_profile_allows_raw_launch_command
+test_chained_raw_launch_strips_ai_trailer_in_every_step
+test_claude_threads_model_and_effort
+test_codex_threads_model_and_effort
+test_codex_threads_model_and_max_effort
+test_codex_omits_max_effort_for_unsupported_model
+test_codex_crewmate_launch_disables_the_hook_layer
+test_codex_secondmate_launch_keeps_the_hook_layer
+test_grok_threads_model_and_reasoning_effort
+test_grok_omits_invalid_max_reasoning_effort
+test_grok_omits_invalid_xhigh_reasoning_effort
+test_cursor_threads_model_workspace_and_omits_effort_axis
+test_cursor_refuses_model_absent_from_live_catalog
+test_cursor_failed_catalog_probe_does_not_block_spawn
+test_opencode_threads_model_and_effort_variant
+test_opencode_without_effort_keeps_launch_config_unchanged
+test_opencode_emits_variant_for_openai_family_effort
+test_opencode_omits_variant_when_model_family_lacks_effort
+test_native_effort_validator_keeps_axes_separate
+test_native_pi_ultra_is_explicit_and_model_scoped
+test_batch_preserves_native_ultra
+test_pi_scout_launch_enters_recorded_worktree
+test_pi_threads_model_and_max_effort
+test_pi_tui_mode_probe_is_safe_for_old_and_new_pi
+test_pi_signed_threads_shared_pi_profile_and_preserves_identity
+test_pi_signed_missing_binary_refuses_before_endpoint_or_metadata
+test_pi_signed_persistent_secondmate_uses_pi_extensions_and_identity
+test_pi_seeded_secondmate_preapproves_project_trust
+test_pi_worker_launch_omits_seeded_home_approve
+test_pi_approve_probe_omits_unsupported_flag
+test_pi_exclude_tools_reach_ship_and_scout_launches
+test_pi_exclude_tools_worker_registry_reports
+test_pi_exclude_tools_absent_and_empty_lists
+test_exclude_tools_non_pi_runtime_refuses_non_empty_list
+test_pi_exclude_tools_malformed_entry_refuses_before_endpoint
+test_pi_exclude_tools_read_failure_refuses_before_launch
+test_pi_exclude_tools_do_not_leak_across_homes_or_to_secondmates
+test_batch_forwards_shared_profile_flags
+test_claude_forwards_firstmate_config_dir_when_set
+test_lavish_server_address_is_exported_to_worker_launch
+test_lavish_absent_config_preserves_destination_ambient
+test_claude_permission_mode_auto_swaps_only_the_permission_flag
+test_claude_permission_mode_auto_reaches_scout_launch
+test_claude_worker_launch_covers_task_channel_dirs
+test_claude_permission_mode_invalid_refuses_before_endpoint_or_metadata
+test_claude_task_launch_carries_control_channel_authority
+test_claude_secondmate_launch_omits_task_control_channel_authority
+test_claude_crewmate_launch_carries_the_attribution_policy
+test_claude_worker_nested_under_a_firstmate_home_excludes_its_memory_files
+test_claude_worker_nested_under_a_secondmate_home_excludes_its_memory_files
+test_claude_worker_outside_any_firstmate_home_gets_no_exclusion
+test_claude_worker_keeps_its_own_root_memory_files
+test_raw_claude_nested_launches_exclude_supervisor_memory
+test_keep_ai_trailers_omits_attribution_settings_and_strip_hooks
+test_home_local_keep_ai_trailers_reaches_secondmate_crew_launches
+test_claude_secondmate_launch_carries_the_attribution_policy
+test_active_dispatch_profile_does_not_block_secondmate_launch
+test_teamclaude_launcher_proxies_a_fresh_claude_spawn
+test_absent_claude_launcher_keeps_the_direct_launch
+test_teamclaude_launcher_proxies_a_claude_secondmate_launch
+test_teamclaude_launcher_refusals_leave_no_task
+test_teamclaude_config_paths_reach_only_teamclaude
+test_teamclaude_snapshot_overrides_stale_pane_configuration
+test_teamclaude_launcher_proxies_a_raw_claude_launch
+test_teamclaude_launcher_is_inherited_by_secondmates
+test_default_secondmate_launch_survives_unsafe_routing_sources
 test_governed_slot_refuses_before_admission_and_preserves_work
 test_governed_slot_requires_explicit_scope_before_refresh
 

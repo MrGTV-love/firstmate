@@ -1918,6 +1918,8 @@ test_promotion_carries_the_forge_binding() {
   home="$TMP_ROOT/forge-promote/home"
   sendroot="$TMP_ROOT/forge-promote/sendroot"
   mkdir -p "$home/state" "$home/data" "$home/projects/proj" "$sendroot/bin"
+  # A directory inside a checkout otherwise inherits its publication identity.
+  git -C "$home/projects/proj" init -q || fail 'could not initialize the promotion project fixture'
   printf '%s\n' '- proj [no-mistakes forge=gerrit] - fixture (added 2026-01-01)' > "$home/data/projects.md"
   cat > "$sendroot/bin/fm-send.sh" <<'STUB'
 #!/usr/bin/env bash
