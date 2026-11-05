@@ -241,7 +241,15 @@
 # (a process-event source id, for example). The binding is a private record
 # under `state/decision-bindings/`; a source with no binding feeds nothing, so
 # this whole path is opt-in per source and an unbound source behaves as if it
-# did not exist. `bind` deliberately does not require the source to exist yet,
+# did not exist. The Slack request path checks the binding and then delivers (the
+# acknowledgement post and the request wake print) while it holds
+# `state/decision-bindings/` shared, and `unbind` takes it exclusive to remove the
+# record: no Slack request delivery already past its binding check is completed once
+# `unbind` has returned. Other channels (the Slack answer path, process-event feeds)
+# check the binding as before and are not held. `unbind` waits at most
+# FM_BINDING_UNBIND_WAIT seconds (default 60) for a delivery already under way, then
+# removes the record anyway and says so on stderr.
+# `bind` deliberately does not require the source to exist yet,
 # so a channel can be bound BEFORE it is armed. The optional second argument
 # exists only for legacy pre-collapse records and callers: a concrete origin is
 # stored verbatim and used as the composition fallback above, and
@@ -2282,10 +2290,30 @@ command_bind() {
 }
 
 command_unbind() {
-  local source=${1:-}
+  local source=${1:-} dest
   [ "$#" -eq 1 ] || { usage >&2; exit 2; }
   validate_source_id "$source"
-  rm -f -- "$(binding_path "$source")"
+  dest=$(binding_path "$source")
+  # The Slack request path holds BINDING_DIR shared across its binding check and the post or print it allows, so
+  # the removal waits for such a delivery to end: none completes after this returns. Other channels are not held. The
+  # wait is bounded; past it the binding is removed anyway and the caller is told, so an unbind is never refused.
+  if [ -d "$BINDING_DIR" ]; then
+    perl -e '
+      use strict; use warnings; use Fcntl qw(:flock);
+      my ($dir, $path, $seconds) = @ARGV;
+      my $locked = 0;
+      if (open(my $held, "<", $dir)) {
+        for (my $tries = 0; $tries <= $seconds * 10; $tries++) {
+          if (flock($held, LOCK_EX | LOCK_NB)) { $locked = 1; last }
+          select(undef, undef, undef, 0.1);
+        }
+        unlink($path) or $!{ENOENT} or die "fm-captain-hold: cannot remove the decision binding: $path: $!\n";
+        print STDERR "fm-captain-hold: the binding was removed although a delivery that began earlier was still running after ${seconds}s\n" unless $locked;
+      } else {
+        unlink($path) or $!{ENOENT} or die "fm-captain-hold: cannot remove the decision binding: $path: $!\n";
+      }
+    ' "$BINDING_DIR" "$dest" "${FM_BINDING_UNBIND_WAIT:-60}" || fail "cannot remove the decision binding for $source"
+  fi
   printf 'unbound: %s\n' "$source"
 }
 

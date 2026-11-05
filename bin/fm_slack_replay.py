@@ -11,6 +11,25 @@ from pathlib import Path
 
 from fm_slack import SlackError
 
+# The scope Slack requires for each method the plane calls. A transcript that sets
+# "enforce_scopes" fails a call whose scope its "scopes" list lacks, as Slack does.
+METHOD_SCOPES = {
+    'chat.postMessage': 'chat:write',
+    'chat.update': 'chat:write',
+    'conversations.open': 'im:write',
+    'conversations.history': 'im:history',
+    'conversations.replies': 'im:history',
+    'reactions.get': 'reactions:read',
+    'reactions.add': 'reactions:write',
+    'users.info': 'users:read',
+}
+
+
+def ts_key(ts):
+    """Order Slack timestamps as numbers, never as floats."""
+    seconds, _, fraction = str(ts or 0).partition('.')
+    return int(seconds or 0), int((fraction + '000000000')[:9])
+
 
 class Replay:
     def __init__(self, transcript_path, state_dir, token_present=True):
@@ -25,8 +44,10 @@ class Replay:
         digest = __import__('hashlib').sha256(str(self.path.resolve()).encode()).hexdigest()[:16]
         self.state_path = self.state_dir / ('replay-state-' + digest + '.json')
         self.log_path = self.state_dir / 'outbound.jsonl'
+        # Every call that reaches the replay, including one that fails, is recorded here before it is judged.
+        self.attempts_path = self.state_dir / 'attempts.jsonl'
         self.token_present = token_present
-        if self.state_path.is_symlink() or self.log_path.is_symlink():
+        if self.state_path.is_symlink() or self.log_path.is_symlink() or self.attempts_path.is_symlink():
             raise SlackError('unsafe_replay_state_path')
         if self.state_path.exists():
             self.state = json.loads(self.state_path.read_text())
@@ -64,9 +85,20 @@ class Replay:
         self.save()
         return rule
 
+    def attempt(self, method, fields):
+        entry = {'method': method, 'channel': fields.get('channel'),
+                 'oldest': fields.get('oldest'), 'latest': fields.get('latest')}
+        with self.attempts_path.open('a') as out:
+            out.write(json.dumps(entry, ensure_ascii=False) + '\n')
+
     def call(self, method, **fields):
+        self.attempt(method, fields)
         if not self.token_present:
             raise SlackError('missing_token')
+        needed = METHOD_SCOPES.get(method)
+        if self.transcript.get('enforce_scopes') and needed and needed not in self.scopes:
+            self.log({'method': method, 'error': 'missing_scope', 'scope': needed})
+            raise SlackError('missing_scope')
         rule = self.fail(method, fields.get('ts') or fields.get('timestamp'))
         if rule:
             status = int(rule.get('status', 503))
@@ -78,8 +110,12 @@ class Replay:
                     'user_id': self.transcript.get('bot_user', 'UBOT0123456')}
         elif method == 'conversations.open':
             target = fields.get('users')
-            if target != os.environ.get('FM_SLACK_DM_USER'):
+            # The configured owner, or one whose DM this conversation already opened (a retarget reads the DM it leaves).
+            opened = self.state.setdefault('opened', [])
+            if target != os.environ.get('FM_SLACK_DM_USER') and target not in opened:
                 raise SlackError('target_mismatch')
+            if target not in opened:
+                opened.append(target)
             # owner_dm names the DM that really belongs to the opened user when it is not the channel that accepts posts.
             channel = self.transcript.get('owner_dm', self.transcript.get('channel', 'D0123456789'))
             self.log({'method': method, 'recipient': target, 'channel': channel})
@@ -88,11 +124,27 @@ class Replay:
             channel = fields.get('channel')
             if channel != self.transcript.get('channel', 'D0123456789'):
                 raise SlackError('channel_not_found')
+            # A message may name its own channel; the default is the transcript's DM.
+            here = [m for m in self.state['messages']
+                    if m.get('channel', self.transcript.get('channel', 'D0123456789')) == channel]
             if method.endswith('history'):
-                messages = [m for m in reversed(self.state['messages']) if not m.get('thread_ts')]
+                # Slack's history lists the channel's top-level messages, newest first: a thread
+                # root (thread_ts equal to its own ts, once it has replies) and a reply that was
+                # also sent to the channel (subtype thread_broadcast, thread_ts different from ts).
+                # An ordinary thread reply is read through conversations.replies only.
+                messages = [m for m in reversed(here)
+                            if not m.get('thread_ts') or m['thread_ts'] == m.get('ts')
+                            or m.get('subtype') == 'thread_broadcast']
+                oldest = fields.get('oldest')
+                if oldest:
+                    messages = [m for m in messages if ts_key(m.get('ts')) > ts_key(oldest)]
+                # Like Slack, both bounds are exclusive, and a page is the newest messages inside them.
+                latest = fields.get('latest')
+                if latest:
+                    messages = [m for m in messages if ts_key(m.get('ts')) < ts_key(latest)]
             else:
                 root = fields.get('ts')
-                messages = [m for m in self.state['messages']
+                messages = [m for m in here
                             if m.get('ts') == root or m.get('thread_ts') == root]
             if not fields.get('include_all_metadata'):
                 messages = [{k: v for k, v in m.items() if k != 'metadata'} for m in messages]
@@ -100,10 +152,11 @@ class Replay:
             size = int(fields.get('limit') or 100)
             page = messages[start:start + size]
             self.log({'method': method, 'recipient': os.environ.get('FM_SLACK_DM_USER'),
-                      'channel': channel, 'thread_ts': fields.get('ts'), 'cursor': start})
-            data = {'ok': True, 'messages': page,
-                    'response_metadata': {'next_cursor': str(start + size)
-                                          if len(messages) > start + size else ''}}
+                      'channel': channel, 'thread_ts': fields.get('ts'), 'cursor': start,
+                      'oldest': fields.get('oldest'), 'latest': fields.get('latest'), 'limit': size})
+            more = len(messages) > start + size
+            data = {'ok': True, 'messages': page, 'has_more': more,
+                    'response_metadata': {'next_cursor': str(start + size) if more else ''}}
         elif method == 'chat.postMessage':
             channel = fields.get('channel')
             if channel != self.transcript.get('channel', 'D0123456789'):
