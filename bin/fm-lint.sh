@@ -116,6 +116,8 @@
 # gate is the oldest. A stopped root keeps what it holds but cannot grow, and
 # the oldest running gate is never stopped, so the total exceeds the budget by
 # at most what the oldest root grows by, which the per-root bounds below cap,
+# plus what every other root grows within one reading interval (up to 2 s at or
+# below 60 percent of the budget, 0.5 s above it),
 # and every root still finishes. The time a root spends stopped counts toward
 # its deadline. Processes named shellcheck outside every gate are counted but
 # not stopped; when they alone hold the budget, every gate waits and stops.

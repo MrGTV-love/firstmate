@@ -416,7 +416,9 @@ if (($ARGV[0] // '') eq 'gate') {
     # the oldest. A stopped process keeps what it holds but cannot grow, and the
     # oldest running gate is never stopped (unless processes named shellcheck
     # outside every gate alone hold the budget), so the aggregate exceeds the
-    # budget by at most what the oldest root grows by, and every root finishes.
+    # budget by at most what the oldest root grows by, plus what every other
+    # root grows within one reading interval (up to 2 s at or below 60 percent
+    # of the budget, 0.5 s above it), and every root finishes.
     my ($guard_busy, $poll) = (0, 0.5);
     my $resume = sub { for my $pid (keys %paused) { kill 'CONT', $pid; delete $paused{$pid}; } };
     my $guard = sub {
@@ -437,7 +439,8 @@ if (($ARGV[0] // '') eq 'gate') {
             for my $pid (keys %{$mine->[0]}) {
                 next if $pid == $$ || $paused{$pid};
                 my $row = $table->{$pid} or next;
-                next if $row->[1] < 8192 || $row->[3] =~ m{fm-lint-cache\.pl|fm-lint\.sh|fm-proc-info\.py};
+                next if $row->[1] < 8192
+                    || $row->[3] =~ m{\A\S*(?:perl|bash|python3?)\S*\s+(?:-\S+\s+)*\S*(?:fm-lint-cache\.pl|fm-lint\.sh|fm-proc-info\.py)\b};
                 $paused{$pid} = 1 if kill 'STOP', $pid;
             }
         } elsif (%paused) {

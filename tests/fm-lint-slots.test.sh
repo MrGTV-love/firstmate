@@ -941,7 +941,7 @@ test_growing_roots_are_held_to_the_budget_across_pools() {
 }
 
 test_a_wrapper_around_the_real_shellcheck_shares_the_host_wide_memory_bound() {
-  local tmp rc out outside pid deadline real before after
+  local tmp rc out outside pid deadline real fixture mark
   pinned_ready || { pass "SKIP (ShellCheck $REQUIRED not resolved): wrapper around the real ShellCheck"; return; }
   tmp=$(fm_test_tmproot fm-lint-wrapper)
   mkdir -p "$tmp/bin"
@@ -951,15 +951,18 @@ test_a_wrapper_around_the_real_shellcheck_shares_the_host_wide_memory_bound() {
   chmod +x "$tmp/bin/shellcheck"
   fm_lint_hide_outside_shellcheck "$tmp/bin"
   # Compliant: a one-line wrapper with no pool setting goes through the shared
-  # host pool, takes a ticket there and makes no scratch pool of its own.
-  before=$(cat "/var/tmp/firstmate-lint-$(id -u)/lint-slots/queue.next" 2>/dev/null || printf 0)
+  # host pool and leaves there the history record that only its own fixture path
+  # can name; the test removes that record.
+  fixture="$tmp/wrapped.sh"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$fixture"
   rc=0
-  out=$(env -u FM_LINT_SLOT_DIR PATH="$tmp/bin:$PATH" TMPDIR="$tmp" FM_LINT_HOST_RSS_KIB=1000000000 "$LINT" --jobs 1 "$tmp/a.sh" 2>&1) || rc=$?
+  out=$(env -u FM_LINT_SLOT_DIR PATH="$tmp/bin:$PATH" TMPDIR="$tmp" FM_LINT_HOST_RSS_KIB=1000000000 \
+    "$LINT" --jobs 1 --telemetry "$tmp/wrapper.tsv" "$fixture" 2>&1) || rc=$?
   [ "$rc" -eq 0 ] || fail "the wrapper run failed (rc=$rc)"$'\n'"$out"
   [ -e "$tmp/analysis.marker" ] || fail "the wrapper never ran the real analysis"
-  after=$(cat "/var/tmp/firstmate-lint-$(id -u)/lint-slots/queue.next" 2>/dev/null || printf 0)
-  [ "$((after - before))" -ge 1 ] || fail "the wrapper run took no ticket in the host pool (tickets $before -> $after)"
-  [ -z "$(find "$tmp" -maxdepth 2 -name slots -print -quit)" ] || fail "the wrapper run made a pool of its own under its scratch directory"
+  mark="/var/tmp/firstmate-lint-$(id -u)/lint-slots/history/$(perl -MDigest::SHA=sha256_hex -e 'print sha256_hex($ARGV[0])' "full:$fixture")"
+  [ -s "$mark" ] || fail "the wrapper run left no record in the host pool ($mark)"
+  rm -f "$mark"
   # Harmful: the same wrapper pointed at its own pool, while a real ShellCheck
   # outside it holds more than the 4 MiB budget, is not admitted although its pool
   # is empty, and runs once the outside one ends.
