@@ -372,6 +372,40 @@ test_legacy_record_without_report_digest_omits_the_field() {
   pass "a legacy record without report_sha256 omits the digest instead of fabricating it"
 }
 
+test_plan_names_the_owed_families_and_decides_nothing() {
+  local case_dir out
+  case_dir=$(make_case plan-owed gpt-5.1)
+  run_plan() {
+    NM_HOME="$NM_FIXTURE" FM_HOME="$case_dir/home" "$RECORD" plan --pr "$URL" --head "$HEAD1" \
+      --task task-x1 --base "$BASE" "$@"
+  }
+  out=$(run_plan)
+  # shellcheck disable=SC2016  # jq program; single quotes are intended.
+  "$JQ_BIN" -e --arg head "$HEAD1" '.schema == "fm-review-plan.v1" and .ok == true and .head == $head
+    and .groups.ship == [{"model":"gpt-5.1","family":"openai"}]
+    and .uncovered == [{"group":"ship","families":["openai"]}]' <<<"$out" >/dev/null \
+    || fail "plan with no review must name the ship group and the openai family it owes: $out"
+  [ ! -e "$case_dir/home/state/review-records.jsonl" ] || fail "plan wrote a review record"
+  record_review "$case_dir" "$HEAD1" PASS gpt-5.2 '{"ship":["gpt-5.1"]}' >/dev/null
+  out=$(run_plan)
+  "$JQ_BIN" -e '.uncovered == [{"group":"ship","families":["openai"]}]' <<<"$out" >/dev/null \
+    || fail "a reader of the author's own family must leave the family owed: $out"
+  record_review "$case_dir" "$HEAD1" PASS claude-opus-5-5 '{"ship":["gpt-5.1"]}' >/dev/null
+  out=$(run_plan)
+  "$JQ_BIN" -e '.uncovered == []' <<<"$out" >/dev/null || fail "a different-family PASS must clear the owed family: $out"
+  record_review "$case_dir" "$HEAD1" FAIL claude-opus-5-5 '{"ship":["gpt-5.1"]}' >/dev/null
+  record_word "$case_dir" "$HEAD1" 'merge it' >/dev/null
+  out=$(run_plan)
+  "$JQ_BIN" -e '.ok == true and .uncovered == []' <<<"$out" >/dev/null \
+    || fail "plan must ignore a FAIL and a captain-word and report coverage only: $out"
+  out=$(run_verify "$case_dir" "$HEAD1" --json)
+  "$JQ_BIN" -e '.ok == true and .basis == "captain-word"' <<<"$out" >/dev/null \
+    || fail "verify itself must still follow the captain-word rule: $out"
+  out=$(run_plan --nonsense 2>&1 || true)
+  case "$out" in *usage*|*unrecognized*) ;; *) fail "plan must reject an unknown flag: $out" ;; esac
+  pass "plan names the owed author families from the exact head, ignores a FAIL and a captain-word, and writes nothing"
+}
+
 test_review_only_json_is_immutable_record_time_evidence
 test_default_text_and_captain_word_json
 test_review_only_cannot_be_satisfied_by_captain_word
@@ -382,3 +416,4 @@ test_stored_family_fields_cannot_retroactively_change_independence
 test_typed_failures_distinguish_unavailable_and_invalid_input
 test_default_fail_after_captain_word_precedence_holds
 test_legacy_record_without_report_digest_omits_the_field
+test_plan_names_the_owed_families_and_decides_nothing
