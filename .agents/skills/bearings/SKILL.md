@@ -203,7 +203,7 @@ Never bind old prose to the head current at capture time merely because no judge
 A STALE verdict describes an earlier version; keep its provenance and reassess the current version before treating its blocker as current.
 Route repairs already within accepted intent to the fleet.
 Carry any unresolved scope or authority choice through `captain-hold-lifecycle` in the owning task, then surface it through the existing Captain's Call.
-The classifier does not infer a captain decision from comment prose, and a recorded captain-actor verdict on the current head stays with the captain unless the task's own row has a dated hold or a resolution recorded no earlier than the verdict while no hold is open again, or the task declares a `paused:` wait.
+The classifier does not infer a captain decision from comment prose, and a recorded captain-actor verdict without a live hold asks the fleet to reconcile that missing arbitration.
 A merge-ready classification grants no merge authority and the ordinary exact-PR checks still govern any later approval.
 
 When filing work corresponding to an upstream ticket, put its canonical issue URL on the structured backlog row and run the observer's `arm` operation.

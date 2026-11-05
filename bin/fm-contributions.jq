@@ -16,8 +16,7 @@ def valid_record:
     and (.retired == null or (.retired | (.actor == "captain")
       and (.reason | type == "string" and length > 0) and (.at | fromdateiso8601 | type == "number")))
     and (.verdict == null or (.verdict | (.head | sha) and (.source | type == "string")
-      and (.actor | IN("captain","fleet","maintainer","nobody")) and (.summary | type == "string")
-      and (.at == null or (.at | fromdateiso8601 | type == "number"))))
+      and (.actor | IN("captain","fleet","maintainer","nobody")) and (.summary | type == "string")))
     and (.observation == null or (.kind as $kind | .observation |
       (.state | IN("open","closed","merged")) and (.checks | type == "array")
       and (.reviews | type == "array") and (.events | type == "array")
@@ -56,11 +55,9 @@ def projected($input; $saved; $now; $max_age):
   known($input; $saved) as $known
   | [$known[] as $k
     | ([$saved[] | select(.task == $k.task) | .records[] | select(.url == $k.url)] | first) as $record
-    | [$input.backlog.records[]? | select(.structured and
-         (.id == $k.task or ((.links // []) | index($k.url)) != null))] as $owned
-    | ([$owned[] | select(.hold_bucket == "live")] | first) as $hold
-    | (([$owned[] | select(.id == $k.task)] + [$input.archived_holds[]? | select(.id == $k.task)]) | first) as $own
-    | [$input.tasks[]? | select(.id == $k.task)] as $own_tasks
+    | ([$input.backlog.records[]? | select(.structured and
+         (.id == $k.task or ((.links // []) | index($k.url)) != null))
+         | select(.hold_bucket == "live")] | first) as $hold
     | ([$input.tasks[]? | select(.id == $k.task and .pr.url == $k.url)
        | {head:(.pr.head | select(. != null and . != "")), merge_authority:(.merge_authority // "unknown")}] | first) as $task
     | ($task.head // null) as $recorded_head
@@ -85,11 +82,6 @@ def projected($input; $saved; $now; $max_age):
     | ([$o.reviews[]? | select(.state != "COMMENTED")] | group_by(.user.login)
        | map(sort_by([.submitted_at,.id]) | last)
        | map(. + {freshness:(if $observed_head != null and .commit_id != $observed_head then "STALE" elif $fresh then "current" else "unverified" end)})) as $reviews
-    | ($own.hold_bucket == "dated" or any($own_tasks[]; .paused == true)
-       or ($own.hold_bucket == null and $own.hold_answered == true
-           and ((try ($own.hold_resolved_at | fromdateiso8601) catch null) as $resolved
-                | (try ($verdict.at | fromdateiso8601) catch null) as $judged
-                | $resolved != null and $judged != null and $resolved >= $judged))) as $settled
     | review_state($o.review_verification; $k.url; $observed_head; $k.task; $o.base_sha) as $review
     | ({"qualified":2,"not-qualified":3}[$review] // 4) as $review_rank
     | (if ($k.url | startswith("https://github.com/") | not) then
@@ -100,7 +92,6 @@ def projected($input; $saved; $now; $max_age):
        elif $hold != null then {actor:"captain",reason:$hold.hold_reason,hold:$hold.id}
        elif $fresh | not then {actor:"fleet",reason:($record.error // "contribution not recently checked")}
        elif $stale then {actor:"fleet",reason:"STALE maintainer verdict; reassess the current head"}
-       elif $verdict.actor == "captain" and ($settled | not) then {actor:"captain",reason:$verdict.summary}
        elif ($record.pending | length) > 0 then {actor:"fleet",reason:"incoming maintainer signal needs triage"}
        elif $record.kind == "issue" then
          if $o.ready then {actor:"fleet",reason:"filed issue is ready-for-pr"}
@@ -114,16 +105,18 @@ def projected($input; $saved; $now; $max_age):
        elif ($pending | length) > 0 then {actor:"fleet",reason:"checks still running"}
        elif $o.review_decision == "CHANGES_REQUESTED" then {actor:"fleet",reason:"forge requests changes"}
        elif $verdict.actor | IN("maintainer","nobody") then {actor:$verdict.actor,reason:$verdict.summary}
-       elif ($o.base_containment.behind_by // 0) > 0 then {actor:"fleet",reason:"update the branch; base is stale",label_rank:0}
+       elif ($o.base_containment.behind_by // 0) > 0 and $o.can_merge == true
+         and $o.review_decision != "REVIEW_REQUIRED" and $merge_authority != "away"
+         and $verdict.actor != "captain" then {actor:"fleet",reason:"update the branch; base is stale",label_rank:0}
        elif $verdict.actor == "fleet" then {actor:"fleet",reason:$verdict.summary}
-       elif $o.base_containment == null and $o.can_merge == true
-         and $o.review_decision != "REVIEW_REQUIRED" and $merge_authority != "away" then
-         {actor:"fleet",reason:"base freshness unknown; refresh the base comparison",label_rank:1}
-       elif $review == "not-qualified" then {actor:"fleet",reason:"route the independent review",label_rank:$review_rank}
+       elif $verdict.actor == "captain" then {actor:"fleet",reason:"record the unresolved arbitration as a captain hold"}
        elif $o.review_decision == "REVIEW_REQUIRED" then {actor:"maintainer",reason:"review required",label_rank:$review_rank}
        elif $o.can_merge != true then {actor:"maintainer",reason:"delivery awaits the maintainer",label_rank:$review_rank}
        elif $merge_authority == "away" then
          {actor:"fleet",reason:"checks green; merge is authorized by delivery posture",label_rank:$review_rank}
+       elif $o.base_containment == null then
+         {actor:"fleet",reason:"base freshness unknown; refresh the base comparison",label_rank:1}
+       elif $review == "not-qualified" then {actor:"fleet",reason:"route the independent review",label_rank:$review_rank}
        elif $review != "qualified" then {actor:"fleet",reason:"PASS fact unknown; recheck the independent review",label_rank:$review_rank}
        else {actor:"fleet",reason:"merge under the standing merge rule",label_rank:$review_rank} end) as $action
     | $k + {kind:($record.kind // (if ($k.url | contains("/issues/")) then "issue" else "pr" end)),
