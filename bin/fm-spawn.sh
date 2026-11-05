@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Spawn a direct report: a crewmate in a treehouse or Orca worktree, or a
 # secondmate in its isolated firstmate home.
-# Usage: fm-spawn.sh <task-id> <project-dir> --mode <no-mistakes|direct-PR|local-only> --yolo <on|off> [--branch-prefix <prefix>] [--base-branch <branch>] [--owned-path <tracked-path>]... [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--backend <name>] [--herdr-resume-lock-wait]
+# Usage: fm-spawn.sh <task-id> <project-dir> --mode <no-mistakes|direct-PR|local-only> --yolo <on|off> [--branch-prefix <prefix>] [--base-branch <branch>] [--owned-path <tracked-path>]... [--successor-of <predecessor-task-id>] [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--backend <name>] [--herdr-resume-lock-wait]
 #        fm-spawn.sh <task-id> <project-dir> --scout [--fixed-family] [--base-branch <branch>] [--owned-path <tracked-path>]... [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--backend <name>] [--herdr-resume-lock-wait]
 #        fm-spawn.sh <task-id> [<firstmate-home>] [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--backend <name>] --secondmate
 #   Every fresh spawn reads host memory once through fm-mem-guard.sh; its
@@ -584,6 +584,23 @@
 #   Without a recorded local plan, that retry repeats current fresh local-only
 #   source selection, so an advanced qualified local default is consumed rather
 #   than replaced by origin; a selected local source is saved with the prepared commit.
+#   --successor-of <predecessor-task-id> (fresh ship spawns only; --scout,
+#   --secondmate and --relaunch refuse it) declares this task the successor of
+#   another task's live copy. Before any lock, pool, backlog, state or window action
+#   it resolves state/<predecessor>.meta and refuses unless the recorded worktree is a
+#   git worktree root of this project, checked out on the recorded branch, and the
+#   project's provision_existing_slot.py lists --supersedes in its --help.
+#   Spawn then re-checks that branch just before the one provisioning call, refuses
+#   if the copy moved, passes the resolved copy to the provisioner as --supersedes
+#   and records successor_of=<predecessor>; the project's provisioner alone writes
+#   the successor record, never firstmate. An id=repo batch refuses the flag.
+#   A provisioner refusal keeps successor_of beside recovery=slot-provision-refused
+#   as an unfulfilled declaration. Its retry, fm-spawn.sh <id> --relaunch while the
+#   window lives or a fresh spawn naming the same --successor-of once it is gone,
+#   repeats those checks and passes --supersedes again, refusing if the predecessor
+#   is no longer live; a fresh spawn that names no or another predecessor refuses,
+#   so no retry provisions without the declaration. A relaunch of an
+#   admitted successor attests as for any task and sends no --supersedes.
 #   If provisioning still refuses after preparation finishes, that commit is
 #   saved once in the retained record; later retries never replace an existing
 #   prepared identity with newer upstream history.
@@ -1133,6 +1150,8 @@ BRANCH_PREFIX_SET=0
 BASE_BRANCH=
 BASE_BRANCH_SET=0
 SLOT_OWNED_PATHS=()
+SUCCESSOR_OF=
+SUCCESSOR_OF_SET=0
 UPSTREAM_CONSENT=
 UPSTREAM_CONSENT_SET=0
 CAPTAIN_MODEL_PIN=
@@ -1198,6 +1217,14 @@ for a in "$@"; do
       ;;
     owned-path)
       SLOT_OWNED_PATHS+=("$a")
+      ;;
+    successor-of)
+      [ "$SUCCESSOR_OF_SET" -eq 0 ] || {
+        echo "error: --successor-of names one predecessor task" >&2
+        exit 1
+      }
+      SUCCESSOR_OF=$a
+      SUCCESSOR_OF_SET=1
       ;;
     upstream-consent)
       UPSTREAM_CONSENT=$a
@@ -1283,6 +1310,15 @@ for a in "$@"; do
     ;;
   --owned-path) want_value="owned-path" ;;
   --owned-path=*) SLOT_OWNED_PATHS+=("${a#--owned-path=}") ;;
+  --successor-of) want_value="successor-of" ;;
+  --successor-of=*)
+    [ "$SUCCESSOR_OF_SET" -eq 0 ] || {
+      echo "error: --successor-of names one predecessor task" >&2
+      exit 1
+    }
+    SUCCESSOR_OF=${a#--successor-of=}
+    SUCCESSOR_OF_SET=1
+    ;;
   --upstream-consent) want_value="upstream-consent" ;;
   --upstream-consent=*)
     UPSTREAM_CONSENT=${a#--upstream-consent=}
@@ -1370,6 +1406,16 @@ esac
 if [ "$KIND" = secondmate ] && [ "${#SLOT_OWNED_PATHS[@]}" -gt 0 ]; then
   echo 'error: --owned-path applies only to ship and scout assigned-copy provisioning' >&2
   exit 1
+fi
+if [ "$SUCCESSOR_OF_SET" -eq 1 ]; then
+  [ "$RELAUNCH" -eq 0 ] || {
+    echo 'error: --successor-of applies only to a fresh ship spawn; a retained refusal keeps its declaration and --relaunch re-resolves it' >&2
+    exit 1
+  }
+  [ "$KIND" = ship ] || {
+    echo "error: --successor-of applies only to a fresh ship spawn, not a $KIND" >&2
+    exit 1
+  }
 fi
 
 # --relaunch preserves the recorded task rather than accepting fresh-spawn
@@ -2255,6 +2301,10 @@ if [ "$RELAUNCH" -eq 1 ] && [ "${#POS[@]}" -gt 0 ] && [ "${POS[0]}" != "$idpart"
   exit 1
 fi
 if [ "${#POS[@]}" -gt 0 ] && [ "${POS[0]}" != "$idpart" ] && case "$idpart" in */*) false ;; *) true ;; esac then
+  if [ "$SUCCESSOR_OF_SET" -eq 1 ]; then
+    echo 'error: --successor-of applies to one task; spawn a declared successor on its own, not in an id=repo batch' >&2
+    exit 1
+  fi
   if [ "$KIND" != secondmate ] && [ -z "$HARNESS_ARG" ] && [ -f "$CONFIG/crew-dispatch.json" ]; then
     echo "error: config/crew-dispatch.json is active - pass an explicit harness resolved from the dispatch rules (the consultation backstop, so the rules are never silently skipped)." >&2
     exit 1
@@ -2320,6 +2370,34 @@ if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" = ship ]; then
   BRANCH="$BRANCH_PREFIX$ID"
   if ! git check-ref-format --branch "$BRANCH" >/dev/null 2>&1; then
     echo "error: --branch-prefix and task id must form a valid git branch (got '$BRANCH')" >&2
+    exit 1
+  fi
+fi
+# A declared successor is checked before the first lock or state write, so a
+# refusal leaves the state directory exactly as it was. The same checks run
+# again once the project is resolved; this pass only reads.
+if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" = ship ] && [ -f "$STATE/$ID.meta" ] && [ ! -L "$STATE/$ID.meta" ] &&
+  [ "$(fm_meta_get "$STATE/$ID.meta" recovery)" = slot-provision-refused ]; then
+  spawn_kept_pred=$(fm_meta_get "$STATE/$ID.meta" successor_of)
+  if [ -n "$spawn_kept_pred" ] && [ "$spawn_kept_pred" != "$SUCCESSOR_OF" ]; then
+    echo "error: $ID keeps an unfulfilled successor declaration of $spawn_kept_pred; retry it with fm-spawn.sh $ID --relaunch while the window lives, or a fresh spawn naming the same --successor-of $spawn_kept_pred once it is gone" >&2
+    exit 1
+  fi
+fi
+if [ "$SUCCESSOR_OF_SET" -eq 1 ] && [ "$RELAUNCH" -eq 0 ] && [ "$KIND" = ship ]; then
+  spawn_early_proj=${POS[1]:-}
+  case "$spawn_early_proj" in projects/*) spawn_early_proj=$PROJECTS/${spawn_early_proj#projects/} ;; esac
+  spawn_early_proj=$(cd "$spawn_early_proj" 2>/dev/null && pwd) || spawn_early_proj=
+  if [ -n "$spawn_early_proj" ]; then
+    fm_slot_resolve_successor "$spawn_early_proj" "$STATE" "$ID" "$SUCCESSOR_OF" || exit 1
+  fi
+elif [ "$RELAUNCH" -eq 1 ] && [ -f "$STATE/$ID.meta" ] && [ ! -L "$STATE/$ID.meta" ] &&
+  [ "$(fm_meta_get "$STATE/$ID.meta" recovery)" = slot-provision-refused ] &&
+  [ -n "$(fm_meta_get "$STATE/$ID.meta" successor_of)" ]; then
+  # The retry of a refused declaration carries it, so it is checked the same way.
+  spawn_early_proj=$(cd "$(fm_meta_get "$STATE/$ID.meta" project)" 2>/dev/null && pwd) || spawn_early_proj=
+  if [ -n "$spawn_early_proj" ] && ! fm_slot_resolve_successor "$spawn_early_proj" "$STATE" "$ID" "$(fm_meta_get "$STATE/$ID.meta" successor_of)"; then
+    echo "error: --relaunch of $ID keeps its unfulfilled successor declaration of $(fm_meta_get "$STATE/$ID.meta" successor_of) and cannot continue without it" >&2
     exit 1
   fi
 fi
@@ -2572,6 +2650,12 @@ if [ "$RELAUNCH" -eq 1 ]; then
     echo "error: --relaunch reuses recorded slot scope; --owned-path cannot override it" >&2
     exit 1
   }
+  # A successor_of beside the retained refusal is a declaration the provisioner
+  # has not yet accepted: this retry must carry it. An admitted record has none.
+  if [ "$(fm_meta_get "$RELAUNCH_META" recovery)" = slot-provision-refused ]; then
+    SUCCESSOR_OF=$(fm_meta_get "$RELAUNCH_META" successor_of)
+    [ -z "$SUCCESSOR_OF" ] || SUCCESSOR_OF_SET=1
+  fi
   fm_backend_validate_task_endpoint "$RELAUNCH_META" "$ID" || exit 1
   BACKEND=$FM_BACKEND_VALIDATED_BACKEND
   RELAUNCH_PRIOR_BACKEND=$BACKEND
@@ -4399,6 +4483,15 @@ else
   PROJ_ABS="$(cd "$(resolve_project_dir_arg "$PROJ")" && pwd)"
   WT=""
   BRIEF="$DATA/$ID/brief.md"
+fi
+# A declared successor must resolve to a live predecessor copy before any pool,
+# backlog, state or window action; the project's provisioner records it later.
+if [ "$SUCCESSOR_OF_SET" -eq 1 ]; then
+  fm_slot_resolve_successor "$PROJ_ABS" "$STATE" "$ID" "$SUCCESSOR_OF" || {
+    [ "$RELAUNCH" -eq 0 ] || echo "error: --relaunch of $ID keeps its unfulfilled successor declaration of $SUCCESSOR_OF and cannot continue without it" >&2
+    exit 1
+  }
+  FM_SLOT_SUPERSEDES=$FM_SLOT_SUCCESSOR_WT
 fi
 # Resolve consent before provisioning, never from a live worker's first refusal.
 # The TypeScript policy owner also validates the runtime backstop's grant.
@@ -6296,6 +6389,7 @@ spawn_slot_refused() {
       echo "kind=$KIND"
       echo 'recovery=slot-provision-refused'
       echo "branch=${BRANCH:-fm/$ID}"
+      [ -z "$SUCCESSOR_OF" ] || echo "successor_of=$SUCCESSOR_OF"
       [ -z "$MODE" ] || echo "mode=$MODE"
       [ -z "$YOLO" ] || echo "yolo=$YOLO"
       [ -z "$BASE_BRANCH" ] || echo "base_branch=$BASE_BRANCH"
@@ -7507,6 +7601,8 @@ preserve_relaunch_meta() {
     [ -z "$FM_SLOT_BASE_REF" ] || echo "slot_source_ref=$FM_SLOT_BASE_REF"
     for owned_path in "${SLOT_OWNED_PATHS[@]}"; do echo "slot_owned_path=$owned_path"; done
   fi
+  # A relaunch carries the record's own successor_of line through preserve_relaunch_meta.
+  [ "$RELAUNCH" -ne 0 ] || [ -z "$SUCCESSOR_OF" ] || echo "successor_of=$SUCCESSOR_OF"
   [ -z "$BASE_BRANCH" ] || echo "base_branch=$BASE_BRANCH"
   [ -z "$UPSTREAM_CONSENT" ] || echo "upstream_consent=$UPSTREAM_CONSENT"
   echo "model=${MODEL:-default}"
