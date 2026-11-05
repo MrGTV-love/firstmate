@@ -90,15 +90,16 @@
 # watch bound, or the address-space limit under the enforced envelope) until it
 # has one.
 # A cold root takes its turn only when its charge, every held root's current
-# charge and the resident size of every process named shellcheck outside the
-# held roots together fit the budget; a held root's current charge is the larger
+# charge and the resident size outside the held roots (the running lint trees of
+# other pools and every other process named shellcheck) together fit the budget;
+# a held root's current charge is the larger
 # of its charge at admission and what its tree holds now, read when the root
 # asks for its turn. That reading is the live process table (resident size
 # only, from ps or libproc) and, where the macOS watch runs, the watch's own
 # peak of resident size and footprint. A held root is charged the worst case
 # when the table cannot be read or its record names no charge. With nothing held
-# and no outside ShellCheck running, one root is always admitted, so a root larger
-# than the budget runs alone once outside ShellCheck has ended, and queued roots
+# and nothing running outside, one root is always admitted, so a root larger
+# than the budget runs alone once that outside memory has ended, and queued roots
 # wait rather than fail. When a root's analysis completes, its
 # record is raised to the peak this run measured (the watch's peak and
 # /usr/bin/time's maximum resident size) if that is higher; a record is never
@@ -132,7 +133,7 @@
 # (3.06 s in 60 s) and about 0.20 of a core at the 0.5 s rate (6.1 s in 30 s);
 # a lone two-worker run below 60 percent spends about 0.1 of a core on it.
 # A lone default two-worker run keeps both workers only while
-# both roots' charges and any outside ShellCheck fit the budget: on a pool with
+# both roots' charges and any outside memory fit the budget: on a pool with
 # no history it runs one root at a time until its roots are recorded, and two
 # recorded roots of 7.2 GiB each (14.4 GiB) also run one at a time.
 # Admission also needs a free slot among the count cap; fairness does not

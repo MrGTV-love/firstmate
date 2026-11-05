@@ -45,11 +45,12 @@ use File::Basename qw(dirname basename);
 # and what its root holds now: its gate's whole process tree in one read of the
 # live process table, and the peak the macOS watch publishes beside the slot
 # (slot.<n>.peak, through FM_LINT_INTERNAL_SLOT_PEAK_FILE). The turn is taken
-# only if those charges, plus the current resident size of every process named
-# shellcheck outside the held roots (another pool, another caller or a wrapper
-# script around the real ShellCheck), plus the request's own charge fit the
-# budget, or nothing is held and no such outside ShellCheck runs, so a root larger
-# than the budget runs alone. A held slot is charged the worst case when its
+# only if those charges, plus the current resident size outside the held roots
+# (the running lint trees of other pools and every other process named
+# shellcheck, from another caller or a wrapper script around the real
+# ShellCheck), plus the request's own charge fit the budget, or nothing is held
+# and nothing runs outside, so a root larger than the budget runs alone. A held
+# slot is charged the worst case when its
 # record names no charge or the table cannot be read. When the analysis
 # completes (no signal reached the gate, and it exited 0, 1, 98 or 251), the
 # gate raises the root's record to the larger of the watch's peak and the
@@ -191,7 +192,8 @@ if (($ARGV[0] // '') eq 'gate') {
     # Every lint gate on the host, whatever pool it uses, the processes below
     # it, and every other process named shellcheck: the table reduced to
     # { total => KiB in all of them, gates => { gate pid => [process set, start,
-    #   running] }, outside => KiB not in a gate's tree }. A gate's own table and
+    #   running] }, named => KiB of processes named shellcheck in no gate's tree }.
+    # total counts only gates that are running. A gate's own table and
     # owner reads (ps, fm-proc-info.py table or memory, also seen as a bare or
     # parenthesized command name, a <defunct> row or, before their exec, the
     # gate's own command) are not in its set, so a gate runs only once its
@@ -356,9 +358,8 @@ if (($ARGV[0] // '') eq 'gate') {
             if (defined $next && $oldest{$next} eq $ticket_path) {
                 # My turn. The memory budget decides, from a table read no older
                 # than a fifth of a second. It counts the held roots, the
-                # ShellCheck outside this pool and the new root; a root takes
-                # its turn alone only when no held root and no outside
-                # ShellCheck runs.
+                # memory outside them and the new root; a root takes its turn
+                # alone only when no held root runs and nothing runs outside.
                 $charge_kib = ($history_path && $read_kib->($history_path)) || $worst_kib;
                 my $now = Time::HiRes::time();
                 ($table, $table_at) = ($process_table->(), $now) if !defined $table_at || $now - $table_at >= 0.2;
