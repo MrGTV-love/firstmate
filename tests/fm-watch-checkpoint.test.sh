@@ -270,7 +270,13 @@ SH
     fail "the bound child never reached its delayed process-group setup"
   }
   read -r child watchdog owner < "$home/slow-pgrp.mark"
-  watchdog_parent=$(ps -o ppid= -p "$watchdog" 2>/dev/null | tr -d ' ')
+  watchdog_parent=$(fm_test_process_read ppid "$watchdog") || {
+    kill -KILL -- "-$checkpoint_pid" "-$watchdog" "-$child" 2>/dev/null || true
+    kill -KILL "$child" "$watchdog" 2>/dev/null || true
+    wait "$checkpoint_pid" 2>/dev/null || true
+    fail 'could not observe the bound parent; ownership is unknown'
+  }
+  watchdog_parent=${watchdog_parent//[[:space:]]/}
   if [ "$owner" != "$checkpoint_pid" ] || [ "$watchdog_parent" != "$checkpoint_pid" ]; then
     kill -KILL -- "-$checkpoint_pid" "-$watchdog" "-$child" 2>/dev/null || true
     kill -KILL "$child" "$watchdog" 2>/dev/null || true
@@ -515,7 +521,7 @@ SH
     "XDG_CACHE_HOME=$home/cache" "XDG_RUNTIME_DIR=$home/runtime"
     "FM_HOME=$home" "FM_ROOT_OVERRIDE=$home/root" "FM_STATE_OVERRIDE=$home/state"
     "FM_CONFIG_OVERRIDE=$home/config" "FM_PROCEVENT_CLAIM_ROOT=$home/procevent-claims"
-    FM_GATE_REFUSE_BYPASS=1 FM_TEST_SEAM=1 FM_OPEN_LOOPS_BIN=/usr/bin/true
+    FM_GATE_REFUSE_BYPASS=1 FM_TEST_SEAM=1 FM_OPEN_LOOPS_BIN=/usr/bin/true FM_GITHUB_ACCOUNTING=0
     FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999
     FM_HEARTBEAT_MAX=999999 FM_HOME_SUMMARY_INTERVAL=999999)
   fm_write_meta "$home/state/restored.meta" "backend=herdr" "kind=ship" \
