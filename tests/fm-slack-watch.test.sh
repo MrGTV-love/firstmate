@@ -2153,13 +2153,13 @@ for via in poll check; do
   out=$(via_shim "$via" FM_SHIM_NEEDLE=ZEBRA-9172-secret-words FM_SHIM_NEEDLE_LOG="$TMP/needle.log")
   assert_contains "$out" 'ZEBRA-9172-secret-words' "INTAKE-6 [$via text] the request was not woken with its text"
   [ "$(wc -l < "$TMP/needle.log" | tr -d ' ')" -ge 3 ] || fail "INTAKE-6 [$via text] the binding check was not seen at delivery and at print"
-  [ -z "$(grep -v '^0$' "$TMP/needle.log")" ] || fail "INTAKE-6 [$via text] the message text reached the binding check"
+  ! grep -q -v '^0$' "$TMP/needle.log" || fail "INTAKE-6 [$via text] the message text reached the binding check"
   # Control: the same count finds a word the check really is handed (the source name in its arguments).
   intake_home
   say_owner 2000.000100 'ZEBRA-9172-secret-words'
   : > "$TMP/needle.log"
   via_shim "$via" FM_SHIM_NEEDLE=slack-dm FM_SHIM_NEEDLE_LOG="$TMP/needle.log" >/dev/null
-  [ -n "$(grep -v '^0$' "$TMP/needle.log")" ] || fail "INTAKE-6 [$via text control] the count did not find the source name in the binding check's arguments"
+  grep -q -v '^0$' "$TMP/needle.log" || fail "INTAKE-6 [$via text control] the count did not find the source name in the binding check's arguments"
 done
 printf 'ok - INTAKE-6\n'
 
