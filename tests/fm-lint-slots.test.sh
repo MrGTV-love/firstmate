@@ -940,107 +940,204 @@ test_growing_roots_are_held_to_the_budget_across_pools() {
   pass "growing roots from four pools stay within the budget plus one root and all finish; without a budget they stack (${all[*]} as budget:peak MiB:alive)"
 }
 
-# fm_lint_child_of <parent-pid> <command>: the pid of a direct child of
-# <parent-pid> whose whole command is <command>, waiting up to 10 s.
+# fm_lint_child_of <parent-pid> <text>: the pid of a direct child of <parent-pid>
+# whose command holds <text>, waiting up to 10 s.
 fm_lint_child_of() {
   local deadline=$((SECONDS + 10)) pid
   while [ "$SECONDS" -lt "$deadline" ]; do
-    pid=$(ps -axo pid=,ppid=,command= | awk -v parent="$1" -v want="$2" '{
-      pid = $1; ppid = $2; $1 = ""; $2 = ""; sub(/^ +/, ""); sub(/ +$/, "")
-      if (ppid == parent && $0 == want) { print pid; exit }
-    }')
+    pid=$(ps -axo pid=,ppid=,command= | awk -v parent="$1" -v want="$2" '$2 == parent && index($0, want) { print $1; exit }')
     [ -n "$pid" ] && { printf '%s\n' "$pid"; return 0; }
     sleep 0.1
   done
   return 1
 }
 
+# fm_lint_kill_tree <pid>...: ends each process this test started, and its children.
+fm_lint_kill_tree() {
+  local pid
+  for pid in "$@"; do
+    pkill -KILL -P "$pid" 2>/dev/null
+    kill -KILL "$pid" 2>/dev/null
+    wait "$pid" 2>/dev/null
+  done
+  return 0
+}
+
+# fm_lint_write_table_filter <dir>: an fm-proc-info.py for a gate copied into
+# <dir> whose ps is refused, so the gate reads the host through this helper. It
+# calls the real helper (FM_TEST_REAL_HELPER) and keeps only this fixture's gates
+# (FM_TEST_POOL_ROOT) and no process named shellcheck, as the ps shim does. The
+# table row whose command holds FM_TEST_HIDDEN_MATCH takes FM_TEST_HIDDEN_FORM:
+# drop removes it, so the census gives that process only its bare name, parent
+# gives it its parent's command, and any other value is its command.
+fm_lint_write_table_filter() {
+  cat > "$1/fm-proc-info.py" <<'PY'
+import json
+import os
+import subprocess
+import sys
+
+env = os.environ
+output = subprocess.run([sys.executable, env["FM_TEST_REAL_HELPER"]] + sys.argv[1:],
+                        stdout=subprocess.PIPE, text=True).stdout
+if sys.argv[1] == "memory":
+    print(json.dumps([row for row in json.loads(output) if row.get("comm") != "shellcheck"]))
+    sys.exit(0)
+rows = [line.split(None, 2) for line in output.splitlines()]
+commands = {row[0]: row[2] for row in rows if len(row) == 3}
+for row in rows:
+    if len(row) != 3:
+        continue
+    pid, ppid, command = row
+    if "fm-lint-cache.pl gate" in command and env["FM_TEST_POOL_ROOT"] not in command:
+        continue
+    if env["FM_TEST_HIDDEN_MATCH"] in command:
+        form = env["FM_TEST_HIDDEN_FORM"]
+        if form == "drop":
+            continue
+        command = commands.get(ppid, "") if form == "parent" else form
+    print(pid, ppid, command)
+PY
+}
+
 test_a_waiting_gate_reading_the_table_never_stops_a_younger_running_root() {
-  local tmp py waiter runner deadline helper
-  py=$(python3 -c 'import os, sys; print(os.path.realpath(sys.executable))' 2>/dev/null) \
-    || { pass "SKIP (python3 not resolved): a waiting gate's table read"; return; }
+  local tmp waiter runner deadline helper form index=0 root_pid stopped
+  local -a forms=(ps)
+  command -v python3 >/dev/null 2>&1 || { pass "SKIP (python3 not resolved): a waiting gate's table read"; return; }
   tmp=$(fm_test_tmproot fm-lint-waiting-reader)
-  mkdir -p "$tmp/refuse" "$tmp/hide" "$tmp/gate" "$tmp/MacOS"
+  mkdir -p "$tmp/refuse" "$tmp/hide" "$tmp/waiter" "$tmp/watcher"
   printf '#!/bin/sh\nexit 1\n' > "$tmp/refuse/ps"
   chmod +x "$tmp/refuse/ps"
-  ln -s "$py" "$tmp/MacOS/Python"
-  cp "$ROOT/bin/fm-lint-cache.pl" "$tmp/gate/fm-lint-cache.pl"
-  printf 'import time\ntime.sleep(60)\n' > "$tmp/gate/fm-proc-info.py"
+  cp "$ROOT/bin/fm-lint-cache.pl" "$tmp/waiter/fm-lint-cache.pl"
+  cp "$ROOT/bin/fm-lint-cache.pl" "$tmp/watcher/fm-lint-cache.pl"
+  printf 'import time\ntime.sleep(600)\n' > "$tmp/waiter/fm-proc-info.py"
+  fm_lint_write_table_filter "$tmp/watcher"
   fm_lint_hide_outside_shellcheck "$tmp/hide"
-  # The older gate's turn reads the process table through the libproc helper
-  # beside it, because ps is refused; that helper runs under an interpreter named
-  # Python and does not answer for 60 s, so the gate waits with that one child.
-  PATH="$tmp/refuse:$PATH" FM_LINT_INTERNAL_PYTHON="$tmp/MacOS/Python" FM_LINT_HOST_RSS_KIB=1000000 \
-    perl "$tmp/gate/fm-lint-cache.pl" gate "$tmp/waiting-pool" 2 waiting "$tmp/waiting.wait" -- true &
+  # The older gate's turn reads the process table through the helper beside it,
+  # because ps is refused, and that helper does not answer, so the gate waits
+  # with that one child.
+  PATH="$tmp/refuse:$PATH" FM_LINT_HOST_RSS_KIB=1000000 \
+    perl "$tmp/waiter/fm-lint-cache.pl" gate "$tmp/waiting-pool" 2 waiting "$tmp/waiting.wait" -- true &
   waiter=$!
-  helper=$(fm_lint_child_of "$waiter" "$tmp/MacOS/Python $tmp/gate/fm-proc-info.py table pid,ppid,command") \
-    || { kill -KILL "$waiter" 2>/dev/null; fail "the waiting gate never started its table read"; }
+  helper=$(fm_lint_child_of "$waiter" "$tmp/waiter/fm-proc-info.py table") \
+    || { fm_lint_kill_tree "$waiter"; fail "the waiting gate never started its table read"; }
   sleep 1.2
-  # The younger gate runs a root of 80 MiB against a 40000 KiB budget. Only a
-  # gate that is not the oldest running gate stops its own root, so this root
-  # must run to its end while the older gate still waits.
-  PATH="$tmp/hide:$PATH" FM_TEST_GATE_POOL_PREFIX="$tmp/" FM_LINT_HOST_RSS_KIB=40000 FM_LINT_INTERNAL_ROOT_CAP_KIB=1024 \
-    perl "$ROOT/bin/fm-lint-cache.pl" gate "$tmp/running-pool" 2 running "$tmp/running.wait" -- \
-    perl -e '$x = "x" x (80 * 1048576); select(undef, undef, undef, 3); exit 0' &
-  runner=$!
-  deadline=$((SECONDS + 20))
-  while kill -0 "$runner" 2>/dev/null && [ "$SECONDS" -lt "$deadline" ]; do sleep 0.2; done
-  if kill -0 "$runner" 2>/dev/null; then
-    pkill -KILL -P "$runner" 2>/dev/null; kill -KILL "$runner" 2>/dev/null
-    pkill -KILL -P "$waiter" 2>/dev/null; kill -KILL "$waiter" 2>/dev/null
-    wait "$runner" "$waiter" 2>/dev/null
-    fail "a younger root over the budget was held back while an older gate only waited on its table read"
-  fi
-  wait "$runner" || fail "the younger root failed while an older gate waited on its table read"
-  kill -0 "$helper" 2>/dev/null || fail "the older gate's table read ended before the younger root, so this test proved nothing"
-  pkill -KILL -P "$waiter" 2>/dev/null; kill -KILL "$waiter" 2>/dev/null
-  wait "$waiter" 2>/dev/null
-  pass "a waiting gate whose only child is its own table read is not the oldest running gate, so a younger root over the budget runs on"
+  # A younger gate sees that helper in each form a process table can show it: its
+  # full command from ps; and, where a gate with ps refused reads libproc, its bare
+  # name, a parenthesized name, a zombie row or, before its exec, the gate's own
+  # command. Its root of 80 MiB is over its 40000 KiB budget, and only a gate that
+  # is not the oldest running gate stops its own root, so that root must run to
+  # its end each time.
+  [ "$(uname)" != Darwin ] || forms+=(drop '(ps)' '<defunct>' '[ps] <defunct>' parent /usr/bin/true)
+  for form in "${forms[@]}"; do
+    index=$((index + 1))
+    if [ "$form" = ps ]; then
+      PATH="$tmp/hide:$PATH" FM_TEST_GATE_POOL_PREFIX="$tmp/" FM_LINT_HOST_RSS_KIB=40000 FM_LINT_INTERNAL_ROOT_CAP_KIB=1024 \
+        perl "$ROOT/bin/fm-lint-cache.pl" gate "$tmp/running-pool.$index" 2 running "$tmp/running.$index.wait" -- \
+        perl -e '$x = "x" x (80 * 1048576); select(undef, undef, undef, 3); exit 0' &
+    else
+      PATH="$tmp/refuse:$PATH" FM_LINT_HOST_RSS_KIB=40000 FM_LINT_INTERNAL_ROOT_CAP_KIB=1024 \
+        FM_TEST_REAL_HELPER="$ROOT/bin/fm-proc-info.py" FM_TEST_POOL_ROOT="$tmp/" \
+        FM_TEST_HIDDEN_MATCH="$tmp/waiter/fm-proc-info.py table" FM_TEST_HIDDEN_FORM="$form" \
+        perl "$tmp/watcher/fm-lint-cache.pl" gate "$tmp/running-pool.$index" 2 running "$tmp/running.$index.wait" -- \
+        perl -e '$x = "x" x (80 * 1048576); select(undef, undef, undef, 3); exit 0' &
+    fi
+    runner=$!
+    if [ "$form" = /usr/bin/true ]; then
+      # The control: the same reading, with the helper's row a started command,
+      # names the waiting gate the oldest, so this root is stopped. Without this
+      # stop, the passes above could come from a reading that never worked.
+      root_pid=$(fm_lint_child_of "$runner" "80 * 1048576") || { fm_lint_kill_tree "$runner" "$waiter"; fail "the control root never started"; }
+      stopped=0
+      deadline=$((SECONDS + 15))
+      while [ "$SECONDS" -lt "$deadline" ]; do
+        case "$(ps -o stat= -p "$root_pid" 2>/dev/null)" in *T*) stopped=1; break ;; esac
+        sleep 0.1
+      done
+      fm_lint_kill_tree "$runner"
+      [ "$stopped" -eq 1 ] || { fm_lint_kill_tree "$waiter"; fail "a root under an older running gate was not stopped, so this test proved nothing"; }
+      continue
+    fi
+    deadline=$((SECONDS + 20))
+    while kill -0 "$runner" 2>/dev/null && [ "$SECONDS" -lt "$deadline" ]; do sleep 0.2; done
+    if kill -0 "$runner" 2>/dev/null; then
+      fm_lint_kill_tree "$runner" "$waiter"
+      fail "a younger root over the budget was held back while an older gate only waited on its table read (table form: $form)"
+    fi
+    wait "$runner" || { fm_lint_kill_tree "$waiter"; fail "the younger root failed while an older gate waited on its table read (table form: $form)"; }
+    kill -0 "$helper" 2>/dev/null || fail "the older gate's table read ended before the younger root (table form: $form), so this test proved nothing"
+  done
+  fm_lint_kill_tree "$waiter"
+  pass "a waiting gate whose only child is its own table read is not the oldest running gate in any form a table shows it (${forms[*]})"
 }
 
 test_growth_guard_never_stops_the_watch_reader() {
-  local tmp py older younger deadline rows reader standin reader_stopped=0 standin_stopped=0
+  local tmp py older younger deadline rows watch reader standin form
+  local reader_seen reader_large reader_stopped standin_stopped
   [ "$(uname)" = Darwin ] || { pass "SKIP (not macOS): the resident watch's reader runs only on macOS"; return; }
   py=$(python3 -c 'import os, sys; print(os.path.realpath(sys.executable))' 2>/dev/null) \
     || { pass "SKIP (python3 not resolved): the resident watch's reader"; return; }
   tmp=$(fm_test_tmproot fm-lint-guard-reader)
-  mkdir -p "$tmp/MacOS" "$tmp/hide"
-  # The reader runs under an interpreter named Python, as the Command Line Tools
-  # and python.org installs show it.
+  mkdir -p "$tmp/MacOS" "$tmp/hide" "$tmp/refuse" "$tmp/watcher"
+  printf '#!/bin/sh\nexit 1\n' > "$tmp/refuse/ps"
+  chmod +x "$tmp/refuse/ps"
+  # In the full form the reader runs under an interpreter named Python, as the
+  # Command Line Tools and python.org installs show it.
   ln -s "$py" "$tmp/MacOS/Python"
+  cp "$ROOT/bin/fm-lint-cache.pl" "$tmp/watcher/fm-lint-cache.pl"
+  fm_lint_write_table_filter "$tmp/watcher"
   fm_lint_hide_outside_shellcheck "$tmp/hide"
   PATH="$tmp/hide:$PATH" FM_TEST_GATE_POOL_PREFIX="$tmp/" FM_LINT_HOST_RSS_KIB=1000000000 \
-    perl "$ROOT/bin/fm-lint-cache.pl" gate "$tmp/older-pool" 2 older "$tmp/older.wait" -- perl -e 'sleep 30' &
+    perl "$ROOT/bin/fm-lint-cache.pl" gate "$tmp/older-pool" 2 older "$tmp/older.wait" -- perl -e 'sleep 120' &
   older=$!
-  fm_lint_child_of "$older" "perl -e sleep 30" > /dev/null || { kill -KILL "$older" 2>/dev/null; fail "the older gate never started its root"; }
+  fm_lint_child_of "$older" "sleep 120" > /dev/null || { fm_lint_kill_tree "$older"; fail "the older gate never started its root"; }
   sleep 1.2
-  # The younger gate is not the oldest and its watched root of 80 MiB is over its
-  # 40000 KiB budget, so its guard stops that root; it must never stop the
-  # watch's own reader.
-  PATH="$tmp/hide:$PATH" FM_TEST_GATE_POOL_PREFIX="$tmp/" FM_LINT_HOST_RSS_KIB=40000 FM_LINT_INTERNAL_ROOT_CAP_KIB=1024 \
-    FM_LINT_INTERNAL_PYTHON="$tmp/MacOS/Python" \
-    perl "$ROOT/bin/fm-lint-cache.pl" gate "$tmp/younger-pool" 2 younger "$tmp/younger.wait" -- \
-    perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 8388608 "$tmp/rss" -- \
-    perl -e '$x = "x" x (80 * 1048576); sleep 20' &
-  younger=$!
-  deadline=$((SECONDS + 8))
-  while [ "$SECONDS" -lt "$deadline" ]; do
-    rows=$(ps -axo pid=,stat=,command=)
-    reader=$(printf '%s\n' "$rows" | awk -v want="$tmp/MacOS/Python" '$3 == want && $5 == "mem-tree" { print $2 }')
-    standin=$(printf '%s\n' "$rows" | awk '$3 == "perl" && $4 == "-e" && index($0, "80 * 1048576") { print $2 }')
-    case "$reader" in *T*) reader_stopped=1 ;; esac
-    case "$standin" in *T*) standin_stopped=1 ;; esac
-    sleep 0.1
+  # A younger gate is not the oldest and its watched root of 80 MiB is over its
+  # 40000 KiB budget, so its guard stops that root. It must never stop the watch's
+  # own reader, whether its table shows the reader's full command (from ps) or,
+  # with ps refused, only its bare name (from libproc).
+  for form in full bare; do
+    if [ "$form" = full ]; then
+      PATH="$tmp/hide:$PATH" FM_TEST_GATE_POOL_PREFIX="$tmp/" FM_LINT_HOST_RSS_KIB=40000 FM_LINT_INTERNAL_ROOT_CAP_KIB=1024 \
+        FM_LINT_INTERNAL_PYTHON="$tmp/MacOS/Python" \
+        perl "$ROOT/bin/fm-lint-cache.pl" gate "$tmp/younger-pool.$form" 2 younger "$tmp/younger.$form.wait" -- \
+        perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 8388608 "$tmp/rss.$form" -- \
+        perl -e '$x = "x" x (80 * 1048576); sleep 60' &
+    else
+      PATH="$tmp/refuse:$PATH" FM_LINT_HOST_RSS_KIB=40000 FM_LINT_INTERNAL_ROOT_CAP_KIB=1024 \
+        FM_TEST_REAL_HELPER="$ROOT/bin/fm-proc-info.py" FM_TEST_POOL_ROOT="$tmp/" \
+        FM_TEST_HIDDEN_MATCH="fm-proc-info.py mem-tree" FM_TEST_HIDDEN_FORM=drop \
+        perl "$tmp/watcher/fm-lint-cache.pl" gate "$tmp/younger-pool.$form" 2 younger "$tmp/younger.$form.wait" -- \
+        perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 8388608 "$tmp/rss.$form" -- \
+        perl -e '$x = "x" x (80 * 1048576); sleep 60' &
+    fi
+    younger=$!
+    reader_seen=0 reader_large=0 reader_stopped=0 standin_stopped=0
+    deadline=$((SECONDS + 8))
+    while [ "$SECONDS" -lt "$deadline" ]; do
+      rows=$(ps -axo pid=,ppid=,stat=,rss=,command=)
+      watch=$(printf '%s\n' "$rows" | awk -v parent="$younger" '$2 == parent && index($0, "fm-lint-cache.pl rsswatch") { print $1; exit }')
+      reader=$(printf '%s\n' "$rows" | awk -v parent="${watch:-none}" '$2 == parent && index($0, "fm-proc-info.py mem-tree") { print $3, $4; exit }')
+      standin=$(printf '%s\n' "$rows" | awk -v parent="${watch:-none}" '$2 == parent && index($0, "80 * 1048576") { print $3; exit }')
+      if [ -n "$reader" ]; then
+        reader_seen=1
+        [ "${reader#* }" -lt 8192 ] || reader_large=1
+        case "${reader%% *}" in *T*) reader_stopped=1 ;; esac
+      fi
+      case "$standin" in *T*) standin_stopped=1 ;; esac
+      sleep 0.1
+    done
+    kill -TERM "$younger" 2>/dev/null
+    wait "$younger" 2>/dev/null
+    [ "$reader_seen" -eq 1 ] || { fm_lint_kill_tree "$older"; fail "the resident watch's reader never appeared (form: $form), so this test proved nothing"; }
+    [ "$reader_large" -eq 1 ] || { fm_lint_kill_tree "$older"; fail "the resident watch's reader held under 8192 KiB, below what the guard stops (form: $form), so this test proved nothing"; }
+    [ "$standin_stopped" -eq 1 ] || { fm_lint_kill_tree "$older"; fail "the guard never stopped the root over the budget (form: $form), so this test proved nothing"; }
+    [ "$reader_stopped" -eq 0 ] || { fm_lint_kill_tree "$older"; fail "the growth guard stopped the resident watch's reader (form: $form)"; }
+    ! grep -q '^rss_reader_unavailable=' "$tmp/rss.$form" 2>/dev/null \
+      || { fm_lint_kill_tree "$older"; fail "the resident watch lost its reader under the growth guard (form: $form): $(cat "$tmp/rss.$form")"; }
   done
-  kill -TERM "$younger" 2>/dev/null
-  wait "$younger" 2>/dev/null
-  pkill -KILL -P "$older" 2>/dev/null; kill -KILL "$older" 2>/dev/null
-  wait "$older" 2>/dev/null
-  [ "$standin_stopped" -eq 1 ] || fail "the guard never stopped the root over the budget, so this test proved nothing"
-  [ "$reader_stopped" -eq 0 ] || fail "the growth guard stopped the resident watch's reader"
-  ! grep -q '^rss_reader_unavailable=' "$tmp/rss" 2>/dev/null \
-    || fail "the resident watch lost its reader under the growth guard: $(cat "$tmp/rss")"
-  pass "the growth guard stops a root over the budget but never the resident watch's reader, also under an interpreter named Python"
+  fm_lint_kill_tree "$older"
+  pass "the growth guard stops a root over the budget but never the resident watch's reader, seen by its full command under an interpreter named Python or by its bare name"
 }
 
 test_a_wrapper_around_the_real_shellcheck_shares_the_host_wide_memory_bound() {

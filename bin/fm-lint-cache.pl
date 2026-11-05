@@ -193,8 +193,9 @@ if (($ARGV[0] // '') eq 'gate') {
     # { total => KiB in all of them, gates => { gate pid => [process set, start,
     #   running] }, outside => KiB not in a gate's tree }. A gate's own table and
     # owner reads (ps, fm-proc-info.py table or memory, also seen as a bare or
-    # parenthesized command name or a <defunct> row) are not in its set, so a
-    # gate runs only once its command has started.
+    # parenthesized command name, a <defunct> row or, before their exec, the
+    # gate's own command) are not in its set, so a gate runs only once its
+    # command has started.
     my $host_view = sub {
         my ($table) = @_;
         return undef unless $table;
@@ -205,8 +206,10 @@ if (($ARGV[0] // '') eq 'gate') {
             # A gate is a perl running this script's gate mode; a process that only
             # carries those words later in its arguments (check, timeout) is not one.
             next unless ($table->{$pid}[3] // '') =~ m{\A\S*perl\S*\s+(?:-\S+\s+)*\S*fm-lint-cache\.pl\s+gate\s};
+            my $own_command = $table->{$pid}[3] // '';
             my (@queue, %set) = grep {
-                ($table->{$_}[3] // '') !~ m{\A(?:\S*/)?ps\s|\A\S*sh\s+\S*/ps\s|\A\S*(?i:python)\S*\s+(?:-\S+\s+)*\S*fm-proc-info\.py\s+(?:table|memory)\b|\A\(?\S*(?i:python)\S*\)?\z|\A\(\S+\)\z|\A(?:\[\S+\]\s+)?<defunct>\z}
+                my $command = $table->{$_}[3] // '';
+                $command ne $own_command && $command !~ m{\A(?:\S*/)?ps\s|\A\S*sh\s+\S*/ps\s|\A\S*(?i:python)\S*\s+(?:-\S+\s+)*\S*fm-proc-info\.py\s+(?:table|memory)\b|\A\(?\S*(?i:python)\S*\)?\z|\A\(\S+\)\z|\A(?:\[\S+\]\s+)?<defunct>\z}
             } @{$children{$pid} // []};
             $set{$pid} = 1;
             while (defined(my $member = shift @queue)) {
