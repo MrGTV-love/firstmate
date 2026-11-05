@@ -60,7 +60,7 @@ case "${1:-}" in
     printf '╭────╮\n│    │\n╰────╯\n'
     exit 0 ;;
   list-windows)
-    printf 'foreign:%s\nfm-mpf-lane-m8\nfm-lane-key\nfm-lane-ok\n' \
+    printf 'foreign:%s\nfm-mpf-lane-m8\nfm-lane-key\nfm-lane-ok\nfm-fm-slack-main-window-intake\nfm-other\nfm-fm-mini\n' \
       "${FM_FAKE_TMUX_WINDOW:-fm-lost}"
     exit 0 ;;
 esac
@@ -238,6 +238,111 @@ test_key_send_exit_status_follows_delivery() {
   pass "fm-send --key: exit status follows delivery, and an undelivered key never reports success"
 }
 
+test_task_owner_mismatch_is_refused() {
+  local dir fb home log err rc target
+  for target in fm-mini another-worker; do
+    dir="$TMP_ROOT/owner-mismatch-$target"; mkdir -p "$dir"
+    fb=$(make_stubs "$dir"); home=$(setup_home "$target"); log="$dir/send.log"; err="$dir/send.err"
+    : > "$log"
+    fm_write_meta "$home/state/fm-slack-main-window-intake.meta" \
+      "window=sess:fm-fm-slack-main-window-intake" "kind=ship" "harness=claude"
+    if [ "$target" = fm-mini ]; then
+      fm_write_secondmate_meta "$home/state/$target.meta" "$home" "sess:fm-$target"
+    else
+      fm_write_meta "$home/state/$target.meta" "window=sess:fm-$target" "kind=ship"
+    fi
+    printf 'needs-decision [key=dependency]: waiting for approved input\n' > "$home/state/$target.status"
+    cp "$home/state/$target.status" "$dir/status-before"
+    PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" \
+      "$SEND" "$target" --resolve-key dependency \
+      'Start the fix round for fm-slack-main-window-intake' > "$dir/send.out" 2> "$err"; rc=$?
+    [ "$rc" -ne 0 ] && [ "$rc" -ne 3 ] || fail "wrong-owner steer reported delivered or unconfirmed: $rc"
+    assert_contains "$(cat "$err")" 'fm-slack-main-window-intake' "refusal must name the real owner"
+    [ ! -s "$log" ] || fail "wrong-owner refusal typed into the target"
+    [ ! -e "$home/state/$target.inbox" ] || fail "wrong-owner refusal enqueued a steer"
+    [ ! -d "$home/state/pending-replies" ] || fail "wrong-owner refusal armed a reply expectation"
+    cmp -s "$dir/status-before" "$home/state/$target.status" || fail "refusal answered the dependency"
+    printf 'owner-mismatch target=%s exit=%s diagnostic=%s\n' "$target" "$rc" "$(cat "$err")"
+  done
+  pass "fm-send: a wrong worker or secondmate is refused before delivery or decision closure"
+}
+
+test_owner_relay_and_correct_owner() {
+  local dir fb home log err rc text target body record
+  dir="$TMP_ROOT/owner-allowed"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); home=$(setup_home allowed); log="$dir/send.log"; err="$dir/send.err"
+  fm_write_meta "$home/state/fm-slack-main-window-intake.meta" \
+    "window=sess:fm-fm-slack-main-window-intake" "kind=ship" "harness=claude"
+  fm_write_meta "$home/state/other.meta" "window=sess:fm-other" "kind=ship"
+  text=$'Start the fix round for\nfm-slack-main-window-intake'
+  for target in fm-slack-main-window-intake fm-fm-slack-main-window-intake other; do
+    : > "$log"
+    set --
+    [ "$target" != other ] || set -- --relay
+    PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" \
+      "$SEND" "$target" "$@" "$text" >/dev/null 2> "$err"; rc=$?
+    expect_code 0 "$rc" "correct-owner and explicit-relay steers must send"
+    case "$target" in fm-fm-*) target=${target#fm-} ;; esac
+    for record in "$home/state/$target.inbox/"*.msg; do
+      body=$(bash -c '. "$1"; fm_task_inbox_body "$2"' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$record")
+      [ "$body" = "$text" ] || fail "owner/relay send changed message bytes"
+    done
+    assert_contains "$(cat "$log")" 'Firstmate instruction waiting' "allowed steer must ring its durable record"
+  done
+  pass "fm-send: correct-owner selectors and explicit cross-task relays retain the message"
+}
+
+test_task_mentions_match_whole_tokens() {
+  local dir fb home log err rc text
+  dir="$TMP_ROOT/owner-tokens"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); home=$(setup_home tokens); log="$dir/send.log"; err="$dir/send.err"
+  fm_write_meta "$home/state/task-one.meta" "window=sess:fm-task-one" "kind=ship"
+  fm_write_meta "$home/state/other.meta" "window=sess:fm-other" "kind=ship"
+  for text in 'task-one-longer' 'prefix-task-one' 'task-one.extension' 'task-not-owned-here'; do
+    : > "$log"
+    PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" \
+      "$SEND" other "$text" >/dev/null 2> "$err"; rc=$?
+    expect_code 0 "$rc" "a longer or unrecorded task id is not a local owner mismatch"
+  done
+  for text in '(task-one)' 'task-one,' $'next action:\ntask-one' 'mention task-one --relay in the body'; do
+    : > "$log"
+    PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" \
+      "$SEND" other "$text" >/dev/null 2> "$err"; rc=$?
+    [ "$rc" -ne 0 ] || fail "whole task token escaped ownership guard: $text"
+    [ ! -s "$log" ] || fail "whole-token refusal sent input"
+  done
+  pass "fm-send: whole task tokens reject, longer and unknown ids do not"
+}
+
+test_secondmate_own_task_and_relay_safety() {
+  local dir fb home log err rc
+  dir="$TMP_ROOT/owner-secondmate"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); home=$(setup_home secondmate); log="$dir/send.log"; err="$dir/send.err"
+  mkdir -p "$dir/child/state"
+  fm_write_secondmate_meta "$home/state/fm-mini.meta" "$dir/child" "sess:fm-fm-mini"
+  fm_write_meta "$dir/child/state/child-task.meta" "window=child:fm-child-task" "kind=ship"
+  : > "$log"
+  PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" \
+    "$SEND" fm-mini 'Continue child-task' >/dev/null 2> "$err"; rc=$?
+  expect_code 0 "$rc" "a secondmate child absent from parent direct reports is not a mismatch"
+  assert_grep 'Continue child-task' "$home/state/fm-mini.inbox/001.msg" "secondmate must receive its child task request"
+  : > "$log"
+  PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" \
+    "$SEND" fm-mini --relay --resolve-key nonexistent 'answer' >/dev/null 2> "$err"; rc=$?
+  [ "$rc" -ne 0 ] || fail "relay bypassed missing decision refusal"
+  [ ! -s "$log" ] || fail "relay delivered an invalid decision answer"
+  PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" \
+    "$SEND" fm-mini --relay ' ' >/dev/null 2> "$err"; rc=$?
+  [ "$rc" -ne 0 ] || fail "relay bypassed empty-message refusal"
+  pass "fm-send: a secondmate's own child routes normally and relay grants no decision authority"
+}
+
+fm_test_only
+
+test_task_owner_mismatch_is_refused
+test_owner_relay_and_correct_owner
+test_task_mentions_match_whole_tokens
+test_secondmate_own_task_and_relay_safety
 test_exact_lane_id_send_still_works
 test_key_send_exit_status_follows_delivery
 test_unset_fm_home_fails

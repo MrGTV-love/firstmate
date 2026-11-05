@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
 # Steer a task by durable record: write the message into the task's steering
 # inbox and ring its doorbell (bin/fm-task-inbox-lib.sh), best-effort.
-# Usage: fm-send.sh <target> [--resolve-key <key>]... [--fire-and-forget <delivery-id>] <text...>
+# Usage: fm-send.sh <target> [--relay] [--resolve-key <key>]... [--fire-and-forget <delivery-id>] <text...>
+# Text naming a whole task id recorded in this home's state/<id>.meta must
+# target that owner. A wrong-owner steer is refused before enqueue, reply
+# tracking, or typing, and names the correct task selector. Use --relay before
+# the text only for a deliberate cross-task mention; it bypasses only this
+# ownership check, never decision, lease, target, or delivery safeguards.
+# Tasks owned inside a secondmate's home are not inferred from that home:
+# without a direct-report meta here, their mentions remain ordinary text.
 #   <target> may be an exact task id, a legacy fm-<id> task label resolved
 #   through this home's state/<id>.meta, or an explicit well-formed backend
 #   target. fm-send refuses unresolved guesses rather than falling back to a
@@ -25,8 +32,9 @@
 # doorbell line plus Enter, best-effort. The durable record IS
 # the delivery, so the record's fate alone governs the exit: 0 = the steer is
 # durably sent (recorded); nonzero = nothing was confirmed delivered and a
-# resend is appropriate (unresolvable target, an endpoint that cannot be
-# locked and revalidated or that retired or changed, an unwritable record, a
+# corrected send is appropriate (a wrong-owner refusal must be addressed to
+# its named owner or explicitly relayed; an unresolvable target, an endpoint
+# that cannot be locked and revalidated or that retired or changed, an unwritable record, a
 # failed or lost remote transport) or a decision-close append failed after
 # delivery (the error then carries the exact manual close). The remote enqueue
 # is idempotent: the remote leg deduplicates an exact re-run of the same
@@ -471,6 +479,7 @@ fi
 # message exactly as before, so ordinary sends are byte-identical.
 RESOLVE_KEYS=
 FIRE_AND_FORGET_ID=
+RELAY=0
 fm_send_add_resolve_key() { # <key>
   local k=$1
   case "$k" in
@@ -489,6 +498,10 @@ fm_send_add_resolve_key() { # <key>
 }
 while :; do
   case "${1:-}" in
+  --relay)
+    RELAY=1
+    shift
+    ;;
   --resolve-key)
     [ $# -ge 2 ] || {
       echo "error: --resolve-key requires a key" >&2
@@ -819,6 +832,22 @@ else
   if [ -z "${MESSAGE//[[:space:]]/}" ]; then
     echo "error: a text steer requires a nonempty message; nothing was sent (an empty marked request would deliver only marker and correlation bytes and leave the parent waiting on a reply to nothing)" >&2
     exit 1
+  fi
+  if [ "$RELAY" = 0 ]; then
+    # Tokenize once, using the task-id alphabet rather than substring matches.
+    # A final prose period is punctuation only when no exact meta names it.
+    owner_target=
+    [ -z "$TARGET_META" ] || owner_target=$(fm_send_id_from_meta "$TARGET_META")
+    while IFS= read -r mentioned_task; do
+      [ -n "$mentioned_task" ] || continue
+      while [ ! -f "$STATE/$mentioned_task.meta" ] && [ "${mentioned_task%.}" != "$mentioned_task" ]; do
+        mentioned_task=${mentioned_task%.}
+      done
+      [ -f "$STATE/$mentioned_task.meta" ] || continue
+      [ "$mentioned_task" != "$owner_target" ] || continue
+      echo "error: task '$mentioned_task' is owned by this home's direct report '$mentioned_task', not target '$RAW_TARGET'; nothing was sent. Send to '$mentioned_task', or use --relay for a deliberate cross-task mention." >&2
+      exit 1
+    done < <(printf '%s\n' "$MESSAGE" | LC_ALL=C tr -cs 'A-Za-z0-9_.-' '\n')
   fi
   if [ "$TARGET_BACKEND" = remote ]; then
     FM_SEND_REMOTE_BUDGET=${FM_SEND_REMOTE_BUDGET:-30}
