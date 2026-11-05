@@ -1,6 +1,6 @@
 // Native-SDK scope regression, invoked by fm-dsh-primary.test.sh when an SDK is supplied.
 import assert from 'node:assert/strict';
-import {mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, unlinkSync, realpathSync, readdirSync, rmSync, symlinkSync} from 'node:fs';
+import {chmodSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, unlinkSync, realpathSync, readdirSync, rmSync, symlinkSync} from 'node:fs';
 import {execFileSync, spawn, spawnSync} from 'node:child_process';
 import {join, resolve} from 'node:path';
 import {createRequire} from 'node:module';
@@ -55,7 +55,7 @@ const script = (file, body) => {
 };
 script('fm-turnend-guard.sh', 'exit 0');
 // The gate only delays the canonical writer so the release barrier is observable.
-script('fm-lock.sh', `printf '%s\\n' "\${1:-acquire}" >> "$FM_HOME/state/lock-calls"; if [ "\${1:-}" = release ] && [ -f "$FM_HOME/state/release-fail" ]; then echo 'fixture release fault' >&2; exit 2; fi; while [ -f "$FM_HOME/state/release-gate" ]; do sleep 0.025; done; exec bash ${JSON.stringify(join(root, 'bin/fm-lock.sh'))} "$@"`);
+script('fm-lock.sh', `printf '%s\\n' "\${1:-acquire}" >> "$FM_HOME/state/lock-calls"; while [ -f "$FM_HOME/state/release-gate" ]; do sleep 0.025; done; exec bash ${JSON.stringify(join(root, 'bin/fm-lock.sh'))} "$@"`);
 script('fm-sessionstart-run.sh', 'echo FORBIDDEN-HOT-STARTUP; exit 99');
 script('fm-wake-drain.sh', 'test "$1" = --queued; cat "$FM_HOME/state/queue"');
 script('fm-watch-arm.sh', 'echo "watcher: started pid=fixture"; while [ ! -f "$FM_HOME/state/release" ]; do read -r -t 0.02 _ || :; done; echo "check: tagged-native-wake"');
@@ -212,21 +212,26 @@ try {
   await delay(40);
   assert.equal(lockCalls().filter(call => call === 'release').length, 1, 'stale termination and HMR disposal must not release resumed ownership');
   assert.deepEqual(pair(), owned);
-  // A failed canonical release stays visible and leaves ownership in place,
-  // without poisoning the next legitimate same-ID attachment.
+  const events = () => readFileSync(join(home, 'state/.dsh-primary-events.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
+  const releaseErrors = () => events().filter(row => row.event === 'release-error');
+  assert.equal(releaseErrors().length, 0, 'a successful owned release is not an error');
+  // A real canonical release fault (exit 1 from the unwritable state directory)
+  // stays visible and leaves ownership in place, without poisoning the next
+  // legitimate same-ID attachment.
   unlinkSync(join(home, 'state/release'));
   const failing = host.plugin(bridge, {root: code, home, sessionId: target.id});
   await failing.await();
   await until(() => arms() === 4, 'the replacement re-attaches through its owned lock');
-  writeFileSync(join(home, 'state/release-fail'), '');
-  await replacement.scope.dispose();
-  live.delete(replacement.id);
-  host.emit(scopeTarget(replacement, replacement), 'agent/disposed', {agent: replacement});
-  const events = () => readFileSync(join(home, 'state/.dsh-primary-events.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
-  await until(() => events().some(row => row.event === 'release-error'), 'a failed release must be recorded');
-  assert.match(events().find(row => row.event === 'release-error').detail, /fixture release fault/);
+  chmodSync(join(home, 'state'), 0o555);
+  try {
+    assert.throws(() => writeFileSync(join(home, 'state/write-probe'), ''), {code: 'EACCES'}, 'the fault needs a really unwritable state directory');
+    await replacement.scope.dispose();
+    live.delete(replacement.id);
+    host.emit(scopeTarget(replacement, replacement), 'agent/disposed', {agent: replacement});
+    await until(() => releaseErrors().length === 1, 'a real exit-1 release fault must be recorded');
+  } finally { chmodSync(join(home, 'state'), 0o755); }
+  assert.match(releaseErrors()[0].detail, /cannot write session lock/);
   assert.deepEqual(pair(), owned, 'a failed release must fail closed without removing ownership');
-  unlinkSync(join(home, 'state/release-fail'));
   const successor = agent(target.id);
   writeFileSync(join(home, 'state/release'), '');
   await host.serial(scopeTarget(successor, successor), 'agent/created', {agent: successor, source: 'resume'});
@@ -234,6 +239,19 @@ try {
   assert.deepEqual(lockCalls().slice(-1), ['release'], 'the owned successor needs no further lock call');
   await failing.dispose();
   await successor.scope.dispose();
+  // A different live session stays refused after that failure. Its own
+  // termination records the legitimate refusal and changes nothing.
+  const different = agent('session-different');
+  const refusedMount = host.plugin(bridge, {root: code, home, sessionId: different.id});
+  await refusedMount.await();
+  assert.deepEqual(pair(), owned, 'a different session must not acquire after a failed release');
+  await different.scope.dispose();
+  live.delete(different.id);
+  host.emit(scopeTarget(different, different), 'agent/disposed', {agent: different});
+  await until(() => releaseErrors().length === 2, 'a refused release must be recorded');
+  assert.match(releaseErrors()[1].detail, /cannot release another or unverified/);
+  assert.deepEqual(pair(), owned, 'a refused release must leave the exact owner in place');
+  await refusedMount.dispose();
 
   // A genuine process-owned TUI profile still admits the legacy root/home
   // configuration and its future-created primary through the same native SDK.
