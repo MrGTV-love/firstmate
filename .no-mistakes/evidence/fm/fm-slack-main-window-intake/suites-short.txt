@@ -1,9 +1,13 @@
-### python3 tests/fm_slack_watch_test.py
-......................................
+== python3 tests/fm_slack_watch_test.py
+.................................................
 ----------------------------------------------------------------------
-Ran 38 tests in 7.086s
+Ran 49 tests in 0.220s
 
 OK
-rc=
-### bash tests/fm-slack-secret-scan.test.sh
-note: rc= is blank because the shell was zsh (no PIPESTATUS); the unittest result line OK is the pass signal.
+exit=0
+== bash tests/fm-slack-secret-scan.test.sh
+ok - scan redacted and detected both planted copies
+exit=0
+== bash tests/fm-slack-intake-unchanged.test.sh
+ok - intake refusals hold
+exit=0

@@ -1,0 +1,7 @@
+== BASE 01d52eaecfc9669cf1309f73d913e9f175a9e488 bin/ (head fixtures + head replay helper, test-only files)
+$ fm-slack-check.sh arm --replay intake
+armed: state/slack.check.sh
+owner types top-level DM 2000.000100: please check the status of vernant d7
+$ fm-slack-poll.sh --replay intake
+stdout> <empty>
+chat.postMessage count: 0

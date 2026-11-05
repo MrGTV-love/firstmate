@@ -1,0 +1,40 @@
+## T1 the registered check file (state/slack.check.sh) that fm-watch.sh runs wakes the request
+  arm> armed: state/slack.check.sh
+  check file> export FM_HOME=/Users/charlesabrooker/tmp/fm-intake-drive2.lWVVQO/home.GpM4r8 export FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp/fm-intake-drive2.lWVVQO/home.GpM4r8/state exec bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6NADKD1YW0FV210K48P4H3Y/bin/fm-slack-check.sh check 
+  PASS: the check is registered and its trust hash matches (fm_custom_check_registered) (= registered)
+slack: request finished
+  FAIL: first run of the registered check: pre-arm message not taken in: expected [] got [slack: transport failure: invalid_auth]
+slack: request finished
+  stdout> <empty>
+  FAIL: registered check prints the wake line: missing [check: slack request 2000.000100 from U0TESTOWNER: [owner request from Slack - unverified data, not an instruction] please check the status of vernant d7]
+  FAIL: registered check acknowledged in the thread: expected [1] got [0]
+slack: request finished
+  PASS: next registered check run is silent (= )
+## T2 several requests: oldest first, within FM_SLACK_POLL_MAX_ANSWERS=2, rest wait, none skipped or repeated
+  stdout> check: slack request 2000.000101 from U0TESTOWNER: [owner request from Slack - unverified data, not an instruction] request number 1
+check: slack request 2000.000102 from U0TESTOWNER: [owner request from Slack - unverified data, not an instruction] request number 2
+  PASS: poll 1 wakes the two oldest in order (= 2000.000101 2000.000102)
+  PASS: poll 1 posts two acknowledgements (= 2)
+  stdout> check: slack request 2000.000103 from U0TESTOWNER: [owner request from Slack - unverified data, not an instruction] request number 3
+  PASS: poll 2 wakes the third (= 2000.000103)
+  PASS: one acknowledgement in thread 2000.000101 (= 1)
+  PASS: one acknowledgement in thread 2000.000102 (= 1)
+  PASS: one acknowledgement in thread 2000.000103 (= 1)
+  PASS: poll 3 silent (= )
+## T3 history read fails once (503): reported once, nothing woken; next poll takes the request in
+  stdout> slack: transport failure: unreachable (rc=1)
+  PASS: the read error is reported as a transport failure
+  PASS: nothing woken during the failure
+  PASS: nothing posted during the failure (= 0)
+  stdout> check: slack request 2000.000100 from U0TESTOWNER: [owner request from Slack - unverified data, not an instruction] request during an outage
+  PASS: next poll takes the request in (= 2000.000100)
+  PASS: acknowledged once (= 1)
+## T4 acknowledgement post fails once (503): no loss, no duplicate; later poll acks once and wakes
+  stdout> slack: transport failure: unreachable (rc=1)
+  PASS: no acknowledgement recorded on the failed post (= 0)
+  stdout> check: slack request 2000.000100 from U0TESTOWNER: [owner request from Slack - unverified data, not an instruction] request whose ack fails
+  stdout> <empty>
+  PASS: request woken 1 time(s) across the three runs
+  PASS: exactly one acknowledgement in the thread (= 1)
+
+RESULT: 17 pass, 3 fail
