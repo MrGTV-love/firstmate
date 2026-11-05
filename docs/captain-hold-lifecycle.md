@@ -43,6 +43,7 @@ It never reads report bodies, review artifacts, terminal output, or chat.
 | `freeze` | Declares the one project an open hold freezes. | [A hold can freeze a project](#a-hold-can-freeze-a-project) |
 | `frozen` | Read-only check of whether an open hold in this home or a local home above it freezes a task's project. | [A hold can freeze a project](#a-hold-can-freeze-a-project) |
 | `answers` | Channel-agnostic entry point for keyed answers. | [Answer-time resolution](#answer-time-resolution) |
+| `archived-resolution` | Read-only fact for `bin/fm-contributions.sh`: whether a task's done-archive row ends in an answer, withdrawal, or reconcile record, and its `Resolved at:` time. | [`bin/fm-captain-hold.sh --help`](../bin/fm-captain-hold.sh) |
 | `bind`, `unbind`, `binding` | Record that a captured-answer source feeds the keyed-answer intake. | [Source bindings](#source-bindings) |
 | `reconcile-requests` | Internal intake that records a reconcile request from a board selection. | [Reconcile](#reconcile-re-check-reality-never-a-blind-close) |
 | `reconcile close`, `reconcile note`, `reconcile list` | Resolve verified calls, or retire/list pending board requests. | [Verifying and retiring a request](#verifying-and-retiring-a-request) |
