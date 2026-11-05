@@ -140,6 +140,7 @@
     "teardown-superseded-slot-lease",
     "captain-hold-withdraw-ruling",
     "slack-dm-retarget-pending-work",
+    "slack-request-resolve-failed-only",
     "github-accounting-foreign-database",
     "open-loops-one-deferral",
     "pipeline-start-unreadable-source",
@@ -6830,6 +6831,40 @@
       "tier": "C",
       "harm": "irreversible",
       "layer_note": "added by the Slack watch activation-readiness change; deny without a guard event: retarget exits non-zero with slack: refused: dm_user_changed_with_pending_work (raised in Watch.retarget in bin/fm_slack_watch.py) and changes the journal only by the rows its own read of the old threads staged; without the guard, answers pending on the old DM would be lost or misrouted after a retarget; the two bin/fm-slack-check.sh help lines document the refusal and its remedy; test X26 proves the refusal on a journal that already holds work and the retarget that succeeds once the journal is empty; test X41 proves the refusal after the retarget read stages an unread reply, that only that row is added, and the retarget that succeeds once it drains; retarget also exits non-zero with slack: refused: dm_user_changed_with_unread_requests (raised in Watch.retarget through Watch.unread_requests) while the old DM still holds an owner request newer than its starting point that no poll has taken in, and it only looks and never takes a request in itself; the INTAKE-5 drain scenario in tests/fm-slack-watch.test.sh proves the refusal after a capped poll and the retarget that succeeds once polling has delivered every request, and the retarget unit tests in tests/fm_slack_watch_test.py prove that messages which are not requests do not block it"
+    },
+    {
+      "decision": "deny",
+      "fail_direction": "closed",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "id": "slack-request-resolve-failed-only",
+      "owner": "bin/fm_slack_watch.py",
+      "sites": [
+        {
+          "file": "bin/fm-slack-check.sh",
+          "match": "call and refuses an unknown ts or a request that is not failed."
+        },
+        {
+          "file": "bin/fm_slack_watch.py",
+          "match": "print('slack: refused: ' + (str(error) if isinstance(error, SlackError) else 'local_state_or_response_error'),"
+        }
+      ],
+      "invariant": "fm-slack-check.sh resolve closes only an open failed Slack request row",
+      "layer": "runtime-block",
+      "source": "the pending journal in state/slack-watch/state.json, read by Watch.close_request() in bin/fm_slack_watch.py",
+      "trigger": "bin/fm-slack-check.sh resolve <request-ts> names a ts with no pending request row (no_pending_request), a request row that is not failed (request_not_failed), or the state cannot be read or written",
+      "remedy": "run bin/fm-slack-poll.sh and pass bin/fm-slack-check.sh resolve <request-ts> one ts from a slack: request <ts> not acknowledged (failed, owner Main) line it prints; a request that is not failed needs no resolve, because polling acknowledges and delivers it",
+      "budget": 1,
+      "test": "tests/fm-slack-watch.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "layer_note": "added by the Slack main-window intake change; deny without a guard event: resolve exits non-zero with one slack: refused: line on stderr (no_pending_request or request_not_failed, raised in Watch.close_request in bin/fm_slack_watch.py, or local_state_or_response_error), makes no Slack call and leaves the journal unchanged; the bin/fm-slack-check.sh help line documents the refusal; the INTAKE-3 [resolve] scenario in tests/fm-slack-watch.test.sh proves the refusal for an unknown ts and a request that is not failed and the resolve that closes the failed row, and test_resolve_closes_only_a_failed_request_and_makes_no_slack_call in tests/fm_slack_watch_test.py proves the same at the unit level"
     },
     {
       "id": "pipeline-start-unreadable-source",
