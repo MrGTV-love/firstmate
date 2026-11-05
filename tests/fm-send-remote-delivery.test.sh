@@ -107,6 +107,12 @@ SH
 exit 0
 SH
   chmod +x "$fb/sleep"
+  # These fixtures never own a real Herdr endpoint on the developer's host.
+  cat > "$fb/herdr" <<'SH'
+#!/usr/bin/env bash
+exit 1
+SH
+  chmod +x "$fb/herdr"
   cat > "$fb/fake-ssh" <<'SH'
 #!/usr/bin/env bash
 set -u
@@ -843,6 +849,86 @@ test_local_pending_does_not_close_resolve_key() {
   pass "fm-send local: an unconfirmed submit still never closes a --resolve-key decision"
 }
 
+test_declared_remote_input_is_reported_without_access_grants() {
+  local dir fb ssh_log home rhome rc before after rec corr body
+  dir="$TMP_ROOT/required-remote-input"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
+  rhome=$(setup_remote_secondmate_home required-input)
+  home=$(setup_remote_parent_home required-input "$rhome")
+  mkdir -p "$rhome/data"
+  printf 'source report\n' > "$home/data/required.md"
+  printf 'undeclared source neighbor\n' > "$home/data/neighbor.md"
+  chmod 600 "$home/data/required.md" "$home/data/neighbor.md"
+  before=$(LC_ALL=C ls -ld "$home/data" "$home/data/required.md" "$home/data/neighbor.md" "$rhome/data")
+  rc=0
+  send_env "$fb" "$home" "$ssh_log" "$SEND" rsm --relay --require-input data/required.md \
+    'Use the declared input report' > "$dir/out" 2> "$dir/err" || rc=$?
+  [ "$rc" -ne 0 ] || fail "sender-only file was accepted as an accessible remote input"
+  assert_contains "$(cat "$dir/err")" 'data/required.md' "remote failure must name the declared artifact"
+  assert_contains "$(cat "$dir/err")" "receiver 'rsm'" "remote failure must name its actual receiver"
+  [ -z "$(remote_inbox_records "$rhome")" ] || fail "missing required input published a remote steer"
+  [ -z "$(pending_record "$home")" ] || fail "missing required input left a false pending reply"
+  [ ! -e "$rhome/data/required.md" ] && [ ! -e "$rhome/data/neighbor.md" ] \
+    || fail "validation silently transferred declared or undeclared files"
+  after=$(LC_ALL=C ls -ld "$home/data" "$home/data/required.md" "$home/data/neighbor.md" "$rhome/data")
+  [ "$before" = "$after" ] || fail "input failure changed file or directory permissions"
+  # Fixture setup makes only the declared input available, without extending
+  # the production transfer writer beyond its existing handoff confinement.
+  cp "$home/data/required.md" "$rhome/data/required.md"
+  rc=0
+  send_env "$fb" "$home" "$ssh_log" "$SEND" rsm --require-input data/required.md \
+    'Use the declared input report' > "$dir/out" 2> "$dir/err" || rc=$?
+  expect_code 0 "$rc" "a receiver-accessible declared input should allow delivery"
+  rec=$(remote_inbox_records "$rhome")
+  body=$(cat "$rec")
+  assert_contains "$body" 'Required input artifacts' "the receiving worker must see the declaration"
+  corr=$(fm_pending_reply_extract_corr "$body")
+  [ -n "$corr" ] || fail "input steer lost its request identity"
+  # A completed action may consume its input. Retrying its existing identity
+  # must still find the handled record, not fail validation or execute twice.
+  mv "$rec" "$rhome/state/parent-route/rsm.inbox/handled/"
+  rm "$rhome/data/required.md"
+  rc=0
+  send_env "$fb" "$home" "$ssh_log" FM_PENDING_REPLY_EXISTING_CORR="$corr" \
+    "$SEND" rsm --require-input data/required.md 'Use the declared input report' \
+    > "$dir/retry.out" 2> "$dir/retry.err" || rc=$?
+  expect_code 0 "$rc" "an acknowledged idempotent retry must not revalidate a consumed input"
+  [ -z "$(remote_inbox_records "$rhome")" ] || fail "input retry duplicated the instruction"
+  [ -f "$rhome/state/parent-route/rsm.inbox/handled/001.msg" ] || fail "input retry lost the handled record"
+  pass "fm-send remote: declared inputs are checked on the receiver without grants, and consumed-input retries deduplicate"
+}
+
+test_declared_input_cannot_expand_transfer_confinement() {
+  local dir fb ssh_log home rhome rc before after
+  dir="$TMP_ROOT/confined-input"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
+  rhome=$(setup_remote_secondmate_home confined-input)
+  home=$(setup_remote_parent_home confined-input "$rhome")
+  mkdir -p "$rhome/data"
+  printf 'outside sentinel, must not be opened\n' > "$dir/outside.md"
+  chmod 600 "$dir/outside.md"
+  ln -s "$dir/outside.md" "$rhome/data/escape.md"
+  before=$(LC_ALL=C ls -ld "$dir/outside.md" "$rhome/data" "$rhome/data/escape.md")
+  rc=0
+  send_env "$fb" "$home" "$ssh_log" "$SEND" rsm --require-input data/escape.md \
+    'Use the declared input' > "$dir/out" 2> "$dir/err" || rc=$?
+  [ "$rc" -ne 0 ] || fail "declared input bypassed the existing symlink confinement"
+  [ -z "$(remote_inbox_records "$rhome")" ] || fail "unsafe declared input published a steer"
+  after=$(LC_ALL=C ls -ld "$dir/outside.md" "$rhome/data" "$rhome/data/escape.md")
+  [ "$before" = "$after" ] || fail "validation broadened the existing access"
+  assert_not_contains "$(cat "$dir/out" "$dir/err")" 'outside sentinel' "validation must not read or disclose input contents"
+  rc=0
+  send_env "$fb" "$home" "$ssh_log" "$SEND" rsm --require-input "$dir/outside.md" \
+    'Use the declared input' > "$dir/out" 2> "$dir/err" || rc=$?
+  [ "$rc" -ne 0 ] || fail "an absolute input escaped the existing receiving-home confinement"
+  [ -z "$(remote_inbox_records "$rhome")" ] || fail "outside input published a steer"
+  pass "fm-send remote: declaring an input grants neither symlink escape nor broader file access"
+}
+
+fm_test_only
+
+test_declared_remote_input_is_reported_without_access_grants
+test_declared_input_cannot_expand_transfer_confinement
 test_remote_steer_lands_in_remote_inbox
 test_remote_rerun_is_idempotent
 test_remote_retry_failure_preserves_ambiguous_expectation

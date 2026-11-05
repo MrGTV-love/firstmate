@@ -337,8 +337,60 @@ test_secondmate_own_task_and_relay_safety() {
   pass "fm-send: a secondmate's own child routes normally and relay grants no decision authority"
 }
 
+test_arbitrary_path_mentions_are_not_inputs() {
+  local dir fb home log err rc text body
+  dir="$TMP_ROOT/path-mentions"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); home=$(setup_home mentions); log="$dir/send.log"; err="$dir/send.err"
+  fm_write_meta "$home/state/other.meta" "window=sess:fm-other" "kind=ship"
+  fm_write_meta "$home/state/task-one.meta" "window=sess:fm-task-one" "kind=ship"
+  text='Write output to /not-created/task-one/output.md; example /examples/task-one/example.md; the other computer has /Users/studio/task-one/report.md and C:\reports\task-one\report.md.'
+  : > "$log"
+  PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" \
+    "$SEND" other "$text" >/dev/null 2> "$err"; rc=$?
+  expect_code 0 "$rc" "undeclared output, example and other-host paths are ordinary message text"
+  body=$(bash -c '. "$1"; fm_task_inbox_body "$2"' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$home/state/other.inbox/001.msg")
+  [ "$body" = "$text" ] || fail "path mentions changed the delivered instruction"
+  pass "fm-send: output, example and other-computer paths are not input declarations or task tokens"
+}
+
+test_declared_local_input_is_checked_without_grants() {
+  local dir fb home log err rc worktree before after body
+  dir="$TMP_ROOT/local-input"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); home=$(setup_home input); log="$dir/send.log"; err="$dir/send.err"
+  worktree="$dir/task-copy"; mkdir -p "$worktree"
+  fm_write_meta "$home/state/other.meta" "window=sess:fm-other" "kind=ship" "worktree=$worktree"
+  printf 'needs-decision [key=dependency]: waiting for input\n' > "$home/state/other.status"
+  cp "$home/state/other.status" "$dir/status-before"
+  : > "$log"
+  PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" \
+    "$SEND" other --relay --require-input "$worktree/required.md" --resolve-key dependency \
+    'Use the declared report' >/dev/null 2> "$err"; rc=$?
+  [ "$rc" -ne 0 ] || fail "a missing declared input was silently delegated"
+  assert_contains "$(cat "$err")" "$worktree/required.md" "missing input report must name its artifact"
+  assert_contains "$(cat "$err")" "receiver 'other'" "missing input report must name its receiver"
+  [ ! -s "$log" ] || fail "missing input typed a doorbell"
+  [ ! -f "$home/state/other.inbox/001.msg" ] || fail "missing input published an instruction"
+  cmp -s "$dir/status-before" "$home/state/other.status" || fail "missing input closed a dependency"
+  printf 'required report\n' > "$worktree/required.md"
+  printf 'undeclared neighbor\n' > "$worktree/neighbor.md"
+  chmod 600 "$worktree/required.md" "$worktree/neighbor.md"
+  before=$(LC_ALL=C ls -ld "$worktree" "$worktree/required.md" "$worktree/neighbor.md")
+  PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" \
+    "$SEND" other --require-input "$worktree/required.md" 'Use the declared report' >/dev/null 2> "$err"; rc=$?
+  expect_code 0 "$rc" "an accessible input in the recorded task copy should send"
+  after=$(LC_ALL=C ls -ld "$worktree" "$worktree/required.md" "$worktree/neighbor.md")
+  [ "$before" = "$after" ] || fail "input validation changed artifact or parent access"
+  [ ! -e "$worktree/state" ] || fail "input validation wrote operational state into the task copy"
+  body=$(bash -c '. "$1"; fm_task_inbox_body "$2"' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$home/state/other.inbox/001.msg")
+  assert_contains "$body" "$worktree/required.md" "the receiver needs the declared input location"
+  case "$body" in *neighbor.md*) fail "an undeclared neighbor was included in the instruction" ;; esac
+  pass "fm-send: declared local inputs gate delivery without permission changes or implicit transfers"
+}
+
 fm_test_only
 
+test_arbitrary_path_mentions_are_not_inputs
+test_declared_local_input_is_checked_without_grants
 test_task_owner_mismatch_is_refused
 test_owner_relay_and_correct_owner
 test_task_mentions_match_whole_tokens

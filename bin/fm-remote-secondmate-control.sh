@@ -7,7 +7,10 @@
 #   fm-remote-secondmate-control.sh state <id>
 #   fm-remote-secondmate-control.sh route <id>
 #   fm-remote-secondmate-control.sh stay <id>
-#   fm-remote-secondmate-control.sh send <id> <message> [fire-and-forget]
+#   fm-remote-secondmate-control.sh send <id> <message> [fire-and-forget] [--require-input <path>]...
+# Required input declarations are metadata-checked on this receiving host,
+# under fm-remote-file.sh's existing confinement, before a new record is
+# published. Retries of an already-delivered record retain their dedup outcome.
 #   fm-remote-secondmate-control.sh key <id> <key>
 #   fm-remote-secondmate-control.sh capture <id> [lines]
 #   fm-remote-secondmate-control.sh observe <id>
@@ -336,10 +339,29 @@ cmd_stay() {
     "$SCRIPT_DIR/fm-control.sh" "$id" stay
 }
 
+remote_send_check_inputs() { # <newline-delimited-inputs> <receiver-id>
+  local declared=$1 id=$2 input
+  [ -n "$declared" ] || return 0
+  while IFS= read -r input; do
+    if ! "$SCRIPT_DIR/fm-remote-file.sh" check "$input" >/dev/null; then
+      printf "error: required input '%s' is unavailable to receiver '%s' on its receiving host; stage only this declared artifact through the existing authorized transfer mechanism; no access was granted\n" "$input" "$id" >&2
+      return 1
+    fi
+  done <<< "$declared"
+}
+
 cmd_send() {
-  local id=$1 message=$2 delivery_mode=${3:-} rec ring_rc=0 meta meta_lock
+  local id=$1 message=$2 delivery_mode='' required_inputs='' input rec ring_rc=0 meta meta_lock
+  shift 2
+  if [ "${1:-}" = fire-and-forget ]; then delivery_mode=$1; shift; fi
+  while [ "$#" -gt 0 ]; do
+    [ "$1" = --require-input ] && [ "$#" -ge 2 ] && [ -n "$2" ] || die "invalid send input declaration"
+    input=$2
+    case "$input" in *$'\n'*|*$'\r'*|*$'\t'*) die "declared input path contains control characters" ;; esac
+    required_inputs="${required_inputs}${required_inputs:+$'\n'}$input"
+    shift 2
+  done
   validate_id "$id"
-  [ -z "$delivery_mode" ] || [ "$delivery_mode" = fire-and-forget ] || die "invalid send delivery mode"
   validate_home "$id"
   meta=$(meta_path "$id")
   meta_lock=$(fm_meta_lock_path "$meta") || die "remote secondmate metadata lock path is invalid"
@@ -358,7 +380,8 @@ cmd_send() {
   # the parent may safely repeat this leg. Exit 0 once the record durably
   # exists; no ring outcome changes it, because the parent transport owns any
   # retry or reply-tracking policy from here.
-  if ! rec=$(fm_task_inbox_write_idempotent "$CONTROL_STATE" "$id" "$message" "$delivery_mode"); then
+  if ! rec=$(fm_task_inbox_write_idempotent "$CONTROL_STATE" "$id" "$message" "$delivery_mode" \
+    remote_send_check_inputs "$required_inputs" "$id"); then
     fm_lock_release "$meta_lock"
     die "steering-inbox record could not be written under $CONTROL_STATE/$id.inbox"
   fi
@@ -504,7 +527,7 @@ case "${1:-}" in
   state) shift; [ "$#" -eq 1 ] || usage; validate_id "$1"; validate_home "$1"; state_value "$1" ;;
   route) shift; [ "$#" -eq 1 ] || usage; cmd_route "$1" ;;
   stay) shift; [ "$#" -eq 1 ] || usage; cmd_stay "$1" ;;
-  send) shift; [ "$#" -ge 2 ] && [ "$#" -le 3 ] || usage; cmd_send "$@" ;;
+  send) shift; [ "$#" -ge 2 ] || usage; cmd_send "$@" ;;
   key) shift; [ "$#" -eq 2 ] || usage; cmd_key "$@" ;;
   capture) shift; [ "$#" -ge 1 ] && [ "$#" -le 2 ] || usage; cmd_capture "$@" ;;
   observe) shift; [ "$#" -eq 1 ] || usage; cmd_observe "$@" ;;

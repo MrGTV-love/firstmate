@@ -2,11 +2,15 @@
 # Path-confined remote file transfer for fm-on.sh.
 #
 # Usage:
+#   fm-remote-file.sh check <home-relative-or-home-absolute-path>
 #   fm-remote-file.sh get <relative-path> [max-bytes]
 #   fm-remote-file.sh put state/handoff/<id>.outbox.md <max-bytes> <bytes> <sha256> <generation>
 #
 # A get path is relative to FM_HOME, must resolve through ordinary directories
 # to one non-symlink regular file inside that home, and is bounded before output.
+# Check uses that same confinement and tests readability without opening the
+# file or transferring bytes. It may name an absolute path only inside FM_HOME.
+# It never changes permissions, sandbox grants, or the allowed transfer paths.
 # Put is deliberately narrower: it atomically replaces only a backlog handoff
 # scratch file under state/handoff. There is no delete operation and no generic
 # write path; the receiving command owns scratch cleanup after committed ingest.
@@ -176,6 +180,16 @@ MAX=${3:-$MAX_DEFAULT}
 case "$MAX" in ''|*[!0-9]*|0) die "max-bytes must be a positive integer" ;; esac
 [ "$MAX" -le 1048576 ] || die "max-bytes exceeds the 1048576-byte safety bound"
 case "$COMMAND" in
+  check)
+    [ "$#" -eq 2 ] || usage
+    case "$REL" in
+      "$FM_HOME"/*) REL=${REL#"$FM_HOME"/} ;;
+      /*) die "required input is outside the receiving home: $REL" ;;
+    esac
+    FILE=$(resolve_file "$REL")
+    [ -r "$FILE" ] || die "required input is not readable: $REL"
+    printf 'available: %s\n' "$FILE"
+    ;;
   get)
     [ "$#" -le 3 ] || usage
     FILE=$(resolve_file "$REL")

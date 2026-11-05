@@ -227,13 +227,23 @@ _fm_task_inbox_write_record_locked() {  # <inbox-dir> <text> [delivery-mode]
 
 # Durably enqueue one steer: temp-write, then atomic rename into the next
 # sequence slot. Prints the record path. Fails without a partial record.
-fm_task_inbox_write() {  # <state-dir> <task-id> <text> [delivery-mode]
+# After delivery-mode, an optional trusted command and its argv validate inputs
+# under the sequence lock immediately before a NEW record is published.
+# Idempotent retries that find an existing record do not rerun that command:
+# a completed worker may already have consumed or removed its input artifact.
+fm_task_inbox_write() {  # <state-dir> <task-id> <text> [delivery-mode [validator args...]]
   local state=$1 task=$2 text=$3 delivery_mode=${4:-} dir lock rec status=0
   dir=$(fm_task_inbox_dir "$state" "$task")
   mkdir -p "$dir/handled" || return 1
   lock="$dir/.seq.lock"
   fm_task_inbox_lock_acquire "$lock" || return 1
-  rec=$(_fm_task_inbox_write_record_locked "$dir" "$text" "$delivery_mode") || status=1
+  if [ "$#" -gt 4 ]; then
+    shift 4
+    "$@" || status=1
+  fi
+  if [ "$status" -eq 0 ]; then
+    rec=$(_fm_task_inbox_write_record_locked "$dir" "$text" "$delivery_mode") || status=1
+  fi
   fm_lock_release "$lock"
   [ "$status" -eq 0 ] || return 1
   printf '%s' "$rec"
@@ -250,7 +260,7 @@ fm_task_inbox_write() {  # <state-dir> <task-id> <text> [delivery-mode]
 # secondmate request embeds a per-request correlation token in its body. The
 # local plane keeps plain fm_task_inbox_write: its outcome is synchronous, so
 # a repeated identical local steer is a deliberate new instruction.
-fm_task_inbox_write_idempotent() {  # <state-dir> <task-id> <text> [delivery-mode]
+fm_task_inbox_write_idempotent() {  # <state-dir> <task-id> <text> [delivery-mode [validator args...]]
   local state=$1 task=$2 text=$3 delivery_mode=${4:-} dir lock want have f rec='' status=0
   dir=$(fm_task_inbox_dir "$state" "$task")
   mkdir -p "$dir/handled" || return 1
@@ -296,7 +306,13 @@ fm_task_inbox_write_idempotent() {  # <state-dir> <task-id> <text> [delivery-mod
     status=1
   fi
   if [ "$status" -eq 0 ] && [ -z "$rec" ]; then
-    rec=$(_fm_task_inbox_write_record_locked "$dir" "$text" "$delivery_mode") || status=1
+    if [ "$#" -gt 4 ]; then
+      shift 4
+      "$@" || status=1
+    fi
+    if [ "$status" -eq 0 ]; then
+      rec=$(_fm_task_inbox_write_record_locked "$dir" "$text" "$delivery_mode") || status=1
+    fi
   fi
   fm_lock_release "$lock"
   [ "$status" -eq 0 ] || return 1

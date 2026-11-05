@@ -1,7 +1,17 @@
 #!/usr/bin/env bash
 # Steer a task by durable record: write the message into the task's steering
 # inbox and ring its doorbell (bin/fm-task-inbox-lib.sh), best-effort.
-# Usage: fm-send.sh <target> [--relay] [--resolve-key <key>]... [--fire-and-forget <delivery-id>] <text...>
+# Usage: fm-send.sh <target> [--relay] [--require-input <path>]... [--resolve-key <key>]... [--fire-and-forget <delivery-id>] <text...>
+# --require-input declares a required artifact on the receiving host, relative
+# to its FM_HOME or absolute within that home (a local task's recorded worktree
+# is also allowed). Only declared inputs are checked, under the existing file
+# transfer's confinement, immediately before a new record is published.
+# Missing/inaccessible inputs fail with the receiver and path named: stage the
+# declared artifact through the existing authorized transfer, then correct the
+# instruction. No automatic transfer, permission grant, or resend is added.
+# Ordinary output/example/other-host paths in message text are never validated.
+# Declared input paths are included in the delivered instruction; --relay does
+# not bypass their validation. Keys and unrecorded endpoints cannot declare inputs.
 # Text naming a whole task id recorded in this home's state/<id>.meta must
 # target that owner. A wrong-owner steer is refused before enqueue, reply
 # tracking, or typing, and names the correct task selector. Use --relay before
@@ -480,6 +490,7 @@ fi
 RESOLVE_KEYS=
 FIRE_AND_FORGET_ID=
 RELAY=0
+REQUIRED_INPUTS=
 fm_send_add_resolve_key() { # <key>
   local k=$1
   case "$k" in
@@ -501,6 +512,18 @@ while :; do
   --relay)
     RELAY=1
     shift
+    ;;
+  --require-input)
+    [ "$#" -ge 2 ] && [ -n "$2" ] || {
+      echo 'error: --require-input requires a nonempty receiving-host path' >&2
+      exit 1
+    }
+    case "$2" in *$'\n'*|*$'\r'*|*$'\t'*)
+      echo 'error: a declared input path cannot contain control characters' >&2
+      exit 1 ;;
+    esac
+    REQUIRED_INPUTS="${REQUIRED_INPUTS}${REQUIRED_INPUTS:+$'\n'}$2"
+    shift 2
     ;;
   --resolve-key)
     [ $# -ge 2 ] || {
@@ -537,6 +560,29 @@ while :; do
   *) break ;;
   esac
 done
+
+if [ -n "$REQUIRED_INPUTS" ] && { [ -z "$TARGET_SELECTOR" ] || [ "${1:-}" = --key ]; }; then
+  echo 'error: --require-input needs a recorded task text steer; keys and explicit endpoints have no declared receiving home' >&2
+  exit 1
+fi
+
+fm_send_check_required_inputs() { # <newline-delimited-declarations>
+  local declared=$1 input receiver_home=$FM_HOME root worktree
+  [ -n "$declared" ] || return 0
+  if [ "$(fm_meta_get "$TARGET_META" kind)" = secondmate ]; then
+    receiver_home=$(fm_meta_get "$TARGET_META" home)
+    [ -n "$receiver_home" ] || receiver_home=$FM_HOME
+  fi
+  worktree=$(fm_meta_get "$TARGET_META" worktree)
+  while IFS= read -r input; do
+    root=$receiver_home
+    case "$worktree" in /*) case "$input" in "$worktree"/*) root=$worktree ;; esac ;; esac
+    if ! FM_HOME="$root" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-remote-file.sh" check "$input" >/dev/null; then
+      echo "error: required input '$input' is unavailable to receiver '$RAW_TARGET'; nothing was sent. Stage only this declared artifact through the existing authorized transfer mechanism; no access was granted." >&2
+      return 1
+    fi
+  done <<< "$declared"
+}
 
 if [ "$TARGET_BACKEND" != remote ]; then
   fm_backend_validate "$TARGET_BACKEND" || exit 1
@@ -834,12 +880,14 @@ else
     exit 1
   fi
   if [ "$RELAY" = 0 ]; then
-    # Tokenize once, using the task-id alphabet rather than substring matches.
+    # Tokenize once without treating pathname components as standalone task ids.
     # A final prose period is punctuation only when no exact meta names it.
     owner_target=
     [ -z "$TARGET_META" ] || owner_target=$(fm_send_id_from_meta "$TARGET_META")
     while IFS= read -r mentioned_task; do
       [ -n "$mentioned_task" ] || continue
+      # A task name embedded in a pathname is not a task-id token.
+      case "$mentioned_task" in */*|*\\*) continue ;; esac
       while [ ! -f "$STATE/$mentioned_task.meta" ] && [ "${mentioned_task%.}" != "$mentioned_task" ]; do
         mentioned_task=${mentioned_task%.}
       done
@@ -847,7 +895,7 @@ else
       [ "$mentioned_task" != "$owner_target" ] || continue
       echo "error: task '$mentioned_task' is owned by this home's direct report '$mentioned_task', not target '$RAW_TARGET'; nothing was sent. Send to '$mentioned_task', or use --relay for a deliberate cross-task mention." >&2
       exit 1
-    done < <(printf '%s\n' "$MESSAGE" | LC_ALL=C tr -cs 'A-Za-z0-9_.-' '\n')
+    done < <(printf '%s\n' "$MESSAGE" | LC_ALL=C tr -cs 'A-Za-z0-9_./\\-' '\n')
   fi
   if [ "$TARGET_BACKEND" = remote ]; then
     FM_SEND_REMOTE_BUDGET=${FM_SEND_REMOTE_BUDGET:-30}
@@ -861,6 +909,9 @@ else
   # The pre-marker answer text, kept for the closing resolved note so the
   # durable ledger records the plain answer without marker or corr bytes.
   RESOLVE_ANSWER_TEXT=$MESSAGE
+  if [ -n "$REQUIRED_INPUTS" ]; then
+    MESSAGE="$MESSAGE"$'\n\nRequired input artifacts (paths on receiving host):\n'"$REQUIRED_INPUTS"
+  fi
   if [ "$MARK_FROM_FIRSTMATE" = 1 ] && [ -n "$FIRE_AND_FORGET_ID" ]; then
     fm_message_mark_from_firstmate "$MESSAGE" MESSAGE
     MESSAGE="${FM_FROMFIRST_MARK}delivery=${FIRE_AND_FORGET_ID} ${MESSAGE#"$FM_FROMFIRST_MARK"}"
@@ -986,6 +1037,11 @@ else
     remote_completion_unknown=0
     REMOTE_SEND_ARGS=("$TARGET_REMOTE_ID" "$MESSAGE")
     [ -z "$FIRE_AND_FORGET_ID" ] || REMOTE_SEND_ARGS+=(fire-and-forget)
+    if [ -n "$REQUIRED_INPUTS" ]; then
+      while IFS= read -r required_input; do
+        REMOTE_SEND_ARGS+=(--require-input "$required_input")
+      done <<< "$REQUIRED_INPUTS"
+    fi
     # Each transport attempt is bounded by FM_SEND_REMOTE_BUDGET seconds.
     # fm_run_timed's 124 means the attempt was killed at the bound with remote
     # completion unknown - the enqueue may have landed - so it exits through
@@ -1089,10 +1145,10 @@ else
     fi
     if [ "${FM_SEND_IDEMPOTENT:-0}" = 1 ]; then
       INBOX_RECORD=$(fm_task_inbox_write_idempotent "$STATE" "$INBOX_TASK_ID" "$MESSAGE" \
-        "${FIRE_AND_FORGET_ID:+fire-and-forget}") || inbox_write_rc=$?
+        "${FIRE_AND_FORGET_ID:+fire-and-forget}" fm_send_check_required_inputs "$REQUIRED_INPUTS") || inbox_write_rc=$?
     else
       INBOX_RECORD=$(fm_task_inbox_write "$STATE" "$INBOX_TASK_ID" "$MESSAGE" \
-        "${FIRE_AND_FORGET_ID:+fire-and-forget}") || inbox_write_rc=$?
+        "${FIRE_AND_FORGET_ID:+fire-and-forget}" fm_send_check_required_inputs "$REQUIRED_INPUTS") || inbox_write_rc=$?
     fi
     if [ "${inbox_write_rc:-0}" -ne 0 ]; then
       fm_lock_release "$INBOX_META_LOCK"
@@ -1156,6 +1212,10 @@ else
     3) echo "fm-send: doorbell not typed because the agent in $T has exited; the steer is durably recorded at $INBOX_RECORD for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane" >&2 ;;
     esac
     exit 0
+  fi
+  if ! fm_send_check_required_inputs "$REQUIRED_INPUTS"; then
+    fm_send_known_undelivered_cleanup || true
+    exit 1
   fi
   # Slash commands open a completion popup in some TUIs (verified on codex);
   # submitting too fast selects nothing, so give the popup time to settle before
