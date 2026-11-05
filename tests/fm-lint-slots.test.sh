@@ -2025,7 +2025,7 @@ open(my $manifest, '>', "$tmp/manifest") or die "$!";
 print {$manifest} "0\tbin/consumer.sh\n";
 close $manifest;
 local %ENV = (%ENV, FM_LINT_INTERNAL => 1, FM_LINT_INTERNAL_CACHE => "$tmp/cache",
-    FM_LINT_INTERNAL_SLOT_DIR => "$tmp/slots", FM_LINT_INTERNAL_NCPU => 18,
+    FM_LINT_INTERNAL_SLOT_DIR => "$tmp/slots", FM_LINT_INTERNAL_NCPU => 18, FM_LINT_INTERNAL_RUN_ID => 'worker',
     FM_LINT_INTERNAL_BOUNDED => 'perl', FM_LINT_INTERNAL_MEMORY_KIB => 2097152,
     FM_LINT_INTERNAL_ROOT_SECS => 8, FM_LINT_INTERNAL_GRACE => 1,
     FM_LINT_INTERNAL_ROOTS_LOG => "$tmp/roots.tsv", FM_LINT_SHELLCHECK => $tool,
