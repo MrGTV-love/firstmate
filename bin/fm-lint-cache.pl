@@ -7,6 +7,8 @@
 # are reused. Cache-key flock serializes identical misses before host admission.
 # --execute wraps a cold analysis with the gate/watchdog/time command supplied
 # by fm-lint.sh; the analysis identity remains the ShellCheck binary and args.
+# A cold analysis runs with FM_LINT_INTERNAL_ROOT_BYTES set to the size of the
+# root file plus every file its source closure follows.
 #
 use Cwd qw(abs_path);
 use strict;
@@ -38,10 +40,13 @@ use File::Basename qw(dirname basename);
 # alone enforce the capacity count.
 # The memory budget is checked only by the request whose turn it is, under
 # admission.lock, or without it on the stopped-gate path above. The request is
-# charged the recorded peak of its root
-# (FM_LINT_INTERNAL_ROOT_KEY, kept in history/<sha256 of the key>), or the
-# per-root worst case (FM_LINT_INTERNAL_ROOT_CAP_KIB) when the root has no
-# record. Every held slot is charged the larger of the charge its record names
+# charged the recorded peak of its root (FM_LINT_INTERNAL_ROOT_KEY, kept in
+# history/<sha256 of the key> as "<peak KiB> <input bytes>") only when its input
+# now (FM_LINT_INTERNAL_ROOT_BYTES, the root file plus every file the analysis
+# follows, from check mode below) is more than 90 and less than 110 percent of
+# the input that peak was measured on; otherwise (no record, a record in another
+# format, no input size, an input outside that band) it is charged the per-root
+# worst case (FM_LINT_INTERNAL_ROOT_CAP_KIB). Every held slot is charged the larger of the charge its record names
 # and what its root holds now: its gate's whole process tree in one read of the
 # live process table, and the peak the macOS watch publishes beside the slot
 # (slot.<n>.peak, through FM_LINT_INTERNAL_SLOT_PEAK_FILE). The turn is taken
@@ -50,12 +55,16 @@ use File::Basename qw(dirname basename);
 # shellcheck, from another caller or a wrapper script around the real
 # ShellCheck), plus the request's own charge fit the budget, or nothing is held
 # and nothing runs outside, so a root larger than the budget runs alone. A held
-# slot is charged the worst case when its
-# record names no charge or the table cannot be read. When the analysis
+# slot is charged the worst case when its record names no charge. Admission
+# needs a readable table: while neither ps nor fm-proc-info.py answers, the
+# request whose turn it is retries, and after about 5 s it names the table on
+# stderr and exits 2 without starting its command. When the analysis
 # completes (no signal reached the gate, and it exited 0, 1, 98 or 251), the
-# gate raises the root's record to the larger of the watch's peak and the
-# maximum resident size in FM_LINT_INTERNAL_ROOT_RSS_FILE; any other end leaves
-# the record alone, and a record is never lowered. Every slot.<n> file in the
+# gate takes the larger of the watch's peak and the maximum resident size in
+# FM_LINT_INTERNAL_ROOT_RSS_FILE: a record whose input is in the band above is
+# raised to it and keeps its input size, and is never lowered; any other record
+# is replaced by that peak and this input size. Any other end, or no input
+# size, leaves the record alone. Every slot.<n> file in the
 # directory counts toward the budget, beyond this run's count cap too.
 # A pool that cannot be used (directory, lock, ticket, slot or queue file) never
 # lets the analysis run unbounded: the gate names the path and the fix on stderr
@@ -79,18 +88,23 @@ if (($ARGV[0] // '') eq 'gate') {
     my $cap = ($ENV{FM_LINT_HOST_SLOTS} // '') =~ /\A[1-9][0-9]*\z/ ? $ENV{FM_LINT_HOST_SLOTS} + 0
         : ($ncpu >> 1) > 2 ? ($ncpu >> 1) : 2;
     # Memory budget (KiB) for every ShellCheck the pool admits, and the per-root
-    # worst case charged without a record or a table. bin/fm-lint.sh validates
+    # worst case charged without a trusted record. bin/fm-lint.sh validates
     # the budget override and owns the documented defaults.
     my $positive = sub { ($_[0] // '') =~ /\A[1-9][0-9]*\z/ ? $_[0] + 0 : $_[1] };
     my $budget_kib = $positive->($ENV{FM_LINT_HOST_RSS_KIB}, 12582912);
     my $worst_kib = $positive->($ENV{FM_LINT_INTERNAL_ROOT_CAP_KIB}, 8388608);
     my $root_key = $ENV{FM_LINT_INTERNAL_ROOT_KEY} // '';
     my $history_path = length $root_key ? "$slot_dir/history/" . sha256_hex($root_key) : undef;
+    my $root_bytes = ($ENV{FM_LINT_INTERNAL_ROOT_BYTES} // '') =~ /\A[0-9]+\z/ ? $ENV{FM_LINT_INTERNAL_ROOT_BYTES} + 0 : undef;
     my $read_kib = sub {
         open(my $fh, '<', $_[0]) or return 0;
         my $line = <$fh> // '';
         return $line =~ /\A([0-9]+)\n\z/ ? $1 + 0 : 0;
     };
+    # The record's peak when it was measured on an input within 10 percent of
+    # this one, else undef.
+    my $in_band = sub { my ($line) = @_; ($line // '') =~ /\A([0-9]+) ([0-9]+)\n\z/
+        && defined $root_bytes && $root_bytes * 10 > $2 * 9 && $root_bytes * 10 < $2 * 11 ? $1 + 0 : undef };
     my $max = sub { $_[0] > $_[1] ? $_[0] : $_[1] };
     my $refuse = sub {
         my ($path, $why) = @_;
@@ -165,16 +179,16 @@ if (($ARGV[0] // '') eq 'gate') {
     # KiB charged for the held slots, each [gate pid, charge, watch peak file]
     # with undef for what its record does not name: the larger of its charge and
     # what it holds now (its gate's whole process tree, or the watch's peak), and
-    # at least the worst case without a charge or a table.
+    # at least the worst case without a charge.
     my $charged = sub {
         my ($table, @held) = @_;
         my %children;
-        if ($table) { push @{$children{$table->{$_}[0]}}, $_ for keys %$table; }
+        push @{$children{$table->{$_}[0]}}, $_ for keys %$table;
         my $total = 0;
         for my $entry (@held) {
             my ($pid, $charge, $peak_file) = @$entry;
             my $sum = $read_kib->($peak_file);
-            if ($table && defined $pid) {
+            if (defined $pid) {
                 my ($tree, @queue, %seen) = (0, $pid);
                 while (defined(my $member = shift @queue)) {
                     next if $seen{$member}++ || !$table->{$member};
@@ -184,7 +198,6 @@ if (($ARGV[0] // '') eq 'gate') {
                 $sum = $max->($sum, $tree);
             }
             $charge = $worst_kib unless defined $charge;
-            $charge = $max->($charge, $worst_kib) unless $table;
             $total += $max->($charge, $sum);
         }
         return $total;
@@ -200,7 +213,6 @@ if (($ARGV[0] // '') eq 'gate') {
     # command has started.
     my $host_view = sub {
         my ($table) = @_;
-        return undef unless $table;
         my %children;
         push @{$children{$table->{$_}[0]}}, $_ for keys %$table;
         my (%gates, %in_tree, %running);
@@ -237,7 +249,7 @@ if (($ARGV[0] // '') eq 'gate') {
     # shellcheck outside every gate: memory this pool does not hold.
     my $foreign = sub {
         my ($table, @held) = @_;
-        my $view = $host_view->($table) or return 0;
+        my $view = $host_view->($table);
         my %own;
         for my $entry (@held) {
             my ($pid) = @$entry;
@@ -250,23 +262,27 @@ if (($ARGV[0] // '') eq 'gate') {
         }
         return $total;
     };
-    my ($table, $table_at);
+    my $table;
+    # Whether a stopped gate other than this one has <needle> in its command.
     my $stopped_gate = sub {
+        my ($needle) = @_;
         open(my $ps, '-|', 'ps', '-axww', '-o', 'pid=,stat=,command=') or return 0;
         my $found = 0;
         while (my $line = <$ps>) {
             next unless $line =~ /\A\s*([0-9]+)\s+T\S*\s+(.*)\z/s && $1 != $$;
-            $found = 1 if index($2, " gate $slot_dir ") >= 0;
+            $found = 1 if index($2, $needle) >= 0;
         }
         close $ps;
         return $found;
     };
     my ($slot, $slot_path, $peak_file, $charge_kib, $waited_from, $ticket, $ticket_path, $ticket_number, $coordinator);
-    my ($blocked_at, $checked_at, $bypass);
+    my ($blocked_at, $checked_at, $bypass, $census_from, $host, $host_blocked_at, $host_checked_at, $host_bypass);
     my ($passed, $passed_at, %stopped);
     eval { make_path($slot_dir, {mode => 0700}); 1 } or $refuse->($slot_dir, $@);
     -d $slot_dir && -w _ or $refuse->($slot_dir, 'not a writable directory');
     open($coordinator, '>>', "$slot_dir/admission.lock") or $refuse->("$slot_dir/admission.lock", $!);
+    my $host_lock = $ENV{FM_LINT_INTERNAL_HOST_LOCK} // '';
+    if (length $host_lock) { open($host, '>>', $host_lock) or $refuse->($host_lock, $!); }
     $waited_from = Time::HiRes::time();
     ACQUIRE: while (!$slot && !$caught) {
         if (flock($coordinator, LOCK_EX | LOCK_NB)) {
@@ -278,7 +294,7 @@ if (($ARGV[0] // '') eq 'gate') {
             $blocked_at //= $now;
             if ($now - $blocked_at >= 1 && $now - ($checked_at // 0) >= 1) {
                 $checked_at = $now;
-                $bypass = $stopped_gate->();
+                $bypass = $stopped_gate->(" gate $slot_dir ");
             }
             unless ($bypass) {
                 Time::HiRes::sleep(0.1);
@@ -356,18 +372,51 @@ if (($ARGV[0] // '') eq 'gate') {
                     || $oldest{$a} cmp $oldest{$b}
             } keys %oldest;
             if (defined $next && $oldest{$next} eq $ticket_path) {
-                # My turn. The memory budget decides, from a table read no older
-                # than a fifth of a second. It counts the held roots, the
-                # memory outside them and the new root; a root takes its turn
-                # alone only when no held root runs and nothing runs outside.
-                $charge_kib = ($history_path && $read_kib->($history_path)) || $worst_kib;
+                # My turn. The memory budget decides, from a table read now under
+                # the host-wide admission lock (FM_LINT_INTERNAL_HOST_LOCK), which
+                # an admitted gate keeps until its command has started, so no two
+                # pools admit on one reading. A gate blocked from that lock for a
+                # second while a stopped gate exists decides without it. The
+                # budget counts the held roots, the memory outside them and the
+                # new root; a root takes its turn alone only when no held root
+                # runs and nothing runs outside. Without a table nothing is
+                # admitted, and after about 5 s without one the request is
+                # refused.
+                my $line = '';
+                if ($history_path && open(my $record, '<', $history_path)) { $line = <$record> // ''; }
+                $charge_kib = $in_band->($line) || $worst_kib;
                 my $now = Time::HiRes::time();
-                ($table, $table_at) = ($process_table->(), $now) if !defined $table_at || $now - $table_at >= 0.2;
-                my $outside = $foreign->($table, @charges);
-                my $fits = !@charges && !$outside;
-                if (!$fits) {
-                    $fits = $charged->($table, @charges) + $outside + $charge_kib <= $budget_kib;
+                my $fits;
+                my $held = !$host || flock($host, LOCK_EX | LOCK_NB);
+                if ($held) {
+                    undef $host_blocked_at;
+                    undef $host_bypass;
+                } else {
+                    $!{EWOULDBLOCK} || $!{EAGAIN} || $!{EINTR} or $refuse->($host_lock, $!);
+                    $host_blocked_at //= $now;
+                    if ($now - $host_blocked_at >= 1 && $now - ($host_checked_at // 0) >= 1) {
+                        $host_checked_at = $now;
+                        $host_bypass = $stopped_gate->('fm-lint-cache.pl gate ');
+                    }
                 }
+                $table = $process_table->() if $held || $host_bypass;
+                if (($held || $host_bypass) && !$table) {
+                    $census_from //= $now;
+                    if ($now - $census_from >= 5) {
+                        unlink($ticket_path);
+                        print STDERR "fm-lint: the host process table cannot be read: ps failed, and so did fm-proc-info.py "
+                            . "(table and memory) beside fm-lint-cache.pl; the host-wide ShellCheck memory bound cannot be "
+                            . "enforced, so this analysis was not started. Let this user run ps, or keep bin/fm-proc-info.py "
+                            . "beside bin/fm-lint-cache.pl with a python3 that can run it.\n";
+                        exit 2;
+                    }
+                } elsif ($held || $host_bypass) {
+                    undef $census_from;
+                    my $outside = $foreign->($table, @charges);
+                    $fits = !@charges && !$outside
+                        || $charged->($table, @charges) + $outside + $charge_kib <= $budget_kib;
+                }
+                flock($host, LOCK_UN) if $host && $held && !$fits;
                 if ($fits) {
                     ($slot, $slot_path) = @{shift @free};
                     $peak_file = "$slot_path.peak";
@@ -410,26 +459,37 @@ if (($ARGV[0] // '') eq 'gate') {
     }
     exit 128 + $signal_number{$caught} if $caught;
     $ENV{FM_LINT_INTERNAL_SLOT_PEAK_FILE} = $peak_file;
+    # The host lock is held until the command has replaced the child's image,
+    # which closes the child's close-on-exec end of this pipe, so the next
+    # decision in any pool reads this root as running.
+    pipe(my $exec_read, my $exec_write) or die "fm-lint-gate: pipe: $!\n";
     $child = fork();
     die "fm-lint-gate: fork: $!\n" unless defined $child;
     if (!$child) {
+        close $exec_read;
         exec {$command[0]} @command;
         warn "fm-lint-gate: exec $command[0]: $!\n";
         POSIX::_exit(127);
     }
+    close $exec_write;
+    1 while !defined sysread($exec_read, my $byte, 1) && $!{EINTR};
+    close $exec_read;
+    close $host if $host;
     kill 'TERM', $child if $caught;
-    # Growth guard. Admission is a reading at one moment; a root admitted small
-    # can grow later, and so can every other root admitted with it. While the
-    # lint trees of every pool on the host, plus any other process named
-    # shellcheck, hold more than the budget, this gate stops (SIGSTOP) the
-    # analysis processes of its own tree unless it belongs to the oldest running
-    # gate, and resumes them as soon as the total fits again or its gate becomes
-    # the oldest. A stopped process keeps what it holds but cannot grow, and the
+    # Growth guard. Admission charges each root its record only when that
+    # record was measured on this input, so the budget holds at every reading
+    # for roots that stay within their records. The residual is a root that
+    # grows beyond its record on an unchanged input (analysis noise, a file the
+    # analysis follows that the walk does not see). While the lint trees of
+    # every pool on the host, plus any other process named shellcheck, hold
+    # more than the budget, this gate stops (SIGSTOP) the analysis processes of
+    # its own tree unless it belongs to the oldest running gate, and resumes
+    # them as soon as the total fits again or its gate becomes the oldest. A
+    # stopped process keeps what it holds but cannot grow further, and the
     # oldest running gate is never stopped (unless processes named shellcheck
-    # outside every gate alone hold the budget), so the aggregate exceeds the
-    # budget by at most what the oldest root grows by, plus what every other
-    # root grows within one reading interval (up to 2 s at or below 60 percent
-    # of the budget, 0.5 s above it), and every root finishes.
+    # outside every gate alone hold the budget), so every root finishes. No
+    # polling guard can remove what roots grow inside one reading interval (up
+    # to 2 s at or below 60 percent of the budget, 0.5 s above it).
     my ($guard_busy, $poll) = (0, 0.5);
     my $resume = sub { for my $pid (keys %paused) { kill 'CONT', $pid; delete $paused{$pid}; } };
     my $guard = sub {
@@ -466,11 +526,12 @@ if (($ARGV[0] // '') eq 'gate') {
     my $status = $reaped == $child ? $? : 127 << 8;
     Time::HiRes::setitimer(Time::HiRes::ITIMER_REAL(), 0, 0);
     $resume->();
-    # Raise the root's record to this complete analysis's measured peak: the
+    # Raise the root's record to this complete analysis's measured peak (the
     # watch's peak of resident size and footprint, and /usr/bin/time's maximum
-    # resident size.
+    # resident size) when it describes this input, else replace it with that
+    # peak and this input's size.
     my $code = ($status & 127) ? -1 : $status >> 8;
-    if ($history_path && !$caught && grep { $code == $_ } 0, 1, 98, 251) {
+    if ($history_path && defined $root_bytes && !$caught && grep { $code == $_ } 0, 1, 98, 251) {
         my $peak = $read_kib->($peak_file);
         my $rss_file = $ENV{FM_LINT_INTERNAL_ROOT_RSS_FILE} // '';
         if (length $rss_file && open(my $fh, '<', $rss_file)) {
@@ -484,8 +545,13 @@ if (($ARGV[0] // '') eq 'gate') {
         if ($peak && !(eval { make_path(dirname($history_path), {mode => 0700}); 1 }
             && open($history, '+>>', $history_path) && flock($history, LOCK_EX)
             && seek($history, 0, 0)
-            && do { my $old = <$history> // ''; $old =~ /\A([0-9]+)\n\z/ && $1 >= $peak
-                    || truncate($history, 0) && syswrite($history, "$peak\n") })) {
+            && do {
+                my $old = <$history> // '';
+                my $kept = $in_band->($old);
+                defined $kept && $kept >= $peak
+                    || truncate($history, 0)
+                        && syswrite($history, defined $kept ? "$peak " . (split ' ', $old)[1] . "\n" : "$peak $root_bytes\n");
+            })) {
             warn "fm-lint: cannot record the $peak KiB memory peak of $root_key at $history_path ($!); "
                 . "its record was not raised\n";
         }
@@ -1108,6 +1174,14 @@ if (defined $key) {
 }
 duration_outcome('analyzed');
 @execute = ($tool, @args) unless @execute;
+# The input a cold analysis reads, for the gate's memory record: the root file
+# plus every file its source closure follows, whatever the cache setting.
+{
+    my (%seen, $bytes);
+    closure($path, \%seen);
+    $bytes += (-s $_ || 0) for keys %seen;
+    $ENV{FM_LINT_INTERNAL_ROOT_BYTES} = $bytes;
+}
 # Cache lookup and identical-miss serialization precede slot admission. Forward
 # cancellation to the cold runner, retaining the key lock until it is reaped.
 my ($child, $caught);

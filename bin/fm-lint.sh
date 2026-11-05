@@ -82,13 +82,21 @@
 # plus headroom, so one root at its bound still leaves room for small roots).
 # Each root is charged its own recorded peak, the larger of resident size and
 # physical footprint over its earlier complete analyses, kept per analysis mode
-# (full or fast) and repo-relative root path in the pool's history/ directory.
+# (full or fast) and repo-relative root path in the pool's history/ directory
+# together with the input size that peak was measured on: the root file plus
+# every file the analysis follows, as the cache's dependency walk finds them,
+# computed whether or not the cache is on.
 # The history lives in the pool, not the lint cache, because the cache depends
 # on HOME and is off in CI or under FM_LINT_CACHE_DIR=off, and the pool is the
 # one directory every run of this user shares.
-# A root with no history is charged the per-root worst case (the 8 GiB resident
-# watch bound, or the address-space limit under the enforced envelope) until it
-# has one.
+# A record is trusted only when the root's input now is more than 90 and less
+# than 110 percent of the input it was measured on. A root with no record, a
+# record in another format (records written before input sizes were kept
+# included) or an input outside that band is charged the per-root worst case
+# (the 8 GiB resident watch bound, or the address-space limit under the enforced
+# envelope). The cost: a root whose input changed by more than 10 percent runs
+# once on the worst-case charge, so the first lint after an edit that big runs
+# such roots one at a time.
 # A cold root takes its turn only when its charge, every held root's current
 # charge and the resident size outside the held roots (the running lint trees of
 # other pools and every other process named shellcheck) together fit the budget;
@@ -97,29 +105,39 @@
 # asks for its turn. That reading is the live process table (resident size
 # only, from ps or libproc) and, where the macOS watch runs, the watch's own
 # peak of resident size and footprint. A held root is charged the worst case
-# when the table cannot be read or its record names no charge. With nothing held
+# when its record names no charge. Admission needs that table: while neither ps
+# nor bin/fm-proc-info.py (its table and memory commands) can read it, no root
+# is admitted in any pool, and a root whose turn it is waits about 5 s for it,
+# then exits 2 naming the host process table, ps and fm-proc-info.py and the fix,
+# without starting. With nothing held
 # and nothing running outside, one root is always admitted, so a root larger
 # than the budget runs alone once that outside memory has ended, and queued roots
-# wait rather than fail. When a root's analysis completes, its
-# record is raised to the peak this run measured (the watch's peak and
-# /usr/bin/time's maximum resident size) if that is higher; a record is never
-# lowered, so the narrower memory retry cannot shrink it. Complete means its
+# wait rather than fail. When a root's analysis completes, a record whose input
+# is in the band above is raised to the peak this run measured (the watch's
+# peak and /usr/bin/time's maximum resident size) if that is higher, keeping
+# its input size, and is never lowered, so the narrower memory retry, which
+# reads the same input, cannot shrink it; any other record is replaced by that
+# peak and the input size now. Complete means its
 # gate caught no signal and the analysis exited 0 or 1 (clean or findings), 98
 # (ended by the watch at its bound) or 251 (GHC heap exhaustion); a signal, a
 # deadline, a gate ended by KILL or any other end raises no record. Without
 # /usr/bin/time and the macOS watch no record forms, so every root stays
-# charged the worst case. A root admitted on a reading can grow later, and so
-# can every other root admitted with it, so each gate also watches the host
+# charged the worst case. Because a record is trusted only for the input it
+# was measured on, the budget holds at every reading for roots whose records
+# match their input. The residual is a root that grows beyond its record on an
+# unchanged input (analysis noise, or a file it follows that the dependency
+# walk does not see), so each gate also watches the host
 # while its root runs: while the lint trees of every pool on the
 # host, plus any other process named shellcheck, hold more than the budget, a
 # gate stops (SIGSTOP) the analysis processes of its own tree unless it belongs
 # to the oldest running gate, and resumes them once the total fits again or its
-# gate is the oldest. A stopped root keeps what it holds but cannot grow, and
-# the oldest running gate is never stopped, so the total exceeds the budget by
-# at most what the oldest root grows by, which the per-root bounds below cap,
-# plus what every other root grows within one reading interval (up to 2 s at or
-# below 60 percent of the budget, 0.5 s above it),
-# and every root still finishes. The time a root spends stopped counts toward
+# gate is the oldest. A stopped root keeps what it holds but cannot grow
+# further, and the oldest running gate is never stopped, so its growth is
+# bounded by the per-root bounds below and every root still finishes. No
+# polling guard can remove what roots grow inside one reading interval (up to
+# 2 s at or below 60 percent of the budget, 0.5 s above it); the trusted
+# charge, not the guard, is what keeps the total within the budget.
+# The time a root spends stopped counts toward
 # its deadline. Processes named shellcheck outside every gate are counted but
 # not stopped; when they alone hold the budget, every gate waits and stops.
 # The oldest is judged by each process's absolute start time (ps lstart), ties
@@ -146,7 +164,11 @@
 # fixture seam for tests: that run keeps its own queue, count cap and history,
 # and is still bounded host-wide by the growth guard above and by the outside
 # count at admission, both of which read the lint trees of every pool and every
-# process named shellcheck. What a run in another pool does not get is the
+# process named shellcheck. Every pool's admission decisions take one lock,
+# /var/tmp/firstmate-lint-<uid>/admission.lock beside the default pool, for the
+# reading they decide on, and an admitted gate keeps it until its root's command
+# has started, so two pools never admit on one reading and each sees the
+# other's started roots. What a run in another pool does not get is the
 # charges of this pool's held roots: its admission counts them at their current
 # resident size, so a root just admitted here with a large charge and little
 # resident memory counts as little there, and its own unrecorded roots are
@@ -2154,10 +2176,11 @@ fm_lint_run_worker() {  # <worker-index>
     FM_LINT_PERL_BIN="$PERL_BIN"
   )
   worker_env+=(FM_LINT_INTERNAL_CACHE="$CACHE_DIR" FM_LINT_INTERNAL_SLOT_DIR="$SLOT_DIR" FM_LINT_INTERNAL_NCPU="$NCPU")
+  worker_env+=(FM_LINT_INTERNAL_HOST_LOCK="$HOST_POOL_ROOT/admission.lock")
   worker_env+=(FM_LINT_INTERNAL_RUN_ID="$$")
   # The most one root can hold: its address-space limit under the enforced
-  # envelope, else the resident watch bound. The gate charges it for a root with
-  # no recorded peak, and for held roots when it cannot read the process table.
+  # envelope, else the resident watch bound. The gate charges it for a root
+  # without a record measured on its current input.
   if [ "$BOUND_MECH" != none ]; then
     worker_env+=(FM_LINT_INTERNAL_ROOT_CAP_KIB="$ROOT_MEMORY_KIB")
   else
@@ -2201,24 +2224,24 @@ fm_lint_wait_workers() {
 # host-wide memory bound would otherwise be lost silently. Each gate repeats the
 # check for its own files and refuses the same way (bin/fm-lint-cache.pl).
 pool_problem=
-if [ "$SLOT_DIR" = "$HOST_POOL_DIR" ]; then
-  if [ -L "$HOST_POOL_ROOT" ]; then
-    pool_problem="$HOST_POOL_ROOT is a symbolic link"
-  else
-    ( umask 077; mkdir -p "$HOST_POOL_ROOT" ) 2>/dev/null
-    if [ ! -d "$HOST_POOL_ROOT" ]; then
-      pool_problem="$HOST_POOL_ROOT cannot be created"
-    elif [ ! -O "$HOST_POOL_ROOT" ]; then
-      pool_problem="$HOST_POOL_ROOT is owned by another user"
-    fi
+if [ -L "$HOST_POOL_ROOT" ]; then
+  pool_problem="$HOST_POOL_ROOT is a symbolic link"
+else
+  ( umask 077; mkdir -p "$HOST_POOL_ROOT" ) 2>/dev/null
+  if [ ! -d "$HOST_POOL_ROOT" ]; then
+    pool_problem="$HOST_POOL_ROOT cannot be created"
+  elif [ ! -O "$HOST_POOL_ROOT" ]; then
+    pool_problem="$HOST_POOL_ROOT is owned by another user"
   fi
 fi
 if [ -z "$pool_problem" ]; then
   ( umask 077; mkdir -p "$SLOT_DIR" ) 2>/dev/null
-  { [ -d "$SLOT_DIR" ] && [ -w "$SLOT_DIR" ]; } || pool_problem="$SLOT_DIR is not a writable directory"
+  if ! { [ -d "$SLOT_DIR" ] && [ -w "$SLOT_DIR" ]; }; then
+    pool_problem="$SLOT_DIR is not a writable directory"
+    [ "$SLOT_DIR" = "$HOST_POOL_DIR" ] || pool_problem="FM_LINT_SLOT_DIR: $pool_problem"
+  fi
 fi
 if [ -n "$pool_problem" ]; then
-  [ "$SLOT_DIR" = "$HOST_POOL_DIR" ] || pool_problem="FM_LINT_SLOT_DIR: $pool_problem"
   printf 'fm-lint.sh: host slot pool unusable (%s); the host-wide ShellCheck memory bound cannot be enforced, so no root was started. Make that path writable or remove it if it is damaged.\n' \
     "$pool_problem" >&2
   exit 2
