@@ -1626,6 +1626,8 @@ test_worker_role_renders_shared_rubric() {
   local role_file line missing="$TMP_ROOT/rubric-less-root"
   role_file="$TMP_ROOT/worker-role-rubric.txt"
   fm_brief_worker_role "$TMP_ROOT/state" upstream-4751 "$ROOT" >"$role_file"
+  [ "$(grep -cF 'use the existing Intent-to-test alignment criteria in the shared review rubric below during implementation and verification' "$role_file")" -eq 1 ] \
+    || fail 'worker role did not route applicable implementation and verification to the existing criteria exactly once'
   while IFS= read -r line; do
     [ -n "$line" ] || continue
     grep -qxF -- "$line" "$role_file" || fail "worker role did not render rubric line: $line"
