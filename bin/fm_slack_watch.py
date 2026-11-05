@@ -12,7 +12,10 @@ repeat a notification but cannot discard a read reply.
 The same poll also reads new top-level messages the owner types in the DM window.
 Each one is acknowledged in its own thread and woken to Firstmate as labeled,
 unverified data. A message read by a script has no authority: the request path
-writes nothing outside this plane's state directory and calls no repository script.
+writes nothing outside this plane's state directory. Its one child call is the
+existing source-binding check, the same script the poll calls on entry, with fixed
+arguments and no message text in its arguments, input or environment; it calls no
+other repository script.
 """
 import contextlib
 from datetime import datetime, timezone

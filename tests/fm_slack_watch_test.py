@@ -710,7 +710,7 @@ class IntakeTest(unittest.TestCase):
                 self.assertEqual(len(self.wakes(watch)), 1)
                 self.assertEqual(watch.state['pending'], [])
 
-    def test_a_request_path_runs_no_repository_script_and_posts_no_text_of_the_message(self):
+    def test_a_request_path_runs_only_the_binding_check_and_posts_no_text_of_the_message(self):
         with self.fixture() as (watch, replay):
             self.say(replay, '200.000100', 'secret words 12345')
             with patch.object(plane, 'run', side_effect=AssertionError('the request path ran a script')):
