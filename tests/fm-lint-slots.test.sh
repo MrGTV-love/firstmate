@@ -1150,6 +1150,7 @@ test_a_wrapper_around_the_real_shellcheck_shares_the_host_wide_memory_bound() {
   mkdir -p "$tmp/bin"
   printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/a.sh"
   real=$(command -v shellcheck)
+  # shellcheck disable=SC2016 # ${1:-} and $@ expand in the generated stand-in.
   printf '#!/bin/sh\n[ "${1:-}" = --version ] || : > "%s/analysis.marker"\nexec "%s" "$@"\n' "$tmp" "$real" > "$tmp/bin/shellcheck"
   chmod +x "$tmp/bin/shellcheck"
   fm_lint_hide_outside_shellcheck "$tmp/bin"
