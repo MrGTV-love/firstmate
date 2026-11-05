@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # DOD-16: the bot token and the signing secret never reach a tracked file or home runtime state.
 # The plane runs with a known token and signing secret (mirror, poll, arm, check, a transport
-# failure, and the owner-request intake: arm, a poll, and a standing check that each take in
-# a typed request), its stdout and stderr are captured inside the scanned home, and the
+# failure, the owner-request intake: arm, a poll, and a standing check that each take in
+# a typed request, and the thread conversation: a follow-up typed in a request thread and
+# Firstmate's answer posted into it), its stdout and stderr are captured inside the scanned home, and the
 # scan then looks for either secret anywhere in tracked files, state, data, and
 # config. The scan prints paths and counts only; never a secret or contents.
 set -euo pipefail
@@ -55,6 +56,16 @@ grep -q 'transport failure' "${HOMES[1]}/data/captured/poll.out" || fail "the fa
 grep -q '^check: slack request 2000.000100 ' "${HOMES[2]}/data/captured/request-poll.out" || fail "the intake poll did not take the request in"
 grep -q '^check: slack request 2000.000200 ' "${HOMES[2]}/data/captured/request-check.out" || fail "the intake check did not take the request in"
 [ "$(grep -c '"method": "chat.postMessage"' "${HOMES[2]}/state/slack-watch/outbound.jsonl")" = 2 ] || fail "the intake did not acknowledge both requests"
+
+# The thread conversation: the owner replies inside the first request's thread, a poll wakes it as a follow-up,
+# and Firstmate's answer goes into the same thread through the reply command.
+python3 "$HELPER" reply "$replay" 2000.000100 2000.000300 U0TESTOWNER 'a follow-up typed in the first request thread'
+run_plane "${HOMES[2]}" followup-poll "$ROOT/bin/fm-slack-poll.sh" --replay "$INTAKE"
+printf '%s' 'an answer for the first request' \
+  | run_plane "${HOMES[2]}" reply "$ROOT/bin/fm-slack-reply.sh" --thread 2000.000100 --to 2000.000300 --replay "$INTAKE"
+grep -q '^check: slack follow-up 2000.000300 to request 2000.000100 ' "${HOMES[2]}/data/captured/followup-poll.out" || fail "the poll did not take the follow-up in"
+grep -q '^replied: ' "${HOMES[2]}/data/captured/reply.out" || fail "the reply command did not post the answer"
+[ "$(grep -c '"method": "chat.postMessage"' "${HOMES[2]}/state/slack-watch/outbound.jsonl")" = 3 ] || fail "the thread conversation did not add exactly the one answer"
 
 scan() {  # <output-file>; prints matches=N
   FM_SLACK_SCAN_SECRET="$SECRET" FM_SLACK_SCAN_SIGNING="$SIGNING" python3 - "$1" "${HOMES[@]}" <<'PY'
