@@ -45,6 +45,11 @@ unset TMUX TMUX_PANE HERDR_ENV HERDR_PANE_ID HERDR_SESSION HERDR_SOCKET_PATH \
 
 # A fake toolchain where every required tool is present and gh is authenticated.
 # treehouse's `get --help` advertises --lease only when FM_FAKE_TREEHOUSE_LEASE_HELP=1.
+# Its `capabilities --json` proves persistent recovered leases and publishes a
+# protected holder unless FM_FAKE_TREEHOUSE_CAPABILITY names another answer
+# (false, malformed, unknown, failing, none for an empty success, or no-holder
+# for a schema 1 build without recovered_quarantine_holder); every call is appended to
+# FM_FAKE_TREEHOUSE_LOG when set, so a case can prove bootstrap ran no pool command.
 make_fake_toolchain() {
   local dir=$1 fakebin
   fakebin=$(fm_fakebin "$dir")
@@ -69,6 +74,19 @@ SH
   chmod +x "$fakebin/gh"
   cat > "$fakebin/treehouse" <<'SH'
 #!/usr/bin/env bash
+[ -z "${FM_FAKE_TREEHOUSE_LOG:-}" ] || printf '%s\n' "$*" >> "$FM_FAKE_TREEHOUSE_LOG"
+if [ "${1:-}" = capabilities ]; then
+  case "${FM_FAKE_TREEHOUSE_CAPABILITY:-proven}" in
+    proven) printf '%s\n' '{"schema_version":2,"version":"v-fake","persistent_recovered_leases":true,"recovered_quarantine_holder":"quarantined: fixture"}' ;;
+    no-holder) printf '%s\n' '{"schema_version":1,"version":"v-fake","persistent_recovered_leases":true}' ;;
+    false) printf '%s\n' '{"schema_version":2,"version":"v-fake","persistent_recovered_leases":false,"recovered_quarantine_holder":"quarantined: fixture"}' ;;
+    malformed) printf '%s\n' 'not json' ;;
+    none) ;;
+    failing) exit 3 ;;
+    unknown) printf '%s\n' 'unknown command "capabilities" for "treehouse"' >&2; exit 1 ;;
+  esac
+  exit 0
+fi
 if [ "${1:-}" = get ] && [ "${2:-}" = --help ]; then
   if [ "${FM_FAKE_TREEHOUSE_LEASE_HELP:-}" = 1 ]; then
     printf '%s\n' 'Usage: treehouse get [--lease] [--lease-holder <holder>]'
@@ -985,6 +1003,78 @@ test_treehouse_lease_check_follows_resolved_backend() {
   assert_contains "$out" "MISSING: treehouse" "backend=herdr must still require treehouse with durable lease support"
   assert_not_contains "$out" "MISSING: tmux" "backend=herdr must not demand tmux even when treehouse is too old"
   pass "bootstrap: the treehouse lease check follows the resolved backend's worktree provider"
+}
+
+# A treehouse that supports --lease but does not prove persistent recovered
+# leases gets one non-blocking BOOTSTRAP_INFO line naming the upgrade, from the
+# shared capability probe; a proven provider and an Orca home get none, and the
+# probe runs nothing but `capabilities`.
+test_treehouse_recovered_capability_diagnostic() {
+  local case_dir fakebin out calls answer
+  for answer in unknown none malformed false failing no-holder; do
+    case_dir="$TMP_ROOT/capability-$answer"
+    mkdir -p "$case_dir/home/config"
+    printf '%s\n' manual > "$case_dir/home/config/backlog-backend"
+    fakebin=$(make_fake_toolchain "$case_dir")
+    calls="$case_dir/treehouse-calls"
+    : > "$calls"
+    out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
+      FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_FAKE_TREEHOUSE_CAPABILITY="$answer" FM_FAKE_TREEHOUSE_LOG="$calls" \
+      "$ROOT/bin/fm-bootstrap.sh")
+    assert_contains "$out" "BOOTSTRAP_INFO: treehouse " "$answer: an unproven capability was not reported"
+    assert_contains "$out" "persistent_recovered_leases: true" "$answer: the diagnostic did not name the needed capability"
+    assert_not_contains "$out" "MISSING: treehouse" "$answer: the capability diagnostic must not block dispatch like a missing tool"
+    ! grep -Ev '^(capabilities --json|get --help)$' "$calls" | grep -q . \
+      || fail "$answer: bootstrap ran a treehouse command other than the capability probe and the lease check: $(cat "$calls")"
+    grep -Fxq 'capabilities --json' "$calls" || fail "$answer: bootstrap never ran the capability probe"
+  done
+
+  # Without jq the probe cannot run, so the line names jq, not a treehouse upgrade.
+  case_dir="$TMP_ROOT/capability-no-jq"
+  mkdir -p "$case_dir/home/config"
+  printf '%s\n' manual > "$case_dir/home/config/backlog-backend"
+  fakebin=$(make_fake_toolchain "$case_dir")
+  cat > "$case_dir/no-jq.bash" <<'SH'
+command() {
+  if [ "${1:-}" = -v ] && [ "${2:-}" = jq ]; then
+    return 1
+  fi
+  builtin command "$@"
+}
+jq() {
+  return 127
+}
+SH
+  out=$(PATH="$fakebin:$BASE_PATH" BASH_ENV="$case_dir/no-jq.bash" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
+    FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh")
+  assert_contains "$out" "BOOTSTRAP_INFO: treehouse cannot be probed for persistent recovered leases because jq is not installed; install jq" \
+    "no-jq: the diagnostic did not name jq as the remedy"
+  assert_not_contains "$out" "upgrade to a build" "no-jq: the diagnostic named a treehouse upgrade although jq is the cause"
+
+  case_dir="$TMP_ROOT/capability-proven"
+  mkdir -p "$case_dir/home/config"
+  printf '%s\n' manual > "$case_dir/home/config/backlog-backend"
+  fakebin=$(make_fake_toolchain "$case_dir")
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
+    FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh")
+  [ -z "$out" ] || fail "a provider that proves persistent recovered leases must add no line, got: $out"
+
+  # An Orca-only home needs no treehouse, so it is told nothing about it.
+  case_dir="$TMP_ROOT/capability-orca"
+  mkdir -p "$case_dir/home/config"
+  printf '%s\n' manual > "$case_dir/home/config/backlog-backend"
+  printf '%s\n' orca > "$case_dir/home/config/backend"
+  fakebin=$(make_fake_toolchain "$case_dir")
+  rm -f "$fakebin/tmux"
+  fm_fake_exit0 "$fakebin" orca
+  calls="$case_dir/treehouse-calls"
+  : > "$calls"
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
+    FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_FAKE_TREEHOUSE_CAPABILITY=unknown FM_FAKE_TREEHOUSE_LOG="$calls" \
+    "$ROOT/bin/fm-bootstrap.sh")
+  [ -z "$out" ] || fail "backend=orca must not report a treehouse capability, got: $out"
+  [ ! -s "$calls" ] || fail "backend=orca must not run treehouse at all: $(cat "$calls")"
+  pass "bootstrap: the recovered-lease capability diagnostic comes from the shared probe, is non-blocking, and follows the resolved backend"
 }
 
 test_fleet_sync_timeout_scales_with_origin_backed_project_count() {
@@ -1998,6 +2088,7 @@ test_cmux_bundled_cli_satisfies_dependency
 test_unknown_backend_reports_invalid_configuration
 test_json_backends_require_jq_not_tmux
 test_treehouse_lease_check_follows_resolved_backend
+test_treehouse_recovered_capability_diagnostic
 test_fleet_sync_timeout_scales_with_origin_backed_project_count
 test_fleet_sync_timeout_floor_preserves_small_fleets
 test_fleet_sync_timeout_explicit_override_wins

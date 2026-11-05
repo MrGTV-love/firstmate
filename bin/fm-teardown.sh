@@ -4431,6 +4431,309 @@ teardown_release_enclosing_slot() {
   teardown_nested_slot prove
 }
 
+# The release of a pool slot that encloses this task's nested current copy but
+# carries no slot-owner claim, which teardown_nested_slot prove leaves
+# unreturned. Hard rule 3 (never tear down unlanded work) is preserved by
+# ordering, in the final project-custody step before the task record goes:
+#   1. the existing landed-work and own-copy proofs ran earlier, unchanged;
+#   2. teardown_unclaimed_slot_prove reads the slot's lease fresh under project
+#      custody, binds its exact path, holder, and lease id, requires no claim,
+#      peer, other record, foreign or unregistered copy, live process, or dirt,
+#      and requires the root's HEAD landed (an anchor alone is not enough to
+#      reset a root nobody claims);
+#   3. the ordinary own-copy cleanup (teardown_nested_slot return) runs;
+#   4. teardown_unclaimed_slot_release repeats every check, returns the slot by
+#      an exact, conditional, non-forced treehouse return with EOF stdin
+#      (never teardown_treehouse_return, which adds --force), and reads the
+#      entry back as unleased;
+#   5. only then does the caller retire the task record and its return-pending
+#      marker. Any refusal keeps both for a retry.
+# A recovered quarantine (no lease id) is released by its holder literal alone;
+# an entry still on the old literal is first adopted under the protected one by
+# one treehouse status, so the return names the holder the provider keeps.
+# Only a treehouse that proves persistent recovered leases
+# (fm_task_copy_treehouse_persists_recovered_leases) is used, because only then
+# does a failed or stale return leave every sibling untouched. A slot already
+# unleased by an earlier interrupted attempt converges after the same checks
+# without a second reset. Nothing here searches for leases by task name.
+TEARDOWN_UNCLAIMED_SLOT=
+TEARDOWN_UNCLAIMED_KIND=
+TEARDOWN_UNCLAIMED_NAME=
+TEARDOWN_UNCLAIMED_HOLDER=
+TEARDOWN_UNCLAIMED_LEASE_ID=
+
+TEARDOWN_UNCLAIMED_WHY=
+teardown_unclaimed_note() {  # <reason>
+  TEARDOWN_UNCLAIMED_WHY=$1
+}
+
+# Run one phase; the only place the route reports a refusal.
+teardown_unclaimed_step() {  # prove | release
+  TEARDOWN_UNCLAIMED_WHY=
+  "teardown_unclaimed_slot_$1" && return 0
+  echo "REFUSED: pool slot $TEARDOWN_UNCLAIMED_SLOT, which encloses task $ID's nested copy and carries no slot claim, was not returned${TEARDOWN_UNCLAIMED_WHY:+: $TEARDOWN_UNCLAIMED_WHY}; nothing in it was reset or moved by this route, and task $ID's record and return-pending marker are kept for a retry." >&2
+  return 1
+}
+
+# Read the slot's lease fresh. <phase> bind records it; verify requires the
+# recorded path, holder, and lease id unchanged.
+teardown_unclaimed_read_lease() {  # bind | verify
+  local slot=$TEARDOWN_UNCLAIMED_SLOT
+  fm_task_copy_pool_slot_lease "$slot" || true
+  if [ "$1" = bind ] && [ "$FM_TASK_COPY_LEASE_HOLDER" = "$FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER" ]; then
+    fm_task_copy_current_pool_listing "$PROJ" || true
+    fm_task_copy_pool_slot_lease "$slot" || true
+  fi
+  case "$FM_TASK_COPY_LEASE_STATE" in
+    ordinary)
+      [ "$FM_TASK_COPY_LEASE_HOLDER" = "$ID" ] \
+        || { teardown_unclaimed_note "its lease is held by '$FM_TASK_COPY_LEASE_HOLDER', not by this task"; return 1; }
+      ;;
+    recovered) ;;
+    unleased)
+      [ "$1" = verify ] && [ "$TEARDOWN_UNCLAIMED_KIND" = unleased ] && return 0
+      [ "$1" = bind ] || { teardown_unclaimed_note "its lease changed to unleased after the checks"; return 1; }
+      ;;
+    legacy) teardown_unclaimed_note "its lease has no lease id, so ownership cannot be bound"; return 1 ;;
+    conflicting) teardown_unclaimed_note "more than one pool-state entry names it"; return 1 ;;
+    absent) teardown_unclaimed_note "its pool state has no entry for it"; return 1 ;;
+    *) teardown_unclaimed_note "its pool state cannot be read exactly"; return 1 ;;
+  esac
+  if [ "$1" = bind ]; then
+    TEARDOWN_UNCLAIMED_KIND=$FM_TASK_COPY_LEASE_STATE
+    TEARDOWN_UNCLAIMED_NAME=$FM_TASK_COPY_LEASE_NAME
+    TEARDOWN_UNCLAIMED_HOLDER=$FM_TASK_COPY_LEASE_HOLDER
+    TEARDOWN_UNCLAIMED_LEASE_ID=$FM_TASK_COPY_LEASE_ID
+    return 0
+  fi
+  [ "$FM_TASK_COPY_LEASE_STATE" = "$TEARDOWN_UNCLAIMED_KIND" ] \
+    && [ "$FM_TASK_COPY_LEASE_NAME" = "$TEARDOWN_UNCLAIMED_NAME" ] \
+    && [ "$FM_TASK_COPY_LEASE_HOLDER" = "$TEARDOWN_UNCLAIMED_HOLDER" ] \
+    && [ "$FM_TASK_COPY_LEASE_ID" = "$TEARDOWN_UNCLAIMED_LEASE_ID" ] \
+    || { teardown_unclaimed_note "its lease changed (holder, lease id, or entry) since the checks, so a successor may hold it"; return 1; }
+}
+
+# The first Git repository under <slot>, ignored paths included, other than the
+# slot's own .git and whatever lies inside <own-copy>; empty when there is none.
+# Fails when the scan cannot complete.
+teardown_slot_other_repo() {  # <slot> [<own-copy>...]
+  local slot=$1 copy repos
+  local -a own=()
+  shift
+  for copy in "$@"; do
+    [ ! -e "$copy" ] || own+=(-o \( -samefile "$copy" -prune \))
+  done
+  repos=$(find -P "$slot" -mindepth 1 \( -path "$slot/.git" -prune \) ${own[@]+"${own[@]}"} -o \( -name .git -prune -print \) 2>/dev/null) || return 1
+  printf '%s\n' "${repos%%$'\n'*}"
+}
+
+# Whether read-only checks already show this task alone holds the planned slot's
+# root, so the root's parked run and launch agents are this task's to retire. They
+# are retired before project custody, ahead of the strict walk, so nothing bound
+# only by the walk may be touched: the entry must be this task's lease or a
+# recovered quarantine, and no peer, other record, or other Git repository may be
+# in the slot. Any failure leaves the root alone, and the walk then refuses by name.
+teardown_unclaimed_root_is_own() {
+  local slot=$TEARDOWN_UNCLAIMED_SLOT current prior repo
+  local -a own=()
+  fm_task_copy_pool_slot_lease "$slot" || return 1
+  [ "$FM_TASK_COPY_LEASE_STATE" = recovered ] || [ "$FM_TASK_COPY_LEASE_HOLDER" = "$ID" ] || return 1
+  ( teardown_slot_peers_detect "$slot"; [ "${#TEARDOWN_PEER_IDS[@]}" -eq 0 ] ) || return 1
+  ( require_exclusive_worktree_slot_record "$META" "$ID" "$STATE" "$slot" ) >/dev/null 2>&1 || return 1
+  if current=$(fm_task_copy_canonical_dir "$WT"); then
+    own+=("$current")
+  fi
+  while IFS= read -r prior; do
+    own+=("$prior")
+  done < <(fm_task_copy_priors_inside "$META" "$slot")
+  repo=$(teardown_slot_other_repo "$slot" ${own[@]+"${own[@]}"}) && [ -z "$repo" ]
+}
+
+# The strict custody walk and the root checks, repeated before each decision.
+teardown_unclaimed_prove_custody() {
+  local slot=$TEARDOWN_UNCLAIMED_SLOT current prior_real known copy pids changes change repo
+  local -a proofs=()
+  fm_treehouse_slot_owner_state "$slot" "$ID"
+  [ "$FM_TREEHOUSE_SLOT_OWNER" = absent ] \
+    || { teardown_unclaimed_note "its slot claim is '$FM_TREEHOUSE_SLOT_OWNER', not absent"; return 1; }
+  teardown_slot_peers_detect "$slot"
+  [ "${#TEARDOWN_PEER_IDS[@]}" -eq 0 ] \
+    || { teardown_unclaimed_note "task ${TEARDOWN_PEER_IDS[*]} also works in it"; return 1; }
+  require_exclusive_worktree_slot_record "$META" "$ID" "$STATE" "$slot" || return 1
+  current=$(fm_task_copy_canonical_dir "$WT") || current=
+  proofs=("$slot")
+  while IFS= read -r prior_real; do
+    known=0
+    [ "$prior_real" != "$current" ] || known=1
+    for copy in "${proofs[@]}"; do
+      [ "$copy" != "$prior_real" ] || known=1
+    done
+    [ "$known" = 1 ] || proofs+=("$prior_real")
+  done < <(fm_task_copy_priors_inside "$META" "$slot")
+  TEARDOWN_RETURN_SLOT=$slot
+  TEARDOWN_NESTED_COPIES=()
+  [ -z "$current" ] || TEARDOWN_NESTED_COPIES+=("$current")
+  [ "${#proofs[@]}" -le 1 ] || TEARDOWN_NESTED_COPIES+=("${proofs[@]:1}")
+  TEARDOWN_PROOF_COPIES=("${proofs[@]}")
+  TEARDOWN_FOREIGN_COPIES=()
+  TEARDOWN_PROOF_OUTCOME="the slot was not returned and nothing in it was reset; --force does not waive this proof"
+  if ! teardown_nested_slot reprove; then
+    TEARDOWN_RETURN_SLOT=
+    TEARDOWN_NESTED_COPIES=()
+    TEARDOWN_PROOF_COPIES=()
+    TEARDOWN_HELD_SLOT=
+    TEARDOWN_FOREIGN_COPIES=()
+    return 1
+  fi
+  if [ -n "$TEARDOWN_HELD_SLOT" ] || [ "${#TEARDOWN_FOREIGN_COPIES[@]}" -gt 0 ]; then
+    TEARDOWN_RETURN_SLOT=
+    TEARDOWN_NESTED_COPIES=()
+    TEARDOWN_PROOF_COPIES=()
+    TEARDOWN_HELD_SLOT=
+    TEARDOWN_FOREIGN_COPIES=()
+    teardown_unclaimed_note "another task's copy remains inside it"
+    return 1
+  fi
+  # The own copies and the slot stay set for the cleanup that follows; the caller
+  # clears them (teardown_unclaimed_slot_forget) once the release is decided.
+  # An anchor alone proves a copy preserved, not a root nobody claims landed.
+  teardown_landed "$slot" HEAD "" \
+    || { teardown_unclaimed_note "its root HEAD is not landed"; return 1; }
+  # Nothing but this task's own proven copies may sit in the root, tracked or not:
+  # a stray nested repository or loose file is someone's work the return would
+  # sweep.
+  if ! changes=$(git -C "$slot" status --porcelain --untracked-files=all 2>/dev/null); then
+    teardown_unclaimed_note "its root status cannot be read"
+    return 1
+  fi
+  while IFS= read -r change; do
+    [ -n "$change" ] || continue
+    known=0
+    for copy in ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}; do
+      case "$slot/${change:3}" in "$copy"|"$copy"/|"$copy"/*) known=1 ;; esac
+      # The directories above an own copy (and what removing the copy leaves of
+      # it) are this task's own only while they hold no file or repository of
+      # anyone else's: a bare .git pointer file is the copy's own residue.
+      case "$copy/" in
+        "$slot/${change:3}"*)
+          if [ -z "$(find "$slot/${change:3}" \( -type f ! -name .git \) -o \( -type d -name .git \) 2>/dev/null | head -1)" ]; then
+            known=1
+          fi
+          ;;
+      esac
+    done
+    [ "$known" = 1 ] || { teardown_unclaimed_note "its root holds changes that are not this task's own copies: ${change:3}"; return 1; }
+  done <<< "$changes"
+  if ! repo=$(teardown_slot_other_repo "$slot" ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}); then
+    teardown_unclaimed_note "its root could not be scanned for other Git repositories"
+    return 1
+  fi
+  [ -z "$repo" ] || { teardown_unclaimed_note "its root holds Git repository ${repo%/.git}, which is not this task's own copy"; return 1; }
+  if ! pids=$(pids_with_cwd_under "$slot"); then
+    teardown_unclaimed_note "the live-process scan under it could not complete"
+    return 1
+  fi
+  [ -z "$pids" ] || { teardown_unclaimed_note "a live process runs inside it: $(printf '%s' "$pids" | tr '\n\t' '  ')"; return 1; }
+  return 0
+}
+
+# Whether this teardown plans the release of <slot>, the record's enclosing slot
+# with no slot claim (read-only, no custody needed). Without force, for a ship or
+# scout. An unproven treehouse or a failed capability probe stays inert: the copy
+# stays in place and no return-pending marker is written. On a proven treehouse
+# an entry provably someone else's or already free with no interrupted release of
+# this task's (another holder, absent, unleased with no marker naming the slot)
+# keeps that same no-return behavior. Every other reading (this task's own lease,
+# with or without a lease id, a recovered quarantine, a conflicting or unreadable
+# entry, an interrupted release) is planned, so any refusal there keeps the record
+# and the retry obligation.
+teardown_unclaimed_candidate() {  # <slot>
+  local slot=$1 marked
+  [ "$FORCE" != --force ] || return 1
+  case "$KIND" in ship|scout) ;; *) return 1 ;; esac
+  [ -n "$slot" ] || return 1
+  fm_task_copy_treehouse_persists_recovered_leases || return 1
+  fm_task_copy_pool_slot_lease "$slot" || true
+  case "$FM_TASK_COPY_LEASE_STATE" in
+    ordinary|legacy) [ "$FM_TASK_COPY_LEASE_HOLDER" = "$ID" ] ;;
+    recovered|conflicting|unreadable) return 0 ;;
+    unleased)
+      fm_teardown_return_pending "$STATE" "$ID" || return 1
+      marked=$(sed -n 's/^slot=//p' "$STATE/$ID.teardown-return-pending" 2>/dev/null | head -1)
+      [ -n "$marked" ] && [ "$(fm_task_copy_canonical_dir "$marked" 2>/dev/null)" = "$slot" ]
+      ;;
+    *) return 1 ;;
+  esac
+}
+
+# Before project custody, take the root's landed-work proof the way the claimed
+# route does: under custody a root landing proof can only be re-read from this
+# cache. A refusal here is not final; the release step re-checks and refuses.
+teardown_unclaimed_early_proof() {
+  local slot=$TEARDOWN_RECORD_SLOT
+  [ -n "$slot" ] && [ -z "$TEARDOWN_ENCLOSING_SLOT" ] || return 0
+  fm_treehouse_slot_owner_state "$slot" "$ID"
+  [ "$FM_TREEHOUSE_SLOT_OWNER" = absent ] || return 0
+  teardown_unclaimed_candidate "$slot" || return 0
+  teardown_landed "$slot" HEAD "" || true
+}
+
+# Before own-copy cleanup, under project custody.
+teardown_unclaimed_slot_prove() {
+  teardown_unclaimed_read_lease bind || return 1
+  teardown_unclaimed_prove_custody || return 1
+}
+
+teardown_unclaimed_slot_forget() {
+  TEARDOWN_RETURN_SLOT=
+  TEARDOWN_NESTED_COPIES=()
+  TEARDOWN_PROOF_COPIES=()
+  TEARDOWN_HELD_SLOT=
+  TEARDOWN_FOREIGN_COPIES=()
+}
+
+# The task's own proven copies, removed through the existing nested-copy path.
+teardown_unclaimed_slot_cleanup() {
+  [ ! -d "$WT" ] || validate_worktree_teardown_safety || exit 1
+  teardown_own_locked_copies_release || exit 1
+  teardown_remove_own_nested_copies "before returning pool slot $TEARDOWN_UNCLAIMED_SLOT"
+}
+
+# After own-copy cleanup, still under project custody.
+teardown_unclaimed_slot_release() {
+  local slot=$TEARDOWN_UNCLAIMED_SLOT out rc=0 prior prior_real
+  local -a args kept=()
+  teardown_unclaimed_read_lease verify || return 1
+  teardown_unclaimed_prove_custody || return 1
+  if [ "$TEARDOWN_UNCLAIMED_KIND" != unleased ]; then
+    teardown_retire_slot_manifest "$slot" || {
+      "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded deny --rule landed-work --task "$ID" --source-ok true 2>/dev/null || true
+      teardown_unclaimed_note "its slot manifest could not be retired"
+      return 1
+    }
+    args=(return "$slot" --if-lease-holder "$TEARDOWN_UNCLAIMED_HOLDER")
+    [ "$TEARDOWN_UNCLAIMED_KIND" != ordinary ] || args+=(--if-lease-id "$TEARDOWN_UNCLAIMED_LEASE_ID")
+    out=$(cd "$PROJ" && treehouse "${args[@]}" </dev/null 2>&1) || rc=$?
+    if [ "$rc" -ne 0 ]; then
+      teardown_unclaimed_note "treehouse refused the exact conditional return (exit $rc): $out"
+      return 1
+    fi
+  fi
+  fm_task_copy_pool_slot_lease "$slot" || true
+  [ "$FM_TASK_COPY_LEASE_STATE" = unleased ] \
+    || { teardown_unclaimed_note "its pool entry reads '$FM_TASK_COPY_LEASE_STATE' after the return, not unleased"; return 1; }
+  for prior in ${TEARDOWN_PRIOR_COPIES[@]+"${TEARDOWN_PRIOR_COPIES[@]}"}; do
+    prior_real=$(fm_task_copy_canonical_dir "$prior") || prior_real=$prior
+    case "$prior_real" in
+      "$slot"|"$slot"/*) ;;
+      *) kept+=("$prior") ;;
+    esac
+  done
+  TEARDOWN_PRIOR_COPIES=(${kept[@]+"${kept[@]}"})
+  teardown_unclaimed_slot_forget
+  return 0
+}
+
 require_owned_task_worktree_slot() {
   local slot=${1:-} rc=0
   if [ -z "$slot" ]; then
@@ -4814,7 +5117,7 @@ teardown_nested_slot_reprove_after_lock() {
 
 teardown_nested_slot() {  # prove | landed | retire | reprove | return
   local phase=$1 current prior prior_real copy known root branch teardown_slot post_lock_check
-  local -a kept=() proofs=() swept=() still=()
+  local -a kept=() proofs=() swept=() retired=() still=()
   case "$phase" in
     prove)
       [ "$KIND" != secondmate ] || return 0
@@ -4949,10 +5252,17 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
           ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}; do
         [ "$root" -ef "$WT" ] || swept+=("$root")
       done
-      for root in "${swept[@]}"; do
+      retired=("${swept[@]}")
+      if [ -n "$TEARDOWN_UNCLAIMED_SLOT" ] && teardown_unclaimed_root_is_own; then
+        [ "$TEARDOWN_UNCLAIMED_SLOT" -ef "$WT" ] || retired+=("$TEARDOWN_UNCLAIMED_SLOT")
+        while IFS= read -r root; do
+          [ "$root" -ef "$WT" ] || retired+=("$root")
+        done < <(fm_task_copy_priors_inside "$META" "$TEARDOWN_UNCLAIMED_SLOT")
+      fi
+      for root in "${retired[@]}"; do
         conclude_task_no_mistakes_run "$root" || exit 1
       done
-      for root in "${swept[@]}"; do
+      for root in "${retired[@]}"; do
         retire_task_private_nm_launch_agents "$root" || exit 1
       done
       teardown_foreign_procs_retire || exit 1
@@ -6211,6 +6521,7 @@ if [ "$KIND" != secondmate ] && [ "$TEARDOWN_SLOT_SHARED" = 1 ] \
 fi
 teardown_nested_slot prove || exit 1
 [ "$KIND" = secondmate ] || teardown_prove_slot_manifest "${TEARDOWN_ENCLOSING_SLOT:-$WT}"
+[ "$KIND" = secondmate ] || teardown_unclaimed_early_proof
 
 validate_pr_poll_cleanup "$STATE" "$ID" || exit 1
 
@@ -6407,7 +6718,10 @@ if [ "$TREEHOUSE_SLOT_LOCK_REQUIRED" = 1 ] && teardown_owns_worktree && [ -z "$T
     fm_treehouse_slot_owner_state "$TEARDOWN_RESERVED_SLOT" "$ID"
     case "$FM_TREEHOUSE_SLOT_OWNER" in
       mine) ;;
-      absent) teardown_release_enclosing_slot || exit 1 ;;
+      absent)
+        ! teardown_unclaimed_candidate "$TEARDOWN_RESERVED_SLOT" || TEARDOWN_UNCLAIMED_SLOT=$TEARDOWN_RESERVED_SLOT
+        teardown_release_enclosing_slot || exit 1
+        ;;
       *) require_owned_task_worktree_slot "$TEARDOWN_RESERVED_SLOT" || exit 1 ;;
     esac
   else
@@ -6655,6 +6969,14 @@ elif { [ -d "$WT" ] || [ -n "$TEARDOWN_ENCLOSING_SLOT" ]; } && [ "$KIND" != seco
     teardown_nested_slot return
   fi
 fi
+# An unclaimed enclosing slot is released by the same final custody step, with
+# its own proven nested copy cleaned there, also when that copy is already gone
+# (an earlier attempt removed it). This replaces whatever cleanup the chain above
+# chose: that chain either keeps a reassociated copy in place or returns the copy
+# by a forced path, and neither applies to a slot nobody claims.
+if [ -n "$TEARDOWN_UNCLAIMED_SLOT" ] && [ "$TREEHOUSE_SLOT_LOCK_REQUIRED" = 1 ] && [ "$KIND" != secondmate ]; then
+  TEARDOWN_DEFERRED_POOL_CLEANUP=unclaimed
+fi
 
 if [ "$BACKEND" != herdr ] && [ "$BACKEND" != orca ] && [ "$TEARDOWN_WINDOWLESS" != 1 ]; then
   fm_backend_kill "$BACKEND" "$T" "$(meta_value "$META" zellij_tab_id)" "fm-$ID" \
@@ -6771,7 +7093,7 @@ fi
 # see a false shared-slot collision. Backlog completion and clone sync need
 # only task custody and run after project custody is released.
 if [ -n "$TEARDOWN_DEFERRED_POOL_CLEANUP" ]; then
-  teardown_mark_return_pending "${TEARDOWN_RETURN_SLOT:-${TEARDOWN_PEER_SLOT:-$TEARDOWN_SHARED_SLOT}}" || exit 1
+  teardown_mark_return_pending "${TEARDOWN_RETURN_SLOT:-${TEARDOWN_PEER_SLOT:-${TEARDOWN_SHARED_SLOT:-$TEARDOWN_UNCLAIMED_SLOT}}}" || exit 1
   if [ "$TEARDOWN_DEFERRED_POOL_CLEANUP" = return ] || [ "$TEARDOWN_DEFERRED_POOL_CLEANUP" = peers ]; then
     TEARDOWN_PROOF_OUTCOME="earlier cleanup steps already ran, but nothing was removed and the slot keeps its contents; --force does not waive this proof"
     teardown_reprove_same_route || exit 1
@@ -6780,6 +7102,7 @@ if [ -n "$TEARDOWN_DEFERRED_POOL_CLEANUP" ]; then
     teardown_own_locked_copies_release || exit 1
   fi
   [ "$TREEHOUSE_PROJECT_LOCK_HELD" = 1 ] || teardown_acquire_project_lock wait || exit $?
+  [ -z "$TEARDOWN_UNCLAIMED_SLOT" ] || teardown_unclaimed_step prove || exit 1
   if [ "$TEARDOWN_DEFERRED_POOL_CLEANUP" = shared ]; then
     # Drop only this task's claim, never the remaining task's durable lease.
     fm_treehouse_slot_owner_release "$TEARDOWN_SHARED_SLOT" "$ID"
@@ -6793,6 +7116,8 @@ if [ -n "$TEARDOWN_DEFERRED_POOL_CLEANUP" ]; then
     # local proof under custody, as the return does, before the copy goes.
     [ ! -d "$WT" ] || validate_worktree_teardown_safety || exit 1
     teardown_nested_slot return
+  elif [ "$TEARDOWN_DEFERRED_POOL_CLEANUP" = unclaimed ]; then
+    teardown_unclaimed_slot_cleanup
   else
     TEARDOWN_DEFERRED_RETURN_SLOT=$TEARDOWN_RETURN_SLOT
     require_owned_task_worktree_slot "$TEARDOWN_RETURN_SLOT" || exit 1
@@ -6817,6 +7142,7 @@ if [ -n "$TEARDOWN_DEFERRED_POOL_CLEANUP" ]; then
       teardown_nested_slot return
     fi
   fi
+  [ -z "$TEARDOWN_UNCLAIMED_SLOT" ] || teardown_unclaimed_step release || exit 1
   fm_backlog_atomic_transition remove "$META" "task record" "$STATE" || exit 1
   TEARDOWN_META_REMOVED=1
   teardown_release_project_lock || exit 1
@@ -6890,6 +7216,8 @@ elif [ -n "$TEARDOWN_PEER_SLOT" ] && teardown_owns_worktree; then
   echo "teardown $ID complete (window ${T:-none}; nested reassociated worktree $WT removed; pool slot $TEARDOWN_PEER_SLOT left in place, since task ${TEARDOWN_PEER_IDS[*]} still works in it)"
 elif [ -n "$TEARDOWN_ENCLOSING_SLOT" ] && teardown_owns_worktree; then
   echo "teardown $ID complete (window ${T:-none}; nested reassociated worktree $WT removed and its pool slot $TEARDOWN_ENCLOSING_SLOT returned)"
+elif [ -n "$TEARDOWN_UNCLAIMED_SLOT" ]; then
+  echo "teardown $ID complete (window ${T:-none}; nested reassociated worktree $WT removed and its unclaimed pool slot $TEARDOWN_UNCLAIMED_SLOT returned by its exact lease)"
 elif [ "$TEARDOWN_KEEP_COPY" = 1 ] && [ -n "$TEARDOWN_RECORD_SLOT" ] && [ ! -d "$WT" ]; then
   echo "teardown $ID complete (window ${T:-none}; nested reassociated worktree $WT was already removed by an earlier teardown, and its pool slot $TEARDOWN_RECORD_SLOT is no longer this task's, so it was left alone)"
 elif [ "$TEARDOWN_KEEP_COPY" = 1 ]; then
