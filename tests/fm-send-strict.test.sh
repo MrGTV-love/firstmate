@@ -383,9 +383,22 @@ test_declared_local_input_is_checked_without_grants() {
   [ "$before" = "$after" ] || fail "input validation changed artifact or parent access"
   [ ! -e "$worktree/state" ] || fail "input validation wrote operational state into the task copy"
   body=$(bash -c '. "$1"; fm_task_inbox_body "$2"' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$home/state/other.inbox/001.msg")
-  assert_contains "$body" "$worktree/required.md" "the receiver needs the declared input location"
-  case "$body" in *neighbor.md*) fail "an undeclared neighbor was included in the instruction" ;; esac
-  pass "fm-send: declared local inputs gate delivery without permission changes or implicit transfers"
+  [ "$body" = 'Use the declared report' ] || fail "a declared input changed the delivered message: $body"
+  : > "$log"
+  PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" \
+    "$SEND" other --require-input "$worktree/required.md" '/review the declared report' >/dev/null 2> "$err"; rc=$?
+  expect_code 0 "$rc" "a typed native command with an accessible declared input should send"
+  [ "$(sed -n 's/^send-keys target=[^ ]* literal=1 arg=//p' "$log")" = '/review the declared report' ] \
+    || fail "a declared input changed the typed native command"$'\n'"$(cat "$log")"
+  [ ! -f "$home/state/other.inbox/002.msg" ] || fail "a typed native command was enqueued as a record"
+  rm "$worktree/required.md"
+  : > "$log"
+  PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" \
+    "$SEND" other --require-input "$worktree/required.md" '/review the declared report' >/dev/null 2> "$err"; rc=$?
+  [ "$rc" -ne 0 ] && [ "$rc" -ne 3 ] || fail "a typed native command sent without its declared input: $rc"
+  assert_contains "$(cat "$err")" "$worktree/required.md" "typed missing-input report must name its artifact"
+  [ ! -s "$log" ] || fail "a typed native command was typed without its declared input"
+  pass "fm-send: declared local inputs gate inbox and typed delivery without changing the message, permissions, or transfers"
 }
 
 fm_test_only

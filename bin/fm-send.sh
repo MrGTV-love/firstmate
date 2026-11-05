@@ -10,7 +10,7 @@
 # declared artifact through the existing authorized transfer, then correct the
 # instruction. No automatic transfer, permission grant, or resend is added.
 # Ordinary output/example/other-host paths in message text are never validated.
-# Declared input paths are included in the delivered instruction; --relay does
+# Declarations never change the delivered message bytes; --relay does
 # not bypass their validation. Keys and unrecorded endpoints cannot declare inputs.
 # Text naming a whole task id recorded in this home's state/<id>.meta, or its
 # legacy fm-<id> label, must target that owner. A task id inside a path is not
@@ -924,9 +924,6 @@ else
   # The pre-marker answer text, kept for the closing resolved note so the
   # durable ledger records the plain answer without marker or corr bytes.
   RESOLVE_ANSWER_TEXT=$MESSAGE
-  if [ -n "$REQUIRED_INPUTS" ]; then
-    MESSAGE="$MESSAGE"$'\n\nRequired input artifacts (paths on receiving host):\n'"$REQUIRED_INPUTS"
-  fi
   if [ "$MARK_FROM_FIRSTMATE" = 1 ] && [ -n "$FIRE_AND_FORGET_ID" ]; then
     fm_message_mark_from_firstmate "$MESSAGE" MESSAGE
     MESSAGE="${FM_FROMFIRST_MARK}delivery=${FIRE_AND_FORGET_ID} ${MESSAGE#"$FM_FROMFIRST_MARK"}"

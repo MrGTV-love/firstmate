@@ -881,7 +881,10 @@ test_declared_remote_input_is_reported_without_access_grants() {
   expect_code 0 "$rc" "a receiver-accessible declared input should allow delivery"
   rec=$(remote_inbox_records "$rhome")
   body=$(cat "$rec")
-  assert_contains "$body" 'Required input artifacts' "the receiving worker must see the declaration"
+  case "$(fm_task_inbox_body "$rec")" in
+    *' Use the declared input report') : ;;
+    *) fail "a declared input changed the delivered remote message"$'\n'"$body" ;;
+  esac
   corr=$(fm_pending_reply_extract_corr "$body")
   [ -n "$corr" ] || fail "input steer lost its request identity"
   # A completed action may consume its input. Retrying its existing identity
