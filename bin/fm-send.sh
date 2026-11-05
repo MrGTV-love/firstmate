@@ -12,8 +12,11 @@
 # Ordinary output/example/other-host paths in message text are never validated.
 # Declared input paths are included in the delivered instruction; --relay does
 # not bypass their validation. Keys and unrecorded endpoints cannot declare inputs.
-# Text naming a whole task id recorded in this home's state/<id>.meta must
-# target that owner. A wrong-owner steer is refused before enqueue, reply
+# Text naming a whole task id recorded in this home's state/<id>.meta, or its
+# legacy fm-<id> label, must target that owner. A task id inside a path is not
+# checked, so a wrong-owner path mention such as data/<other-id>/review.md is
+# accepted; the pending-reply repost relays its already-routed request.
+# A wrong-owner steer is refused before enqueue, reply
 # tracking, or typing, and names the correct task selector. Use --relay before
 # the text only for a deliberate cross-task mention; it bypasses only this
 # ownership check, never decision, lease, target, or delivery safeguards.
@@ -888,12 +891,24 @@ else
       [ -n "$mentioned_task" ] || continue
       # A task name embedded in a pathname is not a task-id token.
       case "$mentioned_task" in */*|*\\*) continue ;; esac
-      while [ ! -f "$STATE/$mentioned_task.meta" ] && [ "${mentioned_task%.}" != "$mentioned_task" ]; do
+      mentioned_id=
+      while :; do
+        if [ -f "$STATE/$mentioned_task.meta" ]; then
+          mentioned_id=$mentioned_task
+          break
+        fi
+        case "$mentioned_task" in fm-?*)
+          if [ -f "$STATE/${mentioned_task#fm-}.meta" ]; then
+            mentioned_id=${mentioned_task#fm-}
+            break
+          fi ;;
+        esac
+        [ "${mentioned_task%.}" != "$mentioned_task" ] || break
         mentioned_task=${mentioned_task%.}
       done
-      [ -f "$STATE/$mentioned_task.meta" ] || continue
-      [ "$mentioned_task" != "$owner_target" ] || continue
-      echo "error: task '$mentioned_task' is owned by this home's direct report '$mentioned_task', not target '$RAW_TARGET'; nothing was sent. Send to '$mentioned_task', or use --relay for a deliberate cross-task mention." >&2
+      [ -n "$mentioned_id" ] || continue
+      [ "$mentioned_id" != "$owner_target" ] || continue
+      echo "error: task '$mentioned_id' is owned by this home's direct report '$mentioned_id', not target '$RAW_TARGET'; nothing was sent. Send to '$mentioned_id', or use --relay for a deliberate cross-task mention." >&2
       exit 1
     done < <(printf '%s\n' "$MESSAGE" | LC_ALL=C tr -cs 'A-Za-z0-9_./\\-' '\n')
   fi

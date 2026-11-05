@@ -298,20 +298,21 @@ test_task_mentions_match_whole_tokens() {
   fb=$(make_stubs "$dir"); home=$(setup_home tokens); log="$dir/send.log"; err="$dir/send.err"
   fm_write_meta "$home/state/task-one.meta" "window=sess:fm-task-one" "kind=ship"
   fm_write_meta "$home/state/other.meta" "window=sess:fm-other" "kind=ship"
-  for text in 'task-one-longer' 'prefix-task-one' 'task-one.extension' 'task-not-owned-here'; do
+  for text in 'task-one-longer' 'prefix-task-one' 'task-one.extension' 'task-not-owned-here' 'fm-task-one-longer' 'fm-other' 'review data/task-one/review.md'; do
     : > "$log"
     PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" \
       "$SEND" other "$text" >/dev/null 2> "$err"; rc=$?
     expect_code 0 "$rc" "a longer or unrecorded task id is not a local owner mismatch"
   done
-  for text in '(task-one)' 'task-one,' $'next action:\ntask-one' 'mention task-one --relay in the body'; do
+  for text in '(task-one)' 'task-one,' $'next action:\ntask-one' 'mention task-one --relay in the body' 'fm-task-one' 'Resume fm-task-one.'; do
     : > "$log"
     PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" \
       "$SEND" other "$text" >/dev/null 2> "$err"; rc=$?
     [ "$rc" -ne 0 ] || fail "whole task token escaped ownership guard: $text"
     [ ! -s "$log" ] || fail "whole-token refusal sent input"
+    assert_contains "$(cat "$err")" "Send to 'task-one'" "refusal must name the owner selector: $text"
   done
-  pass "fm-send: whole task tokens reject, longer and unknown ids do not"
+  pass "fm-send: whole task tokens and legacy labels reject; longer, unknown and path-embedded ids do not"
 }
 
 test_secondmate_own_task_and_relay_safety() {

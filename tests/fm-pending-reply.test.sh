@@ -36,6 +36,7 @@
 #      uncached status read - accepting any verb - immediately before firing
 #  18. A same-kind escalation after an operator close appends again and reopens
 #      the decision; a retry while that decision is still open appends nothing
+#  19. A relayed cross-task request's repost reaches its mate unrefused
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -1223,6 +1224,32 @@ test_fm_send_marked_secondmate_creates_pending_and_embeds_corr() {
     || fail "task_id must match secondmate id"
   pass "fm-send marked secondmate path creates pending and embeds corr"
 }
+
+test_relayed_request_recovery_reaches_the_mate() (
+  local dir fb log home state rc corr body
+  unset FM_PENDING_REPLY_SEND_HOOK FM_PENDING_REPLY_NOW
+  dir="$TMP_ROOT/relay-recovery"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); log="$dir/send.log"
+  home=$(setup_parent relay-recovery); state="$home/state"
+  fm_write_secondmate_meta "$state/hibit.meta" "$home/sm" "sess:fm-hibit"
+  fm_write_meta "$state/other-task.meta" "window=sess:fm-other-task" "kind=ship"
+  run_send "$fb" "$home" "$log" hibit --relay "relay the fix round for other-task"; rc=$?
+  expect_code 0 "$rc" "setup: relayed secondmate request should send"
+  corr=$(fm_pending_reply_extract_corr "$(latest_record_body "$home" hibit)")
+  fm_pending_reply_observe_busy "$state" "$corr" busy
+  fm_pending_reply_observe_busy "$state" "$corr" idle
+  PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$home" FM_SEND_LOG="$log" \
+    fm_pending_reply_send_recovery "$state" "$corr" 2>/dev/null \
+    || fail "recovery of a relayed request must reach the mate, phase $(phase_of "$state" "$corr")"
+  [ "$(phase_of "$state" "$corr")" = recovery_sent ] \
+    || fail "phase should be recovery_sent, got $(phase_of "$state" "$corr")"
+  body=$(latest_record_body "$home" hibit)
+  case "$body" in
+    *"REPOST REQUIRED"*other-task*) : ;;
+    *) fail "mate inbox must hold the repost of the relayed request"$'\n'"$body" ;;
+  esac
+  pass "recovery of a relayed cross-task request reaches the mate"
+)
 
 test_document_pointer_resolves() {
   local home state corr
@@ -2465,6 +2492,7 @@ test_restart_preserves_expectation_and_parent_destination
 test_wrong_home_detected_not_acknowledged
 test_unmarked_captain_input_creates_no_expectation
 test_fm_send_marked_secondmate_creates_pending_and_embeds_corr
+test_relayed_request_recovery_reaches_the_mate
 test_document_pointer_resolves
 test_helper_report_resolves
 test_busy_idle_observation_via_backend_abstraction
