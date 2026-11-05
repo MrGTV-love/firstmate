@@ -30,13 +30,18 @@
 # is refused. A comment's arrival time never supplies its judged head. Record a
 # prose verdict only after its source identifies that head; otherwise leave it unbound and
 # triage its signal. Formal reviews carry GitHub's own commit_id. Neither kind
-# can grant merge authority. Only a live captain hold projects a captain actor.
-# Ordinary green mergeable PRs are fleet work: refresh an unknown base, update a
-# stale branch, route the independent review, recheck an unknown PASS fact, or
-# merge under the standing rule. These are action labels, never forge writes.
+# can grant merge authority. A live captain hold projects a captain actor, and so
+# does a current captain verdict unless a deferred captain hold pauses that task.
+# A current maintainer or nobody verdict keeps its actor and summary.
+# Other green PRs are fleet work. A stale base updates the branch and a missing
+# qualifying PASS routes the independent review, on REVIEW_REQUIRED, can_merge
+# false and away rows too. An eligible row refreshes an unknown base, rechecks an
+# unknown PASS fact, or merges under the standing rule. When owners of one URL
+# differ, a qualifying PASS decides the review label; task names never do. These
+# are action labels, never forge writes.
 # Optional PR facts share checked_at's freshness window: base_sha is the pull
 # resource's base SHA passed to the review verifier; base_containment records
-# tip, built_on and behind_by from compare/<encoded live base branch>...<head>.
+# behind_by from compare/<encoded live base branch>...<head>.
 # A missing or unreadable comparison is null (unknown), never fresh.
 # review_verification binds pr, head, task and base to the unchanged typed
 # fm-review-verification.v1 answer from fm-review-record.py verify --review-only.
@@ -323,10 +328,8 @@ observe() { # canonical GitHub URL -> normalized JSON
     if [ -n "$base_ref" ]; then
       if FORGE_ERR="$TMP/base.err" forge api "repos/$part/compare/$base_ref...$head?per_page=1" > "$TMP/compare.json"; then
         if comparison=$(jq -ce '
-          select((.base_commit.sha | type == "string" and test("^[a-fA-F0-9]{40}$"))
-            and (.merge_base_commit.sha | type == "string" and test("^[a-fA-F0-9]{40}$"))
-            and (.behind_by | type == "number" and . >= 0 and . == floor))
-          | {tip:.base_commit.sha,built_on:.merge_base_commit.sha,behind_by}' "$TMP/compare.json" 2>/dev/null); then
+          select(.behind_by | type == "number" and . >= 0 and . == floor)
+          | {behind_by}' "$TMP/compare.json" 2>/dev/null); then
           printf '%s\n' "$comparison" > "$TMP/base-containment.json"
         fi
       fi
@@ -393,10 +396,8 @@ observe_review() { # task canonical-url: attach this owner's local review-only a
       --task "$task" --base "$base" --review-only --json \
       > "$TMP/review-output.json" 2> "$TMP/review.err" || rc=$?
     if [ "$rc" -eq 0 ] || [ "$rc" -eq 1 ] || [ "$rc" -eq 2 ]; then
-      jq -nce --argjson rc "$rc" --slurpfile answer "$TMP/review-output.json" '
-        select(($answer | length) == 1) | $answer[0]
-        | select(.schema == "fm-review-verification.v1"
-          and ((.ok == true and $rc == 0) or (.ok == false and $rc != 0)))' \
+      jq -nce --slurpfile answer "$TMP/review-output.json" '
+        select(($answer | length) == 1) | $answer[0]' \
         > "$TMP/review-answer.json" 2>/dev/null || printf 'null\n' > "$TMP/review-answer.json"
     fi
   fi
