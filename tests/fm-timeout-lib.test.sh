@@ -703,7 +703,7 @@ env = dict(os.environ, PATH=str(fakebin) + os.pathsep + os.environ['PATH'],
            FM_HOME=str(fixture), FM_DATA_OVERRIDE=str(fixture / 'data'),
            FM_CONFIG_OVERRIDE=str(fixture / 'config'), FM_STATE_OVERRIDE=str(fixture / 'state'),
            FM_DURATION_FILE=str(ledger), FM_LINT_CACHE_DIR=str(fixture / 'cache'),
-           FM_LINT_SLOT_DIR='off', FM_LINT_TELEMETRY='off', FM_CACHE_ANALYSES=str(analyses),
+           FM_LINT_SLOT_DIR=str(fixture / 'slots'), FM_LINT_TELEMETRY='off', FM_LINT_HOST_RSS_KIB='100000000', FM_CACHE_ANALYSES=str(analyses),
            CI='false', GITHUB_ACTIONS='false')
 helper = repo / 'bin/fm-duration.py'
 command = [sys.executable, str(helper), 'run', 'lint.full.whole', '--', 'bash', str(repo / 'bin/fm-lint.sh'), '--jobs', '1']

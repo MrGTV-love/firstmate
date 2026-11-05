@@ -25,8 +25,41 @@ INSTALLER="$ROOT/bin/fm-install-shellcheck.sh"
 REQUIRED=$("$LINT" --required-version)
 # Ordinary regressions must not read or populate the operator's shared cache.
 export FM_LINT_CACHE_DIR=off
-# Nor may they queue on the operator's shared host-wide ShellCheck slots.
-export FM_LINT_SLOT_DIR=off
+# Nor may they queue in the operator's live host pool: every lint run of these
+# suites uses this suite's own fixture pool, which the gate still bounds host-wide
+# by the growth guard and the outside count. A test that proves the default host
+# pool unsets FM_LINT_SLOT_DIR for that run.
+FM_LINT_SLOT_DIR=$(fm_test_tmproot fm-lint-pool) || exit 1
+export FM_LINT_SLOT_DIR="$FM_LINT_SLOT_DIR/slots"
+FM_LINT_REAL_PS=$(command -v ps)
+
+# fm_lint_hide_outside_shellcheck <fakebin>: a ps for a stand-in analysis in a
+# fixture pool. Admission and the growth guard read every lint gate on the host
+# and every process named shellcheck, so a real lint or a real ShellCheck elsewhere
+# would change this fixture's result. In the gate's process table read this ps
+# drops the rows of processes named shellcheck, except the pid in
+# FM_TEST_COUNTED_SHELLCHECK_PID, and the rows of gates that use another pool
+# directory (FM_TEST_GATE_POOL_PREFIX, when set, names every pool directory it
+# keeps by a common prefix). A gate of the live host pool and every other call
+# get plain ps, so the shim never hides memory from the host pool.
+fm_lint_hide_outside_shellcheck() {
+  cat > "$1/ps" <<SH
+#!/bin/sh
+[ "\$*" = '-axww -o pid=,ppid=,rss=,lstart=,command=' ] || exec "$FM_LINT_REAL_PS" "\$@"
+[ "\${FM_LINT_INTERNAL_SLOT_DIR:-}" != "/var/tmp/firstmate-lint-$UID/lint-slots" ] || exec "$FM_LINT_REAL_PS" "\$@"
+"$FM_LINT_REAL_PS" "\$@" | /usr/bin/awk -v counted="\${FM_TEST_COUNTED_SHELLCHECK_PID:-}" -v keep=" gate \${FM_TEST_GATE_POOL_PREFIX:-\${FM_LINT_INTERNAL_SLOT_DIR:-} }" '{
+  cmd = \$0
+  sub(/^ *[0-9]+ +[0-9]+ +[0-9]+ +[A-Za-z]+ +[A-Za-z]+ +[0-9]+ +[0-9:]+ +[0-9]+ +/, "", cmd)
+  name = cmd
+  sub(/ .*/, "", name)
+  sub(/.*\//, "", name)
+  if (name == "shellcheck" && \$1 != counted) next
+  if (cmd ~ /fm-lint-cache[.]pl gate / && index(cmd, keep) == 0) next
+  print
+}'
+SH
+  chmod +x "$1/ps"
+}
 
 # Official GitHub release asset sha256 values for shellcheck v0.11.0 .tar.xz
 # archives (https://github.com/koalaman/shellcheck/releases/tag/v0.11.0). Tests
@@ -268,6 +301,7 @@ printf '%s\n' "\$@" >> "$log"
 exit 0
 SH
   chmod +x "$fakebin/shellcheck"
+  fm_lint_hide_outside_shellcheck "$fakebin"
 }
 
 # fm_lint_bounds_supported: the platform pair the bounded per-root envelope
@@ -346,6 +380,7 @@ printf '%s\n' "$target" >> "${FM_TEST_STUB_LOG:-/dev/null}"
 exit 0
 SH
   chmod +x "$fakebin/shellcheck"
+  fm_lint_hide_outside_shellcheck "$fakebin"
 }
 
 fm_lint_assert_flag_log() {
@@ -369,7 +404,7 @@ fm_lint_assert_flag_log() {
 # E flock slot pool in the Perl helper     1           2             0                0 (chosen)
 # E supplies a host bound without a daemon or stale-lock reclamation protocol.
 # Supplied paired reproduction: identical workloads of six roots per run,
-# --jobs 2, gate disabled with FM_LINT_SLOT_DIR=off versus enabled with cap 3.
+# --jobs 2, an effectively unlimited pool versus a pool with cap 3.
 # Concurrent runs:                    1     4     8    16
 # Peak live ShellCheck, disabled:     2     8    16    32 (2 x runs)
 # Peak live ShellCheck, enabled:      2     3     3     3 (min(2 x runs, cap))
@@ -415,7 +450,7 @@ use warnings;
 use Time::HiRes qw(time sleep);
 if (\$ENV{FM_LINT_COUNT_HOLD} && (\$ARGV[0] // '') =~ m{/fm-lint-cache[.]pl\\z}
     && ((\$ARGV[1] // '') eq 'gate'
-        || ((\$ARGV[1] // '') eq 'check' && (\$ENV{FM_LINT_INTERNAL_SLOT_DIR} // 'off') eq 'off'))) {
+        )) {
     my \$dir = \$ENV{FM_LINT_COUNT_READY_DIR};
     open(my \$ready, '>', "\$dir/ready.\$\$") or die "\$!";
     close \$ready;
