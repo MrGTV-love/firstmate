@@ -2592,6 +2592,58 @@ test_recovery_rejects_malformed_pr_urls() {
   pass "recovery rejects malformed PR URL values"
 }
 
+# Teardown closes a train member with the merged train as its PR and one strictly
+# formatted note naming the closed member. That one shape replays; every wider
+# note or argument shape stays refused.
+test_recovery_accepts_only_the_merge_train_close_shape() {
+  local case_dir id marker out shape i=0 member=https://github.com/example/repo/pull/7
+  local train=https://github.com/example/repo/pull/9
+  local -a ids=()
+  case_dir=$(make_home marker-train-close)
+  id=atomic-marker-train-ok-b12
+  add_item "$case_dir" "$id"
+  start_item "$case_dir" "$id"
+  printf 'id=%s\ndata=%s\nspawn_gen=spawn-train\narg=--pr\narg=%s\narg=--note\narg=closed by merge train: %s\n' \
+    "$id" "$(home_of "$case_dir")/data" "$train" "$member" \
+    > "$(home_of "$case_dir")/state/$id.backlog-close"
+  for shape in \
+    "--pr|$train|--note|closed by merge train: $member and more" \
+    "--pr|$train|--note|closed by merge train: http://github.com/example/repo/pull/7" \
+    "--pr|$train|--note|closed by merge train: https://example.com/example/repo/pull/7" \
+    "--pr|$train|--note|closed by merge train:  $member" \
+    "--pr|$train|--note|landed by $member" \
+    "--note|closed by merge train: $member|--pr|$train" \
+    "--report|data/x/report.md|--note|closed by merge train: $member" \
+    "--pr|$train|--pr|$member" \
+    "--pr|$train|--note|closed by merge train: $member|--note|dropped"; do
+    i=$((i + 1))
+    ids+=("atomic-marker-train-wide-$i-b12")
+    add_item "$case_dir" "${ids[$((i - 1))]}"
+    start_item "$case_dir" "${ids[$((i - 1))]}"
+    marker="$(home_of "$case_dir")/state/${ids[$((i - 1))]}.backlog-close"
+    {
+      printf 'id=%s\ndata=%s\nspawn_gen=spawn-train-wide\n' "${ids[$((i - 1))]}" "$(home_of "$case_dir")/data"
+      printf '%s\n' "$shape" | tr '|' '\n' | sed 's/^/arg=/'
+    } > "$marker"
+  done
+
+  out=$(run_bootstrap "$case_dir")
+  [ "$(row_state "$case_dir" "$id")" = "done" ] \
+    || fail "the merge-train close shape was not replayed: $out"
+  grep -F -- "- [x] $id " "$(backlog_of "$case_dir")" | grep -F " $train " >/dev/null \
+    || fail "the replayed train close did not record the train as its PR"
+  grep -qxF "  closed by merge train: $member" "$(backlog_of "$case_dir")" \
+    || fail "the replayed train close did not name the closed member"
+  assert_absent "$(home_of "$case_dir")/state/$id.backlog-close" "the replayed train close left its record behind"
+  for i in "${!ids[@]}"; do
+    assert_present "$(home_of "$case_dir")/state/${ids[$i]}.backlog-close" \
+      "a wider train close shape ($((i + 1))) was consumed"
+    [ "$(row_state "$case_dir" "${ids[$i]}")" = in_flight ] \
+      || fail "a wider train close shape ($((i + 1))) changed the backlog row: $out"
+  done
+  pass "recovery replays only the merge-train close shape and refuses every wider note or argument shape"
+}
+
 test_failed_close_replay_is_not_started_as_live_work() {
   local case_dir id marker out
   id=atomic-pending-close-not-started-b12
@@ -3625,6 +3677,7 @@ test_recovery_rejects_an_unterminated_unknown_field
 test_recovery_rejects_lexical_data_traversal
 test_recovery_rejects_raw_control_bytes
 test_recovery_rejects_malformed_pr_urls
+test_recovery_accepts_only_the_merge_train_close_shape
 test_failed_close_replay_is_not_started_as_live_work
 test_recovery_rejects_invalid_close_arguments
 test_recovery_rejects_a_symlinked_close_marker

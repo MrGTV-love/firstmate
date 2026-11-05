@@ -6072,6 +6072,7 @@
         {"file": "bin/fm-teardown.sh", "match": "echo \"REFUSED: task $ID shares pool slot $TEARDOWN_SHARED_SLOT, but its recorded PR is not confirmed merged and its own branch $branch is not proved landed; its record and slot claim stay in place.\" >&2"},
         {"file": "bin/fm-teardown.sh", "match": "echo \"REFUSED: task $ID's nested copy $WT is already removed and its branch is not landed; a pushed branch alone is not completion.\" >&2"},
         {"file": "bin/fm-teardown.sh", "match": "echo \"REFUSED: task $ID's recorded copy $WT was reassigned to task $TEARDOWN_SLOT_REASSIGNED_TO, but its recorded PR is not confirmed merged and its own branch $branch is not proved landed; its records stay in place.\" >&2"},
+        {"file": "bin/fm-teardown.sh", "match": "echo \"REFUSED: not known whether the ship deliverable is landed; a pushed branch alone is not completion.\" >&2"},
         {"file": "bin/fm-teardown.sh", "match": "echo \"REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.\" >&2"},
         {"file": "bin/fm-teardown.sh", "match": "echo \"REFUSED: worktree $WT has uncommitted changes.\" >&2"},
         {"file": "bin/fm-teardown.sh", "match": "teardown_refuse_removed_nested_copy", "count": 2},

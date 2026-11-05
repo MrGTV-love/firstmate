@@ -3294,3 +3294,169 @@ SH
   chmod +x "$case_dir/fakebin/mv"
 }
 
+
+# Merge-train fixtures. A train member PR (pull/7) is CLOSED, not merged, because
+# a merged train PR (pull/9) carried its head unchanged. The forge is a fake gh
+# that answers from files under $case/gh-fixture, so a case edits one fact at a
+# time; every call is logged to calls.log so a case can prove which reads ran.
+TRAIN_MEMBER_URL=https://github.com/example/repo/pull/7
+TRAIN_URL=https://github.com/example/repo/pull/9
+TRAIN_MEMBER_HEAD=
+TRAIN_HEAD=
+TRAIN_COPY_HEAD=
+
+# setup_train_history <case-dir> <landing: none|squash> <copy: head|prerebase|inside|extra> [train: merge|flat|flat-missing]
+# Builds the member PR head H (two commits on top of a moved main: feature.txt, then
+# feature2.txt), the train head (a merge of H plus a second member's commit), and
+# then moves the default branch
+# on by editing feature.txt, so the content-in-default proof can never match.
+#   landing squash: the default branch also holds the train's squash commit.
+#   train flat: the pipeline rebased the train flat, so it replays the member's two
+#     commits as new commits and does not contain H. flat-missing: it replays only
+#     the second, so one of the member's commits never reached the train.
+#   copy head: the copy sits at H. prerebase: at a commit with H's patch on the old
+#     main. inside: at the train's merge of H, later than H. extra: at H plus a
+#     commit the train never merged.
+# TRAIN_PREFETCH_TRAIN=0 leaves the train head out of the copy's object store.
+# Sets TRAIN_MEMBER_HEAD, TRAIN_HEAD and TRAIN_COPY_HEAD.
+setup_train_history() {
+  local case_dir=$1 landing=$2 copy=$3 shape=${4:-merge} tmp="$1/_train" prerebase='' merge_commit
+  if [ "$copy" = prerebase ]; then
+    wt_commit_file "$case_dir" feature.txt hello "add feature"
+    prerebase=$(git -C "$case_dir/wt" rev-parse HEAD)
+  fi
+  git clone -q "$case_dir/origin.git" "$tmp"
+  git -C "$tmp" config user.email t@t
+  git -C "$tmp" config user.name t
+  printf '%s\n' moved > "$tmp/m.txt"
+  git -C "$tmp" add -- m.txt
+  git -C "$tmp" commit -q -m "main moves"
+  git -C "$tmp" push -q origin main
+  git -C "$tmp" checkout -q -b member
+  printf '%s\n' hello > "$tmp/feature.txt"
+  git -C "$tmp" add -- feature.txt
+  git -C "$tmp" commit -q -m "add feature"
+  printf '%s\n' hello2 > "$tmp/feature2.txt"
+  git -C "$tmp" add -- feature2.txt
+  git -C "$tmp" commit -q -m "add feature two"
+  TRAIN_MEMBER_HEAD=$(git -C "$tmp" rev-parse HEAD)
+  git -C "$tmp" push -q origin "HEAD:refs/pull/7/head"
+  git -C "$tmp" checkout -q -b train main
+  case "$shape" in
+    merge) git -C "$tmp" merge -q --no-ff --no-edit member ;;
+    flat) GIT_COMMITTER_DATE="2030-01-01T00:00:00Z" git -C "$tmp" cherry-pick member~1 member >/dev/null ;;
+    flat-missing) GIT_COMMITTER_DATE="2030-01-01T00:00:00Z" git -C "$tmp" cherry-pick member >/dev/null ;;
+    *) fail "setup_train_history: unknown train shape $shape" ;;
+  esac
+  merge_commit=$(git -C "$tmp" rev-parse HEAD)
+  printf '%s\n' second > "$tmp/second.txt"
+  git -C "$tmp" add -- second.txt
+  git -C "$tmp" commit -q -m "second member work"
+  TRAIN_HEAD=$(git -C "$tmp" rev-parse HEAD)
+  git -C "$tmp" push -q origin "HEAD:refs/pull/9/head"
+  git -C "$tmp" checkout -q main
+  if [ "$landing" = squash ]; then
+    git -C "$tmp" merge -q --squash train >/dev/null
+    git -C "$tmp" commit -q -m "train squash (#9)"
+    git -C "$tmp" push -q origin main
+  fi
+  printf '%s\n' changed-on-main > "$tmp/feature.txt"
+  git -C "$tmp" add -- feature.txt
+  git -C "$tmp" commit -q -m "main edits feature"
+  git -C "$tmp" push -q origin main
+  rm -rf "$tmp"
+  git -C "$case_dir/project" fetch -q origin
+  git -C "$case_dir/wt" fetch -q origin refs/pull/7/head
+  [ "${TRAIN_PREFETCH_TRAIN:-1}" != 1 ] || git -C "$case_dir/wt" fetch -q origin refs/pull/9/head
+  case "$copy" in
+    head) git -C "$case_dir/wt" reset -q --hard "$TRAIN_MEMBER_HEAD" ;;
+    prerebase) ;;
+    inside) git -C "$case_dir/wt" reset -q --hard "$merge_commit" ;;
+    extra)
+      git -C "$case_dir/wt" reset -q --hard "$TRAIN_MEMBER_HEAD"
+      wt_commit_file "$case_dir" extra.txt unmerged "unmerged follow-up"
+      ;;
+    *) fail "setup_train_history: unknown copy $copy" ;;
+  esac
+  TRAIN_COPY_HEAD=$(git -C "$case_dir/wt" rev-parse HEAD)
+  [ "$prerebase" = "" ] || [ "$prerebase" = "$TRAIN_COPY_HEAD" ] || fail "setup_train_history: prerebase copy moved"
+}
+
+# add_gh_train_fake <case-dir> <member state> <member head>: the member PR's state
+# and head, an empty train search, and a log of every call. A member-view.once file
+# answers the first full member read and fails every later one.
+add_gh_train_fake() {
+  local case_dir=$1 fx="$1/gh-fixture"
+  mkdir -p "$fx"
+  printf '%s\n' "$2" > "$fx/member-state"
+  printf '%s\n' "$3" > "$fx/member-head"
+  printf '[]\n' > "$fx/list.json"
+  rm -f "$fx/list.fail" "$fx/calls.log" "$fx/member-view.once" "$fx/member-view.seen"
+  cat > "$case_dir/fakebin/gh" <<SH
+#!/usr/bin/env bash
+fx='$fx'
+printf '%s\n' "\$*" >> "\$fx/calls.log"
+case "\${1:-} \${2:-}" in
+  "pr view")
+    case " \$* " in
+      *"state,headRefOid,url"*)
+        if [ -e "\$fx/member-view.once" ]; then
+          [ ! -e "\$fx/member-view.seen" ] || { echo "error: forge unavailable" >&2 ; exit 1 ; }
+          : > "\$fx/member-view.seen"
+        fi
+        printf '%s\t%s\t%s\n' "\$(cat "\$fx/member-state")" "\$(cat "\$fx/member-head")" '$TRAIN_MEMBER_URL' ; exit 0 ;;
+      *"--json state "*) cat "\$fx/member-state" ; exit 0 ;;
+    esac ;;
+  "pr list")
+    [ ! -e "\$fx/list.fail" ] || { echo "error: forge unavailable" >&2 ; exit 1 ; }
+    cat "\$fx/list.json" ; exit 0 ;;
+esac
+echo "error: pull request not found" >&2
+exit 1
+SH
+  chmod +x "$case_dir/fakebin/gh"
+}
+
+# train_list <case-dir> <number> <state> <base> <head> <body>: the one PR the
+# forge's search returns.
+train_list() {
+  jq -n --argjson number "$2" --arg url "https://github.com/example/repo/pull/$2" \
+    --arg state "$3" --arg base "$4" --arg head "$5" --arg body "$6" \
+    '[{number: $number, url: $url, state: $state, baseRefName: $base, headRefOid: $head, body: $body}]' \
+    > "$1/gh-fixture/list.json"
+}
+
+# train_body <member url> <sha>: a train body that lists this member and another.
+train_body() {
+  printf 'Merge train\n\nComponents, in order:\n- %s at %s\n- https://github.com/example/repo/pull/8 at %s\n' \
+    "$1" "$2" cccccccccccccccccccccccccccccccccccccccc
+}
+
+# train_default_list <case-dir>: a MERGED train into main listing the member at H.
+train_default_list() {
+  train_list "$1" 9 MERGED main "$TRAIN_HEAD" "$(train_body "$TRAIN_MEMBER_URL" "$TRAIN_MEMBER_HEAD")"
+}
+
+# add_logging_treehouse <case-dir>: the pool stub, recording every call.
+add_logging_treehouse() {
+  cat > "$1/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$1/treehouse.log"
+exit 0
+SH
+  chmod +x "$1/fakebin/treehouse"
+}
+
+# train_case <name> <landing> <copy> [<base-branch recorded in meta>] [<train shape>]: a task whose
+# member PR is CLOSED and whose train is listed and merged, ready to run teardown.
+# Sets TRAIN_CASE.
+train_case() {
+  TRAIN_CASE=$(make_case "$1")
+  write_meta "$TRAIN_CASE" no-mistakes ship
+  append_pr_meta_url "$TRAIN_CASE"
+  [ -z "${4:-}" ] || printf 'base_branch=%s\n' "$4" >> "$TRAIN_CASE/state/task-x1.meta"
+  setup_train_history "$TRAIN_CASE" "$2" "$3" "${5:-merge}"
+  add_gh_train_fake "$TRAIN_CASE" CLOSED "$TRAIN_MEMBER_HEAD"
+  train_default_list "$TRAIN_CASE"
+  add_logging_treehouse "$TRAIN_CASE"
+}

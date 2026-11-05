@@ -3812,6 +3812,613 @@ SH
 }
 
 
+# Merge-train landing proof. A member PR closed (not merged) because a merged train
+# PR carried it is landed only when the forge shows that train MERGED into the
+# task's base, listing this member URL at the member's recorded head, containing
+# that head, and the copy's work carried by the train head. Rows 1 to 8 are built
+# so no other proof applies: the default branch has moved on and edited the same
+# file, and no bundle or run record exists.
+assert_train_allowed() {  # <case-dir> <label>
+  local case_dir=$1 label=$2 rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "$label: teardown should accept the verified train"$'\n'"$(cat "$case_dir/stderr")"
+  ! grep -q REFUSED "$case_dir/stderr" || fail "$label: teardown printed a REFUSED line"
+  assert_grep "return" "$case_dir/treehouse.log" "$label: the slot was not returned"
+  assert_absent "$case_dir/state/task-x1.meta" "$label: accepted teardown left the task record"
+  assert_grep "$TRAIN_URL" "$case_dir/stderr" "$label: stderr did not name the train PR"
+  assert_grep "$TRAIN_MEMBER_URL" "$case_dir/stderr" "$label: stderr did not name the member PR"
+  assert_grep "$TRAIN_MEMBER_HEAD" "$case_dir/stderr" "$label: stderr did not name the listed sha"
+}
+
+# The closed row records the merged train as its PR and the member as closed by it,
+# and the ledger's merged_pr evidence names the train, never the closed member.
+assert_train_backlog_close() {  # <case-dir> <label>
+  local case_dir=$1 label=$2 row
+  row=$(grep -F -- '- [x] task-x1 ' "$case_dir/data/backlog.md") \
+    || fail "$label: the backlog has no closed task-x1 row"$'\n'"$(cat "$case_dir/data/backlog.md")"
+  case "$row" in *" $TRAIN_URL "*) ;; *) fail "$label: the closed row does not record the train PR: $row" ;; esac
+  case "$row" in *"$TRAIN_MEMBER_URL"*) fail "$label: the closed row records the closed member as its PR: $row" ;; esac
+  grep -qxF "  closed by merge train: $TRAIN_MEMBER_URL" "$case_dir/data/backlog.md" \
+    || fail "$label: the close did not name the member as closed by the train"$'\n'"$(cat "$case_dir/data/backlog.md")"
+  if [ -e "$case_dir/config/fleet-ledger" ]; then
+    assert_equals "[\"task-x1\",\"merged_pr\",\"$TRAIN_URL\",true]" \
+      "$(ledger_closed_rows "$case_dir")" "$label: task.closed record"
+  fi
+}
+
+# A refused teardown names the failed fact, keeps the copy and every record, and
+# never asks the pool to return the slot.
+assert_train_refused() {  # <case-dir> <label> <fact> [unknown]
+  local case_dir=$1 label=$2 fact=$3 kind=${4:-} rc=0 head
+  head=$(git -C "$case_dir/wt" rev-parse HEAD 2>/dev/null || true)
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "$label: teardown must refuse"$'\n'"$(cat "$case_dir/stderr")"
+  assert_grep "REFUSED" "$case_dir/stderr" "$label: refusal did not say REFUSED"
+  assert_grep "$fact" "$case_dir/stderr" "$label: refusal did not name the failed fact"$'\n'"$(cat "$case_dir/stderr")"
+  if [ "$kind" = unknown ]; then
+    assert_no_grep "ship deliverable is not landed" "$case_dir/stderr" \
+      "$label: an unread forge fact was reported as not landed"
+    assert_grep "unknown, retry" "$case_dir/stderr" "$label: refusal did not say the proof is unknown"
+  fi
+  assert_absent "$case_dir/treehouse.log" "$label: refused teardown returned the slot"
+  assert_present "$case_dir/state/task-x1.meta" "$label: refusal removed the task record"
+  [ -d "$case_dir/wt" ] || fail "$label: refusal removed the copy"
+  [ -z "$head" ] || [ "$(git -C "$case_dir/wt" rev-parse HEAD)" = "$head" ] || fail "$label: refusal moved the copy's HEAD"
+}
+
+test_train_member_closed_landed_by_merged_train_allows() {
+  train_case train-merge-landed none head
+  seed_backlog_in_flight "$TRAIN_CASE"
+  : > "$TRAIN_CASE/config/fleet-ledger"
+  assert_train_allowed "$TRAIN_CASE" "train-merge-landed"
+  [ "$(backlog_row_state "$TRAIN_CASE")" = "done" ] || fail "train-merge-landed: backlog item stayed open"
+  assert_train_backlog_close "$TRAIN_CASE" train-merge-landed
+  pass "a CLOSED member whose merged train lists its head and contains it is accepted, naming the train on stderr and on the backlog close"
+}
+
+test_train_member_prerebase_copy_allows() {
+  train_case train-prerebase none prerebase
+  [ "$TRAIN_COPY_HEAD" != "$TRAIN_MEMBER_HEAD" ] || fail "train-prerebase: the copy is not a pre-rebase head"
+  assert_train_allowed "$TRAIN_CASE" "train-prerebase"
+  pass "a pre-rebase copy whose patches the train head carries is accepted by the patch proof"
+}
+
+test_train_member_squash_landed_allows() {
+  train_case train-squash squash head
+  git -C "$TRAIN_CASE/wt" merge-base --is-ancestor "$TRAIN_HEAD" origin/main \
+    && fail "train-squash: the train head is an ancestor of the default branch"
+  assert_train_allowed "$TRAIN_CASE" "train-squash"
+  pass "a train landed by squash is accepted"
+}
+
+test_train_member_copy_inside_train_allows() {
+  train_case train-inside none inside
+  [ "$TRAIN_COPY_HEAD" != "$TRAIN_MEMBER_HEAD" ] || fail "train-inside: the copy is at the listed head"
+  git -C "$TRAIN_CASE/wt" merge-base --is-ancestor "$TRAIN_MEMBER_HEAD" "$TRAIN_COPY_HEAD" \
+    || fail "train-inside: the copy is not later than the listed head"
+  assert_train_allowed "$TRAIN_CASE" "train-inside"
+  pass "a copy later than the listed head but inside the verified train is accepted"
+}
+
+test_train_refuses_when_no_merged_pr_lists_the_member() {
+  local row body
+  for row in empty other-member prefix-of-another-number no-sha; do
+    train_case "train-nolist-$row" none head
+    case "$row" in
+      empty) printf '[]\n' > "$TRAIN_CASE/gh-fixture/list.json" ;;
+      other-member)
+        body=$(train_body https://github.com/example/repo/pull/8 "$TRAIN_MEMBER_HEAD")
+        train_list "$TRAIN_CASE" 9 MERGED main "$TRAIN_HEAD" "$body" ;;
+      prefix-of-another-number)
+        body=$(train_body https://github.com/example/repo/pull/70 "$TRAIN_MEMBER_HEAD")
+        train_list "$TRAIN_CASE" 9 MERGED main "$TRAIN_HEAD" "$body" ;;
+      no-sha)
+        body=$(printf 'Merge train\n\n- %s\n- %s at short1234\n' "$TRAIN_MEMBER_URL" "$TRAIN_MEMBER_URL")
+        train_list "$TRAIN_CASE" 9 MERGED main "$TRAIN_HEAD" "$body" ;;
+    esac
+    assert_train_refused "$TRAIN_CASE" "train-nolist-$row" "no PR found by the forge lists it"
+    assert_grep "ship deliverable is not landed" "$TRAIN_CASE/stderr" "train-nolist-$row: refusal lost the existing text"
+  done
+  pass "a closed member no merged PR lists at a 40-hex sha is refused (no list, other member, number prefix, no sha)"
+}
+
+test_train_refuses_a_listing_that_is_not_the_members_head() {
+  local other=dddddddddddddddddddddddddddddddddddddddd
+  train_case train-wrong-sha none head
+  train_list "$TRAIN_CASE" 9 MERGED main "$TRAIN_HEAD" "$(train_body "$TRAIN_MEMBER_URL" "$other")"
+  assert_train_refused "$TRAIN_CASE" "train-wrong-sha" "not the member PR's recorded head"
+
+  # The member moved on after the train was built: the listed sha is no longer its head.
+  train_case train-moved-member none head
+  printf '%s\n' "$other" > "$TRAIN_CASE/gh-fixture/member-head"
+  assert_train_refused "$TRAIN_CASE" "train-moved-member" "not the member PR's recorded head"
+
+  # The listed sha is the member's head, but the train head does not contain it.
+  train_case train-not-contained none head
+  git -C "$TRAIN_CASE/wt" -c user.email=t@t -c user.name=t commit -q --allow-empty -m "member moved on"
+  printf '%s\n' "$(git -C "$TRAIN_CASE/wt" rev-parse HEAD)" > "$TRAIN_CASE/gh-fixture/member-head"
+  train_list "$TRAIN_CASE" 9 MERGED main "$TRAIN_HEAD" \
+    "$(train_body "$TRAIN_MEMBER_URL" "$(git -C "$TRAIN_CASE/wt" rev-parse HEAD)")"
+  assert_train_refused "$TRAIN_CASE" "train-not-contained" "neither contains it nor carries every commit of it"
+  pass "a train listing another sha, or a sha its head does not contain, is refused"
+}
+
+test_train_refuses_copy_work_the_train_does_not_carry() {
+  train_case train-extra none extra
+  assert_train_refused "$TRAIN_CASE" "train-extra" "whose change is not proven present in the merged PR head"
+  assert_grep "unmerged follow-up" "$TRAIN_CASE/stderr" "train-extra: refusal did not name the unmerged commit"
+  assert_grep "copy's work is not proven present" "$TRAIN_CASE/stderr" "train-extra: refusal did not name the train fact"
+  pass "a copy holding a commit the train head never carried is refused with the commit named"
+}
+
+test_train_dirty_copy_refuses_before_the_train_is_read() {
+  train_case train-dirty none head
+  printf '%s\n' scratch > "$TRAIN_CASE/wt/scratch.txt"
+  assert_train_refused "$TRAIN_CASE" "train-dirty" "has uncommitted changes"
+  assert_absent "$TRAIN_CASE/gh-fixture/calls.log" "train-dirty: the forge was read for a dirty copy"
+  pass "a dirty copy refuses before any forge read, even when its train is verified"
+}
+
+test_train_refuses_a_train_that_is_not_merged() {
+  local state
+  for state in OPEN CLOSED; do
+    train_case "train-$state" none head
+    train_list "$TRAIN_CASE" 9 "$state" main "$TRAIN_HEAD" "$(train_body "$TRAIN_MEMBER_URL" "$TRAIN_MEMBER_HEAD")"
+    assert_train_refused "$TRAIN_CASE" "train-$state" "is $state, not merged"
+  done
+  pass "an open or closed-unmerged train is refused"
+}
+
+test_train_refuses_a_train_merged_into_another_branch() {
+  train_case train-other-base none head
+  train_list "$TRAIN_CASE" 9 MERGED develop "$TRAIN_HEAD" "$(train_body "$TRAIN_MEMBER_URL" "$TRAIN_MEMBER_HEAD")"
+  assert_train_refused "$TRAIN_CASE" "train-other-base" "merged into develop, not this task's base main"
+
+  # A task that records its own base_branch is judged against that branch.
+  train_case train-recorded-base none head release
+  assert_train_refused "$TRAIN_CASE" "train-recorded-base-refuse" "merged into main, not this task's base release"
+  train_case train-recorded-base-ok none head release
+  train_list "$TRAIN_CASE" 9 MERGED release "$TRAIN_HEAD" "$(train_body "$TRAIN_MEMBER_URL" "$TRAIN_MEMBER_HEAD")"
+  assert_train_allowed "$TRAIN_CASE" "train-recorded-base-ok"
+  pass "the train must be merged into the task's base: the default branch, or its recorded base_branch"
+}
+
+test_train_unreadable_forge_is_unknown_never_accepted() {
+  # The search fails.
+  train_case train-search-fails none head
+  : > "$TRAIN_CASE/gh-fixture/list.fail"
+  assert_train_refused "$TRAIN_CASE" "train-search-fails" "the forge search for PRs listing" unknown
+
+  # The search answers with something that is not a list.
+  train_case train-search-garbled none head
+  printf 'not json\n' > "$TRAIN_CASE/gh-fixture/list.json"
+  assert_train_refused "$TRAIN_CASE" "train-search-garbled" "returned nothing readable" unknown
+
+  # The train head cannot be fetched.
+  TRAIN_PREFETCH_TRAIN=0 train_case train-fetch-fails none head
+  git -C "$TRAIN_CASE/origin.git" update-ref -d refs/pull/9/head
+  git -C "$TRAIN_CASE/wt" cat-file -e "$TRAIN_HEAD^{commit}" 2>/dev/null \
+    && fail "train-fetch-fails: the train head was already in the copy"
+  assert_train_refused "$TRAIN_CASE" "train-fetch-fails" "could not be fetched" unknown
+  pass "a failed forge search or fetch of the train is unknown, retry, never accepted and never 'not landed'"
+}
+
+test_train_control_open_member_is_not_landed_by_a_train() {
+  train_case train-open-member none head
+  printf 'OPEN\n' > "$TRAIN_CASE/gh-fixture/member-state"
+  assert_train_refused "$TRAIN_CASE" "train-open-member" "ship deliverable is not landed"
+  assert_no_grep "pr list" "$TRAIN_CASE/gh-fixture/calls.log" "train-open-member: the train was searched for an open PR"
+  pass "a train that lists an OPEN member does not make it landed"
+}
+
+test_train_control_merged_member_keeps_the_existing_route() {
+  train_case train-merged-member none head
+  printf 'MERGED\n' > "$TRAIN_CASE/gh-fixture/member-state"
+  run_teardown "$TRAIN_CASE" > "$TRAIN_CASE/stdout" 2> "$TRAIN_CASE/stderr" \
+    || fail "train-merged-member: a merged member was refused: $(cat "$TRAIN_CASE/stderr")"
+  assert_no_grep "pr list" "$TRAIN_CASE/gh-fixture/calls.log" "train-merged-member: the train route ran for a merged member"
+  assert_no_grep "merged train" "$TRAIN_CASE/stderr" "train-merged-member: the train was named for a merged member"
+  pass "a MERGED member is decided by the existing route, with no train read"
+}
+
+test_train_control_content_proof_still_accepts_a_closed_member() {
+  local mode case_dir
+  for mode in no-train forge-down; do
+    case_dir=$(make_case "train-content-$mode")
+    write_meta "$case_dir" no-mistakes ship
+    append_pr_meta_url "$case_dir"
+    wt_commit_file "$case_dir" feature.txt hello "add feature"
+    land_on_origin_main "$case_dir" feature.txt hello
+    add_gh_train_fake "$case_dir" CLOSED "$(git -C "$case_dir/wt" rev-parse HEAD)"
+    [ "$mode" != forge-down ] || : > "$case_dir/gh-fixture/list.fail"
+    add_logging_treehouse "$case_dir"
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" \
+      || fail "train-content-$mode: the content proof no longer accepts: $(cat "$case_dir/stderr")"
+    assert_grep return "$case_dir/treehouse.log" "train-content-$mode: the slot was not returned"
+    assert_no_grep "pr list" "$case_dir/gh-fixture/calls.log" "train-content-$mode: the train was searched although the content proof held"
+  done
+  pass "a CLOSED member whose clean content is already in the default branch is still accepted by the content proof"
+}
+
+test_train_other_refusals_stay() {
+  local case_dir rc
+  # A closed member with no train and unlanded work keeps the existing refusal and text.
+  case_dir=$(make_case train-unlanded)
+  write_meta "$case_dir" no-mistakes ship
+  append_pr_meta_url "$case_dir"
+  wt_commit_file "$case_dir" feature.txt hello "add feature"
+  add_gh_train_fake "$case_dir" CLOSED "$(git -C "$case_dir/wt" rev-parse HEAD)"
+  add_logging_treehouse "$case_dir"
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "train-unlanded: unlanded work must refuse"
+  assert_grep "REFUSED: the ship deliverable is not landed" "$case_dir/stderr" "train-unlanded: refusal text changed"
+  assert_absent "$case_dir/treehouse.log" "train-unlanded: refused teardown returned the slot"
+  pass "a closed member with no train and unlanded work keeps the existing refusal"
+}
+
+# The record-only route (the copy is gone) applies the same verified-train rule and
+# reads no copy: the recorded PR is CLOSED, so only the forge's train proof counts.
+train_absent_case() {  # <name> [<train shape>]
+  train_case "$1" none head "" "${2:-merge}"
+  write_windowless_legacy_meta "$TRAIN_CASE" no-mistakes ship "$TRAIN_CASE/missing-wt"
+  append_pr_meta_url "$TRAIN_CASE"
+  seed_backlog_in_flight "$TRAIN_CASE"
+}
+
+test_train_record_only_route_without_a_copy() {
+  local row other=dddddddddddddddddddddddddddddddddddddddd
+  train_absent_case train-absent-ok
+  run_teardown "$TRAIN_CASE" > "$TRAIN_CASE/stdout" 2> "$TRAIN_CASE/stderr" \
+    || fail "train-absent-ok: a verified train was refused for a removed copy: $(cat "$TRAIN_CASE/stderr")"
+  assert_grep "$TRAIN_URL" "$TRAIN_CASE/stderr" "train-absent-ok: stderr did not name the train PR"
+  assert_grep "$TRAIN_MEMBER_HEAD" "$TRAIN_CASE/stderr" "train-absent-ok: stderr did not name the listed sha"
+  assert_absent "$TRAIN_CASE/state/task-x1.meta" "train-absent-ok: accepted teardown left the task record"
+  [ "$(backlog_row_state "$TRAIN_CASE")" = "done" ] || fail "train-absent-ok: backlog item stayed open"
+  assert_train_backlog_close "$TRAIN_CASE" train-absent-ok
+
+  for row in empty other-member wrong-sha prefix-sha missing-sha open-train other-base search-fails fetch-fails; do
+    case "$row" in
+      fetch-fails) TRAIN_PREFETCH_TRAIN=0 train_absent_case "train-absent-$row" ;;
+      *) train_absent_case "train-absent-$row" ;;
+    esac
+    case "$row" in
+      empty)
+        printf '[]\n' > "$TRAIN_CASE/gh-fixture/list.json"
+        assert_train_refused "$TRAIN_CASE" "train-absent-$row" "no PR found by the forge lists it" ;;
+      other-member)
+        train_list "$TRAIN_CASE" 9 MERGED main "$TRAIN_HEAD" "$(train_body https://github.com/example/repo/pull/8 "$TRAIN_MEMBER_HEAD")"
+        assert_train_refused "$TRAIN_CASE" "train-absent-$row" "no PR found by the forge lists it" ;;
+      wrong-sha)
+        train_list "$TRAIN_CASE" 9 MERGED main "$TRAIN_HEAD" "$(train_body "$TRAIN_MEMBER_URL" "$other")"
+        assert_train_refused "$TRAIN_CASE" "train-absent-$row" "not the member PR's recorded head" ;;
+      prefix-sha)
+        train_list "$TRAIN_CASE" 9 MERGED main "$TRAIN_HEAD" "$(train_body "$TRAIN_MEMBER_URL" "${TRAIN_MEMBER_HEAD:0:12}")"
+        assert_train_refused "$TRAIN_CASE" "train-absent-$row" "no PR found by the forge lists it" ;;
+      missing-sha)
+        train_list "$TRAIN_CASE" 9 MERGED main "$TRAIN_HEAD" "Merge train"$'\n\n'"- $TRAIN_MEMBER_URL"
+        assert_train_refused "$TRAIN_CASE" "train-absent-$row" "no PR found by the forge lists it" ;;
+      open-train)
+        train_list "$TRAIN_CASE" 9 OPEN main "$TRAIN_HEAD" "$(train_body "$TRAIN_MEMBER_URL" "$TRAIN_MEMBER_HEAD")"
+        assert_train_refused "$TRAIN_CASE" "train-absent-$row" "is OPEN, not merged" ;;
+      other-base)
+        train_list "$TRAIN_CASE" 9 MERGED develop "$TRAIN_HEAD" "$(train_body "$TRAIN_MEMBER_URL" "$TRAIN_MEMBER_HEAD")"
+        assert_train_refused "$TRAIN_CASE" "train-absent-$row" "merged into develop, not this task's base main" ;;
+      search-fails)
+        : > "$TRAIN_CASE/gh-fixture/list.fail"
+        assert_train_refused "$TRAIN_CASE" "train-absent-$row" "the forge search for PRs listing" unknown ;;
+      fetch-fails)
+        git -C "$TRAIN_CASE/origin.git" update-ref -d refs/pull/9/head
+        assert_train_refused "$TRAIN_CASE" "train-absent-$row" "could not be fetched" unknown ;;
+    esac
+    [ "$(backlog_row_state "$TRAIN_CASE")" = in_flight ] || fail "train-absent-$row: refusal closed the backlog"
+  done
+  pass "a removed copy is accepted only on a verified merged train, and every unverified or unread train refuses"
+}
+
+# The removed-copy route in a pool slot (teardown_nested_slot landed) judges the
+# task's branch ref through the same landed-work rule, so it accepts the same
+# verified train and refuses the same unverified ones.
+test_train_member_removed_copy_in_pool_slot() {
+  local row case_dir rc
+  for row in verified wrong-sha; do
+    make_nested_slot_case "train-nested-$row" enclosing .claude/worktrees/bundled
+    case_dir=$NESTED_CASE
+    ln -s "$NESTED_COPY" "$case_dir/wt"
+    setup_train_history "$case_dir" none head
+    rm "$case_dir/wt"
+    git -C "$case_dir/project" worktree remove --force "$NESTED_COPY"
+    assert_absent "$NESTED_COPY" "train-nested-$row: setup did not remove the nested copy"
+    printf '%s\n' "pr=$TRAIN_MEMBER_URL" >> "$case_dir/state/task-x1.meta"
+    add_gh_train_fake "$case_dir" CLOSED "$TRAIN_MEMBER_HEAD"
+    train_default_list "$case_dir"
+    if [ "$row" = wrong-sha ]; then
+      train_list "$case_dir" 9 MERGED main "$TRAIN_HEAD" "$(train_body "$TRAIN_MEMBER_URL" dddddddddddddddddddddddddddddddddddddddd)"
+    fi
+    add_logging_treehouse "$case_dir"
+    rc=0
+    FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    if [ "$row" = verified ]; then
+      expect_code 0 "$rc" "train-nested-$row: a verified train must finish: $(cat "$case_dir/stderr")"
+      assert_grep "$TRAIN_URL" "$case_dir/stderr" "train-nested-$row: stderr did not name the train PR"
+      assert_absent "$case_dir/state/task-x1.meta" "train-nested-$row: task was not retired"
+    else
+      expect_code 1 "$rc" "train-nested-$row: an unverified train must refuse: $(cat "$case_dir/stderr")"
+      assert_present "$case_dir/state/task-x1.meta" "train-nested-$row: refusal removed the record"
+      assert_absent "$case_dir/treehouse.log" "train-nested-$row: refusal returned the slot"
+    fi
+  done
+  pass "a removed copy's branch in a pool slot is landed by a verified train only"
+}
+
+# A train the pipeline rebased flat (Vernant's squash-only history) does not contain
+# the member head: it replays the member's commits as new commits. The listed head
+# is then carried when every one of its commits has an equivalent patch in the train.
+test_train_flattened_rebase_carries_the_listed_head() {
+  local copy
+  for copy in head prerebase; do
+    train_case "train-flat-$copy" squash "$copy" "" flat
+    if git -C "$TRAIN_CASE/wt" merge-base --is-ancestor "$TRAIN_MEMBER_HEAD" "$TRAIN_HEAD"; then
+      fail "train-flat-$copy: the flat train contains the member head"
+    fi
+    assert_train_allowed "$TRAIN_CASE" "train-flat-$copy"
+  done
+  pass "a flattened-rebase train that replays every member commit is accepted although it does not contain the member head"
+}
+
+test_train_flattened_rebase_missing_a_member_commit_refuses() {
+  train_case train-flat-missing squash head "" flat-missing
+  assert_train_refused "$TRAIN_CASE" "train-flat-missing" "neither contains it nor carries every commit of it"
+  assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "train-flat-missing: the train was accepted"
+  pass "a flattened train missing one commit of the member head is refused"
+}
+
+# A remote-tracking ref left at the member head's parent must not hide that parent
+# from the proof: the flat train dropped it, so neither the member head nor the
+# copy is carried, in work mode or record mode.
+test_train_flat_missing_with_a_stale_remote_ref_refuses() {
+  train_case train-flat-stale squash head "" flat-missing
+  git -C "$TRAIN_CASE/wt" update-ref refs/remotes/origin/fm/task-x1 "$TRAIN_MEMBER_HEAD~1"
+  assert_train_refused "$TRAIN_CASE" "train-flat-stale" "neither contains it nor carries every commit of it"
+  assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "train-flat-stale: the train was accepted"
+
+  train_absent_case train-absent-flat-stale flat-missing
+  git -C "$TRAIN_CASE/project" fetch -q origin refs/pull/7/head
+  git -C "$TRAIN_CASE/project" update-ref refs/remotes/origin/fm/task-x1 "$TRAIN_MEMBER_HEAD~1"
+  assert_train_refused "$TRAIN_CASE" "train-absent-flat-stale" "neither contains it nor carries every commit of it"
+  assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "train-absent-flat-stale: the train was accepted"
+  [ "$(backlog_row_state "$TRAIN_CASE")" = in_flight ] || fail "train-absent-flat-stale: refusal closed the backlog"
+  pass "a flat train missing a member commit refuses even when a stale remote-tracking ref holds that commit"
+}
+
+# The train route reads the member again after pr_is_merged saw it CLOSED; a re-read
+# that fails is unknown, retry, never 'not landed' and never accepted.
+test_train_member_reread_failure_is_unknown() {
+  local events
+  train_case train-reread-fails none head
+  : > "$TRAIN_CASE/gh-fixture/member-view.once"
+  events="$TRAIN_CASE/guard-events.jsonl"
+  FM_GUARD_EVENT_LOG="$events" assert_train_refused "$TRAIN_CASE" "train-reread-fails" "could not be read again" unknown
+  assert_grep "REFUSED: not known whether the ship deliverable is landed" "$TRAIN_CASE/stderr" \
+    "train-reread-fails: the refusal did not say the landing is unknown"
+  assert_no_grep "pr list" "$TRAIN_CASE/gh-fixture/calls.log" "train-reread-fails: the train was searched after the member read failed"
+  assert_equals "deny:false" \
+    "$(jq -rs '[.[] | select(.guard == "teardown-unlanded") | "\(.decision):\(.source_ok)"] | join(" ")' "$events")" \
+    "train-reread-fails: an unread train proof was logged as a readable source"
+
+  # An answered refusal (no train lists the member) still logs a readable source.
+  train_case train-answered-guard none head
+  printf '[]\n' > "$TRAIN_CASE/gh-fixture/list.json"
+  events="$TRAIN_CASE/guard-events.jsonl"
+  FM_GUARD_EVENT_LOG="$events" assert_train_refused "$TRAIN_CASE" "train-answered-guard" "ship deliverable is not landed"
+  assert_equals "deny:true" \
+    "$(jq -rs '[.[] | select(.guard == "teardown-unlanded") | "\(.decision):\(.source_ok)"] | join(" ")' "$events")" \
+    "train-answered-guard: an answered refusal was logged as an unread source"
+  pass "a failed re-read of the CLOSED member is unknown, retry, and its guard event says the source was not readable"
+}
+
+# With no recorded pr=, pr_is_merged finds the member PR by its branch and sees it
+# CLOSED; the train route uses that same PR and does not look the branch up again,
+# so a later branch lookup that fails cannot turn the proof into 'not landed'.
+test_train_member_found_by_branch_is_not_looked_up_again() {
+  local case_dir
+  case_dir=$(make_case train-branch-lookup-once)
+  write_meta "$case_dir" no-mistakes ship
+  setup_train_history "$case_dir" none head
+  add_gh_train_fake "$case_dir" CLOSED "$TRAIN_MEMBER_HEAD"
+  train_default_list "$case_dir"
+  add_logging_treehouse "$case_dir"
+  cat > "$case_dir/fakebin/gh-axi" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> '$case_dir/gh-axi.log'
+case "\${1:-} \${2:-}" in
+  "pr list")
+    [ ! -e '$case_dir/gh-axi.seen' ] || { echo "error: forge unavailable" >&2 ; exit 1 ; }
+    : > '$case_dir/gh-axi.seen'
+    printf '%s\n' "count: 1 (showing first 1)" "pull_requests[1]{number,title,state}:" "  7,train member,closed" ; exit 0 ;;
+esac
+echo "error: pull request not found" >&2
+exit 1
+SH
+  chmod +x "$case_dir/fakebin/gh-axi"
+  assert_train_allowed "$case_dir" train-branch-lookup-once
+  pass "a member PR found by its branch is used by the train route without a second branch lookup"
+}
+
+# train_pipeline_input_case <name>: the live d1 B5 r4 shape. The copy is the input
+# of a run that rewrote it and pushed the member head, so no patch of "add a" is in
+# the train, the member is CLOSED, and a merged train lists that pushed head.
+train_pipeline_input_case() {
+  local tmp
+  TRAIN_CASE=$(make_case "$1")
+  write_meta "$TRAIN_CASE" no-mistakes ship
+  append_pr_meta_url "$TRAIN_CASE"
+  TRAIN_MEMBER_HEAD=$(setup_pipeline_rewritten_history "$TRAIN_CASE" rewritten-input)
+  add_gh_train_fake "$TRAIN_CASE" CLOSED "$TRAIN_MEMBER_HEAD"
+  tmp="$TRAIN_CASE/_train"
+  git clone -q "$TRAIN_CASE/origin.git" "$tmp"
+  git -C "$tmp" fetch -q origin refs/pull/7/head
+  git -C "$tmp" checkout -q -b train origin/main~1
+  git -C "$tmp" -c user.email=t@t -c user.name=t merge -q --no-ff --no-edit "$TRAIN_MEMBER_HEAD"
+  TRAIN_HEAD=$(git -C "$tmp" rev-parse HEAD)
+  git -C "$tmp" push -q origin HEAD:refs/pull/9/head
+  rm -rf "$tmp"
+  git -C "$TRAIN_CASE/wt" fetch -q origin refs/pull/7/head refs/pull/9/head
+  train_default_list "$TRAIN_CASE"
+  add_logging_treehouse "$TRAIN_CASE"
+}
+
+# A run record shows what a pipeline run pushed, never that the copy's own commits
+# survived into the train, so no record can stand in for carried work (Main 3011 F1).
+# Dropped-input falsifier: the copy holds a commit neither the train head nor the
+# default branch has, and a run record ties exactly this copy to the listed head.
+test_train_run_record_never_stands_in_for_carried_work() {
+  local copy_head rows
+  train_case train-record-dropped-input none extra
+  copy_head=$(git -C "$TRAIN_CASE/wt" rev-parse HEAD)
+  write_nm_run_record "$TRAIN_CASE" 01RUNDROPPED "$TRAIN_MEMBER_URL" "$copy_head" "$TRAIN_MEMBER_HEAD"
+  assert_train_refused "$TRAIN_CASE" "train-record-dropped-input" "copy's work is not proven present"
+  assert_grep "unmerged follow-up" "$TRAIN_CASE/stderr" "train-record-dropped-input: refusal did not name the unmerged commit"
+  assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "train-record-dropped-input: the record carried the copy"
+  assert_present "$TRAIN_CASE/nm/state.sqlite" "train-record-dropped-input: refusal removed the run record"
+  rows=$(python3 -I -c 'import sqlite3,sys; print(sqlite3.connect(sys.argv[1]).execute("select count(*) from runs").fetchone()[0])' "$TRAIN_CASE/nm/state.sqlite")
+  [ "$rows" = 1 ] || fail "train-record-dropped-input: refusal changed the run record ($rows rows)"
+
+  # The live d1 B5 r4 shape: a rewritten input whose patch is in no train commit stays refused.
+  train_pipeline_input_case train-record-rewritten-input
+  copy_head=$(git -C "$TRAIN_CASE/wt" rev-parse HEAD)
+  write_nm_run_record "$TRAIN_CASE" 01RUNTRAIN "$TRAIN_MEMBER_URL" "$copy_head" "$TRAIN_MEMBER_HEAD"
+  assert_train_refused "$TRAIN_CASE" "train-record-rewritten-input" "copy's work is not proven present"
+  assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "train-record-rewritten-input: the record carried the copy"
+  pass "a matching run record never carries a copy whose commits the train head lacks; the copy and the record stay"
+}
+
+# A silent record reader changes nothing on the train route, which never reads the record.
+test_train_route_never_reads_the_run_record() {
+  local copy_head rc
+  train_pipeline_input_case train-record-not-read
+  copy_head=$(git -C "$TRAIN_CASE/wt" rev-parse HEAD)
+  write_nm_run_record "$TRAIN_CASE" 01RUNTRAIN "$TRAIN_MEMBER_URL" "$copy_head" "$TRAIN_MEMBER_HEAD"
+  install_quiet_record_reader "$TRAIN_CASE" hang
+  rc=0
+  run_teardown "$TRAIN_CASE" > "$TRAIN_CASE/stdout" 2> "$TRAIN_CASE/stderr" || rc=$?
+  expect_code 1 "$rc" "train-record-not-read: the train route must refuse, not wait on a record"$'\n'"$(cat "$TRAIN_CASE/stderr")"
+  assert_no_grep "did not answer" "$TRAIN_CASE/stderr" "train-record-not-read: the train route waited on the run record"
+  assert_refusal_retained_task_state "$TRAIN_CASE" train-record-not-read "$copy_head"
+  pass "the train route never reads the run record, so a silent reader neither delays nor admits it"
+}
+
+# Reachability from the default branch is not a carry proof (Main 3237 F1): an
+# `ours` merge puts a commit in the default history without its change. Each case
+# below hides one commit K that the flat train never carried behind such a merge,
+# so the helper that skipped default-reachable commits proved the rest and
+# accepted. K sits under the member's replayed commits, so they stay candidates.
+
+# train_ours_merge_into_main <case-dir> <origin ref>: merge that ref into origin's
+# main with the ours strategy, then fetch main into the project and the copy.
+train_ours_merge_into_main() {
+  local case_dir=$1 ref=$2 tmp="$1/_ours"
+  git clone -q "$case_dir/origin.git" "$tmp"
+  git -C "$tmp" config user.email t@t
+  git -C "$tmp" config user.name t
+  git -C "$tmp" merge -q -s ours --no-edit "origin/${ref#refs/heads/}" >/dev/null
+  git -C "$tmp" push -q origin main
+  rm -rf "$tmp"
+  git -C "$case_dir/project" fetch -q origin
+  [ ! -d "$case_dir/wt" ] || git -C "$case_dir/wt" fetch -q origin
+}
+
+# train_hide_commit <case-dir> <member|copy>: build K (extra.txt on the old main)
+# followed by the member's two commits replayed, push K as a branch, and hide K
+# in main behind an ours merge. "member" publishes the rebuilt head as the member
+# PR head (TRAIN_MEMBER_HEAD changes); "copy" leaves the member alone and sets
+# HIDDEN_COPY_HEAD for the caller to reset the copy to. Sets HIDDEN_COMMIT.
+train_hide_commit() {
+  local case_dir=$1 target=$2 tmp="$1/_member" rebuilt
+  git clone -q "$case_dir/origin.git" "$tmp"
+  git -C "$tmp" config user.email t@t
+  git -C "$tmp" config user.name t
+  git -C "$tmp" fetch -q origin refs/pull/7/head
+  git -C "$tmp" checkout -q -b hidden origin/main~1
+  printf '%s\n' hidden > "$tmp/extra.txt"
+  git -C "$tmp" add -- extra.txt
+  git -C "$tmp" commit -q -m "hidden follow-up"
+  HIDDEN_COMMIT=$(git -C "$tmp" rev-parse HEAD)
+  git -C "$tmp" push -q origin "HEAD:refs/heads/hidden-k"
+  git -C "$tmp" cherry-pick "$TRAIN_MEMBER_HEAD~1" "$TRAIN_MEMBER_HEAD" >/dev/null
+  rebuilt=$(git -C "$tmp" rev-parse HEAD)
+  case "$target" in
+    member)
+      TRAIN_MEMBER_HEAD=$rebuilt
+      git -C "$tmp" push -q -f origin "HEAD:refs/pull/7/head" ;;
+    copy)
+      HIDDEN_COPY_HEAD=$rebuilt
+      git -C "$tmp" push -q origin "HEAD:refs/heads/hidden-copy" ;;
+    *) fail "train_hide_commit: unknown target $target" ;;
+  esac
+  rm -rf "$tmp"
+  train_ours_merge_into_main "$case_dir" refs/heads/hidden-k
+  git -C "$case_dir/project" fetch -q origin refs/pull/7/head
+  [ ! -d "$case_dir/wt" ] || git -C "$case_dir/wt" fetch -q origin refs/pull/7/head
+}
+
+test_train_ours_merged_commit_in_a_copy_never_counts_as_carried() {
+  local copy_head
+  # Copy route: the copy is K plus the member's replayed commits.
+  train_case train-ours-copy none head "" flat
+  train_hide_commit "$TRAIN_CASE" copy
+  git -C "$TRAIN_CASE/wt" reset -q --hard "$HIDDEN_COPY_HEAD"
+  copy_head=$(git -C "$TRAIN_CASE/wt" rev-parse HEAD)
+  git -C "$TRAIN_CASE/wt" merge-base --is-ancestor "$HIDDEN_COMMIT" origin/main \
+    || fail "train-ours-copy: the hidden commit is not reachable from the default branch"
+  if git -C "$TRAIN_CASE/wt" cat-file -e "origin/main:extra.txt" 2>/dev/null; then
+    fail "train-ours-copy: the default branch holds the hidden change"
+  fi
+  assert_train_refused "$TRAIN_CASE" "train-ours-copy" "copy's work is not proven present"
+  assert_grep "hidden follow-up" "$TRAIN_CASE/stderr" "train-ours-copy: refusal did not name the hidden commit"
+  assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "train-ours-copy: the train was accepted"
+  [ "$(git -C "$TRAIN_CASE/wt" rev-parse HEAD)" = "$copy_head" ] || fail "train-ours-copy: refusal moved the copy"
+  pass "a commit hidden in the default history by an ours merge is not carried by the train, in the copy route"
+}
+
+test_train_ours_merged_commit_in_a_member_never_counts_as_carried() {
+  # Record-only route: the listed member head holds K, which the train never carried.
+  train_absent_case train-ours-record flat
+  train_hide_commit "$TRAIN_CASE" member
+  add_gh_train_fake "$TRAIN_CASE" CLOSED "$TRAIN_MEMBER_HEAD"
+  train_default_list "$TRAIN_CASE"
+  assert_train_refused "$TRAIN_CASE" "train-ours-record" "neither contains it nor carries every commit of it"
+  assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "train-ours-record: the train was accepted"
+  [ "$(backlog_row_state "$TRAIN_CASE")" = in_flight ] || fail "train-ours-record: refusal closed the backlog"
+  pass "a commit hidden in the default history by an ours merge is not carried by the train, in the record-only route"
+}
+
+# The same rule must still accept work the train genuinely carries, also when the
+# default history holds an ours merge of some unrelated commit.
+test_train_flat_carried_work_is_accepted_beside_an_ours_merge() {
+  local tmp
+  train_case train-ours-carried none head "" flat
+  tmp="$TRAIN_CASE/_other"
+  git clone -q "$TRAIN_CASE/origin.git" "$tmp"
+  git -C "$tmp" config user.email t@t
+  git -C "$tmp" config user.name t
+  git -C "$tmp" checkout -q -b unrelated origin/main~1
+  printf '%s\n' other > "$tmp/other.txt"
+  git -C "$tmp" add -- other.txt
+  git -C "$tmp" commit -q -m "unrelated work"
+  git -C "$tmp" push -q origin HEAD:refs/heads/unrelated
+  rm -rf "$tmp"
+  train_ours_merge_into_main "$TRAIN_CASE" refs/heads/unrelated
+  assert_train_allowed "$TRAIN_CASE" "train-ours-carried"
+
+  train_absent_case train-ours-carried-record flat
+  run_teardown "$TRAIN_CASE" > "$TRAIN_CASE/stdout" 2> "$TRAIN_CASE/stderr" \
+    || fail "train-ours-carried-record: a carried flat train was refused: $(cat "$TRAIN_CASE/stderr")"
+  assert_grep "$TRAIN_URL" "$TRAIN_CASE/stderr" "train-ours-carried-record: stderr did not name the train PR"
+  assert_absent "$TRAIN_CASE/state/task-x1.meta" "train-ours-carried-record: accepted teardown left the task record"
+  pass "a flat train that carries every member commit is accepted in both routes beside an ours merge of unrelated work"
+}
+
 teardown_test_cases=(
 test_local_only_fork_remote_allows
 test_teardown_does_not_wait_for_the_home_summary_refresh
@@ -3870,6 +4477,33 @@ test_pipeline_input_refuses_when_the_run_table_lacks_the_input_column
 test_pr_check_does_not_refresh_stale_pr_head
 test_pr_check_records_remote_head_when_local_lags
 test_content_in_default_fallback_allows
+test_train_member_closed_landed_by_merged_train_allows
+test_train_member_prerebase_copy_allows
+test_train_member_squash_landed_allows
+test_train_member_copy_inside_train_allows
+test_train_refuses_when_no_merged_pr_lists_the_member
+test_train_refuses_a_listing_that_is_not_the_members_head
+test_train_refuses_copy_work_the_train_does_not_carry
+test_train_run_record_never_stands_in_for_carried_work
+test_train_route_never_reads_the_run_record
+test_train_ours_merged_commit_in_a_copy_never_counts_as_carried
+test_train_ours_merged_commit_in_a_member_never_counts_as_carried
+test_train_flat_carried_work_is_accepted_beside_an_ours_merge
+test_train_flattened_rebase_carries_the_listed_head
+test_train_flattened_rebase_missing_a_member_commit_refuses
+test_train_flat_missing_with_a_stale_remote_ref_refuses
+test_train_member_reread_failure_is_unknown
+test_train_member_found_by_branch_is_not_looked_up_again
+test_train_dirty_copy_refuses_before_the_train_is_read
+test_train_refuses_a_train_that_is_not_merged
+test_train_refuses_a_train_merged_into_another_branch
+test_train_unreadable_forge_is_unknown_never_accepted
+test_train_control_open_member_is_not_landed_by_a_train
+test_train_control_merged_member_keeps_the_existing_route
+test_train_control_content_proof_still_accepts_a_closed_member
+test_train_other_refusals_stay
+test_train_record_only_route_without_a_copy
+test_train_member_removed_copy_in_pool_slot
 test_teardown_removes_pr_ready_refusal_marker
 test_content_fallback_uses_recorded_base_branch
 test_content_fallback_refreshes_stale_origin_ref

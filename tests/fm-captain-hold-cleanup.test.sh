@@ -1161,6 +1161,31 @@ SH
   pass "an answer before cleanup replay notes the retained Gerrit change"
 }
 
+# Teardown retains a held train member with the merged train as its PR and a
+# note naming the closed member. The answer records both on the closed row.
+test_answer_before_cleanup_replay_records_a_retained_merge_train_close() {
+  local home id show train=https://github.com/sample/sample/pull/9
+  local member=https://github.com/sample/sample/pull/7
+  home=$(make_home answer-before-replay-train)
+  id=sample-answer-before-replay-train
+  tasks_in "$home" add "$id" "Ship the held train member" --kind ship \
+    --repo sample --start >/dev/null || fail "could not create the held train member fixture"
+  run_captain "$home" hold "$id" --reason "captain must choose the follow-up" >/dev/null \
+    || fail "could not hold the train member for the captain"
+  printf 'id=%s\ndata=%s\nspawn_gen=fixture-%s\nmode=retain\narg=--pr\narg=%s\narg=--note\narg=closed by merge train: %s\n' \
+    "$id" "$home/data" "$id" "$train" "$member" > "$home/state/$id.backlog-close"
+
+  printf 'Proceed with the landed train.\n' > "$home/answer.txt"
+  run_captain "$home" answer "$id" --decision-file "$home/answer.txt" >/dev/null \
+    || fail "the captain could not answer a train member before cleanup replay"
+  show=$(tasks_in "$home" show "$id" --full) || fail "the answered train member row is gone"
+  assert_contains "$show" "state: done" "the answer did not close the train member row"
+  assert_contains "$show" "$train" "the answer dropped the merge train PR"
+  assert_contains "$show" "closed by merge train: $member" \
+    "the answer dropped the closed member note"
+  pass "an answer before cleanup replay records the merge train PR and the closed member"
+}
+
 test_unusable_pending_close_record_names_its_reason() {
   local home id wt rc err marker
   home=$(make_home unusable-pending-close-reason)
@@ -2112,6 +2137,7 @@ test_retained_row_artifacts_survive_captain_answers
 test_interrupted_cleanup_keeps_the_captain_call_recoverable
 test_answer_before_cleanup_replay_preserves_the_retained_report
 test_answer_before_cleanup_replay_notes_a_retained_gerrit_change
+test_answer_before_cleanup_replay_records_a_retained_merge_train_close
 test_captain_close_of_retained_work_records_task_closed
 test_captain_close_before_cleanup_replay_records_task_closed_once
 test_interrupted_captain_close_records_the_ledger_once
