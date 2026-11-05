@@ -16,7 +16,8 @@ def valid_record:
     and (.retired == null or (.retired | (.actor == "captain")
       and (.reason | type == "string" and length > 0) and (.at | fromdateiso8601 | type == "number")))
     and (.verdict == null or (.verdict | (.head | sha) and (.source | type == "string")
-      and (.actor | IN("captain","fleet","maintainer","nobody")) and (.summary | type == "string")))
+      and (.actor | IN("captain","fleet","maintainer","nobody")) and (.summary | type == "string")
+      and (.at == null or (.at | fromdateiso8601 | type == "number"))))
     and (.observation == null or (.kind as $kind | .observation |
       (.state | IN("open","closed","merged")) and (.checks | type == "array")
       and (.reviews | type == "array") and (.events | type == "array")
@@ -84,12 +85,11 @@ def projected($input; $saved; $now; $max_age):
     | ([$o.reviews[]? | select(.state != "COMMENTED")] | group_by(.user.login)
        | map(sort_by([.submitted_at,.id]) | last)
        | map(. + {freshness:(if $observed_head != null and .commit_id != $observed_head then "STALE" elif $fresh then "current" else "unverified" end)})) as $reviews
-    | ([$o.events[]? | select(.source == $verdict.source)
-        | .token | capture(":(?<at>[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:]+Z)").at] | max) as $source_at
     | ($own.hold_bucket == "dated" or any($own_tasks[]; .paused == true)
        or ($own.hold_bucket == null and $own.hold_answered == true
-           and (($own.links // []) | index($k.url) != null or any($own_tasks[]; .pr.url == $k.url))
-           and (($source_at != null and $own.hold_resolved_at != null and $source_at > $own.hold_resolved_at) | not))) as $settled
+           and ((try ($own.hold_resolved_at | fromdateiso8601) catch null) as $resolved
+                | (try ($verdict.at | fromdateiso8601) catch null) as $judged
+                | $resolved != null and $judged != null and $resolved >= $judged))) as $settled
     | review_state($o.review_verification; $k.url; $observed_head; $k.task; $o.base_sha) as $review
     | ({"qualified":2,"not-qualified":3}[$review] // 4) as $review_rank
     | (if ($k.url | startswith("https://github.com/") | not) then

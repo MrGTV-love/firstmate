@@ -76,7 +76,7 @@
 # own words; any other owner is refused with the routing above.
 #
 # `archived-resolution` is a read-only fact for bin/fm-contributions.sh. It prints
-# one JSON line (id, hold_answered, hold_resolved_at, links) and exits 0 when the
+# one JSON line (id, hold_answered, hold_resolved_at) and exits 0 when the
 # configured done archive holds <task-id> and its newest record is a captain answer,
 # a withdrawal, or reconcile evidence. It exits 1 when no such row exists or the
 # backend keeps no markdown archive, and 2 when the archive cannot be read.
@@ -3450,10 +3450,9 @@ command_archived_resolution() {
   archive_row_lookup "$data" "$id" || return "$?"
   archived_answer_state "$ARCHIVE_ROW_BODY" || rc=$?
   case "$rc" in 0|4|5) ;; *) return 1 ;; esac
-  jq -nc --arg id "$id" --arg header "$ARCHIVE_ROW_HEADER" --arg body "$ARCHIVE_ROW_BODY" '
+  jq -nc --arg id "$id" --arg body "$ARCHIVE_ROW_BODY" '
     {id:$id,hold_answered:true,
-     hold_resolved_at:(first($body | split("\n")[] | capture("^Resolved at: (?<v>.+)$").v) // null),
-     links:[$header | scan("https?://[^[:space:])\"<>]+")]}'
+     hold_resolved_at:(first($body | split("\n")[] | capture("^Resolved at: (?<v>.+)$").v) // null)}'
 }
 
 command_open_bound() {

@@ -25,7 +25,8 @@
 # checks/reviews). Checks are normalized by name, id, started_at, status and
 # conclusion; projection picks the newest attempt per distinct name. The last
 # observation's lane names also disclose a lane absent from the next head.
-# A verdict records the EXACT judged head, source URL, actor and summary. The
+# A verdict records the EXACT judged head, source URL, actor, summary, and at,
+# the UTC time the verdict command recorded it (absent on legacy verdicts). The
 # actor is exactly one of captain, fleet, maintainer or nobody; any other value
 # is refused. A comment's arrival time never supplies its judged head. Record a
 # prose verdict only after its source identifies that head; otherwise leave it unbound and
@@ -34,10 +35,10 @@
 # does a current captain verdict until that task's own row settles it. A dated
 # hold or a declared paused: wait pauses it. An answer, withdraw or reconcile
 # close on the row, live or read through fm-captain-hold.sh archived-resolution,
-# answers it when the row links this URL or the task's pr= names it and no hold
-# is open again. An aged or blocked hold, or a resolution on another row, settles
-# nothing. A verdict has no time of its own: a resolution counts as older only
-# when the forge event the verdict cites was updated after it.
+# answers every verdict on this task's saved task-and-URL records whose at is
+# not later than the newest record's Resolved at, while no hold is open again.
+# A legacy verdict without at, an aged or blocked hold, or a resolution on
+# another row settles nothing.
 # A current maintainer or nobody verdict keeps its actor and summary.
 # Other green PRs are fleet work. A stale base updates the branch and a missing
 # qualifying PASS routes the independent review, on REVIEW_REQUIRED, can_merge
@@ -196,7 +197,9 @@ archived_holds() { # input-file: resolution facts for captain verdicts whose tas
   : > "$TMP/archived-holds.json"
   grep -Eq '"actor": *"captain"' "$TMP/saved.json" || return 0
   jq -r --slurpfile input "$1" '
-    ([.[] | select(any(.records[]; .verdict.actor == "captain")) | .task] | unique)
+    ([.[] | select(any(.records[]; .retired == null and .verdict.actor == "captain"
+        and .observation.head != null and .verdict.head == .observation.head
+        and (.observation.state | IN("merged","closed") | not))) | .task] | unique)
       - [$input[0].backlog.records[]?.id] | .[]' "$TMP/saved.json" \
     | while IFS= read -r id; do
         "$SCRIPT_DIR/fm-captain-hold.sh" archived-resolution "$id" 2>/dev/null || :
@@ -645,8 +648,8 @@ case "${1:-}" in
       fm_pr_head_valid "$1" || fail 'an exact judged commit is required'
       case "$3" in captain|fleet|maintainer|nobody) ;; *) fail "invalid required actor '$3'; expected one of: captain, fleet, maintainer, nobody" ;; esac
       case "$2" in "$url"\#*) ;; *) fail 'verdict source must be a comment or review on this contribution' ;; esac
-      jq --arg head "$1" --arg source "$2" --arg actor "$3" --arg summary "$4" \
-        '.verdict={head:$head,source:$source,actor:$actor,summary:$summary}' "$TMP/row.json" > "$TMP/update.json"
+      jq --arg head "$1" --arg source "$2" --arg actor "$3" --arg summary "$4" --arg at "$NOW" \
+        '.verdict={head:$head,source:$source,actor:$actor,summary:$summary,at:$at}' "$TMP/row.json" > "$TMP/update.json"
     fi
     write_record "$task" "$TMP/update.json"
     ;;
