@@ -1081,13 +1081,17 @@ class IntakeTest(unittest.TestCase):
             acks.append(self.acks(replay)[before:])
         return acks, errors
 
-    def test_a_head_request_that_can_never_be_acknowledged_is_woken_once_after_three_polls_and_the_next_follows(self):
+    def release(self, watch, replay):
+        """A head request whose acknowledgement always fails, with a newer one behind it, run to its release."""
+        self.say(replay, '200.000100', 'a request the owner deleted')
+        self.say(replay, '200.000200', 'the newer request')
+        replay.state['failures']['conversations.replies:200.000100'] = {'status': 400}
+        replay.save()
+        return self.polls(watch, replay, 3)
+
+    def test_a_head_request_that_can_never_be_acknowledged_is_woken_once_after_three_polls_and_stays_open(self):
         with self.fixture() as (watch, replay):
-            self.say(replay, '200.000100', 'a request the owner deleted')
-            self.say(replay, '200.000200', 'the newer request')
-            replay.state['failures']['conversations.replies:200.000100'] = {'status': 400}
-            replay.save()
-            acks, errors = self.polls(watch, replay, 3)
+            acks, errors = self.release(watch, replay)
             self.assertEqual(errors, ['api_error', 'api_error', None])
             # Released at the third failed poll, never acknowledged; the newer request follows in that same poll.
             self.assertEqual(acks, [[], [], ['200.000200']])
@@ -1096,13 +1100,57 @@ class IntakeTest(unittest.TestCase):
                 + plane.REQUEST_LABEL + ' a request the owner deleted',
                 plane.request_line('200.000200', self.OWNER, 'the newer request')])
             saved = watch.load_state()
-            event = next(e for e in saved['seen'] if e.endswith('/200.000100/request'))
-            self.assertEqual((saved['pending'], saved['seen'][event]), ([], {'key': '', 'unacknowledged': True}))
-            # Nothing is lost or repeated, and the released request is never retried.
+            [row] = saved['pending']
+            self.assertEqual((row['thread'], row['state'], row['owner'], row['tries'], row['text'], row['author']),
+                             ('200.000100', 'failed', 'Main', 3, 'a request the owner deleted', self.OWNER))
+            self.assertNotIn(row['event'], saved['seen'])
+            self.assertEqual(watch.failed_requests(), ['200.000100'])
+            # Later requests still go on in order; the open row is never retried, acknowledged or woken again.
+            self.say(replay, '200.000300', 'a later request')
             acks, errors = self.polls(watch, replay, 3)
-            self.assertEqual((acks, errors), ([[], [], []], [None, None, None]))
-            self.assertEqual([line.split()[3] for line in self.wakes(watch)], ['200.000100', '200.000200'])
-            self.assertEqual(self.acks(replay), ['200.000200'])
+            self.assertEqual((acks, errors), ([['200.000300'], [], []], [None, None, None]))
+            self.assertEqual([line.split()[3] for line in self.wakes(watch)], ['200.000100', '200.000200', '200.000300'])
+            self.assertEqual(self.acks(replay), ['200.000200', '200.000300'])
+            self.assertEqual(watch.load_state()['pending'], [row])
+
+    def test_resolve_closes_only_a_failed_request_and_makes_no_slack_call(self):
+        with self.fixture() as (watch, replay):
+            self.release(watch, replay)
+            self.say(replay, '200.000300', 'a request whose acknowledgement fails once')
+            replay.state['failures']['conversations.replies:200.000300'] = {'status': 400}
+            replay.save()
+            self.polls(watch, replay, 1)
+            calls = len(replay.state['log'])
+            before = watch.load_state()
+            for ts, error in (('200.000999', 'no_pending_request'), ('200.000300', 'request_not_failed'),
+                              ('200.000200', 'no_pending_request')):
+                with self.subTest(ts=ts), self.assertRaisesRegex(SlackError, '^%s$' % error):
+                    watch.close_request(ts)
+                self.assertEqual(watch.load_state(), before)
+            watch.close_request('200.000100')
+            saved = watch.load_state()
+            self.assertEqual([row['thread'] for row in saved['pending']], ['200.000300'])
+            event = next(e for e in saved['seen'] if e.endswith('/200.000100/request'))
+            self.assertEqual(saved['seen'][event], {'key': '', 'resolved': True})
+            self.assertEqual(watch.failed_requests(), [])
+            self.assertEqual(len(replay.state['log']), calls)
+
+    def test_only_resolve_takes_a_request_ts_and_only_a_slack_timestamp(self):
+        self.assertEqual(plane.parse_command(['check', '200.000100'], positional=True), ('check', None, '200.000100'))
+        for argv in (['check'], ['check', 'x200'], ['check', '200.000100', '200.000200'], ['check', '200.000100;x']):
+            with self.subTest(argv=argv), self.assertRaisesRegex(SlackError, '^resolve_needs_one_request_ts$'):
+                plane.parse_command(argv, positional=True)
+        with self.assertRaisesRegex(SlackError, '^unexpected_arguments$'):
+            plane.parse_command(['check', '200.000100'])
+
+    def test_retarget_refuses_while_a_failed_request_is_open(self):
+        with self.fixture() as (watch, replay):
+            self.release(watch, replay)
+            before = watch.load_state()
+            with patch.dict(os.environ, {'FM_SLACK_DM_USER': 'U0OTHEROWNER1'}), self.assertRaisesRegex(
+                    SlackError, '^dm_user_changed_with_pending_work$'):
+                watch.retarget()
+            self.assertEqual(watch.load_state(), before)
 
     def test_a_released_request_line_keeps_its_label_and_its_bound(self):
         line = plane.request_line('200.000100', self.OWNER, 'x' * 1000, plane.REQUEST_UNACKNOWLEDGED)
@@ -1134,7 +1182,7 @@ class IntakeTest(unittest.TestCase):
             self.assertEqual(self.polls(watch, replay, 3)[1], ['unreachable'] * 3)
             with patch.object(watch, 'bound', return_value=None):
                 self.assertEqual(self.polls(watch, replay, 3), ([[], [], []], [None, None, None]))
-            self.assertEqual(watch.load_state()['pending'][0]['failures'], 2)
+            self.assertEqual(watch.load_state()['pending'][0]['tries'], 2)
             self.assertEqual((self.acks(replay), self.wakes(watch)), ([], []))
             self.assertEqual(self.polls(watch, replay, 1), ([['200.000100']], [None]))
             self.assertEqual(self.wakes(watch), [plane.request_line('200.000100', self.OWNER, 'the older request')])

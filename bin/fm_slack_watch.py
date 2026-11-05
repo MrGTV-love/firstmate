@@ -168,6 +168,10 @@ def request_line(ts, user, text, note=''):
     return head + text
 
 
+def failed(row):
+    return row.get('state') == 'failed'
+
+
 def stamp(value):
     for form in ('%Y-%m-%dT%H:%M:%SZ', '%Y-%m-%dT%H:%MZ'):
         try:
@@ -750,7 +754,7 @@ class Watch:
         self.state['seen'][event] = {'key': key}
 
     def publish(self, pending):
-        if self.staging_only:
+        if self.staging_only or failed(pending):
             return
         if pending.get('kind') in ('answer', 'request') and pending.get('author') not in self.authors:
             self.state['pending'] = [p for p in self.state['pending'] if p is not pending]
@@ -771,14 +775,13 @@ class Watch:
                 except SlackError as error:
                     if str(error) not in THREAD_ERRORS:
                         raise
-                    pending['failures'] = pending.get('failures', 0) + 1
-                    if pending['failures'] < REQUEST_TRIES:
+                    pending['tries'] = pending.get('tries', 0) + 1
+                    if pending['tries'] < REQUEST_TRIES:
                         self.commit()
                         raise
                     self.say(request_line(pending['thread'], pending['author'], pending['text'], REQUEST_UNACKNOWLEDGED)
                              if 'text' in pending else pending['line'])
-                    self.state['seen'][pending['event']] = {'key': pending['key'], 'unacknowledged': True}
-                    self.state['pending'] = [p for p in self.state['pending'] if p is not pending]
+                    pending.update(state='failed', owner='Main')
                     self.advanced += 1
                     self.commit()
                     return
@@ -1094,8 +1097,9 @@ class Watch:
         if remaining <= 0 or not channel or cursor is None or self.window_reads:
             return
         # An older request that is journaled and not yet delivered (its acknowledgement failed, or the source is
-        # unbound) goes first: no newer request is taken in while it is retryable, so order never changes.
-        if any(row.get('kind') == 'request' for row in self.state['pending']):
+        # unbound) goes first: no newer request is taken in while it is retryable, so order never changes. A failed
+        # request is no longer retried; it waits in the journal for `fm-slack-check.sh resolve`.
+        if any(row.get('kind') == 'request' and not failed(row) for row in self.state['pending']):
             return
         self.owner_channel()
         bounds = self.state.get('intake_bounds')
@@ -1223,6 +1227,21 @@ class Watch:
     def event(self, record, *parts):
         return '/'.join([self.state.get('team', ''), self.state.get('channel', ''), record['ts'], *parts])
 
+    def failed_requests(self):
+        """The open failed request rows, oldest first: each waits in the journal for Main to resolve it."""
+        return [row['thread'] for row in self.state['pending'] if row.get('kind') == 'request' and failed(row)]
+
+    def close_request(self, ts):
+        """Remove the one failed request row of thread ts and record it resolved; no Slack call."""
+        rows = [row for row in self.state['pending'] if row.get('kind') == 'request' and row.get('thread') == ts]
+        if not rows:
+            raise SlackError('no_pending_request')
+        if not failed(rows[0]):
+            raise SlackError('request_not_failed')
+        self.state['pending'] = [row for row in self.state['pending'] if row is not rows[0]]
+        self.state['seen'][rows[0]['event']] = {'key': rows[0]['key'], 'resolved': True}
+        self.commit()
+
     def report_failure(self, error):
         name = str(error) if isinstance(error, SlackError) else 'local_state_or_response_error'
         if self.state.get('failure') != name:
@@ -1238,9 +1257,10 @@ class Watch:
             self.commit()
 
 
-def parse_command(argv):
+def parse_command(argv, positional=False):
+    """The command, the replay path, and the one Slack timestamp that only `resolve` takes."""
     if not argv:
-        return None, None
+        return None, None, None
     command = argv[0]
     replay = None
     rest = []
@@ -1257,16 +1277,21 @@ def parse_command(argv):
             raise SystemExit(0)
         rest.append(argv[index])
         index += 1
-    if rest:
-        raise SlackError('unexpected_arguments')
-    return command, replay
+    if not positional:
+        if rest:
+            raise SlackError('unexpected_arguments')
+        return command, replay, None
+    if len(rest) != 1 or not SLACK_TS.fullmatch(rest[0]):
+        raise SlackError('resolve_needs_one_request_ts')
+    return command, replay, rest[0]
 
 
 def help_text(command):
     return {
         'mirror': 'Usage: fm-slack-mirror.sh [--replay transcript.json]\nMirror open captain calls into owner DM threads.',
         'poll': 'Usage: fm-slack-poll.sh [--replay transcript.json]\nDeliver authorized Slack signals through the keyed-answer intake.',
-        'check': 'Usage: fm-slack-check.sh [arm|check|disarm|retarget] [--replay transcript.json]',
+        'check': 'Usage: fm-slack-check.sh [arm|check|disarm|retarget] [--replay transcript.json]\n'
+                 '       fm-slack-check.sh resolve <request-ts>',
     }.get(command, 'Usage: fm-slack-{mirror,poll,check}.sh [--replay transcript.json]')
 
 
@@ -1283,6 +1308,10 @@ def emit(watch, command):
             emit_lines(watch, command, bound)
     else:
         emit_lines(watch, command, True)
+    if command in ('poll', 'check'):
+        for ts in watch.failed_requests():
+            print('slack: request %s not acknowledged (failed, owner Main)' % ts,
+                  file=sys.stderr if command == 'check' else sys.stdout, flush=True)
 
 
 def emit_lines(watch, command, bound):
@@ -1317,12 +1346,12 @@ def note_progress():
 def main(argv):
     os.umask(0o077)
     action = env_value('FM_SLACK_CHECK_ACTION') if argv and argv[0] == 'check' else ''
-    refusals = sys.stderr if action in ('arm', 'retarget') else sys.stdout
+    refusals = sys.stderr if action in ('arm', 'retarget', 'resolve') else sys.stdout
     if not argv:
         print('error: missing command')
         return 2
     try:
-        command, replay_path = parse_command(argv)
+        command, replay_path, request_ts = parse_command(argv, positional=action == 'resolve')
     except SlackError as error:
         print('error: slack ' + str(error), file=refusals)
         return 2
@@ -1331,6 +1360,8 @@ def main(argv):
         return 2
     if action == 'disarm':
         return disarm()
+    if action == 'resolve':
+        return resolve_request(request_ts)
     state, reason = mode()
     if state != 'on':
         if action in ('arm', 'retarget'):
@@ -1387,6 +1418,23 @@ def main(argv):
                 watch.lock.close()
             except OSError:
                 pass
+
+
+def resolve_request(ts):
+    """Close one failed request row that Main has dealt with. No Slack call: the transport is never used."""
+    watch = None
+    try:
+        watch = Watch(replay=None, token='')
+        watch.close_request(ts)
+    except (SlackError, OSError, ValueError, KeyError, TypeError) as error:
+        print('slack: refused: ' + (str(error) if isinstance(error, SlackError) else 'local_state_or_response_error'),
+              file=sys.stderr)
+        return 1
+    finally:
+        if watch is not None:
+            watch.lock.close()
+    print('resolved: slack request ' + ts)
+    return 0
 
 
 def check(watch, action):
