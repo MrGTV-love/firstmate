@@ -25,7 +25,8 @@
 #     normalized current_role, requires_child_metadata, blocked_by_ids,
 #     unresolved_blocker_ids, captain_actionable, hold_set, hold_age_days,
 #     and hold_bucket fields, plus hold_answered when the row's body carries a
-#     resolution record (answer, withdraw, or reconcile close).
+#     resolution record (answer, withdraw, or reconcile close) and
+#     hold_resolved_at, the newest record's `Resolved at:` value when it has one.
 #     Repeated blocker tokens remain ordered; a blocker resolves only when its
 #     structured record is Done, and missing ids stay open.
 #     There is no separate decision type: any captain-held task is the same
@@ -647,6 +648,7 @@ backlog_json() (  # [<backlog-path>] - defaults to this home's $BACKLOG
         if .structured then
           .captain_drop = any(.body_lines[]?; . == "dropped" or . == "Deliverable of the finished work: dropped")
           | .hold_answered = any(.body_lines[]?; test("^Resolution recorded by fm-(captain|decision)-hold\\.$"))
+          | .hold_resolved_at = (first(.body_lines[]? | capture("^Resolved at: (?<v>.+)$").v) // null)
         else . end)
     | .records as $records
     | (reduce ($records[] | select(.structured)) as $record ({};

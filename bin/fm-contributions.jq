@@ -58,8 +58,8 @@ def projected($input; $saved; $now; $max_age):
     | [$input.backlog.records[]? | select(.structured and
          (.id == $k.task or ((.links // []) | index($k.url)) != null))] as $owned
     | ([$owned[] | select(.hold_bucket == "live")] | first) as $hold
-    | (any($owned[]; .hold_bucket != null or .hold_answered == true)
-       or any($input.tasks[]?; .id == $k.task and .paused == true)) as $settled
+    | (([$owned[] | select(.id == $k.task)] + [$input.archived_holds[]? | select(.id == $k.task)]) | first) as $own
+    | [$input.tasks[]? | select(.id == $k.task)] as $own_tasks
     | ([$input.tasks[]? | select(.id == $k.task and .pr.url == $k.url)
        | {head:(.pr.head | select(. != null and . != "")), merge_authority:(.merge_authority // "unknown")}] | first) as $task
     | ($task.head // null) as $recorded_head
@@ -84,6 +84,12 @@ def projected($input; $saved; $now; $max_age):
     | ([$o.reviews[]? | select(.state != "COMMENTED")] | group_by(.user.login)
        | map(sort_by([.submitted_at,.id]) | last)
        | map(. + {freshness:(if $observed_head != null and .commit_id != $observed_head then "STALE" elif $fresh then "current" else "unverified" end)})) as $reviews
+    | ([$o.events[]? | select(.source == $verdict.source)
+        | .token | capture(":(?<at>[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:]+Z)").at] | max) as $source_at
+    | ($own.hold_bucket == "dated" or any($own_tasks[]; .paused == true)
+       or ($own.hold_bucket == null and $own.hold_answered == true
+           and (($own.links // []) | index($k.url) != null or any($own_tasks[]; .pr.url == $k.url))
+           and (($source_at != null and $own.hold_resolved_at != null and $source_at > $own.hold_resolved_at) | not))) as $settled
     | review_state($o.review_verification; $k.url; $observed_head; $k.task; $o.base_sha) as $review
     | ({"qualified":2,"not-qualified":3}[$review] // 4) as $review_rank
     | (if ($k.url | startswith("https://github.com/") | not) then
@@ -132,8 +138,8 @@ def projected($input; $saved; $now; $max_age):
   # a qualifying PASS decide among labels; facts, never task names, choose the row.
   | group_by(.url)
   | map(. as $owners
-      | sort_by([if .actor == "captain" then 0 elif .label_rank != null then 3
-          elif .actor == "fleet" then 1 elif .verdict.actor == .actor then 2 else 4 end, .label_rank, .reason]) | first
+      | sort_by([if .hold != null then 0 elif .actor == "captain" then 1 elif .label_rank != null then 4
+          elif .actor == "fleet" then 2 elif .verdict.actor == .actor then 3 else 5 end, .label_rank, .reason]) | first
       | del(.label_rank) + {tasks:($owners | map(.task) | unique)});
 def summary($rows; $errors):
   {known:($rows | length),checked:([$rows[] | select(.checked)] | length),

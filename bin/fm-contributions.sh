@@ -31,9 +31,13 @@
 # prose verdict only after its source identifies that head; otherwise leave it unbound and
 # triage its signal. Formal reviews carry GitHub's own commit_id. Neither kind
 # can grant merge authority. A live captain hold projects a captain actor, and so
-# does a current captain verdict, unless the owner's backlog row has a deferred
-# hold or a recorded resolution (hold_answered) or its latest declared wait is
-# paused:. A row that backlog retention moved to the done archive is not read.
+# does a current captain verdict until that task's own row settles it. A dated
+# hold or a declared paused: wait pauses it. An answer, withdraw or reconcile
+# close on the row, live or read through fm-captain-hold.sh archived-resolution,
+# answers it when the row links this URL or the task's pr= names it and no hold
+# is open again. An aged or blocked hold, or a resolution on another row, settles
+# nothing. A verdict has no time of its own: a resolution counts as older only
+# when the forge event the verdict cites was updated after it.
 # A current maintainer or nobody verdict keeps its actor and summary.
 # Other green PRs are fleet work. A stale base updates the branch and a missing
 # qualifying PASS routes the independent review, on REVIEW_REQUIRED, can_merge
@@ -187,11 +191,24 @@ get_input() {
   "$SCRIPT_DIR/fm-fleet-snapshot.sh" --contribution-input > "$TMP/input.json"
 }
 
+archived_holds() { # input-file: resolution facts for captain verdicts whose task row left the backlog
+  local id
+  : > "$TMP/archived-holds.json"
+  grep -Eq '"actor": *"captain"' "$TMP/saved.json" || return 0
+  jq -r --slurpfile input "$1" '
+    ([.[] | select(any(.records[]; .verdict.actor == "captain")) | .task] | unique)
+      - [$input[0].backlog.records[]?.id] | .[]' "$TMP/saved.json" \
+    | while IFS= read -r id; do
+        "$SCRIPT_DIR/fm-captain-hold.sh" archived-resolution "$id" 2>/dev/null || :
+      done > "$TMP/archived-holds.json"
+}
+
 project() {
-  jq_lib -n --slurpfile input "$1" --slurpfile saved "$TMP/saved.json" \
+  archived_holds "$1"
+  jq_lib -n --slurpfile input "$1" --slurpfile saved "$TMP/saved.json" --slurpfile archived "$TMP/archived-holds.json" \
     --argjson now "$EPOCH" --argjson max_age "$MAX_AGE" --argjson errors "$ERRORS" \
     --arg all "${2:-}" '
-    projected($input[0];$saved[0];$now;$max_age) as $rows
+    projected($input[0] + {archived_holds:$archived};$saved[0];$now;$max_age) as $rows
     | summary($rows;($errors + (if $input[0].backlog.present == true then 0 else 1 end)))
     # Final rows never expire; a home holding only final rows is valid from now.
     | .valid_until = (if ($rows | length) > 0 and all($rows[]; .final) then $now else .valid_until end) + $max_age
