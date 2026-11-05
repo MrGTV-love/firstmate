@@ -1,0 +1,112 @@
+### HEAD: FM_LINT_SLOT_DIR=off with stand-in
+$ FM_LINT_SLOT_DIR=off 01M6N1HVAKM46GY6DT148EV8A5/bin/fm-lint.sh --jobs 2 a.sh b.sh
+exit=2 stand-ins started=0
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: FM_LINT_SLOT_DIR=off is not supported: no setting turns the host-wide ShellCheck memory bound off. Unset FM_LINT_SLOT_DIR to use the host pool /var/tmp/firstmate-lint-501/lint-slots.
+
+### HEAD: FM_LINT_SLOT_DIR=off with real ShellCheck (PATH without stand-in)
+$ FM_LINT_SLOT_DIR=off PATH=/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources 01M6N1HVAKM46GY6DT148EV8A5/bin/fm-lint.sh --jobs 2 a.sh b.sh
+exit=2 stand-ins started=0
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: FM_LINT_SLOT_DIR=off is not supported: no setting turns the host-wide ShellCheck memory bound off. Unset FM_LINT_SLOT_DIR to use the host pool /var/tmp/firstmate-lint-501/lint-slots.
+
+### HEAD: FM_LINT_HOST_RSS_KIB=0
+$ FM_LINT_SLOT_DIR=/tmp/fmlt/refuse/p1 FM_LINT_HOST_RSS_KIB=0 01M6N1HVAKM46GY6DT148EV8A5/bin/fm-lint.sh --jobs 2 a.sh b.sh
+exit=2 stand-ins started=0
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: FM_LINT_HOST_RSS_KIB must be a positive integer, got 0.
+
+### HEAD: FM_LINT_HOST_RSS_KIB=08
+$ FM_LINT_SLOT_DIR=/tmp/fmlt/refuse/p1 FM_LINT_HOST_RSS_KIB=08 01M6N1HVAKM46GY6DT148EV8A5/bin/fm-lint.sh --jobs 2 a.sh b.sh
+exit=2 stand-ins started=0
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: FM_LINT_HOST_RSS_KIB must be a positive integer, got 08.
+
+### HEAD: FM_LINT_HOST_RSS_KIB=1.5
+$ FM_LINT_SLOT_DIR=/tmp/fmlt/refuse/p1 FM_LINT_HOST_RSS_KIB=1.5 01M6N1HVAKM46GY6DT148EV8A5/bin/fm-lint.sh --jobs 2 a.sh b.sh
+exit=2 stand-ins started=0
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: FM_LINT_HOST_RSS_KIB must be a positive integer, got 1.5.
+
+### HEAD: FM_LINT_HOST_SLOTS=zero
+$ FM_LINT_SLOT_DIR=/tmp/fmlt/refuse/p1 FM_LINT_HOST_SLOTS=zero 01M6N1HVAKM46GY6DT148EV8A5/bin/fm-lint.sh --jobs 2 a.sh b.sh
+exit=2 stand-ins started=0
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: FM_LINT_HOST_SLOTS must be a positive integer, got zero.
+
+### HEAD: FM_LINT_ROOT_RSS_KIB=abc
+$ FM_LINT_SLOT_DIR=/tmp/fmlt/refuse/p1 FM_LINT_ROOT_RSS_KIB=abc 01M6N1HVAKM46GY6DT148EV8A5/bin/fm-lint.sh --jobs 2 a.sh b.sh
+exit=2 stand-ins started=0
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: FM_LINT_ROOT_RSS_KIB must be a positive integer, got abc.
+
+### HEAD: slot dir under a regular file (unusable)
+$ FM_LINT_SLOT_DIR=/tmp/fmlt/refuse/afile/slots 01M6N1HVAKM46GY6DT148EV8A5/bin/fm-lint.sh --jobs 2 a.sh b.sh
+exit=2 stand-ins started=0
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: host slot pool unusable (FM_LINT_SLOT_DIR: /tmp/fmlt/refuse/afile/slots is not a writable directory); the host-wide ShellCheck memory bound cannot be enforced, so no root was started. Make that path writable or remove it if it is damaged.
+
+### HEAD: slot.0 replaced by a directory
+$ FM_LINT_SLOT_DIR=/tmp/fmlt/refuse/p2 01M6N1HVAKM46GY6DT148EV8A5/bin/fm-lint.sh --jobs 2 a.sh b.sh
+exit=2 stand-ins started=0
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint: end /tmp/fmlt/a.sh reason=error:2 rc=2 duration_ms=80 rss_kib=unavailable
+fm-lint: end /tmp/fmlt/b.sh reason=error:2 rc=2 duration_ms=342 rss_kib=unavailable
+fm-lint: host slot pool unusable at /tmp/fmlt/refuse/p2/slot.0 (Is a directory); the host-wide ShellCheck memory bound cannot be enforced, so this analysis was not started. Make that path writable, or remove it if it is damaged.
+fm-lint: host slot pool unusable at /tmp/fmlt/refuse/p2/slot.0 (Is a directory); the host-wide ShellCheck memory bound cannot be enforced, so this analysis was not started. Make that path writable, or remove it if it is damaged.
+
+### HEAD: admission.lock replaced by a directory
+$ FM_LINT_SLOT_DIR=/tmp/fmlt/refuse/p3 01M6N1HVAKM46GY6DT148EV8A5/bin/fm-lint.sh --jobs 2 a.sh b.sh
+exit=2 stand-ins started=0
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint: end /tmp/fmlt/b.sh reason=error:2 rc=2 duration_ms=116 rss_kib=unavailable
+fm-lint: end /tmp/fmlt/a.sh reason=error:2 rc=2 duration_ms=120 rss_kib=unavailable
+fm-lint: host slot pool unusable at /tmp/fmlt/refuse/p3/admission.lock (Is a directory); the host-wide ShellCheck memory bound cannot be enforced, so this analysis was not started. Make that path writable, or remove it if it is damaged.
+fm-lint: host slot pool unusable at /tmp/fmlt/refuse/p3/admission.lock (Is a directory); the host-wide ShellCheck memory bound cannot be enforced, so this analysis was not started. Make that path writable, or remove it if it is damaged.
+
+### HEAD: slot.1 unreadable (chmod 000)
+$ FM_LINT_SLOT_DIR=/tmp/fmlt/refuse/p4 01M6N1HVAKM46GY6DT148EV8A5/bin/fm-lint.sh --jobs 2 a.sh b.sh
+exit=2 stand-ins started=0
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint: end /tmp/fmlt/a.sh reason=error:2 rc=2 duration_ms=78 rss_kib=unavailable
+fm-lint: end /tmp/fmlt/b.sh reason=error:2 rc=2 duration_ms=338 rss_kib=unavailable
+fm-lint: host slot pool unusable at /tmp/fmlt/refuse/p4/slot.1 (Permission denied); the host-wide ShellCheck memory bound cannot be enforced, so this analysis was not started. Make that path writable, or remove it if it is damaged.
+fm-lint: host slot pool unusable at /tmp/fmlt/refuse/p4/slot.1 (Permission denied); the host-wide ShellCheck memory bound cannot be enforced, so this analysis was not started. Make that path writable, or remove it if it is damaged.
+
+=========== BASE for comparison ===========
+admission.lock
+queue.next
+slot.0
+slot.1
+slot.2
+slot.3
+slot.4
+slot.5
+slot.6
+slot.7
+slot.8
+### BASE: slot.0 replaced by a directory
+$ FM_LINT_SLOT_DIR=/tmp/fmlt/refuse/b2 base/bin/fm-lint.sh --jobs 2 a.sh b.sh
+exit=0 stand-ins started=2
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint: host slot directory unavailable; running without the host-wide ShellCheck bound
+fm-lint: host slot directory unavailable; running without the host-wide ShellCheck bound
+
+### BASE: FM_LINT_SLOT_DIR=off with stand-in
+$ FM_LINT_SLOT_DIR=off base/bin/fm-lint.sh --jobs 2 a.sh b.sh
+exit=0 stand-ins started=2
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+

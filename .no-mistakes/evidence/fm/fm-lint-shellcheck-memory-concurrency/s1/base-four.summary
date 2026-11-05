@@ -1,0 +1,8 @@
+label=base-four lint=/tmp/fmlt/base/bin/fm-lint.sh pool=/tmp/fmlt/pool-base env=FM_LINT_HOST_SLOTS=9
+exit statuses: 0 0 0 0 
+wall seconds: 9
+roots completed (stand-in end records): 12 of 12
+samples: 23 at 0.2 s
+peak aggregate stand-in RSS KiB, count at that sample: 1682000 8
+max concurrent stand-ins in any sample: 8
+max RSS KiB of other (real) shellcheck processes on host during window: 0

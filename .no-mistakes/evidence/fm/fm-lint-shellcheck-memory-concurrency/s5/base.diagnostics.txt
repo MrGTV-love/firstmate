@@ -1,0 +1,60 @@
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+
+In /tmp/fmlt/real/fx/broken.sh line 2:
+if true; then
+^-- SC1046 (error): Couldn't find 'fi' for this 'if'.
+^-- SC1073 (error): Couldn't parse this if expression. Fix to allow more checks.
+
+
+In /tmp/fmlt/real/fx/broken.sh line 4:
+
+^-- SC1047 (error): Expected 'fi' matching previously mentioned 'if'.
+^-- SC1072 (error): Expected 'fi'. Fix any mentioned problems and try again.
+
+For more information:
+  https://www.shellcheck.net/wiki/SC1046 -- Couldn't find 'fi' for this 'if'.
+  https://www.shellcheck.net/wiki/SC1047 -- Expected 'fi' matching previously...
+  https://www.shellcheck.net/wiki/SC1072 -- Expected 'fi'. Fix any mentioned ...
+
+In /tmp/fmlt/real/fx/findings.sh line 2:
+unused=1
+^----^ SC2034 (warning): unused appears unused. Verify use (or export if used externally).
+
+
+In /tmp/fmlt/real/fx/findings.sh line 3:
+x=`date`
+  ^----^ SC2006 (style): Use $(...) notation instead of legacy backticks `...`.
+
+Did you mean:
+x=$(date)
+
+
+In /tmp/fmlt/real/fx/findings.sh line 4:
+echo $x
+     ^-- SC2086 (info): Double quote to prevent globbing and word splitting.
+
+Did you mean:
+echo "$x"
+
+
+In /tmp/fmlt/real/fx/findings.sh line 5:
+cd /tmp
+^-----^ SC2164 (warning): Use 'cd ... || exit' or 'cd ... || return' in case cd fails.
+
+Did you mean:
+cd /tmp || exit
+
+
+In /tmp/fmlt/real/fx/findings.sh line 6:
+[ $1 == a ] && echo y
+  ^-- SC2086 (info): Double quote to prevent globbing and word splitting.
+
+Did you mean:
+[ "$1" == a ] && echo y
+
+For more information:
+  https://www.shellcheck.net/wiki/SC2034 -- unused appears unused. Verify use...
+  https://www.shellcheck.net/wiki/SC2164 -- Use 'cd ... || exit' or 'cd ... |...
+  https://www.shellcheck.net/wiki/SC2086 -- Double quote to prevent globbing ...
+exit=1

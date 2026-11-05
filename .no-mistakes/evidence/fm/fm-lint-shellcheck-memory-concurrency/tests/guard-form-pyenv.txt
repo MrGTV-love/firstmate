@@ -1,0 +1,112 @@
+python3 -> /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3
+Traceback (most recent call last):
+  File "/Users/charlesabrooker/tmp/fm-lint-waiting-reader.ZXUFJy/watcher/fm-proc-info.py", line 10, in <module>
+    print(json.dumps([row for row in json.loads(output) if row.get("comm") != "shellcheck"]))
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+BrokenPipeError: [Errno 32] Broken pipe
+Traceback (most recent call last):
+  File "/Users/charlesabrooker/tmp/fm-lint-waiting-reader.ZXUFJy/watcher/fm-proc-info.py", line 10, in <module>
+    print(json.dumps([row for row in json.loads(output) if row.get("comm") != "shellcheck"]))
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+BrokenPipeError: [Errno 32] Broken pipe
+ok - a waiting gate whose only child is its own table read is not the oldest running gate in any form a table shows it (ps drop (ps) <defunct> [ps] <defunct> parent /usr/bin/true)
+tests/fm-lint-slots.test.sh: line 1119: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1121: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1119: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1121: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1119: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1121: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1119: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1120: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1121: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1119: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1120: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1121: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1119: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1120: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1121: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1119: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1120: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1121: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1119: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1120: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1121: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1119: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1120: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1121: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1119: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1120: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1121: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1119: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1120: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1121: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1119: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1120: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1121: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1119: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1120: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1121: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1119: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1120: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1121: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1119: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1120: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1121: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1119: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1120: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1121: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1119: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1120: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1121: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1119: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1121: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1119: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1121: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1119: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1121: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1119: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1120: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1121: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1119: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1120: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1121: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1119: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1120: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1121: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1119: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1120: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1121: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1119: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1120: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1121: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1119: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1120: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1121: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1119: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1120: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1121: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1119: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1120: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1121: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1119: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1120: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1121: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1119: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1120: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1121: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1119: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1120: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1121: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1119: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1120: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1121: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1119: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1120: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1121: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1119: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1120: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1121: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1119: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1120: printf: write error: Broken pipe
+tests/fm-lint-slots.test.sh: line 1121: printf: write error: Broken pipe
+ok - the growth guard stops a root over the budget but never the resident watch's reader, seen by its full command under an interpreter named Python or by its bare name

@@ -1,0 +1,2 @@
+ok - memory failures retry without source following, exclude cross-file codes, and preserve a real fallback finding
+ok - a root over the resident-memory bound is ended and retried narrower with the roots log marking it

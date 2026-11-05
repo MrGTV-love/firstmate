@@ -1,0 +1,8 @@
+label=head-four-cold lint=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6N1HVAKM46GY6DT148EV8A5/bin/fm-lint.sh pool=/tmp/fmlt/pool-head env=FM_LINT_HOST_SLOTS=9 FM_LINT_HOST_RSS_KIB=512000 FM_LINT_ROOT_RSS_KIB=1048576
+exit statuses: 0 0 0 0 
+wall seconds: 35
+roots completed (stand-in end records): 12 of 12
+samples: 75 at 0.2 s
+peak aggregate stand-in RSS KiB, count at that sample: 420560 2
+max concurrent stand-ins in any sample: 2
+max RSS KiB of other (real) shellcheck processes on host during window: 0

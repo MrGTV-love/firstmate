@@ -1,0 +1,13 @@
+pressure level before: 1
+real shellcheck processes on host before: 0
+mode=head2 env=FM_LINT_SLOT_DIR=/tmp/fmlt/realmem/pool-calibrate-shared FM_LINT_HOST_RSS_KIB=700000 runs=2 jobs=2 exit statuses: 0 0  wall s: 9
+  run 1 fm-doc-audience-check.sh rc=0 rss_kib=ok
+  run 1 fm-test-run.sh rc=0 rss_kib=ok
+  run 1 fm-guard-lint.sh rc=0 rss_kib=ok
+  run 1 fm-lint-workflows.sh rc=0 rss_kib=ok
+  run 2 fm-test-run.sh rc=0 rss_kib=ok
+  run 2 fm-doc-audience-check.sh rc=0 rss_kib=ok
+  run 2 fm-guard-lint.sh rc=0 rss_kib=ok
+  run 2 fm-lint-workflows.sh rc=0 rss_kib=ok
+  peak aggregate RSS KiB of this test's shellcheck: 538976 (count 1 ) max concurrent: 1 max other host shellcheck RSS KiB: 
+  samples: 20 at 0.2 s; max pressure level seen: 1

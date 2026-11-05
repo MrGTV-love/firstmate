@@ -1,0 +1,7 @@
+label=base-lone lint=/tmp/fmlt/base/bin/fm-lint.sh env=
+exit status: 0
+wall seconds: 8.64
+roots completed: 3 of 3
+samples: 21 at 0.2 s
+peak aggregate stand-in RSS KiB: 420448
+max concurrent stand-ins: 2

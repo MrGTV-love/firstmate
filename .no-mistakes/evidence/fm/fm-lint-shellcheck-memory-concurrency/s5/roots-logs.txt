@@ -1,0 +1,42 @@
+== base roots log: root and argv columns
+begin	1	/tmp/fmlt/real/fx/clean.sh	1	full	1793882832591
+begin	2	/tmp/fmlt/real/fx/findings.sh	1	full	1793882832807
+begin	3	/tmp/fmlt/real/fx/broken.sh	0	full	1793882832590
+begin	4	/tmp/fmlt/real/fx/caller.sh	0	full	1793882833043
+end	1	/tmp/fmlt/real/fx/clean.sh	1	full	1793882832591	1793882832784	193	0
+end	2	/tmp/fmlt/real/fx/findings.sh	1	full	1793882832807	1793882833003	196	1
+end	3	/tmp/fmlt/real/fx/broken.sh	0	full	1793882832590	1793882833022	199	1
+end	4	/tmp/fmlt/real/fx/caller.sh	0	full	1793882833043	1793882833231	188	0
+format	fm-lint-roots-v1
+meta	bounds_enforced	0
+meta	image_os	unknown
+meta	image_version	unknown
+meta	jobs	2
+meta	mode	full
+meta	partition	all
+meta	platform	Darwin arm64
+meta	result_exit	1
+meta	root_deadline_seconds	unbounded
+meta	root_kill_grace_seconds	unbounded
+meta	root_memory_limit_kib	unbounded
+== head roots log: root and argv columns
+begin	1	/tmp/fmlt/real/fx/clean.sh	1	full	1793882835677
+begin	2	/tmp/fmlt/real/fx/findings.sh	1	full	1793882836227
+begin	3	/tmp/fmlt/real/fx/broken.sh	0	full	1793882835677
+begin	4	/tmp/fmlt/real/fx/caller.sh	0	full	1793882835984
+end	1	/tmp/fmlt/real/fx/clean.sh	1	full	1793882835677	1793882836206	210	0
+end	2	/tmp/fmlt/real/fx/findings.sh	1	full	1793882836227	1793882836702	185	1
+end	3	/tmp/fmlt/real/fx/broken.sh	0	full	1793882835677	1793882835962	214	1
+end	4	/tmp/fmlt/real/fx/caller.sh	0	full	1793882835984	1793882836495	207	0
+format	fm-lint-roots-v1
+meta	bounds_enforced	0
+meta	image_os	unknown
+meta	image_version	unknown
+meta	jobs	2
+meta	mode	full
+meta	partition	all
+meta	platform	Darwin arm64
+meta	result_exit	1
+meta	root_deadline_seconds	unbounded
+meta	root_kill_grace_seconds	unbounded
+meta	root_memory_limit_kib	unbounded

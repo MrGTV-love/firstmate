@@ -1,0 +1,13 @@
+pressure level before: 1
+real shellcheck processes on host before: 0
+mode=base2 env= runs=2 jobs=2 exit statuses: 0 0  wall s: 11
+  run 1 fm-doc-audience-check.sh rc=0 rss_kib=ok
+  run 1 fm-guard-lint.sh rc=0 rss_kib=ok
+  run 1 fm-lint-workflows.sh rc=0 rss_kib=ok
+  run 1 fm-test-run.sh rc=0 rss_kib=ok
+  run 2 fm-doc-audience-check.sh rc=0 rss_kib=ok
+  run 2 fm-guard-lint.sh rc=0 rss_kib=ok
+  run 2 fm-lint-workflows.sh rc=0 rss_kib=ok
+  run 2 fm-test-run.sh rc=0 rss_kib=ok
+  peak aggregate RSS KiB of this test's shellcheck: 1032928 (count 2 ) max concurrent: 4 max other host shellcheck RSS KiB: 
+  samples: 18 at 0.2 s; max pressure level seen: 1

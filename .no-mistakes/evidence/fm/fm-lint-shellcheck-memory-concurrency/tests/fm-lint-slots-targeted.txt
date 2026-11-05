@@ -1,0 +1,8 @@
+ok - a two-worker run and a one-worker run alternate turns on a scarce pool
+ok - a content-identical cached success finishes while all host slots remain occupied
+ok - slot open, counter and non-contention coordinator/scan lock failures refuse naming the path and never run the analysis
+ok - growing roots from four pools stay within the budget plus one root and all finish; without a budget they stack (131072:88:4 100000000:256:4 as budget:peak MiB:alive)
+ok - a wrapper around the real ShellCheck uses the host pool by default and is held back by real shellcheck memory outside its own pool
+ok - four runs with four HOME values stay within the memory budget with and without records, run two recorded roots at once, and finish all 12 roots (unbudgeted: 8 12; no records: 2 12; records: 2 12)
+ok - a root larger than the budget runs alone, and a killed run frees its charge and leaves no ticket
+ok - runs with different HOME, XDG_CACHE_HOME and FM_HOME values record in the same per-user pool

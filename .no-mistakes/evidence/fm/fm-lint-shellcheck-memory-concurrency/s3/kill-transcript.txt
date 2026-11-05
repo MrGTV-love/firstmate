@@ -1,0 +1,18 @@
+06:46:00 started run A (lint pid 1805); its stand-in holds 200 MiB for 60 s; budget 300000 KiB; pool has no record, so each root is charged 8 GiB
+06:46:01 running stand-ins: 3102 
+06:46:01 started run B (lint pid 4732)
+06:46:05 after 4 s, running stand-ins: 3102  (only A's: B queues)
+06:46:05 pool files while B waits: admission.lock queue.00000000000000000002.5439.4732 queue.next slot.0 slot.0.peak slot.1 slot.2 slot.3 slot.4 slot.5 slot.6 slot.7 slot.8 
+06:46:06 sent TERM to run A; its exit status: 143
+06:46:09 run B exit status: 0
+06:46:09 completed stand-ins (pid start end root): 13136 1793882766.114 1793882767.246 /tmp/fmlt/b.sh
+06:46:09 leftover stand-ins: []
+06:46:09 pool files after: admission.lock history queue.next slot.0 slot.0.peak slot.1 slot.2 slot.3 slot.4 slot.5 slot.6 slot.7 slot.8 
+  /tmp/fmlt/kill/pool/slot.0: [4732	2	5439	8388608]
+  /tmp/fmlt/kill/pool/slot.1: []
+  no queue ticket left
+06:46:11 later run C on the same pool exit status: 0
+--- run A output ---
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6N1HVAKM46GY6DT148EV8A5/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
