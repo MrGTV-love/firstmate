@@ -1,0 +1,7 @@
+04:03:47
+ok - both closing proofs stop at every owner-filed marker, open owner call, unreadable hold, and live task, and close an item that only mentions the owner
+ok - fm-tasks-axi.sh closes a duplicate into a Queued or In flight item on checked proof and leaves both items alone when a check or the append fails
+ok - fm-tasks-axi.sh closes a moved item on checked proof, local, remote, and adapter, from the source's own registry, and stops on every unproved case
+ok - a move closes the source only when the target's own identity, read through the transport, is a different backlog and the target holds the item open
+rc=0
+04:10:56
