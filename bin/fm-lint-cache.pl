@@ -190,8 +190,10 @@ if (($ARGV[0] // '') eq 'gate') {
     };
     # Every lint gate on the host, whatever pool it uses, the processes below
     # it, and every other process named shellcheck: the table reduced to
-    # { total => KiB in all of them, gates => { gate pid => [process set, start] },
-    #   outside => KiB not in a gate's tree }.
+    # { total => KiB in all of them, gates => { gate pid => [process set, start,
+    #   running] }, outside => KiB not in a gate's tree }. A gate's own table and
+    # owner reads (ps, fm-proc-info.py table or memory) are not in its set, so a
+    # gate runs only once its command has started.
     my $host_view = sub {
         my ($table) = @_;
         return undef unless $table;
@@ -202,16 +204,20 @@ if (($ARGV[0] // '') eq 'gate') {
             # A gate is a perl running this script's gate mode; a process that only
             # carries those words later in its arguments (check, timeout) is not one.
             next unless ($table->{$pid}[3] // '') =~ m{\A\S*perl\S*\s+(?:-\S+\s+)*\S*fm-lint-cache\.pl\s+gate\s};
-            my (@queue, %set) = ($pid);
+            my (@queue, %set) = grep {
+                ($table->{$_}[3] // '') !~ m{\A(?:\S*/)?ps\s|\A\S*sh\s+\S*/ps\s|\A\S*(?i:python)\S*\s+(?:-\S+\s+)*\S*fm-proc-info\.py\s+(?:table|memory)\b}
+            } @{$children{$pid} // []};
+            $set{$pid} = 1;
             while (defined(my $member = shift @queue)) {
                 next if $set{$member}++ || !$table->{$member};
                 push @queue, @{$children{$member} // []};
             }
-            $gates{$pid} = [\%set, $table->{$pid}[4]];
-            $in_tree{$_} = 1 for keys %set;
             # A gate that has not started its command holds nothing: waiting
             # gates must not count each other, or none would ever be admitted.
-            $running{$_} = 1 for keys(%set) > 1 ? keys %set : ();
+            my $started = keys(%set) > 1;
+            $gates{$pid} = [\%set, $table->{$pid}[4], $started];
+            $in_tree{$_} = 1 for keys %set;
+            $running{$_} = 1 for $started ? keys %set : ();
         }
         my ($total, $named) = (0, 0);
         $total += $table->{$_}[1] for keys %running;
@@ -233,7 +239,7 @@ if (($ARGV[0] // '') eq 'gate') {
         }
         my $total = $view->{named};
         for my $gate (keys %{$view->{gates}}) {
-            next if $gate == $$ || $own{$gate} || keys(%{$view->{gates}{$gate}[0]}) < 2;
+            next if $gate == $$ || $own{$gate} || !$view->{gates}{$gate}[2];
             for my $pid (keys %{$view->{gates}{$gate}[0]}) { $total += $table->{$pid}[1] unless $own{$pid}; }
         }
         return $total;
@@ -433,14 +439,14 @@ if (($ARGV[0] // '') eq 'gate') {
         $poll = $next;
         if (!$mine) { $guard_busy = 0; return; }
         my ($oldest) = sort { $view->{gates}{$a}[1] <=> $view->{gates}{$b}[1] || $a <=> $b }
-            grep { keys(%{$view->{gates}{$_}[0]}) > 1 } keys %{$view->{gates}};
+            grep { $view->{gates}{$_}[2] } keys %{$view->{gates}};
         my $over = $view->{total} > $budget_kib;
         if ($over && (!defined $oldest || $oldest != $$ || $view->{named} >= $budget_kib)) {
             for my $pid (keys %{$mine->[0]}) {
                 next if $pid == $$ || $paused{$pid};
                 my $row = $table->{$pid} or next;
                 next if $row->[1] < 8192
-                    || $row->[3] =~ m{\A\S*(?:perl|bash|python3?)\S*\s+(?:-\S+\s+)*\S*(?:fm-lint-cache\.pl|fm-lint\.sh|fm-proc-info\.py)\b};
+                    || $row->[3] =~ m{\A\S*(?i:perl|bash|python)\S*\s+(?:-\S+\s+)*\S*(?:fm-lint-cache\.pl|fm-lint\.sh|fm-proc-info\.py)\b};
                 $paused{$pid} = 1 if kill 'STOP', $pid;
             }
         } elsif (%paused) {

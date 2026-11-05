@@ -592,7 +592,7 @@ esac
 exec "$real_ps" "\$@"
 SH
   chmod +x "$tmp/bin/ps"
-  perl - "$ROOT/bin/fm-lint-cache.pl" "$tmp" <<'PL' || fail "slow ps admission regression failed"
+  FM_TEST_GATE_POOL_PREFIX="$tmp/" perl - "$ROOT/bin/fm-lint-cache.pl" "$tmp" <<'PL' || fail "slow ps admission regression failed"
 use strict;
 use warnings;
 use POSIX qw(WNOHANG);
@@ -1252,7 +1252,7 @@ test_memory_charge_survives_unknown_records_and_an_unreadable_table() {
   chmod +x "$tmp/shim/ps"
   fm_lint_hide_outside_shellcheck "$tmp/hide"
   cp "$ROOT/bin/fm-lint-cache.pl" "$tmp/lonely/fm-lint-cache.pl"
-  PATH="$tmp/hide:$PATH" perl - "$ROOT/bin/fm-lint-cache.pl" "$tmp" <<'PL' || fail "memory charge state regression failed"
+  PATH="$tmp/hide:$PATH" FM_TEST_GATE_POOL_PREFIX="$tmp/" perl - "$ROOT/bin/fm-lint-cache.pl" "$tmp" <<'PL' || fail "memory charge state regression failed"
 use strict;
 use warnings;
 use Digest::SHA qw(sha256_hex);
