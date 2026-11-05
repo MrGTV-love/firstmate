@@ -2204,7 +2204,7 @@
       "invariant": "A proved held-close or slot-return route cannot silently change before removal.",
       "layer": "runtime-block",
       "source": "the task's current metadata, ownership/copy/process inventory, pending outcomes and lock-bound cleanup proofs; existing decision points: site:bin/fm-teardown.sh:feccb8ae4f",
-      "trigger": "refuses when the held-close vs slot-return route changed between proof and removal, or a peer left the slot so the peer route no longer applies",
+      "trigger": "refuses when the held-close vs slot-return route changed between proof and removal, or a peer left the slot so the peer route no longer applies, or the slot-return route has no resolved pool slot or its durable lease is lost under custody",
       "decision": "deny",
       "fail_direction": "closed",
       "remedy": "Preserve the task and its records; have the owner satisfy the named custody or completion prerequisite, then retry FM_HOME=<home> bash bin/fm-teardown.sh <task> without force.",
@@ -2232,6 +2232,14 @@
         {
           "file": "bin/fm-teardown.sh",
           "match": "echo \"REFUSED: the foreign copies held in pool slot $was changed since they were proved, so the held close no longer applies. $TEARDOWN_PROOF_OUTCOME.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: reserved pool slot $TEARDOWN_RETURN_SLOT lost its durable lease; retaining the task record and contents\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: no pool slot was resolved for task $ID's return, so no durable lease can be proved; retaining the task record and contents\" >&2"
         }
       ]
     },
@@ -4060,7 +4068,7 @@
       "invariant": "A held close records the foreign copies it preserves before removing its own task records.",
       "layer": "runtime-block",
       "source": "the task's current metadata, ownership/copy/process inventory, pending outcomes and lock-bound cleanup proofs; existing decision points: site:bin/fm-teardown.sh:2d6419125d",
-      "trigger": "refuses a held close when data/held-foreign-copies.log cannot be written before removal (its call site is also a mapped site)",
+      "trigger": "refuses a held close when data/held-foreign-copies.log cannot be written before removal, and also checks at entry, before the slot is reserved, that the record can be written (both call sites are also mapped sites)",
       "decision": "deny",
       "fail_direction": "closed",
       "remedy": "Preserve the task and its records; have the owner satisfy the named custody or completion prerequisite, then retry FM_HOME=<home> bash bin/fm-teardown.sh <task> without force.",
@@ -4080,6 +4088,10 @@
         {
           "file": "bin/fm-teardown.sh",
           "match": "[ \"$KIND\" = secondmate ] || teardown_held_copies_record_or_refuse || exit 1"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "[ \"$KIND\" = secondmate ] || teardown_held_copies_record_or_refuse check || exit 1"
         },
         {
           "file": "bin/fm-teardown.sh",

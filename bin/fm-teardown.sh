@@ -390,10 +390,10 @@
 # copy, so teardown releases project custody and re-proves this record's own
 # delivery as the reassigned-slot cleanup above does, before its next
 # destructive step, refusing with its records in place when that proof fails.
-# That holds when the record's copy is the slot itself. A reassociated copy
-# nested inside the slot stays this task's own whoever the claim names: only the
-# slot steps are dropped, and the copy's runtime is retired and its landing
-# proved exactly as for any reassociated copy.
+# That holds when the record's copy is the slot itself. A current copy nested
+# inside the slot, reassociated or, for a ship, not, stays this task's own
+# whoever the claim names: only the slot steps are dropped, and the copy's
+# runtime is retired and its landing proved exactly as for any reassociated copy.
 # A slot whose state is neither held nor unleased (recovered, conflicting,
 # unreadable, or needing jq), or an unleased slot whose installed treehouse is
 # missing or has no lease command (probed once with treehouse lease --help),
@@ -904,10 +904,14 @@ teardown_friction_outcome retried
 
 # The pool slot of <project> that encloses a record's current copy without
 # being it: the slot that strictly contains the copy or, once the copy is gone,
-# the record's own prior_worktree= pool slot that encloses its recorded path -
-# what a nested teardown leaves when it stops after removing that copy.
+# the record's own prior_worktree= pool slot that encloses its recorded path,
+# else, for a record that is not a scout, the pool slot that strictly contains
+# that absolute path through its nearest existing ancestor - what a nested
+# teardown leaves when it stops after removing that copy. No prior_worktree= line
+# is needed to find it; who the slot claim names is teardown_nested_slot's
+# question.
 teardown_record_enclosing_slot() {  # <meta> <project> <worktree>
-  local meta=$1 project=$2 worktree=$3 copy line prior prior_real
+  local meta=$1 project=$2 worktree=$3 copy line prior prior_real tail=
   if copy=$(fm_task_copy_canonical_dir "$worktree"); then
     fm_task_copy_enclosing_pool_slot "$project" "$copy"
     return
@@ -922,7 +926,14 @@ teardown_record_enclosing_slot() {  # <meta> <project> <worktree>
     printf '%s\n' "$prior_real"
     return 0
   done < "$meta"
-  return 1
+  case "$worktree" in /*) ;; *) return 1 ;; esac
+  [ "$(fm_meta_get "$meta" kind)" != scout ] || return 1
+  while [ -n "$worktree" ] && [ ! -d "$worktree" ]; do
+    tail=/${worktree##*/}$tail
+    worktree=${worktree%/*}
+  done
+  copy=$(fm_task_copy_canonical_dir "$worktree") || return 1
+  fm_task_copy_enclosing_pool_slot "$project" "$copy$tail"
 }
 
 # True when a record's worktree is a pool slot of its project or a slot
@@ -1989,6 +2000,16 @@ teardown_preserves_reassociated_copy() {
   return 1
 }
 
+# A ship's current copy that is not itself a pool slot but sits inside one,
+# whatever the record's lines say; a scout, a secondmate or an Orca task keeps
+# its own route.
+# Its slot is the one owner above's answer.
+teardown_current_copy_nested_in_slot() {  # <meta> <kind> <backend> <project> <worktree>
+  [ "$2" != secondmate ] && [ "$2" != scout ] && [ "$3" != orca ] || return 1
+  ! fm_treehouse_pool_slot "$4" "$5" || return 1
+  teardown_record_enclosing_slot "$1" "$4" "$5" >/dev/null
+}
+
 # A record that bin/fm-control.sh reassociate re-pointed at a replacement copy
 # names every copy the task worked in before in prior_worktree=, or in
 # released_worktree= when the copy's pool slot was released. Teardown never
@@ -1999,9 +2020,10 @@ teardown_preserves_reassociated_copy() {
 # applies to it and its branch and hook files are not Firstmate's to remove:
 # after the ordinary landed-work test it is left exactly as it is. A current
 # copy that is a pool slot takes the ordinary return path below. So does a
-# current copy nested inside a pool slot this task still claims: it is removed
-# and that slot is returned, since the slot would otherwise stay held by a task
-# that no longer exists (teardown_nested_slot).
+# current copy nested inside a pool slot this task still claims, with or
+# without a prior_worktree= line: it is removed and that slot is returned, since
+# the slot would otherwise stay held by a task that no longer exists
+# (teardown_nested_slot).
 TEARDOWN_PRIOR_COPIES=()
 while IFS= read -r teardown_prior_line || [ -n "$teardown_prior_line" ]; do
   case "$teardown_prior_line" in
@@ -2011,7 +2033,8 @@ done < "$META"
 TEARDOWN_KEEP_COPY=0
 TEARDOWN_ENCLOSING_SLOT=
 TEARDOWN_RECORD_SLOT=
-if teardown_preserves_reassociated_copy "$META" "$KIND" "$BACKEND" "$PROJ" "$WT"; then
+if teardown_preserves_reassociated_copy "$META" "$KIND" "$BACKEND" "$PROJ" "$WT" \
+   || teardown_current_copy_nested_in_slot "$META" "$KIND" "$BACKEND" "$PROJ" "$WT"; then
   TEARDOWN_KEEP_COPY=1
   TEARDOWN_RECORD_SLOT=$(teardown_record_enclosing_slot "$META" "$PROJ" "$WT") \
     || TEARDOWN_RECORD_SLOT=
@@ -4565,19 +4588,20 @@ teardown_owns_worktree() {
 }
 
 # A pool return resets the whole slot, so it sweeps away every copy of this
-# task that lies inside the slot. Two reassociated shapes put one there: a
-# current copy nested inside the slot the task still claims (the slot is then
-# its prior copy), and a prior copy nested inside the slot that is its current
-# copy. Neither refuses outright, because the record could then never be
-# retired. Instead each own copy the return would sweep, other than the current
-# copy the ordinary landed-work test covers, must be a clean worktree root
-# whose HEAD is landed or held by this task's preservation anchor
-# (refs/fm/anchor/<task>-<sha>, written by bin/fm-control.sh reassociate).
+# task that lies inside the slot. Two shapes put one there: a current copy
+# nested inside the slot the task still claims (the slot is then its prior copy,
+# or a ship's record names no prior copy at all), and a prior copy nested inside
+# the slot that is its current copy. Neither refuses outright, because the record
+# could then never be retired. Instead each own copy the return would sweep,
+# other than the current copy the ordinary landed-work test covers, must be a
+# clean worktree root whose HEAD is landed or held by this task's preservation
+# anchor (refs/fm/anchor/<task>-<sha>, written by bin/fm-control.sh reassociate).
 # --force does not waive that proof: no captain words cover a prior copy.
 #
 # teardown_nested_slot is the one owner of that lifecycle, so a re-run after any
-# refusal derives its input from the record's branch= and prior_worktree=, never
-# from the nested copy still existing:
+# refusal derives its input from the record's branch= and the slot
+# teardown_record_enclosing_slot finds from it, never from the nested copy still
+# existing:
 #   prove    Phase A, no side effects. The slot and every own copy nested in it
 #            are clean and landed or anchored, and the claim is this task's.
 #   landed   Phase A for a nested copy an earlier teardown already removed: its
@@ -4675,13 +4699,43 @@ teardown_held_copies_report() {
   echo "notice: each held copy is also listed in $record."
 }
 
+# Succeeds when no held-copy record write is needed that could not be made: every
+# held copy already has its identical line in the record (the write skips it, so
+# a retry needs no append and a read-only record does not stop it), or the record
+# resolves to a writable regular file (the shape test the write uses, so a symlink
+# to one passes and a directory or dangling symlink does not), or it does not
+# exist yet and the nearest existing directory above it is writable. It writes nothing.
+teardown_held_copies_record_writable() {
+  local record="$DATA/held-foreign-copies.log" dir=$DATA entry missing=0
+  [ "${#TEARDOWN_FOREIGN_HELD[@]}" -gt 0 ] || return 0
+  for entry in "${TEARDOWN_FOREIGN_HELD[@]}"; do
+    teardown_held_copy_recorded "$(fm_refuse_text "$TEARDOWN_HELD_SLOT")" \
+      "$(fm_refuse_text "${entry%%$'\t'*}")" "$(fm_refuse_text "${entry#*$'\t'}")" || missing=1
+  done
+  [ "$missing" = 1 ] || return 0
+  teardown_held_copies_record_shape_ok "$record" || return 1
+  if [ -e "$record" ] || [ -L "$record" ]; then
+    [ -w "$record" ]
+    return
+  fi
+  while [ ! -e "$dir" ] && [ ! -L "$dir" ] && [ "$dir" != / ] && [ -n "$dir" ]; do
+    dir=$(dirname "$dir")
+  done
+  [ -d "$dir" ] && [ -w "$dir" ]
+}
+
 # Writes the held-copy record before anything is removed, and refuses the close
 # when it cannot, so a close that happened never lacks its inventory. A line
-# already there for the same copy is not repeated.
-teardown_held_copies_record_or_refuse() {
+# already there for the same copy is not repeated. With check, it only proves
+# the record can be written, before the slot is reserved, and writes nothing.
+teardown_held_copies_record_or_refuse() {  # [check]
   [ -n "$TEARDOWN_HELD_SLOT" ] || return 0
   teardown_owns_worktree || return 0
-  teardown_held_copies_record && return 0
+  if [ "${1:-}" = check ]; then
+    teardown_held_copies_record_writable && return 0
+  else
+    teardown_held_copies_record && return 0
+  fi
   echo "REFUSED: the held-copy record $DATA/held-foreign-copies.log could not be written, and a held close never closes without its inventory of the foreign copies it leaves; nothing was removed." >&2
   return 1
 }
@@ -6380,10 +6434,6 @@ else
     BACKLOG_SKIP_REASON=$TEARDOWN_BACKLOG_SKIP_REASON
   fi
 fi
-if ! fm_backlog_close_marker_clear "$STATE" "$ID"; then
-  echo "error: the previous pending backlog $BACKLOG_TRANSITION for $ID could not be cleared ($FM_BACKLOG_TRANSITION_ERROR); refusing process cleanup" >&2
-  exit 1
-fi
 
 # Every landed/discard-work refusal above has now passed (or --force skipped
 # them). Fix 1, Fix 3, and Fix 2 (see script header) run here, unconditionally on
@@ -6400,6 +6450,7 @@ fi
 # copies it holds; a slot in a superseded pool folder is leased by its exact
 # path. This task's misdirected leases are released after the reservation and
 # the held-copy record checks below.
+[ "$KIND" = secondmate ] || teardown_held_copies_record_or_refuse check || exit 1
 if [ "$TREEHOUSE_SLOT_LOCK_REQUIRED" = 1 ] && teardown_owns_worktree && [ -z "$TEARDOWN_PEER_SLOT" ]; then
   teardown_acquire_project_lock || exit $?
   if ! TEARDOWN_RESERVED_SLOT=$(teardown_live_slot_path); then
@@ -6446,6 +6497,13 @@ fi
 if [ "$TEARDOWN_SLOT_SUPERSEDED" = 1 ]; then
   teardown_release_misdirected_leases "$PROJ" "$ID" "$TEARDOWN_SLOT_SUPERSEDED_NAME"
   [ "$TEARDOWN_SLOT_CUSTODY" = project ] || teardown_release_project_lock || exit 1
+fi
+# The previous pending-close record is retired only now, after the reservation
+# and held-copy refusals above, so a refusal that is decidable from the state at
+# entry leaves its bytes as they were.
+if ! fm_backlog_close_marker_clear "$STATE" "$ID"; then
+  echo "error: the previous pending backlog $BACKLOG_TRANSITION for $ID could not be cleared ($FM_BACKLOG_TRANSITION_ERROR); refusing process cleanup" >&2
+  exit 1
 fi
 if [ "$KIND" != secondmate ] && teardown_owns_worktree; then
   teardown_nested_slot retire
@@ -6806,7 +6864,11 @@ if [ -n "$TEARDOWN_DEFERRED_POOL_CLEANUP" ]; then
         FM_TASK_COPY_POOL_STATE_FILE=
         FM_TASK_COPY_POOL_STATE_ENTRIES=
         fm_task_copy_pool_slot_held "$TEARDOWN_RETURN_SLOT" || {
-          echo "REFUSED: reserved pool slot $TEARDOWN_RETURN_SLOT lost its durable lease; retaining the task record and contents" >&2
+          if [ -n "$TEARDOWN_RETURN_SLOT" ]; then
+            echo "REFUSED: reserved pool slot $TEARDOWN_RETURN_SLOT lost its durable lease; retaining the task record and contents" >&2
+          else
+            echo "REFUSED: no pool slot was resolved for task $ID's return, so no durable lease can be proved; retaining the task record and contents" >&2
+          fi
           exit 1
         }
       fi

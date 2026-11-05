@@ -1167,6 +1167,26 @@ teardown_own_nested_other_repos() {
   done
 }
 
+# Whether the record already holds a line for this task, the slot, <copy> and
+# <reason> (both as fm_refuse_text renders them): the one test that decides a
+# held copy needs no append, shared by the write and by the entry check.
+teardown_held_copy_recorded() {  # <slot> <copy> <reason>
+  [ -f "$DATA/held-foreign-copies.log" ] && FM_HELD_ID=$ID FM_HELD_SLOT=$1 FM_HELD_COPY=$2 FM_HELD_WHY=$3 awk -F'\t' \
+    '$2 == ENVIRON["FM_HELD_ID"] && $3 == ENVIRON["FM_HELD_SLOT"] && $4 == ENVIRON["FM_HELD_COPY"] && $5 == ENVIRON["FM_HELD_WHY"] { f = 1 } END { exit !f }' "$DATA/held-foreign-copies.log" 2>/dev/null
+}
+
+# The record rule the write and the entry check share: the record is acceptable
+# when it is an existing regular writable file, reached directly or through a
+# symlink to an existing regular writable file, or when it does not exist and its
+# directory is writable. A dangling symlink is refused, because appending through
+# it would create a file at the link target; a directory or another kind of file
+# is refused too. This test decides the shape part of that rule; each caller
+# decides whether its needed append is writable.
+teardown_held_copies_record_shape_ok() {  # <record>
+  [ -e "$1" ] || [ -L "$1" ] || return 0
+  [ -f "$1" ]
+}
+
 # Appends each held foreign copy of the last proof to the record
 # data/held-foreign-copies.log: UTC time, closing task id, slot path, copy path
 # and the exact reason, tab separated. bin/fm-teardown.sh calls it once every
@@ -1182,12 +1202,11 @@ teardown_held_copies_record() {
   stamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   slot=$(fm_refuse_text "$TEARDOWN_HELD_SLOT")
   mkdir -p "$DATA" 2>/dev/null || return 1
-  [ ! -e "$record" ] || [ -f "$record" ] || return 1
+  teardown_held_copies_record_shape_ok "$record" || return 1
   for entry in "${TEARDOWN_FOREIGN_HELD[@]}"; do
     copy=$(fm_refuse_text "${entry%%$'\t'*}")
     why=$(fm_refuse_text "${entry#*$'\t'}")
-    if [ -f "$record" ] && FM_HELD_ID=$ID FM_HELD_SLOT=$slot FM_HELD_COPY=$copy FM_HELD_WHY=$why awk -F'\t' \
-        '$2 == ENVIRON["FM_HELD_ID"] && $3 == ENVIRON["FM_HELD_SLOT"] && $4 == ENVIRON["FM_HELD_COPY"] && $5 == ENVIRON["FM_HELD_WHY"] { f = 1 } END { exit !f }' "$record" 2>/dev/null; then
+    if teardown_held_copy_recorded "$slot" "$copy" "$why"; then
       continue
     fi
     { printf '%s\t%s\t%s\t%s\t%s\n' "$stamp" "$ID" "$slot" "$copy" "$why" >> "$record"; } 2>/dev/null || rc=1
