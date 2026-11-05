@@ -940,6 +940,220 @@ test_growing_roots_are_held_to_the_budget_across_pools() {
   pass "growing roots from four pools stay within the budget plus one root and all finish; without a budget they stack (${all[*]} as budget:peak MiB:alive)"
 }
 
+# fm_lint_write_barrier_shellcheck <fakebin> <MiB> <log>: a stand-in that logs its
+# start, waits until FM_TEST_BARRIER starts (its own and its peers', restarts
+# included) are logged or 30 s pass, then allocates and holds <MiB> at once, so
+# every root admitted small grows inside one reading of the host. Its log lines
+# are "<start|held|end> <pid> <time>".
+fm_lint_write_barrier_shellcheck() {
+  mkdir -p "$1"
+  cat > "$1/shellcheck" <<PL
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use Time::HiRes qw(time sleep);
+BEGIN {
+    if ((\$ARGV[0] // '') eq '--version') {
+        print "ShellCheck - shell script analysis tool\nversion: 0.11.0\n";
+        exit 0;
+    }
+}
+my \$log = '$3';
+sub note { open(my \$fh, '>>', \$log) or die "\$!"; printf {\$fh} "%s %d %.6f\n", shift, \$\$, time(); close \$fh; }
+note('start');
+if (my \$peers = \$ENV{FM_TEST_BARRIER}) {
+    my \$deadline = time() + 30;
+    while (time() < \$deadline) {
+        open(my \$fh, '<', \$log) or last;
+        my \$n = () = grep { /^start / } <\$fh>;
+        close \$fh;
+        last if \$n >= \$peers;
+        sleep 0.05;
+    }
+}
+my \$block = 'x' x ($2 * 1048576);
+note('held');
+sleep \$ENV{FM_TEST_MEM_HOLD} // 2;
+note('end');
+exit(length(\$block) ? 0 : 1);
+PL
+  chmod +x "$1/shellcheck"
+  fm_lint_hide_outside_shellcheck "$1"
+}
+
+# fm_lint_sample_stand_ins <marker> <out> <stop-file>: an independent sampler,
+# one process table read about every 0.2 s through ps, that writes
+# "<time> <KiB resident in every process whose command holds <marker>> <the
+# largest single process KiB>" to <out> until <stop-file> exists. It reads
+# nothing the gate keeps.
+fm_lint_sample_stand_ins() {
+  perl -MTime::HiRes=time,sleep -e '
+    my ($marker, $out, $stop) = @ARGV;
+    open(my $fh, ">", $out) or die "$!";
+    select((select($fh), $| = 1)[0]);
+    until (-e $stop) {
+      my $t = time();
+      my ($sum, $top) = (0, 0);
+      if (open(my $ps, "-|", "ps", "-axww", "-o", "pid=,rss=,command=")) {
+        while (my $line = <$ps>) {
+          chomp $line;
+          next unless $line =~ /\A\s*[0-9]+\s+([0-9]+)\s+(.*)\z/;
+          my ($rss, $command) = ($1, $2);
+          next unless $command =~ /\A\S*perl\S*\s+\Q$marker\E(?:\s|\z)/;
+          $sum += $rss; $top = $rss if $rss > $top;
+        }
+        close $ps;
+      }
+      printf {$fh} "%.3f %d %d\n", $t, $sum, $top;
+      my $left = 0.2 - (time() - $t);
+      sleep $left if $left > 0;
+    }' "$1" "$2" "$3"
+}
+
+# fm_lint_over_allowance <samples> <KiB allowance>: "<longest stretch in seconds
+# above the allowance> <largest total KiB> <largest single KiB>" from a sampler
+# file.
+fm_lint_over_allowance() {
+  LIMIT=$2 perl -ane '
+    BEGIN { ($start, $longest, $peak, $top) = (undef, 0, 0, 0); }
+    $peak = $F[1] if $F[1] > $peak;
+    $top = $F[2] if $F[2] > $top;
+    if ($F[1] > $ENV{LIMIT}) { $start //= $F[0]; $longest = $F[0] - $start if $F[0] - $start > $longest; }
+    else { undef $start; }
+    END { printf "%.1f %d %d\n", $longest, $peak, $top; }' "$1"
+}
+
+# fm_lint_barrier_growth <tmp> <label> <budget KiB> <hold s>: four lint runs from
+# four HOME values and four pool directories, each root recorded at 16 MiB and
+# admitted at once, then every stand-in grows by 64 MiB together once all four
+# have started. Prints "<longest seconds above the allowance> <peak KiB> <largest
+# single KiB> <starts> <ends>"; the allowance is the budget plus the largest
+# single stand-in.
+fm_lint_barrier_growth() {
+  local tmp=$1 label=$2 budget=$3 hold=$4 run rc=0 pid key history sampler stop over
+  local -a pids
+  key=$(printf "full:%s" "$(cd -P "$tmp" && pwd -P)/a.sh" | perl -MDigest::SHA=sha256_hex -ne 'print sha256_hex($_)')
+  : > "$tmp/barrier.log"
+  stop="$tmp/$label.stop"
+  rm -f "$stop"
+  fm_lint_sample_stand_ins "$tmp/bin/shellcheck" "$tmp/$label.samples" "$stop" &
+  sampler=$!
+  for run in 1 2 3 4; do
+    history="$tmp/pool.$label.$run/history"
+    mkdir -p "$history" "$tmp/home.$run/.cache"
+    printf '16384\n' > "$history/$key"
+    env HOME="$tmp/home.$run" XDG_CACHE_HOME="$tmp/home.$run/.cache" FM_HOME="$tmp/fm.$run" \
+      FM_LINT_SLOT_DIR="$tmp/pool.$label.$run" FM_LINT_HOST_SLOTS=9 FM_LINT_HOST_RSS_KIB="$budget" \
+      FM_LINT_ROOT_RSS_KIB=262144 FM_TEST_GATE_POOL_PREFIX="$tmp/pool.$label." FM_TEST_BARRIER=4 \
+      FM_TEST_MEM_HOLD="$hold" PATH="$tmp/bin:$PATH" \
+      "$LINT" --jobs 1 "$tmp/a.sh" > "$tmp/$label.$run.out" 2>&1 &
+    pids+=("$!")
+  done
+  for pid in "${pids[@]}"; do wait "$pid" || rc=$?; done
+  : > "$stop"
+  wait "$sampler" 2>/dev/null || true
+  [ "$rc" -eq 0 ] || fail "a growing run failed under budget $budget (rc=$rc)"$'\n'"$(cat "$tmp"/$label.?.out)"
+  # The allowance is the budget plus the largest single stand-in the sampler saw.
+  over=$(fm_lint_over_allowance "$tmp/$label.samples" 0)
+  over=$(fm_lint_over_allowance "$tmp/$label.samples" $((budget + $(printf '%s' "$over" | cut -d' ' -f3))))
+  printf '%s %s %s\n' "$over" "$(grep -c '^start ' "$tmp/barrier.log")" "$(grep -c '^end ' "$tmp/barrier.log")"
+}
+
+test_simultaneous_growth_after_admission_is_brought_back_within_the_allowance() {
+  local tmp budget result longest peak top starts ends control lone
+  tmp=$(fm_test_tmproot fm-lint-barrier)
+  mkdir -p "$tmp/bin"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/a.sh"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/b.sh"
+  fm_lint_write_barrier_shellcheck "$tmp/bin" 64 "$tmp/barrier.log"
+  budget=131072
+  # Four roots, each recorded at 16 MiB (so four fit the 128 MiB budget), are
+  # admitted on readings taken before any of them has allocated, then all four
+  # allocate and hold 64 MiB at once. An independent sampler reads every
+  # stand-in's resident size about every 0.2 s. The allowance is the budget plus
+  # the largest single stand-in. A gate reads the host at most every 2 s, so
+  # the total may exceed the allowance for up to that long; it must then come
+  # back and stay back while every root still finishes.
+  result=$(fm_lint_barrier_growth "$tmp" bounded "$budget" 8)
+  read -r longest peak top starts ends <<<"$result"
+  [ "$top" -gt 60000 ] || fail "the sampler saw no 64 MiB stand-in (largest $top KiB), so this test measured nothing: $result"
+  [ "$ends" -eq 4 ] || fail "$ends of 4 growing roots finished under a $budget KiB budget: $result"
+  perl -e 'exit($ARGV[0] <= 4.5 ? 0 : 1)' "$longest" \
+    || fail "four roots that grew together after admission stayed above the $budget KiB budget plus one root for $longest s (peak $peak KiB, largest single $top KiB; $starts starts): $result"
+  # The control: with no effective budget the same roots stack above that allowance
+  # for as long as they hold their memory, so the check above can fail.
+  control=$(fm_lint_barrier_growth "$tmp" unbounded 100000000 8)
+  read -r longest peak top starts ends <<<"$control"
+  [ "$peak" -gt $((budget + top)) ] \
+    || fail "four growing roots without a budget peaked at only $peak KiB, so this test cannot show a bound: $control"
+  # A root larger than the whole budget still runs, alone, to its end, and is
+  # never ended for a total only it holds.
+  : > "$tmp/barrier.log"
+  FM_TEST_BARRIER=0 FM_TEST_MEM_HOLD=3 FM_LINT_SLOT_DIR="$tmp/pool.lone" FM_LINT_HOST_SLOTS=9 \
+    FM_LINT_HOST_RSS_KIB=$((budget / 2)) FM_LINT_ROOT_RSS_KIB=262144 PATH="$tmp/bin:$PATH" \
+    "$LINT" --jobs 2 "$tmp/a.sh" "$tmp/b.sh" > "$tmp/lone.out" 2>&1 \
+    || fail "a root larger than the budget failed"$'\n'"$(cat "$tmp/lone.out")"
+  lone="$(grep -c '^start ' "$tmp/barrier.log") $(grep -c '^end ' "$tmp/barrier.log")"
+  [ "$lone" = "2 2" ] || fail "two roots each larger than the budget did not each start and finish once (starts and ends: $lone)"$'\n'"$(cat "$tmp/lone.out")"
+  pass "four roots admitted small and growing together come back within the budget plus one root (bounded: $result as longest seconds above, peak KiB, largest KiB, starts, ends; unbudgeted control: $control)"
+}
+
+test_an_unreadable_host_census_never_starts_a_root_in_any_pool() {
+  local tmp run rc pid
+  local -a pids
+  tmp=$(fm_test_tmproot fm-lint-census)
+  mkdir -p "$tmp/bin" "$tmp/deny" "$tmp/repo"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/a.sh"
+  fm_lint_write_memory_shellcheck "$tmp/bin" 48 "$tmp/mem.starts"
+  # Every census route fails: ps exits 1, and the lint copy has no
+  # fm-proc-info.py to fall back on. No unrelated host row is hidden: the
+  # gate must not be able to see anything, in any pool.
+  cp -R "$ROOT/bin" "$tmp/repo/bin"
+  rm -f "$tmp/repo/bin/fm-proc-info.py"
+  printf '#!/bin/sh\nexit 1\n' > "$tmp/deny/ps"
+  chmod +x "$tmp/deny/ps"
+  : > "$tmp/mem.starts"
+  pids=()
+  for run in 1 2; do
+    mkdir -p "$tmp/home.$run/.cache"
+    env HOME="$tmp/home.$run" XDG_CACHE_HOME="$tmp/home.$run/.cache" FM_HOME="$tmp/fm.$run" \
+      FM_LINT_SLOT_DIR="$tmp/pool.$run" FM_LINT_HOST_SLOTS=9 FM_LINT_HOST_RSS_KIB=32768 FM_LINT_ROOT_RSS_KIB=262144 \
+      FM_TEST_MEM_HOLD=4 PATH="$tmp/deny:$tmp/bin:$PATH" \
+      "$tmp/repo/bin/fm-lint.sh" --jobs 1 "$tmp/a.sh" > "$tmp/deny.$run.out" 2>&1 &
+    pids+=("$!")
+  done
+  for run in 1 2; do
+    pid=${pids[$((run - 1))]}
+    rc=0
+    wait "$pid" || rc=$?
+    [ "$rc" -ne 0 ] || fail "run $run succeeded with no readable process table"$'\n'"$(cat "$tmp/deny.$run.out")"
+  done
+  [ ! -s "$tmp/mem.starts" ] || fail "a root started while no process table could be read: $(cat "$tmp/mem.starts")"
+  for run in 1 2; do
+    grep -q 'process table' "$tmp/deny.$run.out" \
+      || fail "run $run did not name the unreadable process table"$'\n'"$(cat "$tmp/deny.$run.out")"
+  done
+  # With the table readable again the same two runs queue behind one another
+  # and both finish.
+  : > "$tmp/mem.starts"
+  : > "$tmp/mem.starts.spans"
+  pids=()
+  for run in 1 2; do
+    env HOME="$tmp/home.$run" XDG_CACHE_HOME="$tmp/home.$run/.cache" FM_HOME="$tmp/fm.$run" \
+      FM_LINT_SLOT_DIR="$tmp/pool.$run" FM_LINT_HOST_SLOTS=9 FM_LINT_HOST_RSS_KIB=32768 FM_LINT_ROOT_RSS_KIB=262144 \
+      FM_TEST_MEM_HOLD=3 FM_TEST_GATE_POOL_PREFIX="$tmp/pool." PATH="$tmp/bin:$PATH" \
+      "$LINT" --jobs 1 "$tmp/a.sh" > "$tmp/ok.$run.out" 2>&1 &
+    pids+=("$!")
+  done
+  rc=0
+  for pid in "${pids[@]}"; do wait "$pid" || rc=$?; done
+  [ "$rc" -eq 0 ] || fail "the two runs failed once the process table was readable (rc=$rc)"$'\n'"$(cat "$tmp"/ok.?.out)"
+  [ "$(wc -l < "$tmp/mem.starts" | tr -d ' ')" -eq 2 ] || fail "not both roots ran once the process table was readable"
+  [ "$(perl -ane 'push @e, [$F[1], 1], [$F[2], -1]; END { my ($n, $m) = (0, 0); for (sort { $a->[0] <=> $b->[0] || $a->[1] <=> $b->[1] } @e) { $n += $_->[1]; $m = $n if $n > $m } print "$m\n" }' "$tmp/mem.starts.spans")" -eq 1 ] \
+    || fail "two 48 MiB roots in two pools ran at once under a 32 MiB budget"
+  pass "with no readable process table every run in every pool refuses naming it and starts no root; with it, the two pools take turns"
+}
+
 # fm_lint_child_of <parent-pid> <text>: the pid of a direct child of <parent-pid>
 # whose command holds <text>, waiting up to 10 s.
 fm_lint_child_of() {
@@ -2854,6 +3068,8 @@ test_cached_success_does_not_wait_for_host_slots
 test_slot_pool_cannot_be_disabled_and_refuses_bad_settings
 test_slot_file_failures_refuse_and_never_run_unbounded
 test_growing_roots_are_held_to_the_budget_across_pools
+test_simultaneous_growth_after_admission_is_brought_back_within_the_allowance
+test_an_unreadable_host_census_never_starts_a_root_in_any_pool
 test_a_waiting_gate_reading_the_table_never_stops_a_younger_running_root
 test_growth_guard_never_stops_the_watch_reader
 test_a_wrapper_around_the_real_shellcheck_shares_the_host_wide_memory_bound
