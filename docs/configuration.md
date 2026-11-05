@@ -446,6 +446,75 @@ Completion refuses to report success until the item is closed, and session start
 
 When a spawn is interrupted after launch delivery began, its exit path re-reads the paired task record and the backlog row under the same per-task lock as the commit, repairs a row the commit believed it had moved, and reports only what was verified or honestly attempted, never intent phrased as outcome ([`bin/fm-spawn.sh`](../bin/fm-spawn.sh); [`tests/fm-backlog-atomicity.test.sh`](../tests/fm-backlog-atomicity.test.sh)).
 
+### Backlog intake and closing proofs
+
+[`bin/fm-tasks-axi.sh`](../bin/fm-tasks-axi.sh) judges every `add` and `create` before tasks-axi runs, so a backlog that grows by filing stays current and unduplicated.
+The script header owns the flags, the refusals, and their exit status; [`bin/fm-backlog-intake.py`](../bin/fm-backlog-intake.py) owns the overlap rule and the owner-filed pattern.
+
+- **Objective.**
+  An add names `--objective O1` to `O7`, the ids [`docs/objectives.md`](objectives.md) lists, or `--objective none --objective-reason "<why>"`.
+  An unknown id, or `none` with no reason, is refused, and so is an add with no objective at all.
+  Each filed item adds one tab-separated line to `data/backlog-review.tsv` in the data directory the add addresses: `id`, `review-by` (left empty), `objective`, and `reason`.
+  Each add ends the item's body with a hidden comment, `<!-- fm-add:<token> -->`, the attribution token of that one invocation; the add's printed answer does not show it (an add with no body of its own prints `null` in `--json` and `body: ""` in text), and `done --duplicate-of` never copies it into the kept item.
+  When tasks-axi's answer cannot be read, the wrapper claims a new item only if its stored body carries the token, so it never records or removes another writer's item.
+  An add it cannot prove fails without changing anything and names the items to check.
+  tasks-axi has no field for these values.
+  The line is written for the id tasks-axi stored, a minted one included.
+  An add stops before filing when the file cannot take a line, and an item whose line fails to write is removed again.
+- **Duplicate check.**
+  A title is compared with every Queued and In flight item and with the 50 newest Done items, in the backlog the add addresses.
+  Done items past the rows tasks-axi keeps are read from its markdown done archive, newest first.
+  The overlap of two titles is the number of words they share divided by the number of distinct words in either.
+  A word is a run of letters or digits at least three characters long, compared in lower case, with a short stop-word list removed.
+  Titles are compared on their first 80 characters, the length `tasks-axi list` keeps.
+  An overlap of 0.25 or more makes the other item a neighbour.
+  Three worked pairs, checked by the test suite:
+
+  | New title | Existing title | Shared / distinct words | Overlap | Verdict |
+  | --- | --- | --- | --- | --- |
+  | Lock holder crash recovery | Lock holder crash | 3 / 4 | 0.75 | refused |
+  | Lock timeout | Lock holder crash | 1 / 4 | 0.25 | refused (at the threshold) |
+  | Lock timeout retry loop | Lock holder crash | 1 / 6 | 0.17 | filed |
+
+  A refusal exits 2, files nothing, lists the three highest-overlap neighbours (id, state, overlap, title), and prints both overrides as full commands:
+  `--dup-of <kept-id>` appends the new title and body to that kept item in the active backlog and files nothing.
+  A neighbour that is only in the done archive cannot take an appended note, so `--dup-of` it is refused and `--not-dup` is the way through.
+  `--not-dup <neighbour-id>` files the item; it accepts any neighbour that meets the threshold, listed or not, and nothing else.
+  `--not-dup` takes one id, so a repeat is refused, and all four intake flags refuse an empty or option-like value in both the split and the `=` form.
+  An add is never its own neighbour, and `--dup-of` naming the add's own id is refused.
+  Both overrides still need an objective.
+  The check shows neighbours and forces a choice; it cannot decide whether two titles are the same work.
+  An unreadable backlog or done archive stops the add with a message and files nothing.
+- **Closing proofs.**
+  `done <id> --duplicate-of <kept-id>` closes a duplicate once its title and body are appended to a Queued or In flight kept item.
+  `done <id> --moved-to <home> <item-id>` closes an item whose work moved to a home registered exactly once in the `data/secondmates.md` of the operation's own data directory, when that home's own backlog, a different one from this, holds `<item-id>` open.
+  A local home is read through tasks-axi in its own data directory.
+  A remote home is read through [`bin/fm-on.sh`](../bin/fm-on.sh), which owns the route and the transport, and an unreachable remote closes nothing.
+  A move closes the source item only when two things are proved: the target is a different physical backlog, and the target's backlog holds the item open.
+  For a local home, the first proof is that its data directory and its `backlog.md` are not the same files as this home's.
+  For a remote home, the first proof is the backlog's own identity, which is the machine id, the canonical data directory and its device and inode, printed by [`bin/fm-backlog-identity.sh`](../bin/fm-backlog-identity.sh) and read through the same transport that reads the item, never judged from a host name or an address.
+  The same machine, directory and inode is the same backlog, whatever name reaches it, and an identity that cannot be read or is not complete refuses the move.
+  Only standard output is the identity: it must be exactly the lines `machine=`, `data=` and `dev_ino=`, each once, and any other line makes the answer unreadable; standard error is kept apart for the error message and never enters the comparison.
+  The same path on another machine is a different backlog.
+  Both proofs stop at an item the owner filed, an item whose owner call is open, an item with a live task record, a closed item, and an item that still blocks an open item, and each refusal names what to do next.
+  A proof close leaves the work open elsewhere, so the refusal names the open items it would release and tells the operator to re-point them first; the tool never re-points them itself.
+  For `--duplicate-of`, every dependent, held or not, is re-pointed with `block <dependent> --by <kept-id>` and then `unblock <dependent> --by <id>`; the kept item itself needs only the unblock step.
+  For `--moved-to`, a dependent with no hold is held with a reason naming the moved item, and a dependent already on a hold keeps that hold and needs only the unblock step.
+  An item the owner filed quotes the owner or captain in a way [`bin/fm-backlog-intake.py`](../bin/fm-backlog-intake.py) lists once, after the triage report's heuristic.
+  An open owner call is one [`bin/fm-captain-hold.sh`](../bin/fm-captain-hold.sh) `open` reports, and a call it cannot read counts as undecided.
+  The closing note records the proof, and the ledger records the close with evidence `none`.
+
+No flag or environment variable waives these checks.
+[`docs/guards/registry.json`](guards/registry.json) registers them as the `backlog-intake-*` and `backlog-close-*` guards.
+A policy refusal prints the [refusal envelope](../bin/fm-refuse-lib.sh) above its message and records one refusal in `state/friction.jsonl`.
+Each decision writes one event to `state/guard-events.jsonl`, and a source that cannot be read writes a deny with `source_ok` false.
+A `--not-dup` escape writes an allow with `override` true on `backlog-intake-duplicate`, so the metrics show when that guard is often waived.
+A `--dup-of` escape agrees that the guard found a duplicate, so it writes an allow with `cleared_by` `dup-of` and `override` false.
+A hold created by `bin/fm-captain-hold.sh hold` files through `bin/fm-tasks-axi.sh add` with `--objective none --objective-reason "captain hold record: tracks a captain decision, not a work item"`, so its objective row is recorded and the duplicate check applies; a duplicate refusal stops the hold and prints the neighbours.
+The refused hold then says not to use the printed `--dup-of` command, which would append the captain call to a work item, file nothing, and record no hold; to file it anyway, run the printed `--not-dup` command naming the neighbour you checked, prefixed with `BD_DUE_REQUIRED=false` because a captain call has no due date, then run the same hold command again.
+This applies to the teardown recovery commands, whose `Land or drop the bundle-preserved commits of <id>` titles overlap one another, and to calls filed through the `bin/fm-decision-hold.sh` shim.
+The objective rule covers `add` and `create` only: a typed `public-followup` obligation that `bin/fm-public-followup.sh` registers goes through `tasks-axi public-followup`, is not a backlog work item, and needs no objective.
+
 ### Which backlog receives a transition
 
 Automatic transitions run from the configured data directory's parent, letting that home's effective tasks-axi configuration address its selected adapter while keeping relative scout-report links rooted there.
@@ -1147,7 +1216,7 @@ Focused fixture regressions are in [`tests/fm-github-accounting.test.sh`](../tes
 
 ### Completion and discard
 
-Ship and scout completion requires delivery evidence or the captain's own words, not merely a stopped worker or a pushed branch.
+Ship and scout completion requires delivery evidence, the captain's own words, or a checked [duplicate or moved proof](#backlog-intake-and-closing-proofs), not merely a stopped worker or a pushed branch.
 [`bin/fm-tasks-axi.sh`](../bin/fm-tasks-axi.sh)'s header owns direct completion admission, retained drop records, and the supported completion and restart grammar.
 [`captain-hold-lifecycle.md`](captain-hold-lifecycle.md#cleanup-never-closes-a-captain-call) owns the separate unresolved-question gate, which delivery or discard cannot bypass.
 A live task record completes only through [`bin/fm-teardown.sh`](../bin/fm-teardown.sh), whose header owns landing proofs, missing-copy admission, report requirements, and captain-authorized forced discard.

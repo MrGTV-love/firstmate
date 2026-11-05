@@ -114,8 +114,8 @@ run_captain() {  # <home> <command args...>
 # the origin task is never accepted as its own inventory entry.
 complete_through_sibling() {  # <home> <origin-id>
   local home=$1 id=$2
-  run_captain "$home" hold "$id-call" --title "Sibling captain call for $id" \
-    --reason "captain must decide the sibling call" --repo sample --origin "$id" >/dev/null \
+  tasks_in "$home" add "$id-call" "Sibling captain call for $id" --kind captain --repo sample >/dev/null \
+    && run_captain "$home" hold "$id-call" --reason "captain must decide the sibling call" --origin "$id" >/dev/null \
     && run_captain "$home" complete "$id" "$id-call"
 }
 

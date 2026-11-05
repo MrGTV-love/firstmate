@@ -21,10 +21,10 @@
 #   bin/fm-teardown.sh           cleaned_up
 #   bin/fm-backlog-transition-lib.sh  closed (a landed backlog close: teardown,
 #                                its replay, and a proven `done`)
-#   bin/fm-tasks-axi.sh          filed (an `add` that created a new item)
+#   bin/fm-tasks-axi.sh          filed (an `add` that created a new item, including
+#                                the one bin/fm-captain-hold.sh hold makes)
 #   bin/fm-send.sh               answered ... send (a --resolve-key close)
-#   bin/fm-captain-hold.sh       filed (a captain-hold item it created),
-#                                closed (a held item it moved to Done),
+#   bin/fm-captain-hold.sh       closed (a held item it moved to Done),
 #                                answered ... hold (an answer or a reconciliation)
 #
 # Usage:
