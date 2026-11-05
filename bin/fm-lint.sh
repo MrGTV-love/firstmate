@@ -109,7 +109,7 @@
 # /usr/bin/time and the macOS watch no record forms, so every root stays
 # charged the worst case. A root admitted on a reading can grow later, and so
 # can every other root admitted with it, so each gate also watches the host
-# while its root runs (twice a second): while the lint trees of every pool on the
+# while its root runs: while the lint trees of every pool on the
 # host, plus any other process named shellcheck, hold more than the budget, a
 # gate stops (SIGSTOP) the analysis processes of its own tree unless it belongs
 # to the oldest running gate, and resumes them once the total fits again or its
@@ -119,6 +119,16 @@
 # and every root still finishes. The time a root spends stopped counts toward
 # its deadline. Processes named shellcheck outside every gate are counted but
 # not stopped; when they alone hold the budget, every gate waits and stops.
+# The oldest is judged by each process's absolute start time (ps lstart), ties
+# broken by pid, so every gate names the same one. A gate reads the host every
+# 0.5 s while its last reading was above 60 percent of the budget and every 2 s
+# otherwise, starting 0.5 s after its root starts, and not at all while it holds
+# no root (waiting for admission, or after its root ends). Measured on the Studio
+# (18 CPUs, about 1,520 processes), with /usr/bin/time -p around one gate whose
+# command is sleep, less the same gate around sleep 0: about 0.10 s of CPU per
+# reading (ps included), so about 0.05 of a core per gate at the 2 s rate
+# (3.06 s in 60 s) and about 0.20 of a core at the 0.5 s rate (6.1 s in 30 s);
+# a lone two-worker run below 60 percent spends about 0.1 of a core on it.
 # A lone default two-worker run keeps both workers only while
 # both roots' charges and any outside ShellCheck fit the budget: on a pool with
 # no history it runs one root at a time until its roots are recorded, and two
@@ -127,15 +137,17 @@
 # increase host concurrency.
 # The default pool is /var/tmp/firstmate-lint-<uid>/lint-slots, which does not
 # depend on HOME or XDG_CACHE_HOME, so every run of one user on a host meets in
-# one pool and one count cap. FM_LINT_SLOT_DIR=off is refused (exit 2): no
-# setting turns the host-wide bound off. FM_LINT_SLOT_DIR set to another
-# directory gives that run its own queue, count cap and history, for a test's
-# fixture, but not its own memory bound: the budget is judged on the whole host
-# by the process table, across every pool and for any analysis, a wrapper
-# script around the real ShellCheck included, because the admission count of
-# outside memory and the growth guard above read the lint trees of all pools.
-# Left separate for a run in another pool: its own queue and count cap, and
-# its records, so its unrecorded roots are charged the worst case. Host load
+# one pool and one count cap. Every analysis, the real ShellCheck or not, goes
+# through this shared admission, and no setting opts out: FM_LINT_SLOT_DIR=off
+# is refused (exit 2). FM_LINT_SLOT_DIR set to another directory is only a
+# fixture seam for tests: that run keeps its own queue, count cap and history,
+# and is still bounded host-wide by the growth guard above and by the outside
+# count at admission, both of which read the lint trees of every pool and every
+# process named shellcheck. What a run in another pool does not get is the
+# charges of this pool's held roots: its admission counts them at their current
+# resident size, so a root just admitted here with a large charge and little
+# resident memory counts as little there, and its own unrecorded roots are
+# charged the worst case. Host load
 # average never changes admission, so unrelated machine load cannot starve lint.
 # FM_LINT_HOST_SLOTS sets the count cap; unset or empty uses max(2, floor(ncpu/2)).
 # A nonempty FM_LINT_HOST_SLOTS or FM_LINT_HOST_RSS_KIB must be a positive

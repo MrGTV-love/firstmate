@@ -108,20 +108,28 @@ if (($ARGV[0] // '') eq 'gate') {
     };
     # One read of the live process table: { pid => [ppid, resident KiB, name,
     # command, start seconds] }, or undef when no source answers. ps first, then
-    # libproc through fm-proc-info.py for a sandbox that refuses ps.
+    # libproc through fm-proc-info.py for a sandbox that refuses ps. The start is
+    # the absolute start (lstart) every reader sees alike, so all gates agree on
+    # which running gate is the oldest.
+    require Time::Piece;
+    my %start_of;
+    my $start = sub {
+        my ($text) = @_;
+        $text =~ s/\s+/ /g;
+        return $start_of{$text} //= eval { Time::Piece->strptime($text, '%a %b %e %H:%M:%S %Y')->epoch } // 0;
+    };
     my $process_table = sub {
         my %table;
-        my $now = time();
         {
             no warnings 'exec';
-            if (open(my $ps, '-|', 'ps', '-axww', '-o', 'pid=,ppid=,rss=,etime=,command=')) {
+            local $ENV{LC_ALL} = 'C';
+            if (open(my $ps, '-|', 'ps', '-axww', '-o', 'pid=,ppid=,rss=,lstart=,command=')) {
                 while (my $line = <$ps>) {
-                    next unless $line =~ /\A\s*([0-9]+)\s+([0-9]+)\s+([0-9]+)\s+(?:(?:([0-9]+)-)?(?:([0-9]+):)?([0-9]+):([0-9]+))\s+(.*?)\s*\z/s;
-                    my ($pid, $ppid, $rss, $days, $hours, $minutes, $seconds, $command) = ($1, $2, $3, $4, $5, $6, $7, $8);
-                    my $age = (($days // 0) * 24 + ($hours // 0)) * 3600 + $minutes * 60 + $seconds;
+                    next unless $line =~ /\A\s*([0-9]+)\s+([0-9]+)\s+([0-9]+)\s+(\S+\s+\S+\s+[0-9]+\s+[0-9:]+\s+[0-9]+)\s+(.*?)\s*\z/s;
+                    my ($pid, $ppid, $rss, $started, $command) = ($1, $2, $3, $4, $5);
                     my $name = (split ' ', $command)[0] // '';
                     $name =~ s{.*/}{};
-                    $table{$pid} = [$ppid, $rss + 0, $name, $command, $now - $age];
+                    $table{$pid} = [$ppid, $rss + 0, $name, $command, $start->($started)];
                 }
                 close $ps;
             }
@@ -137,7 +145,6 @@ if (($ARGV[0] // '') eq 'gate') {
                 while (my $line = <$py>) { $command{$1} = $3 if $line =~ /\A\s*([0-9]+)\s+([0-9]+)\s+(.*?)\s*\z/s; }
                 close $py;
             }
-            require Time::Piece;
             if (open(my $py, '-|', $python, $helper, 'memory')) {
                 local $/;
                 my $json = <$py>;
@@ -147,9 +154,8 @@ if (($ARGV[0] // '') eq 'gate') {
                 for my $row (ref $rows eq 'ARRAY' ? @$rows : ()) {
                     next unless ref $row eq 'HASH' && defined $row->{pid} && defined $row->{ppid}
                         && defined $row->{rss_bytes};
-                    my $started = eval { my $t = $row->{started}; $t =~ s/\s+/ /g; Time::Piece->strptime($t, '%a %b %e %H:%M:%S %Y')->epoch } // 0;
                     $table{$row->{pid}} = [$row->{ppid}, int($row->{rss_bytes} / 1024), $row->{comm} // '',
-                        $command{$row->{pid}} // ($row->{comm} // ''), $started];
+                        $command{$row->{pid}} // ($row->{comm} // ''), $start->($row->{started} // '')];
                 }
             }
         }
@@ -411,14 +417,18 @@ if (($ARGV[0] // '') eq 'gate') {
     # oldest running gate is never stopped (unless processes named shellcheck
     # outside every gate alone hold the budget), so the aggregate exceeds the
     # budget by at most what the oldest root grows by, and every root finishes.
-    my $guard_busy;
+    my ($guard_busy, $poll) = (0, 0.5);
     my $resume = sub { for my $pid (keys %paused) { kill 'CONT', $pid; delete $paused{$pid}; } };
     my $guard = sub {
         return if $caught || $guard_busy;
         $guard_busy = 1;
         my $table = $process_table->();
+        delete @paused{grep { !$table->{$_} } keys %paused} if $table;
         my $view = $table && $host_view->($table);
         my $mine = $view && $view->{gates}{$$};
+        my $next = $mine && $view->{total} * 5 > $budget_kib * 3 ? 0.5 : 2;
+        Time::HiRes::setitimer(Time::HiRes::ITIMER_REAL(), $next, $next) if $next != $poll;
+        $poll = $next;
         if (!$mine) { $guard_busy = 0; return; }
         my ($oldest) = sort { $view->{gates}{$a}[1] <=> $view->{gates}{$b}[1] || $a <=> $b }
             grep { keys(%{$view->{gates}{$_}[0]}) > 1 } keys %{$view->{gates}};
@@ -427,7 +437,7 @@ if (($ARGV[0] // '') eq 'gate') {
             for my $pid (keys %{$mine->[0]}) {
                 next if $pid == $$ || $paused{$pid};
                 my $row = $table->{$pid} or next;
-                next if $row->[1] < 8192 || $row->[3] =~ m{fm-lint-cache\.pl|fm-lint\.sh};
+                next if $row->[1] < 8192 || $row->[3] =~ m{fm-lint-cache\.pl|fm-lint\.sh|fm-proc-info\.py};
                 $paused{$pid} = 1 if kill 'STOP', $pid;
             }
         } elsif (%paused) {
@@ -436,7 +446,7 @@ if (($ARGV[0] // '') eq 'gate') {
         $guard_busy = 0;
     };
     $SIG{ALRM} = sub { local ($?, $!); $guard->() };
-    Time::HiRes::setitimer(Time::HiRes::ITIMER_REAL(), 0.5, 0.5);
+    Time::HiRes::setitimer(Time::HiRes::ITIMER_REAL(), $poll, $poll);
     my $reaped;
     while (($reaped = waitpid($child, 0)) == -1 && $!{EINTR}) { }
     my $status = $reaped == $child ? $? : 127 << 8;

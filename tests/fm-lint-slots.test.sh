@@ -721,8 +721,8 @@ PL
 }
 
 test_cached_success_does_not_wait_for_host_slots() {
-  # A stand-in analysis, not the real ShellCheck: the pool directory below is a
-  # fixture, which a real ShellCheck may not use.
+  # A stand-in analysis in a fixture pool directory, a test seam that is still
+  # bounded host-wide by the growth guard and the outside count.
   local tmp repo out fakebin
   tmp=$(fm_test_tmproot fm-lint-cache-slots)
   repo="$tmp/repo"
@@ -1491,8 +1491,9 @@ test_fast_record_does_not_lower_the_full_charge() {
 
 test_default_pool_is_one_directory_for_every_home() {
   local tmp pool run fixture mark
-  # The real ShellCheck: its pool is always the live per-user host pool, which no
-  # PATH entry, HOME or setting can change. Each run leaves a history record that
+  # The real ShellCheck with FM_LINT_SLOT_DIR unset: its pool is the live per-user
+  # host pool, which no PATH entry, HOME, XDG_CACHE_HOME or FM_HOME can change.
+  # Each run leaves a history record that
   # only its own fixture path can name, and the test removes that record.
   pinned_ready || { pass "SKIP (ShellCheck $REQUIRED not resolved): default pool for every HOME"; return; }
   tmp=$(fm_test_tmproot fm-lint-default-pool)
