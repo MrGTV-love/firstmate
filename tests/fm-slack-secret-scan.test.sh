@@ -6,6 +6,8 @@
 # scan then looks for either secret anywhere in tracked files, state, data, and
 # config. The scan prints paths and counts only; never a secret or contents.
 set -euo pipefail
+# Every plane run here is on a transcript; the real transport is closed so none can reach Slack.
+export FM_SLACK_NO_NETWORK=1
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)

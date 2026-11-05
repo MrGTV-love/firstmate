@@ -44,8 +44,10 @@ class Replay:
         digest = __import__('hashlib').sha256(str(self.path.resolve()).encode()).hexdigest()[:16]
         self.state_path = self.state_dir / ('replay-state-' + digest + '.json')
         self.log_path = self.state_dir / 'outbound.jsonl'
+        # Every call that reaches the replay, including one that fails, is recorded here before it is judged.
+        self.attempts_path = self.state_dir / 'attempts.jsonl'
         self.token_present = token_present
-        if self.state_path.is_symlink() or self.log_path.is_symlink():
+        if self.state_path.is_symlink() or self.log_path.is_symlink() or self.attempts_path.is_symlink():
             raise SlackError('unsafe_replay_state_path')
         if self.state_path.exists():
             self.state = json.loads(self.state_path.read_text())
@@ -83,7 +85,14 @@ class Replay:
         self.save()
         return rule
 
+    def attempt(self, method, fields):
+        entry = {'method': method, 'channel': fields.get('channel'),
+                 'oldest': fields.get('oldest'), 'latest': fields.get('latest')}
+        with self.attempts_path.open('a') as out:
+            out.write(json.dumps(entry, ensure_ascii=False) + '\n')
+
     def call(self, method, **fields):
+        self.attempt(method, fields)
         if not self.token_present:
             raise SlackError('missing_token')
         needed = METHOD_SCOPES.get(method)
@@ -101,8 +110,12 @@ class Replay:
                     'user_id': self.transcript.get('bot_user', 'UBOT0123456')}
         elif method == 'conversations.open':
             target = fields.get('users')
-            if target != os.environ.get('FM_SLACK_DM_USER'):
+            # The configured owner, or one whose DM this conversation already opened (a retarget reads the DM it leaves).
+            opened = self.state.setdefault('opened', [])
+            if target != os.environ.get('FM_SLACK_DM_USER') and target not in opened:
                 raise SlackError('target_mismatch')
+            if target not in opened:
+                opened.append(target)
             # owner_dm names the DM that really belongs to the opened user when it is not the channel that accepts posts.
             channel = self.transcript.get('owner_dm', self.transcript.get('channel', 'D0123456789'))
             self.log({'method': method, 'recipient': target, 'channel': channel})

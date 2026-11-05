@@ -44,7 +44,7 @@ Usage:
   fm_slack_watch_test.py set-transcript <transcript.json> <out.json> <key> <json-value>
   fm_slack_watch_test.py outbox-count <state.json>
   fm_slack_watch_test.py pad-foreign <replay-state.json> <count> <ts-prefix>
-  fm_slack_watch_test.py history-calls <outbound.jsonl>
+  fm_slack_watch_test.py history-calls <outbound.jsonl>   (attempted history reads, failed ones included)
   fm_slack_watch_test.py request-lines <min-count>   (reads wake lines on stdin)
 """
 from contextlib import contextmanager
@@ -54,13 +54,17 @@ import io
 import json
 import os
 import re
+import subprocess
 import sys
+import time
 import unicodedata
 import unittest
 import tempfile
 from unittest.mock import patch
 from pathlib import Path
 
+# No test in this file may reach Slack: the real transport is closed for the whole run.
+os.environ.setdefault('FM_SLACK_NO_NETWORK', '1')
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'bin'))
 import fm_slack_watch as plane
 from fm_slack_watch import CARD_LIMIT, SlackError, Watch
@@ -746,7 +750,8 @@ class IntakeTest(unittest.TestCase):
                 self.assertTrue(line.startswith('check: slack request 200.000100 from U0TESTOWNER: '))
 
     def histories(self, replay):
-        return sum(1 for e in replay.state['log'] if e['method'] == 'conversations.history')
+        """Attempted history reads of the owner DM, the failed ones included."""
+        return history_attempts(replay.attempts_path)
 
     def test_a_poll_makes_at_most_one_history_read_of_the_owner_dm_in_every_case(self):
         with self.fixture() as (watch, replay):
@@ -885,6 +890,213 @@ class IntakeTest(unittest.TestCase):
             saved = watch.load_state()
             self.assertEqual(('intake_cursor' in saved, 'intake_bounds' in saved), (False, False))
 
+    # The binding check and the delivery it allows are one step against an unbind (the real unbind, the real check).
+    CAPTAIN = str(plane.ROOT / 'fm-captain-hold.sh')
+
+    def captain(self, *args):
+        return subprocess.run(['bash', self.CAPTAIN, *args], check=True, capture_output=True, text=True)
+
+    @contextmanager
+    def raced(self, watch, replay, number, hold=True):
+        """The real binding check; right after its number-th answer the real unbind starts in the background and is
+        given time to reach its wait. Records whether the binding record still stood at each post and each print."""
+        record = watch.root.parent / 'decision-bindings' / 'slack-dm.origin'
+        real, call = Watch.bound.__get__(watch), replay.call
+        seen = {'checks': 0, 'unbind': None, 'at': [], 'record': record}
+
+        def bound():
+            answer = real()
+            seen['checks'] += 1
+            if seen['checks'] == number:
+                seen['unbind'] = subprocess.Popen(['bash', self.CAPTAIN, 'unbind', 'slack-dm'],
+                                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                time.sleep(1.0)
+                if not hold:
+                    # Nothing holds the unbind back in the control, so it has completed before the check answers.
+                    seen['unbind'].wait(timeout=60)
+            return answer
+
+        def watched(method, **fields):
+            if method == 'chat.postMessage':
+                seen['at'].append(('post', record.exists()))
+            return call(method, **fields)
+
+        @contextmanager
+        def no_hold():
+            yield
+
+        patches = [patch.object(watch, 'bound', bound), patch.object(replay, 'call', watched)]
+        if not hold:
+            patches.append(patch.object(watch, 'binding_held', no_hold))
+        with contextlib.ExitStack() as stack:
+            for item in patches:
+                stack.enter_context(item)
+            try:
+                yield seen
+            finally:
+                if seen['unbind']:
+                    seen['unbind'].communicate(timeout=60)
+
+    def printing(self, seen):
+        class Recorder(io.StringIO):
+            def write(inner, text):
+                if text.strip():
+                    seen['at'].append(('print', seen['record'].exists()))
+                return super().write(text)
+        return Recorder()
+
+    def test_an_unbind_cannot_complete_between_the_publication_check_and_the_acknowledgement(self):
+        for command in ('poll', 'check'):
+            with self.subTest(command=command), self.fixture() as (watch, replay):
+                self.captain('bind', 'slack-dm')
+                self.say(replay, '200.000100', 'recover this request')
+                with self.raced(watch, replay, 1) as seen:
+                    watch.take_requests(20)
+                # The acknowledgement was posted while the binding record still stood: the unbind was waiting for it.
+                self.assertEqual(seen['at'], [('post', True)])
+                self.assertEqual(seen['unbind'].returncode, 0)
+                self.assertFalse(seen['record'].exists())
+                self.assertEqual(self.acks(replay), ['200.000100'])
+                # Unbound now: the wake is held in the journal, neither printed nor removed.
+                printed = io.StringIO()
+                with patch.object(watch, 'bound', Watch.bound.__get__(watch)), contextlib.redirect_stdout(printed):
+                    plane.emit(watch, command)
+                self.assertEqual(printed.getvalue(), '')
+                self.assertEqual(len(watch.load_state()['outbox']), 1)
+                self.captain('bind', 'slack-dm')
+                with patch.object(watch, 'bound', Watch.bound.__get__(watch)), contextlib.redirect_stdout(printed):
+                    plane.emit(watch, command)
+                self.assertEqual(printed.getvalue().count('check: slack request 200.000100'), 1)
+                self.assertEqual((self.acks(replay), watch.load_state()['outbox']), (['200.000100'], []))
+
+    def test_an_unbind_cannot_complete_between_the_emission_check_and_the_wake_print(self):
+        for command in ('poll', 'check'):
+            with self.subTest(command=command), self.fixture() as (watch, replay):
+                self.captain('bind', 'slack-dm')
+                self.say(replay, '200.000100', 'print this request once')
+                with patch.object(watch, 'bound', Watch.bound.__get__(watch)):
+                    watch.take_requests(20)
+                self.assertEqual(self.acks(replay), ['200.000100'])
+                with self.raced(watch, replay, 1) as seen:
+                    printed = self.printing(seen)
+                    with contextlib.redirect_stdout(printed):
+                        plane.emit(watch, command)
+                # The wake was printed and removed while the binding record still stood; the unbind then completed.
+                self.assertEqual(seen['at'], [('print', True)])
+                self.assertEqual(seen['unbind'].returncode, 0)
+                self.assertFalse(seen['record'].exists())
+                self.assertEqual(printed.getvalue().count('check: slack request 200.000100'), 1)
+                self.assertEqual(watch.load_state()['outbox'], [])
+                # Nothing more is acknowledged or woken once the unbind has returned.
+                again = io.StringIO()
+                with patch.object(watch, 'bound', Watch.bound.__get__(watch)), contextlib.redirect_stdout(again):
+                    watch.poll()
+                    plane.emit(watch, command)
+                self.assertEqual((again.getvalue(), self.acks(replay)), ('', ['200.000100']))
+
+    def test_a_request_is_delivered_once_while_the_source_stays_bound(self):
+        for command in ('poll', 'check'):
+            with self.subTest(command=command), self.fixture() as (watch, replay):
+                self.captain('bind', 'slack-dm')
+                self.say(replay, '200.000100', 'a bound control')
+                with self.raced(watch, replay, 99) as seen:
+                    printed = self.printing(seen)
+                    with contextlib.redirect_stdout(printed):
+                        watch.take_requests(20)
+                        plane.emit(watch, command)
+                self.assertEqual(seen['at'], [('post', True), ('print', True)])
+                self.assertEqual((self.acks(replay), printed.getvalue().count('check: slack request 200.000100'),
+                                  watch.load_state()['outbox']), (['200.000100'], 1, []))
+
+    def test_mutation_control_without_the_hold_an_unbind_completes_before_the_acknowledgement(self):
+        with self.fixture() as (watch, replay):
+            self.captain('bind', 'slack-dm')
+            self.say(replay, '200.000100', 'recover this request')
+            with self.raced(watch, replay, 1, hold=False) as seen:
+                watch.take_requests(20)
+            # The race this harness exists to catch: the post happens after the unbind removed the record.
+            self.assertEqual(seen['at'], [('post', False)])
+
+    def test_a_stored_channel_that_is_not_the_owner_dm_is_never_read_for_requests(self):
+        for first_poll in (False, True):
+            with self.subTest(first_poll=first_poll), self.fixture() as (watch, replay):
+                if first_poll:
+                    watch.state.pop('intake_cursor')
+                self.say(replay, '200.000100', 'a request in a channel that is not the owner DM')
+                # Slack now opens a different DM for the owner than the stored one.
+                replay.transcript['owner_dm'] = 'D0SOMEONEELSE'
+                watch.dm_proven = False
+                before = self.histories(replay)
+                with self.assertRaisesRegex(SlackError, '^stored_channel_not_owner_dm$'):
+                    watch.poll()
+                self.assertEqual(self.histories(replay) - before, 0)
+                saved = watch.load_state()
+                self.assertEqual((saved['pending'], saved['seen'], saved['outbox']), ([], {}, []))
+                self.assertEqual((self.acks(replay), self.wakes(watch)), ([], []))
+                # The control: the proven owner DM is read and the request is taken in.
+                replay.transcript.pop('owner_dm')
+                watch.state, watch.advanced = watch.load_state(), 0
+                if first_poll:
+                    # The proven owner DM gives the starting point, then a later request is taken in.
+                    watch.state.pop('intake_cursor')
+                    watch.poll()
+                    self.assertEqual(self.acks(replay), [])
+                    self.say(replay, '200.000200', 'a request after the starting point')
+                    watch.advanced = 0
+                watch.poll()
+                self.assertEqual(self.acks(replay), ['200.000200' if first_poll else '200.000100'])
+
+    def test_a_later_request_never_publishes_before_an_older_one_that_failed(self):
+        for failures in (0, 2):
+            with self.subTest(failures=failures), self.fixture() as (watch, replay):
+                self.say(replay, '200.000100', 'the older request')
+                self.say(replay, '200.000200', 'the newer request')
+                if failures:
+                    replay.state['failures']['conversations.replies:200.000100'] = {'status': 400, 'times': failures}
+                    replay.save()
+                per_poll = []
+                for turn in range(failures + 1):
+                    watch.state, watch.advanced = watch.load_state(), 0
+                    before = len(self.acks(replay))
+                    try:
+                        watch.poll()
+                    except SlackError as error:
+                        self.assertEqual(str(error), 'api_error')
+                    per_poll.append(self.acks(replay)[before:])
+                # With failures the older request is retried alone until it is delivered, then the newer follows.
+                self.assertEqual(per_poll, [[]] * failures + [['200.000100', '200.000200']])
+                self.assertEqual([line.split()[3] for line in self.wakes(watch)], ['200.000100', '200.000200'])
+
+    def test_the_history_counter_counts_a_failed_attempt(self):
+        with self.fixture() as (watch, replay):
+            replay.state['failures']['conversations.history'] = {'status': 503, 'times': 1}
+            replay.save()
+            before = self.histories(replay)
+            logged = sum(1 for e in replay.state['log'] if e['method'] == 'conversations.history')
+            with self.assertRaises(SlackError):
+                watch.read_window('D0123456789', limit=1)
+            watch.read_window('D0123456789', limit=1)
+            self.assertEqual(self.histories(replay) - before, 2)
+            # The outbound log alone saw only the one that succeeded: the gap the attempt log closes.
+            self.assertEqual(sum(1 for e in replay.state['log'] if e['method'] == 'conversations.history') - logged, 1)
+
+    def test_a_poll_whose_history_read_fails_makes_one_attempt_and_the_next_poll_recovers_with_one(self):
+        with self.fixture() as (watch, replay):
+            self.say(replay, '200.000100', 'a request behind a failed read')
+            replay.state['failures']['conversations.history'] = {'status': 503, 'times': 1}
+            replay.save()
+            reads = []
+            for turn in range(2):
+                watch.state, watch.advanced = watch.load_state(), 0
+                before = self.histories(replay)
+                try:
+                    watch.poll()
+                except SlackError as error:
+                    self.assertEqual((turn, str(error)), (0, 'unreachable'))
+                reads.append(self.histories(replay) - before)
+            self.assertEqual((reads, self.acks(replay)), ([1, 1], ['200.000100']))
+
+
     def test_a_removed_allowlist_member_loses_the_pending_request(self):
         with self.fixture() as (watch, replay):
             self.say(replay, '200.000100', 'hello')
@@ -893,6 +1105,54 @@ class IntakeTest(unittest.TestCase):
             watch.state, watch.authors = watch.load_state(), {'U0SOMEONEELSE'}
             watch.poll()
             self.assertEqual((self.acks(replay), self.wakes(watch), watch.state['pending']), ([], [], []))
+
+
+class ClosedTransportTest(unittest.TestCase):
+    """A test or verification run cannot reach Slack: it runs on a transcript, or its transport is closed."""
+
+    ENV = {'FM_SLACK_DM_USER': 'U0TESTOWNER', 'FM_SLACK_ALLOWED_AUTHORS': 'U0TESTOWNER',
+           'SLACK_BOT_TOKEN': 'fixture-token-not-a-secret'}
+
+    def test_no_network_closes_the_real_transport_before_any_socket_exists(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as directory, \
+             patch.dict(os.environ, dict(self.ENV, FM_HOME=directory, FM_STATE_OVERRIDE=directory,
+                                         FM_SLACK_NO_NETWORK='1')), \
+             patch('fm_slack.urllib.request.urlopen', side_effect=AssertionError('a socket was opened')):
+            watch = Watch(token='fixture-token-not-a-secret')
+            try:
+                with patch.object(watch, 'bound', return_value=True):
+                    for call in (watch.prepare, lambda: watch.api.call('auth.test'),
+                                 lambda: list(watch.api.pages('conversations.history', 'messages', channel='D0123456789'))):
+                        with self.assertRaisesRegex(SlackError, '^network_closed$'):
+                            call()
+            finally:
+                watch.lock.close()
+
+    def test_the_replay_env_runs_a_flagless_entry_on_a_transcript_and_never_builds_the_real_transport(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as directory:
+            transcript = Path(directory) / 'transcript.json'
+            transcript.write_text(json.dumps({'schema': 'fm-slack-replay.v1', 'messages': []}))
+            env = dict(self.ENV, FM_HOME=directory, FM_STATE_OVERRIDE=directory, FM_SLACK_REPLAY=str(transcript))
+            seen = []
+            with patch.dict(os.environ, env), patch.object(plane, 'Slack', side_effect=AssertionError('real transport')), \
+                 patch.object(Watch, 'poll', lambda self: seen.append(type(self.api).__name__)):
+                self.assertEqual(plane.main(['poll']), 0)
+            self.assertEqual(seen, ['Replay'])
+            # An unreadable transcript is an error; it never falls back to Slack.
+            printed = io.StringIO()
+            with patch.dict(os.environ, dict(env, FM_SLACK_REPLAY=str(Path(directory) / 'missing.json'))), \
+                 patch.object(plane, 'Slack', side_effect=AssertionError('real transport')), \
+                 contextlib.redirect_stdout(printed):
+                self.assertEqual(plane.main(['poll']), 1)
+            self.assertIn('transport failure: replay_transcript_unreadable', printed.getvalue())
+
+
+def history_attempts(path):
+    """Every conversations.history call that reached the replay, whether it succeeded or failed."""
+    if not Path(path).is_file():
+        return 0
+    with open(path) as lines:
+        return sum(1 for line in lines if json.loads(line)['method'] == 'conversations.history')
 
 
 def messages(path):
@@ -1081,7 +1341,8 @@ def main(argv):
             {'ts': '%s.%06d' % (argv[3], n), 'user': 'U0STRANGER01', 'text': 'noise %d' % n}
             for n in range(1, int(argv[2]) + 1)))
     elif command == 'history-calls':
-        print(sum(1 for line in open(argv[1]) if json.loads(line).get('method') == 'conversations.history'))
+        # Attempts, failed ones included: the file beside the outbound log that records every call before it is judged.
+        print(history_attempts(Path(argv[1]).with_name('attempts.jsonl')))
     elif command == 'drop-state-field':
         edit(argv[1], lambda data: data.pop(argv[2], None))
     elif command == 'state-field':

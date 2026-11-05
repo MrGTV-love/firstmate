@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# Slack decision plane regressions DOD-01..DOD-17, S1..S3, X1..X49, INTAKE-1..INTAKE-7.
-# Every Slack call is a checked-in replay transcript; no socket is opened.
+# Slack decision plane regressions DOD-01..DOD-17, S1..S3, X1..X49, INTAKE-1..INTAKE-8.
+# Every Slack call is a checked-in replay transcript; no socket is opened. FM_SLACK_NO_NETWORK closes the real
+# transport for the whole suite, so a scenario that forgot its replay fails with network_closed instead of reaching Slack.
 set -euo pipefail
+export FM_SLACK_NO_NETWORK=1
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -568,6 +570,17 @@ if [ "\${1:-}" = open ] && [ -f "\${FM_SHIM_UNBIND_ON_OPEN:-/nonexistent}" ]; th
 fi
 if [ "\${1:-}" = binding ] && [ -n "\${FM_SHIM_NEEDLE:-}" ]; then
   { printf '%s\\n' "\$@"; env | grep -v '^FM_SHIM_'; } | grep -c -F -- "\$FM_SHIM_NEEDLE" >> "\$FM_SHIM_NEEDLE_LOG" || true
+fi
+if [ "\${1:-}" = binding ] && [ -n "\${FM_SHIM_RACE:-}" ]; then
+  n=\$(( \$(cat "\$FM_SHIM_RACE.n" 2>/dev/null || echo 0) + 1 )); printf '%s' "\$n" > "\$FM_SHIM_RACE.n"
+  out=\$(bash "$ROOT/bin/fm-captain-hold.sh" "\$@"); rc=\$?
+  if [ "\$n" = "\$(cat "\$FM_SHIM_RACE")" ]; then
+    # The real unbind is started by another process right after the check answered, and given time to reach its wait.
+    ( bash "$ROOT/bin/fm-captain-hold.sh" unbind slack-dm > "\$FM_SHIM_RACE.out" 2>&1; echo done > "\$FM_SHIM_RACE.done" ) </dev/null >/dev/null 2>&1 &
+    sleep 1
+  fi
+  printf '%s\\n' "\$out"
+  exit "\$rc"
 fi
 if [ "\${1:-}" = binding ] && [ -f "\${FM_SHIM_UNBIND_AFTER_BINDING:-/nonexistent}" ]; then
   out=\$(bash "$ROOT/bin/fm-captain-hold.sh" "\$@"); rc=\$?
@@ -1898,9 +1911,13 @@ say_owner 2000.000200 'sent after the first poll'
 expect_requests "legacy plane" 2000.000200
 # A plane armed before requests existed that is busy on its first upgraded poll (a delivered answer uses the whole
 # per-poll cap) still gets its starting point at that poll, takes in no history, and takes in a later request once.
+# It runs on the same three-scope, permission-sensitive replay as every other intake scenario, and its answer is the
+# control: the busy answer is delivered under those scopes, so the cap really is used up by existing work.
 new_home typed-reply
 bind
-TR="$FIX/typed-reply/transcript.json"
+TR="$TMP/typed-reply-strict.json"
+python3 "$HELPER" set-transcript "$FIX/typed-reply/transcript.json" "$TMP/typed-reply-scoped.json" scopes '["chat:write","im:write","im:history"]'
+python3 "$HELPER" set-transcript "$TMP/typed-reply-scoped.json" "$TR" enforce_scopes true
 "$ROOT/bin/fm-slack-check.sh" arm --replay "$TR" >/dev/null
 python3 "$HELPER" drop-state-field "$(state_file)" intake_cursor
 python3 "$HELPER" owner-message "$(replay_file)" 2000.000100 U0TESTOWNER 'sent before the first upgraded poll'
@@ -1972,6 +1989,24 @@ assert_eq "$(printf '%s\n' "$second" | grep -c 'transport failure' || true)" 0 "
 assert_eq "$(request_count "$first$second")" 0 "INTAKE-3 a request was taken in through a failed read"
 out=$(ipoll)
 assert_eq "$(request_count "$out")" 1 "INTAKE-3 the next poll did not take the request in"
+# An older request whose acknowledgement keeps failing is retried alone: a newer request is never acknowledged or
+# woken before it, however many polls the failure lasts, and both then arrive oldest first in one poll.
+intake_home
+say_owner 2000.000100 'the older request'
+say_owner 2000.000200 'the newer request'
+python3 "$HELPER" fail-call "$(replay_file)" conversations.replies:2000.000100 400 2
+for turn in 1 2; do
+  set +e
+  out=$(ipoll); rc=$?
+  set -e
+  [ "$rc" -ne 0 ] || fail "INTAKE-3 [order] failed acknowledgement $turn reported success"
+  assert_eq "$(request_count "$out")" 0 "INTAKE-3 [order] a request was woken while the older one was failing (poll $turn)"
+  assert_eq "$(outbound_count chat.postMessage)" 0 "INTAKE-3 [order] a request was acknowledged while the older one was failing (poll $turn)"
+done
+out=$(ipoll)
+assert_eq "$(printf '%s\n' "$out" | sed -n 's/^check: slack request \([0-9.]*\) from .*/\1/p' | tr '\n' ' ')" '2000.000100 2000.000200 ' \
+  "INTAKE-3 [order] the older request did not come first once it recovered"
+assert_eq "$(posts_in 2000.000100)$(posts_in 2000.000200)" 11 "INTAKE-3 [order] one acknowledgement each after the recovery"
 printf 'ok - INTAKE-3\n'
 
 # INTAKE-4: the text is one line of unverified data with no authority
@@ -2025,15 +2060,17 @@ printf 'ok - INTAKE-4\n'
 intake_home
 lines=$(wc -l < "$(outbound_log)")
 assert_eq "$(ipoll)" "" "INTAKE-5 an idle poll printed"
-assert_eq "$(( $(wc -l < "$(outbound_log)") - lines ))" 1 "INTAKE-5 an idle poll made more than the history read"
-assert_eq "$(tail -n 1 "$(outbound_log)" | python3 -c 'import json, sys; print(json.loads(sys.stdin.read())["method"])')" \
-  conversations.history "INTAKE-5 the idle request was not the history read"
+assert_eq "$(( $(wc -l < "$(outbound_log)") - lines ))" 2 "INTAKE-5 an idle poll made more than the owner-DM proof and the history read"
+assert_eq "$(tail -n 2 "$(outbound_log)" | python3 -c 'import json, sys; print(" ".join(json.loads(line)["method"] for line in sys.stdin))')" \
+  "conversations.open conversations.history" "INTAKE-5 the idle poll was not the owner-DM proof, then the history read"
 # A stored channel that is not the owner's proven DM refuses the acknowledgement; the request waits.
 intake_home
 say_owner 2000.000100 'please check the status of vernant d7'
 python3 "$HELPER" set-transcript "$INTAKE" "$TMP/other-dm-1.json" messages \
   '[{"ts":"100.000100","user":"U0TESTOWNER","text":"old"},{"ts":"2000.000100","user":"U0TESTOWNER","text":"please check"}]'
 python3 "$HELPER" set-transcript "$TMP/other-dm-1.json" "$TMP/other-dm.json" owner_dm '"D0OTHEROWNER1"'
+armed_reads=$(python3 "$HELPER" history-calls "$(outbound_log)")
+outbox_count_now() { python3 "$HELPER" outbox-count "$(state_file)"; }
 set +e
 out=$("$ROOT/bin/fm-slack-poll.sh" --replay "$TMP/other-dm.json" 2>&1); rc=$?
 set -e
@@ -2041,6 +2078,10 @@ set -e
 assert_contains "$out" 'stored_channel_not_owner_dm' "INTAKE-5 the refusal was not named"
 assert_eq "$(outbound_count chat.postMessage)" 0 "INTAKE-5 an acknowledgement bypassed the owner-DM proof"
 assert_eq "$(request_count "$out")" 0 "INTAKE-5 a request was woken without its acknowledgement"
+# The stored channel is proven before it is read: the refused poll attempted no history read and journaled nothing.
+assert_eq "$(( $(python3 "$HELPER" history-calls "$(outbound_log)") - armed_reads ))" 0 "INTAKE-5 a channel that is not the owner's DM was read for requests"
+assert_eq "$(python3 "$HELPER" pending-count "$(state_file)")" 0 "INTAKE-5 a request from an unproven channel was journaled"
+assert_eq "$(outbox_count_now)" 0 "INTAKE-5 a wake line from an unproven channel was journaled"
 out=$(ipoll)
 assert_eq "$(request_count "$out")" 1 "INTAKE-5 the request was lost after a refused acknowledgement"
 assert_eq "$(posts_in 2000.000100)" 1 "INTAKE-5 the request was acknowledged after the proof held"
@@ -2161,6 +2202,93 @@ for via in poll check; do
   via_shim "$via" FM_SHIM_NEEDLE=slack-dm FM_SHIM_NEEDLE_LOG="$TMP/needle.log" >/dev/null
   grep -q -v '^0$' "$TMP/needle.log" || fail "INTAKE-6 [$via text control] the count did not find the source name in the binding check's arguments"
 done
+# The binding check and the delivery it allows are one step against an unbind. The real unbind is started by another
+# process right after the binding check answers, at the last two checks of a run (the publication check and the
+# emission check); it waits for the delivery that check allowed, so nothing is acknowledged or woken after it returns.
+await_unbind() {  # <race file>: wait for the background unbind to finish
+  local n=0
+  until [ -e "$1.done" ]; do
+    n=$((n + 1))
+    [ "$n" -le 150 ] || fail "INTAKE-6 the unbind never returned"
+    sleep 0.2
+  done
+}
+for via in poll check; do
+  intake_home
+  say_owner 2000.000100 'count the binding checks'
+  : > "$TMP/shim-calls.log"
+  via_shim "$via" FM_SHIM_LOG="$TMP/shim-calls.log" >/dev/null
+  checks=$(grep -c '^binding slack-dm$' "$TMP/shim-calls.log")
+  [ "$checks" -ge 3 ] || fail "INTAKE-6 [$via race] a delivered request made $checks binding checks, fewer than entry, delivery and print"
+  # After the publication check (the next to last): the acknowledgement is posted before the unbind returns. The wake
+  # that follows is printed (the run takes the binding again before the unbind does) or held in the journal (the unbind
+  # won it); either way nothing is acknowledged or woken once the unbind has returned, and the rebind adds no repeat.
+  intake_home
+  say_owner 2000.000100 'unbound after the publication check'
+  rm -f "$TMP/race".*
+  printf '%s' "$((checks - 1))" > "$TMP/race"
+  out=$(via_shim "$via" FM_SHIM_RACE="$TMP/race" 2>&1 || true)
+  await_unbind "$TMP/race"
+  assert_eq "$(posts_in 2000.000100)" 1 "INTAKE-6 [$via publication race] the acknowledgement was not posted once before the unbind returned"
+  assert_eq "$(( $(request_count "$out") + $(outbox_count) ))" 1 "INTAKE-6 [$via publication race] the wake was neither printed once nor held in the journal"
+  held=$(outbox_count)
+  "$CAPTAIN" binding slack-dm >/dev/null 2>&1 && fail "INTAKE-6 [$via publication race] the unbind did not remove the binding"
+  assert_eq "$(via_run "$via")" "" "INTAKE-6 [$via publication race] a run after the unbind woke or acknowledged"
+  assert_eq "$(outbound_count chat.postMessage)" 1 "INTAKE-6 [$via publication race] a run after the unbind posted"
+  assert_eq "$(outbox_count)" "$held" "INTAKE-6 [$via publication race] a run after the unbind changed the journal"
+  bind
+  out=$(via_run "$via")
+  assert_eq "$(request_count "$out")" "$held" "INTAKE-6 [$via publication race] the rebind did not deliver exactly what was held"
+  assert_eq "$(posts_in 2000.000100)" 1 "INTAKE-6 [$via publication race] the rebind acknowledged again"
+  # After the emission check (the last): printed and removed before the unbind returned; nothing follows.
+  intake_home
+  say_owner 2000.000100 'unbound after the emission check'
+  rm -f "$TMP/race".*
+  printf '%s' "$checks" > "$TMP/race"
+  out=$(via_shim "$via" FM_SHIM_RACE="$TMP/race" 2>&1 || true)
+  await_unbind "$TMP/race"
+  assert_eq "$(request_count "$out")" 1 "INTAKE-6 [$via emission race] the wake was not printed once before the unbind returned"
+  assert_eq "$(outbox_count)" 0 "INTAKE-6 [$via emission race] the printed wake stayed in the journal"
+  "$CAPTAIN" binding slack-dm >/dev/null 2>&1 && fail "INTAKE-6 [$via emission race] the unbind did not remove the binding"
+  assert_eq "$(via_run "$via")" "" "INTAKE-6 [$via emission race] a run after the unbind woke"
+  assert_eq "$(outbound_count chat.postMessage)" 1 "INTAKE-6 [$via emission race] a run after the unbind posted"
+  # Control: a race that never fires leaves the source bound, and the request is delivered once.
+  intake_home
+  say_owner 2000.000100 'a bound control'
+  rm -f "$TMP/race".*
+  printf '%s' 99 > "$TMP/race"
+  out=$(via_shim "$via" FM_SHIM_RACE="$TMP/race" 2>&1)
+  assert_eq "$(request_count "$out")" 1 "INTAKE-6 [$via race control] the request was not woken once"
+  assert_eq "$(posts_in 2000.000100)" 1 "INTAKE-6 [$via race control] the request was not acknowledged once"
+  "$CAPTAIN" binding slack-dm >/dev/null 2>&1 || fail "INTAKE-6 [$via race control] the binding went away"
+done
+# The unbind itself: it waits for a delivery that holds the binding, then removes it; its wait is bounded.
+holder() {  # <seconds>: another process holds the binding shared, as a delivery does
+  perl -e 'use Fcntl qw(:flock); open(my $d, "<", $ARGV[0]) or die; flock($d, LOCK_SH) or die; $| = 1; print "held\n"; sleep $ARGV[1]' \
+    "$FM_STATE_OVERRIDE/decision-bindings" "$1" > "$TMP/holder.out" &
+  holder_pid=$!
+  until [ -s "$TMP/holder.out" ]; do sleep 0.1; done
+}
+intake_home
+holder 3
+start=$(date +%s)
+"$CAPTAIN" unbind slack-dm > "$TMP/unbind.out" 2>&1
+waited=$(( $(date +%s) - start ))
+wait "$holder_pid"
+[ "$waited" -ge 2 ] || fail "INTAKE-6 [unbind wait] the unbind did not wait for the delivery that held the binding (waited ${waited}s)"
+assert_contains "$(cat "$TMP/unbind.out")" 'unbound: slack-dm' "INTAKE-6 [unbind wait] the unbind did not report"
+assert_not_contains "$(cat "$TMP/unbind.out")" 'still running' "INTAKE-6 [unbind wait] a finished wait warned"
+"$CAPTAIN" binding slack-dm >/dev/null 2>&1 && fail "INTAKE-6 [unbind wait] the binding stayed after the unbind"
+intake_home
+holder 5
+start=$(date +%s)
+FM_BINDING_UNBIND_WAIT=1 "$CAPTAIN" unbind slack-dm > "$TMP/unbind.out" 2>&1
+waited=$(( $(date +%s) - start ))
+kill "$holder_pid" 2>/dev/null || true
+wait "$holder_pid" 2>/dev/null || true
+[ "$waited" -le 3 ] || fail "INTAKE-6 [unbind bound] the unbind waited past its bound (${waited}s)"
+assert_contains "$(cat "$TMP/unbind.out")" 'still running' "INTAKE-6 [unbind bound] the cut-short wait was not reported"
+"$CAPTAIN" binding slack-dm >/dev/null 2>&1 && fail "INTAKE-6 [unbind bound] the binding stayed after the bounded wait"
 printf 'ok - INTAKE-6\n'
 
 # INTAKE-7: a poll makes at most one history read of the owner DM for requests, in every case, and a wait longer
@@ -2194,6 +2322,64 @@ done
 assert_eq "$woken" "1999.000001 2001.000001 " "INTAKE-7 a long wait lost, repeated or reordered a request"
 assert_eq "$(outbound_count chat.postMessage)" 2 "INTAKE-7 a long wait posted the wrong number of acknowledgements"
 assert_eq "$(python3 "$HELPER" state-field "$(state_file)" intake_bounds)" "" "INTAKE-7 the walk bounds stayed after the wait was read"
+# The same limit when the history read fails: a failed attempt is an attempt, and the next poll recovers with one.
+intake_home
+say_owner 2000.000100 'a request behind a failed history read'
+python3 "$HELPER" fail-call "$(replay_file)" conversations.history 503 1
+before=$(python3 "$HELPER" history-calls "$(outbound_log)")
+set +e
+out=$(ipoll 2>&1); rc=$?
+set -e
+[ "$rc" -ne 0 ] || fail "INTAKE-7 a failed history read reported success"
+assert_eq "$(( $(python3 "$HELPER" history-calls "$(outbound_log)") - before ))" 1 "INTAKE-7 a poll with a failing history read made more than one attempt"
+assert_eq "$(request_count "$out")" 0 "INTAKE-7 a request was woken through a failed read"
+before=$(python3 "$HELPER" history-calls "$(outbound_log)")
+out=$(ipoll)
+assert_eq "$(( $(python3 "$HELPER" history-calls "$(outbound_log)") - before ))" 1 "INTAKE-7 the recovering poll made more than one attempt"
+assert_eq "$(request_count "$out")" 1 "INTAKE-7 the recovering poll did not wake the request"
+# A wait that fits one page completes in one poll; a wait of k pages completes in at most 2k-1 polls (k=2: three),
+# with the older request first and nothing skipped, repeated or reordered.
+intake_home
+say_owner 1999.000001 'the older request'
+python3 "$HELPER" pad-foreign "$(replay_file)" 5 2000
+say_owner 2001.000001 'the newer request'
+expect_requests "one page" 1999.000001 2001.000001
+intake_home
+say_owner 1999.000001 'the older request'
+python3 "$HELPER" pad-foreign "$(replay_file)" 199 2000
+say_owner 2001.000001 'the newer request'
+per_poll=""
+for turn in 1 2 3 4; do
+  before=$(python3 "$HELPER" history-calls "$(outbound_log)")
+  out=$(ipoll)
+  assert_eq "$(( $(python3 "$HELPER" history-calls "$(outbound_log)") - before ))" 1 "INTAKE-7 [two pages] poll $turn made more than one history read"
+  per_poll="${per_poll}[$(printf '%s\n' "$out" | sed -n 's/^check: slack request \([0-9.]*\) from .*/\1/p' | tr '\n' ' ' | sed 's/ $//')]"
+done
+assert_eq "$per_poll" "[][1999.000001][2001.000001][]" "INTAKE-7 two pages were not delivered in three polls, oldest first"
+assert_eq "$(outbound_count chat.postMessage)" 2 "INTAKE-7 [two pages] acknowledgements"
 printf 'ok - INTAKE-7\n'
+
+# INTAKE-8: a run that is not live cannot reach Slack. The registered check file (state/slack.check.sh) takes no flag,
+# so it runs on a transcript through FM_SLACK_REPLAY; with that set the real transport is never built, an unreadable
+# transcript is an error and not a fallback, and FM_SLACK_NO_NETWORK closes the real transport for any run without one.
+intake_home
+say_owner 2000.000100 'a request for the registered check file'
+REGISTERED="$FM_STATE_OVERRIDE/slack.check.sh"
+[ -x "$REGISTERED" ] || fail "INTAKE-8 the registered check file was not written by arm"
+out=$(FM_SLACK_REPLAY="$INTAKE" "$REGISTERED")
+assert_eq "$(request_count "$out")" 1 "INTAKE-8 the registered check file did not run on the transcript"
+assert_eq "$(posts_in 2000.000100)" 1 "INTAKE-8 the registered check file did not post through the transcript"
+# Without a transcript the same file has no way out: the transport is closed, and the run reports it.
+intake_home
+say_owner 2000.000100 'a request that must not reach Slack'
+out=$(env -u FM_SLACK_REPLAY SLACK_BOT_TOKEN=fixture-token-not-a-secret "$REGISTERED" 2>&1 || true)
+assert_eq "$(request_count "$out")" 0 "INTAKE-8 a run without a transcript woke a request"
+assert_contains "$out" 'network_closed' "INTAKE-8 the closed transport was not named"
+assert_eq "$(outbound_count chat.postMessage)" 0 "INTAKE-8 a run without a transcript posted"
+# An unreadable transcript is an error, never a fallback to Slack.
+out=$(FM_SLACK_REPLAY="$TMP/missing-transcript.json" "$REGISTERED" 2>&1 || true)
+assert_contains "$out" 'replay_transcript_unreadable' "INTAKE-8 an unreadable transcript did not refuse"
+assert_eq "$(request_count "$out")" 0 "INTAKE-8 an unreadable transcript woke a request"
+printf 'ok - INTAKE-8\n'
 
 printf 'ok - all Slack watch checks\n'
