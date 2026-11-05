@@ -1,0 +1,16 @@
+HEAD 92362aec4aba14641c9c027943b055d1dd8f0cc4 + working tree:
+ .dsh/fm-primary.mjs               |  2 +-
+ bin/fm-lock.sh                    |  5 ++++-
+ docs/supervision-protocols/dsh.md |  3 ++-
+ tests/fm-dsh-primary-web.mjs      | 42 ++++++++++++++++++++++++++++-----------
+ tests/fm-dsh-web-lock.mjs         | 17 +++++++++++++++-
+ 5 files changed, 53 insertions(+), 16 deletions(-)
+$ node tests/fm-dsh-web-lock.mjs
+ok - empty Web homes refuse missing/invalid SID or missing native shell evidence before authority publication; status remains usable
+ok - canonical native acquire/reconfirm/owned-release, next-primary progress, same-PID sibling/child refusal, stale-release refusal, dead old-server same-ID reclaim, failed removal keeps the pair and same-ID recovery, closer-harness rejection, foreign owner preserved
+EXIT=0
+$ node tests/fm-dsh-primary-web.mjs
+ok - actual SDK Web config without sessionId refuses before environment mutation or legacy subscription
+ok - actual SDK owned TUI profile preserves legacy root/home startup and one supervision followup, and ignores inherited Web identity
+ok - native Web existing/resumed Agent through real inspect and canonical lock: free/dead acquire, live foreign refusal, explicit env, no startup, one followup, true-termination release barrier, visible fail-closed release failure with later recovery, no HMR/stale release and scoped cleanup
+EXIT=0

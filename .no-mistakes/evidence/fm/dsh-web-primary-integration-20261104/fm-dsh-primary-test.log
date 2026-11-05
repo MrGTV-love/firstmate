@@ -1,8 +1,8 @@
-+(eval):1> FM_DSH_SDK_ANCHOR=/opt/homebrew/lib/node_modules/@deepseek-ai/dsh/package.json timeout 600 bash tests/fm-dsh-primary.test.sh
+$ FM_DSH_SDK_ANCHOR=/opt/homebrew/lib/node_modules/@deepseek-ai/dsh/package.json bin/fm-proc-budget.sh -- bash tests/fm-dsh-primary.test.sh
 ok - empty Web homes refuse missing/invalid SID or missing native shell evidence before authority publication; status remains usable
-ok - canonical native acquire/reconfirm/owned-release, next-primary progress, same-PID sibling/child refusal, stale-release refusal, dead old-server same-ID reclaim, closer-harness rejection, foreign owner preserved
+ok - canonical native acquire/reconfirm/owned-release, next-primary progress, same-PID sibling/child refusal, stale-release refusal, dead old-server same-ID reclaim, failed removal keeps the pair and same-ID recovery, closer-harness rejection, foreign owner preserved
 ok - actual SDK Web config without sessionId refuses before environment mutation or legacy subscription
 ok - actual SDK owned TUI profile preserves legacy root/home startup and one supervision followup, and ignores inherited Web identity
 ok - native Web existing/resumed Agent through real inspect and canonical lock: free/dead acquire, live foreign refusal, explicit env, no startup, one followup, true-termination release barrier, visible fail-closed release failure with later recovery, no HMR/stale release and scoped cleanup
 ok - DSH primary enters its digest ahead of the brief in the first step, reports startup failure there, bounds guard follow-ups, preserves wake acknowledgement, excludes children, retires watcher descendants on disposal and native SIGKILL, and parks the supervision host only on an opted-in home it owns
-exit=0
+EXIT=0

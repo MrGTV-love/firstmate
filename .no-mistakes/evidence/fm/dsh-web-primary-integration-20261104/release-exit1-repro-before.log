@@ -1,0 +1,296 @@
+92362aec4aba14641c9c027943b055d1dd8f0cc4
+{
+ "case": "success-owned",
+ "cli": {
+  "status": 0,
+  "stderr": "",
+  "stdout": "lock released: exact native Web owner",
+  "after": [
+   null,
+   null
+  ]
+ },
+ "plugin": {
+  "before": [
+   "82396",
+   "dsh-web:session-repro"
+  ],
+  "attached": [
+   "82396",
+   "dsh-web:session-repro"
+  ],
+  "after": [
+   null,
+   null
+  ],
+  "releaseErrors": []
+ },
+ "sameIdAfter": {
+  "before": [
+   null,
+   null
+  ],
+  "inspect": 4,
+  "inspectOut": "",
+  "acquire": 0,
+  "stderr": "",
+  "pair": [
+   "82396",
+   "dsh-web:session-repro"
+  ]
+ },
+ "differentSessionAfter": {
+  "status": 1,
+  "stderr": "error: another live firstmate session holds the lock (pid 82396, session dsh-web:session-repro); operate read-only until resolved",
+  "pair": [
+   "82396",
+   "dsh-web:session-repro"
+  ]
+ }
+}
+{
+ "case": "refusal-live-foreign",
+ "cli": {
+  "status": 1,
+  "stderr": "error: cannot release another or unverified native session lock",
+  "stdout": "",
+  "after": [
+   "82415",
+   "foreign-claude-session"
+  ]
+ },
+ "plugin": {
+  "before": [
+   "82415",
+   "foreign-claude-session"
+  ],
+  "attached": [
+   "82415",
+   "foreign-claude-session"
+  ],
+  "after": [
+   "82415",
+   "foreign-claude-session"
+  ],
+  "releaseErrors": []
+ },
+ "sameIdAfter": {
+  "before": [
+   "82415",
+   "foreign-claude-session"
+  ],
+  "inspect": 4,
+  "inspectOut": "",
+  "acquire": 1,
+  "stderr": "error: another live firstmate session holds the lock (pid 82415, session foreign-claude-session); operate read-only until resolved",
+  "pair": [
+   "82415",
+   "foreign-claude-session"
+  ]
+ },
+ "differentSessionAfter": {
+  "status": 1,
+  "stderr": "error: another live firstmate session holds the lock (pid 82415, session foreign-claude-session); operate read-only until resolved",
+  "pair": [
+   "82415",
+   "foreign-claude-session"
+  ]
+ }
+}
+{
+ "case": "refusal-next-primary",
+ "cli": {
+  "status": 1,
+  "stderr": "error: cannot release another or unverified native session lock",
+  "stdout": "",
+  "after": [
+   "82396",
+   "dsh-web:session-next"
+  ]
+ },
+ "plugin": {
+  "before": [
+   "82396",
+   "dsh-web:session-next"
+  ],
+  "attached": [
+   "82396",
+   "dsh-web:session-next"
+  ],
+  "after": [
+   "82396",
+   "dsh-web:session-next"
+  ],
+  "releaseErrors": []
+ },
+ "sameIdAfter": {
+  "before": [
+   "82396",
+   "dsh-web:session-next"
+  ],
+  "inspect": 4,
+  "inspectOut": "",
+  "acquire": 1,
+  "stderr": "error: another live firstmate session holds the lock (pid 82396, session dsh-web:session-next); operate read-only until resolved",
+  "pair": [
+   "82396",
+   "dsh-web:session-next"
+  ]
+ },
+ "differentSessionAfter": {
+  "status": 1,
+  "stderr": "error: another live firstmate session holds the lock (pid 82396, session dsh-web:session-next); operate read-only until resolved",
+  "pair": [
+   "82396",
+   "dsh-web:session-next"
+  ]
+ }
+}
+{
+ "case": "refusal-free-lock",
+ "cli": {
+  "status": 1,
+  "stderr": "error: cannot release another or unverified native session lock",
+  "stdout": "",
+  "after": [
+   null,
+   null
+  ]
+ },
+ "plugin": {
+  "before": [
+   null,
+   null
+  ],
+  "attached": [
+   null,
+   null
+  ],
+  "after": [
+   null,
+   null
+  ],
+  "releaseErrors": []
+ },
+ "sameIdAfter": {
+  "before": [
+   null,
+   null
+  ],
+  "inspect": 3,
+  "inspectOut": "",
+  "acquire": 0,
+  "stderr": "",
+  "pair": [
+   "82396",
+   "dsh-web:session-repro"
+  ]
+ },
+ "differentSessionAfter": {
+  "status": 1,
+  "stderr": "error: another live firstmate session holds the lock (pid 82396, session dsh-web:session-repro); operate read-only until resolved",
+  "pair": [
+   "82396",
+   "dsh-web:session-repro"
+  ]
+ }
+}
+{
+ "case": "real-error-readonly-state",
+ "cli": {
+  "status": 1,
+  "stderr": "error: cannot write session lock; operate read-only until resolved",
+  "stdout": "",
+  "after": [
+   "82396",
+   "dsh-web:session-repro"
+  ]
+ },
+ "plugin": {
+  "before": [
+   "82396",
+   "dsh-web:session-repro"
+  ],
+  "attached": [
+   "82396",
+   "dsh-web:session-repro"
+  ],
+  "after": [
+   "82396",
+   "dsh-web:session-repro"
+  ],
+  "releaseErrors": []
+ },
+ "sameIdAfter": {
+  "before": [
+   "82396",
+   "dsh-web:session-repro"
+  ],
+  "inspect": 0,
+  "inspectOut": "watch",
+  "acquire": 0,
+  "stderr": "",
+  "pair": [
+   "82396",
+   "dsh-web:session-repro"
+  ]
+ },
+ "differentSessionAfter": {
+  "status": 1,
+  "stderr": "error: another live firstmate session holds the lock (pid 82396, session dsh-web:session-repro); operate read-only until resolved",
+  "pair": [
+   "82396",
+   "dsh-web:session-repro"
+  ]
+ }
+}
+{
+ "case": "real-error-immutable-lock",
+ "cli": {
+  "status": 1,
+  "stderr": "rm: /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.0FsEAhWixE/cases-Qhaq5b/home-11/state/.lock: Operation not permitted",
+  "stdout": "",
+  "after": [
+   "82396",
+   null
+  ]
+ },
+ "plugin": {
+  "before": [
+   "82396",
+   "dsh-web:session-repro"
+  ],
+  "attached": [
+   "82396",
+   "dsh-web:session-repro"
+  ],
+  "after": [
+   "82396",
+   null
+  ],
+  "releaseErrors": []
+ },
+ "sameIdAfter": {
+  "before": [
+   "82396",
+   null
+  ],
+  "inspect": 4,
+  "inspectOut": "",
+  "acquire": 1,
+  "stderr": "error: another live firstmate session holds the lock (pid 82396); operate read-only until resolved",
+  "pair": [
+   "82396",
+   null
+  ]
+ },
+ "differentSessionAfter": {
+  "status": 1,
+  "stderr": "error: another live firstmate session holds the lock (pid 82396); operate read-only until resolved",
+  "pair": [
+   "82396",
+   null
+  ]
+ }
+}
+EXIT=0

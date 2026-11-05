@@ -1,0 +1,81 @@
+HEAD 92362aec4aba14641c9c027943b055d1dd8f0cc4 + test edits only (source unchanged:        0 changed lines)
+$ node tests/fm-dsh-web-lock.mjs
+ok - empty Web homes refuse missing/invalid SID or missing native shell evidence before authority publication; status remains usable
+node:fs:539
+    return binding.readFileUtf8(path, stringToFlags(options.flag));
+                   ^
+
+Error: ENOENT: no such file or directory, open '/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.mLKx0mWM4B/web-lock-FJBWpY/home/state/.lock-session'
+    at readFileSync (node:fs:539:20)
+    at file:///Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6MMSDWYRQ06VZNZ6GN9Z029/tests/fm-dsh-web-lock.mjs:105:45
+    at ModuleJob.run (node:internal/modules/esm/module_job:447:25)
+    at async node:internal/modules/esm/loader:646:26 {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.mLKx0mWM4B/web-lock-FJBWpY/home/state/.lock-session'
+}
+
+Node.js v26.4.0
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: native Web lock scenario must pass
+
+1 !== 0
+
+    at file:///Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6MMSDWYRQ06VZNZ6GN9Z029/tests/fm-dsh-web-lock.mjs:26:12
+    at ModuleJob.run (node:internal/modules/esm/module_job:447:25)
+    at async node:internal/modules/esm/loader:646:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 1,
+  expected: 0,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.4.0
+EXIT=1
+$ node tests/fm-dsh-primary-web.mjs
+ok - actual SDK Web config without sessionId refuses before environment mutation or legacy subscription
+node:internal/process/promises:324
+    triggerUncaughtException(err, true /* fromPromise */);
+    ^
+
+AssertionError [ERR_ASSERTION]: a real exit-1 release fault must be recorded
+    at until (file:///Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6MMSDWYRQ06VZNZ6GN9Z029/tests/fm-dsh-primary-web.mjs:32:39)
+    at async file:///Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6MMSDWYRQ06VZNZ6GN9Z029/tests/fm-dsh-primary-web.mjs:231:5 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: undefined,
+  expected: undefined,
+  operator: 'fail',
+  diff: 'simple'
+}
+
+Node.js v26.4.0
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: native Web SDK scenario must pass
+
+1 !== 0
+
+    at file:///Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6MMSDWYRQ06VZNZ6GN9Z029/tests/fm-dsh-primary-web.mjs:22:10
+    at ModuleJob.run (node:internal/modules/esm/module_job:447:25)
+    at async node:internal/modules/esm/loader:646:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 1,
+  expected: 0,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.4.0
+EXIT=1

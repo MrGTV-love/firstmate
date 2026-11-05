@@ -1,0 +1,4 @@
+head=92362aec4aba14641c9c027943b055d1dd8f0cc4
+ok - empty Web homes refuse missing/invalid SID or missing native shell evidence before authority publication; status remains usable
+ok - canonical native acquire/reconfirm/owned-release, next-primary progress, same-PID sibling/child refusal, stale-release refusal, dead old-server same-ID reclaim, closer-harness rejection, foreign owner preserved
+exit=0

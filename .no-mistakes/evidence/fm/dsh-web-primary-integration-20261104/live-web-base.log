@@ -1,0 +1,169 @@
+
+=== base: rev=01d52eaecfc9669cf1309f73d913e9f175a9e488 bin-tree=6fcc3b4c81649c58842377c15cf22cd0073ec50d dsh=0.2.1-rc.2
+registered: state/lab-probe.check.sh
+
+=== Start private web server with explicit bindings for session A and session B
+dsh web: http://127.0.0.1:61062/?token=REDACTED
+server pid=60931
+
+=== S0 attach: A is created, canonical acquire records exact native identity
+{"ok":true}
+state/.lock=[60931] state/.lock-session=[dsh-web:lab-session-a]
+PASS  A owns the exact pair (server pid + dsh-web:A)
+PASS  real watcher armed for A
+
+=== S1 control: successful owned release
+{"ok":true}
+state/.lock=[ABSENT] state/.lock-session=[ABSENT]
+PASS  successful owned release removes the pair
+PASS  successful owned release records no release-error
+
+=== S2 same-ID resume on a free lock
+{"ok":true}
+state/.lock=[60931] state/.lock-session=[dsh-web:lab-session-a]
+PASS  resumed A re-acquires the free lock
+
+=== S3 real exit-1 fault: state directory really unwritable (chmod 555), then true Agent termination
+{"ok":true}
+state/.lock=[60931] state/.lock-session=[dsh-web:lab-session-a]
+FAIL  real exit-1 fault is recorded as one release-error
+FAIL  recorded detail carries real stderr
+PASS  fault leaves the exact pair in place
+
+=== S4 adversarial: different live session B on the same server after the failed release
+{"ok":true}
+state/.lock=[60931] state/.lock-session=[dsh-web:lab-session-a]
+PASS  B does not acquire: pair is byte-identical
+B log census for Firstmate text: {}
+PASS  B session log really exists
+PASS  B gets no Firstmate follow-up
+{"ok":true}
+state/.lock=[60931] state/.lock-session=[dsh-web:lab-session-a]
+FAIL  B termination records the legitimate refusal
+PASS  the refusal changes nothing
+
+=== S5 same-ID recovery on that server; real watcher wake reaches A once
+{"ok":true}
+state/.lock=[60931] state/.lock-session=[dsh-web:lab-session-a]
+PASS  same-ID A recovers ownership on that server
+PASS  recovered A has a real armed watcher
+watcher follow-ups=1 A log census={"agent/inbox/spliced": 1, "session/title": 1, "session/title-llm-request": 1, "user/message": 1} B log census={}
+PASS  real watcher wake gave exactly one native follow-up
+PASS  that follow-up is in A session log
+PASS  sibling B session log has no such follow-up
+
+=== S6 real removal fault: state/.lock is really immutable (chflags uchg), so real rm fails
+flags: uchg
+{"ok":true}
+state/.lock=[60931] state/.lock-session=[ABSENT]
+FAIL  removal fault is recorded
+FAIL  recorded detail names the real rm error
+FAIL  sidecar stays paired with the lock
+{"ok":true}
+state/.lock=[60931] state/.lock-session=[ABSENT]
+FAIL  same ID recovers after the removal fault
+
+=== S6b real removal fault on the sidecar only: state/.lock-session is really immutable
+chflags: ~/tmp/fm-lab.HZqT6X/state/.lock-session: No such file or directory
+{"ok":true}
+state/.lock=[60931] state/.lock-session=[ABSENT]
+chflags: ~/tmp/fm-lab.HZqT6X/state/.lock-session: No such file or directory
+FAIL  sidecar removal fault is recorded
+{"ok":true}
+state/.lock=[60931] state/.lock-session=[ABSENT]
+FAIL  same ID re-acquires after the sidecar fault
+
+=== S7 adversarial: second live private server, different session C, while A still owns
+dsh web: http://127.0.0.1:61975/?token=REDACTED
+{"ok":true}
+state/.lock=[60931] state/.lock-session=[ABSENT]
+PASS  second server is refused: pair is byte-identical
+{"ok":true}
+state/.lock=[60931] state/.lock-session=[ABSENT]
+FAIL  second server termination is a recorded refusal, pair unchanged
+
+=== S8 final successful owned release after the faults
+{"ok":true}
+state/.lock=[60931] state/.lock-session=[ABSENT]
+FAIL  owned release still removes the pair after the faults
+PASS  owned release adds no release-error
+
+=== S9 server death: same-ID reclaims a dead recorded server pid on restart
+{"ok":true}
+state/.lock=[60931] state/.lock-session=[ABSENT]
+~/.no-mistakes/evidence/01M6MMSDWYRQ06VZNZ6GN9Z029/live-web-run.sh: line 144: 60931 Killed: 9               ( cd "$HOME_LAB" && exec env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE -u FM_PROJECTS_OVERRIDE -u CLAUDECO
+state/.lock=[60931] state/.lock-session=[ABSENT]
+dsh web: http://127.0.0.1:62483/?token=REDACTED
+new server pid=78212
+{"ok":true}
+state/.lock=[78212] state/.lock-session=[dsh-web:lab-session-a]
+PASS  dead old server pid is reclaimed by same ID
+
+=== S10 plugin teardown on graceful stop never reports a failed release
+state/.lock=[78212] state/.lock-session=[dsh-web:lab-session-a]
+release-errors added=0
+PASS  graceful stop adds no release-error
+
+=== Full plugin event log
+{"event":"attached","session":"lab-session-a"}
+{"event":"acquire","code":0}
+{"event":"turnend-guard","code":2}
+{"event":"watcher-ready","arm":N}
+{"event":"disposed"}
+{"event":"turnend-guard","code":null}
+{"event":"attached","session":"lab-session-a"}
+{"event":"acquire","code":0}
+{"event":"turnend-guard","code":2}
+{"event":"watcher-ready","arm":N}
+{"event":"disposed"}
+{"event":"turnend-guard","code":null}
+{"event":"attached","session":"lab-session-b"}
+{"event":"acquire","code":1}
+{"event":"read-only","code":4}
+{"event":"disposed"}
+{"event":"attached","session":"lab-session-a"}
+{"event":"turnend-guard","code":2}
+{"event":"watcher-ready","arm":N}
+{"event":"turnend-guard","code":0}
+{"event":"watcher-close","code":0}
+{"event":"wake-delivery","rows":["1793844846\t1","1793844846\t2"]}
+{"event":"followup","kind":"watcher"}
+{"event":"turn-end","seq":17}
+{"event":"turnend-guard","code":2}
+{"event":"followup","kind":"guard"}
+{"event":"turn-end","seq":25}
+{"event":"turnend-guard","code":2}
+{"event":"disposed"}
+{"event":"attached","session":"lab-session-a"}
+{"event":"acquire","code":1}
+{"event":"read-only","code":4}
+{"event":"disposed"}
+{"event":"attached","session":"lab-session-a"}
+{"event":"acquire","code":1}
+{"event":"read-only","code":4}
+{"event":"attached","session":"lab-session-c"}
+{"event":"acquire","code":1}
+{"event":"read-only","code":4}
+{"event":"disposed"}
+{"event":"disposed"}
+{"event":"attached","session":"lab-session-a"}
+{"event":"acquire","code":1}
+{"event":"read-only","code":4}
+{"event":"attached","session":"lab-session-a"}
+{"event":"acquire","code":0}
+{"event":"turnend-guard","code":2}
+{"event":"watcher-ready","arm":N}
+{"event":"turnend-guard","code":0}
+{"event":"watcher-close","code":0}
+{"event":"wake-delivery","rows":["1793844846\t1","1793844846\t2","1793845026\t3"]}
+{"event":"followup","kind":"watcher"}
+{"event":"turn-end","seq":36}
+{"event":"turnend-guard","code":2}
+{"event":"followup","kind":"guard"}
+{"event":"turn-end","seq":44}
+{"event":"turnend-guard","code":2}
+{"event":"disposed"}
+
+=== Result: base pass=19 fail=11
+
+lab removed: home=yes lab=yes
