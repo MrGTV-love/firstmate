@@ -125,6 +125,10 @@ class Replay:
                 oldest = fields.get('oldest')
                 if oldest:
                     messages = [m for m in messages if ts_key(m.get('ts')) > ts_key(oldest)]
+                # Like Slack, both bounds are exclusive, and a page is the newest messages inside them.
+                latest = fields.get('latest')
+                if latest:
+                    messages = [m for m in messages if ts_key(m.get('ts')) < ts_key(latest)]
             else:
                 root = fields.get('ts')
                 messages = [m for m in here
@@ -135,10 +139,11 @@ class Replay:
             size = int(fields.get('limit') or 100)
             page = messages[start:start + size]
             self.log({'method': method, 'recipient': os.environ.get('FM_SLACK_DM_USER'),
-                      'channel': channel, 'thread_ts': fields.get('ts'), 'cursor': start})
-            data = {'ok': True, 'messages': page,
-                    'response_metadata': {'next_cursor': str(start + size)
-                                          if len(messages) > start + size else ''}}
+                      'channel': channel, 'thread_ts': fields.get('ts'), 'cursor': start,
+                      'oldest': fields.get('oldest'), 'latest': fields.get('latest'), 'limit': size})
+            more = len(messages) > start + size
+            data = {'ok': True, 'messages': page, 'has_more': more,
+                    'response_metadata': {'next_cursor': str(start + size) if more else ''}}
         elif method == 'chat.postMessage':
             channel = fields.get('channel')
             if channel != self.transcript.get('channel', 'D0123456789'):

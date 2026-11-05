@@ -42,10 +42,15 @@ Usage:
   fm_slack_watch_test.py drop-state-field <state.json> <field>
   fm_slack_watch_test.py state-field <state.json> <field>
   fm_slack_watch_test.py set-transcript <transcript.json> <out.json> <key> <json-value>
+  fm_slack_watch_test.py outbox-count <state.json>
+  fm_slack_watch_test.py pad-foreign <replay-state.json> <count> <ts-prefix>
+  fm_slack_watch_test.py history-calls <outbound.jsonl>
   fm_slack_watch_test.py request-lines <min-count>   (reads wake lines on stdin)
 """
 from contextlib import contextmanager
+import contextlib
 import glob
+import io
 import json
 import os
 import re
@@ -462,6 +467,21 @@ class ReplayShapeTest(unittest.TestCase):
             self.assertEqual(after('0'), ['100.000001', '10.000002', '10.000001', '9.000001'])
             self.assertEqual(ts_key('10.000001') > ts_key('9.000001'), True)
 
+    def test_history_latest_is_exclusive_and_a_page_is_the_newest_messages_inside_the_bounds(self):
+        rows = [{'ts': '%d.000001' % n, 'user': 'U0TESTOWNER', 'text': str(n)} for n in range(1, 8)]
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as directory, \
+             patch.dict(os.environ, {'FM_SLACK_DM_USER': 'U0TESTOWNER'}):
+            replay = self.replay(directory, messages=rows)
+            window = lambda **bounds: replay.call('conversations.history', channel='D0123456789', **bounds)
+            self.assertEqual([m['text'] for m in window(oldest='2.000001', latest='6.000001')['messages']],
+                             ['5', '4', '3'])
+            page = window(oldest='2.000001', latest='7.000001', limit=2)
+            self.assertEqual([m['text'] for m in page['messages']], ['6', '5'])
+            self.assertEqual((page['has_more'], bool(page['response_metadata']['next_cursor'])), (True, True))
+            whole = window(oldest='2.000001', latest='5.000001', limit=2)
+            self.assertEqual([m['text'] for m in whole['messages']], ['4', '3'])
+            self.assertEqual((whole['has_more'], whole['response_metadata']['next_cursor']), (False, ''))
+
     def test_scopes_are_enforced_only_when_the_transcript_asks(self):
         calls = (('users.info', {'user': 'U0TESTOWNER'}),
                  ('reactions.get', {'channel': 'D0123456789', 'timestamp': '10.000001'}),
@@ -723,6 +743,125 @@ class IntakeTest(unittest.TestCase):
                 self.assertEqual(line.endswith(' [cut, full text in Slack thread 200.000100]'), size > room)
                 self.assertTrue(line.startswith('check: slack request 200.000100 from U0TESTOWNER: '))
 
+    def histories(self, replay):
+        return sum(1 for e in replay.state['log'] if e['method'] == 'conversations.history')
+
+    def test_a_poll_makes_at_most_one_history_read_of_the_owner_dm_in_every_case(self):
+        with self.fixture() as (watch, replay):
+            watch.state.pop('intake_cursor')
+            self.say(replay, '200.000100', 'sent before the first upgraded poll')
+            reads = []
+            for turn in range(3):
+                if turn:
+                    watch.state = watch.load_state()
+                watch.advanced = 0
+                before = self.histories(replay)
+                watch.poll()
+                reads.append(self.histories(replay) - before)
+            # The first upgraded poll sets the starting point and takes nothing in; later polls read from it.
+            self.assertEqual(reads, [1, 1, 1])
+            self.assertEqual(watch.state['intake_cursor'], '200.000100')
+            self.assertEqual((self.acks(replay), self.wakes(watch)), ([], []))
+
+    def test_a_wait_longer_than_one_page_is_read_one_page_per_poll_oldest_first_with_none_lost(self):
+        with self.fixture(cap='50') as (watch, replay):
+            self.say(replay, '200.000001', 'the oldest request')
+            for n in range(2, 450):
+                self.say(replay, '200.%06d' % n, 'noise', user='U0STRANGER01')
+            self.say(replay, '200.000450', 'the newest request')
+            self.assertGreater(len([m for m in replay.state['messages'] if m['ts'].startswith('200.')]), plane.REQUEST_PAGE)
+            order, reads = [], []
+            for _ in range(10):
+                watch.output, watch.state['outbox'], watch.advanced = [], [], 0
+                before = self.histories(replay)
+                watch.poll()
+                reads.append(self.histories(replay) - before)
+                order += [line.split()[3] for line in self.wakes(watch)]
+                watch.state = watch.load_state()
+            self.assertTrue(all(count <= 1 for count in reads), reads)
+            self.assertEqual(order, ['200.000001', '200.000450'])
+            self.assertEqual(sorted(self.acks(replay)), order)
+            self.assertEqual(watch.state['intake_cursor'], '200.000450')
+            self.assertNotIn('intake_bound', watch.state)
+            self.assertEqual(watch.state['pending'], [])
+
+    def test_a_long_wait_walks_down_with_a_bound_and_never_skips_a_request_at_the_bottom(self):
+        with self.fixture() as (watch, replay):
+            self.say(replay, '150.000001', 'the oldest request')
+            for n in range(1, 2 * plane.REQUEST_PAGE + 1):
+                self.say(replay, '200.%06d' % n, 'noise', user='U0STRANGER01')
+            reads = lambda: [e for e in replay.state['log'] if e['method'] == 'conversations.history']
+            watch.poll()
+            # Slack lists newest first: the page holds only the newest part of the wait, so nothing is taken in yet.
+            self.assertEqual((self.acks(replay), self.wakes(watch)), ([], []))
+            saved = watch.load_state()
+            self.assertEqual((saved['intake_cursor'], saved['intake_bound']), ('100.000100', '200.%06d' % (plane.REQUEST_PAGE + 1)))
+            self.assertEqual((reads()[-1]['oldest'], reads()[-1]['latest']), ('100.000100', None))
+            watch.state, watch.advanced = saved, 0
+            watch.poll()
+            # The next poll looks below the page it already read, still with one read.
+            self.assertEqual((reads()[-1]['oldest'], reads()[-1]['latest']),
+                             ('100.000100', '200.%06d' % (plane.REQUEST_PAGE + 1)))
+            self.assertEqual(len(reads()), 3)
+
+    def test_a_request_is_neither_acknowledged_nor_woken_while_the_source_is_unbound(self):
+        with self.fixture() as (watch, replay):
+            self.say(replay, '200.000100', 'recover this request')
+            with patch.object(watch, 'bound', return_value=None):
+                watch.take_requests(20)
+            self.assertEqual((self.acks(replay), self.wakes(watch)), ([], []))
+            saved = watch.load_state()
+            self.assertEqual([row['thread'] for row in saved['pending']], ['200.000100'])
+            self.assertEqual(saved['intake_cursor'], '200.000100')
+            watch.resume()
+            self.assertEqual(self.acks(replay), ['200.000100'])
+            self.assertEqual([line.split()[3] for line in self.wakes(watch)], ['200.000100'])
+            watch.resume()
+            self.assertEqual((self.acks(replay), len(self.wakes(watch)), watch.state['pending']),
+                             (['200.000100'], 1, []))
+
+    def test_a_queued_request_line_stays_in_the_journal_while_the_source_is_unbound(self):
+        request = plane.request_line('200.000100', self.OWNER, 'recover this request')
+        other = 'check: slack 900.000001 - reply for a replaced hold: some-key'
+        for command in ('poll', 'check'):
+            with self.subTest(command=command), self.fixture() as (watch, replay):
+                watch.output = [request, other]
+                watch.state['outbox'] = list(watch.output)
+                watch.commit()
+                printed = io.StringIO()
+                with patch.object(watch, 'bound', return_value=None), contextlib.redirect_stdout(printed):
+                    plane.emit(watch, command)
+                self.assertNotIn('check: slack request', printed.getvalue())
+                self.assertIn(other, printed.getvalue())
+                self.assertEqual(watch.load_state()['outbox'], [request])
+                printed = io.StringIO()
+                with contextlib.redirect_stdout(printed):
+                    plane.emit(watch, command)
+                self.assertEqual(printed.getvalue().count('check: slack request 200.000100'), 1)
+                self.assertEqual(watch.load_state()['outbox'], [])
+
+    def test_a_request_path_runs_only_the_binding_check_and_hands_it_nothing_from_the_message(self):
+        calls = []
+        def record(*argv, **kwargs):
+            calls.append(argv)
+            return type('Result', (), {'returncode': 0, 'stdout': 'slack-dm\n', 'stderr': ''})()
+        with self.fixture() as (watch, replay):
+            self.say(replay, '200.000100', 'secret words 12345')
+            with patch.object(watch, 'bound', wraps=Watch.bound.__get__(watch)), \
+                 patch.object(plane, 'run', side_effect=record):
+                watch.take_requests(20)
+            self.assertEqual(self.acks(replay), ['200.000100'])
+            self.assertEqual(calls, [('fm-captain-hold.sh', 'binding', plane.SOURCE)])
+
+    def test_retarget_drops_the_old_dms_walk_bound_with_its_cursor(self):
+        with self.fixture() as (watch, replay):
+            watch.state['intake_bound'] = '200.000100'
+            watch.commit()
+            with patch.dict(os.environ, {'FM_SLACK_DM_USER': 'U0OTHEROWNER1'}):
+                self.assertTrue(watch.retarget())
+            saved = watch.load_state()
+            self.assertEqual(('intake_cursor' in saved, 'intake_bound' in saved), (False, False))
+
     def test_a_removed_allowlist_member_loses_the_pending_request(self):
         with self.fixture() as (watch, replay):
             self.say(replay, '200.000100', 'hello')
@@ -912,6 +1051,14 @@ def main(argv):
     elif command == 'distinct-texts':
         rows = [json.loads(line) for line in open(argv[1])]
         print(len({row.get('text') for row in rows if row.get('method') == argv[2]}))
+    elif command == 'outbox-count':
+        print(len(json.load(open(argv[1])).get('outbox', [])))
+    elif command == 'pad-foreign':
+        edit(argv[1], lambda data: data['messages'].extend(
+            {'ts': '%s.%06d' % (argv[3], n), 'user': 'U0STRANGER01', 'text': 'noise %d' % n}
+            for n in range(1, int(argv[2]) + 1)))
+    elif command == 'history-calls':
+        print(sum(1 for line in open(argv[1]) if json.loads(line).get('method') == 'conversations.history'))
     elif command == 'drop-state-field':
         edit(argv[1], lambda data: data.pop(argv[2], None))
     elif command == 'state-field':
