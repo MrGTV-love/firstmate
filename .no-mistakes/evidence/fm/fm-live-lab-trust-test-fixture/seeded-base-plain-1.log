@@ -1,0 +1,3 @@
+ok - up re-registers primary trust after a concurrent Claude write
+driver finished cleanly
+exit=0 elapsed=14s

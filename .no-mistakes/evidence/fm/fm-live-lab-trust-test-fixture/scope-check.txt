@@ -1,0 +1,7 @@
+== diff --stat 37a733cb..3fe2ac82
+ tests/fm-live-lab.test.sh | 31 +++++++++++++++++++++++++++----
+ 1 file changed, 27 insertions(+), 4 deletions(-)
+== blob ids base vs head
+bin/fm-live-lab.sh base=6e743eaca46ad69e038456a58681c4bf4404adc9 head=6e743eaca46ad69e038456a58681c4bf4404adc9
+bin/fm-claude-trust.sh base=d5212aa0667ffefbd74385f6e7c31deb1502f69d head=d5212aa0667ffefbd74385f6e7c31deb1502f69d
+bin/fm-proc-budget.sh base=4b503db7899d383410b071d5528cb39dce1b5f32 head=4b503db7899d383410b071d5528cb39dce1b5f32

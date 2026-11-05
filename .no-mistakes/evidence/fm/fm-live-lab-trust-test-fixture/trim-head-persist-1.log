@@ -1,0 +1,10 @@
+not ok - up refused before primary launch (missing: 'primary: claude')
+--- output ---
+lab: /Users/charlesabrooker/tmp/fm-live-lab.qr0JZR/up-lab (tear down with: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6PS1067FR01RCW4S4F76FN1/bin/fm-live-lab.sh down /Users/charlesabrooker/tmp/fm-live-lab.qr0JZR/up-lab)
+tree: 793e3a4c40a9d7dacdfe27139b278ac31479e271 from /Users/charlesabrooker/tmp/fm-live-lab.qr0JZR/up-source
+fm-live-lab: the lab home's Claude trust keeps disappearing from /Users/charlesabrooker/tmp/fm-live-lab.qr0JZR/fakehome/.claude.json
+rival trust case up output:
+lab: /Users/charlesabrooker/tmp/fm-live-lab.qr0JZR/up-lab (tear down with: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6PS1067FR01RCW4S4F76FN1/bin/fm-live-lab.sh down /Users/charlesabrooker/tmp/fm-live-lab.qr0JZR/up-lab)
+tree: 793e3a4c40a9d7dacdfe27139b278ac31479e271 from /Users/charlesabrooker/tmp/fm-live-lab.qr0JZR/up-source
+fm-live-lab: the lab home's Claude trust keeps disappearing from /Users/charlesabrooker/tmp/fm-live-lab.qr0JZR/fakehome/.claude.json
+exit=1 elapsed=7s

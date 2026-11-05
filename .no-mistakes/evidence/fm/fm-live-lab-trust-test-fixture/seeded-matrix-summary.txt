@@ -1,0 +1,14 @@
+base-slow #1 exit=1
+base-slow #2 exit=0
+base-slow #3 exit=1
+base-plain #1 exit=0
+base-plain #2 exit=0
+head-plain #1 exit=0
+head-plain #2 exit=0
+head-slow #1 exit=0
+head-slow #2 exit=0
+head-persist #1 exit=1
+base-persist #1 exit=1
+head-postlaunch #1 exit=1
+base-postlaunch #1 exit=1
+MATRIX-DONE

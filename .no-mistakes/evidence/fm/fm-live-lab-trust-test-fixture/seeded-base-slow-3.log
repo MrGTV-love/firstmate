@@ -1,0 +1,2 @@
+not ok - primary launched trusted after the rival write (expected 'present', got 'absent')
+exit=1 elapsed=15s

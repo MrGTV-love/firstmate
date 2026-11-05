@@ -1,0 +1,29 @@
+== variant base-delay25 (diff vs unmodified base test, fixtures path made absolute)
+724c724
+<   sleep 0.5
+---
+>   sleep 2.5
+== variant head-delay25 (diff vs unmodified head test, fixtures path made absolute)
+742c742
+<   sleep 0.5
+---
+>   sleep 2.5
+== variant base-refusal (diff vs unmodified base test, fixtures path made absolute)
+717a718,723
+> cat > "$FAKEBIN/tmux" <<SH
+> #!/usr/bin/env bash
+> for a in "\$@"; do [ "\$a" = new-session ] && { echo "forced pre-launch refusal: tmux new-session blocked" >&2; exit 1; }; done
+> exec "$(command -v tmux)" "\$@"
+> SH
+> chmod +x "$FAKEBIN/tmux"
+== variant head-refusal (diff vs unmodified head test, fixtures path made absolute)
+720a721,726
+> cat > "$FAKEBIN/tmux" <<SH
+> #!/usr/bin/env bash
+> for a in "\$@"; do [ "\$a" = new-session ] && { echo "forced pre-launch refusal: tmux new-session blocked" >&2; exit 1; }; done
+> exec "$(command -v tmux)" "\$@"
+> SH
+> chmod +x "$FAKEBIN/tmux"
+== variant head-untrusted-launch (diff vs unmodified head test, fixtures path made absolute)
+718a719
+> printf "#!/usr/bin/env bash\necho absent > \"\$FM_HOME/../claude-launch-trust\"\n: > \"\$FM_HOME/state/.session-start-complete\"\nexec sleep 45 >/dev/null 2>&1\n" > "$FAKEBIN/claude"

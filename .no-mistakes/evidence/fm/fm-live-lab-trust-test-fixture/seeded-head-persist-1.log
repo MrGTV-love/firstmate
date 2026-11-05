@@ -1,0 +1,10 @@
+not ok - up refused before primary launch (missing: 'primary: claude')
+--- output ---
+lab: /Users/charlesabrooker/tmp/fm-live-lab.iCuyep/up-lab (tear down with: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6PS1067FR01RCW4S4F76FN1/bin/fm-live-lab.sh down /Users/charlesabrooker/tmp/fm-live-lab.iCuyep/up-lab)
+tree: 056760b10d09502cca4810acfe948da406b00622 from /Users/charlesabrooker/tmp/fm-live-lab.iCuyep/up-source
+fm-live-lab: the lab home's Claude trust keeps disappearing from /Users/charlesabrooker/tmp/fm-live-lab.iCuyep/fakehome/.claude.json
+rival trust case up output:
+lab: /Users/charlesabrooker/tmp/fm-live-lab.iCuyep/up-lab (tear down with: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6PS1067FR01RCW4S4F76FN1/bin/fm-live-lab.sh down /Users/charlesabrooker/tmp/fm-live-lab.iCuyep/up-lab)
+tree: 056760b10d09502cca4810acfe948da406b00622 from /Users/charlesabrooker/tmp/fm-live-lab.iCuyep/up-source
+fm-live-lab: the lab home's Claude trust keeps disappearing from /Users/charlesabrooker/tmp/fm-live-lab.iCuyep/fakehome/.claude.json
+exit=1 elapsed=7s

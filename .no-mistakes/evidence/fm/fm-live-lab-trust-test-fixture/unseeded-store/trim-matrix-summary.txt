@@ -1,0 +1,17 @@
+head-plain #1 exit=0
+head-plain #2 exit=0
+head-plain #3 exit=0
+head-plain #4 exit=0
+head-plain #5 exit=0
+head-slow #1 exit=0
+head-slow #2 exit=0
+head-slow #3 exit=0
+head-slow #4 exit=0
+head-slow #5 exit=0
+base-slow #1 exit=1
+base-slow #2 exit=1
+base-slow #3 exit=1
+base-plain #1 exit=1
+base-plain #2 exit=1
+base-plain #3 exit=1
+head-persist #1 exit=1

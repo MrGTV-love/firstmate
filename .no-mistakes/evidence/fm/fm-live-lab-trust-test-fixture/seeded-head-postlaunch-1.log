@@ -1,0 +1,14 @@
+not ok - primary launched trusted after the rival write (expected 'present', got 'absent')
+rival trust case up output:
+lab: /Users/charlesabrooker/tmp/fm-live-lab.lfXLEL/up-lab (tear down with: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6PS1067FR01RCW4S4F76FN1/bin/fm-live-lab.sh down /Users/charlesabrooker/tmp/fm-live-lab.lfXLEL/up-lab)
+tree: c42a066482200996cc7b5e8b1ef45e01e5d27710 from /Users/charlesabrooker/tmp/fm-live-lab.lfXLEL/up-source
+primary: claude --setting-sources project,local --model sonnet --effort medium --permission-mode auto
+fail primary: the lab session lock names no live process (session start has not run)
+fail probe: no LABREADY-21b2c6a0ad2b reply in window main (model refused, turn still running, or a dialog is open)
+fail trust: /Users/charlesabrooker/tmp/fm-live-lab.lfXLEL/up-lab/home has no registered Claude workspace trust
+fail mirror: fm-host-mirror.sh check exited 1 
+ok host: skipped (empty fleet arms no supervision)
+ok watcher: skipped (empty fleet)
+ok treehouse: ~/.treehouse unchanged
+not ready after 1s; the lab is left up for inspection: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6PS1067FR01RCW4S4F76FN1/bin/fm-live-lab.sh pane /Users/charlesabrooker/tmp/fm-live-lab.lfXLEL/up-lab, then /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6PS1067FR01RCW4S4F76FN1/bin/fm-live-lab.sh down /Users/charlesabrooker/tmp/fm-live-lab.lfXLEL/up-lab
+exit=1 elapsed=20s
