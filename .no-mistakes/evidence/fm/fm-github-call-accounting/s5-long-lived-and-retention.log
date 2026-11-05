@@ -1,0 +1,40 @@
+# S5 long-lived caller across 48 h: real owner, real ps, real child process; only the wall clock is shifted by a test wrapper. head 25157f9bb57bc92754832ae9f69e8e570d814fff
+--- wait for a quota tick so the owner prunes at offset 172801
+/tmp/fm-gha-scn.BeXqwf/fix/gh: line 2: 95152 Terminated: 15          sleep "${FIX_SLEEP:-4}"
+owner exit=0
+--- every retained record for that caller, offsets from run start
+process observed_at+86404 first_observed_at+2 epoch 2 argv ['sh', 'gh', 'api', 'graphql', '--field', '[REDACTED]'] ancestors 5
+process observed_at+172805 first_observed_at+2 epoch 2 argv ['sh', 'gh', 'api', 'graphql', '--field', '[REDACTED]'] ancestors 5
+process_end observed_at+172822  epoch 2 argv None ancestors 0
+kinds {'owner': 1, 'process': 15, 'process_end': 14, 'quota': 1, 'sampling': 2}
+oldest_any+86404 newest_any+172853
+--- advance beyond end+48 h, real prune
+{"removed": 33}
+rows left 0 caller rows left 0
+/tmp/fm-gha-scn.BeXqwf/L/home/state:
+github-accounting
+unrelated-sentinel
+
+/tmp/fm-gha-scn.BeXqwf/L/home/state/github-accounting:
+observations.sqlite
+owner.lock
+unrelated-sentinel
+keep
+keep
+secret in db bytes: 0
+
+# S5b survivor at a 48 h normal stop: fresh row, no end row
+owner exit=0
+process observed_at+172804 first_observed_at+1 epoch 2 argv ['sh', 'gh', '[REDACTED]'] ancestors 5
+process observed_at+172820 first_observed_at+1 epoch 2 argv ['sh', 'gh', '[REDACTED]'] ancestors 5
+kinds {'owner': 1, 'process': 19, 'process_end': 17, 'quota': 1, 'sampling': 2}
+oldest_any+172804 newest_any+172820
+/tmp/fm-gha-scn.BeXqwf/fix/gh: line 2: 23065 Terminated: 15          sleep "${FIX_SLEEP:-4}"
+
+# S5c seeded owner rows, real prune, real clock
+
+# S5c seeded owner-format rows either side of the 48 h cutoff, real prune, real clock
+{"removed": 0}
+before ['older-than-48h', 'old-unended', 'old-ended-first', 'old-ended-latest', 'other-epoch-not-kept', 'newer-than-48h', 'end-in-window']
+{"removed": 4}
+after ['old-ended-latest', 'newer-than-48h', 'end-in-window']

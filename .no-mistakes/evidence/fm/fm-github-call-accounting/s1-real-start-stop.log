@@ -1,0 +1,57 @@
+# S1 real start/status/records against real gh-axi (PATH=/opt/homebrew/bin/gh-axi) and real ps; home=/Users/charlesabrooker/tmp/fm-lab.nhvnrY; head=25157f9bb57bc92754832ae9f69e8e570d814fff
+$ fm-github-accounting.py status
+{"state": "stopped"}
+[exit=0]
+$ fm-github-accounting.py start
+{"state": "running", "pid": 5457, "run_id": "97ee3c9f20064051b362931d624141d4", "started_at": 1793858838.072472}
+[exit=0]
+$ fm-github-accounting.py status
+{"state": "running", "pid": 5457, "run_id": "97ee3c9f20064051b362931d624141d4", "started_at": 1793858838.072472}
+[exit=0]
+$ fm-github-accounting.py start
+{"state": "running", "pid": 5457, "run_id": "97ee3c9f20064051b362931d624141d4", "started_at": 1793858838.072472}
+[exit=0]
+$ fm-github-accounting.py run --duration 1
+fm-github-accounting: busy (owner lock held); retry
+[exit=75]
+$ fm-github-accounting.py records
+fm-github-accounting: busy (owner lock held); retry
+[exit=75]
+$ fm-github-accounting.py prune
+fm-github-accounting: busy (owner lock held); retry
+[exit=75]
+--- waiting for two 15 s quota ticks
+$ fm-github-accounting.py stop
+{"state": "stopped"}
+[exit=0]
+$ fm-github-accounting.py status
+{"state": "stopped"}
+[exit=0]
+$ fm-github-accounting.py records --kind quota
+{"endpoint": "rate_limit", "exit_code": 0, "graphql": {"limit": 5000, "remaining": 4885, "reset": 1793862131, "used": 115}, "host": "github.com", "kind": "quota", "observed_at": 1793858838.704087, "request_pid": 5581, "request_started_at": 1793858838.076573, "run_id": "97ee3c9f20064051b362931d624141d4", "source": "REST rate_limit resources.graphql", "status": "observed"}
+{"endpoint": "rate_limit", "exit_code": 0, "graphql": {"limit": 5000, "remaining": 4882, "reset": 1793862131, "used": 118}, "host": "github.com", "kind": "quota", "observed_at": 1793858853.76515, "request_pid": 24421, "request_started_at": 1793858853.242429, "run_id": "97ee3c9f20064051b362931d624141d4", "source": "REST rate_limit resources.graphql", "status": "observed"}
+[exit=0]
+$ fm-github-accounting.py records --kind owner
+{"action": "start", "kind": "owner", "observed_at": 1793858838.072633, "pid": 5457, "process_interval": 0.2, "quota_interval": 15.0, "run_id": "97ee3c9f20064051b362931d624141d4", "started_at": 1793858838.072472, "state": "running"}
+{"action": "stop", "kind": "owner", "observed_at": 1793858857.458538, "run_id": "97ee3c9f20064051b362931d624141d4"}
+[exit=0]
+$ fm-github-accounting.py records --kind sampling
+{"failures": 0, "kind": "sampling", "max_gap_seconds": 0.0, "observed_at": 1793858838.0735092, "process_interval": 0.2, "run_id": "97ee3c9f20064051b362931d624141d4", "scans": 1}
+{"failures": 0, "kind": "sampling", "max_gap_seconds": 0.350024624960497, "observed_at": 1793858853.238382, "process_interval": 0.2, "run_id": "97ee3c9f20064051b362931d624141d4", "scans": 46}
+{"failures": 0, "kind": "sampling", "max_gap_seconds": 0.34997891704551876, "observed_at": 1793858857.457786, "process_interval": 0.2, "run_id": "97ee3c9f20064051b362931d624141d4", "scans": 12}
+[exit=0]
+--- caller and process rows from background gh-axi seen by the real table:
+$ fm-github-accounting.py records --kind process
+{"ancestor_end": "root", "ancestors": [{"argv": ["bash", "fm-gh-rest.sh", "[REDACTED]", "[REDACTED]", "--paginate", "[REDACTED]"], "pid": 4535, "ppid": 4387, "start": "Thu Nov 5 00:07:17 2026"}, {"argv": ["bash", "fm-gh-rest.sh", "[REDACTED]", "[REDACTED]", "--paginate", "[REDACTED]"], "pid": 4387, "ppid": 4250, "start": "Thu Nov 5 00:07:17 2026"}, {"argv": ["python3", "fm-duration.py", "[REDACTED
+{"ancestor_end": "root", "ancestors": [{"argv": ["python3", "fm-github-accounting.py", "[REDACTED]", "[REDACTED]", "[REDACTED]"], "pid": 5457, "ppid": 1, "start": "Thu Nov 5 00:07:18 2026"}, {"argv": ["launchd"], "pid": 1, "ppid": 0, "start": "Tue Oct 20 14:29:12 2026"}], "argv": ["node", "gh-axi", "api", "rate_limit", "--jq", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "
+{"ancestor_end": "root", "ancestors": [{"argv": ["node", "gh-axi", "api", "rate_limit", "--jq", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "--full"], "pid": 5581, "ppid": 5457, "start": "Thu Nov 5 00:07:18 2026"}, {"argv": ["python3", "fm-github-accounting.py", "[REDACTED]", "[REDACTED]", "[REDACTED]"], "pid": 5457, "ppid": 1, "start": "Thu Nov 5 00:07:18 2
+{"ancestor_end": "root", "ancestors": [{"argv": ["python3", "fm-github-accounting.py", "[REDACTED]", "[REDACTED]", "[REDACTED]"], "pid": 5851, "ppid": 1, "start": "Thu Nov 5 00:07:18 2026"}, {"argv": ["launchd"], "pid": 1, "ppid": 0, "start": "Tue Oct 20 14:29:12 2026"}], "argv": ["sh", "gh-axi", "api", "rate_limit", "--jq", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[R
+{"ancestor_end": "root", "ancestors": [{"argv": ["python3", "fm-duration.py", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "[REDACTED]", "--json", "[REDACTED]"], "pid": 6473, "ppid": 88893, "start": "Thu Nov 5 00:07:18 2026"}, {"argv": ["bash", "fm-contributions.sh", "[REDACTED]"], "pid": 88893, "ppid": 88602, "start"
+total 1680
+drwx------@ 7 charlesabrooker  staff     224 Nov  5 00:07 .
+drwxr-xr-x@ 4 charlesabrooker  staff     128 Nov  5 00:07 ..
+-rw-------@ 1 charlesabrooker  staff  798720 Nov  5 00:07 observations.sqlite
+-rw-------@ 1 charlesabrooker  staff     112 Nov  5 00:07 owner.lock
+-rw-------@ 1 charlesabrooker  staff       0 Nov  5 00:07 owner.log
+-rw-------@ 1 charlesabrooker  staff       0 Nov  5 00:07 start.lock
+-rw-------@ 1 charlesabrooker  staff      32 Nov  5 00:07 stop

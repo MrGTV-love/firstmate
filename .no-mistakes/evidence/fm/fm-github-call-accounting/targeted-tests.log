@@ -1,26 +1,66 @@
-ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6HY67SMDHG0CZE4NE696MQG/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
-FM_TEST_BEGIN 2026-11-04T00:15:15Z tests/fm-watch-github-accounting.test.sh family=watcher-wake-lock expected_gate_skip=none
-FM_TEST_BEGIN 2026-11-04T00:15:15Z tests/fm-watch-checkpoint.test.sh family=watcher-wake-lock expected_gate_skip=none
-ok - quiet checkpoint exits 124 with a clean checkpoint line and no live lock
-ok - Perl fallback honors the cleanup bound before escalating an INT-ignoring direct watcher
-ok - an unusable Perl falls back to timeout or gtimeout and still runs the watcher
-ok - a checkpoint restores ignored INT before launching its watcher
-ok - a checkpoint launches its watcher from a code root whose path holds a space
-ok - a cancelled checkpoint forwards the cancel so its watcher releases the lock
-# group-kill ordinary stop_ms=417
-ok - a group-killed checkpoint still stops its watcher and frees the next checkpoint
-# group-kill delayed stop_ms=393
-ok - a group-killed checkpoint still stops a bound child that was slow to make its process group
-ok - an announced recovery is not reannounced by the next foreground checkpoint
+head=25157f9bb57bc92754832ae9f69e8e570d814fff
+=== tests/fm-github-accounting.test.sh
+FM_TEST_BEGIN 2026-11-05T06:07:11Z tests/fm-github-accounting.test.sh family=unclassified expected_gate_skip=none
+...........................
+----------------------------------------------------------------------
+Ran 27 tests in 55.954s
+
+OK
+ok - GitHub accounting observer behavior
+FM_TEST_END 2026-11-05T06:08:09Z tests/fm-github-accounting.test.sh exit=0 duration_ms=57505 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6N4MXKXQMT0EH35VGX9XY15/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=58824
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=57505 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-github-accounting.test.sh duration_ms=57505
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6N4MXKXQMT0EH35VGX9XY15/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+exit=
+=== tests/fm-watch-github-accounting.test.sh
+FM_TEST_BEGIN 2026-11-05T06:08:10Z tests/fm-watch-github-accounting.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - a cycle starts an absent owner, leaves a running one alone, and recovers a crash
+ok - a failed start wakes once, retries only on the long interval, and clears on success
+ok - a busy start retries at the next cycle with no wake, no hold, and no marker change
+ok - a real lock holder reads as busy, and the next cycle starts the owner once it is free
+ok - a real failed start is reported and its stderr reaches the bounded log
+ok - a secondmate home, a lab home, and FM_GITHUB_ACCOUNTING=0 never start the owner
+ok - a start still running is never doubled, and the poll keeps running
+FM_TEST_END 2026-11-05T06:09:25Z tests/fm-watch-github-accounting.test.sh exit=0 duration_ms=74929 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6N4MXKXQMT0EH35VGX9XY15/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=76068
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=74929 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watch-github-accounting.test.sh duration_ms=74929
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6N4MXKXQMT0EH35VGX9XY15/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+exit=
+=== tests/fm-test-fixture-cleanup.test.sh
+FM_TEST_BEGIN 2026-11-05T06:09:27Z tests/fm-test-fixture-cleanup.test.sh family=standalone expected_gate_skip=none
+ok - fm_test_tmproot cleans up its fixture root on normal exit
+ok - fm_test_tmproot cleans up its fixture root on SIGTERM
+ok - the cleanup registry cannot be injected through path precreation
+ok - failed fixture registration rolls back the new root
+ok - the orphan sweep reaps only old fixtures without a live owner
+ok - the orphan sweep reaps read-only package fixtures
+ok - test registries and fixture roots stay out of a git worktree TMPDIR
+ok - the stub reap continues past a stub that exits after the alive check
+ok - a failed group read signals only the PID
+ok - the stub reap reports a live stub with an unknown group after the loop
+ok - cleanup finishes under set -e when a stub exits after the alive check
+ok - signal cleanup finishes under set -e and reports a reap failure
+FM_TEST_END 2026-11-05T06:09:35Z tests/fm-test-fixture-cleanup.test.sh exit=0 duration_ms=8385 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6N4MXKXQMT0EH35VGX9XY15/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=9386
+FM_TEST_SUMMARY_FAMILY family=standalone count=1 duration_ms=8385 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-test-fixture-cleanup.test.sh duration_ms=8385
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6N4MXKXQMT0EH35VGX9XY15/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+exit=
+=== tests/fm-watch-checkpoint.test.sh
 ok - a never-announced recovery still surfaces once from a foreground checkpoint
 ok - a queue append during a foreground checkpoint still resurfaces
-WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 78418.1793751343.lkYnqH
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 89185.1793859002.aAmeUs
 ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ●  WATCHER DOWN - SUPERVISION IS OFF
 ●  Unread wake(s) queued, but no live watcher process holds this home lock (last beat: 3s ago).
 ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
 ●  This is a supervision warning only; the guarded operation WILL still run.
-●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-test-run.crH7vu/w2/tmp/fm-wake-tangle-root.uUlxRI/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-wake-tangle-root.7MQ51Z/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
 ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
 ok - checkpoint passes through a real watcher wake and leaves the queue for drain
@@ -31,24 +71,15 @@ ok - checkpoint: an opted-in home runs the host for the checkpoint's bound, rais
 ok - checkpoint: a handed-back wake passes through, and a host stand-down or signal death is a failure
 ok - checkpoint: a Codex home without config/supervision-host, or with an off file, never runs the host
 ok - checkpoint: the real host ends its park at the checkpoint bound as a quiet checkpoint
-FM_TEST_END 2026-11-04T00:16:19Z tests/fm-watch-checkpoint.test.sh exit=0 duration_ms=63569 gate_skip=false
-ok - a cycle starts an absent owner, leaves a running one alone, and recovers a crash
-ok - a failed start wakes once, retries only on the long interval, and clears on success
-ok - a busy start retries at the next cycle with no wake, no hold, and no marker change
-ok - a real lock holder reads as busy, and the next cycle starts the owner once it is free
-ok - a real failed start is reported and its stderr reaches the bounded log
-ok - a secondmate home, a lab home, and FM_GITHUB_ACCOUNTING=0 never start the owner
-ok - a start still running is never doubled, and the poll keeps running
-FM_TEST_END 2026-11-04T00:16:28Z tests/fm-watch-github-accounting.test.sh exit=0 duration_ms=72204 gate_skip=false
-FM_TEST_BEGIN 2026-11-04T00:16:28Z tests/fm-github-accounting.test.sh family=unclassified expected_gate_skip=none
-.....................
-----------------------------------------------------------------------
-Ran 21 tests in 43.952s
-
-OK
-ok - GitHub accounting observer behavior
-FM_TEST_END 2026-11-04T00:17:13Z tests/fm-github-accounting.test.sh exit=0 duration_ms=44787 gate_skip=false
-FM_TEST_BEGIN 2026-11-04T00:17:13Z tests/fm-spawn-acquisition-cleanup.test.sh family=backend-dispatch expected_gate_skip=none
+FM_TEST_END 2026-11-05T06:10:34Z tests/fm-watch-checkpoint.test.sh exit=0 duration_ms=57449 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6N4MXKXQMT0EH35VGX9XY15/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=58456
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=57449 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watch-checkpoint.test.sh duration_ms=57449
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6N4MXKXQMT0EH35VGX9XY15/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+exit=
+=== tests/fm-spawn-acquisition-cleanup.test.sh
+FM_TEST_BEGIN 2026-11-05T06:10:35Z tests/fm-spawn-acquisition-cleanup.test.sh family=backend-dispatch expected_gate_skip=none
 ok - tmux successful launch retains its slot
 ok - tmux slow refusal returns its slot and ends its get subshell
 ok - tmux spawning refusal returns its slot and ends its get subshell
@@ -64,13 +95,10 @@ ok - tmux provisioning runs in the acquired shell ancestry before admitting its 
 ok - tmux busy provisioning wait is bounded and stops only its own helper before restoring the copy
 ok - tmux stalled provisioning wait is bounded and stops only its own helper before restoring the copy
 ok - tmux public relaunch recovers refusal with exact scope and prepared base while preserving prior ahead work
-FM_TEST_END 2026-11-04T00:19:29Z tests/fm-spawn-acquisition-cleanup.test.sh exit=0 duration_ms=135551 gate_skip=false
-FM_TEST_SUMMARY total=4 failed=0 skipped_gate=0 duration_ms=254555
-FM_TEST_SUMMARY_FAMILY family=backend-dispatch count=1 duration_ms=135551 failed=0
-FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=44787 failed=0
-FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=2 duration_ms=135773 failed=0
-FM_TEST_SLOWEST rank=1 script=tests/fm-spawn-acquisition-cleanup.test.sh duration_ms=135551
-FM_TEST_SLOWEST rank=2 script=tests/fm-watch-github-accounting.test.sh duration_ms=72204
-FM_TEST_SLOWEST rank=3 script=tests/fm-watch-checkpoint.test.sh duration_ms=63569
-FM_TEST_SLOWEST rank=4 script=tests/fm-github-accounting.test.sh duration_ms=44787
-EXIT=0
+FM_TEST_END 2026-11-05T06:13:43Z tests/fm-spawn-acquisition-cleanup.test.sh exit=0 duration_ms=187836 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6N4MXKXQMT0EH35VGX9XY15/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=189620
+FM_TEST_SUMMARY_FAMILY family=backend-dispatch count=1 duration_ms=187836 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-spawn-acquisition-cleanup.test.sh duration_ms=187836
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6N4MXKXQMT0EH35VGX9XY15/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+exit=

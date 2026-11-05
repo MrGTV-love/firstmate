@@ -1,0 +1,40 @@
+# S7 real bin/fm-watch.sh, disposable homes, labelled fake gh-axi; memory guard seam quiet so the watcher keeps polling. head 25157f9bb57bc92754832ae9f69e8e570d814fff
+--- a) primary-shaped home
+watcher exited: check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+{"state": "running", "pid": 88484, "run_id": "105b8ccb7fce42a0926998c4c58dfcd0", "started_at": 1793859566.0699468}
+running owner left alone:
+{"state": "running", "pid": 88484, "run_id": "105b8ccb7fce42a0926998c4c58dfcd0", "started_at": 1793859566.0699468}
+kill -9 owner 88484, wait for next cycle
+watcher exited: check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+{"state": "stopped"}
+watcher stopped; owner outlives it:
+{"state": "stopped"}
+{"state": "stopped"}
+wake queue:
+1793859567	1	check	open-loop-ledger	check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+--- b) marked lab home: tick skips
+watcher exited: check: memory-health: the non-fleet RSS alarm is uncalibrated (no baseline at /Users/charlesabrooker/tmp/fm-lab.nhvnrY/state/.memory-baseline.json); admission i
+owner dir present: 0
+--- c) secondmate-marked home: tick skips
+watcher exited: check: inactive-outcome
+owner dir present: 0
+--- d) FM_GITHUB_ACCOUNTING=0: tick skips
+watcher exited: check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+owner dir present: 0
+--- e) foreign db in primary-shaped home: one wake, marker, no owner, file unchanged; relaunch does not wake again
+watcher exited: check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+wake rows: 0
+github-accounting
+foreign file unchanged
+--- f) crash recovery by watcher relaunch in the same home (the supervisor relaunches a watcher after each wake)
+{"state": "running", "pid": 73939, "run_id": "2a0b2f6b88bf47a498cbea1ef53913bf", "started_at": 1793859657.596001}
+after kill -9:
+{"state": "stopped"}
+after next watcher cycle:
+{"state": "running", "pid": 77796, "run_id": "be8b4ac3fdb24fa3b567ac0860368a4e", "started_at": 1793859664.03311}
+{"state": "stopped"}
+{"action": "start", "kind": "owner", "observed_at": 1793859566.070108, "pid": 88484, "process_interval": 0.2, "quota_int
+{"action": "start", "kind": "owner", "observed_at": 1793859657.5961442, "pid": 73939, "process_interval": 0.2, "quota_in
+{"action": "start", "kind": "owner", "observed_at": 1793859664.033262, "pid": 77796, "process_interval": 0.2, "quota_int
+{"action": "stop", "kind": "owner", "observed_at": 1793859668.2496839, "run_id": "be8b4ac3fdb24fa3b567ac0860368a4e"}
+--- note: the watcher exits on each wake by design; in these disposable homes the open-loop-ledger wake ends it in about 1 s, so the watcher's own in-cycle recovery, the one-wake failed start and busy retry are proved by tests/fm-watch-github-accounting.test.sh (targeted-tests.log).

@@ -1,0 +1,49 @@
+# S4 cold-reader attribution from public records; labelled quota fixture rises while a real fixture caller runs. head 25157f9bb57bc92754832ae9f69e8e570d814fff
+{"state": "running", "pid": 75490, "run_id": "3603963ab665439eada408eb118d7532", "started_at": 1793859320.438625}
+--- first tick is at +0, second at +15; caller B runs across +14..+18 with the fixture counter rising after +15, C starts after +32
+{"state": "stopped"}
+interval +0.0..+15.1 used 100 -> 4900 (delta 4800)
+  observed caller gh pr view [REDACTED] --repo [REDACTED] --json [REDACTED] --jq [REDACTED] | first+0.0 end+0.4 | ancestors ['no-mistakes [REDACTED]', 'launchd']
+  observed caller sh gh-axi api rate_limit --jq [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] --full | first+0.0 end+0.4 | ancestors ['python3 fm-github-accounting.py', 'launchd']
+  observed caller sh gh pr list [REDACTED] | first+0.0 end+2.3 | ancestors ['zsh -c', 'zsh -c', 'claude [REDACTED]']
+  observed caller gh pr view [REDACTED] --repo [REDACTED] --json [REDACTED] --jq [REDACTED] | first+0.4 end+1.0 | ancestors ['no-mistakes [REDACTED]', 'launchd']
+  observed caller gh pr view [REDACTED] --repo [REDACTED] --json [REDACTED] --jq [REDACTED] | first+1.0 end+1.6 | ancestors ['no-mistakes [REDACTED]', 'launchd']
+  observed caller gh api --hostname [REDACTED] [REDACTED] -f [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [
+  observed caller gh api graphql -f [REDACTED] [REDACTED] -F [REDACTED] -F [REDACTED] -F [REDACTED] --jq [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] | first+1.6 end+2.3 | a
+  observed caller gh api --hostname [REDACTED] [REDACTED] [REDACTED] [REDACTED] -f [REDACTED] -f [REDACTED] --paginate [REDACTED] | first+2.6 end+3.6 | ancestors ['no-mistakes [REDACTED]', 'launchd']
+  observed caller bash gh api -i -H [REDACTED] [REDACTED] [REDACTED] | first+3.0 end+3.3 | ancestors ['bash fm-gh-rest.sh', 'python3 fm-duration.py', 'bash fm-contributions.sh']
+  observed caller gh pr view [REDACTED] --repo [REDACTED] --json [REDACTED] --jq [REDACTED] | first+3.6 end+4.3 | ancestors ['no-mistakes [REDACTED]', 'launchd']
+  observed caller gh api graphql -f [REDACTED] [REDACTED] -F [REDACTED] -F [REDACTED] -F [REDACTED] --jq [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] | first+4.0 end+4.3 | a
+  observed caller gh [REDACTED] | first+4.3 end+4.6 | ancestors ['launchd']
+  observed caller bash gh api -i -H [REDACTED] [REDACTED] [REDACTED] | first+4.3 end+4.6 | ancestors ['bash fm-gh-rest.sh', 'bash fm-gh-rest.sh', 'python3 fm-duration.py']
+  observed caller gh api graphql -f [REDACTED] [REDACTED] -F [REDACTED] -F [REDACTED] -F [REDACTED] --jq [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] | first+5.3 end+5.8 | a
+  observed caller gh api graphql -f [REDACTED] [REDACTED] -F [REDACTED] -F [REDACTED] -F [REDACTED] --jq [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] | first+8.6 end+9.3 | a
+  observed caller gh api graphql -f [REDACTED] [REDACTED] -F [REDACTED] -F [REDACTED] -F [REDACTED] --jq [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] | first+9.6 end+9.9 | a
+  observed caller gh api -i -H [REDACTED] [REDACTED] [REDACTED] | first+11.8 end+12.5 | ancestors ['bash fm-gh-rest.sh', 'bash fm-gh-rest.sh', 'python3 fm_open_loops.py']
+  observed caller gh api -i -H [REDACTED] [REDACTED] [REDACTED] | first+13.2 end+14.5 | ancestors ['bash fm-gh-rest.sh', 'bash fm-gh-rest.sh', 'python3 fm_open_loops.py']
+  observed caller sh gh api graphql --field [REDACTED] -H [REDACTED] [REDACTED] [REDACTED] --body [REDACTED] | first+14.5 end+18.6 | ancestors ['sh parent.sh', 'sh grandparent.sh', 'zsh -c']
+  observed caller gh api -i -H [REDACTED] [REDACTED] [REDACTED] | first+14.8 end+15.1 | ancestors ['bash fm-gh-rest.sh', 'bash fm-gh-rest.sh', 'python3 fm_open_loops.py']
+interval +15.1..+30.3 used 4900 -> 5000 (delta 100)
+  observed caller sh gh api graphql --field [REDACTED] -H [REDACTED] [REDACTED] [REDACTED] --body [REDACTED] | first+14.5 end+18.6 | ancestors ['sh parent.sh', 'sh grandparent.sh', 'zsh -c']
+  observed caller gh api -i -H [REDACTED] [REDACTED] [REDACTED] | first+14.8 end+15.1 | ancestors ['bash fm-gh-rest.sh', 'bash fm-gh-rest.sh', 'python3 fm_open_loops.py']
+  observed caller gh api -i -H [REDACTED] [REDACTED] [REDACTED] | first+15.3 end+16.6 | ancestors ['bash fm-gh-rest.sh', 'bash fm-gh-rest.sh', 'python3 fm_open_loops.py']
+  observed caller gh api -i -H [REDACTED] [REDACTED] [REDACTED] | first+16.9 end+17.2 | ancestors ['bash fm-gh-rest.sh', 'bash fm-gh-rest.sh', 'python3 fm_open_loops.py']
+  observed caller gh api -i -H [REDACTED] [REDACTED] [REDACTED] | first+17.5 end+18.6 | ancestors ['bash fm-gh-rest.sh', 'bash fm-gh-rest.sh', 'python3 fm_open_loops.py']
+  observed caller bash gh api -i [REDACTED] | first+17.9 end+18.2 | ancestors ['bash fm-gh-rest.sh', 'python3 fm-duration.py', 'bash fm-contributions.sh']
+  observed caller gh api -i -H [REDACTED] [REDACTED] [REDACTED] | first+18.9 end+19.2 | ancestors ['bash fm-gh-rest.sh', 'bash fm-gh-rest.sh', 'python3 fm_open_loops.py']
+  observed caller gh api -i -H [REDACTED] [REDACTED] [REDACTED] | first+19.6 end+20.3 | ancestors ['bash fm-gh-rest.sh', 'bash fm-gh-rest.sh', 'python3 fm_open_loops.py']
+  observed caller gh api -i -H [REDACTED] [REDACTED] [REDACTED] | first+20.5 end+21.2 | ancestors ['bash fm-gh-rest.sh', 'bash fm-gh-rest.sh', 'python3 fm_open_loops.py']
+  observed caller gh auth status --hostname [REDACTED] | first+20.5 end+20.9 | ancestors ['no-mistakes [REDACTED]', 'launchd']
+  observed caller node gh-axi pr checks [REDACTED] | first+20.5 end+21.9 | ancestors ['zsh -c', 'claude [REDACTED]', 'zsh -i']
+  observed caller gh pr view [REDACTED] --json [REDACTED] | first+20.9 end+21.9 | ancestors ['node gh-axi', 'zsh -c', 'claude [REDACTED]']
+  observed caller gh pr view [REDACTED] --repo [REDACTED] --json [REDACTED] --jq [REDACTED] | first+20.9 end+21.2 | ancestors ['no-mistakes [REDACTED]', 'launchd']
+  observed caller gh api -i -H [REDACTED] [REDACTED] [REDACTED] | first+21.6 end+22.6 | ancestors ['bash fm-gh-rest.sh', 'bash fm-gh-rest.sh', 'python3 fm_open_loops.py']
+  observed caller gh api -i -H [REDACTED] [REDACTED] [REDACTED] | first+22.9 end+23.6 | ancestors ['bash fm-gh-rest.sh', 'bash fm-gh-rest.sh', 'python3 fm_open_loops.py']
+  observed caller gh api -i -H [REDACTED] [REDACTED] [REDACTED] | first+23.8 end+24.5 | ancestors ['bash fm-gh-rest.sh', 'bash fm-gh-rest.sh', 'python3 fm_open_loops.py']
+  observed caller gh api -i -H [REDACTED] [REDACTED] [REDACTED] | first+24.8 end+25.2 | ancestors ['bash fm-gh-rest.sh', 'bash fm-gh-rest.sh', 'python3 fm_open_loops.py']
+  observed caller gh api -i -H [REDACTED] [REDACTED] [REDACTED] | first+25.5 end+26.3 | ancestors ['bash fm-gh-rest.sh', 'bash fm-gh-rest.sh', 'python3 fm_open_loops.py']
+  observed caller gh api -i -H [REDACTED] [REDACTED] [REDACTED] | first+26.7 end+27.0 | ancestors ['bash fm-gh-rest.sh', 'bash fm-gh-rest.sh', 'python3 fm_open_loops.py']
+  observed caller gh api -i -H [REDACTED] [REDACTED] [REDACTED] | first+27.7 end+28.7 | ancestors ['bash fm-gh-rest.sh', 'bash fm-gh-rest.sh', 'python3 fm_open_loops.py']
+  observed caller gh api -i -H [REDACTED] [REDACTED] [REDACTED] | first+29.4 end+29.7 | ancestors ['bash fm-gh-rest.sh', 'bash fm-gh-rest.sh', 'python3 fm_open_loops.py']
+scan summaries: [(1, 0, 0.0), (46, 0, 0.35), (46, 0, 0.35), (15, 0, 0.35)]
+Temporal overlap only: this is not proof that a caller spent the points.

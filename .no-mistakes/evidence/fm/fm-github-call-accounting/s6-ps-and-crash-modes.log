@@ -1,0 +1,50 @@
+# S6 ps failure modes, real owner, labelled fake ps on PATH. head 25157f9bb57bc92754832ae9f69e8e570d814fff
+--- a) ps exits 1 on every call: quota continues, failures counted, nothing ended
+run exit=0
+sampling {'failures': 0, 'max_gap_seconds': 0.0, 'scans': 1}
+sampling {'failures': 45, 'max_gap_seconds': 0.35, 'scans': 45}
+sampling {'failures': 5, 'max_gap_seconds': 0.35, 'scans': 5}
+quota {'status': 'observed'}
+quota {'status': 'observed'}
+       0
+       0
+--- b) ps hangs quiet: owner still ticks quota; stop returns fast; no ps left
+{"state": "stopped"}
+stop took 0.55 s
+       0
+quota {'status': 'observed'}
+quota {'status': 'observed'}
+sampling {'failures': 0, 'max_gap_seconds': 0.0, 'scans': 1}
+sampling {'failures': 0, 'max_gap_seconds': 0.0, 'scans': 0}
+sampling {'failures': 0, 'max_gap_seconds': 0.0, 'scans': 0}
+--- c) real ps, then failing ps gap while a real caller stays alive, then real ps: no false end, same epoch; caller ends in a second gap, end row only at next success
+/tmp/fm-gha-scn.BeXqwf/fix/gh: line 2: 17734 Terminated: 15          sleep "${FIX_SLEEP:-4}"
+{"state": "stopped"}
+process epoch 2 observed_at-caller_kill=-5.95 first=-5.95
+process_end epoch 2 observed_at-caller_kill=2.75 
+sampling [(1, 0), (30, 16)]
+--- d) kill -9 owner with a hung gh-axi: documented limit (child survives, new owner overlaps), no stop row
+       1
+       2
+{"state": "stopped"}
+       1
+owner {'action': 'start', 'pid': 29893}
+owner {'action': 'start', 'pid': 31910}
+owner {'action': 'stop'}
+--- e) concurrent starts: one owner
+fm-github-accounting: busy (owner lock held); retry
+start6 exit=75
+fm-github-accounting: busy (owner lock held); retry
+fm-github-accounting: busy (owner lock held); retry
+fm-github-accounting: busy (owner lock held); retry
+start4 exit=75
+start3 exit=75
+start1 exit=75
+fm-github-accounting: busy (owner lock held); retry
+start5 exit=75
+{"state": "running", "pid": 35633, "run_id": "1f2e0aa1343e4599bcb18446f465b936", "started_at": 1793859442.0817258}
+start2 exit=0
+{"state": "running", "pid": 35633, "run_id": "1f2e0aa1343e4599bcb18446f465b936", "started_at": 1793859442.0817258}
+{"state": "stopped"}
+owner {'action': 'start', 'pid': 35633}
+owner {'action': 'stop'}

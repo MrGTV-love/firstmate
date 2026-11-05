@@ -1,0 +1,9 @@
+--- --help
+usage: fm-github-accounting.py [-h] [--duration DURATION] [--kind KIND]
+                               {start,run,status,stop,prune,records}
+
+Standing GitHub quota and caller observer (no caller control or attribution verdict).
+
+Usage: fm-github-accounting.py {start,run,status,stop,prune,records}
+       fm-github-accounting.py run [--duration SECONDS]
+       fm-github-accounting.py records [--kind KIND]

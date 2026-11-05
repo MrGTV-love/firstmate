@@ -1,0 +1,76 @@
+# S3 quota failure modes with the real owner; head 25157f9bb57bc92754832ae9f69e8e570d814fff
+--- a) no gh-axi on PATH (PATH=/usr/bin:/bin)
+run exit=0
+{'reason': 'command_unavailable', 'status': 'unavailable'}
+--- b) gh-axi exits 1 with a body that looks fine
+run exit=0
+{'exit_code': 1, 'graphql': {}, 'status': 'unavailable'}
+--- c) gh-axi rate-limited/garbage body
+run exit=0
+{'exit_code': 0, 'graphql': {}, 'status': 'unavailable'}
+--- d) hung gh-axi: 3 ticks stay 1 request, stop kills its group
+{"state": "running", "pid": 81848, "run_id": "72f08d762b85435db7eda43c6bf29af7", "started_at": 1793858992.912858}
+{"state": "stopped"}
+{'status': 'pending'}
+requests launched=       1
+request gone
+--- e) kill -9 owner, status + restart recovers, stale stop marker ignored
+{"state": "running", "pid": 4068, "run_id": "52a20760ab234228b685d0a08e0e9479", "started_at": 1793859011.718539}
+{"state": "stopped"}
+{"state": "running", "pid": 6352, "run_id": "674dca4f02d944d599de656c5b576a45", "started_at": 1793859013.218511}
+{"state": "running", "pid": 6352, "run_id": "674dca4f02d944d599de656c5b576a45", "started_at": 1793859013.218511}
+{"state": "stopped"}
+{"state": "running", "pid": 9290, "run_id": "ea4985e3ff9d4b0ab6f5e7efe9d120c7", "started_at": 1793859014.879849}
+{"state": "running", "pid": 9290, "run_id": "ea4985e3ff9d4b0ab6f5e7efe9d120c7", "started_at": 1793859014.879849}
+{"state": "stopped"}
+{'action': 'start'}
+{'action': 'start'}
+{'action': 'stop'}
+{'action': 'start'}
+{'action': 'stop'}
+--- f) stop on an idle home, bad args
+{"state": "stopped"}
+exit=0
+usage: fm-github-accounting.py [-h] [--duration DURATION] [--kind KIND]
+                               {start,run,status,stop,prune,records}
+fm-github-accounting.py: error: --duration must be finite, positive and used with run
+exit=2
+usage: fm-github-accounting.py [-h] [--duration DURATION] [--kind KIND]
+                               {start,run,status,stop,prune,records}
+fm-github-accounting.py: error: --kind is for records
+exit=2
+--- g) foreign db refused unchanged
+fm-github-accounting: operation unavailable (check owner status/state permissions)
+start exit=1
+fm-github-accounting: operation unavailable (check owner status/state permissions)
+run exit=1
+fm-github-accounting: operation unavailable (check owner status/state permissions)
+prune exit=1
+fm-github-accounting: operation unavailable (check owner status/state permissions)
+records exit=1
+foreign file unchanged
+{"state": "stopped"}
+--- h) nonempty non-db and symlink db refused; zero-size treated as new
+fm-github-accounting: operation unavailable (check owner status/state permissions)
+nonempty text exit=1
+keep
+fm-github-accounting: operation unavailable (check owner status/state permissions)
+symlink exit=1
+target
+{"removed": 0}
+zero-size exit=0
+zero-size records exit=0
+--- i) symlink state dir refused
+fm-github-accounting: operation unavailable (check owner status/state permissions)
+exit=1
+       0
+--- j) owner.log trim at launch
+   32768 /tmp/fm-gha-scn.BeXqwf/j/home/state/github-accounting/owner.log
+{"state": "stopped"}
+--- k) private modes
+700 /tmp/fm-gha-scn.BeXqwf/j/home/state/github-accounting
+600 /tmp/fm-gha-scn.BeXqwf/j/home/state/github-accounting/observations.sqlite
+600 /tmp/fm-gha-scn.BeXqwf/j/home/state/github-accounting/owner.lock
+600 /tmp/fm-gha-scn.BeXqwf/j/home/state/github-accounting/owner.log
+600 /tmp/fm-gha-scn.BeXqwf/j/home/state/github-accounting/start.lock
+600 /tmp/fm-gha-scn.BeXqwf/j/home/state/github-accounting/stop
