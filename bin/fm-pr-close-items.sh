@@ -9,12 +9,40 @@
 # because an item that is already done is only reported and no second proof is linked.
 #
 # What it reads. The merged pull request's body, through bin/fm-pr-closes-lib.sh, which
-# owns the `Closes: <item-id>` line syntax and the merge-train member list. A body with a
-# member list is a merge train: each member pull request is read the same way (its own
-# `Closes:` lines), and every task whose state/<task>.meta records pr= equal to that
-# member's full URL is considered too. Bodies are read from GitHub, GitLab and Forgejo,
-# each member by its own URL. The proof is always the merged pull request this script was
-# given (the train's own URL for a train), because a train's members close unmerged.
+# owns the two directive lines that close anything: `Closes-backlog-item: <item-id>` and
+# `Train-member: <pull request URL>`. Nothing else in a body closes an item: a table, a
+# heading, a bullet, a link, a sentence, a fenced example or an HTML comment (read as the
+# library header says) names nothing. Each
+# `Train-member:` pull request is read the same way (its own `Closes-backlog-item:` lines),
+# and every task whose state/<task>.meta records pr= equal to that member's full URL is
+# considered too. Bodies are read from GitHub, GitLab and Forgejo, each member by its own
+# URL. The proof is always the merged pull request this script was given (the train's own
+# URL for a train), because a train's members close unmerged. A body with no directive
+# line closes nothing, a train body written before this block existed included; its items
+# are closed by hand as before.
+# These things in a body, outside the block, are reported, never closed, on stderr behind
+# `actionable:`. The first two kinds count as left open, so they add to the summary's left
+# open count and make the exit status 3; a `mentioned ...` line changes neither:
+#   - an old `Closes: <item-id>` line is `not closed <id>`, naming the new form. It is reported
+#     only after every body and task record has been read, and only when no directive line or
+#     task record named the same id, so that source decides the item. An old line that names
+#     the merging task's own id is a stdout line instead, not counted, saying its own teardown
+#     closes it;
+#   - a column-0 line that starts with a directive word but does not fit its form, and a
+#     `Train-member:` value that is no pull request URL. A `Train-member:` line that names the
+#     merged pull request itself is ignored with its own `actionable:` line and is not counted;
+#   - in the merged pull request's body and in each train member's body that was read: an
+#     active, not-done backlog id that appears as a word in the prose is a `mentioned ...`
+#     line that says nothing was closed for it. An id is matched as spelled (a leading or
+#     trailing `_` or `-` belongs to it; only leading and trailing `.` and one matched
+#     Markdown emphasis pair, `_id_` or `__id__`, are dropped). An id
+#     a directive line, task record or old line already named gets no second line, and the
+#     merging task's own id is left out, because its teardown owns that item. A member's
+#     prose never closes anything. In the merged pull request's body only, a link in the
+#     prose to another pull request that no `Train-member:` line lists is also a
+#     `mentioned ...` line; links are read for GitHub, GitLab and Forgejo alike. The id check
+#     reads the backlog once; when the backlog cannot be listed, each body that has prose gets
+#     one `actionable:` line that names it, whether or not it holds a directive line.
 # The same read gives that pull request's merge state: when it is not merged (a hand run
 # with a pull request that is still open, or a state it cannot read), nothing is closed
 # and every named item in the active backlog that is not done yet is reported as not
@@ -30,10 +58,13 @@
 #     owner call check (a captain hold that is not released, an expired but unanswered one
 #     included): FM_TASKS_AXI_REFUSE_OPEN_CALL, set only here, makes it refuse one inside
 #     the lock it holds while it completes the item, so a hold placed before the close
-#     takes effect wins. An open owner call, a live task record, a scout item, a proof it
-#     cannot verify (a non-GitHub pull request) or any other refusal is reported with its
-#     first line. Only the merged pull request's own task is left for its own teardown to
-#     close; any other task with a live record stays open until someone acts on the report.
+#     takes effect wins. An open owner call, a live task record of a ship or scout item, a
+#     scout item, a proof it refuses (a ship item accepts only a GitHub pull request, and
+#     no item accepts a GitLab merge request URL) or any other refusal
+#     is reported with its first line. A ship or scout item with a live record stays open:
+#     the merged pull request's own task is left for its own teardown to close, and any
+#     other stays open until someone acts on the report. A live item of any other kind
+#     closes like any other named item.
 # A completed item also clears itself from every other item's blocked-by list
 # (bin/fm-backlog-transition-lib.sh), reported as `unblocked:`.
 #
@@ -43,13 +74,15 @@
 #
 # Output. One `close-at-merge:` line per closed item on stdout, one line per item left
 # open (`close-at-merge: not closed <id>: <reason>`: on stdout only when the merged pull
-# request's own task still has its live record, which its teardown closes; on stderr
-# behind `actionable:` for every other item), and a summary line. A closed item's cleared
-# blocked-by edge is a `close-at-merge: unblocked:` line on stdout; an edge it could not
-# clear is an `actionable: close-at-merge:` line on stderr.
+# request's own ship or scout task still has its live record, which its teardown closes;
+# on stderr behind `actionable:` for every other item), and a summary line. A closed
+# item's cleared blocked-by edge is a `close-at-merge: unblocked:` line on stdout; an edge
+# it could not clear is an `actionable: close-at-merge:` line on stderr.
 # Exit 0 when every named item was closed or was already done; exit 3 when any item was
-# left open; exit 1 when a body cannot be read (the line names the pull request URL and
-# the read error); exit 2 on a bad request. bin/fm-pr-merge.sh ignores the exit status:
+# left open, a malformed directive line or a `Train-member:` value that is no pull request
+# URL was ignored, or a train member's body could not be read; exit 1 when the merged pull
+# request's own body cannot be read (the line names the pull request URL and the read
+# error); exit 2 on a bad request. bin/fm-pr-merge.sh ignores the exit status:
 # no close outcome ever changes the merge result.
 set -u
 
@@ -222,20 +255,44 @@ while IFS= read -r id; do
   [ -z "$id" ] || consider "$id" "$URL" "the body of $URL"
 done < <(fm_pr_closes_ids "$WORK/body")
 
+: > "$WORK/old-form"
+report_old_form() {  # <body-file> <where>: queue the old `Closes:` lines, report malformed directive lines
+  local old line
+  while IFS= read -r old; do
+    [ -z "$old" ] || printf '%s\t%s\n' "$old" "$2" >> "$WORK/old-form"
+  done < <(fm_pr_closes_legacy_ids "$1")
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    LEFT=$((LEFT + 1))
+    printf 'actionable: close-at-merge: ignored a malformed directive line in %s: %s; the forms are one Closes-backlog-item: <item-id> or Train-member: <pull request URL> per line\n' "$2" "$line" >&2
+  done < <(fm_pr_closes_malformed "$1")
+}
+report_old_form "$WORK/body" "the body of $URL"
+
 n=0
+MEMBER_URLS=()
 MEMBER_SEEN=$'\n'
 while IFS= read -r candidate; do
   [ -n "$candidate" ] || continue
-  fm_pr_url_parse "$candidate" || continue
+  if ! fm_pr_url_parse "$candidate"; then
+    LEFT=$((LEFT + 1))
+    printf 'actionable: close-at-merge: could not use Train-member %s: it is not a GitHub, GitLab or Forgejo pull request URL, so nothing was closed for it\n' "$candidate" >&2
+    continue
+  fi
   member=$FM_PR_URL
-  [ "$member" != "$URL" ] || continue
+  if [ "$member" = "$URL" ]; then
+    printf 'actionable: close-at-merge: ignored Train-member %s: it is the merged pull request itself\n' "$member" >&2
+    continue
+  fi
   case "$MEMBER_SEEN" in *$'\n'"$member"$'\n'*) continue ;; esac
   MEMBER_SEEN="$MEMBER_SEEN$member"$'\n'
   n=$((n + 1))
+  MEMBER_URLS[n]=$member
   if read_body "$member" "$WORK/member-$n"; then
     while IFS= read -r id; do
       [ -z "$id" ] || consider "$id" "$URL" "the body of train member $member"
     done < <(fm_pr_closes_ids "$WORK/member-$n")
+    report_old_form "$WORK/member-$n" "the body of train member $member"
   else
     LEFT=$((LEFT + 1))
     printf 'actionable: close-at-merge: could not read the body of train member %s (%s); retry: %s %s %s\n' \
@@ -245,7 +302,70 @@ while IFS= read -r candidate; do
     [ -n "$task" ] || continue
     consider "$task" "$URL" "the task record that holds train member $member"
   done < <(tasks_recording_pr "$member")
-done < <(fm_pr_closes_train_members "$WORK/body")
+done < <(fm_pr_closes_members "$WORK/body")
+
+while IFS=$'\t' read -r old where; do
+  [ -n "$old" ] || continue
+  case "$SEEN" in *$'\n'"$old"$'\n'*) continue ;; esac
+  SEEN="$SEEN$old"$'\n'
+  if [ "$old" = "$TASK_ID" ]; then
+    printf 'close-at-merge: %s names the merging task %s with a Closes: line, which closes nothing; its own teardown closes it\n' "$where" "$old"
+  else
+    left_open "$old" "$where names it with a Closes: line, which closes nothing; write 'Closes-backlog-item: $old' on a line of its own in the body, then retry: $0 $TASK_ID $URL"
+  fi
+done < "$WORK/old-form"
+
+# Mentions outside the block: reported, never closed. The merged body and every train member
+# body that was read are checked, against one read of the backlog.
+MENTION_BODIES=("$WORK/body")
+MENTION_WHERE=("the prose of $URL")
+MENTION_HOW=("add a Closes-backlog-item: <id> line to the body if this merge finished it")
+m=1
+while [ "$m" -le "$n" ]; do
+  if [ -f "$WORK/member-$m" ]; then
+    MENTION_BODIES+=("$WORK/member-$m")
+    MENTION_WHERE+=("the prose of train member ${MEMBER_URLS[$m]}")
+    MENTION_HOW+=("add a Closes-backlog-item: <id> line to the train body or to that member's body if it finished the item")
+  fi
+  m=$((m + 1))
+done
+PROSE_AT=()
+k=0
+while [ "$k" -lt "${#MENTION_BODIES[@]}" ]; do
+  [ -z "$(fm_pr_closes_prose_words "${MENTION_BODIES[$k]}" | sed -n '1p')" ] || PROSE_AT+=("$k")
+  k=$((k + 1))
+done
+if [ "${#PROSE_AT[@]}" -gt 0 ]; then
+  if states=$(fm_backlog_row_states "$DATA" 2>/dev/null); then
+    : > "$WORK/active-ids"
+    while IFS= read -r row; do
+      [ -n "$row" ] && [ "${row#*:}" != "done" ] || continue
+      printf '%s\n' "${row%%:*}" >> "$WORK/active-ids"
+    done <<ROWS
+$states
+ROWS
+    SEEN="$SEEN$TASK_ID"$'\n'
+    for k in "${PROSE_AT[@]}"; do
+      while IFS= read -r word; do
+        [ -n "$word" ] || continue
+        case "$SEEN" in *$'\n'"$word"$'\n'*) continue ;; esac
+        SEEN="$SEEN$word"$'\n'
+        printf 'actionable: close-at-merge: mentioned %s in %s: nothing was closed for it; %s\n' \
+          "$word" "${MENTION_WHERE[$k]}" "${MENTION_HOW[$k]//<id>/$word}" >&2
+      done < <(fm_pr_closes_prose_words "${MENTION_BODIES[$k]}" | grep -Fxf "$WORK/active-ids")
+    done
+  else
+    for k in "${PROSE_AT[@]}"; do
+      printf 'actionable: close-at-merge: could not list the backlog to check which ids %s mentions, so none were checked\n' "${MENTION_WHERE[$k]}" >&2
+    done
+  fi
+fi
+while IFS= read -r linked; do
+  fm_pr_url_parse "$linked" || continue
+  [ "$FM_PR_URL" != "$URL" ] || continue
+  case "$MEMBER_SEEN" in *$'\n'"$FM_PR_URL"$'\n'*) continue ;; esac
+  printf 'actionable: close-at-merge: mentioned %s in the prose of %s: no item was closed for it; list it as a Train-member: line if it landed with this merge\n' "$FM_PR_URL" "$URL" >&2
+done < <(fm_pr_closes_prose_prs "$WORK/body")
 
 if [ "$CLOSED" -gt 0 ] || [ "$LEFT" -gt 0 ]; then
   printf 'close-at-merge: %s closed, %s left open\n' "$CLOSED" "$LEFT"

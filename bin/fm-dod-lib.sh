@@ -1175,7 +1175,7 @@ fm_dod_block() {  # <mode> <task-id> [branch] [<forge>] [<base>] [<consent>] [<b
     echo "error: fm_dod_block: mode=no-mistakes needs the durable task brief to build its verification plan" >&2
     return 1
   fi
-  local branch=${3:-fm/$id} pr_base='' nm_base='' base_q contract_forge='' contract_consent='' forge_cli=gh-axi draft_check closes_note closes_read closes_edit
+  local branch=${3:-fm/$id} pr_base='' nm_base='' base_q contract_forge='' contract_consent='' forge_cli=gh-axi draft_check closes_note closes_note_nm closes_check_nm closes_verify closes_read closes_edit
   fm_forge_valid_for_mode "$forge" "$mode" fm_dod_block || return 1
   fm_base_branch_valid "$base" "$mode" "$forge" fm_dod_block || return 1
   if [ -n "$consent" ]; then
@@ -1186,7 +1186,7 @@ fm_dod_block() {  # <mode> <task-id> [branch] [<forge>] [<base>] [<consent>] [<b
     contract_consent=" upstream-consent=$consent"
   fi
   # A merge through bin/fm-pr-merge.sh closes the items the merged PR body names with
-  # `Closes:` lines (bin/fm-pr-close-items.sh; bin/fm-pr-closes-lib.sh owns the syntax),
+  # `Closes-backlog-item:` lines (bin/fm-pr-close-items.sh; bin/fm-pr-closes-lib.sh owns the syntax),
   # on every forge with a PR. The pipeline can rewrite the PR body after the worker's
   # commit, so the instruction names a route that re-checks the body at the end.
   closes_read="\`gh-axi pr view <number> --full\`"
@@ -1199,9 +1199,14 @@ fm_dod_block() {  # <mode> <task-id> [branch] [<forge>] [<base>] [<consent>] [<b
     forge_cli=tea
     draft_check="(\`tea api --repo <owner>/<repo> /repos/{owner}/{repo}/pulls/<number>\` must show \`draft\` as false, where <owner>/<repo> and <number> come from your PR URL); Forgejo marks a draft by a work-in-progress title prefix such as \`WIP:\`, so if it is a draft, remove that prefix with \`tea pulls edit <number> --repo <owner>/<repo> --title '<title without the prefix>'\`."
   fi
-  closes_note="Name the backlog items your change finishes: put \`Closes: <task-id>\` on a line of its own, exactly that form with nothing else on the line, in your commit message and in the PR body, and add one such line for each other queued backlog item the change fixes. A merge through bin/fm-pr-merge.sh closes each named item. The pipeline can rewrite the PR body after your commit, so as the last step before your final done, read the PR body back with $closes_read; if any \`Closes:\` line is missing, $closes_edit, then read the body again and confirm each line is there.
+  closes_verify="Read the PR body back with $closes_read; if any \`Closes-backlog-item:\` line is missing, or (for a merge train) any \`Train-member:\` line for a component that landed, $closes_edit, then read the body again and confirm each of those lines is there."
+  closes_note="Name the backlog items your change finishes: put \`Closes-backlog-item: $id\` on a line of its own, exactly that form with nothing else on the line, in your commit message and in the PR body, and add one such line for each other queued backlog item the change fixes. Only those lines close anything: prose, a table or a quoted example closes nothing. If your PR is a merge train, add one \`Train-member: <PR URL>\` line of its own for each component pull request that landed in it, and keep every one of them through the pipeline's body rewrite: a train body that loses its member lines closes no member item. A merge that bin/fm-pr-merge.sh confirms and records itself closes each named item (a queued, --auto or externally seen merge does not; backlog item fm-pr-close-items-queued-and-polled-merges owns that gap). The pipeline can rewrite the PR body after your commit, so as the last step before your final done, $closes_verify
 "
-  [ "$forge" != gerrit ] || closes_note=
+  closes_note_nm="Name the backlog items your change finishes: put \`Closes-backlog-item: $id\` on a line of its own, exactly that form with nothing else on the line, in your commit message, and add one such line for each other queued backlog item the change fixes. Only those lines close anything: prose, a table or a quoted example closes nothing. If your PR is a merge train, add one \`Train-member: <PR URL>\` line of its own for each component pull request that landed in it, and keep every one of them through the pipeline's body rewrite: a train body that loses its member lines closes no member item. A merge that bin/fm-pr-merge.sh confirms and records itself closes each named item from the PR body (a queued, --auto or externally seen merge does not; backlog item fm-pr-close-items-queued-and-polled-merges owns that gap). The pipeline writes the PR body after this handoff, so you check the body only after /no-mistakes reports CI green, as described below.
+"
+  closes_check_nm="Before that done, check the PR body for the lines that close backlog items (at least \`Closes-backlog-item: $id\`) and, for a merge train, for one \`Train-member:\` line per component that landed, because the pipeline wrote the body after your commit. $closes_verify This edits only the PR body: commit nothing.
+"
+  [ "$forge" != gerrit ] || { closes_note=; closes_note_nm=; closes_check_nm=; }
   if [ -n "$base" ]; then
     printf -v base_q '%q' "$base"
     pr_base=", against the base branch \`$base\` (\`--base $base_q\`), not the repository default"
@@ -1298,7 +1303,7 @@ The task is complete only when committed on your branch.
 When you believe it is complete, append \`done [at=<epoch>]: {summary}\` to the status file and stop.
 Firstmate will then instruct you to run /no-mistakes to validate and ship a PR.
 That first \`done:\` is the handoff that starts the pipeline, which owns the push; it is not a request to push from this copy.
-${closes_note}${nm_base}
+${closes_note_nm}${nm_base}
 EOF
       fm_verification_plan_block "$brief"
       fm_nm_driving_block "$forge"
@@ -1306,7 +1311,7 @@ EOF
 
 After /no-mistakes reports CI green (the CI-ready return point - do not wait for it to keep monitoring in the background until merge), read the PR back from the forge and confirm it is not a draft $draft_check
 A draft cannot be merged, so a done report on one leaves the merge unasked.
-Then append \`done [at=<epoch>]: PR {url} checks green\` and stop. You are finished.
+${closes_check_nm}Then append \`done [at=<epoch>]: PR {url} checks green\` and stop. You are finished.
 That CI-ready \`done:\` is accepted only when this copy's HEAD - your latest commit - is one the /no-mistakes run pushed, so commit nothing after the run; the check tests that commit, not merely that a branch moved.
 If you deliberately keep the PR a draft, append \`paused [at=<epoch>]: {why the draft is held}\` instead of done.
 EOF

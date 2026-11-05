@@ -1622,6 +1622,71 @@ test_completion_refuses_a_legacy_record_without_an_incarnation() {
   pass "completion leaves legacy records open when no incarnation can be recorded"
 }
 
+test_a_legacy_record_teardown_clears_the_finished_blocker_with_no_timeout_wrapper() {
+  local case_dir id meta out dep
+  id=atomic-legacy-unblock-b7
+  dep=atomic-legacy-dep-b7
+  case_dir=$(make_home legacy-unblock)
+  add_item "$case_dir" "$id"
+  add_item "$case_dir" "$dep"
+  tasks-axi block "$dep" --by "$id" --file "$(backlog_of "$case_dir")" >/dev/null
+  start_item "$case_dir" "$id"
+  write_task_meta "$case_dir" "$id" ship local-only
+  meta="$(home_of "$case_dir")/state/$id.meta"
+
+  # The same command the lab ran, here without any wrapper around it.
+  out=$(run_teardown "$case_dir" "$id" --legacy-record) || fail "legacy-record teardown failed: $out"
+  assert_absent "$meta" "legacy-record teardown left the task record"
+  [ "$(row_state "$case_dir" "$id")" = "done" ] || fail "legacy-record teardown left the item $(row_state "$case_dir" "$id"): $out"
+  assert_contains "$out" "unblocked: $dep no longer waits on $id" "legacy-record teardown did not report the cleared edge"
+  pass "a --legacy-record teardown closes the item and clears its dependents, run with no timeout wrapper"
+}
+
+# The missing-copy scenario of the earlier lab: the task's copy is gone, so teardown may
+# complete it only on a recorded GitHub PR the forge confirms merged. By default the forge
+# read is answered by a stub, so the case is deterministic. A lab run can set
+# FM_LAB_MERGED_PR to the URL of an already-merged pull request of the real repository; the
+# stub is then removed and teardown reads that PR through the real gh, which is a read-only
+# call (`gh pr view <url> --json state`). Nothing is ever written to the forge.
+test_a_missing_copy_teardown_with_a_merged_pr_proof_closes_the_item_and_clears_the_edge() {
+  local case_dir id dep meta out pr source
+  id=atomic-missing-copy-b7
+  dep=atomic-missing-copy-dep-b7
+  case_dir=$(make_home missing-copy)
+  add_item "$case_dir" "$id"
+  add_item "$case_dir" "$dep"
+  tasks-axi block "$dep" --by "$id" --file "$(backlog_of "$case_dir")" >/dev/null
+  start_item "$case_dir" "$id"
+  if [ -n "${FM_LAB_MERGED_PR:-}" ]; then
+    pr=$FM_LAB_MERGED_PR
+    source="real gh read of $pr"
+    rm -f "$case_dir/fakebin/gh"
+  else
+    pr=https://github.com/example/repo/pull/353
+    source="stubbed gh read of $pr"
+    cat > "$case_dir/fakebin/gh" <<'SH'
+#!/usr/bin/env bash
+# Answers only the read-only state query teardown makes for its merged-PR proof.
+[ "${1:-} ${2:-}" = "pr view" ] && [ "${4:-}" = "--json" ] && [ "${5:-}" = state ] && { echo MERGED; exit 0; }
+exit 1
+SH
+    chmod +x "$case_dir/fakebin/gh"
+  fi
+  write_task_meta "$case_dir" "$id" ship no-mistakes "pr=$pr"
+  meta="$(home_of "$case_dir")/state/$id.meta"
+  # The copy is gone: remove the worktree directory the record names.
+  git -C "$case_dir/project" worktree remove --force "$case_dir/wt" || fail "could not remove the fixture copy"
+  [ ! -d "$case_dir/wt" ] || fail "the fixture copy is still present"
+
+  out=$(run_teardown "$case_dir" "$id" --legacy-record) || fail "missing-copy teardown failed ($source): $out"
+  assert_absent "$meta" "missing-copy teardown left the task record"
+  [ "$(row_state "$case_dir" "$id")" = "done" ] || fail "missing-copy teardown left the item $(row_state "$case_dir" "$id"): $out"
+  assert_grep "$pr" "$(backlog_of "$case_dir")" "the closed item does not carry the merged PR as its proof"
+  assert_contains "$out" "unblocked: $dep no longer waits on $id" "missing-copy teardown did not report the cleared edge"
+  printf 'missing-copy proof source: %s\n' "$source" >&2
+  pass "a missing-copy teardown closes the item on a merged PR proof read from the forge and clears its dependents ($source)"
+}
+
 test_completion_refuses_ambiguous_incarnation_metadata() {
   local case_dir id meta marker out rc=0
   id=atomic-close-ambiguous-incarnation-b7
@@ -2109,6 +2174,39 @@ test_recovery_replays_a_close_an_interrupted_cleanup_left_open() {
   assert_not_contains "$out" "endpoint or local copy may remain" \
     "recovery claimed incomplete cleanup without task metadata"
   pass "session start finishes a close an interrupted cleanup recorded but never landed"
+}
+
+test_recovery_replay_clears_the_finished_blocker_from_its_dependents() {
+  local case_dir id out deps
+  id=atomic-heal-unblock-b9
+  case_dir=$(make_home heal-unblock)
+  add_item "$case_dir" "$id"
+  add_item "$case_dir" atomic-heal-open
+  add_item "$case_dir" atomic-heal-dep-one
+  add_item "$case_dir" atomic-heal-dep-two
+  tasks-axi block atomic-heal-dep-one --by "$id" --file "$(backlog_of "$case_dir")" >/dev/null
+  tasks-axi block atomic-heal-dep-two --by "$id" --file "$(backlog_of "$case_dir")" >/dev/null
+  tasks-axi block atomic-heal-dep-two --by atomic-heal-open --file "$(backlog_of "$case_dir")" >/dev/null
+  # A dependent that also carries a hold: the replay clears its edge and keeps the hold.
+  tasks-axi hold atomic-heal-dep-one --reason "waiting for the owner" --kind external --file "$(backlog_of "$case_dir")" >/dev/null
+  start_item "$case_dir" "$id"
+  printf 'id=%s\ndata=%s\nspawn_gen=spawn-heal-unblock\narg=--pr\narg=https://github.com/example/repo/pull/12\n' \
+    "$id" "$(home_of "$case_dir")/data" \
+    > "$(home_of "$case_dir")/state/$id.backlog-close"
+
+  out=$(run_bootstrap "$case_dir")
+  [ "$(row_state "$case_dir" "$id")" = "done" ] || fail "replay left the item at $(row_state "$case_dir" "$id"): $out"
+  deps=$(tasks-axi show atomic-heal-dep-one --file "$(backlog_of "$case_dir")" 2>/dev/null | sed -n 's/^  deps: *//p' | tr -d '"')
+  [ "$deps" = none ] || fail "replay left the finished edge on its only dependent: $deps"
+  deps=$(tasks-axi show atomic-heal-dep-two --file "$(backlog_of "$case_dir")" 2>/dev/null | sed -n 's/^  deps: *//p' | tr -d '"')
+  [ "$deps" = "blocked-by:atomic-heal-open" ] || fail "replay lost the other blocker: $deps"
+  tasks-axi show atomic-heal-dep-one --file "$(backlog_of "$case_dir")" 2>/dev/null | grep -qi 'waiting for the owner' \
+    || fail "replay lost the hold on the dependent"
+  assert_contains "$out" "unblocked: atomic-heal-dep-one no longer waits on $id" \
+    "replay did not report the dependent whose edge it cleared"
+  assert_contains "$out" "unblocked: atomic-heal-dep-two no longer waits on $id; it still waits on atomic-heal-open" \
+    "replay did not report the dependent that keeps another blocker"
+  pass "the close replay clears the finished blocker from its dependents, reports each, keeps another blocker and a hold"
 }
 
 test_recovery_replays_a_gerrit_close_with_its_change_url_as_a_note() {
@@ -3589,6 +3687,8 @@ test_dispatch_fails_when_its_row_vanishes_after_preflight
 test_completion_closes_a_local_only_ship_before_reporting_success
 test_completion_closes_a_scout_with_its_report
 test_completion_refuses_a_legacy_record_without_an_incarnation
+test_a_legacy_record_teardown_clears_the_finished_blocker_with_no_timeout_wrapper
+test_a_missing_copy_teardown_with_a_merged_pr_proof_closes_the_item_and_clears_the_edge
 test_completion_refuses_ambiguous_incarnation_metadata
 test_completion_records_a_relative_report_for_relocated_data
 test_space_containing_scout_report_marker_replays
@@ -3608,6 +3708,7 @@ test_recovery_releases_nonqueued_worker_locks
 test_recovery_rejects_an_internal_worker_record_symlink
 test_recovery_ignores_a_symlinked_worker_record
 test_recovery_replays_a_close_an_interrupted_cleanup_left_open
+test_recovery_replay_clears_the_finished_blocker_from_its_dependents
 test_recovery_replays_a_gerrit_close_with_its_change_url_as_a_note
 test_recovery_backfills_a_recorded_link_on_an_already_done_item
 test_recovery_records_a_replayed_close_in_the_fleet_ledger
