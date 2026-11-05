@@ -28,6 +28,7 @@
 #   fm-captain-hold.sh frozen <task-id>
 #   fm-captain-hold.sh answer <task-id> --decision-file <path> [--release]
 #   fm-captain-hold.sh answers [<legacy-origin> | --any-origin] --source <provenance>   (keyed answers on stdin)
+#   fm-captain-hold.sh archived-resolution <task-id>
 #   fm-captain-hold.sh reconcile-requests --source-id <source-id> --source <provenance>   (task ids on stdin)
 #   fm-captain-hold.sh bind <source-id> [<legacy-origin> | --any-origin]
 #   fm-captain-hold.sh unbind <source-id>
@@ -73,6 +74,12 @@
 # In a secondmate home `--owner captain` is required, because the home's parent
 # channel is its only addressee, so each hold must say it waits on the captain's
 # own words; any other owner is refused with the routing above.
+#
+# `archived-resolution` is a read-only fact for bin/fm-contributions.sh. It prints
+# one JSON line (id, hold_answered, hold_resolved_at) and exits 0 when the
+# configured done archive holds <task-id> and its newest record is a captain answer,
+# a withdrawal, or reconcile evidence. It exits 1 when no such row exists or the
+# backend keeps no markdown archive, and 2 when the archive cannot be read.
 #
 # `withdraw` is the honest release of a captain-kind hold that a recorded
 # captain ruling made moot. It never writes the captain's words and never
@@ -3432,6 +3439,22 @@ EOF
   return 1
 }
 
+command_archived_resolution() {
+  local id=${1:-} data root backend rc=0
+  [ "$#" -eq 1 ] || { usage >&2; exit 2; }
+  validate_slug task-id "$id"
+  data=$(fm_backlog_data_absolute "$DATA") || return 2
+  root=$(fm_backlog_root "$data") || return 2
+  backend=$(fm_tasks_axi_backend "$root") || return 2
+  [ "$backend" = markdown ] || return 1
+  archive_row_lookup "$data" "$id" || return "$?"
+  archived_answer_state "$ARCHIVE_ROW_BODY" || rc=$?
+  case "$rc" in 0|4|5) ;; *) return 1 ;; esac
+  jq -nc --arg id "$id" --arg body "$ARCHIVE_ROW_BODY" '
+    {id:$id,hold_answered:true,
+     hold_resolved_at:(first($body | split("\n")[] | capture("^Resolved at: (?<v>.+)$").v) // null)}'
+}
+
 command_open_bound() {
   local source=${1:-} key=${2:-} origin resolved rc=0
   [ "$#" -eq 2 ] || return 2
@@ -3450,6 +3473,7 @@ case "${1:-}" in
   withdraw) shift; command_withdraw "$@" ;;
   answer) shift; command_answer "$@" ;;
   answers) shift; command_answers "$@" ;;
+  archived-resolution) shift; command_archived_resolution "$@" ;;
   reconcile-requests) shift; command_reconcile_requests "$@" ;;
   bind) shift; command_bind "$@" ;;
   unbind) shift; command_unbind "$@" ;;

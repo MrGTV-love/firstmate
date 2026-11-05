@@ -16,7 +16,8 @@ def valid_record:
     and (.retired == null or (.retired | (.actor == "captain")
       and (.reason | type == "string" and length > 0) and (.at | fromdateiso8601 | type == "number")))
     and (.verdict == null or (.verdict | (.head | sha) and (.source | type == "string")
-      and (.actor | IN("captain","fleet","maintainer","nobody")) and (.summary | type == "string")))
+      and (.actor | IN("captain","fleet","maintainer","nobody")) and (.summary | type == "string")
+      and (.at == null or (.at | fromdateiso8601 | type == "number"))))
     and (.observation == null or (.kind as $kind | .observation |
       (.state | IN("open","closed","merged")) and (.checks | type == "array")
       and (.reviews | type == "array") and (.events | type == "array")
@@ -25,7 +26,20 @@ def valid_record:
       and (if $kind == "pr" then (.head | sha) and (.draft | type == "boolean")
         and (.mergeable | IN("mergeable","conflicting","unknown")) and (.can_merge | type == "boolean")
         and (.review_decision | IN("","APPROVED","CHANGES_REQUESTED","REVIEW_REQUIRED"))
+        and (.base_sha == null or (.base_sha | sha))
+        and (.base_containment == null or (.base_containment |
+          (.behind_by | type == "number" and . >= 0 and . == floor)))
+        and (.review_verification == null or (.review_verification | type == "object"))
         else (.ready | type == "boolean") end))))) catch false;
+# A typed verifier answer is evidence, not an independently implemented review policy.
+def review_state($fact; $url; $head; $task; $base):
+  try (if $fact.pr != $url or $fact.head != $head or $fact.task != $task
+      or ($base | sha | not) or $fact.base != $base
+      or $fact.answer.schema != "fm-review-verification.v1" then "unknown"
+    elif $fact.answer.ok == false and $fact.answer.error.kind == "not-qualified" then "not-qualified"
+    elif $fact.answer.ok == true and $fact.answer.basis == "independent-review"
+      and $fact.answer.pr == $url and $fact.answer.head == $head
+    then "qualified" else "unknown" end) catch "unknown";
 def known($input; $saved):
   ([($input.tasks // [])[] | select(.kind != "secondmate")
      | select(.pr.url | canonical_url) | {task:.id,url:.pr.url}]
@@ -42,9 +56,11 @@ def projected($input; $saved; $now; $max_age):
   known($input; $saved) as $known
   | [$known[] as $k
     | ([$saved[] | select(.task == $k.task) | .records[] | select(.url == $k.url)] | first) as $record
-    | ([$input.backlog.records[]? | select(.structured and
-         (.id == $k.task or ((.links // []) | index($k.url)) != null))
-         | select(.hold_bucket == "live")] | first) as $hold
+    | [$input.backlog.records[]? | select(.structured and
+         (.id == $k.task or ((.links // []) | index($k.url)) != null))] as $owned
+    | ([$owned[] | select(.hold_bucket == "live")] | first) as $hold
+    | (([$owned[] | select(.id == $k.task)] + [$input.archived_holds[]? | select(.id == $k.task)]) | first) as $own
+    | [$input.tasks[]? | select(.id == $k.task)] as $own_tasks
     | ([$input.tasks[]? | select(.id == $k.task and .pr.url == $k.url)
        | {head:(.pr.head | select(. != null and . != "")), merge_authority:(.merge_authority // "unknown")}] | first) as $task
     | ($task.head // null) as $recorded_head
@@ -69,6 +85,13 @@ def projected($input; $saved; $now; $max_age):
     | ([$o.reviews[]? | select(.state != "COMMENTED")] | group_by(.user.login)
        | map(sort_by([.submitted_at,.id]) | last)
        | map(. + {freshness:(if $observed_head != null and .commit_id != $observed_head then "STALE" elif $fresh then "current" else "unverified" end)})) as $reviews
+    | ($own.hold_bucket == "dated" or any($own_tasks[]; .paused == true)
+       or ($own.hold_bucket == null and $own.hold_answered == true
+           and ((try ($own.hold_resolved_at | fromdateiso8601) catch null) as $resolved
+                | (try ($verdict.at | fromdateiso8601) catch null) as $judged
+                | $resolved != null and $judged != null and $resolved >= $judged))) as $settled
+    | review_state($o.review_verification; $k.url; $observed_head; $k.task; $o.base_sha) as $review
+    | ({"qualified":2,"not-qualified":3}[$review] // 4) as $review_rank
     | (if ($k.url | startswith("https://github.com/") | not) then
          {actor:"unmeasured",reason:"unsupported forge; coverage is unmeasured"}
        elif $o.state == "merged" or $o.state == "closed" then
@@ -77,6 +100,7 @@ def projected($input; $saved; $now; $max_age):
        elif $hold != null then {actor:"captain",reason:$hold.hold_reason,hold:$hold.id}
        elif $fresh | not then {actor:"fleet",reason:($record.error // "contribution not recently checked")}
        elif $stale then {actor:"fleet",reason:"STALE maintainer verdict; reassess the current head"}
+       elif $verdict.actor == "captain" and ($settled | not) then {actor:"captain",reason:$verdict.summary}
        elif ($record.pending | length) > 0 then {actor:"fleet",reason:"incoming maintainer signal needs triage"}
        elif $record.kind == "issue" then
          if $o.ready then {actor:"fleet",reason:"filed issue is ready-for-pr"}
@@ -89,14 +113,19 @@ def projected($input; $saved; $now; $max_age):
        elif ($checks | length) == 0 then {actor:"fleet",reason:"no reported checks; readiness unconfirmed"}
        elif ($pending | length) > 0 then {actor:"fleet",reason:"checks still running"}
        elif $o.review_decision == "CHANGES_REQUESTED" then {actor:"fleet",reason:"forge requests changes"}
-       elif $verdict != null and $verdict.actor == "fleet" then {actor:"fleet",reason:$verdict.summary}
-       elif $verdict != null and $verdict.actor == "captain" then
-         {actor:"fleet",reason:"record the unresolved arbitration as a captain hold"}
-       elif $o.review_decision == "REVIEW_REQUIRED" then {actor:"maintainer",reason:"review required"}
-       elif $o.can_merge == true and $merge_authority == "away" then
-         {actor:"fleet",reason:"checks green; merge is authorized by delivery posture"}
-       elif $o.can_merge == true then {actor:"captain",reason:"checks green; merge approval needed"}
-       else {actor:"maintainer",reason:"delivery awaits the maintainer"} end) as $action
+       elif $verdict.actor | IN("maintainer","nobody") then {actor:$verdict.actor,reason:$verdict.summary}
+       elif ($o.base_containment.behind_by // 0) > 0 then {actor:"fleet",reason:"update the branch; base is stale",label_rank:0}
+       elif $verdict.actor == "fleet" then {actor:"fleet",reason:$verdict.summary}
+       elif $o.base_containment == null and $o.can_merge == true
+         and $o.review_decision != "REVIEW_REQUIRED" and $merge_authority != "away" then
+         {actor:"fleet",reason:"base freshness unknown; refresh the base comparison",label_rank:1}
+       elif $review == "not-qualified" then {actor:"fleet",reason:"route the independent review",label_rank:$review_rank}
+       elif $o.review_decision == "REVIEW_REQUIRED" then {actor:"maintainer",reason:"review required",label_rank:$review_rank}
+       elif $o.can_merge != true then {actor:"maintainer",reason:"delivery awaits the maintainer",label_rank:$review_rank}
+       elif $merge_authority == "away" then
+         {actor:"fleet",reason:"checks green; merge is authorized by delivery posture",label_rank:$review_rank}
+       elif $review != "qualified" then {actor:"fleet",reason:"PASS fact unknown; recheck the independent review",label_rank:$review_rank}
+       else {actor:"fleet",reason:"merge under the standing merge rule",label_rank:$review_rank} end) as $action
     | $k + {kind:($record.kind // (if ($k.url | contains("/issues/")) then "issue" else "pr" end)),
          checked_at:$record.checked_at,checked:$fresh,final:$final,head:($observed_head // $recorded_head // $o.head),verdict:$verdict,reviews:$reviews,
          distinct_checks:($checks | length),missing_verdicts:(($no_verdict | length) + (($o.absent_checks // []) | length)),
@@ -105,9 +134,13 @@ def projected($input; $saved; $now; $max_age):
          signals:($record.pending // [])} + $action]
   # Multiple filed tasks may own the same URL. Retain every owner but count a
   # contribution once; any live arbitration wins over action-free duplicates.
+  # A current recorded verdict outranks every derived label, and base facts then
+  # a qualifying PASS decide among labels; facts, never task names, choose the row.
   | group_by(.url)
-  | map(. as $owners | sort_by(if .actor == "captain" then 0 elif .actor == "fleet" then 1 else 2 end) | first
-      | . + {tasks:($owners | map(.task) | unique)});
+  | map(. as $owners
+      | sort_by([if .hold != null then 0 elif .actor == "captain" then 1 elif .label_rank != null then 4
+          elif .actor == "fleet" then 2 elif .verdict.actor == .actor then 3 else 5 end, .label_rank, .reason]) | first
+      | del(.label_rank) + {tasks:($owners | map(.task) | unique)});
 def summary($rows; $errors):
   {known:($rows | length),checked:([$rows[] | select(.checked)] | length),
    counts:{captain:([$rows[] | select(.actor == "captain")] | length),

@@ -24,7 +24,9 @@
 #     hold_reason, and hold_until when tasks-axi emits it. They also carry
 #     normalized current_role, requires_child_metadata, blocked_by_ids,
 #     unresolved_blocker_ids, captain_actionable, hold_set, hold_age_days,
-#     and hold_bucket fields.
+#     and hold_bucket fields, plus hold_answered when the row's body carries a
+#     resolution record (answer, withdraw, or reconcile close) and
+#     hold_resolved_at, the newest record's `Resolved at:` value when it has one.
 #     Repeated blocker tokens remain ordered; a blocker resolves only when its
 #     structured record is Done, and missing ids stay open.
 #     There is no separate decision type: any captain-held task is the same
@@ -645,6 +647,8 @@ backlog_json() (  # [<backlog-path>] - defaults to this home's $BACKLOG
     | .records |= map(
         if .structured then
           .captain_drop = any(.body_lines[]?; . == "dropped" or . == "Deliverable of the finished work: dropped")
+          | .hold_answered = any(.body_lines[]?; test("^Resolution recorded by fm-(captain|decision)-hold\\.$"))
+          | .hold_resolved_at = (first(.body_lines[]? | capture("^Resolved at: (?<v>.+)$").v) // null)
         else . end)
     | .records as $records
     | (reduce ($records[] | select(.structured)) as $record ({};
@@ -2260,7 +2264,7 @@ scout_report_lines() {
 
 BACKLOG_JSON=$(backlog_json) || { echo "fm-fleet-snapshot: backlog read failed" >&2; exit 1; }
 contribution_tasks_json() {
-  local meta id task_kind url head merge_authority=unknown authority_resolved=0
+  local meta id task_kind url head merge_authority=unknown authority_resolved=0 paused
   local -a rows=()
   for meta in "$STATE"/*.meta; do
     [ -f "$meta" ] && [ ! -L "$meta" ] || continue
@@ -2277,14 +2281,16 @@ contribution_tasks_json() {
     meta_value_to "$meta" kind task_kind
     meta_value_to "$meta" pr url
     meta_value_to "$meta" pr_head head
-    rows+=("$id" "$task_kind" "$url" "$head")
+    paused=false
+    if status_is_paused "$(status_declared_wait_line "$STATE/$id.status" 2>/dev/null || true)"; then paused=true; fi
+    rows+=("$id" "$task_kind" "$url" "$head" "$paused")
   done
-  # One jq for the entire task inventory; four positional arguments per task.
+  # One jq for the entire task inventory; five positional arguments per task.
   jq -n --arg merge_authority "$merge_authority" \
     '[ $ARGS.positional as $rows
-       | range(0; $rows | length; 4)
+       | range(0; $rows | length; 5)
        | {id:$rows[.],kind:$rows[. + 1],pr:{url:$rows[. + 2],head:$rows[. + 3]},
-          merge_authority:$merge_authority} ]' \
+          paused:($rows[. + 4] == "true"),merge_authority:$merge_authority} ]' \
     --args ${rows[@]+"${rows[@]}"}
 }
 
