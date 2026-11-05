@@ -532,6 +532,8 @@ class IntakeTest(unittest.TestCase):
                      patch.object(watch, 'backlog', return_value=[]):
                     try:
                         watch.prepare()
+                        # Arming is a run of its own, not a poll: the polls that follow have their own history read.
+                        watch.window_reads = 0
                         yield watch, replay
                     finally:
                         watch.lock.close()

@@ -51,6 +51,10 @@ CARD_LIMIT = 38000
 SLACK_LINK = re.compile(r'<((?:https?://|mailto:)[^<>|\s]+)(?:\|([^<>]*))?>')
 PARTIAL_ENTITY = re.compile(r'&[a-z]*$')
 SLACK_TS = re.compile(r'[0-9]{1,12}\.[0-9]{1,9}')
+# Slack lists history newest first, so one read of the wait since the starting point holds its newest part when the
+# wait is longer than this many messages (Slack's own advice is no more than 200 at a time).
+REQUEST_PAGE = 200
+REQUEST_PREFIX = 'check: slack request '
 # The one acknowledgement posted in a request's thread; it never repeats the request text.
 REQUEST_ACK = 'Request received. Firstmate has been notified; any change is confirmed in the terminal chat first.'
 # Sits before the text so that a cut can never remove it.
@@ -137,7 +141,7 @@ def request_text(value):
 
 def request_line(ts, user, text):
     """The wake line for one request, bounded so a queue marker still fits behind it."""
-    head = 'check: slack request %s from %s: %s ' % (ts, user, REQUEST_LABEL)
+    head = REQUEST_PREFIX + '%s from %s: %s ' % (ts, user, REQUEST_LABEL)
     room = WAKE_LIMIT - QUEUE_RESERVE - len(head)
     if len(text) > room:
         tail = ' [cut, full text in Slack thread %s]' % ts
@@ -312,6 +316,7 @@ class Watch:
         self.notices_held = False
         self.staging_only = False
         self.dm_proven = False
+        self.window_reads = 0
 
     def dm_user(self):
         return env_value('FM_SLACK_DM_USER').strip()
@@ -348,9 +353,20 @@ class Watch:
             self.output.append(line)
             self.state['outbox'] = list(self.output)
 
-    def printed(self, count):
-        """Drop the first count wake lines from the journal once they have been printed."""
-        self.output = self.output[count:]
+    def deliverable(self):
+        """The wake lines that may be printed now. A request line waits in the journal while the source is
+        unbound: it is neither printed nor removed, and the rebind delivers it once."""
+        if not any(line.startswith(REQUEST_PREFIX) for line in self.output) or self.bound():
+            return list(self.output)
+        return [line for line in self.output if not line.startswith(REQUEST_PREFIX)]
+
+    def printed(self, lines):
+        """Drop the wake lines that have been printed from the journal; every other line stays."""
+        kept = list(self.output)
+        for line in lines:
+            if line in kept:
+                kept.remove(line)
+        self.output = kept
         if self.state['outbox'] != self.output:
             self.state['outbox'] = list(self.output)
             self.commit()
@@ -576,13 +592,15 @@ class Watch:
             raise SlackError('dm_user_changed_with_unread_requests')
         # The old DM's threads stop being tracked and nothing more is posted there.
         self.state.update(user='', channel='', team='', scopes=[], threads={})
-        # The request cursor belongs to the old DM; the new DM starts from its own latest message.
+        # The request cursor and its walk bound belong to the old DM; the new DM starts from its own latest message.
         self.state.pop('intake_cursor', None)
+        self.state.pop('intake_bound', None)
         self.commit()
         return True
 
     def newer_messages(self, channel, cursor):
-        """The messages of the DM window newer than the starting point, in Slack's order (newest first)."""
+        """Every message of the DM window newer than the starting point, all pages, in Slack's order (newest first).
+        Only retarget reads this way; a poll reads one page (take_requests)."""
         for message in self.api.pages('conversations.history', 'messages', channel=channel, oldest=cursor):
             if (isinstance(message, dict) and isinstance(message.get('ts'), str)
                     and SLACK_TS.fullmatch(message['ts']) and ts_key(message['ts']) > ts_key(cursor)):
@@ -599,13 +617,19 @@ class Watch:
                 return True
         return False
 
+    def read_window(self, channel, **fields):
+        """The one conversations.history read of the owner DM that a poll may make for requests."""
+        self.window_reads += 1
+        return self.api.call('conversations.history', channel=channel, **fields)
+
     def start_requests(self):
         """A plane armed before requests existed starts at the DM's latest message on its first poll, never at
-        its history, and whatever the per-poll cap leaves for other work."""
+        its history, and whatever the per-poll cap leaves for other work. That read is the poll's one history
+        read, so the same poll takes nothing in."""
         channel = self.state.get('channel')
         if not channel or self.state.get('intake_cursor') is not None:
             return
-        latest = self.api.call('conversations.history', channel=channel, limit=1)
+        latest = self.read_window(channel, limit=1)
         self.state['intake_cursor'] = self.newest(latest.get('messages'))
         self.commit()
 
@@ -616,10 +640,11 @@ class Watch:
         channel = self.api.call('conversations.open', users=self.dm_user(), return_im=True).get('channel', {})
         if not DM_CHANNEL.fullmatch(channel.get('id') or '') or not channel.get('is_im'):
             raise SlackError('target_is_not_a_DM')
-        latest = self.api.call('conversations.history', channel=channel['id'], limit=1)
+        latest = self.read_window(channel['id'], limit=1)
         self.state.update(team=result.get('team_id'), user=self.dm_user(),
                           channel=channel['id'], scopes=sorted(getattr(self.api, 'scopes', set())),
                           intake_cursor=self.newest(latest.get('messages')))
+        self.state.pop('intake_bound', None)
         self.commit()
         self.dm_proven = True
 
@@ -677,6 +702,10 @@ class Watch:
             return
         if pending.get('kind') == 'request':
             fault('after-stage')
+            # A request is acknowledged and woken only while the source is bound, at the moment of delivery and
+            # not only when the poll began; unbound, it stays journaled and the rebind delivers it once.
+            if not self.bound():
+                return
             # Post first, then earn the wake line: a crash in between repeats the line, never loses it,
             # and the event-marker lookup in post() keeps the acknowledgement to one per thread.
             self.post('ack:' + pending['event'], REQUEST_ACK, pending['thread'])
@@ -927,10 +956,12 @@ class Watch:
         return pending is row or self.advanced > advanced
 
     def poll(self):
+        self.window_reads = 0
         if not self.bound():
             return
         # The starting point of requests is set before anything uses the per-poll cap, so that a busy first
         # upgraded poll cannot skip a request sent after it; a failed read is held back like a mirror failure.
+        # That read is the one history read of the owner DM that a poll may make, so the poll takes nothing in.
         start_error = None
         try:
             self.start_requests()
@@ -979,15 +1010,37 @@ class Watch:
             raise deferred
 
     def take_requests(self, remaining):
-        """Take in new owner messages from the DM window, oldest first, at most remaining of them."""
+        """Take in new owner messages from the DM window, oldest first, at most remaining of them, with the one
+        history read a poll may make. Slack lists history newest first, so when the wait since the starting point
+        is longer than a page, the read holds only its newest part: nothing is taken in from it, the next poll
+        reads below it, and requests still arrive oldest first with none skipped."""
         channel, cursor = self.state.get('channel'), self.state.get('intake_cursor')
-        if remaining <= 0 or not channel or cursor is None:
+        if remaining <= 0 or not channel or cursor is None or self.window_reads:
             return
-        moved = False
-        for message in sorted(self.newer_messages(channel, cursor), key=lambda m: ts_key(m['ts'])):
+        bound = self.state.get('intake_bound')
+        fields = {'oldest': cursor, 'limit': REQUEST_PAGE}
+        if bound:
+            fields['latest'] = bound
+        data = self.read_window(channel, **fields)
+        if not isinstance(data.get('messages'), list):
+            raise SlackError('unreadable_dm_history')
+        window = [message for message in data['messages']
+                  if isinstance(message, dict) and isinstance(message.get('ts'), str)
+                  and SLACK_TS.fullmatch(message['ts']) and ts_key(message['ts']) > ts_key(cursor)
+                  and (not bound or ts_key(message['ts']) < ts_key(bound))]
+        paging = data.get('response_metadata')
+        if data.get('has_more') or (isinstance(paging, dict) and paging.get('next_cursor')):
+            if not window:
+                raise SlackError('unreadable_dm_history')
+            self.state['intake_bound'] = min((message['ts'] for message in window), key=ts_key)
+            self.commit()
+            return
+        moved, finished = False, True
+        for message in sorted(window, key=lambda m: ts_key(m['ts'])):
             row = self.request_from(message)
             if row and row['event'] not in self.state['seen']:
                 if remaining <= 0:
+                    finished = False
                     break
                 # The cursor passes a message only in the same commit that journals it.
                 self.state['intake_cursor'] = message['ts']
@@ -995,9 +1048,16 @@ class Watch:
                 moved = False
                 self.publish(pending)
                 remaining -= 1
+                if any(held is pending for held in self.state['pending']):
+                    # Journaled but not delivered (the source was unbound): the rest waits for the next poll.
+                    finished = False
+                    break
             else:
                 self.state['intake_cursor'] = message['ts']
                 moved = True
+        if finished and bound:
+            self.state.pop('intake_bound')
+            moved = True
         if moved:
             self.commit()
 
@@ -1129,7 +1189,9 @@ def state_home():
 
 def emit(watch, command):
     fault('before-emit')
-    lines = list(watch.output)
+    # The binding is checked again here: a request line journaled while the source was bound is not printed
+    # or removed once it is unbound.
+    lines = watch.deliverable()
     queued = watch.queued() if command in ('poll', 'check') else 0
     if command == 'check':
         # Only the lines the wake line holds are printed (and cleared from the journal);
@@ -1139,13 +1201,14 @@ def emit(watch, command):
             shown -= 1
         if lines:
             print(wake_line(lines[:shown], queued + len(lines) - shown), flush=True)
-            watch.printed(shown)
+            watch.printed(lines[:shown])
         return
+    owed = list(lines)
     if lines:
         lines[-1] += queue_tail(queued)
     for line in lines:
         print(line, flush=True)
-    watch.printed(len(watch.output))
+    watch.printed(owed)
 
 
 def note_progress():
