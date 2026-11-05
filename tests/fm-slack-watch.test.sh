@@ -566,6 +566,9 @@ if [ "\${1:-}" = open ] && [ -f "\${FM_SHIM_UNBIND_ON_OPEN:-/nonexistent}" ]; th
   rm -f "\$FM_SHIM_UNBIND_ON_OPEN"
   bash "$ROOT/bin/fm-captain-hold.sh" unbind slack-dm >/dev/null
 fi
+if [ "\${1:-}" = binding ] && [ -n "\${FM_SHIM_NEEDLE:-}" ]; then
+  { printf '%s\\n' "\$@"; env | grep -v '^FM_SHIM_'; } | grep -c -F -- "\$FM_SHIM_NEEDLE" >> "\$FM_SHIM_NEEDLE_LOG" || true
+fi
 if [ "\${1:-}" = binding ] && [ -f "\${FM_SHIM_UNBIND_AFTER_BINDING:-/nonexistent}" ]; then
   out=\$(bash "$ROOT/bin/fm-captain-hold.sh" "\$@"); rc=\$?
   rm -f "\$FM_SHIM_UNBIND_AFTER_BINDING"
@@ -2141,6 +2144,23 @@ for via in poll check; do
   assert_eq "$(request_count "$out")" 1 "INTAKE-6 [$via mid-poll control] the request was not woken once"
   assert_eq "$(posts_in 2000.000100)" 1 "INTAKE-6 [$via mid-poll control] the request was not acknowledged once"
 done
+# The binding check a request makes is handed nothing from the message: the copy of the script counts the
+# message text in the arguments and the environment it receives (its own FM_SHIM_ names left out).
+for via in poll check; do
+  intake_home
+  say_owner 2000.000100 'ZEBRA-9172-secret-words'
+  : > "$TMP/needle.log"
+  out=$(via_shim "$via" FM_SHIM_NEEDLE=ZEBRA-9172-secret-words FM_SHIM_NEEDLE_LOG="$TMP/needle.log")
+  assert_contains "$out" 'ZEBRA-9172-secret-words' "INTAKE-6 [$via text] the request was not woken with its text"
+  [ "$(wc -l < "$TMP/needle.log" | tr -d ' ')" -ge 3 ] || fail "INTAKE-6 [$via text] the binding check was not seen at delivery and at print"
+  [ -z "$(grep -v '^0$' "$TMP/needle.log")" ] || fail "INTAKE-6 [$via text] the message text reached the binding check"
+  # Control: the same count finds a word the check really is handed (the source name in its arguments).
+  intake_home
+  say_owner 2000.000100 'ZEBRA-9172-secret-words'
+  : > "$TMP/needle.log"
+  via_shim "$via" FM_SHIM_NEEDLE=slack-dm FM_SHIM_NEEDLE_LOG="$TMP/needle.log" >/dev/null
+  [ -n "$(grep -v '^0$' "$TMP/needle.log")" ] || fail "INTAKE-6 [$via text control] the count did not find the source name in the binding check's arguments"
+done
 printf 'ok - INTAKE-6\n'
 
 # INTAKE-7: a poll makes at most one history read of the owner DM for requests, in every case, and a wait longer
@@ -2173,7 +2193,7 @@ for turn in 1 2 3 4 5 6 7 8; do
 done
 assert_eq "$woken" "1999.000001 2001.000001 " "INTAKE-7 a long wait lost, repeated or reordered a request"
 assert_eq "$(outbound_count chat.postMessage)" 2 "INTAKE-7 a long wait posted the wrong number of acknowledgements"
-assert_eq "$(python3 "$HELPER" state-field "$(state_file)" intake_bound)" "" "INTAKE-7 the walk bound stayed after the wait was read"
+assert_eq "$(python3 "$HELPER" state-field "$(state_file)" intake_bounds)" "" "INTAKE-7 the walk bounds stayed after the wait was read"
 printf 'ok - INTAKE-7\n'
 
 printf 'ok - all Slack watch checks\n'

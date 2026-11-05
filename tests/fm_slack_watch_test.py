@@ -784,10 +784,10 @@ class IntakeTest(unittest.TestCase):
             self.assertEqual(order, ['200.000001', '200.000450'])
             self.assertEqual(sorted(self.acks(replay)), order)
             self.assertEqual(watch.state['intake_cursor'], '200.000450')
-            self.assertNotIn('intake_bound', watch.state)
+            self.assertNotIn('intake_bounds', watch.state)
             self.assertEqual(watch.state['pending'], [])
 
-    def test_a_long_wait_walks_down_with_a_bound_and_never_skips_a_request_at_the_bottom(self):
+    def test_a_long_wait_walks_down_with_bounds_and_never_skips_a_request_at_the_bottom(self):
         with self.fixture() as (watch, replay):
             self.say(replay, '150.000001', 'the oldest request')
             for n in range(1, 2 * plane.REQUEST_PAGE + 1):
@@ -797,7 +797,7 @@ class IntakeTest(unittest.TestCase):
             # Slack lists newest first: the page holds only the newest part of the wait, so nothing is taken in yet.
             self.assertEqual((self.acks(replay), self.wakes(watch)), ([], []))
             saved = watch.load_state()
-            self.assertEqual((saved['intake_cursor'], saved['intake_bound']), ('100.000100', '200.%06d' % (plane.REQUEST_PAGE + 1)))
+            self.assertEqual((saved['intake_cursor'], saved['intake_bounds']), ('100.000100', ['200.%06d' % (plane.REQUEST_PAGE + 1)]))
             self.assertEqual((reads()[-1]['oldest'], reads()[-1]['latest']), ('100.000100', None))
             watch.state, watch.advanced = saved, 0
             watch.poll()
@@ -805,6 +805,14 @@ class IntakeTest(unittest.TestCase):
             self.assertEqual((reads()[-1]['oldest'], reads()[-1]['latest']),
                              ('100.000100', '200.%06d' % (plane.REQUEST_PAGE + 1)))
             self.assertEqual(len(reads()), 3)
+            # That window still holds more than a page, so a second bound is kept below the first.
+            self.assertEqual(watch.load_state()['intake_bounds'], ['200.%06d' % (plane.REQUEST_PAGE + 1), '200.000001'])
+            watch.state, watch.advanced = watch.load_state(), 0
+            watch.poll()
+            # The window below the second bound holds the oldest request alone: it is taken in, one bound is dropped.
+            self.assertEqual(self.acks(replay), ['150.000001'])
+            self.assertEqual(watch.load_state()['intake_bounds'], ['200.%06d' % (plane.REQUEST_PAGE + 1)])
+            self.assertEqual(watch.load_state()['intake_cursor'], '150.000001')
 
     def test_a_request_is_neither_acknowledged_nor_woken_while_the_source_is_unbound(self):
         with self.fixture() as (watch, replay):
@@ -842,27 +850,40 @@ class IntakeTest(unittest.TestCase):
                 self.assertEqual(printed.getvalue().count('check: slack request 200.000100'), 1)
                 self.assertEqual(watch.load_state()['outbox'], [])
 
-    def test_a_request_path_runs_only_the_binding_check_and_hands_it_nothing_from_the_message(self):
+    def test_the_binding_check_a_request_makes_gets_fixed_arguments_and_nothing_from_the_message(self):
+        needle = 'ZEBRA-9172-secret-words'
         calls = []
-        def record(*argv, **kwargs):
-            calls.append(argv)
-            return type('Result', (), {'returncode': 0, 'stdout': 'slack-dm\n', 'stderr': ''})()
-        with self.fixture() as (watch, replay):
-            self.say(replay, '200.000100', 'secret words 12345')
-            with patch.object(watch, 'bound', wraps=Watch.bound.__get__(watch)), \
-                 patch.object(plane, 'run', side_effect=record):
-                watch.take_requests(20)
-            self.assertEqual(self.acks(replay), ['200.000100'])
-            self.assertEqual(calls, [('fm-captain-hold.sh', 'binding', plane.SOURCE)])
 
-    def test_retarget_drops_the_old_dms_walk_bound_with_its_cursor(self):
+        def record(argv, **kwargs):
+            calls.append((argv, kwargs))
+            return plane.subprocess.CompletedProcess(argv, 0, stdout='slack-dm\n', stderr='')
+
         with self.fixture() as (watch, replay):
-            watch.state['intake_bound'] = '200.000100'
+            self.say(replay, '200.000100', needle)
+            printed = io.StringIO()
+            with patch.object(watch, 'bound', Watch.bound.__get__(watch)), \
+                 patch.object(plane.subprocess, 'run', side_effect=record), contextlib.redirect_stdout(printed):
+                watch.take_requests(20)
+                plane.emit(watch, 'poll')
+            self.assertEqual(self.acks(replay), ['200.000100'])
+            self.assertIn(needle, printed.getvalue())
+        # One check when the request is delivered and one when its wake line is printed, nothing else.
+        self.assertEqual(len(calls), 2)
+        for argv, kwargs in calls:
+            self.assertEqual(argv, ['bash', str(plane.ROOT / 'fm-captain-hold.sh'), 'binding', plane.SOURCE])
+            self.assertIsNone(kwargs.get('input'))
+            self.assertFalse([key for key in kwargs['env'] if key.startswith('SLACK_')])
+            self.assertFalse([value for value in kwargs['env'].values() if needle in value])
+            self.assertNotIn(needle, repr((argv, kwargs.get('input'))))
+
+    def test_retarget_drops_the_old_dms_walk_bounds_with_its_cursor(self):
+        with self.fixture() as (watch, replay):
+            watch.state['intake_bounds'] = ['200.000100']
             watch.commit()
             with patch.dict(os.environ, {'FM_SLACK_DM_USER': 'U0OTHEROWNER1'}):
                 self.assertTrue(watch.retarget())
             saved = watch.load_state()
-            self.assertEqual(('intake_cursor' in saved, 'intake_bound' in saved), (False, False))
+            self.assertEqual(('intake_cursor' in saved, 'intake_bounds' in saved), (False, False))
 
     def test_a_removed_allowlist_member_loses_the_pending_request(self):
         with self.fixture() as (watch, replay):

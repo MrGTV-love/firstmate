@@ -592,9 +592,9 @@ class Watch:
             raise SlackError('dm_user_changed_with_unread_requests')
         # The old DM's threads stop being tracked and nothing more is posted there.
         self.state.update(user='', channel='', team='', scopes=[], threads={})
-        # The request cursor and its walk bound belong to the old DM; the new DM starts from its own latest message.
+        # The request cursor and its walk bounds belong to the old DM; the new DM starts from its own latest message.
         self.state.pop('intake_cursor', None)
-        self.state.pop('intake_bound', None)
+        self.state.pop('intake_bounds', None)
         self.commit()
         return True
 
@@ -644,7 +644,7 @@ class Watch:
         self.state.update(team=result.get('team_id'), user=self.dm_user(),
                           channel=channel['id'], scopes=sorted(getattr(self.api, 'scopes', set())),
                           intake_cursor=self.newest(latest.get('messages')))
-        self.state.pop('intake_bound', None)
+        self.state.pop('intake_bounds', None)
         self.commit()
         self.dm_proven = True
 
@@ -1012,12 +1012,16 @@ class Watch:
     def take_requests(self, remaining):
         """Take in new owner messages from the DM window, oldest first, at most remaining of them, with the one
         history read a poll may make. Slack lists history newest first, so when the wait since the starting point
-        is longer than a page, the read holds only its newest part: nothing is taken in from it, the next poll
-        reads below it, and requests still arrive oldest first with none skipped."""
+        is longer than a page, the read holds only its newest part: nothing is taken in from it, its lowest
+        timestamp is kept as a bound, and the next poll reads below that bound. Once a page reaches the oldest
+        message, it is taken in and the pages above it follow, one bound at a time, so requests still arrive
+        oldest first with none skipped, and a wait of k pages takes about 2k-1 polls."""
         channel, cursor = self.state.get('channel'), self.state.get('intake_cursor')
         if remaining <= 0 or not channel or cursor is None or self.window_reads:
             return
-        bound = self.state.get('intake_bound')
+        bounds = self.state.get('intake_bounds')
+        bounds = bounds if isinstance(bounds, list) else []
+        bound = bounds[-1] if bounds else None
         fields = {'oldest': cursor, 'limit': REQUEST_PAGE}
         if bound:
             fields['latest'] = bound
@@ -1032,7 +1036,7 @@ class Watch:
         if data.get('has_more') or (isinstance(paging, dict) and paging.get('next_cursor')):
             if not window:
                 raise SlackError('unreadable_dm_history')
-            self.state['intake_bound'] = min((message['ts'] for message in window), key=ts_key)
+            self.state['intake_bounds'] = bounds + [min((message['ts'] for message in window), key=ts_key)]
             self.commit()
             return
         moved, finished = False, True
@@ -1055,8 +1059,12 @@ class Watch:
             else:
                 self.state['intake_cursor'] = message['ts']
                 moved = True
-        if finished and bound:
-            self.state.pop('intake_bound')
+        if finished and bounds:
+            # This page is taken in; the next bound down names the page above it.
+            if bounds[:-1]:
+                self.state['intake_bounds'] = bounds[:-1]
+            else:
+                self.state.pop('intake_bounds')
             moved = True
         if moved:
             self.commit()
