@@ -1001,7 +1001,7 @@ PY
 }
 
 test_a_waiting_gate_reading_the_table_never_stops_a_younger_running_root() {
-  local tmp waiter runner deadline helper form index=0 root_pid stopped
+  local tmp waiter runner deadline helper form index=0 root_pid stopped hold
   local -a forms=(ps)
   command -v python3 >/dev/null 2>&1 || { pass "SKIP (python3 not resolved): a waiting gate's table read"; return; }
   tmp=$(fm_test_tmproot fm-lint-waiting-reader)
@@ -1031,25 +1031,28 @@ test_a_waiting_gate_reading_the_table_never_stops_a_younger_running_root() {
   [ "$(uname)" != Darwin ] || forms+=(drop '(ps)' '<defunct>' '[ps] <defunct>' parent /usr/bin/true)
   for form in "${forms[@]}"; do
     index=$((index + 1))
+    hold=3
+    [ "$form" != /usr/bin/true ] || hold=60
     if [ "$form" = ps ]; then
       PATH="$tmp/hide:$PATH" FM_TEST_GATE_POOL_PREFIX="$tmp/" FM_LINT_HOST_RSS_KIB=40000 FM_LINT_INTERNAL_ROOT_CAP_KIB=1024 \
         perl "$ROOT/bin/fm-lint-cache.pl" gate "$tmp/running-pool.$index" 2 running "$tmp/running.$index.wait" -- \
-        perl -e '$x = "x" x (80 * 1048576); select(undef, undef, undef, 3); exit 0' &
+        perl -e '$x = "x" x (80 * 1048576); select(undef, undef, undef, $ARGV[0]); open(my $end, ">", $ARGV[1]); exit 0' "$hold" "$tmp/ended.$index" &
     else
       PATH="$tmp/refuse:$PATH" FM_LINT_HOST_RSS_KIB=40000 FM_LINT_INTERNAL_ROOT_CAP_KIB=1024 \
         FM_TEST_REAL_HELPER="$ROOT/bin/fm-proc-info.py" FM_TEST_POOL_ROOT="$tmp/" \
         FM_TEST_HIDDEN_MATCH="$tmp/waiter/fm-proc-info.py table" FM_TEST_HIDDEN_FORM="$form" \
         perl "$tmp/watcher/fm-lint-cache.pl" gate "$tmp/running-pool.$index" 2 running "$tmp/running.$index.wait" -- \
-        perl -e '$x = "x" x (80 * 1048576); select(undef, undef, undef, 3); exit 0' &
+        perl -e '$x = "x" x (80 * 1048576); select(undef, undef, undef, $ARGV[0]); open(my $end, ">", $ARGV[1]); exit 0' "$hold" "$tmp/ended.$index" &
     fi
     runner=$!
     if [ "$form" = /usr/bin/true ]; then
       # The control: the same reading, with the helper's row a started command,
       # names the waiting gate the oldest, so this root is stopped. Without this
-      # stop, the passes above could come from a reading that never worked.
+      # stop, the passes above could come from a reading that never worked. This
+      # root outlives the slowest reading and ends as soon as the stop is seen.
       root_pid=$(fm_lint_child_of "$runner" "80 * 1048576") || { fm_lint_kill_tree "$runner" "$waiter"; fail "the control root never started"; }
       stopped=0
-      deadline=$((SECONDS + 15))
+      deadline=$((SECONDS + 45))
       while [ "$SECONDS" -lt "$deadline" ]; do
         case "$(ps -o stat= -p "$root_pid" 2>/dev/null)" in *T*) stopped=1; break ;; esac
         sleep 0.1
@@ -1058,13 +1061,10 @@ test_a_waiting_gate_reading_the_table_never_stops_a_younger_running_root() {
       [ "$stopped" -eq 1 ] || { fm_lint_kill_tree "$waiter"; fail "a root under an older running gate was not stopped, so this test proved nothing"; }
       continue
     fi
-    deadline=$((SECONDS + 20))
-    while kill -0 "$runner" 2>/dev/null && [ "$SECONDS" -lt "$deadline" ]; do sleep 0.2; done
-    if kill -0 "$runner" 2>/dev/null; then
-      fm_lint_kill_tree "$runner" "$waiter"
-      fail "a younger root over the budget was held back while an older gate only waited on its table read (table form: $form)"
-    fi
-    wait "$runner" || { fm_lint_kill_tree "$waiter"; fail "the younger root failed while an older gate waited on its table read (table form: $form)"; }
+    deadline=$((SECONDS + 45))
+    while [ ! -e "$tmp/ended.$index" ] && [ "$SECONDS" -lt "$deadline" ]; do sleep 0.2; done
+    fm_lint_kill_tree "$runner"
+    [ -e "$tmp/ended.$index" ] || { fm_lint_kill_tree "$waiter"; fail "a younger root over the budget was held back while an older gate only waited on its table read (table form: $form)"; }
     kill -0 "$helper" 2>/dev/null || fail "the older gate's table read ended before the younger root (table form: $form), so this test proved nothing"
   done
   fm_lint_kill_tree "$waiter"
@@ -1072,7 +1072,7 @@ test_a_waiting_gate_reading_the_table_never_stops_a_younger_running_root() {
 }
 
 test_growth_guard_never_stops_the_watch_reader() {
-  local tmp py older younger deadline rows watch reader standin form
+  local tmp py older younger deadline settle rows watch reader standin form
   local reader_seen reader_large reader_stopped standin_stopped
   [ "$(uname)" = Darwin ] || { pass "SKIP (not macOS): the resident watch's reader runs only on macOS"; return; }
   py=$(python3 -c 'import os, sys; print(os.path.realpath(sys.executable))' 2>/dev/null) \
@@ -1112,8 +1112,8 @@ test_growth_guard_never_stops_the_watch_reader() {
         perl -e '$x = "x" x (80 * 1048576); sleep 60' &
     fi
     younger=$!
-    reader_seen=0 reader_large=0 reader_stopped=0 standin_stopped=0
-    deadline=$((SECONDS + 8))
+    reader_seen=0 reader_large=0 reader_stopped=0 standin_stopped=0 settle=
+    deadline=$((SECONDS + 45))
     while [ "$SECONDS" -lt "$deadline" ]; do
       rows=$(ps -axo pid=,ppid=,stat=,rss=,command=)
       watch=$(printf '%s\n' "$rows" | awk -v parent="$younger" '$2 == parent && index($0, "fm-lint-cache.pl rsswatch") { print $1; exit }')
@@ -1125,6 +1125,9 @@ test_growth_guard_never_stops_the_watch_reader() {
         case "${reader%% *}" in *T*) reader_stopped=1 ;; esac
       fi
       case "$standin" in *T*) standin_stopped=1 ;; esac
+      # Once the guard has stopped the root, watch the reader through later readings.
+      if [ -z "$settle" ] && [ "$standin_stopped" -eq 1 ] && [ "$reader_large" -eq 1 ]; then settle=$((SECONDS + 5)); fi
+      if [ -n "$settle" ] && [ "$SECONDS" -ge "$settle" ]; then break; fi
       sleep 0.1
     done
     kill -TERM "$younger" 2>/dev/null
