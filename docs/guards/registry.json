@@ -7109,7 +7109,7 @@
       ],
       "invariant": "a moved item closes only when a different registered home holds its work open",
       "layer": "runtime-block",
-      "source": "data/secondmates.md through bin/fm-secondmate-registry-lib.sh, then the other home's backlog through tasks-axi or bin/fm-on.sh",
+      "source": "data/secondmates.md through bin/fm-secondmate-registry-lib.sh, then the other home's backlog through tasks-axi or bin/fm-on.sh, and for a remote home the backlog identity that bin/fm-backlog-identity.sh prints here and through bin/fm-on.sh",
       "trigger": "bin/fm-tasks-axi.sh done <id> --moved-to <home> <item-id> where the home is not registered exactly once, is this backlog (also through a remote record that reaches it), holds no such item, or holds it closed",
       "decision": "deny",
       "fail_direction": "closed",

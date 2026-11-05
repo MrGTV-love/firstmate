@@ -491,7 +491,8 @@ The script header owns the flags, the refusals, and their exit status; [`bin/fm-
   A local home is read through tasks-axi in its own data directory.
   A remote home is read through [`bin/fm-on.sh`](../bin/fm-on.sh), which owns the route and the transport, and an unreachable remote closes nothing.
   A move closes the source item only when two things are proved: the target is a different physical backlog, and the target's backlog holds the item open.
-  The first proof is the backlog's own identity, which is the machine id, the canonical data directory and its device and inode, printed by [`bin/fm-backlog-identity.sh`](../bin/fm-backlog-identity.sh) and read through the same transport that reads the item, never judged from a host name or an address.
+  For a local home, the first proof is that its data directory and its `backlog.md` are not the same files as this home's.
+  For a remote home, the first proof is the backlog's own identity, which is the machine id, the canonical data directory and its device and inode, printed by [`bin/fm-backlog-identity.sh`](../bin/fm-backlog-identity.sh) and read through the same transport that reads the item, never judged from a host name or an address.
   The same machine, directory and inode is the same backlog, whatever name reaches it, and an identity that cannot be read or is not complete refuses the move.
   Only standard output is the identity: it must be exactly the lines `machine=`, `data=` and `dev_ino=`, each once, and any other line makes the answer unreadable; standard error is kept apart for the error message and never enters the comparison.
   The same path on another machine is a different backlog.
