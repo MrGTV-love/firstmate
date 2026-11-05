@@ -1927,8 +1927,80 @@ test_away_merge_action() {
   pass 'away rows name a stale base and a missing PASS and keep the posture reason otherwise'
 }
 
+shared_mutation() { # home other jq-mutation
+  mutate_record "$1" delivery "$3"
+  mutate_record "$1" "$2" "$3"
+}
+
+shared_restore() { # home other
+  cp "$1/delivery.json" "$1/data/delivery/contributions.json"
+  cp "$1/other.json" "$1/data/$2/contributions.json"
+}
+
+test_captain_verdict_settled_lifecycle() {
+  local home variant url=https://github.com/o/r/pull/8
+  for variant in control answer-release answer-close withdraw reconcile paused; do
+    home=$(new_home "settled-verdict-$variant")
+    merge_home "$home"
+    merge_poll "$home"
+    with_home "$home" "$ROOT/bin/fm-contributions.sh" verdict delivery "$url" "$(cat "$home/forge/head")" \
+      "$url#issuecomment-1" captain 'choose X' >/dev/null || fail 'could not record the captain verdict'
+    expect_merge_action "$home" 'choose X' captain
+    printf 'evidence for the settled call\n' > "$home/evidence.txt"
+    if [ "$variant" = answer-release ] || [ "$variant" = answer-close ] || [ "$variant" = withdraw ]; then
+      FM_CAPTAIN_HOLD_NOW="$NOW" with_home "$home" bash "$ROOT/bin/fm-captain-hold.sh" hold delivery --reason 'choose contract' >/dev/null \
+        || fail 'could not file the hold'
+      expect_merge_action "$home" 'choose contract' captain
+    fi
+    case "$variant" in
+      control)
+        merge_snapshot "$home" | jq -e '.counts.captain == 1 and (.proven_clear | not)' >/dev/null \
+          || fail 'an unanswered captain verdict left the owner'
+        ;;
+      answer-release)
+        with_home "$home" bash "$ROOT/bin/fm-captain-hold.sh" answer delivery --decision-file "$home/evidence.txt" --release >/dev/null \
+          || fail 'answer --release failed'
+        ;;
+      answer-close)
+        with_home "$home" bash "$ROOT/bin/fm-captain-hold.sh" answer delivery --decision-file "$home/evidence.txt" >/dev/null \
+          || fail 'answer without --release failed'
+        ;;
+      withdraw)
+        FM_CAPTAIN_HOLD_NOW="$NOW" with_home "$home" bash "$ROOT/bin/fm-captain-hold.sh" hold ruling-call --title 'Ruling call' \
+          --reason 'does delivery still need a choice' --repo sample >/dev/null || fail 'could not hold the ruling call'
+        with_home "$home" bash "$ROOT/bin/fm-captain-hold.sh" answer ruling-call --decision-file "$home/evidence.txt" >/dev/null \
+          || fail 'could not answer the ruling call'
+        with_home "$home" bash "$ROOT/bin/fm-captain-hold.sh" withdraw delivery --evidence-file "$home/evidence.txt" --ruling ruling-call >/dev/null \
+          || fail 'withdraw failed'
+        ;;
+      reconcile)
+        FM_CAPTAIN_HOLD_NOW="$NOW" with_home "$home" bash "$ROOT/bin/fm-captain-hold.sh" hold reconcile-call --title "Captain call $url" \
+          --reason 'choose contract' --repo sample >/dev/null || fail 'could not file the linked call'
+        expect_merge_action "$home" 'choose contract' captain
+        with_home "$home" bash "$ROOT/bin/fm-captain-hold.sh" reconcile close reconcile-call --evidence-file "$home/evidence.txt" --verified-outcome moot >/dev/null \
+          || fail 'reconcile close failed'
+        merge_poll "$home"
+        ;;
+      paused)
+        printf 'paused: waiting for external CI\n' > "$home/state/delivery.status"
+        ;;
+    esac
+    if [ "$variant" != control ]; then
+      merge_snapshot "$home" | jq -e '.rows[0].verdict.freshness == "current" and .rows[0].verdict.actor == "captain"' >/dev/null \
+        || fail "$variant lost the current captain verdict fixture"
+      expect_merge_action "$home" 'route the independent review'
+    fi
+    if [ "$variant" = paused ]; then
+      printf 'working: the external CI returned\n' >> "$home/state/delivery.status"
+      expect_merge_action "$home" 'choose X' captain
+    fi
+    printf 'settled verdict variant: %s\n' "$variant"
+  done
+  pass 'a captain verdict stays an owner call until an answer, withdrawal, reconcile close or declared pause settles it'
+}
+
 test_shared_url_label_follows_facts() {
-  local other home
+  local other home actor
   for other in a-landing z-landing; do
     home=$(new_home "shared-label-$other")
     merge_home "$home"
@@ -1937,14 +2009,44 @@ test_shared_url_label_follows_facts() {
     merge_poll "$home"
     expect_merge_action "$home" 'merge under the standing merge rule'
     merge_snapshot "$home" | jq -e --arg other "$other" '.known == 1 and .rows[0].task == "delivery"
-      and .rows[0].tasks == ([$other,"delivery"] | sort) and (.rows[0] | has("review_rank") | not)' >/dev/null \
+      and .rows[0].tasks == ([$other,"delivery"] | sort) and (.rows[0] | has("label_rank") | not)' >/dev/null \
       || fail "shared URL lost the qualifying owner beside $other"
     jq -e '.records[0].observation.review_verification.answer.ok == false' "$home/data/$other/contributions.json" >/dev/null \
       || fail "fixture owner $other unexpectedly qualified"
     mutate_record "$home" "$other" '.records[0].verdict={head:.records[0].observation.head,actor:"maintainer",source:"review",summary:"awaiting maintainer"}'
     expect_merge_action "$home" 'awaiting maintainer' maintainer
+    mutate_record "$home" "$other" '.records[0].verdict=null
+      | .records[0].observation.review_verification.answer={schema:"fm-review-verification.v1",ok:false,error:{kind:"not-qualified",message:"absent"}}'
+    expect_merge_action "$home" 'merge under the standing merge rule'
+    cp "$home/data/delivery/contributions.json" "$home/delivery.json"
+    cp "$home/data/$other/contributions.json" "$home/other.json"
+    shared_mutation "$home" "$other" '.records[0].observation.can_merge=false'
+    expect_merge_action "$home" 'delivery awaits the maintainer' maintainer
+    shared_restore "$home" "$other"
+    shared_mutation "$home" "$other" '.records[0].observation.review_decision="REVIEW_REQUIRED"'
+    expect_merge_action "$home" 'review required' maintainer
+    shared_restore "$home" "$other"
+    for actor in maintainer nobody; do
+      mutate_record "$home" "$other" ".records[0].verdict={head:.records[0].observation.head,actor:\"$actor\",source:\"review\",summary:\"kept judgment\"}"
+      cp "$home/data/$other/contributions.json" "$home/other.json"
+      shared_mutation "$home" "$other" '.records[0].observation.base_containment.behind_by=1'
+      expect_merge_action "$home" 'kept judgment' "$actor"
+      shared_restore "$home" "$other"
+      shared_mutation "$home" "$other" 'del(.records[0].observation.base_containment)'
+      expect_merge_action "$home" 'kept judgment' "$actor"
+      shared_restore "$home" "$other"
+    done
+    printf 'pr=https://github.com/o/r/pull/8\npr_head=%s\nyolo=on\n' "$(cat "$home/forge/head")" >> "$home/state/delivery.meta"
+    with_home "$home" "$ROOT/bin/fm-afk-contract.sh" enter --words 'merge the delivery PR when green' >/dev/null \
+      || fail 'could not enter away posture'
+    for actor in maintainer nobody; do
+      mutate_record "$home" "$other" ".records[0].verdict={head:.records[0].observation.head,actor:\"$actor\",source:\"review\",summary:\"kept judgment\"}"
+      expect_merge_action "$home" 'kept judgment' "$actor"
+    done
+    mutate_record "$home" "$other" '.records[0].verdict=null'
+    expect_merge_action "$home" 'checks green; merge is authorized by delivery posture'
   done
-  pass 'a shared URL label follows the owners facts and never the task-name order'
+  pass 'a shared URL row follows the owners facts in either task-name order'
 }
 
 test_merge_precedence_matrix() {
@@ -2047,7 +2149,7 @@ EXPECTED
 
 fm_test_only
 failures=0
-for test_name in test_ordinary_merge_ownership test_observed_merge_check_precedence test_merge_base_observation test_merge_verifier_unknowns test_merge_saved_facts_and_freshness test_merge_hold_lifecycle test_away_merge_action test_shared_url_label_follows_facts test_merge_precedence_matrix test_actor_coverage test_stale_verdict test_unchecked_is_not_silence test_newest_check_has_no_verdict test_comment_wake test_review_wake test_inline_wake test_ready_issue_wake test_fresh_issue_requires_maintainer test_missing_lane_remains_missing test_partial_freshness_keeps_measured_rows test_malformed_record_cannot_prove_silence test_issue_timeline_and_exact_ack test_verdict_retains_judged_head test_verdict_actor_values_are_discoverable test_observed_replacement_refreshes_verdict test_unobserved_head_leaves_verdict_unknown test_away_yolo_is_fleet_work test_away_yolo_cross_home_is_fleet_work test_retired_and_unsupported_coverage test_unsupported_forge_is_not_fleet_work test_held_unsupported_forge_is_not_captain_work test_shared_contribution_signal_wakes_once test_watcher_keeps_diagnostics_separate_from_contribution_wakes test_expired_child_unsupported_forge_stays_unmeasured test_watcher_surfaces_new_contribution_once test_home_summary_coverage test_unreadable_pending_is_not_empty test_record_task_identity_matches_dirname_basename test_read_only_views_create_no_state test_clock_jump_does_not_refuse_a_read test_genuine_failure_after_clock_jump_is_unavailable test_shared_url_observed_once test_terminal_contribution_settles test_late_owner_inherits_terminal_observation test_interrupted_multi_owner_poll_settles_every_owner test_done_task_open_pr_still_observed test_all_urls_are_attempted_without_reservation test_three_second_pr_reads_complete_fresh_in_one_cycle test_progressing_reads_survive_fivefold_slowdown test_unsupported_url_first_does_not_abort_the_pass test_quota_reason_is_the_refusal_line test_reads_record_their_samples_when_the_poll_ends test_first_unknown_read_defers_the_rest_of_the_pass test_always_silent_url_does_not_starve_the_others test_stop_while_writing_the_order_leaves_no_temporary test_retired_pr_poll_starts_a_new_stop_episode test_every_disarm_path_starts_a_new_stop_episode test_reads_are_independent_of_watcher_interval test_watcher_stopped_check_rings_queued_row_next_pass test_unavailable_forge_records_error_and_wakes_once_per_episode test_late_owner_keeps_failure_episode_suppressed test_retire_ends_observation_of_a_gone_contribution test_late_owner_of_a_retired_final_contribution_is_not_retired test_retire_is_idempotent_and_refuses_unknown_pairs test_repeated_poll_reads_unchanged_prs_conditionally test_low_quota_poll_keeps_last_observation_marked_stale test_failure_after_quota_episode_wakes test_late_owners_keep_quota_episode_suppressed test_low_quota_wave_guards_graphql_and_marks_every_tail_owner test_successful_issue_wave_marks_unmeasured_tail_owners test_http_shim_preserves_backend_failures; do
+for test_name in test_ordinary_merge_ownership test_observed_merge_check_precedence test_merge_base_observation test_merge_verifier_unknowns test_merge_saved_facts_and_freshness test_merge_hold_lifecycle test_away_merge_action test_captain_verdict_settled_lifecycle test_shared_url_label_follows_facts test_merge_precedence_matrix test_actor_coverage test_stale_verdict test_unchecked_is_not_silence test_newest_check_has_no_verdict test_comment_wake test_review_wake test_inline_wake test_ready_issue_wake test_fresh_issue_requires_maintainer test_missing_lane_remains_missing test_partial_freshness_keeps_measured_rows test_malformed_record_cannot_prove_silence test_issue_timeline_and_exact_ack test_verdict_retains_judged_head test_verdict_actor_values_are_discoverable test_observed_replacement_refreshes_verdict test_unobserved_head_leaves_verdict_unknown test_away_yolo_is_fleet_work test_away_yolo_cross_home_is_fleet_work test_retired_and_unsupported_coverage test_unsupported_forge_is_not_fleet_work test_held_unsupported_forge_is_not_captain_work test_shared_contribution_signal_wakes_once test_watcher_keeps_diagnostics_separate_from_contribution_wakes test_expired_child_unsupported_forge_stays_unmeasured test_watcher_surfaces_new_contribution_once test_home_summary_coverage test_unreadable_pending_is_not_empty test_record_task_identity_matches_dirname_basename test_read_only_views_create_no_state test_clock_jump_does_not_refuse_a_read test_genuine_failure_after_clock_jump_is_unavailable test_shared_url_observed_once test_terminal_contribution_settles test_late_owner_inherits_terminal_observation test_interrupted_multi_owner_poll_settles_every_owner test_done_task_open_pr_still_observed test_all_urls_are_attempted_without_reservation test_three_second_pr_reads_complete_fresh_in_one_cycle test_progressing_reads_survive_fivefold_slowdown test_unsupported_url_first_does_not_abort_the_pass test_quota_reason_is_the_refusal_line test_reads_record_their_samples_when_the_poll_ends test_first_unknown_read_defers_the_rest_of_the_pass test_always_silent_url_does_not_starve_the_others test_stop_while_writing_the_order_leaves_no_temporary test_retired_pr_poll_starts_a_new_stop_episode test_every_disarm_path_starts_a_new_stop_episode test_reads_are_independent_of_watcher_interval test_watcher_stopped_check_rings_queued_row_next_pass test_unavailable_forge_records_error_and_wakes_once_per_episode test_late_owner_keeps_failure_episode_suppressed test_retire_ends_observation_of_a_gone_contribution test_late_owner_of_a_retired_final_contribution_is_not_retired test_retire_is_idempotent_and_refuses_unknown_pairs test_repeated_poll_reads_unchanged_prs_conditionally test_low_quota_poll_keeps_last_observation_marked_stale test_failure_after_quota_episode_wakes test_late_owners_keep_quota_episode_suppressed test_low_quota_wave_guards_graphql_and_marks_every_tail_owner test_successful_issue_wave_marks_unmeasured_tail_owners test_http_shim_preserves_backend_failures; do
   ( "$test_name" ) || failures=$((failures + 1))
 done
 [ "$failures" -eq 0 ] || fail "$failures contribution regressions"

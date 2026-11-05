@@ -31,14 +31,17 @@
 # prose verdict only after its source identifies that head; otherwise leave it unbound and
 # triage its signal. Formal reviews carry GitHub's own commit_id. Neither kind
 # can grant merge authority. A live captain hold projects a captain actor, and so
-# does a current captain verdict unless a deferred captain hold pauses that task.
+# does a current captain verdict, unless the owner's backlog row has a deferred
+# hold or a recorded resolution (hold_answered) or its latest declared wait is
+# paused:. A row that backlog retention moved to the done archive is not read.
 # A current maintainer or nobody verdict keeps its actor and summary.
 # Other green PRs are fleet work. A stale base updates the branch and a missing
 # qualifying PASS routes the independent review, on REVIEW_REQUIRED, can_merge
 # false and away rows too. An eligible row refreshes an unknown base, rechecks an
 # unknown PASS fact, or merges under the standing rule. When owners of one URL
-# differ, a qualifying PASS decides the review label; task names never do. These
-# are action labels, never forge writes.
+# differ, a current recorded verdict outranks these labels, a qualifying PASS
+# outranks a missing or unknown one, and task names never decide. These are
+# action labels, never forge writes.
 # Optional PR facts share checked_at's freshness window: base_sha is the pull
 # resource's base SHA passed to the review verifier; base_containment records
 # behind_by from compare/<encoded live base branch>...<head>.
