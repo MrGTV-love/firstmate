@@ -37,7 +37,8 @@ use File::Basename qw(dirname basename);
 # its owner may hold the lock, so the waiter scans without the lock. Slot flocks
 # alone enforce the capacity count.
 # The memory budget is checked only by the request whose turn it is, under
-# admission.lock. The request is charged the recorded peak of its root
+# admission.lock, or without it on the stopped-gate path above. The request is
+# charged the recorded peak of its root
 # (FM_LINT_INTERNAL_ROOT_KEY, kept in history/<sha256 of the key>), or the
 # per-root worst case (FM_LINT_INTERNAL_ROOT_CAP_KIB) when the root has no
 # record. Every held slot is charged the larger of the charge its record names
