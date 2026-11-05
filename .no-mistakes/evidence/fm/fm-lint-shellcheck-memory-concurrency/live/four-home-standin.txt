@@ -1,0 +1,9 @@
+# four HOME values, four runs, 3 roots each, stand-in allocates 64 MiB after admission. uptime: load averages: 9.87 13.98 16.30
+BASE_default_pools budget_kib=170000 runs_rc=0 roots_completed=12/12 most_at_once_by_spans=8 ps_sampler_max_procs_and_max_rss_kib=8 1093232 gap_mean_s=0.28 gap_max_s=0.32 samples=28 history_records=0
+HEAD_shared_pool_no_records budget_kib=170000 runs_rc=0 roots_completed=12/12 most_at_once_by_spans=1 ps_sampler_max_procs_and_max_rss_kib=1 136800 gap_mean_s=0.29 gap_max_s=0.79 samples=130 history_records=3
+HEAD_shared_pool_with_records budget_kib=170000 runs_rc=0 roots_completed=12/12 most_at_once_by_spans=1 ps_sampler_max_procs_and_max_rss_kib=1 136800 gap_mean_s=0.32 gap_max_s=1.36 samples=125 history_records=3
+HEAD_stand-in_no_pool_setting(each_run_its_own_scratch_pool) budget_kib=170000 runs_rc=0 roots_completed=12/12 most_at_once_by_spans=4 ps_sampler_max_procs_and_max_rss_kib=4 546624 gap_mean_s=0.28 gap_max_s=0.37 samples=39 history_records=0
+
+# a budget that fits two recorded stand-ins (each peaks near 136800 KiB) and no unrecorded one (262144 KiB)
+HEAD_budget_fits_two_no_records budget_kib=342000 runs_rc=0 roots_completed=12/12 most_at_once_by_spans=2 ps_sampler_max_procs_and_max_rss_kib=2 273456 gap_mean_s=0.45 gap_max_s=4.17 samples=75 history_records=3
+HEAD_budget_fits_two_with_records budget_kib=342000 runs_rc=0 roots_completed=12/12 most_at_once_by_spans=2 ps_sampler_max_procs_and_max_rss_kib=2 273280 gap_mean_s=0.30 gap_max_s=0.38 samples=66 history_records=3

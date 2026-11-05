@@ -1,0 +1,9 @@
+$ s4-fast at 0812532f796594aa8f13ef742beb8234e0f27ab8
+fast run exit=0
+history for fast:a.sh = 6496 KiB
+history for full:a.sh = none (expect none)
+fast request beside an unrecorded holder: exit=0 starts=2 (expect 2, it joins)
+starts 4 s after a full request of the same root (expect still 2, it waits): 2
+full request exit=0 after the holder ended; starts=3
+history for full:a.sh after its own run: 6752 KiB
+driver rc=0

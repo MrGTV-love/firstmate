@@ -1,0 +1,12 @@
+load averages: 14.66 16.55 17.57
+key waiter did not start
+not ok - cache queue consumed the memory retry budget
+head iter 1 rc=1
+load averages: 19.67 17.28 17.78
+key waiter did not start
+not ok - cache queue consumed the memory retry budget
+head iter 2 rc=1
+load averages: 16.32 16.80 17.59
+key waiter did not start
+not ok - cache queue consumed the memory retry budget
+head iter 3 rc=1

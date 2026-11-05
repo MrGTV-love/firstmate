@@ -1,0 +1,14 @@
+# head 0812532f796594aa8f13ef742beb8234e0f27ab8
+## stand-in that grows 8 MiB per step, bound 102400 KiB
+exit=0 seconds=5 attempts=yes no  (expect yes no)
+fm-lint: grow.sh hit the memory ceiling with --external-sources (reason=memory rc=98); retried without it; fallback passed with cross-file codes excluded (SC1091,SC2034,SC2153,SC2329)
+roots log: status=0 outcome=memory-fallback peak_rss_kib=160880
+
+## real ShellCheck version: 0.11.0, heavy repo root, host pool, bound 2097152 KiB (2 GiB)
+history record before: 8490752 KiB
+host admit exit=0
+exit=0 seconds=12
+fm-lint: bin/fm-watch.sh hit the memory ceiling with --external-sources (reason=memory rc=98); retried without it; fallback passed with cross-file codes excluded (SC1091,SC2034,SC2153,SC2329)
+roots log: root=bin/fm-watch.sh status=0 outcome=memory-fallback peak_rss_kib=2457856
+history record after: 8490752 KiB (a record never falls)
+driver rc=0

@@ -1,0 +1,40 @@
+# head 0812532f796594aa8f13ef742beb8234e0f27ab8; container fm-ubuntu2604:latest --init, memory 8g, 6 CPUs, /usr/bin/time from apt
+ok - jobs=1 and jobs=2 preserve deterministic diagnostics, failures, cleanup bounds, and quiet telemetry
+ok - six concurrent runs peak at 12 ShellCheck processes ungated and 3 with a three-slot pool
+ok - oversubscribed runs share the CPU-derived cap and every run finishes
+ok - host caps are CPU-derived, ignore load, and admission respects total occupancy
+ok - waiting roots precede newer roots and a killed waiter cannot strand admission
+ok - a two-worker run and a one-worker run alternate turns on a scarce pool
+ok - a stopped head waiter is skipped while a slot is free and is admitted once resumed
+ok - a gate stopped while owning admission does not freeze free capacity
+ok - a waiter's slow ps does not keep the next root out of admission
+ok - the queue scan handles slot paths with spaces and tickets cancelled mid-scan
+ok - a content-identical cached success finishes while all host slots remain occupied
+ok - the slot pool cannot be disabled, rejects bad settings, and refuses an unusable directory instead of running unbounded
+ok - slot open, counter and non-contention coordinator/scan lock failures refuse naming the path and never run the analysis
+ok - a real ShellCheck cannot leave the host pool, real shellcheck outside a pool counts against its budget, and a stand-in keeps its fixture pool
+ok - four runs with four HOME values stay within the memory budget with and without records, run two recorded roots at once, and finish all 12 roots (unbudgeted: 8 12; no
+ok - a root larger than the budget runs alone, and a killed run frees its charge and leaves no ticket
+ok - stale records are reclaimed, unknown records and an unreadable table are charged the worst case, a root with no record is charged the worst case, a root past its rec
+ok - a --fast record charges later fast requests only; a full request of the same root is still charged the worst case
+ok - runs with different HOME, XDG_CACHE_HOME and FM_HOME values record in the same per-user pool
+ok - inherited slots prevent overlap after gate death and allow admission after watchdog cleanup
+ok - queued roots and memory retries record precise analysis durations without EPOCHREALTIME
+ok - jobs=1 and jobs=2 stop complete worker trees with and without telemetry
+ok - a root pinned at the wall deadline fails by name, reaps its tree, and leaves the sentinel alive
+ok - a root refused by its enforced memory limit fails by name with a memory reason
+ok - memory failures retry without source following, exclude cross-file codes, and preserve a real fallback finding
+ok - off macOS the resident-memory watch leaves a root over the bound to its single attempt
+ok - a root under the resident-memory bound, a malformed bound, and the enforced envelope behave as before
+ok - SKIP (the resident-memory watch runs only on macOS): owner-death check
+ok - a resident-watch shim that resolves to itself is refused at once
+ok - SKIP (the resident-memory watch runs only on macOS): own-tree sampling check
+ok - SKIP (the resident-memory watch runs only on macOS): footprint bound check
+ok - SKIP (the resident-memory watch runs only on macOS): stalled reader check
+ok - SKIP (the resident-memory watch runs only on macOS): slow first reply check
+ok - SKIP (the resident-memory watch runs only on macOS): slow later reply check
+ok - SKIP (the resident-memory watch runs only on macOS): failed replacement check
+ok - SKIP (the resident-memory watch runs only on macOS): restarts-failed check
+ok - a cache-key wait longer than the root deadline preserves its memory retry budget
+suite exit=0
+docker rc=0

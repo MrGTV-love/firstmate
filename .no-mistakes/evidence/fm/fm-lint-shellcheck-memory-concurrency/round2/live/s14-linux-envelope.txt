@@ -1,0 +1,62 @@
+# head 0812532f796594aa8f13ef742beb8234e0f27ab8; container fm-ubuntu2604:latest, memory 8g, 6 CPUs, /usr/bin/time from apt inside the container, removed at the end
+apt exit=0
+installer exit=0
+Linux aarch64 ShellCheck version: 0.11.0
+## real, FM_LINT_REQUIRE_BOUNDS=1, CI=true, --strict-version: a clean and a finding root
+exit=1 (expect 1, a real finding)
+^----^ SC2034 (warning): unused appears unused. Verify use (or export if used externally).
+  https://www.shellcheck.net/wiki/SC2034 -- unused appears unused. Verify use...
+host pool: /var/tmp/firstmate-lint-1000/lint-slots
+## real, enforced envelope, address-space limit too small for the source-following attempt: named death, then narrower retry
+exit=0
+fallback: "1200s existing caller limit"
+fm-lint: bin/fm-watch.sh hit the memory ceiling with --external-sources (reason=memory rc=251); retried without it; fallback passed with cross-file codes excluded (SC1091,SC2034,SC2153,SC2329)
+roots log: root=bin/fm-watch.sh status=0 outcome=memory-fallback
+## refusals on Linux
+FM_LINT_SLOT_DIR=off exit=2
+FM_LINT_SLOT_DIR=other exit=2
+## two recorded roots under the enforced envelope: real runs overlap once they have records
+-rwxr-xr-x 1 root root 68040 Jan 14  2026 /usr/bin/time
+cold exit=0
+  /tmp/fx/clean.sh status=0 outcome=ok peak_rss_kib=22360
+  tests/fm-lint-helpers.sh status=0 outcome=ok peak_rss_kib=216496
+warm exit=0
+  /tmp/fx/clean.sh status=0 outcome=ok peak_rss_kib=22360
+  tests/fm-lint-helpers.sh status=0 outcome=ok peak_rss_kib=216500
+## the whole slots suite, with the CI and GITHUB_ACTIONS values CI has
+ok - jobs=1 and jobs=2 preserve deterministic diagnostics, failures, cleanup bounds, and quiet telemetry
+ok - six concurrent runs peak at 12 ShellCheck processes ungated and 3 with a three-slot pool
+ok - oversubscribed runs share the CPU-derived cap and every run finishes
+ok - host caps are CPU-derived, ignore load, and admission respects total occupancy
+ok - waiting roots precede newer roots and a killed waiter cannot strand admission
+ok - a two-worker run and a one-worker run alternate turns on a scarce pool
+ok - a stopped head waiter is skipped while a slot is free and is admitted once resumed
+ok - a gate stopped while owning admission does not freeze free capacity
+ok - a waiter's slow ps does not keep the next root out of admission
+analysis ran
+analysis ran
+ok - the queue scan handles slot paths with spaces and tickets cancelled mid-scan
+ok - a content-identical cached success finishes while all host slots remain occupied
+ok - the slot pool cannot be disabled, rejects bad settings, and refuses an unusable directory instead of running unbounded
+ok - slot open, counter and non-contention coordinator/scan lock failures refuse naming the path and never run the analysis
+ok - a real ShellCheck cannot leave the host pool, real shellcheck outside a pool counts against its budget, and a stand-in keeps its fixture pool
+ok - four runs with four HOME values stay within the memory budget with and without records, run two recorded roots at once, and finish all 12 roots (unbudgeted: 8 12; no records: 2 12; records: 2 12)
+ok - a root larger than the budget runs alone, and a killed run frees its charge and leaves no ticket
+ok - stale records are reclaimed, unknown records and an unreadable table are charged the worst case, a root with no record is charged the worst case, a root past its record is charged its current pea
+ok - a --fast record charges later fast requests only; a full request of the same root is still charged the worst case
+ok - runs with different HOME, XDG_CACHE_HOME and FM_HOME values record in the same per-user pool
+error: process ID list syntax error
+
+Usage:
+ ps [options]
+
+ Try 'ps --help <simple|list|output|threads|misc|all>'
+  or 'ps --help <s|l|o|t|m|a>'
+ for additional help text.
+
+For more details see ps(1).
+ok - inherited slots prevent overlap after gate death and allow admission after watchdog cleanup
+ok - queued roots and memory retries record precise analysis durations without EPOCHREALTIME
+not ok - jobs=1 telemetry=off left ShellCheck running
+suite exit=1
+docker rc=0

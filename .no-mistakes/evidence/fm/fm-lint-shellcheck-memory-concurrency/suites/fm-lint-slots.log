@@ -1,0 +1,48 @@
+FM_TEST_BEGIN 2026-11-05T00:22:28Z tests/fm-lint-slots.test.sh family=pure-contract-unit expected_gate_skip=none
+ok - jobs=1 and jobs=2 preserve deterministic diagnostics, failures, cleanup bounds, and quiet telemetry
+ok - six concurrent runs peak at 12 ShellCheck processes ungated and 3 with a three-slot pool
+ok - oversubscribed runs share the CPU-derived cap and every run finishes
+ok - host caps are CPU-derived, ignore load, and admission respects total occupancy
+ok - waiting roots precede newer roots and a killed waiter cannot strand admission
+ok - a two-worker run and a one-worker run alternate turns on a scarce pool
+ok - a stopped head waiter is skipped while a slot is free and is admitted once resumed
+ok - a gate stopped while owning admission does not freeze free capacity
+ok - a waiter's slow ps does not keep the next root out of admission
+analysis ran
+analysis ran
+ok - the queue scan handles slot paths with spaces and tickets cancelled mid-scan
+ok - a content-identical cached success finishes while all host slots remain occupied
+ok - the slot pool cannot be disabled, rejects bad settings, and refuses an unusable directory instead of running unbounded
+ok - slot open, counter and non-contention coordinator/scan lock failures refuse naming the path and never run the analysis
+ok - a real ShellCheck cannot leave the host pool, real shellcheck outside a pool counts against its budget, and a stand-in keeps its fixture pool
+ok - four runs with four HOME values stay within the memory budget with and without records, run two recorded roots at once, and finish all 12 roots (unbudgeted: 8 12; no records: 2 12; records: 2 12)
+ok - a root larger than the budget runs alone, and a killed run frees its charge and leaves no ticket
+ok - stale records are reclaimed, unknown records and an unreadable table are charged the worst case, a root with no record is charged the worst case, a root past its record is charged its current peak, records only rise and only after a complete analysis, and slots beyond a run's cap count
+ok - a --fast record charges later fast requests only; a full request of the same root is still charged the worst case
+ok - runs with different HOME, XDG_CACHE_HOME and FM_HOME values record in the same per-user pool
+ok - inherited slots prevent overlap after gate death and allow admission after watchdog cleanup
+ok - queued roots and memory retries record precise analysis durations without EPOCHREALTIME
+ok - jobs=1 and jobs=2 stop complete worker trees with and without telemetry
+ok - SKIP (host cannot enforce the bounded envelope): root deadline kill check
+ok - SKIP (host cannot enforce the bounded envelope): memory-limit death check
+ok - memory failures retry without source following, exclude cross-file codes, and preserve a real fallback finding
+ok - a root over the resident-memory bound is ended and retried narrower with the roots log marking it
+ok - a root under the resident-memory bound, a malformed bound, and the enforced envelope behave as before
+ok - the resident-memory watch ends its command when the owner dies
+ok - a resident-watch shim that resolves to itself is refused at once
+ok - the resident-memory watch samples only its command's own tree
+ok - a root whose footprint crosses the bound while its resident size does not is ended and retried narrower
+ok - a reader that misses one deadline is replaced and footprint ends the root on the next tick
+ok - a reader whose first reply is 1 s late keeps footprint in use
+ok - a later reply 1 s late is sampled by ps for that tick only
+ok - a replacement reader that exits before replying is retried and footprint still ends the root
+ok - three failed replacement readers in a row give the reader up as restarts-failed
+key waiter did not start
+not ok - cache queue consumed the memory retry budget
+FM_TEST_END 2026-11-05T00:28:30Z tests/fm-lint-slots.test.sh exit=1 duration_ms=362031 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6MC9FAZ2R279RGXAGWCSZK4/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=364819
+FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=1 duration_ms=362031 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-lint-slots.test.sh duration_ms=362031
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6MC9FAZ2R279RGXAGWCSZK4/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+rc=1

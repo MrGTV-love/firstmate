@@ -1,0 +1,40 @@
+base clean.sh exit=0 lines=3
+base error.sh exit=1 lines=19
+base warning.sh exit=1 lines=16
+base info.sh exit=1 lines=13
+base style.sh exit=1 lines=22
+head clean.sh exit=0 lines=3
+head error.sh exit=1 lines=19
+head warning.sh exit=1 lines=16
+head info.sh exit=1 lines=13
+head style.sh exit=1 lines=22
+--- all-files run: base exit=1 head exit=1
+diff of the all-files output, base vs head: exit=0 lines=0
+diff clean.sh: exit=0
+diff error.sh: exit=0
+diff warning.sh: exit=0
+diff info.sh: exit=0
+diff style.sh: exit=0
+--- diagnostic codes found (head):
+   1 SC1046 
+   1 SC1046 (error
+   1 SC1047 
+   1 SC1047 (error
+   1 SC1072 
+   1 SC1072 (error
+   1 SC1073 (error
+   1 SC2005 
+   1 SC2005 (style
+   1 SC2006 (style
+   1 SC2034 
+   1 SC2034 (warning
+   1 SC2045 
+   1 SC2045 (error
+   1 SC2046 
+   1 SC2046 (warning
+   1 SC2086 
+   1 SC2086 (info
+   1 SC2128 
+   1 SC2128 (warning
+   2 SC1046    2 SC1047    2 SC1072    1 SC1073    2 SC2005    1 SC2006    2 SC2034    2 SC2045    2 SC2046    2 SC2086    2 SC2128 
+history marks removed from the live pool: 5 of 5

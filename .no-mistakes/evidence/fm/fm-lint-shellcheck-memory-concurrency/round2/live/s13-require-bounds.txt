@@ -1,0 +1,8 @@
+# base 9c5874baa vs head 0812532f796594aa8f13ef742beb8234e0f27ab8
+base FM_LINT_REQUIRE_BOUNDS=1 exit=2
+head FM_LINT_REQUIRE_BOUNDS=1 exit=2
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: bounds required but per-root memory limit FM_LINT_ROOT_MEMORY_KIB=12582912 KiB is not enforceable on this host (ulimit -v).
+fm-lint.sh: refusing to lint uncapped under FM_LINT_REQUIRE_BOUNDS=1.
+diff base vs head: exit=0

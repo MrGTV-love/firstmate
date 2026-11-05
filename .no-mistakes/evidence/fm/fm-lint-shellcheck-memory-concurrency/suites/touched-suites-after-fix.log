@@ -1,0 +1,140 @@
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6MC9FAZ2R279RGXAGWCSZK4/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-11-05T00:38:01Z tests/fm-lint-report.test.sh family=pure-contract-unit expected_gate_skip=none
+FM_TEST_BEGIN 2026-11-05T00:38:01Z tests/fm-lint-slots.test.sh family=pure-contract-unit expected_gate_skip=none
+FM_TEST_BEGIN 2026-11-05T00:38:01Z tests/fm-lint.test.sh family=pure-contract-unit expected_gate_skip=none
+ok - jobs=1 and jobs=2 preserve deterministic diagnostics, failures, cleanup bounds, and quiet telemetry
+ok - six concurrent runs peak at 12 ShellCheck processes ungated and 3 with a three-slot pool
+ok - oversubscribed runs share the CPU-derived cap and every run finishes
+ok - host caps are CPU-derived, ignore load, and admission respects total occupancy
+ok - waiting roots precede newer roots and a killed waiter cannot strand admission
+ok - a two-worker run and a one-worker run alternate turns on a scarce pool
+ok - a stopped head waiter is skipped while a slot is free and is admitted once resumed
+ok - a gate stopped while owning admission does not freeze free capacity
+ok - a waiter's slow ps does not keep the next root out of admission
+analysis ran
+analysis ran
+ok - the queue scan handles slot paths with spaces and tickets cancelled mid-scan
+ok - a content-identical cached success finishes while all host slots remain occupied
+ok - the slot pool cannot be disabled, rejects bad settings, and refuses an unusable directory instead of running unbounded
+ok - slot open, counter and non-contention coordinator/scan lock failures refuse naming the path and never run the analysis
+ok - a real ShellCheck cannot leave the host pool, real shellcheck outside a pool counts against its budget, and a stand-in keeps its fixture pool
+ok - four runs with four HOME values stay within the memory budget with and without records, run two recorded roots at once, and finish all 12 roots (unbudgeted: 8 12; no records: 2 12; records: 2 12)
+ok - a root larger than the budget runs alone, and a killed run frees its charge and leaves no ticket
+ok - stale records are reclaimed, unknown records and an unreadable table are charged the worst case, a root with no record is charged the worst case, a root past its record is charged its current peak, records only rise and only after a complete analysis, and slots beyond a run's cap count
+ok - a --fast record charges later fast requests only; a full request of the same root is still charged the worst case
+ok - runs with different HOME, XDG_CACHE_HOME and FM_HOME values record in the same per-user pool
+ok - inherited slots prevent overlap after gate death and allow admission after watchdog cleanup
+ok - queued roots and memory retries record precise analysis durations without EPOCHREALTIME
+ok - jobs=1 and jobs=2 stop complete worker trees with and without telemetry
+ok - SKIP (host cannot enforce the bounded envelope): root deadline kill check
+ok - SKIP (host cannot enforce the bounded envelope): memory-limit death check
+ok - memory failures retry without source following, exclude cross-file codes, and preserve a real fallback finding
+ok - a root over the resident-memory bound is ended and retried narrower with the roots log marking it
+ok - a root under the resident-memory bound, a malformed bound, and the enforced envelope behave as before
+ok - the resident-memory watch ends its command when the owner dies
+ok - a resident-watch shim that resolves to itself is refused at once
+ok - the resident-memory watch samples only its command's own tree
+ok - a root whose footprint crosses the bound while its resident size does not is ended and retried narrower
+ok - a reader that misses one deadline is replaced and footprint ends the root on the next tick
+ok - a reader whose first reply is 1 s late keeps footprint in use
+ok - a later reply 1 s late is sampled by ps for that tick only
+ok - a replacement reader that exits before replying is retried and footprint still ends the root
+ok - three failed replacement readers in a row give the reader up as restarts-failed
+ok - a cache-key wait longer than the root deadline preserves its memory retry budget
+FM_TEST_END 2026-11-05T00:43:33Z tests/fm-lint-slots.test.sh exit=0 duration_ms=332241 gate_skip=false
+ok - SKIP (host cannot enforce the bounded envelope): fallback deadline check
+ok - explicit memory evidence outranks findings and signal reasons (modes: 0)
+ok - OOM words in a source excerpt or a root path never classify a root as memory
+ok - FM_LINT_REQUIRE_BOUNDS refuses missing enforcement and proceeds when enforceable
+ok - SKIP (host cannot enforce the bounded envelope): pinned memory-envelope check
+ok - the roots sidecar and telemetry record the run's final exit status
+ok - the retained sidecar records each root's lifecycle with a mode, reason, and duration
+ok - jointly sourced dispatcher, adapter, production-owner, and test-local diagnostics preserve parity
+ok - CI=true checks the complete uncached inventory even with an empty diff
+ok - fm-lint.sh forces a full lint when HEAD is on main
+ok - fm-lint.sh explicit paths bypass changed-file mode selection
+ok - an explicit leading-dash root retains real ShellCheck findings
+ok - fm-lint.sh exits 0 with a note when the local branch has no changed lint targets
+ok - fm-lint.sh CI keeps source following without the local exclusion list
+ok - fm-lint.sh on main keeps source following without the local exclusion list
+ok - fm-lint.sh without a merge-base keeps source following without the local exclusion list
+ok - fm-lint.sh explicit paths keep source following
+FM_TEST_END 2026-11-05T00:45:39Z tests/fm-lint-report.test.sh exit=0 duration_ms=457472 gate_skip=false
+ok - inert quoted programs, prose, comments, conditionals, and heredocs are not imports
+ok - child-shell positional imports and executable substitutions govern selection and cache inputs
+ok - executable stdin imports select direct and transitive callers and invalidate reusable closures
+ok - command-string, script-file, and non-stdin heredocs remain import data
+ok - production fixture stdin helper imports select callers and never authorize stale reuse
+ok - production nested source words reuse results and the real pending-reply closure invalidates on adapter sources
+ok - unresolved runtime sources select possible direct and transitive callers
+ok - unproved transitive runtime closures never reuse successful analysis
+ok - source spellings and command prefixes retain changed/cached dataflow findings
+ok - joint-source calls retain SC2119 in explicit, changed, cold, mutated-cache, and CI modes
+ok - private-source imports retain changed-library call diagnostics across selection and cache modes
+ok - declaration words permit reuse without hiding changed cross-file argument requirements
+ok - a fast-mode success cannot satisfy source-aware extended analysis
+ok - changed and deleted libraries recheck transitive callers with the full diagnostic rules
+ok - selection analyzes unchanged imports only through changed or explicit callers
+ok - each runtime backend change selects every direct and transitive dispatcher consumer
+ok - changes and deletions of every runtime backend invalidate dispatcher and caller caches
+ok - shared cache single-flights identical misses and invalidates sources, binaries and failures
+ok - fm-lint.sh --list-files reports the complete shell inventory
+ok - three canonical lint partitions preserve complete source-aware coverage and reject weakened modes
+ok - canonical partitions balance measured analysis cost rather than equal direct bytes
+FM_TEST_END 2026-11-05T00:48:05Z tests/fm-lint.test.sh exit=0 duration_ms=604013 gate_skip=false
+FM_TEST_BEGIN 2026-11-05T00:48:05Z tests/fm-timeout-lib.test.sh family=pure-contract-unit expected_gate_skip=none
+FM_TEST_BEGIN 2026-11-05T00:48:05Z tests/fm-lint-workflows.test.sh family=pure-contract-unit expected_gate_skip=none
+ok - fm-lint-workflows.sh pins an explicit actionlint version (1.7.12)
+ok - current .github/workflows YAML files parse
+ok - column-0 heredoc workflow fails validation with a clear error
+ok - valid fixture workflow passes
+ok - empty workflows directory fails closed
+ok - explicit malformed workflow path fails validation
+ok - non-mapping workflow YAML root fails
+ok - missing actionlint fails closed
+ok - fm-lint-workflows.sh refuses a non-pinned actionlint in strict and CI modes
+ok - fm-lint-workflows.sh warns and proceeds under a newer local actionlint
+ok - actionlint installer retries a transient download failure
+ok - actionlint installer selects the official archive, URL, and checksum per OS/arch
+ok - actionlint installer rejects a wrong checksum
+ok - actionlint installer falls back to shasum -a 256 when sha256sum is absent
+ok - actionlint installer prefers sha256sum when both hashers are present
+ok - actionlint installer rejects an unsupported OS or architecture
+tests/fm-lint-workflows.test.sh: line 540: fm_lint_hide_outside_shellcheck: command not found
+ok - fm-lint.sh default path catches a self-broken ci.yml
+FM_TEST_END 2026-11-05T00:48:10Z tests/fm-lint-workflows.test.sh exit=0 duration_ms=4306 gate_skip=false
+ok - owned execution has no deadline, preserves completion and refuses deadline-only fallback
+ok - fm_exec_timed passes a command's status and output through unchanged
+ok - system Bash top-level and subshell calls preserve success, failure, and signal status
+_: line 5: 34507 Terminated: 15          "$@" 20>&-
+ok - fm_run_timed reports 124 when the bound TERMs a read whose wrapper recorded 143
+ok - fm_run_timed passes a natural exit through when the bound fired after completion
+ok - fm_exec_timed sends TERM at the bound and a cooperative command ends there
+ok - fm_exec_timed kills a TERM-ignoring command once the grace has passed
+ok - fm_exec_timed replaces the calling shell instead of wrapping it
+ok - fm_exec_timed reaps a descendant that would otherwise hold the output past the bound
+ok - fm_exec_timed forwards a TERM it receives to the bounded command
+ok - fm_exec_timed ends the command when its named owner is already gone
+ok - fm_exec_timed ends the command when its owner dies during watchdog startup
+ok - fm_exec_timed preserves a top-level shell's parent across exec startup
+ok - fm_exec_timed prefers its perl watchdog over timeout
+ok - fm_exec_timed refuses instead of running unbounded when no mechanism exists
+ok - fm_exec_timed rejects a zero, padded, non-numeric, or missing bound and a missing command
+tests/fm-timeout-lib.test.sh: line 28: 55912 Killed: 9               ( . "$ROOT/bin/fm-timeout-lib.sh"; PATH=$path fm_exec_timed "$@" )
+ok - fm_exec_timed's GNU timeout fallback kills a TERM-ignoring command once the grace has passed
+ok - fm_timed_out accepts 124 and 137 and nothing else
+ok - fm_run_timed's perl bound reaches a child that was slow to make its process group
+ok - fm_nm_bounded's perl bound reaches a child that was slow to make its process group
+ok - the perl bound forwards a TERM to its command's group
+ok - an outer Perl bound reaps a TERM-resistant nested command
+ok - no bounded-call status file survives a normal, failing, timed-out, or signalled exit of the caller
+ok - warm hits leave cold root and outer ceilings uncalibrated; changed cold analysis completes
+FM_TEST_END 2026-11-05T00:48:48Z tests/fm-timeout-lib.test.sh exit=0 duration_ms=42902 gate_skip=false
+FM_TEST_SUMMARY total=5 failed=0 skipped_gate=0 duration_ms=651360
+FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=5 duration_ms=1440934 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-lint.test.sh duration_ms=604013
+FM_TEST_SLOWEST rank=2 script=tests/fm-lint-report.test.sh duration_ms=457472
+FM_TEST_SLOWEST rank=3 script=tests/fm-lint-slots.test.sh duration_ms=332241
+FM_TEST_SLOWEST rank=4 script=tests/fm-timeout-lib.test.sh duration_ms=42902
+FM_TEST_SLOWEST rank=5 script=tests/fm-lint-workflows.test.sh duration_ms=4306
+rc=0

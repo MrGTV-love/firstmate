@@ -1,0 +1,10 @@
+$ s2-larger-than-budget at 0812532f796594aa8f13ef742beb8234e0f27ab8
+# budget 30000 KiB, stand-in allocates 64 MiB (65536 KiB) so it is larger than the budget alone
+run1 exit=0 run2 exit=0 roots_finished=4/4 most_at_once=1 wall_s=11
+# a waiter is SIGKILLed while queued; the holder ends; a later run is admitted at once
+starts while waiter is queued (expect 1): 1
+waiter killed, exit=137
+holder exit=0 roots_finished=1
+later run exit=0 seconds=3 stand-in starts=2
+tickets left in the pool: 0
+driver rc=0

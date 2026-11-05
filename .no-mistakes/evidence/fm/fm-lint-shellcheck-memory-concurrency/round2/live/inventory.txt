@@ -1,0 +1,13 @@
+# base 9c5874baa vs head 0812532f796594aa8f13ef742beb8234e0f27ab8
+base --list-files rc=0 lines=692
+base --partition 1of3 rc=0 lines=231
+base --partition 2of3 rc=0 lines=230
+base --partition 3of3 rc=0 lines=231
+head --list-files rc=0 lines=692
+head --partition 1of3 rc=0 lines=231
+head --partition 2of3 rc=0 lines=230
+head --partition 3of3 rc=0 lines=231
+diff base vs head list: exit=0
+diff base vs head 1of3: exit=0
+diff base vs head 2of3: exit=0
+diff base vs head 3of3: exit=0

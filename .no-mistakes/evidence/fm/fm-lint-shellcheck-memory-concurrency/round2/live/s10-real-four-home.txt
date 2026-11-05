@@ -1,0 +1,20 @@
+# head 0812532f796594aa8f13ef742beb8234e0f27ab8
+host admit exit=0
+ShellCheck version: 0.11.0; uptime: 19:06  up 17:01, 1 user, load averages: 8.63 9.87 11.38
+cold: run exit=0
+cold: run exit=0
+cold: run exit=0
+cold: run exit=0
+cold: wall_s=15 samples=64 gap_mean_s=0.24 gap_max_s=0.28 most_own_shellcheck=1 own_peak_kib=200048 most_other_shellcheck=0 own_plus_other_peak_kib=200048
+cold: roots with an end line in the roots logs: 12/12
+records in the one host pool after cold: 12/12
+pools under the four HOME values: 0 (expect 0)
+lowest and highest record KiB: 216448 216480 
+warm: run exit=0
+warm: run exit=0
+warm: run exit=0
+warm: run exit=0
+warm: wall_s=6 samples=24 gap_mean_s=0.25 gap_max_s=0.28 most_own_shellcheck=6 own_peak_kib=797792 most_other_shellcheck=0 own_plus_other_peak_kib=797792
+warm: roots with an end line in the roots logs: 12/12
+fixture marks removed from the host pool: 12
+driver rc=0

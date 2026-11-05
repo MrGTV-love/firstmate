@@ -1,0 +1,35 @@
+# Refusals, real ShellCheck version: 0.11.0 at 56c955856
+
+$ FM_LINT_SLOT_DIR=off (real ShellCheck)
+fm-lint.sh: FM_LINT_SLOT_DIR=off is not supported: no setting turns the host-wide ShellCheck memory bound off. Unset FM_LINT_SLOT_DIR to use the host pool /var/tmp/firstmate-lint-501/lint-slots.
+exit=2
+
+$ FM_LINT_SLOT_DIR=<other dir> (real ShellCheck)
+fm-lint.sh: FM_LINT_SLOT_DIR=/tmp/nm-live-01M6/elsewhere cannot move a real ShellCheck (~/.local/bin/shellcheck) out of the host pool /var/tmp/firstmate-lint-501/lint-slots: only a stand-in script, a file that starts with #!, may use another pool directory. Unset FM_LINT_SLOT_DIR.
+exit=2
+other directory created: no
+
+$ FM_LINT_HOST_RSS_KIB=zero
+fm-lint.sh: FM_LINT_HOST_RSS_KIB must be a positive integer, got zero.
+exit=2
+
+$ FM_LINT_HOST_RSS_KIB=0
+fm-lint.sh: FM_LINT_HOST_RSS_KIB must be a positive integer, got 0.
+exit=2
+
+$ FM_LINT_HOST_SLOTS=08
+fm-lint.sh: FM_LINT_HOST_SLOTS must be a positive integer, got 08.
+exit=2
+
+$ ShellCheck file with no #!, other pool dir
+fm-lint.sh: FM_LINT_SLOT_DIR=/tmp/nm-live-01M6/elsewhere cannot move a real ShellCheck (/tmp/nm-live-01M6/plain/shellcheck) out of the host pool /var/tmp/firstmate-lint-501/lint-slots: only a stand-in script, a file that starts with #!, may use another pool directory. Unset FM_LINT_SLOT_DIR.
+exit=2
+
+$ ShellCheck that od cannot read (mode 111), other pool dir
+fm-lint.sh: FM_LINT_SLOT_DIR=/tmp/nm-live-01M6/elsewhere cannot move a real ShellCheck (/tmp/nm-live-01M6/unr/shellcheck) out of the host pool /var/tmp/firstmate-lint-501/lint-slots: only a stand-in script, a file that starts with #!, may use another pool directory. Unset FM_LINT_SLOT_DIR.
+exit=2
+
+$ stand-in with an unusable pool path
+fm-lint.sh: host slot pool unusable (FM_LINT_SLOT_DIR: /tmp/nm-live-01M6/fx/clean.sh/blocked is not a writable directory); the host-wide ShellCheck memory bound cannot be enforced, so no root was started. Make that path writable or remove it if it is damaged.
+exit=2
+stand-in ran on the unusable pool: no

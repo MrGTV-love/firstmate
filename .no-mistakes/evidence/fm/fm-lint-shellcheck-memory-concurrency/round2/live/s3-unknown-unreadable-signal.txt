@@ -1,0 +1,30 @@
+$ s3-unknown-unreadable-signal at 0812532f796594aa8f13ef742beb8234e0f27ab8 (driver fixed: control record needs its newline; archive is a full git tree)
+# seed records for h.sh and w.sh in a roomy pool
+seed exit=0
+record h.sh: 13744 KiB
+record w.sh: 13728 KiB
+
+## unknown record in a held slot
+# control: the held slot names a small charge, so a recorded root joins
+control: root started beside a named small charge (expected)
+control exit=0
+# case: the held slot holds garbage, so it is charged the worst case and the root waits
+starts after 4 s beside a garbage slot (expect 0): 0
+root started after the holder ended (expected)
+root exit=0
+
+## unreadable process table
+readable table (no fm-proc-info.py): starts 3 s after a recorded second root asked: 2 (expect readable=2, unreadable=1)
+readable: holder exit=0 second root exit=0 roots finished=2/2
+unreadable table (no fm-proc-info.py): starts 3 s after a recorded second root asked: 1 (expect readable=2, unreadable=1)
+unreadable: holder exit=0 second root exit=0 roots finished=2/2
+
+## signalled gate leaves no record, a complete run does
+control, complete run: record=13696
+gate pid found: yes
+lint exit after TERM of the gate=143
+signalled run: record=none (expect none)
+# next request of that root is charged the worst case: it waits beside a recorded holder, where the recorded control joined
+starts 3 s after the signalled root asked again beside a recorded holder (expect 1): 1
+that root exit=0 roots finished=2/2 most at once=1
+driver rc=0

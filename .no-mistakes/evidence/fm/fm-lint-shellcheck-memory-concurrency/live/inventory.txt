@@ -1,0 +1,16 @@
+base list rc=0 lines=     692
+base 1of3 rc=0 lines=     231
+base 2of3 rc=0 lines=     230
+base 3of3 rc=0 lines=     231
+head list rc=0 lines=     692
+head 1of3 rc=0 lines=     231
+head 2of3 rc=0 lines=     230
+head 3of3 rc=0 lines=     231
+diff base.list head.list:
+(diff exit )
+diff base.1of3 head.1of3:
+(diff exit )
+diff base.2of3 head.2of3:
+(diff exit )
+diff base.3of3 head.3of3:
+(diff exit )

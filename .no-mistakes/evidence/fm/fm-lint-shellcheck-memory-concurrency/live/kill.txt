@@ -1,0 +1,14 @@
+== Case 1: SIGKILL the holder's whole process tree
+starts while holder lives (expect 1): 1
+waiter started 0 s after SIGKILL of the tree
+/tmp/nm-live-01M6/killtest.sh: line 36: 19989 Killed: 9               L 120 "$S/a.sh" > "$S/1a.out" 2>&1
+waiter exit=0
+== Case 2: SIGKILL only the top-level lint process, its worker tree left to notice
+starts while holder lives (expect 1): 1
+waiter started 22 s after SIGKILL of the top process
+/tmp/nm-live-01M6/killtest.sh: line 47: 35965 Killed: 9               L 25 "$S/c.sh" > "$S/2c.out" 2>&1
+waiter exit=0
+orphaned stand-in gone
+== Case 3: the pool after both kills
+queue tickets left: 0
+later run exit=0 starts=1

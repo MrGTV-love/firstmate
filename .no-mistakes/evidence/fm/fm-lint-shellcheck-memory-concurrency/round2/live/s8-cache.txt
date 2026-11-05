@@ -1,0 +1,6 @@
+$ s8-cache at 0812532f796594aa8f13ef742beb8234e0f27ab8
+first run exit=0 stand-in starts=1 (fills the cache)
+cached run with the budget full: exit=0 seconds=2.26 stand-in starts=1 (expect 1, only the holder)
+control, cold root 3 s after it asked with the budget full: stand-in starts=1 (expect 1, it waits)
+cold root exit=0 starts=2 (expect 2)
+driver rc=0

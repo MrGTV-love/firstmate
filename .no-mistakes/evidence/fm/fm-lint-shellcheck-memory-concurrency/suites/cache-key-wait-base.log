@@ -1,0 +1,9 @@
+load averages: 19.08 17.54 17.83
+ok - a cache-key wait longer than the root deadline preserves its memory retry budget
+base iter 1 rc=0
+load averages: 18.53 17.47 17.80
+ok - a cache-key wait longer than the root deadline preserves its memory retry budget
+base iter 2 rc=0
+load averages: 17.21 17.23 17.71
+ok - a cache-key wait longer than the root deadline preserves its memory retry budget
+base iter 3 rc=0

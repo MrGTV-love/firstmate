@@ -1,0 +1,10 @@
+# base 9c5874baa vs head 0812532f796594aa8f13ef742beb8234e0f27ab8; ShellCheck version: 0.11.0
+host admit exit=0
+base exit=0
+fm-lint: bin/fm-watch.sh hit the memory ceiling with --external-sources (reason=memory rc=98); retried without it; fallback passed with cross-file codes excluded (SC1091,SC2034,SC2153,SC2329)
+base roots log: status=0 outcome=memory-fallback
+head exit=0
+fm-lint: bin/fm-watch.sh hit the memory ceiling with --external-sources (reason=memory rc=98); retried without it; fallback passed with cross-file codes excluded (SC1091,SC2034,SC2153,SC2329)
+head roots log: status=0 outcome=memory-fallback
+diff of the output, base vs head: exit=0
+driver rc=0

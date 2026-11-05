@@ -1,0 +1,9 @@
+# head 0812532f796594aa8f13ef742beb8234e0f27ab8
+host admit exit=0
+other processes named shellcheck before the run: 0
+control, real ShellCheck, 1 KiB budget, nothing outside: exit=0 seconds=2 (one root is always admitted)
+outside real shellcheck running, resident KiB now: 149344
+/Users/charlesabrooker/.no-mistakes/evidence/01M6MC9FAZ2R279RGXAGWCSZK4/round2/drivers/s11-outside-shellcheck.sh: line 5: 54688 Killed: 9               shellcheck --norc --external-sources "$WT/bin/fm-watch.sh" > /dev/null 2>&1
+with a raw real shellcheck outside the lint, ended by this driver after 10 s: exit=0 seconds=17 outside still alive at the end=no (expect it waits about 9 s, alive=no)
+fixture mark removed
+driver rc=0

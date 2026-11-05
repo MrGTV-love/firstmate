@@ -1,0 +1,24 @@
+# base 9c5874baa vs head 0812532f796594aa8f13ef742beb8234e0f27ab8; container fm-ubuntu2604:latest --init, memory 8g, 6 CPUs
+base FM_LINT_JOBS=1 exit=0 wall_s=29 most_shellcheck=1 aggregate_peak_kib=1026660 samples=273
+  tests/fm-lint-report.test.sh status=0 outcome=ok
+  bin/fm-mem-guard.sh status=0 outcome=ok
+  tests/fm-lint-helpers.sh status=0 outcome=ok
+  tests/fm-lint-workflows.test.sh status=0 outcome=ok
+base FM_LINT_JOBS=2 exit=0 wall_s=23 most_shellcheck=2 aggregate_peak_kib=1026660 samples=216
+  tests/fm-lint-helpers.sh status=0 outcome=ok
+  tests/fm-lint-report.test.sh status=0 outcome=ok
+  tests/fm-lint-workflows.test.sh status=0 outcome=ok
+  bin/fm-mem-guard.sh status=0 outcome=ok
+head FM_LINT_JOBS=1 exit=0 wall_s=29 most_shellcheck=1 aggregate_peak_kib=1026664 samples=268
+  tests/fm-lint-report.test.sh status=0 outcome=ok
+  bin/fm-mem-guard.sh status=0 outcome=ok
+  tests/fm-lint-helpers.sh status=0 outcome=ok
+  tests/fm-lint-workflows.test.sh status=0 outcome=ok
+head FM_LINT_JOBS=2 exit=0 wall_s=22 most_shellcheck=2 aggregate_peak_kib=1026660 samples=212
+  tests/fm-lint-helpers.sh status=0 outcome=ok
+  tests/fm-lint-report.test.sh status=0 outcome=ok
+  tests/fm-lint-workflows.test.sh status=0 outcome=ok
+  bin/fm-mem-guard.sh status=0 outcome=ok
+diff of the output, base vs head, FM_LINT_JOBS=1: exit=0 lines=0
+diff of the output, base vs head, FM_LINT_JOBS=2: exit=0 lines=0
+docker rc=0

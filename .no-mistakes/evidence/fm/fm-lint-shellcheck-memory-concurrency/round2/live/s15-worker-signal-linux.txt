@@ -1,0 +1,10 @@
+# base 9c5874baa vs head 0812532f796594aa8f13ef742beb8234e0f27ab8; container fm-ubuntu2604:latest with /usr/bin/time from apt
+base CI values try 1 exit=1: not ok - jobs=1 telemetry=off left ShellCheck running
+base CI values try 2 exit=1: not ok - jobs=1 telemetry=off left ShellCheck running
+base CI values try 3 exit=1: not ok - jobs=1 telemetry=off left ShellCheck running
+base no CI values exit=1: not ok - jobs=1 telemetry=off left ShellCheck running
+head CI values try 1 exit=1: not ok - jobs=1 telemetry=off left ShellCheck running
+head CI values try 2 exit=1: not ok - jobs=1 telemetry=off left ShellCheck running
+head CI values try 3 exit=1: not ok - jobs=1 telemetry=off left ShellCheck running
+head no CI values exit=1: not ok - jobs=1 telemetry=off left ShellCheck running
+docker rc=0
