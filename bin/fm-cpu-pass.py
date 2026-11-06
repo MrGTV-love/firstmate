@@ -63,10 +63,9 @@ Pipeline starts:
     is counted (a one-start minimum). The projection is S for the new run plus,
     per counted run: only what it holds when it waits on remote CI (open step ci
     in running, no live launch reservation, and positive proof that no agent
-    lives: either no process of it is visible and no agent pid is recorded, or
-    its recorded agent pid is dead and its round began more than
-    NO_PID_WINDOW_SECS ago; a visible tree with no recorded pid keeps A,
-    whatever its processes are named) or while its launch gate waits in
+    lives: no process of it is visible, and its recorded agent pid is absent
+    or dead; a visible tree keeps A whatever its processes are named and
+    whatever its recorded pid) or while its launch gate waits in
     this queue with no live launch reservation; its resident memory or A,
     whichever is larger, when the reading sees it; R while the reading cannot see it. S is the largest per-run peak of every recorded
     no-mistakes run with at least 2 readings, and R the 75th percentile (nearest
@@ -867,12 +866,6 @@ def active_term(report: dict) -> Optional[Tuple[int, int]]:
 # the daemon records an agent's pid at the agent's start event and clears it at its
 # exit (no-mistakes fork 935aedf, internal/pipeline/executor.go:952-960), and sets
 # round_started_at when a step or fix round starts (internal/db/step.go:224-245).
-# Evidence: in all 5 native fork-harness launches (p11 refuse3 and admit2) the gate's
-# first database read already saw its own pid recorded as agent_pid, and that read
-# follows the engine's start, which takes at most 0.113 s here (10 timed runs of
-# fm-cpu-pass.py size); inside the window the run keeps A.
-# measured: value=120 date=2026-11-04 host=Mac-Studio.local margin=1000
-NO_PID_WINDOW_SECS = 120
 
 
 def pid_dead(pid) -> Optional[bool]:
@@ -891,14 +884,15 @@ def pid_dead(pid) -> Optional[bool]:
 
 
 def proven_agentless(step, now: float) -> bool:
-    """Positive proof that no agent of this CI step is alive: its recorded pid is dead, after the window.
+    """Whether this CI step's recorded agent pid is dead (project() also requires that nothing of the run is visible).
 
-    A step with no recorded pid, a live or unjudgeable pid, an unknown round
-    start, or a round younger than NO_PID_WINDOW_SECS is not proof.
+    The daemon records an agent's pid when the agent starts and clears it when
+    it exits, so a dead recorded pid is an agent that has ended; a live or
+    unjudgeable pid is not proof. No time window applies: the run database
+    gives no measured start-to-visible interval to derive one from, and a
+    visible process of the run keeps the active term whatever its pid.
     """
-    started = step[3] if len(step) > 3 else None
-    return (step[2] is not None and type(started) is int and now - started > NO_PID_WINDOW_SECS
-            and pid_dead(step[2]) is True)
+    return step[2] is not None and pid_dead(step[2]) is True
 
 
 def project(available: int, rss: dict, counted: dict, steps: Optional[dict], launches: dict,
@@ -912,12 +906,11 @@ def project(available: int, rss: dict, counted: dict, steps: Optional[dict], lau
     clock (time.time() when None). A run waiting on remote CI (open step ci,
     status running, no live launch) reserves only the resident memory it holds
     on positive proof that no agent lives: the reading sees no process of it,
-    and either no agent pid is recorded or its recorded agent pid is dead and
-    its round began more than NO_PID_WINDOW_SECS ago (proven_agentless). Every
-    other CI run keeps the active term: a visible tree, whatever the recorded
-    pid (a reparented agent can outlive its launcher's pid), a live or
-    unjudgeable pid, an unknown round start or a round inside the window is not
-    proof that no agent lives, whatever the processes are named. Every other counted or launched run reserves its
+    and either no agent pid is recorded or its recorded agent pid is dead
+    (proven_agentless). Every other CI run keeps the active term: a visible
+    tree, whatever the recorded pid (a reparented agent can outlive its
+    launcher's pid), or a live or unjudgeable pid is not proof that no agent
+    lives, whatever the processes are named. Every other counted or launched run reserves its
     resident memory or the active-run term A, whichever is larger, once its tree
     is visible, and its full R while the reading cannot see it yet. The new run
     reserves S. Each of the pending admitted starts that has not registered a run
@@ -1874,14 +1867,17 @@ def cmd_launch_gate(args: argparse.Namespace) -> int:
         return 125
     started = time.monotonic()
     run = branch = None
+    cwd = "unknown"
+    # This launch attempt's identity: the gate's pid and start time (a retry is a new attempt).
+    attempt = "%d:%d" % (os.getpid(), time.time_ns())
     try:
         cwd = os.getcwd()
         run, repo, branch = map_worktree(cwd)
         steps = open_steps()
         step = None if steps is None else steps.get(run)
-        log(2, "launch-gate run=%s branch=%s step=%s agent_pid=%s attempt=%d:%d" % (
+        log(2, "launch-gate run=%s branch=%s step=%s agent_pid=%s attempt=%s" % (
             run, branch, step[0] + ":" + step[1] if step else "unreadable" if steps is None else "none",
-            step[2] if step else "none", os.getpid(), time.time_ns()))
+            step[2] if step else "none", attempt))
         if step is not None and step[0] != CI_STEP:
             # Another step of a run already counted as active: unchanged, at once.
             _restore_exec_signals()
@@ -1926,15 +1922,17 @@ def cmd_launch_gate(args: argparse.Namespace) -> int:
             durable_line("run %s (%s) admitted after %.2fs held: %s" % (run, branch, waited, reason), "launch-gate-" + run)
         return wait_agent(child, watch_fd, reservation_fd)
     except LaunchRefused as refused:
-        text = "launch-gate refused: %s: run %s; %s; next action: %s" % (
-            refused.cause, run or "unknown", refused.detail, refused.action)
+        # With no run identified (unmapped, ambiguous, unreadable database) the line names the worktree and attempt.
+        text = "launch-gate refused: %s: %s; %s; next action: %s" % (
+            refused.cause, "run %s" % run if run else "worktree %s, attempt %s" % (cwd, attempt), refused.detail, refused.action)
         log(2, text)
         durable_line(text, "launch-gate-" + (run or "unmapped"))
         return 75
     except KeyboardInterrupt:
         return 130
     except (PoolUnavailable, OSError, sqlite3.Error, ValueError, KeyError) as exc:
-        text = "launch-gate refused: gate error: run %s; %s; next action: repair the gate source named here; the next fix round enters the gate again" % (run or "unknown", exc)
+        text = "launch-gate refused: gate error: %s; %s; next action: repair the gate source named here; the next fix round enters the gate again" % (
+            "run %s" % run if run else "worktree %s, attempt %s" % (cwd, attempt), exc)
         log(2, text)
         durable_line(text, "launch-gate-" + (run or "unmapped"))
         return 75

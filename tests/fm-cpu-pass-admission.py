@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import signal
 import socket
 import sqlite3
@@ -613,7 +614,8 @@ try:
             ('ci-waiting', [('x', 'ci', 'running', None)], [], True),
             ('ci-waiting-raised', [('x', 'ci', 'running', None)], [('repo', 'x', 4 * GIB)], True),
             ('ci-agent-resumed', [('x', 'ci', 'fixing', 4321)], [], False),
-            ('ci-agent-pid', [('x', 'ci', 'running', 4321)], [], False),
+            # A recorded agent pid that is alive keeps the reservation; a dead one with nothing visible releases (review-f1 cases).
+            ('ci-agent-pid', [('x', 'ci', 'running', os.getpid())], [], False),
             ('just-registered', [], [], False),
             ('step-unreadable', None, [], False),
             ('other-step', [('x', 'review', 'running', None)], [], False)):
@@ -1160,6 +1162,12 @@ while not (folder / (run + '.release')).exists(): time.sleep(0.025)
     queue = wakes(folder)
     assert all(cause in queue for cause in ('unmapped worktree', 'ambiguous worktree', 'run database unreadable')), queue
     assert 'next action: ' in queue, queue
+    # With no run identified, each durable refusal line names the worktree and the launch attempt, then the next action.
+    for cause, where in (('unmapped worktree', folder / 'elsewhere'), ('ambiguous worktree', folder / 'wt-x'),
+                         ('run database unreadable', folder / 'wt-x')):
+        line = next(l for l in queue.splitlines() if 'launch-gate refused: ' + cause in l)
+        assert re.search(r'launch-gate refused: %s: worktree %s, attempt \d+:\d+; .+; next action: \S' % (
+            re.escape(cause), re.escape(os.path.realpath(where))), line), line
 
     # A busy wake-queue lock never holds the gate: the refusal exits at once and its wake is spilled to state/.wake-spill.<seq>,
     # which the next append to that queue, or the watcher's next start, replays.
@@ -1579,10 +1587,9 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
             review[name] = 'FAIL: %s: %s' % (type(exc).__name__, str(exc)[:600])
 
     def idle_leftover():
-        # F1 (delta review of 427dbb240, Main 021): a CI waiter is released to the bytes it holds only on positive
-        # proof that no agent lives: its recorded agent pid is dead and its round began outside the window. A visible
-        # tree with no recorded pid keeps A whatever its processes are named or parented (R1's and D1's releases
-        # by parentage and by name are withdrawn); so do a live pid and a dead pid inside the window.
+        # A CI waiter is released to the bytes it holds only on positive proof that no agent lives: nothing of it is
+        # visible, and its recorded agent pid is absent or dead (no time window). A visible tree keeps A whatever its
+        # processes are named or parented and whatever its recorded pid; so does a live pid.
         held = GIB // 5
         ended = subprocess.Popen(['true'])
         ended.wait()
@@ -1591,7 +1598,8 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
                 ('no-pid-sleep-reparented', 'sleep', 1, None, old, False), ('no-pid-sleep-live-parent', 'sleep', 50, None, old, False),
                 ('no-pid-node-agent', 'node', 50, None, old, False), ('no-pid-named-agent', '2.1.318', 50, None, old, False),
                 ('no-pid-unknown-round', 'sleep', 1, None, None, False), ('live-pid', 'node', 50, os.getpid(), old, False),
-                ('dead-pid-inside-window', 'sleep', 1, ended.pid, recent, False),
+                ('dead-pid-recent-visible', 'sleep', 1, ended.pid, recent, False),
+                ('dead-pid-recent-invisible', None, None, ended.pid, recent, True),
                 # A visible tree keeps A even when the recorded launcher pid is dead: a reparented agent can outlive it.
                 ('dead-pid-visible-reparented-agent', 'node', 1, ended.pid, old, False), ('dead-pid-proof', None, None, ended.pid, old, True)):
             folder, db, env = case('review-f1-' + label, measured=True, available=int(8.5 * GIB))
@@ -1820,6 +1828,7 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
 folder = pathlib.Path(os.environ['CASE_FOLDER']); args = sys.argv[1:]
 intent = args[args.index('--intent') + 1] if '--intent' in args else ''
 with (folder / 'calls.log').open('a') as out: out.write('%s :: %s\\n' % (os.path.basename(os.getcwd()), intent))
+(folder / ('pid-' + intent)).write_text(str(os.getpid()))
 if intent.startswith('hold'):
     while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
 if intent.startswith('reg'):
@@ -1867,6 +1876,26 @@ if intent.startswith('reg'):
             assert code == 0 and len(calls(folder)) == 2, (label, code, calls(folder), text)
             assert text.count('pipeline-start admitted') == admissions, (label, text)
             assert not list((folder / 'pool').glob('pending-*.lock')), label
+
+    def killed_client():
+        # A claiming client killed before its run appears ends its pending start (its client exited), so a start in that
+        # gap is decided without it (the stated residual); once the daemon writes the run's row, it is counted.
+        folder, db, env = case('nested-killed-client', cores=3)
+        nest_client(folder, env)
+        child = launch(mem_guard + ['bash', '-c', 'no-mistakes axi run --intent hold-k; sleep 60'], env, folder / 'x')
+        wait_for(lambda: (folder / 'pid-hold-k').exists(), 'the client runs')
+        os.kill(int((folder / 'pid-hold-k').read_text()), signal.SIGKILL)
+        gap = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'gap')], env, folder / 'gap')
+        finish(gap)
+        assert (folder / 'gap').exists(), 'a start in the gap was not admitted'
+        change(db, "INSERT INTO runs (id, status) VALUES ('late-run', 'running')")
+        later = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'later')], env, folder / 'later')
+        pending(folder, 1)
+        wait_for(lambda: 'waiting: counted=1 ' in (folder / 'later.stderr').read_text(), 'the late run is counted')
+        assert not (folder / 'later').exists(), (folder / 'later.stderr').read_text()
+        change(db, "UPDATE runs SET status = 'completed' WHERE id = 'late-run'")
+        finish(later)
+        os.killpg(child.pid, signal.SIGKILL); child.wait()
 
     def nested_enclosing_counted():
         # The enclosing start's unclaimed reservation keeps counting while a process in its command runs the
@@ -2086,6 +2115,7 @@ exec /bin/ln "$@"
                        ('a fresh start under any measurement key meets the interception', any_key_interception),
                        ('a second fresh client inside an admitted command is admitted on its own', nested_second_client),
                        ('an enclosing start counts while its client runs or the process table is unreadable', nested_enclosing_counted),
+                       ('a killed client ends its pending start; its late run is counted once its row exists', killed_client),
                        ('a nested second client keeps class order behind a start queued elsewhere', nested_class_order),
                        ('two nested clients started together are each counted', nested_parallel_counted),
                        ('an unplaceable interception holds a shell of two starts as one start', nested_unplaceable),

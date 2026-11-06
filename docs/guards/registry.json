@@ -6869,11 +6869,11 @@
       "sites": [
         {
           "file": "bin/fm-cpu-pass.py",
-          "match": "launch-gate refused: %s: run %s; %s; next action: %s"
+          "match": "launch-gate refused: %s: %s; %s; next action: %s"
         },
         {
           "file": "bin/fm-cpu-pass.py",
-          "match": "launch-gate refused: gate error: run %s; %s; next action:"
+          "match": "launch-gate refused: gate error: %s; %s; next action:"
         }
       ],
       "invariant": "a no-mistakes CI fix agent launched through the gate starts only after the pipeline-start rule admits one more active run for its run",
