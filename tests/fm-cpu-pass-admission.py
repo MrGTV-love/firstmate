@@ -1211,6 +1211,12 @@ while not (folder / (run + '.release')).exists(): time.sleep(0.025)
     child, log = gate(folder, env, 'x', mode='exit-0')
     finish(child)
     assert 'admitted' not in log.with_suffix('.stderr').read_text() and (folder / 'x.agent').exists()
+    # An uncounted mapped run (CI-ready) at a non-CI step passes through too; a CI-step launch is gated (gate-three).
+    folder, db, env = gate_case('gate-scope-uncounted', available=GIB, runs=(('x', 'pr', 'running', None),))
+    change(db, "UPDATE runs SET ci_ready_at = 1 WHERE id = 'x'")
+    child, log = gate(folder, env, 'x', mode='exit-0')
+    finish(child)
+    assert 'admitted' not in log.with_suffix('.stderr').read_text() and (folder / 'x.agent').exists()
 
     # Exit codes and signal deaths pass through; a signal sent to the gate reaches the agent.
     for mode, code in (('exit-0', 0), ('exit-1', 1), ('exit-75', 75), ('self-term', -signal.SIGTERM)):
@@ -1271,6 +1277,20 @@ while not (folder / (run + '.release')).exists(): time.sleep(0.025)
     for run in ('b', 'c'):
         (folder / (run + '.release')).touch()
         finish(gates[run])
+
+    # Class: a fix round waits in class other, so a machinery fresh start that arrives after it is admitted first.
+    folder, db, env = gate_case('gate-class', available=GIB, runs=[('x', 'ci', 'running', None), ('y', 'review', 'running', None)])
+    gate_x = gate(folder, env, 'x')[0]
+    pending(folder, 1)
+    fresh = launch(cli + ['pipeline-start', '--priority', 'machinery', '--', 'touch', str(folder / 'm')], env, folder / 'fresh')
+    pending(folder, 2)
+    facts(folder, available=12 * GIB)
+    wait_for(lambda: (folder / 'x.agent').exists(), 'the fix round starts after the fresh start')
+    assert (folder / 'm').exists() and (folder / 'm').stat().st_mtime_ns <= (folder / 'x.agent').stat().st_mtime_ns, \
+        'the later machinery start was not admitted first'
+    finish(fresh)
+    (folder / 'x.release').touch()
+    finish(gate_x)
 
     # After first appearance: a visible agent at 0.2 GiB still reserves A = 1 GiB. A later start that
     # fits on startup memory alone (8.2 of 8.7 GiB) waits (9 > 8.7) and is admitted once the agent exits.
@@ -1571,21 +1591,24 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
                 ('no-pid-sleep-reparented', 'sleep', 1, None, old, False), ('no-pid-sleep-live-parent', 'sleep', 50, None, old, False),
                 ('no-pid-node-agent', 'node', 50, None, old, False), ('no-pid-named-agent', '2.1.318', 50, None, old, False),
                 ('no-pid-unknown-round', 'sleep', 1, None, None, False), ('live-pid', 'node', 50, os.getpid(), old, False),
-                ('dead-pid-inside-window', 'sleep', 1, ended.pid, recent, False), ('dead-pid-proof', 'node', 50, ended.pid, old, True)):
+                ('dead-pid-inside-window', 'sleep', 1, ended.pid, recent, False),
+                # A visible tree keeps A even when the recorded launcher pid is dead: a reparented agent can outlive it.
+                ('dead-pid-visible-reparented-agent', 'node', 1, ended.pid, old, False), ('dead-pid-proof', None, None, ended.pid, old, True)):
             folder, db, env = case('review-f1-' + label, measured=True, available=int(8.5 * GIB))
             change(db, "INSERT INTO runs (id, status, repo_id) VALUES ('x', 'running', 'repo')")
             change(db, "INSERT INTO step_results (id, run_id, step_name, step_order, status, agent_pid, round_started_at) "
                        "VALUES ('x-ci', 'x', 'ci', 1, 'running', ?, ?)", (pid, started))
-            facts(folder, available=int(8.5 * GIB), runs=[('repo', 'x', held)])
-            rows = json.loads((folder / 'native' / 'processes.json').read_text())
-            rows[-1].update(comm=comm, ppid=parent)
-            (folder / 'native' / 'processes.json').write_text(json.dumps(rows))
+            facts(folder, available=int(8.5 * GIB), runs=[('repo', 'x', held)] if comm else [])
+            if comm:
+                rows = json.loads((folder / 'native' / 'processes.json').read_text())
+                rows[-1].update(comm=comm, ppid=parent)
+                (folder / 'native' / 'processes.json').write_text(json.dumps(rows))
             log = folder / 'r1.stderr'
             child = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'm')], env, folder / 'r1')
             if admitted:
                 finish(child)
-                assert 'admitted: counted=1 projected=%d ' % (held + 8 * GIB) in log.read_text() and \
-                    'holding_only=[x:ci-waiting:%d]' % held in log.read_text(), (label, log.read_text())
+                assert 'admitted: counted=1 projected=%d ' % (8 * GIB) in log.read_text() and \
+                    'holding_only=[x:ci-waiting:0:unseen]' in log.read_text(), (label, log.read_text())
             else:
                 line = 'waiting: counted=1 projected=%d ' % (9 * GIB)
                 until = time.monotonic() + 10
@@ -1599,18 +1622,21 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
 
     def gate_node_agent():
         # F1 at the launch gate: while run x shows a live node agent with no recorded pid, run y's fix agent
-        # holds (x keeps A); the same with a named agent; with x proven agentless y's agent starts.
+        # holds (x keeps A); the same with a named agent, and with x's launcher pid dead but its tree still visible;
+        # with x proven agentless (nothing visible, a dead pid with an old round) y's agent starts.
         ended = subprocess.Popen(['true'])
         ended.wait()
         old = int(time.time()) - 3600
-        for label, comm, pid, holds in (('node', 'node', None, True), ('named', '2.1.318', None, True), ('proven', 'node', ended.pid, False)):
+        for label, comm, pid, holds in (('node', 'node', None, True), ('named', '2.1.318', None, True),
+                                        ('dead-pid-visible', 'node', ended.pid, True), ('proven', None, ended.pid, False)):
             folder, db, env = gate_case('review-f1-gate-' + label, available=int(8.5 * GIB),
                                         runs=[('x', 'ci', 'running', pid), ('y', 'ci', 'running', None)])
             change(db, "UPDATE step_results SET round_started_at = ?", (old,))
-            facts(folder, available=int(8.5 * GIB), runs=[('repo', 'x', GIB // 5)])
-            rows = json.loads((folder / 'native' / 'processes.json').read_text())
-            rows[-1].update(comm=comm, ppid=50)
-            (folder / 'native' / 'processes.json').write_text(json.dumps(rows))
+            facts(folder, available=int(8.5 * GIB), runs=[('repo', 'x', GIB // 5)] if comm else [])
+            if comm:
+                rows = json.loads((folder / 'native' / 'processes.json').read_text())
+                rows[-1].update(comm=comm, ppid=50)
+                (folder / 'native' / 'processes.json').write_text(json.dumps(rows))
             child, log = gate(folder, env, 'y')
             if holds:
                 wait_for(lambda: 'x:active:%d' % GIB in (folder / 'gate-y.stderr').read_text(), label + ': x keeps A at the gate')
@@ -1620,7 +1646,7 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
                 child.wait(timeout=30)
             else:
                 wait_for(lambda: (folder / 'y.agent').exists(), label + ': y starts once x is proven agentless')
-                assert 'x:ci-waiting:%d' % (GIB // 5) in (folder / 'gate-y.stderr').read_text(), (folder / 'gate-y.stderr').read_text()
+                assert 'x:ci-waiting:0:unseen' in (folder / 'gate-y.stderr').read_text(), (folder / 'gate-y.stderr').read_text()
                 (folder / 'y.release').touch()
                 finish(child)
 

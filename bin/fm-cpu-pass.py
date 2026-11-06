@@ -911,10 +911,11 @@ def project(available: int, rss: dict, counted: dict, steps: Optional[dict], lau
     run IDs to their live launch-gate reservations; now is the decision's wall
     clock (time.time() when None). A run waiting on remote CI (open step ci,
     status running, no live launch) reserves only the resident memory it holds
-    in two cases: the reading cannot see its tree and no agent pid is recorded
-    (it holds nothing), or its recorded agent pid is dead and its round began
-    more than NO_PID_WINDOW_SECS ago (proven_agentless: its bytes). Every other
-    CI run keeps the active term: a visible tree with no recorded pid, a live or
+    on positive proof that no agent lives: the reading sees no process of it,
+    and either no agent pid is recorded or its recorded agent pid is dead and
+    its round began more than NO_PID_WINDOW_SECS ago (proven_agentless). Every
+    other CI run keeps the active term: a visible tree, whatever the recorded
+    pid (a reparented agent can outlive its launcher's pid), a live or
     unjudgeable pid, an unknown round start or a round inside the window is not
     proof that no agent lives, whatever the processes are named. Every other counted or launched run reserves its
     resident memory or the active-run term A, whichever is larger, once its tree
@@ -944,7 +945,7 @@ def project(available: int, rss: dict, counted: dict, steps: Optional[dict], lau
         elif run == self_run or run in waiting:
             kind, demand = "waiter", size
         elif (steps is not None and step is not None and step[0] == CI_STEP and step[1] == "running"
-              and ((step[2] is None and not visible) or proven_agentless(step, clock))):
+              and not visible and (step[2] is None or proven_agentless(step, clock))):
             kind, demand = "ci-waiting", size
         else:
             kind = "step-unreadable" if steps is None else ("no-open-step" if step is None else "active")
