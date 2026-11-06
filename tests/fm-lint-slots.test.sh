@@ -1268,7 +1268,7 @@ fm_lint_max_overlap() {
 }
 
 test_every_mode_takes_its_budget_from_the_same_host_wide_bound() {
-  local tmp repo mode holder pid rc queued starts before
+  local tmp repo mode holder pid rc queued starts
   local -a modes
   tmp=$(fm_test_tmproot fm-lint-modes)
   repo="$tmp/repo"
@@ -1335,7 +1335,7 @@ SH
 }
 
 test_a_second_run_finds_the_budget_restored_and_repeats_the_first() {
-  local tmp run rc out first first_rc second second_rc slot
+  local tmp run rc out first first_rc second second_rc
   tmp=$(fm_test_tmproot fm-lint-second-run)
   mkdir -p "$tmp/bin"
   printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/a.sh"

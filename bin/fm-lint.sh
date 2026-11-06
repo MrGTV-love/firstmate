@@ -2025,17 +2025,13 @@ if [ -n "${FM_LINT_FIXTURE_HOST_RSS_KIB:-}" ]; then
   fi
   HOST_RSS_KIB=$FM_LINT_FIXTURE_HOST_RSS_KIB
 fi
-for pool_pair in \
-  "FM_LINT_HOST_SLOTS=${FM_LINT_HOST_SLOTS:-1}"; do
-  case "${pool_pair#*=}" in
-    ''|0*|*[!0-9]*)
-      pool_name=${pool_pair%%=*}
-      printf 'fm-lint.sh: %s must be a positive integer, got %s.\n' \
-        "$pool_name" "${!pool_name:-}" >&2
-      exit 2
-      ;;
-  esac
-done
+case "${FM_LINT_HOST_SLOTS:-1}" in
+  ''|0*|*[!0-9]*)
+    printf 'fm-lint.sh: FM_LINT_HOST_SLOTS must be a positive integer, got %s.\n' \
+      "${FM_LINT_HOST_SLOTS:-}" >&2
+    exit 2
+    ;;
+esac
 NCPU=$(sysctl -n hw.ncpu 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null) || NCPU=
 case "$NCPU" in ''|0*|*[!0-9]*) NCPU=1 ;; esac
 
