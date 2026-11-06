@@ -78,7 +78,9 @@
 # gate merges, restart in-flight lints that still run the older code.
 # The pool bounds the memory of the ShellCheck processes this script starts,
 # host-wide, in bytes. The budget is fixed: 3670016 KiB = 3.5 GiB = 3758096384
-# bytes. No environment variable or flag sets it (FM_LINT_HOST_RSS_KIB is refused
+# bytes. PROVISIONAL (Main 1161, 2026-11-06): this value is the measurement
+# default only; the final default is derived from the readings of the lint
+# runs measured under it and replaces it in a later commit. No environment variable or flag sets it (FM_LINT_HOST_RSS_KIB is refused
 # by name), this script is the only place that holds the number, and it is
 # printed as the host_memory_budget_kib line of the roots log. The one seam is
 # FM_LINT_FIXTURE_HOST_RSS_KIB, honored only together with FM_LINT_SLOT_DIR, a

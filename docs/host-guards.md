@@ -19,7 +19,7 @@ Paired task markers, a kernel cwd inside a no-mistakes run worktree or the decla
 [Host memory admission](configuration.md#host-memory-admission) owns operator setup; `tests/fm-mem-guard.test.sh`, `tests/fm-project-capacity.test.sh`, and `tests/fm-watch-typesafe-health.test.sh` cover classification, actual admission, and identifying wake delivery.
 
 The lint family is not a verdict guard: `bin/fm-lint.sh` bounds the resident memory of every ShellCheck it starts across all runs, homes and sandboxes of one user, in bytes, through the host-slot gate in `bin/fm-lint-cache.pl`.
-The budget is fixed at 3670016 KiB (3.5 GiB, 3758096384 bytes), set only by `bin/fm-lint.sh`, whose header owns the derivation from the memory-pressure level 2 readings and the rules; no setting overrides it, and the run prints it as `host_memory_budget_kib` in the lint roots log.
+The budget is fixed at 3670016 KiB (3.5 GiB, 3758096384 bytes; PROVISIONAL, a measurement default recorded by Main on 2026-11-06 until the measured runs derive the final one), set only by `bin/fm-lint.sh`, whose header owns the derivation from the memory-pressure level 2 readings and the rules; no setting overrides it, and the run prints it as `host_memory_budget_kib` in the lint roots log.
 When the host process table cannot be read the gate refuses and starts no root; it never runs a root unbounded.
 
 The process family is `fm-proc-guard`; its engine header owns the count semantics, thresholds, and census document.
