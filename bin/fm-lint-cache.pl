@@ -118,6 +118,7 @@ if (($ARGV[0] // '') eq 'gate') {
     };
     my $stopped_owners = sub {
         my %stopped;
+        no warnings 'exec';
         open(my $ps, '-|', 'ps', '-o', 'pid=,stat=', '-p', join(',', @_)) or return %stopped;
         while (my $line = <$ps>) { $stopped{$1} = 1 if $line =~ /\A\s*([0-9]+)\s+T/; }
         close $ps;
@@ -290,6 +291,7 @@ if (($ARGV[0] // '') eq 'gate') {
     # Whether a stopped gate other than this one has <needle> in its command.
     my $stopped_gate = sub {
         my ($needle) = @_;
+        no warnings 'exec';
         open(my $ps, '-|', 'ps', '-axww', '-o', 'pid=,stat=,command=') or return 0;
         my $found = 0;
         while (my $line = <$ps>) {
