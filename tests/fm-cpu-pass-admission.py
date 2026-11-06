@@ -1715,6 +1715,31 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
                 assert code == 0 and 'pipeline-start admitted' not in text and new_rows == 0, (name, route_name, code, text)
                 assert not list((folder / 'pool').glob('pipeline-waiter-*.lock')), (name, route_name)
 
+    def any_key_interception():
+        # bin/fm-duration.py run routes a fresh start by the command's content, whatever the measurement key:
+        # the reviewer's xargs shape under the key task.pipeline waits behind a full pool and is admitted once;
+        # under that key a reattachment through xargs and an ordinary command are not queued.
+        task_run = measured_run[:-2] + ['task.pipeline', '--']
+        folder, db, env = case('review-any-key-held', cores=3, running=1)
+        env.update(PATH=str(nm_bin) + os.pathsep + env['PATH'], FM_DURATION_FILE='off', CASE_NAME='xargs-task-key')
+        child = launch(task_run + ['sh', '-c', "printf 'x\\n' | xargs -n1 no-mistakes axi run --intent goal"], env, folder / 'x')
+        pending(folder, 1)
+        assert not (folder / 'order').exists() and child.poll() is None, 'a fresh start under a non-pipeline key ran past a full pool'
+        change(db, "UPDATE runs SET status='completed' WHERE id='baseline-0'")
+        finish(child)
+        assert (folder / 'order').read_text().splitlines() == ['xargs-task-key'], (folder / 'order').read_text()
+        assert (folder / 'x.stderr').read_text().count('pipeline-start admitted') == 1, (folder / 'x.stderr').read_text()
+        for name, words in (('reattach', ['sh', '-c', "printf 'x\\n' | xargs -I {} no-mistakes axi run"]), ('ordinary', ['true'])):
+            folder, db, env = case('review-any-key-%s' % name, cores=3)
+            env.update(PATH=str(nm_bin) + os.pathsep + env['PATH'], FM_DURATION_FILE='off', CASE_NAME=name)
+            change(db, "INSERT INTO runs (id, status) VALUES ('existing', 'running')")
+            change(db, "UPDATE runs SET ci_ready_at = 1 WHERE id = 'existing'")  # active but not counted
+            child = launch(task_run + words, env, folder / 'x')
+            code = child.wait(timeout=30)
+            text = (folder / 'x.stderr').read_text() + (folder / 'x.stdout').read_text()
+            assert code == 0 and 'pipeline-start admitted' not in text, (name, code, text)
+            assert not list((folder / 'pool').glob('pipeline-waiter-*.lock')), name
+
     def wake_holder(env, folder):
         held, release = folder / 'held', folder / 'release-queue'
         holder = subprocess.Popen(['bash', '-c', '. "$1" && fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" && touch "$2" && '
@@ -1838,6 +1863,7 @@ exec /bin/ln "$@"
                        ('F4 an unplaceable interception holds the start', intercept_unplaceable), ('R2 wrapper forms join the queue once', wrapper_shapes),
                        ('R2 env -S starts wait behind a full pool in class order', split_held_order),
                        ('D2 an xargs start meets the exec interception', xargs_interception),
+                       ('a fresh start under any measurement key meets the interception', any_key_interception),
                        ('R3 gate and watcher spills collide', watcher_collision),
                        ('D3 a collision replayed before the failed link returns', collision_then_replay), ('R3 controls: free lock, lone spill, replay', spill_controls),
                        ('R4 a short start-lock hold is recorded', short_hold_record)):

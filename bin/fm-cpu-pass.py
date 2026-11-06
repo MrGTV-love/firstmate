@@ -98,7 +98,7 @@ Pipeline starts:
     admission routes themselves); any other program's arguments are data.
     A COMMAND it does not judge a new run runs with the exec interception
     first on PATH (fm-mem-guard.sh run, and fm-duration.py run under a
-    no-mistakes. key): a private 0700 directory in the user's temporary
+    no-mistakes. key or when a word of the command names no-mistakes): a private 0700 directory in the user's temporary
     directory holding one symlink named no-mistakes to fm-cpu-pass.sh, which
     runs exec-intercept: it judges the client's own argv by the same facts,
     admits a new run once in the route's class (FM_PIPELINE_START_PRIORITY),
@@ -106,7 +106,7 @@ Pipeline starts:
     admitted start runs without the directory, so its client is not admitted
     twice. Limit: the requirement that every new run is admitted whatever its
     formatting is not met here: a second fresh start inside an admitted
-    command, fm-duration.py run under a key outside no-mistakes., an unmodeled
+    command, an unmodeled
     wrapper handed the real client's absolute path, one that resets PATH (sudo,
     env -i), and a start outside both routes still run unadmitted; it is met
     only when admission at run creation in the no-mistakes fork, backlog task

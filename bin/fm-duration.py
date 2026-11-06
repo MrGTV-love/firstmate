@@ -16,9 +16,10 @@ Usage: fm-duration.py record KEY MILLISECONDS EXIT [--sample-id ID] [--uncalibra
 A command that begins a new no-mistakes run, as fm-cpu-pass.py's
 fresh_pipeline_start judges it (a rerun, or axi run with an intent input, behind
 the wrapper forms it models), automatically enters that pipeline-start owner
-before any run clock or sample; under a no-mistakes. key any other command runs
-with that engine's exec interception first on PATH, which admits a fresh
-no-mistakes the command itself reaches. --pipeline-priority chooses merge-train,
+before any run clock or sample; under a no-mistakes. key, or under any key when
+a word of the command names no-mistakes, any other command runs with that
+engine's exec interception first on PATH, which admits a fresh no-mistakes the
+command itself reaches. --pipeline-priority chooses merge-train,
 machinery, vernant-build or other (default); docs/cpu-pass-pool.md owns policy.
 The admission owner re-executes this runner once with an internal argument that
 this runner consumes, so only that measured child skips requeueing; the wrapped
@@ -1519,9 +1520,10 @@ def main():
                 # Admitted once already: the client runs past the exec interception.
                 cleaned = cpu_pass.without_intercept(dict(os.environ))
                 os.environ.clear(); os.environ.update(cleaned)
-            elif pipeline_key and not fresh_pipeline:
-                # A pipeline-key command the parser finds no start in (xargs, a script, a variable): a fresh
-                # no-mistakes it reaches through PATH is admitted by the exec interception, in this class.
+            elif not fresh_pipeline:
+                # A pipeline-key command, or any command whose words name no-mistakes, that the parser finds no
+                # start in (xargs, a script, a variable), whatever its key: a fresh no-mistakes it reaches through
+                # PATH is admitted by the exec interception, in this class.
                 intercepted = cpu_pass.with_intercept(dict(os.environ), args.pipeline_priority)
                 if intercepted is not None:
                     os.environ.clear(); os.environ.update(intercepted)
