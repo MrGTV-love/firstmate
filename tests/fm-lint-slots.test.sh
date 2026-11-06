@@ -16,6 +16,9 @@
 # The count-cap tests below isolate the count from the memory budget, which
 # the memory tests set for themselves.
 export FM_LINT_FIXTURE_HOST_RSS_KIB=100000000
+# The gate tests below start the gate directly, which takes the budget from the
+# private variable that bin/fm-lint.sh would set.
+export FM_LINT_INTERNAL_HOST_RSS_KIB=100000000
 
 test_jobs_are_deterministic_and_complete() {
   if ! pinned_ready; then
