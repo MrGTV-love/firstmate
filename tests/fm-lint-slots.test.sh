@@ -1324,13 +1324,49 @@ SH
       "$lint" "$@" > "$tmp/$mode.out" 2>&1 || rc=$?
     wait "$holder" || fail "the run that holds the budget failed ($mode)"
     [ "$rc" -eq 0 ] || fail "the $mode run failed behind a run that holds the budget (rc=$rc)"$'\n'"$(cat "$tmp/$mode.out")"
-    queued=$(awk -F '\t' '$1 == "end" { q = $7 - $6 - $8; if (q > m) m = q } END { print m + 0 }' "$tmp/$mode.roots.tsv")
+    queued=$(awk -F '\t' '$1 == "end" { if ($17 + 0 > m) m = $17 + 0 } END { print m + 0 }' "$tmp/$mode.roots.tsv")
     [ "$queued" -ge 1000 ] \
       || fail "$mode: no root waited for the budget that another run held (longest queue $queued ms)"$'\n'"$(cat "$tmp/$mode.roots.tsv")"
     [ "$(fm_lint_max_overlap "$tmp/mem.starts.spans")" -eq 1 ] \
       || fail "$mode: two stand-in analyses held their memory at once behind a charge above the budget"$'\n'"$(cat "$tmp/mem.starts.spans")"
   done
   pass "the explicit-path, --fast, --partition, memory-retry, and ${modes[4]:+CI-bounds }mode runs each wait behind a run that holds the host-wide budget, and never hold memory beside it"
+}
+
+test_the_roots_log_records_each_roots_queue_wait_in_wait_ms() {
+  local tmp holder deadline waited gap
+  tmp=$(fm_test_tmproot fm-lint-wait-ms)
+  mkdir -p "$tmp/bin"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/a.sh"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/b.sh"
+  fm_lint_write_memory_shellcheck "$tmp/bin" 8 "$tmp/mem.starts"
+  # A lone run's root does not wait: the last column of its end row is 0.
+  FM_LINT_SLOT_DIR="$tmp/pool" FM_LINT_ROOT_RSS_KIB=8388608 FM_TEST_MEM_HOLD=0.2 FM_TEST_GATE_POOL_PREFIX="$tmp/pool" \
+    FM_LINT_TELEMETRY="$tmp/lone.tsv" PATH="$tmp/bin:$PATH" "$LINT" --jobs 1 "$tmp/a.sh" > "$tmp/lone.out" 2>&1 \
+    || fail "the lone run failed"$'\n'"$(cat "$tmp/lone.out")"
+  waited=$(awk -F '\t' '$1 == "end" { print $17 }' "$tmp/lone.roots.tsv")
+  [ "$waited" = 0 ] || fail "a root that did not wait recorded wait_ms '$waited', expected 0"$'\n'"$(cat "$tmp/lone.roots.tsv")"
+  # A second run's root waits behind a holder charged above the whole budget:
+  # its wait is recorded, not derived, and agrees with its start, end and duration.
+  : > "$tmp/mem.starts"
+  FM_LINT_SLOT_DIR="$tmp/pool" FM_LINT_ROOT_RSS_KIB=8388608 FM_TEST_MEM_HOLD=4 FM_TEST_GATE_POOL_PREFIX="$tmp/pool" \
+    PATH="$tmp/bin:$PATH" "$LINT" --jobs 1 "$tmp/a.sh" > "$tmp/holder.out" 2>&1 &
+  holder=$!
+  deadline=$((SECONDS + 60))
+  until [ -s "$tmp/mem.starts" ]; do
+    [ "$SECONDS" -lt "$deadline" ] || { kill "$holder" 2>/dev/null; fail "the holding run never started its root"; }
+    sleep 0.1
+  done
+  FM_LINT_SLOT_DIR="$tmp/pool" FM_LINT_ROOT_RSS_KIB=8388608 FM_TEST_MEM_HOLD=0.2 FM_TEST_GATE_POOL_PREFIX="$tmp/pool" \
+    FM_LINT_TELEMETRY="$tmp/wait.tsv" PATH="$tmp/bin:$PATH" "$LINT" --jobs 1 "$tmp/b.sh" > "$tmp/wait.out" 2>&1 \
+    || { kill "$holder" 2>/dev/null; fail "the waiting run failed"$'\n'"$(cat "$tmp/wait.out")"; }
+  wait "$holder" || fail "the holding run failed"$'\n'"$(cat "$tmp/holder.out")"
+  waited=$(awk -F '\t' '$1 == "end" { print $17 }' "$tmp/wait.roots.tsv")
+  case "$waited" in ''|*[!0-9]*) fail "the waiting root recorded no numeric wait_ms: '$waited'" ;; esac
+  [ "$waited" -ge 1000 ] || fail "a root that queued behind a holder recorded wait_ms $waited, expected at least 1000"$'\n'"$(cat "$tmp/wait.roots.tsv")"
+  gap=$(awk -F '\t' '$1 == "end" { print $7 - $6 - $8 - $17 }' "$tmp/wait.roots.tsv")
+  [ "$gap" = 0 ] || fail "wait_ms disagrees with end minus start minus duration by $gap ms"$'\n'"$(cat "$tmp/wait.roots.tsv")"
+  pass "the roots log records each root's queue wait in wait_ms: 0 for a root that did not wait, the queue time for one that did"
 }
 
 test_a_second_run_finds_the_budget_restored_and_repeats_the_first() {
@@ -3361,6 +3397,7 @@ test_an_unreadable_host_census_never_starts_a_root_in_any_pool
 test_a_host_that_loses_its_process_table_stops_the_run_after_one_refusal
 test_every_mode_takes_its_budget_from_the_same_host_wide_bound
 test_a_second_run_finds_the_budget_restored_and_repeats_the_first
+test_the_roots_log_records_each_roots_queue_wait_in_wait_ms
 test_a_waiting_gate_reading_the_table_never_stops_a_younger_running_root
 test_growth_guard_never_stops_the_watch_reader
 test_a_wrapper_around_the_real_shellcheck_shares_the_host_wide_memory_bound

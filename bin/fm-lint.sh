@@ -597,10 +597,13 @@ fm_lint_run_root() {  # <index> <path> <output-dir> <shard-index>
     calibration=1
   fi
   if [ -n "${FM_LINT_INTERNAL_ROOTS_LOG:-}" ]; then
-    printf 'end\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+    # The last column, wait_ms, is the root's queue wait in the host-wide gate in
+    # milliseconds (0 when it did not wait); duration_ms excludes it, so
+    # end_ms - start_ms - duration_ms equals wait_ms.
+    printf 'end\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
       "$index" "$path" "$shard_index" "${FM_LINT_INTERNAL_MODE:-}" \
       "$start_ms" "$end_ms" "$duration_ms" "$invocation_rc" "$reason" "$rss_kib" "$final_follow_sources" "$calibration" \
-      "$load_start" "$load_end" "$(fm_lint_root_rss_samples "$rss_file" "$fallback_rss")" >> "$FM_LINT_INTERNAL_ROOTS_LOG"
+      "$load_start" "$load_end" "$(fm_lint_root_rss_samples "$rss_file" "$fallback_rss")" "$queued_ms" >> "$FM_LINT_INTERNAL_ROOTS_LOG"
   fi
   if [ "${FM_LINT_INTERNAL_PROGRESS:-0}" = 1 ] || { [ "$reason" != ok ] && [ "$reason" != findings ] && [ "$reason" != memory-fallback ]; }; then
     printf 'fm-lint: end %s reason=%s rc=%s duration_ms=%s rss_kib=%s\n' \

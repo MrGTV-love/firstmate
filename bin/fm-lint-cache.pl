@@ -302,7 +302,7 @@ if (($ARGV[0] // '') eq 'gate') {
         return $found;
     };
     my ($slot, $slot_path, $peak_file, $charge_kib, $waited_from, $ticket, $ticket_path, $ticket_number, $coordinator);
-    my ($blocked_at, $checked_at, $bypass, $census_from, $host, $host_blocked_at, $host_checked_at, $host_bypass);
+    my ($blocked_at, $checked_at, $bypass, $census_from, $host, $host_blocked_at, $host_checked_at, $host_bypass, $queued);
     my ($passed, $passed_at, %stopped);
     eval { make_path($slot_dir, {mode => 0700}); 1 } or $refuse->($slot_dir, $@);
     -d $slot_dir && -w _ or $refuse->($slot_dir, 'not a writable directory');
@@ -323,6 +323,7 @@ if (($ARGV[0] // '') eq 'gate') {
                 $bypass = $stopped_gate->(" gate $slot_dir ");
             }
             unless ($bypass) {
+                $queued = 1;
                 Time::HiRes::sleep(0.1);
                 next;
             }
@@ -466,6 +467,7 @@ if (($ARGV[0] // '') eq 'gate') {
             %stopped = $stopped_owners->(@check_owners);
             $passed_at = Time::HiRes::time();
         }
+        $queued = 1 unless $slot || $caught;
         Time::HiRes::sleep(0.1) unless $slot || $caught;
     }
     if ($ticket) { unlink($ticket_path); close $ticket; }
@@ -476,7 +478,9 @@ if (($ARGV[0] // '') eq 'gate') {
         $refuse->($slot_path, $why);
     }
     if (open(my $fh, '>', $wait_file)) {
-        printf {$fh} "%d\n", $waited_from ? (Time::HiRes::time() - $waited_from) * 1000 : 0;
+        # A root admitted on its first pass did not queue: it records 0, so the
+        # roots log's wait_ms is the time a root spent queued, not the admission work.
+        printf {$fh} "%d\n", $waited_from && $queued ? (Time::HiRes::time() - $waited_from) * 1000 : 0;
         close $fh;
     }
     exit 128 + $signal_number{$caught} if $caught;
