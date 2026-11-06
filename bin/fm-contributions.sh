@@ -32,14 +32,15 @@
 # triage its signal. Formal reviews carry GitHub's own commit_id. Neither kind
 # can grant merge authority. Only a live captain hold projects a captain actor;
 # a recorded captain verdict without one asks the fleet to record the arbitration
-# as a hold. Current maintainer and nobody verdicts keep their actor and summary.
+# as a hold. Maintainer and nobody verdicts do not override the observed row.
 # The former ordinary-mode merge call is fleet work: refresh an unknown base,
 # update a stale branch, route the independent review when no PASS qualifies,
 # recheck an unknown PASS fact, or merge under the standing rule. REVIEW_REQUIRED,
 # can_merge false and away-mode rows keep their prior actor and reason. A known
-# stale base outranks a current fleet verdict only within that eligible scope;
-# fresh or unknown bases keep the verdict summary. When owners of one URL differ,
-# recorded verdicts outrank derived labels, then base facts and a qualifying PASS
+# stale base outranks every recorded verdict within that eligible scope.
+# Otherwise fleet and captain verdicts keep their prior dispositions, including
+# on unknown bases. When owners of one URL differ, fleet action or arbitration
+# verdicts outrank derived labels, then base facts and a qualifying PASS
 # decide among labels, never task names. These are action labels, not forge writes.
 # Optional PR facts share checked_at's freshness window: base_sha is the pull
 # resource's base SHA passed to the review verifier; base_containment records

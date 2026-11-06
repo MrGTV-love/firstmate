@@ -104,10 +104,8 @@ def projected($input; $saved; $now; $max_age):
        elif ($checks | length) == 0 then {actor:"fleet",reason:"no reported checks; readiness unconfirmed"}
        elif ($pending | length) > 0 then {actor:"fleet",reason:"checks still running"}
        elif $o.review_decision == "CHANGES_REQUESTED" then {actor:"fleet",reason:"forge requests changes"}
-       elif $verdict.actor | IN("maintainer","nobody") then {actor:$verdict.actor,reason:$verdict.summary}
        elif ($o.base_containment.behind_by // 0) > 0 and $o.can_merge == true
-         and $o.review_decision != "REVIEW_REQUIRED" and $merge_authority != "away"
-         and $verdict.actor != "captain" then {actor:"fleet",reason:"update the branch; base is stale",label_rank:0}
+         and $o.review_decision != "REVIEW_REQUIRED" and $merge_authority != "away" then {actor:"fleet",reason:"update the branch; base is stale",label_rank:0}
        elif $verdict.actor == "fleet" then {actor:"fleet",reason:$verdict.summary}
        elif $verdict.actor == "captain" then {actor:"fleet",reason:"record the unresolved arbitration as a captain hold"}
        elif $o.review_decision == "REVIEW_REQUIRED" then {actor:"maintainer",reason:"review required",label_rank:$review_rank}
@@ -127,7 +125,7 @@ def projected($input; $saved; $now; $max_age):
          signals:($record.pending // [])} + $action]
   # Multiple filed tasks may own the same URL. Retain every owner but count a
   # contribution once; any live arbitration wins over action-free duplicates.
-  # A current recorded verdict outranks every derived label, and base facts then
+  # Fleet action or arbitration verdicts outrank derived labels; base facts then
   # a qualifying PASS decide among labels; facts, never task names, choose the row.
   | group_by(.url)
   | map(. as $owners

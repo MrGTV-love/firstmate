@@ -1952,13 +1952,15 @@ test_captain_verdict_requires_live_hold() {
     "$(cat "$home/forge/head")" https://github.com/o/r/pull/8#issuecomment-1 captain 'choose X' >/dev/null \
     || fail 'could not record captain verdict'
   expect_merge_action "$home" 'record the unresolved arbitration as a captain hold'
+  mutate_record "$home" delivery '.records[0].observation.base_containment.behind_by=1'
+  expect_merge_action "$home" 'update the branch; base is stale'
   FM_CAPTAIN_HOLD_NOW="$NOW" contribution_hold "$home" hold delivery --reason 'choose contract'
   expect_merge_action "$home" 'choose contract' captain
   printf 'Use the accepted contract.\n' > "$home/decision.txt"
   contribution_hold "$home" answer delivery --decision-file "$home/decision.txt" --release
-  expect_merge_action "$home" 'record the unresolved arbitration as a captain hold'
+  expect_merge_action "$home" 'update the branch; base is stale'
   printf 'paused: waiting for external CI\n' > "$home/state/delivery.status"
-  expect_merge_action "$home" 'record the unresolved arbitration as a captain hold'
+  expect_merge_action "$home" 'update the branch; base is stale'
   pass 'recorded captain verdicts stay fleet before and after an actual hold answer; only the live hold reaches the owner'
 }
 
@@ -1995,7 +1997,7 @@ test_shared_url_label_follows_facts() {
     jq -e '.records[0].observation.review_verification.answer.ok == false' "$home/data/$other/contributions.json" >/dev/null \
       || fail "fixture owner $other unexpectedly qualified"
     mutate_record "$home" "$other" '.records[0].verdict={head:.records[0].observation.head,actor:"maintainer",source:"review",summary:"awaiting maintainer"}'
-    expect_merge_action "$home" 'awaiting maintainer' maintainer
+    expect_merge_action "$home" 'merge under the standing merge rule'
     mutate_record "$home" "$other" '.records[0].verdict=null
       | .records[0].observation.review_verification.answer={schema:"fm-review-verification.v1",ok:false,error:{kind:"not-qualified",message:"absent"}}'
     expect_merge_action "$home" 'merge under the standing merge rule'
@@ -2011,10 +2013,10 @@ test_shared_url_label_follows_facts() {
       mutate_record "$home" "$other" ".records[0].verdict={head:.records[0].observation.head,actor:\"$actor\",source:\"review\",summary:\"kept judgment\"}"
       cp "$home/data/$other/contributions.json" "$home/other.json"
       shared_mutation "$home" "$other" '.records[0].observation.base_containment.behind_by=1'
-      expect_merge_action "$home" 'kept judgment' "$actor"
+      expect_merge_action "$home" 'update the branch; base is stale'
       shared_restore "$home" "$other"
       shared_mutation "$home" "$other" 'del(.records[0].observation.base_containment)'
-      expect_merge_action "$home" 'kept judgment' "$actor"
+      expect_merge_action "$home" 'base freshness unknown; refresh the base comparison'
       shared_restore "$home" "$other"
     done
     printf 'pr=https://github.com/o/r/pull/8\npr_head=%s\nyolo=on\n' "$(cat "$home/forge/head")" >> "$home/state/delivery.meta"
@@ -2022,7 +2024,7 @@ test_shared_url_label_follows_facts() {
       || fail 'could not enter away posture'
     for actor in maintainer nobody; do
       mutate_record "$home" "$other" ".records[0].verdict={head:.records[0].observation.head,actor:\"$actor\",source:\"review\",summary:\"kept judgment\"}"
-      expect_merge_action "$home" 'kept judgment' "$actor"
+      expect_merge_action "$home" 'checks green; merge is authorized by delivery posture'
     done
     mutate_record "$home" "$other" '.records[0].verdict=null'
     expect_merge_action "$home" 'checks green; merge is authorized by delivery posture'
@@ -2070,7 +2072,7 @@ captain-changes|forge requests changes|.records[0].observation.review_decision="
 captain-signal|incoming maintainer signal needs triage|.records[0].pending=[{token:"comment:1"}]
 captain-draft|draft delivery|.records[0].observation.draft=true
 captain-conflict|mergeability conflicting|.records[0].observation.mergeable="conflicting"
-captain-stale-base|record the unresolved arbitration as a captain hold|.
+captain-stale-base|update the branch; base is stale|.
 captain-old-observation|contribution not recently checked|.records[0].checked_at="2026-09-15T08:00:00Z"
 captain-old-head|STALE maintainer verdict; reassess the current head|.records[0].verdict.head="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 CAPTAIN
@@ -2092,14 +2094,56 @@ EXPECTED
   pass 'excluded rows preserve prior actors and reasons across base and PASS facts; captain verdicts never mask checks or forge decisions'
 }
 
+test_recorded_verdict_cross_factors() {
+  local home judged state id number=200 actor reason out expected=
+  home=$(new_home recorded-verdict-cross)
+  for judged in maintainer nobody; do
+    for state in fresh stale unknown review-required cannot-merge away; do
+      id="$judged-$state"
+      record "$home" "$id" "$number" open mergeable
+      number=$((number + 1))
+      mutate_record "$home" "$id" '.records[0].observation += {can_merge:true,base_sha:"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",base_containment:{behind_by:0}}
+        | .records[0].observation.review_verification={pr:.records[0].url,head:.records[0].observation.head,task:.task,base:.records[0].observation.base_sha,answer:{schema:"fm-review-verification.v1",ok:false,error:{kind:"not-qualified"}}}'
+      mutate_record "$home" "$id" ".records[0].verdict={head:.records[0].observation.head,actor:\"$judged\",source:\"review\",summary:\"recorded judgment\"}"
+      actor=fleet
+      case "$state" in
+        fresh) reason='route the independent review' ;;
+        stale) reason='update the branch; base is stale'; mutate_record "$home" "$id" '.records[0].observation.base_containment.behind_by=1' ;;
+        unknown) reason='base freshness unknown; refresh the base comparison'; mutate_record "$home" "$id" 'del(.records[0].observation.base_containment)' ;;
+        review-required) actor=maintainer; reason='review required'; mutate_record "$home" "$id" '.records[0].observation.review_decision="REVIEW_REQUIRED"' ;;
+        cannot-merge) actor=maintainer; reason='delivery awaits the maintainer'; mutate_record "$home" "$id" '.records[0].observation.can_merge=false' ;;
+        away) reason='checks green; merge is authorized by delivery posture' ;;
+      esac
+      expected="${expected}${id}|${actor}|${reason}
+"
+    done
+  done
+  with_home "$home" bash "$ROOT/bin/fm-fleet-snapshot.sh" --contribution-input > "$home/input.raw.json" || fail 'verdict input failed'
+  jq '.tasks += [.backlog.records[] | select(.id | endswith("-away")) | {id:.id,kind:"ship",merge_authority:"away",pr:{url:.links[0],head:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}]' \
+    "$home/input.raw.json" > "$home/input.json" || fail 'away verdict fixture failed'
+  out=$(with_home "$home" bash "$ROOT/bin/fm-contributions.sh" snapshot "$home/input.json" --all) || fail 'verdict cross-factor snapshot failed'
+  while IFS='|' read -r id actor reason; do
+    [ -n "$id" ] || continue
+    printf '%s' "$out" | jq -e --arg id "$id" --arg actor "$actor" --arg reason "$reason" '
+      [.rows[] | select(.task == $id) | [.actor,.reason]] == [[$actor,$reason]]' >/dev/null \
+      || fail "recorded $id verdict overrode its observed row: $out"
+  done <<EXPECTED
+$expected
+EXPECTED
+  printf '%s' "$out" | jq -r '.rows[] | [.task,.actor,.reason] | @tsv'
+  pass 'maintainer and nobody verdicts do not override fresh, stale, unknown, review-required, cannot-merge or away rows'
+}
+
 test_merge_precedence_matrix() {
-  local home id number=20 actor reason mutation out
+  local home id number=20 actor reason mutation out expected
   home=$(new_home merge-matrix)
+  : > "$home/expected.tsv"
   while IFS='|' read -r id actor reason mutation; do
     record "$home" "$id" "$number" open mergeable
     mutate_record "$home" "$id" '.records[0].observation += {can_merge:true,base_sha:"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",base_containment:{behind_by:0}}'
     mutate_record "$home" "$id" '.records[0].observation.review_verification={pr:.records[0].url,head:.records[0].observation.head,task:.task,base:.records[0].observation.base_sha,answer:{schema:"fm-review-verification.v1",ok:true,basis:"independent-review",pr:.records[0].url,head:.records[0].observation.head,at:1,reader_model:"sonnet",reader_family:"anthropic",author_groups:{ship:[{model:"gpt-5.1",family:"openai"}]}}}'
     mutate_record "$home" "$id" "$mutation"
+    printf '%s\t%s\t%s\n' "$id" "$actor" "$reason" >> "$home/expected.tsv"
     number=$((number + 1))
   done <<'CASES'
 no-review|fleet|route the independent review|.records[0].observation.review_verification={pr:.records[0].url,head:.records[0].observation.head,task:.task,base:.records[0].observation.base_sha,answer:{schema:"fm-review-verification.v1",ok:false,error:{kind:"not-qualified",message:"absent"}}}
@@ -2112,12 +2156,13 @@ verdict-stale-base|fleet|update the branch; base is stale|.records[0].observatio
 verdict-fresh-base|fleet|merge this head now|.records[0].verdict={head:.records[0].observation.head,source:"review",actor:"fleet",summary:"merge this head now"}
 verdict-unknown-base|fleet|merge this head now|del(.records[0].observation.base_containment) | .records[0].verdict={head:.records[0].observation.head,source:"review",actor:"fleet",summary:"merge this head now"}
 verdict-captain|fleet|record the unresolved arbitration as a captain hold|.records[0].verdict={head:.records[0].observation.head,source:"review",actor:"captain",summary:"choose"}
-verdict-maintainer|maintainer|awaiting maintainer|.records[0].verdict={head:.records[0].observation.head,source:"review",actor:"maintainer",summary:"awaiting maintainer"}
-verdict-maintainer-no-pass|maintainer|awaiting maintainer|.records[0].observation.review_verification.answer={schema:"fm-review-verification.v1",ok:false,error:{kind:"not-qualified",message:"absent"}} | .records[0].verdict={head:.records[0].observation.head,source:"review",actor:"maintainer",summary:"awaiting maintainer"}
-verdict-maintainer-stale-base|maintainer|awaiting maintainer|.records[0].observation.base_containment.behind_by=1 | .records[0].verdict={head:.records[0].observation.head,source:"review",actor:"maintainer",summary:"awaiting maintainer"}
-verdict-nobody|nobody|no action|.records[0].verdict={head:.records[0].observation.head,source:"review",actor:"nobody",summary:"no action"}
-verdict-nobody-no-pass|nobody|no action|.records[0].observation.review_verification.answer={schema:"fm-review-verification.v1",ok:false,error:{kind:"not-qualified",message:"absent"}} | .records[0].verdict={head:.records[0].observation.head,source:"review",actor:"nobody",summary:"no action"}
-verdict-nobody-stale-base|nobody|no action|.records[0].observation.base_containment.behind_by=1 | .records[0].verdict={head:.records[0].observation.head,source:"review",actor:"nobody",summary:"no action"}
+verdict-captain-stale|fleet|update the branch; base is stale|.records[0].observation.base_containment.behind_by=1 | .records[0].verdict={head:.records[0].observation.head,source:"review",actor:"captain",summary:"choose"}
+verdict-maintainer|fleet|merge under the standing merge rule|.records[0].verdict={head:.records[0].observation.head,source:"review",actor:"maintainer",summary:"awaiting maintainer"}
+verdict-maintainer-no-pass|fleet|route the independent review|.records[0].observation.review_verification.answer={schema:"fm-review-verification.v1",ok:false,error:{kind:"not-qualified",message:"absent"}} | .records[0].verdict={head:.records[0].observation.head,source:"review",actor:"maintainer",summary:"awaiting maintainer"}
+verdict-maintainer-stale-base|fleet|update the branch; base is stale|.records[0].observation.base_containment.behind_by=1 | .records[0].verdict={head:.records[0].observation.head,source:"review",actor:"maintainer",summary:"awaiting maintainer"}
+verdict-nobody|fleet|merge under the standing merge rule|.records[0].verdict={head:.records[0].observation.head,source:"review",actor:"nobody",summary:"no action"}
+verdict-nobody-no-pass|fleet|route the independent review|.records[0].observation.review_verification.answer={schema:"fm-review-verification.v1",ok:false,error:{kind:"not-qualified",message:"absent"}} | .records[0].verdict={head:.records[0].observation.head,source:"review",actor:"nobody",summary:"no action"}
+verdict-nobody-stale-base|fleet|update the branch; base is stale|.records[0].observation.base_containment.behind_by=1 | .records[0].verdict={head:.records[0].observation.head,source:"review",actor:"nobody",summary:"no action"}
 review-required-stale-base|maintainer|review required|.records[0].observation.review_decision="REVIEW_REQUIRED" | .records[0].observation.base_containment.behind_by=1
 review-required-no-pass|maintainer|review required|.records[0].observation.review_decision="REVIEW_REQUIRED" | .records[0].observation.review_verification.answer={schema:"fm-review-verification.v1",ok:false,error:{kind:"not-qualified",message:"absent"}}
 review-required-pass|maintainer|review required|.records[0].observation.review_decision="REVIEW_REQUIRED"
@@ -2140,59 +2185,37 @@ stale-verdict|fleet|STALE maintainer verdict; reassess the current head|.records
 signal|fleet|incoming maintainer signal needs triage|.records[0].pending=[{token:"comment:1"}]
 issue|maintainer|awaiting issue triage|.records[0].kind="issue" | .records[0].observation.ready=false
 CASES
+  record "$home" live-hold "$number" open mergeable
+  FM_CAPTAIN_HOLD_NOW="$NOW" contribution_hold "$home" hold live-hold --reason 'choose scope'
+  printf 'live-hold\tcaptain\tchoose scope\n' >> "$home/expected.tsv"
   out=$(merge_snapshot "$home") || fail 'precedence snapshot failed'
-  while IFS='|' read -r id actor reason; do
+  while IFS="$(printf '\t')" read -r id actor reason; do
     printf '%s' "$out" | jq -e --arg task "$id" --arg actor "$actor" --arg reason "$reason" '
       .rows[] | select(.task == $task) | .actor == $actor and .reason == $reason' >/dev/null \
       || fail "precedence changed for $id: $out"
-  done <<'EXPECTED'
-no-review|fleet|route the independent review
-base-unknown|fleet|base freshness unknown; refresh the base comparison
-base-stale|fleet|update the branch; base is stale
-base-stale-pass|fleet|update the branch; base is stale
-qualified|fleet|merge under the standing merge rule
-pass-unknown|fleet|PASS fact unknown; recheck the independent review
-verdict-stale-base|fleet|update the branch; base is stale
-verdict-fresh-base|fleet|merge this head now
-verdict-unknown-base|fleet|merge this head now
-verdict-captain|fleet|record the unresolved arbitration as a captain hold
-verdict-maintainer|maintainer|awaiting maintainer
-verdict-maintainer-no-pass|maintainer|awaiting maintainer
-verdict-maintainer-stale-base|maintainer|awaiting maintainer
-verdict-nobody|nobody|no action
-verdict-nobody-no-pass|nobody|no action
-verdict-nobody-stale-base|nobody|no action
-review-required-stale-base|maintainer|review required
-review-required-no-pass|maintainer|review required
-review-required-pass|maintainer|review required
-review-required-unknown|maintainer|review required
-cannot-merge-stale-base|maintainer|delivery awaits the maintainer
-cannot-merge-no-pass|maintainer|delivery awaits the maintainer
-cannot-merge-pass|maintainer|delivery awaits the maintainer
-cannot-merge-unknown|maintainer|delivery awaits the maintainer
-changes|fleet|forge requests changes
-failed|fleet|checks failed
-missing|fleet|check lane has no verdict
-pending|fleet|checks still running
-no-checks|fleet|no reported checks; readiness unconfirmed
-draft|fleet|draft delivery
-conflict|fleet|mergeability conflicting
-merged|nobody|forge reports merged
-closed|nobody|forge reports closed
-stale-observation|fleet|contribution not recently checked
-stale-verdict|fleet|STALE maintainer verdict; reassess the current head
-signal|fleet|incoming maintainer signal needs triage
-issue|maintainer|awaiting issue triage
-EXPECTED
+  done < "$home/expected.tsv"
   printf '%s' "$out" | jq -r '.rows[] | [.task,.actor,.reason] | @tsv'
-  bearings "$home" | jq -e '.contributions.counts.captain == 0 and .contributions.captain == []' >/dev/null \
-    || fail 'Bearings must not show a recorded verdict without a live hold as an owner choice'
+  expected=$(jq -Rs 'split("\n") | map(select(length > 0) | split("\t") | {task:.[0],actor:.[1]})
+    | {known:length,counts:{captain:(map(select(.actor == "captain")) | length),
+        fleet:(map(select(.actor == "fleet")) | length),maintainer:(map(select(.actor == "maintainer")) | length),
+        nobody:(map(select(.actor == "nobody")) | length)},captain:(map(select(.actor == "captain") | .task) | sort)}' "$home/expected.tsv")
+  printf '%s' "$out" | jq -e --argjson expected "$expected" '
+    .known == $expected.known and .counts == $expected.counts
+    and ([.captain[].task] | sort) == $expected.captain
+    and all(.rows[]; if .actor == "captain" then .hold != null else true end)' >/dev/null \
+    || fail "snapshot counts differ from the fixture table: $out"
+  bearings "$home" | jq -e --argjson expected "$expected" '
+    .contributions | .known == $expected.known and .counts == $expected.counts
+    and ([.captain[].task] | sort) == $expected.captain
+    and all(.captain[]; .hold != null)' >/dev/null \
+    || fail 'Bearings counts or captain list differ from the live-hold fixture table'
+  printf 'fixture summary: %s\n' "$expected"
   pass 'classifier branch precedence keeps ordinary actions distinct; only live holds are owner calls'
 }
 
 fm_test_only
 failures=0
-for test_name in test_ordinary_merge_ownership test_observed_merge_check_precedence test_merge_base_observation test_merge_verifier_unknowns test_merge_saved_facts_and_freshness test_merge_hold_lifecycle test_away_merge_action test_captain_verdict_requires_live_hold test_shared_url_live_hold_outranks_verdict test_shared_url_label_follows_facts test_merge_preserved_cross_factors test_merge_precedence_matrix test_actor_coverage test_stale_verdict test_unchecked_is_not_silence test_newest_check_has_no_verdict test_comment_wake test_review_wake test_inline_wake test_ready_issue_wake test_fresh_issue_requires_maintainer test_missing_lane_remains_missing test_partial_freshness_keeps_measured_rows test_malformed_record_cannot_prove_silence test_issue_timeline_and_exact_ack test_verdict_retains_judged_head test_verdict_actor_values_are_discoverable test_observed_replacement_refreshes_verdict test_unobserved_head_leaves_verdict_unknown test_away_yolo_is_fleet_work test_away_yolo_cross_home_is_fleet_work test_retired_and_unsupported_coverage test_unsupported_forge_is_not_fleet_work test_held_unsupported_forge_is_not_captain_work test_shared_contribution_signal_wakes_once test_watcher_keeps_diagnostics_separate_from_contribution_wakes test_expired_child_unsupported_forge_stays_unmeasured test_watcher_surfaces_new_contribution_once test_home_summary_coverage test_unreadable_pending_is_not_empty test_record_task_identity_matches_dirname_basename test_read_only_views_create_no_state test_clock_jump_does_not_refuse_a_read test_genuine_failure_after_clock_jump_is_unavailable test_shared_url_observed_once test_terminal_contribution_settles test_late_owner_inherits_terminal_observation test_interrupted_multi_owner_poll_settles_every_owner test_done_task_open_pr_still_observed test_all_urls_are_attempted_without_reservation test_three_second_pr_reads_complete_fresh_in_one_cycle test_progressing_reads_survive_fivefold_slowdown test_unsupported_url_first_does_not_abort_the_pass test_quota_reason_is_the_refusal_line test_reads_record_their_samples_when_the_poll_ends test_first_unknown_read_defers_the_rest_of_the_pass test_always_silent_url_does_not_starve_the_others test_stop_while_writing_the_order_leaves_no_temporary test_retired_pr_poll_starts_a_new_stop_episode test_every_disarm_path_starts_a_new_stop_episode test_reads_are_independent_of_watcher_interval test_watcher_stopped_check_rings_queued_row_next_pass test_unavailable_forge_records_error_and_wakes_once_per_episode test_late_owner_keeps_failure_episode_suppressed test_retire_ends_observation_of_a_gone_contribution test_late_owner_of_a_retired_final_contribution_is_not_retired test_retire_is_idempotent_and_refuses_unknown_pairs test_repeated_poll_reads_unchanged_prs_conditionally test_low_quota_poll_keeps_last_observation_marked_stale test_failure_after_quota_episode_wakes test_late_owners_keep_quota_episode_suppressed test_low_quota_wave_guards_graphql_and_marks_every_tail_owner test_successful_issue_wave_marks_unmeasured_tail_owners test_http_shim_preserves_backend_failures; do
+for test_name in test_ordinary_merge_ownership test_observed_merge_check_precedence test_merge_base_observation test_merge_verifier_unknowns test_merge_saved_facts_and_freshness test_merge_hold_lifecycle test_away_merge_action test_captain_verdict_requires_live_hold test_shared_url_live_hold_outranks_verdict test_shared_url_label_follows_facts test_merge_preserved_cross_factors test_recorded_verdict_cross_factors test_merge_precedence_matrix test_actor_coverage test_stale_verdict test_unchecked_is_not_silence test_newest_check_has_no_verdict test_comment_wake test_review_wake test_inline_wake test_ready_issue_wake test_fresh_issue_requires_maintainer test_missing_lane_remains_missing test_partial_freshness_keeps_measured_rows test_malformed_record_cannot_prove_silence test_issue_timeline_and_exact_ack test_verdict_retains_judged_head test_verdict_actor_values_are_discoverable test_observed_replacement_refreshes_verdict test_unobserved_head_leaves_verdict_unknown test_away_yolo_is_fleet_work test_away_yolo_cross_home_is_fleet_work test_retired_and_unsupported_coverage test_unsupported_forge_is_not_fleet_work test_held_unsupported_forge_is_not_captain_work test_shared_contribution_signal_wakes_once test_watcher_keeps_diagnostics_separate_from_contribution_wakes test_expired_child_unsupported_forge_stays_unmeasured test_watcher_surfaces_new_contribution_once test_home_summary_coverage test_unreadable_pending_is_not_empty test_record_task_identity_matches_dirname_basename test_read_only_views_create_no_state test_clock_jump_does_not_refuse_a_read test_genuine_failure_after_clock_jump_is_unavailable test_shared_url_observed_once test_terminal_contribution_settles test_late_owner_inherits_terminal_observation test_interrupted_multi_owner_poll_settles_every_owner test_done_task_open_pr_still_observed test_all_urls_are_attempted_without_reservation test_three_second_pr_reads_complete_fresh_in_one_cycle test_progressing_reads_survive_fivefold_slowdown test_unsupported_url_first_does_not_abort_the_pass test_quota_reason_is_the_refusal_line test_reads_record_their_samples_when_the_poll_ends test_first_unknown_read_defers_the_rest_of_the_pass test_always_silent_url_does_not_starve_the_others test_stop_while_writing_the_order_leaves_no_temporary test_retired_pr_poll_starts_a_new_stop_episode test_every_disarm_path_starts_a_new_stop_episode test_reads_are_independent_of_watcher_interval test_watcher_stopped_check_rings_queued_row_next_pass test_unavailable_forge_records_error_and_wakes_once_per_episode test_late_owner_keeps_failure_episode_suppressed test_retire_ends_observation_of_a_gone_contribution test_late_owner_of_a_retired_final_contribution_is_not_retired test_retire_is_idempotent_and_refuses_unknown_pairs test_repeated_poll_reads_unchanged_prs_conditionally test_low_quota_poll_keeps_last_observation_marked_stale test_failure_after_quota_episode_wakes test_late_owners_keep_quota_episode_suppressed test_low_quota_wave_guards_graphql_and_marks_every_tail_owner test_successful_issue_wave_marks_unmeasured_tail_owners test_http_shim_preserves_backend_failures; do
   ( "$test_name" ) || failures=$((failures + 1))
 done
 [ "$failures" -eq 0 ] || fail "$failures contribution regressions"
