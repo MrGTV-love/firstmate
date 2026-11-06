@@ -1806,7 +1806,16 @@ if intent.startswith('reg'):
         outer = launch(mem_guard + ['bash', '-c', line.format(abs=client, go=go)], env, folder / 'outer')
         wait_for(lambda: calls(folder) == ['first'], 'the first client ran')
         lock = os.open(str(folder / 'pool' / 'pipeline-start.lock'), os.O_RDWR | os.O_CREAT, 0o600)
-        fcntl.flock(lock, fcntl.LOCK_EX)
+        until = time.monotonic() + 15
+        while True:
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() >= until:
+                    os.close(lock); go.touch()
+                    raise AssertionError('the admitted command still holds the start lock after its first client ended')
+                time.sleep(0.05)
         try:
             elsewhere = launch(cli + ['pipeline-start', '--priority', 'merge-train', '--', str(client), 'axi', 'run', '--intent', 'elsewhere'],
                                env, folder / 'elsewhere')
