@@ -76,31 +76,31 @@
 # cannot bypass an older one. Killed waiters, and waiters stopped for a second
 # while a slot sits free, are skipped automatically. After an update to this
 # gate merges, restart in-flight lints that still run the older code.
-# The pool bounds the memory of the ShellCheck processes this script starts,
-# host-wide, in bytes. The budget is fixed: 3670016 KiB = 3.5 GiB = 3758096384
-# bytes. PROVISIONAL (Main 1161, 2026-11-06): this value is the measurement
-# default only; the final default is derived from the readings of the lint
-# runs measured under it and replaces it in a later commit. No environment variable or flag sets it (FM_LINT_HOST_RSS_KIB is refused
-# by name), this script is the only place that holds the number, and it is
-# printed as the host_memory_budget_kib line of the roots log. Tests get no
-# seam either: a test uses a private FM_LINT_SLOT_DIR pool, and a test that
-# starts ShellCheck counts against this same host-wide budget and may queue on it.
-# Derivation (rule: at or below the smallest ShellCheck aggregate among the
-# readings at memory pressure level 2). state/memory-readings.jsonl holds these
-# level-2 readings with ShellCheck among the ten largest processes; the sum is
-# of their rss_bytes, in MiB (processes counted in brackets):
-#   2026-11-02T21:11:32Z  3673.8125 [2]
-#   2026-11-04T04:19:35Z 13115.46875 [7]
-#   2026-11-04T04:19:44Z 12253.59375 [6]
-#   2026-11-04T04:20:14Z 12080.96875 [5]
-#   2026-11-04T04:44:59Z 10911.125 [8]
-#   2026-11-04T04:45:21Z 10879.171875 [7]
-#   2026-11-04T04:52:23Z 10706.25 [5] (read after the other six)
-# The smallest is 3673.8125 MiB * 1024 = 3761984 KiB = 3.588 GiB. The budget is
-# the next round figure below it: 3.5 GiB * 1048576 = 3670016 KiB, which is
-# 91968 KiB under that reading. An unrecorded root is charged more than that
-# budget (the 8 GiB watch bound below), so with no history each root runs alone,
-# and recorded roots share the budget.
+# The pool bounds the total resident memory T of the ShellCheck processes this
+# script starts, host-wide, in bytes. The budget is fixed: 3670016 KiB = 3.5 GiB =
+# 3758096384 bytes, the value Main recorded on 2026-11-06. No environment variable
+# or flag sets it (FM_LINT_HOST_RSS_KIB is refused by name), this script is the
+# only place that holds the number, and it is printed as the host_memory_budget_kib
+# line of the roots log. Tests get no seam either: a test uses a private
+# FM_LINT_SLOT_DIR pool, and a test that starts ShellCheck counts against this same
+# host-wide budget and may queue on it.
+# T stays at or below the budget at every moment two or more roots run. A root
+# larger than the budget runs alone and is ended at the per-root watch bound
+# (FM_LINT_ROOT_RSS_KIB, never above its 8 GiB default), so the residual is one
+# root up to that bound plus the watch's sampling overshoot.
+# Measured basis (this repository's real full lint, sampled every 0.25 s, each
+# ShellCheck process attributed to its lint run by its parent chain):
+#   the lint before this change peaked at T = 13.31 GiB (14287699968 bytes) with
+#   two roots, above the budget;
+#   the lint with this budget had at most 3.16 GiB with two roots, and no sample
+#   above the budget;
+#   the smallest ShellCheck total among the memory-pressure level 2 readings in
+#   state/memory-readings.jsonl (processes among the ten largest) is
+#   3673.8125 MiB = 3761984 KiB (2026-11-02T21:11:32Z, 2 processes), 91968 KiB
+#   above the budget; the six other such readings are 10.4 to 12.8 GiB.
+# An unrecorded root is charged more than that budget (the 8 GiB watch bound
+# below), so with no history each root runs alone, and recorded roots share the
+# budget.
 # Each root is charged its own recorded peak, the larger of resident size and
 # physical footprint over its earlier complete analyses, kept per analysis mode
 # (full or fast) and repo-relative root path in the pool's history/ directory
