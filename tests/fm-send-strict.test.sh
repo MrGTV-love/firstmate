@@ -60,7 +60,7 @@ case "${1:-}" in
     printf '╭────╮\n│    │\n╰────╯\n'
     exit 0 ;;
   list-windows)
-    printf 'foreign:%s\nfm-mpf-lane-m8\nfm-lane-key\nfm-lane-ok\nfm-fm-slack-main-window-intake\nfm-other\nfm-fm-mini\n' \
+    printf 'foreign:%s\nfm-mpf-lane-m8\nfm-lane-key\nfm-lane-ok\nfm-fm-slack-main-window-intake\nfm-task-one\nfm-other\nfm-unmatched\nfm-fm-mini\n' \
       "${FM_FAKE_TMUX_WINDOW:-fm-lost}"
     exit 0 ;;
 esac
@@ -364,11 +364,14 @@ test_declared_local_input_is_checked_without_grants() {
   cp "$home/state/other.status" "$dir/status-before"
   : > "$log"
   PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" \
+    FM_GUARD_EVENT_LOG="$home/state/guard-events.jsonl" \
     "$SEND" other --relay --require-input "$worktree/required.md" --resolve-key dependency \
     'Use the declared report' >/dev/null 2> "$err"; rc=$?
   [ "$rc" -ne 0 ] || fail "a missing declared input was silently delegated"
   assert_contains "$(cat "$err")" "$worktree/required.md" "missing input report must name its artifact"
   assert_contains "$(cat "$err")" "receiver 'other'" "missing input report must name its receiver"
+  jq -es 'map(select(.guard == "send-task-prerequisites")) | length == 1 and .[0].decision == "deny" and .[0].rule == "required-input" and .[0].task == "other"' "$home/state/guard-events.jsonl" >/dev/null \
+    || fail "missing local input must emit one receiver-attributed denial"
   [ ! -s "$log" ] || fail "missing input typed a doorbell"
   [ ! -f "$home/state/other.inbox/001.msg" ] || fail "missing input published an instruction"
   cmp -s "$dir/status-before" "$home/state/other.status" || fail "missing input closed a dependency"
@@ -401,8 +404,107 @@ test_declared_local_input_is_checked_without_grants() {
   pass "fm-send: declared local inputs gate inbox and typed delivery without changing the message, permissions, or transfers"
 }
 
+test_explicit_endpoint_ownership_and_guard_events() {
+  local dir fb home log err events rc text body target mode
+  dir="$TMP_ROOT/explicit-owner"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); home=$(setup_home explicit-owner)
+  log="$dir/send.log"; err="$dir/send.err"; events="$dir/events.jsonl"
+  fm_write_meta "$home/state/task-one.meta" "window=sess:fm-task-one" "kind=ship" "harness=claude"
+  fm_write_meta "$home/state/other.meta" "window=sess:fm-other" "kind=ship" "harness=claude"
+  printf 'needs-decision [key=dependency]: waiting for approved input\n' > "$home/state/other.status"
+  cp "$home/state/other.status" "$dir/status-before"
+  for mode in explicit typed fire-and-forget; do
+    target=other; text='Continue task-one and task-one'; set --
+    case "$mode" in
+      explicit) target=sess:fm-unmatched ;;
+      typed) text='/review task-one and task-one' ;;
+      fire-and-forget)
+        fm_write_secondmate_meta "$home/state/other.meta" "$home" "sess:fm-other"
+        set -- --fire-and-forget 0123456789abcdef ;;
+
+    esac
+    : > "$log"; : > "$events"
+    PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" FM_SEND_SETTLE=0 \
+      FM_GUARD_EVENT_LOG="$events" "$SEND" "$target" "$@" "$text" > /dev/null 2> "$err"; rc=$?
+    expect_code 1 "$rc" "$mode wrong-owner refusal must not report delivered-unconfirmed"
+    [ ! -s "$log" ] || fail "$mode wrong-owner refusal reached backend"
+    [ ! -d "$home/state/other.inbox" ] || fail "$mode refusal wrote an inbox"
+    [ ! -d "$home/state/pending-replies" ] || fail "$mode refusal armed a pending reply"
+    cmp -s "$dir/status-before" "$home/state/other.status" || fail "$mode refusal changed status"
+    jq -es 'map(select(.guard == "send-task-prerequisites")) | length == 1 and .[0].decision == "deny" and .[0].task == "task-one" and .[0].override == false' "$events" >/dev/null \
+      || fail "$mode refusal must emit exactly one attributed deny"
+    : > "$log"; : > "$events"
+    PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" FM_SEND_SETTLE=0 \
+      FM_GUARD_EVENT_LOG="$events" "$SEND" "$target" --relay "$@" "$text" > /dev/null 2> "$err"; rc=$?
+    expect_code 0 "$rc" "$mode deliberate relay should send"
+    jq -es 'map(select(.guard == "send-task-prerequisites")) | length == 1 and .[0].decision == "bypass" and .[0].task == "task-one" and .[0].override == true' "$events" >/dev/null \
+      || fail "$mode relay must emit exactly one attributed bypass despite repeated mentions"
+    if [ "$mode" = fire-and-forget ]; then
+      body=$(bash -c '. "$1"; fm_task_inbox_body "$2"' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$home/state/other.inbox/001.msg")
+      case "$body" in
+        *" $text") : ;;
+        *) fail "fire-and-forget relay changed message" ;;
+      esac
+    else
+      [ "$(sed -n 's/^send-keys target=[^ ]* literal=1 arg=//p' "$log")" = "$text" ] \
+        || fail "$mode relay changed typed text"
+    fi
+  done
+  : > "$log"; : > "$events"
+  PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" FM_SEND_SETTLE=0 \
+    FM_GUARD_EVENT_LOG="$events" "$SEND" sess:fm-task-one 'Continue task-one' >/dev/null 2> "$err"; rc=$?
+  expect_code 0 "$rc" "the owner's recorded endpoint must send unchanged"
+  [ "$(sed -n 's/^send-keys target=[^ ]* literal=1 arg=//p' "$log")" = 'Continue task-one' ] \
+    || fail "owner endpoint changed message"
+  [ ! -d "$home/state/task-one.inbox" ] || fail "owner endpoint changed the typed plane"
+  jq -es 'map(select(.guard == "send-task-prerequisites")) | length == 0' "$events" >/dev/null \
+    || fail "correct owner emitted an ownership decision"
+  : > "$events"
+  PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" FM_SEND_SETTLE=0 \
+    FM_GUARD_EVENT_LOG="$events" "$SEND" other --relay 'no recorded task mention' >/dev/null 2> "$err"; rc=$?
+  expect_code 0 "$rc" "unneeded relay must still send"
+  jq -es 'map(select(.guard == "send-task-prerequisites")) | length == 0' "$events" >/dev/null \
+    || fail "unneeded relay emitted bypass"
+  : > "$events"
+  PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" FM_SEND_SETTLE=0 \
+    FM_GUARD_EVENT_LOG="$events" "$SEND" other --relay --resolve-key nonexistent 'Continue task-one' >/dev/null 2> "$err"; rc=$?
+  expect_code 1 "$rc" "relay must not escape the earlier decision guard"
+  jq -es 'map(select(.guard == "send-task-prerequisites")) | length == 0' "$events" >/dev/null \
+    || fail "an earlier refusal emitted an ownership escape"
+  pass "fm-send: explicit, typed and fire-and-forget mismatches emit one deny or effective escape; owner and earlier guards stay intact"
+}
+
+test_relay_survives_unavailable_event_writer() {
+  local dir fb home log err rc writer body bells baseline_body='' baseline_bells=''
+  dir="$TMP_ROOT/writer-failure"; mkdir -p "$dir/copy"
+  cp -R "$ROOT/bin" "$dir/copy/bin"
+  fb=$(make_stubs "$dir"); log="$dir/send.log"; err="$dir/send.err"
+  for writer in executable unavailable; do
+    home=$(setup_home "writer-$writer")
+    fm_write_meta "$home/state/task-one.meta" "window=sess:fm-task-one" "kind=ship"
+    fm_write_meta "$home/state/other.meta" "window=sess:fm-other" "kind=ship"
+    [ "$writer" != unavailable ] || chmod -x "$dir/copy/bin/fm-guard-event.sh"
+    : > "$log"
+    PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" FM_SEND_SETTLE=0 \
+      "$dir/copy/bin/fm-send.sh" other --relay 'Continue task-one' >/dev/null 2> "$err"; rc=$?
+    expect_code 0 "$rc" "writer availability must not change relay exit"
+    body=$(bash -c '. "$1"; fm_task_inbox_body "$2"' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$home/state/other.inbox/001.msg")
+    bells=$(cat "$log"); bells=${bells//"$home"/HOME}
+    if [ "$writer" = executable ]; then
+      baseline_body=$body; baseline_bells=$bells
+      assert_contains "$bells" 'Firstmate instruction waiting' "baseline must actually ring"
+    else
+      [ "$body" = "$baseline_body" ] || fail "unavailable writer changed durable record"
+      [ "$bells" = "$baseline_bells" ] || fail "unavailable writer changed doorbell"
+    fi
+  done
+  pass "fm-send: a non-executable telemetry writer changes neither relay exit, durable body nor doorbell"
+}
+
 fm_test_only
 
+test_explicit_endpoint_ownership_and_guard_events
+test_relay_survives_unavailable_event_writer
 test_arbitrary_path_mentions_are_not_inputs
 test_declared_local_input_is_checked_without_grants
 test_task_owner_mismatch_is_refused

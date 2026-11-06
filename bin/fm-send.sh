@@ -16,10 +16,13 @@
 # legacy fm-<id> label, must target that owner. A task id inside a path is not
 # checked, so a wrong-owner path mention such as data/<other-id>/review.md is
 # accepted; the pending-reply repost relays its already-routed request.
-# A wrong-owner steer is refused before enqueue, reply
-# tracking, or typing, and names the correct task selector. Use --relay before
-# the text only for a deliberate cross-task mention; it bypasses only this
-# ownership check, never decision, lease, target, or delivery safeguards.
+# A wrong-owner steer, including an unmatched explicit endpoint naming a
+# recorded task, is refused before enqueue, reply tracking, or typing and names
+# the correct selector. Send a refused steer to that owner, or use --relay before
+# the text only for a deliberate cross-task mention. --relay is this guard's
+# registered escape; every effective use is logged through fm-guard-event.sh.
+# It changes only ownership checking, never decision, lease, target, declared
+# input, or delivery safeguards.
 # Tasks owned inside a secondmate's home are not inferred from that home:
 # without a direct-report meta here, their mentions remain ordinary text.
 #   <target> may be an exact task id, a legacy fm-<id> task label resolved
@@ -581,7 +584,8 @@ fm_send_check_required_inputs() { # <newline-delimited-declarations>
     root=$receiver_home
     case "$worktree" in /*) case "$input" in "$worktree"/*) root=$worktree ;; esac ;; esac
     if ! FM_HOME="$root" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-remote-file.sh" check "$input" >/dev/null; then
-      echo "error: required input '$input' is unavailable to receiver '$RAW_TARGET'; nothing was sent. Stage only this declared artifact through the existing authorized transfer mechanism; no access was granted." >&2
+      "$SCRIPT_DIR/fm-guard-event.sh" send-task-prerequisites deny --rule required-input --task "$(fm_send_id_from_meta "$TARGET_META")" 2>/dev/null || true
+      echo "error: refused required input '$input': unavailable to receiver '$RAW_TARGET'; nothing was sent. Stage only this declared artifact through the existing authorized transfer mechanism; no access was granted." >&2
       return 1
     fi
   done <<< "$declared"
@@ -882,36 +886,39 @@ else
     echo "error: a text steer requires a nonempty message; nothing was sent (an empty marked request would deliver only marker and correlation bytes and leave the parent waiting on a reply to nothing)" >&2
     exit 1
   fi
-  if [ "$RELAY" = 0 ]; then
-    # Tokenize once without treating pathname components as standalone task ids.
-    # A final prose period is punctuation only when no exact meta names it.
-    owner_target=
-    [ -z "$TARGET_META" ] || owner_target=$(fm_send_id_from_meta "$TARGET_META")
-    while IFS= read -r mentioned_task; do
-      [ -n "$mentioned_task" ] || continue
-      # A task name embedded in a pathname is not a task-id token.
-      case "$mentioned_task" in */*|*\\*) continue ;; esac
-      mentioned_id=
-      while :; do
-        if [ -f "$STATE/$mentioned_task.meta" ]; then
-          mentioned_id=$mentioned_task
+  # Tokenize once without treating pathname components as standalone task ids.
+  # A final prose period is punctuation only when no exact meta names it.
+  owner_target=
+  [ -z "$TARGET_META" ] || owner_target=$(fm_send_id_from_meta "$TARGET_META")
+  while IFS= read -r mentioned_task; do
+    [ -n "$mentioned_task" ] || continue
+    # A task name embedded in a pathname is not a task-id token.
+    case "$mentioned_task" in */*|*\\*) continue ;; esac
+    mentioned_id=
+    while :; do
+      if [ -f "$STATE/$mentioned_task.meta" ]; then
+        mentioned_id=$mentioned_task
+        break
+      fi
+      case "$mentioned_task" in fm-?*)
+        if [ -f "$STATE/${mentioned_task#fm-}.meta" ]; then
+          mentioned_id=${mentioned_task#fm-}
           break
-        fi
-        case "$mentioned_task" in fm-?*)
-          if [ -f "$STATE/${mentioned_task#fm-}.meta" ]; then
-            mentioned_id=${mentioned_task#fm-}
-            break
-          fi ;;
-        esac
-        [ "${mentioned_task%.}" != "$mentioned_task" ] || break
-        mentioned_task=${mentioned_task%.}
-      done
-      [ -n "$mentioned_id" ] || continue
-      [ "$mentioned_id" != "$owner_target" ] || continue
-      echo "error: task '$mentioned_id' is owned by this home's direct report '$mentioned_id', not target '$RAW_TARGET'; nothing was sent. Send to '$mentioned_id', or use --relay for a deliberate cross-task mention." >&2
-      exit 1
-    done < <(printf '%s\n' "$MESSAGE" | LC_ALL=C tr -cs 'A-Za-z0-9_./\\-' '\n')
-  fi
+        fi ;;
+      esac
+      [ "${mentioned_task%.}" != "$mentioned_task" ] || break
+      mentioned_task=${mentioned_task%.}
+    done
+    [ -n "$mentioned_id" ] || continue
+    [ "$mentioned_id" != "$owner_target" ] || continue
+    if [ "$RELAY" = 1 ]; then
+      "$SCRIPT_DIR/fm-guard-event.sh" send-task-prerequisites bypass --rule task-owner --override --task "$mentioned_id" 2>/dev/null || true
+      break
+    fi
+    "$SCRIPT_DIR/fm-guard-event.sh" send-task-prerequisites deny --rule task-owner --task "$mentioned_id" 2>/dev/null || true
+    echo "error: refused task '$mentioned_id': this home's direct report '$mentioned_id' owns it, not target '$RAW_TARGET'; nothing was sent. Send to '$mentioned_id', or use --relay for a deliberate cross-task mention." >&2
+    exit 1
+  done < <(printf '%s\n' "$MESSAGE" | LC_ALL=C tr -cs 'A-Za-z0-9_./\\-' '\n')
   if [ "$TARGET_BACKEND" = remote ]; then
     FM_SEND_REMOTE_BUDGET=${FM_SEND_REMOTE_BUDGET:-30}
     case "$FM_SEND_REMOTE_BUDGET" in

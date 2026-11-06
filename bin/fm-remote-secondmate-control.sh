@@ -344,7 +344,8 @@ remote_send_check_inputs() { # <newline-delimited-inputs> <receiver-id>
   [ -n "$declared" ] || return 0
   while IFS= read -r input; do
     if ! "$SCRIPT_DIR/fm-remote-file.sh" check "$input" >/dev/null; then
-      printf "error: required input '%s' is unavailable to receiver '%s' on its receiving host; stage only this declared artifact through the existing authorized transfer mechanism; no access was granted\n" "$input" "$id" >&2
+      "$SCRIPT_DIR/fm-guard-event.sh" send-task-prerequisites deny --rule required-input --task "$id" 2>/dev/null || true
+      printf "error: refused required input '%s': unavailable to receiver '%s' on its receiving host; stage only this declared artifact through the existing authorized transfer mechanism; no access was granted\n" "$input" "$id" >&2
       return 1
     fi
   done <<< "$declared"

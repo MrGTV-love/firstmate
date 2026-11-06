@@ -861,11 +861,13 @@ test_declared_remote_input_is_reported_without_access_grants() {
   chmod 600 "$home/data/required.md" "$home/data/neighbor.md"
   before=$(LC_ALL=C ls -ld "$home/data" "$home/data/required.md" "$home/data/neighbor.md" "$rhome/data")
   rc=0
-  send_env "$fb" "$home" "$ssh_log" "$SEND" rsm --relay --require-input data/required.md \
+  send_env "$fb" "$home" "$ssh_log" FM_GUARD_EVENT_LOG="$dir/input-events.jsonl" "$SEND" rsm --relay --require-input data/required.md \
     'Use the declared input report' > "$dir/out" 2> "$dir/err" || rc=$?
   [ "$rc" -ne 0 ] || fail "sender-only file was accepted as an accessible remote input"
   assert_contains "$(cat "$dir/err")" 'data/required.md' "remote failure must name the declared artifact"
   assert_contains "$(cat "$dir/err")" "receiver 'rsm'" "remote failure must name its actual receiver"
+  jq -es 'map(select(.guard == "send-task-prerequisites")) | length == 1 and .[0].decision == "deny" and .[0].rule == "required-input" and .[0].task == "rsm"' "$dir/input-events.jsonl" >/dev/null \
+    || fail "missing remote input must emit one receiver-attributed denial"
   [ -z "$(remote_inbox_records "$rhome")" ] || fail "missing required input published a remote steer"
   [ -z "$(pending_record "$home")" ] || fail "missing required input left a false pending reply"
   [ ! -e "$rhome/data/required.md" ] && [ ! -e "$rhome/data/neighbor.md" ] \
@@ -928,8 +930,39 @@ test_declared_input_cannot_expand_transfer_confinement() {
   pass "fm-send remote: declaring an input grants neither symlink escape nor broader file access"
 }
 
+test_remote_wrong_owner_and_logged_relay() {
+  local dir fb ssh_log home rhome rc events rec
+  dir="$TMP_ROOT/remote-owner"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
+  rhome=$(setup_remote_secondmate_home remote-owner)
+  home=$(setup_remote_parent_home remote-owner "$rhome")
+  fm_write_meta "$home/state/task-one.meta" "window=sess:fm-task-one" "kind=ship"
+  events="$home/state/guard-events.jsonl"
+  rc=0
+  send_env "$fb" "$home" "$ssh_log" FM_GUARD_EVENT_LOG="$events" "$SEND" rsm 'Continue task-one' > "$dir/out" 2> "$dir/err" || rc=$?
+  expect_code 1 "$rc" "remote wrong-owner steer must fail before transport"
+  [ ! -s "$ssh_log" ] || fail "remote wrong-owner refusal used transport"
+  [ -z "$(remote_inbox_records "$rhome")" ] || fail "remote refusal published an instruction"
+  [ -z "$(pending_record "$home")" ] || fail "remote refusal armed a pending reply"
+  jq -es 'map(select(.guard == "send-task-prerequisites")) | length == 1 and .[0].decision == "deny" and .[0].task == "task-one"' "$events" >/dev/null \
+    || fail "remote wrong-owner denial must be attributed once"
+  : > "$events"
+  rc=0
+  send_env "$fb" "$home" "$ssh_log" FM_GUARD_EVENT_LOG="$events" "$SEND" rsm --relay 'Continue task-one' > "$dir/out" 2> "$dir/err" || rc=$?
+  expect_code 0 "$rc" "deliberate remote relay must send"
+  rec=$(remote_inbox_records "$rhome")
+  case "$(fm_task_inbox_body "$rec")" in
+    *' Continue task-one') : ;;
+    *) fail "remote relay changed instruction" ;;
+  esac
+  jq -es 'map(select(.guard == "send-task-prerequisites")) | length == 1 and .[0].decision == "bypass" and .[0].override == true and .[0].task == "task-one"' "$events" >/dev/null \
+    || fail "remote relay must emit one effective escape"
+  pass "fm-send remote: wrong-owner refusal precedes transport and explicit relay is attributed once"
+}
+
 fm_test_only
 
+test_remote_wrong_owner_and_logged_relay
 test_declared_remote_input_is_reported_without_access_grants
 test_declared_input_cannot_expand_transfer_confinement
 test_remote_steer_lands_in_remote_inbox
