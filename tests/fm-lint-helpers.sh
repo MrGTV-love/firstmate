@@ -31,10 +31,8 @@ export FM_LINT_CACHE_DIR=off
 # pool unsets FM_LINT_SLOT_DIR for that run.
 FM_LINT_SLOT_DIR=$(fm_test_tmproot fm-lint-pool) || exit 1
 export FM_LINT_SLOT_DIR="$FM_LINT_SLOT_DIR/slots"
-# Their own pool also takes a budget no ordinary test reaches, so another lane's
-# ShellCheck on the same host cannot hold these tests back; a test of the fixed
-# host budget sets the seam itself, and a host-pool run unsets both.
-export FM_LINT_FIXTURE_HOST_RSS_KIB=100000000
+# The host-wide ShellCheck budget is fixed and no test sets it: a test that
+# starts ShellCheck counts against it and may queue behind another run.
 FM_LINT_REAL_PS=$(command -v ps)
 
 # fm_lint_hide_outside_shellcheck <fakebin>: a ps for a stand-in analysis in a

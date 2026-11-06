@@ -82,9 +82,9 @@
 # default only; the final default is derived from the readings of the lint
 # runs measured under it and replaces it in a later commit. No environment variable or flag sets it (FM_LINT_HOST_RSS_KIB is refused
 # by name), this script is the only place that holds the number, and it is
-# printed as the host_memory_budget_kib line of the roots log. The one seam is
-# FM_LINT_FIXTURE_HOST_RSS_KIB, honored only together with FM_LINT_SLOT_DIR, a
-# private fixture pool for tests, and refused with the host pool.
+# printed as the host_memory_budget_kib line of the roots log. Tests get no
+# seam either: a test uses a private FM_LINT_SLOT_DIR pool, and a test that
+# starts ShellCheck counts against this same host-wide budget and may queue on it.
 # Derivation (rule: at or below the smallest ShellCheck aggregate among the
 # readings at memory pressure level 2). state/memory-readings.jsonl holds these
 # level-2 readings with ShellCheck among the ten largest processes; the sum is
@@ -2002,28 +2002,12 @@ if [ -n "${FM_LINT_SLOT_DIR:-}" ]; then
   SLOT_DIR=$FM_LINT_SLOT_DIR
 fi
 # The host-wide ShellCheck memory budget in KiB. It has one value, the default
-# documented in the header; no environment variable sets it. The fixture seam
-# lowers it for a private test pool only.
+# documented in the header; no environment variable or flag sets it.
 HOST_RSS_KIB=3670016
 if [ -n "${FM_LINT_HOST_RSS_KIB:-}" ]; then
   printf 'fm-lint.sh: FM_LINT_HOST_RSS_KIB is not supported: the host-wide ShellCheck memory bound is fixed at %s KiB and no setting changes it. Unset FM_LINT_HOST_RSS_KIB.\n' \
     "$HOST_RSS_KIB" >&2
   exit 2
-fi
-if [ -n "${FM_LINT_FIXTURE_HOST_RSS_KIB:-}" ]; then
-  case "$FM_LINT_FIXTURE_HOST_RSS_KIB" in
-    0*|*[!0-9]*)
-      printf 'fm-lint.sh: FM_LINT_FIXTURE_HOST_RSS_KIB must be a positive integer, got %s.\n' \
-        "$FM_LINT_FIXTURE_HOST_RSS_KIB" >&2
-      exit 2
-      ;;
-  esac
-  if [ -z "${FM_LINT_SLOT_DIR:-}" ]; then
-    printf 'fm-lint.sh: FM_LINT_FIXTURE_HOST_RSS_KIB is honored only with FM_LINT_SLOT_DIR, a private fixture pool; the host pool keeps its fixed bound of %s KiB.\n' \
-      "$HOST_RSS_KIB" >&2
-    exit 2
-  fi
-  HOST_RSS_KIB=$FM_LINT_FIXTURE_HOST_RSS_KIB
 fi
 case "${FM_LINT_HOST_SLOTS:-1}" in
   ''|0*|*[!0-9]*)
