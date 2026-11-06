@@ -98,7 +98,12 @@
 # for a tick libproc did not answer in time) and names any attempt that gave
 # up its libproc reader, with the reason. Linux runs are never watched, and CI
 # runs under FM_LINT_REQUIRE_BOUNDS=1 keep their ulimit envelope.
-# Waiting roots queue rather than fail; both cache-key and host-slot queue time
+# A cold root takes one pass of the host-wide CPU pool before its host slot
+# (bin/fm-cpu-pass.sh; docs/cpu-pass-pool.md owns the protocol), so ShellChecks and
+# test scripts together never exceed the pool. The changed-root dependency scan
+# takes one pass too. A run already inside a pass
+# (FM_CPU_PASS_HELD above 0) takes none and runs at most that many workers.
+# Waiting roots queue rather than fail; cache-key, host-slot and CPU-pass queue time
 # consume neither the root deadline nor its retry budget.
 # Slot directory, file, or locking failures warn and run ungated rather than failing lint.
 # The private gate's locking and process-lifetime invariants live in bin/fm-lint-cache.pl.
@@ -322,7 +327,7 @@ fm_lint_classify_root() {  # <rc> <root-stderr-file>
 # address-space limit, returning its exit status in FM_LINT_LAST_RC.
 fm_lint_exec_root() {  # <path> <stdout-file> <stderr-file> <rss-file> <seconds> <args...>
   local path=$1 root_out=$2 root_err=$3 rss_file=$4 seconds=$5 invocation_rc=0 wait_file waited
-  local -a analysis_command gate_command cold_command check_command
+  local -a analysis_command gate_command pass_command cold_command check_command
   shift 5
   analysis_command=("$FM_LINT_SHELLCHECK" "$@" -- "$path")
   if [ "${FM_LINT_INTERNAL_BOUNDED:-none}" = none ] && [ -x /usr/bin/time ]; then
@@ -344,10 +349,20 @@ fm_lint_exec_root() {  # <path> <stdout-file> <stderr-file> <rss-file> <seconds>
   # queue time counts toward neither the root deadline nor its peak RSS.
   gate_command=()
   wait_file="$rss_file.wait"
-  rm -f "$wait_file" "$rss_file.cache" "$rss_file.cache.wait"
+  rm -f "$wait_file" "$rss_file.cache" "$rss_file.cache.wait" "$rss_file.pass.wait"
   if [ "${FM_LINT_INTERNAL_SLOT_DIR:-off}" != off ]; then
     gate_command=("${FM_LINT_PERL_BIN:-perl}" "$SELF_DIR/fm-lint-cache.pl" gate \
       "$FM_LINT_INTERNAL_SLOT_DIR" "$FM_LINT_INTERNAL_NCPU" "$FM_LINT_INTERNAL_RUN_ID" "$wait_file" --)
+  fi
+  # A cold ShellCheck is CPU-bound, so before its memory slot it takes one pass of
+  # the host-wide CPU pool (docs/cpu-pass-pool.md), also outside the root deadline.
+  # The gate stays the direct parent of the watchdog or ShellCheck, so they inherit
+  # its slot and see its death. A run already inside a pass takes none; its pass
+  # wait leaves the root's recorded time.
+  pass_command=()
+  if [ -x "$SELF_DIR/fm-cpu-pass.sh" ] && [ -r "$SELF_DIR/fm-cpu-pass.py" ]; then
+    pass_command=("$SELF_DIR/fm-cpu-pass.sh" run --label "fm-lint $path" --log-fd 8 \
+      --wait-file "$rss_file.pass.wait" --)
   fi
   if [ "${FM_LINT_INTERNAL_BOUNDED:-none}" != none ]; then
     # The watchdog runs in a process group of its own (the same setpgrp hop the
@@ -357,13 +372,13 @@ fm_lint_exec_root() {  # <path> <stdout-file> <stderr-file> <rss-file> <seconds>
     # check still starts the same terminate-then-kill escalation; the worker
     # names itself as that owner before the launch, so a worker that dies while
     # the watchdog is still starting is detected too.
-    cold_command=(${gate_command[@]+"${gate_command[@]}"} "${FM_LINT_PERL_BIN:-perl}" -e 'setpgrp(0, 0) or die "setpgrp: $!"; exec @ARGV or die "exec: $!"' \
+    cold_command=(${pass_command[@]+"${pass_command[@]}"} ${gate_command[@]+"${gate_command[@]}"} "${FM_LINT_PERL_BIN:-perl}" -e 'setpgrp(0, 0) or die "setpgrp: $!"; exec @ARGV or die "exec: $!"' \
         "${BASH:-bash}" "$SELF" --internal-timed \
         "$seconds" "$FM_LINT_INTERNAL_GRACE" \
         "${BASH:-bash}" "$SELF" --internal-root "$rss_file" "$FM_LINT_INTERNAL_MEMORY_KIB" \
         "${analysis_command[@]}")
   else
-    cold_command=(${gate_command[@]+"${gate_command[@]}"} "${analysis_command[@]}")
+    cold_command=(${pass_command[@]+"${pass_command[@]}"} ${gate_command[@]+"${gate_command[@]}"} "${analysis_command[@]}")
   fi
   # Hits and identical concurrent misses need no host slot. Only the cache's
   # cold execution enters the gate, with the watchdog still inside admission.
@@ -377,7 +392,7 @@ fm_lint_exec_root() {  # <path> <stdout-file> <stderr-file> <rss-file> <seconds>
   FM_LINT_WORKER_RUN_PID=
   FM_LINT_LAST_RC=$invocation_rc
   FM_LINT_LAST_WAIT_MS=0
-  for wait_file in "$rss_file.wait" "$rss_file.cache.wait"; do
+  for wait_file in "$rss_file.wait" "$rss_file.cache.wait" "$rss_file.pass.wait"; do
     if [ -r "$wait_file" ]; then
       waited=$(tr -d '[:space:]' < "$wait_file" 2>/dev/null)
       case "$waited" in
@@ -987,6 +1002,23 @@ case "$JOBS" in
   *) printf 'fm-lint.sh: jobs must be 1 or 2, got %s.\n' "$JOBS" >&2; exit 2 ;;
 esac
 
+# Pass notices keep to the real stderr, never a root's captured diagnostics. A run
+# inside a pass takes no further one, so it runs at most that many ShellChecks.
+exec 8>&2
+if [ -n "${FM_CPU_PASS_HELD+x}" ]; then
+  case "$FM_CPU_PASS_HELD" in
+    ''|*[!0-9]*)
+      printf 'fm-lint.sh: FM_CPU_PASS_HELD must be a nonnegative decimal integer.\n' >&2
+      exit 125 ;;
+  esac
+  if [ "${#FM_CPU_PASS_HELD}" -le 2 ] && [ "$((10#$FM_CPU_PASS_HELD))" -gt 0 ] \
+    && [ "$((10#$FM_CPU_PASS_HELD))" -lt "$JOBS" ]; then
+    printf 'fm-lint.sh: reducing --jobs %s to inherited FM_CPU_PASS_HELD=%s\n' \
+      "$JOBS" "$FM_CPU_PASS_HELD" >&2
+    JOBS=$((10#$FM_CPU_PASS_HELD))
+  fi
+fi
+
 case "$PARTITION" in
   '')
     if [ "$PARTITION_REQUESTED" -eq 1 ]; then
@@ -1067,9 +1099,14 @@ else
     ROOTS=()
     changed_list=$(mktemp "${TMPDIR:-/tmp}/fm-lint-changes.XXXXXX") || exit 1
     selected_list=$(mktemp "${TMPDIR:-/tmp}/fm-lint-selection.XXXXXX") || { rm -f "$changed_list"; exit 1; }
+    # The dependency scan is one CPU-bound process (measured 8.9 CPU seconds for one path), so it takes a pass too.
+    select_command=(perl "$SELF_DIR/fm-lint-cache.pl" select "$ROOT")
+    if [ -x "$SELF_DIR/fm-cpu-pass.sh" ] && [ -r "$SELF_DIR/fm-cpu-pass.py" ]; then
+      select_command=("$SELF_DIR/fm-cpu-pass.sh" run --label "fm-lint select" --log-fd 8 -- "${select_command[@]}")
+    fi
     if ! git diff --name-only --no-renames -z "$merge_base" -- > "$changed_list" \
       || ! git ls-files --others --exclude-standard -z >> "$changed_list" \
-      || ! perl "$SELF_DIR/fm-lint-cache.pl" select "$ROOT" < "$changed_list" > "$selected_list"; then
+      || ! "${select_command[@]}" < "$changed_list" > "$selected_list"; then
       rm -f "$changed_list" "$selected_list"
       printf 'fm-lint.sh: could not select changed roots and source dependencies.\n' >&2
       exit 2

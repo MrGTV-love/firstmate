@@ -139,6 +139,7 @@
 # An unnested runner takes one pass per executed script from the host-wide pool
 # (bin/fm-cpu-pass.sh; docs/cpu-pass-pool.md owns the protocol), outside its
 # per-script bound, so participating test bursts across worktrees take turns.
+# An unnested --check-coverage takes one pass for its whole scan.
 # A runner already inside a pass (FM_CPU_PASS_HELD set) takes no additional pass
 # and runs at most that many concurrent scripts, reporting a reduced --jobs on stderr.
 # The marker must be a nonnegative decimal integer or execution exits 125;
@@ -149,9 +150,10 @@
 # host-wide per-key gate (python3 bin/fm-duration.py gate), outside the CPU pass
 # and the per-script bound, so the same heavy suite started in several worktrees
 # runs at most FM_TEST_KEY_SLOTS (default 2) copies at a time. A waiter prints
-# which key it waits on and who holds the slots on the CPU-pass log descriptor,
-# gives up after FM_TEST_SLOT_WAIT_SECONDS and then runs without a slot; a nested
-# run of a key already held (FM_TEST_SLOT_HELD) takes none. The time a script
+# which key it waits on and who holds the slots on the CPU-pass log descriptor
+# and waits until a holder ends, never admitted by elapsed time; a nested
+# run of a key already held (FM_TEST_SLOT_HELD) takes none, and a run inside a
+# pass (FM_CPU_PASS_HELD above 0) takes no slot. The time a script
 # queued for its slot is left out of its recorded duration, its FM_TEST_END
 # duration_ms and its test.<script> sample, and that sample records no start load
 # (the load was read before the queue); the run's own wall time (--max-wall-ms,
@@ -240,6 +242,7 @@ if [ -r "$ROOT/bin/fm-duration-lib.sh" ]; then
   RUN_STARTED_LOAD=$(fm_duration_load)
 fi
 
+ORIGINAL_ARGS=("$@")
 MODE=
 LIST_ONLY=0
 LIST_SCHEDULED=0
@@ -2739,6 +2742,13 @@ if [ "$LIST_LANES" -eq 1 ]; then
 fi
 
 if [ "$CHECK_COVERAGE" -eq 1 ]; then
+  # The guard is one long sequential scan of the test inventory (measured 20 CPU seconds
+  # over 37 s), so an unnested run takes one pass of the host-wide pool like a script does.
+  if [ -z "${FM_CPU_PASS_HELD+x}" ] && [ -x "$ROOT/bin/fm-cpu-pass.sh" ] \
+    && [ -r "$ROOT/bin/fm-cpu-pass.py" ] && command -v python3 >/dev/null 2>&1; then
+    exec "$ROOT/bin/fm-cpu-pass.sh" run --label "fm-test-run --check-coverage" -- \
+      "$ROOT/bin/fm-test-run.sh" ${ORIGINAL_ARGS[@]+"${ORIGINAL_ARGS[@]}"}
+  fi
   run_coverage_guard
   exit $?
 fi
