@@ -98,42 +98,43 @@ Pipeline starts:
     admission routes themselves); any other program's arguments are data.
     A COMMAND it does not judge a new run runs with the exec interception
     first on PATH (fm-mem-guard.sh run, and fm-duration.py run under a
-    no-mistakes. key or when a word of the command names no-mistakes): a private 0700 directory in the user's temporary
-    directory holding one symlink named no-mistakes to fm-cpu-pass.sh, which
-    runs exec-intercept: it judges the client's own argv by the same facts,
-    admits a new run once in the route's class (FM_PIPELINE_START_PRIORITY),
-    and runs the real client with every such directory removed from PATH. An
-    admitted start runs without the directory, so its client is not admitted
-    twice. Limit: the requirement that every new run is admitted whatever its
-    formatting is not met here: a second fresh start inside an admitted
-    command, an unmodeled
-    wrapper handed the real client's absolute path, one that resets PATH (sudo,
-    env -i), and a start outside both routes still run unadmitted; it is met
-    only when admission at run creation in the no-mistakes fork, backlog task
-    nm-run-creation-admission, lands.
-    When the start runs behind another admission
-    route (fm-mem-guard.sh run, fm-duration.py run, pipeline-start), the
-    admission publishes one single-use grant-*.lock naming its own pid, locked
-    while it holds the start lock. A later start consumes it, and runs without
-    queueing again, only when that pid is one of its ancestors and nobody
-    consumed it before; every other start queues, a sibling elsewhere, a second
-    descendant or an identical invocation alike. The grant ends at registration
-    or when COMMAND returns.
-    Limit: a nested start that cannot prove the ancestry (one that detached to
-    another parent, or an inner route on a checkout without grants) queues behind
-    the outer start's lock; when it is the outer start's only run, both wait
-    until one is stopped.
-  - A short start lock bridges the check-to-registration race until a new
-    running run ID appears, or COMMAND returns. It does not reserve a run's
-    lifetime or poll after registration; status changes release capacity.
-    Participating starts serialize this handshake, not their required checks.
-    A registered run whose process tree the reading cannot see yet reserves its
-    full R in the next decision.
+    no-mistakes. key or when a word of the command names no-mistakes): a
+    private 0700 directory in the user's temporary directory holding one
+    symlink named no-mistakes to fm-cpu-pass.sh, which runs exec-intercept: it
+    judges the client's own argv by the same facts, admits a new run in the
+    route's class (FM_PIPELINE_START_PRIORITY), and runs the real client with
+    every such directory removed from PATH. An admitted command keeps the
+    interception unless it runs the client directly (runs_client_directly), so
+    each further fresh client in it is admitted on its own. When the directory
+    cannot be placed the route says why and holds the whole command as one
+    start. Limit: a fresh start no wrapper here can see, the real client called
+    by its absolute path past the interception, a PATH reset (sudo, env -i) or a
+    start outside every route, is admitted only by run-creation admission in
+    the no-mistakes fork (backlog task nm-run-creation-admission).
+  - The start lock serializes each decision with the publication of its
+    admitted start's pending reservation (a locked pending-*.lock naming the
+    admitting pid, the admitted no-mistakes arguments and the running run IDs
+    of the decision), then is released. Every later decision counts each
+    admitted start that has not registered a run yet at the full R, and as one
+    run in the count fallback and the one-start minimum (live_pending). Each
+    new running run ID releases one pending start, the oldest still unreleased;
+    a pending start also ends when its COMMAND returns, or when the client that
+    claimed it through the interception has exited (its run, if any, is then in
+    the run database). It does not reserve a run's lifetime; status changes
+    release capacity. A registered run whose process tree the reading cannot
+    see yet reserves its full R in the next decision.
+    The admitted client itself, reached through a nested route or the
+    interception, claims its own pending start (claim_pending): same arguments,
+    (same_start_args), the admitting pid among its ancestors, and either unclaimed or claimed by
+    itself or an ancestor; it runs without queueing again. Every other start,
+    a sibling, a second client or the same arguments run again, is decided on
+    its own with the pending start counted.
     Bypassing this owner or external daemon status changes cannot be made
     atomic with a read-only external database; deployment must route starts here.
   - An unreadable run database or CPU count refuses with 125 instead of
-    guessing headroom. If a read fails after launch, retain the start lock until
-    COMMAND returns; never stop running work because the observer lost its source.
+    guessing headroom. If a read fails after launch, keep the pending
+    reservation until COMMAND returns; never stop running work because the
+    observer lost its source.
 
 Launch gate:
   - `launch-gate -- AGENT [ARGS...]` is the no-mistakes agent launcher's final
@@ -893,7 +894,7 @@ def proven_agentless(step, now: float) -> bool:
 
 def project(available: int, rss: dict, counted: dict, steps: Optional[dict], launches: dict,
             reservation: int, slack: int, term: int, self_run: Optional[str] = None,
-            waiting: frozenset = frozenset(), now: Optional[float] = None) -> dict:
+            waiting: frozenset = frozenset(), now: Optional[float] = None, pending: int = 0) -> dict:
     """The reservation fit for one more active run; a pure function of its facts.
 
     counted maps each counted run ID to its repo ID; rss is the reading's run map
@@ -909,7 +910,8 @@ def project(available: int, rss: dict, counted: dict, steps: Optional[dict], lau
     proof that no agent lives, whatever the processes are named. Every other counted or launched run reserves its
     resident memory or the active-run term A, whichever is larger, once its tree
     is visible, and its full R while the reading cannot see it yet. The new run
-    reserves S. With no live launch, the waiting launch's own run (self_run) and
+    reserves S. Each of the pending admitted starts that has not registered a run
+    yet (pending, see live_pending) reserves the full R. With no live launch, the waiting launch's own run (self_run) and
     every run in waiting (a run whose launch gate is queued in the pool) are
     waiters: each adds only what it holds. Budget is available memory plus what
     the counted runs hold.
@@ -939,6 +941,8 @@ def project(available: int, rss: dict, counted: dict, steps: Optional[dict], lau
             kind = "step-unreadable" if steps is None else ("no-open-step" if step is None else "active")
             demand = max(size, term) if visible else reservation
         entries.append((run, kind, demand, visible))
+    for index in range(pending):
+        entries.append(("start-%d" % (index + 1), "pending", reservation, False))
     projected = sum(demand for _, _, demand, _ in entries) + slack
     budget = available + held
     others = [run for run, _, _, _ in entries if run != self_run]
@@ -1001,13 +1005,16 @@ def host_observation(fresh: bool = False) -> dict:
 def admission(reasons: List[str], report: Optional[dict], running: dict, counted: dict, steps: Optional[dict],
               launches: dict, cores: int, priority: str, self_run: Optional[str] = None,
               measured: Optional[Tuple[Tuple[int, int, int], Tuple[int, int]]] = None,
-              waiting: frozenset = frozenset()) -> Tuple[bool, str]:
+              waiting: frozenset = frozenset(), pending: int = 0) -> Tuple[bool, str]:
     """The complete admission rule over one reading's facts: holds first, then the fit or the count fallback.
 
     measured, when given, supplies ((R, S, runs measured), (A, readings measured))
     instead of reading the records; the P4 replay passes the copied records here.
+    pending is the number of admitted starts that have not registered a run yet:
+    each counts as one run in the count fallback and the one-start minimum and
+    reserves R in the fit.
     """
-    others = len([run for run in set(counted) | set(launches) if run != self_run])
+    others = len([run for run in set(counted) | set(launches) if run != self_run]) + pending
     if reasons:
         return False, "overload: %s counted=%d priority=%s" % ("; ".join(reasons), len(counted), priority)
     if measured is None and report is not None:
@@ -1018,7 +1025,7 @@ def admission(reasons: List[str], report: Optional[dict], running: dict, counted
         return others < limit, "counted=%d limit=%d basis=fallback priority=%s" % (others, limit, priority)
     (reservation, slack, qualifying), (term, readings) = measured
     fit = project(report["available_bytes"], report["runs"], counted, steps, launches, reservation, slack, term, self_run,
-                  waiting)
+                  waiting, pending=pending)
     return fit["admit"], projection_text(fit, reservation, slack, term, qualifying, readings) + " priority=%s" % priority
 
 
@@ -1028,9 +1035,10 @@ def decide(running: dict, counted: dict, cores: int, priority: str, fresh: bool 
     """(admit, one-line reason) for the first waiter, from the running and counted runs and the host reading."""
     seen = host_observation(fresh)
     launches = live_launches(directory) if directory else {}
+    pending = sum(1 for _, _, registered in live_pending(directory, set(running)) if not registered) if directory else 0
     steps = open_steps() if seen["memory"] is not None else None
     return admission(seen["reasons"], seen["memory"], running, counted, steps, launches, cores, priority, self_run,
-                     waiting=waiting)
+                     waiting=waiting, pending=pending)
 
 
 def pipeline_observation() -> Tuple[dict, int]:
@@ -1063,6 +1071,64 @@ def live_launches(directory: str) -> dict:
         finally:
             os.close(fd)
     return found
+
+
+def live_pending(directory: str, running: set) -> List[Tuple[str, dict, bool]]:
+    """(path, entry, registered) for each pending admitted start whose start still holds its record, oldest first.
+
+    An admitted start publishes a locked pending-*.lock naming the running run IDs
+    of its decision (before). Each running run ID that is in none of those sets
+    releases one pending start, the oldest one still unreleased, so a new run never
+    releases two starts and release is never earlier than the first new run. A
+    start whose client claimed it through the exec interception (claim_pending)
+    and has since exited is released too: a run that client created is in the
+    run database by then. An unlocked file belongs to a start that no longer
+    exists and is removed.
+    """
+    found = []
+    for path in Path(directory).glob("pending-*.lock"):
+        try:
+            fd = os.open(str(path), os.O_RDWR | getattr(os, "O_CLOEXEC", 0))
+        except FileNotFoundError:
+            continue
+        try:
+            if try_lock(fd):
+                for stale in (str(path), str(path) + ".claimed"):
+                    with contextlib.suppress(FileNotFoundError):
+                        os.unlink(stale)
+                continue
+            entry = json.loads(os.pread(fd, 65536, 0))
+            found.append((int(entry["created_ns"]), str(path), entry))
+        except (ValueError, KeyError, TypeError):
+            continue
+        finally:
+            os.close(fd)
+    used: set = set()
+    result = []
+    for _, path, entry in sorted(found):
+        if client_ended(path):
+            result.append((path, entry, True))
+            continue
+        fresh = sorted(set(running) - set(entry.get("before", ())) - used)
+        if fresh:
+            used.add(fresh[0])
+        result.append((path, entry, bool(fresh)))
+    return result
+
+
+def client_ended(path: str) -> bool:
+    """Whether the client that claimed the pending start at PATH through the exec interception has exited."""
+    try:
+        claimer = int(Path(path + ".claimed").read_text())
+    except (OSError, ValueError):
+        return False
+    try:
+        os.kill(claimer, 0)
+    except ProcessLookupError:
+        return True
+    except OSError:
+        return False
+    return False
 
 
 def publish_locked(directory: str, prefix: str, entry: dict) -> Tuple[int, str]:
@@ -1200,40 +1266,126 @@ def ancestors(pid: int) -> List[int]:
     return chain
 
 
-def claim_grant(directory: str) -> Optional[int]:
-    """The pid of the enclosing admission whose single-use grant this process just consumed, or None.
+def claim_pending(directory: str, args: List[str]) -> Optional[int]:
+    """The pid of the enclosing admitted start whose pending reservation is this very start, or None.
 
-    An admission whose start runs behind another admission route publishes one
-    locked grant-*.lock naming its own pid. A later start consumes it only when
-    that pid is one of its ancestors and nobody consumed it before (an exclusive
-    .claimed file), so the one nested route of that start does not queue twice,
-    while any other start, a sibling elsewhere or a second descendant, queues.
+    An admitted start publishes a locked pending-*.lock naming its own pid and the
+    no-mistakes arguments of the start it admitted. A later start with the same
+    arguments is that start, reached through a nested route or the exec
+    interception, only when that pid is one of its ancestors and either nobody
+    claimed the record before (an exclusive .claimed file then names this
+    process) or the process that claimed it is this one or one of its ancestors
+    (the same start passing one more route). Every other start, a sibling, a
+    second client with other arguments or the same arguments run again, is
+    decided on its own, with that pending start counted.
     """
     mine = None
-    for path in Path(directory).glob("grant-*.lock"):
+    for path in Path(directory).glob("pending-*.lock"):
         try:
             fd = os.open(str(path), os.O_RDWR | getattr(os, "O_CLOEXEC", 0))
         except FileNotFoundError:
             continue
         try:
             if try_lock(fd):
-                path.unlink(missing_ok=True)
-                Path(str(path) + ".claimed").unlink(missing_ok=True)
+                for stale in (str(path), str(path) + ".claimed"):
+                    with contextlib.suppress(FileNotFoundError):
+                        os.unlink(stale)
                 continue
-            holder = json.loads(os.pread(fd, 65536, 0))["holder"]
+            entry = json.loads(os.pread(fd, 65536, 0))
+            holder, admitted = entry["holder"], entry.get("args")
         except (ValueError, KeyError, TypeError):
             continue
         finally:
             os.close(fd)
+        if not same_start_args(admitted, list(args)):
+            continue
         if mine is None:
             mine = ancestors(os.getpid())
-        if holder in mine:
+        if holder not in mine:
+            continue
+        claim = str(path) + ".claimed"
+        temporary = "%s.%d" % (claim, os.getpid())
+        try:
+            with open(temporary, "w") as handle:
+                handle.write(str(os.getpid()))
+            os.link(temporary, claim)
+            return holder
+        except FileExistsError:
             try:
-                os.close(os.open(str(path) + ".claimed", os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600))
-                return holder
-            except FileExistsError:
+                claimer = int(Path(claim).read_text())
+            except (OSError, ValueError):
                 continue
+            if claimer == os.getpid() or claimer in mine:
+                return holder
+        finally:
+            with contextlib.suppress(FileNotFoundError):
+                os.unlink(temporary)
     return None
+
+
+SHELL_EXPANSION_CHARS = "$`*?[~{"
+
+
+def same_start_args(admitted, args: List[str]) -> bool:
+    """Whether ARGS are the arguments the pending start admitted, as its client sees them.
+
+    The admission reads a shell's -c string before the shell expands it, so a
+    word holding an expansion ($X, a glob, ~) becomes what the shell makes of
+    it: the words up to the first such word must be equal, the rest are taken
+    as expanded.
+    """
+    if not isinstance(admitted, list):
+        return False
+    if admitted == args:
+        return True
+    for index, word in enumerate(admitted):
+        if any(char in word for char in SHELL_EXPANSION_CHARS):
+            return args[:index] == admitted[:index]
+    return False
+
+
+def runs_client_directly(command: List[str]) -> bool:
+    """Whether COMMAND runs the no-mistakes client as its one program, so nothing in it can begin a second run.
+
+    Only leading VAR=value words, the transparent wrappers (env -S included) and
+    the admission routes are followed; a shell, an interpreter running a script or
+    any other program could start further clients, so it is not direct.
+    """
+    words = list(command)
+    while words:
+        while words and "=" in words[0] and words[0].split("=", 1)[0].isidentifier():
+            words = words[1:]
+        if not words:
+            return False
+        name, rest = os.path.basename(words[0]), words[1:]
+        if name == "no-mistakes":
+            return True
+        if name in TRANSPARENT:
+            operands = wrapper_operands(name, rest)
+            if operands is None:
+                return False
+            words, split = operands
+            if split is not None:
+                import shlex
+                try:
+                    words = ["env"] + shlex.split(split) + words
+                except ValueError:
+                    return False
+            continue
+        if name == "fm-mem-guard.sh" and rest[:2] == ["run", "--"]:
+            words = rest[2:]
+            continue
+        if name == "fm-duration.py" and rest[:1] == ["run"] and "--" in rest:
+            words = rest[rest.index("--") + 1:]
+            continue
+        if name.startswith("fm-cpu-pass.") and rest[:1] == ["pipeline-start"] and "--" in rest:
+            words = rest[rest.index("--") + 1:]
+            continue
+        if name.rstrip("0123456789.").lower() == "python" and rest and os.path.basename(rest[0]) in ("fm-duration.py", "fm-cpu-pass.py"):
+            words = rest
+            continue
+        return False
+    return False
 
 
 INTERCEPT_PRIORITY_ENV = "FM_PIPELINE_START_PRIORITY"
@@ -1338,6 +1490,7 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
         return 125
     environment = dict(os.environ)
     route = start_route(command)
+    unplaced = False
     if args.only_fresh and route is None:
         # A reattachment, response, status read or other command that is no new run; a fresh start it
         # reaches through PATH in a form the parser does not model meets the exec interception.
@@ -1345,55 +1498,68 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
         if intercepted is not None or intercept_unavailable_passes(command):
             _restore_exec_signals()
             return exec_direct(command, without_intercept(environment) if intercepted is None else intercepted, 2)
-    # This start is admitted once here (or by its enclosing start): its client runs past the interception.
-    environment = without_intercept(environment)
-    admission_fd = grant_fd = None
-    grant_path = None
+        unplaced = True  # the interception cannot be placed (said once above): the command is held as one start
+    # An admitted command that runs the client directly cannot begin a second run, so its client runs past the
+    # interception; any other admitted command keeps the interception, so each further fresh client in it is
+    # admitted on its own while the admitted client claims its own pending reservation (claim_pending).
+    if unplaced or route is not None and runs_client_directly(command):
+        child_environment = without_intercept(environment)
+    else:
+        child_environment = with_intercept(environment, args.priority) or without_intercept(environment)
+    admission_fd = pending_fd = None
+    pending_path = None
+
+    def release_pending() -> None:
+        nonlocal pending_fd, pending_path
+        if pending_path is not None:
+            for path in (pending_path, pending_path + ".claimed"):
+                with contextlib.suppress(FileNotFoundError):
+                    os.unlink(path)
+            pending_path = None
+        if pending_fd is not None:
+            os.close(pending_fd)
+            pending_fd = None
+
     try:
         directory = pool_dir()
         ensure_pool_dir(directory)
         if route is not None:
-            holder = claim_grant(directory)
+            holder = claim_pending(directory, route[0])
             if holder is not None:
                 log(2, "pipeline-start: this start was admitted by its enclosing start (pid %d); not queued again" % holder)
                 _restore_exec_signals()
-                return exec_direct(command, environment, 2)
+                return exec_direct(command, child_environment, 2)
         admission_fd, before, reason, _ = wait_for_admission(directory, args.priority)
         log(2, "pipeline-start admitted: " + reason)
-        if route is not None and route[1]:
-            # The start runs behind another admission route: offer that one route this admission.
-            grant_fd, grant_path = publish_locked(directory, "grant-", {"holder": os.getpid(), "created_ns": time.time_ns()})
+        # In the same locked step as the admit, publish this start's pending reservation: every later decision
+        # counts it at the full R until a new run registers for it or COMMAND returns. Then release the lock.
+        pending_fd, pending_path = publish_locked(directory, "pending-", {
+            "holder": os.getpid(), "args": None if route is None else list(route[0]),
+            "before": sorted(before), "created_ns": time.time_ns()})
+        fcntl.flock(admission_fd, fcntl.LOCK_UN)
+        os.close(admission_fd)
+        admission_fd = None
         registration_error = False
-
-        def release_grant() -> None:
-            nonlocal grant_fd, grant_path
-            if grant_path is not None:
-                for path in (grant_path, grant_path + ".claimed"):
-                    with contextlib.suppress(FileNotFoundError):
-                        os.unlink(path)
-                grant_path = None
-            if grant_fd is not None:
-                os.close(grant_fd)
-                grant_fd = None
 
         def registered() -> bool:
             nonlocal registration_error
             try:
-                running = running_runs()
-                new_runs = running.keys() - before.keys()
-                if new_runs:
-                    # Serialize only the check-to-registration gap. The daemon
-                    # owns status after this handoff; no lifetime watcher remains.
-                    release_grant()
-                    fcntl.flock(admission_fd, fcntl.LOCK_UN)
-                    return True
+                running = set(running_runs())
+                for path, _, done in live_pending(directory, running):
+                    if path == pending_path:
+                        if done:
+                            # A new run registered for this start: the daemon's row now carries it.
+                            release_pending()
+                            return True
+                        return False
+                return False
             except (OSError, sqlite3.Error, ValueError) as exc:
                 if not registration_error:
-                    log(2, "cannot confirm startup registration; retaining start lock until command returns: %s" % exc)
+                    log(2, "cannot confirm startup registration; keeping the pending reservation until command returns: %s" % exc)
                     registration_error = True
             return False
 
-        return run_child(command, environment, 2, registered)
+        return run_child(command, child_environment, 2, registered)
     except KeyboardInterrupt:
         return 130
     except (PoolUnavailable, OSError, sqlite3.Error, ValueError, KeyError) as exc:
@@ -1402,13 +1568,9 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
         log(2, "pipeline-start refused: %s" % exc)
         return 125
     finally:
-        if grant_path is not None:
-            for path in (grant_path, grant_path + ".claimed"):
-                with contextlib.suppress(FileNotFoundError):
-                    os.unlink(path)
-        for fd in (grant_fd, admission_fd):
-            if fd is not None:
-                os.close(fd)
+        release_pending()
+        if admission_fd is not None:
+            os.close(admission_fd)
 
 
 NO_MISTAKES_CONFIG = "~/.no-mistakes/config.yaml"

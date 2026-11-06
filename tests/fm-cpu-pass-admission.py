@@ -462,10 +462,10 @@ try:
         (folder / (name + '.release')).touch()
         finish(clients[name])
 
-    # The check must reject spacing. The same burst shape with a 2-second delay injected before
-    # each fake start registers (the admission lock is held across it) passes the earlier
-    # assertions but fails assert_no_spacing; the undelayed burst above passed it.
-    folder, db, env = case('spacing-injected', cores=3, measured=True, available=37 * GIB)
+    # A registration delay no longer spaces grants: the start lock covers only each decision and the publication of
+    # its pending reservation, so four starts whose fake registers 2 s after its launch are admitted back to back,
+    # each counted at its full R by the next decision (37 GiB: 3 x 3 + 8 fits).
+    folder, db, env = case('spacing-registration-delay', cores=3, measured=True, available=37 * GIB)
     env['CASE_LAUNCH_DELAY'] = '2'
     names = ['slow-%d' % i for i in range(4)]
     clients = {name: launch(cli + ['pipeline-start', '--', python, str(worker), str(folder), name], env, folder / name) for name in names}
@@ -477,16 +477,23 @@ try:
         assert all('projected=' not in line and 'overload' not in line and 'limit=' not in line for line in waits), text
         assert 'admitted: counted=' in text and 'basis=fallback' not in text, text
     assert all(c.poll() is None for c in clients.values())
+    injected_gaps = assert_no_spacing(folder, names)
+    assert any(':pending:%d:unseen' % (3 * GIB) in (folder / (name + '.stderr')).read_text() for name in names), 'no pending start was counted'
+    for name in names:
+        (folder / (name + '.release')).touch()
+        finish(clients[name])
+    # The check still rejects spacing: grants 2 s apart fail it.
+    folder = root / 'spacing-control'
+    folder.mkdir()
+    for index, name in enumerate(names):
+        (folder / (name + '.started')).touch()
+        os.utime(folder / (name + '.started'), ns=(10 ** 18 + index * 2 * 10 ** 9,) * 2)
     try:
         assert_no_spacing(folder, names)
     except AssertionError as rejected:
         injected_rejection = str(rejected)
-        injected_gaps = grant_gaps(folder, names)
     else:
-        raise AssertionError('the injected 2-second per-launch delay was not rejected: %r' % grant_gaps(folder, names))
-    for name in names:
-        (folder / (name + '.release')).touch()
-        finish(clients[name])
+        raise AssertionError('grants 2 s apart were not rejected: %r' % grant_gaps(folder, names))
 
     # Load5 alone decides nothing: the same full reservations with idle load admit nothing
     # extra, and fitting reservations under a load of 500 are admitted.
@@ -1740,6 +1747,118 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
             assert code == 0 and 'pipeline-start admitted' not in text, (name, code, text)
             assert not list((folder / 'pool').glob('pipeline-waiter-*.lock')), name
 
+    def nest_client(folder, env):
+        # A fake no-mistakes client: it logs "<cwd name> :: <args>"; an intent beginning reg registers a running run,
+        # one beginning hold waits for folder/release-<intent> and then exits without registering, any other exits
+        # without registering.
+        nest = folder / 'nestbin'
+        nest.mkdir()
+        (nest / 'no-mistakes').write_text('#!' + python + '\n' + """import os, pathlib, sqlite3, sys, time
+folder = pathlib.Path(os.environ['CASE_FOLDER']); args = sys.argv[1:]
+intent = args[args.index('--intent') + 1] if '--intent' in args else ''
+with (folder / 'calls.log').open('a') as out: out.write('%s :: %s\\n' % (os.path.basename(os.getcwd()), intent))
+if intent.startswith('hold'):
+    while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
+if intent.startswith('reg'):
+    with sqlite3.connect(folder / 'state.sqlite') as db:
+        db.execute("INSERT INTO runs (id, status) VALUES (?, 'running')", ('run-' + intent,))
+""")
+        (nest / 'no-mistakes').chmod(0o700)
+        env.update(PATH=str(nest) + os.pathsep + env['PATH'], FM_DURATION_FILE='off')
+        return nest / 'no-mistakes'
+
+    def calls(folder):
+        log = folder / 'calls.log'
+        return [line.split(' :: ')[1] for line in log.read_text().splitlines()] if log.exists() else []
+
+    def ended(child, folder, what, timeout=30):
+        try:
+            return child.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            os.killpg(child.pid, signal.SIGKILL); child.wait()
+            raise AssertionError('%s hung: calls %r' % (what, calls(folder)))
+
+    def nested_second_client():
+        # A second fresh client inside an admitted command is admitted on its own, whether the first client went
+        # through the interception or by its absolute path, registered a run or not; nothing hangs.
+        for label, line in (('path-unregistered', 'no-mistakes axi run --intent a; no-mistakes axi run --intent b'),
+                            ('abs-first-unregistered', '{abs} axi run --intent a; no-mistakes axi run --intent b'),
+                            ('both-register', 'no-mistakes axi run --intent reg-a; no-mistakes axi run --intent reg-b'),
+                            ('reviewer-two-repositories', 'cd {r1} && no-mistakes axi run --intent first; cd {r2} && no-mistakes axi run --intent second')):
+            folder, db, env = case('nested-' + label, cores=18)
+            client = nest_client(folder, env)
+            for repository in ('repo1', 'repo2'):
+                (folder / repository).mkdir()
+            child = launch(mem_guard + ['bash', '-c', line.format(abs=client, r1=folder / 'repo1', r2=folder / 'repo2')], env, folder / 'x')
+            code = ended(child, folder, label)
+            text = (folder / 'x.stderr').read_text()
+            assert code == 0 and len(calls(folder)) == 2, (label, code, calls(folder), text)
+            assert text.count('pipeline-start admitted') == 2, (label, text)
+            assert not list((folder / 'pool').glob('pending-*.lock')), label
+
+    def nested_class_order():
+        # A higher-class start queued elsewhere while a nested second client waits: no hang, and class order holds.
+        import fcntl
+        folder, db, env = case('nested-class-order', cores=18)
+        client = nest_client(folder, env)
+        go = folder / 'go'
+        line = '{abs} axi run --intent first; while [ ! -e {go} ]; do sleep 0.05; done; no-mistakes axi run --intent second'
+        outer = launch(mem_guard + ['bash', '-c', line.format(abs=client, go=go)], env, folder / 'outer')
+        wait_for(lambda: calls(folder) == ['first'], 'the first client ran')
+        lock = os.open(str(folder / 'pool' / 'pipeline-start.lock'), os.O_RDWR | os.O_CREAT, 0o600)
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            elsewhere = launch(cli + ['pipeline-start', '--priority', 'merge-train', '--', str(client), 'axi', 'run', '--intent', 'elsewhere'],
+                               env, folder / 'elsewhere')
+            pending(folder, 1)
+            go.touch()
+            pending(folder, 2)
+        finally:
+            fcntl.flock(lock, fcntl.LOCK_UN); os.close(lock)
+        assert ended(elsewhere, folder, 'the elsewhere start') == 0
+        assert ended(outer, folder, 'the outer command') == 0
+        assert calls(folder) == ['first', 'elsewhere', 'second'], calls(folder)
+
+    def nested_parallel_counted():
+        # Two nested clients started together: the second is decided with the first, admitted and not registered,
+        # counted at its full R. R = 3 GiB and S = 8 GiB: at 10 GiB available the second (3 + 8 = 11) waits until
+        # the first client ends, at 12 GiB it is admitted while the first still runs.
+        for available, admitted in ((10 * GIB, False), (12 * GIB, True)):
+            folder, db, env = case('nested-parallel-%d' % (available // GIB), cores=3, measured=True, available=available)
+            nest_client(folder, env)
+            line = 'no-mistakes axi run --intent hold-a & no-mistakes axi run --intent b; wait'
+            child = launch(mem_guard + ['bash', '-c', line], env, folder / 'x')
+            wait_for(lambda: 'hold-a' in calls(folder), 'the first client runs')
+            if admitted:
+                wait_for(lambda: 'b' in calls(folder), 'the second client admitted with the first counted')
+            else:
+                wait_for(lambda: 'start-1:pending:%d:unseen' % (3 * GIB) in (folder / 'x.stderr').read_text(), 'the second waits with the first counted')
+                time.sleep(1)
+                assert 'b' not in calls(folder), ('the second ran without the first counted', calls(folder))
+            (folder / 'release-hold-a').touch()
+            assert ended(child, folder, 'the parallel pair') == 0
+            assert sorted(calls(folder)) == ['b', 'hold-a'], calls(folder)
+            assert (folder / 'x.stderr').read_text().count('pipeline-start admitted') == 2, (folder / 'x.stderr').read_text()
+
+    def nested_unplaceable():
+        # When the interception cannot be placed (a 0777 directory), a shell with two fresh clients is held as one
+        # start with the printed reason: it waits behind a full pool and runs once admitted.
+        folder, db, env = case('nested-unplaceable', cores=3, running=1)
+        nest_client(folder, env)
+        tmp = folder / 'tmp'
+        tmp.mkdir()
+        digest = hashlib.sha256(os.path.realpath(str(repo / 'bin' / 'fm-cpu-pass.sh')).encode()).hexdigest()[:12]
+        unsafe = tmp / ('fm-exec-intercept-%d-%s' % (os.getuid(), digest))
+        unsafe.mkdir(); unsafe.chmod(0o777)
+        env.update(TMPDIR=str(tmp))
+        child = launch(mem_guard + ['bash', '-c', 'no-mistakes axi run --intent a; no-mistakes axi run --intent b'], env, folder / 'x')
+        pending(folder, 1)
+        assert calls(folder) == [] and child.poll() is None, 'a shell ran past a full pool with no interception'
+        assert 'cannot place the no-mistakes exec interception' in (folder / 'x.stderr').read_text()
+        change(db, "UPDATE runs SET status='completed' WHERE id='baseline-0'")
+        assert ended(child, folder, 'the held shell') == 0
+        assert calls(folder) == ['a', 'b'], calls(folder)
+
     def wake_holder(env, folder):
         held, release = folder / 'held', folder / 'release-queue'
         holder = subprocess.Popen(['bash', '-c', '. "$1" && fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" && touch "$2" && '
@@ -1864,6 +1983,10 @@ exec /bin/ln "$@"
                        ('R2 env -S starts wait behind a full pool in class order', split_held_order),
                        ('D2 an xargs start meets the exec interception', xargs_interception),
                        ('a fresh start under any measurement key meets the interception', any_key_interception),
+                       ('a second fresh client inside an admitted command is admitted on its own', nested_second_client),
+                       ('a nested second client keeps class order behind a start queued elsewhere', nested_class_order),
+                       ('two nested clients started together are each counted', nested_parallel_counted),
+                       ('an unplaceable interception holds a shell of two starts as one start', nested_unplaceable),
                        ('R3 gate and watcher spills collide', watcher_collision),
                        ('D3 a collision replayed before the failed link returns', collision_then_replay), ('R3 controls: free lock, lone spill, replay', spill_controls),
                        ('R4 a short start-lock hold is recorded', short_hold_record)):

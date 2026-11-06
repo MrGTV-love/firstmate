@@ -1517,9 +1517,9 @@ def main():
             engine.loader.exec_module(cpu_pass)
             fresh_pipeline = cpu_pass.fresh_pipeline_start(command)
             if args.pipeline_admitted:
-                # Admitted once already: the client runs past the exec interception.
-                cleaned = cpu_pass.without_intercept(dict(os.environ))
-                os.environ.clear(); os.environ.update(cleaned)
+                # Admitted once already: the admitting pipeline-start chose this command's PATH (with the exec
+                # interception unless the command runs the client directly); its client claims that admission.
+                pass
             elif not fresh_pipeline:
                 # A pipeline-key command, or any command whose words name no-mistakes, that the parser finds no
                 # start in (xargs, a script, a variable), whatever its key: a fresh no-mistakes it reaches through
@@ -1533,7 +1533,7 @@ def main():
         if fresh_pipeline and not args.pipeline_admitted:
             # Admission precedes run(), its absolute/progress clocks and samples.
             # The existing pool owns priority, native observations and the short
-            # check-to-daemon-registration lock; reattachments never requeue.
+            # start lock with its pending reservations; reattachments never requeue.
             os.execv(sys.executable, [sys.executable, str(ROOT / 'bin/fm-cpu-pass.py'),
                 'pipeline-start', '--priority', args.pipeline_priority, '--',
                 sys.executable, str(Path(__file__).resolve()), 'run', '--pipeline-admitted'] + sys.argv[2:])
