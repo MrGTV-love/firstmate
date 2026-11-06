@@ -88,6 +88,15 @@ wait_file() {  # <path> <what>
   fail "$2: $1 never appeared"
 }
 
+wait_gone() {  # <pid> <what>
+  # A process killed with its group can still answer kill -0 for a moment, until its new parent reaps it.
+  for _ in $(seq 1 600); do
+    kill -0 "$1" 2>/dev/null || return 0
+    sleep 0.05
+  done
+  fail "$2"
+}
+
 test_size_follows_host() {
   local host got
   host=$(python3 -c 'import os; print(max(1, os.cpu_count() or 1))')
@@ -269,9 +278,7 @@ test_cleanup_terminates_running_work() {
   wait_file "$dir/child.pid" "cleanup holder"
   child=$(cat "$dir/child.pid")
   reap_bg
-  if kill -0 "$child" 2>/dev/null; then
-    fail "cleanup left the workload alive"
-  fi
+  wait_gone "$child" "cleanup left the workload alive"
   assert_equals 0 "$(held_count "$pool" 1)" "cleanup must release the workload's pass"
   pass "failure cleanup terminates and reaps wrappers and their workloads"
 }
