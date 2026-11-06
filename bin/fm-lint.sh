@@ -85,9 +85,14 @@
 # FM_LINT_SLOT_DIR pool, and a test that starts ShellCheck counts against this same
 # host-wide budget and may queue on it.
 # T stays at or below the budget at every moment two or more roots run. A root
-# larger than the budget runs alone and is ended at the per-root watch bound
-# (FM_LINT_ROOT_RSS_KIB, never above its 8 GiB default), so the residual is one
-# root up to that bound plus the watch's sampling overshoot.
+# larger than the budget runs alone and is ended at the per-root cap
+# (FM_LINT_ROOT_RSS_KIB, default 8388608 KiB = 8 GiB; a larger value is clamped
+# to that default, and stderr and the roots log name the requested and the applied
+# value). The residual host total of one lone root, R, is therefore that cap plus
+# the watch's sampling overshoot: R = 10353888 KiB = 10602381312 bytes (9.87 GiB),
+# the cap of 8388608 KiB plus 1965280 KiB, the largest amount by which a root the
+# watch ended exceeded the cap in this repository's measured runs (the largest
+# peak of any root in those runs is 10353888 KiB).
 # Measured basis (this repository's real full lint, sampled every 0.25 s, each
 # ShellCheck process attributed to its lint run by its parent chain):
 #   the lint before this change peaked at T = 13.31 GiB (14287699968 bytes) with
@@ -205,7 +210,8 @@
 # On native macOS, where the enforced envelope below does not apply, each root's
 # process tree is instead watched for memory, the larger of its resident size
 # and its physical footprint (FM_LINT_ROOT_RSS_KIB, default 8388608 = 8 GiB, a
-# positive decimal integer or lint exits 2 on every host). A root that crosses
+# positive decimal integer or lint exits 2 on every host; a value above the default
+# is clamped to it). A root that crosses
 # it is ended and takes the memory retry described below, and the roots log's
 # last end-record column counts the samples each source gave (libproc, or ps
 # for a tick libproc did not answer in time) and names any attempt that gave
@@ -1938,6 +1944,17 @@ for bound_pair in \
       ;;
   esac
 done
+# A request above the default would let one root enlarge the host total past the
+# per-root cap, so it runs at the default and both values are logged. The digit
+# count is compared first so that a very long number never reaches shell arithmetic.
+ROOT_RSS_DEFAULT_KIB=8388608
+ROOT_RSS_REQUESTED_KIB=''
+if [ "${#ROOT_RSS_KIB}" -gt 7 ] || { [ "${#ROOT_RSS_KIB}" -eq 7 ] && [ "$ROOT_RSS_KIB" -gt "$ROOT_RSS_DEFAULT_KIB" ]; }; then
+  ROOT_RSS_REQUESTED_KIB=$ROOT_RSS_KIB
+  ROOT_RSS_KIB=$ROOT_RSS_DEFAULT_KIB
+  printf 'fm-lint.sh: FM_LINT_ROOT_RSS_KIB=%s is above the %s KiB per-root cap; the lint runs at %s KiB.\n' \
+    "$ROOT_RSS_REQUESTED_KIB" "$ROOT_RSS_DEFAULT_KIB" "$ROOT_RSS_KIB" >&2
+fi
 
 BOUND_MECH=none
 if [ "${FM_LINT_REQUIRE_BOUNDS:-0}" = 1 ]; then
@@ -2122,6 +2139,10 @@ fi
   printf 'meta\t%s\t%s\n' 'root_kill_grace_seconds' "$root_grace_meta"
   printf 'meta\t%s\t%s\n' 'root_memory_limit_kib' "$root_memory_meta"
   printf 'meta\t%s\t%s\n' 'host_memory_budget_kib' "$HOST_RSS_KIB"
+  printf 'meta\t%s\t%s\n' 'root_rss_limit_kib' "$ROOT_RSS_KIB"
+  if [ -n "$ROOT_RSS_REQUESTED_KIB" ]; then
+    printf 'meta\t%s\t%s\n' 'root_rss_requested_kib' "$ROOT_RSS_REQUESTED_KIB"
+  fi
   printf 'meta\t%s\t%s\n' 'timing_mechanism' "$BOUND_MECH"
 } >> "$ROOTS_LOG"
 

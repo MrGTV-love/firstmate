@@ -3376,6 +3376,75 @@ test_resident_watch_gives_up_after_three_failed_restarts() {
   pass "three failed replacement readers in a row give the reader up as restarts-failed"
 }
 
+test_a_per_root_limit_above_the_default_is_clamped_and_a_lower_one_is_kept() {
+  local tmp out request limit rc
+  tmp=$(fm_lint_slot_fixture fm-lint-slots-clamp)
+  # A request of 9 GiB runs at the 8 GiB default, and the roots log and stderr name
+  # both values; a request of 4 GiB runs at 4 GiB with no clamp line; an omitted
+  # setting runs at the default with no clamp line. A number too long for shell
+  # arithmetic is clamped too.
+  for request in 9437184 99999999999999999999999 4194304 omitted; do
+    if [ "$request" = omitted ]; then
+      out=$(env -u FM_LINT_ROOT_RSS_KIB PATH="$tmp/bin:$PATH" FM_LINT_SLOT_DIR="$tmp/pool.$request" \
+        FM_LINT_TELEMETRY="$tmp/$request.tsv" "$LINT" "$tmp/a.sh" 2>&1) \
+        || fail "a lint run with FM_LINT_ROOT_RSS_KIB omitted failed"$'\n'"$out"
+    else
+      out=$(env FM_LINT_ROOT_RSS_KIB="$request" PATH="$tmp/bin:$PATH" FM_LINT_SLOT_DIR="$tmp/pool.$request" \
+        FM_LINT_TELEMETRY="$tmp/$request.tsv" "$LINT" "$tmp/a.sh" 2>&1) \
+        || fail "a lint run with FM_LINT_ROOT_RSS_KIB=$request failed"$'\n'"$out"
+    fi
+    limit=$(awk -F '\t' '$1 == "meta" && $2 == "root_rss_limit_kib" { print $3 }' "$tmp/$request.roots.tsv")
+    case "$request" in
+      4194304)
+        [ "$limit" = 4194304 ] || fail "a request of 4 GiB ran at '$limit' KiB, not 4194304"
+        assert_not_contains "$out" "per-root cap" "a request below the default printed a clamp line"
+        ! grep -q $'^meta\troot_rss_requested_kib\t' "$tmp/$request.roots.tsv" \
+          || fail "a request below the default logged a requested value"
+        ;;
+      omitted)
+        [ "$limit" = 8388608 ] || fail "an omitted setting ran at '$limit' KiB, not the 8388608 default"
+        assert_not_contains "$out" "per-root cap" "an omitted setting printed a clamp line"
+        ! grep -q $'^meta\troot_rss_requested_kib\t' "$tmp/$request.roots.tsv" \
+          || fail "an omitted setting logged a requested value"
+        ;;
+      *)
+        [ "$limit" = 8388608 ] || fail "a request of $request KiB ran at '$limit' KiB, not clamped to 8388608"
+        assert_contains "$out" "FM_LINT_ROOT_RSS_KIB=$request is above the 8388608 KiB per-root cap; the lint runs at 8388608 KiB" \
+          "the clamp of $request was not named on stderr"
+        assert_grep $'meta\troot_rss_requested_kib\t'"$request" "$tmp/$request.roots.tsv" \
+          "the roots log did not record the requested value $request"
+        ;;
+    esac
+  done
+  out=$(env FM_LINT_ROOT_RSS_KIB=0x PATH="$tmp/bin:$PATH" FM_LINT_SLOT_DIR="$tmp/pool.bad" "$LINT" "$tmp/a.sh" 2>&1) && rc=0 || rc=$?
+  [ "${rc:-0}" -eq 2 ] || fail "an invalid FM_LINT_ROOT_RSS_KIB exited ${rc:-0}, not 2"
+  pass "a per-root limit of 9 GiB runs at 8 GiB with both values logged, a very long number is clamped, 4 GiB and the omitted default run as set, and an invalid value still exits 2"
+}
+
+test_a_high_host_slot_count_does_not_raise_the_memory_limit() {
+  local tmp control capped most starts
+  tmp=$(fm_test_tmproot fm-lint-slots-high)
+  mkdir -p "$tmp/bin"
+  for root in a b c; do printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/$root.sh"; done
+  fm_lint_write_memory_shellcheck "$tmp/bin" 64 "$tmp/mem.starts"
+  # The control: with FM_LINT_HOST_SLOTS=100 and small charges (256 MiB per root)
+  # four runs from four homes run several roots at once, so the count cap is not
+  # what holds the other case back.
+  control=$(fm_lint_memory_runs "$tmp" "$tmp/bin" 4 FM_LINT_SLOT_DIR="$tmp/control" \
+    FM_LINT_HOST_SLOTS=100 FM_LINT_ROOT_RSS_KIB=262144)
+  read -r most starts <<<"$control"
+  [ "$most" -ge 3 ] || fail "four runs with FM_LINT_HOST_SLOTS=100 and small charges peaked at only $most roots at once, so this test cannot show the memory limit: $control"
+  # The same four runs with the default per-root charge, 8 GiB, above the whole
+  # budget: FM_LINT_HOST_SLOTS=100 leaves each root alone in the pool and every
+  # root completes.
+  capped=$( unset FM_LINT_ROOT_RSS_KIB
+    fm_lint_memory_runs "$tmp" "$tmp/bin" 4 FM_LINT_SLOT_DIR="$tmp/capped" FM_LINT_HOST_SLOTS=100 FM_TEST_MEM_HOLD=0.4 )
+  read -r most starts <<<"$capped"
+  [ "$most" -eq 1 ] || fail "four runs with FM_LINT_HOST_SLOTS=100 and the default per-root charge ran $most roots at once, expected one: $capped"
+  [ "$starts" -eq 12 ] || fail "$starts of 12 roots completed with FM_LINT_HOST_SLOTS=100: $capped"
+  pass "FM_LINT_HOST_SLOTS=100 does not raise the memory limit: four runs from four homes with the default charge run one root at a time and finish all 12 (small charges: $control; default charge: $capped)"
+}
+
 fm_lint_test_cases=(
 test_jobs_are_deterministic_and_complete
 test_host_slots_bound_concurrent_runs
@@ -3390,6 +3459,7 @@ test_queue_scan_survives_odd_slot_paths_and_vanishing_tickets
 test_cached_success_does_not_wait_for_host_slots
 test_slot_pool_cannot_be_disabled_and_refuses_bad_settings
 test_host_budget_default_is_one_number_stated_by_both_docs
+test_a_per_root_limit_above_the_default_is_clamped_and_a_lower_one_is_kept
 test_slot_file_failures_refuse_and_never_run_unbounded
 test_growing_roots_are_held_to_the_budget_across_pools
 test_simultaneous_growth_after_admission_is_brought_back_within_the_allowance
@@ -3402,6 +3472,7 @@ test_a_waiting_gate_reading_the_table_never_stops_a_younger_running_root
 test_growth_guard_never_stops_the_watch_reader
 test_a_wrapper_around_the_real_shellcheck_shares_the_host_wide_memory_bound
 test_memory_budget_bounds_the_aggregate_across_homes
+test_a_high_host_slot_count_does_not_raise_the_memory_limit
 test_root_larger_than_the_budget_runs_alone_and_a_killed_run_frees_its_charge
 test_memory_charge_survives_unknown_records_and_an_unreadable_table
 test_fast_record_does_not_lower_the_full_charge
