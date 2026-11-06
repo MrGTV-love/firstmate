@@ -246,7 +246,11 @@
 # (FM_LINT_ROOT_MEMORY_KIB, default 12582912 = 12 GiB of virtual address
 # space per analysis process). The sizing rationale and RSS reduction threshold
 # live beside ROOT_MEMORY_KIB below. This is not a resident-memory ceiling;
-# check aggregate runner RSS in CI. The watchdog uses the shared
+# check aggregate runner RSS in CI. It does not change the host-wide budget B
+# (the sum of the resident sizes of all roots) or the per-root cap
+# FM_LINT_ROOT_RSS_KIB (8 GiB, the resident size at which the macOS watch ends
+# one root): the address-space limit applies only where ulimit -v works, and the
+# admission that holds B applies in every mode. The watchdog uses the shared
 # bin/fm-timeout-lib.sh group-kill pattern, so a deadline or an interrupt
 # removes the owned process group. Bounds mode proves the watchdog can
 # actually bound a probe command and that the host accepts the memory limit
@@ -256,7 +260,7 @@
 # cannot apply the address-space limit at all) each root still runs in its
 # own ShellCheck process with identical diagnostics, no deadline and no
 # address-space limit, under the resident-memory watch above on macOS; the host-wide
-# concurrency pool remains enabled unless disabled above.
+# concurrency pool and its memory admission are always on.
 #
 # If a source-following root exits with a memory failure, including a resident
 # bound crossing (status 98, named on stderr), it is retried once
