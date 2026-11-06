@@ -136,6 +136,10 @@ Pipeline starts:
     command it runs in ends.
     Bypassing this owner or external daemon status changes cannot be made
     atomic with a read-only external database; deployment must route starts here.
+  - A SIGINT while a start waits ends it with 130 and never runs COMMAND,
+    also when it lands inside a Python callback that drops the
+    KeyboardInterrupt: the signal is recorded and every round, and the grant
+    itself, checks it.
   - An unreadable run database or CPU count refuses with 125 instead of
     guessing headroom. If a read fails after launch, keep the pending
     reservation until COMMAND returns; never stop running work because the
@@ -1279,6 +1283,18 @@ def wait_for_admission(directory: str, priority: str, self_run: Optional[str] = 
     waiter_fd = admission_fd = None
     waiter_path = None
     started = time.monotonic()
+    # A SIGINT that lands while Python runs a callback (an import's module-lock
+    # callback, a weakref finalizer) raises KeyboardInterrupt there, where it is
+    # printed as ignored and lost; the waiter would then go on and could run its
+    # COMMAND. The handler also records the signal, and every round checks it.
+    interrupted: List[int] = []
+    previous_handler = None
+    if signal.getsignal(signal.SIGINT) is signal.default_int_handler:
+        def on_interrupt(signum, frame):
+            interrupted.append(signum)
+            raise KeyboardInterrupt
+        with contextlib.suppress(ValueError):  # not the main thread: keep the default
+            previous_handler = signal.signal(signal.SIGINT, on_interrupt)
     try:
         # Publish a fully written, locked entry atomically; no reader sees a
         # partial priority record. These are startup waiters, not CPU passes.
@@ -1289,6 +1305,8 @@ def wait_for_admission(directory: str, priority: str, self_run: Optional[str] = 
         delay = POLL_MIN_SECS
         waited = False
         while True:
+            if interrupted:
+                raise KeyboardInterrupt
             reason = "another start is registering"
             if try_lock(admission_fd):
                 before, cores = pipeline_observation()
@@ -1303,6 +1321,8 @@ def wait_for_admission(directory: str, priority: str, self_run: Optional[str] = 
                                                self_run=self_run, waiting=waiting)
                     if admit and waited and bound is not None and time.monotonic() - started > bound:
                         raise HoldBound("a fit came only after the hold bound passed: " + reason)
+                    if admit and interrupted:
+                        raise KeyboardInterrupt
                     if admit:
                         result = (admission_fd, before, reason, time.monotonic() - started)
                         admission_fd = None
@@ -1323,6 +1343,8 @@ def wait_for_admission(directory: str, priority: str, self_run: Optional[str] = 
             time.sleep(delay)
             delay = min(POLL_MAX_SECS, delay * 2)
     finally:
+        if previous_handler is not None:
+            signal.signal(signal.SIGINT, previous_handler)
         if waiter_path is not None:
             try:
                 os.unlink(waiter_path)

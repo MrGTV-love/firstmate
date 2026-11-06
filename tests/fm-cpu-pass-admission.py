@@ -93,6 +93,17 @@ if len(sys.argv) > 1 and os.path.basename(sys.argv[1]) in ('fm-cpu-pass.py', 'fm
                 os.kill(os.getpid(), signal.SIGKILL)
             return real_write(fd, data)
         os.write = write_until_killed
+    if os.environ.get('CASE_SWALLOW_INTERRUPT'):
+        # A KeyboardInterrupt raised inside a callee is lost there (as one raised in an import's module-lock
+        # callback is printed as ignored): the queue's sleep swallows it, so only a recorded signal can stop the wait.
+        import time
+        real_sleep = time.sleep
+        def swallowing_sleep(seconds):
+            try:
+                real_sleep(seconds)
+            except KeyboardInterrupt:
+                pass
+        time.sleep = swallowing_sleep
     if os.environ.get('CASE_PROCESS_TABLE_UNREADABLE'):
         # The process table cannot be read (both readers the engine uses), so no running client can be seen.
         try:
@@ -856,6 +867,14 @@ try:
         finish(cancelled, 130)
         assert survivor.poll() is None, (folder / 'survivor.stderr').read_text()
     assert not (folder / 'cancelled').exists()
+    # A SIGINT whose KeyboardInterrupt a callee swallows still ends the waiting start with 130, without its COMMAND.
+    swallowed = launch(cli + ['pipeline-start', '--priority', 'merge-train', '--', 'touch', str(folder / 'swallowed')],
+                       dict(env, CASE_SWALLOW_INTERRUPT='1'), folder / 'swallowed')
+    pending(folder, 2)
+    time.sleep(0.3)
+    os.killpg(swallowed.pid, signal.SIGINT)
+    finish(swallowed, 130)
+    assert not (folder / 'swallowed').exists() and survivor.poll() is None
     change(db, "UPDATE runs SET status='completed'")
     finish(survivor)
     assert (folder / 'survivor').exists()
