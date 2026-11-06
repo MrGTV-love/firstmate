@@ -3588,7 +3588,8 @@ test_resident_watch_ends_a_tree_whose_memory_sits_in_descendants_and_an_orphan()
 # 2 GiB each (4 GiB together, above the 3.5 GiB budget) never hold their memory
 # at once under any of them.
 test_no_route_sets_a_runs_budget() {
-  local tmp rc out kib real key route run
+  local tmp rc out kib real key route run pid
+  local -a pids
   tmp=$(fm_test_tmproot fm-lint-budget-routes)
   mkdir -p "$tmp/bin" "$tmp/home/.cache"
   for run in a b; do printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/$run.sh"; done
@@ -3626,6 +3627,7 @@ test_no_route_sets_a_runs_budget() {
   done
   : > "$tmp/mem.starts"
   : > "$tmp/mem.starts.spans"
+  pids=()
   for run in 1 2; do
     mkdir -p "$tmp/home.$run/.cache"
     env HOME="$tmp/home.$run" XDG_CACHE_HOME="$tmp/home.$run/.cache" FM_HOME="$tmp/fm.$run" \
@@ -3633,8 +3635,11 @@ test_no_route_sets_a_runs_budget() {
       FM_LINT_INTERNAL_HOST_RSS_KIB=100000000 FM_LINT_ROOT_RSS_KIB=2000000 FM_TEST_MEM_HOLD=1.5 \
       FM_LINT_TELEMETRY="$tmp/ignored.$run.tsv" PATH="$tmp/bin:$PATH" \
       "$LINT" --jobs 1 "$tmp/a.sh" "$tmp/b.sh" > "$tmp/ignored.$run.out" 2>&1 &
+    pids+=("$!")
   done
-  wait || fail "a run with the ignored routes failed"$'\n'"$(cat "$tmp"/ignored.*.out)"
+  for pid in "${pids[@]}"; do
+    wait "$pid" || fail "a run with the ignored routes failed"$'\n'"$(cat "$tmp"/ignored.*.out)"
+  done
   kib=$(awk -F '\t' '$1 == "meta" && $2 == "host_memory_budget_kib" { print $3 }' "$tmp/ignored.1.roots.tsv")
   [ "$kib" = 3670016 ] || fail "an ignored route changed the published budget to '$kib' KiB"
   [ "$(wc -l < "$tmp/mem.starts" | tr -d ' ')" -eq 4 ] || fail "not every root ran under the ignored routes"
@@ -3695,7 +3700,8 @@ test_a_waiting_run_is_served_within_a_stated_wait_bound() {
 # admission and alone: two concurrent runs whose roots are recorded at 5 GiB
 # never hold memory at once, each root completes, and the second run's roots wait.
 test_a_five_gib_root_runs_alone_inside_the_admission() {
-  local tmp run real key root rc
+  local tmp run real key root rc pid
+  local -a pids
   tmp=$(fm_test_tmproot fm-lint-five-gib)
   mkdir -p "$tmp/bin" "$tmp/pool/history"
   for root in a b; do printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/$root.sh"; done
@@ -3707,15 +3713,17 @@ test_a_five_gib_root_runs_alone_inside_the_admission() {
   done
   : > "$tmp/mem.starts"
   : > "$tmp/mem.starts.spans"
+  pids=()
   for run in 1 2; do
     mkdir -p "$tmp/home.$run/.cache"
     ( unset FM_LINT_ROOT_RSS_KIB
       env HOME="$tmp/home.$run" XDG_CACHE_HOME="$tmp/home.$run/.cache" FM_HOME="$tmp/fm.$run" \
         FM_LINT_SLOT_DIR="$tmp/pool" FM_LINT_HOST_SLOTS=9 FM_TEST_MEM_HOLD=1.5 FM_LINT_TELEMETRY="$tmp/five.$run.tsv" \
         PATH="$tmp/bin:$PATH" "$LINT" --jobs 1 "$tmp/a.sh" "$tmp/b.sh" > "$tmp/five.$run.out" 2>&1 ) &
+    pids+=("$!")
   done
   rc=0
-  wait || rc=$?
+  for pid in "${pids[@]}"; do wait "$pid" || rc=$?; done
   [ "$rc" -eq 0 ] || fail "a run with 5 GiB roots failed"$'\n'"$(cat "$tmp"/five.?.out)"
   [ "$(wc -l < "$tmp/mem.starts" | tr -d ' ')" -eq 4 ] || fail "not every 5 GiB root completed"
   [ "$(fm_lint_max_overlap "$tmp/mem.starts.spans")" -eq 1 ] || fail "two 5 GiB roots held their memory at once"$'\n'"$(cat "$tmp/mem.starts.spans")"
