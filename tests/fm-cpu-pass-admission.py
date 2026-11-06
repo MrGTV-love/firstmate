@@ -93,6 +93,23 @@ if len(sys.argv) > 1 and os.path.basename(sys.argv[1]) in ('fm-cpu-pass.py', 'fm
                 os.kill(os.getpid(), signal.SIGKILL)
             return real_write(fd, data)
         os.write = write_until_killed
+    if os.environ.get('CASE_PROCESS_TABLE_UNREADABLE'):
+        # The process table cannot be read (both readers the engine uses), so no running client can be seen.
+        try:
+            import importlib.util
+            spec = importlib.util.spec_from_file_location('fm_proc_info', os.path.join(os.path.dirname(os.path.abspath(sys.argv[1])), 'fm-proc-info.py'))
+            info = importlib.util.module_from_spec(spec)
+            sys.modules['fm_proc_info'] = info
+            spec.loader.exec_module(info)
+            def unreadable(*selector): raise OSError('injected: process table unreadable')
+            info.processes = unreadable
+        except Exception:
+            sys.modules.pop('fm_proc_info', None)
+        real_listdir = os.listdir
+        def listdir(path='.'):
+            if str(path) == '/proc': raise OSError('injected: process table unreadable')
+            return real_listdir(path)
+        os.listdir = listdir
     connect = sqlite3.connect
     host = pathlib.Path('~/.no-mistakes/state.sqlite').expanduser().resolve().as_uri()
     def isolated(database, *args, **kwargs):
@@ -1785,12 +1802,16 @@ if intent.startswith('reg'):
         # With 3 cores the count fallback admits one run: a first client called by its absolute path that ends
         # without a run must not leave its enclosing start counted against the second (no hang); a first that did
         # create a run releases its pending start, so a second with the same arguments is admitted on its own.
-        for label, cores, line in (('path-unregistered', 18, 'no-mistakes axi run --intent a; no-mistakes axi run --intent b'),
-                                   ('abs-first-unregistered', 18, '{abs} axi run --intent a; no-mistakes axi run --intent b'),
-                                   ('tight-abs-first-unregistered', 3, '{abs} axi run --intent a; no-mistakes axi run --intent b'),
-                                   ('abs-first-same-args-registered', 18, '{abs} axi run --intent reg-x; no-mistakes axi run --intent reg-x'),
-                                   ('both-register', 18, 'no-mistakes axi run --intent reg-a; no-mistakes axi run --intent reg-b'),
-                                   ('reviewer-two-repositories', 18, 'cd {r1} && no-mistakes axi run --intent first; cd {r2} && no-mistakes axi run --intent second')):
+        # A first client with the same arguments that created no run leaves its admission to the second: one
+        # admission for the one start that ran.
+        for label, cores, line, admissions in (
+                ('path-unregistered', 18, 'no-mistakes axi run --intent a; no-mistakes axi run --intent b', 2),
+                ('abs-first-unregistered', 18, '{abs} axi run --intent a; no-mistakes axi run --intent b', 2),
+                ('tight-abs-first-unregistered', 3, '{abs} axi run --intent a; no-mistakes axi run --intent b', 2),
+                ('abs-first-same-args-registered', 18, '{abs} axi run --intent reg-x; no-mistakes axi run --intent reg-x', 2),
+                ('abs-first-same-args-unregistered', 18, '{abs} axi run --intent x; no-mistakes axi run --intent x', 1),
+                ('both-register', 18, 'no-mistakes axi run --intent reg-a; no-mistakes axi run --intent reg-b', 2),
+                ('reviewer-two-repositories', 18, 'cd {r1} && no-mistakes axi run --intent first; cd {r2} && no-mistakes axi run --intent second', 2)):
             folder, db, env = case('nested-' + label, cores=cores)
             client = nest_client(folder, env)
             for repository in ('repo1', 'repo2'):
@@ -1799,8 +1820,28 @@ if intent.startswith('reg'):
             code = ended(child, folder, label)
             text = (folder / 'x.stderr').read_text()
             assert code == 0 and len(calls(folder)) == 2, (label, code, calls(folder), text)
-            assert text.count('pipeline-start admitted') == 2, (label, text)
+            assert text.count('pipeline-start admitted') == admissions, (label, text)
             assert not list((folder / 'pool').glob('pending-*.lock')), label
+
+    def nested_enclosing_counted():
+        # The enclosing start's unclaimed reservation keeps counting while a process in its command runs the
+        # admitted client, and when the process table cannot be read: with 3 cores (one run) the second waits.
+        for label, line, extra in (('client-running', '{abs} axi run --intent hold-a & sleep 0.3; no-mistakes axi run --intent b; wait', {}),
+                                   ('table-unreadable', '{abs} axi run --intent a; no-mistakes axi run --intent b', {'CASE_PROCESS_TABLE_UNREADABLE': '1'})):
+            folder, db, env = case('nested-enclosing-' + label, cores=3)
+            client = nest_client(folder, env)
+            env.update(extra)
+            child = launch(mem_guard + ['bash', '-c', line.format(abs=client)], env, folder / 'x')
+            pending(folder, 1)
+            time.sleep(2)
+            assert 'b' not in calls(folder) and child.poll() is None, (label, 'the second ran without the enclosing start counted', calls(folder))
+            if label == 'client-running':
+                (folder / 'release-hold-a').touch()
+                assert ended(child, folder, label) == 0
+                assert sorted(calls(folder)) == ['b', 'hold-a'], calls(folder)
+                assert (folder / 'x.stderr').read_text().count('pipeline-start admitted') == 2, (folder / 'x.stderr').read_text()
+            else:
+                os.killpg(child.pid, signal.SIGKILL); child.wait()
 
     def nested_class_order():
         # A higher-class start queued elsewhere while a nested second client waits: no hang, and class order holds.
@@ -1999,6 +2040,7 @@ exec /bin/ln "$@"
                        ('D2 an xargs start meets the exec interception', xargs_interception),
                        ('a fresh start under any measurement key meets the interception', any_key_interception),
                        ('a second fresh client inside an admitted command is admitted on its own', nested_second_client),
+                       ('an enclosing start counts while its client runs or the process table is unreadable', nested_enclosing_counted),
                        ('a nested second client keeps class order behind a start queued elsewhere', nested_class_order),
                        ('two nested clients started together are each counted', nested_parallel_counted),
                        ('an unplaceable interception holds a shell of two starts as one start', nested_unplaceable),
