@@ -404,6 +404,7 @@ test_rejects_direct_beads_cli_invocations() {
   lint_copy="$tmp/repo/bin/fm-lint.sh"
   cp "$LINT" "$lint_copy"
   cp "$ROOT/bin/fm-lint-cache.pl" "$tmp/repo/bin/"
+  cp "$ROOT/bin/fm-proc-info.py" "$tmp/repo/bin/"
   cat > "$tmp/repo/bin/fm-lint-workflows.sh" <<'SH'
 #!/usr/bin/env bash
 exit 0
@@ -457,6 +458,7 @@ test_rejects_direct_beads_cli_in_explicit_core_path() {
   target="$tmp/repo/bin/direct-beads.sh"
   cp "$LINT" "$lint_copy"
   cp "$ROOT/bin/fm-lint-cache.pl" "$tmp/repo/bin/"
+  cp "$ROOT/bin/fm-proc-info.py" "$tmp/repo/bin/"
   printf '#!/usr/bin/env bash\nbd close fm-example\n' > "$target"
   chmod +x "$lint_copy"
   fm_lint_stub_shellcheck "$fakebin" "$log"

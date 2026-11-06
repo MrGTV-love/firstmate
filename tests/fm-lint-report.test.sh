@@ -184,6 +184,7 @@ test_require_bounds_refuses_when_enforcement_is_missing() {
   mkdir -p "$lone_dir"
   cp "$LINT" "$lone_dir/fm-lint.sh"
   cp "$ROOT/bin/fm-lint-cache.pl" "$lone_dir/"
+  cp "$ROOT/bin/fm-proc-info.py" "$lone_dir/"
   chmod +x "$lone_dir/fm-lint.sh"
   rc=0
   out=$(PATH="$fakebin:$PATH" FM_LINT_REQUIRE_BOUNDS=1 \
@@ -273,6 +274,7 @@ test_sidecar_result_exit_reflects_final_status() {
   mkdir -p "$tmp/repo/bin/backends" "$tmp/repo/tests" "$tmp/repo/.github/workflows"
   cp "$LINT" "$tmp/repo/bin/fm-lint.sh"
   cp "$ROOT/bin/fm-lint-cache.pl" "$tmp/repo/bin/"
+  cp "$ROOT/bin/fm-proc-info.py" "$tmp/repo/bin/"
   cp "$ROOT/bin/fm-timeout-lib.sh" "$tmp/repo/bin/fm-timeout-lib.sh"
   cat > "$tmp/repo/bin/fm-lint-workflows.sh" <<'SH'
 #!/usr/bin/env bash

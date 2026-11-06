@@ -91,7 +91,9 @@ if (($ARGV[0] // '') eq 'gate') {
     # worst case charged without a trusted record. bin/fm-lint.sh validates
     # the budget override and owns the documented defaults.
     my $positive = sub { ($_[0] // '') =~ /\A[1-9][0-9]*\z/ ? $_[0] + 0 : $_[1] };
-    my $budget_kib = $positive->($ENV{FM_LINT_HOST_RSS_KIB}, 12582912);
+    # The budget has one owner and one default: bin/fm-lint.sh always passes it.
+    my $budget_kib = ($ENV{FM_LINT_INTERNAL_HOST_RSS_KIB} // '') =~ /\A[1-9][0-9]*\z/ ? $ENV{FM_LINT_INTERNAL_HOST_RSS_KIB} + 0
+        : die "fm-lint-gate: invalid private invocation: FM_LINT_INTERNAL_HOST_RSS_KIB is the host-wide budget in KiB and bin/fm-lint.sh sets it\n";
     my $worst_kib = $positive->($ENV{FM_LINT_INTERNAL_ROOT_CAP_KIB}, 8388608);
     my $root_key = $ENV{FM_LINT_INTERNAL_ROOT_KEY} // '';
     my $history_path = length $root_key ? "$slot_dir/history/" . sha256_hex($root_key) : undef;
@@ -176,6 +178,28 @@ if (($ARGV[0] // '') eq 'gate') {
         }
         return $table{$$} ? \%table : undef;
     };
+    # The refusal for a host whose process table cannot be read by either route.
+    # It also marks the run (FM_LINT_INTERNAL_ABORT_FILE) so the lint's workers
+    # start no further root: each would wait the same 5 s and fail the same way.
+    my $refuse_census = sub {
+        my $abort = $ENV{FM_LINT_INTERNAL_ABORT_FILE} // '';
+        if (length $abort && open(my $mark, '>>', $abort)) { close $mark; }
+        print STDERR "fm-lint: the host process table cannot be read: ps failed, and so did fm-proc-info.py "
+            . "(table and memory) beside fm-lint-cache.pl; the host-wide ShellCheck memory bound cannot be "
+            . "enforced, so this analysis was not started. Let this user run ps, or keep bin/fm-proc-info.py "
+            . "beside bin/fm-lint-cache.pl with a python3 that can run it.\n";
+        exit 2;
+    };
+    # Probe mode, run once by bin/fm-lint.sh before any root starts: succeeds when
+    # the table can be read, else waits about 5 s and refuses as a root would.
+    if ($ENV{FM_LINT_INTERNAL_CENSUS_ONLY}) {
+        my $began = Time::HiRes::time();
+        while (!$process_table->()) {
+            $refuse_census->() if Time::HiRes::time() - $began >= 5;
+            Time::HiRes::sleep(0.5);
+        }
+        exit 0;
+    }
     # KiB charged for the held slots, each [gate pid, charge, watch peak file]
     # with undef for what its record does not name: the larger of its charge and
     # what it holds now (its gate's whole process tree, or the watch's peak), and
@@ -404,11 +428,7 @@ if (($ARGV[0] // '') eq 'gate') {
                     $census_from //= $now;
                     if ($now - $census_from >= 5) {
                         unlink($ticket_path);
-                        print STDERR "fm-lint: the host process table cannot be read: ps failed, and so did fm-proc-info.py "
-                            . "(table and memory) beside fm-lint-cache.pl; the host-wide ShellCheck memory bound cannot be "
-                            . "enforced, so this analysis was not started. Let this user run ps, or keep bin/fm-proc-info.py "
-                            . "beside bin/fm-lint-cache.pl with a python3 that can run it.\n";
-                        exit 2;
+                        $refuse_census->();
                     }
                 } elsif ($held || $host_bypass) {
                     undef $census_from;

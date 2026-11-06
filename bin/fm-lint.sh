@@ -77,9 +77,28 @@
 # while a slot sits free, are skipped automatically. After an update to this
 # gate merges, restart in-flight lints that still run the older code.
 # The pool bounds the memory of the ShellCheck processes this script starts,
-# host-wide, in bytes. FM_LINT_HOST_RSS_KIB is that budget (a positive decimal
-# KiB count, default 12582912 = 12 GiB: the 8 GiB per-root watch bound below
-# plus headroom, so one root at its bound still leaves room for small roots).
+# host-wide, in bytes. The budget is fixed: 3670016 KiB = 3.5 GiB = 3758096384
+# bytes. No environment variable or flag sets it (FM_LINT_HOST_RSS_KIB is refused
+# by name), this script is the only place that holds the number, and it is
+# printed as the host_memory_budget_kib line of the roots log. The one seam is
+# FM_LINT_FIXTURE_HOST_RSS_KIB, honored only together with FM_LINT_SLOT_DIR, a
+# private fixture pool for tests, and refused with the host pool.
+# Derivation (rule: at or below the smallest ShellCheck aggregate among the
+# readings at memory pressure level 2). state/memory-readings.jsonl holds these
+# level-2 readings with ShellCheck among the ten largest processes; the sum is
+# of their rss_bytes, in MiB (processes counted in brackets):
+#   2026-11-02T21:11:32Z  3673.8125 [2]
+#   2026-11-04T04:19:35Z 13115.46875 [7]
+#   2026-11-04T04:19:44Z 12253.59375 [6]
+#   2026-11-04T04:20:14Z 12080.96875 [5]
+#   2026-11-04T04:44:59Z 10911.125 [8]
+#   2026-11-04T04:45:21Z 10879.171875 [7]
+#   2026-11-04T04:52:23Z 10706.25 [5] (read after the other six)
+# The smallest is 3673.8125 MiB * 1024 = 3761984 KiB = 3.588 GiB. The budget is
+# the next round figure below it: 3.5 GiB * 1048576 = 3670016 KiB, which is
+# 91968 KiB under that reading. An unrecorded root is charged more than that
+# budget (the 8 GiB watch bound below), so with no history each root runs alone,
+# and recorded roots share the budget.
 # Each root is charged its own recorded peak, the larger of resident size and
 # physical footprint over its earlier complete analyses, kept per analysis mode
 # (full or fast) and repo-relative root path in the pool's history/ directory
@@ -107,9 +126,12 @@
 # peak of resident size and footprint. A held root is charged the worst case
 # when its record names no charge. Admission needs that table: while neither ps
 # nor bin/fm-proc-info.py (its table and memory commands) can read it, no root
-# is admitted in any pool, and a root whose turn it is waits about 5 s for it,
-# then exits 2 naming the host process table, ps and fm-proc-info.py and the fix,
-# without starting. With nothing held
+# is admitted in any pool. This script reads that table once, before any root
+# starts, and exits 2 naming the host process table, ps and fm-proc-info.py and
+# the fix after about 5 s if it cannot; a table lost while the run is under way
+# makes the root whose turn it is wait about 5 s and exit 2 the same way, and
+# that refusal stops both workers from starting any further root, so the run
+# does not spend 5 s on every root or hold the head of the shared queue. With nothing held
 # and nothing running outside, one root is always admitted, so a root larger
 # than the budget runs alone once that outside memory has ended, and queued roots
 # wait rather than fail. When a root's analysis completes, a record whose input
@@ -175,8 +197,8 @@
 # charged the worst case. Host load
 # average never changes admission, so unrelated machine load cannot starve lint.
 # FM_LINT_HOST_SLOTS sets the count cap; unset or empty uses max(2, floor(ncpu/2)).
-# A nonempty FM_LINT_HOST_SLOTS or FM_LINT_HOST_RSS_KIB must be a positive
-# decimal integer without leading zeros, or lint exits 2. The per-root address-space limit is enforced only where ulimit -v works, and
+# A nonempty FM_LINT_HOST_SLOTS must be a positive decimal integer without
+# leading zeros, or lint exits 2; a nonempty FM_LINT_HOST_RSS_KIB exits 2. The per-root address-space limit is enforced only where ulimit -v works, and
 # native macOS cannot enforce it.
 # On native macOS, where the enforced envelope below does not apply, each root's
 # process tree is instead watched for memory, the larger of its resident size
@@ -605,6 +627,9 @@ fm_lint_worker() {  # <manifest> <output-dir> <shard-index>
     fi
     : > "$output.out"
     for entry in "${root_entries[@]}"; do
+      # A gate that refused for an unreadable host process table marked the
+      # run: start no further root in either worker.
+      [ ! -e "${FM_LINT_INTERNAL_ABORT_FILE:-}" ] || break
       index=${entry%%"$tab"*}
       path=${entry#*"$tab"}
       invocation_rc=0
@@ -1974,9 +1999,32 @@ if [ -n "${FM_LINT_SLOT_DIR:-}" ]; then
   fi
   SLOT_DIR=$FM_LINT_SLOT_DIR
 fi
+# The host-wide ShellCheck memory budget in KiB. It has one value, the default
+# documented in the header; no environment variable sets it. The fixture seam
+# lowers it for a private test pool only.
+HOST_RSS_KIB=3670016
+if [ -n "${FM_LINT_HOST_RSS_KIB:-}" ]; then
+  printf 'fm-lint.sh: FM_LINT_HOST_RSS_KIB is not supported: the host-wide ShellCheck memory bound is fixed at %s KiB and no setting changes it. Unset FM_LINT_HOST_RSS_KIB.\n' \
+    "$HOST_RSS_KIB" >&2
+  exit 2
+fi
+if [ -n "${FM_LINT_FIXTURE_HOST_RSS_KIB:-}" ]; then
+  case "$FM_LINT_FIXTURE_HOST_RSS_KIB" in
+    0*|*[!0-9]*)
+      printf 'fm-lint.sh: FM_LINT_FIXTURE_HOST_RSS_KIB must be a positive integer, got %s.\n' \
+        "$FM_LINT_FIXTURE_HOST_RSS_KIB" >&2
+      exit 2
+      ;;
+  esac
+  if [ -z "${FM_LINT_SLOT_DIR:-}" ]; then
+    printf 'fm-lint.sh: FM_LINT_FIXTURE_HOST_RSS_KIB is honored only with FM_LINT_SLOT_DIR, a private fixture pool; the host pool keeps its fixed bound of %s KiB.\n' \
+      "$HOST_RSS_KIB" >&2
+    exit 2
+  fi
+  HOST_RSS_KIB=$FM_LINT_FIXTURE_HOST_RSS_KIB
+fi
 for pool_pair in \
-  "FM_LINT_HOST_SLOTS=${FM_LINT_HOST_SLOTS:-1}" \
-  "FM_LINT_HOST_RSS_KIB=${FM_LINT_HOST_RSS_KIB:-1}"; do
+  "FM_LINT_HOST_SLOTS=${FM_LINT_HOST_SLOTS:-1}"; do
   case "${pool_pair#*=}" in
     ''|0*|*[!0-9]*)
       pool_name=${pool_pair%%=*}
@@ -2088,6 +2136,7 @@ fi
   printf 'meta\t%s\t%s\n' 'root_deadline_seconds' "$root_deadline_meta"
   printf 'meta\t%s\t%s\n' 'root_kill_grace_seconds' "$root_grace_meta"
   printf 'meta\t%s\t%s\n' 'root_memory_limit_kib' "$root_memory_meta"
+  printf 'meta\t%s\t%s\n' 'host_memory_budget_kib' "$HOST_RSS_KIB"
   printf 'meta\t%s\t%s\n' 'timing_mechanism' "$BOUND_MECH"
 } >> "$ROOTS_LOG"
 
@@ -2176,7 +2225,8 @@ fm_lint_run_worker() {  # <worker-index>
     FM_LINT_PERL_BIN="$PERL_BIN"
   )
   worker_env+=(FM_LINT_INTERNAL_CACHE="$CACHE_DIR" FM_LINT_INTERNAL_SLOT_DIR="$SLOT_DIR" FM_LINT_INTERNAL_NCPU="$NCPU")
-  worker_env+=(FM_LINT_INTERNAL_HOST_LOCK="$HOST_POOL_ROOT/admission.lock")
+  worker_env+=(FM_LINT_INTERNAL_HOST_LOCK="$HOST_POOL_ROOT/admission.lock" FM_LINT_INTERNAL_HOST_RSS_KIB="$HOST_RSS_KIB"
+    FM_LINT_INTERNAL_ABORT_FILE="$TMP_ROOT/census.abort")
   worker_env+=(FM_LINT_INTERNAL_RUN_ID="$$")
   # The most one root can hold: its address-space limit under the enforced
   # envelope, else the resident watch bound. The gate charges it for a root
@@ -2244,6 +2294,16 @@ fi
 if [ -n "$pool_problem" ]; then
   printf 'fm-lint.sh: host slot pool unusable (%s); the host-wide ShellCheck memory bound cannot be enforced, so no root was started. Make that path writable or remove it if it is damaged.\n' \
     "$pool_problem" >&2
+  exit 2
+fi
+
+# The gate admits no root without a readable host process table, so read it once
+# here, before any root starts: a host that cannot give it fails this run in
+# about 5 s, not 5 s for every root, and holds no place in the shared queue.
+if ! census_problem=$(FM_LINT_INTERNAL_CENSUS_ONLY=1 FM_LINT_INTERNAL_HOST_RSS_KIB="$HOST_RSS_KIB" \
+    FM_LINT_INTERNAL_PYTHON="$WATCH_PYTHON" "$PERL_BIN" "$SELF_DIR/fm-lint-cache.pl" gate \
+    "$SLOT_DIR" "$NCPU" "$$" "$TMP_ROOT/census.wait" -- true 2>&1); then
+  printf '%s\n' "$census_problem" >&2
   exit 2
 fi
 
@@ -2405,6 +2465,7 @@ EOF
     printf 'root_deadline_seconds\t%s\n' "$root_deadline_meta"
     printf 'root_kill_grace_seconds\t%s\n' "$root_grace_meta"
     printf 'root_memory_limit_kib\t%s\n' "$root_memory_meta"
+    printf 'host_memory_budget_kib\t%s\n' "$HOST_RSS_KIB"
     printf 'root_timing_mechanism\t%s\n' "$BOUND_MECH"
     printf 'root_count\t%s\n' "$ROOT_COUNT"
     printf 'direct_lines\t%s\n' "$direct_lines"

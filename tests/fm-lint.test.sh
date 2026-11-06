@@ -1021,6 +1021,7 @@ test_canonical_partitions_balance_measured_cost() {
   printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/repo/bin/backends/noop.sh"
   cp "$LINT" "$tmp/repo/bin/fm-lint.sh"
   cp "$ROOT/bin/fm-lint-cache.pl" "$tmp/repo/bin/"
+  cp "$ROOT/bin/fm-proc-info.py" "$tmp/repo/bin/"
   # Equal-sized roots deliberately make direct bytes a misleading cost proxy.
   # Seed independent duration evidence; assert only the executable selection.
   python3 - "$tmp/repo" <<'PY'
