@@ -112,6 +112,7 @@ Each effective `FM_HOME` contains private operational directories.
 - The [pool-copy prune](#pool-copy-prune-after-a-merge-fm_merge_prune) record `state/<id>.merge-prune` with its locks, and the task's outcome log `data/<id>/merge-prune.log` with any preserved records under `data/<id>/merge-prune-preserved/`.
 - The automatic Lavish listener sweep's retirement record `state/lavish-auto-retire.log` and persistent watcher deadline `state/.lavish-auto-retire-next`.
 - The ready-PR registration pass's single-flight lock, rotating `state/.pr-ready-reconcile/cursor`, and per-task refusal markers `state/.pr-ready-reconcile/<id>.refused` are owned by `bin/fm-pr-ready-reconcile.sh`; `bin/fm-teardown.sh` removes each task's refusal marker, and deleting a marker only makes the next pass retry that task.
+- The [standing GitHub caller accounting](#standing-github-caller-accounting) owner's private directory `state/github-accounting/` and the watcher's failed-start marker `state/.github-accounting-start-failed`.
 - The [TypeSafe account-health](#typesafe-account-health) record `state/.typesafe-health` with its lock, and persistent watcher probe deadline `state/.typesafe-health-next`.
 - The [host memory admission](#host-memory-admission) readings `state/memory-readings.jsonl` and, in the root home only, the alarm episode marker `state/.memory-alarmed`, calibration record `state/.memory-calibration.json` and alarm baseline `state/.memory-baseline.json`, all owned by `bin/fm-mem-guard.sh`; `bin/fm-watch.sh` owns the persistent probe deadline `state/.memory-health-next` and surfaced-row marker `state/.seen-memory-health`.
 - Parent-owned secondmate pending-reply records under `state/pending-replies/` (`bin/fm-pending-reply-lib.sh`).
@@ -1102,6 +1103,48 @@ The [open-work ledger section](#open-work-ledger-configopen-loopsjson) owns its 
 The check needs no call of its own because it reads headers from calls the sweeps were already making.
 Focused regressions are in [`tests/fm-gh-rest.test.sh`](../tests/fm-gh-rest.test.sh), [`tests/fm-contributions.test.sh`](../tests/fm-contributions.test.sh), and [`tests/fm-open-loops.test.sh`](../tests/fm-open-loops.test.sh).
 
+### Standing GitHub caller accounting
+
+[`bin/fm-github-accounting.py`](../bin/fm-github-accounting.py)'s header and `--help` own the observer's launch/stop commands, private state format, cadences, retention, and argument projection.
+It does not wrap, throttle, or change GitHub callers or the sweep quota floor above.
+A primary home's watcher runs the owner's idempotent `start` as a detached, single-flight helper on each cycle (`github_accounting_tick` in `bin/fm-watch.sh`), so a reboot or a crash recovers at the next cycle and a running owner is left alone; a secondmate or disposable lab home never starts it.
+A plain `stop` therefore lasts until the next cycle: set `FM_GITHUB_ACCOUNTING=0` in the watcher's environment first to keep the observer off.
+A `start` that meets a held lock, such as a running `records` or `prune` or another `start`, starts nothing and exits 75 (busy); the watcher raises no wake, leaves the marker below unchanged, and asks again at its next cycle.
+Any other failed `start` raises one `check: github-accounting owner failed to start` wake.
+`state/.github-accounting-start-failed` then holds further attempts to one per hour, without another wake, until a `start` succeeds and removes it.
+An owner that starts and then dies is restarted at the next cycle and raises no wake; `start` reports only a failure to reach readiness.
+A detached owner's stderr appends to `state/github-accounting/owner.log`, which `start` trims to its newest 32 KiB before a launch once it passes 64 KiB.
+Its selected quota source is the REST `rate_limit` endpoint's `resources.graphql` body through `gh-axi`, not the enforcing response headers used by the sweeps.
+That source was explicitly selected instead of the original GraphQL-query/header proposal; a returned REST counter does not establish agreement between counter shards.
+A `process` row holds a locally sampled caller chain at its first sighting; while successful scans still list that identity, the owner renews the saved sanitized projection in one fresh `process` row once the latest row is 24 hours old.
+The renewal preserves the same argv and ancestors rather than resampling their values, so a caller that remains visible across the 48-hour retention keeps a joinable row.
+Every `process` row carries `first_observed_at`, copied unchanged from the first sighting of that `gh`/`gh-axi` epoch, alongside its own `observed_at`.
+Join process projections and ends only by `(pid, start, run_id, epoch)`, as defined in the owner's header; a successful scan that stops listing a caller ends that epoch, and a later return gets a distinct epoch even for the same PID/start/run.
+Renewals and a normal-stop row keep their epoch; never merge distinct epochs by PID/start/run or carry one epoch's argv or end into another.
+For a quota interval, use `first_observed_at <= interval_end` and the matching end time at or after the interval start, not the `observed_at` of a later `process` row or the OS process start: a process that execs into `gh` later was not observed as a caller earlier.
+A missing end leaves the overlap uncertain after the last successful scan that listed the caller, which a stop row's `observed_at` does not show; these timestamps do not establish continuous observation across failed scans or downtime.
+A `process_end` row holds the time of the first successful scan that no longer lists that caller, connecting its matching epoch's retained process row to the quota intervals up to that scan.
+Prune keeps each ended epoch's latest `process` row while its matching `process_end` row is retained, independently of other epochs of the same OS process, and every other row expires at 48 hours.
+That last `process` row can therefore outlive 48 hours by up to its 24-hour renewal interval, or by the failed-scan gap that delayed its end row, at most another 48 hours.
+No row is written per scan, and a failed scan ends nothing or renews nothing, so a `process_end` time can follow the real end by the failed or missing scans that `sampling` rows report.
+A caller still alive when the observer stops has no `process_end` row, nor has one that ends while no owner runs, so a retained `process` row with no matching end row shows a first sighting, a renewal or a stop, and not how long the caller lived afterward; a new owner records a caller it finds alive as a new `process` row.
+At a normal stop the owner writes one fresh `process` row for each caller it has not seen end, with the saved projection and `first_observed_at` and no `process_end` row, because a stop does not show that a caller departed.
+That row's `observed_at` is the stop time, not a new sighting: the same run's `owner` row with `action=stop` marks that time, and the caller may have ended unseen before it.
+With no end row, every successful scan the owner read after `first_observed_at` in that run listed the caller.
+A `sampling` row counts scans when they start and failures when they finish, so successful completions in its interval equal scans minus failures, plus or minus one scan in flight at an interval edge.
+A surplus of 2 or more proves a successful completion in that interval; a surplus of 1 or less does not: 0 or 1 neither proves nor excludes one, and -1 excludes one.
+These rows give the latest proven successful scan, not an exact last-success time, and the overlap stays uncertain after it.
+A hung scan counts as started and not as failed, and a failed scan in flight at the stop is never counted as failed.
+A SIGKILL or a power loss writes no such row, so that caller's latest `process` row can expire at 48 hours while a quota row it overlapped is retained.
+An observation gap longer than retention can remove the process row before an end is observed.
+Temporal coincidence cannot prove that a caller spent the points of a quota interval, and missed, non-`gh`, or off-host consumers remain unknown.
+Arguments are a sanitized `ps` command-line projection, not lossless argv; arbitrary values and shell payloads are withheld.
+Its own start/stop commands manage only its private owner, quota child group, and owned `ps` children, never a shared service.
+No wall-clock limit stops a quota request or a `ps`: each is killed only on `bin/fm-duration.py`'s no-progress verdict (15 quiet minutes by default, `FM_DURATION_NO_PROGRESS_SECS`), a killed request is recorded unavailable with `reason=timeout`, and a killed `ps` counts as a sampling failure.
+Each `ps` runs off the owner's loop, so a slow or hung one delays neither the quota stream nor `stop`.
+A hung `ps` leaves at most one scan and one quota verdict waiting, a later request has no no-progress verdict until `ps` recovers, and an owner that exits normally ends its remaining child processes, including a hung `ps`.
+Focused fixture regressions are in [`tests/fm-github-accounting.test.sh`](../tests/fm-github-accounting.test.sh) and, for the watcher's lifecycle, [`tests/fm-watch-github-accounting.test.sh`](../tests/fm-watch-github-accounting.test.sh); controlled fixtures do not establish live counter accuracy or universal caller capture.
+
 ### Completion and discard
 
 Ship and scout completion requires delivery evidence or the captain's own words, not merely a stopped worker or a pushed branch.
@@ -1625,7 +1668,7 @@ devin is verified for crewmate and scout launches only; a secondmate is refused 
 
 Its private worker config disables Claude Code imports (including the captain's hooks) and, unless the home sets `config/keep-ai-trailers` (see "Commit attribution"), Devin commit attribution without editing user or project config; [`fm-devin-config.sh`](../bin/fm-devin-config.sh) owns these enforced settings and [Devin verification](verification/devin.md) owns the live evidence and observed model availability.
 
-dsh (DeepSeek Harness through `dsh-tui`) uses the native primary plugin for main and secondmate sessions and keeps worker launches separate; [its adapter reference](../.agents/skills/harness-adapters/references/harness/dsh.md) owns the launch, model, busy-state, and composer contracts, and [runtime verification](verification/runtime-backends.md#deepseek-harness-dsh-tui) owns the live evidence.
+dsh uses the native primary plugin for launch-owned `dsh-tui` main and secondmate sessions and explicitly bound existing native Web conversations, keeping terminal worker launches separate; [the DSH protocol](supervision-protocols/dsh.md) owns primary activation, [its adapter reference](../.agents/skills/harness-adapters/references/harness/dsh.md) owns launch, model, detection, busy-state and composer contracts, and [runtime verification](verification/runtime-backends.md#deepseek-harness-dsh-tui) owns the evidence.
 
 ### Verification and primary supervision
 
@@ -1965,7 +2008,7 @@ Secondmate charters carry neither section and are never checked.
 A fresh spawn of a brief with no such section at all is not refused: it prints one warning line on stderr that names the missing section and the task id, and carries on.
 The supervision sweep reads a `DoD file:` line as the criteria and reports a missing or placeholder section instead of inventing criteria.
 `bin/fm-dod-lib.sh` owns the scaffold text, criteria check, and separate no-mistakes verification-plan construction; its header and executable `--help` own extraction, line-ending support, and malformed or missing-input behavior.
-The shared [review rubric](review-rubric.md) owns the criteria used by that plan and independent review readers; `fm-spawn.sh` renders its text into every ship and scout launch's role instructions, including legacy briefs and relaunches.
+The shared [review rubric](review-rubric.md) owns the criteria used by that plan and independent review readers; `fm-spawn.sh` renders its text into every ship and scout launch's role instructions, including legacy briefs and relaunches, and those instructions also point work that adds or changes tests, hooks or validators to its [intent-to-test criteria](review-rubric.md#intent-to-test-alignment) during implementation and verification.
 `bin/fm-dod-lib.sh` also owns the one mandatory item shape: each item starts its own line with a unique id and carries every field nonempty, with Authority taken from a fixed set; `bash bin/fm-dod-lib.sh --shape` prints the id pattern, lead and trailing fields, allowed Authority values, one-line item form that a criteria refusal names, and the rule sentence that the scaffold and a verification-plan refusal print.
 It also refuses a section with no well-formed mandatory item, an item with a missing or duplicate id, and an item with a missing, empty, or invalid field, whether the items are inline or in the named `DoD file`.
 This is an objective shape check only: it never claims the criteria are semantically adequate, and the independent grader still decides whether each item is true and complete.
@@ -4642,6 +4685,8 @@ FM_TYPESAFE_HEALTH_INTERVAL=600   # seconds between the watcher's detached TypeS
 FM_TYPESAFE_HEALTH_UNREACHABLE_PROBES=3   # consecutive failed probes before an unreachable wake; credits and auth failures wake at once; invalid or zero values use 3
 FM_TYPESAFE_HEALTH_BIN=   # test seam: the probe the watcher launches instead of bin/fm-typesafe-health.sh
 FM_MEMORY_GUARD_BIN=   # test seam: the guard the watcher's memory probe and bin/fm-spawn.sh's admission run instead of bin/fm-mem-guard.sh
+FM_GITHUB_ACCOUNTING=1   # 0 stops a primary home's watcher from keeping the standing GitHub accounting owner running (see "Standing GitHub caller accounting"); anything else leaves it on
+FM_GITHUB_ACCOUNTING_BIN=   # test seam: the owner the watcher starts instead of bin/fm-github-accounting.py
 FM_LAVISH_AUTO_RETIRE_INTERVAL=900   # seconds between the watcher's detached `bin/fm-procevent-lavish.sh sweep --auto` runs; 0 turns them off; a fresh watcher waits one full interval; invalid values use 900
 FM_TEST_KEY_SLOTS=2   # concurrent copies of one test.* key allowed host-wide by bin/fm-duration.py run and gate (bin/fm-test-run.sh wraps each script in gate); 0 turns the gate off; whole numbers up to 16 (docs/configuration.md "Test slots per key")
 FM_TEST_SLOT_WAIT_SECONDS=7200   # seconds a waiter queues for a slot before it runs without one and says so; whole number of at least 1
