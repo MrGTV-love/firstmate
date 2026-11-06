@@ -966,6 +966,7 @@ with (folder / 'order').open('a') as out: out.write(os.environ['CASE_NAME'] + '\
         'shell-lines': ['sh', '-c', 'no-mistakes axi status\nno-mistakes axi run --intent "two\nlines"'],
         # A route nested in an admitted route's shell string is that one start: it never queues behind itself.
         'nested-mem-guard': ['sh', '-c', 'bash MEMGUARD_PLACEHOLDER run -- no-mistakes axi run --intent goal'],
+        # The inner measured route runs under the test's python3 shim too, so it reads the same fixture run database.
         'nested-measured': ['sh', '-c', 'PYTHON_PLACEHOLDER DURATION_PLACEHOLDER run no-mistakes.inner -- no-mistakes axi run --intent goal'],
         # Redirections and comments are not the client's arguments, so the nested route still sees the one start.
         'nested-redirect': ['sh', '-c', 'bash MEMGUARD_PLACEHOLDER run -- no-mistakes axi run --intent goal 2>&1 | cat # note'],
@@ -994,7 +995,7 @@ with (folder / 'order').open('a') as out: out.write(os.environ['CASE_NAME'] + '\
             folder, db, env = case('p6-%s-%s' % (route_name, name), cores=3)
             env.update(PATH=str(nm_bin) + os.pathsep + env['PATH'], CASE_NAME=name, FM_DURATION_FILE='off')
             shape = [part.replace('HOME_PLACEHOLDER', str(folder / 'fmhome')).replace('MEMGUARD_PLACEHOLDER', str(repo / 'bin/fm-mem-guard.sh'))
-                     .replace('PYTHON_PLACEHOLDER', python).replace('DURATION_PLACEHOLDER', str(repo / 'bin/fm-duration.py')) for part in shape]
+                     .replace('PYTHON_PLACEHOLDER', str(proxy)).replace('DURATION_PLACEHOLDER', str(repo / 'bin/fm-duration.py')) for part in shape]
             code, active = (0, False) if name in fresh_shapes else not_starts[name][1:]
             if active:
                 change(db, "INSERT INTO runs (id, status) VALUES ('existing', 'running')")
@@ -1761,7 +1762,7 @@ if intent.startswith('hold'):
     while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
 if intent.startswith('reg'):
     with sqlite3.connect(folder / 'state.sqlite') as db:
-        db.execute("INSERT INTO runs (id, status) VALUES (?, 'running')", ('run-' + intent,))
+        db.execute("INSERT INTO runs (id, status) VALUES (?, 'running')", ('run-%s-%d' % (intent, os.getpid()),))
 """)
         (nest / 'no-mistakes').chmod(0o700)
         env.update(PATH=str(nest) + os.pathsep + env['PATH'], FM_DURATION_FILE='off')
@@ -1781,11 +1782,16 @@ if intent.startswith('reg'):
     def nested_second_client():
         # A second fresh client inside an admitted command is admitted on its own, whether the first client went
         # through the interception or by its absolute path, registered a run or not; nothing hangs.
-        for label, line in (('path-unregistered', 'no-mistakes axi run --intent a; no-mistakes axi run --intent b'),
-                            ('abs-first-unregistered', '{abs} axi run --intent a; no-mistakes axi run --intent b'),
-                            ('both-register', 'no-mistakes axi run --intent reg-a; no-mistakes axi run --intent reg-b'),
-                            ('reviewer-two-repositories', 'cd {r1} && no-mistakes axi run --intent first; cd {r2} && no-mistakes axi run --intent second')):
-            folder, db, env = case('nested-' + label, cores=18)
+        # With 3 cores the count fallback admits one run: a first client called by its absolute path that ends
+        # without a run must not leave its enclosing start counted against the second (no hang); a first that did
+        # create a run releases its pending start, so a second with the same arguments is admitted on its own.
+        for label, cores, line in (('path-unregistered', 18, 'no-mistakes axi run --intent a; no-mistakes axi run --intent b'),
+                                   ('abs-first-unregistered', 18, '{abs} axi run --intent a; no-mistakes axi run --intent b'),
+                                   ('tight-abs-first-unregistered', 3, '{abs} axi run --intent a; no-mistakes axi run --intent b'),
+                                   ('abs-first-same-args-registered', 18, '{abs} axi run --intent reg-x; no-mistakes axi run --intent reg-x'),
+                                   ('both-register', 18, 'no-mistakes axi run --intent reg-a; no-mistakes axi run --intent reg-b'),
+                                   ('reviewer-two-repositories', 18, 'cd {r1} && no-mistakes axi run --intent first; cd {r2} && no-mistakes axi run --intent second')):
+            folder, db, env = case('nested-' + label, cores=cores)
             client = nest_client(folder, env)
             for repository in ('repo1', 'repo2'):
                 (folder / repository).mkdir()

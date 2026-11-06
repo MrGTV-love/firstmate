@@ -126,9 +126,14 @@ Pipeline starts:
     The admitted client itself, reached through a nested route or the
     interception, claims its own pending start (claim_pending): same arguments,
     (same_start_args), the admitting pid among its ancestors, and either unclaimed or claimed by
-    itself or an ancestor; it runs without queueing again. Every other start,
-    a sibling, a second client or the same arguments run again, is decided on
-    its own with the pending start counted.
+    itself or an ancestor, and no new run has registered for it yet; it runs
+    without queueing again. Every other start, a sibling, a second client or
+    the same arguments run again, is decided on its own with the pending start
+    counted, except that a start nested in the admitted command does not count
+    that command's own pending start while it is unclaimed and no process in
+    the command runs the admitted client (counted_pending): that client ended
+    without a run, so counting it could hold the nested start until the
+    command it runs in ends.
     Bypassing this owner or external daemon status changes cannot be made
     atomic with a read-only external database; deployment must route starts here.
   - An unreadable run database or CPU count refuses with 125 instead of
@@ -201,7 +206,7 @@ import tempfile
 import subprocess
 import sys
 import time
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 try:
     import fcntl  # type: ignore
@@ -1035,7 +1040,7 @@ def decide(running: dict, counted: dict, cores: int, priority: str, fresh: bool 
     """(admit, one-line reason) for the first waiter, from the running and counted runs and the host reading."""
     seen = host_observation(fresh)
     launches = live_launches(directory) if directory else {}
-    pending = sum(1 for _, _, registered in live_pending(directory, set(running)) if not registered) if directory else 0
+    pending = counted_pending(directory, set(running)) if directory else 0
     steps = open_steps() if seen["memory"] is not None else None
     return admission(seen["reasons"], seen["memory"], running, counted, steps, launches, cores, priority, self_run,
                      waiting=waiting, pending=pending)
@@ -1114,6 +1119,93 @@ def live_pending(directory: str, running: set) -> List[Tuple[str, dict, bool]]:
             used.add(fresh[0])
         result.append((path, entry, bool(fresh)))
     return result
+
+
+def counted_pending(directory: str, running: set) -> int:
+    """How many pending admitted starts this decision counts at the full R.
+
+    Every unreleased pending start counts, except one that is this process's own
+    enclosing start, has not been claimed, and whose admitted client no process
+    in the holder's tree is running (admitted_client_running): its client ended
+    without registering (it was called past the interception, by its absolute
+    path) or never ran, so counting it would make a later start in the same
+    command wait on capacity only that command's end frees.
+    """
+    mine = None
+    count = 0
+    for path, entry, registered in live_pending(directory, running):
+        if registered:
+            continue
+        if not os.path.exists(path + ".claimed"):
+            if mine is None:
+                mine = ancestors(os.getpid())
+            if entry.get("holder") in mine and not admitted_client_running(entry["holder"], entry.get("args")):
+                continue
+        count += 1
+    return count
+
+
+def process_table() -> Dict[int, int]:
+    """pid -> parent pid for every process this user can see (OSError when unreadable)."""
+    if os.path.isdir("/proc/self"):
+        table = {}
+        for name in os.listdir("/proc"):
+            if name.isdigit():
+                with contextlib.suppress(OSError, IndexError, ValueError):
+                    with open("/proc/%s/stat" % name, "rb") as handle:
+                        table[int(name)] = int(handle.read().rsplit(b")", 1)[1].split()[1])
+        return table
+    info = sibling("fm_proc_info", "fm-proc-info.py")
+    return dict(info.processes())
+
+
+def process_argv(pid: int) -> Optional[List[str]]:
+    """PID's argument vector, unescaped, or None when it cannot be read (the process ended)."""
+    try:
+        if os.path.isdir("/proc/self"):
+            with open("/proc/%d/cmdline" % pid, "rb") as handle:
+                words = handle.read().split(b"\0")[:-1]
+        else:
+            import struct
+            info = sibling("fm_proc_info", "fm-proc-info.py")
+            data = info.sysctl(info.CTL_KERN, info.KERN_PROCARGS2, pid)
+            argc = struct.unpack_from("i", data, 0)[0]
+            words = data[4:].split(b"\0", 1)[1].lstrip(b"\0").split(b"\0")[:argc]
+    except (OSError, LookupError, IndexError, ValueError, AttributeError):
+        return None
+    return [word.decode("utf-8", "surrogateescape") for word in words]
+
+
+def admitted_client_running(holder: int, admitted) -> bool:
+    """Whether a process in HOLDER's tree runs the no-mistakes client with the ADMITTED arguments.
+
+    The client may be the binary itself or a script whose interpreter carries it
+    as its first argument. True when the process table cannot be read, so an
+    unreadable table never stops a start being counted.
+    """
+    if not isinstance(admitted, list):
+        return False
+    try:
+        table = process_table()
+    except (OSError, LookupError, ValueError, AttributeError):
+        return True
+    children: Dict[int, List[int]] = {}
+    for pid, parent in table.items():
+        children.setdefault(parent, []).append(pid)
+    pending, seen = [holder], set()
+    while pending:
+        pid = pending.pop()
+        for child in children.get(pid, ()):
+            if child in seen:
+                continue
+            seen.add(child)
+            pending.append(child)
+            words = process_argv(child) or []
+            if words and os.path.basename(words[0]) != "no-mistakes" and len(words) > 1 and os.path.basename(words[1]) == "no-mistakes":
+                words = words[1:]
+            if words and os.path.basename(words[0]) == "no-mistakes" and same_start_args(admitted, words[1:]):
+                return True
+    return False
 
 
 def client_ended(path: str) -> bool:
@@ -1280,7 +1372,14 @@ def claim_pending(directory: str, args: List[str]) -> Optional[int]:
     decided on its own, with that pending start counted.
     """
     mine = None
+    try:
+        released = {path for path, _, registered in live_pending(directory, set(running_runs())) if registered}
+    except (OSError, sqlite3.Error, ValueError):
+        # Without the run database no release is known; the enclosing admission read it when it admitted.
+        released = set()
     for path in Path(directory).glob("pending-*.lock"):
+        if str(path) in released:
+            continue  # a new run already registered for that start: this one is another start
         try:
             fd = os.open(str(path), os.O_RDWR | getattr(os, "O_CLOEXEC", 0))
         except FileNotFoundError:
