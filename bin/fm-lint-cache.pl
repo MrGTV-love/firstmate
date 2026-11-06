@@ -590,11 +590,14 @@ if (($ARGV[0] // '') eq 'gate') {
 # fm-lint.sh runs this only on native macOS, which cannot apply ulimit -v and so
 # has no other memory bound on a root. It runs the command in a process group
 # of its own and samples once a second that command's process tree within that
-# group, reading only the group's own processes and never the whole host's.
-# Each sample is the larger of the tree's resident size and its physical
-# footprint, which also counts the compressed pages jetsam counts, both read by
-# a long-lived libproc reader (fm-proc-info.py mem-tree) started at the first
-# tick, so a command that ends sooner starts none. Each reader runs under the
+# group, reading only the tree's own processes and never the whole host's: the
+# command, its descendants in any group or session, and each process the reader
+# has seen in the tree that was later orphaned (its parent left it to the init
+# process), so a memory-holding grandchild cannot leave the count by outliving
+# its parent. Each sample is the larger of the tree's resident size and its
+# physical footprint, which also counts the compressed pages jetsam counts, both
+# read by a long-lived libproc reader (fm-proc-info.py rss-tree) started at the
+# first tick, so a command that ends sooner starts none. Each reader runs under the
 # interpreter fm-lint.sh resolved once (FM_LINT_INTERNAL_PYTHON), or python3
 # when that is unset. A reader's first reply may take 2 s, which covers its
 # start-up; each later reply has 0.5 s. A tick whose reply is late or malformed
@@ -653,13 +656,14 @@ if (($ARGV[0] // '') eq 'rsswatch') {
         no warnings 'exec';
         my $first = !defined $reader_fresh;
         $reader_pid = -r $helper
-            ? eval { IPC::Open2::open2($from_reader, $to_reader, $python, $helper, 'mem-tree', $root_pid) } : undef;
+            ? eval { IPC::Open2::open2($from_reader, $to_reader, $python, $helper, 'rss-tree', $root_pid) } : undef;
         ($reader_fresh, $reader_answered) = ($first && $reader_pid ? 1 : 0, 0);
         return if $reader_pid;
         $reader_down = $first ? 'exited-at-start' : ++$reader_failures > 3 ? 'restarts-failed' : undef;
     };
-    # KiB of the group leader <pid> and its live descendants in its group, the
-    # larger of footprint and resident size, or undef when unreadable.
+    # KiB of the group leader <pid>, its live descendants and the members of its
+    # tree orphaned since the reader saw them, the larger of footprint and
+    # resident size, or undef when unreadable.
     my $tree_rss = sub {
         my ($root_pid) = @_;
         $start_reader->($root_pid) unless $reader_pid || $reader_down;
@@ -672,14 +676,14 @@ if (($ARGV[0] // '') eq 'rsswatch') {
             while (!$gone && $answer !~ /\n/ && select(my $readable = $ready, undef, undef, $wait) > 0) {
                 $gone = !sysread($from_reader, $answer, 64, length $answer);
             }
-            if ($answer =~ /\A([0-9]+) ([0-9]+)\n\z/) {
+            if ($answer =~ /\A\{"rss_kib":([0-9]+),[^\n]*\}\n\z/) {
                 ($reader_failures, $reader_fresh, $reader_answered) = (0, 0, 1);
                 $samples{libproc}++;
-                return $1 > $2 ? $1 + 0 : $2 + 0;
+                return $1 + 0;
             }
             my $fresh = $reader_fresh;
             $stop_reader->();
-            $reader_down = $answer eq "-\n" ? 'libproc-unreadable'
+            $reader_down = $answer eq "-\n" || $answer =~ /\A\{"rss_kib":null,/ ? 'libproc-unreadable'
                 : $gone && $fresh ? 'exited-at-start'
                 : ++$reader_failures > 3 ? 'restarts-failed' : undef;
             $start_reader->($root_pid) unless $reader_down;
@@ -697,13 +701,10 @@ if (($ARGV[0] // '') eq 'rsswatch') {
         }
         return undef unless exists $rss{$root_pid};
         $samples{ps}++;
-        my (%children, $total, @queue);
-        push @{$children{$parent{$_}}}, $_ for keys %parent;
-        @queue = ($root_pid);
-        while (defined(my $pid = shift @queue)) {
-            $total += $rss{$pid} // 0;
-            push @queue, @{$children{$pid} // []};
-        }
+        # Every member of the root's group counts, a descendant or an orphan whose
+        # parent left it to the init process.
+        my $total = 0;
+        $total += $_ for values %rss;
         return $total;
     };
     my ($child, $caught, $term_at, $over, $warned);

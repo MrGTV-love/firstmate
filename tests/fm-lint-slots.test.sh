@@ -1571,7 +1571,7 @@ test_growth_guard_never_stops_the_watch_reader() {
     else
       PATH="$tmp/refuse:$PATH" FM_LINT_INTERNAL_HOST_RSS_KIB=40000 FM_LINT_INTERNAL_ROOT_CAP_KIB=1024 \
         FM_TEST_REAL_HELPER="$ROOT/bin/fm-proc-info.py" FM_TEST_POOL_ROOT="$tmp/" \
-        FM_TEST_HIDDEN_MATCH="fm-proc-info.py mem-tree" FM_TEST_HIDDEN_FORM=drop \
+        FM_TEST_HIDDEN_MATCH="fm-proc-info.py rss-tree" FM_TEST_HIDDEN_FORM=drop \
         perl "$tmp/watcher/fm-lint-cache.pl" gate "$tmp/younger-pool.$form" 2 younger "$tmp/younger.$form.wait" -- \
         perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 8388608 "$tmp/rss.$form" -- \
         perl -e '$x = "x" x (80 * 1048576); sleep 60' &
@@ -1582,7 +1582,7 @@ test_growth_guard_never_stops_the_watch_reader() {
     while [ "$SECONDS" -lt "$deadline" ]; do
       rows=$(ps -axo pid=,ppid=,stat=,rss=,command=)
       watch=$(printf '%s\n' "$rows" | awk -v parent="$younger" '$2 == parent && index($0, "fm-lint-cache.pl rsswatch") { print $1; exit }')
-      reader=$(printf '%s\n' "$rows" | awk -v parent="${watch:-none}" '$2 == parent && index($0, "fm-proc-info.py mem-tree") { print $3, $4; exit }')
+      reader=$(printf '%s\n' "$rows" | awk -v parent="${watch:-none}" '$2 == parent && index($0, "fm-proc-info.py rss-tree") { print $3, $4; exit }')
       standin=$(printf '%s\n' "$rows" | awk -v parent="${watch:-none}" '$2 == parent && index($0, "80 * 1048576") { print $3; exit }')
       if [ -n "$reader" ]; then
         reader_seen=1
@@ -3056,9 +3056,10 @@ test_resident_watch_ends_its_command_when_its_owner_dies() {
 # Every entry appends its pid to FM_TEST_SHIM_TRACE when that is set. The ps
 # shim logs how many processes each call listed to FM_TEST_PS_LOG; the python3 shim logs each
 # call's arguments to FM_TEST_PY_LOG, fails at once under FM_TEST_PY_REFUSE=1,
-# and with FM_TEST_PY_MEMORY set answers each line a mem-tree reader is sent
-# with that value instead of reading memory; with FM_TEST_PY_PLAN=<file> too,
-# the Nth mem-tree reader started follows line N of <file>: stall answers its
+# and with FM_TEST_PY_MEMORY set (resident and footprint KiB) answers each line a
+# rss-tree reader is sent with the larger of the two as the reader's JSON reply
+# instead of reading memory; with FM_TEST_PY_PLAN=<file> too,
+# the Nth rss-tree reader started follows line N of <file>: stall answers its
 # first line 3 s late, slow answers its first line 1 s late, slow-later answers
 # its second line 1 s late, exit exits before any reply, and anything else (or
 # no such line) answers at once. The python3 shim names itself as the
@@ -3092,9 +3093,9 @@ if [ "$*" = "-c import sys; print(sys.executable)" ]; then
 fi
 printf '%s\n' "$*" >> "$FM_TEST_PY_LOG"
 [ "${FM_TEST_PY_REFUSE:-0}" = 0 ] || exit 1
-if [ -n "${FM_TEST_PY_MEMORY:-}" ] && [ "${2:-}" = mem-tree ]; then
+if [ -n "${FM_TEST_PY_MEMORY:-}" ] && [ "${2:-}" = rss-tree ]; then
   plan=
-  [ -z "${FM_TEST_PY_PLAN:-}" ] || plan=$(sed -n "$(grep -c mem-tree "$FM_TEST_PY_LOG")p" "$FM_TEST_PY_PLAN")
+  [ -z "${FM_TEST_PY_PLAN:-}" ] || plan=$(sed -n "$(grep -c rss-tree "$FM_TEST_PY_LOG")p" "$FM_TEST_PY_PLAN")
   [ "$plan" != exit ] || exit 1
   line=0
   while read -r _; do
@@ -3103,7 +3104,7 @@ if [ -n "${FM_TEST_PY_MEMORY:-}" ] && [ "${2:-}" = mem-tree ]; then
       stall:1) sleep 3 ;;
       slow:1|slow-later:2) sleep 1 ;;
     esac
-    printf '%s\n' "$FM_TEST_PY_MEMORY"
+    printf '{"rss_kib":%s,"members":[],"uncounted":[]}\n' "$(printf '%s\n' "$FM_TEST_PY_MEMORY" | awk '{ print ($1 > $2 ? $1 : $2) }')"
   done
   exit 0
 fi
@@ -3158,32 +3159,31 @@ test_resident_watch_reads_only_its_own_tree() {
   if [ ! -x "$real_ps" ] || [ "$real_ps" -ef "$shims/ps" ]; then
     fail "no real ps outside the shim directory"
   fi
-  # The watched command starts a decoy that leaves the command's process
-  # group and holds 160 MiB, over the 100 MiB bound, while the command lives.
-  cat > "$tmp/decoy-parent.sh" <<'SH'
-perl -MPOSIX -e 'POSIX::setpgid(0, 0); my $held = "x" x (160 * 1024 * 1024); sleep 30' &
-echo "$!" > "$1"
-sleep 3
-SH
+  # The decoy is a process that is not the command's: it is started here, in a
+  # process group of its own, holds 160 MiB, over the 100 MiB bound, and lives
+  # while the command runs. The command is a short sleep.
   # The libproc reader samples first; refusing it leaves ps as the fallback.
   for refuse in 0 1; do
     : > "$tmp/ps.log"
     : > "$tmp/py.log"
     rm -f "$tmp/rss" "$tmp/decoy.pid"
+    perl -MPOSIX -e 'POSIX::setpgid(0, 0); open(my $fh, ">", $ARGV[0]); print {$fh} "$$\n"; close $fh; my $held = "x" x (160 * 1024 * 1024); sleep 30' "$tmp/decoy.pid" &
+    local waited=0
+    while [ ! -s "$tmp/decoy.pid" ] && [ "$waited" -lt 100 ]; do sleep 0.1; waited=$((waited + 1)); done
+    decoy_pid=$(cat "$tmp/decoy.pid" 2>/dev/null || true)
+    [ -n "$decoy_pid" ] || fail "the decoy did not start"
     rc=0
     fm_test_tree_leash env -u FM_TEST_RSS_SHIM_DEPTH PATH="$shims:$PATH" \
       FM_TEST_PY_REFUSE="$refuse" FM_TEST_REAL_PS="$real_ps" FM_TEST_REAL_PYTHON="$real_python" \
       FM_TEST_PS_LOG="$tmp/ps.log" FM_TEST_PY_LOG="$tmp/py.log" \
       perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 102400 "$tmp/rss" -- \
-      bash "$tmp/decoy-parent.sh" "$tmp/decoy.pid" > /dev/null 2>&1 || rc=$?
-    decoy_pid=$(cat "$tmp/decoy.pid" 2>/dev/null || true)
-    [ -z "$decoy_pid" ] || kill -KILL "$decoy_pid" 2>/dev/null || true
-    [ -n "$decoy_pid" ] || fail "the decoy did not start"
+      sleep 3 > /dev/null 2>&1 || rc=$?
+    kill -KILL "$decoy_pid" 2>/dev/null || true
     if [ "$rc" -ne 0 ] || grep -q '^max_rss_kib=' "$tmp/rss"; then
       fail "the watch counted a process outside its command's tree (exit $rc, libproc refused=$refuse)"
     fi
     samples=$(sed -n 's/^rss_samples=//p' "$tmp/rss")
-    [ "$(grep -c 'mem-tree' "$tmp/py.log")" -eq 1 ] \
+    [ "$(grep -c 'rss-tree' "$tmp/py.log")" -eq 1 ] \
       || fail "the watch did not start exactly one libproc reader"$'\n'"$(cat "$tmp/py.log")"
     if [ "$refuse" = 0 ]; then
       [ ! -s "$tmp/ps.log" ] || fail "the watch ran ps while the libproc reader answered"
@@ -3198,7 +3198,27 @@ SH
         || fail "the refused reader was not recorded once as exited at start"$'\n'"$(cat "$tmp/rss")"
     fi
   done
-  pass "the resident-memory watch samples only its command's own tree"
+  # A descendant of the command that leaves its process group is still the
+  # command's own: the libproc reader counts it and ends the root.
+  cat > "$tmp/leaver-parent.sh" <<'SH'
+perl -MPOSIX -e 'POSIX::setpgid(0, 0); my $held = "x" x (160 * 1024 * 1024); sleep 30' &
+echo "$!" > "$1"
+sleep 3
+SH
+  : > "$tmp/py.log"
+  rm -f "$tmp/rss" "$tmp/leaver.pid"
+  rc=0
+  fm_test_tree_leash env -u FM_TEST_RSS_SHIM_DEPTH PATH="$shims:$PATH" \
+    FM_TEST_PY_REFUSE=0 FM_TEST_REAL_PS="$real_ps" FM_TEST_REAL_PYTHON="$real_python" \
+    FM_TEST_PS_LOG="$tmp/ps.log" FM_TEST_PY_LOG="$tmp/py.log" \
+    perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 102400 "$tmp/rss" -- \
+    bash "$tmp/leaver-parent.sh" "$tmp/leaver.pid" > /dev/null 2>&1 || rc=$?
+  decoy_pid=$(cat "$tmp/leaver.pid" 2>/dev/null || true)
+  [ -z "$decoy_pid" ] || kill -KILL "$decoy_pid" 2>/dev/null || true
+  [ -n "$decoy_pid" ] || fail "the group-leaving descendant did not start"
+  grep -q '^max_rss_kib=' "$tmp/rss" \
+    || fail "the watch did not count a descendant of its command that left the command's process group (exit $rc)"
+  pass "the resident-memory watch samples only its command's own tree: an unrelated process is not counted, and a descendant that leaves the process group is"
 }
 
 # fm_lint_footprint_lint <tmp> [<env>...]: lint <tmp>/footprint.sh, whose
@@ -3255,7 +3275,7 @@ test_resident_watch_bounds_footprint_beyond_resident() {
     "$roots_log" || fail "the roots log did not mark the footprint end with its libproc samples"$'\n'"$(cat "$roots_log")"
   rss_kib=$(awk -F '\t' '$1 == "end" && $3 ~ /footprint\.sh$/ { print $11 }' "$roots_log")
   [ "$rss_kib" = 204800 ] || fail "the roots log peak $rss_kib KiB is not the 204800 KiB footprint"
-  [ "$(grep -c 'mem-tree' "$tmp/py.log")" -eq 1 ] \
+  [ "$(grep -c 'rss-tree' "$tmp/py.log")" -eq 1 ] \
     || fail "a reader started for an attempt that ended before its first tick"$'\n'"$(cat "$tmp/py.log")"
   pass "a root whose footprint crosses the bound while its resident size does not is ended and retried narrower"
 }
@@ -3278,7 +3298,7 @@ test_resident_watch_replaces_a_stalled_reader() {
   samples=$(awk -F '\t' '$1 == "end" && $3 ~ /footprint\.sh$/ { print $16 }' "$tmp/pass.roots.tsv")
   [ "$samples" = libproc:1,ps:1 ] \
     || fail "the stalled tick did not fall back to ps alone with footprint used on the next tick: $samples"
-  [ "$(grep -c 'mem-tree' "$tmp/py.log")" -eq 2 ] \
+  [ "$(grep -c 'rss-tree' "$tmp/py.log")" -eq 2 ] \
     || fail "the stalled reader was not replaced exactly once"$'\n'"$(cat "$tmp/py.log")"
   pass "a reader that misses one deadline is replaced and footprint ends the root on the next tick"
 }
@@ -3300,7 +3320,7 @@ test_resident_watch_waits_for_a_slow_first_reply() {
   samples=$(awk -F '\t' '$1 == "end" && $3 ~ /footprint\.sh$/ { print $16 }' "$tmp/pass.roots.tsv")
   [ "$samples" = libproc:1,ps:0 ] \
     || fail "a first reply 1 s late was not used as the footprint sample: $samples"
-  [ "$(grep -c 'mem-tree' "$tmp/py.log")" -eq 1 ] \
+  [ "$(grep -c 'rss-tree' "$tmp/py.log")" -eq 1 ] \
     || fail "a reader whose first reply was 1 s late was replaced"$'\n'"$(cat "$tmp/py.log")"
   pass "a reader whose first reply is 1 s late keeps footprint in use"
 }
@@ -3324,7 +3344,7 @@ test_resident_watch_samples_a_slow_later_reply_by_ps() {
     libproc:[2-9],ps:1) ;;
     *) fail "a later reply 1 s late was not sampled by ps for that tick alone: $samples" ;;
   esac
-  [ "$(grep -c 'mem-tree' "$tmp/py.log")" -eq 2 ] \
+  [ "$(grep -c 'rss-tree' "$tmp/py.log")" -eq 2 ] \
     || fail "the reader with a slow later reply was not replaced exactly once"$'\n'"$(cat "$tmp/py.log")"
   pass "a later reply 1 s late is sampled by ps for that tick only"
 }
@@ -3347,7 +3367,7 @@ test_resident_watch_retries_a_replacement_that_exits() {
   samples=$(awk -F '\t' '$1 == "end" && $3 ~ /footprint\.sh$/ { print $16 }' "$tmp/pass.roots.tsv")
   [ "$samples" = libproc:1,ps:2 ] \
     || fail "the failed replacement's tick did not fall back to ps alone with footprint used after it: $samples"
-  [ "$(grep -c 'mem-tree' "$tmp/py.log")" -eq 3 ] \
+  [ "$(grep -c 'rss-tree' "$tmp/py.log")" -eq 3 ] \
     || fail "the failed replacement was not replaced exactly once"$'\n'"$(cat "$tmp/py.log")"
   pass "a replacement reader that exits before replying is retried and footprint still ends the root"
 }
@@ -3371,7 +3391,7 @@ test_resident_watch_gives_up_after_three_failed_restarts() {
     libproc:0,ps:[1-9]*,reader-unavailable:restarts-failed) ;;
     *) fail "three failed replacements did not give the reader up as restarts-failed: $samples" ;;
   esac
-  [ "$(grep -c 'mem-tree' "$tmp/py.log")" -eq 4 ] \
+  [ "$(grep -c 'rss-tree' "$tmp/py.log")" -eq 4 ] \
     || fail "the watch did not stop starting readers after three failed replacements"$'\n'"$(cat "$tmp/py.log")"
   pass "three failed replacement readers in a row give the reader up as restarts-failed"
 }
@@ -3445,6 +3465,294 @@ test_a_high_host_slot_count_does_not_raise_the_memory_limit() {
   pass "FM_LINT_HOST_SLOTS=100 does not raise the memory limit: four runs from four homes with the default charge run one root at a time and finish all 12 (small charges: $control; default charge: $capped)"
 }
 
+# The cap the watch holds is not shown by the roots log alone: the fake process
+# helper answers every reading with a footprint the test chooses, so the cap the
+# watch received shows in whether it ends the root. No memory is allocated. With
+# the setting omitted the watch holds the 8 GiB default; a request of 9 GiB is
+# clamped to it; a request of 4 GiB is held as asked. The roots log's applied
+# value is corroborated by the same decision.
+test_the_watch_receives_the_default_cap_and_the_clamped_request() {
+  local tmp out n=0 spec request reading expect applied flags requested
+  for spec in "omitted|9000000|ended|8388608" "omitted|8300000|left|8388608" \
+    "9437184|9000000|ended|8388608" "9437184|8300000|left|8388608" \
+    "4194304|4300000|ended|4194304" "4194304|4000000|left|4194304"; do
+    n=$((n + 1))
+    IFS='|' read -r request reading expect applied <<<"$spec"
+    tmp=$(fm_test_tmproot "fm-lint-rss-sim-$n")
+    requested=$request
+    [ "$request" != omitted ] || requested=
+    if ! fm_lint_footprint_lint "$tmp" FM_TEST_PY_MEMORY="1024 $reading" FM_LINT_ROOT_RSS_KIB="$requested" FM_TEST_GROW_HOLD=4; then
+      pass "SKIP (the resident-memory watch runs only on macOS): simulated cap check"
+      return
+    fi
+    out=$(cat "$tmp/out")
+    [ "$(cat "$tmp/rc")" -eq 0 ] || fail "case $spec: the lint failed (exit $(cat "$tmp/rc"))"$'\n'"$out"
+    flags=$(cat "$tmp/flags.log")
+    case "$expect" in
+      ended) [ "$flags" = "$(printf 'yes\nno')" ] || fail "case $spec: a simulated reading of $reading KiB did not end the root at the cap of $applied KiB"$'\n'"$flags" ;;
+      left) [ "$flags" = yes ] || fail "case $spec: a simulated reading of $reading KiB below the cap of $applied KiB ended the root"$'\n'"$flags" ;;
+    esac
+    assert_grep $'meta\troot_rss_limit_kib\t'"$applied" "$tmp/pass.roots.tsv" "case $spec: the roots log did not show the applied limit $applied"
+  done
+  pass "the watch ends a simulated 9000000 KiB tree at the default cap and at a 9 GiB request clamped to it, leaves 8300000 KiB alone, and holds a 4 GiB request as asked, with the roots log's applied value matching each decision"
+}
+
+# fm_lint_write_tree_shellcheck <fakebin>: a stand-in whose memory sits in a tree.
+# The root holds FM_TEST_TREE_MID_MB. Its child starts a grandchild that holds
+# FM_TEST_TREE_ORPHAN_MB, then leaves after three seconds, so the grandchild is an
+# orphan; the root then grows by FM_TEST_TREE_LATE_MB. Each part is under any cap
+# the tests use alone; only the tree total is over it.
+fm_lint_write_tree_shellcheck() {
+  cat > "$1/shellcheck" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = --version ]; then
+  printf 'ShellCheck - shell script analysis tool\nversion: 0.11.0\n'
+  exit 0
+fi
+follow=no
+for arg in "$@"; do
+  [ "$arg" != --external-sources ] || follow=yes
+done
+printf '%s\n' "$follow" >> "$FM_TEST_FLAGS_LOG"
+[ "$follow" = yes ] || exit 0
+printf '%s\n' "$$" > "$FM_TEST_PID_FILE"
+exec perl -e '
+  my ($mid, $orphan, $late, $orphan_pid_file) = @ARGV;
+  my $held = "x" x ($mid * 1048576);
+  my $kid = fork();
+  if (!$kid) {
+    my $grand = fork();
+    if (!$grand) {
+      if (open(my $fh, ">", $orphan_pid_file)) { print {$fh} "$$\n"; close $fh; }
+      my $g = "x" x ($orphan * 1048576);
+      sleep 40;
+      exit 0;
+    }
+    sleep 3;
+    exit 0;
+  }
+  waitpid($kid, 0);
+  $held .= "x" x ($late * 1048576) if $late > 0;
+  sleep 40;' "$FM_TEST_TREE_MID_MB" "$FM_TEST_TREE_ORPHAN_MB" "$FM_TEST_TREE_LATE_MB" "$FM_TEST_ORPHAN_PID_FILE"
+SH
+  chmod +x "$1/shellcheck"
+}
+
+# A root whose memory sits in descendants is ended at the cap: the child and the
+# grandchild are read while the child lives, and the orphan the grandchild
+# becomes is still read after the child is gone. Each part is under the cap
+# alone, so only a reader that follows the whole tree ends it. The control has
+# the same tree shape under the cap and is left alone.
+test_resident_watch_ends_a_tree_whose_memory_sits_in_descendants_and_an_orphan() {
+  local tmp fakebin fixture out rc flags_log started case_name late orphan_pid
+  if [ "$(uname)" != Darwin ]; then
+    pass "SKIP (the resident-memory watch runs only on macOS): descendant tree check"
+    return
+  fi
+  for case_name in over control; do
+    tmp=$(fm_test_tmproot "fm-lint-rss-tree-$case_name")
+    fakebin=$(fm_fakebin "$tmp")
+    fixture="$tmp/tree.sh"
+    flags_log="$tmp/flags.log"
+    printf '#!/usr/bin/env bash\nexit 0\n' > "$fixture"
+    fm_lint_write_tree_shellcheck "$fakebin"
+    : > "$flags_log"
+    late=40
+    [ "$case_name" = over ] || late=0
+    rc=0
+    started=$SECONDS
+    out=$(PATH="$fakebin:$PATH" FM_LINT_JOBS=1 FM_LINT_REQUIRE_BOUNDS=0 FM_LINT_ROOT_RSS_KIB=102400 \
+      FM_TEST_FLAGS_LOG="$flags_log" FM_TEST_PID_FILE="$tmp/root.pid" FM_TEST_ORPHAN_PID_FILE="$tmp/orphan.pid" \
+      FM_TEST_TREE_MID_MB=30 FM_TEST_TREE_ORPHAN_MB=40 FM_TEST_TREE_LATE_MB="$late" \
+      "$LINT" --telemetry "$tmp/pass.tsv" "$fixture" 2>&1) || rc=$?
+    orphan_pid=$(cat "$tmp/orphan.pid" 2>/dev/null || true)
+    if [ "$case_name" = over ]; then
+      [ "$rc" -eq 0 ] || fail "the tree over the cap did not pass its narrower retry (exit $rc)"$'\n'"$out"
+      [ "$((SECONDS - started))" -lt 30 ] || fail "the tree over the cap was not ended: lint waited out the stand-in"
+      [ "$(cat "$flags_log")" = "$(printf 'yes\nno')" ] \
+        || fail "a tree whose memory sits in descendants and an orphan was not ended at the cap"$'\n'"$(cat "$flags_log")"
+      assert_contains "$out" "hit the memory ceiling with --external-sources" "the end of the tree was not identified in the output"
+    else
+      # The control is left alone, so its stand-in sleeps 40 s: end it by hand.
+      kill -KILL "$(cat "$tmp/root.pid" 2>/dev/null || echo 0)" 2>/dev/null || true
+    fi
+    [ -z "$orphan_pid" ] || ! kill -0 "$orphan_pid" 2>/dev/null || { kill -KILL "$orphan_pid" 2>/dev/null; fail "$case_name: the orphan $orphan_pid outlived the lint"; }
+  done
+  pass "a root whose memory sits in a child, a grandchild and the orphan it becomes is ended at the cap, and the same tree under the cap is left alone"
+}
+
+# No route sets a lint run's host-wide memory budget: the environment (the
+# refused name, the old fixture name and the private helper name), a command-line
+# flag, and a file in the local slot directory or in HOME are each tried. The
+# run is refused or its budget stays the fixed value, and two roots recorded at
+# 2 GiB each (4 GiB together, above the 3.5 GiB budget) never hold their memory
+# at once under any of them.
+test_no_route_sets_a_runs_budget() {
+  local tmp rc out kib real key route run
+  tmp=$(fm_test_tmproot fm-lint-budget-routes)
+  mkdir -p "$tmp/bin" "$tmp/home/.cache"
+  for run in a b; do printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/$run.sh"; done
+  fm_lint_write_memory_shellcheck "$tmp/bin" 48 "$tmp/mem.starts"
+  # A refused route: the run exits 2 and starts no analysis.
+  : > "$tmp/mem.starts"
+  rc=0
+  out=$(env FM_LINT_HOST_RSS_KIB=1 PATH="$tmp/bin:$PATH" FM_LINT_SLOT_DIR="$tmp/pool.env" "$LINT" "$tmp/a.sh" 2>&1) || rc=$?
+  [ "$rc" -eq 2 ] || fail "FM_LINT_HOST_RSS_KIB was not refused (exit $rc)"$'\n'"$out"
+  assert_contains "$out" FM_LINT_HOST_RSS_KIB "the refusal did not name FM_LINT_HOST_RSS_KIB"
+  [ ! -s "$tmp/mem.starts" ] || fail "a refused route still started an analysis"
+  # A flag route: the flag is refused, or the run's published budget stays the
+  # fixed value (the lint knows no flag that sets it).
+  for route in --host-rss-kib=1 --budget=1 --memory-budget=1 --host-budget=1; do
+    rc=0
+    out=$(env PATH="$tmp/bin:$PATH" FM_LINT_SLOT_DIR="$tmp/pool.flag" FM_LINT_TELEMETRY="$tmp/flag.tsv" FM_TEST_MEM_HOLD=0.2 \
+      "$LINT" "$route" "$tmp/a.sh" 2>&1) || rc=$?
+    if [ "$rc" -eq 0 ]; then
+      kib=$(awk -F '\t' '$1 == "meta" && $2 == "host_memory_budget_kib" { print $3 }' "$tmp/flag.roots.tsv")
+      [ "$kib" = 3670016 ] || fail "the flag $route changed the published budget to '$kib' KiB"$'\n'"$out"
+    fi
+    rm -f "$tmp/flag.roots.tsv" "$tmp/flag.tsv"
+  done
+  # Routes that are ignored: the old fixture name, the private helper name, and
+  # files in the places a run reads state from (the local slot directory, HOME).
+  real=$(cd -P "$tmp" && pwd -P)
+  mkdir -p "$tmp/pool.ignored/history"
+  for run in a b; do
+    key=$(printf 'full:%s' "$real/$run.sh" | perl -MDigest::SHA=sha256_hex -ne 'print sha256_hex($_)')
+    printf '%s %s\n' 2097152 "$(wc -c < "$tmp/$run.sh" | tr -d ' ')" > "$tmp/pool.ignored/history/$key"
+  done
+  for route in host_rss_kib budget host-budget host_memory_budget_kib; do
+    printf '100000000\n' > "$tmp/pool.ignored/$route"
+    printf '100000000\n' > "$tmp/home/.cache/$route"
+  done
+  : > "$tmp/mem.starts"
+  : > "$tmp/mem.starts.spans"
+  for run in 1 2; do
+    mkdir -p "$tmp/home.$run/.cache"
+    env HOME="$tmp/home.$run" XDG_CACHE_HOME="$tmp/home.$run/.cache" FM_HOME="$tmp/fm.$run" \
+      FM_LINT_SLOT_DIR="$tmp/pool.ignored" FM_LINT_HOST_SLOTS=9 FM_LINT_FIXTURE_HOST_RSS_KIB=100000000 \
+      FM_LINT_INTERNAL_HOST_RSS_KIB=100000000 FM_LINT_ROOT_RSS_KIB=2000000 FM_TEST_MEM_HOLD=1.5 \
+      FM_LINT_TELEMETRY="$tmp/ignored.$run.tsv" PATH="$tmp/bin:$PATH" \
+      "$LINT" --jobs 1 "$tmp/a.sh" "$tmp/b.sh" > "$tmp/ignored.$run.out" 2>&1 &
+  done
+  wait || fail "a run with the ignored routes failed"$'\n'"$(cat "$tmp"/ignored.*.out)"
+  kib=$(awk -F '\t' '$1 == "meta" && $2 == "host_memory_budget_kib" { print $3 }' "$tmp/ignored.1.roots.tsv")
+  [ "$kib" = 3670016 ] || fail "an ignored route changed the published budget to '$kib' KiB"
+  [ "$(wc -l < "$tmp/mem.starts" | tr -d ' ')" -eq 4 ] || fail "not every root ran under the ignored routes"
+  [ "$(fm_lint_max_overlap "$tmp/mem.starts.spans")" -eq 1 ] \
+    || fail "two roots recorded at 2 GiB each held their memory at once: an ignored route raised the budget"$'\n'"$(cat "$tmp/mem.starts.spans")"
+  pass "the refused name is refused, four flags are refused or leave the budget at 3670016 KiB, and the old fixture name, the private helper name and four budget files in the local slot directory and in HOME leave the budget at 3670016 KiB and keep two 2 GiB roots apart"
+}
+
+# The service order and the wait bound are recorded: four runs from four homes,
+# the fourth arriving later, each selecting three roots charged more than the whole
+# budget, so the roots are served one at a time. The bound is stated before the
+# run: no root waits longer than every root ahead of it plus a margin of 3 s per
+# root for admission. Every run is served and finishes, and the order is printed.
+test_a_waiting_run_is_served_within_a_stated_wait_bound() {
+  local tmp run root pid rc order bound_ms hold_ms=1000 margin_ms=3000 total=12 worst late
+  local -a pids
+  tmp=$(fm_test_tmproot fm-lint-wait-bound)
+  mkdir -p "$tmp/bin"
+  # Twelve distinct root files, so that no root has a recorded peak and every root
+  # is charged the 8 GiB default, above the whole budget.
+  for run in 1 2 3 4; do
+    for root in a b c; do printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/r$run.$root.sh"; done
+  done
+  fm_lint_write_memory_shellcheck "$tmp/bin" 32 "$tmp/mem.starts"
+  : > "$tmp/mem.starts"
+  : > "$tmp/mem.starts.spans"
+  bound_ms=$((total * (hold_ms + margin_ms)))
+  pids=()
+  for run in 1 2 3 4; do
+    mkdir -p "$tmp/home.$run/.cache"
+    if [ "$run" -eq 4 ]; then sleep 1.5; fi
+    ( unset FM_LINT_ROOT_RSS_KIB
+      env HOME="$tmp/home.$run" XDG_CACHE_HOME="$tmp/home.$run/.cache" FM_HOME="$tmp/fm.$run" \
+        FM_LINT_SLOT_DIR="$tmp/pool" FM_LINT_HOST_SLOTS=9 FM_TEST_MEM_HOLD=1 FM_LINT_TELEMETRY="$tmp/run.$run.tsv" \
+        PATH="$tmp/bin:$PATH" "$LINT" --jobs 2 "$tmp/r$run.a.sh" "$tmp/r$run.b.sh" "$tmp/r$run.c.sh" > "$tmp/run.$run.out" 2>&1 ) &
+    pids+=("$!")
+  done
+  rc=0
+  for pid in "${pids[@]}"; do wait "$pid" || rc=$?; done
+  [ "$rc" -eq 0 ] || fail "a run failed while it waited (rc=$rc)"$'\n'"$(cat "$tmp"/run.?.out)"
+  [ "$(wc -l < "$tmp/mem.starts" | tr -d ' ')" -eq "$total" ] || fail "not every one of the $total roots was served"
+  [ "$(fm_lint_max_overlap "$tmp/mem.starts.spans")" -eq 1 ] || fail "two roots charged above the budget ran at once"
+  worst=0
+  for run in 1 2 3 4; do
+    late=$(awk -F '\t' '$1 == "end" { if ($17 + 0 > m) m = $17 + 0 } END { print m + 0 }' "$tmp/run.$run.roots.tsv")
+    [ "$late" -le "$bound_ms" ] || fail "run $run waited $late ms for a root, above the stated bound of $bound_ms ms"
+    [ "$late" -le "$worst" ] || worst=$late
+  done
+  # The service order: every root of every run by the time it was admitted (its
+  # request time plus its queue wait), relative to the first, in the order served.
+  order=$(for run in 1 2 3 4; do
+    awk -F '\t' -v run="$run" '$1 == "end" { printf "%s run%s:%s\n", $6 + $17, run, $3 }' "$tmp/run.$run.roots.tsv"
+  done | sort -n | awk 'NR == 1 { first = $1 } { n = split($2, p, "/"); printf " %s+%dms", substr($2, 1, index($2, ":") - 1), $1 - first }')
+  pass "four runs queued behind roots charged above the budget were all served, one root at a time, each root within the stated wait bound of $bound_ms ms (longest wait of a run's roots $worst ms; roots in the order served:$order)"
+}
+
+# A root charged more than the whole budget but at most R (5 GiB here) runs inside the
+# admission and alone: two concurrent runs whose roots are recorded at 5 GiB
+# never hold memory at once, each root completes, and the second run's roots wait.
+test_a_five_gib_root_runs_alone_inside_the_admission() {
+  local tmp run real key root rc
+  tmp=$(fm_test_tmproot fm-lint-five-gib)
+  mkdir -p "$tmp/bin" "$tmp/pool/history"
+  for root in a b; do printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/$root.sh"; done
+  fm_lint_write_memory_shellcheck "$tmp/bin" 32 "$tmp/mem.starts"
+  real=$(cd -P "$tmp" && pwd -P)
+  for root in a b; do
+    key=$(printf 'full:%s' "$real/$root.sh" | perl -MDigest::SHA=sha256_hex -ne 'print sha256_hex($_)')
+    printf '%s %s\n' 5242880 "$(wc -c < "$tmp/$root.sh" | tr -d ' ')" > "$tmp/pool/history/$key"
+  done
+  : > "$tmp/mem.starts"
+  : > "$tmp/mem.starts.spans"
+  for run in 1 2; do
+    mkdir -p "$tmp/home.$run/.cache"
+    ( unset FM_LINT_ROOT_RSS_KIB
+      env HOME="$tmp/home.$run" XDG_CACHE_HOME="$tmp/home.$run/.cache" FM_HOME="$tmp/fm.$run" \
+        FM_LINT_SLOT_DIR="$tmp/pool" FM_LINT_HOST_SLOTS=9 FM_TEST_MEM_HOLD=1.5 FM_LINT_TELEMETRY="$tmp/five.$run.tsv" \
+        PATH="$tmp/bin:$PATH" "$LINT" --jobs 1 "$tmp/a.sh" "$tmp/b.sh" > "$tmp/five.$run.out" 2>&1 ) &
+  done
+  rc=0
+  wait || rc=$?
+  [ "$rc" -eq 0 ] || fail "a run with 5 GiB roots failed"$'\n'"$(cat "$tmp"/five.?.out)"
+  [ "$(wc -l < "$tmp/mem.starts" | tr -d ' ')" -eq 4 ] || fail "not every 5 GiB root completed"
+  [ "$(fm_lint_max_overlap "$tmp/mem.starts.spans")" -eq 1 ] || fail "two 5 GiB roots held their memory at once"$'\n'"$(cat "$tmp/mem.starts.spans")"
+  [ "$(awk -F '\t' '$1 == "end" { if ($17 + 0 > m) m = $17 + 0 } END { print m + 0 }' "$tmp/five.1.roots.tsv" "$tmp/five.2.roots.tsv")" -ge 1000 ] \
+    || fail "no 5 GiB root waited for another"
+  pass "four 5 GiB roots (above the 3.5 GiB budget, below R) from two runs complete one at a time inside the admission, with queue waits recorded"
+}
+
+# The directory that holds the host-wide budget state is part of the failed
+# states: a copy of the lint whose host-wide directory is a plain file, or a
+# symbolic link, refuses before any root starts, names the path and the fix, and
+# starts no analysis. The copy differs from the shipped script only in that
+# directory's path, so the test never touches the real host-wide state.
+test_an_unusable_host_wide_budget_directory_refuses_before_any_root_starts() {
+  local tmp rc out kind
+  tmp=$(fm_test_tmproot fm-lint-host-dir)
+  mkdir -p "$tmp/repo" "$tmp/bin" "$tmp/real"
+  cp -R "$ROOT/bin" "$tmp/repo/bin"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/a.sh"
+  fm_lint_write_memory_shellcheck "$tmp/bin" 1 "$tmp/mem.starts"
+  for kind in file symlink; do
+    : > "$tmp/mem.starts"
+    rm -rf "$tmp/host.$kind"
+    if [ "$kind" = file ]; then : > "$tmp/host.$kind"; else ln -s "$tmp/real" "$tmp/host.$kind"; fi
+    perl -pi -e "s{^HOST_POOL_ROOT=.*\$}{HOST_POOL_ROOT=$tmp/host.$kind}" "$tmp/repo/bin/fm-lint.sh"
+    grep -q "^HOST_POOL_ROOT=$tmp/host.$kind\$" "$tmp/repo/bin/fm-lint.sh" || fail "the copy's host-wide directory path was not replaced"
+    rc=0
+    out=$(env -u FM_LINT_SLOT_DIR PATH="$tmp/bin:$PATH" "$tmp/repo/bin/fm-lint.sh" "$tmp/a.sh" 2>&1) || rc=$?
+    [ "$rc" -eq 2 ] || fail "a host-wide directory that is a $kind exited $rc, expected 2"$'\n'"$out"
+    assert_contains "$out" "$tmp/host.$kind" "the refusal did not name the unusable host-wide path ($kind)"
+    assert_contains "$out" "host slot pool unusable" "the refusal did not say the pool is unusable ($kind)"
+    assert_not_contains "$out" "running without the host-wide ShellCheck bound" "an unusable host-wide directory still ran unbounded ($kind)"
+    [ ! -s "$tmp/mem.starts" ] || fail "an unusable host-wide directory ($kind) still started ShellCheck"
+  done
+  pass "a host-wide budget directory that is a plain file or a symbolic link is refused with its path named, before any root starts"
+}
+
 fm_lint_test_cases=(
 test_jobs_are_deterministic_and_complete
 test_host_slots_bound_concurrent_runs
@@ -3460,7 +3768,10 @@ test_cached_success_does_not_wait_for_host_slots
 test_slot_pool_cannot_be_disabled_and_refuses_bad_settings
 test_host_budget_default_is_one_number_stated_by_both_docs
 test_a_per_root_limit_above_the_default_is_clamped_and_a_lower_one_is_kept
+test_the_watch_receives_the_default_cap_and_the_clamped_request
+test_no_route_sets_a_runs_budget
 test_slot_file_failures_refuse_and_never_run_unbounded
+test_an_unusable_host_wide_budget_directory_refuses_before_any_root_starts
 test_growing_roots_are_held_to_the_budget_across_pools
 test_simultaneous_growth_after_admission_is_brought_back_within_the_allowance
 test_an_unreadable_host_census_never_starts_a_root_in_any_pool
@@ -3473,6 +3784,8 @@ test_growth_guard_never_stops_the_watch_reader
 test_a_wrapper_around_the_real_shellcheck_shares_the_host_wide_memory_bound
 test_memory_budget_bounds_the_aggregate_across_homes
 test_a_high_host_slot_count_does_not_raise_the_memory_limit
+test_a_five_gib_root_runs_alone_inside_the_admission
+test_a_waiting_run_is_served_within_a_stated_wait_bound
 test_root_larger_than_the_budget_runs_alone_and_a_killed_run_frees_its_charge
 test_memory_charge_survives_unknown_records_and_an_unreadable_table
 test_fast_record_does_not_lower_the_full_charge
@@ -3489,6 +3802,7 @@ test_resident_watch_ends_its_command_when_its_owner_dies
 test_rss_shim_that_resolves_to_itself_is_refused
 test_resident_watch_reads_only_its_own_tree
 test_resident_watch_bounds_footprint_beyond_resident
+test_resident_watch_ends_a_tree_whose_memory_sits_in_descendants_and_an_orphan
 test_resident_watch_replaces_a_stalled_reader
 test_resident_watch_waits_for_a_slow_first_reply
 test_resident_watch_samples_a_slow_later_reply_by_ps

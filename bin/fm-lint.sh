@@ -208,7 +208,9 @@
 # leading zeros, or lint exits 2; a nonempty FM_LINT_HOST_RSS_KIB exits 2. The per-root address-space limit is enforced only where ulimit -v works, and
 # native macOS cannot enforce it.
 # On native macOS, where the enforced envelope below does not apply, each root's
-# process tree is instead watched for memory, the larger of its resident size
+# process tree (the root, its descendants in any process group, and each process
+# the watch saw in the tree that was later orphaned) is instead watched for
+# memory, the larger of its resident size
 # and its physical footprint (FM_LINT_ROOT_RSS_KIB, default 8388608 = 8 GiB, a
 # positive decimal integer or lint exits 2 on every host; a value above the default
 # is clamped to it). A root that crosses
