@@ -1260,6 +1260,64 @@ SH
   pass "when the process table is lost during a run, at most one refusal per worker is printed and the other roots are never started"
 }
 
+# A run on a host whose process table cannot be read must fail once, in about 5 s,
+# before it starts a root or takes a place in the shared queue, and another run in
+# the same pool that can read the table must not wait for it.
+test_an_unreadable_census_fails_one_run_once_and_does_not_delay_another_in_the_pool() {
+  local tmp rc out run base t0 t1 deny_secs ok_secs alone_secs refusals roots pid_deny pid_ok
+  tmp=$(fm_test_tmproot fm-lint-census-once)
+  mkdir -p "$tmp/bin.deny" "$tmp/bin.ok" "$tmp/deny" "$tmp/repo"
+  roots=()
+  for run in 1 2 3 4 5 6; do
+    printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/r$run.sh"
+    roots+=("$tmp/r$run.sh")
+  done
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/ok.sh"
+  fm_lint_write_memory_shellcheck "$tmp/bin.deny" 48 "$tmp/deny.starts"
+  fm_lint_write_memory_shellcheck "$tmp/bin.ok" 48 "$tmp/ok.starts"
+  cp -R "$ROOT/bin" "$tmp/repo/bin"
+  rm -f "$tmp/repo/bin/fm-proc-info.py"
+  printf '#!/bin/sh\nexit 1\n' > "$tmp/deny/ps"
+  chmod +x "$tmp/deny/ps"
+  now() { perl -MTime::HiRes=time -e 'printf "%.3f\n", time'; }
+  : > "$tmp/deny.starts"; : > "$tmp/ok.starts"
+  # The reference: the readable run alone in its own pool.
+  t0=$(now)
+  env FM_LINT_SLOT_DIR="$tmp/pool.alone" FM_LINT_HOST_SLOTS=9 FM_LINT_ROOT_RSS_KIB=8388608 \
+    FM_TEST_MEM_HOLD=1 PATH="$tmp/bin.ok:$PATH" "$LINT" --jobs 1 "$tmp/ok.sh" > "$tmp/alone.out" 2>&1 \
+    || fail "the readable run failed alone"$'\n'"$(cat "$tmp/alone.out")"
+  t1=$(now)
+  alone_secs=$(perl -e "printf '%.3f', $t1 - $t0")
+  : > "$tmp/ok.starts"
+  # Both runs share one pool. The unreadable run has six roots and two workers.
+  t0=$(now)
+  env FM_LINT_SLOT_DIR="$tmp/pool" FM_LINT_HOST_SLOTS=9 FM_LINT_ROOT_RSS_KIB=8388608 \
+    FM_TEST_MEM_HOLD=1 PATH="$tmp/deny:$tmp/bin.deny:$PATH" \
+    "$tmp/repo/bin/fm-lint.sh" --jobs 2 "${roots[@]}" > "$tmp/deny.out" 2>&1 &
+  pid_deny=$!
+  sleep 0.3
+  env FM_LINT_SLOT_DIR="$tmp/pool" FM_LINT_HOST_SLOTS=9 FM_LINT_ROOT_RSS_KIB=8388608 \
+    FM_TEST_MEM_HOLD=1 PATH="$tmp/bin.ok:$PATH" "$LINT" --jobs 1 "$tmp/ok.sh" > "$tmp/ok.out" 2>&1 &
+  pid_ok=$!
+  rc=0; wait "$pid_ok" || rc=$?
+  t1=$(now)
+  ok_secs=$(perl -e "printf '%.3f', $t1 - $t0")
+  [ "$rc" -eq 0 ] || fail "the readable run sharing the pool failed (rc=$rc)"$'\n'"$(cat "$tmp/ok.out")"
+  rc=0; wait "$pid_deny" || rc=$?
+  t1=$(now)
+  deny_secs=$(perl -e "printf '%.3f', $t1 - $t0")
+  [ "$rc" -eq 2 ] || fail "the unreadable run exited $rc, not 2"$'\n'"$(cat "$tmp/deny.out")"
+  refusals=$(grep -c 'host process table cannot be read' "$tmp/deny.out" || true)
+  [ "$refusals" -eq 1 ] || fail "the unreadable run printed $refusals refusals, not one"$'\n'"$(cat "$tmp/deny.out")"
+  [ ! -s "$tmp/deny.starts" ] || fail "a root started on the unreadable run: $(cat "$tmp/deny.starts")"
+  perl -e 'exit(($ARGV[0] >= 4.5 && $ARGV[0] <= 12) ? 0 : 1)' "$deny_secs" \
+    || fail "the unreadable run took $deny_secs s, not about 5 s (six roots at 5 s each would be 30 s)"
+  perl -e 'exit(($ARGV[0] <= $ARGV[1] + 3) ? 0 : 1)' "$ok_secs" "$alone_secs" \
+    || fail "the readable run took $ok_secs s beside the unreadable run, against $alone_secs s alone"
+  [ "$(wc -l < "$tmp/ok.starts" | tr -d ' ')" -eq 1 ] || fail "the readable run did not start its root once"
+  pass "an unreadable process table fails one run once in $deny_secs s with no root started, and a readable run in the same pool took $ok_secs s ($alone_secs s alone)"
+}
+
 # fm_lint_max_overlap <spans file>: the most stand-in analyses (lines of
 # "<pid> <start> <end>") that held their memory at the same moment.
 fm_lint_max_overlap() {
@@ -3784,6 +3842,7 @@ test_growing_roots_are_held_to_the_budget_across_pools
 test_simultaneous_growth_after_admission_is_brought_back_within_the_allowance
 test_an_unreadable_host_census_never_starts_a_root_in_any_pool
 test_a_host_that_loses_its_process_table_stops_the_run_after_one_refusal
+test_an_unreadable_census_fails_one_run_once_and_does_not_delay_another_in_the_pool
 test_every_mode_takes_its_budget_from_the_same_host_wide_bound
 test_a_second_run_finds_the_budget_restored_and_repeats_the_first
 test_the_roots_log_records_each_roots_queue_wait_in_wait_ms
