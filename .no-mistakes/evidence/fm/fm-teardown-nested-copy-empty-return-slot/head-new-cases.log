@@ -1,0 +1,5 @@
+8a9a29babb3ee90ab354305a30bc0cabe891f5ff
+ok - empty recorded slot drops only the owner-authorized nested copy and preserves its bundled commits and enclosing owner
+ok - a real recorded slot whose reserved lease is lost still refuses with its slot named
+ok - a real recorded slot with an intact lease completes and releases only its owned slot
+rc=0

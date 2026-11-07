@@ -1,0 +1,9 @@
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no live watcher process holds this home lock (last beat: 10s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-teardown-tests.jKfH3S/empty-recorded-slot-nested-drop/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: task task-x1's recorded worktree /Users/charlesabrooker/tmp/fm-teardown-tests.jKfH3S/empty-recorded-slot-nested-drop/pool/1/project was reassigned to task other (home /Users/charlesabrooker/tmp/fm-teardown-tests.jKfH3S/empty-recorded-slot-nested-drop/home), which claimed that pool slot after this record was written; that slot is no longer task-x1's, so its processes, copy, and claim are left untouched and only task-x1's own cleanup runs.
+WARNING: watcher still down (same stale episode; last beat: 28s ago, grace 300s) - full banner already printed this episode.

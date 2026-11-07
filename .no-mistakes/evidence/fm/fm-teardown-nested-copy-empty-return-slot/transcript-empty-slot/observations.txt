@@ -1,0 +1,8 @@
+treehouse provider log:
+return --force /Users/charlesabrooker/tmp/fm-teardown-tests.jKfH3S/empty-recorded-slot-nested-drop/pool/1/project/.claude/worktrees/bundled
+copy exists after drop: no
+task meta exists: no
+pending exists: no
+enclosing slot HEAD before=ad59115c88172dc50c2cad8a0086c1c92411fc06 after=ad59115c88172dc50c2cad8a0086c1c92411fc06
+other.txt=other task bytes
+restored work.txt from bundle=recoverable work
