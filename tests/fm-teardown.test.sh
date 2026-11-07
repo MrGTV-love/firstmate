@@ -2695,12 +2695,13 @@ make_bundle_copy_case() {  # <name> [mode]
 # A nested task copy is not its enclosing task's reserved pool slot.
 # Empty slot fields also occur on retries whose earlier cleanup wrote a marker.
 test_empty_recorded_slot_nested_drop() {
-  local case_dir slot copy head bundle rc
+  local case_dir slot copy head slot_head bundle rc
   make_bundle_copy_case empty-recorded-slot-nested-drop
   case_dir=$NESTED_CASE
   slot=$NESTED_SLOT
   copy=$NESTED_COPY
   head=$(git -C "$copy" rev-parse HEAD)
+  slot_head=$(git -C "$slot" rev-parse HEAD)
   bundle=$BUNDLE_PATH
   write_meta "$case_dir" no-mistakes ship "$copy"
   printf 'slot=\n' >> "$case_dir/state/task-x1.meta"
@@ -2746,6 +2747,7 @@ SH
   cmp -s "$case_dir/owner.before" "${slot%/*}/.fm-slot-owner" || fail 'nested drop changed the enclosing claim'
   cmp -s "$case_dir/lease.before" "$case_dir/pool/treehouse-state.json" || fail 'nested drop changed the enclosing lease'
   assert_equals 'other task bytes' "$(cat "$slot/other.txt")" 'nested drop removed enclosing task bytes'
+  assert_equals "$slot_head" "$(git -C "$slot" rev-parse HEAD)" 'nested drop changed enclosing task HEAD'
   assert_equals "return --force $copy" "$(cat "$case_dir/treehouse.log")" 'nested drop administered the enclosing slot'
   cmp -s "$FM_TEST_DROP_WORDS" "$case_dir/data/task-x1/captain-drop.md" || fail 'owner drop words were not retained'
   git init -q --bare "$case_dir/restored.git"
@@ -2782,6 +2784,35 @@ SH
   assert_grep "slot=$slot" "$case_dir/state/task-x1.teardown-return-pending" 'lost-lease refusal lost its pending return'
   assert_absent "$case_dir/treehouse.log" 'lost-lease refusal returned the slot'
   pass 'a real recorded slot whose reserved lease is lost still refuses with its slot named'
+}
+
+# Same landed recorded-slot fixture as the lost-lease case, without the fault.
+# Provider state records the observable release; it never touches a live pool.
+test_recorded_slot_intact_lease_completes() {
+  local case_dir slot rc=0
+  make_nested_slot_case recorded-slot-intact-lease enclosing .claude/worktrees/x
+  case_dir=$NESTED_CASE
+  slot=$NESTED_SLOT
+  printf 'slot=%s\n' "$slot" >> "$case_dir/state/task-x1.meta"
+  printf 'spawn_gen=teardown-test-task-x1\nslot=%s\n' "$slot" > "$case_dir/state/task-x1.teardown-return-pending"
+  cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in pool-dir|status) exit 0 ;; esac
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+[ "\$*" = 'return --force $slot' ] || exit 1
+printf '{"worktrees":[{"name":"1","path":"%s","leased":false}]}\n' '$slot' > '$case_dir/pool/treehouse-state.json'
+SH
+  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "a real reserved slot with its lease intact must complete: $(cat "$case_dir/stderr")"
+  assert_no_grep 'REFUSED:' "$case_dir/stderr" 'intact-lease completion printed a refusal'
+  assert_equals "return --force $slot" "$(cat "$case_dir/treehouse.log")" 'intact lease did not return exactly the owned slot'
+  assert_absent "$NESTED_COPY" 'intact-lease completion retained the nested copy'
+  assert_absent "$case_dir/state/task-x1.meta" 'intact-lease completion retained task metadata'
+  assert_absent "$case_dir/state/task-x1.teardown-return-pending" 'intact-lease completion retained pending metadata'
+  assert_absent "${slot%/*}/.fm-slot-owner" 'intact-lease completion retained the task claim'
+  assert_present "$slot/.git" 'intact-lease completion removed the reusable pool slot'
+  assert_equals false "$(jq -r '.worktrees[0].leased' "$case_dir/pool/treehouse-state.json")" 'intact-lease completion retained the lease'
+  pass 'a real recorded slot with an intact lease completes and releases only its owned slot'
 }
 
 test_verified_bundle_preserves_unlanded_copy() {
@@ -3907,6 +3938,7 @@ SH
 teardown_test_cases=(
 test_empty_recorded_slot_nested_drop
 test_recorded_slot_lost_lease_still_refuses
+test_recorded_slot_intact_lease_completes
 test_local_only_fork_remote_allows
 test_teardown_does_not_wait_for_the_home_summary_refresh
 test_teardown_closes_the_backlog_item_itself
