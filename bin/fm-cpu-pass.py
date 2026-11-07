@@ -156,7 +156,8 @@ Launch gate:
     starts AGENT at once as its child in its own process group, then releases
     the lock; it never waits for AGENT to appear in memory. A launch entry
     whose holder is gone reserves nothing and is removed by the next scan;
-    several live attempts of one run count once.
+    each live attempt of a run is its own agent and reserves its own R (A once
+    visible), so two attempts that both start an agent never share one.
   - Hold bound: the daemon's per-invocation budget (agent_timeout in
     ~/.no-mistakes/config.yaml, else the daemon's 30-minute default) minus the
     nearest-rank 99th percentile of completed (exit_status ok) agent_invocations
@@ -934,7 +935,8 @@ def project(available: int, rss: dict, counted: dict, steps: Optional[dict], lau
         held += size
         if run in launches:
             kind = "launched"
-            demand = max(size, term) if visible else reservation
+            attempts = launches[run].get("attempts", 1)
+            demand = max(size, attempts * term) if visible else attempts * reservation
         elif run == self_run or run in waiting:
             kind, demand = "waiter", size
         elif (steps is not None and step is not None and step[0] == CI_STEP and step[1] == "running"
@@ -1052,10 +1054,12 @@ def pipeline_observation() -> Tuple[dict, int]:
 
 
 def live_launches(directory: str) -> dict:
-    """Run ID -> entry for each launch-gate reservation whose gate still holds its lock.
+    """Run ID -> entry for each run with a launch-gate reservation whose gate still holds its lock.
 
     An unlocked file belongs to a gate that no longer exists: it reserves nothing
-    and is removed. Several live attempts of one run count once.
+    and is removed. The entry's "attempts" is the number of live attempts of that
+    run: each live launch is its own agent and carries its own reservation, so
+    two attempts that both start an agent never share one.
     """
     found: dict = {}
     for path in Path(directory).glob("launch-*.lock"):
@@ -1068,7 +1072,10 @@ def live_launches(directory: str) -> dict:
                 path.unlink(missing_ok=True)
                 continue
             entry = json.loads(os.pread(fd, 65536, 0))
-            found.setdefault(entry["run"], entry)
+            if entry["run"] in found:
+                found[entry["run"]]["attempts"] += 1
+            else:
+                found[entry["run"]] = dict(entry, attempts=1)
         except (ValueError, KeyError, TypeError):
             continue
         finally:

@@ -142,6 +142,7 @@ The [engine header](../bin/fm-cpu-pass.py) owns its exact sequence, refusal text
 2. A launch for any step other than `ci` runs the agent at once, unchanged, because that run is already counted.
 3. A `ci` launch waits in this same class-ordered queue in class `other` and asks this same rule for one more active run, with its own run and every other run whose gate waits in the queue counted as waiters.
 4. On admission it publishes the run's reservation, a lock file it holds for the agent's life, under the start lock, then starts the agent at once without waiting for it to appear in memory, then releases the lock.
+   Each live attempt of a run is its own agent and carries its own reservation, so two attempts of one run that both start an agent are counted twice, never once.
    Every later decision counts that run at `R` while it is invisible and at its resident memory or `A` afterwards, until the agent's process tree has exited.
 5. It holds at most the daemon's per-invocation agent budget minus the 99th percentile of completed CI-fix invocation durations, and refuses at that bound, including a fit that comes only after a wait past it; a fit at the very first decision is admitted, so a bound of 0 holds not at all.
 

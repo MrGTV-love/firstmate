@@ -94,6 +94,18 @@ if len(sys.argv) > 1 and os.path.basename(sys.argv[1]) in ('fm-cpu-pass.py', 'fm
                 os.kill(os.getpid(), signal.SIGKILL)
             return real_write(fd, data)
         os.write = write_until_killed
+    if os.environ.get('CASE_CLOCK_FILE'):
+        # The engine's monotonic clock runs ahead by the seconds in this file, so a test drives a real constant
+        # (the production hold bound) to its boundary without shortening it.
+        import time
+        real_monotonic = time.monotonic
+        def driven_monotonic():
+            try:
+                with open(os.environ['CASE_CLOCK_FILE']) as handle:
+                    return real_monotonic() + float(handle.read() or 0)
+            except (OSError, ValueError):
+                return real_monotonic()
+        time.monotonic = driven_monotonic
     if os.environ.get('CASE_SWALLOW_INTERRUPT'):
         # A KeyboardInterrupt raised inside a callee is lost there (as one raised in an import's module-lock
         # callback is printed as ignored): the queue's sleep swallows it, so only a recorded signal can stop the wait.
@@ -552,6 +564,18 @@ try:
     facts(folder, available=8 * GIB, runs=[(None, 'baseline-0', 7 * GIB)])
     finish(child)
     assert marker.exists() and 'admitted: counted=1 projected=%d budget=%d' % (15 * GIB, 15 * GIB) in (folder / 'over.stderr').read_text()
+    # Above the largest recorded peak: a run at 10 GiB (above S = 8 GiB) counts 10 GiB, so 7.5 GiB available waits
+    # (10 + 8 = 18 > 17.5); a rule capped at S would count 8 and admit (16 <= 17.5). 8 GiB available fits (18 <= 18).
+    folder, db, env = case('above-peak', cores=18, running=1, measured=True, available=int(7.5 * GIB))
+    facts(folder, available=int(7.5 * GIB), runs=[(None, 'baseline-0', 10 * GIB)])
+    marker = folder / 'above.marker'
+    child = launch(cli + ['pipeline-start', '--', 'touch', str(marker)], env, folder / 'above')
+    pending(folder, 1)
+    wait_for(lambda: 'waiting: counted=1 projected=%d budget=%d' % (18 * GIB, int(17.5 * GIB)) in (folder / 'above.stderr').read_text(), 'memory above S is counted')
+    assert not marker.exists() and child.poll() is None
+    facts(folder, available=8 * GIB, runs=[(None, 'baseline-0', 10 * GIB)])
+    finish(child)
+    assert marker.exists() and 'admitted: counted=1 projected=%d budget=%d' % (18 * GIB, 18 * GIB) in (folder / 'above.stderr').read_text()
     folder, db, env = case('busy-but-fits', cores=18, running=0, measured=True, available=40 * GIB, load=500)
     finish(launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'busy.marker')], env, folder / 'busy'))
     assert (folder / 'busy.marker').exists()
@@ -1349,10 +1373,16 @@ while not (folder / (run + '.release')).exists(): time.sleep(0.025)
     (folder / 'x.agent').unlink(missing_ok=True)
     second, _ = gate(folder, env, 'x', log='attempt-2')
     wait_for(lambda: live_entries(folder, 'launch-*.lock') == 2, 'second attempt reserved')
-    finish(launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'm2')], env, folder / 'two'))
-    assert (folder / 'two.stderr').read_text().count('x:launched:') == 1, (folder / 'two.stderr').read_text()
+    # Two live attempts, both started and not yet visible, reserve 2 x R = 6 GiB: a start that would fit beside one
+    # (3 + 8 = 11 of 12 GiB) waits beside two (6 + 8 = 14), and starts once one attempt ends.
+    two = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'm2')], env, folder / 'two')
+    pending(folder, 1)
+    wait_for(lambda: 'x:launched:%d:unseen' % (6 * GIB) in (folder / 'two.stderr').read_text(), 'two live attempts count twice')
+    assert not (folder / 'm2').exists() and (folder / 'two.stderr').read_text().count('x:launched:') >= 1
     (folder / 'x.release').touch()
     finish(first); finish(second)
+    finish(two)
+    assert (folder / 'm2').exists()
 
     # Hold bound: budget 3 s minus the CI-fix p99 of 1 s holds 2 s, then refuses visibly; the agent never starts.
     folder, db, env = gate_case('gate-bound', available=GIB, runs=[('x', 'ci', 'running', None), ('y', 'review', 'running', None)],
@@ -1367,6 +1397,36 @@ while not (folder / (run + '.release')).exists(): time.sleep(0.025)
     no_retry_phrase(text)
     assert 'refused: hold bound reached' in wakes(folder) and 'held for capacity' in wakes(folder)
     assert not live_entries(folder) and not live_entries(folder, 'launch-*.lock')
+    # The real bound, driven by the clock: the host's 240-minute budget with a completed CI-fix p99 of 152.45 min
+    # (9147000 ms) gives 14400 - 9147 = 5253 s; the omitted budget (30 min default) with a p99 of 10 min gives 1200 s.
+    # Five seconds before the bound the gate still holds; a fit then is admitted; at the bound it refuses.
+    for label, timeout, ci_ms, bound, budget, p99 in (('override-240m', '240m', (9147000,), 5253, 14400, 9147),
+                                                      ('default-30m', None, (600000,), 1200, 1800, 600)):
+        for outcome in ('fits-before', 'refused-at'):
+            folder, db, env = gate_case('gate-real-bound-%s-%s' % (label, outcome), available=GIB, timeout=timeout, ci_ms=ci_ms,
+                                        runs=[('x', 'ci', 'running', None), ('y', 'review', 'running', None)])
+            if timeout is None:
+                # The key omitted from an existing config: the daemon's built-in 30 minutes apply.
+                (folder / 'home' / '.no-mistakes' / 'config.yaml').write_text('agent: [claude]\n')
+            clock = folder / 'clock'
+            clock.write_text('0')
+            child, log = gate(folder, dict(env, CASE_CLOCK_FILE=str(clock)), 'x')
+            pending(folder, 1)
+            clock.write_text(str(bound - 5))
+            time.sleep(1.5)
+            assert child.poll() is None and not (folder / 'x.agent').exists(), (label, log.with_suffix('.stderr').read_text())
+            if outcome == 'fits-before':
+                facts(folder, available=40 * GIB)
+                wait_for(lambda: (folder / 'x.agent').exists(), label + ': admitted before the bound')
+                (folder / 'x.release').touch()
+                finish(child)
+            else:
+                clock.write_text(str(bound + 1))
+                finish(child, 75)
+                text = log.with_suffix('.stderr').read_text()
+                assert 'launch-gate refused: hold bound reached: run x; hold_bound=%ds budget=%ds ci_fix_p99=%ds; held ' % (bound, budget, p99) in text, (label, text)
+                assert not (folder / 'x.agent').exists()
+
     # No positive bound (budget not above p99, or no config) refuses at once when nothing fits.
     for timeout in ('1s', None):
         folder, db, env = gate_case('gate-nobound-%s' % timeout, available=GIB, runs=[('x', 'ci', 'running', None), ('y', 'review', 'running', None)],
