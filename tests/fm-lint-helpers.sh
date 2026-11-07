@@ -450,7 +450,8 @@ PL
 use strict;
 use warnings;
 use Time::HiRes qw(time sleep);
-if (\$ENV{FM_LINT_COUNT_HOLD} && !\$ENV{FM_LINT_INTERNAL_CENSUS_ONLY} && (\$ARGV[0] // '') =~ m{/fm-lint-cache[.]pl\\z}
+# The version probe also goes through the gate; it is not a contender root.
+if (\$ENV{FM_LINT_COUNT_HOLD} && !\$ENV{FM_LINT_INTERNAL_CENSUS_ONLY} && !grep({ \$_ eq '--version' } @ARGV) && (\$ARGV[0] // '') =~ m{/fm-lint-cache[.]pl\\z}
     && ((\$ARGV[1] // '') eq 'gate'
         )) {
     my \$dir = \$ENV{FM_LINT_COUNT_READY_DIR};

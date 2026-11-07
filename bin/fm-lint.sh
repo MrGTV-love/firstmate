@@ -1881,14 +1881,6 @@ else
   printf 'fm-lint.sh: full ShellCheck extended analysis enabled\n' >&2
 fi
 
-if [ "$CHANGED_MODE" -eq 1 ] && [ "$ROOT_COUNT" -eq 0 ]; then
-  printf 'fm-lint.sh: no changed lint targets\n'
-  overall_rc=0
-  fm_lint_run_backend_purity || overall_rc=$?
-  fm_lint_run_workflows || overall_rc=$?
-  exit "$overall_rc"
-fi
-
 if [ -n "$TELEMETRY" ]; then
   telemetry_parent=$(dirname "$TELEMETRY")
   [ -d "$telemetry_parent" ] || {
@@ -2164,6 +2156,18 @@ if [ "$resolved" != "$REQUIRED_SHELLCHECK" ]; then
   fi
   printf 'fm-lint.sh: WARNING: ShellCheck %s differs from the CI pin %s; local findings may differ. Install %s with bin/fm-install-shellcheck.sh <destination-directory>, or pass --strict-version to make this an error.\n' \
     "$resolved" "$REQUIRED_SHELLCHECK" "$REQUIRED_SHELLCHECK" >&2
+fi
+
+# Nothing changed to lint: the version probe above still ran (and was admitted),
+# but there is no root, no timing to record and no temporary state to keep.
+if [ "$CHANGED_MODE" -eq 1 ] && [ "$ROOT_COUNT" -eq 0 ]; then
+  trap - EXIT
+  rm -rf "$TMP_ROOT"
+  printf 'fm-lint.sh: no changed lint targets\n'
+  overall_rc=0
+  fm_lint_run_backend_purity || overall_rc=$?
+  fm_lint_run_workflows || overall_rc=$?
+  exit "$overall_rc"
 fi
 
 # The roots log is the retained per-root lifecycle sidecar; beside --telemetry
