@@ -6877,6 +6877,57 @@ test_the_default_driver_interpreter_and_the_override_close_the_same_way() {
   pass "the default interpreter and the explicit override close the kept-copy task the same way, and a missing default interpreter refuses with nothing removed"
 }
 
+# C2 (legacy): a copy that already holds driver tars and saved outputs, with no
+# retained record, is asked once on the first teardown after the change (one named
+# extra tar), and the later runs add nothing.
+test_the_first_teardown_of_a_copy_that_already_holds_tars_asks_the_driver_once() {
+  local rc run tardir
+  make_retained_case retained-legacy enclosing
+  tardir=$FOREIGN_SLOT/.claude/bug-evidence/worktree-preservation
+  mkdir -p "$tardir" "$FOREIGN_CASE/data/task-x1"
+  for run in 1 2 3; do
+    printf 'archive %s\n' "$run" > "$tardir/stub-ordinary_cleanup-$run.tar"
+  done
+  printf '{"allowed": false, "reason": "cleanup_ignored_payload_archived_tree_retained", "retained_worktree_path": "%s"}\n' "$FOREIGN_COPY" > "$FOREIGN_CASE/data/task-x1/vernant-closeout.seed1"
+  assert_equals "0 3" "$(retained_call_count) $(retained_tar_count)" "retained-legacy: the seeded state is wrong"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  expect_code 0 "$rc" "retained-legacy: the first run must close: $(cat "$FOREIGN_CASE/stderr")"
+  assert_equals "1 4" "$(retained_call_count) $(retained_tar_count)" "retained-legacy: the first run did not ask the driver once for exactly one more tar"
+  retained_assert_closed retained-legacy
+  for run in 2 3; do
+    run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+    assert_equals "1 4" "$(retained_call_count) $(retained_tar_count)" "retained-legacy: run $run added a driver call or a tar"
+  done
+  pass "a copy that already holds driver tars is asked once on the first teardown, with one more tar, and later runs add none"
+}
+
+# C2 (changed) (head-only): a move of HEAD to another landed commit, with the ignored
+# payload unchanged, asks the driver exactly once more (one named extra tar), and a
+# further unchanged run adds nothing.
+test_a_head_only_change_of_a_kept_copy_asks_the_driver_exactly_once_more() {
+  local rc record head
+  make_retained_case retained-head-only enclosing
+  held_plain_get_slot "$FOREIGN_CASE"
+  : > "$FOREIGN_CASE/no-lease-command"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  expect_code 1 "$rc" "retained-head-only: run 1 must refuse for the lease: $(cat "$FOREIGN_CASE/stderr")"
+  assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-head-only: run 1 should have asked the driver once"
+  record=$(retained_record_path)
+  cp "$record" "$FOREIGN_CASE/record.run1"
+  git -C "$FOREIGN_COPY" -c user.email=t@t -c user.name=t commit -q --allow-empty -m 'another landed commit'
+  head=$(git -C "$FOREIGN_COPY" rev-parse HEAD)
+  git -C "$FOREIGN_CASE/project" fetch -q "$FOREIGN_COPY" HEAD
+  git -C "$FOREIGN_CASE/project" update-ref refs/heads/main FETCH_HEAD
+  add_gh_pr_merged_for_head "$FOREIGN_CASE" "$head"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  expect_code 1 "$rc" "retained-head-only: run 2 must refuse for the lease: $(cat "$FOREIGN_CASE/stderr")"
+  assert_equals "2 2" "$(retained_call_count) $(retained_tar_count)" "retained-head-only: a HEAD-only change did not ask the driver exactly once more"
+  cmp -s "$FOREIGN_CASE/record.run1" "$record" && fail "retained-head-only: the stale record was not replaced"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  assert_equals "2 2" "$(retained_call_count) $(retained_tar_count)" "retained-head-only: an unchanged run after the change asked the driver again"
+  pass "a move of HEAD alone asks the driver exactly once more, with one more tar, and the next unchanged run adds none"
+}
+
 teardown_test_cases=(
 test_fixture_cleanup_leaves_no_home_summary_refresh_worker
 test_teardown_never_holds_up_a_steer_to_another_task
@@ -7093,6 +7144,8 @@ test_a_refused_kept_copy_that_changed_or_whose_cause_went_is_asked_again
 test_a_driver_that_names_many_unique_paths_still_closes_after_verifying_each
 test_the_preserve_and_the_archives_survive_the_close_and_every_later_run
 test_the_default_driver_interpreter_and_the_override_close_the_same_way
+test_the_first_teardown_of_a_copy_that_already_holds_tars_asks_the_driver_once
+test_a_head_only_change_of_a_kept_copy_asks_the_driver_exactly_once_more
 )
 
 # In the combined tests/fm-teardown.test.sh run,
