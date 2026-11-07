@@ -141,7 +141,9 @@
 # does not spend 5 s on every root or hold the head of the shared queue. The
 # version probe (`shellcheck --version`, once per lint in every mode except
 # --list-files) is a ShellCheck start too, so it takes a turn in the same
-# admission, charged 64 MiB (it holds about 15 MB for 0.02 s). With nothing held
+# admission, charged 64 MiB (it holds about 15 MB for 0.02 s), unless the pool
+# already holds the version of this binary (kept under the SHA-256 of its bytes),
+# when no probe starts. With nothing held
 # and nothing running outside, one root is always admitted, so a root larger
 # than the budget runs alone once that outside memory has ended, and queued roots
 # wait rather than fail. When a root's analysis completes, a record whose input
@@ -2131,18 +2133,38 @@ fi
 
 # The version probe is a ShellCheck start like any other, so it takes a turn in
 # the host-wide admission, charged a small fixed amount (64 MiB, above the 15 MB
-# measured for `shellcheck --version`) and never a recorded peak. It runs once per
-# lint, after the pool and census checks above and before any root, in every mode
-# except --list-files (which starts no ShellCheck).
+# measured for `shellcheck --version`) and never a recorded peak. It runs after
+# the pool and census checks above and before any root, in every mode except
+# --list-files (which starts no ShellCheck). What `--version` prints is a function
+# of the binary's bytes, so the pool keeps it under the SHA-256 of those bytes
+# (version/<digest>, written only after a probe the admission ran): a run whose
+# binary is already known starts no probe, as a cache hit starts no root, and so
+# never waits behind a pool that is full.
 probe_rc=0
-resolved=$(env FM_LINT_INTERNAL_HOST_LOCK="$HOST_POOL_ROOT/admission.lock" FM_LINT_INTERNAL_HOST_RSS_KIB="$HOST_RSS_KIB" \
-    FM_LINT_INTERNAL_PYTHON="$WATCH_PYTHON" FM_LINT_INTERNAL_ROOT_CAP_KIB=65536 FM_LINT_INTERNAL_RUN_ID="$$" \
-    FM_LINT_INTERNAL_ABORT_FILE="$TMP_ROOT/census.abort" \
-    "$PERL_BIN" "$SELF_DIR/fm-lint-cache.pl" gate "$SLOT_DIR" "$NCPU" "$$" "$TMP_ROOT/probe.wait" -- \
-    "$SHELLCHECK_BIN" --version 2>"$TMP_ROOT/probe.err" | awk '/^version:/ {print $2; exit}'; exit "${PIPESTATUS[0]}") || probe_rc=$?
-if [ "$probe_rc" -ne 0 ] && [ "$probe_rc" -ne 127 ]; then
-  cat "$TMP_ROOT/probe.err" >&2
-  exit 2
+resolved=
+version_digest=$("$PERL_BIN" -MDigest::SHA -e 'open(my $fh, "<", $ARGV[0]) or exit 1; binmode $fh; print Digest::SHA->new(256)->addfile($fh)->hexdigest' \
+  "$SHELLCHECK_BIN" 2>/dev/null) || version_digest=
+version_file=
+if [ -n "$version_digest" ]; then
+  version_file=$SLOT_DIR/version/$version_digest
+  if [ -f "$version_file" ] && [ ! -L "$version_file" ]; then
+    read -r resolved < "$version_file" || resolved=
+    case "$resolved" in ''|*[!0-9A-Za-z.+-]*) resolved= ;; esac
+  fi
+fi
+if [ -z "$resolved" ]; then
+  resolved=$(env FM_LINT_INTERNAL_HOST_LOCK="$HOST_POOL_ROOT/admission.lock" FM_LINT_INTERNAL_HOST_RSS_KIB="$HOST_RSS_KIB" \
+      FM_LINT_INTERNAL_PYTHON="$WATCH_PYTHON" FM_LINT_INTERNAL_ROOT_CAP_KIB=65536 FM_LINT_INTERNAL_RUN_ID="$$" \
+      FM_LINT_INTERNAL_ABORT_FILE="$TMP_ROOT/census.abort" \
+      "$PERL_BIN" "$SELF_DIR/fm-lint-cache.pl" gate "$SLOT_DIR" "$NCPU" "$$" "$TMP_ROOT/probe.wait" -- \
+      "$SHELLCHECK_BIN" --version 2>"$TMP_ROOT/probe.err" | awk '/^version:/ {print $2; exit}'; exit "${PIPESTATUS[0]}") || probe_rc=$?
+  if [ "$probe_rc" -ne 0 ] && [ "$probe_rc" -ne 127 ]; then
+    cat "$TMP_ROOT/probe.err" >&2
+    exit 2
+  fi
+  if [ -n "$version_file" ] && [ -n "$resolved" ]; then
+    ( umask 077; mkdir -p "$SLOT_DIR/version" && printf '%s\n' "$resolved" > "$version_file.$$" && mv -f "$version_file.$$" "$version_file" ) 2>/dev/null || true
+  fi
 fi
 printf 'fm-lint.sh: ShellCheck %s (pinned %s)\n' "$resolved" "$REQUIRED_SHELLCHECK" >&2
 if [ "$STRICT_VERSION" -eq 1 ] || [ "${GITHUB_ACTIONS:-}" = true ] || [ "${CI:-}" = true ]; then

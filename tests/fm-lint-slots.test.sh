@@ -760,7 +760,10 @@ fi
 exit 0
 SH
   chmod +x "$fakebin/shellcheck"
-  out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+  # The warm-up runs in the pool the hit run uses, as two runs of one user do in
+  # the host pool: the pool then knows this ShellCheck binary's version and the
+  # hit run starts no version probe, which would have to queue.
+  out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" FM_LINT_SLOT_DIR="$tmp/slots" \
     "$repo/bin/fm-lint.sh" bin/consumer.sh 2>&1) || fail "cache warm-up failed: $out"
   perl - "$repo/bin/fm-lint.sh" "$tmp" "$fakebin" <<'PL' || fail "warm cache queued behind an occupied host slot"
 use strict;
@@ -1322,30 +1325,36 @@ test_an_unreadable_census_fails_one_run_once_and_does_not_delay_another_in_the_p
 # host-wide admission like a root: it does not start while another run's root
 # holds the pool, and it does not wait when the pool is empty.
 test_the_shellcheck_version_probe_waits_for_the_admission_like_a_root() {
-  local tmp pid_a pid_b a_end b_probe a_probe t0 rc
+  local tmp pid_a pid_b a_end b_probe a_probe t0 rc tag
   tmp=$(fm_test_tmproot fm-lint-probe)
   mkdir -p "$tmp/bin" "$tmp/real"
   printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/a.sh"
   printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/b.sh"
   fm_lint_write_memory_shellcheck "$tmp/real" 48 "$tmp/mem.starts"
-  cat > "$tmp/bin/shellcheck" <<SH
+  # One wrapper per run, each with its own bytes: the pool keeps the version
+  # per binary, so two runs with one binary would start one probe.
+  for tag in a b; do
+    mkdir -p "$tmp/bin.$tag"
+    cat > "$tmp/bin.$tag/shellcheck" <<SH
 #!/bin/bash
+# wrapper $tag
 if [ "\$1" = --version ]; then
-  printf '%s %s\n' "\$FM_TEST_PROBE_TAG" "\$(perl -MTime::HiRes=time -e 'printf "%.6f", time')" >> "$tmp/probe.log"
+  printf '%s %s\n' "$tag" "\$(perl -MTime::HiRes=time -e 'printf "%.6f", time')" >> "$tmp/probe.log"
 fi
 exec "$tmp/real/shellcheck" "\$@"
 SH
-  chmod +x "$tmp/bin/shellcheck"
+    chmod +x "$tmp/bin.$tag/shellcheck"
+  done
   : > "$tmp/mem.starts"; : > "$tmp/mem.starts.spans"; : > "$tmp/probe.log"
   t0=$(perl -MTime::HiRes=time -e 'printf "%.6f", time')
   env HOME="$tmp/home.a" XDG_CACHE_HOME="$tmp/home.a/.cache" FM_HOME="$tmp/fm.a" FM_TEST_PROBE_TAG=a \
     FM_LINT_SLOT_DIR="$tmp/pool" FM_LINT_HOST_SLOTS=9 FM_LINT_ROOT_RSS_KIB=8388608 FM_TEST_MEM_HOLD=4 \
-    PATH="$tmp/bin:$PATH" "$LINT" --jobs 1 "$tmp/a.sh" > "$tmp/a.out" 2>&1 &
+    PATH="$tmp/bin.a:$PATH" "$LINT" --jobs 1 "$tmp/a.sh" > "$tmp/a.out" 2>&1 &
   pid_a=$!
   until [ -s "$tmp/mem.starts" ]; do sleep 0.1; done
   env HOME="$tmp/home.b" XDG_CACHE_HOME="$tmp/home.b/.cache" FM_HOME="$tmp/fm.b" FM_TEST_PROBE_TAG=b \
     FM_LINT_SLOT_DIR="$tmp/pool" FM_LINT_HOST_SLOTS=9 FM_LINT_ROOT_RSS_KIB=8388608 FM_TEST_MEM_HOLD=1 \
-    PATH="$tmp/bin:$PATH" "$LINT" --jobs 1 "$tmp/b.sh" > "$tmp/b.out" 2>&1 &
+    PATH="$tmp/bin.b:$PATH" "$LINT" --jobs 1 "$tmp/b.sh" > "$tmp/b.out" 2>&1 &
   pid_b=$!
   rc=0; wait "$pid_a" || rc=$?
   [ "$rc" -eq 0 ] || fail "run a failed (rc=$rc)"$'\n'"$(cat "$tmp/a.out")"
@@ -1359,6 +1368,14 @@ SH
     || fail "the probe of a run with an empty pool waited $(perl -e "printf '%.1f', $a_probe - $t0") s"
   perl -e 'exit(($ARGV[0] >= $ARGV[1] - 0.05) ? 0 : 1)' "$b_probe" "$a_end" \
     || fail "the probe of run b started at $b_probe, before run a's root ended at $a_end: a ShellCheck start outside the admission"
+  # A binary the pool already knows starts no probe: a third run of binary a
+  # leaves the probe log with its one earlier line.
+  env HOME="$tmp/home.a" XDG_CACHE_HOME="$tmp/home.a/.cache" FM_HOME="$tmp/fm.a" \
+    FM_LINT_SLOT_DIR="$tmp/pool" FM_LINT_HOST_SLOTS=9 FM_LINT_ROOT_RSS_KIB=8388608 FM_TEST_MEM_HOLD=1 \
+    PATH="$tmp/bin.a:$PATH" "$LINT" --jobs 1 "$tmp/b.sh" > "$tmp/c.out" 2>&1 \
+    || fail "the third run failed"$'\n'"$(cat "$tmp/c.out")"
+  [ "$(grep -c '^a ' "$tmp/probe.log")" -eq 1 ] || fail "a binary the pool knew started another probe: $(cat "$tmp/probe.log")"
+  grep -q 'ShellCheck 0.11.0 (pinned 0.11.0)' "$tmp/c.out" || fail "the third run did not print the remembered version"$'\n'"$(cat "$tmp/c.out")"
   pass "the version probe waits for another run's root like a root does (probe b $(perl -e "printf '%.2f', $b_probe - $a_end") s after the root ended) and does not wait with an empty pool"
 }
 
