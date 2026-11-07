@@ -6637,6 +6637,7 @@ retained_variant() {
     changed-after-preserve) driver_env+=("FM_STUB_AFTER=printf 'changed\\n' > '$FOREIGN_COPY/notes/unique.dat'") ;;
     removed-from-preserve) driver_env+=("FM_STUB_AFTER=rm -f '$preserve/notes/unique.dat'") ;;
     driver-path-differs) driver_env+=("FM_STUB_AFTER=mkdir -p '$preserve/.claude/channel-outbox' && printf 'different\\n' > '$preserve/.claude/channel-outbox/a.jsonl'") ;;
+    driver-path-differs-second) driver_env+=("FM_STUB_AFTER=mkdir -p '$preserve/.claude/channel-outbox' && printf 'different\\n' > '$preserve/.claude/channel-outbox/b.jsonl'") ;;
     driver-path-directory) driver_env+=("FM_STUB_UNIQUE=.claude/channel-outbox/") ;;
     driver-path-gone) driver_env+=("FM_STUB_UNIQUE=.claude/channel-outbox/a.jsonl .claude/channel-outbox/missing.jsonl") ;;
     driver-path-escapes) driver_env+=("FM_STUB_UNIQUE=.claude/channel-outbox/a.jsonl ../outside.dat") ;;
@@ -6693,7 +6694,7 @@ retained_variant_run() {
 
 test_every_other_state_of_an_own_copy_the_driver_keeps_still_refuses() {
   local variant plain force want
-  for variant in c1-input unlanded dirty changed-after-preserve removed-from-preserve driver-path-differs driver-path-directory driver-path-gone driver-path-escapes lease-conflict live-or-unknown policy-not-allowed other-exit json-broken json-two other-repo same-repo-worktree; do
+  for variant in c1-input unlanded dirty changed-after-preserve removed-from-preserve driver-path-differs driver-path-differs-second driver-path-directory driver-path-gone driver-path-escapes lease-conflict live-or-unknown policy-not-allowed other-exit json-broken json-two other-repo same-repo-worktree; do
     retained_variant "$variant" plain
     plain=$RV_DISPOSITION
     case "$variant" in
@@ -6706,7 +6707,7 @@ test_every_other_state_of_an_own_copy_the_driver_keeps_still_refuses() {
       c1-input|same-repo-worktree|driver-path-directory) ;;
       unlanded) assert_grep 'not landed' "$FOREIGN_CASE/stderr" "$variant: the refusal named no cause" ;;
       dirty) assert_grep 'REFUSED' "$FOREIGN_CASE/stderr" "$variant: the refusal named no cause" ;;
-      changed-after-preserve|removed-from-preserve|driver-path-differs|driver-path-gone|driver-path-escapes)
+      changed-after-preserve|removed-from-preserve|driver-path-differs|driver-path-differs-second|driver-path-gone|driver-path-escapes)
         assert_grep 'REFUSED' "$FOREIGN_CASE/stderr" "$variant: the refusal named no cause" ;;
       other-repo) assert_grep 'REFUSED' "$FOREIGN_CASE/stderr" "$variant: the refusal named no cause" ;;
       *) assert_grep "Vernant's closeout driver did not release own nested copy $FOREIGN_COPY (exit" "$FOREIGN_CASE/stderr" "$variant: the driver refusal was not reported" ;;
@@ -6798,6 +6799,82 @@ test_a_driver_that_names_many_unique_paths_still_closes_after_verifying_each() {
   assert_equals 600 "$(grep -c ' graphify-out/cache/f' "$preserve/SHA256SUMS")" "retained-many: SHA256SUMS does not list every named file"
   assert_equals 600 "$(retained_field "$(retained_record_path)" unique | grep -c graphify-out)" "retained-many: the record does not list every named file"
   pass "a driver that names 600 derived files as unique still closes the task, with every one verified byte for byte, copied into the preserve and listed once in the record"
+}
+
+# retained_preserve_intact <copy> <preserve-dir> <relative-file>...: every file is in the
+# preserve with the SHA-256 of the fixture's source bytes (printf of the builder's
+# text, never read from teardown's SHA256SUMS) and SHA256SUMS still lists it.
+retained_preserve_intact() {
+  local copy=$1 dir=$2 rel want have
+  shift 2
+  for rel in "$@"; do
+    want=$(shasum -a 256 "$copy/$rel" | awk '{print $1}')
+    [ -f "$dir/$rel" ] || return 1
+    have=$(shasum -a 256 "$dir/$rel" | awk '{print $1}')
+    [ "$want" = "$have" ] || return 1
+    grep -q "^$want  $rel\$" "$dir/SHA256SUMS" || return 1
+  done
+}
+
+# C1 (f) and C4 (f): the close and every later run leave the preserve named by the
+# record, the driver's tars and the saved outputs as they were. The negative side is
+# the same check run after a controlled removal of one preserved file.
+test_the_preserve_and_the_archives_survive_the_close_and_every_later_run() {
+  local rc preserve record tars_before outputs_before run
+  make_retained_case retained-survive enclosing
+  preserve=$FOREIGN_CASE/data/task-x1/nested-copy-preserved/$(printf '%s' "$FOREIGN_COPY" | shasum -a 256 | awk '{print $1}')
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  expect_code 0 "$rc" "retained-survive: the close must succeed: $(cat "$FOREIGN_CASE/stderr")"
+  record=$(retained_record_path)
+  assert_equals "$preserve" "$(retained_field "$record" preserve)" "retained-survive: the record does not name the preserve"
+  retained_preserve_intact "$FOREIGN_COPY" "$preserve" notes/unique.dat .claude/channel-outbox/a.jsonl .claude/channel-outbox/b.jsonl \
+    || fail "retained-survive: the preserve named by the record is not intact after the close"
+  tars_before=$(find "$FOREIGN_SLOT/.claude/bug-evidence/worktree-preservation" -type f -exec shasum -a 256 {} + | sort | shasum -a 256)
+  outputs_before=$(find "$FOREIGN_CASE/data/task-x1" -maxdepth 1 -name 'vernant-closeout.*' | sort | paste -sd ' ' -)
+  for run in 1 2; do
+    run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+    assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-survive: later run $run asked the driver or wrote a tar"
+    assert_equals "$tars_before" "$(find "$FOREIGN_SLOT/.claude/bug-evidence/worktree-preservation" -type f -exec shasum -a 256 {} + | sort | shasum -a 256)" "retained-survive: later run $run changed a tar"
+    assert_equals "$outputs_before" "$(find "$FOREIGN_CASE/data/task-x1" -maxdepth 1 -name 'vernant-closeout.*' | sort | paste -sd ' ' -)" "retained-survive: later run $run saved a driver output"
+    retained_preserve_intact "$FOREIGN_COPY" "$preserve" notes/unique.dat .claude/channel-outbox/a.jsonl .claude/channel-outbox/b.jsonl \
+      || fail "retained-survive: the preserve is not intact after later run $run"
+  done
+  rm -f "$preserve/.claude/channel-outbox/b.jsonl"
+  retained_preserve_intact "$FOREIGN_COPY" "$preserve" notes/unique.dat .claude/channel-outbox/a.jsonl .claude/channel-outbox/b.jsonl \
+    && fail "retained-survive: the intact check passed after a preserved file was removed"
+  pass "the preserve the record names, the driver's tars and the saved outputs survive the close and later runs, and the intact check rejects a removed preserved file"
+}
+
+# C1 (config): the production default interpreter (<slot>/.venv/bin/python, with
+# FM_TEARDOWN_VERNANT_PYTHON unset) and the explicit override give the same close; a
+# missing default interpreter refuses and removes nothing.
+test_the_default_driver_interpreter_and_the_override_close_the_same_way() {
+  local rc mode
+  for mode in default override missing; do
+    make_retained_case "retained-config-$mode" enclosing
+    case "$mode" in
+      default)
+        mkdir -p "$FOREIGN_SLOT/.venv/bin"
+        cp "$FOREIGN_CASE/vernant-python" "$FOREIGN_SLOT/.venv/bin/python"
+        chmod +x "$FOREIGN_SLOT/.venv/bin/python"
+        run_foreign_teardown rc FM_STUB_CLOSEOUT=retained FM_TEARDOWN_VERNANT_PYTHON=
+        ;;
+      override) run_foreign_teardown rc FM_STUB_CLOSEOUT=retained ;;
+      missing) run_foreign_teardown rc FM_STUB_CLOSEOUT=retained FM_TEARDOWN_VERNANT_PYTHON= ;;
+    esac
+    if [ "$mode" = missing ]; then
+      expect_code 1 "$rc" "retained-config-$mode: a missing default interpreter must refuse: $(cat "$FOREIGN_CASE/stderr")"
+      assert_equals "0 0" "$(retained_call_count) $(retained_tar_count)" "retained-config-$mode: the driver ran without an interpreter"
+      assert_present "$FOREIGN_CASE/state/task-x1.meta" "retained-config-$mode: the refusal removed the task record"
+      assert_present "$FOREIGN_COPY/.git" "retained-config-$mode: the copy was removed"
+      assert_no_grep 'complete' "$FOREIGN_CASE/stdout" "retained-config-$mode: the task closed"
+    else
+      expect_code 0 "$rc" "retained-config-$mode: the close must succeed: $(cat "$FOREIGN_CASE/stderr")"
+      assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-config-$mode: the driver was not asked exactly once"
+      retained_assert_closed "retained-config-$mode"
+    fi
+  done
+  pass "the default interpreter and the explicit override close the kept-copy task the same way, and a missing default interpreter refuses with nothing removed"
 }
 
 teardown_test_cases=(
@@ -7014,6 +7091,8 @@ test_every_other_state_of_an_own_copy_the_driver_keeps_still_refuses
 test_a_stable_refusal_after_the_driver_asks_the_driver_nothing_on_retry
 test_a_refused_kept_copy_that_changed_or_whose_cause_went_is_asked_again
 test_a_driver_that_names_many_unique_paths_still_closes_after_verifying_each
+test_the_preserve_and_the_archives_survive_the_close_and_every_later_run
+test_the_default_driver_interpreter_and_the_override_close_the_same_way
 )
 
 # In the combined tests/fm-teardown.test.sh run,
