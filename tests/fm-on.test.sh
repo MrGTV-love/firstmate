@@ -170,6 +170,39 @@ if grep -q 'stdin:' "$TMP_ROOT/stdout-default"; then
 fi
 pass "fm-on defaults the remote command's stdin to /dev/null"
 
+# Exercise the default independently of ambient overrides, and inspect argv
+# boundaries rather than a substring that could accept ConnectTimeout=150.
+cat > "$FAKEBIN/record-ssh" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$@" > "$FM_CONNECT_ARGV"
+printf 'called\n' >> "$FM_CONNECT_CALLS"
+SH
+chmod +x "$FAKEBIN/record-ssh"
+connect_probe() {
+  FM_HOME="$LOCAL_HOME" FM_ROOT_OVERRIDE="$REMOTE_ROOT" \
+    FM_SSH_BIN="$FAKEBIN/record-ssh" FM_CONNECT_ARGV="$TMP_ROOT/connect.argv" \
+    FM_CONNECT_CALLS="$TMP_ROOT/connect.calls" \
+    "$ROOT/bin/fm-on.sh" "$@"
+}
+(unset FM_SSH_CONNECT_TIMEOUT; connect_probe ios fm-probe-two.sh)
+grep -Fx -- 'ConnectTimeout=15' "$TMP_ROOT/connect.argv" >/dev/null \
+  || fail "default SSH connect timeout was not 15 seconds"
+FM_SSH_CONNECT_TIMEOUT=7 connect_probe --stdin ios fm-probe-two.sh < /dev/null
+grep -Fx -- 'ConnectTimeout=7' "$TMP_ROOT/connect.argv" >/dev/null \
+  || fail "explicit SSH connect timeout was not honored"
+CONNECT_CALLS_BEFORE=$(wc -l < "$TMP_ROOT/connect.calls" | tr -d ' ')
+for invalid_timeout in 0 '' not-a-number; do
+  set +e
+  invalid_out=$(FM_SSH_CONNECT_TIMEOUT="$invalid_timeout" connect_probe ios fm-probe-two.sh 2>&1)
+  invalid_rc=$?
+  set -e
+  [ "$invalid_rc" -eq 1 ] || fail "invalid connect timeout '$invalid_timeout' was accepted (rc $invalid_rc)"
+  assert_contains "$invalid_out" 'FM_SSH_CONNECT_TIMEOUT must be a positive integer' "invalid connect timeout did not explain its constraint"
+  [ "$(wc -l < "$TMP_ROOT/connect.calls" | tr -d ' ')" -eq "$CONNECT_CALLS_BEFORE" ] \
+    || fail "invalid connect timeout launched SSH"
+done
+pass "fm-on passes default and explicit connect timeouts and rejects invalid values before SSH"
+
 # A vanished remote peer must become a bounded ssh failure instead of an
 # indefinite hang on a half-open TCP connection, so the existing no-result ->
 # reconcile re-arm recovery can self-heal without manual intervention. Assert
