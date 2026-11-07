@@ -2726,6 +2726,8 @@ SH
   FM_HOME="$case_dir/home" run_teardown "$case_dir" --force > "$case_dir/no-drop.stdout" 2> "$case_dir/no-drop.stderr" || rc=$?
   expect_code 1 "$rc" 'empty recorded slot must not waive owner drop-file authorization'
   assert_grep 'requires --drop-file' "$case_dir/no-drop.stderr" 'missing owner authorization did not refuse'
+  assert_no_grep 'REFUSED: reserved pool slot  lost its durable lease; retaining the task record and contents' \
+    "$case_dir/no-drop.stderr" 'unauthorized empty-slot copy reached reserved-slot return'
   cmp -s "$case_dir/task.before" "$case_dir/state/task-x1.meta" || fail 'unauthorized drop changed task metadata'
   cmp -s "$case_dir/pending.before" "$case_dir/state/task-x1.teardown-return-pending" || fail 'unauthorized drop changed pending metadata'
   assert_present "$copy/.git" 'unauthorized drop removed the nested copy'
