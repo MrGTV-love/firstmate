@@ -1432,7 +1432,14 @@ SH
       ci-bounds) set -- "$tmp/b.sh" ;;
     esac
     local bin=$tmp/bin lint=$LINT require=0
-    [ "$mode" != retry ] || bin=$tmp/retry-bin
+    if [ "$mode" = retry ]; then
+      bin=$tmp/retry-bin
+      # The pool already knows this stand-in's version, as it would after an
+      # earlier run of the same binary, so the wait measured below is the
+      # root's wait for the budget and not a version probe's.
+      mkdir -p "$tmp/pool.$mode/version"
+      printf '0.11.0\n' > "$tmp/pool.$mode/version/$(perl -MDigest::SHA -e 'open(my $fh, "<", $ARGV[0]) or die; binmode $fh; print Digest::SHA->new(256)->addfile($fh)->hexdigest' "$bin/shellcheck")"
+    fi
     [ "$mode" != partition ] || lint=$repo/bin/fm-lint.sh
     [ "$mode" != ci-bounds ] || require=1
     rc=0
