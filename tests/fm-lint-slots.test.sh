@@ -1318,6 +1318,50 @@ test_an_unreadable_census_fails_one_run_once_and_does_not_delay_another_in_the_p
   pass "an unreadable process table fails one run once in $deny_secs s with no root started, and a readable run in the same pool took $ok_secs s ($alone_secs s alone)"
 }
 
+# The ShellCheck version probe is a ShellCheck start, so it takes a turn in the
+# host-wide admission like a root: it does not start while another run's root
+# holds the pool, and it does not wait when the pool is empty.
+test_the_shellcheck_version_probe_waits_for_the_admission_like_a_root() {
+  local tmp pid_a pid_b a_end b_probe a_probe t0 rc
+  tmp=$(fm_test_tmproot fm-lint-probe)
+  mkdir -p "$tmp/bin" "$tmp/real"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/a.sh"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/b.sh"
+  fm_lint_write_memory_shellcheck "$tmp/real" 48 "$tmp/mem.starts"
+  cat > "$tmp/bin/shellcheck" <<SH
+#!/bin/bash
+if [ "\$1" = --version ]; then
+  printf '%s %s\n' "\$FM_TEST_PROBE_TAG" "\$(perl -MTime::HiRes=time -e 'printf "%.6f", time')" >> "$tmp/probe.log"
+fi
+exec "$tmp/real/shellcheck" "\$@"
+SH
+  chmod +x "$tmp/bin/shellcheck"
+  : > "$tmp/mem.starts"; : > "$tmp/mem.starts.spans"; : > "$tmp/probe.log"
+  t0=$(perl -MTime::HiRes=time -e 'printf "%.6f", time')
+  env HOME="$tmp/home.a" XDG_CACHE_HOME="$tmp/home.a/.cache" FM_HOME="$tmp/fm.a" FM_TEST_PROBE_TAG=a \
+    FM_LINT_SLOT_DIR="$tmp/pool" FM_LINT_HOST_SLOTS=9 FM_LINT_ROOT_RSS_KIB=8388608 FM_TEST_MEM_HOLD=4 \
+    PATH="$tmp/bin:$PATH" "$LINT" --jobs 1 "$tmp/a.sh" > "$tmp/a.out" 2>&1 &
+  pid_a=$!
+  until [ -s "$tmp/mem.starts" ]; do sleep 0.1; done
+  env HOME="$tmp/home.b" XDG_CACHE_HOME="$tmp/home.b/.cache" FM_HOME="$tmp/fm.b" FM_TEST_PROBE_TAG=b \
+    FM_LINT_SLOT_DIR="$tmp/pool" FM_LINT_HOST_SLOTS=9 FM_LINT_ROOT_RSS_KIB=8388608 FM_TEST_MEM_HOLD=1 \
+    PATH="$tmp/bin:$PATH" "$LINT" --jobs 1 "$tmp/b.sh" > "$tmp/b.out" 2>&1 &
+  pid_b=$!
+  rc=0; wait "$pid_a" || rc=$?
+  [ "$rc" -eq 0 ] || fail "run a failed (rc=$rc)"$'\n'"$(cat "$tmp/a.out")"
+  rc=0; wait "$pid_b" || rc=$?
+  [ "$rc" -eq 0 ] || fail "run b failed (rc=$rc)"$'\n'"$(cat "$tmp/b.out")"
+  a_probe=$(awk '$1 == "a" { print $2; exit }' "$tmp/probe.log")
+  b_probe=$(awk '$1 == "b" { print $2; exit }' "$tmp/probe.log")
+  a_end=$(awk 'NR == 1 { print $3 }' "$tmp/mem.starts.spans")
+  [ -n "$a_probe" ] && [ -n "$b_probe" ] && [ -n "$a_end" ] || fail "missing probe or span times: a=$a_probe b=$b_probe end=$a_end"
+  perl -e 'exit(($ARGV[0] - $ARGV[1] < 3) ? 0 : 1)' "$a_probe" "$t0" \
+    || fail "the probe of a run with an empty pool waited $(perl -e "printf '%.1f', $a_probe - $t0") s"
+  perl -e 'exit(($ARGV[0] >= $ARGV[1] - 0.05) ? 0 : 1)' "$b_probe" "$a_end" \
+    || fail "the probe of run b started at $b_probe, before run a's root ended at $a_end: a ShellCheck start outside the admission"
+  pass "the version probe waits for another run's root like a root does (probe b $(perl -e "printf '%.2f', $b_probe - $a_end") s after the root ended) and does not wait with an empty pool"
+}
+
 # fm_lint_max_overlap <spans file>: the most stand-in analyses (lines of
 # "<pid> <start> <end>") that held their memory at the same moment.
 fm_lint_max_overlap() {
@@ -3843,6 +3887,7 @@ test_simultaneous_growth_after_admission_is_brought_back_within_the_allowance
 test_an_unreadable_host_census_never_starts_a_root_in_any_pool
 test_a_host_that_loses_its_process_table_stops_the_run_after_one_refusal
 test_an_unreadable_census_fails_one_run_once_and_does_not_delay_another_in_the_pool
+test_the_shellcheck_version_probe_waits_for_the_admission_like_a_root
 test_every_mode_takes_its_budget_from_the_same_host_wide_bound
 test_a_second_run_finds_the_budget_restored_and_repeats_the_first
 test_the_roots_log_records_each_roots_queue_wait_in_wait_ms

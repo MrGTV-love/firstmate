@@ -138,7 +138,10 @@
 # the fix after about 5 s if it cannot; a table lost while the run is under way
 # makes the root whose turn it is wait about 5 s and exit 2 the same way, and
 # that refusal stops both workers from starting any further root, so the run
-# does not spend 5 s on every root or hold the head of the shared queue. With nothing held
+# does not spend 5 s on every root or hold the head of the shared queue. The
+# version probe (`shellcheck --version`, once per lint in every mode except
+# --list-files) is a ShellCheck start too, so it takes a turn in the same
+# admission, charged 64 MiB (it holds about 15 MB for 0.02 s). With nothing held
 # and nothing running outside, one root is always admitted, so a root larger
 # than the budget runs alone once that outside memory has ended, and queued roots
 # wait rather than fail. When a root's analysis completes, a record whose input
@@ -1868,20 +1871,6 @@ fi
 
 unset SHELLCHECK_OPTS
 SHELLCHECK_BIN=$(command -v shellcheck)
-resolved=$("$SHELLCHECK_BIN" --version | awk '/^version:/ {print $2; exit}')
-printf 'fm-lint.sh: ShellCheck %s (pinned %s)\n' "$resolved" "$REQUIRED_SHELLCHECK" >&2
-if [ "$STRICT_VERSION" -eq 1 ] || [ "${GITHUB_ACTIONS:-}" = true ] || [ "${CI:-}" = true ]; then
-  export FM_LINT_STRICT_VERSION=1
-fi
-if [ "$resolved" != "$REQUIRED_SHELLCHECK" ]; then
-  if [ "${FM_LINT_STRICT_VERSION:-0}" = 1 ]; then
-    printf 'fm-lint.sh: ShellCheck %s required for CI parity, found %s. Install %s with bin/fm-install-shellcheck.sh <destination-directory>.\n' \
-      "$REQUIRED_SHELLCHECK" "$resolved" "$REQUIRED_SHELLCHECK" >&2
-    exit 1
-  fi
-  printf 'fm-lint.sh: WARNING: ShellCheck %s differs from the CI pin %s; local findings may differ. Install %s with bin/fm-install-shellcheck.sh <destination-directory>, or pass --strict-version to make this an error.\n' \
-    "$resolved" "$REQUIRED_SHELLCHECK" "$REQUIRED_SHELLCHECK" >&2
-fi
 CACHE_DIR=${FM_LINT_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/firstmate/lint}
 if [ "${GITHUB_ACTIONS:-}" = true ] || [ "${CI:-}" = true ]; then
   CACHE_DIR=off
@@ -2111,6 +2100,72 @@ WEIGHTS="$TMP_ROOT/weights"
 OUTPUT_DIR="$TMP_ROOT/output"
 mkdir -p "$OUTPUT_DIR"
 
+# A pool that cannot be used must stop the run before any root starts: the
+# host-wide memory bound would otherwise be lost silently. Each gate repeats the
+# check for its own files and refuses the same way (bin/fm-lint-cache.pl).
+pool_problem=
+if [ -L "$HOST_POOL_ROOT" ]; then
+  pool_problem="$HOST_POOL_ROOT is a symbolic link"
+else
+  ( umask 077; mkdir -p "$HOST_POOL_ROOT" ) 2>/dev/null
+  if [ ! -d "$HOST_POOL_ROOT" ]; then
+    pool_problem="$HOST_POOL_ROOT cannot be created"
+  elif [ ! -O "$HOST_POOL_ROOT" ]; then
+    pool_problem="$HOST_POOL_ROOT is owned by another user"
+  fi
+fi
+if [ -z "$pool_problem" ]; then
+  ( umask 077; mkdir -p "$SLOT_DIR" ) 2>/dev/null
+  if ! { [ -d "$SLOT_DIR" ] && [ -w "$SLOT_DIR" ]; }; then
+    pool_problem="$SLOT_DIR is not a writable directory"
+    [ "$SLOT_DIR" = "$HOST_POOL_DIR" ] || pool_problem="FM_LINT_SLOT_DIR: $pool_problem"
+  fi
+fi
+if [ -n "$pool_problem" ]; then
+  printf 'fm-lint.sh: host slot pool unusable (%s); the host-wide ShellCheck memory bound cannot be enforced, so no root was started. Make that path writable or remove it if it is damaged.\n' \
+    "$pool_problem" >&2
+  exit 2
+fi
+
+# The gate admits no root without a readable host process table, so read it once
+# here, before any root starts: a host that cannot give it fails this run in
+# about 5 s, not 5 s for every root, and holds no place in the shared queue.
+if ! census_problem=$(FM_LINT_INTERNAL_CENSUS_ONLY=1 FM_LINT_INTERNAL_HOST_RSS_KIB="$HOST_RSS_KIB" \
+    FM_LINT_INTERNAL_PYTHON="$WATCH_PYTHON" "$PERL_BIN" "$SELF_DIR/fm-lint-cache.pl" gate \
+    "$SLOT_DIR" "$NCPU" "$$" "$TMP_ROOT/census.wait" -- true 2>&1); then
+  printf '%s\n' "$census_problem" >&2
+  exit 2
+fi
+
+# The version probe is a ShellCheck start like any other, so it takes a turn in
+# the host-wide admission, charged a small fixed amount (64 MiB, above the 15 MB
+# measured for `shellcheck --version`) and never a recorded peak. It runs once per
+# lint, after the pool and census checks above and before any root, in every mode
+# except --list-files (which starts no ShellCheck).
+probe_rc=0
+resolved=$(env FM_LINT_INTERNAL_HOST_LOCK="$HOST_POOL_ROOT/admission.lock" FM_LINT_INTERNAL_HOST_RSS_KIB="$HOST_RSS_KIB" \
+    FM_LINT_INTERNAL_PYTHON="$WATCH_PYTHON" FM_LINT_INTERNAL_ROOT_CAP_KIB=65536 FM_LINT_INTERNAL_RUN_ID="$$" \
+    FM_LINT_INTERNAL_ABORT_FILE="$TMP_ROOT/census.abort" \
+    "$PERL_BIN" "$SELF_DIR/fm-lint-cache.pl" gate "$SLOT_DIR" "$NCPU" "$$" "$TMP_ROOT/probe.wait" -- \
+    "$SHELLCHECK_BIN" --version 2>"$TMP_ROOT/probe.err" | awk '/^version:/ {print $2; exit}'; exit "${PIPESTATUS[0]}") || probe_rc=$?
+if [ "$probe_rc" -ne 0 ] && [ "$probe_rc" -ne 127 ]; then
+  cat "$TMP_ROOT/probe.err" >&2
+  exit 2
+fi
+printf 'fm-lint.sh: ShellCheck %s (pinned %s)\n' "$resolved" "$REQUIRED_SHELLCHECK" >&2
+if [ "$STRICT_VERSION" -eq 1 ] || [ "${GITHUB_ACTIONS:-}" = true ] || [ "${CI:-}" = true ]; then
+  export FM_LINT_STRICT_VERSION=1
+fi
+if [ "$resolved" != "$REQUIRED_SHELLCHECK" ]; then
+  if [ "${FM_LINT_STRICT_VERSION:-0}" = 1 ]; then
+    printf 'fm-lint.sh: ShellCheck %s required for CI parity, found %s. Install %s with bin/fm-install-shellcheck.sh <destination-directory>.\n' \
+      "$REQUIRED_SHELLCHECK" "$resolved" "$REQUIRED_SHELLCHECK" >&2
+    exit 1
+  fi
+  printf 'fm-lint.sh: WARNING: ShellCheck %s differs from the CI pin %s; local findings may differ. Install %s with bin/fm-install-shellcheck.sh <destination-directory>, or pass --strict-version to make this an error.\n' \
+    "$resolved" "$REQUIRED_SHELLCHECK" "$REQUIRED_SHELLCHECK" >&2
+fi
+
 # The roots log is the retained per-root lifecycle sidecar; beside --telemetry
 # it survives as ${TELEMETRY%.tsv}.roots.tsv even when a run is killed
 # mid-flight.
@@ -2281,43 +2336,6 @@ fm_lint_wait_workers() {
     ACTIVE_PIDS=("${ACTIVE_PIDS[@]:1}")
   done
 }
-
-# A pool that cannot be used must stop the run before any root starts: the
-# host-wide memory bound would otherwise be lost silently. Each gate repeats the
-# check for its own files and refuses the same way (bin/fm-lint-cache.pl).
-pool_problem=
-if [ -L "$HOST_POOL_ROOT" ]; then
-  pool_problem="$HOST_POOL_ROOT is a symbolic link"
-else
-  ( umask 077; mkdir -p "$HOST_POOL_ROOT" ) 2>/dev/null
-  if [ ! -d "$HOST_POOL_ROOT" ]; then
-    pool_problem="$HOST_POOL_ROOT cannot be created"
-  elif [ ! -O "$HOST_POOL_ROOT" ]; then
-    pool_problem="$HOST_POOL_ROOT is owned by another user"
-  fi
-fi
-if [ -z "$pool_problem" ]; then
-  ( umask 077; mkdir -p "$SLOT_DIR" ) 2>/dev/null
-  if ! { [ -d "$SLOT_DIR" ] && [ -w "$SLOT_DIR" ]; }; then
-    pool_problem="$SLOT_DIR is not a writable directory"
-    [ "$SLOT_DIR" = "$HOST_POOL_DIR" ] || pool_problem="FM_LINT_SLOT_DIR: $pool_problem"
-  fi
-fi
-if [ -n "$pool_problem" ]; then
-  printf 'fm-lint.sh: host slot pool unusable (%s); the host-wide ShellCheck memory bound cannot be enforced, so no root was started. Make that path writable or remove it if it is damaged.\n' \
-    "$pool_problem" >&2
-  exit 2
-fi
-
-# The gate admits no root without a readable host process table, so read it once
-# here, before any root starts: a host that cannot give it fails this run in
-# about 5 s, not 5 s for every root, and holds no place in the shared queue.
-if ! census_problem=$(FM_LINT_INTERNAL_CENSUS_ONLY=1 FM_LINT_INTERNAL_HOST_RSS_KIB="$HOST_RSS_KIB" \
-    FM_LINT_INTERNAL_PYTHON="$WATCH_PYTHON" "$PERL_BIN" "$SELF_DIR/fm-lint-cache.pl" gate \
-    "$SLOT_DIR" "$NCPU" "$$" "$TMP_ROOT/census.wait" -- true 2>&1); then
-  printf '%s\n' "$census_problem" >&2
-  exit 2
-fi
 
 if [ "$JOBS" -eq 1 ]; then
   worker=0
