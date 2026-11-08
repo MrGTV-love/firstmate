@@ -90,6 +90,9 @@ TEARDOWN_RETAINED=()
 TEARDOWN_RETAINED_REASON=cleanup_ignored_payload_archived_tree_retained
 TEARDOWN_RETAINED_RECORD=
 TEARDOWN_RETAINED_PRESERVE=
+TEARDOWN_RETAINED_DIR=
+TEARDOWN_RETAINED_SUFFIX=
+TEARDOWN_RETAINED_BUILD=0
 TEARDOWN_RETAINED_UNIQUE=
 TEARDOWN_RET_HEAD=
 TEARDOWN_RET_STATUS=
@@ -856,14 +859,14 @@ teardown_bundle_preserved() {  # <copy> <ref> [hint]
 # anything cannot be listed, copied or hashed, after removing the one staging
 # directory it built, and the caller then refuses the copy rather than removing
 # unpreserved content.
-teardown_preserve_ignored() {  # <copy> [all|releasable]
-  local copy=$1 root dest stage entries entry file hash
+teardown_preserve_ignored() {  # <copy> [all|releasable] [<directory suffix>]
+  local copy=$1 root dest stage entries entry file hash suffix=${3:-}
   entries=$(teardown_preservable_ignored "$copy" "${2:-}") || return 1
   [ -n "$entries" ] || return 0
   hash=$(printf '%s' "$copy" | teardown_ignored_sha256) || return 1
   root="$DATA/$ID/nested-copy-preserved"
-  dest="$root/$hash"
-  stage="$root/.staging-$hash"
+  dest="$root/$hash$suffix"
+  stage="$root/.staging-$hash$suffix"
   rm -rf "$stage" || return 1
   (
     mkdir -p "$stage" || return 1
@@ -1434,11 +1437,24 @@ teardown_retained_snapshot() {  # <copy>
   TEARDOWN_RET_PAYLOAD=$(teardown_retained_payload "$copy") || return 1
 }
 
-# The directory teardown_preserve_ignored keeps <copy>'s ignored files in.
-teardown_retained_preserve_dir() {  # <copy>
+# The directory teardown_preserve_ignored keeps <copy>'s ignored files in. The
+# first payload of a copy goes to <sha256 of the copy path>; a later payload that
+# the first directory does not hold goes to its own directory beside it, named by
+# the first 16 characters of that payload's fingerprint, so no preserved byte is
+# ever overwritten or removed.
+teardown_retained_preserve_dir() {  # <copy> [payload-sha256]
   local hash
   hash=$(printf '%s' "$1" | teardown_ignored_sha256) || return 1
-  printf '%s/%s/nested-copy-preserved/%s\n' "$DATA" "$ID" "$hash"
+  printf '%s/%s/nested-copy-preserved/%s%s\n' "$DATA" "$ID" "$hash" "${2:+.${2:0:16}}"
+}
+
+# The preserve directory a retained record of <copy> names, or the first
+# directory when there is no record.
+teardown_retained_preserve_of() {  # <copy>
+  local rec preserve=
+  rec=$(teardown_retained_receipt "$DATA" "$1") && [ -f "$rec" ] && preserve=$(teardown_retained_fields "$rec" preserve) || true
+  [ -n "$preserve" ] || preserve=$(teardown_retained_preserve_dir "$1") || return 1
+  printf '%s\n' "$preserve"
 }
 
 # Is <entry> a plain path inside <copy> that exists and is reached through no
@@ -1602,7 +1618,8 @@ teardown_retained_matches() {  # <copy>
   [ "$(teardown_retained_fields "$rec" status-sha256)" = "$TEARDOWN_RET_STATUS" ] || return 1
   [ "$(teardown_retained_fields "$rec" payload-sha256)" = "$TEARDOWN_RET_PAYLOAD" ] || return 1
   preserve=$(teardown_retained_fields "$rec" preserve)
-  [ "$preserve" = "$(teardown_retained_preserve_dir "$copy")" ] && [ -d "$preserve" ] && [ ! -L "$preserve" ] || return 1
+  [ "$preserve" = "$(teardown_retained_preserve_dir "$copy")" ] || [ "$preserve" = "$(teardown_retained_preserve_dir "$copy" "$TEARDOWN_RET_PAYLOAD")" ] || return 1
+  { [ -d "$preserve" ] && [ ! -L "$preserve" ]; } || return 1
   TEARDOWN_RETAINED_RECORD=$rec
   TEARDOWN_RETAINED_PRESERVE=$preserve
   TEARDOWN_RETAINED_UNIQUE=$(teardown_retained_fields "$rec" unique)
@@ -1643,15 +1660,13 @@ teardown_retained_preserve_check() {  # <strict|adopt> <copy> <dir>   (driver-na
   teardown_retained_cover "$mode" "$copy" "$dir" "${named[@]}"
 }
 
-# Does every entry an earlier run adopted into the preserve of <copy> (one under
-# no entry teardown_preserve_ignored selects) still hold the copy's bytes,
-# wherever the copy still has that entry? One that now differs can only refuse
-# after the driver, and the preserve's rebuild would drop it, so it refuses first.
-# Returns 1 for an entry that differs and 2 when the check could not be made.
-teardown_retained_preserve_current() {  # <copy>
-  local copy=$1 dir p rel entry selected
+# Does the preserve in <dir> hold <copy>'s current bytes: every entry
+# teardown_preserve_ignored selects, and every entry an earlier run adopted into
+# it (one under no selected entry), wherever the copy still has that entry?
+# Returns 1 when one is missing or differs and 2 when the check could not be made.
+teardown_retained_preserve_current() {  # <copy> <dir>
+  local copy=$1 dir=$2 p rel entry selected
   local -a adopted_paths=() chosen=()
-  dir=$(teardown_retained_preserve_dir "$copy") || return 2
   [ -d "$dir" ] || return 0
   selected=$(teardown_preservable_ignored "$copy") || return 2
   while IFS= read -r entry; do
@@ -1666,8 +1681,46 @@ teardown_retained_preserve_current() {  # <copy>
     [ -e "$copy/$rel" ] || [ -L "$copy/$rel" ] || continue
     adopted_paths+=("$rel")
   done < <(find -P "$dir" ! -type d -print0)
+  if [ "${#chosen[@]}" -gt 0 ]; then
+    teardown_retained_cover strict "$copy" "$dir" "${chosen[@]}" || return $?
+  fi
   [ "${#adopted_paths[@]}" -gt 0 ] || return 0
   teardown_retained_cover strict "$copy" "$dir" "${adopted_paths[@]}"
+}
+
+# Chooses where the ignored files of <copy> are preserved for this assessment and
+# sets TEARDOWN_RETAINED_DIR to it, and TEARDOWN_RETAINED_BUILD to 1 when that
+# directory does not exist yet and teardown_preserve_ignored must build it, else
+# 0. An existing preserve is never rebuilt, overwritten or removed: the first
+# directory is kept when it already holds the copy's current bytes, and a copy
+# whose payload changed since is preserved in its own directory beside it.
+# Returns 2 when the copy or a preserve could not be read.
+teardown_retained_preserve_choose() {  # <copy>
+  local copy=$1 base rc=0
+  TEARDOWN_RETAINED_DIR=
+  TEARDOWN_RETAINED_SUFFIX=
+  TEARDOWN_RETAINED_BUILD=0
+  base=$(teardown_retained_preserve_dir "$copy") || return 2
+  if [ ! -e "$base" ] && [ ! -L "$base" ]; then
+    TEARDOWN_RETAINED_DIR=$base
+    TEARDOWN_RETAINED_BUILD=1
+    return 0
+  fi
+  [ -d "$base" ] && [ ! -L "$base" ] || return 2
+  teardown_retained_preserve_current "$copy" "$base" || rc=$?
+  if [ "$rc" = 0 ]; then
+    TEARDOWN_RETAINED_DIR=$base
+    return 0
+  fi
+  [ "$rc" = 1 ] || return 2
+  teardown_retained_snapshot "$copy" || return 2
+  TEARDOWN_RETAINED_DIR=$(teardown_retained_preserve_dir "$copy" "$TEARDOWN_RET_PAYLOAD") || return 2
+  TEARDOWN_RETAINED_SUFFIX=.${TEARDOWN_RET_PAYLOAD:0:16}
+  if [ ! -e "$TEARDOWN_RETAINED_DIR" ] && [ ! -L "$TEARDOWN_RETAINED_DIR" ]; then
+    TEARDOWN_RETAINED_BUILD=1
+    return 0
+  fi
+  [ -d "$TEARDOWN_RETAINED_DIR" ] && [ ! -L "$TEARDOWN_RETAINED_DIR" ] || return 2
 }
 
 # Does any own nested copy of the task have a retained record that still applies?
@@ -1823,7 +1876,7 @@ teardown_retained_accept() {  # <slot> <copy> <lock-sha256> <identity> <paths>
       "the copy is not proved landed and clean"
     return 1
   fi
-  dir=$(teardown_retained_preserve_dir "$copy") || return 1
+  dir=${TEARDOWN_RETAINED_DIR:-$(teardown_retained_preserve_dir "$copy")} || return 1
   if ! teardown_retained_snapshot "$copy"; then
     echo "REFUSED: the state of own nested copy $(fm_refuse_text "$copy") could not be read, so its retained state cannot be recorded; the task was not closed." >&2
     return 1
@@ -2035,22 +2088,17 @@ teardown_own_copy_dispose() {  # <slot> <copy>
   lock_hash=$(teardown_ignored_sha256 "$TEARDOWN_FOREIGN_LOCK_FILE") || lock_hash=
   identity=$(copy_identity "$copy") || identity=
   rc=0
-  teardown_retained_preserve_current "$copy" || rc=$?
-  case "$rc" in
-    0) ;;
-    1)
-      echo "REFUSED: ignored files of own nested copy $(fm_refuse_text "$copy") differ from the bytes already preserved for it in $(fm_refuse_text "$(teardown_retained_preserve_dir "$copy")"); Vernant's closeout driver was not asked, and the task was not closed." >&2
-      return 1
-      ;;
-    *)
-      echo "REFUSED: the ignored files already preserved for own nested copy $(fm_refuse_text "$copy") in $(fm_refuse_text "$DATA/$ID/nested-copy-preserved") could not be read or checked against the copy; Vernant's closeout driver was not asked, and the task was not closed." >&2
-      return 1
-      ;;
-  esac
-  teardown_preserve_ignored "$copy" || {
-    teardown_refuse_copy ignored-bytes-preserved "the ignored files of own nested copy $copy could not be preserved in $DATA/$ID/nested-copy-preserved; it was not removed." "$copy"
+  teardown_retained_preserve_choose "$copy" || rc=$?
+  if [ "$rc" != 0 ]; then
+    echo "REFUSED: the ignored files already preserved for own nested copy $(fm_refuse_text "$copy") in $(fm_refuse_text "$DATA/$ID/nested-copy-preserved") could not be read or checked against the copy; Vernant's closeout driver was not asked, and the task was not closed." >&2
     return 1
-  }
+  fi
+  if [ "$TEARDOWN_RETAINED_BUILD" = 1 ]; then
+    teardown_preserve_ignored "$copy" "" "$TEARDOWN_RETAINED_SUFFIX" || {
+      teardown_refuse_copy ignored-bytes-preserved "the ignored files of own nested copy $copy could not be preserved in $DATA/$ID/nested-copy-preserved; it was not removed." "$copy"
+      return 1
+    }
+  fi
   [ -z "$refused" ] || rm -f -- "$refused"
   rc=0
   teardown_run_closeout "$slot" "$copy" || rc=$?

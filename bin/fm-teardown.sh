@@ -4674,7 +4674,7 @@ teardown_held_copies_report() {
   return_cmd="(cd $proj_q && treehouse return $slot_q --if-lease-holder $holder_q </dev/null)"
   if [ "${#TEARDOWN_RETAINED[@]}" -gt 0 ]; then
     for copy in "${TEARDOWN_RETAINED[@]}"; do
-      echo "notice: own nested copy $(fm_refuse_text "$copy") was kept by Vernant's closeout driver and stays untouched in pool slot $(fm_refuse_text "$slot") under a durable lease; its ignored files are verified byte for byte in $(fm_refuse_text "$(teardown_retained_preserve_dir "$copy")") and it is recorded in $(fm_refuse_text "$(teardown_retained_receipt "$DATA" "$copy")")."
+      echo "notice: own nested copy $(fm_refuse_text "$copy") was kept by Vernant's closeout driver and stays untouched in pool slot $(fm_refuse_text "$slot") under a durable lease; its ignored files are verified byte for byte in $(fm_refuse_text "$(teardown_retained_preserve_of "$copy")") and it is recorded in $(fm_refuse_text "$(teardown_retained_receipt "$DATA" "$copy")")."
     done
     echo "notice: no command removes a creation-locked retained copy today: its release depends on Vernant's closeout driver (owner: the Vernant lane, through Main), and the driver's --execute-cleanup only writes another archive and keeps the tree, so do not run it for this copy; nothing returns the slot automatically."
     [ "${#TEARDOWN_FOREIGN_HELD[@]}" -gt 0 ] || return 0
