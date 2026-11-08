@@ -296,7 +296,9 @@ import os, subprocess, sys, time
 root, mode, out = sys.argv[1], sys.argv[2], sys.argv[3]
 apple = ["/bin/zsh", "-c", "/bin/sleep 600; :"]
 nonapple = [sys.executable, "-c", "import time; time.sleep(600)"]
-cmd = apple if mode.endswith("apple") else nonapple
+# "nonapple" also ends with "apple": test the longer suffix first, or every non-Apple state
+# would start the Apple shell and sleep.
+cmd = nonapple if mode.endswith("nonapple") else apple
 if mode.startswith("live"):
     p = subprocess.Popen(cmd, cwd=root)
     open(out, "w").write(str(p.pid))
@@ -332,6 +334,26 @@ PY
   sleep 0.5
 }
 
+# real_proc_shape_check <state> <pid> <label>: the leftover must really have the shape its
+# state names. A "nonapple" state whose process is an Apple platform binary (comm under
+# /bin, /usr/bin, /sbin, /usr/sbin or /System) would hide its environment and be judged by
+# another rule than the one the case means to test, so the case fails instead of passing or
+# failing for the wrong reason. An "apple" state must really be one.
+real_proc_shape_check() {
+  local state=$1 pid=$2 label=$3 comm kind want
+  comm=$(ps -o comm= -p "$pid" 2>/dev/null | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+  case "$comm" in
+    /bin/*|/usr/bin/*|/sbin/*|/usr/sbin/*|/System/*) kind=apple ;;
+    ?*) kind=nonapple ;;
+    *) kind=unreadable ;;
+  esac
+  case "$state" in *nonapple) want=nonapple ;; *) want=apple ;; esac
+  if [ "$kind" != "$want" ]; then
+    kill "$pid" 2>/dev/null || true
+    fail "$label: the fixture process $pid should be $want but its comm is '${comm:-unreadable}'"
+  fi
+}
+
 test_real_leftover_processes_at_the_copy_root_are_ended_only_when_proved_the_tasks_own() {
   local rc route state want pid parent rec identity
   if ! ps -p $$ -o pid= >/dev/null 2>&1 || ! real_proc_python >/dev/null; then
@@ -350,6 +372,7 @@ test_real_leftover_processes_at_the_copy_root_are_ended_only_when_proved_the_tas
       case "$state" in
         recorded-orphan-apple)
           real_proc_start live-apple || fail "b-leftover-$state-$route: the fixture did not start"
+          real_proc_shape_check live-apple "$PROC_PID" "b-leftover-$state-$route"
           # Run 1 refuses before anything is reaped (a dirty copy), after the owned record is written.
           printf 'edit\n' > "$FOREIGN_COPY/untracked.txt"
           if [ "$route" = kept ]; then real_teardown rc FM_STUB_CLOSEOUT=retained; else real_teardown rc; fi
@@ -370,6 +393,7 @@ test_real_leftover_processes_at_the_copy_root_are_ended_only_when_proved_the_tas
           ;;
         *)
           real_proc_start "$state" || fail "b-leftover-$state-$route: the fixture did not start"
+          real_proc_shape_check "$state" "$PROC_PID" "b-leftover-$state-$route"
           ;;
       esac
       pid=$PROC_PID
