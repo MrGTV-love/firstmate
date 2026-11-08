@@ -228,9 +228,11 @@ test_a_copy_with_a_foreign_process_inside_it_is_kept_and_the_slot_stays_leased()
   pass "b-process: a copy with a foreign process inside it is refused naming the process, the process is left running, and the copy, the task and the real lease are unchanged"
 }
 
-# The task's own process (cwd exactly at the copy's root, as the worker session's
-# is) is what the retire phase ends; this is base behavior (bin/fm-teardown-nested-lib.sh
-# teardown_own_scan), not part of the kept-copy route. Needs a ps that works.
+# The task's own process is what the retire phase ends, and it is proved the task's
+# own by its launch environment (FM_TASK_INBOX, exported by bin/fm-spawn.sh), never
+# by its working directory: one at the copy's root that carries the task's marker is
+# ended; one at the root that does not (a foreign user's, or one with a scrubbed
+# environment) refuses the close and is left running (next case). Needs a working ps.
 test_a_process_at_the_copy_root_is_the_tasks_own_and_is_ended_before_the_close() {
   local rc pid
   if ! ps -p $$ -o pid= >/dev/null 2>&1; then
@@ -239,7 +241,7 @@ test_a_process_at_the_copy_root_is_the_tasks_own_and_is_ended_before_the_close()
   fi
   real_case b-process-own
   rm -f "$FOREIGN_CASE/fakebin/lsof"
-  ( cd "$FOREIGN_COPY" && exec sleep 600 ) &
+  ( cd "$FOREIGN_COPY" && exec env "FM_TASK_INBOX=$(cd "$FOREIGN_CASE/state" && pwd -P)/task-x1.inbox" sleep 600 ) &
   pid=$!
   sleep 1
   real_teardown rc FM_STUB_CLOSEOUT=retained
@@ -253,6 +255,38 @@ test_a_process_at_the_copy_root_is_the_tasks_own_and_is_ended_before_the_close()
   expect_code 0 "$rc" "b-process-own: the close must succeed once the task's own process is ended: $(cat "$FOREIGN_CASE/stderr")"
   real_assert_closed "b-process-own"
   pass "b-process-own: a process at the copy root is the task's own, is ended, and the kept copy and its lease are unchanged"
+}
+
+test_a_foreign_or_scrubbed_process_at_the_copy_root_is_never_ended_and_refuses_the_close() {
+  local rc pid shape route
+  for route in kept released; do
+    for shape in foreign scrubbed; do
+      real_case b-process-root-$shape-$route
+      rm -f "$FOREIGN_CASE/fakebin/lsof"
+      SLOT_ENTRY_BEFORE=$(real_slot_entry)
+      case "$shape" in
+        foreign) ( cd "$FOREIGN_COPY" && exec env "FM_TASK_INBOX=$(cd "$FOREIGN_CASE/state" && pwd -P)/other-task.inbox" sleep 600 ) & ;;
+        scrubbed) ( cd "$FOREIGN_COPY" && exec env -i /bin/sleep 600 ) & ;;
+      esac
+      pid=$!
+      sleep 1
+      if [ "$route" = kept ]; then real_teardown rc FM_STUB_CLOSEOUT=retained; else real_teardown rc; fi
+      real_record after
+      if ! kill -0 "$pid" 2>/dev/null; then
+        fail "b-process-root-$shape-$route: the process at the copy root that is not proved the task's own was ended"
+      fi
+      kill "$pid" 2>/dev/null || true
+      wait "$pid" 2>/dev/null || true
+      expect_code 1 "$rc" "b-process-root-$shape-$route: a process at the root that is not proved the task's own must refuse: $(cat "$FOREIGN_CASE/stderr")"
+      assert_grep "process $pid" "$FOREIGN_CASE/stderr" "b-process-root-$shape-$route: the refusal did not name the process"
+      # The cause is the missing launch marker, not an unrelated inability to read the process.
+      grep -Eq "process $pid is running in it|does not carry this task's FM_TASK_INBOX launch marker" "$FOREIGN_CASE/stderr" \
+        || fail "b-process-root-$shape-$route: the refusal does not say the process is not proved the task's own: $(grep -E "process $pid" "$FOREIGN_CASE/stderr" | head -3)"
+      assert_equals 0 "$(retained_call_count)" "b-process-root-$shape-$route: the driver was asked about a copy with a live user"
+      real_assert_kept "b-process-root-$shape-$route"
+    done
+  done
+  pass "b-process-root: on the kept and the released route, a process at the copy root that is foreign or has a scrubbed environment refuses the close by name, is left running, and the copy, the task and the real lease are unchanged"
 }
 
 test_a_copy_that_another_task_record_names_is_kept_and_the_slot_stays_leased() {
@@ -399,6 +433,7 @@ test_a_real_pool_slot_keeps_its_lease_and_the_unique_files_are_preserved_and_the
 test_a_real_pool_slot_is_returned_after_the_unique_file_is_preserved_and_the_control_is_removed
 test_a_copy_with_a_foreign_process_inside_it_is_kept_and_the_slot_stays_leased
 test_a_process_at_the_copy_root_is_the_tasks_own_and_is_ended_before_the_close
+test_a_foreign_or_scrubbed_process_at_the_copy_root_is_never_ended_and_refuses_the_close
 test_a_copy_that_another_task_record_names_is_kept_and_the_slot_stays_leased
 test_a_slot_another_task_claims_is_left_untouched_and_stays_leased
 test_a_start_racing_the_close_never_receives_the_held_slot

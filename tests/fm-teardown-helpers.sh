@@ -77,14 +77,43 @@ teardown_fixture_track() {
   printf '%s\t%s\n' "$signal" "$birth" > "$TEARDOWN_FIXTURE_PROCESSES/$pid"
 }
 
+# The launch marker bin/fm-spawn.sh exports for a task's worker session
+# (FM_TASK_INBOX=<physical state dir>/<id>.inbox): a process at a root counts as the
+# task's own only with it (teardown_process_marked). A fixture started with
+# teardown_fixture_start is the task's own, so it carries the marker of the case
+# directory that holds <cwd> (every case's task is task-x1);
+# teardown_fixture_start_foreign starts one without it.
+teardown_fixture_marker() {  # <cwd>
+  local d=$1
+  while [ -n "$d" ] && [ "$d" != / ]; do
+    if [ -d "$d/state" ] && [ -d "$d/fakebin" ]; then
+      printf 'FM_TASK_INBOX=%s/task-x1.inbox\n' "$(cd "$d/state" && pwd -P)"
+      return 0
+    fi
+    d=$(dirname "$d")
+  done
+  return 1
+}
+
+teardown_fixture_start_foreign() {
+  TEARDOWN_FIXTURE_FOREIGN=1 teardown_fixture_start "$@"
+}
+
 teardown_fixture_start() {
-  local cwd=$1 signal=$2 interrupted=0
+  local cwd=$1 signal=$2 interrupted=0 marker=
   shift 2
+  [ -n "${TEARDOWN_FIXTURE_FOREIGN:-}" ] || marker=$(teardown_fixture_marker "$cwd") || marker=""
   trap 'interrupted=130' INT
   trap 'interrupted=143' TERM
   trap 'interrupted=129' HUP
   trap 'interrupted=131' QUIT
-  (cd "$cwd" && exec "$@") &
+  if [ -n "$marker" ]; then
+    (cd "$cwd" && exec env "$marker" "$@") &
+  elif [ -n "${TEARDOWN_FIXTURE_FOREIGN:-}" ]; then
+    (cd "$cwd" && exec env -u FM_TASK_INBOX "$@") &
+  else
+    (cd "$cwd" && exec "$@") &
+  fi
   TEARDOWN_FIXTURE_PID=$!
   teardown_fixture_track "$TEARDOWN_FIXTURE_PID" "$signal"
   [ "$signal" != KILL ] || disown "$TEARDOWN_FIXTURE_PID"
@@ -2702,6 +2731,25 @@ run_foreign_teardown() {
     NM_HOME="$case_dir/nm" PATH="$case_dir/fakebin:${FM_TEARDOWN_TEST_PATH:-$PATH}" \
     "$TEARDOWN" task-x1 ${FOREIGN_TEARDOWN_ARGS[@]+"${FOREIGN_TEARDOWN_ARGS[@]}"} > "$case_dir/stdout" 2> "$case_dir/stderr" || status=$?
   printf -v "$rc_var" '%s' "$status"
+  retained_observe "$status" "$@"
+}
+
+# With FM_RETAINED_EVIDENCE=<file>, one line per teardown run: the observations a
+# grader needs from the run itself (not "ok"): test, case, arguments, exit status,
+# the stand-in driver's call count, an independent listing hash of the tar
+# directory (path and SHA-256 of every tar), and the task, copy and record state.
+retained_observe() {  # <status> [env...]
+  [ -n "${FM_RETAINED_EVIDENCE:-}" ] || return 0
+  local fn test_name=unknown tars rec
+  for fn in "${FUNCNAME[@]}"; do
+    case "$fn" in test_*) test_name=$fn; break ;; esac
+  done
+  tars=$(find "$FOREIGN_SLOT/.claude/bug-evidence/worktree-preservation" -name '*.tar' -type f -exec shasum -a 256 {} + 2>/dev/null | LC_ALL=C sort | shasum -a 256 | awk '{print substr($1,1,16)}')
+  rec=absent
+  [ ! -e "$(retained_record_path 2>/dev/null)" ] || rec=present
+  printf '%s | case=%s | args=%s | exit=%s | driver-calls=%s | tar-files=%s tar-listing-sha256=%s | task-record=%s | copy=%s | retained-record=%s\n' \
+    "$test_name" "${FOREIGN_CASE##*/}" "${FOREIGN_TEARDOWN_ARGS[*]:-none}" "$1" "$(retained_call_count)" "$(retained_tar_count)" "${tars:-none}" \
+    "$([ -e "$FOREIGN_CASE/state/task-x1.meta" ] && echo kept || echo gone)" "$([ -e "$FOREIGN_COPY/.git" ] && echo kept || echo gone)" "$rec" >> "$FM_RETAINED_EVIDENCE"
 }
 
 # Nothing moved: the copy, its branch and the slot are intact and no closeout

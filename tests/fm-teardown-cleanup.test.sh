@@ -4925,7 +4925,7 @@ SH
 }
 
 test_earlier_preserved_copy_survives_until_its_replacement_is_verified() {
-  local shape rc exclude hash dest real_cp
+  local shape rc exclude hash dest real_cp beside
   real_cp=$(command -v cp)
   for shape in failed-copy replaced; do
     dead_launcher_pid
@@ -4955,13 +4955,19 @@ SH
       assert_equals "earlier backup" "$(cat "$dest/unique.dat")" "own-backup-$shape: the earlier preserved copy was destroyed by a failed replacement"
       assert_equals "earlier manifest" "$(cat "$dest/SHA256SUMS")" "own-backup-$shape: the earlier manifest was destroyed by a failed replacement"
     else
-      expect_code 0 "$rc" "own-backup-$shape: a verified replacement must release the copy: $(cat "$FOREIGN_CASE/stderr")"
-      assert_equals "only here" "$(cat "$dest/unique.dat")" "own-backup-$shape: the earlier preserved copy was not replaced"
-      assert_grep "$(shasum -a 256 "$dest/unique.dat" | awk '{print $1}')  unique.dat" "$dest/SHA256SUMS" \
-        "own-backup-$shape: the manifest does not describe the replacement"
+      # An existing preserve is never replaced (Main 1970): the verified new one is
+      # written beside it and the earlier backup keeps every byte.
+      expect_code 0 "$rc" "own-backup-$shape: a verified new preserve must release the copy: $(cat "$FOREIGN_CASE/stderr")"
+      assert_equals "earlier backup" "$(cat "$dest/unique.dat")" "own-backup-$shape: the earlier preserved copy was replaced"
+      assert_equals "earlier manifest" "$(cat "$dest/SHA256SUMS")" "own-backup-$shape: the earlier manifest was replaced"
+      beside=$(find "$FOREIGN_CASE/data/task-x1/nested-copy-preserved" -maxdepth 1 -type d -name "$hash.*" | head -n 1)
+      [ -n "$beside" ] || fail "own-backup-$shape: no new preserve was written beside the earlier one"
+      assert_equals "only here" "$(cat "$beside/unique.dat")" "own-backup-$shape: the new preserve lacks the copy's bytes"
+      assert_grep "$(shasum -a 256 "$beside/unique.dat" | awk '{print $1}')  unique.dat" "$beside/SHA256SUMS" \
+        "own-backup-$shape: the manifest does not describe the new preserve"
     fi
   done
-  pass "an earlier preserved copy of a locked own copy survives a failed replacement and is replaced only by a verified one"
+  pass "an earlier preserved copy of a locked own copy survives a failed new preserve and a verified one; the new preserve is written beside it, never over it"
 }
 
 test_a_held_copy_keeps_its_unique_ignored_files_and_none_are_preserved() {
@@ -7157,6 +7163,178 @@ test_the_retained_record_states_the_disposition_facts() {
   pass "the retained record states that the driver's --execute-cleanup keeps the tree and writes another archive and that no disposal, unlock or force route is added"
 }
 
+# Round 3 of the outcome review: the driver's name is judged as written (before any
+# trimming); a link target and a path are framed without tab or newline loss; no
+# preserve is ever replaced; every preserve failure leaves a durable record.
+test_a_driver_name_is_judged_as_written_before_any_trimming() {
+  local variant rc run names exclude want
+  for variant in link-dir-slash link-final dangling-link double-slash dot-component link-inside; do
+    make_retained_case "retained-name-$variant" enclosing
+    exclude=$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)
+    printf '%s\n' '.claude/portal' >> "$exclude"
+    mkdir -p "$FOREIGN_CASE/outside"
+    printf 'x\n' > "$FOREIGN_CASE/outside/f"
+    want=1
+    case "$variant" in
+      link-dir-slash) ln -s "$FOREIGN_CASE/outside" "$FOREIGN_COPY/.claude/portal"; names=".claude/portal/" ;;
+      link-final) ln -s "$FOREIGN_CASE/outside" "$FOREIGN_COPY/.claude/portal"; names=".claude/portal" ;;
+      dangling-link) ln -s "$FOREIGN_CASE/nowhere" "$FOREIGN_COPY/.claude/portal"; names=".claude/portal" ;;
+      double-slash) names=".claude/channel-outbox//a.jsonl" ;;
+      dot-component) names=".claude/./channel-outbox/a.jsonl" ;;
+      link-inside) ln -s "$FOREIGN_COPY/notes" "$FOREIGN_COPY/.claude/portal"; names=".claude/portal"; want=0 ;;
+    esac
+    run_foreign_teardown rc FM_STUB_CLOSEOUT=retained "FM_STUB_UNIQUE=$names"
+    expect_code "$want" "$rc" "retained-name-$variant: wrong result for the driver name $names: $(cat "$FOREIGN_CASE/stderr")"
+    assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-name-$variant: run 1 should have asked the driver once"
+    if [ "$want" = 1 ]; then
+      assert_present "$FOREIGN_CASE/state/task-x1.meta" "retained-name-$variant: the task record was removed"
+      assert_absent "$(retained_record_path)" "retained-name-$variant: a retained record was written"
+      for run in 2 3; do
+        run_foreign_teardown rc FM_STUB_CLOSEOUT=retained "FM_STUB_UNIQUE=$names"
+        expect_code 1 "$rc" "retained-name-$variant: run $run must refuse"
+        assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-name-$variant: run $run asked the driver again"
+      done
+    else
+      assert_present "$(retained_record_path)" "retained-name-$variant: no retained record was written"
+    fi
+  done
+  pass "a driver name that resolves outside the copy (through a trailing slash or a final symlink), dangles, or has an empty or dot component refuses and is recorded, and a link that stays inside the copy closes"
+}
+
+retained_link_target_is() {  # <path> <expected-bytes-file>
+  perl -e 'print readlink($ARGV[0])' -- "$1" | cmp -s - "$2"
+}
+
+test_link_targets_and_names_are_framed_without_tab_or_newline_loss() {
+  local rc shape link exclude
+  for shape in newline-target tab-pair; do
+    make_retained_case "retained-link-$shape" enclosing
+    held_plain_get_slot "$FOREIGN_CASE"
+    : > "$FOREIGN_CASE/no-lease-command"
+    link="$FOREIGN_COPY/.claude/channel-outbox/lnk"
+    case "$shape" in
+      newline-target) ln -s foo "$link" ;;
+      tab-pair) ln -s "foo	lbar" "$FOREIGN_COPY/.claude/channel-outbox/a" ;;
+    esac
+    run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+    assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-link-$shape: run 1 should have asked the driver once"
+    case "$shape" in
+      newline-target) ln -sfn "foo
+" "$link" ;;
+      tab-pair) rm -f "$FOREIGN_COPY/.claude/channel-outbox/a"; ln -s bar "$FOREIGN_COPY/.claude/channel-outbox/a	lfoo" ;;
+    esac
+    run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+    assert_equals "2 2" "$(retained_call_count) $(retained_tar_count)" "retained-link-$shape: a changed link was not assessed again exactly once"
+    run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+    assert_equals "2 2" "$(retained_call_count) $(retained_tar_count)" "retained-link-$shape: the unchanged retry asked the driver"
+    rm -f "$FOREIGN_CASE/no-lease-command"
+    run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+    expect_code 0 "$rc" "retained-link-$shape: the close must succeed once the slot can be leased: $(cat "$FOREIGN_CASE/stderr")"
+    case "$shape" in
+      newline-target)
+        printf 'foo\n' > "$FOREIGN_CASE/want.target"
+        retained_link_target_is "$(retained_field "$(retained_record_path)" preserve)/.claude/channel-outbox/lnk" "$FOREIGN_CASE/want.target" \
+          || fail "retained-link-$shape: the preserved link target is not the copy's target byte for byte"
+        ;;
+    esac
+  done
+  pass "a link whose target gains a trailing newline, and two names that differ only after a tab, are different payloads (one reassessment each), and a preserved link keeps its target byte for byte"
+}
+
+test_a_preserve_that_does_not_hold_never_replaces_the_earlier_one_and_never_repeats_the_driver() {
+  local rc preserve rec
+  # (a) a concurrent actor corrupts the preserve while the driver runs
+  make_retained_case retained-unheld-corrupt enclosing
+  preserve=$FOREIGN_CASE/data/task-x1/nested-copy-preserved/$(printf '%s' "$FOREIGN_COPY" | shasum -a 256 | awk '{print $1}')
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained "FM_STUB_AFTER=printf 'corrupted\n' > '$preserve/notes/unique.dat'"
+  expect_code 1 "$rc" "retained-unheld-corrupt: run 1 must refuse: $(cat "$FOREIGN_CASE/stderr")"
+  assert_present "$(retained_refused_record_path)" "retained-unheld-corrupt: the refusal left no durable record"
+  for run in 2 3; do
+    run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+    assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-unheld-corrupt: run $run asked the driver again"
+  done
+  assert_equals "corrupted" "$(cat "$preserve/notes/unique.dat")" "retained-unheld-corrupt: the earlier preserve was replaced"
+  rec=$(retained_field "$(retained_record_path)" preserve)
+  [ -n "$rec" ] && [ "$rec" != "$preserve" ] || fail "retained-unheld-corrupt: the close was not recorded against a new preserve beside the first"
+  assert_equals "only here" "$(cat "$rec/notes/unique.dat")" "retained-unheld-corrupt: the new preserve does not hold the copy's bytes"
+  # (b) the driver changes a selected ignored file while it runs
+  make_retained_case retained-unheld-changed enclosing
+  preserve=$FOREIGN_CASE/data/task-x1/nested-copy-preserved/$(printf '%s' "$FOREIGN_COPY" | shasum -a 256 | awk '{print $1}')
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained "FM_STUB_AFTER=printf 'changed payload\n' > '$FOREIGN_COPY/notes/unique.dat'"
+  expect_code 1 "$rc" "retained-unheld-changed: run 1 must refuse: $(cat "$FOREIGN_CASE/stderr")"
+  assert_equals "only here" "$(cat "$preserve/notes/unique.dat")" "retained-unheld-changed: run 1 replaced the earlier preserve"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  expect_code 0 "$rc" "retained-unheld-changed: the changed payload must be assessed and closed: $(cat "$FOREIGN_CASE/stderr")"
+  assert_equals "2 2" "$(retained_call_count) $(retained_tar_count)" "retained-unheld-changed: the changed payload was not assessed exactly once"
+  assert_equals "only here" "$(cat "$preserve/notes/unique.dat")" "retained-unheld-changed: the earlier preserve lost its bytes"
+  assert_equals "changed payload" "$(cat "$(retained_field "$(retained_record_path)" preserve)/notes/unique.dat")" "retained-unheld-changed: the new preserve lacks the new bytes"
+  # (c) an unavailable interpreter, then a pre-existing preserve and a later answer
+  make_retained_case retained-unheld-interp enclosing
+  preserve=$FOREIGN_CASE/data/task-x1/nested-copy-preserved/$(printf '%s' "$FOREIGN_COPY" | shasum -a 256 | awk '{print $1}')
+  mkdir -p "$preserve/notes"
+  printf 'earlier backup\n' > "$preserve/notes/unique.dat"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained FM_TEARDOWN_VERNANT_PYTHON="$FOREIGN_CASE/no-such-python"
+  expect_code 1 "$rc" "retained-unheld-interp: a missing interpreter must refuse"
+  assert_equals "earlier backup" "$(cat "$preserve/notes/unique.dat")" "retained-unheld-interp: the earlier preserve was replaced by a refused run"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  expect_code 0 "$rc" "retained-unheld-interp: the later answer must close: $(cat "$FOREIGN_CASE/stderr")"
+  assert_equals "earlier backup" "$(cat "$preserve/notes/unique.dat")" "retained-unheld-interp: the pre-existing preserve was replaced"
+  pass "a preserve that does not hold leaves a durable record, the driver is not asked again for the unchanged copy, no earlier preserve is replaced, and a changed payload is preserved beside and assessed once"
+}
+
+test_an_ignored_file_created_while_the_driver_runs_refuses_and_is_assessed_afresh() {
+  local rc
+  make_retained_case retained-late-ignored enclosing
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained "FM_STUB_AFTER=printf 'late\n' > '$FOREIGN_COPY/.claude/channel-outbox/late.jsonl'"
+  git -C "$FOREIGN_COPY" check-ignore -q .claude/channel-outbox/late.jsonl || fail "retained-late-ignored: the fixture file is not ignored"
+  expect_code 1 "$rc" "retained-late-ignored: an ignored file created during the driver call must refuse: $(cat "$FOREIGN_CASE/stderr")"
+  assert_present "$FOREIGN_CASE/state/task-x1.meta" "retained-late-ignored: the task record was removed"
+  assert_absent "$(retained_record_path)" "retained-late-ignored: a retained record was written"
+  assert_equals "late" "$(cat "$FOREIGN_COPY/.claude/channel-outbox/late.jsonl")" "retained-late-ignored: the late file changed"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  expect_code 0 "$rc" "retained-late-ignored: the changed payload must be assessed afresh and close: $(cat "$FOREIGN_CASE/stderr")"
+  assert_equals "2 2" "$(retained_call_count) $(retained_tar_count)" "retained-late-ignored: the changed payload was not assessed exactly once"
+  pass "an ignored file created while the driver runs refuses the close without a record, and the next run assesses the changed payload once and closes"
+}
+
+# The launch marker is read from the process environment, never inferred from the
+# process's place. The function is exercised on its own with a ps stand-in that
+# prints a process line the way `ps -ww -E -o command=` does.
+test_the_launch_marker_is_read_from_the_process_environment() {
+  local dir fake state_real case_name want line rc
+  dir=$(make_case marker-reader)
+  fake=$dir/fakebin
+  state_real=$(cd "$dir/state" && pwd -P)
+  eval "$(sed -n '/^teardown_process_env_lines() {/,/^}/p; /^teardown_process_marked() {/,/^}/p' "$ROOT/bin/fm-teardown-nested-lib.sh")"
+  # shellcheck disable=SC2034 # read by teardown_process_marked, evaluated above.
+  STATE=$dir/state
+  # shellcheck disable=SC2034 # read by teardown_process_marked, evaluated above.
+  ID=task-x1
+  for case_name in present:0 other-task:1 absent:1 prefix-of-longer-value:1 inside-another-name:1 unreadable:1; do
+    want=${case_name#*:}
+    case "${case_name%:*}" in
+      present) line="sleep 600 HOME=/h FM_TASK_INBOX=$state_real/task-x1.inbox TERM=x" ;;
+      other-task) line="sleep 600 FM_TASK_INBOX=$state_real/task-y1.inbox" ;;
+      absent) line="sleep 600 HOME=/h" ;;
+      prefix-of-longer-value) line="sleep 600 FM_TASK_INBOX=$state_real/task-x1.inbox.old" ;;
+      inside-another-name) line="sleep 600 XFM_TASK_INBOX=$state_real/task-x1.inbox" ;;
+      unreadable) line="" ;;
+    esac
+    cat > "$fake/ps" <<SH
+#!/usr/bin/env bash
+case "\$*" in
+  *"-E"*"-o command="*) [ -n '$line' ] && printf '%s\n' '$line' || exit 1 ;;
+  *) exit 1 ;;
+esac
+SH
+    chmod +x "$fake/ps"
+    rc=0
+    PATH="$fake:$PATH" teardown_process_marked 4242 || rc=$?
+    [ "$rc" = "$want" ] || fail "marker-reader $case_name: expected result $want, got $rc"
+  done
+  pass "a process counts as the task's own only when its environment carries exactly this task's FM_TASK_INBOX value: another task's value, a longer value, a different variable name and an unreadable environment do not"
+}
+
 # F-round probes, two real processes on one kept copy. The first teardown holds in
 # the driver (the stand-in sleeps after it wrote its tar); the second starts while
 # it is there. Whatever the second does, the driver is asked once and one tar exists.
@@ -7503,6 +7681,11 @@ test_a_changed_retry_after_a_refusal_after_the_driver_keeps_the_earlier_preserve
 test_an_unwritable_retained_record_never_makes_an_unchanged_retry_ask_the_driver
 test_a_retry_of_a_closed_kept_copy_task_says_it_is_already_closed
 test_the_retained_record_states_the_disposition_facts
+test_a_driver_name_is_judged_as_written_before_any_trimming
+test_link_targets_and_names_are_framed_without_tab_or_newline_loss
+test_a_preserve_that_does_not_hold_never_replaces_the_earlier_one_and_never_repeats_the_driver
+test_an_ignored_file_created_while_the_driver_runs_refuses_and_is_assessed_afresh
+test_the_launch_marker_is_read_from_the_process_environment
 )
 
 # In the combined tests/fm-teardown.test.sh run,

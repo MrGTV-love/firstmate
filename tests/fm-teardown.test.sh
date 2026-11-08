@@ -2696,10 +2696,13 @@ make_bundle_copy_case() {  # <name> [mode]
 # header, "Recorded bundle preservation"): an unlanded commit held by a recorded
 # verified bundle and filed with the captain's call is the one unlanded state it
 # accepts; a refs/fm/anchor ref alone is not (tests/fm-teardown-cleanup.test.sh).
+retained_field_of() {  # <record> <key>
+  sed -n "s/^$2=//p" "$1" | head -n 1
+}
+
 test_the_kept_copy_route_accepts_a_recorded_verified_bundle_for_unlanded_commits() {
   local rc bundle
   make_retained_case retained-bundle enclosing
-  rm -f "$FOREIGN_COPY/notes/unique.dat"
   printf 'recoverable work\n' > "$FOREIGN_COPY/work.txt"
   git -C "$FOREIGN_COPY" add work.txt
   git -C "$FOREIGN_COPY" -c user.email=t@t -c user.name=t commit -qm 'unpublished work'
@@ -2710,6 +2713,7 @@ test_the_kept_copy_route_accepts_a_recorded_verified_bundle_for_unlanded_commits
   expect_code 0 "$rc" "retained-bundle: a recorded verified bundle must let the kept route close: $(cat "$FOREIGN_CASE/stderr")"
   assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-bundle: the driver was not asked exactly once"
   assert_present "$(retained_record_path)" "retained-bundle: no retained record was written"
+  assert_equals "only here" "$(cat "$(retained_field_of "$(retained_record_path)" preserve)/notes/unique.dat")" "retained-bundle: the selected ignored file is not in the preserve"
   assert_present "$FOREIGN_COPY/.git" "retained-bundle: the copy was removed"
   assert_grep "$bundle" "$FOREIGN_CASE/stderr" "retained-bundle: the bundle was not reported"
   pass "the kept-copy route closes around a copy whose unlanded commits a recorded verified bundle holds, as the header's mechanics allow"

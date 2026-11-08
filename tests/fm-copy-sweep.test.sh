@@ -1699,16 +1699,18 @@ test_a_sweep_from_another_home_does_not_ask_the_driver_for_a_copy_a_lane_record_
 
 test_a_sweep_holds_a_copy_when_another_homes_records_cannot_be_read() {
   local copy mode calls
-  for mode in unreadable-folder skipped-home; do
+  for mode in unreadable-folder unsearchable-data skipped-home; do
     make_locked_copy_case "xhome-$mode" dead
     install_driver "$SLOT" "$W"
     make_lane l1
     copy=$(copy_path locked)
     case "$mode" in
       unreadable-folder) mkdir -p "$W/lane-l1/data/copy-sweep/retained"; chmod 000 "$W/lane-l1/data/copy-sweep/retained" ;;
+      unsearchable-data) mkdir -p "$W/lane-l1/data/copy-sweep/retained"; chmod 000 "$W/lane-l1/data" ;;
       skipped-home) rm -rf "$W/lane-l1" ;;
     esac
     FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+    chmod 755 "$W/lane-l1/data" 2>/dev/null || true
     chmod 755 "$W/lane-l1/data/copy-sweep/retained" 2>/dev/null || true
     [ "$RC" = 0 ] || fail "$mode: the run failed ($RC): $OUT"
     assert_class locked HELD-LOCKED
