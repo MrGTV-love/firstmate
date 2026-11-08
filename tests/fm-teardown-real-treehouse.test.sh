@@ -379,9 +379,8 @@ test_real_leftover_processes_at_the_copy_root_are_ended_only_when_proved_the_tas
       if [ "$want" = ended ]; then
         sleep 0.5
         if real_proc_alive "$pid"; then
-          # What the close did, before the process is killed: the exit code, its last
-          # output, the process state, and the signals the product audited for this pid.
-          survivor="rc=$rc; ps(stat ppid)=$(ps -o stat=,ppid= -p "$pid" 2>&1 | tr -s ' '); signals audited for $pid=$(awk -F'\t' -v p="$pid" '$3 == p { printf "%s ", $2 }' "$FOREIGN_CASE/state/task-x1.teardown-processes" 2>/dev/null); close stderr tail=$(tail -c 1200 "$FOREIGN_CASE/stderr" 2>/dev/null | tr '\n' '|')"
+          # What the close did, before the process is killed (teardown_diag_report).
+          survivor=$(teardown_diag_report "$FOREIGN_CASE" "$rc" "$pid")
           kill "$pid" 2>/dev/null || true
           fail "b-leftover-$state-$route: a process proved the task's own was not ended ($survivor)"
         fi

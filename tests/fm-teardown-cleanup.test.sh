@@ -2434,7 +2434,7 @@ SH
 }
 
 test_process_spawned_during_grace_is_reaped_on_later_pass() {
-  local case_dir rc pid child_file child_pid="" parent_survived=0 child_survived=0
+  local case_dir rc pid child_file child_pid="" parent_survived=0 child_survived=0 diag
   case_dir=$(make_case grace-spawn-convergence)
   write_meta "$case_dir" no-mistakes ship
   land_shippable_commit "$case_dir"
@@ -2487,6 +2487,8 @@ PERL
   run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   if [ -f "$child_file" ]; then child_pid=$(cat "$child_file"); fi
+  # What the close did, read before any process is stopped (teardown_diag_report).
+  diag=$(teardown_diag_report "$case_dir" "$rc" "$child_pid" "$pid")
   if [ -n "$child_pid" ] && kill -0 "$child_pid" 2>/dev/null; then
     child_survived=1
     teardown_fixture_stop "$child_pid"
@@ -2495,10 +2497,10 @@ PERL
     parent_survived=1
     teardown_fixture_stop "$pid"
   fi
-  expect_code 0 "$rc" "grace-spawn-convergence: teardown should converge"
+  expect_code 0 "$rc" "grace-spawn-convergence: teardown should converge ($diag)"
   assert_present "$child_file" "grace-spawn-convergence: TERM handler did not spawn a child"
-  [ "$child_survived" -eq 0 ] || fail "grace-spawn-convergence: spawned child survived"
-  [ "$parent_survived" -eq 0 ] || fail "grace-spawn-convergence: original process survived"
+  [ "$child_survived" -eq 0 ] || fail "grace-spawn-convergence: spawned child survived ($diag)"
+  [ "$parent_survived" -eq 0 ] || fail "grace-spawn-convergence: original process survived ($diag)"
   pass "a process spawned during grace is reaped on a later pass"
 }
 

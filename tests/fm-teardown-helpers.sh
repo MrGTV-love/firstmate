@@ -3495,3 +3495,37 @@ SH
   chmod +x "$case_dir/fakebin/mv"
 }
 
+
+# teardown_diag_report <case-dir> <rc> [<pid>...]: one line that says what a close did, for a
+# failure message. It carries the exit code; for each given pid its ps state, parent, command
+# and the number of launch-marker words `ps -E` shows (the marker read the product relies on);
+# the signals the teardown audited for it (state/*.teardown-processes); the owned record; the
+# close's stderr with the test home's watcher banner removed; the last 40 stderr lines that
+# say REFUSED, refus, skip or error; and the pid and command of every process a REFUSED line
+# names. It reads only; callers use it before they stop any process.
+teardown_diag_report() {
+  local case_dir=$1 rc=$2 err pid line named out="" audited rec
+  shift 2
+  err=$case_dir/stderr
+  out="rc=$rc"
+  for pid in "$@"; do
+    [ -n "$pid" ] || continue
+    out+="; pid $pid: ps(stat ppid comm)=$(ps -o stat=,ppid=,comm= -p "$pid" 2>&1 | tr -s ' ')"
+    out+=", marker words in ps -E=$(LC_ALL=C ps -ww -E -p "$pid" -o command= 2>/dev/null | tr ' ' '\n' | grep -c '^FM_TASK_INBOX=')"
+    audited=$(cat "$case_dir"/state/*.teardown-processes 2>/dev/null | awk -F'\t' -v p="$pid" '$3 == p { printf "%s ", $2 }')
+    out+=", signals audited=${audited:-NONE}"
+  done
+  rec=$(cat "$case_dir"/state/*.teardown-owned 2>/dev/null | tr '\t\n' '  |')
+  out+="; owned record=${rec:-EMPTY}"
+  if [ -r "$err" ]; then
+    out+="; stderr without banner="
+    out+=$(grep -v -e '^●' -e '^━' -e 'WATCHER DOWN' -e 'fm-claude-stop-autoarm' "$err" | tail -n 40 | tail -c 3000 | tr '\n' '|')
+    out+="; stderr REFUSED/refus/skip/error lines="
+    out+=$(grep -i -e 'REFUSED' -e 'refus' -e 'skip' -e 'error' "$err" | tail -n 40 | tail -c 3000 | tr '\n' '|')
+    named=$(grep 'REFUSED' "$err" | grep -o 'process [0-9][0-9]*' | awk '{ print $2 }' | sort -un)
+    for pid in $named; do
+      out+="; refused process $pid=$(ps -o pid=,comm= -p "$pid" 2>&1 | tr -s ' ')"
+    done
+  fi
+  printf '%s' "$out"
+}
