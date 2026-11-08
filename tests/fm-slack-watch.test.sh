@@ -1739,8 +1739,10 @@ assert_eq "$(python3 "$HELPER" root-count "$(replay_file)" with-options)" 1 "X49
 printf 'ok - X49\n'
 
 # INTAKE: the owner's new top-level DM messages are acknowledged in their own thread and woken to Firstmate as data.
-# Every scenario runs on a permission-sensitive replay (chat:write, im:write, im:history only): a path that needs
-# users.info or a reaction read fails with missing_scope, as it would in Slack. Replay evidence, no socket.
+# Every scenario runs on a permission-sensitive replay: the scopes are the intake's three (chat:write, im:write,
+# im:history) and those that the base card path's own methods need, so an in-population method with a missing scope
+# fails with missing_scope, as it would in Slack, and a method outside the base card path's population fails by the
+# transcript's method allowlist. Replay evidence, no socket.
 INTAKE="$FIX/intake/transcript.json"
 intake_home() { new_home intake; bind; "$ROOT/bin/fm-slack-check.sh" arm --replay "$INTAKE" >/dev/null; }
 ipoll() { "$ROOT/bin/fm-slack-poll.sh" --replay "$INTAKE"; }

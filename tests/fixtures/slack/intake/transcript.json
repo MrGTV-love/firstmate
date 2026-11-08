@@ -8,7 +8,21 @@
   "scopes": [
     "chat:write",
     "im:write",
-    "im:history"
+    "im:history",
+    "reactions:read",
+    "reactions:write",
+    "users:read"
+  ],
+  "method_allowlist": [
+    "auth.test",
+    "chat.postMessage",
+    "chat.update",
+    "conversations.open",
+    "conversations.history",
+    "conversations.replies",
+    "reactions.get",
+    "reactions.add",
+    "users.info"
   ],
   "enforce_scopes": true,
   "users": {
