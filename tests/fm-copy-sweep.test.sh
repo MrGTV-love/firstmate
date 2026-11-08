@@ -3198,8 +3198,8 @@ test_a_record_that_fails_any_condition_keeps_the_copy_and_never_reaches_the_driv
     phrase=
     expect=0
     case "$row" in
-      tip-differs) route_record "bad-$row" "$((100 + n))" "$other" "$W/profiles/bad-$row.json"; phrase="names tip $other" ;;
-      tip-prefix) route_record "bad-$row" "$((100 + n))" "${tip:0:39}" "$W/profiles/bad-$row.json"; phrase="names tip ${tip:0:39}" ;;
+      tip-differs) route_record "bad-$row" "$((100 + n))" "$other" "$W/profiles/bad-$row.json"; phrase="at tip $other but the copy is at $tip" ;;
+      tip-prefix) route_record "bad-$row" "$((100 + n))" "${tip:0:39}" "$W/profiles/bad-$row.json"; phrase="at tip ${tip:0:39} but the copy is at $tip" ;;
       tip-moves)
         route_record "bad-$row" "$((100 + n))" "$tip" "$W/profiles/bad-$row.json"
         # shellcheck disable=SC2016 # the hook expands its own $1 when it runs
@@ -3252,7 +3252,11 @@ test_a_record_that_fails_any_condition_keeps_the_copy_and_never_reaches_the_driv
         ;;
       other-copy)
         # A record for another copy, carrying this copy's tip and profile, binds nothing here.
-        printf '%s\t%s\t%s\t%s\n' "$(copy_path ok)" "$tip" "$((100 + n))" "$W/profiles/bad-$row.json" >> "$HOMED/data/supersedence-records.tsv"
+        # The other copy is a holder of its own: a row of another tip holds the copy it names.
+        add_copy holder
+        route_lock_dead holder
+        route_script_row "$W" holder allowed success 7
+        printf '%s\t%s\t%s\t%s\n' "$(copy_path holder)" "$tip" "$((100 + n))" "$W/profiles/bad-$row.json" >> "$HOMED/data/supersedence-records.tsv"
         phrase="verification_stale_or_uncovered_paths"
         expect=1
         ;;
@@ -3406,6 +3410,7 @@ test_a_plan_that_times_out_or_is_stopped_leaves_no_forge_read_running() {
   [ "$RC" = 0 ] || fail "forge lifetime: a held plan must not fail the run ($RC): $OUT"
   route_assert_kept slow "forge lifetime"
   assert_contains "$(route_line_of slow)" "did not answer within 3s" "forge lifetime: the plan's bound is not named"
+  assert_contains "$(route_line_of slow)" "supersedence route --pr 7" "forge lifetime: a timed-out route plan does not name the route and the PR"
   assert_equals "" "$(route_calls_for slow)" "forge lifetime: the copy reached the driver while the forge read was unfinished"
   [ -s "$W/forge/gh.pids" ] || fail "forge lifetime: the fake forge never ran"
   forge_reads_are_gone "$W/forge" 3 || { for pid in $FORGE_ALIVE; do kill -s KILL "$pid" 2>/dev/null; done; fail "forge lifetime: the forge read outlived the sweep's plan bound (pid$FORGE_ALIVE)"; }
@@ -3547,7 +3552,7 @@ test_the_routes_answers_are_read_in_their_real_shape_and_fail_closed() {
 # stays (Main 010 F3). The first malformed kind is the reviewer's reproduction.
 test_a_malformed_or_contradictory_temporary_refusal_keeps_the_retention_receipt() {
   local kind receipt line
-  local -a kinds=(temporary-string temporary-string-kept temporary-removed temporary-removed-null temporary-not-requested)
+  local -a kinds=(temporary-string temporary-string-kept temporary-removed temporary-removed-null temporary-not-requested temporary-branch-delete temporary-branch-reap)
   route_world route-temporary-shapes
   route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE"
   for kind in "${kinds[@]}" temporary; do
@@ -3574,6 +3579,7 @@ test_a_malformed_or_contradictory_temporary_refusal_keeps_the_retention_receipt(
   # A contradiction is refused by name: the reason says what the answer contradicts.
   assert_contains "$OUT" "cleanup_requested is false" "temporary shapes: the contradictory cleanup request is not named in the refusal"
   assert_contains "$OUT" "worktree_removed true while the state is BLOCKED" "temporary shapes: the contradictory removal claim is not named in the refusal"
+  assert_contains "$OUT" "branch delete or reap decision while the state is BLOCKED" "temporary shapes: the contradictory branch decision is not named in the refusal"
   pass "only the valid temporary refusal (BLOCKED, predicates_failed an array with cleanup_gate, worktree_removed false, a lease conflict) clears the retention receipt; a string predicates_failed, a removal claim or a null worktree_removed keeps the receipt and reports a failure"
 }
 
@@ -3641,10 +3647,278 @@ test_a_forge_read_that_times_out_leaves_no_descendant_running() {
   route_world route-forge-child-control
   route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE"
   route_copy fast 7
-  FM_TEARDOWN_FORGE_TIMEOUT=1 route_sweep --apply
+  FM_TEARDOWN_FORGE_TIMEOUT=5 route_sweep --apply
   route_assert_released fast "forge child control"
   route_assert_calls fast 7 "forge child control"
   pass "a forge read that times out at the plan or at the execute leaves neither its direct child nor a descendant running, and a fast forge still routes"
+}
+
+# A records file that exists but cannot be read says nothing about which copy it
+# names, so every locked copy is held, named or not, and the driver is not asked;
+# the plain call for a copy with no record needs a file that can be read, or none.
+# Control: the held copies route again once the file reads.
+test_a_records_file_that_cannot_be_read_holds_every_locked_copy_before_the_driver() {
+  local variant name line
+  for variant in directory unreadable; do
+    if [ "$variant" = unreadable ] && [ "$(id -u)" = 0 ]; then
+      printf 'records file %s: skipped (root reads any file)\n' "$variant"
+      continue
+    fi
+    route_world "route-carrier-$variant"
+    route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE"
+    route_copy named 7
+    add_copy plain
+    route_lock_dead plain
+    route_script_row "$W" plain allowed success 7
+    cp "$HOMED/data/supersedence-records.tsv" "$W/records.saved"
+    case "$variant" in
+      directory) rm -f "$HOMED/data/supersedence-records.tsv"; mkdir "$HOMED/data/supersedence-records.tsv" ;;
+      unreadable) chmod 000 "$HOMED/data/supersedence-records.tsv" ;;
+    esac
+    route_sweep --apply
+    route_assert_kept named "records file $variant"
+    route_assert_kept plain "records file $variant"
+    for name in named plain; do
+      line=$(route_line_of "$name")
+      assert_contains "$line" "supersedence records file" "records file $variant: the reason for $name does not name the records file"
+      assert_equals "" "$(route_calls_for "$name")" "records file $variant: $name reached the driver: $(route_calls_for "$name")"
+    done
+    printf 'records file %s: both copies kept, no driver call; reason: %s\n' "$variant" "$(printf '%s' "$line" | awk -F '\t' '{ print substr($NF, 1, 200) }')"
+    case "$variant" in
+      directory) rmdir "$HOMED/data/supersedence-records.tsv" ;;
+      unreadable) chmod 600 "$HOMED/data/supersedence-records.tsv" ;;
+    esac
+    cp "$W/records.saved" "$HOMED/data/supersedence-records.tsv"
+    route_sweep --apply
+    route_assert_released named "records file $variant control"
+    route_assert_kept plain "records file $variant control"
+    assert_equals "--cleanup-worktree $(copy_path plain)" "$(route_calls_for plain)" "records file $variant control: the plain copy was not asked the plain plan once the file read again"
+  done
+  pass "a records file that is a directory or unreadable holds every locked copy, named or not, with no driver call, and the valid copy releases once the file reads"
+}
+
+# A row that names the copy at another tip holds it whether the row sits before or
+# after the valid one (R2: a record that names the copy and fails its tip binding
+# keeps it). Control: a copy with only its valid row routes.
+test_a_row_for_another_tip_holds_the_copy_before_or_after_its_valid_row() {
+  local name other tip order line
+  other=$(printf '%040d' 0 | tr 0 b)
+  route_world route-stale-rows
+  route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE"
+  route_copy valid-only 7
+  for order in stale-first stale-after stale-only; do
+    add_copy "$order"
+    route_lock_dead "$order"
+    tip=$(route_tip "$order")
+    route_write_profile "$W/profiles/$order.json" 7 "$tip"
+    route_script_row "$W" "$order" allowed success 7
+    case "$order" in
+      stale-first) route_record "$order" 7 "$other" "$W/profiles/$order.json"; route_record "$order" 7 "$tip" "$W/profiles/$order.json" ;;
+      stale-after) route_record "$order" 7 "$tip" "$W/profiles/$order.json"; route_record "$order" 7 "$other" "$W/profiles/$order.json" ;;
+      stale-only) route_record "$order" 7 "$other" "$W/profiles/$order.json" ;;
+    esac
+  done
+  route_sweep --apply
+  route_assert_released valid-only "stale rows control"
+  route_assert_calls valid-only 7 "stale rows control"
+  for order in stale-first stale-after stale-only; do
+    route_assert_kept "$order" "$order"
+    line=$(route_line_of "$order")
+    assert_contains "$line" "a row for another tip of the same path holds the copy" "$order: the reason does not name the stale row"
+    assert_equals "" "$(route_calls_for "$order")" "$order: the copy reached the driver: $(route_calls_for "$order")"
+    printf 'stale rows %s: kept, no driver call; reason: %s\n' "$order" "$(printf '%s' "$line" | awk -F '\t' '{ print substr($NF, 1, 200) }')"
+  done
+  pass "a row for another tip of the same path holds the copy before or after its valid row, or alone, with no driver call, while a copy with only its valid row routes"
+}
+
+# A record that changes while the forge is read holds the copy: the record is read
+# again after the read and must bind the same PR, profile and tip. The fake forge
+# appends an empty row for the copy on its second read of the PR (the execute's), after
+# the plan has proved the record and before the execute asks the driver.
+test_a_record_that_changes_while_the_forge_is_read_holds_the_copy() {
+  local row line
+  route_world route-record-moves
+  route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE"
+  route_copy steady 7
+  route_copy moving 8
+  row=$(printf '%s\t%s\t\t' "$(copy_path moving)" "$(route_tip moving)")
+  route_set_pr_append "$W/forge" 8 2 "$HOMED/data/supersedence-records.tsv" "$row" "$ROUTE_MERGE"
+  route_sweep --apply
+  route_assert_released steady "record moves control"
+  route_assert_calls steady 7 "record moves control"
+  route_assert_kept moving "record moves"
+  line=$(route_line_of moving)
+  assert_contains "$line" "was not released: its supersedence record cannot be used" "record moves: the stopped execute is not named"
+  assert_contains "$line" "leaves the PR or the profile empty" "record moves: the changed record is not named"
+  assert_equals 1 "$(route_calls_for moving | grep -c .)" "record moves: wanted the plan only, got: $(route_calls_for moving)"
+  assert_not_contains "$(route_calls_for moving)" "--execute-cleanup" "record moves: the execute reached the driver after the record changed"
+  printf 'record moves: kept at the execute with one driver call (the plan); reason: %s\n' "$(printf '%s' "$line" | awk -F '\t' '{ print substr($NF, 1, 200) }')"
+  pass "a row written for the copy while the execute's forge read ran holds the copy with no execute call, while a record that stays put routes"
+}
+
+# R1 and R2 name a decimal integer, not a nine-digit one: a PR number of ten or more
+# digits routes like any other, and a zero or a leading zero still does not.
+test_a_decimal_pr_number_of_any_length_routes_and_a_zero_or_a_leading_zero_does_not() {
+  local name line
+  route_world route-pr-digits
+  route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE"
+  route_set_pr "$W/forge" 1000000000 MERGED "$ROUTE_MERGE"
+  route_set_pr "$W/forge" 123456789012345 MERGED "$ROUTE_MERGE"
+  route_copy pr-seven 7
+  route_copy pr-ten 1000000000
+  route_copy pr-fifteen 123456789012345
+  for name in pr-zero pr-leading-zero; do
+    add_copy "$name"
+    route_lock_dead "$name"
+    route_write_profile "$W/profiles/$name.json" 7 "$(route_tip "$name")"
+    route_script_row "$W" "$name" allowed success 7
+  done
+  route_record pr-zero 0 "$(route_tip pr-zero)" "$W/profiles/pr-zero.json"
+  route_record pr-leading-zero 007 "$(route_tip pr-leading-zero)" "$W/profiles/pr-leading-zero.json"
+  route_sweep --apply
+  route_assert_released pr-seven "pr digits"
+  route_assert_released pr-ten "pr digits"
+  route_assert_released pr-fifteen "pr digits"
+  route_assert_calls pr-ten 1000000000 "pr digits"
+  route_assert_calls pr-fifteen 123456789012345 "pr digits"
+  for name in pr-zero pr-leading-zero; do
+    route_assert_kept "$name" "pr digits"
+    line=$(route_line_of "$name")
+    assert_contains "$line" "is not a decimal integer" "pr digits: $name is not named as no decimal integer"
+    assert_equals "" "$(route_calls_for "$name")" "pr digits: $name reached the driver"
+  done
+  pass "a merged PR with ten or fifteen digits routes like PR 7, and PR 0 and PR 007 are held with no driver call"
+}
+
+# The landing branch is the one the clone's origin/HEAD names, or the task's base.
+# A local main or master is a guess: without origin/HEAD the branch is unknown and
+# the copy is held, however plausible main looks. Each world has one copy; the
+# controls route a merge on the default branch and a merge on a default of release.
+test_a_landing_branch_that_is_only_a_guess_holds_the_copy_and_the_actual_default_routes() {
+  local variant line
+  for variant in main-control no-origin-head default-release-off-release default-release-on-release; do
+    route_world "route-landing-$variant"
+    case "$variant" in
+      main-control) ;;
+      no-origin-head) git -C "$SLOT" remote set-head origin -d >/dev/null ;;
+      default-release-off-release)
+        git -C "$SLOT" push -q origin "$ROUTE_MERGE^:refs/heads/release"
+        git -C "$SLOT" fetch -q origin
+        git -C "$SLOT" remote set-head origin release >/dev/null
+        ;;
+      default-release-on-release)
+        git -C "$SLOT" push -q origin "$ROUTE_MERGE:refs/heads/release"
+        git -C "$SLOT" fetch -q origin
+        git -C "$SLOT" remote set-head origin release >/dev/null
+        ;;
+    esac
+    route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE"
+    route_copy only 7
+    route_sweep --apply
+    case "$variant" in
+      main-control | default-release-on-release)
+        route_assert_released only "landing $variant"
+        route_assert_calls only 7 "landing $variant"
+        printf 'landing %s: released by the route\n' "$variant"
+        ;;
+      *)
+        route_assert_kept only "landing $variant"
+        line=$(route_line_of only)
+        assert_equals "" "$(route_calls_for only)" "landing $variant: the copy reached the driver: $(route_calls_for only)"
+        case "$variant" in
+          no-origin-head) assert_contains "$line" "the clone has no origin/HEAD, so the repository's default branch is unknown" "landing $variant: the unknown default branch is not named" ;;
+          *) assert_contains "$line" "is not on origin/release (not landed)" "landing $variant: the off-default merge is not named" ;;
+        esac
+        printf 'landing %s: kept, no driver call; reason: %s\n' "$variant" "$(printf '%s' "$line" | awk -F '\t' '{ print substr($NF, 1, 200) }')"
+        ;;
+    esac
+  done
+  pass "a merge commit counts as landed only on the branch origin/HEAD names (or the task's base): no origin/HEAD, or a merge that is off the actual default, holds the copy with no driver call, while a merge on main (default main) or on release (default release) routes"
+}
+
+# A forge read whose parent exits at once while a descendant keeps its output open
+# ends with the read: nothing it started survives, the read does not wait for the
+# descendant, and no answer arrives after the bound. At the plan the bound is short
+# against the descendant's life; at the execute the driver's hook checks that the
+# descendant is gone and the time between the read and the execute is far short of
+# the descendant's life. The fast-forge control is the control of the cases before it.
+test_a_forge_read_whose_parent_exits_at_once_leaves_no_descendant_and_does_not_wait_for_one() {
+  local t0 t1 pid
+  route_world route-early-plan
+  route_set_pr "$W/forge" 7 EARLYEXIT "$ROUTE_MERGE"
+  route_copy early 7
+  ROUTE_EARLYEXIT_LIFE=30 FM_COPY_SWEEP_PLAN_TIMEOUT=12 FM_TEARDOWN_FORGE_TIMEOUT=8 route_sweep --apply
+  [ "$RC" = 0 ] || fail "early exit (plan): the run failed ($RC): $OUT"
+  [ -s "$W/forge/gh.pids" ] || fail "early exit (plan): the fake forge never started its descendant"
+  forge_reads_are_gone "$W/forge" 2 || { for pid in $FORGE_ALIVE; do kill -s KILL "$pid" 2>/dev/null; done; fail "early exit (plan): the read left a descendant running (pid$FORGE_ALIVE)"; }
+  route_assert_released early "early exit (plan)"
+  route_assert_calls early 7 "early exit (plan)"
+  printf 'early exit (plan): plan bound 12s, descendant life 30s: released by the route, descendant pids %s gone\n' "$(tr '\n' ' ' < "$W/forge/gh.pids")"
+  route_world route-early-execute
+  route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE"
+  route_copy late 7
+  # shellcheck disable=SC2016 # the hooks expand their own variables when they run
+  printf '#!/usr/bin/env bash\nprintf "EARLYEXIT\\nMERGED\\t%%s\\t%%s\\n" "%s" "fm/pr-7-head" > "%s/pr-7"\n' "$ROUTE_MERGE" "$W/forge" > "$W/ans/late/plan.hook"
+  cat > "$W/ans/late/exec.hook" <<HOOK
+#!/usr/bin/env bash
+n=0
+while [ "\$n" -lt 20 ]; do
+  alive=
+  for p in \$(cat "$W/forge/gh.pids" 2>/dev/null); do kill -0 "\$p" 2>/dev/null && alive="\$alive \$p"; done
+  [ -z "\$alive" ] && break
+  sleep 0.1
+  n=\$((n + 1))
+done
+[ -z "\$alive" ] || { echo "forge descendant alive at the execute:\$alive" >&2; exit 1; }
+date +%s > "$W/exec.time"
+HOOK
+  ROUTE_EARLYEXIT_LIFE=30 FM_TEARDOWN_FORGE_TIMEOUT=8 route_sweep --apply
+  [ -s "$W/exec.time" ] || fail "early exit (execute): the execute hook did not run clean (a descendant of the read was alive when the driver ran): $OUT"
+  t0=$(sed -n 1p "$W/forge/gh.times")
+  t1=$(cat "$W/exec.time")
+  [ $((t1 - t0)) -le 18 ] || fail "early exit (execute): the execute began $((t1 - t0))s after the read, so the read waited for its descendant (life 30s)"
+  forge_reads_are_gone "$W/forge" 2 || { for pid in $FORGE_ALIVE; do kill -s KILL "$pid" 2>/dev/null; done; fail "early exit (execute): the read left a descendant running (pid$FORGE_ALIVE)"; }
+  route_assert_released late "early exit (execute)"
+  printf 'early exit (execute): descendant life 30s: the driver ran %ss after the read, no descendant alive at the execute\n' "$((t1 - t0))"
+  route_world route-early-control
+  route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE"
+  route_copy fast 7
+  FM_TEARDOWN_FORGE_TIMEOUT=8 route_sweep --apply
+  route_assert_released fast "early exit control"
+  route_assert_calls fast 7 "early exit control"
+  pass "a forge read whose parent exits at once while a descendant holds its output ends with the read at the plan and at the execute: no descendant survives, the execute is not delayed by it, and a fast forge still routes"
+}
+
+# R3: a route execute that claims success uses a release slot even when the copy and
+# its lock are untouched, so the per-run cap counts it (the claim is that the driver
+# removed a locked copy). Cap 1: the first copy's success claim leaves everything in
+# place; the second eligible copy must wait for the next run. The control is a
+# temporary refusal that released nothing: it uses no slot and the second copy goes.
+test_a_route_execute_that_claims_success_and_leaves_the_copy_uses_a_release_slot() {
+  local line
+  route_world route-intact-slot
+  route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE"
+  route_copy z-claims 7 allowed intact
+  route_copy a-second 7
+  FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT=1 route_sweep --apply
+  route_assert_kept z-claims "intact claim"
+  assert_contains "$(route_line_of z-claims)" "still present or registered after its removal" "intact claim: the unremoved copy is not reported"
+  assert_equals 2 "$(route_calls_for z-claims | wc -l | tr -d ' ')" "intact claim: wanted one plan and one execute"
+  route_assert_kept a-second "intact claim"
+  line=$(route_line_of a-second)
+  assert_contains "$line" "per-run cap: 1 locked release slots used" "intact claim: the second copy was not deferred by the cap"
+  assert_equals "" "$(route_calls_for a-second)" "intact claim: the second copy reached the driver after the cap was used: $(route_calls_for a-second)"
+  printf 'intact claim: cap 1: the success claim used the slot; second copy deferred with no driver call\n'
+  route_world route-temporary-slot
+  route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE"
+  route_copy z-temp 7 allowed temporary
+  route_copy a-second 7
+  FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT=1 route_sweep --apply
+  route_assert_kept z-temp "temporary control"
+  route_assert_released a-second "temporary control"
+  route_assert_calls a-second 7 "temporary control"
+  printf 'temporary control: cap 1: a refusal that released nothing used no slot; second copy released\n'
+  pass "a route execute that claims success uses a release slot even when the copy and its lock are untouched, and a temporary refusal that released nothing uses none"
 }
 
 # The two facts the hold matrix needs before it trusts a comparison: the prior
@@ -3782,7 +4056,7 @@ test_the_recorded_cases_are_decided_by_their_records_and_the_drivers_scripted_an
     if [ "$kind" = accept ]; then
       route_script_row "$W" "$name" allowed success "$pr"
     elif [ "$state" = MERGED ]; then
-      route_script_row "$W" "$name" refuse refuse "$pr"
+      route_script_row "$W" "$name" refuse blocked "$pr"
     else
       route_script_row "$W" "$name" allowed success "$pr"
     fi
@@ -3942,6 +4216,13 @@ test_the_routes_answers_are_read_in_their_real_shape_and_fail_closed
 test_a_malformed_or_contradictory_temporary_refusal_keeps_the_retention_receipt
 test_a_retained_payload_signal_on_stderr_beats_the_temporary_retry
 test_a_forge_read_that_times_out_leaves_no_descendant_running
+test_a_records_file_that_cannot_be_read_holds_every_locked_copy_before_the_driver
+test_a_row_for_another_tip_holds_the_copy_before_or_after_its_valid_row
+test_a_record_that_changes_while_the_forge_is_read_holds_the_copy
+test_a_decimal_pr_number_of_any_length_routes_and_a_zero_or_a_leading_zero_does_not
+test_a_landing_branch_that_is_only_a_guess_holds_the_copy_and_the_actual_default_routes
+test_a_forge_read_whose_parent_exits_at_once_leaves_no_descendant_and_does_not_wait_for_one
+test_a_route_execute_that_claims_success_and_leaves_the_copy_uses_a_release_slot
 test_the_hold_matrix_checks_fail_without_a_receipt_and_after_any_driver_call
 test_a_valid_record_releases_no_copy_that_the_sweep_holds_before_the_driver
 test_the_recorded_cases_are_decided_by_their_records_and_the_drivers_scripted_answers

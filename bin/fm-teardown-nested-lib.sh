@@ -74,16 +74,20 @@
 # one line per copy of four tab-separated fields - the copy's absolute path, its
 # 40-hex tip, the merged PR number (a decimal integer) and the absolute path of a
 # Vernant supersedence profile. Blank lines and lines starting with # are ignored.
-# A copy no line names is called exactly as above. For a copy a line names,
-# teardown_closeout_route uses the route only when all of these hold, read afresh
-# at every call (the sweep's plan and execute, teardown's execute): one record
-# binds the copy's full live HEAD (a line for another tip of the path is history
-# and a line with other than four fields refuses; every line that names the copy
-# at its live HEAD speaks for the owner and is judged on its own, so one that
+# No records file is the plain call, exactly as above. A records file that exists but
+# cannot be read as a regular file (a directory, a mode that forbids it, a read error)
+# says nothing about which copy it names, so every locked copy of that home is held,
+# named or not, with the reason naming the file, until it reads again.
+# For a copy a line names, teardown_closeout_route uses the route only when all of
+# these hold, read afresh at every call (the sweep's plan and execute, teardown's
+# execute): every line that names the copy speaks for the owner and is judged on its
+# own, so a line for another tip of the path (history is not ignored: take the line
+# out once it no longer applies), a line with other than four fields, a line that
 # leaves the PR or the profile empty or gives a PR that is no decimal integer
-# refuses, and two that give different PRs or profiles conflict and refuse,
-# whichever comes first; exact duplicates of one valid line are one record); the
-# PR field is a decimal integer; the profile is an
+# (digits only, no zero and no leading zero, of any length) refuses, and two lines that
+# give different PRs or profiles conflict and refuse, whichever comes first; exact
+# duplicates of one valid line are one record, and that record binds the copy's full
+# live HEAD; the profile is an
 # absolute, regular, non-symlink, readable JSON file whose pr is the record's PR
 # and whose superseded_tip_sha is the record's tip; and gh, naming the repository
 # from the clone's origin URL (GitHub only), shows that PR MERGED with a merge
@@ -91,14 +95,21 @@
 # read with git and no fetch; and the clone's primary checkout is not on that
 # PR's head branch (forge headRefName), where the driver's DONE-state finish would
 # switch it to the base branch even on a plan. The landing branch is the task's
-# base_branch= (TEARDOWN_ROUTE_BASE) or else the clone's default branch. A forge read that
+# base_branch= (TEARDOWN_ROUTE_BASE) or else the branch the clone's origin/HEAD
+# names; a local main or master is a guess and never stands in for it, so a clone
+# with no origin/HEAD holds the copy (the pool's clones carry one). A forge read that
 # fails, times out (FM_TEARDOWN_FORGE_TIMEOUT seconds, 60 by default) or cannot be
 # parsed is unknown, never merged. The read is bounded by fm_timeout_perl_bound: gh
-# and its descendants share a process group that the bound kills at its limit, and
-# the bound kills that group when the caller goes away, so the sweep's plan stop
-# and an interrupted teardown end the read with the caller (it needs perl; without
-# perl the read is unknown). A record that names the copy and fails any of these
-# keeps the copy with no driver call and the failed condition named.
+# runs under a small perl wrapper that leads the bound's process group, waits for gh,
+# prints one trailer line with gh's status and kills the whole group, so a descendant
+# that outlives gh or holds its output ends with the read and the read never waits for
+# one; the bound kills the group at its limit and when the caller goes away, so the
+# sweep's plan stop and an interrupted teardown end the read with the caller (it
+# needs perl; without perl the read is unknown). The record is read again after the
+# forge read and must bind the same PR, profile and tip, and the profile is checked
+# again, so a row written while the forge was read holds the copy; the last check and
+# the driver's start are not one step. A record that names the copy and fails any of
+# these keeps the copy with no driver call and the failed condition named.
 # The route's call is closeout_pr.py --cleanup-worktree <copy> [--execute-cleanup]
 # --pr <PR> --supersedence-profile <profile> --no-evidence-files, run from the
 # slot with the same interpreter and no other option. Its answer has no top-level
@@ -1310,26 +1321,39 @@ TEARDOWN_CLOSEOUT_ROUTE_WHY=
 
 # 0: one record binds <copy> at its live tip (PR and profile set), 1: no record
 # names <copy> (the plain call), 2: a record names it and cannot be used (WHY set).
-# Records for another tip of the same path are history and are ignored while one
-# binds the live tip. Every row that names the copy at its live tip speaks for the
-# owner, so each is judged on its own before it is compared with another: a row
-# that leaves the PR or the profile empty or gives a PR that is no decimal integer
-# refuses, and two rows that give different PRs or profiles conflict and refuse,
-# whichever comes first. Exact duplicates of one valid row are one record.
+# No records file at all is the plain call. A records file that exists but cannot
+# be read as a regular file is not: whether a row names the copy is then unknown, so
+# every copy is held with the reason named until the file reads again. Every row that
+# names the copy speaks for the owner, so each is judged on its own before it is
+# compared with another: a row for another tip of the same path, a row that leaves
+# the PR or the profile empty, a PR that is no decimal integer and two rows that
+# give different PRs or profiles all refuse, whichever comes first. Exact duplicates
+# of one valid row are one record.
 teardown_route_record() {  # <copy>
-  local copy=$1 file=${TEARDOWN_ROUTE_DATA:+$TEARDOWN_ROUTE_DATA/supersedence-records.tsv}
-  local line rest first stale='' pr='' profile='' count bound=0
+  local copy=$1 dir=${TEARDOWN_ROUTE_DATA:-} file content line rest first pr='' profile='' count bound=0
   local -a fields named=()
   TEARDOWN_CLOSEOUT_ROUTE_PR=
   TEARDOWN_CLOSEOUT_ROUTE_PROFILE=
   TEARDOWN_ROUTE_TIP=
-  [ -n "$file" ] && [ -f "$file" ] && [ -r "$file" ] || return 1
+  [ -n "$dir" ] || return 1
+  file=$dir/supersedence-records.tsv
+  if [ -d "$dir" ] && [ ! -x "$dir" ]; then
+    TEARDOWN_CLOSEOUT_ROUTE_WHY="the supersedence records file $file cannot be read (its directory cannot be searched), so whether a record names this copy is unknown"
+    return 2
+  fi
+  if [ ! -e "$file" ] && [ ! -L "$file" ]; then
+    return 1
+  fi
+  if [ ! -f "$file" ] || ! content=$(cat -- "$file" 2>/dev/null); then
+    TEARDOWN_CLOSEOUT_ROUTE_WHY="the supersedence records file $file cannot be read as a regular file, so whether a record names this copy is unknown"
+    return 2
+  fi
   while IFS= read -r line || [ -n "$line" ]; do
     case "$line" in '' | '#'*) continue ;; esac
     [[ $line =~ ^[[:space:]]*$ ]] && continue
     first=${line%%$'\t'*}
     [ "$first" = "$copy" ] && named+=("$line")
-  done < "$file"
+  done <<< "$content"
   [ "${#named[@]}" -gt 0 ] || return 1
   TEARDOWN_ROUTE_TIP=$(git -C "$copy" rev-parse --verify --quiet 'HEAD^{commit}' 2>/dev/null) || TEARDOWN_ROUTE_TIP=
   if [[ ! $TEARDOWN_ROUTE_TIP =~ ^[0-9a-f]{40}$ ]]; then
@@ -1351,14 +1375,14 @@ teardown_route_record() {  # <copy>
       return 2
     fi
     if [ "${fields[1]}" != "$TEARDOWN_ROUTE_TIP" ]; then
-      [ -n "$stale" ] || stale=${fields[1]}
-      continue
+      TEARDOWN_CLOSEOUT_ROUTE_WHY="a record names this copy at tip ${fields[1]:-?} but the copy is at $TEARDOWN_ROUTE_TIP (a row for another tip of the same path holds the copy; take that row out once it no longer applies)"
+      return 2
     fi
     if [ -z "${fields[2]}" ] || [ -z "${fields[3]}" ]; then
       TEARDOWN_CLOSEOUT_ROUTE_WHY="a record that binds this copy at its tip leaves the PR or the profile empty"
       return 2
     fi
-    if [[ ! ${fields[2]} =~ ^[1-9][0-9]{0,8}$ ]]; then
+    if [[ ! ${fields[2]} =~ ^[1-9][0-9]*$ ]]; then
       TEARDOWN_CLOSEOUT_ROUTE_WHY="the record's PR field '${fields[2]}' is not a decimal integer"
       return 2
     fi
@@ -1371,10 +1395,6 @@ teardown_route_record() {  # <copy>
       return 2
     fi
   done
-  if [ "$bound" = 0 ]; then
-    TEARDOWN_CLOSEOUT_ROUTE_WHY="the record names tip ${stale:-?} but the copy is at $TEARDOWN_ROUTE_TIP"
-    return 2
-  fi
   TEARDOWN_CLOSEOUT_ROUTE_PR=$pr
   TEARDOWN_CLOSEOUT_ROUTE_PROFILE=$profile
 }
@@ -1401,20 +1421,60 @@ teardown_route_profile_ok() {  # <profile> <pr> <tip>
 
 # The forge read of PR <pr> in <owner/repo>, bounded by <seconds> with
 # fm_timeout_perl_bound (bin/fm-timeout-lib.sh), not with fm_run_timed. That bound
-# runs gh in a process group of its own and kills the whole group at its limit, so
-# a descendant of gh ends with the read, and it watches its parent and kills the
-# group when the caller goes away, so a sweep plan that is stopped (a kill of the
-# plan's own group, which does not reach a group of its own) or a teardown that is
-# interrupted ends the read with the caller. fm_run_timed picks `timeout` where it
-# exists, which never watches its caller. Sets TEARDOWN_ROUTE_FORGE_OUT; returns
-# gh's status, 124 when the bound passed, 125 when there is no perl to bound it.
+# runs its command in a process group of its own and kills the whole group at its
+# limit, so a descendant of gh ends with the read, and it watches its parent and
+# kills the group when the caller goes away, so a sweep plan that is stopped (a kill
+# of the plan's own group, which does not reach a group of its own) or a teardown
+# that is interrupted ends the read with the caller. fm_run_timed picks `timeout`
+# where it exists, which never watches its caller. The bound does nothing for a
+# command that exits early while a descendant still holds the output pipe: it stops
+# watching when its direct child exits, so the capture would wait for that
+# descendant and the descendant would outlive the read. So gh runs under a small
+# perl wrapper, the leader of that group, which waits for gh, prints one trailer
+# line with gh's status, and then kills the whole group (itself included). The
+# trailer is read first: a well-formed trailer is gh's own status; no trailer means
+# the bound ended the read. A group that the wrapper does not lead cannot be ended,
+# so the read is unknown (126). Sets TEARDOWN_ROUTE_FORGE_OUT to gh's output;
+# returns gh's status, 124 when the bound passed, 125 when there is no perl to bound
+# it, 126 when the wrapper cannot end its group.
 TEARDOWN_ROUTE_FORGE_OUT=
 teardown_route_forge_read() {  # <seconds> <pr> <owner/repo>
-  local rc=0
+  local rc=0 raw trailer body
   TEARDOWN_ROUTE_FORGE_OUT=
   command -v perl >/dev/null 2>&1 || return 125
-  TEARDOWN_ROUTE_FORGE_OUT=$(fm_timeout_perl_bound "$1" gh pr view "$2" --repo "$3" --json state,mergeCommit,headRefName \
+  # shellcheck disable=SC2016  # single quotes are deliberate: Perl expands its own variables.
+  raw=$(fm_timeout_perl_bound "$1" perl -e '
+    my $pid = fork;
+    die "fork failed" unless defined $pid;
+    if (!$pid) {
+      open(STDIN, "<", "/dev/null");
+      open(STDERR, ">", "/dev/null");
+      exec @ARGV;
+      exit 127;
+    }
+    waitpid($pid, 0);
+    my $st = $?;
+    my $code = ($st & 127) ? 128 + ($st & 127) : $st >> 8;
+    $| = 1;
+    if (getpgrp(0) != $$) { print "\nFM_FORGE_RC=nogroup\n"; exit 0; }
+    print "\nFM_FORGE_RC=$code\n";
+    kill "KILL", -$$;
+    exit 0;
+  ' gh pr view "$2" --repo "$3" --json state,mergeCommit,headRefName \
     -q '[.state, (.mergeCommit.oid // ""), .headRefName] | join("\t")' 2>/dev/null </dev/null) || rc=$?
+  trailer=${raw##*$'\n'}
+  if [[ $raw == *$'\n'* && $trailer == FM_FORGE_RC=* ]]; then
+    body=${raw%$'\n'*}
+    while [[ $body == *$'\n' ]]; do body=${body%$'\n'}; done
+    trailer=${trailer#FM_FORGE_RC=}
+    case "$trailer" in
+      nogroup) return 126 ;;
+      '' | *[!0-9]*) return 1 ;;
+    esac
+    TEARDOWN_ROUTE_FORGE_OUT=$body
+    return $((10#$trailer > 255 ? 1 : 10#$trailer))
+  fi
+  [ "$rc" != 0 ] || rc=1
   return "$rc"
 }
 
@@ -1458,6 +1518,8 @@ teardown_route_pr_landed() {  # <slot> <pr>
       TEARDOWN_CLOSEOUT_ROUTE_WHY="the forge read of PR $pr timed out after ${limit}s (unknown, not merged)"
     elif [ "$rc" = 125 ]; then
       TEARDOWN_CLOSEOUT_ROUTE_WHY="the forge read of PR $pr cannot be bounded here (perl is not available), so it is unknown, not merged"
+    elif [ "$rc" = 126 ]; then
+      TEARDOWN_CLOSEOUT_ROUTE_WHY="the forge read of PR $pr could not end its own process group, so it is unknown, not merged"
     else
       TEARDOWN_CLOSEOUT_ROUTE_WHY="the forge read of PR $pr failed (exit $rc; unknown, not merged)"
     fi
@@ -1488,7 +1550,18 @@ teardown_route_pr_landed() {  # <slot> <pr>
     return 1
   fi
   branch=${TEARDOWN_ROUTE_BASE:-}
-  [ -n "$branch" ] || branch=$(fm_task_copy_default_branch "$slot") || branch=
+  if [ -z "$branch" ]; then
+    # The repository's default branch is the one origin/HEAD names. A local main or
+    # master is a guess, never a proof, so without origin/HEAD the branch is unknown.
+    ref=$(git -C "$slot" symbolic-ref --quiet refs/remotes/origin/HEAD 2>/dev/null) || ref=
+    case "$ref" in
+      refs/remotes/origin/?*) branch=${ref#refs/remotes/origin/} ;;
+    esac
+    if [ -z "$branch" ]; then
+      TEARDOWN_CLOSEOUT_ROUTE_WHY="the clone has no origin/HEAD, so the repository's default branch is unknown and the merge commit of PR $pr cannot be placed on it (unknown, not landed)"
+      return 1
+    fi
+  fi
   ref=refs/remotes/origin/$branch
   if [ -z "$branch" ] || ! git check-ref-format "$ref" 2>/dev/null \
     || ! git -C "$slot" rev-parse --verify --quiet "$ref^{commit}" >/dev/null 2>&1; then
@@ -1508,19 +1581,46 @@ teardown_route_pr_landed() {  # <slot> <pr>
   fi
 }
 
+# After the forge read, which is the slow step: the record must still bind the same
+# PR, profile and tip. A reader that refuses names its own reason; a record that
+# vanished or changed is named here.
+teardown_route_reread() {  # <copy> <pr> <profile> <tip>
+  local rc=0
+  teardown_route_record "$1" || rc=$?
+  [ "$rc" != 2 ] || return 1
+  if [ "$rc" != 0 ] || [ "$TEARDOWN_CLOSEOUT_ROUTE_PR" != "$2" ] \
+    || [ "$TEARDOWN_CLOSEOUT_ROUTE_PROFILE" != "$3" ] || [ "$TEARDOWN_ROUTE_TIP" != "$4" ]; then
+    TEARDOWN_CLOSEOUT_ROUTE_WHY="the records file changed while the route was being proved (it no longer binds PR $2, its profile and tip $4)"
+    return 1
+  fi
+}
+
 # Sets TEARDOWN_CLOSEOUT_ROUTE for <copy>: empty (the plain call), pr (the route,
 # with PR and PROFILE) or invalid (return 1, with WHY). It reads the live tip and
 # the forge each time it runs, so the plan and the execute each prove the record.
+# The record is read again after the forge read and must bind the same PR, profile
+# and tip, and the profile is checked again after it, so a row written while the
+# forge was read holds the copy. A caller that publishes the route learns the PR
+# while the proof still runs (route "proving").
 teardown_closeout_route() {  # <slot> <copy>
-  local rc=0
+  local rc=0 pr profile tip
   TEARDOWN_CLOSEOUT_ROUTE=
   TEARDOWN_CLOSEOUT_ROUTE_WHY=
   teardown_route_record "$2" || rc=$?
   [ "$rc" != 1 ] || return 0
-  if [ "$rc" = 0 ] && teardown_route_profile_ok "$TEARDOWN_CLOSEOUT_ROUTE_PROFILE" "$TEARDOWN_CLOSEOUT_ROUTE_PR" "$TEARDOWN_ROUTE_TIP" \
-    && teardown_route_pr_landed "$1" "$TEARDOWN_CLOSEOUT_ROUTE_PR"; then
-    TEARDOWN_CLOSEOUT_ROUTE='pr'
-    return 0
+  if [ "$rc" = 0 ]; then
+    pr=$TEARDOWN_CLOSEOUT_ROUTE_PR
+    profile=$TEARDOWN_CLOSEOUT_ROUTE_PROFILE
+    tip=$TEARDOWN_ROUTE_TIP
+    TEARDOWN_CLOSEOUT_ROUTE=proving
+    teardown_closeout_route_publish
+    if teardown_route_profile_ok "$profile" "$pr" "$tip" \
+      && teardown_route_pr_landed "$1" "$pr" \
+      && teardown_route_reread "$2" "$pr" "$profile" "$tip" \
+      && teardown_route_profile_ok "$profile" "$pr" "$tip"; then
+      TEARDOWN_CLOSEOUT_ROUTE='pr'
+      return 0
+    fi
   fi
   TEARDOWN_CLOSEOUT_ROUTE=invalid
   return 1
@@ -1555,7 +1655,7 @@ teardown_closeout_route_answer() {  # <plan|execute> <driver-exit>
   # always names --cleanup-worktree, so cleanup_requested false is wrong, and a
   # BLOCKED state that claims a removal is wrong; neither is read as a refusal
   # that released nothing.
-  contradiction=$(printf '%s' "$TEARDOWN_CLOSEOUT_STDOUT" | jq -s -r 'if length == 1 and (.[0] | type) == "object" then .[0] | (if .cleanup_requested == false then "cleanup_requested is false although the call asked for cleanup" elif .state == "BLOCKED" and .worktree_removed == true then "it reports worktree_removed true while the state is BLOCKED" else empty end) else empty end' 2>/dev/null) || contradiction=
+  contradiction=$(printf '%s' "$TEARDOWN_CLOSEOUT_STDOUT" | jq -s -r 'if length == 1 and (.[0] | type) == "object" then .[0] | (if .cleanup_requested == false then "cleanup_requested is false although the call asked for cleanup" elif .state == "BLOCKED" and .worktree_removed == true then "it reports worktree_removed true while the state is BLOCKED" elif .state == "BLOCKED" and ((.branch_delete // null) != null or (.branch_reap // null) != null) then "it reports a branch delete or reap decision while the state is BLOCKED" else empty end) else empty end' 2>/dev/null) || contradiction=
   if [ -n "$contradiction" ]; then
     TEARDOWN_CLOSEOUT_ROUTE_WHY="the driver's answer contradicts the call or itself ($contradiction), so it is not read as proof that nothing was released"
     return 1

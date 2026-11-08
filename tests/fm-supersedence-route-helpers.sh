@@ -130,6 +130,11 @@ route_write_profile() {
 # <table-dir>/gh.pids and becomes `sleep`, so that pid is the sleeper's own.
 # HANGCHILD records its own pid and that of a `sleep` child it starts and waits
 # for, both in gh.pids, so a read that is ended without its descendants is visible.
+# EARLYEXIT (line 1, then the answer row) starts a `sleep` child that inherits gh's
+# stdout and records its pid and the call time, prints the answer and exits at once:
+# the parent is gone while a descendant still holds the pipe. APPEND <n> (line 1,
+# then the carrier path, a row, and the answer row) appends that row to the carrier
+# on the <n>th read of that PR or later, so a record can change while the forge is read.
 # Anything else goes to the fixture's own gh (kept as gh.base) or fails.
 route_install_gh() {
   local fakebin=$1 dir=$2
@@ -153,6 +158,11 @@ case "\$(head -n 1 "\$file")" in
   HANG) printf '%s\\n' "\$\$" >> "$dir/gh.pids"; exec sleep 30 ;;
   HANGCHILD) printf '%s\\n' "\$\$" >> "$dir/gh.pids"; sleep 60 & printf '%s\\n' "\$!" >> "$dir/gh.pids"; wait ;;
   GARBAGE) echo "not a state row"; exit 0 ;;
+  EARLYEXIT) sleep "\${ROUTE_EARLYEXIT_LIFE:-20}" & printf '%s\\n' "\$!" >> "$dir/gh.pids"; date +%s >> "$dir/gh.times"; tail -n +2 "\$file"; exit 0 ;;
+  APPEND*)
+    nth=\$(head -n 1 "\$file" | cut -d' ' -f2)
+    if [ "\$(grep -c "^pr view \$3 " "$dir/gh.log")" -ge "\${nth:-1}" ]; then sed -n 3p "\$file" >> "\$(sed -n 2p "\$file")"; fi
+    sed -n 4p "\$file"; exit 0 ;;
   *) cat "\$file"; exit 0 ;;
 esac
 SH
@@ -165,8 +175,28 @@ route_set_pr() {
   mkdir -p "$1"
   case "$3" in
     FAIL | HANG | HANGCHILD | GARBAGE) printf '%s\n' "$3" > "$1/pr-$2" ;;
+    EARLYEXIT) printf 'EARLYEXIT\nMERGED\t%s\t%s\n' "${4:-}" "${5:-fm/pr-$2-head}" > "$1/pr-$2" ;;
     *) printf '%s\t%s\t%s\n' "$3" "${4:-}" "${5:-fm/pr-$2-head}" > "$1/pr-$2" ;;
   esac
+}
+
+# route_set_pr_append <table-dir> <pr> <nth-read> <carrier> <row> <merge-commit> [<head-branch>]:
+# a MERGED answer that appends <row> to <carrier> on the <nth-read>th read of that PR or later.
+route_set_pr_append() {
+  mkdir -p "$1"
+  printf 'APPEND %s\n%s\n%s\nMERGED\t%s\t%s\n' "$3" "$4" "$5" "$6" "${7:-fm/pr-$2-head}" > "$1/pr-$2"
+}
+
+# route_wait_for <path> <seconds>: 0 once <path> exists, 1 when it does not appear in time.
+# A detached launch writes its marker some moments after the command that started it
+# returns, so a check made at once can reject a run that is about to be right.
+route_wait_for() {
+  local path=$1 limit=$(($2 * 10)) i=0
+  while [ ! -e "$path" ] && [ "$i" -lt "$limit" ]; do
+    sleep 0.1
+    i=$((i + 1))
+  done
+  [ -e "$path" ]
 }
 
 # route_install_row_driver <slot> <log-dir>: a scripted driver, one answer set per
@@ -200,6 +230,10 @@ if [ "\${3:-}" != --execute-cleanup ]; then
     exit 0
   fi
   [ ! -e "\$dir/plan.err" ] || cat "\$dir/plan.err" >&2
+  if [ ! -f "\$dir/plan.out" ] || [ ! -f "\$dir/plan.exit" ]; then
+    echo "SCRIPTED-ANSWER-MISSING: no plan answer in \$dir" >&2
+    exit 99
+  fi
   cat "\$dir/plan.out"
   exit "\$(cat "\$dir/plan.exit")"
 fi
@@ -212,6 +246,10 @@ if [ -e "\$dir/exec.remove" ]; then
   git worktree remove "\$2" || exit 4
 fi
 [ ! -e "\$dir/exec.err" ] || cat "\$dir/exec.err" >&2
+if [ ! -f "\$dir/exec.out" ] || [ ! -f "\$dir/exec.exit" ]; then
+  echo "SCRIPTED-ANSWER-MISSING: no execute answer in \$dir" >&2
+  exit 99
+fi
 cat "\$dir/exec.out"
 exit "\$(cat "\$dir/exec.exit")"
 SH
@@ -279,9 +317,12 @@ route_assert_digest_sees() {
 # error (exit 2 and a closeout_pr failure on stderr), allowed-doc (the plain
 # call's {"allowed": true}), silent, hang, retain (the dry-run envelope with the
 # ignored-payload retain key). Execute kinds: success, lie (the success envelope
-# after it unlocked the copy but left it in place), success-done (state DONE), blocked (a cleanup_tip_unbound refusal), retained
+# after it unlocked the copy but left it in place), intact (the success envelope
+# with the copy and its lock untouched), success-done (state DONE), blocked (a cleanup_tip_unbound refusal), retained
 # (the archived-tree-retained refusal), temporary (a lease conflict), allowed-doc,
-# and four malformed or contradictory temporary refusals that must not read as one:
+# and malformed or contradictory temporary refusals that must not read as one
+# (temporary-branch-delete and temporary-branch-reap carry a branch decision a BLOCKED
+# answer cannot have):
 # temporary-string (predicates_failed a string and worktree_removed true, the shape
 # Main 010 F3 reproduced), temporary-string-kept (a string, worktree_removed false),
 # temporary-removed (an array but worktree_removed true), temporary-removed-null,
@@ -303,11 +344,13 @@ route_script_row() {
     silent) : > "$dir/plan.out"; printf 0 > "$dir/plan.exit" ;;
     hang) : > "$dir/plan.out"; printf 0 > "$dir/plan.exit"; : > "$dir/plan.hang" ;;
     retain) route_plan_allowed_envelope "$pr" | sed 's/^{/{"ignored_payload_disposition":"archive_then_retain_tree",/' > "$dir/plan.out"; printf 3 > "$dir/plan.exit" ;;
+    *) fail "route_script_row: unknown plan kind '$3' for $2 (a kind that is not scripted leaves no answer)" ;;
   esac
   case "${4:-success}" in
     success) route_execute_success_envelope "$pr" > "$dir/exec.out"; printf 0 > "$dir/exec.exit"; : > "$dir/exec.remove" ;;
     success-done) route_envelope DONE '[]' true null "$pr" > "$dir/exec.out"; printf 0 > "$dir/exec.exit"; : > "$dir/exec.remove" ;;
     lie) route_execute_success_envelope "$pr" > "$dir/exec.out"; printf 0 > "$dir/exec.exit"; : > "$dir/exec.unlock" ;;
+    intact) route_execute_success_envelope "$pr" > "$dir/exec.out"; printf 0 > "$dir/exec.exit" ;;
     blocked) route_envelope BLOCKED '["cleanup_gate"]' false '"cleanup_tip_unbound"' "$pr" > "$dir/exec.out"; printf 3 > "$dir/exec.exit" ;;
     retained) route_envelope BLOCKED '["cleanup_gate"]' false '"cleanup_ignored_payload_archived_tree_retained"' "$pr" > "$dir/exec.out"; printf 3 > "$dir/exec.exit" ;;
     temporary) route_envelope BLOCKED '["cleanup_gate"]' false '"cleanup_lease_conflict"' "$pr" > "$dir/exec.out"; printf 3 > "$dir/exec.exit" ;;
@@ -316,8 +359,11 @@ route_script_row() {
     temporary-removed) route_envelope BLOCKED '["cleanup_gate"]' true '"cleanup_lease_conflict"' "$pr" > "$dir/exec.out"; printf 3 > "$dir/exec.exit" ;;
     temporary-removed-null) route_envelope BLOCKED '["cleanup_gate"]' null '"cleanup_lease_conflict"' "$pr" > "$dir/exec.out"; printf 3 > "$dir/exec.exit" ;;
     temporary-not-requested) ROUTE_CLEANUP_REQUESTED=false route_envelope BLOCKED '["cleanup_gate"]' false '"cleanup_lease_conflict"' "$pr" > "$dir/exec.out"; printf 3 > "$dir/exec.exit" ;;
+    temporary-branch-delete) route_envelope BLOCKED '["cleanup_gate"]' false '"cleanup_lease_conflict"' "$pr" | sed 's/"branch_delete":null/"branch_delete":{"state":"deleted_after_landing_proof"}/' > "$dir/exec.out"; printf 3 > "$dir/exec.exit" ;;
+    temporary-branch-reap) route_envelope BLOCKED '["cleanup_gate"]' false '"cleanup_lease_conflict"' "$pr" | sed 's/"branch_reap":null/"branch_reap":{"outcome":"reaped"}/' > "$dir/exec.out"; printf 3 > "$dir/exec.exit" ;;
     temporary-retained-stderr) route_envelope BLOCKED '["cleanup_gate"]' false '"cleanup_lease_conflict"' "$pr" > "$dir/exec.out"; printf 3 > "$dir/exec.exit"; echo "closeout_pr: cleanup_ignored_payload_archived_tree_retained" > "$dir/exec.err" ;;
     allowed-doc) echo '{"allowed": true}' > "$dir/exec.out"; printf 0 > "$dir/exec.exit" ;;
+    *) fail "route_script_row: unknown execute kind '${4:-success}' for $2 (a kind that is not scripted leaves no answer)" ;;
   esac
 }
 

@@ -175,7 +175,9 @@
 # that route's dry-run answer (exit 3, state BLOCKED, predicates_failed exactly
 # ["cleanup_not_executed"]); bin/fm-teardown-nested-lib.sh's header owns the record
 # format and the merged-PR conditions, and a record that fails one, or any other
-# answer, holds the copy as above with the route and PR named.
+# answer, holds the copy as above with the route and PR named; a plan that times out
+# names the route and PR too. A route execute that claims success uses a release slot
+# of the per-run cap even when the copy and its lock are untouched.
 # The timeout is deliberate (FM_COPY_SWEEP_PLAN_TIMEOUT seconds, 120 by default):
 # the owner's rule holds a copy whose plan does not answer. The plan runs as a
 # process group of its own and the timeout kills that whole group, so neither the
@@ -1448,6 +1450,9 @@ driver_plan_allows() {  # <clone> <copy>
   rmdir "$dir" 2>/dev/null
   if [ "$timed_out" = 1 ]; then
     PLAN_WHY="its closeout driver did not answer within ${limit}s"
+    case "$TEARDOWN_CLOSEOUT_ROUTE" in
+      pr | proving) PLAN_WHY="$PLAN_WHY (supersedence route --pr ${TEARDOWN_CLOSEOUT_ROUTE_PR:-?})" ;;
+    esac
     return 1
   fi
   PLAN_WHY=$(printf '%s' "$TEARDOWN_CLOSEOUT_OUT" | tr '\n\t' '  ')
@@ -1491,7 +1496,8 @@ release_still_proven() {  # <clone> <copy> <pool> <container> <HEAD> <lock-sha25
 # route the document is the lane's BLOCKED envelope in its real shape: a
 # predicates_failed array that holds cleanup_gate, cleanup_requested true (the call
 # asked for cleanup), worktree_removed the boolean false (it must not claim a
-# removal), and the recovery reason. A string for predicates_failed, a removal
+# removal), no branch delete or reap decision (a BLOCKED answer has none), and the
+# recovery reason. A string for predicates_failed, a removal
 # claim, a false cleanup_requested, a null or missing flag or any other shape
 # contradicts "nothing was released" and is not temporary, so the retention
 # receipt stays. A retained-tree signal on stdout or stderr beats all of it.
@@ -1502,7 +1508,7 @@ execute_refusal_is_temporary() {  # <exit>
     case "$TEARDOWN_CLOSEOUT_STDOUT$TEARDOWN_CLOSEOUT_OUT" in
       *cleanup_ignored_payload_archived_tree_retained* | *archive_then_retain_tree*) return 1 ;;
     esac
-    printf '%s' "$TEARDOWN_CLOSEOUT_STDOUT" | jq -s -e 'length == 1 and (.[0] | type == "object" and .state == "BLOCKED" and .cleanup_requested == true and (.predicates_failed | type) == "array" and (.predicates_failed | index("cleanup_gate")) != null and .worktree_removed == false and (.cleanup_recovery_reason == "cleanup_lease_conflict" or .cleanup_recovery_reason == "cleanup_skipped_live_or_unknown"))' >/dev/null 2>&1
+    printf '%s' "$TEARDOWN_CLOSEOUT_STDOUT" | jq -s -e 'length == 1 and (.[0] | type == "object" and .state == "BLOCKED" and .cleanup_requested == true and (.predicates_failed | type) == "array" and (.predicates_failed | index("cleanup_gate")) != null and .worktree_removed == false and (.branch_delete // null) == null and (.branch_reap // null) == null and (.cleanup_recovery_reason == "cleanup_lease_conflict" or .cleanup_recovery_reason == "cleanup_skipped_live_or_unknown"))' >/dev/null 2>&1
     return
   fi
   printf '%s' "$TEARDOWN_CLOSEOUT_STDOUT" | jq -s -e 'length == 1 and (.[0] | type == "object" and .allowed == false and (.reason == "cleanup_lease_conflict" or .reason == "cleanup_skipped_live_or_unknown"))' >/dev/null 2>&1
@@ -1745,7 +1751,7 @@ clear_stale_receipts() {
 apply_removals() {
   local line container pool clone copy kib head branch err refusal freed gone='' held='' stamp
   local release_id preserve_dir preserved net release_rc receipt lock_hash earlier identity
-  local driver_slots=0 driver_limit deferred='' registered enumeration_rc want now activity
+  local driver_slots=0 driver_limit deferred='' registered enumeration_rc want now activity route_used route_file
   driver_limit=${FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT:-5}
   case "$driver_limit" in ''|*[!0-9]*) driver_limit=0 ;; esac
   driver_limit=$((10#$driver_limit))
@@ -1798,12 +1804,22 @@ apply_removals() {
         continue
       }
       release_rc=0
+      route_used=
+      route_file=$(mktemp "${TMPDIR:-/tmp}/fm-sweep-route.XXXXXX") || route_file=
       identity=$(copy_identity "$copy") || identity=
-      err=$(teardown_driver_release "$clone" "$copy" "$release_id" "$pool" "$container" "$head" "$lock_hash" 2>&1) || release_rc=$?
+      err=$(TEARDOWN_CLOSEOUT_ROUTE_FILE=$route_file teardown_driver_release "$clone" "$copy" "$release_id" "$pool" "$container" "$head" "$lock_hash" 2>&1) || release_rc=$?
+      if [ -n "$route_file" ]; then
+        IFS= read -r route_used < "$route_file" || route_used=
+        rm -f -- "$route_file"
+      fi
       if [ "$release_rc" != 2 ]; then
         enumeration_rc=0
         registered=$(list_nested "$clone") || enumeration_rc=$?
-        if ! { copy_still_holds "$copy" "$identity" "$lock_hash" \
+        # A copy the driver changed uses a slot. So does a route execute that
+        # claimed success, whatever the copy shows: the driver was asked to remove
+        # a locked copy and said it did.
+        if { [ "$route_used" = pr ] && [ "$release_rc" = 0 ]; } \
+          || ! { copy_still_holds "$copy" "$identity" "$lock_hash" \
           && [ "$enumeration_rc" = 0 ] && grep -qxF "$copy" <<< "$registered"; }; then
           driver_slots=$((driver_slots + 1))
         fi
