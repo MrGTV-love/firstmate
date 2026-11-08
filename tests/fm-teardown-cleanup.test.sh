@@ -7021,6 +7021,51 @@ test_a_replaced_kept_copy_at_the_same_path_is_assessed_on_its_own_state() {
   pass "a copy replaced at the same path is assessed on its own state exactly once, the earlier preserve keeps its bytes and its retry asks nothing"
 }
 
+# F-round probes, two real processes on one kept copy. The first teardown holds in
+# the driver (the stand-in sleeps after it wrote its tar); the second starts while
+# it is there. Whatever the second does, the driver is asked once and one tar exists.
+retained_overlap_run() {  # <label> <second-command...>: first run in the background
+  local label=$1 first_pid n
+  shift
+  (
+    env FM_TEARDOWN_VERNANT_PYTHON="$FOREIGN_CASE/vernant-python" FM_STUB_CLOSEOUT=retained \
+      "FM_STUB_AFTER=sleep 6" FM_HOME="$FOREIGN_CASE/home" \
+      FM_ROOT_OVERRIDE="$FOREIGN_CASE/code-root" FM_STATE_OVERRIDE="$FOREIGN_CASE/state" \
+      FM_DATA_OVERRIDE="$FOREIGN_CASE/data" FM_CONFIG_OVERRIDE="$FOREIGN_CASE/config" \
+      NM_HOME="$FOREIGN_CASE/nm" PATH="$FOREIGN_CASE/fakebin:${FM_TEARDOWN_TEST_PATH:-$PATH}" \
+      "$TEARDOWN" task-x1 > "$FOREIGN_CASE/stdout.first" 2> "$FOREIGN_CASE/stderr.first"
+    echo $? > "$FOREIGN_CASE/rc.first"
+  ) &
+  first_pid=$!
+  for n in $(seq 1 100); do
+    [ -f "$FOREIGN_CASE/closeout.log" ] && break
+    sleep 0.2
+  done
+  [ -f "$FOREIGN_CASE/closeout.log" ] || fail "$label: the first run never reached the driver"
+  "$@" || true
+  wait "$first_pid" 2>/dev/null || true
+}
+
+test_two_overlapping_teardowns_of_one_kept_copy_make_one_archive() {
+  local rc
+  make_retained_case retained-overlap-teardown enclosing
+  retained_overlap_run retained-overlap-teardown run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  cp "$FOREIGN_CASE/stderr" "$FOREIGN_CASE/stderr.second"
+  assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-overlap-teardown: two overlapping teardowns made more than one driver call or tar (first rc $(cat "$FOREIGN_CASE/rc.first"), second rc $rc: $(tail -3 "$FOREIGN_CASE/stderr.second"))"
+  pass "two overlapping teardowns of one kept copy ask the driver once and write one tar (first rc $(cat "$FOREIGN_CASE/rc.first"), second rc $rc)"
+}
+
+test_a_file_created_in_the_copy_while_the_driver_runs_is_not_closed_over() {
+  local rc
+  make_retained_case retained-late-file enclosing
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained "FM_STUB_AFTER=printf 'late\n' > '$FOREIGN_COPY/notes/late.dat'"
+  expect_code 1 "$rc" "retained-late-file: a unique ignored file created during the driver call must not be closed over: $(cat "$FOREIGN_CASE/stderr")"
+  assert_present "$FOREIGN_CASE/state/task-x1.meta" "retained-late-file: the task record was removed"
+  assert_present "$FOREIGN_COPY/notes/late.dat" "retained-late-file: the late file is gone"
+  assert_equals "late" "$(cat "$FOREIGN_COPY/notes/late.dat")" "retained-late-file: the late file changed"
+  pass "a unique ignored file created in the copy while the driver runs refuses the close and stays in the copy"
+}
+
 # C2 (unchanged): the record does not expire; a run 30 days after the record's
 # time fields and file times asks the driver nothing.
 test_an_aged_record_of_an_unchanged_kept_copy_still_asks_the_driver_nothing() {
@@ -7313,6 +7358,8 @@ test_a_replaced_kept_copy_at_the_same_path_is_assessed_on_its_own_state
 test_an_aged_record_of_an_unchanged_kept_copy_still_asks_the_driver_nothing
 test_a_retained_record_that_cannot_be_written_refuses_the_close
 test_the_preserve_restores_to_the_builders_hashes
+test_a_file_created_in_the_copy_while_the_driver_runs_is_not_closed_over
+test_two_overlapping_teardowns_of_one_kept_copy_make_one_archive
 )
 
 # In the combined tests/fm-teardown.test.sh run,
