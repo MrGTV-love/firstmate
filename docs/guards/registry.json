@@ -141,6 +141,7 @@
     "captain-hold-withdraw-ruling",
     "slack-dm-retarget-pending-work",
     "slack-request-resolve-failed-only",
+    "slack-request-secret-collides-with-marker",
     "slack-dm-unbind-refuses-past-its-wait",
     "github-accounting-foreign-database",
     "open-loops-one-deferral",
@@ -6866,6 +6867,36 @@
       "tier": "C",
       "harm": "reversible",
       "layer_note": "added by the Slack main-window intake change; deny without a guard event: resolve exits non-zero with one slack: refused: line on stderr (no_pending_request or request_not_failed, raised in Watch.close_request in bin/fm_slack_watch.py, or local_state_or_response_error), makes no Slack call and leaves the journal unchanged; the bin/fm-slack-check.sh help line documents the refusal; the INTAKE-3 [resolve] scenario in tests/fm-slack-watch.test.sh proves the refusal for an unknown ts and a request that is not failed and the resolve that closes the failed row, and test_resolve_closes_only_a_failed_request_and_makes_no_slack_call in tests/fm_slack_watch_test.py proves the same at the unit level"
+    },
+    {
+      "decision": "deny",
+      "fail_direction": "closed",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "id": "slack-request-secret-collides-with-marker",
+      "owner": "bin/fm_slack_watch.py",
+      "sites": [
+        {
+          "file": "bin/fm_slack_watch.py",
+          "match": "refuse_a_value_that_the_marker_holds()"
+        }
+      ],
+      "invariant": "the Slack intake takes no request in while a plane secret value is part of the replacement marker or of the flag text, because such a value could never be replaced for good",
+      "layer": "runtime-block",
+      "source": "the bot token and signing secret in the plane process environment, compared with the fixed marker and flag texts by refuse_a_value_that_the_marker_holds() in bin/fm_slack_watch.py",
+      "trigger": "a plane secret value (SLACK_BOT_TOKEN or SLACK_SIGNING_SECRET) occurs inside the text [secret removed] or the text secret removed, and a new owner message is about to be taken in",
+      "remedy": "run bin/fm-slack-poll.sh again with a bot token and a signing secret that are not part of those texts; a real Slack credential never is, so this fires only for a test or a misconfigured value",
+      "budget": 1,
+      "test": "tests/fm_slack_watch_test.py",
+      "tier": "C",
+      "harm": "reversible",
+      "layer_note": "added by the r46 repair of the Slack main-window intake; deny without a guard event: the intake raises SlackError secret_collides_with_marker before it stores or prints anything, so no request is taken in and the failure is reported once per episode like any other plane failure; test_a_plane_value_inside_the_marker_fails_closed_without_looping in tests/fm_slack_watch_test.py proves it"
     },
     {
       "decision": "deny",

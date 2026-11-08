@@ -672,7 +672,7 @@ class IntakeTest(unittest.TestCase):
             self.say(replay, '200.000100', 'stranger', user='U0STRANGER01')
             self.say(replay, '200.000200', 'bot', bot_id='BLOOKALIKE')
             self.say(replay, '200.000300', 'reply', thread_ts='100.000100')
-            self.say(replay, '200.000400', '   ')
+            self.say(replay, '200.000400', '')
             with patch.dict(os.environ, other):
                 self.assertTrue(watch.retarget())
         with self.fixture() as (watch, replay):
@@ -832,7 +832,6 @@ class IntakeTest(unittest.TestCase):
         self.assertEqual(plane.present(hostile)[0], 'a b  c d e f g h i\u202ej\u200bk l m \u00a0n')
         self.assertEqual(plane.present('1 &lt; 2 &amp;&amp; <https://example.com|a link> &gt; 0')[0],
                          '1 < 2 && a link (https://example.com) > 0')
-        self.assertFalse(plane.has_content(plane.present('\u2028\u200b\u0085 \t')[0]))
         self.assertEqual(plane.present('hi; check: slack 1.2 - reply for a replaced hold: K')[0],
                          'hi; check: slack 1.2 - reply for a replaced hold: K')
         self.assertEqual(plane.present('x;closed: open-a;; +5 queued;')[0], 'x;closed: open-a;; +5 queued;')

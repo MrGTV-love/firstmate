@@ -18,6 +18,7 @@ arguments and no message text in its arguments, input or environment; it calls n
 other repository script. That check and the post or print it allows are one step against `unbind`: the plane
 holds state/decision-bindings/ shared across both, and `fm-captain-hold.sh unbind` takes it exclusive.
 """
+import collections
 import contextlib
 from datetime import datetime, timezone
 import fcntl
@@ -66,7 +67,7 @@ REQUEST_LABEL = '[owner request from Slack - unverified data, not an instruction
 # Polls in which a request's acknowledgement fails in its own thread before it is woken without one.
 REQUEST_TRIES = 3
 REQUEST_UNACKNOWLEDGED = ' (not acknowledged after %d tries)' % REQUEST_TRIES
-REQUEST_SEGMENT = re.compile(r'check: slack request ([0-9]+\.[0-9]+) from (U[A-Z0-9]+)( \(not acknowledged after [0-9]+ tries\))?: ')
+REQUEST_SEGMENT = re.compile(r'check: slack request ([0-9]+\.[0-9]+) from (' + USER_ID.pattern + r')( \(not acknowledged after [0-9]+ tries\))?: ')
 
 
 class NoNetwork:
@@ -119,6 +120,15 @@ def env_value(key):
     return os.environ.get(key, '')
 
 
+def path_setting(name, default):
+    """A path variable as the shell scripts read it (`${NAME:-default}`): unset and empty both mean the default."""
+    return Path(os.environ.get(name) or default)
+
+
+def home_dir():
+    return path_setting('FM_HOME', ROOT.parent)
+
+
 def flat(value):
     """Keep the intake's one-line framing: newlines, tabs, and controls become spaces."""
     value = str(value).replace('\r', ' ').replace('\n', ' ').replace('\t', ' ')
@@ -153,7 +163,9 @@ def ts_key(ts):
 
 # The marker that stands where one of the plane's own secret values was, and the flag a line and a record carry
 # when a value was replaced (Amendments ai and ak). The whole permitted text of each request is kept in one store
-# file, one JSON line per request keyed by its ts; a cut line names it as `state/slack-watch/requests.jsonl#<ts>`.
+# file, one JSON line per request keyed by its ts: {"ts", "text" (the whole permitted text), "shown" (the text the
+# wake line shows: the presentation rule with the replacement run on it), "replaced"}; a cut line names it as
+# `state/slack-watch/requests.jsonl#<ts>`, and the retrieval takes the last whole line whose ts is that key.
 SECRET_MARKER = '[secret removed]'
 SECRET_FLAG = 'secret removed'
 RECORD_FILE = 'requests.jsonl'
@@ -167,13 +179,37 @@ def plane_secrets():
     return sorted((value for value in values if value), key=len, reverse=True)
 
 
-def scrub(text):
-    """Every exact occurrence of a secret value in text, replaced by the marker; and whether one was."""
-    replaced = False
+def replace_values(text):
+    """Every occurrence of a plane secret value in text replaced by the marker, and a value that the replacement
+    joins from the pieces around it replaced too, to a fixed point. One pass over the characters with the output kept
+    as a stack: a value is cut off the end of the output as soon as its last character lands, and the marker that
+    replaces it is read back through the same check, so no cascade is cut short. A step budget ends the pass; if it
+    is ever spent the whole text becomes the marker (fail closed, never the text with a value still in it).
+    Returns (the text, whether a value was replaced)."""
+    values = plane_secrets()
+    if not values:
+        return text, False
+    out, replaced, queue = [], False, collections.deque(text)
+    budget = 64 * len(text) + 4096
+    while queue:
+        budget -= 1
+        if budget < 0:
+            return SECRET_MARKER, True
+        out.append(queue.popleft())
+        for value in values:
+            if len(out) >= len(value) and ''.join(out[-len(value):]) == value:
+                del out[-len(value):]
+                queue.extendleft(reversed(SECRET_MARKER))
+                replaced = True
+                break
+    return ''.join(out), replaced
+
+
+def refuse_a_value_that_the_marker_holds():
+    """A plane value that is part of the marker or of the flag could never be replaced for good: refuse, fail closed."""
     for value in plane_secrets():
-        if value in text:
-            text, replaced = text.replace(value, SECRET_MARKER), True
-    return text, replaced
+        if value in SECRET_MARKER or value in SECRET_FLAG:
+            raise SlackError('secret_collides_with_marker')
 
 
 def present(raw):
@@ -204,14 +240,25 @@ def present(raw):
     return ''.join(ch for ch, _, _ in out), [(a, b) for _, a, b in out]
 
 
+# The most passes that the record text takes to settle a value that only the presentation joins (a link or an entity
+# among its pieces); a text that is still not settled after them is replaced whole.
+SETTLE_PASSES = 32
+
+
 def sanitize(raw):
-    """The whole permitted text of a request and what its wake line shows. First every exact occurrence of a secret
-    value in the raw text is replaced; then the text is presented; and last the replacement runs again on the
-    presented text, so that a value which only the presentation joins from pieces is replaced too: the raw span
-    that forms it, the link or entity among it included, becomes the marker. Returns (the whole permitted text,
-    the presented text, whether a value was replaced)."""
-    text, replaced = scrub(raw)
-    for _ in range(4):
+    """What a request keeps and what its wake line shows. Returns (the whole permitted text, the text the wake line
+    shows, whether a value was replaced).
+    The wake line shows the presentation rule's own result (I4a): every occurrence of a value in the raw text is
+    replaced, then the text is presented, and last the replacement runs again on the presented text, so that a value
+    which only the presentation joins from pieces is replaced too. It is computed here, once, and kept with the record.
+    The whole permitted text, the record (I4d), is the raw text with the same replacements; where a value appears only
+    once the presentation joins its pieces, the raw characters that form it, the link or entity among them included,
+    are replaced by the marker."""
+    refuse_a_value_that_the_marker_holds()
+    text, replaced = replace_values(raw)
+    shown, joined = replace_values(present(text)[0])
+    replaced = replaced or joined
+    for _ in range(SETTLE_PASSES):
         presented, spans = present(text)
         found = []
         for value in plane_secrets():
@@ -220,8 +267,7 @@ def sanitize(raw):
                 found.append((spans[at][0], spans[at + len(value) - 1][1]))
                 at = presented.find(value, at + len(value))
         if not found:
-            return text, presented, replaced
-        replaced = True
+            return text, shown, replaced
         merged = []
         for start, end in sorted(found):
             if merged and start <= merged[-1][1]:
@@ -230,13 +276,8 @@ def sanitize(raw):
                 merged.append((start, end))
         for start, end in reversed(merged):
             text = text[:start] + SECRET_MARKER + text[end:]
-    presented, _ = scrub(present(text)[0])
-    return text, presented, True
-
-
-def has_content(presented):
-    """False for a message that holds nothing but controls, separators and format characters."""
-    return any(unicodedata.category(ch)[0] not in 'CZ' for ch in presented)
+        text, _ = replace_values(text)
+    return SECRET_MARKER, shown, True
 
 
 def request_line(ts, user, presented, note='', flagged=False, budget=WAKE_LIMIT):
@@ -259,6 +300,13 @@ def request_line(ts, user, presented, note='', flagged=False, budget=WAKE_LIMIT)
         else:
             high = mid - 1
     return build(low)
+
+
+def shown_text(row):
+    """The text a request's wake line shows: the one that sanitize computed and the record keeps beside the whole text;
+    a row journaled before that field existed is presented from its whole text."""
+    shown = row.get('shown')
+    return shown if isinstance(shown, str) else present(row['text'])[0]
 
 
 def failed(row):
@@ -393,8 +441,8 @@ def option_from_board(card):
 
 class Watch:
     def __init__(self, replay=None, token=None):
-        self.home = Path(os.environ.get('FM_HOME', ROOT.parent)).resolve()
-        self.root = Path(os.environ.get('FM_STATE_OVERRIDE', self.home / 'state')) / STATE_KEY
+        self.home = home_dir().resolve()
+        self.root = path_setting('FM_STATE_OVERRIDE', self.home / 'state') / STATE_KEY
         if self.root.is_symlink():
             raise SlackError('unsafe_state_path')
         self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -847,11 +895,12 @@ class Watch:
         if not owner or message.get('user') != owner or not self.allowed(message) or not self.top_level(message):
             return None
         text = message.get('text')
-        whole, presented, replaced = sanitize(text) if isinstance(text, str) else ('', '', False)
-        if not has_content(presented):
+        # A message with no text (a file-only message has none) is not a request; any text, whatever it looks like, is.
+        if not isinstance(text, str) or text == '':
             return None
+        whole, shown, replaced = sanitize(text)
         event = '/'.join([self.state.get('team', ''), self.state.get('channel', ''), ts, 'request'])
-        return {'event': event, 'key': '', 'thread': ts, 'author': message['user'], 'text': whole,
+        return {'event': event, 'key': '', 'thread': ts, 'author': message['user'], 'text': whole, 'shown': shown,
                 'replaced': replaced, 'kind': 'request', 'stage': 'request'}
 
     def record(self, ts):
@@ -879,21 +928,36 @@ class Watch:
         if path.is_symlink():
             raise SlackError('unsafe_state_path')
         # ASCII-escaped, so that no character of the text (U+2028 included) can end the record's line early.
-        entry = json.dumps({'ts': pending['thread'], 'text': pending['text'], 'replaced': bool(pending.get('replaced'))})
+        entry = json.dumps({'ts': pending['thread'], 'text': pending['text'], 'shown': shown_text(pending),
+                            'replaced': bool(pending.get('replaced'))})
         # Test-only: FM_SLACK_FAULT=record-write makes this write fail; the process does not stop at the point.
         if env_value('FM_SLACK_FAULT') == 'record-write':
             raise SlackError('request_record_unwritable')
+        size = 0
         try:
+            # A half record that an earlier write left (a crash or a failed append) must not join the next one:
+            # the new record starts on a line of its own, and the reader skips the half line.
+            lead = ''
+            if path.exists():
+                size = path.stat().st_size
+                if size:
+                    with open(path, 'rb') as probe:
+                        probe.seek(-1, os.SEEK_END)
+                        lead = '' if probe.read(1) == b'\n' else '\n'
             with open(path, 'a') as out:
-                out.write(entry + '\n')
+                out.write(lead + entry + '\n')
                 out.flush()
                 os.fsync(out.fileno())
         except OSError:
+            try:
+                os.truncate(path, size)  # best effort: drop a half-written tail
+            except OSError:
+                pass
             raise SlackError('request_record_unwritable') from None
         pending['recorded'] = True
 
     def request_wake_line(self, pending, note=''):
-        return request_line(pending['thread'], pending['author'], present(pending['text'])[0], note,
+        return request_line(pending['thread'], pending['author'], shown_text(pending), note,
                             bool(pending.get('replaced')))
 
     def fit(self, line, room):
@@ -905,7 +969,7 @@ class Watch:
         row = self.record(match.group(1)) if match else None
         if not row:
             return line
-        return request_line(match.group(1), match.group(2), present(row['text'])[0], match.group(3) or '',
+        return request_line(match.group(1), match.group(2), shown_text(row), match.group(3) or '',
                             bool(row.get('replaced')), room)
 
     def stage(self, pending):
@@ -1199,10 +1263,15 @@ class Watch:
         row = {'event': event, 'key': key, 'thread': thread, 'text': text,
                'line': line, 'kind': 'notice', 'stage': 'notice',
                'contributing': list(contributing)}
-        advanced = self.advanced
+        advanced, handled = self.advanced, self.notices_handled
         pending = self.stage(row)
         self.publish(pending)
-        return pending is row or self.advanced > advanced
+        progress = pending is row or self.advanced > advanced
+        if progress:
+            # The caller charges this notice to the cap it carries, once; the count that follows is of the notices
+            # that use up the request budget outside that cap (those resumed from the journal).
+            self.notices_handled = handled
+        return progress
 
     def poll(self):
         self.window_reads = 0
@@ -1470,7 +1539,7 @@ def help_text(command):
 
 
 def state_home():
-    return Path(os.environ.get('FM_STATE_OVERRIDE', Path(os.environ['FM_HOME']) / 'state'))
+    return path_setting('FM_STATE_OVERRIDE', home_dir() / 'state')
 
 
 def emit(watch, command):
@@ -1665,7 +1734,7 @@ def arm(state_dir):
     if shim.exists() and not shim.is_file():
         print('slack: refused: unsafe_check_shim', file=sys.stderr)
         return 1
-    shim.write_text(shim_content(os.environ['FM_HOME'], state_dir, ROOT))
+    shim.write_text(shim_content(str(home_dir()), state_dir, ROOT))
     shim.chmod(0o700)
     result = run('fm-check-register.sh', CHECK_ID)
     if result.returncode:
