@@ -682,7 +682,10 @@
 #     descendants of the marker-bearing worker, never extended once no bearer
 #     is alive, kept by a refusal for its retry and removed by the successful close; or a live parent chain to either (teardown_process_proved_own).
 #     Anything else is not proved: teardown refuses by naming its pid and leaves it
-#     running, on every route; a foreign process is never ended.
+#     running, on every route; a foreign process is never ended. A process that
+#     has exited by the time it is checked (the kernel answers "no such process",
+#     task_pid_positively_gone) is dropped, never refused and never signalled; a
+#     read that merely fails does not make a live process gone.
 #     Every other descendant cwd, existing or deleted,
 #     refuses with its pid, birth identity, matched path and scan root, because
 #     a damaged sibling lane cannot be distinguished from an own-tree directory.
@@ -3877,6 +3880,14 @@ EOF
   done
 }
 
+# Is <pid> positively gone? Only the kernel's answer "no such process" counts (kill -0
+# failing with ESRCH). A process that cannot be read, or whose ps read failed, is not gone:
+# the caller keeps it and refuses by name. The same check ends the audited signal path
+# (task_record_process_signal) when a process exits between its listing and its signal.
+task_pid_positively_gone() {  # <pid>
+  perl -MErrno=ESRCH -e 'exit((kill(0, $ARGV[0]) == 0 && $! == ESRCH) ? 0 : 1)' -- "$1"
+}
+
 task_pids_under_roots() {  # <dir>...
   TASK_PIDS=
   TASK_PIDS_FAILED_DIR=
@@ -3933,6 +3944,11 @@ task_pids_under_roots() {  # <dir>...
         return 1
       fi
       if ! teardown_process_proved_own "$pid"; then
+        # A process that exited after lsof listed it has no environment, record entry or
+        # parent chain left to prove; it is dropped, never signalled and never refused.
+        # Only a positive "no such process" counts: a live process whose ownership cannot
+        # be proved, or whose reads fail, still refuses by name below.
+        ! task_pid_positively_gone "$pid" || continue
         identity=$(task_process_identity "$pid") || identity="identity unavailable"
         echo "REFUSED: process $pid ($identity) is at scan root $dir but is not proved this task's own (no FM_TASK_INBOX launch marker in a readable environment, not in the owned record, no live parent chain to either), so its ownership by $ID is not proven; leaving it running and preserving task $ID without signalling." >&2
         TASK_PIDS_FAILED_DIR=$path
@@ -3963,7 +3979,7 @@ task_record_process_signal() {  # <pid> <birth-identity> <signal>
     if current=$(task_process_identity "$pid") && [ "$current" != "$identity" ]; then
       return 2
     fi
-    if perl -MErrno=ESRCH -e 'exit((kill(0, $ARGV[0]) == 0 && $! == ESRCH) ? 0 : 1)' -- "$pid"; then
+    if task_pid_positively_gone "$pid"; then
       return 2
     fi
     return 1

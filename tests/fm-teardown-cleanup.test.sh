@@ -2530,6 +2530,62 @@ test_an_apple_process_spawned_during_grace_is_refused_by_name_and_the_copy_is_ke
   grace_spawn_case apple grace-spawn-apple-refused
 }
 
+# A live process at the scan root that is not proved the task's own refuses by name and is
+# left running. Run once plain and once with the process's ps reads failing (a failed read is
+# not "gone"): only the kernel's "no such process" drops a process from the scan.
+unproved_live_root_process_case() {  # <name> <plain|unreadable>
+  local name=$1 mode=$2 case_dir rc pid diag
+  case_dir=$(make_case "$name")
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  teardown_fixture_start_foreign "$case_dir" KILL perl -e 'sleep 300'
+  pid=$TEARDOWN_FIXTURE_PID
+  sleep 0.2
+  cat > "$case_dir/fakebin/lsof" <<EOF
+#!/usr/bin/env bash
+printf 'p%s\nfcwd\nn%s\n' '$pid' '$case_dir/wt'
+EOF
+  cat > "$case_dir/fakebin/ps" <<'SH'
+#!/usr/bin/env bash
+# Every ps read about the target fails with no output, as for a process that cannot be read.
+case " $* " in
+  *" -p ${FM_FAKE_UNREADABLE_PID:-none} "*) exit 1 ;;
+esac
+exec "$REAL_PS_FOR_TEST" "$@"
+SH
+  chmod +x "$case_dir/fakebin/lsof" "$case_dir/fakebin/ps"
+  rc=0
+  if [ "$mode" = unreadable ]; then
+    FM_PROC_ROOT_OVERRIDE="$case_dir/no-proc" FM_FAKE_UNREADABLE_PID="$pid" \
+      run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  else
+    FM_PROC_ROOT_OVERRIDE="$case_dir/no-proc" \
+      run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  fi
+  diag=$(teardown_diag_report "$case_dir" "$rc" "$pid")
+  expect_code 1 "$rc" "$name: a live process not proved the task's own must refuse ($diag)"
+  assert_grep "process $pid" "$case_dir/stderr" "$name: the refusal did not name the process"
+  assert_grep "not proved" "$case_dir/stderr" "$name: the refusal did not say the process is not proved"
+  if ! kill -0 "$pid" 2>/dev/null; then
+    fail "$name: a process not proved the task's own was ended ($diag)"
+  fi
+  teardown_fixture_stop "$pid"
+  assert_no_grep $'\tTERM\t'"$pid"$'\t' "$case_dir/state/task-x1.teardown-processes" \
+    "$name: a signal was audited for a process not proved the task's own"
+  assert_no_grep $'\tKILL\t'"$pid"$'\t' "$case_dir/state/task-x1.teardown-processes" \
+    "$name: a KILL was audited for a process not proved the task's own"
+}
+
+test_a_live_process_at_the_root_that_is_not_proved_the_tasks_own_still_refuses() {
+  unproved_live_root_process_case live-unproved-refusal plain
+  pass "a live process at the scan root that is not proved the tasks own is refused by name and left running"
+}
+
+test_a_live_process_whose_identity_read_fails_is_not_gone_and_still_refuses() {
+  unproved_live_root_process_case live-unreadable-refusal unreadable
+  pass "a live process whose ps reads fail is not taken for gone: it is refused by name and left running"
+}
+
 test_persistent_scan_refuses_after_bounded_retries() {
   local case_dir rc spawner i=0
   case_dir=$(make_case persistent-reap-refusal)
@@ -7670,6 +7726,8 @@ test_process_spawned_during_grace_is_reaped_on_later_pass
 test_an_apple_process_spawned_during_grace_is_refused_by_name_and_the_copy_is_kept
 test_persistent_scan_refuses_after_bounded_retries
 test_process_exit_during_identity_lookup_does_not_refuse
+test_a_live_process_at_the_root_that_is_not_proved_the_tasks_own_still_refuses
+test_a_live_process_whose_identity_read_fails_is_not_gone_and_still_refuses
 test_run_abort_precedes_process_reap_precedes_worktree_removal
 test_locked_own_copy_is_released_by_the_closeout_driver
 test_unlocked_landed_foreign_copy_is_removed_without_the_driver
