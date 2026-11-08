@@ -2541,6 +2541,45 @@ test_transient_index_lock_clears_after_first_attempt_and_retry_succeeds() {
   pass "transient index.lock cleared after first failed return is retried successfully without force-remove"
 }
 
+# The lock classifier used to write the whole failure text into `grep -q` through a
+# pipe. grep -q stops at its first match, so a long text met a closed pipe, and a
+# parent that ignores SIGPIPE made bash print "write error: Broken pipe" into the
+# teardown's stderr. A stub grep that exits at once and a text far larger than a pipe
+# buffer make that deterministic; the retry must still end in success.
+test_index_lock_classifier_never_breaks_a_pipe_on_a_long_failure_text() {
+  local case_dir rc lock attempt_file real_grep
+  real_grep=$(command -v grep)
+  case_dir=$(make_case lock-classifier-pipe)
+  write_meta "$case_dir" no-mistakes ship
+  wt_commit "$case_dir" "shippable work"
+  git -C "$case_dir/wt" push -q origin fm/task-x1
+  git -C "$case_dir/project" fetch -q origin
+  add_transient_lock_treehouse "$case_dir"
+  add_lsof_no_holder "$case_dir"
+  cat > "$case_dir/fakebin/grep" <<EOF
+#!/usr/bin/env bash
+case " \$* " in *'index'*'lock'*) exit 0 ;; esac
+exec "$real_grep" "\$@"
+EOF
+  chmod +x "$case_dir/fakebin/grep"
+  lock=$(git_index_lock_path "$case_dir/wt")
+  mkdir -p "$(dirname "$lock")"
+  : > "$lock"
+  touch "$lock"
+  attempt_file="$case_dir/treehouse-attempts"
+  : > "$attempt_file"
+  rc=0
+  ( trap '' PIPE
+    TREEHOUSE_ATTEMPT_FILE="$attempt_file" TREEHOUSE_LOCK_PAD_LINES=40000 \
+    FM_TREEHOUSE_RETURN_LOCK_RETRIES=2 FM_TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS=0 \
+    FM_STALE_WORKTREE_LOCK_AGE_SECS=3600 \
+      run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" ) || rc=$?
+  expect_code 0 "$rc" "lock-classifier-pipe: teardown should succeed on retry"
+  assert_no_grep "write error" "$case_dir/stderr" "lock-classifier-pipe: the classifier wrote into a pipe its reader had closed"
+  assert_no_grep "Broken pipe" "$case_dir/stderr" "lock-classifier-pipe: the classifier broke its pipe"
+  pass "the index.lock classifier reads a long failure text without a pipe, so an early-exiting grep cannot break it"
+}
+
 test_persistent_index_lock_exhausts_retries_and_refuses_loudly() {
   local case_dir rc lock
   case_dir=$(make_case persistent-index-lock)
@@ -4882,6 +4921,7 @@ test_stale_index_lock_cleanup_rechecks_dirty_worktree
 test_non_linked_index_lock_path_is_checked_from_worktree
 test_index_lock_mtime_read_failure_refuses
 test_transient_index_lock_clears_after_first_attempt_and_retry_succeeds
+test_index_lock_classifier_never_breaks_a_pipe_on_a_long_failure_text
 test_persistent_index_lock_exhausts_retries_and_refuses_loudly
 test_empty_retry_wait_uses_default_without_aborting
 test_fractional_legacy_retry_wait_refuses_without_arithmetic_error

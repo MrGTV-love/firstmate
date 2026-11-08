@@ -1509,14 +1509,14 @@ handoff_wake_retire_validate() {
     prepared:*)
       corr=${value#prepared:}
       corr=${corr%%:*}
-      printf '%s' "$value" | grep -Eq '^prepared:[a-f0-9]{16}:[a-f0-9]{16}$' || {
+      grep -Eq '^prepared:[a-f0-9]{16}:[a-f0-9]{16}$' <<< "$value" || {
         echo "REFUSED: receiver wake state for secondmate $ID is invalid" >&2
         return 1
       }
       ;;
     pending:*|confirmed:*)
       corr=${value#*:}
-      printf '%s' "$corr" | grep -Eq '^[a-f0-9]{16}$' || {
+      grep -Eq '^[a-f0-9]{16}$' <<< "$corr" || {
         echo "REFUSED: receiver wake state for secondmate $ID is invalid" >&2
         return 1
       }
@@ -1631,7 +1631,7 @@ handoff_wake_retire_stage_recover() {
     return 1
   }
   corr=$(cat "$stage/corr" 2>/dev/null || true)
-  [ -z "$corr" ] || printf '%s' "$corr" | grep -Eq '^[a-f0-9]{16}$' || {
+  [ -z "$corr" ] || grep -Eq '^[a-f0-9]{16}$' <<< "$corr" || {
     echo "REFUSED: receiver wake retirement correlation for secondmate $ID is invalid" >&2
     return 1
   }
@@ -1727,11 +1727,11 @@ pending_replies_recovery_validate() {
       [ -f "$rec" ] && [ ! -L "$rec" ] \
         || { echo "REFUSED: pending-replies contains an unsafe recovery entry" >&2; return 1; }
       base=$(basename "$rec")
-      printf '%s' "$base" | grep -Eq '^[a-f0-9]{16}$' \
+      grep -Eq '^[a-f0-9]{16}$' <<< "$base" \
         || { echo "REFUSED: pending-replies contains an unsafe recovery entry" >&2; return 1; }
       corr=$(fm_meta_get "$rec" corr_id)
       if [ -n "$corr" ]; then
-        printf '%s' "$corr" | grep -Eq '^[a-f0-9]{16}$' \
+        grep -Eq '^[a-f0-9]{16}$' <<< "$corr" \
           || { echo "REFUSED: pending-replies contains an unsafe recovery entry" >&2; return 1; }
         [ "$corr" = "$base" ] \
           || { echo "REFUSED: pending-replies contains an unsafe recovery entry" >&2; return 1; }
@@ -1795,7 +1795,7 @@ pending_replies_cleanup_for_task() {
       task_id=$(fm_meta_get "$rec" task_id)
       [ "$task_id" = "$ID" ] || continue
       base=${rec#./}
-      printf '%s' "$base" | grep -Eq '^[a-f0-9]{16}$' || exit 1
+      grep -Eq '^[a-f0-9]{16}$' <<< "$base" || exit 1
       corr=$(fm_meta_get "$rec" corr_id)
       [ -z "$corr" ] || [ "$corr" = "$base" ] || exit 1
       rm -f -- "./.delivery-confirmed-$base" "$rec" || exit 1
@@ -2402,7 +2402,7 @@ unpushed_patches_are_in_pr_head() {
     [ -n "$commit" ] || continue
     patch_id=$(patch_id_for_commit "$commit") || return 1
     [ -n "$patch_id" ] || return 1
-    printf '%s\n' "$pr_patch_ids" | grep -qxF "$patch_id" || return 1
+    grep -qxF "$patch_id" <<< "$pr_patch_ids" || return 1
   done <<EOF
 $unpushed
 EOF
@@ -2483,7 +2483,7 @@ EOF
     case ${#fields[@]} in
       1|2)
         patch_id=$(patch_id_for_commit "$commit")
-        if [ -n "$patch_id" ] && printf '%s\n' "$pr_patch_ids" | grep -qxF "$patch_id"; then
+        if [ -n "$patch_id" ] && grep -qxF "$patch_id" <<< "$pr_patch_ids"; then
           proven=1
         fi
         ;;
@@ -3197,7 +3197,7 @@ reap_task_archive_branches() {
       echo "notice: keeping $branch (archive is a link to another ref)" >&2
       continue
     fi
-    if printf '%s\n' "$checked_out" | grep -qxF "branch $ref"; then
+    if grep -qxF "branch $ref" <<< "$checked_out"; then
       echo "notice: keeping $branch (checked out in a local copy)" >&2
       continue
     fi
@@ -3373,7 +3373,7 @@ TEARDOWN_TREEHOUSE_CUSTODY_REFUSED=5
 # Other return failures must not enter the retry path.
 treehouse_return_is_index_lock_error() {
   local text=$1
-  printf '%s\n' "$text" | grep -Eq "Unable to create ['\"].*index\\.lock['\"]: File exists"
+  grep -Eq "Unable to create ['\"].*index\\.lock['\"]: File exists" <<< "$text"
 }
 
 # Absolute path to the git index lock for a worktree/repo dir, or empty when it
@@ -3930,7 +3930,7 @@ task_status_is_own_parked_run() {  # <worktree> <axi-status-output>
     [ "$(fm_nm_runs_status_for_worktree "$wt" "$branch" "$ledger" "$run_head")" = running ] || return 1
   fi
   awaiting=$(printf '%s\n' "$out" | grep -E '^[[:space:]]*awaiting_agent:' | head -1 || true)
-  has_gate=$(printf '%s\n' "$out" | grep -Eq '^[[:space:]]*gate:[[:space:]]*' && echo 1 || echo 0)
+  has_gate=$(grep -Eq '^[[:space:]]*gate:[[:space:]]*' <<< "$out" && echo 1 || echo 0)
   case "$status" in
     awaiting_approval|fix_review) TASK_RUN_ID=$run_id; return 0 ;;
   esac
@@ -4074,7 +4074,7 @@ task_process_identity_matches() {  # <pid> <identity>
 }
 
 task_pid_list_contains() {  # <pid-list> <pid>
-  printf '%s\n' "$1" | grep -Fxq "$2"
+  grep -Fxq "$2" <<< "$1"
 }
 
 # Canonical form of <path> even when its tail no longer exists: the nearest

@@ -773,6 +773,10 @@ if [ "${1:-}" = return ]; then
     else
       echo "fatal: Unable to create 'index.lock': File exists." >&2
     fi
+    # TREEHOUSE_LOCK_PAD_LINES=<n>: n more stderr lines after the signature, so the
+    # text the classifier reads is far larger than a pipe buffer.
+    [ -z "${TREEHOUSE_LOCK_PAD_LINES:-}" ] \
+      || awk -v n="$TREEHOUSE_LOCK_PAD_LINES" 'BEGIN { for (i = 0; i < n; i++) printf "padding line %d of the treehouse return failure text\n", i }' >&2
     exit 128
   fi
   exit 0
