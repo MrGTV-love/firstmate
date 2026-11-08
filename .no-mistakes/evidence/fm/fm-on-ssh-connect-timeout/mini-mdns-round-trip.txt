@@ -1,0 +1,131 @@
+# Live round trip from Mac Studio to Mac mini through the mDNS name. Date: 2026-11-08T04:42:15Z
+# ssh -G gtt-cb => hostname gtt-cb.local connecttimeout none 
+
+=== head-1
+$ FM_HOME=<lab, registry line copied from fleet> FM_ROOT_OVERRIDE=<worktree> timeout 60 bash bin/fm-on.sh vernant-mini-build fm-remote-doctor.sh   (check mode, read-only)
+exit=0 elapsed=5.5s
+--- stdout (first 25 lines)
+mode=check
+path=/Users/charlesabrooker/fleet/firstmate/bin:/Users/charlesabrooker/.local/bin:/Users/charlesabrooker/.nvm/versions/node/v24.4.1/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+entrypoint=yes
+platform=darwin
+required git=/usr/bin/git
+required jq=/usr/bin/jq
+required herdr=/Users/charlesabrooker/.local/bin/herdr
+required tasks-axi=/opt/homebrew/bin/tasks-axi
+required treehouse=/Users/charlesabrooker/.local/bin/treehouse
+required python3=/opt/homebrew/bin/python3
+required harness=claude:/Users/charlesabrooker/.local/bin/claude
+optional tmux=/opt/homebrew/bin/tmux
+optional no-mistakes=/Users/charlesabrooker/.local/bin/no-mistakes
+optional gh=/opt/homebrew/bin/gh
+check herdr=ok: /Users/charlesabrooker/.local/bin/herdr
+check gui-session=ok: gui/501
+check remote-job-worker=ok: /Users/charlesabrooker/Library/LaunchAgents/dev.firstmate.remote-job.plist matches the Firstmate-owned Aqua worker contract
+check remote-job-worker-loaded=ok: dev.firstmate.remote-job is loaded in gui/501
+check remote-job-probe=ok: the remote job worker completed the required-tool probe
+check launchagent=ok: /Users/charlesabrooker/Library/LaunchAgents/dev.firstmate.herdr.fm-remote.plist matches the Firstmate-owned contract
+check launchagent-scope=ok: LimitLoadToSessionType=Aqua
+check launchagent-loaded=ok: gui/501/dev.firstmate.herdr.fm-remote matches the effective contract
+check herdr-owner-reader=ok: python3 runs on the runtime PATH
+check herdr-server=ok: session fm-remote is running in the Aqua login session (pid 2918, launchd)
+check entrypoint-link=ok: /Users/charlesabrooker/.local/bin/fm-remote-entrypoint.sh
+--- stderr
+
+
+=== head-2
+$ FM_HOME=<lab, registry line copied from fleet> FM_ROOT_OVERRIDE=<worktree> timeout 60 bash bin/fm-on.sh vernant-mini-build fm-remote-doctor.sh   (check mode, read-only)
+exit=0 elapsed=3.3s
+--- stdout (first 25 lines)
+mode=check
+path=/Users/charlesabrooker/fleet/firstmate/bin:/Users/charlesabrooker/.local/bin:/Users/charlesabrooker/.nvm/versions/node/v24.4.1/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+entrypoint=yes
+platform=darwin
+required git=/usr/bin/git
+required jq=/usr/bin/jq
+required herdr=/Users/charlesabrooker/.local/bin/herdr
+required tasks-axi=/opt/homebrew/bin/tasks-axi
+required treehouse=/Users/charlesabrooker/.local/bin/treehouse
+required python3=/opt/homebrew/bin/python3
+required harness=claude:/Users/charlesabrooker/.local/bin/claude
+optional tmux=/opt/homebrew/bin/tmux
+optional no-mistakes=/Users/charlesabrooker/.local/bin/no-mistakes
+optional gh=/opt/homebrew/bin/gh
+check herdr=ok: /Users/charlesabrooker/.local/bin/herdr
+check gui-session=ok: gui/501
+check remote-job-worker=ok: /Users/charlesabrooker/Library/LaunchAgents/dev.firstmate.remote-job.plist matches the Firstmate-owned Aqua worker contract
+check remote-job-worker-loaded=ok: dev.firstmate.remote-job is loaded in gui/501
+check remote-job-probe=ok: the remote job worker completed the required-tool probe
+check launchagent=ok: /Users/charlesabrooker/Library/LaunchAgents/dev.firstmate.herdr.fm-remote.plist matches the Firstmate-owned contract
+check launchagent-scope=ok: LimitLoadToSessionType=Aqua
+check launchagent-loaded=ok: gui/501/dev.firstmate.herdr.fm-remote matches the effective contract
+check herdr-owner-reader=ok: python3 runs on the runtime PATH
+check herdr-server=ok: session fm-remote is running in the Aqua login session (pid 2918, launchd)
+check entrypoint-link=ok: /Users/charlesabrooker/.local/bin/fm-remote-entrypoint.sh
+--- stderr
+
+
+=== head-3
+$ FM_HOME=<lab, registry line copied from fleet> FM_ROOT_OVERRIDE=<worktree> timeout 60 bash bin/fm-on.sh vernant-mini-build fm-remote-doctor.sh   (check mode, read-only)
+exit=0 elapsed=3.8s
+--- stdout (first 25 lines)
+mode=check
+path=/Users/charlesabrooker/fleet/firstmate/bin:/Users/charlesabrooker/.local/bin:/Users/charlesabrooker/.nvm/versions/node/v24.4.1/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+entrypoint=yes
+platform=darwin
+required git=/usr/bin/git
+required jq=/usr/bin/jq
+required herdr=/Users/charlesabrooker/.local/bin/herdr
+required tasks-axi=/opt/homebrew/bin/tasks-axi
+required treehouse=/Users/charlesabrooker/.local/bin/treehouse
+required python3=/opt/homebrew/bin/python3
+required harness=claude:/Users/charlesabrooker/.local/bin/claude
+optional tmux=/opt/homebrew/bin/tmux
+optional no-mistakes=/Users/charlesabrooker/.local/bin/no-mistakes
+optional gh=/opt/homebrew/bin/gh
+check herdr=ok: /Users/charlesabrooker/.local/bin/herdr
+check gui-session=ok: gui/501
+check remote-job-worker=ok: /Users/charlesabrooker/Library/LaunchAgents/dev.firstmate.remote-job.plist matches the Firstmate-owned Aqua worker contract
+check remote-job-worker-loaded=ok: dev.firstmate.remote-job is loaded in gui/501
+check remote-job-probe=ok: the remote job worker completed the required-tool probe
+check launchagent=ok: /Users/charlesabrooker/Library/LaunchAgents/dev.firstmate.herdr.fm-remote.plist matches the Firstmate-owned contract
+check launchagent-scope=ok: LimitLoadToSessionType=Aqua
+check launchagent-loaded=ok: gui/501/dev.firstmate.herdr.fm-remote matches the effective contract
+check herdr-owner-reader=ok: python3 runs on the runtime PATH
+check herdr-server=ok: session fm-remote is running in the Aqua login session (pid 2918, launchd)
+check entrypoint-link=ok: /Users/charlesabrooker/.local/bin/fm-remote-entrypoint.sh
+--- stderr
+
+
+=== base-1
+$ FM_HOME=<lab, registry line copied from fleet> FM_ROOT_OVERRIDE=<worktree> timeout 60 bash /tmp/fm-ct-lab.a0Wo/base/bin/fm-on.sh vernant-mini-build fm-remote-doctor.sh   (check mode, read-only)
+exit=0 elapsed=5.2s
+--- stdout (first 25 lines)
+mode=check
+path=/Users/charlesabrooker/fleet/firstmate/bin:/Users/charlesabrooker/.local/bin:/Users/charlesabrooker/.nvm/versions/node/v24.4.1/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+entrypoint=yes
+platform=darwin
+required git=/usr/bin/git
+required jq=/usr/bin/jq
+required herdr=/Users/charlesabrooker/.local/bin/herdr
+required tasks-axi=/opt/homebrew/bin/tasks-axi
+required treehouse=/Users/charlesabrooker/.local/bin/treehouse
+required python3=/opt/homebrew/bin/python3
+required harness=claude:/Users/charlesabrooker/.local/bin/claude
+optional tmux=/opt/homebrew/bin/tmux
+optional no-mistakes=/Users/charlesabrooker/.local/bin/no-mistakes
+optional gh=/opt/homebrew/bin/gh
+check herdr=ok: /Users/charlesabrooker/.local/bin/herdr
+check gui-session=ok: gui/501
+check remote-job-worker=ok: /Users/charlesabrooker/Library/LaunchAgents/dev.firstmate.remote-job.plist matches the Firstmate-owned Aqua worker contract
+check remote-job-worker-loaded=ok: dev.firstmate.remote-job is loaded in gui/501
+check remote-job-probe=ok: the remote job worker completed the required-tool probe
+check launchagent=ok: /Users/charlesabrooker/Library/LaunchAgents/dev.firstmate.herdr.fm-remote.plist matches the Firstmate-owned contract
+check launchagent-scope=ok: LimitLoadToSessionType=Aqua
+check launchagent-loaded=ok: gui/501/dev.firstmate.herdr.fm-remote matches the effective contract
+check herdr-owner-reader=ok: python3 runs on the runtime PATH
+check herdr-server=ok: session fm-remote is running in the Aqua login session (pid 2918, launchd)
+check entrypoint-link=ok: /Users/charlesabrooker/.local/bin/fm-remote-entrypoint.sh
+--- stderr
+
+

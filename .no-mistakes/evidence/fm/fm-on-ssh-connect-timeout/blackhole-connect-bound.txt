@@ -1,0 +1,18 @@
+# Real /usr/bin/ssh via bin/fm-on.sh to blackhole host 192.0.2.1 (TEST-NET-1, unroutable). Date: 2026-11-08T04:40:30Z
+# ssh -G 192.0.2.1 => connecttimeout none
+
+=== head-default
+$  FM_HOME=<lab> FM_ROOT_OVERRIDE=<worktree> timeout 60 bash bin/fm-on.sh blackhole fm-crew-state.sh
+exit=255 elapsed=15.7s
+stderr: ssh: connect to host 192.0.2.1 port 22: Operation timed out 
+
+=== head-override-3
+$ FM_SSH_CONNECT_TIMEOUT=3 FM_HOME=<lab> FM_ROOT_OVERRIDE=<worktree> timeout 60 bash bin/fm-on.sh blackhole fm-crew-state.sh
+exit=255 elapsed=3.8s
+stderr: ssh: connect to host 192.0.2.1 port 22: Operation timed out 
+
+=== base-default
+$  FM_HOME=<lab> FM_ROOT_OVERRIDE=<worktree> timeout 45 bash /tmp/fm-ct-lab.a0Wo/base/bin/fm-on.sh blackhole fm-crew-state.sh
+exit=124 elapsed=45.2s
+stderr: 
+
