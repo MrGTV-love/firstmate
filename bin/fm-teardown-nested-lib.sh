@@ -1691,17 +1691,22 @@ teardown_retained_preserve_current() {  # <copy> <dir>
 # Chooses where the ignored files of <copy> are preserved for this assessment and
 # sets TEARDOWN_RETAINED_DIR to it, and TEARDOWN_RETAINED_BUILD to 1 when that
 # directory does not exist yet and teardown_preserve_ignored must build it, else
-# 0. An existing preserve is never rebuilt, overwritten or removed: the first
-# directory is kept when it already holds the copy's current bytes, and a copy
-# whose payload changed since is preserved in its own directory beside it.
+# 0. For a copy a retained record names, an existing preserve is never rebuilt,
+# overwritten or removed: the first directory is kept when it already holds the
+# copy's current bytes, and a copy whose payload changed since is preserved in its
+# own directory beside it.
 # Returns 2 when the copy or a preserve could not be read.
 teardown_retained_preserve_choose() {  # <copy>
-  local copy=$1 base rc=0
+  local copy=$1 base rec rc=0
   TEARDOWN_RETAINED_DIR=
   TEARDOWN_RETAINED_SUFFIX=
   TEARDOWN_RETAINED_BUILD=0
   base=$(teardown_retained_preserve_dir "$copy") || return 2
-  if [ ! -e "$base" ] && [ ! -L "$base" ]; then
+  rec=$(teardown_retained_receipt "$DATA" "$copy") || return 2
+  # No directory yet, or no record of a kept copy: build the first directory as
+  # before (an earlier backup of a copy no record names is replaced only after the
+  # new one is verified).
+  if { [ ! -e "$base" ] && [ ! -L "$base" ]; } || { [ ! -e "$rec" ] && [ ! -L "$rec" ]; }; then
     TEARDOWN_RETAINED_DIR=$base
     TEARDOWN_RETAINED_BUILD=1
     return 0
