@@ -2316,6 +2316,37 @@ SH
   chmod +x "$case_dir/fakebin/git"
 }
 
+# add_git_read_fault <case-dir> <needle> <emit>: a git shim that fails the one read
+# whose command line contains <needle> with status 128, and runs everything else on the
+# real git. <emit> is what the failing read prints first: none, text:<printf %b text>
+# (a NUL-terminated path list, say), firstpatch (the real patch up to its second
+# file, so a valid prefix patch) or lastpatch (the real patch's last file alone, a
+# valid partial patch). The fault is armed by the case's fault.needle file,
+# so a case can build its history on the real git and arm the fault for the teardown
+# alone. Every hit is logged to fault.hits.
+add_git_read_fault() {
+  local case_dir=$1 needle=$2 emit=$3
+  cat > "$case_dir/fakebin/git" <<SH
+#!/usr/bin/env bash
+c='$case_dir'
+if [ -e "\$c/fault.needle" ] && [[ " \$* " == *"\$(cat "\$c/fault.needle")"* ]]; then
+  mode=\$(cat "\$c/fault.mode")
+  printf '%s\\n' "\$*" >> "\$c/fault.hits"
+  case "\$mode" in
+    none) exit 128 ;;
+    text:*) printf '%b' "\${mode#text:}"; exit 128 ;;
+    firstpatch) "\${REAL_GIT_FOR_TEST:?}" "\$@" | awk '/^diff --git /{n++} n<2'; exit 128 ;;
+    lastpatch) "\${REAL_GIT_FOR_TEST:?}" "\$@" | awk '/^diff --git /{blk=""} {blk=blk \$0 "\\n"} END{printf "%s", blk}'; exit 128 ;;
+  esac
+fi
+exec "\${REAL_GIT_FOR_TEST:?}" "\$@"
+SH
+  chmod +x "$case_dir/fakebin/git"
+  printf '%s' "$needle" > "$case_dir/fault.needle"
+  printf '%s' "$emit" > "$case_dir/fault.mode"
+  rm -f "$case_dir/fault.hits"
+}
+
 # A concurrent fresh allocator for the reservation window: it waits until the
 # run is inside the window, takes the project lock as bin/fm-spawn.sh does,
 # replaces the lapsed slot claim through the real claim helper, publishes its
@@ -3335,7 +3366,17 @@ TRAIN_COPY_HEAD=
 # TRAIN_MAIN_EDIT=0 skips the last commit on main (an edit of feature.txt), so the
 # default branch still holds the member's change as landed: the content-in-default proof
 # can then decide the copy by itself, and a case can ask whether it should.
+# TRAIN_MAIN_EDIT_FILE names the file that edit changes (default feature.txt).
 # TRAIN_PREFETCH_TRAIN=0 leaves the train head out of the copy's object store.
+# TRAIN_HIDDEN_ORDER=1: the member is built on K (hidden.txt), a sibling of D (side.txt)
+#   on the old main. The default branch holds a merge M whose FIRST parent is K and
+#   whose SECOND parent is D, with D's tree, and was fast-forwarded from D to M. K is
+#   on the first-parent line of the default branch, yet hidden.txt is in no tree
+#   from M on. Parent order is all that puts K there. Sets TRAIN_HIDDEN_COMMIT to K.
+# TRAIN_MEMBER_ON_LINE=1: the default branch is fast-forwarded to the member head H
+#   before the train starts, so H is on its first-parent line; the train then adds a
+#   commit on H and lands by squash, so the landing's first parent is H.
+#   Copy kinds: hidden is K (needs TRAIN_HIDDEN_ORDER=1), train is the train head.
 # Sets TRAIN_MEMBER_HEAD, TRAIN_HEAD and TRAIN_COPY_HEAD.
 setup_train_history() {
   local case_dir=$1 landing=$2 copy=$3 shape=${4:-merge} tmp="$1/_train" prerebase='' merge_commit
@@ -3362,6 +3403,23 @@ setup_train_history() {
     git -C "$tmp" merge -q -s ours --no-edit hidden >/dev/null
     git -C "$tmp" push -q origin main
     git -C "$tmp" checkout -q -b member hidden
+  elif [ "${TRAIN_HIDDEN_ORDER:-0}" = 1 ]; then
+    git -C "$tmp" checkout -q -b hidden
+    printf '%s\n' hidden > "$tmp/hidden.txt"
+    git -C "$tmp" add -- hidden.txt
+    git -C "$tmp" commit -q -m "hidden change"
+    TRAIN_HIDDEN_COMMIT=$(git -C "$tmp" rev-parse HEAD)
+    git -C "$tmp" checkout -q main
+    printf '%s\n' side > "$tmp/side.txt"
+    git -C "$tmp" add -- side.txt
+    git -C "$tmp" commit -q -m "side change"
+    git -C "$tmp" push -q origin main
+    # M: first parent K, second parent D, D's tree. The branch moves from D to M.
+    merge_commit=$(git -C "$tmp" commit-tree "$(git -C "$tmp" rev-parse 'HEAD^{tree}')" \
+      -p "$TRAIN_HIDDEN_COMMIT" -p HEAD -m "merge that kept the side's tree")
+    git -C "$tmp" reset -q --hard "$merge_commit"
+    git -C "$tmp" push -q origin main
+    git -C "$tmp" checkout -q -b member "$TRAIN_HIDDEN_COMMIT"
   else
     git -C "$tmp" checkout -q -b member
   fi
@@ -3373,6 +3431,11 @@ setup_train_history() {
   git -C "$tmp" commit -q -m "add feature two"
   TRAIN_MEMBER_HEAD=$(git -C "$tmp" rev-parse HEAD)
   git -C "$tmp" push -q origin "HEAD:refs/pull/7/head"
+  if [ "${TRAIN_MEMBER_ON_LINE:-0}" = 1 ]; then
+    git -C "$tmp" checkout -q main
+    git -C "$tmp" merge -q --ff-only member
+    git -C "$tmp" push -q origin main
+  fi
   git -C "$tmp" checkout -q -b train main
   case "$shape" in
     merge) git -C "$tmp" merge -q --no-ff --no-edit member ;;
@@ -3418,8 +3481,8 @@ setup_train_history() {
     TRAIN_LANDING_COMMIT=$(git -C "$tmp" rev-parse HEAD)
   fi
   if [ "${TRAIN_MAIN_EDIT:-1}" = 1 ]; then
-    printf '%s\n' changed-on-main > "$tmp/feature.txt"
-    git -C "$tmp" add -- feature.txt
+    printf '%s\n' changed-on-main > "$tmp/${TRAIN_MAIN_EDIT_FILE:-feature.txt}"
+    git -C "$tmp" add -- "${TRAIN_MAIN_EDIT_FILE:-feature.txt}"
     git -C "$tmp" commit -q -m "main edits feature"
     git -C "$tmp" push -q origin main
   fi
@@ -3431,6 +3494,8 @@ setup_train_history() {
     head) git -C "$case_dir/wt" reset -q --hard "$TRAIN_MEMBER_HEAD" ;;
     prerebase) ;;
     inside) git -C "$case_dir/wt" reset -q --hard "$merge_commit" ;;
+    hidden) git -C "$case_dir/wt" reset -q --hard "$TRAIN_HIDDEN_COMMIT" ;;
+    train) git -C "$case_dir/wt" reset -q --hard "$TRAIN_HEAD" ;;
     extra)
       git -C "$case_dir/wt" reset -q --hard "$TRAIN_MEMBER_HEAD"
       wt_commit_file "$case_dir" extra.txt unmerged "unmerged follow-up"

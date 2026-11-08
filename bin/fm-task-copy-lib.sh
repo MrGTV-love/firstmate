@@ -147,134 +147,350 @@ fm_task_copy_content_in_default() {  # <worktree> <project> [<default-branch>] [
   FM_TASK_COPY_UNASKED=
   merged_tree=${merged_tree%%$'\n'*}
   [ "$merged_tree" = "$default_tree" ] || return 1
-  # The merge above takes the merge base of the two as the copy's own base, and an
-  # `ours` merge can make a commit of the copy that main never took in the base.
-  # The change must also be present measured from a base that merge cannot fake.
+  # The merge above takes the merge base of the two as the copy's own base, and a merge
+  # that dropped a side's change (an `ours` merge, or either parent order) can make a
+  # commit of the copy the base without its change. The base must be audited too.
   fm_task_copy_default_holds_change "$worktree" "$head" "$ref"
 }
 
-# The newest commit on <default-ref>'s FIRST-PARENT line that <ref> holds: the base
-# of the copy's own change. The first-parent line is what was directly integrated
-# into the default branch (a squash, a fast-forward, or the first parent of a merge).
-# An `ours` merge puts the commit it takes in on the second parent, so it is not on
-# that line and cannot move this base past that commit: that commit stays inside the
-# copy's change. The merge base of the copy and the default branch is NOT used,
-# because that merge makes the hidden commit the merge base. Holding a commit is
-# monotone along the line (a commit older than one held is held too), so this is a
-# binary search. Prints the commit, or fails when <ref> holds none.
+# Is the change a copy holds delivered to the default branch? Reachability is not delivery:
+# a merge can make a commit reachable without its change (an `ours` merge, or a merge whose
+# tree is one side's, whichever parent comes first). So the copy's own change is measured
+# from a base, and a base is accepted only after the merges that could have dropped
+# something from it are audited. A git read that fails or ends early is never an answer:
+# every helper below keeps a git read's output in a file, checks the read's status, and
+# reports "unread" (FM_TASK_COPY_UNASKED set) before it ever reports "not present".
+FM_TASK_COPY_WHY=
+FM_TASK_COPY_BASE=
+FM_TASK_COPY_LANDING=
+# The most merges one audit reads; a longer line is unknown, not delivered.
+FM_TASK_COPY_AUDIT_MAX=${FM_TASK_COPY_AUDIT_MAX:-300}
+
+# fm_task_copy_read <dir> <out> <git args...>: run a git read with its output in <out>,
+# returning git's own status, so a caller never takes the output of a failed read for an answer.
+fm_task_copy_read() {
+  local dir=$1 out=$2
+  shift 2
+  git -C "$dir" "$@" > "$out" 2>/dev/null
+}
+
+# Is <a> an ancestor of <b>? 0 yes, 1 no, 2 the answer could not be read.
+fm_task_copy_ancestor() {  # <dir> <a> <b>
+  local rc=0
+  git -C "$1" merge-base --is-ancestor "$2" "$3" 2>/dev/null || rc=$?
+  case "$rc" in 0 | 1) return "$rc" ;; *) return 2 ;; esac
+}
+
+# Is the net change <base> to <ref> present in <target>'s final tree? 0 when every path the
+# change touches holds the same content there, or the reverse of the change applies cleanly
+# to that tree (which also covers a target that built further on the same paths). 1 when it
+# is not present. 2 when the net change is empty: nothing to lose, which a caller decides for
+# itself. 3 when a read failed or ended early. History alone is not enough: a commit can be
+# reachable, or its patch replayed, and then reverted before it lands.
+fm_task_copy_net_change_present() {  # <dir> <ref> <target> <base>
+  local scratch rc
+  scratch=$(mktemp -d "${TMPDIR:-/tmp}/fm-task-copy.XXXXXX") || return 3
+  fm_task_copy_net_change_present_in "$scratch" "$@"
+  rc=$?
+  rm -rf "$scratch"
+  return "$rc"
+}
+
+fm_task_copy_net_change_present_in() {  # <scratch> <dir> <ref> <target> <base>
+  local scratch=$1 dir=$2 ref=$3 target=$4 base=$5 path rc=0
+  local -a paths=()
+  fm_task_copy_read "$dir" "$scratch/paths" diff --name-only -z --no-renames "$base" "$ref" -- || return 3
+  [ -s "$scratch/paths" ] || return 2
+  while IFS= read -r -d '' path; do
+    paths+=("$path")
+  done < "$scratch/paths"
+  [ "${#paths[@]}" -gt 0 ] || return 3
+  GIT_LITERAL_PATHSPECS=1 git -C "$dir" diff --quiet --no-renames "$ref" "$target" -- "${paths[@]}" 2>/dev/null || rc=$?
+  case "$rc" in 0) return 0 ;; 1) ;; *) return 3 ;; esac
+  GIT_INDEX_FILE=$scratch/index git -C "$dir" read-tree "$target" 2>/dev/null || return 3
+  fm_task_copy_read "$dir" "$scratch/patch" diff --binary --full-index --no-renames "$base" "$ref" -- || return 3
+  [ -s "$scratch/patch" ] || return 3
+  rc=0
+  GIT_INDEX_FILE=$scratch/index git -C "$dir" apply --cached -R --check < "$scratch/patch" 2>/dev/null || rc=$?
+  case "$rc" in 0) return 0 ;; 1) return 1 ;; *) return 3 ;; esac
+}
+
+# Did every merge on <default-ref>'s first-parent line after <base> keep what each of its
+# parents changed, on the paths where <ref> and <default-ref> differ? For a merge X of P1
+# and P2, git's own merge of P1 and P2 is what an honest X holds; a path of X that differs
+# from it, where the copy and the default branch differ too, is a change one side made that
+# the merge threw away (or an edit the merge added on its own), and the line cannot be
+# trusted to have integrated <base> past it. Paths git could not merge itself (conflicts)
+# are the merge author's to resolve and are not compared. 0 when every merge is honest on
+# those paths. 1 when one is not, or is an octopus merge, with the fact in FM_TASK_COPY_WHY.
+# 2 when a read failed, or more than FM_TASK_COPY_AUDIT_MAX merges lie after <base>, with
+# the fact in FM_TASK_COPY_UNASKED.
+fm_task_copy_line_merges_keep_changes() {  # <dir> <ref> <default-ref> <base>
+  local scratch rc
+  scratch=$(mktemp -d "${TMPDIR:-/tmp}/fm-task-copy.XXXXXX") || {
+    FM_TASK_COPY_UNASKED='a scratch directory for the merge audit could not be made'
+    return 2
+  }
+  fm_task_copy_line_merges_keep_changes_in "$scratch" "$@"
+  rc=$?
+  rm -rf "$scratch"
+  return "$rc"
+}
+
+fm_task_copy_line_merges_keep_changes_in() {  # <scratch> <dir> <ref> <default-ref> <base>
+  local scratch=$1 dir=$2 ref=$3 default_ref=$4 base=$5 commit p1 p2 rest count merge_rc path
+  local clean_tree name is_conflicted
+  local -a conflicted
+  fm_task_copy_read "$dir" "$scratch/merges" rev-list --merges --first-parent --parents "$base..$default_ref" -- || {
+    FM_TASK_COPY_UNASKED="the merges after ${base:0:12} on the default branch could not be listed"
+    return 2
+  }
+  [ -s "$scratch/merges" ] || return 0
+  count=$(wc -l < "$scratch/merges") || count=0
+  if [ "${count// /}" -gt "$FM_TASK_COPY_AUDIT_MAX" ]; then
+    FM_TASK_COPY_UNASKED="${count// /} merges lie after ${base:0:12} on the default branch, more than the $FM_TASK_COPY_AUDIT_MAX the audit reads"
+    return 2
+  fi
+  while IFS=' ' read -r commit p1 p2 rest; do
+    [ -n "$commit" ] || continue
+    if [ -z "$p2" ] || [ -n "$rest" ]; then
+      FM_TASK_COPY_WHY="the merge ${commit:0:12} is an octopus merge (or has no second parent), which the audit does not read"
+      return 1
+    fi
+    merge_rc=0
+    git -C "$dir" merge-tree --write-tree --name-only -z "$p1" "$p2" > "$scratch/clean" 2>/dev/null || merge_rc=$?
+    case "$merge_rc" in 0 | 1) ;; *)
+      FM_TASK_COPY_UNASKED="git could not merge the parents of ${commit:0:12}"
+      return 2
+      ;;
+    esac
+    # The first record is the merged tree; for a conflicted merge, the records up to the
+    # next empty one are the conflicted paths.
+    conflicted=()
+    clean_tree=
+    while IFS= read -r -d '' name; do
+      if [ -z "$clean_tree" ]; then
+        clean_tree=$name
+      elif [ -z "$name" ]; then
+        break
+      else
+        conflicted+=("$name")
+      fi
+    done < "$scratch/clean"
+    [ -n "$clean_tree" ] || {
+      FM_TASK_COPY_UNASKED="git printed no merged tree for the parents of ${commit:0:12}"
+      return 2
+    }
+    fm_task_copy_read "$dir" "$scratch/dev" diff --name-only -z --no-renames "$commit" "$clean_tree" -- || {
+      FM_TASK_COPY_UNASKED="the merge ${commit:0:12} could not be compared with git's own merge of its parents"
+      return 2
+    }
+    while IFS= read -r -d '' path; do
+      is_conflicted=0
+      for name in ${conflicted[@]+"${conflicted[@]}"}; do
+        [ "$name" != "$path" ] || is_conflicted=1
+      done
+      [ "$is_conflicted" = 0 ] || continue
+      merge_rc=0
+      GIT_LITERAL_PATHSPECS=1 git -C "$dir" diff --quiet --no-renames "$ref" "$default_ref" -- "$path" 2>/dev/null || merge_rc=$?
+      case "$merge_rc" in
+        0) ;;
+        1)
+          FM_TASK_COPY_WHY="the merge ${commit:0:12} does not hold what its parents' own merge holds at $path, where the copy and the default branch differ (a change one side made was dropped, or the merge added an edit of its own)"
+          return 1
+          ;;
+        *)
+          FM_TASK_COPY_UNASKED="$path could not be compared between the copy and the default branch"
+          return 2
+          ;;
+      esac
+    done < "$scratch/dev"
+  done < "$scratch/merges"
+  return 0
+}
+
+# The first-parent line of <default-ref>, newest first, one commit per line in <out>.
+fm_task_copy_line() {  # <dir> <default-ref> <out>
+  fm_task_copy_read "$1" "$3" rev-list --first-parent "$2" -- && [ -s "$3" ]
+}
+
+# The base of <ref>'s own change: the newest commit on <default-ref>'s FIRST-PARENT line that
+# <ref> holds, once the merges after it on that line are audited. The line is what was
+# directly integrated into the default branch (a squash, a fast-forward, or the first parent
+# of a merge). A commit that reached the default branch only as the second parent of a merge
+# is not on it, so an `ours` merge cannot move the base past that commit: it stays inside the
+# copy's change. A merge whose first parent is the commit and whose tree is another's puts
+# the commit on the line without its change, which is why the audit
+# (fm_task_copy_line_merges_keep_changes) must pass before the base is trusted. Holding a
+# commit is monotone along the line, so the search is a binary search. Sets FM_TASK_COPY_BASE.
+# 0 with the base set. 1 with the refusal in FM_TASK_COPY_WHY (the copy holds no commit of the
+# line, or the audit refused). 2 with the unread fact in FM_TASK_COPY_UNASKED.
 fm_task_copy_first_parent_base() {  # <dir> <ref> <default-ref>
-  local dir=$1 ref=$2 default_ref=$3 list line n=0 lo hi mid
+  local dir=$1 ref default_ref=$3 scratch line n=0 lo hi mid rc=0
   local -a line_commits=()
-  ref=$(git -C "$dir" rev-parse --verify --quiet "$ref^{commit}" 2>/dev/null) || return 1
-  list=$(git -C "$dir" rev-list --first-parent "$default_ref" -- 2>/dev/null) || return 1
+  FM_TASK_COPY_BASE=
+  FM_TASK_COPY_WHY=
+  FM_TASK_COPY_UNASKED=
+  ref=$(git -C "$dir" rev-parse --verify --quiet "$2^{commit}" 2>/dev/null) || {
+    FM_TASK_COPY_UNASKED="$2 could not be read"
+    return 2
+  }
+  scratch=$(mktemp -d "${TMPDIR:-/tmp}/fm-task-copy.XXXXXX") || {
+    FM_TASK_COPY_UNASKED='a scratch directory for the base search could not be made'
+    return 2
+  }
+  if ! fm_task_copy_line "$dir" "$default_ref" "$scratch/line"; then
+    rm -rf "$scratch"
+    FM_TASK_COPY_UNASKED="the first-parent line of $default_ref could not be read"
+    return 2
+  fi
   while IFS= read -r line; do
     [ -n "$line" ] || continue
     line_commits[n]=$line
     n=$((n + 1))
-  done <<EOF
-$list
-EOF
-  [ "$n" -gt 0 ] || return 1
-  git -C "$dir" merge-base --is-ancestor "${line_commits[$((n - 1))]}" "$ref" 2>/dev/null || return 1
+  done < "$scratch/line"
+  rm -rf "$scratch"
+  fm_task_copy_ancestor "$dir" "${line_commits[$((n - 1))]}" "$ref" || rc=$?
+  case "$rc" in
+    0) ;;
+    1)
+      FM_TASK_COPY_WHY="the copy holds no commit of the default branch's first-parent line"
+      return 1
+      ;;
+    *)
+      FM_TASK_COPY_UNASKED="whether the copy holds the root of $default_ref could not be read"
+      return 2
+      ;;
+  esac
   lo=0
   hi=$((n - 1))
   while [ "$lo" -lt "$hi" ]; do
     mid=$(((lo + hi) / 2))
-    if git -C "$dir" merge-base --is-ancestor "${line_commits[$mid]}" "$ref" 2>/dev/null; then
-      hi=$mid
-    else
-      lo=$((mid + 1))
-    fi
+    rc=0
+    fm_task_copy_ancestor "$dir" "${line_commits[$mid]}" "$ref" || rc=$?
+    case "$rc" in
+      0) hi=$mid ;;
+      1) lo=$((mid + 1)) ;;
+      *)
+        FM_TASK_COPY_UNASKED="whether the copy holds ${line_commits[$mid]:0:12} could not be read"
+        return 2
+        ;;
+    esac
   done
-  printf '%s\n' "${line_commits[$lo]}"
+  rc=0
+  fm_task_copy_line_merges_keep_changes "$dir" "$ref" "$default_ref" "${line_commits[$lo]}" || rc=$?
+  [ "$rc" = 0 ] || return "$rc"
+  FM_TASK_COPY_BASE=${line_commits[$lo]}
 }
 
-# The OLDEST commit on <default-ref>'s first-parent line that holds <ref>: the commit
-# that integrated it. Prints it, or fails when <ref> is not reachable from the line.
-# A commit reachable only through a second parent is held by the merge that took that
-# parent in, so that merge is where its change must be read.
+# The OLDEST commit on <default-ref>'s first-parent line that holds <ref>: the commit that
+# integrated it. A commit reachable only through a second parent is held by the merge that
+# took that parent in, so that merge is where its change must be read. Sets
+# FM_TASK_COPY_LANDING. 0 with it set. 1 when <ref> is not reachable from the line. 2 when a
+# read failed.
 fm_task_copy_first_parent_landing() {  # <dir> <ref> <default-ref>
-  local dir=$1 ref=$2 default_ref=$3 list line n=0 lo hi mid
+  local dir=$1 ref default_ref=$3 scratch line n=0 lo hi mid rc=0
   local -a line_commits=()
-  ref=$(git -C "$dir" rev-parse --verify --quiet "$ref^{commit}" 2>/dev/null) || return 1
-  list=$(git -C "$dir" rev-list --first-parent "$default_ref" -- 2>/dev/null) || return 1
+  FM_TASK_COPY_LANDING=
+  ref=$(git -C "$dir" rev-parse --verify --quiet "$2^{commit}" 2>/dev/null) || {
+    FM_TASK_COPY_UNASKED="$2 could not be read"
+    return 2
+  }
+  scratch=$(mktemp -d "${TMPDIR:-/tmp}/fm-task-copy.XXXXXX") || {
+    FM_TASK_COPY_UNASKED='a scratch directory for the landing search could not be made'
+    return 2
+  }
+  if ! fm_task_copy_line "$dir" "$default_ref" "$scratch/line"; then
+    rm -rf "$scratch"
+    FM_TASK_COPY_UNASKED="the first-parent line of $default_ref could not be read"
+    return 2
+  fi
   while IFS= read -r line; do
     [ -n "$line" ] || continue
     line_commits[n]=$line
     n=$((n + 1))
-  done <<EOF
-$list
-EOF
-  [ "$n" -gt 0 ] || return 1
-  git -C "$dir" merge-base --is-ancestor "$ref" "${line_commits[0]}" 2>/dev/null || return 1
+  done < "$scratch/line"
+  rm -rf "$scratch"
+  fm_task_copy_ancestor "$dir" "$ref" "${line_commits[0]}" || rc=$?
+  case "$rc" in
+    0) ;;
+    1) return 1 ;;
+    *)
+      FM_TASK_COPY_UNASKED="whether the copy is reachable from $default_ref could not be read"
+      return 2
+      ;;
+  esac
   lo=0
   hi=$((n - 1))
   while [ "$lo" -lt "$hi" ]; do
     mid=$(((lo + hi + 1) / 2))
-    if git -C "$dir" merge-base --is-ancestor "$ref" "${line_commits[$mid]}" 2>/dev/null; then
-      lo=$mid
-    else
-      hi=$((mid - 1))
-    fi
-  done
-  printf '%s\n' "${line_commits[$lo]}"
-}
-
-# Is the net change <base> to <ref> present in <target>'s final tree? 0 when every
-# path the change touches holds the same content there, or the reverse of the
-# change applies cleanly to that tree (which also covers a target that built further
-# on the same paths). 1 when it is not present. 2 when the net change is empty, which
-# proves nothing and which a caller decides for itself. History alone is not enough:
-# a commit can be reachable, or its patch replayed, and then reverted before it lands.
-fm_task_copy_net_change_present() {  # <dir> <ref> <target> <base>
-  local dir=$1 ref=$2 target=$3 base=$4 idx rc=1 path
-  local -a paths=()
-  while IFS= read -r -d '' path; do
-    paths+=("$path")
-  done < <(git -C "$dir" diff --name-only -z --no-renames "$base" "$ref" -- 2>/dev/null)
-  [ "${#paths[@]}" -gt 0 ] || return 2
-  if GIT_LITERAL_PATHSPECS=1 git -C "$dir" diff --quiet --no-renames "$ref" "$target" -- "${paths[@]}" 2>/dev/null; then
-    return 0
-  fi
-  idx=$(mktemp "${TMPDIR:-/tmp}/fm-task-copy-index.XXXXXX") || return 1
-  if GIT_INDEX_FILE=$idx git -C "$dir" read-tree "$target" 2>/dev/null \
-     && git -C "$dir" diff --binary --full-index --no-renames "$base" "$ref" -- 2>/dev/null \
-        | GIT_INDEX_FILE=$idx git -C "$dir" apply --cached -R --check 2>/dev/null; then
     rc=0
-  fi
-  rm -f "$idx"
-  return "$rc"
+    fm_task_copy_ancestor "$dir" "$ref" "${line_commits[$mid]}" || rc=$?
+    case "$rc" in
+      0) lo=$mid ;;
+      1) hi=$((mid - 1)) ;;
+      *)
+        FM_TASK_COPY_UNASKED="whether the copy is reachable from ${line_commits[$mid]:0:12} could not be read"
+        return 2
+        ;;
+    esac
+  done
+  FM_TASK_COPY_LANDING=${line_commits[$lo]}
 }
 
-# Does <default-ref> really hold <ref>'s own work, measured from the first-parent base
-# (fm_task_copy_first_parent_base)? Reachability alone is not that: an `ours` merge, or
-# a merge that took a commit in without its change, makes the commit reachable and loses
-# the change. A copy on the first-parent line itself was integrated whole. A copy
-# reachable only through a merge is held by the commit that took it in
-# (fm_task_copy_first_parent_landing), and that commit's own tree must hold the net
-# change; later commits are never read, so a later edit of the same file does not count
-# against a landing that really carried it. A copy not reachable at all (squashed or
-# rebased in) must merge into <default-ref> from that base with no change of the
-# default tree. A copy that leaves no net change has nothing to lose. Any failure to
-# read is no answer: it leaves FM_TASK_COPY_UNASKED set.
+# Does <default-ref> really hold <ref>'s own work, measured from the audited first-parent
+# base? A copy on the first-parent line itself was integrated whole. A copy reachable only
+# through a merge is held by the commit that took it in (fm_task_copy_first_parent_landing),
+# and that commit's own tree must hold the net change; later commits are never read, so a
+# later edit of the same file does not count against a landing that really carried it. A copy
+# not reachable at all (squashed or rebased in) must merge into <default-ref> from that base
+# with no change of the default tree. A copy that leaves no net change has nothing to lose.
+# Any failure to read is no answer: it leaves FM_TASK_COPY_UNASKED set.
 fm_task_copy_default_holds_change() {  # <dir> <ref> <default-ref>
-  local dir=$1 ref=$2 default_ref=$3 base landing merged default_tree rc=0 merge_rc=0
-  ref=$(git -C "$dir" rev-parse --verify --quiet "$ref^{commit}" 2>/dev/null) || return 1
-  base=$(fm_task_copy_first_parent_base "$dir" "$ref" "$default_ref") || return 1
+  local dir=$1 ref=$2 default_ref=$3 base rc=0 default_tree merged merge_rc=0
+  FM_TASK_COPY_UNASKED=
+  ref=$(git -C "$dir" rev-parse --verify --quiet "$ref^{commit}" 2>/dev/null) || {
+    FM_TASK_COPY_UNASKED="$2 could not be read"
+    return 1
+  }
+  fm_task_copy_first_parent_base "$dir" "$ref" "$default_ref" || return 1
+  base=$FM_TASK_COPY_BASE
   [ "$base" != "$ref" ] || return 0
-  if git -C "$dir" merge-base --is-ancestor "$ref" "$default_ref" 2>/dev/null; then
-    landing=$(fm_task_copy_first_parent_landing "$dir" "$ref" "$default_ref") || return 1
-    fm_task_copy_net_change_present "$dir" "$ref" "$landing" "$base" || rc=$?
-  else
-    default_tree=$(git -C "$dir" rev-parse --quiet --verify "$default_ref^{tree}" 2>/dev/null) || return 1
-    merged=$(git -C "$dir" merge-tree --write-tree --merge-base="$base" "$default_ref" "$ref" 2>/dev/null) || merge_rc=$?
-    if [ "$merge_rc" -gt 1 ]; then
-      FM_TASK_COPY_UNASKED='the content check could not merge the copy from its first-parent base'
+  fm_task_copy_ancestor "$dir" "$ref" "$default_ref" || rc=$?
+  case "$rc" in
+    0)
+      fm_task_copy_first_parent_landing "$dir" "$ref" "$default_ref" || {
+        [ "$?" != 2 ] || return 1
+        FM_TASK_COPY_UNASKED='the commit that took the copy in could not be found'
+        return 1
+      }
+      rc=0
+      fm_task_copy_net_change_present "$dir" "$ref" "$FM_TASK_COPY_LANDING" "$base" || rc=$?
+      case "$rc" in
+        0 | 2) return 0 ;;
+        1) return 1 ;;
+        *)
+          FM_TASK_COPY_UNASKED='the net change of the copy could not be read against the commit that took it in'
+          return 1
+          ;;
+      esac
+      ;;
+    1) ;;
+    *)
+      FM_TASK_COPY_UNASKED='the copy could not be placed against the default branch'
       return 1
-    fi
-    [ "$merge_rc" = 0 ] && [ "${merged%%$'\n'*}" = "$default_tree" ] || rc=1
+      ;;
+  esac
+  default_tree=$(git -C "$dir" rev-parse --quiet --verify "$default_ref^{tree}" 2>/dev/null) || {
+    FM_TASK_COPY_UNASKED='the default branch tree could not be read'
+    return 1
+  }
+  merged=$(git -C "$dir" merge-tree --write-tree --merge-base="$base" "$default_ref" "$ref" 2>/dev/null) || merge_rc=$?
+  if [ "$merge_rc" -gt 1 ]; then
+    FM_TASK_COPY_UNASKED='the content check could not merge the copy from its base'
+    return 1
   fi
-  [ "$rc" = 0 ] || [ "$rc" = 2 ]
+  [ "$merge_rc" = 0 ] && [ "${merged%%$'\n'*}" = "$default_tree" ]
 }
 
 # The porcelain status lines of <copy> that are its own uncommitted work:

@@ -4004,7 +4004,7 @@ test_train_ours_merged_commit_is_never_taken_as_delivered() {
       && fail "train-ours-hidden-$landing: the train holds the hidden change"
     git -C "$TRAIN_CASE/wt" cat-file -e origin/main:hidden.txt 2>/dev/null \
       && fail "train-ours-hidden-$landing: the default branch holds the hidden change"
-    assert_train_refused "$TRAIN_CASE" "train-ours-hidden-$landing" "net change is not present in the train head's final tree"
+    assert_train_refused "$TRAIN_CASE" "train-ours-hidden-$landing" "does not hold what its parents' own merge holds at hidden.txt"
     assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "train-ours-hidden-$landing: the train was accepted"
   done
   TRAIN_HIDDEN_OURS=0
@@ -4015,7 +4015,7 @@ test_train_ours_merged_commit_is_refused_in_the_record_only_route() {
   local landing
   for landing in squash merge; do
     TRAIN_HIDDEN_OURS=1 train_absent_case "train-ours-hidden-record-$landing" ours-flat "$landing"
-    assert_train_refused "$TRAIN_CASE" "train-ours-hidden-record-$landing" "net change is not present in the train head's final tree"
+    assert_train_refused "$TRAIN_CASE" "train-ours-hidden-record-$landing" "does not hold what its parents' own merge holds at hidden.txt"
     assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "train-ours-hidden-record-$landing: the train was accepted"
     [ "$(backlog_row_state "$TRAIN_CASE")" = in_flight ] || fail "train-ours-hidden-record-$landing: refusal closed the backlog"
   done
@@ -4038,6 +4038,33 @@ test_train_ours_merged_commit_is_carried_when_the_train_replays_it() {
   assert_absent "$TRAIN_CASE/state/task-x1.meta" "train-ours-hidden-carried-record: accepted teardown left the task record"
   TRAIN_HIDDEN_OURS=0
   pass "a train that replays the ours-merged commit as well carries the member, in the copy and record-only routes"
+}
+
+# train_conflict_merge_into_main <case-dir>: a merge on origin's main that conflicted on
+# c.txt (both sides added it) and that a person resolved by hand, then fetched into the
+# project and the copy. The merge differs from git's own merge at c.txt alone.
+train_conflict_merge_into_main() {
+  local case_dir=$1 tmp="$1/_conflict"
+  git clone -q "$case_dir/origin.git" "$tmp"
+  git -C "$tmp" config user.email t@t
+  git -C "$tmp" config user.name t
+  git -C "$tmp" checkout -q -b side
+  printf '%s\n' side > "$tmp/c.txt"
+  git -C "$tmp" add -- c.txt
+  git -C "$tmp" commit -q -m "side adds c"
+  git -C "$tmp" checkout -q main
+  printf '%s\n' main > "$tmp/c.txt"
+  git -C "$tmp" add -- c.txt
+  git -C "$tmp" commit -q -m "main adds c"
+  git -C "$tmp" merge -q --no-edit side >/dev/null 2>&1 \
+    && fail "train_conflict_merge_into_main: the merge did not conflict"
+  printf '%s\n' resolved > "$tmp/c.txt"
+  git -C "$tmp" add -- c.txt
+  git -C "$tmp" commit -q --no-edit
+  git -C "$tmp" push -q origin main
+  rm -rf "$tmp"
+  git -C "$case_dir/project" fetch -q origin
+  [ ! -d "$case_dir/wt" ] || git -C "$case_dir/wt" fetch -q origin
 }
 
 # The default-reachability proof (content in the default branch) is the same landed-work
@@ -4140,8 +4167,17 @@ test_default_proof_refuses_a_reverted_member_landed_by_a_merge_commit() {
 # Every genuine landing the proof accepted before is still accepted.
 test_default_proof_still_accepts_genuine_landings() {
   local row rc
-  for row in merge-commit-then-main-edit squash-carrying-hidden fast-forward net-empty; do
+  for row in merge-commit-then-main-edit squash-carrying-hidden fast-forward net-empty resolved-conflict-merge-after; do
     case "$row" in
+      resolved-conflict-merge-after)
+        # A merge whose conflict a person resolved by hand lies after the copy's base.
+        # It differs from git's own merge at the conflicted path, which is the
+        # author's to resolve, so it does not make the base untrusted.
+        TRAIN_MAIN_EDIT=1 train_case "default-ok-$row" merge head "" merge
+        printf '[]\n' > "$TRAIN_CASE/gh-fixture/list.json"
+        train_conflict_merge_into_main "$TRAIN_CASE"
+        git -C "$TRAIN_CASE/wt" cat-file -e origin/main:c.txt 2>/dev/null \
+          || fail "default-ok-$row: the default branch lacks the resolved file" ;;
       merge-commit-then-main-edit)
         # The member's own merge commit holds its change; main edits the file later.
         TRAIN_MAIN_EDIT=1 train_case "default-ok-$row" merge head "" merge
@@ -4171,7 +4207,7 @@ test_default_proof_still_accepts_genuine_landings() {
     assert_grep "return" "$TRAIN_CASE/treehouse.log" "default-ok-$row: the slot was not returned"
   done
   TRAIN_HIDDEN_OURS=0
-  pass "the content-in-default proof still accepts a merge-commit landing, a carried hidden commit, a fast-forward and a net-empty copy"
+  pass "the content-in-default proof still accepts a merge-commit landing, a carried hidden commit, a fast-forward, a net-empty copy and a landing beside a hand-resolved merge"
 }
 
 # The forge names the commit that landed a MERGED train. That commit must be on the
@@ -4190,14 +4226,14 @@ test_train_landing_commit_without_the_change_is_refused() {
       || fail "train-landing-ours-$shape: the train head lacks the member's file"
     run_teardown "$TRAIN_CASE" > "$TRAIN_CASE/stdout" 2> "$TRAIN_CASE/stderr" && rc=0 || rc=$?
     expect_code 1 "$rc" "train-landing-ours-$shape: teardown must refuse"$'\n'"$(cat "$TRAIN_CASE/stderr")"
-    assert_grep "landing commit" "$TRAIN_CASE/stderr" "train-landing-ours-$shape: refusal did not name the landing commit"
+    assert_grep "does not hold what its parents' own merge holds" "$TRAIN_CASE/stderr" "train-landing-ours-$shape: refusal did not name the merge that dropped the change"
     assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "train-landing-ours-$shape: the train was accepted"
     assert_absent "$TRAIN_CASE/treehouse.log" "train-landing-ours-$shape: refused teardown returned the slot"
     assert_present "$TRAIN_CASE/state/task-x1.meta" "train-landing-ours-$shape: refusal removed the task record"
   done
   for shape in flat merge; do
     train_absent_case "train-landing-ours-record-$shape" "$shape" ours
-    assert_train_refused "$TRAIN_CASE" "train-landing-ours-record-$shape" "landing commit"
+    assert_train_refused "$TRAIN_CASE" "train-landing-ours-record-$shape" "does not hold what its parents' own merge holds"
     assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "train-landing-ours-record-$shape: the train was accepted"
     [ "$(backlog_row_state "$TRAIN_CASE")" = in_flight ] || fail "train-landing-ours-record-$shape: refusal closed the backlog"
   done
@@ -4737,7 +4773,7 @@ test_train_ours_merged_commit_in_a_copy_never_counts_as_carried() {
     fail "train-ours-copy: the default branch holds the hidden change"
   fi
   assert_train_refused "$TRAIN_CASE" "train-ours-copy" "copy's work is not proven present"
-  assert_grep "hidden follow-up" "$TRAIN_CASE/stderr" "train-ours-copy: refusal did not name the hidden commit"
+  assert_grep "does not hold what its parents' own merge holds at extra.txt" "$TRAIN_CASE/stderr" "train-ours-copy: refusal did not name the dropped path"
   assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "train-ours-copy: the train was accepted"
   [ "$(git -C "$TRAIN_CASE/wt" rev-parse HEAD)" = "$copy_head" ] || fail "train-ours-copy: refusal moved the copy"
   pass "a commit hidden in the default history by an ours merge is not carried by the train, in the copy route"
@@ -4749,7 +4785,7 @@ test_train_ours_merged_commit_in_a_member_never_counts_as_carried() {
   train_hide_commit "$TRAIN_CASE" member
   add_gh_train_fake "$TRAIN_CASE" CLOSED "$TRAIN_MEMBER_HEAD"
   train_default_list "$TRAIN_CASE"
-  assert_train_refused "$TRAIN_CASE" "train-ours-record" "neither contains it nor carries every commit of it"
+  assert_train_refused "$TRAIN_CASE" "train-ours-record" "does not hold what its parents' own merge holds at extra.txt"
   assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "train-ours-record: the train was accepted"
   [ "$(backlog_row_state "$TRAIN_CASE")" = in_flight ] || fail "train-ours-record: refusal closed the backlog"
   pass "a commit hidden in the default history by an ours merge is not carried by the train, in the record-only route"
@@ -4779,6 +4815,134 @@ test_train_flat_carried_work_is_accepted_beside_an_ours_merge() {
   assert_grep "$TRAIN_URL" "$TRAIN_CASE/stderr" "train-ours-carried-record: stderr did not name the train PR"
   assert_absent "$TRAIN_CASE/state/task-x1.meta" "train-ours-carried-record: accepted teardown left the task record"
   pass "a flat train that carries every member commit is accepted in both routes beside an ours merge of unrelated work"
+}
+
+# Main 2206 F1: where a commit sits in the default branch's history says nothing about
+# whether its change was kept. K (hidden.txt) is the FIRST parent of the merge M whose
+# tree is D's, and the branch was fast-forwarded from D to M, so K is on the first-parent
+# line and hidden.txt is in no tree from M on. The member is built on K.
+assert_parent_order_fixture() {  # <case-dir> <label>
+  local case_dir=$1 label=$2
+  git -C "$case_dir/wt" rev-list --first-parent origin/main | grep -qxF -- "$TRAIN_HIDDEN_COMMIT" \
+    || fail "$label: K is not on the default branch's first-parent line"
+  git -C "$case_dir/wt" cat-file -e origin/main:hidden.txt 2>/dev/null \
+    && fail "$label: the default branch holds the hidden change"
+  [ -z "${TRAIN_LANDING_COMMIT:-}" ] || ! git -C "$case_dir/wt" cat-file -e "$TRAIN_LANDING_COMMIT:hidden.txt" 2>/dev/null \
+    || fail "$label: the landing holds the hidden change"
+  git -C "$case_dir/wt" cat-file -e "$TRAIN_HEAD:hidden.txt" 2>/dev/null \
+    && fail "$label: the train holds the hidden change"
+  return 0
+}
+
+test_train_member_hidden_by_parent_order_is_never_taken_as_delivered() {
+  local route
+  for route in copy record; do
+    if [ "$route" = copy ]; then
+      TRAIN_HIDDEN_ORDER=1 TRAIN_MAIN_EDIT=1 train_case "hidden-order-$route" squash head "" ours-flat
+      git -C "$TRAIN_CASE/wt" cat-file -e "$TRAIN_COPY_HEAD:hidden.txt" 2>/dev/null \
+        || fail "hidden-order-$route: the copy lacks the hidden change"
+    else
+      TRAIN_HIDDEN_ORDER=1 TRAIN_MAIN_EDIT=1 train_absent_case "hidden-order-$route" ours-flat squash
+    fi
+    assert_parent_order_fixture "$TRAIN_CASE" "hidden-order-$route"
+    assert_train_refused "$TRAIN_CASE" "hidden-order-$route" "REFUSED"
+    assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "hidden-order-$route: the train was accepted"
+    [ "$route" = copy ] || [ "$(backlog_row_state "$TRAIN_CASE")" = in_flight ] \
+      || fail "hidden-order-$route: refusal closed the backlog"
+  done
+  pass "a member built on a commit that only parent order put on the default branch's first-parent line is refused, in the copy and record-only routes"
+}
+
+test_default_proof_refuses_a_commit_that_parent_order_put_on_the_first_parent_line() {
+  local copy
+  for copy in hidden head; do
+    TRAIN_HIDDEN_ORDER=1 default_proof_case "default-hidden-order-$copy" squash "$copy" ours-flat
+    assert_parent_order_fixture "$TRAIN_CASE" "default-hidden-order-$copy"
+    git -C "$TRAIN_CASE/wt" cat-file -e "$TRAIN_COPY_HEAD:hidden.txt" 2>/dev/null \
+      || fail "default-hidden-order-$copy: the copy lacks the hidden change"
+    assert_default_proof_refused "$TRAIN_CASE" "default-hidden-order-$copy"
+  done
+  pass "a copy that holds a change the default branch dropped behind a first-parent merge is refused by the content-in-default proof"
+}
+
+# Main 2206 F3: a member already on the default branch's first-parent line, and a copy
+# later than it that the train carried whole, are landed. The squash landing's first
+# parent is H and its tree is the train head's.
+test_train_member_on_the_default_line_is_accepted_when_the_train_carried_it() {
+  local route
+  TRAIN_MEMBER_ON_LINE=1 TRAIN_MAIN_EDIT=1 TRAIN_MAIN_EDIT_FILE=second.txt train_case line-copy squash train "" merge
+  [ "$(git -C "$TRAIN_CASE/wt" rev-parse "$TRAIN_LANDING_COMMIT^")" = "$TRAIN_MEMBER_HEAD" ] \
+    || fail "line-copy: the landing's first parent is not the member head"
+  [ "$(git -C "$TRAIN_CASE/wt" rev-parse "$TRAIN_LANDING_COMMIT^{tree}")" = "$(git -C "$TRAIN_CASE/wt" rev-parse "$TRAIN_HEAD^{tree}")" ] \
+    || fail "line-copy: the landing's tree is not the train head's"
+  [ "$TRAIN_COPY_HEAD" = "$TRAIN_HEAD" ] || fail "line-copy: the copy is not at the train head"
+  assert_train_allowed "$TRAIN_CASE" line-copy
+  TRAIN_MEMBER_ON_LINE=1 TRAIN_MAIN_EDIT=1 TRAIN_MAIN_EDIT_FILE=second.txt train_absent_case line-record merge squash
+  run_teardown "$TRAIN_CASE" > "$TRAIN_CASE/stdout" 2> "$TRAIN_CASE/stderr" \
+    || fail "line-record: a member on the default line that a verified train carried was refused: $(cat "$TRAIN_CASE/stderr")"
+  assert_grep "$TRAIN_URL" "$TRAIN_CASE/stderr" "line-record: stderr did not name the train PR"
+  assert_absent "$TRAIN_CASE/state/task-x1.meta" "line-record: accepted teardown left the task record"
+  assert_train_backlog_close "$TRAIN_CASE" line-record
+  pass "a member on the default branch's first-parent line and a later copy of the train head are accepted in the copy and record-only routes"
+}
+
+# Main 2206 F2: a git read that fails, or ends early, is no proof. Each case fails one
+# read of the content proof (the changed-path list, the patch, or a read of the audit) and
+# the teardown must keep the copy and every record. In every case but the audit rows the
+# train reverted the member's file, so the unfailed read refuses on content alone and only
+# the failed read can change the answer; the audit rows fail a read of a genuine landing,
+# which is accepted without the fault (test_default_proof_still_accepts_genuine_landings).
+# FAULT_ROWS names the rows to run (default all), so one row can be run alone.
+test_a_failed_or_short_git_read_never_proves_content() {
+  local row
+  for row in ${FAULT_ROWS:-default-empty copy-short copy-patch-partial record-short record-patch-partial audit-list audit-merge audit-diff}; do
+    case "$row" in
+      default-empty)
+        TRAIN_REVERT_MEMBER=1 default_proof_case "git-fault-$row" merge head merge
+        add_git_read_fault "$TRAIN_CASE" "diff --name-only -z --no-renames" none ;;
+      copy-short)
+        TRAIN_REVERT_MEMBER=1 TRAIN_MAIN_EDIT=0 train_case "git-fault-$row" squash head "" merge
+        add_git_read_fault "$TRAIN_CASE" "diff --name-only -z --no-renames" 'text:feature2.txt\0' ;;
+      copy-patch-partial)
+        TRAIN_REVERT_MEMBER=1 TRAIN_MAIN_EDIT=0 train_case "git-fault-$row" squash head "" merge
+        add_git_read_fault "$TRAIN_CASE" "diff --binary --full-index" lastpatch ;;
+      record-short)
+        TRAIN_REVERT_MEMBER=1 TRAIN_MAIN_EDIT=0 train_absent_case "git-fault-$row" merge squash
+        add_git_read_fault "$TRAIN_CASE" "diff --name-only -z --no-renames" 'text:feature2.txt\0' ;;
+      record-patch-partial)
+        TRAIN_REVERT_MEMBER=1 TRAIN_MAIN_EDIT=0 train_absent_case "git-fault-$row" merge squash
+        add_git_read_fault "$TRAIN_CASE" "diff --binary --full-index" lastpatch ;;
+      audit-list | audit-merge | audit-diff)
+        TRAIN_MAIN_EDIT=1 train_case "git-fault-$row" merge head "" merge
+        printf '[]\n' > "$TRAIN_CASE/gh-fixture/list.json"
+        case "$row" in
+          audit-list) add_git_read_fault "$TRAIN_CASE" "rev-list --merges --first-parent" none ;;
+          audit-merge) add_git_read_fault "$TRAIN_CASE" "merge-tree --write-tree --name-only" none ;;
+          audit-diff) add_git_read_fault "$TRAIN_CASE" "diff --name-only -z --no-renames" 'text:' ;;
+        esac ;;
+    esac
+    assert_default_proof_refused "$TRAIN_CASE" "git-fault-$row"
+    [ -s "$TRAIN_CASE/fault.hits" ] || fail "git-fault-$row: the injected read never ran"
+    assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "git-fault-$row: the train was accepted"
+  done
+  TRAIN_REVERT_MEMBER=0
+  pass "a changed-path list, a patch or an audit read that fails or ends early never proves content, in the default proof, the copy route and the record-only route"
+}
+
+# A landing the forge names that is a plain commit (no merge for the audit to read) holds
+# its own tree: the member's change must be in it.
+test_train_landing_commit_that_is_a_plain_commit_without_the_change_is_refused() {
+  local plain
+  train_absent_case train-landing-plain flat squash
+  plain=$(git -C "$TRAIN_CASE/wt" rev-list -1 --grep='^main moves$' origin/main)
+  [ -n "$plain" ] || fail "train-landing-plain: no plain commit on main to name"
+  git -C "$TRAIN_CASE/wt" cat-file -e "$plain:feature2.txt" 2>/dev/null \
+    && fail "train-landing-plain: the plain commit holds the member's file"
+  TRAIN_LANDING_COMMIT=$plain train_default_list "$TRAIN_CASE"
+  assert_train_refused "$TRAIN_CASE" "train-landing-plain" "does not hold the member's net change in its tree"
+  assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "train-landing-plain: the train was accepted"
+  [ "$(backlog_row_state "$TRAIN_CASE")" = in_flight ] || fail "train-landing-plain: refusal closed the backlog"
+  pass "a landing commit that is a plain commit without the member's change is refused, though the merge audit has nothing to read"
 }
 
 teardown_test_cases=(
@@ -4850,6 +5014,11 @@ test_train_run_record_never_stands_in_for_carried_work
 test_train_route_never_reads_the_run_record
 test_train_ours_merged_commit_in_a_copy_never_counts_as_carried
 test_train_ours_merged_commit_in_a_member_never_counts_as_carried
+test_train_member_hidden_by_parent_order_is_never_taken_as_delivered
+test_default_proof_refuses_a_commit_that_parent_order_put_on_the_first_parent_line
+test_train_member_on_the_default_line_is_accepted_when_the_train_carried_it
+test_a_failed_or_short_git_read_never_proves_content
+test_train_landing_commit_that_is_a_plain_commit_without_the_change_is_refused
 test_train_flat_carried_work_is_accepted_beside_an_ours_merge
 test_train_flattened_rebase_carries_the_listed_head
 test_train_flattened_rebase_missing_a_member_commit_refuses
