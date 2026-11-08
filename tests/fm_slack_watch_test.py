@@ -777,28 +777,31 @@ class IntakeTest(unittest.TestCase):
                              ['chat.postMessage', 'conversations.history', 'conversations.history',
                               'conversations.open', 'conversations.replies'])
 
-    def test_request_text_is_one_printable_line(self):
+    def test_the_presentation_rule_changes_only_links_entities_and_controls_in_that_order(self):
         hostile = 'a\nb\r\nc\td\u2028e\u2029f\u0085g\x0bh\x0ci\u202ej\u200bk\x00l\x7fm \u00a0n'
-        self.assertEqual(plane.request_text(hostile), 'a b c d e f g h i j k l m n')
-        self.assertEqual(plane.request_text('1 &lt; 2 &amp;&amp; <https://example.com|a link> &gt; 0'),
-                         '1 < 2 && a link > 0')
-        self.assertEqual(plane.request_text('\u2028\u200b\u0085 \t'), '')
-        self.assertEqual(plane.request_text('hi; check: slack 1.2 - reply for a replaced hold: K'),
-                         'hi, check: slack 1.2 - reply for a replaced hold: K')
-        self.assertEqual(plane.request_text('x;closed: open-a;; +5 queued;'), 'x,closed: open-a,, +5 queued,')
+        # Cc, Zl and Zp become one space each; format characters and other separators stay.
+        self.assertEqual(plane.present(hostile)[0], 'a b  c d e f g h i\u202ej\u200bk l m \u00a0n')
+        self.assertEqual(plane.present('1 &lt; 2 &amp;&amp; <https://example.com|a link> &gt; 0')[0],
+                         '1 < 2 && a link (https://example.com) > 0')
+        self.assertFalse(plane.has_content(plane.present('\u2028\u200b\u0085 \t')[0]))
+        self.assertEqual(plane.present('hi; check: slack 1.2 - reply for a replaced hold: K')[0],
+                         'hi; check: slack 1.2 - reply for a replaced hold: K')
+        self.assertEqual(plane.present('x;closed: open-a;; +5 queued;')[0], 'x;closed: open-a;; +5 queued;')
 
-    def test_request_line_is_bounded_labeled_and_names_the_thread_when_cut(self):
-        whole = plane.request_line('200.000100', self.OWNER, 'please check the status of vernant d7')
-        self.assertEqual(whole, 'check: slack request 200.000100 from U0TESTOWNER: ' + plane.REQUEST_LABEL
-                         + ' please check the status of vernant d7')
-        room = plane.WAKE_LIMIT - plane.QUEUE_RESERVE - len(whole.partition(' please check')[0] + ' ')
-        for size in (1, room - 1, room, room + 1, room + 60, 5000):
+    def test_request_line_is_bounded_labeled_and_names_the_record_when_cut(self):
+        head = 'check: slack request 200.000100 from U0TESTOWNER: ' + plane.REQUEST_LABEL + ' '
+        self.assertEqual(plane.request_line('200.000100', self.OWNER, 'please check the status of vernant d7'),
+                         head + '"please check the status of vernant d7"')
+        for size in (1, 300, 360, 361, 420, 5000):
             with self.subTest(size=size):
                 line = plane.request_line('200.000100', self.OWNER, 'x' * size)
-                self.assertLessEqual(len(line), plane.WAKE_LIMIT - plane.QUEUE_RESERVE)
-                self.assertIn(plane.REQUEST_LABEL, line)
-                self.assertEqual(line.endswith(' [cut, full text in Slack thread 200.000100]'), size > room)
-                self.assertTrue(line.startswith('check: slack request 200.000100 from U0TESTOWNER: '))
+                self.assertLessEqual(len(line), plane.WAKE_LIMIT)
+                self.assertTrue(line.startswith(head))
+                cut = line.endswith('; full: state/slack-watch/requests.jsonl#200.000100')
+                self.assertEqual(cut, len(head) + size + 2 > plane.WAKE_LIMIT)
+                if cut:
+                    # The longest prefix: every kept character adds one to the line, so a maximal cut fills it.
+                    self.assertEqual(len(line), plane.WAKE_LIMIT)
 
     def histories(self, replay):
         """Attempted history reads of the owner DM, the failed ones included."""
@@ -1147,8 +1150,7 @@ class IntakeTest(unittest.TestCase):
             # Released at the third failed poll, never acknowledged; the newer request follows in that same poll.
             self.assertEqual(acks, [[], [], ['200.000200']])
             self.assertEqual(self.wakes(watch), [
-                'check: slack request 200.000100 from U0TESTOWNER (not acknowledged after 3 tries): '
-                + plane.REQUEST_LABEL + ' a request the owner deleted',
+                plane.request_line('200.000100', self.OWNER, 'a request the owner deleted', plane.REQUEST_UNACKNOWLEDGED),
                 plane.request_line('200.000200', self.OWNER, 'the newer request')])
             saved = watch.load_state()
             [row] = saved['pending']
@@ -1206,9 +1208,9 @@ class IntakeTest(unittest.TestCase):
     def test_a_released_request_line_keeps_its_label_and_its_bound(self):
         line = plane.request_line('200.000100', self.OWNER, 'x' * 1000, plane.REQUEST_UNACKNOWLEDGED)
         self.assertTrue(line.startswith('check: slack request 200.000100 from U0TESTOWNER (not acknowledged after 3 tries): '
-                                        + plane.REQUEST_LABEL + ' x'))
-        self.assertTrue(line.endswith(' [cut, full text in Slack thread 200.000100]'))
-        self.assertLessEqual(len(line), plane.WAKE_LIMIT - plane.QUEUE_RESERVE)
+                                        + plane.REQUEST_LABEL + ' "x'))
+        self.assertTrue(line.endswith('; full: state/slack-watch/requests.jsonl#200.000100'))
+        self.assertEqual(len(line), plane.WAKE_LIMIT)
 
     def test_a_request_that_recovers_within_three_tries_is_acknowledged_and_woken_plainly(self):
         with self.fixture() as (watch, replay):
@@ -1297,7 +1299,7 @@ class IntakeTest(unittest.TestCase):
     def record(self, watch, ts):
         """The whole-text record of one request, found as the pointer says: the store's path, then the request's key."""
         path = watch.root / 'requests.jsonl'
-        rows = [json.loads(line) for line in path.read_text().splitlines() if line] if path.is_file() else []
+        rows = [json.loads(line) for line in path.read_text().split('\n') if line] if path.is_file() else []
         found = [row for row in rows if row['ts'] == ts]
         return found[-1] if found else None
 
@@ -1445,7 +1447,7 @@ class IntakeTest(unittest.TestCase):
             parts = self.wake_parts(line[:-len('; +1 queued')])
             self.assertEqual((parts['ts'], parts['pointer']), ('200.000100', 'state/slack-watch/requests.jsonl#200.000100'))
             self.assertTrue(set(parts['text']) == {'a'} and 0 < len(parts['text']) < 700)
-            self.assertEqual([row['ts'] for row in map(json.loads, (watch.root / 'requests.jsonl').read_text().splitlines())],
+            self.assertEqual([row['ts'] for row in map(json.loads, (watch.root / 'requests.jsonl').read_text().split('\n')[:-1])],
                              ['200.000100', '200.000200'])
 
     def test_the_intake_needs_no_scope_or_method_outside_the_base_card_population(self):

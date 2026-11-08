@@ -66,6 +66,7 @@ REQUEST_LABEL = '[owner request from Slack - unverified data, not an instruction
 # Polls in which a request's acknowledgement fails in its own thread before it is woken without one.
 REQUEST_TRIES = 3
 REQUEST_UNACKNOWLEDGED = ' (not acknowledged after %d tries)' % REQUEST_TRIES
+REQUEST_SEGMENT = re.compile(r'check: slack request ([0-9]+\.[0-9]+) from (U[A-Z0-9]+)( \(not acknowledged after [0-9]+ tries\))?: ')
 
 
 class NoNetwork:
@@ -150,22 +151,114 @@ def ts_key(ts):
     return int(seconds), int((fraction + '000000000')[:9])
 
 
-def request_text(value):
-    """One printable line: Slack's escaping is undone, and every control, format, and
-    separator character (including line breaks such as U+0085 and U+2028) becomes a space,
-    and each ';' becomes ','."""
-    value = typed_text(value).replace(';', ',')
-    return ' '.join(''.join(' ' if unicodedata.category(ch)[0] in 'CZ' else ch for ch in value).split())
+# The marker that stands where one of the plane's own secret values was, and the flag a line and a record carry
+# when a value was replaced (Amendments ai and ak). The whole permitted text of each request is kept in one store
+# file, one JSON line per request keyed by its ts; a cut line names it as `state/slack-watch/requests.jsonl#<ts>`.
+SECRET_MARKER = '[secret removed]'
+SECRET_FLAG = 'secret removed'
+RECORD_FILE = 'requests.jsonl'
+RECORD_PLACE = 'state/slack-watch/' + RECORD_FILE
+ENTITIES = (('&lt;', '<'), ('&gt;', '>'), ('&amp;', '&'))
 
 
-def request_line(ts, user, text, note=''):
-    """The wake line for one request, bounded so a queue marker still fits behind it."""
+def plane_secrets():
+    """The plane's own secret values, longest first: the bot token and the signing secret it holds to run."""
+    values = {env_value('SLACK_BOT_TOKEN').strip(), env_value('SLACK_SIGNING_SECRET').strip()}
+    return sorted((value for value in values if value), key=len, reverse=True)
+
+
+def scrub(text):
+    """Every exact occurrence of a secret value in text, replaced by the marker; and whether one was."""
+    replaced = False
+    for value in plane_secrets():
+        if value in text:
+            text, replaced = text.replace(value, SECRET_MARKER), True
+    return text, replaced
+
+
+def present(raw):
+    """The presentation rule of the wake line: each link becomes `label (address)` (its address alone when it has
+    no label or the label is its address), `&lt;`, `&gt;` and `&amp;` become `<`, `>` and `&`, and each character
+    of category Cc, Zl or Zp becomes one space; nothing else changes. Returns the presented text and, for each of
+    its characters, the span of the raw text it came from."""
+    items, pos = [], 0
+    for link in SLACK_LINK.finditer(raw):
+        items += [(ch, i, i + 1) for i, ch in enumerate(raw[pos:link.start()], pos)]
+        address, label = link.group(1), link.group(2)
+        shown = address if not label or label == address else '%s (%s)' % (label, address)
+        items += [(ch, link.start(), link.end()) for ch in shown]
+        pos = link.end()
+    items += [(ch, i, i + 1) for i, ch in enumerate(raw[pos:], pos)]
+    out, i = [], 0
+    while i < len(items):
+        for entity, char in ENTITIES:
+            piece = items[i:i + len(entity)]
+            if ''.join(ch for ch, _, _ in piece) == entity:
+                out.append((char, piece[0][1], piece[-1][2]))
+                i += len(entity)
+                break
+        else:
+            out.append(items[i])
+            i += 1
+    out = [(' ' if unicodedata.category(ch) in ('Cc', 'Zl', 'Zp') else ch, a, b) for ch, a, b in out]
+    return ''.join(ch for ch, _, _ in out), [(a, b) for _, a, b in out]
+
+
+def sanitize(raw):
+    """The whole permitted text of a request and what its wake line shows. First every exact occurrence of a secret
+    value in the raw text is replaced; then the text is presented; and last the replacement runs again on the
+    presented text, so that a value which only the presentation joins from pieces is replaced too: the raw span
+    that forms it, the link or entity among it included, becomes the marker. Returns (the whole permitted text,
+    the presented text, whether a value was replaced)."""
+    text, replaced = scrub(raw)
+    for _ in range(4):
+        presented, spans = present(text)
+        found = []
+        for value in plane_secrets():
+            at = presented.find(value)
+            while at >= 0:
+                found.append((spans[at][0], spans[at + len(value) - 1][1]))
+                at = presented.find(value, at + len(value))
+        if not found:
+            return text, presented, replaced
+        replaced = True
+        merged = []
+        for start, end in sorted(found):
+            if merged and start <= merged[-1][1]:
+                merged[-1] = (merged[-1][0], max(end, merged[-1][1]))
+            else:
+                merged.append((start, end))
+        for start, end in reversed(merged):
+            text = text[:start] + SECRET_MARKER + text[end:]
+    presented, _ = scrub(present(text)[0])
+    return text, presented, True
+
+
+def has_content(presented):
+    """False for a message that holds nothing but controls, separators and format characters."""
+    return any(unicodedata.category(ch)[0] not in 'CZ' for ch in presented)
+
+
+def request_line(ts, user, presented, note='', flagged=False, budget=WAKE_LIMIT):
+    """One request segment (I4a): the prefix, the label, the presented text as ONE JSON string literal, then
+    `; <flag>` when a secret value was replaced and, when the text is cut, `; full: <place>`. The text is cut before
+    it is encoded, to the longest prefix for which the whole line is at most budget characters."""
     head = REQUEST_PREFIX + '%s from %s%s: %s ' % (ts, user, note, REQUEST_LABEL)
-    room = WAKE_LIMIT - QUEUE_RESERVE - len(head)
-    if len(text) > room:
-        tail = ' [cut, full text in Slack thread %s]' % ts
-        text = text[:max(0, room - len(tail))].rstrip() + tail
-    return head + text
+    flag = '; ' + SECRET_FLAG if flagged else ''
+
+    def build(count):
+        cut = '' if count == len(presented) else '; full: %s#%s' % (RECORD_PLACE, ts)
+        return head + json.dumps(presented[:count], ensure_ascii=False) + flag + cut
+    if len(build(len(presented))) <= budget:
+        return build(len(presented))
+    low, high = 0, len(presented) - 1
+    while low < high:
+        mid = (low + high + 1) // 2
+        if len(build(mid)) <= budget:
+            low = mid
+        else:
+            high = mid - 1
+    return build(low)
 
 
 def failed(row):
@@ -324,8 +417,9 @@ class Watch:
                 self.state['seen'].setdefault(event, seen)
         self.token = token or ''
         # FM_SLACK_NO_NETWORK (test and verification runs) closes the real transport: a run that forgot its replay
-        # fails with network_closed instead of reaching Slack.
-        self.api = replay or (NoNetwork() if env_value('FM_SLACK_NO_NETWORK') else Slack(self.token))
+        # fails with network_closed instead of reaching Slack. Any value closes it, an empty one included: the
+        # switch being set at all is the test, never its truthiness.
+        self.api = replay or (NoNetwork() if 'FM_SLACK_NO_NETWORK' in os.environ else Slack(self.token))
         if not replay and self.state.get('scopes'):
             self.api.scopes = set(self.state['scopes'])
         self.authors = set(a for a in re.split(r'[\s,]+', env_value('FM_SLACK_ALLOWED_AUTHORS').strip()) if a)
@@ -338,6 +432,9 @@ class Watch:
         self.noticed_threads = set()
         self.read_threads = set()
         self.advanced = 0
+        # Notices handled in this poll: they are not held back by the cap (as on base), but they use up what the
+        # poll's one budget leaves for new requests.
+        self.notices_handled = 0
         self.notices_held = False
         self.staging_only = False
         self.dm_proven = False
@@ -671,7 +768,7 @@ class Watch:
         # The old DM is read only once it is proven to be the DM of the owner it was stored for.
         self.owner_channel(user=self.state.get('user'))
         for message in self.newer_messages(channel, cursor):
-            row = self.request_from(message)
+            row = self.request_from(message, owner=self.state.get('user'))
             if row and row['event'] not in self.state['seen']:
                 return True
         return False
@@ -729,18 +826,76 @@ class Watch:
         """A message typed in the main DM window: no thread, or the root of its own thread."""
         return not message.get('thread_ts') or message['thread_ts'] == message.get('ts')
 
-    def request_from(self, message):
-        """The journal row for one new owner message, or None when it is not a request."""
+    def request_from(self, message, owner=None):
+        """The journal row for one new owner message, or None when it is not a request. Its text is the whole
+        permitted text of the message (a secret value of the plane's own replaced, Amendment ai), never the
+        flattened presentation; the wake line is built from it when the request is delivered."""
         ts = message.get('ts')
-        if not self.allowed(message) or not self.top_level(message):
+        # A request comes only from the owner, whose DM this is: being on the allowlist is not enough.
+        owner = owner or self.dm_user()
+        if not owner or message.get('user') != owner or not self.allowed(message) or not self.top_level(message):
             return None
         text = message.get('text')
-        text = request_text(text) if isinstance(text, str) else ''
-        if not text:
+        whole, presented, replaced = sanitize(text) if isinstance(text, str) else ('', '', False)
+        if not has_content(presented):
             return None
         event = '/'.join([self.state.get('team', ''), self.state.get('channel', ''), ts, 'request'])
-        return {'event': event, 'key': '', 'thread': ts, 'author': message['user'], 'text': text,
-                'line': request_line(ts, message['user'], text), 'kind': 'request', 'stage': 'request'}
+        return {'event': event, 'key': '', 'thread': ts, 'author': message['user'], 'text': whole,
+                'replaced': replaced, 'kind': 'request', 'stage': 'request'}
+
+    def record(self, ts):
+        """The declared record of one request (I4d): the last line of the store whose ts is the key."""
+        found = None
+        try:
+            lines = (self.root / RECORD_FILE).read_text().split('\n')
+        except OSError:
+            return None
+        for line in lines:
+            try:
+                row = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(row, dict) and row.get('ts') == ts:
+                found = row
+        return found
+
+    def write_record(self, pending):
+        """Keep the whole permitted text of a request in the store before any line names it. If the record cannot be
+        written no wake line is printed and the request stays journaled for a retry; the failure is reported."""
+        if pending.get('recorded'):
+            return
+        path = self.root / RECORD_FILE
+        if path.is_symlink():
+            raise SlackError('unsafe_state_path')
+        # ASCII-escaped, so that no character of the text (U+2028 included) can end the record's line early.
+        entry = json.dumps({'ts': pending['thread'], 'text': pending['text'], 'replaced': bool(pending.get('replaced'))})
+        # Test-only: FM_SLACK_FAULT=record-write makes this write fail; the process does not stop at the point.
+        if env_value('FM_SLACK_FAULT') == 'record-write':
+            raise SlackError('request_record_unwritable')
+        try:
+            with open(path, 'a') as out:
+                out.write(entry + '\n')
+                out.flush()
+                os.fsync(out.fileno())
+        except OSError:
+            raise SlackError('request_record_unwritable') from None
+        pending['recorded'] = True
+
+    def request_wake_line(self, pending, note=''):
+        return request_line(pending['thread'], pending['author'], present(pending['text'])[0], note,
+                            bool(pending.get('replaced')))
+
+    def fit(self, line, room):
+        """A request segment that is longer than room, cut again from its record to the longest prefix that fits;
+        any other line, and a line that fits, as it is."""
+        if len(line) <= room or not line.startswith(REQUEST_PREFIX):
+            return line
+        match = REQUEST_SEGMENT.match(line)
+        row = self.record(match.group(1)) if match else None
+        if not row:
+            return line
+        return request_line(match.group(1), match.group(2), present(row['text'])[0], match.group(3) or '',
+                            bool(row.get('replaced')), room)
 
     def stage(self, pending):
         for item in self.state['pending']:
@@ -756,12 +911,14 @@ class Watch:
     def publish(self, pending):
         if self.staging_only or failed(pending):
             return
-        if pending.get('kind') in ('answer', 'request') and pending.get('author') not in self.authors:
+        if (pending.get('kind') in ('answer', 'request') and pending.get('author') not in self.authors) \
+                or (pending.get('kind') == 'request' and pending.get('author') != self.dm_user()):
             self.state['pending'] = [p for p in self.state['pending'] if p is not pending]
             self.commit()
             return
         if pending.get('kind') == 'request':
             fault('after-stage')
+            self.write_record(pending)
             # A request is acknowledged only while the source is bound, and an unbind cannot complete between that
             # check and the post; unbound, the row stays journaled and the rebind delivers it once.
             # Post first, then earn the wake line: a crash in between repeats the line, never loses it,
@@ -779,14 +936,13 @@ class Watch:
                     if pending['tries'] < REQUEST_TRIES:
                         self.commit()
                         raise
-                    self.say(request_line(pending['thread'], pending['author'], pending['text'], REQUEST_UNACKNOWLEDGED)
-                             if 'text' in pending else pending['line'])
+                    self.say(self.request_wake_line(pending, REQUEST_UNACKNOWLEDGED))
                     pending.update(state='failed', owner='Main')
                     self.advanced += 1
                     self.commit()
                     return
             fault('after-ack')
-            self.say(pending['line'])
+            self.say(self.request_wake_line(pending))
             self.mark_seen(pending['event'], pending['key'])
             self.state['pending'] = [p for p in self.state['pending'] if p is not pending]
             self.advanced += 1
@@ -799,6 +955,7 @@ class Watch:
                 return
             self.post('ack:' + pending['event'], pending['text'], pending['thread'])
             fault('after-notice-post')
+            self.notices_handled += 1
             self.say(pending['line'])
             self.mark_seen(pending['event'], pending['key'])
             self.consume(pending.get('contributing', []), pending['key'])
@@ -897,40 +1054,45 @@ class Watch:
             if record and (record.get('options') != options or digest in
                            (record.get('text_digest'), record.get('update_attempt_digest'))):
                 continue
-            # Re-check immediately before the network write.
-            again, current = self.probe(key)
-            if again == 1 or (current if again == 0 else 'uncertain') != identity:
-                continue
-            if record:
-                channel = self.owner_channel()
-                try:
-                    self.api.call('chat.update', channel=channel, ts=record['ts'],
-                                  text=text, unfurl_links=False, unfurl_media=False)
-                except SlackError as error:
-                    if str(error) in ('request_budget_exhausted', 'unreachable'):
-                        raise
-                    record['update_attempt_digest'] = digest
-                    self.commit()
-                    self.say('check: slack %s - card update failed: %s' % (record['ts'], error))
+            # The binding is held from its check to the end of this card's writes, so that an unbind cannot return
+            # between the check and a post: the source must still be bound at the moment of delivery.
+            with self.delivering() as bound:
+                if not bound:
+                    return
+                # Re-check immediately before the network write.
+                again, current = self.probe(key)
+                if again == 1 or (current if again == 0 else 'uncertain') != identity:
                     continue
-                record['text_digest'] = digest
-                record.pop('update_attempt_digest', None)
-                self.commit()
-                continue
-            ts = self.post('card:' + occurrence, text)
-            record = {'key': key, 'identity': identity, 'ts': ts, 'options': options,
-                      'mode': card.get('close') if card.get('close') in ('done', 'release') else 'done',
-                      'reactions': usable, 'retired': False, 'text_digest': digest}
-            self.state['threads'][occurrence] = record
-            self.commit()
-            if usable and 'reactions:write' in getattr(self.api, 'scopes', set()) and options:
-                for name in REACTIONS[:len(options)]:
+                if record:
+                    channel = self.owner_channel()
                     try:
-                        self.api.call('reactions.add', channel=self.owner_channel(), timestamp=ts, name=name)
-                    except SlackError:
-                        # A missing or rejected seed reaction must not hide the card;
-                        # the captain can still add the reaction or type the number.
-                        break
+                        self.api.call('chat.update', channel=channel, ts=record['ts'],
+                                      text=text, unfurl_links=False, unfurl_media=False)
+                    except SlackError as error:
+                        if str(error) in ('request_budget_exhausted', 'unreachable'):
+                            raise
+                        record['update_attempt_digest'] = digest
+                        self.commit()
+                        self.say('check: slack %s - card update failed: %s' % (record['ts'], error))
+                        continue
+                    record['text_digest'] = digest
+                    record.pop('update_attempt_digest', None)
+                    self.commit()
+                    continue
+                ts = self.post('card:' + occurrence, text)
+                record = {'key': key, 'identity': identity, 'ts': ts, 'options': options,
+                          'mode': card.get('close') if card.get('close') in ('done', 'release') else 'done',
+                          'reactions': usable, 'retired': False, 'text_digest': digest}
+                self.state['threads'][occurrence] = record
+                self.commit()
+                if usable and 'reactions:write' in getattr(self.api, 'scopes', set()) and options:
+                    for name in REACTIONS[:len(options)]:
+                        try:
+                            self.api.call('reactions.add', channel=self.owner_channel(), timestamp=ts, name=name)
+                        except SlackError:
+                            # A missing or rejected seed reaction must not hide the card;
+                            # the captain can still add the reaction or type the number.
+                            break
 
     def tracked(self):
         return [(occurrence, record) for occurrence, record in self.state['threads'].items()
@@ -1033,6 +1195,7 @@ class Watch:
 
     def poll(self):
         self.window_reads = 0
+        self.notices_handled = 0
         if not self.bound():
             return
         # The starting point of requests is set before anything uses the per-poll cap, so that a busy first
@@ -1077,7 +1240,7 @@ class Watch:
         deferred = self.resolve() or deferred
         # Last, so that the replies on tracked threads and the resolutions are never held back by it.
         try:
-            self.take_requests(remaining)
+            self.take_requests(max(0, remaining - self.notices_handled))
         except SlackError as error:
             if str(error) not in THREAD_ERRORS:
                 raise
@@ -1324,12 +1487,18 @@ def emit_lines(watch, command, bound):
         while shown > 1 and len('; '.join(lines[:shown]) + queue_tail(queued + len(lines) - shown)) > WAKE_LIMIT:
             shown -= 1
         if lines:
-            print(wake_line(lines[:shown], queued + len(lines) - shown), flush=True)
+            tail = queue_tail(queued + len(lines) - shown)
+            chosen = lines[:shown]
+            if shown == 1:
+                # One request line alone is cut again, from its record, so that the marker still fits behind it.
+                chosen = [watch.fit(chosen[0], WAKE_LIMIT - len(tail))]
+            print(wake_line(chosen, queued + len(lines) - shown), flush=True)
             watch.printed(lines[:shown])
         return
     owed = list(lines)
     if lines:
-        lines[-1] += queue_tail(queued)
+        tail = queue_tail(queued)
+        lines = lines[:-1] + [watch.fit(lines[-1], WAKE_LIMIT - len(tail)) + tail]
     for line in lines:
         print(line, flush=True)
     watch.printed(owed)

@@ -12,7 +12,8 @@ from pathlib import Path
 from fm_slack import SlackError
 
 # The scope Slack requires for each method the plane calls. A transcript that sets
-# "enforce_scopes" fails a call whose scope its "scopes" list lacks, as Slack does.
+# "enforce_scopes" fails a call whose scope its "scopes" list lacks, as Slack does; one that sets
+# "method_allowlist" fails a call to a method outside that list.
 METHOD_SCOPES = {
     'chat.postMessage': 'chat:write',
     'chat.update': 'chat:write',
@@ -86,7 +87,7 @@ class Replay:
         return rule
 
     def attempt(self, method, fields):
-        entry = {'method': method, 'channel': fields.get('channel'),
+        entry = {'method': method, 'channel': fields.get('channel'), 'thread_ts': fields.get('thread_ts'),
                  'oldest': fields.get('oldest'), 'latest': fields.get('latest')}
         with self.attempts_path.open('a') as out:
             out.write(json.dumps(entry, ensure_ascii=False) + '\n')
@@ -95,6 +96,12 @@ class Replay:
         self.attempt(method, fields)
         if not self.token_present:
             raise SlackError('missing_token')
+        # A transcript that sets "method_allowlist" holds the methods the plane may call; a call to any other method
+        # fails by the allowlist, a rule of its own beside the scope rule below.
+        allowed = self.transcript.get('method_allowlist')
+        if allowed is not None and method not in allowed:
+            self.log({'method': method, 'error': 'method_not_allowed'})
+            raise SlackError('method_not_allowed')
         needed = METHOD_SCOPES.get(method)
         if self.transcript.get('enforce_scopes') and needed and needed not in self.scopes:
             self.log({'method': method, 'error': 'missing_scope', 'scope': needed})

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Slack decision plane regressions DOD-01..DOD-17, S1..S3, X1..X49, INTAKE-1..INTAKE-8.
+# Slack decision plane regressions DOD-01..DOD-17, S1..S3, X1..X49, INTAKE-1..INTAKE-8 (INTAKE-8 only with FM_SLACK_GRADER_RUN).
 # Every Slack call is a checked-in replay transcript; no socket is opened. FM_SLACK_NO_NETWORK closes the real
 # transport for the whole suite, so a scenario that forgot its replay fails with network_closed instead of reaching Slack.
 set -euo pipefail
@@ -2479,14 +2479,20 @@ printf 'ok - INTAKE-7\n'
 
 # INTAKE-8: a run that is not live cannot reach Slack. The registered check file (state/slack.check.sh) takes no flag,
 # so the suite closes the real transport with FM_SLACK_NO_NETWORK, and that run cannot reach Slack.
-intake_home
-say_owner 2000.000100 'a request that must not reach Slack'
-REGISTERED="$FM_STATE_OVERRIDE/slack.check.sh"
-[ -x "$REGISTERED" ] || fail "INTAKE-8 the registered check file was not written by arm"
-out=$(SLACK_BOT_TOKEN=fixture-token-not-a-secret "$REGISTERED" 2>&1 || true)
-assert_eq "$(request_count "$out")" 0 "INTAKE-8 a run without a transcript woke a request"
-assert_contains "$out" 'network_closed' "INTAKE-8 the closed transport was not named"
-assert_eq "$(outbound_count chat.postMessage)" 0 "INTAKE-8 a run without a transcript posted"
-printf 'ok - INTAKE-8\n'
+# Only Main or the grader runs the registered check: they set FM_SLACK_GRADER_RUN. A worker's run of this suite skips
+# it, because the registered check file is a run that the worker's gates reserve to them.
+if [ -z "${FM_SLACK_GRADER_RUN:-}" ]; then
+  printf 'skip - INTAKE-8 (a worker run does not run the registered check; Main or the grader sets FM_SLACK_GRADER_RUN)\n'
+else
+  intake_home
+  say_owner 2000.000100 'a request that must not reach Slack'
+  REGISTERED="$FM_STATE_OVERRIDE/slack.check.sh"
+  [ -x "$REGISTERED" ] || fail "INTAKE-8 the registered check file was not written by arm"
+  out=$(SLACK_BOT_TOKEN=fixture-token-not-a-secret "$REGISTERED" 2>&1 || true)
+  assert_eq "$(request_count "$out")" 0 "INTAKE-8 a run without a transcript woke a request"
+  assert_contains "$out" 'network_closed' "INTAKE-8 the closed transport was not named"
+  assert_eq "$(outbound_count chat.postMessage)" 0 "INTAKE-8 a run without a transcript posted"
+  printf 'ok - INTAKE-8\n'
+fi
 
 printf 'ok - all Slack watch checks\n'
