@@ -378,7 +378,13 @@ test_real_leftover_processes_at_the_copy_root_are_ended_only_when_proved_the_tas
       real_record after
       if [ "$want" = ended ]; then
         sleep 0.5
-        if real_proc_alive "$pid"; then kill "$pid" 2>/dev/null || true; fail "b-leftover-$state-$route: a process proved the task's own was not ended"; fi
+        if real_proc_alive "$pid"; then
+          # What the close did, before the process is killed: the exit code, its last
+          # output, the process state, and the signals the product audited for this pid.
+          survivor="rc=$rc; ps(stat ppid)=$(ps -o stat=,ppid= -p "$pid" 2>&1 | tr -s ' '); signals audited for $pid=$(awk -F'\t' -v p="$pid" '$3 == p { printf "%s ", $2 }' "$FOREIGN_CASE/state/task-x1.teardown-processes" 2>/dev/null); close stderr tail=$(tail -c 1200 "$FOREIGN_CASE/stderr" 2>/dev/null | tr '\n' '|')"
+          kill "$pid" 2>/dev/null || true
+          fail "b-leftover-$state-$route: a process proved the task's own was not ended ($survivor)"
+        fi
         expect_code 0 "$rc" "b-leftover-$state-$route: the close must succeed once the task's own process is ended: $(cat "$FOREIGN_CASE/stderr")"
         assert_absent "$FOREIGN_CASE/state/task-x1.teardown-owned" "b-leftover-$state-$route: the owned record survived a successful close"
         # Retained from the deleted b-process-own (Main 2054): the own process is ended AND
