@@ -206,23 +206,53 @@ real_assert_kept() {  # <label>: nothing moved
   assert_present "$FOREIGN_COPY/.venv/bin/python" "$label: the copy lost its control"
 }
 
-test_a_copy_with_a_live_process_inside_it_is_kept_and_the_slot_stays_leased() {
+test_a_copy_with_a_foreign_process_inside_it_is_kept_and_the_slot_stays_leased() {
   local rc pid
   real_case b-process
   rm -f "$FOREIGN_CASE/fakebin/lsof"
   SLOT_ENTRY_BEFORE=$(real_slot_entry)
+  # Its working directory is below the copy's root, so it is not a process the
+  # task's own cleanup ends (those have their cwd exactly at a root retire sweeps).
+  ( cd "$FOREIGN_COPY/notes" && exec sleep 600 ) &
+  pid=$!
+  sleep 1
+  real_teardown rc FM_STUB_CLOSEOUT=retained
+  real_record after
+  kill -0 "$pid" 2>/dev/null || fail "b-process: the foreign process was ended"
+  kill "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  expect_code 1 "$rc" "b-process: a copy with a foreign process inside it must refuse: $(cat "$FOREIGN_CASE/stderr")"
+  assert_grep "process $pid is running in it" "$FOREIGN_CASE/stderr" "b-process: the refusal did not name the process"
+  assert_equals 0 "$(retained_call_count)" "b-process: the driver was asked about a copy with a live user"
+  real_assert_kept "b-process"
+  pass "b-process: a copy with a foreign process inside it is refused naming the process, the process is left running, and the copy, the task and the real lease are unchanged"
+}
+
+# The task's own process (cwd exactly at the copy's root, as the worker session's
+# is) is what the retire phase ends; this is base behavior (bin/fm-teardown-nested-lib.sh
+# teardown_own_scan), not part of the kept-copy route. Needs a ps that works.
+test_a_process_at_the_copy_root_is_the_tasks_own_and_is_ended_before_the_close() {
+  local rc pid
+  if ! ps -p $$ -o pid= >/dev/null 2>&1; then
+    pass "skipped: ps is not available here, so the process identity cannot be verified"
+    return 0
+  fi
+  real_case b-process-own
+  rm -f "$FOREIGN_CASE/fakebin/lsof"
   ( cd "$FOREIGN_COPY" && exec sleep 600 ) &
   pid=$!
   sleep 1
   real_teardown rc FM_STUB_CLOSEOUT=retained
   real_record after
-  kill "$pid" 2>/dev/null || true
+  if kill -0 "$pid" 2>/dev/null; then
+    kill "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+    fail "b-process-own: the task's own process at the copy root was not ended"
+  fi
   wait "$pid" 2>/dev/null || true
-  expect_code 1 "$rc" "b-process: a copy with a live process inside it must refuse: $(cat "$FOREIGN_CASE/stderr")"
-  assert_grep 'REFUSED' "$FOREIGN_CASE/stderr" "b-process: the refusal named no cause"
-  assert_equals 0 "$(retained_call_count)" "b-process: the driver was asked about a copy with a live user"
-  real_assert_kept "b-process"
-  pass "b-process: a copy with a live process inside it is refused with the copy, the task and the real lease unchanged"
+  expect_code 0 "$rc" "b-process-own: the close must succeed once the task's own process is ended: $(cat "$FOREIGN_CASE/stderr")"
+  real_assert_closed "b-process-own"
+  pass "b-process-own: a process at the copy root is the task's own, is ended, and the kept copy and its lease are unchanged"
 }
 
 test_a_copy_that_another_task_record_names_is_kept_and_the_slot_stays_leased() {
@@ -324,7 +354,8 @@ test_a_start_racing_the_close_of_an_unleased_slot_never_resets_the_copy() {
 teardown_test_cases=(
 test_a_real_pool_slot_keeps_its_lease_and_the_unique_files_are_preserved_and_the_control_is_left_out
 test_a_real_pool_slot_is_returned_after_the_unique_file_is_preserved_and_the_control_is_removed
-test_a_copy_with_a_live_process_inside_it_is_kept_and_the_slot_stays_leased
+test_a_copy_with_a_foreign_process_inside_it_is_kept_and_the_slot_stays_leased
+test_a_process_at_the_copy_root_is_the_tasks_own_and_is_ended_before_the_close
 test_a_copy_that_another_task_record_names_is_kept_and_the_slot_stays_leased
 test_a_slot_another_task_claims_is_left_untouched_and_stays_leased
 test_a_start_racing_the_close_never_receives_the_held_slot
