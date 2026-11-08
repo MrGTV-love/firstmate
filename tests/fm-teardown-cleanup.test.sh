@@ -6540,7 +6540,8 @@ test_a_changed_kept_copy_is_assessed_afresh() {
         assert_equals "2 2" "$(retained_call_count) $(retained_tar_count)" "retained-changed-$change: a changed copy that passes every proof was not evaluated again"
         assert_grep 'could not be durably leased' "$FOREIGN_CASE/stderr" "retained-changed-$change: run 2 did not reach the lease check"
         cmp -s "$FOREIGN_CASE/record.run1" "$record" && fail "retained-changed-$change: the stale record was not replaced"
-        retained_expect_sums "retained-changed-$change" "$FOREIGN_COPY" "$FOREIGN_CASE/data/task-x1/nested-copy-preserved/$(printf '%s' "$FOREIGN_COPY" | shasum -a 256 | awk '{print $1}')" notes/unique.dat
+        retained_expect_sums "retained-changed-$change" "$FOREIGN_COPY" "$(retained_field "$record" preserve)" notes/unique.dat
+        assert_equals "only here" "$(cat "$FOREIGN_CASE/data/task-x1/nested-copy-preserved/$(printf '%s' "$FOREIGN_COPY" | shasum -a 256 | awk '{print $1}')/notes/unique.dat")" "retained-changed-$change: the earlier preserve lost its bytes"
         ;;
       *)
         assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-changed-$change: a changed copy that fails a proof reached the driver"
@@ -6556,10 +6557,12 @@ test_a_changed_kept_copy_is_assessed_afresh() {
 
 # The recorded shape holds unique ignored files only under .claude, which the
 # preservation skips, so an earlier run adopted them into the preserve. When one
-# of them changes, the preserve can never match after the driver, so every
-# retry refuses before the driver and writes no tar and no saved output.
-test_a_kept_copy_whose_adopted_bytes_changed_refuses_before_the_driver() {
-  local rc run shape label preserve before
+# of them changes, the changed payload is assessed again (Main 1845, P3): the
+# driver is asked once, the new bytes are preserved in their own directory beside
+# the first, no earlier preserved byte is removed or overwritten, and an unchanged
+# retry asks nothing.
+test_a_kept_copy_whose_adopted_bytes_changed_is_preserved_again_beside_the_first() {
+  local rc run shape label preserve before record new
   for shape in claude-only with-selected; do
     label=retained-adopted-$shape
     make_retained_case "$label" enclosing
@@ -6576,16 +6579,18 @@ test_a_kept_copy_whose_adopted_bytes_changed_refuses_before_the_driver() {
     printf 'changed\n' > "$FOREIGN_COPY/.claude/channel-outbox/a.jsonl"
     for run in 2 3; do
       run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
-      expect_code 1 "$rc" "$label: run $run must refuse: $(cat "$FOREIGN_CASE/stderr")"
-      assert_grep "differ from the bytes already preserved" "$FOREIGN_CASE/stderr" "$label: run $run did not name the cause"
-      assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "$label: run $run asked the driver again"
-      assert_absent "$FOREIGN_CASE/data/task-x1/vernant-closeout."* "$label: run $run saved a driver output"
+      expect_code 1 "$rc" "$label: run $run must refuse for the lease: $(cat "$FOREIGN_CASE/stderr")"
+      assert_equals "2 2" "$(retained_call_count) $(retained_tar_count)" "$label: run $run: the changed payload was not assessed exactly once"
       assert_present "$FOREIGN_CASE/state/task-x1.meta" "$label: run $run removed the task record"
       assert_present "$FOREIGN_COPY/.git" "$label: run $run removed the copy"
-      assert_equals "$before" "$(shasum -a 256 "$preserve/.claude/channel-outbox/a.jsonl" 2>/dev/null | awk '{print $1}')" "$label: run $run dropped or replaced the adopted bytes"
+      assert_equals "$before" "$(shasum -a 256 "$preserve/.claude/channel-outbox/a.jsonl" 2>/dev/null | awk '{print $1}')" "$label: run $run dropped or replaced the earlier preserved bytes"
+      record=$(retained_record_path)
+      new=$(retained_field "$record" preserve)
+      [ "$new" != "$preserve" ] || fail "$label: run $run recorded the first preserve for a changed payload"
+      retained_expect_sums "$label" "$FOREIGN_COPY" "$new" .claude/channel-outbox/a.jsonl
     done
   done
-  pass "a kept copy whose adopted ignored bytes changed refuses before the driver on every retry, with no tar and no saved output, whether or not preservation selects other files"
+  pass "a kept copy whose adopted ignored bytes changed is assessed once (one call, one tar), preserved beside the first preserve with no earlier byte lost, and an unchanged retry asks nothing"
 }
 
 # A kept copy in a slot another live task still works in (the peer route) cannot
@@ -6647,6 +6652,9 @@ retained_variant() {
     other-exit) driver_env+=(FM_STUB_EXIT=4) ;;
     json-broken) driver_env+=(FM_STUB_JSON=broken) ;;
     json-two) driver_env+=(FM_STUB_JSON=two) ;;
+    json-no-unique) driver_env+=(FM_STUB_JSON=nounique) ;;
+    json-unique-string) driver_env+=(FM_STUB_JSON=uniquestring) ;;
+    reason-invented) driver_env+=(FM_STUB_REASON=cleanup_reason_no_list_holds) ;;
     same-repo-worktree)
       # A linked worktree of the same repository: the existing predicate lets it
       # stand, so the new route is not what refuses this copy.
@@ -6694,7 +6702,7 @@ retained_variant_run() {
 
 test_every_other_state_of_an_own_copy_the_driver_keeps_still_refuses() {
   local variant plain force want
-  for variant in c1-input unlanded dirty changed-after-preserve removed-from-preserve driver-path-differs driver-path-differs-second driver-path-directory driver-path-gone driver-path-escapes lease-conflict live-or-unknown policy-not-allowed other-exit json-broken json-two other-repo same-repo-worktree; do
+  for variant in c1-input unlanded dirty changed-after-preserve removed-from-preserve driver-path-differs driver-path-differs-second driver-path-directory driver-path-gone driver-path-escapes lease-conflict live-or-unknown policy-not-allowed other-exit json-broken json-two json-no-unique json-unique-string reason-invented other-repo same-repo-worktree; do
     retained_variant "$variant" plain
     plain=$RV_DISPOSITION
     case "$variant" in
@@ -6850,7 +6858,7 @@ test_the_preserve_and_the_archives_survive_the_close_and_every_later_run() {
 # missing default interpreter refuses and removes nothing.
 test_the_default_driver_interpreter_and_the_override_close_the_same_way() {
   local rc mode
-  for mode in default override missing; do
+  for mode in default override missing override-missing; do
     make_retained_case "retained-config-$mode" enclosing
     case "$mode" in
       default)
@@ -6861,8 +6869,15 @@ test_the_default_driver_interpreter_and_the_override_close_the_same_way() {
         ;;
       override) run_foreign_teardown rc FM_STUB_CLOSEOUT=retained ;;
       missing) run_foreign_teardown rc FM_STUB_CLOSEOUT=retained FM_TEARDOWN_VERNANT_PYTHON= ;;
+      override-missing)
+        mkdir -p "$FOREIGN_SLOT/.venv/bin"
+        cp "$FOREIGN_CASE/vernant-python" "$FOREIGN_SLOT/.venv/bin/python"
+        chmod +x "$FOREIGN_SLOT/.venv/bin/python"
+        run_foreign_teardown rc FM_STUB_CLOSEOUT=retained "FM_TEARDOWN_VERNANT_PYTHON=$FOREIGN_CASE/no-such-python"
+        ;;
     esac
-    if [ "$mode" = missing ]; then
+    if [ "$mode" = missing ] || [ "$mode" = override-missing ]; then
+      assert_grep 'is not available' "$FOREIGN_CASE/stderr" "retained-config-$mode: the refusal did not say the interpreter is not available"
       expect_code 1 "$rc" "retained-config-$mode: a missing default interpreter must refuse: $(cat "$FOREIGN_CASE/stderr")"
       assert_equals "0 0" "$(retained_call_count) $(retained_tar_count)" "retained-config-$mode: the driver ran without an interpreter"
       assert_present "$FOREIGN_CASE/state/task-x1.meta" "retained-config-$mode: the refusal removed the task record"
@@ -6926,6 +6941,121 @@ test_a_head_only_change_of_a_kept_copy_asks_the_driver_exactly_once_more() {
   run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
   assert_equals "2 2" "$(retained_call_count) $(retained_tar_count)" "retained-head-only: an unchanged run after the change asked the driver again"
   pass "a move of HEAD alone asks the driver exactly once more, with one more tar, and the next unchanged run adds none"
+}
+
+# C2 (changed), Main 1845 P3: a genuinely changed ignored payload is assessed again
+# with exactly one driver call and one tar per change of the payload, whatever
+# changed (a new entry the driver does not name, changed bytes, a second distinct
+# change, a return to an earlier payload), and the same payload never asks again.
+test_a_changed_payload_is_archived_once_per_change_and_never_again_while_unchanged() {
+  local rc step want=1 run
+  make_retained_case retained-p3 enclosing
+  held_plain_get_slot "$FOREIGN_CASE"
+  : > "$FOREIGN_CASE/no-lease-command"
+  for step in none new-entry changed-bytes second-change earlier-payload; do
+    case "$step" in
+      none) ;;
+      new-entry) printf 'three\n' > "$FOREIGN_COPY/.claude/channel-outbox/c.jsonl"; want=$((want + 1)) ;;
+      changed-bytes) printf 'two2\n' > "$FOREIGN_COPY/.claude/channel-outbox/a.jsonl"; want=$((want + 1)) ;;
+      second-change) printf 'two3\n' > "$FOREIGN_COPY/.claude/channel-outbox/a.jsonl"; want=$((want + 1)) ;;
+      earlier-payload) printf 'two2\n' > "$FOREIGN_COPY/.claude/channel-outbox/a.jsonl"; want=$((want + 1)) ;;
+    esac
+    for run in 1 2; do
+      run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+      expect_code 1 "$rc" "retained-p3 $step run $run: must refuse for the lease: $(cat "$FOREIGN_CASE/stderr")"
+      assert_equals "$want $want" "$(retained_call_count) $(retained_tar_count)" "retained-p3 $step run $run: wrong driver calls and tars"
+    done
+  done
+  pass "each change of the ignored payload causes exactly one driver call and one tar, a return to an earlier payload counts as a change, and the same payload never asks again"
+}
+
+# C2 (changed): a replaced creation lock is a different copy state and is asked again.
+test_a_replaced_creation_lock_of_a_kept_copy_asks_the_driver_once_more() {
+  local rc pid
+  make_retained_case retained-lock enclosing
+  held_plain_get_slot "$FOREIGN_CASE"
+  : > "$FOREIGN_CASE/no-lease-command"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-lock: run 1 should have asked the driver once"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-lock: an unchanged retry asked the driver"
+  git -C "$FOREIGN_CASE/project" worktree unlock "$FOREIGN_COPY"
+  sleep 0.1 & pid=$!
+  wait "$pid" 2>/dev/null || true
+  git -C "$FOREIGN_CASE/project" worktree lock --reason "vernant-session-active owner=launcher:$pid launcher=$pid" "$FOREIGN_COPY"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  assert_equals "2 2" "$(retained_call_count) $(retained_tar_count)" "retained-lock: a replaced creation lock was not assessed again exactly once"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  assert_equals "2 2" "$(retained_call_count) $(retained_tar_count)" "retained-lock: the retry after the replaced lock asked the driver"
+  pass "a replaced creation lock of a kept copy asks the driver exactly once more and its retry asks nothing"
+}
+
+# C2 (unchanged): the record does not expire; a run 30 days after the record's
+# time fields and file times asks the driver nothing.
+test_an_aged_record_of_an_unchanged_kept_copy_still_asks_the_driver_nothing() {
+  local rc record then
+  make_retained_case retained-aged enclosing
+  held_plain_get_slot "$FOREIGN_CASE"
+  : > "$FOREIGN_CASE/no-lease-command"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  expect_code 1 "$rc" "retained-aged: run 1 must refuse for the lease: $(cat "$FOREIGN_CASE/stderr")"
+  record=$(retained_record_path)
+  then=$(date -u -v-30d +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d '30 days ago' +%Y-%m-%dT%H:%M:%SZ)
+  sed "s/^closed-at=.*/closed-at=$then/" "$record" > "$record.aged" && mv "$record.aged" "$record"
+  find "$FOREIGN_CASE/data" -type f -exec touch -t "$(date -u -v-30d +%Y%m%d%H%M 2>/dev/null || date -u -d '30 days ago' +%Y%m%d%H%M)" {} +
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  expect_code 1 "$rc" "retained-aged: the aged run must refuse for the lease: $(cat "$FOREIGN_CASE/stderr")"
+  assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-aged: an aged record asked the driver again"
+  rm -f "$FOREIGN_CASE/no-lease-command"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  expect_code 0 "$rc" "retained-aged: the aged record must still close the task: $(cat "$FOREIGN_CASE/stderr")"
+  assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-aged: the closing run asked the driver again"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-aged: a run after the close asked the driver"
+  pass "a record 30 days old of an unchanged kept copy still asks the driver nothing, before and after the close"
+}
+
+# C4 (record): a record that cannot be written refuses the close and leaves the
+# task, the copy and the slot as they were.
+test_a_retained_record_that_cannot_be_written_refuses_the_close() {
+  local rc dir
+  make_retained_case retained-unwritable enclosing
+  dir=$FOREIGN_CASE/data/copy-sweep/retained
+  mkdir -p "$dir"
+  chmod a-w "$dir"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  chmod u+w "$dir"
+  if [ "$(id -u)" = 0 ]; then
+    pass "skipped as root: a directory permission does not stop root"
+    return 0
+  fi
+  expect_code 1 "$rc" "retained-unwritable: an unwritable record location must refuse the close: $(cat "$FOREIGN_CASE/stderr")"
+  assert_grep 'could not be written' "$FOREIGN_CASE/stderr" "retained-unwritable: the refusal did not say the record could not be written"
+  assert_present "$FOREIGN_CASE/state/task-x1.meta" "retained-unwritable: the task record was removed"
+  assert_present "$FOREIGN_COPY/.git" "retained-unwritable: the copy was removed"
+  assert_absent "$FOREIGN_CASE/treehouse.log" "retained-unwritable: the slot was returned"
+  assert_equals 0 "$(find "$dir" -type f | wc -l | tr -d ' ')" "retained-unwritable: a record exists"
+  pass "a retained record that cannot be written refuses the close with the task, the copy and the slot unchanged"
+}
+
+# C1 (d): the preserve restores into a scratch path byte for byte against hashes
+# computed from the fixture builder's own bytes, never from teardown's output.
+test_the_preserve_restores_to_the_builders_hashes() {
+  local rc scratch preserve file want have
+  make_retained_case retained-restore enclosing
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  expect_code 0 "$rc" "retained-restore: the close must succeed: $(cat "$FOREIGN_CASE/stderr")"
+  preserve=$(retained_field "$(retained_record_path)" preserve)
+  scratch=$FOREIGN_CASE/scratch-restore
+  mkdir -p "$scratch"
+  (cd "$preserve" && tar -cf - .) | (cd "$scratch" && tar -xf -)
+  for file in .claude/channel-outbox/a.jsonl:one .claude/channel-outbox/b.jsonl:two notes/unique.dat:'only here'; do
+    want=$(printf '%s\n' "${file#*:}" | shasum -a 256 | awk '{print $1}')
+    have=$(shasum -a 256 "$scratch/${file%%:*}" | awk '{print $1}')
+    assert_equals "$want" "$have" "retained-restore: ${file%%:*} does not restore to the builder's hash"
+    assert_grep "$want  ${file%%:*}" "$preserve/SHA256SUMS" "retained-restore: SHA256SUMS does not record ${file%%:*}"
+  done
+  pass "the preserve restores into a scratch path byte for byte against hashes computed from the fixture builder's own bytes"
 }
 
 teardown_test_cases=(
@@ -7136,7 +7266,7 @@ test_teardown_retires_the_dsh_launch_state
 test_a_landed_task_closes_around_an_own_copy_the_driver_keeps
 test_a_retry_of_an_unchanged_kept_copy_asks_the_driver_nothing
 test_a_kept_copy_in_a_slot_a_peer_works_in_refuses_and_its_retry_asks_the_driver_nothing
-test_a_kept_copy_whose_adopted_bytes_changed_refuses_before_the_driver
+test_a_kept_copy_whose_adopted_bytes_changed_is_preserved_again_beside_the_first
 test_a_changed_kept_copy_is_assessed_afresh
 test_every_other_state_of_an_own_copy_the_driver_keeps_still_refuses
 test_a_stable_refusal_after_the_driver_asks_the_driver_nothing_on_retry
@@ -7146,6 +7276,11 @@ test_the_preserve_and_the_archives_survive_the_close_and_every_later_run
 test_the_default_driver_interpreter_and_the_override_close_the_same_way
 test_the_first_teardown_of_a_copy_that_already_holds_tars_asks_the_driver_once
 test_a_head_only_change_of_a_kept_copy_asks_the_driver_exactly_once_more
+test_a_changed_payload_is_archived_once_per_change_and_never_again_while_unchanged
+test_a_replaced_creation_lock_of_a_kept_copy_asks_the_driver_once_more
+test_an_aged_record_of_an_unchanged_kept_copy_still_asks_the_driver_nothing
+test_a_retained_record_that_cannot_be_written_refuses_the_close
+test_the_preserve_restores_to_the_builders_hashes
 )
 
 # In the combined tests/fm-teardown.test.sh run,

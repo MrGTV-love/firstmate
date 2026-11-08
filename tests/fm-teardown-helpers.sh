@@ -2441,20 +2441,52 @@ make_nested_slot_case() {  # <name> <shape> <nested-relative-path> [mode]
   case_dir=$(make_case "$1")
   NESTED_CASE=$case_dir
   mkdir -p "$case_dir/home/state" "$case_dir/pool/1"
-  git -C "$case_dir/project" worktree move "$case_dir/wt" "$case_dir/pool/1/project"
-  printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"task-x1"}]}\n' \
-    "$case_dir/pool/1/project" > "$case_dir/pool/treehouse-state.json"
-  NESTED_SLOT=$(cd "$case_dir/pool/1/project" && pwd -P)
+  if [ -n "${FM_TEST_REAL_TREEHOUSE:-}" ]; then
+    # The slot comes from the real treehouse binary in a pool under the case
+    # directory, leased to the task as fm-spawn leases it; $case_dir/pool is then
+    # a symlink to that pool folder, so the paths the helpers read (the slot
+    # claim and treehouse-state.json) are the real ones.
+    local real_slot real_pool
+    git -C "$case_dir/project" worktree remove --force "$case_dir/wt"
+    git -C "$case_dir/project" branch -D fm/task-x1 >/dev/null 2>&1 || true
+    if [ -n "${FM_TEST_REAL_UNLEASED:-}" ]; then
+      # A slot taken by a plain get and left unleased, as an older spawn leaves it.
+      (cd "$case_dir/project" && SHELL=/usr/bin/true TREEHOUSE_ROOT="$case_dir/realroot" treehouse get </dev/null >/dev/null 2>"$case_dir/treehouse-get.err") \
+        || fail "the real treehouse could not give a slot: $(cat "$case_dir/treehouse-get.err")"
+      real_slot=$(cd "$case_dir/project" && TREEHOUSE_ROOT="$case_dir/realroot" treehouse status --json </dev/null | jq -r '.[0].path')
+    else
+      real_slot=$(cd "$case_dir/project" && TREEHOUSE_ROOT="$case_dir/realroot" treehouse get --lease --lease-holder task-x1 </dev/null 2>"$case_dir/treehouse-get.err") \
+        || fail "the real treehouse could not lease a slot: $(cat "$case_dir/treehouse-get.err")"
+    fi
+    real_pool=$(dirname "$(dirname "$real_slot")")
+    rm -rf "$case_dir/pool"
+    ln -s "$real_pool" "$case_dir/pool"
+    NESTED_SLOT=$(cd "$real_slot" && pwd -P)
+  else
+    git -C "$case_dir/project" worktree move "$case_dir/wt" "$case_dir/pool/1/project"
+    printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"task-x1"}]}\n' \
+      "$case_dir/pool/1/project" > "$case_dir/pool/treehouse-state.json"
+    NESTED_SLOT=$(cd "$case_dir/pool/1/project" && pwd -P)
+  fi
   NESTED_COPY="$NESTED_SLOT/$3"
   mkdir -p "${NESTED_COPY%/*}"
   git -C "$case_dir/project" worktree add -q -b fm/task-x1-v2 "$NESTED_COPY" main
   printf 'task=task-x1\nhome=%s\n' "$case_dir/home" > "$case_dir/pool/1/.fm-slot-owner"
-  cat > "$case_dir/fakebin/treehouse" <<SH
+  if [ -n "${FM_TEST_REAL_TREEHOUSE:-}" ]; then
+    # Every call is logged to treehouse.calls.log and then run by the real binary.
+    cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s|%s\n' "\$(date -u +%Y-%m-%dT%H:%M:%SZ)" "\$*" >> "$case_dir/treehouse.calls.log"
+exec "$FM_TEST_REAL_TREEHOUSE" "\$@"
+SH
+  else
+    cat > "$case_dir/fakebin/treehouse" <<SH
 #!/usr/bin/env bash
 case "\${1:-}" in pool-dir|status) exit 0 ;; esac
 printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
 exit 0
 SH
+  fi
   if [ "$2" = enclosing ]; then
     fm_write_meta "$case_dir/state/task-x1.meta" \
       "window=firstmate:fm-task-x1" "endpoint_task_id=task-x1" \
@@ -2630,6 +2662,8 @@ unique=$(printf '%s\n' ${FM_STUB_UNIQUE-.claude/channel-outbox/a.jsonl .claude/c
 reason=${FM_STUB_REASON:-cleanup_ignored_payload_archived_tree_retained}
 case "${FM_STUB_JSON:-one}" in
   broken) printf '{"allowed": false, "reason": "%s"\n' "$reason" ;;
+  nounique) printf '{"allowed": false, "ignored_payload_disposition": "archive_then_retain_tree", "reason": "%s", "tracked_uncovered_paths": [], "uncovered_paths": []}\n' "$reason" ;;
+  uniquestring) printf '{"allowed": false, "ignored_payload_disposition": "archive_then_retain_tree", "reason": "%s", "tracked_uncovered_paths": [], "uncovered_paths": [], "unique_ignored_paths": ".claude/channel-outbox/a.jsonl"}\n' "$reason" ;;
   two) printf '{"allowed": false}\n{"allowed": false, "reason": "%s"}\n' "$reason" ;;
   *)
     jq -n -c --arg copy "$2" --arg reason "$reason" --argjson unique "$unique" '{allowed: false, ignored_payload_disposition: "archive_then_retain_tree", ignored_payload_preservation: [{archive_path: "stub.tar", archive_sha256: ("ab" * 32), path_count: ($unique | length), restore_verified: true, stage: "ordinary_cleanup"}], reason: $reason, retained_worktree_path: $copy, target: $copy, tracked_uncovered_paths: [], uncovered_paths: [], untracked_uncovered_paths: [], unique_ignored_paths: $unique}'
