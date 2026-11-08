@@ -2050,6 +2050,9 @@ PERL
 set -u
 args=" $* "
 boundary=0
+# Only the audit's own reads synchronise the exit: the ownership proof reads the
+# environment with `ps -ww -E` and is not one of the calls this case counts.
+case "$args" in *" -E "*) exec "$REAL_PS_FOR_TEST" "$@" ;; esac
 if [[ "$args" == *" -p $FM_AUDIT_TARGET "* ]]; then
   if [[ "$args" == *" -o lstart= "* ]] && [ -f "$FM_AUDIT_CASE/lstart-failed" ]; then
     exit 1
@@ -2288,18 +2291,30 @@ EOF
   pass "an erroring lsof scan refuses teardown and preserves the task"
 }
 
+# Under the process-ownership rule (Main 2005, 2108) a pid whose start time stops matching
+# its owned-record entry is a different process: it is not proved the task's own, so the
+# teardown refuses it by name and leaves it running, and nothing is ever force-killed.
+# Host-independent: the fixture carries no launch marker (so no host can prove it by its
+# environment) and its record line holds the start time the stand-in reports first. The
+# stand-in answers the start-time read of the target with that first value until the
+# journal holds the TERM line for the pid and the read that follows it, then with another
+# value; every read before the TERM audit passes through to the real ps.
+# Not covered (a Linux-only shape): a readable launch marker that keeps a pid whose start
+# time changed proved, so that the reaper silently skips it.
 test_reused_pid_identity_is_not_force_killed() {
-  local case_dir rc pid
+  local case_dir rc pid first
   case_dir=$(make_case reused-pid-identity)
   write_meta "$case_dir" no-mistakes ship
   land_shippable_commit "$case_dir"
 
-  teardown_fixture_start "$case_dir" KILL perl -e "$(cat <<'PERL'
+  teardown_fixture_start_foreign "$case_dir" KILL perl -e "$(cat <<'PERL'
 $SIG{TERM} = "IGNORE"; sleep 300
 PERL
   )"
   pid=$TEARDOWN_FIXTURE_PID
   sleep 0.2
+  first='lstart=Tue Aug  4 10:00:00 2026'
+  printf '%s\t%s\n' "$pid" "$first" > "$case_dir/state/task-x1.teardown-owned"
   cat > "$case_dir/fakebin/lsof" <<EOF
 #!/usr/bin/env bash
 count=0
@@ -2310,14 +2325,18 @@ if [ "\$count" -le 3 ]; then printf 'p%s\nfcwd\nn%s\n' '$pid' '$case_dir/wt'; fi
 EOF
   cat > "$case_dir/fakebin/ps" <<'SH'
 #!/usr/bin/env bash
+# The target's start-time read: the recorded first value until the journal holds the TERM
+# line for the target and one further read has passed; another value after that.
 if [ "${1:-}" = -p ] && [ "${2:-}" = "${FM_FAKE_REUSED_PID:-}" ] \
    && [ "${3:-}" = -o ] && [ "${4:-}" = lstart= ]; then
-  count=0
-  [ ! -f "$FM_FAKE_PS_COUNT" ] || count=$(cat "$FM_FAKE_PS_COUNT")
-  count=$((count + 1))
-  printf '%s\n' "$count" > "$FM_FAKE_PS_COUNT"
-  if [ "$count" -le 4 ]; then printf 'Tue Aug  4 10:00:00 2026\n'
-  else printf 'Tue Aug  4 10:00:01 2026\n'; fi
+  if grep -q "	TERM	${FM_FAKE_REUSED_PID}	" "$FM_FAKE_JOURNAL" 2>/dev/null; then
+    n=0
+    [ ! -f "$FM_FAKE_PS_COUNT" ] || n=$(cat "$FM_FAKE_PS_COUNT")
+    n=$((n + 1))
+    printf '%s\n' "$n" > "$FM_FAKE_PS_COUNT"
+    if [ "$n" -ge 2 ]; then printf 'Tue Aug  4 10:00:01 2026\n'; exit 0; fi
+  fi
+  printf 'Tue Aug  4 10:00:00 2026\n'
   exit 0
 fi
 exec "$REAL_PS_FOR_TEST" "$@"
@@ -2327,18 +2346,21 @@ SH
   rc=0
   FM_PROC_ROOT_OVERRIDE="$case_dir/no-proc" \
   FM_FAKE_REUSED_PID="$pid" FM_FAKE_PS_COUNT="$case_dir/ps-count" \
+  FM_FAKE_JOURNAL="$case_dir/state/task-x1.teardown-processes" \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
-  expect_code 0 "$rc" "reused-pid-identity: teardown should skip the replacement process"
+  expect_code 1 "$rc" "reused-pid-identity: a pid whose start time changed is not proved the task's own and must be refused: $(cat "$case_dir/stderr")"
+  assert_grep "process $pid" "$case_dir/stderr" "reused-pid-identity: the refusal did not name the pid"
+  assert_grep "not proved" "$case_dir/stderr" "reused-pid-identity: the refusal did not say the process is not proved"
   if ! kill -0 "$pid" 2>/dev/null; then
-    fail "reused-pid-identity: teardown force-killed a process whose start time changed"
+    fail "reused-pid-identity: teardown ended a process whose start time changed"
   fi
   teardown_fixture_stop "$pid"
   assert_grep $'\tTERM\t'"$pid"$'\t' "$case_dir/state/task-x1.teardown-processes" \
-    "reused-pid-identity: the original identity was not sent TERM before the grace period"
+    "reused-pid-identity: the original identity was not sent TERM before the start time changed"
   assert_no_grep $'\tKILL\t' "$case_dir/state/task-x1.teardown-processes" \
     "reused-pid-identity: a KILL was audited for a changed identity"
-  pass "a reused pid with a different start time is never force-killed"
+  pass "a pid whose start time no longer matches its record is refused by name, left running, and never force-killed"
 }
 
 test_exec_changed_process_is_still_reaped() {
@@ -2351,6 +2373,9 @@ test_exec_changed_process_is_still_reaped() {
 
   teardown_fixture_start "$case_dir/wt" KILL perl -e "$(cat <<'PERL'
       my ($marker, $done) = @ARGV;
+      # TERM is ignored from the start (and across the exec): the exec is triggered after
+      # the TERM audit, so the process must still be there for the KILL that follows.
+      $SIG{TERM} = "IGNORE";
       until (-e $marker) { select undef, undef, undef, 0.01; }
       open my $fh, ">", $done or die "open";
       close $fh;
@@ -2361,10 +2386,14 @@ PERL
   sleep 0.2
   cat > "$case_dir/fakebin/ps" <<'SH'
 #!/usr/bin/env bash
+# The exec is triggered by the first start-time read of the target after the journal holds
+# the TERM line for it (the reaper's own read), never by an earlier read of any caller.
 if [ "${1:-}" = -p ] && [ "${2:-}" = "${FM_FAKE_EXEC_PID:-}" ] \
    && [ "${3:-}" = -o ] && [ "${4:-}" = lstart= ]; then
   out=$("$REAL_PS_FOR_TEST" "$@") || exit $?
-  [ -e "$FM_FAKE_EXEC_MARKER" ] || : > "$FM_FAKE_EXEC_MARKER"
+  if grep -q "	TERM	${FM_FAKE_EXEC_PID}	" "$FM_FAKE_JOURNAL" 2>/dev/null; then
+    [ -e "$FM_FAKE_EXEC_MARKER" ] || : > "$FM_FAKE_EXEC_MARKER"
+  fi
   printf '%s\n' "$out"
   exit 0
 fi
@@ -2392,6 +2421,7 @@ SH
   FM_PROC_ROOT_OVERRIDE="$case_dir/no-proc" \
   FM_FAKE_EXEC_PID="$pid" FM_FAKE_EXEC_MARKER="$marker" \
   FM_FAKE_EXEC_DONE="$done_flag" FM_FAKE_LSOF_COUNT="$case_dir/lsof-count" \
+  FM_FAKE_JOURNAL="$case_dir/state/task-x1.teardown-processes" \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   if kill -0 "$pid" 2>/dev/null; then
@@ -7386,6 +7416,25 @@ EOF
   sed -i.bak 's/^102|1|Sun Nov  8 08:00:06 2026/102|1|Mon Nov  9 10:00:00 2026/' "$t"
   rc=0; PATH="$fake:$PATH" teardown_process_proved_own 102 || rc=$?
   [ "$rc" = 1 ] || fail "own-proof pid-reuse: a recorded pid with another start time was proved (got $rc)"
+  # The record is read before the process table is asked for a birth identity: the same
+  # decisions for a recorded and an unrecorded pid, with no start-time read for the latter.
+  : > "$dir/ps-calls"
+  cat > "$fake/ps" <<SH
+#!/usr/bin/env bash
+case "\$*" in *"-o lstart="*) printf '%s\n' "\$*" >> '$dir/ps-calls' ;; esac
+exec bash -c 'FAKE_PS_TABLE=$t; export FAKE_PS_TABLE; row() { awk -F"|" -v p="\$1" "\\\$1 == p" "\$FAKE_PS_TABLE"; }; pid=\$(printf "%s" "\$*" | sed "s/.*-p \\([0-9]*\\).*/\\1/"); r=\$(row "\$pid"); [ -n "\$r" ] || exit 1; printf "%s\\n" "\$(printf "%s" "\$r" | awk -F"|" "{ print \\\$3 }")"' _ "\$@"
+SH
+  chmod +x "$fake/ps"
+  printf '600|1|Sun Nov  8 10:00:00 2026|/bin/sleep 600\n601|1|Sun Nov  8 10:00:01 2026|/bin/sleep 600\n' >> "$t"
+  rm -f "$rec"
+  printf '600\tlstart=Sun Nov  8 10:00:00 2026\n' > "$rec"
+  rc=0; PATH="$fake:$PATH" teardown_process_recorded 600 || rc=$?
+  [ "$rc" = 0 ] || fail "own-proof recorded-pid: a recorded pid with a matching start time was not recorded (got $rc)"
+  [ "$(wc -l < "$dir/ps-calls" | tr -d ' ')" = 1 ] || fail "own-proof recorded-pid: expected one start-time read, got $(wc -l < "$dir/ps-calls")"
+  : > "$dir/ps-calls"
+  rc=0; PATH="$fake:$PATH" teardown_process_recorded 601 || rc=$?
+  [ "$rc" = 1 ] || fail "own-proof unrecorded-pid: an unrecorded pid was reported recorded (got $rc)"
+  [ "$(wc -l < "$dir/ps-calls" | tr -d ' ')" = 0 ] || fail "own-proof unrecorded-pid: the process table was asked for the identity of a pid the record does not name"
   unset FAKE_PS_TABLE FM_PROC_ROOT_OVERRIDE
   pass "a process is proved the task's own only by its readable marker, a matching entry in the owned record, or a live parent chain to either; a foreign orphan, another task's marker, a late process and a reused pid are not, and the record is never extended after the worker is gone"
 }

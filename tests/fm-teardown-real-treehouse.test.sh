@@ -267,6 +267,16 @@ test_a_foreign_or_scrubbed_process_at_the_copy_root_is_never_ended_and_refuses_t
 # anything else refuses by name and is left running. These cases need a working ps and
 # a non-Apple python3; where either is missing the cases are NOT RUN (a skip is not a
 # pass), and the output says so.
+# A process counts as ended when it is gone or a zombie (ps stat Z), the same rule as
+# teardown_fixture_live in tests/fm-teardown-helpers.sh.
+real_proc_alive() {  # <pid>
+  local st
+  st=$(ps -o stat= -p "$1" 2>/dev/null | tr -d ' ') || return 1
+  [ -n "$st" ] || return 1
+  case "$st" in Z*) return 1 ;; esac
+  return 0
+}
+
 real_proc_python() {
   local py
   py=$(python3 -c 'import sys; print(sys.executable)' 2>/dev/null) || return 1
@@ -290,6 +300,10 @@ cmd = apple if mode.endswith("apple") else nonapple
 if mode.startswith("live"):
     p = subprocess.Popen(cmd, cwd=root)
     open(out, "w").write(str(p.pid))
+    # A live parent reaps its child as soon as the child ends: an ended child of a parent
+    # that never wait()s stays a zombie, which `kill -0` still reports alive.
+    while p.poll() is None:
+        time.sleep(0.2)
     time.sleep(600)
 else:
     if mode.startswith("daemon"):
@@ -343,7 +357,7 @@ test_real_leftover_processes_at_the_copy_root_are_ended_only_when_proved_the_tas
           assert_present "$FOREIGN_CASE/state/task-x1.teardown-owned" "b-leftover-$state-$route: no owned record was written"
           grep -q "^$PROC_PID	" "$FOREIGN_CASE/state/task-x1.teardown-owned" \
             || fail "b-leftover-$state-$route: the product did not record the live marked-parent's child $PROC_PID (no fixture-written entry exists in this case)"
-          kill -0 "$PROC_PID" 2>/dev/null || fail "b-leftover-$state-$route: run 1 ended the process before the copy was proved"
+          real_proc_alive "$PROC_PID" || fail "b-leftover-$state-$route: run 1 ended the process before the copy was proved"
           kill "$PROC_PARENT" 2>/dev/null || true
           wait "$PROC_PARENT" 2>/dev/null || true
           sleep 0.5
@@ -364,7 +378,7 @@ test_real_leftover_processes_at_the_copy_root_are_ended_only_when_proved_the_tas
       real_record after
       if [ "$want" = ended ]; then
         sleep 0.5
-        if kill -0 "$pid" 2>/dev/null; then kill "$pid" 2>/dev/null || true; fail "b-leftover-$state-$route: a process proved the task's own was not ended"; fi
+        if real_proc_alive "$pid"; then kill "$pid" 2>/dev/null || true; fail "b-leftover-$state-$route: a process proved the task's own was not ended"; fi
         expect_code 0 "$rc" "b-leftover-$state-$route: the close must succeed once the task's own process is ended: $(cat "$FOREIGN_CASE/stderr")"
         assert_absent "$FOREIGN_CASE/state/task-x1.teardown-owned" "b-leftover-$state-$route: the owned record survived a successful close"
         # Retained from the deleted b-process-own (Main 2054): the own process is ended AND
@@ -379,7 +393,7 @@ test_real_leftover_processes_at_the_copy_root_are_ended_only_when_proved_the_tas
           assert_grep '|return ' "$FOREIGN_CASE/treehouse.calls.log" "b-leftover-$state-$route: the real binary did not return the slot"
         fi
       else
-        kill -0 "$pid" 2>/dev/null || fail "b-leftover-$state-$route: a process not proved the task's own was ended"
+        real_proc_alive "$pid" || fail "b-leftover-$state-$route: a process not proved the task's own was ended"
         kill "$pid" 2>/dev/null || true
         expect_code 1 "$rc" "b-leftover-$state-$route: a process not proved the task's own must refuse: $(cat "$FOREIGN_CASE/stderr")"
         assert_grep "process $pid" "$FOREIGN_CASE/stderr" "b-leftover-$state-$route: the refusal did not name the process"

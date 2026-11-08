@@ -330,13 +330,16 @@ teardown_owned_record_path() {
 # Is <pid> in the owned record with the same birth identity (pid AND start time)? A
 # recycled pid has another start time and proves nothing.
 teardown_process_recorded() {  # <pid>
-  local pid=$1 rec recorded current
+  local pid=$1 rec recorded current line
   rec=$(teardown_owned_record_path)
   { [ -f "$rec" ] && [ ! -L "$rec" ] && [ -r "$rec" ]; } || return 1
-  current=$(task_process_identity "$pid" 2>/dev/null) || return 1
-  [ -n "$current" ] || return 1
+  # The record is read first: a pid it does not name is never recorded, so the process
+  # table is asked for its birth identity only for a pid the record names (fewer ps
+  # calls for every other process at a root, same decision).
   recorded=$(awk -F'\t' -v p="$pid" '$1 == p { print substr($0, length($1) + 2) }' "$rec")
   [ -n "$recorded" ] || return 1
+  current=$(task_process_identity "$pid" 2>/dev/null) || return 1
+  [ -n "$current" ] || return 1
   while IFS= read -r line; do
     [ "$line" != "$current" ] || return 0
   done <<< "$recorded"
