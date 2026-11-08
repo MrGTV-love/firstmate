@@ -2513,7 +2513,11 @@ test_a_cut_scan_wakes_on_what_it_measured_and_never_invents_one() {
   printf 'default-pool off\ncontainer %s 5\ninterval 0\ncache-max-age 0\n' "$SLOT" > "$HOMED/config/copy-budget"
   # The first du finishes at once; the second hangs past the bound at every
   # sub-second phase of its whole-second deadline; the third never starts.
-  FAKE_DU_HANG_AFTER=1 FM_CHECK_TIMEOUT=8 run_sweep check
+  # check stops FM_CHECK_TIMEOUT - 5 seconds after it starts, and the first du must
+  # finish inside that window. At 8 the window was 3 seconds, which a host slow to
+  # start a process broke by itself (0 du calls completed); 20 gives it 15 seconds,
+  # and the hanging du sleeps 30, so it is still cut inside the window.
+  FAKE_DU_HANG_AFTER=1 FM_CHECK_TIMEOUT=20 run_sweep check
   [ "$RC" = 0 ] || fail "check failed ($RC): $OUT"
   measured=$(du_calls)
   { [ "$measured" -ge 1 ] && [ "$measured" -le 2 ]; } || fail "a du that could not finish inside the bound was counted, or none finished: $measured completed"
@@ -2522,7 +2526,7 @@ test_a_cut_scan_wakes_on_what_it_measured_and_never_invents_one() {
   assert_no_grep "last_scan" "$HOMED/state/copy-sweep.record" "a cut scan was recorded as complete"
   make_budget_world cutquiet 1 1 1
   printf 'default-pool off\ncontainer %s 5\ninterval 0\ncache-max-age 0\n' "$SLOT" > "$HOMED/config/copy-budget"
-  FAKE_DU_HANG_AFTER=1 FM_CHECK_TIMEOUT=8 run_sweep check
+  FAKE_DU_HANG_AFTER=1 FM_CHECK_TIMEOUT=20 run_sweep check
   [ -z "$OUT" ] || fail "a cut scan that proved nothing over still woke: $OUT"
   pass "a scan cut at its time bound wakes only on bytes it measured and records no completed scan"
 }
