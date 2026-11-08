@@ -670,7 +670,13 @@
 #     missing or prunable, or a linked worktree git discovers from the cwd;
 #     outer-worktree discovery never proves custody.
 #     Only a cwd exactly equal to a live recorded scan root is
-#     eligible for signalling. Every other descendant cwd, existing or deleted,
+#     eligible for signalling, and only when the process is proved the task's own
+#     by its launch environment: bin/fm-spawn.sh exports FM_TASK_INBOX=<physical
+#     state dir>/<id>.inbox before the worker's launch command, so every process
+#     the worker session starts carries it (teardown_process_marked, read with
+#     ps -E). A process at a root without that value, or whose environment cannot
+#     be read, is not proved the task's own: teardown refuses by naming its pid and
+#     leaves it running, on every route. Every other descendant cwd, existing or deleted,
 #     refuses with its pid, birth identity, matched path and scan root, because
 #     a damaged sibling lane cannot be distinguished from an own-tree directory.
 #     One exception: before this sweep, retire sends TERM to a creation-lock
@@ -3919,6 +3925,13 @@ task_pids_under_roots() {  # <dir>...
         TASK_PIDS_ERROR="descendant cwd holds process $pid without proven task custody"
         return 1
       fi
+      if ! teardown_process_marked "$pid"; then
+        identity=$(task_process_identity "$pid") || identity="identity unavailable"
+        echo "REFUSED: process $pid ($identity) is at scan root $dir but does not carry this task's FM_TASK_INBOX launch marker, or its environment cannot be read, so its ownership by $ID is not proven; leaving it running and preserving task $ID without signalling." >&2
+        TASK_PIDS_FAILED_DIR=$path
+        TASK_PIDS_ERROR="process $pid at the scan root is not proven the task's own"
+        return 1
+      fi
       TASK_SCAN_PIDS+=("$pid")
       TASK_PID_CWDS+=("$path")
       pids="$pids
@@ -4784,7 +4797,13 @@ teardown_remove_own_nested_copies() {  # <slot-label>
 # still needs an ignored-file proof, even when an anchor or landing holds HEAD.
 # The returned slot keeps its ignored files, so it needs no such proof.
 teardown_bundle_ignored_kept() {  # <copy> <refusal-subject> [proof-outcome]
-  local unique bundle=${TEARDOWN_BUNDLE_SWEEP_PROOF:-$TEARDOWN_BUNDLE_ACCEPTED}
+  local unique bundle=${TEARDOWN_BUNDLE_SWEEP_PROOF:-$TEARDOWN_BUNDLE_ACCEPTED} lock_rc=0
+  # A copy Vernant's creation lock holds is released or kept only through
+  # teardown_own_copy_dispose, which preserves and verifies its ignored files
+  # before the driver is asked; the bundle's ignored-file refusal is for a copy
+  # that would be removed with them unpreserved.
+  teardown_copy_lock_file "$1" || lock_rc=$?
+  [ "$lock_rc" != 0 ] || return 0
   if unique=$(teardown_preservable_ignored "$1"); then
     [ -n "$unique" ] || return 0
     echo "REFUSED: $2 $1, during cleanup admitted by recorded bundle $bundle, but it holds ignored files no hash record preserves: $(printf '%s' "$unique" | paste -sd ' ' -)${3:+; $3}." >&2

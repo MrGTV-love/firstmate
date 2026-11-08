@@ -779,6 +779,13 @@ other_home_retained() {  # <copy>
   own_data=$(fm_task_copy_canonical_dir "$DATA_DIR" 2>/dev/null) || own_data=$DATA_DIR
   for state_dir in ${FM_LOCAL_FIRSTMATE_STATES[@]+"${FM_LOCAL_FIRSTMATE_STATES[@]}"}; do
     data=${state_dir%/*}/data
+    # A data directory that exists but cannot be searched hides every record in it:
+    # an unknown, so the copy is held (an absent one holds nothing).
+    if [ -d "$data" ] && [ ! -x "$data" ]; then
+      CLASS=HELD-LOCKED
+      REASON="the data directory of another local home ($data) cannot be searched, so its retained records cannot be read and the driver is not asked"
+      return 0
+    fi
     [ -d "$data" ] || continue
     [ "$(fm_task_copy_canonical_dir "$data" 2>/dev/null)" != "$own_data" ] || continue
     if [ -d "$data/$CHECK_ID" ] && { [ ! -x "$data/$CHECK_ID" ] \
