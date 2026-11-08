@@ -351,6 +351,49 @@ test_a_start_racing_the_close_of_an_unleased_slot_never_resets_the_copy() {
   pass "c-race-unleased: on an unleased real slot, racing starts never received it, the close leased it, and the copy is unchanged"
 }
 
+# F2 of the contract review: a copy-sweep apply that starts while a teardown of the
+# same kept copy sits in the driver call (no record written yet) must not call the
+# driver or archive again. The sweep skips a copy an active task record names.
+real_sweep() {  # <label> <mode...>: the real sweep against this case's home and pool
+  FM_HOME="$FOREIGN_CASE/home" FM_STATE_OVERRIDE="$FOREIGN_CASE/state" FM_DATA_OVERRIDE="$FOREIGN_CASE/data" \
+    FM_CONFIG_OVERRIDE="$FOREIGN_CASE/config" FM_COPY_SWEEP_TREEHOUSE_ROOT="$FOREIGN_CASE/realroot/.treehouse" \
+    FM_TEARDOWN_VERNANT_PYTHON="$FOREIGN_CASE/vernant-python" NM_HOME="$FOREIGN_CASE/nm" \
+    PATH="$FOREIGN_CASE/fakebin:$PATH" TREEHOUSE_ROOT="$TREEHOUSE_ROOT" \
+    "$ROOT/bin/fm-copy-sweep.sh" "${@:2}" > "$FOREIGN_CASE/sweep.$1.out" 2>&1
+  echo $? > "$FOREIGN_CASE/sweep.$1.rc"
+}
+
+test_a_copy_sweep_apply_during_a_teardown_in_the_driver_makes_no_second_archive() {
+  local first_pid n
+  real_case f-sweep-race
+  (
+    env FM_TEARDOWN_VERNANT_PYTHON="$FOREIGN_CASE/vernant-python" FM_STUB_CLOSEOUT=retained \
+      "FM_STUB_AFTER=sleep 8" FM_HOME="$FOREIGN_CASE/home" \
+      FM_ROOT_OVERRIDE="$FOREIGN_CASE/code-root" FM_STATE_OVERRIDE="$FOREIGN_CASE/state" \
+      FM_DATA_OVERRIDE="$FOREIGN_CASE/data" FM_CONFIG_OVERRIDE="$FOREIGN_CASE/config" \
+      NM_HOME="$FOREIGN_CASE/nm" TREEHOUSE_ROOT="$TREEHOUSE_ROOT" PATH="$FOREIGN_CASE/fakebin:${FM_TEARDOWN_TEST_PATH:-$PATH}" \
+      "$TEARDOWN" task-x1 > "$FOREIGN_CASE/stdout.first" 2> "$FOREIGN_CASE/stderr.first"
+    echo $? > "$FOREIGN_CASE/rc.first"
+  ) &
+  first_pid=$!
+  for n in $(seq 1 100); do
+    [ -f "$FOREIGN_CASE/closeout.log" ] && break
+    sleep 0.2
+  done
+  [ -f "$FOREIGN_CASE/closeout.log" ] || fail "f-sweep-race: the teardown never reached the driver"
+  real_sweep apply --apply
+  real_sweep report
+  wait "$first_pid" 2>/dev/null || true
+  if [ -n "$REAL_DIR" ]; then
+    cp "$FOREIGN_CASE"/sweep.*.out "$FOREIGN_CASE"/sweep.*.rc "$REAL_DIR/" 2>/dev/null || true
+  fi
+  grep -q "$FOREIGN_COPY" "$FOREIGN_CASE/sweep.report.out" || fail "f-sweep-race: the sweep never listed the copy, so it proves nothing: $(head -c 600 "$FOREIGN_CASE/sweep.report.out")"
+  assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "f-sweep-race: a sweep apply during a teardown called the driver or archived again"
+  assert_equals 0 "$(cat "$FOREIGN_CASE/rc.first")" "f-sweep-race: the teardown did not close: $(cat "$FOREIGN_CASE/stderr.first")"
+  assert_present "$FOREIGN_COPY/.git" "f-sweep-race: the copy was removed"
+  pass "f-sweep-race: a real copy-sweep apply and report during a teardown held in the driver listed the copy, called the driver no more and wrote no second tar"
+}
+
 teardown_test_cases=(
 test_a_real_pool_slot_keeps_its_lease_and_the_unique_files_are_preserved_and_the_control_is_left_out
 test_a_real_pool_slot_is_returned_after_the_unique_file_is_preserved_and_the_control_is_removed
@@ -360,6 +403,7 @@ test_a_copy_that_another_task_record_names_is_kept_and_the_slot_stays_leased
 test_a_slot_another_task_claims_is_left_untouched_and_stays_leased
 test_a_start_racing_the_close_never_receives_the_held_slot
 test_a_start_racing_the_close_of_an_unleased_slot_never_resets_the_copy
+test_a_copy_sweep_apply_during_a_teardown_in_the_driver_makes_no_second_archive
 )
 
 fm_test_run_cases "${teardown_test_cases[@]}" -- "$@"
