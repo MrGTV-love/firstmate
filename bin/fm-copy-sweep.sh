@@ -767,6 +767,42 @@ receipt_is_stale() {  # <receipt>
   RECEIPT_STALE_WHY="the copy there now has a different creation lock"
 }
 
+# A retained record another local home wrote for <copy> (a lane closed its task
+# around the kept copy in a shared pool) holds it for this sweep too, so a sweep
+# run from this home never asks the driver for another archive. Read-only: another
+# home's record is never written, cleared, claimed or closed from here, and a
+# stale one is ignored, not removed. A record or a folder that cannot be read
+# holds the copy as well, since an unknown is never answered with an archive.
+# Sets CLASS and REASON and succeeds when another home holds <copy>.
+other_home_retained() {  # <copy>
+  local state_dir data rec own_data
+  own_data=$(fm_task_copy_canonical_dir "$DATA_DIR" 2>/dev/null) || own_data=$DATA_DIR
+  for state_dir in ${FM_LOCAL_FIRSTMATE_STATES[@]+"${FM_LOCAL_FIRSTMATE_STATES[@]}"}; do
+    data=${state_dir%/*}/data
+    [ -d "$data" ] || continue
+    [ "$(fm_task_copy_canonical_dir "$data" 2>/dev/null)" != "$own_data" ] || continue
+    if [ -d "$data/$CHECK_ID" ] && { [ ! -x "$data/$CHECK_ID" ] \
+         || { [ -d "$data/$CHECK_ID/retained" ] && [ ! -x "$data/$CHECK_ID/retained" ]; }; }; then
+      CLASS=HELD-LOCKED
+      REASON="the retained records of another local home ($data/$CHECK_ID) cannot be read, so the driver is not asked"
+      return 0
+    fi
+    rec=$(teardown_retained_receipt "$data" "$1") || continue
+    [ -e "$rec" ] || [ -L "$rec" ] || continue
+    if [ ! -r "$rec" ]; then
+      CLASS=HELD-LOCKED
+      REASON="a retained record of another local home ($rec) cannot be read, so the driver is not asked"
+      return 0
+    fi
+    if ! receipt_is_stale "$rec"; then
+      CLASS=HELD-LOCKED
+      REASON="driver retained this copy: recorded by another local home in $rec; no retry from this home"
+      return 0
+    fi
+  done
+  return 1
+}
+
 # A copy whose preserve stayed after a retryable refusal gets a waiting record:
 # its path, its identity, the fingerprint of its preservable ignored content as
 # the sweep last saw it, and the fingerprint of that latest preserve.
@@ -953,6 +989,9 @@ classify() {  # <copy> <clone> <pool> <container>
     REASON="driver retained this copy: $(sed -n '4p' "$pending" 2>/dev/null || printf 'receipt unreadable'); no retry until its retained disposition is reconciled"
     return 0
   fi
+  if other_home_retained "$copy"; then
+    return 0
+  fi
   rc=0
   teardown_copy_lock_file "$copy" || rc=$?
   case "$rc" in
@@ -982,6 +1021,10 @@ classify() {  # <copy> <clone> <pool> <container>
       if [ ! -f "$clone/scripts/git-stability/closeout_pr.py" ] \
         || [ ! -x "${FM_TEARDOWN_VERNANT_PYTHON:-$clone/.venv/bin/python}" ]; then
         REASON="$REASON; closeout driver or interpreter unavailable"
+        return 0
+      fi
+      if [ -n "${FM_LOCAL_FIRSTMATE_SKIPPED[*]:-}" ]; then
+        REASON="$REASON; a local home's records were not read, so another home's retained record cannot be ruled out and the driver is not asked"
         return 0
       fi
       launcher=$pid
