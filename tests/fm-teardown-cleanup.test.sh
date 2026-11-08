@@ -2610,7 +2610,7 @@ SH
 }
 
 test_process_exit_during_identity_lookup_does_not_refuse() {
-  local case_dir rc wt_path fake_pid=99999998
+  local case_dir rc wt_path diag fake_pid=99999998
   case_dir=$(make_case identity-exit-convergence)
   write_meta "$case_dir" no-mistakes ship
   land_shippable_commit "$case_dir"
@@ -2642,11 +2642,12 @@ EOF
   FM_PROC_ROOT_OVERRIDE="$case_dir/no-proc" FM_FAKE_EXITED_PID="$fake_pid" \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
-  expect_code 0 "$rc" "identity-exit-convergence: teardown should succeed"
+  diag=$(teardown_diag_report "$case_dir" "$rc" "$fake_pid")
+  expect_code 0 "$rc" "identity-exit-convergence: teardown should succeed ($diag)"
   assert_present "$case_dir/treehouse.log" \
     "identity-exit-convergence: teardown did not reach worktree return"
   ! grep -q REFUSED "$case_dir/stderr" || \
-    fail "identity-exit-convergence: a disappeared process caused teardown refusal"
+    fail "identity-exit-convergence: a disappeared process caused teardown refusal ($diag)"
   pass "a process exiting during identity lookup does not block teardown"
 }
 
