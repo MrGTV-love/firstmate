@@ -2368,16 +2368,45 @@ wait "$holder_pid"
 assert_contains "$(cat "$TMP/unbind.out")" 'unbound: slack-dm' "INTAKE-6 [unbind wait] the unbind did not report"
 assert_not_contains "$(cat "$TMP/unbind.out")" 'still running' "INTAKE-6 [unbind wait] a finished wait warned"
 "$CAPTAIN" binding slack-dm >/dev/null 2>&1 && fail "INTAKE-6 [unbind wait] the binding stayed after the unbind"
+# No environment value shortens the wait: the unbind still waits for the delivery that holds the binding.
 intake_home
 holder 5
-start=$(date +%s)
-FM_BINDING_UNBIND_WAIT=1 "$CAPTAIN" unbind slack-dm > "$TMP/unbind.out" 2>&1
-waited=$(( $(date +%s) - start ))
+FM_BINDING_UNBIND_WAIT=0 "$CAPTAIN" unbind slack-dm > "$TMP/unbind.out" 2>&1 &
+unbind_pid=$!
+sleep 2
+kill -0 "$unbind_pid" 2>/dev/null || fail "INTAKE-6 [unbind no override] an environment value shortened the unbind's wait"
+wait "$holder_pid" 2>/dev/null || true
+wait "$unbind_pid" || fail "INTAKE-6 [unbind no override] the unbind failed after the delivery ended"
+assert_contains "$(cat "$TMP/unbind.out")" 'unbound: slack-dm' "INTAKE-6 [unbind no override] the unbind did not report"
+"$CAPTAIN" binding slack-dm >/dev/null 2>&1 && fail "INTAKE-6 [unbind no override] the binding stayed after the unbind"
+# Past its fixed wait the unbind refuses: it exits nonzero and the binding stays. The clock shim ends the wait at once.
+intake_home
+holder 30
+REAL_PERL=$(command -v perl)
+set +e
+PATH="$FIX/fake-clock:$PATH" FM_REAL_PERL="$REAL_PERL" "$CAPTAIN" unbind slack-dm > "$TMP/unbind.out" 2>&1
+rc=$?
+set -e
 kill "$holder_pid" 2>/dev/null || true
 wait "$holder_pid" 2>/dev/null || true
-[ "$waited" -le 3 ] || fail "INTAKE-6 [unbind bound] the unbind waited past its bound (${waited}s)"
-assert_contains "$(cat "$TMP/unbind.out")" 'still running' "INTAKE-6 [unbind bound] the cut-short wait was not reported"
-"$CAPTAIN" binding slack-dm >/dev/null 2>&1 && fail "INTAKE-6 [unbind bound] the binding stayed after the bounded wait"
+[ "$rc" != 0 ] || fail "INTAKE-6 [unbind bound] the unbind past its wait reported success"
+assert_not_contains "$(cat "$TMP/unbind.out")" 'unbound: slack-dm' "INTAKE-6 [unbind bound] a refused unbind reported success"
+"$CAPTAIN" binding slack-dm >/dev/null 2>&1 || fail "INTAKE-6 [unbind bound] the refused unbind removed the binding"
+# A state folder that cannot be examined is a refusal, not a success; the base refused it too.
+intake_home
+if [ "$(id -u)" = 0 ]; then
+  printf 'skip - INTAKE-6 [unbind inaccessible state] this user can read any folder\n'
+else
+  set +e
+  chmod 000 "$FM_STATE_OVERRIDE"
+  "$CAPTAIN" unbind slack-dm > "$TMP/unbind.out" 2>&1
+  rc=$?
+  chmod 700 "$FM_STATE_OVERRIDE"
+  set -e
+  [ "$rc" != 0 ] || fail "INTAKE-6 [unbind inaccessible state] the unbind reported success"
+  assert_not_contains "$(cat "$TMP/unbind.out")" 'unbound: slack-dm' "INTAKE-6 [unbind inaccessible state] a refused unbind reported success"
+  "$CAPTAIN" binding slack-dm >/dev/null 2>&1 || fail "INTAKE-6 [unbind inaccessible state] the binding was removed"
+fi
 printf 'ok - INTAKE-6\n'
 
 # INTAKE-7: a poll makes at most one history read of the owner DM for requests, in every case, and a wait longer

@@ -49,6 +49,7 @@ Usage:
 """
 from contextlib import contextmanager
 import contextlib
+import fcntl
 import glob
 import io
 import json
@@ -337,6 +338,28 @@ class CardRefreshTest(unittest.TestCase):
                     finally:
                         watch.lock.close()
 
+    def test_every_card_post_happens_while_the_source_binding_is_held(self):
+        # An unbind takes the binding folder exclusive: while a card post is under way it must be blocked.
+        with self.fixture() as (watch, replay, rows):
+            directory = watch.root.parent / 'decision-bindings'
+            directory.mkdir()
+            blocked, real = [], replay.call
+
+            def spy(method, **fields):
+                if method in ('chat.postMessage', 'chat.update'):
+                    fd = os.open(directory, os.O_RDONLY)
+                    try:
+                        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        blocked.append(False)
+                    except BlockingIOError:
+                        blocked.append(True)
+                    finally:
+                        os.close(fd)
+                return real(method, **fields)
+            with patch.object(replay, 'call', spy):
+                watch.mirror()
+            self.assertEqual(blocked, [True, True])
+
     def test_live_scopes_that_differ_from_armed_scopes_do_not_change_cards(self):
         full = ['reactions:read', 'users:read']
         for armed, live in ((full, set()), ((), set(full))):
@@ -443,6 +466,29 @@ class ReplayShapeTest(unittest.TestCase):
         transcript.write_text(json.dumps({'schema': 'fm-slack-replay.v1', 'messages': list(messages), **(extra or {})}))
         return Replay(transcript, Path(directory) / 'slack-watch')
 
+    POPULATION = ('auth.test', 'chat.postMessage', 'chat.update', 'conversations.open', 'conversations.history',
+                  'conversations.replies', 'reactions.get', 'reactions.add', 'users.info')
+
+    def test_a_post_attempt_records_its_thread_before_it_is_judged(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as directory:
+            replay = self.replay(directory, {'failures': {'chat.postMessage': {'status': 400}}})
+            with self.assertRaises(SlackError):
+                replay.call('chat.postMessage', channel='D0123456789', text='x', thread_ts='10.000001')
+            attempts = [json.loads(line) for line in (Path(directory) / 'slack-watch' / 'attempts.jsonl').read_text().splitlines()]
+            self.assertEqual((attempts[-1]['method'], attempts[-1]['thread_ts']), ('chat.postMessage', '10.000001'))
+
+    def test_the_method_allowlist_and_the_scope_rule_fail_separately(self):
+        scopes = ['chat:write', 'im:write', 'im:history', 'reactions:read', 'reactions:write', 'users:read']
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as directory:
+            replay = self.replay(directory, {'enforce_scopes': True, 'scopes': scopes[1:], 'method_allowlist': list(self.POPULATION)})
+            with self.assertRaisesRegex(SlackError, '^method_not_allowed$'):
+                replay.call('files.list', channel='D0123456789')
+            with self.assertRaisesRegex(SlackError, '^missing_scope$'):
+                replay.call('chat.postMessage', channel='D0123456789', text='x')
+            self.assertEqual(replay.call('users.info', user='U0TESTOWNER')['user']['id'], 'U0TESTOWNER')
+            methods = [json.loads(line)['method'] for line in (Path(directory) / 'slack-watch' / 'attempts.jsonl').read_text().splitlines()]
+            self.assertEqual(methods, ['files.list', 'chat.postMessage', 'users.info'])
+
     def test_history_lists_roots_and_broadcasts_but_not_ordinary_replies(self):
         thread = [{'ts': '10.000001', 'user': 'U0TESTOWNER', 'text': 'root'},
                   {'ts': '10.000002', 'user': 'U0TESTOWNER', 'text': 'reply', 'thread_ts': '10.000001'},
@@ -516,19 +562,24 @@ class IntakeTest(unittest.TestCase):
     """New top-level owner messages: what is taken in, in what order, and what carries no authority."""
 
     OWNER = 'U0TESTOWNER'
+    OTHER = 'U0OTHERALLOWED'
+    # Synthetic values: the plane's own secrets in these tests are never real credentials.
+    TOKEN = 'fixture-token-not-a-secret'
+    SIGNING = 'fixture-signing-not-a-secret'
 
     @contextmanager
-    def fixture(self, cap='20', scopes=('chat:write', 'im:write', 'im:history')):
+    def fixture(self, cap='20', scopes=('chat:write', 'im:write', 'im:history'), authors=None, env=None, transcript_extra=None):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as directory:
             home = Path(directory)
             transcript = home / 'transcript.json'
             transcript.write_text(json.dumps({
                 'schema': 'fm-slack-replay.v1', 'team': 'T0123456789', 'channel': 'D0123456789',
                 'scopes': list(scopes), 'enforce_scopes': True,
-                'messages': [{'ts': '100.000100', 'user': self.OWNER, 'text': 'already there'}]}))
+                'messages': [{'ts': '100.000100', 'user': self.OWNER, 'text': 'already there'}],
+                **(transcript_extra or {})}))
             env = {'FM_HOME': directory, 'FM_STATE_OVERRIDE': directory, 'FM_SLACK_DM_USER': self.OWNER,
-                   'FM_SLACK_ALLOWED_AUTHORS': self.OWNER, 'FM_SLACK_POLL_MAX_ANSWERS': cap,
-                   'SLACK_BOT_TOKEN': 'fixture-token-not-a-secret'}
+                   'FM_SLACK_ALLOWED_AUTHORS': authors or self.OWNER, 'FM_SLACK_POLL_MAX_ANSWERS': cap,
+                   'SLACK_BOT_TOKEN': self.TOKEN, 'SLACK_SIGNING_SECRET': self.SIGNING, **(env or {})}
             with patch.dict(os.environ, env):
                 replay = Replay(transcript, home / 'slack-watch')
                 watch = Watch(replay=replay)
@@ -1227,6 +1278,209 @@ class IntakeTest(unittest.TestCase):
             self.assertEqual((self.acks(replay), self.wakes(watch), watch.state['pending']), ([], [], []))
 
 
+    # ---- the outcome review's findings (OF1..OF6): each of these failed at the head they were written against ----
+
+    def wake_parts(self, line):
+        """The grammar of one request segment: prefix, label, ONE JSON string literal, then the optional flag, the
+        pointer and the queue marker, each behind '; '."""
+        match = re.match(r'check: slack request (\d+\.\d+) from (U[A-Z0-9]+)( \(not acknowledged after 3 tries\))?: '
+                         + re.escape(plane.REQUEST_LABEL) + ' ', line)
+        self.assertIsNotNone(match, line)
+        rest = line[match.end():]
+        text, end = json.JSONDecoder().raw_decode(rest)
+        tail = [part for part in rest[end:].split('; ') if part]
+        return {'ts': match.group(1), 'user': match.group(2), 'released': bool(match.group(3)), 'text': text,
+                'flag': 'secret removed' in tail,
+                'pointer': next((p[len('full: '):] for p in tail if p.startswith('full: ')), None),
+                'queued': next((p for p in tail if p.startswith('+')), None)}
+
+    def record(self, watch, ts):
+        """The whole-text record of one request, found as the pointer says: the store's path, then the request's key."""
+        path = watch.root / 'requests.jsonl'
+        rows = [json.loads(line) for line in path.read_text().splitlines() if line] if path.is_file() else []
+        found = [row for row in rows if row['ts'] == ts]
+        return found[-1] if found else None
+
+    def test_an_allowlisted_non_owner_is_not_taken_in_as_an_owner_request(self):
+        with self.fixture(authors='%s,%s' % (self.OWNER, self.OTHER)) as (watch, replay):
+            self.say(replay, '200.000100', 'from a second allowlisted member', user=self.OTHER)
+            self.say(replay, '200.000200', 'the owner control')
+            for _ in range(2):
+                watch.advanced = 0
+                watch.poll()
+                watch.state = watch.load_state()
+            self.assertEqual(self.acks(replay), ['200.000200'])
+            self.assertEqual([line.split()[3] for line in self.wakes(watch)], ['200.000200'])
+            saved = watch.load_state()
+            self.assertEqual(saved['pending'], [])
+            self.assertEqual([event for event in saved['seen'] if '200.000100' in event], [])
+
+    def test_the_planes_own_secret_values_never_reach_state_output_or_the_record(self):
+        cases = (('the token', {}, self.TOKEN, 'use ' + 'fixture-token-not-a-secret' + ' to check'),
+                 ('the signing secret', {}, self.SIGNING, 'use ' + 'fixture-signing-not-a-secret' + ' to check'),
+                 ('a value that only the presentation joins', {'SLACK_BOT_TOKEN': 'fixture&token-not-a-secret'},
+                  'fixture&token-not-a-secret', 'use fixture&amp;token-not-a-secret to check'))
+        for name, env, secret, delivered in cases:
+            with self.subTest(name), self.fixture(env=env) as (watch, replay):
+                writes, real = [], plane.save
+
+                def spy(path, value):
+                    writes.append(json.dumps(value, ensure_ascii=False))
+                    return real(path, value)
+                self.say(replay, '200.000100', delivered)
+                out = io.StringIO()
+                with patch.object(plane, 'save', spy), contextlib.redirect_stdout(out):
+                    watch.poll()
+                    plane.emit(watch, 'check')
+                store = watch.root / 'requests.jsonl'
+                scanned = writes + [out.getvalue(), json.dumps(replay.state['log']), (watch.root / 'state.json').read_text(),
+                                    store.read_text() if store.is_file() else '', json.dumps(watch.output)]
+                for text in scanned:
+                    self.assertNotIn(secret, text)
+                [line] = [l for l in out.getvalue().splitlines() if l.startswith(plane.REQUEST_PREFIX)]
+                parts = self.wake_parts(line)
+                self.assertEqual((parts['text'], parts['flag']), ('use [secret removed] to check', True))
+                record = self.record(watch, '200.000100')
+                self.assertEqual((record['text'], record['replaced']), ('use [secret removed] to check', True))
+
+    def test_a_stop_right_after_staging_leaves_no_secret_in_the_journal(self):
+        with self.fixture() as (watch, replay):
+            self.say(replay, '200.000100', 'use fixture-signing-not-a-secret to check')
+            with patch.dict(os.environ, {'FM_SLACK_FAULT': 'after-stage'}), self.assertRaises(RuntimeError):
+                watch.poll()
+            self.assertNotIn(self.SIGNING, (watch.root / 'state.json').read_text())
+            self.assertEqual([row['thread'] for row in watch.load_state()['pending']], ['200.000100'])
+
+    def test_a_request_line_is_one_json_literal_with_nothing_dropped(self):
+        cases = (
+            ('please check the status of vernant d7', 'please check the status of vernant d7'),
+            ('alpha  beta; +1 queued <https://example.com|label>', 'alpha  beta; +1 queued label (https://example.com)'),
+            ('<https://example.com>', 'https://example.com'),
+            ('<https://example.com|https://example.com>', 'https://example.com'),
+            ('<mailto:a@example.com|mail me>', 'mail me (mailto:a@example.com)'),
+            ('line one\nline two', 'line one line two'),
+            ('tab\tsep para end\r\nnext', 'tab sep para end  next'),
+            ('check: a line that starts like a wake', 'check: a line that starts like a wake'),
+            ('say "hi" \\ back; full: x &lt;b&gt; &amp; <@U0TESTOWNER> <#C123|general>',
+             'say "hi" \\ back; full: x <b> & <@U0TESTOWNER> <#C123|general>'),
+            ('café ☃', 'café ☃'))
+        for delivered, presented in cases:
+            with self.subTest(delivered=delivered), self.fixture() as (watch, replay):
+                self.say(replay, '200.000100', delivered)
+                watch.poll()
+                [line] = self.wakes(watch)
+                parts = self.wake_parts(line)
+                self.assertEqual((parts['text'], parts['flag'], parts['pointer'], parts['released']),
+                                 (presented, False, None, False))
+                self.assertTrue(all(ch == ' ' or unicodedata.category(ch)[0] not in 'CZ' for ch in line))
+                self.assertLessEqual(len(line), plane.WAKE_LIMIT)
+
+    def test_a_cut_request_is_the_longest_prefix_and_names_a_record_that_holds_the_whole_text(self):
+        wholes = ('x' * 1200, 'y' * 400, ('café \n check: x; ' * 80)[:700])
+        for whole in wholes:
+            with self.subTest(length=len(whole)), self.fixture() as (watch, replay):
+                self.say(replay, '200.000100', whole)
+                watch.poll()
+                [line] = self.wakes(watch)
+                parts = self.wake_parts(line)
+                presented = ''.join(' ' if unicodedata.category(ch)[0] in 'CZ' else ch for ch in whole)
+                self.assertTrue(presented.startswith(parts['text']) and len(parts['text']) < len(presented))
+                self.assertEqual(parts['pointer'], 'state/slack-watch/requests.jsonl#200.000100')
+                # The longest prefix that fits: one more character would not.
+                longer = json.dumps(presented[:len(parts['text']) + 1], ensure_ascii=False)
+                self.assertGreater(len(line) - len(json.dumps(parts['text'], ensure_ascii=False)) + len(longer),
+                                   plane.WAKE_LIMIT)
+                self.assertLessEqual(len(line), plane.WAKE_LIMIT)
+                self.assertEqual(self.record(watch, '200.000100')['text'], whole)
+                # Still whole after the journal row closed, a further poll and a fresh process.
+                self.assertEqual(watch.load_state()['pending'], [])
+                watch.state, watch.advanced = watch.load_state(), 0
+                watch.poll()
+                self.assertEqual(self.record(watch, '200.000100')['text'], whole)
+
+    def test_a_failed_request_keeps_its_whole_permitted_text_and_its_record_survives_resolve(self):
+        text = 'hello; line\nsecond ' + 'z' * 600
+        with self.fixture() as (watch, replay):
+            self.say(replay, '200.000100', text)
+            replay.state['failures']['conversations.replies:200.000100'] = {'status': 400}
+            replay.save()
+            self.polls(watch, replay, 3)
+            [row] = watch.load_state()['pending']
+            self.assertEqual((row['state'], row['text']), ('failed', text))
+            [line] = self.wakes(watch)
+            parts = self.wake_parts(line)
+            self.assertTrue(parts['released'])
+            self.assertEqual(parts['pointer'], 'state/slack-watch/requests.jsonl#200.000100')
+            self.assertEqual(self.record(watch, '200.000100')['text'], text)
+            watch.close_request('200.000100')
+            self.assertEqual(self.record(watch, '200.000100')['text'], text)
+
+    def test_a_request_whose_record_cannot_be_written_prints_no_line_and_stays_journaled(self):
+        with self.fixture() as (watch, replay):
+            (watch.root / 'requests.jsonl').mkdir()
+            self.say(replay, '200.000100', 'y' * 600)
+            with self.assertRaises(SlackError):
+                watch.poll()
+            self.assertEqual(self.wakes(watch), [])
+            self.assertEqual([row['thread'] for row in watch.load_state()['pending']], ['200.000100'])
+            (watch.root / 'requests.jsonl').rmdir()
+            watch.state, watch.advanced = watch.load_state(), 0
+            watch.poll()
+            [line] = self.wakes(watch)
+            self.assertEqual(self.wake_parts(line)['pointer'], 'state/slack-watch/requests.jsonl#200.000100')
+            self.assertEqual(self.record(watch, '200.000100')['text'], 'y' * 600)
+            self.assertEqual(self.acks(replay), ['200.000100'])
+
+    def test_a_joined_check_line_cuts_a_request_before_encoding_so_the_queue_marker_fits(self):
+        with self.fixture(cap='2') as (watch, replay):
+            self.say(replay, '200.000100', 'a' * 700)
+            self.say(replay, '200.000200', 'b' * 700)
+            watch.poll()
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                plane.emit(watch, 'check')
+            [line] = out.getvalue().splitlines()
+            self.assertEqual(len(line), plane.WAKE_LIMIT)
+            self.assertTrue(line.endswith('; +1 queued'))
+            parts = self.wake_parts(line[:-len('; +1 queued')])
+            self.assertEqual((parts['ts'], parts['pointer']), ('200.000100', 'state/slack-watch/requests.jsonl#200.000100'))
+            self.assertTrue(set(parts['text']) == {'a'} and 0 < len(parts['text']) < 700)
+            self.assertEqual([row['ts'] for row in map(json.loads, (watch.root / 'requests.jsonl').read_text().splitlines())],
+                             ['200.000100', '200.000200'])
+
+    def test_the_intake_needs_no_scope_or_method_outside_the_base_card_population(self):
+        scopes = ('chat:write', 'im:write', 'im:history', 'reactions:read', 'reactions:write', 'users:read')
+        with self.fixture(scopes=scopes, transcript_extra={'method_allowlist': list(ReplayShapeTest.POPULATION)}) as (watch, replay):
+            self.say(replay, '200.000100', 'a request under the base card path population')
+            watch.poll()
+            self.assertEqual((self.acks(replay), len(self.wakes(watch))), (['200.000100'], 1))
+            attempts = [json.loads(line)['method'] for line in (watch.root / 'attempts.jsonl').read_text().splitlines()]
+            self.assertTrue(set(attempts) <= set(ReplayShapeTest.POPULATION), attempts)
+
+    def notice(self, event, thread):
+        return {'event': event, 'key': 'k-' + event, 'thread': thread, 'text': 'A notice', 'kind': 'notice',
+                'line': 'check: slack %s - a notice' % thread, 'stage': 'notice', 'contributing': []}
+
+    def test_a_resumed_notice_and_a_new_request_share_the_cap(self):
+        with self.fixture(cap='1') as (watch, replay):
+            watch.state['pending'].append(self.notice('test/notice/1', '100.000100'))
+            watch.commit()
+            self.say(replay, '200.000100', 'a new request')
+            watch.poll()
+            self.assertEqual(len(self.acks(replay)), 1)
+            watch.state, watch.advanced = watch.load_state(), 0
+            watch.poll()
+            self.assertEqual(self.acks(replay), ['100.000100', '200.000100'])
+
+    def test_notices_themselves_are_not_throttled_by_the_cap_as_on_base(self):
+        with self.fixture(cap='1') as (watch, replay):
+            watch.state['pending'].append(self.notice('test/notice/1', '100.000100'))
+            watch.state['pending'].append(self.notice('test/notice/2', '100.000200'))
+            watch.commit()
+            watch.poll()
+            self.assertEqual(self.acks(replay), ['100.000100', '100.000200'])
+
+
 class ClosedTransportTest(unittest.TestCase):
     """A test or verification run cannot reach Slack: it runs on a transcript, or its transport is closed."""
 
@@ -1247,6 +1501,21 @@ class ClosedTransportTest(unittest.TestCase):
                             call()
             finally:
                 watch.lock.close()
+
+
+    def test_a_set_but_empty_network_value_also_closes_the_real_transport(self):
+        for value in ('', '0', '1'):
+            with self.subTest(value=value), tempfile.TemporaryDirectory(dir=Path.cwd()) as directory, \
+                 patch.dict(os.environ, dict(self.ENV, FM_HOME=directory, FM_STATE_OVERRIDE=directory,
+                                             FM_SLACK_NO_NETWORK=value)), \
+                 patch('fm_slack.urllib.request.urlopen', side_effect=AssertionError('a socket was opened')):
+                watch = Watch(token='fixture-token-not-a-secret')
+                try:
+                    with patch.object(watch, 'bound', return_value=True):
+                        with self.assertRaisesRegex(SlackError, '^network_closed$'):
+                            watch.api.call('auth.test')
+                finally:
+                    watch.lock.close()
 
 
 def history_attempts(path):

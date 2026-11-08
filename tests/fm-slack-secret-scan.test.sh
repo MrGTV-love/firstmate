@@ -15,7 +15,8 @@ command -v tasks-axi >/dev/null || { printf 'skip: tasks-axi not found\n'; exit 
 cd "$ROOT"
 TMP=$(fm_test_tmproot fm-slack-secret-scan)
 FIX="$ROOT/tests/fixtures/slack"
-SECRET=${FM_SLACK_TEST_SECRET:-"fixture-secret-$(date +%s)-$$"}
+# The token holds an ampersand so that a request can deliver it as an entity the presentation decodes.
+SECRET=${FM_SLACK_TEST_SECRET:-"fixture&secret-$(date +%s)-$$"}
 SIGNING=${FM_SLACK_TEST_SIGNING:-"fixture-signing-$(date +%s)-$$"}
 HELPER="$ROOT/tests/fm_slack_watch_test.py"
 planted="$ROOT/tests/.fm-slack-secret-planted"
@@ -49,6 +50,18 @@ run_plane "${HOMES[2]}" request-poll "$ROOT/bin/fm-slack-poll.sh" --replay "$INT
 python3 "$HELPER" owner-message "$replay" 2000.000200 U0TESTOWNER 'a second request, taken in by the standing check'
 run_plane "${HOMES[2]}" request-check "$ROOT/bin/fm-slack-check.sh" check --replay "$INTAKE"
 
+# Requests that hold the plane's own values: the token, the signing secret, and the token as an entity that the
+# presentation decodes. Slack keeps what the owner typed (the replay state stands in for Slack and is not scanned);
+# the plane's state, outputs and records must hold the marker instead.
+joined=$(python3 -c 'import sys; print(sys.argv[1].replace("&", "&amp;"))' "$SECRET")
+python3 "$HELPER" owner-message "$replay" 2000.000300 U0TESTOWNER "a request that holds $SECRET"
+python3 "$HELPER" owner-message "$replay" 2000.000400 U0TESTOWNER "a request that holds $SIGNING"
+python3 "$HELPER" owner-message "$replay" 2000.000500 U0TESTOWNER "a request whose entity joins it: $joined"
+run_plane "${HOMES[2]}" request-secrets "$ROOT/bin/fm-slack-poll.sh" --replay "$INTAKE"
+for ts in 2000.000300 2000.000400 2000.000500; do
+  grep -q "^check: slack request $ts .*secret removed" "${HOMES[2]}/data/captured/request-secrets.out" || fail "the request $ts did not carry the marker and its flag"
+done
+
 # The scan is only meaningful if the plane really ran with the token.
 [ -s "${HOMES[0]}/state/slack-watch/state.json" ] || fail "the plane left no state to scan"
 [ -s "${HOMES[0]}/state/slack-watch/outbound.jsonl" ] || fail "the mirror posted nothing"
@@ -56,7 +69,7 @@ grep -q '^armed: ' "${HOMES[0]}/data/captured/arm.out" || fail "the arm did not 
 grep -q 'transport failure' "${HOMES[1]}/data/captured/poll.out" || fail "the failure path did not run"
 grep -q '^check: slack request 2000.000100 ' "${HOMES[2]}/data/captured/request-poll.out" || fail "the intake poll did not take the request in"
 grep -q '^check: slack request 2000.000200 ' "${HOMES[2]}/data/captured/request-check.out" || fail "the intake check did not take the request in"
-[ "$(grep -c '"method": "chat.postMessage"' "${HOMES[2]}/state/slack-watch/outbound.jsonl")" = 2 ] || fail "the intake did not acknowledge both requests"
+[ "$(grep -c '"method": "chat.postMessage"' "${HOMES[2]}/state/slack-watch/outbound.jsonl")" = 5 ] || fail "the intake did not acknowledge all five requests"
 
 scan() {  # <output-file>; prints matches=N
   FM_SLACK_SCAN_SECRET="$SECRET" FM_SLACK_SCAN_SIGNING="$SIGNING" python3 - "$1" "${HOMES[@]}" <<'PY'
@@ -74,6 +87,8 @@ for raw in paths:
     if not raw:
         continue
     path = raw.decode(errors='replace')
+    if os.path.basename(path).startswith('replay-state-'):
+        continue  # the fixture stand-in for Slack, which keeps what the owner typed
     if os.path.isfile(path) and any(needle in open(path, 'rb').read() for needle in needles):
         matches.append(path)
 with open(out, 'w') as handle:
