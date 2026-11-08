@@ -395,6 +395,36 @@ test_the_wake_names_the_oldest_five_live_copies_and_points_at_the_report() {
   pass 'the wake carries the count, the oldest five live copies and a pointer to the report, as one line'
 }
 
+# `printf "$record" | grep -q` breaks the pipe whenever grep exits before printf has
+# written the whole record: grep -q stops at its first match, and a parent that ignores
+# SIGPIPE (a Python watcher can) makes bash print "printf: write error: Broken pipe" on
+# stderr, which check puts into the wake text. A stub grep that exits at once, a record
+# far larger than any pipe buffer, and an ignored SIGPIPE make that deterministic.
+test_a_record_lookup_never_breaks_a_pipe_when_grep_exits_early() {
+  local real_grep
+  real_grep=$(command -v grep)
+  make_world pipe-early
+  add_copy a1
+  fm_write_meta "$HOMED/state/outer-task.meta" "worktree=$SLOT" "kind=ship"
+  printf 'default-pool off\ndefault-container off\ninterval 0\n' > "$HOMED/config/copy-budget"
+  run_sweep check
+  [ "$RC" = 0 ] || fail "the first check failed: $OUT"
+  [ -f "$HOMED/state/copy-sweep.record" ] || fail "the first check wrote no record"
+  awk 'BEGIN { for (i = 0; i < 60000; i++) printf "live\t/record/padding/%d\n", i }' >> "$HOMED/state/copy-sweep.record"
+  [ "$(wc -c < "$HOMED/state/copy-sweep.record")" -gt 1000000 ] || fail "the record is not larger than a pipe buffer"
+  cat > "$FAKEBIN/grep" <<EOF
+#!/usr/bin/env bash
+case " \$* " in *" -qxF "*) exit 0 ;; esac
+exec "$real_grep" "\$@"
+EOF
+  chmod +x "$FAKEBIN/grep"
+  RC=0
+  OUT=$( ( trap '' PIPE; sweep_cmd check ) 2>&1) || RC=$?
+  assert_not_contains "$OUT" 'write error' 'a record lookup wrote into a pipe its reader had closed'
+  assert_not_contains "$OUT" 'Broken pipe' 'a record lookup broke its pipe'
+  pass 'a record lookup does not write into a pipe, so a reader that exits early cannot break it'
+}
+
 test_a_new_youngest_copy_is_named_first_and_the_wake_stays_bounded() {
   local i
   make_world live-new-first
@@ -3065,6 +3095,7 @@ test_live_nested_copies_are_named_once_with_age_and_left_untouched
 test_a_lock_probe_cut_by_the_time_bound_reads_unknown_never_directory
 test_a_registered_copy_whose_directory_is_gone_is_not_named_live
 test_the_wake_names_the_oldest_five_live_copies_and_points_at_the_report
+test_a_record_lookup_never_breaks_a_pipe_when_grep_exits_early
 test_a_new_youngest_copy_is_named_first_and_the_wake_stays_bounded
 test_closed_task_and_secondmate_home_do_not_raise_live_nested_fact
 test_unreadable_registration_is_reported_without_walking_for_copies

@@ -1935,7 +1935,7 @@ evaluate_budgets() {
       case "$status" in
         over)
           OVER_NOW="$OVER_NOW$kind:$key"$'\n'
-          if ! printf '%s' "$REC_OVER" | grep -qxF "$kind:$key"; then
+          if ! grep -qxF "$kind:$key" <<< "$REC_OVER"; then
             text="$kind $key is over its budget: $(kib_to_gib "$total") GiB against $gib GiB; largest copies: $(largest_five "$field" "$key")"
             [ "$unknown" -eq 0 ] || text="$text; $unknown copies unmeasured"
             WAKE_PARTS="${WAKE_PARTS:+$WAKE_PARTS; }$text"
@@ -1976,7 +1976,7 @@ evaluate_skip() {  # <now>
   fi
   [ "$SKIP_RUNS_NOW" -ge "$SKIP_WAKE_RUNS" ] || return 0
   OVER_NOW="${OVER_NOW}skip:load"$'\n'
-  ! printf '%s' "$REC_OVER" | grep -qxF skip:load || return 0
+  ! grep -qxF skip:load <<< "$REC_OVER" || return 0
   WAKE_PARTS="${WAKE_PARTS:+$WAKE_PARTS; }$SKIP_LINE on $SKIP_RUNS_NOW runs in a row"
 }
 
@@ -1992,7 +1992,7 @@ evaluate_live_fact() {
   fi
   while IFS= read -r path; do
     [ -n "$path" ] || continue
-    printf '%s' "$REC_LIVE" | grep -qxF "$path" && continue
+    grep -qxF "$path" <<< "$REC_LIVE" && continue
     LIVE_NESTED_FACT_NEW=1
     return 0
   done <<< "$LIVE_RECORD_NEW"
@@ -2057,8 +2057,8 @@ write_record() {  # <last-scan> <error>
   done <<< "$OVER_NOW"
   while IFS= read -r key; do
     case "$key" in pool:*|container:*) ;; *) continue ;; esac
-    printf '%s' "$OVER_NOW" | grep -qxF "$key" && continue
-    if [ "$SCAN_CUT" = 1 ] || printf '%s' "$UNKNOWN_NOW" | grep -qxF "$key"; then
+    grep -qxF "$key" <<< "$OVER_NOW" && continue
+    if [ "$SCAN_CUT" = 1 ] || grep -qxF "$key" <<< "$UNKNOWN_NOW"; then
       content="$content"$'over\t'"$key"$'\n'
     fi
   done <<< "$REC_OVER"
