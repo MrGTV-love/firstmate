@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Slack decision plane regressions DOD-01..DOD-17, S1..S3, X1..X49, INTAKE-1..INTAKE-8 (INTAKE-8 only with FM_SLACK_GRADER_RUN).
+# Slack decision plane regressions DOD-01..DOD-17, S1..S3, X1..X49, INTAKE-1..INTAKE-10 (INTAKE-8, the two DOD-17 registered-file runs and the deadline suite only with FM_SLACK_GRADER_RUN).
 # Every Slack call is a checked-in replay transcript; no socket is opened. FM_SLACK_NO_NETWORK closes the real
 # transport for the whole suite, so a scenario that forgot its replay fails with network_closed instead of reaching Slack.
 set -euo pipefail
@@ -10,6 +10,8 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 command -v tasks-axi >/dev/null || { printf 'skip: tasks-axi not found\n'; exit 0; }
 TMP=$(fm_test_tmproot fm-slack-watch)
 FIX="$ROOT/tests/fixtures/slack"
+# shellcheck source=tests/fixtures/slack/registered-gate.sh
+. "$FIX/registered-gate.sh"
 CAPTAIN="$ROOT/bin/fm-captain-hold.sh"
 
 assert_eq() { [ "$1" = "$2" ] || fail "$3: expected [$2], got [$1]"; }
@@ -24,9 +26,9 @@ assert_closed() {
   [ "$rc" = "${2:-1}" ] || fail "$3: open $1 rc=$rc"
 }
 
-new_home() {  # <scenario>
+new_home() {  # <scenario> [per-poll cap that the fixture home's configuration file carries]
   HOME_DIR=$(mktemp -d "$TMP/home.XXXXXX")
-  bash "$FIX/make-home.sh" "$1" "$HOME_DIR" >/dev/null
+  bash "$FIX/make-home.sh" "$1" "$HOME_DIR" ${2:+"$2"} >/dev/null
   export FM_HOME="$HOME_DIR" FM_STATE_OVERRIDE="$HOME_DIR/state" \
     FM_DATA_OVERRIDE="$HOME_DIR/data" FM_CONFIG_OVERRIDE="$HOME_DIR/config"
 }
@@ -431,16 +433,21 @@ bind
 "$ROOT/bin/fm-slack-check.sh" arm --replay "$FIX/arming/arm.json" >/dev/null
 [ -f "$FM_STATE_OVERRIDE/slack.check.sh" ] && [ -f "$FM_STATE_OVERRIDE/slack.check-trust" ] \
   || fail "DOD-17 arm did not register"
-set +e
-out=$(SLACK_BOT_TOKEN='' "$FM_STATE_OVERRIDE/slack.check.sh" 2>&1); rc=$?
-set -e
-assert_eq "$rc" 0 "DOD-17 the armed shim exits cleanly when Slack is off"
-assert_eq "$out" "" "DOD-17 the armed shim is silent when Slack is off"
-set +e
-out=$(FM_SLACK_ALLOWED_AUTHORS='' "$FM_STATE_OVERRIDE/slack.check.sh" 2>&1); rc=$?
-set -e
-assert_eq "$rc" 0 "DOD-17 the armed shim exits cleanly with an empty allowlist"
-assert_eq "$out" "" "DOD-17 the armed shim is silent with an empty allowlist"
+# The two runs of the registered check file below are reserved to Main and the grader (Main 2180).
+if fm_slack_registered_allowed "DOD-17 [token empty]"; then
+  set +e
+  out=$(SLACK_BOT_TOKEN='' "$FM_STATE_OVERRIDE/slack.check.sh" 2>&1); rc=$?
+  set -e
+  assert_eq "$rc" 0 "DOD-17 the armed shim exits cleanly when Slack is off"
+  assert_eq "$out" "" "DOD-17 the armed shim is silent when Slack is off"
+fi
+if fm_slack_registered_allowed "DOD-17 [allowlist empty]"; then
+  set +e
+  out=$(FM_SLACK_ALLOWED_AUTHORS='' "$FM_STATE_OVERRIDE/slack.check.sh" 2>&1); rc=$?
+  set -e
+  assert_eq "$rc" 0 "DOD-17 the armed shim exits cleanly with an empty allowlist"
+  assert_eq "$out" "" "DOD-17 the armed shim is silent with an empty allowlist"
+fi
 python3 -I -c 'import json, sys; d = json.load(open(sys.argv[1])); d["action"] = "disarm"; json.dump(d, open(sys.argv[2], "w"))' \
   "$FIX/arming/arm.json" "$TMP/action-key.json"
 "$ROOT/bin/fm-slack-check.sh" --replay "$TMP/action-key.json" >/dev/null
@@ -1744,7 +1751,7 @@ printf 'ok - X49\n'
 # fails with missing_scope, as it would in Slack, and a method outside the base card path's population fails by the
 # transcript's method allowlist. Replay evidence, no socket.
 INTAKE="$FIX/intake/transcript.json"
-intake_home() { new_home intake; bind; "$ROOT/bin/fm-slack-check.sh" arm --replay "$INTAKE" >/dev/null; }
+intake_home() { new_home intake ${1:+"$1"}; bind; "$ROOT/bin/fm-slack-check.sh" arm --replay "$INTAKE" >/dev/null; }
 ipoll() { "$ROOT/bin/fm-slack-poll.sh" --replay "$INTAKE"; }
 ienv() { env "$@" "$ROOT/bin/fm-slack-poll.sh" --replay "$INTAKE"; }
 icheck() { "$ROOT/bin/fm-slack-check.sh" check --replay "$INTAKE"; }
@@ -2484,9 +2491,7 @@ printf 'ok - INTAKE-7\n'
 # so the suite closes the real transport with FM_SLACK_NO_NETWORK, and that run cannot reach Slack.
 # Only Main or the grader runs the registered check: they set FM_SLACK_GRADER_RUN. A worker's run of this suite skips
 # it, because the registered check file is a run that the worker's gates reserve to them.
-if [ -z "${FM_SLACK_GRADER_RUN:-}" ]; then
-  printf 'skip - INTAKE-8 (a worker run does not run the registered check; Main or the grader sets FM_SLACK_GRADER_RUN)\n'
-else
+if fm_slack_registered_allowed "INTAKE-8"; then
   intake_home
   say_owner 2000.000100 'a request that must not reach Slack'
   REGISTERED="$FM_STATE_OVERRIDE/slack.check.sh"
@@ -2497,5 +2502,59 @@ else
   assert_eq "$(outbound_count chat.postMessage)" 0 "INTAKE-8 a run without a transcript posted"
   printf 'ok - INTAKE-8\n'
 fi
+
+# INTAKE-9: the per-poll budget is one budget for notices and requests, and its value is the file's value or the
+# environment's value over the file. The probe needs no long wait, so it works at any history page limit: with a cap
+# of n, n-1 staged notices leave room for the one new request in the first poll, and n staged notices defer it by one.
+unset FM_SLACK_POLL_MAX_ANSWERS
+budget_probe() {  # <label> <cap in the fixture file> <cap in the environment, or -> <staged notices> <acknowledged by the first poll: 1|0>
+  local label=$1 file=$2 envcap=$3 notices=$4 expect=$5 i pass out all=''
+  intake_home "$file"
+  say_owner 2000.000100 'one new request'
+  for ((i = 1; i <= notices; i++)); do
+    python3 "$HELPER" stage-notice "$(state_file)" "900.00000$i" "budget-$i" 10
+  done
+  for pass in 1 2 3; do
+    if [ "$envcap" = - ]; then
+      out=$(icheck)
+    else
+      out=$(env FM_SLACK_POLL_MAX_ANSWERS="$envcap" "$ROOT/bin/fm-slack-check.sh" check --replay "$INTAKE")
+    fi
+    all="$all$out"$'\n'
+    if [ "$pass" = 1 ]; then
+      assert_eq "$(posts_in 2000.000100)" "$expect" "INTAKE-9 [$label] the request's acknowledgement after the first poll"
+    fi
+  done
+  assert_eq "$(posts_in 2000.000100)" 1 "INTAKE-9 [$label] the request's acknowledgements after three polls"
+  assert_eq "$(printf '%s' "$all" | grep -c 'check: slack request 2000.000100 ')" 1 "INTAKE-9 [$label] wake lines of the request"
+}
+budget_probe 'file only, one below the cap' 5 - 4 1
+budget_probe 'file only, at the cap' 5 - 5 0
+budget_probe 'environment 2 over file 5, one below the cap' 5 2 1 1
+budget_probe 'environment 2 over file 5, at the cap' 5 2 2 0
+budget_probe 'environment 7 over file 5, one below the cap' 5 7 6 1
+budget_probe 'environment 7 over file 5, at the cap' 5 7 7 0
+printf 'ok - INTAKE-9\n'
+
+# INTAKE-10: a request whose whole text cannot be kept is not woken and stays journaled, and the failure reaches Main
+# once per failure episode on the plane's own failure line (stdout, as every other failure does); the record is
+# written and the request woken once the place is writable again.
+intake_home
+say_owner 2000.000100 "$(python3 -c 'print("y" * 700)')"
+store="$FM_STATE_OVERRIDE/slack-watch/requests.jsonl"
+mkdir "$store"
+out=$(icheck 2>"$TMP/i10.err")
+assert_eq "$(request_count "$out")" 0 "INTAKE-10 a request line was printed while its record could not be written"
+assert_eq "$(printf '%s\n' "$out" | grep -c 'request_record_unwritable' || true)" 1 "INTAKE-10 the failure was not reported once on stdout"
+assert_eq "$(python3 "$HELPER" pending-count "$(state_file)")" 1 "INTAKE-10 the request left the journal"
+out=$(icheck 2>>"$TMP/i10.err")
+assert_eq "$(printf '%s\n' "$out" | grep -c 'request_record_unwritable' || true)" 0 "INTAKE-10 the same episode was reported again"
+rmdir "$store"
+out=$(icheck)
+assert_eq "$(request_count "$out")" 1 "INTAKE-10 the request was not woken after the place became writable"
+assert_contains "$out" '; full: state/slack-watch/requests.jsonl#2000.000100' "INTAKE-10 the line does not name its record"
+assert_eq "$(grep -c '"ts": "2000.000100"' "$store")" 1 "INTAKE-10 the record is not in the store"
+assert_eq "$(posts_in 2000.000100)" 1 "INTAKE-10 acknowledgements"
+printf 'ok - INTAKE-10\n'
 
 printf 'ok - all Slack watch checks\n'

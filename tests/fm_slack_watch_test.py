@@ -55,7 +55,9 @@ import glob
 import io
 import json
 import os
+import random
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -71,6 +73,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'bin'))
 import fm_slack_watch as plane
 from fm_slack_watch import CARD_LIMIT, SlackError, Watch
 from fm_slack_replay import Replay, ts_key
+
+REPO = Path(__file__).resolve().parents[1]
 
 
 class CardRenderingTest(unittest.TestCase):
@@ -559,6 +563,10 @@ class ReplayShapeTest(unittest.TestCase):
             self.assertTrue(lax.call('users.info', user='U0TESTOWNER')['ok'])
 
 
+# The scopes that the base card path's own methods need (the replay's METHOD_SCOPES): the default of every intake scenario.
+BASE_SCOPES = ('chat:write', 'im:write', 'im:history', 'reactions:read', 'reactions:write', 'users:read')
+
+
 class IntakeTest(unittest.TestCase):
     """New top-level owner messages: what is taken in, in what order, and what carries no authority."""
 
@@ -569,7 +577,7 @@ class IntakeTest(unittest.TestCase):
     SIGNING = 'fixture-signing-not-a-secret'
 
     @contextmanager
-    def fixture(self, cap='20', scopes=('chat:write', 'im:write', 'im:history'), authors=None, env=None, transcript_extra=None):
+    def fixture(self, cap='20', scopes=BASE_SCOPES, authors=None, env=None, transcript_extra=None):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as directory:
             home = Path(directory)
             transcript = home / 'transcript.json'
@@ -598,7 +606,7 @@ class IntakeTest(unittest.TestCase):
         replay.state['messages'].append({'ts': ts, 'user': user or self.OWNER, 'text': text, **more})
 
     def acks(self, replay):
-        return [e['thread_ts'] for e in replay.state['log'] if e['method'] == 'chat.postMessage']
+        return [e['thread_ts'] for e in replay.state['log'] if e['method'] == 'chat.postMessage' and 'error' not in e]
 
     def wakes(self, watch):
         return [line for line in watch.output if line.startswith('check: slack request ')]
@@ -696,8 +704,7 @@ class IntakeTest(unittest.TestCase):
             self.say(replay, '200.000400', 'bot profile', bot_profile={'id': 'BPROFILE'})
             self.say(replay, '200.000500', 'broadcast reply', thread_ts='100.000100', subtype='thread_broadcast')
             self.say(replay, '200.000600', 'ordinary reply', thread_ts='100.000100')
-            self.say(replay, '200.000700', '   ')
-            self.say(replay, '200.000800', '\u2028\u200b\u0085')
+            self.say(replay, '200.000700', '')
             self.say(replay, '200.000900', 'in another channel', channel='D0OTHERDM001')
             self.say(replay, '200.001000', 'ordinary root')
             self.say(replay, '200.001100', 'self-thread root', thread_ts='200.001100')
@@ -719,24 +726,65 @@ class IntakeTest(unittest.TestCase):
         self.assertEqual(taken(False), ['200.000200', '200.000300'])
         self.assertEqual(taken(True), ['200.000100', '200.000200', '200.000300'])
 
-    def test_mutation_control_a_user_lookup_prerequisite_blocks_every_request_on_this_replay(self):
+    # ---- I5b-scope: three separate controls, each with its own compliant case (the replay holds the base card
+    # path's scopes and its method allowlist) ----
+
+    def prerequisite(self, method, fields, swallow=False):
+        """An intake variant that makes one more call before it decides on a message."""
         original = Watch.request_from
 
-        def needs_lookup(self, message):
-            self.api.call('users.info', user=message['user'])
-            return original(self, message)
+        def with_call(watch, message, owner=None):
+            try:
+                watch.api.call(method, **fields(message))
+            except SlackError:
+                if not swallow:
+                    raise
+            return original(watch, message, owner)
+        return with_call
 
-        def run(mutated):
-            with self.fixture() as (watch, replay):
-                self.say(replay, '200.000100', 'please check the status of vernant d7')
-                with patch.object(Watch, 'request_from', needs_lookup if mutated else original):
-                    try:
-                        watch.poll()
-                    except SlackError as error:
-                        self.assertEqual(str(error), 'missing_scope')
-                return self.acks(replay), self.wakes(watch)
-        self.assertEqual(run(False)[0], ['200.000100'])
-        self.assertEqual(run(True), ([], []))
+    def poll_with(self, variant, **fixture):
+        with self.fixture(**fixture) as (watch, replay):
+            self.say(replay, '200.000100', 'please check the status of vernant d7')
+            error = None
+            with patch.object(Watch, 'request_from', variant):
+                try:
+                    watch.poll()
+                except SlackError as caught:
+                    error = str(caught)
+            attempts = [json.loads(line)['method'] for line in (watch.root / 'attempts.jsonl').read_text().splitlines()]
+            return self.acks(replay), error, attempts
+
+    def test_a_method_that_the_base_card_path_already_calls_needs_no_new_scope(self):
+        lookup = self.prerequisite('users.info', lambda message: {'user': message['user']})
+        acks, error, attempts = self.poll_with(lookup)
+        self.assertEqual((acks, error), (['200.000100'], None))
+        self.assertIn('users.info', attempts)
+        self.assertTrue(set(attempts) <= set(ReplayShapeTest.POPULATION), attempts)
+
+    def test_control_a_scope_of_the_population_that_is_missing_stops_the_acknowledgement(self):
+        without_chat_write = tuple(scope for scope in BASE_SCOPES if scope != 'chat:write')
+        acks, error, _ = self.poll_with(Watch.request_from, scopes=without_chat_write)
+        self.assertEqual((acks, error), ([], 'missing_scope'))
+        acks, error, _ = self.poll_with(Watch.request_from)
+        self.assertEqual((acks, error), (['200.000100'], None))
+
+    def test_control_a_method_outside_the_population_is_stopped_by_the_allowlist_and_not_by_a_scope(self):
+        files = self.prerequisite('files.list', lambda message: {})
+        extra = {'method_allowlist': list(ReplayShapeTest.POPULATION)}
+        acks, error, attempts = self.poll_with(files, transcript_extra=extra)
+        self.assertEqual((acks, error), ([], 'method_not_allowed'))
+        self.assertIn('files.list', attempts)
+        acks, error, attempts = self.poll_with(Watch.request_from, transcript_extra=extra)
+        self.assertEqual((acks, error), (['200.000100'], None))
+        self.assertTrue(set(attempts) <= set(ReplayShapeTest.POPULATION), attempts)
+
+    def test_control_a_forbidden_attempt_that_the_intake_swallows_is_found_in_the_attempts_record(self):
+        files = self.prerequisite('files.list', lambda message: {}, swallow=True)
+        extra = {'method_allowlist': list(ReplayShapeTest.POPULATION)}
+        acks, error, attempts = self.poll_with(files, transcript_extra=extra)
+        self.assertEqual((acks, error), (['200.000100'], None))
+        self.assertFalse(set(attempts) <= set(ReplayShapeTest.POPULATION), attempts)
+        self.assertIn('files.list', attempts)
 
     def test_the_cursor_never_passes_a_message_that_is_not_journaled(self):
         with self.fixture(cap='1') as (watch, replay):
@@ -1286,7 +1334,7 @@ class IntakeTest(unittest.TestCase):
     def wake_parts(self, line):
         """The grammar of one request segment: prefix, label, ONE JSON string literal, then the optional flag, the
         pointer and the queue marker, each behind '; '."""
-        match = re.match(r'check: slack request (\d+\.\d+) from (U[A-Z0-9]+)( \(not acknowledged after 3 tries\))?: '
+        match = re.match(r'check: slack request (\d+\.\d+) from ([UW][A-Z0-9]+)( \(not acknowledged after 3 tries\))?: '
                          + re.escape(plane.REQUEST_LABEL) + ' ', line)
         self.assertIsNotNone(match, line)
         rest = line[match.end():]
@@ -1300,8 +1348,15 @@ class IntakeTest(unittest.TestCase):
     def record(self, watch, ts):
         """The whole-text record of one request, found as the pointer says: the store's path, then the request's key."""
         path = watch.root / 'requests.jsonl'
-        rows = [json.loads(line) for line in path.read_text().split('\n') if line] if path.is_file() else []
-        found = [row for row in rows if row['ts'] == ts]
+        rows = []
+        for line in (path.read_text().split('\n') if path.is_file() else []):
+            try:
+                row = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(row, dict):
+                rows.append(row)
+        found = [row for row in rows if row.get('ts') == ts]
         return found[-1] if found else None
 
     def test_an_allowlisted_non_owner_is_not_taken_in_as_an_owner_request(self):
@@ -1484,6 +1539,209 @@ class IntakeTest(unittest.TestCase):
             self.assertEqual(self.acks(replay), ['100.000100', '100.000200'])
 
 
+    # ---- the outcome re-review's findings of a472bf5e (r46): each of these failed at the head they were written against ----
+
+    def watch_durable_text(self, watch, replay, writes, out):
+        """Everything a request leaves behind that a plane value must not be in."""
+        store = watch.root / 'requests.jsonl'
+        return writes + [out, (watch.root / 'state.json').read_text(), store.read_text() if store.is_file() else '',
+                         json.dumps(replay.state['log']), json.dumps(watch.output)]
+
+    def test_a_cascade_of_replacements_leaves_no_plane_value_in_any_durable_write(self):
+        value = 'a' + plane.SECRET_MARKER + 'b'
+        delivered = 'a' * 6 + plane.SECRET_MARKER + 'b' * 6
+        with self.fixture(env={'SLACK_SIGNING_SECRET': value}) as (watch, replay):
+            writes, real = [], plane.save
+
+            def spy(path, written):
+                writes.append(json.dumps(written, ensure_ascii=False))
+                return real(path, written)
+            self.say(replay, '200.000100', delivered)
+            with patch.dict(os.environ, {'FM_SLACK_FAULT': 'after-stage'}), patch.object(plane, 'save', spy), \
+                 self.assertRaises(RuntimeError):
+                watch.poll()
+            self.assertNotIn(value, (watch.root / 'state.json').read_text())
+            watch.state, watch.advanced = watch.load_state(), 0
+            out = io.StringIO()
+            with patch.object(plane, 'save', spy), contextlib.redirect_stdout(out):
+                watch.poll()
+                plane.emit(watch, 'check')
+            for text in self.watch_durable_text(watch, replay, writes, out.getvalue()):
+                self.assertNotIn(value, text)
+            [line] = [l for l in out.getvalue().splitlines() if l.startswith(plane.REQUEST_PREFIX)]
+            parts = self.wake_parts(line)
+            self.assertEqual((parts['text'], parts['flag']), (plane.SECRET_MARKER, True))
+            record = self.record(watch, '200.000100')
+            self.assertEqual((record['text'], record['replaced']), (plane.SECRET_MARKER, True))
+
+    def test_a_value_split_across_a_link_keeps_the_text_around_it_in_the_line(self):
+        value = 'fixturesigning1234'
+        with self.fixture(env={'SLACK_SIGNING_SECRET': value}) as (watch, replay):
+            self.say(replay, '200.000100', 'fixturesig<https://example.com|ning1234extra>')
+            watch.poll()
+            [line] = self.wakes(watch)
+            parts = self.wake_parts(line)
+            # The line: the presentation rule first, the replacement on its result (I4a).
+            self.assertEqual((parts['text'], parts['flag']), (plane.SECRET_MARKER + 'extra (https://example.com)', True))
+            # The record: the delivered characters that form the value, the link among them, are replaced (I4d).
+            record = self.record(watch, '200.000100')
+            self.assertEqual((record['text'], record['replaced']), (plane.SECRET_MARKER, True))
+            for text in self.watch_durable_text(watch, replay, [], line):
+                self.assertNotIn(value, text)
+
+    def test_a_joined_line_that_is_cut_again_keeps_the_text_the_rule_computed(self):
+        value = 'fixturesigning1234'
+        straddle = 'fixturesig<https://example.com|ning1234extra>'
+        with self.fixture(cap='2', env={'SLACK_SIGNING_SECRET': value}) as (watch, replay):
+            self.say(replay, '200.000100', straddle + 'a' * 700)
+            self.say(replay, '200.000200', straddle + 'b' * 700)
+            watch.poll()
+            first = io.StringIO()
+            with contextlib.redirect_stdout(first):
+                plane.emit(watch, 'check')
+            [line] = first.getvalue().splitlines()
+            self.assertTrue(line.endswith('; +1 queued'))
+            head = self.wake_parts(line[:-len('; +1 queued')])
+            self.assertTrue(head['text'].startswith(plane.SECRET_MARKER + 'extra (https://example.com)aaa'), head['text'][:80])
+            second = io.StringIO()
+            with contextlib.redirect_stdout(second):
+                plane.emit(watch, 'check')
+            tail = self.wake_parts(second.getvalue().splitlines()[0])
+            self.assertTrue(tail['text'].startswith(plane.SECRET_MARKER + 'extra (https://example.com)bbb'), tail['text'][:80])
+
+    def test_the_replacement_leaves_no_plane_value_and_leaves_value_free_text_alone(self):
+        values = ['abc12', 'x' + plane.SECRET_MARKER + 'y']
+        pieces = ['a', 'b', 'c', '1', '2', 'x', 'y', 'z', ' ', 'ab', 'abc', 'c12', '&amp;', '&lt;', '<https://e.com|', '>', '|',
+                  plane.SECRET_MARKER, 'x' + plane.SECRET_MARKER, plane.SECRET_MARKER + 'y']
+        rng = random.Random(46)
+        # Deep cascades: removing a value brings the pieces of the next one together, k levels deep.
+        cascades = ['x' * k + plane.SECRET_MARKER + 'y' * k for k in range(1, 9)] + ['abc' * k + '12' * k for k in range(1, 9)]
+        with patch.dict(os.environ, {'SLACK_BOT_TOKEN': values[0], 'SLACK_SIGNING_SECRET': values[1]}):
+            for raw in cascades + [''.join(rng.choice(pieces) for _ in range(rng.randint(0, 26))) for _ in range(500)]:
+                started = time.monotonic()
+                text, shown, replaced = plane.sanitize(raw)
+                self.assertLess(time.monotonic() - started, 1.0, raw)
+                for value in values:
+                    for held in (text, shown, plane.present(text)[0]):
+                        self.assertNotIn(value, held, raw)
+                joined = any(value in raw or value in plane.present(raw)[0] for value in values)
+                self.assertEqual(replaced, joined, raw)
+                if not joined:
+                    self.assertEqual((text, shown), (raw, plane.present(raw)[0]), raw)
+
+    def test_a_plane_value_inside_the_marker_fails_closed_without_looping(self):
+        with self.fixture(env={'SLACK_SIGNING_SECRET': 'removed]'}) as (watch, replay):
+            self.say(replay, '200.000100', 'a request')
+            started = time.monotonic()
+            with self.assertRaisesRegex(SlackError, '^secret_collides_with_marker$'):
+                watch.poll()
+            self.assertLess(time.monotonic() - started, 2.0)
+            self.assertEqual((self.acks(replay), self.wakes(watch), watch.load_state()['pending']), ([], [], []))
+
+    def test_a_w_prefixed_owner_gets_the_same_queued_line_as_a_u_prefixed_owner(self):
+        for owner in ('U0TESTOWNER', 'W0TESTOWNER'):
+            with self.subTest(owner), self.fixture(cap='2', authors=owner, env={'FM_SLACK_DM_USER': owner}) as (watch, replay):
+                self.say(replay, '200.000100', 'a' * 800, user=owner)
+                self.say(replay, '200.000200', 'b' * 800, user=owner)
+                watch.poll()
+                first = io.StringIO()
+                with contextlib.redirect_stdout(first):
+                    plane.emit(watch, 'check')
+                [line] = first.getvalue().splitlines()
+                self.assertEqual(len(line), plane.WAKE_LIMIT)
+                self.assertTrue(line.endswith('; +1 queued'))
+                head = self.wake_parts(line[:-len('; +1 queued')])
+                self.assertEqual((head['ts'], head['user'], head['pointer']),
+                                 ('200.000100', owner, 'state/slack-watch/requests.jsonl#200.000100'))
+                self.assertEqual(self.record(watch, '200.000100')['text'], 'a' * 800)
+                second = io.StringIO()
+                with contextlib.redirect_stdout(second):
+                    plane.emit(watch, 'check')
+                [line] = second.getvalue().splitlines()
+                self.assertEqual(self.wake_parts(line.split('; +')[0])['ts'], '200.000200')
+
+    def test_a_partial_line_in_the_store_does_not_swallow_the_next_record(self):
+        with self.fixture() as (watch, replay):
+            store = watch.root / 'requests.jsonl'
+            store.write_text(json.dumps({'ts': '150.000100', 'text': 'earlier', 'replaced': False}) + '\n{"ts": "160.000100", "te')
+            self.say(replay, '200.000100', 'y' * 600)
+            watch.poll()
+            [line] = self.wakes(watch)
+            self.assertEqual(self.wake_parts(line)['pointer'], 'state/slack-watch/requests.jsonl#200.000100')
+            self.assertEqual(self.record(watch, '200.000100')['text'], 'y' * 600)
+            self.assertEqual(watch.record('200.000100')['text'], 'y' * 600)
+            self.assertEqual(watch.record('150.000100')['text'], 'earlier')
+
+    def test_an_empty_state_override_means_the_home_state_as_the_shell_scripts_read_it(self):
+        env = dict(ClosedTransportTest.ENV, FM_SLACK_NO_NETWORK='1')
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as home, tempfile.TemporaryDirectory(dir=Path.cwd()) as elsewhere:
+            (Path(home) / 'state' / 'decision-bindings').mkdir(parents=True)
+            here = os.getcwd()
+            os.chdir(elsewhere)
+            try:
+                with patch.dict(os.environ, dict(env, FM_HOME=home, FM_STATE_OVERRIDE='')):
+                    watch = Watch(token='fixture-token-not-a-secret')
+                    try:
+                        self.assertEqual(watch.root.resolve(), (Path(home) / 'state' / 'slack-watch').resolve())
+                        self.assertEqual(plane.state_home().resolve(), (Path(home) / 'state').resolve())
+                        probe = os.open(Path(home) / 'state' / 'decision-bindings', os.O_RDONLY)
+                        try:
+                            with watch.binding_held(), self.assertRaises(BlockingIOError):
+                                fcntl.flock(probe, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        finally:
+                            os.close(probe)
+                    finally:
+                        watch.lock.close()
+            finally:
+                os.chdir(here)
+            self.assertEqual(os.listdir(elsewhere), [])
+
+    def test_an_empty_home_variable_means_the_default_home(self):
+        env = dict(ClosedTransportTest.ENV, FM_SLACK_NO_NETWORK='1')
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as state:
+            with patch.dict(os.environ, dict(env, FM_HOME='', FM_STATE_OVERRIDE=state)):
+                watch = Watch(token='fixture-token-not-a-secret')
+                try:
+                    self.assertEqual(watch.home, plane.ROOT.parent.resolve())
+                finally:
+                    watch.lock.close()
+
+    def stage_notice(self, watch, event, thread):
+        return {'event': event, 'key': 'k-' + event, 'thread': thread, 'text': 'A notice', 'kind': 'notice',
+                'line': 'check: slack %s - a notice' % thread, 'stage': 'notice', 'contributing': []}
+
+    def test_a_fresh_notice_and_a_waiting_request_share_the_cap_once(self):
+        with self.fixture(cap='2') as (watch, replay):
+            watch.state['threads']['gone:live'] = {'ts': '150.000100', 'key': 'gone', 'identity': 'x', 'options': []}
+            self.say(replay, '150.000200', 'a late reply', thread_ts='150.000100')
+            self.say(replay, '200.000100', 'a new request')
+            with patch.object(watch, 'hold', return_value='closed'):
+                watch.poll()
+            self.assertEqual(sorted(self.acks(replay)), ['150.000100', '200.000100'])
+
+    def test_a_resumed_notice_a_fresh_notice_and_a_request_share_the_cap_once_each(self):
+        with self.fixture(cap='3') as (watch, replay):
+            watch.state['threads']['gone:live'] = {'ts': '150.000100', 'key': 'gone', 'identity': 'x', 'options': []}
+            watch.state['pending'].append(self.stage_notice(watch, 'test/notice/resumed', '120.000100'))
+            watch.commit()
+            self.say(replay, '150.000200', 'a late reply', thread_ts='150.000100')
+            self.say(replay, '200.000100', 'a new request')
+            with patch.object(watch, 'hold', return_value='closed'):
+                watch.poll()
+            self.assertEqual(sorted(self.acks(replay)), ['120.000100', '150.000100', '200.000100'])
+
+    def test_a_message_that_is_not_empty_is_a_request_whatever_it_looks_like(self):
+        shown = {'200.000100': '\ue000', '200.000200': '   ', '200.000300': '\u2028\u200b\u0085', '200.000400': '\u200b'}
+        with self.fixture(cap='10') as (watch, replay):
+            for ts, text in shown.items():
+                self.say(replay, ts, text)
+            self.say(replay, '200.000500', '')
+            self.say(replay, '200.000600', 'a successor')
+            watch.poll()
+            self.assertEqual(sorted(self.acks(replay)), ['200.000100', '200.000200', '200.000300', '200.000400', '200.000600'])
+            self.assertEqual(watch.load_state()['pending'], [])
+
+
 class ClosedTransportTest(unittest.TestCase):
     """A test or verification run cannot reach Slack: it runs on a transcript, or its transport is closed."""
 
@@ -1519,6 +1777,149 @@ class ClosedTransportTest(unittest.TestCase):
                             watch.api.call('auth.test')
                 finally:
                     watch.lock.close()
+
+
+class RegisteredGateTest(unittest.TestCase):
+    """A scenario does not run a fixture home's registered check file where it could reach a REAL registered Slack
+    check file outside its own fixture (Main 2180, 2191): there it skips with a named reason, and Main or the grader
+    runs it under a host-level denial with FM_SLACK_GRADER_RUN set. Where none exists (a CI runner) it runs. Both
+    sides are tested here with a stub in place of every file, so that this test itself never runs the real one."""
+
+    GATE = REPO / 'tests' / 'fixtures' / 'slack' / 'registered-gate.sh'
+    REASON = 'a real registered Slack check file exists at '
+
+    def environment(self, **extra):
+        drop = ('FM_HOME', 'FM_STATE_OVERRIDE', 'FM_SLACK_GRADER_RUN', 'GIT_DIR', 'GIT_WORK_TREE', 'GIT_CONFIG_GLOBAL')
+        env = {key: value for key, value in os.environ.items() if key not in drop}
+        env.update(extra)
+        return env
+
+    def make_real(self, directory):
+        """A directory that holds a stub registered file at state/slack.check.sh, as a real home would."""
+        (Path(directory) / 'state').mkdir(parents=True, exist_ok=True)
+        stub = Path(directory) / 'state' / 'slack.check.sh'
+        stub.write_text('#!/usr/bin/env bash\nexit 0\n')
+        return stub
+
+    def checkout(self, parent):
+        """A checkout of the gate, with no git repository around it and no state of its own."""
+        tree = Path(parent) / 'checkout'
+        (tree / 'tests' / 'fixtures' / 'slack').mkdir(parents=True)
+        shutil.copy(self.GATE, tree / 'tests' / 'fixtures' / 'slack' / 'registered-gate.sh')
+        return tree
+
+    def run_gate(self, tree, **env):
+        """Source the gate in that checkout; run a stub file only if the gate allows it."""
+        ran = Path(tree).parent / 'ran'
+        ran.unlink(missing_ok=True)
+        stub = Path(tree).parent / 'registered.sh'
+        stub.write_text('#!/usr/bin/env bash\ntouch "%s"\n' % ran)
+        stub.chmod(0o755)
+        script = '. "$1"; if fm_slack_registered_allowed "TEST-LABEL"; then "$2"; fi'
+        gate = Path(tree) / 'tests' / 'fixtures' / 'slack' / 'registered-gate.sh'
+        result = subprocess.run(['bash', '-c', script, '_', str(gate), str(stub)], env=self.environment(**env),
+                                capture_output=True, text=True, check=False)
+        return result, ran.exists()
+
+    def assert_skipped(self, result, ran, where):
+        self.assertEqual((result.returncode, ran), (0, False), result.stderr)
+        [line] = result.stdout.splitlines()
+        self.assertTrue(line.startswith('skip - TEST-LABEL (' + self.REASON + str(where)), line)
+
+    def test_where_no_real_registered_file_exists_the_file_runs_and_nothing_is_printed(self):
+        with tempfile.TemporaryDirectory() as parent:
+            result, ran = self.run_gate(self.checkout(parent))
+            self.assertEqual((result.returncode, result.stdout, ran), (0, '', True), result.stderr)
+
+    def test_a_real_registered_file_in_the_inherited_state_directory_skips_with_its_name(self):
+        with tempfile.TemporaryDirectory() as parent, tempfile.TemporaryDirectory() as real:
+            stub = self.make_real(real)
+            result, ran = self.run_gate(self.checkout(parent), FM_STATE_OVERRIDE=str(stub.parent))
+            self.assert_skipped(result, ran, stub)
+
+    def test_a_real_registered_file_in_the_inherited_home_skips_with_its_name(self):
+        with tempfile.TemporaryDirectory() as parent, tempfile.TemporaryDirectory() as real:
+            stub = self.make_real(real)
+            result, ran = self.run_gate(self.checkout(parent), FM_HOME=real)
+            self.assert_skipped(result, ran, stub)
+
+    def test_a_real_registered_file_in_the_home_of_the_checkout_itself_skips_with_its_name(self):
+        with tempfile.TemporaryDirectory() as parent:
+            tree = self.checkout(parent)
+            stub = self.make_real(tree)
+            result, ran = self.run_gate(tree)
+            self.assert_skipped(result, ran, stub)
+
+    def test_a_real_registered_file_in_the_primary_home_of_a_worktree_skips_with_its_name(self):
+        git = {'GIT_CONFIG_GLOBAL': os.devnull, 'GIT_CONFIG_NOSYSTEM': '1', 'GIT_AUTHOR_NAME': 't', 'GIT_AUTHOR_EMAIL': 't@t',
+               'GIT_COMMITTER_NAME': 't', 'GIT_COMMITTER_EMAIL': 't@t'}
+        with tempfile.TemporaryDirectory() as parent:
+            primary = Path(parent) / 'primary'
+            primary.mkdir()
+            env = self.environment(**git)
+            for command in (['init', '-q'], ['config', 'core.hooksPath', os.devnull]):
+                subprocess.run(['git', '-C', str(primary), *command], env=env, check=True, capture_output=True)
+            tree_id = subprocess.run(['git', '-C', str(primary), 'hash-object', '-t', 'tree', '-w', '--stdin'], env=env,
+                                     input='', check=True, capture_output=True, text=True).stdout.strip()
+            commit = subprocess.run(['git', '-C', str(primary), 'commit-tree', tree_id, '-m', 'x'], env=env,
+                                    check=True, capture_output=True, text=True).stdout.strip()
+            subprocess.run(['git', '-C', str(primary), 'update-ref', 'refs/heads/main', commit], env=env, check=True,
+                           capture_output=True)
+            work = Path(parent) / 'work'
+            subprocess.run(['git', '-C', str(primary), 'worktree', 'add', '-q', '--detach', str(work), commit], env=env,
+                           check=True, capture_output=True)
+            (work / 'tests' / 'fixtures' / 'slack').mkdir(parents=True)
+            shutil.copy(self.GATE, work / 'tests' / 'fixtures' / 'slack' / 'registered-gate.sh')
+            result, ran = self.run_gate(work, **git)
+            self.assertEqual((result.returncode, result.stdout, ran), (0, '', True), result.stderr)
+            stub = self.make_real(primary)
+            result, ran = self.run_gate(work, **git)
+            self.assert_skipped(result, ran, stub.resolve())
+
+    def test_the_grader_marker_runs_the_file_even_where_a_real_one_exists(self):
+        with tempfile.TemporaryDirectory() as parent, tempfile.TemporaryDirectory() as real:
+            self.make_real(real)
+            tree = self.checkout(parent)
+            result, ran = self.run_gate(tree, FM_HOME=real, FM_SLACK_GRADER_RUN='1')
+            self.assertEqual((result.returncode, result.stdout, ran), (0, '', True), result.stderr)
+            result, ran = self.run_gate(tree, FM_HOME=real, FM_SLACK_GRADER_RUN='')
+            self.assert_skipped(result, ran, Path(real) / 'state' / 'slack.check.sh')
+
+    def run_deadline_entry(self, **env):
+        """The deadline suite's own entry script, copied beside the gate and a stub that stands in for its Python test."""
+        with tempfile.TemporaryDirectory() as directory:
+            tree = Path(directory) / 'checkout'
+            (tree / 'tests' / 'fixtures' / 'slack').mkdir(parents=True)
+            shutil.copy(REPO / 'tests' / 'fm-slack-deadline.test.sh', tree / 'tests' / 'fm-slack-deadline.test.sh')
+            (tree / 'tests' / 'lib.sh').write_text('# the entry script sources the shared test library; nothing of it is needed here\n')
+            shutil.copy(self.GATE, tree / 'tests' / 'fixtures' / 'slack' / 'registered-gate.sh')
+            (tree / 'tests' / 'fm_slack_deadline_test.py').write_text(
+                'import pathlib\npathlib.Path(__file__).with_name("ran").write_text("ran")\n')
+            tool = Path(directory) / 'tool'
+            tool.mkdir()
+            (tool / 'tasks-axi').write_text('#!/usr/bin/env bash\nexit 0\n')
+            (tool / 'tasks-axi').chmod(0o755)
+            real = Path(directory) / 'real'
+            self.make_real(real)
+            environment = self.environment(**{key: (str(real) if value is True else value) for key, value in env.items()})
+            environment['PATH'] = str(tool) + os.pathsep + environment['PATH']
+            result = subprocess.run(['bash', str(tree / 'tests' / 'fm-slack-deadline.test.sh')], env=environment,
+                                    capture_output=True, text=True, check=False)
+            return result, (tree / 'tests' / 'ran').exists(), real / 'state' / 'slack.check.sh'
+
+    def test_the_deadline_suite_runs_its_python_test_where_no_real_registered_file_exists(self):
+        result, ran, _ = self.run_deadline_entry()
+        self.assertEqual((result.returncode, ran, result.stdout), (0, True, ''), result.stderr)
+
+    def test_the_deadline_suite_skips_before_its_python_test_starts_where_a_real_one_exists(self):
+        result, ran, real = self.run_deadline_entry(FM_HOME=True)
+        self.assertEqual((result.returncode, ran), (0, False), result.stderr)
+        [line] = result.stdout.splitlines()
+        self.assertTrue(line.startswith('skip - the Slack deadline suite (' + self.REASON + str(real)), line)
+
+    def test_the_deadline_suite_runs_under_the_grader_marker_where_a_real_one_exists(self):
+        result, ran, _ = self.run_deadline_entry(FM_HOME=True, FM_SLACK_GRADER_RUN='1')
+        self.assertEqual((result.returncode, ran, result.stdout), (0, True, ''), result.stderr)
 
 
 def history_attempts(path):
@@ -1727,7 +2128,7 @@ def main(argv):
         json.dump(data, open(argv[2], 'w'))
     elif command in ('request-lines', 'request-texts'):
         lines = sys.stdin.read().splitlines()
-        shape = re.compile(r'check: slack request [0-9]+\.[0-9]+ from U[A-Z0-9]+( \(not acknowledged after 3 tries\))?: '
+        shape = re.compile(r'check: slack request [0-9]+\.[0-9]+ from [UW][A-Z0-9]+( \(not acknowledged after 3 tries\))?: '
                            + re.escape(plane.REQUEST_LABEL) + ' ')
         texts = []
         for line in lines:
