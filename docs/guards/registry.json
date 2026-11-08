@@ -516,6 +516,26 @@
         },
         {
           "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: the state of own nested copy $(fm_refuse_text \"$copy\") could not be read, so it is not proved clean; the task was not closed.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: own nested copy $(fm_refuse_text \"$copy\") has uncommitted or untracked changes, so it is not clean and its work is not landed; the task was not closed.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: the HEAD of own nested copy $(fm_refuse_text \"$copy\") cannot be resolved, so it is not proved landed; the task was not closed.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: own nested copy $(fm_refuse_text \"$copy\") has HEAD $head, which is not landed (a refs/fm/anchor ref alone does not land it) and is held by no recorded verified bundle; the task was not closed.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: Vernant's closeout driver names an ignored path of own nested copy $(fm_refuse_text \"$copy\") that is not a plain path inside the copy; the task was not closed.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
           "match": "echo \"REFUSED: the state of own nested copy $(fm_refuse_text \"$copy\") could not be read, so its retained state cannot be recorded; the task was not closed.\" >&2"
         },
         {
@@ -532,7 +552,7 @@
         },
         {
           "file": "bin/fm-teardown-nested-lib.sh",
-          "match": "echo \"REFUSED: the retained record for own nested copy $(fm_refuse_text \"$copy\") could not be written; the task was not closed.\" >&2"
+          "match": "echo \"REFUSED: the retained record for own nested copy $(fm_refuse_text \"$copy\") could not be written; the task was not closed, and a retry asks the driver nothing while it still cannot be written.\" >&2"
         },
         {
           "file": "bin/fm-teardown-nested-lib.sh",
