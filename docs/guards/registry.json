@@ -141,6 +141,7 @@
     "captain-hold-withdraw-ruling",
     "slack-dm-retarget-pending-work",
     "slack-request-resolve-failed-only",
+    "slack-dm-unbind-refuses-past-its-wait",
     "github-accounting-foreign-database",
     "open-loops-one-deferral",
     "pipeline-start-unreadable-source",
@@ -6865,6 +6866,36 @@
       "tier": "C",
       "harm": "reversible",
       "layer_note": "added by the Slack main-window intake change; deny without a guard event: resolve exits non-zero with one slack: refused: line on stderr (no_pending_request or request_not_failed, raised in Watch.close_request in bin/fm_slack_watch.py, or local_state_or_response_error), makes no Slack call and leaves the journal unchanged; the bin/fm-slack-check.sh help line documents the refusal; the INTAKE-3 [resolve] scenario in tests/fm-slack-watch.test.sh proves the refusal for an unknown ts and a request that is not failed and the resolve that closes the failed row, and test_resolve_closes_only_a_failed_request_and_makes_no_slack_call in tests/fm_slack_watch_test.py proves the same at the unit level"
+    },
+    {
+      "decision": "deny",
+      "fail_direction": "closed",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "id": "slack-dm-unbind-refuses-past-its-wait",
+      "owner": "bin/fm-captain-hold.sh",
+      "sites": [
+        {
+          "file": "bin/fm-captain-hold.sh",
+          "match": "unbind refused: a delivery that began earlier still holds the binding"
+        }
+      ],
+      "invariant": "fm-captain-hold.sh unbind exits 0 only when the binding is gone: past its fixed 60 second wait for a Slack delivery under way, or on a binding folder that exists and cannot be examined or opened, it exits non-zero and removes nothing",
+      "layer": "runtime-block",
+      "source": "the exclusive lock on state/decision-bindings and the binding record, read by command_unbind in bin/fm-captain-hold.sh",
+      "trigger": "bin/fm-captain-hold.sh unbind <source> runs while a Slack request or mirror delivery still holds state/decision-bindings shared after 60 seconds, or while that folder exists and cannot be examined or opened",
+      "remedy": "wait for the delivery to end (a poll, a standing check or a mirror run) and run bin/fm-captain-hold.sh unbind <source> again; for a folder that cannot be examined, restore access to it and run the unbind again",
+      "budget": 1,
+      "test": "tests/fm-slack-watch.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "layer_note": "added by the Slack main-window intake change; deny without a guard event: unbind exits non-zero with one fm-captain-hold: line on stderr and no unbound: line, the binding is unchanged, and the wait has no override; the INTAKE-6 [unbind bound] and [unbind inaccessible state] scenarios in tests/fm-slack-watch.test.sh prove the refusal, and [unbind wait] and [unbind no override] prove that a delivery under way is waited for"
     },
     {
       "id": "pipeline-start-unreadable-source",

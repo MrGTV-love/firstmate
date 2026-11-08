@@ -688,22 +688,33 @@ class Watch:
         return self.api.call('conversations.history', channel=channel, limit=100,
                              include_all_metadata=True).get('messages', [])
 
-    def owner_channel(self, user=None):
-        """The one conversation this plane may write to or read for requests: the owner's DM, and nothing else.
-        The stored id must be the DM Slack itself opens for the owner (the configured one, or with user the one
-        a retarget is leaving); a different DM-shaped id, or an answer that cannot be read, touches nothing."""
-        current = user is None
-        user = user or self.dm_user()
+    def owner_channel(self):
+        """The one conversation this plane may write to: the owner's DM, and nothing else."""
         channel = self.state.get('channel')
         if not channel:
             raise SlackError('dm_not_prepared')
-        if not DM_CHANNEL.fullmatch(channel) or self.state.get('user') != user:
+        if not DM_CHANNEL.fullmatch(channel) or self.state.get('user') != self.dm_user():
             raise SlackError('target_is_not_a_DM')
-        if not (current and self.dm_proven):
-            opened = self.api.call('conversations.open', users=user, return_im=True).get('channel', {})
+        if not self.dm_proven:
+            # The stored id must be the DM Slack itself opens for the configured owner;
+            # a different DM-shaped id, or an answer that cannot be read, writes nothing.
+            opened = self.api.call('conversations.open', users=self.dm_user(), return_im=True).get('channel', {})
             if opened.get('id') != channel:
                 raise SlackError('stored_channel_not_owner_dm')
-            self.dm_proven = self.dm_proven or current
+            self.dm_proven = True
+        return channel
+
+    def leaving_dm(self):
+        """The DM a retarget is leaving, for a read only: it must be the DM Slack itself opens for the owner it was
+        stored for. Nothing is ever written to it; owner_channel stays the one channel this plane writes to."""
+        channel, user = self.state.get('channel'), self.state.get('user')
+        if not channel:
+            raise SlackError('dm_not_prepared')
+        if not user or not DM_CHANNEL.fullmatch(channel):
+            raise SlackError('target_is_not_a_DM')
+        opened = self.api.call('conversations.open', users=user, return_im=True).get('channel', {})
+        if opened.get('id') != channel:
+            raise SlackError('stored_channel_not_owner_dm')
         return channel
 
     def post(self, event, text, thread=None):
@@ -766,7 +777,7 @@ class Watch:
         if not channel or cursor is None:
             return False
         # The old DM is read only once it is proven to be the DM of the owner it was stored for.
-        self.owner_channel(user=self.state.get('user'))
+        self.leaving_dm()
         for message in self.newer_messages(channel, cursor):
             row = self.request_from(message, owner=self.state.get('user'))
             if row and row['event'] not in self.state['seen']:

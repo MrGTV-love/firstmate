@@ -45,7 +45,8 @@ Usage:
   fm_slack_watch_test.py outbox-count <state.json>
   fm_slack_watch_test.py pad-foreign <replay-state.json> <count> <ts-prefix>
   fm_slack_watch_test.py history-calls <outbound.jsonl>   (attempted history reads, failed ones included)
-  fm_slack_watch_test.py request-lines <min-count>   (reads wake lines on stdin)
+  fm_slack_watch_test.py request-lines <min-count>   (reads wake lines on stdin; checks the grammar)
+  fm_slack_watch_test.py request-texts   (reads wake lines on stdin; prints each decoded text)
 """
 from contextlib import contextmanager
 import contextlib
@@ -1724,15 +1725,27 @@ def main(argv):
         data = json.load(open(argv[1]))
         data[argv[3]] = json.loads(argv[4])
         json.dump(data, open(argv[2], 'w'))
-    elif command == 'request-lines':
+    elif command in ('request-lines', 'request-texts'):
         lines = sys.stdin.read().splitlines()
-        shape = re.compile(r'check: slack request [0-9]+\.[0-9]+ from U[A-Z0-9]+: ' + re.escape(plane.REQUEST_LABEL) + ' ')
+        shape = re.compile(r'check: slack request [0-9]+\.[0-9]+ from U[A-Z0-9]+( \(not acknowledged after 3 tries\))?: '
+                           + re.escape(plane.REQUEST_LABEL) + ' ')
+        texts = []
         for line in lines:
-            assert shape.match(line), 'not a request line: ' + line
-            assert len(line) <= plane.WAKE_LIMIT - plane.QUEUE_RESERVE, 'line too long: %d' % len(line)
-            assert all(c == ' ' or unicodedata.category(c)[0] not in 'CZ' for c in line), 'control or separator in a line'
-        assert len(lines) >= int(argv[1]), 'expected at least %s request lines, got %d' % (argv[1], len(lines))
-        print(len(lines))
+            match = shape.match(line)
+            assert match, 'not a request line: ' + line
+            assert len(line) <= plane.WAKE_LIMIT, 'line too long: %d' % len(line)
+            assert all(unicodedata.category(c) not in ('Cc', 'Zl', 'Zp') for c in line), 'control or separator in a line'
+            rest = line[match.end():]
+            text, end = json.JSONDecoder().raw_decode(rest)
+            tail = [part for part in rest[end:].split('; ') if part]
+            assert all(part == plane.SECRET_FLAG or re.fullmatch(r'full: state/slack-watch/requests\.jsonl#[0-9.]+', part)
+                       or re.fullmatch(r'\+[0-9]+ queued', part) for part in tail), 'outside the grammar: ' + line
+            texts.append(text)
+        if command == 'request-texts':
+            print('\n'.join(texts))
+        else:
+            assert len(lines) >= int(argv[1]), 'expected at least %s request lines, got %d' % (argv[1], len(lines))
+            print(len(lines))
     elif command == 'replay-file':
         paths = glob.glob(os.path.join(argv[1], 'replay-state-*.json'))
         print(paths[0] if paths else '')
