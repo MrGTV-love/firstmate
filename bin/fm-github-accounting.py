@@ -1,0 +1,645 @@
+#!/usr/bin/env python3
+"""Standing GitHub quota and caller observer (no caller control or attribution verdict).
+
+Usage: fm-github-accounting.py {start,run,status,stop,prune,records}
+       fm-github-accounting.py run [--duration SECONDS]
+       fm-github-accounting.py records [--kind KIND]
+
+State: FM_STATE_OVERRIDE, else <FM_HOME or FM_ROOT_OVERRIDE or code root>/state,
+under github-accounting/. Private observations.sqlite holds timestamped JSON
+records. Only this database's records strictly older than 48 hours expire,
+on startup, every quota tick and prune. Existing unrelated state is untouched.
+A zero-size observations.sqlite, as an interrupted start leaves, holds no data and is
+treated as new; any other file without this owner's application id is refused unchanged.
+start detaches one owner, run stays foreground, status reports its lock ownership,
+and stop requests that owner's shutdown and awaits release. No launchd agent or
+shared service is installed. Repeating start is idempotent. run refuses a second
+owner. --duration is an optional observation window, not a request timeout.
+A primary home's watcher runs start each cycle (github_accounting_tick in
+bin/fm-watch.sh), so a reboot, a crash or a plain stop recovers at its next cycle.
+A detached owner's stderr appends to owner.log, which start trims to its newest
+bytes before a launch once it passes LOG_LIMIT.
+Only run holds owner.lock exclusively, so an exclusive holder is a live owner;
+records and prune hold it shared. start, run, records and prune exit BUSY (75)
+when the lock they need is unavailable; a busy start started nothing and may
+retry, and any other failed start exits 1. A stop during startup exits 1. A second
+concurrent reader can exit 1 after the SQLite wait.
+records needs the observer stopped; a records call held open during start makes
+start report busy (75), not a running owner.
+
+Quota source: gh-axi api rate_limit --full, unchanged inherited authentication,
+every 15 seconds. Records identify REST resources.graphql, not GraphQL response
+headers. This observer intentionally uses the REST counter rather than spending
+points on a GraphQL accounting query. REST shard agreement is not established.
+A slow request is not overlapped or retried in a burst; pending ticks are recorded.
+A request is stopped only on bin/fm-duration.py's no-progress verdict (no process-tree
+CPU growth and no runnable member for FM_DURATION_NO_PROGRESS_SECS, default 15 minutes),
+never by wall clock, and without CPU telemetry it is not stopped. Its private process
+group is then killed and it is recorded unavailable with reason=timeout; the next
+normal tick sends a new one.
+Limit: a SIGKILL of the owner while a gh-axi quota child hangs can leave that child alive, and a new owner can overlap it until it exits; a normal stop kills the group.
+The owner inherits PATH: a gh-axi it cannot launch records unavailable with
+reason=command_unavailable on each tick, which fails neither start nor the owner.
+
+Process source: one LC_ALL=C ps table every 0.2 seconds in the root home's
+watcher context, not a confined worker. Each scan runs off the owner's loop and scans
+never overlap, so a slow or hung ps delays neither the quota stream nor stop. A ps
+with no output or CPU progress for the same interval is killed and counts as a
+sampling failure. Where that CPU sample itself needs ps (Darwin) and ps hangs, no
+verdict exists: only stop ends the scan, and sampling summaries show the gap as
+missing scans. A quota request starts its verdict only once the earlier verdict has
+returned, so a hung ps leaves at most one scan and one quota verdict waiting, and a
+later request has no verdict until ps recovers. An owner that exits normally ends its
+remaining child processes, including a hung ps; a SIGKILL of the owner does not.
+run's process_source callable is a test
+seam returning {pid: (ppid, start_identity, argv_words)}; the default is ps.
+Injected rows prove output behavior, not actual host observations. A new observed
+gh/gh-axi epoch retains sanitized argv and the ancestor chain in a first-sighting
+process row. Each sighting after a successful scan ended the prior epoch gets a
+new integer epoch within its owner run, even for the same PID/start identity.
+While successful scans still list that caller, its saved sanitized projection is
+repeated in one fresh process row once the latest row is 24 hours old, keeping it
+joinable within the unchanged 48-hour retention. Every process row keeps
+first_observed_at, the first time that epoch was seen as gh/gh-axi, unchanged next
+to its own observed_at. Use first_observed_at <= interval_end, not a later row's
+observed_at, for interval overlap. No argv or ancestor projection is recomputed
+for a renewal. One process_end row with the same pid, start identity, run_id and
+epoch follows when the first successful scan no longer lists that caller.
+Join only on (pid, start, run_id, epoch); separate epochs must never share an end
+or projection. Prune keeps each epoch's latest process row while its matching
+process_end row is retained, and every other row expires at 48 hours. So an ended
+caller's last process row can outlive 48 hours by up to its 24-hour renewal interval,
+or by the failed-scan gap that delayed its end row, at most another 48 hours. At a
+normal stop the owner writes one fresh process row for each caller it has not seen
+end, with the saved projection and first_observed_at and no process_end row, because
+a stop does not show that a caller departed. That row's observed_at is the stop time,
+not a new sighting: the same run's owner row with action=stop marks that time, and the
+caller may have ended unseen before it. With no end row, every successful scan the
+owner read after first_observed_at in that run listed the caller. A sampling row counts
+scans when they start and failures when they finish, so successful completions in its
+interval equal scans minus failures, plus or minus one scan in flight at an interval
+edge. A surplus of 2 or more proves a successful completion in that interval; a surplus
+of 1 or less does not: 0 or 1 neither proves nor excludes one, and -1 excludes one.
+These rows give the latest proven successful scan, not an exact last-success time. A
+hung scan counts as started and not as failed, and a failed scan in flight at the stop
+is never counted as failed. A SIGKILL or a power loss writes no such
+row, so that caller's latest process row can expire at 48 hours while a quota row it
+overlapped is retained. A failed scan
+ends nothing and no row is written per scan. A caller still alive when the observer
+stops has no process_end row, nor has one that ends while no owner runs, and a new
+owner records a caller it finds alive as a new process row. Payloads and
+arbitrary argument values are withheld, as in the process census's safe logging
+convention. Executable/script basenames, an interpreter's known no-value flags,
+command words and recognized option names are retained. A flag not known to take no
+value ends the script search, so -c, -e and -m payloads stay withheld. No
+environment, headers, prompts or free text is logged.
+ps does not preserve argv boundaries, so recorded argv is explicitly a sanitized
+command-line projection, not a lossless reconstruction. Missing, unreadable,
+short-lived, non-gh and off-host callers remain unknown. Temporal correlation
+with a quota interval is not causal proof. Sampling summaries report actual scan
+counts/gaps and failures, not an assurance that every requested tick ran on time.
+"""
+import argparse
+from contextlib import contextmanager
+import fcntl
+import functools
+import json
+import os
+from pathlib import Path
+import re
+import runpy
+import signal
+import sqlite3
+import subprocess
+import sys
+import tempfile
+import threading
+import time
+import uuid
+
+QUOTA_INTERVAL = 15.0
+PROCESS_INTERVAL = 0.2
+RETENTION = 48 * 60 * 60
+APPLICATION_ID = 0x464D4748
+LOG_LIMIT = 64 * 1024
+BUSY = 75
+SAMPLE_ERRORS = (OSError, subprocess.SubprocessError, RuntimeError)
+CALLER_FIELDS = ("pid", "start", "run_id", "epoch")
+SAME_CALLER = " AND ".join(f"json_extract(other.payload,'$.{field}')=json_extract(observations.payload,'$.{field}')"
+                           for field in CALLER_FIELDS)
+QUOTA_JQ = '.resources.graphql | "used=\\(.used) reset=\\(.reset) limit=\\(.limit) remaining=\\(.remaining)"'
+QUOTA_BODY = re.compile(r'''^  body: ["']?used=(\d+) reset=(\d+) limit=(\d+|null) remaining=(\d+|null)["']?$''', re.MULTILINE)
+ROW = re.compile(r"\s*(\d+)\s+(\d+)\s+(\w{3}\s+\w{3}\s+\d+\s+\d\d:\d\d:\d\d\s+\d{4})\s+(.*)")
+COMMANDS = frozenset("api graphql rate_limit pr issue run workflow repo release gist auth view list checks status create edit comment merge close reopen ready checkout diff watch download upload delete search get POST GET PATCH PUT HEAD DELETE".split())
+OPTIONS = frozenset("--repo -R --hostname --json --jq --template --field -f -F --header -H --input --body --body-file --title --message -m -c --eval --paginate --include -i --full --state --limit -L --head --base --author --label --help -h --version".split())
+SHELL_FLAGS = re.compile(r"-[BEelux]+|--login|--noprofile|--norc|--posix")
+NO_VALUE_FLAGS = {
+    "bash": SHELL_FLAGS, "sh": SHELL_FLAGS, "zsh": SHELL_FLAGS, "dash": SHELL_FLAGS,
+    "python": re.compile(r"-[BEIOPSqsuv]+"),
+    "node": re.compile(r"--no-warnings|--no-deprecation|--trace-warnings|--trace-uncaught|--enable-source-maps"),
+    "ruby": re.compile(r"-w"), "perl": re.compile(r"-w"),
+}
+
+
+def state_root():
+    home = Path(os.environ.get("FM_HOME", os.environ.get("FM_ROOT_OVERRIDE", Path(__file__).resolve().parent.parent)))
+    return Path(os.environ.get("FM_STATE_OVERRIDE", home / "state")) / "github-accounting"
+
+
+def private_root():
+    root = state_root()
+    if root.is_symlink():
+        raise RuntimeError("unsafe observer state directory")
+    root.mkdir(mode=0o700, parents=True, exist_ok=True)
+    os.chmod(root, 0o700)
+    for name in ("owner.lock", "observations.sqlite", "stop", "observations.sqlite-journal"):
+        if (root / name).is_symlink():
+            raise RuntimeError("unsafe observer state file")
+    return root
+
+
+def open_private(path):
+    descriptor = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+    os.fchmod(descriptor, 0o600)
+    return os.fdopen(descriptor, "r+")
+
+
+def owner_log(root):
+    descriptor = os.open(root / "owner.log", os.O_RDWR | os.O_CREAT | os.O_APPEND | os.O_NOFOLLOW, 0o600)
+    os.fchmod(descriptor, 0o600)
+    size = os.fstat(descriptor).st_size
+    if size > LOG_LIMIT:
+        newest = os.pread(descriptor, LOG_LIMIT // 2, size - LOG_LIMIT // 2)
+        os.ftruncate(descriptor, 0)
+        os.write(descriptor, newest)
+    return descriptor
+
+
+class OwnerLockHeld(RuntimeError):
+    pass
+
+
+@contextmanager
+def ownership(root, mode):
+    with open_private(root / "owner.lock") as lock:
+        try:
+            fcntl.flock(lock, mode | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise OwnerLockHeld from None
+        yield lock
+
+
+def database(root):
+    path = root / "observations.sqlite"
+    populated = path.exists() and path.stat().st_size > 0
+    if not populated:
+        with open_private(path):
+            pass
+    db = sqlite3.connect(path)
+    if populated and db.execute("PRAGMA application_id").fetchone()[0] != APPLICATION_ID:
+        db.close()
+        raise RuntimeError("refusing database not owned by the observer")
+    db.execute("PRAGMA auto_vacuum=FULL")
+    db.execute("PRAGMA secure_delete=ON")
+    db.execute(f"PRAGMA application_id={APPLICATION_ID}")
+    db.execute("CREATE TABLE IF NOT EXISTS observations (observed REAL NOT NULL, kind TEXT NOT NULL, payload TEXT NOT NULL)")
+    db.execute("CREATE INDEX IF NOT EXISTS observations_time ON observations(observed)")
+    caller = ",".join(f"json_extract(payload,'$.{field}')" for field in CALLER_FIELDS)
+    db.execute(f"CREATE INDEX IF NOT EXISTS observations_caller ON observations(kind,{caller})")
+    db.commit()
+    return db
+
+
+def record(db, kind, payload, observed=None):
+    stamp = time.time() if observed is None else observed
+    payload = dict(payload, observed_at=stamp, kind=kind)
+    db.execute("INSERT INTO observations VALUES (?,?,?)", (stamp, kind, json.dumps(payload, sort_keys=True)))
+
+
+def prune(db, now):
+    changed = db.execute(f"""DELETE FROM observations WHERE observed < :cutoff AND NOT (kind='process'
+        AND EXISTS (SELECT 1 FROM observations other WHERE other.kind='process_end' AND {SAME_CALLER}
+                    AND other.observed >= :cutoff)
+        AND NOT EXISTS (SELECT 1 FROM observations other WHERE other.kind='process' AND {SAME_CALLER}
+                        AND other.rowid > observations.rowid))""", {"cutoff": now - RETENTION}).rowcount
+    db.commit()
+    # auto_vacuum reclaims expired payload pages at commit, without a full
+    # database rewrite on the sampler's critical path.
+    return changed
+
+
+def words(command):
+    # ps renders a command line, not an argv protocol. Do not interpret shell
+    # syntax or treat a quote as proof that a payload can safely be disclosed.
+    return command.split()
+
+
+def executable(argv):
+    if not argv:
+        return "", [], None
+    name = Path(argv[0]).name
+    flags, script = [], None
+    allowed = NO_VALUE_FLAGS.get(re.sub(r"[\d.]+$", "", name.lower()))
+    if allowed is not None:
+        for word in argv[1:]:
+            if allowed.fullmatch(word):
+                flags.append(word)
+                continue
+            if not word.startswith("-"):
+                script = Path(word).name
+            break
+    return name, flags, script
+
+
+def safe_argv(argv):
+    """Withhold arbitrary values, including unknown options and shell fragments."""
+    name, flags, script = executable(argv)
+    if not name:
+        return []
+    result = [name, *flags]
+    start = 1 + len(flags)
+    if script:
+        result.append(script)
+        start += 1
+    command_prefix = (script or name) in ("gh", "gh-axi")
+    for word in argv[start:]:
+        if command_prefix and word in COMMANDS:
+            result.append(word)
+            continue
+        command_prefix = False
+        option = word.split("=", 1)[0]
+        if option in OPTIONS:
+            result.append(option + ("=[REDACTED]" if "=" in word else ""))
+        else:
+            result.append("[REDACTED]")
+    return result
+
+
+@functools.lru_cache(maxsize=None)
+def sibling(name):
+    return runpy.run_path(str(Path(__file__).resolve().with_name(name)))
+
+
+def progress_api():
+    # bin/fm-duration.py owns the no-progress verdict, its interval and the blind-telemetry rule.
+    return sibling("fm-duration.py")
+
+
+def wait_for_progress(child):
+    """Wait for a private child; TimeoutExpired only on the shared no-progress verdict."""
+    api = progress_api()
+    return api["communicate_progress"](child, api["positive_override"]("FM_DURATION_NO_PROGRESS_SECS",
+                                                                       api["NO_PROGRESS_LIMIT"]))
+
+
+def end_child(child):
+    if child.poll() is None:
+        # The unreaped child owns a fresh session/group, so its numeric
+        # group cannot be reused by an unrelated caller.
+        try:
+            os.killpg(child.pid, signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            pass
+    child.wait()
+
+
+def end_owned_children(table, threads):
+    # bin/fm-proc-budget-tree.py reads the table natively, so a hung ps cannot block this.
+    for _ in range(10):
+        for pid, row in table.read().items():
+            if row[0] == os.getpid() and not row[3]:
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+        alive = [thread for thread in threads if thread is not None and thread.is_alive()]
+        if not alive:
+            return
+        alive[0].join(0.1)
+
+
+def process_table():
+    child = subprocess.Popen(["ps", "-axo", "pid=,ppid=,lstart=,command="],
+                             env=dict(os.environ, LC_ALL="C", COLUMNS="100000"),
+                             stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                             stderr=subprocess.DEVNULL, text=True, start_new_session=True)
+    try:
+        stdout, _ = wait_for_progress(child)
+    except subprocess.TimeoutExpired:
+        end_child(child)
+        raise
+    if child.returncode:
+        raise RuntimeError("process table unavailable")
+    rows = {}
+    for line in stdout.splitlines():
+        match = ROW.fullmatch(line)
+        if match:
+            pid, ppid, start, command = match.groups()
+            rows[int(pid)] = (int(ppid), " ".join(start.split()), words(command))
+    if not rows:
+        raise RuntimeError("process table unavailable")
+    return rows
+
+
+def process_records(rows, seen):
+    current = set()
+    found = []
+    for pid, (ppid, start, argv) in rows.items():
+        name, _flags, script = executable(argv)
+        if (script or name) not in ("gh", "gh-axi"):
+            continue
+        identity = (pid, start)
+        current.add(identity)
+        if identity in seen:
+            continue
+        chain, visited, parent = [], {pid}, ppid
+        while parent in rows and parent not in visited:
+            visited.add(parent)
+            ancestor, born, args = rows[parent]
+            chain.append({"pid": parent, "ppid": ancestor, "start": born, "argv": safe_argv(args)})
+            parent = ancestor
+        found.append({"pid": pid, "ppid": ppid, "start": start, "argv": safe_argv(argv),
+                      "argv_source": "ps-command-line-projection", "ancestors": chain,
+                      "ancestor_end": "root" if parent == 0 else "cycle" if parent in visited else "unobserved"})
+    return found, current
+
+
+def owner_status(root):
+    with open_private(root / "owner.lock") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_SH | fcntl.LOCK_NB)
+        except BlockingIOError:
+            try:
+                lock.seek(0)
+                return json.load(lock)
+            except (ValueError, OSError):
+                return {"state": "starting"}
+    return {"state": "stopped"}
+
+
+class Scan(threading.Thread):
+    """One process-table read off the owner's loop; the loop judges its result."""
+
+    def __init__(self, source):
+        super().__init__(daemon=True)
+        self.source = source
+        self.rows = self.error = None
+
+    def run(self):
+        try:
+            self.rows = self.source()
+        except Exception as error:
+            self.error = error
+
+
+def stop_without_progress(child, expired):
+    try:
+        wait_for_progress(child)
+    except subprocess.TimeoutExpired:
+        expired.set()
+        end_child(child)
+
+
+def quota_result(db, child, stream, began, run_id, timed_out):
+    stream.seek(0)
+    try:
+        projection = stream.read(1024 * 1024).decode("utf-8", "replace")
+        match = QUOTA_BODY.search(projection)
+        if timed_out or child.returncode or match is None:
+            raise ValueError("unavailable")
+        fields = {key: int(value) for key, value in zip(("used", "reset", "limit", "remaining"), match.groups())
+                  if value != "null"}
+        status = "observed"
+    except (ValueError, KeyError, TypeError):
+        fields, status = {}, "unavailable"
+    record(db, "quota", {"run_id": run_id, "status": status, "source": "REST rate_limit resources.graphql",
+                         "endpoint": "rate_limit", "host": os.environ.get("GH_HOST", "github.com"),
+                         "request_started_at": began, "request_pid": child.pid,
+                         "exit_code": child.returncode, "graphql": fields,
+                         **({"reason": "timeout"} if timed_out else {})})
+    stream.close()
+
+
+def run(root, duration=None, ready=None, *, process_source=None):
+    # Root-home execution uses ps; deterministic callers inject the same table
+    # shape without changing filtering, ancestry, identity or storage behavior.
+    source = process_table if process_source is None else process_source
+    progress_api()
+    tree = sibling("fm-proc-budget-tree.py")
+    table = tree["Table"]()
+    with ownership(root, fcntl.LOCK_EX) as lock:
+        lock.truncate(0)
+        db = database(root)
+        run_id = uuid.uuid4().hex
+        metadata = {"state": "running", "pid": os.getpid(), "run_id": run_id, "started_at": time.time()}
+        json.dump(metadata, lock)
+        lock.flush()
+        stopped = False
+
+        def stop_requested(_number, _frame):
+            nonlocal stopped
+            stopped = True
+
+        for number in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+            signal.signal(number, stop_requested)
+        child = stream = expired = scan = verdict = None
+        seen = {}
+        epoch = 0
+        scans = failures = 0
+        max_gap = 0.0
+        previous = None
+        started = next_process = next_quota = time.monotonic()
+
+        def finish_scan():
+            nonlocal scan, failures, epoch
+            finished, scan = scan, None
+            if isinstance(finished.error, SAMPLE_ERRORS):
+                failures += 1
+            elif finished.error is not None:
+                raise finished.error
+            else:
+                found, current = process_records(finished.rows, seen)
+                observed = time.time()
+                for pid, start in sorted(seen.keys() - current):
+                    _stamp, item = seen.pop((pid, start))
+                    record(db, "process_end", {field: item[field] for field in CALLER_FIELDS}, observed)
+                for item in found:
+                    epoch += 1
+                    seen[(item["pid"], item["start"])] = (None, dict(item, run_id=run_id, epoch=epoch,
+                                                                  first_observed_at=observed))
+                for identity, (stamp, item) in seen.items():
+                    if stamp is None or observed - stamp >= RETENTION / 2:
+                        record(db, "process", item, observed)
+                        seen[identity] = (observed, item)
+
+        try:
+            prune(db, time.time())
+            record(db, "owner", dict(metadata, action="start", process_interval=PROCESS_INTERVAL, quota_interval=QUOTA_INTERVAL))
+            db.commit()
+            if ready is not None:
+                os.write(ready, b"ready\n")
+                os.close(ready)
+                ready = None
+            while not stopped:
+                now = time.monotonic()
+                if duration is not None and now - started >= duration:
+                    break
+                try:
+                    if (root / "stop").read_text() == run_id:
+                        break
+                except FileNotFoundError:
+                    pass
+                if child is not None and child.poll() is not None:
+                    quota_result(db, child, stream, began, run_id, expired.is_set())
+                    child = stream = None
+                    db.commit()
+                if scan is not None and not scan.is_alive():
+                    finish_scan()
+                    db.commit()
+                if now >= next_process:
+                    next_process = now + PROCESS_INTERVAL
+                    if scan is None:
+                        if previous is not None:
+                            max_gap = max(max_gap, now - previous)
+                        previous = now
+                        scans += 1
+                        scan = Scan(source)
+                        scan.start()
+                if now >= next_quota:
+                    record(db, "sampling", {"run_id": run_id, "scans": scans, "failures": failures,
+                                             "max_gap_seconds": max_gap, "process_interval": PROCESS_INTERVAL})
+                    scans = failures = 0
+                    max_gap = 0.0
+                    prune(db, time.time())
+                    if child is None:
+                        began = time.time()
+                        stream = tempfile.TemporaryFile(dir=root)
+                        try:
+                            child = subprocess.Popen(["gh-axi", "api", "rate_limit", "--jq", QUOTA_JQ, "--full"],
+                                                     stdout=stream, stderr=subprocess.DEVNULL,
+                                                     stdin=subprocess.DEVNULL, start_new_session=True)
+                        except OSError:
+                            stream.close()
+                            stream = None
+                            record(db, "quota", {"run_id": run_id, "status": "unavailable", "endpoint": "rate_limit",
+                                                 "source": "REST rate_limit resources.graphql", "reason": "command_unavailable"})
+                        else:
+                            expired = threading.Event()
+                    else:
+                        record(db, "quota", {"run_id": run_id, "status": "pending", "endpoint": "rate_limit",
+                                             "source": "REST rate_limit resources.graphql", "request_pid": child.pid})
+                    if child is not None and (verdict is None or not verdict.is_alive()):
+                        verdict = threading.Thread(target=stop_without_progress, args=(child, expired), daemon=True)
+                        verdict.start()
+                    db.commit()
+                    next_quota = time.monotonic() + QUOTA_INTERVAL
+                time.sleep(max(0, min(next_process, next_quota) - time.monotonic()))
+        finally:
+            if ready is not None:
+                os.close(ready)
+            if child is not None:
+                end_child(child)
+                stream.close()
+            try:
+                end_owned_children(table, (verdict, scan))
+            except tree["SampleError"]:
+                pass
+            if scan is not None and scan.rows is not None:
+                finish_scan()
+            observed = time.time()
+            for _stamp, item in seen.values():
+                record(db, "process", item, observed)
+            record(db, "sampling", {"run_id": run_id, "scans": scans, "failures": failures,
+                                     "max_gap_seconds": max_gap, "process_interval": PROCESS_INTERVAL})
+            record(db, "owner", {"run_id": run_id, "action": "stop"})
+            db.commit()
+            db.close()
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("command", choices=("start", "run", "status", "stop", "prune", "records"))
+    parser.add_argument("--duration", type=float)
+    parser.add_argument("--kind")
+    parser.add_argument("--ready-fd", type=int, help=argparse.SUPPRESS)
+    args = parser.parse_args()
+    if args.duration is not None and (args.command != "run" or not 0 < args.duration < float("inf")):
+        parser.error("--duration must be finite, positive and used with run")
+    if args.kind is not None and args.command != "records":
+        parser.error("--kind is for records")
+    os.umask(0o077)
+    root = private_root()
+    if args.command == "status":
+        print(json.dumps(owner_status(root)))
+    elif args.command == "run":
+        run(root, args.duration, args.ready_fd)
+    elif args.command == "start":
+        with open_private(root / "start.lock") as starting:
+            try:
+                fcntl.flock(starting, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                raise OwnerLockHeld from None
+            status = owner_status(root)
+            if status["state"] == "starting":
+                raise OwnerLockHeld
+            if status["state"] != "stopped":
+                print(json.dumps(status))
+                return
+            log = owner_log(root)
+            read_fd, write_fd = os.pipe()
+            try:
+                child = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "run", "--ready-fd", str(write_fd)],
+                                         pass_fds=(write_fd,), start_new_session=True, stdin=subprocess.DEVNULL,
+                                         stdout=subprocess.DEVNULL, stderr=log)
+                os.close(write_fd)
+                write_fd = None
+                if os.read(read_fd, 32) != b"ready\n":
+                    if child.wait() == BUSY:
+                        raise OwnerLockHeld
+                    raise RuntimeError("observer failed to start")
+            finally:
+                os.close(log)
+                os.close(read_fd)
+                if write_fd is not None:
+                    os.close(write_fd)
+            print(json.dumps(owner_status(root)))
+    elif args.command == "stop":
+        status = owner_status(root)
+        if status.get("run_id"):
+            with open_private(root / "stop") as marker:
+                marker.seek(0)
+                marker.truncate()
+                marker.write(status["run_id"])
+            while owner_status(root).get("run_id") == status["run_id"]:
+                time.sleep(PROCESS_INTERVAL)
+        elif status["state"] != "stopped":
+            raise RuntimeError("owner is starting; retry stop after readiness")
+        print(json.dumps({"state": "stopped"}))
+    else:
+        with ownership(root, fcntl.LOCK_SH):
+            db = database(root)
+            try:
+                if args.command == "prune":
+                    print(json.dumps({"removed": prune(db, time.time())}))
+                else:
+                    query = "SELECT payload FROM observations"
+                    parameters = ()
+                    if args.kind is not None:
+                        query += " WHERE kind=?"
+                        parameters = (args.kind,)
+                    for row in db.execute(query + " ORDER BY observed,rowid", parameters):
+                        print(row[0])
+            finally:
+                db.close()
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except OwnerLockHeld:
+        print("fm-github-accounting: busy (owner lock held); retry", file=sys.stderr)
+        sys.exit(BUSY)
+    except (OSError, RuntimeError, sqlite3.Error):
+        # No exception text: command output/path arguments can contain secrets.
+        print("fm-github-accounting: operation unavailable (check owner status/state permissions)", file=sys.stderr)
+        sys.exit(1)

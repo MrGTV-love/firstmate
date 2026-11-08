@@ -408,6 +408,9 @@
 # nested inside the slot stays this task's own whoever the claim names: only the
 # slot steps are dropped, and the copy's runtime is retired and its landing
 # proved exactly as for any reassociated copy.
+# Pool-custody admission alone does not identify a slot to return: a nested
+# copy with no derived return slot uses ordinary copy cleanup, even when an
+# interrupted teardown left a pending-return record with an empty slot field.
 # A slot whose state is neither held nor unleased (recovered, conflicting,
 # unreadable, or needing jq), or an unleased slot whose installed treehouse is
 # missing or has no lease command (probed once with treehouse lease --help),
@@ -6706,7 +6709,9 @@ elif [ "$KIND" != secondmate ] && { [ -n "$TEARDOWN_PEER_SLOT" ] || [ -n "$TEARD
 elif [ "$TEARDOWN_KEEP_COPY" = 1 ] && [ -z "$TEARDOWN_ENCLOSING_SLOT" ]; then
   :
 elif { [ -d "$WT" ] || [ -n "$TEARDOWN_ENCLOSING_SLOT" ]; } && [ "$KIND" != secondmate ]; then
-  if [ "$TREEHOUSE_SLOT_LOCK_REQUIRED" = 1 ]; then
+  # Admission can need pool custody for a nested copy even when this task
+  # owns no slot to return. Only a proved return slot takes the reserved route.
+  if [ "$TREEHOUSE_SLOT_LOCK_REQUIRED" = 1 ] && [ -n "$TEARDOWN_RETURN_SLOT" ]; then
     TEARDOWN_DEFERRED_POOL_CLEANUP='return'
   else
     teardown_nested_slot return
