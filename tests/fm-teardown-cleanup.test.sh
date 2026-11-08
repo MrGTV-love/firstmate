@@ -6990,6 +6990,37 @@ test_a_replaced_creation_lock_of_a_kept_copy_asks_the_driver_once_more() {
   pass "a replaced creation lock of a kept copy asks the driver exactly once more and its retry asks nothing"
 }
 
+# C2 (changed): a replaced copy at the same path is a different copy: the old
+# record does not apply, the driver is asked once for it, and the earlier preserve
+# keeps its bytes.
+test_a_replaced_kept_copy_at_the_same_path_is_assessed_on_its_own_state() {
+  local rc pid first
+  make_retained_case retained-replaced enclosing
+  held_plain_get_slot "$FOREIGN_CASE"
+  : > "$FOREIGN_CASE/no-lease-command"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-replaced: run 1 should have asked the driver once"
+  first=$(shasum -a 256 "$FOREIGN_CASE/data/task-x1/nested-copy-preserved/$(printf '%s' "$FOREIGN_COPY" | shasum -a 256 | awk '{print $1}')/notes/unique.dat" | awk '{print $1}')
+  git -C "$FOREIGN_CASE/project" worktree unlock "$FOREIGN_COPY"
+  git -C "$FOREIGN_CASE/project" worktree remove --force "$FOREIGN_COPY"
+  git -C "$FOREIGN_CASE/project" worktree add -q -b fm/task-x1-v3 "$FOREIGN_COPY" main
+  sleep 0.1 & pid=$!
+  wait "$pid" 2>/dev/null || true
+  git -C "$FOREIGN_CASE/project" worktree lock --reason "vernant-session-active owner=launcher:$pid launcher=$pid" "$FOREIGN_COPY"
+  mkdir -p "$FOREIGN_COPY/.claude/channel-outbox" "$FOREIGN_COPY/notes"
+  printf 'one\n' > "$FOREIGN_COPY/.claude/channel-outbox/a.jsonl"
+  printf 'two\n' > "$FOREIGN_COPY/.claude/channel-outbox/b.jsonl"
+  printf 'new copy\n' > "$FOREIGN_COPY/notes/unique.dat"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  assert_equals "2 2" "$(retained_call_count) $(retained_tar_count)" "retained-replaced: a replaced copy was not assessed again exactly once"
+  assert_equals "only here" "$(cat "$FOREIGN_CASE/data/task-x1/nested-copy-preserved/$(printf '%s' "$FOREIGN_COPY" | shasum -a 256 | awk '{print $1}')/notes/unique.dat")" "retained-replaced: the earlier preserve lost its bytes"
+  assert_present "$FOREIGN_CASE/state/task-x1.meta" "retained-replaced: the task record was removed"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  assert_equals "2 2" "$(retained_call_count) $(retained_tar_count)" "retained-replaced: the retry asked the driver"
+  [ -n "$first" ] || fail "retained-replaced: no first preserve"
+  pass "a copy replaced at the same path is assessed on its own state exactly once, the earlier preserve keeps its bytes and its retry asks nothing"
+}
+
 # C2 (unchanged): the record does not expire; a run 30 days after the record's
 # time fields and file times asks the driver nothing.
 test_an_aged_record_of_an_unchanged_kept_copy_still_asks_the_driver_nothing() {
@@ -7278,6 +7309,7 @@ test_the_first_teardown_of_a_copy_that_already_holds_tars_asks_the_driver_once
 test_a_head_only_change_of_a_kept_copy_asks_the_driver_exactly_once_more
 test_a_changed_payload_is_archived_once_per_change_and_never_again_while_unchanged
 test_a_replaced_creation_lock_of_a_kept_copy_asks_the_driver_once_more
+test_a_replaced_kept_copy_at_the_same_path_is_assessed_on_its_own_state
 test_an_aged_record_of_an_unchanged_kept_copy_still_asks_the_driver_nothing
 test_a_retained_record_that_cannot_be_written_refuses_the_close
 test_the_preserve_restores_to_the_builders_hashes
