@@ -1621,7 +1621,7 @@ teardown_retained_write() {  # <slot> <copy> <lock-sha256> <identity> <preserve-
 # bundle that bin/fm-teardown.sh's header allows for an attended teardown). --force
 # does not waive it. Prints the cause and returns 1 when either fails.
 teardown_retained_copy_proved() {  # <copy>
-  local copy=$1 status line nested dirty= head
+  local copy=$1 status line nested dirty="" head
   status=$(git -C "$copy" status --porcelain=v1 --untracked-files=all --ignore-submodules=none 2>/dev/null) || {
     echo "REFUSED: the state of own nested copy $(fm_refuse_text "$copy") could not be read, so it is not proved clean; the task was not closed." >&2
     return 1
