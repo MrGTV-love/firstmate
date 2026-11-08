@@ -7024,15 +7024,15 @@ test_a_replaced_kept_copy_at_the_same_path_is_assessed_on_its_own_state() {
 # C2 (unchanged): the record does not expire; a run 30 days after the record's
 # time fields and file times asks the driver nothing.
 test_an_aged_record_of_an_unchanged_kept_copy_still_asks_the_driver_nothing() {
-  local rc record then
+  local rc record aged_at
   make_retained_case retained-aged enclosing
   held_plain_get_slot "$FOREIGN_CASE"
   : > "$FOREIGN_CASE/no-lease-command"
   run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
   expect_code 1 "$rc" "retained-aged: run 1 must refuse for the lease: $(cat "$FOREIGN_CASE/stderr")"
   record=$(retained_record_path)
-  then=$(date -u -v-30d +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d '30 days ago' +%Y-%m-%dT%H:%M:%SZ)
-  sed "s/^closed-at=.*/closed-at=$then/" "$record" > "$record.aged" && mv "$record.aged" "$record"
+  aged_at=$(date -u -v-30d +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d '30 days ago' +%Y-%m-%dT%H:%M:%SZ)
+  sed "s/^closed-at=.*/closed-at=$aged_at/" "$record" > "$record.aged" && mv "$record.aged" "$record"
   find "$FOREIGN_CASE/data" -type f -exec touch -t "$(date -u -v-30d +%Y%m%d%H%M 2>/dev/null || date -u -d '30 days ago' +%Y%m%d%H%M)" {} +
   run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
   expect_code 1 "$rc" "retained-aged: the aged run must refuse for the lease: $(cat "$FOREIGN_CASE/stderr")"
