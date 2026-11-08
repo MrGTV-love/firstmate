@@ -1649,6 +1649,25 @@ test_leaked_worktree_process_is_reaped() {
   pass "a leaked descendant process rooted under the task's worktree is reaped by teardown, not left surviving"
 }
 
+test_the_owned_record_is_removed_at_a_successful_close_and_kept_by_a_refusal() {
+  local case_dir rc
+  case_dir=$(make_case owned-record-close)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  printf '%s\t%s\n' 4242 'lstart=Sun Nov  8 08:00:00 2026' > "$case_dir/state/task-x1.teardown-owned"
+  printf 'edit\n' > "$case_dir/wt/untracked.txt"
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "owned-record-close: a dirty copy must refuse: $(cat "$case_dir/stderr")"
+  assert_present "$case_dir/state/task-x1.teardown-owned" "owned-record-close: a refusal removed the owned record, which a retry needs"
+  rm -f "$case_dir/wt/untracked.txt"
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "owned-record-close: the retry must close: $(cat "$case_dir/stderr")"
+  assert_absent "$case_dir/state/task-x1.teardown-owned" "owned-record-close: the owned record survived a successful close"
+  pass "the owned record survives a refused teardown for its retry and is removed by the successful close"
+}
+
 test_process_identity_is_recorded_before_term_and_kill() {
   local case_dir rc pid journal expected_start expected_cwd epoch signal audit_pid birth command start cwd matched
   case_dir=$(make_case durable-process-identity)
@@ -7553,6 +7572,7 @@ test_top_level_pipeline_discovery_failures_remain_best_effort
 test_own_autonomous_run_is_left_alone
 test_leaked_worktree_process_is_reaped
 test_leaked_tasktmp_process_is_reaped
+test_the_owned_record_is_removed_at_a_successful_close_and_kept_by_a_refusal
 test_process_identity_is_recorded_before_term_and_kill
 test_process_audit_collection_exit_races
 test_nested_registered_worktree_process_is_not_reaped

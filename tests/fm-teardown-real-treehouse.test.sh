@@ -228,35 +228,6 @@ test_a_copy_with_a_foreign_process_inside_it_is_kept_and_the_slot_stays_leased()
   pass "b-process: a copy with a foreign process inside it is refused naming the process, the process is left running, and the copy, the task and the real lease are unchanged"
 }
 
-# The task's own process is what the retire phase ends, and it is proved the task's
-# own by its launch environment (FM_TASK_INBOX, exported by bin/fm-spawn.sh), never
-# by its working directory: one at the copy's root that carries the task's marker is
-# ended; one at the root that does not (a foreign user's, or one with a scrubbed
-# environment) refuses the close and is left running (next case). Needs a working ps.
-test_a_process_at_the_copy_root_is_the_tasks_own_and_is_ended_before_the_close() {
-  local rc pid
-  if ! ps -p $$ -o pid= >/dev/null 2>&1; then
-    pass "skipped: ps is not available here, so the process identity cannot be verified"
-    return 0
-  fi
-  real_case b-process-own
-  rm -f "$FOREIGN_CASE/fakebin/lsof"
-  ( cd "$FOREIGN_COPY" && exec env "FM_TASK_INBOX=$(cd "$FOREIGN_CASE/state" && pwd -P)/task-x1.inbox" sleep 600 ) &
-  pid=$!
-  sleep 1
-  real_teardown rc FM_STUB_CLOSEOUT=retained
-  real_record after
-  if kill -0 "$pid" 2>/dev/null; then
-    kill "$pid" 2>/dev/null || true
-    wait "$pid" 2>/dev/null || true
-    fail "b-process-own: the task's own process at the copy root was not ended"
-  fi
-  wait "$pid" 2>/dev/null || true
-  expect_code 0 "$rc" "b-process-own: the close must succeed once the task's own process is ended: $(cat "$FOREIGN_CASE/stderr")"
-  real_assert_closed "b-process-own"
-  pass "b-process-own: a process at the copy root is the task's own, is ended, and the kept copy and its lease are unchanged"
-}
-
 test_a_foreign_or_scrubbed_process_at_the_copy_root_is_never_ended_and_refuses_the_close() {
   local rc pid shape route
   for route in kept released; do
@@ -370,6 +341,8 @@ test_real_leftover_processes_at_the_copy_root_are_ended_only_when_proved_the_tas
           if [ "$route" = kept ]; then real_teardown rc FM_STUB_CLOSEOUT=retained; else real_teardown rc; fi
           expect_code 1 "$rc" "b-leftover-$state-$route: run 1 must refuse for the dirty copy: $(cat "$FOREIGN_CASE/stderr")"
           assert_present "$FOREIGN_CASE/state/task-x1.teardown-owned" "b-leftover-$state-$route: no owned record was written"
+          grep -q "^$PROC_PID	" "$FOREIGN_CASE/state/task-x1.teardown-owned" \
+            || fail "b-leftover-$state-$route: the product did not record the live marked-parent's child $PROC_PID (no fixture-written entry exists in this case)"
           kill -0 "$PROC_PID" 2>/dev/null || fail "b-leftover-$state-$route: run 1 ended the process before the copy was proved"
           kill "$PROC_PARENT" 2>/dev/null || true
           wait "$PROC_PARENT" 2>/dev/null || true
@@ -393,6 +366,18 @@ test_real_leftover_processes_at_the_copy_root_are_ended_only_when_proved_the_tas
         sleep 0.5
         if kill -0 "$pid" 2>/dev/null; then kill "$pid" 2>/dev/null || true; fail "b-leftover-$state-$route: a process proved the task's own was not ended"; fi
         expect_code 0 "$rc" "b-leftover-$state-$route: the close must succeed once the task's own process is ended: $(cat "$FOREIGN_CASE/stderr")"
+        assert_absent "$FOREIGN_CASE/state/task-x1.teardown-owned" "b-leftover-$state-$route: the owned record survived a successful close"
+        # Retained from the deleted b-process-own (Main 2054): the own process is ended AND
+        # the close leaves the kept copy and the real lease as they were.
+        if [ "$route" = kept ]; then
+          real_assert_closed "b-leftover-$state-$route"
+          assert_equals 0 "$(real_returns)" "b-leftover-$state-$route: the slot was returned"
+          real_assert_slot_unchanged "b-leftover-$state-$route"
+          assert_present "$FOREIGN_COPY/.venv/bin/python" "b-leftover-$state-$route: the kept copy lost its control"
+        else
+          assert_absent "$FOREIGN_COPY" "b-leftover-$state-$route: the released copy survived"
+          assert_grep '|return ' "$FOREIGN_CASE/treehouse.calls.log" "b-leftover-$state-$route: the real binary did not return the slot"
+        fi
       else
         kill -0 "$pid" 2>/dev/null || fail "b-leftover-$state-$route: a process not proved the task's own was ended"
         kill "$pid" 2>/dev/null || true
@@ -550,7 +535,6 @@ teardown_test_cases=(
 test_a_real_pool_slot_keeps_its_lease_and_the_unique_files_are_preserved_and_the_control_is_left_out
 test_a_real_pool_slot_is_returned_after_the_unique_file_is_preserved_and_the_control_is_removed
 test_a_copy_with_a_foreign_process_inside_it_is_kept_and_the_slot_stays_leased
-test_a_process_at_the_copy_root_is_the_tasks_own_and_is_ended_before_the_close
 test_a_foreign_or_scrubbed_process_at_the_copy_root_is_never_ended_and_refuses_the_close
 test_real_leftover_processes_at_the_copy_root_are_ended_only_when_proved_the_tasks_own
 test_a_copy_that_another_task_record_names_is_kept_and_the_slot_stays_leased

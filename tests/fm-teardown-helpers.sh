@@ -77,22 +77,43 @@ teardown_fixture_track() {
   printf '%s\t%s\n' "$signal" "$birth" > "$TEARDOWN_FIXTURE_PROCESSES/$pid"
 }
 
-# The launch marker bin/fm-spawn.sh exports for a task's worker session
-# (FM_TASK_INBOX=<physical state dir>/<id>.inbox): a process at a root counts as the
-# task's own with it (teardown_process_proved_own; the record and a live parent chain also prove). A fixture started with
-# teardown_fixture_start is the task's own, so it carries the marker of the case
-# directory that holds <cwd> (every case's task is task-x1);
-# teardown_fixture_start_foreign starts one without it.
-teardown_fixture_marker() {  # <cwd>
+# The task's own leftover has the production shape (Main 2054): a process of an Apple
+# binary (/bin/sleep, /bin/zsh) hides its environment, so a bare one carrying the
+# marker proves nothing and is refused. A fixture for the task's own process
+# therefore (1) keeps the launch marker (FM_TASK_INBOX=<physical state dir>/<id>.inbox,
+# read where the binary is not an Apple one) and (2) is recorded in the case's
+# state/task-x1.teardown-owned (pid and birth identity), the shape the product's own
+# record has for a live descendant of the worker. teardown_fixture_start_foreign
+# starts one with neither. The real process shapes (a marked non-Apple parent with
+# Apple children; live, orphaned, daemonised) are in tests/fm-teardown-real-treehouse.test.sh,
+# and the product's own recording, with no fixture-written entry, is exercised by the
+# recorded-orphan-apple state of test_real_leftover_processes_at_the_copy_root_are_ended_only_when_proved_the_tasks_own
+# (a real marked python parent; the record is written by the product at the start of run 1)
+# and by the table-driven test_a_process_is_proved_the_tasks_own_by_marker_record_or_live_chain_never_by_place.
+teardown_fixture_case_dir() {  # <cwd>
   local d=$1
   while [ -n "$d" ] && [ "$d" != / ]; do
     if [ -d "$d/state" ] && [ -d "$d/fakebin" ]; then
-      printf 'FM_TASK_INBOX=%s/task-x1.inbox\n' "$(cd "$d/state" && pwd -P)"
+      printf '%s\n' "$d"
       return 0
     fi
     d=$(dirname "$d")
   done
   return 1
+}
+
+teardown_fixture_marker() {  # <cwd>
+  local d
+  d=$(teardown_fixture_case_dir "$1") || return 1
+  printf 'FM_TASK_INBOX=%s/task-x1.inbox\n' "$(cd "$d/state" && pwd -P)"
+}
+
+# Adds <pid> with its birth identity to the case's owned record, as the product writes it.
+teardown_fixture_record_owned() {  # <cwd> <pid>
+  local d birth
+  d=$(teardown_fixture_case_dir "$1") || return 0
+  birth=$(teardown_fixture_birth "$2") || fail "cannot read the identity of fixture process $2"
+  printf '%s\t%s\n' "$2" "$birth" >> "$d/state/task-x1.teardown-owned"
 }
 
 teardown_fixture_start_foreign() {
@@ -116,6 +137,7 @@ teardown_fixture_start() {
   fi
   TEARDOWN_FIXTURE_PID=$!
   teardown_fixture_track "$TEARDOWN_FIXTURE_PID" "$signal"
+  [ -n "${TEARDOWN_FIXTURE_FOREIGN:-}" ] || teardown_fixture_record_owned "$cwd" "$TEARDOWN_FIXTURE_PID"
   [ "$signal" != KILL ] || disown "$TEARDOWN_FIXTURE_PID"
   trap 'exit 130' INT
   trap 'exit 143' TERM

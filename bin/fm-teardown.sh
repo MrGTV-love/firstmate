@@ -679,8 +679,8 @@
 #     dir>/<id>.inbox) in its readable environment; a place in
 #     state/<id>.teardown-owned (pid AND birth identity), written at the start of
 #     the teardown, before any reaping or endpoint closure, from the live
-#     descendants of the marker-bearing worker and never extended once no bearer
-#     is alive; or a live parent chain to either (teardown_process_proved_own).
+#     descendants of the marker-bearing worker, never extended once no bearer
+#     is alive, kept by a refusal for its retry and removed by the successful close; or a live parent chain to either (teardown_process_proved_own).
 #     Anything else is not proved: teardown refuses by naming its pid and leaves it
 #     running, on every route; a foreign process is never ended.
 #     Every other descendant cwd, existing or deleted,
@@ -6934,7 +6934,7 @@ esac
 if [ "$BACKLOG_CLOSED" = 1 ] && [ "$BACKLOG_TRANSITION" = close ]; then
   fm_backlog_ledger_closed "$STATE" "$CONFIG" "$ID" "${BACKLOG_DONE_ARGS[@]+"${BACKLOG_DONE_ARGS[@]}"}"
 fi
-rm -f "$STATE/$ID.teardown-return-pending"
+rm -f "$STATE/$ID.teardown-return-pending" "$STATE/$ID.teardown-owned"
 [ "$TEARDOWN_POOL_SLOT_LOST" != 0 ] || teardown_friction_outcome completed
 if [ "$KIND" != scout ] && [ "$KIND" != secondmate ] && [ "$MODE" != local-only ] \
     && teardown_owns_worktree; then
