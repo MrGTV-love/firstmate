@@ -3328,6 +3328,9 @@ TRAIN_COPY_HEAD=
 #   copy head: the copy sits at H. prerebase: at a commit with H's patch on the old
 #     main. inside: at the train's merge of H, later than H. extra: at H plus a
 #     commit the train never merged.
+# TRAIN_MAIN_EDIT=0 skips the last commit on main (an edit of feature.txt), so the
+# default branch still holds the member's change as landed: the content-in-default proof
+# can then decide the copy by itself, and a case can ask whether it should.
 # TRAIN_PREFETCH_TRAIN=0 leaves the train head out of the copy's object store.
 # Sets TRAIN_MEMBER_HEAD, TRAIN_HEAD and TRAIN_COPY_HEAD.
 setup_train_history() {
@@ -3410,10 +3413,12 @@ setup_train_history() {
     git -C "$tmp" push -q origin main
     TRAIN_LANDING_COMMIT=$(git -C "$tmp" rev-parse HEAD)
   fi
-  printf '%s\n' changed-on-main > "$tmp/feature.txt"
-  git -C "$tmp" add -- feature.txt
-  git -C "$tmp" commit -q -m "main edits feature"
-  git -C "$tmp" push -q origin main
+  if [ "${TRAIN_MAIN_EDIT:-1}" = 1 ]; then
+    printf '%s\n' changed-on-main > "$tmp/feature.txt"
+    git -C "$tmp" add -- feature.txt
+    git -C "$tmp" commit -q -m "main edits feature"
+    git -C "$tmp" push -q origin main
+  fi
   rm -rf "$tmp"
   git -C "$case_dir/project" fetch -q origin
   git -C "$case_dir/wt" fetch -q origin refs/pull/7/head

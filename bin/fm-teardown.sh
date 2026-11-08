@@ -50,7 +50,14 @@
 # cherry, and merge-tree containment each fail to prove content landed without also
 # accepting unlanded edits to the same paths. Teardown still accepts a merged PR
 # whose head contains the current local work (ancestor or equivalent patch ids),
-# or a clean content-in-default tree match. A copy left on pre-rebase commits
+# or a clean content-in-default tree match. Reachability from the default branch is
+# not delivery either: an ours merge makes a commit reachable without its change. So
+# that proof, and the local-only proof (a branch merged into local main), also measure
+# the copy's change from the newest commit of the default branch's first-parent line
+# that the copy holds, which an ours merge cannot move, and require the default
+# branch to hold that net change (bin/fm-task-copy-lib.sh's
+# fm_task_copy_default_holds_change owns the rule): for a copy reachable only through
+# a merge, the tree of the commit that took it in must hold it. A copy left on pre-rebase commits
 # (even ones pushed to another remote) is also accepted when every commit the PR
 # head and the default branch lack has a patch id among the PR head's own commits
 # and each merge commit is exactly what git produces from its parents; a refusal
@@ -2741,40 +2748,17 @@ TEARDOWN_TRAIN_MEMBER_URL=
 teardown_train_member_base() {  # <ref>
   local dir=${TEARDOWN_LANDED_DIR:-$WT} ref=$1 default_ref base
   default_ref=$(landed_default_ref) || return 1
-  base=$({
-    git -C "$dir" rev-list "$ref" -- 2>/dev/null || exit 1
-    printf '%s\n' '--first-parent-line--'
-    git -C "$dir" rev-list --first-parent "$default_ref" -- 2>/dev/null || exit 1
-  } | awk '/^--first-parent-line--$/ { line = 1; next } !line { held[$0] = 1; next } held[$0] { print; exit }')
-  [ -n "$base" ] || return 1
+  base=$(fm_task_copy_first_parent_base "$dir" "$ref" "$default_ref") || return 1
   [ "$base" != "$(git -C "$dir" rev-parse --verify "$ref^{commit}" 2>/dev/null)" ] || return 1
   printf '%s\n' "$base"
 }
 
 # Is the member's net change (<base> to <ref>) still in <train head>'s final tree?
-# Either every path the change touches holds the same content there, or the
-# reverse of the change applies cleanly to that tree, which also covers a train that
-# built further on the same paths. History alone is not enough: a train can contain
-# a commit, or replay its patch, and then revert it before it lands.
+# fm_task_copy_net_change_present owns the rule; an empty net change is refused here.
 teardown_train_content_present() {  # <ref> <train head> <base>
-  local dir=${TEARDOWN_LANDED_DIR:-$WT} ref=$1 train=$2 base=$3 idx rc=1
-  local -a paths=()
-  local path
-  while IFS= read -r -d '' path; do
-    paths+=("$path")
-  done < <(git -C "$dir" diff --name-only -z --no-renames "$base" "$ref" -- 2>/dev/null)
-  [ "${#paths[@]}" -gt 0 ] || return 1
-  if GIT_LITERAL_PATHSPECS=1 git -C "$dir" diff --quiet --no-renames "$ref" "$train" -- "${paths[@]}" 2>/dev/null; then
-    return 0
-  fi
-  idx=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-train-index.XXXXXX") || return 1
-  if GIT_INDEX_FILE=$idx git -C "$dir" read-tree "$train" 2>/dev/null \
-     && git -C "$dir" diff --binary --full-index --no-renames "$base" "$ref" -- 2>/dev/null \
-        | GIT_INDEX_FILE=$idx git -C "$dir" apply --cached -R --check 2>/dev/null; then
-    rc=0
-  fi
-  rm -f "$idx"
-  return "$rc"
+  local rc=0
+  fm_task_copy_net_change_present "${TEARDOWN_LANDED_DIR:-$WT}" "$1" "$2" "$3" || rc=$?
+  [ "$rc" = 0 ]
 }
 
 # Is <ref> carried by <train head>? Both must hold: the change reaches the train, as an
@@ -3079,7 +3063,8 @@ work_is_landed_proof() {
   if [ "$MODE" = local-only ]; then
     local name
     name=$(fm_task_copy_default_branch "$PROJ") || name=
-    if [ -n "$name" ] && git -C "$dir" merge-base --is-ancestor "$ref" "refs/heads/$name" 2>/dev/null; then
+    if [ -n "$name" ] && git -C "$dir" merge-base --is-ancestor "$ref" "refs/heads/$name" 2>/dev/null \
+       && fm_task_copy_default_holds_change "$dir" "$ref" "refs/heads/$name"; then
       return 0
     fi
   fi
