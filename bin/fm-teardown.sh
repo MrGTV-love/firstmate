@@ -1304,6 +1304,12 @@ fm_refuse_if_gate_agent
 FM_LOCK_LOG_PREFIX=teardown
 
 fm_backlog_record_present "$META" "task record" "$STATE" || {
+  # A task that closed around a kept own copy has no record any more; its retained
+  # record still names the task, so a retry is told so instead of a missing record.
+  if closed_by=$(teardown_retained_closed_by "$DATA" "$ID"); then
+    echo "teardown $ID: already closed; its own nested copy was kept by Vernant's closeout driver and stays recorded in $closed_by; nothing was changed and the driver was not asked."
+    exit 0
+  fi
   echo "error: teardown refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
   exit 1
 }
