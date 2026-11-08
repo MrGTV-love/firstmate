@@ -3529,3 +3529,12 @@ teardown_diag_report() {
   fi
   printf '%s' "$out"
 }
+
+# teardown_nonapple_python: prints the path of a python3 that is not an Apple platform binary
+# (its environment is readable by ps -E on macOS), or fails when there is none.
+teardown_nonapple_python() {
+  local py
+  py=$(python3 -c 'import sys; print(sys.executable)' 2>/dev/null) || return 1
+  case "$py" in /usr/bin/*|/System/*|/Library/Developer/*|'') return 1 ;; esac
+  printf '%s\n' "$py"
+}

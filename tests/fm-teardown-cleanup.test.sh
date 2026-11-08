@@ -2433,14 +2433,22 @@ SH
   pass "an exec change preserves birth identity and the process is reaped"
 }
 
-test_process_spawned_during_grace_is_reaped_on_later_pass() {
-  local case_dir rc pid child_file child_pid="" parent_survived=0 child_survived=0 diag
-  case_dir=$(make_case grace-spawn-convergence)
+# grace_spawn_case <apple|nonapple> <case-name>: the owned parent's TERM handler starts a
+# child in the copy root and the parent exits, so the child is an orphan the record never
+# named. A nonapple child (a non-Apple python) inherits the launch marker, so the close
+# proves it the task's own and ends it on a later pass. An apple child (/bin/sleep) hides its
+# environment on macOS, so it is not proved and the close refuses by name and keeps the copy.
+grace_spawn_case() {
+  local kind=$1 name=$2 case_dir rc pid child_file child_pid="" parent_survived=0 child_survived=0 diag py=""
+  if [ "$kind" = nonapple ]; then
+    py=$(teardown_nonapple_python) || { echo "NOT RUN - $name needs a non-Apple python3; a skip is not a pass"; return 0; }
+  fi
+  case_dir=$(make_case "$name")
   write_meta "$case_dir" no-mistakes ship
   land_shippable_commit "$case_dir"
   child_file="$case_dir/child.pid"
 
-  teardown_fixture_start "$case_dir/wt" HUP perl -e "$(cat <<'PERL'
+  FM_GRACE_PY=$py teardown_fixture_start "$case_dir/wt" HUP perl -e "$(cat <<'PERL'
       use POSIX qw(SIG_BLOCK SIG_SETMASK SIGTERM SIGHUP SIGINT SIGQUIT);
       require $ENV{FM_TEARDOWN_FIXTURE_HELPERS};
       my ($file, $ready) = @ARGV;
@@ -2464,7 +2472,8 @@ test_process_spawned_during_grace_is_reaped_on_later_pass() {
         if (!$child) {
           $SIG{TERM} = $SIG{HUP} = $SIG{INT} = $SIG{QUIT} = "DEFAULT";
           POSIX::sigprocmask(SIG_SETMASK, $old) or die "restore signals";
-          exec "sleep", "300"; die "exec";
+          my $py = $ENV{FM_GRACE_PY};
+          exec((defined $py && length $py) ? ($py, "-c", "import time; time.sleep(300)") : ("sleep", "300")); die "exec";
         }
         fixture_track($child);
         open my $fh, ">", $file or die "open";
@@ -2481,7 +2490,7 @@ PERL
   pid=$TEARDOWN_FIXTURE_PID
   local i=0
   while [ ! -e "$case_dir/ready" ] && [ "$i" -lt 100 ]; do sleep 0.1; i=$((i + 1)); done
-  [ -e "$case_dir/ready" ] || fail "grace-spawn-convergence: parent not ready"
+  [ -e "$case_dir/ready" ] || fail "$name: parent not ready"
 
   rc=0
   run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
@@ -2497,11 +2506,28 @@ PERL
     parent_survived=1
     teardown_fixture_stop "$pid"
   fi
-  expect_code 0 "$rc" "grace-spawn-convergence: teardown should converge ($diag)"
-  assert_present "$child_file" "grace-spawn-convergence: TERM handler did not spawn a child"
-  [ "$child_survived" -eq 0 ] || fail "grace-spawn-convergence: spawned child survived ($diag)"
-  [ "$parent_survived" -eq 0 ] || fail "grace-spawn-convergence: original process survived ($diag)"
-  pass "a process spawned during grace is reaped on a later pass"
+  assert_present "$child_file" "$name: TERM handler did not spawn a child"
+  [ "$parent_survived" -eq 0 ] || fail "$name: original process survived ($diag)"
+  if [ "$kind" = nonapple ]; then
+    expect_code 0 "$rc" "$name: teardown should converge ($diag)"
+    [ "$child_survived" -eq 0 ] || fail "$name: spawned child survived ($diag)"
+    pass "a process spawned during grace is reaped on a later pass"
+  else
+    expect_code 1 "$rc" "$name: an unproved Apple orphan must refuse ($diag)"
+    [ "$child_survived" -eq 1 ] || fail "$name: the unproved child was ended ($diag)"
+    assert_grep "process $child_pid" "$case_dir/stderr" "$name: the refusal did not name the process"
+    assert_grep "not proved" "$case_dir/stderr" "$name: the refusal did not say the process is not proved"
+    assert_present "$case_dir/wt" "$name: the refused close removed the copy"
+    pass "an Apple process spawned during grace is refused by name and the copy is kept"
+  fi
+}
+
+test_process_spawned_during_grace_is_reaped_on_later_pass() {
+  grace_spawn_case nonapple grace-spawn-convergence
+}
+
+test_an_apple_process_spawned_during_grace_is_refused_by_name_and_the_copy_is_kept() {
+  grace_spawn_case apple grace-spawn-apple-refused
 }
 
 test_persistent_scan_refuses_after_bounded_retries() {
@@ -7640,6 +7666,7 @@ test_lsof_error_refuses_before_removal
 test_reused_pid_identity_is_not_force_killed
 test_exec_changed_process_is_still_reaped
 test_process_spawned_during_grace_is_reaped_on_later_pass
+test_an_apple_process_spawned_during_grace_is_refused_by_name_and_the_copy_is_kept
 test_persistent_scan_refuses_after_bounded_retries
 test_process_exit_during_identity_lookup_does_not_refuse
 test_run_abort_precedes_process_reap_precedes_worktree_removal
