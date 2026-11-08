@@ -1881,13 +1881,14 @@ say_owner 2000.000200 'from the owner'
 expect_requests "other channel" 2000.000200
 assert_eq "$(python3 "$HELPER" outbound-targets "$(outbound_log)" conversations.history)" 'U0TESTOWNER@D0123456789' \
   "INTAKE-2 [other channel] a history read left the owner DM"
-# Empty text, or text that is only spaces and invisible characters, is not a request.
+# Empty text is not a request; a text that only looks empty (spaces, invisible and separator characters) is one, because
+# the predicate is that the text is not empty (Amendments am and bf).
 intake_home
 say_owner 2000.000100 ''
 say_owner 2000.000200 '   '
 say_owner 2000.000300 'json:"\u200b\u2028\u0085\t"'
 say_owner 2000.000400 'from the owner'
-expect_requests "empty text" 2000.000400
+expect_requests "empty text and text that only looks empty" 2000.000200 2000.000300 2000.000400
 # Plane off (no token, empty allowlist) or source unbound: no network call, no state change, no output.
 intake_home
 say_owner 2000.000100 'typed while the plane is off'
