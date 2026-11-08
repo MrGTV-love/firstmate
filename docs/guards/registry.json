@@ -2273,7 +2273,7 @@
         },
         {
           "file": "bin/fm-teardown.sh",
-          "match": "echo \"REFUSED: process $pid ($identity) is at scan root $dir but does not carry this task's FM_TASK_INBOX launch marker, or its environment cannot be read, so its ownership by $ID is not proven; leaving it running and preserving task $ID without signalling.\" >&2"
+          "match": "echo \"REFUSED: process $pid ($identity) is at scan root $dir but is not proved this task's own (no FM_TASK_INBOX launch marker in a readable environment, not in the owned record, no live parent chain to either), so its ownership by $ID is not proven; leaving it running and preserving task $ID without signalling.\" >&2"
         },
         {
           "file": "bin/fm-teardown.sh",

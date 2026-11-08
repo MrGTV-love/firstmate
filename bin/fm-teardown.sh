@@ -674,12 +674,16 @@
 #     outer-worktree discovery never proves custody.
 #     Only a cwd exactly equal to a live recorded scan root is
 #     eligible for signalling, and only when the process is proved the task's own
-#     by its launch environment: bin/fm-spawn.sh exports FM_TASK_INBOX=<physical
-#     state dir>/<id>.inbox before the worker's launch command, so every process
-#     the worker session starts carries it (teardown_process_marked, read with
-#     ps -E). A process at a root without that value, or whose environment cannot
-#     be read, is not proved the task's own: teardown refuses by naming its pid and
-#     leaves it running, on every route. Every other descendant cwd, existing or deleted,
+#     without reading an Apple binary's environment (hidden on macOS): any one of
+#     the launch marker bin/fm-spawn.sh exports (FM_TASK_INBOX=<physical state
+#     dir>/<id>.inbox) in its readable environment; a place in
+#     state/<id>.teardown-owned (pid AND birth identity), written at the start of
+#     the teardown, before any reaping or endpoint closure, from the live
+#     descendants of the marker-bearing worker and never extended once no bearer
+#     is alive; or a live parent chain to either (teardown_process_proved_own).
+#     Anything else is not proved: teardown refuses by naming its pid and leaves it
+#     running, on every route; a foreign process is never ended.
+#     Every other descendant cwd, existing or deleted,
 #     refuses with its pid, birth identity, matched path and scan root, because
 #     a damaged sibling lane cannot be distinguished from an own-tree directory.
 #     One exception: before this sweep, retire sends TERM to a creation-lock
@@ -3928,9 +3932,9 @@ task_pids_under_roots() {  # <dir>...
         TASK_PIDS_ERROR="descendant cwd holds process $pid without proven task custody"
         return 1
       fi
-      if ! teardown_process_marked "$pid"; then
+      if ! teardown_process_proved_own "$pid"; then
         identity=$(task_process_identity "$pid") || identity="identity unavailable"
-        echo "REFUSED: process $pid ($identity) is at scan root $dir but does not carry this task's FM_TASK_INBOX launch marker, or its environment cannot be read, so its ownership by $ID is not proven; leaving it running and preserving task $ID without signalling." >&2
+        echo "REFUSED: process $pid ($identity) is at scan root $dir but is not proved this task's own (no FM_TASK_INBOX launch marker in a readable environment, not in the owned record, no live parent chain to either), so its ownership by $ID is not proven; leaving it running and preserving task $ID without signalling." >&2
         TASK_PIDS_FAILED_DIR=$path
         TASK_PIDS_ERROR="process $pid at the scan root is not proven the task's own"
         return 1
@@ -6269,6 +6273,7 @@ if [ "$KIND" != secondmate ] && [ "$TEARDOWN_SLOT_SHARED" = 1 ] \
     && [ -d "$WT" ] && [ "$(fm_task_copy_canonical_dir "$WT")" != "$TEARDOWN_SHARED_SLOT" ]; then
   require_exclusive_worktree_slot_record "$META" "$ID" "$STATE" "$WT" || exit 1
 fi
+[ "$KIND" = secondmate ] || teardown_owned_record_write
 teardown_nested_slot prove || exit 1
 [ "$KIND" = secondmate ] || teardown_prove_slot_manifest "${TEARDOWN_ENCLOSING_SLOT:-$WT}"
 

@@ -294,20 +294,111 @@ sys.stdout.buffer.write(b"\n".join(env) + b"\n")
 PY
 }
 
-# Is process <pid> proved to be this task's own by its launch environment, and not
-# by where it sits? bin/fm-spawn.sh exports FM_TASK_INBOX=<physical state
-# directory>/<task-id>.inbox before the worker's launch command, so every process
-# the worker session starts, orphaned or not, carries exactly this value. A process
-# without it, or whose environment cannot be read, is not proved the task's own.
-teardown_process_marked() {  # <pid>
-  local pid=$1 state_real expected out
+# The marker value bin/fm-spawn.sh exports for this task's worker session:
+# FM_TASK_INBOX=<physical state directory>/<task-id>.inbox. Every process the
+# worker session starts inherits it.
+teardown_owner_marker() {
+  local state_real
   state_real=$(cd "$STATE" 2>/dev/null && pwd -P) || return 1
-  expected="FM_TASK_INBOX=$state_real/$ID.inbox"
+  printf 'FM_TASK_INBOX=%s/%s.inbox\n' "$state_real" "$ID"
+}
+
+# Does process <pid>'s own readable environment carry the marker? The environment of
+# an Apple platform binary (/bin/sleep, /bin/zsh, /usr/bin/git) is hidden from other
+# processes on macOS, so a missing marker proves nothing by itself.
+teardown_process_env_marked() {  # <pid>
+  local pid=$1 expected out env_file
+  expected=$(teardown_owner_marker) || return 1
   out=$(LC_ALL=C ps -ww -E -p "$pid" -o command= 2>/dev/null) || out=
   case "$out" in *" $expected"|*" $expected "*) return 0 ;; esac
-  out=$(teardown_process_env_lines "$pid" 2>/dev/null) || return 1
+  env_file=${FM_PROC_ROOT_OVERRIDE:-/proc}/$pid/environ
+  if [ -r "$env_file" ]; then
+    out=$(tr '\0' '\n' < "$env_file" 2>/dev/null) || out=
+  else
+    out=$(teardown_process_env_lines "$pid" 2>/dev/null) || return 1
+  fi
   case $'\n'"$out" in *$'\n'"$expected"$'\n'*) return 0 ;; esac
   return 1
+}
+
+# The record of the task's own processes, written once at the start of a teardown
+# while the worker is alive: one "<pid><TAB><birth identity>" line each.
+teardown_owned_record_path() {
+  printf '%s/%s.teardown-owned\n' "$STATE" "$ID"
+}
+
+# Is <pid> in the owned record with the same birth identity (pid AND start time)? A
+# recycled pid has another start time and proves nothing.
+teardown_process_recorded() {  # <pid>
+  local pid=$1 rec recorded current
+  rec=$(teardown_owned_record_path)
+  { [ -f "$rec" ] && [ ! -L "$rec" ] && [ -r "$rec" ]; } || return 1
+  current=$(task_process_identity "$pid" 2>/dev/null) || return 1
+  [ -n "$current" ] || return 1
+  recorded=$(awk -F'\t' -v p="$pid" '$1 == p { print substr($0, length($1) + 2) }' "$rec")
+  [ -n "$recorded" ] || return 1
+  while IFS= read -r line; do
+    [ "$line" != "$current" ] || return 0
+  done <<< "$recorded"
+  return 1
+}
+
+# Is process <pid> proved to be this task's own, without reading an Apple binary's
+# environment? Any one of: its readable environment carries the marker; it is in the
+# owned record with a matching birth identity; a live parent chain reaches such a
+# process. Anything else is not proved: the caller refuses by name and leaves it
+# running, and a foreign process is never ended.
+teardown_process_proved_own() {  # <pid>
+  local cur=$1 hops=0
+  while [ -n "$cur" ] && [ "$cur" -gt 1 ] 2>/dev/null && [ "$hops" -lt 64 ]; do
+    teardown_process_env_marked "$cur" && return 0
+    teardown_process_recorded "$cur" && return 0
+    cur=$(LC_ALL=C ps -o ppid= -p "$cur" 2>/dev/null | tr -d '[:space:]') || return 1
+    hops=$((hops + 1))
+  done
+  return 1
+}
+
+# Writes the owned record from the live processes: every descendant (by live
+# parent chain) of a process whose environment carries the marker, the marker
+# bearers included, except this teardown's own process and its ancestors. Run once
+# at the start of a teardown, before anything is reaped or any endpoint is closed.
+# Entries already recorded stay; nothing is added when no bearer is alive, so the
+# record is never extended after the worker is gone. Failure to read the process
+# table records nothing and is not an error (unrecorded processes stay unproved).
+teardown_owned_record_write() {
+  local rec expected table ancestors cur pids line pid identity tmp
+  rec=$(teardown_owned_record_path)
+  expected=$(teardown_owner_marker) || return 0
+  table=$(LC_ALL=C ps -A -ww -E -o pid=,ppid=,command= 2>/dev/null) || return 0
+  [ -n "$table" ] || return 0
+  ancestors=" $$ "
+  cur=$$
+  while [ -n "$cur" ] && [ "$cur" -gt 1 ] 2>/dev/null; do
+    cur=$(LC_ALL=C ps -o ppid= -p "$cur" 2>/dev/null | tr -d '[:space:]') || break
+    [ -z "$cur" ] || ancestors="$ancestors$cur "
+  done
+  pids=$(printf '%s\n' "$table" | awk -v mk="$expected" -v anc="$ancestors" '
+    { parent[$1] = $2; if (index(" " $0 " ", " " mk " ") > 0) mark[$1] = 1 }
+    END {
+      changed = 1
+      while (changed) {
+        changed = 0
+        for (p in parent) if (!(p in mark) && (parent[p] in mark)) { mark[p] = 1; changed = 1 }
+      }
+      for (p in mark) if (index(anc, " " p " ") == 0) print p
+    }') || return 0
+  [ -n "$pids" ] || return 0
+  tmp=$(mktemp "${rec}.XXXXXX" 2>/dev/null) || return 0
+  { [ -f "$rec" ] && [ ! -L "$rec" ] && cat "$rec"; } > "$tmp" 2>/dev/null || true
+  while IFS= read -r pid; do
+    [ -n "$pid" ] || continue
+    identity=$(task_process_identity "$pid" 2>/dev/null) || continue
+    [ -n "$identity" ] || continue
+    printf '%s\t%s\n' "$pid" "$identity" >> "$tmp"
+  done <<< "$pids"
+  LC_ALL=C sort -u "$tmp" > "$tmp.sorted" 2>/dev/null && mv -- "$tmp.sorted" "$rec" || true
+  rm -f -- "$tmp" "$tmp.sorted"
 }
 
 # Reads into TEARDOWN_OWN_SCAN the "pid<TAB>cwd" lines of the processes whose cwd
@@ -323,7 +414,7 @@ teardown_own_scan() {
     root=$(cd "$root" && pwd -P) || return 1
     out=$(pids_with_cwd_under "$root") || return 1
     while IFS=$'\t' read -r owned_pid owned_path; do
-      [ "$owned_path" != "$root" ] || ! teardown_process_marked "$owned_pid" || TEARDOWN_OWN_SCAN+="$owned_pid"$'\t'"$owned_path"$'\n'
+      [ "$owned_path" != "$root" ] || ! teardown_process_proved_own "$owned_pid" || TEARDOWN_OWN_SCAN+="$owned_pid"$'\t'"$owned_path"$'\n'
     done <<< "$out"
   done
   TEARDOWN_OWN_SCANNED=1

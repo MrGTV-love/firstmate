@@ -289,6 +289,124 @@ test_a_foreign_or_scrubbed_process_at_the_copy_root_is_never_ended_and_refuses_t
   pass "b-process-root: on the kept and the released route, a process at the copy root that is foreign or has a scrubbed environment refuses the close by name, is left running, and the copy, the task and the real lease are unchanged"
 }
 
+# Real leftover process types at the copy root (Main 2002, 2005): an Apple /bin/zsh
+# with an Apple /bin/sleep child, and a marked non-Apple python. Each state is run on
+# the kept and the released route. "Own" is proved by a readable marker, a place in
+# state/<id>.teardown-owned (pid and start time) or a live parent chain to either;
+# anything else refuses by name and is left running. These cases need a working ps and
+# a non-Apple python3; where either is missing the cases are NOT RUN (a skip is not a
+# pass), and the output says so.
+real_proc_python() {
+  local py
+  py=$(python3 -c 'import sys; print(sys.executable)' 2>/dev/null) || return 1
+  case "$py" in /usr/bin/*|/System/*|/Library/Developer/*|'') return 1 ;; esac
+  printf '%s\n' "$py"
+}
+
+# real_proc_start <mode>: starts the leftover in $FOREIGN_COPY; the parent's pid is in
+# PROC_PARENT (empty when the parent has exited) and the process at the root in PROC_PID.
+real_proc_start() {
+  local mode=$1 py marker script i
+  py=$(real_proc_python) || return 1
+  marker="FM_TASK_INBOX=$(cd "$FOREIGN_CASE/state" && pwd -P)/task-x1.inbox"
+  script=$FOREIGN_CASE/leftover.py
+  cat > "$script" <<'PY'
+import os, subprocess, sys, time
+root, mode, out = sys.argv[1], sys.argv[2], sys.argv[3]
+apple = ["/bin/zsh", "-c", "/bin/sleep 600; :"]
+nonapple = [sys.executable, "-c", "import time; time.sleep(600)"]
+cmd = apple if mode.endswith("apple") else nonapple
+if mode.startswith("live"):
+    p = subprocess.Popen(cmd, cwd=root)
+    open(out, "w").write(str(p.pid))
+    time.sleep(600)
+else:
+    if mode.startswith("daemon"):
+        if os.fork() != 0:
+            sys.exit(0)
+        os.setsid()
+        if os.fork() != 0:
+            sys.exit(0)
+        os.chdir(root)
+        open(out, "w").write(str(os.getpid()))
+        os.execv(cmd[0], cmd)
+    else:
+        p = subprocess.Popen(cmd, cwd=root)
+        open(out, "w").write(str(p.pid))
+        sys.exit(0)
+PY
+  rm -f "$FOREIGN_CASE/leftover.pid"
+  case "$mode" in
+    foreign-apple) ( cd "$FOREIGN_COPY" && exec /bin/sleep 600 ) & PROC_PID=$!; PROC_PARENT=; return 0 ;;
+  esac
+  env "$marker" "$py" "$script" "$FOREIGN_COPY" "$mode" "$FOREIGN_CASE/leftover.pid" &
+  PROC_PARENT=$!
+  for i in $(seq 1 100); do [ -s "$FOREIGN_CASE/leftover.pid" ] && break; sleep 0.1; done
+  PROC_PID=$(cat "$FOREIGN_CASE/leftover.pid" 2>/dev/null) || return 1
+  case "$mode" in live*) ;; *) wait "$PROC_PARENT" 2>/dev/null || true; PROC_PARENT= ;; esac
+  sleep 0.5
+}
+
+test_real_leftover_processes_at_the_copy_root_are_ended_only_when_proved_the_tasks_own() {
+  local rc route state want pid parent rec identity
+  if ! ps -p $$ -o pid= >/dev/null 2>&1 || ! real_proc_python >/dev/null; then
+    echo "NOT RUN - b-process-leftovers needs a working ps and a non-Apple python3; a skip is not a pass"
+    return 0
+  fi
+  for route in kept released; do
+    for state in live-apple live-nonapple orphan-nonapple daemon-nonapple orphan-apple daemon-apple foreign-apple recorded-orphan-apple pid-reuse; do
+      real_case "b-leftover-$state-$route"
+      rm -f "$FOREIGN_CASE/fakebin/lsof"
+      SLOT_ENTRY_BEFORE=$(real_slot_entry)
+      want=refused
+      case "$state" in
+        live-apple|live-nonapple|orphan-nonapple|daemon-nonapple|recorded-orphan-apple) want=ended ;;
+      esac
+      case "$state" in
+        recorded-orphan-apple)
+          real_proc_start live-apple || fail "b-leftover-$state-$route: the fixture did not start"
+          # Run 1 refuses before anything is reaped (a dirty copy), after the owned record is written.
+          printf 'edit\n' > "$FOREIGN_COPY/untracked.txt"
+          if [ "$route" = kept ]; then real_teardown rc FM_STUB_CLOSEOUT=retained; else real_teardown rc; fi
+          expect_code 1 "$rc" "b-leftover-$state-$route: run 1 must refuse for the dirty copy: $(cat "$FOREIGN_CASE/stderr")"
+          assert_present "$FOREIGN_CASE/state/task-x1.teardown-owned" "b-leftover-$state-$route: no owned record was written"
+          kill -0 "$PROC_PID" 2>/dev/null || fail "b-leftover-$state-$route: run 1 ended the process before the copy was proved"
+          kill "$PROC_PARENT" 2>/dev/null || true
+          wait "$PROC_PARENT" 2>/dev/null || true
+          sleep 0.5
+          rm -f "$FOREIGN_COPY/untracked.txt"
+          held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY"
+          ;;
+        pid-reuse)
+          real_proc_start foreign-apple || fail "b-leftover-$state-$route: the fixture did not start"
+          printf '%s\tlstart=Mon Jan  1 00:00:00 2001\n' "$PROC_PID" > "$FOREIGN_CASE/state/task-x1.teardown-owned"
+          ;;
+        *)
+          real_proc_start "$state" || fail "b-leftover-$state-$route: the fixture did not start"
+          ;;
+      esac
+      pid=$PROC_PID
+      parent=$PROC_PARENT
+      if [ "$route" = kept ]; then real_teardown rc FM_STUB_CLOSEOUT=retained; else real_teardown rc; fi
+      real_record after
+      if [ "$want" = ended ]; then
+        sleep 0.5
+        if kill -0 "$pid" 2>/dev/null; then kill "$pid" 2>/dev/null || true; fail "b-leftover-$state-$route: a process proved the task's own was not ended"; fi
+        expect_code 0 "$rc" "b-leftover-$state-$route: the close must succeed once the task's own process is ended: $(cat "$FOREIGN_CASE/stderr")"
+      else
+        kill -0 "$pid" 2>/dev/null || fail "b-leftover-$state-$route: a process not proved the task's own was ended"
+        kill "$pid" 2>/dev/null || true
+        expect_code 1 "$rc" "b-leftover-$state-$route: a process not proved the task's own must refuse: $(cat "$FOREIGN_CASE/stderr")"
+        assert_grep "process $pid" "$FOREIGN_CASE/stderr" "b-leftover-$state-$route: the refusal did not name the process"
+        assert_equals 0 "$(retained_call_count)" "b-leftover-$state-$route: the driver was asked about a copy with a live user"
+        real_assert_kept "b-leftover-$state-$route"
+      fi
+      [ -z "$parent" ] || { kill "$parent" 2>/dev/null || true; wait "$parent" 2>/dev/null || true; }
+    done
+  done
+  pass "b-leftovers: on the kept and the released route, an Apple zsh or sleep and a marked non-Apple python at the copy root are ended when a readable marker, the owned record or a live parent chain proves them the task's own, and refused by name and left running otherwise (orphaned or daemonised Apple binaries, a foreign process, a reused pid)"
+}
+
 test_a_copy_that_another_task_record_names_is_kept_and_the_slot_stays_leased() {
   local rc
   real_case b-record
@@ -434,6 +552,7 @@ test_a_real_pool_slot_is_returned_after_the_unique_file_is_preserved_and_the_con
 test_a_copy_with_a_foreign_process_inside_it_is_kept_and_the_slot_stays_leased
 test_a_process_at_the_copy_root_is_the_tasks_own_and_is_ended_before_the_close
 test_a_foreign_or_scrubbed_process_at_the_copy_root_is_never_ended_and_refuses_the_close
+test_real_leftover_processes_at_the_copy_root_are_ended_only_when_proved_the_tasks_own
 test_a_copy_that_another_task_record_names_is_kept_and_the_slot_stays_leased
 test_a_slot_another_task_claims_is_left_untouched_and_stays_leased
 test_a_start_racing_the_close_never_receives_the_held_slot

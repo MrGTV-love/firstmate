@@ -79,7 +79,7 @@ teardown_fixture_track() {
 
 # The launch marker bin/fm-spawn.sh exports for a task's worker session
 # (FM_TASK_INBOX=<physical state dir>/<id>.inbox): a process at a root counts as the
-# task's own only with it (teardown_process_marked). A fixture started with
+# task's own with it (teardown_process_proved_own; the record and a live parent chain also prove). A fixture started with
 # teardown_fixture_start is the task's own, so it carries the marker of the case
 # directory that holds <cwd> (every case's task is task-x1);
 # teardown_fixture_start_foreign starts one without it.

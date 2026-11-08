@@ -7297,42 +7297,78 @@ test_an_ignored_file_created_while_the_driver_runs_refuses_and_is_assessed_afres
   pass "an ignored file created while the driver runs refuses the close without a record, and the next run assesses the changed payload once and closes"
 }
 
-# The launch marker is read from the process environment, never inferred from the
-# process's place. The function is exercised on its own with a ps stand-in that
-# prints a process line the way `ps -ww -E -o command=` does.
-test_the_launch_marker_is_read_from_the_process_environment() {
-  local dir fake state_real case_name want line rc
-  dir=$(make_case marker-reader)
-  fake=$dir/fakebin
-  state_real=$(cd "$dir/state" && pwd -P)
-  eval "$(sed -n '/^teardown_process_env_lines() {/,/^}/p; /^teardown_process_marked() {/,/^}/p' "$ROOT/bin/fm-teardown-nested-lib.sh")"
-  # shellcheck disable=SC2034 # read by teardown_process_marked, evaluated above.
-  STATE=$dir/state
-  # shellcheck disable=SC2034 # read by teardown_process_marked, evaluated above.
-  ID=task-x1
-  for case_name in present:0 other-task:1 absent:1 prefix-of-longer-value:1 inside-another-name:1 unreadable:1; do
-    want=${case_name#*:}
-    case "${case_name%:*}" in
-      present) line="sleep 600 HOME=/h FM_TASK_INBOX=$state_real/task-x1.inbox TERM=x" ;;
-      other-task) line="sleep 600 FM_TASK_INBOX=$state_real/task-y1.inbox" ;;
-      absent) line="sleep 600 HOME=/h" ;;
-      prefix-of-longer-value) line="sleep 600 FM_TASK_INBOX=$state_real/task-x1.inbox.old" ;;
-      inside-another-name) line="sleep 600 XFM_TASK_INBOX=$state_real/task-x1.inbox" ;;
-      unreadable) line="" ;;
-    esac
-    cat > "$fake/ps" <<SH
+# "The task's own" is proved without reading an Apple binary's environment: the
+# marker in a readable environment, a place in the owned record (pid AND start
+# time), or a live parent chain to either. The functions run on their own against
+# a ps stand-in that serves a synthetic process table ("pid|ppid|start|command").
+retained_ps_table_shim() {  # <fakebin> <table>
+  cat > "$1/ps" <<'SH'
 #!/usr/bin/env bash
-case "\$*" in
-  *"-E"*"-o command="*) [ -n '$line' ] && printf '%s\n' '$line' || exit 1 ;;
+t=${FAKE_PS_TABLE:?}
+row() { awk -F'|' -v p="$1" '$1 == p' "$t"; }
+case "$*" in
+  *"-A -ww -E -o pid=,ppid=,command="*) awk -F'|' '{ printf "%s %s %s\n", $1, $2, $4 }' "$t" ;;
+  *"-ww -E -p "*"-o command="*) r=$(row "${*#*-p }" | head -1); r=${r%% *}; pid=$(printf '%s' "$*" | sed 's/.*-p \([0-9]*\).*/\1/'); r=$(row "$pid"); [ -n "$r" ] || exit 1; printf '%s\n' "$(printf '%s' "$r" | awk -F'|' '{ print $4 }')" ;;
+  *"-o ppid= -p "*) pid=$(printf '%s' "$*" | sed 's/.*-p \([0-9]*\).*/\1/'); r=$(row "$pid"); [ -n "$r" ] || exit 1; printf '%s\n' "$(printf '%s' "$r" | awk -F'|' '{ print $2 }')" ;;
+  *"-p "*"-o lstart="*) pid=$(printf '%s' "$*" | sed 's/.*-p \([0-9]*\).*/\1/'); r=$(row "$pid"); [ -n "$r" ] || exit 1; printf '%s\n' "$(printf '%s' "$r" | awk -F'|' '{ print $3 }')" ;;
   *) exit 1 ;;
 esac
 SH
-    chmod +x "$fake/ps"
+  chmod +x "$1/ps"
+}
+
+test_a_process_is_proved_the_tasks_own_by_marker_record_or_live_chain_never_by_place() {
+  local dir fake m t rec cur case_name want
+  dir=$(make_case own-proof)
+  fake=$dir/fakebin
+  m=$(cd "$dir/state" && pwd -P)/task-x1.inbox
+  t=$dir/ps-table
+  rec=$dir/state/task-x1.teardown-owned
+  eval "$(sed -n '/^fm_nm_trim_stub/d; /^task_process_identity() {/,/^}/p; /^teardown_process_env_lines() {/,/^}/p; /^teardown_owner_marker() {/,/^}/p; /^teardown_process_env_marked() {/,/^}/p; /^teardown_owned_record_path() {/,/^}/p; /^teardown_process_recorded() {/,/^}/p; /^teardown_process_proved_own() {/,/^}/p; /^teardown_owned_record_write() {/,/^}/p' "$ROOT/bin/fm-teardown.sh" "$ROOT/bin/fm-teardown-nested-lib.sh")"
+  # shellcheck disable=SC2329 # called by the evaluated task_process_identity.
+  fm_nm_trim() { printf '%s' "$1" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'; }
+  # shellcheck disable=SC2034 # read by the evaluated functions.
+  STATE=$dir/state
+  # shellcheck disable=SC2034
+  ID=task-x1
+  retained_ps_table_shim "$fake" "$t"
+  export FAKE_PS_TABLE=$t FM_PROC_ROOT_OVERRIDE=$dir/no-proc
+  # pid|ppid|start|command(+environment as `ps -E` prints it for a readable one)
+  cat > "$t" <<EOF
+100|1|Sun Nov  8 08:00:00 2026|/opt/homebrew/bin/python3 worker.py HOME=/h FM_TASK_INBOX=$m
+101|100|Sun Nov  8 08:00:05 2026|/bin/zsh -c sleep
+102|101|Sun Nov  8 08:00:06 2026|/bin/sleep 600
+200|1|Sun Nov  8 08:01:00 2026|/bin/sleep 600
+201|1|Sun Nov  8 08:01:01 2026|/opt/homebrew/bin/python3 other.py FM_TASK_INBOX=$m.other
+202|1|Sun Nov  8 08:01:02 2026|/opt/homebrew/bin/python3 leak.py HOME=/h FM_TASK_INBOX=$m
+300|1|Sun Nov  8 08:02:00 2026|/bin/sleep 600
+EOF
+  for case_name in marker-readable:100:0 live-chain-apple-child:102:0 foreign-apple-orphan:200:1 other-task-marker:201:1 orphan-nonapple-with-marker:202:0 unknown-pid:999:1; do
+    cur=${case_name#*:}; want=${cur#*:}; cur=${cur%%:*}
     rc=0
-    PATH="$fake:$PATH" teardown_process_marked 4242 || rc=$?
-    [ "$rc" = "$want" ] || fail "marker-reader $case_name: expected result $want, got $rc"
+    PATH="$fake:$PATH" teardown_process_proved_own "$cur" || rc=$?
+    [ "$rc" = "$want" ] || fail "own-proof ${case_name%%:*}: pid $cur expected $want, got $rc"
   done
-  pass "a process counts as the task's own only when its environment carries exactly this task's FM_TASK_INBOX value: another task's value, a longer value, a different variable name and an unreadable environment do not"
+  # The record: written from the live descendants of the marker bearers (100, 101, 102 and
+  # 202), never the foreign ones (200, 201, 300); a second write with no bearer alive
+  # adds nothing; a recorded Apple orphan is proved while its identity matches, and not
+  # once the pid belongs to a process with another start time.
+  PATH="$fake:$PATH" teardown_owned_record_write
+  assert_equals "100 101 102 202" "$(cut -f1 "$rec" | sort -n | paste -sd ' ' -)" "own-proof: the record holds the wrong processes"
+  awk -F'|' '$1 != 100 && $1 != 202' "$t" | sed 's/^101|100|/101|1|/; s/^102|101|/102|1|/' > "$t.next"
+  mv "$t.next" "$t"
+  printf '400|1|Sun Nov  8 09:00:00 2026|/bin/sleep 600\n' >> "$t"
+  rc=0; PATH="$fake:$PATH" teardown_process_proved_own 102 || rc=$?
+  [ "$rc" = 0 ] || fail "own-proof recorded-orphan: an Apple orphan recorded while the worker lived was not proved (got $rc)"
+  PATH="$fake:$PATH" teardown_owned_record_write
+  assert_equals "100 101 102 202" "$(cut -f1 "$rec" | sort -n | paste -sd ' ' -)" "own-proof: the record was extended after the worker was gone"
+  rc=0; PATH="$fake:$PATH" teardown_process_proved_own 400 || rc=$?
+  [ "$rc" = 1 ] || fail "own-proof late-process: a process started after the worker left was proved (got $rc)"
+  sed -i.bak 's/^102|1|Sun Nov  8 08:00:06 2026/102|1|Mon Nov  9 10:00:00 2026/' "$t"
+  rc=0; PATH="$fake:$PATH" teardown_process_proved_own 102 || rc=$?
+  [ "$rc" = 1 ] || fail "own-proof pid-reuse: a recorded pid with another start time was proved (got $rc)"
+  unset FAKE_PS_TABLE FM_PROC_ROOT_OVERRIDE
+  pass "a process is proved the task's own only by its readable marker, a matching entry in the owned record, or a live parent chain to either; a foreign orphan, another task's marker, a late process and a reused pid are not, and the record is never extended after the worker is gone"
 }
 
 # F-round probes, two real processes on one kept copy. The first teardown holds in
@@ -7685,7 +7721,7 @@ test_a_driver_name_is_judged_as_written_before_any_trimming
 test_link_targets_and_names_are_framed_without_tab_or_newline_loss
 test_a_preserve_that_does_not_hold_never_replaces_the_earlier_one_and_never_repeats_the_driver
 test_an_ignored_file_created_while_the_driver_runs_refuses_and_is_assessed_afresh
-test_the_launch_marker_is_read_from_the_process_environment
+test_a_process_is_proved_the_tasks_own_by_marker_record_or_live_chain_never_by_place
 )
 
 # In the combined tests/fm-teardown.test.sh run,
