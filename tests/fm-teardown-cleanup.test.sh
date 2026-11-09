@@ -7642,6 +7642,61 @@ test_an_aged_record_of_an_unchanged_kept_copy_still_asks_the_driver_nothing() {
 
 # C4 (record): a record that cannot be written refuses the close and leaves the
 # task, the copy and the slot as they were.
+# A refusal that follows the driver's answer is recorded, so an unchanged retry asks the
+# driver nothing. Here no ignored file is selected by preservation (only the two the driver
+# names, under .claude), so nothing builds the preserve before the driver is asked, and the
+# preserve folder cannot be created afterwards: a regular file sits where its parent should be.
+test_a_preserve_that_cannot_be_created_after_the_driver_answers_is_recorded_and_not_repeated() {
+  local rc i calls tars rec_dir
+  make_retained_case retained-preserve-obstructed enclosing
+  rm -f "$FOREIGN_COPY/notes/unique.dat"
+  held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY"
+  mkdir -p "$FOREIGN_CASE/data/task-x1"
+  printf 'in the way\n' > "$FOREIGN_CASE/data/task-x1/nested-copy-preserved"
+  rec_dir=$FOREIGN_CASE/data/task-x1/closeout-refused
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  expect_code 1 "$rc" "retained-preserve-obstructed: run 1 must refuse: $(cat "$FOREIGN_CASE/stderr")"
+  assert_grep 'could not be created' "$FOREIGN_CASE/stderr" "retained-preserve-obstructed: the refusal did not say the preserve could not be created"
+  calls=$(retained_call_count); tars=$(retained_tar_count)
+  assert_equals 1 "$calls" "retained-preserve-obstructed: run 1 must make exactly one driver call"
+  assert_equals 1 "$(find "$rec_dir" -type f 2>/dev/null | wc -l | tr -d ' ')" "retained-preserve-obstructed: no durable refusal record was written"
+  for i in 2 3; do
+    run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+    expect_code 1 "$rc" "retained-preserve-obstructed: unchanged retry $i must refuse: $(cat "$FOREIGN_CASE/stderr")"
+    assert_equals "$calls" "$(retained_call_count)" "retained-preserve-obstructed: retry $i asked the driver again"
+    assert_equals "$tars" "$(retained_tar_count)" "retained-preserve-obstructed: retry $i wrote another archive"
+  done
+  assert_present "$FOREIGN_CASE/state/task-x1.meta" "retained-preserve-obstructed: the task record was removed"
+  assert_present "$FOREIGN_COPY/.git" "retained-preserve-obstructed: the copy was removed"
+  # Repaired storage: the recorded answer is accepted again without the driver, and the close succeeds.
+  rm -f "$FOREIGN_CASE/data/task-x1/nested-copy-preserved"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  expect_code 0 "$rc" "retained-preserve-obstructed: once the preserve can be created the close must succeed: $(cat "$FOREIGN_CASE/stderr")"
+  assert_equals "$calls" "$(retained_call_count)" "retained-preserve-obstructed: the repaired retry asked the driver again"
+  assert_equals "$tars" "$(retained_tar_count)" "retained-preserve-obstructed: the repaired retry wrote another archive"
+  pass "a preserve that cannot be created after the driver answered is recorded: two unchanged retries ask the driver nothing, and repaired storage closes without it"
+}
+
+# The state of the copy can no longer be read after the driver answered (a file lost its
+# permissions while the driver ran): nothing can be recorded from an unreadable state, and
+# the retry refuses before the driver is asked, with no further call, while it stays unreadable.
+test_a_copy_whose_state_cannot_be_read_after_the_driver_answers_is_not_asked_about_again_while_unreadable() {
+  local rc calls
+  [ "$(id -u)" != 0 ] || { pass "skipped as root: a file permission does not stop root"; return 0; }
+  make_retained_case retained-state-unreadable enclosing
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained "FM_STUB_AFTER=chmod 000 '$FOREIGN_COPY/.claude/channel-outbox/a.jsonl'"
+  expect_code 1 "$rc" "retained-state-unreadable: run 1 must refuse: $(cat "$FOREIGN_CASE/stderr")"
+  calls=$(retained_call_count)
+  assert_equals 1 "$calls" "retained-state-unreadable: run 1 must make exactly one driver call"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  chmod 644 "$FOREIGN_COPY/.claude/channel-outbox/a.jsonl" 2>/dev/null || true
+  expect_code 1 "$rc" "retained-state-unreadable: an unchanged retry must refuse: $(cat "$FOREIGN_CASE/stderr")"
+  assert_equals "$calls" "$(retained_call_count)" "retained-state-unreadable: the retry asked the driver while the state was unreadable"
+  assert_present "$FOREIGN_CASE/state/task-x1.meta" "retained-state-unreadable: the task record was removed"
+  assert_present "$FOREIGN_COPY/.git" "retained-state-unreadable: the copy was removed"
+  pass "a copy whose state cannot be read after the driver answered is refused before the driver on every retry while it stays unreadable"
+}
+
 test_a_retained_record_that_cannot_be_written_refuses_the_close() {
   local rc dir
   make_retained_case retained-unwritable enclosing
@@ -7910,6 +7965,8 @@ test_a_replaced_creation_lock_of_a_kept_copy_asks_the_driver_once_more
 test_a_replaced_kept_copy_at_the_same_path_is_assessed_on_its_own_state
 test_an_aged_record_of_an_unchanged_kept_copy_still_asks_the_driver_nothing
 test_a_retained_record_that_cannot_be_written_refuses_the_close
+test_a_preserve_that_cannot_be_created_after_the_driver_answers_is_recorded_and_not_repeated
+test_a_copy_whose_state_cannot_be_read_after_the_driver_answers_is_not_asked_about_again_while_unreadable
 test_the_preserve_restores_to_the_builders_hashes
 test_a_file_created_in_the_copy_while_the_driver_runs_is_not_closed_over
 test_two_overlapping_teardowns_of_one_kept_copy_make_one_archive

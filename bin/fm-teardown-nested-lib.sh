@@ -2158,7 +2158,11 @@ teardown_retained_accept() {  # <slot> <copy> <lock-sha256> <identity> <paths>
       "the copy is not proved landed and clean"
     return 1
   fi
-  dir=${TEARDOWN_RETAINED_DIR:-$(teardown_retained_preserve_dir "$copy")} || return 1
+  if ! dir=${TEARDOWN_RETAINED_DIR:-$(teardown_retained_preserve_dir "$copy")}; then
+    teardown_retained_refused_note "$copy" "$lock_hash" "$identity" "$paths" "$TEARDOWN_RETAINED_UNHELD_REASON"
+    echo "REFUSED: the preserve directory of own nested copy $(fm_refuse_text "$copy") could not be named; the task was not closed, and a retry asks the driver nothing." >&2
+    return 1
+  fi
   if ! teardown_retained_snapshot "$copy"; then
     echo "REFUSED: the state of own nested copy $(fm_refuse_text "$copy") could not be read, so its retained state cannot be recorded; the task was not closed." >&2
     return 1
@@ -2173,7 +2177,11 @@ teardown_retained_accept() {  # <slot> <copy> <lock-sha256> <identity> <paths>
   fi
   if [ ! -d "$dir" ]; then
     { mkdir -p "$dir" && printf '%s\n' "$copy" > "$dir/copy-path" && : > "$dir/SHA256SUMS"; } || {
-      echo "REFUSED: the preserve directory $(fm_refuse_text "$dir") could not be created; the task was not closed." >&2
+      # The driver has answered: the refusal is recorded like every other post-answer
+      # refusal, so an unchanged retry asks the driver nothing and, once the preserve
+      # can be created, accepts the recorded answer again.
+      teardown_retained_refused_note "$copy" "$lock_hash" "$identity" "$paths" "$TEARDOWN_RETAINED_UNHELD_REASON"
+      echo "REFUSED: the preserve directory $(fm_refuse_text "$dir") could not be created; the task was not closed, and a retry asks the driver nothing." >&2
       return 1
     }
   fi

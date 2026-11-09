@@ -549,7 +549,11 @@
         },
         {
           "file": "bin/fm-teardown-nested-lib.sh",
-          "match": "echo \"REFUSED: the preserve directory $(fm_refuse_text \"$dir\") could not be created; the task was not closed.\" >&2"
+          "match": "echo \"REFUSED: the preserve directory $(fm_refuse_text \"$dir\") could not be created; the task was not closed, and a retry asks the driver nothing.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: the preserve directory of own nested copy $(fm_refuse_text \"$copy\") could not be named; the task was not closed, and a retry asks the driver nothing.\" >&2"
         },
         {
           "file": "bin/fm-teardown-nested-lib.sh",
