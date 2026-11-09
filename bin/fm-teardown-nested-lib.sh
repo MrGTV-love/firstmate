@@ -1643,9 +1643,13 @@ teardown_retained_compare() {  # <strict|adopt> <copy> <dir>
     if (open(my $s, "<:raw", $sumsf)) { local $/ = "\n"; while (<$s>) { chomp; $have{$_} = 1 } close $s }
     my @add;
     sub fsha { my $f = shift; open(my $fh, "<:raw", $f) or return undef; my $h = Digest::SHA->new(256); $h->addfile($fh); close $fh; return $h->hexdigest }
+    # A preserved object must be reached through real directories of the preserve itself: a
+    # symlink anywhere above it would let bytes outside the preserve stand for the preserve.
+    sub anc_ok { my ($dir, $rel) = @_; my @c = split m{/}, $rel; pop @c; my $q = $dir; for my $x (@c) { $q .= "/$x"; return 0 if -l $q || !-d $q } return 1 }
     for my $p (@p) {
       my $rel = $p; $rel =~ s{^\./}{};
       my ($c, $d) = ("$copy/$rel", "$dir/$rel");
+      anc_ok($dir, $rel) or exit 1;
       if (-l $c) { my $t = readlink $c; defined $t or exit 2; -l $d or exit 1; my $u = readlink $d; defined $u or exit 1; $t eq $u or exit 1 }
       elsif (-f $c) {
         (!-l $d && -f $d) or exit 1;

@@ -7823,6 +7823,51 @@ test_a_driver_named_path_that_holds_a_newline_is_carried_whole_and_not_asked_abo
   pass "a driver-named path that holds a newline is carried whole: one call and one tar, held in the preserve, and no call or tar on an unchanged retry (the tab name is the control)"
 }
 
+# A preserve reached through a symlinked directory is not a preserve: an existing preserve whose
+# `notes` is a symlink to a directory outside it, holding the same bytes, must not stand for the
+# copy's file. The close builds its own real preserve beside it, records that one, and the
+# recorded preserve restores with the outside directory gone. The control (a real `notes`
+# directory holding the same bytes) is accepted as the existing preserve.
+test_a_preserve_reached_through_a_symlinked_directory_does_not_stand_for_the_copys_file() {
+  local rc kind preserve outside recorded export
+  for kind in symlink real; do
+    make_retained_case "retained-preserve-$kind" enclosing
+    preserve=$FOREIGN_CASE/data/task-x1/nested-copy-preserved/$(printf '%s' "$FOREIGN_COPY" | shasum -a 256 | awk '{print $1}')
+    outside=$FOREIGN_CASE/outside-notes
+    mkdir -p "$preserve" "$outside"
+    printf 'only here\n' > "$outside/unique.dat"
+    printf '%s\n' "$FOREIGN_COPY" > "$preserve/copy-path"
+    : > "$preserve/SHA256SUMS"
+    if [ "$kind" = symlink ]; then
+      ln -s "$outside" "$preserve/notes"
+    else
+      mkdir -p "$preserve/notes"
+      cp "$outside/unique.dat" "$preserve/notes/unique.dat"
+    fi
+    mkdir -p "$preserve/.claude/channel-outbox"
+    printf 'one\n' > "$preserve/.claude/channel-outbox/a.jsonl"
+    printf 'two\n' > "$preserve/.claude/channel-outbox/b.jsonl"
+    printf '%s  notes/unique.dat\n%s  .claude/channel-outbox/a.jsonl\n%s  .claude/channel-outbox/b.jsonl\n' \
+      "$(printf 'only here\n' | shasum -a 256 | awk '{print $1}')" "$(printf 'one\n' | shasum -a 256 | awk '{print $1}')" "$(printf 'two\n' | shasum -a 256 | awk '{print $1}')" > "$preserve/SHA256SUMS"
+    run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+    expect_code 0 "$rc" "retained-preserve-$kind: the close must succeed: $(cat "$FOREIGN_CASE/stderr")"
+    recorded=$(retained_field "$(retained_record_path)" preserve)
+    if [ "$kind" = symlink ]; then
+      [ "$recorded" != "$preserve" ] || fail "retained-preserve-symlink: the preserve with a symlinked directory was recorded as the copy's preserve"
+      rm -rf "$outside"
+      export=$FOREIGN_CASE/export-recorded
+      mkdir -p "$export"
+      (cd "$recorded" && tar -cf - .) | (cd "$export" && tar -xf -)
+      [ -f "$export/notes/unique.dat" ] && [ ! -L "$export/notes" ] || fail "retained-preserve-symlink: the recorded preserve does not restore notes/unique.dat as a real file once the outside directory is gone"
+      assert_equals "only here" "$(cat "$export/notes/unique.dat")" "retained-preserve-symlink: the restored file changed"
+    else
+      assert_equals "$preserve" "$recorded" "retained-preserve-real: a real, matching existing preserve was not accepted"
+    fi
+    assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-preserve-$kind: the driver was asked more than once"
+  done
+  pass "a preserve reached through a symlinked directory does not stand for the copy's file (the close records its own real preserve, which restores with the outside directory gone), and a real matching preserve is accepted"
+}
+
 test_a_retained_record_that_cannot_be_written_refuses_the_close() {
   local rc dir
   make_retained_case retained-unwritable enclosing
@@ -8151,6 +8196,7 @@ test_a_retained_record_that_cannot_be_written_refuses_the_close
 test_a_preserve_that_cannot_be_created_after_the_driver_answers_is_recorded_and_not_repeated
 test_a_copy_whose_state_cannot_be_read_after_the_driver_answers_is_not_asked_about_again_while_unreadable
 test_an_unreadable_existing_receipt_is_not_taken_for_no_receipt
+test_a_preserve_reached_through_a_symlinked_directory_does_not_stand_for_the_copys_file
 test_a_driver_named_path_that_holds_a_newline_is_carried_whole_and_not_asked_about_again
 test_the_preserve_restores_to_the_builders_hashes
 test_the_builders_whole_inventory_is_preserved_fingerprinted_and_restored_byte_for_byte
