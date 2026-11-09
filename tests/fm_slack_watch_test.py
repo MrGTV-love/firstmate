@@ -1510,13 +1510,13 @@ class IntakeTest(unittest.TestCase):
     def wake_parts(self, line):
         """The grammar of one request segment: prefix, label, ONE JSON string literal, then the optional flag, the
         pointer and the queue marker, each behind '; '."""
-        match = re.match(r'check: slack request (\d+\.\d+) from ([UW][A-Z0-9]+)( \(not acknowledged after 3 tries\))?: '
+        match = re.match(r'check: slack request (\d+\.\d+) from ([UW][A-Z0-9]+)( \((?:not acknowledged after 3 tries|acknowledgement state unknown)\))?: '
                          + re.escape(plane.REQUEST_LABEL) + ' ', line)
         self.assertIsNotNone(match, line)
         rest = line[match.end():]
         text, end = json.JSONDecoder().raw_decode(rest)
         tail = [part for part in rest[end:].split('; ') if part]
-        return {'ts': match.group(1), 'user': match.group(2), 'released': bool(match.group(3)), 'text': text,
+        return {'ts': match.group(1), 'user': match.group(2), 'released': bool(match.group(3) and 'not acknowledged' in match.group(3)), 'unknown': bool(match.group(3) and 'unknown' in match.group(3)), 'text': text,
                 'flag': 'secret removed' in tail,
                 'pointer': next((p[len('full: '):] for p in tail if p.startswith('full: ')), None),
                 'queued': next((p for p in tail if p.startswith('+')), None)}
@@ -2412,6 +2412,39 @@ class IntakeTest(unittest.TestCase):
             self.assertEqual(self.wakes(watch), [plane.request_line('200.000100', self.OWNER, 'the request')])
             self.assertEqual((watch.load_state()['pending'], watch.failed_requests()), ([], []))
 
+    def test_a_crash_between_the_post_and_its_mark_then_three_failed_lookups_post_nothing_and_wake_with_the_state_unknown(self):
+        # F7, Main 2617: the attempt mark is written before the post and the posted mark after it. A crash between them leaves the
+        # state unknown; failed lookups never post blindly, and the third gives the distinct wake.
+        with self.fixture() as (watch, replay):
+            self.say(replay, '200.000100', 'the request')
+            with patch.dict(os.environ, {'FM_SLACK_FAULT': 'after-post'}), self.assertRaises(RuntimeError):
+                watch.poll()
+            self.assertEqual(self.acks(replay), ['200.000100'])
+            [row] = watch.load_state()['pending']
+            self.assertEqual((row.get('attempted'), row.get('posted')), (True, None))
+            replay.state['failures']['conversations.replies:200.000100'] = {'status': 400}
+            replay.save()
+            acks, errors = self.polls(watch, replay, 3)
+            self.assertEqual((acks, errors), ([[], [], []], ['api_error', 'api_error', None]))
+            [line] = self.wakes(watch)
+            self.assertEqual(line, plane.request_line('200.000100', self.OWNER, 'the request', plane.REQUEST_UNKNOWN))
+            self.assertEqual((self.wake_parts(line)['unknown'], self.wake_parts(line)['released']), (True, False))
+            self.assertNotIn('not acknowledged', line)
+            self.assertEqual((watch.load_state()['pending'], watch.failed_requests(), self.acks(replay)), ([], [], ['200.000100']))
+
+    def test_a_failed_lookup_after_a_failed_post_attempt_does_not_post_blindly_and_a_good_lookup_goes_on(self):
+        with self.fixture() as (watch, replay):
+            self.say(replay, '200.000100', 'the request')
+            replay.state['failures']['chat.postMessage:200.000100'] = {'status': 400, 'times': 1}
+            replay.save()
+            self.assertEqual(self.polls(watch, replay, 1)[1], ['api_error'])
+            replay.state['failures']['conversations.replies:200.000100'] = {'status': 400, 'times': 1}
+            replay.save()
+            acks, errors = self.polls(watch, replay, 2)
+            # The failed lookup posts nothing and counts as a lookup, not as a failed attempt; the next lookup is good and the post goes on.
+            self.assertEqual((acks, errors), ([[], ['200.000100']], ['api_error', None]))
+            self.assertEqual(self.wakes(watch), [plane.request_line('200.000100', self.OWNER, 'the request')])
+
     def test_a_failed_lookup_before_the_first_post_does_not_count_and_the_post_goes_on(self):
         with self.fixture() as (watch, replay):
             self.say(replay, '200.000100', 'the request')
@@ -2918,7 +2951,7 @@ def card_text(path, task):
     raise SystemExit('no card for ' + task)
 
 
-REQUEST_SEGMENT = re.compile(r'check: slack request ([0-9]+\.[0-9]+) from ([UW][A-Z0-9]+)( \(not acknowledged after 3 tries\))?: '
+REQUEST_SEGMENT = re.compile(r'check: slack request ([0-9]+\.[0-9]+) from ([UW][A-Z0-9]+)( \((?:not acknowledged after 3 tries|acknowledgement state unknown)\))?: '
                              + re.escape(plane.REQUEST_LABEL) + ' ')
 OTHER_SEGMENT = re.compile(r'check: slack [0-9]+\.[0-9]+ - .*?(?=; check: slack |; \+[0-9]+ queued$|$)', re.S)
 POINTER_PART = re.compile(r'; full: state/slack-watch/requests\.jsonl#[0-9]+\.[0-9]+')
