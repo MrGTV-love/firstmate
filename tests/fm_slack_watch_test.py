@@ -2032,6 +2032,27 @@ class IntakeTest(unittest.TestCase):
                 self.assertEqual(len([line for line in polling.output if 'could not be proven' in line]), 1)
                 self.assertNotIn('drain', polling.load_state())
 
+    def test_once_retarget_accepts_the_old_dm_is_never_read_again_and_nothing_is_posted_there(self):
+        # Amendment bj (Main 2379): the claim is that retarget loses no owner message sent before its last read of the old
+        # DM; a message sent to the old DM after that read is a named limit (K13): not read, woken or acknowledged.
+        both = self.OWNER + ',' + self.NEW_OWNER
+        with self.fixture(authors=both) as (watch, replay):
+            watch.lock.close()
+            state = self.retargeted(replay, both)
+            self.assertNotIn('drain', state)
+            self.assertNotIn('intake_cursor', state)
+            with self.configured(replay, self.NEW_OWNER, both) as arming:
+                arming.prepare()
+            self.say(replay, '200.000100', 'sent to the old DM after the last read')
+            before = len(replay.state['log'])
+            with self.configured(replay, self.NEW_OWNER, both) as polling:
+                polling.poll()
+                self.assertEqual((self.acks(replay), self.wakes(polling)), ([], []))
+                self.assertNotIn('drain', polling.load_state())
+            later = replay.state['log'][before:]
+            self.assertEqual([e for e in later if e['method'] == 'chat.postMessage'], [])
+            self.assertEqual([e for e in later if e['method'] == 'conversations.history' and e.get('oldest') == '100.000100'], [])
+
     def test_a_notice_that_fails_part_way_still_charges_the_cap(self):
         def run(failing):
             with self.fixture(cap='2') as (watch, replay):
