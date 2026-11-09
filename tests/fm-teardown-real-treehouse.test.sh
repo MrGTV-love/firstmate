@@ -178,7 +178,7 @@ test_a_real_pool_slot_keeps_its_lease_and_the_unique_files_are_preserved_and_the
 # preserve with its hash before the copy goes, the control goes with the copy and
 # was never preserved, and the real slot is returned by the real binary.
 test_a_real_pool_slot_is_returned_after_the_unique_file_is_preserved_and_the_control_is_removed() {
-  local rc preserve hash
+  local rc preserve hash pl rl
   real_case a-released
   real_teardown rc
   real_record after
@@ -190,6 +190,11 @@ test_a_real_pool_slot_is_returned_after_the_unique_file_is_preserved_and_the_con
   assert_equals "only here" "$(cat "$preserve/notes/unique.dat")" "a-released: the unique file was not preserved before the removal"
   assert_grep "$(printf 'only here\n' | shasum -a 256 | awk '{print $1}')  notes/unique.dat" "$preserve/SHA256SUMS" "a-released: SHA256SUMS does not record the unique file"
   [ ! -e "$preserve/.venv" ] && [ ! -e "$preserve/node_modules" ] || fail "a-released: the regenerable control was preserved"
+  # The preserve was verified before anything was removed, read from the product's own output
+  # order and not from the end state: its "preserved" line comes before its removal line.
+  pl=$(grep -n 'teardown: preserved ignored files from' "$FOREIGN_CASE/stderr" | head -n 1 | cut -d: -f1)
+  rl=$(grep -n 'teardown: removed ' "$FOREIGN_CASE/stderr" | head -n 1 | cut -d: -f1)
+  { [ -n "$pl" ] && [ -n "$rl" ] && [ "$pl" -lt "$rl" ]; } || fail "a-released: the preserve line (${pl:-none}) does not come before the removal line (${rl:-none}): $(grep -v '^●\|^━' "$FOREIGN_CASE/stderr" | tail -6 | tr '\n' '|')"
   assert_grep '|return ' "$FOREIGN_CASE/treehouse.calls.log" "a-released: the real binary was not asked to return the slot"
   [ "$(jq -r '.[0].status // "gone"' <<<"$(real_slot_entry)")" != leased ] || fail "a-released: the real slot is still leased after the return: $(real_slot_entry)"
   pass "a-released: the unique file is preserved with its hash, the control is gone with the copy and unpreserved, and the real binary returned the slot"
@@ -577,6 +582,37 @@ test_a_copy_sweep_apply_during_a_teardown_in_the_driver_makes_no_second_archive(
   pass "f-sweep-race: a real copy-sweep apply and report during a teardown held in the driver listed the copy, called the driver no more and wrote no second tar"
 }
 
+# c. A genuinely ignored file created while the driver runs is never closed over: on a real
+# pool slot the first close refuses with the copy, the claim and the real lease unchanged and
+# no record, and the next run assesses the changed copy once (one more driver call) and
+# closes with the late file held in the preserve.
+test_an_ignored_file_created_while_the_driver_runs_is_not_closed_over_on_a_real_pool_slot() {
+  local rc preserve
+  real_case c-late-file
+  SLOT_ENTRY_BEFORE=$(real_slot_entry)
+  real_teardown rc FM_STUB_CLOSEOUT=retained "FM_STUB_AFTER=printf 'late\n' > '$FOREIGN_COPY/.claude/channel-outbox/late.jsonl'"
+  real_record after-run1
+  expect_code 1 "$rc" "c-late-file: a file created during the driver call must not be closed over: $(cat "$FOREIGN_CASE/stderr")"
+  git -C "$FOREIGN_COPY" check-ignore -q .claude/channel-outbox/late.jsonl || fail "c-late-file: the late file is not an ignored file, so the case proves nothing"
+  assert_equals 1 "$(retained_call_count)" "c-late-file: run 1 must make exactly one driver call"
+  assert_present "$FOREIGN_CASE/state/task-x1.meta" "c-late-file: the task record was removed"
+  assert_present "$FOREIGN_COPY/.claude/channel-outbox/late.jsonl" "c-late-file: the late file is gone"
+  assert_equals 0 "$(find "$FOREIGN_CASE/data/copy-sweep/retained" -type f 2>/dev/null | wc -l | tr -d ' ')" "c-late-file: a record was written for a copy that changed during the call"
+  assert_equals 0 "$(real_returns)" "c-late-file: the slot was returned"
+  real_assert_slot_unchanged "c-late-file"
+  # The late file is part of the copy now; the second close must leave the copy as it finds it.
+  held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY"
+  real_teardown rc FM_STUB_CLOSEOUT=retained
+  real_record after
+  expect_code 0 "$rc" "c-late-file: the next run must assess the changed copy and close: $(cat "$FOREIGN_CASE/stderr")"
+  assert_equals "2 2" "$(retained_call_count) $(retained_tar_count)" "c-late-file: the changed copy must be assessed exactly once more"
+  retained_assert_closed "c-late-file"
+  real_assert_slot_unchanged "c-late-file"
+  preserve=$(retained_field "$(retained_record_path)" preserve)
+  assert_equals "late" "$(cat "$preserve/.claude/channel-outbox/late.jsonl")" "c-late-file: the late file is not held in the preserve of the close"
+  pass "c-late-file: an ignored file created while the driver runs refuses the first close with the copy, claim and real lease unchanged, and the next run assesses it once and holds it in the preserve"
+}
+
 teardown_test_cases=(
 test_a_real_pool_slot_keeps_its_lease_and_the_unique_files_are_preserved_and_the_control_is_left_out
 test_a_real_pool_slot_is_returned_after_the_unique_file_is_preserved_and_the_control_is_removed
@@ -587,6 +623,7 @@ test_a_copy_that_another_task_record_names_is_kept_and_the_slot_stays_leased
 test_a_slot_another_task_claims_is_left_untouched_and_stays_leased
 test_a_start_racing_the_close_never_receives_the_held_slot
 test_a_start_racing_the_close_of_an_unleased_slot_never_resets_the_copy
+test_an_ignored_file_created_while_the_driver_runs_is_not_closed_over_on_a_real_pool_slot
 test_a_copy_sweep_apply_during_a_teardown_in_the_driver_makes_no_second_archive
 )
 

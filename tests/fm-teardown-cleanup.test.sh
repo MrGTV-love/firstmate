@@ -6994,21 +6994,28 @@ test_the_preserve_and_the_archives_survive_the_close_and_every_later_run() {
 }
 
 # C1 (config): the production default interpreter (<slot>/.venv/bin/python, with
-# FM_TEARDOWN_VERNANT_PYTHON unset) and the explicit override give the same close; a
-# missing default interpreter refuses and removes nothing.
+# FM_TEARDOWN_VERNANT_PYTHON truly unset, and set to an empty string) and the explicit
+# override give the same close; a missing default interpreter refuses and removes nothing.
 test_the_default_driver_interpreter_and_the_override_close_the_same_way() {
   local rc mode
-  for mode in default override missing override-missing; do
+  for mode in default default-empty override missing missing-empty override-missing; do
     make_retained_case "retained-config-$mode" enclosing
     case "$mode" in
       default)
         mkdir -p "$FOREIGN_SLOT/.venv/bin"
         cp "$FOREIGN_CASE/vernant-python" "$FOREIGN_SLOT/.venv/bin/python"
         chmod +x "$FOREIGN_SLOT/.venv/bin/python"
+        RETAINED_UNSET_PYTHON=1 run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+        ;;
+      default-empty)
+        mkdir -p "$FOREIGN_SLOT/.venv/bin"
+        cp "$FOREIGN_CASE/vernant-python" "$FOREIGN_SLOT/.venv/bin/python"
+        chmod +x "$FOREIGN_SLOT/.venv/bin/python"
         run_foreign_teardown rc FM_STUB_CLOSEOUT=retained FM_TEARDOWN_VERNANT_PYTHON=
         ;;
       override) run_foreign_teardown rc FM_STUB_CLOSEOUT=retained ;;
-      missing) run_foreign_teardown rc FM_STUB_CLOSEOUT=retained FM_TEARDOWN_VERNANT_PYTHON= ;;
+      missing) RETAINED_UNSET_PYTHON=1 run_foreign_teardown rc FM_STUB_CLOSEOUT=retained ;;
+      missing-empty) run_foreign_teardown rc FM_STUB_CLOSEOUT=retained FM_TEARDOWN_VERNANT_PYTHON= ;;
       override-missing)
         mkdir -p "$FOREIGN_SLOT/.venv/bin"
         cp "$FOREIGN_CASE/vernant-python" "$FOREIGN_SLOT/.venv/bin/python"
@@ -7016,7 +7023,7 @@ test_the_default_driver_interpreter_and_the_override_close_the_same_way() {
         run_foreign_teardown rc FM_STUB_CLOSEOUT=retained "FM_TEARDOWN_VERNANT_PYTHON=$FOREIGN_CASE/no-such-python"
         ;;
     esac
-    if [ "$mode" = missing ] || [ "$mode" = override-missing ]; then
+    if [ "$mode" = missing ] || [ "$mode" = missing-empty ] || [ "$mode" = override-missing ]; then
       assert_grep 'is not available' "$FOREIGN_CASE/stderr" "retained-config-$mode: the refusal did not say the interpreter is not available"
       expect_code 1 "$rc" "retained-config-$mode: a missing default interpreter must refuse: $(cat "$FOREIGN_CASE/stderr")"
       assert_equals "0 0" "$(retained_call_count) $(retained_tar_count)" "retained-config-$mode: the driver ran without an interpreter"
@@ -7573,12 +7580,18 @@ SH
 # F-round probes, two real processes on one kept copy. The first teardown holds in
 # the driver (the stand-in sleeps after it wrote its tar); the second starts while
 # it is there. Whatever the second does, the driver is asked once and one tar exists.
+# Two overlapping activations with a deterministic handshake: the first teardown's stand-in
+# driver writes `entered` and waits for `release` (bounded at 30 s so a broken run cannot hang),
+# the second command starts only after `entered`, its attempt and output are recorded by the
+# caller, and only then is `release` written.
 retained_overlap_run() {  # <label> <second-command...>: first run in the background
-  local label=$1 first_pid n
+  local label=$1 first_pid releaser_pid n after
   shift
+  rm -f "$FOREIGN_CASE/entered" "$FOREIGN_CASE/release"
+  after=": > '$FOREIGN_CASE/entered'; n=0; until [ -e '$FOREIGN_CASE/release' ] || [ \"\$n\" -ge 300 ]; do sleep 0.1; n=\$((n + 1)); done"
   (
     env FM_TEARDOWN_VERNANT_PYTHON="$FOREIGN_CASE/vernant-python" FM_STUB_CLOSEOUT=retained \
-      "FM_STUB_AFTER=sleep 6" FM_HOME="$FOREIGN_CASE/home" \
+      "FM_STUB_AFTER=$after" FM_HOME="$FOREIGN_CASE/home" \
       FM_ROOT_OVERRIDE="$FOREIGN_CASE/code-root" FM_STATE_OVERRIDE="$FOREIGN_CASE/state" \
       FM_DATA_OVERRIDE="$FOREIGN_CASE/data" FM_CONFIG_OVERRIDE="$FOREIGN_CASE/config" \
       NM_HOME="$FOREIGN_CASE/nm" PATH="$FOREIGN_CASE/fakebin:${FM_TEARDOWN_TEST_PATH:-$PATH}" \
@@ -7586,12 +7599,28 @@ retained_overlap_run() {  # <label> <second-command...>: first run in the backgr
     echo $? > "$FOREIGN_CASE/rc.first"
   ) &
   first_pid=$!
-  for n in $(seq 1 100); do
-    [ -f "$FOREIGN_CASE/closeout.log" ] && break
+  for n in $(seq 1 150); do
+    [ -f "$FOREIGN_CASE/entered" ] && break
     sleep 0.2
   done
-  [ -f "$FOREIGN_CASE/closeout.log" ] || fail "$label: the first run never reached the driver"
+  [ -f "$FOREIGN_CASE/entered" ] || { : > "$FOREIGN_CASE/release"; fail "$label: the first run never entered the driver"; }
+  # The second activation either refuses at once or queues behind the first for a lock it
+  # holds. A releaser writes `release` once the second is observed waiting (the lock monitor's
+  # wait marker exists in the state folder), bounded so a refusal that never queues is not waited for; the second's own
+  # return writes it too.
+  (
+    for n in $(seq 1 150); do
+      [ -e "$FOREIGN_CASE/release" ] && exit 0
+      ls "$FOREIGN_CASE"/state/.lock-monitor.wait.* > /dev/null 2>&1 && break
+      sleep 0.2
+    done
+    ls "$FOREIGN_CASE"/state/.lock-monitor.wait.* > "$FOREIGN_CASE/waiting-at-release.txt" 2>/dev/null || true
+    : > "$FOREIGN_CASE/release"
+  ) &
+  releaser_pid=$!
   "$@" || true
+  : > "$FOREIGN_CASE/release"
+  wait "$releaser_pid" 2>/dev/null || true
   wait "$first_pid" 2>/dev/null || true
 }
 
@@ -7600,6 +7629,7 @@ test_two_overlapping_teardowns_of_one_kept_copy_make_one_archive() {
   make_retained_case retained-overlap-teardown enclosing
   retained_overlap_run retained-overlap-teardown run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
   cp "$FOREIGN_CASE/stderr" "$FOREIGN_CASE/stderr.second"
+  [ -s "$FOREIGN_CASE/waiting-at-release.txt" ] || fail "retained-overlap-teardown: the second teardown was never observed waiting on the first one's lock before the driver was released"
   assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-overlap-teardown: two overlapping teardowns made more than one driver call or tar (first rc $(cat "$FOREIGN_CASE/rc.first"), second rc $rc: $(tail -3 "$FOREIGN_CASE/stderr.second"))"
   pass "two overlapping teardowns of one kept copy ask the driver once and write one tar (first rc $(cat "$FOREIGN_CASE/rc.first"), second rc $rc)"
 }
@@ -7618,26 +7648,28 @@ test_a_file_created_in_the_copy_while_the_driver_runs_is_not_closed_over() {
 # C2 (unchanged): the record does not expire; a run 30 days after the record's
 # time fields and file times asks the driver nothing.
 test_an_aged_record_of_an_unchanged_kept_copy_still_asks_the_driver_nothing() {
-  local rc record aged_at
-  make_retained_case retained-aged enclosing
-  held_plain_get_slot "$FOREIGN_CASE"
-  : > "$FOREIGN_CASE/no-lease-command"
-  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
-  expect_code 1 "$rc" "retained-aged: run 1 must refuse for the lease: $(cat "$FOREIGN_CASE/stderr")"
-  record=$(retained_record_path)
-  aged_at=$(date -u -v-30d +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d '30 days ago' +%Y-%m-%dT%H:%M:%SZ)
-  sed "s/^closed-at=.*/closed-at=$aged_at/" "$record" > "$record.aged" && mv "$record.aged" "$record"
-  find "$FOREIGN_CASE/data" -type f -exec touch -t "$(date -u -v-30d +%Y%m%d%H%M 2>/dev/null || date -u -d '30 days ago' +%Y%m%d%H%M)" {} +
-  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
-  expect_code 1 "$rc" "retained-aged: the aged run must refuse for the lease: $(cat "$FOREIGN_CASE/stderr")"
-  assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-aged: an aged record asked the driver again"
-  rm -f "$FOREIGN_CASE/no-lease-command"
-  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
-  expect_code 0 "$rc" "retained-aged: the aged record must still close the task: $(cat "$FOREIGN_CASE/stderr")"
-  assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-aged: the closing run asked the driver again"
-  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
-  assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-aged: a run after the close asked the driver"
-  pass "a record 30 days old of an unchanged kept copy still asks the driver nothing, before and after the close"
+  local rc record aged_at age
+  for age in 30 400; do
+    make_retained_case "retained-aged-$age" enclosing
+    held_plain_get_slot "$FOREIGN_CASE"
+    : > "$FOREIGN_CASE/no-lease-command"
+    run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+    expect_code 1 "$rc" "retained-aged-$age: run 1 must refuse for the lease: $(cat "$FOREIGN_CASE/stderr")"
+    record=$(retained_record_path)
+    aged_at=$(date -u -v-"$age"d +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d "$age days ago" +%Y-%m-%dT%H:%M:%SZ)
+    sed "s/^closed-at=.*/closed-at=$aged_at/" "$record" > "$record.aged" && mv "$record.aged" "$record"
+    find "$FOREIGN_CASE/data" -type f -exec touch -t "$(date -u -v-"$age"d +%Y%m%d%H%M 2>/dev/null || date -u -d "$age days ago" +%Y%m%d%H%M)" {} +
+    run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+    expect_code 1 "$rc" "retained-aged-$age: the aged run must refuse for the lease: $(cat "$FOREIGN_CASE/stderr")"
+    assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-aged-$age: an aged record asked the driver again"
+    rm -f "$FOREIGN_CASE/no-lease-command"
+    run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+    expect_code 0 "$rc" "retained-aged-$age: the aged record must still close the task: $(cat "$FOREIGN_CASE/stderr")"
+    assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-aged-$age: the closing run asked the driver again"
+    run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+    assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-aged-$age: a run after the close asked the driver"
+  done
+  pass "a record 30 and 400 days old (its time fields and every file time) of an unchanged kept copy still asks the driver nothing, before and after the close"
 }
 
 # C4 (record): a record that cannot be written refuses the close and leaves the
@@ -7726,7 +7758,7 @@ test_a_retained_record_that_cannot_be_written_refuses_the_close() {
 # then only the .cache file, is one reassessment each (one driver call and one tar), the
 # unchanged retries ask nothing, and no earlier preserved byte is overwritten.
 test_the_builders_whole_inventory_is_preserved_fingerprinted_and_restored_byte_for_byte() {
-  local rc item name want have preserve scratch first_dir other
+  local rc item name want have preserve scratch first_dir other earlier now
   make_retained_case retained-inventory enclosing
   retained_add_inventory
   held_plain_get_slot "$FOREIGN_CASE"
@@ -7734,6 +7766,10 @@ test_the_builders_whole_inventory_is_preserved_fingerprinted_and_restored_byte_f
   run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
   assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-inventory: run 1 should have asked the driver once"
   first_dir=$(find "$FOREIGN_CASE/data/task-x1/nested-copy-preserved" -mindepth 1 -maxdepth 1 -type d | head -n 1)
+  # Independent before/after hashes: what the first driver call wrote (its tars and saved
+  # outputs) must be byte for byte the same after every later call.
+  earlier=$(find "$FOREIGN_SLOT/.claude/bug-evidence/worktree-preservation" "$FOREIGN_CASE/data/task-x1" -maxdepth 1 -type f \( -name '*.tar' -o -name 'vernant-closeout.*' \) -exec shasum -a 256 {} + | LC_ALL=C sort)
+  [ -n "$earlier" ] || fail "retained-inventory: the first call left no tar or saved output to compare"
   printf 'AB2\n' > "$FOREIGN_COPY/a"$'\n'"b"
   RETAINED_INVENTORY[8]='a\nb|AB2'
   run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
@@ -7766,6 +7802,8 @@ test_the_builders_whole_inventory_is_preserved_fingerprinted_and_restored_byte_f
   # No earlier preserved byte was overwritten: the first preserve still holds the first bytes.
   assert_equals "AB" "$(cat "$first_dir/a"$'\n'"b")" "retained-inventory: the first preserve's newline-named file changed"
   assert_equals "claude cache" "$(cat "$first_dir/.claude/.cache/unique.txt")" "retained-inventory: the first preserve's .claude/.cache file changed"
+  now=$(find "$FOREIGN_SLOT/.claude/bug-evidence/worktree-preservation" "$FOREIGN_CASE/data/task-x1" -maxdepth 1 -type f \( -name '*.tar' -o -name 'vernant-closeout.*' \) -exec shasum -a 256 {} + | LC_ALL=C sort)
+  [ -z "$(comm -23 <(printf '%s\n' "$earlier") <(printf '%s\n' "$now"))" ] || fail "retained-inventory: an earlier tar or saved output changed or disappeared"
   other=$(find "$FOREIGN_CASE/data/task-x1/nested-copy-preserved" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')
   [ "$other" -ge 3 ] || fail "retained-inventory: expected one preserve per payload (3), found $other"
   pass "the builder's whole inventory (a newline name, a tab name, unnamed .claude and .opencode files, one below .cache) is preserved, fingerprinted and restored byte for byte, one reassessment per change, no earlier byte overwritten"

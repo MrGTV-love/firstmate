@@ -2746,8 +2746,12 @@ FOREIGN_TEARDOWN_ARGS=()
 
 run_foreign_teardown() {
   local rc_var=$1 case_dir=$FOREIGN_CASE status=0
+  local -a py=(FM_TEARDOWN_VERNANT_PYTHON="$case_dir/vernant-python")
   shift
-  env FM_TEARDOWN_VERNANT_PYTHON="$case_dir/vernant-python" "$@" FM_HOME="$case_dir/home" \
+  # RETAINED_UNSET_PYTHON=1: the variable is truly unset for the run (not set to an empty
+  # string), the production default shape.
+  [ -z "${RETAINED_UNSET_PYTHON:-}" ] || py=(-u FM_TEARDOWN_VERNANT_PYTHON)
+  env "${py[@]}" "$@" FM_HOME="$case_dir/home" \
     FM_ROOT_OVERRIDE="$case_dir/code-root" FM_STATE_OVERRIDE="$case_dir/state" \
     FM_DATA_OVERRIDE="$case_dir/data" FM_CONFIG_OVERRIDE="$case_dir/config" \
     NM_HOME="$case_dir/nm" PATH="$case_dir/fakebin:${FM_TEARDOWN_TEST_PATH:-$PATH}" \
