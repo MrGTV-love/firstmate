@@ -174,9 +174,22 @@ ENTITIES = (('&lt;', '<'), ('&gt;', '>'), ('&amp;', '&'))
 
 
 def plane_secrets():
-    """The plane's own secret values, longest first: the bot token and the signing secret it holds to run."""
-    values = {env_value('SLACK_BOT_TOKEN').strip(), env_value('SLACK_SIGNING_SECRET').strip()}
-    return sorted((value for value in values if value), key=len, reverse=True)
+    """The plane's own secret values, longest first: the bot token as configured and as the plane sends it (stripped),
+    and the signing secret exactly as configured; text that holds none of them exactly is never changed."""
+    token = env_value('SLACK_BOT_TOKEN')
+    values = {token, token.strip(), env_value('SLACK_SIGNING_SECRET')}
+    return sorted((value for value in values if value.strip()), key=len, reverse=True)
+
+
+SINK_WORD = '[redacted]'
+
+
+def redact_sink(text):
+    """A diagnostic with every plane secret value in it replaced by a fixed word, once: a refusal or failure line, and the
+    name stored beside it, never carry a plane value, not even one that is a word of the fixed diagnostic itself."""
+    for value in plane_secrets():
+        text = text.replace(value, SINK_WORD)
+    return text
 
 
 def replace_values(text):
@@ -483,6 +496,7 @@ class Watch:
         # Notices handled in this poll: they are not held back by the cap (as on base), but they use up what the
         # poll's one budget leaves for new requests.
         self.notices_handled = 0
+        self.spent_notices = 0
         self.notices_held = False
         self.staging_only = False
         self.dm_proven = False
@@ -827,7 +841,7 @@ class Watch:
         # The old DM is read only once it is proven to be the DM of the owner it was stored for.
         self.leaving_dm()
         for message in self.newer_messages(channel, cursor):
-            row = self.request_from(message, owner=self.state.get('user'))
+            row = self.request_from(message, owner=self.state.get('user'), allowlisted=False)
             if row and row['event'] not in self.state['seen']:
                 return True
         return False
@@ -877,22 +891,29 @@ class Watch:
             raise SlackError('unreadable_dm_history')
         return ts
 
+    def human(self, message):
+        """No bot marker."""
+        return not any(message.get(k) for k in ('bot_id', 'app_id', 'bot_profile'))
+
     def allowed(self, message):
-        return (message.get('user') in self.authors
-                and not any(message.get(k) for k in ('bot_id', 'app_id', 'bot_profile')))
+        return message.get('user') in self.authors and self.human(message)
 
     def top_level(self, message):
         """A message typed in the main DM window: no thread, or the root of its own thread."""
         return not message.get('thread_ts') or message['thread_ts'] == message.get('ts')
 
-    def request_from(self, message, owner=None):
+    def request_from(self, message, owner=None, allowlisted=True):
         """The journal row for one new owner message, or None when it is not a request. Its text is the whole
         permitted text of the message (a secret value of the plane's own replaced, Amendment ai), never the
-        flattened presentation; the wake line is built from it when the request is delivered."""
+        flattened presentation; the wake line is built from it when the request is delivered. allowlisted=False
+        is for the retarget's look at the old DM only: it never delivers, so the stored owner is judged without
+        the current allowlist (Amendment bj)."""
         ts = message.get('ts')
         # A request comes only from the owner, whose DM this is: being on the allowlist is not enough.
         owner = owner or self.dm_user()
-        if not owner or message.get('user') != owner or not self.allowed(message) or not self.top_level(message):
+        if not owner or message.get('user') != owner or not self.human(message) or not self.top_level(message):
+            return None
+        if allowlisted and message.get('user') not in self.authors:
             return None
         text = message.get('text')
         # A message with no text (a file-only message has none) is not a request; any text, whatever it looks like, is.
@@ -1265,9 +1286,16 @@ class Watch:
                'contributing': list(contributing)}
         advanced, handled = self.advanced, self.notices_handled
         pending = self.stage(row)
-        self.publish(pending)
+        try:
+            self.publish(pending)
+        except SlackError:
+            if pending is row:
+                # A notice staged now used a slot of this poll even though its post failed.
+                self.spent_notices += 1
+            raise
         progress = pending is row or self.advanced > advanced
         if progress:
+            self.spent_notices += 1
             # The caller charges this notice to the cap it carries, once; the count that follows is of the notices
             # that use up the request budget outside that cap (those resumed from the journal).
             self.notices_handled = handled
@@ -1276,6 +1304,7 @@ class Watch:
     def poll(self):
         self.window_reads = 0
         self.notices_handled = 0
+        self.spent_notices = 0
         if not self.bound():
             return
         # The starting point of requests is set before anything uses the per-poll cap, so that a busy first
@@ -1306,7 +1335,7 @@ class Watch:
         for occurrence, record in self.tracked():
             if remaining <= 0:
                 break
-            advanced = self.advanced
+            advanced, spent = self.advanced, self.spent_notices
             try:
                 remaining = self.read_thread(occurrence, record, remaining)
             except SlackError as error:
@@ -1315,7 +1344,8 @@ class Watch:
                 if str(error) not in THREAD_ERRORS:
                     raise
                 self.read_threads.discard(record['ts'])
-                remaining -= self.advanced - advanced
+                # What the aborted read had already used: answers moved on, and the notices it staged or posted.
+                remaining -= (self.advanced - advanced) + (self.spent_notices - spent)
                 deferred = deferred or error
         deferred = self.resolve() or deferred
         # Last, so that the replies on tracked threads and the resolutions are never held back by it.
@@ -1486,10 +1516,10 @@ class Watch:
         self.commit()
 
     def report_failure(self, error):
-        name = str(error) if isinstance(error, SlackError) else 'local_state_or_response_error'
+        name = redact_sink(str(error) if isinstance(error, SlackError) else 'local_state_or_response_error')
         if self.state.get('failure') != name:
             # The wake line and the failure class are journaled by the same commit.
-            self.say('slack: transport failure: ' + name + (': ' + self.detail if self.detail else ''))
+            self.say(redact_sink('slack: transport failure: ' + name + (': ' + self.detail if self.detail else '')))
             self.state['failure'] = name
             self.commit()
         return 1
@@ -1602,7 +1632,7 @@ def main(argv):
     try:
         command, replay_path, request_ts = parse_command(argv, positional=action == 'resolve')
     except SlackError as error:
-        print('error: slack ' + str(error), file=refusals)
+        print(redact_sink('error: slack ' + str(error)), file=refusals)
         return 2
     if command not in ('mirror', 'poll', 'check'):
         print('error: unknown command; use --help')
@@ -1646,14 +1676,14 @@ def main(argv):
     except (SlackError, OSError, ValueError, KeyError, TypeError) as error:
         # Report once per failure episode. Pending rows and state remain durable;
         # lines said before the failure belong to state already committed.
-        name = str(error) if isinstance(error, SlackError) else 'local_state_or_response_error'
+        name = redact_sink(str(error) if isinstance(error, SlackError) else 'local_state_or_response_error')
         if action in ('arm', 'retarget'):
-            print('slack: refused: ' + name, file=sys.stderr)
+            print(redact_sink('slack: refused: ' + name), file=sys.stderr)
         elif watch is not None:
             watch.report_failure(error)
             emit(watch, command)
         else:
-            print('slack: transport failure: ' + name)
+            print(redact_sink('slack: transport failure: ' + name))
         return 1
     except RuntimeError as error:
         if str(error).startswith('FM_SLACK_FAULT='):
@@ -1698,7 +1728,7 @@ def check(watch, action):
         try:
             watch.prepare()
         except SlackError as error:
-            print('slack: refused: ' + str(error), file=sys.stderr)
+            print(redact_sink('slack: refused: ' + str(error)), file=sys.stderr)
             return 1
         return arm(state_dir)
     if not (state_dir / (CHECK_ID + '.check.sh')).is_file() or not (state_dir / (CHECK_ID + '.check-trust')).is_file():
@@ -1759,5 +1789,5 @@ if __name__ == '__main__':
     try:
         raise SystemExit(main(sys.argv[1:]))
     except SlackError as error:
-        print('error: slack ' + str(error))
+        print(redact_sink('error: slack ' + str(error)))
         raise SystemExit(1)
