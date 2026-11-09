@@ -348,7 +348,15 @@ PY
   esac
   env "$marker" "$py" "$script" "$FOREIGN_COPY" "$mode" "$FOREIGN_CASE/leftover.pid" &
   PROC_PARENT=$!
-  for i in $(seq 1 100); do [ -s "$FOREIGN_CASE/leftover.pid" ] && break; sleep 0.1; done
+  # No cut-off: wait for the leftover's pid file while its starter lives; a slow start prints
+  # one alarm line and the wait goes on.
+  i=0
+  until [ -s "$FOREIGN_CASE/leftover.pid" ]; do
+    kill -0 "$PROC_PARENT" 2>/dev/null || break
+    sleep 0.1
+    i=$((i + 1))
+    [ "$i" -ne 100 ] || echo "slow: the leftover fixture has not written its pid yet" >&2
+  done
   PROC_PID=$(cat "$FOREIGN_CASE/leftover.pid" 2>/dev/null) || return 1
   case "$mode" in live*|below*) ;; *) wait "$PROC_PARENT" 2>/dev/null || true; PROC_PARENT= ;; esac
   sleep 0.5
@@ -512,6 +520,11 @@ real_race() {  # <label> <rc-var>
     [ -f "$FOREIGN_CASE/race$n.rc" ] || fail "$label: racing start $n never ran"
     out=$(jq -r '.path // empty' "$FOREIGN_CASE/race$n.out" 2>/dev/null || true)
     [ "$out" != "$FOREIGN_SLOT" ] || fail "$label: racing start $n was handed the held slot $FOREIGN_SLOT"
+    # A start either fails safely (a nonzero status) or hands out a real, different slot; a
+    # success with no readable path is not evidence that the held slot was kept from it.
+    if [ "$(cat "$FOREIGN_CASE/race$n.rc")" = 0 ]; then
+      [ -n "$out" ] && [ -d "$out" ] || fail "$label: racing start $n succeeded without naming an existing slot: $(head -c 300 "$FOREIGN_CASE/race$n.out")"
+    fi
   done
 }
 
@@ -567,9 +580,10 @@ real_sweep() {  # <label> <mode...>: the real sweep against this case's home and
 test_a_copy_sweep_apply_during_a_teardown_in_the_driver_makes_no_second_archive() {
   local first_pid n
   real_case f-sweep-race
+  rm -f "$FOREIGN_CASE/entered" "$FOREIGN_CASE/release"
   (
     env FM_TEARDOWN_VERNANT_PYTHON="$FOREIGN_CASE/vernant-python" FM_STUB_CLOSEOUT=retained \
-      "FM_STUB_AFTER=sleep 8" FM_HOME="$FOREIGN_CASE/home" \
+      "FM_STUB_AFTER=: > '$FOREIGN_CASE/entered'; n=0; until [ -e '$FOREIGN_CASE/release' ]; do sleep 0.1; n=\$((n + 1)); [ \"\$n\" -ne 300 ] || echo 'slow: the stand-in driver is still waiting for release' >&2; done" FM_HOME="$FOREIGN_CASE/home" \
       FM_ROOT_OVERRIDE="$FOREIGN_CASE/code-root" FM_STATE_OVERRIDE="$FOREIGN_CASE/state" \
       FM_DATA_OVERRIDE="$FOREIGN_CASE/data" FM_CONFIG_OVERRIDE="$FOREIGN_CASE/config" \
       NM_HOME="$FOREIGN_CASE/nm" TREEHOUSE_ROOT="$TREEHOUSE_ROOT" PATH="$FOREIGN_CASE/fakebin:${FM_TEARDOWN_TEST_PATH:-$PATH}" \
@@ -577,13 +591,20 @@ test_a_copy_sweep_apply_during_a_teardown_in_the_driver_makes_no_second_archive(
     echo $? > "$FOREIGN_CASE/rc.first"
   ) &
   first_pid=$!
-  for n in $(seq 1 100); do
-    [ -f "$FOREIGN_CASE/closeout.log" ] && break
+  # The handshake: the stand-in driver writes `entered` and waits for `release`; the sweep runs
+  # (apply, then report) only after `entered`, its outputs are recorded, and `release` is
+  # written afterwards. No wait has a cut-off; a slow one prints one alarm line.
+  n=0
+  until [ -f "$FOREIGN_CASE/entered" ]; do
+    kill -0 "$first_pid" 2>/dev/null || break
     sleep 0.2
+    n=$((n + 1))
+    [ "$n" -ne 150 ] || echo "slow: f-sweep-race: the teardown has not entered the driver yet" >&2
   done
-  [ -f "$FOREIGN_CASE/closeout.log" ] || fail "f-sweep-race: the teardown never reached the driver"
+  [ -f "$FOREIGN_CASE/entered" ] || fail "f-sweep-race: the teardown ended without entering the driver"
   real_sweep apply --apply
   real_sweep report
+  : > "$FOREIGN_CASE/release"
   wait "$first_pid" 2>/dev/null || true
   if [ -n "$REAL_DIR" ]; then
     cp "$FOREIGN_CASE"/sweep.*.out "$FOREIGN_CASE"/sweep.*.rc "$REAL_DIR/" 2>/dev/null || true
