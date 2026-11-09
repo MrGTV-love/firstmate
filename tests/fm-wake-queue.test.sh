@@ -386,8 +386,10 @@ SH
     [ "$(key_rows "$state/aa-events.check.sh#event:after" | wc -l | tr -d ' ')" = 1 ] \
       || fail "valid event after the malformed lines was lost on pass $pass_no"
     ! grep -E '#event:(ts:channel|missing-tab)' "$queue" >/dev/null || fail "malformed input became an event"
-    key_rows "$state/aa-events.check.sh" | grep -F 'malformed fm-check-event' >/dev/null \
-      || fail "pass $pass_no had no check-keyed diagnostic"
+    ! grep -E 'fm-check-event missing-tab|invalid identity payload' "$queue" >/dev/null \
+      || fail "malformed input became ordinary check output"
+    key_rows "$state/aa-events.check.sh" | grep -F " $((3 - pass_no)) malformed fm-check-event" >/dev/null \
+      || fail "pass $pass_no had an incorrect malformed-line count"
     key_rows "$state/aa-events.check.sh" | grep -F "ordinary state $pass_no" >/dev/null \
       || fail "ordinary state was not delivered on pass $pass_no"
     key_rows "$state/contributions.check.sh" | grep -F 'fm-check-event contrib' >/dev/null \

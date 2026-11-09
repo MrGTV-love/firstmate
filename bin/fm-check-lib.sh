@@ -115,7 +115,7 @@ $output
 EOF
   if [ "$malformed" -gt 0 ]; then
     [ -z "$state_output" ] || state_output="$state_output"$'\n'
-    state_output="${state_output}skipped $malformed malformed fm-check-event line(s)"
+    state_output="${state_output}refused $malformed malformed fm-check-event line(s)"
   fi
   if [ -n "$state_output" ]; then
     reason="check: $check: $state_output"
