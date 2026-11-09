@@ -7829,7 +7829,7 @@ test_a_driver_named_path_that_holds_a_newline_is_carried_whole_and_not_asked_abo
 # recorded preserve restores with the outside directory gone. The control (a real `notes`
 # directory holding the same bytes) is accepted as the existing preserve.
 test_a_preserve_reached_through_a_symlinked_directory_does_not_stand_for_the_copys_file() {
-  local rc kind preserve outside recorded export
+  local rc kind preserve outside recorded restored
   for kind in symlink real; do
     make_retained_case "retained-preserve-$kind" enclosing
     preserve=$FOREIGN_CASE/data/task-x1/nested-copy-preserved/$(printf '%s' "$FOREIGN_COPY" | shasum -a 256 | awk '{print $1}')
@@ -7855,11 +7855,11 @@ test_a_preserve_reached_through_a_symlinked_directory_does_not_stand_for_the_cop
     if [ "$kind" = symlink ]; then
       [ "$recorded" != "$preserve" ] || fail "retained-preserve-symlink: the preserve with a symlinked directory was recorded as the copy's preserve"
       rm -rf "$outside"
-      export=$FOREIGN_CASE/export-recorded
-      mkdir -p "$export"
-      (cd "$recorded" && tar -cf - .) | (cd "$export" && tar -xf -)
-      [ -f "$export/notes/unique.dat" ] && [ ! -L "$export/notes" ] || fail "retained-preserve-symlink: the recorded preserve does not restore notes/unique.dat as a real file once the outside directory is gone"
-      assert_equals "only here" "$(cat "$export/notes/unique.dat")" "retained-preserve-symlink: the restored file changed"
+      restored=$FOREIGN_CASE/export-recorded
+      mkdir -p "$restored"
+      (cd "$recorded" && tar -cf - .) | (cd "$restored" && tar -xf -)
+      [ -f "$restored/notes/unique.dat" ] && [ ! -L "$restored/notes" ] || fail "retained-preserve-symlink: the recorded preserve does not restore notes/unique.dat as a real file once the outside directory is gone"
+      assert_equals "only here" "$(cat "$restored/notes/unique.dat")" "retained-preserve-symlink: the restored file changed"
     else
       assert_equals "$preserve" "$recorded" "retained-preserve-real: a real, matching existing preserve was not accepted"
     fi
