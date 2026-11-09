@@ -498,8 +498,17 @@ setup_squash_rebased_history() {
 # Echoes: <pr_head>
 setup_pushed_prerebase_history() {
   local case_dir=$1 mode=$2 tmp pr_head
-  wt_commit_file "$case_dir" a.txt alpha "add a"
-  wt_commit_file "$case_dir" b.txt bravo "add b"
+  if [ "$mode" = combined-commit ]; then
+    # One copy commit holds both files; the PR head replays them as two commits, so no
+    # PR commit has this commit's patch id.
+    printf '%s\n' alpha > "$case_dir/wt/a.txt"
+    printf '%s\n' bravo > "$case_dir/wt/b.txt"
+    git -C "$case_dir/wt" add -- a.txt b.txt
+    git -C "$case_dir/wt" -c user.email=t@t -c user.name=t commit -q -m "add a and b"
+  else
+    wt_commit_file "$case_dir" a.txt alpha "add a"
+    wt_commit_file "$case_dir" b.txt bravo "add b"
+  fi
 
   tmp="$case_dir/_main_move"
   git clone -q "$case_dir/origin.git" "$tmp"
@@ -3367,12 +3376,17 @@ TRAIN_COPY_HEAD=
 # default branch still holds the member's change as landed: the content-in-default proof
 # can then decide the copy by itself, and a case can ask whether it should.
 # TRAIN_MAIN_EDIT_FILE names the file that edit changes (default feature.txt).
+# TRAIN_SHARED_APPEND=1: main has shared.txt; the member appends a line to it; the train
+#   first rewrites the first line of it, so the train's shared.txt is a version the member
+#   never had, which differs from the member's by a removed line and an added one.
 # TRAIN_PREFETCH_TRAIN=0 leaves the train head out of the copy's object store.
 # TRAIN_HIDDEN_ORDER=1: the member is built on K (hidden.txt), a sibling of D (side.txt)
 #   on the old main. The default branch holds a merge M whose FIRST parent is K and
 #   whose SECOND parent is D, with D's tree, and was fast-forwarded from D to M. K is
 #   on the first-parent line of the default branch, yet hidden.txt is in no tree
 #   from M on. Parent order is all that puts K there. Sets TRAIN_HIDDEN_COMMIT to K.
+#   TRAIN_HIDDEN_ORDER=2 makes K and D both add hidden.txt with different content, so
+#   the merge of K and D conflicts; M still has D's tree.
 # TRAIN_MEMBER_ON_LINE=1: the default branch is fast-forwarded to the member head H
 #   before the train starts, so H is on its first-parent line; the train then adds a
 #   commit on H and lands by squash, so the landing's first parent is H.
@@ -3391,6 +3405,12 @@ setup_train_history() {
   git -C "$tmp" add -- m.txt
   git -C "$tmp" commit -q -m "main moves"
   git -C "$tmp" push -q origin main
+  if [ "${TRAIN_SHARED_APPEND:-0}" = 1 ]; then
+    printf '%s\n' base-one base-two base-three base-four > "$tmp/shared.txt"
+    git -C "$tmp" add -- shared.txt
+    git -C "$tmp" commit -q -m "shared file"
+    git -C "$tmp" push -q origin main
+  fi
   if [ "${TRAIN_HIDDEN_OURS:-0}" = 1 ]; then
     # K: a commit whose change never lands. The default branch takes it in by an
     # `ours` merge, so K is reachable from main but main's tree lacks hidden.txt;
@@ -3403,15 +3423,21 @@ setup_train_history() {
     git -C "$tmp" merge -q -s ours --no-edit hidden >/dev/null
     git -C "$tmp" push -q origin main
     git -C "$tmp" checkout -q -b member hidden
-  elif [ "${TRAIN_HIDDEN_ORDER:-0}" = 1 ]; then
+  elif [ "${TRAIN_HIDDEN_ORDER:-0}" = 1 ] || [ "${TRAIN_HIDDEN_ORDER:-0}" = 2 ]; then
     git -C "$tmp" checkout -q -b hidden
     printf '%s\n' hidden > "$tmp/hidden.txt"
     git -C "$tmp" add -- hidden.txt
     git -C "$tmp" commit -q -m "hidden change"
     TRAIN_HIDDEN_COMMIT=$(git -C "$tmp" rev-parse HEAD)
     git -C "$tmp" checkout -q main
-    printf '%s\n' side > "$tmp/side.txt"
-    git -C "$tmp" add -- side.txt
+    if [ "${TRAIN_HIDDEN_ORDER:-0}" = 2 ]; then
+      # D adds hidden.txt too, with other content: the merge of K and D conflicts.
+      printf '%s\n' different-side > "$tmp/hidden.txt"
+      git -C "$tmp" add -- hidden.txt
+    else
+      printf '%s\n' side > "$tmp/side.txt"
+      git -C "$tmp" add -- side.txt
+    fi
     git -C "$tmp" commit -q -m "side change"
     git -C "$tmp" push -q origin main
     # M: first parent K, second parent D, D's tree. The branch moves from D to M.
@@ -3425,6 +3451,10 @@ setup_train_history() {
   fi
   printf '%s\n' hello > "$tmp/feature.txt"
   git -C "$tmp" add -- feature.txt
+  if [ "${TRAIN_SHARED_APPEND:-0}" = 1 ]; then
+    printf '%s\n' member >> "$tmp/shared.txt"
+    git -C "$tmp" add -- shared.txt
+  fi
   git -C "$tmp" commit -q -m "add feature"
   printf '%s\n' hello2 > "$tmp/feature2.txt"
   git -C "$tmp" add -- feature2.txt
@@ -3437,6 +3467,12 @@ setup_train_history() {
     git -C "$tmp" push -q origin main
   fi
   git -C "$tmp" checkout -q -b train main
+  if [ "${TRAIN_SHARED_APPEND:-0}" = 1 ]; then
+    # Another member of the train appended to the same file first.
+    sed 's/^base-one$/base-one-edited-by-other/' "$tmp/shared.txt" > "$tmp/shared.new" && mv "$tmp/shared.new" "$tmp/shared.txt"
+    git -C "$tmp" add -- shared.txt
+    git -C "$tmp" commit -q -m "other member appends"
+  fi
   case "$shape" in
     merge) git -C "$tmp" merge -q --no-ff --no-edit member ;;
     ours-flat)
@@ -3515,7 +3551,8 @@ add_gh_train_fake() {
   printf '%s\n' "$2" > "$fx/member-state"
   printf '%s\n' "$3" > "$fx/member-head"
   printf '[]\n' > "$fx/list.json"
-  rm -f "$fx/list.fail" "$fx/calls.log" "$fx/member-view.once" "$fx/member-view.seen"
+  printf '%s\n' feature.txt feature2.txt > "$fx/member-files"
+  rm -f "$fx/list.fail" "$fx/calls.log" "$fx/member-view.once" "$fx/member-view.seen" "$fx/member-files.fail" "$fx/member-files.count"
   cat > "$case_dir/fakebin/gh" <<SH
 #!/usr/bin/env bash
 fx='$fx'
@@ -3523,6 +3560,10 @@ printf '%s\n' "\$*" >> "\$fx/calls.log"
 case "\${1:-} \${2:-}" in
   "pr view")
     case " \$* " in
+      *"changedFiles,files"*)
+        [ ! -e "\$fx/member-files.fail" ] || { echo "error: forge unavailable" >&2 ; exit 1 ; }
+        if [ -e "\$fx/member-files.count" ]; then cat "\$fx/member-files.count"; else wc -l < "\$fx/member-files" | tr -d ' '; fi
+        cat "\$fx/member-files" ; exit 0 ;;
       *"state,headRefOid,url"*)
         if [ -e "\$fx/member-view.once" ]; then
           [ ! -e "\$fx/member-view.seen" ] || { echo "error: forge unavailable" >&2 ; exit 1 ; }
