@@ -328,6 +328,21 @@ SH
   pass "distinct events survive regrouping and acknowledgement while ordinary state checks coalesce"
 )
 
+test_unpresentable_row_cannot_suppress_a_check_event() {
+  local dir state event_key
+  dir=$(make_case malformed-pending-event)
+  state="$dir/state"
+  event_key="$state/slack.check.sh#event:request-1"
+  printf '1700000000\tbroken\tcheck\t%s\tcheck: incomplete event\n' "$event_key" > "$state/.wake-queue"
+  append_wake "$state" check "$event_key" 'check: complete request 1' || fail "valid event append failed"
+  FM_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/drain.out" 2> "$dir/drain.err" || fail "event recovery drain failed"
+  grep -F 'check: complete request 1' "$dir/drain.out" >/dev/null || fail "unpresentable row suppressed the real event"
+  ! grep -F 'check: incomplete event' "$dir/drain.out" >/dev/null || fail "unpresentable row was presented"
+  ack_drain_err "$state" "$dir/drain.err" || fail "recovered event could not be acknowledged"
+  [ ! -s "$state/.wake-queue" ] || fail "recovered event remained queued"
+  pass "an unpresentable row cannot suppress a consumable pending event"
+}
+
 test_atomic_double_drain() {
   local dir state out1 out2 count1 count2 sequence generation leftover
   dir=$(make_case double-drain)
@@ -4397,6 +4412,7 @@ test_stale_enqueue_before_suppressor
 test_not_working_stale_enqueue_before_suppressor
 test_check_output_is_queued
 test_check_events_survive_batch_changes_and_state_coalescing
+test_unpresentable_row_cannot_suppress_a_check_event
 test_atomic_double_drain
 test_drain_dedupes_obvious_duplicates
 test_drain_asserts_watcher_liveness

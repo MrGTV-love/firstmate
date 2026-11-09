@@ -2783,7 +2783,7 @@ _fm_wake_append_row_locked() {
       # presentation. A retry must not escape that presentation's ack cutoff.
       if [ -e "$FM_WAKE_QUEUE" ]; then
         pending_event=$(awk -F '\t' -v key="$clean_key" '
-          NF >= 5 && $3 == "check" && $4 == key { found=1 }
+          NF == 5 && $1 ~ /^[0-9]+$/ && $2 ~ /^[0-9]+$/ && $3 == "check" && $4 == key { found=1 }
           END { print found + 0 }
         ' "$FM_WAKE_QUEUE") || return 1
         [ "$pending_event" != 1 ] || return 0
