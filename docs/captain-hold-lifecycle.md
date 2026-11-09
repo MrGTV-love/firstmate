@@ -108,6 +108,16 @@ An expired deferral therefore remains answerable.
 While originating task metadata is live, the `complete` subcommand unions the reviewed captain-held task ids, called the reviewed inventory, into `decision_keys=` and appends `decisions_reviewed=1`.
 A post-teardown visual review can complete against the surviving report and durable tasks without recreating volatile task metadata.
 
+The authorized supervising firstmate owns this metadata attestation in the originating home's authoritative `FM_HOME`.
+A confined scout or worker inventories its complete report and visual surface, records each genuine unresolved captain choice and its options (or explicitly none), and sends the report path and inventory through the existing status/inbox handoff.
+With no open choice or blocker keys, its `done:` is report-ready for owner review, not task-completion certification.
+While any key remains open, the worker sends the report path and inventory through that keyed `needs-decision` or `blocked` status and stops without `done:` or `failed:`: the existing scout terminal-status fold retires open keys, so a terminal notification would lose that handoff.
+The worker does not run captain-hold mutation commands or obtain permission to write protected metadata.
+The supervising firstmate reads the full surface, registers genuine calls through `hold`, reconciles operational keys through their existing owner, then runs the normal `complete <origin> <task-id>...` or `complete <origin> --none` command.
+An executor/permission failure is not a captain choice: retain its evidence and resolve that operational key through the existing owner path before retrying the gate; never fabricate a captain answer or bypass the inventory check.
+A secondmate acting as supervisor in its own authoritative home uses the same normal gate there.
+No metadata permission, completion guard or native-helper admission changes for this handoff.
+
 `complete` accepts `--none` as an explicit semantic inventory result.
 `--none` is refused while the origin still has a lifecycle-open keyed status decision.
 Before recording completion, `complete` verifies every listed task against tasks-axi.

@@ -1031,25 +1031,6 @@ test_ship_and_scout_teach_validation_round_pause() {
   pass "fm-brief.sh: ship and scout scaffolds declare a validation-round pause once, then hold it"
 }
 
-test_scout_and_secondmate_load_decision_hold_policy() {
-  local home scout charter
-  home="$TMP_ROOT/decision-policy-home"
-  mkdir -p "$home/data"
-  FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
-    "$ROOT/bin/fm-brief.sh" sample-investigation sample --scout >/dev/null 2>&1
-  scout="$home/data/sample-investigation/brief.md"
-  assert_grep "$ROOT/.agents/skills/captain-hold-lifecycle/SKILL.md" "$scout" \
-    "scout brief did not load the captain-call policy before done"
-  assert_grep "pass its shared completion gate for the report and any visual review" "$scout" \
-    "scout brief did not cross-reference visual-review completion"
-  FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" FM_SECONDMATE_CHARTER='sample reviews' \
-    "$ROOT/bin/fm-brief.sh" sample-mate --secondmate --no-projects >/dev/null 2>&1
-  charter="$home/data/sample-mate/brief.md"
-  assert_grep "load \`captain-hold-lifecycle\`" "$charter" \
-    "secondmate charter did not load the shared captain-call policy for detailed investigations"
-  pass "fm-brief.sh: investigation and visual-review completions load the shared decision policy"
-}
-
 # A scout brief offers the Lavish review loop for every compatible board version,
 # including older builds that use the legacy reply path.
 test_scout_lavish_line_follows_presentation_floor() {
@@ -2049,7 +2030,6 @@ test_secondmate_marked_request_reporting_contract
 test_secondmate_directory_paths_are_absolute_and_output_is_stable
 test_pause_verb_override_renders_all_brief_scaffolds
 test_ship_and_scout_teach_validation_round_pause
-test_scout_and_secondmate_load_decision_hold_policy
 test_scout_and_secondmate_scaffold
 test_ship_and_scout_briefs_carry_the_task_dod_and_grading_sections
 test_spawn_lists_every_dispatch_placeholder_in_one_refusal

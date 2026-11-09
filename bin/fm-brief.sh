@@ -800,8 +800,8 @@ $CREWMATE_PAUSE_INSTRUCTIONS
    Timeout and elapsed-read events follow the measured-command instructions above, not this stop rule.
 6. If a decision belongs to a human (product choices, destructive actions),
    append \`needs-decision [at=<epoch>]: {summary of options}\` and stop. Firstmate will reply with the decision.
-   A decision or blocker you opened stays open until a \`resolved\` line carrying its exact key lands; a later \`done:\` or \`working:\` line never closes it, even when the answer is what started that work.
-   Firstmate's reply normally writes that closing line at answer time; when a blocker or wait clears WITHOUT a firstmate reply, append \`resolved [at=<epoch>]: {how it cleared}\` yourself (same \`[key=<slug>]\` if you opened it with one) as you resume.
+   Report readiness while any choice or blocker key remains open through its keyed \`needs-decision\` or \`blocked\` line, including the report path and inventory. Never follow it with \`done:\` or \`failed:\`: terminal scout status retires open keys in the existing fold.
+   Firstmate owns the durable hold/transfer or exact-key resolution. Its reply normally records that action; when an operational blocker or wait clears WITHOUT a firstmate reply, append \`resolved [at=<epoch>]: {how it cleared}\` yourself (same \`[key=<slug>]\` if you opened it with one) as you resume.
 $SHARED_INFRA_RULE
 $PRIVATE_SERVICE_RULE
 $SHARED_PROC_BUDGET_RULE
@@ -813,8 +813,10 @@ $WAIT_BLOCK$INBOX_SECTION
 Write your findings to \`$DATA/$ID/report.md\`.
 The report must stand alone: what you did, what you found, the evidence (commands run, output, file:line references), and what you recommend.
 $LAVISH_LINE
-Before reporting done, read and follow \`$FM_ROOT/.agents/skills/captain-hold-lifecycle/SKILL.md\` and pass its shared completion gate for the report and any visual review.
-When the report is complete, append \`done [at=<epoch>]: {one-line conclusion}\` to the status file and stop.
+Before reporting the findings ready, read \`$FM_ROOT/.agents/skills/captain-hold-lifecycle/SKILL.md\` and inventory the whole report and any visual review for genuine unresolved captain choices. Include each choice and its options in the report, or explicitly state that none remain; route any unresolved choice or operational blocker through the existing keyed status protocol.
+Do not invoke the captain-hold mutation commands or write protected task metadata from this worker. Send the report path and complete semantic inventory to the supervising firstmate through the status protocol.
+When the report and inventory are ready and no choice or blocker keys remain open, append \`done [at=<epoch>]: report ready at $DATA/$ID/report.md; {one-line conclusion and inventory}\` to the status file and stop. This is a report-ready signal for owner review, not self-certified task completion. Otherwise send the report path and inventory in the still-open keyed status and stop without a terminal status.
+The supervising firstmate must review the complete report and visual surface, register any genuine captain calls through the existing hold path, and reconcile operational keys through their existing owner before attesting. The firstmate, in the authoritative \`FM_HOME\`, must run \`bin/fm-captain-hold.sh complete $ID <captain-held-task-id>...\`, or \`bin/fm-captain-hold.sh complete $ID --none\` only when its reviewed inventory is empty. This normal completion gate remains mandatory before treating the investigation as complete or tearing it down.
 If your findings reveal work that should ship (e.g. you reproduced a bug and the fix is clear), say so in the report; firstmate may promote this task in place, and you would then receive mode-specific ship instructions as a follow-up message.
 
 $DOD_TASK
