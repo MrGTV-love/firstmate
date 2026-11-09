@@ -242,10 +242,11 @@
 # under `state/decision-bindings/`; a source with no binding feeds nothing, so
 # this whole path is opt-in per source and an unbound source behaves as if it
 # did not exist. The Slack request path and the mirror's card posts check the binding
-# and then deliver (the acknowledgement post, the request wake print, a card post)
+# and then deliver (the acknowledgement post, the selection of a request wake line for printing, a card post)
 # while they hold `state/decision-bindings/` shared, and `unbind` takes it exclusive
 # to remove the record: no such delivery already past its binding check is completed
-# once `unbind` has returned. Other channels (the Slack answer path, process-event
+# once `unbind` has returned. The write of a selected line to standard output is not
+# held, so that a reader that does not read can never make an unbind wait. Other channels (the Slack answer path, process-event
 # feeds) check the binding as before and are not held. `unbind` waits for a delivery
 # already under way and has no time limit (no override either); after 60 seconds of
 # waiting it prints one line saying so on stderr and keeps waiting. When the binding
@@ -2296,8 +2297,9 @@ command_unbind() {
   [ "$#" -eq 1 ] || { usage >&2; exit 2; }
   validate_source_id "$source"
   dest=$(binding_path "$source")
-  # The Slack delivery paths hold BINDING_DIR shared across their binding check and the post or print it allows, so
-  # the removal waits for such a delivery to end: none completes after this returns. Other channels are not held.
+  # The Slack delivery paths hold BINDING_DIR shared across their binding check and the post or the selection of a line
+  # to print that it allows (never across the write to standard output), so the removal waits for such a delivery to
+  # end: none completes after this returns. Other channels are not held.
   # The wait has no time limit and no override: it ends when the delivery ends, which the operating system also
   # settles if that process dies. A slow wait is an alarm, never a cut-off: one line after 60 seconds, then it keeps
   # waiting. Nothing the delivery waits for is held by an unbind (it takes only this folder), so the wait cannot

@@ -17,9 +17,15 @@ SAFE_ERRORS = {
 }
 
 
+# A reader that wants to know that the transport removed its token from a response sets scrub_with to SCRUB_MARK followed by
+# its own marker text; the character is a Unicode noncharacter, which Slack text does not carry.
+SCRUB_MARK = '\ufdd0'
+
+
 class Slack:
     base = 'https://slack.com/api/'
     on_reply = None
+    scrub_with = '[REDACTED]'
 
     def __init__(self, token):
         self.token = token
@@ -47,7 +53,7 @@ class Slack:
                 if len(raw) > 4 * 1024 * 1024:
                     raise SlackError('response_too_large')
                 # Scrub before any successful body can reach output or state.
-                data = json.loads(raw.decode(errors='replace').replace(self.token, '[REDACTED]'))
+                data = json.loads(raw.decode(errors='replace').replace(self.token, self.scrub_with))
         except urllib.error.HTTPError as error:
             if error.code == 429:
                 raise SlackError('rate_limited') from None

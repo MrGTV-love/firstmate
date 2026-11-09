@@ -73,9 +73,11 @@ class Replay:
             out.write(json.dumps(entry, ensure_ascii=False) + '\n')
         self.save()
 
-    def fail(self, method, target=None):
-        # A rule keyed "<method>:<ts>" fails only the call about that one message.
-        rule = (self.state['failures'].get('%s:%s' % (method, target)) if target else None) \
+    def fail(self, method, *targets):
+        # A rule keyed "<method>:<ts>" fails only the call about that one message: by the message a call names (ts or
+        # timestamp) or by the thread it posts into (thread_ts).
+        rule = next((self.state['failures'].get('%s:%s' % (method, target)) for target in targets
+                     if target and self.state['failures'].get('%s:%s' % (method, target))), None) \
             or self.state['failures'].get(method)
         if not rule:
             return None
@@ -106,7 +108,7 @@ class Replay:
         if self.transcript.get('enforce_scopes') and needed and needed not in self.scopes:
             self.log({'method': method, 'error': 'missing_scope', 'scope': needed})
             raise SlackError('missing_scope')
-        rule = self.fail(method, fields.get('ts') or fields.get('timestamp'))
+        rule = self.fail(method, fields.get('ts'), fields.get('timestamp'), fields.get('thread_ts'))
         if rule:
             status = int(rule.get('status', 503))
             if status == 429:
@@ -139,9 +141,11 @@ class Replay:
                 # root (thread_ts equal to its own ts, once it has replies) and a reply that was
                 # also sent to the channel (subtype thread_broadcast, thread_ts different from ts).
                 # An ordinary thread reply is read through conversations.replies only.
-                messages = [m for m in reversed(here)
-                            if not m.get('thread_ts') or m['thread_ts'] == m.get('ts')
-                            or m.get('subtype') == 'thread_broadcast']
+                # Newest first by the timestamp as a number, whatever order the fixture inserted the messages in.
+                messages = sorted((m for m in here
+                                   if not m.get('thread_ts') or m['thread_ts'] == m.get('ts')
+                                   or m.get('subtype') == 'thread_broadcast'),
+                                  key=lambda m: ts_key(m.get('ts')), reverse=True)
                 oldest = fields.get('oldest')
                 if oldest:
                     messages = [m for m in messages if ts_key(m.get('ts')) > ts_key(oldest)]

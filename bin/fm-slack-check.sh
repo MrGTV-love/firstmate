@@ -12,10 +12,13 @@
 # the standing check writes it to stderr, which the watcher does not keep, so on the standing path the release
 # wake is the notice. Resolve makes no Slack call and refuses an unknown ts or a request that is not failed.
 # Retarget refuses while the old DM still has pending work or unread owner requests, and the poll refuses a
-# changed owner: restore the old FM_SLACK_DM_USER and run fm-slack-poll.sh with it, then set the new value,
-# then disarm, retarget, arm. A poll can print nothing while work is still pending, and an empty journal
-# does not prove the old DM is drained: a poll takes in at most the per-poll cap.
-# A retarget that still refuses with dm_user_changed_with_pending_work or dm_user_changed_with_unread_requests means: restore the old value, poll again,
+# changed owner: restore BOTH old settings, the old FM_SLACK_DM_USER and the old FM_SLACK_ALLOWED_AUTHORS (or the old
+# allowlist in the home's configuration file), and run fm-slack-poll.sh with them, then set the new values,
+# then disarm, retarget, arm. Restoring only the old owner loses requests: a poll takes in a request only from an
+# author on the allowlist that is set when it runs, and ignores the rest. A poll can print nothing while work is
+# still pending, and an empty journal does not prove the old DM is drained: a poll takes in at most the per-poll cap.
+# A retarget that still refuses with dm_user_changed_with_pending_work or dm_user_changed_with_unread_requests means:
+# restore both old settings, poll again,
 # or run fm-slack-check.sh resolve <ts> for each open failed request the poll lists.
 # Last resort, when a pending row can never drain because its thread or channel is gone: run disarm, check the
 # pending rows by hand, then remove state/slack-watch/ to start a fresh DM. This can re-read replies that were
@@ -36,12 +39,14 @@ case "${1:-}" in
       'Bind slack-dm with fm-captain-hold.sh before arm; arm proves the DM is readable.' \
       'Retarget stops tracking the old DM after FM_SLACK_DM_USER changed; arm then opens the new one.' \
       'Retarget refuses while the old DM has pending work or unread owner requests and the poll refuses a changed' \
-      'owner, so: restore the old FM_SLACK_DM_USER and run fm-slack-poll.sh with it, then set the new value,' \
-      'then disarm, retarget, arm. A poll can print nothing while work is still pending, and an empty journal does' \
-      'not prove the old DM is drained: a poll takes in at most the per-poll cap.' \
+      'owner, so: restore BOTH old settings, FM_SLACK_DM_USER and FM_SLACK_ALLOWED_AUTHORS (or the old allowlist in' \
+      'the home configuration file), and run fm-slack-poll.sh with them, then set the new values, then disarm,' \
+      'retarget, arm. Restoring only the old owner loses requests: a poll takes in a request only from an author on' \
+      'the allowlist that is set when it runs, and ignores the rest. A poll can print nothing while work is still' \
+      'pending, and an empty journal does not prove the old DM is drained: a poll takes in at most the per-poll cap.' \
       'A retarget that still refuses with dm_user_changed_with_pending_work or dm_user_changed_with_unread_requests' \
-      'means: restore the old value, poll again, or run fm-slack-check.sh resolve <ts> for each open failed request' \
-      'the poll lists.' \
+      'means: restore both old settings, poll again, or run fm-slack-check.sh resolve <ts> for each open failed' \
+      'request the poll lists.' \
       'Last resort, when a pending row can never drain because its thread or channel is gone: run disarm, check the' \
       'pending rows by hand, then remove state/slack-watch/ to start a fresh DM. This can re-read replies that were' \
       'already answered, so do it only after that check. The same last resort covers an old thread retarget can never' \
