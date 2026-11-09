@@ -5653,6 +5653,29 @@ test_a_prerebase_copy_built_on_an_honestly_merged_commit_is_accepted() {
   pass "a pre-rebase copy built on a commit the default branch merged honestly is accepted"
 }
 
+# Main 2679 F2: an empty measured change counts only from an X the exact-merge check proved. The pair:
+# a pre-rebase copy that IS a commit behind the recorded base (so the change from X is empty) is
+# accepted when every merge between it and the recorded base is exact, and refused when one is not.
+test_an_empty_change_counts_only_behind_exact_merges() {
+  local how
+  for how in honest ours; do
+    BW_PRE_HOW=$how BW_PRE_OWN=0 bespoke_world "empty-change-$how" bw_steps_prerebase_on_dropped_commit
+    train_default_list "$TRAIN_CASE"
+    [ "$TRAIN_COPY_HEAD" = "$(git -C "$TRAIN_CASE/wt" rev-parse "$(git -C "$TRAIN_CASE/wt" merge-base "$TRAIN_COPY_HEAD" "$TRAIN_BASE_OID")")" ] \
+      || fail "empty-change-$how: the copy is not the merge base with the recorded base, so the measured change is not empty"
+    if [ "$how" = honest ]; then
+      run_teardown "$TRAIN_CASE" > "$TRAIN_CASE/stdout" 2> "$TRAIN_CASE/stderr" \
+        || fail "empty-change-$how: an empty change behind only exact merges was refused: $(cat "$TRAIN_CASE/stderr")"
+      assert_absent "$TRAIN_CASE/state/task-x1.meta" "empty-change-$how: accepted teardown left the task record"
+    else
+      assert_train_refused "$TRAIN_CASE" "empty-change-$how" "REFUSED"
+      assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "empty-change-$how: the train was accepted"
+    fi
+  done
+  BW_PRE_HOW=ours
+  pass "an empty measured change is accepted behind only exact merges and refused behind one inexact merge"
+}
+
 teardown_test_cases=(
 test_local_only_fork_remote_allows
 test_teardown_does_not_wait_for_the_home_summary_refresh
@@ -5735,6 +5758,7 @@ test_default_proof_refuses_a_closed_copy_whose_lines_main_edited_later
 test_a_prerebase_copy_whose_reverted_work_the_train_lacks_is_refused
 test_a_prerebase_copy_built_on_an_ours_merged_commit_is_refused
 test_a_prerebase_copy_built_on_an_honestly_merged_commit_is_accepted
+test_an_empty_change_counts_only_behind_exact_merges
 test_default_proof_refuses_work_whose_only_change_is_a_file_mode
 test_train_that_restored_a_deleted_file_is_refused
 test_train_with_many_unrelated_paths_still_accepts_its_member
