@@ -1808,6 +1808,15 @@ class IntakeTest(unittest.TestCase):
             self.assertNotIn('failure": "secret', self.state_text(watch))
             watch.report_failure(error)
             self.assertEqual(len([line for line in watch.output if 'transport failure' in line]), 1)
+        # An eligible credential-shaped value (16 characters or more, Amendment bg) that collides with the marker is the
+        # marker's own text; it is refused and reported without the value in either place.
+        with self.fixture(env={'SLACK_SIGNING_SECRET': plane.SECRET_MARKER}) as (watch, replay):
+            self.say(replay, '200.000100', 'an ordinary request')
+            with self.assertRaisesRegex(SlackError, 'collides_with_marker'):
+                watch.poll()
+            watch.report_failure(SlackError('secret_collides_with_marker'))
+            self.assertEqual(self.acks(replay), [])
+            self.assertNotIn(plane.SECRET_MARKER, '\n'.join(watch.output) + self.state_text(watch))
         with self.fixture() as (watch, replay):
             self.say(replay, '200.000100', 'an ordinary request')
             watch.poll()
@@ -1872,6 +1881,112 @@ class IntakeTest(unittest.TestCase):
                     self.assertTrue(changed.retarget())
                 finally:
                     changed.lock.close()
+
+    @contextmanager
+    def configured(self, replay, owner, authors):
+        """A new Watch of the same state and replay under another owner and allowlist (a new process after a change)."""
+        env = {'FM_SLACK_DM_USER': owner, 'FM_SLACK_ALLOWED_AUTHORS': authors}
+        with patch.dict(os.environ, env):
+            watch = Watch(replay=replay)
+            try:
+                with patch.object(watch, 'bound', return_value=True), patch.object(watch, 'backlog', return_value=[]):
+                    yield watch
+            finally:
+                watch.lock.close()
+
+    NEW_OWNER = 'U0OTHEROWNER1'
+
+    def retargeted(self, replay, authors):
+        with self.configured(replay, self.NEW_OWNER, authors) as watch:
+            self.assertTrue(watch.retarget())
+            return watch.load_state()
+
+    def test_retarget_keeps_the_old_cursor_and_delivers_a_message_that_arrives_after_the_decision(self):
+        both = self.OWNER + ',' + self.NEW_OWNER
+        with self.fixture(authors=both) as (watch, replay):
+            watch.lock.close()
+            state = self.retargeted(replay, both)
+            self.assertEqual((state['drain']['user'], state['drain']['channel'], state['drain']['intake_cursor']),
+                             (self.OWNER, 'D0123456789', '100.000100'))
+            self.assertNotIn('intake_cursor', state)
+            # The operator arms the new DM; a third owner cannot be retargeted to while the old DM is still draining.
+            with self.configured(replay, self.NEW_OWNER, both) as arming:
+                arming.prepare()
+            with self.configured(replay, 'U0THIRDOWNER1', both) as third:
+                with self.assertRaisesRegex(SlackError, '^dm_user_changed_while_draining$'):
+                    third.retarget()
+            # A message arrives in the old DM after the decision: the drain delivers it (it wakes Main; the
+            # acknowledgement into the old DM thread waits for the owner's approval, Main 2331).
+            self.say(replay, '200.000100', 'arrived after the retarget decision')
+            with self.configured(replay, self.NEW_OWNER, both) as polling:
+                polling.window_reads = 0
+                polling.poll()
+                self.assertEqual(self.acks(replay), [])
+                self.assertEqual([line.split()[3] for line in self.wakes(polling)], ['200.000100'])
+                self.assertIn('drain', polling.load_state())
+            # One later poll reads the old DM empty: only then is the old boundary dropped, and nothing repeats.
+            self.say(replay, '200.000200', 'a stranger', user='U0STRANGER01')
+            self.say(replay, '200.000300', 'a bot', bot_id='BLOOKALIKE')
+            with self.configured(replay, self.NEW_OWNER, both) as polling:
+                polling.poll()
+                self.assertNotIn('drain', polling.load_state())
+                self.assertEqual(self.acks(replay), [])
+                self.assertEqual(len(self.wakes(polling)), 1)   # the one line already owed, not a second request
+            with self.configured(replay, self.NEW_OWNER, both) as polling:
+                polling.poll()
+                self.assertEqual(self.acks(replay), [])
+                self.assertEqual(len(self.wakes(polling)), 1)
+
+    def test_a_transient_post_failure_then_recovery_acknowledges_exactly_once(self):
+        with self.fixture() as (watch, replay):
+            self.say(replay, '200.000100', 'a request')
+            original, failed = replay.call, []
+
+            def call(method, **fields):
+                if method == 'chat.postMessage' and not failed:
+                    failed.append(fields)
+                    raise SlackError('api_error')
+                return original(method, **fields)
+            with patch.object(replay, 'call', side_effect=call):
+                with self.assertRaisesRegex(SlackError, '^api_error$'):
+                    watch.poll()
+            self.assertEqual((self.acks(replay), self.wakes(watch)), ([], []))
+            watch.state, watch.advanced = watch.load_state(), 0
+            watch.poll()
+            watch.state, watch.advanced = watch.load_state(), 0
+            watch.poll()
+            self.assertEqual(self.acks(replay), ['200.000100'])
+            self.assertEqual(len(self.wakes(watch)), 1)
+
+    def test_a_drain_for_an_old_owner_who_left_the_allowlist_delivers_nothing_and_says_so_once(self):
+        with self.fixture() as (watch, replay):
+            watch.lock.close()
+            state = self.retargeted(replay, self.NEW_OWNER)
+            self.assertIn('drain', state)
+            self.say(replay, '200.000100', 'arrived after the retarget decision')
+            with self.configured(replay, self.NEW_OWNER, self.NEW_OWNER) as polling:
+                polling.poll()
+                self.assertEqual((self.acks(replay), self.wakes(polling)), ([], []))
+                failures = [line for line in polling.output if 'no longer in FM_SLACK_ALLOWED_AUTHORS' in line]
+                self.assertEqual(len(failures), 1, polling.output)
+                self.assertNotIn('drain', polling.load_state())
+            self.assertEqual([m['ts'] for m in replay.state['messages'] if m['ts'] == '200.000100'], ['200.000100'])
+            with self.configured(replay, self.NEW_OWNER, self.NEW_OWNER) as polling:
+                polling.poll()
+                self.assertEqual((self.acks(replay), self.wakes(polling)), ([], []))
+
+    def test_a_drain_that_cannot_prove_the_old_dm_writes_and_reads_nothing_more(self):
+        both = self.OWNER + ',' + self.NEW_OWNER
+        with self.fixture(authors=both) as (watch, replay):
+            watch.lock.close()
+            self.retargeted(replay, both)
+            self.say(replay, '200.000100', 'arrived after the retarget decision')
+            replay.transcript['owner_dm'] = 'D0SOMEONEELSE'
+            with self.configured(replay, self.NEW_OWNER, both) as polling:
+                polling.poll()
+                self.assertEqual((self.acks(replay), self.wakes(polling)), ([], []))
+                self.assertEqual(len([line for line in polling.output if 'could not be proven' in line]), 1)
+                self.assertNotIn('drain', polling.load_state())
 
     def test_a_notice_that_fails_part_way_still_charges_the_cap(self):
         def run(failing):
