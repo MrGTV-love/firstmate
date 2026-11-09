@@ -105,7 +105,7 @@ An expired deferral therefore remains answerable.
 
 ### Recording a reviewed inventory (`complete`)
 
-While originating task metadata is live, the `complete` subcommand unions the reviewed captain-held task ids, called the reviewed inventory, into `decision_keys=` and appends `decisions_reviewed=1`.
+While originating task metadata is live, the `complete` subcommand unions the reviewed captain-held task ids, called the reviewed inventory, into `decision_keys=` and records `decisions_reviewed=1` without disturbing an existing managed PR poll's identity footer.
 A post-teardown visual review can complete against the surviving report and durable tasks without recreating volatile task metadata.
 
 The authorized supervising firstmate owns this metadata attestation in the originating home's authoritative `FM_HOME`.
