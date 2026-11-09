@@ -2205,12 +2205,14 @@ assert_eq "$(outbox_count_now)" 0 "INTAKE-5 a wake line from an unproven channel
 out=$(ipoll)
 assert_eq "$(request_count "$out")" 1 "INTAKE-5 the request was lost after a refused acknowledgement"
 assert_eq "$(posts_in 2000.000100)" 1 "INTAKE-5 the request was acknowledged after the proof held"
-# A retarget drops the old DM's cursor; the next arm starts from the new DM's latest message.
+# A retarget drops the old DM's cursor and records the new DM's newest message as the starting point at the retarget itself
+# (Main 2602); the replay of this scenario gives both owners the same DM id, so the value is the same message.
 intake_home
 assert_eq "$(python3 "$HELPER" state-field "$(state_file)" intake_cursor)" 100.000100 "INTAKE-5 the arming cursor"
 out=$(FM_SLACK_DM_USER=U0OTHEROWNER1 "$ROOT/bin/fm-slack-check.sh" retarget --replay "$INTAKE" 2>&1)
 assert_contains "$out" 'retargeted:' "INTAKE-5 retarget refused"
-assert_eq "$(python3 "$HELPER" state-field "$(state_file)" intake_cursor)" "" "INTAKE-5 retarget kept the old DM's cursor"
+assert_eq "$(python3 "$HELPER" state-field "$(state_file)" user)" U0OTHEROWNER1 "INTAKE-5 retarget did not record the new owner"
+assert_eq "$(python3 "$HELPER" state-field "$(state_file)" intake_cursor)" 100.000100 "INTAKE-5 retarget did not record the new DM's starting point"
 # An empty journal does not prove the old DM is drained: retarget refuses while the old DM still holds an owner
 # request that was never taken in, and it never takes one in itself; polling until it accepts delivers each once.
 intake_home
