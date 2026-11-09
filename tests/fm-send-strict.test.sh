@@ -682,8 +682,117 @@ test_input_boundary_is_not_reported_missing() {
   pass "fm-send: outside-home input is reported as the transfer boundary without reading its contents"
 }
 
+# Count how many recorded-task existence tests the scan runs for a message that
+# ends in a long run of dots. The count is a structural measure: a scan that
+# strips one dot per pass tests one growing path per dot, so the count grows
+# with the number of dots; a single-pass scan does not. xtrace output is
+# counted, so no timer or kill is involved.
+mention_scan_meta_tests() {  # <home> <fakebin> <log> <dots> -> echoes count
+  local home=$1 fb=$2 log=$3 dots=$4 trace msg
+  trace="$TMP_ROOT/scan-trace-$dots"
+  msg="zq$(head -c "$dots" /dev/zero | tr '\0' '.')"
+  : > "$log"
+  PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" FM_SEND_SETTLE=0 \
+    bash -x "$SEND" other "$msg" >/dev/null 2> "$trace" || fail "dotted control message was not delivered"
+  grep -F 'zq' "$trace" | grep -cF '.meta'
+}
+
+test_mention_scan_cost_does_not_grow_with_trailing_dots() {
+  local dir fb home log small large grown
+  dir="$TMP_ROOT/scan-cost"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); home=$(setup_home scancost); log="$dir/send.log"
+  fm_write_meta "$home/state/task-one.meta" "window=sess:fm-task-one" "kind=ship"
+  fm_write_meta "$home/state/other.meta" "window=sess:fm-other" "kind=ship"
+  small=$(mention_scan_meta_tests "$home" "$fb" "$log" 1000)
+  large=$(mention_scan_meta_tests "$home" "$fb" "$log" 4000)
+  grown=$((large - small))
+  printf 'scan-cost: recorded-task tests at 1000 dots=%s, at 4000 dots=%s, growth=%s\n' "$small" "$large" "$grown"
+  [ "$grown" -le 4 ] || fail "scan runs one existence test per trailing dot: $small at 1000 dots, $large at 4000 dots"
+  pass "fm-send: the mention scan does a constant number of existence tests however many dots end a token"
+}
+
+test_long_dotted_forms_keep_rule_m_results() {
+  local dir fb home log err rc dots text body
+  dir="$TMP_ROOT/scan-dotted"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); home=$(setup_home scandotted); log="$dir/send.log"; err="$dir/send.err"
+  fm_write_meta "$home/state/task-one.meta" "window=sess:fm-task-one" "kind=ship"
+  fm_write_meta "$home/state/other.meta" "window=sess:fm-other" "kind=ship"
+  dots=$(head -c 3000 /dev/zero | tr '\0' '.')
+  : > "$log"
+  PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" FM_SEND_SETTLE=0 \
+    "$SEND" other "Continue task-one$dots" >/dev/null 2> "$err"; rc=$?
+  [ "$rc" -ne 0 ] && [ "$rc" -ne 3 ] || fail "a recorded id followed by 3000 dots escaped the ownership guard"
+  assert_contains "$(cat "$err")" "Send to 'task-one'" "the long dotted form must still designate its owner"
+  [ ! -s "$log" ] && [ ! -e "$home/state/other.inbox" ] || fail "the long dotted refusal had an effect"
+  text="Continue task-one-longer$dots"
+  PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" FM_SEND_SETTLE=0 \
+    "$SEND" other "$text" >/dev/null 2> "$err"; rc=$?
+  expect_code 0 "$rc" "a longer id followed by dots is not a mention"
+  body=$(bash -c '. "$1"; fm_task_inbox_body "$2"' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$home/state/other.inbox/001.msg")
+  [ "$body" = "$text" ] || fail "the dotted control changed its body"
+  pass "fm-send: a recorded id followed by a long run of dots is refused and a longer id is delivered unchanged"
+}
+
+# The scan before the single-pass change, kept here as the reference for rule M:
+# strip one trailing dot at a time and stop at the first form that resolves.
+reference_mention_id() {  # <state> <token>
+  local state=$1 token=$2 id=
+  while :; do
+    if [ -f "$state/$token.meta" ]; then id=$token; break; fi
+    case "$token" in fm-?*)
+      if [ -f "$state/${token#fm-}.meta" ]; then id=${token#fm-}; break; fi ;;
+    esac
+    [ "${token%.}" != "$token" ] || break
+    token=${token%.}
+  done
+  printf '%s' "$id"
+}
+
+test_mention_resolution_matches_the_reference_scan() {
+  local dir state fn id base dots k token want got checked=0 set sets
+  dir="$TMP_ROOT/scan-diff"; mkdir -p "$dir"
+  fn=$(awk '/^fm_send_resolve_mention\(\) /,/^}$/' "$SEND")
+  [ -n "$fn" ] || fail "fm_send_resolve_mention is not defined in bin/fm-send.sh"
+  eval "$fn"
+  sets=(
+    "a"
+    "fm-a"
+    "a fm-a"
+    "a.. fm-a. b.."
+    "a.b a.b.. fm-a.b"
+    "= . .. ......"
+    "a.......... fm-a.......... fm-...........  ...........x"
+    "a a. a.. a... a.... a..... a...... a....... a........ a......... a.......... fm-a fm-a. fm-a........... b fm-fm-a"
+  )
+  for set in "${sets[@]}"; do
+    state="$dir/state"; rm -rf "$state"; mkdir -p "$state"
+    for id in $set; do
+      [ "$id" != '=' ] || id=
+      : > "$state/$id.meta"
+    done
+    export STATE=$state
+    for base in '' a fm- fm-a fm-fm-a b a.b fm-a.b x; do
+      for k in 0 1 2 3 4 5 6 7 8 9 10 11 12 13; do
+        dots=$(printf '%*s' "$k" '' | tr ' ' '.')
+        token=$base$dots
+        want=$(reference_mention_id "$state" "$token")
+        MENTION_ID=
+        fm_send_resolve_mention "$base" "$k"
+        got=$MENTION_ID
+        [ "$got" = "$want" ] || fail "rule M differs for '$token' with metas [$set]: reference '$want', scan '$got'"
+        checked=$((checked + 1))
+      done
+    done
+  done
+  printf 'scan-diff: %s token and meta-set pairs agree with the reference scan\n' "$checked"
+  pass "fm-send: the single-pass mention scan resolves every token like the one-dot-at-a-time scan"
+}
+
 fm_test_only
 
+test_mention_scan_cost_does_not_grow_with_trailing_dots
+test_long_dotted_forms_keep_rule_m_results
+test_mention_resolution_matches_the_reference_scan
 test_input_boundary_is_not_reported_missing
 test_missing_inputs_report_all_without_inbox_trace
 test_known_endpoint_accepts_declared_input

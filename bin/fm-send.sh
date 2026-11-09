@@ -305,6 +305,73 @@ fm_send_id_from_meta() { # <meta-file>
   printf '%s' "${base%.meta}"
 }
 
+# fm_send_resolve_mention <text> <dots>: set MENTION_ID to the recorded task id
+# that the token <text> followed by <dots> trailing '.' characters mentions
+# (rule M), or to nothing. The caller has split the token so <text> does not
+# end in '.'. Forms are tried from the longest, all dots kept, down to <text>
+# alone: an exact meta first, then the legacy fm-<id> label, and the first form
+# that resolves wins. Up to eight dots are tried one form at a time. A longer
+# run is resolved from one listing of the recorded metas, so the work stays
+# linear in the token and no form is skipped for its length.
+fm_send_resolve_mention() {
+  local text=$1 dots=$2 pad='........' j form name id rest label_text
+  local best_j=-1 best_rank=-1 cand_j cand_rank
+  MENTION_ID=
+  if [ "$dots" -le 8 ]; then
+    j=$dots
+    while :; do
+      form=$text${pad:0:j}
+      if [ -f "$STATE/$form.meta" ]; then
+        MENTION_ID=$form
+        return 0
+      fi
+      case "$form" in fm-?*)
+        if [ -f "$STATE/${form#fm-}.meta" ]; then
+          MENTION_ID=${form#fm-}
+          return 0
+        fi ;;
+      esac
+      [ "$j" -gt 0 ] || return 0
+      j=$((j - 1))
+    done
+  fi
+  label_text=
+  case "$text" in fm-*) label_text=${text#fm-} ;; esac
+  while IFS= read -r name; do
+    case "$name" in *.meta) id=${name%.meta} ;; *) continue ;; esac
+    [ -f "$STATE/$name" ] || continue
+    cand_j=-1
+    cand_rank=-1
+    case "$id" in "$text"*)
+      rest=${id#"$text"}
+      case "$rest" in *[!.]*) ;; *)
+        cand_j=${#rest}
+        cand_rank=1 ;;
+      esac ;;
+    esac
+    if [ "$cand_j" -lt 0 ]; then
+      case "$text" in fm-*)
+        case "$id" in "$label_text"*)
+          rest=${id#"$label_text"}
+          case "$rest" in *[!.]*) ;; *)
+            # The label form needs at least one character after fm-.
+            if [ "${#label_text}" -gt 0 ] || [ "${#rest}" -gt 0 ]; then
+              cand_j=${#rest}
+              cand_rank=0
+            fi ;;
+          esac ;;
+        esac ;;
+      esac
+    fi
+    [ "$cand_j" -ge 0 ] && [ "$cand_j" -le "$dots" ] || continue
+    if [ "$cand_j" -gt "$best_j" ] || { [ "$cand_j" -eq "$best_j" ] && [ "$cand_rank" -gt "$best_rank" ]; }; then
+      best_j=$cand_j
+      best_rank=$cand_rank
+      MENTION_ID=$id
+    fi
+  done < <(LC_ALL=C ls -A "$STATE" 2>/dev/null)
+}
+
 # fm_send_clear_after_interrupt: muse RESTORES the interrupted prompt back into
 # the composer when Escape cancels a turn, as real bright text (verified: fg
 # 38;2;204;211;219, luminance ~210, muse 0.1.0-R708.1), not de-emphasised ghost
@@ -903,28 +970,18 @@ else
     exit 1
   fi
   # Tokenize once without treating pathname components as standalone task ids.
-  # A final prose period is punctuation only when no exact meta names it.
+  # A final prose period is punctuation only when no exact meta names it. awk
+  # splits each token into its text and the count of dots that end it, in one
+  # pass, so a long run of dots costs no more than the same length of any text.
   owner_target=
   [ -z "$TARGET_META" ] || owner_target=$(fm_send_id_from_meta "$TARGET_META")
-  while IFS= read -r mentioned_task; do
-    [ -n "$mentioned_task" ] || continue
+  while IFS=$'\t' read -r mention_dots mention_base; do
+    [ -n "$mention_base" ] || [ "$mention_dots" != 0 ] || continue
     # A task name embedded in a pathname is not a task-id token.
-    case "$mentioned_task" in */*|*\\*) continue ;; esac
-    mentioned_id=
-    while :; do
-      if [ -f "$STATE/$mentioned_task.meta" ]; then
-        mentioned_id=$mentioned_task
-        break
-      fi
-      case "$mentioned_task" in fm-?*)
-        if [ -f "$STATE/${mentioned_task#fm-}.meta" ]; then
-          mentioned_id=${mentioned_task#fm-}
-          break
-        fi ;;
-      esac
-      [ "${mentioned_task%.}" != "$mentioned_task" ] || break
-      mentioned_task=${mentioned_task%.}
-    done
+    case "$mention_base" in */*|*\\*) continue ;; esac
+    MENTION_ID=
+    fm_send_resolve_mention "$mention_base" "$mention_dots"
+    mentioned_id=$MENTION_ID
     [ -n "$mentioned_id" ] || continue
     [ "$mentioned_id" != "$owner_target" ] || continue
     # Explicit endpoints can be shared by several recorded tasks. A selector
@@ -940,7 +997,8 @@ else
     "$SCRIPT_DIR/fm-guard-event.sh" send-task-prerequisites deny --rule task-owner --task "$mentioned_id" 2>/dev/null || true
     echo "error: refused task '$mentioned_id': this home's direct report '$mentioned_id' owns it, not target '$RAW_TARGET'; nothing was sent. Send to '$mentioned_id', or use --relay for a deliberate cross-task mention." >&2
     exit 1
-  done < <(printf '%s\n' "$MESSAGE" | LC_ALL=C tr -cs 'A-Za-z0-9_./\\-' '\n')
+  done < <(printf '%s\n' "$MESSAGE" | LC_ALL=C tr -cs 'A-Za-z0-9_./\\-' '\n' |
+    LC_ALL=C awk '{ n = length($0); i = n; while (i > 0 && substr($0, i, 1) == ".") i--; printf "%d\t%s\n", n - i, substr($0, 1, i) }')
   if [ "$TARGET_BACKEND" = remote ]; then
     FM_SEND_REMOTE_BUDGET=${FM_SEND_REMOTE_BUDGET:-30}
     case "$FM_SEND_REMOTE_BUDGET" in
