@@ -2817,9 +2817,330 @@ CASES
   pass 'classifier branch precedence keeps ordinary actions distinct; only live holds are owner calls'
 }
 
+K7_BASE40=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+K7_GREEN='.records[0].observation += {can_merge:true,base_sha:"'$K7_BASE40'",base_containment:{behind_by:0}}'
+K7_PASSQ='.records[0].observation.review_verification={pr:.records[0].url,head:.records[0].observation.head,task:.task,base:.records[0].observation.base_sha,answer:{schema:"fm-review-verification.v1",ok:true,basis:"independent-review",pr:.records[0].url,head:.records[0].observation.head,at:1,reader_model:"sonnet",reader_family:"anthropic",author_groups:{ship:[{model:"gpt-5.1",family:"openai"}]}}}'
+K7_NOTQ='.records[0].observation.review_verification={pr:.records[0].url,head:.records[0].observation.head,task:.task,base:.records[0].observation.base_sha,answer:{schema:"fm-review-verification.v1",ok:false,error:{kind:"not-qualified",message:"absent"}}}'
+
+k7_note_input() { # inputs-file case key value: the recorded input value a case expects as its reason
+  jq --arg c "$2" --arg k "$3" --arg v "$4" '.[$c] = ((.[$c] // {}) + {($k):$v})' "$1" > "$1.new" && mv "$1.new" "$1"
+}
+
+k7_green_base() { # home id number [extra jq mutation after the green fresh-base, no-PASS base]
+  record "$1" "$2" "$3" open mergeable
+  mutate_record "$1" "$2" "$K7_GREEN"
+  mutate_record "$1" "$2" "$K7_NOTQ"
+  [ -z "${4:-}" ] || mutate_record "$1" "$2" "$4"
+}
+
+k7_hold() { # home id reason: a real live hold through the real hold command
+  FM_CAPTAIN_HOLD_NOW="$NOW" contribution_hold "$1" hold "$2" --reason "$3"
+}
+
+k7_verdict() { # actor summary
+  printf '.records[0].verdict={head:.records[0].observation.head,source:"review",actor:"%s",summary:"%s"}' "$1" "$2"
+}
+k7_build_section_a() { # home inputs-file
+  local home=$1 inputs=$2 n=100
+  # A01 unsupported forge
+  printf -- '- [ ] a01 - Filed https://gitlab.com/o/r/-/merge_requests/2 (repo: sample) (kind: ship)\n' >> "$home/data/backlog.md"
+  n=$((n+1)); record "$home" a02 $n merged mergeable
+  n=$((n+1)); record "$home" a03 $n closed mergeable
+  n=$((n+1)); record "$home" a04 $n merged mergeable
+  mutate_record "$home" a04 '.records[0].error="K7 recorded error A04"'
+  n=$((n+1)); k7_green_base "$home" a05 $n; k7_hold "$home" a05 'K7 hold reason A05'; k7_note_input "$inputs" A05 reason 'K7 hold reason A05'; k7_note_input "$inputs" A05 hold_id a05
+  n=$((n+1)); k7_green_base "$home" a06 $n '.records[0].error="K7 recorded error A06"'; k7_note_input "$inputs" A06 reason 'K7 recorded error A06'
+  n=$((n+1)); k7_green_base "$home" a07 $n '.records[0].checked_at="2026-09-15T08:00:00Z"'
+  n=$((n+1)); k7_green_base "$home" a08 $n '.records[0].verdict={head:"'"$K7_BASE40"'",source:"review",actor:"fleet",summary:"old verdict"}'
+  n=$((n+1)); k7_green_base "$home" a09 $n '.records[0].pending=[{token:"comment:1"}]'
+  n=$((n+1)); k7_green_base "$home" a10 $n '.records[0].kind="issue" | .records[0].observation.ready=true'
+  n=$((n+1)); k7_green_base "$home" a11 $n '.records[0].kind="issue" | .records[0].observation.ready=false'
+  n=$((n+1)); k7_green_base "$home" a12 $n '.records[0].observation.draft=true'
+  n=$((n+1)); k7_green_base "$home" a13 $n '.records[0].observation.mergeable="conflicting"'
+  n=$((n+1)); k7_green_base "$home" a14 $n '.records[0].observation.mergeable="unknown"'
+  n=$((n+1)); k7_green_base "$home" a15 $n '.records[0].observation.checks[0].conclusion="failure"'
+  n=$((n+1)); k7_green_base "$home" a16 $n '.records[0].observation.checks[0].conclusion=null'
+  n=$((n+1)); k7_green_base "$home" a17 $n '.records[0].observation.absent_checks=["required-extra"]'
+  n=$((n+1)); k7_green_base "$home" a18 $n '.records[0].observation.checks=[]'
+  n=$((n+1)); k7_green_base "$home" a19 $n '.records[0].observation.checks[0].status="in_progress"'
+  n=$((n+1)); k7_green_base "$home" a20 $n '.records[0].observation.review_decision="CHANGES_REQUESTED"'
+  n=$((n+1)); k7_green_base "$home" a21 $n "$(k7_verdict fleet 'K7 merge this head now A21')"; k7_note_input "$inputs" A21 reason 'K7 merge this head now A21'
+  n=$((n+1)); k7_green_base "$home" a22 $n "$(k7_verdict captain 'K7 choose A22')"
+  n=$((n+1)); k7_green_base "$home" a23 $n "$(k7_verdict maintainer 'K7 awaiting maintainer A23')"
+  n=$((n+1)); k7_green_base "$home" a24 $n "$(k7_verdict nobody 'K7 no action A24')"
+  n=$((n+1)); k7_green_base "$home" a25 $n '.records[0].observation.review_decision="REVIEW_REQUIRED"'
+  n=$((n+1)); k7_green_base "$home" a26 $n
+  printf 'kind=ship\npr=https://github.com/o/r/pull/%s\npr_head=%s\n' "$n" "$HEAD_A" > "$home/state/a26.meta"; chmod 600 "$home/state/a26.meta"
+  n=$((n+1)); k7_green_base "$home" a27 $n '.records[0].observation.can_merge=false'
+  n=$((n+1)); k7_green_base "$home" a28 $n "$K7_PASSQ"
+  n=$((n+1)); k7_green_base "$home" a29 $n
+  n=$((n+1)); k7_green_base "$home" a30 $n '.records[0].observation.base_containment.behind_by=1'
+  n=$((n+1)); k7_green_base "$home" a31 $n 'del(.records[0].observation.base_containment)'
+  n=$((n+1)); k7_green_base "$home" a32 $n '.records[0].observation.review_verification=null'
+  n=$((n+1)); k7_green_base "$home" a33 $n "$K7_PASSQ"; k7_hold "$home" a33 'K7 hold reason A33'; k7_note_input "$inputs" A33 reason 'K7 hold reason A33'; k7_note_input "$inputs" A33 hold_id a33
+  n=$((n+1)); record "$home" a34 $n merged mergeable; k7_hold "$home" a34 'K7 hold reason A34'
+  n=$((n+1)); record "$home" a35 $n open mergeable; printf 'incomplete JSON' > "$home/data/a35/contributions.json"
+  n=$((n+1)); record "$home" a36 $n open mergeable; printf '{"schema":"fm-contributions.v1","task":"a36","records":[{"url":"not-a-url","kind":"pr"}]}\n' > "$home/data/a36/contributions.json"
+  mkdir -p "$home/data/a37"; printf 'incomplete JSON' > "$home/data/a37/contributions.json"
+}
+
+
+# Second fixture. Rows: 1 draft PR, 2 merged PR, 3 REVIEW_REQUIRED PR (variants alter row 3 or add a hold).
+k7_build_b() { # home inputs-file variant(base|i|ii|iii|iv|v)
+  local home=$1 inputs=$2 v=$3
+  record "$home" b1 201 open mergeable; mutate_record "$home" b1 "$K7_GREEN"; mutate_record "$home" b1 "$K7_NOTQ"; mutate_record "$home" b1 '.records[0].observation.draft=true'
+  record "$home" b2 202 merged mergeable
+  case "$v" in
+    base|i|ii)
+      record "$home" b3 203 open mergeable; mutate_record "$home" b3 "$K7_GREEN"; mutate_record "$home" b3 "$K7_NOTQ"
+      mutate_record "$home" b3 '.records[0].observation.review_decision="REVIEW_REQUIRED"'
+      [ "$v" != i ] || { k7_hold "$home" b3 'K7 hold reason B(i)'; k7_note_input "$inputs" Bi-3 reason 'K7 hold reason B(i)'; }
+      [ "$v" != ii ] || k7_hold "$home" b2 'K7 hold reason B(ii)' ;;
+    iii)
+      record "$home" b3 203 open mergeable; mutate_record "$home" b3 "$K7_GREEN"; mutate_record "$home" b3 "$K7_NOTQ"
+      mutate_record "$home" b3 '.records[0].checked_at="2026-09-15T08:00:00Z"' ;;
+    iv) printf -- '- [ ] b3 - Filed https://gitlab.com/o/r/-/merge_requests/3 (repo: sample) (kind: ship)\n' >> "$home/data/backlog.md" ;;
+    v)
+      mkdir -p "$home/data/b3"; printf 'incomplete JSON' > "$home/data/b3/contributions.json"
+      printf 'kind=ship\npr=https://github.com/o/r/pull/203\n' > "$home/state/b3.meta"; chmod 600 "$home/state/b3.meta" ;;
+  esac
+}
+
+k7_snapshot() { # home
+  local home=$1 before after full summary file calls_before calls_after
+  mkdir -p "$home/forge"
+  with_home "$home" bash "$ROOT/bin/fm-fleet-snapshot.sh" --contribution-input > "$home/input.json" || return 1
+  if [ -n "${K7_AWAY_TASK:-}" ]; then
+    jq --arg t "$K7_AWAY_TASK" '.tasks = ((.tasks // []) | map(if .id == $t then . + {merge_authority:"away"} else . end))' "$home/input.json" > "$home/input.patched.json" && mv "$home/input.patched.json" "$home/input.json"
+    printf 'canonical input tasks[] entries for %s: %s\n' "$K7_AWAY_TASK" "$(jq --arg t "$K7_AWAY_TASK" '[.tasks[]? | select(.id == $t)] | length' "$home/input.json")" >> "$K7_OUT/notes.txt"
+  fi
+  before=$(for file in "$home"/data/*/contributions.json; do [ ! -f "$file" ] || shasum -a 256 "$file"; done)
+  calls_before=$(cat "$home/forge/shim.log" "$home/forge/review-calls" 2>/dev/null || true)
+  full=$(with_home "$home" bash "$ROOT/bin/fm-contributions.sh" snapshot "$home/input.json" --all) || return 1
+  after=$(for file in "$home"/data/*/contributions.json; do [ ! -f "$file" ] || shasum -a 256 "$file"; done)
+  calls_after=$(cat "$home/forge/shim.log" "$home/forge/review-calls" 2>/dev/null || true)
+  [ "$before" = "$after" ] || { echo 'snapshot changed saved bytes' >&2; return 1; }
+  [ "$calls_before" = "$calls_after" ] || { echo 'snapshot made forge or verifier calls' >&2; return 1; }
+  printf '%s\n' "$full"
+}
+
+k7_observe() { # name home
+  local name=$1 home=$2 all bear
+  all=$(k7_snapshot "$home") || fail "K7 snapshot failed: $name"
+  bear=$(bearings "$home") || fail "K7 bearings failed: $name"
+  jq -n --argjson all "$all" --argjson bear "$bear" '{all:$all,bearings:$bear.contributions}' > "$K7_OUT/observed-$name.json"
+}
+
+k7_observe_a26_real() {
+  local home
+  home=$(new_home k7-a26-real)
+  forge_home "$home"
+  with_home "$home" "$ROOT/bin/fm-pr-check.sh" delivery https://github.com/o/r/pull/8 >/dev/null || fail 'K7 away home setup failed'
+  printf 'yolo=on\n' >> "$home/state/delivery.meta"
+  with_home "$home" "$ROOT/bin/fm-afk-contract.sh" enter --words 'merge the delivery PR when green' >/dev/null || fail 'K7 away posture failed'
+  mutate_record "$home" delivery "$K7_GREEN"
+  mutate_record "$home" delivery "$K7_NOTQ"
+  # bin/fm-bearings-snapshot.sh refuses ordinary reads while away mode is active, so only the contribution snapshot is read.
+  k7_snapshot "$home" | jq '{all:.,bearings:null}' > "$K7_OUT/observed-A26real.json"
+}
+
+# K7: the fixtures of the contract's Verify (5) and (7) (section A and the second fixture with its five variants),
+# each in its own disposable home through the real hold command, canonical input, snapshot --all and Bearings.
+# The comparison table is Main-owned and independent of this change: when FM_K7_EXPECTED_TABLE and FM_K7_R1_TABLE
+# name its read-only copies, every observed row and summary value must equal the table; this test never writes it.
+# Without them only the table-independent invariants run, and the output says so.
+test_k7_fixture_table() {
+  local home variant rows
+  K7_OUT=${FM_K7_OUT:-$TMP_ROOT/k7-out}
+  rm -rf "$K7_OUT"; mkdir -p "$K7_OUT"
+  printf '{}\n' > "$K7_OUT/recorded-inputs.json"
+  for variant in base i ii iii iv v; do
+    home=$(new_home "k7-b-$variant"); k7_build_b "$home" "$K7_OUT/recorded-inputs.json" "$variant"
+    k7_observe "B$variant" "$home"
+  done
+  home=$(new_home k7-a); k7_build_section_a "$home" "$K7_OUT/recorded-inputs.json"
+  K7_AWAY_TASK=a26 k7_observe A "$home"
+  k7_observe_a26_real
+  # Table-independent invariants: a live hold is the only owner call, nothing carries the former reason, coverage adds up.
+  jq -e '.all as $a | .all.rows | all(.[]; .reason != "checks green; merge approval needed")
+    and ($a.known == 36 and $a.unreadable_records == 3 and ($a.counts | add) + $a.unmeasured == $a.known)
+    and ([$a.captain[].task] | sort) == ["a05","a33"]' "$K7_OUT/observed-A.json" >/dev/null \
+    || fail 'K7 section A coverage or owner calls are wrong'
+  for variant in base ii iii iv v; do
+    jq -e '.all.known == 3 and .all.counts.captain == 0 and .all.captain == []' "$K7_OUT/observed-B$variant.json" >/dev/null \
+      || fail "K7 second fixture variant $variant produced an owner call or a wrong row count"
+  done
+  jq -e '.all.known == 3 and ([.all.captain[].task] == ["b3"]) and (.all.proven_clear | not)' "$K7_OUT/observed-Bi.json" >/dev/null \
+    || fail 'K7 variant (i): the live hold on the REVIEW_REQUIRED row must be the only owner call'
+  if [ -n "${FM_K7_EXPECTED_TABLE:-}" ] && [ -n "${FM_K7_R1_TABLE:-}" ]; then
+    printf 'K7 table sha256: %s\nR1 table sha256: %s\n' "$(shasum -a 256 "$FM_K7_EXPECTED_TABLE" | cut -d' ' -f1)" "$(shasum -a 256 "$FM_K7_R1_TABLE" | cut -d' ' -f1)"
+    python3 - "$FM_K7_EXPECTED_TABLE" "$FM_K7_R1_TABLE" "$K7_OUT" <<'PY' || fail 'K7 rows differ from the Main-owned table'
+"""Compare K7 observed rows with the Main-owned expected table (read-only input).
+
+Usage: EXPECTED_TABLE R1_TABLE OUT_DIR
+Reads OUT_DIR/observed-{A,A26real,Bbase,Bi,Bii,Biii,Biv,Bv}.json and OUT_DIR/recorded-inputs.json.
+The expected table is only read; nothing is derived from observed output.
+"""
+import hashlib, json, re, sys
+from pathlib import Path
+
+table_path, r1_path, out = sys.argv[1], sys.argv[2], Path(sys.argv[3])
+table = Path(table_path).read_text()
+r1 = Path(r1_path).read_text()
+inputs = json.loads((out / 'recorded-inputs.json').read_text())
+
+# R1 reason strings by outcome name.
+r1_map = {}
+for line in r1.splitlines():
+    cells = [c.strip() for c in line.strip().strip('|').split('|')]
+    if len(cells) == 3 and cells[1] == 'fleet':
+        r1_map[cells[0]] = cells[2]
+outcome_names = {
+    'route-review': 'No qualifying PASS', 'update-branch': 'Base stale', 'merge': 'Qualifying PASS',
+    'PASS-unknown': 'PASS fact unknown', 'base-unknown': 'Base freshness unknown'}
+
+def rows_of(prefix_re):
+    rows = []
+    for line in table.splitlines():
+        if re.match(r'^\|\s*' + prefix_re + r'\s*\|', line):
+            cells = [c.strip() for c in line.strip().strip('|').split(' | ')]
+            rows.append(cells)
+    return rows
+
+def expected_reason(case, cell):
+    m = re.match(r'^outcome ([A-Za-z-]+): (.*)$', cell)
+    if m:
+        name, text = m.group(1), m.group(2)
+        assert r1_map[outcome_names[name]] == text, f'{case}: table string differs from the R1 table for {name}'
+        return text
+    if cell.startswith('arbitrary input') or cell.startswith('conditional'):
+        return ('INPUT', case)
+    return cell
+
+failures = []
+report = []
+
+def check_group(name, expect_rows, observed, task_of, input_reason=None, special=None):
+    """expect_rows: list of (case, actor, reason cell, checked cell)."""
+    by_task = {r['task']: r for r in observed['all']['rows']}
+    for case, actor, reason_cell, checked in expect_rows:
+        task = task_of(case)
+        if actor == 'no row' or task is None:
+            ok = task not in by_task
+            report.append((name, case, 'no row', '' if ok else 'ROW PRESENT', 'PASS' if ok else 'FAIL'))
+            if not ok: failures.append(f'{name} {case}: expected no row')
+            continue
+        row = by_task.get(task)
+        if row is None:
+            failures.append(f'{name} {case}: row missing'); report.append((name, case, '-', '-', 'FAIL')); continue
+        exp = expected_reason(case, reason_cell)
+        if isinstance(exp, tuple):
+            exp = inputs.get(case, {}).get('reason')
+            if exp is None and special is not None:
+                exp = special(case)
+        ok = row['actor'] == actor and row['reason'] == exp and bool(row['checked']) == (checked == 'yes')
+        report.append((name, case, f"{row['actor']}/{row['reason']} checked={row['checked']}",
+                       f'expected {actor}/{exp} checked={checked}', 'PASS' if ok else 'FAIL'))
+        if not ok: failures.append(f'{name} {case}: observed {row["actor"]}/{row["reason"]}/{row["checked"]} expected {actor}/{exp}/{checked}')
+
+def summarize(rows):
+    """CONTEXT 26 summary from table rows: (case, actor, checked, adds_row, unreadable)."""
+    counts = {'captain': 0, 'fleet': 0, 'maintainer': 0, 'nobody': 0}
+    known = checked = unmeasured = unreadable = 0
+    captain_cases = []
+    for case, actor, chk, adds, unread in rows:
+        unreadable += int(unread)
+        if adds == '1':
+            known += 1
+            if actor == 'unmeasured': unmeasured += 1
+            else: counts[actor] += 1
+            if chk == 'yes': checked += 1
+            if actor == 'captain': captain_cases.append(case)
+    complete = unreadable == 0 and checked == known
+    return dict(known=known, counts=counts, unmeasured=unmeasured, checked=checked, unreadable=unreadable,
+                complete=complete, proven_clear=complete and not counts['captain'], captain_cases=captain_cases)
+
+def block(label):
+    m = re.search(r'```' + label + r'\n(.*?)```', table, re.S)
+    return [l.split('|') for l in m.group(1).strip().splitlines()]
+
+def compare_summary(name, exp, observed, task_of):
+    a, b = observed['all'], observed['bearings']
+    cap_tasks = sorted(task_of(c) for c in exp['captain_cases'])
+    pairs = [
+        ('all.known', a['known'], exp['known']), ('all.checked', a['checked'], exp['checked']),
+        ('all.counts', a['counts'], exp['counts']), ('all.unmeasured', a['unmeasured'], exp['unmeasured']),
+        ('all.unreadable_records', a['unreadable_records'], exp['unreadable']),
+        ('all.complete', a['complete'], exp['complete']), ('all.proven_clear', a['proven_clear'], exp['proven_clear']),
+        ('all.captain list', sorted(r['task'] for r in a['captain']), cap_tasks),
+        ('bearings.known', b['known'], exp['known']), ('bearings.checked', b['checked'], exp['checked']),
+        ('bearings.counts', b['counts'], exp['counts']), ('bearings.unmeasured', b['unmeasured'], exp['unmeasured']),
+        ('bearings.unreadable_records', b.get('unreadable_records'), exp['unreadable']),
+        ('bearings.complete', b['complete'], exp['complete']), ('bearings.proven_clear', b['proven_clear'], exp['proven_clear']),
+        ('bearings.captain list', sorted(r['task'] for r in b['captain']), cap_tasks)]
+    for label, got, want in pairs:
+        ok = got == want
+        report.append((name, 'summary ' + label, json.dumps(got), json.dumps(want), 'PASS' if ok else 'FAIL'))
+        if not ok: failures.append(f'{name} summary {label}: observed {got} expected {want}')
+
+# ---- Section A
+task_a = lambda case: 'a' + case[1:].lower() if False else case.lower()
+a_rows = [(c[0], c[2], c[3], c[4]) for c in rows_of(r'A\d\d')]
+a_obs = json.loads((out / 'observed-A.json').read_text())
+check_group('A', a_rows, a_obs, lambda c: c.lower())
+a_block = [[x.strip() for x in l] for l in block('rows-A')]
+exp_a = summarize([(r[0], r[1], r[2], r[3], r[4]) for r in a_block])
+# the stated literal values of the table must equal what CONTEXT 26 computes from its rows
+stated = {m.group(1): int(m.group(2)) for m in re.finditer(r'^- (counts\.captain|counts\.fleet|counts\.maintainer|counts\.nobody|unmeasured|unreadable count) = (\d+)', table, re.M)}
+for key, want in (('counts.captain', exp_a['counts']['captain']), ('counts.fleet', exp_a['counts']['fleet']),
+                  ('counts.maintainer', exp_a['counts']['maintainer']), ('counts.nobody', exp_a['counts']['nobody']),
+                  ('unmeasured', exp_a['unmeasured']), ('unreadable count', exp_a['unreadable'])):
+    if stated.get(key) != want:
+        failures.append(f'table stated {key}={stated.get(key)} but its rows give {want}')
+compare_summary('A', exp_a, a_obs, lambda c: c.lower())
+
+# the real away record for A26
+real = json.loads((out / 'observed-A26real.json').read_text())
+row = real['all']['rows'][0]
+ok = row['actor'] == 'fleet' and row['reason'] == 'checks green; merge is authorized by delivery posture'
+report.append(('A26real', 'A26 on a real away record', f"{row['actor']}/{row['reason']}", 'fleet/checks green; merge is authorized by delivery posture', 'PASS' if ok else 'FAIL'))
+if not ok: failures.append('A26 real away row differs')
+
+# ---- Section B
+b_names = {'base': ('B0', 'rows-B0'), 'i': ('Bi', 'rows-Bi'), 'ii': ('Bii', 'rows-Bii'), 'iii': ('Biii', 'rows-Biii'), 'iv': ('Biv', 'rows-Biv'), 'v': ('Bv', 'rows-Bv')}
+for variant, (pfx, blk) in b_names.items():
+    obs = json.loads((out / f'observed-B{variant}.json').read_text())
+    exp_rows = [(c[0], c[2], c[3], c[4]) for c in rows_of(re.escape(pfx) + r'-\d')]
+    def task_of(case): return 'b' + case.split('-')[1]
+    def special(case):
+        # B(iii) row 3: the fixture records no error, so the table's conditional reason is the not-recently-checked text
+        return 'contribution not recently checked'
+    check_group('B' + variant, exp_rows, obs, task_of, special=special)
+    brows = [[x.strip() for x in l] for l in block(blk)]
+    exp = summarize([(r[0], r[1], r[2], r[3], r[4]) for r in brows])
+    # stated Summary line of the table for this variant
+    m = re.search(r'###\s+B(?:\(' + re.escape(variant) + r'\)|0 base fixture)[^\n]*\n.*?Summary: ([^\n]+)', table, re.S)
+    compare_summary('B' + variant, exp, obs, task_of)
+
+report_lines = ['| group | case | observed | expected | verdict |', '| --- | --- | --- | --- | --- |']
+for g, c, o, e, v in report:
+    report_lines.append(f'| {g} | {c} | {o} | {e} | {v} |')
+(out / 'k7-comparison.md').write_text('\n'.join(report_lines) + '\n')
+(out / 'k7-comparison.json').write_text(json.dumps({'failures': failures, 'rows': len(report)}, indent=2) + '\n')
+print(f'{len(report)} comparisons, {len(failures)} failures')
+for f in failures: print('FAIL:', f)
+sys.exit(1 if failures else 0)
+PY
+    pass 'K7 observed rows and summaries equal every row of the Main-owned table'
+  else
+    printf 'K7 table comparison not run: FM_K7_EXPECTED_TABLE and FM_K7_R1_TABLE are unset\n'
+    pass 'K7 fixtures hold the table-independent invariants (live holds alone are owner calls, coverage adds up)'
+  fi
+}
+
 fm_test_only
 failures=0
-for test_name in test_merge_refresh_and_read_call_audit test_preserved_base_rows test_live_hold_branch_preservation test_merge_arbitrary_url_and_task test_merge_verifier_failure_refresh_and_precedence test_shared_owner_real_reviews test_merge_silent_verifier_waits test_shared_owner_rule_pairs test_ordinary_merge_ownership test_observed_merge_check_precedence test_merge_base_observation test_merge_verifier_unknowns test_merge_saved_facts_and_freshness test_merge_hold_lifecycle test_away_merge_action test_captain_verdict_requires_live_hold test_shared_url_live_hold_outranks_verdict test_shared_url_label_follows_facts test_merge_preserved_cross_factors test_recorded_verdict_cross_factors test_merge_precedence_matrix test_actor_coverage test_stale_verdict test_unchecked_is_not_silence test_newest_check_has_no_verdict test_comment_wake test_review_wake test_inline_wake test_ready_issue_wake test_fresh_issue_requires_maintainer test_missing_lane_remains_missing test_partial_freshness_keeps_measured_rows test_malformed_record_cannot_prove_silence test_issue_timeline_and_exact_ack test_verdict_retains_judged_head test_verdict_actor_values_are_discoverable test_observed_replacement_refreshes_verdict test_unobserved_head_leaves_verdict_unknown test_away_yolo_is_fleet_work test_away_yolo_cross_home_is_fleet_work test_retired_and_unsupported_coverage test_unsupported_forge_is_not_fleet_work test_held_unsupported_forge_is_not_captain_work test_shared_contribution_signal_wakes_once test_watcher_keeps_diagnostics_separate_from_contribution_wakes test_expired_child_unsupported_forge_stays_unmeasured test_watcher_surfaces_new_contribution_once test_home_summary_coverage test_unreadable_pending_is_not_empty test_record_task_identity_matches_dirname_basename test_read_only_views_create_no_state test_clock_jump_does_not_refuse_a_read test_genuine_failure_after_clock_jump_is_unavailable test_shared_url_observed_once test_terminal_contribution_settles test_late_owner_inherits_terminal_observation test_interrupted_multi_owner_poll_settles_every_owner test_done_task_open_pr_still_observed test_all_urls_are_attempted_without_reservation test_three_second_pr_reads_complete_fresh_in_one_cycle test_progressing_reads_survive_fivefold_slowdown test_unsupported_url_first_does_not_abort_the_pass test_quota_reason_is_the_refusal_line test_reads_record_their_samples_when_the_poll_ends test_first_unknown_read_defers_the_rest_of_the_pass test_always_silent_url_does_not_starve_the_others test_stop_while_writing_the_order_leaves_no_temporary test_retired_pr_poll_starts_a_new_stop_episode test_every_disarm_path_starts_a_new_stop_episode test_reads_are_independent_of_watcher_interval test_watcher_stopped_check_rings_queued_row_next_pass test_unavailable_forge_records_error_and_wakes_once_per_episode test_late_owner_keeps_failure_episode_suppressed test_retire_ends_observation_of_a_gone_contribution test_late_owner_of_a_retired_final_contribution_is_not_retired test_retire_is_idempotent_and_refuses_unknown_pairs test_repeated_poll_reads_unchanged_prs_conditionally test_low_quota_poll_keeps_last_observation_marked_stale test_failure_after_quota_episode_wakes test_late_owners_keep_quota_episode_suppressed test_low_quota_wave_guards_graphql_and_marks_every_tail_owner test_successful_issue_wave_marks_unmeasured_tail_owners test_http_shim_preserves_backend_failures; do
+for test_name in test_k7_fixture_table test_merge_refresh_and_read_call_audit test_preserved_base_rows test_live_hold_branch_preservation test_merge_arbitrary_url_and_task test_merge_verifier_failure_refresh_and_precedence test_shared_owner_real_reviews test_merge_silent_verifier_waits test_shared_owner_rule_pairs test_ordinary_merge_ownership test_observed_merge_check_precedence test_merge_base_observation test_merge_verifier_unknowns test_merge_saved_facts_and_freshness test_merge_hold_lifecycle test_away_merge_action test_captain_verdict_requires_live_hold test_shared_url_live_hold_outranks_verdict test_shared_url_label_follows_facts test_merge_preserved_cross_factors test_recorded_verdict_cross_factors test_merge_precedence_matrix test_actor_coverage test_stale_verdict test_unchecked_is_not_silence test_newest_check_has_no_verdict test_comment_wake test_review_wake test_inline_wake test_ready_issue_wake test_fresh_issue_requires_maintainer test_missing_lane_remains_missing test_partial_freshness_keeps_measured_rows test_malformed_record_cannot_prove_silence test_issue_timeline_and_exact_ack test_verdict_retains_judged_head test_verdict_actor_values_are_discoverable test_observed_replacement_refreshes_verdict test_unobserved_head_leaves_verdict_unknown test_away_yolo_is_fleet_work test_away_yolo_cross_home_is_fleet_work test_retired_and_unsupported_coverage test_unsupported_forge_is_not_fleet_work test_held_unsupported_forge_is_not_captain_work test_shared_contribution_signal_wakes_once test_watcher_keeps_diagnostics_separate_from_contribution_wakes test_expired_child_unsupported_forge_stays_unmeasured test_watcher_surfaces_new_contribution_once test_home_summary_coverage test_unreadable_pending_is_not_empty test_record_task_identity_matches_dirname_basename test_read_only_views_create_no_state test_clock_jump_does_not_refuse_a_read test_genuine_failure_after_clock_jump_is_unavailable test_shared_url_observed_once test_terminal_contribution_settles test_late_owner_inherits_terminal_observation test_interrupted_multi_owner_poll_settles_every_owner test_done_task_open_pr_still_observed test_all_urls_are_attempted_without_reservation test_three_second_pr_reads_complete_fresh_in_one_cycle test_progressing_reads_survive_fivefold_slowdown test_unsupported_url_first_does_not_abort_the_pass test_quota_reason_is_the_refusal_line test_reads_record_their_samples_when_the_poll_ends test_first_unknown_read_defers_the_rest_of_the_pass test_always_silent_url_does_not_starve_the_others test_stop_while_writing_the_order_leaves_no_temporary test_retired_pr_poll_starts_a_new_stop_episode test_every_disarm_path_starts_a_new_stop_episode test_reads_are_independent_of_watcher_interval test_watcher_stopped_check_rings_queued_row_next_pass test_unavailable_forge_records_error_and_wakes_once_per_episode test_late_owner_keeps_failure_episode_suppressed test_retire_ends_observation_of_a_gone_contribution test_late_owner_of_a_retired_final_contribution_is_not_retired test_retire_is_idempotent_and_refuses_unknown_pairs test_repeated_poll_reads_unchanged_prs_conditionally test_low_quota_poll_keeps_last_observation_marked_stale test_failure_after_quota_episode_wakes test_late_owners_keep_quota_episode_suppressed test_low_quota_wave_guards_graphql_and_marks_every_tail_owner test_successful_issue_wave_marks_unmeasured_tail_owners test_http_shim_preserves_backend_failures; do
   ( "$test_name" ) || failures=$((failures + 1))
 done
 [ "$failures" -eq 0 ] || fail "$failures contribution regressions"
