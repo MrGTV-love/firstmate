@@ -265,6 +265,69 @@ SH
   pass "registered custom check output is queued before cadence suppression"
 }
 
+# Controlled journal entries exercise the maintained Slack emitter, authenticated
+# check scheduling and the real consumer, without claiming Slack eligibility proof.
+test_check_events_survive_batch_changes_and_state_coalescing() (
+  set -e
+  local dir state leg
+  dir=$(make_case check-events)
+  state="$dir/state"
+  mkdir -p "$dir/config" "$dir/data"
+  export FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_CONFIG_OVERRIDE="$dir/config" FM_DATA_OVERRIDE="$dir/data"
+  export FM_GITHUB_ACCOUNTING=0 FM_MEMORY_GUARD_BIN=/usr/bin/true FM_OPEN_LOOPS_BIN=/usr/bin/true
+  export FM_WATCH_HANDLING_SUCCESSOR=1 SLACK_BOT_TOKEN=fixture FM_SLACK_ALLOWED_AUTHORS=U0TESTOWNER FM_SLACK_DM_USER=U0TESTOWNER
+  export FM_EVENT_TEST_ROOT="$ROOT" FM_EVENT_TEST_REPLAY="$dir/replay.json"
+  printf '%s\n' '{"schema":"fm-slack-replay.v1","skip_mirror":true}' > "$dir/replay.json"
+  bash "$ROOT/bin/fm-captain-hold.sh" bind slack-dm >/dev/null
+  cat > "$state/slack.check.sh" <<'SH'
+#!/usr/bin/env bash
+set -eu
+python3 - "$FM_STATE_OVERRIDE" <<'PY'
+import json, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+counter = root / 'event-counter'
+leg = int(counter.read_text()) + 1 if counter.exists() else 1
+counter.write_text(str(leg))
+path = root / 'slack-watch/state.json'
+path.parent.mkdir(exist_ok=True)
+state = {'schema': 'fm-slack-watch.v1', 'threads': {}, 'seen': {}, 'pending': [], 'failure': ''}
+events = {1: [1, 2], 2: [1], 3: [1, 3]}.get(leg, [])
+state['outbox'] = ['check: slack request 900.00000%d from U0TESTOWNER: [unverified data] "request %d"' % (n, n) for n in events]
+path.write_text(json.dumps(state))
+PY
+exec bash "$FM_EVENT_TEST_ROOT/bin/fm-slack-check.sh" check --replay "$FM_EVENT_TEST_REPLAY"
+SH
+  cat > "$state/status.check.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'state round %s\n' "$(cat "$FM_STATE_OVERRIDE/event-counter")"
+SH
+  chmod 0700 "$state/slack.check.sh" "$state/status.check.sh"
+  bash "$ROOT/bin/fm-check-register.sh" slack >/dev/null
+  bash "$ROOT/bin/fm-check-register.sh" status >/dev/null
+  for leg in 1 2; do
+    # Keep the production cadence and age its input instead of shortening it.
+    touch -t 200001010000 "$state/.last-check"
+    PATH="$dir/fakebin:$PATH" bash "$WATCH" > "$dir/watch-$leg.out" 2> "$dir/watch-$leg.err"
+  done
+  "$DRAIN" > "$dir/drain.out" 2> "$dir/drain.err"
+  [ "$(grep -c 'check: slack request 900.000001 ' "$dir/drain.out")" = 1 ] || fail "request 1 was lost or replayed with its changed batch"
+  [ "$(grep -c 'check: slack request 900.000002 ' "$dir/drain.out")" = 1 ] || fail "request 2 was lost or duplicated"
+  grep -F 'state round 2' "$dir/drain.out" >/dev/null || fail "latest state was not presented"
+  ! grep -F 'state round 1' "$dir/drain.out" >/dev/null || fail "ordinary state checks stopped coalescing"
+  touch -t 200001010000 "$state/.last-check"
+  PATH="$dir/fakebin:$PATH" bash "$WATCH" > "$dir/watch-newer.out" 2> "$dir/watch-newer.err"
+  ack_drain_err "$state" "$dir/drain.err" || fail "event drain acknowledgement failed"
+  "$DRAIN" --queued > "$dir/remaining"
+  ! grep -E '900\.000001|900\.000002|state round [12]' "$dir/remaining" >/dev/null || fail "acknowledged event/state rows remained"
+  grep -F '900.000003' "$dir/remaining" >/dev/null || fail "old acknowledgement removed the unpresented event"
+  grep -F 'state round 3' "$dir/remaining" >/dev/null || fail "old acknowledgement removed newer state"
+  "$DRAIN" > "$dir/newer.out" 2> "$dir/newer.err"
+  [ "$(grep -c 'check: slack request 900.000003 ' "$dir/newer.out")" = 1 ] || fail "newer event was not presented exactly once"
+  ack_drain_err "$state" "$dir/newer.err" || fail "newer event acknowledgement failed"
+  [ ! -s "$state/.wake-queue" ] || fail "handled event rows remained queued"
+  pass "distinct events survive regrouping and acknowledgement while ordinary state checks coalesce"
+)
+
 test_atomic_double_drain() {
   local dir state out1 out2 count1 count2 sequence generation leftover
   dir=$(make_case double-drain)
@@ -3702,6 +3765,8 @@ test_wake_queue_prune_task() {
   append_wake "$state" signal "task-a.status" "signal: $state/task-a.status"
   append_wake "$state" signal "task-a.turn-ended" "signal: $state/task-a.turn-ended"
   append_wake "$state" check "$state/task-a.check.sh" "check: $state/task-a.check.sh: merged: https://example.test/pr/1"
+  append_wake "$state" check "$state/task-a.check.sh#event:request-1" "check: task-a event"
+  append_wake "$state" check "$state/task-a.check.sh-other#event:request-1" "check: neighboring check event"
   append_wake "$state" stale "test:window-b" "stale: test:window-b"
   append_wake "$state" signal "task-b.status" "signal: $state/task-b.status"
   append_wake "$state" check "$state/task-b.check.sh" "check: $state/task-b.check.sh: merged: https://example.test/pr/2"
@@ -3712,7 +3777,9 @@ test_wake_queue_prune_task() {
   grep -F 'test:window-a' "$queue" >/dev/null && fail "prune left stale wake for task-a"
   grep -F 'task-a.status' "$queue" >/dev/null && fail "prune left status wake for task-a"
   grep -F 'task-a.turn-ended' "$queue" >/dev/null && fail "prune left turn-ended wake for task-a"
-  grep -F 'task-a.check.sh' "$queue" >/dev/null && fail "prune left check wake for task-a"
+  grep -F "$state/task-a.check.sh"$'\t' "$queue" >/dev/null && fail "prune left check wake for task-a"
+  grep -F "$state/task-a.check.sh#event:" "$queue" >/dev/null && fail "prune left event wake for task-a"
+  grep -F "$state/task-a.check.sh-other#event:request-1" "$queue" >/dev/null || fail "prune removed a neighboring check event"
   grep -F 'test:window-b' "$queue" >/dev/null || fail "prune removed stale wake for task-b"
   grep -F 'task-b.status' "$queue" >/dev/null || fail "prune removed status wake for task-b"
   grep -F 'task-b.check.sh' "$queue" >/dev/null || fail "prune removed check wake for task-b"
@@ -4329,6 +4396,7 @@ test_signal_catchup_without_running_watcher
 test_stale_enqueue_before_suppressor
 test_not_working_stale_enqueue_before_suppressor
 test_check_output_is_queued
+test_check_events_survive_batch_changes_and_state_coalescing
 test_atomic_double_drain
 test_drain_dedupes_obvious_duplicates
 test_drain_asserts_watcher_liveness

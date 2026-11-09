@@ -4033,7 +4033,7 @@ prelude_phase() {
           out=$FM_CHECK_RESULT
         elif fm_custom_check_snapshot_prepare "$STATE" "$id"; then
           custom_snapshot=$FM_CUSTOM_CHECK_SNAPSHOT
-          run_check_capture "$id" "$custom_snapshot" || exit 1
+          FM_CHECK_EVENT_OUTPUT=1 run_check_capture "$id" "$custom_snapshot" || exit 1
           out=$FM_CHECK_RESULT
           fm_custom_check_snapshot_cleanup
         else
@@ -4109,8 +4109,8 @@ EOF
           continue
         fi
         pr_poll_control_release || exit 1
-        fm_wake_append check "$c" "$reason" || exit 1
-        [ -n "$check_wake_reason" ] || check_wake_reason=$reason
+        fm_check_queue_output "$c" "$out" || exit 1
+        [ -n "$check_wake_reason" ] || check_wake_reason=$FM_CHECK_WAKE_REASON
       fi
       pr_poll_control_release || exit 1
     done
