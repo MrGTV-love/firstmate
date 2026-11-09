@@ -110,8 +110,10 @@ A post-teardown visual review can complete against the surviving report and dura
 
 The authorized supervising firstmate owns this metadata attestation in the originating home's authoritative `FM_HOME`.
 A confined scout or worker inventories its complete report and visual surface, records each genuine unresolved captain choice and its options (or explicitly none), and sends the report path and inventory through the existing status/inbox handoff.
-With no open choice or blocker keys, its `done:` is report-ready for owner review, not task-completion certification.
-While any key remains open, the worker sends the report path and inventory through that keyed `needs-decision` or `blocked` status and stops without `done:` or `failed:`: the existing scout terminal-status fold retires open keys, so a terminal notification would lose that handoff.
+For a scout report with no open choice or blocker keys, `done:` is report-ready for owner review, not task-completion certification. A ship retains its selected delivery contract rather than adopting the scout's report-ready definition.
+While any key remains open, a ship or scout sends its ready-work/report pointer and inventory through that keyed `needs-decision` or `blocked` status and stops without `done:` or `failed:`: the existing ship/scout terminal-status fold retires open keys, so a terminal notification would lose that handoff.
+Only the actual owner resolution or verified durable hold/transfer permits the gated phase to proceed; the selected delivery and normal completion gates are unchanged.
+The persistent secondmate channel does not retire escalation keys on another phase's `done:` or `failed:`. It still reports a gated phase through its keyed nonterminal status until owner resolution/transfer, rather than misreporting that phase complete. This role difference is why the generator must not apply a worker terminal-status claim to every scaffold.
 The worker does not run captain-hold mutation commands or obtain permission to write protected metadata.
 The supervising firstmate reads the full surface, registers genuine calls through `hold`, reconciles operational keys through their existing owner, then runs the normal `complete <origin> <task-id>...` or `complete <origin> --none` command.
 An executor/permission failure is not a captain choice: retain its evidence and resolve that operational key through the existing owner path before retrying the gate; never fabricate a captain answer or bypass the inventory check.

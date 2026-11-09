@@ -604,7 +604,8 @@ Never append \`working:\` merely to acknowledge receipt or announce that a marke
 When a routed-work phase has a supervisor-actionable material change worth reporting under the rule above, give that reported phase a stable key.
 If its first reportable event is \`working [key=<work-slug>]: {material phase}\`, use the same key on its later \`$PAUSED_VERB\`, \`done\`, \`failed\`, \`needs-decision\`, or \`blocked\` event so the earlier working phase is superseded.
 When a keyed phase ends without another reportable state, append \`resolved [key=<work-slug>] [at=<epoch>]: {why it is no longer active}\`.
-\`resolved\` separately closes an escalated decision or blocker, and only a \`resolved\` line carrying that decision's exact key closes it: a later \`done\` or \`working\` event never does, even when the answer is what started that work.
+Keep an unresolved escalation on its keyed \`needs-decision\` or \`blocked\` status until its owner records an exact-key \`resolved\` line or a verified durable captain-held transfer. Do not report that gated phase as \`done\` or \`failed\`.
+On this persistent secondmate channel, reporting another phase \`done\` or \`failed\` does not close escalation keys; the ship/scout terminal-status fold is different. A \`working\` event is never a resolution.
 The main firstmate's answer normally writes that closing line at answer time; when a blocker or wait clears WITHOUT an answer from the main firstmate, append \`resolved [at=<epoch>]: {how it cleared}\` yourself (keyed with \`[key=<slug>]\` if you opened it with one) as your domain resumes.
 Routine internal supervision, heartbeats, retries, and crewmate churn stay inside your own home and must not touch that status file.
 
@@ -892,8 +893,8 @@ $CREWMATE_PAUSE_INSTRUCTIONS
 6. If a decision belongs above the implementation worker (product choices, destructive actions),
    append \`needs-decision [at=<epoch>]: {summary of options}\` and stop. Firstmate will reply with the decision.
 $ASK_USER_BLOCK
-   A decision or blocker you opened stays open until a \`resolved\` line carrying its exact key lands; a later \`done:\` or \`working:\` line never closes it, even when the answer is what started that work.
-   Firstmate's reply normally writes that closing line at answer time; when a blocker or wait clears WITHOUT a firstmate reply, append \`resolved [at=<epoch>]: {how it cleared}\` yourself (same \`[key=<slug>]\` if you opened it with one) as you resume.
+   Keep each unresolved choice or blocker on its keyed \`needs-decision\` or \`blocked\` status, including any ready-work pointer. Never follow it with \`done:\` or \`failed:\`: terminal ship status retires open keys in the existing fold.
+   Firstmate owns the durable hold/transfer or exact-key resolution. Its reply normally records that action; when an operational blocker or wait clears WITHOUT a firstmate reply, append \`resolved [at=<epoch>]: {how it cleared}\` yourself (same \`[key=<slug>]\` if you opened it with one) as you resume. Report terminal completion only after the pending keys and the selected delivery gates are settled.
 $SHARED_INFRA_RULE
 $PRIVATE_SERVICE_RULE
 $SHARED_PROC_BUDGET_RULE
