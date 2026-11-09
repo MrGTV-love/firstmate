@@ -7918,6 +7918,56 @@ SH
   pass "a process below the copy root is named and never queued for the retire signal, even when its parent is the task's own proved process; the proved root process alone is accepted and queued"
 }
 
+# The owned record binds each identity to the process the snapshot showed. Pid 101 is a child
+# of the marker bearer 100 in the snapshot; by the time its identity is read it is a different
+# process (another start time, parent 1). It must not be recorded: a recycled pid is no
+# descendant of the worker. The stable child 102 is recorded, the foreign 300 is not. The actual
+# record writer and proof run on a process table kept in a file; no process is started.
+test_a_pid_recycled_after_the_snapshot_is_not_recorded_as_the_workers_descendant() {
+  local dir fake m t rec rc
+  dir=$(make_case own-record-recycled)
+  fake=$dir/fakebin
+  m=$(cd "$dir/state" && pwd -P)/task-x1.inbox
+  t=$dir/ps-table
+  rec=$dir/state/task-x1.teardown-owned
+  eval "$(sed -n '/^task_process_identity() {/,/^}/p; /^teardown_process_env_has() {/,/^}/p; /^teardown_owner_marker() {/,/^}/p; /^teardown_owned_record_path() {/,/^}/p; /^teardown_process_recorded() {/,/^}/p; /^teardown_owned_record_write() {/,/^}/p' "$ROOT/bin/fm-teardown.sh" "$ROOT/bin/fm-teardown-nested-lib.sh")"
+  # shellcheck disable=SC2329 # called by the evaluated task_process_identity.
+  fm_nm_trim() { printf '%s' "$1" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'; }
+  # shellcheck disable=SC2034 # read by the evaluated functions.
+  STATE=$dir/state
+  # shellcheck disable=SC2034
+  ID=task-x1
+  retained_ps_table_shim "$fake" "$t"
+  mv "$fake/ps" "$fake/ps.table"
+  {
+    printf '#!/usr/bin/env bash\n'
+    printf 'case "$*" in *"-A -ww -E"*) : > "%s" ;; esac\n' "$dir/snapshot-taken"
+    printf 'if [ -f "%s" ]; then\n' "$dir/snapshot-taken"
+    printf '  case "$*" in\n'
+    printf '    *"-o ppid= -p 101"*) echo 1; exit 0 ;;\n'
+    printf '    *"-p 101 -o lstart="*) echo "Mon Nov  9 10:00:00 2026"; exit 0 ;;\n'
+    printf '  esac\nfi\n'
+    printf 'exec "%s" "$@"\n' "$fake/ps.table"
+  } > "$fake/ps"
+  chmod +x "$fake/ps"
+  printf '%s\n' \
+    "100|1|Sun Nov  8 08:00:00 2026|/opt/homebrew/bin/python3 worker.py FM_TASK_INBOX=$m" \
+    "101|100|Sun Nov  8 08:00:05 2026|/bin/sleep 600" \
+    "102|100|Sun Nov  8 08:00:06 2026|/bin/sleep 600" \
+    "300|1|Sun Nov  8 08:02:00 2026|/bin/sleep 600" > "$t"
+  mkdir -p "$dir/proc/100"
+  printf 'HOME=/h\0FM_TASK_INBOX=%s\0' "$m" > "$dir/proc/100/environ"
+  export FAKE_PS_TABLE=$t FM_PROC_ROOT_OVERRIDE=$dir/proc
+  PATH="$fake:$PATH" teardown_owned_record_write
+  assert_equals "100 102" "$(cut -f1 "$rec" | sort -n | paste -sd ' ' -)" "own-record-recycled: the record holds the wrong processes"
+  rc=0; PATH="$fake:$PATH" teardown_process_recorded 101 || rc=$?
+  [ "$rc" = 1 ] || fail "own-record-recycled: the recycled pid 101 is proved by the record (got $rc)"
+  rc=0; PATH="$fake:$PATH" teardown_process_recorded 102 || rc=$?
+  [ "$rc" = 0 ] || fail "own-record-recycled: the stable child 102 is not proved by the record (got $rc)"
+  unset FAKE_PS_TABLE FM_PROC_ROOT_OVERRIDE
+  pass "a pid recycled between the snapshot and the identity read is not recorded as the worker's descendant, while a stable child is, and a foreign process never is"
+}
+
 test_a_retained_record_that_cannot_be_written_refuses_the_close() {
   local rc dir
   make_retained_case retained-unwritable enclosing
@@ -8248,6 +8298,7 @@ test_a_copy_whose_state_cannot_be_read_after_the_driver_answers_is_not_asked_abo
 test_an_unreadable_existing_receipt_is_not_taken_for_no_receipt
 test_a_preserve_reached_through_a_symlinked_directory_does_not_stand_for_the_copys_file
 test_a_process_below_the_copy_root_is_named_and_never_queued_for_the_retire_signal
+test_a_pid_recycled_after_the_snapshot_is_not_recorded_as_the_workers_descendant
 test_a_driver_named_path_that_holds_a_newline_is_carried_whole_and_not_asked_about_again
 test_the_preserve_restores_to_the_builders_hashes
 test_the_builders_whole_inventory_is_preserved_fingerprinted_and_restored_byte_for_byte

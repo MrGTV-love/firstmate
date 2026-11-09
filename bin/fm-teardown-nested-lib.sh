@@ -407,12 +407,38 @@ teardown_owned_record_write() {
   [ -n "$pids" ] || return 0
   tmp=$(mktemp "${rec}.XXXXXX" 2>/dev/null) || return 0
   { [ -f "$rec" ] && [ ! -L "$rec" ] && cat "$rec"; } > "$tmp" 2>/dev/null || true
-  while IFS= read -r pid; do
-    [ -n "$pid" ] || continue
-    identity=$(task_process_identity "$pid" 2>/dev/null) || continue
-    [ -n "$identity" ] || continue
-    printf '%s\t%s\n' "$pid" "$identity" >> "$tmp"
-  done <<< "$pids"
+  # Each process is recorded only when the identity read is bound to the process that the
+  # snapshot above showed: a marker bearer is read again for its marker after its identity is
+  # read; any other process must still have, before and after its identity is read, a parent
+  # that is a bearer or an already recorded descendant. A pid that was recycled between the
+  # snapshot and these reads fails one of the two and is left out. Descendants are taken
+  # parent first, so passes repeat until none is added.
+  local accepted=" " pending="$pids" next added=1 before after
+  while [ "$added" = 1 ] && [ -n "$pending" ]; do
+    added=0
+    next=
+    while IFS= read -r pid; do
+      [ -n "$pid" ] || continue
+      case "$bearers" in *" $pid "*)
+        identity=$(task_process_identity "$pid" 2>/dev/null) || continue
+        [ -n "$identity" ] || continue
+        teardown_process_env_has "$pid" "$expected" || continue
+        ;;
+      *)
+        before=$(LC_ALL=C ps -o ppid= -p "$pid" 2>/dev/null | tr -d '[:space:]') || continue
+        case "$accepted" in *" $before "*) ;; *) next+="$pid"$'\n'; continue ;; esac
+        identity=$(task_process_identity "$pid" 2>/dev/null) || continue
+        [ -n "$identity" ] || continue
+        after=$(LC_ALL=C ps -o ppid= -p "$pid" 2>/dev/null | tr -d '[:space:]') || continue
+        [ "$before" = "$after" ] || continue
+        ;;
+      esac
+      printf '%s\t%s\n' "$pid" "$identity" >> "$tmp"
+      accepted="$accepted$pid "
+      added=1
+    done <<< "$pending"
+    pending=$next
+  done
   LC_ALL=C sort -u "$tmp" > "$tmp.sorted" 2>/dev/null && mv -- "$tmp.sorted" "$rec" || true
   rm -f -- "$tmp" "$tmp.sorted"
 }
