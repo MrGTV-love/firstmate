@@ -1901,44 +1901,6 @@ class IntakeTest(unittest.TestCase):
             self.assertTrue(watch.retarget())
             return watch.load_state()
 
-    def test_retarget_keeps_the_old_cursor_and_delivers_a_message_that_arrives_after_the_decision(self):
-        both = self.OWNER + ',' + self.NEW_OWNER
-        with self.fixture(authors=both) as (watch, replay):
-            watch.lock.close()
-            state = self.retargeted(replay, both)
-            self.assertEqual((state['drain']['user'], state['drain']['channel'], state['drain']['intake_cursor']),
-                             (self.OWNER, 'D0123456789', '100.000100'))
-            self.assertNotIn('intake_cursor', state)
-            # The operator arms the new DM; a third owner cannot be retargeted to while the old DM is still draining.
-            with self.configured(replay, self.NEW_OWNER, both) as arming:
-                arming.prepare()
-            with self.configured(replay, 'U0THIRDOWNER1', both) as third:
-                with self.assertRaisesRegex(SlackError, '^dm_user_changed_while_draining$'):
-                    third.retarget()
-            # A message arrives in the old DM after the decision: the drain delivers it, in the old DM thread.
-            self.say(replay, '200.000100', 'arrived after the retarget decision')
-            with self.configured(replay, self.NEW_OWNER, both) as polling:
-                polling.window_reads = 0
-                polling.poll()
-                self.assertEqual(self.acks(replay), ['200.000100'])
-                self.assertEqual([line.split()[3] for line in self.wakes(polling)], ['200.000100'])
-                self.assertIn('drain', polling.load_state())
-            opens = [e for e in replay.state['log'] if e['method'] in ('conversations.open', 'chat.postMessage')]
-            self.assertEqual([e['method'] for e in opens[-2:]], ['conversations.open', 'chat.postMessage'])
-            self.assertEqual(opens[-2]['recipient'], self.OWNER)
-            # One later poll reads the old DM empty: only then is the old boundary dropped, and nothing repeats.
-            self.say(replay, '200.000200', 'a stranger', user='U0STRANGER01')
-            self.say(replay, '200.000300', 'a bot', bot_id='BLOOKALIKE')
-            with self.configured(replay, self.NEW_OWNER, both) as polling:
-                polling.poll()
-                self.assertNotIn('drain', polling.load_state())
-                self.assertEqual(self.acks(replay), ['200.000100'])
-                self.assertEqual(len(self.wakes(polling)), 1)   # the one line already owed, not a second request
-            with self.configured(replay, self.NEW_OWNER, both) as polling:
-                polling.poll()
-                self.assertEqual(self.acks(replay), ['200.000100'])
-                self.assertEqual(len(self.wakes(polling)), 1)
-
     def test_a_transient_post_failure_then_recovery_acknowledges_exactly_once(self):
         with self.fixture() as (watch, replay):
             self.say(replay, '200.000100', 'a request')
@@ -1960,78 +1922,6 @@ class IntakeTest(unittest.TestCase):
             self.assertEqual(self.acks(replay), ['200.000100'])
             self.assertEqual(len(self.wakes(watch)), 1)
 
-    def test_the_drain_acknowledges_in_the_old_dm_thread_only_after_proving_that_dm(self):
-        # Pending the owner's approval (Main 2331): the one fixed acknowledgement goes into the old DM thread, after
-        # conversations.open for the stored old owner returned that DM, and into no other channel or thread.
-        both = self.OWNER + ',' + self.NEW_OWNER
-        with self.fixture(authors=both) as (watch, replay):
-            watch.lock.close()
-            self.retargeted(replay, both)
-            self.say(replay, '200.000100', 'arrived after the retarget decision')
-            with self.configured(replay, self.NEW_OWNER, both) as polling:
-                polling.poll()
-            writes = [e for e in replay.state['log'] if e['method'] == 'chat.postMessage']
-            self.assertEqual([(e['channel'], e['thread_ts']) for e in writes], [('D0123456789', '200.000100')])
-            order = [e['method'] for e in replay.state['log'] if e['method'] in ('conversations.open', 'chat.postMessage')]
-            self.assertEqual(order[-2:], ['conversations.open', 'chat.postMessage'])
-        with self.fixture(authors=both) as (watch, replay):
-            watch.lock.close()
-            self.retargeted(replay, both)
-            self.say(replay, '200.000100', 'arrived after the retarget decision')
-            replay.transcript['owner_dm'] = 'D0SOMEONEELSE'
-            with self.configured(replay, self.NEW_OWNER, both) as polling:
-                polling.poll()
-            self.assertEqual([e for e in replay.state['log'] if e['method'] == 'chat.postMessage'], [])
-
-    def test_a_message_that_arrives_right_after_retargets_last_read_is_delivered_not_lost(self):
-        # Main 2315: a message arriving between the last read and the decision is delivered (not lost). The message is
-        # appended inside retarget, the instant its read of the old DM has finished and found nothing unread.
-        both = self.OWNER + ',' + self.NEW_OWNER
-        original = plane.Watch.newer_messages
-
-        def late(watch, channel, cursor):
-            yield from original(watch, channel, cursor)
-            watch.api.state['messages'].append({'ts': '200.000100', 'user': self.OWNER, 'text': 'arrived after the last read'})
-        with self.fixture(authors=both) as (watch, replay):
-            watch.lock.close()
-            with self.configured(replay, self.NEW_OWNER, both) as deciding:
-                with patch.object(plane.Watch, 'newer_messages', late):
-                    self.assertTrue(deciding.retarget())
-            self.assertIn('drain', deciding.load_state())
-            with self.configured(replay, self.NEW_OWNER, both) as polling:
-                polling.poll()
-                self.assertEqual([line.split()[3] for line in self.wakes(polling)], ['200.000100'])
-
-    def test_a_drain_for_an_old_owner_who_left_the_allowlist_delivers_nothing_and_says_so_once(self):
-        with self.fixture() as (watch, replay):
-            watch.lock.close()
-            state = self.retargeted(replay, self.NEW_OWNER)
-            self.assertIn('drain', state)
-            self.say(replay, '200.000100', 'arrived after the retarget decision')
-            with self.configured(replay, self.NEW_OWNER, self.NEW_OWNER) as polling:
-                polling.poll()
-                self.assertEqual((self.acks(replay), self.wakes(polling)), ([], []))
-                failures = [line for line in polling.output if 'no longer in FM_SLACK_ALLOWED_AUTHORS' in line]
-                self.assertEqual(len(failures), 1, polling.output)
-                self.assertNotIn('drain', polling.load_state())
-            self.assertEqual([m['ts'] for m in replay.state['messages'] if m['ts'] == '200.000100'], ['200.000100'])
-            with self.configured(replay, self.NEW_OWNER, self.NEW_OWNER) as polling:
-                polling.poll()
-                self.assertEqual((self.acks(replay), self.wakes(polling)), ([], []))
-
-    def test_a_drain_that_cannot_prove_the_old_dm_writes_and_reads_nothing_more(self):
-        both = self.OWNER + ',' + self.NEW_OWNER
-        with self.fixture(authors=both) as (watch, replay):
-            watch.lock.close()
-            self.retargeted(replay, both)
-            self.say(replay, '200.000100', 'arrived after the retarget decision')
-            replay.transcript['owner_dm'] = 'D0SOMEONEELSE'
-            with self.configured(replay, self.NEW_OWNER, both) as polling:
-                polling.poll()
-                self.assertEqual((self.acks(replay), self.wakes(polling)), ([], []))
-                self.assertEqual(len([line for line in polling.output if 'could not be proven' in line]), 1)
-                self.assertNotIn('drain', polling.load_state())
-
     def test_once_retarget_accepts_the_old_dm_is_never_read_again_and_nothing_is_posted_there(self):
         # Amendment bj (Main 2379): the claim is that retarget loses no owner message sent before its last read of the old
         # DM; a message sent to the old DM after that read is a named limit (K13): not read, woken or acknowledged.
@@ -2051,7 +1941,8 @@ class IntakeTest(unittest.TestCase):
                 self.assertNotIn('drain', polling.load_state())
             later = replay.state['log'][before:]
             self.assertEqual([e for e in later if e['method'] == 'chat.postMessage'], [])
-            self.assertEqual([e for e in later if e['method'] == 'conversations.history' and e.get('oldest') == '100.000100'], [])
+            # Every call is annotated with the user whose DM it opened or used: none names the old owner.
+            self.assertEqual([e for e in later if e.get('recipient') == self.OWNER], [])
 
     def test_a_notice_that_fails_part_way_still_charges_the_cap(self):
         def run(failing):

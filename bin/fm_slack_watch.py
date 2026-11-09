@@ -502,7 +502,6 @@ class Watch:
         # poll's one budget leaves for new requests.
         self.notices_handled = 0
         self.spent_notices = 0
-        self.taken, self.finished_read = 0, False
         self.notices_held = False
         self.staging_only = False
         self.dm_proven = False
@@ -740,17 +739,17 @@ class Watch:
                 for prefix, value in fields]
         return '\n'.join(text + footer), options, usable
 
-    def messages(self, thread, channel=None):
-        channel = channel or self.state.get('channel')
+    def messages(self, thread):
+        channel = self.state.get('channel')
         if not channel:
             raise SlackError('dm_not_prepared')
         return list(self.api.pages('conversations.replies', 'messages', channel=channel, ts=thread,
                                    include_all_metadata=True))
 
-    def recent(self, thread, channel=None):
+    def recent(self, thread):
         if thread:
-            return self.messages(thread, channel)
-        channel = channel or self.state.get('channel')
+            return self.messages(thread)
+        channel = self.state.get('channel')
         if not channel:
             raise SlackError('dm_not_prepared')
         return self.api.call('conversations.history', channel=channel, limit=100,
@@ -772,11 +771,10 @@ class Watch:
             self.dm_proven = True
         return channel
 
-    def leaving_dm(self, left=None):
-        """The DM a retarget is leaving (or has left, for the drain): it must be the DM Slack itself opens for the
-        owner it was stored for. It is read, and written to only by the drain of a retarget (drain_requests)."""
-        left = left or self.state
-        channel, user = left.get('channel'), left.get('user')
+    def leaving_dm(self):
+        """The DM a retarget is leaving, for a read only: it must be the DM Slack itself opens for the owner it was
+        stored for. Nothing is ever written to it; owner_channel stays the one channel this plane writes to."""
+        channel, user = self.state.get('channel'), self.state.get('user')
         if not channel:
             raise SlackError('dm_not_prepared')
         if not user or not DM_CHANNEL.fullmatch(channel):
@@ -786,10 +784,10 @@ class Watch:
             raise SlackError('stored_channel_not_owner_dm')
         return channel
 
-    def post(self, event, text, thread=None, channel=None):
-        channel = channel or self.owner_channel()
+    def post(self, event, text, thread=None):
+        channel = self.owner_channel()
         marker = hashlib.sha256(event.encode()).hexdigest()
-        for message in self.recent(thread, channel):
+        for message in self.recent(thread):
             if message.get('metadata', {}).get('event_payload', {}).get('id') == marker:
                 return message['ts']
         if len(text) > 39000:
@@ -806,9 +804,6 @@ class Watch:
         """Re-point the plane at a changed owner DM; only an explicit retarget may do this."""
         if not self.state.get('user') or self.state['user'] == self.dm_user():
             return False
-        if self.state.get('drain'):
-            # The old DM of an earlier retarget is still being drained: only that drain may finish first.
-            raise SlackError('dm_user_changed_while_draining')
         if self.state['pending']:
             # Pending rows belong to threads in the old DM; they must finish there first.
             raise SlackError('dm_user_changed_with_pending_work')
@@ -827,17 +822,11 @@ class Watch:
         # the per-poll cap, so owner requests may still wait in the old DM. Only look, never take in.
         if self.unread_requests():
             raise SlackError('dm_user_changed_with_unread_requests')
-        # The old DM's threads stop being tracked. A retarget is not a one-shot decision about requests (Amendment bj,
-        # Main 2315): a message can arrive after the last read, so the old DM's cursor is kept as a drain that the
-        # polls read until one of them finds it empty; only then is the old boundary dropped.
-        left = {key: self.state.get(key) for key in ('user', 'channel', 'team', 'intake_cursor', 'intake_bounds')
-                if self.state.get(key) is not None}
+        # The old DM's threads stop being tracked and nothing more is posted there.
         self.state.update(user='', channel='', team='', scopes=[], threads={})
         # The request cursor and its walk bounds belong to the old DM; the new DM starts from its own latest message.
         self.state.pop('intake_cursor', None)
         self.state.pop('intake_bounds', None)
-        if left.get('channel') and left.get('intake_cursor') is not None:
-            self.state['drain'] = left
         self.commit()
         return True
 
@@ -918,14 +907,13 @@ class Watch:
         """A message typed in the main DM window: no thread, or the root of its own thread."""
         return not message.get('thread_ts') or message['thread_ts'] == message.get('ts')
 
-    def request_from(self, message, owner=None, allowlisted=True, left=None):
+    def request_from(self, message, owner=None, allowlisted=True):
         """The journal row for one new owner message, or None when it is not a request. Its text is the whole
         permitted text of the message (a secret value of the plane's own replaced, Amendment ai), never the
         flattened presentation; the wake line is built from it when the request is delivered. allowlisted=False
         is for the retarget's look at the old DM only: it never delivers, so the stored owner is judged without
-        the current allowlist (Amendment bj). left is the old DM of a drain (its team and channel name the event)."""
+        the current allowlist (Amendment bj)."""
         ts = message.get('ts')
-        source = left or self.state
         # A request comes only from the owner, whose DM this is: being on the allowlist is not enough.
         owner = owner or self.dm_user()
         if not owner or message.get('user') != owner or not self.human(message) or not self.top_level(message):
@@ -937,12 +925,9 @@ class Watch:
         if not isinstance(text, str) or text == '':
             return None
         whole, shown, replaced = sanitize(text)
-        event = '/'.join([source.get('team', ''), source.get('channel', ''), ts, 'request'])
-        row = {'event': event, 'key': '', 'thread': ts, 'author': message['user'], 'text': whole, 'shown': shown,
-               'replaced': replaced, 'kind': 'request', 'stage': 'request'}
-        if left is not None:
-            row['drain'] = True
-        return row
+        event = '/'.join([self.state.get('team', ''), self.state.get('channel', ''), ts, 'request'])
+        return {'event': event, 'key': '', 'thread': ts, 'author': message['user'], 'text': whole, 'shown': shown,
+                'replaced': replaced, 'kind': 'request', 'stage': 'request'}
 
     def record(self, ts):
         """The declared record of one request (I4d): the last line of the store whose ts is the key."""
@@ -1027,10 +1012,8 @@ class Watch:
     def publish(self, pending):
         if self.staging_only or failed(pending):
             return
-        # A request comes from the owner of the DM it was read in: the configured owner, or the stored old owner of a drain.
-        owner = (self.state.get('drain') or {}).get('user') if pending.get('drain') else self.dm_user()
         if (pending.get('kind') in ('answer', 'request') and pending.get('author') not in self.authors) \
-                or (pending.get('kind') == 'request' and pending.get('author') != owner):
+                or (pending.get('kind') == 'request' and pending.get('author') != self.dm_user()):
             self.state['pending'] = [p for p in self.state['pending'] if p is not pending]
             self.commit()
             return
@@ -1044,14 +1027,9 @@ class Watch:
             with self.delivering() as bound:
                 if not bound:
                     return
-                drained = pending.get('drain')
-                if drained and not self.state.get('drain'):
-                    raise SlackError('dm_not_prepared')
-                # The drain acknowledges in the old DM, proved by conversations.open for the stored old owner. Pending the
-                # owner's approval (Main 2331): this block is its own commit and can be dropped cleanly.
-                channel = self.leaving_dm(self.state['drain']) if drained else self.owner_channel()
+                self.owner_channel()
                 try:
-                    self.post('ack:' + pending['event'], REQUEST_ACK, pending['thread'], channel if drained else None)
+                    self.post('ack:' + pending['event'], REQUEST_ACK, pending['thread'])
                 except SlackError as error:
                     if str(error) not in THREAD_ERRORS:
                         raise
@@ -1377,10 +1355,7 @@ class Watch:
         deferred = self.resolve() or deferred
         # Last, so that the replies on tracked threads and the resolutions are never held back by it.
         try:
-            if self.state.get('drain'):
-                self.drain_requests(max(0, remaining - self.notices_handled))
-            else:
-                self.take_requests(max(0, remaining - self.notices_handled))
+            self.take_requests(max(0, remaining - self.notices_handled))
         except SlackError as error:
             if str(error) not in THREAD_ERRORS:
                 raise
@@ -1388,7 +1363,7 @@ class Watch:
         if deferred:
             raise deferred
 
-    def take_requests(self, remaining, drain=False):
+    def take_requests(self, remaining):
         """Take in new owner messages from the DM window, oldest first, at most remaining of them, with the one
         history read a poll may make. Slack lists history newest first, so when the wait since the starting point
         is longer than a page, the read holds only its newest part: nothing is taken in from it, its lowest
@@ -1396,9 +1371,7 @@ class Watch:
         message, it is taken in and the pages above it follow, one bound at a time, so requests still arrive
         oldest first with none skipped, repeated or reordered. A wait that fits one page completes in one poll; a wait of
         k pages completes in at most 2k-1 polls."""
-        source = self.state['drain'] if drain else self.state
-        channel, cursor = source.get('channel'), source.get('intake_cursor')
-        self.taken, self.finished_read = 0, False
+        channel, cursor = self.state.get('channel'), self.state.get('intake_cursor')
         if remaining <= 0 or not channel or cursor is None or self.window_reads:
             return
         # An older request that is journaled and not yet delivered (its acknowledgement failed, or the source is
@@ -1406,11 +1379,8 @@ class Watch:
         # request is no longer retried; it waits in the journal for `fm-slack-check.sh resolve`.
         if any(row.get('kind') == 'request' and not failed(row) for row in self.state['pending']):
             return
-        if drain:
-            self.leaving_dm(source)
-        else:
-            self.owner_channel()
-        bounds = source.get('intake_bounds')
+        self.owner_channel()
+        bounds = self.state.get('intake_bounds')
         bounds = bounds if isinstance(bounds, list) else []
         bound = bounds[-1] if bounds else None
         fields = {'oldest': cursor, 'limit': REQUEST_PAGE}
@@ -1427,27 +1397,20 @@ class Watch:
         if data.get('has_more') or (isinstance(paging, dict) and paging.get('next_cursor')):
             if not window:
                 raise SlackError('unreadable_dm_history')
-            source['intake_bounds'] = bounds + [min((message['ts'] for message in window), key=ts_key)]
+            self.state['intake_bounds'] = bounds + [min((message['ts'] for message in window), key=ts_key)]
             self.commit()
             return
         moved, finished = False, True
         for message in sorted(window, key=lambda m: ts_key(m['ts'])):
-            row = (self.request_from(message, owner=source.get('user'), allowlisted=False, left=source) if drain
-                   else self.request_from(message))
+            row = self.request_from(message)
             if row and row['event'] not in self.state['seen']:
                 if remaining <= 0:
                     finished = False
                     break
-                if drain and source.get('user') not in self.authors:
-                    # The old owner has left FM_SLACK_ALLOWED_AUTHORS: nothing is delivered for them (Main 2317).
-                    self.stop_drain('slack: old DM request not delivered: its sender is no longer in FM_SLACK_ALLOWED_AUTHORS; '
-                                    'it stays unread in Slack')
-                    return
                 # The cursor passes a message only in the same commit that journals it.
-                source['intake_cursor'] = message['ts']
+                self.state['intake_cursor'] = message['ts']
                 pending = self.stage(row)
                 moved = False
-                self.taken += 1
                 self.publish(pending)
                 remaining -= 1
                 if any(held is pending for held in self.state['pending']):
@@ -1455,41 +1418,17 @@ class Watch:
                     finished = False
                     break
             else:
-                source['intake_cursor'] = message['ts']
+                self.state['intake_cursor'] = message['ts']
                 moved = True
         if finished and bounds:
             # This page is taken in; the next bound down names the page above it.
             if bounds[:-1]:
-                source['intake_bounds'] = bounds[:-1]
+                self.state['intake_bounds'] = bounds[:-1]
             else:
-                source.pop('intake_bounds')
+                self.state.pop('intake_bounds')
             moved = True
-        self.finished_read = finished and not bounds
         if moved:
             self.commit()
-
-    def stop_drain(self, line):
-        """Drop the old DM's boundary; a failure line, when there is one, goes to Main once."""
-        if line:
-            self.say(line)
-        self.state.pop('drain', None)
-        self.commit()
-
-    def drain_requests(self, remaining):
-        """After a retarget the polls read the old DM with their one request history read, until one reads it empty
-        (Amendment bj, Main 2315 and 2317): a request that arrived after the retarget decision is delivered and
-        acknowledged in the old DM thread, and only an empty read drops the old boundary."""
-        try:
-            self.take_requests(remaining, drain=True)
-        except SlackError as error:
-            if str(error) in ('stored_channel_not_owner_dm', 'target_is_not_a_DM', 'channel_not_found'):
-                # The old DM can no longer be proven the old owner's: nothing is read or written there.
-                self.stop_drain('slack: old DM could not be proven; its boundary was dropped: ' + str(error))
-                return
-            raise
-        drained = not any(row.get('drain') for row in self.state['pending'])
-        if self.state.get('drain') and self.window_reads and self.taken == 0 and self.finished_read and drained:
-            self.stop_drain('')
 
     def read_thread(self, occurrence, record, remaining):
         """Read one tracked thread and stage at most the answers the cap allows; returns the cap left."""
