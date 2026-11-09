@@ -7620,7 +7620,7 @@ retained_overlap_run() {  # <label> <second-command...>: first run in the backgr
       n=$((n + 1))
       [ "$n" -ne 150 ] || echo "slow: $label: the second activation is not waiting yet" >&2
     done
-    ls "$FOREIGN_CASE"/state/.lock-monitor.wait.* > "$FOREIGN_CASE/waiting-at-release.txt" 2>/dev/null || true
+    cat "$FOREIGN_CASE"/state/.lock-monitor.wait.* > "$FOREIGN_CASE/waiting-at-release.txt" 2>/dev/null || true
     : > "$FOREIGN_CASE/release"
   ) &
   releaser_pid=$!
@@ -7637,7 +7637,7 @@ test_two_overlapping_teardowns_of_one_kept_copy_make_one_archive() {
   cp "$FOREIGN_CASE/stderr" "$FOREIGN_CASE/stderr.second"
   [ -s "$FOREIGN_CASE/waiting-at-release.txt" ] || fail "retained-overlap-teardown: the second teardown was never observed waiting on the first one's lock before the driver was released"
   assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-overlap-teardown: two overlapping teardowns made more than one driver call or tar (first rc $(cat "$FOREIGN_CASE/rc.first"), second rc $rc: $(tail -3 "$FOREIGN_CASE/stderr.second"))"
-  pass "two overlapping teardowns of one kept copy ask the driver once and write one tar (first rc $(cat "$FOREIGN_CASE/rc.first"), second rc $rc)"
+  pass "two overlapping teardowns of one kept copy ask the driver once and write one tar (first rc $(cat "$FOREIGN_CASE/rc.first"), second rc $rc; the second waited on: $(sed -n 2p "$FOREIGN_CASE/waiting-at-release.txt" | sed "s#$FOREIGN_CASE/##" | tr '\n' ' '))"
 }
 
 test_a_file_created_in_the_copy_while_the_driver_runs_is_not_closed_over() {
@@ -7653,6 +7653,27 @@ test_a_file_created_in_the_copy_while_the_driver_runs_is_not_closed_over() {
 
 # C2 (unchanged): the record does not expire; a run 30 days after the record's
 # time fields and file times asks the driver nothing.
+# The control that makes the overlap check discriminate: the same two overlapping teardowns,
+# the second one run from a copy of bin/ without the per-task lifecycle locks, make two driver
+# calls and two tars. Without it the check above could pass for another reason. The locks
+# removed are the three teardown takes per task, in order: the lease-command lock
+# (fm_lease_guard, the one the first teardown holds and the second waits on), the control lock
+# and the task record's meta lock. The project lock is left in place.
+test_a_run_without_the_per_task_lifecycle_locks_calls_the_driver_twice_so_the_overlap_check_discriminates() {
+  local rc patched
+  make_retained_case retained-overlap-nolock enclosing
+  patched=$FOREIGN_CASE/patched-code
+  mkdir -p "$patched"
+  cp -R "$ROOT/bin" "$patched/bin"
+  sed -i.bak -e 's/^fm_lease_guard "\$ID" "teardown (fm-teardown)"$/true/' -e 's/^fm_lock_try_acquire "\$CONTROL_LOCK" || {$/true || {/' -e 's/^fm_lock_acquire_wait "\$META_LOCK"$/true/' "$patched/bin/fm-teardown.sh"
+  [ "$(diff "$ROOT/bin/fm-teardown.sh" "$patched/bin/fm-teardown.sh" | grep -c '^>')" = 3 ] || fail "retained-overlap-nolock: the three per-task lock lines to remove were not all found"
+  rc=0
+  second_without_locks() { TEARDOWN="$patched/bin/fm-teardown.sh" run_foreign_teardown rc FM_STUB_CLOSEOUT=retained; }
+  retained_overlap_run retained-overlap-nolock second_without_locks
+  assert_equals "2 2" "$(retained_call_count) $(retained_tar_count)" "retained-overlap-nolock: without the per-task locks a second run should have called the driver again (second rc $rc: stdout $(tail -3 "$FOREIGN_CASE/stdout" | tr "\n" "|"))"
+  pass "a second teardown without the per-task lifecycle locks makes a second driver call and a second tar, so the overlap check discriminates"
+}
+
 test_an_aged_record_of_an_unchanged_kept_copy_still_asks_the_driver_nothing() {
   local rc record aged_at age
   for age in 30 400; do
@@ -8066,6 +8087,7 @@ test_the_preserve_restores_to_the_builders_hashes
 test_the_builders_whole_inventory_is_preserved_fingerprinted_and_restored_byte_for_byte
 test_a_file_created_in_the_copy_while_the_driver_runs_is_not_closed_over
 test_two_overlapping_teardowns_of_one_kept_copy_make_one_archive
+test_a_run_without_the_per_task_lifecycle_locks_calls_the_driver_twice_so_the_overlap_check_discriminates
 test_the_kept_route_refuses_an_anchored_but_unlanded_commit_and_an_untracked_claude_file
 test_a_driver_path_of_only_slashes_is_refused_and_recorded
 test_ignored_names_that_differ_after_a_tab_are_different_payloads
