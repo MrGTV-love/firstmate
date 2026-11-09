@@ -1915,26 +1915,28 @@ class IntakeTest(unittest.TestCase):
             with self.configured(replay, 'U0THIRDOWNER1', both) as third:
                 with self.assertRaisesRegex(SlackError, '^dm_user_changed_while_draining$'):
                     third.retarget()
-            # A message arrives in the old DM after the decision: the drain delivers it (it wakes Main; the
-            # acknowledgement into the old DM thread waits for the owner's approval, Main 2331).
+            # A message arrives in the old DM after the decision: the drain delivers it, in the old DM thread.
             self.say(replay, '200.000100', 'arrived after the retarget decision')
             with self.configured(replay, self.NEW_OWNER, both) as polling:
                 polling.window_reads = 0
                 polling.poll()
-                self.assertEqual(self.acks(replay), [])
+                self.assertEqual(self.acks(replay), ['200.000100'])
                 self.assertEqual([line.split()[3] for line in self.wakes(polling)], ['200.000100'])
                 self.assertIn('drain', polling.load_state())
+            opens = [e for e in replay.state['log'] if e['method'] in ('conversations.open', 'chat.postMessage')]
+            self.assertEqual([e['method'] for e in opens[-2:]], ['conversations.open', 'chat.postMessage'])
+            self.assertEqual(opens[-2]['recipient'], self.OWNER)
             # One later poll reads the old DM empty: only then is the old boundary dropped, and nothing repeats.
             self.say(replay, '200.000200', 'a stranger', user='U0STRANGER01')
             self.say(replay, '200.000300', 'a bot', bot_id='BLOOKALIKE')
             with self.configured(replay, self.NEW_OWNER, both) as polling:
                 polling.poll()
                 self.assertNotIn('drain', polling.load_state())
-                self.assertEqual(self.acks(replay), [])
+                self.assertEqual(self.acks(replay), ['200.000100'])
                 self.assertEqual(len(self.wakes(polling)), 1)   # the one line already owed, not a second request
             with self.configured(replay, self.NEW_OWNER, both) as polling:
                 polling.poll()
-                self.assertEqual(self.acks(replay), [])
+                self.assertEqual(self.acks(replay), ['200.000100'])
                 self.assertEqual(len(self.wakes(polling)), 1)
 
     def test_a_transient_post_failure_then_recovery_acknowledges_exactly_once(self):
@@ -1957,6 +1959,29 @@ class IntakeTest(unittest.TestCase):
             watch.poll()
             self.assertEqual(self.acks(replay), ['200.000100'])
             self.assertEqual(len(self.wakes(watch)), 1)
+
+    def test_the_drain_acknowledges_in_the_old_dm_thread_only_after_proving_that_dm(self):
+        # Pending the owner's approval (Main 2331): the one fixed acknowledgement goes into the old DM thread, after
+        # conversations.open for the stored old owner returned that DM, and into no other channel or thread.
+        both = self.OWNER + ',' + self.NEW_OWNER
+        with self.fixture(authors=both) as (watch, replay):
+            watch.lock.close()
+            self.retargeted(replay, both)
+            self.say(replay, '200.000100', 'arrived after the retarget decision')
+            with self.configured(replay, self.NEW_OWNER, both) as polling:
+                polling.poll()
+            writes = [e for e in replay.state['log'] if e['method'] == 'chat.postMessage']
+            self.assertEqual([(e['channel'], e['thread_ts']) for e in writes], [('D0123456789', '200.000100')])
+            order = [e['method'] for e in replay.state['log'] if e['method'] in ('conversations.open', 'chat.postMessage')]
+            self.assertEqual(order[-2:], ['conversations.open', 'chat.postMessage'])
+        with self.fixture(authors=both) as (watch, replay):
+            watch.lock.close()
+            self.retargeted(replay, both)
+            self.say(replay, '200.000100', 'arrived after the retarget decision')
+            replay.transcript['owner_dm'] = 'D0SOMEONEELSE'
+            with self.configured(replay, self.NEW_OWNER, both) as polling:
+                polling.poll()
+            self.assertEqual([e for e in replay.state['log'] if e['method'] == 'chat.postMessage'], [])
 
     def test_a_drain_for_an_old_owner_who_left_the_allowlist_delivers_nothing_and_says_so_once(self):
         with self.fixture() as (watch, replay):

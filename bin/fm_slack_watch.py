@@ -774,7 +774,7 @@ class Watch:
 
     def leaving_dm(self, left=None):
         """The DM a retarget is leaving (or has left, for the drain): it must be the DM Slack itself opens for the
-        owner it was stored for. It is read only; nothing is written to it."""
+        owner it was stored for. It is read, and written to only by the drain of a retarget (drain_requests)."""
         left = left or self.state
         channel, user = left.get('channel'), left.get('user')
         if not channel:
@@ -1047,13 +1047,11 @@ class Watch:
                 drained = pending.get('drain')
                 if drained and not self.state.get('drain'):
                     raise SlackError('dm_not_prepared')
-                # A drained request is woken without an acknowledgement: posting one into the old DM waits for the owner's
-                # approval (Main 2331), and is its own commit.
-                if not drained:
-                    self.owner_channel()
+                # The drain acknowledges in the old DM, proved by conversations.open for the stored old owner. Pending the
+                # owner's approval (Main 2331): this block is its own commit and can be dropped cleanly.
+                channel = self.leaving_dm(self.state['drain']) if drained else self.owner_channel()
                 try:
-                    if not drained:
-                        self.post('ack:' + pending['event'], REQUEST_ACK, pending['thread'])
+                    self.post('ack:' + pending['event'], REQUEST_ACK, pending['thread'], channel if drained else None)
                 except SlackError as error:
                     if str(error) not in THREAD_ERRORS:
                         raise
