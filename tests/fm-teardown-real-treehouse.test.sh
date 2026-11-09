@@ -289,6 +289,9 @@ real_proc_python() {
   printf '%s\n' "$py"
 }
 
+# below-nonapple: a marked non-Apple parent at the copy root, alive, and its child running below
+# the root (notes/): the child is refused by name and left running (the process under test is
+# the child), on both routes, and no TERM is audited for it.
 # real_proc_start <mode>: starts the leftover in $FOREIGN_COPY; the parent's pid is in
 # PROC_PARENT (empty when the parent has exited) and the process at the root in PROC_PID.
 real_proc_start() {
@@ -304,7 +307,16 @@ nonapple = [sys.executable, "-c", "import time; time.sleep(600)"]
 # "nonapple" also ends with "apple": test the longer suffix first, or every non-Apple state
 # would start the Apple shell and sleep.
 cmd = nonapple if mode.endswith("nonapple") else apple
-if mode.startswith("live"):
+if mode.startswith("below"):
+    # The marked parent runs at the copy root and stays alive; its child runs below the root.
+    os.chdir(root)
+    os.makedirs(os.path.join(root, "notes"), exist_ok=True)
+    p = subprocess.Popen(cmd, cwd=os.path.join(root, "notes"))
+    open(out, "w").write(str(p.pid))
+    while p.poll() is None:
+        time.sleep(0.2)
+    time.sleep(600)
+elif mode.startswith("live"):
     p = subprocess.Popen(cmd, cwd=root)
     open(out, "w").write(str(p.pid))
     # A live parent reaps its child as soon as the child ends: an ended child of a parent
@@ -338,7 +350,7 @@ PY
   PROC_PARENT=$!
   for i in $(seq 1 100); do [ -s "$FOREIGN_CASE/leftover.pid" ] && break; sleep 0.1; done
   PROC_PID=$(cat "$FOREIGN_CASE/leftover.pid" 2>/dev/null) || return 1
-  case "$mode" in live*) ;; *) wait "$PROC_PARENT" 2>/dev/null || true; PROC_PARENT= ;; esac
+  case "$mode" in live*|below*) ;; *) wait "$PROC_PARENT" 2>/dev/null || true; PROC_PARENT= ;; esac
   sleep 0.5
 }
 
@@ -369,7 +381,7 @@ test_real_leftover_processes_at_the_copy_root_are_ended_only_when_proved_the_tas
     return 0
   fi
   for route in kept released; do
-    for state in live-apple live-nonapple orphan-nonapple daemon-nonapple orphan-apple daemon-apple foreign-apple foreign-argv-nonapple recorded-orphan-apple pid-reuse; do
+    for state in live-apple live-nonapple orphan-nonapple daemon-nonapple orphan-apple daemon-apple foreign-apple foreign-argv-nonapple below-nonapple recorded-orphan-apple pid-reuse; do
       real_case "b-leftover-$state-$route"
       rm -f "$FOREIGN_CASE/fakebin/lsof"
       SLOT_ENTRY_BEFORE=$(real_slot_entry)
@@ -435,6 +447,7 @@ test_real_leftover_processes_at_the_copy_root_are_ended_only_when_proved_the_tas
         expect_code 1 "$rc" "b-leftover-$state-$route: a process not proved the task's own must refuse: $(cat "$FOREIGN_CASE/stderr")"
         assert_grep "process $pid" "$FOREIGN_CASE/stderr" "b-leftover-$state-$route: the refusal did not name the process"
         assert_equals 0 "$(retained_call_count)" "b-leftover-$state-$route: the driver was asked about a copy with a live user"
+        assert_no_grep $'\tTERM\t'"$pid"$'\t' "$FOREIGN_CASE/state/task-x1.teardown-processes" "b-leftover-$state-$route: a TERM was audited for a process not proved the task's own"
         real_assert_kept "b-leftover-$state-$route"
       fi
       [ -z "$parent" ] || { kill "$parent" 2>/dev/null || true; wait "$parent" 2>/dev/null || true; }

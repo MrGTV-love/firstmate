@@ -7868,6 +7868,56 @@ test_a_preserve_reached_through_a_symlinked_directory_does_not_stand_for_the_cop
   pass "a preserve reached through a symlinked directory does not stand for the copy's file (the close records its own real preserve, which restores with the outside directory gone), and a real matching preserve is accepted"
 }
 
+# A process is judged by where it runs itself. The copy has a proved own process at its root and
+# a child of it running below the root (cwd notes/). The ownership check of the foreign copy must
+# name the child and refuse, and must not record it for the retire step, which sends TERM before
+# the sweep's below-root refusal could be reached. The control is the root process alone: proved,
+# recorded, no refusal. The actual functions run on a process table kept in a file; no process is
+# started.
+test_a_process_below_the_copy_root_is_named_and_never_queued_for_the_retire_signal() {
+  local dir root fake rc pid
+  dir=$(make_case below-root-unowned)
+  fake=$dir/fakebin
+  root=$(cd "$dir/wt" && pwd -P)
+  mkdir -p "$root/notes"
+  eval "$(sed -n '/^teardown_pid_is_task_own() {/,/^}/p; /^teardown_foreign_proc_record() {/,/^}/p; /^teardown_foreign_copy_unowned() {/,/^}/p' "$ROOT/bin/fm-teardown-nested-lib.sh")"
+  # shellcheck disable=SC2329 # called by the evaluated functions.
+  fm_task_copy_other_record() { return 1; }
+  # shellcheck disable=SC2329
+  teardown_copy_lock_file() { return 1; }
+  # The scan of the processes proved the task's own: only 100, at the root.
+  # shellcheck disable=SC2329,SC2034 # the evaluated functions read what it sets.
+  teardown_own_scan() { TEARDOWN_OWN_SCAN=$(printf '100\t%s\n' "$root"); TEARDOWN_OWN_SCANNED=1; }
+  # shellcheck disable=SC2329
+  task_process_identity() { printf 'lstart=Sun Nov  8 08:00:00 2026\n'; }
+  # shellcheck disable=SC2329
+  pids_with_cwd_under() { printf '100\t%s\n' "$root"; [ "$BELOW_ROOT_CASE" != child ] || printf '101\t%s/notes\n' "$root"; }
+  cat > "$fake/ps" <<'SH'
+#!/usr/bin/env bash
+case "$*" in *"-o ppid= -p 101"*) echo 100 ;; *"-o ppid= -p 100"*) echo 1 ;; *) exit 1 ;; esac
+SH
+  chmod +x "$fake/ps"
+  # shellcheck disable=SC2034 # read by the evaluated functions.
+  META=$dir/state/task-x1.meta STATE=$dir/state
+  for BELOW_ROOT_CASE in child alone; do
+    TEARDOWN_FOREIGN_PROCS=()
+    TEARDOWN_FOREIGN_PID=
+    rc=0; PATH="$fake:$PATH" teardown_foreign_copy_unowned "$root" || rc=$?
+    if [ "$BELOW_ROOT_CASE" = child ]; then
+      [ "$rc" = 1 ] || fail "below-root: a child below the root of a proved process was accepted (rc $rc)"
+      assert_equals 101 "$TEARDOWN_FOREIGN_PID" "below-root: the refusal does not name the process below the root"
+      for pid in "${TEARDOWN_FOREIGN_PROCS[@]+"${TEARDOWN_FOREIGN_PROCS[@]}"}"; do
+        case "$pid" in 101$'\t'*) fail "below-root: the process below the root was queued for the retire signal" ;; esac
+      done
+    else
+      [ "$rc" = 0 ] || fail "below-root control: the proved process at the root alone was refused (rc $rc)"
+      assert_equals 1 "${#TEARDOWN_FOREIGN_PROCS[@]}" "below-root control: the proved root process was not queued for the retire step"
+    fi
+  done
+  unset BELOW_ROOT_CASE
+  pass "a process below the copy root is named and never queued for the retire signal, even when its parent is the task's own proved process; the proved root process alone is accepted and queued"
+}
+
 test_a_retained_record_that_cannot_be_written_refuses_the_close() {
   local rc dir
   make_retained_case retained-unwritable enclosing
@@ -8197,6 +8247,7 @@ test_a_preserve_that_cannot_be_created_after_the_driver_answers_is_recorded_and_
 test_a_copy_whose_state_cannot_be_read_after_the_driver_answers_is_not_asked_about_again_while_unreadable
 test_an_unreadable_existing_receipt_is_not_taken_for_no_receipt
 test_a_preserve_reached_through_a_symlinked_directory_does_not_stand_for_the_copys_file
+test_a_process_below_the_copy_root_is_named_and_never_queued_for_the_retire_signal
 test_a_driver_named_path_that_holds_a_newline_is_carried_whole_and_not_asked_about_again
 test_the_preserve_restores_to_the_builders_hashes
 test_the_builders_whole_inventory_is_preserved_fingerprinted_and_restored_byte_for_byte

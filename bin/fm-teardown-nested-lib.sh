@@ -1131,7 +1131,7 @@ teardown_preserve_ignored() {  # <copy> [all|releasable] [<directory suffix>] [n
 # teardown own <copy>? Returns 1 with TEARDOWN_FOREIGN_WHY set when so or when
 # that cannot be told.
 teardown_foreign_copy_unowned() {  # <copy>
-  local copy=$1 rc=0 pids pid
+  local copy=$1 rc=0 pids pid pid_cwd copy_root
   TEARDOWN_OWN_SCANNED=0
   TEARDOWN_FOREIGN_PID=
   # shellcheck disable=SC2153 # STATE is bin/fm-teardown.sh's global, not a typo of a local.
@@ -1154,9 +1154,14 @@ teardown_foreign_copy_unowned() {  # <copy>
     TEARDOWN_FOREIGN_WHY="a scan for processes running in it failed"
     return 1
   fi
-  while IFS=$'\t' read -r pid _; do
+  # A process is judged by where it runs itself: only a process whose own cwd is the copy root
+  # can be this task's own through the proof (marker, record or a live chain to either). A process
+  # below the root is named and left running, even when its parent is the task's own: the sweep's
+  # below-root refusal would otherwise come after the retire step had already sent it TERM.
+  copy_root=$(cd "$copy" 2>/dev/null && pwd -P) || copy_root=$copy
+  while IFS=$'\t' read -r pid pid_cwd; do
     [ -n "$pid" ] || continue
-    if ! teardown_pid_is_task_own "$pid"; then
+    if [ "$pid_cwd" != "$copy_root" ] || ! teardown_pid_is_task_own "$pid"; then
       TEARDOWN_FOREIGN_RULE=process-cwd-owner
       TEARDOWN_FOREIGN_PID=$pid
       TEARDOWN_FOREIGN_WHY="process $pid is running in it"
