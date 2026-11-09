@@ -2736,8 +2736,12 @@ for via in poll check; do
   assert_eq "$(shasum -a 256 "$(state_file)")" "$digest" "INTAKE-14 [$via] an unbound run with a changed owner changed the state file"
   # The control: bound, the same run still refuses the changed owner.
   bind
-  out=$(via_run "$via" FM_SLACK_DM_USER=U0OTHEROWNER1 2>&1 || true)
+  set +e
+  out=$(via_run "$via" FM_SLACK_DM_USER=U0OTHEROWNER1 2>&1)
+  rc=$?
+  set -e
   assert_contains "$out" 'dm_user_changed' "INTAKE-14 [$via control] a bound run did not refuse the changed owner"
+  assert_eq "$rc" 1 "INTAKE-14 [$via control] a bound run with a changed owner did not exit 1"
 done
 printf 'ok - INTAKE-14\n'
 
