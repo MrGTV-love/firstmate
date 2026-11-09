@@ -207,7 +207,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-mail.py`             | The IMAP/SMTP engine behind `fm-mail.sh` |
 | `fm-mail-check.sh`       | Standing received-mail poll: `arm` registers a watcher check that runs `fm-mail.sh poll` on the watcher cadence (new mail still wakes via the poll; the check's own line also wakes unless the poll is a proven no-op), `disarm` removes it |
 | `fm-slack-lib.sh`        | Slack environment resolution and the Python entry point used by the Slack commands |
-| `fm_slack.py`            | Slack Web API client that alarms on a slow request and keeps waiting, with classified errors and token redaction |
+| `fm_slack.py`            | Slack Web API client with bounded waits, classified errors, and token redaction |
 | `fm_slack_replay.py`     | Deterministic replay of the Slack methods the plane uses; opens no socket |
 | `fm_slack_watch.py`      | Mirror open captain calls into DM threads, deliver authorized replies to the keyed-answer intake, take in new owner DM messages as acknowledged, woken requests, and journal pending publication |
 | `fm-slack-mirror.sh`     | Mirror open captain calls into one owner-DM thread per call |

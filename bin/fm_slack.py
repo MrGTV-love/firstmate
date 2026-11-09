@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 """Slack Web API transport only. Shell entry points own environment resolution."""
 import json
-import os
-import threading
-import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -28,39 +25,11 @@ SCRUB_MARK = '\ufdd0'
 class Slack:
     base = 'https://slack.com/api/'
     on_reply = None
-    on_wait = None
     scrub_with = '[REDACTED]'
-    # No fixed deadline ends a request: a reply that is slow is still a reply. A request that has waited this many seconds raises
-    # an alarm (on_wait, or one line on standard error) and again after each further stretch of this length, and keeps waiting.
-    # A request fails as unreachable only when the connection itself fails. fm-watch.sh owns the standing check's progress and
-    # absolute bounds; the alarm line is standard error, which it counts as progress.
-    # measured: value=10 date=2026-10-31 host=Mac-Studio.local margin=1.1 (at 5-minute load 185-195 a whole hand-run poll took 9 s and a mirror 6 s, so no single request exceeded 9 s)
-    alarm_every = 10
 
     def __init__(self, token):
         self.token = token
         self.scopes = set()
-
-    @staticmethod
-    def _waiting_line(method, seconds):
-        return ('slack: request %s still waiting after %ds; it keeps waiting\n' % (method, seconds)).encode()
-
-    def _raise_alarm(self, method, seconds):
-        if self.on_wait:
-            self.on_wait(method, seconds)
-        else:
-            os.write(2, self._waiting_line(method, int(seconds)))
-
-    def _watch_the_wait(self, method):
-        """Start the alarm of one request; the returned event stops it."""
-        done = threading.Event()
-        started = time.monotonic()
-
-        def run():
-            while not done.wait(self.alarm_every):
-                self._raise_alarm(method, time.monotonic() - started)
-        threading.Thread(target=run, daemon=True).start()
-        return done
 
     def call(self, method, **fields):
         if not self.token:
@@ -71,9 +40,12 @@ class Slack:
             data=urllib.parse.urlencode(encoded).encode(),
             headers={'Authorization': 'Bearer ' + self.token,
                      'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'})
-        waiting = self._watch_the_wait(method)
         try:
-            with urllib.request.urlopen(request) as response:
+            # Conservative socket ceiling, first set 2026-10-18 on the operator host.
+            # A hung check can starve supervision: fm-watch.sh owns its progress
+            # and absolute bounds. Time between requests is not a socket failure.
+            # measured: value=10 date=2026-10-31 host=Mac-Studio.local margin=1.1 (at 5-minute load 185-195 a whole hand-run poll took 9 s and a mirror 6 s, so no single request exceeded 9 s)
+            with urllib.request.urlopen(request, timeout=10) as response:
                 header = response.headers.get('x-oauth-scopes', '')
                 if header:
                     self.scopes = {s for s in header.replace(' ', '').split(',') if s}
@@ -88,8 +60,6 @@ class Slack:
             raise SlackError('http_' + str(error.code)) from None
         except (OSError, ValueError, urllib.error.URLError):
             raise SlackError('unreachable') from None
-        finally:
-            waiting.set()
         if self.on_reply:
             self.on_reply()
         if not isinstance(data, dict) or not data.get('ok'):
