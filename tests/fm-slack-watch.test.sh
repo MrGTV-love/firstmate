@@ -75,6 +75,15 @@ close_terminal() {  # <task-id>
 
 python3 "$HELPER"
 
+# HELPERS: the assertion helpers give the same verdict however fast their pipe is read. A value larger than the pipe buffer that holds
+# the pattern on its first line makes a grep that exits at its first match leave the writer with a broken pipe; under pipefail that must
+# neither fail assert_contains nor pass assert_not_contains.
+big=$(python3 -c 'print("MATCH-AT-THE-START"); print("\n".join(["x" * 49] * 20000))')
+assert_contains "$big" 'MATCH-AT-THE-START' "HELPERS assert_contains on a large value that holds the pattern at its start"
+set +e; ( assert_not_contains "$big" 'MATCH-AT-THE-START' "HELPERS" ) >/dev/null 2>&1; rc=$?; set -e
+[ "$rc" -ne 0 ] || fail "HELPERS assert_not_contains passed on a large value that holds the pattern"
+printf 'ok - HELPERS\n'
+
 # DOD-01
 new_home mirror
 bind
