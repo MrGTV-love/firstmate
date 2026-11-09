@@ -15,8 +15,9 @@ FIX="$ROOT/tests/fixtures/slack"
 CAPTAIN="$ROOT/bin/fm-captain-hold.sh"
 
 assert_eq() { [ "$1" = "$2" ] || fail "$3: expected [$2], got [$1]"; }
-assert_contains() { printf '%s' "$1" | grep -q -- "$2" || fail "$3: missing [$2]"; }
-assert_not_contains() { ! printf '%s' "$1" | grep -q -- "$2" || fail "$3: unexpected [$2]"; }
+# grep reads its whole input (no -q, no early exit): under pipefail a grep that stopped at its first match left the writer with a broken pipe.
+assert_contains() { printf '%s' "$1" | grep -- "$2" >/dev/null || fail "$3: missing [$2]"; }
+assert_not_contains() { ! printf '%s' "$1" | grep -- "$2" >/dev/null || fail "$3: unexpected [$2]"; }
 assert_open() {
   set +e; "$CAPTAIN" open "$1" >/dev/null; rc=$?; set -e
   [ "$rc" = "${2:-0}" ] || fail "$3: open $1 rc=$rc"
