@@ -265,6 +265,13 @@ SH
   pass "registered custom check output is queued before cadence suppression"
 }
 
+# Export the isolated home shared by the check-event cases. Call it only from a
+# ( ) test body, so the exports end with that case's subshell.
+use_check_event_home() {  # <case-dir>
+  export FM_HOME="$1" FM_STATE_OVERRIDE="$1/state" FM_CONFIG_OVERRIDE="$1/config" FM_DATA_OVERRIDE="$1/data"
+  export FM_GITHUB_ACCOUNTING=0 FM_MEMORY_GUARD_BIN=/usr/bin/true FM_OPEN_LOOPS_BIN=/usr/bin/true FM_WATCH_HANDLING_SUCCESSOR=1
+}
+
 # Controlled journal entries exercise the maintained Slack emitter, authenticated
 # check scheduling and the real consumer, without claiming Slack eligibility proof.
 test_check_events_survive_batch_changes_and_state_coalescing() (
@@ -273,9 +280,8 @@ test_check_events_survive_batch_changes_and_state_coalescing() (
   dir=$(make_case check-events)
   state="$dir/state"
   mkdir -p "$dir/config" "$dir/data"
-  export FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_CONFIG_OVERRIDE="$dir/config" FM_DATA_OVERRIDE="$dir/data"
-  export FM_GITHUB_ACCOUNTING=0 FM_MEMORY_GUARD_BIN=/usr/bin/true FM_OPEN_LOOPS_BIN=/usr/bin/true
-  export FM_WATCH_HANDLING_SUCCESSOR=1 SLACK_BOT_TOKEN=fixture FM_SLACK_ALLOWED_AUTHORS=U0TESTOWNER FM_SLACK_DM_USER=U0TESTOWNER
+  use_check_event_home "$dir"
+  export SLACK_BOT_TOKEN=fixture FM_SLACK_ALLOWED_AUTHORS=U0TESTOWNER FM_SLACK_DM_USER=U0TESTOWNER
   export FM_EVENT_TEST_ROOT="$ROOT" FM_EVENT_TEST_REPLAY="$dir/replay.json"
   printf '%s\n' '{"schema":"fm-slack-replay.v1","skip_mirror":true}' > "$dir/replay.json"
   bash "$ROOT/bin/fm-captain-hold.sh" bind slack-dm >/dev/null
@@ -337,8 +343,8 @@ test_malformed_check_events_keep_delivery_and_cadence() (
   state="$dir/state"
   queue="$state/.wake-queue"
   mkdir -p "$dir/config" "$dir/data" "$dir/root/bin"
-  export FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_CONFIG_OVERRIDE="$dir/config" FM_DATA_OVERRIDE="$dir/data" FM_ROOT_OVERRIDE="$dir/root"
-  export FM_GITHUB_ACCOUNTING=0 FM_MEMORY_GUARD_BIN=/usr/bin/true FM_OPEN_LOOPS_BIN=/usr/bin/true FM_WATCH_HANDLING_SUCCESSOR=1
+  use_check_event_home "$dir"
+  export FM_ROOT_OVERRIDE="$dir/root"
   cat > "$state/aa-events.check.sh" <<'SH'
 #!/usr/bin/env bash
 counter="$FM_STATE_OVERRIDE/malformed-counter"
