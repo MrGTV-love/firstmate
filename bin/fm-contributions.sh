@@ -52,6 +52,7 @@
 # review_verification binds pr, head, task and base to the unchanged typed
 # fm-review-verification.v1 answer from fm-review-record.py verify --review-only.
 # Missing, unreadable or invalid answers are unknown, not qualifying reviews.
+# The local verifier call has no stopping limit; only its own typed result decides.
 # Pre-fact records remain valid; eligible rows without a current fleet or captain
 # verdict report base unknown.
 #
