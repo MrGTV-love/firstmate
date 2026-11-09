@@ -1,0 +1,11 @@
+candidate_head=0cd55bcc265b34e9d14f9b8bc67c005b08255999
+candidate_tree=93579f7f5ecd2d4bfd4fbb5426a4107e1ba78661
+status_lines=0
+base_commit=cb411ea377a5441cf41af17d1f21db85020bfd79
+base_root=/Users/charlesabrooker/tmp/fm-base-cb411ea37.E9TrmH (git archive extract)
+e3a18c515fe559e3ee50b643494478c756eae2aef56fc55e9466012560095da6  /Users/charlesabrooker/.no-mistakes/evidence/01M6ZSG3ND8GVWFQPSXNBHQFQZ/head-0cd55bcc2/drivers/drive_queue.py
+f3f29dd5915cfd59088b23251ac0db5b78b34b3644565269e57dd69bd1f85235  /Users/charlesabrooker/.no-mistakes/evidence/01M6ZSG3ND8GVWFQPSXNBHQFQZ/head-0cd55bcc2/drivers/drive_briefs.py
+e3a18c515fe559e3ee50b643494478c756eae2aef56fc55e9466012560095da6  /Users/charlesabrooker/.no-mistakes/evidence/01M6ZSG3ND8GVWFQPSXNBHQFQZ/head-99c696a10/drive_queue.py
+Mon Nov  9 12:10:06 UTC 2026
+r2r3_scratch=/Users/charlesabrooker/tmp/fm-r2r3-driver.R6Y6kp (removed after run)
+base_root removed after run

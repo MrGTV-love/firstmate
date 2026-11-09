@@ -1,0 +1,13 @@
+candidate=0cd55bcc265b34e9d14f9b8bc67c005b08255999
+tree=93579f7f5ecd2d4bfd4fbb5426a4107e1ba78661
+test_file_sha256=57ed6e9d553385ed9c6b70e13f4935830ccbf670b72639a27cc45c371e0a7fe2
+status_lines=0
+fixture_home=/Users/charlesabrooker/tmp/fm-gate-full-wake.uZjV0G/home
+fixture_tmpdir=/Users/charlesabrooker/tmp/fm-gate-full-wake.uZjV0G/tmp
+start=2026-11-09T11:51:37Z
+ 5:51  up 5 days,  3:46, 2 users, load averages: 22.88 23.55 23.25
+exit=0
+end=2026-11-09T12:00:24Z
+ 6:00  up 5 days,  3:55, 2 users, load averages: 17.30 21.02 22.22
+head_after=0cd55bcc265b34e9d14f9b8bc67c005b08255999
+status_lines_after=0

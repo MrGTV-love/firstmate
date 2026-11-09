@@ -1,0 +1,132 @@
+[
+ {
+  "file": "r5a-scout-no-choices.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "r5b-scout-open-choice.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "r5c-fold-scout.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "r5c-fold-secondmate.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "r5c-fold-ship.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "r5c-summary.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "r5d-role-briefs.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "s1-summary.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "s1-two-requests-base.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "s1-two-requests-candidate.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "s2-retry-ack-second-drain.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "s2b-stale-generation-base.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "s2b-stale-generation-candidate.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "s2b-summary.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "s3-malformed-markers.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "s3b-only-malformed-output.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "s4-queue-write-failure-is-fatal.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "s5-unauthenticated-check.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "s6-non-event-routes-stay-state.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "s6b-stop-notice-stays-state.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "s6c-pr-poll-stays-state.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "s7-unpresentable-pending-row.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "s8-slack-emitter-identities.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "s8b-slack-text-cannot-forge-events.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "s9-prune-task-events.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "s9b-real-teardown-prunes-events.json",
+  "passed": true,
+  "failed_assertions": []
+ }
+]

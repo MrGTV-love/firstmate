@@ -1,0 +1,126 @@
+{
+  "scenario": "s8-slack-emitter-identities",
+  "source": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ",
+  "passed": true,
+  "assertions": {
+    "without_env_one_batch_line": true,
+    "with_env_one_line_per_event": true,
+    "identity_is_hex_token": true,
+    "identities_differ": true,
+    "regrouped_identity_stable": true,
+    "overflow_prints_partial": true,
+    "overflow_rest_retained_in_journal": true,
+    "overflow_next_run_distinct_ids": true,
+    "no_network_cli": true
+  },
+  "extra": {
+    "plain": "check: slack request 900.000001 from U0TESTOWNER: [unverified data] \"request 1\"; check: slack request 900.000002 from U0TESTOWNER: [unverified data] \"request 2\"\n",
+    "event": "fm-check-event 0729e5f8f63482ec715440b4de680c6fa48d03bc7d2b055b2f0c605c3e42cd7e\tcheck: slack request 900.000001 from U0TESTOWNER: [unverified data] \"request 1\"\nfm-check-event 72f40b047af513685f775564db67e74159e99347b0265e27da884fd44f552eb5\tcheck: slack request 900.000002 from U0TESTOWNER: [unverified data] \"request 2\"\n",
+    "regroup": "fm-check-event 0729e5f8f63482ec715440b4de680c6fa48d03bc7d2b055b2f0c605c3e42cd7e\tcheck: slack request 900.000001 from U0TESTOWNER: [unverified data] \"request 1\"\n",
+    "overflow1": "fm-check-event 1062f191e3952ae9ce8ef51242761ee3fab60716cec1d489edd738b753968d0e\tcheck: slack request 900.000010 from U0TESTOWNER: [unverified data] \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx 10\"; +4 queued\n",
+    "overflow2": "fm-check-event b67eede7bbb6273d098852fc7d7465c4f0c12adca1ed78d02537ba7b0554057d\tcheck: slack request 900.000011 from U0TESTOWNER: [unverified data] \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx 11\"; +3 queued\n"
+  },
+  "transcript": [
+    {
+      "label": "bind",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-captain-hold.sh",
+        "bind",
+        "slack-dm"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "bound: slack-dm -> (any)\n",
+      "stderr": ""
+    },
+    {
+      "label": "plain-no-env",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-slack-check.sh",
+        "check",
+        "--replay",
+        "/Users/charlesabrooker/tmp/fm-lab.ceaas6e2/replay.json"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "check: slack request 900.000001 from U0TESTOWNER: [unverified data] \"request 1\"; check: slack request 900.000002 from U0TESTOWNER: [unverified data] \"request 2\"\n",
+      "stderr": ""
+    },
+    {
+      "label": "event-mode-batch-1-2",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-slack-check.sh",
+        "check",
+        "--replay",
+        "/Users/charlesabrooker/tmp/fm-lab.ceaas6e2/replay.json"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "fm-check-event 0729e5f8f63482ec715440b4de680c6fa48d03bc7d2b055b2f0c605c3e42cd7e\tcheck: slack request 900.000001 from U0TESTOWNER: [unverified data] \"request 1\"\nfm-check-event 72f40b047af513685f775564db67e74159e99347b0265e27da884fd44f552eb5\tcheck: slack request 900.000002 from U0TESTOWNER: [unverified data] \"request 2\"\n",
+      "stderr": ""
+    },
+    {
+      "label": "event-mode-regrouped-1",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-slack-check.sh",
+        "check",
+        "--replay",
+        "/Users/charlesabrooker/tmp/fm-lab.ceaas6e2/replay.json"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "fm-check-event 0729e5f8f63482ec715440b4de680c6fa48d03bc7d2b055b2f0c605c3e42cd7e\tcheck: slack request 900.000001 from U0TESTOWNER: [unverified data] \"request 1\"\n",
+      "stderr": ""
+    },
+    {
+      "label": "overflow-1",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-slack-check.sh",
+        "check",
+        "--replay",
+        "/Users/charlesabrooker/tmp/fm-lab.ceaas6e2/replay.json"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "fm-check-event 1062f191e3952ae9ce8ef51242761ee3fab60716cec1d489edd738b753968d0e\tcheck: slack request 900.000010 from U0TESTOWNER: [unverified data] \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx 10\"; +4 queued\n",
+      "stderr": ""
+    },
+    {
+      "label": "overflow-2",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-slack-check.sh",
+        "check",
+        "--replay",
+        "/Users/charlesabrooker/tmp/fm-lab.ceaas6e2/replay.json"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "fm-check-event b67eede7bbb6273d098852fc7d7465c4f0c12adca1ed78d02537ba7b0554057d\tcheck: slack request 900.000011 from U0TESTOWNER: [unverified data] \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx 11\"; +3 queued\n",
+      "stderr": ""
+    }
+  ],
+  "env": {
+    "PATH": "/Users/charlesabrooker/tmp/fm-lab.ceaas6e2/fakebin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.6.6/libexec:/opt/homebrew/Cellar/pyenv/2.6.6/plugins/python-build/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources",
+    "HOME": "/Users/charlesabrooker/tmp/fm-lab.ceaas6e2",
+    "TMPDIR": "/Users/charlesabrooker/tmp/fm-lab.ceaas6e2/tmp",
+    "FM_HOME": "/Users/charlesabrooker/tmp/fm-lab.ceaas6e2",
+    "TMUX_TMPDIR": "/tmp/fml.pv61LA",
+    "FM_GITHUB_ACCOUNTING": "0",
+    "FM_MEMORY_GUARD_BIN": "/usr/bin/true",
+    "FM_OPEN_LOOPS_BIN": "/usr/bin/true",
+    "FM_WATCH_HANDLING_SUCCESSOR": "1",
+    "FM_OPEN_LOOPS_INTERVAL": "99999999",
+    "FM_HOME_SUMMARY_INTERVAL": "99999999",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "NO_MISTAKES_GATE": "1",
+    "FM_SLACK_ALLOWED_AUTHORS": "U0TESTOWNER",
+    "FM_SLACK_DM_USER": "U0TESTOWNER",
+    "FM_EVENT_TEST_ROOT": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ"
+  }
+}

@@ -1,0 +1,5 @@
+repos/example/fixture/commits/2009d8c94330369b5ed6057ae8a210d01e4c1247/check-runs
+repos/example/fixture/actions/jobs/8
+repos/example/fixture/actions/runs/7/attempts/1
+repos/example/fixture/actions/runs/7/artifacts
+repos/example/fixture/commits/2009d8c94330369b5ed6057ae8a210d01e4c1247/check-runs

@@ -1,0 +1,8 @@
+candidate=99c696a10161822663aa19cd62cae11147ca248b
+tree=d9daeae5de9d7d5320a115930eb1232a2ca4d5f2
+status_lines=       0
+start=2026-11-09T11:20:58Z
+ 5:20  up 5 days,  3:16, 2 users, load averages: 18.63 21.51 23.40
+exit=1
+end=2026-11-09T11:22:03Z
+ 5:22  up 5 days,  3:17, 2 users, load averages: 20.56 21.36 23.19

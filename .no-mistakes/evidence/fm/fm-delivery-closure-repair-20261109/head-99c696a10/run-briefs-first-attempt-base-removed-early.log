@@ -1,0 +1,59 @@
+{
+ "scenario": "r5a-scout-no-choices",
+ "passed": true,
+ "assertions": {
+  "worker_status_ok": true,
+  "worker_left_metadata_alone": true,
+  "report_ready_does_not_pass_gate": true,
+  "owner_none_ok": true,
+  "owner_attested_verifies": true,
+  "metadata_attested": true,
+  "brief_tells_worker_not_to_mutate": true,
+  "brief_gives_owner_complete": true
+ }
+}
+{
+ "scenario": "r5b-scout-open-choice",
+ "passed": true,
+ "assertions": {
+  "key_open_before_owner": true,
+  "verify_refuses_before_owner": true,
+  "none_refused_with_open_key": true,
+  "refusal_left_metadata_unchanged": true,
+  "hold_ok": true,
+  "complete_with_held_id_ok": true,
+  "verify_ok_after_owner": true,
+  "held_id_recorded": true,
+  "task_in_backlog": true
+ }
+}
+{
+ "scenario": "r5c-fold-scout",
+ "passed": true,
+ "assertions": {
+  "key_open_before": true
+ }
+}
+{
+ "scenario": "r5c-fold-ship",
+ "passed": true,
+ "assertions": {
+  "key_open_before": true
+ }
+}
+{
+ "scenario": "r5c-fold-secondmate",
+ "passed": true,
+ "assertions": {
+  "key_open_before": true
+ }
+}
+{
+ "r5c": {
+  "scout_done_retires_key": true,
+  "ship_done_retires_key": true,
+  "secondmate_done_keeps_key": true
+ }
+}
+ERROR roles FileNotFoundError(2, 'No such file or directory')
+SUMMARY {'r5a-scout-no-choices': True, 'r5b-scout-open-choice': True, 'r5c-fold-scout': True, 'r5c-fold-ship': True, 'r5c-fold-secondmate': True, 'r5c-summary': True, 'roles-error': False}

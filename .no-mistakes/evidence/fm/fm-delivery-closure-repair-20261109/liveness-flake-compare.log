@@ -1,0 +1,38 @@
+== candidate attempt 1
+ok - an exactly idle live mate with unknown draft risk retains the parent alert without a drain steer or input
+ok - watch liveness: alive and ambiguous endpoints are probed, logged, and never touched
+bash tests/fm-wake-queue-single.test.sh 2>&1  4.71s user 9.41s system 40% cpu 35.010 total
+tail -3  0.00s user 0.00s system 0% cpu 35.010 total
+cut -c1-200  0.00s user 0.00s system 0% cpu 35.009 total
+== candidate attempt 2
+ok - an exactly idle live mate with unknown draft risk retains the parent alert without a drain steer or input
+ok - watch liveness: alive and ambiguous endpoints are probed, logged, and never touched
+bash tests/fm-wake-queue-single.test.sh 2>&1  4.27s user 8.78s system 57% cpu 22.854 total
+tail -3  0.00s user 0.00s system 0% cpu 22.854 total
+cut -c1-200  0.00s user 0.00s system 0% cpu 22.853 total
+== candidate attempt 3
+ok - an exactly idle live mate with unknown draft risk retains the parent alert without a drain steer or input
+ok - watch liveness: alive and ambiguous endpoints are probed, logged, and never touched
+bash tests/fm-wake-queue-single.test.sh 2>&1  3.98s user 8.30s system 41% cpu 29.632 total
+tail -3  0.00s user 0.00s system 0% cpu 29.598 total
+cut -c1-200  0.00s user 0.00s system 0% cpu 29.584 total
+== base attempt 1
+ok - an exactly idle live mate with unknown draft risk retains the parent alert without a drain steer or input
+ok - watch liveness: alive and ambiguous endpoints are probed, logged, and never touched
+bash tests/fm-wake-queue-single.test.sh 2>&1  4.08s user 8.37s system 38% cpu 32.501 total
+tail -3  0.00s user 0.00s system 0% cpu 32.500 total
+cut -c1-200  0.00s user 0.00s system 0% cpu 32.500 total
+== base attempt 2
+ok - an exactly idle live mate with unknown draft risk retains the parent alert without a drain steer or input
+grep: /Users/charlesabrooker/tmp/fm-wake-tests.9xZmNv/liveness-quiet/state/.watch-triage.log: No such file or directory
+not ok - the ambiguous probe did not land in the triage log: 
+bash tests/fm-wake-queue-single.test.sh 2>&1  3.69s user 7.50s system 43% cpu 25.851 total
+tail -3  0.00s user 0.00s system 0% cpu 25.851 total
+cut -c1-200  0.00s user 0.00s system 0% cpu 25.850 total
+== base attempt 3
+ok - an exactly idle live mate with unknown draft risk retains the parent alert without a drain steer or input
+grep: /Users/charlesabrooker/tmp/fm-wake-tests.ECgc48/liveness-quiet/state/.watch-triage.log: No such file or directory
+not ok - the ambiguous probe did not land in the triage log: 
+bash tests/fm-wake-queue-single.test.sh 2>&1  4.16s user 8.62s system 53% cpu 23.961 total
+tail -3  0.00s user 0.00s system 0% cpu 23.960 total
+cut -c1-200  0.00s user 0.00s system 0% cpu 23.958 total

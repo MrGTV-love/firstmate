@@ -1,0 +1,140 @@
+{
+  "scenario": "s9b-real-teardown-prunes-events",
+  "source": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ",
+  "passed": true,
+  "assertions": {
+    "teardown_ok": true,
+    "had_rows": true,
+    "task_a_rows_gone": true,
+    "neighbor_kept": true,
+    "task_b_kept": true
+  },
+  "extra": {
+    "exit": 0,
+    "stdout": "teardown task-a complete (window isolated:fm-task-a, worktree /Users/charlesabrooker/tmp/fm-lab.mp2ih92f/projects/worktree-a)\nBacklog: task-a is closed in /Users/charlesabrooker/tmp/fm-lab.mp2ih92f/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.\n",
+    "stderr": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.mp2ih92f\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\u25cf  WATCHER DOWN - SUPERVISION IS OFF\n\u25cf  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 6s ago).\n\u25cf  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.\n\u25cf  This is a supervision warning only; the guarded operation WILL still run.\n\u25cf  After draining queued wakes, repair missing watcher supervision according to the session-start block for this harness; do not use shell &.\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\nWARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.\n",
+    "keys": [
+      "task-a-other.check.sh#event:one",
+      "task-a-other.check.sh",
+      "task-b.check.sh#event:one",
+      "task-b.check.sh"
+    ]
+  },
+  "transcript": [
+    {
+      "label": "register-task-a",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-check-register.sh",
+        "task-a"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "registered: state/task-a.check.sh\n",
+      "stderr": ""
+    },
+    {
+      "label": "register-task-a-other",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-check-register.sh",
+        "task-a-other"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "registered: state/task-a-other.check.sh\n",
+      "stderr": ""
+    },
+    {
+      "label": "register-task-b",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-check-register.sh",
+        "task-b"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "registered: state/task-b.check.sh\n",
+      "stderr": ""
+    },
+    {
+      "label": "watch",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-watch.sh"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "check: /Users/charlesabrooker/tmp/fm-lab.mp2ih92f/state/task-a-other.check.sh: task-a-other event\n",
+      "stderr": "",
+      "last_check_advanced": true
+    },
+    {
+      "label": "queue-before",
+      "queue_tsv": "1794219939\t1\tcheck\t/Users/charlesabrooker/tmp/fm-lab.mp2ih92f/state/task-a-other.check.sh#event:one\tcheck: /Users/charlesabrooker/tmp/fm-lab.mp2ih92f/state/task-a-other.check.sh: task-a-other event\n1794219940\t2\tcheck\t/Users/charlesabrooker/tmp/fm-lab.mp2ih92f/state/task-a-other.check.sh\tcheck: /Users/charlesabrooker/tmp/fm-lab.mp2ih92f/state/task-a-other.check.sh: task-a-other state\n1794219940\t3\tcheck\t/Users/charlesabrooker/tmp/fm-lab.mp2ih92f/state/task-a.check.sh#event:one\tcheck: /Users/charlesabrooker/tmp/fm-lab.mp2ih92f/state/task-a.check.sh: task-a event\n1794219940\t4\tcheck\t/Users/charlesabrooker/tmp/fm-lab.mp2ih92f/state/task-a.check.sh\tcheck: /Users/charlesabrooker/tmp/fm-lab.mp2ih92f/state/task-a.check.sh: task-a state\n1794219941\t5\tcheck\t/Users/charlesabrooker/tmp/fm-lab.mp2ih92f/state/task-b.check.sh#event:one\tcheck: /Users/charlesabrooker/tmp/fm-lab.mp2ih92f/state/task-b.check.sh: task-b event\n1794219941\t6\tcheck\t/Users/charlesabrooker/tmp/fm-lab.mp2ih92f/state/task-b.check.sh\tcheck: /Users/charlesabrooker/tmp/fm-lab.mp2ih92f/state/task-b.check.sh: task-b state\n"
+    },
+    {
+      "label": "backlog-add",
+      "argv": [
+        "tasks-axi",
+        "add",
+        "task-a",
+        "fixture scout",
+        "--kind",
+        "scout",
+        "--repo",
+        "sample"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: added task-a (scout, repo sample) -> Queued\ntask:\n  id: task-a\n  title: fixture scout\n  state: queued\n  blocked: no\n  blocked_by: none\n  held: no\n  hold_reason: \"-\"\n  hold_kind: \"-\"\n  hold_until: \"-\"\n  kind: scout\n  repo: sample\n  priority: \"-\"\n  created: 2026-11-09\n  closed: \"-\"\n  deps: none\n  links: none\n  body: \"\"\nhelp[2]:\n  - Run `tasks-axi start task-a` to move it to in flight\n  - Run `tasks-axi block task-a --by <other>` to record a dependency\n",
+      "stderr": ""
+    },
+    {
+      "label": "backlog-start",
+      "argv": [
+        "tasks-axi",
+        "start",
+        "task-a"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: start task-a -> In flight\nhelp[1]:\n  - Run `tasks-axi done task-a --pr <url>` when it ships\n",
+      "stderr": ""
+    },
+    {
+      "label": "teardown",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-teardown.sh",
+        "task-a"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "teardown task-a complete (window isolated:fm-task-a, worktree /Users/charlesabrooker/tmp/fm-lab.mp2ih92f/projects/worktree-a)\nBacklog: task-a is closed in /Users/charlesabrooker/tmp/fm-lab.mp2ih92f/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.\n",
+      "stderr": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.mp2ih92f\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\u25cf  WATCHER DOWN - SUPERVISION IS OFF\n\u25cf  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 6s ago).\n\u25cf  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.\n\u25cf  This is a supervision warning only; the guarded operation WILL still run.\n\u25cf  After draining queued wakes, repair missing watcher supervision according to the session-start block for this harness; do not use shell &.\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\nWARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.\n"
+    },
+    {
+      "label": "queue-after",
+      "queue_tsv": "1794219939\t1\tcheck\t/Users/charlesabrooker/tmp/fm-lab.mp2ih92f/state/task-a-other.check.sh#event:one\tcheck: /Users/charlesabrooker/tmp/fm-lab.mp2ih92f/state/task-a-other.check.sh: task-a-other event\n1794219940\t2\tcheck\t/Users/charlesabrooker/tmp/fm-lab.mp2ih92f/state/task-a-other.check.sh\tcheck: /Users/charlesabrooker/tmp/fm-lab.mp2ih92f/state/task-a-other.check.sh: task-a-other state\n1794219941\t5\tcheck\t/Users/charlesabrooker/tmp/fm-lab.mp2ih92f/state/task-b.check.sh#event:one\tcheck: /Users/charlesabrooker/tmp/fm-lab.mp2ih92f/state/task-b.check.sh: task-b event\n1794219941\t6\tcheck\t/Users/charlesabrooker/tmp/fm-lab.mp2ih92f/state/task-b.check.sh\tcheck: /Users/charlesabrooker/tmp/fm-lab.mp2ih92f/state/task-b.check.sh: task-b state\n"
+    }
+  ],
+  "env": {
+    "PATH": "/Users/charlesabrooker/tmp/fm-lab.mp2ih92f/fakebin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.6.6/libexec:/opt/homebrew/Cellar/pyenv/2.6.6/plugins/python-build/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources",
+    "HOME": "/Users/charlesabrooker/tmp/fm-lab.mp2ih92f",
+    "TMPDIR": "/Users/charlesabrooker/tmp/fm-lab.mp2ih92f/tmp",
+    "FM_HOME": "/Users/charlesabrooker/tmp/fm-lab.mp2ih92f",
+    "TMUX_TMPDIR": "/tmp/fml.7KjnlZ",
+    "FM_GITHUB_ACCOUNTING": "0",
+    "FM_MEMORY_GUARD_BIN": "/usr/bin/true",
+    "FM_OPEN_LOOPS_BIN": "/usr/bin/true",
+    "FM_WATCH_HANDLING_SUCCESSOR": "1",
+    "FM_OPEN_LOOPS_INTERVAL": "99999999",
+    "FM_HOME_SUMMARY_INTERVAL": "99999999",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "NO_MISTAKES_GATE": "1",
+    "FM_SLACK_ALLOWED_AUTHORS": "U0TESTOWNER",
+    "FM_SLACK_DM_USER": "U0TESTOWNER",
+    "FM_EVENT_TEST_ROOT": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ"
+  }
+}

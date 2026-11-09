@@ -1,0 +1,21 @@
+scratch=/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/fm-mut.Wok4wwOXiJ
+== mutation queue: 1 lines changed
+> elif fm_lock_acquire_wait_bounded "$FM_WAKE_QUEUE_LOCK" 5; then
+not ok - queue lock delayed the drain 5319ms against a 1823ms control
+rc=1
+not ok - queue lock delayed the drain 5356ms against a 1572ms control
+rc=1
+not ok - queue lock delayed the drain 5289ms against a 1095ms control
+rc=1
+== mutation pres: 2 lines changed
+>     if ! fm_lock_acquire_wait_bounded "$lock" 5; then
+>   if fm_lock_acquire_wait_bounded "$lock" 5; then
+drain timing: queue held=1331ms control=1601ms
+not ok - presentation lock delayed the drain 6179ms against a 1270ms control
+rc=1
+drain timing: queue held=1321ms control=1096ms
+not ok - presentation lock delayed the drain 8027ms against a 2716ms control
+rc=1
+drain timing: queue held=1337ms control=1676ms
+not ok - presentation lock delayed the drain 6276ms against a 1247ms control
+rc=1

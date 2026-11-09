@@ -1,0 +1,112 @@
+{
+  "scenario": "s9-prune-task-events",
+  "source": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ",
+  "passed": true,
+  "assertions": {
+    "prune_ok": true,
+    "had_task_a_rows": true,
+    "task_a_state_gone": true,
+    "task_a_event_gone": true,
+    "neighbor_event_kept": true,
+    "other_task_kept": true
+  },
+  "extra": {
+    "keys": [
+      "task-a-other.check.sh#event:one",
+      "task-a-other.check.sh",
+      "task-b.check.sh#event:one",
+      "task-b.check.sh"
+    ]
+  },
+  "transcript": [
+    {
+      "label": "register-task-a",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-check-register.sh",
+        "task-a"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "registered: state/task-a.check.sh\n",
+      "stderr": ""
+    },
+    {
+      "label": "register-task-a-other",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-check-register.sh",
+        "task-a-other"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "registered: state/task-a-other.check.sh\n",
+      "stderr": ""
+    },
+    {
+      "label": "register-task-b",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-check-register.sh",
+        "task-b"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "registered: state/task-b.check.sh\n",
+      "stderr": ""
+    },
+    {
+      "label": "watch",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-watch.sh"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "check: /Users/charlesabrooker/tmp/fm-lab.wqjqq37k/state/task-a-other.check.sh: task-a-other event\n",
+      "stderr": "",
+      "last_check_advanced": true
+    },
+    {
+      "label": "queue-before",
+      "queue_tsv": "1794222645\t1\tcheck\t/Users/charlesabrooker/tmp/fm-lab.wqjqq37k/state/task-a-other.check.sh#event:one\tcheck: /Users/charlesabrooker/tmp/fm-lab.wqjqq37k/state/task-a-other.check.sh: task-a-other event\n1794222645\t2\tcheck\t/Users/charlesabrooker/tmp/fm-lab.wqjqq37k/state/task-a-other.check.sh\tcheck: /Users/charlesabrooker/tmp/fm-lab.wqjqq37k/state/task-a-other.check.sh: task-a-other state\n1794222646\t3\tcheck\t/Users/charlesabrooker/tmp/fm-lab.wqjqq37k/state/task-a.check.sh#event:one\tcheck: /Users/charlesabrooker/tmp/fm-lab.wqjqq37k/state/task-a.check.sh: task-a event\n1794222646\t4\tcheck\t/Users/charlesabrooker/tmp/fm-lab.wqjqq37k/state/task-a.check.sh\tcheck: /Users/charlesabrooker/tmp/fm-lab.wqjqq37k/state/task-a.check.sh: task-a state\n1794222646\t5\tcheck\t/Users/charlesabrooker/tmp/fm-lab.wqjqq37k/state/task-b.check.sh#event:one\tcheck: /Users/charlesabrooker/tmp/fm-lab.wqjqq37k/state/task-b.check.sh: task-b event\n1794222647\t6\tcheck\t/Users/charlesabrooker/tmp/fm-lab.wqjqq37k/state/task-b.check.sh\tcheck: /Users/charlesabrooker/tmp/fm-lab.wqjqq37k/state/task-b.check.sh: task-b state\n"
+    },
+    {
+      "label": "prune",
+      "argv": [
+        "bash",
+        "-c",
+        ". \"$1\"; fm_wake_queue_prune_task \"$2\" task-a",
+        "_",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-wake-lib.sh",
+        "/Users/charlesabrooker/tmp/fm-lab.wqjqq37k/state"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "queue-after",
+      "queue_tsv": "1794222645\t1\tcheck\t/Users/charlesabrooker/tmp/fm-lab.wqjqq37k/state/task-a-other.check.sh#event:one\tcheck: /Users/charlesabrooker/tmp/fm-lab.wqjqq37k/state/task-a-other.check.sh: task-a-other event\n1794222645\t2\tcheck\t/Users/charlesabrooker/tmp/fm-lab.wqjqq37k/state/task-a-other.check.sh\tcheck: /Users/charlesabrooker/tmp/fm-lab.wqjqq37k/state/task-a-other.check.sh: task-a-other state\n1794222646\t5\tcheck\t/Users/charlesabrooker/tmp/fm-lab.wqjqq37k/state/task-b.check.sh#event:one\tcheck: /Users/charlesabrooker/tmp/fm-lab.wqjqq37k/state/task-b.check.sh: task-b event\n1794222647\t6\tcheck\t/Users/charlesabrooker/tmp/fm-lab.wqjqq37k/state/task-b.check.sh\tcheck: /Users/charlesabrooker/tmp/fm-lab.wqjqq37k/state/task-b.check.sh: task-b state\n"
+    }
+  ],
+  "env": {
+    "PATH": "/Users/charlesabrooker/tmp/fm-lab.wqjqq37k/fakebin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.6.6/libexec:/opt/homebrew/Cellar/pyenv/2.6.6/plugins/python-build/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources",
+    "HOME": "/Users/charlesabrooker/tmp/fm-lab.wqjqq37k",
+    "TMPDIR": "/Users/charlesabrooker/tmp/fm-lab.wqjqq37k/tmp",
+    "FM_HOME": "/Users/charlesabrooker/tmp/fm-lab.wqjqq37k",
+    "TMUX_TMPDIR": "/tmp/fml.yjjXfe",
+    "FM_GITHUB_ACCOUNTING": "0",
+    "FM_MEMORY_GUARD_BIN": "/usr/bin/true",
+    "FM_OPEN_LOOPS_BIN": "/usr/bin/true",
+    "FM_WATCH_HANDLING_SUCCESSOR": "1",
+    "FM_OPEN_LOOPS_INTERVAL": "99999999",
+    "FM_HOME_SUMMARY_INTERVAL": "99999999",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "NO_MISTAKES_GATE": "1",
+    "FM_SLACK_ALLOWED_AUTHORS": "U0TESTOWNER",
+    "FM_SLACK_DM_USER": "U0TESTOWNER",
+    "FM_EVENT_TEST_ROOT": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ"
+  }
+}

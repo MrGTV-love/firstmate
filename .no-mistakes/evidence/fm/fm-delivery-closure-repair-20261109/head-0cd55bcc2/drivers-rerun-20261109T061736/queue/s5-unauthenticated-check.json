@@ -1,0 +1,74 @@
+{
+  "scenario": "s5-unauthenticated-check",
+  "source": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ",
+  "passed": true,
+  "assertions": {
+    "tampered_did_not_run": true,
+    "unregistered_did_not_run": true,
+    "no_event_rows": true,
+    "no_forged_payload_presented": true
+  },
+  "extra": {
+    "exit": 0,
+    "timed_out": false,
+    "stdout": "check: rejected unauthenticated state checks: /Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-lab.20w3wou3/state/neverreg.check.sh /Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-lab.20w3wou3/state/tampered.check.sh\n",
+    "stderr": "",
+    "rows": [
+      [
+        "1794226743",
+        "1",
+        "check",
+        "unauthenticated-state-checks",
+        "check: rejected unauthenticated state checks: /Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-lab.20w3wou3/state/neverreg.check.sh /Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-lab.20w3wou3/state/tampered.check.sh"
+      ]
+    ]
+  },
+  "transcript": [
+    {
+      "label": "register-tampered",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-check-register.sh",
+        "tampered"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "registered: state/tampered.check.sh\n",
+      "stderr": ""
+    },
+    {
+      "label": "watch",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-watch.sh"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "check: rejected unauthenticated state checks: /Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-lab.20w3wou3/state/neverreg.check.sh /Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-lab.20w3wou3/state/tampered.check.sh\n",
+      "stderr": "",
+      "last_check_advanced": true
+    },
+    {
+      "label": "queue",
+      "queue_tsv": "1794226743\t1\tcheck\tunauthenticated-state-checks\tcheck: rejected unauthenticated state checks: /Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-lab.20w3wou3/state/neverreg.check.sh /Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-lab.20w3wou3/state/tampered.check.sh\n"
+    }
+  ],
+  "env": {
+    "PATH": "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-lab.20w3wou3/fakebin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.6.6/libexec:/opt/homebrew/Cellar/pyenv/2.6.6/plugins/python-build/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources",
+    "HOME": "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-lab.20w3wou3",
+    "TMPDIR": "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-lab.20w3wou3/tmp",
+    "FM_HOME": "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-lab.20w3wou3",
+    "TMUX_TMPDIR": "/tmp/fml.Xg2fzp",
+    "FM_GITHUB_ACCOUNTING": "0",
+    "FM_MEMORY_GUARD_BIN": "/usr/bin/true",
+    "FM_OPEN_LOOPS_BIN": "/usr/bin/true",
+    "FM_WATCH_HANDLING_SUCCESSOR": "1",
+    "FM_OPEN_LOOPS_INTERVAL": "99999999",
+    "FM_HOME_SUMMARY_INTERVAL": "99999999",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "NO_MISTAKES_GATE": "1",
+    "FM_SLACK_ALLOWED_AUTHORS": "U0TESTOWNER",
+    "FM_SLACK_DM_USER": "U0TESTOWNER",
+    "FM_EVENT_TEST_ROOT": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ"
+  }
+}

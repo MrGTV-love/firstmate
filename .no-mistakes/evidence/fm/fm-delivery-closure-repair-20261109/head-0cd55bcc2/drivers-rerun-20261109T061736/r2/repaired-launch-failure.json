@@ -1,0 +1,59 @@
+{
+  "label": "repaired-launch-failure",
+  "source_version": "proposal-root-v2",
+  "source_sha256": "0ef9674fa1fd71c51ff03ffa0679710c3541d824d4a115ec0ad86f6a05cb948f",
+  "argv": [
+    "bash",
+    "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-delivery-r2-sjbajit2/repaired-launch-failure/lane/run-review.sh",
+    "packs/review pack",
+    "https://github.com/example/fixture/pull/1",
+    "1111111111111111111111111111111111111111",
+    "change.diff",
+    "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-delivery-r2-sjbajit2/repaired-launch-failure",
+    "fixture/model"
+  ],
+  "cwd": "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-delivery-r2-sjbajit2/repaired-launch-failure",
+  "expected_exit": "nonzero",
+  "exit": 126,
+  "stdout": "rc=126 report=/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-delivery-r2-sjbajit2/repaired-launch-failure/packs/review pack/review.md\nserved-model: fixture/nonqualifying-model\nfixture qualifier: plumbing only; independent qualification NOT RUN\nfixture route handoff written; independent qualification NOT RUN\n",
+  "stderr": "",
+  "invoked_model_stub": false,
+  "live_observation": null,
+  "report_copied": false,
+  "model_review_qualification": "NOT RUN; fixture helpers demonstrate plumbing only",
+  "owner_pid": 32874,
+  "owner_reaped": true,
+  "destination_observation": {
+    "caller_cwd": "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-delivery-r2-sjbajit2/repaired-launch-failure",
+    "pack_argument": "packs/review pack",
+    "resolved_pack": "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-delivery-r2-sjbajit2/repaired-launch-failure/packs/review pack",
+    "fixture_home": "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-delivery-r2-sjbajit2/repaired-launch-failure",
+    "log": {
+      "resolved": "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-delivery-r2-sjbajit2/repaired-launch-failure/packs/review pack/review-run.log",
+      "is_file": true,
+      "content": "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-delivery-r2-sjbajit2/repaired-launch-failure/fakebin/omp: line 2: /fixture/missing-review-executable: No such file or directory\n/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-delivery-r2-sjbajit2/repaired-launch-failure/fakebin/omp: line 2: exec: /fixture/missing-review-executable: cannot execute: No such file or directory\n",
+      "sha256": "087952600f7e750af9f269a59681799e86ff5649ac02174149f0f218cffd79b8"
+    },
+    "session": {
+      "resolved": "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-delivery-r2-sjbajit2/repaired-launch-failure/packs/review pack/omp-session",
+      "is_dir": true
+    },
+    "model_report": {
+      "resolved": "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-delivery-r2-sjbajit2/repaired-launch-failure/work/packs-review pack/review.md",
+      "is_file": false
+    },
+    "copied_report": {
+      "resolved": "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-delivery-r2-sjbajit2/repaired-launch-failure/packs/review pack/review.md",
+      "is_file": false
+    }
+  },
+  "consumer_action": "consume nonzero exit 126 and launch error; repair executable path before a deliberate retry",
+  "launch_log": "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-delivery-r2-sjbajit2/repaired-launch-failure/fakebin/omp: line 2: /fixture/missing-review-executable: No such file or directory\n/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-delivery-r2-sjbajit2/repaired-launch-failure/fakebin/omp: line 2: exec: /fixture/missing-review-executable: cannot execute: No such file or directory\n",
+  "fixture_route": {
+    "fixture": true,
+    "qualifying": false,
+    "actual_review": "NOT RUN",
+    "pack": "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-delivery-r2-sjbajit2/repaired-launch-failure/packs/review pack",
+    "fixture_helper_exit": "8"
+  }
+}

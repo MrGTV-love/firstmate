@@ -1,0 +1,10 @@
+base_head=436d5de47a7d43c4ddadff2f8ebbdc20034dc54a
+test_file_blob=b8308b62162c91445c7e95cb7f839d4140daffd9
+test_file_sha256=aaf66c2ee54f07deea2e61bbc725c5e3800e775e87cc229875b9c180cbb146f0
+worktree_diff= 1 file changed, 11 insertions(+), 5 deletions(-)
+fixture_home=/Users/charlesabrooker/tmp/fm-gate-full-wake.VNYCoU/home
+fixture_tmpdir=/Users/charlesabrooker/tmp/fm-gate-full-wake.VNYCoU/tmp
+start=2026-11-09T14:01:59Z
+exit=0
+end=2026-11-09T14:11:01Z
+test_file_blob_after=b8308b62162c91445c7e95cb7f839d4140daffd9

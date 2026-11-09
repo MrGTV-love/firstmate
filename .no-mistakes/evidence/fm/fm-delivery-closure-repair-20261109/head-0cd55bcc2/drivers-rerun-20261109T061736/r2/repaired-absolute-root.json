@@ -1,0 +1,72 @@
+{
+  "label": "repaired-absolute-root",
+  "source_version": "proposal-root-v2",
+  "source_sha256": "0ef9674fa1fd71c51ff03ffa0679710c3541d824d4a115ec0ad86f6a05cb948f",
+  "argv": [
+    "bash",
+    "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-delivery-r2-sjbajit2/repaired-absolute-root/lane/run-review.sh",
+    "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-delivery-r2-sjbajit2/repaired-absolute-root/packs/review pack",
+    "https://github.com/example/fixture/pull/1",
+    "1111111111111111111111111111111111111111",
+    "change.diff",
+    "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-delivery-r2-sjbajit2/repaired-absolute-root/source repo",
+    "fixture/model"
+  ],
+  "cwd": "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-delivery-r2-sjbajit2/repaired-absolute-root",
+  "expected_exit": 0,
+  "exit": 0,
+  "stdout": "rc=0 report=/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-delivery-r2-sjbajit2/repaired-absolute-root/packs/review pack/review.md\nVERDICT: PASS head=1111111111111111111111111111111111111111\nserved-model: fixture/nonqualifying-model\nfixture qualifier: plumbing only; independent qualification NOT RUN\nfixture route handoff written; independent qualification NOT RUN\n",
+  "stderr": "",
+  "invoked_model_stub": true,
+  "live_observation": null,
+  "report_copied": true,
+  "model_review_qualification": "NOT RUN; fixture helpers demonstrate plumbing only",
+  "owner_pid": 35142,
+  "owner_reaped": true,
+  "destination_observation": {
+    "caller_cwd": "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-delivery-r2-sjbajit2/repaired-absolute-root",
+    "pack_argument": "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-delivery-r2-sjbajit2/repaired-absolute-root/packs/review pack",
+    "resolved_pack": "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-delivery-r2-sjbajit2/repaired-absolute-root/packs/review pack",
+    "fixture_home": "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-delivery-r2-sjbajit2/repaired-absolute-root",
+    "log": {
+      "resolved": "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-delivery-r2-sjbajit2/repaired-absolute-root/packs/review pack/review-run.log",
+      "is_file": true,
+      "content": "fixture model process completed; real model NOT RUN\n",
+      "sha256": "b1efc236e3d379b1dc7713a67d8425f7a831247c992c32d51440203fa5b9bf51"
+    },
+    "session": {
+      "resolved": "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-delivery-r2-sjbajit2/repaired-absolute-root/packs/review pack/omp-session",
+      "is_dir": true
+    },
+    "model_report": {
+      "resolved": "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-delivery-r2-sjbajit2/repaired-absolute-root/work/packs-review pack/review.md",
+      "is_file": true
+    },
+    "copied_report": {
+      "resolved": "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-delivery-r2-sjbajit2/repaired-absolute-root/packs/review pack/review.md",
+      "is_file": true
+    }
+  },
+  "invocation": {
+    "cwd": "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-delivery-r2-sjbajit2/repaired-absolute-root/work/packs-review pack",
+    "diff": "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-delivery-r2-sjbajit2/repaired-absolute-root/packs/review pack/change.diff",
+    "session": "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-delivery-r2-sjbajit2/repaired-absolute-root/packs/review pack/omp-session",
+    "prompt_report_destination": "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-delivery-r2-sjbajit2/repaired-absolute-root/work/packs-review pack/review.md",
+    "prompt_root": "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-delivery-r2-sjbajit2/repaired-absolute-root/source repo",
+    "resolved_prompt_root": "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-delivery-r2-sjbajit2/repaired-absolute-root/source repo",
+    "root_marker": "intended caller repository\n",
+    "log_destination": "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-delivery-r2-sjbajit2/repaired-absolute-root/packs/review pack/review-run.log",
+    "log_exists_at_model_entry": true,
+    "stdout_is_log": true,
+    "stderr_is_log": true
+  },
+  "consumed_report": "VERDICT: PASS head=1111111111111111111111111111111111111111\nFixture plumbing only, NOT independent-review qualification.\n",
+  "consumer_action": "read captured fixture report; do not claim real independent qualification",
+  "fixture_route": {
+    "fixture": true,
+    "qualifying": false,
+    "actual_review": "NOT RUN",
+    "pack": "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-delivery-r2-sjbajit2/repaired-absolute-root/packs/review pack",
+    "fixture_helper_exit": "0"
+  }
+}

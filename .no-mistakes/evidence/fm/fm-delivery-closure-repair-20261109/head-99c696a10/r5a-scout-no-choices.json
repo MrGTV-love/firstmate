@@ -1,0 +1,77 @@
+{
+  "scenario": "r5a-scout-no-choices",
+  "passed": true,
+  "assertions": {
+    "worker_status_ok": true,
+    "worker_left_metadata_alone": true,
+    "report_ready_does_not_pass_gate": true,
+    "owner_none_ok": true,
+    "owner_attested_verifies": true,
+    "metadata_attested": true,
+    "brief_tells_worker_not_to_mutate": true,
+    "brief_gives_owner_complete": true
+  },
+  "extra": {
+    "verify_before": "fm-captain-hold: origin fixture-scout-none has no completed captain-call inventory\n",
+    "meta_after": "kind=scout\nmode=scout\nspawn_gen=fixture\ndecisions_reviewed=1\ndecision_keys=\n"
+  },
+  "transcript": [
+    {
+      "label": "scaffold-fixture-scout-none",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-brief.sh",
+        "fixture-scout-none",
+        "sample",
+        "--scout"
+      ],
+      "exit": 0,
+      "stdout": "scaffolded: /Users/charlesabrooker/tmp/fm-lab.di2xisd9/data/fixture-scout-none/brief.md (scout; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE})\n",
+      "stderr": ""
+    },
+    {
+      "label": "status: done [at=1794222752]: report ready at /U",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-status-append.sh",
+        "/Users/charlesabrooker/tmp/fm-lab.di2xisd9/state/fixture-scout-none.status",
+        "done [at=1794222752]: report ready at /Users/charlesabrooker/tmp/fm-lab.di2xisd9/data/fixture-scout-none/report.md; Unresolved captain choices: none."
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "verify-before-owner",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-captain-hold.sh",
+        "verify",
+        "fixture-scout-none"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "fm-captain-hold: origin fixture-scout-none has no completed captain-call inventory\n"
+    },
+    {
+      "label": "owner-complete-none",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-captain-hold.sh",
+        "complete",
+        "fixture-scout-none",
+        "--none"
+      ],
+      "exit": 0,
+      "stdout": "complete: fixture-scout-none captain-call inventory reviewed\n",
+      "stderr": ""
+    },
+    {
+      "label": "verify-after-owner",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-captain-hold.sh",
+        "verify",
+        "fixture-scout-none"
+      ],
+      "exit": 0,
+      "stdout": "verified: fixture-scout-none captain-call inventory\n",
+      "stderr": ""
+    }
+  ]
+}

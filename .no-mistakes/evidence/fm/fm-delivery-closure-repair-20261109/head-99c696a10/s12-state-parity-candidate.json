@@ -1,0 +1,81 @@
+{
+  "scenario": "s12-state-parity-candidate",
+  "source": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ",
+  "passed": true,
+  "assertions": {
+    "ran": true
+  },
+  "extra": {
+    "exit": 0,
+    "payloads": [
+      "check: <HOME>/state/multi.check.sh: line one  line three   indented literal back\\\\slash dollar trailing $(not run) `not run`"
+    ],
+    "keys": [
+      "<HOME>/state/multi.check.sh"
+    ],
+    "drain": "1794222718\t1\tcheck\t<HOME>/state/multi.check.sh\tcheck: <HOME>/state/multi.check.sh: line one  line three   indented literal back\\\\slash dollar trailing $(not run) `not run`\n"
+  },
+  "transcript": [
+    {
+      "label": "register-multi",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-check-register.sh",
+        "multi"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "registered: state/multi.check.sh\n",
+      "stderr": ""
+    },
+    {
+      "label": "watch",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-watch.sh"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "check: /Users/charlesabrooker/tmp/fm-lab.blnls0gz/state/multi.check.sh: line one\n\nline three\n  indented\nliteral back\\\\slash dollar\ntrailing $(not run) `not run`\n",
+      "stderr": "",
+      "last_check_advanced": true
+    },
+    {
+      "label": "queue",
+      "queue_tsv": "1794222718\t1\tcheck\t/Users/charlesabrooker/tmp/fm-lab.blnls0gz/state/multi.check.sh\tcheck: /Users/charlesabrooker/tmp/fm-lab.blnls0gz/state/multi.check.sh: line one  line three   indented literal back\\\\slash dollar trailing $(not run) `not run`\n"
+    },
+    {
+      "label": "drain",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-wake-drain.sh"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "1794222718\t1\tcheck\t/Users/charlesabrooker/tmp/fm-lab.blnls0gz/state/multi.check.sh\tcheck: /Users/charlesabrooker/tmp/fm-lab.blnls0gz/state/multi.check.sh: line one  line three   indented literal back\\\\slash dollar trailing $(not run) `not run`\n",
+      "stderr": "WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 46127.1794222718.vI5Gls\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\u25cf  WATCHER DOWN - SUPERVISION IS OFF\n\u25cf  1 registered custom check(s), but no live watcher process holds this home lock (last beat: 3s ago).\n\u25cf  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.\n\u25cf  This is a supervision warning only; the guarded operation WILL still run.\n\u25cf  After draining queued wakes, repair missing watcher supervision according to the session-start block for this harness; do not use shell &.\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\nWARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.\n",
+      "ack": [
+        "1",
+        "46127.1794222718.vI5Gls"
+      ]
+    }
+  ],
+  "env": {
+    "PATH": "/Users/charlesabrooker/tmp/fm-lab.blnls0gz/fakebin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.6.6/libexec:/opt/homebrew/Cellar/pyenv/2.6.6/plugins/python-build/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources",
+    "HOME": "/Users/charlesabrooker/tmp/fm-lab.blnls0gz",
+    "TMPDIR": "/Users/charlesabrooker/tmp/fm-lab.blnls0gz/tmp",
+    "FM_HOME": "/Users/charlesabrooker/tmp/fm-lab.blnls0gz",
+    "TMUX_TMPDIR": "/tmp/fml.drzFRy",
+    "FM_GITHUB_ACCOUNTING": "0",
+    "FM_MEMORY_GUARD_BIN": "/usr/bin/true",
+    "FM_OPEN_LOOPS_BIN": "/usr/bin/true",
+    "FM_WATCH_HANDLING_SUCCESSOR": "1",
+    "FM_OPEN_LOOPS_INTERVAL": "99999999",
+    "FM_HOME_SUMMARY_INTERVAL": "99999999",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "NO_MISTAKES_GATE": "1",
+    "FM_SLACK_ALLOWED_AUTHORS": "U0TESTOWNER",
+    "FM_SLACK_DM_USER": "U0TESTOWNER",
+    "FM_EVENT_TEST_ROOT": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ"
+  }
+}

@@ -1,0 +1,256 @@
+{
+  "candidate_head": "0cd55bcc265b34e9d14f9b8bc67c005b08255999",
+  "end_of_run_worktree_clean": true,
+  "base_commit": "cb411ea377a5441cf41af17d1f21db85020bfd79",
+  "full_wake_queue_proof": "retained at head-0cd55bcc2/full-wake-queue/ (86 ok, 0 failed, none excluded); not repeated",
+  "operator_slips": [
+    "First drive_briefs.py run failed: its evidence folder did not exist (setup error, no product code ran to a verdict). Log kept as run-briefs-first-attempt-no-evidence-dir.log; rerun after mkdir passed.",
+    "First R2 patch check used the historical r2-execution/run-review.patch (e952d11f... -> 66001fad...). Redone with proposal-root-v2/run-review.patch (e89fc513... -> 0ef9674f..., byte-identical). The file now holds the redone result."
+  ],
+  "scenarios": [
+    {
+      "scenario": "Two distinct Slack requests pending before one drain are each shown once, where the base commit loses one",
+      "driver": "drive_queue.py",
+      "driver_sha256": "e3a18c515fe559e3ee50b643494478c756eae2aef56fc55e9466012560095da6",
+      "command": "cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ && python3 /Users/charlesabrooker/.no-mistakes/evidence/01M6ZSG3ND8GVWFQPSXNBHQFQZ/head-0cd55bcc2/drivers/drive_queue.py /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ <base-root: git archive cb411ea37 extract> /Users/charlesabrooker/.no-mistakes/evidence/01M6ZSG3ND8GVWFQPSXNBHQFQZ/head-0cd55bcc2/drivers/queue",
+      "scenario_ids": [
+        "s1"
+      ],
+      "evidence": [
+        "queue/s1-two-requests-base.json",
+        "queue/s1-two-requests-candidate.json",
+        "queue/s1-summary.json"
+      ],
+      "verdict": "pass",
+      "live": true
+    },
+    {
+      "scenario": "A retried event keeps its first sequence, an older ack leaves newer event 3 and the newest state, and a second drain shows them once",
+      "driver": "drive_queue.py",
+      "driver_sha256": "e3a18c515fe559e3ee50b643494478c756eae2aef56fc55e9466012560095da6",
+      "command": "cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ && python3 /Users/charlesabrooker/.no-mistakes/evidence/01M6ZSG3ND8GVWFQPSXNBHQFQZ/head-0cd55bcc2/drivers/drive_queue.py /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ <base-root: git archive cb411ea37 extract> /Users/charlesabrooker/.no-mistakes/evidence/01M6ZSG3ND8GVWFQPSXNBHQFQZ/head-0cd55bcc2/drivers/queue",
+      "scenario_ids": [
+        "s2"
+      ],
+      "evidence": [
+        "queue/s2-retry-ack-second-drain.json"
+      ],
+      "verdict": "pass",
+      "live": true
+    },
+    {
+      "scenario": "Malformed event lines give a check-keyed diagnostic while valid events, state, later checks and the next cycle still work",
+      "driver": "drive_queue.py",
+      "driver_sha256": "e3a18c515fe559e3ee50b643494478c756eae2aef56fc55e9466012560095da6",
+      "command": "cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ && python3 /Users/charlesabrooker/.no-mistakes/evidence/01M6ZSG3ND8GVWFQPSXNBHQFQZ/head-0cd55bcc2/drivers/drive_queue.py /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ <base-root: git archive cb411ea37 extract> /Users/charlesabrooker/.no-mistakes/evidence/01M6ZSG3ND8GVWFQPSXNBHQFQZ/head-0cd55bcc2/drivers/queue",
+      "scenario_ids": [
+        "s3",
+        "s3b"
+      ],
+      "evidence": [
+        "queue/s3-malformed-markers.json",
+        "queue/s3b-only-malformed-output.json"
+      ],
+      "verdict": "pass",
+      "live": true
+    },
+    {
+      "scenario": "A real queue-write failure still stops the watcher and does not advance the check cadence",
+      "driver": "drive_queue.py",
+      "driver_sha256": "e3a18c515fe559e3ee50b643494478c756eae2aef56fc55e9466012560095da6",
+      "command": "cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ && python3 /Users/charlesabrooker/.no-mistakes/evidence/01M6ZSG3ND8GVWFQPSXNBHQFQZ/head-0cd55bcc2/drivers/drive_queue.py /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ <base-root: git archive cb411ea37 extract> /Users/charlesabrooker/.no-mistakes/evidence/01M6ZSG3ND8GVWFQPSXNBHQFQZ/head-0cd55bcc2/drivers/queue",
+      "scenario_ids": [
+        "s4"
+      ],
+      "evidence": [
+        "queue/s4-queue-write-failure-is-fatal.json"
+      ],
+      "verdict": "pass",
+      "live": true
+    },
+    {
+      "scenario": "A tampered or unregistered check cannot run or create event rows",
+      "driver": "drive_queue.py",
+      "driver_sha256": "e3a18c515fe559e3ee50b643494478c756eae2aef56fc55e9466012560095da6",
+      "command": "cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ && python3 /Users/charlesabrooker/.no-mistakes/evidence/01M6ZSG3ND8GVWFQPSXNBHQFQZ/head-0cd55bcc2/drivers/drive_queue.py /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ <base-root: git archive cb411ea37 extract> /Users/charlesabrooker/.no-mistakes/evidence/01M6ZSG3ND8GVWFQPSXNBHQFQZ/head-0cd55bcc2/drivers/queue",
+      "scenario_ids": [
+        "s5"
+      ],
+      "evidence": [
+        "queue/s5-unauthenticated-check.json"
+      ],
+      "verdict": "pass",
+      "live": true
+    },
+    {
+      "scenario": "PR-poll, X, contribution and stop-notice output that looks like an event marker stays ordinary state",
+      "driver": "drive_queue.py",
+      "driver_sha256": "e3a18c515fe559e3ee50b643494478c756eae2aef56fc55e9466012560095da6",
+      "command": "cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ && python3 /Users/charlesabrooker/.no-mistakes/evidence/01M6ZSG3ND8GVWFQPSXNBHQFQZ/head-0cd55bcc2/drivers/drive_queue.py /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ <base-root: git archive cb411ea37 extract> /Users/charlesabrooker/.no-mistakes/evidence/01M6ZSG3ND8GVWFQPSXNBHQFQZ/head-0cd55bcc2/drivers/queue",
+      "scenario_ids": [
+        "s6",
+        "s6b",
+        "s10"
+      ],
+      "evidence": [
+        "queue/s6-non-event-routes-stay-state.json",
+        "queue/s6b-stop-notice-stays-state.json",
+        "queue/s6c-pr-poll-stays-state.json"
+      ],
+      "verdict": "pass",
+      "live": true
+    },
+    {
+      "scenario": "A broken pending row cannot hide a real event with the same key",
+      "driver": "drive_queue.py",
+      "driver_sha256": "e3a18c515fe559e3ee50b643494478c756eae2aef56fc55e9466012560095da6",
+      "command": "cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ && python3 /Users/charlesabrooker/.no-mistakes/evidence/01M6ZSG3ND8GVWFQPSXNBHQFQZ/head-0cd55bcc2/drivers/drive_queue.py /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ <base-root: git archive cb411ea37 extract> /Users/charlesabrooker/.no-mistakes/evidence/01M6ZSG3ND8GVWFQPSXNBHQFQZ/head-0cd55bcc2/drivers/queue",
+      "scenario_ids": [
+        "s7"
+      ],
+      "evidence": [
+        "queue/s7-unpresentable-pending-row.json"
+      ],
+      "verdict": "pass",
+      "live": true
+    },
+    {
+      "scenario": "The Slack emitter gives one stable identity per event, and Slack text cannot forge an event line",
+      "driver": "drive_queue.py",
+      "driver_sha256": "e3a18c515fe559e3ee50b643494478c756eae2aef56fc55e9466012560095da6",
+      "command": "cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ && python3 /Users/charlesabrooker/.no-mistakes/evidence/01M6ZSG3ND8GVWFQPSXNBHQFQZ/head-0cd55bcc2/drivers/drive_queue.py /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ <base-root: git archive cb411ea37 extract> /Users/charlesabrooker/.no-mistakes/evidence/01M6ZSG3ND8GVWFQPSXNBHQFQZ/head-0cd55bcc2/drivers/queue",
+      "scenario_ids": [
+        "s8",
+        "s8b"
+      ],
+      "evidence": [
+        "queue/s8-slack-emitter-identities.json",
+        "queue/s8b-slack-text-cannot-forge-events.json"
+      ],
+      "verdict": "pass",
+      "live": true
+    },
+    {
+      "scenario": "Teardown of one task removes its event rows and keeps rows of other tasks",
+      "driver": "drive_queue.py",
+      "driver_sha256": "e3a18c515fe559e3ee50b643494478c756eae2aef56fc55e9466012560095da6",
+      "command": "cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ && python3 /Users/charlesabrooker/.no-mistakes/evidence/01M6ZSG3ND8GVWFQPSXNBHQFQZ/head-0cd55bcc2/drivers/drive_queue.py /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ <base-root: git archive cb411ea37 extract> /Users/charlesabrooker/.no-mistakes/evidence/01M6ZSG3ND8GVWFQPSXNBHQFQZ/head-0cd55bcc2/drivers/queue",
+      "scenario_ids": [
+        "s9",
+        "s9b"
+      ],
+      "evidence": [
+        "queue/s9-prune-task-events.json",
+        "queue/s9b-real-teardown-prunes-events.json"
+      ],
+      "verdict": "pass",
+      "live": true
+    },
+    {
+      "scenario": "A stale recovery generation leaves a newer episode and unpresented rows in place, the same as the base commit",
+      "driver": "drive_queue.py",
+      "driver_sha256": "e3a18c515fe559e3ee50b643494478c756eae2aef56fc55e9466012560095da6",
+      "command": "cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ && python3 /Users/charlesabrooker/.no-mistakes/evidence/01M6ZSG3ND8GVWFQPSXNBHQFQZ/head-0cd55bcc2/drivers/drive_queue.py /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ <base-root: git archive cb411ea37 extract> /Users/charlesabrooker/.no-mistakes/evidence/01M6ZSG3ND8GVWFQPSXNBHQFQZ/head-0cd55bcc2/drivers/queue",
+      "scenario_ids": [
+        "s2b"
+      ],
+      "evidence": [
+        "queue/s2b-stale-generation-base.json",
+        "queue/s2b-stale-generation-candidate.json",
+        "queue/s2b-summary.json"
+      ],
+      "verdict": "pass",
+      "live": true
+    },
+    {
+      "scenario": "Odd payloads stay well-formed, and output with no markers reads the same as on the base commit",
+      "driver": "drive_queue.py",
+      "driver_sha256": "e3a18c515fe559e3ee50b643494478c756eae2aef56fc55e9466012560095da6",
+      "command": "cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ && python3 /Users/charlesabrooker/.no-mistakes/evidence/01M6ZSG3ND8GVWFQPSXNBHQFQZ/head-0cd55bcc2/drivers/drive_queue.py /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ <base-root: git archive cb411ea37 extract> /Users/charlesabrooker/.no-mistakes/evidence/01M6ZSG3ND8GVWFQPSXNBHQFQZ/head-0cd55bcc2/drivers/queue",
+      "scenario_ids": [
+        "s11",
+        "s12"
+      ],
+      "evidence": [
+        "queue/s11-odd-payloads.json",
+        "queue/s12-state-parity-base.json",
+        "queue/s12-state-parity-candidate.json",
+        "queue/s12-summary.json"
+      ],
+      "verdict": "pass",
+      "live": true
+    },
+    {
+      "scenario": "A scout reports readiness without writing protected metadata, and only its supervising firstmate completes and verifies, with open choices kept",
+      "driver": "drive_briefs.py",
+      "driver_sha256": "f3f29dd5915cfd59088b23251ac0db5b78b34b3644565269e57dd69bd1f85235",
+      "command": "cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ && python3 /Users/charlesabrooker/.no-mistakes/evidence/01M6ZSG3ND8GVWFQPSXNBHQFQZ/head-0cd55bcc2/drivers/drive_briefs.py /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ <base-root> /Users/charlesabrooker/.no-mistakes/evidence/01M6ZSG3ND8GVWFQPSXNBHQFQZ/head-0cd55bcc2/drivers/briefs",
+      "scenario_ids": [
+        "r5a",
+        "r5b",
+        "r5c",
+        "r5d"
+      ],
+      "evidence": [
+        "briefs/brief-summary.json",
+        "briefs/r5-emitted-scout-brief.md",
+        "briefs/r5-emitted-secondmate-brief.md",
+        "briefs/r5-emitted-ship-brief.md",
+        "briefs/r5a-scout-no-choices.json",
+        "briefs/r5b-scout-open-choice.json",
+        "briefs/r5c-fold-scout.json",
+        "briefs/r5c-fold-secondmate.json",
+        "briefs/r5c-fold-ship.json",
+        "briefs/r5c-summary.json",
+        "briefs/r5d-role-briefs.json"
+      ],
+      "verdict": "pass",
+      "live": true
+    },
+    {
+      "scenario": "The patched private run-review.sh reaches the right pack paths, refuses bad pack folders, and keeps failed, live, completed and missing-output cases distinct",
+      "driver": "r2-execution/replay.py (scratch copy)",
+      "driver_sha256": "original c3df4d4b313ee28d8c06994d6f066bcb5b3bc1f6fddac3ce13e204cc9b4e1478; edited 125373f3d5246a3d72fa26755540774618a88c5cd537950a041b67427a44ad4e",
+      "command": "cd <scratch>/r2 && R2_OBSERVATION_ROOT=/Users/charlesabrooker/.no-mistakes/evidence/01M6ZSG3ND8GVWFQPSXNBHQFQZ/head-0cd55bcc2/drivers/r2 python3 <scratch>/r2/replay.py (scratch copy of r2-execution/{original,proposal,proposal-root-v2,replay.py}; edit in r2/driver-edit.diff)",
+      "evidence": [
+        "r2/baseline-absolute-control.json",
+        "r2/baseline-relative.json",
+        "r2/driver-edit.diff",
+        "r2/exit.txt",
+        "r2/patch-applies-byte-for-byte.txt",
+        "r2/prior-relative-root.json",
+        "r2/records.json",
+        "r2/repaired-absolute-root.json",
+        "r2/repaired-absolute.json",
+        "r2/repaired-empty.json",
+        "r2/repaired-invalid.json",
+        "r2/repaired-launch-failure.json",
+        "r2/repaired-missing-output.json",
+        "r2/repaired-relative-root.json",
+        "r2/repaired-relative.json",
+        "r2/repaired-running.json",
+        "r2/run.log",
+        "r2/run.stderr"
+      ],
+      "verdict": "pass",
+      "live": true,
+      "note": "All 12 cases hit their expected exit. Every repaired-* case ran source_sha256 0ef9674f... (proposal-root-v2, the current delivered proposal). Top-level records.json proposal_sha256 66001fad... is the historical proposal/ hash that replay.py reports; only prior-relative-root uses it, on purpose (expected exit 19). Current patch e89fc513... applied to original fcd8ff43... gives 0ef9674f... byte-identical (r2/patch-applies-byte-for-byte.txt). This private runner does not depend on the candidate commit."
+    },
+    {
+      "scenario": "Review evidence for one candidate commit cannot qualify a different commit, and a relabelled report or foreign-head check is refused",
+      "driver": "r3-identity-smoke.py (scratch copy)",
+      "driver_sha256": "original 9e16c9c296cdaa8b48e7fdf3aa20d41e142a575baf54b99f4bf6c18a79cc9fc2; edit in r3/driver-edit.diff",
+      "command": "cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ && python3 -I <scratch>/r3/r3-identity-smoke.py /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ /Users/charlesabrooker/.no-mistakes/evidence/01M6ZSG3ND8GVWFQPSXNBHQFQZ/head-0cd55bcc2/drivers/r3 (edit in r3/driver-edit.diff)",
+      "evidence": [
+        "r3/records.json",
+        "r3/synthetic-review-records.jsonl",
+        "r3/api-fixture-calls.txt",
+        "r3/stdout.log",
+        "r3/exit.txt"
+      ],
+      "verdict": "pass",
+      "live": true,
+      "note": "records.json revision=0cd55bcc2. matching 0/ok, changed 1/not-qualified head mismatch, wrong-head-report 2, preserved 0/ok at A, matching-check-head 0, wrong-check-head 3 no-waiver. Synthetic review/API fixtures only; no real qualification claimed."
+    }
+  ]
+}

@@ -1,0 +1,68 @@
+{
+  "scenario": "s3b-only-malformed-output",
+  "source": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ",
+  "passed": true,
+  "assertions": {
+    "exit0": true,
+    "cadence_advanced": true,
+    "diagnostic_row": true,
+    "no_event_row": true
+  },
+  "extra": {
+    "rows": [
+      [
+        "1794226737",
+        "1",
+        "check",
+        "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-lab.9hcuxv4k/state/bad.check.sh",
+        "check: /Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-lab.9hcuxv4k/state/bad.check.sh: refused 1 malformed fm-check-event line(s)"
+      ]
+    ],
+    "stdout": "check: /Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-lab.9hcuxv4k/state/bad.check.sh: refused 1 malformed fm-check-event line(s)\n",
+    "stderr": "error: malformed event output from /Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-lab.9hcuxv4k/state/bad.check.sh\n"
+  },
+  "transcript": [
+    {
+      "label": "register-bad",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-check-register.sh",
+        "bad"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "registered: state/bad.check.sh\n",
+      "stderr": ""
+    },
+    {
+      "label": "watch",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-watch.sh"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "check: /Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-lab.9hcuxv4k/state/bad.check.sh: refused 1 malformed fm-check-event line(s)\n",
+      "stderr": "error: malformed event output from /Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-lab.9hcuxv4k/state/bad.check.sh\n",
+      "last_check_advanced": true
+    }
+  ],
+  "env": {
+    "PATH": "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-lab.9hcuxv4k/fakebin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.6.6/libexec:/opt/homebrew/Cellar/pyenv/2.6.6/plugins/python-build/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources",
+    "HOME": "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-lab.9hcuxv4k",
+    "TMPDIR": "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-lab.9hcuxv4k/tmp",
+    "FM_HOME": "/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/tmp/fm-lab.9hcuxv4k",
+    "TMUX_TMPDIR": "/tmp/fml.jgVgbu",
+    "FM_GITHUB_ACCOUNTING": "0",
+    "FM_MEMORY_GUARD_BIN": "/usr/bin/true",
+    "FM_OPEN_LOOPS_BIN": "/usr/bin/true",
+    "FM_WATCH_HANDLING_SUCCESSOR": "1",
+    "FM_OPEN_LOOPS_INTERVAL": "99999999",
+    "FM_HOME_SUMMARY_INTERVAL": "99999999",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "NO_MISTAKES_GATE": "1",
+    "FM_SLACK_ALLOWED_AUTHORS": "U0TESTOWNER",
+    "FM_SLACK_DM_USER": "U0TESTOWNER",
+    "FM_EVENT_TEST_ROOT": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ"
+  }
+}

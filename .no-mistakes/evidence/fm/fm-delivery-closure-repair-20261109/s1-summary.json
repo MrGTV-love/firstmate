@@ -1,0 +1,36 @@
+{
+  "passed": true,
+  "assertions": {
+    "base_loses_a_request": true,
+    "candidate_presents_request1_once": true,
+    "candidate_presents_request2_once": true,
+    "candidate_presents_latest_state": true,
+    "candidate_coalesces_old_state": true
+  },
+  "observed": {
+    "base": {
+      "request1": 1,
+      "request2": 0,
+      "round2": true,
+      "round1": false,
+      "queue_keys": [
+        "slack.check.sh",
+        "status.check.sh",
+        "slack.check.sh",
+        "status.check.sh"
+      ]
+    },
+    "candidate": {
+      "request1": 1,
+      "request2": 1,
+      "round2": true,
+      "round1": false,
+      "queue_keys": [
+        "slack.check.sh#event:0729e5f8f63482ec715440b4de680c6fa48d03bc7d2b055b2f0c605c3e42cd7e",
+        "slack.check.sh#event:72f40b047af513685f775564db67e74159e99347b0265e27da884fd44f552eb5",
+        "status.check.sh",
+        "status.check.sh"
+      ]
+    }
+  }
+}

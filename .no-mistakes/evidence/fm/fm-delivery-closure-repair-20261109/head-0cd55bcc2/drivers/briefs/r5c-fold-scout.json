@@ -1,0 +1,63 @@
+{
+  "scenario": "r5c-fold-scout",
+  "passed": true,
+  "assertions": {
+    "key_open_before": true
+  },
+  "extra": {
+    "before": "route\tneeds-decision\tchoose",
+    "after": ""
+  },
+  "transcript": [
+    {
+      "label": "status: needs-decision [key=route] [at=179422642",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-status-append.sh",
+        "/Users/charlesabrooker/tmp/fm-lab.yv82itfg/state/s-scout.status",
+        "needs-decision [key=route] [at=1794226422]: choose"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "before",
+      "argv": [
+        "bash",
+        "-c",
+        ". \"$1/bin/fm-classify-lib.sh\"; status_open_decisions \"$2\"",
+        "_",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ",
+        "/Users/charlesabrooker/tmp/fm-lab.yv82itfg/state/s-scout.status"
+      ],
+      "exit": 0,
+      "stdout": "route\tneeds-decision\tchoose",
+      "stderr": ""
+    },
+    {
+      "label": "status: done [at=1794226422]: other work finishe",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-status-append.sh",
+        "/Users/charlesabrooker/tmp/fm-lab.yv82itfg/state/s-scout.status",
+        "done [at=1794226422]: other work finished"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "after-done",
+      "argv": [
+        "bash",
+        "-c",
+        ". \"$1/bin/fm-classify-lib.sh\"; status_open_decisions \"$2\"",
+        "_",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ",
+        "/Users/charlesabrooker/tmp/fm-lab.yv82itfg/state/s-scout.status"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ]
+}

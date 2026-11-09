@@ -1,0 +1,120 @@
+{
+  "scenario": "s1-two-requests-candidate",
+  "source": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ",
+  "passed": true,
+  "assertions": {
+    "drained": true
+  },
+  "extra": {
+    "request1": 1,
+    "request2": 1,
+    "round2": true,
+    "round1": false,
+    "queue_keys": [
+      "slack.check.sh#event:0729e5f8f63482ec715440b4de680c6fa48d03bc7d2b055b2f0c605c3e42cd7e",
+      "slack.check.sh#event:72f40b047af513685f775564db67e74159e99347b0265e27da884fd44f552eb5",
+      "status.check.sh",
+      "status.check.sh"
+    ]
+  },
+  "transcript": [
+    {
+      "label": "bind",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-captain-hold.sh",
+        "bind",
+        "slack-dm"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "bound: slack-dm -> (any)\n",
+      "stderr": ""
+    },
+    {
+      "label": "register-slack",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-check-register.sh",
+        "slack"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "registered: state/slack.check.sh\n",
+      "stderr": ""
+    },
+    {
+      "label": "register-status",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-check-register.sh",
+        "status"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "registered: state/status.check.sh\n",
+      "stderr": ""
+    },
+    {
+      "label": "watch-1-outbox-1-2",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-watch.sh"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "check: /Users/charlesabrooker/tmp/fm-lab.u66opoxh/state/slack.check.sh: check: slack request 900.000001 from U0TESTOWNER: [unverified data] \"request 1\"\n",
+      "stderr": "",
+      "last_check_advanced": true
+    },
+    {
+      "label": "watch-2-regrouped-1",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-watch.sh"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "check: /Users/charlesabrooker/tmp/fm-lab.u66opoxh/state/slack.check.sh: check: slack request 900.000001 from U0TESTOWNER: [unverified data] \"request 1\"\n",
+      "stderr": "",
+      "last_check_advanced": true
+    },
+    {
+      "label": "queue-before-drain",
+      "queue_tsv": "1794222555\t1\tcheck\t/Users/charlesabrooker/tmp/fm-lab.u66opoxh/state/slack.check.sh#event:0729e5f8f63482ec715440b4de680c6fa48d03bc7d2b055b2f0c605c3e42cd7e\tcheck: /Users/charlesabrooker/tmp/fm-lab.u66opoxh/state/slack.check.sh: check: slack request 900.000001 from U0TESTOWNER: [unverified data] \"request 1\"\n1794222555\t2\tcheck\t/Users/charlesabrooker/tmp/fm-lab.u66opoxh/state/slack.check.sh#event:72f40b047af513685f775564db67e74159e99347b0265e27da884fd44f552eb5\tcheck: /Users/charlesabrooker/tmp/fm-lab.u66opoxh/state/slack.check.sh: check: slack request 900.000002 from U0TESTOWNER: [unverified data] \"request 2\"\n1794222555\t3\tcheck\t/Users/charlesabrooker/tmp/fm-lab.u66opoxh/state/status.check.sh\tcheck: /Users/charlesabrooker/tmp/fm-lab.u66opoxh/state/status.check.sh: state round 1\n1794222558\t4\tcheck\t/Users/charlesabrooker/tmp/fm-lab.u66opoxh/state/status.check.sh\tcheck: /Users/charlesabrooker/tmp/fm-lab.u66opoxh/state/status.check.sh: state round 2\n"
+    },
+    {
+      "label": "drain",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-wake-drain.sh"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "1794222555\t1\tcheck\t/Users/charlesabrooker/tmp/fm-lab.u66opoxh/state/slack.check.sh#event:0729e5f8f63482ec715440b4de680c6fa48d03bc7d2b055b2f0c605c3e42cd7e\tcheck: /Users/charlesabrooker/tmp/fm-lab.u66opoxh/state/slack.check.sh: check: slack request 900.000001 from U0TESTOWNER: [unverified data] \"request 1\"\n1794222555\t2\tcheck\t/Users/charlesabrooker/tmp/fm-lab.u66opoxh/state/slack.check.sh#event:72f40b047af513685f775564db67e74159e99347b0265e27da884fd44f552eb5\tcheck: /Users/charlesabrooker/tmp/fm-lab.u66opoxh/state/slack.check.sh: check: slack request 900.000002 from U0TESTOWNER: [unverified data] \"request 2\"\n1794222558\t4\tcheck\t/Users/charlesabrooker/tmp/fm-lab.u66opoxh/state/status.check.sh\tcheck: /Users/charlesabrooker/tmp/fm-lab.u66opoxh/state/status.check.sh: state round 2\n",
+      "stderr": "WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 4 --recovery-generation 98113.1794222558.Z79YhQ\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\u25cf  WATCHER DOWN - SUPERVISION IS OFF\n\u25cf  2 registered custom check(s), but no live watcher process holds this home lock (last beat: 2s ago).\n\u25cf  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.\n\u25cf  This is a supervision warning only; the guarded operation WILL still run.\n\u25cf  After draining queued wakes, repair missing watcher supervision according to the session-start block for this harness; do not use shell &.\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\nWARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.\n",
+      "ack": [
+        "4",
+        "98113.1794222558.Z79YhQ"
+      ]
+    }
+  ],
+  "env": {
+    "PATH": "/Users/charlesabrooker/tmp/fm-lab.u66opoxh/fakebin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.6.6/libexec:/opt/homebrew/Cellar/pyenv/2.6.6/plugins/python-build/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources",
+    "HOME": "/Users/charlesabrooker/tmp/fm-lab.u66opoxh",
+    "TMPDIR": "/Users/charlesabrooker/tmp/fm-lab.u66opoxh/tmp",
+    "FM_HOME": "/Users/charlesabrooker/tmp/fm-lab.u66opoxh",
+    "TMUX_TMPDIR": "/tmp/fml.e1zLf0",
+    "FM_GITHUB_ACCOUNTING": "0",
+    "FM_MEMORY_GUARD_BIN": "/usr/bin/true",
+    "FM_OPEN_LOOPS_BIN": "/usr/bin/true",
+    "FM_WATCH_HANDLING_SUCCESSOR": "1",
+    "FM_OPEN_LOOPS_INTERVAL": "99999999",
+    "FM_HOME_SUMMARY_INTERVAL": "99999999",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "NO_MISTAKES_GATE": "1",
+    "FM_SLACK_ALLOWED_AUTHORS": "U0TESTOWNER",
+    "FM_SLACK_DM_USER": "U0TESTOWNER",
+    "FM_EVENT_TEST_ROOT": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ"
+  }
+}

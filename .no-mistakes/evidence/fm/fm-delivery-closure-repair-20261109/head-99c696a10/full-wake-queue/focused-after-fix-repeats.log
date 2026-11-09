@@ -1,0 +1,40 @@
+load averages: 21.08 22.87 23.26
+drain timing: queue held=1317ms control=1537ms
+drain timing: presentation held=2228ms control=1430ms
+ok - presentation lock waits are bounded and retriable without weakening acknowledgement atomicity
+rc=0
+load averages: 18.87 22.12 22.97
+drain timing: queue held=1329ms control=1690ms
+drain timing: presentation held=2225ms control=1340ms
+ok - presentation lock waits are bounded and retriable without weakening acknowledgement atomicity
+rc=0
+load averages: 17.52 21.43 22.68
+drain timing: queue held=1331ms control=1526ms
+drain timing: presentation held=2373ms control=1544ms
+ok - presentation lock waits are bounded and retriable without weakening acknowledgement atomicity
+rc=0
+load averages: 19.22 21.45 22.64
+drain timing: queue held=1321ms control=1333ms
+drain timing: presentation held=2420ms control=1839ms
+ok - presentation lock waits are bounded and retriable without weakening acknowledgement atomicity
+rc=0
+load averages: 28.37 23.50 23.31
+drain timing: queue held=1355ms control=1548ms
+drain timing: presentation held=2441ms control=2033ms
+ok - presentation lock waits are bounded and retriable without weakening acknowledgement atomicity
+rc=0
+load averages: 29.06 24.53 23.69
+drain timing: queue held=1319ms control=1440ms
+drain timing: presentation held=2469ms control=1477ms
+ok - presentation lock waits are bounded and retriable without weakening acknowledgement atomicity
+rc=0
+load averages: 26.53 24.32 23.65
+drain timing: queue held=1384ms control=1743ms
+drain timing: presentation held=2169ms control=1197ms
+ok - presentation lock waits are bounded and retriable without weakening acknowledgement atomicity
+rc=0
+load averages: 21.22 23.27 23.29
+drain timing: queue held=1338ms control=1599ms
+drain timing: presentation held=2370ms control=1458ms
+ok - presentation lock waits are bounded and retriable without weakening acknowledgement atomicity
+rc=0

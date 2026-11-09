@@ -1,0 +1,56 @@
+{
+  "label": "baseline-relative",
+  "source_version": "original",
+  "source_sha256": "fcd8ff43bae34f03e76ccab15dd864a9a842a79a951e46dad540736b35b34eff",
+  "argv": [
+    "bash",
+    "/Users/charlesabrooker/tmp/fm-delivery-r2-qi1z_r7k/baseline-relative/lane/run-review.sh",
+    "packs/review pack",
+    "https://github.com/example/fixture/pull/1",
+    "1111111111111111111111111111111111111111",
+    "change.diff",
+    "/Users/charlesabrooker/tmp/fm-delivery-r2-qi1z_r7k/baseline-relative",
+    "fixture/model"
+  ],
+  "cwd": "/Users/charlesabrooker/tmp/fm-delivery-r2-qi1z_r7k/baseline-relative",
+  "expected_exit": 1,
+  "exit": 1,
+  "stdout": "rc=1 report=packs/review pack/review.md\nserved-model: fixture/nonqualifying-model\nfixture qualifier: plumbing only; independent qualification NOT RUN\nfixture route handoff written; independent qualification NOT RUN\n",
+  "stderr": "/Users/charlesabrooker/tmp/fm-delivery-r2-qi1z_r7k/baseline-relative/lane/run-review.sh: line 74: packs/review pack/review-run.log: No such file or directory\n",
+  "invoked_model_stub": false,
+  "live_observation": null,
+  "report_copied": false,
+  "model_review_qualification": "NOT RUN; fixture helpers demonstrate plumbing only",
+  "owner_pid": 52092,
+  "owner_reaped": true,
+  "destination_observation": {
+    "caller_cwd": "/Users/charlesabrooker/tmp/fm-delivery-r2-qi1z_r7k/baseline-relative",
+    "pack_argument": "packs/review pack",
+    "resolved_pack": "/Users/charlesabrooker/tmp/fm-delivery-r2-qi1z_r7k/baseline-relative/packs/review pack",
+    "fixture_home": "/Users/charlesabrooker/tmp/fm-delivery-r2-qi1z_r7k/baseline-relative",
+    "log": {
+      "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-qi1z_r7k/baseline-relative/packs/review pack/review-run.log",
+      "is_file": false
+    },
+    "session": {
+      "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-qi1z_r7k/baseline-relative/packs/review pack/omp-session",
+      "is_dir": true
+    },
+    "model_report": {
+      "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-qi1z_r7k/baseline-relative/work/packs-review pack/review.md",
+      "is_file": false
+    },
+    "copied_report": {
+      "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-qi1z_r7k/baseline-relative/packs/review pack/review.md",
+      "is_file": false
+    }
+  },
+  "consumer_action": "consume path refusal; correct pack invocation before retry",
+  "fixture_route": {
+    "fixture": true,
+    "qualifying": false,
+    "actual_review": "NOT RUN",
+    "pack": "packs/review pack",
+    "fixture_helper_exit": "8"
+  }
+}

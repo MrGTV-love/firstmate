@@ -1,0 +1,87 @@
+{
+  "scenario": "s6c-pr-poll-stays-state",
+  "source": "/Users/charlesabrooker/tmp/fm-copy.a6ydbv7k",
+  "passed": true,
+  "assertions": {
+    "armed": true,
+    "exit0": true,
+    "marker_text_kept_as_state": true,
+    "no_event_keys": true,
+    "env_not_1": true
+  },
+  "extra": {
+    "arm_stderr": "\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\u25cf  WATCHER DOWN - SUPERVISION IS OFF\n\u25cf  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).\n\u25cf  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.\n\u25cf  This is a supervision warning only; the guarded operation WILL still run.\n\u25cf  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n",
+    "keys": [
+      "/Users/charlesabrooker/tmp/fm-lab.7hfxbfhk/state/contributions.check.sh",
+      "/Users/charlesabrooker/tmp/fm-lab.7hfxbfhk/state/prtask.check.sh"
+    ],
+    "env": "unset",
+    "rows": [
+      [
+        "1794226336",
+        "1",
+        "check",
+        "/Users/charlesabrooker/tmp/fm-lab.7hfxbfhk/state/contributions.check.sh",
+        "check: /Users/charlesabrooker/tmp/fm-lab.7hfxbfhk/state/contributions.check.sh: contributions: observation unavailable for https://github.com/o/r/pull/8"
+      ],
+      [
+        "1794226337",
+        "2",
+        "check",
+        "/Users/charlesabrooker/tmp/fm-lab.7hfxbfhk/state/prtask.check.sh",
+        "check: /Users/charlesabrooker/tmp/fm-lab.7hfxbfhk/state/prtask.check.sh: fm-check-event prpoll pr text"
+      ]
+    ],
+    "stdout": "check: /Users/charlesabrooker/tmp/fm-lab.7hfxbfhk/state/contributions.check.sh: contributions: observation unavailable for https://github.com/o/r/pull/8\n",
+    "stderr": ""
+  },
+  "transcript": [
+    {
+      "label": "arm-pr-poll",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/tmp/fm-copy.a6ydbv7k/bin/fm-pr-check.sh",
+        "prtask",
+        "https://github.com/o/r/pull/8"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "armed: state/prtask.check.sh\n",
+      "stderr": "\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\u25cf  WATCHER DOWN - SUPERVISION IS OFF\n\u25cf  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).\n\u25cf  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.\n\u25cf  This is a supervision warning only; the guarded operation WILL still run.\n\u25cf  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n"
+    },
+    {
+      "label": "watch",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/tmp/fm-copy.a6ydbv7k/bin/fm-watch.sh"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "check: /Users/charlesabrooker/tmp/fm-lab.7hfxbfhk/state/contributions.check.sh: contributions: observation unavailable for https://github.com/o/r/pull/8\n",
+      "stderr": "",
+      "last_check_advanced": true
+    },
+    {
+      "label": "queue",
+      "queue_tsv": "1794226336\t1\tcheck\t/Users/charlesabrooker/tmp/fm-lab.7hfxbfhk/state/contributions.check.sh\tcheck: /Users/charlesabrooker/tmp/fm-lab.7hfxbfhk/state/contributions.check.sh: contributions: observation unavailable for https://github.com/o/r/pull/8\n1794226337\t2\tcheck\t/Users/charlesabrooker/tmp/fm-lab.7hfxbfhk/state/prtask.check.sh\tcheck: /Users/charlesabrooker/tmp/fm-lab.7hfxbfhk/state/prtask.check.sh: fm-check-event prpoll pr text\n"
+    }
+  ],
+  "env": {
+    "PATH": "/Users/charlesabrooker/tmp/fm-lab.7hfxbfhk/fakebin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.6.6/libexec:/opt/homebrew/Cellar/pyenv/2.6.6/plugins/python-build/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources",
+    "HOME": "/Users/charlesabrooker/tmp/fm-lab.7hfxbfhk",
+    "TMPDIR": "/Users/charlesabrooker/tmp/fm-lab.7hfxbfhk/tmp",
+    "FM_HOME": "/Users/charlesabrooker/tmp/fm-lab.7hfxbfhk",
+    "TMUX_TMPDIR": "/tmp/fml.zS5Fxp",
+    "FM_GITHUB_ACCOUNTING": "0",
+    "FM_MEMORY_GUARD_BIN": "/usr/bin/true",
+    "FM_OPEN_LOOPS_BIN": "/usr/bin/true",
+    "FM_WATCH_HANDLING_SUCCESSOR": "1",
+    "FM_OPEN_LOOPS_INTERVAL": "99999999",
+    "FM_HOME_SUMMARY_INTERVAL": "99999999",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "NO_MISTAKES_GATE": "1",
+    "FM_SLACK_ALLOWED_AUTHORS": "U0TESTOWNER",
+    "FM_SLACK_DM_USER": "U0TESTOWNER",
+    "FM_EVENT_TEST_ROOT": "/Users/charlesabrooker/tmp/fm-copy.a6ydbv7k"
+  }
+}

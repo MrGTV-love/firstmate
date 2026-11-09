@@ -1,0 +1,16 @@
+start=2026-11-09T12:17:51Z
+candidate_head=0cd55bcc265b34e9d14f9b8bc67c005b08255999
+candidate_tree=93579f7f5ecd2d4bfd4fbb5426a4107e1ba78661
+status_lines=0
+base_commit=cb411ea377a5441cf41af17d1f21db85020bfd79
+base_root=/Users/charlesabrooker/tmp/fm-rerun.n7mnRU/base (git archive extract, removed after run)
+e3a18c515fe559e3ee50b643494478c756eae2aef56fc55e9466012560095da6  /Users/charlesabrooker/.no-mistakes/evidence/01M6ZSG3ND8GVWFQPSXNBHQFQZ/head-0cd55bcc2/drivers-rerun-20261109T061736/drive_queue.py
+f3f29dd5915cfd59088b23251ac0db5b78b34b3644565269e57dd69bd1f85235  /Users/charlesabrooker/.no-mistakes/evidence/01M6ZSG3ND8GVWFQPSXNBHQFQZ/head-0cd55bcc2/drivers-rerun-20261109T061736/drive_briefs.py
+125373f3d5246a3d72fa26755540774618a88c5cd537950a041b67427a44ad4e  /Users/charlesabrooker/tmp/fm-rerun.n7mnRU/r2/replay.py
+a973104c36f527f1a9f73887257fc15207fe824fee0849226069afdee82116ea  /Users/charlesabrooker/tmp/fm-rerun.n7mnRU/r3/r3-identity-smoke.py
+fcd8ff43bae34f03e76ccab15dd864a9a842a79a951e46dad540736b35b34eff  /Users/charlesabrooker/tmp/fm-rerun.n7mnRU/r2/original/run-review.sh
+0ef9674fa1fd71c51ff03ffa0679710c3541d824d4a115ec0ad86f6a05cb948f  /Users/charlesabrooker/tmp/fm-rerun.n7mnRU/r2/proposal-root-v2/run-review.sh
+e89fc513a2b24d6f846db7e47afb121910101771f84e02988702a7beb4f85ca7  /Users/charlesabrooker/work/fm-repair/data/fm-delivery-closure-repair-20261109/r2-execution/proposal-root-v2/run-review.patch
+end=2026-11-09T12:21:39Z
+head_after=0cd55bcc265b34e9d14f9b8bc67c005b08255999
+status_lines_after=0

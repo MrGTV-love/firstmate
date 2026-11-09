@@ -1,0 +1,9 @@
+{
+  "r5a-scout-no-choices": true,
+  "r5b-scout-open-choice": true,
+  "r5c-fold-scout": true,
+  "r5c-fold-ship": true,
+  "r5c-fold-secondmate": true,
+  "r5c-summary": true,
+  "r5d-role-briefs": true
+}

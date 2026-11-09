@@ -1,0 +1,49 @@
+{
+  "label": "repaired-invalid",
+  "source_version": "proposal-root-v2",
+  "source_sha256": "0ef9674fa1fd71c51ff03ffa0679710c3541d824d4a115ec0ad86f6a05cb948f",
+  "argv": [
+    "bash",
+    "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-invalid/lane/run-review.sh",
+    "packs/absent",
+    "https://github.com/example/fixture/pull/1",
+    "1111111111111111111111111111111111111111",
+    "change.diff",
+    "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-invalid",
+    "fixture/model"
+  ],
+  "cwd": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-invalid",
+  "expected_exit": 2,
+  "exit": 2,
+  "stdout": "",
+  "stderr": "review directory unavailable: packs/absent\n",
+  "invoked_model_stub": false,
+  "live_observation": null,
+  "report_copied": false,
+  "model_review_qualification": "NOT RUN; fixture helpers demonstrate plumbing only",
+  "owner_pid": 87745,
+  "owner_reaped": true,
+  "destination_observation": {
+    "caller_cwd": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-invalid",
+    "pack_argument": "packs/absent",
+    "resolved_pack": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-invalid/packs/review pack",
+    "fixture_home": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-invalid",
+    "log": {
+      "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-invalid/packs/review pack/review-run.log",
+      "is_file": false
+    },
+    "session": {
+      "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-invalid/packs/review pack/omp-session",
+      "is_dir": false
+    },
+    "model_report": {
+      "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-invalid/work/packs-review pack/review.md",
+      "is_file": false
+    },
+    "copied_report": {
+      "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-invalid/packs/review pack/review.md",
+      "is_file": false
+    }
+  },
+  "consumer_action": "consume path refusal; correct pack invocation before retry"
+}

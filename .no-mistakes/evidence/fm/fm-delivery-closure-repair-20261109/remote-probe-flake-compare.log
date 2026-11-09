@@ -1,0 +1,12 @@
+== candidate attempt 1
+not ok - the remote endpoint was never probed
+== candidate attempt 2
+not ok - the remote endpoint was never probed
+== candidate attempt 3
+not ok - the remote endpoint was never probed
+== base attempt 1
+not ok - the remote endpoint was never probed
+== base attempt 2
+not ok - the remote endpoint was never probed
+== base attempt 3
+not ok - the remote endpoint was never probed

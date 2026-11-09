@@ -1,0 +1,86 @@
+{
+  "scenario": "s6-non-event-routes-stay-state",
+  "source": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ",
+  "passed": true,
+  "assertions": {
+    "exit0": true,
+    "no_event_keys_for_contrib_or_x": true,
+    "contribution_marker_kept_as_state": true,
+    "x_marker_kept_as_state": true,
+    "contrib_env_not_1": true,
+    "x_env_not_1": true,
+    "custom_env_is_1": true
+  },
+  "extra": {
+    "envs": {
+      "contrib": "0",
+      "regular": "1",
+      "x": "unset"
+    },
+    "keys": [
+      "/Users/charlesabrooker/tmp/fm-lab.k7iy7j1e/state/contributions.check.sh",
+      "/Users/charlesabrooker/tmp/fm-lab.k7iy7j1e/state/regular.check.sh",
+      "/Users/charlesabrooker/tmp/fm-lab.k7iy7j1e/state/x-watch.check.sh"
+    ]
+  },
+  "transcript": [
+    {
+      "label": "register-contributions",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-check-register.sh",
+        "contributions"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "registered: state/contributions.check.sh\n",
+      "stderr": ""
+    },
+    {
+      "label": "register-regular",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-check-register.sh",
+        "regular"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "registered: state/regular.check.sh\n",
+      "stderr": ""
+    },
+    {
+      "label": "watch",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-watch.sh"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "check: /Users/charlesabrooker/tmp/fm-lab.k7iy7j1e/state/contributions.check.sh: fm-check-event contrib\tcontribution text\n",
+      "stderr": "",
+      "last_check_advanced": true
+    },
+    {
+      "label": "queue",
+      "queue_tsv": "1794222597\t1\tcheck\t/Users/charlesabrooker/tmp/fm-lab.k7iy7j1e/state/contributions.check.sh\tcheck: /Users/charlesabrooker/tmp/fm-lab.k7iy7j1e/state/contributions.check.sh: fm-check-event contrib contribution text\n1794222597\t2\tcheck\t/Users/charlesabrooker/tmp/fm-lab.k7iy7j1e/state/regular.check.sh\tcheck: /Users/charlesabrooker/tmp/fm-lab.k7iy7j1e/state/regular.check.sh: plain\n1794222598\t3\tcheck\t/Users/charlesabrooker/tmp/fm-lab.k7iy7j1e/state/x-watch.check.sh\tcheck: /Users/charlesabrooker/tmp/fm-lab.k7iy7j1e/state/x-watch.check.sh: fm-check-event xpoll x text\n"
+    }
+  ],
+  "env": {
+    "PATH": "/Users/charlesabrooker/tmp/fm-lab.k7iy7j1e/fakebin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.6.6/libexec:/opt/homebrew/Cellar/pyenv/2.6.6/plugins/python-build/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources",
+    "HOME": "/Users/charlesabrooker/tmp/fm-lab.k7iy7j1e",
+    "TMPDIR": "/Users/charlesabrooker/tmp/fm-lab.k7iy7j1e/tmp",
+    "FM_HOME": "/Users/charlesabrooker/tmp/fm-lab.k7iy7j1e",
+    "TMUX_TMPDIR": "/tmp/fml.KyF9rj",
+    "FM_GITHUB_ACCOUNTING": "0",
+    "FM_MEMORY_GUARD_BIN": "/usr/bin/true",
+    "FM_OPEN_LOOPS_BIN": "/usr/bin/true",
+    "FM_WATCH_HANDLING_SUCCESSOR": "1",
+    "FM_OPEN_LOOPS_INTERVAL": "99999999",
+    "FM_HOME_SUMMARY_INTERVAL": "99999999",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "NO_MISTAKES_GATE": "1",
+    "FM_SLACK_ALLOWED_AUTHORS": "U0TESTOWNER",
+    "FM_SLACK_DM_USER": "U0TESTOWNER",
+    "FM_EVENT_TEST_ROOT": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ"
+  }
+}

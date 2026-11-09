@@ -1,0 +1,22 @@
+{
+  "passed": true,
+  "assertions": {
+    "candidate_reports_newer_episode": true,
+    "candidate_keeps_unpresented_row": true,
+    "same_as_base": true
+  },
+  "observed": {
+    "base": {
+      "exit": 0,
+      "reports_newer_episode": true,
+      "unpresented_row_retained": true,
+      "stderr": "wake drain: acknowledged wakes through 1 (1 row(s) consumed), but a newer recovery episode is pending; re-run bin/fm-wake-drain.sh and use the new WAKE_ACK_REQUIRED command\n"
+    },
+    "candidate": {
+      "exit": 0,
+      "reports_newer_episode": true,
+      "unpresented_row_retained": true,
+      "stderr": "wake drain: acknowledged wakes through 1 (1 row(s) consumed), but a newer recovery episode is pending; re-run bin/fm-wake-drain.sh and use the new WAKE_ACK_REQUIRED command\n"
+    }
+  }
+}
