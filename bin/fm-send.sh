@@ -305,6 +305,21 @@ fm_send_id_from_meta() { # <meta-file>
   printf '%s' "${base%.meta}"
 }
 
+# fm_send_split_trailing_dots: read one token per line and print, for each, the
+# count of '.' characters that end it, a tab, and the token without them. awk
+# copies the whole line on every substr call, so the run is found by binary
+# search (about twenty passes) instead of one call per dot.
+fm_send_split_trailing_dots() {
+  LC_ALL=C awk '{
+    n = length($0); lo = 0; hi = n
+    while (lo < hi) {
+      mid = int((lo + hi + 1) / 2)
+      if (substr($0, n - mid + 1) ~ /[^.]/) hi = mid - 1; else lo = mid
+    }
+    printf "%d\t%s\n", lo, substr($0, 1, n - lo)
+  }'
+}
+
 # fm_send_resolve_mention <text> <dots>: set MENTION_ID to the recorded task id
 # that the token <text> followed by <dots> trailing '.' characters mentions
 # (rule M), or to nothing. The caller has split the token so <text> does not
@@ -998,7 +1013,7 @@ else
     echo "error: refused task '$mentioned_id': this home's direct report '$mentioned_id' owns it, not target '$RAW_TARGET'; nothing was sent. Send to '$mentioned_id', or use --relay for a deliberate cross-task mention." >&2
     exit 1
   done < <(printf '%s\n' "$MESSAGE" | LC_ALL=C tr -cs 'A-Za-z0-9_./\\-' '\n' |
-    LC_ALL=C awk '{ n = length($0); i = n; while (i > 0 && substr($0, i, 1) == ".") i--; printf "%d\t%s\n", n - i, substr($0, 1, i) }')
+    fm_send_split_trailing_dots)
   if [ "$TARGET_BACKEND" = remote ]; then
     FM_SEND_REMOTE_BUDGET=${FM_SEND_REMOTE_BUDGET:-30}
     case "$FM_SEND_REMOTE_BUDGET" in

@@ -788,8 +788,30 @@ test_mention_resolution_matches_the_reference_scan() {
   pass "fm-send: the single-pass mention scan resolves every token like the one-dot-at-a-time scan"
 }
 
+test_trailing_dot_split_matches_the_reference_split() {
+  local fn token reference want got checked=0 base k dots
+  fn=$(awk '/^fm_send_split_trailing_dots\(\) /,/^}$/' "$SEND")
+  [ -n "$fn" ] || fail "fm_send_split_trailing_dots is not defined in bin/fm-send.sh"
+  eval "$fn"
+  for base in '' a ab a.b fm- zq 'a..b' '...' 'x.y.z'; do
+    for k in 0 1 2 3 4 5 8 9 17 64 129; do
+      dots=$(printf '%*s' "$k" '' | tr ' ' '.')
+      token=$base$dots
+      [ -n "$token" ] || continue
+      reference=$token; want=0
+      while [ "${reference%.}" != "$reference" ]; do reference=${reference%.}; want=$((want + 1)); done
+      got=$(printf '%s\n' "$token" | fm_send_split_trailing_dots)
+      [ "$got" = "$(printf '%d\t%s' "$want" "$reference")" ] || fail "split of '$token' is wrong: '$got'"
+      checked=$((checked + 1))
+    done
+  done
+  printf 'split-diff: %s tokens split like the one-dot-at-a-time reference\n' "$checked"
+  pass "fm-send: the trailing-dot split counts the same dots as stripping them one at a time"
+}
+
 fm_test_only
 
+test_trailing_dot_split_matches_the_reference_split
 test_mention_scan_cost_does_not_grow_with_trailing_dots
 test_long_dotted_forms_keep_rule_m_results
 test_mention_resolution_matches_the_reference_scan
