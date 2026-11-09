@@ -2813,8 +2813,8 @@ teardown_train_content_present() {  # <ref> <target> <base>
 # Is <ref> carried by <train head>? Both must hold: the change reaches the train, as an
 # ancestor or by every commit's patch replayed there, and its net content from the member's
 # recorded base is present in the train head's tree. A copy that does not contain the member
-# head (a pre-rebase copy) has no recorded base of its own: every commit of it must then be
-# proven by its patch (the reach proof), and the member head's content proof covers the rest.
+# head (a pre-rebase copy) is measured from its merge base with the member head
+# (teardown_train_content_applies); patch presence alone never proves it.
 # The first failing fact is left in TEARDOWN_TRAIN_CARRY_WHY, a fact that could not be read in
 # TEARDOWN_TRAIN_UNASKED.
 TEARDOWN_TRAIN_CARRY_WHY=
@@ -2850,23 +2850,49 @@ teardown_train_carries() {  # <ref> <train head>
   }
 }
 
-# Does the content proof apply to <ref>, and does it hold against <target>? It applies to the
-# member head and to a copy that contains the member head. A copy that does not contain it is
-# proven by its commits' patches alone.
+# Does <ref>'s net change hold in <target>? Every copy is proven by content, with no shortcut.
+# The member head and a copy that contains it are measured from the member PR's recorded base. A
+# copy that does not contain the member head (a pre-rebase copy) is measured from its merge base
+# with the member head, the fork point of its own work: no record of that point exists, so it is
+# read from the commits, and the commit-level patch proof (teardown_train_carries) is what still
+# sees a commit that only a graph could hide. Patch presence is not content presence, so the
+# change from that base must also be present in <target> by the same rule. No common history, or
+# more than one merge base, is a refusal; a failed read is unknown.
 teardown_train_content_applies() {  # <ref> <target>
-  local dir=${TEARDOWN_LANDED_DIR:-$WT} rc=0
+  local dir=${TEARDOWN_LANDED_DIR:-$WT} rc=0 base=$TEARDOWN_TRAIN_MEMBER_BASE bases
   if [ -n "$TEARDOWN_TRAIN_MEMBER_HEAD" ] && [ "$1" != "$TEARDOWN_TRAIN_MEMBER_HEAD" ]; then
     fm_task_copy_ancestor "$dir" "$TEARDOWN_TRAIN_MEMBER_HEAD" "$1" || rc=$?
     case "$rc" in
       0) ;;
-      1) return 0 ;;
+      1)
+        rc=0
+        bases=$(git -C "$dir" merge-base --all "$TEARDOWN_TRAIN_MEMBER_HEAD" "$1" 2>/dev/null) || rc=$?
+        case "$rc" in
+          0) ;;
+          1)
+            TEARDOWN_TRAIN_CARRY_WHY="has no common history with the member head, so its own work has no base to be measured from"
+            return 1
+            ;;
+          *)
+            TEARDOWN_TRAIN_UNASKED="the merge base of ${1:0:12} and the member head could not be read"
+            return 1
+            ;;
+        esac
+        case "$bases" in
+          *$'\n'*)
+            TEARDOWN_TRAIN_CARRY_WHY="has more than one merge base with the member head, so its own work has no single base to be measured from"
+            return 1
+            ;;
+        esac
+        base=$bases
+        ;;
       *)
         TEARDOWN_TRAIN_UNASKED="whether ${1:0:12} contains the member head could not be read"
         return 1
         ;;
     esac
   fi
-  teardown_train_content_present "$1" "$2" "$TEARDOWN_TRAIN_MEMBER_BASE"
+  teardown_train_content_present "$1" "$2" "$base"
 }
 
 # Does the train's landing commit hold <ref>'s net change? The forge names the commit that

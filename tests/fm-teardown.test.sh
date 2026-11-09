@@ -5482,6 +5482,73 @@ test_default_proof_refuses_a_closed_copy_whose_lines_main_edited_later() {
   pass "a CLOSED member's reachable copy whose changed lines main edited later is refused by the default proof, and kept"
 }
 
+# Main 2645 F1: a pre-rebase copy (it does not contain the recorded member head) holds O1 and O2.
+# The recorded PR head H is a rewritten history carrying only O1's file and h.txt. The train replays
+# O1 and O2 (so every patch is present), then reverts O2, and the squash landing L has the train's
+# tree. The copy's O2 work (dropped.txt) is in neither the train head nor the landing. Main then
+# edits a.txt, so only the train route can decide the copy.
+bw_steps_prerebase_reverted() {  # <clone>
+  local t=$1 c h tr o1 o2
+  bw_commit_file "$t" base.txt "base" "baseline"
+  git -C "$t" push -q origin main
+  BW_BASE=$(git -C "$t" rev-parse HEAD)
+  git -C "$t" checkout -q -b original
+  bw_commit_file "$t" a.txt one "O1 adds a"
+  o1=$(git -C "$t" rev-parse HEAD)
+  bw_commit_file "$t" dropped.txt secret "O2 adds dropped"
+  o2=$(git -C "$t" rev-parse HEAD)
+  c=$o2
+  git -C "$t" push -q origin "HEAD:refs/heads/original"
+  git -C "$t" checkout -q -b member "$BW_BASE"
+  bw_commit_file "$t" a.txt one "rewritten: a"
+  bw_commit_file "$t" h.txt present "rewritten: h"
+  h=$(git -C "$t" rev-parse HEAD)
+  git -C "$t" push -q origin "HEAD:refs/pull/7/head"
+  git -C "$t" checkout -q -b train "$BW_BASE"
+  GIT_COMMITTER_DATE="2030-01-01T00:00:00Z" git -C "$t" cherry-pick "$o1" "$o2" >/dev/null
+  if [ "${BW_PREREBASE_CARRIES:-0}" != 1 ]; then
+    git -C "$t" rm -q -- dropped.txt
+    git -C "$t" commit -q -m "revert O2"
+  fi
+  bw_commit_file "$t" h.txt present "train: h"
+  bw_commit_file "$t" second.txt second "second member work"
+  tr=$(git -C "$t" rev-parse HEAD)
+  git -C "$t" push -q origin "HEAD:refs/pull/9/head"
+  git -C "$t" checkout -q main
+  git -C "$t" merge -q --squash train >/dev/null
+  git -C "$t" commit -q -m "train squash (#9)"
+  BW_LANDING=$(git -C "$t" rev-parse HEAD)
+  git -C "$t" push -q origin main
+  bw_commit_file "$t" a.txt "one, edited later" "main edits a.txt"
+  git -C "$t" push -q origin main
+  BW_MEMBER=$h
+  BW_TRAIN=$tr
+  BW_COPY=$c
+}
+
+test_a_prerebase_copy_whose_reverted_work_the_train_lacks_is_refused() {
+  local control
+  for control in 0 1; do
+    BW_PREREBASE_CARRIES=$control bespoke_world "prerebase-reverted-$control" bw_steps_prerebase_reverted
+    train_default_list "$TRAIN_CASE"
+    git -C "$TRAIN_CASE/wt" merge-base --is-ancestor "$TRAIN_MEMBER_HEAD" "$TRAIN_COPY_HEAD" \
+      && fail "prerebase-reverted-$control: the copy contains the member head"
+    git -C "$TRAIN_CASE/wt" cat-file -e "$TRAIN_COPY_HEAD:dropped.txt" 2>/dev/null \
+      || fail "prerebase-reverted-$control: the copy lacks dropped.txt"
+    if [ "$control" = 0 ]; then
+      git -C "$TRAIN_CASE/wt" cat-file -e "$TRAIN_HEAD:dropped.txt" 2>/dev/null && fail "prerebase-reverted: the train holds dropped.txt"
+      git -C "$TRAIN_CASE/wt" cat-file -e "$TRAIN_LANDING_COMMIT:dropped.txt" 2>/dev/null && fail "prerebase-reverted: the landing holds dropped.txt"
+      assert_train_refused "$TRAIN_CASE" prerebase-reverted-copy "net change is not present in the train head's final tree"
+      assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "prerebase-reverted-copy: the train was accepted"
+    else
+      git -C "$TRAIN_CASE/wt" cat-file -e "$TRAIN_HEAD:dropped.txt" 2>/dev/null || fail "prerebase control: the train lacks dropped.txt"
+      assert_train_allowed "$TRAIN_CASE" prerebase-carried-copy
+    fi
+  done
+  BW_PREREBASE_CARRIES=0
+  pass "a pre-rebase copy whose work the train replayed and then reverted is refused by content, and the same copy whose work the train kept is accepted"
+}
+
 teardown_test_cases=(
 test_local_only_fork_remote_allows
 test_teardown_does_not_wait_for_the_home_summary_refresh
@@ -5561,6 +5628,7 @@ test_train_listing_with_a_longer_hex_token_is_not_a_listing
 test_a_failed_patch_read_never_proves_a_replayed_patch
 test_default_proof_refuses_a_third_version_conflict_resolution
 test_default_proof_refuses_a_closed_copy_whose_lines_main_edited_later
+test_a_prerebase_copy_whose_reverted_work_the_train_lacks_is_refused
 test_default_proof_refuses_work_whose_only_change_is_a_file_mode
 test_train_that_restored_a_deleted_file_is_refused
 test_train_with_many_unrelated_paths_still_accepts_its_member
