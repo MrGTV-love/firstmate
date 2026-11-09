@@ -7665,9 +7665,11 @@ test_a_run_without_the_per_task_lifecycle_locks_calls_the_driver_twice_so_the_ov
   patched=$FOREIGN_CASE/patched-code
   mkdir -p "$patched"
   cp -R "$ROOT/bin" "$patched/bin"
+  # shellcheck disable=SC2016 # the patterns are sed text: the dollar signs are literal.
   sed -i.bak -e 's/^fm_lease_guard "\$ID" "teardown (fm-teardown)"$/true/' -e 's/^fm_lock_try_acquire "\$CONTROL_LOCK" || {$/true || {/' -e 's/^fm_lock_acquire_wait "\$META_LOCK"$/true/' "$patched/bin/fm-teardown.sh"
   [ "$(diff "$ROOT/bin/fm-teardown.sh" "$patched/bin/fm-teardown.sh" | grep -c '^>')" = 3 ] || fail "retained-overlap-nolock: the three per-task lock lines to remove were not all found"
   rc=0
+  # shellcheck disable=SC2329 # run by retained_overlap_run as the second activation.
   second_without_locks() { TEARDOWN="$patched/bin/fm-teardown.sh" run_foreign_teardown rc FM_STUB_CLOSEOUT=retained; }
   retained_overlap_run retained-overlap-nolock second_without_locks
   assert_equals "2 2" "$(retained_call_count) $(retained_tar_count)" "retained-overlap-nolock: without the per-task locks a second run should have called the driver again (second rc $rc: stdout $(tail -3 "$FOREIGN_CASE/stdout" | tr "\n" "|"))"
