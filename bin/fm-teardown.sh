@@ -52,16 +52,16 @@
 # whose head contains the current local work (ancestor or equivalent patch ids),
 # or a clean content-in-default tree match. Reachability from the default branch is
 # not delivery either: a merge can make a commit reachable without its change (an ours
-# merge, or a merge whose tree is one side's, whichever parent comes first), and no
-# commit is trusted for where it sits in the history. So that proof, and the local-only
-# proof (a branch merged into local main), measure the copy's change from the newest
-# commit of the default branch's first-parent line that the copy holds, and accept that
-# base only after every merge after it on that line is shown to hold what git's own merge
-# of its parents holds, on the paths where the copy and the default branch differ
-# (bin/fm-task-copy-lib.sh's fm_task_copy_default_holds_change and
-# fm_task_copy_line_merges_keep_changes own the rule); for a copy reachable only through
-# a merge, the tree of the commit that took it in must hold the net change.
-# A git read that fails or ends early is never an answer: it is unknown, not landed.
+# merge, or a merge whose tree is one side's, whichever parent comes first), and no base
+# computed from parent pointers can be trusted. So that proof measures the copy's change
+# from a RECORD where one exists: the base oid the forge attests for the task's recorded PR
+# when it is CLOSED (gh pr view --json baseRefOid), and asks the net change from there to
+# be present in the default branch's tree (bin/fm-task-copy-lib.sh's
+# fm_task_copy_default_holds_change and fm_task_copy_net_change_present own the rule). A
+# task with no recorded PR (local-only, copy-sweep orphans) has no record to measure from,
+# and keeps the position-based proof (the first-parent base), which refuses the
+# conventional ours merge but cannot refuse a crafted parent-order merge.
+# A git or forge read that fails or ends early is never an answer: it is unknown, not landed.
 # A copy left on pre-rebase commits
 # (even ones pushed to another remote) is also accepted when every commit the PR
 # head and the default branch lack has a patch id among the PR head's own commits
@@ -2448,7 +2448,7 @@ TEARDOWN_UNPROVEN_COMMITS=
 # unproven on purpose: only the captain's own words discard it.
 rebased_commits_are_in_pr_head() {
   local pr_head=$1 current default_ref base pr_commits pr_patch_ids candidates commit parents
-  local patch_id tree merged proven unproven=
+  local patch_id tree merged proven merge_rc unproven=''
   local dir=${TEARDOWN_LANDED_DIR:-$WT} ref=${TEARDOWN_LANDED_REF:-HEAD}
   local -a fields
   TEARDOWN_UNPROVEN_COMMITS=
@@ -2467,15 +2467,19 @@ rebased_commits_are_in_pr_head() {
     base=$(git -C "$dir" merge-base "$current" "$pr_head" 2>/dev/null) || return 1
     pr_commits=$(git -C "$dir" rev-list --no-merges "$base..$pr_head" -- 2>/dev/null) || return 1
   fi
-  pr_patch_ids=$(
-    printf '%s\n' "$pr_commits" \
-      | while IFS= read -r commit; do
-          [ -n "$commit" ] || continue
-          patch_id_for_commit "$commit"
-        done \
-      | sed '/^$/d' \
-      | sort -u
-  ) || return 1
+  # Every patch id is read without a pipe, so a producer that failed is seen: in the train
+  # route that is unknown (retry), elsewhere the commit simply stays unproven.
+  pr_patch_ids=
+  while IFS= read -r commit; do
+    [ -n "$commit" ] || continue
+    patch_id=$(patch_id_for_commit "$commit") || {
+      [ -z "${TEARDOWN_PATCH_PROOF_BASE:-}" ] || TEARDOWN_TRAIN_UNASKED="the patch of train commit ${commit:0:12} could not be read"
+      return 1
+    }
+    [ -z "$patch_id" ] || pr_patch_ids="$pr_patch_ids$patch_id"$'\n'
+  done <<EOF
+$pr_commits
+EOF
   # The train route sets TEARDOWN_PATCH_PROOF_BASE: a commit reachable from the
   # default branch is then still proven by its own patch, because reachability
   # alone does not say the train carried it (an `ours` merge puts a commit in the
@@ -2498,18 +2502,27 @@ EOF
     proven=0
     case ${#fields[@]} in
       1|2)
-        patch_id=$(patch_id_for_commit "$commit")
-        if [ -n "$patch_id" ] && grep -qxF "$patch_id" <<< "$pr_patch_ids"; then
-          proven=1
+        if patch_id=$(patch_id_for_commit "$commit"); then
+          if [ -n "$patch_id" ] && grep -qxF "$patch_id" <<< "$pr_patch_ids"; then
+            proven=1
+          fi
+        elif [ -n "${TEARDOWN_PATCH_PROOF_BASE:-}" ]; then
+          TEARDOWN_TRAIN_UNASKED="the patch of ${commit:0:12} could not be read"
+          return 1
         fi
         ;;
       3)
         tree=$(git -C "$dir" rev-parse --verify "$commit^{tree}" 2>/dev/null) || tree=
-        if merged=$(git -C "$dir" merge-tree --write-tree "${fields[1]}" "${fields[2]}" 2>/dev/null); then
+        merge_rc=0
+        merged=$(git -C "$dir" merge-tree --write-tree "${fields[1]}" "${fields[2]}" 2>/dev/null) || merge_rc=$?
+        if [ "$merge_rc" = 0 ]; then
           merged=$(printf '%s\n' "$merged" | head -1)
           if [ -n "$tree" ] && [ "$merged" = "$tree" ]; then
             proven=1
           fi
+        elif [ "$merge_rc" -gt 1 ] && [ -n "${TEARDOWN_PATCH_PROOF_BASE:-}" ]; then
+          TEARDOWN_TRAIN_UNASKED="the merge ${commit:0:12} could not be compared with git's own merge of its parents"
+          return 1
         fi
         ;;
     esac
@@ -2732,16 +2745,16 @@ pr_is_merged() {
 # head; both tests are teardown_train_carries, which needs the change to reach the
 # train AND its net content to be in the train head's tree. Reaching is an ancestor,
 # or every commit the train head does not hold proven by the rebased-patch proof
-# pr_is_merged applies to the PR head, measured from the member's own base (the newest
-# commit of the default branch's first-parent line that the member holds, once the merges
-# after it are audited) so a train the default branch has since merged still counts; a
-# commit reachable from the default branch is not skipped (an `ours` merge puts a commit
-# in the default history without its change), so its own patch must be among the train's. Content present
+# pr_is_merged applies to the PR head, measured from the member's own base (the base oid the
+# forge records for the member PR, not a position in the history) so a train the default
+# branch has since merged still counts; a commit reachable from the default branch is not
+# skipped (an `ours` merge puts a commit in the default history without its change), so its
+# own patch must be among the train's. Content present
 # means every path of the member's net change holds the same content at the train
 # head, or the reverse of that change applies cleanly to the train head's tree;
-# history alone is not enough, since a train can revert a commit it contains. A member
-# already on the default branch's first-parent line has nothing left to carry and passes
-# the same audit.
+# history alone is not enough, since a train can revert a commit it contains, and type and
+# mode are part of that patch. Nothing else is read about the graph. A member already on the
+# default branch is proven by the same patch.
 # No run record stands in for that proof.
 # Record mode (copy gone or slot reassigned) reads no copy.
 # A train is found by searching the forge for the member URL, never by a title,
@@ -2754,35 +2767,36 @@ TEARDOWN_TRAIN_ANNOUNCED=0
 # The first accepted train and its member, recorded on the backlog close.
 TEARDOWN_TRAIN_PR_URL=
 TEARDOWN_TRAIN_MEMBER_URL=
-# The base of the member's own change: the newest commit on the default branch's
-# FIRST-PARENT line that <ref> holds (fm_task_copy_first_parent_base). A commit that reached
-# the default branch only as the second parent of a merge is not on the line, so an `ours`
-# merge cannot move the base past it. The base is a position in the history, not content:
-# it only chooses the change the patch proof and the net-change proof measure, and
-# fm_task_copy_content_delivered must hold as well, so no position is ever trusted alone.
-# A base equal to <ref> leaves no net change: the member was integrated whole.
-# Sets TEARDOWN_TRAIN_MEMBER_BASE. A refusal leaves its fact in TEARDOWN_TRAIN_CARRY_WHY; a
-# read that failed leaves TEARDOWN_TRAIN_UNASKED.
+# The base of the member's own change is a RECORD, not a position in the history: the member
+# PR's base oid, which the forge attests (gh pr view --json baseRefOid) and
+# teardown_train_landed reads into TEARDOWN_TRAIN_ANCHOR. Every base computed from parent
+# pointers (merge base, first-parent line) can be faked by a merge that dropped a side's change,
+# and four reviews found a new graph that did. The anchor must be a commit of this clone
+# (fetched when it is not); one that cannot be made present is unknown (retry).
+TEARDOWN_TRAIN_ANCHOR=
 TEARDOWN_TRAIN_MEMBER_BASE=
 teardown_train_member_base() {  # <ref>
-  local dir=${TEARDOWN_LANDED_DIR:-$WT} ref=$1 default_ref rc=0
+  local dir=${TEARDOWN_LANDED_DIR:-$WT}
   TEARDOWN_TRAIN_MEMBER_BASE=
-  default_ref=$(landed_default_ref) || {
-    TEARDOWN_TRAIN_UNASKED="the default branch could not be read for the merge-train check"
+  if [ -z "$TEARDOWN_TRAIN_ANCHOR" ] || ! fm_pr_head_valid "$TEARDOWN_TRAIN_ANCHOR"; then
+    TEARDOWN_TRAIN_UNASKED="the forge gave no base commit for the member PR"
     return 1
-  }
-  fm_task_copy_first_parent_base "$dir" "$ref" "$default_ref" || rc=$?
-  case "$rc" in
-    0) TEARDOWN_TRAIN_MEMBER_BASE=$FM_TASK_COPY_BASE ;;
-    1) TEARDOWN_TRAIN_CARRY_WHY="leaves no base to measure from: $FM_TASK_COPY_WHY" ;;
-    *) TEARDOWN_TRAIN_UNASKED=$FM_TASK_COPY_UNASKED ;;
-  esac
-  [ "$rc" = 0 ]
+  fi
+  if ! git -C "$dir" cat-file -e "$TEARDOWN_TRAIN_ANCHOR^{commit}" 2>/dev/null; then
+    git -C "$dir" fetch --quiet origin "$TEARDOWN_TRAIN_ANCHOR" >/dev/null 2>&1 || :
+    git -C "$dir" cat-file -e "$TEARDOWN_TRAIN_ANCHOR^{commit}" 2>/dev/null || {
+      TEARDOWN_TRAIN_UNASKED="the base ${TEARDOWN_TRAIN_ANCHOR:0:12} of the member PR could not be fetched"
+      return 1
+    }
+  fi
+  TEARDOWN_TRAIN_MEMBER_BASE=$TEARDOWN_TRAIN_ANCHOR
 }
 
-# Is the member's net change (<base> to <ref>) still in <target>'s final tree?
-# fm_task_copy_net_change_present owns the rule. An empty net change leaves nothing to lose
-# and counts as present; a read that failed leaves TEARDOWN_TRAIN_UNASKED.
+# Is the net change (<base> to <ref>) still in <target>'s final tree?
+# fm_task_copy_net_change_present owns the rule: every changed path equal there, or the reverse
+# of the change applies cleanly, with type and mode part of the patch. An empty net change
+# leaves nothing to lose and counts as present; a read that failed leaves
+# TEARDOWN_TRAIN_UNASKED.
 teardown_train_content_present() {  # <ref> <target> <base>
   local rc=0
   fm_task_copy_net_change_present "${TEARDOWN_LANDED_DIR:-$WT}" "$1" "$2" "$3" || rc=$?
@@ -2797,25 +2811,28 @@ teardown_train_content_present() {  # <ref> <target> <base>
 }
 
 # Is <ref> carried by <train head>? Both must hold: the change reaches the train, as an
-# ancestor or by every commit's patch replayed there, and its net content is present
-# in the train head's tree. The first failing fact is left in TEARDOWN_TRAIN_CARRY_WHY,
-# a fact that could not be read in TEARDOWN_TRAIN_UNASKED.
+# ancestor or by every commit's patch replayed there, and its net content from the member's
+# recorded base is present in the train head's tree. A copy that does not contain the member
+# head (a pre-rebase copy) has no recorded base of its own: every commit of it must then be
+# proven by its patch (the reach proof), and the member head's content proof covers the rest.
+# The first failing fact is left in TEARDOWN_TRAIN_CARRY_WHY, a fact that could not be read in
+# TEARDOWN_TRAIN_UNASKED.
 TEARDOWN_TRAIN_CARRY_WHY=
-# The member PR's files, one per line, as the forge lists them.
-TEARDOWN_TRAIN_STRICT=
+TEARDOWN_TRAIN_MEMBER_HEAD=
 teardown_train_carries() {  # <ref> <train head>
-  local base reached=0 rc=0
+  local base reached=0 rc=0 dir=${TEARDOWN_LANDED_DIR:-$WT}
   local TEARDOWN_LANDED_REF=$1
   TEARDOWN_UNPROVEN_COMMITS=
   TEARDOWN_TRAIN_CARRY_WHY=
   teardown_train_member_base "$1" || return 1
   base=$TEARDOWN_TRAIN_MEMBER_BASE
-  fm_task_copy_ancestor "${TEARDOWN_LANDED_DIR:-$WT}" "$1" "$2" || rc=$?
+  fm_task_copy_ancestor "$dir" "$1" "$2" || rc=$?
   case "$rc" in
     0) reached=1 ;;
     1)
       local TEARDOWN_PATCH_PROOF_BASE=$base
       rebased_commits_are_in_pr_head "$2" && reached=1
+      [ -z "$TEARDOWN_TRAIN_UNASKED" ] || return 1
       ;;
     *)
       TEARDOWN_TRAIN_UNASKED="whether ${1:0:12} is in the train head ${2:0:12} could not be read"
@@ -2826,38 +2843,38 @@ teardown_train_carries() {  # <ref> <train head>
     TEARDOWN_TRAIN_CARRY_WHY="neither contains it nor carries every commit of it"
     return 1
   fi
-  if ! teardown_train_content_present "$1" "$2" "$base"; then
+  teardown_train_content_applies "$1" "$2" || {
     TEARDOWN_UNPROVEN_COMMITS=
     [ -n "$TEARDOWN_TRAIN_UNASKED" ] || TEARDOWN_TRAIN_CARRY_WHY="reaches it in history, but its net change is not present in the train head's final tree"
-    return 1
-  fi
-  teardown_train_content_delivered "$1" "$2" "net change is not present in the train head's final tree" || {
-    TEARDOWN_UNPROVEN_COMMITS=
     return 1
   }
 }
 
-# The content proof (fm_task_copy_content_delivered) of <ref> against <target>, with the
-# member PR's files as the paths the member's own work touched. An unread fact leaves
-# TEARDOWN_TRAIN_UNASKED; a refusal leaves its fact in TEARDOWN_TRAIN_CARRY_WHY.
-teardown_train_content_delivered() {  # <ref> <target> <what failed>
-  local rc=0
-  fm_task_copy_content_delivered "${TEARDOWN_LANDED_DIR:-$WT}" "$1" "$2" "$TEARDOWN_TRAIN_STRICT" || rc=$?
-  case "$rc" in
-    0) return 0 ;;
-    1) TEARDOWN_TRAIN_CARRY_WHY="$3 ($FM_TASK_COPY_WHY)" ;;
-    *) TEARDOWN_TRAIN_UNASKED=$FM_TASK_COPY_UNASKED ;;
-  esac
-  return 1
+# Does the content proof apply to <ref>, and does it hold against <target>? It applies to the
+# member head and to a copy that contains the member head. A copy that does not contain it is
+# proven by its commits' patches alone.
+teardown_train_content_applies() {  # <ref> <target>
+  local dir=${TEARDOWN_LANDED_DIR:-$WT} rc=0
+  if [ -n "$TEARDOWN_TRAIN_MEMBER_HEAD" ] && [ "$1" != "$TEARDOWN_TRAIN_MEMBER_HEAD" ]; then
+    fm_task_copy_ancestor "$dir" "$TEARDOWN_TRAIN_MEMBER_HEAD" "$1" || rc=$?
+    case "$rc" in
+      0) ;;
+      1) return 0 ;;
+      *)
+        TEARDOWN_TRAIN_UNASKED="whether ${1:0:12} contains the member head could not be read"
+        return 1
+        ;;
+    esac
+  fi
+  teardown_train_content_present "$1" "$2" "$TEARDOWN_TRAIN_MEMBER_BASE"
 }
 
-# Does the train's landing commit hold <ref>'s net change? The forge names the
-# commit that landed a MERGED train. It must be a 40-hex id on the default branch's
-# first-parent line, and its tree must hold the change as teardown_train_content_present
-# defines it, measured from the member's base, and fm_task_copy_content_delivered must hold
-# as well. A landing id the forge did not give, an object this clone lacks, or a
-# read that failed is 2 (unknown, retry: the forge or the fetched default branch is
-# behind); any other failure is 1 with the fact in TEARDOWN_TRAIN_CARRY_WHY.
+# Does the train's landing commit hold <ref>'s net change? The forge names the commit that
+# landed a MERGED train. It must be a 40-hex id on the default branch's first-parent line, and
+# its tree must hold the change as teardown_train_content_present defines it, measured from the
+# member's recorded base. A landing id the forge did not give, an object this clone lacks, or a
+# read that failed is 2 (unknown, retry: the forge or the fetched default branch is behind); any
+# other failure is 1 with the fact in TEARDOWN_TRAIN_CARRY_WHY.
 # Later default-branch commits do not count against it: only this commit's tree is read.
 teardown_train_landing_holds() {  # <ref> <landing commit>
   local dir=${TEARDOWN_LANDED_DIR:-$WT} ref=$1 landing=$2 default_ref line_commits
@@ -2873,33 +2890,28 @@ teardown_train_landing_holds() {  # <ref> <landing commit>
     TEARDOWN_TRAIN_CARRY_WHY="is not on the first-parent line of the default branch"
     return 1
   fi
-  teardown_train_member_base "$ref" || {
-    [ -z "$TEARDOWN_TRAIN_UNASKED" ] || return 2
-    return 1
-  }
-  teardown_train_content_present "$ref" "$landing" "$TEARDOWN_TRAIN_MEMBER_BASE" || {
+  teardown_train_member_base "$ref" || return 2
+  teardown_train_content_applies "$ref" "$landing" || {
     [ -z "$TEARDOWN_TRAIN_UNASKED" ] || return 2
     TEARDOWN_TRAIN_CARRY_WHY="does not hold the member's net change in its tree"
-    return 1
-  }
-  teardown_train_content_delivered "$ref" "$landing" "does not hold the member's net change in its tree" || {
-    [ -z "$TEARDOWN_TRAIN_UNASKED" ] || return 2
     return 1
   }
 }
 
 teardown_train_landed() {  # work <member pr url or number> | record <member pr url>
   local mode=$1 target=$2 view state remainder mhead murl base found list candidates
-  local n u s b h shas why='' current landing_rc files count lines
+  local n u s b h shas why='' current landing_rc
   local dir=${TEARDOWN_LANDED_DIR:-$WT} ref=${TEARDOWN_LANDED_REF:-HEAD}
   [ "$mode" != record ] || dir=$PROJ
   local TEARDOWN_LANDED_DIR=$dir
   TEARDOWN_TRAIN_UNASKED=
   TEARDOWN_TRAIN_WHY=
+  TEARDOWN_TRAIN_ANCHOR=
+  TEARDOWN_TRAIN_MEMBER_HEAD=
   [ -d "$dir" ] && [ -n "$target" ] || return 1
   # Every caller has already seen the member CLOSED (pr_is_merged, or the
   # record-only caller), so a re-read that fails now is unknown, never unlanded.
-  view=$(cd "$dir" && gh pr view "$target" --json state,headRefOid,url -q '.state + "\t" + .headRefOid + "\t" + .url' 2>/dev/null) || {
+  view=$(cd "$dir" && gh pr view "$target" --json state,headRefOid,url,baseRefOid -q '.state + "\t" + .headRefOid + "\t" + .url + "\t" + .baseRefOid' 2>/dev/null) || {
     TEARDOWN_TRAIN_UNASKED="the member PR $target could not be read again"
     return 1
   }
@@ -2907,36 +2919,14 @@ teardown_train_landed() {  # work <member pr url or number> | record <member pr 
   remainder=${view#*$'\t'}
   [ "$state" = CLOSED ] || return 1
   mhead=${remainder%%$'\t'*}
-  murl=${remainder#*$'\t'}
+  remainder=${remainder#*$'\t'}
+  murl=${remainder%%$'\t'*}
+  TEARDOWN_TRAIN_ANCHOR=${remainder#*$'\t'}
+  [ "$TEARDOWN_TRAIN_ANCHOR" != "$remainder" ] || TEARDOWN_TRAIN_ANCHOR=
+  TEARDOWN_TRAIN_MEMBER_HEAD=$mhead
   fm_pr_head_valid "$mhead" || return 1
   [[ "$murl" =~ ^https://github[.]com/([^/]+/[^/]+)/pull/[0-9]+$ ]] || return 1
   local repo=${BASH_REMATCH[1]}
-  # The member PR's files, as the forge lists them: the paths the member's own work touched.
-  # A list that is not as long as the forge says (a truncated list would weaken the
-  # content proof) is unknown, not an empty one.
-  files=$(cd "$dir" && gh pr view "$target" --json changedFiles,files -q '[.changedFiles] + [.files[].path] | .[]' 2>/dev/null) || {
-    TEARDOWN_TRAIN_UNASKED="the files of the member PR $target could not be read"
-    return 1
-  }
-  count=${files%%$'\n'*}
-  case "$count" in '' | *[!0-9]*)
-    TEARDOWN_TRAIN_UNASKED="the file count of the member PR $target could not be read"
-    return 1
-    ;;
-  esac
-  if [ "$files" = "$count" ]; then
-    files=
-    lines=0
-  else
-    files=${files#*$'\n'}
-    lines=$(printf '%s\n' "$files" | wc -l)
-    lines=${lines// /}
-  fi
-  if [ "$lines" != "$count" ]; then
-    TEARDOWN_TRAIN_UNASKED="the forge lists $count files for the member PR $target but gave $lines"
-    return 1
-  fi
-  TEARDOWN_TRAIN_STRICT=$files
   base=${BASE_BRANCH:-}
   [ -n "$base" ] || base=$(fm_task_copy_default_branch "$PROJ") || {
     TEARDOWN_TRAIN_UNASKED="the base branch of the merge-train check could not be resolved"
@@ -3159,7 +3149,7 @@ work_is_landed() {
 # A pushed branch proves recoverability, not delivery: require the landing
 # proofs documented in this script's header even when every commit is pushed.
 work_is_landed_proof() {
-  local branch=$1 local_only_unasked=''
+  local branch=$1 local_only_unasked='' anchor anchor_unasked=''
   local dir=${TEARDOWN_LANDED_DIR:-$WT} ref=${TEARDOWN_LANDED_REF:-HEAD}
   # Each call reports on its own directory and ref, never on an earlier call's.
   TEARDOWN_UNPROVEN_COMMITS=
@@ -3176,7 +3166,24 @@ work_is_landed_proof() {
     local_only_unasked=$FM_TASK_COPY_UNASKED
   fi
   pr_is_merged "$branch" && return 0
-  fm_task_copy_content_in_default "$dir" "$PROJ" "${BASE_BRANCH:-}" "$ref" && return 0
+  # A task whose recorded PR the forge shows CLOSED has a recorded base for its change: the PR's
+  # base oid. The content-in-default proof measures from it, so no commit graph is trusted. A
+  # base that cannot be read is unknown, never a reason to fall back to the position-based proof.
+  anchor=
+  if [ "$TEARDOWN_PR_SEEN_STATE" = CLOSED ]; then
+    anchor=$(cd "$dir" && gh pr view "$TEARDOWN_PR_SEEN_TARGET" --json baseRefOid -q .baseRefOid 2>/dev/null) || anchor=
+    if ! fm_pr_head_valid "$anchor"; then
+      anchor_unasked="the base commit of $TEARDOWN_PR_SEEN_TARGET could not be read from the forge"
+    elif ! git -C "$dir" cat-file -e "$anchor^{commit}" 2>/dev/null \
+         && { git -C "$dir" fetch --quiet origin "$anchor" >/dev/null 2>&1 || :; ! git -C "$dir" cat-file -e "$anchor^{commit}" 2>/dev/null; }; then
+      anchor_unasked="the base ${anchor:0:12} of $TEARDOWN_PR_SEEN_TARGET could not be fetched"
+    fi
+  fi
+  if [ -z "$anchor_unasked" ]; then
+    fm_task_copy_content_in_default "$dir" "$PROJ" "${BASE_BRANCH:-}" "$ref" '' "$anchor" && return 0
+  else
+    FM_TASK_COPY_UNASKED=$anchor_unasked
+  fi
   [ -z "$local_only_unasked" ] || TEARDOWN_LANDED_UNASKED=${TEARDOWN_LANDED_UNASKED:-$local_only_unasked}
   [ -z "$FM_TASK_COPY_UNASKED" ] || TEARDOWN_LANDED_UNASKED=${TEARDOWN_LANDED_UNASKED:-$FM_TASK_COPY_UNASKED}
   # A closed PR that a merged train landed: the last proof, so it reads the forge only

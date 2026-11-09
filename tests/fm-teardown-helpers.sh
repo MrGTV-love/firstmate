@@ -3348,6 +3348,8 @@ TRAIN_URL=https://github.com/example/repo/pull/9
 TRAIN_MEMBER_HEAD=
 TRAIN_HEAD=
 TRAIN_COPY_HEAD=
+# The member PR's base oid as the forge records it: main's tip when the member was opened.
+TRAIN_BASE_OID=
 
 # setup_train_history <case-dir> <landing: none|squash|merge|ours> <copy: head|prerebase|inside|extra> [train: merge|flat|flat-missing|ours-flat|flat-hidden]
 # Builds the member PR head H (two commits on top of a moved main: feature.txt, then
@@ -3422,6 +3424,7 @@ setup_train_history() {
     git -C "$tmp" checkout -q main
     git -C "$tmp" merge -q -s ours --no-edit hidden >/dev/null
     git -C "$tmp" push -q origin main
+    TRAIN_BASE_OID=$(git -C "$tmp" rev-parse HEAD)
     git -C "$tmp" checkout -q -b member hidden
   elif [ "${TRAIN_HIDDEN_ORDER:-0}" = 1 ] || [ "${TRAIN_HIDDEN_ORDER:-0}" = 2 ]; then
     git -C "$tmp" checkout -q -b hidden
@@ -3445,8 +3448,10 @@ setup_train_history() {
       -p "$TRAIN_HIDDEN_COMMIT" -p HEAD -m "merge that kept the side's tree")
     git -C "$tmp" reset -q --hard "$merge_commit"
     git -C "$tmp" push -q origin main
+    TRAIN_BASE_OID=$(git -C "$tmp" rev-parse HEAD)
     git -C "$tmp" checkout -q -b member "$TRAIN_HIDDEN_COMMIT"
   else
+    TRAIN_BASE_OID=$(git -C "$tmp" rev-parse HEAD)
     git -C "$tmp" checkout -q -b member
   fi
   printf '%s\n' hello > "$tmp/feature.txt"
@@ -3551,8 +3556,8 @@ add_gh_train_fake() {
   printf '%s\n' "$2" > "$fx/member-state"
   printf '%s\n' "$3" > "$fx/member-head"
   printf '[]\n' > "$fx/list.json"
-  printf '%s\n' feature.txt feature2.txt > "$fx/member-files"
-  rm -f "$fx/list.fail" "$fx/calls.log" "$fx/member-view.once" "$fx/member-view.seen" "$fx/member-files.fail" "$fx/member-files.count"
+  printf '%s\n' "${TRAIN_BASE_OID:-}" > "$fx/member-base"
+  rm -f "$fx/list.fail" "$fx/calls.log" "$fx/member-view.once" "$fx/member-view.seen" "$fx/member-base.fail"
   cat > "$case_dir/fakebin/gh" <<SH
 #!/usr/bin/env bash
 fx='$fx'
@@ -3560,15 +3565,19 @@ printf '%s\n' "\$*" >> "\$fx/calls.log"
 case "\${1:-} \${2:-}" in
   "pr view")
     case " \$* " in
-      *"changedFiles,files"*)
-        [ ! -e "\$fx/member-files.fail" ] || { echo "error: forge unavailable" >&2 ; exit 1 ; }
-        if [ -e "\$fx/member-files.count" ]; then cat "\$fx/member-files.count"; else wc -l < "\$fx/member-files" | tr -d ' '; fi
-        cat "\$fx/member-files" ; exit 0 ;;
+      *"--json baseRefOid"*)
+        [ ! -e "\$fx/member-base.fail" ] || { echo "error: forge unavailable" >&2 ; exit 1 ; }
+        cat "\$fx/member-base" ; exit 0 ;;
       *"state,headRefOid,url"*)
         if [ -e "\$fx/member-view.once" ]; then
           [ ! -e "\$fx/member-view.seen" ] || { echo "error: forge unavailable" >&2 ; exit 1 ; }
           : > "\$fx/member-view.seen"
         fi
+        case " \$* " in
+          *"url,baseRefOid"*)
+            if [ -e "\$fx/member-base.fail" ]; then echo "error: forge unavailable" >&2 ; exit 1 ; fi
+            printf '%s\t%s\t%s\t%s\n' "\$(cat "\$fx/member-state")" "\$(cat "\$fx/member-head")" '$TRAIN_MEMBER_URL' "\$(cat "\$fx/member-base")" ; exit 0 ;;
+        esac
         printf '%s\t%s\t%s\n' "\$(cat "\$fx/member-state")" "\$(cat "\$fx/member-head")" '$TRAIN_MEMBER_URL' ; exit 0 ;;
       *"--json state "*) cat "\$fx/member-state" ; exit 0 ;;
     esac ;;

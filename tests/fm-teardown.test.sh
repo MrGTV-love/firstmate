@@ -4173,14 +4173,14 @@ test_default_proof_still_accepts_genuine_landings() {
         # A merge whose conflict a person resolved by hand lies after the copy's base.
         # It differs from git's own merge at the conflicted path, which is the
         # author's to resolve, so it does not make the base untrusted.
-        TRAIN_MAIN_EDIT=1 train_case "default-ok-$row" merge head "" merge
+        TRAIN_MAIN_EDIT=1 TRAIN_MAIN_EDIT_FILE=second.txt train_case "default-ok-$row" merge head "" merge
         printf '[]\n' > "$TRAIN_CASE/gh-fixture/list.json"
         train_conflict_merge_into_main "$TRAIN_CASE"
         git -C "$TRAIN_CASE/wt" cat-file -e origin/main:c.txt 2>/dev/null \
           || fail "default-ok-$row: the default branch lacks the resolved file" ;;
       merge-commit-then-main-edit)
-        # The member's own merge commit holds its change; main edits the file later.
-        TRAIN_MAIN_EDIT=1 train_case "default-ok-$row" merge head "" merge
+        # The member's own merge commit holds its change; main edits another file later.
+        TRAIN_MAIN_EDIT=1 TRAIN_MAIN_EDIT_FILE=second.txt train_case "default-ok-$row" merge head "" merge
         printf '[]\n' > "$TRAIN_CASE/gh-fixture/list.json" ;;
       squash-carrying-hidden)
         # The default branch really took the ours-merged commit's change in as well.
@@ -4427,6 +4427,7 @@ test_train_control_content_proof_still_accepts_a_closed_member() {
     append_pr_meta_url "$case_dir"
     wt_commit_file "$case_dir" feature.txt hello "add feature"
     land_on_origin_main "$case_dir" feature.txt hello
+    train_anchor_root "$case_dir"
     add_gh_train_fake "$case_dir" CLOSED "$(git -C "$case_dir/wt" rev-parse HEAD)"
     [ "$mode" != forge-down ] || : > "$case_dir/gh-fixture/list.fail"
     add_logging_treehouse "$case_dir"
@@ -4445,6 +4446,7 @@ test_train_other_refusals_stay() {
   write_meta "$case_dir" no-mistakes ship
   append_pr_meta_url "$case_dir"
   wt_commit_file "$case_dir" feature.txt hello "add feature"
+  train_anchor_root "$case_dir"
   add_gh_train_fake "$case_dir" CLOSED "$(git -C "$case_dir/wt" rev-parse HEAD)"
   add_logging_treehouse "$case_dir"
   rc=0
@@ -4646,12 +4648,19 @@ SH
 # train_pipeline_input_case <name>: the live d1 B5 r4 shape. The copy is the input
 # of a run that rewrote it and pushed the member head, so no patch of "add a" is in
 # the train, the member is CLOSED, and a merged train lists that pushed head.
+# train_anchor_root <case-dir>: the member PR's recorded base for an ad hoc fixture is the root
+# commit of the case's origin, so the member's whole history is its change.
+train_anchor_root() {
+  TRAIN_BASE_OID=$(git -C "$1/origin.git" rev-list --max-parents=0 main | head -1)
+}
+
 train_pipeline_input_case() {
   local tmp
   TRAIN_CASE=$(make_case "$1")
   write_meta "$TRAIN_CASE" no-mistakes ship
   append_pr_meta_url "$TRAIN_CASE"
   TRAIN_MEMBER_HEAD=$(setup_pipeline_rewritten_history "$TRAIN_CASE" rewritten-input)
+  train_anchor_root "$TRAIN_CASE"
   add_gh_train_fake "$TRAIN_CASE" CLOSED "$TRAIN_MEMBER_HEAD"
   tmp="$TRAIN_CASE/_train"
   git clone -q "$TRAIN_CASE/origin.git" "$tmp"
@@ -4892,48 +4901,53 @@ test_train_member_on_the_default_line_is_accepted_when_the_train_carried_it() {
   pass "a member on the default branch's first-parent line and a later copy of the train head are accepted in the copy and record-only routes"
 }
 
-# Main 2206 F2: a git read that fails, or ends early, is no proof. Each case fails one
-# read of the content proof (the changed-path list, the patch, a version of a path, the
-# history of a path, or the merges between) and the teardown must keep the copy and every
-# record. In the first five rows the train reverted the member's file, so the unfailed read
-# refuses on content alone and only the failed read can change the answer; the last three
-# rows fail a read of a genuine landing, which is accepted without the fault
-# (test_default_proof_still_accepts_genuine_landings).
+# Main 2206 F2: a git read that fails, or ends early, is no proof. Each case fails one read of the
+# content proof (the changed-path list, its mode check, the patch, the throwaway index or the
+# apply) and the teardown must keep the copy and every record. In the first and third rows the train
+# reverted the member's file, so the unfailed read refuses on content alone; in the others a genuine
+# landing (the mode control, the shared file) is accepted without the fault, so only the failed read
+# can change the answer.
 # FAULT_ROWS names the rows to run (default all), so one row can be run alone.
 test_a_failed_or_short_git_read_never_proves_content() {
   local row
-  for row in ${FAULT_ROWS:-default-empty copy-short copy-patch-partial record-short record-patch-partial content-log content-entry content-merges}; do
+  for row in ${FAULT_ROWS:-default-empty copy-short copy-patch-partial record-short record-patch-partial mode-entry apply-fault read-tree-fault}; do
     case "$row" in
       default-empty)
         TRAIN_REVERT_MEMBER=1 default_proof_case "git-fault-$row" merge head merge
-        add_git_read_fault "$TRAIN_CASE" "diff --name-only -z --no-renames" none ;;
+        add_git_read_fault "$TRAIN_CASE" "diff --raw -z --no-renames" none ;;
       copy-short)
         TRAIN_REVERT_MEMBER=1 TRAIN_MAIN_EDIT=0 train_case "git-fault-$row" squash head "" merge
-        add_git_read_fault "$TRAIN_CASE" "diff --name-only -z --no-renames" 'text:feature2.txt\0' ;;
+        add_git_read_fault "$TRAIN_CASE" "diff --raw -z --no-renames" 'text::100644 100644 0000000000000000000000000000000000000000 1111111111111111111111111111111111111111 M\0feature2.txt\0' ;;
       copy-patch-partial)
-        TRAIN_REVERT_MEMBER=1 TRAIN_MAIN_EDIT=0 train_case "git-fault-$row" squash head "" merge
+        TRAIN_SHARED_APPEND=1 train_case "git-fault-$row" squash head "" merge
         add_git_read_fault "$TRAIN_CASE" "diff --binary --full-index" lastpatch ;;
       record-short)
         TRAIN_REVERT_MEMBER=1 TRAIN_MAIN_EDIT=0 train_absent_case "git-fault-$row" merge squash
-        add_git_read_fault "$TRAIN_CASE" "diff --name-only -z --no-renames" 'text:feature2.txt\0' ;;
+        add_git_read_fault "$TRAIN_CASE" "diff --raw -z --no-renames" 'text::100644 100644 0000000000000000000000000000000000000000 1111111111111111111111111111111111111111 M\0feature2.txt\0' ;;
       record-patch-partial)
-        TRAIN_REVERT_MEMBER=1 TRAIN_MAIN_EDIT=0 train_absent_case "git-fault-$row" merge squash
+        TRAIN_SHARED_APPEND=1 train_absent_case "git-fault-$row" merge squash
         add_git_read_fault "$TRAIN_CASE" "diff --binary --full-index" lastpatch ;;
-      content-log | content-entry | content-merges)
-        TRAIN_MAIN_EDIT=1 train_case "git-fault-$row" merge head "" merge
-        printf '[]\n' > "$TRAIN_CASE/gh-fixture/list.json"
-        case "$row" in
-          content-log) add_git_read_fault "$TRAIN_CASE" "log --format=%H" none ;;
-          content-entry) add_git_read_fault "$TRAIN_CASE" "cat-file --batch-check" none ;;
-          content-merges) add_git_read_fault "$TRAIN_CASE" "rev-list --merges --ancestry-path" none ;;
-        esac ;;
+      mode-entry)
+        BW_MODE_KEPT=1 BW_LATER_EDIT=1 bespoke_world "git-fault-$row-control" bw_steps_mode_only
+        run_teardown "$TRAIN_CASE" > "$TRAIN_CASE/stdout" 2> "$TRAIN_CASE/stderr" \
+          || fail "git-fault-$row: the control (mode kept, content edited later) was refused: $(cat "$TRAIN_CASE/stderr")"
+        BW_MODE_KEPT=1 BW_LATER_EDIT=1 bespoke_world "git-fault-$row" bw_steps_mode_only
+        BW_MODE_KEPT=0 BW_LATER_EDIT=0
+        add_git_read_fault "$TRAIN_CASE" "ls-tree -z" none ;;
+      apply-fault)
+        TRAIN_SHARED_APPEND=1 train_case "git-fault-$row" squash head "" merge
+        add_git_read_fault "$TRAIN_CASE" "apply --cached -R --check" none ;;
+      read-tree-fault)
+        TRAIN_SHARED_APPEND=1 train_case "git-fault-$row" squash head "" merge
+        add_git_read_fault "$TRAIN_CASE" "read-tree" none ;;
     esac
     assert_default_proof_refused "$TRAIN_CASE" "git-fault-$row"
     [ -s "$TRAIN_CASE/fault.hits" ] || fail "git-fault-$row: the injected read never ran"
     assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "git-fault-$row: the train was accepted"
   done
   TRAIN_REVERT_MEMBER=0
-  pass "a changed-path list, a patch, a version, a path history or a merge list read that fails or ends early never proves content, in the default proof, the copy route and the record-only route"
+  TRAIN_SHARED_APPEND=0
+  pass "a changed-path list, a mode check, a patch, an index or an apply that fails or ends early never proves content, in the default proof, the copy route and the record-only route"
 }
 
 # A landing the forge names that is a plain commit (no merge for the audit to read) holds
@@ -5030,22 +5044,6 @@ test_train_listing_with_a_longer_hex_token_is_not_a_listing() {
   pass "a 41-character hex token after the member URL is not a listing, in the copy and record-only routes"
 }
 
-# The member's file list is read from the forge and must be complete: a count that the
-# list does not match is unknown, never an empty list.
-test_train_member_file_list_that_is_short_or_unread_is_unknown() {
-  local row
-  for row in short unread; do
-    train_case "files-$row" squash head "" merge
-    case "$row" in
-      short) printf '%s\n' 5 > "$TRAIN_CASE/gh-fixture/member-files.count" ;;
-      unread) : > "$TRAIN_CASE/gh-fixture/member-files.fail" ;;
-    esac
-    assert_train_refused "$TRAIN_CASE" "files-$row" "unknown, retry" unknown
-    assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "files-$row: the train was accepted"
-  done
-  pass "a member file list that is shorter than the forge's count, or unreadable, is unknown and keeps the copy"
-}
-
 # Main 2306 F3: the patch id of a commit whose read failed is no patch id. One copy commit
 # adds two files; the PR head replays them as two commits. A read of the copy's commit that
 # fails after the first file's patch must not match the first replayed commit.
@@ -5113,6 +5111,375 @@ test_train_accepts_a_file_other_members_appended_to() {
     || fail "shared-append-record: a carried member was refused: $(cat "$TRAIN_CASE/stderr")"
   assert_absent "$TRAIN_CASE/state/task-x1.meta" "shared-append-record: accepted teardown left the task record"
   pass "a member whose train holds a file with other members' lines added is accepted, in the copy and record-only routes"
+}
+
+# bespoke_world <name> <steps function> [<copy>]: a closed-member, merged-train task whose git
+# history a steps function builds in a scratch clone of the case's origin. The function gets the
+# clone's path and must leave main, the member branch and the train branch pushed, and set:
+#   BW_BASE     the member PR's base oid as the forge records it
+#   BW_MEMBER   the member head (pushed as refs/pull/7/head)
+#   BW_TRAIN    the train head (pushed as refs/pull/9/head)
+#   BW_LANDING  the commit the forge names as the train's landing
+# The copy is reset to BW_MEMBER, or to BW_COPY when the function sets it. Sets TRAIN_CASE.
+bespoke_world() {
+  local name=$1 steps=$2 tmp init
+  train_case "$name" none head "" merge
+  printf '[]\n' > "$TRAIN_CASE/gh-fixture/list.json"
+  tmp="$TRAIN_CASE/_bw"
+  git clone -q "$TRAIN_CASE/origin.git" "$tmp"
+  git -C "$tmp" config user.email t@t
+  git -C "$tmp" config user.name t
+  init=$(git -C "$tmp" rev-list --max-parents=0 origin/main | head -1)
+  git -C "$tmp" checkout -q -B main "$init"
+  git -C "$tmp" push -q -f origin main
+  git -C "$tmp" push -q origin :refs/pull/7/head :refs/pull/9/head 2>/dev/null || :
+  BW_COPY=
+  "$steps" "$tmp"
+  rm -rf "$tmp"
+  git -C "$TRAIN_CASE/project" fetch -q origin
+  git -C "$TRAIN_CASE/wt" fetch -q origin refs/pull/7/head
+  git -C "$TRAIN_CASE/wt" fetch -q origin refs/pull/9/head 2>/dev/null || :
+  git -C "$TRAIN_CASE/wt" reset -q --hard "${BW_COPY:-$BW_MEMBER}"
+  TRAIN_MEMBER_HEAD=$BW_MEMBER
+  TRAIN_HEAD=$BW_TRAIN
+  TRAIN_COPY_HEAD=$(git -C "$TRAIN_CASE/wt" rev-parse HEAD)
+  TRAIN_BASE_OID=$BW_BASE
+  TRAIN_LANDING_COMMIT=${BW_LANDING:-}
+  add_gh_train_fake "$TRAIN_CASE" CLOSED "$TRAIN_MEMBER_HEAD"
+  train_default_list "$TRAIN_CASE"
+  add_logging_treehouse "$TRAIN_CASE"
+}
+
+# bw_commit_file <clone> <path> <content> <message>: commit one file.
+bw_commit_file() {
+  printf '%s\n' "$3" > "$1/$2"
+  git -C "$1" add -- "$2"
+  git -C "$1" commit -q -m "$4"
+}
+
+# Main 2415 F1: a merge that resolved the conflict of H and D to a third, unrelated version.
+# H is the clean member (its own text), D changed the same file another way, M has H first and
+# D second with a third tree, and the default branch was fast-forwarded from D to M.
+bw_steps_third_version() {  # <clone>
+  local t=$1 tree d h m
+  bw_commit_file "$t" f.txt "baseline only" "baseline"
+  git -C "$t" push -q origin main
+  BW_BASE=$(git -C "$t" rev-parse HEAD)
+  git -C "$t" checkout -q -b member
+  bw_commit_file "$t" f.txt "MEMBER ONLY, never landed" "member change"
+  h=$(git -C "$t" rev-parse HEAD)
+  git -C "$t" push -q origin "HEAD:refs/pull/7/head"
+  git -C "$t" checkout -q main
+  bw_commit_file "$t" f.txt "default side only" "default side"
+  d=$(git -C "$t" rev-parse HEAD)
+  git -C "$t" push -q origin main
+  if [ "${BW_THIRD_CARRIES:-0}" = 1 ]; then
+    printf '%s\n' "MEMBER ONLY, never landed" > "$t/f.txt"
+  else
+    printf '%s\n' "third unrelated resolution" > "$t/f.txt"
+  fi
+  git -C "$t" add -- f.txt
+  tree=$(git -C "$t" write-tree)
+  m=$(git -C "$t" commit-tree "$tree" -p "$h" -p "$d" -m "resolve f.txt")
+  git -C "$t" reset -q --hard "$m"
+  git -C "$t" push -q origin main
+  BW_MEMBER=$h
+  BW_TRAIN=$m
+  BW_LANDING=
+}
+
+test_default_proof_refuses_a_third_version_conflict_resolution() {
+  local control
+  for control in 0 1; do
+    BW_THIRD_CARRIES=$control bespoke_world "third-version-$control" bw_steps_third_version
+    if [ "$control" = 0 ]; then
+      [ "$(git -C "$TRAIN_CASE/wt" show origin/main:f.txt)" = "third unrelated resolution" ] || fail "third-version: main lacks the third version"
+      assert_default_proof_refused "$TRAIN_CASE" third-version-refused
+    else
+      [ "$(git -C "$TRAIN_CASE/wt" show origin/main:f.txt)" = "MEMBER ONLY, never landed" ] || fail "third-version control: main lacks the member's text"
+      run_teardown "$TRAIN_CASE" > "$TRAIN_CASE/stdout" 2> "$TRAIN_CASE/stderr" \
+        || fail "third-version control: a merge that carried the member's text was refused: $(cat "$TRAIN_CASE/stderr")"
+    fi
+  done
+  BW_THIRD_CARRIES=0
+  pass "a conflict resolved to a third version is refused by the default proof, and the same merge carrying the member's text is accepted"
+}
+
+# Main 2415 F2: the member changes only the executable bit; a merge keeps the other side's mode.
+bw_steps_mode_only() {  # <clone>
+  local t=$1 h d m tree
+  bw_commit_file "$t" job.sh "echo job" "baseline"
+  git -C "$t" push -q origin main
+  BW_BASE=$(git -C "$t" rev-parse HEAD)
+  git -C "$t" checkout -q -b member
+  chmod +x "$t/job.sh"
+  git -C "$t" add -- job.sh
+  git -C "$t" commit -q -m "make job.sh executable"
+  h=$(git -C "$t" rev-parse HEAD)
+  git -C "$t" push -q origin "HEAD:refs/pull/7/head"
+  git -C "$t" checkout -q main
+  bw_commit_file "$t" other.txt "other" "default side"
+  d=$(git -C "$t" rev-parse HEAD)
+  git -C "$t" push -q origin main
+  if [ "${BW_MODE_KEPT:-0}" = 1 ]; then
+    chmod +x "$t/job.sh"
+    git -C "$t" add -- job.sh
+    git -C "$t" commit -q -m "default also makes job.sh executable"
+    d=$(git -C "$t" rev-parse HEAD)
+    git -C "$t" push -q origin main
+  fi
+  tree=$(git -C "$t" rev-parse "$d^{tree}")
+  m=$(git -C "$t" commit-tree "$tree" -p "$h" -p "$d" -m "merge that kept the default side's tree")
+  git -C "$t" reset -q --hard "$m"
+  git -C "$t" push -q origin main
+  if [ "${BW_LATER_EDIT:-0}" = 1 ]; then
+    # main then edits the file's content, so the paths no longer compare equal
+    printf '%s\n' "echo more" >> "$t/job.sh"
+    git -C "$t" add -- job.sh
+    git -C "$t" commit -q -m "edit job.sh"
+    git -C "$t" push -q origin main
+  fi
+  BW_MEMBER=$h
+  BW_TRAIN=$m
+  BW_LANDING=
+}
+
+test_default_proof_refuses_work_whose_only_change_is_a_file_mode() {
+  local control
+  for control in 0 1; do
+    BW_MODE_KEPT=$control bespoke_world "mode-only-$control" bw_steps_mode_only
+    [ "$(git -C "$TRAIN_CASE/wt" ls-tree "$TRAIN_MEMBER_HEAD" job.sh | cut -c1-6)" = 100755 ] || fail "mode-only: the member is not executable"
+    if [ "$control" = 0 ]; then
+      [ "$(git -C "$TRAIN_CASE/wt" ls-tree origin/main job.sh | cut -c1-6)" = 100644 ] || fail "mode-only: main is executable"
+      assert_default_proof_refused "$TRAIN_CASE" mode-only-refused
+    else
+      [ "$(git -C "$TRAIN_CASE/wt" ls-tree origin/main job.sh | cut -c1-6)" = 100755 ] || fail "mode-only control: main is not executable"
+      run_teardown "$TRAIN_CASE" > "$TRAIN_CASE/stdout" 2> "$TRAIN_CASE/stderr" \
+        || fail "mode-only control: a mode that was kept was refused: $(cat "$TRAIN_CASE/stderr")"
+    fi
+  done
+  BW_MODE_KEPT=0
+  pass "a change of only the executable bit that the default branch did not keep is refused, and the same change kept is accepted"
+}
+
+# Main 2415 F3: the member deletes obsolete.txt; the train (and the landing) restores it.
+bw_steps_restored_deletion() {  # <clone>
+  local t=$1 h tr
+  bw_commit_file "$t" obsolete.txt "obsolete" "baseline"
+  git -C "$t" push -q origin main
+  BW_BASE=$(git -C "$t" rev-parse HEAD)
+  git -C "$t" checkout -q -b member
+  git -C "$t" rm -q -- obsolete.txt
+  git -C "$t" commit -q -m "delete obsolete.txt"
+  h=$(git -C "$t" rev-parse HEAD)
+  git -C "$t" push -q origin "HEAD:refs/pull/7/head"
+  # the member head is on the default branch's first-parent line before the train starts
+  git -C "$t" checkout -q main
+  git -C "$t" merge -q --ff-only member
+  git -C "$t" push -q origin main
+  git -C "$t" checkout -q -b train
+  if [ "${BW_DELETION_CARRIED:-0}" != 1 ]; then
+    bw_commit_file "$t" obsolete.txt "obsolete" "restore obsolete.txt"
+  fi
+  bw_commit_file "$t" second.txt "second" "second member work"
+  tr=$(git -C "$t" rev-parse HEAD)
+  git -C "$t" push -q origin "HEAD:refs/pull/9/head"
+  git -C "$t" checkout -q main
+  git -C "$t" merge -q --squash train >/dev/null
+  git -C "$t" commit -q -m "train squash (#9)"
+  git -C "$t" push -q origin main
+  BW_MEMBER=$h
+  BW_TRAIN=$tr
+  BW_LANDING=$(git -C "$t" rev-parse HEAD)
+}
+
+test_train_that_restored_a_deleted_file_is_refused() {
+  local control
+  for control in 0 1; do
+    BW_DELETION_CARRIED=$control bespoke_world "restored-deletion-$control" bw_steps_restored_deletion
+    train_default_list "$TRAIN_CASE"
+    if [ "$control" = 0 ]; then
+      git -C "$TRAIN_CASE/wt" cat-file -e "$TRAIN_HEAD:obsolete.txt" 2>/dev/null || fail "restored-deletion: the train does not hold the file"
+      assert_train_refused "$TRAIN_CASE" restored-deletion-copy "net change is not present in the train head's final tree"
+      assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "restored-deletion-copy: the train was accepted"
+      BW_DELETION_CARRIED=0 bespoke_world "restored-deletion-record" bw_steps_restored_deletion
+      write_windowless_legacy_meta "$TRAIN_CASE" no-mistakes ship "$TRAIN_CASE/missing-wt"
+      append_pr_meta_url "$TRAIN_CASE"
+      seed_backlog_in_flight "$TRAIN_CASE"
+      assert_train_refused "$TRAIN_CASE" restored-deletion-record "net change is not present in the train head's final tree"
+      [ "$(backlog_row_state "$TRAIN_CASE")" = in_flight ] || fail "restored-deletion-record: refusal closed the backlog"
+    else
+      git -C "$TRAIN_CASE/wt" cat-file -e "$TRAIN_HEAD:obsolete.txt" 2>/dev/null && fail "carried deletion: the train holds the file"
+      run_teardown "$TRAIN_CASE" > "$TRAIN_CASE/stdout" 2> "$TRAIN_CASE/stderr" \
+        || fail "carried deletion: a train that kept the deletion was refused: $(cat "$TRAIN_CASE/stderr")"
+    fi
+  done
+  BW_DELETION_CARRIED=0
+  pass "a train that restored a file the member deleted is refused in the copy and record-only routes, and a train that kept the deletion is accepted"
+}
+
+# Main 2415 F5: a verified train that also changes 1,501 unrelated files is a valid train.
+bw_steps_many_unrelated() {  # <clone>
+  local t=$1 h tr i
+  bw_commit_file "$t" feature.txt "hello" "baseline"
+  git -C "$t" push -q origin main
+  BW_BASE=$(git -C "$t" rev-parse HEAD)
+  git -C "$t" checkout -q -b member
+  bw_commit_file "$t" feature.txt "hello member" "member change"
+  h=$(git -C "$t" rev-parse HEAD)
+  git -C "$t" push -q origin "HEAD:refs/pull/7/head"
+  git -C "$t" checkout -q -b train
+  mkdir -p "$t/other"
+  for ((i = 0; i < ${BW_UNRELATED:-1501}; i++)); do printf '%s\n' "$i" > "$t/other/f$i.txt"; done
+  git -C "$t" add -- other
+  git -C "$t" commit -q -m "other members' files"
+  tr=$(git -C "$t" rev-parse HEAD)
+  git -C "$t" push -q origin "HEAD:refs/pull/9/head"
+  git -C "$t" checkout -q main
+  git -C "$t" merge -q --squash train >/dev/null
+  git -C "$t" commit -q -m "train squash (#9)"
+  BW_LANDING=$(git -C "$t" rev-parse HEAD)
+  git -C "$t" push -q origin main
+  # a later default merge edits the member's file, so only the train route can decide the copy
+  git -C "$t" checkout -q -b later "$BW_BASE"
+  bw_commit_file "$t" later.txt "later" "later branch"
+  git -C "$t" checkout -q main
+  git -C "$t" merge -q --no-commit --no-ff later >/dev/null
+  printf '%s\n' "hello member, edited later" > "$t/feature.txt"
+  git -C "$t" add -- feature.txt
+  git -C "$t" commit -q -m "merge later, editing feature.txt"
+  git -C "$t" push -q origin main
+  BW_MEMBER=$h
+  BW_TRAIN=$tr
+}
+
+test_train_with_many_unrelated_paths_still_accepts_its_member() {
+  local count
+  for count in 3 1501; do
+    BW_UNRELATED=$count bespoke_world "unrelated-$count" bw_steps_many_unrelated
+    train_default_list "$TRAIN_CASE"
+    assert_train_allowed "$TRAIN_CASE" "unrelated-$count-copy"
+    BW_UNRELATED=$count bespoke_world "unrelated-record-$count" bw_steps_many_unrelated
+    train_default_list "$TRAIN_CASE"
+    write_windowless_legacy_meta "$TRAIN_CASE" no-mistakes ship "$TRAIN_CASE/missing-wt"
+    append_pr_meta_url "$TRAIN_CASE"
+    seed_backlog_in_flight "$TRAIN_CASE"
+    run_teardown "$TRAIN_CASE" > "$TRAIN_CASE/stdout" 2> "$TRAIN_CASE/stderr" \
+      || fail "unrelated-record-$count: a valid train was refused: $(cat "$TRAIN_CASE/stderr")"
+  done
+  BW_UNRELATED=1501
+  pass "a verified train that changes 1,501 unrelated paths still accepts its member, in the copy and record-only routes"
+}
+
+# Main 2415 F4: a failed read of a train patch is unknown, whichever train commit it is. X is an
+# unrelated newer train commit; the member's own patch is replayed by another train commit.
+bw_steps_replayed_patch() {  # <clone>
+  local t=$1 h tr
+  bw_commit_file "$t" feature.txt "hello" "baseline"
+  git -C "$t" push -q origin main
+  BW_BASE=$(git -C "$t" rev-parse HEAD)
+  git -C "$t" checkout -q -b member
+  if [ "${BW_TWO_FILES_ONE_COMMIT:-0}" = 1 ]; then
+    printf '%s\n' one > "$t/a.txt"
+    printf '%s\n' two > "$t/b.txt"
+    git -C "$t" add -- a.txt b.txt
+    git -C "$t" commit -q -m "add a and b"
+  else
+    bw_commit_file "$t" a.txt one "add a"
+  fi
+  h=$(git -C "$t" rev-parse HEAD)
+  git -C "$t" push -q origin "HEAD:refs/pull/7/head"
+  git -C "$t" checkout -q -b train "$BW_BASE"
+  if [ "${BW_TWO_FILES_ONE_COMMIT:-0}" = 1 ]; then
+    bw_commit_file "$t" a.txt one "add a"
+    bw_commit_file "$t" b.txt two "add b"
+  else
+    GIT_COMMITTER_DATE="2030-01-01T00:00:00Z" git -C "$t" cherry-pick "$h" >/dev/null
+  fi
+  bw_commit_file "$t" x.txt unrelated "unrelated newer commit"
+  tr=$(git -C "$t" rev-parse HEAD)
+  git -C "$t" push -q origin "HEAD:refs/pull/9/head"
+  git -C "$t" checkout -q main
+  git -C "$t" merge -q --squash train >/dev/null
+  git -C "$t" commit -q -m "train squash (#9)"
+  BW_LANDING=$(git -C "$t" rev-parse HEAD)
+  git -C "$t" push -q origin main
+  # main edits the member's file afterwards, so only the train route can decide the copy
+  bw_commit_file "$t" a.txt "one, edited later" "main edits a.txt"
+  git -C "$t" push -q origin main
+  BW_MEMBER=$h
+  BW_TRAIN=$tr
+  BW_X=$tr
+}
+
+test_a_failed_train_patch_read_is_unknown_in_every_route() {
+  local row mode shape
+  for shape in 0 1; do
+    for row in plain fault-unrelated; do
+      for mode in copy record; do
+        BW_TWO_FILES_ONE_COMMIT=$shape bespoke_world "patch-$shape-$row-$mode" bw_steps_replayed_patch
+        train_default_list "$TRAIN_CASE"
+        if [ "$mode" = record ]; then
+          write_windowless_legacy_meta "$TRAIN_CASE" no-mistakes ship "$TRAIN_CASE/missing-wt"
+          append_pr_meta_url "$TRAIN_CASE"
+          seed_backlog_in_flight "$TRAIN_CASE"
+        fi
+        if [ "$row" = plain ]; then
+          # one-commit-two-files member against a train that split it: no single train commit has
+          # the member's patch, so the patch proof cannot hold and the work is refused for content
+          if [ "$shape" = 1 ]; then
+            assert_train_refused "$TRAIN_CASE" "patch-$shape-$row-$mode" "neither contains it nor carries every commit of it"
+          else
+            run_teardown "$TRAIN_CASE" > "$TRAIN_CASE/stdout" 2> "$TRAIN_CASE/stderr" \
+              || fail "patch-$shape-$row-$mode: a replayed member was refused: $(cat "$TRAIN_CASE/stderr")"
+          fi
+        else
+          if [ "$shape" = 0 ]; then
+            add_git_read_fault "$TRAIN_CASE" "show --pretty=medium --no-ext-diff $BW_X" none
+          else
+            add_git_read_fault "$TRAIN_CASE" "show --pretty=medium --no-ext-diff $TRAIN_MEMBER_HEAD" firstpatch
+          fi
+          assert_train_refused "$TRAIN_CASE" "patch-$shape-$row-$mode" "unknown, retry" unknown
+          assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "patch-$shape-$row-$mode: the train was accepted"
+          [ -s "$TRAIN_CASE/fault.hits" ] || fail "patch-$shape-$row-$mode: the injected read never ran"
+        fi
+      done
+    done
+  done
+  BW_TWO_FILES_ONE_COMMIT=0
+  pass "a failed read of a train patch is unknown in the copy and record-only routes, for a read of an unrelated train commit and for a read of the member"
+}
+
+# Main 2415 (extra concern): the forge's base for the member must be readable and present. A
+# failed read is unknown, never a reason to prove the work by position.
+test_an_unreadable_member_base_is_unknown_in_every_proof() {
+  local row
+  for row in forge-fails object-missing; do
+    TRAIN_MAIN_EDIT=1 train_case "base-$row" squash head "" merge
+    case "$row" in
+      forge-fails) : > "$TRAIN_CASE/gh-fixture/member-base.fail" ;;
+      object-missing) printf '%s\n' dddddddddddddddddddddddddddddddddddddddd > "$TRAIN_CASE/gh-fixture/member-base" ;;
+    esac
+    assert_train_refused "$TRAIN_CASE" "base-$row" "REFUSED"
+    assert_grep "unknown, retry" "$TRAIN_CASE/stderr" "base-$row: refusal did not say the proof is unknown"$'\n'"$(cat "$TRAIN_CASE/stderr")"$'\n'"$(cat "$TRAIN_CASE/gh-fixture/calls.log")"
+    assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "base-$row: the train was accepted"
+  done
+  pass "a member base that the forge cannot give, or that is not in the clone, makes the proof unknown and keeps the copy"
+}
+
+# A trade-off, recorded as a test so it cannot change unseen: a copy of a CLOSED member PR whose
+# commits are reachable from the default branch through a merge commit, with no train listed, is
+# measured from the forge's base against the default branch's tip. If main later edited the very
+# lines of the copy's change, that change is no longer present in the tip and the proof refuses,
+# because without a recorded landing commit no graph position may be trusted to say where it landed.
+# The copy is kept (fail closed); a verified train or a merged PR names its landing and is judged there.
+test_default_proof_refuses_a_closed_copy_whose_lines_main_edited_later() {
+  TRAIN_MAIN_EDIT=1 train_case later-same-lines merge head "" merge
+  printf '[]\n' > "$TRAIN_CASE/gh-fixture/list.json"
+  git -C "$TRAIN_CASE/wt" merge-base --is-ancestor "$TRAIN_COPY_HEAD" origin/main \
+    || fail "later-same-lines: the copy is not reachable from the default branch"
+  assert_default_proof_refused "$TRAIN_CASE" later-same-lines
+  pass "a CLOSED member's reachable copy whose changed lines main edited later is refused by the default proof, and kept"
 }
 
 teardown_test_cases=(
@@ -5191,8 +5558,14 @@ test_a_failed_or_short_git_read_never_proves_content
 test_train_member_carried_by_the_landing_is_accepted_after_a_later_default_merge
 test_train_that_reverted_a_first_parent_member_is_refused
 test_train_listing_with_a_longer_hex_token_is_not_a_listing
-test_train_member_file_list_that_is_short_or_unread_is_unknown
 test_a_failed_patch_read_never_proves_a_replayed_patch
+test_default_proof_refuses_a_third_version_conflict_resolution
+test_default_proof_refuses_a_closed_copy_whose_lines_main_edited_later
+test_default_proof_refuses_work_whose_only_change_is_a_file_mode
+test_train_that_restored_a_deleted_file_is_refused
+test_train_with_many_unrelated_paths_still_accepts_its_member
+test_a_failed_train_patch_read_is_unknown_in_every_route
+test_an_unreadable_member_base_is_unknown_in_every_proof
 test_default_proof_refuses_a_copy_that_restores_an_older_version
 test_train_accepts_a_file_other_members_appended_to
 test_train_landing_commit_that_is_a_plain_commit_without_the_change_is_refused
