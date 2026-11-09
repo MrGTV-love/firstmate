@@ -234,6 +234,66 @@ fm_task_copy_net_change_present_in() {  # <scratch> <dir> <ref> <target> <base>
   case "$rc" in 0) return 0 ;; 1) return 1 ;; *) return 3 ;; esac
 }
 
+# Is every merge between <base> and <tip> EXACTLY what git itself makes of its two parents?
+# A merge that dropped a side's change (an `ours` merge, a merge that took one side's tree
+# whichever parent comes first, or a conflict resolved to either side or to a third version)
+# makes the commits it merged reachable without their content, so a copy that stands on such a
+# commit cannot be measured from it. The rule has no escape: a merge counts only when
+# `git merge-tree --write-tree p1 p2` is clean and its tree IS the merge's tree; a conflict, an
+# octopus merge or any other tree refuses. Ancestry is never read as content. 0 when every merge
+# is exact (or there is none). 1 with the fact in FM_TASK_COPY_WHY. 2 when a read failed, with
+# the fact in FM_TASK_COPY_UNASKED. No count limit: a long path is slow, not refused.
+fm_task_copy_merges_exact() {  # <dir> <base> <tip>
+  local scratch rc
+  scratch=$(mktemp -d "${TMPDIR:-/tmp}/fm-task-copy.XXXXXX") || {
+    FM_TASK_COPY_UNASKED='a scratch directory for the merge check could not be made'
+    return 2
+  }
+  fm_task_copy_merges_exact_in "$scratch" "$@"
+  rc=$?
+  rm -rf "$scratch"
+  return "$rc"
+}
+
+fm_task_copy_merges_exact_in() {  # <scratch> <dir> <base> <tip>
+  local scratch=$1 dir=$2 base=$3 tip=$4 commit p1 p2 rest merged merge_rc tree
+  FM_TASK_COPY_WHY=
+  fm_task_copy_read "$dir" "$scratch/merges" rev-list --merges --ancestry-path --parents "$base..$tip" -- || {
+    FM_TASK_COPY_UNASKED="the merges between ${base:0:12} and ${tip:0:12} could not be listed"
+    return 2
+  }
+  [ -s "$scratch/merges" ] || return 0
+  while IFS=' ' read -r commit p1 p2 rest; do
+    [ -n "$commit" ] || continue
+    if [ -z "$p2" ] || [ -n "$rest" ]; then
+      FM_TASK_COPY_WHY="the merge ${commit:0:12} is an octopus merge (or has no second parent), which is not read"
+      return 1
+    fi
+    merge_rc=0
+    merged=$(git -C "$dir" merge-tree --write-tree "$p1" "$p2" 2>/dev/null) || merge_rc=$?
+    case "$merge_rc" in
+      0) ;;
+      1)
+        FM_TASK_COPY_WHY="the merge ${commit:0:12} resolved a conflict, so a side's change may have been dropped"
+        return 1
+        ;;
+      *)
+        FM_TASK_COPY_UNASKED="git could not merge the parents of ${commit:0:12}"
+        return 2
+        ;;
+    esac
+    tree=$(git -C "$dir" rev-parse --verify --quiet "$commit^{tree}" 2>/dev/null) || {
+      FM_TASK_COPY_UNASKED="the tree of ${commit:0:12} could not be read"
+      return 2
+    }
+    if [ "${merged%%$'\n'*}" != "$tree" ]; then
+      FM_TASK_COPY_WHY="the merge ${commit:0:12} is not what git makes of its parents (a side's change was dropped, or the merge added an edit of its own)"
+      return 1
+    fi
+  done < "$scratch/merges"
+  return 0
+}
+
 # The first-parent line of <default-ref>, newest first, one commit per line in <out>.
 fm_task_copy_line() {  # <dir> <default-ref> <out>
   fm_task_copy_read "$1" "$3" rev-list --first-parent "$2" -- && [ -s "$3" ]

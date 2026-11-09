@@ -5549,6 +5549,110 @@ test_a_prerebase_copy_whose_reverted_work_the_train_lacks_is_refused() {
   pass "a pre-rebase copy whose work the train replayed and then reverted is refused by content, and the same copy whose work the train kept is accepted"
 }
 
+# Main 2662 F1: a pre-rebase copy that stands on a commit the default branch reaches only through
+# a merge that dropped it. The copy is clean at K (hidden.txt); the member head H sits on the merge M
+# that took K in without its content; the train merges H and adds second.txt; a squash landing L.
+# BW_PRE_HOW picks how M dropped K: ours (an `ours` merge), order (K is the first parent and the
+# tree is D's), conflict (K and D add hidden.txt differently and the merge keeps D's), honest (a
+# clean merge that keeps K's content, so K's content is on the default branch).
+bw_steps_prerebase_on_dropped_commit() {  # <clone>
+  local t=$1 k c d m tree h tr
+  bw_commit_file "$t" base.txt base "baseline"
+  git -C "$t" push -q origin main
+  git -C "$t" checkout -q -b hidden
+  bw_commit_file "$t" hidden.txt hidden "K adds hidden"
+  k=$(git -C "$t" rev-parse HEAD)
+  if [ "${BW_PRE_OWN:-0}" = 1 ]; then
+    bw_commit_file "$t" a.txt one "O1 adds a, on K"
+    c=$(git -C "$t" rev-parse HEAD)
+  else
+    c=$k
+  fi
+  git -C "$t" push -q origin "HEAD:refs/heads/hidden-k"
+  git -C "$t" checkout -q main
+  case "${BW_PRE_HOW:-ours}" in
+    ours)
+      git -C "$t" merge -q -s ours --no-edit "$k" >/dev/null ;;
+    order | conflict)
+      if [ "${BW_PRE_HOW}" = conflict ]; then
+        bw_commit_file "$t" hidden.txt different-side "D adds hidden differently"
+      else
+        bw_commit_file "$t" side.txt side "D adds side"
+      fi
+      d=$(git -C "$t" rev-parse HEAD)
+      git -C "$t" push -q origin main
+      tree=$(git -C "$t" rev-parse "$d^{tree}")
+      m=$(git -C "$t" commit-tree "$tree" -p "$k" -p "$d" -m "merge that kept the side's tree")
+      git -C "$t" reset -q --hard "$m" ;;
+    honest)
+      bw_commit_file "$t" side.txt side "D adds side"
+      git -C "$t" merge -q --no-ff --no-edit "$k" >/dev/null ;;
+  esac
+  # the recorded head replays the copy's own work (if any) on the default branch's tip
+  git -C "$t" push -q origin main
+  BW_BASE=$(git -C "$t" rev-parse HEAD)
+  git -C "$t" checkout -q -b member
+  if [ "${BW_PRE_OWN:-0}" = 1 ]; then
+    bw_commit_file "$t" a.txt one "O1 adds a, replayed"
+  fi
+  bw_commit_file "$t" feature.txt feature "member adds feature"
+  h=$(git -C "$t" rev-parse HEAD)
+  git -C "$t" push -q origin "HEAD:refs/pull/7/head"
+  git -C "$t" checkout -q -b train
+  git -C "$t" merge -q --no-ff --no-edit member >/dev/null 2>&1 || :
+  bw_commit_file "$t" second.txt second "second member work"
+  tr=$(git -C "$t" rev-parse HEAD)
+  git -C "$t" push -q origin "HEAD:refs/pull/9/head"
+  git -C "$t" checkout -q main
+  git -C "$t" merge -q --squash train >/dev/null
+  git -C "$t" commit -q -m "train squash (#9)"
+  BW_LANDING=$(git -C "$t" rev-parse HEAD)
+  git -C "$t" push -q origin main
+  bw_commit_file "$t" feature.txt "feature, edited later" "main edits feature.txt"
+  git -C "$t" push -q origin main
+  BW_MEMBER=$h
+  BW_TRAIN=$tr
+  BW_COPY=$c
+}
+
+test_a_prerebase_copy_built_on_an_ours_merged_commit_is_refused() {
+  local how own
+  for how in ours order conflict; do
+    for own in 0 1; do
+      BW_PRE_HOW=$how BW_PRE_OWN=$own bespoke_world "prerebase-dropped-$how-$own" bw_steps_prerebase_on_dropped_commit
+      train_default_list "$TRAIN_CASE"
+      git -C "$TRAIN_CASE/wt" merge-base --is-ancestor "$TRAIN_MEMBER_HEAD" "$TRAIN_COPY_HEAD" \
+        && fail "prerebase-dropped-$how-$own: the copy contains the member head"
+      [ "$own" = 1 ] || git -C "$TRAIN_CASE/wt" merge-base --is-ancestor "$TRAIN_COPY_HEAD" "$TRAIN_HEAD" \
+        || fail "prerebase-dropped-$how-$own: the copy is not reachable from the train head"
+      git -C "$TRAIN_CASE/wt" cat-file -e "$TRAIN_COPY_HEAD:hidden.txt" 2>/dev/null || fail "prerebase-dropped-$how-$own: the copy lacks hidden.txt"
+      [ "$(git -C "$TRAIN_CASE/wt" show "$TRAIN_HEAD:hidden.txt" 2>/dev/null)" != hidden ] || fail "prerebase-dropped-$how-$own: the train holds K's hidden.txt"
+      [ "$(git -C "$TRAIN_CASE/wt" show "$TRAIN_LANDING_COMMIT:hidden.txt" 2>/dev/null)" != hidden ] || fail "prerebase-dropped-$how-$own: the landing holds K's hidden.txt"
+      assert_train_refused "$TRAIN_CASE" "prerebase-dropped-$how-$own" "REFUSED"
+      assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "prerebase-dropped-$how-$own: the train was accepted"
+    done
+  done
+  BW_PRE_HOW=ours
+  BW_PRE_OWN=0
+  pass "a pre-rebase copy, with or without work of its own, that stands on a commit the default branch reached only through a merge that dropped it is refused, however the merge dropped it"
+}
+
+# The control of the same shape: the merge between the copy's base and the recorded base keeps
+# the copy's content (a clean merge), so the copy is proven by content and accepted.
+test_a_prerebase_copy_built_on_an_honestly_merged_commit_is_accepted() {
+  BW_PRE_HOW=honest BW_PRE_OWN=1 bespoke_world prerebase-honest bw_steps_prerebase_on_dropped_commit
+  BW_PRE_OWN=0
+  train_default_list "$TRAIN_CASE"
+  git -C "$TRAIN_CASE/wt" merge-base --is-ancestor "$TRAIN_MEMBER_HEAD" "$TRAIN_COPY_HEAD" \
+    && fail "prerebase-honest: the copy contains the member head"
+  [ "$(git -C "$TRAIN_CASE/wt" show "$TRAIN_HEAD:hidden.txt" 2>/dev/null)" = hidden ] || fail "prerebase-honest: the train lacks K's hidden.txt"
+  run_teardown "$TRAIN_CASE" > "$TRAIN_CASE/stdout" 2> "$TRAIN_CASE/stderr" \
+    || fail "prerebase-honest: a copy whose content the default branch kept was refused: $(cat "$TRAIN_CASE/stderr")"
+  assert_absent "$TRAIN_CASE/state/task-x1.meta" "prerebase-honest: accepted teardown left the task record"
+  BW_PRE_HOW=ours
+  pass "a pre-rebase copy built on a commit the default branch merged honestly is accepted"
+}
+
 teardown_test_cases=(
 test_local_only_fork_remote_allows
 test_teardown_does_not_wait_for_the_home_summary_refresh
@@ -5629,6 +5733,8 @@ test_a_failed_patch_read_never_proves_a_replayed_patch
 test_default_proof_refuses_a_third_version_conflict_resolution
 test_default_proof_refuses_a_closed_copy_whose_lines_main_edited_later
 test_a_prerebase_copy_whose_reverted_work_the_train_lacks_is_refused
+test_a_prerebase_copy_built_on_an_ours_merged_commit_is_refused
+test_a_prerebase_copy_built_on_an_honestly_merged_commit_is_accepted
 test_default_proof_refuses_work_whose_only_change_is_a_file_mode
 test_train_that_restored_a_deleted_file_is_refused
 test_train_with_many_unrelated_paths_still_accepts_its_member

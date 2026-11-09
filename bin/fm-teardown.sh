@@ -2813,8 +2813,9 @@ teardown_train_content_present() {  # <ref> <target> <base>
 # Is <ref> carried by <train head>? Both must hold: the change reaches the train, as an
 # ancestor or by every commit's patch replayed there, and its net content from the member's
 # recorded base is present in the train head's tree. A copy that does not contain the member
-# head (a pre-rebase copy) is measured from its merge base with the member head
-# (teardown_train_content_applies); patch presence alone never proves it.
+# head (a pre-rebase copy) is measured from its merge base with the recorded base once the
+# merges in between are shown exact (teardown_train_content_applies); patch presence and
+# ancestry alone never prove it.
 # The first failing fact is left in TEARDOWN_TRAIN_CARRY_WHY, a fact that could not be read in
 # TEARDOWN_TRAIN_UNASKED.
 TEARDOWN_TRAIN_CARRY_WHY=
@@ -2850,14 +2851,23 @@ teardown_train_carries() {  # <ref> <train head>
   }
 }
 
-# Does <ref>'s net change hold in <target>? Every copy is proven by content, with no shortcut.
-# The member head and a copy that contains it are measured from the member PR's recorded base. A
-# copy that does not contain the member head (a pre-rebase copy) is measured from its merge base
-# with the member head, the fork point of its own work: no record of that point exists, so it is
-# read from the commits, and the commit-level patch proof (teardown_train_carries) is what still
-# sees a commit that only a graph could hide. Patch presence is not content presence, so the
-# change from that base must also be present in <target> by the same rule. No common history, or
-# more than one merge base, is a refusal; a failed read is unknown.
+# Does <ref>'s net change hold in <target>? Every copy is proven by content, with no shortcut,
+# and ancestry is never read as content. The member head, and a copy that contains it, are
+# measured from the member PR's recorded base. A copy that does not contain the member head (a
+# pre-rebase copy) has no record of its own fork point, so it is measured from its merge base X
+# with the recorded base, and X is trusted only after every merge between X and the recorded base
+# is shown to be EXACTLY what git makes of its two parents (fm_task_copy_merges_exact): a merge
+# that dropped a side's change (an `ours` merge, either parent order, a conflict resolved to a
+# side or to a third version) would make X a commit the default branch reached without its
+# content, and the copy's own work would then be measured from a base that already holds the
+# dropped change. An empty change from X (the copy is itself an ancestor of the recorded base, as
+# a pool slot parked on an old default-branch commit is) is accepted ONLY because every merge
+# between it and the recorded base was just shown exact: all that it holds is then the default
+# branch's own history with its content intact, so there is nothing unlanded to lose. Without
+# that check an empty change proves nothing, and a copy on a commit that a dropping merge took in
+# is refused (test_a_prerebase_copy_built_on_an_ours_merged_commit_is_refused). The change from X
+# must be present in <target> by the same rule as for any copy. No common
+# history, or more than one merge base, refuses; a failed read is unknown.
 teardown_train_content_applies() {  # <ref> <target>
   local dir=${TEARDOWN_LANDED_DIR:-$WT} rc=0 base=$TEARDOWN_TRAIN_MEMBER_BASE bases
   if [ -n "$TEARDOWN_TRAIN_MEMBER_HEAD" ] && [ "$1" != "$TEARDOWN_TRAIN_MEMBER_HEAD" ]; then
@@ -2866,25 +2876,38 @@ teardown_train_content_applies() {  # <ref> <target>
       0) ;;
       1)
         rc=0
-        bases=$(git -C "$dir" merge-base --all "$TEARDOWN_TRAIN_MEMBER_HEAD" "$1" 2>/dev/null) || rc=$?
+        bases=$(git -C "$dir" merge-base --all "$TEARDOWN_TRAIN_MEMBER_BASE" "$1" 2>/dev/null) || rc=$?
         case "$rc" in
           0) ;;
           1)
-            TEARDOWN_TRAIN_CARRY_WHY="has no common history with the member head, so its own work has no base to be measured from"
+            TEARDOWN_TRAIN_CARRY_WHY="has no common history with the member PR's recorded base, so its own work has no base to be measured from"
             return 1
             ;;
           *)
-            TEARDOWN_TRAIN_UNASKED="the merge base of ${1:0:12} and the member head could not be read"
+            TEARDOWN_TRAIN_UNASKED="the merge base of ${1:0:12} and the member PR's recorded base could not be read"
             return 1
             ;;
         esac
         case "$bases" in
           *$'\n'*)
-            TEARDOWN_TRAIN_CARRY_WHY="has more than one merge base with the member head, so its own work has no single base to be measured from"
+            TEARDOWN_TRAIN_CARRY_WHY="has more than one merge base with the member PR's recorded base, so its own work has no single base to be measured from"
             return 1
             ;;
         esac
         base=$bases
+        rc=0
+        fm_task_copy_merges_exact "$dir" "$base" "$TEARDOWN_TRAIN_MEMBER_BASE" || rc=$?
+        case "$rc" in
+          0) ;;
+          1)
+            TEARDOWN_TRAIN_CARRY_WHY="stands on a commit that the default branch reached through a merge that is not what git makes of its parents ($FM_TASK_COPY_WHY), so its own work cannot be measured from there"
+            return 1
+            ;;
+          *)
+            TEARDOWN_TRAIN_UNASKED=$FM_TASK_COPY_UNASKED
+            return 1
+            ;;
+        esac
         ;;
       *)
         TEARDOWN_TRAIN_UNASKED="whether ${1:0:12} contains the member head could not be read"
