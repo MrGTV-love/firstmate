@@ -2024,7 +2024,7 @@ assert_eq "$(request_count "$out")" 1 "INTAKE-3 the next poll did not take the r
 intake_home
 say_owner 2000.000100 'the older request'
 say_owner 2000.000200 'the newer request'
-python3 "$HELPER" fail-call "$(replay_file)" conversations.replies:2000.000100 400 2
+python3 "$HELPER" fail-call "$(replay_file)" chat.postMessage:2000.000100 400 2
 for turn in 1 2; do
   set +e
   out=$(ipoll); rc=$?
@@ -2046,7 +2046,7 @@ FAILED_LINE='slack: request 2000.000100 not acknowledged (failed, owner Main)'
 intake_home
 say_owner 2000.000100 'a request the owner deleted'
 say_owner 2000.000200 'the newer request'
-python3 "$HELPER" fail-call "$(replay_file)" conversations.replies:2000.000100 400
+python3 "$HELPER" fail-call "$(replay_file)" chat.postMessage:2000.000100 400
 for turn in 1 2; do
   set +e
   out=$(ipoll); rc=$?
@@ -2080,7 +2080,7 @@ assert_eq "$(outbound_count chat.postMessage)" 2 "INTAKE-3 [release] a later pol
 # Resolve refuses, and changes nothing and calls nothing, for an unknown ts, a malformed or missing ts, and a request
 # that is not failed; it closes the failed one, after which nothing lists, wakes or acknowledges it.
 say_owner 2000.000400 'a request whose acknowledgement fails once'
-python3 "$HELPER" fail-call "$(replay_file)" conversations.replies:2000.000400 400 1
+python3 "$HELPER" fail-call "$(replay_file)" chat.postMessage:2000.000400 400 1
 ipoll >/dev/null 2>&1 && fail "INTAKE-3 [resolve] the failed acknowledgement reported success"
 state_before=$(shasum -a 256 < "$(state_file)")
 calls_before=$(grep -c '' "$(outbound_log)")
@@ -2107,9 +2107,9 @@ assert_eq "$(posts_in 2000.000100)" 0 "INTAKE-3 [resolve] the resolved request w
 # and three unbound polls, and the request is still acknowledged and woken plainly once Slack answers again.
 intake_home
 say_owner 2000.000100 'the older request'
-python3 "$HELPER" fail-call "$(replay_file)" conversations.replies:2000.000100 400 2
+python3 "$HELPER" fail-call "$(replay_file)" chat.postMessage:2000.000100 400 2
 for turn in 1 2; do ipoll >/dev/null 2>&1 && fail "INTAKE-3 [not counted] failed try $turn reported success"; done
-python3 "$HELPER" fail-call "$(replay_file)" conversations.replies:2000.000100 503 3
+python3 "$HELPER" fail-call "$(replay_file)" chat.postMessage:2000.000100 503 3
 for turn in 1 2 3; do
   set +e
   out=$(ipoll); rc=$?
