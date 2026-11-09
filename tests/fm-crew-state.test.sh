@@ -3275,8 +3275,9 @@ test_no_run_idle_pane_uses_keyed_log() {
   arm_idle_record "$d/state" feat-keyed
   local out; out=$(run_crew_state "$d" feat-keyed)
   assert_contains "$out" "state: parked" "keyed needs-decision log -> parked"
-  assert_contains "$out" "which database?" "key token is excluded from status detail"
-  pass "no run + idle pane parses keyed status syntax"
+  assert_contains "$out" "which database?" "the dependency detail remains visible"
+  assert_contains "$out" "[key=q1]" "the open dependency key remains actionable"
+  pass "no run + idle pane preserves the dependency key and detail"
 }
 
 # (g') no run + idle pane on a DECLARED external-wait pause -> state: paused, so a

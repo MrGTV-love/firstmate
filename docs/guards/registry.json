@@ -157,11 +157,11 @@
     {
       "id": "send-task-prerequisites",
       "owner": "bin/fm-send.sh",
-      "emitters": ["bin/fm-remote-secondmate-control.sh"],
+      "emitters": ["bin/fm-remote-secondmate-control.sh", "bin/fm-send-unattended.sh"],
       "invariant": "a text steer satisfies recorded task ownership or an explicit relay and its declared receiving-host input prerequisites before publication",
-      "source": "this home's state/<id>.meta direct reports and fm-remote-file.sh check on the receiving host",
-      "trigger": "message names another recorded task owner without --relay, or an explicitly declared required input is inaccessible",
-      "remedy": "FM_HOME=<home> bin/fm-send.sh <recorded-owner> <message>; for a deliberate cross-task mention use bin/fm-send.sh <target> --relay <message>; stage a missing declared input through the authorized transfer before retrying",
+      "source": "this home's state/<id>.meta direct reports, fm-remote-file.sh check on the receiving host, and an open unattended-steer key in the existing task status log",
+      "trigger": "message names another recorded task owner without --relay, an explicitly declared required input is inaccessible, or the caller is holding that prerequisite refusal for Firstmate handling",
+      "remedy": "FM_HOME=<home> bin/fm-send.sh <recorded-owner> <message>; for a deliberate cross-task mention use bin/fm-send.sh <target> --relay <message>; stage a missing declared input through the authorized transfer before retrying; Firstmate handles the surfaced instruction and closes its existing unattended-steer key before automatic sending resumes",
       "decision": "deny",
       "fail_direction": "closed",
       "budget": 1,
@@ -172,7 +172,8 @@
         {"file": "bin/fm-send.sh", "match": "send-task-prerequisites deny", "count": 2},
         {"file": "bin/fm-send.sh", "match": "send-task-prerequisites bypass"},
         {"file": "bin/fm-remote-secondmate-control.sh", "match": "error: refused required input"},
-        {"file": "bin/fm-remote-secondmate-control.sh", "match": "send-task-prerequisites deny"}
+        {"file": "bin/fm-remote-secondmate-control.sh", "match": "send-task-prerequisites deny"},
+        {"file": "bin/fm-send-unattended.sh", "match": "send-task-prerequisites warn"}
       ],
       "proxy": false,
       "proxy_reason": "",

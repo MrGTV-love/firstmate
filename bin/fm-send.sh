@@ -5,8 +5,11 @@
 # --require-input declares a required artifact on the receiving host, relative
 # to its FM_HOME or absolute within that home (a local task's recorded worktree
 # is also allowed). Only declared inputs are checked, under the existing file
-# transfer's confinement, immediately before a new record is published.
-# Missing/inaccessible inputs fail with the receiver and path named: stage the
+# transfer's confinement before any delivery or reply-tracking effect, including
+# an idempotent retry. Validation refusal exits 4 (FM_TASK_INBOX_INPUT_REFUSED
+# in fm-task-inbox-lib.sh); other write failures retain their existing status.
+# An input outside the receiving boundary is reported as outside the transfer
+# boundary, not as missing. Missing/inaccessible inputs name receiver and path: stage the
 # declared artifact through the existing authorized transfer, then correct the
 # instruction. No automatic transfer, permission grant, or resend is added.
 # Ordinary output/example/other-host paths in message text are never validated.
@@ -15,7 +18,11 @@
 # Text naming a whole task id recorded in this home's state/<id>.meta, or its
 # legacy fm-<id> label, must target that owner. A task id inside a path is not
 # checked, so a wrong-owner path mention such as data/<other-id>/review.md is
-# accepted; the pending-reply repost relays its already-routed request.
+# accepted. A separate task-id token inside a quoted path with spaces is still
+# a mention and needs its owner or --relay. A URL scheme or drive letter that
+# is itself a recorded id also counts. Shared explicit endpoints own every task
+# whose recorded endpoint equals that target. The pending-reply repost relays
+# its already-routed request.
 # A wrong-owner steer, including an unmatched explicit endpoint naming a
 # recorded task, is refused before enqueue, reply tracking, or typing and names
 # the correct selector. Send a refused steer to that owner, or use --relay before
@@ -567,13 +574,13 @@ while :; do
   esac
 done
 
-if [ -n "$REQUIRED_INPUTS" ] && { [ -z "$TARGET_SELECTOR" ] || [ "${1:-}" = --key ]; }; then
-  echo 'error: --require-input needs a recorded task text steer; keys and explicit endpoints have no declared receiving home' >&2
+if [ -n "$REQUIRED_INPUTS" ] && { [ -z "$TARGET_META" ] || [ "${1:-}" = --key ]; }; then
+  echo 'error: --require-input needs a recorded receiving task; keys and unrecorded endpoints have no declared receiving home' >&2
   exit 1
 fi
 
 fm_send_check_required_inputs() { # <newline-delimited-declarations>
-  local declared=$1 input receiver_home=$FM_HOME root worktree
+  local declared=$1 input receiver_home=$FM_HOME root worktree rc failed=0 reason
   [ -n "$declared" ] || return 0
   if [ "$(fm_meta_get "$TARGET_META" kind)" = secondmate ]; then
     receiver_home=$(fm_meta_get "$TARGET_META" home)
@@ -583,12 +590,21 @@ fm_send_check_required_inputs() { # <newline-delimited-declarations>
   while IFS= read -r input; do
     root=$receiver_home
     case "$worktree" in /*) case "$input" in "$worktree"/*) root=$worktree ;; esac ;; esac
-    if ! FM_HOME="$root" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-remote-file.sh" check "$input" >/dev/null; then
-      "$SCRIPT_DIR/fm-guard-event.sh" send-task-prerequisites deny --rule required-input --task "$(fm_send_id_from_meta "$TARGET_META")" 2>/dev/null || true
-      echo "error: refused required input '$input': unavailable to receiver '$RAW_TARGET'; nothing was sent. Stage only this declared artifact through the existing authorized transfer mechanism; no access was granted." >&2
-      return 1
+    rc=0
+    if [ "$TARGET_BACKEND" = remote ]; then
+      "$SCRIPT_DIR/fm-on.sh" "$TARGET_REMOTE_ID" fm-remote-file.sh check "$input" >/dev/null 2>&1 || rc=$?
+    else
+      FM_HOME="$root" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-remote-file.sh" check "$input" >/dev/null 2>&1 || rc=$?
     fi
+    [ "$rc" -ne 0 ] || continue
+    failed=1
+    reason='unavailable to'
+    [ "$rc" -ne 5 ] || reason='outside the transfer boundary for'
+    echo "error: refused required input '$input': $reason receiver '$RAW_TARGET'; nothing was sent and any earlier record is unchanged. Stage only this declared artifact through the existing authorized transfer mechanism; no access was granted." >&2
   done <<< "$declared"
+  [ "$failed" -ne 0 ] || return 0
+  "$SCRIPT_DIR/fm-guard-event.sh" send-task-prerequisites deny --rule required-input --task "$(fm_send_id_from_meta "$TARGET_META")" 2>/dev/null || true
+  return "$FM_TASK_INBOX_INPUT_REFUSED"
 }
 
 if [ "$TARGET_BACKEND" != remote ]; then
@@ -911,6 +927,12 @@ else
     done
     [ -n "$mentioned_id" ] || continue
     [ "$mentioned_id" != "$owner_target" ] || continue
+    # Explicit endpoints can be shared by several recorded tasks. A selector
+    # still names exactly one task; an endpoint owns every meta that names it.
+    if [ -z "$TARGET_SELECTOR" ] &&
+      [ "$(fm_backend_target_of_meta "$STATE/$mentioned_id.meta")" = "$T" ]; then
+      continue
+    fi
     if [ "$RELAY" = 1 ]; then
       "$SCRIPT_DIR/fm-guard-event.sh" send-task-prerequisites bypass --rule task-owner --override --task "$mentioned_id" 2>/dev/null || true
       break
@@ -928,6 +950,9 @@ else
       ;;
     esac
   fi
+  # A declared-input refusal must precede even a transient reply expectation,
+  # as well as any inbox directory, typed text or doorbell.
+  fm_send_check_required_inputs "$REQUIRED_INPUTS" || exit "$FM_TASK_INBOX_INPUT_REFUSED"
   # The pre-marker answer text, kept for the closing resolved note so the
   # durable ledger records the plain answer without marker or corr bytes.
   RESOLVE_ANSWER_TEXT=$MESSAGE
@@ -1056,11 +1081,9 @@ else
     remote_completion_unknown=0
     REMOTE_SEND_ARGS=("$TARGET_REMOTE_ID" "$MESSAGE")
     [ -z "$FIRE_AND_FORGET_ID" ] || REMOTE_SEND_ARGS+=(fire-and-forget)
-    if [ -n "$REQUIRED_INPUTS" ]; then
-      while IFS= read -r required_input; do
-        REMOTE_SEND_ARGS+=(--require-input "$required_input")
-      done <<< "$REQUIRED_INPUTS"
-    fi
+    # Declared inputs were checked on this receiving host before reply-state
+    # creation. The enqueue leg must not turn a later recheck into a refusal
+    # after that invocation already created an expectation.
     # Each transport attempt is bounded by FM_SEND_REMOTE_BUDGET seconds.
     # fm_run_timed's 124 means the attempt was killed at the bound with remote
     # completion unknown - the enqueue may have landed - so it exits through
@@ -1110,6 +1133,7 @@ else
     if [ "$remote_rc" -ne 0 ]; then
       fm_send_known_undelivered_cleanup ||
         echo "error: known-undelivered pending-reply state could not be reset for $TARGET_TASK_ID" >&2
+      [ "$remote_rc" -ne "$FM_TASK_INBOX_INPUT_REFUSED" ] || exit "$remote_rc"
       echo "error: steer not sent to remote secondmate $TARGET_REMOTE_ID (the remote steering-inbox record could not be written; the remote leg's stderr above has the reason)" >&2
       exit 1
     fi
@@ -1164,10 +1188,10 @@ else
     fi
     if [ "${FM_SEND_IDEMPOTENT:-0}" = 1 ]; then
       INBOX_RECORD=$(fm_task_inbox_write_idempotent "$STATE" "$INBOX_TASK_ID" "$MESSAGE" \
-        "${FIRE_AND_FORGET_ID:+fire-and-forget}" fm_send_check_required_inputs "$REQUIRED_INPUTS") || inbox_write_rc=$?
+        "${FIRE_AND_FORGET_ID:+fire-and-forget}") || inbox_write_rc=$?
     else
       INBOX_RECORD=$(fm_task_inbox_write "$STATE" "$INBOX_TASK_ID" "$MESSAGE" \
-        "${FIRE_AND_FORGET_ID:+fire-and-forget}" fm_send_check_required_inputs "$REQUIRED_INPUTS") || inbox_write_rc=$?
+        "${FIRE_AND_FORGET_ID:+fire-and-forget}") || inbox_write_rc=$?
     fi
     if [ "${inbox_write_rc:-0}" -ne 0 ]; then
       fm_lock_release "$INBOX_META_LOCK"
@@ -1231,10 +1255,6 @@ else
     3) echo "fm-send: doorbell not typed because the agent in $T has exited; the steer is durably recorded at $INBOX_RECORD for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane" >&2 ;;
     esac
     exit 0
-  fi
-  if ! fm_send_check_required_inputs "$REQUIRED_INPUTS"; then
-    fm_send_known_undelivered_cleanup || true
-    exit 1
   fi
   # Slash commands open a completion popup in some TUIs (verified on codex);
   # submitting too fast selects nothing, so give the popup time to settle before

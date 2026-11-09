@@ -457,7 +457,7 @@ class Collector:
         env = dict(self.env)
         if task.get("spawn_gen"):
             env["FM_SEND_EXPECTED_SPAWN_GEN"] = task["spawn_gen"]
-        self.run([BIN / "fm-send.sh", task_id, CHECK_IN_TEXT], env=env)
+        self.run([BIN / "fm-send-unattended.sh", task_id, CHECK_IN_TEXT], env=env)
         return dict(check_in="sent", subject=task_id)
 
     def recorded_stop(self, task):

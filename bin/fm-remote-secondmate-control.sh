@@ -340,19 +340,24 @@ cmd_stay() {
 }
 
 remote_send_check_inputs() { # <newline-delimited-inputs> <receiver-id>
-  local declared=$1 id=$2 input
+  local declared=$1 id=$2 input rc failed=0 reason
   [ -n "$declared" ] || return 0
   while IFS= read -r input; do
-    if ! "$SCRIPT_DIR/fm-remote-file.sh" check "$input" >/dev/null; then
-      "$SCRIPT_DIR/fm-guard-event.sh" send-task-prerequisites deny --rule required-input --task "$id" 2>/dev/null || true
-      printf "error: refused required input '%s': unavailable to receiver '%s' on its receiving host; stage only this declared artifact through the existing authorized transfer mechanism; no access was granted\n" "$input" "$id" >&2
-      return 1
-    fi
+    rc=0
+    "$SCRIPT_DIR/fm-remote-file.sh" check "$input" >/dev/null 2>&1 || rc=$?
+    [ "$rc" -ne 0 ] || continue
+    failed=1
+    reason='unavailable to'
+    [ "$rc" -ne 5 ] || reason='outside the transfer boundary for'
+    printf "error: refused required input '%s': %s receiver '%s' on its receiving host; nothing was sent and any earlier record is unchanged; stage only this declared artifact through the existing authorized transfer mechanism; no access was granted\n" "$input" "$reason" "$id" >&2
   done <<< "$declared"
+  [ "$failed" -ne 0 ] || return 0
+  "$SCRIPT_DIR/fm-guard-event.sh" send-task-prerequisites deny --rule required-input --task "$id" 2>/dev/null || true
+  return "$FM_TASK_INBOX_INPUT_REFUSED"
 }
 
 cmd_send() {
-  local id=$1 message=$2 delivery_mode='' required_inputs='' input rec ring_rc=0 meta meta_lock
+  local id=$1 message=$2 delivery_mode='' required_inputs='' input rec ring_rc=0 meta meta_lock write_rc=0
   shift 2
   if [ "${1:-}" = fire-and-forget ]; then delivery_mode=$1; shift; fi
   while [ "$#" -gt 0 ]; do
@@ -381,9 +386,11 @@ cmd_send() {
   # the parent may safely repeat this leg. Exit 0 once the record durably
   # exists; no ring outcome changes it, because the parent transport owns any
   # retry or reply-tracking policy from here.
-  if ! rec=$(fm_task_inbox_write_idempotent "$CONTROL_STATE" "$id" "$message" "$delivery_mode" \
-    remote_send_check_inputs "$required_inputs" "$id"); then
+  rec=$(fm_task_inbox_write_idempotent "$CONTROL_STATE" "$id" "$message" "$delivery_mode" \
+    remote_send_check_inputs "$required_inputs" "$id") || write_rc=$?
+  if [ "$write_rc" -ne 0 ]; then
     fm_lock_release "$meta_lock"
+    [ "$write_rc" -ne "$FM_TASK_INBOX_INPUT_REFUSED" ] || return "$write_rc"
     die "steering-inbox record could not be written under $CONTROL_STATE/$id.inbox"
   fi
   fm_lock_release "$meta_lock"

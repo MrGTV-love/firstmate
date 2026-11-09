@@ -106,6 +106,10 @@ _FM_TASK_INBOX_LIB_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" 
 # shellcheck source=/dev/null
 . "$_FM_TASK_INBOX_LIB_DIR/fm-backend.sh"
 
+# Enqueue exit contract: 0 = record path, 1 = generic write/lock failure,
+# 4 = declared-input validator refused before any inbox mutation. Callers must
+# preserve that distinction and must not print a write-failure cause for 4.
+FM_TASK_INBOX_INPUT_REFUSED=4
 FM_TASK_INBOX_SCHEMA='fm-task-inbox.v1'
 FM_TASK_INBOX_GRACE_DEFAULT=90
 FM_TASK_INBOX_RING_MAX_DEFAULT=3
@@ -228,22 +232,18 @@ _fm_task_inbox_write_record_locked() {  # <inbox-dir> <text> [delivery-mode]
 # Durably enqueue one steer: temp-write, then atomic rename into the next
 # sequence slot. Prints the record path. Fails without a partial record.
 # After delivery-mode, an optional trusted command and its argv validate inputs
-# under the sequence lock immediately before a NEW record is published.
-# Idempotent retries that find an existing record do not rerun that command:
-# a completed worker may already have consumed or removed its input artifact.
+# before creating any inbox entry, including on an idempotent retry. A refusal
+# returns FM_TASK_INBOX_INPUT_REFUSED; no directory or lock needs cleanup.
 fm_task_inbox_write() {  # <state-dir> <task-id> <text> [delivery-mode [validator args...]]
   local state=$1 task=$2 text=$3 delivery_mode=${4:-} dir lock rec status=0
   dir=$(fm_task_inbox_dir "$state" "$task")
+  if [ "$#" -gt 4 ]; then
+    ( shift 4; "$@" ) || return "$FM_TASK_INBOX_INPUT_REFUSED"
+  fi
   mkdir -p "$dir/handled" || return 1
   lock="$dir/.seq.lock"
   fm_task_inbox_lock_acquire "$lock" || return 1
-  if [ "$#" -gt 4 ]; then
-    shift 4
-    "$@" || status=1
-  fi
-  if [ "$status" -eq 0 ]; then
-    rec=$(_fm_task_inbox_write_record_locked "$dir" "$text" "$delivery_mode") || status=1
-  fi
+  rec=$(_fm_task_inbox_write_record_locked "$dir" "$text" "$delivery_mode") || status=1
   fm_lock_release "$lock"
   [ "$status" -eq 0 ] || return 1
   printf '%s' "$rec"
@@ -263,6 +263,9 @@ fm_task_inbox_write() {  # <state-dir> <task-id> <text> [delivery-mode [validato
 fm_task_inbox_write_idempotent() {  # <state-dir> <task-id> <text> [delivery-mode [validator args...]]
   local state=$1 task=$2 text=$3 delivery_mode=${4:-} dir lock want have f rec='' status=0
   dir=$(fm_task_inbox_dir "$state" "$task")
+  if [ "$#" -gt 4 ]; then
+    ( shift 4; "$@" ) || return "$FM_TASK_INBOX_INPUT_REFUSED"
+  fi
   mkdir -p "$dir/handled" || return 1
   lock="$dir/.seq.lock"
   fm_task_inbox_lock_acquire "$lock" || return 1
@@ -306,13 +309,7 @@ fm_task_inbox_write_idempotent() {  # <state-dir> <task-id> <text> [delivery-mod
     status=1
   fi
   if [ "$status" -eq 0 ] && [ -z "$rec" ]; then
-    if [ "$#" -gt 4 ]; then
-      shift 4
-      "$@" || status=1
-    fi
-    if [ "$status" -eq 0 ]; then
-      rec=$(_fm_task_inbox_write_record_locked "$dir" "$text" "$delivery_mode") || status=1
-    fi
+    rec=$(_fm_task_inbox_write_record_locked "$dir" "$text" "$delivery_mode") || status=1
   fi
   fm_lock_release "$lock"
   [ "$status" -eq 0 ] || return 1

@@ -41,6 +41,11 @@ set -u
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# Sourced production libraries initialize wake paths. Keep that initialization
+# inside the suite's own temporary home before selecting any individual case.
+FM_HOME=$(fm_test_tmproot fm-pending-reply-source)
+export FM_HOME
+unset FM_STATE_OVERRIDE FM_ROOT_OVERRIDE FM_WAKE_QUEUE FM_WAKE_QUEUE_LOCK
 _fm_pending_test_source_marker() {
   # shellcheck source=bin/fm-marker-lib.sh
   . "$ROOT/bin/fm-marker-lib.sh"
@@ -1226,29 +1231,62 @@ test_fm_send_marked_secondmate_creates_pending_and_embeds_corr() {
 }
 
 test_relayed_request_recovery_reaches_the_mate() (
-  local dir fb log home state rc corr body
+  local dir fb log home state rc corr body mode original repost count
   unset FM_PENDING_REPLY_SEND_HOOK FM_PENDING_REPLY_NOW
-  dir="$TMP_ROOT/relay-recovery"; mkdir -p "$dir"
-  fb=$(make_stubs "$dir"); log="$dir/send.log"
-  home=$(setup_parent relay-recovery); state="$home/state"
-  fm_write_secondmate_meta "$state/hibit.meta" "$home/sm" "sess:fm-hibit"
-  fm_write_meta "$state/other-task.meta" "window=sess:fm-other-task" "kind=ship"
-  run_send "$fb" "$home" "$log" hibit --relay "relay the fix round for other-task"; rc=$?
-  expect_code 0 "$rc" "setup: relayed secondmate request should send"
-  corr=$(fm_pending_reply_extract_corr "$(latest_record_body "$home" hibit)")
-  fm_pending_reply_observe_busy "$state" "$corr" busy
-  fm_pending_reply_observe_busy "$state" "$corr" idle
-  PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$home" FM_SEND_LOG="$log" \
-    fm_pending_reply_send_recovery "$state" "$corr" 2>/dev/null \
-    || fail "recovery of a relayed request must reach the mate, phase $(phase_of "$state" "$corr")"
-  [ "$(phase_of "$state" "$corr")" = recovery_sent ] \
-    || fail "phase should be recovery_sent, got $(phase_of "$state" "$corr")"
-  body=$(latest_record_body "$home" hibit)
-  case "$body" in
-    *"REPOST REQUIRED"*other-task*) : ;;
-    *) fail "mate inbox must hold the repost of the relayed request"$'\n'"$body" ;;
-  esac
-  pass "recovery of a relayed cross-task request reaches the mate"
+  for mode in unhandled handled; do
+    dir="$TMP_ROOT/relay-recovery-$mode"; mkdir -p "$dir"
+    fb=$(make_stubs "$dir"); log="$dir/send.log"
+    home=$(setup_parent "relay-recovery-$mode"); state="$home/state"
+    export FM_GUARD_EVENT_LOG="$dir/guard-events.jsonl"
+    fm_write_secondmate_meta "$state/hibit.meta" "$home/sm" "sess:fm-hibit"
+    fm_write_meta "$state/other-task.meta" "window=sess:fm-other-task" "kind=ship"
+    run_send "$fb" "$home" "$log" hibit --relay "relay the fix round for other-task"; rc=$?
+    expect_code 0 "$rc" "setup: relayed secondmate request should send"
+    original="$state/hibit.inbox/001.msg"
+    cp "$original" "$dir/original.msg"
+    corr=$(fm_pending_reply_extract_corr "$(latest_record_body "$home" hibit)")
+    if [ "$mode" = handled ]; then
+      mv "$original" "$state/hibit.inbox/handled/"
+      original="$state/hibit.inbox/handled/001.msg"
+    fi
+    fm_pending_reply_observe_busy "$state" "$corr" busy
+    fm_pending_reply_observe_busy "$state" "$corr" idle
+    PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$home" FM_SEND_LOG="$log" \
+      fm_pending_reply_send_recovery "$state" "$corr" \
+      || fail "recovery of a relayed request must reach the mate, phase $(phase_of "$state" "$corr")"
+    [ "$(phase_of "$state" "$corr")" = recovery_sent ] \
+      || fail "phase should be recovery_sent, got $(phase_of "$state" "$corr")"
+    repost="$state/hibit.inbox/002.msg"
+    [ -f "$repost" ] || fail "recovery did not publish its own ordinary inbox record"
+    body=$(latest_record_body "$home" hibit)
+    case "$body" in
+      *"REPOST REQUIRED"*other-task*) : ;;
+      *) fail "mate inbox must hold the repost of the relayed request"$'\n'"$body" ;;
+    esac
+    assert_not_contains "$(cat "$repost")" 'delivery=fire-and-forget' "repost must remain under ordinary recovery"
+    [ "$(fm_pending_reply_extract_corr "$body")" = "$corr" ] || fail "repost minted another correlation"
+    count=$(find "$state/pending-replies" -maxdepth 1 -type f ! -name '.*' | wc -l | tr -d ' ')
+    [ "$count" = 1 ] || fail "repost created another expectation"
+    cmp -s "$dir/original.msg" "$original" || fail "repost changed the original instruction"
+    cp "$repost" "$dir/repost.msg"; cp "$log" "$dir/bells-before"
+    if PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$home" FM_SEND_LOG="$log" \
+      fm_pending_reply_send_recovery "$state" "$corr"; then
+      fail "a second recovery attempt must not send"
+    fi
+    [ ! -e "$state/hibit.inbox/003.msg" ] || fail "second attempt published another record"
+    cmp -s "$dir/bells-before" "$log" || fail "second attempt rang again"
+    rc=0
+    run_send "$fb" "$home" "$log" hibit "$body" || rc=$?
+    [ "$rc" -ne 0 ] && [ "$rc" -ne 3 ] || fail "negative repost without relay was accepted"
+    cmp -s "$dir/repost.msg" "$repost" || fail "negative repost changed the delivered record"
+    [ ! -e "$state/hibit.inbox/003.msg" ] || fail "negative repost published another record"
+    jq -es 'map(select(.guard == "send-task-prerequisites" and .decision == "bypass")) | length == 2 and all(.task == "other-task" and .override == true)' "$FM_GUARD_EVENT_LOG" >/dev/null \
+      || fail "original and recovery each need one effective relay row"
+    printf 'BO8 mode=%s corr=%s phase=%s original_preserved=yes repost=002.msg expectations=%s duplicate_suppressed=yes negative_without_relay=refused\n' \
+      "$mode" "$corr" "$(phase_of "$state" "$corr")" "$count"
+    printf 'BO8 repost body: %s\n' "$body"
+  done
+  pass "recovery preserves identity and original records for handled or unhandled cross-task requests"
 )
 
 test_document_pointer_resolves() {
@@ -2463,6 +2501,8 @@ test_tick_beats_between_records() {
 }
 
 # --- run --------------------------------------------------------------------
+
+fm_test_only
 
 test_normal_correlated_reply_resolves_once
 test_completed_turn_no_report_triggers_one_recovery

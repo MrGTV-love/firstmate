@@ -239,7 +239,8 @@ test_key_send_exit_status_follows_delivery() {
 }
 
 test_task_owner_mismatch_is_refused() {
-  local dir fb home log err rc target
+  local dir fb home log err rc target owner text
+  text='Start the fix round for fm-slack-main-window-intake'
   for target in fm-mini another-worker; do
     dir="$TMP_ROOT/owner-mismatch-$target"; mkdir -p "$dir"
     fb=$(make_stubs "$dir"); home=$(setup_home "$target"); log="$dir/send.log"; err="$dir/send.err"
@@ -255,14 +256,20 @@ test_task_owner_mismatch_is_refused() {
     cp "$home/state/$target.status" "$dir/status-before"
     PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" \
       "$SEND" "$target" --resolve-key dependency \
-      'Start the fix round for fm-slack-main-window-intake' > "$dir/send.out" 2> "$err"; rc=$?
+      "$text" > "$dir/send.out" 2> "$err"; rc=$?
     [ "$rc" -ne 0 ] && [ "$rc" -ne 3 ] || fail "wrong-owner steer reported delivered or unconfirmed: $rc"
-    assert_contains "$(cat "$err")" 'fm-slack-main-window-intake' "refusal must name the real owner"
+    owner=$(sed -n "s/.*Send to '\([^']*\)'.*/\1/p" "$err")
+    [ "$owner" = fm-slack-main-window-intake ] || fail "refusal must designate the usable owner, not merely echo a task id"
     [ ! -s "$log" ] || fail "wrong-owner refusal typed into the target"
     [ ! -e "$home/state/$target.inbox" ] || fail "wrong-owner refusal enqueued a steer"
     [ ! -d "$home/state/pending-replies" ] || fail "wrong-owner refusal armed a reply expectation"
     cmp -s "$dir/status-before" "$home/state/$target.status" || fail "refusal answered the dependency"
     printf 'owner-mismatch target=%s exit=%s diagnostic=%s\n' "$target" "$rc" "$(cat "$err")"
+    PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" \
+      "$SEND" "$owner" "$text" >/dev/null 2> "$err"; rc=$?
+    expect_code 0 "$rc" "the designated owner must accept the same instruction"
+    [ "$(bash -c '. "$1"; fm_task_inbox_body "$2"' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$home/state/$owner.inbox/001.msg")" = "$text" ] \
+      || fail "loop-back did not reach the designated owner's inbox unchanged"
   done
   pass "fm-send: a wrong worker or secondmate is refused before delivery or decision closure"
 }
@@ -275,6 +282,12 @@ test_owner_relay_and_correct_owner() {
     "window=sess:fm-fm-slack-main-window-intake" "kind=ship" "harness=claude"
   fm_write_meta "$home/state/other.meta" "window=sess:fm-other" "kind=ship"
   text=$'Start the fix round for\nfm-slack-main-window-intake'
+  : > "$log"
+  PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" \
+    "$SEND" other "$text" >/dev/null 2> "$err"; rc=$?
+  [ "$rc" -ne 0 ] && [ "$rc" -ne 3 ] || fail "the same deliberate mention without relay must be refused"
+  assert_contains "$(cat "$err")" "Send to 'fm-slack-main-window-intake'" "relay negative must designate the actual owner"
+  [ ! -e "$home/state/other.inbox" ] && [ ! -s "$log" ] || fail "relay negative delivered"
   for target in fm-slack-main-window-intake fm-fm-slack-main-window-intake other; do
     : > "$log"
     set --
@@ -293,18 +306,24 @@ test_owner_relay_and_correct_owner() {
 }
 
 test_task_mentions_match_whole_tokens() {
-  local dir fb home log err rc text
+  local dir fb home log err rc text body sequence=0 record
   dir="$TMP_ROOT/owner-tokens"; mkdir -p "$dir"
   fb=$(make_stubs "$dir"); home=$(setup_home tokens); log="$dir/send.log"; err="$dir/send.err"
   fm_write_meta "$home/state/task-one.meta" "window=sess:fm-task-one" "kind=ship"
   fm_write_meta "$home/state/other.meta" "window=sess:fm-other" "kind=ship"
-  for text in 'task-one-longer' 'prefix-task-one' 'task-one.extension' 'task-not-owned-here' 'fm-task-one-longer' 'fm-other' 'review data/task-one/review.md'; do
+  fm_write_meta "$home/state/team_task.meta" "window=sess:fm-team_task" "kind=ship"
+  fm_write_meta "$home/state/rel.v2.meta" "window=sess:fm-rel.v2" "kind=scout"
+  fm_write_meta "$home/state/task7.meta" "window=sess:fm-task7" "kind=secondmate"
+  for text in 'task-one-longer' 'prefix-task-one' 'task-one.extension' 'task-not-owned-here' 'fm-task-one-longer' 'fm-other' 'review data/task-one/review.md' 'prefix_team_task' 'rel.v2.extension' 'task71' 'C:\data\task-one\x.md'; do
     : > "$log"
     PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" \
       "$SEND" other "$text" >/dev/null 2> "$err"; rc=$?
     expect_code 0 "$rc" "a longer or unrecorded task id is not a local owner mismatch"
+    sequence=$((sequence + 1)); printf -v record '%s/state/other.inbox/%03d.msg' "$home" "$sequence"
+    body=$(bash -c '. "$1"; fm_task_inbox_body "$2"' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$record")
+    [ "$body" = "$text" ] || fail "successful whole-token control changed its body"
   done
-  for text in '(task-one)' 'task-one,' $'next action:\ntask-one' 'mention task-one --relay in the body' 'fm-task-one' 'Resume fm-task-one.'; do
+  for text in '(task-one)' 'task-one,' $'next action:\ntask-one' 'mention task-one --relay in the body' 'fm-task-one' 'Resume fm-task-one.' 'The output path is "/tmp/generated task-one"; the example is "/tmp/example"; another host has "/remote/report".'; do
     : > "$log"
     PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" \
       "$SEND" other "$text" >/dev/null 2> "$err"; rc=$?
@@ -312,11 +331,24 @@ test_task_mentions_match_whole_tokens() {
     [ ! -s "$log" ] || fail "whole-token refusal sent input"
     assert_contains "$(cat "$err")" "Send to 'task-one'" "refusal must name the owner selector: $text"
   done
+  for text in team_task rel.v2 task7; do
+    : > "$log"
+    PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" \
+      "$SEND" other "Continue $text." >/dev/null 2> "$err"; rc=$?
+    [ "$rc" -ne 0 ] && [ "$rc" -ne 3 ] || fail "recorded id alphabet escaped guard: $text"
+    assert_contains "$(cat "$err")" "Send to '$text'" "refusal must designate the whole recorded id"
+    [ ! -s "$log" ] || fail "recorded id refusal typed text"
+  done
+  : > "$log"
+  PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" \
+    "$SEND" other 'team_task then task-one' >/dev/null 2> "$err"; rc=$?
+  [ "$rc" -ne 0 ] || fail "multiple-owner steer escaped guard"
+  assert_contains "$(cat "$err")" "Send to 'team_task'" "first mismatching mention must win"
   pass "fm-send: whole task tokens and legacy labels reject; longer, unknown and path-embedded ids do not"
 }
 
 test_secondmate_own_task_and_relay_safety() {
-  local dir fb home log err rc
+  local dir fb home log err rc body corr
   dir="$TMP_ROOT/owner-secondmate"; mkdir -p "$dir"
   fb=$(make_stubs "$dir"); home=$(setup_home secondmate); log="$dir/send.log"; err="$dir/send.err"
   mkdir -p "$dir/child/state"
@@ -326,7 +358,11 @@ test_secondmate_own_task_and_relay_safety() {
   PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" \
     "$SEND" fm-mini 'Continue child-task' >/dev/null 2> "$err"; rc=$?
   expect_code 0 "$rc" "a secondmate child absent from parent direct reports is not a mismatch"
-  assert_grep 'Continue child-task' "$home/state/fm-mini.inbox/001.msg" "secondmate must receive its child task request"
+  body=$(bash -c '. "$1"; fm_task_inbox_body "$2"' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$home/state/fm-mini.inbox/001.msg")
+  corr=$(bash -c '. "$1"; fm_pending_reply_extract_corr "$2"' _ "$ROOT/bin/fm-pending-reply-lib.sh" "$body")
+  [ -n "$corr" ] || fail "secondmate request lost its correlation"
+  [ "${body#*"corr=$corr "}" = 'Continue child-task' ] || fail "secondmate child instruction changed"
+  assert_contains "$(cat "$log")" 'Firstmate instruction waiting' "secondmate child instruction must have its doorbell"
   : > "$log"
   PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" \
     "$SEND" fm-mini --relay --resolve-key nonexistent 'answer' >/dev/null 2> "$err"; rc=$?
@@ -475,17 +511,24 @@ test_explicit_endpoint_ownership_and_guard_events() {
 }
 
 test_relay_survives_unavailable_event_writer() {
-  local dir fb home log err rc writer body bells baseline_body='' baseline_bells=''
+  local dir fb home log err rc writer body bells baseline_body='' baseline_bells='' baseline_owner='' baseline_input='' baseline_owner_rc=0 line events
   dir="$TMP_ROOT/writer-failure"; mkdir -p "$dir/copy"
+  events="$dir/events.jsonl"
   cp -R "$ROOT/bin" "$dir/copy/bin"
   fb=$(make_stubs "$dir"); log="$dir/send.log"; err="$dir/send.err"
-  for writer in executable unavailable; do
+  for writer in executable unavailable failed; do
     home=$(setup_home "writer-$writer")
     fm_write_meta "$home/state/task-one.meta" "window=sess:fm-task-one" "kind=ship"
     fm_write_meta "$home/state/other.meta" "window=sess:fm-other" "kind=ship"
+    printf 'done: previous instruction completed\n' > "$home/state/task-one.status"
+    printf 'done: previous instruction completed\n' > "$home/state/other.status"
     [ "$writer" != unavailable ] || chmod -x "$dir/copy/bin/fm-guard-event.sh"
-    : > "$log"
-    PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" FM_SEND_SETTLE=0 \
+    if [ "$writer" = failed ]; then
+      printf '#!/usr/bin/env bash\nexit 7\n' > "$dir/copy/bin/fm-guard-event.sh"
+      chmod +x "$dir/copy/bin/fm-guard-event.sh"
+    fi
+    : > "$log"; : > "$events"
+    PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" FM_SEND_SETTLE=0 FM_GUARD_EVENT_LOG="$events" \
       "$dir/copy/bin/fm-send.sh" other --relay 'Continue task-one' >/dev/null 2> "$err"; rc=$?
     expect_code 0 "$rc" "writer availability must not change relay exit"
     body=$(bash -c '. "$1"; fm_task_inbox_body "$2"' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$home/state/other.inbox/001.msg")
@@ -497,12 +540,154 @@ test_relay_survives_unavailable_event_writer() {
       [ "$body" = "$baseline_body" ] || fail "unavailable writer changed durable record"
       [ "$bells" = "$baseline_bells" ] || fail "unavailable writer changed doorbell"
     fi
+    : > "$log"
+    PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" FM_GUARD_EVENT_LOG="$events" \
+      "$dir/copy/bin/fm-send.sh" other 'Continue task-one' >/dev/null 2> "$err"; rc=$?
+    [ "$rc" -ne 0 ] && [ "$rc" -ne 3 ] || fail "writer outage bypassed ownership refusal"
+    line=$(sed -n '/^error: refused task /p' "$err")
+    if [ "$writer" = executable ]; then baseline_owner=$line; baseline_owner_rc=$rc; else
+      expect_code "$baseline_owner_rc" "$rc" "writer outage must preserve ownership exit"
+      [ "$line" = "$baseline_owner" ] || fail "writer outage changed ownership refusal"
+    fi
+    [ ! -s "$log" ] && [ ! -f "$home/state/other.inbox/002.msg" ] || fail "writer outage bypassed owner guard"
+    PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" FM_GUARD_EVENT_LOG="$events" \
+      "$dir/copy/bin/fm-send.sh" other --require-input missing.md 'Use input' >/dev/null 2> "$err"; rc=$?
+    expect_code 4 "$rc" "writer outage must preserve declared-input refusal"
+    line=$(sed -n '/^error: refused required input /p' "$err")
+    if [ "$writer" = executable ]; then baseline_input=$line; else
+      [ "$line" = "$baseline_input" ] || fail "writer outage changed input refusal"
+      [ ! -s "$events" ] || fail "unavailable or failing writer unexpectedly wrote an event"
+    fi
+    [ ! -s "$log" ] && [ ! -f "$home/state/other.inbox/002.msg" ] || fail "writer outage bypassed input guard"
   done
-  pass "fm-send: a non-executable telemetry writer changes neither relay exit, durable body nor doorbell"
+  pass "fm-send: unavailable and failing telemetry writers preserve relay delivery and ownership/input refusals"
+}
+
+test_shared_endpoint_accepts_each_recorded_owner() {
+  local dir fb home log err events rc text
+  dir="$TMP_ROOT/shared-owner"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); home=$(setup_home shared)
+  log="$dir/send.log"; err="$dir/send.err"; events="$dir/events.jsonl"
+  fm_write_meta "$home/state/task-one.meta" "window=sess:fm-task-one" "kind=ship"
+  fm_write_meta "$home/state/task-two.meta" "window=sess:fm-task-one" "kind=scout"
+  fm_write_meta "$home/state/other.meta" "window=sess:fm-other" "kind=ship"
+  for text in 'Continue task-one' 'Continue task-two'; do
+    : > "$log"; : > "$events"
+    PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" FM_SEND_SETTLE=0 \
+      FM_GUARD_EVENT_LOG="$events" "$SEND" sess:fm-task-one "$text" >/dev/null 2> "$err"; rc=$?
+    expect_code 0 "$rc" "shared explicit endpoint owns either recorded task: $text"
+    [ "$(sed -n 's/^send-keys target=[^ ]* literal=1 arg=//p' "$log")" = "$text" ] \
+      || fail "shared endpoint changed typed text"
+    jq -es 'map(select(.guard == "send-task-prerequisites")) | length == 0' "$events" >/dev/null \
+      || fail "shared owner emitted an ownership event"
+  done
+  : > "$log"; : > "$events"
+  PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" FM_SEND_SETTLE=0 \
+    FM_GUARD_EVENT_LOG="$events" "$SEND" sess:fm-task-one 'Continue other' >/dev/null 2> "$err"; rc=$?
+  expect_code 1 "$rc" "shared endpoint does not own a task recorded elsewhere"
+  assert_contains "$(cat "$err")" "Send to 'other'" "shared endpoint refusal designates the different owner"
+  [ ! -s "$log" ] || fail "shared endpoint mismatch typed text"
+  pass "fm-send: a shared explicit endpoint accepts either owner but refuses a different endpoint's task"
+}
+
+test_missing_inputs_report_all_without_inbox_trace() {
+  local dir fb home log err rc existing input
+  dir="$TMP_ROOT/input-refusal"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); home=$(setup_home input-refusal)
+  log="$dir/send.log"; err="$dir/send.err"
+  fm_write_meta "$home/state/other.meta" "window=sess:fm-other" "kind=ship"
+  for existing in no yes; do
+    if [ "$existing" = yes ]; then
+      mkdir -p "$home/state/other.inbox"
+      printf 'schema=fm-task-inbox.v1\nat=2020-01-01T00:00:00Z\n--\nprevious' > "$home/state/other.inbox/007.msg"
+      cp "$home/state/other.inbox/007.msg" "$dir/before.msg"
+    fi
+    : > "$log"
+    PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" FM_SEND_SETTLE=0 \
+      "$SEND" other --require-input first.md --require-input middle.md --require-input last.md \
+      'Use the required inputs' >/dev/null 2> "$err"; rc=$?
+    expect_code 4 "$rc" "declared input refusal has a distinct documented status"
+    for input in first.md middle.md last.md; do
+      assert_contains "$(cat "$err")" "$input" "every missing declaration must be reported"
+    done
+    assert_contains "$(cat "$err")" "receiver 'other'" "input report names receiver"
+    assert_not_contains "$(cat "$err")" 'inbox record could not be written' "input refusal must not claim a write failure"
+    [ ! -s "$log" ] || fail "missing inputs reached backend"
+    if [ "$existing" = no ]; then
+      [ ! -e "$home/state/other.inbox" ] || fail "refusal created target inbox"
+    else
+      cmp -s "$dir/before.msg" "$home/state/other.inbox/007.msg" || fail "refusal changed earlier record"
+      [ ! -e "$home/state/other.inbox/handled" ] || fail "refusal created handled directory"
+      [ "$(find "$home/state/other.inbox" -mindepth 1 | wc -l | tr -d ' ')" = 1 ] || fail "refusal left extra inbox entries"
+    fi
+  done
+  for input in first.md middle.md last.md; do printf 'input\n' > "$home/$input"; done
+  existing=8
+  for input in first.md middle.md last.md; do
+    rm "$home/$input"; : > "$log"
+    PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" FM_SEND_SETTLE=0 \
+      "$SEND" other --require-input "$home/first.md" --require-input "$home/middle.md" --require-input "$home/last.md" \
+      'Use all three inputs' >/dev/null 2> "$err"; rc=$?
+    expect_code 4 "$rc" "a missing declaration at each position must refuse"
+    assert_contains "$(cat "$err")" "$home/$input" "the missing position must be named"
+    [ ! -s "$log" ] || fail "a missing later declaration reached the backend"
+    [ ! -e "$home/state/other.inbox/$(printf '%03d' "$existing").msg" ] || fail "a missing later declaration published a record"
+    printf 'input\n' > "$home/$input"
+    PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" FM_SEND_SETTLE=0 \
+      "$SEND" other --require-input "$home/first.md" --require-input "$home/middle.md" --require-input "$home/last.md" \
+      'Use all three inputs' >/dev/null 2> "$err"; rc=$?
+    expect_code 0 "$rc" "every all-accessible twin must deliver"
+    [ "$(bash -c '. "$1"; fm_task_inbox_body "$2"' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$home/state/other.inbox/$(printf '%03d' "$existing").msg")" = 'Use all three inputs' ] \
+      || fail "accessible input declarations changed the delivered body"
+    existing=$((existing + 1))
+  done
+  pass "fm-send: all missing inputs report their own cause, status 4, and leave absent or existing inbox unchanged"
+}
+
+test_known_endpoint_accepts_declared_input() {
+  local dir fb home log err rc text
+  dir="$TMP_ROOT/endpoint-input"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); home=$(setup_home endpoint-input)
+  log="$dir/send.log"; err="$dir/send.err"; text='/review the input'
+  fm_write_meta "$home/state/other.meta" "window=sess:fm-other" "kind=ship"
+  printf 'report\n' > "$home/input.md"
+  : > "$log"
+  PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" FM_SEND_SETTLE=0 \
+    "$SEND" sess:fm-other --require-input input.md "$text" >/dev/null 2> "$err"; rc=$?
+  expect_code 0 "$rc" "known-owner explicit endpoint accepts input declaration"
+  [ "$(sed -n 's/^send-keys target=[^ ]* literal=1 arg=//p' "$log")" = "$text" ] || fail "declared input changed endpoint text"
+  rm "$home/input.md"; : > "$log"
+  PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" FM_SEND_SETTLE=0 \
+    "$SEND" sess:fm-other --require-input input.md "$text" >/dev/null 2> "$err"; rc=$?
+  expect_code 4 "$rc" "missing explicit-endpoint input refuses distinctly"
+  [ ! -s "$log" ] || fail "missing endpoint input reached backend"
+  pass "fm-send: known-owner explicit endpoint validates inputs without changing its typed plane"
+}
+
+test_input_boundary_is_not_reported_missing() {
+  local dir fb home log err rc
+  dir="$TMP_ROOT/input-boundary"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); home=$(setup_home input-boundary)
+  log="$dir/send.log"; err="$dir/send.err"
+  fm_write_meta "$home/state/other.meta" "window=sess:fm-other" "kind=ship"
+  printf 'already readable, do not disclose\n' > "$dir/outside.md"
+  : > "$log"
+  PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" \
+    "$SEND" other --require-input "$dir/outside.md" 'Use the declared input' >/dev/null 2> "$err"; rc=$?
+  expect_code 4 "$rc" "outside input refuses distinctly"
+  assert_contains "$(cat "$err")" 'outside the transfer boundary' "outside input is a confinement limit, not missing"
+  assert_not_contains "$(cat "$err")" 'unavailable to' "outside input must not be called inaccessible"
+  assert_not_contains "$(cat "$err")" 'already readable, do not disclose' "validation returns no contents"
+  [ ! -s "$log" ] && [ ! -e "$home/state/other.inbox" ] || fail "outside declaration reached receiver"
+  pass "fm-send: outside-home input is reported as the transfer boundary without reading its contents"
 }
 
 fm_test_only
 
+test_input_boundary_is_not_reported_missing
+test_missing_inputs_report_all_without_inbox_trace
+test_known_endpoint_accepts_declared_input
+test_shared_endpoint_accepts_each_recorded_owner
 test_explicit_endpoint_ownership_and_guard_events
 test_relay_survives_unavailable_event_writer
 test_arbitrary_path_mentions_are_not_inputs

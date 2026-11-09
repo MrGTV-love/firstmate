@@ -205,6 +205,25 @@ hold_lock_until_released() {  # <lock> <ready> <release>
 }
 
 
+test_wrong_owner_refusal_reaches_firstmate_without_resend() {
+  local home mate fakebin snap out rc
+  { read -r home; read -r mate; read -r fakebin; } < <(make_main_home refused mate)
+  fm_write_meta "$home/state/fleet.meta" "window=firstmate:fm-fleet" "kind=ship"
+  snap="$home/snapshot.json"
+  write_snapshot "$snap" mate '{"kind":"orphan_in_flight","ids":["ghost"]}'
+  rc=0; out=$(run_notify "$home" "$fakebin" refused "$snap") || rc=$?
+  [ "$rc" -ne 0 ] || fail "wrong-owner autonomous instruction claimed delivery"
+  [ ! -e "$home/state/mate.inbox" ] || fail "refused nudge landed"
+  assert_contains "$(cat "$home/state/mate.status" 2>/dev/null)" "Send to 'fleet'" "Firstmate must receive the designated owner"
+  assert_contains "$(cat "$home/state/mate.status")" 'A fleet snapshot found' "Firstmate must receive the refused instruction"
+  cp "$home/state/mate.status" "$home/status-before"
+  rc=0; out=$(run_notify "$home" "$fakebin" refused "$snap") || rc=$?
+  [ "$rc" -ne 0 ] || fail "a held refusal claimed a new delivery"
+  cmp -s "$home/status-before" "$home/state/mate.status" || fail "an unanswered refusal was repeated"
+  [ ! -e "$home/state/mate.inbox" ] || fail "autonomous caller resent a refused instruction"
+  pass "a wrong-owner autonomous steer reaches Firstmate with its instruction and does not resend"
+}
+
 test_an_inventory_mismatch_asks_the_mate_once_per_window() {
   local home mate fakebin snap out
   { read -r home; read -r mate; read -r fakebin; } < <(make_main_home once mate)
@@ -985,6 +1004,7 @@ test_bearings_request_returns_before_remote_delivery_and_supervision_sends_later
   pass "Bearings records locally, returns before a delayed remote queue, and supervision delivers later"
 }
 
+test_wrong_owner_refusal_reaches_firstmate_without_resend
 test_reconcile_request_rejects_an_unbounded_input_without_filling_storage
 test_reconcile_request_requires_one_snapshot_document
 test_reconcile_requests_coalesce_per_target_until_delivery

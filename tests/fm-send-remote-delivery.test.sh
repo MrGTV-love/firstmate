@@ -849,6 +849,55 @@ test_local_pending_does_not_close_resolve_key() {
   pass "fm-send local: an unconfirmed submit still never closes a --resolve-key decision"
 }
 
+test_remote_input_refusal_leaves_no_trace_with_writer_outages() {
+  local dir fb ssh_log home rhome rc writer existing events before after
+  dir="$TMP_ROOT/remote-input-refusal"; mkdir -p "$dir/copy"
+  cp -R "$ROOT/bin" "$dir/copy/bin"
+  fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; events="$dir/events.jsonl"
+  for writer in executable unavailable failed; do
+    [ "$writer" != unavailable ] || chmod -x "$dir/copy/bin/fm-guard-event.sh"
+    if [ "$writer" = failed ]; then
+      printf '#!/usr/bin/env bash\nexit 7\n' > "$dir/copy/bin/fm-guard-event.sh"
+      chmod +x "$dir/copy/bin/fm-guard-event.sh"
+    fi
+    for existing in no yes; do
+      rhome=$(setup_remote_secondmate_home "input-$writer-$existing")
+      home=$(setup_remote_parent_home "input-$writer-$existing" "$rhome")
+      if [ "$existing" = yes ]; then
+        FM_HOME="$rhome" FM_STATE_OVERRIDE="$rhome/state/parent-route" bash -c \
+          '. "$1"; fm_task_inbox_write "$2" rsm previous' _ \
+          "$ROOT/bin/fm-task-inbox-lib.sh" "$rhome/state/parent-route" >/dev/null
+        cp "$rhome/state/parent-route/rsm.inbox/001.msg" "$dir/previous.msg"
+      fi
+      before=$(find "$rhome/state/parent-route/rsm.inbox" -print 2>/dev/null | sort)
+      : > "$events"; : > "$ssh_log"
+      rc=0
+      send_env "$fb" "$home" "$ssh_log" FM_REMOTE_CODE_ROOT="$dir/copy" FM_GUARD_EVENT_LOG="$events" \
+        "$ROOT/bin/fm-on.sh" rsm fm-remote-secondmate-control.sh send rsm 'Use inputs' \
+        --require-input first.md --require-input last.md > "$dir/out" 2> "$dir/err" || rc=$?
+      expect_code 4 "$rc" "receiving-host validator refusal must remain distinct"
+      assert_contains "$(cat "$dir/err")" 'first.md' "remote refusal names the first input"
+      assert_contains "$(cat "$dir/err")" 'last.md' "remote refusal names the last input"
+      assert_contains "$(cat "$dir/err")" "receiver 'rsm'" "remote refusal names its receiver"
+      assert_not_contains "$(cat "$dir/err")" 'record could not be written' "remote input refusal must not claim a write failure"
+      after=$(find "$rhome/state/parent-route/rsm.inbox" -print 2>/dev/null | sort)
+      [ "$before" = "$after" ] || fail "remote refusal changed the inbox tree"
+      [ "$existing" != no ] || [ ! -e "$rhome/state/parent-route/rsm.inbox" ] || fail "remote refusal created an inbox"
+      if [ "$existing" = yes ]; then
+        cmp -s "$dir/previous.msg" "$rhome/state/parent-route/rsm.inbox/001.msg" || fail "remote refusal changed an existing record"
+      fi
+      if [ "$writer" = executable ]; then
+        jq -es 'map(select(.guard == "send-task-prerequisites" and .decision == "deny" and .task == "rsm")) | length == 1' "$events" >/dev/null \
+          || fail "remote refusal needs exactly one receiver-attributed event"
+      else
+        [ ! -s "$events" ] || fail "unavailable or failing remote writer unexpectedly wrote a row"
+      fi
+      printf 'remote-input-refusal writer=%s existing=%s exit=%s stderr=%s\n' "$writer" "$existing" "$rc" "$(cat "$dir/err")"
+    done
+  done
+  pass "remote host: input refusal preserves status, cause and inbox under working, unavailable or failing telemetry"
+}
+
 test_declared_remote_input_is_reported_without_access_grants() {
   local dir fb ssh_log home rhome rc before after rec corr body
   dir="$TMP_ROOT/required-remote-input"; mkdir -p "$dir"
@@ -889,18 +938,29 @@ test_declared_remote_input_is_reported_without_access_grants() {
   esac
   corr=$(fm_pending_reply_extract_corr "$body")
   [ -n "$corr" ] || fail "input steer lost its request identity"
-  # A completed action may consume its input. Retrying its existing identity
-  # must still find the handled record, not fail validation or execute twice.
-  mv "$rec" "$rhome/state/parent-route/rsm.inbox/handled/"
+  # A declared input is checked even on an idempotent retry. Removing it must
+  # refuse before another expectation, record or doorbell, preserving the old
+  # record byte for byte rather than reporting delivery of an unusable input.
+  cp "$rec" "$dir/original.msg"
   rm "$rhome/data/required.md"
   rc=0
   send_env "$fb" "$home" "$ssh_log" FM_PENDING_REPLY_EXISTING_CORR="$corr" \
     "$SEND" rsm --require-input data/required.md 'Use the declared input report' \
     > "$dir/retry.out" 2> "$dir/retry.err" || rc=$?
-  expect_code 0 "$rc" "an acknowledged idempotent retry must not revalidate a consumed input"
-  [ -z "$(remote_inbox_records "$rhome")" ] || fail "input retry duplicated the instruction"
-  [ -f "$rhome/state/parent-route/rsm.inbox/handled/001.msg" ] || fail "input retry lost the handled record"
-  pass "fm-send remote: declared inputs are checked on the receiver without grants, and consumed-input retries deduplicate"
+  expect_code 4 "$rc" "an unhandled retry must validate a declared input"
+  assert_contains "$(cat "$dir/retry.err")" 'earlier record is unchanged' "retry refusal explains prior record is unchanged"
+  cmp -s "$dir/original.msg" "$rec" || fail "input refusal changed original record"
+  [ "$(remote_inbox_records "$rhome")" = "$rec" ] || fail "input retry added a record"
+  printf 'restored report\n' > "$rhome/data/required.md"
+  mv "$rec" "$rhome/state/parent-route/rsm.inbox/handled/"
+  rc=0
+  send_env "$fb" "$home" "$ssh_log" FM_PENDING_REPLY_EXISTING_CORR="$corr" \
+    "$SEND" rsm --require-input data/required.md 'Use the declared input report' \
+    > "$dir/retry-present.out" 2> "$dir/retry-present.err" || rc=$?
+  expect_code 0 "$rc" "an accessible declared-input retry still deduplicates"
+  [ -z "$(remote_inbox_records "$rhome")" ] || fail "accessible retry duplicated the instruction"
+  cmp -s "$dir/original.msg" "$rhome/state/parent-route/rsm.inbox/handled/001.msg" || fail "retry changed the handled record"
+  pass "fm-send remote: receiver inputs gate unhandled retries, and accessible retries preserve the original record"
 }
 
 test_declared_input_cannot_expand_transfer_confinement() {
@@ -962,6 +1022,7 @@ test_remote_wrong_owner_and_logged_relay() {
 
 fm_test_only
 
+test_remote_input_refusal_leaves_no_trace_with_writer_outages
 test_remote_wrong_owner_and_logged_relay
 test_declared_remote_input_is_reported_without_access_grants
 test_declared_input_cannot_expand_transfer_confinement
