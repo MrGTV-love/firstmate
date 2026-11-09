@@ -266,13 +266,22 @@ teardown_lock_launcher_may_be_live() {  # <pid> <lock-file>
   [ "$age" -ge $(( now - mtime - 2 )) ]
 }
 
-# The process environment as NUL-split lines, read from the kernel, for a ps that
-# cannot be used. Prints nothing and fails when the environment cannot be read.
-teardown_process_env_lines() {  # <pid>
+# Is <entry> one complete entry of process <pid>'s environment? The environment is read
+# from a source that separates its entries with NUL bytes (/proc/<pid>/environ, or the
+# kernel's process-argument call on macOS, split by its argument count) and compared whole,
+# inside the reader, so an argument, or a value that holds a newline and then the entry,
+# is never taken for an entry. Succeeds when the entry is there; fails when it is not or
+# when the environment cannot be read.
+teardown_process_env_has() {  # <pid> <entry>
+  local env_file=${FM_PROC_ROOT_OVERRIDE:-/proc}/$1/environ
+  if [ -r "$env_file" ]; then
+    perl -e 'local $/ = "\0"; open(my $f, "<:raw", $ARGV[0]) or exit 1; while (<$f>) { chomp; exit 0 if $_ eq $ARGV[1] } exit 1' -- "$env_file" "$2"
+    return
+  fi
   command -v python3 >/dev/null 2>&1 || return 1
-  python3 - "$1" <<'PY'
+  python3 - "$1" "$2" <<'PY'
 import sys, ctypes, ctypes.util, struct
-pid = int(sys.argv[1])
+pid, want = int(sys.argv[1]), sys.argv[2].encode()
 libc = ctypes.CDLL(ctypes.util.find_library("c"), use_errno=True)
 mib = (ctypes.c_int * 3)(1, 49, pid)
 size = ctypes.c_size_t(0)
@@ -287,10 +296,7 @@ parts = data[4:].split(b"\0")
 i = 0
 while i < len(parts) and parts[i] != b"": i += 1
 while i < len(parts) and parts[i] == b"": i += 1
-env = [p for p in parts[i + argc:] if p]
-if not env:
-    sys.exit(1)
-sys.stdout.buffer.write(b"\n".join(env) + b"\n")
+sys.exit(0 if want in parts[i + argc:] else 1)
 PY
 }
 
@@ -303,22 +309,15 @@ teardown_owner_marker() {
   printf 'FM_TASK_INBOX=%s/%s.inbox\n' "$state_real" "$ID"
 }
 
-# Does process <pid>'s own readable environment carry the marker? The environment of
-# an Apple platform binary (/bin/sleep, /bin/zsh, /usr/bin/git) is hidden from other
-# processes on macOS, so a missing marker proves nothing by itself.
+# Does process <pid>'s own readable environment carry the marker as one whole entry?
+# The environment of an Apple platform binary (/bin/sleep, /bin/zsh, /usr/bin/git) is
+# hidden from other processes on macOS, so a missing marker proves nothing by itself.
+# The flat text `ps -E` prints is never used as proof: it cannot tell an argument from
+# an environment entry.
 teardown_process_env_marked() {  # <pid>
-  local pid=$1 expected out env_file
+  local expected
   expected=$(teardown_owner_marker) || return 1
-  out=$(LC_ALL=C ps -ww -E -p "$pid" -o command= 2>/dev/null) || out=
-  case "$out" in *" $expected"|*" $expected "*) return 0 ;; esac
-  env_file=${FM_PROC_ROOT_OVERRIDE:-/proc}/$pid/environ
-  if [ -r "$env_file" ]; then
-    out=$(tr '\0' '\n' < "$env_file" 2>/dev/null) || out=
-  else
-    out=$(teardown_process_env_lines "$pid" 2>/dev/null) || return 1
-  fi
-  case $'\n'"$out" in *$'\n'"$expected"$'\n'*) return 0 ;; esac
-  return 1
+  teardown_process_env_has "$1" "$expected"
 }
 
 # The record of the task's own processes, written once at the start of a teardown
@@ -370,7 +369,7 @@ teardown_process_proved_own() {  # <pid>
 # record is never extended after the worker is gone. Failure to read the process
 # table records nothing and is not an error (unrecorded processes stay unproved).
 teardown_owned_record_write() {
-  local rec expected table ancestors cur pids line pid identity tmp
+  local rec expected table ancestors cur pids line pid identity tmp proc_root candidates bearers=" "
   rec=$(teardown_owned_record_path)
   expected=$(teardown_owner_marker) || return 0
   table=$(LC_ALL=C ps -A -ww -E -o pid=,ppid=,command= 2>/dev/null) || return 0
@@ -381,8 +380,22 @@ teardown_owned_record_write() {
     cur=$(LC_ALL=C ps -o ppid= -p "$cur" 2>/dev/null | tr -d '[:space:]') || break
     [ -z "$cur" ] || ancestors="$ancestors$cur "
   done
-  pids=$(printf '%s\n' "$table" | awk -v mk="$expected" -v anc="$ancestors" '
-    { parent[$1] = $2; if (index(" " $0 " ", " " mk " ") > 0) mark[$1] = 1 }
+  # The flat text of `ps -E` only picks candidates (it cannot tell an argument from an
+  # environment entry); a candidate bears the marker only when the marker is one whole
+  # entry of its environment (teardown_process_env_has). Where /proc publishes
+  # environments, every process with a readable one is a candidate as well.
+  proc_root=${FM_PROC_ROOT_OVERRIDE:-/proc}
+  candidates=$(printf '%s\n' "$table" | awk -v mk="$expected" -v root="$proc_root" '
+    { if (index(" " $0 " ", " " mk " ") > 0) print $1
+      else if ((getline line < (root "/" $1 "/environ")) >= 0) print $1; close(root "/" $1 "/environ") }') || candidates=
+  while IFS= read -r pid; do
+    [ -n "$pid" ] || continue
+    ! teardown_process_env_has "$pid" "$expected" || bearers="$bearers$pid "
+  done <<< "$candidates"
+  [ "$bearers" != " " ] || return 0
+  pids=$(printf '%s\n' "$table" | awk -v bearers="$bearers" -v anc="$ancestors" '
+    BEGIN { n = split(bearers, b, " "); for (i = 1; i <= n; i++) mark[b[i]] = 1 }
+    { parent[$1] = $2 }
     END {
       changed = 1
       while (changed) {

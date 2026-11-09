@@ -325,6 +325,9 @@ PY
   rm -f "$FOREIGN_CASE/leftover.pid"
   case "$mode" in
     foreign-apple) ( cd "$FOREIGN_COPY" && exec /bin/sleep 600 ) & PROC_PID=$!; PROC_PARENT=; return 0 ;;
+    # A foreign non-Apple process that only mentions this task's marker as an argument: its
+    # environment is readable and does not hold the marker, so it is not the task's own.
+    foreign-argv-nonapple) ( cd "$FOREIGN_COPY" && exec env -u FM_TASK_INBOX "$py" -c 'import time; time.sleep(600)' "$marker" ) & PROC_PID=$!; PROC_PARENT=; return 0 ;;
   esac
   env "$marker" "$py" "$script" "$FOREIGN_COPY" "$mode" "$FOREIGN_CASE/leftover.pid" &
   PROC_PARENT=$!
@@ -361,7 +364,7 @@ test_real_leftover_processes_at_the_copy_root_are_ended_only_when_proved_the_tas
     return 0
   fi
   for route in kept released; do
-    for state in live-apple live-nonapple orphan-nonapple daemon-nonapple orphan-apple daemon-apple foreign-apple recorded-orphan-apple pid-reuse; do
+    for state in live-apple live-nonapple orphan-nonapple daemon-nonapple orphan-apple daemon-apple foreign-apple foreign-argv-nonapple recorded-orphan-apple pid-reuse; do
       real_case "b-leftover-$state-$route"
       rm -f "$FOREIGN_CASE/fakebin/lsof"
       SLOT_ENTRY_BEFORE=$(real_slot_entry)

@@ -676,7 +676,8 @@
 #     eligible for signalling, and only when the process is proved the task's own
 #     without reading an Apple binary's environment (hidden on macOS): any one of
 #     the launch marker bin/fm-spawn.sh exports (FM_TASK_INBOX=<physical state
-#     dir>/<id>.inbox) in its readable environment; a place in
+#     dir>/<id>.inbox) as one whole entry of its readable environment (never as
+#     an argument or as text inside another value); a place in
 #     state/<id>.teardown-owned (pid AND birth identity), written at the start of
 #     the teardown, before any reaping or endpoint closure, from the live
 #     descendants of the marker-bearing worker, never extended once no bearer
