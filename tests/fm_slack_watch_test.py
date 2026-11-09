@@ -583,7 +583,7 @@ class IntakeTest(unittest.TestCase):
             transcript = home / 'transcript.json'
             transcript.write_text(json.dumps({
                 'schema': 'fm-slack-replay.v1', 'team': 'T0123456789', 'channel': 'D0123456789',
-                'scopes': list(scopes), 'enforce_scopes': True,
+                'scopes': list(scopes), 'enforce_scopes': True, 'method_allowlist': list(ReplayShapeTest.POPULATION),
                 'messages': [{'ts': '100.000100', 'user': self.OWNER, 'text': 'already there'}],
                 **(transcript_extra or {})}))
             env = {'FM_HOME': directory, 'FM_STATE_OVERRIDE': directory, 'FM_SLACK_DM_USER': self.OWNER,
@@ -1546,6 +1546,64 @@ class IntakeTest(unittest.TestCase):
         return writes + [out, (watch.root / 'state.json').read_text(), store.read_text() if store.is_file() else '',
                          json.dumps(replay.state['log']), json.dumps(watch.output)]
 
+    @contextmanager
+    def observe_every_write(self, watch, writes):
+        """Every byte written through open() to a file under the fixture home, whatever the plane function that writes
+        it (the state save, the record append, the shim): the observer of every durable write, not of one function."""
+        import builtins
+        real_open, home = builtins.open, str(watch.root.parent)
+
+        class Spy:
+            def __init__(self, handle):
+                self.handle = handle
+
+            def write(self, data):
+                writes.append(data.decode('utf-8', 'replace') if isinstance(data, bytes) else data)
+                return self.handle.write(data)
+
+            def __getattr__(self, name):
+                return getattr(self.handle, name)
+
+            def __enter__(self):
+                self.handle.__enter__()
+                return self
+
+            def __exit__(self, *exc):
+                return self.handle.__exit__(*exc)
+
+        def spy(file, mode='r', *args, **kwargs):
+            handle = real_open(file, mode, *args, **kwargs)
+            if isinstance(file, (str, os.PathLike)) and str(file).startswith(home) and any(c in mode for c in 'wax+'):
+                return Spy(handle)
+            return handle
+        with patch('builtins.open', spy):
+            yield
+
+    def test_the_every_write_observer_catches_a_transient_record_write(self):
+        value = 'fixture-signing-transient-0123456789'
+        original = plane.Watch.write_record
+
+        def transient(self, pending):
+            with open(self.root / plane.RECORD_FILE, 'a') as out:
+                out.write(value + '\n')
+                out.flush()
+                os.fsync(out.fileno())
+            with open(self.root / plane.RECORD_FILE, 'w') as out:
+                out.truncate(0)
+            return original(self, pending)
+        for mutant in (False, True):
+            with self.fixture(env={'SLACK_SIGNING_SECRET': value}) as (watch, replay):
+                writes = []
+                self.say(replay, '200.000100', 'an ordinary request')
+                with self.observe_every_write(watch, writes):
+                    if mutant:
+                        with patch.object(plane.Watch, 'write_record', transient):
+                            watch.poll()
+                    else:
+                        watch.poll()
+                self.assertEqual(value in '\n'.join(writes), mutant)
+                self.assertEqual(self.acks(replay), ['200.000100'])
+
     def test_a_cascade_of_replacements_leaves_no_plane_value_in_any_durable_write(self):
         value = 'a' + plane.SECRET_MARKER + 'b'
         delivered = 'a' * 6 + plane.SECRET_MARKER + 'b' * 6
@@ -1557,12 +1615,12 @@ class IntakeTest(unittest.TestCase):
                 return real(path, written)
             self.say(replay, '200.000100', delivered)
             with patch.dict(os.environ, {'FM_SLACK_FAULT': 'after-stage'}), patch.object(plane, 'save', spy), \
-                 self.assertRaises(RuntimeError):
+                 self.observe_every_write(watch, writes), self.assertRaises(RuntimeError):
                 watch.poll()
             self.assertNotIn(value, (watch.root / 'state.json').read_text())
             watch.state, watch.advanced = watch.load_state(), 0
             out = io.StringIO()
-            with patch.object(plane, 'save', spy), contextlib.redirect_stdout(out):
+            with patch.object(plane, 'save', spy), self.observe_every_write(watch, writes), contextlib.redirect_stdout(out):
                 watch.poll()
                 plane.emit(watch, 'check')
             for text in self.watch_durable_text(watch, replay, writes, out.getvalue()):
@@ -1728,6 +1786,157 @@ class IntakeTest(unittest.TestCase):
             with patch.object(watch, 'hold', return_value='closed'):
                 watch.poll()
             self.assertEqual(sorted(self.acks(replay)), ['120.000100', '150.000100', '200.000100'])
+
+    def state_text(self, watch):
+        """Every byte the plane left in its state folder, as one text."""
+        return ''.join(path.read_text(errors='replace') for path in sorted(watch.root.rglob('*')) if path.is_file())
+
+    def test_a_collision_refusal_reports_and_stores_no_plane_value(self):
+        # The refusal for a plane value that is part of the marker or the flag reports a fixed name; that name, and
+        # the line that carries it, must hold no plane value (here the value is a word of the name itself).
+        with self.fixture(env={'SLACK_SIGNING_SECRET': 'secret'}) as (watch, replay):
+            self.say(replay, '200.000100', 'an ordinary request')
+            with self.assertRaisesRegex(SlackError, 'collides_with_marker'):
+                watch.poll()
+            error = SlackError('secret_collides_with_marker')
+            watch.report_failure(error)
+            self.assertEqual(self.acks(replay), [])
+            self.assertTrue([line for line in watch.output if 'transport failure' in line])
+            reported = '\n'.join(watch.output)
+            self.assertNotIn('secret', reported.replace('collides_with_marker', ''), reported)
+            self.assertNotIn('"secret_collides', self.state_text(watch))
+            self.assertNotIn('failure": "secret', self.state_text(watch))
+            watch.report_failure(error)
+            self.assertEqual(len([line for line in watch.output if 'transport failure' in line]), 1)
+        with self.fixture() as (watch, replay):
+            self.say(replay, '200.000100', 'an ordinary request')
+            watch.poll()
+            self.assertEqual(self.acks(replay), ['200.000100'])
+            self.assertNotIn(self.SIGNING, '\n'.join(watch.output) + self.state_text(watch))
+
+    def test_a_padded_secret_value_changes_no_text_that_does_not_hold_it_exactly(self):
+        padded = ' plane '
+        text = 'check airplane status: ' + 'x' * 1000
+        with self.fixture(env={'SLACK_SIGNING_SECRET': padded}) as (watch, replay):
+            self.say(replay, '200.000100', text)
+            watch.poll()
+            line = self.wakes(watch)[0]
+            self.assertNotIn('; secret removed', line)
+            self.assertIn('check airplane status: ', line)
+            record = watch.record('200.000100')
+            self.assertEqual((record['text'], record['replaced']), (text, False))
+        with self.fixture(env={'SLACK_SIGNING_SECRET': padded}) as (watch, replay):
+            self.say(replay, '200.000100', 'an exact ' + padded + ' occurrence')
+            watch.poll()
+            self.assertIn('; secret removed', self.wakes(watch)[0])
+
+    def test_retarget_refuses_while_an_old_owner_request_is_unread_after_the_allowlist_changed(self):
+        new_owner = {'FM_SLACK_DM_USER': 'U0OTHEROWNER1', 'FM_SLACK_ALLOWED_AUTHORS': 'U0OTHEROWNER1'}
+        with self.fixture(cap='1') as (watch, replay):
+            self.say(replay, '200.000100', 'first request')
+            self.say(replay, '200.000200', 'second request')
+            watch.poll()
+            self.assertEqual(self.acks(replay), ['200.000100'])
+            before = watch.load_state()
+            watch.lock.close()
+            with patch.dict(os.environ, new_owner):
+                changed = Watch(replay=replay)
+                try:
+                    with patch.object(changed, 'bound', return_value=True), self.assertRaisesRegex(
+                            SlackError, '^dm_user_changed_with_unread_requests$'):
+                        changed.retarget()
+                    self.assertEqual(changed.load_state(), before)
+                finally:
+                    changed.lock.close()
+            # The old DM is then drained under the old settings and retarget accepts.
+            drained = Watch(replay=replay)
+            try:
+                with patch.object(drained, 'bound', return_value=True), patch.object(drained, 'backlog', return_value=[]):
+                    drained.poll()
+            finally:
+                drained.lock.close()
+            self.assertEqual(self.acks(replay), ['200.000100', '200.000200'])
+            with patch.dict(os.environ, new_owner):
+                again = Watch(replay=replay)
+                try:
+                    self.assertTrue(again.retarget())
+                finally:
+                    again.lock.close()
+        with self.fixture() as (watch, replay):
+            self.say(replay, '200.000100', 'stranger', user='U0STRANGER01')
+            self.say(replay, '200.000200', 'bot', bot_id='BLOOKALIKE')
+            watch.lock.close()
+            with patch.dict(os.environ, new_owner):
+                changed = Watch(replay=replay)
+                try:
+                    self.assertTrue(changed.retarget())
+                finally:
+                    changed.lock.close()
+
+    def test_a_notice_that_fails_part_way_still_charges_the_cap(self):
+        def run(failing):
+            with self.fixture(cap='2') as (watch, replay):
+                watch.state['threads']['gone:live'] = {'ts': '150.000100', 'key': 'gone', 'identity': 'x', 'options': []}
+                self.say(replay, '150.000200', 'a late reply', thread_ts='150.000100')
+                self.say(replay, '150.000300', 'another late reply', thread_ts='150.000100')
+                self.say(replay, '200.000100', 'a first request')
+                self.say(replay, '200.000200', 'a second request')
+                original, posts = replay.call, []
+
+                def call(method, **fields):
+                    if method == 'chat.postMessage' and fields.get('thread_ts') == '150.000100':
+                        posts.append(fields)
+                        if failing and len(posts) == 2:
+                            raise SlackError('api_error')
+                    return original(method, **fields)
+                with patch.object(replay, 'call', side_effect=call), patch.object(watch, 'hold', return_value='closed'):
+                    try:
+                        watch.poll()
+                    except SlackError as error:
+                        self.assertEqual(str(error), 'api_error')
+                requests = [thread for thread in self.acks(replay) if thread.startswith('200.')]
+                notices = [thread for thread in self.acks(replay) if thread.startswith('150.')]
+                return requests, notices
+        self.assertEqual(run(failing=False), ([], ['150.000100', '150.000100']))
+        requests, notices = run(failing=True)
+        self.assertEqual(requests, [])
+        self.assertLessEqual(len(notices) + 1, 2)
+
+    def test_every_intake_scenario_runs_on_the_permission_sensitive_replay(self):
+        with self.fixture() as (watch, replay):
+            self.assertEqual(set(replay.transcript['scopes']), set(BASE_SCOPES))
+            self.assertEqual(replay.transcript['method_allowlist'], list(ReplayShapeTest.POPULATION))
+            self.assertTrue(replay.transcript['enforce_scopes'])
+            with self.assertRaisesRegex(SlackError, 'method_not_allowed'):
+                replay.call('files.list')
+            self.assertEqual(replay.call('users.info', user=self.OWNER)['ok'], True)
+        with self.fixture(scopes=('chat:write', 'im:write', 'im:history')) as (watch, replay):
+            with self.assertRaisesRegex(SlackError, 'missing_scope'):
+                replay.call('users.info', user=self.OWNER)
+
+    def test_the_wake_line_grammar_accepts_valid_lines_and_rejects_the_malformed(self):
+        label = plane.REQUEST_LABEL
+        one = 'check: slack request 200.000100 from U0TESTOWNER: %s %s' % (label, json.dumps('hello'))
+        cut = one + '; full: state/slack-watch/requests.jsonl#200.000100'
+        joined = ('%s; check: slack 150.000100 - a notice; check: slack request 200.000200 from W0TESTOWNER: %s %s; +2 queued'
+                  % (one, label, json.dumps('second; check: slack 1.2 - inside the literal')))
+        self.assertEqual(parse_wake_line(one)[0][0]['text'], 'hello')
+        self.assertEqual(parse_wake_line(cut)[0][0]['pointer'], 'state/slack-watch/requests.jsonl#200.000100')
+        segments, marker = parse_wake_line(joined)
+        self.assertEqual([s['kind'] for s in segments], ['request', 'other', 'request'])
+        self.assertEqual((segments[2]['text'], marker), ('second; check: slack 1.2 - inside the literal', '+2 queued'))
+        self.assertEqual(parse_wake_line(cut + '; +1 queued')[1], '+1 queued')
+        self.assertEqual(parse_wake_line(one + '; ' + plane.SECRET_FLAG + '; full: state/slack-watch/requests.jsonl#9.9')[0][0]['flag'], True)
+        for bad in (cut.replace('; full: ', '; +1 queued; full: '),                       # the marker before the pointer
+                    one + '; +1 queued; ' + plane.SECRET_FLAG,                            # the marker before the flag
+                    one + '; full: state/slack-watch/requests.jsonl#200.000100; ' + plane.SECRET_FLAG,   # the flag after the pointer
+                    one + ' ' + json.dumps('second literal'),
+                    one.replace(label + ' ', ''),                                          # no label
+                    one + '\n', 'check: slack request 2.1 from U0TESTOWNER: ' + label + ' "x',
+                    one.replace('"hello"', 'hello'),
+                    one + '; +1 queued; +2 queued', 'x' * 481):
+            with self.assertRaises((AssertionError, ValueError)):
+                parse_wake_line(bad)
 
     def test_a_message_that_is_not_empty_is_a_request_whatever_it_looks_like(self):
         shown = {'200.000100': '\ue000', '200.000200': '   ', '200.000300': '\u2028\u200b\u0085', '200.000400': '\u200b'}
@@ -1967,6 +2176,48 @@ def card_text(path, task):
     raise SystemExit('no card for ' + task)
 
 
+REQUEST_SEGMENT = re.compile(r'check: slack request ([0-9]+\.[0-9]+) from ([UW][A-Z0-9]+)( \(not acknowledged after 3 tries\))?: '
+                             + re.escape(plane.REQUEST_LABEL) + ' ')
+OTHER_SEGMENT = re.compile(r'check: slack [0-9]+\.[0-9]+ - .*?(?=; check: slack |; \+[0-9]+ queued$|$)', re.S)
+POINTER_PART = re.compile(r'; full: state/slack-watch/requests\.jsonl#[0-9]+\.[0-9]+')
+QUEUED_PART = re.compile(r'; \+[0-9]+ queued')
+
+
+def parse_wake_line(line):
+    """One printed wake line by the grammar of I4a, read left to right with a JSON parser (never by splitting on
+    the delimiters, which a request text may hold): one or more segments joined by '; ', a request segment being the
+    label and ONE JSON string literal, then the flag when a value was replaced, then the pointer when the text was
+    cut; the queue marker last and alone. Raises AssertionError for anything outside it. Returns (segments, marker)."""
+    assert len(line) <= plane.WAKE_LIMIT, 'line too long: %d' % len(line)
+    assert all(unicodedata.category(c) not in ('Cc', 'Zl', 'Zp') for c in line), 'control or separator in a line'
+    segments, pos = [], 0
+    while True:
+        match = REQUEST_SEGMENT.match(line, pos)
+        if match:
+            text, pos = json.JSONDecoder().raw_decode(line, match.end())
+            segment = {'kind': 'request', 'ts': match.group(1), 'user': match.group(2), 'released': bool(match.group(3)),
+                       'text': text, 'flag': False, 'pointer': None}
+            if line.startswith('; ' + plane.SECRET_FLAG, pos) and (
+                    pos + 2 + len(plane.SECRET_FLAG) == len(line) or line.startswith('; ', pos + 2 + len(plane.SECRET_FLAG))):
+                segment['flag'] = True
+                pos += 2 + len(plane.SECRET_FLAG)
+            pointer = POINTER_PART.match(line, pos)
+            if pointer:
+                segment['pointer'] = pointer.group(0)[len('; full: '):]
+                pos = pointer.end()
+        else:
+            other = OTHER_SEGMENT.match(line, pos)
+            assert other and other.end() > pos, 'not a segment of the grammar: ' + line[pos:pos + 80]
+            segment, pos = {'kind': 'other', 'text': other.group(0)}, other.end()
+        segments.append(segment)
+        if pos == len(line):
+            return segments, None
+        if QUEUED_PART.fullmatch(line, pos):
+            return segments, line[pos + 2:]
+        assert line.startswith('; check: slack ', pos), 'outside the grammar: ' + line[pos:pos + 80]
+        pos += 2
+
+
 def main(argv):
     command = argv[0]
     if command == 'card-payload':
@@ -2127,20 +2378,9 @@ def main(argv):
         json.dump(data, open(argv[2], 'w'))
     elif command in ('request-lines', 'request-texts'):
         lines = sys.stdin.read().splitlines()
-        shape = re.compile(r'check: slack request [0-9]+\.[0-9]+ from [UW][A-Z0-9]+( \(not acknowledged after 3 tries\))?: '
-                           + re.escape(plane.REQUEST_LABEL) + ' ')
         texts = []
         for line in lines:
-            match = shape.match(line)
-            assert match, 'not a request line: ' + line
-            assert len(line) <= plane.WAKE_LIMIT, 'line too long: %d' % len(line)
-            assert all(unicodedata.category(c) not in ('Cc', 'Zl', 'Zp') for c in line), 'control or separator in a line'
-            rest = line[match.end():]
-            text, end = json.JSONDecoder().raw_decode(rest)
-            tail = [part for part in rest[end:].split('; ') if part]
-            assert all(part == plane.SECRET_FLAG or re.fullmatch(r'full: state/slack-watch/requests\.jsonl#[0-9.]+', part)
-                       or re.fullmatch(r'\+[0-9]+ queued', part) for part in tail), 'outside the grammar: ' + line
-            texts.append(text)
+            texts += [segment['text'] for segment in parse_wake_line(line)[0] if segment['kind'] == 'request']
         if command == 'request-texts':
             print('\n'.join(texts))
         else:

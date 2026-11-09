@@ -1921,13 +1921,17 @@ say_owner 2000.000200 'sent after the first poll'
 expect_requests "legacy plane" 2000.000200
 # A plane armed before requests existed that is busy on its first upgraded poll (a delivered answer uses the whole
 # per-poll cap) still gets its starting point at that poll, takes in no history, and takes in a later request once.
-# It runs on the same three-scope, permission-sensitive replay as every other intake scenario, and its answer is the
-# control: the busy answer is delivered under those scopes, so the cap really is used up by existing work.
+# It runs on the same permission-sensitive replay as every other intake scenario (the base card path's scope set and
+# its method allowlist), and its answer is the control: the busy answer is delivered under those scopes, so the cap
+# really is used up by existing work.
 new_home typed-reply
 bind
 TR="$TMP/typed-reply-strict.json"
-python3 "$HELPER" set-transcript "$FIX/typed-reply/transcript.json" "$TMP/typed-reply-scoped.json" scopes '["chat:write","im:write","im:history"]'
-python3 "$HELPER" set-transcript "$TMP/typed-reply-scoped.json" "$TR" enforce_scopes true
+python3 "$HELPER" set-transcript "$FIX/typed-reply/transcript.json" "$TMP/typed-reply-scoped.json" scopes \
+  '["chat:write","im:write","im:history","reactions:read","reactions:write","users:read"]'
+python3 "$HELPER" set-transcript "$TMP/typed-reply-scoped.json" "$TMP/typed-reply-enforced.json" enforce_scopes true
+python3 "$HELPER" set-transcript "$TMP/typed-reply-enforced.json" "$TR" method_allowlist \
+  '["auth.test","chat.postMessage","chat.update","conversations.open","conversations.history","conversations.replies","reactions.get","reactions.add","users.info"]'
 "$ROOT/bin/fm-slack-check.sh" arm --replay "$TR" >/dev/null
 python3 "$HELPER" drop-state-field "$(state_file)" intake_cursor
 python3 "$HELPER" owner-message "$(replay_file)" 2000.000100 U0TESTOWNER 'sent before the first upgraded poll'
