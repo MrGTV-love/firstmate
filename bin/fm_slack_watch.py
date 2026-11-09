@@ -2059,6 +2059,9 @@ def check(watch, action):
             watch.clear_failure()
     except SlackError as error:
         watch.report_failure(error)
+        if str(error) == 'dm_user_changed':
+            # As before the owner check moved behind the bound check: a changed owner fails the whole run, exit 1.
+            return 1
     return 0
 
 
