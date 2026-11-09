@@ -225,6 +225,8 @@ An ordinary authenticated check reports latest state, so changing results from t
 Event-bearing checks instead retain each distinct event identity, while a retry of the same pending identity coalesces only that event under the queue lock.
 A retry during handling keeps the original sequence, so it cannot leave a duplicate beyond the presented acknowledgement cutoff.
 The Slack standing check identifies individual journaled output entries before batching or adding queued-count metadata, so a later batch cannot replace an earlier request.
+Only an authenticated custom check receives the event protocol; PR-poll, X, contribution and stop-notice output stays ordinary state even when it looks like an event marker.
+A malformed event line is refused as an event: valid events and state from that output, later checks and the check cadence continue, and the check's state row reports the refused count.
 [`bin/fm-check-lib.sh`](../bin/fm-check-lib.sh) owns the check-output protocol; it uses the existing queue, actor claims and generation-bound acknowledgement, without another scheduler or acceptance ledger.
 `tests/fm-wake-queue.test.sh` exercises the real Slack emitter, watcher scheduling, regrouped retries, ordinary state coalescing and acknowledgement with newer unpresented rows.
 

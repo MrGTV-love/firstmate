@@ -82,7 +82,7 @@ fm_custom_check_snapshot_cleanup() {
 
 FM_CHECK_WAKE_REASON=
 fm_check_queue_output() {  # <check-path> <captured-output>
-  local check=$1 output=$2 line event payload reason state_output=
+  local check=$1 output=$2 line event payload reason malformed=0 state_output=
   FM_CHECK_WAKE_REASON=
   while IFS= read -r line; do
     case "$line" in
@@ -90,10 +90,14 @@ fm_check_queue_output() {  # <check-path> <captured-output>
         event=${line#fm-check-event }
         case "$event" in
           *$'\t'*) payload=${event#*$'\t'}; event=${event%%$'\t'*} ;;
-          *) echo "error: malformed event output from $check" >&2; return 1 ;;
+          *) event= ;;
         esac
         case "$event" in
-          ''|*[!A-Za-z0-9._-]*) echo "error: invalid event identity from $check" >&2; return 1 ;;
+          ''|*[!A-Za-z0-9._-]*)
+            echo "error: malformed event output from $check" >&2
+            malformed=$((malformed + 1))
+            continue
+            ;;
         esac
         reason="check: $check: $payload"
         fm_wake_append check "$check#event:$event" "$reason" || return 1
@@ -107,6 +111,10 @@ fm_check_queue_output() {  # <check-path> <captured-output>
   done <<EOF
 $output
 EOF
+  if [ "$malformed" -gt 0 ]; then
+    [ -z "$state_output" ] || state_output="$state_output"$'\n'
+    state_output="${state_output}refused $malformed malformed fm-check-event line(s)"
+  fi
   if [ -n "$state_output" ]; then
     reason="check: $check: $state_output"
     fm_wake_append check "$check" "$reason" || return 1

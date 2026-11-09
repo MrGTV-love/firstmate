@@ -328,6 +328,77 @@ SH
   pass "distinct events survive regrouping and acknowledgement while ordinary state checks coalesce"
 )
 
+# A malformed marker from one authenticated check must not end the watcher pass,
+# and marker-looking text from routes outside the event protocol stays state.
+test_malformed_check_events_keep_delivery_and_cadence() (
+  set -e
+  local dir state queue pass_no
+  dir=$(make_case malformed-check-events)
+  state="$dir/state"
+  queue="$state/.wake-queue"
+  mkdir -p "$dir/config" "$dir/data" "$dir/root/bin"
+  export FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_CONFIG_OVERRIDE="$dir/config" FM_DATA_OVERRIDE="$dir/data" FM_ROOT_OVERRIDE="$dir/root"
+  export FM_GITHUB_ACCOUNTING=0 FM_MEMORY_GUARD_BIN=/usr/bin/true FM_OPEN_LOOPS_BIN=/usr/bin/true FM_WATCH_HANDLING_SUCCESSOR=1
+  cat > "$state/aa-events.check.sh" <<'SH'
+#!/usr/bin/env bash
+counter="$FM_STATE_OVERRIDE/malformed-counter"
+pass=$(( $(cat "$counter" 2>/dev/null || echo 0) + 1 ))
+printf '%s' "$pass" > "$counter"
+printf 'fm-check-event before\tbefore payload\n'
+printf 'fm-check-event missing-tab\n'
+if [ "$pass" = 1 ]; then
+  printf 'fm-check-event ts:channel\tinvalid identity payload\n'
+  printf 'fm-check-event after\tafter payload\n'
+else
+  printf 'fm-check-event next\tnext payload\n'
+fi
+printf 'ordinary state %s\n' "$pass"
+SH
+  cat > "$state/contributions.check.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'fm-check-event contrib\tcontribution text\n'
+SH
+  chmod 0700 "$state/aa-events.check.sh" "$state/contributions.check.sh"
+  bash "$ROOT/bin/fm-check-register.sh" aa-events >/dev/null
+  bash "$ROOT/bin/fm-check-register.sh" contributions >/dev/null
+  cat > "$dir/root/bin/fm-x-poll.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'fm-check-event xpoll\tx text\n'
+SH
+  chmod 0700 "$dir/root/bin/fm-x-poll.sh"
+  bash -c '. "$1"; fmx_poll_shim_content "$2" "$3"' _ "$ROOT/bin/fm-x-lib.sh" "$dir" "$dir/root" > "$state/x-watch.check.sh"
+  chmod 0700 "$state/x-watch.check.sh"
+  touch -t 200001010000 "$dir/aged"
+  key_rows() { awk -F '\t' -v key="$1" '$4 == key' "$queue"; }
+  for pass_no in 1 2; do
+    touch -t 200001010000 "$state/.last-check"
+    PATH="$dir/fakebin:$PATH" bash "$WATCH" > "$dir/watch-$pass_no.out" 2> "$dir/watch-$pass_no.err" \
+      || fail "malformed event output failed watcher pass $pass_no"
+    [ "$state/.last-check" -nt "$dir/aged" ] || fail "pass $pass_no did not advance the check cadence"
+    [ "$(key_rows "$state/aa-events.check.sh#event:before" | wc -l | tr -d ' ')" = 1 ] \
+      || fail "valid event before the malformed lines was lost or duplicated on pass $pass_no"
+    [ "$(key_rows "$state/aa-events.check.sh#event:after" | wc -l | tr -d ' ')" = 1 ] \
+      || fail "valid event after the malformed lines was lost on pass $pass_no"
+    ! grep -E '#event:(ts:channel|missing-tab)' "$queue" >/dev/null || fail "malformed input became an event"
+    key_rows "$state/aa-events.check.sh" | grep -F 'malformed fm-check-event' >/dev/null \
+      || fail "pass $pass_no had no check-keyed diagnostic"
+    key_rows "$state/aa-events.check.sh" | grep -F "ordinary state $pass_no" >/dev/null \
+      || fail "ordinary state was not delivered on pass $pass_no"
+    key_rows "$state/contributions.check.sh" | grep -F 'fm-check-event contrib' >/dev/null \
+      || fail "later contribution check output was not delivered as state on pass $pass_no"
+    key_rows "$state/x-watch.check.sh" | grep -F 'fm-check-event xpoll' >/dev/null \
+      || fail "X output was not delivered as state on pass $pass_no"
+  done
+  [ "$(key_rows "$state/aa-events.check.sh#event:next" | wc -l | tr -d ' ')" = 1 ] || fail "second-pass event was not delivered"
+  ! grep -E '(contributions|x-watch)\.check\.sh#event:' "$queue" >/dev/null || fail "non-event route parsed a marker-looking line"
+  "$DRAIN" > "$dir/drain.out" 2> "$dir/drain.err"
+  [ "$(grep -c 'before payload' "$dir/drain.out")" = 1 ] || fail "retried event was presented more than once"
+  grep -F 'next payload' "$dir/drain.out" >/dev/null || fail "second-pass event was not presented"
+  grep -F 'ordinary state 2' "$dir/drain.out" >/dev/null || fail "latest state was not presented"
+  ! grep -F 'ordinary state 1' "$dir/drain.out" >/dev/null || fail "ordinary state stopped coalescing"
+  pass "malformed event output keeps valid events, state, later checks and cadence"
+)
+
 test_unpresentable_row_cannot_suppress_a_check_event() {
   local dir state event_key
   dir=$(make_case malformed-pending-event)
@@ -4412,6 +4483,7 @@ test_stale_enqueue_before_suppressor
 test_not_working_stale_enqueue_before_suppressor
 test_check_output_is_queued
 test_check_events_survive_batch_changes_and_state_coalescing
+test_malformed_check_events_keep_delivery_and_cadence
 test_unpresentable_row_cannot_suppress_a_check_event
 test_atomic_double_drain
 test_drain_dedupes_obvious_duplicates

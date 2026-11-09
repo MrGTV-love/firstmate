@@ -4001,6 +4001,7 @@ prelude_phase() {
       [ -e "$c" ] || continue
       watcher_beat
       is_pr_poll=0
+      check_events=0
       if [ "$(basename "$c")" = x-watch.check.sh ]; then
         if fmx_poll_shim_valid "$c" "$FM_HOME" "$FM_ROOT" \
           && [ -f "$FM_ROOT/bin/fm-x-poll.sh" ] && [ ! -L "$FM_ROOT/bin/fm-x-poll.sh" ]; then
@@ -4033,7 +4034,8 @@ prelude_phase() {
           out=$FM_CHECK_RESULT
         elif fm_custom_check_snapshot_prepare "$STATE" "$id"; then
           custom_snapshot=$FM_CUSTOM_CHECK_SNAPSHOT
-          FM_CHECK_EVENT_OUTPUT=1 run_check_capture "$id" "$custom_snapshot" || exit 1
+          [ "$id" = contributions ] || check_events=1
+          FM_CHECK_EVENT_OUTPUT=$check_events run_check_capture "$id" "$custom_snapshot" || exit 1
           out=$FM_CHECK_RESULT
           fm_custom_check_snapshot_cleanup
         else
@@ -4042,7 +4044,7 @@ prelude_phase() {
           continue
         fi
       fi
-      [ -z "$FM_CHECK_STOP_NOTICE" ] || out=$FM_CHECK_STOP_NOTICE
+      [ -z "$FM_CHECK_STOP_NOTICE" ] || { out=$FM_CHECK_STOP_NOTICE; check_events=0; }
       if [ -n "$out" ]; then
         if [ "$(basename "$c")" = contributions.check.sh ]; then
           contribution_check_output=
@@ -4109,8 +4111,13 @@ EOF
           continue
         fi
         pr_poll_control_release || exit 1
-        fm_check_queue_output "$c" "$out" || exit 1
-        [ -n "$check_wake_reason" ] || check_wake_reason=$FM_CHECK_WAKE_REASON
+        if [ "$check_events" -eq 1 ]; then
+          fm_check_queue_output "$c" "$out" || exit 1
+          [ -n "$check_wake_reason" ] || check_wake_reason=$FM_CHECK_WAKE_REASON
+        else
+          fm_wake_append check "$c" "$reason" || exit 1
+          [ -n "$check_wake_reason" ] || check_wake_reason=$reason
+        fi
       fi
       pr_poll_control_release || exit 1
     done
