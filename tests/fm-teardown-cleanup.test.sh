@@ -7792,6 +7792,37 @@ test_an_unreadable_existing_receipt_is_not_taken_for_no_receipt() {
   pass "an existing receipt that cannot be read is unknown, not absent: the driver is not asked, and the repaired run closes with the one call and one tar"
 }
 
+# A driver-named path holds a newline (a valid element of the driver's JSON array). The route
+# carries the complete name through recognition, validation, recording and comparison: the first
+# close succeeds with one driver call and one tar, the file is held in the preserve, and an
+# unchanged retry adds no call and no tar. A tab-named path is the ordinary control.
+test_a_driver_named_path_that_holds_a_newline_is_carried_whole_and_not_asked_about_again() {
+  local rc name json calls kind preserve
+  for kind in newline tab; do
+    make_retained_case "retained-named-$kind" enclosing
+    if [ "$kind" = newline ]; then
+      name=$'.claude/a\nb.txt'; json='[".claude/channel-outbox/a.jsonl",".claude/a\nb.txt"]'
+    else
+      name=$'.claude/a\tb.txt'; json='[".claude/channel-outbox/a.jsonl",".claude/a\tb.txt"]'
+    fi
+    printf '%s\n' '.claude/a?b.txt' >> "$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)"
+    printf 'named bytes\n' > "$FOREIGN_COPY/$name"
+    git -C "$FOREIGN_COPY" check-ignore -q -- "$name" || fail "retained-named-$kind: the named file is not an ignored file, so the case proves nothing"
+    held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY"
+    run_foreign_teardown rc FM_STUB_CLOSEOUT=retained "FM_STUB_UNIQUE_JSON=$json"
+    expect_code 0 "$rc" "retained-named-$kind: the close must succeed: $(cat "$FOREIGN_CASE/stderr")"
+    calls=$(retained_call_count)
+    assert_equals "1 1" "$calls $(retained_tar_count)" "retained-named-$kind: run 1 must make exactly one driver call and one tar"
+    preserve=$(retained_field "$(retained_record_path)" preserve)
+    [ -f "$preserve/$name" ] || fail "retained-named-$kind: the named file is missing from the preserve"
+    assert_equals "named bytes" "$(cat "$preserve/$name")" "retained-named-$kind: the preserved named file changed"
+    run_foreign_teardown rc FM_STUB_CLOSEOUT=retained "FM_STUB_UNIQUE_JSON=$json"
+    run_foreign_teardown rc FM_STUB_CLOSEOUT=retained "FM_STUB_UNIQUE_JSON=$json"
+    assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-named-$kind: an unchanged retry asked the driver or wrote a tar"
+  done
+  pass "a driver-named path that holds a newline is carried whole: one call and one tar, held in the preserve, and no call or tar on an unchanged retry (the tab name is the control)"
+}
+
 test_a_retained_record_that_cannot_be_written_refuses_the_close() {
   local rc dir
   make_retained_case retained-unwritable enclosing
@@ -8120,6 +8151,7 @@ test_a_retained_record_that_cannot_be_written_refuses_the_close
 test_a_preserve_that_cannot_be_created_after_the_driver_answers_is_recorded_and_not_repeated
 test_a_copy_whose_state_cannot_be_read_after_the_driver_answers_is_not_asked_about_again_while_unreadable
 test_an_unreadable_existing_receipt_is_not_taken_for_no_receipt
+test_a_driver_named_path_that_holds_a_newline_is_carried_whole_and_not_asked_about_again
 test_the_preserve_restores_to_the_builders_hashes
 test_the_builders_whole_inventory_is_preserved_fingerprinted_and_restored_byte_for_byte
 test_a_file_created_in_the_copy_while_the_driver_runs_is_not_closed_over

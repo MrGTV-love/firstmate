@@ -2710,6 +2710,9 @@ n=$(find "$tardir" -name '*.tar' | wc -l | tr -d ' ')
 printf 'archive %s\n' "$n" > "$tardir/stub-ordinary_cleanup-$((n + 1)).tar"
 [ -z "${FM_STUB_AFTER:-}" ] || eval "$FM_STUB_AFTER"
 unique=$(printf '%s\n' ${FM_STUB_UNIQUE-.claude/channel-outbox/a.jsonl .claude/channel-outbox/b.jsonl} | jq -R . | jq -s -c .)
+# FM_STUB_UNIQUE_JSON: the driver's array as JSON text, for a name no space-separated list
+# can carry (a newline, a space); it replaces FM_STUB_UNIQUE.
+[ -z "${FM_STUB_UNIQUE_JSON:-}" ] || unique=$FM_STUB_UNIQUE_JSON
 reason=${FM_STUB_REASON:-cleanup_ignored_payload_archived_tree_retained}
 case "${FM_STUB_JSON:-one}" in
   broken) printf '{"allowed": false, "reason": "%s"\n' "$reason" ;;

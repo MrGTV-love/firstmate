@@ -1718,11 +1718,21 @@ teardown_retained_preserve_of() {  # <copy>
   printf '%s\n' "$preserve"
 }
 
+# A driver-named path travels through the lists, records and here-strings of this route as
+# one line: a backslash is written \\ and a newline \n (the driver's JSON array holds the
+# complete name, a newline included). teardown_name_dec sets TEARDOWN_NAME to the name itself,
+# trailing newlines included. A lone backslash before another character stays as it is.
+teardown_name_dec() {  # <encoded name>
+  TEARDOWN_NAME=
+  IFS= read -r -d '' TEARDOWN_NAME < <(perl -e 'my $s = shift; $s =~ s/\\(.)/$1 eq "n" ? "\n" : $1/ge; print $s, "\0"' -- "$1") || return 1
+}
+
 # Is <entry> a plain path inside <copy> that exists and is reached through no
-# symlink? Driver-named paths are never trusted to stay inside the copy.
+# symlink? Driver-named paths are never trusted to stay inside the copy. <entry> is the
+# name itself (decode a driver-named one first); a newline in it is part of the name.
 teardown_retained_entry_ok() {  # <copy> <entry>
   local copy=$1 entry=$2 rest part prefix=
-  case "$entry" in ''|/*|*$'\n'*) return 1 ;; esac
+  case "$entry" in ''|/*) return 1 ;; esac
   rest=$entry
   while :; do
     part=${rest%%/*}
@@ -1742,8 +1752,10 @@ teardown_retained_entry_ok() {  # <copy> <entry>
 # symlink is accepted only without a trailing slash and only when it resolves to
 # a place inside the copy (a name written with a trailing slash must be a real
 # directory); one that resolves outside the copy, or nowhere, is refused.
-teardown_retained_named_ok() {  # <copy> <raw-name>
-  local copy=$1 raw=$2 body slash=0 rest part prefix="" copy_real real
+teardown_retained_named_ok() {  # <copy> <raw-name, encoded as the lists hold it>
+  local copy=$1 raw body slash=0 rest part prefix="" copy_real real
+  teardown_name_dec "$2" || return 1
+  raw=$TEARDOWN_NAME
   case "$raw" in ''|/*) return 1 ;; esac
   body=$raw
   case "$raw" in */) body=${raw%/}; slash=1 ;; esac
@@ -1818,13 +1830,13 @@ teardown_closeout_retained_paths() {  # <copy>
     and (.[0].tracked_uncovered_paths == []) and (.[0].uncovered_paths == [])
     and ((.[0].untracked_uncovered_paths // []) == [])
     and ((.[0].unique_ignored_paths | type) == "array")
-    and (.[0].unique_ignored_paths | all(type == "string" and length > 0 and (contains("\n") | not)))
+    and (.[0].unique_ignored_paths | all(type == "string" and length > 0 and (contains("\u0000") | not)))
   ' >/dev/null 2>&1 || return 1
   kept=$(printf '%s' "$TEARDOWN_CLOSEOUT_STDOUT" | jq -s -r '.[0].retained_worktree_path // empty' 2>/dev/null) || return 1
   if [ -n "$kept" ] && [ "$(fm_task_copy_canonical_dir "$kept" 2>/dev/null)" != "$(fm_task_copy_canonical_dir "$copy" 2>/dev/null)" ]; then
     return 1
   fi
-  printf '%s' "$TEARDOWN_CLOSEOUT_STDOUT" | jq -s -r '.[0].unique_ignored_paths[]' 2>/dev/null
+  printf '%s' "$TEARDOWN_CLOSEOUT_STDOUT" | jq -s -r '.[0].unique_ignored_paths[] | gsub("\\\\";"\\\\") | gsub("\n";"\\n")' 2>/dev/null
 }
 
 # Can the retained record of <copy> be written now? (A scratch file in its folder.)
@@ -1964,7 +1976,7 @@ teardown_retained_preserve_check() {  # <strict|adopt> <copy> <dir>   (driver-na
   local -a named=() chosen=()
   paths=$(cat)
   while IFS= read -r entry; do
-    [ -z "$entry" ] || named+=("$entry")
+    [ -z "$entry" ] || { teardown_name_dec "$entry" || return 1; named+=("$TEARDOWN_NAME"); }
   done <<< "$paths"
   for entry in ${named[@]+"${named[@]}"}; do
     if ! teardown_retained_entry_ok "$copy" "$entry"; then
@@ -2093,7 +2105,7 @@ teardown_retained_named_state() {  # <copy>
   local entry
   while IFS= read -r entry; do
     [ -n "$entry" ] || continue
-    if teardown_retained_entry_ok "$1" "$entry"; then
+    if teardown_name_dec "$entry" && teardown_retained_entry_ok "$1" "$TEARDOWN_NAME"; then
       printf '%s\tok\n' "$entry"
     else
       printf '%s\tbad\n' "$entry"
