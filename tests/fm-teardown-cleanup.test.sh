@@ -7739,23 +7739,57 @@ test_a_preserve_that_cannot_be_created_after_the_driver_answers_is_recorded_and_
 }
 
 # The state of the copy can no longer be read after the driver answered (a file lost its
-# permissions while the driver ran): nothing can be recorded from an unreadable state, and
-# the retry refuses before the driver is asked, with no further call, while it stays unreadable.
+# permissions while the driver ran). The driver answered for the state read before it was asked,
+# so that answer is recorded at once: the retry while the file stays unreadable refuses before
+# the driver, and once the file is readable again, with nothing else changed, the recorded
+# answer is accepted again: no further driver call, no further tar, and the close succeeds.
 test_a_copy_whose_state_cannot_be_read_after_the_driver_answers_is_not_asked_about_again_while_unreadable() {
-  local rc calls
+  local rc calls tars
   [ "$(id -u)" != 0 ] || { pass "skipped as root: a file permission does not stop root"; return 0; }
   make_retained_case retained-state-unreadable enclosing
   run_foreign_teardown rc FM_STUB_CLOSEOUT=retained "FM_STUB_AFTER=chmod 000 '$FOREIGN_COPY/.claude/channel-outbox/a.jsonl'"
   expect_code 1 "$rc" "retained-state-unreadable: run 1 must refuse: $(cat "$FOREIGN_CASE/stderr")"
-  calls=$(retained_call_count)
-  assert_equals 1 "$calls" "retained-state-unreadable: run 1 must make exactly one driver call"
+  calls=$(retained_call_count); tars=$(retained_tar_count)
+  assert_equals "1 1" "$calls $tars" "retained-state-unreadable: run 1 must make exactly one driver call and one tar"
+  assert_equals 1 "$(find "$FOREIGN_CASE/data/task-x1/closeout-refused" -type f 2>/dev/null | wc -l | tr -d ' ')" "retained-state-unreadable: the driver's answer was not recorded"
   run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
-  chmod 644 "$FOREIGN_COPY/.claude/channel-outbox/a.jsonl" 2>/dev/null || true
-  expect_code 1 "$rc" "retained-state-unreadable: an unchanged retry must refuse: $(cat "$FOREIGN_CASE/stderr")"
+  expect_code 1 "$rc" "retained-state-unreadable: an unchanged retry must refuse while the file is unreadable: $(cat "$FOREIGN_CASE/stderr")"
   assert_equals "$calls" "$(retained_call_count)" "retained-state-unreadable: the retry asked the driver while the state was unreadable"
   assert_present "$FOREIGN_CASE/state/task-x1.meta" "retained-state-unreadable: the task record was removed"
   assert_present "$FOREIGN_COPY/.git" "retained-state-unreadable: the copy was removed"
-  pass "a copy whose state cannot be read after the driver answered is refused before the driver on every retry while it stays unreadable"
+  chmod 644 "$FOREIGN_COPY/.claude/channel-outbox/a.jsonl"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  expect_code 0 "$rc" "retained-state-unreadable: once readable again the recorded answer must be accepted: $(cat "$FOREIGN_CASE/stderr")"
+  assert_equals "$calls $tars" "$(retained_call_count) $(retained_tar_count)" "retained-state-unreadable: the recovered run asked the driver again or wrote another tar"
+  pass "a copy whose state cannot be read after the driver answered keeps the answer: refused before the driver while unreadable, and closed without a second call or tar once readable again"
+}
+
+# An existing record that cannot be read is unknown, not absent: the driver is not asked while
+# the answer it may hold cannot be read, and once the record is readable again the close
+# succeeds without a second call or tar. The record exists while the task is still open because
+# the held-slot lease proof refuses after the driver answered.
+test_an_unreadable_existing_receipt_is_not_taken_for_no_receipt() {
+  local rc calls tars record
+  [ "$(id -u)" != 0 ] || { pass "skipped as root: a file permission does not stop root"; return 0; }
+  make_retained_case retained-receipt-unreadable enclosing
+  held_plain_get_slot "$FOREIGN_CASE"
+  : > "$FOREIGN_CASE/no-lease-command"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  expect_code 1 "$rc" "retained-receipt-unreadable: run 1 must refuse for the lease: $(cat "$FOREIGN_CASE/stderr")"
+  calls=$(retained_call_count); tars=$(retained_tar_count)
+  assert_equals "1 1" "$calls $tars" "retained-receipt-unreadable: run 1 must make exactly one driver call and one tar"
+  record=$(retained_record_path)
+  chmod 000 "$record"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  chmod 644 "$record"
+  expect_code 1 "$rc" "retained-receipt-unreadable: an unreadable receipt must refuse: $(cat "$FOREIGN_CASE/stderr")"
+  assert_grep 'cannot be read' "$FOREIGN_CASE/stderr" "retained-receipt-unreadable: the refusal did not say the record cannot be read"
+  assert_equals "$calls $tars" "$(retained_call_count) $(retained_tar_count)" "retained-receipt-unreadable: the driver was asked while the receipt was unreadable"
+  rm -f "$FOREIGN_CASE/no-lease-command"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  expect_code 0 "$rc" "retained-receipt-unreadable: once readable the close must succeed: $(cat "$FOREIGN_CASE/stderr")"
+  assert_equals "$calls $tars" "$(retained_call_count) $(retained_tar_count)" "retained-receipt-unreadable: the repaired run asked the driver again or wrote another tar"
+  pass "an existing receipt that cannot be read is unknown, not absent: the driver is not asked, and the repaired run closes with the one call and one tar"
 }
 
 test_a_retained_record_that_cannot_be_written_refuses_the_close() {
@@ -8085,6 +8119,7 @@ test_an_aged_record_of_an_unchanged_kept_copy_still_asks_the_driver_nothing
 test_a_retained_record_that_cannot_be_written_refuses_the_close
 test_a_preserve_that_cannot_be_created_after_the_driver_answers_is_recorded_and_not_repeated
 test_a_copy_whose_state_cannot_be_read_after_the_driver_answers_is_not_asked_about_again_while_unreadable
+test_an_unreadable_existing_receipt_is_not_taken_for_no_receipt
 test_the_preserve_restores_to_the_builders_hashes
 test_the_builders_whole_inventory_is_preserved_fingerprinted_and_restored_byte_for_byte
 test_a_file_created_in_the_copy_while_the_driver_runs_is_not_closed_over

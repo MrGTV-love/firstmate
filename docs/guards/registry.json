@@ -545,7 +545,15 @@
         },
         {
           "file": "bin/fm-teardown-nested-lib.sh",
-          "match": "echo \"REFUSED: the state of own nested copy $(fm_refuse_text \"$copy\") could not be read, so its retained state cannot be recorded; the task was not closed.\" >&2"
+          "match": "echo \"REFUSED: the state of own nested copy $(fm_refuse_text \"$copy\") could not be read after the driver answered; the answer is recorded for the state read before it was asked, the task was not closed, and a retry asks the driver nothing.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: the state of own nested copy $(fm_refuse_text \"$copy\") could not be read after its ignored files were verified; the answer is recorded for the state read before the driver was asked, the task was not closed, and a retry asks the driver nothing.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: the record $(fm_refuse_text \"$record\") of own nested copy $(fm_refuse_text \"$copy\") exists but cannot be read, so what Vernant's closeout driver already answered is unknown; the driver was not asked, and the task was not closed.\" >&2"
         },
         {
           "file": "bin/fm-teardown-nested-lib.sh",

@@ -2105,7 +2105,15 @@ teardown_retained_named_state() {  # <copy>
 # teardown_retained_snapshot, naming <reason>.
 teardown_retained_refused_write() {  # <copy> <lock-sha256> <identity> <paths> <reason>
   local copy=$1 rec tmp named path
-  teardown_retained_snapshot "$copy" || return 1
+  if ! teardown_retained_snapshot "$copy"; then
+    # The state can no longer be read (a file lost its permissions after the driver
+    # answered). The driver answered for the state read before it was asked; the record is
+    # keyed on that state, so an unchanged copy that becomes readable again matches it and
+    # the driver is not asked again.
+    [ -n "${TEARDOWN_PRE_SNAPSHOT:-}" ] || return 1
+    read -r TEARDOWN_RET_HEAD TEARDOWN_RET_STATUS TEARDOWN_RET_PAYLOAD <<< "$TEARDOWN_PRE_SNAPSHOT"
+    [ -n "$TEARDOWN_RET_HEAD" ] && [ -n "$TEARDOWN_RET_STATUS" ] && [ -n "$TEARDOWN_RET_PAYLOAD" ] || return 1
+  fi
   named=$(printf '%s\n' "$4" | teardown_retained_named_state "$copy") || return 1
   rec=$(teardown_retained_refused_path "$copy") || return 1
   mkdir -p "${rec%/*}" || return 1
@@ -2221,7 +2229,8 @@ teardown_retained_accept() {  # <slot> <copy> <lock-sha256> <identity> <paths>
     return 1
   fi
   if ! teardown_retained_snapshot "$copy"; then
-    echo "REFUSED: the state of own nested copy $(fm_refuse_text "$copy") could not be read, so its retained state cannot be recorded; the task was not closed." >&2
+    teardown_retained_refused_note "$copy" "$lock_hash" "$identity" "$paths" "$TEARDOWN_RETAINED_UNHELD_REASON"
+    echo "REFUSED: the state of own nested copy $(fm_refuse_text "$copy") could not be read after the driver answered; the answer is recorded for the state read before it was asked, the task was not closed, and a retry asks the driver nothing." >&2
     return 1
   fi
   before="$TEARDOWN_RET_HEAD $TEARDOWN_RET_STATUS $TEARDOWN_RET_PAYLOAD"
@@ -2255,7 +2264,12 @@ teardown_retained_accept() {  # <slot> <copy> <lock-sha256> <identity> <paths>
     echo "REFUSED: the ignored files of own nested copy $(fm_refuse_text "$copy") that the driver names unique, or that preservation selects, are not held byte for byte in $(fm_refuse_text "$dir"); the task was not closed and the copy was not touched." >&2
     return 1
   fi
-  if ! teardown_retained_snapshot "$copy" || [ "$before" != "$TEARDOWN_RET_HEAD $TEARDOWN_RET_STATUS $TEARDOWN_RET_PAYLOAD" ]; then
+  if ! teardown_retained_snapshot "$copy"; then
+    teardown_retained_refused_note "$copy" "$lock_hash" "$identity" "$paths" "$TEARDOWN_RETAINED_UNHELD_REASON"
+    echo "REFUSED: the state of own nested copy $(fm_refuse_text "$copy") could not be read after its ignored files were verified; the answer is recorded for the state read before the driver was asked, the task was not closed, and a retry asks the driver nothing." >&2
+    return 1
+  fi
+  if [ "$before" != "$TEARDOWN_RET_HEAD $TEARDOWN_RET_STATUS $TEARDOWN_RET_PAYLOAD" ]; then
     echo "REFUSED: own nested copy $(fm_refuse_text "$copy") changed while its ignored files were verified; the task was not closed." >&2
     return 1
   fi
@@ -2429,12 +2443,20 @@ teardown_own_locked_copies_prove() {
 # creation lock holds, then releases and removes it. Returns 1 after printing a
 # refusal.
 teardown_own_copy_dispose() {  # <slot> <copy>
-  local slot=$1 copy=$2 rc=0 lock_hash='' identity='' paths
+  local slot=$1 copy=$2 rc=0 lock_hash='' identity='' paths record
   teardown_copy_lock_file "$copy" || rc=$?
   if [ "$rc" != 0 ] || ! teardown_vernant_lock_pid "$TEARDOWN_FOREIGN_LOCK" >/dev/null; then
     echo "REFUSED: own nested copy $(fm_refuse_text "$copy") is not locked by Vernant's creation lock any more; it was not removed." >&2
     return 1
   fi
+  # A record that exists but cannot be read says nothing: it is not "no record". The driver
+  # is not asked while the answer it may hold is unknown.
+  for record in "$(teardown_retained_receipt "$DATA" "$copy")" "$(teardown_retained_refused_path "$copy")"; do
+    if { [ -e "$record" ] || [ -L "$record" ]; } && ! { [ -f "$record" ] && [ ! -L "$record" ] && [ -r "$record" ]; }; then
+      echo "REFUSED: the record $(fm_refuse_text "$record") of own nested copy $(fm_refuse_text "$copy") exists but cannot be read, so what Vernant's closeout driver already answered is unknown; the driver was not asked, and the task was not closed." >&2
+      return 1
+    fi
+  done
   if teardown_retained_matches "$copy"; then
     teardown_retained_confirm "$slot" "$copy"
     return
