@@ -1699,7 +1699,7 @@ test_a_sweep_from_another_home_does_not_ask_the_driver_for_a_copy_a_lane_record_
 
 test_a_sweep_holds_a_copy_when_another_homes_records_cannot_be_read() {
   local copy mode calls
-  for mode in unreadable-folder unsearchable-data skipped-home; do
+  for mode in unreadable-folder unsearchable-data skipped-home searchable-unreadable-retained searchable-unreadable-folder searchable-unreadable-data; do
     make_locked_copy_case "xhome-$mode" dead
     install_driver "$SLOT" "$W"
     make_lane l1
@@ -1708,9 +1708,14 @@ test_a_sweep_holds_a_copy_when_another_homes_records_cannot_be_read() {
       unreadable-folder) mkdir -p "$W/lane-l1/data/copy-sweep/retained"; chmod 000 "$W/lane-l1/data/copy-sweep/retained" ;;
       unsearchable-data) mkdir -p "$W/lane-l1/data/copy-sweep/retained"; chmod 000 "$W/lane-l1/data" ;;
       skipped-home) rm -rf "$W/lane-l1" ;;
+      # Searchable but not readable: the directory lists as empty, so its records are unknown.
+      searchable-unreadable-retained) mkdir -p "$W/lane-l1/data/copy-sweep/retained"; chmod 111 "$W/lane-l1/data/copy-sweep/retained" ;;
+      searchable-unreadable-folder) mkdir -p "$W/lane-l1/data/copy-sweep/retained"; chmod 111 "$W/lane-l1/data/copy-sweep" ;;
+      searchable-unreadable-data) mkdir -p "$W/lane-l1/data/copy-sweep/retained"; chmod 111 "$W/lane-l1/data" ;;
     esac
     FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
     chmod 755 "$W/lane-l1/data" 2>/dev/null || true
+    chmod 755 "$W/lane-l1/data/copy-sweep" 2>/dev/null || true
     chmod 755 "$W/lane-l1/data/copy-sweep/retained" 2>/dev/null || true
     [ "$RC" = 0 ] || fail "$mode: the run failed ($RC): $OUT"
     assert_class locked HELD-LOCKED
@@ -1720,6 +1725,34 @@ test_a_sweep_holds_a_copy_when_another_homes_records_cannot_be_read() {
     registered locked || fail "$mode: the copy is no longer registered"
   done
   pass "a sweep holds a locked copy and asks the driver nothing when another home's retained records, or the home itself, cannot be read"
+}
+
+# A receipt is cleared only when its copy is positively gone (the kernel says it does not
+# exist). A copy that cannot be looked up because a directory above it cannot be searched is
+# unknown, not gone: its receipt stays, and is still there when the access is restored.
+test_a_receipt_survives_while_its_copy_cannot_be_looked_up_and_is_cleared_only_when_it_is_gone() {
+  local copy hash record parent
+  [ "$(id -u)" != 0 ] || { pass "skipped as root: a directory permission does not stop root"; return 0; }
+  make_locked_copy_case receipt-unobservable dead
+  install_driver "$SLOT" "$W"
+  copy=$(copy_path locked)
+  hash=$(printf '%s' "$copy" | shasum -a 256 | awk '{print $1}')
+  record="$HOMED/data/copy-sweep/retained/$hash"
+  xhome_record "$copy" "$record"
+  parent=$(dirname "$copy")
+  chmod 000 "$parent"
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  chmod 755 "$parent"
+  assert_not_contains "$OUT" "RECEIPT-CLEARED" "a receipt was cleared while its copy could not be looked up"
+  [ -e "$record" ] || fail "the receipt of a copy that could not be looked up was removed"
+  [ -e "$copy" ] || fail "the copy is gone after the access was restored"
+  # Control: once the copy really is gone the apply clears the receipt.
+  git -C "$SLOT" worktree unlock "$copy"
+  git -C "$SLOT" worktree remove --force "$copy"
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  assert_contains "$OUT" "RECEIPT-CLEARED" "the receipt of a copy that is gone was not cleared"
+  [ ! -e "$record" ] || fail "the receipt of a copy that is gone survived"
+  pass "a retained receipt survives while its copy cannot be looked up and is cleared only once the copy is positively gone"
 }
 
 test_a_long_sorted_key_refusal_still_shows_the_drivers_reason() {
@@ -3220,6 +3253,7 @@ test_a_long_sorted_key_refusal_still_shows_the_drivers_reason
 test_a_teardown_retained_record_protects_the_copy_and_is_cleared_with_it
 test_a_sweep_from_another_home_does_not_ask_the_driver_for_a_copy_a_lane_record_holds
 test_a_sweep_holds_a_copy_when_another_homes_records_cannot_be_read
+test_a_receipt_survives_while_its_copy_cannot_be_looked_up_and_is_cleared_only_when_it_is_gone
 test_a_failed_preservation_is_the_sweeps_own_human_only_refusal
 test_a_failed_preservation_leaves_no_staging_directory
 test_a_lock_that_stops_being_vernants_after_the_plan_is_not_released

@@ -735,9 +735,17 @@ record_driver_retention() {  # <copy> <lock-sha256> <identity> <reason>
 # copy is there, or the copy there has a different creation lock. The same copy
 # with no lock stays protected, because the driver may have released the lock and
 # then failed to remove the copy. Sets RECEIPT_STALE_COPY and RECEIPT_STALE_WHY.
-# A receipt or copy that cannot be read is not stale.
+# A receipt or copy that cannot be read or looked up is not stale.
 RECEIPT_STALE_COPY=
 RECEIPT_STALE_WHY=
+
+# Is <path> positively gone? Only the kernel's answer ENOENT or ENOTDIR counts. A path that
+# exists, or that cannot be looked up (a parent it cannot search, any other error), is not
+# gone: an unknown is never answered as absent. Exit 0 gone, 1 present, 2 unknown.
+path_positively_gone() {  # <path>
+  perl -e 'exit(lstat($ARGV[0]) ? 1 : (($!{ENOENT} || $!{ENOTDIR}) ? 0 : 2))' -- "$1"
+}
+
 receipt_is_stale() {  # <receipt>
   local hash='' copy='' identity='' current actual rc=0
   RECEIPT_STALE_COPY=
@@ -751,10 +759,13 @@ receipt_is_stale() {  # <receipt>
     RECEIPT_STALE_WHY="it records no lock hash, copy path and copy identity"
     return 0
   fi
-  if [ ! -e "$copy" ] && [ ! -L "$copy" ]; then
-    RECEIPT_STALE_WHY="its copy is gone"
-    return 0
-  fi
+  rc=0; path_positively_gone "$copy" || rc=$?
+  case "$rc" in
+    0) RECEIPT_STALE_WHY="its copy is gone"; return 0 ;;
+    1) ;;
+    *) return 1 ;;
+  esac
+  rc=0
   current=$(copy_identity "$copy") || return 1
   if [ "$current" != "$identity" ]; then
     RECEIPT_STALE_WHY="a different copy is now at its path"
@@ -774,22 +785,26 @@ receipt_is_stale() {  # <receipt>
 # stale one is ignored, not removed. A record or a folder that cannot be read
 # holds the copy as well, since an unknown is never answered with an archive.
 # Sets CLASS and REASON and succeeds when another home holds <copy>.
+# Is <dir> a directory this process cannot both read and search? An unknown is a hold.
+other_home_dir_blocked() {  # <dir>
+  [ -d "$1" ] && { [ ! -r "$1" ] || [ ! -x "$1" ]; }
+}
+
 other_home_retained() {  # <copy>
   local state_dir data rec own_data
   own_data=$(fm_task_copy_canonical_dir "$DATA_DIR" 2>/dev/null) || own_data=$DATA_DIR
   for state_dir in ${FM_LOCAL_FIRSTMATE_STATES[@]+"${FM_LOCAL_FIRSTMATE_STATES[@]}"}; do
     data=${state_dir%/*}/data
-    # A data directory that exists but cannot be searched hides every record in it:
+    # A data directory that exists but cannot be read or searched hides every record in it:
     # an unknown, so the copy is held (an absent one holds nothing).
-    if [ -d "$data" ] && [ ! -x "$data" ]; then
+    if other_home_dir_blocked "$data"; then
       CLASS=HELD-LOCKED
-      REASON="the data directory of another local home ($data) cannot be searched, so its retained records cannot be read and the driver is not asked"
+      REASON="the data directory of another local home ($data) cannot be read or searched, so its retained records cannot be read and the driver is not asked"
       return 0
     fi
     [ -d "$data" ] || continue
     [ "$(fm_task_copy_canonical_dir "$data" 2>/dev/null)" != "$own_data" ] || continue
-    if [ -d "$data/$CHECK_ID" ] && { [ ! -x "$data/$CHECK_ID" ] \
-         || { [ -d "$data/$CHECK_ID/retained" ] && [ ! -x "$data/$CHECK_ID/retained" ]; }; }; then
+    if other_home_dir_blocked "$data/$CHECK_ID" || other_home_dir_blocked "$data/$CHECK_ID/retained"; then
       CLASS=HELD-LOCKED
       REASON="the retained records of another local home ($data/$CHECK_ID) cannot be read, so the driver is not asked"
       return 0
@@ -1707,7 +1722,7 @@ teardown_driver_release() {  # <clone> <copy> <release-id> <pool> <container> <H
 # receipt_is_stale proves no longer describes its path is removed. Also removes,
 # without listing, each waiting record whose copy is gone or is a different copy.
 clear_stale_receipts() {
-  local receipt copy identity
+  local receipt copy identity rc
   for receipt in "$DATA_DIR/$CHECK_ID/retained"/*; do
     [ -e "$receipt" ] || [ -L "$receipt" ] || continue
     receipt_is_stale "$receipt" || continue
@@ -1721,9 +1736,16 @@ clear_stale_receipts() {
   for receipt in "$DATA_DIR/$CHECK_ID/waiting"/*; do
     [ -e "$receipt" ] || [ -L "$receipt" ] || continue
     copy=$(sed -n '1s/^copy=//p' "$receipt" 2>/dev/null) || continue
-    if [ -n "$copy" ] && { [ -e "$copy" ] || [ -L "$copy" ]; }; then
-      identity=$(copy_identity "$copy") || continue
-      ! read_waiting "$receipt" "$copy" "$identity" || continue
+    if [ -n "$copy" ]; then
+      rc=0; path_positively_gone "$copy" || rc=$?
+      case "$rc" in
+        0) ;;
+        1)
+          identity=$(copy_identity "$copy") || continue
+          ! read_waiting "$receipt" "$copy" "$identity" || continue
+          ;;
+        *) continue ;;
+      esac
     fi
     rm -f -- "$receipt" 2>/dev/null || true
   done
