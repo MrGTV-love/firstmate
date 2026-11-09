@@ -7720,6 +7720,57 @@ test_a_retained_record_that_cannot_be_written_refuses_the_close() {
 
 # C1 (d): the preserve restores into a scratch path byte for byte against hashes
 # computed from the fixture builder's own bytes, never from teardown's output.
+# The builder's own inventory (retained_add_inventory) is held byte for byte and fingerprinted
+# whole: a root name that holds a newline, a tab name, and unnamed files under .claude and
+# .opencode, one of them below a .cache directory. Changing only the newline-named file, and
+# then only the .cache file, is one reassessment each (one driver call and one tar), the
+# unchanged retries ask nothing, and no earlier preserved byte is overwritten.
+test_the_builders_whole_inventory_is_preserved_fingerprinted_and_restored_byte_for_byte() {
+  local rc item name want have preserve scratch first_dir other
+  make_retained_case retained-inventory enclosing
+  retained_add_inventory
+  held_plain_get_slot "$FOREIGN_CASE"
+  : > "$FOREIGN_CASE/no-lease-command"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-inventory: run 1 should have asked the driver once"
+  first_dir=$(find "$FOREIGN_CASE/data/task-x1/nested-copy-preserved" -mindepth 1 -maxdepth 1 -type d | head -n 1)
+  printf 'AB2\n' > "$FOREIGN_COPY/a"$'\n'"b"
+  RETAINED_INVENTORY[8]='a\nb|AB2'
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  assert_equals "2 2" "$(retained_call_count) $(retained_tar_count)" "retained-inventory: a change of only the newline-named file was not assessed again"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  assert_equals "2 2" "$(retained_call_count) $(retained_tar_count)" "retained-inventory: the unchanged retry asked the driver again"
+  printf 'claude cache 2\n' > "$FOREIGN_COPY/.claude/.cache/unique.txt"
+  RETAINED_INVENTORY[4]='.claude/.cache/unique.txt|claude cache 2'
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  assert_equals "3 3" "$(retained_call_count) $(retained_tar_count)" "retained-inventory: a change of only the .claude/.cache file was not assessed again"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  assert_equals "3 3" "$(retained_call_count) $(retained_tar_count)" "retained-inventory: the second unchanged retry asked the driver again"
+  rm -f "$FOREIGN_CASE/no-lease-command"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  expect_code 0 "$rc" "retained-inventory: the close must succeed once the slot can be leased: $(cat "$FOREIGN_CASE/stderr")"
+  assert_equals "3 3" "$(retained_call_count) $(retained_tar_count)" "retained-inventory: the closing run asked the driver again"
+  preserve=$(retained_field "$(retained_record_path)" preserve)
+  scratch=$FOREIGN_CASE/scratch-inventory
+  mkdir -p "$scratch"
+  (cd "$preserve" && tar -cf - .) | (cd "$scratch" && tar -xf -)
+  for item in "${RETAINED_INVENTORY[@]}"; do
+    name=$(retained_inventory_name "$item")
+    [ -f "$scratch/$name" ] || fail "retained-inventory: $(printf '%q' "$name") is missing from the preserve of the close"
+    want=$(printf '%s\n' "${item#*|}" | shasum -a 256 | awk '{print $1}')
+    have=$(shasum -a 256 < "$scratch/$name" | awk '{print $1}')
+    assert_equals "$want" "$have" "retained-inventory: $(printf '%q' "$name") does not restore to the builder's hash"
+  done
+  # sha256sum's form for a name holding a newline: a leading backslash and \n in the name.
+  assert_grep "\\$(printf 'AB2\n' | shasum -a 256 | awk '{print $1}')  a\\nb" "$preserve/SHA256SUMS" "retained-inventory: SHA256SUMS does not record the newline-named file in sha256sum's form"
+  # No earlier preserved byte was overwritten: the first preserve still holds the first bytes.
+  assert_equals "AB" "$(cat "$first_dir/a"$'\n'"b")" "retained-inventory: the first preserve's newline-named file changed"
+  assert_equals "claude cache" "$(cat "$first_dir/.claude/.cache/unique.txt")" "retained-inventory: the first preserve's .claude/.cache file changed"
+  other=$(find "$FOREIGN_CASE/data/task-x1/nested-copy-preserved" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')
+  [ "$other" -ge 3 ] || fail "retained-inventory: expected one preserve per payload (3), found $other"
+  pass "the builder's whole inventory (a newline name, a tab name, unnamed .claude and .opencode files, one below .cache) is preserved, fingerprinted and restored byte for byte, one reassessment per change, no earlier byte overwritten"
+}
+
 test_the_preserve_restores_to_the_builders_hashes() {
   local rc scratch preserve file want have
   make_retained_case retained-restore enclosing
@@ -7968,6 +8019,7 @@ test_a_retained_record_that_cannot_be_written_refuses_the_close
 test_a_preserve_that_cannot_be_created_after_the_driver_answers_is_recorded_and_not_repeated
 test_a_copy_whose_state_cannot_be_read_after_the_driver_answers_is_not_asked_about_again_while_unreadable
 test_the_preserve_restores_to_the_builders_hashes
+test_the_builders_whole_inventory_is_preserved_fingerprinted_and_restored_byte_for_byte
 test_a_file_created_in_the_copy_while_the_driver_runs_is_not_closed_over
 test_two_overlapping_teardowns_of_one_kept_copy_make_one_archive
 test_the_kept_route_refuses_an_anchored_but_unlanded_commit_and_an_untracked_claude_file

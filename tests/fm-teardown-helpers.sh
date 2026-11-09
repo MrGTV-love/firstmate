@@ -3538,3 +3538,40 @@ teardown_nonapple_python() {
   case "$py" in /usr/bin/*|/System/*|/Library/Developer/*|'') return 1 ;; esac
   printf '%s\n' "$py"
 }
+
+# retained_add_inventory: extends the retained-copy fixture with the ignored populations the
+# acceptance text names beyond the driver-named files: unnamed files under .claude and
+# .opencode (one below a regenerable-looking .cache), root files `a`, `b` and `a<newline>b`
+# (a name holding a newline is a different path from its neighbours), and a name with a tab.
+# RETAINED_INVENTORY lists "<name>|<bytes>" for every ignored file of the builder, names in
+# printf %b form; retained_inventory_name decodes one. The builder's own bytes are the
+# expected values: nothing is read back from the product.
+RETAINED_INVENTORY=()
+retained_inventory_name() {  # <inventory item>
+  local n=${1%%|*}
+  printf '%b' "$n"
+}
+retained_add_inventory() {
+  local exclude item name bytes
+  exclude=$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)
+  printf '%s\n' '.claude/' '.opencode/' '/a' '/b' '/a?b' 'notes/t?x' >> "$exclude"
+  mkdir -p "$FOREIGN_COPY/.claude/.cache" "$FOREIGN_COPY/.opencode" "$FOREIGN_COPY/notes"
+  RETAINED_INVENTORY=(
+    '.claude/channel-outbox/a.jsonl|one'
+    '.claude/channel-outbox/b.jsonl|two'
+    'notes/unique.dat|only here'
+    '.claude/unnamed.txt|unnamed claude'
+    '.claude/.cache/unique.txt|claude cache'
+    '.opencode/unnamed.txt|unnamed opencode'
+    'a|A'
+    'b|B'
+    'a\nb|AB'
+    'notes/t\tx|tabbed'
+  )
+  for item in "${RETAINED_INVENTORY[@]}"; do
+    name=$(retained_inventory_name "$item")
+    bytes=${item#*|}
+    printf '%s\n' "$bytes" > "$FOREIGN_COPY/$name"
+  done
+  held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY"
+}

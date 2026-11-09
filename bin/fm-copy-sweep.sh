@@ -861,34 +861,40 @@ tree_fingerprint() {  # <root> <find-args>...
   printf '%s' "$out" | LC_ALL=C sort | teardown_ignored_sha256
 }
 
-# The fingerprint of the newline-separated entries of <copy>.
-entries_fingerprint() {  # <copy> <entries>
-  local entry paths=()
-  while IFS= read -r entry; do
+# The fingerprint of the entries (paths relative to <copy>) given as arguments.
+entries_fingerprint() {  # <copy> <entry>...
+  local entry copy=$1 paths=()
+  shift
+  for entry in "$@"; do
     [ -z "$entry" ] || paths+=("./$entry")
-  done <<< "$2"
+  done
   if [ "${#paths[@]}" = 0 ]; then
     printf '' | teardown_ignored_sha256
     return
   fi
-  tree_fingerprint "$1" "${paths[@]}"
+  tree_fingerprint "$copy" "${paths[@]}"
 }
 
 # The fingerprint of every entry a release of proven <copy> preserves: the locked
-# route's by default, the unlocked route's when all mode is requested.
+# route's by default, the unlocked route's when all mode is requested. The entries come
+# as NUL-ended names, so a name that holds a newline is fingerprinted as itself.
 content_fingerprint() {  # <copy> [all]
-  local entries
-  entries=$(teardown_preservable_ignored "$1" "${2:-releasable}") || return 1
-  entries_fingerprint "$1" "$entries"
+  teardown_ignored_list "$1" "${2:-releasable}" || return 1
+  entries_fingerprint "$1" ${TEARDOWN_IGNORED_LIST[@]+"${TEARDOWN_IGNORED_LIST[@]}"}
 }
 
 # What shows whether <copy> is idle: those same entries and its regenerable
 # directories, which only preservation leaves out.
 activity_fingerprint() {  # <copy> [all]
-  local entries dirs
-  entries=$(teardown_preservable_ignored "$1" "${2:-releasable}") || return 1
+  local dirs dir
+  local -a more=()
+  teardown_ignored_list "$1" "${2:-releasable}" || return 1
+  more=(${TEARDOWN_IGNORED_LIST[@]+"${TEARDOWN_IGNORED_LIST[@]}"})
   dirs=$(teardown_regenerable_ignored "$1") || return 1
-  entries_fingerprint "$1" "$entries"$'\n'"$dirs"
+  while IFS= read -r dir; do
+    [ -z "$dir" ] || more+=("$dir")
+  done <<< "$dirs"
+  entries_fingerprint "$1" ${more[@]+"${more[@]}"}
 }
 
 # The fingerprint of preserve <dir>, without the library's metadata.

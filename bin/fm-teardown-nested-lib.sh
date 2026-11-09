@@ -524,44 +524,72 @@ teardown_regenerable_ignored() {  # <copy>
   return "$rc"
 }
 
-# Prints ignored <entry> of <copy> without the class: whole when it holds none of
-# those directories, otherwise split only as far as needed to leave them out.
-teardown_entry_without_regenerable() {  # <copy> <entry>
-  local copy=$1 entry=$2 found child
-  found=$(teardown_regenerable_dirs "$copy/$entry") || return 1
-  if [ -z "$found" ]; then
-    printf '%s\n' "$entry"
+# The same outermost directories as teardown_regenerable_dirs, NUL-ended into the file <out>
+# (a name may hold a newline). Fails when the listing fails.
+teardown_regenerable_dirs_z() {  # <root> <out>
+  local name args=()
+  for name in "${TEARDOWN_REGENERABLE_NAMES[@]}"; do
+    args+=(-o -name "$name")
+  done
+  find "$1" -type d \( "${args[@]:1}" \) -print0 -prune > "$2" 2>/dev/null
+}
+
+# Prints ignored <entry> of <copy> without the class, NUL-ended: whole when it holds none
+# of those directories, otherwise split only as far as needed to leave them out.
+teardown_entry_without_regenerable_z() {  # <copy> <entry>
+  local copy=$1 entry=$2 list dir child found=0 whole=0 rc=0
+  list=$(mktemp "${TMPDIR:-/tmp}/fm-regenerable.XXXXXX") || return 1
+  teardown_regenerable_dirs_z "$copy/$entry" "$list" || rc=1
+  if [ "$rc" = 0 ]; then
+    while IFS= read -r -d '' dir; do
+      found=1
+      [ "$dir" != "$copy/$entry" ] || whole=1
+    done < "$list"
+  fi
+  rm -f "$list"
+  [ "$rc" = 0 ] || return 1
+  if [ "$found" = 0 ]; then
+    printf '%s\0' "$entry"
     return 0
   fi
-  [ "$found" != "$copy/$entry" ] || return 0
+  [ "$whole" = 0 ] || return 0
   for child in "$copy/$entry"/* "$copy/$entry"/.[!.]* "$copy/$entry"/..?*; do
     { [ -e "$child" ] || [ -L "$child" ]; } || continue
-    teardown_entry_without_regenerable "$copy" "$entry/${child##*/}" || return 1
+    teardown_entry_without_regenerable_z "$copy" "$entry/${child##*/}" || return 1
   done
 }
 
-teardown_print_entry() {  # <copy> <entry>
-  printf '%s\n' "$2"
+teardown_print_entry_z() {  # <copy> <entry>
+  printf '%s\0' "$2"
 }
 
-# Ignored entries no commit holds that must be preserved before removal.
-# Symlinks, caches, virtual environments, Firstmate's own hook files, graft's
-# generated output (teardown_graft_generated) and regenerable build output are
-# derived machinery and are skipped; every other entry is printed for
-# teardown_preserve_ignored to copy. A sweep release of a proven copy names a mode,
-# and both modes leave out the regenerable class at any depth: releasable applies
-# that to the list above, and all mode starts from every ignored entry, so the
-# unlocked sweep can preserve the disposable bytes without widening this owner's
-# disposable classification.
-teardown_preservable_ignored() {  # <copy> [all|releasable]
-  local copy=$1 mode=${2:-} listing entry name child rc=0 emit=teardown_entry_without_regenerable
-  case "$mode" in '') emit=teardown_print_entry ;; all|releasable) ;; *) return 1 ;; esac
+# Ignored entries no commit holds that must be preserved before removal, NUL-ended so a
+# name may hold any byte but NUL (a newline included). Symlinks, caches, virtual
+# environments, Firstmate's own hook files, graft's generated output
+# (teardown_graft_generated) and regenerable build output are derived machinery and are
+# skipped; every other entry is printed for teardown_preserve_ignored to copy. A sweep
+# release of a proven copy names a mode, and the sweep's modes leave out the regenerable
+# class at any depth: releasable applies that to the list above; all mode starts from every
+# ignored entry, so the unlocked sweep can preserve the disposable bytes without widening
+# this owner's disposable classification. The retained route names a third mode, retained:
+# all mode, except that every ignored entry at or under .claude and .opencode is kept whole,
+# a regenerable-looking name (.cache) included, because the driver's archive and the
+# acceptance text cover that whole population (the ordinary preservation skips those two
+# trees and the retained route preserves and verifies them itself).
+teardown_preservable_ignored_z() {  # <copy> [all|releasable|retained]
+  local copy=$1 mode=${2:-} listing entry name child rc=0 emit=teardown_entry_without_regenerable_z
+  case "$mode" in '') emit=teardown_print_entry_z ;; all|releasable|retained) ;; *) return 1 ;; esac
   listing=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-ignored.XXXXXX") || return 1
   git -C "$copy" ls-files --others --ignored --exclude-standard --directory -z >"$listing" 2>/dev/null || rc=$?
   if [ "$rc" = 0 ]; then
     while IFS= read -r -d '' entry; do
       entry=${entry%/}
-      if [ "$mode" = all ]; then
+      if [ "$mode" = all ] || [ "$mode" = retained ]; then
+        if [ "$mode" = retained ]; then
+          case "$entry" in
+            .claude|.claude/*|.opencode|.opencode/*) teardown_print_entry_z "$copy" "$entry" || { rc=1; break; }; continue ;;
+          esac
+        fi
         "$emit" "$copy" "$entry" || { rc=1; break; }
         continue
       fi
@@ -589,6 +617,55 @@ teardown_preservable_ignored() {  # <copy> [all|releasable]
   fi
   rm -f "$listing"
   return "$rc"
+}
+
+# The same entries, one per line, for callers that only test whether there are any or
+# show them. A name holding a newline shows as two lines: no caller may split it back into
+# a path (the preserve, the fingerprint and the retained check read the NUL form).
+teardown_preservable_ignored() {  # <copy> [all|releasable]
+  local list rc=0
+  list=$(mktemp "${TMPDIR:-/tmp}/fm-ignored-lines.XXXXXX") || return 1
+  teardown_preservable_ignored_z "$@" > "$list" || rc=$?
+  [ "$rc" != 0 ] || tr '\0' '\n' < "$list"
+  rm -f "$list"
+  return "$rc"
+}
+
+# Reads the NUL-ended entries of teardown_preservable_ignored_z <copy> [mode] into the array
+# TEARDOWN_IGNORED_LIST, so a path keeps every byte it holds. Fails when the listing fails.
+teardown_ignored_list() {  # <copy> [all|releasable]
+  local list entry rc=0
+  TEARDOWN_IGNORED_LIST=()
+  list=$(mktemp "${TMPDIR:-/tmp}/fm-ignored-list.XXXXXX") || return 1
+  teardown_preservable_ignored_z "$@" > "$list" || rc=$?
+  if [ "$rc" = 0 ]; then
+    while IFS= read -r -d '' entry; do
+      TEARDOWN_IGNORED_LIST+=("$entry")
+    done < "$list"
+  fi
+  rm -f "$list"
+  return "$rc"
+}
+
+# Appends "<sha256>  <path>" lines, in sha256sum's form, to <out> for each NUL-ended
+# absolute path of <list> (a regular file under <stage>), the path shown relative to
+# <stage>. A path holding a backslash or a newline is written as sha256sum writes it: a
+# leading backslash on the line and \\ and \n in the name.
+teardown_sums_write() {  # <stage> <list> <out>
+  perl -e '
+    use strict; use warnings; use Digest::SHA;
+    my ($stage, $list, $out) = @ARGV; local $/ = "\0";
+    open(my $l, "<:raw", $list) or exit 2; my @f = <$l>; chomp @f; close $l;
+    open(my $o, ">>:raw", $out) or exit 2;
+    for my $f (@f) {
+      open(my $fh, "<:raw", $f) or exit 2;
+      my $h = Digest::SHA->new(256); $h->addfile($fh); close $fh;
+      my $rel = $f; $rel =~ s{^\Q$stage\E/}{};
+      my $e = $rel; $e =~ s/\\/\\\\/g; $e =~ s/\n/\\n/g;
+      print $o (($e ne $rel ? "\\" : ""), $h->hexdigest, "  ", $e, "\n");
+    }
+    close $o or exit 2;
+  ' "$1" "$2" "$3"
 }
 
 # Prints the SHA-256 of file <path>, or of standard input when no path is given.
@@ -1013,29 +1090,27 @@ teardown_bundle_preserved() {  # <copy> <ref> [hint]
 # directory it built, and the caller then refuses the copy rather than removing
 # unpreserved content.
 teardown_preserve_ignored() {  # <copy> [all|releasable] [<directory suffix>] [no-replace]
-  local copy=$1 root dest stage entries entry file hash suffix=${3:-} keep=${4:-}
-  entries=$(teardown_preservable_ignored "$copy" "${2:-}") || return 1
-  [ -n "$entries" ] || return 0
+  local copy=$1 root dest stage entry hash suffix=${3:-} keep=${4:-} work
+  teardown_ignored_list "$copy" "${2:-}" || return 1
+  [ "${#TEARDOWN_IGNORED_LIST[@]}" -gt 0 ] || return 0
   hash=$(printf '%s' "$copy" | teardown_ignored_sha256) || return 1
   root="$DATA/$ID/nested-copy-preserved"
   dest="$root/$hash$suffix"
   stage="$root/.staging-$hash$suffix"
   rm -rf "$stage" || return 1
+  work=$(mktemp -d "${TMPDIR:-/tmp}/fm-preserve.XXXXXX") || return 1
   (
     mkdir -p "$stage" || return 1
     printf '%s\n' "$copy" > "$stage/copy-path" || return 1
     : > "$stage/SHA256SUMS" || return 1
-    while IFS= read -r entry; do
-      [ -n "$entry" ] || continue
+    for entry in "${TEARDOWN_IGNORED_LIST[@]}"; do
       case "$entry" in /*|..|../*|*/..|*/../*) return 1 ;; esac
       rm -rf "${stage:?}/$entry" || return 1
-      mkdir -p "$(dirname "$stage/$entry")" || return 1
+      case "$entry" in */*) mkdir -p "$stage/${entry%/*}" || return 1 ;; esac
       cp -RPp "$copy/$entry" "$stage/$entry" || return 1
-    done <<< "$entries"
-    while IFS= read -r -d '' file; do
-      hash=$(teardown_ignored_sha256 "$file") || return 1
-      printf '%s  %s\n' "$hash" "${file#"$stage/"}" >> "$stage/SHA256SUMS" || return 1
-    done < <(find "$stage" -type f ! -path "$stage/copy-path" ! -path "$stage/SHA256SUMS" -print0)
+    done
+    find "$stage" -type f ! -path "$stage/copy-path" ! -path "$stage/SHA256SUMS" -print0 > "$work/files" || return 1
+    teardown_sums_write "$stage" "$work/files" "$stage/SHA256SUMS" || return 1
     if [ "$keep" = no-replace ]; then
       # An existing preserve is never removed or replaced: the new one is written
       # beside it, and a name already taken is a failure, not an overwrite.
@@ -1045,9 +1120,10 @@ teardown_preserve_ignored() {  # <copy> [all|releasable] [<directory suffix>] [n
     fi
     mv "$stage" "$dest" || return 1
   ) || {
-    rm -rf "$stage"
+    rm -rf "$stage" "$work"
     return 1
   }
+  rm -rf "$work"
   echo "teardown: preserved ignored files from $(fm_refuse_text "$copy") in $dest" >&2
 }
 
@@ -1523,27 +1599,10 @@ teardown_retained_files() {  # <root> <list> <entry>...
   done
 }
 
-# Prints "<sha256><TAB><path>" for every regular file in the NUL-separated "./<path>"
-# <list> under <root>, hashing in batches. Fails when a path holds a newline, a
-# file cannot be read, or the hasher answers anything else.
-teardown_retained_sums() {  # <root> <list>
-  local root=$1 list=$2 out line
-  local -a hasher=(shasum -a 256)
-  command -v shasum >/dev/null 2>&1 || hasher=(sha256sum)
-  [ -s "$list" ] || return 0
-  [ "$(tr -d '\0' < "$list" | wc -l | tr -d ' ')" = 0 ] || return 1
-  out=$(cd "$root" && xargs -0 "${hasher[@]}" < "$list") || return 1
-  while IFS= read -r line; do
-    [[ $line =~ ^[0-9a-f]{64}\ \ \./ ]] || return 1
-    printf '%s\t%s\n' "${line:0:64}" "${line:68}"
-  done <<< "$out"
-}
-
 # The fingerprint and the preserve comparison are built from NUL-delimited paths
 # and from records with an explicit type and explicit lengths, never from command
 # substitution or tab or newline framing: a link target keeps its trailing
-# newlines and a path keeps its tabs. A path holding a newline cannot be framed by
-# the lists around it, so it fails closed (exit 3).
+# newlines and a path keeps its tabs and its newlines.
 # teardown_retained_digest <root>: reads the NUL-separated "./<path>" list on stdin
 # and prints one SHA-256 over, for each path in byte order, its type (F file, L
 # symlink, P FIFO), the length and bytes of the path, and the file's own SHA-256
@@ -1555,7 +1614,7 @@ teardown_retained_digest() {  # <root>
     my @p = <STDIN>; chomp @p;
     my $d = Digest::SHA->new(256);
     for my $p (sort @p) {
-      my $rel = $p; $rel =~ s{^\./}{}; exit 3 if $rel =~ /\n/;
+      my $rel = $p; $rel =~ s{^\./}{};
       my $f = "$root/$rel";
       if (-l $f) { my $t = readlink $f; defined $t or exit 2; $d->add("L", length($rel), ":", $rel, "\0", length($t), ":", $t, "\0"); }
       elsif (-f $f) { open(my $fh, "<:raw", $f) or exit 2; my $h = Digest::SHA->new(256); $h->addfile($fh); close $fh; $d->add("F", length($rel), ":", $rel, "\0", $h->hexdigest, "\0"); }
@@ -1572,7 +1631,9 @@ teardown_retained_digest() {  # <root>
 # in <dir>/SHA256SUMS (adopt mode appends a missing line, never changes a file), a
 # symlink with byte-identical target bytes (trailing newlines included), a FIFO.
 # Exit 0 when all are held, 1 when one differs or is missing, 2 when none could be
-# compared (a path with a newline, an unreadable file).
+# compared (an unreadable file). A SHA256SUMS line is in sha256sum's form (a path with a
+# backslash or newline is escaped); a plain line an earlier run wrote for such a path is
+# accepted as well.
 teardown_retained_compare() {  # <strict|adopt> <copy> <dir>
   perl -e '
     use strict; use warnings; use Digest::SHA;
@@ -1583,14 +1644,16 @@ teardown_retained_compare() {  # <strict|adopt> <copy> <dir>
     my @add;
     sub fsha { my $f = shift; open(my $fh, "<:raw", $f) or return undef; my $h = Digest::SHA->new(256); $h->addfile($fh); close $fh; return $h->hexdigest }
     for my $p (@p) {
-      my $rel = $p; $rel =~ s{^\./}{}; exit 2 if $rel =~ /\n/;
+      my $rel = $p; $rel =~ s{^\./}{};
       my ($c, $d) = ("$copy/$rel", "$dir/$rel");
       if (-l $c) { my $t = readlink $c; defined $t or exit 2; -l $d or exit 1; my $u = readlink $d; defined $u or exit 1; $t eq $u or exit 1 }
       elsif (-f $c) {
         (!-l $d && -f $d) or exit 1;
         my $a = fsha($c); my $b = fsha($d); defined $a && defined $b or exit 2;
         $a eq $b or exit 1;
-        my $line = "$a  $rel"; push @add, $line unless $have{$line};
+        my $plain = "$a  $rel"; my $e = $rel; $e =~ s/\\/\\\\/g; $e =~ s/\n/\\n/g;
+        my $line = ($e ne $rel ? "\\" : "") . "$a  $e";
+        push @add, $line unless $have{$line} || $have{$plain};
       }
       elsif (-p $c) { (!-l $d && -p $d) or exit 1 }
       else { exit 1 }
@@ -1601,15 +1664,13 @@ teardown_retained_compare() {  # <strict|adopt> <copy> <dir>
 }
 
 # One SHA-256 over every file, symlink and FIFO in <copy>'s ignored entries other
-# than the regenerable class (all mode of teardown_preservable_ignored), through
+# than the regenerable class (retained mode of teardown_preservable_ignored), through
 # teardown_retained_digest. Fails when any cannot be listed or read.
 teardown_retained_payload() {  # <copy>
-  local copy=$1 entries entry work rc=0
+  local copy=$1 work rc=0
   local -a named=()
-  entries=$(teardown_preservable_ignored "$copy" all) || return 1
-  while IFS= read -r entry; do
-    [ -z "$entry" ] || named+=("$entry")
-  done <<< "$entries"
+  teardown_ignored_list "$copy" retained || return 1
+  named=(${TEARDOWN_IGNORED_LIST[@]+"${TEARDOWN_IGNORED_LIST[@]}"})
   work=$(mktemp -d "${TMPDIR:-/tmp}/fm-retained-payload.XXXXXX") || return 1
   if [ "${#named[@]}" -gt 0 ]; then
     teardown_retained_files "$copy" "$work/all" "${named[@]}" || rc=1
@@ -1899,7 +1960,7 @@ teardown_copy_retained() {  # <copy>
 # mode the driver-named ones the preserve lacks are copied in first. Returns 3
 # when a driver-named path is not a plain path inside the copy, 1 otherwise.
 teardown_retained_preserve_check() {  # <strict|adopt> <copy> <dir>   (driver-named paths on stdin)
-  local mode=$1 copy=$2 dir=$3 entry paths selected
+  local mode=$1 copy=$2 dir=$3 entry paths
   local -a named=() chosen=()
   paths=$(cat)
   while IFS= read -r entry; do
@@ -1911,18 +1972,16 @@ teardown_retained_preserve_check() {  # <strict|adopt> <copy> <dir>   (driver-na
       return 3
     fi
   done
-  selected=$(teardown_preservable_ignored "$copy") || return 1
-  while IFS= read -r entry; do
-    [ -z "$entry" ] || chosen+=("$entry")
-  done <<< "$selected"
+  teardown_ignored_list "$copy" || return 1
+  chosen=(${TEARDOWN_IGNORED_LIST[@]+"${TEARDOWN_IGNORED_LIST[@]}"})
   teardown_retained_cover strict "$copy" "$dir" ${chosen[@]+"${chosen[@]}"} || return 1
   # Every ignored entry under .claude or .opencode is payload too, named by the
   # driver or not (the ordinary preservation skips those trees): a newly appearing
   # one is copied into this preserve, never over a different preserved byte.
-  selected=$(teardown_preservable_ignored "$copy" all | grep -E '^\.(claude|opencode)(/|$)' || true)
-  while IFS= read -r entry; do
-    [ -z "$entry" ] || named+=("$entry")
-  done <<< "$selected"
+  teardown_ignored_list "$copy" retained || return 1
+  for entry in ${TEARDOWN_IGNORED_LIST[@]+"${TEARDOWN_IGNORED_LIST[@]}"}; do
+    case "$entry" in .claude|.claude/*|.opencode|.opencode/*) named+=("$entry") ;; esac
+  done
   [ "${#named[@]}" -gt 0 ] || return 0
   teardown_retained_cover "$mode" "$copy" "$dir" "${named[@]}"
 }
@@ -1932,13 +1991,11 @@ teardown_retained_preserve_check() {  # <strict|adopt> <copy> <dir>   (driver-na
 # it (one under no selected entry), wherever the copy still has that entry?
 # Returns 1 when one is missing or differs and 2 when the check could not be made.
 teardown_retained_preserve_current() {  # <copy> <dir>
-  local copy=$1 dir=$2 p rel entry selected
+  local copy=$1 dir=$2 p rel entry
   local -a adopted_paths=() chosen=()
   [ -d "$dir" ] || return 0
-  selected=$(teardown_preservable_ignored "$copy") || return 2
-  while IFS= read -r entry; do
-    [ -z "$entry" ] || chosen+=("$entry")
-  done <<< "$selected"
+  teardown_ignored_list "$copy" || return 2
+  chosen=(${TEARDOWN_IGNORED_LIST[@]+"${TEARDOWN_IGNORED_LIST[@]}"})
   while IFS= read -r -d '' p; do
     rel=${p#"$dir/"}
     case "$rel" in copy-path|SHA256SUMS) continue ;; esac
