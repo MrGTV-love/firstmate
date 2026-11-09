@@ -246,11 +246,11 @@
 # while they hold `state/decision-bindings/` shared, and `unbind` takes it exclusive
 # to remove the record: no such delivery already past its binding check is completed
 # once `unbind` has returned. Other channels (the Slack answer path, process-event
-# feeds) check the binding as before and are not held. `unbind` waits at most 60
-# seconds (a fixed wait with no override) for a delivery already under way; past it,
-# or when the binding folder exists but cannot be examined or opened, it refuses
-# (exit 1) and the binding stays as it was, so a successful `unbind` always means
-# the record is gone.
+# feeds) check the binding as before and are not held. `unbind` waits for a delivery
+# already under way and has no time limit (no override either); after 60 seconds of
+# waiting it prints one line saying so on stderr and keeps waiting. When the binding
+# folder exists but cannot be examined or opened, it refuses (exit 1) and the binding
+# stays as it was, so a successful `unbind` always means the record is gone.
 # `bind` deliberately does not require the source to exist yet,
 # so a channel can be bound BEFORE it is armed. The optional second argument
 # exists only for legacy pre-collapse records and callers: a concrete origin is
@@ -2298,24 +2298,26 @@ command_unbind() {
   dest=$(binding_path "$source")
   # The Slack delivery paths hold BINDING_DIR shared across their binding check and the post or print it allows, so
   # the removal waits for such a delivery to end: none completes after this returns. Other channels are not held.
-  # The wait is fixed and bounded; past it the unbind refuses and removes nothing, so it never removes less than
-  # it reports. A folder that was never made holds no binding; one that cannot be examined or opened is a refusal.
+  # The wait has no time limit and no override: it ends when the delivery ends, which the operating system also
+  # settles if that process dies. A slow wait is an alarm, never a cut-off: one line after 60 seconds, then it keeps
+  # waiting. Nothing the delivery waits for is held by an unbind (it takes only this folder), so the wait cannot
+  # become a cycle. A folder that was never made holds no binding; one that cannot be examined or opened is a refusal.
   perl -e '
     use strict; use warnings; use Fcntl qw(:flock);
     my ($dir, $path) = @ARGV;
-    # measured: value=60 date=2026-11-08 host=Mac-Studio margin=2 (a delivery under the shared hold makes at most three Slack calls, each bound by the 10 s timeout of bin/fm_slack.py, so 30 s at worst)
-    my $seconds = 60;
+    # A delivery under the shared hold makes at most three Slack calls, each bound by the 10 s timeout of bin/fm_slack.py, so 30 s at worst: 60 s is twice that.
+    my $alarm_after = 60;
     if (!stat($dir)) {
       exit 0 if $!{ENOENT};
       die "fm-captain-hold: cannot examine the decision binding folder: $dir: $!\n";
     }
     open(my $held, "<", $dir) or die "fm-captain-hold: cannot open the decision binding folder: $dir: $!\n";
-    my $locked = 0;
-    for (my $tries = 0; $tries <= $seconds * 10; $tries++) {
-      if (flock($held, LOCK_EX | LOCK_NB)) { $locked = 1; last }
+    my $tries = 0;
+    until (flock($held, LOCK_EX | LOCK_NB)) {
+      $tries++;
+      print STDERR "fm-captain-hold: unbind is slow: a delivery that began earlier is still running and holds the binding after ${alarm_after}s; it keeps waiting, and the binding is unchanged until that delivery ends\n" if $tries == $alarm_after * 10;
       select(undef, undef, undef, 0.1);
     }
-    $locked or die "fm-captain-hold: unbind refused: a delivery that began earlier still holds the binding after ${seconds}s, and the binding is unchanged\n";
     unlink($path) or $!{ENOENT} or die "fm-captain-hold: cannot remove the decision binding: $path: $!\n";
   ' "$BINDING_DIR" "$dest" || fail "cannot unbind $source"
   printf 'unbound: %s\n' "$source"
