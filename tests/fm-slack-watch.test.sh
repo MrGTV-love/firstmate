@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Slack decision plane regressions DOD-01..DOD-17, S1..S3, X1..X49, INTAKE-1..INTAKE-10 (INTAKE-8, the two DOD-17 registered-file runs and the deadline suite only with FM_SLACK_GRADER_RUN).
+# Slack decision plane regressions DOD-01..DOD-17, S1..S3, X1..X49, INTAKE-1..INTAKE-13 (INTAKE-8, the two DOD-17 registered-file runs and the deadline suite only with FM_SLACK_GRADER_RUN).
 # Every Slack call is a checked-in replay transcript; no socket is opened. FM_SLACK_NO_NETWORK closes the real
 # transport for the whole suite, so a scenario that forgot its replay fails with network_closed instead of reaching Slack.
 set -euo pipefail
@@ -1751,7 +1751,22 @@ printf 'ok - X49\n'
 # fails with missing_scope, as it would in Slack, and a method outside the base card path's population fails by the
 # transcript's method allowlist. Replay evidence, no socket.
 INTAKE="$FIX/intake/transcript.json"
-intake_home() { new_home intake ${1:+"$1"}; bind; "$ROOT/bin/fm-slack-check.sh" arm --replay "$INTAKE" >/dev/null; }
+scope_clean() {  # <home state folder> <transcript>: I5b-scope for the scenario that just ended on that home
+  local out
+  [ -d "$1/slack-watch" ] || return 0
+  out=$(python3 "$HELPER" scope-clean "$1/slack-watch" "$2")
+  [ -z "$out" ] || fail "INTAKE [I5b-scope] a scenario attempted a call outside the base set or scope: $out"
+}
+# Every intake scenario is also an I5b-scope control: when the next one starts (and at the end of the suite), the home it
+# used attempted only methods of the transcript's allowlist, and none of its calls failed for a scope or the allowlist.
+INTAKE_LAST_STATE=
+intake_home() {
+  [ -z "$INTAKE_LAST_STATE" ] || scope_clean "$INTAKE_LAST_STATE" "$INTAKE"
+  new_home intake ${1:+"$1"}
+  INTAKE_LAST_STATE=$FM_STATE_OVERRIDE
+  bind
+  "$ROOT/bin/fm-slack-check.sh" arm --replay "$INTAKE" >/dev/null
+}
 ipoll() { "$ROOT/bin/fm-slack-poll.sh" --replay "$INTAKE"; }
 ienv() { env "$@" "$ROOT/bin/fm-slack-poll.sh" --replay "$INTAKE"; }
 icheck() { "$ROOT/bin/fm-slack-check.sh" check --replay "$INTAKE"; }
@@ -1947,6 +1962,7 @@ assert_eq "$(request_count "$out")" 1 "INTAKE-3 [busy legacy] a request sent aft
 assert_contains "$out" 'check: slack request 2000.000200 from U0TESTOWNER: ' "INTAKE-3 [busy legacy] wrong request woken"
 assert_eq "$(posts_in 2000.000200)" 1 "INTAKE-3 [busy legacy] acknowledgements in the later request's thread"
 assert_eq "$(env FM_SLACK_POLL_MAX_ANSWERS=1 "$ROOT/bin/fm-slack-poll.sh" --replay "$TR")" "" "INTAKE-3 [busy legacy] a later poll woke again"
+scope_clean "$FM_STATE_OVERRIDE" "$TR"
 intake_home
 say_owner 2000.000100 'sent before a re-arm'
 "$ROOT/bin/fm-slack-check.sh" arm --replay "$INTAKE" >/dev/null
@@ -2592,4 +2608,125 @@ file_only_allowlist U0TESTOWNER 1
 file_only_allowlist U0OTHERALLOWED,U0TESTOWNER 1
 printf 'ok - INTAKE-11\n'
 
+# INTAKE-12: a poll or a check that finds the source unbound makes no call, changes no state and prints nothing, also after an
+# earlier failure; a bound run that succeeds clears that failure.
+attempts_log() { printf '%s/slack-watch/attempts.jsonl' "$FM_STATE_OVERRIDE"; }
+attempt_count() { if [ -f "$(attempts_log)" ]; then wc -l < "$(attempts_log)" | tr -d ' '; else printf 0; fi; }
+for via in poll check; do
+  intake_home
+  say_owner 2000.000100 'a request that waits behind a failure'
+  python3 "$HELPER" fail-call "$(replay_file)" conversations.history 503
+  via_run "$via" > "$TMP/i12.out" 2>&1 || true
+  failure=$(python3 "$HELPER" state-field "$(state_file)" failure)
+  [ -n "$failure" ] || fail "INTAKE-12 [$via] the failed run did not set the failure state"
+  python3 "$HELPER" clear-fail "$(replay_file)" conversations.history
+  "$CAPTAIN" unbind slack-dm >/dev/null
+  digest=$(shasum -a 256 "$(state_file)")
+  calls=$(attempt_count)
+  out=$(via_run "$via" 2>&1)
+  assert_eq "$out" "" "INTAKE-12 [$via] an unbound run printed"
+  assert_eq "$(attempt_count)" "$calls" "INTAKE-12 [$via] an unbound run made a Slack call"
+  assert_eq "$(shasum -a 256 "$(state_file)")" "$digest" "INTAKE-12 [$via] an unbound run rewrote the state file"
+  assert_eq "$(python3 "$HELPER" state-field "$(state_file)" failure)" "$failure" "INTAKE-12 [$via] an unbound run cleared the failure"
+  # Control: the same run, bound again, succeeds, takes the request in and clears the failure.
+  bind
+  out=$(via_run "$via" 2>&1)
+  assert_eq "$(request_count "$out")" 1 "INTAKE-12 [$via control] the bound run did not wake the request"
+  assert_eq "$(python3 "$HELPER" state-field "$(state_file)" failure)" "" "INTAKE-12 [$via control] a bound run that succeeded kept the failure"
+done
+printf 'ok - INTAKE-12\n'
+
+# INTAKE-13: the plane never holds the source binding across a write to standard output, so a consumer that does not read can
+# never make an unbind wait. The unbind completes while the run is blocked on a full pipe; the line the run owes stays in the
+# journal until it is printed; nothing is lost and nothing is repeated.
+fill_then_run() {  # <command> [argument...]: fill the pipe that is our standard output, then run the command with it
+  perl -MFcntl -e '
+    if (defined $ENV{FILL_PIDFILE}) { open(my $f, ">", $ENV{FILL_PIDFILE}) or die; print $f $$; close $f; }
+    my $flags = fcntl(STDOUT, F_GETFL, 0);
+    fcntl(STDOUT, F_SETFL, $flags | O_NONBLOCK);
+    my $chunk = ("x" x 1023) . "\n";
+    while (defined(syswrite(STDOUT, $chunk))) { }
+    fcntl(STDOUT, F_SETFL, $flags);
+    exec @ARGV or die "exec: $!";' -- "$@"
+}
+kill_tree() {  # <pid>: kill what runs below a process first, then the process itself
+  local pid=$1 child
+  for child in $(pgrep -P "$pid" 2>/dev/null || true); do kill_tree "$child"; done
+  kill -KILL "$pid" 2>/dev/null || true
+}
+reader_after_drain() { until [ -e "$TMP/drain" ]; do sleep 0.1; done; cat > "$TMP/consumer.out"; }
+wait_until() {  # <what> <command...>: wait for progress with no limit; after 30 seconds print one alarm line and keep waiting
+  local what=$1 n=0
+  shift
+  until "$@"; do
+    n=$((n + 1))
+    [ "$n" -ne 300 ] || printf 'slow - INTAKE-13 still waiting: %s\n' "$what" >&2
+    sleep 0.1
+  done
+}
+wait_bounded() {  # <what> <command...>: the proof that something did NOT wait needs a clock: fail after 30 seconds
+  local what=$1 n=0
+  shift
+  until "$@"; do
+    n=$((n + 1))
+    [ "$n" -le 300 ] || { : > "$TMP/drain"; fail "INTAKE-13 $what"; }
+    sleep 0.1
+  done
+}
+acknowledged() { [ "$(posts_in 2000.000100)" = 1 ]; }
+unbind_ended() { ! kill -0 "$unbind_pid" 2>/dev/null; }
+for via in poll check; do
+  intake_home
+  say_owner 2000.000100 'a request while the consumer does not read'
+  rm -f "$TMP/drain" "$TMP/consumer.out"
+  if [ "$via" = poll ]; then run=("$ROOT/bin/fm-slack-poll.sh" --replay "$INTAKE")
+  else run=("$ROOT/bin/fm-slack-check.sh" check --replay "$INTAKE"); fi
+  ( fill_then_run "${run[@]}" 2>/dev/null | reader_after_drain ) &
+  pipeline_pid=$!
+  wait_until "[$via] the request was never acknowledged" acknowledged
+  "$CAPTAIN" unbind slack-dm > "$TMP/unbind.out" 2>&1 &
+  unbind_pid=$!
+  wait_bounded "[$via] the unbind waited for a consumer that does not read" unbind_ended
+  unbind_ended || fail "INTAKE-13 [$via] the unbind was still running"
+  wait "$unbind_pid" || fail "INTAKE-13 [$via] the unbind failed"
+  kill -0 "$pipeline_pid" 2>/dev/null || fail "INTAKE-13 [$via] the run was not blocked on its output when the unbind returned"
+  "$CAPTAIN" binding slack-dm >/dev/null 2>&1 && fail "INTAKE-13 [$via] the unbind left the binding"
+  assert_eq "$(outbox_count)" 1 "INTAKE-13 [$via] the owed line left the journal before it was printed"
+  : > "$TMP/drain"
+  wait "$pipeline_pid" || fail "INTAKE-13 [$via] the run failed once its output was read"
+  assert_eq "$(grep -c '^check: slack request 2000.000100 ' "$TMP/consumer.out")" 1 "INTAKE-13 [$via] the owed line was not printed once"
+  assert_eq "$(outbox_count)" 0 "INTAKE-13 [$via] the printed line stayed in the journal"
+  assert_eq "$(posts_in 2000.000100)" 1 "INTAKE-13 [$via] the request was acknowledged again"
+  bind
+  assert_eq "$(via_run "$via")" "" "INTAKE-13 [$via] the rebind repeated the line"
+  # A run killed while blocked on its output loses nothing: the line is still owed, and the next run prints it once.
+  intake_home
+  say_owner 2000.000100 'a request whose run is killed while it prints'
+  rm -f "$TMP/drain" "$TMP/consumer.out" "$TMP/fill.pid"
+  ( FILL_PIDFILE="$TMP/fill.pid" fill_then_run "${run[@]}" 2>/dev/null | reader_after_drain ) &
+  pipeline_pid=$!
+  wait_until "[$via killed] the request was never acknowledged" acknowledged
+  kill_tree "$(cat "$TMP/fill.pid")"
+  : > "$TMP/drain"
+  wait "$pipeline_pid" 2>/dev/null || true
+  assert_eq "$(outbox_count)" 1 "INTAKE-13 [$via killed] a killed run lost the owed line"
+  out=$(via_run "$via")
+  assert_eq "$(request_count "$out")" 1 "INTAKE-13 [$via killed] the next run did not print the owed line once"
+  assert_eq "$(posts_in 2000.000100)" 1 "INTAKE-13 [$via killed] the next run acknowledged again"
+  assert_eq "$(outbox_count)" 0 "INTAKE-13 [$via killed] the printed line stayed in the journal"
+done
+# A delivery killed while it holds the binding leaves no stale lock: the unbind goes through at once.
+intake_home
+holder 600
+kill -KILL "$holder_pid"
+wait "$holder_pid" 2>/dev/null || true
+"$CAPTAIN" unbind slack-dm > "$TMP/unbind.out" 2>&1 &
+unbind_pid=$!
+wait_bounded "[killed holder] the unbind waited for a delivery that no longer exists" unbind_ended
+unbind_ended || fail "INTAKE-13 [killed holder] the unbind was still running"
+wait "$unbind_pid" || fail "INTAKE-13 [killed holder] the unbind failed"
+"$CAPTAIN" binding slack-dm >/dev/null 2>&1 && fail "INTAKE-13 [killed holder] the unbind left the binding"
+printf 'ok - INTAKE-13\n'
+
+scope_clean "$INTAKE_LAST_STATE" "$INTAKE"
 printf 'ok - all Slack watch checks\n'
