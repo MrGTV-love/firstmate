@@ -39,9 +39,12 @@
 # can_merge false and away-mode rows keep their prior actor and reason. A known
 # stale base outranks every recorded verdict within that eligible scope.
 # Otherwise fleet and captain verdicts keep their prior dispositions, including
-# on unknown bases. When owners of one URL differ, fleet action or arbitration
-# verdicts outrank derived labels, then base facts and a qualifying PASS
-# decide among labels, never task names. These are action labels, not forge writes.
+# on unknown bases. A shared URL keeps a live hold first, then any owner whose
+# observation needs refresh. Among current ordinary owners, a stale base wins,
+# then a current captain or fleet verdict, then an unknown base, then any
+# qualifying PASS, then any unknown PASS, and only then review absence.
+# A captain verdict wins over a fleet verdict; differing fleet summaries are
+# chosen deterministically. These are action labels, not forge writes.
 # Optional PR facts share checked_at's freshness window: base_sha is the pull
 # resource's base SHA passed to the review verifier; base_containment records
 # behind_by from compare/<encoded live base branch>...<head>.
@@ -49,7 +52,8 @@
 # review_verification binds pr, head, task and base to the unchanged typed
 # fm-review-verification.v1 answer from fm-review-record.py verify --review-only.
 # Missing, unreadable or invalid answers are unknown, not qualifying reviews.
-# Pre-fact records remain valid and ordinary eligible rows report base unknown.
+# Pre-fact records remain valid; eligible rows without a current fleet or captain
+# verdict report base unknown.
 #
 # retire ends one task's observation of a contribution whose forge object can
 # never be read again, such as a PR in a deleted repository. It records retired
@@ -392,10 +396,9 @@ observe_review() { # task canonical-url: attach this owner's local review-only a
   head=$(jq -r '.head // ""' "$TMP/observation.json")
   base=$(jq -r '.base_sha // ""' "$TMP/observation.json")
   if [ -n "$head" ] && [ -n "$base" ]; then
-    # measured: reuse forge reads' 5s CPU/output-inactivity bound; progressing
-    # verifier work has no wall-clock deadline and cannot freeze the poll silently.
-    fm_duration_progress contributions.read.review 5 "$TMP/durations.tsv" \
-      "$FM_ROOT/bin/fm-review-record.py" verify --pr "$url" --head "$head" \
+    # Local review verification has no stopping limit; only its own result
+    # determines whether a typed answer is available.
+    "$FM_ROOT/bin/fm-review-record.py" verify --pr "$url" --head "$head" \
       --task "$task" --base "$base" --review-only --json \
       > "$TMP/review-output.json" 2> "$TMP/review.err" || rc=$?
     if [ "$rc" -eq 0 ] || [ "$rc" -eq 1 ] || [ "$rc" -eq 2 ]; then
