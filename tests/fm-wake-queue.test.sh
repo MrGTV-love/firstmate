@@ -3529,6 +3529,61 @@ drain_elapsed_ms() {  # <state> <out> <err>; elapsed wall time of one bounded dr
 # mistaken for lock waiting.
 DRAIN_DEADLINE_MARGIN_MS=1500
 
+# lock_deadline_sample <label> <lock-name>: time one identical control drain and
+# one drain behind a live holder of <lock-name>, each in its own fresh case.
+lock_deadline_sample() {
+  local label=$1 lock_name=$2 control held holder i case_dir
+  control=$(make_case "$label-control")
+  held=$(make_case "$label-held")
+  for case_dir in "$control" "$held"; do
+    printf 'needs-decision [key=fixture]: presentation remains retriable\n' > "$case_dir/state/task.status"
+    append_wake "$case_dir/state" signal task.status "signal: $case_dir/state/task.status" || return 1
+  done
+  drain_elapsed_ms "$control/state" "$control/drain.out" "$control/drain.err" || return 1
+  LOCK_SAMPLE_CONTROL_MS=$DRAIN_ELAPSED_MS
+  FM_STATE_OVERRIDE="$held/state" bash -c '
+    . "$1"
+    fm_lock_acquire_wait "$2"
+    printf "ready\n" > "$3"
+    exec sleep 30
+  ' _ "$ROOT/bin/fm-wake-lib.sh" "$held/state/$lock_name" "$held/holder.ready" &
+  holder=$!
+  i=0
+  while [ "$i" -lt 100 ] && [ ! -s "$held/holder.ready" ]; do
+    sleep 0.05
+    i=$((i + 1))
+  done
+  if [ ! -s "$held/holder.ready" ] \
+    || ! drain_elapsed_ms "$held/state" "$held/drain.out" "$held/drain.err"; then
+    kill "$holder" 2>/dev/null || true
+    wait "$holder" 2>/dev/null || true
+    return 1
+  fi
+  LOCK_SAMPLE_HELD_MS=$DRAIN_ELAPSED_MS
+  kill "$holder" 2>/dev/null || true
+  wait "$holder" 2>/dev/null || true
+}
+
+# lock_deadline_best_ms <label> <lock-name> <held-ms> <control-ms>: host load only
+# adds time to a drain, and a no-holder control alone has swung from 1.5s to 6s
+# on a busy host, so one held/control pair measures the scheduler. Compare the
+# fastest of three samples per side; a drain that really waits longer stays slow
+# in all three, and a spiked control can no longer hide it.
+lock_deadline_best_ms() {
+  local label=$1 lock_name=$2 sample
+  LOCK_DEADLINE_HELD_MS=$3
+  LOCK_DEADLINE_CONTROL_MS=$4
+  for sample in 2 3; do
+    lock_deadline_sample "$label-sample-$sample" "$lock_name" || return 1
+    if [ "$LOCK_SAMPLE_HELD_MS" -lt "$LOCK_DEADLINE_HELD_MS" ]; then
+      LOCK_DEADLINE_HELD_MS=$LOCK_SAMPLE_HELD_MS
+    fi
+    if [ "$LOCK_SAMPLE_CONTROL_MS" -lt "$LOCK_DEADLINE_CONTROL_MS" ]; then
+      LOCK_DEADLINE_CONTROL_MS=$LOCK_SAMPLE_CONTROL_MS
+    fi
+  done
+}
+
 # A live-but-stuck presentation lock must not strand the executable drain. The
 # presentation remains retriable on the next pass, while the separate queue
 # mutation lock keeps its blocking all-or-nothing acknowledgement contract.
@@ -3580,6 +3635,10 @@ test_live_presentation_holder_is_deadlined_without_weakening_ack() {
   held_ms=$DRAIN_ELAPSED_MS
   kill -0 "$queue_holder" 2>/dev/null \
     || fail "queue presentation returned only after its live holder exited"
+  lock_deadline_best_ms presentation-lock-deadline-queue .wake-queue.lock "$held_ms" "$control_ms" \
+    || { kill "$queue_holder" 2>/dev/null || true; fail "queue lock deadline timing sample failed"; }
+  held_ms=$LOCK_DEADLINE_HELD_MS
+  control_ms=$LOCK_DEADLINE_CONTROL_MS
   [ $((held_ms - control_ms)) -le $((1000 + DRAIN_DEADLINE_MARGIN_MS)) ] \
     || { kill "$queue_holder" 2>/dev/null || true; fail "queue lock delayed the drain ${held_ms}ms against a ${control_ms}ms control"; }
   printf 'drain timing: queue held=%sms control=%sms\n' "$held_ms" "$control_ms" >&2
@@ -3648,6 +3707,10 @@ test_live_presentation_holder_is_deadlined_without_weakening_ack() {
   held_ms=$DRAIN_ELAPSED_MS
   kill -0 "$presentation_holder" 2>/dev/null \
     || fail "status presentation returned only after its live holder exited"
+  lock_deadline_best_ms presentation-lock-deadline-presentation .status-presentation-lock "$held_ms" "$control_ms" \
+    || { kill "$presentation_holder" 2>/dev/null || true; fail "presentation lock deadline timing sample failed"; }
+  held_ms=$LOCK_DEADLINE_HELD_MS
+  control_ms=$LOCK_DEADLINE_CONTROL_MS
   [ $((held_ms - control_ms)) -le $((1000 + DRAIN_DEADLINE_MARGIN_MS)) ] \
     || { kill "$presentation_holder" 2>/dev/null || true; fail "presentation lock delayed the drain ${held_ms}ms against a ${control_ms}ms control"; }
   printf 'drain timing: presentation held=%sms control=%sms\n' "$held_ms" "$control_ms" >&2
