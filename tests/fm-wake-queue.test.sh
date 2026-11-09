@@ -4006,6 +4006,25 @@ drain_liveness_wakes() {
     > /dev/null 2>&1 || true
 }
 
+# wait_liveness_polls <pid> <polls-file> <more>: wait until the leg's watcher has
+# completed <more> further poll cycles, the watcher's own unit of work. The caller
+# has already called count_watch_polls, and each case undoes it with unset -f sleep.
+wait_liveness_polls() {
+  local pid=$1 polls=$2 more=$3 count target
+  count=$(cat "$polls" 2>/dev/null || true)
+  case "$count" in ''|*[!0-9]*) count=0 ;; esac
+  target=$((count + more))
+  fm_test_wait_until --while-alive "$pid" --cycles "$((more + 2))" "$polls" \
+    -- liveness_polls_reached "$polls" "$target"
+}
+
+liveness_polls_reached() {  # <polls-file> <count>
+  local count
+  count=$(cat "$1" 2>/dev/null || true)
+  case "$count" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$count" -ge "$2" ]
+}
+
 test_secondmate_liveness_tick_relaunches_dead_endpoint_once() {
   local dir state pid out ledger
   dir=$(make_secondmate_liveness_case liveness-dead)
@@ -4125,18 +4144,17 @@ test_secondmate_liveness_tick_relaunches_every_dead_mate_before_waking() {
 }
 
 test_secondmate_liveness_tick_leaves_alive_and_inconclusive_untouched() {
-  local dir state pid i
+  local dir state pid polls
   dir=$(make_secondmate_liveness_case liveness-quiet)
   state="$dir/state"
+  count_watch_polls
 
-  # A live endpoint probes every cadence and never acts.
+  # A live endpoint probes every cadence and never acts. Each completed poll
+  # cycle has run the tick, so four of them prove repeated quiet probes.
   run_liveness_leg "$dir" alive FM_FAKE_TMUX_CURRENT_COMMAND=claude; pid=$LIVENESS_PID
-  i=0
-  while [ "$i" -lt 300 ] && [ ! -e "$state/.secondmate-liveness-tick" ] && is_live_non_zombie "$pid"; do
-    sleep 0.1
-    i=$((i + 1))
-  done
-  sleep 4
+  polls=$(watch_polls_file "$state" "$pid")
+  wait_liveness_polls "$pid" "$polls" 4 \
+    || { kill_liveness_leg "$pid"; fail "the watcher did not keep polling against an alive secondmate: $(cat "$dir/watch-alive.out" "$dir/watch-alive.err")"; }
   is_live_non_zombie "$pid" \
     || fail "the watcher exited against an alive secondmate: $(cat "$dir/watch-alive.out" "$dir/watch-alive.err")"
   kill_liveness_leg "$pid"
@@ -4146,19 +4164,23 @@ test_secondmate_liveness_tick_leaves_alive_and_inconclusive_untouched() {
   [ -e "$state/.secondmate-liveness-tick" ] || fail "the liveness tick did not stamp its cadence marker"
 
   # An ambiguous existing process is evidence of nothing; it is triage-only
-  # and never a relaunch. Drain the killed leg's downtime marker first so the
-  # next watcher does not resurface instead of exercising the tick.
+  # and never a relaunch. Drain the killed leg's downtime marker and clear its
+  # cycle markers first so the next watcher runs the whole cycle, tick included.
   drain_liveness_wakes "$dir"
+  clear_watcher_cycle "$state"
   run_liveness_leg "$dir" ambiguous FM_FAKE_TMUX_CURRENT_COMMAND=node; pid=$LIVENESS_PID
-  sleep 4
+  polls=$(watch_polls_file "$state" "$pid")
+  fm_test_wait_until --while-alive "$pid" --cycles 5 "$polls" \
+    -- grep -F 'secondmate sm1 liveness: existing endpoint has ambiguous agent process (backend=tmux)' "$state/.watch-triage.log" \
+    || { kill_liveness_leg "$pid"; fail "the ambiguous probe did not land in the triage log: $(cat "$state/.watch-triage.log" "$dir/watch-ambiguous.out" "$dir/watch-ambiguous.err" 2>/dev/null)"; }
+  wait_liveness_polls "$pid" "$polls" 1 \
+    || { kill_liveness_leg "$pid"; fail "the watcher did not finish its cycle against an ambiguous secondmate endpoint: $(cat "$dir/watch-ambiguous.out" "$dir/watch-ambiguous.err")"; }
   is_live_non_zombie "$pid" \
     || fail "the watcher exited against an ambiguous secondmate endpoint: $(cat "$dir/watch-ambiguous.out" "$dir/watch-ambiguous.err")"
   kill_liveness_leg "$pid"
   [ ! -s "$dir/tmux.log" ] || fail "an ambiguous endpoint was killed or relaunched: $(cat "$dir/tmux.log")"
   [ ! -s "$state/.wake-queue" ] || fail "an ambiguous endpoint queued a wake: $(cat "$state/.wake-queue")"
-  grep -F 'secondmate sm1 liveness: existing endpoint has ambiguous agent process (backend=tmux)' \
-    "$state/.watch-triage.log" >/dev/null \
-    || fail "the ambiguous probe did not land in the triage log: $(cat "$state/.watch-triage.log" 2>/dev/null)"
+  unset -f sleep
   pass "watch liveness: alive and ambiguous endpoints are probed, logged, and never touched"
 }
 
@@ -4396,9 +4418,17 @@ test_secondmate_liveness_tick_skips_mate_whose_lock_is_held() {
 }
 
 test_secondmate_liveness_tick_preserves_unreachable_remote() {
-  local dir state
+  local dir state code_root pid polls
   dir=$(make_secondmate_liveness_case liveness-remote-down)
   state="$dir/state"
+  count_watch_polls
+  # bin/fm-on.sh runs only a command git tracks in its code root. This leg owns
+  # that root, so the probe does not depend on the runner's copy having git data.
+  code_root="$dir/code-root"
+  mkdir -p "$code_root/bin"
+  git init -q -b main "$code_root"
+  cp "$ROOT/bin/fm-remote-secondmate-control.sh" "$code_root/bin/"
+  git -C "$code_root" add bin
   rm -f "$state/sm1.meta"
   cat > "$state/rsm1.meta" <<EOF
 window=remote:rsm1
@@ -4422,8 +4452,13 @@ SH
   chmod +x "$dir/fakebin/ssh"
   : > "$dir/ssh.log"
 
-  run_liveness_leg "$dir" unreachable FM_SSH_BIN="$dir/fakebin/ssh" FM_FAKE_SSH_LOG="$dir/ssh.log"; pid=$LIVENESS_PID
-  sleep 4
+  run_liveness_leg "$dir" unreachable FM_ROOT_OVERRIDE="$code_root" FM_SSH_BIN="$dir/fakebin/ssh" FM_FAKE_SSH_LOG="$dir/ssh.log"; pid=$LIVENESS_PID
+  polls=$(watch_polls_file "$state" "$pid")
+  fm_test_wait_until --while-alive "$pid" --cycles 5 "$polls" \
+    -- grep -F 'secondmate rsm1 liveness: remote host unavailable or endpoint state unknown; route preserved on lab-host' "$state/.watch-triage.log" \
+    || { kill_liveness_leg "$pid"; fail "the unreachable remote probe did not report its preserved route: $(cat "$state/.watch-triage.log" "$dir/watch-unreachable.out" "$dir/watch-unreachable.err" 2>/dev/null)"; }
+  wait_liveness_polls "$pid" "$polls" 1 \
+    || { kill_liveness_leg "$pid"; fail "the watcher did not finish its cycle against an unreachable remote secondmate: $(cat "$dir/watch-unreachable.out" "$dir/watch-unreachable.err")"; }
   is_live_non_zombie "$pid" \
     || fail "the watcher exited against an unreachable remote secondmate: $(cat "$dir/watch-unreachable.out" "$dir/watch-unreachable.err")"
   kill_liveness_leg "$pid"
@@ -4435,6 +4470,7 @@ SH
   [ ! -e "$state/.secondmate-relaunch-rsm1" ] \
     || fail "an unreachable remote probe ledgered a relaunch attempt"
   [ ! -s "$dir/tmux.log" ] || fail "an unreachable remote probe touched a local endpoint"
+  unset -f sleep
   pass "watch liveness: an unreachable remote secondmate is probed, preserved, and never failed over"
 }
 
