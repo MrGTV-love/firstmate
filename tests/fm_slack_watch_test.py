@@ -65,6 +65,7 @@ import sys
 import time
 import unicodedata
 import unittest
+import urllib.error
 import urllib.request
 import tempfile
 from unittest.mock import patch
@@ -2760,6 +2761,89 @@ class ClosedTransportTest(unittest.TestCase):
                             self.assertEqual(len(opened) >= 1, True)
             finally:
                 watch.lock.close()
+
+
+class SlowReplyTest(unittest.TestCase):
+    """A slow Slack request is never ended by a fixed deadline: past the alarm interval it raises an alarm and keeps waiting
+    (Main 2694). The replies are fakes, so no socket is opened."""
+
+    TOKEN = 'fixture-token-not-a-secret'
+
+    class Reply(io.BytesIO):
+        headers = {}
+
+    def api(self, alarms, every=0.3):
+        import fm_slack
+        api = fm_slack.Slack(self.TOKEN)
+        api.alarm_every = every
+        api.on_wait = lambda method, seconds: alarms.append((method, round(seconds, 1)))
+        return api
+
+    def reply_after(self, delay, seen):
+        def urlopen(request, *args, **kwargs):
+            seen.append((args, kwargs))
+            time.sleep(delay)
+            return self.Reply(b'{"ok": true, "who": "fixture"}')
+        return urlopen
+
+    def test_a_slow_reply_raises_an_alarm_and_the_request_keeps_waiting(self):
+        alarms, seen = [], []
+        with patch('fm_slack.urllib.request.urlopen', side_effect=self.reply_after(1.3, seen)):
+            data = self.api(alarms).call('auth.test')
+        self.assertEqual(data['who'], 'fixture')
+        self.assertGreaterEqual(len(alarms), 3)
+        self.assertTrue(all(method == 'auth.test' for method, _ in alarms))
+        waited = [seconds for _, seconds in alarms]
+        self.assertEqual(waited, sorted(set(waited)))
+
+    def test_the_connection_is_opened_without_a_fixed_deadline(self):
+        alarms, seen = [], []
+        with patch('fm_slack.urllib.request.urlopen', side_effect=self.reply_after(0, seen)):
+            self.api(alarms).call('auth.test')
+        (args, kwargs), = seen
+        self.assertIsNone(kwargs.get('timeout'))
+        self.assertEqual(args, ())
+
+    def test_a_reply_before_the_first_alarm_raises_none_and_a_finished_request_leaves_no_alarm_behind(self):
+        alarms, seen = [], []
+        with patch('fm_slack.urllib.request.urlopen', side_effect=self.reply_after(0.05, seen)):
+            self.api(alarms, every=0.4).call('auth.test')
+        time.sleep(0.9)
+        self.assertEqual(alarms, [])
+
+    def test_a_failed_connection_is_unreachable_at_once_and_leaves_no_alarm_behind(self):
+        alarms = []
+        with patch('fm_slack.urllib.request.urlopen', side_effect=urllib.error.URLError('refused')):
+            with self.assertRaises(SlackError) as caught:
+                self.api(alarms, every=0.4).call('auth.test')
+        self.assertEqual(str(caught.exception), 'unreachable')
+        time.sleep(0.9)
+        self.assertEqual(alarms, [])
+
+    def test_the_alarm_line_names_the_method_and_the_wait(self):
+        import fm_slack
+        self.assertEqual(fm_slack.Slack.waiting_line('conversations.history', 20),
+                         b'slack: request conversations.history still waiting after 20s; it keeps waiting\n')
+
+    def test_without_a_handler_the_alarm_goes_to_standard_error_and_never_holds_the_token(self):
+        import fm_slack
+        seen = []
+        read_fd, write_fd = os.pipe()
+        saved = os.dup(2)
+        try:
+            os.dup2(write_fd, 2)
+            api = fm_slack.Slack(self.TOKEN)
+            api.alarm_every = 0.2
+            with patch('fm_slack.urllib.request.urlopen', side_effect=self.reply_after(0.6, seen)):
+                api.call('auth.test')
+        finally:
+            os.dup2(saved, 2)
+            os.close(saved)
+            os.close(write_fd)
+        text = os.read(read_fd, 4096).decode()
+        os.close(read_fd)
+        self.assertIn('slack: request auth.test still waiting after', text)
+        self.assertNotIn(self.TOKEN, text)
 
 
 class RegisteredGateTest(unittest.TestCase):
