@@ -37,7 +37,8 @@ case "${1:-}" in
       'Usage: fm-slack-check.sh [arm|check|disarm|retarget] [--replay transcript.json]' \
       '       fm-slack-check.sh resolve <request-ts>' \
       'Bind slack-dm with fm-captain-hold.sh before arm; arm proves the DM is readable.' \
-      'Retarget stops tracking the old DM after FM_SLACK_DM_USER changed; arm then opens the new one.' \
+      'Retarget stops tracking the old DM after FM_SLACK_DM_USER changed, opens the new DM and records its newest message as the' \
+      'starting point, so the next poll takes in the requests sent after it; arm records a fresh starting point again.' \
       'Retarget refuses while the old DM has pending work or unread owner requests and the poll refuses a changed' \
       'owner, so: restore BOTH old settings, FM_SLACK_DM_USER and FM_SLACK_ALLOWED_AUTHORS (or the old allowlist in' \
       'the home configuration file), and run fm-slack-poll.sh with them, then set the new values, then disarm,' \

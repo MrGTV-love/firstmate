@@ -73,6 +73,16 @@ class Replay:
             out.write(json.dumps(entry, ensure_ascii=False) + '\n')
         self.save()
 
+    def dm_of(self, user):
+        """The DM that Slack opens for a user: the transcript's `dms` names it; a user it does not name gets the transcript's DM
+        (`owner_dm` where the channel that accepts posts is another one)."""
+        named = (self.transcript.get('dms') or {}).get(user)
+        return named or self.transcript.get('owner_dm', self.transcript.get('channel', 'D0123456789'))
+
+    def known_channels(self):
+        """Every DM id of this conversation: the transcript's own and those its `dms` names."""
+        return {self.transcript.get('channel', 'D0123456789'), *(self.transcript.get('dms') or {}).values()}
+
     def fail(self, method, *targets):
         # A rule keyed "<method>:<ts>" fails only the call about that one message: by the message a call names (ts or
         # timestamp) or by the thread it posts into (thread_ts).
@@ -126,12 +136,12 @@ class Replay:
             if target not in opened:
                 opened.append(target)
             # owner_dm names the DM that really belongs to the opened user when it is not the channel that accepts posts.
-            channel = self.transcript.get('owner_dm', self.transcript.get('channel', 'D0123456789'))
+            channel = self.dm_of(target)
             self.log({'method': method, 'recipient': target, 'channel': channel})
             data = {'ok': True, 'channel': {'id': channel, 'is_im': True} if fields.get('return_im') else {'id': channel}}
         elif method in ('conversations.history', 'conversations.replies'):
             channel = fields.get('channel')
-            if channel != self.transcript.get('channel', 'D0123456789'):
+            if channel not in self.known_channels():
                 raise SlackError('channel_not_found')
             # A message may name its own channel; the default is the transcript's DM.
             here = [m for m in self.state['messages']
@@ -170,7 +180,7 @@ class Replay:
                     'response_metadata': {'next_cursor': str(start + size) if more else ''}}
         elif method == 'chat.postMessage':
             channel = fields.get('channel')
-            if channel != self.transcript.get('channel', 'D0123456789'):
+            if channel not in self.known_channels():
                 raise SlackError('channel_not_found')
             if len(fields.get('text', '')) > 40000:
                 raise SlackError('api_error')
@@ -184,6 +194,8 @@ class Replay:
                        'metadata': fields.get('metadata')}
             if fields.get('thread_ts'):
                 message['thread_ts'] = fields['thread_ts']
+            if channel != self.transcript.get('channel', 'D0123456789'):
+                message['channel'] = channel
             self.state['messages'].append(message)
             self.state['reactions'].setdefault(ts, [])
             self.save()
@@ -193,7 +205,7 @@ class Replay:
             data = {'ok': True, 'ts': ts, 'channel': channel}
         elif method == 'chat.update':
             channel, ts = fields.get('channel'), fields.get('ts')
-            if channel != self.transcript.get('channel', 'D0123456789'):
+            if channel not in self.known_channels():
                 raise SlackError('channel_not_found')
             message = next((m for m in self.state['messages'] if m.get('ts') == ts), None)
             if message is None or len(fields.get('text', '')) > 40000:

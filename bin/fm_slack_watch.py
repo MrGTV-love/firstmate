@@ -25,6 +25,7 @@ import contextlib
 from datetime import datetime, timezone
 import fcntl
 import hashlib
+import itertools
 import json
 import os
 from pathlib import Path
@@ -84,6 +85,11 @@ class NoNetwork:
         raise SlackError('network_closed')
 
 
+class SourceUnbound(Exception):
+    """The slack-dm source was found unbound at the moment of a post: nothing is posted, the staged row stays journaled,
+    and the run ends quietly (I2 (h) and I8)."""
+
+
 def fault(point):
     """Test-only crash injection, read from the process environment and never from .env."""
     if env_value('FM_SLACK_FAULT') == point:
@@ -134,6 +140,7 @@ def home_dir():
 def flat(value):
     """Keep the intake's one-line framing: newlines, tabs, and controls become spaces."""
     value = str(value).replace('\r', ' ').replace('\n', ' ').replace('\t', ' ')
+    value = ''.join(' ' if unicodedata.category(ch) in ('Zl', 'Zp') else ch for ch in value)
     return ''.join(ch for ch in value if ord(ch) >= 32 and ord(ch) != 127)
 
 
@@ -184,6 +191,11 @@ def plane_secrets():
 
 
 SINK_WORD = '[redacted]'
+# Every constant that a wake line, the failed-row listing or the record pointer carries: a plane value that is part of any of
+# them could never be replaced for good, so the plane refuses it (F1 of Main 2602). The diagnostic prefixes are not in this list:
+# redact_sink protects them.
+FIXED_WAKE_TEXT = (REQUEST_PREFIX, ' from ', REQUEST_UNACKNOWLEDGED, REQUEST_LABEL, '; ' + SECRET_FLAG, '; full: ', '; +', ' queued',
+                   SECRET_MARKER, SECRET_FLAG, SINK_WORD, 'slack: request ', ' not acknowledged (failed, owner Main)')
 
 
 def redacted_error(error):
@@ -225,6 +237,15 @@ def replace_values_tracked(pairs):
         for value in values:
             size = len(value)
             if len(out) >= size and ''.join(char for char, _ in out[-size:]) == value:
+                # The longest occurrence wins: a longer value that starts here and completes with the characters still to come.
+                head = ''.join(char for char, _ in out[-size:])
+                for longer in values:
+                    more = len(longer) - size
+                    if more > 0 and longer.startswith(head) and len(queue) >= more \
+                            and ''.join(char for char, _ in itertools.islice(queue, more)) == longer[size:]:
+                        out.extend(queue.popleft() for _ in range(more))
+                        size = len(longer)
+                        break
                 window = out[-size:]
                 del out[-size:]
                 origins = [origin for _, origin in window]
@@ -255,7 +276,15 @@ def replace_values(text):
         out.append(queue.popleft())
         for value in values:
             if len(out) >= len(value) and ''.join(out[-len(value):]) == value:
-                del out[-len(value):]
+                size, head = len(value), value
+                for longer in values:
+                    more = len(longer) - size
+                    if more > 0 and longer.startswith(head) and len(queue) >= more \
+                            and ''.join(itertools.islice(queue, more)) == longer[size:]:
+                        out.extend(queue.popleft() for _ in range(more))
+                        size = len(longer)
+                        break
+                del out[-size:]
                 queue.extendleft(reversed(SECRET_MARKER))
                 replaced = True
                 break
@@ -263,9 +292,9 @@ def replace_values(text):
 
 
 def refuse_a_value_that_the_marker_holds():
-    """A plane value that is part of the marker or of the flag could never be replaced for good: refuse, fail closed."""
+    """A plane value that is part of the marker, the flag or any other fixed text of a wake line could never be replaced for good: refuse, fail closed."""
     for value in plane_secrets():
-        if value in SECRET_MARKER or value in SECRET_FLAG or value in SINK_WORD:
+        if any(value in text for text in FIXED_WAKE_TEXT):
             raise SlackError('secret_collides_with_marker')
 
 
@@ -273,13 +302,22 @@ def present(raw):
     """The presentation rule of the wake line: each link becomes `label (address)` (its address alone when it has
     no label or the label is its address), `&lt;`, `&gt;` and `&amp;` become `<`, `>` and `&`, and each character
     of category Cc, Zl or Zp becomes one space; nothing else changes. Returns the presented text and, for each of
-    its characters, the span of the raw text it came from."""
+    its characters, the span of the raw text it came from: a label or address character maps to its own raw character,
+    and only the framing characters of a link map to the whole link."""
     items, pos = [], 0
     for link in SLACK_LINK.finditer(raw):
         items += [(ch, i, i + 1) for i, ch in enumerate(raw[pos:link.start()], pos)]
         address, label = link.group(1), link.group(2)
-        shown = address if not label or label == address else '%s (%s)' % (label, address)
-        items += [(ch, link.start(), link.end()) for ch in shown]
+        a_at = link.start(1)
+        if not label or label == address:
+            items += [(ch, a_at + k, a_at + k + 1) for k, ch in enumerate(address)]
+        else:
+            l_at = link.start(2)
+            items += [(ch, l_at + k, l_at + k + 1) for k, ch in enumerate(label)]
+            # Only the framing characters belong to the whole link.
+            items += [(' ', link.start(), link.end()), ('(', link.start(), link.end())]
+            items += [(ch, a_at + k, a_at + k + 1) for k, ch in enumerate(address)]
+            items += [(')', link.start(), link.end())]
         pos = link.end()
     items += [(ch, i, i + 1) for i, ch in enumerate(raw[pos:], pos)]
     out, i = [], 0
@@ -302,13 +340,55 @@ def present(raw):
 SETTLE_PASSES = 32
 
 
+def encoded_hits(text):
+    """The indexes of the characters of text whose JSON encoding overlaps a plane value, in either encoding the plane writes
+    (the state file and the wake line keep the characters, the record store escapes them to ASCII). A value that only the
+    encoding creates (a quote or a backslash among its pieces) is found here, and never splits an escape pair."""
+    values = plane_secrets()
+    hit = set()
+    if not values:
+        return []
+    for ascii_only in (False, True):
+        pieces = [json.dumps(ch, ensure_ascii=ascii_only)[1:-1] for ch in text]
+        offsets, pos = [], 0
+        for piece in pieces:
+            offsets.append((pos, pos + len(piece)))
+            pos += len(piece)
+        encoded = ''.join(pieces)
+        for value in values:
+            at = encoded.find(value)
+            while at >= 0:
+                end = at + len(value)
+                hit.update(i for i, (a, b) in enumerate(offsets) if a < end and b > at)
+                at = encoded.find(value, at + 1)
+    return sorted(hit)
+
+
+def protect_encoded(text):
+    """text with every character whose JSON encoding forms a plane value replaced by the marker, to a fixed point (fail closed)."""
+    for _ in range(SETTLE_PASSES):
+        hits = encoded_hits(text)
+        if not hits:
+            return text, False
+        runs = []
+        for i in hits:
+            if runs and i == runs[-1][1]:
+                runs[-1][1] = i + 1
+            else:
+                runs.append([i, i + 1])
+        for start, end in reversed(runs):
+            text = text[:start] + SECRET_MARKER + text[end:]
+        text = replace_values(text)[0]
+    return SECRET_MARKER, True
+
+
 def sanitize(raw):
     """What a request keeps and what its wake line shows. Returns (the whole permitted text, the text the wake line
     shows, whether a value was replaced). sanitize_counted also returns the count of extra bytes (see there)."""
     return sanitize_counted(raw)[:3]
 
 
-def sanitize_counted(raw):
+def sanitize_counted(raw, mark=None):
     """sanitize, and a fourth value: the number of UTF-8 bytes of the raw text that redaction removed other than as an
     exact occurrence of a value in it (a cascade, or a value that only the presentation joins). It is 0 when no value
     occurs and when every value occurs whole; every other byte is kept exactly, in order (Amendment bq).
@@ -321,13 +401,16 @@ def sanitize_counted(raw):
     refuse_a_value_that_the_marker_holds()
     # The transport may already have removed the plane's token from the response (a mark and the marker stand where it was):
     # the mark is dropped, the marker stays, and the value counts as replaced.
-    removed_by_transport = SCRUB_MARK in raw
-    raw = raw.replace(SCRUB_MARK, '')
+    # Only the mark that this read asked the transport to leave is dropped; an owner's own U+FDD0 stays in the text.
+    removed_by_transport = bool(mark) and mark in raw
+    if mark:
+        raw = raw.replace(mark, '')
     chars, replaced, extra = replace_values_tracked([(char, index) for index, char in enumerate(raw)])
     replaced = replaced or removed_by_transport
     text = ''.join(char for char, _ in chars)
     shown, joined = replace_values(present(text)[0])
-    replaced = replaced or joined
+    shown, encoded = protect_encoded(shown)
+    replaced = replaced or joined or encoded
     for _ in range(SETTLE_PASSES):
         text = ''.join(char for char, _ in chars)
         presented, spans = present(text)
@@ -335,16 +418,20 @@ def sanitize_counted(raw):
         for value in plane_secrets():
             at = presented.find(value)
             while at >= 0:
-                found.append((spans[at][0], spans[at + len(value) - 1][1]))
+                # The union of the spans of the matched characters, not first start to last end: the raw characters that
+                # form the value are replaced, and the link target, trailing label and later words in between stay.
+                found.extend(spans[at:at + len(value)])
                 at = presented.find(value, at + len(value))
+        found.extend((i, i + 1) for i in encoded_hits(text))
         if not found:
             return text, shown, replaced, extra
         merged = []
-        for start, end in sorted(found):
+        for start, end in sorted(set(found)):
             if merged and start <= merged[-1][1]:
                 merged[-1] = (merged[-1][0], max(end, merged[-1][1]))
             else:
                 merged.append((start, end))
+        replaced = True
         for start, end in reversed(merged):
             extra += sum(len(char.encode('utf-8')) for char, origin in chars[start:end] if origin >= 0)
             chars[start:end] = [(char, -1) for char in SECRET_MARKER]
@@ -353,26 +440,68 @@ def sanitize_counted(raw):
     return SECRET_MARKER, shown, True, len(raw.encode('utf-8'))
 
 
-def request_line(ts, user, presented, note='', flagged=False, budget=WAKE_LIMIT, place=RECORD_PLACE):
+def request_line(ts, user, presented, note='', flagged=False, budget=WAKE_LIMIT, place=RECORD_PLACE, fallbacks=()):
     """One request segment (I4a): the prefix, the label, the presented text as ONE JSON string literal, then
-    `; <flag>` when a secret value was replaced and, when the text is cut, `; full: <place>`. The text is cut before
-    it is encoded, to the longest prefix for which the whole line is at most budget characters."""
+    `; <flag>` when a secret value was replaced and, when the text is cut, `; full: <place>#<ts>`. The text is cut before
+    it is encoded, to the longest prefix for which the whole line is at most budget characters. The place is tried first;
+    when even the empty text does not fit with it, each fallback is tried (the path from the home, then the key alone, which
+    is the empty place), so the line always keeps the complete `#<ts>` key and never exceeds the budget. Last, the whole
+    line is scanned for the plane's secret values (F1 of Main 2602): a value that the fixed text and the JSON encoding
+    create together is protected like any other match, by replacing the whole characters that form it."""
     head = REQUEST_PREFIX + '%s from %s%s: %s ' % (ts, user, note, REQUEST_LABEL)
-    flag = '; ' + SECRET_FLAG if flagged else ''
-
-    def build(count):
-        cut = '' if count == len(presented) else '; full: %s#%s' % (place, ts)
-        return head + json.dumps(presented[:count], ensure_ascii=False) + flag + cut
-    if len(build(len(presented))) <= budget:
-        return build(len(presented))
-    low, high = 0, len(presented) - 1
-    while low < high:
-        mid = (low + high + 1) // 2
-        if len(build(mid)) <= budget:
-            low = mid
-        else:
-            high = mid - 1
-    return build(low)
+    places = [place, *fallbacks] if place else list(fallbacks)
+    places = [value for index, value in enumerate(places) if value not in places[:index]] + ['']
+    for _ in range(SETTLE_PASSES):
+        flag = '; ' + SECRET_FLAG if flagged else ''
+        line, count = None, 0
+        for where in places:
+            def build(count, where=where):
+                cut = '' if count == len(presented) else '; full: %s#%s' % (where, ts)
+                return head + json.dumps(presented[:count], ensure_ascii=False) + flag + cut
+            if len(build(len(presented))) <= budget:
+                line, count = build(len(presented)), len(presented)
+                break
+            if len(build(0)) > budget and where:
+                continue
+            low, high = 0, len(presented) - 1
+            while low < high:
+                mid = (low + high + 1) // 2
+                if len(build(mid)) <= budget:
+                    low = mid
+                else:
+                    high = mid - 1
+            line, count = build(low), low
+            break
+        values = [value for value in plane_secrets() if value in line]
+        if not values:
+            return line
+        lit_start = len(head) + 1
+        encoded = [json.dumps(ch, ensure_ascii=False)[1:-1] for ch in presented[:count]]
+        offsets, pos = [], lit_start
+        for piece in encoded:
+            offsets.append((pos, pos + len(piece)))
+            pos += len(piece)
+        hit = set()
+        for value in values:
+            at = line.find(value)
+            while at >= 0:
+                end = at + len(value)
+                touched = [k for k, (a, b) in enumerate(offsets) if a < end and b > at]
+                if not touched:
+                    # The value lies wholly in the fixed text: it could never be replaced for good.
+                    raise SlackError('secret_collides_with_marker')
+                hit.update(touched)
+                at = line.find(value, at + 1)
+        runs = []
+        for k in sorted(hit):
+            if runs and k == runs[-1][1]:
+                runs[-1][1] = k + 1
+            else:
+                runs.append([k, k + 1])
+        for start, end in reversed(runs):
+            presented = presented[:start] + SECRET_MARKER + presented[end:]
+        flagged = True
+    return request_line(ts, user, SECRET_MARKER, note, True, budget, place, fallbacks)
 
 
 def shown_text(row):
@@ -562,6 +691,9 @@ class Watch:
         self.dm_proven = False
         self.window_reads = 0
         self.ran_unbound = False
+        self.hold_depth = 0
+        self.hold_bound = False
+        self.read_mark = None
 
     def dm_user(self):
         return env_value('FM_SLACK_DM_USER').strip()
@@ -632,8 +764,20 @@ class Watch:
     def delivering(self):
         """Yields whether the source is bound, and keeps it bound until the block ends: the check and the
         delivery it allows (a post, a print) are one step against an unbind."""
+        if self.hold_depth:
+            # Already held by this run: the inner step reuses the answer of the check made when the hold began.
+            self.hold_depth += 1
+            try:
+                yield self.hold_bound
+            finally:
+                self.hold_depth -= 1
+            return
         with self.binding_held():
-            yield bool(self.bound())
+            self.hold_depth, self.hold_bound = 1, bool(self.bound())
+            try:
+                yield self.hold_bound
+            finally:
+                self.hold_depth = 0
 
     def printed(self, lines):
         """Drop the wake lines that have been printed from the journal; every other line stays."""
@@ -840,21 +984,34 @@ class Watch:
             raise SlackError('stored_channel_not_owner_dm')
         return channel
 
-    def post(self, event, text, thread=None):
-        channel = self.owner_channel()
-        marker = hashlib.sha256(event.encode()).hexdigest()
-        for message in self.recent(thread):
-            if message.get('metadata', {}).get('event_payload', {}).get('id') == marker:
-                return message['ts']
-        if len(text) > 39000:
-            text = clip(text, 38000) + '\nFull text remains in the local backlog.'
-        args = {'channel': channel, 'text': text,
-                'client_msg_id': str(uuid.uuid5(uuid.NAMESPACE_URL, event)),
-                'metadata': {'event_type': STATE_KEY, 'event_payload': {'id': marker}},
-                'unfurl_links': False, 'unfurl_media': False}
-        if thread:
-            args['thread_ts'] = thread
-        return self.api.call('chat.postMessage', **args)['ts']
+    def post(self, event, text, thread=None, dedup_may_fail=False):
+        """The one place that writes a message: the binding is held from its check to the end of the post, so that an unbind
+        cannot return between them (I8); unbound, nothing is posted and the staged row stays journaled (SourceUnbound).
+        dedup_may_fail lets a request's acknowledgement go on when the lookup that finds an earlier post fails: only a
+        failed chat.postMessage then counts as a failed attempt (F7 of Main 2602)."""
+        with self.delivering() as bound:
+            if not bound:
+                raise SourceUnbound()
+            channel = self.owner_channel()
+            marker = hashlib.sha256(event.encode()).hexdigest()
+            try:
+                earlier = self.recent(thread)
+            except SlackError as error:
+                if not dedup_may_fail or str(error) not in THREAD_ERRORS:
+                    raise
+                earlier = []
+            for message in earlier:
+                if message.get('metadata', {}).get('event_payload', {}).get('id') == marker:
+                    return message['ts']
+            if len(text) > 39000:
+                text = clip(text, 38000) + '\nFull text remains in the local backlog.'
+            args = {'channel': channel, 'text': text,
+                    'client_msg_id': str(uuid.uuid5(uuid.NAMESPACE_URL, event)),
+                    'metadata': {'event_type': STATE_KEY, 'event_payload': {'id': marker}},
+                    'unfurl_links': False, 'unfurl_media': False}
+            if thread:
+                args['thread_ts'] = thread
+            return self.api.call('chat.postMessage', **args)['ts']
 
     def retarget(self):
         """Re-point the plane at a changed owner DM; only an explicit retarget may do this."""
@@ -878,12 +1035,16 @@ class Watch:
         # the per-poll cap, so owner requests may still wait in the old DM. Only look, never take in.
         if self.unread_requests():
             raise SlackError('dm_user_changed_with_unread_requests')
-        # The old DM's threads stop being tracked and nothing more is posted there.
-        self.state.update(user='', channel='', team='', scopes=[], threads={})
-        # The request cursor and its walk bounds belong to the old DM; the new DM starts from its own latest message.
-        self.state.pop('intake_cursor', None)
+        # The new DM is opened and its newest message read before anything changes: the boundary is recorded at the retarget
+        # itself, and the next poll takes in the requests sent after it. A failed open or read changes nothing.
+        updates = self.dm_boundary()
+        # The old DM's threads stop being tracked and nothing more is posted there; its request cursor and walk bounds
+        # belong to it, and the new DM starts from its own newest message.
+        self.state.update(updates)
+        self.state['threads'] = {}
         self.state.pop('intake_bounds', None)
         self.commit()
+        self.dm_proven = True
         return True
 
     def newer_messages(self, channel, cursor):
@@ -913,7 +1074,8 @@ class Watch:
         if hasattr(self.api, 'scrub_with'):
             # The transport removes the plane's token from a response before it is decoded (a defense that stays); here it
             # also leaves the declared marker and a mark that tells sanitize that a value was removed at the boundary.
-            self.api.scrub_with = SCRUB_MARK + SECRET_MARKER
+            self.read_mark = SCRUB_MARK + os.urandom(6).hex() + SCRUB_MARK
+            self.api.scrub_with = self.read_mark + SECRET_MARKER
             try:
                 return self.api.call('conversations.history', channel=channel, **fields)
             finally:
@@ -932,17 +1094,22 @@ class Watch:
         self.state['intake_cursor'] = self.newest(latest.get('messages'))
         self.commit()
 
-    def prepare(self):
-        if not self.bound():
-            raise SlackError('source_not_bound')
+    def dm_boundary(self):
+        """Open the DM of the configured owner and read its newest message: the state a plane keeps for that DM, with the
+        starting point of requests. Changes no state (the caller commits it)."""
         result = self.api.call('auth.test')
         channel = self.api.call('conversations.open', users=self.dm_user(), return_im=True).get('channel', {})
         if not DM_CHANNEL.fullmatch(channel.get('id') or '') or not channel.get('is_im'):
             raise SlackError('target_is_not_a_DM')
         latest = self.read_window(channel['id'], limit=1)
-        self.state.update(team=result.get('team_id'), user=self.dm_user(),
-                          channel=channel['id'], scopes=sorted(getattr(self.api, 'scopes', set())),
-                          intake_cursor=self.newest(latest.get('messages')))
+        return dict(team=result.get('team_id'), user=self.dm_user(),
+                    channel=channel['id'], scopes=sorted(getattr(self.api, 'scopes', set())),
+                    intake_cursor=self.newest(latest.get('messages')))
+
+    def prepare(self):
+        if not self.bound():
+            raise SlackError('source_not_bound')
+        self.state.update(self.dm_boundary())
         self.state.pop('intake_bounds', None)
         self.commit()
         self.dm_proven = True
@@ -988,7 +1155,7 @@ class Watch:
         # A message with no text (a file-only message has none) is not a request; any text, whatever it looks like, is.
         if not isinstance(text, str) or text == '':
             return None
-        whole, shown, replaced, extra = sanitize_counted(text)
+        whole, shown, replaced, extra = sanitize_counted(text, self.read_mark)
         event = '/'.join([self.state.get('team', ''), self.state.get('channel', ''), ts, 'request'])
         return {'event': event, 'key': '', 'thread': ts, 'author': message['user'], 'text': whole, 'shown': shown,
                 'replaced': replaced, 'extra': extra, 'kind': 'request', 'stage': 'request'}
@@ -1046,20 +1213,32 @@ class Watch:
             raise SlackError('request_record_unwritable') from None
         pending['recorded'] = True
 
-    def record_place(self):
-        """Where the store of whole texts is, for the pointer of a cut line: its path from the firstmate home when it lies
-        under the home (the default is `state/slack-watch/requests.jsonl`), the absolute path otherwise, written so that
-        the pointer holds no `;` or `#` (each is a percent escape, as is `%` itself)."""
+    @staticmethod
+    def escape_place(place):
+        """The place written so that the pointer holds no `;` or `#` and no control or line separator: each is percent-escaped,
+        by its UTF-8 bytes, as is `%` itself."""
+        return ''.join(''.join('%%%02X' % byte for byte in ch.encode('utf-8'))
+                       if ch in '%;#' or unicodedata.category(ch) in ('Cc', 'Zl', 'Zp') else ch for ch in place)
+
+    def record_places(self):
+        """Where the store of whole texts is, for the pointer of a cut line, in the order the line tries them: its path from the
+        firstmate home when it lies under the home (the default is `state/slack-watch/requests.jsonl`), the absolute path
+        otherwise; then the path relative to the home; the key alone is the last resort and is added by request_line."""
         path = (self.root / RECORD_FILE).resolve()
         try:
-            place = str(path.relative_to(self.home))
+            first = str(path.relative_to(self.home))
         except ValueError:
-            place = str(path)
-        return ''.join('%%%02X' % ord(char) if char in '%;#' or ord(char) < 32 else char for char in place)
+            first = str(path)
+        forms = [first, os.path.relpath(path, self.home)]
+        return [self.escape_place(value) for index, value in enumerate(forms) if value not in forms[:index]]
+
+    def record_place(self):
+        return self.record_places()[0]
 
     def request_wake_line(self, pending, note=''):
+        places = self.record_places()
         return request_line(pending['thread'], pending['author'], shown_text(pending), note,
-                            bool(pending.get('replaced')), place=self.record_place())
+                            bool(pending.get('replaced')), place=places[0], fallbacks=places[1:])
 
     def fit(self, line, room):
         """A request segment that is longer than room, cut again from its record to the longest prefix that fits;
@@ -1070,8 +1249,9 @@ class Watch:
         row = self.record(match.group(1)) if match else None
         if not row:
             return line
+        places = self.record_places()
         return request_line(match.group(1), match.group(2), shown_text(row), match.group(3) or '',
-                            bool(row.get('replaced')), room, self.record_place())
+                            bool(row.get('replaced')), room, places[0], places[1:])
 
     def stage(self, pending):
         for item in self.state['pending']:
@@ -1104,7 +1284,12 @@ class Watch:
                     return
                 self.owner_channel()
                 try:
-                    self.post('ack:' + pending['event'], REQUEST_ACK, pending['thread'])
+                    if not pending.get('posted'):
+                        self.post('ack:' + pending['event'], REQUEST_ACK, pending['thread'], dedup_may_fail=True)
+                        # Written inside the hold, before the after-ack point: a later failed deduplication lookup can
+                        # then never turn an acknowledgement that was posted into a failed one.
+                        pending['posted'] = True
+                        self.commit()
                 except SlackError as error:
                     if str(error) not in THREAD_ERRORS:
                         raise
@@ -1188,14 +1373,15 @@ class Watch:
         for pending in list(self.state['pending']):
             if remaining <= 0:
                 break
-            advanced = self.advanced
+            advanced, handled = self.advanced, self.notices_handled
             try:
                 self.publish(pending)
             except SlackError as error:
                 if str(error) not in THREAD_ERRORS:
                     raise
                 deferred = deferred or error
-            remaining -= self.advanced - advanced
+            # One budget for answers, requests and resumed notices alike (Main 2602, F8).
+            remaining -= (self.advanced - advanced) + (self.notices_handled - handled)
         return remaining, deferred
 
     def mirror(self):
@@ -1389,6 +1575,14 @@ class Watch:
             # An unbound source makes no call, no state change and no output (I2 (h)): the caller must not clear a failure either.
             self.ran_unbound = True
             return
+        self.verify_target()
+        try:
+            self.poll_work()
+        except SourceUnbound:
+            # Unbound at the moment of a post (an unbind returned in between): nothing was posted, the staged row stays journaled.
+            self.ran_unbound = True
+
+    def poll_work(self):
         # The starting point of requests is set before anything uses the per-poll cap, so that a busy first
         # upgraded poll cannot skip a request sent after it; a failed read is held back like a mirror failure.
         # That read is the one history read of the owner DM that a poll may make, so the poll takes nothing in.
@@ -1398,6 +1592,8 @@ class Watch:
         except SlackError as error:
             start_error = error
         remaining, deferred = self.resume()
+        # The resumed notices are already charged to the shared cap by resume().
+        self.notices_handled = 0
         deferred = deferred or start_error
         if remaining <= 0:
             if deferred:
@@ -1748,13 +1944,20 @@ def main(argv):
         watch = Watch(replay=replay, token=env_value('SLACK_BOT_TOKEN').strip())
         if action == 'check':
             watch.api.on_reply = note_progress
-        if action != 'retarget':
-            # Only an explicit retarget may move the plane to a changed owner DM.
+        # A plane value that is part of the fixed text of a wake line could never be replaced for good: refuse (arm and check).
+        refuse_a_value_that_the_marker_holds()
+        if action == 'arm':
+            # Only an explicit retarget may move the plane to a changed owner DM. The poll and the mirror look at the owner
+            # after they have found the source bound: an unbound run makes no call, no state change and no output (I2 (h)).
             watch.verify_target()
         if command == 'mirror':
             if not watch.bound():
                 return 0
-            watch.mirror()
+            watch.verify_target()
+            try:
+                watch.mirror()
+            except SourceUnbound:
+                return 0
             watch.clear_failure()
         elif command == 'poll':
             watch.poll()
@@ -1814,7 +2017,7 @@ def check(watch, action):
     state_dir = state_home()
     if action == 'retarget':
         if watch.retarget():
-            print('retargeted: the old DM is no longer tracked; the next arm, mirror, or poll opens the DM of FM_SLACK_DM_USER')
+            print('retargeted: the old DM is no longer tracked; the DM of FM_SLACK_DM_USER is open and its starting point is recorded; the next poll takes in the requests sent after it')
         else:
             print('unchanged: FM_SLACK_DM_USER matches the DM already in use; nothing to retarget')
         return 0
