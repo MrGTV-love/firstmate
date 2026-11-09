@@ -7581,14 +7581,16 @@ SH
 # the driver (the stand-in sleeps after it wrote its tar); the second starts while
 # it is there. Whatever the second does, the driver is asked once and one tar exists.
 # Two overlapping activations with a deterministic handshake: the first teardown's stand-in
-# driver writes `entered` and waits for `release` (bounded at 30 s so a broken run cannot hang),
-# the second command starts only after `entered`, its attempt and output are recorded by the
-# caller, and only then is `release` written.
+# driver writes `entered` and waits for `release`, the second command starts only after
+# `entered`, its attempt and output are recorded by the caller, and only then is `release`
+# written. No wait here has a cut-off: a wait that runs long prints one slow-alarm line and
+# keeps waiting (the first run dying ends the wait for `entered`, the second returning writes
+# `release`).
 retained_overlap_run() {  # <label> <second-command...>: first run in the background
   local label=$1 first_pid releaser_pid n after
   shift
   rm -f "$FOREIGN_CASE/entered" "$FOREIGN_CASE/release"
-  after=": > '$FOREIGN_CASE/entered'; n=0; until [ -e '$FOREIGN_CASE/release' ] || [ \"\$n\" -ge 300 ]; do sleep 0.1; n=\$((n + 1)); done"
+  after=": > '$FOREIGN_CASE/entered'; n=0; until [ -e '$FOREIGN_CASE/release' ]; do sleep 0.1; n=\$((n + 1)); [ \"\$n\" -ne 300 ] || echo 'slow: the stand-in driver is still waiting for release' >&2; done"
   (
     env FM_TEARDOWN_VERNANT_PYTHON="$FOREIGN_CASE/vernant-python" FM_STUB_CLOSEOUT=retained \
       "FM_STUB_AFTER=$after" FM_HOME="$FOREIGN_CASE/home" \
@@ -7599,20 +7601,24 @@ retained_overlap_run() {  # <label> <second-command...>: first run in the backgr
     echo $? > "$FOREIGN_CASE/rc.first"
   ) &
   first_pid=$!
-  for n in $(seq 1 150); do
-    [ -f "$FOREIGN_CASE/entered" ] && break
+  n=0
+  until [ -f "$FOREIGN_CASE/entered" ]; do
+    kill -0 "$first_pid" 2>/dev/null || break
     sleep 0.2
+    n=$((n + 1))
+    [ "$n" -ne 150 ] || echo "slow: $label: the first teardown has not entered the driver yet" >&2
   done
-  [ -f "$FOREIGN_CASE/entered" ] || { : > "$FOREIGN_CASE/release"; fail "$label: the first run never entered the driver"; }
+  [ -f "$FOREIGN_CASE/entered" ] || fail "$label: the first run ended without entering the driver"
   # The second activation either refuses at once or queues behind the first for a lock it
   # holds. A releaser writes `release` once the second is observed waiting (the lock monitor's
-  # wait marker exists in the state folder), bounded so a refusal that never queues is not waited for; the second's own
-  # return writes it too.
+  # wait marker exists in the state folder); the second's own return writes it too.
   (
-    for n in $(seq 1 150); do
-      [ -e "$FOREIGN_CASE/release" ] && exit 0
+    n=0
+    until [ -e "$FOREIGN_CASE/release" ]; do
       ls "$FOREIGN_CASE"/state/.lock-monitor.wait.* > /dev/null 2>&1 && break
       sleep 0.2
+      n=$((n + 1))
+      [ "$n" -ne 150 ] || echo "slow: $label: the second activation is not waiting yet" >&2
     done
     ls "$FOREIGN_CASE"/state/.lock-monitor.wait.* > "$FOREIGN_CASE/waiting-at-release.txt" 2>/dev/null || true
     : > "$FOREIGN_CASE/release"
