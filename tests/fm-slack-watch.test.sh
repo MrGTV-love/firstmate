@@ -2719,5 +2719,27 @@ wait "$unbind_pid" || fail "INTAKE-13 [killed holder] the unbind failed"
 "$CAPTAIN" binding slack-dm >/dev/null 2>&1 && fail "INTAKE-13 [killed holder] the unbind left the binding"
 printf 'ok - INTAKE-13\n'
 
+# INTAKE-14: a poll or a check that finds the source unbound makes no call, changes no state and prints nothing even when the
+# configured owner differs from the stored one (the owner is not looked at while unbound); bound, the same run refuses the change.
+for via in poll check; do
+  intake_home
+  "$CAPTAIN" unbind slack-dm >/dev/null
+  digest=$(shasum -a 256 "$(state_file)")
+  calls=$(attempt_count)
+  set +e
+  out=$(via_run "$via" FM_SLACK_DM_USER=U0OTHEROWNER1 2>&1)
+  rc=$?
+  set -e
+  assert_eq "$rc" 0 "INTAKE-14 [$via] an unbound run with a changed owner exited nonzero"
+  assert_eq "$out" "" "INTAKE-14 [$via] an unbound run with a changed owner printed"
+  assert_eq "$(attempt_count)" "$calls" "INTAKE-14 [$via] an unbound run with a changed owner made a Slack call"
+  assert_eq "$(shasum -a 256 "$(state_file)")" "$digest" "INTAKE-14 [$via] an unbound run with a changed owner changed the state file"
+  # The control: bound, the same run still refuses the changed owner.
+  bind
+  out=$(via_run "$via" FM_SLACK_DM_USER=U0OTHEROWNER1 2>&1 || true)
+  assert_contains "$out" 'dm_user_changed' "INTAKE-14 [$via control] a bound run did not refuse the changed owner"
+done
+printf 'ok - INTAKE-14\n'
+
 scope_clean "$INTAKE_LAST_STATE" "$INTAKE"
 printf 'ok - all Slack watch checks\n'
