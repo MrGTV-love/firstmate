@@ -2366,7 +2366,7 @@ for via in poll check; do
   assert_eq "$(posts_in 2000.000100)" 1 "INTAKE-6 [$via race control] the request was not acknowledged once"
   "$CAPTAIN" binding slack-dm >/dev/null 2>&1 || fail "INTAKE-6 [$via race control] the binding went away"
 done
-# The unbind itself: it waits for a delivery that holds the binding, then removes it; its wait is bounded.
+# The unbind itself: it waits for a delivery that holds the binding, then removes it; its wait has no time limit.
 holder() {  # <seconds>: another process holds the binding shared, as a delivery does
   perl -e 'use Fcntl qw(:flock); open(my $d, "<", $ARGV[0]) or die; flock($d, LOCK_SH) or die; $| = 1; print "held\n"; sleep $ARGV[1]' \
     "$FM_STATE_OVERRIDE/decision-bindings" "$1" > "$TMP/holder.out" &
@@ -2394,19 +2394,28 @@ wait "$holder_pid" 2>/dev/null || true
 wait "$unbind_pid" || fail "INTAKE-6 [unbind no override] the unbind failed after the delivery ended"
 assert_contains "$(cat "$TMP/unbind.out")" 'unbound: slack-dm' "INTAKE-6 [unbind no override] the unbind did not report"
 "$CAPTAIN" binding slack-dm >/dev/null 2>&1 && fail "INTAKE-6 [unbind no override] the binding stayed after the unbind"
-# Past its fixed wait the unbind refuses: it exits nonzero and the binding stays. The clock shim ends the wait at once.
+# A slow wait is an alarm, never a cut-off (the owner's rule of 2026-10-23, Main 2408): after 60 seconds the unbind prints one line
+# and keeps waiting, the binding stays while the delivery holds it, and the unbind succeeds when the delivery ends. The clock shim
+# reaches the 60 seconds at once; the delivery is a real process that really holds the binding for a few seconds.
 intake_home
-holder 30
+holder 4
 REAL_PERL=$(command -v perl)
+PATH="$FIX/fake-clock:$PATH" FM_REAL_PERL="$REAL_PERL" "$CAPTAIN" unbind slack-dm > "$TMP/unbind.out" 2> "$TMP/unbind.err" &
+unbind_pid=$!
+until grep -q 'unbind is slow' "$TMP/unbind.err"; do kill -0 "$unbind_pid" 2>/dev/null || break; sleep 0.1; done
+kill -0 "$unbind_pid" 2>/dev/null || fail "INTAKE-6 [unbind slow] the unbind stopped before it printed its alarm or while the delivery still held the binding"
+"$CAPTAIN" binding slack-dm >/dev/null 2>&1 || fail "INTAKE-6 [unbind slow] the binding was removed while the delivery still held it"
+sleep 0.5
+kill -0 "$unbind_pid" 2>/dev/null || fail "INTAKE-6 [unbind slow] the unbind gave up after its alarm"
 set +e
-PATH="$FIX/fake-clock:$PATH" FM_REAL_PERL="$REAL_PERL" "$CAPTAIN" unbind slack-dm > "$TMP/unbind.out" 2>&1
+wait "$holder_pid"
+wait "$unbind_pid"
 rc=$?
 set -e
-kill "$holder_pid" 2>/dev/null || true
-wait "$holder_pid" 2>/dev/null || true
-[ "$rc" != 0 ] || fail "INTAKE-6 [unbind bound] the unbind past its wait reported success"
-assert_not_contains "$(cat "$TMP/unbind.out")" 'unbound: slack-dm' "INTAKE-6 [unbind bound] a refused unbind reported success"
-"$CAPTAIN" binding slack-dm >/dev/null 2>&1 || fail "INTAKE-6 [unbind bound] the refused unbind removed the binding"
+[ "$rc" = 0 ] || fail "INTAKE-6 [unbind slow] the unbind did not succeed once the delivery ended (exit $rc)"
+assert_eq "$(grep -c 'unbind is slow' "$TMP/unbind.err")" 1 "INTAKE-6 [unbind slow] the alarm was not printed exactly once"
+assert_contains "$(cat "$TMP/unbind.out")" 'unbound: slack-dm' "INTAKE-6 [unbind slow] the unbind did not report"
+"$CAPTAIN" binding slack-dm >/dev/null 2>&1 && fail "INTAKE-6 [unbind slow] the binding stayed after the delivery ended"
 # A state folder that cannot be examined is a refusal, not a success; the base refused it too.
 intake_home
 if [ "$(id -u)" = 0 ]; then
