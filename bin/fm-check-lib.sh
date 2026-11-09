@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # Authenticated custom checks normally report latest state under their check path.
-# The watcher sets FM_CHECK_EVENT_OUTPUT=1 for an authenticated check invocation.
-# Event producers may then print one `fm-check-event <identity><TAB><payload>` line
-# per event, with a stable nonempty [A-Za-z0-9._-] identity. Identity excludes
-# changing presentation metadata such as queued counts. Ordinary output keeps
+# The watcher sets FM_CHECK_EVENT_OUTPUT=1 and parses event lines only for an
+# authenticated custom check other than contributions; PR-poll, X, contribution
+# and stop-notice output stays ordinary state. Event producers may then print
+# one `fm-check-event <identity><TAB><payload>` line per event, with a stable
+# nonempty [A-Za-z0-9._-] identity. Identity excludes changing presentation
+# metadata such as queued counts. Ordinary output keeps
 # latest-state semantics; events use <check-path>#event:<identity> as opaque keys.
 # Only the existing queue/drain owns presentation, actor claims and acknowledgement.
 
