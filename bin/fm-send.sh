@@ -980,10 +980,16 @@ if [ "${1:-}" = "--key" ]; then
   fm_send_record_interrupt "$semantic_key" || exit 1
 else
   MESSAGE=$*
-  if [ -z "${MESSAGE//[[:space:]]/}" ]; then
+  # A message is empty when it holds no character outside [[:space:]]. The case
+  # pattern stops at the first such character; deleting every space with
+  # ${MESSAGE//[[:space:]]/} was quadratic in a UTF-8 locale.
+  case "$MESSAGE" in
+  *[![:space:]]*) ;;
+  *)
     echo "error: a text steer requires a nonempty message; nothing was sent (an empty marked request would deliver only marker and correlation bytes and leave the parent waiting on a reply to nothing)" >&2
     exit 1
-  fi
+    ;;
+  esac
   # Tokenize once without treating pathname components as standalone task ids.
   # A final prose period is punctuation only when no exact meta names it. awk
   # splits each token into its text and the count of dots that end it, in one

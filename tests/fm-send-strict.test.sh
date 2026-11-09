@@ -809,8 +809,89 @@ test_trailing_dot_split_matches_the_reference_split() {
   pass "fm-send: the trailing-dot split counts the same dots as stripping them one at a time"
 }
 
+# A UTF-8 locale an operator's shell normally runs in; echoes nothing if none is installed.
+utf8_test_locale() {
+  local name
+  for name in en_US.UTF-8 C.UTF-8; do
+    if LC_ALL=$name bash -c 'exit 0' 2>/dev/null && locale -a 2>/dev/null | grep -qix "$name"; then
+      printf '%s\n' "$name"; return 0
+    fi
+  done
+}
+
+# CPU milliseconds (user plus system, children included) that one send of a
+# message of <chars> characters followed by one space and a word takes, in the
+# UTF-8 locale <locale>. CPU time, not a deadline: nothing is timed out or
+# killed, and the assertion compares two sizes. A message with a space is the
+# case that matters: the old empty-message check was fast without one.
+send_cpu_ms_for_message() {  # <home> <fakebin> <log> <chars> <locale> -> echoes ms
+  local home=$1 fb=$2 log=$3 chars=$4 locale=$5 msg out
+  msg="$(printf '%*s' "$chars" '' | tr ' ' x) y"
+  : > "$log"
+  out=$(LC_ALL=$locale PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" FM_SEND_SETTLE=0 \
+    bash -c '"$1" other "$2" >/dev/null 2>&1; times' _ "$SEND" "$msg") || fail "long no-space message was not delivered"
+  printf '%s\n' "$out" | awk 'NR == 2 { for (i = 1; i <= 2; i++) { split($i, a, /[ms]/); total += a[1] * 60000 + a[2] * 1000 } printf "%d\n", total }'
+}
+
+test_empty_message_check_cost_does_not_grow_quadratically() {
+  local dir fb home log small large grown locale
+  locale=$(utf8_test_locale)
+  if [ -z "$locale" ]; then
+    printf 'empty-check-cost: no UTF-8 locale installed here; the cost check needs one and was not run\n'
+    return 0
+  fi
+  dir="$TMP_ROOT/empty-check-cost"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); home=$(setup_home emptycost); log="$dir/send.log"
+  fm_write_meta "$home/state/other.meta" "window=sess:fm-other" "kind=ship"
+  small=$(send_cpu_ms_for_message "$home" "$fb" "$log" 2000 "$locale")
+  large=$(send_cpu_ms_for_message "$home" "$fb" "$log" 8000 "$locale")
+  grown=$((large - small))
+  printf 'empty-check-cost: locale=%s cpu ms at 2000 chars=%s, at 8000 chars=%s, growth=%s\n' "$locale" "$small" "$large" "$grown"
+  [ "$grown" -le 2000 ] || fail "send CPU grows faster than the message: ${small} ms at 2000 characters, ${large} ms at 8000"
+  pass "fm-send: a long message with a space costs CPU in proportion to its length"
+}
+
+test_empty_message_refusal_is_unchanged_for_long_inputs() {
+  local dir fb home log err rc text reference n
+  dir="$TMP_ROOT/empty-check-rows"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); home=$(setup_home emptyrows); log="$dir/send.log"; err="$dir/send.err"
+  fm_write_meta "$home/state/other.meta" "window=sess:fm-other" "kind=ship"
+  for text in '' ' ' $'\t\n \r' "$(printf '%*s' 20000 '' | tr ' ' ' ')" "$(printf '%*s' 20000 '' | tr ' ' $'\n')" $'\v\f' ; do
+    : > "$log"
+    PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" FM_SEND_SETTLE=0 \
+      "$SEND" other "$text" >/dev/null 2> "$err"; rc=$?
+    [ "$rc" -eq 1 ] || fail "an empty-looking message of ${#text} characters was not refused: exit $rc"
+    assert_contains "$(cat "$err")" 'requires a nonempty message' "empty-looking message refusal text"
+    [ ! -s "$log" ] && [ ! -e "$home/state/other.inbox" ] || fail "an empty-looking message had an effect"
+  done
+  n=0
+  for text in 'x' ' x ' $'\n\nx' "$(printf '%*s' 20000 '' | tr ' ' x)" "$(printf '%*s' 20000 '' | tr ' ' .)" "$(printf '%*s' 20000 '' | tr ' ' ' ')x" "$(printf '%*s' 20000 '' | tr ' ' x) y"; do
+    n=$((n + 1))
+    PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" FM_SEND_SETTLE=0 \
+      "$SEND" other "$text" >/dev/null 2> "$err"; rc=$?
+    expect_code 0 "$rc" "a non-empty message of ${#text} characters must still send"
+    reference=$(bash -c '. "$1"; fm_task_inbox_body "$2"' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$(printf '%s/state/other.inbox/%03d.msg' "$home" "$n")")
+    [ "$reference" = "$text" ] || fail "a non-empty message changed on delivery"
+  done
+  # The case pattern must call the same strings empty as the deletion it replaced.
+  local locale probe empty_by_case empty_by_deletion compared=0
+  for locale in C "$(utf8_test_locale)"; do
+    [ -n "$locale" ] || continue
+    for probe in '' ' ' $'\t\n\v\f\r ' 'x' ' x' 'x ' $' \n x \n' $'\xc2\xa0' $'\xc2\xa0x' $'\xe3\x80\x80' $'\xe2\x80\x83 ' $'\xff' $'\xff ' 'é' ' é '; do
+      empty_by_deletion=$(LC_ALL=$locale bash -c 'if [ -z "${1//[[:space:]]/}" ]; then echo yes; else echo no; fi' _ "$probe")
+      empty_by_case=$(LC_ALL=$locale bash -c 'case "$1" in *[![:space:]]*) echo no ;; *) echo yes ;; esac' _ "$probe")
+      [ "$empty_by_case" = "$empty_by_deletion" ] || fail "locale $locale: case says empty=$empty_by_case, deletion says $empty_by_deletion"
+      compared=$((compared + 1))
+    done
+  done
+  printf 'empty-check-diff: %s string and locale pairs agree between the case and the old deletion\n' "$compared"
+  pass "fm-send: empty-looking messages, short or very long, are still refused; non-empty ones still send unchanged"
+}
+
 fm_test_only
 
+test_empty_message_check_cost_does_not_grow_quadratically
+test_empty_message_refusal_is_unchanged_for_long_inputs
 test_trailing_dot_split_matches_the_reference_split
 test_mention_scan_cost_does_not_grow_with_trailing_dots
 test_long_dotted_forms_keep_rule_m_results
