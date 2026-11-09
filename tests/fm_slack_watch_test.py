@@ -2822,7 +2822,7 @@ class SlowReplyTest(unittest.TestCase):
 
     def test_the_alarm_line_names_the_method_and_the_wait(self):
         import fm_slack
-        self.assertEqual(fm_slack.Slack.waiting_line('conversations.history', 20),
+        self.assertEqual(fm_slack.Slack._waiting_line('conversations.history', 20),
                          b'slack: request conversations.history still waiting after 20s; it keeps waiting\n')
 
     def test_without_a_handler_the_alarm_goes_to_standard_error_and_never_holds_the_token(self):
