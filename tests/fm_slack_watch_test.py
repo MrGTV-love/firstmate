@@ -1983,6 +1983,25 @@ class IntakeTest(unittest.TestCase):
                 polling.poll()
             self.assertEqual([e for e in replay.state['log'] if e['method'] == 'chat.postMessage'], [])
 
+    def test_a_message_that_arrives_right_after_retargets_last_read_is_delivered_not_lost(self):
+        # Main 2315: a message arriving between the last read and the decision is delivered (not lost). The message is
+        # appended inside retarget, the instant its read of the old DM has finished and found nothing unread.
+        both = self.OWNER + ',' + self.NEW_OWNER
+        original = plane.Watch.newer_messages
+
+        def late(watch, channel, cursor):
+            yield from original(watch, channel, cursor)
+            watch.api.state['messages'].append({'ts': '200.000100', 'user': self.OWNER, 'text': 'arrived after the last read'})
+        with self.fixture(authors=both) as (watch, replay):
+            watch.lock.close()
+            with self.configured(replay, self.NEW_OWNER, both) as deciding:
+                with patch.object(plane.Watch, 'newer_messages', late):
+                    self.assertTrue(deciding.retarget())
+            self.assertIn('drain', deciding.load_state())
+            with self.configured(replay, self.NEW_OWNER, both) as polling:
+                polling.poll()
+                self.assertEqual([line.split()[3] for line in self.wakes(polling)], ['200.000100'])
+
     def test_a_drain_for_an_old_owner_who_left_the_allowlist_delivers_nothing_and_says_so_once(self):
         with self.fixture() as (watch, replay):
             watch.lock.close()

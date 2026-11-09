@@ -26,9 +26,9 @@ assert_closed() {
   [ "$rc" = "${2:-1}" ] || fail "$3: open $1 rc=$rc"
 }
 
-new_home() {  # <scenario> [per-poll cap that the fixture home's configuration file carries]
+new_home() {  # <scenario> [per-poll cap that the fixture home's configuration file carries] [allowed authors it carries]
   HOME_DIR=$(mktemp -d "$TMP/home.XXXXXX")
-  bash "$FIX/make-home.sh" "$1" "$HOME_DIR" ${2:+"$2"} >/dev/null
+  bash "$FIX/make-home.sh" "$1" "$HOME_DIR" ${2:+"$2"} ${3:+"$3"} >/dev/null
   export FM_HOME="$HOME_DIR" FM_STATE_OVERRIDE="$HOME_DIR/state" \
     FM_DATA_OVERRIDE="$HOME_DIR/data" FM_CONFIG_OVERRIDE="$HOME_DIR/config"
 }
@@ -2561,5 +2561,26 @@ assert_contains "$out" '; full: state/slack-watch/requests.jsonl#2000.000100' "I
 assert_eq "$(grep -c '"ts": "2000.000100"' "$store")" 1 "INTAKE-10 the record is not in the store"
 assert_eq "$(posts_in 2000.000100)" 1 "INTAKE-10 acknowledgements"
 printf 'ok - INTAKE-10\n'
+
+# INTAKE-11: the allowlist that only the home's configuration file carries decides (the process key is absent): a file that
+# excludes the owner takes no request in and posts nothing, and a file that includes the owner takes the request in.
+unset FM_SLACK_ALLOWED_AUTHORS FM_SLACK_DM_USER SLACK_BOT_TOKEN
+file_only_allowlist() {  # <allowed authors in the file> <expected: 1|0>
+  local out
+  new_home intake 20 "$1"
+  bind
+  "$ROOT/bin/fm-slack-check.sh" arm --replay "$INTAKE" >/dev/null
+  say_owner 2000.000100 'a request for the file-only allowlist'
+  out=$(icheck)
+  assert_eq "$(request_count "$out")" "$2" "INTAKE-11 [$1] wake lines of the request"
+  assert_eq "$(posts_in 2000.000100)" "$2" "INTAKE-11 [$1] acknowledgements of the request"
+  if [ "$2" = 0 ]; then
+    assert_eq "$(python3 "$HELPER" pending-count "$(state_file)")" 0 "INTAKE-11 [$1] a journal row was kept"
+  fi
+}
+file_only_allowlist U0OTHERALLOWED 0
+file_only_allowlist U0TESTOWNER 1
+file_only_allowlist U0OTHERALLOWED,U0TESTOWNER 1
+printf 'ok - INTAKE-11\n'
 
 printf 'ok - all Slack watch checks\n'

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build a disposable home for one Slack replay fixture.
-# Usage: make-home.sh <scenario> <home-dir> [per-poll-cap]
+# Usage: make-home.sh <scenario> <home-dir> [per-poll-cap] [allowed-authors]
 # The optional cap (1 to 200, default 20) is the value that the fixture home's configuration file carries for
 # FM_SLACK_POLL_MAX_ANSWERS; the file holds only the documented fake values below, and nothing reads it back here.
 # Every scenario uses the real tasks-axi and captain-hold commands against the
@@ -9,8 +9,12 @@ set -euo pipefail
 SCENARIO=${1:?usage: make-home.sh <scenario> <home-dir>}
 HOME_DIR=${2:?usage: make-home.sh <scenario> <home-dir>}
 CAP=${3:-20}
+ALLOWED=${4:-U0TESTOWNER}
 case "$CAP" in
   ''|*[!0-9]*) printf 'make-home: the per-poll cap must be a number\n' >&2; exit 2 ;;
+esac
+case "$ALLOWED" in
+  ''|*[!A-Z0-9,]*) printf 'make-home: the allowed authors must be member ids separated by commas\n' >&2; exit 2 ;;
 esac
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)
 mkdir -p "$HOME_DIR"/{data,state,config,projects}
@@ -29,7 +33,7 @@ if [ "$SCENARIO" != no-token ] && [ "$SCENARIO" != config ]; then
   cat > "$HOME_DIR/.env" <<ENV
 SLACK_BOT_TOKEN=fixture-token-not-a-secret
 FM_SLACK_DM_USER=U0TESTOWNER
-FM_SLACK_ALLOWED_AUTHORS=U0TESTOWNER
+FM_SLACK_ALLOWED_AUTHORS=$ALLOWED
 FM_SLACK_POLL_MAX_ANSWERS=$CAP
 ENV
 fi
