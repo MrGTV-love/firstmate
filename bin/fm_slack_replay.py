@@ -120,7 +120,7 @@ class Replay:
     def call(self, method, **fields):
         """One replayed call. The fields are checked first, as the real transport checks them, before any record of the attempt exists; a call that
         a log refuses part-way (a value that the log's own lines form) leaves the replayed conversation as it was."""
-        refuse_outbound(fields)
+        refuse_outbound(fields, wire=True)
         snapshot = copy.deepcopy(self.state)
         try:
             return self.replayed(method, **fields)

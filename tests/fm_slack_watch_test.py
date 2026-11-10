@@ -3569,6 +3569,23 @@ class IntakeTest(unittest.TestCase):
                 replay.call('chat.postMessage', channel='D0123456789', text='an ordinary text')
                 self.assertTrue((replay.state_dir / 'outbound.jsonl').exists())
 
+    def test_the_form_encoded_body_of_a_call_is_checked_as_it_goes_on_the_wire(self):
+        """The field names and separators of the request body are fixed text too: a value made only of them (it lies in no one field) is refused by the transport and before the
+        attempt mark of a post; the same fields without it go through."""
+        value = '&unfurl_links=false&unfurl_media=false'
+        with self.fixture() as (watch, replay):
+            pending = self.staged_request(watch, replay)
+            with patch.dict(os.environ, {'SLACK_SIGNING_SECRET': value}):
+                with patch.object(urllib.request, 'urlopen') as network:
+                    with self.assertRaisesRegex(SlackError, '^secret_collides_with_marker$'):
+                        plane.Slack('fixture-token-not-a-secret').call('chat.postMessage', **Watch.post_fields('ack:x', 'text', '200.000100', 'D0123456789'))
+                    self.assertFalse(network.called)
+                with self.assertRaisesRegex(SlackError, '^secret_collides_with_marker$'):
+                    watch.publish(pending)
+                saved = json.loads((watch.root / 'state.json').read_text())['pending'][0]
+                self.assertEqual([key for key in ('attempted', 'posted', 'tries', 'lookups') if saved.get(key)], [])
+                self.assertEqual(self.acks(replay), [])
+
     def test_the_replay_log_refuses_a_line_that_two_clean_lines_form_and_leaves_the_conversation_as_it_was(self):
         """The complete outbound log is a sink: a value across the newline between two appends is refused (bad control), nothing is appended, and the
         replayed conversation is as it was; the neighbour value is not formed and both lines go in."""

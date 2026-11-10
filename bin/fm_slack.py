@@ -41,9 +41,16 @@ def value_hits(text):
     return merged
 
 
-def outbound_texts(fields):
+def wire_body(fields):
+    """The request body exactly as the transport sends it: the fields form-encoded, a dict, a list or a boolean as JSON."""
+    encoded = {key: json.dumps(value) if isinstance(value, (dict, list, bool)) else value for key, value in fields.items()}
+    return urllib.parse.urlencode(encoded)
+
+
+def outbound_texts(fields, wire=False):
     """Every string the receiver of one call is handed: a string field as it is, a dict or list field as the JSON the transport sends (in both
-    encodings of non-ASCII characters), anything else as its text. The Authorization header is not a field and is never in this list."""
+    encodings of non-ASCII characters), anything else as its text; with wire, also the request body as it goes on the wire (its field names and
+    separators are fixed text too). The Authorization header is not a field and is never in this list."""
     texts = []
     for value in fields.values():
         if isinstance(value, str):
@@ -52,18 +59,20 @@ def outbound_texts(fields):
             texts += [json.dumps(value), json.dumps(value, ensure_ascii=False)]
         elif value is not None and not isinstance(value, (bool, int, float)):
             texts.append(str(value))
+    if wire:
+        texts.append(wire_body(fields))
     return texts
 
 
-def outbound_hit(fields):
+def outbound_hit(fields, wire=False):
     """Whether any string of one outbound call holds a plane value."""
-    return any(value_hits(text) for text in outbound_texts(fields))
+    return any(value_hits(text) for text in outbound_texts(fields, wire))
 
 
-def refuse_outbound(fields):
+def refuse_outbound(fields, wire=False):
     """The one check every outbound call passes before any byte of it exists (a request, an attempt record, a log line): a call whose fields hold a
     plane value is not made."""
-    if outbound_hit(fields):
+    if outbound_hit(fields, wire):
         raise SecretCollision('secret_collides_with_marker')
 
 
@@ -91,11 +100,9 @@ class Slack:
     def call(self, method, **fields):
         if not self.token:
             raise SlackError('missing_token')
-        refuse_outbound(fields)
-        encoded = {key: json.dumps(value) if isinstance(value, (dict, list, bool)) else value
-                   for key, value in fields.items()}
+        refuse_outbound(fields, wire=True)
         request = urllib.request.Request(self.base + method,
-            data=urllib.parse.urlencode(encoded).encode(),
+            data=wire_body(fields).encode(),
             headers={'Authorization': 'Bearer ' + self.token,
                      'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'})
         try:

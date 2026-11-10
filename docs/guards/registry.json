@@ -6945,17 +6945,17 @@
       "sites": [
         {
           "file": "bin/fm_slack.py",
-          "match": "refuse_outbound(fields)",
+          "match": "refuse_outbound(fields, wire=True)",
           "count": 1
         },
         {
           "file": "bin/fm_slack_replay.py",
-          "match": "refuse_outbound(fields)",
+          "match": "refuse_outbound(fields, wire=True)",
           "count": 1
         },
         {
           "file": "bin/fm_slack_watch.py",
-          "match": "refuse_outbound(args)",
+          "match": "refuse_outbound(args, wire=True)",
           "count": 1
         },
         {

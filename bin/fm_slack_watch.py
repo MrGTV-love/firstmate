@@ -1156,7 +1156,7 @@ class Watch:
             args = self.post_fields(event, text, thread, channel)
             # The body is checked BEFORE the attempt mark: a post that a plane value refuses is not an attempt (it counts for none of the three tries and
             # leaves no "state unknown"), and the transport checks the same fields again.
-            refuse_outbound(args)
+            refuse_outbound(args, wire=True)
             if row is not None and not row.get('attempted'):
                 row['attempted'] = True
                 self.commit()
@@ -1487,7 +1487,7 @@ class Watch:
         whole, base = self.store_after(text)
         artifacts.append((whole, [(field, [(a + base, b + base) for a, b in spans]) for field, spans in runs]))
         # The one fixed acknowledgement, as the post will hand it to the transport: it holds no character of the request's text, so a value in it is class 3.
-        for body in outbound_texts(self.post_fields('ack:' + row['event'], REQUEST_ACK, row['thread'], self.state.get('channel') or '')):
+        for body in outbound_texts(self.post_fields('ack:' + row['event'], REQUEST_ACK, row['thread'], self.state.get('channel') or ''), wire=True):
             artifacts.append((body, []))
         for note in ('', REQUEST_UNKNOWN, REQUEST_UNACKNOWLEDGED):
             line, count, start = self.request_wake_parts(row, note)
@@ -1568,7 +1568,7 @@ class Watch:
             if not pending.get('posted'):
                 # The one fixed acknowledgement is checked before anything of this request is written: a value inside it holds the request, and a
                 # held request leaves no second record line behind in each poll.
-                refuse_outbound(self.post_fields('ack:' + pending['event'], REQUEST_ACK, pending['thread'], self.state.get('channel') or ''))
+                refuse_outbound(self.post_fields('ack:' + pending['event'], REQUEST_ACK, pending['thread'], self.state.get('channel') or ''), wire=True)
             self.write_record(pending)
             # A request is acknowledged only while the source is bound, and an unbind cannot complete between that
             # check and the post; unbound, the row stays journaled and the rebind delivers it once.
