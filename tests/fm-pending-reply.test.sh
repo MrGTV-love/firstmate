@@ -1310,13 +1310,13 @@ test_recovery_refuses_unreadable_sender_identity() (
 )
 
 test_recovery_refuses_other_ps_failures_with_working_native_reader() (
-  local home state corr rec hook_log native_log rejected_ps_status sender_identity recovery_status
+  local home state corr rec hook_log native_log rejected_ps_status fixture_identity recovery_status
   # shellcheck disable=SC2030,SC2031
   local FM_PENDING_REPLY_SEND_HOOK=other_ps_failure_hook FM_PENDING_REPLY_NOW=2000
   home=$(setup_parent other-ps-failure); state="$home/state"
   hook_log="$home/send.log"
   native_log="$home/native-reader.log"
-  sender_identity=$(fm_pending_reply_pid_identity "${BASHPID:-$$}") \
+  fixture_identity=$(fm_pending_reply_pid_identity "${BASHPID:-$$}") \
     || fail "fixture must have a valid sender identity"
   # shellcheck disable=SC2329
   other_ps_failure_hook() { printf 'sent\n' >> "$hook_log"; }
@@ -1332,7 +1332,7 @@ test_recovery_refuses_other_ps_failures_with_working_native_reader() (
   # shellcheck disable=SC2329
   python3() {
     printf 'called\n' >> "$native_log"
-    printf '%s\n' "$sender_identity"
+    printf '%s\n' "$fixture_identity"
   }
   for rejected_ps_status in 1 2 127; do
     recovery_status=0
