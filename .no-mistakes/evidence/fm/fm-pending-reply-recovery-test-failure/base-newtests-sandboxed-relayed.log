@@ -1,0 +1,13 @@
+# label: base-newtests-sandboxed-relayed
+# cwd: /tmp/fm-lab-nmt.saGEta/base-newtests
+# commit: cb411ea3 lib + ee7ec3bd tests/fm-pending-reply.test.sh
+# sandbox denying exec of /bin/ps: yes
+# command: env -i PATH=/bin:/usr/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin HOME=/tmp/fm-lab-nmt.saGEta/h-base-newtests-sandboxed-relayed TMPDIR=/tmp/fm-lab-nmt.saGEta/t-base-newtests-sandboxed-relayed /usr/bin/sandbox-exec -f /tmp/fm-lab-nmt.saGEta/deny-ps.sb /usr/bin/env FM_TEST_ONLY=test_relayed_request_recovery_reaches_the_mate /bin/bash tests/fm-pending-reply.test.sh
+# host: 26.7.1 25G241; /bin/bash 3.2.57(1)-release
+# started: 2026-11-10T20:02:47Z
+----
+not ok - recovery of a relayed request must reach the mate, phase awaiting_report
+----
+# exit: 1
+# duration_s: 3
+# OMP_API_BILLING occurrences in this log: 0

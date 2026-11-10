@@ -1,0 +1,13 @@
+# label: posctl-ps126-shadowed-sender_identity
+# cwd: /tmp/fm-lab-nmt.saGEta/posctl-shadowed
+# commit: ee7ec3bd + positive control using the pre-review shadowed name sender_identity
+# sandbox denying exec of /bin/ps: no
+# command: env -i PATH=/bin:/usr/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin HOME=/tmp/fm-lab-nmt.saGEta/h-posctl-ps126-shadowed-sender_identity TMPDIR=/tmp/fm-lab-nmt.saGEta/t-posctl-ps126-shadowed-sender_identity  /usr/bin/env FM_TEST_ONLY=test_posctl_ps126_same_stub_sends /bin/bash tests/fm-pending-reply.test.sh
+# host: 26.7.1 25G241; /bin/bash 3.2.57(1)-release
+# started: 2026-11-10T20:03:10Z
+----
+not ok - POSCTL: ps=126 with working stub must send (rc=1, phase awaiting_report)
+----
+# exit: 1
+# duration_s: 0
+# OMP_API_BILLING occurrences in this log: 0

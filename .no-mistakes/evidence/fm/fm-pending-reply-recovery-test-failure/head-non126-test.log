@@ -1,0 +1,13 @@
+# label: head-non126-test
+# cwd: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M73FYB3CN9ZWYTT6BHGTQDAF
+# commit: ee7ec3bd474e8cd3a3a818772a6026fc8cfbe29f
+# sandbox denying exec of /bin/ps: no
+# command: env -i PATH=/bin:/usr/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin HOME=/tmp/fm-lab-nmt.saGEta/h-head-non126-test TMPDIR=/tmp/fm-lab-nmt.saGEta/t-head-non126-test  /usr/bin/env FM_TEST_ONLY=test_recovery_refuses_other_ps_failures_with_working_native_reader /bin/bash tests/fm-pending-reply.test.sh
+# host: 26.7.1 25G241; /bin/bash 3.2.57(1)-release
+# started: 2026-11-10T20:02:47Z
+----
+ok - non-126 ps failures refuse recovery without calling a working native reader
+----
+# exit: 0
+# duration_s: 2
+# OMP_API_BILLING occurrences in this log: 0

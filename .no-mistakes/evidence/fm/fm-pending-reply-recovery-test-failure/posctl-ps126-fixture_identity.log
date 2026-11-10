@@ -1,0 +1,14 @@
+# label: posctl-ps126-fixture_identity
+# cwd: /tmp/fm-lab-nmt.saGEta/posctl
+# commit: ee7ec3bd + lab-only positive-control test function
+# sandbox denying exec of /bin/ps: no
+# command: env -i PATH=/bin:/usr/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin HOME=/tmp/fm-lab-nmt.saGEta/h-posctl-ps126-fixture_identity TMPDIR=/tmp/fm-lab-nmt.saGEta/t-posctl-ps126-fixture_identity  /usr/bin/env FM_TEST_ONLY=test_posctl_ps126_same_stub_sends /bin/bash tests/fm-pending-reply.test.sh
+# host: 26.7.1 25G241; /bin/bash 3.2.57(1)-release
+# started: 2026-11-10T20:03:10Z
+----
+POSCTL stub identity: Tue Nov 10 14:03:10 2026     /bin/bash tests/fm-pending-reply.test.sh
+ok - POSCTL: ps=126 with the same stub reads native identity and sends exactly once
+----
+# exit: 0
+# duration_s: 0
+# OMP_API_BILLING occurrences in this log: 0

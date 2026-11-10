@@ -1,0 +1,13 @@
+# label: mutant-any-status-non126-test
+# cwd: /tmp/fm-lab-nmt.saGEta/mut-any
+# commit: ee7ec3bd + MUTANT: ps fallback on any non-zero status
+# sandbox denying exec of /bin/ps: no
+# command: env -i PATH=/bin:/usr/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin HOME=/tmp/fm-lab-nmt.saGEta/h-mutant-any-status-non126-test TMPDIR=/tmp/fm-lab-nmt.saGEta/t-mutant-any-status-non126-test  /usr/bin/env FM_TEST_ONLY=test_recovery_refuses_other_ps_failures_with_working_native_reader /bin/bash tests/fm-pending-reply.test.sh
+# host: 26.7.1 25G241; /bin/bash 3.2.57(1)-release
+# started: 2026-11-10T20:02:47Z
+----
+not ok - non-126 ps failure must not call the native reader (ps=1)
+----
+# exit: 1
+# duration_s: 2
+# OMP_API_BILLING occurrences in this log: 0

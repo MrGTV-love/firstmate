@@ -1,0 +1,20 @@
+# label: drive-head-ps-and-native-blocked
+# cwd: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M73FYB3CN9ZWYTT6BHGTQDAF
+# commit: ee7ec3bd474e8cd3a3a818772a6026fc8cfbe29f
+# sandbox denying exec of /bin/ps AND read of bin/fm-proc-info.py: yes
+# command: env -i PATH=/bin:/usr/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin HOME=/tmp/fm-lab-nmt.saGEta/h-drive-head-ps-and-native-blocked TMPDIR=/tmp/fm-lab-nmt.saGEta/t-drive-head-ps-and-native-blocked /usr/bin/sandbox-exec -f /tmp/fm-lab-nmt.saGEta/deny-ps-native.sb /bin/bash /tmp/fm-lab-nmt.saGEta/drive-recovery.sh /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M73FYB3CN9ZWYTT6BHGTQDAF
+# host: 26.7.1 25G241; /bin/bash 3.2.57(1)-release
+# started: 2026-11-10T20:04:08Z
+----
+ps probe: rc=126
+native reader probe: rc=2
+sender identity: []
+send_recovery rc=1
+phase=awaiting_report
+recovery_attempted_epoch=[]
+hook deliveries=0
+second send_recovery rc=1; hook deliveries after retry=0
+----
+# exit: 0
+# duration_s: 0
+# OMP_API_BILLING occurrences in this log: 0
