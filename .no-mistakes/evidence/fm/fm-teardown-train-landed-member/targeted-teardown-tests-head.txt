@@ -1,0 +1,111 @@
+# head 83244a8c5990a2b2a07af7108b9abe8a6e3ef904
+## tests/fm-teardown.test.sh (cases added by this change)
+ok - a CLOSED member whose merged train lists its head and contains it is accepted, naming the train on stderr and on the backlog close
+ok - a pre-rebase copy whose patches the train head carries is accepted by the patch proof
+ok - a train landed by squash is accepted
+ok - a copy later than the listed head but inside the verified train is accepted
+ok - a closed member no merged PR lists at a 40-hex sha is refused (no list, other member, number prefix, no sha)
+ok - a train listing another sha, or a sha its head does not contain, is refused
+ok - a copy holding a commit the train head never carried is refused with the commit named
+ok - a matching run record never carries a copy whose commits the train head lacks; the copy and the record stay
+ok - the train route never reads the run record, so a silent reader neither delays nor admits it
+ok - a commit hidden in the default history by an ours merge is not carried by the train, in the copy route
+ok - a commit hidden in the default history by an ours merge is not carried by the train, in the record-only route
+ok - a member built on a commit that only parent order put on the default branch's first-parent line is refused, conflicting side or not, in the copy and record-only routes
+ok - a copy that holds a change the default branch dropped behind a first-parent merge is refused by the content-in-default proof, conflicting side or not
+ok - a member on the default branch's first-parent line and a later copy of the train head are accepted in the copy and record-only routes
+Auto-merging shared.txt
+Auto-merging shared.txt
+Auto-merging shared.txt
+Auto-merging shared.txt
+ok - a changed-path list, a mode check, a patch, an index or an apply that fails or ends early never proves content, in the default proof, the copy route and the record-only route
+Automatic merge went well; stopped before committing as requested
+Automatic merge went well; stopped before committing as requested
+ok - a member the landing carried is accepted in the copy and record-only routes after a later default-branch merge that edits its files
+ok - a train that reverted a member already on the default line is refused, in the copy and record-only routes
+ok - a 41-character hex token after the member URL is not a listing, in the copy and record-only routes
+ok - a patch read that fails after a valid prefix is not taken as the commit's patch id
+ok - a conflict resolved to a third version is refused by the default proof, and the same merge carrying the member's text is accepted
+ok - a CLOSED member's reachable copy whose changed lines main edited later is refused by the default proof, and kept
+ok - a pre-rebase copy whose work the train replayed and then reverted is refused by content, and the same copy whose work the train kept is accepted
+ok - a pre-rebase copy, with or without work of its own, that stands on a commit the default branch reached only through a merge that dropped it is refused, however the merge dropped it
+ok - a pre-rebase copy built on a commit the default branch merged honestly is accepted
+ok - an empty measured change is accepted behind only exact merges and refused behind one inexact merge
+ok - a change of only the executable bit that the default branch did not keep is refused, and the same change kept is accepted
+ok - a train that restored a file the member deleted is refused in the copy and record-only routes, and a train that kept the deletion is accepted
+Automatic merge went well; stopped before committing as requested
+Automatic merge went well; stopped before committing as requested
+Automatic merge went well; stopped before committing as requested
+Automatic merge went well; stopped before committing as requested
+ok - a verified train that changes 1,501 unrelated paths still accepts its member, in the copy and record-only routes
+ok - a failed read of a train patch is unknown in the copy and record-only routes, for a read of an unrelated train commit and for a read of the member
+ok - a member base that the forge cannot give, or that is not in the clone, makes the proof unknown and keeps the copy
+ok - a copy that restores an older version of a file the default branch moved past is refused
+Auto-merging shared.txt
+Auto-merging shared.txt
+ok - a member whose train holds a file with other members' lines added is accepted, in the copy and record-only routes
+ok - a landing commit that is a plain commit without the member's change is refused, though the merge audit has nothing to read
+ok - a flat train that carries every member commit is accepted in both routes beside an ours merge of unrelated work
+ok - a flattened-rebase train that replays every member commit is accepted although it does not contain the member head
+ok - a flattened train missing one commit of the member head is refused
+ok - a flat train missing a member commit refuses even when a stale remote-tracking ref holds that commit
+ok - a failed re-read of the CLOSED member is unknown, retry, and its guard event says the source was not readable
+ok - a member PR found by its branch is used by the train route without a second branch lookup
+ok - a dirty copy refuses before any forge read, even when its train is verified
+ok - an open or closed-unmerged train is refused
+ok - the train must be merged into the task's base: the default branch, or its recorded base_branch
+ok - a failed forge search or fetch of the train is unknown, retry, never accepted and never 'not landed'
+ok - a train that lists an OPEN member does not make it landed
+ok - a MERGED member is decided by the existing route, with no train read
+ok - a CLOSED member whose clean content is already in the default branch is still accepted by the content proof
+ok - the record-only route fetches a stale default branch before it places the train's landing commit, and a failed fetch is unknown
+ok - a CLOSED member whose recorded base is ahead of its fork point and whose work a squash landed is accepted by the content proof
+ok - a train member whose recorded base is ahead of its fork point is accepted when the train carried it, in the copy and record-only routes
+ok - a recorded base ahead of the fork point never accepts a commit the train did not carry or a change the train reverted
+ok - a closed member with no train and unlanded work keeps the existing refusal
+ok - a train that reverted the member's change before landing is refused in the copy route, by ancestry and by patch replay, squashed or merged
+ok - a train that reverted the member's change before landing is refused in the record-only route too
+ok - a pre-rebase copy is carried by a train landed with a merge commit, although the train head is reachable from the default branch
+ok - the record-only route accepts a member whose train was landed with a merge commit
+ok - a copy holding a commit the merge-commit-landed train never carried is refused
+ok - a copy built on a commit the default branch only ours-merged is refused though the train contains its head
+ok - the same ours-merged hidden commit is refused in the record-only route, which keeps the backlog row
+ok - a train that replays the ours-merged commit as well carries the member, in the copy and record-only routes
+ok - a copy built on a commit the default branch only ours-merged is refused by the content-in-default proof
+ok - a removed copy's branch built on an ours-merged commit is refused by the content-in-default proof
+ok - a local-only branch that local main only ours-merged is refused
+ok - a copy reachable only through a merge that reverted its change is refused by the content-in-default proof
+ok - the content-in-default proof still accepts a merge-commit landing, a carried hidden commit, a fast-forward, a net-empty copy and a landing beside a hand-resolved merge
+ok - a merged train whose landing commit holds none of the member's change is refused in the copy and record-only routes
+ok - a landing commit that is not on the default branch's first-parent line is refused
+ok - a landing commit the forge did not give, or this clone lacks, is unknown (retry), never unlanded
+ok - a removed copy is accepted only on a verified merged train, and every unverified or unread train refuses
+ok - a removed copy's branch in a pool slot is landed by a verified train only
+ok - the index.lock classifier reads a long failure text without a pipe, so an early-exiting grep cannot break it
+exit=0
+## tests/fm-teardown.test.sh (older accept and refuse routes)
+ok - local-only worktree with HEAD on a fork remote is torn down and the home summary is refreshed
+ok - local-only worktree with truly unpushed work is refused (safety preserved)
+ok - local main landing succeeds independently of pushed and remote availability
+ok - squash-merged + deleted-branch worktree (PR merged) is torn down (the fix)
+ok - squash-merged PR accepts a local HEAD that is an ancestor of the final PR head
+ok - teardown discovers a merged PR by branch name and tears down when no pr= was ever recorded
+ok - squash-merged PR accepts replayed unpushed local patches contained in the PR head
+ok - squash-merged task whose local branch followed the pipeline rebase is torn down
+ok - teardown proves a Forgejo task landed from the merged pull request when the content check is inconclusive
+ok - squash-merged same-path different content still refuses
+ok - squash-merged rebased local still refuses a genuinely unlanded follow-up commit
+ok - squash-merged stale local still refuses when the forge is unreachable
+ok - squash-merged PR accepts a pushed pre-rebase copy whose patches are all in the PR head
+ok - squash-merged PR still refuses a pushed pre-rebase copy with a commit missing from the PR head
+Automatic merge went well; stopped before committing as requested
+ok - squash-merged PR still refuses a merge commit that carries a change of its own
+Automatic merge went well; stopped before committing as requested
+ok - squash-merged PR accepts a pre-rebase copy that merged a later main commit the PR head lacks
+ok - merged PR accepts the local input that the recorded run rewrote and extended
+ok - merged PR still refuses a copy that is not part of the recorded run's input
+ok - worktree whose content already landed in the default branch is torn down (content fallback)
+ok - the content-landed fallback checks a task's recorded base branch, not the default branch
+ok - content fallback refreshes origin default before comparing trees
+ok - gh lookup error with content not in default refuses (fail-safe)
+exit=0

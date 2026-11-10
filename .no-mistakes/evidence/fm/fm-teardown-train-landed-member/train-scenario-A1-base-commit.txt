@@ -1,0 +1,35 @@
+teardown under test: <base cb411ea37 extracted>/bin/fm-teardown.sh
+
+==================================================================
+SCENARIO: A1 clean copy at the listed head; member CLOSED; train MERGED by squash and lists the member
+EXPECT:   accept
+member PR: https://github.com/example/repo/pull/7  listed head: 2d7bf1256fc7392ba0f92661740591b77011dc01
+train PR:  https://github.com/example/repo/pull/9  train head: 59112ce6319f39ffd9b2286591daf74ce9746261
+copy HEAD before: 2d7bf1256fc7392ba0f92661740591b77011dc01
+--- exit code: 1
+--- stderr:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 5s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs <sandbox>/A1-accept/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: bundle preservation unavailable: missing preservation record (regular nonsymlink file required): <sandbox>/A1-accept/data/task-x1/preservation-bundles.tsv.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in <sandbox>/A1-accept/data/task-x1/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+2d7bf12 add feature two
+58a5a49 add feature
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+--- pool (treehouse) calls:
+(none)
+--- task record still present: yes
+--- copy HEAD after: 2d7bf1256fc7392ba0f92661740591b77011dc01   copy dir present: yes
+--- backlog rows for task-x1:
+4:- [ ] task-x1 - teardown fixture task (kind: ship) (since 2026-11-10)
+5-
+6-## Queued
+--- forge (fake gh) calls: 1
+RESULT: MISMATCH
+

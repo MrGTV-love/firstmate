@@ -1,0 +1,699 @@
+teardown under test: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M722JK05D7G9YFKTN3NYENM6/bin/fm-teardown.sh
+
+==================================================================
+SCENARIO: A1 clean copy at the listed head; member CLOSED; train MERGED by squash and lists the member
+EXPECT:   accept
+member PR: https://github.com/example/repo/pull/7  listed head: fe72d4d4612b1c64bb17041f8cf72872a61b7510
+train PR:  https://github.com/example/repo/pull/9  train head: c7f59870e93fb9885d67c7d81b379ba7f7ad40c7
+copy HEAD before: fe72d4d4612b1c64bb17041f8cf72872a61b7510
+--- exit code: 0
+--- stderr:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 3s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs <sandbox>/A1-accept/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+landed by a merged train: merged train PR https://github.com/example/repo/pull/9 lists https://github.com/example/repo/pull/7 at fe72d4d4612b1c64bb17041f8cf72872a61b7510; https://github.com/example/repo/pull/7 itself is closed, not merged
+--- pool (treehouse) calls:
+return --force <sandbox>/A1-accept/wt
+--- task record still present: no
+--- copy HEAD after: fe72d4d4612b1c64bb17041f8cf72872a61b7510   copy dir present: yes
+--- backlog rows for task-x1:
+6:- [x] task-x1 - teardown fixture task https://github.com/example/repo/pull/9 (kind: ship) (merged 2026-11-10)
+7-  closed by merge train: https://github.com/example/repo/pull/7
+--- forge (fake gh) calls: 4
+RESULT: AS-EXPECTED
+
+==================================================================
+SCENARIO: A2 copy on pre-rebase commits whose patches the train carries
+EXPECT:   accept
+member PR: https://github.com/example/repo/pull/7  listed head: f4d2e1eb977fd8f3196f96ff32fa57fef9d14355
+train PR:  https://github.com/example/repo/pull/9  train head: 0fe6b193b07d921422f0ce4eb3394b76d77c50d3
+copy HEAD before: 4fbbb14e1612a3aa6347b674705b78a8494c0fbe
+--- exit code: 0
+--- stderr:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 5s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs <sandbox>/A2-prerebase/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+landed by a merged train: merged train PR https://github.com/example/repo/pull/9 lists https://github.com/example/repo/pull/7 at f4d2e1eb977fd8f3196f96ff32fa57fef9d14355; https://github.com/example/repo/pull/7 itself is closed, not merged
+--- pool (treehouse) calls:
+return --force <sandbox>/A2-prerebase/wt
+--- task record still present: no
+--- copy HEAD after: 4fbbb14e1612a3aa6347b674705b78a8494c0fbe   copy dir present: yes
+--- forge (fake gh) calls: 4
+RESULT: AS-EXPECTED
+
+==================================================================
+SCENARIO: A3 copy at a later commit that is inside the verified train
+EXPECT:   accept
+member PR: https://github.com/example/repo/pull/7  listed head: 5cb579f6b266687eec00008f81615c2f8906cc0d
+train PR:  https://github.com/example/repo/pull/9  train head: 675671740f9c9bf1a6fa20b39ef9bcf3864182e9
+copy HEAD before: 47dec158dcb82977e1bd31cc3947b81a597c0290
+--- exit code: 0
+--- stderr:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 2s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs <sandbox>/A3-inside/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+landed by a merged train: merged train PR https://github.com/example/repo/pull/9 lists https://github.com/example/repo/pull/7 at 5cb579f6b266687eec00008f81615c2f8906cc0d; https://github.com/example/repo/pull/7 itself is closed, not merged
+--- pool (treehouse) calls:
+return --force <sandbox>/A3-inside/wt
+--- task record still present: no
+--- copy HEAD after: 47dec158dcb82977e1bd31cc3947b81a597c0290   copy dir present: yes
+--- forge (fake gh) calls: 4
+RESULT: AS-EXPECTED
+
+==================================================================
+SCENARIO: A4 copy is gone (record-only route); recorded member PR CLOSED; verified train
+EXPECT:   accept
+member PR: https://github.com/example/repo/pull/7  listed head: 8993a430af2e7d5295f47dcfc4b69c3c48abe933
+train PR:  https://github.com/example/repo/pull/9  train head: 9348e6b29ac04377cac8ec359f895bdb2dbf772a
+copy HEAD before: 8993a430af2e7d5295f47dcfc4b69c3c48abe933
+--- exit code: 0
+--- stderr:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 4s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs <sandbox>/A4-record-only/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+landed by a merged train: merged train PR https://github.com/example/repo/pull/9 lists https://github.com/example/repo/pull/7 at 8993a430af2e7d5295f47dcfc4b69c3c48abe933; https://github.com/example/repo/pull/7 itself is closed, not merged
+--- pool (treehouse) calls:
+(none)
+--- task record still present: no
+--- copy HEAD after: 8993a430af2e7d5295f47dcfc4b69c3c48abe933   copy dir present: yes
+--- backlog rows for task-x1:
+6:- [x] task-x1 - teardown fixture task https://github.com/example/repo/pull/9 (kind: ship) (merged 2026-11-10)
+7-  closed by merge train: https://github.com/example/repo/pull/7
+--- forge (fake gh) calls: 3
+RESULT: AS-EXPECTED
+
+==================================================================
+SCENARIO: A5 pipeline rebased the train flat; every member commit has an equal patch in the train
+EXPECT:   accept
+member PR: https://github.com/example/repo/pull/7  listed head: 2e099e396a44c5a70492be3ef457e9d820cca969
+train PR:  https://github.com/example/repo/pull/9  train head: febd8186e5bb8c92ace020f0a3c1807b262887f1
+copy HEAD before: 2e099e396a44c5a70492be3ef457e9d820cca969
+--- exit code: 0
+--- stderr:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 3s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs <sandbox>/A5-flat/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+landed by a merged train: merged train PR https://github.com/example/repo/pull/9 lists https://github.com/example/repo/pull/7 at 2e099e396a44c5a70492be3ef457e9d820cca969; https://github.com/example/repo/pull/7 itself is closed, not merged
+--- pool (treehouse) calls:
+return --force <sandbox>/A5-flat/wt
+--- task record still present: no
+--- copy HEAD after: 2e099e396a44c5a70492be3ef457e9d820cca969   copy dir present: yes
+--- forge (fake gh) calls: 4
+RESULT: AS-EXPECTED
+
+==================================================================
+SCENARIO: R1 the train PR is OPEN
+EXPECT:   refuse
+member PR: https://github.com/example/repo/pull/7  listed head: dd73e792a5dab59637705a74c3c13a483fecdc4a
+train PR:  https://github.com/example/repo/pull/9  train head: 9613555a160be686133d2d04899d41f5925b89b5
+copy HEAD before: dd73e792a5dab59637705a74c3c13a483fecdc4a
+--- exit code: 1
+--- stderr:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 3s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs <sandbox>/R1-train-open/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: bundle preservation unavailable: missing preservation record (regular nonsymlink file required): <sandbox>/R1-train-open/data/task-x1/preservation-bundles.tsv.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in <sandbox>/R1-train-open/data/task-x1/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+dd73e79 add feature two
+b76b84a add feature
+no merge-train proof:
+train PR https://github.com/example/repo/pull/9 lists https://github.com/example/repo/pull/7 but is OPEN, not merged
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+--- pool (treehouse) calls:
+(none)
+--- task record still present: yes
+--- copy HEAD after: dd73e792a5dab59637705a74c3c13a483fecdc4a   copy dir present: yes
+--- forge (fake gh) calls: 4
+RESULT: AS-EXPECTED
+
+==================================================================
+SCENARIO: R2 the train PR is CLOSED and not merged
+EXPECT:   refuse
+member PR: https://github.com/example/repo/pull/7  listed head: d48940c80415fd3c428a5bbb1469136ba41a91f2
+train PR:  https://github.com/example/repo/pull/9  train head: c6e656c09272e2de2403d2f2d70bd76397aca2f2
+copy HEAD before: d48940c80415fd3c428a5bbb1469136ba41a91f2
+--- exit code: 1
+--- stderr:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 2s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs <sandbox>/R2-train-closed/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: bundle preservation unavailable: missing preservation record (regular nonsymlink file required): <sandbox>/R2-train-closed/data/task-x1/preservation-bundles.tsv.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in <sandbox>/R2-train-closed/data/task-x1/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+d48940c add feature two
+76bbf8e add feature
+no merge-train proof:
+train PR https://github.com/example/repo/pull/9 lists https://github.com/example/repo/pull/7 but is CLOSED, not merged
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+--- pool (treehouse) calls:
+(none)
+--- task record still present: yes
+--- copy HEAD after: d48940c80415fd3c428a5bbb1469136ba41a91f2   copy dir present: yes
+--- forge (fake gh) calls: 4
+RESULT: AS-EXPECTED
+
+==================================================================
+SCENARIO: R3 the train merged into 'develop', not the task base 'main'
+EXPECT:   refuse
+member PR: https://github.com/example/repo/pull/7  listed head: e2f24d287829ee1332091bf08163ad2a197a28e5
+train PR:  https://github.com/example/repo/pull/9  train head: 1dae36d526555deb56cad9219dae8a8c05894cc4
+copy HEAD before: e2f24d287829ee1332091bf08163ad2a197a28e5
+--- exit code: 1
+--- stderr:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 2s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs <sandbox>/R3-other-base/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: bundle preservation unavailable: missing preservation record (regular nonsymlink file required): <sandbox>/R3-other-base/data/task-x1/preservation-bundles.tsv.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in <sandbox>/R3-other-base/data/task-x1/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+e2f24d2 add feature two
+e92c388 add feature
+no merge-train proof:
+train PR https://github.com/example/repo/pull/9 lists https://github.com/example/repo/pull/7 but was merged into develop, not this task's base main
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+--- pool (treehouse) calls:
+(none)
+--- task record still present: yes
+--- copy HEAD after: e2f24d287829ee1332091bf08163ad2a197a28e5   copy dir present: yes
+--- forge (fake gh) calls: 4
+RESULT: AS-EXPECTED
+
+==================================================================
+SCENARIO: R4 the train lists the member with a sha that differs in the last character
+EXPECT:   refuse
+member PR: https://github.com/example/repo/pull/7  listed head: 76c867168bb72cc80bd9f723a26db4e685a923a0
+train PR:  https://github.com/example/repo/pull/9  train head: 23b989467550d07d844b73ed7b743d9e0da00b1a
+copy HEAD before: 76c867168bb72cc80bd9f723a26db4e685a923a0
+--- exit code: 1
+--- stderr:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs <sandbox>/R4-sha-off-by-one/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: bundle preservation unavailable: missing preservation record (regular nonsymlink file required): <sandbox>/R4-sha-off-by-one/data/task-x1/preservation-bundles.tsv.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in <sandbox>/R4-sha-off-by-one/data/task-x1/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+76c8671 add feature two
+8f4ba10 add feature
+no merge-train proof:
+train PR https://github.com/example/repo/pull/9 lists https://github.com/example/repo/pull/7 at 76c867168bb7, not the member PR's recorded head 76c867168bb7
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+--- pool (treehouse) calls:
+(none)
+--- task record still present: yes
+--- copy HEAD after: 76c867168bb72cc80bd9f723a26db4e685a923a0   copy dir present: yes
+--- forge (fake gh) calls: 4
+RESULT: AS-EXPECTED
+
+==================================================================
+SCENARIO: R5 the train lists only pull/70; the member is pull/7
+EXPECT:   refuse
+member PR: https://github.com/example/repo/pull/7  listed head: db3592dbe119167a7e2524822c4eb806dad18d06
+train PR:  https://github.com/example/repo/pull/9  train head: ccb261455e238a5d8889f45ba010a89acfda37f6
+copy HEAD before: db3592dbe119167a7e2524822c4eb806dad18d06
+--- exit code: 1
+--- stderr:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs <sandbox>/R5-number-prefix/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: bundle preservation unavailable: missing preservation record (regular nonsymlink file required): <sandbox>/R5-number-prefix/data/task-x1/preservation-bundles.tsv.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in <sandbox>/R5-number-prefix/data/task-x1/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+db3592d add feature two
+c6e7538 add feature
+no merge-train proof:
+https://github.com/example/repo/pull/7 is CLOSED and no PR found by the forge lists it at a 40-hex sha
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+--- pool (treehouse) calls:
+(none)
+--- task record still present: yes
+--- copy HEAD after: db3592dbe119167a7e2524822c4eb806dad18d06   copy dir present: yes
+--- forge (fake gh) calls: 4
+RESULT: AS-EXPECTED
+
+==================================================================
+SCENARIO: R6 the train lists the member with a 12-character sha only
+EXPECT:   refuse
+member PR: https://github.com/example/repo/pull/7  listed head: fa7d03d1fba4f681f3e3bb3dcb03528d3bc34a92
+train PR:  https://github.com/example/repo/pull/9  train head: 5201a410636b85840ece206ae7dabaa5f5c04f90
+copy HEAD before: fa7d03d1fba4f681f3e3bb3dcb03528d3bc34a92
+--- exit code: 1
+--- stderr:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 2s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs <sandbox>/R6-short-sha/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: bundle preservation unavailable: missing preservation record (regular nonsymlink file required): <sandbox>/R6-short-sha/data/task-x1/preservation-bundles.tsv.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in <sandbox>/R6-short-sha/data/task-x1/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+fa7d03d add feature two
+fa1c86f add feature
+no merge-train proof:
+https://github.com/example/repo/pull/7 is CLOSED and no PR found by the forge lists it at a 40-hex sha
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+--- pool (treehouse) calls:
+(none)
+--- task record still present: yes
+--- copy HEAD after: fa7d03d1fba4f681f3e3bb3dcb03528d3bc34a92   copy dir present: yes
+--- forge (fake gh) calls: 4
+RESULT: AS-EXPECTED
+
+==================================================================
+SCENARIO: R7 a merged PR only mentions the member URL (no 'at <sha>')
+EXPECT:   refuse
+member PR: https://github.com/example/repo/pull/7  listed head: 289bd3c4a11c647f1a4ce45e5475d5bf3aec32dd
+train PR:  https://github.com/example/repo/pull/9  train head: be417768ff5ab416637d63274afb7fa7660a39ce
+copy HEAD before: 289bd3c4a11c647f1a4ce45e5475d5bf3aec32dd
+--- exit code: 1
+--- stderr:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 2s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs <sandbox>/R7-mention-only/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: bundle preservation unavailable: missing preservation record (regular nonsymlink file required): <sandbox>/R7-mention-only/data/task-x1/preservation-bundles.tsv.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in <sandbox>/R7-mention-only/data/task-x1/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+289bd3c add feature two
+17be25a add feature
+no merge-train proof:
+https://github.com/example/repo/pull/7 is CLOSED and no PR found by the forge lists it at a 40-hex sha
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+--- pool (treehouse) calls:
+(none)
+--- task record still present: yes
+--- copy HEAD after: 289bd3c4a11c647f1a4ce45e5475d5bf3aec32dd   copy dir present: yes
+--- forge (fake gh) calls: 4
+RESULT: AS-EXPECTED
+
+==================================================================
+SCENARIO: R8 no PR lists the member
+EXPECT:   refuse
+member PR: https://github.com/example/repo/pull/7  listed head: 48020e352ca8d73a3be52fda949f195e694e0cca
+train PR:  https://github.com/example/repo/pull/9  train head: 5f0381bb8829416bd8b973f041031e49123340e9
+copy HEAD before: 48020e352ca8d73a3be52fda949f195e694e0cca
+--- exit code: 1
+--- stderr:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 3s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs <sandbox>/R8-no-train/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: bundle preservation unavailable: missing preservation record (regular nonsymlink file required): <sandbox>/R8-no-train/data/task-x1/preservation-bundles.tsv.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in <sandbox>/R8-no-train/data/task-x1/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+48020e3 add feature two
+60fd29a add feature
+no merge-train proof:
+https://github.com/example/repo/pull/7 is CLOSED and no PR found by the forge lists it at a 40-hex sha
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+--- pool (treehouse) calls:
+(none)
+--- task record still present: yes
+--- copy HEAD after: 48020e352ca8d73a3be52fda949f195e694e0cca   copy dir present: yes
+--- forge (fake gh) calls: 4
+RESULT: AS-EXPECTED
+
+==================================================================
+SCENARIO: R9 the copy holds one commit the train never merged
+EXPECT:   refuse
+member PR: https://github.com/example/repo/pull/7  listed head: 7735f1e8e7fe4a6384efd3f6b8c6a59ca2906592
+train PR:  https://github.com/example/repo/pull/9  train head: 44bc17f547c45c44ca6612359c9861d3fd5eb04b
+copy HEAD before: 830e46d3712a9734eedd3d96d75ba399f13c38a2
+--- exit code: 1
+--- stderr:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 4s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs <sandbox>/R9-extra-commit/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: bundle preservation unavailable: missing preservation record (regular nonsymlink file required): <sandbox>/R9-extra-commit/data/task-x1/preservation-bundles.tsv.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in <sandbox>/R9-extra-commit/data/task-x1/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+830e46d unmerged follow-up
+7735f1e add feature two
+c6f5783 add feature
+commits whose change is not proven present in the merged PR head:
+830e46d unmerged follow-up
+no merge-train proof:
+train PR https://github.com/example/repo/pull/9 is a verified train for https://github.com/example/repo/pull/7, but this copy's work is not proven present in its head 44bc17f547c4 (neither contains it nor carries every commit of it)
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+--- pool (treehouse) calls:
+(none)
+--- task record still present: yes
+--- copy HEAD after: 830e46d3712a9734eedd3d96d75ba399f13c38a2   copy dir present: yes
+--- forge (fake gh) calls: 4
+RESULT: AS-EXPECTED
+
+==================================================================
+SCENARIO: R10 the copy has an uncommitted file
+EXPECT:   refuse
+member PR: https://github.com/example/repo/pull/7  listed head: ff74f27b65e49f1f3af10f166eeddb4c037dc046
+train PR:  https://github.com/example/repo/pull/9  train head: b7d64a4320cb287e2d9176aacd2f995358505a2c
+copy HEAD before: ff74f27b65e49f1f3af10f166eeddb4c037dc046
+--- exit code: 1
+--- stderr:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 2s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs <sandbox>/R10-dirty/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: worktree <sandbox>/R10-dirty/wt has uncommitted changes.
+uncommitted changes present (untracked-only leftovers)
+untracked paths (up to 10):
+  scratch.txt
+Commit them (or get the captain's explicit OK to discard, then --force).
+--- pool (treehouse) calls:
+(none)
+--- task record still present: yes
+--- copy HEAD after: ff74f27b65e49f1f3af10f166eeddb4c037dc046   copy dir present: yes
+--- forge (fake gh) calls: 0
+RESULT: AS-EXPECTED
+
+==================================================================
+SCENARIO: R11 the train contains the member commit but reverted its change before landing
+EXPECT:   refuse
+member PR: https://github.com/example/repo/pull/7  listed head: a9283242c3ac6690a4ca08fd369ff983eb324cc6
+train PR:  https://github.com/example/repo/pull/9  train head: 8d8f46ddba222e008b5691e128d40c7e963c65c8
+copy HEAD before: a9283242c3ac6690a4ca08fd369ff983eb324cc6
+--- exit code: 1
+--- stderr:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 5s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs <sandbox>/R11-reverted/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: bundle preservation unavailable: missing preservation record (regular nonsymlink file required): <sandbox>/R11-reverted/data/task-x1/preservation-bundles.tsv.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in <sandbox>/R11-reverted/data/task-x1/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+a928324 add feature two
+5fdc3f7 add feature
+no merge-train proof:
+train PR https://github.com/example/repo/pull/9 lists https://github.com/example/repo/pull/7 at a9283242c3ac, but the train head 8d8f46ddba22 reaches it in history, but its net change is not present in the train head's final tree
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+--- pool (treehouse) calls:
+(none)
+--- task record still present: yes
+--- copy HEAD after: a9283242c3ac6690a4ca08fd369ff983eb324cc6   copy dir present: yes
+--- forge (fake gh) calls: 4
+RESULT: AS-EXPECTED
+
+==================================================================
+SCENARIO: R12 the forge says MERGED, but the landing commit took no change in (ours merge)
+EXPECT:   refuse
+member PR: https://github.com/example/repo/pull/7  listed head: 7fa5a41a8b71619b73cfdadc3280bff78e971e71
+train PR:  https://github.com/example/repo/pull/9  train head: 648cd3e9737f4ace8a026e7eeab18b437e630e09
+copy HEAD before: 7fa5a41a8b71619b73cfdadc3280bff78e971e71
+--- exit code: 1
+--- stderr:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 2s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs <sandbox>/R12-ours-landing/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: bundle preservation unavailable: copy has no unlanded tips of its own; existing delivery proof is still required.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+no merge-train proof:
+train PR https://github.com/example/repo/pull/9 lists https://github.com/example/repo/pull/7, but its landing commit a45ffa1e9802 does not hold the member's net change in its tree
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+--- pool (treehouse) calls:
+(none)
+--- task record still present: yes
+--- copy HEAD after: 7fa5a41a8b71619b73cfdadc3280bff78e971e71   copy dir present: yes
+--- forge (fake gh) calls: 4
+RESULT: AS-EXPECTED
+
+==================================================================
+SCENARIO: R13 the member PR is still OPEN and a merged train lists it
+EXPECT:   refuse
+member PR: https://github.com/example/repo/pull/7  listed head: 91d7c567b8909f449ca7e24bc29ead40e8bc88ee
+train PR:  https://github.com/example/repo/pull/9  train head: a71c5ff22af10d538e994821dcd20a0f8bf99af1
+copy HEAD before: 91d7c567b8909f449ca7e24bc29ead40e8bc88ee
+--- exit code: 1
+--- stderr:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 2s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs <sandbox>/R13-member-open/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: bundle preservation unavailable: missing preservation record (regular nonsymlink file required): <sandbox>/R13-member-open/data/task-x1/preservation-bundles.tsv.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in <sandbox>/R13-member-open/data/task-x1/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+91d7c56 add feature two
+4181795 add feature
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+--- pool (treehouse) calls:
+(none)
+--- task record still present: yes
+--- copy HEAD after: 91d7c567b8909f449ca7e24bc29ead40e8bc88ee   copy dir present: yes
+--- forge (fake gh) calls: 1
+RESULT: AS-EXPECTED
+
+==================================================================
+SCENARIO: R14 the member PR head moved after the train listed it
+EXPECT:   refuse
+member PR: https://github.com/example/repo/pull/7  listed head: ec1d9950474cedd4fce527ce6af76144e8a887fc
+train PR:  https://github.com/example/repo/pull/9  train head: a31de075a656b8ec8eb1d3e1a42649238263d4d3
+copy HEAD before: ec1d9950474cedd4fce527ce6af76144e8a887fc
+--- exit code: 1
+--- stderr:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs <sandbox>/R14-member-moved/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: bundle preservation unavailable: missing preservation record (regular nonsymlink file required): <sandbox>/R14-member-moved/data/task-x1/preservation-bundles.tsv.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in <sandbox>/R14-member-moved/data/task-x1/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+ec1d995 add feature two
+a4e22b1 add feature
+no merge-train proof:
+train PR https://github.com/example/repo/pull/9 lists https://github.com/example/repo/pull/7 at ec1d9950474c, not the member PR's recorded head dddddddddddd
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+--- pool (treehouse) calls:
+(none)
+--- task record still present: yes
+--- copy HEAD after: ec1d9950474cedd4fce527ce6af76144e8a887fc   copy dir present: yes
+--- forge (fake gh) calls: 4
+RESULT: AS-EXPECTED
+
+==================================================================
+SCENARIO: R15 record-only route; the train lists another sha
+EXPECT:   refuse
+member PR: https://github.com/example/repo/pull/7  listed head: fe09b48220222a6dfd1f07ac1f2da1d672db0047
+train PR:  https://github.com/example/repo/pull/9  train head: fa451ad6412a5ebc421f3cd8d646e287344fe2d7
+copy HEAD before: fe09b48220222a6dfd1f07ac1f2da1d672db0047
+--- exit code: 1
+--- stderr:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 4s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs <sandbox>/R15-record-only-wrong-sha/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: task task-x1 has no recorded Git worktree; completion requires a recorded GitHub PR confirmed merged by the forge.
+Restore its copy, land its recorded PR, or get the captain's own words to drop it and pass --force --drop-file.
+no merge-train proof:
+train PR https://github.com/example/repo/pull/9 lists https://github.com/example/repo/pull/7 at dddddddddddd, not the member PR's recorded head fe09b4822022
+--- pool (treehouse) calls:
+(none)
+--- task record still present: yes
+--- copy HEAD after: fe09b48220222a6dfd1f07ac1f2da1d672db0047   copy dir present: yes
+--- backlog rows for task-x1:
+4:- [ ] task-x1 - teardown fixture task (kind: ship) (since 2026-11-10)
+5-
+6-## Queued
+--- forge (fake gh) calls: 3
+RESULT: AS-EXPECTED
+
+==================================================================
+SCENARIO: R16 record-only route; the train is OPEN
+EXPECT:   refuse
+member PR: https://github.com/example/repo/pull/7  listed head: 920291cefb1bf9835db0a2d9db914d77f4a027e1
+train PR:  https://github.com/example/repo/pull/9  train head: db2c0d4253c0bf533784e8b5deb86e8518a7eea1
+copy HEAD before: 920291cefb1bf9835db0a2d9db914d77f4a027e1
+--- exit code: 1
+--- stderr:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 4s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs <sandbox>/R16-record-only-open-train/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: task task-x1 has no recorded Git worktree; completion requires a recorded GitHub PR confirmed merged by the forge.
+Restore its copy, land its recorded PR, or get the captain's own words to drop it and pass --force --drop-file.
+no merge-train proof:
+train PR https://github.com/example/repo/pull/9 lists https://github.com/example/repo/pull/7 but is OPEN, not merged
+--- pool (treehouse) calls:
+(none)
+--- task record still present: yes
+--- copy HEAD after: 920291cefb1bf9835db0a2d9db914d77f4a027e1   copy dir present: yes
+--- backlog rows for task-x1:
+4:- [ ] task-x1 - teardown fixture task (kind: ship) (since 2026-11-10)
+5-
+6-## Queued
+--- forge (fake gh) calls: 3
+RESULT: AS-EXPECTED
+
+==================================================================
+SCENARIO: U1 the forge search for the train fails
+EXPECT:   unknown
+member PR: https://github.com/example/repo/pull/7  listed head: a376e16ee26aa8cf966e72217ca211b31a368f1c
+train PR:  https://github.com/example/repo/pull/9  train head: 30e79e6fcc7c376c333b3a4d42e634a1002c3568
+copy HEAD before: a376e16ee26aa8cf966e72217ca211b31a368f1c
+--- exit code: 1
+--- stderr:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 3s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs <sandbox>/U1-search-fails/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: bundle preservation unavailable: missing preservation record (regular nonsymlink file required): <sandbox>/U1-search-fails/data/task-x1/preservation-bundles.tsv.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in <sandbox>/U1-search-fails/data/task-x1/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: not known whether the ship deliverable is landed; a pushed branch alone is not completion.
+unpushed commits:
+a376e16 add feature two
+c03f999 add feature
+unknown, retry: the merge-train proof could not be read (the forge search for PRs listing https://github.com/example/repo/pull/7 failed); this is not a finding that the work is unlanded.
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+--- pool (treehouse) calls:
+(none)
+--- task record still present: yes
+--- copy HEAD after: a376e16ee26aa8cf966e72217ca211b31a368f1c   copy dir present: yes
+--- forge (fake gh) calls: 4
+RESULT: AS-EXPECTED
+
+==================================================================
+SCENARIO: U2 the train head cannot be fetched
+EXPECT:   unknown
+member PR: https://github.com/example/repo/pull/7  listed head: f85d21230c6db952dda81f05cdfff16e9c14a6c4
+train PR:  https://github.com/example/repo/pull/9  train head: d84f24b7ed447f4ca752c351a1b93256046f5466
+copy HEAD before: f85d21230c6db952dda81f05cdfff16e9c14a6c4
+--- exit code: 1
+--- stderr:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs <sandbox>/U2-fetch-fails/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: bundle preservation unavailable: missing preservation record (regular nonsymlink file required): <sandbox>/U2-fetch-fails/data/task-x1/preservation-bundles.tsv.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in <sandbox>/U2-fetch-fails/data/task-x1/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: not known whether the ship deliverable is landed; a pushed branch alone is not completion.
+unpushed commits:
+f85d212 add feature two
+598f005 add feature
+unknown, retry: the merge-train proof could not be read (the head of train PR https://github.com/example/repo/pull/9 could not be fetched); this is not a finding that the work is unlanded.
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+--- pool (treehouse) calls:
+(none)
+--- task record still present: yes
+--- copy HEAD after: f85d21230c6db952dda81f05cdfff16e9c14a6c4   copy dir present: yes
+--- forge (fake gh) calls: 4
+RESULT: AS-EXPECTED
+
+==================================================================
+SCENARIO: U3 record-only route; the forge search fails
+EXPECT:   unknown
+member PR: https://github.com/example/repo/pull/7  listed head: 399a1f6817c891b664e3863e4011e5993f0e42b7
+train PR:  https://github.com/example/repo/pull/9  train head: 1a1901549bed996ecc3b517a7f0394104af184f9
+copy HEAD before: 399a1f6817c891b664e3863e4011e5993f0e42b7
+--- exit code: 1
+--- stderr:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 6s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs <sandbox>/U3-record-only-search-fails/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: task task-x1 has no recorded Git worktree; completion requires a recorded GitHub PR confirmed merged by the forge.
+Restore its copy, land its recorded PR, or get the captain's own words to drop it and pass --force --drop-file.
+unknown, retry: the merge-train proof could not be read (the forge search for PRs listing https://github.com/example/repo/pull/7 failed); this is not a finding that the work is unlanded.
+--- pool (treehouse) calls:
+(none)
+--- task record still present: yes
+--- copy HEAD after: 399a1f6817c891b664e3863e4011e5993f0e42b7   copy dir present: yes
+--- backlog rows for task-x1:
+4:- [ ] task-x1 - teardown fixture task (kind: ship) (since 2026-11-10)
+5-
+6-## Queued
+--- forge (fake gh) calls: 3
+RESULT: AS-EXPECTED
+
