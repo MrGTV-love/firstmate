@@ -1,0 +1,6 @@
+/tmp/fm-lab-nmtest.qz6pNt/home
+/tmp/fm-lab-nmtest.qz6pNt/tmp-link
+/tmp/fm-lab-nmtest.qz6pNt/tmp-real
+/tmp/fm-lab-nmtest.qz6pNt/tmp-real/fm-herdr-lab-501
+/tmp/fm-lab-nmtest.qz6pNt/tmp-real/fm-test-owners
+/tmp/fm-lab-nmtest.qz6pNt/tmp-real/fm-test-owners/.legacy-discovery

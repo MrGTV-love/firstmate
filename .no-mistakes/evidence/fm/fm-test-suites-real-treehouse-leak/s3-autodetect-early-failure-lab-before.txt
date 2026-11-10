@@ -1,0 +1,3 @@
+/tmp/fm-lab-nmtest.qz6pNt/home
+/tmp/fm-lab-nmtest.qz6pNt/tmp-link
+/tmp/fm-lab-nmtest.qz6pNt/tmp-real

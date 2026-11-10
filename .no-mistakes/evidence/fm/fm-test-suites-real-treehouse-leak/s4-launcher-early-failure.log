@@ -1,0 +1,5 @@
+fm-herdr-lab: fleet-state tripwire requires exactly one running default session
+not ok - could not provision isolated Herdr lab session
+fm-herdr-lab: missing fleet-state tripwire for 'fm-lab-fm-herdr-launche-92567-13310'; refusing destructive calls
+exit=1
+real_root_unchanged=yes

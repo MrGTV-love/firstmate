@@ -1,0 +1,8 @@
+🌳 Setting up worktree...
+🌳 Leased worktree at /private/tmp/fm-lab-nmtest.qz6pNt/tmp-real/fm-herdr-presentation.tTuSAC/treehouse.uwJpTM/.treehouse/sandbox-project-65882e/1/sandbox-project. Run 'treehouse return /private/tmp/fm-lab-nmtest.qz6pNt/tmp-real/fm-herdr-presentation.tTuSAC/treehouse.uwJpTM/.treehouse/sandbox-project-65882e/1/sandbox-project' to release it.
+error: refusing to pre-register Claude trust: task worktree '/private/tmp/fm-lab-nmtest.qz6pNt/tmp-real/fm-herdr-presentation.tTuSAC/treehouse.uwJpTM/.treehouse/sandbox-project-65882e/1/sandbox-project' is not an accessible directory
+
+signal=SIGTERM sent_after_lease_seen=True lease_file=/tmp/fm-lab-nmtest.qz6pNt/tmp-real/fm-herdr-presentation.tTuSAC/treehouse.uwJpTM/.treehouse/sandbox-project-65882e/treehouse-state.json
+exit=-15
+leftover_fixture_roots=[]
+real_root_unchanged=yes

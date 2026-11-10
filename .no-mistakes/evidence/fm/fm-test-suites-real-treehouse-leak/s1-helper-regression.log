@@ -1,0 +1,10 @@
+🌳 Setting up worktree...
+🌳 Leased worktree at /private/tmp/fm-lab-nmtest.qz6pNt/tmp-real/fm-treehouse-safety.3lau7z/treehouse.POeLxx/.treehouse/scratch-project-b35b5c/1/scratch-project. Run 'treehouse return /private/tmp/fm-lab-nmtest.qz6pNt/tmp-real/fm-treehouse-safety.3lau7z/treehouse.POeLxx/.treehouse/scratch-project-b35b5c/1/scratch-project' to release it.
+not ok - test Treehouse pools or leases remain: /private/tmp/fm-lab-nmtest.qz6pNt/tmp-real/fm-treehouse-safety.3lau7z/treehouse.POeLxx
+ok - project config confines allocation without controller environment; cleanup removes its lease
+🌳 Setting up worktree...
+🌳 Leased worktree at ~/.treehouse/scratch-project-b35b5c/1/scratch-project. Run 'treehouse return ~/.treehouse/scratch-project-b35b5c/1/scratch-project' to release it.
+not ok - real Treehouse root changed: /tmp/fm-lab-nmtest.qz6pNt/tmp-link/fm-treehouse-safety.3lau7z/user/.treehouse
+ok - exit check rejects the unfixed default-root allocation
+exit=0
+real_root_unchanged=yes

@@ -1,0 +1,10 @@
+🌳 Setting up worktree...
+🌳 Leased worktree at /private/tmp/fm-lab-nmtest.qz6pNt/tmp-real/fm-herdr-presentation.ARO1GY/treehouse.y2dlIs/.treehouse/sandbox-project-2ba840/1/sandbox-project. Run 'treehouse return /private/tmp/fm-lab-nmtest.qz6pNt/tmp-real/fm-herdr-presentation.ARO1GY/treehouse.y2dlIs/.treehouse/sandbox-project-2ba840/1/sandbox-project' to release it.
+trusted: /private/tmp/fm-lab-nmtest.qz6pNt/tmp-real/fm-herdr-presentation.ARO1GY/treehouse.y2dlIs/.treehouse/sandbox-project-2ba840/1/sandbox-project
+trusted (project root): /private/tmp/fm-lab-nmtest.qz6pNt/tmp-real/fm-herdr-presentation.ARO1GY/sandbox-project
+ok - real allocator stays in the configured sandbox without controller environment; pre-launch Claude trust uses its private store
+
+signal=SIGINT sent_after_lease_seen=True lease_file=/tmp/fm-lab-nmtest.qz6pNt/tmp-real/fm-herdr-presentation.ARO1GY/treehouse.y2dlIs/.treehouse/sandbox-project-2ba840/treehouse-state.json
+exit=0
+leftover_fixture_roots=[]
+real_root_unchanged=yes
