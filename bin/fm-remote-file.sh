@@ -31,7 +31,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FILE_BOUNDARY_STATUS=1
 FILE_UNAVAILABLE_STATUS=1
 die() { printf 'error: %s\n' "$1" >&2; exit "${2:-1}"; }
-usage() { sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
+usage() { sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
 sha256_file() {
   if command -v shasum >/dev/null 2>&1; then shasum -a 256 "$1" | awk '{print $1}'; else sha256sum "$1" | awk '{print $1}'; fi
 }
