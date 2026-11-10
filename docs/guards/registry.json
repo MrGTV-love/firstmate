@@ -6885,10 +6885,10 @@
         {
           "file": "bin/fm_slack_watch.py",
           "match": "refuse_a_value_that_the_marker_holds()",
-          "count": 2
+          "count": 3
         }
       ],
-      "invariant": "the Slack intake takes no request in, and arm and check refuse, while a plane secret value is part of the replacement marker, the flag text or any other fixed text of a wake line, because such a value could never be replaced for good",
+      "invariant": "the Slack intake takes no request in, arm and check refuse, and the failed-row listing prints no row text, while a plane secret value is part of the replacement marker, the flag text or any other fixed text of a wake line or of the listing, because such a value could never be replaced for good",
       "layer": "runtime-block",
       "source": "the bot token and signing secret in the plane process environment, compared with the fixed marker and flag texts by refuse_a_value_that_the_marker_holds() in bin/fm_slack_watch.py",
       "trigger": "a plane secret value (SLACK_BOT_TOKEN or SLACK_SIGNING_SECRET) occurs inside the marker, the flag text or another fixed text of a wake line (the prefix, the label, the unacknowledged note, the pointer words, the queue marker), when arm or check starts or a new owner message is about to be taken in",

@@ -645,7 +645,11 @@ class IntakeTest(unittest.TestCase):
     def assert_only_base_calls(self, replay):
         """I5b-scope for one scenario: every call that reached the replay, swallowed ones included, names a method of the base set,
         and none failed for a missing scope or a method outside the allowlist."""
-        allowed = set(replay.transcript['method_allowlist'])
+        # The BASE population (read from the base code and the base outbound logs), never the transcript under test: a transcript that widens its own
+        # allowlist or does not enforce scopes cannot vouch for the scenario (E1 of the repair of 406f63e0; r62:172).
+        allowed = set(ReplayShapeTest.POPULATION)
+        self.assertIs(replay.transcript.get('enforce_scopes'), True, 'the replay does not enforce scopes: it cannot refuse a call whose scope is missing')
+        self.assertEqual(set(replay.transcript.get('method_allowlist') or []), allowed, 'the replay allowlist is not the base population')
         attempted = [json.loads(line) for line in replay.attempts_path.read_text().splitlines()] \
             if replay.attempts_path.is_file() else []
         self.assertEqual([row['method'] for row in attempted if row['method'] not in allowed], [])
@@ -2079,6 +2083,38 @@ class IntakeTest(unittest.TestCase):
         self.assertTrue(any('no method allowlist' in line for line in no_allowlist), no_allowlist)
         no_scopes = self.scope_clean_output({'method_allowlist': list(ReplayShapeTest.POPULATION)}, ['chat.postMessage'])
         self.assertTrue(any('does not enforce scopes' in line for line in no_scopes), no_scopes)
+
+    def test_the_scope_checks_reject_a_widened_allowlist_and_a_fixture_without_scope_enforcement(self):
+        """E1 and E2 of the repair of 406f63e0: the checks compare with the BASE population, never with the transcript under test. A transcript
+        that widens its own allowlist is reported by the scope-clean command (and the outside attempt is reported against the base set), and
+        the fixture's own closing control fails for a transcript that does not enforce scopes; the strict legal scenario stays clean."""
+        population = list(ReplayShapeTest.POPULATION)
+        widened = {'method_allowlist': population + ['api.test'], 'enforce_scopes': True}
+        output = self.scope_clean_output(widened, ['api.test'])
+        self.assertIn('attempted outside the allowlist: api.test', output)
+        self.assertTrue(any('not the base population' in line for line in output), output)
+        self.assertEqual(self.scope_clean_output({'method_allowlist': population, 'enforce_scopes': True}, ['chat.postMessage']), [])
+        with self.assertRaises(AssertionError):
+            with self.fixture(transcript_extra={'enforce_scopes': False}):
+                pass
+        with self.assertRaises(AssertionError):
+            with self.fixture(transcript_extra={'method_allowlist': population + ['api.test']}) as (watch, replay):
+                replay.attempts_path.write_text(json.dumps({'method': 'api.test'}) + '\n')
+                self.assert_only_base_calls(replay)
+        with self.fixture():
+            pass
+
+    def test_control_the_named_api_test_method_is_stopped_by_the_allowlist_and_by_no_scope(self):
+        """E3 (r62:172): a variant whose request path calls `api.test`, a method outside the population that needs no scope, fails by the
+        allowlist refusal `method_not_allowed` and by no scope refusal; the compliant request still passes with the same transcript."""
+        probe = self.prerequisite('api.test', lambda message: {})
+        extra = {'method_allowlist': list(ReplayShapeTest.POPULATION)}
+        acks, error, attempts = self.poll_with(probe, transcript_extra=extra)
+        self.assertEqual((acks, error), ([], 'method_not_allowed'))
+        self.assertIn('api.test', attempts)
+        acks, error, attempts = self.poll_with(Watch.request_from, transcript_extra=extra)
+        self.assertEqual((acks, error), (['200.000100'], None))
+        self.assertTrue(set(attempts) <= set(ReplayShapeTest.POPULATION), attempts)
 
     def test_a_value_split_across_a_link_keeps_the_text_around_it_in_the_line(self):
         value = 'fixturesigning1234'
@@ -3891,18 +3927,23 @@ def main(argv):
     elif command == 'scope-clean':
         # I5b-scope for one scenario's home: every call that reached the replay (swallowed ones included) names a method of the
         # transcript's allowlist, and none failed for a missing scope or a method outside the allowlist. Prints each violation.
-        transcript = json.load(open(argv[2]))
-        allowed = set(transcript.get('method_allowlist') or [])
+        with open(argv[2]) as handle:
+            transcript = json.load(handle)
+        # The base population, not the transcript's own list: a widened allowlist is itself reported (E2 of the repair of 406f63e0).
+        allowed = set(ReplayShapeTest.POPULATION)
+        listed = set(transcript.get('method_allowlist') or [])
         directory = Path(argv[1])
         # A replay that holds no allowlist cannot refuse an outside method, and one that does not enforce scopes cannot refuse a missing
         # scope: a clean result from it proves nothing, so it is reported as a violation of the check itself (F7 of the outcome review of b0f37a54).
-        if not allowed:
+        if not listed:
             print('the replay holds no method allowlist: it cannot refuse a method outside the base set')
+        elif listed != allowed:
+            print('the replay allowlist is not the base population: ' + ', '.join(sorted(listed ^ allowed)))
         if not transcript.get('enforce_scopes'):
             print('the replay does not enforce scopes: it cannot refuse a call whose scope is missing')
         attempts = directory / 'attempts.jsonl'
         for line in (attempts.read_text().splitlines() if attempts.is_file() else []):
-            if allowed and json.loads(line)['method'] not in allowed:
+            if json.loads(line)['method'] not in allowed:
                 print('attempted outside the allowlist: ' + json.loads(line)['method'])
         log = directory / 'outbound.jsonl'
         for line in (log.read_text().splitlines() if log.is_file() else []):

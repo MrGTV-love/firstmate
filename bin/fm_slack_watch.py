@@ -107,11 +107,6 @@ class Out:
         return self.write(stream, text + '\n')
 
 
-def say_out(text, stream='out', out=None):
-    """One line through the one writer (a fresh writer when the caller has no run's): False when the complete stream would hold a plane value."""
-    return (out or Out()).line(stream, text)
-
-
 class NoNetwork:
     """The transport of a run that must not reach Slack: every call is refused before any socket exists."""
     scopes = set()
@@ -2111,7 +2106,7 @@ def parse_command(argv, positional=False):
             index += 2
             continue
         if argv[index] in ('-h', '--help'):
-            say_out(help_text(command))
+            print(help_text(command))
             raise SystemExit(0)
         rest.append(argv[index])
         index += 1
@@ -2309,19 +2304,19 @@ def note_progress():
 
 def main(argv):
     os.umask(0o077)
-    action = env_value('FM_SLACK_CHECK_ACTION') if argv and argv[0] == 'check' else ''
     out = Out()
-    refusals = 'err' if action in ('arm', 'retarget', 'resolve') else 'out'
+    action = env_value('FM_SLACK_CHECK_ACTION') if argv and argv[0] == 'check' else ''
+    refusals = sys.stderr if action in ('arm', 'retarget', 'resolve') else sys.stdout
     if not argv:
-        say_out('error: missing command', 'out', out)
+        print('error: missing command')
         return 2
     try:
         command, replay_path, request_ts = parse_command(argv, positional=action == 'resolve')
     except SlackError as error:
-        say_out('error: slack ' + redact_sink(str(error)), refusals, out)
+        print('error: slack ' + str(error), file=refusals)
         return 2
     if command not in ('mirror', 'poll', 'check'):
-        say_out('error: unknown command; use --help', 'out', out)
+        print('error: unknown command; use --help')
         return 2
     if action == 'disarm':
         return disarm()
@@ -2330,10 +2325,10 @@ def main(argv):
     state, reason = mode()
     if state != 'on':
         if action in ('arm', 'retarget'):
-            say_out('slack: refused: ' + reason, 'err', out)
+            print('slack: refused: ' + reason, file=sys.stderr)
             return 1
         if state == 'refused' and command != 'check':
-            say_out('slack: refused: ' + reason, 'out', out)
+            print('slack: refused: ' + reason)
         list_failed_requests(command, open_failed_threads(), out)
         return 0
     watch = None
@@ -2375,24 +2370,25 @@ def main(argv):
         error = redacted_error(error)
         name = str(error) if isinstance(error, SlackError) else 'local_state_or_response_error'
         if action in ('arm', 'retarget'):
-            say_out('slack: refused: ' + name, 'err', out)
+            print('slack: refused: ' + name, file=sys.stderr)
         elif watch is not None:
             try:
                 watch.report_failure(error)
             except SecretCollision:
                 # The journal itself would hold a value: the report is printed, not journaled.
-                say_out('slack: transport failure: ' + name, 'out', out)
+                print('slack: transport failure: ' + name)
             try:
                 emit(watch, command)
             except SecretCollision:
                 pass
         else:
-            say_out('slack: transport failure: ' + name, 'out', out)
+            print('slack: transport failure: ' + name)
         return 1
     except RuntimeError as error:
         if str(error).startswith('FM_SLACK_FAULT='):
             return 75
-        say_out('slack: refused: local_runtime_error' if action == 'arm' else 'slack: local_runtime_error', refusals, out)
+        print('slack: refused: local_runtime_error' if action == 'arm' else 'slack: local_runtime_error',
+              file=refusals)
         return 1
     finally:
         if watch is not None:
@@ -2410,12 +2406,13 @@ def resolve_request(ts):
         watch.close_request(ts)
     except (SlackError, OSError, ValueError, KeyError, TypeError) as error:
         error = redacted_error(error)
-        say_out('slack: refused: ' + (str(error) if isinstance(error, SlackError) else 'local_state_or_response_error'), 'err')
+        print('slack: refused: ' + (str(error) if isinstance(error, SlackError) else 'local_state_or_response_error'),
+              file=sys.stderr)
         return 1
     finally:
         if watch is not None:
             watch.lock.close()
-    say_out('resolved: slack request ' + ts)
+    print('resolved: slack request ' + ts)
     return 0
 
 
@@ -2423,16 +2420,16 @@ def check(watch, action):
     state_dir = state_home()
     if action == 'retarget':
         if watch.retarget():
-            say_out('retargeted: the old DM is no longer tracked; the DM of FM_SLACK_DM_USER is open and its starting point is recorded; the next poll takes in the requests sent after it')
+            print('retargeted: the old DM is no longer tracked; the DM of FM_SLACK_DM_USER is open and its starting point is recorded; the next poll takes in the requests sent after it')
         else:
-            say_out('unchanged: FM_SLACK_DM_USER matches the DM already in use; nothing to retarget')
+            print('unchanged: FM_SLACK_DM_USER matches the DM already in use; nothing to retarget')
         return 0
     if action == 'arm':
         try:
             watch.prepare()
         except SlackError as error:
             error = redacted_error(error)
-            say_out('slack: refused: ' + str(error), 'err')
+            print('slack: refused: ' + str(error), file=sys.stderr)
             return 1
         return arm(state_dir)
     if not (state_dir / (CHECK_ID + '.check.sh')).is_file() or not (state_dir / (CHECK_ID + '.check-trust')).is_file():
@@ -2461,16 +2458,16 @@ def shim_content(home, state_dir, script_dir):
 def arm(state_dir):
     state_dir.mkdir(parents=True, exist_ok=True)
     if state_dir.is_symlink():
-        say_out('slack: refused: unsafe_state_path', 'err')
+        print('slack: refused: unsafe_state_path', file=sys.stderr)
         return 1
     shim = state_dir / (CHECK_ID + '.check.sh')
     trust = state_dir / (CHECK_ID + '.check-trust')
     if shim.is_symlink() or trust.is_symlink():
-        say_out('slack: refused: unsafe_state_path', 'err')
+        print('slack: refused: unsafe_state_path', file=sys.stderr)
         return 1
     # Validate the shim path before touching either artifact.
     if shim.exists() and not shim.is_file():
-        say_out('slack: refused: unsafe_check_shim', 'err')
+        print('slack: refused: unsafe_check_shim', file=sys.stderr)
         return 1
     shim.write_text(shim_content(str(home_dir()), state_dir, ROOT))
     shim.chmod(0o700)
@@ -2478,18 +2475,18 @@ def arm(state_dir):
     if result.returncode:
         shim.unlink(missing_ok=True)
         trust.unlink(missing_ok=True)
-        say_out('slack: refused: check_registration_failed', 'err')
+        print('slack: refused: check_registration_failed', file=sys.stderr)
         return 1
-    say_out('armed: state/%s.check.sh' % CHECK_ID)
+    print('armed: state/%s.check.sh' % CHECK_ID)
     return 0
 
 
 def disarm():
     result = run('fm-check-unregister.sh', CHECK_ID)
     if result.returncode:
-        say_out('slack: refused: check_unregistration_failed')
+        print('slack: refused: check_unregistration_failed')
         return 1
-    say_out('disarmed: state/%s.check.sh' % CHECK_ID)
+    print('disarmed: state/%s.check.sh' % CHECK_ID)
     return 0
 
 
@@ -2497,5 +2494,5 @@ if __name__ == '__main__':
     try:
         raise SystemExit(main(sys.argv[1:]))
     except SlackError as error:
-        say_out('error: slack ' + str(error))
+        print('error: slack ' + str(error))
         raise SystemExit(1)
