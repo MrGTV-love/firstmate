@@ -3393,6 +3393,24 @@ class IntakeTest(unittest.TestCase):
             self.assertEqual(out.splitlines()[0], artifacts[-3][0])
 
 
+    def test_the_one_writer_refuses_a_text_that_would_make_the_complete_stream_hold_a_value(self):
+        """Calibration of the complete-stream view (r65): a value across the newline between two writes is refused (bad control), nothing of
+        the refused text is sent, and the clean pair is sent whole; standard error is a stream of its own."""
+        first, second = 'first line of the stream', 'second line of the stream'
+        value = first[-12:] + '\n' + second[:12]
+        for suffix, refused in (('', True), ('X', False)):
+            with patch.dict(os.environ, {'SLACK_SIGNING_SECRET': value + suffix}):
+                out, err, writer = io.StringIO(), io.StringIO(), plane.Out()
+                with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                    self.assertTrue(writer.line('out', first))
+                    self.assertEqual(writer.line('out', second), not refused)
+                    self.assertTrue(writer.line('err', second))
+                self.assertEqual(out.getvalue(), first + '\n' + ('' if refused else second + '\n'))
+                self.assertEqual(err.getvalue(), second + '\n')
+                self.assertNotIn(value + suffix, out.getvalue())
+                self.assertNotIn(value + suffix, err.getvalue())
+
+
 class ClosedTransportTest(unittest.TestCase):
     """A test or verification run cannot reach Slack: it runs on a transcript, or its transport is closed."""
 
