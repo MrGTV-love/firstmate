@@ -2829,8 +2829,11 @@ class IntakeTest(unittest.TestCase):
                 flags.append(watch.notice('test/notice/%d' % i, 'k%d' % i, thread, 'A notice',
                                           'check: slack %s - a notice that fills the wake line with some words %s' % (thread, 'x' * 30)))
             posted = len(watch.output)
-            self.assertGreater(posted, 0)
-            self.assertLess(posted, 20)
+            lines = ['check: slack %s - a notice that fills the wake line with some words %s' % ('100.%06d' % (i + 1), 'x' * 30) for i in range(20)]
+            fit = max(n for n in range(1, 21) if len('; '.join(lines[:n])) <= plane.WAKE_LIMIT - plane.QUEUE_RESERVE or n == 1)
+            # Exactly the lines that fit the wake line are posted (a count worked out here, not read from the head); how many units that makes
+            # in a mixed wait is owner call OC4, recorded in test_pending_owner_oc4_*.
+            self.assertEqual(posted, fit)
             self.assertEqual(flags, [True] * posted + [False] * (20 - posted))
             self.assertEqual(watch.spent_notices, posted)
             self.assertEqual(len(watch.state['pending']), 20 - posted)
@@ -3057,9 +3060,10 @@ class IntakeTest(unittest.TestCase):
             self.assertIsNotNone(record, 'the record is not found under the request key')
             self.assertTrue(record['replaced'])
             self.assertTrue(record['text'].startswith(plane.SECRET_MARKER))
-            [line] = self.wakes(watch) if self.wakes(watch) else [l for l in out.splitlines() if l.startswith(plane.REQUEST_PREFIX)]
+            [line] = [l for l in out.splitlines() if l.startswith(plane.REQUEST_PREFIX)]
             parts = self.wake_parts(line)
-            self.assertEqual((parts['ts'], parts['user'], parts['flag'], parts['pointer']), ('200.000100', self.OWNER, True, '#200.000100'))
+            self.assertEqual((parts['ts'], parts['user'], parts['flag'], parts['pointer']),
+                             ('200.000100', self.OWNER, True, watch.record_places()[0] + '#200.000100'))
             self.assertEqual(self.acks(replay), ['200.000100'])
         with self.fixture(env={'SLACK_SIGNING_SECRET': 'unrelated-fixture-value-0123456789'}) as (watch, replay):
             self.say(replay, '200.000100', text)
@@ -3225,6 +3229,7 @@ class IntakeTest(unittest.TestCase):
                 out, err = self.run_printed(watch)
             self.assertEqual(self.acks(replay), ['200.000100', '200.000200'])
             self.assertEqual(len([l for l in out.splitlines() if l.startswith(plane.REQUEST_PREFIX)]), 2)
+            watch.clear_failure()
             self.assertEqual(watch.load_state()['failure'], '')
 
     def notice_line(self, thread):
@@ -3289,6 +3294,67 @@ class IntakeTest(unittest.TestCase):
         self.assertEqual((copy['text'], copy['shown'], copy['replaced'], copy['extra']),
                          ('a' + plane.SECRET_MARKER + 'def', 'abcd' + plane.SECRET_MARKER + 'f', True, 2))
         self.assertEqual({k: copy[k] for k in ('event', 'key', 'thread', 'author', 'kind', 'stage')}, {k: row[k] for k in ('event', 'key', 'thread', 'author', 'kind', 'stage')})
+
+
+    def test_pending_owner_oc1_a_value_across_two_notice_lines_withholds_the_later_line_to_the_next_run(self):
+        """A hit in the printed stream with no request-text character (class 3, PENDING owner OC1): the later line is withheld and stays
+        journaled, nothing holds the value, and the next run prints it alone, once; the earlier line is printed once."""
+        first, second = self.notice_line('120.000100'), self.notice_line('120.000200')
+        value = first[-20:] + '\n' + second[:20]
+        for suffix, held in (('', True), ('X', False)):
+            with self.fixture(env={'SLACK_SIGNING_SECRET': value + suffix}) as (watch, replay):
+                watch.output = [first, second]
+                watch.state['outbox'] = [first, second]
+                watch.commit()
+                out = io.StringIO()
+                with contextlib.redirect_stdout(out):
+                    plane.emit(watch, 'poll')
+                self.assertNotIn(value + suffix, out.getvalue())
+                report = 'slack: transport failure: secret_collides_with_marker'
+                self.assertEqual(out.getvalue().splitlines(), [first, report] if held else [first, second])
+                self.assertEqual(watch.load_state()['outbox'], [second] if held else [])
+                later = io.StringIO()
+                with contextlib.redirect_stdout(later):
+                    plane.emit(watch, 'poll')
+                self.assertEqual(later.getvalue().splitlines(), [second] if held else [])
+                self.assertEqual(watch.load_state()['outbox'], [])
+
+    def test_pending_owner_oc1_a_state_that_would_hold_a_value_is_not_written(self):
+        """The journal's own sink (class 3, PENDING owner OC1): a state whose complete text holds a plane value is refused before any byte is
+        written and the file stays as it was; a clean state is written."""
+        value = 'fixture-signing-in-the-state-0123456789'
+        with self.fixture(env={'SLACK_SIGNING_SECRET': value}) as (watch, replay):
+            before = (watch.root / 'state.json').read_bytes()
+            watch.state['pending'].append(self.notice('test/notice/1', '100.000100'))
+            watch.state['threads']['x'] = {'ts': '150.000100', 'label': 'a card holding ' + value}
+            with self.assertRaisesRegex(SlackError, '^secret_collides_with_marker$'):
+                watch.commit()
+            self.assertEqual((watch.root / 'state.json').read_bytes(), before)
+            watch.state['threads']['x']['label'] = 'a clean card'
+            watch.commit()
+            self.assertNotEqual((watch.root / 'state.json').read_bytes(), before)
+
+    def test_the_preflight_predicts_the_exact_bytes_of_every_state_the_request_leaves(self):
+        """The drift guard of request_artifacts: the journal states, the whole record store and the wake line that the pre-flight builds as copies
+        are byte for byte what the real run writes and prints."""
+        with self.fixture() as (watch, replay):
+            self.say(replay, '200.000100', 'an ordinary request with "quotes", a backslash \\ and   a line separator')
+            message = [m for m in replay.state['messages'] if m['ts'] == '200.000100'][0]
+            row = watch.request_from(message)
+            artifacts = watch.request_artifacts(row)
+            written, real = [], plane.save
+
+            def spy(path, value):
+                written.append(json.dumps(value, ensure_ascii=False))
+                return real(path, value)
+            with patch.object(plane, 'save', spy):
+                out, err = self.run_printed(watch)
+            staged, attempted, posted, delivered = artifacts[0][0], artifacts[1][0], artifacts[2][0], artifacts[7][0]
+            for label, text in (('staged', staged), ('attempted', attempted), ('posted', posted), ('delivered', delivered)):
+                self.assertIn(text, written, label)
+            record = [text for text, runs in artifacts if text.endswith('\n') and text.startswith('{"ts"')]
+            self.assertEqual([(watch.root / plane.RECORD_FILE).read_text()], record)
+            self.assertEqual(out.splitlines()[0], artifacts[-3][0])
 
 
 class ClosedTransportTest(unittest.TestCase):

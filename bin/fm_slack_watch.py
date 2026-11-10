@@ -22,6 +22,7 @@ make an unbind wait.
 """
 import collections
 import contextlib
+import copy
 from datetime import datetime, timezone
 import fcntl
 import hashlib
@@ -85,6 +86,32 @@ REQUEST_UNKNOWN = ' (acknowledgement state unknown)'
 REQUEST_SEGMENT = re.compile(r'check: slack request ([0-9]+\.[0-9]+) from (' + USER_ID.pattern + r')( \((?:not acknowledged after [0-9]+ tries|acknowledgement state unknown)\))?: ')
 
 
+class Out:
+    """The one writer of a run's standard output and standard error. It keeps what it has sent, and a text goes out only while the COMPLETE stream
+    after it holds no plane value; the write is flushed at once (a wake line is printed before it leaves the journal). A refused text is not
+    sent and write returns False; what to do then is collision_outcome's."""
+    def __init__(self):
+        self.sent = {'out': '', 'err': ''}
+
+    def write(self, stream, text):
+        whole = self.sent[stream] + text
+        if value_hits(whole):
+            return False
+        target = sys.stdout if stream == 'out' else sys.stderr
+        target.write(text)
+        target.flush()
+        self.sent[stream] = whole
+        return True
+
+    def line(self, stream, text):
+        return self.write(stream, text + '\n')
+
+
+def say_out(text, stream='out', out=None):
+    """One line through the one writer (a fresh writer when the caller has no run's): False when the complete stream would hold a plane value."""
+    return (out or Out()).line(stream, text)
+
+
 class NoNetwork:
     """The transport of a run that must not reach Slack: every call is refused before any socket exists."""
     scopes = set()
@@ -123,9 +150,11 @@ def run(script, *args, text=None):
 def save(path, value):
     if path.is_symlink():
         raise SlackError('unsafe_state_path')
-    # The complete serialized text is protected before any byte is written (F1 of the outcome review of b0f37a54): a value that
-    # the JSON syntax joins from the pieces of two fields, or of one field and the delimiters around it, never reaches the file.
-    text, _ = protect_document(value, False)
+    # The complete serialized text is the sink: it is checked as a whole before any byte is written and never rewritten. A request's own text is
+    # made free of every value its serialization could form (settle_request, before the request is staged), so a hit here is class 3.
+    text = json.dumps(value, ensure_ascii=False)
+    if value_hits(text):
+        collision_outcome('state')
     fd, name = tempfile.mkstemp(prefix='.slack-', dir=path.parent)
     try:
         with os.fdopen(fd, 'w') as out:
@@ -214,7 +243,7 @@ SINK_WORD = '[redacted]'
 # them could never be replaced for good, so the plane refuses it (F1 of Main 2602). The diagnostic prefixes are not in this list:
 # redact_sink protects them.
 FIXED_WAKE_TEXT = (REQUEST_PREFIX, ' from ', REQUEST_UNACKNOWLEDGED, REQUEST_UNKNOWN, REQUEST_LABEL, '; ' + SECRET_FLAG, '; full: ', '; +', ' queued',
-                   SECRET_MARKER, SECRET_FLAG, SINK_WORD, 'slack: request ', ' not acknowledged (failed, owner Main)')
+                   SECRET_MARKER, SECRET_FLAG, SINK_WORD, 'slack: request ', ' not acknowledged (failed, owner Main)', 'slack: request finished')
 
 
 def redacted_error(error):
@@ -404,17 +433,53 @@ def protect_encoded(text):
     return SECRET_MARKER, True
 
 
-def document_spans(value, ascii_only):
-    """json.dumps(value) as the plane writes it, with for each output character the (leaf, index) of the string character that it
-    encodes, or None for structure (braces, keys, separators, numbers, quotes) and for characters that must never be replaced (a
-    wake line of the outbox keeps its grammar: its fixed text is structure). Also returns the leaves as (container, key, string)."""
-    chars, refs, leaves = [], [], []
+class SecretCollision(SlackError):
+    """A plane value that no replacement of request text can remove: it holds no request-text character."""
 
-    def put(piece, ref=None):
+
+def value_hits(text):
+    """The sink check: the (start, end) spans, merged, of every plane secret value in the COMPLETE text of one sink (a whole file after an append, a
+    whole stream, one printed line). Pure: it reads and changes nothing, and it is the only judge of whether a sink holds a value."""
+    spans = []
+    for value in plane_secrets():
+        at = text.find(value)
+        while at >= 0:
+            spans.append((at, at + len(value)))
+            at = text.find(value, at + 1)
+    merged = []
+    for start, end in sorted(spans):
+        if merged and start <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(end, merged[-1][1]))
+        else:
+            merged.append((start, end))
+    return merged
+
+
+def collision_outcome(kind):
+    """THE interim outcome of a hit that holds no request-text character (class 3), the one place that decides it. PENDING the owner (OC1: what
+    an already accepted request does; OC2: identity or structure against replacement; OC3: the failed-row listing against the refusal): only this
+    function changes when the owner rules. The interim is the protective one: nothing that holds the value is written or printed, no identity is
+    changed, and the secret_collides_with_marker refusal is reported once per episode (`report_failure`). For a request, a state or a record the
+    request is not taken in (the intake cursor stays, nothing is staged or acknowledged, the message is read again each poll, the requests behind
+    it wait, in order, until the value or the message changes), so it raises. A printed line is withheld and stays journaled, and a listing prints
+    no row text; those return None."""
+    if kind in ('listing', 'stream'):
+        return None
+    raise SecretCollision('secret_collides_with_marker')
+
+
+def serialize_with_spans(value, ascii_only, leaves):
+    """json.dumps(value) as the plane writes it, and for each of the named string leaves the span of every character: leaves is a list of
+    (container, key, field), and the result's runs is [(field, [(start, end), ...])], one span per character of that leaf's string. A read-only
+    walk of the one serialization; it names where a request's own text lies in a sink and changes nothing."""
+    chars, runs, pos = [], [], [0]
+    wanted = {(id(container), key): field for container, key, field in leaves}
+
+    def put(piece):
         chars.append(piece)
-        refs.extend([ref] * len(piece))
+        pos[0] += len(piece)
 
-    def walk(item, parent, key, outbox):
+    def walk(item, parent, key):
         if isinstance(item, dict):
             put('{')
             for n, (k, v) in enumerate(item.items()):
@@ -422,76 +487,58 @@ def document_spans(value, ascii_only):
                     put(', ')
                 put(json.dumps(k, ensure_ascii=ascii_only))
                 put(': ')
-                walk(v, item, k, outbox or k == 'outbox')
+                walk(v, item, k)
             put('}')
         elif isinstance(item, list):
             put('[')
             for n, v in enumerate(item):
                 if n:
                     put(', ')
-                walk(v, item, n, outbox)
+                walk(v, item, n)
             put(']')
         elif isinstance(item, str):
-            leaf = len(leaves)
-            leaves.append((parent, key, item))
             put('"')
-            for index, ch in enumerate(item):
-                put(json.dumps(ch, ensure_ascii=ascii_only)[1:-1], None if outbox else (leaf, index))
+            spans = []
+            for ch in item:
+                piece = json.dumps(ch, ensure_ascii=ascii_only)[1:-1]
+                spans.append((pos[0], pos[0] + len(piece)))
+                put(piece)
             put('"')
+            field = wanted.get((id(parent), key))
+            if field:
+                runs.append((field, spans))
         else:
             put(json.dumps(item, ensure_ascii=ascii_only))
-    walk(value, None, None, False)
+    walk(value, None, None)
     text = ''.join(chars)
     if text != json.dumps(value, ensure_ascii=ascii_only):
-        return json.dumps(value, ensure_ascii=ascii_only), None, leaves
-    return text, refs, leaves
+        raise SlackError('serialization_mismatch')
+    return text, runs
 
 
-def protect_document(value, ascii_only):
-    """json.dumps(value) as the plane writes it (ensure_ascii as asked), with every plane value that the serialization itself
-    creates replaced, in place, inside the string fields that it overlaps, to a fixed point: a value formed from the end of one field,
-    the JSON delimiters and the start of another (F1 of the outcome review of b0f37a54). Only the overlapped characters are replaced by
-    the marker; every other byte is kept. A value that lies wholly in structure (a key, a delimiter, a wake line's fixed text) could
-    never be replaced for good, so it is refused like a value that the marker holds. A request row whose text is changed here also
-    carries replaced=True and counts the removed bytes in extra, so its wake line and record say so. Returns (the text, whether a value was replaced)."""
-    replaced = False
-    for _ in range(SETTLE_PASSES):
-        text = json.dumps(value, ensure_ascii=ascii_only)
-        values = plane_secrets()
-        if not values or not any(v in text for v in values):
-            return text, replaced
-        text, refs, leaves = document_spans(value, ascii_only)
-        if refs is None:
-            raise SlackError('secret_collides_with_marker')
-        marks = {}
-        for v in values:
-            at = text.find(v)
-            while at >= 0:
-                touched = {refs[i] for i in range(at, at + len(v)) if refs[i] is not None}
-                if not touched:
-                    raise SlackError('secret_collides_with_marker')
-                for leaf, index in touched:
-                    marks.setdefault(leaf, set()).add(index)
-                at = text.find(v, at + 1)
-        for leaf, indexes in marks.items():
-            parent, key, item = leaves[leaf]
-            new, run, removed = [], False, 0
-            for index, ch in enumerate(item):
-                if index in indexes:
-                    removed += len(ch.encode('utf-8'))
-                    if not run:
-                        new.append(SECRET_MARKER)
-                    run = True
-                else:
-                    new.append(ch)
-                    run = False
-            parent[key] = ''.join(new)
-            if isinstance(parent, dict) and ('replaced' in parent or 'shown' in parent):
-                parent['replaced'] = True
-                if key == 'text' and 'extra' in parent:
-                    parent['extra'] = int(parent.get('extra') or 0) + removed
-        replaced = True
-    raise SlackError('secret_collides_with_marker')
+def replace_request_text(row, marks):
+    """The ONE replacer: replace the marked characters of a request's own `text` and `shown` by the marker (a run of consecutive marked characters
+    becomes one marker), count the removed bytes of `text` in `extra` and set `replaced`. marks is {field: {index, ...}}. It can reach no other
+    field: a mark that names any field but `text` or `shown` (a thread, an author, an event, a key) is refused before anything changes."""
+    if any(field not in ('text', 'shown') for field in marks):
+        raise SlackError('identity_is_never_replaced')
+    for field, indexes in marks.items():
+        if not indexes:
+            continue
+        new, run, removed = [], False, 0
+        for index, ch in enumerate(row[field]):
+            if index in indexes:
+                removed += len(ch.encode('utf-8'))
+                if not run:
+                    new.append(SECRET_MARKER)
+                run = True
+            else:
+                new.append(ch)
+                run = False
+        row[field] = ''.join(new)
+        row['replaced'] = True
+        if field == 'text':
+            row['extra'] = int(row.get('extra') or 0) + removed
 
 
 SEGMENT = re.compile(r'(check: slack request ([0-9]+\.[0-9]+) from (' + USER_ID.pattern + r')( \((?:not acknowledged after [0-9]+ tries|acknowledgement state unknown)\))?: '
@@ -558,71 +605,41 @@ def sanitize_counted(raw, mark=None):
 
 
 def request_line(ts, user, presented, note='', flagged=False, budget=WAKE_LIMIT, place=RECORD_PLACE, fallbacks=()):
-    """One request segment (I4a): the prefix, the label, the presented text as ONE JSON string literal, then
-    `; <flag>` when a secret value was replaced and, when the text is cut, `; full: <place>#<ts>`. The text is cut before
-    it is encoded, to the longest prefix for which the whole line is at most budget characters. The place is tried first;
-    when even the empty text does not fit with it, each fallback is tried (the path from the home, then the key alone, which
-    is the empty place), so the line always keeps the complete `#<ts>` key and never exceeds the budget. Last, the whole
-    line is scanned for the plane's secret values (F1 of Main 2602): a value that the fixed text and the JSON encoding
-    create together is protected like any other match, by replacing the whole characters that form it."""
+    """One request segment (I4a): the prefix, the label, the presented text as ONE JSON string literal, then `; <flag>` when a secret value was
+    replaced and, when the text is cut, `; full: <place>#<ts>`. See request_line_parts."""
+    return request_line_parts(ts, user, presented, note, flagged, budget, place, fallbacks)[0]
+
+
+def request_line_parts(ts, user, presented, note='', flagged=False, budget=WAKE_LIMIT, place=RECORD_PLACE, fallbacks=()):
+    """The request segment, and the count of presented characters its literal holds and where the literal starts: (line, count, start). The text is
+    cut before it is encoded, to the longest prefix for which the whole line is at most budget characters. The place is tried first; when even the
+    empty text does not fit with it, each fallback is tried (the path from the home, then the key alone, which is the empty place), so the line
+    always keeps the complete `#<ts>` key and never exceeds the budget. A place whose pointer (`; full: <place>#<ts>`) holds a plane value is left
+    out and the key alone, which locates the record in the store of the state folder in use (I4d), is used (F6 and R3 of the outcome reviews). It
+    scans nothing and rewrites nothing: a value that the text and the line around it form is found by value_hits and removed from the request's
+    own text by the one replacer before the line is built."""
     head = REQUEST_PREFIX + '%s from %s%s: %s ' % (ts, user, note, REQUEST_LABEL)
     places = [place, *fallbacks] if place else list(fallbacks)
-    # A place that holds a plane value would write it into the pointer: it is skipped, and the key alone, which locates the record in
-    # the store of the state folder in use (I4d), is always left (F6 of the outcome review of b0f37a54).
-    places = [value for value in places if not any(secret in value for secret in plane_secrets())]
+    places = [value for value in places if not value_hits('; full: %s#%s' % (value, ts))]
     places = [value for index, value in enumerate(places) if value not in places[:index]] + ['']
-    for _ in range(SETTLE_PASSES):
-        flag = '; ' + SECRET_FLAG if flagged else ''
-        line, count = None, 0
-        for where in places:
-            def build(count, where=where):
-                cut = '' if count == len(presented) else '; full: %s#%s' % (where, ts)
-                return head + json.dumps(presented[:count], ensure_ascii=False) + flag + cut
-            if len(build(len(presented))) <= budget:
-                line, count = build(len(presented)), len(presented)
-                break
-            if len(build(0)) > budget and where:
-                continue
-            low, high = 0, len(presented) - 1
-            while low < high:
-                mid = (low + high + 1) // 2
-                if len(build(mid)) <= budget:
-                    low = mid
-                else:
-                    high = mid - 1
-            line, count = build(low), low
-            break
-        values = [value for value in plane_secrets() if value in line]
-        if not values:
-            return line
-        lit_start = len(head) + 1
-        encoded = [json.dumps(ch, ensure_ascii=False)[1:-1] for ch in presented[:count]]
-        offsets, pos = [], lit_start
-        for piece in encoded:
-            offsets.append((pos, pos + len(piece)))
-            pos += len(piece)
-        hit = set()
-        for value in values:
-            at = line.find(value)
-            while at >= 0:
-                end = at + len(value)
-                touched = [k for k, (a, b) in enumerate(offsets) if a < end and b > at]
-                if not touched:
-                    # The value lies wholly in the fixed text: it could never be replaced for good.
-                    raise SlackError('secret_collides_with_marker')
-                hit.update(touched)
-                at = line.find(value, at + 1)
-        runs = []
-        for k in sorted(hit):
-            if runs and k == runs[-1][1]:
-                runs[-1][1] = k + 1
+    flag = '; ' + SECRET_FLAG if flagged else ''
+    for where in places:
+        def build(count, where=where):
+            cut = '' if count == len(presented) else '; full: %s#%s' % (where, ts)
+            return head + json.dumps(presented[:count], ensure_ascii=False) + flag + cut
+        if len(build(len(presented))) <= budget:
+            return build(len(presented)), len(presented), len(head) + 1
+        if len(build(0)) > budget and where:
+            continue
+        low, high = 0, len(presented) - 1
+        while low < high:
+            mid = (low + high + 1) // 2
+            if len(build(mid)) <= budget:
+                low = mid
             else:
-                runs.append([k, k + 1])
-        for start, end in reversed(runs):
-            presented = presented[:start] + SECRET_MARKER + presented[end:]
-        flagged = True
-    return request_line(ts, user, SECRET_MARKER, note, True, budget, place, fallbacks)
-
+                high = mid - 1
+        return build(low), low, len(head) + 1
+    return build(0), 0, len(head) + 1
 
 def shown_text(row):
     """The text a request's wake line shows: the one that sanitize computed and the record keeps beside the whole text;
@@ -814,6 +831,8 @@ class Watch:
         self.hold_depth = 0
         self.hold_bound = False
         self.read_mark = None
+        self.settled = set()
+        self.out = Out()
 
     def dm_user(self):
         return env_value('FM_SLACK_DM_USER').strip()
@@ -1304,20 +1323,37 @@ class Watch:
                 found = row
         return found
 
+    def record_entry(self, pending):
+        """The declared record of one request (I4d) as the dict that is written: the request's key is its thread, never rewritten."""
+        return {'ts': pending['thread'], 'text': pending['text'], 'shown': shown_text(pending),
+                'replaced': bool(pending.get('replaced')), 'extra_removed': int(pending.get('extra') or 0)}
+
+    def store_after(self, entry_text):
+        """The complete record store as it will stand after one more entry, and where that entry starts in it. A half line that an earlier write
+        left makes the new entry start on a line of its own."""
+        try:
+            existing = (self.root / RECORD_FILE).read_bytes().decode('utf-8', 'replace')
+        except OSError:
+            existing = ''
+        lead = '' if not existing or existing.endswith('\n') else '\n'
+        return existing + lead + entry_text + '\n', len(existing) + len(lead)
+
     def write_record(self, pending):
         """Keep the whole permitted text of a request in the store before any line names it. If the record cannot be
-        written no wake line is printed and the request stays journaled for a retry; the failure is reported."""
+        written no wake line is printed and the request stays journaled for a retry; the failure is reported. The complete store after the
+        append is checked before the append (value_hits); nothing is rewritten here."""
         if pending.get('recorded'):
             return
         path = self.root / RECORD_FILE
         if path.is_symlink():
             raise SlackError('unsafe_state_path')
         # ASCII-escaped, so that no character of the text (U+2028 included) can end the record's line early.
-        entry, _ = protect_document({'ts': pending['thread'], 'text': pending['text'], 'shown': shown_text(pending),
-                                     'replaced': bool(pending.get('replaced')), 'extra_removed': int(pending.get('extra') or 0)}, True)
+        entry = json.dumps(self.record_entry(pending), ensure_ascii=True)
         # Test-only: FM_SLACK_FAULT=record-write makes this write fail; the process does not stop at the point.
         if env_value('FM_SLACK_FAULT') == 'record-write':
             raise SlackError('request_record_unwritable')
+        if value_hits(self.store_after(entry)[0]):
+            collision_outcome('record')
         size = 0
         try:
             # A half record that an earlier write left (a crash or a failed append) must not join the next one:
@@ -1360,63 +1396,107 @@ class Watch:
         forms = [first, os.path.relpath(path, self.home)]
         return [self.escape_place(value) for index, value in enumerate(forms) if value not in forms[:index]]
 
-    def protect_printed(self, text):
-        """The text of one printed wake line with every plane value that the join of its parts creates (the segments, the separators, the
-        appended queue marker) replaced inside the request texts it overlaps, to a fixed point (F1 of the outcome review of b0f37a54). Each
-        touched segment is rebuilt by request_line, with the flag, and cut to what the line still has room for, with its pointer. A value
-        that lies wholly in the fixed text of the line is refused like a value that the marker holds."""
-        for _ in range(SETTLE_PASSES):
-            values = plane_secrets()
-            hits = []
-            for value in values:
-                at = text.find(value)
-                while at >= 0:
-                    hits.append((at, at + len(value)))
-                    at = text.find(value, at + 1)
-            if not hits:
-                return text
-            segments = list(SEGMENT.finditer(text))
-            units = []
-            for n, match in enumerate(segments):
-                base = match.start(5) + 1
-                for unit in LITERAL_UNIT.finditer(match.group(5)[1:-1]):
-                    units.append((base + unit.start(), base + unit.end(), n))
-            touched = {}
-            for a, b in hits:
-                over = [unit for unit in units if unit[0] < b and unit[1] > a]
-                if not over:
-                    raise SlackError('secret_collides_with_marker')
-                for start, end, n in over:
-                    touched.setdefault(n, set()).add((start, end))
-            for n in sorted(touched, reverse=True):
-                match = segments[n]
-                base, content = match.start(5) + 1, match.group(5)[1:-1]
-                # Consecutive touched units become one marker; everything else of the text is kept.
-                pieces, cursor = [], 0
-                spans = sorted(touched[n])
-                merged = []
-                for start, end in spans:
-                    if merged and start == merged[-1][1]:
-                        merged[-1][1] = end
-                    else:
-                        merged.append([start, end])
-                for start, end in merged:
-                    pieces.append(content[cursor:start - base])
-                    pieces.append(SECRET_MARKER)
-                    cursor = end - base
-                pieces.append(content[cursor:])
-                presented = json.loads('"' + ''.join(pieces) + '"')
-                outside = len(text) - (match.end() - match.start())
-                places = self.record_places()
-                segment = request_line(match.group(2), match.group(3), presented, match.group(4) or '', True,
-                                       max(0, WAKE_LIMIT - outside), places[0], places[1:])
-                text = text[:match.start()] + segment + text[match.end():]
-        raise SlackError('secret_collides_with_marker')
+    def request_wake_parts(self, pending, note=''):
+        places = self.record_places()
+        return request_line_parts(pending['thread'], pending['author'], shown_text(pending), note,
+                                  bool(pending.get('replaced')), place=places[0], fallbacks=places[1:])
 
     def request_wake_line(self, pending, note=''):
-        places = self.record_places()
-        return request_line(pending['thread'], pending['author'], shown_text(pending), note,
-                            bool(pending.get('replaced')), place=places[0], fallbacks=places[1:])
+        return self.request_wake_parts(pending, note)[0]
+
+    def request_artifacts(self, row):
+        """Everything this request will leave in a sink, each as the exact text of the sink and the runs (field, one span per character) that name
+        the request's own `text` and `shown` characters in it: the journal in each state the request passes through (staged, acknowledged,
+        delivered with either note, released as failed), the whole record store after its append, and its wake line in each form. Read-only:
+        every state is a copy. The states mirror what take_requests and publish do (a test compares them with the bytes really written)."""
+        artifacts = []
+
+        def lifted(runs, count, start, mine):
+            """The runs of a line that sits in the outbox, as runs over `shown`: each presented character spans the line characters that carry it."""
+            out = []
+            for field, spans in runs:
+                if field != 'line':
+                    out.append((field, spans))
+                    continue
+                shown_spans, pos = [], start
+                for ch in shown_text(mine)[:count]:
+                    size = len(json.dumps(ch, ensure_ascii=False)[1:-1])
+                    shown_spans.append((spans[pos][0], spans[pos + size - 1][1]))
+                    pos += size
+                out.append(('shown', shown_spans))
+            return out
+
+        def add_state(shape, note=None, tail=None):
+            state, mine, line, count, start = copy.deepcopy(self.state), dict(row), None, 0, 0
+            state['intake_cursor'] = row['thread']
+            mine.update(tail or {})
+            if note is not None:
+                line, count, start = self.request_wake_parts(mine, note)
+                line = flat(line)
+            if shape in ('staged', 'failed'):
+                state['pending'].append(mine)
+            if shape in ('delivered', 'failed') and line and (not state['outbox'] or state['outbox'][-1] != line):
+                state['outbox'] = state['outbox'] + [line]
+            if shape == 'delivered':
+                state['seen'][mine['event']] = {'key': mine['key']}
+            if shape == 'failed':
+                mine.update(state='failed', owner='Main')
+            leaves = [(mine, 'text', 'text'), (mine, 'shown', 'shown')]
+            if line is not None:
+                leaves.append((state['outbox'], len(state['outbox']) - 1, 'line'))
+            text, runs = serialize_with_spans(state, False, leaves)
+            artifacts.append((text, lifted(runs, count, start, mine)))
+        # The row grows at its end as the request moves (record written, post attempted, post marked, a failed attempt or lookup counted); each
+        # of those states is one the journal can hold.
+        attempted = {'recorded': True, 'attempted': True}
+        add_state('staged')
+        add_state('staged', None, attempted)
+        add_state('staged', None, {**attempted, 'posted': True})
+        for count in (1, 2):
+            add_state('staged', None, {**attempted, 'tries': count})
+            add_state('staged', None, {**attempted, 'lookups': count})
+        add_state('delivered', '', {**attempted, 'posted': True})
+        add_state('delivered', REQUEST_UNKNOWN, {**attempted, 'lookups': 3})
+        add_state('failed', REQUEST_UNACKNOWLEDGED, {**attempted, 'tries': 3})
+        entry = self.record_entry(row)
+        text, runs = serialize_with_spans(entry, True, [(entry, 'text', 'text'), (entry, 'shown', 'shown')])
+        whole, base = self.store_after(text)
+        artifacts.append((whole, [(field, [(a + base, b + base) for a, b in spans]) for field, spans in runs]))
+        for note in ('', REQUEST_UNKNOWN, REQUEST_UNACKNOWLEDGED):
+            line, count, start = self.request_wake_parts(row, note)
+            spans, pos = [], start
+            for ch in shown_text(row)[:count]:
+                size = len(json.dumps(ch, ensure_ascii=False)[1:-1])
+                spans.append((pos, pos + size))
+                pos += size
+            artifacts.append((line, [('shown', spans)]))
+        return artifacts
+
+    def settle_request(self, row):
+        """Before the request is staged, acknowledged or woken: make every sink it will leave free of a plane value by replacing only its own text
+        characters (class 1 and class 2). A value that holds no character of the request's text (class 3) goes to collision_outcome. Runs to a
+        fixed point; a request the passes cannot settle has its whole text replaced (fail closed)."""
+        for _ in range(SETTLE_PASSES):
+            marks = {}
+            for text, runs in self.request_artifacts(row):
+                for start, end in value_hits(text):
+                    found = [(field, k) for field, spans in runs for k, (a, b) in enumerate(spans) if a < end and b > start]
+                    if not found:
+                        collision_outcome('request')
+                    for field, k in found:
+                        marks.setdefault(field, set()).add(k)
+            if not marks:
+                self.settled.add(row['event'])
+                return row
+            replace_request_text(row, marks)
+        row['extra'] = int(row.get('extra') or 0) + len(row['text'].encode('utf-8'))
+        row['text'] = row['shown'] = SECRET_MARKER
+        row['replaced'] = True
+        for text, runs in self.request_artifacts(row):
+            if value_hits(text):
+                collision_outcome('request')
+        self.settled.add(row['event'])
+        return row
 
     def fit(self, line, room):
         """A request segment that is longer than room, cut again from its record to the longest prefix that fits;
@@ -1452,6 +1532,8 @@ class Watch:
             return
         if pending.get('kind') == 'request':
             fault('after-stage')
+            if pending['event'] not in self.settled and not pending.get('recorded'):
+                self.settle_request(pending)
             self.write_record(pending)
             # A request is acknowledged only while the source is bound, and an unbind cannot complete between that
             # check and the post; unbound, the row stays journaled and the rebind delivers it once.
@@ -1872,6 +1954,9 @@ class Watch:
                 if remaining <= 0:
                     finished = False
                     break
+                # Before the cursor, the stage and the post: every sink this request will leave is made free of a plane value by replacing only its
+                # own text, or, for a value with no text character in it (class 3), the request is not taken in and the message is read again.
+                self.settle_request(row)
                 # The cursor passes a message only in the same commit that journals it.
                 self.state['intake_cursor'] = message['ts']
                 pending = self.stage(row)
@@ -1994,6 +2079,16 @@ class Watch:
             self.commit()
         return 1
 
+    def note_collision(self):
+        """Report the collision refusal once per episode (the failure line is journaled by the same commit); True when this call reported it."""
+        if self.state.get('failure') == 'secret_collides_with_marker':
+            return False
+        try:
+            self.report_failure(SlackError('secret_collides_with_marker'))
+        except SecretCollision:
+            return False
+        return True
+
     def clear_failure(self):
         if self.state.get('failure'):
             self.state['failure'] = ''
@@ -2016,7 +2111,7 @@ def parse_command(argv, positional=False):
             index += 2
             continue
         if argv[index] in ('-h', '--help'):
-            print(help_text(command))
+            say_out(help_text(command))
             raise SystemExit(0)
         rest.append(argv[index])
         index += 1
@@ -2048,22 +2143,41 @@ def emit(watch, command):
     # unbind cannot complete between that check and the selection: the binding is held across both. The write to
     # standard output happens after the binding is released and before the line leaves the journal, so a consumer that
     # does not read can never make an unbind wait (the journal keeps the line until it is printed, as before).
-    if watch.has_request_line():
-        with watch.delivering() as bound:
-            plan = emit_plan(watch, command, bound)
-    else:
-        plan = emit_plan(watch, command, True)
+    for attempt in range(2):
+        if watch.has_request_line():
+            with watch.delivering() as bound:
+                plan = emit_plan(watch, command, bound)
+        else:
+            plan = emit_plan(watch, command, True)
+        if not plan[2] or attempt or not watch.note_collision():
+            break
     emit_write(watch, plan)
-    list_failed_requests(command, watch.failed_requests())
+    list_failed_requests(command, watch.failed_requests(), watch.out)
 
 
-def list_failed_requests(command, threads):
+def listing_may_print():
+    """The failed-row listing prints only while no plane value lies in its fixed text (r62:132) and its complete text holds none (collision_outcome)."""
+    try:
+        refuse_a_value_that_the_marker_holds()
+    except SlackError:
+        collision_outcome('listing')
+        return False
+    return True
+
+
+def list_failed_requests(command, threads, out=None):
     """Each open failed request row, once, as `slack: request <ts> not acknowledged (failed, owner Main)`: on standard output for a poll, on
-    standard error for a check. The listing is not a wake."""
-    if command in ('poll', 'check'):
-        for ts in threads:
-            print('slack: request %s not acknowledged (failed, owner Main)' % ts,
-                  file=sys.stderr if command == 'check' else sys.stdout, flush=True)
+    standard error for a check. The listing is not a wake. It goes through the one writer: a listing whose complete text would hold a plane
+    value prints no row text at all (collision_outcome, PENDING owner OC3); the rows stay in the journal and `resolve` still closes them."""
+    out = out or Out()
+    if command not in ('poll', 'check') or not threads or not listing_may_print():
+        return
+    stream = 'err' if command == 'check' else 'out'
+    text = ''.join('slack: request %s not acknowledged (failed, owner Main)\n' % ts for ts in threads)
+    if value_hits(out.sent[stream] + text):
+        collision_outcome('listing')
+        return
+    out.write(stream, text)
 
 
 def open_failed_threads():
@@ -2079,8 +2193,74 @@ def open_failed_threads():
         return []
 
 
+def segment_units(text):
+    """The request segments of one printed text and, for each, the span (relative to the text) of every unit of its literal: the one read-only
+    mapper from a printed hit to the request's own text characters."""
+    found = []
+    for match in SEGMENT.finditer(text):
+        base = match.start(5) + 1
+        found.append((match, [(base + unit.start(), base + unit.end()) for unit in LITERAL_UNIT.finditer(match.group(5)[1:-1])]))
+    return found
+
+
+def settle_lines(watch, texts):
+    """The lines one call will print, made free of a plane value in the COMPLETE stream (what was already sent plus these lines, a newline after
+    each): a hit that holds characters of a request's text (class 2: the join of a line with its queue marker or with its neighbour) is removed by
+    replacing only those characters, the segment rebuilt with the flag; a hit that holds none (class 3) withholds the line it first touches and
+    every later request line, which stay journaled (collision_outcome). Returns (the lines to print, the indexes of the planned lines they are)."""
+    sent = watch.out.sent['out']
+    items = list(enumerate(texts))
+    for _ in range(SETTLE_PASSES):
+        lines = [text for _, text in items]
+        hits = value_hits(sent + ''.join(text + '\n' for text in lines))
+        if not hits:
+            return lines, [index for index, _ in items]
+        starts, pos = [], len(sent)
+        for text in lines:
+            starts.append(pos)
+            pos += len(text) + 1
+        marks, held = {}, None
+        for a, b in hits:
+            touched = False
+            for n, text in enumerate(lines):
+                for index, (match, units) in enumerate(segment_units(text)):
+                    over = [unit for unit in units if starts[n] + unit[0] < b and starts[n] + unit[1] > a]
+                    if over:
+                        touched = True
+                        marks.setdefault((n, index), []).extend(over)
+            if not touched:
+                collision_outcome('stream')
+                # The LATER line of a join is the one withheld (it prints alone on the next run), the only line of a hit inside one line.
+                last = max((n for n, text in enumerate(lines) if starts[n] < b and starts[n] + len(text) + 1 > a), default=0)
+                held = last if held is None else min(held, last)
+        if held is not None:
+            kept = [item for n, item in enumerate(items) if n < held or (n > held and not item[1].startswith(REQUEST_PREFIX))]
+            if len(kept) == len(items):
+                break
+            items = kept
+            continue
+        for n, index in sorted(marks, reverse=True):
+            match, units = segment_units(lines[n])[index]
+            content, cursor, pieces, base, merged = match.group(5)[1:-1], 0, [], match.start(5) + 1, []
+            for start, end in sorted(marks[(n, index)]):
+                if merged and start == merged[-1][1]:
+                    merged[-1][1] = end
+                else:
+                    merged.append([start, end])
+            for start, end in merged:
+                pieces += [content[cursor:start - base], SECRET_MARKER]
+                cursor = end - base
+            pieces.append(content[cursor:])
+            presented = json.loads('"' + ''.join(pieces) + '"')
+            outside = len(lines[n]) - (match.end() - match.start())
+            places = watch.record_places()
+            segment = request_line(match.group(2), match.group(3), presented, match.group(4) or '', True, max(0, WAKE_LIMIT - outside), places[0], places[1:])
+            items[n] = (items[n][0], lines[n][:match.start()] + segment + lines[n][match.end():])
+    return [], []
+
+
 def emit_plan(watch, command, bound):
-    """What to print and which journal lines the print clears: ([text, ...], [journal line, ...]). Nothing is written."""
+    """What to print and which journal lines the print clears: ([text, ...], [journal line, ...], whether a line was withheld). Nothing is written."""
     lines = watch.deliverable(bound)
     queued = watch.queued() if command in ('poll', 'check') else 0
     if command == 'check':
@@ -2090,24 +2270,31 @@ def emit_plan(watch, command, bound):
         while shown > 1 and len('; '.join(lines[:shown]) + queue_tail(queued + len(lines) - shown)) > WAKE_LIMIT:
             shown -= 1
         if not lines:
-            return [], []
-        tail = queue_tail(queued + len(lines) - shown)
-        chosen = lines[:shown]
-        if shown == 1:
-            # One request line alone is cut again, from its record, so that the marker still fits behind it.
-            chosen = [watch.fit(chosen[0], WAKE_LIMIT - len(tail))]
-        return [watch.protect_printed(wake_line(chosen, queued + len(lines) - shown))], lines[:shown]
+            return [], [], False
+        while True:
+            tail = queue_tail(queued + len(lines) - shown)
+            chosen = lines[:shown]
+            if shown == 1:
+                # One request line alone is cut again, from its record, so that the marker still fits behind it.
+                chosen = [watch.fit(chosen[0], WAKE_LIMIT - len(tail))]
+            texts, kept = settle_lines(watch, [wake_line(chosen, queued + len(lines) - shown)])
+            if kept:
+                return texts, lines[:shown], False
+            if shown == 1:
+                return [], [], True
+            shown -= 1
     owed = list(lines)
     if lines:
         tail = queue_tail(queued)
         lines = lines[:-1] + [watch.fit(lines[-1], WAKE_LIMIT - len(tail)) + tail]
-    return [watch.protect_printed(line) for line in lines], owed
+    texts, kept = settle_lines(watch, lines)
+    return texts, [owed[index] for index in kept], len(kept) < len(lines)
 
 
 def emit_write(watch, plan):
-    texts, owed = plan
+    texts, owed = plan[0], plan[1]
     for text in texts:
-        print(text, flush=True)
+        watch.out.line('out', text)
     if owed:
         watch.printed(owed)
 
@@ -2123,17 +2310,18 @@ def note_progress():
 def main(argv):
     os.umask(0o077)
     action = env_value('FM_SLACK_CHECK_ACTION') if argv and argv[0] == 'check' else ''
-    refusals = sys.stderr if action in ('arm', 'retarget', 'resolve') else sys.stdout
+    out = Out()
+    refusals = 'err' if action in ('arm', 'retarget', 'resolve') else 'out'
     if not argv:
-        print('error: missing command')
+        say_out('error: missing command', 'out', out)
         return 2
     try:
         command, replay_path, request_ts = parse_command(argv, positional=action == 'resolve')
     except SlackError as error:
-        print('error: slack ' + str(error), file=refusals)
+        say_out('error: slack ' + redact_sink(str(error)), refusals, out)
         return 2
     if command not in ('mirror', 'poll', 'check'):
-        print('error: unknown command; use --help')
+        say_out('error: unknown command; use --help', 'out', out)
         return 2
     if action == 'disarm':
         return disarm()
@@ -2142,11 +2330,11 @@ def main(argv):
     state, reason = mode()
     if state != 'on':
         if action in ('arm', 'retarget'):
-            print('slack: refused: ' + reason, file=sys.stderr)
+            say_out('slack: refused: ' + reason, 'err', out)
             return 1
         if state == 'refused' and command != 'check':
-            print('slack: refused: ' + reason)
-        list_failed_requests(command, open_failed_threads())
+            say_out('slack: refused: ' + reason, 'out', out)
+        list_failed_requests(command, open_failed_threads(), out)
         return 0
     watch = None
     code = 0
@@ -2154,6 +2342,7 @@ def main(argv):
         replay = Replay(replay_path, state_home() / STATE_KEY,
                         token_present=bool(env_value('SLACK_BOT_TOKEN'))) if replay_path else None
         watch = Watch(replay=replay, token=env_value('SLACK_BOT_TOKEN').strip())
+        watch.out = out
         if action == 'check':
             watch.api.on_reply = note_progress
         # A plane value that is part of the fixed text of a wake line could never be replaced for good: refuse (arm and check).
@@ -2186,18 +2375,24 @@ def main(argv):
         error = redacted_error(error)
         name = str(error) if isinstance(error, SlackError) else 'local_state_or_response_error'
         if action in ('arm', 'retarget'):
-            print('slack: refused: ' + name, file=sys.stderr)
+            say_out('slack: refused: ' + name, 'err', out)
         elif watch is not None:
-            watch.report_failure(error)
-            emit(watch, command)
+            try:
+                watch.report_failure(error)
+            except SecretCollision:
+                # The journal itself would hold a value: the report is printed, not journaled.
+                say_out('slack: transport failure: ' + name, 'out', out)
+            try:
+                emit(watch, command)
+            except SecretCollision:
+                pass
         else:
-            print('slack: transport failure: ' + name)
+            say_out('slack: transport failure: ' + name, 'out', out)
         return 1
     except RuntimeError as error:
         if str(error).startswith('FM_SLACK_FAULT='):
             return 75
-        print('slack: refused: local_runtime_error' if action == 'arm' else 'slack: local_runtime_error',
-              file=refusals)
+        say_out('slack: refused: local_runtime_error' if action == 'arm' else 'slack: local_runtime_error', refusals, out)
         return 1
     finally:
         if watch is not None:
@@ -2215,13 +2410,12 @@ def resolve_request(ts):
         watch.close_request(ts)
     except (SlackError, OSError, ValueError, KeyError, TypeError) as error:
         error = redacted_error(error)
-        print('slack: refused: ' + (str(error) if isinstance(error, SlackError) else 'local_state_or_response_error'),
-              file=sys.stderr)
+        say_out('slack: refused: ' + (str(error) if isinstance(error, SlackError) else 'local_state_or_response_error'), 'err')
         return 1
     finally:
         if watch is not None:
             watch.lock.close()
-    print('resolved: slack request ' + ts)
+    say_out('resolved: slack request ' + ts)
     return 0
 
 
@@ -2229,16 +2423,16 @@ def check(watch, action):
     state_dir = state_home()
     if action == 'retarget':
         if watch.retarget():
-            print('retargeted: the old DM is no longer tracked; the DM of FM_SLACK_DM_USER is open and its starting point is recorded; the next poll takes in the requests sent after it')
+            say_out('retargeted: the old DM is no longer tracked; the DM of FM_SLACK_DM_USER is open and its starting point is recorded; the next poll takes in the requests sent after it')
         else:
-            print('unchanged: FM_SLACK_DM_USER matches the DM already in use; nothing to retarget')
+            say_out('unchanged: FM_SLACK_DM_USER matches the DM already in use; nothing to retarget')
         return 0
     if action == 'arm':
         try:
             watch.prepare()
         except SlackError as error:
             error = redacted_error(error)
-            print('slack: refused: ' + str(error), file=sys.stderr)
+            say_out('slack: refused: ' + str(error), 'err')
             return 1
         return arm(state_dir)
     if not (state_dir / (CHECK_ID + '.check.sh')).is_file() or not (state_dir / (CHECK_ID + '.check-trust')).is_file():
@@ -2267,16 +2461,16 @@ def shim_content(home, state_dir, script_dir):
 def arm(state_dir):
     state_dir.mkdir(parents=True, exist_ok=True)
     if state_dir.is_symlink():
-        print('slack: refused: unsafe_state_path', file=sys.stderr)
+        say_out('slack: refused: unsafe_state_path', 'err')
         return 1
     shim = state_dir / (CHECK_ID + '.check.sh')
     trust = state_dir / (CHECK_ID + '.check-trust')
     if shim.is_symlink() or trust.is_symlink():
-        print('slack: refused: unsafe_state_path', file=sys.stderr)
+        say_out('slack: refused: unsafe_state_path', 'err')
         return 1
     # Validate the shim path before touching either artifact.
     if shim.exists() and not shim.is_file():
-        print('slack: refused: unsafe_check_shim', file=sys.stderr)
+        say_out('slack: refused: unsafe_check_shim', 'err')
         return 1
     shim.write_text(shim_content(str(home_dir()), state_dir, ROOT))
     shim.chmod(0o700)
@@ -2284,18 +2478,18 @@ def arm(state_dir):
     if result.returncode:
         shim.unlink(missing_ok=True)
         trust.unlink(missing_ok=True)
-        print('slack: refused: check_registration_failed', file=sys.stderr)
+        say_out('slack: refused: check_registration_failed', 'err')
         return 1
-    print('armed: state/%s.check.sh' % CHECK_ID)
+    say_out('armed: state/%s.check.sh' % CHECK_ID)
     return 0
 
 
 def disarm():
     result = run('fm-check-unregister.sh', CHECK_ID)
     if result.returncode:
-        print('slack: refused: check_unregistration_failed')
+        say_out('slack: refused: check_unregistration_failed')
         return 1
-    print('disarmed: state/%s.check.sh' % CHECK_ID)
+    say_out('disarmed: state/%s.check.sh' % CHECK_ID)
     return 0
 
 
@@ -2303,5 +2497,5 @@ if __name__ == '__main__':
     try:
         raise SystemExit(main(sys.argv[1:]))
     except SlackError as error:
-        print('error: slack ' + str(error))
+        say_out('error: slack ' + str(error))
         raise SystemExit(1)
