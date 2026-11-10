@@ -3,25 +3,55 @@
 # Configure each project too: terminal servers need not inherit this shell's
 # environment. Stop the suite's terminal session before removing its sandbox.
 # This helper owns no trap; callers compose it with their existing EXIT cleanup.
+# The exit check compares exact names and modification times under the real
+# ~/.treehouse. The Herdr e2e suites run with the real HOME, so they need a
+# quiet fleet: any concurrent Treehouse activity there fails the check.
+# Unverified limitation: the live cmux suite's worker pane inherits the cmux
+# app's environment, not TREEHOUSE_NO_UPDATE_CHECK, so its in-pane
+# `treehouse get` can still write ~/.treehouse/update-check.json.
 
 fm_test_treehouse_snapshot() {  # <root>
   python3 - "$1" <<'PY'
 import json
-import pathlib
+import os
 import sys
 
-root = pathlib.Path(sys.argv[1])
-paths = [root, *root.glob('*'), *root.glob('*/*')] if root.exists() else []
-print(json.dumps(sorted((str(p.relative_to(root)), p.lstat().st_mtime_ns)
-                        for p in paths), separators=(',', ':')))
+root = sys.argv[1]
+rows = []
+
+
+def record(rel, path):
+    try:
+        rows.append((rel, os.lstat(path).st_mtime_ns))
+    except FileNotFoundError:
+        pass
+
+
+def children(path):
+    try:
+        with os.scandir(path) as entries:
+            return [(e.name, e.path, e.is_dir()) for e in entries]
+    except (FileNotFoundError, NotADirectoryError):
+        return []
+
+
+if os.path.exists(root):
+    record('.', root)
+    for name, path, is_dir in children(root):
+        record(name, path)
+        if is_dir:
+            for child, child_path, _ in children(path):
+                record(f'{name}/{child}', child_path)
+print(json.dumps(sorted(rows), separators=(',', ':')))
 PY
 }
 
 fm_test_treehouse_init() {  # <existing-fixture-root>
-  FM_TEST_TREEHOUSE_ROOT=$(mktemp -d "$1/treehouse.XXXXXX") || return 1
-  FM_TEST_TREEHOUSE_ROOT=$(cd "$FM_TEST_TREEHOUSE_ROOT" && pwd -P) || return 1
+  local root
   FM_TEST_TREEHOUSE_USER_ROOT="$HOME/.treehouse"
   FM_TEST_TREEHOUSE_BEFORE=$(fm_test_treehouse_snapshot "$FM_TEST_TREEHOUSE_USER_ROOT") || return 1
+  root=$(mktemp -d "$1/treehouse.XXXXXX") || return 1
+  FM_TEST_TREEHOUSE_ROOT=$(cd "$root" && pwd -P) || return 1
   # An inherited template can place worktrees outside even an explicit root.
   unset TREEHOUSE_WORKTREE_PATH
   TREEHOUSE_ROOT=$FM_TEST_TREEHOUSE_ROOT

@@ -8,6 +8,8 @@ set -u
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=tests/treehouse-test-safety.sh
+. "$ROOT/tests/treehouse-test-safety.sh"
 TASK="fm-test-cmux-claude-composer-$$"
 LAB=
 SPAWNED=0
@@ -21,6 +23,7 @@ pass() { printf 'ok - %s\n' "$1"; }
 untimed_status() { sed -E 's/ \[at=[0-9]+\]//g' "$1" 2>/dev/null; }
 
 cleanup() {
+  local status=0
   [ "$SPAWNED" -eq 0 ] || {
     mkdir -p "$LAB/data/$TASK"
     : > "$LAB/data/$TASK/report.md"
@@ -29,10 +32,9 @@ cleanup() {
       printf '%s\n' 'resolved [key=probe-decision]: live guard cleanup' >> "$LAB/state/$TASK.status"
     fi
     FM_HOME="$LAB" "$ROOT/bin/fm-decision-hold.sh" complete "$TASK" --none >/dev/null 2>&1 || true
-    FM_HOME="$LAB" "$ROOT/bin/fm-teardown.sh" "$TASK" || return $?
+    FM_HOME="$LAB" "$ROOT/bin/fm-teardown.sh" "$TASK" || status=$?
   }
-  local status=0
-  fm_test_treehouse_cleanup || status=$?
+  fm_test_treehouse_cleanup || [ "$status" != 0 ] || status=1
   [ -z "$LAB" ] || rm -rf -- "$LAB"
   fm_test_cleanup
   return "$status"

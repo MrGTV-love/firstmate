@@ -37,9 +37,6 @@ umask 022
 # header owns the invariant and the layers it deliberately leaves in force.
 # shellcheck source=tests/git-config-helpers.sh
 . "$(dirname "${BASH_SOURCE[0]}")/git-config-helpers.sh"
-# Real allocator suites explicitly initialize a sandbox and compose its cleanup.
-# shellcheck source=tests/treehouse-test-safety.sh
-. "$(dirname "${BASH_SOURCE[0]}")/treehouse-test-safety.sh"
 
 # Exempt firstmate's own test suite from the gate-lifecycle refusal
 # (bin/fm-gate-refuse-lib.sh). The no-mistakes gate runs this suite FROM a gate

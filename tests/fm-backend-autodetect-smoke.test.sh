@@ -67,7 +67,6 @@ herdr_forget_inherited_pane
 TMP_ROOT=$(mktemp -d "$(cd "${TMPDIR:-/tmp}" && pwd -P)/fm-backend-autodetect-smoke.XXXXXX")
 # shellcheck source=tests/treehouse-test-safety.sh
 . "$ROOT/tests/treehouse-test-safety.sh"
-fm_test_treehouse_init "$TMP_ROOT" || fail "could not isolate Treehouse"
 HERDR_LAB_HELPER="$ROOT/bin/fm-herdr-lab.sh"
 HERDR_LAB_SESSION=$("$HERDR_LAB_HELPER" name fm-autodetect-smoke-concurrency-h3) || {
   rm -rf "$TMP_ROOT"
@@ -78,8 +77,8 @@ ID="autodetectsmoke1"
 WT=
 cleanup_all() {
   local cleanup_status=0
-  "$HERDR_LAB_HELPER" teardown "$HERDR_LAB_SESSION" || return $?
-  fm_test_treehouse_cleanup || cleanup_status=$?
+  "$HERDR_LAB_HELPER" teardown "$HERDR_LAB_SESSION" || cleanup_status=$?
+  fm_test_treehouse_cleanup || [ "$cleanup_status" != 0 ] || cleanup_status=1
   rm -rf "$TMP_ROOT"
   return "$cleanup_status"
 }
@@ -90,6 +89,7 @@ on_exit() {
   exit "$status"
 }
 trap on_exit EXIT
+fm_test_treehouse_init "$TMP_ROOT" || fail "could not isolate Treehouse"
 "$HERDR_LAB_HELPER" provision "$HERDR_LAB_SESSION" || fail "could not provision isolated Herdr lab session"
 
 # --- scratch world: FM_HOME with NO backend config, one throwaway project ---

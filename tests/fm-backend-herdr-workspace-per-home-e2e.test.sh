@@ -13,8 +13,9 @@
 # convention: a private throwaway HERDR_SESSION (never the captain's
 # default), scratch FM_HOME(s), and scratch local-only projects.
 #
-# Safety (2026-07-02 incident, see tests/herdr-test-safety.sh): provisioning,
-# probes and cleanup use the guarded named-session lab helper.
+# Safety (2026-07-02 incident, see tests/herdr-test-safety.sh): cleanup uses
+# ONLY herdr_safe_stop_and_delete, never a bare/inline-prefixed `herdr server
+# stop`.
 #
 # Covers, at minimum (per the task brief):
 #   - a primary-shaped home (no .fm-secondmate-home marker) spawning a
@@ -67,18 +68,15 @@ herdr_forget_inherited_pane
 TMP_ROOT=$(mktemp -d "$(cd "${TMPDIR:-/tmp}" && pwd -P)/fm-herdr-e2e.XXXXXX")
 # shellcheck source=tests/treehouse-test-safety.sh
 . "$ROOT/tests/treehouse-test-safety.sh"
-fm_test_treehouse_init "$TMP_ROOT" || fail "could not isolate Treehouse"
-HERDR_LAB_HELPER="$ROOT/bin/fm-herdr-lab.sh"
-SESSION=$("$HERDR_LAB_HELPER" name fm-herdr-e2e) || fail "could not name Herdr lab"
-lab() { "$HERDR_LAB_HELPER" run "$SESSION" "$@"; }
+SESSION="fm-lab-herdr-e2e-$$"
 export HERDR_SESSION="$SESSION"
 CLEANED=0
 cleanup_all() {
   local status=0
   [ "$CLEANED" = 0 ] || return 0
   CLEANED=1
-  "$HERDR_LAB_HELPER" teardown "$SESSION" || return $?
-  fm_test_treehouse_cleanup || status=$?
+  herdr_safe_stop_and_delete "$SESSION" || status=$?
+  fm_test_treehouse_cleanup || [ "$status" != 0 ] || status=1
   # Spawn leaves each state/<id>.git-hooks strip dir read-only.
   find "$TMP_ROOT" -type d -exec chmod u+rwx {} + 2>/dev/null
   rm -rf "$TMP_ROOT"
@@ -91,7 +89,8 @@ on_exit() {
   exit "$status"
 }
 trap on_exit EXIT
-"$HERDR_LAB_HELPER" provision "$SESSION" || fail "could not provision isolated Herdr lab session"
+fm_test_treehouse_init "$TMP_ROOT" || fail "could not isolate Treehouse"
+fm_herdr_lab_prepare "$SESSION" || fail "could not prepare isolated Herdr lab session"
 
 # shellcheck source=/dev/null
 . "$ROOT/bin/fm-backend.sh"
@@ -169,9 +168,9 @@ sleep 1
 CM1_CAPTURE=$(fm_backend_herdr_capture "$SESSION:$CM1_PANE" 30) || fail "capture failed on cm1's pane"
 assert_contains_local "$CM1_CAPTURE" "primary-crew-ok" "cm1's raw launch command did not run in its herdr pane"
 
-CM1_WSID=$(lab pane get "$CM1_PANE" 2>/dev/null | jq -r '.result.pane.workspace_id // empty')
+CM1_WSID=$(herdr pane get "$CM1_PANE" --session "$SESSION" 2>/dev/null | jq -r '.result.pane.workspace_id // empty')
 [ -n "$CM1_WSID" ] || fail "could not read cm1's pane workspace_id"
-CM1_WS_LABEL=$(lab workspace list 2>&1 | jq -r --arg id "$CM1_WSID" '.result.workspaces[]? | select(.workspace_id == $id) | .label')
+CM1_WS_LABEL=$(herdr workspace list --session "$SESSION" 2>&1 | jq -r --arg id "$CM1_WSID" '.result.workspaces[]? | select(.workspace_id == $id) | .label')
 [ "$CM1_WS_LABEL" = "firstmate" ] || fail "a primary-shaped home's crewmate should land in the 'firstmate' workspace, got '$CM1_WS_LABEL'"
 pass "real herdr E2E: the primary-shaped home's crewmate landed in the 'firstmate' workspace"
 
@@ -195,10 +194,10 @@ SM_PANE=$(grep '^herdr_pane_id=' "$SM_META" | cut -d= -f2-)
 [ -n "$SM_PANE" ] || fail "e2esm1 meta missing herdr_pane_id"
 pass "real herdr E2E: the primary spawns a --secondmate task on the herdr backend"
 
-SM_WSID=$(lab pane get "$SM_PANE" 2>/dev/null | jq -r '.result.pane.workspace_id // empty')
+SM_WSID=$(herdr pane get "$SM_PANE" --session "$SESSION" 2>/dev/null | jq -r '.result.pane.workspace_id // empty')
 [ -n "$SM_WSID" ] || fail "could not read e2esm1's pane workspace_id"
 [ "$SM_WSID" != "$CM1_WSID" ] || fail "the secondmate's tab must NOT land in the primary's workspace, but it shares $CM1_WSID"
-SM_WS_LABEL=$(lab workspace list 2>&1 | jq -r --arg id "$SM_WSID" '.result.workspaces[]? | select(.workspace_id == $id) | .label')
+SM_WS_LABEL=$(herdr workspace list --session "$SESSION" 2>&1 | jq -r --arg id "$SM_WSID" '.result.workspaces[]? | select(.workspace_id == $id) | .label')
 [ "$SM_WS_LABEL" = "2ndmate-e2esm1" ] || fail "a --secondmate spawn should land in '2ndmate-<id>', got '$SM_WS_LABEL'"
 pass "real herdr E2E: a --secondmate spawn by the PRIMARY lands in the SECONDMATE's own labeled workspace, distinct from the primary's"
 
@@ -227,7 +226,7 @@ sleep 1
 CM2_CAPTURE=$(fm_backend_herdr_capture "$SESSION:$CM2_PANE" 30) || fail "capture failed on cm2's pane"
 assert_contains_local "$CM2_CAPTURE" "sm-crew-ok" "cm2's raw launch command did not run in its herdr pane"
 
-CM2_WSID=$(lab pane get "$CM2_PANE" 2>/dev/null | jq -r '.result.pane.workspace_id // empty')
+CM2_WSID=$(herdr pane get "$CM2_PANE" --session "$SESSION" 2>/dev/null | jq -r '.result.pane.workspace_id // empty')
 [ "$CM2_WSID" = "$SM_WSID" ] || fail "a crewmate spawned FROM the secondmate home should land in the SAME workspace as the secondmate's own task ($SM_WSID), got '$CM2_WSID'"
 [ "$CM2_WSID" != "$CM1_WSID" ] || fail "a crewmate spawned FROM the secondmate home must NOT land in the primary's workspace"
 pass "real herdr E2E: a crewmate spawned FROM the secondmate-shaped home lands in the secondmate's OWN workspace - falls out of per-home resolution, no glue needed"
@@ -255,13 +254,13 @@ FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$PRIMARY_HOME/state" FM_DATA_OVERRID
 rc=$?
 [ "$rc" -eq 0 ] || fail "fm-teardown.sh failed for the primary-shaped crewmate cm1"$'\n'"$(cat "$TD1_OUT")"
 [ -f "$CM1_META" ] && fail "fm-teardown.sh did not remove cm1's meta"
-if lab pane get "$CM1_PANE" >/dev/null 2>&1; then
+if herdr pane get "$CM1_PANE" --session "$SESSION" >/dev/null 2>&1; then
   fail "fm-teardown.sh did not close cm1's pane"
 fi
-if ! lab pane get "$SM_PANE" >/dev/null 2>&1; then
+if ! herdr pane get "$SM_PANE" --session "$SESSION" >/dev/null 2>&1; then
   fail "tearing down cm1 must not have closed the secondmate's OWN pane (wrong tab closed)"
 fi
-if ! lab pane get "$CM2_PANE" >/dev/null 2>&1; then
+if ! herdr pane get "$CM2_PANE" --session "$SESSION" >/dev/null 2>&1; then
   fail "tearing down cm1 must not have closed cm2's pane (wrong tab closed)"
 fi
 pass "real herdr E2E: tearing down cm1 closes only its own tab - the secondmate's and cm2's tabs survive untouched"
@@ -273,10 +272,10 @@ FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$SM_HOME/state" FM_DATA_OVERRIDE="$S
 rc=$?
 [ "$rc" -eq 0 ] || fail "fm-teardown.sh failed for the secondmate-owned crewmate cm2"$'\n'"$(cat "$TD2_OUT")"
 [ -f "$CM2_META" ] && fail "fm-teardown.sh did not remove cm2's meta"
-if lab pane get "$CM2_PANE" >/dev/null 2>&1; then
+if herdr pane get "$CM2_PANE" --session "$SESSION" >/dev/null 2>&1; then
   fail "fm-teardown.sh did not close cm2's pane"
 fi
-if ! lab pane get "$SM_PANE" >/dev/null 2>&1; then
+if ! herdr pane get "$SM_PANE" --session "$SESSION" >/dev/null 2>&1; then
   fail "tearing down cm2 must not have closed the secondmate's OWN pane (wrong tab closed)"
 fi
 pass "real herdr E2E: tearing down cm2 closes only its own tab - the secondmate's own tab (same workspace) survives untouched"

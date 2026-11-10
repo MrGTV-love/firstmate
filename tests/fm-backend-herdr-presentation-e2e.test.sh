@@ -32,10 +32,9 @@ REAL_TREEHOUSE=$(command -v treehouse)
 HERDR_ORIGINAL_PATH=$PATH
 # Keep fixtures outside the code checkout, including allocations made by a
 # pane whose daemon did not inherit the controller's TREEHOUSE_ROOT.
-TMP_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/fm-herdr-presentation.XXXXXX")
+TMP_ROOT=$(mktemp -d "$(cd "${TMPDIR:-/tmp}" && pwd -P)/fm-herdr-presentation.XXXXXX")
 # shellcheck source=tests/treehouse-test-safety.sh
 . "$ROOT/tests/treehouse-test-safety.sh"
-fm_test_treehouse_init "$TMP_ROOT" || fail "could not isolate Treehouse"
 # This standalone suite does not source tests/lib.sh; ordinary-work teardown --force needs the captain's words.
 fm_test_drop_file() {
   [ -f "$TMP_ROOT/captain-words.txt" ] || printf 'Fixture: the captain approved discarding this work.\n' > "$TMP_ROOT/captain-words.txt"
@@ -337,10 +336,10 @@ cleanup_all() {
   CROSS_LOCK_PID=
   if [ "$LAB_READY" -eq 1 ]; then
     PATH="$HERDR_ORIGINAL_PATH" \
-      "$HERDR_LAB_HELPER" teardown "$HERDR_LAB_SESSION" || return $?
+      "$HERDR_LAB_HELPER" teardown "$HERDR_LAB_SESSION" || status=$?
     LAB_READY=0
   fi
-  fm_test_treehouse_cleanup || status=$?
+  fm_test_treehouse_cleanup || [ "$status" != 0 ] || status=1
   # Spawn-owned Git-hook directories are intentionally read-only.
   chmod -R u+w "$TMP_ROOT" 2>/dev/null || true
   rm -rf "$TMP_ROOT"
@@ -353,6 +352,7 @@ on_exit() {
   exit "$status"
 }
 trap on_exit EXIT
+fm_test_treehouse_init "$TMP_ROOT" || fail "could not isolate Treehouse"
 
 lab() {
   PATH="$HERDR_ORIGINAL_PATH" "$HERDR_LAB_HELPER" run "$HERDR_LAB_SESSION" "$@"

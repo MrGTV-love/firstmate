@@ -49,7 +49,6 @@ herdr_forget_inherited_pane
 TMP_ROOT=$(mktemp -d "$(cd "${TMPDIR:-/tmp}" && pwd -P)/fm-herdr-launcher-e2e.XXXXXX")
 # shellcheck source=tests/treehouse-test-safety.sh
 . "$ROOT/tests/treehouse-test-safety.sh"
-fm_test_treehouse_init "$TMP_ROOT" || fail "could not isolate Treehouse"
 HERDR_LAB_HELPER="$ROOT/bin/fm-herdr-lab.sh"
 HERDR_LAB_SESSION=$("$HERDR_LAB_HELPER" name fm-herdr-launcher-ws) || {
   rm -rf "$TMP_ROOT"
@@ -66,8 +65,8 @@ cleanup_all() {
   local status=0
   [ "$CLEANED" = 0 ] || return 0
   CLEANED=1
-  "$HERDR_LAB_HELPER" teardown "$HERDR_LAB_SESSION" || return $?
-  fm_test_treehouse_cleanup || status=$?
+  "$HERDR_LAB_HELPER" teardown "$HERDR_LAB_SESSION" || status=$?
+  fm_test_treehouse_cleanup || [ "$status" != 0 ] || status=1
   # Spawn leaves each state/<id>.git-hooks strip dir read-only.
   find "$TMP_ROOT" -type d -exec chmod u+rwx {} + 2>/dev/null
   rm -rf "$TMP_ROOT"
@@ -80,6 +79,7 @@ on_exit() {
   exit "$status"
 }
 trap on_exit EXIT
+fm_test_treehouse_init "$TMP_ROOT" || fail "could not isolate Treehouse"
 "$HERDR_LAB_HELPER" provision "$HERDR_LAB_SESSION" || fail "could not provision isolated Herdr lab session"
 
 lab() { "$HERDR_LAB_HELPER" run "$HERDR_LAB_SESSION" "$@"; }
