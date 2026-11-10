@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Slack Web API transport only. Shell entry points own environment resolution."""
 import json
+import os
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -8,6 +9,62 @@ import urllib.request
 
 class SlackError(Exception):
     pass
+
+
+class SecretCollision(SlackError):
+    """A plane value that no replacement of request text can remove: it holds no request-text character."""
+
+
+def plane_secrets():
+    """The plane's own secret values, longest first: the bot token as configured and as the plane sends it (stripped),
+    and the signing secret exactly as configured; text that holds none of them exactly is never changed."""
+    token = os.environ.get('SLACK_BOT_TOKEN', '')
+    values = {token, token.strip(), os.environ.get('SLACK_SIGNING_SECRET', '')}
+    return sorted((value for value in values if value.strip()), key=len, reverse=True)
+
+
+def value_hits(text):
+    """The sink check: the (start, end) spans, merged, of every plane secret value in the COMPLETE text of one sink (a whole file after an append, a
+    whole stream, one printed line, one outbound field). Pure: it reads and changes nothing, and it is the only judge of whether a sink holds a value."""
+    spans = []
+    for value in plane_secrets():
+        at = text.find(value)
+        while at >= 0:
+            spans.append((at, at + len(value)))
+            at = text.find(value, at + 1)
+    merged = []
+    for start, end in sorted(spans):
+        if merged and start <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(end, merged[-1][1]))
+        else:
+            merged.append((start, end))
+    return merged
+
+
+def outbound_texts(fields):
+    """Every string the receiver of one call is handed: a string field as it is, a dict or list field as the JSON the transport sends (in both
+    encodings of non-ASCII characters), anything else as its text. The Authorization header is not a field and is never in this list."""
+    texts = []
+    for value in fields.values():
+        if isinstance(value, str):
+            texts.append(value)
+        elif isinstance(value, (dict, list)):
+            texts += [json.dumps(value), json.dumps(value, ensure_ascii=False)]
+        elif value is not None and not isinstance(value, (bool, int, float)):
+            texts.append(str(value))
+    return texts
+
+
+def outbound_hit(fields):
+    """Whether any string of one outbound call holds a plane value."""
+    return any(value_hits(text) for text in outbound_texts(fields))
+
+
+def refuse_outbound(fields):
+    """The one check every outbound call passes before any byte of it exists (a request, an attempt record, a log line): a call whose fields hold a
+    plane value is not made."""
+    if outbound_hit(fields):
+        raise SecretCollision('secret_collides_with_marker')
 
 
 SAFE_ERRORS = {
@@ -34,6 +91,7 @@ class Slack:
     def call(self, method, **fields):
         if not self.token:
             raise SlackError('missing_token')
+        refuse_outbound(fields)
         encoded = {key: json.dumps(value) if isinstance(value, (dict, list, bool)) else value
                    for key, value in fields.items()}
         request = urllib.request.Request(self.base + method,

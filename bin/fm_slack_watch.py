@@ -38,7 +38,7 @@ import tempfile
 import unicodedata
 import uuid
 
-from fm_slack import SCRUB_MARK, Slack, SlackError
+from fm_slack import SCRUB_MARK, SecretCollision, Slack, SlackError, outbound_texts, plane_secrets, refuse_outbound, value_hits
 from fm_slack_replay import Replay
 
 ROOT = Path(__file__).resolve().parent
@@ -105,6 +105,12 @@ class Out:
 
     def line(self, stream, text):
         return self.write(stream, text + '\n')
+
+    def diagnostic(self, stream, text):
+        """A line that is not request text (a refusal, a failure, a confirmation, help): every plane value in it is replaced by the fixed word first,
+        then it goes out like any other text, only while the complete stream after it holds no value. A line that a value still reaches is withheld
+        (False): the exit status is then the only word of that command."""
+        return self.line(stream, redact_sink(text))
 
 
 class NoNetwork:
@@ -225,26 +231,25 @@ RECORD_PLACE = 'state/slack-watch/' + RECORD_FILE
 ENTITIES = (('&lt;', '<'), ('&gt;', '>'), ('&amp;', '&'))
 
 
-def plane_secrets():
-    """The plane's own secret values, longest first: the bot token as configured and as the plane sends it (stripped),
-    and the signing secret exactly as configured; text that holds none of them exactly is never changed."""
-    token = env_value('SLACK_BOT_TOKEN')
-    values = {token, token.strip(), env_value('SLACK_SIGNING_SECRET')}
-    return sorted((value for value in values if value.strip()), key=len, reverse=True)
-
-
 SINK_WORD = '[redacted]'
 # Every constant that a wake line, the failed-row listing or the record pointer carries: a plane value that is part of any of
-# them could never be replaced for good, so the plane refuses it (F1 of Main 2602). The diagnostic prefixes are not in this list:
-# redact_sink protects them.
-FIXED_WAKE_TEXT = (REQUEST_PREFIX, ' from ', REQUEST_UNACKNOWLEDGED, REQUEST_UNKNOWN, REQUEST_LABEL, '; ' + SECRET_FLAG, '; full: ', '; +', ' queued',
-                   SECRET_MARKER, SECRET_FLAG, SINK_WORD, 'slack: request ', ' not acknowledged (failed, owner Main)', 'slack: request finished',
-                   # The constants that arm, disarm, resolve and retarget print: they print nothing else of their own, so a plane value inside one is
-                   # refused at the start of the command like a value inside a wake line (a test reads the print calls and holds this list complete).
-                   *('slack: refused: ' + name for name in ('', 'unsafe_state_path', 'unsafe_check_shim', 'check_registration_failed', 'check_unregistration_failed')),
-                   'armed: state/slack.check.sh', 'disarmed: state/slack.check.sh', 'resolved: slack request ',
-                   'retargeted: the old DM is no longer tracked; the DM of FM_SLACK_DM_USER is open and its starting point is recorded; the next poll takes in the requests sent after it',
-                   'unchanged: FM_SLACK_DM_USER matches the DM already in use; nothing to retarget')
+# them could never be replaced for good, so a run that prints wake lines (poll, mirror, check) refuses it at its start (F1 of Main 2602). The diagnostic
+# prefixes are not in this list: redact_sink protects them.
+WAKE_FIXED_TEXT = (REQUEST_PREFIX, ' from ', REQUEST_UNACKNOWLEDGED, REQUEST_UNKNOWN, REQUEST_LABEL, '; ' + SECRET_FLAG, '; full: ', '; +', ' queued',
+                   SECRET_MARKER, SECRET_FLAG, SINK_WORD, 'slack: request ', ' not acknowledged (failed, owner Main)', 'slack: request finished')
+# The constants each other command prints and nothing else of its own (Main 3266: the check runs on what THAT command emits): a plane value inside
+# one of them is refused at the start of that command only, so a collision in the wake or listing text never stops resolve, disarm, arm or retarget.
+COMMAND_FIXED_TEXT = {
+    'arm': ('slack: refused: ', 'slack: refused: unsafe_state_path', 'slack: refused: unsafe_check_shim', 'slack: refused: check_registration_failed',
+            'armed: state/slack.check.sh', SINK_WORD),
+    'disarm': ('slack: refused: check_unregistration_failed', 'disarmed: state/slack.check.sh', SINK_WORD),
+    'resolve': ('slack: refused: ', 'resolved: slack request ', SINK_WORD),
+    'retarget': ('slack: refused: ',
+                 'retargeted: the old DM is no longer tracked; the DM of FM_SLACK_DM_USER is open and its starting point is recorded; the next poll takes in the requests sent after it',
+                 'unchanged: FM_SLACK_DM_USER matches the DM already in use; nothing to retarget', SINK_WORD),
+}
+# Every fixed text any command can print: the inventory test reads the print calls and holds this list complete.
+FIXED_WAKE_TEXT = WAKE_FIXED_TEXT + tuple(text for texts in COMMAND_FIXED_TEXT.values() for text in texts if text not in WAKE_FIXED_TEXT)
 
 
 def redacted_error(error):
@@ -340,11 +345,12 @@ def replace_values(text):
     return ''.join(out), replaced
 
 
-def refuse_a_value_that_the_marker_holds():
-    """A plane value that is part of the marker, the flag or any other fixed text of a wake line could never be replaced for good: refuse, fail closed."""
+def refuse_a_value_that_the_marker_holds(texts=WAKE_FIXED_TEXT):
+    """A plane value that is part of the marker, the flag or any other fixed text that the command prints could never be replaced for good: refuse,
+    fail closed. texts is what THAT command prints: the wake and listing text for the runs that print wake lines, a command's own constants for the others."""
     for value in plane_secrets():
-        if any(value in text for text in FIXED_WAKE_TEXT):
-            raise SlackError('secret_collides_with_marker')
+        if any(value in text for text in texts):
+            raise SecretCollision('secret_collides_with_marker')
 
 
 def present(raw):
@@ -432,28 +438,6 @@ def protect_encoded(text):
             text = text[:start] + SECRET_MARKER + text[end:]
         text = replace_values(text)[0]
     return SECRET_MARKER, True
-
-
-class SecretCollision(SlackError):
-    """A plane value that no replacement of request text can remove: it holds no request-text character."""
-
-
-def value_hits(text):
-    """The sink check: the (start, end) spans, merged, of every plane secret value in the COMPLETE text of one sink (a whole file after an append, a
-    whole stream, one printed line). Pure: it reads and changes nothing, and it is the only judge of whether a sink holds a value."""
-    spans = []
-    for value in plane_secrets():
-        at = text.find(value)
-        while at >= 0:
-            spans.append((at, at + len(value)))
-            at = text.find(value, at + 1)
-    merged = []
-    for start, end in sorted(spans):
-        if merged and start <= merged[-1][1]:
-            merged[-1] = (merged[-1][0], max(end, merged[-1][1]))
-        else:
-            merged.append((start, end))
-    return merged
 
 
 def collision_outcome(kind):
@@ -792,16 +776,7 @@ class Watch:
         self.lock = open(self.lock_path, 'a')
         fcntl.flock(self.lock, fcntl.LOCK_EX)
         self.replay = replay
-        self.state = self.load_state()
-        if replay and isinstance(replay.transcript.get('seed_state'), dict):
-            seed = replay.transcript['seed_state']
-            for occurrence, record in seed.get('threads', {}).items():
-                self.state['threads'].setdefault(occurrence, record)
-            seeded_seen = seed.get('seen', {})
-            if isinstance(seeded_seen, list):
-                seeded_seen = {event: {} for event in seeded_seen}
-            for event, seen in seeded_seen.items():
-                self.state['seen'].setdefault(event, seen)
+        self.state = self.start_state()
         self.token = token or ''
         # FM_SLACK_NO_NETWORK (test and verification runs) closes the real transport: a run that forgot its replay
         # fails with network_closed instead of reaching Slack. Any value closes it, an empty one included: the
@@ -833,6 +808,7 @@ class Watch:
         self.read_mark = None
         self.settled = set()
         self.out = Out()
+        self.reported = set()
 
     def dm_user(self):
         return env_value('FM_SLACK_DM_USER').strip()
@@ -840,6 +816,20 @@ class Watch:
     def verify_target(self):
         if self.state.get('user') and self.state['user'] != self.dm_user():
             raise SlackError('dm_user_changed')
+
+    def start_state(self):
+        """The journal as it stands on disk, with the replay's seed merged in: what a run starts from and what memory returns to after a refused write."""
+        state = self.load_state()
+        if self.replay and isinstance(self.replay.transcript.get('seed_state'), dict):
+            seed = self.replay.transcript['seed_state']
+            for occurrence, record in seed.get('threads', {}).items():
+                state['threads'].setdefault(occurrence, record)
+            seeded_seen = seed.get('seen', {})
+            if isinstance(seeded_seen, list):
+                seeded_seen = {event: {} for event in seeded_seen}
+            for event, seen in seeded_seen.items():
+                state['seen'].setdefault(event, seen)
+        return state
 
     def load_state(self):
         if self.path.exists():
@@ -860,8 +850,19 @@ class Watch:
         return state
 
     def commit(self):
-        save(self.path, self.state)
+        try:
+            save(self.path, self.state)
+        except SecretCollision:
+            # The journal refused the write: whatever the step changed in memory and did not commit is dropped, so that nothing later in this run reads a
+            # state that the journal never held (the outbox line a refused commit left behind kept the one report from ever being written).
+            self.restore()
+            raise
         self.changed = True
+
+    def restore(self):
+        """Memory equals the journal again."""
+        self.state = self.start_state()
+        self.output = list(self.state['outbox'])
 
     def say(self, line):
         line = flat(line)
@@ -1147,18 +1148,28 @@ class Watch:
             for message in earlier:
                 if message.get('metadata', {}).get('event_payload', {}).get('id') == marker:
                     return message['ts']
+            args = self.post_fields(event, text, thread, channel)
+            # The body is checked BEFORE the attempt mark: a post that a plane value refuses is not an attempt (it counts for none of the three tries and
+            # leaves no "state unknown"), and the transport checks the same fields again.
+            refuse_outbound(args)
             if row is not None and not row.get('attempted'):
                 row['attempted'] = True
                 self.commit()
-            if len(text) > 39000:
-                text = clip(text, 38000) + '\nFull text remains in the local backlog.'
-            args = {'channel': channel, 'text': text,
-                    'client_msg_id': str(uuid.uuid5(uuid.NAMESPACE_URL, event)),
-                    'metadata': {'event_type': STATE_KEY, 'event_payload': {'id': marker}},
-                    'unfurl_links': False, 'unfurl_media': False}
-            if thread:
-                args['thread_ts'] = thread
             return self.api.call('chat.postMessage', **args)['ts']
+
+    @staticmethod
+    def post_fields(event, text, thread, channel):
+        """The fields of one message post, built in the one place that both the post and the pre-flight of a request read."""
+        marker = hashlib.sha256(event.encode()).hexdigest()
+        if len(text) > 39000:
+            text = clip(text, 38000) + '\nFull text remains in the local backlog.'
+        args = {'channel': channel, 'text': text,
+                'client_msg_id': str(uuid.uuid5(uuid.NAMESPACE_URL, event)),
+                'metadata': {'event_type': STATE_KEY, 'event_payload': {'id': marker}},
+                'unfurl_links': False, 'unfurl_media': False}
+        if thread:
+            args['thread_ts'] = thread
+        return args
 
     def retarget(self):
         """Re-point the plane at a changed owner DM; only an explicit retarget may do this."""
@@ -1433,7 +1444,15 @@ class Watch:
             if note is not None:
                 line, count, start = self.request_wake_parts(mine, note)
                 line = flat(line)
-            if shape in ('staged', 'failed'):
+            # The journal is modeled as it really stands: a request that is already in it (a resumed row) is replaced where it is, or leaves it when it
+            # is delivered; it is never added a second time (F3 of the outcome review of b86f8e55e).
+            index = next((n for n, held in enumerate(state['pending']) if held.get('event') == row['event']), None)
+            if index is not None:
+                if shape in ('staged', 'failed'):
+                    state['pending'][index] = mine
+                else:
+                    del state['pending'][index]
+            elif shape in ('staged', 'failed'):
                 state['pending'].append(mine)
             if shape in ('delivered', 'failed') and line and (not state['outbox'] or state['outbox'][-1] != line):
                 state['outbox'] = state['outbox'] + [line]
@@ -1462,6 +1481,9 @@ class Watch:
         text, runs = serialize_with_spans(entry, True, [(entry, 'text', 'text'), (entry, 'shown', 'shown')])
         whole, base = self.store_after(text)
         artifacts.append((whole, [(field, [(a + base, b + base) for a, b in spans]) for field, spans in runs]))
+        # The one fixed acknowledgement, as the post will hand it to the transport: it holds no character of the request's text, so a value in it is class 3.
+        for body in outbound_texts(self.post_fields('ack:' + row['event'], REQUEST_ACK, row['thread'], self.state.get('channel') or '')):
+            artifacts.append((body, []))
         for note in ('', REQUEST_UNKNOWN, REQUEST_UNACKNOWLEDGED):
             line, count, start = self.request_wake_parts(row, note)
             spans, pos = [], start
@@ -1538,6 +1560,10 @@ class Watch:
             fault('after-stage')
             if pending['event'] not in self.settled and not pending.get('recorded'):
                 self.settle_request(pending)
+            if not pending.get('posted'):
+                # The one fixed acknowledgement is checked before anything of this request is written: a value inside it holds the request, and a
+                # held request leaves no second record line behind in each poll.
+                refuse_outbound(self.post_fields('ack:' + pending['event'], REQUEST_ACK, pending['thread'], self.state.get('channel') or ''))
             self.write_record(pending)
             # A request is acknowledged only while the source is bound, and an unbind cannot complete between that
             # check and the post; unbound, the row stays journaled and the rebind delivers it once.
@@ -2075,22 +2101,28 @@ class Watch:
         self.commit()
 
     def report_failure(self, error):
+        """Report a failure once per episode. The wake line and the failure class are journaled by the same commit, and the class is set in memory only
+        with that line (a refused commit has restored memory). A report the journal cannot hold is printed at once instead: it is never skipped, and it
+        is repeated by the next run, because nothing durable says it was made."""
         name = redact_sink(str(error) if isinstance(error, SlackError) else 'local_state_or_response_error')
-        if self.state.get('failure') != name:
-            # The wake line and the failure class are journaled by the same commit.
-            self.say(redact_sink('slack: transport failure: ' + name + (': ' + self.detail if self.detail else '')))
-            self.state['failure'] = name
+        if self.state.get('failure') == name or name in self.reported:
+            return 1
+        line = redact_sink('slack: transport failure: ' + name + (': ' + self.detail if self.detail else ''))
+        self.say(line)
+        self.state['failure'] = name
+        self.reported.add(name)
+        try:
             self.commit()
+        except SecretCollision:
+            self.out.diagnostic('out', line)
         return 1
 
     def note_collision(self):
-        """Report the collision refusal once per episode (the failure line is journaled by the same commit); True when this call reported it."""
-        if self.state.get('failure') == 'secret_collides_with_marker':
+        """Report the collision refusal once per episode; True when this call reported it."""
+        name = 'secret_collides_with_marker'
+        if self.state.get('failure') == name or name in self.reported:
             return False
-        try:
-            self.report_failure(SlackError('secret_collides_with_marker'))
-        except SecretCollision:
-            return False
+        self.report_failure(SecretCollision(name))
         return True
 
     def clear_failure(self):
@@ -2099,7 +2131,7 @@ class Watch:
             self.commit()
 
 
-def parse_command(argv, positional=False):
+def parse_command(argv, positional=False, out=None):
     """The command, the replay path, and the one Slack timestamp that only `resolve` takes."""
     if not argv:
         return None, None, None
@@ -2115,7 +2147,7 @@ def parse_command(argv, positional=False):
             index += 2
             continue
         if argv[index] in ('-h', '--help'):
-            print(help_text(command))
+            (out or Out()).diagnostic('out', help_text(command))
             raise SystemExit(0)
         rest.append(argv[index])
         index += 1
@@ -2159,22 +2191,12 @@ def emit(watch, command):
     list_failed_requests(command, watch.failed_requests(), watch.out)
 
 
-def listing_may_print():
-    """The failed-row listing prints only while no plane value lies in its fixed text (r62:132) and its complete text holds none (collision_outcome)."""
-    try:
-        refuse_a_value_that_the_marker_holds()
-    except SlackError:
-        collision_outcome('listing')
-        return False
-    return True
-
-
 def list_failed_requests(command, threads, out=None):
     """Each open failed request row, once, as `slack: request <ts> not acknowledged (failed, owner Main)`: on standard output for a poll, on
     standard error for a check. The listing is not a wake. It goes through the one writer: a listing whose complete text would hold a plane
     value prints no row text at all (collision_outcome; decided by Main 3190 and 3193); the rows stay in the journal and `resolve` still closes them."""
     out = out or Out()
-    if command not in ('poll', 'check') or not threads or not listing_may_print():
+    if command not in ('poll', 'check') or not threads:
         return
     stream = 'err' if command == 'check' else 'out'
     text = ''.join('slack: request %s not acknowledged (failed, owner Main)\n' % ts for ts in threads)
@@ -2311,44 +2333,45 @@ def emit_write(watch, plan):
         watch.printed(owed)
 
 
-def note_progress():
+def note_progress(out):
     # A check waiting on a slow reply uses almost no CPU, so the watcher would
     # stop it as idle. Its progress rule also counts check stderr. Only a finished
     # request writes here, so a hung or trickling request still shows no progress.
     with contextlib.suppress(OSError):
-        os.write(2, b'slack: request finished\n')
+        out.diagnostic('err', 'slack: request finished')
 
 
-def main(argv):
+def main(argv, out=None):
     os.umask(0o077)
-    out = Out()
+    out = out or Out()
     action = env_value('FM_SLACK_CHECK_ACTION') if argv and argv[0] == 'check' else ''
-    refusals = sys.stderr if action in ('arm', 'retarget', 'resolve') else sys.stdout
+    refusals = 'err' if action in ('arm', 'retarget', 'resolve') else 'out'
     if not argv:
-        print('error: missing command')
+        out.diagnostic('out', 'error: missing command')
         return 2
     try:
-        command, replay_path, request_ts = parse_command(argv, positional=action == 'resolve')
+        command, replay_path, request_ts = parse_command(argv, positional=action == 'resolve', out=out)
     except SlackError as error:
-        print('error: slack ' + str(error), file=refusals)
+        out.diagnostic(refusals, 'error: slack ' + str(error))
         return 2
     if command not in ('mirror', 'poll', 'check'):
-        print('error: unknown command; use --help')
+        out.diagnostic('out', 'error: unknown command; use --help')
         return 2
     if action in ('disarm', 'resolve'):
-        # These two do not build a watcher: a plane value inside a constant they print is refused here, as arm and check refuse it.
-        refuse_a_value_that_the_marker_holds()
+        # These two do not build a watcher: a plane value inside a constant THEY print is refused here, as arm and check refuse theirs. The wake and
+        # listing text is not theirs: a collision in it never stops them (Main 3266).
+        refuse_a_value_that_the_marker_holds(COMMAND_FIXED_TEXT[action])
     if action == 'disarm':
-        return disarm()
+        return disarm(out)
     if action == 'resolve':
-        return resolve_request(request_ts)
+        return resolve_request(request_ts, out)
     state, reason = mode()
     if state != 'on':
         if action in ('arm', 'retarget'):
-            print('slack: refused: ' + reason, file=sys.stderr)
+            out.diagnostic('err', 'slack: refused: ' + reason)
             return 1
         if state == 'refused' and command != 'check':
-            print('slack: refused: ' + reason)
+            out.diagnostic('out', 'slack: refused: ' + reason)
         list_failed_requests(command, open_failed_threads(), out)
         return 0
     watch = None
@@ -2359,9 +2382,10 @@ def main(argv):
         watch = Watch(replay=replay, token=env_value('SLACK_BOT_TOKEN').strip())
         watch.out = out
         if action == 'check':
-            watch.api.on_reply = note_progress
-        # A plane value that is part of the fixed text of a wake line could never be replaced for good: refuse (arm and check).
-        refuse_a_value_that_the_marker_holds()
+            watch.api.on_reply = lambda: note_progress(out)
+        # A plane value that is part of a fixed text this command prints could never be replaced for good: refuse (the wake text for the runs that
+        # print wake lines, the command's own constants for arm and retarget).
+        refuse_a_value_that_the_marker_holds(COMMAND_FIXED_TEXT.get(action, WAKE_FIXED_TEXT))
         if action == 'arm':
             # Only an explicit retarget may move the plane to a changed owner DM. The poll and the mirror look at the owner
             # after they have found the source bound: an unbound run makes no call, no state change and no output (I2 (h)).
@@ -2390,25 +2414,20 @@ def main(argv):
         error = redacted_error(error)
         name = str(error) if isinstance(error, SlackError) else 'local_state_or_response_error'
         if action in ('arm', 'retarget'):
-            print('slack: refused: ' + name, file=sys.stderr)
+            out.diagnostic('err', 'slack: refused: ' + name)
         elif watch is not None:
-            try:
-                watch.report_failure(error)
-            except SecretCollision:
-                # The journal itself would hold a value: the report is printed, not journaled.
-                print('slack: transport failure: ' + name)
+            watch.report_failure(error)
             try:
                 emit(watch, command)
             except SecretCollision:
                 pass
         else:
-            print('slack: transport failure: ' + name)
+            out.diagnostic('out', 'slack: transport failure: ' + name)
         return 1
     except RuntimeError as error:
         if str(error).startswith('FM_SLACK_FAULT='):
             return 75
-        print('slack: refused: local_runtime_error' if action == 'arm' else 'slack: local_runtime_error',
-              file=refusals)
+        out.diagnostic(refusals, 'slack: refused: local_runtime_error' if action == 'arm' else 'slack: local_runtime_error')
         return 1
     finally:
         if watch is not None:
@@ -2418,7 +2437,7 @@ def main(argv):
                 pass
 
 
-def resolve_request(ts):
+def resolve_request(ts, out):
     """Close one failed request row that Main has dealt with. No Slack call: the transport is never used."""
     watch = None
     try:
@@ -2426,13 +2445,12 @@ def resolve_request(ts):
         watch.close_request(ts)
     except (SlackError, OSError, ValueError, KeyError, TypeError) as error:
         error = redacted_error(error)
-        print('slack: refused: ' + (str(error) if isinstance(error, SlackError) else 'local_state_or_response_error'),
-              file=sys.stderr)
+        out.diagnostic('err', 'slack: refused: ' + (str(error) if isinstance(error, SlackError) else 'local_state_or_response_error'))
         return 1
     finally:
         if watch is not None:
             watch.lock.close()
-    print('resolved: slack request ' + ts)
+    out.diagnostic('out', 'resolved: slack request ' + ts)
     return 0
 
 
@@ -2440,18 +2458,18 @@ def check(watch, action):
     state_dir = state_home()
     if action == 'retarget':
         if watch.retarget():
-            print('retargeted: the old DM is no longer tracked; the DM of FM_SLACK_DM_USER is open and its starting point is recorded; the next poll takes in the requests sent after it')
+            watch.out.diagnostic('out', 'retargeted: the old DM is no longer tracked; the DM of FM_SLACK_DM_USER is open and its starting point is recorded; the next poll takes in the requests sent after it')
         else:
-            print('unchanged: FM_SLACK_DM_USER matches the DM already in use; nothing to retarget')
+            watch.out.diagnostic('out', 'unchanged: FM_SLACK_DM_USER matches the DM already in use; nothing to retarget')
         return 0
     if action == 'arm':
         try:
             watch.prepare()
         except SlackError as error:
             error = redacted_error(error)
-            print('slack: refused: ' + str(error), file=sys.stderr)
+            watch.out.diagnostic('err', 'slack: refused: ' + str(error))
             return 1
-        return arm(state_dir)
+        return arm(state_dir, watch.out)
     if not (state_dir / (CHECK_ID + '.check.sh')).is_file() or not (state_dir / (CHECK_ID + '.check-trust')).is_file():
         return 0
     try:
@@ -2475,19 +2493,19 @@ def shim_content(home, state_dir, script_dir):
                 shlex.quote(str(Path(script_dir) / 'fm-slack-check.sh')))
 
 
-def arm(state_dir):
+def arm(state_dir, out):
     state_dir.mkdir(parents=True, exist_ok=True)
     if state_dir.is_symlink():
-        print('slack: refused: unsafe_state_path', file=sys.stderr)
+        out.diagnostic('err', 'slack: refused: unsafe_state_path')
         return 1
     shim = state_dir / (CHECK_ID + '.check.sh')
     trust = state_dir / (CHECK_ID + '.check-trust')
     if shim.is_symlink() or trust.is_symlink():
-        print('slack: refused: unsafe_state_path', file=sys.stderr)
+        out.diagnostic('err', 'slack: refused: unsafe_state_path')
         return 1
     # Validate the shim path before touching either artifact.
     if shim.exists() and not shim.is_file():
-        print('slack: refused: unsafe_check_shim', file=sys.stderr)
+        out.diagnostic('err', 'slack: refused: unsafe_check_shim')
         return 1
     shim.write_text(shim_content(str(home_dir()), state_dir, ROOT))
     shim.chmod(0o700)
@@ -2495,24 +2513,29 @@ def arm(state_dir):
     if result.returncode:
         shim.unlink(missing_ok=True)
         trust.unlink(missing_ok=True)
-        print('slack: refused: check_registration_failed', file=sys.stderr)
+        out.diagnostic('err', 'slack: refused: check_registration_failed')
         return 1
-    print('armed: state/%s.check.sh' % CHECK_ID)
+    out.diagnostic('out', 'armed: state/%s.check.sh' % CHECK_ID)
     return 0
 
 
-def disarm():
+def disarm(out):
     result = run('fm-check-unregister.sh', CHECK_ID)
     if result.returncode:
-        print('slack: refused: check_unregistration_failed')
+        out.diagnostic('out', 'slack: refused: check_unregistration_failed')
         return 1
-    print('disarmed: state/%s.check.sh' % CHECK_ID)
+    out.diagnostic('out', 'disarmed: state/%s.check.sh' % CHECK_ID)
     return 0
 
 
 if __name__ == '__main__':
+    run_out = Out()
     try:
-        raise SystemExit(main(sys.argv[1:]))
+        raise SystemExit(main(sys.argv[1:], run_out))
     except SlackError as error:
-        print('error: slack ' + str(error))
+        run_out.diagnostic('out', 'error: slack ' + str(error))
+        raise SystemExit(1)
+    except Exception:
+        # The last resort: no traceback, whose text can hold a value, only the one fixed line.
+        run_out.diagnostic('err', 'slack: local_runtime_error')
         raise SystemExit(1)

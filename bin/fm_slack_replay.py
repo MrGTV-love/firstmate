@@ -5,11 +5,12 @@ Transcripts never contain a token. Replay state, the outbound log and the log of
 every attempted call live under the fixture home's state directory, so a mirror
 leg followed by a poll leg sees the same conversation. No socket is opened.
 """
+import copy
 import json
 import os
 from pathlib import Path
 
-from fm_slack import SlackError
+from fm_slack import SecretCollision, SlackError, refuse_outbound, value_hits
 
 # The scope Slack requires for each method the plane calls. A transcript that sets
 # "enforce_scopes" fails a call whose scope its "scopes" list lacks, as Slack does; one that sets
@@ -67,10 +68,23 @@ class Replay:
     def save(self):
         self.state_path.write_text(json.dumps(self.state, ensure_ascii=False))
 
+    @staticmethod
+    def append_line(path, line):
+        """Append one line to a log file only while the COMPLETE file after the append holds no plane value (a value that two clean lines form is
+        found here); nothing is written otherwise."""
+        try:
+            existing = path.read_text()
+        except OSError:
+            existing = ''
+        if value_hits(existing + line):
+            raise SecretCollision('secret_collides_with_marker')
+        with path.open('a') as out:
+            out.write(line)
+
     def log(self, entry):
+        line = json.dumps(entry, ensure_ascii=False) + '\n'
+        self.append_line(self.log_path, line)
         self.state['log'].append(entry)
-        with self.log_path.open('a') as out:
-            out.write(json.dumps(entry, ensure_ascii=False) + '\n')
         self.save()
 
     def dm_of(self, user):
@@ -101,10 +115,21 @@ class Replay:
     def attempt(self, method, fields):
         entry = {'method': method, 'channel': fields.get('channel'), 'thread_ts': fields.get('thread_ts'),
                  'oldest': fields.get('oldest'), 'latest': fields.get('latest')}
-        with self.attempts_path.open('a') as out:
-            out.write(json.dumps(entry, ensure_ascii=False) + '\n')
+        self.append_line(self.attempts_path, json.dumps(entry, ensure_ascii=False) + '\n')
 
     def call(self, method, **fields):
+        """One replayed call. The fields are checked first, as the real transport checks them, before any record of the attempt exists; a call that
+        a log refuses part-way (a value that the log's own lines form) leaves the replayed conversation as it was."""
+        refuse_outbound(fields)
+        snapshot = copy.deepcopy(self.state)
+        try:
+            return self.replayed(method, **fields)
+        except SecretCollision:
+            self.state = snapshot
+            self.save()
+            raise
+
+    def replayed(self, method, **fields):
         self.attempt(method, fields)
         if not self.token_present:
             raise SlackError('missing_token')

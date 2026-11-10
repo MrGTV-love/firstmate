@@ -50,7 +50,9 @@ Usage:
   fm_slack_watch_test.py request-texts   (reads wake lines on stdin; prints each decoded text)
 """
 from contextlib import contextmanager
+import ast
 import contextlib
+import copy
 import fcntl
 import glob
 import io
@@ -703,7 +705,9 @@ class IntakeTest(unittest.TestCase):
                             yield watch, replay
                         if not forbidden:
                             self.assertEqual(violations, [], 'a post was made without the binding hold')
-                        if not forbidden and tuple(scopes) == BASE_SCOPES and 'method_allowlist' not in (transcript_extra or {}):
+                        # The closing check runs for EVERY scenario that keeps the base scopes: one that names its own allowlist is judged against the base
+                        # population too (assert_only_base_calls), so a scenario whose transcript widens it fails here, not silently skips (E3 of the review of b86f8e55e).
+                        if not forbidden and tuple(scopes) == BASE_SCOPES:
                             self.assert_only_base_calls(replay)
                     finally:
                         watch.lock.close()
@@ -898,7 +902,8 @@ class IntakeTest(unittest.TestCase):
     def test_control_a_method_outside_the_population_is_stopped_by_the_allowlist_and_not_by_a_scope(self):
         files = self.prerequisite('files.list', lambda message: {})
         extra = {'method_allowlist': list(ReplayShapeTest.POPULATION)}
-        acks, error, attempts = self.poll_with(files, transcript_extra=extra)
+        # The call to a method outside the population is made on purpose: the control says so (forbidden=True), as the closing check would otherwise fail it.
+        acks, error, attempts = self.poll_with(files, transcript_extra=extra, forbidden=True)
         self.assertEqual((acks, error), ([], 'method_not_allowed'))
         self.assertIn('files.list', attempts)
         acks, error, attempts = self.poll_with(Watch.request_from, transcript_extra=extra)
@@ -908,7 +913,7 @@ class IntakeTest(unittest.TestCase):
     def test_control_a_forbidden_attempt_that_the_intake_swallows_is_found_in_the_attempts_record(self):
         files = self.prerequisite('files.list', lambda message: {}, swallow=True)
         extra = {'method_allowlist': list(ReplayShapeTest.POPULATION)}
-        acks, error, attempts = self.poll_with(files, transcript_extra=extra)
+        acks, error, attempts = self.poll_with(files, transcript_extra=extra, forbidden=True)
         self.assertEqual((acks, error), (['200.000100'], None))
         self.assertFalse(set(attempts) <= set(ReplayShapeTest.POPULATION), attempts)
         self.assertIn('files.list', attempts)
@@ -2138,7 +2143,7 @@ class IntakeTest(unittest.TestCase):
         allowlist refusal `method_not_allowed` and by no scope refusal; the compliant request still passes with the same transcript."""
         probe = self.prerequisite('api.test', lambda message: {})
         extra = {'method_allowlist': list(ReplayShapeTest.POPULATION)}
-        acks, error, attempts = self.poll_with(probe, transcript_extra=extra)
+        acks, error, attempts = self.poll_with(probe, transcript_extra=extra, forbidden=True)
         self.assertEqual((acks, error), ([], 'method_not_allowed'))
         self.assertIn('api.test', attempts)
         acks, error, attempts = self.poll_with(Watch.request_from, transcript_extra=extra)
@@ -2680,13 +2685,19 @@ class IntakeTest(unittest.TestCase):
         with self.fixture() as (watch, replay):
             watch.lock.close()
             transcript = str(watch.root.parent / 'transcript.json')
-            for action, expected in (('arm', 'slack: refused: secret_collides_with_marker'),
-                                     ('check', 'slack: transport failure: secret_collides_with_marker')):
+            for action, value, expected in (('arm', 'armed: state/slack.check.sh', 'slack: refused: secret_collides_with_marker'),
+                                            ('check', plane.REQUEST_LABEL[1:30], 'slack: transport failure: secret_collides_with_marker')):
                 out, err = io.StringIO(), io.StringIO()
-                with patch.dict(os.environ, {'FM_SLACK_CHECK_ACTION': action, 'SLACK_SIGNING_SECRET': plane.REQUEST_LABEL[1:30]}), \
+                with patch.dict(os.environ, {'FM_SLACK_CHECK_ACTION': action, 'SLACK_SIGNING_SECRET': value}), \
                      contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
                     code = plane.main(['check', '--replay', transcript])
                 self.assertEqual((code, expected in out.getvalue() + err.getvalue()), (1, True), (action, out.getvalue(), err.getvalue()))
+            # Arm prints none of the wake text (Main 3266: the check runs on what THAT command emits): a value in it does not stop arm.
+            out, err = io.StringIO(), io.StringIO()
+            with patch.dict(os.environ, {'FM_SLACK_CHECK_ACTION': 'arm', 'SLACK_SIGNING_SECRET': plane.REQUEST_LABEL[1:30]}), \
+                 contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                plane.main(['check', '--replay', transcript])
+            self.assertNotIn('secret_collides_with_marker', out.getvalue() + err.getvalue())
 
     def test_an_owner_text_with_the_transport_marker_character_keeps_it_and_sets_no_flag(self):
         with self.fixture() as (watch, replay):
@@ -3394,12 +3405,16 @@ class IntakeTest(unittest.TestCase):
         value = 'fixture-signing-in-the-state-0123456789'
         with self.fixture(env={'SLACK_SIGNING_SECRET': value}) as (watch, replay):
             before = (watch.root / 'state.json').read_bytes()
+            kept = copy.deepcopy(watch.state)
             watch.state['pending'].append(self.notice('test/notice/1', '100.000100'))
             watch.state['threads']['x'] = {'ts': '150.000100', 'label': 'a card holding ' + value}
             with self.assertRaisesRegex(SlackError, '^secret_collides_with_marker$'):
                 watch.commit()
             self.assertEqual((watch.root / 'state.json').read_bytes(), before)
-            watch.state['threads']['x']['label'] = 'a clean card'
+            # Memory equals the journal again (F2 of the outcome review of b86f8e55e): the refused change is gone, not kept for the next write.
+            self.assertEqual(watch.state, kept)
+            self.assertEqual(watch.output, kept['outbox'])
+            watch.state['threads']['x'] = {'ts': '150.000100', 'label': 'a clean card'}
             watch.commit()
             self.assertNotEqual((watch.root / 'state.json').read_bytes(), before)
 
@@ -3445,7 +3460,8 @@ class IntakeTest(unittest.TestCase):
 
 
     def printed_constants_of_the_four_commands(self):
-        """Every constant that arm, disarm, resolve and retarget print, read from the print calls of their code: what the print of each is."""
+        """Every constant that arm, disarm, resolve and retarget print, read from the diagnostic calls of their code (they have no print call: the
+        structural test of the egress holds that): what the line of each is."""
         import ast
         tree = ast.parse((Path(plane.__file__)).read_text())
         wanted = {'resolve_request', 'check', 'arm', 'disarm'}
@@ -3453,8 +3469,8 @@ class IntakeTest(unittest.TestCase):
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef) and node.name in wanted:
                 for call in ast.walk(node):
-                    if isinstance(call, ast.Call) and isinstance(call.func, ast.Name) and call.func.id == 'print' and call.args:
-                        first = call.args[0]
+                    if isinstance(call, ast.Call) and isinstance(call.func, ast.Attribute) and call.func.attr == 'diagnostic' and len(call.args) == 2:
+                        first = call.args[1]
                         if isinstance(first, ast.Constant) and isinstance(first.value, str):
                             found.append((node.name, first.value, 'constant'))
                         elif isinstance(first, ast.BinOp) and isinstance(first.op, ast.Mod) and isinstance(first.left, ast.Constant):
@@ -3490,6 +3506,280 @@ class IntakeTest(unittest.TestCase):
                         code = str(error)
                 self.assertNotIn(value, out.getvalue() + err.getvalue(), (action, constant))
                 self.assertIn(code, (1, 'secret_collides_with_marker'), (action, constant))
+
+
+    # ---- The egress boundary (Main 3266 and 3271, the outcome review of b86f8e55e) ----
+
+    def staged_request(self, watch, replay, ts='200.000100', text='an ordinary request'):
+        """A request journaled and not yet acknowledged, as a run that stopped at after-stage leaves it."""
+        self.say(replay, ts, text)
+        row = watch.request_from([m for m in replay.state['messages'] if m['ts'] == ts][0])
+        watch.settle_request(row)
+        watch.state['intake_cursor'] = ts
+        return watch.stage(row)
+
+    def test_a_post_body_that_holds_a_value_is_refused_before_the_attempt_mark_and_counts_for_nothing(self):
+        """F1 (b): the one fixed acknowledgement holds the value. The staged row is not marked attempted, counts no try and no failed lookup, nothing
+        is recorded, posted or logged; when the value goes the same row is acknowledged once with the same text."""
+        with self.fixture() as (watch, replay):
+            pending = self.staged_request(watch, replay)
+            with patch.dict(os.environ, {'SLACK_SIGNING_SECRET': plane.REQUEST_ACK[:24]}):
+                with self.assertRaisesRegex(SlackError, '^secret_collides_with_marker$'):
+                    watch.publish(pending)
+            saved = json.loads((watch.root / 'state.json').read_text())['pending'][0]
+            self.assertEqual([key for key in ('attempted', 'posted', 'recorded', 'tries', 'lookups') if saved.get(key)], [])
+            self.assertEqual(self.acks(replay), [])
+            self.assertIsNone(watch.record('200.000100'))
+            attempts = watch.root / 'attempts.jsonl'
+            self.assertNotIn('chat.postMessage', attempts.read_text() if attempts.is_file() else '')
+            watch.publish(watch.state['pending'][0])
+            self.assertEqual(self.acks(replay), ['200.000100'])
+            self.assertEqual([e['text'] for e in replay.state['log'] if e['method'] == 'chat.postMessage'], [plane.REQUEST_ACK])
+
+    def test_a_request_whose_acknowledgement_would_hold_a_value_is_not_taken_in_and_waits_until_the_value_goes(self):
+        """F1 (b), the pre-flight: the request is not staged, the cursor stays, the poll reports the collision, and when the value goes the request is
+        acknowledged once and woken once."""
+        with self.fixture(env={'SLACK_SIGNING_SECRET': plane.REQUEST_ACK[:24]}) as (watch, replay):
+            self.say(replay, '200.000100', 'an ordinary request')
+            cursor = watch.state.get('intake_cursor')
+            with self.assertRaisesRegex(SlackError, '^secret_collides_with_marker$'):
+                watch.poll()
+            self.assertEqual((watch.state['pending'], watch.state.get('intake_cursor'), self.acks(replay)), ([], cursor, []))
+            with patch.dict(os.environ, {'SLACK_SIGNING_SECRET': 'unrelated-fixture-value-0123456789'}):
+                out, err = self.run_printed(watch)
+            self.assertEqual((self.acks(replay), len([l for l in out.splitlines() if l.startswith(plane.REQUEST_PREFIX)])), (['200.000100'], 1))
+
+    def test_the_transports_refuse_a_call_whose_fields_hold_a_value_before_any_byte_exists(self):
+        """The real transport builds no request and the replay records no attempt for a call whose field (a string, or the JSON of a dict) holds a
+        plane value; the same call without it goes through. The Authorization header carries the token and is not a field."""
+        value = 'fixture-signing-in-the-field-0123456789'
+        with patch.dict(os.environ, {'SLACK_SIGNING_SECRET': value}):
+            for fields in ({'text': 'before ' + value}, {'metadata': {'event_payload': {'id': value}}}, {'thread_ts': value}):
+                with patch.object(urllib.request, 'urlopen') as network, patch.object(urllib.request, 'Request') as request:
+                    with self.assertRaisesRegex(SlackError, '^secret_collides_with_marker$'):
+                        plane.Slack('fixture-token-not-a-secret').call('chat.postMessage', **fields)
+                self.assertEqual((network.called, request.called), (False, False), fields)
+            with tempfile.TemporaryDirectory(dir=Path.cwd()) as directory:
+                transcript = Path(directory) / 'transcript.json'
+                transcript.write_text(json.dumps({'schema': 'fm-slack-replay.v1', 'channel': 'D0123456789'}))
+                replay = Replay(transcript, Path(directory) / 'state')
+                with self.assertRaisesRegex(SlackError, '^secret_collides_with_marker$'):
+                    replay.call('chat.postMessage', channel='D0123456789', text='before ' + value)
+                self.assertFalse((replay.state_dir / 'attempts.jsonl').exists() or (replay.state_dir / 'outbound.jsonl').exists())
+                replay.call('chat.postMessage', channel='D0123456789', text='an ordinary text')
+                self.assertTrue((replay.state_dir / 'outbound.jsonl').exists())
+
+    def test_the_replay_log_refuses_a_line_that_two_clean_lines_form_and_leaves_the_conversation_as_it_was(self):
+        """The complete outbound log is a sink: a value across the newline between two appends is refused (bad control), nothing is appended, and the
+        replayed conversation is as it was; the neighbour value is not formed and both lines go in."""
+        for suffix, refused in (('', True), ('X', False)):
+            with tempfile.TemporaryDirectory(dir=Path.cwd()) as directory:
+                transcript = Path(directory) / 'transcript.json'
+                transcript.write_text(json.dumps({'schema': 'fm-slack-replay.v1', 'channel': 'D0123456789'}))
+                replay = Replay(transcript, Path(directory) / 'state')
+                first = 'a log line ending in the head'
+                second = 'the tail begins this log line'
+                replay.append_line(replay.log_path, first + '\n')
+                value = first[-10:] + '\n' + second[:10] + suffix
+                with patch.dict(os.environ, {'SLACK_SIGNING_SECRET': value}):
+                    if refused:
+                        with self.assertRaisesRegex(SlackError, '^secret_collides_with_marker$'):
+                            replay.append_line(replay.log_path, second + '\n')
+                        self.assertEqual(replay.log_path.read_text(), first + '\n')
+                    else:
+                        replay.append_line(replay.log_path, second + '\n')
+                        self.assertEqual(replay.log_path.read_text(), first + '\n' + second + '\n')
+
+    def test_the_preflight_models_a_resumed_row_in_place_and_never_adds_a_second_copy(self):
+        """F3: a row already in the journal is replaced where it is (or leaves it when delivered). The reviewer's value, the join of one row's last member
+        with the next row's first, exists in no state the run can write, so the request is acknowledged and woken once after a fresh process."""
+        with self.fixture() as (watch, replay):
+            pending = self.staged_request(watch, replay)
+            committed = (watch.root / 'state.json').read_text()
+            row_text = json.dumps(watch.state['pending'][0], ensure_ascii=False)
+            value = row_text[-8:] + ', ' + row_text[:10]
+            self.assertNotIn(value, committed)
+            for text, runs in watch.request_artifacts(dict(pending)):
+                self.assertLessEqual(text.count('"event": "%s"' % pending['event']), 1)
+            watch.lock.close()
+            with patch.dict(os.environ, {'SLACK_SIGNING_SECRET': value}):
+                resumed = Watch(replay=replay)
+                try:
+                    with patch.object(resumed, 'bound', return_value=True), patch.object(resumed, 'backlog', return_value=[]):
+                        out, err = self.run_printed(resumed)
+                finally:
+                    resumed.lock.close()
+            self.assertNotIn(value, out + err)
+            self.assertEqual((self.acks(replay), len([l for l in out.splitlines() if l.startswith(plane.REQUEST_PREFIX)])), (['200.000100'], 1))
+
+    def test_a_report_the_journal_cannot_hold_is_printed_now_and_again_by_the_next_run_never_skipped(self):
+        """F2: the failure class is set in memory only with the line that earned it. When the commit is refused, memory is the journal again, the report
+        is printed at once, a second call in the same run is silent, and a later run (nothing durable says it was made) reports again."""
+        with self.fixture() as (watch, replay):
+            out = io.StringIO()
+            with patch.object(plane, 'save', side_effect=plane.SecretCollision('secret_collides_with_marker')), contextlib.redirect_stdout(out):
+                watch.report_failure(SlackError('some_failure'))
+                watch.report_failure(SlackError('some_failure'))
+            self.assertEqual(out.getvalue(), 'slack: transport failure: some_failure\n')
+            self.assertEqual((watch.state.get('failure'), watch.output, watch.load_state()['outbox']), ('', [], []))
+            watch.lock.close()
+            nextrun = Watch(replay=replay)
+            try:
+                again = io.StringIO()
+                with contextlib.redirect_stdout(again):
+                    nextrun.report_failure(SlackError('some_failure'))
+                    plane.emit(nextrun, 'poll')
+                    nextrun.report_failure(SlackError('some_failure'))
+                    plane.emit(nextrun, 'poll')
+                self.assertEqual(again.getvalue(), 'slack: transport failure: some_failure\n')
+                self.assertEqual(nextrun.load_state()['failure'], 'some_failure')
+            finally:
+                nextrun.lock.close()
+
+    def test_resolve_and_disarm_check_only_what_they_print_and_a_value_in_the_listing_text_does_not_stop_them(self):
+        """F4: the population of each command is its own constants. A value in the failed-row listing suffix stops the runs that print the listing and
+        wake lines, not resolve, disarm, arm or retarget; a value in a command's own confirmation stops that command."""
+        listing = ' not acknowledged (failed'
+        confirmations = {'resolve': 'resolved: slack request ', 'disarm': 'disarmed: state/slack.check.sh', 'arm': 'armed: state/slack.check.sh',
+                         'retarget': 'unchanged: FM_SLACK_DM_USER matches'}
+        with patch.dict(os.environ, {'SLACK_SIGNING_SECRET': listing}):
+            with self.assertRaisesRegex(SlackError, '^secret_collides_with_marker$'):
+                plane.refuse_a_value_that_the_marker_holds()
+            for command, texts in plane.COMMAND_FIXED_TEXT.items():
+                plane.refuse_a_value_that_the_marker_holds(texts)
+        for command, value in confirmations.items():
+            with patch.dict(os.environ, {'SLACK_SIGNING_SECRET': value}):
+                with self.assertRaisesRegex(SlackError, '^secret_collides_with_marker$'):
+                    plane.refuse_a_value_that_the_marker_holds(plane.COMMAND_FIXED_TEXT[command])
+
+    def test_every_stream_write_of_every_command_goes_through_the_one_writer(self):
+        """The runtime view of the egress boundary: standard output and standard error are replaced by streams that fail any write whose caller is
+        not Out.write, and the commands are run (help, a missing and an unknown command, an unexpected argument, a refused and an unconfigured
+        plane for poll and arm, resolve of an unknown request): every line they print passes the writer."""
+        class Observer(io.StringIO):
+            def write(self, text):
+                caller = sys._getframe(1)
+                if type(caller.f_locals.get('self')).__name__ != 'Out' or caller.f_code.co_name != 'write':
+                    raise AssertionError('a stream write that did not go through Out.write, from %s' % caller.f_code.co_name)
+                return super().write(text)
+        value = 'invalid_FM_SLACK_POLL_MAX_ANSWERS_1_to_200'
+        runs = [([], {}), (['bogus'], {}), (['poll', 'unexpected'], {}), (['poll', '--help'], {}), (['poll'], {'FM_SLACK_POLL_MAX_ANSWERS': 'x'}),
+                (['check'], {'FM_SLACK_CHECK_ACTION': 'arm', 'FM_SLACK_POLL_MAX_ANSWERS': 'x'}), (['poll'], {'SLACK_BOT_TOKEN': ''})]
+        with self.fixture(env={'SLACK_SIGNING_SECRET': value}) as (watch, replay):
+            watch.lock.close()
+            runs.append((['check', '200.000100'], {'FM_SLACK_CHECK_ACTION': 'resolve'}))
+            for argv, env in runs:
+                out, err = Observer(), Observer()
+                with patch.dict(os.environ, {'FM_SLACK_NO_NETWORK': '1', **env}), contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                    try:
+                        plane.main(argv)
+                    except SystemExit:
+                        pass
+                self.assertNotIn(value, out.getvalue() + err.getvalue(), (argv, env))
+
+# The raw ways out of the process, found by NAME (a reference, not only a call, so that an alias such as `w = sys.stdout.write` is found too).
+EGRESS_BIN = Path(plane.__file__).resolve().parent
+EGRESS_MODULES = ('fm_slack_watch.py', 'fm_slack.py', 'fm_slack_replay.py')
+EGRESS_NAMES = {
+    'print': 'STREAM', 'sys.stdout': 'STREAM', 'sys.stderr': 'STREAM', 'sys.__stdout__': 'STREAM', 'sys.__stderr__': 'STREAM', 'os.write': 'STREAM',
+    'open': 'FILE', 'os.fdopen': 'FILE', 'os.replace': 'FILE', 'os.truncate': 'FILE', 'os.rename': 'FILE', 'shutil.copyfile': 'FILE',
+    'subprocess.run': 'CHILD', 'subprocess.Popen': 'CHILD', 'subprocess.call': 'CHILD', 'subprocess.check_output': 'CHILD', 'os.system': 'CHILD',
+    'urllib.request.urlopen': 'NET', 'urllib.request.Request': 'NET', 'socket.socket': 'NET',
+}
+# A file is written through a handle that something opened, and the opening is what the scan finds (os.open of a directory, which only takes a lock, is not one).
+EGRESS_ATTRIBUTES = {'write_text': 'FILE', 'write_bytes': 'FILE', 'open': 'FILE'}
+# The only functions that may touch a raw way out, and what each may touch. Everything else reaches stdout and standard error through the run's one
+# writer (Out.write), a file through save, write_record or the replay's guarded append, the network through Slack.call, and a child through run.
+EGRESS_ALLOWED = {
+    'fm_slack_watch.py': {'Out.write': {'STREAM'}, 'save': {'FILE'}, 'Watch.write_record': {'FILE'}, 'Watch.__init__': {'FILE'}, 'arm': {'FILE'},
+                          'run': {'CHILD'}},
+    'fm_slack.py': {'Slack.call': {'NET'}},
+    'fm_slack_replay.py': {'Replay.save': {'FILE'}, 'Replay.append_line': {'FILE'}},
+}
+
+
+def dotted_name(node):
+    if isinstance(node, ast.Attribute):
+        base = dotted_name(node.value)
+        return base + '.' + node.attr if base else ''
+    if isinstance(node, ast.Name):
+        return node.id
+    return ''
+
+
+def egress_references(source):
+    """Every reference to a raw way out in one module's source: (kind, line, the function that holds it)."""
+    found = []
+
+    def visit(node, stack):
+        if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+            stack = stack + [node.name]
+        name = dotted_name(node) if isinstance(node, (ast.Name, ast.Attribute)) else ''
+        kind = EGRESS_NAMES.get(name)
+        if kind is None and isinstance(node, ast.Attribute) and name != 'os.open':
+            kind = EGRESS_ATTRIBUTES.get(node.attr)
+        if kind:
+            found.append((kind, node.lineno, '.'.join(stack) or '<module>'))
+        for child in ast.iter_child_nodes(node):
+            visit(child, stack)
+    visit(ast.parse(source), [])
+    return found
+
+
+def egress_violations(module, source):
+    allowed = EGRESS_ALLOWED.get(module, {})
+    return [(kind, line, where) for kind, line, where in egress_references(source) if kind not in allowed.get(where, set())]
+
+
+class EgressBoundaryTest(unittest.TestCase):
+    """Main 3266: one boundary for every byte that leaves the process. The runtime proof is the oracle through fresh CLI processes and the observer
+    test below; this static scan guards against a regression (a raw print, write or network call added outside the few functions that check)."""
+
+    def test_no_raw_way_out_of_the_process_lies_outside_the_functions_that_check_it(self):
+        for module in EGRESS_MODULES:
+            with self.subTest(module=module):
+                self.assertEqual(egress_violations(module, (EGRESS_BIN / module).read_text()), [])
+
+    def test_the_scan_goes_red_for_a_planted_bypass_of_every_kind(self):
+        """Bad controls: each planted statement is a bypass the scan must find in a copy of the real source (print, a stream write, an alias that is
+        never called, a file write, a child, a network call, in the watch module and in the transport), and the real source stays clean."""
+        planted = {
+            'print': 'def planted():\n    print("x")\n',
+            'standard error write': 'def planted():\n    sys.stderr.write("x")\n',
+            'os.write': 'def planted():\n    os.write(2, b"x")\n',
+            'an alias, never called': 'def planted():\n    emit_line = sys.stdout.write\n',
+            'open for writing': 'def planted():\n    open("/tmp/x", "w")\n',
+            'write_text': 'def planted():\n    Path("/tmp/x").write_text("x")\n',
+            'a child process': 'def planted():\n    subprocess.run(["true"])\n',
+        }
+        for module in EGRESS_MODULES:
+            real = (EGRESS_BIN / module).read_text()
+            for label, code in planted.items():
+                with self.subTest(module=module, planted=label):
+                    self.assertTrue(egress_violations(module, real + '\n\n' + code), (module, label))
+        transport = (EGRESS_BIN / 'fm_slack.py').read_text()
+        self.assertTrue(egress_violations('fm_slack.py', transport + '\n\ndef planted():\n    urllib.request.urlopen("https://example.invalid")\n'))
+        # A bypass inside a function that is allowed one kind of way out is still found for any other kind.
+        watch = (EGRESS_BIN / 'fm_slack_watch.py').read_text()
+        self.assertTrue(egress_violations('fm_slack_watch.py', watch.replace('def save(path, value):\n', 'def save(path, value):\n    print("x")\n', 1)))
+
+    def test_the_transports_check_their_fields_before_any_byte_of_a_call_exists(self):
+        """Slack.call and Replay.call run the outbound check as their first act: before the request is built, before an attempt is recorded, before the
+        network or a log is touched."""
+        def first_act(module, qualified):
+            tree = ast.parse((EGRESS_BIN / module).read_text())
+            cls, name = qualified.split('.')
+            node = next(n for c in tree.body if isinstance(c, ast.ClassDef) and c.name == cls for n in c.body if isinstance(n, ast.FunctionDef) and n.name == name)
+            body = [s for s in node.body if not (isinstance(s, ast.Expr) and isinstance(s.value, ast.Constant))]
+            calls = [dotted_name(n.func) for s in body for n in ast.walk(s) if isinstance(n, ast.Call)]
+            return body, calls
+        body, calls = first_act('fm_slack_replay.py', 'Replay.call')
+        self.assertEqual(dotted_name(body[0].value.func), 'refuse_outbound')
+        body, calls = first_act('fm_slack.py', 'Slack.call')
+        index = [dotted_name(n.func) for s in body for n in ast.walk(s) if isinstance(n, ast.Call)]
+        self.assertIn('refuse_outbound', index)
+        self.assertLess(index.index('refuse_outbound'), index.index('urllib.request.Request'))
+        self.assertLess(index.index('refuse_outbound'), index.index('urllib.request.urlopen'))
 
 
 class ClosedTransportTest(unittest.TestCase):
