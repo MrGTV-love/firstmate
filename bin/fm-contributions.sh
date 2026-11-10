@@ -48,7 +48,7 @@
 # Optional PR facts share checked_at's freshness window: base_sha is the pull
 # resource's base SHA passed to the review verifier; base_containment records
 # behind_by from compare/<encoded live base branch>...<head>.
-# A missing or unreadable comparison is null (unknown), never fresh.
+# A missing, stopped or unreadable comparison is null (unknown), never fresh.
 # review_verification binds pr, head, task and base to the unchanged typed
 # fm-review-verification.v1 answer from fm-review-record.py verify --review-only.
 # Missing, unreadable or invalid answers are unknown, not qualifying reviews.
@@ -83,9 +83,12 @@
 # pass prints a contribution-wake line for each contribution row still waiting
 # in the wake queue, so a row queued by a pass that was later stopped still
 # doorbells.
-# A pull observation reads core, six independent resources, the optional base
-# comparison, then the closing head; an issue has two waves. URLs are sorted and rotated by the five-minute
-# epoch bucket modulo their count; each distinct URL is attempted at most
+# A pull observation reads core, six independent resources, the closing head,
+# then the optional base comparison; an issue has two waves.
+# A stopped base comparison follows a complete head-checked observation, so that
+# observation is saved with base_containment null while the URL still moves to
+# the back of the order and no further URL is dialed this pass.
+# URLs are sorted and rotated by the five-minute epoch bucket modulo their count; each distinct URL is attempted at most
 # once per poll and applied to every owner. Final URLs settle locally before
 # rotation and are never re-read. Genuine forge failures or head changes
 # record an error. docs/configuration.md "GitHub REST reads and the quota floor"
@@ -330,6 +333,9 @@ observe() { # canonical GitHub URL -> normalized JSON
     local repo_pid=$!
     wait_forges "$comments_pid" "$reviews_pid" "$inline_pid" "$checks_pid" "$statuses_pid" "$repo_pid" || return 1
     jq -e 'type == "array" and all(.[]; type == "array")' "$TMP/comments.json" >/dev/null || return 1
+    forge pr view "$url" --json headRefOid,reviewDecision > "$TMP/after.json" || return 1
+    after=$(jq -er .headRefOid "$TMP/after.json")
+    [ "$head" = "$after" ] || { printf 'head changed during observation\n' > "$TMP/forge.err"; return 1; }
     printf 'null\n' > "$TMP/base-containment.json"
     local base_ref comparison
     base_ref=$(jq -r '.base.ref // "" | @uri' "$TMP/core.json")
@@ -342,9 +348,6 @@ observe() { # canonical GitHub URL -> normalized JSON
         fi
       fi
     fi
-    forge pr view "$url" --json headRefOid,reviewDecision > "$TMP/after.json" || return 1
-    after=$(jq -er .headRefOid "$TMP/after.json")
-    [ "$head" = "$after" ] || { printf 'head changed during observation\n' > "$TMP/forge.err"; return 1; }
     jq -n --slurpfile core "$TMP/core.json" --slurpfile comments "$TMP/comments.json" \
       --slurpfile reviews "$TMP/reviews.json" --slurpfile inline "$TMP/inline.json" --slurpfile after "$TMP/after.json" --slurpfile checks "$TMP/checks.json" \
       --slurpfile statuses "$TMP/statuses.json" --slurpfile repo "$TMP/repo.json" \
@@ -511,13 +514,12 @@ poll() {
       mark_quota_stale "$url" "${row[@]:1}"
       continue
     fi
+    deferred_drop "$url"
     if [ "$READ_UNKNOWN" -ne 0 ]; then
       PASS_UNKNOWN=1
-      deferred_drop "$url"
       DEFERRED=${DEFERRED:+$DEFERRED$'\n'}$url
-      continue
+      [ "$observed" -eq 0 ] || continue
     fi
-    deferred_drop "$url"
     # Wake once per failure episode: only when no owner has a prior error.
     if [ "$observed" -ne 0 ] && jq -ne --slurpfile saved "$TMP/saved.json" --arg url "$url" --args \
       'all($ARGS.positional[] as $task | [$saved[0][] | select(.task == $task) | .records[] | select(.url == $url)] | first;
