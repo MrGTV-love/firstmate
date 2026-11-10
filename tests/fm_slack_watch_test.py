@@ -1762,9 +1762,18 @@ class IntakeTest(unittest.TestCase):
         def text_of(data):
             return data.decode('utf-8', 'replace') if isinstance(data, (bytes, bytearray)) else data
 
+        def whole_file(path):
+            """The complete file as it stands once a handle has closed: a value that spans two appends, each clean alone, is in it."""
+            try:
+                with real_open(path, 'rb') as done:
+                    return text_of(done.read())
+            except (OSError, TypeError, ValueError):
+                return ''
+
         class Spy:
-            def __init__(self, handle):
+            def __init__(self, handle, path):
                 self.handle = handle
+                self.path = path
                 self.whole = []
 
             def write(self, data):
@@ -1779,7 +1788,9 @@ class IntakeTest(unittest.TestCase):
             def close(self):
                 writes.append(''.join(self.whole))
                 self.whole = []
-                return self.handle.close()
+                result = self.handle.close()
+                writes.append(whole_file(self.path))
+                return result
 
             def __getattr__(self, name):
                 return getattr(self.handle, name)
@@ -1791,13 +1802,15 @@ class IntakeTest(unittest.TestCase):
             def __exit__(self, *exc):
                 writes.append(''.join(self.whole))
                 self.whole = []
-                return self.handle.__exit__(*exc)
+                result = self.handle.__exit__(*exc)
+                writes.append(whole_file(self.path))
+                return result
 
         def spy_open(file, mode='r', *args, **kwargs):
             handle = real_open(file, mode, *args, **kwargs)
             path = fd_path(file) if isinstance(file, int) else file
             if isinstance(path, (str, os.PathLike)) and under(path) and any(c in mode for c in 'wax+'):
-                return Spy(handle)
+                return Spy(handle, path)
             return handle
 
         def spy_write(fd, data):
@@ -1886,6 +1899,22 @@ class IntakeTest(unittest.TestCase):
             with self.observe_every_write(watch, writes):
                 via_json_dump_across_chunks(watch.root / 'route-json.txt', 'ab', 'cd')
             self.assertIn('ab", "b": "cd', '\n'.join(writes))
+
+    def test_the_every_write_observer_sees_a_value_that_two_clean_appends_form_in_the_complete_file(self):
+        """Calibration of the complete-file view (r65): two appends through two handles, each clean alone, form the value in the file; the
+        observer reports it (bad control) and reports nothing for the clean pair. The earlier observer saw each handle's own text only."""
+        value = 'fixture-signing-cross-append-0123456789'
+        for mutant in (False, True):
+            with self.fixture(env={'SLACK_SIGNING_SECRET': value}) as (watch, replay):
+                writes = []
+                store = watch.root / 'cross-append.txt'
+                first, second = value[:15], value[15:] if mutant else 'an ordinary second line'
+                with self.observe_every_write(watch, writes):
+                    for piece in (first, second):
+                        with open(store, 'a') as out:
+                            out.write(piece)
+                self.assertEqual(any(value in w for w in writes), mutant)
+                self.assertFalse(value in first or value in second)
 
     def test_the_every_write_observer_sees_the_journals_own_save_route(self):
         with self.fixture() as (watch, replay):
@@ -2990,6 +3019,276 @@ class IntakeTest(unittest.TestCase):
             watch.poll()
             self.assertEqual(sorted(self.acks(replay)), ['200.000100', '200.000200', '200.000300', '200.000400', '200.000600'])
             self.assertEqual(watch.load_state()['pending'], [])
+
+
+    # ---- r65 (Main 3176): the output boundary. Each case of the outcome reassessment of 406f63e0 (R1 to R3, and the refused-on listing found
+    # beside it) with its clean neighbour. A test named pending_owner_* pins the INTERIM behaviour of a hit that holds no request-text
+    # character (class 3): the plane writes nothing that holds the value, prints nothing that holds it, changes no identity, does not take the
+    # request in (the intake cursor stays, nothing is staged or acknowledged, the message is read again each poll) and reports
+    # secret_collides_with_marker once. The owner has not ruled on OC1, OC2 and OC3, so these are PENDING, not passes. ----
+
+    def run_printed(self, watch, command='poll'):
+        """One poll, then what the run prints through the one writer: (standard output, standard error)."""
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            watch.poll()
+            plane.emit(watch, command)
+        return out.getvalue(), err.getvalue()
+
+    def sink_texts(self, watch, replay, *printed):
+        """Every sink of the request path as one complete text each: the journal, the whole record store, the outbound log, what was printed."""
+        store = watch.root / plane.RECORD_FILE
+        return [(watch.root / 'state.json').read_text(), store.read_text() if store.is_file() else '', json.dumps(replay.state['log'])] + list(printed)
+
+    def cursor(self, watch):
+        return json.loads((watch.root / 'state.json').read_text()).get('intake_cursor')
+
+    def test_a_value_across_the_record_key_and_the_text_replaces_the_text_characters_and_keeps_the_key(self):
+        """R2 part 2 (class 2, r62:132 and r62:156): the value holds request text, so only those characters are replaced; the record keeps its
+        `ts`, the pointer finds it, the flag and `replaced` are set."""
+        text = 'q' * 18 + 'z' * 1200
+        value = '200.000100' + '", "text": "' + 'q' * 18
+        with self.fixture(env={'SLACK_SIGNING_SECRET': value}) as (watch, replay):
+            self.say(replay, '200.000100', text)
+            out, err = self.run_printed(watch)
+            for sink in self.sink_texts(watch, replay, out, err):
+                self.assertNotIn(value, sink)
+            record = self.record(watch, '200.000100')
+            self.assertIsNotNone(record, 'the record is not found under the request key')
+            self.assertTrue(record['replaced'])
+            self.assertTrue(record['text'].startswith(plane.SECRET_MARKER))
+            [line] = self.wakes(watch) if self.wakes(watch) else [l for l in out.splitlines() if l.startswith(plane.REQUEST_PREFIX)]
+            parts = self.wake_parts(line)
+            self.assertEqual((parts['ts'], parts['user'], parts['flag'], parts['pointer']), ('200.000100', self.OWNER, True, '#200.000100'))
+            self.assertEqual(self.acks(replay), ['200.000100'])
+        with self.fixture(env={'SLACK_SIGNING_SECRET': 'unrelated-fixture-value-0123456789'}) as (watch, replay):
+            self.say(replay, '200.000100', text)
+            self.run_printed(watch)
+            record = self.record(watch, '200.000100')
+            self.assertEqual((record['text'], record['replaced']), (text, False))
+
+    def test_a_value_across_two_wake_lines_replaces_the_request_text_characters_in_the_printed_stream(self):
+        """R1 part 2, standard output (class 2): the value holds the first request's text, its closing quote, the newline and the next line's
+        prefix and ts. The complete stream holds no value, the first line carries the flag, the second is untouched, both are acknowledged."""
+        first, second = 'first plain owner request', 'second plain owner request'
+        value = first + '"' + '\n' + 'check: slack request ' + '200.000200'
+        with self.fixture(env={'SLACK_SIGNING_SECRET': value}) as (watch, replay):
+            self.say(replay, '200.000100', first)
+            self.say(replay, '200.000200', second)
+            out, err = self.run_printed(watch)
+            self.assertNotIn(value, out + err)
+            lines = [l for l in out.splitlines() if l.startswith(plane.REQUEST_PREFIX)]
+            self.assertEqual(len(lines), 2)
+            self.assertEqual([self.wake_parts(l)['flag'] for l in lines], [True, False])
+            self.assertEqual(self.wake_parts(lines[1])['text'], second)
+            self.assertEqual(self.acks(replay), ['200.000100', '200.000200'])
+        with self.fixture(env={'SLACK_SIGNING_SECRET': value + 'X'}) as (watch, replay):
+            self.say(replay, '200.000100', first)
+            self.say(replay, '200.000200', second)
+            out, err = self.run_printed(watch)
+            lines = [l for l in out.splitlines() if l.startswith(plane.REQUEST_PREFIX)]
+            self.assertEqual([self.wake_parts(l)['flag'] for l in lines], [False, False])
+
+    def test_a_value_across_the_pointer_frame_and_the_place_takes_the_key_alone_and_the_request_is_woken(self):
+        """R3: the value forms from `; full: ` and the start of the record place. The place is left out, the key alone is the pointer (r62:156,
+        confirmed by Main 3176), the request is acknowledged and woken once and is not stuck."""
+        text = 'z' * 1200
+        with self.fixture() as (probe, probe_replay):
+            place = probe.record_places()[0]
+        value = '; full: ' + place[:12]
+        with self.fixture(env={'SLACK_SIGNING_SECRET': value}) as (watch, replay):
+            self.say(replay, '200.000100', text)
+            out, err = self.run_printed(watch)
+            self.assertNotIn(value, out + err + '\n'.join(self.sink_texts(watch, replay)))
+            [line] = [l for l in out.splitlines() if l.startswith(plane.REQUEST_PREFIX)]
+            self.assertEqual(self.wake_parts(line)['pointer'], '#200.000100')
+            self.assertEqual(self.record(watch, '200.000100')['text'], text)
+            self.assertEqual(self.acks(replay), ['200.000100'])
+            self.assertEqual(watch.load_state()['pending'], [])
+        with self.fixture(env={'SLACK_SIGNING_SECRET': 'unrelated-fixture-value-0123456789'}) as (watch, replay):
+            self.say(replay, '200.000100', text)
+            out, err = self.run_printed(watch)
+            [line] = [l for l in out.splitlines() if l.startswith(plane.REQUEST_PREFIX)]
+            self.assertEqual(self.wake_parts(line)['pointer'], place + '#200.000100')
+
+    def test_pending_owner_oc2_a_value_formed_from_identities_and_syntax_takes_no_request_in_and_changes_no_identity(self):
+        """R2 part 1 (class 3, PENDING owner OC1/OC2): thread + the JSON separator + the author id holds no request-text character. Interim: the
+        request is not taken in (cursor held, nothing staged, no acknowledgement), the failure is reported, the journal holds no value; when the
+        value is gone the request arrives once, with its identities intact."""
+        value = '200.000100' + '", "author": "' + self.OWNER
+        with self.fixture(env={'SLACK_SIGNING_SECRET': value}) as (watch, replay):
+            start = self.cursor(watch)
+            self.say(replay, '200.000100', 'an ordinary request')
+            with self.assertRaisesRegex(SlackError, '^secret_collides_with_marker$'):
+                watch.poll()
+            for sink in self.sink_texts(watch, replay):
+                self.assertNotIn(value, sink)
+            self.assertEqual((self.cursor(watch), self.acks(replay), watch.load_state()['pending']), (start, [], []))
+            with patch.dict(os.environ, {'SLACK_SIGNING_SECRET': 'unrelated-fixture-value-0123456789'}):
+                watch.state, watch.advanced = watch.load_state(), 0
+                out, err = self.run_printed(watch)
+            self.assertEqual(self.acks(replay), ['200.000100'])
+            [line] = [l for l in out.splitlines() if l.startswith(plane.REQUEST_PREFIX)]
+            self.assertEqual((self.wake_parts(line)['ts'], self.wake_parts(line)['user']), ('200.000100', self.OWNER))
+        with self.fixture(env={'SLACK_SIGNING_SECRET': 'unrelated-fixture-value-0123456789'}) as (watch, replay):
+            self.say(replay, '200.000100', 'an ordinary request')
+            watch.poll()
+            self.assertEqual(self.acks(replay), ['200.000100'])
+
+    def test_pending_owner_oc2_a_value_across_two_record_entries_takes_the_second_request_no_further(self):
+        """R1 part 2, the record store (class 3, PENDING owner OC1/OC2): the value is the end of one entry, the newline and the start of the next
+        (structure and the next key, no request text). Interim: the first request is taken in and woken; the second is not taken in; the whole
+        store holds no value; when the value is gone the second arrives once, in order."""
+        texts = ['first plain owner request', 'second plain owner request']
+
+        def entry(ts, text):
+            return json.dumps({'ts': ts, 'text': text, 'shown': text, 'replaced': False, 'extra_removed': 0}, ensure_ascii=True)
+        value = entry('200.000100', texts[0])[-20:] + '\n' + entry('200.000200', texts[1])[:20]
+        with self.fixture(env={'SLACK_SIGNING_SECRET': value}) as (watch, replay):
+            self.say(replay, '200.000100', texts[0])
+            self.say(replay, '200.000200', texts[1])
+            with self.assertRaisesRegex(SlackError, '^secret_collides_with_marker$'):
+                watch.poll()
+            for sink in self.sink_texts(watch, replay):
+                self.assertNotIn(value, sink)
+            self.assertEqual(self.acks(replay), ['200.000100'])
+            self.assertEqual(self.cursor(watch), '200.000100')
+            with patch.dict(os.environ, {'SLACK_SIGNING_SECRET': 'unrelated-fixture-value-0123456789'}):
+                watch.state, watch.advanced = watch.load_state(), 0
+                watch.poll()
+            self.assertEqual(self.acks(replay), ['200.000100', '200.000200'])
+        with self.fixture(env={'SLACK_SIGNING_SECRET': value + 'X'}) as (watch, replay):
+            self.say(replay, '200.000100', texts[0])
+            self.say(replay, '200.000200', texts[1])
+            watch.poll()
+            self.assertEqual(self.acks(replay), ['200.000100', '200.000200'])
+
+    def failed_row(self, thread='200.000100'):
+        return {'event': 'test/request/' + thread, 'key': '', 'thread': thread, 'author': self.OWNER, 'text': 'a request', 'shown': 'a request',
+                'replaced': False, 'extra': 0, 'kind': 'request', 'stage': 'request', 'state': 'failed', 'owner': 'Main', 'tries': 3}
+
+    def test_pending_owner_oc3_a_value_inside_the_listing_prints_no_row_text_off_the_plane_and_under_a_refusal(self):
+        """R1 part 1 and the refused-on listing found beside it (PENDING owner OC3): a plane value inside the failed-row listing's fixed text
+        makes the listing print no row text, off the plane and in a run the collision refuses; the journal is unchanged; a clean neighbour
+        lists the row once."""
+        value = 'not acknowledged (failed'
+        listing = 'slack: request 200.000100 not acknowledged (failed, owner Main)'
+        for token, label in (('', 'off the plane'), ('fixture-token-not-a-secret', 'a refused run')):
+            with self.fixture(env={'SLACK_SIGNING_SECRET': value}) as (watch, replay):
+                watch.state['pending'].append(self.failed_row())
+                watch.commit()
+                before = (watch.root / 'state.json').read_bytes()
+                watch.lock.close()
+                for command in ('poll', 'check'):
+                    out, err = io.StringIO(), io.StringIO()
+                    env = {'SLACK_BOT_TOKEN': token, 'SLACK_SIGNING_SECRET': value, 'FM_SLACK_NO_NETWORK': '1'}
+                    with patch.dict(os.environ, env), contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                        plane.main([command])
+                    self.assertNotIn(value, out.getvalue() + err.getvalue(), (label, command))
+                    self.assertNotIn('slack: request 200.000100', out.getvalue() + err.getvalue(), (label, command))
+                if token == '':
+                    self.assertEqual((watch.root / 'state.json').read_bytes(), before)
+            with self.fixture(env={'SLACK_SIGNING_SECRET': 'unrelated-fixture-value-0123456789'}) as (watch, replay):
+                watch.state['pending'].append(self.failed_row())
+                watch.commit()
+                watch.lock.close()
+                out, err = io.StringIO(), io.StringIO()
+                env = {'SLACK_BOT_TOKEN': token, 'SLACK_SIGNING_SECRET': 'unrelated-fixture-value-0123456789', 'FM_SLACK_NO_NETWORK': '1'}
+                with patch.dict(os.environ, env), contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                    plane.main(['poll'])
+                self.assertEqual(out.getvalue().count(listing), 1, label)
+
+    def test_the_refusal_is_reported_once_and_the_request_arrives_once_in_order_when_the_collision_clears(self):
+        """Liveness of the interim function: the one report line prints although the request is refused, a second run adds no second report,
+        and nothing is lost or repeated when the value goes away."""
+        value = '200.000100' + '", "author": "' + self.OWNER
+        with self.fixture(env={'SLACK_SIGNING_SECRET': value}) as (watch, replay):
+            self.say(replay, '200.000100', 'the refused request')
+            self.say(replay, '200.000200', 'the request behind it')
+            reports = []
+            for _ in range(3):
+                watch.state, watch.advanced = watch.load_state(), 0
+                out = io.StringIO()
+                with contextlib.redirect_stdout(out):
+                    try:
+                        watch.poll()
+                    except SlackError as error:
+                        watch.report_failure(error)
+                    plane.emit(watch, 'poll')
+                reports.append(out.getvalue().count('slack: transport failure: secret_collides_with_marker'))
+            self.assertEqual(reports, [1, 0, 0])
+            self.assertEqual(self.acks(replay), [])
+            self.assertEqual(watch.load_state()['failure'], 'secret_collides_with_marker')
+            self.assertNotIn(value, json.dumps(watch.load_state()['outbox']))
+            with patch.dict(os.environ, {'SLACK_SIGNING_SECRET': 'unrelated-fixture-value-0123456789'}):
+                watch.state, watch.advanced = watch.load_state(), 0
+                out, err = self.run_printed(watch)
+            self.assertEqual(self.acks(replay), ['200.000100', '200.000200'])
+            self.assertEqual(len([l for l in out.splitlines() if l.startswith(plane.REQUEST_PREFIX)]), 2)
+            self.assertEqual(watch.load_state()['failure'], '')
+
+    def notice_line(self, thread):
+        return 'check: slack %s - unmatched reply %s' % (thread, thread)
+
+    def staged_notices(self, watch, count):
+        for n in range(count):
+            thread = '120.%06d' % (100 + n)
+            row = self.stage_notice(watch, 'test/notice/%d' % n, thread)
+            row['line'] = self.notice_line(thread)
+            watch.state['pending'].append(row)
+        watch.commit()
+
+    def units(self, replay):
+        posts = [e['thread_ts'] for e in replay.state['log'] if e['method'] == 'chat.postMessage' and 'error' not in e]
+        return sum(1 for t in posts if t.startswith('120.')), sum(1 for t in posts if t.startswith('200.'))
+
+    def test_the_default_cap_spends_exactly_twenty_units_when_twenty_are_completable(self):
+        """R4, line 108 of r62 (a unit is counted from its post): notices that fit the wake line plus enough waiting requests complete exactly
+        20 units in the first poll, with the 480-character line and the queue marker kept. Two mixes, both measured on the head."""
+        fit = 0
+        while len('; '.join(self.notice_line('120.%06d' % (100 + n)) for n in range(fit + 1))) <= plane.WAKE_LIMIT - plane.QUEUE_RESERVE:
+            fit += 1
+        self.assertGreater(fit, 0)
+        for notices, requests in ((20, 20), (0, 21)):
+            with self.fixture(cap='20') as (watch, replay):
+                self.staged_notices(watch, notices)
+                for n in range(requests):
+                    self.say(replay, '200.%06d' % (100 + n), 'request %d' % n)
+                out, err = self.run_printed(watch, 'check')
+                posted_notices, posted_requests = self.units(replay)
+                self.assertEqual(posted_notices + posted_requests, 20, (notices, requests))
+                self.assertEqual(posted_notices, min(notices, fit))
+                self.assertLessEqual(len(out.strip()), plane.WAKE_LIMIT)
+
+    def test_pending_owner_oc4_twenty_notices_and_one_request_complete_only_the_units_that_fit(self):
+        """R4's own mix (PENDING owner OC4: is a notice with no outbox room eligible?): 20 notices and 1 request complete the notices that fit
+        the wake line plus the request, which is fewer than 20. This records the head's behaviour; it is not a pass of r62:108."""
+        fit = 0
+        while len('; '.join(self.notice_line('120.%06d' % (100 + n)) for n in range(fit + 1))) <= plane.WAKE_LIMIT - plane.QUEUE_RESERVE:
+            fit += 1
+        with self.fixture(cap='20') as (watch, replay):
+            self.staged_notices(watch, 20)
+            self.say(replay, '200.000100', 'the one request')
+            self.run_printed(watch, 'check')
+            self.assertEqual(self.units(replay), (fit, 1))
+
+
+    def test_the_text_only_replacer_cannot_touch_an_identity_or_a_key_and_refuses_a_span_that_names_one(self):
+        """The limit of the one replacer (Main 3178): it takes marks for the request's `text` and `shown` only. A mark that names the thread, the
+        author, the event, the key or any other field is refused, and the row is left as it was; a mark on `text` replaces exactly those
+        characters, counts the removed bytes and sets `replaced`."""
+        row = {'event': 'e/200.000100/request', 'key': '', 'thread': '200.000100', 'author': self.OWNER, 'text': 'abcdef', 'shown': 'abcdef',
+               'replaced': False, 'extra': 0, 'kind': 'request', 'stage': 'request'}
+        for field in ('thread', 'author', 'event', 'key', 'kind', 'stage', 'ts'):
+            copy = json.loads(json.dumps(row))
+            with self.assertRaises(SlackError, msg=field):
+                plane.replace_request_text(copy, {field: {0, 1, 2}})
+            self.assertEqual(copy, row, field)
+        copy = json.loads(json.dumps(row))
+        plane.replace_request_text(copy, {'text': {1, 2}, 'shown': {4}})
+        self.assertEqual((copy['text'], copy['shown'], copy['replaced'], copy['extra']),
+                         ('a' + plane.SECRET_MARKER + 'def', 'abcd' + plane.SECRET_MARKER + 'f', True, 2))
+        self.assertEqual({k: copy[k] for k in ('event', 'key', 'thread', 'author', 'kind', 'stage')}, {k: row[k] for k in ('event', 'key', 'thread', 'author', 'kind', 'stage')})
 
 
 class ClosedTransportTest(unittest.TestCase):
