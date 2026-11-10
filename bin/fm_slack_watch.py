@@ -113,10 +113,13 @@ def run(script, *args, text=None):
 def save(path, value):
     if path.is_symlink():
         raise SlackError('unsafe_state_path')
+    # The complete serialized text is protected before any byte is written (F1 of the outcome review of b0f37a54): a value that
+    # the JSON syntax joins from the pieces of two fields, or of one field and the delimiters around it, never reaches the file.
+    text, _ = protect_document(value, False)
     fd, name = tempfile.mkstemp(prefix='.slack-', dir=path.parent)
     try:
         with os.fdopen(fd, 'w') as out:
-            json.dump(value, out, ensure_ascii=False)
+            out.write(text)
             out.flush()
             os.fsync(out.fileno())
         os.replace(name, path)
@@ -371,11 +374,14 @@ def encoded_hits(text):
 
 
 def protect_encoded(text):
-    """text with every character whose JSON encoding forms a plane value replaced by the marker, to a fixed point (fail closed)."""
+    """text with every character whose JSON encoding forms a plane value replaced by the marker, to a fixed point (fail closed).
+    Returns (the text, whether anything was replaced): a replacement that settles still reports True (F6 of the outcome review)."""
+    changed = False
     for _ in range(SETTLE_PASSES):
         hits = encoded_hits(text)
         if not hits:
-            return text, False
+            return text, changed
+        changed = True
         runs = []
         for i in hits:
             if runs and i == runs[-1][1]:
@@ -386,6 +392,101 @@ def protect_encoded(text):
             text = text[:start] + SECRET_MARKER + text[end:]
         text = replace_values(text)[0]
     return SECRET_MARKER, True
+
+
+def document_spans(value, ascii_only):
+    """json.dumps(value) as the plane writes it, with for each output character the (leaf, index) of the string character that it
+    encodes, or None for structure (braces, keys, separators, numbers, quotes) and for characters that must never be replaced (a
+    wake line of the outbox keeps its grammar: its fixed text is structure). Also returns the leaves as (container, key, string)."""
+    chars, refs, leaves = [], [], []
+
+    def put(piece, ref=None):
+        chars.append(piece)
+        refs.extend([ref] * len(piece))
+
+    def walk(item, parent, key, outbox):
+        if isinstance(item, dict):
+            put('{')
+            for n, (k, v) in enumerate(item.items()):
+                if n:
+                    put(', ')
+                put(json.dumps(k, ensure_ascii=ascii_only))
+                put(': ')
+                walk(v, item, k, outbox or k == 'outbox')
+            put('}')
+        elif isinstance(item, list):
+            put('[')
+            for n, v in enumerate(item):
+                if n:
+                    put(', ')
+                walk(v, item, n, outbox)
+            put(']')
+        elif isinstance(item, str):
+            leaf = len(leaves)
+            leaves.append((parent, key, item))
+            put('"')
+            for index, ch in enumerate(item):
+                put(json.dumps(ch, ensure_ascii=ascii_only)[1:-1], None if outbox else (leaf, index))
+            put('"')
+        else:
+            put(json.dumps(item, ensure_ascii=ascii_only))
+    walk(value, None, None, False)
+    text = ''.join(chars)
+    if text != json.dumps(value, ensure_ascii=ascii_only):
+        return json.dumps(value, ensure_ascii=ascii_only), None, leaves
+    return text, refs, leaves
+
+
+def protect_document(value, ascii_only):
+    """json.dumps(value) as the plane writes it (ensure_ascii as asked), with every plane value that the serialization itself
+    creates replaced, in place, inside the string fields that it overlaps, to a fixed point: a value formed from the end of one field,
+    the JSON delimiters and the start of another (F1 of the outcome review of b0f37a54). Only the overlapped characters are replaced by
+    the marker; every other byte is kept. A value that lies wholly in structure (a key, a delimiter, a wake line's fixed text) could
+    never be replaced for good, so it is refused like a value that the marker holds. A request row whose text is changed here also
+    carries replaced=True and counts the removed bytes in extra, so its wake line and record say so. Returns (the text, whether a value was replaced)."""
+    replaced = False
+    for _ in range(SETTLE_PASSES):
+        text = json.dumps(value, ensure_ascii=ascii_only)
+        values = plane_secrets()
+        if not values or not any(v in text for v in values):
+            return text, replaced
+        text, refs, leaves = document_spans(value, ascii_only)
+        if refs is None:
+            raise SlackError('secret_collides_with_marker')
+        marks = {}
+        for v in values:
+            at = text.find(v)
+            while at >= 0:
+                touched = {refs[i] for i in range(at, at + len(v)) if refs[i] is not None}
+                if not touched:
+                    raise SlackError('secret_collides_with_marker')
+                for leaf, index in touched:
+                    marks.setdefault(leaf, set()).add(index)
+                at = text.find(v, at + 1)
+        for leaf, indexes in marks.items():
+            parent, key, item = leaves[leaf]
+            new, run, removed = [], False, 0
+            for index, ch in enumerate(item):
+                if index in indexes:
+                    removed += len(ch.encode('utf-8'))
+                    if not run:
+                        new.append(SECRET_MARKER)
+                    run = True
+                else:
+                    new.append(ch)
+                    run = False
+            parent[key] = ''.join(new)
+            if isinstance(parent, dict) and ('replaced' in parent or 'shown' in parent):
+                parent['replaced'] = True
+                if key == 'text' and 'extra' in parent:
+                    parent['extra'] = int(parent.get('extra') or 0) + removed
+        replaced = True
+    raise SlackError('secret_collides_with_marker')
+
+
+SEGMENT = re.compile(r'(check: slack request ([0-9]+\.[0-9]+) from (' + USER_ID.pattern + r')( \((?:not acknowledged after [0-9]+ tries|acknowledgement state unknown)\))?: '
+                     + re.escape(REQUEST_LABEL) + r' )("(?:[^"\\]|\\.)*")((?:; ' + SECRET_FLAG + r')?)((?:; full: [^;#]*#[0-9]+\.[0-9]+)?)')
+LITERAL_UNIT = re.compile(r'\\u[0-9a-fA-F]{4}|\\.|.', re.S)
 
 
 def sanitize(raw):
@@ -456,6 +557,9 @@ def request_line(ts, user, presented, note='', flagged=False, budget=WAKE_LIMIT,
     create together is protected like any other match, by replacing the whole characters that form it."""
     head = REQUEST_PREFIX + '%s from %s%s: %s ' % (ts, user, note, REQUEST_LABEL)
     places = [place, *fallbacks] if place else list(fallbacks)
+    # A place that holds a plane value would write it into the pointer: it is skipped, and the key alone, which locates the record in
+    # the store of the state folder in use (I4d), is always left (F6 of the outcome review of b0f37a54).
+    places = [value for value in places if not any(secret in value for secret in plane_secrets())]
     places = [value for index, value in enumerate(places) if value not in places[:index]] + ['']
     for _ in range(SETTLE_PASSES):
         flag = '; ' + SECRET_FLAG if flagged else ''
@@ -1197,8 +1301,8 @@ class Watch:
         if path.is_symlink():
             raise SlackError('unsafe_state_path')
         # ASCII-escaped, so that no character of the text (U+2028 included) can end the record's line early.
-        entry = json.dumps({'ts': pending['thread'], 'text': pending['text'], 'shown': shown_text(pending),
-                            'replaced': bool(pending.get('replaced')), 'extra_removed': int(pending.get('extra') or 0)})
+        entry, _ = protect_document({'ts': pending['thread'], 'text': pending['text'], 'shown': shown_text(pending),
+                                     'replaced': bool(pending.get('replaced')), 'extra_removed': int(pending.get('extra') or 0)}, True)
         # Test-only: FM_SLACK_FAULT=record-write makes this write fail; the process does not stop at the point.
         if env_value('FM_SLACK_FAULT') == 'record-write':
             raise SlackError('request_record_unwritable')
@@ -1243,6 +1347,59 @@ class Watch:
             first = str(path)
         forms = [first, os.path.relpath(path, self.home)]
         return [self.escape_place(value) for index, value in enumerate(forms) if value not in forms[:index]]
+
+    def protect_printed(self, text):
+        """The text of one printed wake line with every plane value that the join of its parts creates (the segments, the separators, the
+        appended queue marker) replaced inside the request texts it overlaps, to a fixed point (F1 of the outcome review of b0f37a54). Each
+        touched segment is rebuilt by request_line, with the flag, and cut to what the line still has room for, with its pointer. A value
+        that lies wholly in the fixed text of the line is refused like a value that the marker holds."""
+        for _ in range(SETTLE_PASSES):
+            values = plane_secrets()
+            hits = []
+            for value in values:
+                at = text.find(value)
+                while at >= 0:
+                    hits.append((at, at + len(value)))
+                    at = text.find(value, at + 1)
+            if not hits:
+                return text
+            segments = list(SEGMENT.finditer(text))
+            units = []
+            for n, match in enumerate(segments):
+                base = match.start(5) + 1
+                for unit in LITERAL_UNIT.finditer(match.group(5)[1:-1]):
+                    units.append((base + unit.start(), base + unit.end(), n))
+            touched = {}
+            for a, b in hits:
+                over = [unit for unit in units if unit[0] < b and unit[1] > a]
+                if not over:
+                    raise SlackError('secret_collides_with_marker')
+                for start, end, n in over:
+                    touched.setdefault(n, set()).add((start, end))
+            for n in sorted(touched, reverse=True):
+                match = segments[n]
+                base, content = match.start(5) + 1, match.group(5)[1:-1]
+                # Consecutive touched units become one marker; everything else of the text is kept.
+                pieces, cursor = [], 0
+                spans = sorted(touched[n])
+                merged = []
+                for start, end in spans:
+                    if merged and start == merged[-1][1]:
+                        merged[-1][1] = end
+                    else:
+                        merged.append([start, end])
+                for start, end in merged:
+                    pieces.append(content[cursor:start - base])
+                    pieces.append(SECRET_MARKER)
+                    cursor = end - base
+                pieces.append(content[cursor:])
+                presented = json.loads('"' + ''.join(pieces) + '"')
+                outside = len(text) - (match.end() - match.start())
+                places = self.record_places()
+                segment = request_line(match.group(2), match.group(3), presented, match.group(4) or '', True,
+                                       max(0, WAKE_LIMIT - outside), places[0], places[1:])
+                text = text[:match.start()] + segment + text[match.end():]
+        raise SlackError('secret_collides_with_marker')
 
     def request_wake_line(self, pending, note=''):
         places = self.record_places()
@@ -1904,12 +2061,12 @@ def emit_plan(watch, command, bound):
         if shown == 1:
             # One request line alone is cut again, from its record, so that the marker still fits behind it.
             chosen = [watch.fit(chosen[0], WAKE_LIMIT - len(tail))]
-        return [wake_line(chosen, queued + len(lines) - shown)], lines[:shown]
+        return [watch.protect_printed(wake_line(chosen, queued + len(lines) - shown))], lines[:shown]
     owed = list(lines)
     if lines:
         tail = queue_tail(queued)
         lines = lines[:-1] + [watch.fit(lines[-1], WAKE_LIMIT - len(tail)) + tail]
-    return lines, owed
+    return [watch.protect_printed(line) for line in lines], owed
 
 
 def emit_write(watch, plan):

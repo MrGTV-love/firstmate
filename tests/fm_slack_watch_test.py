@@ -1947,6 +1947,88 @@ class IntakeTest(unittest.TestCase):
             record = self.record(watch, '200.000100')
             self.assertEqual((record['text'], record['replaced']), (plane.SECRET_MARKER, True))
 
+    def test_a_value_that_the_json_syntax_joins_from_two_fields_is_protected_in_the_journal_and_the_record(self):
+        """F1 of the outcome review of b0f37a54 (the state and record sinks): a plane value formed from the end of one field, the JSON
+        delimiters and the start of the next never reaches a durable write, and a text that no pair of fields turns into a value keeps
+        every byte."""
+        text = 'ordinaryfixturetextXYZ'
+        value = text + '", "shown": "' + text
+        for fault in ('after-stage', None):
+            with self.fixture(env={'SLACK_SIGNING_SECRET': value}) as (watch, replay):
+                writes = []
+                self.say(replay, '200.000100', text)
+                with self.observe_every_write(watch, writes):
+                    if fault:
+                        with patch.dict(os.environ, {'FM_SLACK_FAULT': fault}), self.assertRaises(RuntimeError):
+                            watch.poll()
+                    else:
+                        watch.poll()
+                self.assertFalse(value in '\n'.join(writes), 'a plane value formed in a durable write (%s)' % fault)
+                self.assertFalse(value in (watch.root / 'state.json').read_text(), 'a plane value formed in the journal (%s)' % fault)
+                store = watch.root / plane.RECORD_FILE
+                self.assertFalse(store.is_file() and value in store.read_text(), 'a plane value formed in the record (%s)' % fault)
+                if not fault:
+                    [line] = self.wakes(watch)
+                    self.assertTrue(self.wake_parts(line)['flag'])
+                    self.assertTrue(self.record(watch, '200.000100')['replaced'])
+        with self.fixture(env={'SLACK_SIGNING_SECRET': 'fixture-signing-in-no-text-0123456789'}) as (watch, replay):
+            self.say(replay, '200.000100', text)
+            watch.poll()
+            record = self.record(watch, '200.000100')
+            self.assertEqual((record['text'], record['replaced']), (text, False))
+
+    def test_a_value_that_the_join_of_a_line_and_the_queue_marker_creates_is_protected_in_the_printed_line(self):
+        """F1 of the outcome review of b0f37a54 (the final emitted line): a plane value formed from the encoded text, its closing quote and
+        the appended queue marker is replaced inside the text, the line keeps its grammar and its bound, and a control keeps every byte."""
+        text = 'a' * 220
+        for value, protected in ((text + '"; +1 queued', True), ('fixture-signing-in-no-line-0123456789', False)):
+            with self.fixture(env={'SLACK_SIGNING_SECRET': value}) as (watch, replay):
+                self.say(replay, '200.000100', text)
+                self.say(replay, '200.000200', 'b' * 240)
+                watch.poll()
+                out = io.StringIO()
+                with contextlib.redirect_stdout(out):
+                    plane.emit(watch, 'check')
+                self.assertFalse(value in out.getvalue(), 'a plane value formed in the printed line')
+                [line] = [l for l in out.getvalue().splitlines() if l.startswith(plane.REQUEST_PREFIX)]
+                parts = self.wake_parts(line)
+                self.assertEqual((parts['flag'], parts['queued']), (protected, '+1 queued'))
+                self.assertLessEqual(len(line), plane.WAKE_LIMIT)
+                self.assertEqual(parts['text'] == text, not protected)
+
+    def test_the_flag_follows_a_replacement_that_only_the_json_encoding_after_the_presentation_creates(self):
+        """F6 of the outcome review of b0f37a54: the text shows the marker, so the line carries the flag and the record says replaced."""
+        value = 'abcdefghijklmnop' + '\\"' + '&tail'
+        with self.fixture(env={'SLACK_SIGNING_SECRET': value}) as (watch, replay):
+            self.say(replay, '200.000100', 'abcdefghijklmnop"&amp;tail')
+            watch.poll()
+            [line] = self.wakes(watch)
+            self.assertFalse(value in line)
+            self.assertIn(plane.SECRET_MARKER, self.wake_parts(line)['text'])
+            self.assertTrue(self.wake_parts(line)['flag'])
+            self.assertTrue(self.record(watch, '200.000100')['replaced'])
+
+    def test_a_record_place_that_holds_a_plane_value_is_left_out_of_the_pointer_and_the_key_alone_is_used(self):
+        """F6 of the outcome review of b0f37a54: a long request is woken, with a pointer that locates its record, when the state path holds a
+        plane value; a path that holds none is written into the pointer as before."""
+        value = 'fixturepathvalue123456789'
+        long_text = 'z' * 1200
+        with self.fixture(env={'SLACK_SIGNING_SECRET': value}) as (watch, replay):
+            line = plane.request_line('200.000100', self.OWNER, long_text, place='dir-' + value + '/requests.jsonl',
+                                      fallbacks=('rel-' + value + '/requests.jsonl',))
+            self.assertFalse(value in line)
+            self.assertEqual(self.wake_parts(line)['pointer'], '#200.000100')
+            control = plane.request_line('200.000100', self.OWNER, long_text, place='state/slack-watch/requests.jsonl')
+            self.assertEqual(self.wake_parts(control)['pointer'], 'state/slack-watch/requests.jsonl#200.000100')
+            with patch.object(plane.Watch, 'record_places', lambda self: ['dir-' + value + '/requests.jsonl']):
+                self.say(replay, '200.000200', long_text)
+                watch.poll()
+            [woken] = self.wakes(watch)
+            self.assertFalse(value in woken)
+            self.assertEqual(self.wake_parts(woken)['pointer'], '#200.000200')
+            self.assertEqual(self.record(watch, '200.000200')['text'], long_text)
+            self.assertEqual(self.acks(replay), ['200.000200'])
+
     def test_a_value_split_across_a_link_keeps_the_text_around_it_in_the_line(self):
         value = 'fixturesigning1234'
         with self.fixture(env={'SLACK_SIGNING_SECRET': value}) as (watch, replay):
