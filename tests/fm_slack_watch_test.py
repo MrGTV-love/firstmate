@@ -469,6 +469,24 @@ class CardRefreshTest(unittest.TestCase):
             self.assertEqual(methods.count('chat.postMessage'), 2)
 
 
+    def test_pending_owner_oc1_a_plane_value_typed_into_a_card_reply_stops_that_polls_journal_write_and_reports_once(self):
+        """The card-reply case (PENDING owner OC1; answer intake is not widened): a plane value typed into a reply on a live card makes the
+        journal write refuse, so that poll stops and reports secret_collides_with_marker (once per episode in the real run); no value reaches
+        the journal and the reply stays unread, so it is read again when the value is gone."""
+        value = 'fixture-signing-in-a-card-reply-0123456789'
+        with self.fixture() as (watch, replay, rows):
+            watch.authors = {'U0TESTOWNER'}
+            watch.mirror()
+            card = next(iter(watch.state['threads'].values()))
+            replay.state['messages'].append({'ts': '300.000100', 'thread_ts': card['ts'], 'user': 'U0TESTOWNER', 'text': 'my answer ' + value})
+            with patch.dict(os.environ, {'SLACK_SIGNING_SECRET': value}):
+                with self.assertRaisesRegex(SlackError, '^secret_collides_with_marker$'):
+                    watch.poll()
+            journal = (watch.root / 'state.json').read_text()
+            self.assertNotIn(value, journal)
+            self.assertEqual([row for row in json.loads(journal)['pending'] if row.get('kind') == 'answer'], [])
+
+
 class ReplayShapeTest(unittest.TestCase):
     """The replay must deliver history, order, and scopes the way Slack does."""
 
@@ -3409,6 +3427,54 @@ class IntakeTest(unittest.TestCase):
                 self.assertEqual(err.getvalue(), second + '\n')
                 self.assertNotIn(value + suffix, out.getvalue())
                 self.assertNotIn(value + suffix, err.getvalue())
+
+
+    def printed_constants_of_the_four_commands(self):
+        """Every constant that arm, disarm, resolve and retarget print, read from the print calls of their code: what the print of each is."""
+        import ast
+        tree = ast.parse((Path(plane.__file__)).read_text())
+        wanted = {'resolve_request', 'check', 'arm', 'disarm'}
+        found = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef) and node.name in wanted:
+                for call in ast.walk(node):
+                    if isinstance(call, ast.Call) and isinstance(call.func, ast.Name) and call.func.id == 'print' and call.args:
+                        first = call.args[0]
+                        if isinstance(first, ast.Constant) and isinstance(first.value, str):
+                            found.append((node.name, first.value, 'constant'))
+                        elif isinstance(first, ast.BinOp) and isinstance(first.op, ast.Mod) and isinstance(first.left, ast.Constant):
+                            found.append((node.name, first.left.value % plane.CHECK_ID, 'format of a constant'))
+                        elif isinstance(first, ast.BinOp) and isinstance(first.op, ast.Add) and isinstance(first.left, ast.Constant):
+                            found.append((node.name, first.left.value, 'constant then a redacted name or a validated ts'))
+                        else:
+                            found.append((node.name, ast.dump(first)[:60], 'OTHER'))
+        return found
+
+    def test_the_four_commands_print_only_constants_and_none_of_them_can_carry_a_plane_value(self):
+        """arm, disarm, resolve and retarget (Main 3185): the print calls of their code are constants, a format of a constant, or a constant
+        followed by a redacted name or a validated request ts; every such constant is in the fixed text that a start refusal covers, so a plane
+        value inside one is refused before anything is printed, and every one of those commands is run with such a value and prints none."""
+        found = self.printed_constants_of_the_four_commands()
+        self.assertTrue(found)
+        self.assertEqual([item for item in found if item[2] == 'OTHER'], [])
+        for name, text, kind in found:
+            self.assertTrue(any(text and text in fixed for fixed in plane.FIXED_WAKE_TEXT), (name, text))
+        for action, constant in (('arm', 'armed: state/slack.check.sh'), ('arm', 'slack: refused: unsafe_state_path'), ('retarget', plane.FIXED_WAKE_TEXT[-2][:30]),
+                                 ('retarget', plane.FIXED_WAKE_TEXT[-1][:30]), ('disarm', 'disarmed: state/slack.check.sh'),
+                                 ('disarm', 'slack: refused: check_unregistration_failed'), ('resolve', 'resolved: slack request ')):
+            value = constant if len(constant) >= 16 else constant + ' padding to be credential long'
+            with self.fixture(env={'SLACK_SIGNING_SECRET': value}) as (watch, replay):
+                watch.lock.close()
+                out, err = io.StringIO(), io.StringIO()
+                env = {'FM_SLACK_CHECK_ACTION': action, 'FM_SLACK_NO_NETWORK': '1', 'SLACK_SIGNING_SECRET': value}
+                argv = ['check', '200.000100'] if action == 'resolve' else ['check']
+                with patch.dict(os.environ, env), contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                    try:
+                        code = plane.main(argv)
+                    except SlackError as error:
+                        code = str(error)
+                self.assertNotIn(value, out.getvalue() + err.getvalue(), (action, constant))
+                self.assertIn(code, (1, 'secret_collides_with_marker'), (action, constant))
 
 
 class ClosedTransportTest(unittest.TestCase):

@@ -238,7 +238,13 @@ SINK_WORD = '[redacted]'
 # them could never be replaced for good, so the plane refuses it (F1 of Main 2602). The diagnostic prefixes are not in this list:
 # redact_sink protects them.
 FIXED_WAKE_TEXT = (REQUEST_PREFIX, ' from ', REQUEST_UNACKNOWLEDGED, REQUEST_UNKNOWN, REQUEST_LABEL, '; ' + SECRET_FLAG, '; full: ', '; +', ' queued',
-                   SECRET_MARKER, SECRET_FLAG, SINK_WORD, 'slack: request ', ' not acknowledged (failed, owner Main)', 'slack: request finished')
+                   SECRET_MARKER, SECRET_FLAG, SINK_WORD, 'slack: request ', ' not acknowledged (failed, owner Main)', 'slack: request finished',
+                   # The constants that arm, disarm, resolve and retarget print: they print nothing else of their own, so a plane value inside one is
+                   # refused at the start of the command like a value inside a wake line (a test reads the print calls and holds this list complete).
+                   *('slack: refused: ' + name for name in ('', 'unsafe_state_path', 'unsafe_check_shim', 'check_registration_failed', 'check_unregistration_failed')),
+                   'armed: state/slack.check.sh', 'disarmed: state/slack.check.sh', 'resolved: slack request ',
+                   'retargeted: the old DM is no longer tracked; the DM of FM_SLACK_DM_USER is open and its starting point is recorded; the next poll takes in the requests sent after it',
+                   'unchanged: FM_SLACK_DM_USER matches the DM already in use; nothing to retarget')
 
 
 def redacted_error(error):
@@ -2326,6 +2332,9 @@ def main(argv):
     if command not in ('mirror', 'poll', 'check'):
         print('error: unknown command; use --help')
         return 2
+    if action in ('disarm', 'resolve'):
+        # These two do not build a watcher: a plane value inside a constant they print is refused here, as arm and check refuse it.
+        refuse_a_value_that_the_marker_holds()
     if action == 'disarm':
         return disarm()
     if action == 'resolve':
