@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # bin/fm-lint.sh's host slots and resource bounds: deterministic job
 # completion, the CPU-derived host cap, waiter and admission fairness,
-# cache hits that skip the pool, disabled or failing slot state, per-root
+# cache hits that skip the pool, refused or failing slot state, per-root
 # deadlines, a named memory-limit death and its retry without external sources.
 # Changed-file selection lives in tests/fm-lint.test.sh; modes and installer
 # refusals in tests/fm-lint-policy.test.sh; memory fallback and evidence,
@@ -13,6 +13,9 @@
 
 # shellcheck source=tests/fm-lint-helpers.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fm-lint-helpers.sh"
+# The count-cap tests below isolate the count from the memory budget, which
+# the memory tests set for themselves.
+export FM_LINT_HOST_RSS_KIB=100000000
 
 test_jobs_are_deterministic_and_complete() {
   if ! pinned_ready; then
@@ -100,7 +103,8 @@ test_host_slots_bound_concurrent_runs() {
     fm_lint_concurrent_runs 1 "$tmp" "$tmp/bin" 2)
   [ "$lone" -eq 2 ] || fail "a lone run peaked at $lone live ShellCheck processes, expected its two workers"
   : > "$tmp/peak"
-  baseline=$(FM_LINT_SLOT_DIR=off fm_lint_concurrent_runs 6 "$tmp" "$tmp/bin" 12)
+  baseline=$(FM_LINT_SLOT_DIR="$tmp/baseline-slots" FM_LINT_HOST_SLOTS=99 FM_LINT_HOST_RSS_KIB=1000000000 \
+    fm_lint_concurrent_runs 6 "$tmp" "$tmp/bin" 12)
   [ "$baseline" -eq 12 ] || fail "six ungated runs peaked at $baseline live ShellCheck processes, expected 12"
   : > "$tmp/peak"
   # Six runs would start twelve ShellCheck processes if each bounded only itself.
@@ -563,6 +567,93 @@ PL
   pass "a gate stopped while owning admission does not freeze free capacity"
 }
 
+test_slow_ps_does_not_hold_admission_against_the_next_root() {
+  local tmp real_ps
+  tmp=$(fm_test_tmproot fm-lint-slot-slow-ps)
+  mkdir -p "$tmp/bin" "$tmp/hide"
+  fm_lint_hide_outside_shellcheck "$tmp/hide"
+  real_ps="$tmp/hide/ps"
+  # The waiter's owner check (ps -p) does not return until the next root has
+  # started, or for 30 s. A check made while holding admission.lock locks that
+  # root out for the whole time.
+  cat > "$tmp/bin/ps" <<SH
+#!/bin/sh
+case " \$* " in
+  *" -p "*)
+    : > "$tmp/p-called"
+    i=0
+    until grep -q next "$tmp/order" 2>/dev/null; do
+      i=\$((i + 1))
+      if [ "\$i" -ge 600 ]; then : > "$tmp/p-timed-out"; break; fi
+      sleep 0.05
+    done
+    ;;
+esac
+exec "$real_ps" "\$@"
+SH
+  chmod +x "$tmp/bin/ps"
+  FM_TEST_GATE_POOL_PREFIX="$tmp/" perl - "$ROOT/bin/fm-lint-cache.pl" "$tmp" <<'PL' || fail "slow ps admission regression failed"
+use strict;
+use warnings;
+use POSIX qw(WNOHANG);
+use Time::HiRes qw(time sleep);
+my ($gate, $tmp) = @ARGV;
+# Free count slots, but a budget that holds one root: the root after the first
+# keeps its turn, and the root behind it keeps checking on that root's owner.
+local $ENV{FM_LINT_HOST_SLOTS} = 4;
+local $ENV{FM_LINT_HOST_RSS_KIB} = 1000000;
+local $ENV{FM_LINT_INTERNAL_ROOT_CAP_KIB} = 800000;
+local $ENV{PATH} = "$tmp/bin:$ENV{PATH}";
+my $note = 'open(my $fh, ">>", "$ARGV[0]/order") or die "$!"; print {$fh} "$ARGV[1]\n"; close $fh;';
+my $hold = 'for (1 .. 1200) { last if -e "$ARGV[0]/p-called"; select(undef, undef, undef, 0.05); }';
+sub spawn {
+    my ($label, $code) = @_;
+    my $pid = fork();
+    die "fork: $!" unless defined $pid;
+    if (!$pid) {
+        exec $^X, $gate, 'gate', "$tmp/slots", 18, 'run', "$tmp/$label.wait", '--', $^X, '-e', $code, $tmp, $label;
+        die "exec: $!";
+    }
+    return $pid;
+}
+sub until_seen {
+    my ($what, $test) = @_;
+    my $deadline = time() + 30;
+    until ($test->()) {
+        die "$what\n" if time() > $deadline;
+        sleep 0.01;
+    }
+}
+my @pids;
+my $error;
+eval {
+    push @pids, spawn('first', "$note $hold");
+    until_seen('the first root never started', sub { -s "$tmp/order" });
+    push @pids, spawn('next', $note);
+    until_seen('the next root never queued', sub { grep { /\.run\z/ } glob "$tmp/slots/queue.*" });
+    push @pids, spawn('later', $note);
+    my $deadline = time() + 90;
+    for my $pid (@pids) {
+        while (waitpid($pid, WNOHANG) == 0) {
+            die "a gate did not finish\n" if time() > $deadline;
+            sleep 0.01;
+        }
+        die "a gate ended with status $?\n" if $?;
+    }
+    @pids = ();
+    die "the waiter never checked on the owner of the next root\n" unless -e "$tmp/p-called";
+    die "a waiter's ps kept the next root out of admission\n" if -e "$tmp/p-timed-out";
+    open(my $fh, '<', "$tmp/order") or die "$!";
+    my $order = join '', <$fh>;
+    die "admission order was $order\n" unless $order eq "first\nnext\nlater\n";
+};
+$error = $@;
+for my $pid (@pids) { kill 'KILL', $pid; waitpid($pid, 0); }
+die $error if $error;
+PL
+  pass "a waiter's slow ps does not keep the next root out of admission"
+}
+
 test_queue_scan_survives_odd_slot_paths_and_vanishing_tickets() {
   local tmp
   tmp=$(fm_test_tmproot fm-lint-slot-queue-scan)
@@ -630,25 +721,36 @@ PL
 }
 
 test_cached_success_does_not_wait_for_host_slots() {
-  pinned_ready || { pass "SKIP (ShellCheck $REQUIRED not resolved): cached slot bypass"; return; }
-  local tmp repo out
+  # A stand-in analysis in a fixture pool directory, a test seam that is still
+  # bounded host-wide by the growth guard and the outside count.
+  local tmp repo out fakebin
   tmp=$(fm_test_tmproot fm-lint-cache-slots)
   repo="$tmp/repo"
   fm_lint_small_repo "$repo"
-  out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+  fakebin=$(fm_fakebin "$tmp/fake")
+  cat > "$fakebin/shellcheck" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = --version ]; then
+  printf 'ShellCheck - shell script analysis tool\nversion: 0.11.0\n'
+  exit 0
+fi
+exit 0
+SH
+  chmod +x "$fakebin/shellcheck"
+  out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
     "$repo/bin/fm-lint.sh" bin/consumer.sh 2>&1) || fail "cache warm-up failed: $out"
-  perl - "$repo/bin/fm-lint.sh" "$tmp" <<'PL' || fail "warm cache queued behind an occupied host slot"
+  perl - "$repo/bin/fm-lint.sh" "$tmp" "$fakebin" <<'PL' || fail "warm cache queued behind an occupied host slot"
 use strict;
 use warnings;
 use File::Path qw(make_path);
 use Fcntl qw(:flock);
 use POSIX qw(WNOHANG);
 use Time::HiRes qw(time sleep);
-my ($lint, $tmp) = @ARGV;
+my ($lint, $tmp, $fakebin) = @ARGV;
 make_path("$tmp/slots");
 open(my $holder, '>>', "$tmp/slots/slot.0") or die "$!";
 flock($holder, LOCK_EX) or die "$!";
-local %ENV = (%ENV, CI => '', GITHUB_ACTIONS => '', FM_LINT_CACHE_DIR => "$tmp/cache",
+local %ENV = (%ENV, PATH => "$fakebin:$ENV{PATH}", CI => '', GITHUB_ACTIONS => '', FM_LINT_CACHE_DIR => "$tmp/cache",
     FM_LINT_SLOT_DIR => "$tmp/slots", FM_LINT_HOST_SLOTS => 1);
 my $pid = fork();
 die "fork: $!" unless defined $pid;
@@ -682,28 +784,422 @@ PL
   pass "a content-identical cached success finishes while all host slots remain occupied"
 }
 
-test_slot_pool_can_be_disabled_or_misconfigured() {
+test_slot_pool_cannot_be_disabled_and_refuses_bad_settings() {
   local tmp rc out
   tmp=$(fm_lint_slot_fixture fm-lint-slots-off)
+  # No setting turns the host-wide bound off: FM_LINT_SLOT_DIR=off is refused by
+  # name and starts no ShellCheck, whatever ShellCheck is in use.
+  fm_lint_write_memory_shellcheck "$tmp/off-bin" 1 "$tmp/off.starts"
+  : > "$tmp/off.starts"
   rc=0
-  out=$(PATH="$tmp/bin:$PATH" FM_LINT_SLOT_DIR=off "$LINT" "$tmp/a.sh" 2>&1) || rc=$?
-  [ "$rc" -eq 0 ] || fail "a run with the slot pool off failed"$'\n'"$out"
+  out=$(PATH="$tmp/off-bin:$PATH" FM_LINT_SLOT_DIR=off "$LINT" "$tmp/a.sh" 2>&1) || rc=$?
+  [ "$rc" -eq 2 ] || fail "FM_LINT_SLOT_DIR=off exited $rc, expected 2"$'\n'"$out"
+  assert_contains "$out" "FM_LINT_SLOT_DIR=off is not supported" "the refusal did not name the switch"
+  [ ! -s "$tmp/off.starts" ] || fail "FM_LINT_SLOT_DIR=off still started a ShellCheck"
+  rc=0
+  out=$(FM_LINT_SLOT_DIR=off "$LINT" "$tmp/a.sh" 2>&1) || rc=$?
+  [ "$rc" -eq 2 ] || fail "FM_LINT_SLOT_DIR=off with the real ShellCheck exited $rc, expected 2"$'\n'"$out"
+  assert_contains "$out" "FM_LINT_SLOT_DIR=off is not supported" "the real-ShellCheck refusal did not name the switch"
   rc=0
   out=$(PATH="$tmp/bin:$PATH" FM_LINT_SLOT_DIR="$tmp/slots" FM_LINT_HOST_SLOTS=zero "$LINT" "$tmp/a.sh" 2>&1) || rc=$?
   [ "$rc" -eq 2 ] || fail "a non-numeric FM_LINT_HOST_SLOTS exited $rc, expected 2"
   assert_contains "$out" "FM_LINT_HOST_SLOTS" "the refusal did not name the setting"
   [ ! -d "$tmp/slots" ] || fail "a refused run still created the slot directory"
+  for value in zero 0 08 1.5; do
+    rc=0
+    out=$(env FM_LINT_HOST_RSS_KIB="$value" PATH="$tmp/bin:$PATH" FM_LINT_SLOT_DIR="$tmp/slots" "$LINT" "$tmp/a.sh" 2>&1) || rc=$?
+    [ "$rc" -eq 2 ] || fail "FM_LINT_HOST_RSS_KIB=$value exited $rc, expected 2"
+    assert_contains "$out" "FM_LINT_HOST_RSS_KIB" "the refusal did not name FM_LINT_HOST_RSS_KIB"
+  done
+  [ ! -d "$tmp/slots" ] || fail "a refused run still created the slot directory"
+  # An unusable pool is not a bound: the run stops before any root starts and
+  # names the path and the fix, rather than warning and analysing unbounded.
+  fm_lint_write_memory_shellcheck "$tmp/memory-bin" 1 "$tmp/refused.starts"
+  : > "$tmp/refused.starts"
   rc=0
-  out=$(PATH="$tmp/bin:$PATH" FM_LINT_SLOT_DIR="$tmp/a.sh/blocked" "$LINT" "$tmp/a.sh" 2>&1) || rc=$?
-  [ "$rc" -eq 0 ] || fail "an unusable slot directory must not fail lint"$'\n'"$out"
-  assert_contains "$out" "running without the host-wide ShellCheck bound" "an unusable slot directory was not reported"
-  pass "the slot pool can be disabled, rejects bad settings, and never fails lint when unusable"
+  out=$(PATH="$tmp/memory-bin:$PATH" FM_LINT_SLOT_DIR="$tmp/a.sh/blocked" "$LINT" "$tmp/a.sh" 2>&1) || rc=$?
+  [ "$rc" -eq 2 ] || fail "an unusable slot directory exited $rc, expected 2"$'\n'"$out"
+  assert_contains "$out" "$tmp/a.sh/blocked" "the refusal did not name the unusable path"
+  assert_contains "$out" "FM_LINT_SLOT_DIR" "the refusal did not name the fix"
+  assert_not_contains "$out" "running without the host-wide ShellCheck bound" "an unusable pool still ran unbounded"
+  [ ! -s "$tmp/refused.starts" ] || fail "an unusable pool still started ShellCheck"
+  pass "the slot pool cannot be disabled, rejects bad settings, and refuses an unusable directory instead of running unbounded"
 }
 
-test_slot_file_failures_run_ungated() {
+# fm_lint_write_stepping_shellcheck <fakebin> <steps> <MiB per step> <seconds per step> <log>:
+# a stand-in analysis that takes its memory in steps after it starts, then holds
+# it for FM_TEST_MEM_HOLD seconds (default 2); with FM_TEST_GROW_AFTER set it
+# waits for that many stand-ins to have started before it grows. It appends "start <pid> <time>",
+# "mem <pid> <time> <MiB held>" after each step and "end <pid> <time>" to <log>,
+# so the memory held at any moment is known without sampling.
+fm_lint_write_stepping_shellcheck() {
+  mkdir -p "$1"
+  cat > "$1/shellcheck" <<PL
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use Time::HiRes qw(time sleep);
+BEGIN {
+    if ((\$ARGV[0] // '') eq '--version') {
+        print "ShellCheck - shell script analysis tool\nversion: 0.11.0\n";
+        exit 0;
+    }
+}
+my \$log = '$5';
+sub note { open(my \$fh, '>>', \$log) or die "\$!"; printf {\$fh} "%s %d %.6f%s\n", shift, \$\$, time(), @_ ? " \$_[0]" : ''; close \$fh; }
+note('start');
+# Grow only once FM_TEST_GROW_AFTER stand-ins have started, so every run is
+# admitted small before any of them grows.
+if (my \$peers = \$ENV{FM_TEST_GROW_AFTER}) {
+    my \$deadline = time() + 60;
+    while (time() < \$deadline) {
+        open(my \$fh, '<', \$log) or last;
+        my \$n = () = grep { /^start / } <\$fh>;
+        close \$fh;
+        last if \$n >= \$peers;
+        sleep 0.05;
+    }
+}
+my @blocks;
+for my \$step (1 .. $2) {
+    push @blocks, 'x' x ($3 * 1048576);
+    note('mem', \$step * $3);
+    sleep $4;
+}
+sleep \$ENV{FM_TEST_MEM_HOLD} // 2;
+note('end');
+exit 0;
+PL
+  chmod +x "$1/shellcheck"
+  fm_lint_hide_outside_shellcheck "$1"
+}
+
+# fm_lint_peak_held <log>: the most MiB held at one moment by the stand-ins that
+# logged to <log> (each holds its last reported size from its first report until
+# its end), and the most that were alive at once. Prints "<MiB> <alive>".
+fm_lint_peak_held() {
+  perl -ane '
+    if ($F[0] eq "start") { push @e, [$F[2], 0, $F[1], 0]; }
+    elsif ($F[0] eq "mem") { push @e, [$F[2], 1, $F[1], $F[3]]; }
+    elsif ($F[0] eq "end") { push @e, [$F[2], 2, $F[1], 0]; }
+    END {
+      my (%held, %alive, $peak, $most);
+      for (sort { $a->[0] <=> $b->[0] } @e) {
+        my ($t, $kind, $pid, $mib) = @$_;
+        if ($kind == 0) { $alive{$pid} = 1; }
+        elsif ($kind == 1) { $held{$pid} = $mib; }
+        else { delete $alive{$pid}; delete $held{$pid}; }
+        my $sum = 0; $sum += $_ for values %held;
+        $peak = $sum if !defined $peak || $sum > $peak;
+        my $n = keys %alive; $most = $n if !defined $most || $n > $most;
+      }
+      printf "%d %d\n", $peak // 0, $most // 0;
+    }' "$1"
+}
+
+test_growing_roots_are_held_to_the_budget_across_pools() {
+  local tmp run rc pid peak most pids budget history key
+  local -a all
+  tmp=$(fm_test_tmproot fm-lint-growth)
+  mkdir -p "$tmp/bin"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/a.sh"
+  # Each stand-in takes 4 MiB every 0.25 s for 4 s (64 MiB) after its lint run
+  # admits it. Four runs from four HOME values each use their own pool directory,
+  # and each pool already holds a 16 MiB record for the root, so all four are
+  # admitted at once, small, and then grow together.
+  fm_lint_write_stepping_shellcheck "$tmp/bin" 16 4 0.25 "$tmp/growth.log"
+  key=$(printf "full:%s" "$(cd -P "$tmp" && pwd -P)/a.sh" | perl -MDigest::SHA=sha256_hex -ne 'print sha256_hex($_)')
+  for budget in 131072 100000000; do
+    : > "$tmp/growth.log"
+    pids=()
+    for run in 1 2 3 4; do
+      history="$tmp/pool.$budget.$run/history"
+      mkdir -p "$history" "$tmp/home.$run/.cache"
+      printf '16384\n' > "$history/$key"
+      env HOME="$tmp/home.$run" XDG_CACHE_HOME="$tmp/home.$run/.cache" FM_HOME="$tmp/fm.$run" \
+        FM_LINT_SLOT_DIR="$tmp/pool.$budget.$run" FM_LINT_HOST_SLOTS=9 FM_LINT_HOST_RSS_KIB="$budget" \
+        FM_LINT_ROOT_RSS_KIB=262144 FM_TEST_GATE_POOL_PREFIX="$tmp/pool.$budget." FM_TEST_GROW_AFTER=4 PATH="$tmp/bin:$PATH" \
+        "$LINT" --jobs 1 "$tmp/a.sh" > "$tmp/growth.$budget.$run.out" 2>&1 &
+      pids+=("$!")
+    done
+    rc=0
+    for pid in "${pids[@]}"; do wait "$pid" || rc=$?; done
+    [ "$rc" -eq 0 ] || fail "a growing run failed under budget $budget (rc=$rc)"$'\n'"$(cat "$tmp"/growth.$budget.*.out)"
+    read -r peak most <<<"$(fm_lint_peak_held "$tmp/growth.log")"
+    all+=("$budget:$peak:$most")
+    if [ "$budget" -eq 131072 ]; then
+      # The budget is 128 MiB; one root grows to 64 MiB beyond its interpreter, so
+      # budget plus one root is 192 MiB.
+      [ "$peak" -le 192 ] || fail "four growing roots in four pools held $peak MiB, above the 128 MiB budget plus one 64 MiB root: ${all[*]}"
+      [ "$(grep -c '^end ' "$tmp/growth.log")" -eq 4 ] || fail "not every growing root finished under the budget: ${all[*]}"
+    else
+      # The control: with no effective budget the same roots stack.
+      [ "$peak" -gt 192 ] || fail "four growing roots held only $peak MiB without a budget, so this test cannot show a bound: ${all[*]}"
+    fi
+  done
+  pass "growing roots from four pools stay within the budget plus one root and all finish; without a budget they stack (${all[*]} as budget:peak MiB:alive)"
+}
+
+# fm_lint_child_of <parent-pid> <text>: the pid of a direct child of <parent-pid>
+# whose command holds <text>, waiting up to 10 s.
+fm_lint_child_of() {
+  local deadline=$((SECONDS + 10)) pid
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    pid=$(ps -axo pid=,ppid=,command= | awk -v parent="$1" -v want="$2" '$2 == parent && index($0, want) { print $1; exit }')
+    [ -n "$pid" ] && { printf '%s\n' "$pid"; return 0; }
+    sleep 0.1
+  done
+  return 1
+}
+
+# fm_lint_kill_tree <pid>...: ends each process this test started, and its children.
+fm_lint_kill_tree() {
+  local pid
+  for pid in "$@"; do
+    pkill -KILL -P "$pid" 2>/dev/null
+    kill -KILL "$pid" 2>/dev/null
+    wait "$pid" 2>/dev/null
+  done
+  return 0
+}
+
+# fm_lint_write_table_filter <dir>: an fm-proc-info.py for a gate copied into
+# <dir> whose ps is refused, so the gate reads the host through this helper. It
+# calls the real helper (FM_TEST_REAL_HELPER) and keeps only this fixture's gates
+# (FM_TEST_POOL_ROOT) and no process named shellcheck, as the ps shim does. The
+# table row whose command holds FM_TEST_HIDDEN_MATCH takes FM_TEST_HIDDEN_FORM:
+# drop removes it, so the census gives that process only its bare name, parent
+# gives it its parent's command, and any other value is its command.
+fm_lint_write_table_filter() {
+  cat > "$1/fm-proc-info.py" <<'PY'
+import json
+import os
+import subprocess
+import sys
+
+env = os.environ
+output = subprocess.run([sys.executable, env["FM_TEST_REAL_HELPER"]] + sys.argv[1:],
+                        stdout=subprocess.PIPE, text=True).stdout
+if sys.argv[1] == "memory":
+    print(json.dumps([row for row in json.loads(output) if row.get("comm") != "shellcheck"]))
+    sys.exit(0)
+rows = [line.split(None, 2) for line in output.splitlines()]
+commands = {row[0]: row[2] for row in rows if len(row) == 3}
+for row in rows:
+    if len(row) != 3:
+        continue
+    pid, ppid, command = row
+    if "fm-lint-cache.pl gate" in command and env["FM_TEST_POOL_ROOT"] not in command:
+        continue
+    if env["FM_TEST_HIDDEN_MATCH"] in command:
+        form = env["FM_TEST_HIDDEN_FORM"]
+        if form == "drop":
+            continue
+        command = commands.get(ppid, "") if form == "parent" else form
+    print(pid, ppid, command)
+PY
+}
+
+test_a_waiting_gate_reading_the_table_never_stops_a_younger_running_root() {
+  local tmp waiter runner deadline helper form index=0 root_pid stopped hold
+  local -a forms=(ps)
+  command -v python3 >/dev/null 2>&1 || { pass "SKIP (python3 not resolved): a waiting gate's table read"; return; }
+  tmp=$(fm_test_tmproot fm-lint-waiting-reader)
+  mkdir -p "$tmp/refuse" "$tmp/hide" "$tmp/waiter" "$tmp/watcher"
+  printf '#!/bin/sh\nexit 1\n' > "$tmp/refuse/ps"
+  chmod +x "$tmp/refuse/ps"
+  cp "$ROOT/bin/fm-lint-cache.pl" "$tmp/waiter/fm-lint-cache.pl"
+  cp "$ROOT/bin/fm-lint-cache.pl" "$tmp/watcher/fm-lint-cache.pl"
+  printf 'import time\ntime.sleep(600)\n' > "$tmp/waiter/fm-proc-info.py"
+  fm_lint_write_table_filter "$tmp/watcher"
+  fm_lint_hide_outside_shellcheck "$tmp/hide"
+  # The older gate's turn reads the process table through the helper beside it,
+  # because ps is refused, and that helper does not answer, so the gate waits
+  # with that one child.
+  PATH="$tmp/refuse:$PATH" FM_LINT_HOST_RSS_KIB=1000000 \
+    perl "$tmp/waiter/fm-lint-cache.pl" gate "$tmp/waiting-pool" 2 waiting "$tmp/waiting.wait" -- true &
+  waiter=$!
+  helper=$(fm_lint_child_of "$waiter" "$tmp/waiter/fm-proc-info.py table") \
+    || { fm_lint_kill_tree "$waiter"; fail "the waiting gate never started its table read"; }
+  sleep 1.2
+  # A younger gate sees that helper in each form a process table can show it: its
+  # full command from ps; and, where a gate with ps refused reads libproc, its bare
+  # name, a parenthesized name, a zombie row or, before its exec, the gate's own
+  # command. Its root of 80 MiB is over its 40000 KiB budget, and only a gate that
+  # is not the oldest running gate stops its own root, so that root must run to
+  # its end each time.
+  [ "$(uname)" != Darwin ] || forms+=(drop '(ps)' '<defunct>' '[ps] <defunct>' parent /usr/bin/true)
+  for form in "${forms[@]}"; do
+    index=$((index + 1))
+    hold=3
+    [ "$form" != /usr/bin/true ] || hold=60
+    if [ "$form" = ps ]; then
+      PATH="$tmp/hide:$PATH" FM_TEST_GATE_POOL_PREFIX="$tmp/" FM_LINT_HOST_RSS_KIB=40000 FM_LINT_INTERNAL_ROOT_CAP_KIB=1024 \
+        perl "$ROOT/bin/fm-lint-cache.pl" gate "$tmp/running-pool.$index" 2 running "$tmp/running.$index.wait" -- \
+        perl -e '$x = "x" x (80 * 1048576); select(undef, undef, undef, $ARGV[0]); open(my $end, ">", $ARGV[1]); exit 0' "$hold" "$tmp/ended.$index" &
+    else
+      PATH="$tmp/refuse:$PATH" FM_LINT_HOST_RSS_KIB=40000 FM_LINT_INTERNAL_ROOT_CAP_KIB=1024 \
+        FM_TEST_REAL_HELPER="$ROOT/bin/fm-proc-info.py" FM_TEST_POOL_ROOT="$tmp/" \
+        FM_TEST_HIDDEN_MATCH="$tmp/waiter/fm-proc-info.py table" FM_TEST_HIDDEN_FORM="$form" \
+        perl "$tmp/watcher/fm-lint-cache.pl" gate "$tmp/running-pool.$index" 2 running "$tmp/running.$index.wait" -- \
+        perl -e '$x = "x" x (80 * 1048576); select(undef, undef, undef, $ARGV[0]); open(my $end, ">", $ARGV[1]); exit 0' "$hold" "$tmp/ended.$index" &
+    fi
+    runner=$!
+    if [ "$form" = /usr/bin/true ]; then
+      # The control: the same reading, with the helper's row a started command,
+      # names the waiting gate the oldest, so this root is stopped. Without this
+      # stop, the passes above could come from a reading that never worked. This
+      # root outlives the slowest reading and ends as soon as the stop is seen.
+      root_pid=$(fm_lint_child_of "$runner" "80 * 1048576") || { fm_lint_kill_tree "$runner" "$waiter"; fail "the control root never started"; }
+      stopped=0
+      deadline=$((SECONDS + 45))
+      while [ "$SECONDS" -lt "$deadline" ]; do
+        case "$(ps -o stat= -p "$root_pid" 2>/dev/null)" in *T*) stopped=1; break ;; esac
+        sleep 0.1
+      done
+      fm_lint_kill_tree "$runner"
+      [ "$stopped" -eq 1 ] || { fm_lint_kill_tree "$waiter"; fail "a root under an older running gate was not stopped, so this test proved nothing"; }
+      continue
+    fi
+    deadline=$((SECONDS + 45))
+    while [ ! -e "$tmp/ended.$index" ] && [ "$SECONDS" -lt "$deadline" ]; do sleep 0.2; done
+    fm_lint_kill_tree "$runner"
+    [ -e "$tmp/ended.$index" ] || { fm_lint_kill_tree "$waiter"; fail "a younger root over the budget was held back while an older gate only waited on its table read (table form: $form)"; }
+    kill -0 "$helper" 2>/dev/null || fail "the older gate's table read ended before the younger root (table form: $form), so this test proved nothing"
+  done
+  fm_lint_kill_tree "$waiter"
+  pass "a waiting gate whose only child is its own table read is not the oldest running gate in any form a table shows it (${forms[*]})"
+}
+
+test_growth_guard_never_stops_the_watch_reader() {
+  local tmp py older younger deadline settle rows watch reader standin form
+  local reader_seen reader_large reader_stopped standin_stopped
+  [ "$(uname)" = Darwin ] || { pass "SKIP (not macOS): the resident watch's reader runs only on macOS"; return; }
+  py=$(python3 -c 'import os, sys; print(os.path.realpath(sys.executable))' 2>/dev/null) \
+    || { pass "SKIP (python3 not resolved): the resident watch's reader"; return; }
+  tmp=$(fm_test_tmproot fm-lint-guard-reader)
+  mkdir -p "$tmp/MacOS" "$tmp/hide" "$tmp/refuse" "$tmp/watcher"
+  printf '#!/bin/sh\nexit 1\n' > "$tmp/refuse/ps"
+  chmod +x "$tmp/refuse/ps"
+  # In the full form the reader runs under an interpreter named Python, as the
+  # Command Line Tools and python.org installs show it.
+  ln -s "$py" "$tmp/MacOS/Python"
+  cp "$ROOT/bin/fm-lint-cache.pl" "$tmp/watcher/fm-lint-cache.pl"
+  fm_lint_write_table_filter "$tmp/watcher"
+  fm_lint_hide_outside_shellcheck "$tmp/hide"
+  PATH="$tmp/hide:$PATH" FM_TEST_GATE_POOL_PREFIX="$tmp/" FM_LINT_HOST_RSS_KIB=1000000000 \
+    perl "$ROOT/bin/fm-lint-cache.pl" gate "$tmp/older-pool" 2 older "$tmp/older.wait" -- perl -e 'sleep 120' &
+  older=$!
+  fm_lint_child_of "$older" "sleep 120" > /dev/null || { fm_lint_kill_tree "$older"; fail "the older gate never started its root"; }
+  sleep 1.2
+  # A younger gate is not the oldest and its watched root of 80 MiB is over its
+  # 40000 KiB budget, so its guard stops that root. It must never stop the watch's
+  # own reader, whether its table shows the reader's full command (from ps) or,
+  # with ps refused, only its bare name (from libproc).
+  for form in full bare; do
+    if [ "$form" = full ]; then
+      PATH="$tmp/hide:$PATH" FM_TEST_GATE_POOL_PREFIX="$tmp/" FM_LINT_HOST_RSS_KIB=40000 FM_LINT_INTERNAL_ROOT_CAP_KIB=1024 \
+        FM_LINT_INTERNAL_PYTHON="$tmp/MacOS/Python" \
+        perl "$ROOT/bin/fm-lint-cache.pl" gate "$tmp/younger-pool.$form" 2 younger "$tmp/younger.$form.wait" -- \
+        perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 8388608 "$tmp/rss.$form" -- \
+        perl -e '$x = "x" x (80 * 1048576); sleep 60' &
+    else
+      PATH="$tmp/refuse:$PATH" FM_LINT_HOST_RSS_KIB=40000 FM_LINT_INTERNAL_ROOT_CAP_KIB=1024 \
+        FM_TEST_REAL_HELPER="$ROOT/bin/fm-proc-info.py" FM_TEST_POOL_ROOT="$tmp/" \
+        FM_TEST_HIDDEN_MATCH="fm-proc-info.py mem-tree" FM_TEST_HIDDEN_FORM=drop \
+        perl "$tmp/watcher/fm-lint-cache.pl" gate "$tmp/younger-pool.$form" 2 younger "$tmp/younger.$form.wait" -- \
+        perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 8388608 "$tmp/rss.$form" -- \
+        perl -e '$x = "x" x (80 * 1048576); sleep 60' &
+    fi
+    younger=$!
+    reader_seen=0 reader_large=0 reader_stopped=0 standin_stopped=0 settle=
+    deadline=$((SECONDS + 45))
+    while [ "$SECONDS" -lt "$deadline" ]; do
+      rows=$(ps -axo pid=,ppid=,stat=,rss=,command=)
+      watch=$(printf '%s\n' "$rows" | awk -v parent="$younger" '$2 == parent && index($0, "fm-lint-cache.pl rsswatch") { print $1; exit }')
+      reader=$(printf '%s\n' "$rows" | awk -v parent="${watch:-none}" '$2 == parent && index($0, "fm-proc-info.py mem-tree") { print $3, $4; exit }')
+      standin=$(printf '%s\n' "$rows" | awk -v parent="${watch:-none}" '$2 == parent && index($0, "80 * 1048576") { print $3; exit }')
+      if [ -n "$reader" ]; then
+        reader_seen=1
+        [ "${reader#* }" -lt 8192 ] || reader_large=1
+        case "${reader%% *}" in *T*) reader_stopped=1 ;; esac
+      fi
+      case "$standin" in *T*) standin_stopped=1 ;; esac
+      # Once the guard has stopped the root, watch the reader through later readings.
+      if [ -z "$settle" ] && [ "$standin_stopped" -eq 1 ] && [ "$reader_large" -eq 1 ]; then settle=$((SECONDS + 5)); fi
+      if [ -n "$settle" ] && [ "$SECONDS" -ge "$settle" ]; then break; fi
+      sleep 0.1
+    done
+    kill -TERM "$younger" 2>/dev/null
+    wait "$younger" 2>/dev/null
+    [ "$reader_seen" -eq 1 ] || { fm_lint_kill_tree "$older"; fail "the resident watch's reader never appeared (form: $form), so this test proved nothing"; }
+    [ "$reader_large" -eq 1 ] || { fm_lint_kill_tree "$older"; fail "the resident watch's reader held under 8192 KiB, below what the guard stops (form: $form), so this test proved nothing"; }
+    [ "$standin_stopped" -eq 1 ] || { fm_lint_kill_tree "$older"; fail "the guard never stopped the root over the budget (form: $form), so this test proved nothing"; }
+    [ "$reader_stopped" -eq 0 ] || { fm_lint_kill_tree "$older"; fail "the growth guard stopped the resident watch's reader (form: $form)"; }
+    ! grep -q '^rss_reader_unavailable=' "$tmp/rss.$form" 2>/dev/null \
+      || { fm_lint_kill_tree "$older"; fail "the resident watch lost its reader under the growth guard (form: $form): $(cat "$tmp/rss.$form")"; }
+  done
+  fm_lint_kill_tree "$older"
+  pass "the growth guard stops a root over the budget but never the resident watch's reader, seen by its full command under an interpreter named Python or by its bare name"
+}
+
+test_a_wrapper_around_the_real_shellcheck_shares_the_host_wide_memory_bound() {
+  local tmp rc out outside pid deadline real fixture mark
+  pinned_ready || { pass "SKIP (ShellCheck $REQUIRED not resolved): wrapper around the real ShellCheck"; return; }
+  tmp=$(fm_test_tmproot fm-lint-wrapper)
+  mkdir -p "$tmp/bin"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/a.sh"
+  real=$(command -v shellcheck)
+  # shellcheck disable=SC2016 # ${1:-} and $@ expand in the generated stand-in.
+  printf '#!/bin/sh\n[ "${1:-}" = --version ] || : > "%s/analysis.marker"\nexec "%s" "$@"\n' "$tmp" "$real" > "$tmp/bin/shellcheck"
+  chmod +x "$tmp/bin/shellcheck"
+  fm_lint_hide_outside_shellcheck "$tmp/bin"
+  # Compliant: a one-line wrapper with no pool setting goes through the shared
+  # host pool and leaves there the history record that only its own fixture path
+  # can name; the test removes that record.
+  fixture="$tmp/wrapped.sh"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$fixture"
+  rc=0
+  out=$(env -u FM_LINT_SLOT_DIR PATH="$tmp/bin:$PATH" TMPDIR="$tmp" FM_LINT_HOST_RSS_KIB=1000000000 \
+    "$LINT" --jobs 1 --telemetry "$tmp/wrapper.tsv" "$fixture" 2>&1) || rc=$?
+  [ "$rc" -eq 0 ] || fail "the wrapper run failed (rc=$rc)"$'\n'"$out"
+  [ -e "$tmp/analysis.marker" ] || fail "the wrapper never ran the real analysis"
+  mark="/var/tmp/firstmate-lint-$(id -u)/lint-slots/history/$(perl -MDigest::SHA=sha256_hex -e 'print sha256_hex($ARGV[0])' "full:$fixture")"
+  [ -s "$mark" ] || fail "the wrapper run left no record in the host pool ($mark)"
+  rm -f "$mark"
+  # Harmful: the same wrapper pointed at its own pool, while a real ShellCheck
+  # outside it holds more than the 4 MiB budget, is not admitted although its pool
+  # is empty, and runs once the outside one ends.
+  rm -f "$tmp/analysis.marker"
+  mkfifo "$tmp/hold"
+  "$real" - < "$tmp/hold" > /dev/null 2>&1 &
+  outside=$!
+  exec 9> "$tmp/hold"
+  sleep 2
+  PATH="$tmp/bin:$PATH" FM_TEST_COUNTED_SHELLCHECK_PID="$outside" FM_LINT_SLOT_DIR="$tmp/own-pool" FM_LINT_HOST_SLOTS=9 \
+    FM_LINT_HOST_RSS_KIB=4096 "$LINT" "$tmp/a.sh" > "$tmp/wrapper.out" 2>&1 9>&- &
+  pid=$!
+  sleep 4
+  if [ -e "$tmp/analysis.marker" ]; then
+    exec 9>&-
+    kill "$outside" "$pid" 2>/dev/null || true
+    fail "a wrapper in its own pool started while a real shellcheck outside it held more than the 4 MiB budget"
+  fi
+  exec 9>&-
+  wait "$outside" 2>/dev/null || true
+  deadline=$((SECONDS + 30))
+  until [ -e "$tmp/analysis.marker" ]; do
+    [ "$SECONDS" -lt "$deadline" ] || { kill "$pid" 2>/dev/null || true; fail "the wrapper stayed queued after the outside shellcheck ended"; }
+    sleep 0.2
+  done
+  wait "$pid" || fail "the wrapper run failed after the outside shellcheck ended"$'\n'"$(cat "$tmp/wrapper.out")"
+  pass "a wrapper around the real ShellCheck uses the host pool by default and is held back by real shellcheck memory outside its own pool"
+}
+
+test_slot_file_failures_refuse_and_never_run_unbounded() {
   local tmp
   tmp=$(fm_test_tmproot fm-lint-slot-errors)
-  perl - "$ROOT/bin/fm-lint-cache.pl" "$tmp" <<'PL' || fail "slot I/O fallback regression failed"
+  perl - "$ROOT/bin/fm-lint-cache.pl" "$tmp" <<'PL' || fail "slot I/O refusal regression failed"
 use strict;
 use warnings;
 use File::Path qw(make_path);
@@ -730,17 +1226,23 @@ BEGIN {
 1;
 MODULE
 close $module;
-for my $failure (qw(open scan coordinator)) {
+for my $failure (qw(open scan coordinator counter)) {
     my $dir = "$tmp/$failure";
     make_path("$dir/slots");
     make_path("$dir/slots/slot.0") if $failure eq 'open';
+    if ($failure eq 'counter') {
+        open(my $counter, '>', "$dir/slots/queue.next") or die "$!";
+        print {$counter} "not a number\n";
+        close $counter;
+    }
     local $ENV{FM_LINT_HOST_SLOTS} = 1;
     local $ENV{FAIL_LOCK} = $failure;
-    my @inject = $failure eq 'open' ? () : ("-I$tmp", '-MFailLock');
+    my @inject = $failure =~ /\A(?:open|counter)\z/ ? () : ("-I$tmp", '-MFailLock');
     my $pid = fork();
     die "fork: $!" unless defined $pid;
     if (!$pid) {
         open STDERR, '>', "$dir/err" or die "$!";
+        open STDOUT, '>', "$dir/out" or die "$!";
         exec $^X, @inject, $gate, 'gate', "$dir/slots", 18, 'fail', "$dir/wait",
             '--', $^X, '-e', 'print "analysis ran\n"; exit 23';
         die "exec: $!";
@@ -750,19 +1252,472 @@ for my $failure (qw(open scan coordinator)) {
         if (time() > $deadline) {
             kill 'KILL', $pid;
             waitpid($pid, 0);
-            die "$failure failure queued instead of running ungated\n";
+            die "$failure failure queued instead of refusing\n";
         }
         sleep 0.01;
     }
-    die "$failure fallback lost the command exit status: $?\n" unless $? == (23 << 8);
-    open(my $err, '<', "$dir/err") or die "$!";
+    die "$failure failure exited with status $?, expected a refusal with exit 2\n" unless $? == (2 << 8);
+    open(my $out, '<', "$dir/out") or die "$!";
     local $/;
-    my $warning = <$err>;
-    die "$failure fallback omitted the warning\n"
-        unless $warning =~ /running without the host-wide ShellCheck bound/;
+    my $ran = <$out>;
+    die "$failure failure still ran the analysis unbounded\n" if defined $ran && length $ran;
+    open(my $err, '<', "$dir/err") or die "$!";
+    my $message = <$err>;
+    die "$failure refusal omitted the cause: $message\n" unless $message =~ /host slot pool unusable at \Q$dir\E\/slots/;
+    die "$failure refusal omitted the fix: $message\n" unless $message =~ /writable/;
+    die "$failure refusal offers a way to run without the bound: $message\n" if $message =~ /FM_LINT_SLOT_DIR/;
+    die "$failure refusal still claims to run unbounded: $message\n" if $message =~ /running without the host-wide ShellCheck bound/;
 }
 PL
-  pass "slot open and non-contention coordinator/scan lock failures warn and run ungated"
+  pass "slot open, counter and non-contention coordinator/scan lock failures refuse naming the path and never run the analysis"
+}
+
+# fm_lint_write_memory_shellcheck <fakebin> <MiB> <start-log>: a stand-in
+# analysis that holds a known resident size. FM_TEST_MEM_DELAY sets how many
+# seconds it waits after it starts before it allocates (default 0), and
+# FM_TEST_MEM_HOLD how many seconds it holds the memory (default 1.5). A
+# --version call answers before it allocates. It appends its pid to
+# <start-log> once it holds the memory, and "<pid> <held from> <held until>"
+# to <start-log>.spans when it ends.
+fm_lint_write_memory_shellcheck() {
+  mkdir -p "$1"
+  cat > "$1/shellcheck" <<PL
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use Time::HiRes qw(time);
+BEGIN {
+    if ((\$ARGV[0] // '') eq '--version') {
+        print "ShellCheck - shell script analysis tool\nversion: 0.11.0\n";
+        exit 0;
+    }
+    select(undef, undef, undef, \$ENV{FM_TEST_MEM_DELAY} // 0);
+}
+my \$block = 'x' x ($2 * 1048576);
+my \$held = time();
+open(my \$log, '>>', '$3') or die "\$!";
+print {\$log} "\$\$\n";
+close \$log;
+select(undef, undef, undef, \$ENV{FM_TEST_MEM_HOLD} // 1.5);
+open(my \$spans, '>>', '$3.spans') or die "\$!";
+printf {\$spans} "%d %.6f %.6f\n", \$\$, \$held, time();
+close \$spans;
+exit(length(\$block) ? 0 : 1);
+PL
+  chmod +x "$1/shellcheck"
+  fm_lint_hide_outside_shellcheck "$1"
+}
+
+# fm_lint_memory_runs <tmp> <fakebin> <runs> [VAR=value...]: start <runs> lint
+# runs at once, each with its own HOME, XDG_CACHE_HOME and FM_HOME and three
+# roots. Prints "<peak concurrent> <started>": the most stand-in analyses that
+# held their memory at the same moment, taken from their own start and end
+# times rather than from a sampler, and how many started.
+fm_lint_memory_runs() {
+  local tmp=$1 fakebin=$2 runs=$3 run rc=0 pid most
+  local -a pids
+  shift 3
+  : > "$tmp/mem.starts"
+  : > "$tmp/mem.starts.spans"
+  for run in $(seq 1 "$runs"); do
+    mkdir -p "$tmp/home.$run/.cache" "$tmp/fm.$run"
+    env FM_TEST_MEM_HOLD="${FM_TEST_MEM_HOLD:-4}" "$@" HOME="$tmp/home.$run" XDG_CACHE_HOME="$tmp/home.$run/.cache" FM_HOME="$tmp/fm.$run" \
+      PATH="$fakebin:$PATH" "$LINT" --jobs 2 "$tmp/a.sh" "$tmp/b.sh" "$tmp/c.sh" > "$tmp/mem.run.$run.out" 2>&1 &
+    pids+=("$!")
+  done
+  for pid in "${pids[@]}"; do
+    wait "$pid" || rc=$?
+  done
+  [ "$rc" -eq 0 ] || fail "a stand-in lint run failed (rc=$rc)"$'\n'"$(cat "$tmp"/mem.run.*.out)"
+  most=$(perl -ane 'push @e, [$F[1], 1], [$F[2], -1];
+    END { my ($n, $m) = (0, 0);
+      for (sort { $a->[0] <=> $b->[0] || $a->[1] <=> $b->[1] } @e) { $n += $_->[1]; $m = $n if $n > $m }
+      print "$m\n" }' "$tmp/mem.starts.spans")
+  printf '%s %s\n' "$most" "$(wc -l < "$tmp/mem.starts" | tr -d ' ')"
+}
+
+# fm_lint_max_recorded_peak <slot-dir>: the largest root peak (KiB) the pool's
+# history records, or 0 when it records none.
+fm_lint_max_recorded_peak() {
+  local max=0 value file
+  for file in "$1"/history/*; do
+    [ -f "$file" ] || continue
+    value=$(cat "$file")
+    if [ "$value" -gt "$max" ]; then max=$value; fi
+  done
+  printf '%s\n' "$max"
+}
+
+test_memory_budget_bounds_the_aggregate_across_homes() {
+  local tmp limit record budget baseline cold warm lone peak most starts
+  tmp=$(fm_test_tmproot fm-lint-memory-budget)
+  mkdir -p "$tmp/bin"
+  for root in a b c; do printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/$root.sh"; done
+  fm_lint_write_memory_shellcheck "$tmp/bin" 64 "$tmp/mem.starts"
+  # The per-root watch bound is also the charge of a root with no record; it
+  # sits well above one stand-in, so the watch never ends one.
+  limit=$((65536 * 4))
+  # Without a budget, four runs from four homes stack on one count cap of nine.
+  baseline=$(fm_lint_memory_runs "$tmp" "$tmp/bin" 4 FM_LINT_SLOT_DIR="$tmp/base" \
+    FM_LINT_HOST_SLOTS=9 FM_LINT_HOST_RSS_KIB=100000000 FM_LINT_ROOT_RSS_KIB="$limit")
+  record=$(fm_lint_max_recorded_peak "$tmp/base")
+  { [ "$record" -gt 0 ] && [ "$record" -lt "$limit" ]; } \
+    || fail "the unbudgeted runs recorded a stand-in peak of $record KiB, expected above 0 and below $limit"
+  # Two recorded stand-ins fit the budget and three do not; two unrecorded ones
+  # (charged the watch bound) do not. The aggregate at any moment is the number
+  # of stand-ins whose own start and end times overlap, each at the recorded
+  # stand-in peak.
+  budget=$((record * 5 / 2))
+  read -r most starts <<<"$baseline"
+  peak=$((most * record))
+  [ "$peak" -gt $((budget + record)) ] \
+    || fail "four unbudgeted runs peaked at only $peak KiB ($most at once), so this test cannot show a bound: $baseline"
+  # A pool with no records charges each root the watch bound until its first
+  # copy ends, so the aggregate stays within the budget although each stand-in
+  # waits after its admission before it allocates, and no reading taken at
+  # admission sees its memory.
+  cold=$(fm_lint_memory_runs "$tmp" "$tmp/bin" 4 FM_LINT_SLOT_DIR="$tmp/shared" FM_LINT_HOST_SLOTS=9 \
+    FM_LINT_HOST_RSS_KIB="$budget" FM_LINT_ROOT_RSS_KIB="$limit" FM_TEST_MEM_DELAY=0.5 FM_TEST_MEM_HOLD=1)
+  read -r most starts <<<"$cold"
+  peak=$((most * record))
+  [ "$peak" -le $((budget + 16384)) ] \
+    || fail "four runs with no records reached $peak KiB of stand-in memory, above the $budget KiB budget: $cold"
+  [ "$most" -le 2 ] || fail "a pool with no records ran $most roots at once, more than two recorded roots fit: $cold"
+  [ "$starts" -eq 12 ] || fail "$starts of 12 roots completed in a pool with no records: $cold"
+  # The same four runs once every root is recorded: two run at once, and the
+  # aggregate stays within the budget although each allocates after admission.
+  warm=$(fm_lint_memory_runs "$tmp" "$tmp/bin" 4 FM_LINT_SLOT_DIR="$tmp/shared" FM_LINT_HOST_SLOTS=9 \
+    FM_LINT_HOST_RSS_KIB="$budget" FM_LINT_ROOT_RSS_KIB="$limit" FM_TEST_MEM_DELAY=0.5 FM_TEST_MEM_HOLD=1.5)
+  read -r most starts <<<"$warm"
+  peak=$((most * record))
+  [ "$peak" -le $((budget + 16384)) ] \
+    || fail "four runs with records reached $peak KiB of stand-in memory, above the $budget KiB budget: $warm"
+  [ "$most" -eq 2 ] || fail "recorded roots ran $most at once, expected the two that fit the budget: $warm"
+  [ "$starts" -eq 12 ] || fail "$starts of 12 recorded roots completed under the budget: $warm"
+  # A lone run keeps its two workers once its roots are recorded. Each stand-in
+  # holds its memory for eight seconds, so a second worker that starts seconds
+  # late on a loaded host still overlaps the first; a gate that admits them one
+  # at a time still leaves no overlap.
+  lone=$(fm_lint_memory_runs "$tmp" "$tmp/bin" 1 FM_LINT_SLOT_DIR="$tmp/shared" FM_LINT_HOST_SLOTS=9 \
+    FM_LINT_HOST_RSS_KIB="$budget" FM_LINT_ROOT_RSS_KIB="$limit" FM_TEST_MEM_HOLD=8)
+  read -r most starts <<<"$lone"
+  [ "$most" -eq 2 ] || fail "a lone run with recorded roots peaked at $most stand-ins, expected its two workers: $lone"
+  pass "four runs with four HOME values stay within the memory budget with and without records, run two recorded roots at once, and finish all 12 roots (unbudgeted: $baseline; no records: $cold; records: $warm)"
+}
+
+test_root_larger_than_the_budget_runs_alone_and_a_killed_run_frees_its_charge() {
+  local tmp stand out first second pid_a pid_b deadline
+  tmp=$(fm_test_tmproot fm-lint-memory-alone)
+  mkdir -p "$tmp/bin"
+  for root in a b c; do printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/$root.sh"; done
+  fm_lint_write_memory_shellcheck "$tmp/bin" 64 "$tmp/mem.starts"
+  stand=65536
+  # A budget smaller than one root: each root still runs, one at a time.
+  out=$(fm_lint_memory_runs "$tmp" "$tmp/bin" 1 FM_LINT_SLOT_DIR="$tmp/alone" \
+    FM_LINT_HOST_SLOTS=9 FM_LINT_HOST_RSS_KIB=$((stand / 2)))
+  [ "$(printf '%s' "$out" | cut -d' ' -f1)" -eq 1 ] || fail "a root larger than the budget did not run alone: $out"
+  [ "$(printf '%s' "$out" | cut -d' ' -f2)" -eq 3 ] || fail "a root larger than the budget did not complete every root: $out"
+  # A run killed while it holds the only admissible charge frees it for the waiter.
+  : > "$tmp/mem.starts"
+  FM_TEST_MEM_HOLD=60 FM_LINT_SLOT_DIR="$tmp/kill" FM_LINT_HOST_SLOTS=9 FM_LINT_HOST_RSS_KIB=$((stand * 3 / 2)) \
+    PATH="$tmp/bin:$PATH" "$LINT" --jobs 1 "$tmp/a.sh" > "$tmp/kill.a.out" 2>&1 &
+  pid_a=$!
+  deadline=$((SECONDS + 20))
+  until [ "$(wc -l < "$tmp/mem.starts" | tr -d ' ')" -ge 1 ]; do
+    [ "$SECONDS" -lt "$deadline" ] || { kill "$pid_a" 2>/dev/null; fail "the first run never started its root"; }
+    sleep 0.1
+  done
+  FM_TEST_MEM_HOLD=0.3 FM_LINT_SLOT_DIR="$tmp/kill" FM_LINT_HOST_SLOTS=9 FM_LINT_HOST_RSS_KIB=$((stand * 3 / 2)) \
+    PATH="$tmp/bin:$PATH" "$LINT" --jobs 1 "$tmp/b.sh" > "$tmp/kill.b.out" 2>&1 &
+  pid_b=$!
+  sleep 2
+  [ "$(wc -l < "$tmp/mem.starts" | tr -d ' ')" -eq 1 ] || fail "the waiter started while the first root held the whole budget"
+  kill -TERM "$pid_a" 2>/dev/null || true
+  wait "$pid_a" 2>/dev/null || true
+  deadline=$((SECONDS + 30))
+  until [ "$(wc -l < "$tmp/mem.starts" | tr -d ' ')" -ge 2 ]; do
+    [ "$SECONDS" -lt "$deadline" ] || { kill "$pid_b" 2>/dev/null; fail "the waiter stayed queued after the holding run was killed"; }
+    sleep 0.1
+  done
+  wait "$pid_b" || fail "the waiter failed after the killed run released its charge"$'\n'"$(cat "$tmp/kill.b.out")"
+  first=$(find "$tmp/kill" -name 'queue.0*' -print | head -1)
+  [ -z "$first" ] || fail "a killed or finished run left a queue ticket behind: $first"
+  second=$(FM_TEST_MEM_HOLD=0.2 FM_LINT_SLOT_DIR="$tmp/kill" FM_LINT_HOST_SLOTS=9 FM_LINT_HOST_RSS_KIB=$((stand * 3 / 2)) \
+    PATH="$tmp/bin:$PATH" "$LINT" --jobs 1 "$tmp/c.sh" 2>&1) \
+    || fail "a later run failed on the pool a killed run used: $second"
+  pass "a root larger than the budget runs alone, and a killed run frees its charge and leaves no ticket"
+}
+
+test_memory_charge_survives_unknown_records_and_an_unreadable_table() {
+  local tmp
+  tmp=$(fm_test_tmproot fm-lint-memory-state)
+  mkdir -p "$tmp/shim" "$tmp/lonely" "$tmp/hide"
+  printf '#!/bin/sh\nexit 1\n' > "$tmp/shim/ps"
+  chmod +x "$tmp/shim/ps"
+  fm_lint_hide_outside_shellcheck "$tmp/hide"
+  cp "$ROOT/bin/fm-lint-cache.pl" "$tmp/lonely/fm-lint-cache.pl"
+  PATH="$tmp/hide:$PATH" FM_TEST_GATE_POOL_PREFIX="$tmp/" perl - "$ROOT/bin/fm-lint-cache.pl" "$tmp" <<'PL' || fail "memory charge state regression failed"
+use strict;
+use warnings;
+use Digest::SHA qw(sha256_hex);
+use File::Path qw(make_path);
+use Fcntl qw(:flock);
+use POSIX qw(WNOHANG);
+use Time::HiRes qw(time sleep);
+my ($gate, $tmp) = @ARGV;
+my $waiting = q{
+    use Time::HiRes qw(time sleep);
+    my ($started, $release, $peak, $rss) = @ARGV;
+    if (length $peak) {
+        open(my $fh, '>', $ENV{FM_LINT_INTERNAL_SLOT_PEAK_FILE}) or die "$!";
+        print {$fh} "$peak\n";
+        close $fh;
+    }
+    if (length $rss) {
+        open(my $fh, '>', $ENV{FM_LINT_INTERNAL_ROOT_RSS_FILE}) or die "$!";
+        print {$fh} "max_rss_kib=$rss\n";
+        close $fh;
+    }
+    open(my $fh, '>', $started) or die "$!";
+    close $fh;
+    my $deadline = time() + 20;
+    until (-e $release) { exit 1 if time() > $deadline; sleep 0.01; }
+};
+sub launch {
+    my ($gate_script, $dir, $name, $env, $peak, $rss) = @_;
+    my $pid = fork();
+    die "fork: $!" unless defined $pid;
+    if (!$pid) {
+        %ENV = (%ENV, FM_LINT_INTERNAL_ROOT_RSS_FILE => "$dir/rss.$name", %$env);
+        exec $^X, $gate_script, 'gate', "$dir/slots", 18, $name, "$dir/wait.$name", '--',
+            $^X, '-e', $waiting, "$dir/started.$name", "$dir/release.$name", $peak // '', $rss // '';
+        die "exec: $!";
+    }
+    return $pid;
+}
+sub await {
+    my ($path, $seconds) = @_;
+    my $deadline = time() + $seconds;
+    until (-e $path) { return 0 if time() > $deadline; sleep 0.01; }
+    return 1;
+}
+sub release {
+    my ($dir, $name, $pid) = @_;
+    open(my $fh, '>', "$dir/release.$name") or die "$!";
+    close $fh;
+    waitpid($pid, 0);
+    die "$name failed: $?\n" if $?;
+}
+sub history { "$_[0]/slots/history/" . sha256_hex($_[1]) }
+sub record {
+    my ($dir, $key, $kib) = @_;
+    make_path("$dir/slots/history");
+    open(my $fh, '>', history($dir, $key)) or die "$!";
+    print {$fh} "$kib\n";
+    close $fh;
+}
+sub recorded {
+    open(my $fh, '<', history(@_)) or return '';
+    my $line = <$fh> // '';
+    chomp $line;
+    return $line;
+}
+# 1. A dead holder's record is not a held slot, and an empty pool admits a root
+# even when the budget is smaller than its charge.
+{
+    my $dir = "$tmp/stale";
+    make_path("$dir/slots");
+    open(my $record, '>', "$dir/slots/slot.0") or die "$!";
+    print {$record} "dead\t7\t999999\t5\n";
+    close $record;
+    my $pid = launch($gate, $dir, 'stale', {FM_LINT_HOST_SLOTS => 2, FM_LINT_HOST_RSS_KIB => 10});
+    await("$dir/started.stale", 10) or do { kill 'KILL', $pid; die "a stale record blocked an empty pool\n" };
+    release($dir, 'stale', $pid);
+}
+# 2. A held slot whose record names no charge is charged the worst case, then
+# frees the moment its holder ends.
+{
+    my $dir = "$tmp/unknown";
+    make_path("$dir/slots");
+    record($dir, 'small', 100);
+    open(my $holder, '>>', "$dir/slots/slot.0") or die "$!";
+    flock($holder, LOCK_EX) or die "$!";
+    print {$holder} "garbage without a tab\n";
+    my %env = (FM_LINT_HOST_SLOTS => 2, FM_LINT_HOST_RSS_KIB => 1050, FM_LINT_INTERNAL_ROOT_CAP_KIB => 1000,
+        FM_LINT_INTERNAL_ROOT_KEY => 'small');
+    my $pid = launch($gate, $dir, 'unknown', \%env);
+    if (await("$dir/started.unknown", 1.5)) { kill 'KILL', $pid; die "a held slot with an unknown record was charged less than the worst case\n" }
+    close $holder;
+    await("$dir/started.unknown", 10) or do { kill 'KILL', $pid; die "the waiter stayed queued after the unknown holder ended\n" };
+    release($dir, 'unknown', $pid);
+}
+# 3. Three roots recorded at 100000 KiB fit a 1500000 KiB budget when the table
+# can be read. With no readable process table (ps fails and no libproc helper
+# sits beside the gate), every held root is charged the worst case, so the
+# third waits where two fit.
+for my $case (['readable', $gate, {}, 3], ['unreadable', "$tmp/lonely/fm-lint-cache.pl", {PATH => "$tmp/shim:$ENV{PATH}"}, 2]) {
+    my ($label, $gate_script, $extra, $expected) = @$case;
+    my $dir = "$tmp/$label";
+    make_path("$dir/slots");
+    record($dir, 'seeded', 100000);
+    my %env = (FM_LINT_HOST_SLOTS => 9, FM_LINT_HOST_RSS_KIB => 1500000, FM_LINT_INTERNAL_ROOT_CAP_KIB => 1000000,
+        FM_LINT_INTERNAL_ROOT_KEY => 'seeded', %$extra);
+    my @pids = map { launch($gate_script, $dir, "n$_", \%env) } 1 .. 3;
+    my $deadline = time() + 15;
+    sleep 0.05 until (grep { -e "$dir/started.n$_" } 1 .. 3) >= $expected || time() > $deadline;
+    sleep 1.5;
+    my @started = grep { -e "$dir/started.n$_" } 1 .. 3;
+    if (@started != $expected) { kill 'KILL', @pids; die "with a $label table " . scalar(@started) . " roots were admitted, expected $expected\n" }
+    for my $name (1 .. 3) { open(my $fh, '>', "$dir/release.n$name") or die "$!"; close $fh; }
+    for my $pid (@pids) { waitpid($pid, 0); die "a $label-table root failed: $?\n" if $?; }
+    die "a queued root never ran with a $label table\n" unless 3 == grep { -e "$dir/started.n$_" } 1 .. 3;
+}
+# 4. A held root is charged what it holds now when that exceeds its record (the
+# watch's published peak), and a root's record is raised to its measured peak
+# when it ends (the watch's peak, or /usr/bin/time's maximum resident size) and
+# never lowered.
+{
+    my $dir = "$tmp/growth";
+    make_path("$dir/slots");
+    record($dir, $_, 1000) for qw(holder waiter);
+    my %env = (FM_LINT_HOST_SLOTS => 9, FM_LINT_HOST_RSS_KIB => 1000000, FM_LINT_INTERNAL_ROOT_CAP_KIB => 1000000);
+    my $holder = launch($gate, $dir, 'holder', {%env, FM_LINT_INTERNAL_ROOT_KEY => 'holder'}, 2000000);
+    await("$dir/started.holder", 10) or do { kill 'KILL', $holder; die "the holder never started\n" };
+    my $waiter = launch($gate, $dir, 'waiter', {%env, FM_LINT_INTERNAL_ROOT_KEY => 'waiter'}, undef, 500);
+    if (await("$dir/started.waiter", 1.5)) { kill 'KILL', $holder, $waiter; die "a holder past its record was charged only its record\n" }
+    release($dir, 'holder', $holder);
+    await("$dir/started.waiter", 10) or do { kill 'KILL', $waiter; die "the waiter stayed queued after the grown holder ended\n" };
+    release($dir, 'waiter', $waiter);
+    die "the watch's peak did not raise the record: " . recorded($dir, 'holder') . "\n" unless recorded($dir, 'holder') eq '2000000';
+    die "a lower peak lowered the record: " . recorded($dir, 'waiter') . "\n" unless recorded($dir, 'waiter') eq '1000';
+    my $lower = launch($gate, $dir, 'lower', {%env, FM_LINT_INTERNAL_ROOT_KEY => 'holder'}, undef, 50);
+    release($dir, 'lower', $lower);
+    die "a lower peak lowered the record: " . recorded($dir, 'holder') . "\n" unless recorded($dir, 'holder') eq '2000000';
+    my $higher = launch($gate, $dir, 'higher', {%env, FM_LINT_INTERNAL_ROOT_KEY => 'waiter'}, undef, 3000);
+    release($dir, 'higher', $higher);
+    die "the maximum resident size did not raise the record: " . recorded($dir, 'waiter') . "\n" unless recorded($dir, 'waiter') eq '3000';
+}
+# 5. A root with no record is charged the worst case: it waits beside a small
+# held root that a recorded root joins.
+{
+    my $dir = "$tmp/fresh";
+    make_path("$dir/slots");
+    record($dir, $_, 1000) for qw(holder known);
+    my %env = (FM_LINT_HOST_SLOTS => 9, FM_LINT_HOST_RSS_KIB => 1000000, FM_LINT_INTERNAL_ROOT_CAP_KIB => 1000000);
+    my $holder = launch($gate, $dir, 'holder', {%env, FM_LINT_INTERNAL_ROOT_KEY => 'holder'});
+    await("$dir/started.holder", 10) or do { kill 'KILL', $holder; die "the small holder never started\n" };
+    my $known = launch($gate, $dir, 'known', {%env, FM_LINT_INTERNAL_ROOT_KEY => 'known'});
+    await("$dir/started.known", 10) or do { kill 'KILL', $holder, $known; die "a recorded root did not join a small held root\n" };
+    my $fresh = launch($gate, $dir, 'fresh', {%env, FM_LINT_INTERNAL_ROOT_KEY => 'fresh'});
+    if (await("$dir/started.fresh", 1.5)) { kill 'KILL', $holder, $known, $fresh; die "a root with no record was charged less than the worst case\n" }
+    release($dir, $_->[0], $_->[1]) for ['holder', $holder], ['known', $known];
+    await("$dir/started.fresh", 10) or do { kill 'KILL', $fresh; die "the unrecorded root stayed queued in an empty pool\n" };
+    release($dir, 'fresh', $fresh);
+}
+# 6. A gate stopped by a signal leaves no record, so the root's next request is
+# still charged the worst case.
+{
+    my $dir = "$tmp/signalled";
+    make_path("$dir/slots");
+    my $pid = launch($gate, $dir, 'cut', {FM_LINT_INTERNAL_ROOT_KEY => 'cut'}, 500, 500);
+    await("$dir/started.cut", 10) or do { kill 'KILL', $pid; die "the signalled root never started\n" };
+    kill 'TERM', $pid;
+    waitpid($pid, 0);
+    die "a signalled gate exited 0\n" unless $?;
+    die "a signalled analysis set a record: " . recorded($dir, 'cut') . "\n" if length recorded($dir, 'cut');
+}
+# 7. A held slot beyond this run's count cap still counts toward the budget.
+{
+    my $dir = "$tmp/beyond";
+    make_path("$dir/slots");
+    record($dir, 'small', 200000);
+    open(my $holder, '>>', "$dir/slots/slot.5") or die "$!";
+    flock($holder, LOCK_EX) or die "$!";
+    print {$holder} "wide\t1\t$$\t900000\n";
+    my $pid = launch($gate, $dir, 'narrow', {FM_LINT_HOST_SLOTS => 1, FM_LINT_HOST_RSS_KIB => 1000000,
+        FM_LINT_INTERNAL_ROOT_KEY => 'small'});
+    if (await("$dir/started.narrow", 1.5)) { kill 'KILL', $pid; die "a run with a cap of one ignored a slot held beyond its cap\n" }
+    close $holder;
+    await("$dir/started.narrow", 10) or do { kill 'KILL', $pid; die "the narrow run stayed queued after the wide holder ended\n" };
+    release($dir, 'narrow', $pid);
+}
+PL
+  pass "stale records are reclaimed, unknown records and an unreadable table are charged the worst case, a root with no record is charged the worst case, a root past its record is charged its current peak, records only rise and only after a complete analysis, and slots beyond a run's cap count"
+}
+
+test_fast_record_does_not_lower_the_full_charge() {
+  local tmp limit record budget holder waiter starts deadline
+  tmp=$(fm_test_tmproot fm-lint-memory-mode)
+  mkdir -p "$tmp/bin"
+  for root in a b; do printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/$root.sh"; done
+  fm_lint_write_memory_shellcheck "$tmp/bin" 1 "$tmp/mem.starts"
+  limit=$((65536 * 4))
+  # A --fast lint records the small peak of a.sh in fast mode only.
+  CI='' GITHUB_ACTIONS='' FM_TEST_MEM_HOLD=0.1 FM_LINT_SLOT_DIR="$tmp/pool" FM_LINT_ROOT_RSS_KIB="$limit" PATH="$tmp/bin:$PATH" \
+    "$LINT" --fast --jobs 1 "$tmp/a.sh" > "$tmp/fast.out" 2>&1 || fail "the fast seeding run failed"$'\n'"$(cat "$tmp/fast.out")"
+  record=$(fm_lint_max_recorded_peak "$tmp/pool")
+  { [ "$record" -gt 0 ] && [ $((record * 2)) -lt "$limit" ]; } \
+    || fail "the fast run recorded a peak of $record KiB, expected above 0 and below half of $limit"
+  # The budget fits an unrecorded holder plus a.sh at its fast record, but not
+  # two unrecorded roots.
+  budget=$((limit + record * 2))
+  : > "$tmp/mem.starts"
+  FM_TEST_MEM_HOLD=60 FM_LINT_SLOT_DIR="$tmp/pool" FM_LINT_ROOT_RSS_KIB="$limit" FM_LINT_HOST_RSS_KIB="$budget" \
+    PATH="$tmp/bin:$PATH" "$LINT" --jobs 1 "$tmp/b.sh" > "$tmp/holder.out" 2>&1 &
+  holder=$!
+  deadline=$((SECONDS + 20))
+  until [ "$(wc -l < "$tmp/mem.starts" | tr -d ' ')" -ge 1 ]; do
+    [ "$SECONDS" -lt "$deadline" ] || { kill "$holder" 2>/dev/null; fail "the holding run never started its root"; }
+    sleep 0.1
+  done
+  # A fast request of a.sh is charged its fast record and joins the holder.
+  CI='' GITHUB_ACTIONS='' FM_TEST_MEM_HOLD=0.1 FM_LINT_SLOT_DIR="$tmp/pool" FM_LINT_ROOT_RSS_KIB="$limit" FM_LINT_HOST_RSS_KIB="$budget" \
+    PATH="$tmp/bin:$PATH" "$LINT" --fast --jobs 1 "$tmp/a.sh" > "$tmp/fast2.out" 2>&1 &
+  waiter=$!
+  deadline=$((SECONDS + 20))
+  until [ "$(wc -l < "$tmp/mem.starts" | tr -d ' ')" -ge 2 ]; do
+    [ "$SECONDS" -lt "$deadline" ] || { kill "$holder" "$waiter" 2>/dev/null; fail "a fast request was not charged its fast record"; }
+    sleep 0.1
+  done
+  wait "$waiter" || { kill "$holder" 2>/dev/null; fail "the fast request failed beside the holder"$'\n'"$(cat "$tmp/fast2.out")"; }
+  # A full request of a.sh has no full record, so it is charged the worst case and waits.
+  FM_TEST_MEM_HOLD=0.1 FM_LINT_SLOT_DIR="$tmp/pool" FM_LINT_ROOT_RSS_KIB="$limit" FM_LINT_HOST_RSS_KIB="$budget" \
+    PATH="$tmp/bin:$PATH" "$LINT" --jobs 1 "$tmp/a.sh" > "$tmp/full.out" 2>&1 &
+  waiter=$!
+  sleep 2
+  starts=$(wc -l < "$tmp/mem.starts" | tr -d ' ')
+  if [ "$starts" -ne 2 ]; then
+    kill "$holder" "$waiter" 2>/dev/null
+    fail "a full request of a root with only a fast record started beside an unrecorded holder ($starts starts)"
+  fi
+  kill -TERM "$holder" 2>/dev/null || true
+  wait "$holder" 2>/dev/null || true
+  wait "$waiter" || fail "the full request failed after the holder ended"$'\n'"$(cat "$tmp/full.out")"
+  pass "a --fast record charges later fast requests only; a full request of the same root is still charged the worst case"
+}
+
+test_default_pool_is_one_directory_for_every_home() {
+  local tmp pool run fixture mark
+  # The real ShellCheck with FM_LINT_SLOT_DIR unset: its pool is the live per-user
+  # host pool, which no PATH entry, HOME, XDG_CACHE_HOME or FM_HOME can change.
+  # Each run leaves a history record that
+  # only its own fixture path can name, and the test removes that record.
+  pinned_ready || { pass "SKIP (ShellCheck $REQUIRED not resolved): default pool for every HOME"; return; }
+  tmp=$(fm_test_tmproot fm-lint-default-pool)
+  pool="/var/tmp/firstmate-lint-$(id -u)/lint-slots"
+  for run in 1 2; do
+    fixture="$tmp/run.$run.sh"
+    printf '#!/usr/bin/env bash\nexit 0\n' > "$fixture"
+    mkdir -p "$tmp/home.$run/.cache"
+    env -u FM_LINT_SLOT_DIR HOME="$tmp/home.$run" XDG_CACHE_HOME="$tmp/home.$run/.cache" FM_HOME="$tmp/fm.$run" \
+      "$LINT" --jobs 1 --telemetry "$tmp/run.$run.tsv" "$fixture" >/dev/null 2>&1 \
+      || fail "a lint run with the default pool failed (home $run)"
+    [ ! -e "$tmp/home.$run/.cache/firstmate/lint-slots" ] || fail "run $run still used a pool under its own HOME"
+    mark="$pool/history/$(perl -MDigest::SHA=sha256_hex -e 'print sha256_hex($ARGV[0])' "full:$fixture")"
+    [ -s "$mark" ] || fail "run $run with its own HOME, XDG_CACHE_HOME and FM_HOME left no record in $pool"
+    rm -f "$mark"
+  done
+  pass "runs with different HOME, XDG_CACHE_HOME and FM_HOME values record in the same per-user pool"
 }
 
 test_slot_survives_gate_death() {
@@ -1370,7 +2325,7 @@ open(my $manifest, '>', "$tmp/manifest") or die "$!";
 print {$manifest} "0\tbin/consumer.sh\n";
 close $manifest;
 local %ENV = (%ENV, FM_LINT_INTERNAL => 1, FM_LINT_INTERNAL_CACHE => "$tmp/cache",
-    FM_LINT_INTERNAL_SLOT_DIR => 'off', FM_LINT_INTERNAL_NCPU => 18,
+    FM_LINT_INTERNAL_SLOT_DIR => "$tmp/slots", FM_LINT_INTERNAL_NCPU => 18, FM_LINT_INTERNAL_RUN_ID => 'worker',
     FM_LINT_INTERNAL_BOUNDED => 'perl', FM_LINT_INTERNAL_MEMORY_KIB => 2097152,
     FM_LINT_INTERNAL_ROOT_SECS => 8, FM_LINT_INTERNAL_GRACE => 1,
     FM_LINT_INTERNAL_ROOTS_LOG => "$tmp/roots.tsv", FM_LINT_SHELLCHECK => $tool,
@@ -1893,10 +2848,20 @@ test_host_waiters_make_progress_without_barging
 test_unequal_runs_share_scarce_slots_per_run
 test_stopped_head_waiter_does_not_block_the_queue
 test_stopped_admission_coordinator_does_not_freeze_free_capacity
+test_slow_ps_does_not_hold_admission_against_the_next_root
 test_queue_scan_survives_odd_slot_paths_and_vanishing_tickets
 test_cached_success_does_not_wait_for_host_slots
-test_slot_pool_can_be_disabled_or_misconfigured
-test_slot_file_failures_run_ungated
+test_slot_pool_cannot_be_disabled_and_refuses_bad_settings
+test_slot_file_failures_refuse_and_never_run_unbounded
+test_growing_roots_are_held_to_the_budget_across_pools
+test_a_waiting_gate_reading_the_table_never_stops_a_younger_running_root
+test_growth_guard_never_stops_the_watch_reader
+test_a_wrapper_around_the_real_shellcheck_shares_the_host_wide_memory_bound
+test_memory_budget_bounds_the_aggregate_across_homes
+test_root_larger_than_the_budget_runs_alone_and_a_killed_run_frees_its_charge
+test_memory_charge_survives_unknown_records_and_an_unreadable_table
+test_fast_record_does_not_lower_the_full_charge
+test_default_pool_is_one_directory_for_every_home
 test_slot_survives_gate_death
 test_queued_roots_use_high_resolution_timings
 test_worker_trees_stop_on_signal

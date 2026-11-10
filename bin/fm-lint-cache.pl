@@ -23,18 +23,45 @@ use File::Basename qw(dirname basename);
 # releases the slot when the last inherited descriptor closes.
 # Live requests take a ticket under admission.lock; a request's flock is its
 # liveness proof, so a killed waiter cannot strand the queue. Capacity is the
-# CPU-derived cap alone; host load never shrinks it, so unrelated machine load
-# cannot starve lint. Service is shared per run, not per worker: an admitted
-# request records its run and ticket in its slot file, and a free slot goes to
-# the waiting run holding the fewest slots, then the run served least recently,
-# then the oldest ticket. Within a run, tickets stay FIFO, so every waiting run
-# and request makes progress. A head ticket whose owner has been stopped for a
-# second is skipped; one ps call checks every waiting owner, and only after a
-# free slot has stayed unclaimed for that second. A waiter that has been unable
-# to take admission.lock for a second looks, at most once a second, for a stopped
-# gate on this slot directory; if one exists, its owner may hold the lock, so
-# the waiter scans without the lock. Slot flocks alone enforce the capacity bound.
-# Admission retains the slot.* protocol so in-flight older gates remain bounded.
+# CPU-derived cap and a resident-memory budget in bytes; host load never shrinks
+# either, so unrelated machine load cannot starve lint. Service is shared per
+# run, not per worker: an admitted request records its run, ticket and gate pid
+# in its slot file, and a free slot goes to the waiting run holding the fewest
+# slots, then the run served least recently, then the oldest ticket. Within a
+# run, tickets stay FIFO, so every waiting run and request makes progress. A head
+# ticket whose owner has been stopped for a second is skipped; one ps call, made
+# without admission.lock so a slow ps cannot keep the next root out, checks every
+# waiting owner, and only after a free slot has stayed unclaimed for that second.
+# A waiter that has been unable to take admission.lock for a second looks,
+# at most once a second, for a stopped gate on this slot directory; if one exists,
+# its owner may hold the lock, so the waiter scans without the lock. Slot flocks
+# alone enforce the capacity count.
+# The memory budget is checked only by the request whose turn it is, under
+# admission.lock, or without it on the stopped-gate path above. The request is
+# charged the recorded peak of its root
+# (FM_LINT_INTERNAL_ROOT_KEY, kept in history/<sha256 of the key>), or the
+# per-root worst case (FM_LINT_INTERNAL_ROOT_CAP_KIB) when the root has no
+# record. Every held slot is charged the larger of the charge its record names
+# and what its root holds now: its gate's whole process tree in one read of the
+# live process table, and the peak the macOS watch publishes beside the slot
+# (slot.<n>.peak, through FM_LINT_INTERNAL_SLOT_PEAK_FILE). The turn is taken
+# only if those charges, plus the current resident size outside the held roots
+# (the running lint trees of other pools and every other process named
+# shellcheck, from another caller or a wrapper script around the real
+# ShellCheck), plus the request's own charge fit the budget, or nothing is held
+# and nothing runs outside, so a root larger than the budget runs alone. A held
+# slot is charged the worst case when its
+# record names no charge or the table cannot be read. When the analysis
+# completes (no signal reached the gate, and it exited 0, 1, 98 or 251), the
+# gate raises the root's record to the larger of the watch's peak and the
+# maximum resident size in FM_LINT_INTERNAL_ROOT_RSS_FILE; any other end leaves
+# the record alone, and a record is never lowered. Every slot.<n> file in the
+# directory counts toward the budget, beyond this run's count cap too.
+# A pool that cannot be used (directory, lock, ticket, slot or queue file) never
+# lets the analysis run unbounded: the gate names the path and the fix on stderr
+# and exits 2.
+# Admission retains the slot.* protocol so in-flight older gates remain bounded;
+# their records name no charge and are charged the worst case.
 # The high-resolution wait is written in milliseconds to <wait-file> before
 # launch so the caller can account for queue time separately.
 if (($ARGV[0] // '') eq 'gate') {
@@ -44,13 +71,35 @@ if (($ARGV[0] // '') eq 'gate') {
     die "fm-lint-gate: invalid private invocation\n"
         unless defined $dashes && $dashes eq '--' && @command && ($ncpu // '') =~ /\A[1-9][0-9]*\z/
             && ($run // '') =~ /\A[A-Za-z0-9_-]{1,64}\z/;
-    my ($child, $caught);
+    my ($child, $caught, %paused);
     my %signal_number = (HUP => 1, INT => 2, TERM => 15);
     for my $name (keys %signal_number) {
-        $SIG{$name} = sub { $caught = $name; kill 'TERM', $child if $child; };
+        $SIG{$name} = sub { $caught = $name; kill 'CONT', keys %paused; kill 'TERM', $child if $child; };
     }
     my $cap = ($ENV{FM_LINT_HOST_SLOTS} // '') =~ /\A[1-9][0-9]*\z/ ? $ENV{FM_LINT_HOST_SLOTS} + 0
         : ($ncpu >> 1) > 2 ? ($ncpu >> 1) : 2;
+    # Memory budget (KiB) for every ShellCheck the pool admits, and the per-root
+    # worst case charged without a record or a table. bin/fm-lint.sh validates
+    # the budget override and owns the documented defaults.
+    my $positive = sub { ($_[0] // '') =~ /\A[1-9][0-9]*\z/ ? $_[0] + 0 : $_[1] };
+    my $budget_kib = $positive->($ENV{FM_LINT_HOST_RSS_KIB}, 12582912);
+    my $worst_kib = $positive->($ENV{FM_LINT_INTERNAL_ROOT_CAP_KIB}, 8388608);
+    my $root_key = $ENV{FM_LINT_INTERNAL_ROOT_KEY} // '';
+    my $history_path = length $root_key ? "$slot_dir/history/" . sha256_hex($root_key) : undef;
+    my $read_kib = sub {
+        open(my $fh, '<', $_[0]) or return 0;
+        my $line = <$fh> // '';
+        return $line =~ /\A([0-9]+)\n\z/ ? $1 + 0 : 0;
+    };
+    my $max = sub { $_[0] > $_[1] ? $_[0] : $_[1] };
+    my $refuse = sub {
+        my ($path, $why) = @_;
+        $why = 'unknown error' unless defined $why && length $why;
+        $why =~ s/\s+\z//;
+        print STDERR "fm-lint: host slot pool unusable at $path ($why); the host-wide ShellCheck memory bound cannot be enforced, "
+            . "so this analysis was not started. Make that path writable, or remove it if it is damaged.\n";
+        exit 2;
+    };
     my $stopped_owners = sub {
         my %stopped;
         open(my $ps, '-|', 'ps', '-o', 'pid=,stat=', '-p', join(',', @_)) or return %stopped;
@@ -58,8 +107,150 @@ if (($ARGV[0] // '') eq 'gate') {
         close $ps;
         return %stopped;
     };
-    my ($slot, $waited_from, $ticket, $ticket_path, $ticket_number, $coordinator);
-    my ($blocked_at, $checked_at, $bypass);
+    # One read of the live process table: { pid => [ppid, resident KiB, name,
+    # command, start seconds] }, or undef when no source answers. ps first, then
+    # libproc through fm-proc-info.py for a sandbox that refuses ps. The start is
+    # the absolute start (lstart) every reader sees alike, so all gates agree on
+    # which running gate is the oldest.
+    require Time::Piece;
+    my %start_of;
+    my $start = sub {
+        my ($text) = @_;
+        $text =~ s/\s+/ /g;
+        return $start_of{$text} //= eval { Time::Piece->strptime($text, '%a %b %e %H:%M:%S %Y')->epoch } // 0;
+    };
+    my $process_table = sub {
+        my %table;
+        {
+            no warnings 'exec';
+            local $ENV{LC_ALL} = 'C';
+            if (open(my $ps, '-|', 'ps', '-axww', '-o', 'pid=,ppid=,rss=,lstart=,command=')) {
+                while (my $line = <$ps>) {
+                    next unless $line =~ /\A\s*([0-9]+)\s+([0-9]+)\s+([0-9]+)\s+(\S+\s+\S+\s+[0-9]+\s+[0-9:]+\s+[0-9]+)\s+(.*?)\s*\z/s;
+                    my ($pid, $ppid, $rss, $started, $command) = ($1, $2, $3, $4, $5);
+                    my $name = (split ' ', $command)[0] // '';
+                    $name =~ s{.*/}{};
+                    $table{$pid} = [$ppid, $rss + 0, $name, $command, $start->($started)];
+                }
+                close $ps;
+            }
+        }
+        return \%table if $table{$$};
+        %table = ();
+        my $helper = dirname(abs_path($0)) . '/fm-proc-info.py';
+        if (-r $helper) {
+            no warnings 'exec';
+            my $python = $ENV{FM_LINT_INTERNAL_PYTHON} || 'python3';
+            my %command;
+            if (open(my $py, '-|', $python, $helper, 'table', 'pid,ppid,command')) {
+                while (my $line = <$py>) { $command{$1} = $3 if $line =~ /\A\s*([0-9]+)\s+([0-9]+)\s+(.*?)\s*\z/s; }
+                close $py;
+            }
+            if (open(my $py, '-|', $python, $helper, 'memory')) {
+                local $/;
+                my $json = <$py>;
+                close $py;
+                require JSON::PP;
+                my $rows = eval { JSON::PP::decode_json($json // '') };
+                for my $row (ref $rows eq 'ARRAY' ? @$rows : ()) {
+                    next unless ref $row eq 'HASH' && defined $row->{pid} && defined $row->{ppid}
+                        && defined $row->{rss_bytes};
+                    $table{$row->{pid}} = [$row->{ppid}, int($row->{rss_bytes} / 1024), $row->{comm} // '',
+                        $command{$row->{pid}} // ($row->{comm} // ''), $start->($row->{started} // '')];
+                }
+            }
+        }
+        return $table{$$} ? \%table : undef;
+    };
+    # KiB charged for the held slots, each [gate pid, charge, watch peak file]
+    # with undef for what its record does not name: the larger of its charge and
+    # what it holds now (its gate's whole process tree, or the watch's peak), and
+    # at least the worst case without a charge or a table.
+    my $charged = sub {
+        my ($table, @held) = @_;
+        my %children;
+        if ($table) { push @{$children{$table->{$_}[0]}}, $_ for keys %$table; }
+        my $total = 0;
+        for my $entry (@held) {
+            my ($pid, $charge, $peak_file) = @$entry;
+            my $sum = $read_kib->($peak_file);
+            if ($table && defined $pid) {
+                my ($tree, @queue, %seen) = (0, $pid);
+                while (defined(my $member = shift @queue)) {
+                    next if $seen{$member}++ || !$table->{$member};
+                    $tree += $table->{$member}[1];
+                    push @queue, @{$children{$member} // []};
+                }
+                $sum = $max->($sum, $tree);
+            }
+            $charge = $worst_kib unless defined $charge;
+            $charge = $max->($charge, $worst_kib) unless $table;
+            $total += $max->($charge, $sum);
+        }
+        return $total;
+    };
+    # Every lint gate on the host, whatever pool it uses, the processes below
+    # it, and every other process named shellcheck: the table reduced to
+    # { total => KiB in all of them, gates => { gate pid => [process set, start,
+    #   running] }, named => KiB of processes named shellcheck in no gate's tree }.
+    # total counts only gates that are running. A gate's own table and
+    # owner reads (ps, fm-proc-info.py table or memory, also seen as a bare or
+    # parenthesized command name, a <defunct> row or, before their exec, the
+    # gate's own command) are not in its set, so a gate runs only once its
+    # command has started.
+    my $host_view = sub {
+        my ($table) = @_;
+        return undef unless $table;
+        my %children;
+        push @{$children{$table->{$_}[0]}}, $_ for keys %$table;
+        my (%gates, %in_tree, %running);
+        for my $pid (keys %$table) {
+            # A gate is a perl running this script's gate mode; a process that only
+            # carries those words later in its arguments (check, timeout) is not one.
+            next unless ($table->{$pid}[3] // '') =~ m{\A\S*perl\S*\s+(?:-\S+\s+)*\S*fm-lint-cache\.pl\s+gate\s};
+            my $own_command = $table->{$pid}[3] // '';
+            my (@queue, %set) = grep {
+                my $command = $table->{$_}[3] // '';
+                $command ne $own_command && $command !~ m{\A(?:\S*/)?ps\s|\A\S*sh\s+\S*/ps\s|\A\S*(?i:python)\S*\s+(?:-\S+\s+)*\S*fm-proc-info\.py\s+(?:table|memory)\b|\A\(?\S*(?i:python)\S*\)?\z|\A\(\S+\)\z|\A(?:\[\S+\]\s+)?<defunct>\z}
+            } @{$children{$pid} // []};
+            $set{$pid} = 1;
+            while (defined(my $member = shift @queue)) {
+                next if $set{$member}++ || !$table->{$member};
+                push @queue, @{$children{$member} // []};
+            }
+            # A gate that has not started its command holds nothing: waiting
+            # gates must not count each other, or none would ever be admitted.
+            my $started = keys(%set) > 1;
+            $gates{$pid} = [\%set, $table->{$pid}[4], $started];
+            $in_tree{$_} = 1 for keys %set;
+            $running{$_} = 1 for $started ? keys %set : ();
+        }
+        my ($total, $named) = (0, 0);
+        $total += $table->{$_}[1] for keys %running;
+        for my $pid (keys %$table) {
+            next if $in_tree{$pid} || $table->{$pid}[2] ne 'shellcheck';
+            $named += $table->{$pid}[1];
+        }
+        return {total => $total + $named, named => $named, gates => \%gates};
+    };
+    # KiB resident in lint trees of other pools and in processes named
+    # shellcheck outside every gate: memory this pool does not hold.
+    my $foreign = sub {
+        my ($table, @held) = @_;
+        my $view = $host_view->($table) or return 0;
+        my %own;
+        for my $entry (@held) {
+            my ($pid) = @$entry;
+            $own{$_} = 1 for defined $pid && $view->{gates}{$pid} ? keys %{$view->{gates}{$pid}[0]} : ();
+        }
+        my $total = $view->{named};
+        for my $gate (keys %{$view->{gates}}) {
+            next if $gate == $$ || $own{$gate} || !$view->{gates}{$gate}[2];
+            for my $pid (keys %{$view->{gates}{$gate}[0]}) { $total += $table->{$pid}[1] unless $own{$pid}; }
+        }
+        return $total;
+    };
+    my ($table, $table_at);
     my $stopped_gate = sub {
         open(my $ps, '-|', 'ps', '-axww', '-o', 'pid=,stat=,command=') or return 0;
         my $found = 0;
@@ -70,126 +261,155 @@ if (($ARGV[0] // '') eq 'gate') {
         close $ps;
         return $found;
     };
+    my ($slot, $slot_path, $peak_file, $charge_kib, $waited_from, $ticket, $ticket_path, $ticket_number, $coordinator);
+    my ($blocked_at, $checked_at, $bypass);
     my ($passed, $passed_at, %stopped);
-    my $available = eval { make_path($slot_dir, {mode => 0700}); -d $slot_dir && -w _ };
-    $available = 0 if $available && !open($coordinator, '>>', "$slot_dir/admission.lock");
-    if ($available) {
-        $waited_from = Time::HiRes::time();
-        ACQUIRE: while (!$slot && !$caught) {
-            if (flock($coordinator, LOCK_EX | LOCK_NB)) {
-                undef $blocked_at;
-                undef $bypass;
-            } else {
-                unless ($!{EWOULDBLOCK} || $!{EAGAIN} || $!{EINTR}) { $available = 0; last; }
-                my $now = Time::HiRes::time();
-                $blocked_at //= $now;
-                if ($now - $blocked_at >= 1 && $now - ($checked_at // 0) >= 1) {
-                    $checked_at = $now;
-                    $bypass = $stopped_gate->();
-                }
-                unless ($bypass) {
-                    Time::HiRes::sleep(0.1);
-                    next;
-                }
+    eval { make_path($slot_dir, {mode => 0700}); 1 } or $refuse->($slot_dir, $@);
+    -d $slot_dir && -w _ or $refuse->($slot_dir, 'not a writable directory');
+    open($coordinator, '>>', "$slot_dir/admission.lock") or $refuse->("$slot_dir/admission.lock", $!);
+    $waited_from = Time::HiRes::time();
+    ACQUIRE: while (!$slot && !$caught) {
+        if (flock($coordinator, LOCK_EX | LOCK_NB)) {
+            undef $blocked_at;
+            undef $bypass;
+        } else {
+            $!{EWOULDBLOCK} || $!{EAGAIN} || $!{EINTR} or $refuse->("$slot_dir/admission.lock", $!);
+            my $now = Time::HiRes::time();
+            $blocked_at //= $now;
+            if ($now - $blocked_at >= 1 && $now - ($checked_at // 0) >= 1) {
+                $checked_at = $now;
+                $bypass = $stopped_gate->();
             }
-            unless ($ticket) {
-                open(my $sequence, '+>>', "$slot_dir/queue.next")
-                    or do { $available = 0; last; };
-                seek($sequence, 0, 0) or do { $available = 0; last; };
-                my $number = <$sequence> // "0\n";
-                unless ($number =~ /\A[0-9]+\n\z/) { $available = 0; last; }
-                close $sequence;
-                my $next;
-                open($next, '>', "$slot_dir/queue.next.tmp.$$")
-                    && print({$next} $number + 1, "\n") && close($next)
-                    && rename("$slot_dir/queue.next.tmp.$$", "$slot_dir/queue.next")
-                    or do { $available = 0; last; };
-                $ticket_number = $number + 1;
-                $ticket_path = sprintf '%s/queue.%020d.%d.%s', $slot_dir, $ticket_number, $$, $run;
-                open($ticket, '>>', $ticket_path) && flock($ticket, LOCK_EX | LOCK_NB)
-                    or do { $available = 0; last; };
+            unless ($bypass) {
+                Time::HiRes::sleep(0.1);
+                next;
             }
-            my (@free, @slots);
-            for my $index (0 .. $cap - 1) {
-                my $path = "$slot_dir/slot.$index";
-                open(my $fh, '>>', $path) or do { $available = 0; last ACQUIRE; };
-                if (flock($fh, LOCK_EX | LOCK_NB)) { push @free, $fh; push @slots, [$path, 0]; next; }
-                my $busy = $!{EWOULDBLOCK} || $!{EAGAIN} || $!{EINTR};
-                close $fh;
-                unless ($busy) { $available = 0; last ACQUIRE; }
-                push @slots, [$path, 1];
-            }
-            undef $passed unless @free;
-            if (@free) {
-                my (%held, %served, %oldest, %owners);
-                for my $entry (@slots) {
-                    open(my $record, '<', $entry->[0]) or next;
-                    my $line = <$record> // '';
-                    next unless $line =~ /\A([A-Za-z0-9_-]+)\t([0-9]+)\n\z/;
-                    $held{$1}++ if $entry->[1];
-                    $served{$1} = $2 if ($served{$1} // 0) < $2;
-                }
-                opendir(my $queue, $slot_dir) or do { $available = 0; last ACQUIRE; };
-                my @requests = sort grep { /\Aqueue\.[0-9]{20}\.[0-9]+\.[A-Za-z0-9_-]+\z/ } readdir $queue;
-                closedir $queue;
-                for my $name (@requests) {
-                    my $path = "$slot_dir/$name";
-                    my ($owner, $owner_run) = $name =~ /\Aqueue\.[0-9]{20}\.([0-9]+)\.(.+)\z/;
-                    if ($path ne $ticket_path) {
-                        open(my $request, '>>', $path) or do { $available = 0; last ACQUIRE; };
-                        if (flock($request, LOCK_EX | LOCK_NB)) {
-                            unlink($path) or $!{ENOENT} or do { $available = 0; last ACQUIRE; };
-                            next;
-                        }
-                        unless ($!{EWOULDBLOCK} || $!{EAGAIN} || $!{EINTR}) { $available = 0; last ACQUIRE; }
-                        $owners{$owner} = 1;
-                        next if $stopped{$owner};
-                    }
-                    $oldest{$owner_run} //= $path;
-                }
-                my ($next) = sort {
-                    ($held{$a} // 0) <=> ($held{$b} // 0)
-                        || ($served{$a} // 0) <=> ($served{$b} // 0)
-                        || $oldest{$a} cmp $oldest{$b}
-                } keys %oldest;
-                if (defined $next && $oldest{$next} eq $ticket_path) {
-                    $slot = shift @free;
-                    truncate($slot, 0) && syswrite($slot, "$run\t$ticket_number\n");
-                } elsif (defined $next) {
-                    my $now = Time::HiRes::time();
-                    if (($passed // '') ne $oldest{$next}) {
-                        ($passed, $passed_at) = ($oldest{$next}, $now);
-                    } elsif ($now - $passed_at >= 1) {
-                        %stopped = $stopped_owners->(sort keys %owners);
-                        $passed_at = $now;
-                    }
-                }
-            }
-            close $_ for @free;
-            if ($slot) {
-                unlink($ticket_path);
-                close $ticket;
-                undef $ticket;
-            }
-            flock($coordinator, LOCK_UN);
-            Time::HiRes::sleep(0.1) unless $slot || $caught;
         }
+        unless ($ticket) {
+            my $sequence_path = "$slot_dir/queue.next";
+            open(my $sequence, '+>>', $sequence_path) or $refuse->($sequence_path, $!);
+            seek($sequence, 0, 0) or $refuse->($sequence_path, $!);
+            my $number = <$sequence> // "0\n";
+            $number =~ /\A[0-9]+\n\z/ or $refuse->($sequence_path, 'its counter is not a number');
+            close $sequence;
+            my $next;
+            open($next, '>', "$sequence_path.tmp.$$")
+                && print({$next} $number + 1, "\n") && close($next)
+                && rename("$sequence_path.tmp.$$", $sequence_path)
+                or $refuse->($sequence_path, $!);
+            $ticket_number = $number + 1;
+            $ticket_path = sprintf '%s/queue.%020d.%d.%s', $slot_dir, $ticket_number, $$, $run;
+            open($ticket, '>>', $ticket_path) && flock($ticket, LOCK_EX | LOCK_NB)
+                or $refuse->($ticket_path, $!);
+        }
+        my (@free, @slots, %indices, @check_owners);
+        opendir(my $listing, $slot_dir) or $refuse->($slot_dir, $!);
+        %indices = map { $_ => 1 } 0 .. $cap - 1, map { /\Aslot\.([0-9]+)\z/ ? $1 + 0 : () } readdir $listing;
+        closedir $listing;
+        for my $index (sort { $a <=> $b } keys %indices) {
+            my $path = "$slot_dir/slot.$index";
+            open(my $fh, '>>', $path) or $refuse->($path, $!);
+            if (flock($fh, LOCK_EX | LOCK_NB)) {
+                if ($index < $cap) { push @free, [$fh, $path]; } else { close $fh; }
+                push @slots, [$path, 0];
+                next;
+            }
+            my $busy = $!{EWOULDBLOCK} || $!{EAGAIN} || $!{EINTR};
+            my $why = $!;
+            close $fh;
+            $busy or $refuse->($path, $why);
+            push @slots, [$path, 1];
+        }
+        undef $passed unless @free;
+        if (@free) {
+            my (%held, %served, %oldest, %owners, @charges);
+            for my $entry (@slots) {
+                my $line = '';
+                if (open(my $record, '<', $entry->[0])) { $line = <$record> // ''; }
+                my @fields = $line =~ /\A([A-Za-z0-9_-]+)\t([0-9]+)(?:\t([0-9]+)(?:\t([0-9]+))?)?\n\z/;
+                push @charges, [@fields[2, 3], "$entry->[0].peak"] if $entry->[1];
+                next unless @fields;
+                $held{$fields[0]}++ if $entry->[1];
+                $served{$fields[0]} = $fields[1] if ($served{$fields[0]} // 0) < $fields[1];
+            }
+            opendir(my $queue, $slot_dir) or $refuse->($slot_dir, $!);
+            my @requests = sort grep { /\Aqueue\.[0-9]{20}\.[0-9]+\.[A-Za-z0-9_-]+\z/ } readdir $queue;
+            closedir $queue;
+            for my $name (@requests) {
+                my $path = "$slot_dir/$name";
+                my ($owner, $owner_run) = $name =~ /\Aqueue\.[0-9]{20}\.([0-9]+)\.(.+)\z/;
+                if ($path ne $ticket_path) {
+                    open(my $request, '>>', $path) or $refuse->($path, $!);
+                    if (flock($request, LOCK_EX | LOCK_NB)) {
+                        unlink($path) or $!{ENOENT} or $refuse->($path, $!);
+                        next;
+                    }
+                    $!{EWOULDBLOCK} || $!{EAGAIN} || $!{EINTR} or $refuse->($path, $!);
+                    $owners{$owner} = 1;
+                    next if $stopped{$owner};
+                }
+                $oldest{$owner_run} //= $path;
+            }
+            my ($next) = sort {
+                ($held{$a} // 0) <=> ($held{$b} // 0)
+                    || ($served{$a} // 0) <=> ($served{$b} // 0)
+                    || $oldest{$a} cmp $oldest{$b}
+            } keys %oldest;
+            if (defined $next && $oldest{$next} eq $ticket_path) {
+                # My turn. The memory budget decides, from a table read no older
+                # than a fifth of a second. It counts the held roots, the
+                # memory outside them and the new root; a root takes its turn
+                # alone only when no held root runs and nothing runs outside.
+                $charge_kib = ($history_path && $read_kib->($history_path)) || $worst_kib;
+                my $now = Time::HiRes::time();
+                ($table, $table_at) = ($process_table->(), $now) if !defined $table_at || $now - $table_at >= 0.2;
+                my $outside = $foreign->($table, @charges);
+                my $fits = !@charges && !$outside;
+                if (!$fits) {
+                    $fits = $charged->($table, @charges) + $outside + $charge_kib <= $budget_kib;
+                }
+                if ($fits) {
+                    ($slot, $slot_path) = @{shift @free};
+                    $peak_file = "$slot_path.peak";
+                    unlink $peak_file;
+                    truncate($slot, 0) && syswrite($slot, "$run\t$ticket_number\t$$\t$charge_kib\n")
+                        or $refuse->($slot_path, $!);
+                }
+            } elsif (defined $next) {
+                my $now = Time::HiRes::time();
+                if (($passed // '') ne $oldest{$next}) {
+                    ($passed, $passed_at) = ($oldest{$next}, $now);
+                } elsif ($now - $passed_at >= 1) {
+                    @check_owners = sort keys %owners;
+                }
+            }
+        }
+        close $_->[0] for @free;
+        if ($slot) {
+            unlink($ticket_path);
+            close $ticket;
+            undef $ticket;
+        }
+        flock($coordinator, LOCK_UN);
+        if (@check_owners) {
+            %stopped = $stopped_owners->(@check_owners);
+            $passed_at = Time::HiRes::time();
+        }
+        Time::HiRes::sleep(0.1) unless $slot || $caught;
     }
     if ($ticket) { unlink($ticket_path); close $ticket; }
     close $coordinator if $coordinator;
     if ($slot && !defined fcntl($slot, F_SETFD, 0)) {
+        my $why = $!;
         close $slot;
-        undef $slot;
-        $available = 0;
-    }
-    unless ($available) {
-        warn "fm-lint: host slot directory unavailable; running without the host-wide ShellCheck bound\n";
+        $refuse->($slot_path, $why);
     }
     if (open(my $fh, '>', $wait_file)) {
         printf {$fh} "%d\n", $waited_from ? (Time::HiRes::time() - $waited_from) * 1000 : 0;
         close $fh;
     }
     exit 128 + $signal_number{$caught} if $caught;
+    $ENV{FM_LINT_INTERNAL_SLOT_PEAK_FILE} = $peak_file;
     $child = fork();
     die "fm-lint-gate: fork: $!\n" unless defined $child;
     if (!$child) {
@@ -198,9 +418,79 @@ if (($ARGV[0] // '') eq 'gate') {
         POSIX::_exit(127);
     }
     kill 'TERM', $child if $caught;
+    # Growth guard. Admission is a reading at one moment; a root admitted small
+    # can grow later, and so can every other root admitted with it. While the
+    # lint trees of every pool on the host, plus any other process named
+    # shellcheck, hold more than the budget, this gate stops (SIGSTOP) the
+    # analysis processes of its own tree unless it belongs to the oldest running
+    # gate, and resumes them as soon as the total fits again or its gate becomes
+    # the oldest. A stopped process keeps what it holds but cannot grow, and the
+    # oldest running gate is never stopped (unless processes named shellcheck
+    # outside every gate alone hold the budget), so the aggregate exceeds the
+    # budget by at most what the oldest root grows by, plus what every other
+    # root grows within one reading interval (up to 2 s at or below 60 percent
+    # of the budget, 0.5 s above it), and every root finishes.
+    my ($guard_busy, $poll) = (0, 0.5);
+    my $resume = sub { for my $pid (keys %paused) { kill 'CONT', $pid; delete $paused{$pid}; } };
+    my $guard = sub {
+        return if $caught || $guard_busy;
+        $guard_busy = 1;
+        my $table = $process_table->();
+        delete @paused{grep { !$table->{$_} } keys %paused} if $table;
+        my $view = $table && $host_view->($table);
+        my $mine = $view && $view->{gates}{$$};
+        my $next = $mine && $view->{total} * 5 > $budget_kib * 3 ? 0.5 : 2;
+        Time::HiRes::setitimer(Time::HiRes::ITIMER_REAL(), $next, $next) if $next != $poll;
+        $poll = $next;
+        if (!$mine) { $guard_busy = 0; return; }
+        my ($oldest) = sort { $view->{gates}{$a}[1] <=> $view->{gates}{$b}[1] || $a <=> $b }
+            grep { $view->{gates}{$_}[2] } keys %{$view->{gates}};
+        my $over = $view->{total} > $budget_kib;
+        if ($over && (!defined $oldest || $oldest != $$ || $view->{named} >= $budget_kib)) {
+            for my $pid (keys %{$mine->[0]}) {
+                next if $pid == $$ || $paused{$pid};
+                my $row = $table->{$pid} or next;
+                next if $row->[1] < 8192
+                    || $row->[3] =~ m{\A\S*(?i:perl|bash|python)\S*\s+(?:-\S+\s+)*\S*(?:fm-lint-cache\.pl|fm-lint\.sh|fm-proc-info\.py)\b|\A\(?\S*(?i:python)\S*\)?\z};
+                $paused{$pid} = 1 if kill 'STOP', $pid;
+            }
+        } elsif (%paused) {
+            $resume->();
+        }
+        $guard_busy = 0;
+    };
+    $SIG{ALRM} = sub { local ($?, $!); $guard->() };
+    Time::HiRes::setitimer(Time::HiRes::ITIMER_REAL(), $poll, $poll);
     my $reaped;
     while (($reaped = waitpid($child, 0)) == -1 && $!{EINTR}) { }
     my $status = $reaped == $child ? $? : 127 << 8;
+    Time::HiRes::setitimer(Time::HiRes::ITIMER_REAL(), 0, 0);
+    $resume->();
+    # Raise the root's record to this complete analysis's measured peak: the
+    # watch's peak of resident size and footprint, and /usr/bin/time's maximum
+    # resident size.
+    my $code = ($status & 127) ? -1 : $status >> 8;
+    if ($history_path && !$caught && grep { $code == $_ } 0, 1, 98, 251) {
+        my $peak = $read_kib->($peak_file);
+        my $rss_file = $ENV{FM_LINT_INTERNAL_ROOT_RSS_FILE} // '';
+        if (length $rss_file && open(my $fh, '<', $rss_file)) {
+            while (my $line = <$fh>) {
+                $peak = $max->($peak, $1) if $line =~ /\Amax_rss_kib=([0-9]+)\s*\z/;
+                $peak = $max->($peak, int($1 / 1024)) if $line =~ /\A\s*([0-9]+)\s+maximum resident set size/;
+            }
+            close $fh;
+        }
+        my $history;
+        if ($peak && !(eval { make_path(dirname($history_path), {mode => 0700}); 1 }
+            && open($history, '+>>', $history_path) && flock($history, LOCK_EX)
+            && seek($history, 0, 0)
+            && do { my $old = <$history> // ''; $old =~ /\A([0-9]+)\n\z/ && $1 >= $peak
+                    || truncate($history, 0) && syswrite($history, "$peak\n") })) {
+            warn "fm-lint: cannot record the $peak KiB memory peak of $root_key at $history_path ($!); "
+                . "its record was not raised\n";
+        }
+        close $history if $history;
+    }
     exit(($status & 127) ? 128 + ($status & 127) : $status >> 8);
 }
 
@@ -230,7 +520,9 @@ if (($ARGV[0] // '') eq 'gate') {
 # retry. Any other end passes the command's own status straight through.
 # Every end appends to
 # <rss-file> how many samples each source gave, as
-# rss_samples=libproc:<n>,ps:<n>, for the roots log. A signal to the watch, or
+# rss_samples=libproc:<n>,ps:<n>, for the roots log. Each new peak is also
+# written to FM_LINT_INTERNAL_SLOT_PEAK_FILE when the host-slot gate names one,
+# so the gate's admission charges it. A signal to the watch, or
 # the loss of its parent, ends the group within about one tick (about 1 s, or
 # about 6 s if the command ignores TERM) after the lint that started it ends;
 # the watch itself sits in a group of its own, out of reach of its owner's
@@ -244,6 +536,7 @@ if (($ARGV[0] // '') eq 'rsswatch') {
         unless defined $dashes && $dashes eq '--' && @command && defined $rss_file
             && ($limit // '') =~ /\A[1-9][0-9]*\z/;
     my $helper = dirname(abs_path($0)) . '/fm-proc-info.py';
+    my $peak_file = $ENV{FM_LINT_INTERNAL_SLOT_PEAK_FILE} // '';
     my $owner = getppid();
     # The watch keeps a process group of its own, apart from its owner's and
     # its command's, so an owner's group sweep cannot kill it before it has
@@ -353,7 +646,14 @@ if (($ARGV[0] // '') eq 'rsswatch') {
             return;
         }
         $misses = 0;
-        $peak = $rss if $rss > $peak;
+        if ($rss > $peak) {
+            $peak = $rss;
+            if (length $peak_file) {
+                my ($staged, $fh) = ("$peak_file.tmp.$$");
+                open($fh, '>', $staged) && print({$fh} "$peak\n") && close($fh) && rename($staged, $peak_file)
+                    or unlink $staged;
+            }
+        }
         return unless $rss > $limit;
         $over = 1;
         kill 'KILL', -$child;
