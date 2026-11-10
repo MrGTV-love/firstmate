@@ -1226,6 +1226,31 @@ test_watcher_holds_retry_while_the_worker_decides() {
   pass "watcher: a fire-and-forget retry waits out the worker's own decision, then rings once"
 }
 
+test_watcher_retry_ignores_firstmate_unattended_hold() {
+  local dir state log fire rings open
+  dir=$(setup_watch_case faf-retry-unattended-hold)
+  mkdir -p "$dir/config"
+  : > "$dir/config/wait-no-turns"
+  export FM_CONFIG_OVERRIDE="$dir/config"
+  state="$dir/state"; log="$dir/send.log"; : > "$log"
+  fire=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 "one-shot steer" fire-and-forget)
+  age_path "$fire"
+  inbox_lib "$state" fm_task_inbox_mark_retry "$state" t1 "$fire"
+  age_path "$state/t1.inbox/.retry-ring"
+  printf "blocked [key=unattended-steer]: error: refused task 'x' Instruction argv: t1 x\n" > "$state/t1.status"
+  printf 'needs-decision [key=unattended-steerage]: the worker asks\n' >> "$state/t1.status"
+  steer_check_once "$dir"
+  [ ! -s "$log" ] || fail "a worker-raised key that only shares the hold prefix released the retry:"$'\n'"$(cat "$log")"
+  printf 'resolved [key=unattended-steerage]: answered\n' >> "$state/t1.status"
+  steer_check_once "$dir"
+  rings=$(grep -cF 'Firstmate instruction waiting' "$log" || true)
+  [ "$rings" = 1 ] || fail "Firstmate's own unattended hold suppressed the owed retry ring, got $rings:"$'\n'"$(cat "$log")"
+  open=$(bash -c '. "$1/bin/fm-classify-lib.sh"; status_open_decisions "$2"' _ "$ROOT" "$state/t1.status")
+  assert_contains "$open" 'unattended-steer' "Firstmate must still see its own unattended hold as open"
+  unset FM_CONFIG_OVERRIDE
+  pass "watcher: Firstmate's unattended-steer hold does not hold the worker's retry ring"
+}
+
 test_watcher_retry_keeps_a_newer_mark() {
   local dir state log fire newer rings
   dir=$(setup_watch_case faf-retry-newer)
@@ -1373,6 +1398,7 @@ test_watcher_ack_silences_unwritable_ladder
 test_watcher_surfaces_unwritable_ladder
 test_watcher_pays_fire_and_forget_retry_once
 test_watcher_holds_retry_while_the_worker_decides
+test_watcher_retry_ignores_firstmate_unattended_hold
 test_watcher_retry_keeps_a_newer_mark
 test_retry_marks_never_supersede_earlier_records
 test_watcher_recovers_each_skipped_record

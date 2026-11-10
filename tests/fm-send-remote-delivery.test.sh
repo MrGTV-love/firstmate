@@ -963,6 +963,54 @@ test_declared_remote_input_is_reported_without_access_grants() {
   pass "fm-send remote: receiver inputs gate unhandled retries, and accessible retries preserve the original record"
 }
 
+test_remote_input_check_transport_failure_is_not_a_missing_input() {
+  local dir fb ssh_log home rhome rc err began elapsed events
+  dir="$TMP_ROOT/input-check-transport"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
+  rhome=$(setup_remote_secondmate_home input-check-transport)
+  home=$(setup_remote_parent_home input-check-transport "$rhome")
+  mkdir -p "$rhome/data"
+  printf 'receiver report\n' > "$rhome/data/required.md"
+  events="$dir/events.jsonl"
+  for mode in lost bounded unattended; do
+    : > "$events"; printf '0\n' > "$ssh_log.count"
+    rc=0
+    began=$(date +%s)
+    case "$mode" in
+      lost)
+        send_env "$fb" "$home" "$ssh_log" FM_FAKE_SSH_RC=255 FM_GUARD_EVENT_LOG="$events" \
+          "$SEND" rsm --require-input data/required.md 'Use the declared input report' \
+          >"$dir/out" 2>"$dir/err" || rc=$? ;;
+      bounded)
+        send_env "$fb" "$home" "$ssh_log" FM_FAKE_SSH_HANG=25 FM_SEND_REMOTE_BUDGET=2 FM_GUARD_EVENT_LOG="$events" \
+          "$SEND" rsm --require-input data/required.md 'Use the declared input report' \
+          >"$dir/out" 2>"$dir/err" || rc=$? ;;
+      unattended)
+        send_env "$fb" "$home" "$ssh_log" FM_FAKE_SSH_RC=255 FM_GUARD_EVENT_LOG="$events" \
+          "$ROOT/bin/fm-send-unattended.sh" rsm --require-input data/required.md 'Use the declared input report' \
+          >"$dir/out" 2>"$dir/err" || rc=$? ;;
+    esac
+    elapsed=$(( $(date +%s) - began ))
+    err=$(cat "$dir/err")
+    expect_code 1 "$rc" "an input check that could not run must not exit as a validation refusal ($mode): $err"
+    [ "$elapsed" -le 15 ] || fail "the input check waited ${elapsed}s behind the transport ($mode)"
+    assert_contains "$err" "could not be checked on receiver 'rsm'" "the check failure must name its receiver ($mode)"
+    assert_contains "$err" 'data/required.md' "the check failure must name the declared input ($mode)"
+    assert_not_contains "$err" 'refused required input' "a transport failure must not report the input as missing ($mode)"
+    assert_not_contains "$err" 'Stage only this declared artifact' "a transport failure must not ask to stage the input ($mode)"
+    [ "$(cat "$ssh_log.count")" = 1 ] || fail "an unchecked input must stop before the enqueue leg ($mode), got $(cat "$ssh_log.count") attempts"
+    jq -es 'map(select(.guard == "send-task-prerequisites")) | length == 0' "$events" >/dev/null \
+      || fail "a transport failure recorded an input decision ($mode): $(cat "$events")"
+    [ -z "$(remote_inbox_records "$rhome")" ] || fail "an unchecked input published a remote steer ($mode)"
+    [ -z "$(pending_record "$home")" ] || fail "an unchecked input armed a pending reply ($mode)"
+    if [ -f "$home/state/rsm.status" ]; then
+      assert_not_contains "$(cat "$home/state/rsm.status")" 'unattended-steer' \
+        "a transport failure must not open an unattended hold ($mode)"
+    fi
+  done
+  pass "fm-send remote: a lost or bounded input check exits 1 without a missing-input refusal or hold"
+}
+
 test_declared_input_cannot_expand_transfer_confinement() {
   local dir fb ssh_log home rhome rc before after
   dir="$TMP_ROOT/confined-input"; mkdir -p "$dir"
@@ -1026,6 +1074,7 @@ test_remote_input_refusal_leaves_no_trace_with_writer_outages
 test_remote_wrong_owner_and_logged_relay
 test_declared_remote_input_is_reported_without_access_grants
 test_declared_input_cannot_expand_transfer_confinement
+test_remote_input_check_transport_failure_is_not_a_missing_input
 test_remote_steer_lands_in_remote_inbox
 test_remote_rerun_is_idempotent
 test_remote_retry_failure_preserves_ambiguous_expectation

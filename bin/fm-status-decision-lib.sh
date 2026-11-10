@@ -516,7 +516,9 @@ EOF
 # own blocker about a broken remote reply mirror
 # (bin/fm-procevent-remote-reply.sh), and a `captain-hold-` key relays a child
 # decision a secondmate escalated to the captain (bin/fm-captain-hold.sh) while
-# it keeps working, so the task is not waiting on any of them. Pending-reply
+# it keeps working, and the exact `unattended-steer` key is Firstmate's own
+# hold on a refused unattended steer (bin/fm-send-unattended.sh), so the task
+# is not waiting on any of them. Pending-reply
 # recovery and a fire-and-forget retry ring consult this set and leave a task
 # alone while it is non-empty. <out-var> and <tick-command> work as for
 # status_open_decisions.
@@ -529,6 +531,7 @@ status_own_open_decisions() {  # <status-file> [<out-var>] [<tick-command>]
     for prefix in ${FM_CLASSIFY_RESERVED_KEY_PREFIXES:-$FM_CLASSIFY_RESERVED_KEY_PREFIXES_DEFAULT} remote-reply-continuity- captain-hold-; do
       case "$line" in "$prefix"*) continue 2 ;; esac
     done
+    case "$line" in unattended-steer$'\t'*) continue ;; esac
     __fm_own_set="$__fm_own_set$line"$'\n'
   done <<EOF
 $__fm_own_open

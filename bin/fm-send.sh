@@ -8,6 +8,8 @@
 # transfer's confinement before any delivery or reply-tracking effect, including
 # an idempotent retry. Validation refusal exits 4 (FM_TASK_INBOX_INPUT_REFUSED
 # in fm-task-inbox-lib.sh); other write failures retain their existing status.
+# A check that cannot answer (remote transport failure or its
+# FM_SEND_REMOTE_BUDGET bound) exits 1 and never reports the input as missing.
 # An input outside the receiving boundary is reported as outside the transfer
 # boundary, not as missing. Missing/inaccessible inputs name receiver and path: stage the
 # declared artifact through the existing authorized transfer, then correct the
@@ -662,7 +664,7 @@ if [ -n "$REQUIRED_INPUTS" ] && { [ -z "$TARGET_META" ] || [ "${1:-}" = --key ];
 fi
 
 fm_send_check_required_inputs() { # <newline-delimited-declarations>
-  local declared=$1 input receiver_home=$FM_HOME root worktree rc failed=0 reason
+  local declared=$1 input receiver_home=$FM_HOME root worktree rc failed=0 unchecked=0 reason
   [ -n "$declared" ] || return 0
   if [ "$(fm_meta_get "$TARGET_META" kind)" = secondmate ]; then
     receiver_home=$(fm_meta_get "$TARGET_META" home)
@@ -674,17 +676,28 @@ fm_send_check_required_inputs() { # <newline-delimited-declarations>
     case "$worktree" in /*) case "$input" in "$worktree"/*) root=$worktree ;; esac ;; esac
     rc=0
     if [ "$TARGET_BACKEND" = remote ]; then
-      "$SCRIPT_DIR/fm-on.sh" "$TARGET_REMOTE_ID" fm-remote-file.sh check "$input" >/dev/null 2>&1 || rc=$?
+      fm_run_timed "$FM_SEND_REMOTE_BUDGET" "$SCRIPT_DIR/fm-on.sh" "$TARGET_REMOTE_ID" \
+        fm-remote-file.sh check "$input" </dev/null >/dev/null 2>&1 || rc=$?
     else
       FM_HOME="$root" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-remote-file.sh" check "$input" >/dev/null 2>&1 || rc=$?
     fi
-    [ "$rc" -ne 0 ] || continue
+    case "$rc" in
+    0) continue ;;
+    1) reason='unavailable to' ;;
+    5) reason='outside the transfer boundary for' ;;
+    *)
+      unchecked=1
+      echo "error: required input '$input' could not be checked on receiver '$RAW_TARGET' (check exit $rc: transport failure, timeout, or check error; the input is not known to be missing); nothing was sent and any earlier record is unchanged. Retry the same send once the receiver is reachable." >&2
+      continue
+      ;;
+    esac
     failed=1
-    reason='unavailable to'
-    [ "$rc" -ne 5 ] || reason='outside the transfer boundary for'
     echo "error: refused required input '$input': $reason receiver '$RAW_TARGET'; nothing was sent and any earlier record is unchanged. Stage only this declared artifact through the existing authorized transfer mechanism; no access was granted." >&2
   done <<< "$declared"
-  [ "$failed" -ne 0 ] || return 0
+  if [ "$failed" -eq 0 ]; then
+    [ "$unchecked" -eq 0 ] || return 1
+    return 0
+  fi
   "$SCRIPT_DIR/fm-guard-event.sh" send-task-prerequisites deny --rule required-input --task "$(fm_send_id_from_meta "$TARGET_META")" 2>/dev/null || true
   return "$FM_TASK_INBOX_INPUT_REFUSED"
 }
@@ -1031,7 +1044,7 @@ else
   fi
   # A declared-input refusal must precede even a transient reply expectation,
   # as well as any inbox directory, typed text or doorbell.
-  fm_send_check_required_inputs "$REQUIRED_INPUTS" || exit "$FM_TASK_INBOX_INPUT_REFUSED"
+  fm_send_check_required_inputs "$REQUIRED_INPUTS" || exit $?
   # The pre-marker answer text, kept for the closing resolved note so the
   # durable ledger records the plain answer without marker or corr bytes.
   RESOLVE_ANSWER_TEXT=$MESSAGE
