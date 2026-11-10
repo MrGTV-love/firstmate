@@ -1370,6 +1370,31 @@ class IntakeTest(unittest.TestCase):
             self.assertEqual(watch.failed_requests(), [])
             self.assertEqual(len(replay.state['log']), calls)
 
+    def test_resolve_and_disarm_through_the_command_hand_nothing_to_any_transport(self):
+        """I3d, the complete attempted-method observer: every way a call could leave the plane (the closed transport, the real transport, the replay) is replaced by a recorder
+        that also sees a call a handler would swallow. `resolve` through the real command closes the failed row and records no attempt; `disarm` records none either."""
+        with self.fixture() as (watch, replay):
+            self.release(watch, replay)
+            watch.lock.close()
+            attempted = []
+
+            def record(name):
+                return lambda *args, **kwargs: attempted.append(name)
+            with patch.object(plane.NoNetwork, 'call', record('NoNetwork.call')), patch.object(plane.NoNetwork, 'pages', record('NoNetwork.pages')), \
+                 patch.object(plane.Slack, 'call', record('Slack.call')), patch.object(plane.Slack, 'pages', record('Slack.pages')), \
+                 patch.object(Replay, 'call', record('Replay.call')), patch.object(Replay, 'pages', record('Replay.pages')):
+                for action, argv in (('resolve', ['check', '200.000100']), ('disarm', ['check'])):
+                    out, err = io.StringIO(), io.StringIO()
+                    with patch.dict(os.environ, {'FM_SLACK_CHECK_ACTION': action}), contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                        code = plane.main(argv)
+                    self.assertIn(action, ('resolve', 'disarm'))
+                    self.assertEqual(attempted, [], (action, out.getvalue(), err.getvalue()))
+                    if action == 'resolve':
+                        self.assertEqual(code, 0)
+                        self.assertIn('resolved: slack request 200.000100', out.getvalue())
+            saved = json.loads((watch.root / 'state.json').read_text())
+            self.assertEqual([row['thread'] for row in saved['pending']], [])
+
     def test_only_resolve_takes_a_request_ts_and_only_a_slack_timestamp(self):
         self.assertEqual(plane.parse_command(['check', '200.000100'], positional=True), ('check', None, '200.000100'))
         for argv in (['check'], ['check', 'x200'], ['check', '200.000100', '200.000200'], ['check', '200.000100;x']):
