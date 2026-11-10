@@ -1886,6 +1886,8 @@ for reply in 2000.000150 2000.000160 2000.000170; do
   assert_eq "$(posts_in "$reply")" 0 "INTAKE-2 [cards] a thread reply or plane acknowledgement ($reply) was acknowledged as a request"
 done
 assert_eq "$(request_count "$(ipoll)")" 0 "INTAKE-2 [cards] a later poll woke a request"
+# The card home is an I5b-scope control too: it is not an intake_home, so its own check is made here.
+scope_clean "$FM_STATE_OVERRIDE" "$INTAKE"
 # A reply inside a thread is not a request, even when it is also sent to the channel; a root that has replies is.
 intake_home
 reply_to 100.000100 2000.000110 'an ordinary reply inside a thread'
@@ -2653,6 +2655,8 @@ file_only_allowlist() {  # <allowed authors in the file> <expected: 1|0>
   if [ "$2" = 0 ]; then
     assert_eq "$(python3 "$HELPER" pending-count "$(state_file)")" 0 "INTAKE-11 [$1] a journal row was kept"
   fi
+  # These homes are not intake_home homes either: each one is an I5b-scope control, checked as it ends.
+  scope_clean "$FM_STATE_OVERRIDE" "$INTAKE"
 }
 file_only_allowlist U0OTHERALLOWED 0
 file_only_allowlist U0TESTOWNER 1

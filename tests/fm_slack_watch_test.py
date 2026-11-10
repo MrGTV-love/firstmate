@@ -2029,6 +2029,28 @@ class IntakeTest(unittest.TestCase):
             self.assertEqual(self.record(watch, '200.000200')['text'], long_text)
             self.assertEqual(self.acks(replay), ['200.000200'])
 
+    def scope_clean_output(self, transcript, methods):
+        """What the scope-clean command prints for a scenario home whose replay attempted these methods under that transcript."""
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as directory:
+            home = Path(directory)
+            (home / 'attempts.jsonl').write_text(''.join(json.dumps({'method': method}) + '\n' for method in methods))
+            (home / 'transcript.json').write_text(json.dumps(transcript))
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                main(['scope-clean', directory, str(home / 'transcript.json')])
+            return out.getvalue().splitlines()
+
+    def test_the_scope_checker_rejects_a_replay_that_cannot_refuse_and_passes_a_strict_legal_scenario(self):
+        """F7 of the outcome review of b0f37a54: the same out-of-population attempt is reported under a strict replay, and a replay with
+        no allowlist or without scope enforcement is itself reported (it cannot vouch for the scenario); a strict legal run stays clean."""
+        strict = {'method_allowlist': list(ReplayShapeTest.POPULATION), 'enforce_scopes': True}
+        self.assertEqual(self.scope_clean_output(strict, ['chat.postMessage']), [])
+        self.assertEqual(self.scope_clean_output(strict, ['chat.postMessage', 'api.test']), ['attempted outside the allowlist: api.test'])
+        no_allowlist = self.scope_clean_output({'enforce_scopes': True}, ['chat.postMessage', 'api.test'])
+        self.assertTrue(any('no method allowlist' in line for line in no_allowlist), no_allowlist)
+        no_scopes = self.scope_clean_output({'method_allowlist': list(ReplayShapeTest.POPULATION)}, ['chat.postMessage'])
+        self.assertTrue(any('does not enforce scopes' in line for line in no_scopes), no_scopes)
+
     def test_a_value_split_across_a_link_keeps_the_text_around_it_in_the_line(self):
         value = 'fixturesigning1234'
         with self.fixture(env={'SLACK_SIGNING_SECRET': value}) as (watch, replay):
@@ -3504,8 +3526,15 @@ def main(argv):
     elif command == 'scope-clean':
         # I5b-scope for one scenario's home: every call that reached the replay (swallowed ones included) names a method of the
         # transcript's allowlist, and none failed for a missing scope or a method outside the allowlist. Prints each violation.
-        allowed = set(json.load(open(argv[2])).get('method_allowlist') or [])
+        transcript = json.load(open(argv[2]))
+        allowed = set(transcript.get('method_allowlist') or [])
         directory = Path(argv[1])
+        # A replay that holds no allowlist cannot refuse an outside method, and one that does not enforce scopes cannot refuse a missing
+        # scope: a clean result from it proves nothing, so it is reported as a violation of the check itself (F7 of the outcome review of b0f37a54).
+        if not allowed:
+            print('the replay holds no method allowlist: it cannot refuse a method outside the base set')
+        if not transcript.get('enforce_scopes'):
+            print('the replay does not enforce scopes: it cannot refuse a call whose scope is missing')
         attempts = directory / 'attempts.jsonl'
         for line in (attempts.read_text().splitlines() if attempts.is_file() else []):
             if allowed and json.loads(line)['method'] not in allowed:
