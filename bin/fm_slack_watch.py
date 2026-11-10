@@ -1747,7 +1747,11 @@ class Watch:
                 # A notice staged now used a slot of this poll even though its post failed.
                 self.spent_notices += 1
             raise
-        progress = pending is row or self.advanced > advanced
+        # A notice that the outbox had no room for is held in the journal and posted by a later poll, charged then: staged is not
+        # completed, so it takes nothing from the shared budget now (F5 of the outcome review of b0f37a54). A post that was
+        # attempted and failed is still charged, above.
+        posted = self.notices_handled > handled
+        progress = (pending is row and posted) or self.advanced > advanced
         if progress:
             self.spent_notices += 1
             # The caller charges this notice to the cap it carries, once; the count that follows is of the notices

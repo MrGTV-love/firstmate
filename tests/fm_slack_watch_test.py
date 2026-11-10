@@ -2768,6 +2768,29 @@ class IntakeTest(unittest.TestCase):
             self.assertEqual((acks, errors), ([['200.000100']], [None]))
             self.assertEqual(self.wakes(watch), [plane.request_line('200.000100', self.OWNER, 'the request')])
 
+    def test_held_unposted_notices_take_nothing_from_the_shared_budget_and_a_failed_post_still_does(self):
+        """F5 of the outcome review of b0f37a54: twenty notices whose lines fill the wake line post only as many as fit; the rest are
+        held in the journal and are not units of the shared per-poll budget; a notice whose post was attempted and failed is."""
+        with self.fixture(cap='20') as (watch, replay):
+            flags = []
+            for i in range(20):
+                thread = '100.%06d' % (i + 1)
+                flags.append(watch.notice('test/notice/%d' % i, 'k%d' % i, thread, 'A notice',
+                                          'check: slack %s - a notice that fills the wake line with some words %s' % (thread, 'x' * 30)))
+            posted = len(watch.output)
+            self.assertGreater(posted, 0)
+            self.assertLess(posted, 20)
+            self.assertEqual(flags, [True] * posted + [False] * (20 - posted))
+            self.assertEqual(watch.spent_notices, posted)
+            self.assertEqual(len(watch.state['pending']), 20 - posted)
+            self.assertTrue(watch.notices_held)
+        with self.fixture(cap='2') as (watch, replay):
+            replay.state['failures']['chat.postMessage:100.000001'] = {'status': 400}
+            replay.save()
+            with self.assertRaises(plane.SlackError):
+                watch.notice('test/notice/1', 'k1', '100.000001', 'A notice', 'check: slack 100.000001 - a notice')
+            self.assertEqual(watch.spent_notices, 1)
+
     def test_two_resumed_notices_and_a_request_at_cap_one_take_one_post_a_poll(self):
         with self.fixture(cap='1') as (watch, replay):
             watch.state['pending'].append(self.stage_notice(watch, 'test/notice/1', '120.000100'))
