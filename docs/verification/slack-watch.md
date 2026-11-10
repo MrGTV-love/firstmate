@@ -345,12 +345,8 @@ X24 through X32 passed in the first 2026-10-30 run, X33 through X40 in the secon
 Date: 2026-11-10 UTC, from the modified times of the log files.
 This run is the test step of the pipeline run that carried the request intake change.
 Its logs record each suite's output but not the exit status, the commit, the host or a tool version, so none is quoted.
-The script that ran the four suites first set this environment:
-
-```
-unset SLACK_BOT_TOKEN SLACK_SIGNING_SECRET FM_SLACK_GRADER_RUN FM_HOME FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_CONFIG_OVERRIDE
-export FM_SLACK_NO_NETWORK=1
-```
+The script that ran the four suites first set the test environment: it unset the two Slack credentials, the switch that only a grader's run sets, and the four home and state overrides, and it exported `FM_SLACK_NO_NETWORK=1`.
+Its environment lines are kept verbatim in the pipeline run's evidence file `~/.no-mistakes/evidence/01M71HW50W8YM0HTBJMAPGJGT6/run-suites.sh` (lines 7 and 8), and not here, because a tracked file outside `tests/` does not repeat the reserved grader switch name (the environment inventory of the contract's I7-surface item).
 
 It then ran these four commands from the worktree root, one after another:
 

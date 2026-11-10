@@ -1526,10 +1526,14 @@ class Watch:
     def publish(self, pending):
         if self.staging_only or failed(pending):
             return
-        if (pending.get('kind') in ('answer', 'request') and pending.get('author') not in self.authors) \
-                or (pending.get('kind') == 'request' and pending.get('author') != self.dm_user()):
+        if pending.get('kind') == 'answer' and pending.get('author') not in self.authors:
             self.state['pending'] = [p for p in self.state['pending'] if p is not pending]
             self.commit()
+            return
+        if pending.get('kind') == 'request' and (pending.get('author') not in self.authors or pending.get('author') != self.dm_user()):
+            # r62:117: a request staged and not yet delivered when the allowlist (or the owner) changed is KEPT. While its author is off the
+            # allowlist nothing is posted, woken or acted on, and no newer request is taken in ahead of it (take_requests); a poll under the old
+            # settings delivers it once, and retarget refuses with the pending work and changes nothing.
             return
         if pending.get('kind') == 'request':
             fault('after-stage')
