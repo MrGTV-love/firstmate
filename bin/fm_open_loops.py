@@ -538,9 +538,11 @@ class Collector:
                     self.add("failed_task", task["id"], "recover the failed work or record why it ends",
                              mtime(self.state / (task["id"] + ".status")))
             elif (task["current_state"].get("state") == "done" and not task["pr"].get("url")
-                  and not self.captain_dropped(task)):
-                # Terminal worker status hands ownership back; without a PR no
-                # forge row carries the next review or validation action.
+                  and not self.captain_dropped(task)
+                  and (task["kind"] == "scout" or not self.source(
+                      "completed deliverable " + task["id"], self.deliverable_landed, task))):
+                # A report still needs owner consumption, but an already landed
+                # ship has no remaining review or validation handoff to advance.
                 status_at, _, _, _, _, _ = self.report_status(task["id"])
                 self.add("completed_task", task["id"],
                          "consume the report and complete the owner handoff" if task["kind"] == "scout"

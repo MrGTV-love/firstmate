@@ -819,9 +819,13 @@ assert git(local, 'rev-parse', 'refs/heads/main') == local_head
 for pushed in (False, True):
     if pushed:
         git(local_worker, 'push', '-q', 'origin', 'HEAD:refs/heads/fm/local-delivery')
-    fixture([local_task])
-    delivered = ledger()
-    assert not rows(delivered, 'failed_task') and not rows(delivered, 'unlanded_commit'), delivered
+    for state in ('failed', 'done'):
+        local_task['current_state']['state'] = state
+        fixture([local_task])
+        delivered = ledger()
+        assert not rows(delivered, 'failed_task') and not rows(delivered, 'unlanded_commit'), delivered
+        assert not rows(delivered, 'completed_task'), delivered
+local_task['current_state']['state'] = 'failed'
 local_task['mode'] = 'no-mistakes'
 fixture([local_task])
 assert 'local-delivery' in rows(ledger(), 'failed_task')
@@ -829,6 +833,11 @@ local_task['mode'] = 'local-only'
 git(local, 'update-ref', 'refs/heads/main', local_base)
 fixture([local_task])
 assert 'local-delivery' in rows(ledger(), 'unlanded_commit')
+local_task['current_state']['state'] = 'done'
+fixture([local_task])
+pending_local = ledger()
+assert 'local-delivery' in rows(pending_local, 'completed_task'), pending_local
+local_task['current_state']['state'] = 'failed'
 git(local, 'update-ref', 'refs/heads/trunk', local_head)
 git(local, 'symbolic-ref', 'refs/remotes/origin/HEAD', 'refs/remotes/origin/trunk')
 git(local, 'update-ref', 'refs/remotes/origin/trunk', local_base)
