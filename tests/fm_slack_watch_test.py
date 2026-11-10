@@ -2897,7 +2897,7 @@ class IntakeTest(unittest.TestCase):
             lines = ['check: slack %s - a notice that fills the wake line with some words %s' % ('100.%06d' % (i + 1), 'x' * 30) for i in range(20)]
             fit = max(n for n in range(1, 21) if len('; '.join(lines[:n])) <= plane.WAKE_LIMIT - plane.QUEUE_RESERVE or n == 1)
             # Exactly the lines that fit the wake line are posted (a count worked out here, not read from the head); how many units that makes
-            # in a mixed wait is owner call OC4, recorded in test_pending_owner_oc4_*.
+            # in a mixed wait is decided by the owner (Main 3205), recorded in test_a_notice_held_back_for_lack_of_line_room_*.
             self.assertEqual(posted, fit)
             self.assertEqual(flags, [True] * posted + [False] * (20 - posted))
             self.assertEqual(watch.spent_notices, posted)
@@ -3093,7 +3093,7 @@ class IntakeTest(unittest.TestCase):
     # listing found beside it) with its clean neighbour. The tests of a hit that holds no request-text character (class 3) pin the FINAL outcome
     # that Main decided on the owner's authority (3197): an accepted request waits unchanged, no identity is rewritten, nothing that holds the
     # value is written or shown, the collision is reported once, the requests behind it wait until the collision ends and nothing is lost.
-    # The failed-row listing prints nothing under a collision (Main 3190 and 3193). Only OC4 (the 20-unit mix) is still pending the owner. ----
+    # The failed-row listing prints nothing under a collision (Main 3190, 3193 and 3201). ----
 
     def run_printed(self, watch, command='poll'):
         """One poll, then what the run prints through the one writer: (standard output, standard error)."""
@@ -3328,11 +3328,15 @@ class IntakeTest(unittest.TestCase):
                 posted_notices, posted_requests = self.units(replay)
                 self.assertEqual(posted_notices + posted_requests, 20, (notices, requests))
                 self.assertEqual(posted_notices, min(notices, fit))
+                # The held notices are in the mix and stay journaled; they are not units.
+                self.assertEqual(sum(1 for row in watch.load_state()['pending'] if row.get('kind') == 'notice'), notices - posted_notices)
                 self.assertLessEqual(len(out.strip()), plane.WAKE_LIMIT)
 
-    def test_pending_owner_oc4_twenty_notices_and_one_request_complete_only_the_units_that_fit(self):
-        """R4's own mix (PENDING owner OC4: is a notice with no outbox room eligible?): 20 notices and 1 request complete the notices that fit
-        the wake line plus the request, which is fewer than 20. This records the head's behaviour; it is not a pass of r62:108."""
+    def test_a_notice_held_back_for_lack_of_line_room_does_not_count_toward_the_twenty_units(self):
+        """R4's own mix, decided by the owner (Main 3205): a notice held back for lack of line room does not count toward `exactly 20 items`. 20 notices
+        and 1 request complete the notices that fit the wake line plus the request, which is fewer than 20; the rule still demands 20 actual
+        processable items when 20 can be handled (test_the_default_cap_spends_exactly_twenty_units_when_twenty_are_completable, with held notices
+        and requests in the mix)."""
         fit = 0
         while len('; '.join(self.notice_line('120.%06d' % (100 + n)) for n in range(fit + 1))) <= plane.WAKE_LIMIT - plane.QUEUE_RESERVE:
             fit += 1
