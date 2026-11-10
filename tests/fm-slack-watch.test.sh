@@ -2579,6 +2579,42 @@ budget_probe 'environment 2 over file 5, one below the cap' 5 2 1 1
 budget_probe 'environment 2 over file 5, at the cap' 5 2 2 0
 budget_probe 'environment 7 over file 5, one below the cap' 5 7 6 1
 budget_probe 'environment 7 over file 5, at the cap' 5 7 7 0
+# The six cases above cannot tell a request budget of its own from the real remaining budget (F7 of the outcome review of b0f37a54): with the
+# cap used up the poll returns before the request path runs, and with one new request below the cap a constant of 1 or of 20 takes that one
+# request as well. These cases leave room for several requests but not for all of those waiting, so only the real remaining budget gives the
+# count of the first poll: a constant of 1 takes one, a constant of 20 takes every request that waits.
+budget_probe_many() {  # <label> <cap in the fixture file> <cap in the environment, or -> <staged notices> <waiting requests> <acknowledged by the first poll>
+  local label=$1 file=$2 envcap=$3 notices=$4 requests=$5 expect=$6 i pass first all=0
+  intake_home "$file"
+  for ((i = 1; i <= requests; i++)); do
+    say_owner "2000.0001$(printf '%02d' "$i")" "request number $i"
+  done
+  for ((i = 1; i <= notices; i++)); do
+    python3 "$HELPER" stage-notice "$(state_file)" "900.00000$i" "budget-$i" 10
+  done
+  for pass in 1 2 3 4 5 6; do
+    if [ "$envcap" = - ]; then
+      icheck >/dev/null
+    else
+      env FM_SLACK_POLL_MAX_ANSWERS="$envcap" "$ROOT/bin/fm-slack-check.sh" check --replay "$INTAKE" >/dev/null
+    fi
+    if [ "$pass" = 1 ]; then
+      first=0
+      for ((i = 1; i <= requests; i++)); do
+        first=$(( first + $(posts_in "2000.0001$(printf '%02d' "$i")") ))
+      done
+      assert_eq "$first" "$expect" "INTAKE-9 [$label] acknowledgements after the first poll"
+    fi
+  done
+  for ((i = 1; i <= requests; i++)); do
+    all=$(( all + $(posts_in "2000.0001$(printf '%02d' "$i")") ))
+  done
+  assert_eq "$all" "$requests" "INTAKE-9 [$label] acknowledgements after the later polls (each request once)"
+}
+budget_probe_many 'file only, no notices, more requests than the cap' 5 - 0 7 5
+budget_probe_many 'file only, three notices, four requests' 5 - 3 4 2
+budget_probe_many 'environment 2 over file 5, no notices, four requests' 5 2 0 4 2
+budget_probe_many 'environment 7 over file 5, four notices, nine requests' 5 7 4 9 3
 printf 'ok - INTAKE-9\n'
 
 # INTAKE-10: a request whose whole text cannot be kept is not woken and stays journaled, and the failure reaches Main
