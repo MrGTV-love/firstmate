@@ -4125,6 +4125,8 @@ test_train_ours_merged_commit_is_never_taken_as_delivered() {
       || fail "train-ours-hidden-$landing: the hidden commit is not reachable from the default branch"
     git -C "$TRAIN_CASE/wt" cat-file -e "$TRAIN_COPY_HEAD:hidden.txt" 2>/dev/null \
       || fail "train-ours-hidden-$landing: the copy lacks the hidden change"
+    git -C "$TRAIN_CASE/wt" merge-base --is-ancestor "$TRAIN_BASE_OID" "$TRAIN_COPY_HEAD" \
+      && fail "train-ours-hidden-$landing: the recorded base is an ancestor of the copy"
     git -C "$TRAIN_CASE/wt" cat-file -e "$TRAIN_HEAD:hidden.txt" 2>/dev/null \
       && fail "train-ours-hidden-$landing: the train holds the hidden change"
     git -C "$TRAIN_CASE/wt" cat-file -e origin/main:hidden.txt 2>/dev/null \
@@ -4219,6 +4221,8 @@ test_default_proof_refuses_a_commit_the_default_branch_only_ours_merged() {
     TRAIN_HIDDEN_OURS=1 default_proof_case "default-ours-$landing" "$landing" head ours-flat
     git -C "$TRAIN_CASE/wt" cat-file -e "$TRAIN_COPY_HEAD:hidden.txt" 2>/dev/null \
       || fail "default-ours-$landing: the copy lacks the hidden change"
+    git -C "$TRAIN_CASE/wt" merge-base --is-ancestor "$TRAIN_BASE_OID" "$TRAIN_COPY_HEAD" \
+      && fail "default-ours-$landing: the recorded base is an ancestor of the copy"
     git -C "$TRAIN_CASE/wt" cat-file -e origin/main:hidden.txt 2>/dev/null \
       && fail "default-ours-$landing: the default branch holds the hidden change"
     git -C "$TRAIN_CASE/wt" cat-file -e origin/main:feature.txt 2>/dev/null \
@@ -4562,6 +4566,68 @@ test_train_control_content_proof_still_accepts_a_closed_member() {
     assert_no_grep "pr list" "$case_dir/gh-fixture/calls.log" "train-content-$mode: the train was searched although the content proof held"
   done
   pass "a CLOSED member whose clean content is already in the default branch is still accepted by the content proof"
+}
+
+# The forge records a PR's base as the base branch's tip, which can be ahead of the commit the
+# branch forked from. The copy's change is then measured from its fork point, and the work that
+# a squash landed is accepted by the content proof.
+test_default_proof_accepts_a_closed_member_whose_recorded_base_is_ahead_of_its_fork_point() {
+  local case_dir head
+  case_dir=$(make_case default-base-ahead)
+  write_meta "$case_dir" no-mistakes ship
+  append_pr_meta_url "$case_dir"
+  wt_commit_file "$case_dir" feature.txt hello "add feature"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  land_on_origin_main "$case_dir" ahead.txt ahead
+  TRAIN_BASE_OID=$(git -C "$case_dir/origin.git" rev-parse main)
+  land_on_origin_main "$case_dir" feature.txt hello
+  git -C "$case_dir/wt" fetch -q origin
+  git -C "$case_dir/wt" merge-base --is-ancestor "$TRAIN_BASE_OID" "$head" \
+    && fail "default-base-ahead: the recorded base is an ancestor of the copy"
+  add_gh_train_fake "$case_dir" CLOSED "$head"
+  add_logging_treehouse "$case_dir"
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" \
+    || fail "default-base-ahead: landed work measured from a base ahead of its fork point was refused: $(cat "$case_dir/stderr")"
+  assert_grep return "$case_dir/treehouse.log" "default-base-ahead: the slot was not returned"
+  assert_no_grep "pr list" "$case_dir/gh-fixture/calls.log" "default-base-ahead: the train was searched although the content proof held"
+  pass "a CLOSED member whose recorded base is ahead of its fork point and whose work a squash landed is accepted by the content proof"
+}
+
+# The same base on the train route: the member head, a copy at it, and the record-only route are
+# measured from the fork point, against the train head and the squash landing.
+test_train_member_whose_recorded_base_is_ahead_of_its_fork_point_allows() {
+  TRAIN_BASE_AHEAD=1 train_case train-base-ahead squash head
+  git -C "$TRAIN_CASE/wt" merge-base --is-ancestor "$TRAIN_BASE_OID" "$TRAIN_MEMBER_HEAD" \
+    && fail "train-base-ahead: the recorded base is an ancestor of the member head"
+  assert_train_allowed "$TRAIN_CASE" train-base-ahead
+  TRAIN_BASE_AHEAD=1 train_absent_case train-base-ahead-record merge squash
+  TRAIN_BASE_AHEAD=0
+  git -C "$TRAIN_CASE/origin.git" merge-base --is-ancestor "$TRAIN_BASE_OID" "$TRAIN_MEMBER_HEAD" \
+    && fail "train-base-ahead-record: the recorded base is an ancestor of the member head"
+  run_teardown "$TRAIN_CASE" > "$TRAIN_CASE/stdout" 2> "$TRAIN_CASE/stderr" \
+    || fail "train-base-ahead-record: a carried member measured from a base ahead of its fork point was refused: $(cat "$TRAIN_CASE/stderr")"
+  assert_grep "$TRAIN_URL" "$TRAIN_CASE/stderr" "train-base-ahead-record: stderr did not name the train PR"
+  assert_absent "$TRAIN_CASE/state/task-x1.meta" "train-base-ahead-record: accepted teardown left the task record"
+  pass "a train member whose recorded base is ahead of its fork point is accepted when the train carried it, in the copy and record-only routes"
+}
+
+# The same base never accepts unlanded work: a copy with a commit the train never carried, and a
+# member whose file the train reverted (so the change from the fork point is not in the train
+# head's tree), stay refused.
+test_train_member_whose_recorded_base_is_ahead_still_refuses_unlanded_work() {
+  TRAIN_BASE_AHEAD=1 train_case train-base-ahead-extra squash extra
+  git -C "$TRAIN_CASE/wt" merge-base --is-ancestor "$TRAIN_BASE_OID" "$TRAIN_COPY_HEAD" \
+    && fail "train-base-ahead-extra: the recorded base is an ancestor of the copy"
+  assert_train_refused "$TRAIN_CASE" train-base-ahead-extra "copy's work is not proven present"
+  assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "train-base-ahead-extra: the train was accepted"
+  TRAIN_BASE_AHEAD=1 TRAIN_REVERT_MEMBER=1 train_case train-base-ahead-reverted squash head
+  TRAIN_BASE_AHEAD=0
+  TRAIN_REVERT_MEMBER=0
+  git -C "$TRAIN_CASE/wt" merge-base --is-ancestor "$TRAIN_BASE_OID" "$TRAIN_COPY_HEAD" \
+    && fail "train-base-ahead-reverted: the recorded base is an ancestor of the copy"
+  assert_train_refused "$TRAIN_CASE" train-base-ahead-reverted "net change is not present in the train head's final tree"
+  assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "train-base-ahead-reverted: the train was accepted"
+  pass "a recorded base ahead of the fork point never accepts a commit the train did not carry or a change the train reverted"
 }
 
 test_train_other_refusals_stay() {
@@ -5908,6 +5974,9 @@ test_train_unreadable_forge_is_unknown_never_accepted
 test_train_control_open_member_is_not_landed_by_a_train
 test_train_control_merged_member_keeps_the_existing_route
 test_train_control_content_proof_still_accepts_a_closed_member
+test_default_proof_accepts_a_closed_member_whose_recorded_base_is_ahead_of_its_fork_point
+test_train_member_whose_recorded_base_is_ahead_of_its_fork_point_allows
+test_train_member_whose_recorded_base_is_ahead_still_refuses_unlanded_work
 test_train_other_refusals_stay
 test_train_reverted_member_never_counts_as_carried
 test_train_reverted_member_is_refused_in_the_record_only_route

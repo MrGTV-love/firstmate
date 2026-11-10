@@ -294,6 +294,90 @@ fm_task_copy_merges_exact_in() {  # <scratch> <dir> <base> <tip>
   return 0
 }
 
+# The fork point of <ref> against a recorded base that <ref> may not contain. The forge records
+# a PR's base as the base branch's tip, which can be ahead of where the branch forked, and a
+# pre-rebase copy never held the recorded base at all. The fork point is the single merge base
+# X of the two, and X is trusted only after every merge between X and the recorded base is
+# shown exact (fm_task_copy_merges_exact): a merge that dropped a side's change would make X a
+# commit the default branch reached without its content. A <ref> that contains the recorded
+# base forks there. Sets FM_TASK_COPY_BASE. 0 with it set. 1 with the refusal in
+# FM_TASK_COPY_WHY (no common history, more than one merge base, an inexact merge). 2 with the
+# unread fact in FM_TASK_COPY_UNASKED.
+fm_task_copy_fork_base() {  # <dir> <ref> <recorded-base>
+  local dir=$1 ref=$2 recorded=$3 rc=0 bases
+  FM_TASK_COPY_BASE=
+  FM_TASK_COPY_WHY=
+  fm_task_copy_ancestor "$dir" "$recorded" "$ref" || rc=$?
+  case "$rc" in
+    0)
+      FM_TASK_COPY_BASE=$recorded
+      return 0
+      ;;
+    1) ;;
+    *)
+      FM_TASK_COPY_UNASKED="whether ${ref:0:12} contains the recorded base ${recorded:0:12} could not be read"
+      return 2
+      ;;
+  esac
+  rc=0
+  bases=$(git -C "$dir" merge-base --all "$recorded" "$ref" 2>/dev/null) || rc=$?
+  case "$rc" in
+    0) ;;
+    1)
+      FM_TASK_COPY_WHY="has no common history with the member PR's recorded base, so its own work has no base to be measured from"
+      return 1
+      ;;
+    *)
+      FM_TASK_COPY_UNASKED="the merge base of ${ref:0:12} and the member PR's recorded base could not be read"
+      return 2
+      ;;
+  esac
+  case "$bases" in
+    *$'\n'*)
+      FM_TASK_COPY_WHY="has more than one merge base with the member PR's recorded base, so its own work has no single base to be measured from"
+      return 1
+      ;;
+  esac
+  rc=0
+  fm_task_copy_merges_exact "$dir" "$bases" "$recorded" || rc=$?
+  case "$rc" in
+    0) ;;
+    1)
+      FM_TASK_COPY_WHY="stands on a commit that the default branch reached through a merge that is not what git makes of its parents ($FM_TASK_COPY_WHY), so its own work cannot be measured from there"
+      return 1
+      ;;
+    *) return 2 ;;
+  esac
+  FM_TASK_COPY_BASE=$bases
+}
+
+# Is <ref>'s own change, measured from a recorded base, present in <target>'s final tree
+# (fm_task_copy_net_change_present)? The change is measured from the recorded base itself
+# first. When that is not present and <ref> does not contain the recorded base, that diff also
+# held the reverse of the base branch's own commits past the fork point, so the change is
+# measured again from the fork point (fm_task_copy_fork_base). With fork-only the recorded
+# base is never the measure unless <ref> contains it. 0 present. 1 not present, with a fork
+# point's refusal in FM_TASK_COPY_WHY. 2 the measured change is empty. 3 a read failed, with
+# the fact in FM_TASK_COPY_UNASKED when the fork point could not be read.
+fm_task_copy_recorded_change_present() {  # <dir> <ref> <target> <recorded-base> [fork-only]
+  local rc=0
+  FM_TASK_COPY_UNASKED=
+  FM_TASK_COPY_WHY=
+  if [ "${5:-}" != fork-only ]; then
+    fm_task_copy_net_change_present "$1" "$2" "$3" "$4" || rc=$?
+    [ "$rc" = 1 ] || return "$rc"
+    rc=0
+  fi
+  fm_task_copy_fork_base "$1" "$2" "$4" || rc=$?
+  case "$rc" in
+    0) ;;
+    1) return 1 ;;
+    *) return 3 ;;
+  esac
+  [ "${5:-}" = fork-only ] || [ "$FM_TASK_COPY_BASE" != "$4" ] || return 1
+  fm_task_copy_net_change_present "$1" "$2" "$3" "$FM_TASK_COPY_BASE"
+}
+
 # The first-parent line of <default-ref>, newest first, one commit per line in <out>.
 fm_task_copy_line() {  # <dir> <default-ref> <out>
   fm_task_copy_read "$1" "$3" rev-list --first-parent "$2" -- && [ -s "$3" ]
@@ -423,7 +507,9 @@ fm_task_copy_first_parent_landing() {  # <dir> <ref> <default-ref>
 # from the forge) the answer is one test: the net change anchor to <ref> must be present in the
 # default branch's tree (fm_task_copy_net_change_present: every changed path equal there, or the
 # reverse of the change applies cleanly, which covers a later edit of other lines, and checks
-# type and mode). Nothing about the graph is read, so nothing the graph can fake is trusted. A
+# type and mode). A <ref> that does not contain the anchor (the forge's base is ahead of the
+# fork point) is measured from its fork point once the merges up to the anchor are shown exact
+# (fm_task_copy_recorded_change_present). No other graph position is trusted. A
 # copy that leaves no net change has nothing to lose. Without an anchor, the position-based proof
 # runs: measured from the first-parent base, a copy on the first-parent line itself has nothing
 # to measure; a copy reachable only through a merge is held by the commit that took it in
@@ -442,12 +528,12 @@ fm_task_copy_default_holds_change() {  # <dir> <ref> <default-ref> [<anchor>]
       FM_TASK_COPY_UNASKED="the recorded base ${anchor:0:12} of the member PR is not in this clone"
       return 1
     }
-    fm_task_copy_net_change_present "$dir" "$ref" "$default_ref" "$anchor" || rc=$?
+    fm_task_copy_recorded_change_present "$dir" "$ref" "$default_ref" "$anchor" || rc=$?
     case "$rc" in
       0 | 2) return 0 ;;
       1) return 1 ;;
       *)
-        FM_TASK_COPY_UNASKED='the net change of the copy could not be read against the default branch'
+        [ -n "$FM_TASK_COPY_UNASKED" ] || FM_TASK_COPY_UNASKED='the net change of the copy could not be read against the default branch'
         return 1
         ;;
     esac

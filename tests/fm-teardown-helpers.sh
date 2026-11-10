@@ -3450,6 +3450,16 @@ setup_train_history() {
     git -C "$tmp" push -q origin main
     TRAIN_BASE_OID=$(git -C "$tmp" rev-parse HEAD)
     git -C "$tmp" checkout -q -b member "$TRAIN_HIDDEN_COMMIT"
+  elif [ "${TRAIN_BASE_AHEAD:-0}" = 1 ]; then
+    # The forge records the base branch's tip as the member's base, and that tip is one
+    # commit ahead of the commit the member forked from.
+    git -C "$tmp" branch -q member
+    printf '%s\n' ahead > "$tmp/ahead.txt"
+    git -C "$tmp" add -- ahead.txt
+    git -C "$tmp" commit -q -m "main moves past the fork point"
+    git -C "$tmp" push -q origin main
+    TRAIN_BASE_OID=$(git -C "$tmp" rev-parse HEAD)
+    git -C "$tmp" checkout -q member
   else
     TRAIN_BASE_OID=$(git -C "$tmp" rev-parse HEAD)
     git -C "$tmp" checkout -q -b member

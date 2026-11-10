@@ -58,6 +58,8 @@
 # when it is CLOSED (gh pr view --json baseRefOid), and asks the net change from there to
 # be present in the default branch's tree (bin/fm-task-copy-lib.sh's
 # fm_task_copy_default_holds_change and fm_task_copy_net_change_present own the rule). A
+# recorded base ahead of the copy's fork point is replaced by that fork point only after every
+# merge between the two is shown exact (fm_task_copy_recorded_change_present). A
 # task with no recorded PR (local-only, copy-sweep orphans) has no record to measure from,
 # and keeps the position-based proof (the first-parent base), which refuses the
 # conventional ours merge but cannot refuse a crafted parent-order merge.
@@ -2795,30 +2797,12 @@ teardown_train_member_base() {  # <ref>
   TEARDOWN_TRAIN_MEMBER_BASE=$TEARDOWN_TRAIN_ANCHOR
 }
 
-# Is the net change (<base> to <ref>) still in <target>'s final tree?
-# fm_task_copy_net_change_present owns the rule: every changed path equal there, or the reverse
-# of the change applies cleanly, with type and mode part of the patch. An empty net change
-# leaves nothing to lose and counts as present; a read that failed leaves
-# TEARDOWN_TRAIN_UNASKED.
-teardown_train_content_present() {  # <ref> <target> <base>
-  local rc=0
-  fm_task_copy_net_change_present "${TEARDOWN_LANDED_DIR:-$WT}" "$1" "$2" "$3" || rc=$?
-  case "$rc" in
-    0 | 2) return 0 ;;
-    1) return 1 ;;
-    *)
-      TEARDOWN_TRAIN_UNASKED="the net change of ${1:0:12} could not be read against ${2:0:12}"
-      return 1
-      ;;
-  esac
-}
-
 # Is <ref> carried by <train head>? Both must hold: the change reaches the train, as an
 # ancestor or by every commit's patch replayed there, and its net content from the member's
-# recorded base is present in the train head's tree. A copy that does not contain the member
-# head (a pre-rebase copy) is measured from its merge base with the recorded base once the
-# merges in between are shown exact (teardown_train_content_applies); patch presence and
-# ancestry alone never prove it.
+# recorded base is present in the train head's tree. A ref that does not contain the recorded
+# base (a pre-rebase copy, or a member whose forge base is ahead of its fork point) is measured
+# from its merge base with the recorded base once the merges in between are shown exact
+# (teardown_train_content_applies); patch presence and ancestry alone never prove it.
 # The first failing fact is left in TEARDOWN_TRAIN_CARRY_WHY, a fact that could not be read in
 # TEARDOWN_TRAIN_UNASKED.
 TEARDOWN_TRAIN_CARRY_WHY=
@@ -2855,75 +2839,57 @@ teardown_train_carries() {  # <ref> <train head>
 }
 
 # Does <ref>'s net change hold in <target>? Every copy is proven by content, with no shortcut,
-# and ancestry is never read as content. The member head, and a copy that contains it, are
-# measured from the member PR's recorded base. A copy that does not contain the member head (a
-# pre-rebase copy) has no record of its own fork point, so it is measured from its merge base X
-# with the recorded base, and X is trusted only after every merge between X and the recorded base
-# is shown to be EXACTLY what git makes of its two parents (fm_task_copy_merges_exact): a merge
-# that dropped a side's change (an `ours` merge, either parent order, a conflict resolved to a
-# side or to a third version) would make X a commit the default branch reached without its
-# content, and the copy's own work would then be measured from a base that already holds the
-# dropped change. An empty change from X (the copy is itself an ancestor of the recorded base, as
-# a pool slot parked on an old default-branch commit is) is accepted ONLY because every merge
-# between it and the recorded base was just shown exact: all that it holds is then the default
-# branch's own history with its content intact, so there is nothing unlanded to lose. Without
-# that check an empty change proves nothing, and a copy on a commit that a dropping merge took in
-# is refused (test_a_prerebase_copy_built_on_an_ours_merged_commit_is_refused). The change from X
-# must be present in <target> by the same rule as for any copy. No common
-# history, or more than one merge base, refuses; a failed read is unknown.
+# and ancestry is never read as content. bin/fm-task-copy-lib.sh's
+# fm_task_copy_recorded_change_present owns the rule: every changed path equal in <target>, or
+# the reverse of the change applies cleanly, with type and mode part of the patch. The member
+# head, and a copy that contains it, are measured from the member PR's recorded base, and when
+# that is not present and they do not contain the recorded base (the forge's base is ahead of the
+# fork point), from their fork point. A copy that does not contain the member head (a pre-rebase
+# copy) has no record of its own fork point, so it is measured from the fork point only. The fork
+# point is the merge base X with the recorded base, and X is trusted only after every merge
+# between X and the recorded base is shown to be EXACTLY what git makes of its two parents
+# (fm_task_copy_merges_exact): a merge that dropped a side's change (an `ours` merge, either
+# parent order, a conflict resolved to a side or to a third version) would make X a commit the
+# default branch reached without its content, and the work would then be measured from a base
+# that already holds the dropped change. An empty change from X (the copy is itself an ancestor
+# of the recorded base, as a pool slot parked on an old default-branch commit is) is accepted
+# ONLY because every merge between it and the recorded base was just shown exact: all that it
+# holds is then the default branch's own history with its content intact, so there is nothing
+# unlanded to lose. Without that check an empty change proves nothing, and a copy on a commit
+# that a dropping merge took in is refused
+# (test_a_prerebase_copy_built_on_an_ours_merged_commit_is_refused). No common history, or more
+# than one merge base, refuses; a failed read is unknown and leaves TEARDOWN_TRAIN_UNASKED.
 teardown_train_content_applies() {  # <ref> <target>
-  local dir=${TEARDOWN_LANDED_DIR:-$WT} rc=0 base=$TEARDOWN_TRAIN_MEMBER_BASE bases
+  local dir=${TEARDOWN_LANDED_DIR:-$WT} rc=0 fork_only=''
   if [ -n "$TEARDOWN_TRAIN_MEMBER_HEAD" ] && [ "$1" != "$TEARDOWN_TRAIN_MEMBER_HEAD" ]; then
     fm_task_copy_ancestor "$dir" "$TEARDOWN_TRAIN_MEMBER_HEAD" "$1" || rc=$?
     case "$rc" in
       0) ;;
-      1)
-        rc=0
-        bases=$(git -C "$dir" merge-base --all "$TEARDOWN_TRAIN_MEMBER_BASE" "$1" 2>/dev/null) || rc=$?
-        case "$rc" in
-          0) ;;
-          1)
-            TEARDOWN_TRAIN_CARRY_WHY="has no common history with the member PR's recorded base, so its own work has no base to be measured from"
-            return 1
-            ;;
-          *)
-            TEARDOWN_TRAIN_UNASKED="the merge base of ${1:0:12} and the member PR's recorded base could not be read"
-            return 1
-            ;;
-        esac
-        case "$bases" in
-          *$'\n'*)
-            TEARDOWN_TRAIN_CARRY_WHY="has more than one merge base with the member PR's recorded base, so its own work has no single base to be measured from"
-            return 1
-            ;;
-        esac
-        base=$bases
-        rc=0
-        fm_task_copy_merges_exact "$dir" "$base" "$TEARDOWN_TRAIN_MEMBER_BASE" || rc=$?
-        case "$rc" in
-          0) ;;
-          1)
-            TEARDOWN_TRAIN_CARRY_WHY="stands on a commit that the default branch reached through a merge that is not what git makes of its parents ($FM_TASK_COPY_WHY), so its own work cannot be measured from there"
-            return 1
-            ;;
-          *)
-            TEARDOWN_TRAIN_UNASKED=$FM_TASK_COPY_UNASKED
-            return 1
-            ;;
-        esac
-        ;;
+      1) fork_only=fork-only ;;
       *)
         TEARDOWN_TRAIN_UNASKED="whether ${1:0:12} contains the member head could not be read"
         return 1
         ;;
     esac
   fi
-  teardown_train_content_present "$1" "$2" "$base"
+  rc=0
+  fm_task_copy_recorded_change_present "$dir" "$1" "$2" "$TEARDOWN_TRAIN_MEMBER_BASE" "$fork_only" || rc=$?
+  case "$rc" in
+    0 | 2) return 0 ;;
+    1)
+      [ -z "$FM_TASK_COPY_WHY" ] || TEARDOWN_TRAIN_CARRY_WHY=$FM_TASK_COPY_WHY
+      return 1
+      ;;
+    *)
+      TEARDOWN_TRAIN_UNASKED=${FM_TASK_COPY_UNASKED:-the net change of ${1:0:12} could not be read against ${2:0:12}}
+      return 1
+      ;;
+  esac
 }
 
 # Does the train's landing commit hold <ref>'s net change? The forge names the commit that
 # landed a MERGED train. It must be a 40-hex id on the default branch's first-parent line, and
-# its tree must hold the change as teardown_train_content_present defines it, measured from the
+# its tree must hold the change as teardown_train_content_applies defines it, measured from the
 # member's recorded base. A landing id the forge did not give, an object this clone lacks, or a
 # read that failed is 2 (unknown, retry: the forge or the fetched default branch is behind); any
 # other failure is 1 with the fact in TEARDOWN_TRAIN_CARRY_WHY.
