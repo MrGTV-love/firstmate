@@ -1309,6 +1309,45 @@ test_recovery_refuses_unreadable_sender_identity() (
   pass "unreadable sender identity refuses recovery without consuming its attempt"
 )
 
+test_recovery_refuses_other_ps_failures_with_working_native_reader() (
+  local home state corr rec hook_log native_log rejected_ps_status sender_identity recovery_status
+  # shellcheck disable=SC2030,SC2031
+  local FM_PENDING_REPLY_SEND_HOOK=other_ps_failure_hook FM_PENDING_REPLY_NOW=2000
+  home=$(setup_parent other-ps-failure); state="$home/state"
+  hook_log="$home/send.log"
+  native_log="$home/native-reader.log"
+  sender_identity=$(fm_pending_reply_pid_identity "${BASHPID:-$$}") \
+    || fail "fixture must have a valid sender identity"
+  # shellcheck disable=SC2329
+  other_ps_failure_hook() { printf 'sent\n' >> "$hook_log"; }
+  corr=$(fm_pending_reply_create "$home" "$state" hibit "report the result")
+  fm_pending_reply_mark_delivered "$state" "$corr"
+  fm_pending_reply_observe_busy "$state" "$corr" busy
+  fm_pending_reply_observe_busy "$state" "$corr" idle
+  rec=$(fm_pending_reply_path "$state" "$corr")
+  # A working alternate reader must not turn an ordinary ps read failure into
+  # authority to send. Only an unavailable executable (126) permits fallback.
+  # shellcheck disable=SC2329
+  ps() { return "$rejected_ps_status"; }
+  # shellcheck disable=SC2329
+  python3() {
+    printf 'called\n' >> "$native_log"
+    printf '%s\n' "$sender_identity"
+  }
+  for rejected_ps_status in 1 2 127; do
+    recovery_status=0
+    fm_pending_reply_send_recovery "$state" "$corr" || recovery_status=$?
+    [ ! -e "$native_log" ] || fail "non-126 ps failure must not call the native reader (ps=$rejected_ps_status)"
+    [ "$recovery_status" -ne 0 ] || fail "non-126 ps failure must refuse recovery (ps=$rejected_ps_status)"
+    [ "$(phase_of "$state" "$corr")" = awaiting_report ] \
+      || fail "non-126 ps failure must leave the request awaiting its report"
+    [ -z "$(fm_pending_reply_get "$rec" recovery_attempted_epoch)" ] \
+      || fail "non-126 ps failure must not consume the single recovery attempt"
+    [ ! -e "$hook_log" ] || fail "non-126 ps failure must never deliver a recovery"
+  done
+  pass "non-126 ps failures refuse recovery without calling a working native reader"
+)
+
 test_document_pointer_resolves() {
   local home state corr
   home=$(setup_parent doc-pointer)
@@ -2528,6 +2567,7 @@ fm_test_only
 
 test_recovery_when_ps_is_not_executable || exit $?
 test_recovery_refuses_unreadable_sender_identity || exit $?
+test_recovery_refuses_other_ps_failures_with_working_native_reader || exit $?
 test_relayed_request_recovery_reaches_the_mate || exit $?
 test_normal_correlated_reply_resolves_once
 test_completed_turn_no_report_triggers_one_recovery
