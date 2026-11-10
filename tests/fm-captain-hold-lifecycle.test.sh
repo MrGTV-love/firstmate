@@ -444,7 +444,7 @@ EOF
   run_captain "$home" hold sample-later-call --title "Revisit the sample plan" \
     --reason "captain deferred revisit later" --repo sample --until 2026-08-01 >/dev/null \
     || fail "could not register the deferred captain call"
-  run_captain "$home" hold sample-now-call --title "Decide the sample cut" \
+  run_captain "$home" hold sample-now-call --title "Pick the cut" \
     --reason "captain cut choice pending" --repo sample >/dev/null \
     || fail "could not register the live captain call"
   if run_captain "$home" hold sample-bad-date --title "Bad date" \
@@ -779,7 +779,7 @@ EOF
   [ "$(grep -c 'captain-hold-mate-call' "$channel")" = 4 ] \
     || fail "unexpected parent channel contents: $(cat "$channel")"
 
-  run_captain "$mate" hold batch-call --title "Choose the batch release" \
+  run_captain "$mate" hold batch-call --title "Settle batch shipping" \
     --reason "batch choice pending" --repo sample >/dev/null \
     || fail "batch hold failed"
   mv "$channel" "$channel.saved"
@@ -1051,7 +1051,7 @@ test_complete_refuses_an_entry_held_for_another_origin() {
     write_origin_meta "$home" "$o"
     printf 'done: report complete\n' > "$home/state/$o.status"
   done
-  run_captain "$home" hold sample-other-call --title "Call for the second review" \
+  run_captain "$home" hold sample-other-call --title "Pick the north path" \
     --reason "captain must decide" --repo sample --origin "$other" >/dev/null \
     || fail "could not hold the call recorded for the second review"
   if run_captain "$home" complete "$id" sample-other-call > "$home/mismatch.out" 2> "$home/mismatch.err"; then
@@ -1062,7 +1062,7 @@ test_complete_refuses_an_entry_held_for_another_origin() {
   assert_no_grep "decisions_reviewed=1" "$home/state/$id.meta" \
     "the refused completion recorded an inventory attestation"
 
-  run_captain "$home" hold sample-own-call --title "Call for the first review" \
+  run_captain "$home" hold sample-own-call --title "Settle budget limits" \
     --reason "captain must decide" --repo sample --origin "$id" >/dev/null \
     || fail "could not hold the call recorded for the first review"
   out=$(run_captain "$home" complete "$id" sample-own-call) \
@@ -1211,8 +1211,10 @@ test_historical_self_inventory_has_workable_repair() {
     || fail "could not create the historical origin"
   write_origin_meta "$home" "$origin"
   for out in "$keep" "$replacement"; do
-    run_captain "$home" hold "$out" --title "Call $out" --reason "Choose" --origin "$origin" >/dev/null \
+    tasks_in "$home" add "$out" "Call $out" --kind captain --repo sample >/dev/null \
       || fail "could not create $out"
+    run_captain "$home" hold "$out" --reason "Choose" --origin "$origin" >/dev/null \
+      || fail "could not hold $out"
   done
   meta="$home/state/$origin.meta"
   printf 'decisions_reviewed=1\ndecision_keys=%s,%s\n' "$origin" "$keep" >> "$meta"
@@ -1317,7 +1319,7 @@ SH
   assert_equals "$before" "$(cat "$home/state/o.meta")" "a failed identity read changed the inventory"
   rm "$home/fail-identity"
   write_origin_meta "$home" report-only
-  run_captain "$home" hold report-call --title "Report call" --reason "Choose" --origin report-only >/dev/null \
+  run_captain "$home" hold report-call --title "Report decision" --reason "Choose" --origin report-only >/dev/null \
     || fail "an origin with metadata but no backlog row could not record a call"
   run_captain "$home" complete report-only report-call >/dev/null \
     || fail "an origin with metadata but no backlog row could not complete"
@@ -1331,17 +1333,18 @@ SH
 # decoded wherever it is shown, so prose with every awkward character survives.
 test_hold_reason_round_trips_awkward_characters() {
   local home id reason stored json shown start verb fields out raw rc raw_rc mode
-  local title legacy body quoted_reason quoted_title quoted_legacy expected_reason until_args=()
+  local title legacy_title legacy body quoted_reason quoted_title quoted_legacy expected_reason until_args=() create_args=()
   local malformed index=0 malformed_reasons=(
     'fm-hold-v1:/w==' 'fm-hold-v1:bm9ydGg=$' 'fm-hold-v1:bm9ydGg' 'fm-hold-v1:Zh=='
   )
   home=$(make_home reason-round-trip)
   title='Investigate literal %28, "fm-hold-v1:bm9ydGg="'
+  legacy_title='Archived north note %28'
   legacy='Visit https://example.test/%28literal%29 and %0A; fm-hold-v1:bm9ydGg='
   body=$'fm-hold-v1:bm9ydGg=\n  hold_reason: "%28"\n'
   quoted_title=$(jq -cn --arg value "$title" '$value')
   quoted_legacy=$(jq -cn --arg value "$legacy" '$value')
-  tasks_in "$home" add sample-legacy-call "$title" --kind captain --repo sample >/dev/null \
+  tasks_in "$home" add sample-legacy-call "$legacy_title" --kind captain --repo sample >/dev/null \
     || fail "could not create the legacy call"
   tasks_in "$home" hold sample-legacy-call --reason "$legacy" --kind captain >/dev/null \
     || fail "could not hold the legacy call"
@@ -1367,14 +1370,18 @@ test_hold_reason_round_trips_awkward_characters() {
 
   for id in sample-reason-call sample-dated-call; do
     until_args=()
+    create_args=(--title "$title" --repo sample)
     reason=$'  Pick route (north); say "yes" or \'no\' - 100% sure %28x%29, café\t\\slash\r\nSecond line\n\n'
     if [ "$id" = sample-dated-call ]; then
       until_args=(--until 2099-01-01)
       reason='fm-hold-v1:bm9ydGg='
+      create_args=()
+      tasks_in "$home" add "$id" "$title" --kind captain --repo sample >/dev/null \
+        || fail "could not create $id"
     fi
     quoted_reason=$(jq -cn --arg value "$reason" '$value')
-    run_captain "$home" hold "$id" --title "$title" --reason "$reason" \
-      --repo sample ${until_args[@]+"${until_args[@]}"} >/dev/null \
+    run_captain "$home" hold "$id" ${create_args[@]+"${create_args[@]}"} --reason "$reason" \
+      ${until_args[@]+"${until_args[@]}"} >/dev/null \
       || fail "hold refused the reason for $id"
     stored=$(grep "^- \[ \] $id " "$home/data/backlog.md") \
       || fail "the held row is not on one backlog line"
@@ -1407,7 +1414,7 @@ test_hold_reason_round_trips_awkward_characters() {
     printf '%s' "$json" | jq -e --arg id "$id" --arg reason "$reason" --arg title "$title" \
       '.backlog.records[] | select(.id == $id) | .hold_reason == $reason and .title == $title' >/dev/null \
       || fail "fleet changed the reason or title for $id"
-    printf '%s' "$json" | jq -e --arg reason "$legacy" --arg title "$title" \
+    printf '%s' "$json" | jq -e --arg reason "$legacy" --arg title "$legacy_title" \
       '.backlog.records[] | select(.id == "sample-legacy-call") |
        .hold_reason == $reason and .title == $title and .body_lines[0] == "fm-hold-v1:bm9ydGg="' >/dev/null \
       || fail "fleet changed legacy or unrelated fields"
@@ -1564,7 +1571,9 @@ test_answered_by_is_derived_from_the_recorded_source() {
   local home id source want
   home=$(make_home answered-by)
   while IFS='|' read -r id source want; do
-    run_captain "$home" hold "$id" --title "Call $id" --reason "captain choice pending" --repo sample >/dev/null \
+    tasks_in "$home" add "$id" "Call $id" --kind captain --repo sample >/dev/null \
+      || fail "could not create $id"
+    run_captain "$home" hold "$id" --reason "captain choice pending" >/dev/null \
       || fail "could not hold $id"
     printf '%s\tyes\t\n' "$id" | run_captain "$home" answers --any-origin --source "$source" >/dev/null \
       || fail "the keyed answer for $id was not accepted"
@@ -1580,30 +1589,30 @@ call-caps|The Captured Result some-task sequence 3|unknown
 call-send-main|a firstmate answer sent to some-task|main
 call-other|a carrier pigeon|unknown
 SOURCES
-  run_captain "$home" hold call-direct --title "Call direct" --reason "captain choice pending" --repo sample >/dev/null
+  run_captain "$home" hold call-direct --title "Direct reply" --reason "captain choice pending" --repo sample >/dev/null
   printf 'Captain chose.\n' > "$home/direct.txt"
   run_captain "$home" answer call-direct --decision-file "$home/direct.txt" >/dev/null
   assert_equals "Answered by: main" "$(answered_by_line "$home" call-direct)" "a direct answer should take the home's role"
   : > "$home/state/.afk"
-  run_captain "$home" hold call-flag-only --title "Call flag" --reason "captain choice pending" --repo sample >/dev/null
+  run_captain "$home" hold call-flag-only --title "Flag file" --reason "captain choice pending" --repo sample >/dev/null
   printf 'call-flag-only\tyes\t\n' | run_captain "$home" answers --any-origin --source "a firstmate answer sent to some-task" >/dev/null
   assert_equals "Answered by: main" "$(answered_by_line "$home" call-flag-only)" "the away daemon's flag file is not the away record"
   rm -f "$home/state/.afk"
   FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$ROOT/bin/fm-afk-contract.sh" enter >/dev/null || fail "away entry failed"
-  run_captain "$home" hold call-send-afk --title "Call afk" --reason "captain choice pending" --repo sample >/dev/null
+  run_captain "$home" hold call-send-afk --title "Away posture" --reason "captain choice pending" --repo sample >/dev/null
   printf 'call-send-afk\tyes\t\n' | run_captain "$home" answers --any-origin --source "a firstmate answer sent to some-task" >/dev/null
   assert_equals "Answered by: main-afk" "$(answered_by_line "$home" call-send-afk)" "the away posture was not recorded"
-  run_captain "$home" hold call-direct-afk --title "Call direct afk" --reason "captain choice pending" --repo sample >/dev/null
+  run_captain "$home" hold call-direct-afk --title "Absent captain" --reason "captain choice pending" --repo sample >/dev/null
   run_captain "$home" answer call-direct-afk --decision-file "$home/direct.txt" >/dev/null
   assert_equals "Answered by: main-afk" "$(answered_by_line "$home" call-direct-afk)" "a direct answer should take the away role"
   FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$ROOT/bin/fm-afk-contract.sh" archive >/dev/null || fail "away archive failed"
   FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_AFK_MODE=quiet "$ROOT/bin/fm-afk-contract.sh" enter >/dev/null || fail "quiet entry failed"
-  run_captain "$home" hold call-send-quiet --title "Call quiet" --reason "captain choice pending" --repo sample >/dev/null
+  run_captain "$home" hold call-send-quiet --title "Quiet record" --reason "captain choice pending" --repo sample >/dev/null
   printf 'call-send-quiet\tyes\t\n' | run_captain "$home" answers --any-origin --source "a firstmate answer sent to some-task" >/dev/null
   assert_equals "Answered by: main" "$(answered_by_line "$home" call-send-quiet)" "a quiet record is a present captain, not away"
   FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$ROOT/bin/fm-afk-contract.sh" archive >/dev/null || fail "quiet archive failed"
   printf 'secondmate-id\n' > "$home/.fm-secondmate-home"
-  run_captain "$home" hold call-send-mate --title "Call mate" --reason "captain choice pending" --repo sample >/dev/null 2>&1
+  run_captain "$home" hold call-send-mate --title "Secondmate home" --reason "captain choice pending" --repo sample >/dev/null 2>&1
   printf 'call-send-mate\tyes\t\n' | run_captain "$home" answers --any-origin --source "a firstmate answer sent to some-task" >/dev/null 2>&1
   assert_equals "Answered by: secondmate" "$(answered_by_line "$home" call-send-mate)" "a secondmate home was not recorded"
   pass "answered_by comes from two exact source prefixes or this home's role, and is unknown otherwise"
@@ -1624,7 +1633,7 @@ test_hold_answer_records_task_answered_in_the_ledger() {
   rows=$(jq -c 'select(.event == "task.answered") | [.task, .via, .key, .answered_by, (.at | test("Z$"))]' "$home/state/fleet-ledger.jsonl")
   assert_equals "[\"$id\",\"hold\",\"$id\",\"page\",true]" "$rows" "task.answered records after an answer and its replay"
 
-  run_captain "$home" hold sample-failing-call --title "Failing ledger call" --reason "captain choice pending" --repo sample >/dev/null
+  run_captain "$home" hold sample-failing-call --title "Unwritable record choice" --reason "captain choice pending" --repo sample >/dev/null
   printf 'Captain chose.\n' > "$home/failing.txt"
   rm -f "$home/state/fleet-ledger.jsonl"
   mkdir "$home/state/fleet-ledger.jsonl"
@@ -1653,11 +1662,11 @@ test_hold_ledger_records_creation_direct_answer_and_reconcile() {
   run_captain "$home" answer made-call --decision-file "$home/direct.txt" >/dev/null || fail "direct answer failed"
   run_captain "$home" answer made-call --decision-file "$home/direct.txt" >/dev/null || fail "direct answer replay failed"
   FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$ROOT/bin/fm-afk-contract.sh" enter >/dev/null || fail "away entry failed"
-  run_captain "$home" hold away-call --title "Away call" --reason "captain choice pending" --repo sample >/dev/null
+  run_captain "$home" hold away-call --title "Away choice" --reason "captain choice pending" --repo sample >/dev/null
   run_captain "$home" answer away-call --decision-file "$home/direct.txt" >/dev/null || fail "direct answer under away failed"
   FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$ROOT/bin/fm-afk-contract.sh" archive >/dev/null || fail "away archive failed"
 
-  run_captain "$home" hold moot-call --title "Moot call" --reason "captain choice pending" --repo sample >/dev/null
+  run_captain "$home" hold moot-call --title "Moot question" --reason "captain choice pending" --repo sample >/dev/null
   printf 'Nothing is pending. No captain answer was given.\n' > "$home/evidence.txt"
   run_captain "$home" reconcile close moot-call --evidence-file "$home/evidence.txt" --verified-outcome moot >/dev/null \
     || fail "reconcile close failed"
@@ -1681,6 +1690,29 @@ test_hold_ledger_records_creation_direct_answer_and_reconcile() {
     "$(jq -c 'select(.event == "task.closed") | [.task, .evidence, .pr]' "$home/state/fleet-ledger.jsonl")" \
     "a captain call that no teardown retained closes with no recorded evidence"
   pass "ledger on: a created call, a direct answer, and a reconciliation each write one record; an existing item or a replay writes none"
+}
+
+# A hold creates its task through bin/fm-tasks-axi.sh add: the objective row is
+# recorded, and a title that overlaps an open item stops the hold with the
+# wrapper's refusal and files nothing.
+test_hold_files_through_the_intake_checks() {
+  local home out rc=0
+  home=$(make_home hold-intake)
+  run_captain "$home" hold intake-call --title "Pick the vendor contract renewal" --reason "captain choice pending" --repo sample >/dev/null \
+    || fail "could not create and hold a call"
+  assert_equals "$(printf 'intake-call\t\tnone\tcaptain hold record: tracks a captain decision, not a work item')" \
+    "$(grep '^intake-call	' "$home/data/backlog-review.tsv")" "the hold's objective row was not recorded"
+  tasks_in "$home" add intake-work "Renew the vendor contract terms" --kind ship --repo sample >/dev/null || fail "could not add the neighbour"
+  out=$(run_captain "$home" hold intake-dup --title "Renew the vendor contract" --reason "captain choice pending" --repo sample 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail "a hold whose title overlaps an open item was filed: $out"
+  assert_contains "$out" "this title overlaps open or recently closed items" "the hold did not print the wrapper's refusal"
+  assert_contains "$out" "intake-work" "the hold's refusal did not name the neighbour"
+  assert_contains "$out" "Do not run the --dup-of command above" "the hold's refusal did not warn against --dup-of"
+  assert_contains "$out" "run the --not-dup command above naming the neighbour you checked, prefixed with BD_DUE_REQUIRED=false (a captain call has no due date), then run this same hold command again" \
+    "the hold's refusal did not say how to file and hold anyway"
+  assert_no_grep "intake-dup" "$home/data/backlog.md" "a refused hold filed its task"
+  assert_no_grep "intake-dup" "$home/data/backlog-review.tsv" "a refused hold wrote an objective row"
+  pass "a hold files its task through the intake checks: its objective row is recorded, and a duplicate title stops it with guidance for a hold"
 }
 
 # A hold declares the one project it freezes in its own header block. `frozen`
@@ -1784,6 +1816,7 @@ test_retained_body_keeps_its_utf8_bytes
 test_completion_gate_attests_and_transfers
 test_answer_records_and_closes
 test_release_frees_held_work
+test_hold_files_through_the_intake_checks
 test_freeze_declaration_scopes_one_project
 test_hold_stamp_precedes_hold_visibility
 test_interrupted_answer_preserves_hold_age

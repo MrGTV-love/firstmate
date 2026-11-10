@@ -73,7 +73,7 @@ test_sweep_retires_only_finished_board_listeners() {
   run_captain "$home" hold sweep-open-call --title "Choose the sweep route" \
     --reason "captain sweep route pending" --repo sample >/dev/null \
     || fail "could not hold the open captain call"
-  run_captain "$home" hold sweep-closed-call --title "Choose the closed route" \
+  run_captain "$home" hold sweep-closed-call --title "Pick the answered heading" \
     --reason "captain closed route pending" --repo sample >/dev/null \
     || fail "could not hold the call that is answered below"
   printf 'north\n' > "$home/answer.txt"
@@ -246,7 +246,7 @@ test_auto_sweep_retires_only_finished_listeners() {
   run_captain "$home" hold auto-open-call --title "Choose the open route" \
     --reason "captain open route pending" --repo sample >/dev/null \
     || fail "could not hold the call that stays unanswered"
-  run_captain "$home" hold auto-closed-call --title "Choose the closed route" \
+  run_captain "$home" hold auto-closed-call --title "Pick the answered heading" \
     --reason "captain closed route pending" --repo sample >/dev/null \
     || fail "could not hold the call that is answered below"
   printf 'north\n' > "$home/answer.txt"
@@ -881,8 +881,9 @@ test_sweep_resolves_bound_captain_keys() {
   printf '{"sessions":{}}\n' > "$store/state.json"
   for key in origin-open-decision-third-choice origin-closed-decision-third-choice \
       origin-open-decision-exact-choice sweep-bound-open; do
-    run_captain "$home" hold "$key" --title "Bound captain call $key" \
-      --reason "captain choice pending" --repo sample >/dev/null \
+    tasks_in "$home" add "$key" "Bound captain call $key" --kind captain --repo sample >/dev/null \
+      || fail "could not create the bound call $key"
+    run_captain "$home" hold "$key" --reason "captain choice pending" >/dev/null \
       || fail "could not create the bound call $key"
   done
   tasks_in "$home" add exact-choice "Non-held exact identity" >/dev/null \

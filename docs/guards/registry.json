@@ -150,7 +150,14 @@
     "backlog-transition",
     "compact-adviser",
     "secondmate-inherit",
-    "secondmate-sync"
+    "secondmate-sync",
+    "backlog-intake-objective",
+    "backlog-intake-duplicate",
+    "backlog-intake-not-dup",
+    "backlog-intake-dup-of",
+    "backlog-close-item-eligible",
+    "backlog-close-duplicate-of",
+    "backlog-close-moved-to"
   ],
   "guards": [
     {
@@ -6891,6 +6898,234 @@
       "instrumented": false,
       "status": "active",
       "layer_note": "added with the standing GitHub accounting owner; deny without a guard event: the check reads the id before any write, so the foreign file keeps its rows and the owner does not start; the fixed stderr line withholds the exception text because command output can hold secrets; test_symlink_and_foreign_database_are_not_modified in tests/fm-github-accounting.behavior.test.py proves the refusal leaves the rows unchanged, the other owner tests prove a database the owner created opens, and tests/fm-watch-github-accounting.test.sh proves a watcher reports this failed start with a wake that names the owner log; the trigger covers only nonempty files because a zero-size file left by an interrupted start holds no data, and test_zero_size_database_is_treated_as_new and test_nonempty_non_database_file_is_refused_unchanged prove both sides"
+    },
+    {
+      "id": "backlog-intake-objective",
+      "version": "1",
+      "owner": "bin/fm-tasks-axi.sh",
+      "sites": [
+        {
+          "file": "bin/fm-tasks-axi.sh",
+          "match": "backlog_refuse backlog-intake-objective",
+          "count": 3
+        }
+      ],
+      "invariant": "an item enters the backlog only with a listed objective or a stated reason for none",
+      "layer": "runtime-block",
+      "source": "docs/objectives.md, read through bin/fm-backlog-intake.py objectives, against the add's --objective and --objective-reason",
+      "trigger": "bin/fm-tasks-axi.sh add or create without --objective, with an id docs/objectives.md does not list, or with --objective none and no reason",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id>, or bin/fm-tasks-axi.sh add <id> <title> --objective none --objective-reason <why>",
+      "budget": 1,
+      "telemetry": "state/guard-events.jsonl",
+      "test": "tests/fm-tasks-axi.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": true,
+      "status": "active",
+      "layer_note": "each refusal prints the fm_refuse envelope above its message and exits 2 with nothing filed; an unreadable objective list stops the add with a deny event that marks source_ok false; an allow event records each pass"
+    },
+    {
+      "id": "backlog-intake-duplicate",
+      "version": "1",
+      "owner": "bin/fm-tasks-axi.sh",
+      "sites": [
+        {
+          "file": "bin/fm-tasks-axi.sh",
+          "match": "backlog_refuse backlog-intake-duplicate"
+        },
+        {
+          "file": "bin/fm-tasks-axi.sh",
+          "match": "fm-guard-event.sh\" \"$1\" deny --source-ok true"
+        },
+        {
+          "file": "bin/fm-tasks-axi.sh",
+          "match": "fm-guard-event.sh\" \"$1\" deny --source-ok false"
+        },
+        {
+          "file": "bin/fm-tasks-axi.sh",
+          "match": "fm_refuse \"$1\" \"$2\" \"$3\" \"$4\" \"$5\" backlog-item \"$6\""
+        }
+      ],
+      "invariant": "an add whose title overlaps an open or recently closed item files nothing until the filer judges its neighbours",
+      "layer": "runtime-block",
+      "source": "tasks-axi list output and the markdown done archive, scored by bin/fm-backlog-intake.py neighbours",
+      "trigger": "the title's word overlap with a Queued or In flight item, or with one of the 50 newest Done items, is 0.25 or more, and the add names neither override",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id> --dup-of <kept-id>, or bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id> --not-dup <neighbour-id>",
+      "budget": 1,
+      "telemetry": "state/guard-events.jsonl",
+      "test": "tests/fm-tasks-axi.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "proxy": true,
+      "proxy_reason": "title-word overlap stands in for the same work, because no source records that two items are the same; the check shows neighbours and forces a choice instead of deciding",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": true,
+      "status": "active",
+      "layer_note": "the refusal prints the human-only envelope, the three best neighbours and both overrides as full commands, then exits 2; --not-dup waives this guard and records an allow event here with override true and cleared_by not-dup; --dup-of agrees with it and records an allow event with cleared_by dup-of and override false; this entry also holds the shared backlog_refuse and backlog_source_stop lines that every backlog-intake and backlog-close guard calls"
+    },
+    {
+      "id": "backlog-intake-not-dup",
+      "version": "1",
+      "owner": "bin/fm-tasks-axi.sh",
+      "sites": [
+        {
+          "file": "bin/fm-tasks-axi.sh",
+          "match": "backlog_refuse backlog-intake-not-dup",
+          "count": 2
+        }
+      ],
+      "invariant": "the --not-dup override files an overlapping add only when it names a qualifying neighbour",
+      "layer": "runtime-block",
+      "source": "the neighbours bin/fm-backlog-intake.py scores for this add, then tasks-axi list output and the markdown done archive to say why an id does not qualify",
+      "trigger": "bin/fm-tasks-axi.sh add --not-dup <id> where the id is not a neighbour of the add's title",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id> --not-dup <neighbour-id>",
+      "budget": 1,
+      "telemetry": "state/guard-events.jsonl",
+      "test": "tests/fm-tasks-axi.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": true,
+      "status": "active",
+      "layer_note": "the override is the duplicate guard's escape, so a pass records an allow event here and an override event on backlog-intake-duplicate; an empty or repeated value is a usage error that stops before this guard"
+    },
+    {
+      "id": "backlog-intake-dup-of",
+      "version": "1",
+      "owner": "bin/fm-tasks-axi.sh",
+      "sites": [
+        {
+          "file": "bin/fm-tasks-axi.sh",
+          "match": "backlog_refuse backlog-intake-dup-of",
+          "count": 3
+        }
+      ],
+      "invariant": "the --dup-of override appends only to another item in the active backlog",
+      "layer": "runtime-block",
+      "source": "tasks-axi list output, then the markdown done archive through bin/fm-backlog-intake.py archived to say why an id does not qualify",
+      "trigger": "bin/fm-tasks-axi.sh add --dup-of <id> where the id is the add's own id, is only in the done archive, or is in no backlog",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id> --dup-of <kept-id>",
+      "budget": 1,
+      "telemetry": "state/guard-events.jsonl",
+      "test": "tests/fm-tasks-axi.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": true,
+      "status": "active",
+      "layer_note": "the override is the duplicate guard's true-positive answer, so a completed append records an allow event here and an allow event with cleared_by dup-of on backlog-intake-duplicate; a kept id with unsupported characters is a usage error that stops before this guard"
+    },
+    {
+      "id": "backlog-close-item-eligible",
+      "version": "1",
+      "owner": "bin/fm-tasks-axi.sh",
+      "sites": [
+        {
+          "file": "bin/fm-tasks-axi.sh",
+          "match": "backlog_refuse backlog-close-item-eligible",
+          "count": 6
+        }
+      ],
+      "invariant": "a proof close takes only an open item that neither the owner nor another open item still needs",
+      "layer": "runtime-block",
+      "source": "tasks-axi show and list output, bin/fm-captain-hold.sh open, the item's task record in the state directory, and OWNER_PATTERN in bin/fm-backlog-intake.py",
+      "trigger": "bin/fm-tasks-axi.sh done --duplicate-of or --moved-to on an item that is absent or closed, has a live task record, is an open owner call, quotes the owner or captain, or still blocks an open item",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "bin/fm-tasks-axi.sh unblock <dependent> --by <id> for a dependent, bin/fm-teardown.sh <id> for a live task, or, with the owner's words, bin/fm-tasks-axi.sh done <id> --drop-file <words-file> for a ship or scout row and bin/fm-tasks-axi.sh done <id> --note \"<the owner's words>\" for any other row",
+      "budget": 1,
+      "telemetry": "state/guard-events.jsonl",
+      "test": "tests/fm-tasks-axi.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "proxy": true,
+      "proxy_reason": "OWNER_PATTERN reads the item's text for an owner or captain quotation, because tasks-axi records no filer",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": true,
+      "status": "active",
+      "layer_note": "the owner-call and owner-filed refusals print a human-only exit; an unreadable item, hold or dependent list stops the close with a deny event that marks source_ok false; an allow event records each pass"
+    },
+    {
+      "id": "backlog-close-duplicate-of",
+      "version": "1",
+      "owner": "bin/fm-tasks-axi.sh",
+      "sites": [
+        {
+          "file": "bin/fm-tasks-axi.sh",
+          "match": "backlog_refuse backlog-close-duplicate-of",
+          "count": 3
+        }
+      ],
+      "invariant": "a duplicate closes only into a different kept item that is Queued or In flight",
+      "layer": "runtime-block",
+      "source": "the kept item's row, read through tasks-axi by fm_backlog_row_probe",
+      "trigger": "bin/fm-tasks-axi.sh done <id> --duplicate-of <kept-id> where the kept id is the item itself, is absent, or is not Queued or In flight",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "bin/fm-tasks-axi.sh done <id> --duplicate-of <kept-id>",
+      "budget": 1,
+      "telemetry": "state/guard-events.jsonl",
+      "test": "tests/fm-tasks-axi.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": true,
+      "status": "active",
+      "layer_note": "nothing is appended or closed on a refusal; an unreadable kept item stops the close with a deny event that marks source_ok false; an allow event records each completed append"
+    },
+    {
+      "id": "backlog-close-moved-to",
+      "version": "1",
+      "owner": "bin/fm-tasks-axi.sh",
+      "sites": [
+        {
+          "file": "bin/fm-tasks-axi.sh",
+          "match": "backlog_refuse backlog-close-moved-to",
+          "count": 6
+        }
+      ],
+      "invariant": "a moved item closes only when a different registered home holds its work open",
+      "layer": "runtime-block",
+      "source": "data/secondmates.md through bin/fm-secondmate-registry-lib.sh, then the other home's backlog through tasks-axi or bin/fm-on.sh, and for a remote home the backlog identity that bin/fm-backlog-identity.sh prints here and through bin/fm-on.sh",
+      "trigger": "bin/fm-tasks-axi.sh done <id> --moved-to <home> <item-id> where the home is not registered exactly once, is this backlog (also through a remote record that reaches it), holds no such item, or holds it closed",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "bin/fm-tasks-axi.sh done <id> --moved-to <home> <item-id>",
+      "budget": 1,
+      "telemetry": "state/guard-events.jsonl",
+      "test": "tests/fm-tasks-axi.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": true,
+      "status": "active",
+      "layer_note": "nothing is closed on a refusal; an unreachable or unreadable home stops the close with a deny event that marks source_ok false; an allow event records each pass"
     }
   ],
   "excluded": [

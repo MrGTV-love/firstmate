@@ -188,7 +188,16 @@ repository's name, else for firstmate; later events update the ledger without du
 When that item is done or gone and a timeout recurs, a new item naming the old
 one is filed. A self-imposed read wait that ended while its command continued is
 not a timeout and is never recorded as one. Filing failure
-remains retryable and is reported, never silently marked filed. Manual-backlog
+remains retryable and is reported, never silently marked filed. The item names
+objective O7. When the duplicate check refuses the title, the filer reads every
+neighbour the check reads (the active list and the newest Done rows of the
+markdown done archive) from the backlog itself. An open fm-timeout- item filed
+under this exact title is the same repository and key's work, so the occurrence's
+title and body (this host and its bounds) are appended to it with --dup-of and
+nothing new is filed. Otherwise, when every neighbour is the
+previous item or another fm-timeout- item (a different key's work), the filing
+overrides the refusal with --not-dup; any other neighbour may be the same work
+filed by hand, so that refusal is a filing failure for the operator. Manual-backlog
 homes use compatible tasks-axi for this automated addition as well.
 
 check-literals compares bin/ against the merge-base with origin/main (main if
@@ -510,6 +519,28 @@ def task_closed(cmd, env, task):
     raise RuntimeError(f'timeout work {task} could not be inspected: ' + shown.stderr.strip() + shown.stdout.strip())
 
 
+def timeout_neighbours(cmd, env, title, task):
+    """The ids of the backlog items whose titles overlap `title`, and the open
+    fm-timeout- item filed under exactly `title`, if any."""
+    intake = [sys.executable, str(Path(cmd[0]).with_name('fm-backlog-intake.py'))]
+    archive = subprocess.run(['bash', '-c', '. "$1/fm-tasks-axi-lib.sh" && . "$1/fm-backlog-transition-lib.sh" && fm_backlog_tasks_axi_addressing "$2" && fm_backlog_done_archive "$2"',
+                              '_', str(Path(cmd[0]).parent), str(data_dir())], capture_output=True, text=True, env=env)
+    listing = subprocess.run(cmd + ['list'], capture_output=True, text=True, env=env)
+    found = subprocess.run(intake + ['neighbours', title, archive.stdout, task], input=listing.stdout, capture_output=True, text=True)
+    if archive.returncode or listing.returncode or found.returncode not in (0, 1):
+        raise RuntimeError('timeout work could not be filed: its neighbours could not be read: ' + (archive.stderr + listing.stderr + found.stderr).strip())
+    ids, same = set(), None
+    for line in found.stdout.splitlines():
+        item, state, score = line.split('\t')[:3]
+        ids.add(item)
+        if same is None and state != 'done' and item.startswith('fm-timeout-') and score == '1.00':
+            shown = subprocess.run(cmd + ['show', item, '--full'], capture_output=True, text=True, env=env)
+            field = subprocess.run(intake + ['field', 'title'], input=shown.stdout, capture_output=True, text=True)
+            if shown.returncode == 0 and field.returncode == 0 and field.stdout == title:
+                same = item
+    return ids, same
+
+
 def note_timeout(key, milliseconds, event_id):
     with ledger() as (handle, rows):
         if handle is None:
@@ -541,9 +572,34 @@ def own_timeout(key, milliseconds, event_id=None):
     body += '. Measure completion latency across host load, then repair the limit with an explicit margin. A read wait ending is not command failure.'
     # Inspect before retrying an interrupted publication, using the deterministic id.
     if subprocess.run(cmd + ['show', task], capture_output=True, text=True, env=env).returncode:
-        result = subprocess.run(cmd + ['add', task, f'Measure and repair repeated timeout: {repo()} {key}', '--kind', 'ship', '--repo', filing_project(), '--body', body], capture_output=True, text=True, env=env)
-        if result.returncode and subprocess.run(cmd + ['show', task], capture_output=True, text=True, env=env).returncode:
-            raise RuntimeError('timeout work could not be filed: ' + result.stderr.strip() + result.stdout.strip())
+        title = f'Measure and repair repeated timeout: {repo()} {key}'
+        add = cmd + ['add', task, title, '--kind', 'ship', '--repo', filing_project(), '--body', body, '--objective', 'O7']
+        result = subprocess.run(add, capture_output=True, text=True, env=env)
+        same = None
+        # The wrapper stops a title that overlaps another item and prints at most three
+        # neighbours, so the filer reads them all from the backlog and its done archive.
+        # An open fm-timeout- item with this exact title is this repository and key's
+        # work, so this occurrence is appended to it through --dup-of. The title carries
+        # the command key, so the previous item and every other fm-timeout- item are
+        # judged different. Any other neighbour may be the same work filed by hand, so
+        # that refusal goes to the operator, nothing filed.
+        if result.returncode == 2 and '--not-dup' in result.stderr:
+            listed = re.findall(r'^  (\S+) \(', result.stderr, re.M)
+            ids, same = timeout_neighbours(cmd, env, title, task)
+            if same:
+                result = subprocess.run(add + ['--dup-of', same], capture_output=True, text=True, env=env)
+                if result.returncode:
+                    raise RuntimeError(f'timeout work could not be recorded on {same}: ' + result.stderr.strip() + result.stdout.strip())
+                task = same
+            elif listed and all(n == previous or n.startswith('fm-timeout-') for n in ids | set(listed)):
+                result = subprocess.run(add + ['--not-dup', previous if previous in listed else listed[0]], capture_output=True, text=True, env=env)
+            else:
+                hand = sorted(n for n in ids | set(listed) if n != previous and not n.startswith('fm-timeout-'))
+                raise RuntimeError('timeout work could not be filed: ' + (f'{", ".join(hand)} may be the same work filed by hand; ' if hand else '') + result.stderr.strip())
+        if not same:
+            shown = subprocess.run(cmd + ['show', task], capture_output=True, text=True, env=env)
+            if result.returncode and (shown.returncode or 'backlog-review.tsv' in result.stderr):
+                raise RuntimeError('timeout work could not be filed: ' + result.stderr.strip() + result.stdout.strip())
     with ledger() as (handle, rows):
         if not any(mine(r, key) and r.get('event') == 'filed' and r.get('task') == task for r in rows):
             append(handle, rows, dict(host=HOST, repo=repo(), key=key, event='filed', task=task, previous=previous, recorded_at=now_iso()))

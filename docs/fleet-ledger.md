@@ -37,7 +37,7 @@ Readers must ignore members and events they do not recognize, so later versions 
 | `task.merged`      | `via` (`"pr"` or `"local"`), plus `pr` when `via` is `"pr"` | The task's PR merge is recorded, or its local-only branch landed. |
 | `task.cleaned_up`  | none                                           | The task's worker and local copy were removed. |
 | `task.filed`       | `at`, `repo`, `kind`, `priority`               | `bin/fm-tasks-axi.sh add` or `bin/fm-captain-hold.sh hold` created a backlog item. |
-| `task.closed`      | `at`, `evidence`, `pr`                         | A task's backlog item moved to Done on proof of its deliverable, through `bin/fm-teardown.sh`, the next session start's replay of a close teardown recorded, `bin/fm-tasks-axi.sh done`, or `bin/fm-captain-hold.sh` closing a captain-held item that teardown had kept open. |
+| `task.closed`      | `at`, `evidence`, `pr`                         | A task's backlog item moved to Done on proof of its deliverable, or on a duplicate or moved proof, through `bin/fm-teardown.sh`, the next session start's replay of a close teardown recorded, `bin/fm-tasks-axi.sh done`, or `bin/fm-captain-hold.sh` closing a captain-held item that teardown had kept open. |
 | `task.answered`    | `at`, `via`, `key`, `answered_by`              | A decision or blocker was resolved: `fm-send.sh --resolve-key` closed it, or `fm-captain-hold.sh` recorded an answer or a reconciliation. |
 
 `task.dispatched` members: `kind` is `ship`, `scout`, or `secondmate`; `project` is the project directory name, or `null` for a remote second mate; `harness` names the agent tool; `model` is the requested model, or `null` for the tool's default.
@@ -57,7 +57,7 @@ An absent value is `null`.
 A captain-hold item that `fm-captain-hold.sh hold` creates is recorded with `kind` `captain` and no `priority`.
 An `add` of an id that already exists changes nothing, so `tasks-axi` reports it as already present and no record is written.
 
-`task.closed` members: `evidence` is what the close used, one of `merged_pr` (the recorded PR), `local_main` (a local-only landing), `report` (a scout's report), `drop_file` (the captain's recorded drop), or `none`.
+`task.closed` members: `evidence` is what the close used, one of `merged_pr` (the recorded PR), `local_main` (a local-only landing), `report` (a scout's report), `drop_file` (the captain's recorded drop), or `none` (which also records a close on a duplicate or moved proof from `bin/fm-tasks-axi.sh`).
 `pr` is the merged PR URL when `evidence` is `merged_pr`, and `null` otherwise.
 The record is written once, after the backlog item is Done: a close is written once for each task, evidence, and `pr` since the task's latest `task.dispatched`, however many of these paths reach it, so a task that is reopened and dispatched again records its next close.
 A refused teardown, a captain-held item that returns to Queued, and a `fm-tasks-axi.sh done` of an item that was already Done write none.

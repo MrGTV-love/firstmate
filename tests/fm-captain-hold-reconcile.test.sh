@@ -371,7 +371,9 @@ test_verified_close_without_board_request() {
   printf 'Verified both choices against captured-answers.txt: Use north; keep the admission order. No unanswered choice remains.\n' > "$home/evidence.txt"
   for outcome in answered moot; do
     id="sample-verified-$outcome"
-    run_captain "$home" hold "$id" --title "Verify $outcome" --reason "two choices to verify" >/dev/null \
+    tasks_in "$home" add "$id" "Verify $outcome" --kind captain --repo sample >/dev/null \
+      || fail "could not create the verified-close fixture"
+    run_captain "$home" hold "$id" --reason "two choices to verify" >/dev/null \
       || fail "could not hold the verified-close fixture"
     if [ "$outcome" = answered ]; then
       # Block parent publication after the backlog mutation, without any board
@@ -817,7 +819,9 @@ test_standalone_closes_follow_the_supervision_role_partition() {
   printf 'needs-decision [key=call-a]: first operational call\nneeds-decision [key=call-b]: second operational call\n' \
     > "$home/state/lane.status"
   for held in sample-held-a sample-held-b; do
-    run_captain "$home" hold "$held" --title "Held $held" --reason "answers recorded elsewhere" >/dev/null \
+    tasks_in "$home" add "$held" "Held $held" --kind captain --repo sample >/dev/null \
+      || fail "could not create the partition fixture $held"
+    run_captain "$home" hold "$held" --reason "answers recorded elsewhere" >/dev/null \
       || fail "could not hold the partition fixture $held"
   done
   tasks_in "$home" add sample-board-call "Captain call: moot board question?" --repo sample >/dev/null
@@ -989,7 +993,7 @@ test_operational_key_close_refusals_and_interrupted_append() {
   printf 'needs-decision [key=plain]: verify operational question\nneeds-decision [key=stale]: verify the second operational question\nneeds-decision [key=held-call]: captain still owns this\nneeds-decision [key=legacy]: captain owns legacy task\nneeds-decision [key=captain-hold-child-1]: captain hold child\nblocked [key=pending-reply-child]: pending-reply-missed: unavailable\n' \
     > "$home/state/lane.status"
   run_captain "$home" hold held-call --title "Held call" --reason "still needs captain" >/dev/null
-  run_captain "$home" hold lane-decision-legacy --title "Legacy held call" --reason "still needs captain" >/dev/null
+  run_captain "$home" hold lane-decision-legacy --title "Legacy lane question" --reason "still needs captain" >/dev/null
   printf 'Verified dependency is now available.\n' > "$home/evidence.txt"
   before=$(cat "$home/state/lane.status")
   for key in held-call legacy captain-hold-child-1 pending-reply-child; do
@@ -1194,7 +1198,7 @@ test_legacy_identities_keep_working() {
   # A concrete-origin binding (a pre-collapse record) makes short channel keys
   # resolve through the composed identity.
   run_shim "$home" hold "$id" third-choice \
-    --title "Third choice" --reason "captain third choice pending" --repo sample >/dev/null
+    --title "Third option" --reason "captain third choice pending" --repo sample >/dev/null
   run_shim "$home" bind legacy-src "$id" >/dev/null || fail "the shim bind path failed"
   [ "$(run_captain "$home" binding legacy-src)" = "$id" ] \
     || fail "the concrete-origin binding was not preserved"
@@ -1206,7 +1210,7 @@ test_legacy_identities_keep_working() {
   assert_contains "$show" "state: done" "the legacy-keyed answer did not close its row"
 
   run_shim "$home" hold "$id" fourth-choice \
-    --title "Fourth choice" --reason "captain fourth choice pending" --repo sample >/dev/null
+    --title "Fourth alternative" --reason "captain fourth choice pending" --repo sample >/dev/null
   legacy_text=$(printf 'Captain answered this decision through legacy replay.\nDecision key: fourth-choice\nAnswer: option c\n')
   if command -v shasum >/dev/null 2>&1; then
     legacy_digest=$(printf '%s' "$legacy_text" | shasum -a 256 | awk '{print $1}')
@@ -1313,12 +1317,12 @@ test_chat_channel_feeds_the_same_keyed_answer_intake() {
   printf 'needs-decision [key=chat-choice]: pick option A or option B\n' > "$home/state/$id.status"
   printf '# Chat review\n\nTwo captain choices remain.\n' > "$home/data/$id/report.md"
   run_shim "$home" hold "$id" chat-choice \
-    --title "Choose the sample chat option" --reason "captain chat choice pending" --repo sample >/dev/null \
+    --title "Pick option A or B" --reason "captain chat choice pending" --repo sample >/dev/null \
     || fail "could not register the legacy chat row"
-  run_captain "$home" hold sample-chat-followup --title "Choose the chat follow-up" \
+  run_captain "$home" hold sample-chat-followup --title "Decide the next step" \
     --reason "captain follow-up choice pending" --repo sample >/dev/null \
     || fail "could not register the task-id chat call"
-  run_captain "$home" hold sample-chat-reconcile --title "Reconcile from chat" \
+  run_captain "$home" hold sample-chat-reconcile --title "Settle the leftover question" \
     --reason "captain chat reconcile pending" --repo sample >/dev/null \
     || fail "could not register the chat reconcile call"
   run_captain "$home" complete "$id" "$id-decision-chat-choice" sample-chat-followup \
@@ -1566,11 +1570,11 @@ test_legitimate_holds_produce_no_divergence_signal() {
   # (2) The verified transfer: still open structurally, closed on the status side
   # by the captain-held verb command_complete writes.
   run_captain "$home" hold sample-transfer-call \
-    --title "Choose the sample retention window" --reason "captain retention choice pending" \
+    --title "Set the retention window" --reason "captain retention choice pending" \
     --repo sample >/dev/null || fail "could not register the transferred call"
   # (4) An already answered call whose status line reads resolved.
   run_captain "$home" hold sample-answered-call \
-    --title "Choose the sample export format" --reason "captain export choice pending" \
+    --title "Pick an export format" --reason "captain export choice pending" \
     --repo sample >/dev/null || fail "could not register the answered call"
   answer="$home/answer.txt"
   printf 'Export as CSV.\n' > "$answer"
@@ -1592,7 +1596,7 @@ resolved [key=sample-plain-work]: answered: go ahead
 EOF
   # (3) A still-open status decision whose structured twin is also still open.
   run_captain "$home" hold sample-open-call \
-    --title "Choose the sample refresh cadence" --reason "captain cadence choice pending" \
+    --title "Decide refresh cadence" --reason "captain cadence choice pending" \
     --repo sample >/dev/null || fail "could not register the still-open call"
 
   out=$(run_captain "$home" diverged) || fail "diverged failed on the legitimate shapes"

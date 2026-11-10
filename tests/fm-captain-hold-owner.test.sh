@@ -186,7 +186,7 @@ test_withdraw_releases_a_moot_call_on_a_recorded_captain_ruling() {
   # A separate call filed with --origin moot-work carries the task only in its
   # origin lines; the captain never ruled on moot-work's own question.
   printf 'Pick option B.\n' > "$home/origin-answer.txt"
-  run_captain "$home" hold origin-q --title "Which option" --reason "pick one" --repo sample --origin moot-work >/dev/null \
+  run_captain "$home" hold origin-q --title "Choose the variant" --reason "pick one" --repo sample --origin moot-work >/dev/null \
     || fail "could not file the origin-only call"
   run_captain "$home" answer origin-q --decision-file "$home/origin-answer.txt" >/dev/null || fail "could not answer the origin-only call"
   assert_contains "$(tasks_in "$home" show origin-q --full)" "Origin: moot-work" "the fixture call does not carry the origin line"
@@ -319,7 +319,8 @@ test_withdraw_releases_a_legacy_mate_hold_on_a_captain_ruling() {
 
   # A ruling whose recorded question names the hold makes it moot.
   printf 'Fix it; the retry is moot.\n' > "$decision"
-  run_captain "$mate" hold ruling-c --title "Retry or fix for legacy-work" --reason "choose" --repo sample --owner captain >/dev/null
+  tasks_in "$mate" add ruling-c "Retry or fix for legacy-work" --kind captain --repo sample >/dev/null
+  run_captain "$mate" hold ruling-c --reason "choose" --owner captain >/dev/null
   run_captain "$mate" answer ruling-c --decision-file "$decision" >/dev/null || fail "could not record the naming ruling"
   run_captain "$mate" withdraw legacy-work --evidence-file "$evidence" --ruling ruling-c >/dev/null \
     || fail "withdraw refused a legacy hold named by a recorded ruling"
@@ -481,7 +482,8 @@ test_lifecycle_readers_and_the_gate_know_withdrawn_records() {
 
   run_captain "$mate" complete scout-a legacy-w >/dev/null \
     || fail "the completion gate refused an open captain call"
-  run_captain "$mate" hold ruling-w --title "The mechanism for legacy-w" --reason "choose" --repo sample >/dev/null
+  tasks_in "$mate" add ruling-w "The mechanism for legacy-w" --kind captain --repo sample >/dev/null
+  run_captain "$mate" hold ruling-w --reason "choose" >/dev/null
   run_captain "$mate" answer ruling-w --decision-file "$decision" >/dev/null || fail "could not record the ruling"
   run_captain "$mate" withdraw legacy-w --evidence-file "$evidence" --ruling ruling-w >/dev/null || fail "withdraw failed"
   list=$(run_captain "$mate" reconcile list) || fail "could not list the reconcile requests"
@@ -575,7 +577,8 @@ test_a_withdraw_retried_with_another_ruling_publishes_the_recorded_basis() {
   FM_CAPTAIN_HOLD_NOW=$PAST_HOLD_SET run_captain "$mate" hold basis-work --reason "pick one" >/dev/null || fail "hold failed"
   printf 'basis-work is moot.\n' > "$mate/ruling.txt"
   for ruling in ruling-one ruling-two; do
-    run_captain "$mate" hold "$ruling" --title "Ruling $ruling" --reason "choose" --repo sample >/dev/null
+    tasks_in "$mate" add "$ruling" "Ruling $ruling" --kind captain --repo sample >/dev/null
+    run_captain "$mate" hold "$ruling" --reason "choose" >/dev/null
     run_captain "$mate" answer "$ruling" --decision-file "$mate/ruling.txt" >/dev/null || fail "could not record $ruling"
   done
   printf 'Moot under the ruling.\n' > "$mate/evidence.txt"

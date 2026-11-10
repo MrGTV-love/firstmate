@@ -632,9 +632,11 @@ cat > "$WORKSRC/bin/fm-brief.sh" <<SH
 #!/usr/bin/env bash
 exec "$ROOT/bin/fm-brief.sh" "\$@"
 SH
-cat > "$WORKSRC/bin/fm-tasks-axi.sh" <<'SH'
+# The filing step runs the real wrapper against the lab's own home, so a lab that
+# files its worker without an accepted objective fails here.
+cat > "$WORKSRC/bin/fm-tasks-axi.sh" <<SH
 #!/usr/bin/env bash
-exit 0
+exec "$ROOT/bin/fm-tasks-axi.sh" "\$@"
 SH
 cat > "$WORKSRC/bin/fm-spawn.sh" <<SH
 #!/usr/bin/env bash
@@ -671,6 +673,8 @@ assert_contains "$out" "gate: $W/home/data/" "up shows the gate path"
 assert_contains "$out" "then message the worker to resume" "up explains the release message"
 worker_id=$(sed -n 's/^worker_id=//p' "$W/.fm-live-lab")
 brief=$(<"$W/home/data/$worker_id/brief.md")
+assert_grep "$worker_id" "$W/home/data/backlog.md" "the lab did not file its worker through the real wrapper"
+assert_grep "$(printf '%s\t\tO7\t' "$worker_id")" "$W/home/data/backlog-review.tsv" "the lab's worker has no objective row"
 assert_contains "$brief" "append one paused status line naming the gate file" "worker declares its wait"
 assert_contains "$brief" "and end your turn" "worker ends its waiting turn"
 assert_contains "$brief" "Do not poll or sleep in a foreground command" "worker does not run a blocking wait"

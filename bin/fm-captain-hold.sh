@@ -49,8 +49,10 @@
 # optional --origin records provenance in the new task's body and supplies the
 # default repo from that origin's metadata). Prefer holding the work item the
 # question gates over minting a new row. Creating a missing row uses
-# `tasks-axi add --kind captain`: that kind is backlog metadata, and the Beads
-# adapter maps it to native issue type `task`. Captain holds have no due
+# `bin/fm-tasks-axi.sh add --kind captain`, so the intake objective and
+# duplicate checks apply; docs/configuration.md ("Backlog intake and closing
+# proofs") owns them and the refused-hold guidance. The captain kind is backlog
+# metadata, and the Beads adapter maps it to native issue type `task`. Captain holds have no due
 # semantics (`--until` is the optional hold deferral), so the create waives
 # Beads `due.required` through `BD_DUE_REQUIRED` rather than inventing a due
 # date or registering a `types.custom` captain issue type. The command records
@@ -777,15 +779,6 @@ ledger_hold_closed() {  # <task-id> [<retained-done-arg>...]
   fi
   fm_backlog_ledger_closed "$STATE" "$config" "$id" "${args[@]+"${args[@]}"}"
   return 0
-}
-
-# The same ledger's task.filed record for a captain-hold item this command just
-# created; tasks-axi stores no priority for it.
-ledger_hold_filed() {  # <task-id> <repo>
-  local config=${FM_CONFIG_OVERRIDE:-$FM_HOME/config}
-  [ -e "$config/fleet-ledger" ] || return 0
-  FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$config \
-    "$SCRIPT_DIR/fm-fleet-ledger.sh" filed "$1" "$2" captain '' || true
 }
 
 # The record's label is what keeps an evidence-backed reconciliation from
@@ -1736,14 +1729,19 @@ command_hold() {
     # tasks-axi add never passes --due. Beads due.required would refuse this
     # create, and captain holds have no due semantics, so waive it for this
     # call only. --kind captain stays metadata; Beads native type is task.
-    if [ -n "$body" ]; then
-      BD_DUE_REQUIRED=false tasks_axi add "$id" "$title" --kind captain --repo "$repo" --body "$body" >/dev/null \
-        || fail "could not create task $id"
-    else
-      BD_DUE_REQUIRED=false tasks_axi add "$id" "$title" --kind captain --repo "$repo" >/dev/null \
-        || fail "could not create task $id"
-    fi
-    ledger_hold_filed "$id" "$repo"
+    hold_add=(add "$id" "$title" --kind captain --repo "$repo"
+      --objective none --objective-reason "captain hold record: tracks a captain decision, not a work item")
+    [ -z "$body" ] || hold_add+=(--body "$body")
+    add_err=$(env BD_DUE_REQUIRED=false FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" \
+      FM_CONFIG_OVERRIDE="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$SCRIPT_DIR/fm-tasks-axi.sh" "${hold_add[@]}" 2>&1 >/dev/null) || {
+      [ -z "$add_err" ] || printf '%s\n' "$add_err" >&2
+      case "$add_err" in
+        *"this title overlaps open or recently closed items"*)
+          printf 'fm-captain-hold: the duplicate check stopped task %s, so nothing was held. Do not run the --dup-of command above: it would append this captain call to a work item, file nothing, and record no hold. To file it anyway, run the --not-dup command above naming the neighbour you checked, prefixed with BD_DUE_REQUIRED=false (a captain call has no due date), then run this same hold command again.\n' "$id" >&2
+          ;;
+      esac
+      fail "could not create task $id"
+    }
   fi
   # Publish the timestamp before the captain-hold annotation. A concurrent
   # snapshot may see the harmless stamp by itself, but can never see a newly

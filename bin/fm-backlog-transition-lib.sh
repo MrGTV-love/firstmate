@@ -332,6 +332,22 @@ fm_backlog_transition_skip_event() {  # <task>
   "$(dirname "${BASH_SOURCE[0]}")/fm-guard-event.sh" backlog-transition bypass --rule "$FM_BACKLOG_TRANSITION_BYPASS" --task "${1:-}" --override 2>/dev/null || true
 }
 
+# The markdown done archive of the backlog fm_backlog_tasks_axi_addressing last
+# addressed: the archive its `.tasks.toml` names, else <data-dir>/done-archive.md.
+# Prints nothing for another backend.
+fm_backlog_done_archive() {  # <data-dir>
+  local archive
+  [ -n "$FM_BACKLOG_AXI_FILE" ] || return 0
+  archive=$(sed -n "s/^[[:space:]]*archive[[:space:]]*=[[:space:]]*[\"']\\([^\"']*\\)[\"'].*/\\1/p" \
+    "$FM_BACKLOG_AXI_ROOT/.tasks.toml" 2>/dev/null | sed -n '1p')
+  case "$archive" in
+    '') archive="$1/done-archive.md" ;;
+    /*) ;;
+    *) archive="$FM_BACKLOG_AXI_ROOT/$archive" ;;
+  esac
+  printf '%s' "$archive"
+}
+
 fm_backlog_transition_applies() {  # <config-dir> <data-dir> <kind>
   local config=$1 data authorized_data=$2 kind=$3 file root backend authorized_root
   FM_BACKLOG_TRANSITION_SKIP=
