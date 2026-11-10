@@ -2833,7 +2833,7 @@ teardown_train_carries() {  # <ref> <train head>
   fi
   teardown_train_content_applies "$1" "$2" || {
     TEARDOWN_UNPROVEN_COMMITS=
-    [ -n "$TEARDOWN_TRAIN_UNASKED" ] || TEARDOWN_TRAIN_CARRY_WHY="reaches it in history, but its net change is not present in the train head's final tree"
+    [ -n "$TEARDOWN_TRAIN_UNASKED" ] || TEARDOWN_TRAIN_CARRY_WHY="reaches it in history, but its net change is not present in the train head's final tree${FM_TASK_COPY_WHY:+; ${1:0:12} $FM_TASK_COPY_WHY}"
     return 1
   }
 }
@@ -2858,7 +2858,8 @@ teardown_train_carries() {  # <ref> <train head>
 # unlanded to lose. Without that check an empty change proves nothing, and a copy on a commit
 # that a dropping merge took in is refused
 # (test_a_prerebase_copy_built_on_an_ours_merged_commit_is_refused). No common history, or more
-# than one merge base, refuses; a failed read is unknown and leaves TEARDOWN_TRAIN_UNASKED.
+# than one merge base, refuses with that fact left in FM_TASK_COPY_WHY for the caller's refusal;
+# a failed read is unknown and leaves TEARDOWN_TRAIN_UNASKED.
 teardown_train_content_applies() {  # <ref> <target>
   local dir=${TEARDOWN_LANDED_DIR:-$WT} rc=0 fork_only=''
   if [ -n "$TEARDOWN_TRAIN_MEMBER_HEAD" ] && [ "$1" != "$TEARDOWN_TRAIN_MEMBER_HEAD" ]; then
@@ -2876,10 +2877,7 @@ teardown_train_content_applies() {  # <ref> <target>
   fm_task_copy_recorded_change_present "$dir" "$1" "$2" "$TEARDOWN_TRAIN_MEMBER_BASE" "$fork_only" || rc=$?
   case "$rc" in
     0 | 2) return 0 ;;
-    1)
-      [ -z "$FM_TASK_COPY_WHY" ] || TEARDOWN_TRAIN_CARRY_WHY=$FM_TASK_COPY_WHY
-      return 1
-      ;;
+    1) return 1 ;;
     *)
       TEARDOWN_TRAIN_UNASKED=${FM_TASK_COPY_UNASKED:-the net change of ${1:0:12} could not be read against ${2:0:12}}
       return 1
@@ -2911,7 +2909,7 @@ teardown_train_landing_holds() {  # <ref> <landing commit>
   teardown_train_member_base "$ref" || return 2
   teardown_train_content_applies "$ref" "$landing" || {
     [ -z "$TEARDOWN_TRAIN_UNASKED" ] || return 2
-    TEARDOWN_TRAIN_CARRY_WHY="does not hold the member's net change in its tree"
+    TEARDOWN_TRAIN_CARRY_WHY="does not hold the member's net change in its tree${FM_TASK_COPY_WHY:+; ${ref:0:12} $FM_TASK_COPY_WHY}"
     return 1
   }
 }
@@ -3035,7 +3033,14 @@ for pr in prs:
       fi
     fi
     # The train's landing commit, as the forge names it, must hold the same change:
-    # a train can be recorded merged by a merge that left its content out.
+    # a train can be recorded merged by a merge that left its content out. Record mode
+    # reads the project clone, which no earlier proof has brought up to date.
+    if [ "$mode" = record ] && git -C "$dir" remote get-url origin >/dev/null 2>&1; then
+      git -C "$dir" fetch --quiet origin "+refs/heads/$base:refs/remotes/origin/$base" >/dev/null 2>&1 || {
+        TEARDOWN_TRAIN_UNASKED="origin/$base could not be fetched, so the landing commit of train PR $u cannot be placed"
+        return 1
+      }
+    fi
     teardown_train_landing_holds "$mhead" "$landing"
     case $? in
       0) ;;

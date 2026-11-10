@@ -4630,6 +4630,30 @@ test_train_member_whose_recorded_base_is_ahead_still_refuses_unlanded_work() {
   pass "a recorded base ahead of the fork point never accepts a commit the train did not carry or a change the train reverted"
 }
 
+# The record-only route reads the project clone, which nothing else brings up to date: a
+# clone whose origin/main is older than the train squash is fetched before the landing commit
+# is placed, and a fetch that fails is unknown, never unlanded.
+test_train_record_only_route_fetches_a_stale_default_branch() {
+  local row
+  for row in stale unreachable; do
+    train_absent_case "train-absent-stale-$row"
+    git -C "$TRAIN_CASE/project" update-ref refs/remotes/origin/main "$TRAIN_BASE_OID"
+    git -C "$TRAIN_CASE/project" merge-base --is-ancestor "$TRAIN_LANDING_COMMIT" origin/main \
+      && fail "train-absent-stale-$row: the clone's origin/main already holds the train squash"
+    if [ "$row" = stale ]; then
+      run_teardown "$TRAIN_CASE" > "$TRAIN_CASE/stdout" 2> "$TRAIN_CASE/stderr" \
+        || fail "train-absent-stale-$row: a verified train was refused on a clone that was not fetched first: $(cat "$TRAIN_CASE/stderr")"
+      assert_grep "$TRAIN_URL" "$TRAIN_CASE/stderr" "train-absent-stale-$row: stderr did not name the train PR"
+      assert_absent "$TRAIN_CASE/state/task-x1.meta" "train-absent-stale-$row: accepted teardown left the task record"
+    else
+      git -C "$TRAIN_CASE/project" remote set-url origin "$TRAIN_CASE/no-such-origin.git"
+      assert_train_refused "$TRAIN_CASE" "train-absent-stale-$row" "origin/main could not be fetched" unknown
+      [ "$(backlog_row_state "$TRAIN_CASE")" = in_flight ] || fail "train-absent-stale-$row: refusal closed the backlog"
+    fi
+  done
+  pass "the record-only route fetches a stale default branch before it places the train's landing commit, and a failed fetch is unknown"
+}
+
 test_train_other_refusals_stay() {
   local case_dir rc
   # A closed member with no train and unlanded work keeps the existing refusal and text.
@@ -5819,7 +5843,7 @@ test_a_prerebase_copy_built_on_an_ours_merged_commit_is_refused() {
       git -C "$TRAIN_CASE/wt" cat-file -e "$TRAIN_COPY_HEAD:hidden.txt" 2>/dev/null || fail "prerebase-dropped-$how-$own: the copy lacks hidden.txt"
       [ "$(git -C "$TRAIN_CASE/wt" show "$TRAIN_HEAD:hidden.txt" 2>/dev/null)" != hidden ] || fail "prerebase-dropped-$how-$own: the train holds K's hidden.txt"
       [ "$(git -C "$TRAIN_CASE/wt" show "$TRAIN_LANDING_COMMIT:hidden.txt" 2>/dev/null)" != hidden ] || fail "prerebase-dropped-$how-$own: the landing holds K's hidden.txt"
-      assert_train_refused "$TRAIN_CASE" "prerebase-dropped-$how-$own" "REFUSED"
+      assert_train_refused "$TRAIN_CASE" "prerebase-dropped-$how-$own" "${TRAIN_COPY_HEAD:0:12} stands on a commit that the default branch reached through a merge that is not what git makes of its parents"
       assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "prerebase-dropped-$how-$own: the train was accepted"
     done
   done
@@ -5974,6 +5998,7 @@ test_train_unreadable_forge_is_unknown_never_accepted
 test_train_control_open_member_is_not_landed_by_a_train
 test_train_control_merged_member_keeps_the_existing_route
 test_train_control_content_proof_still_accepts_a_closed_member
+test_train_record_only_route_fetches_a_stale_default_branch
 test_default_proof_accepts_a_closed_member_whose_recorded_base_is_ahead_of_its_fork_point
 test_train_member_whose_recorded_base_is_ahead_of_its_fork_point_allows
 test_train_member_whose_recorded_base_is_ahead_still_refuses_unlanded_work
