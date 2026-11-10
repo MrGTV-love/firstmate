@@ -1517,14 +1517,25 @@ class IntakeTest(unittest.TestCase):
             self.assertEqual((reads, self.acks(replay)), ([1, 1], ['200.000100']))
 
 
-    def test_a_removed_allowlist_member_loses_the_pending_request(self):
+    def test_a_staged_request_whose_author_left_the_allowlist_is_kept_and_nothing_is_posted_woken_or_acted_on(self):
+        """r62:117 (Main 3190): a request that was staged and not yet delivered when the allowlist changed is KEPT. A poll under the changed
+        allowlist posts nothing, wakes nothing and acts on nothing for it, a newer request waits behind it (order is kept, nothing is lost), and
+        a poll under the old settings delivers it once and the newer one after it. (An earlier head dropped the row; that was not r62.)"""
         with self.fixture() as (watch, replay):
             self.say(replay, '200.000100', 'hello')
             with patch.dict(os.environ, {'FM_SLACK_FAULT': 'after-stage'}), self.assertRaises(RuntimeError):
                 watch.poll()
+            self.say(replay, '200.000200', 'a newer request')
             watch.state, watch.authors = watch.load_state(), {'U0SOMEONEELSE'}
+            for _ in range(2):
+                watch.poll()
+                self.assertEqual((self.acks(replay), self.wakes(watch)), ([], []))
+                self.assertEqual([row['thread'] for row in watch.load_state()['pending']], ['200.000100'])
+            watch.state, watch.authors, watch.advanced = watch.load_state(), {self.OWNER}, 0
             watch.poll()
-            self.assertEqual((self.acks(replay), self.wakes(watch), watch.state['pending']), ([], [], []))
+            self.assertEqual(self.acks(replay), ['200.000100', '200.000200'])
+            self.assertEqual([line.split()[3] for line in self.wakes(watch)], ['200.000100', '200.000200'])
+            self.assertEqual(watch.load_state()['pending'], [])
 
 
     # ---- the outcome review's findings (OF1..OF6): each of these failed at the head they were written against ----
