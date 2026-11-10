@@ -1,0 +1,9 @@
+synthetic load: 12 busy loops on 10 cores, started 60 s before measurement
+verdict=unknown ring=yes first_ring_ms=4887 iter_at_ring=22 within_test_budget=yes watcher_alive=yes load={ 15.94 8.26 6.69 }
+verdict=unknown ring=yes first_ring_ms=4624 iter_at_ring=20 within_test_budget=yes watcher_alive=yes load={ 16.48 8.63 6.84 }
+verdict=unknown ring=yes first_ring_ms=4977 iter_at_ring=20 within_test_budget=yes watcher_alive=yes load={ 16.45 8.75 6.89 }
+verdict=unknown ring=yes first_ring_ms=5390 iter_at_ring=23 within_test_budget=yes watcher_alive=yes load={ 16.91 9.11 7.04 }
+verdict=unknown ring=yes first_ring_ms=5281 iter_at_ring=21 within_test_budget=yes watcher_alive=yes load={ 17.00 9.26 7.10 }
+verdict=unknown ring=yes first_ring_ms=5122 iter_at_ring=22 within_test_budget=yes watcher_alive=yes load={ 17.31 9.58 7.24 }
+verdict=unknown ring=yes first_ring_ms=5147 iter_at_ring=20 within_test_budget=yes watcher_alive=yes load={ 17.36 9.72 7.30 }
+verdict=unknown ring=yes first_ring_ms=5332 iter_at_ring=22 within_test_budget=yes watcher_alive=yes load={ 17.14 9.92 7.40 }

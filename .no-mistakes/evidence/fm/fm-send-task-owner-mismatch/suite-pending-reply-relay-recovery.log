@@ -1,0 +1,9 @@
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+fm-send: doorbell not typed because the agent in sess:fm-hibit has exited; the steer is durably recorded at /private/tmp/fmsuite.k6cEJu/tmp/fm-pending-reply.SxiTDN/relay-recovery-unhandled-2133/state/hibit.inbox/002.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane
+BO8 mode=unhandled corr=de0608a44fc65030 phase=recovery_sent original_preserved=yes repost=002.msg expectations=1 duplicate_suppressed=yes negative_without_relay=refused
+BO8 repost body: [fm-from-firstmate]⁣corr=de0608a44fc65030 REPOST REQUIRED: previous marked request had no correlated parent report. Reply on the parent status channel including corr=de0608a44fc65030. Original request: relay the fix round for other-task
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+fm-send: doorbell not typed because the agent in sess:fm-hibit has exited; the steer is durably recorded at /private/tmp/fmsuite.k6cEJu/tmp/fm-pending-reply.SxiTDN/relay-recovery-handled-30675/state/hibit.inbox/002.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane
+BO8 mode=handled corr=c1818e5edc0a0a87 phase=recovery_sent original_preserved=yes repost=002.msg expectations=1 duplicate_suppressed=yes negative_without_relay=refused
+BO8 repost body: [fm-from-firstmate]⁣corr=c1818e5edc0a0a87 REPOST REQUIRED: previous marked request had no correlated parent report. Reply on the parent status channel including corr=c1818e5edc0a0a87. Original request: relay the fix round for other-task
+ok - recovery preserves identity and original records for handled or unhandled cross-task requests

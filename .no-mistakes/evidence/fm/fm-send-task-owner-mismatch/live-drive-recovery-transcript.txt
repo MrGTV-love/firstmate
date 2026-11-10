@@ -1,0 +1,37 @@
+LAB FM_HOME=/private/tmp/fmt.SFKGjC/tmp/fm-lab.I6M9iH
+=== R1 Main relays a cross-task request to secondmate fm-mini
+fm-send: doorbell not typed because the agent in lab:fm-fm-mini has exited; the steer is durably recorded at /private/tmp/fmt.SFKGjC/tmp/fm-lab.I6M9iH/state/fm-mini.inbox/001.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane
+exit=0
+001.msg
+handled
+corr=d2dfe70fb753e5ea
+pending record:
+  task_id=fm-mini
+  request_summary=Tell fm-slack-main-window-intake to rebase after PR 370 lands.
+  phase=awaiting_report
+=== R2 the mate takes a turn and goes idle without reading or replying (instruction unread)
+=== R3 the watcher's pending-reply tick fires recovery (no owner action)
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+fm-send: doorbell not typed because the agent in lab:fm-fm-mini has exited; the steer is durably recorded at /private/tmp/fmt.SFKGjC/tmp/fm-lab.I6M9iH/state/fm-mini.inbox/002.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane
+recovery exit=0
+phase after: phase=recovery_sent
+001.msg
+002.msg
+handled
+repost 002.msg body:
+  [fm-from-firstmate]⁣corr=d2dfe70fb753e5ea REPOST REQUIRED: previous marked request had no correlated parent report. Reply on the parent status channel including corr=d2dfe70fb753e5ea. Original request: Tell fm-slack-main-window-intake to rebase after PR 370 lands.original 001.msg unchanged: yes
+expectations: 1
+=== R4 a second recovery attempt does not send again (duplicate guard)
+second recovery exit=1
+001.msg
+002.msg
+handled
+=== R5 negative: the same repost text sent without --relay is refused (why recovery passes --relay)
+error: refused task 'fm-slack-main-window-intake': this home's direct report 'fm-slack-main-window-intake' owns it, not target 'fm-mini'; nothing was sent. Send to 'fm-slack-main-window-intake', or use --relay for a deliberate cross-task mention.
+001.msg
+002.msg
+handled
+guard events:
+  {"decision":"bypass","rule":"task-owner","task":"fm-slack-main-window-intake","override":true}
+  {"decision":"bypass","rule":"task-owner","task":"fm-slack-main-window-intake","override":true}
+  {"decision":"deny","rule":"task-owner","task":"fm-slack-main-window-intake","override":false}

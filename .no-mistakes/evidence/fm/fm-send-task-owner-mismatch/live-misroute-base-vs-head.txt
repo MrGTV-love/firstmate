@@ -1,0 +1,8 @@
+base: fm-send fm-mini '<intake fix round>' exit=0
+  fm-send: doorbell not typed because the agent in lab:fm-fm-mini has exited; the steer is durably recorded at <HOME>/state/fm-mini.inbox/001.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane
+  fm-mini inbox: 001.msg handled 
+  pending replies armed: 1
+head: fm-send fm-mini '<intake fix round>' exit=1
+  error: refused task 'fm-slack-main-window-intake': this home's direct report 'fm-slack-main-window-intake' owns it, not target 'fm-mini'; nothing was sent. Send to 'fm-slack-main-window-intake', or use --relay for a deliberate cross-task mention.
+  fm-mini inbox: ABSENT
+  pending replies armed: 0

@@ -1,0 +1,16 @@
+base send1 exit=0 stderr_tail=fm-send: doorbell not typed because the agent in lab:fm-fm-slack-main-window-intake has exited; the steer is durably recorded at <HOME>/state/fm-slack-main-window-intake.inbox/001.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane 
+base send2 exit=0 stderr_tail=fm-send: doorbell not typed because the agent in lab:fm-fm-slack-main-window-intake has exited; the steer is durably recorded at <HOME>/state/fm-slack-main-window-intake.inbox/002.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane 
+base state: fm-slack-main-window-intake.inbox
+base state: fm-slack-main-window-intake.meta
+base state: other.meta
+head send1 exit=0 stderr_tail=fm-send: doorbell not typed because the agent in lab:fm-fm-slack-main-window-intake has exited; the steer is durably recorded at <HOME>/state/fm-slack-main-window-intake.inbox/001.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane 
+head send2 exit=0 stderr_tail=fm-send: doorbell not typed because the agent in lab:fm-fm-slack-main-window-intake has exited; the steer is durably recorded at <HOME>/state/fm-slack-main-window-intake.inbox/002.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane 
+head state: fm-slack-main-window-intake.inbox
+head state: fm-slack-main-window-intake.meta
+head state: other.meta
+record 1: base and head bytes identical (excluding at= timestamp)
+record 2: base and head bytes identical (excluding at= timestamp)
+--- head record 1:
+schema=fm-task-inbox.v1
+--
+Run the PR 370 fix round for fm-slack-main-window-intake now.

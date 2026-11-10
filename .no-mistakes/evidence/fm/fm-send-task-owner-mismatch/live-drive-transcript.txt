@@ -1,0 +1,315 @@
+LAB FM_HOME=/private/tmp/fmt.QuuYEF/tmp/fm-lab.NqCWnN (marked lab, private tmux socket /tmp/fml.NmPXwD/tmux-501/fm-lab)
+records: state/fm-slack-main-window-intake.meta (direct report ship, claude); state/fm-mini.meta (secondmate, home=/private/tmp/fmt.QuuYEF/tmp/fm-lab.NqCWnN/projects/mini-home); state/other.meta (ship); mini-home/state/child-task.meta
+
+=== S1 wrong owner: Main sends the intake fix round to fm-mini (15:57Z replay)
+$ bin/fm-send.sh fm-mini Run\ the\ PR\ 370\ fix\ round\ for\ fm-slack-main-window-intake\ now.
+  exit=1
+  stderr: error: refused task 'fm-slack-main-window-intake': this home's direct report 'fm-slack-main-window-intake' owns it, not target 'fm-mini'; nothing was sent. Send to 'fm-slack-main-window-intake', or use --relay for a deliberate cross-task mention.
+  inbox(fm-mini): ABSENT
+  pending-replies: ABSENT
+  guard events:
+    {"guard":"gate-agent-containment","decision":"allow","rule":"gate-context","task":"fm-mini","override":false}
+    {"guard":"send-home-fail-closed","decision":"allow","rule":"explicit-home","task":"fm-mini","override":false}
+    {"guard":"send-task-prerequisites","decision":"deny","rule":"task-owner","task":"fm-slack-main-window-intake","override":false}
+  fm-mini.status unchanged: yes
+
+=== S1b wrong owner with --resolve-key: refusal must not close the mate's open decision
+$ bin/fm-send.sh fm-mini --resolve-key pr370-fix-round-no-owner-here Run\ the\ PR\ 370\ fix\ round\ for\ fm-slack-main-window-intake\ now.
+  exit=1
+  stderr: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  stderr: error: refused task 'fm-slack-main-window-intake': this home's direct report 'fm-slack-main-window-intake' owns it, not target 'fm-mini'; nothing was sent. Send to 'fm-slack-main-window-intake', or use --relay for a deliberate cross-task mention.
+  inbox(fm-mini): ABSENT
+  pending-replies: ABSENT
+  fm-mini.status unchanged (decision still open): yes
+  guard events:
+    {"guard":"gate-agent-containment","decision":"allow","rule":"gate-context","task":"fm-mini","override":false}
+    {"guard":"send-home-fail-closed","decision":"allow","rule":"explicit-home","task":"fm-mini","override":false}
+    {"guard":"send-task-prerequisites","decision":"deny","rule":"task-owner","task":"fm-slack-main-window-intake","override":false}
+
+=== S1c wrong owner, legacy label fm-<id>
+$ bin/fm-send.sh other Resume\ fm-fm-slack-main-window-intake.
+  exit=1
+  stderr: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  stderr: error: refused task 'fm-slack-main-window-intake': this home's direct report 'fm-slack-main-window-intake' owns it, not target 'other'; nothing was sent. Send to 'fm-slack-main-window-intake', or use --relay for a deliberate cross-task mention.
+  inbox(other): ABSENT
+  guard events:
+    {"guard":"gate-agent-containment","decision":"allow","rule":"gate-context","task":"other","override":false}
+    {"guard":"send-home-fail-closed","decision":"allow","rule":"explicit-home","task":"other","override":false}
+    {"guard":"send-task-prerequisites","decision":"deny","rule":"task-owner","task":"fm-slack-main-window-intake","override":false}
+
+=== S1d wrong owner, plain worker target
+$ bin/fm-send.sh other Run\ the\ PR\ 370\ fix\ round\ for\ fm-slack-main-window-intake\ now.
+  exit=1
+  stderr: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  stderr: error: refused task 'fm-slack-main-window-intake': this home's direct report 'fm-slack-main-window-intake' owns it, not target 'other'; nothing was sent. Send to 'fm-slack-main-window-intake', or use --relay for a deliberate cross-task mention.
+  inbox(other): ABSENT
+  guard events:
+    {"guard":"gate-agent-containment","decision":"allow","rule":"gate-context","task":"other","override":false}
+    {"guard":"send-home-fail-closed","decision":"allow","rule":"explicit-home","task":"other","override":false}
+    {"guard":"send-task-prerequisites","decision":"deny","rule":"task-owner","task":"fm-slack-main-window-intake","override":false}
+
+=== S2 correct owner: same instruction to the selector the refusal named
+$ bin/fm-send.sh fm-slack-main-window-intake Run\ the\ PR\ 370\ fix\ round\ for\ fm-slack-main-window-intake\ now.
+  exit=0
+  stderr: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  stderr: fm-send: doorbell not typed because the agent in lab:fm-fm-slack-main-window-intake has exited; the steer is durably recorded at /private/tmp/fmt.QuuYEF/tmp/fm-lab.NqCWnN/state/fm-slack-main-window-intake.inbox/001.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane
+  inbox(fm-slack-main-window-intake): 001.msg 
+  last record 001.msg body: Run the PR 370 fix round for fm-slack-main-window-intake now.  guard events:
+    {"guard":"gate-agent-containment","decision":"allow","rule":"gate-context","task":"fm-slack-main-window-intake","override":false}
+    {"guard":"send-home-fail-closed","decision":"allow","rule":"explicit-home","task":"fm-slack-main-window-intake","override":false}
+
+=== S2b correct owner via legacy label selector
+$ bin/fm-send.sh fm-fm-slack-main-window-intake Run\ the\ PR\ 370\ fix\ round\ for\ fm-slack-main-window-intake\ now.
+  exit=0
+  stderr: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  stderr: fm-send: doorbell not typed because the agent in lab:fm-fm-slack-main-window-intake has exited; the steer is durably recorded at /private/tmp/fmt.QuuYEF/tmp/fm-lab.NqCWnN/state/fm-slack-main-window-intake.inbox/002.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane
+  inbox(fm-slack-main-window-intake): 001.msg 002.msg 
+  guard events:
+    {"guard":"gate-agent-containment","decision":"allow","rule":"gate-context","task":"fm-fm-slack-main-window-intake","override":false}
+    {"guard":"send-home-fail-closed","decision":"allow","rule":"explicit-home","task":"fm-fm-slack-main-window-intake","override":false}
+
+=== S3 --relay deliberate cross-task mention
+$ bin/fm-send.sh other --relay FYI:\ fm-slack-main-window-intake\ owns\ the\ PR\ 370\ fix\ round\;\ no\ action\ for\ you.
+  exit=0
+  stderr: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  stderr: fm-send: doorbell not typed because the agent in lab:fm-other has exited; the steer is durably recorded at /private/tmp/fmt.QuuYEF/tmp/fm-lab.NqCWnN/state/other.inbox/001.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane
+  inbox(other): 001.msg 
+  last record 001.msg body: FYI: fm-slack-main-window-intake owns the PR 370 fix round; no action for you.  guard events:
+    {"guard":"gate-agent-containment","decision":"allow","rule":"gate-context","task":"other","override":false}
+    {"guard":"send-home-fail-closed","decision":"allow","rule":"explicit-home","task":"other","override":false}
+    {"guard":"send-task-prerequisites","decision":"bypass","rule":"task-owner","task":"fm-slack-main-window-intake","override":true}
+
+=== S3b --relay does not bypass an empty-message refusal
+$ bin/fm-send.sh other --relay \ \ \ 
+  exit=1
+  stderr: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  stderr: error: a text steer requires a nonempty message; nothing was sent (an empty marked request would deliver only marker and correlation bytes and leave the parent waiting on a reply to nothing)
+  inbox(other): 001.msg 
+
+=== S3c --relay does not bypass a missing-decision refusal
+$ bin/fm-send.sh other --relay --resolve-key nonexistent answer
+  exit=1
+  stderr: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  stderr: error: --resolve-key 'nonexistent': no open decision or blocker with that key in /private/tmp/fmt.QuuYEF/tmp/fm-lab.NqCWnN/state/other.status, and no captain-held task 'nonexistent' or 'other-decision-nonexistent' still open (already closed or mistyped). Re-check the OPEN DECISIONS listing, then resend without that key or with the right one; nothing was sent.
+  inbox(other): 001.msg 
+  guard events:
+    {"guard":"gate-agent-containment","decision":"allow","rule":"gate-context","task":"other","override":false}
+    {"guard":"send-home-fail-closed","decision":"allow","rule":"explicit-home","task":"other","override":false}
+    {"guard":"gate-agent-containment","decision":"allow","rule":"gate-context","task":"other","override":false}
+    {"guard":"send-home-fail-closed","decision":"allow","rule":"explicit-home","task":"other","override":false}
+
+=== S4 non-mention accepted
+$ bin/fm-send.sh other Study\ fm-slack-main-window-intake-v2\ notes.
+  exit=0
+  stderr: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  stderr: fm-send: doorbell not typed because the agent in lab:fm-other has exited; the steer is durably recorded at /private/tmp/fmt.QuuYEF/tmp/fm-lab.NqCWnN/state/other.inbox/002.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane
+  inbox(other): 001.msg 002.msg 
+  last record 002.msg body: Study fm-slack-main-window-intake-v2 notes.
+=== S4 non-mention accepted
+$ bin/fm-send.sh other Continue\ task-not-recorded-here.
+  exit=0
+  stderr: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  stderr: fm-send: doorbell not typed because the agent in lab:fm-other has exited; the steer is durably recorded at /private/tmp/fmt.QuuYEF/tmp/fm-lab.NqCWnN/state/other.inbox/003.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane
+  inbox(other): 001.msg 002.msg 003.msg 
+  last record 003.msg body: Continue task-not-recorded-here.
+=== S4 non-mention accepted
+$ bin/fm-send.sh other xfm-slack-main-window-intake\ is\ a\ different\ word
+  exit=0
+  stderr: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  stderr: fm-send: doorbell not typed because the agent in lab:fm-other has exited; the steer is durably recorded at /private/tmp/fmt.QuuYEF/tmp/fm-lab.NqCWnN/state/other.inbox/004.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane
+  inbox(other): 001.msg 002.msg 003.msg 004.msg 
+  last record 004.msg body: xfm-slack-main-window-intake is a different word
+=== S4 non-mention accepted
+$ bin/fm-send.sh other Write\ output\ to\ /not-created/fm-slack-main-window-intake/out.md\ and\ see\ the\ example\ /examples/x.md\ on\ the\ other\ computer.
+  exit=0
+  stderr: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  stderr: fm-send: doorbell not typed because the agent in lab:fm-other has exited; the steer is durably recorded at /private/tmp/fmt.QuuYEF/tmp/fm-lab.NqCWnN/state/other.inbox/005.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane
+  inbox(other): 001.msg 002.msg 003.msg 004.msg 005.msg 
+  last record 005.msg body: Write output to /not-created/fm-slack-main-window-intake/out.md and see the example /examples/x.md on the other computer.
+=== S4 non-mention accepted
+$ bin/fm-send.sh other Read\ data/fm-slack-main-window-intake/review.md\ \(known\ limit:\ path-embedded\ id\).
+  exit=0
+  stderr: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  stderr: fm-send: doorbell not typed because the agent in lab:fm-other has exited; the steer is durably recorded at /private/tmp/fmt.QuuYEF/tmp/fm-lab.NqCWnN/state/other.inbox/006.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane
+  inbox(other): 001.msg 002.msg 003.msg 004.msg 005.msg 006.msg 
+  last record 006.msg body: Read data/fm-slack-main-window-intake/review.md (known limit: path-embedded id).
+=== S4 non-mention accepted
+$ bin/fm-send.sh other plain\ steer\ with\ no\ task\ id
+  exit=0
+  stderr: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  stderr: fm-send: doorbell not typed because the agent in lab:fm-other has exited; the steer is durably recorded at /private/tmp/fmt.QuuYEF/tmp/fm-lab.NqCWnN/state/other.inbox/007.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane
+  inbox(other): 001.msg 002.msg 003.msg 004.msg 005.msg 006.msg 007.msg 
+  last record 007.msg body: plain steer with no task id  guard events:
+    {"guard":"gate-agent-containment","decision":"allow","rule":"gate-context","task":"other","override":false}
+    {"guard":"send-home-fail-closed","decision":"allow","rule":"explicit-home","task":"other","override":false}
+    {"guard":"gate-agent-containment","decision":"allow","rule":"gate-context","task":"other","override":false}
+    {"guard":"send-home-fail-closed","decision":"allow","rule":"explicit-home","task":"other","override":false}
+    {"guard":"gate-agent-containment","decision":"allow","rule":"gate-context","task":"other","override":false}
+    {"guard":"send-home-fail-closed","decision":"allow","rule":"explicit-home","task":"other","override":false}
+    {"guard":"gate-agent-containment","decision":"allow","rule":"gate-context","task":"other","override":false}
+    {"guard":"send-home-fail-closed","decision":"allow","rule":"explicit-home","task":"other","override":false}
+    {"guard":"gate-agent-containment","decision":"allow","rule":"gate-context","task":"other","override":false}
+    {"guard":"send-home-fail-closed","decision":"allow","rule":"explicit-home","task":"other","override":false}
+    {"guard":"gate-agent-containment","decision":"allow","rule":"gate-context","task":"other","override":false}
+    {"guard":"send-home-fail-closed","decision":"allow","rule":"explicit-home","task":"other","override":false}
+
+=== S5 secondmate own child task (recorded only in the secondmate home)
+$ bin/fm-send.sh fm-mini Continue\ child-task.
+  exit=0
+  stderr: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  stderr: fm-send: doorbell not typed because the agent in lab:fm-fm-mini has exited; the steer is durably recorded at /private/tmp/fmt.QuuYEF/tmp/fm-lab.NqCWnN/state/fm-mini.inbox/001.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane
+  inbox(fm-mini): 001.msg 
+  pending-replies: 1
+  last record 001.msg body: [fm-from-firstmate]⁣corr=06044f15170bf614 Continue child-task.  guard events:
+    {"guard":"gate-agent-containment","decision":"allow","rule":"gate-context","task":"fm-mini","override":false}
+    {"guard":"send-home-fail-closed","decision":"allow","rule":"explicit-home","task":"fm-mini","override":false}
+
+=== S5b steer to a secondmate that names the secondmate itself
+$ bin/fm-send.sh fm-mini fm-mini:\ report\ your\ fleet\ status.
+  exit=0
+  stderr: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  stderr: fm-send: doorbell not typed because the agent in lab:fm-fm-mini has exited; the steer is durably recorded at /private/tmp/fmt.QuuYEF/tmp/fm-lab.NqCWnN/state/fm-mini.inbox/002.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane
+  inbox(fm-mini): 001.msg 002.msg 
+  guard events:
+    {"guard":"gate-agent-containment","decision":"allow","rule":"gate-context","task":"fm-mini","override":false}
+    {"guard":"send-home-fail-closed","decision":"allow","rule":"explicit-home","task":"fm-mini","override":false}
+
+=== S6a declared input missing on the receiver
+$ bin/fm-send.sh other --require-input data/brief.md Use\ the\ brief\ to\ start.
+  exit=4
+  stderr: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  stderr: error: refused required input 'data/brief.md': unavailable to receiver 'other'; nothing was sent and any earlier record is unchanged. Stage only this declared artifact through the existing authorized transfer mechanism; no access was granted.
+  inbox(other): 001.msg 002.msg 003.msg 004.msg 005.msg 006.msg 007.msg 
+  guard events:
+    {"guard":"gate-agent-containment","decision":"allow","rule":"gate-context","task":"other","override":false}
+    {"guard":"send-home-fail-closed","decision":"allow","rule":"explicit-home","task":"other","override":false}
+    {"guard":"send-task-prerequisites","decision":"deny","rule":"required-input","task":"other","override":false}
+
+=== S6b declared input present: sends, message bytes unchanged
+$ bin/fm-send.sh other --require-input data/brief.md Use\ the\ brief\ to\ start.
+  exit=0
+  stderr: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  stderr: fm-send: doorbell not typed because the agent in lab:fm-other has exited; the steer is durably recorded at /private/tmp/fmt.QuuYEF/tmp/fm-lab.NqCWnN/state/other.inbox/008.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane
+  inbox(other): 001.msg 002.msg 003.msg 004.msg 005.msg 006.msg 007.msg 008.msg 
+  last record 008.msg body: Use the brief to start.  guard events:
+    {"guard":"gate-agent-containment","decision":"allow","rule":"gate-context","task":"other","override":false}
+    {"guard":"send-home-fail-closed","decision":"allow","rule":"explicit-home","task":"other","override":false}
+
+=== S6c declared input outside the transfer boundary
+$ bin/fm-send.sh other --require-input /etc/hosts Use\ hosts.
+  exit=4
+  stderr: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  stderr: error: refused required input '/etc/hosts': outside the transfer boundary for receiver 'other'; nothing was sent and any earlier record is unchanged. Stage only this declared artifact through the existing authorized transfer mechanism; no access was granted.
+  inbox(other): 001.msg 002.msg 003.msg 004.msg 005.msg 006.msg 007.msg 008.msg 
+  guard events:
+    {"guard":"gate-agent-containment","decision":"allow","rule":"gate-context","task":"other","override":false}
+    {"guard":"send-home-fail-closed","decision":"allow","rule":"explicit-home","task":"other","override":false}
+    {"guard":"send-task-prerequisites","decision":"deny","rule":"required-input","task":"other","override":false}
+
+=== S6d two declared inputs, both missing: every one is reported
+$ bin/fm-send.sh other --require-input data/a.md --require-input data/b.md Use\ a\ and\ b.
+  exit=4
+  stderr: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  stderr: error: refused required input 'data/a.md': unavailable to receiver 'other'; nothing was sent and any earlier record is unchanged. Stage only this declared artifact through the existing authorized transfer mechanism; no access was granted.
+  stderr: error: refused required input 'data/b.md': unavailable to receiver 'other'; nothing was sent and any earlier record is unchanged. Stage only this declared artifact through the existing authorized transfer mechanism; no access was granted.
+  inbox(other): 001.msg 002.msg 003.msg 004.msg 005.msg 006.msg 007.msg 008.msg 
+  guard events:
+    {"guard":"gate-agent-containment","decision":"allow","rule":"gate-context","task":"other","override":false}
+    {"guard":"send-home-fail-closed","decision":"allow","rule":"explicit-home","task":"other","override":false}
+    {"guard":"send-task-prerequisites","decision":"deny","rule":"required-input","task":"other","override":false}
+
+=== S6e --relay does not bypass declared-input validation
+$ bin/fm-send.sh other --relay --require-input data/missing.md FYI\ fm-slack-main-window-intake\;\ use\ missing.
+  exit=4
+  stderr: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  stderr: error: refused required input 'data/missing.md': unavailable to receiver 'other'; nothing was sent and any earlier record is unchanged. Stage only this declared artifact through the existing authorized transfer mechanism; no access was granted.
+  inbox(other): 001.msg 002.msg 003.msg 004.msg 005.msg 006.msg 007.msg 008.msg 
+  guard events:
+    {"guard":"gate-agent-containment","decision":"allow","rule":"gate-context","task":"other","override":false}
+    {"guard":"send-home-fail-closed","decision":"allow","rule":"explicit-home","task":"other","override":false}
+    {"guard":"send-task-prerequisites","decision":"bypass","rule":"task-owner","task":"fm-slack-main-window-intake","override":true}
+    {"guard":"send-task-prerequisites","decision":"deny","rule":"required-input","task":"other","override":false}
+
+=== S6f a key cannot declare inputs
+$ bin/fm-send.sh other --require-input data/brief.md --key Enter
+  exit=1
+  stderr: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  stderr: error: --require-input needs a recorded receiving task; keys and unrecorded endpoints have no declared receiving home
+  exit recorded above
+
+=== S7 remote declared-input check with no registry route
+$ bin/fm-send.sh rsm --require-input data/x.md Use\ x.
+  exit=1
+  stderr: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  stderr: error: required input 'data/x.md' could not be checked on receiver 'rsm' (check exit 1: transport failure, timeout, or check error; the input is not known to be missing); nothing was sent and any earlier record is unchanged. Retry the same send once the receiver is reachable.
+  inbox(rsm): ABSENT
+  pending-replies: 2
+  guard events:
+    {"guard":"gate-agent-containment","decision":"allow","rule":"gate-context","task":"other","override":false}
+    {"guard":"send-home-fail-closed","decision":"allow","rule":"explicit-home","task":"other","override":false}
+    {"guard":"gate-agent-containment","decision":"allow","rule":"gate-context","task":"rsm","override":false}
+    {"guard":"send-home-fail-closed","decision":"allow","rule":"explicit-home","task":"rsm","override":false}
+
+=== S8a unattended wrong-owner steer is refused and handed to Firstmate
+$ bin/fm-send-unattended.sh fm-mini Run\ the\ PR\ 370\ fix\ round\ for\ fm-slack-main-window-intake\ now.
+  exit=1
+  stderr: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  stderr: error: refused task 'fm-slack-main-window-intake': this home's direct report 'fm-slack-main-window-intake' owns it, not target 'fm-mini'; nothing was sent. Send to 'fm-slack-main-window-intake', or use --relay for a deliberate cross-task mention.
+  inbox(fm-mini): 001.msg 002.msg 
+  fm-mini.status:
+    blocked [key=unattended-steer]: error: refused task 'fm-slack-main-window-intake': this home's direct report 'fm-slack-main-window-intake' owns it, not target 'fm-mini'; nothing was sent. Send to 'fm-slack-main-window-intake', or use --relay for a deliberate cross-task mention. Instruction argv: fm-mini Run\ the\ PR\ 370\ fix\ round\ for\ fm-slack-main-window-intake\ now. 
+
+=== S8b second unattended steer is held, no send attempted
+$ bin/fm-send-unattended.sh fm-mini Continue\ child-task.
+  exit=1
+  stderr: notice: unattended steer to fm-mini awaits Firstmate handling of /private/tmp/fmt.QuuYEF/tmp/fm-lab.NqCWnN/state/fm-mini.status [key=unattended-steer]; no send attempted
+  inbox(fm-mini): 001.msg 002.msg 
+  open decisions (Firstmate view):
+    unattended-steer	blocked	error: refused task 'fm-slack-main-window-intake': this home's direct report 'fm-slack-main-window-intake' owns it, not target 'fm-mini'; nothing was sent. Send to 'fm-slack-main-window-intake', or use --relay for a deliberate cross-task mention. Instruction argv: fm-mini Run\ the\ PR\ 370\ fix\ round\ for\ fm-slack-main-window-intake\ now.   own open decisions (worker view, gates recovery):
+    <end>
+
+=== S8c attended fm-send to the same mate still sends (hold only blocks unattended)
+$ bin/fm-send.sh fm-mini Continue\ child-task.
+  exit=0
+  stderr: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  stderr: fm-send: doorbell not typed because the agent in lab:fm-fm-mini has exited; the steer is durably recorded at /private/tmp/fmt.QuuYEF/tmp/fm-lab.NqCWnN/state/fm-mini.inbox/003.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane
+  inbox(fm-mini): 001.msg 002.msg 003.msg 
+  guard events:
+    {"guard":"gate-agent-containment","decision":"allow","rule":"gate-context","task":"fm-mini","override":false}
+    {"guard":"send-home-fail-closed","decision":"allow","rule":"explicit-home","task":"fm-mini","override":false}
+    {"guard":"send-task-prerequisites","decision":"deny","rule":"task-owner","task":"fm-slack-main-window-intake","override":false}
+    {"guard":"send-task-prerequisites","decision":"warn","rule":"unattended-hold","task":"fm-mini","override":false}
+    {"guard":"gate-agent-containment","decision":"allow","rule":"gate-context","task":"fm-mini","override":false}
+    {"guard":"send-home-fail-closed","decision":"allow","rule":"explicit-home","task":"fm-mini","override":false}
+
+=== S8d unattended ordinary steer to a task with no hold sends normally
+$ bin/fm-send-unattended.sh other plain\ unattended\ check-in
+  exit=0
+  stderr: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  stderr: fm-send: doorbell not typed because the agent in lab:fm-other has exited; the steer is durably recorded at /private/tmp/fmt.QuuYEF/tmp/fm-lab.NqCWnN/state/other.inbox/009.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane
+  inbox(other): 001.msg 002.msg 003.msg 004.msg 005.msg 006.msg 007.msg 008.msg 009.msg 
+  other.status:
+    (none)
+  guard events:
+    {"guard":"gate-agent-containment","decision":"allow","rule":"gate-context","task":"other","override":false}
+    {"guard":"send-home-fail-closed","decision":"allow","rule":"explicit-home","task":"other","override":false}
+
+=== S9 a worker's dependency decision stays open after a refused steer
+$ bin/fm-send.sh other --resolve-key dep-api-key Run\ the\ PR\ 370\ fix\ round\ for\ fm-slack-main-window-intake\ now.
+  exit=1
+  stderr: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  stderr: error: refused task 'fm-slack-main-window-intake': this home's direct report 'fm-slack-main-window-intake' owns it, not target 'other'; nothing was sent. Send to 'fm-slack-main-window-intake', or use --relay for a deliberate cross-task mention.
+  other.status:
+    needs-decision [key=dep-api-key]: waiting for the captain to choose the staging database
+  own open decisions:
+    dep-api-key	needs-decision	waiting for the captain to choose the staging database
+  guard events:
+    {"guard":"gate-agent-containment","decision":"allow","rule":"gate-context","task":"other","override":false}
+    {"guard":"send-home-fail-closed","decision":"allow","rule":"explicit-home","task":"other","override":false}
+    {"guard":"send-task-prerequisites","decision":"deny","rule":"task-owner","task":"fm-slack-main-window-intake","override":false}
+
+=== tmux panes (real shells; the doorbell is skipped for a bare shell pane)
+0: driver* (1 panes) [200x50] [layout ac9d,200x50,0,0,0] @0 (active)
+1: fm-fm-slack-main-window-intake (1 panes) [200x50] [layout ac9e,200x50,0,0,1] @1
+2: fm-fm-mini (1 panes) [200x50] [layout ac9f,200x50,0,0,2] @2
+3: fm-other (1 panes) [200x50] [layout aca0,200x50,0,0,3] @3

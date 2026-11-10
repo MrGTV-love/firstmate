@@ -1,0 +1,17 @@
+LAB FM_HOME=/Users/charlesabrooker/tmp/fm-lab.gb1Mdl; owner pane lab:fm-fm-slack-main-window-intake runs a real Claude Code worker (machine login); fm-mini and other are shell panes
+=== C1 adversarial: the 15:57Z misroute to fm-mini, and a steer to the LIVE Claude owner pane naming another recorded task, are both refused before any typing
+$ bin/fm-send.sh fm-mini Run\ the\ PR\ 370\ fix\ round\ for\ fm-slack-main-window-intake\ now.
+error: refused task 'fm-slack-main-window-intake': this home's direct report 'fm-slack-main-window-intake' owns it, not target 'fm-mini'; nothing was sent. Send to 'fm-slack-main-window-intake', or use --relay for a deliberate cross-task mention.
+exit=1
+$ bin/fm-send.sh fm-slack-main-window-intake Fix\ the\ failing\ tests\ in\ other\ before\ you\ continue.
+error: refused task 'other': this home's direct report 'other' owns it, not target 'fm-slack-main-window-intake'; nothing was sent. Send to 'other', or use --relay for a deliberate cross-task mention.
+exit=1
+PANE CHANGED
+45c45
+<                                                                                                   tmux focus-events off · add 'set -g focus-events on' to ~/.tmux.conf and reattach for focus tracking
+---
+> 
+fm-mini inbox: ABSENT
+fm-slack-main-window-intake inbox: ABSENT
+pending-replies: ABSENT
+note: the only pane difference in C1 is Claude's own transient 'tmux focus-events off' hint clearing on line 45; no text was typed into the composer and no inbox/pending-reply state exists.

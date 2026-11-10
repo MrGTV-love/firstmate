@@ -1,0 +1,6 @@
+send-strict suite=tests/fm-send-strict.test.sh only=<all> exit=0 secs=79 pass_lines=26 fail_lines=2 OMP_API_BILLING=0
+send-remote-delivery suite=tests/fm-send-remote-delivery.test.sh only=<all> exit=0 secs=54 pass_lines=22 fail_lines=7 OMP_API_BILLING=0
+pending-reply-relay-recovery suite=tests/fm-pending-reply.test.sh only=test_relayed_request_recovery_reaches_the_mate exit=0 secs=9 pass_lines=1 fail_lines=0 OMP_API_BILLING=0
+task-inbox suite=tests/fm-task-inbox.test.sh only=<all> exit=0 secs=175 pass_lines=54 fail_lines=4 OMP_API_BILLING=0
+secondmate-reconcile suite=tests/fm-secondmate-reconcile.test.sh only=<all> exit=0 secs=67 pass_lines=23 fail_lines=2 OMP_API_BILLING=0
+crew-state suite=tests/fm-crew-state.test.sh only=<all> exit=0 secs=576 pass_lines=331 fail_lines=68 OMP_API_BILLING=0

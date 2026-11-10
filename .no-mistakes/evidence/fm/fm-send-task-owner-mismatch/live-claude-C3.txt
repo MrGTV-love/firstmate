@@ -1,0 +1,45 @@
+=== C3a typed plane: a harness-native '/context' with a MISSING declared input is refused before typing
+$ bin/fm-send.sh fm-slack-main-window-intake --require-input data/brief.md /context
+error: refused required input 'data/brief.md': unavailable to receiver 'fm-slack-main-window-intake'; nothing was sent and any earlier record is unchanged. Stage only this declared artifact through the existing authorized transfer mechanism; no access was granted.
+exit=4
+occurrences of /context in pane after refusal: 0
+=== C3b typed plane: the same '/context' with the declared input present reaches the live Claude composer unchanged (no appended input block)
+$ bin/fm-send.sh fm-slack-main-window-intake --require-input data/brief.md /context
+exit=0
+--- owner pane capture after C3b: '/context' executed as Claude's native command, no extra lines typed
+❯ /context
+  ⎿  Context Usage
+     ⛁ ⛁ ⛀ ⛀ ⛀ ⛁ ⛁ ⛁ ⛁ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶   Opus 5.5
+     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶   claude-opus-5-5
+     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶   35.1k/1m tokens (4%)
+     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶
+     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶   Estimated usage by category
+     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶   ⛁ System prompt: 4.1k tokens (0.4%)
+     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶   ⛁ System tools: 4.5k tokens (0.4%)
+     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶   ⛁ MCP server instructions: 717 tokens (0.1%)
+     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶   ⛁ Custom agents: 278 tokens (0.0%)
+     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛝ ⛝ ⛝ ⛝ ⛝ ⛝ ⛝   ⛁ Memory files: 2.6k tokens (0.3%)
+                                               ⛁ Skills: 7.4k tokens (0.7%)
+                                               ⛁ Messages: 15.5k tokens (1.5%)
+                                               ⛶ Free space: 931.9k (93.2%)
+                                               ⛝ Autocompact buffer: 33k tokens (3.3%)
+     Auto-compact window: 1m tokens
+     MCP tools · /mcp (loaded on-demand)
+     └ 32 tools · 0 tokens
+     Custom agents · .claude/agents/
+     └ 2 agents · 278 tokens
+     Memory files · /memory
+     └ 3 files · 2.6k tokens
+     Skills · /skills
+     └ 46 skills · 7.4k tokens
+     /context all to expand
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 ░░░░░░░░░░ 3% 35k/1.0M intake-wt:e802d2bd
+  ⏵⏵ auto mode on (shift+tab to cycle)
+inbox entries (typed plane writes none): handled 
+--- guard events (non-allow):
+{"decision":"deny","rule":"task-owner","task":"fm-slack-main-window-intake","override":false}
+{"decision":"deny","rule":"task-owner","task":"other","override":false}
+{"decision":"deny","rule":"required-input","task":"fm-slack-main-window-intake","override":false}

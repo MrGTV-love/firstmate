@@ -1,0 +1,24 @@
+=== C2 correct owner: the same work goes to the owner the refusal named; the live Claude worker reads its inbox record and resumes
+$ bin/fm-send.sh fm-slack-main-window-intake Resume\ task\ fm-slack-main-window-intake:\ write\ the\ single\ word\ RESUMED\ into\ resume-proof.txt\ in\ your\ current\ working\ directory\,\ then\ stop.
+exit=0
+--- owner pane capture after C2 (real Claude worker)
+ ▐▛███▛█   Claude Code v2.1.322
+▝▜██████▀  Opus 5.5 with high effort · Claude Ultra
+ ▝▝   ▝▝   ~/tmp/fm-lab.gb1Mdl/projects/intake-wt
+⚠ Your login expires in 2 days · run /login to renew
+❯ : Firstmate instruction waiting: 'fm-slack-main-window-intake.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+  Listed 2 directories, ran 1 shell command
+⏺ I did the task in the message, and it worked.
+  1. The message said: write RESUMED into resume-proof.txt, then stop.
+  2. I wrote RESUMED into /Users/charlesabrooker/tmp/fm-lab.gb1Mdl/projects/intake-wt/resume-proof.txt. I read the file back to check it.
+  3. I moved 001.msg into handled/. No other messages are in the inbox now.
+  The message was in the inbox folder itself, at $FM_TASK_INBOX/001.msg. It was not in a subfolder with the same name.
+  You do not need to do anything. I stopped, as the message said.
+✻ Cogitated for 38s · done 6:07 AM
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 ░░░░░░░░░░ 3% 35k/1.0M intake-wt:e802d2bd
+  ⏵⏵ auto mode on (shift+tab to cycle)
+--- resume-proof.txt: RESUMED
+--- owner inbox: handled handled/: 001.msg
