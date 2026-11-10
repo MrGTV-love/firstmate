@@ -65,6 +65,9 @@ herdr_forget_inherited_pane
 # The dedicated regression is
 # tests/fm-backend.test.sh:test_spawn_symlinked_project_prefix_avoids_false_refusal.
 TMP_ROOT=$(mktemp -d "$(cd "${TMPDIR:-/tmp}" && pwd -P)/fm-backend-autodetect-smoke.XXXXXX")
+# shellcheck source=tests/treehouse-test-safety.sh
+. "$ROOT/tests/treehouse-test-safety.sh"
+fm_test_treehouse_init "$TMP_ROOT" || fail "could not isolate Treehouse"
 HERDR_LAB_HELPER="$ROOT/bin/fm-herdr-lab.sh"
 HERDR_LAB_SESSION=$("$HERDR_LAB_HELPER" name fm-autodetect-smoke-concurrency-h3) || {
   rm -rf "$TMP_ROOT"
@@ -75,8 +78,8 @@ ID="autodetectsmoke1"
 WT=
 cleanup_all() {
   local cleanup_status=0
-  [ -n "$WT" ] && command -v treehouse >/dev/null 2>&1 && treehouse return --force "$WT" >/dev/null 2>&1
-  "$HERDR_LAB_HELPER" teardown "$HERDR_LAB_SESSION" || cleanup_status=$?
+  "$HERDR_LAB_HELPER" teardown "$HERDR_LAB_SESSION" || return $?
+  fm_test_treehouse_cleanup || cleanup_status=$?
   rm -rf "$TMP_ROOT"
   return "$cleanup_status"
 }
@@ -109,7 +112,8 @@ PROJ="$TMP_ROOT/scratch-project"
 mkdir -p "$PROJ"
 git -C "$PROJ" init -q
 printf '# scratch\n' > "$PROJ/README.md"
-git -C "$PROJ" add README.md
+fm_test_treehouse_project "$PROJ" || fail "could not configure isolated Treehouse"
+git -C "$PROJ" add README.md treehouse.toml
 git -C "$PROJ" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm initial
 git clone --quiet --bare "$PROJ" "$PROJ.origin.git"
 git -C "$PROJ" remote add origin "file://$PROJ.origin.git"
@@ -149,6 +153,10 @@ WT=$(grep '^worktree=' "$META" | cut -d= -f2-)
 if [ -z "$WT" ] || [ ! -d "$WT" ]; then
   fail "auto-detected spawn did not report a real worktree path"
 fi
+case "$WT" in
+  "$FM_TEST_TREEHOUSE_ROOT"/.treehouse/*) : ;;
+  *) fail "auto-detected spawn escaped the disposable Treehouse root: $WT" ;;
+esac
 
 PANE=$(grep '^herdr_pane_id=' "$META" | cut -d= -f2-)
 [ -n "$PANE" ] || fail "auto-detected spawn meta is missing herdr_pane_id"
