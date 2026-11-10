@@ -1,0 +1,2 @@
+K7 table comparison not run: FM_K7_EXPECTED_TABLE and FM_K7_R1_TABLE are unset
+ok - K7 fixtures hold the table-independent invariants (live holds alone are owner calls, coverage adds up)

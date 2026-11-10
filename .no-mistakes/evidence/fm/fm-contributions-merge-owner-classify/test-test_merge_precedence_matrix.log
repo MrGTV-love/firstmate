@@ -1,0 +1,52 @@
+no-review	fleet	route the independent review
+base-unknown	fleet	base freshness unknown; refresh the base comparison
+base-stale	fleet	update the branch; base is stale
+base-stale-pass	fleet	update the branch; base is stale
+qualified	fleet	merge under the standing merge rule
+pass-unknown	fleet	PASS fact unknown; recheck the independent review
+verdict-stale-base	fleet	update the branch; base is stale
+verdict-fresh-base	fleet	merge this head now
+verdict-unknown-base	fleet	merge this head now
+verdict-captain	fleet	record the unresolved arbitration as a captain hold
+verdict-captain-stale	fleet	update the branch; base is stale
+verdict-maintainer	fleet	merge under the standing merge rule
+verdict-maintainer-no-pass	fleet	route the independent review
+verdict-maintainer-stale-base	fleet	update the branch; base is stale
+verdict-nobody	fleet	merge under the standing merge rule
+verdict-nobody-no-pass	fleet	route the independent review
+verdict-nobody-stale-base	fleet	update the branch; base is stale
+review-required-stale-base	maintainer	review required
+review-required-no-pass	maintainer	review required
+review-required-pass	maintainer	review required
+review-required-unknown	maintainer	review required
+cannot-merge-stale-base	maintainer	delivery awaits the maintainer
+cannot-merge-no-pass	maintainer	delivery awaits the maintainer
+cannot-merge-pass	maintainer	delivery awaits the maintainer
+cannot-merge-unknown	maintainer	delivery awaits the maintainer
+changes	fleet	forge requests changes
+failed	fleet	checks failed
+missing	fleet	check lane has no verdict
+pending	fleet	checks still running
+no-checks	fleet	no reported checks; readiness unconfirmed
+draft	fleet	draft delivery
+conflict	fleet	mergeability conflicting
+merged	nobody	forge reports merged
+closed	nobody	forge reports closed
+stale-observation	fleet	contribution not recently checked
+stale-verdict	fleet	STALE maintainer verdict; reassess the current head
+signal	fleet	incoming maintainer signal needs triage
+issue	maintainer	awaiting issue triage
+live-hold	captain	choose scope
+fixture summary: {
+  "known": 39,
+  "counts": {
+    "captain": 1,
+    "fleet": 27,
+    "maintainer": 9,
+    "nobody": 2
+  },
+  "captain": [
+    "live-hold"
+  ]
+}
+ok - classifier branch precedence keeps ordinary actions distinct; only live holds are owner calls

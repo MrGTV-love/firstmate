@@ -1,0 +1,14 @@
+arbitrary owner arbitrary-ship absent: route the independent review
+arbitrary owner arbitrary-ship qualified: merge under the standing merge rule
+arbitrary owner arbitrary-ship fail: route the independent review
+arbitrary owner arbitrary-ship different-head: route the independent review
+arbitrary owner arbitrary-ship same-family: route the independent review
+arbitrary owner arbitrary-ship escalation: route the independent review
+arbitrary owner arbitrary-ship pr-body: route the independent review
+arbitrary owner arbitrary-ship owner-word: route the independent review
+arbitrary owner arbitrary-ship stale: update the branch; base is stale
+arbitrary shared qualified-not-qualified: merge under the standing merge rule
+arbitrary shared qualified-unavailable: merge under the standing merge rule
+arbitrary shared neither: route the independent review
+arbitrary shared neither-unavailable: PASS fact unknown; recheck the independent review
+ok - ordinary and shared review and stale-base ownership do not depend on URL or task identity

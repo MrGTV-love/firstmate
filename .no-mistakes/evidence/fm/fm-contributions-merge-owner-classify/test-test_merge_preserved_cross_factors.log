@@ -1,0 +1,24 @@
+review-required-stale	maintainer	review required
+review-required-unknown	maintainer	review required
+review-required-no-pass	maintainer	review required
+review-required-pass	maintainer	review required
+review-required-pass-unknown	maintainer	review required
+cannot-merge-stale	maintainer	delivery awaits the maintainer
+cannot-merge-unknown	maintainer	delivery awaits the maintainer
+cannot-merge-no-pass	maintainer	delivery awaits the maintainer
+cannot-merge-pass	maintainer	delivery awaits the maintainer
+cannot-merge-pass-unknown	maintainer	delivery awaits the maintainer
+away-stale	fleet	checks green; merge is authorized by delivery posture
+away-unknown	fleet	checks green; merge is authorized by delivery posture
+away-no-pass	fleet	checks green; merge is authorized by delivery posture
+away-pass	fleet	checks green; merge is authorized by delivery posture
+away-pass-unknown	fleet	checks green; merge is authorized by delivery posture
+captain-failed	fleet	checks failed
+captain-changes	fleet	forge requests changes
+captain-signal	fleet	incoming maintainer signal needs triage
+captain-draft	fleet	draft delivery
+captain-conflict	fleet	mergeability conflicting
+captain-stale-base	fleet	update the branch; base is stale
+captain-old-observation	fleet	contribution not recently checked
+captain-old-head	fleet	STALE maintainer verdict; reassess the current head
+ok - excluded rows preserve prior actors and reasons across base and PASS facts; captain verdicts never mask checks or forge decisions

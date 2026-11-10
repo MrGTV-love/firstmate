@@ -1,0 +1,29 @@
+review-required-none	maintainer	review required
+review-required-fleet	fleet	merge this head now
+review-required-captain	fleet	record the unresolved arbitration as a captain hold
+review-required-maintainer	maintainer	review required
+review-required-nobody	maintainer	review required
+cannot-merge-none	maintainer	delivery awaits the maintainer
+cannot-merge-fleet	fleet	merge this head now
+cannot-merge-captain	fleet	record the unresolved arbitration as a captain hold
+cannot-merge-maintainer	maintainer	delivery awaits the maintainer
+cannot-merge-nobody	maintainer	delivery awaits the maintainer
+away-none	fleet	checks green; merge is authorized by delivery posture
+away-fleet	fleet	merge this head now
+away-captain	fleet	record the unresolved arbitration as a captain hold
+away-maintainer	fleet	checks green; merge is authorized by delivery posture
+away-nobody	fleet	checks green; merge is authorized by delivery posture
+failed-none	fleet	checks failed
+failed-fleet	fleet	checks failed
+failed-captain	fleet	checks failed
+failed-maintainer	fleet	checks failed
+failed-nobody	fleet	checks failed
+cannot-merge-unknown-none	maintainer	delivery awaits the maintainer
+cannot-merge-unknown-fleet	fleet	merge this head now
+cannot-merge-unknown-captain	fleet	record the unresolved arbitration as a captain hold
+cannot-merge-unknown-maintainer	maintainer	delivery awaits the maintainer
+cannot-merge-unknown-nobody	maintainer	delivery awaits the maintainer
+stale-head-fleet	fleet	STALE maintainer verdict; reassess the current head
+stale-head-maintainer	fleet	STALE maintainer verdict; reassess the current head
+stale-head-nobody	fleet	STALE maintainer verdict; reassess the current head
+ok - excluded stale-base records with every verdict actor retain their BASE actor and reason

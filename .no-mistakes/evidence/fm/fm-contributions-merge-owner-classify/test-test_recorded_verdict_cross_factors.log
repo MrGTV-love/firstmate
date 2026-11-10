@@ -1,0 +1,13 @@
+maintainer-fresh	fleet	route the independent review
+maintainer-stale	fleet	update the branch; base is stale
+maintainer-unknown	fleet	base freshness unknown; refresh the base comparison
+maintainer-review-required	maintainer	review required
+maintainer-cannot-merge	maintainer	delivery awaits the maintainer
+maintainer-away	fleet	checks green; merge is authorized by delivery posture
+nobody-fresh	fleet	route the independent review
+nobody-stale	fleet	update the branch; base is stale
+nobody-unknown	fleet	base freshness unknown; refresh the base comparison
+nobody-review-required	maintainer	review required
+nobody-cannot-merge	maintainer	delivery awaits the maintainer
+nobody-away	fleet	checks green; merge is authorized by delivery posture
+ok - maintainer and nobody verdicts do not override fresh, stale, unknown, review-required, cannot-merge or away rows

@@ -1,0 +1,15 @@
+canonical hold bucket: live
+hold variant: live
+canonical hold bucket: none
+canonical hold bucket: live
+hold variant: answered
+canonical hold bucket: dated
+hold variant: dated
+canonical hold bucket: aged
+canonical hold bucket: live
+hold variant: aged
+canonical hold bucket: blocked
+hold variant: blocked
+canonical hold bucket: none
+hold variant: paused
+ok - real live holds alone reach the owner; answered, dated, blocked, aged and paused work stays fleet

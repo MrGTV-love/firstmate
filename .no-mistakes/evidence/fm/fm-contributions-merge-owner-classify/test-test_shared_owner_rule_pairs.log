@@ -1,0 +1,73 @@
+shared pair hold-late-0: captain/choose shared contract
+shared pair hold-late-1: captain/choose shared contract
+shared pair hold-stale-0: captain/choose shared contract
+shared pair hold-stale-1: captain/choose shared contract
+shared pair hold-verdict-0: captain/choose shared contract
+shared pair hold-verdict-1: captain/choose shared contract
+shared pair hold-base-0: captain/choose shared contract
+shared pair hold-base-1: captain/choose shared contract
+shared pair hold-pass-0: captain/choose shared contract
+shared pair hold-pass-1: captain/choose shared contract
+shared pair hold-unknown-0: captain/choose shared contract
+shared pair hold-unknown-1: captain/choose shared contract
+shared pair late-stale-0: fleet/contribution not recently checked
+shared pair late-stale-1: fleet/contribution not recently checked
+shared pair late-verdict-0: fleet/contribution not recently checked
+shared pair late-verdict-1: fleet/contribution not recently checked
+shared pair late-base-0: fleet/saved transport failure
+shared pair late-base-1: fleet/saved transport failure
+shared pair late-pass-0: fleet/contribution not recently checked
+shared pair late-pass-1: fleet/contribution not recently checked
+shared pair late-unknown-0: fleet/contribution not recently checked
+shared pair late-unknown-1: fleet/contribution not recently checked
+shared pair stale-verdict-0: fleet/update the branch; base is stale
+shared pair stale-verdict-1: fleet/update the branch; base is stale
+shared pair stale-base-0: fleet/update the branch; base is stale
+shared pair stale-base-1: fleet/update the branch; base is stale
+shared pair stale-pass-0: fleet/update the branch; base is stale
+shared pair stale-pass-1: fleet/update the branch; base is stale
+shared pair stale-unknown-0: fleet/update the branch; base is stale
+shared pair stale-unknown-1: fleet/update the branch; base is stale
+shared pair verdict-base-0: fleet/merge this head now
+shared pair verdict-base-1: fleet/merge this head now
+shared pair verdict-pass-0: fleet/merge this head now
+shared pair verdict-pass-1: fleet/merge this head now
+shared pair verdict-unknown-0: fleet/merge this head now
+shared pair verdict-unknown-1: fleet/merge this head now
+shared pair base-pass-0: fleet/base freshness unknown; refresh the base comparison
+shared pair base-pass-1: fleet/base freshness unknown; refresh the base comparison
+shared pair base-unknown-0: fleet/base freshness unknown; refresh the base comparison
+shared pair base-unknown-1: fleet/base freshness unknown; refresh the base comparison
+shared pair pass-unknown-0: fleet/merge under the standing merge rule
+shared pair pass-unknown-1: fleet/merge under the standing merge rule
+shared pair unknown-none-0: fleet/PASS fact unknown; recheck the independent review
+shared pair unknown-none-1: fleet/PASS fact unknown; recheck the independent review
+shared pair pass-none-0: fleet/merge under the standing merge rule
+shared pair pass-none-1: fleet/merge under the standing merge rule
+shared pair none-none-0: fleet/route the independent review
+shared pair none-none-1: fleet/route the independent review
+shared pair captain-pass-0: fleet/record the unresolved arbitration as a captain hold
+shared pair captain-pass-1: fleet/record the unresolved arbitration as a captain hold
+shared pair fleet-captain-0: fleet/record the unresolved arbitration as a captain hold
+shared pair fleet-captain-1: fleet/record the unresolved arbitration as a captain hold
+shared pair stale-captain-0: fleet/update the branch; base is stale
+shared pair stale-captain-1: fleet/update the branch; base is stale
+shared pair old-pass-0: fleet/contribution not recently checked
+shared pair old-pass-1: fleet/contribution not recently checked
+shared pair error-pass-0: fleet/saved transport failure
+shared pair error-pass-1: fleet/saved transport failure
+shared pair hold-old-0: captain/choose shared contract
+shared pair hold-old-1: captain/choose shared contract
+shared pair hold-error-0: captain/choose shared contract
+shared pair hold-error-1: captain/choose shared contract
+shared pair hold-own-missing-0: captain/choose shared contract
+shared pair hold-own-missing-1: captain/choose shared contract
+shared pair hold-own-old-0: captain/choose shared contract
+shared pair hold-own-old-1: captain/choose shared contract
+shared pair hold-own-error-0: captain/choose shared contract
+shared pair hold-own-error-1: captain/choose shared contract
+shared pair two-fleet-0: fleet/another fleet action
+shared pair two-fleet-1: fleet/another fleet action
+shared pair two-late-0: fleet/contribution not recently checked
+shared pair two-late-1: fleet/contribution not recently checked
+ok - every shared-owner rule pair is independent of owner task order; maintainer and nobody verdicts are inert
