@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Deterministic replay of the Slack Web API methods this plane uses.
 
-Transcripts never contain a token. Replay state and the outbound log live under
-the fixture home's state directory, so a mirror leg followed by a poll leg sees
-the same conversation. No socket is opened.
+Transcripts never contain a token. Replay state, the outbound log and the log of
+every attempted call live under the fixture home's state directory, so a mirror
+leg followed by a poll leg sees the same conversation. No socket is opened.
 """
 import json
 import os

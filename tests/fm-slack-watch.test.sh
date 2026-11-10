@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Slack decision plane regressions DOD-01..DOD-17, S1..S3, X1..X49, INTAKE-1..INTAKE-13 (INTAKE-8, the two DOD-17 registered-file runs and the deadline suite only with FM_SLACK_GRADER_RUN).
+# Slack decision plane regressions DOD-01..DOD-17, S1..S3, X1..X49, INTAKE-1..INTAKE-14 (INTAKE-8, the two DOD-17 registered-file runs and the deadline suite only with FM_SLACK_GRADER_RUN).
 # Every Slack call is a checked-in replay transcript; no socket is opened. FM_SLACK_NO_NETWORK closes the real
 # transport for the whole suite, so a scenario that forgot its replay fails with network_closed instead of reaching Slack.
 set -euo pipefail

@@ -3618,6 +3618,7 @@ The poll has no stop of its own: `FM_MAIL_TIMEOUT` bounds each socket read and t
 
 The Slack plane mirrors this home's open captain-held tasks into one owner DM, one thread per hold occurrence, and returns answers through the existing keyed-answer intake.
 It does not create decisions, reconcile them, or change merge authority.
+It also takes in each new top-level message the owner types in that DM as a request: unverified data that wakes Firstmate and is never an answer or an authorization.
 The terminal, board, inbox, and existing decision records remain authoritative and unchanged.
 There is no inbound listener, Socket Mode connection, or separate schedule.
 This section owns its configuration schema; command mechanics are in `bin/fm-slack-check.sh --help` and the Slack script headers.
@@ -3794,7 +3795,7 @@ A missing reaction scope is reported once per change in the missing set, not on 
 Each Slack API request keeps its own 10-second socket timeout, and no budget is shared across the requests of one run; `bin/fm-watch.sh` owns the standing check's no-progress and absolute bounds.
 The standing check writes one `slack: request finished` line to stderr after each JSON reply, because a check that waits on slow replies uses almost no CPU and the watcher counts check stderr as progress; a hung or trickling request writes nothing, so the no-progress bound still stops it.
 
-`tests/fm-slack-watch.test.sh` drives checked-in replay transcripts and the real keyed-answer intake without live Slack traffic; `tests/fm-slack-intake-unchanged.test.sh` pins the intake refusals Slack must never reach, and `tests/fm-slack-secret-scan.test.sh` runs the plane with a known token and scans for it.
+`tests/fm-slack-watch.test.sh` drives checked-in replay transcripts and the real keyed-answer intake without live Slack traffic; `tests/fm-slack-intake-unchanged.test.sh` pins the intake refusals Slack must never reach, and `tests/fm-slack-secret-scan.test.sh` runs the plane with a known token and signing secret and scans for both.
 Re-notification, a periodic digest, quiet hours, and old-thread cleanup are intentionally not part of this first step.
 
 ## Relay (.env)
