@@ -340,6 +340,61 @@ X24 through X32 passed in the first 2026-10-30 run, X33 through X40 in the secon
 - X42 (`ok - X42`): with the recorded channel set to the DM-shaped `D0OTHERDM01` instead of the owner's DM and a new held call to mirror, the mirror exited nonzero with `stored_channel_not_owner_dm` and wrote nothing to `D0OTHERDM01`; in a fresh home the mirror posted the new call's card to the owner's DM `D0123456789`; with `conversations.open` failing with status 503, the mirror exited nonzero and sent no `chat.postMessage`.
 - X43 (`ok - X43`): with a tap on `reaction-call`'s card and `users.info` failing with status 400, `retarget` to a changed owner exited nonzero with `slack: refused: api_error`, kept the thread, and left `reaction-call` open; once `users.info` recovered, the next poll printed `closed: reaction-call`.
 
+## Request intake (INTAKE-1 to INTAKE-14)
+
+Date: 2026-11-10 UTC, from the modified times of the log files.
+This run is the test step of the pipeline run that carried the request intake change.
+Its logs record each suite's output but not the exit status, the commit, the host or a tool version, so none is quoted.
+The script that ran the four suites first set this environment:
+
+```
+unset SLACK_BOT_TOKEN SLACK_SIGNING_SECRET FM_SLACK_GRADER_RUN FM_HOME FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_CONFIG_OVERRIDE
+export FM_SLACK_NO_NETWORK=1
+```
+
+It then ran these four commands from the worktree root, one after another:
+
+- `python3 tests/fm_slack_watch_test.py`
+- `bash tests/fm-slack-secret-scan.test.sh`
+- `bash tests/fm-slack-intake-unchanged.test.sh`
+- `bash tests/fm-slack-watch.test.sh`
+
+The first run of `tests/fm-slack-watch.test.sh` was stopped by the tool's time limit after its first sections.
+Its log is kept as `suite-fm-slack-watch.partial-stopped-at-time-limit.log` (modified 2026-11-10T05:52:43Z), and its last line is `ok - S3`.
+The run recorded in `suite-fm-slack-watch.log` (modified 2026-11-10T06:55:24Z) is its relaunch in the background with the same environment and command.
+That log holds these lines for the request intake, and this last line:
+
+```
+ok - INTAKE-1
+ok - INTAKE-2
+ok - INTAKE-3
+ok - INTAKE-4
+ok - INTAKE-5
+ok - INTAKE-6
+ok - INTAKE-7
+ok - INTAKE-8
+ok - INTAKE-9
+ok - INTAKE-10
+ok - INTAKE-11
+ok - INTAKE-12
+ok - INTAKE-13
+ok - INTAKE-14
+ok - all Slack watch checks
+```
+
+`suite-fm_slack_watch_test.log` (modified 2026-11-10T05:33:38Z) closes with:
+
+```
+Ran 148 tests in 16.958s
+OK
+```
+
+`suite-fm-slack-secret-scan.log` (modified 2026-11-10T05:34:57Z) holds one line: `ok - scan redacted and detected both planted copies`.
+That log does not separate the signing-secret part of the scan from the rest, so no separate line is quoted for it.
+`suite-fm-slack-intake-unchanged.log` (modified 2026-11-10T05:35:07Z) holds one line: `ok - intake refusals hold`.
+Not run: real Slack end to end, and watcher-to-Main delivery.
+No repository-wide test run is claimed.
+
 ## ACT-1 - live answer
 
 The read-only identity probe above was run; the live answer flow was not.
