@@ -2428,27 +2428,60 @@ wait "$unbind_pid" || fail "INTAKE-6 [unbind no override] the unbind failed afte
 assert_contains "$(cat "$TMP/unbind.out")" 'unbound: slack-dm' "INTAKE-6 [unbind no override] the unbind did not report"
 "$CAPTAIN" binding slack-dm >/dev/null 2>&1 && fail "INTAKE-6 [unbind no override] the binding stayed after the unbind"
 # A slow wait is an alarm, never a cut-off (the owner's rule of 2026-10-23, Main 2408): after 60 seconds the unbind prints one line
-# and keeps waiting, the binding stays while the delivery holds it, and the unbind succeeds when the delivery ends. The clock shim
-# reaches the 60 seconds at once; the delivery is a real process that really holds the binding for a few seconds.
-intake_home
-holder 4
+# and keeps waiting, the binding stays while the delivery holds it, and the unbind succeeds when the delivery ends. The clock shim DRIVES
+# time (tests/fixtures/slack/fake-clock/FakeClock.pm: select, sleep, time and Time::HiRes read and advance one virtual clock, and every line
+# of standard error is stamped with the virtual seconds since the start), so the alarm's calibration is read, not inferred from a retry count:
+# it is printed at 60 virtual seconds, exactly once, and the wait goes on past ten virtual minutes while the delivery really holds the binding
+# for a few seconds. The delivery is a real process.
 REAL_PERL=$(command -v perl)
-PATH="$FIX/fake-clock:$PATH" FM_REAL_PERL="$REAL_PERL" "$CAPTAIN" unbind slack-dm > "$TMP/unbind.out" 2> "$TMP/unbind.err" &
-unbind_pid=$!
-until grep -q 'unbind is slow' "$TMP/unbind.err"; do kill -0 "$unbind_pid" 2>/dev/null || break; sleep 0.1; done
-kill -0 "$unbind_pid" 2>/dev/null || fail "INTAKE-6 [unbind slow] the unbind stopped before it printed its alarm or while the delivery still held the binding"
-"$CAPTAIN" binding slack-dm >/dev/null 2>&1 || fail "INTAKE-6 [unbind slow] the binding was removed while the delivery still held it"
-sleep 0.5
-kill -0 "$unbind_pid" 2>/dev/null || fail "INTAKE-6 [unbind slow] the unbind gave up after its alarm"
-set +e
-wait "$holder_pid"
-wait "$unbind_pid"
-rc=$?
-set -e
-[ "$rc" = 0 ] || fail "INTAKE-6 [unbind slow] the unbind did not succeed once the delivery ended (exit $rc)"
-assert_eq "$(grep -c 'unbind is slow' "$TMP/unbind.err")" 1 "INTAKE-6 [unbind slow] the alarm was not printed exactly once"
+unbind_under_the_clock() {  # <captain script>: sets slow_alarm_lines, slow_alarm_vt, slow_end_vt, slow_mid, slow_rc
+  intake_home
+  holder 4
+  rm -f "$TMP/clock.log"
+  PATH="$FIX/fake-clock:$PATH" FM_REAL_PERL="$REAL_PERL" FM_FAKE_CLOCK_LOG="$TMP/clock.log" "$1" unbind slack-dm > "$TMP/unbind.out" 2> "$TMP/unbind.err" &
+  unbind_pid=$!
+  sleep 1.5
+  slow_mid=gone
+  "$CAPTAIN" binding slack-dm >/dev/null 2>&1 && slow_mid=present
+  set +e
+  wait "$holder_pid"
+  wait "$unbind_pid"
+  slow_rc=$?
+  set -e
+  slow_alarm_lines=$(grep -c 'unbind is slow' "$TMP/unbind.err" || true)
+  slow_alarm_vt=$(awk -F'\t' '$2 ~ /unbind is slow/ {sub(/^vt=/, "", $1); print $1; exit}' "$TMP/clock.log")
+  slow_end_vt=$(awk -F'\t' '$2 ~ /^end/ {sub(/^vt=/, "", $1); print $1}' "$TMP/clock.log")
+}
+within() {  # <value> <low> <high>
+  awk -v v="${1:-x}" -v lo="$2" -v hi="$3" 'BEGIN { exit !(v ~ /^[0-9.]+$/ && v + 0 >= lo && v + 0 <= hi) }'
+}
+unbind_under_the_clock "$CAPTAIN"
+[ "$slow_rc" = 0 ] || fail "INTAKE-6 [unbind slow] the unbind did not succeed once the delivery ended (exit $slow_rc)"
+assert_eq "$slow_mid" present "INTAKE-6 [unbind slow] the binding was removed while the delivery still held it"
+assert_eq "$slow_alarm_lines" 1 "INTAKE-6 [unbind slow] the alarm was not printed exactly once"
+within "$slow_alarm_vt" 59.9 60.1 || fail "INTAKE-6 [unbind slow] the alarm was printed at ${slow_alarm_vt:-no} virtual seconds, not 60"
+within "$slow_end_vt" 600 100000000 || fail "INTAKE-6 [unbind slow] the unbind did not keep waiting past ten virtual minutes (ended at ${slow_end_vt:-no})"
 assert_contains "$(cat "$TMP/unbind.out")" 'unbound: slack-dm' "INTAKE-6 [unbind slow] the unbind did not report"
 "$CAPTAIN" binding slack-dm >/dev/null 2>&1 && fail "INTAKE-6 [unbind slow] the binding stayed after the delivery ended"
+# The calibration reads (bad controls): an alarm after 6 seconds, an alarm after 600 seconds, and an unbind that gives up after 6000 tries (ten
+# virtual minutes) are each exposed by the same readings, on copies of the script in a scratch folder (the product is not touched).
+MUTANT_BIN="$TMP/bin-mutant"
+mutant_captain() {  # <label> <sed expression>: a copy of the script with one change; prints its path
+  rm -rf "$MUTANT_BIN"; cp -R "$ROOT/bin" "$MUTANT_BIN"
+  sed -e "$2" "$ROOT/bin/fm-captain-hold.sh" > "$MUTANT_BIN/fm-captain-hold.sh"
+  cmp -s "$ROOT/bin/fm-captain-hold.sh" "$MUTANT_BIN/fm-captain-hold.sh" && fail "INTAKE-6 [unbind calibration] the change of the mutant '$1' did not apply"
+  printf '%s\n' "$MUTANT_BIN/fm-captain-hold.sh"
+}
+# shellcheck disable=SC2016 # the sed expressions are literal: the dollar signs belong to the perl source that is changed
+unbind_under_the_clock "$(mutant_captain 'alarm after 6 seconds' 's/my \$alarm_after = 60;/my $alarm_after = 6;/')"
+within "$slow_alarm_vt" 59.9 60.1 && fail "INTAKE-6 [unbind calibration] an alarm after 6 seconds was not exposed (alarm at ${slow_alarm_vt} virtual seconds)"
+# shellcheck disable=SC2016 # the sed expressions are literal: the dollar signs belong to the perl source that is changed
+unbind_under_the_clock "$(mutant_captain 'alarm after 600 seconds' 's/my \$alarm_after = 60;/my $alarm_after = 600;/')"
+within "$slow_alarm_vt" 59.9 60.1 && fail "INTAKE-6 [unbind calibration] an alarm after 600 seconds was not exposed (alarm at ${slow_alarm_vt} virtual seconds)"
+# shellcheck disable=SC2016 # the sed expressions are literal: the dollar signs belong to the perl source that is changed
+unbind_under_the_clock "$(mutant_captain 'gives up after 6000 tries' 's/\$tries++;/$tries++; last if $tries >= 6000;/')"
+[ "$slow_mid" = gone ] || fail "INTAKE-6 [unbind calibration] an unbind that gives up after ten virtual minutes was not exposed (the binding stayed while the delivery held it)"
+rm -rf "$MUTANT_BIN"
 # A state folder that cannot be examined is a refusal, not a success; the base refused it too.
 intake_home
 if [ "$(id -u)" = 0 ]; then
