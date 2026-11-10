@@ -2662,6 +2662,69 @@ class IntakeTest(unittest.TestCase):
             self.assertEqual((acks, errors), ([[], ['200.000100']], ['api_error', None]))
             self.assertEqual(self.wakes(watch), [plane.request_line('200.000100', self.OWNER, 'the request')])
 
+    def test_a_post_that_slack_refused_with_any_error_name_counts_as_a_failed_attempt_and_releases_at_the_third(self):
+        """F2 of the outcome review of b0f37a54: a replay that lacks only the write scope refuses every acknowledgement post with
+        missing_scope; three of them release the head with the wake, and the successor is then attempted (its own first try)."""
+        scopes = tuple(scope for scope in BASE_SCOPES if scope != 'chat:write')
+        with self.fixture(scopes=scopes, forbidden=True) as (watch, replay):
+            self.say(replay, '200.000100', 'the head request')
+            self.say(replay, '200.000200', 'the waiting request')
+            acks, errors = self.polls(watch, replay, 3)
+            self.assertEqual(errors, ['missing_scope', 'missing_scope', 'missing_scope'])
+            self.assertEqual(len(self.post_attempts(replay, '200.000100')), 3)
+            rows = {row['thread']: row for row in watch.load_state()['pending']}
+            self.assertEqual((rows['200.000100']['state'], rows['200.000100']['tries']), ('failed', 3))
+            self.assertEqual(len(self.post_attempts(replay, '200.000200')), 1)
+            [line] = [l for l in self.wakes(watch) if '200.000100' in l]
+            self.assertEqual(self.wake_parts(line)['released'], True)
+            self.assertEqual(self.polls(watch, replay, 1)[1], ['missing_scope'])
+            self.assertEqual(len(self.post_attempts(replay, '200.000100')), 3)
+
+    def test_a_rate_limit_or_an_outage_on_the_post_counts_nothing_and_never_releases(self):
+        for status in (429, 503):
+            with self.fixture() as (watch, replay):
+                self.say(replay, '200.000100', 'the request')
+                replay.state['failures']['chat.postMessage:200.000100'] = {'status': status, 'times': 4}
+                replay.save()
+                self.assertEqual(len(set(self.polls(watch, replay, 4)[1])), 1)
+                [row] = watch.load_state()['pending']
+                self.assertEqual((row.get('tries', 0), row.get('state')), (0, None), status)
+                self.assertEqual(self.wakes(watch), [])
+
+    def test_three_failed_lookups_with_an_outage_after_a_crash_between_the_post_and_its_mark_wake_with_the_state_unknown(self):
+        """F3 of the outcome review of b0f37a54: the lookup that fails with a 503 counts like the one that fails with a 400."""
+        for status in (503, 429):
+            with self.fixture() as (watch, replay):
+                self.say(replay, '200.000100', 'the request')
+                with patch.dict(os.environ, {'FM_SLACK_FAULT': 'after-post'}), self.assertRaises(RuntimeError):
+                    watch.poll()
+                self.assertEqual(self.acks(replay), ['200.000100'])
+                replay.state['failures']['conversations.replies:200.000100'] = {'status': status}
+                replay.save()
+                acks, errors = self.polls(watch, replay, 3)
+                self.assertEqual(acks, [[], [], []])
+                [line] = self.wakes(watch)
+                self.assertEqual(line, plane.request_line('200.000100', self.OWNER, 'the request', plane.REQUEST_UNKNOWN))
+                self.assertEqual((watch.load_state()['pending'], watch.failed_requests(), self.acks(replay)), ([], [], ['200.000100']))
+
+    def test_three_failed_lookups_with_an_outage_after_a_posted_acknowledgement_give_the_ordinary_wake(self):
+        with self.fixture() as (watch, replay):
+            self.say(replay, '200.000100', 'the request')
+            with patch.dict(os.environ, {'FM_SLACK_FAULT': 'after-ack'}), self.assertRaises(RuntimeError):
+                watch.poll()
+            replay.state['failures']['conversations.replies:200.000100'] = {'status': 503}
+            replay.save()
+            self.polls(watch, replay, 3)
+            self.assertEqual(self.wakes(watch), [plane.request_line('200.000100', self.OWNER, 'the request')])
+
+    def test_a_failed_lookup_with_an_outage_before_the_first_post_lets_the_post_go_on(self):
+        with self.fixture() as (watch, replay):
+            self.say(replay, '200.000100', 'the request')
+            replay.state['failures']['conversations.replies:200.000100'] = {'status': 503}
+            replay.save()
+            acks, errors = self.polls(watch, replay, 1)
+            self.assertEqual((acks, errors), ([['200.000100']], [None]))
+
     def test_a_failed_lookup_before_the_first_post_does_not_count_and_the_post_goes_on(self):
         with self.fixture() as (watch, replay):
             self.say(replay, '200.000100', 'the request')

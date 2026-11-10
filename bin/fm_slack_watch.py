@@ -50,6 +50,16 @@ DM_CHANNEL = re.compile(r'D[A-Z0-9]{8,}')
 # A failure of one thread's own read, journaled-row post, or resolution post must not stop the other
 # threads' replies from being read.
 THREAD_ERRORS = ('api_error', 'channel_not_found')
+# A request's acknowledgement post counts as a failed attempt of the three only when Slack itself refused it: the API answered with an error
+# name (missing_scope, not_in_channel, invalid_arguments, channel_not_found, api_error, an authentication refusal). An outage, a rate limit,
+# an HTTP failure or a closed network says nothing about whether the post reached Slack, so it counts nothing and the next poll tries again
+# (I3d: an outage neither counts nor resets the count). F2 of the outcome review of b0f37a54.
+OUTAGE_ERRORS = ('unreachable', 'rate_limited', 'ratelimited', 'network_closed', 'response_too_large', 'missing_token')
+
+
+def definite_refusal(error):
+    name = str(error)
+    return name not in OUTAGE_ERRORS and not name.startswith('http_')
 OPTION_LINE = re.compile(r'^\s*Option\s*([1-9][0-9]*)\s*[.):]\s*(.*)$')
 FIELD_LINE = re.compile(r'^\s*(Decision sought|Brief description of issue|Brief|Recommendation|Alternatives|Evidence):\s*(.*)$')
 WAKE_LIMIT = 480
@@ -1108,8 +1118,10 @@ class Watch:
             try:
                 earlier = self.recent(thread)
             except SlackError as error:
-                if row is None or str(error) not in THREAD_ERRORS:
+                if row is None:
                     raise
+                # Any failed lookup counts for a request's acknowledgement, whatever its error name (F3 of the outcome review of
+                # b0f37a54): with the attempt mark written the state is unknown and nothing is posted, with none the post goes on.
                 if row.get('attempted'):
                     raise LookupFailed(str(error)) from None
                 earlier = []
@@ -1467,7 +1479,7 @@ class Watch:
                         raise
                     note = REQUEST_UNKNOWN
                 except SlackError as error:
-                    if str(error) not in THREAD_ERRORS:
+                    if not definite_refusal(error):
                         raise
                     pending['tries'] = pending.get('tries', 0) + 1
                     if pending['tries'] < REQUEST_TRIES:
