@@ -2288,8 +2288,16 @@ def emit_plan(watch, command, bound):
 
 def emit_write(watch, plan):
     texts, owed = plan[0], plan[1]
+    sent = 0
     for text in texts:
-        watch.out.line('out', text)
+        # The line is written and flushed through the one writer before it leaves the journal; a line the writer refused is not cleared.
+        if not watch.out.line('out', text):
+            break
+        sent += 1
+    if len(texts) == len(owed):
+        owed = owed[:sent]
+    elif sent < len(texts):
+        owed = []
     if owed:
         watch.printed(owed)
 
