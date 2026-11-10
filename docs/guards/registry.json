@@ -6960,11 +6960,16 @@
         },
         {
           "file": "bin/fm_slack_watch.py",
+          "match": "refuse_outbound(handed)",
+          "count": 1
+        },
+        {
+          "file": "bin/fm_slack_watch.py",
           "match": "refuse_outbound(self.post_fields('ack:' + pending['event'], REQUEST_ACK",
           "count": 1
         }
       ],
-      "invariant": "no call to Slack is made, and no line of the replay attempt log or outbound log is written, while a string field of it holds a plane secret value; the one fixed acknowledgement of a request is checked before the request is taken in",
+      "invariant": "no call to Slack is made, no line of the replay attempt log or outbound log is written, no child process is started and the registered check file is not written while a string field, a child argument or input, or the file text holds a plane secret value; the one fixed acknowledgement of a request is checked before the request is taken in",
       "layer": "runtime-block",
       "source": "the string fields of one call to Slack (the text of a message, a thread, the metadata) and the bot token and signing secret in the plane process environment, compared by refuse_outbound() in bin/fm_slack.py",
       "trigger": "a plane secret value (SLACK_BOT_TOKEN or SLACK_SIGNING_SECRET) occurs inside a field of a call to Slack, inside a line a replay log would append, or inside the one fixed acknowledgement of a request about to be taken in",

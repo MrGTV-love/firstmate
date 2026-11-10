@@ -3652,6 +3652,95 @@ class IntakeTest(unittest.TestCase):
                 with self.assertRaisesRegex(SlackError, '^secret_collides_with_marker$'):
                     plane.refuse_a_value_that_the_marker_holds(plane.COMMAND_FIXED_TEXT[command])
 
+    def test_the_registered_check_file_is_a_sink_and_a_child_is_handed_no_plane_value(self):
+        """Two more ways out of the process (the review of b86f8e55e, the class of F1): the fixed text of the registered check file, and what a child process is handed. A
+        plane value inside the file's text or inside a child's argument or input stops the write or the start (SecretCollision), and a clean neighbour goes through."""
+        with self.fixture() as (watch, replay):
+            watch.lock.close()
+            state_dir = Path(os.environ['FM_STATE_OVERRIDE'])
+            for secret, refused in (('#!/usr/bin/env bash\nexport FM_HOME=', True), ('unrelated-signing-value-0123456789', False)):
+                with patch.dict(os.environ, {'SLACK_SIGNING_SECRET': secret}):
+                    out = plane.Out()
+                    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                        if refused:
+                            with self.assertRaisesRegex(SlackError, '^secret_collides_with_marker$'):
+                                plane.arm(state_dir, out)
+                            self.assertFalse((state_dir / 'slack.check.sh').exists())
+                        else:
+                            plane.arm(state_dir, out)
+            argument, handed_input = 'a-child-argument-value-0123456789', 'a-child-input-value-0123456789'
+            for call, value in ((lambda: plane.run('fm-captain-hold.sh', 'binding', argument), argument),
+                                (lambda: plane.run('fm-captain-hold.sh', 'answers', text=handed_input), handed_input)):
+                with patch.dict(os.environ, {'SLACK_SIGNING_SECRET': value}):
+                    with self.assertRaisesRegex(SlackError, '^secret_collides_with_marker$'):
+                        call()
+                with patch.dict(os.environ, {'SLACK_SIGNING_SECRET': 'unrelated-signing-value-0123456789'}):
+                    call()  # the child starts (it may refuse the call itself); the check raises nothing
+
+    def test_the_help_of_the_check_script_is_printed_through_the_writer(self):
+        """The help text lives in the shell script and is printed by the plane's writer: a plane value inside it is shown as [redacted], and the help is otherwise byte for byte what
+        the script holds."""
+        script = str(REPO / 'bin' / 'fm-slack-check.sh')
+        env = {**os.environ, 'FM_SLACK_NO_NETWORK': '1', 'SLACK_BOT_TOKEN': '', 'SLACK_SIGNING_SECRET': ''}
+        plain = subprocess.run(['bash', script, '--help'], env=env, text=True, capture_output=True)
+        self.assertEqual(plain.returncode, 0)
+        self.assertIn('Usage: fm-slack-check.sh [arm|check|disarm|retarget]', plain.stdout)
+        window = 'Disarm is the hard off switch.'
+        held = subprocess.run(['bash', script, '--help'], env={**env, 'SLACK_SIGNING_SECRET': window}, text=True, capture_output=True)
+        self.assertEqual(held.returncode, 0)
+        self.assertNotIn(window, held.stdout + held.stderr)
+        self.assertIn('[redacted]', held.stdout)
+        self.assertEqual(held.stdout.replace('[redacted]', window), plain.stdout)
+
+    @staticmethod
+    def fixed_texts_of_the_plane():
+        """Every string constant of the three Slack modules that is at least 16 characters long (docstrings left out), each cut to its first 24 characters: the text the plane itself writes."""
+        values = set()
+        for module in ('fm_slack_watch.py', 'fm_slack.py', 'fm_slack_replay.py'):
+            tree = ast.parse((REPO / 'bin' / module).read_text())
+            docs = {id(n.body[0].value) for n in ast.walk(tree) if isinstance(n, (ast.Module, ast.ClassDef, ast.FunctionDef)) and n.body
+                    and isinstance(n.body[0], ast.Expr) and isinstance(getattr(n.body[0], 'value', None), ast.Constant)}
+            values |= {n.value[:24] for n in ast.walk(tree) if isinstance(n, ast.Constant) and isinstance(n.value, str) and id(n) not in docs and len(n.value.strip()) >= 16}
+        return sorted(value for value in values if value.strip())
+
+    def test_no_fixed_text_of_the_plane_is_written_or_printed_when_it_is_the_secret_value(self):
+        """The class of the reviews of b86f8e55e (a plane value equal to text the plane itself writes), over every fixed string of the three Slack modules as the signing secret, in
+        process: a request is taken in by the check twice and the poll once, and a refused configuration is polled. The value is in no byte of standard output or standard error, the
+        count of its occurrences in the journal, the record store and the replay's logs never grows, and no run ends in an exception. (The sweep through fresh processes, with more
+        states and windows cut from the real sinks, is the evidence record `fixed-text-sweep`.)"""
+        values = self.fixed_texts_of_the_plane()
+        self.assertGreater(len(values), 100)
+        leaks = []
+        for value in values:
+            with self.fixture(forbidden=True) as (watch, replay):
+                watch.lock.close()
+                transcript = str(watch.root.parent / 'transcript.json')
+                self.say(replay, '200.000100', 'a plain owner request')
+                replay.save()  # the commands below build their own replay from this file
+                files = [watch.root / name for name in ('state.json', 'requests.jsonl', 'outbound.jsonl', 'attempts.jsonl')]
+                count = lambda: [f.read_text().count(value) if f.is_file() else 0 for f in files]
+                before, streams = count(), []
+                # The registered check file and its trust file exist, so that `check` runs; the source is bound, as in the fixture.
+                for name in ('slack.check.sh', 'slack.check-trust'):
+                    (watch.root.parent / name).write_text('')
+                for action, argv, extra in (('check', ['check', '--replay', transcript], {}), ('check', ['check', '--replay', transcript], {}),
+                                            ('', ['poll', '--replay', transcript], {}), ('', ['poll'], {'FM_SLACK_POLL_MAX_ANSWERS': 'x'})):
+                    out, err = io.StringIO(), io.StringIO()
+                    with patch.dict(os.environ, {'SLACK_SIGNING_SECRET': value, 'FM_SLACK_CHECK_ACTION': action, **extra}), contextlib.redirect_stdout(out), contextlib.redirect_stderr(err), \
+                         patch.object(Watch, 'bound', return_value='any-origin'), patch.object(Watch, 'backlog', return_value=[]):
+                        try:
+                            plane.main(argv)
+                        except SystemExit:
+                            pass
+                        except Exception as error:  # a traceback is a stream the boundary does not own
+                            leaks.append((value, 'exception', type(error).__name__))
+                    streams += [out.getvalue(), err.getvalue()]
+                if any(value in text for text in streams):
+                    leaks.append((value, 'stream', ''))
+                if any(a > b for a, b in zip(count(), before)):
+                    leaks.append((value, 'file', ''))
+        self.assertEqual(leaks, [])
+
     def test_every_stream_write_of_every_command_goes_through_the_one_writer(self):
         """The runtime view of the egress boundary: standard output and standard error are replaced by streams that fail any write whose caller is
         not Out.write, and the commands are run (help, a missing and an unknown command, an unexpected argument, a refused and an unconfigured

@@ -141,6 +141,11 @@ def fault(point):
 
 
 def run(script, *args, text=None):
+    # What a child is handed (its arguments and its input) leaves the process like any other byte: it is checked first, and no child with a plane value in it starts.
+    handed = {'child argument %d' % n: str(argument) for n, argument in enumerate(args)}
+    if text is not None:
+        handed['child input'] = text
+    refuse_outbound(handed)
     # No local child needs a Slack credential: drop the token and the signing secret.
     env = {key: value for key, value in os.environ.items() if not key.startswith('SLACK_')}
     env['PYTHONDONTWRITEBYTECODE'] = '1'
@@ -2349,6 +2354,10 @@ def main(argv, out=None):
     if not argv:
         out.diagnostic('out', 'error: missing command')
         return 2
+    if argv == ['--print-help-text']:
+        # The help of fm-slack-check.sh is written in that script and printed through this writer, so that a plane value inside it is shown as [redacted] like any other line.
+        out.diagnostic('out', sys.stdin.read().rstrip('\n'))
+        return 0
     try:
         command, replay_path, request_ts = parse_command(argv, positional=action == 'resolve', out=out)
     except SlackError as error:
@@ -2507,7 +2516,11 @@ def arm(state_dir, out):
     if shim.exists() and not shim.is_file():
         out.diagnostic('err', 'slack: refused: unsafe_check_shim')
         return 1
-    shim.write_text(shim_content(str(home_dir()), state_dir, ROOT))
+    content = shim_content(str(home_dir()), state_dir, ROOT)
+    if value_hits(content):
+        # The registered check file is a sink too: a plane value inside its fixed text and paths could not be replaced, so nothing is written.
+        raise SecretCollision('secret_collides_with_marker')
+    shim.write_text(content)
     shim.chmod(0o700)
     result = run('fm-check-register.sh', CHECK_ID)
     if result.returncode:
