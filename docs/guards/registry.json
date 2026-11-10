@@ -140,6 +140,7 @@
     "teardown-superseded-slot-lease",
     "captain-hold-withdraw-ruling",
     "slack-dm-retarget-pending-work",
+    "github-accounting-foreign-database",
     "open-loops-one-deferral",
     "pipeline-start-unreadable-source",
     "merge-required-reported",
@@ -6860,6 +6861,37 @@
       "instrumented": false,
       "status": "active",
       "layer_note": "deny without a guard event: the refusal exits 125 with the reason on stderr and never launches the command, so no run or start lock is left; a start that sees headroom used up waits in the queue and is not this refusal; tests/fm-cpu-pass.test.sh runs tests/fm-cpu-pass-admission.py, which proves the 125 exit with no start on a missing database and a garbage database, and proves the admitted start on readable sources; an unreadable memory or process observation does not refuse but pauses the start (pause-only backstop, proved in the same fixtures)"
+    },
+    {
+      "id": "github-accounting-foreign-database",
+      "version": "1",
+      "owner": "bin/fm-github-accounting.py",
+      "sites": [
+        {
+          "file": "bin/fm-github-accounting.py",
+          "match": "refusing database not owned by the observer"
+        }
+      ],
+      "invariant": "the GitHub accounting owner never changes an existing nonempty file that lacks its application id",
+      "layer": "runtime-block",
+      "source": "the size and PRAGMA application_id of the existing state/github-accounting/observations.sqlite, read by database() in bin/fm-github-accounting.py against APPLICATION_ID",
+      "trigger": "bin/fm-github-accounting.py start, run, prune or records opens a nonempty observations.sqlite whose application_id is not 0x464D4748; a zero-size file holds no data and is treated as new",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "check what the file holds, move it out of the way with mv state/github-accounting/observations.sqlite <path outside state/github-accounting>, then run python3 bin/fm-github-accounting.py start",
+      "budget": 1,
+      "budget_reason": "One refused invocation before an operator moves the file; no cross-invocation counter is implemented, so the watcher's hourly start attempt can refuse again without another wake.",
+      "telemetry": "Not instrumented under this id; the refusal reaches the caller as exit 1 and the fixed line fm-github-accounting: operation unavailable. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-github-accounting.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "layer_note": "added with the standing GitHub accounting owner; deny without a guard event: the check reads the id before any write, so the foreign file keeps its rows and the owner does not start; the fixed stderr line withholds the exception text because command output can hold secrets; test_symlink_and_foreign_database_are_not_modified in tests/fm-github-accounting.behavior.test.py proves the refusal leaves the rows unchanged, the other owner tests prove a database the owner created opens, and tests/fm-watch-github-accounting.test.sh proves a watcher reports this failed start with a wake that names the owner log; the trigger covers only nonempty files because a zero-size file left by an interrupted start holds no data, and test_zero_size_database_is_treated_as_new and test_nonempty_non_database_file_is_refused_unchanged prove both sides"
     }
   ],
   "excluded": [

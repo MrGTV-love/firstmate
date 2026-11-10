@@ -2731,6 +2731,131 @@ make_bundle_copy_case() {  # <name> [mode]
   record_preservation_bundle "$NESTED_CASE" "$NESTED_COPY" "$BUNDLE_PATH" --all || fail 'cannot create bundle fixture'
 }
 
+# A nested task copy is not its enclosing task's reserved pool slot.
+# Empty slot fields also occur on retries whose earlier cleanup wrote a marker.
+test_empty_recorded_slot_nested_drop() {
+  local case_dir slot copy head slot_head bundle rc
+  make_bundle_copy_case empty-recorded-slot-nested-drop
+  case_dir=$NESTED_CASE
+  slot=$NESTED_SLOT
+  copy=$NESTED_COPY
+  head=$(git -C "$copy" rev-parse HEAD)
+  slot_head=$(git -C "$slot" rev-parse HEAD)
+  bundle=$BUNDLE_PATH
+  write_meta "$case_dir" no-mistakes ship "$copy"
+  printf 'slot=\n' >> "$case_dir/state/task-x1.meta"
+  printf 'spawn_gen=teardown-test-task-x1\nslot=\n' > "$case_dir/state/task-x1.teardown-return-pending"
+  printf 'task=other\nhome=%s\n' "$case_dir/home" > "${slot%/*}/.fm-slot-owner"
+  printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"other"}]}\n' "$slot" \
+    > "$case_dir/pool/treehouse-state.json"
+  fm_write_meta "$case_dir/state/other.meta" "worktree=$slot" 'kind=ship'
+  cp "$case_dir/state/other.meta" "$case_dir/other.before"
+  cp "$case_dir/state/task-x1.meta" "$case_dir/task.before"
+  cp "$case_dir/state/task-x1.teardown-return-pending" "$case_dir/pending.before"
+  cp "${slot%/*}/.fm-slot-owner" "$case_dir/owner.before"
+  cp "$case_dir/pool/treehouse-state.json" "$case_dir/lease.before"
+  printf 'other task bytes\n' > "$slot/other.txt"
+  cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in pool-dir|status) exit 0 ;; esac
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+[ "\$*" = 'return --force $copy' ] || exit 1
+exec git -C '$case_dir/project' worktree remove --force '$copy'
+SH
+  rc=0
+  FM_HOME="$case_dir/home" run_teardown "$case_dir" --force > "$case_dir/no-drop.stdout" 2> "$case_dir/no-drop.stderr" || rc=$?
+  expect_code 1 "$rc" 'empty recorded slot must not waive owner drop-file authorization'
+  assert_grep 'requires --drop-file' "$case_dir/no-drop.stderr" 'missing owner authorization did not refuse'
+  assert_no_grep 'REFUSED: reserved pool slot  lost its durable lease; retaining the task record and contents' \
+    "$case_dir/no-drop.stderr" 'unauthorized empty-slot copy reached reserved-slot return'
+  cmp -s "$case_dir/task.before" "$case_dir/state/task-x1.meta" || fail 'unauthorized drop changed task metadata'
+  cmp -s "$case_dir/pending.before" "$case_dir/state/task-x1.teardown-return-pending" || fail 'unauthorized drop changed pending metadata'
+  assert_present "$copy/.git" 'unauthorized drop removed the nested copy'
+  assert_absent "$case_dir/treehouse.log" 'unauthorized drop reached the provider'
+
+  rc=0
+  FM_HOME="$case_dir/home" run_teardown "$case_dir" --force --drop-file "$FM_TEST_DROP_WORDS" \
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "empty recorded slot authorized nested drop refused: $(cat "$case_dir/stderr")"
+  assert_no_grep 'REFUSED: reserved pool slot  lost its durable lease; retaining the task record and contents' \
+    "$case_dir/stderr" 'empty slot entered reserved-slot return'
+  assert_absent "$copy" 'authorized drop retained the nested copy'
+  assert_absent "$case_dir/state/task-x1.meta" 'authorized drop retained task metadata'
+  assert_absent "$case_dir/state/task-x1.teardown-return-pending" 'authorized drop retained pending metadata'
+  cmp -s "$case_dir/other.before" "$case_dir/state/other.meta" || fail 'nested drop changed the enclosing owner record'
+  cmp -s "$case_dir/owner.before" "${slot%/*}/.fm-slot-owner" || fail 'nested drop changed the enclosing claim'
+  cmp -s "$case_dir/lease.before" "$case_dir/pool/treehouse-state.json" || fail 'nested drop changed the enclosing lease'
+  assert_equals 'other task bytes' "$(cat "$slot/other.txt")" 'nested drop removed enclosing task bytes'
+  assert_equals "$slot_head" "$(git -C "$slot" rev-parse HEAD)" 'nested drop changed enclosing task HEAD'
+  if [ -s "$case_dir/treehouse.log" ]; then
+    assert_equals "return --force $copy" "$(cat "$case_dir/treehouse.log")" 'nested drop administered the enclosing slot'
+  fi
+  cmp -s "$FM_TEST_DROP_WORDS" "$case_dir/data/task-x1/captain-drop.md" || fail 'owner drop words were not retained'
+  git init -q --bare "$case_dir/restored.git"
+  git -C "$case_dir/restored.git" fetch -q "$bundle" 'refs/heads/*:refs/heads/*' || fail 'verified bundle cannot restore commits'
+  assert_equals 'recoverable work' "$(git -C "$case_dir/restored.git" show "$head:work.txt")" 'bundle lost the removed commit contents'
+  pass 'empty recorded slot drops only the owner-authorized nested copy and preserves its bundled commits and enclosing owner'
+}
+
+test_recorded_slot_lost_lease_still_refuses() {
+  local case_dir slot rc=0
+  make_nested_slot_case recorded-slot-lost-lease enclosing .claude/worktrees/x
+  case_dir=$NESTED_CASE
+  slot=$NESTED_SLOT
+  printf 'slot=%s\n' "$slot" >> "$case_dir/state/task-x1.meta"
+  printf 'spawn_gen=teardown-test-task-x1\nslot=%s\n' "$slot" > "$case_dir/state/task-x1.teardown-return-pending"
+  cp "$case_dir/state/task-x1.meta" "$case_dir/task.before"
+  cp "${slot%/*}/.fm-slot-owner" "$case_dir/owner.before"
+  # Lose a real lease after reservation but before the final return check.
+  cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = kill-window ]; then
+  printf '{"worktrees":[{"name":"1","path":"%s","leased":false}]}\n' '$slot' > '$case_dir/pool/treehouse-state.json'
+fi
+exit 0
+SH
+  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" 'a real reserved slot that loses its lease must refuse'
+  assert_grep "REFUSED: reserved pool slot $slot lost its durable lease; retaining the task record and contents" \
+    "$case_dir/stderr" 'lost-lease refusal did not name the real slot'
+  cmp -s "$case_dir/task.before" "$case_dir/state/task-x1.meta" || fail 'lost-lease refusal removed task metadata'
+  cmp -s "$case_dir/owner.before" "${slot%/*}/.fm-slot-owner" || fail 'lost-lease refusal changed the claim'
+  assert_present "$NESTED_COPY/.git" 'lost-lease refusal removed the nested copy'
+  assert_present "$slot/.git" 'lost-lease refusal removed the real slot'
+  assert_grep "slot=$slot" "$case_dir/state/task-x1.teardown-return-pending" 'lost-lease refusal lost its pending return'
+  assert_absent "$case_dir/treehouse.log" 'lost-lease refusal returned the slot'
+  pass 'a real recorded slot whose reserved lease is lost still refuses with its slot named'
+}
+
+# Same landed recorded-slot fixture as the lost-lease case, without the fault.
+# Provider state records the observable release; it never touches a live pool.
+test_recorded_slot_intact_lease_completes() {
+  local case_dir slot rc=0
+  make_nested_slot_case recorded-slot-intact-lease enclosing .claude/worktrees/x
+  case_dir=$NESTED_CASE
+  slot=$NESTED_SLOT
+  printf 'slot=%s\n' "$slot" >> "$case_dir/state/task-x1.meta"
+  printf 'spawn_gen=teardown-test-task-x1\nslot=%s\n' "$slot" > "$case_dir/state/task-x1.teardown-return-pending"
+  cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in pool-dir|status) exit 0 ;; esac
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+[ "\$*" = 'return --force $slot' ] || exit 1
+printf '{"worktrees":[{"name":"1","path":"%s","leased":false}]}\n' '$slot' > '$case_dir/pool/treehouse-state.json'
+SH
+  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "a real reserved slot with its lease intact must complete: $(cat "$case_dir/stderr")"
+  assert_no_grep 'REFUSED:' "$case_dir/stderr" 'intact-lease completion printed a refusal'
+  assert_equals "return --force $slot" "$(cat "$case_dir/treehouse.log")" 'intact lease did not return exactly the owned slot'
+  assert_absent "$NESTED_COPY" 'intact-lease completion retained the nested copy'
+  assert_absent "$case_dir/state/task-x1.meta" 'intact-lease completion retained task metadata'
+  assert_absent "$case_dir/state/task-x1.teardown-return-pending" 'intact-lease completion retained pending metadata'
+  assert_absent "${slot%/*}/.fm-slot-owner" 'intact-lease completion retained the task claim'
+  assert_present "$slot/.git" 'intact-lease completion removed the reusable pool slot'
+  assert_equals false "$(jq -r '.worktrees[0].leased' "$case_dir/pool/treehouse-state.json")" 'intact-lease completion retained the lease'
+  pass 'a real recorded slot with an intact lease completes and releases only its owned slot'
+}
+
 test_verified_bundle_preserves_unlanded_copy() {
   local case_dir rc head digest mode second restored stored
   for mode in single multiple; do
@@ -5677,6 +5802,9 @@ test_an_empty_change_counts_only_behind_exact_merges() {
 }
 
 teardown_test_cases=(
+test_empty_recorded_slot_nested_drop
+test_recorded_slot_lost_lease_still_refuses
+test_recorded_slot_intact_lease_completes
 test_local_only_fork_remote_allows
 test_teardown_does_not_wait_for_the_home_summary_refresh
 test_teardown_closes_the_backlog_item_itself
