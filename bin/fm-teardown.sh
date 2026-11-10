@@ -83,6 +83,10 @@
 # change reaches the train head, as an ancestor or by every commit's equivalent patch
 # id (a flat pipeline rebase leaves it so), and that its net change is present in the
 # train head's final tree, so a train that reverted it before landing carries nothing.
+# The commit the forge names as the train's landing must also sit on the first-parent
+# line of the task's base and hold that same net change in its tree, for the member
+# head and for the copy (teardown_train_landing_holds), so a train recorded merged
+# by a merge that left its content out lands nothing.
 # A commit reachable from the default branch is not skipped: its own patch must be in
 # the train, because an ours merge makes a commit reachable without its change.
 # The no-mistakes run record is never a train proof: it shows what a run pushed,
@@ -2761,6 +2765,7 @@ pr_is_merged() {
 # mode are part of that patch. Nothing else is read about the graph. A member already on the
 # default branch is proven by the same patch.
 # No run record stands in for that proof.
+# The train's landing commit must hold the same change (teardown_train_landing_holds).
 # Record mode (copy gone or slot reassigned) reads no copy.
 # A train is found by searching the forge for the member URL, never by a title,
 # branch name or comment text, and every candidate is verified from its own fields.
@@ -2775,8 +2780,8 @@ TEARDOWN_TRAIN_MEMBER_URL=
 # The base of the member's own change is a RECORD, not a position in the history: the member
 # PR's base oid, which the forge attests (gh pr view --json baseRefOid) and
 # teardown_train_landed reads into TEARDOWN_TRAIN_ANCHOR. Every base computed from parent
-# pointers (merge base, first-parent line) can be faked by a merge that dropped a side's change,
-# and four reviews found a new graph that did. The anchor must be a commit of this clone
+# pointers (merge base, first-parent line) can be faked by a merge that dropped a side's change.
+# The anchor must be a commit of this clone
 # (fetched when it is not); one that cannot be made present is unknown (retry).
 TEARDOWN_TRAIN_ANCHOR=
 TEARDOWN_TRAIN_MEMBER_BASE=

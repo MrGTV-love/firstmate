@@ -162,7 +162,7 @@ fm_task_copy_content_in_default() {  # <worktree> <project> [<default-branch>] [
 # attests (gh pr view --json baseRefOid), passed in by the caller as <anchor>. Without a recorded
 # PR no anchor exists, and the base is the newest commit of the default branch's first-parent
 # line that the copy holds, a position that refuses the conventional `ours` merge but cannot
-# refuse a crafted parent-order merge (a known limit, recorded in the verdicts). A git read that
+# refuse a crafted parent-order merge (a known limit). A git read that
 # fails or ends early is never an answer: every helper below keeps a git read's output in a
 # file, checks the read's status, and reports "unread" (FM_TASK_COPY_UNASKED set) before it
 # ever reports "not present".
