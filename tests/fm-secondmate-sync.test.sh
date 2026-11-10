@@ -42,6 +42,12 @@ BASE_PATH=${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
 fm_git_identity fmtest fmtest@example.com
 
 TMP_ROOT=$(fm_test_tmproot fm-secondmate-sync)
+# Bootstrap and host-local sync must never inspect the caller's agent config.
+# Keep every local and fake-remote child below this fresh fixture HOME.
+HOME="$TMP_ROOT/operator-home"
+mkdir -p "$HOME" || fail "could not create the isolated operator HOME"
+export HOME
+unset PI_CODING_AGENT_DIR OMP_PROFILE
 export FM_BACKEND=tmux
 
 # --- world builders --------------------------------------------------------
