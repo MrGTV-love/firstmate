@@ -469,8 +469,8 @@ class CardRefreshTest(unittest.TestCase):
             self.assertEqual(methods.count('chat.postMessage'), 2)
 
 
-    def test_pending_owner_oc1_a_plane_value_typed_into_a_card_reply_stops_that_polls_journal_write_and_reports_once(self):
-        """The card-reply case (PENDING owner OC1; answer intake is not widened): a plane value typed into a reply on a live card makes the
+    def test_a_plane_value_typed_into_a_card_reply_stops_that_polls_journal_write_and_reports_once(self):
+        """The card-reply case (decided by Main 3197; answer intake is not widened): a plane value typed into a reply on a live card makes the
         journal write refuse, so that poll stops and reports secret_collides_with_marker (once per episode in the real run); no value reaches
         the journal and the reply stays unread, so it is read again when the value is gone."""
         value = 'fixture-signing-in-a-card-reply-0123456789'
@@ -3089,11 +3089,11 @@ class IntakeTest(unittest.TestCase):
             self.assertEqual(watch.load_state()['pending'], [])
 
 
-    # ---- r65 (Main 3176): the output boundary. Each case of the outcome reassessment of 406f63e0 (R1 to R3, and the refused-on listing found
-    # beside it) with its clean neighbour. A test named pending_owner_* pins the INTERIM behaviour of a hit that holds no request-text
-    # character (class 3): the plane writes nothing that holds the value, prints nothing that holds it, changes no identity, does not take the
-    # request in (the intake cursor stays, nothing is staged or acknowledged, the message is read again each poll) and reports
-    # secret_collides_with_marker once. The owner has not ruled on OC1, OC2 and OC3, so these are PENDING, not passes. ----
+    # ---- r65 (Main 3176, 3190, 3193, 3197): the output boundary. Each case of the outcome reassessment of 406f63e0 (R1 to R3, and the refused-on
+    # listing found beside it) with its clean neighbour. The tests of a hit that holds no request-text character (class 3) pin the FINAL outcome
+    # that Main decided on the owner's authority (3197): an accepted request waits unchanged, no identity is rewritten, nothing that holds the
+    # value is written or shown, the collision is reported once, the requests behind it wait until the collision ends and nothing is lost.
+    # The failed-row listing prints nothing under a collision (Main 3190 and 3193). Only OC4 (the 20-unit mix) is still pending the owner. ----
 
     def run_printed(self, watch, command='poll'):
         """One poll, then what the run prints through the one writer: (standard output, standard error)."""
@@ -3180,8 +3180,8 @@ class IntakeTest(unittest.TestCase):
             [line] = [l for l in out.splitlines() if l.startswith(plane.REQUEST_PREFIX)]
             self.assertEqual(self.wake_parts(line)['pointer'], place + '#200.000100')
 
-    def test_pending_owner_oc2_a_value_formed_from_identities_and_syntax_takes_no_request_in_and_changes_no_identity(self):
-        """R2 part 1 (class 3, PENDING owner OC1/OC2): thread + the JSON separator + the author id holds no request-text character. Interim: the
+    def test_a_value_formed_from_identities_and_syntax_takes_no_request_in_and_changes_no_identity(self):
+        """R2 part 1 (class 3, decided by Main 3197): thread + the JSON separator + the author id holds no request-text character. The
         request is not taken in (cursor held, nothing staged, no acknowledgement), the failure is reported, the journal holds no value; when the
         value is gone the request arrives once, with its identities intact."""
         value = '200.000100' + '", "author": "' + self.OWNER
@@ -3204,8 +3204,8 @@ class IntakeTest(unittest.TestCase):
             watch.poll()
             self.assertEqual(self.acks(replay), ['200.000100'])
 
-    def test_pending_owner_oc2_a_value_across_two_record_entries_takes_the_second_request_no_further(self):
-        """R1 part 2, the record store (class 3, PENDING owner OC1/OC2): the value is the end of one entry, the newline and the start of the next
+    def test_a_value_across_two_record_entries_takes_the_second_request_no_further(self):
+        """R1 part 2, the record store (class 3, decided by Main 3197): the value is the end of one entry, the newline and the start of the next
         (structure and the next key, no request text). Interim: the first request is taken in and woken; the second is not taken in; the whole
         store holds no value; when the value is gone the second arrives once, in order."""
         texts = ['first plain owner request', 'second plain owner request']
@@ -3236,8 +3236,8 @@ class IntakeTest(unittest.TestCase):
         return {'event': 'test/request/' + thread, 'key': '', 'thread': thread, 'author': self.OWNER, 'text': 'a request', 'shown': 'a request',
                 'replaced': False, 'extra': 0, 'kind': 'request', 'stage': 'request', 'state': 'failed', 'owner': 'Main', 'tries': 3}
 
-    def test_pending_owner_oc3_a_value_inside_the_listing_prints_no_row_text_off_the_plane_and_under_a_refusal(self):
-        """R1 part 1 and the refused-on listing found beside it (PENDING owner OC3): a plane value inside the failed-row listing's fixed text
+    def test_a_value_inside_the_listing_prints_no_row_text_off_the_plane_and_under_a_refusal(self):
+        """R1 part 1 and the refused-on listing found beside it (decided by Main 3190 and 3193): a plane value inside the failed-row listing's fixed text
         makes the listing print no row text, off the plane and in a run the collision refuses; the journal is unchanged; a clean neighbour
         lists the row once."""
         value = 'not acknowledged (failed'
@@ -3268,7 +3268,7 @@ class IntakeTest(unittest.TestCase):
                 self.assertEqual(out.getvalue().count(listing), 1, label)
 
     def test_the_refusal_is_reported_once_and_the_request_arrives_once_in_order_when_the_collision_clears(self):
-        """Liveness of the interim function: the one report line prints although the request is refused, a second run adds no second report,
+        """Liveness of the collision outcome: the one report line prints although the request is refused, a second run adds no second report,
         and nothing is lost or repeated when the value goes away."""
         value = '200.000100' + '", "author": "' + self.OWNER
         with self.fixture(env={'SLACK_SIGNING_SECRET': value}) as (watch, replay):
@@ -3361,8 +3361,8 @@ class IntakeTest(unittest.TestCase):
         self.assertEqual({k: copy[k] for k in ('event', 'key', 'thread', 'author', 'kind', 'stage')}, {k: row[k] for k in ('event', 'key', 'thread', 'author', 'kind', 'stage')})
 
 
-    def test_pending_owner_oc1_a_value_across_two_notice_lines_withholds_the_later_line_to_the_next_run(self):
-        """A hit in the printed stream with no request-text character (class 3, PENDING owner OC1): the later line is withheld and stays
+    def test_a_value_across_two_notice_lines_withholds_the_later_line_to_the_next_run(self):
+        """A hit in the printed stream with no request-text character (class 3, decided by Main 3197): the later line is withheld and stays
         journaled, nothing holds the value, and the next run prints it alone, once; the earlier line is printed once."""
         first, second = self.notice_line('120.000100'), self.notice_line('120.000200')
         value = first[-20:] + '\n' + second[:20]
@@ -3384,8 +3384,8 @@ class IntakeTest(unittest.TestCase):
                 self.assertEqual(later.getvalue().splitlines(), [second] if held else [])
                 self.assertEqual(watch.load_state()['outbox'], [])
 
-    def test_pending_owner_oc1_a_state_that_would_hold_a_value_is_not_written(self):
-        """The journal's own sink (class 3, PENDING owner OC1): a state whose complete text holds a plane value is refused before any byte is
+    def test_a_state_that_would_hold_a_value_is_not_written(self):
+        """The journal's own sink (class 3, decided by Main 3197): a state whose complete text holds a plane value is refused before any byte is
         written and the file stays as it was; a clean state is written."""
         value = 'fixture-signing-in-the-state-0123456789'
         with self.fixture(env={'SLACK_SIGNING_SECRET': value}) as (watch, replay):

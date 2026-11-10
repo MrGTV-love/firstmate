@@ -457,13 +457,12 @@ def value_hits(text):
 
 
 def collision_outcome(kind):
-    """THE interim outcome of a hit that holds no request-text character (class 3), the one place that decides it. PENDING the owner (OC1: what
-    an already accepted request does; OC2: identity or structure against replacement; OC3: the failed-row listing against the refusal): only this
-    function changes when the owner rules. The interim is the protective one: nothing that holds the value is written or printed, no identity is
-    changed, and the secret_collides_with_marker refusal is reported once per episode (`report_failure`). For a request, a state or a record the
-    request is not taken in (the intake cursor stays, nothing is staged or acknowledged, the message is read again each poll, the requests behind
-    it wait, in order, until the value or the message changes), so it raises. A printed line is withheld and stays journaled, and a listing prints
-    no row text; those return None."""
+    """THE outcome of a hit that holds no request-text character (class 3), the one place that decides it. Decided by Main 3197 on the owner's
+    authority (2026-11-10), and final: an already accepted request WAITS unchanged; message identity data (thread, author, event, key) is never
+    rewritten; nothing that holds the value is written or shown; the collision is reported once per episode (`report_failure`); the requests behind
+    it wait until the collision ends; nothing is lost. For a request, a state or a record the request is not taken in (the intake cursor stays,
+    nothing is staged or acknowledged, the message is read again each poll), so it raises. A printed line is withheld and stays journaled, and the
+    failed-row listing prints nothing (Main 3190 and 3193); those return None."""
     if kind in ('listing', 'stream'):
         return None
     raise SecretCollision('secret_collides_with_marker')
@@ -2173,7 +2172,7 @@ def listing_may_print():
 def list_failed_requests(command, threads, out=None):
     """Each open failed request row, once, as `slack: request <ts> not acknowledged (failed, owner Main)`: on standard output for a poll, on
     standard error for a check. The listing is not a wake. It goes through the one writer: a listing whose complete text would hold a plane
-    value prints no row text at all (collision_outcome, PENDING owner OC3); the rows stay in the journal and `resolve` still closes them."""
+    value prints no row text at all (collision_outcome; decided by Main 3190 and 3193); the rows stay in the journal and `resolve` still closes them."""
     out = out or Out()
     if command not in ('poll', 'check') or not threads or not listing_may_print():
         return
