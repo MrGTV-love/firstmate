@@ -588,6 +588,9 @@ function makeHost(session) {
     // Pi reads its session through runtimeHost, which a session replacement swaps.
     runtimeHost: { session },
     compactionQueuedMessages: [],
+    // A class field of InteractiveMode, so a real instance always has it; Pi 1.5.1
+    // reads it in updatePendingMessagesDisplay.
+    pendingBashComponents: [],
     statuses: [],
     warnings: [],
     editorText: "",
@@ -649,6 +652,19 @@ visibility.setCalmPresentation(true);
   }
   check(JSON.stringify(host.statuses) === JSON.stringify([layout.CALM_SUPERVISION_CONTINUES_NOTICE]), `continuation notice: ${JSON.stringify(host.statuses)}`);
   assertNoOperationalText(host.statuses.join("\n"), "continuation notice");
+}
+
+// 1b. A pending bash component in the same listing changes nothing about queued rows.
+//     Whether its own line shows depends on the Pi version, so that is not asserted.
+{
+  const session = makeSession();
+  const host = makeHost(session);
+  host.pendingBashComponents.push({ render: () => ["PENDING_BASH_STUB_LINE"] });
+  session.followUp.push(watcherOne, captainText);
+  host.updatePendingMessagesDisplay();
+  const rows = host.rows();
+  assertNoOperationalText(rows, "queued listing under Calm beside a pending bash component");
+  check(rows.includes(`Follow-up: ${captainText}`), `captain's queued row disappeared beside a pending bash component: ${rows}`);
 }
 
 // 2. The dequeue key restores captain text while the run keeps going: nothing restarts.
