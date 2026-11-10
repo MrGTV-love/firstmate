@@ -1292,7 +1292,7 @@ class IntakeTest(unittest.TestCase):
 
     def release(self, watch, replay):
         """A head request whose acknowledgement always fails, with a newer one behind it, run to its release."""
-        self.say(replay, '200.000100', 'a request the owner deleted')
+        self.say(replay, '200.000100', 'a request Slack will not acknowledge')
         self.say(replay, '200.000200', 'the newer request')
         replay.state['failures']['chat.postMessage:200.000100'] = {'status': 400}
         replay.save()
@@ -1305,12 +1305,12 @@ class IntakeTest(unittest.TestCase):
             # Released at the third failed poll, never acknowledged; the newer request follows in that same poll.
             self.assertEqual(acks, [[], [], ['200.000200']])
             self.assertEqual(self.wakes(watch), [
-                plane.request_line('200.000100', self.OWNER, 'a request the owner deleted', plane.REQUEST_UNACKNOWLEDGED),
+                plane.request_line('200.000100', self.OWNER, 'a request Slack will not acknowledge', plane.REQUEST_UNACKNOWLEDGED),
                 plane.request_line('200.000200', self.OWNER, 'the newer request')])
             saved = watch.load_state()
             [row] = saved['pending']
             self.assertEqual((row['thread'], row['state'], row['owner'], row['tries'], row['text'], row['author']),
-                             ('200.000100', 'failed', 'Main', 3, 'a request the owner deleted', self.OWNER))
+                             ('200.000100', 'failed', 'Main', 3, 'a request Slack will not acknowledge', self.OWNER))
             self.assertNotIn(row['event'], saved['seen'])
             self.assertEqual(watch.failed_requests(), ['200.000100'])
             # Later requests still go on in order; the open row is never retried, acknowledged or woken again.

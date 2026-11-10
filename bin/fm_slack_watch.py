@@ -1244,9 +1244,6 @@ class Watch:
         forms = [first, os.path.relpath(path, self.home)]
         return [self.escape_place(value) for index, value in enumerate(forms) if value not in forms[:index]]
 
-    def record_place(self):
-        return self.record_places()[0]
-
     def request_wake_line(self, pending, note=''):
         places = self.record_places()
         return request_line(pending['thread'], pending['author'], shown_text(pending), note,
