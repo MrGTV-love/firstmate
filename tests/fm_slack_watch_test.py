@@ -1729,18 +1729,57 @@ class IntakeTest(unittest.TestCase):
 
     @contextmanager
     def observe_every_write(self, watch, writes):
-        """Every byte written through open() to a file under the fixture home, whatever the plane function that writes
-        it (the state save, the record append, the shim): the observer of every durable write, not of one function."""
+        """Every byte written to a file under the fixture home, whatever the route: open() and io.open() (Path.write_text
+        and os.fdopen go through io.open, so the journal's mkstemp and fdopen write is seen), a descriptor written with
+        os.write, and the content of a temp file at the moment os.replace or os.rename commits it. Each handle's whole text
+        is also recorded when it closes, so a value that spans two write calls is found. A write that no in-process route
+        reaches (a child process) is covered by the scan of the final files in watch_durable_text."""
         import builtins
-        real_open, home = builtins.open, str(watch.root.parent)
+        real_open, real_write, real_close = builtins.open, os.write, os.close
+        real_replace, real_rename = os.replace, os.rename
+        home = os.path.realpath(str(watch.root.parent))
+        descriptors = {}
+
+        def under(path):
+            try:
+                resolved = os.path.realpath(os.fspath(path))
+            except (TypeError, ValueError):
+                return False
+            # The replay's own state file is Slack's side of the conversation (it holds the owner's raw messages), not the plane's.
+            if os.path.basename(resolved).startswith('replay-state-'):
+                return False
+            return resolved == home or resolved.startswith(home + os.sep)
+
+        def fd_path(fd):
+            getpath = getattr(fcntl, 'F_GETPATH', None)
+            try:
+                if getpath is not None:
+                    return fcntl.fcntl(fd, getpath, b'\0' * 1024).split(b'\0', 1)[0].decode()
+                return os.readlink('/proc/self/fd/%d' % fd)
+            except (OSError, ValueError):
+                return ''
+
+        def text_of(data):
+            return data.decode('utf-8', 'replace') if isinstance(data, (bytes, bytearray)) else data
 
         class Spy:
             def __init__(self, handle):
                 self.handle = handle
+                self.whole = []
 
             def write(self, data):
-                writes.append(data.decode('utf-8', 'replace') if isinstance(data, bytes) else data)
+                writes.append(text_of(data))
+                self.whole.append(text_of(data))
                 return self.handle.write(data)
+
+            def writelines(self, lines):
+                for line in lines:
+                    self.write(line)
+
+            def close(self):
+                writes.append(''.join(self.whole))
+                self.whole = []
+                return self.handle.close()
 
             def __getattr__(self, name):
                 return getattr(self.handle, name)
@@ -1750,15 +1789,111 @@ class IntakeTest(unittest.TestCase):
                 return self
 
             def __exit__(self, *exc):
+                writes.append(''.join(self.whole))
+                self.whole = []
                 return self.handle.__exit__(*exc)
 
-        def spy(file, mode='r', *args, **kwargs):
+        def spy_open(file, mode='r', *args, **kwargs):
             handle = real_open(file, mode, *args, **kwargs)
-            if isinstance(file, (str, os.PathLike)) and str(file).startswith(home) and any(c in mode for c in 'wax+'):
+            path = fd_path(file) if isinstance(file, int) else file
+            if isinstance(path, (str, os.PathLike)) and under(path) and any(c in mode for c in 'wax+'):
                 return Spy(handle)
             return handle
-        with patch('builtins.open', spy):
+
+        def spy_write(fd, data):
+            path = fd_path(fd)
+            if path and under(path):
+                writes.append(text_of(data))
+                descriptors.setdefault(fd, []).append(text_of(data))
+            return real_write(fd, data)
+
+        def spy_close(fd):
+            if fd in descriptors:
+                writes.append(''.join(descriptors.pop(fd)))
+            return real_close(fd)
+
+        def committing(real_call):
+            def call(src, dst, *args, **kwargs):
+                if under(dst):
+                    try:
+                        with real_open(src, 'rb') as committed:
+                            writes.append(text_of(committed.read()))
+                    except OSError:
+                        pass
+                return real_call(src, dst, *args, **kwargs)
+            return call
+        with patch('builtins.open', spy_open), patch('io.open', spy_open), patch('os.write', spy_write), \
+             patch('os.close', spy_close), patch('os.replace', committing(real_replace)), \
+             patch('os.rename', committing(real_rename)):
             yield
+
+    def test_the_every_write_observer_is_calibrated_on_every_python_write_route(self):
+        """A bad write through each route is seen, and a clean write through the same route is not. The earlier observer
+        wrapped builtins.open only, so the journal's own mkstemp and fdopen write was invisible to it (review of b0f37a54, F1)."""
+        value = 'fixture-signing-route-0123456789'
+
+        def via_open(path, text):
+            with open(path, 'a') as out:
+                out.write(text)
+
+        def via_io_open(path, text):
+            with io.open(path, 'w') as out:
+                out.write(text)
+
+        def via_path_write_text(path, text):
+            path.write_text(text)
+
+        def via_mkstemp_fdopen_split_and_transient(path, text):
+            fd, name = tempfile.mkstemp(dir=path.parent)
+            with os.fdopen(fd, 'w') as out:
+                out.write(text[:9])
+                out.write(text[9:])
+            os.unlink(name)
+
+        def via_os_open_and_os_write(path, text):
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            try:
+                os.write(fd, text.encode()[:7])
+                os.write(fd, text.encode()[7:])
+            finally:
+                os.close(fd)
+
+        def via_mkstemp_os_write_replace(path, text):
+            fd, name = tempfile.mkstemp(dir=path.parent)
+            os.write(fd, text.encode())
+            os.close(fd)
+            os.replace(name, path)
+            path.unlink()
+
+        def via_json_dump_across_chunks(path, first, second):
+            fd, name = tempfile.mkstemp(dir=path.parent)
+            with os.fdopen(fd, 'w') as out:
+                json.dump({'a': first, 'b': second}, out)
+            os.unlink(name)
+        routes = [('open', via_open), ('io-open', via_io_open), ('path-write-text', via_path_write_text),
+                  ('mkstemp-fdopen', via_mkstemp_fdopen_split_and_transient), ('os-write', via_os_open_and_os_write),
+                  ('mkstemp-os-write-replace', via_mkstemp_os_write_replace)]
+        for label, route in routes:
+            for mutant in (False, True):
+                with self.fixture(env={'SLACK_SIGNING_SECRET': value}) as (watch, replay):
+                    writes = []
+                    with self.observe_every_write(watch, writes):
+                        route(watch.root / ('route-%s.txt' % label), value if mutant else 'an ordinary clean line of text')
+                    self.assertEqual(value in '\n'.join(writes), mutant, (label, mutant))
+        # A value that only the JSON encoding of two fields could join is not in the chunks, and the handle's whole text shows it.
+        with self.fixture(env={'SLACK_SIGNING_SECRET': 'ab", "b": "cd'}) as (watch, replay):
+            writes = []
+            with self.observe_every_write(watch, writes):
+                via_json_dump_across_chunks(watch.root / 'route-json.txt', 'ab', 'cd')
+            self.assertIn('ab", "b": "cd', '\n'.join(writes))
+
+    def test_the_every_write_observer_sees_the_journals_own_save_route(self):
+        with self.fixture() as (watch, replay):
+            writes = []
+            watch.state['pending'].append(self.notice('test/notice/1', '100.000100'))
+            with self.observe_every_write(watch, writes):
+                watch.commit()
+            self.assertIn('"text": "A notice"', '\n'.join(writes))
 
     def test_the_every_write_observer_catches_a_transient_record_write(self):
         value = 'fixture-signing-transient-0123456789'
