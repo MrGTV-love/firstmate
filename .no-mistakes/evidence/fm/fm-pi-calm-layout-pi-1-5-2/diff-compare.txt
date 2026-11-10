@@ -1,0 +1,15 @@
+carried patch sha256: 1e49920db974ad1580099e59fd3de53e70b471893159a2f507c3852dab7dd0eb (expected 1e49920db974ad1580099e59fd3de53e70b471893159a2f507c3852dab7dd0eb)
+diff --stat base..head:
+ tests/fm-calm-pi-extension.test.sh | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+patch-id delivered: 661d50d1bc313ccabe3f3427dd7fd50417b318ce
+patch-id carried:   661d50d1bc313ccabe3f3427dd7fd50417b318ce
+changed-line compare (empty = byte-equal):
+0a1
+> ---
+16a18
+> -- 
+
+note: the only extra lines are the format-patch mail separators above ('---' after the commit message, '-- ' before the git version signature); no code line differs.
+hunk-only compare:
+(hunks identical)

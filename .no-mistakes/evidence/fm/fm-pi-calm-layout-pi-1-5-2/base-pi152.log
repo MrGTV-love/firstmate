@@ -1,0 +1,21 @@
+== root: /tmp/fm-pi-lab.2nMVKZ/base (archive)
+== start UTC: 2026-11-10T21:17:51Z
+== loaded Pi version (package.json at /tmp/fm-pi-lab.2nMVKZ/pi-1.5.2/lib/node_modules/@earendil-works/pi-coding-agent): 1.5.2
+== pi on PATH: /tmp/fm-pi-lab.2nMVKZ/pi-1.5.2/bin/pi -> 1.5.2
+ok - Pi calm resolves its persistent home independently of Pi's launch directory
+ok - Pi calm compatibility evidence never rejects a Pi version for being newer than 0.82.0, and still fails closed on a missing or malformed version
+ok - a missing collapsed-thinking presentation API degrades only that Calm adapter with a clear skip reason, while the rest of Calm still registers
+ok - missing Pi presentation class exports reach the independent adapter degradation path
+not ok - Pi Calm queued operational rows: file:///private/tmp/fm-pi-lab.2nMVKZ/pi-1.5.2/lib/node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/interactive-mode.js:4009
+        for (const component of this.pendingBashComponents) {
+                                     ^
+
+TypeError: this.pendingBashComponents is not iterable
+    at InteractiveMode.updatePendingMessagesDisplay (file:///private/tmp/fm-pi-lab.2nMVKZ/pi-1.5.2/lib/node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/interactive-mode.js:4009:38)
+    at prototype.updatePendingMessagesDisplay (file:///private/tmp/fm-pi-lab.2nMVKZ/home-1.5.2-base-pi152/tmp/fm-calm-pi-extension.8I4y42/queued-operational-rows/lib/fm-calm-pending-operational-layout.ts:207:44)
+    at file:///private/tmp/fm-pi-lab.2nMVKZ/home-1.5.2-base-pi152/tmp/fm-calm-pi-extension.8I4y42/queued-operational-rows/[eval1]:112:8
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+Node.js v26.11.1
+== exit: 1
+== end UTC: 2026-11-10T21:17:55Z
