@@ -2725,6 +2725,40 @@ class IntakeTest(unittest.TestCase):
             acks, errors = self.polls(watch, replay, 1)
             self.assertEqual((acks, errors), ([['200.000100']], [None]))
 
+    def test_open_failed_requests_are_listed_by_poll_and_check_while_the_plane_is_off_or_unbound(self):
+        """F4 of the outcome review of b0f37a54: with the plane unconfigured both commands exit 0, list the open failed row once on the right
+        stream, make no Slack call and change no byte of the state; the unbound run and the resolved row are the controls."""
+        line = 'slack: request 200.000100 not acknowledged (failed, owner Main)'
+        with self.fixture() as (watch, replay):
+            self.say(replay, '200.000100', 'a request that is refused three times')
+            replay.state['failures']['chat.postMessage:200.000100'] = {'status': 400}
+            replay.save()
+            self.polls(watch, replay, 3)
+            self.assertEqual(watch.failed_requests(), ['200.000100'])
+            before = (watch.path.read_bytes(), sorted(path.name for path in watch.root.iterdir()))
+            for command in ('poll', 'check'):
+                out, err = io.StringIO(), io.StringIO()
+                with patch.dict(os.environ, {'SLACK_BOT_TOKEN': ''}), contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                    code = plane.main([command])
+                streams = (out.getvalue().splitlines(), err.getvalue().splitlines())
+                here, other = streams if command == 'poll' else streams[::-1]
+                self.assertEqual((code, here.count(line), line in other), (0, 1, False), command)
+            self.assertEqual((watch.path.read_bytes(), sorted(path.name for path in watch.root.iterdir())), before)
+            # The unbound source: the same listing, once, from the run that makes no call.
+            with patch.object(watch, 'bound', return_value=None):
+                out = io.StringIO()
+                with contextlib.redirect_stdout(out):
+                    watch.poll()
+                    plane.emit(watch, 'poll')
+                self.assertEqual(out.getvalue().splitlines().count(line), 1)
+            # A resolved row is no longer listed, off or on.
+            watch.close_request('200.000100')
+            watch.commit()
+            out = io.StringIO()
+            with patch.dict(os.environ, {'SLACK_BOT_TOKEN': ''}), contextlib.redirect_stdout(out):
+                self.assertEqual(plane.main(['poll']), 0)
+            self.assertEqual(out.getvalue().splitlines().count(line), 0)
+
     def test_a_failed_lookup_before_the_first_post_does_not_count_and_the_post_goes_on(self):
         with self.fixture() as (watch, replay):
             self.say(replay, '200.000100', 'the request')

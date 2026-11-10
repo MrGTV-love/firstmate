@@ -2050,10 +2050,29 @@ def emit(watch, command):
     else:
         plan = emit_plan(watch, command, True)
     emit_write(watch, plan)
+    list_failed_requests(command, watch.failed_requests())
+
+
+def list_failed_requests(command, threads):
+    """Each open failed request row, once, as `slack: request <ts> not acknowledged (failed, owner Main)`: on standard output for a poll, on
+    standard error for a check. The listing is not a wake."""
     if command in ('poll', 'check'):
-        for ts in watch.failed_requests():
+        for ts in threads:
             print('slack: request %s not acknowledged (failed, owner Main)' % ts,
                   file=sys.stderr if command == 'check' else sys.stdout, flush=True)
+
+
+def open_failed_threads():
+    """The threads of the open failed request rows, read from the journal with no watcher: no lock, no Slack call and no write, so that a
+    run of a plane that is off still lists them (F4 of the outcome review of b0f37a54; I2 (h) allows this listing and nothing else)."""
+    path = state_home() / STATE_KEY / 'state.json'
+    try:
+        if path.is_symlink():
+            return []
+        rows = json.loads(path.read_text()).get('pending', [])
+        return [row['thread'] for row in rows if isinstance(row, dict) and row.get('kind') == 'request' and failed(row)]
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        return []
 
 
 def emit_plan(watch, command, bound):
@@ -2123,6 +2142,7 @@ def main(argv):
             return 1
         if state == 'refused' and command != 'check':
             print('slack: refused: ' + reason)
+        list_failed_requests(command, open_failed_threads())
         return 0
     watch = None
     code = 0
