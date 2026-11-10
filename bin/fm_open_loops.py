@@ -533,11 +533,12 @@ class Collector:
             if task["current_state"].get("state") == "failed":
                 # A scout's report is output to consume, not proof its failed
                 # investigation has been resolved by the supervising owner.
-                if task["kind"] == "scout" or not self.source(
-                        "failed deliverable " + task["id"], self.deliverable_landed, task):
+                if not self.captain_dropped(task) and (task["kind"] == "scout" or not self.source(
+                        "failed deliverable " + task["id"], self.deliverable_landed, task)):
                     self.add("failed_task", task["id"], "recover the failed work or record why it ends",
                              mtime(self.state / (task["id"] + ".status")))
-            elif task["current_state"].get("state") == "done" and not task["pr"].get("url"):
+            elif (task["current_state"].get("state") == "done" and not task["pr"].get("url")
+                  and not self.captain_dropped(task)):
                 # Terminal worker status hands ownership back; without a PR no
                 # forge row carries the next review or validation action.
                 status_at, _, _, _, _, _ = self.report_status(task["id"])

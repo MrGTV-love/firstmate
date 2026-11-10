@@ -244,7 +244,11 @@ print('PASS: ordinary categories, PR proof, ages and configuration', flush=True)
 # is no PR. A failed scout does not become resolved merely by writing a report.
 completion_tasks = [task('finished-review', world / 'no-review-copy', state='done', kind='scout'),
                     task('failed-review', world / 'no-review-copy', state='failed', kind='scout'),
-                    task('candidate-ready', fresh, state='done')]
+                    task('candidate-ready', fresh, state='done'),
+                    task('dropped-review', world / 'no-review-copy', state='done', kind='scout'),
+                    task('dropped-candidate', fresh, state='done')]
+completion_backlog = backlog + [dict(id=name, structured=True, state='done', captain_drop=True)
+                                for name in ('dropped-review', 'dropped-candidate')]
 for item in completion_tasks:
     name = item['id']
     (home / f'state/{name}.status').write_text(f"{item['current_state']['state']} [at={hours(1)}]: ready for owner\n")
@@ -254,7 +258,7 @@ for item in completion_tasks:
         report_dir.mkdir()
         (report_dir / 'report.md').write_text('fixture review result\n')
 (home / 'snapshot.json').write_text(json.dumps(dict(schema='fm-fleet-home-input.v1', tasks=tasks + completion_tasks,
-                                                    backlog=dict(present=True, records=backlog))))
+                                                    backlog=dict(present=True, records=completion_backlog))))
 for _ in range(2):  # a fresh collector process must recover the same unfinished handoff
     completion_report = ledger()
     completed = rows(completion_report, 'completed_task')
@@ -843,13 +847,16 @@ for exists, alive in ((False, 'dead'), (True, 'dead'), (True, 'missing'), (True,
         task('axis-missing-pr', world / 'missing-pr-copy', state='failed', exists=exists, alive=alive,
              pr=PR_URL + '5'),
         task('axis-drop', lost, state='failed', exists=exists, alive=alive),
-        task('axis-report', lost, state='failed', exists=exists, alive=alive, kind='scout')]
-    (home / 'data/axis-report').mkdir(exist_ok=True)
-    (home / 'data/axis-report/report.md').write_text('Delivered findings\n')
-    fixture(failed_axes, [dict(id='axis-drop', structured=True, state='done', captain_drop=True)])
+        task('axis-report', lost, state='failed', exists=exists, alive=alive, kind='scout'),
+        task('axis-dropped-report', lost, state='failed', exists=exists, alive=alive, kind='scout')]
+    for name in ('axis-report', 'axis-dropped-report'):
+        (home / 'data' / name).mkdir(exist_ok=True)
+        (home / 'data' / name / 'report.md').write_text('Delivered findings\n')
+    fixture(failed_axes, [dict(id=name, structured=True, state='done', captain_drop=True)
+                         for name in ('axis-drop', 'axis-dropped-report')])
     (home / 'config/open-loops.json').write_text(json.dumps(dict(age_limits_seconds=dict(failed_task=123))))
     axes = ledger()
-    assert set(rows(axes, 'failed_task')) == {'axis-pending'}, axes
+    assert set(rows(axes, 'failed_task')) == {'axis-pending', 'axis-report'}, axes
     assert rows(axes, 'failed_task')['axis-pending']['limit_seconds'] == 123
     if not exists or alive in ('dead', 'missing'):
         assert set(rows(axes, 'missing_worker')) == {t['id'] for t in failed_axes}, axes
