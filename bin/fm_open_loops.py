@@ -26,7 +26,7 @@ GH_REST = BIN / "fm-gh-rest.sh"  # conditional REST reads and the shared quota f
 DEFAULT_AGES = {
     "missing_worker": 600, "ready_not_started": 1800, "unanswered_question": 1800,
     "unhandled_board_answer": 300, "interrupted_teardown": 1800,
-    "failed_task": 1800, "stalled_worker": 3600, "unlanded_commit": 86400,
+    "failed_task": 1800, "completed_task": 1800, "stalled_worker": 3600, "unlanded_commit": 86400,
     "open_pr": 3600, "review_pass_not_merged": 600, "red_check": 0, "coverage": 0, "silent_report": 900,
 }
 CHECK_IN_TEXT = ("Check in: report progress, blockers, and cross-workstream dependencies that need resolution. "
@@ -416,7 +416,7 @@ class Collector:
         excluded = None
         long_wait = False
         if task["kind"] != "secondmate" and (verb == "done" or task["current_state"].get("state") == "done"):
-            excluded = "excluded: done/ready task is covered by PR or landing evidence"
+            excluded = "excluded: done/ready task is covered by PR or completion handoff"
         elif task["kind"] == "secondmate" and not open_replies and not self.secondmate_has_work(task):
             excluded = "excluded: idle secondmate has no routed work in flight"
         elif open_decision or self.gate_awaits_human(task):
@@ -531,9 +531,21 @@ class Collector:
                 self.add("missing_worker", task["id"], "recover the assigned worker without discarding work",
                          mtime(self.state / (task["id"] + ".status")) or mtime(self.state / (task["id"] + ".meta")))
             if task["current_state"].get("state") == "failed":
-                if not self.source("failed deliverable " + task["id"], self.deliverable_landed, task):
+                # A scout's report is output to consume, not proof its failed
+                # investigation has been resolved by the supervising owner.
+                if task["kind"] == "scout" or not self.source(
+                        "failed deliverable " + task["id"], self.deliverable_landed, task):
                     self.add("failed_task", task["id"], "recover the failed work or record why it ends",
                              mtime(self.state / (task["id"] + ".status")))
+            elif task["current_state"].get("state") == "done" and not task["pr"].get("url"):
+                # Terminal worker status hands ownership back; without a PR no
+                # forge row carries the next review or validation action.
+                status_at, _, _, _, _, _ = self.report_status(task["id"])
+                self.add("completed_task", task["id"],
+                         "consume the report and complete the owner handoff" if task["kind"] == "scout"
+                         else "advance the committed candidate through its selected delivery path",
+                         status_at, evidence="worker completion is a handoff, not final acceptance",
+                         source=self.source("completion provenance " + task["id"], self.task_source, task["id"]))
             elif task["current_state"].get("state") == "working" and alive == "alive":
                 self.source("progress " + task["id"], self.stalled, task)
             self.source("unlanded work " + task["id"], self.unlanded, task)

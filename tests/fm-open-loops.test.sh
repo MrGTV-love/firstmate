@@ -240,6 +240,36 @@ assert bad.returncode == 1 and 'unknown open-loop age category' in bad.stdout, b
 (home / 'config/open-loops.json').unlink()
 print('PASS: ordinary categories, PR proof, ages and configuration', flush=True)
 
+# A terminal declaration hands report/candidate ownership back even when there
+# is no PR. A failed scout does not become resolved merely by writing a report.
+completion_tasks = [task('finished-review', world / 'no-review-copy', state='done', kind='scout'),
+                    task('failed-review', world / 'no-review-copy', state='failed', kind='scout'),
+                    task('candidate-ready', fresh, state='done')]
+for item in completion_tasks:
+    name = item['id']
+    (home / f'state/{name}.status').write_text(f"{item['current_state']['state']} [at={hours(1)}]: ready for owner\n")
+    (home / f'state/{name}.meta').write_text(f"kind={item['kind']}\nspawn_gen=fixture-{name}\n")
+    if item['kind'] == 'scout':
+        report_dir = home / 'data' / name
+        report_dir.mkdir()
+        (report_dir / 'report.md').write_text('fixture review result\n')
+(home / 'snapshot.json').write_text(json.dumps(dict(schema='fm-fleet-home-input.v1', tasks=tasks + completion_tasks,
+                                                    backlog=dict(present=True, records=backlog))))
+for _ in range(2):  # a fresh collector process must recover the same unfinished handoff
+    completion_report = ledger()
+    completed = rows(completion_report, 'completed_task')
+    assert set(completed) == {'finished-review', 'candidate-ready'}, completed
+    assert all(r['owner'] == 'firstmate' and r['overdue'] for r in completed.values()), completed
+    assert 'failed-review' in rows(completion_report, 'failed_task'), completion_report
+# Retirement is owned elsewhere; collection never launches or accepts the work.
+(home / 'snapshot.json').write_text(json.dumps(dict(schema='fm-fleet-home-input.v1', tasks=tasks,
+                                                    backlog=dict(present=True, records=backlog))))
+assert not rows(ledger(), 'completed_task')
+for item in completion_tasks:
+    for suffix in ('status', 'meta'):
+        (home / f"state/{item['id']}.{suffix}").unlink()
+print('PASS: completed reviews and committed candidates retain their owner action; failed reports do not imply acceptance', flush=True)
+
 # Independent review is only the record owner's verified exact-head evidence.
 # review_lanes is a discovery hint, not authority: the ledger asks
 # bin/fm-review-record.py once for the live head and consumes one atomic
