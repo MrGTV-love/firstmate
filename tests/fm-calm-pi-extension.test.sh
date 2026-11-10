@@ -588,6 +588,9 @@ function makeHost(session) {
     // Pi reads its session through runtimeHost, which a session replacement swaps.
     runtimeHost: { session },
     compactionQueuedMessages: [],
+    // A class field of InteractiveMode, so a real instance always has it; Pi 1.5.1
+    // reads it in updatePendingMessagesDisplay.
+    pendingBashComponents: [],
     statuses: [],
     warnings: [],
     editorText: "",
