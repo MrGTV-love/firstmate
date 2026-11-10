@@ -1008,7 +1008,23 @@ test_remote_input_check_transport_failure_is_not_a_missing_input() {
         "a transport failure must not open an unattended hold ($mode)"
     fi
   done
-  pass "fm-send remote: a lost or bounded input check exits 1 without a missing-input refusal or hold"
+  mv "$home/data/secondmates.md" "$dir/secondmates.md"
+  : > "$events"; printf '0\n' > "$ssh_log.count"
+  rc=0
+  send_env "$fb" "$home" "$ssh_log" FM_GUARD_EVENT_LOG="$events" \
+    "$SEND" rsm --require-input data/required.md 'Use the declared input report' \
+    >"$dir/out" 2>"$dir/err" || rc=$?
+  err=$(cat "$dir/err")
+  expect_code 1 "$rc" "a local route failure must not exit as a validation refusal: $err"
+  assert_contains "$err" "could not be checked on receiver 'rsm'" "a local route failure must say the input was not checked"
+  assert_not_contains "$err" 'refused required input' "a local route failure must not report the input as missing"
+  [ "$(cat "$ssh_log.count")" = 0 ] || fail "a local route failure reached the transport"
+  jq -es 'map(select(.guard == "send-task-prerequisites")) | length == 0' "$events" >/dev/null \
+    || fail "a local route failure recorded an input decision: $(cat "$events")"
+  [ -z "$(remote_inbox_records "$rhome")" ] || fail "a local route failure published a remote steer"
+  [ -z "$(pending_record "$home")" ] || fail "a local route failure armed a pending reply"
+  mv "$dir/secondmates.md" "$home/data/secondmates.md"
+  pass "fm-send remote: a lost, bounded or unrouted input check exits 1 without a missing-input refusal or hold"
 }
 
 test_declared_input_cannot_expand_transfer_confinement() {

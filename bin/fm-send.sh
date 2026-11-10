@@ -8,8 +8,9 @@
 # transfer's confinement before any delivery or reply-tracking effect, including
 # an idempotent retry. Validation refusal exits 4 (FM_TASK_INBOX_INPUT_REFUSED
 # in fm-task-inbox-lib.sh); other write failures retain their existing status.
-# A check that cannot answer (remote transport failure or its
-# FM_SEND_REMOTE_BUDGET bound) exits 1 and never reports the input as missing.
+# A check that cannot answer (a local fm-on.sh route failure, remote transport
+# failure or its FM_SEND_REMOTE_BUDGET bound) exits 1 and never reports the
+# input as missing.
 # An input outside the receiving boundary is reported as outside the transfer
 # boundary, not as missing. Missing/inaccessible inputs name receiver and path: stage the
 # declared artifact through the existing authorized transfer, then correct the
@@ -683,7 +684,7 @@ fm_send_check_required_inputs() { # <newline-delimited-declarations>
     fi
     case "$rc" in
     0) continue ;;
-    1) reason='unavailable to' ;;
+    6) reason='unavailable to' ;;
     5) reason='outside the transfer boundary for' ;;
     *)
       unchecked=1

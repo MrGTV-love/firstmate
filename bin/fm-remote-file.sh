@@ -11,7 +11,7 @@
 # Check uses that same confinement and tests readability without opening the
 # file or transferring bytes. It may name an absolute path only inside FM_HOME.
 # It never changes permissions, sandbox grants, or the allowed transfer paths.
-# Check exits 0 when readable, 1 when unavailable inside the boundary, or 5
+# Check exits 0 when readable, 6 when unavailable inside the boundary, or 5
 # when the path is outside the transfer boundary (including disallowed types).
 # Get and put retain their existing exit and confinement contracts.
 # Put is deliberately narrower: it atomically replaces only a backlog handoff
@@ -26,8 +26,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bin/fm-wake-lib.sh
 . "$SCRIPT_DIR/fm-wake-lib.sh"
 
-# Only check changes the status for confinement errors; get/put remain at 1.
+# Only check changes the status for confinement and unavailable-file errors;
+# get/put remain at 1.
 FILE_BOUNDARY_STATUS=1
+FILE_UNAVAILABLE_STATUS=1
 die() { printf 'error: %s\n' "$1" >&2; exit "${2:-1}"; }
 usage() { sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
 sha256_file() {
@@ -42,14 +44,14 @@ resolve_file() { # <relative-path>
   home_real=$(CDPATH='' cd -- "$FM_HOME" 2>/dev/null && pwd -P) || die "FM_HOME is unavailable"
   parent=$(dirname "$rel")
   base=$(basename "$rel")
-  parent_real=$(CDPATH='' cd -- "$FM_HOME/$parent" 2>/dev/null && pwd -P) || die "file parent is unavailable: $rel"
+  parent_real=$(CDPATH='' cd -- "$FM_HOME/$parent" 2>/dev/null && pwd -P) || die "file parent is unavailable: $rel" "$FILE_UNAVAILABLE_STATUS"
   case "$parent_real" in "$home_real"|"$home_real"/*) ;; *) die "file escapes FM_HOME: $rel" "$FILE_BOUNDARY_STATUS" ;; esac
   path="$parent_real/$base"
   if [ ! -f "$path" ] || [ -L "$path" ]; then
     if [ -e "$path" ] || [ -L "$path" ]; then
       die "file is not a non-symlink regular file: $rel" "$FILE_BOUNDARY_STATUS"
     fi
-    die "file is not a non-symlink regular file: $rel"
+    die "file is not a non-symlink regular file: $rel" "$FILE_UNAVAILABLE_STATUS"
   fi
   printf '%s\n' "$path"
 }
@@ -193,12 +195,13 @@ case "$COMMAND" in
   check)
     [ "$#" -eq 2 ] || usage
     FILE_BOUNDARY_STATUS=5
+    FILE_UNAVAILABLE_STATUS=6
     case "$REL" in
       "$FM_HOME"/*) REL=${REL#"$FM_HOME"/} ;;
       /*) die "required input is outside the transfer boundary: $REL" "$FILE_BOUNDARY_STATUS" ;;
     esac
     FILE=$(resolve_file "$REL")
-    [ -r "$FILE" ] || die "required input is not readable: $REL"
+    [ -r "$FILE" ] || die "required input is not readable: $REL" "$FILE_UNAVAILABLE_STATUS"
     printf 'available: %s\n' "$FILE"
     ;;
   get)
