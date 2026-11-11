@@ -3029,8 +3029,12 @@ EOF
             || fail "cannot preserve task metadata while recording the reviewed inventory" ;;
         esac
       done < "$meta" || fail "cannot read task metadata while recording the reviewed inventory"
-      chmod 0600 "$CAPTAIN_META_TMP" && mv -f -- "$CAPTAIN_META_TMP" "$meta" \
-        || fail "cannot publish the reviewed inventory"
+      if ! chmod 0600 "$CAPTAIN_META_TMP"; then
+        fail "cannot publish the reviewed inventory"
+      fi
+      if ! mv -f -- "$CAPTAIN_META_TMP" "$meta"; then
+        fail "cannot publish the reviewed inventory"
+      fi
       CAPTAIN_META_TMP=
     fi
     fm_lock_release "$CAPTAIN_META_LOCK"
