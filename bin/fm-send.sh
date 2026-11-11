@@ -235,10 +235,13 @@
 # orphaning the decision. A failed or unconfirmed send never closes a key; a
 # delivered answer whose closing append fails exits nonzero with the exact
 # manual close command, leaving the decision open to re-surface (the safe
-# direction). A send without the flag never closes anything: a routine steer,
-# working:, or done: event still cannot clear a captain decision. The flag is
-# refused with --key, with an explicit backend target (no task ledger in this
-# home), and with an empty message.
+# direction). A send without the flag never closes anything: a routine steer
+# appends no closing line, and a worker's working: line cannot clear an open
+# key. Which status lines do close a key - including a ship's or scout's
+# terminal done:/failed: - is the fold contract's to state
+# (status_open_decisions, bin/fm-status-decision-lib.sh). The flag is refused
+# with --key, with an explicit backend target (no task ledger in this home),
+# and with an empty message.
 #
 # After a successful TYPED-plane submit fm-send pauses FM_SEND_SETTLE seconds
 # (default 1, 0 disables) before returning: submit confirmation only proves the

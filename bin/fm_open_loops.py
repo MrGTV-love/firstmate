@@ -26,7 +26,7 @@ GH_REST = BIN / "fm-gh-rest.sh"  # conditional REST reads and the shared quota f
 DEFAULT_AGES = {
     "missing_worker": 600, "ready_not_started": 1800, "unanswered_question": 1800,
     "unhandled_board_answer": 300, "interrupted_teardown": 1800,
-    "failed_task": 1800, "stalled_worker": 3600, "unlanded_commit": 86400,
+    "failed_task": 1800, "completed_task": 1800, "stalled_worker": 3600, "unlanded_commit": 86400,
     "open_pr": 3600, "review_pass_not_merged": 600, "red_check": 0, "coverage": 0, "silent_report": 900,
 }
 CHECK_IN_TEXT = ("Check in: report progress, blockers, and cross-workstream dependencies that need resolution. "
@@ -416,7 +416,7 @@ class Collector:
         excluded = None
         long_wait = False
         if task["kind"] != "secondmate" and (verb == "done" or task["current_state"].get("state") == "done"):
-            excluded = "excluded: done/ready task is covered by PR or landing evidence"
+            excluded = "excluded: done/ready task is covered by PR or completion handoff"
         elif task["kind"] == "secondmate" and not open_replies and not self.secondmate_has_work(task):
             excluded = "excluded: idle secondmate has no routed work in flight"
         elif open_decision or self.gate_awaits_human(task):
@@ -475,6 +475,11 @@ class Collector:
                          'status_is_paused "$(status_declared_wait_line "$2")"; then printf stopped; fi',
                          BIN / "fm-status-event-lib.sh", self.state / (task["id"] + ".status")).strip() == "stopped"
 
+    def declared_done(self, task_id):
+        """True when the task's latest durable status event is `done`; read without folding the log."""
+        return self.bash('. "$1"; status_line_verb "$(last_status_line "$2")"', BIN / "fm-status-event-lib.sh",
+                         self.state / (task_id + ".status")).strip() == "done"
+
     def backlog_rows(self):
         by_id = {t["id"]: t for t in self.tasks}
         dispatched = {p.name.rsplit(".", 1)[0] for p in self.state_files if p.name.endswith((".meta", ".status"))}
@@ -530,11 +535,33 @@ class Collector:
             if not stopped and (task["endpoint"].get("exists") is False or alive in ("dead", "missing")):
                 self.add("missing_worker", task["id"], "recover the assigned worker without discarding work",
                          mtime(self.state / (task["id"] + ".status")) or mtime(self.state / (task["id"] + ".meta")))
-            if task["current_state"].get("state") == "failed":
-                if not self.source("failed deliverable " + task["id"], self.deliverable_landed, task):
+            state = task["current_state"].get("state")
+            if state == "failed":
+                # A scout's report is output to consume, not proof its failed
+                # investigation has been resolved by the supervising owner.
+                if not self.captain_dropped(task) and (task["kind"] == "scout" or not self.source(
+                        "failed deliverable " + task["id"], self.deliverable_landed, task)):
                     self.add("failed_task", task["id"], "recover the failed work or record why it ends",
                              mtime(self.state / (task["id"] + ".status")))
-            elif task["current_state"].get("state") == "working" and alive == "alive":
+            elif ((state == "done" or (state == "unknown" and stopped)) and not task["pr"].get("url")
+                  and not self.captain_dropped(task)
+                  # The durable status log, not the live pane, owns the completion declaration: a closed
+                  # or unreadable pane must not retire the owner handoff its last `done` line created.
+                  and (state == "done" or self.source("completion declaration " + task["id"],
+                                                      self.declared_done, task["id"]))
+                  and (task["kind"] == "scout" or not self.source(
+                      "completed deliverable " + task["id"], self.deliverable_landed, task))):
+                # A report still needs owner consumption, but an already landed
+                # ship has no remaining review or validation handoff to advance.
+                status = self.source("completion status " + task["id"], self.report_status, task["id"])
+                status_at = status[0] if status else mtime(self.state / (task["id"] + ".status"))
+                self.add("completed_task", task["id"],
+                         "consume the report, complete the owner handoff and tear the task down"
+                         if task["kind"] == "scout"
+                         else "advance the committed candidate through its selected delivery path",
+                         status_at, evidence="worker completion is a handoff, not final acceptance",
+                         source=self.source("completion provenance " + task["id"], self.task_source, task["id"]))
+            elif state == "working" and alive == "alive":
                 self.source("progress " + task["id"], self.stalled, task)
             self.source("unlanded work " + task["id"], self.unlanded, task)
 
@@ -688,7 +715,7 @@ class Collector:
         return merged_tree == default_tree
 
     def captain_dropped(self, task):
-        return any(record["id"] == task["id"] and record.get("captain_drop") for record in self.backlog)
+        return any(record.get("id") == task["id"] and record.get("captain_drop") for record in self.backlog)
 
     def deliverable_landed(self, task):
         if self.captain_dropped(task):
