@@ -80,8 +80,8 @@ present but unusable: they give no relief and keep the two-reader rule, so a
 read fault is never easier than a successful read. Unknown ship
 constraints still need two different known reader families. Multiple reads may
 collectively cover known author families; a third family is not required for mixed-family work.
-An accepted independent review prints 'pipeline author family not recorded'
-when the single-reader rule above was needed to cover the derived
+An accepted verify, independent review or captain-word, prints 'pipeline
+author family not recorded' when the single-reader rule above was needed to cover the derived
 no-mistakes:unknown group in any window verify checks: the PASS reads after an
 exact-head FAIL that read the group, or all exact-head PASS reads. In that
 window the rule applies and fewer than two different known reader families read
@@ -140,7 +140,7 @@ lock-held read that decides the result: success carries ok true, and either basi
 independent-review (pr, exact head, review epoch at, reader_model, both families
 re-derived from the recorded model ids, the recorded author groups with families
 re-derived, report, and report_sha256 when the record carries that digest) or
-basis captain-word (pr, head, at, words). Failures carry ok false and
+basis captain-word (pr, head, at, words), each with optional facts. Failures carry ok false and
 error {kind, message}, where kind not-qualified means no recorded evidence
 satisfies the request, unavailable means stored history, task metadata or author
 commit evidence cannot be read,
@@ -149,7 +149,7 @@ history is not-qualified; corrupt or unreadable history is unavailable. Failure
 JSON keeps the existing exit status (1 evidence/unavailable, 2 input) and never
 looks like a success object. Without --json, a successful verify prints
 review: PASS (plus review: pipeline author family not recorded when applicable)
-or review: captain-word; a refusal prints an error: line and exits 1.
+or review: captain-word (plus the same fact line when applicable); a refusal prints an error: line and exits 1.
 latest emits the complete newest review and captain-word as JSON for relay reads.
 Missing/invalid input exits 2; missing/mismatched evidence or unreadable history
 exits 1. Corrupt/partial history is preserved for reconciliation, never repaired.
@@ -532,6 +532,9 @@ def verify(records, rows, head, home, pr, task, base, review_only=False):
 
     relief_used = []
 
+    def with_facts(row):
+        return {**row, "facts": ["pipeline author family not recorded"] if relief_used else []}
+
     def uncovered(group, authors, reads):
         families = {a["family"] for a in authors}
         readers = set()
@@ -570,7 +573,7 @@ def verify(records, rows, head, home, pr, task, base, review_only=False):
                 raise VerificationError(f"{reason}{unknown_need(group, 'later ')}, set each read's actual trigger answers and local report, then record each with: {env} {review_command(unknown_reader_placeholder(group), [group], {**groups, group: authors})}; or {captain_help}")
             raise VerificationError(f"{reason}record later exact-head PASS reads of that group from readers outside each of its families with: {env} {review_command('OUTSIDE_FAMILY_MODEL', [group], {**groups, group: authors})}; or {captain_help}")
     if at_word:
-        return "captain-word", word
+        return "captain-word", with_facts(word)
     unknown_reader = model(review["reader_model"], "reader_model") == "unknown"
     for group, authors in sorted(groups.items(), key=lambda item: ("unknown" not in {a["family"] for a in item[1]}, item[0])):
         missing = uncovered(group, authors, passes)
@@ -585,8 +588,7 @@ def verify(records, rows, head, home, pr, task, base, review_only=False):
     yes = [trigger for trigger in TRIGGERS if review[trigger] == "yes"]
     if yes and review_only:
         raise VerificationError(f"{', '.join(yes)} is yes at live head {head}; --review-only requires an independent PASS with no escalation trigger, and a captain-word is not a substitute")
-    facts = ["pipeline author family not recorded"] if relief_used else []
-    return "independent-review", {**review, "facts": facts}
+    return "independent-review", with_facts(review)
 
 
 def verification_json(pr, head, basis, row):
@@ -594,17 +596,17 @@ def verification_json(pr, head, basis, row):
                 "pr": pr, "head": head, "at": row["at"]}
     if basis == "captain-word":
         evidence["words"] = row["words"]
-        return evidence
-    evidence.update(
-        reader_model=row["reader_model"],
-        reader_family=model(row["reader_model"], "reader_model"),
-        author_groups={group: [{"model": author["model"],
-                                "family": model(author["model"], "author_groups model")}
-                               for author in authors]
-                       for group, authors in row["author_groups"].items()},
-        report=row["report"])
-    if isinstance(row.get("report_sha256"), str) and row["report_sha256"]:
-        evidence["report_sha256"] = row["report_sha256"]
+    else:
+        evidence.update(
+            reader_model=row["reader_model"],
+            reader_family=model(row["reader_model"], "reader_model"),
+            author_groups={group: [{"model": author["model"],
+                                    "family": model(author["model"], "author_groups model")}
+                                   for author in authors]
+                           for group, authors in row["author_groups"].items()},
+            report=row["report"])
+        if isinstance(row.get("report_sha256"), str) and row["report_sha256"]:
+            evidence["report_sha256"] = row["report_sha256"]
     if row.get("facts"):
         evidence["facts"] = row["facts"]
     return evidence

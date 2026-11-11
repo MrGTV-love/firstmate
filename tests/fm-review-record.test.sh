@@ -362,6 +362,26 @@ test_unknown_pipeline_after_fail() {
   pass 'a later outside-ship-family pipeline read clears an exact-head FAIL and discloses the relief'
 }
 
+test_unknown_pipeline_relief_after_captain_word() {
+  local case_dir out rc=0 authors
+  case_dir=$(make_case pipeline-word-fail)
+  printf 'mode=no-mistakes\n' >> "$case_dir/home/state/task-x1.meta"
+  authors='{"ship":["gpt-5.1"],"no-mistakes:unknown":["unknown"]}'
+  record_word "$case_dir" "$HEAD1" 'Merge this PR.' >/dev/null || fail 'record captain word'
+  record_review "$case_dir" "$HEAD1" FAIL deepseek-v3 "$authors" >/dev/null || fail 'record FAIL after word'
+  record_review "$case_dir" "$HEAD1" PASS sonnet "$authors" >/dev/null || fail 'record sole outside-ship PASS'
+  out=$(NM_HOME="$case_dir/absent-nm" FM_HOME="$case_dir/home" "$RECORD" verify --pr "$URL" \
+    --head "$HEAD1" --task task-x1 --base "$BASE" --json) || rc=$?
+  expect_code 0 "$rc" "relief clears the FAIL after the captain-word: $out"
+  "$JQ_BIN" -e '.basis == "captain-word" and .facts == ["pipeline author family not recorded"]' <<<"$out" >/dev/null \
+    || fail "captain-word accepted through relief must disclose the fact in JSON: $out"
+  out=$(NM_HOME="$case_dir/absent-nm" FM_HOME="$case_dir/home" "$RECORD" verify --pr "$URL" \
+    --head "$HEAD1" --task task-x1 --base "$BASE") || fail "text verify after word and FAIL: $out"
+  assert_equals $'review: captain-word\nreview: pipeline author family not recorded' "$out" \
+    'captain-word accepted through relief discloses the fact in text'
+  pass 'relief that clears a FAIL after a captain-word discloses the fact'
+}
+
 test_native_claude_aliases_are_anthropic() {
   local case_dir out rc=0 alias
   for alias in opus sonnet haiku; do
@@ -501,6 +521,7 @@ fm_test_run_cases \
   test_unknown_pipeline_preserves_coverage_boundaries \
   test_unknown_pipeline_no_relief_for_partly_unknown_ship \
   test_unknown_pipeline_after_fail \
+  test_unknown_pipeline_relief_after_captain_word \
   test_native_claude_aliases_are_anthropic \
   test_stored_family_fields_cannot_retroactively_change_independence \
   test_typed_failures_distinguish_unavailable_and_invalid_input \
