@@ -246,12 +246,19 @@ completion_tasks = [task('finished-review', world / 'no-review-copy', state='don
                     task('failed-review', world / 'no-review-copy', state='failed', kind='scout'),
                     task('candidate-ready', fresh, state='done'),
                     task('dropped-review', world / 'no-review-copy', state='done', kind='scout'),
-                    task('dropped-candidate', fresh, state='done')]
+                    task('dropped-candidate', fresh, state='done'),
+                    # The durable `done` line owns the handoff when the pane closed or cannot be read.
+                    task('closed-review', world / 'no-review-copy', state='unknown', exists=False, alive='dead',
+                         kind='scout'),
+                    task('unread-review', world / 'no-review-copy', state='unknown', kind='scout'),
+                    task('paused-review', world / 'no-review-copy', state='unknown', kind='scout')]
+declared = dict.fromkeys(('closed-review', 'unread-review'), 'done')
+declared['paused-review'] = 'paused'
 completion_backlog = backlog + [dict(id=name, structured=True, state='done', captain_drop=True)
                                 for name in ('dropped-review', 'dropped-candidate')]
 for item in completion_tasks:
     name = item['id']
-    (home / f'state/{name}.status').write_text(f"{item['current_state']['state']} [at={hours(1)}]: ready for owner\n")
+    (home / f'state/{name}.status').write_text(f"{declared.get(name, item['current_state']['state'])} [at={hours(1)}]: ready for owner\n")
     (home / f'state/{name}.meta').write_text(f"kind={item['kind']}\nspawn_gen=fixture-{name}\n")
     if item['kind'] == 'scout':
         report_dir = home / 'data' / name
@@ -262,7 +269,7 @@ for item in completion_tasks:
 for _ in range(2):  # a fresh collector process must recover the same unfinished handoff
     completion_report = ledger()
     completed = rows(completion_report, 'completed_task')
-    assert set(completed) == {'finished-review', 'candidate-ready'}, completed
+    assert set(completed) == {'finished-review', 'candidate-ready', 'closed-review', 'unread-review'}, completed
     assert all(r['owner'] == 'firstmate' and r['overdue'] for r in completed.values()), completed
     assert 'failed-review' in rows(completion_report, 'failed_task'), completion_report
     # The reviewed-inventory attestation alone is not owner acceptance: the row stays until teardown or a drop.
@@ -271,19 +278,25 @@ for _ in range(2):  # a fresh collector process must recover the same unfinished
 # A completed task whose status log cannot be folded degrades coverage for that
 # one read; it keeps its own row and never hides a later task's obligations.
 blind = task('blind-review', world / 'no-review-copy', state='done', alive='dead', kind='scout')
+# The same unreadable log behind a closed pane still keeps its row: the declaration read does not fold.
+blind_closed = task('blind-closed', world / 'no-review-copy', state='unknown', exists=False, alive='dead', kind='scout')
 after_blind = task('after-blind', lost, state='failed', exists=False, alive='dead')
 (home / 'state/blind-review.status').write_text(f'working [at={hours(2)}]: {"x" * 80}\n' * 40
                                                 + f'done [at={hours(1)}]: ready for owner\n')
-(home / 'snapshot.json').write_text(json.dumps(dict(schema='fm-fleet-home-input.v1', tasks=[blind, after_blind],
+shutil.copy(home / 'state/blind-review.status', home / 'state/blind-closed.status')
+(home / 'snapshot.json').write_text(json.dumps(dict(schema='fm-fleet-home-input.v1', tasks=[blind, blind_closed, after_blind],
                                                     backlog=dict(present=True, records=backlog))))
 blind_report = json.loads(out([code / 'bin/fm-open-loops.sh', '--json'],
                               env=dict(env, FM_STATUS_CAP_BYTES='2048', FM_STATUS_CAP_RESERVE_BYTES='1')))
 assert not blind_report['complete'], blind_report
 assert 'completion status blind-review' in rows(blind_report, 'coverage')['ledger degraded']['evidence'], blind_report
-assert rows(blind_report, 'completed_task')['blind-review']['overdue'], blind_report
+for name in ('blind-review', 'blind-closed'):
+    assert f'completion status {name}' in rows(blind_report, 'coverage')['ledger degraded']['evidence'], blind_report
+    assert rows(blind_report, 'completed_task')[name]['overdue'], blind_report
 for category in ('failed_task', 'missing_worker', 'unlanded_commit'):
     assert 'after-blind' in rows(blind_report, category), (category, blind_report)
 (home / 'state/blind-review.status').unlink()
+(home / 'state/blind-closed.status').unlink()
 # Retirement is owned elsewhere; collection never launches or accepts the work.
 (home / 'snapshot.json').write_text(json.dumps(dict(schema='fm-fleet-home-input.v1', tasks=tasks,
                                                     backlog=dict(present=True, records=backlog))))
