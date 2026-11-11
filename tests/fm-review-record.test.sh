@@ -344,7 +344,7 @@ test_unknown_pipeline_after_fail() {
   out=$(NM_HOME="$case_dir/absent-nm" FM_HOME="$case_dir/home" "$RECORD" verify --pr "$URL" \
     --head "$HEAD1" --task task-x1 --base "$BASE" --json) || rc=$?
   expect_code 0 "$rc" "later qualifying read clears FAIL under the same coverage rule: $out"
-  pass 'later pipeline read clears FAIL only after covering the failed groups'
+  pass 'a later outside-ship-family pipeline read clears an exact-head FAIL'
 }
 
 test_native_claude_aliases_are_anthropic() {

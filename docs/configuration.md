@@ -128,6 +128,8 @@ Untracked files and directories whose names begin with `scratchpad` are also git
 
 The review landing gate's coverage contract is owned by [`bin/fm-review-record.py`](../bin/fm-review-record.py)'s header and `--help`, including its bounded single-reader relief for `no-mistakes:unknown` and unchanged two-reader requirement for an unknown builder.
 The relief applies only when the ship group has at least one derived family and every ship family, derived or typed, is known; the sole reader's known family must differ from every ship family.
+It also applies only when the pipeline evidence is proven absent: no state database, no matching run or invocation, or an invocation that records no model and no provider.
+Evidence that is present but unusable gets no relief and keeps the two-known-reader-families rule: an unreadable, corrupt or schema-changed database, a relative `NM_HOME`, conflicting provider/model families, or a recorded model of unknown family.
 The verifier reads the verifying host's `NM_HOME/state.sqlite`, so a run performed elsewhere can lack local invocation evidence even when the exact head has already received a known different-builder-family PASS.
 
 #### Guard harm-model reassessment
@@ -138,8 +140,10 @@ The residual case is an unrecorded pipeline family that really equals the sole r
 Ship launch history, locally available invocation/provider evidence, exact-head report binding, and continued coverage of every known author family narrow the gap but cannot prove an unknown pipeline author's independence.
 One reader different from every ship family is enough for the builder-independence objective and avoids repeat reads caused only by a cross-host evidence gap, while unknown builders receive no relief.
 A ship group that holds any unknown family, even beside a known one, cannot prove that the sole pipeline reader differs from every builder, so its `no-mistakes:unknown` group keeps the two-known-reader-families rule.
-The remaining residual case is therefore limited to a ship group whose families are all known, with only the pipeline author family unrecorded.
-The verifier discloses `pipeline author family not recorded`, and `bin/fm-pr-merge.sh` writes that fact into the existing merge-authority record rather than presenting pipeline independence as proven; `bin/fm-teardown.sh` deletes that record at task teardown, so it is not a lasting archive.
+A host that holds the evidence but cannot read it must not get an easier rule than a successful read, which could have named a pipeline family equal to the sole reader's, so a read fault fails closed as before.
+The remaining residual case is therefore limited to a ship group whose families are all known, with the pipeline author family proven absent from the verifying host.
+The verifier discloses `pipeline author family not recorded`, and `bin/fm-pr-merge.sh` writes that fact into the existing merge-authority record rather than presenting pipeline independence as proven.
+That record is short-lived and is not an archive: the merge poll in `bin/fm-watch.sh` deletes it when it records the merge outcome, the outcome ledger does not keep the fact, and `bin/fm-teardown.sh` deletes any record left at task teardown.
 [`bin/fm-merge-authority-lib.sh`](../bin/fm-merge-authority-lib.sh) owns its optional-line extension and backward-compatible reader; legacy records without the fact remain readable.
 A portable authenticated run-author evidence carrier needs a separate producer, transfer, trust and replay contract and is not provided by this relief.
 The regressions are [`tests/fm-review-record.test.sh`](../tests/fm-review-record.test.sh) and [`tests/fm-pr-merge.test.sh`](../tests/fm-pr-merge.test.sh).

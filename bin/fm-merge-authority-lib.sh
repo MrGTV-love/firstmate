@@ -12,8 +12,11 @@
 #   <number>
 #   <authority>                 away | attended
 #   [pipeline author family not recorded]
-# The optional final line preserves the verifier's missing-pipeline-provenance
-# fact from the same accepted read. Legacy six-line v1 records remain readable;
+# The optional final line carries the verifier's missing-pipeline-provenance
+# fact from the same accepted read only while the record exists: the merge poll
+# in bin/fm-watch.sh deletes the record when it records the merge outcome, whose
+# ledger does not keep the fact, and bin/fm-teardown.sh deletes any record left
+# at teardown. Legacy six-line v1 records remain readable;
 # known pipeline evidence adds no line. Readers expose the validated optional
 # line as FM_MERGE_AUTHORITY_REVIEW_FACT; it changes no merge authority.
 # While an away record exists every merge runs under away authority (the

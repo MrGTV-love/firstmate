@@ -37,14 +37,15 @@ groups. Attribution is conservative; a rebase or later clean replay never
 drops an earlier run's author family. Runs and agent_invocations are read from
 <NM_HOME>/state.sqlite (default ~/.no-mistakes), opened with SQLite mode=ro. A
 database that exists but cannot be opened or queried, or a relative NM_HOME,
-adds family unknown and never clears evidence already read. A proven-absent database
-adds unknown when any subject starts exactly no-mistakes( or the task's
+adds an unreadable family unknown and never clears evidence already read. A
+proven-absent database adds an absent family unknown when any subject starts exactly no-mistakes( or the task's
 recorded delivery mode is no-mistakes (an unrecorded mode counts as
 no-mistakes); a direct-PR or local-only task without either has no pipeline
 group. When a subject starts no-mistakes( but no matching run recorded any
-invocation, the pipeline group is unknown.
+invocation, the pipeline group is absent unknown.
 A recorded provider can resolve an otherwise unknown model alias; conflicting
-provider/model families are unknown. Every invocation counts, including
+provider/model families are unreadable unknown. An invocation that records no
+model and no provider is absent unknown unless its agent is exactly claude. Every invocation counts, including
 cancelled and errored ones. An invocation with an empty model takes a family
 from its agent only when the agent is exactly claude (anthropic); any other
 agent, such as acp:omp, stays unknown. It never creates a database.
@@ -67,16 +68,24 @@ PASS. Unknown ship authors and other unknown constraints require exact-head
 PASS reads of their group from at least two different known reader families:
 whatever that unknown family really is, at least one reader differs from it.
 Only the derived no-mistakes:unknown group may instead use one such PASS whose
-known reader family differs from EVERY ship family, provided the ship group
+known reader family differs from EVERY ship family, provided every derived
+item of that group is absent evidence (no state database, no matching run or
+invocation, or an invocation with no model and no provider), the ship group
 has at least one derived family and every ship family, derived or typed, is
 known. A ship group with no derived family or with any unknown family gives
-the pipeline group no relief, so it keeps the two-reader rule. Unknown ship
+the pipeline group no relief, so it keeps the two-reader rule. Unreadable,
+corrupt or schema-changed databases, a relative NM_HOME, conflicting
+provider/model families and recorded models of unknown family are evidence
+present but unusable: they give no relief and keep the two-reader rule, so a
+read fault is never easier than a successful read. Unknown ship
 constraints still need two different known reader families. Multiple reads may
 collectively cover known author families; a third family is not required for mixed-family work.
 An accepted independent review with a derived no-mistakes:unknown group prints
 'pipeline author family not recorded'; --json includes that string in optional
 facts. fm-pr-merge.sh writes it into its merge-authority record from the same
-verification read; teardown deletes that record with the task's other state.
+verification read. That record is short-lived: the merge poll in fm-watch.sh
+deletes it when it records the merge outcome, whose ledger does not keep the
+fact, and fm-teardown.sh deletes any record left at teardown.
 Known pipeline groups emit no fact.
 This preserves known-builder independence but not the former guarantee for
 all possible pipeline authors: the unrecorded pipeline family may actually
@@ -406,6 +415,7 @@ def derived_authors(home, pr, head, task, base):
     prefixed = any(subject.startswith("no-mistakes(") for _, subject in commits)
     root = Path(os.environ.get("NM_HOME") or Path.home() / ".no-mistakes")
     unknown = modelled("unknown", "pipeline model")
+    absent = {**unknown, "origin": "absent"}
     models = []
     try:
         if not root.is_absolute():
@@ -414,7 +424,7 @@ def derived_authors(home, pr, head, task, base):
             os.lstat(root / "state.sqlite")
         except FileNotFoundError:
             if prefixed or (meta.get("mode") or "no-mistakes") == "no-mistakes":
-                models.append(unknown)
+                models.append(absent)
         else:
             with contextlib.closing(sqlite3.connect(root.resolve().as_uri() + "/state.sqlite?mode=ro", uri=True)) as db:
                 runs = db.execute("SELECT id FROM runs WHERE pr_url = ? "
@@ -422,6 +432,9 @@ def derived_authors(home, pr, head, task, base):
                                   (pr, meta.get("branch", ""), str(worktree), meta.get("project", ""))).fetchall()
                 for (run_id,) in runs:
                     for agent, exact_model, provider in db.execute("SELECT agent, model, model_provider FROM agent_invocations WHERE run_id = ?", (run_id,)).fetchall():
+                        if not exact_model and not provider and agent != "claude":
+                            models.append(absent)
+                            continue
                         item = modelled(exact_model or ("claude" if agent == "claude" else "unknown"), "pipeline model")
                         # Only fresh database evidence supplies a provider; typed
                         # declarations and historical family fields never do.
@@ -434,8 +447,8 @@ def derived_authors(home, pr, head, task, base):
     except (sqlite3.Error, OSError):
         models.append(unknown)
     if prefixed and not models:
-        models.append(unknown)
-    for item in {(item["model"], item["family"]): item for item in models}.values():
+        models.append(absent)
+    for item in {(item["model"], item["family"], item.get("origin")): item for item in models}.values():
         groups.setdefault(f"no-mistakes:{item['family']}", []).append(item)
     return task, groups
 
@@ -499,7 +512,8 @@ def verify(records, rows, head, home, pr, task, base, review_only=False):
                            "--customer-data-billing-spend", "no", "--report", "LOCAL_READER_REPORT"])
 
     ship_families = {a["family"] for a in groups.get("ship", [])}
-    pipeline_relief = "no-mistakes:unknown" in derived and derived.get("ship") and "unknown" not in ship_families
+    pipeline_relief = (derived.get("no-mistakes:unknown") and derived.get("ship") and "unknown" not in ship_families
+                       and all(a.get("origin") == "absent" for a in derived["no-mistakes:unknown"]))
 
     def unknown_need(group, later):
         two = f"{later}exact-head PASS reads of {'that' if later else 'this'} group from two different known reader families"

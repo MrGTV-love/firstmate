@@ -38,9 +38,9 @@
 # hold immediately before its merge command. bin/fm-review-record.py's header owns
 # the review/captain-word rule and recording CLI; neither --attended-override nor
 # away authority substitutes for this evidence, and captain words waive no guard.
-# An accepted verify's 'pipeline author family not recorded' fact is retained in
+# An accepted verify's 'pipeline author family not recorded' fact is written into
 # the existing merge-authority record; bin/fm-merge-authority-lib.sh owns its
-# backward-compatible optional-line format and reader.
+# backward-compatible optional-line format, reader and short record lifetime.
 #
 # Merge method on GitHub defaults to --squash when the caller passes none of
 # --squash, --merge, --rebase, or --method after the optional -- separator.
