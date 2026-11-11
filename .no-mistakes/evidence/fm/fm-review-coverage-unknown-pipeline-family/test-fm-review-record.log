@@ -1,0 +1,23 @@
+ok - review-only --json reports immutable record-time independent evidence
+ok - default verify text and JSON preserve captain-word precedence
+ok - captain-word alone cannot satisfy review-only
+ok - stale head, FAIL, same family, unknown families and triggers are typed not-qualified
+ok - an unknown ship author family requires exact-head PASS reads from two known reader families
+ok - T1 unknown pipeline accepts one different-builder-family reader
+ok - T6 verify discloses the fact only for single-reader pipeline relief
+ok - pipeline boundary: same-ship
+ok - pipeline boundary: unknown-ship
+ok - pipeline boundary: unknown-reader
+ok - pipeline boundary: mixed-ship
+ok - pipeline boundary: no-ship
+ok - pipeline boundary: no-ship-declared
+ok - pipeline boundary: uncovered-known-pipeline
+ok - pipeline boundary: stale-head
+ok - a ship group with any unknown family gives the unknown pipeline group no relief
+ok - a later outside-ship-family pipeline read clears an exact-head FAIL and discloses the relief
+ok - relief that clears a FAIL after a captain-word discloses the fact
+ok - bare opus, sonnet and haiku ids map to anthropic while unknown ids stay untrusted
+ok - stored family fields cannot retroactively change recorded independence
+ok - not-qualified, unavailable and invalid-input failures stay distinguishable without parsing prose
+ok - default captain-word/FAIL precedence holds
+ok - a legacy record without report_sha256 omits the digest instead of fabricating it

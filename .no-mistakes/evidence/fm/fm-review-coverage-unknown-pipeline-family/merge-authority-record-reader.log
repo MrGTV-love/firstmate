@@ -1,0 +1,6 @@
+legacy 6-line record                         read_rc=0 authority=attended fact=[]
+7-line with exact fact                       read_rc=0 authority=attended fact=[pipeline author family not recorded]
+7-line with junk fact (adversarial)          read_rc=1 authority=external fact=[]
+8-line fact + extra (adversarial)            read_rc=1 authority=external fact=[]
+7-line empty fact line (adversarial)         read_rc=1 authority=external fact=[]
+persist with bogus fact: refused
