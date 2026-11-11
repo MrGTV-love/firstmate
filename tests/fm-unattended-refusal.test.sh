@@ -124,3 +124,53 @@ esac
             print('FAIL:', label, repr(error), flush=True)
 assert not failures, failures
 PY
+python3 - "$ROOT" "$TMP_ROOT" <<'PY'
+import os, subprocess, sys
+from pathlib import Path
+
+root, world = map(Path, sys.argv[1:])
+home = world / 'hold-scan'
+fake = home / 'fakebin'
+for name in ('state', 'config', 'data', 'projects', 'fakebin'):
+    (home / name).mkdir(parents=True, exist_ok=True)
+(home / 'state/worker.meta').write_text('kind=ship\nbackend=tmux\nwindow=sess:fm-worker\nharness=claude\n')
+(fake / 'tmux').write_text('#!/usr/bin/env bash\n'
+                           'case "$1" in\n'
+                           "  capture-pane) printf '╭────╮\\n│    │\\n╰────╯\\n' ;;\n"
+                           "  display-message) printf '1\\n' ;;\n"
+                           "  list-windows) printf 'fm-worker\\n' ;;\n"
+                           'esac\n')
+(fake / 'tmux').chmod(0o755)
+env = dict(os.environ, FM_HOME=str(home), FM_ROOT_OVERRIDE=str(home),
+           FM_STATE_OVERRIDE=str(home / 'state'), FM_CONFIG_OVERRIDE=str(home / 'config'),
+           FM_SEND_SETTLE='0', NM_HOME=str(home / 'nm'),
+           FM_GUARD_EVENT_LOG=str(home / 'guard-events'), PATH=f'{fake}:{os.environ["PATH"]}')
+status = home / 'state/worker.status'
+noise = ''.join(f'note [key=other-{i}]: unattended-refusal: annotate notes {i}\nresolved [key=other-{i}]: resolved notes\n'
+                for i in range(1500))
+noise += 'working: prose names unattended-steer without a key\n'
+refusal = "note [key=unattended-steer]: unattended-refusal: error: refused task 'other'\n"
+handled = 'resolved [key=unattended-steer]: handled\n'
+cases = [
+    ('noise only', noise, False),
+    ('refusal after noise', noise + refusal, True),
+    ('other key resolved', noise + refusal + 'resolved [key=other]: answered\n', True),
+    ('own key resolved', noise + refusal + handled, False),
+    ('note-head key', noise + "note: [key=unattended-steer] unattended-refusal: error: refused task 'other'\n", True),
+    ('unrelated own-key note', noise + 'note [key=unattended-steer]: a plain remark\n', False),
+    ('refusal after resolution', noise + refusal + handled + refusal, True),
+]
+failures = []
+for label, text, held in cases:
+    status.write_text(text)
+    result = subprocess.run(['bash', str(root / 'bin/fm-send-unattended.sh'), 'worker', 'Continue work'],
+                            env=env, text=True, capture_output=True)
+    got_hold = result.returncode == 1 and 'no send attempted' in result.stderr
+    got_send = result.returncode == 0
+    if got_hold != held or got_send == held or status.read_text() != text:
+        failures.append(label)
+        print('FAIL: hold-scan', label, result.returncode, result.stderr, flush=True)
+    else:
+        print('PASS: hold-scan', label, flush=True)
+assert not failures, failures
+PY

@@ -331,26 +331,39 @@ fm_send_split_trailing_dots() {
 # (rule M), or to nothing. The caller has split the token so <text> does not
 # end in '.'. Forms are tried from the longest, all dots kept, down to <text>
 # alone: an exact meta first, then the legacy fm-<id> label, and the first form
-# that resolves wins. Up to eight dots are tried one form at a time. A longer
-# run is resolved from one listing of the recorded metas, so the work stays
-# linear in the token and no form is skipped for its length.
+# that resolves wins. Every form is matched by string against RECORDED_IDS, the
+# newline-framed ids read once per message by fm_send_load_recorded_ids, so a
+# case-insensitive volume cannot resolve a token to a spelling no meta has. Up
+# to eight dots are tried one form at a time. A longer run is resolved in one
+# walk of the recorded ids, so the work stays linear in the token and no form is
+# skipped for its length.
+fm_send_load_recorded_ids() {
+  local name
+  RECORDED_IDS=$'\n'
+  while IFS= read -r name; do
+    case "$name" in *.meta) ;; *) continue ;; esac
+    [ -f "$STATE/$name" ] || continue
+    RECORDED_IDS="$RECORDED_IDS${name%.meta}"$'\n'
+  done < <(LC_ALL=C ls -A "$STATE" 2>/dev/null)
+}
+
 fm_send_resolve_mention() {
-  local text=$1 dots=$2 pad='........' j form name id rest label_text
+  local text=$1 dots=$2 pad='........' j form id rest label_text
   local best_j=-1 best_rank=-1 cand_j cand_rank
   MENTION_ID=
   if [ "$dots" -le 8 ]; then
     j=$dots
     while :; do
       form=$text${pad:0:j}
-      if [ -f "$STATE/$form.meta" ]; then
+      case "$RECORDED_IDS" in *$'\n'"$form"$'\n'*)
         MENTION_ID=$form
-        return 0
-      fi
+        return 0 ;;
+      esac
       case "$form" in fm-?*)
-        if [ -f "$STATE/${form#fm-}.meta" ]; then
+        case "$RECORDED_IDS" in *$'\n'"${form#fm-}"$'\n'*)
           MENTION_ID=${form#fm-}
-          return 0
-        fi ;;
+          return 0 ;;
+        esac ;;
       esac
       [ "$j" -gt 0 ] || return 0
       j=$((j - 1))
@@ -358,9 +371,8 @@ fm_send_resolve_mention() {
   fi
   label_text=
   case "$text" in fm-*) label_text=${text#fm-} ;; esac
-  while IFS= read -r name; do
-    case "$name" in *.meta) id=${name%.meta} ;; *) continue ;; esac
-    [ -f "$STATE/$name" ] || continue
+  while IFS= read -r id; do
+    [ -n "$id" ] || continue
     cand_j=-1
     cand_rank=-1
     case "$id" in "$text"*)
@@ -390,7 +402,7 @@ fm_send_resolve_mention() {
       best_rank=$cand_rank
       MENTION_ID=$id
     fi
-  done < <(LC_ALL=C ls -A "$STATE" 2>/dev/null)
+  done <<< "$RECORDED_IDS"
 }
 
 # fm_send_clear_after_interrupt: muse RESTORES the interrupted prompt back into
@@ -1013,6 +1025,7 @@ else
   # pass, so a long run of dots costs no more than the same length of any text.
   owner_target=
   [ -z "$TARGET_META" ] || owner_target=$(fm_send_id_from_meta "$TARGET_META")
+  fm_send_load_recorded_ids
   while IFS=$'\t' read -r mention_dots mention_base; do
     [ -n "$mention_base" ] || [ "$mention_dots" != 0 ] || continue
     # A task name embedded in a pathname is not a task-id token.

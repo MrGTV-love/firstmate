@@ -25,17 +25,18 @@ TASK=$(fm_backend_task_id_for_selector "$1" "$STATE" 2>/dev/null || true)
 # component may select the status file this caller adds after a refusal.
 case "$TASK" in ''|.*|*[!A-Za-z0-9._-]*) exec "$SCRIPT_DIR/fm-send.sh" "$@" ;; esac
 STATUS="$STATE/$TASK.status"
-HOLD=0
+HOLD=0 KEY='' VERB='' NOTE=''
 RESOLVE=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
 if [ -f "$STATUS" ]; then
-  EVENTS=$(fm_status_cat "$STATUS" | _fm_status_lines_with note "$RESOLVE"; exit "${PIPESTATUS[0]}") || exit 1
+  EVENTS=$(fm_status_cat "$STATUS" | _fm_status_lines_with unattended-steer; exit "${PIPESTATUS[0]}") || exit 1
   while IFS= read -r line; do
-    KEY=$(_fm_decision_key "$line" '') || continue
+    [ -n "$line" ] || continue
+    _fm_decision_key_into "$line" '' KEY || continue
     [ "$KEY" = unattended-steer ] || continue
-    VERB=$(status_line_verb "$line")
+    status_line_verb "$line" VERB
     case "$VERB" in
       note)
-        NOTE=$(status_line_note "$line")
+        status_line_note "$line" NOTE
         case "$NOTE" in unattended-refusal:*) HOLD=1 ;; esac ;;
       "$RESOLVE") HOLD=0 ;;
     esac

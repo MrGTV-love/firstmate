@@ -347,6 +347,33 @@ test_task_mentions_match_whole_tokens() {
   pass "fm-send: whole task tokens and legacy labels reject; longer, unknown and path-embedded ids do not"
 }
 
+test_mentions_match_the_recorded_id_spelling() {
+  local dir fb home log err rc text body sequence=0 record dots
+  dir="$TMP_ROOT/owner-case"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); home=$(setup_home ownercase); log="$dir/send.log"; err="$dir/send.err"
+  fm_write_meta "$home/state/other.meta" "window=sess:fm-other" "kind=ship"
+  fm_write_meta "$home/state/mini.meta" "window=sess:fm-mini" "kind=ship"
+  dots=$(head -c 12 /dev/zero | tr '\0' '.')
+  for text in 'Other tasks wait; continue.' 'OTHER.' "Other$dots" 'Mini, take the next step.' 'Fm-mini, take the next step.' "MINI$dots"; do
+    : > "$log"
+    PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" FM_SEND_SETTLE=0 \
+      "$SEND" other "$text" >/dev/null 2> "$err"; rc=$?
+    expect_code 0 "$rc" "a token spelled unlike every recorded id is not a mention: $text ($(cat "$err"))"
+    sequence=$((sequence + 1)); printf -v record '%s/state/other.inbox/%03d.msg' "$home" "$sequence"
+    body=$(bash -c '. "$1"; fm_task_inbox_body "$2"' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$record")
+    [ "$body" = "$text" ] || fail "a differently spelled token changed the delivered body"
+  done
+  for text in 'mini, take the next step.' "mini$dots" 'fm-mini.'; do
+    : > "$log"
+    PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" FM_SEND_SETTLE=0 \
+      "$SEND" other "$text" >/dev/null 2> "$err"; rc=$?
+    [ "$rc" -ne 0 ] && [ "$rc" -ne 3 ] || fail "the exact recorded spelling escaped the ownership guard: $text"
+    assert_contains "$(cat "$err")" "refused task 'mini'" "the refusal must name the recorded id: $text"
+    [ ! -s "$log" ] || fail "an exact-spelling refusal typed text"
+  done
+  pass "fm-send: only the recorded id spelling is a task mention, in short and long dotted forms"
+}
+
 test_secondmate_own_task_and_relay_safety() {
   local dir fb home log err rc body corr
   dir="$TMP_ROOT/owner-secondmate"; mkdir -p "$dir"
@@ -751,8 +778,10 @@ reference_mention_id() {  # <state> <token>
 test_mention_resolution_matches_the_reference_scan() {
   local dir state fn id base dots k token want got checked=0 set sets
   dir="$TMP_ROOT/scan-diff"; mkdir -p "$dir"
-  fn=$(awk '/^fm_send_resolve_mention\(\) /,/^}$/' "$SEND")
-  [ -n "$fn" ] || fail "fm_send_resolve_mention is not defined in bin/fm-send.sh"
+  fn=$(awk '/^fm_send_load_recorded_ids\(\) /,/^}$/; /^fm_send_resolve_mention\(\) /,/^}$/' "$SEND")
+  case "$fn" in *'fm_send_load_recorded_ids() '*'fm_send_resolve_mention() '*) ;; *)
+    fail "fm_send_load_recorded_ids and fm_send_resolve_mention are not defined in bin/fm-send.sh" ;;
+  esac
   eval "$fn"
   sets=(
     "a"
@@ -771,6 +800,7 @@ test_mention_resolution_matches_the_reference_scan() {
       : > "$state/$id.meta"
     done
     export STATE=$state
+    fm_send_load_recorded_ids
     for base in '' a fm- fm-a fm-fm-a b a.b fm-a.b x; do
       for k in 0 1 2 3 4 5 6 7 8 9 10 11 12 13; do
         dots=$(printf '%*s' "$k" '' | tr ' ' '.')
@@ -907,6 +937,7 @@ test_declared_local_input_is_checked_without_grants
 test_task_owner_mismatch_is_refused
 test_owner_relay_and_correct_owner
 test_task_mentions_match_whole_tokens
+test_mentions_match_the_recorded_id_spelling
 test_secondmate_own_task_and_relay_safety
 test_exact_lane_id_send_still_works
 test_key_send_exit_status_follows_delivery
