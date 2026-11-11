@@ -104,7 +104,7 @@ Each effective `FM_HOME` contains private operational directories.
 - The dated open-work ledger `state/open-loops.json`, published by `bin/fm-open-loops.sh --heartbeat`.
 - The review-agent selector's dry-run evidence log `state/review-agent-select.jsonl`, appended by `bin/fm-review-agent-select.sh --log`.
 - The heartbeat guard-workaround report `state/.guard-workarounds-next`, written by `bin/fm-watch.sh` as file output only; no wake presents it.
-- The append-only review-verdict and captain-word ledger `state/review-records.jsonl`, written only by `bin/fm-review-record.py`, whose header owns author-evidence derivation, unknown-family refusal, named-group coverage, and its format.
+- The append-only review-verdict and captain-word ledger `state/review-records.jsonl`, written only by `bin/fm-review-record.py`, whose header owns author-evidence derivation, pipeline-only unknown-family relief, named-group coverage, and its format; see [Unrecorded pipeline author families](#unrecorded-pipeline-author-families) for the gate's harm-model reassessment.
 - The append-only launch author history `state/<id>.launch-models`, published by `bin/fm-spawn.sh`, whose header owns its format and relaunch behavior.
 - The append-only refusal friction ledger `state/friction.jsonl`, written only by `bin/fm-friction-ledger.py`; [Friction ledger](#friction-ledger) owns its schema and privacy contract.
 - The conditional-read ETag cache `state/gh-rest-cache/` and the last-seen GitHub quota buckets `state/gh-ratelimit.<resource>.json`, both owned by `bin/fm-gh-rest.sh`.
@@ -123,6 +123,23 @@ Each effective `FM_HOME` contains private operational directories.
 `projects/` holds local project clones.
 Firstmate reads these clones, but changes them only through the narrow guarded and concrete captain-approved exceptions in `AGENTS.md`.
 Untracked files and directories whose names begin with `scratchpad` are also gitignored, so temporary scratch does not make porcelain-based secondmate sync guards treat a home as dirty.
+
+### Unrecorded pipeline author families
+
+The review landing gate's coverage contract is owned by [`bin/fm-review-record.py`](../bin/fm-review-record.py)'s header and `--help`, including its bounded single-reader relief for `no-mistakes:unknown` and unchanged two-reader requirement for an unknown builder.
+The verifier reads the verifying host's `NM_HOME/state.sqlite`, so a run performed elsewhere can lack local invocation evidence even when the exact head has already received a known different-builder-family PASS.
+
+#### Guard harm-model reassessment
+
+Two known reader families guarantee that at least one differs from an unknown author, protecting against an author's family-specific blind spot receiving no independent read.
+The pipeline-only relief preserves known-builder independence, not that stronger guarantee for every possible pipeline author.
+The residual case is an unrecorded pipeline family that really equals the sole reader family, leaving pipeline-authored defects without a different-family read; a pipeline author or operator able to withhold run evidence could exploit it.
+Ship launch history, locally available invocation/provider evidence, exact-head report binding, and continued coverage of every known author family narrow the gap but cannot prove an unknown pipeline author's independence.
+One reader different from every known ship family is enough for the builder-independence objective and avoids repeat reads caused only by a cross-host evidence gap, while unknown builders receive no relief.
+The verifier discloses `pipeline author family not recorded`, and `bin/fm-pr-merge.sh` retains that fact in the existing merge-authority record rather than presenting pipeline independence as proven.
+[`bin/fm-merge-authority-lib.sh`](../bin/fm-merge-authority-lib.sh) owns its optional-line extension and backward-compatible reader; legacy records without the fact remain readable.
+A portable authenticated run-author evidence carrier needs a separate producer, transfer, trust and replay contract and is not provided by this relief.
+The regressions are [`tests/fm-review-record.test.sh`](../tests/fm-review-record.test.sh) and [`tests/fm-pr-merge.test.sh`](../tests/fm-pr-merge.test.sh).
 
 ### Friction ledger
 

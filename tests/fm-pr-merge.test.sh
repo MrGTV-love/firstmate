@@ -155,8 +155,10 @@ PY
       ship-unknown-reader)
         record_review "$case_dir" "$url" "$head" >/dev/null || fail 'record covering Claude read'
         record_review "$case_dir" "$url" "$head" --reader-model mistral-large >/dev/null || fail 'record newest unknown-family read' ;;
-      unreadable|unknown-captain-word)
+      unreadable)
         record_review "$case_dir" "$url" "$head" --author-groups '{"all":["gpt-5.1-codex","unknown"]}' --reader-model gemini-3-pro >/dev/null || fail 'record unknown pipeline read' ;;
+      unknown-captain-word)
+        record_review "$case_dir" "$url" "$head" --author-groups '{"all":["gpt-5.1-codex","unknown"]}' --reader-model gpt-5.1-codex >/dev/null || fail 'record same-builder-family read' ;;
       unknown-two-families)
         record_review "$case_dir" "$url" "$head" --author-groups "$unknown_groups" >/dev/null || fail 'record first-family read of the unknown group' ;;
       unknown-fail-clears)
@@ -226,22 +228,9 @@ PY
       run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     fi
     if [ "$scenario" = unknown-two-families ] || [ "$scenario" = unknown-fail-clears ]; then
-      expect_code 1 "$rc" "$scenario must refuse before the second family reads: $(cat "$case_dir/stderr")"
-      if [ "$scenario" = unknown-two-families ]; then
-        assert_grep 'uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families' "$case_dir/stderr" 'the real unknown group is refused on one family'
-      else
-        assert_grep 'no later exact-head PASS covers group no-mistakes:unknown, family unknown, that this FAIL read' "$case_dir/stderr" 'a PASS from before the FAIL does not count toward two families'
-      fi
-      assert_grep "set each read's actual trigger answers and local report" "$case_dir/stderr" 'the refusal asks for the real trigger answers'
-      command=$(sed -n 's/.*then record each with: //p' "$case_dir/stderr")
-      command=${command%%; or *}
-      [ -n "$command" ] || fail "$scenario refusal printed no recording command: $(cat "$case_dir/stderr")"
-      printf 'VERDICT: PASS head=%s\nOpenAI read of the unknown-family commits.\n' "$head" > "$case_dir/second-family.md"
-      command=${command//SECOND_KNOWN_FAMILY_MODEL/gpt-5.1-codex}
-      command=${command//LOCAL_READER_REPORT/$case_dir/second-family.md}
-      eval "$command" > "$case_dir/second-family.out" 2>&1 || fail "the printed second-family command failed: $(cat "$case_dir/second-family.out")"
-      rc=0
-      run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+      expect_code 0 "$rc" "$scenario needs no redundant second-family read: $(cat "$case_dir/stderr")"
+      assert_grep 'pipeline author family not recorded' "$case_dir/state/task-x1.merge-authority" \
+        'pipeline relief leaves a durable provenance fact'
       "$JQ_BIN" -s -e 'all(.kind != "captain-word")' "$case_dir/state/review-records.jsonl" >/dev/null \
         || fail "$scenario must merge without a captain-word record"
     fi
@@ -273,7 +262,7 @@ PY
       run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     fi
     case "$scenario" in
-      two-readers|ship-only|ship-multi-read|ship-history|ship-reused|ship-all-extra|alias-command|unknown-captain-word|ship-unknown-reader|cancelled-claude|exact-head-fail|rebase-deepseek|rebase-two-readers|missing-db-direct|fail-typed-group|unknown-two-families|unknown-fail-clears)
+      unreadable|two-readers|ship-only|ship-multi-read|ship-history|ship-reused|ship-all-extra|alias-command|unknown-captain-word|ship-unknown-reader|cancelled-claude|exact-head-fail|rebase-deepseek|rebase-two-readers|missing-db-direct|fail-typed-group|unknown-two-families|unknown-fail-clears)
         expect_code 0 "$rc" "$scenario must merge: $(cat "$case_dir/stderr")"
         assert_logged_gh_merge "$case_dir" 9 example/repo --squash ;;
       *)
@@ -294,6 +283,10 @@ PY
         assert_grep 'fm-review-record.py' "$case_dir/stderr" "$scenario names recording command"
         ;;
     esac
+    if [ "$scenario" = two-readers ]; then
+      assert_no_grep 'pipeline author family not recorded' "$case_dir/stderr" 'fully known pipeline has no verify fact'
+      assert_no_grep 'pipeline author family not recorded' "$case_dir/state/task-x1.merge-authority" 'fully known pipeline has no merge fact'
+    fi
     after=$(shasum -a 256 "$case_dir/user-home/.no-mistakes/state.sqlite" 2>/dev/null || true)
     [ "$before" = "$after" ] || fail "$scenario mutated the pipeline database"
     pass "derived author coverage: $scenario"
@@ -968,6 +961,32 @@ test_github_conflicting_queue_rules_report_ambiguity() {
   pass "fm-pr-merge reports ambiguity for conflicting merge-queue rules"
 }
 
+test_merge_records_unrecorded_pipeline_family() {
+  local case_dir head url rc=0 groups
+  case_dir=$(make_case pipeline-author-fact)
+  rm "$case_dir/fakebin/git"
+  : > "$case_dir/explicit-review"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  url=https://github.com/example/repo/pull/9
+  groups='{"ship":["gpt-5.1-codex"],"no-mistakes:unknown":["unknown"]}'
+  rm "$case_dir/user-home/.no-mistakes/state.sqlite"
+  add_gh_mocks "$case_dir" "$head"
+  record_review "$case_dir" "$url" "$head" --author-groups "$groups" >/dev/null || fail 'record Claude PASS'
+  record_review "$case_dir" "$url" "$head" --author-groups "$groups" --reader-model gemini-3-pro >/dev/null || fail 'record Google PASS'
+  run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "T6 merge fixture must succeed: $(cat "$case_dir/stderr")"
+  assert_logged_gh_merge "$case_dir" 9 example/repo --squash
+  assert_grep 'pipeline author family not recorded' "$case_dir/state/task-x1.merge-authority" \
+    'T6 accepted merge record must disclose missing pipeline provenance'
+  bash -c 'FM_HOME="$2/home"; FM_STATE_OVERRIDE="$2/state";
+    . "$1/bin/fm-wake-lib.sh"; . "$1/bin/fm-merge-authority-lib.sh";
+    fm_merge_authority_read "$2/state" task-x1 github github.com example/repo 9 &&
+    [ "$FM_MERGE_AUTHORITY" = attended ] &&
+    [ "$FM_MERGE_AUTHORITY_REVIEW_FACT" = "pipeline author family not recorded" ]' \
+    test "$ROOT" "$case_dir" || fail 'extended record must retain its authority and expose its fact to the reader'
+  pass 'T6 merge record persists the pipeline provenance fact and remains readable'
+}
+
 test_verified_merge_records_pr_and_head() {
   local case_dir rc
   case_dir=$(make_case records-before-merge)
@@ -985,6 +1004,13 @@ test_verified_merge_records_pr_and_head() {
   assert_grep 'pr_head=deadbeefcafefeed0000000000000000deadbeef' "$case_dir/state/task-x1.meta" \
     "records-before-merge: pr_head= was not recorded"
   assert_logged_gh_merge "$case_dir" 9 example/repo --squash
+  assert_no_grep 'pipeline author family not recorded' "$case_dir/state/task-x1.merge-authority" \
+    'known pipeline merge must not invent missing provenance'
+  bash -c 'FM_HOME="$2/home"; FM_STATE_OVERRIDE="$2/state";
+    . "$1/bin/fm-wake-lib.sh"; . "$1/bin/fm-merge-authority-lib.sh";
+    fm_merge_authority_read "$2/state" task-x1 github github.com example/repo 9 &&
+    [ "$FM_MERGE_AUTHORITY" = attended ] && [ -z "$FM_MERGE_AUTHORITY_REVIEW_FACT" ]' \
+    test "$ROOT" "$case_dir" || fail 'legacy six-line authority record remains readable without a fact'
   pass "fm-pr-merge records pr= and pr_head= for a verified GitHub merge"
 }
 
@@ -2313,6 +2339,7 @@ test_github_zero_exit_queue_required_refuses_with_exact_retry
 test_github_closed_unqueued_outcome_omits_retry_flags
 test_github_agreeing_queue_rules_keep_retry_guidance
 test_github_conflicting_queue_rules_report_ambiguity
+test_merge_records_unrecorded_pipeline_family
 test_verified_merge_records_pr_and_head
 test_pr_metadata_is_recorded_before_the_forge_call
 test_merge_failure_propagates_after_recording

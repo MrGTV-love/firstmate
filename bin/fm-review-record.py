@@ -62,16 +62,25 @@ the groups the reader actually read, or ["all"]; omitted, author-groups keys nam
 the covered groups. Historical records use those same keys. A PASS covers one
 author family of a group only when it names that group or all, declares its
 derived authors, and its known reader family differs from that author family.
-Every author family of every group, ship and no-mistakes alike, needs at least
-one such exact-head PASS. An unknown author family is covered only when
-exact-head PASS reads of its group come from at least two different known
-reader families: whatever the unknown family really is, at least one of those
-readers differs from it. One known reader, or several of one family, never
-covers unknown. Multiple reads can collectively cover a group; one reader
-outside every family is not required. This tests the harm directly: every
-author's blind spots must receive an independent read, without forcing a third
-family for mixed-family work and without a captain word that only restates
-two independent passes.
+Every known author family of every group needs at least one such exact-head
+PASS. Unknown ship authors and other unknown constraints require exact-head
+PASS reads of their group from at least two different known reader families:
+whatever that unknown family really is, at least one reader differs from it.
+Only the derived no-mistakes:unknown group may instead use one such PASS whose
+known reader family differs from EVERY known ship family, provided at least
+one known ship family exists. A ship with no known family gets no relief.
+Unknown ship constraints still need two different known reader families, even
+when a pipeline group receives relief. Multiple reads may collectively cover
+known author families; a third family is not required for mixed-family work.
+An accepted independent review with a derived no-mistakes:unknown group prints
+'pipeline author family not recorded'; --json includes that string in optional
+facts. fm-pr-merge.sh persists it in its merge-authority record from the same
+verification read. Known pipeline groups emit no fact.
+This preserves known-builder independence but not the former guarantee for
+all possible pipeline authors: the unrecorded pipeline family may actually
+match the sole reader. Local invocation evidence and ship launch history
+narrow, but do not eliminate, that risk. See docs/configuration.md's
+'Unrecorded pipeline author families' harm-model reassessment.
 Exact-head binding, report validation, captain-word/away rules and every live
 forge/hold check remain mandatory.
 Model families are rederived from ids into anthropic, openai, google, deepseek,
@@ -83,8 +92,8 @@ never decide independence. Uncovered-group refusals name each uncovered family,
 reporting any group with an unknown author family before known-family groups.
 For known families they print a review recording command; substitute the actual
 reader, local report and trigger answers. An unknown-family refusal prints
-that command with the same substitutions and asks for reads until two different
-known reader families count. It also offers repaired author evidence or the
+that command with the same substitutions and offers two different known reader
+families, or the pipeline-only single-reader rule above. It also offers repaired author evidence or the
 exact-head captain-word command, whose words must be the captain's actual fresh
 instruction. When every group is covered but the newest reader is unknown, the
 refusal names that reader and prints a known-family reread command.
@@ -120,9 +129,9 @@ commit evidence cannot be read,
 and invalid-input means a caller field, URL or path is invalid. Missing review
 history is not-qualified; corrupt or unreadable history is unavailable. Failure
 JSON keeps the existing exit status (1 evidence/unavailable, 2 input) and never
-looks like a success object. Without --json, a successful verify prints exactly
-review: PASS or review: captain-word; a refusal prints an error: line and exits
-1.
+looks like a success object. Without --json, a successful verify prints
+review: PASS (plus review: pipeline author family not recorded when applicable)
+or review: captain-word; a refusal prints an error: line and exits 1.
 latest emits the complete newest review and captain-word as JSON for relay reads.
 Missing/invalid input exits 2; missing/mismatched evidence or unreadable history
 exits 1. Corrupt/partial history is preserved for reconciliation, never repaired.
@@ -498,9 +507,14 @@ def verify(records, rows, head, home, pr, task, base, review_only=False):
             required = derived_families if "all" in row["author_groups"] else families
             if (group in named or "all" in named) and required <= declared_families and reader != "unknown":
                 readers.add(reader)
-        # Every author family needs some reading PASS from a different family.
-        # An unknown family needs two known reader families: one of them must differ from it.
-        return sorted(f for f in families if (len(readers) < 2 if f == "unknown" else not readers - {f}))
+        # Known authors retain different-family coverage. Unknown builders and
+        # other unknown groups retain the two-reader guarantee; only a derived
+        # unknown pipeline group may use builder-independent single coverage.
+        ship_families = {a["family"] for a in derived.get("ship", [])} - {"unknown"}
+        pipeline_read = (group == "no-mistakes:unknown" and group in derived
+                         and ship_families and readers - ship_families)
+        return sorted(f for f in families if (len(readers) < 2 and not pipeline_read
+                                              if f == "unknown" else not readers - {f}))
 
     # A FAIL stands until later exact-head PASS reads cover every group it read.
     for index in fails:
@@ -526,13 +540,14 @@ def verify(records, rows, head, home, pr, task, base, review_only=False):
         reason = f"model family unknown for newest reader {review['reader_model']}; " if unknown_reader else ""
         if "unknown" in missing:
             raise VerificationError(f"{reason}uncovered commit group {group}, family {','.join(missing)}; model family unknown needs exact-head PASS reads of this group from two different known reader families; obtain reads until both families count, set each read's actual trigger answers and local report, then record each with: {env} {review_command('SECOND_KNOWN_FAMILY_MODEL', [group], groups)}; or repair the author evidence so every author model has a known family, or {captain_help}")
-        raise VerificationError(f"{reason}uncovered commit group {group}, family {','.join(missing)}; each author family needs an exact-head PASS reading this group whose reader_family is known and different from it (model family unknown needs two known reader families); obtain the named read, set its actual trigger answers and local report, then record it with: {env} {review_command('OUTSIDE_FAMILY_MODEL', [group], groups)}")
+        raise VerificationError(f"{reason}uncovered commit group {group}, family {','.join(missing)}; each author family needs an exact-head PASS reading this group whose reader_family is known and different from it (see --help for unknown-pipeline coverage); obtain the named read, set its actual trigger answers and local report, then record it with: {env} {review_command('OUTSIDE_FAMILY_MODEL', [group], groups)}")
     if unknown_reader:
         raise VerificationError(f"model family unknown for newest reader {review['reader_model']}; every group is covered by known-family reads, but the newest review must name a known reader family; obtain a reread from a known-family reader, set its actual trigger answers and local report, then record it with: {env} {review_command('KNOWN_FAMILY_MODEL', sorted(groups), groups)}")
     yes = [trigger for trigger in TRIGGERS if review[trigger] == "yes"]
     if yes and review_only:
         raise VerificationError(f"{', '.join(yes)} is yes at live head {head}; --review-only requires an independent PASS with no escalation trigger, and a captain-word is not a substitute")
-    return "independent-review", review
+    facts = ["pipeline author family not recorded"] if "no-mistakes:unknown" in derived else []
+    return "independent-review", {**review, "facts": facts}
 
 
 def verification_json(pr, head, basis, row):
@@ -551,6 +566,8 @@ def verification_json(pr, head, basis, row):
         report=row["report"])
     if isinstance(row.get("report_sha256"), str) and row["report_sha256"]:
         evidence["report_sha256"] = row["report_sha256"]
+    if row.get("facts"):
+        evidence["facts"] = row["facts"]
     return evidence
 
 
@@ -637,6 +654,8 @@ def main():
                     print(json.dumps(verification_json(pr, args.head, basis, evidence), separators=(",", ":")))
                 else:
                     print(f"review: {'PASS' if basis == 'independent-review' else basis}")
+                    for fact in evidence.get("facts", []):
+                        print(f"review: {fact}")
     except VerificationError as exc:
         if emit_json:
             print(json.dumps(failure_json("not-qualified", str(exc)), separators=(",", ":")))
