@@ -1,0 +1,9 @@
+### tree=base (d791189f) mode=sandbox
+probe: ps exit status in this shell = 126
+identity: UNREADABLE
+first recovery exit=1
+second recovery exit=1
+phase=awaiting_report attempted_epoch=
+hook deliveries: 0
+### exit: 0
+### OMP_API_BILLING diagnostic count in this log: 0

@@ -1,0 +1,9 @@
+### tree=/tmp/fm-nm-pr-lab.EJDqWa/head mode=open FM_TEST_ONLY=test_recovery_refuses_other_ps_failures_with_working_native_reader
+### bash: GNU bash, version 3.2.57(1)-release (arm64-apple-darwin25)
+### os: 26.7.1 25G241
+### started: 2026-11-11T01:04:48Z
+### cmd: /bin/bash tests/fm-pending-reply.test.sh
+ok - non-126 ps failures refuse recovery without calling a working native reader
+### exit: 0
+### finished: 2026-11-11T01:04:49Z
+### OMP_API_BILLING diagnostic count in this log: 0

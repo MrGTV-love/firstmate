@@ -1,0 +1,9 @@
+### tree=/tmp/fm-nm-pr-lab.EJDqWa/head mode=open FM_TEST_ONLY=test_recovery_refuses_unreadable_sender_identity
+### bash: GNU bash, version 3.2.57(1)-release (arm64-apple-darwin25)
+### os: 26.7.1 25G241
+### started: 2026-11-11T01:04:50Z
+### cmd: /bin/bash tests/fm-pending-reply.test.sh
+ok - unreadable sender identity refuses recovery without consuming its attempt
+### exit: 0
+### finished: 2026-11-11T01:04:51Z
+### OMP_API_BILLING diagnostic count in this log: 0

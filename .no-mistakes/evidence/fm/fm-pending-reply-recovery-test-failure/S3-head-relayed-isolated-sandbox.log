@@ -1,0 +1,9 @@
+### tree=/tmp/fm-nm-pr-lab.EJDqWa/head mode=sandbox FM_TEST_ONLY=test_relayed_request_recovery_reaches_the_mate
+### bash: GNU bash, version 3.2.57(1)-release (arm64-apple-darwin25)
+### os: 26.7.1 25G241
+### started: 2026-11-11T01:04:32Z
+### cmd: sandbox-exec -p (version 1)(allow default) /bin/bash tests/fm-pending-reply.test.sh
+ok - recovery of a relayed cross-task request reaches the mate
+### exit: 0
+### finished: 2026-11-11T01:04:34Z
+### OMP_API_BILLING diagnostic count in this log: 0

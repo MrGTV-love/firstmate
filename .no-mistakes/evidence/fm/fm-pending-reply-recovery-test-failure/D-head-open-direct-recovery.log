@@ -1,0 +1,9 @@
+### tree=head (dcd1395d) mode=open
+probe: ps exit status in this shell = 0
+identity: readable
+first recovery exit=0
+second recovery exit=1
+phase=recovery_sent attempted_epoch=5000
+hook deliveries: 1
+### exit: 0
+### OMP_API_BILLING diagnostic count in this log: 0

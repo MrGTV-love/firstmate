@@ -1,0 +1,12 @@
+--- /tmp/fm-nm-pr-lab.EJDqWa/head/bin/fm-pending-reply-lib.sh	2026-11-10 18:54:55
++++ /tmp/fm-nm-pr-lab.EJDqWa/mutant/bin/fm-pending-reply-lib.sh	2026-11-10 19:04:23
+@@ -1060,8 +1060,7 @@
+   identity=$(COLUMNS=10000 LC_ALL=C ps -p "$pid" -o lstart= -o command= 2>/dev/null)
+   case $? in
+     0) ;;
+-    126) identity=$(python3 "$_FM_PENDING_REPLY_LIB_DIR/fm-proc-info.py" identity "$pid" 2>/dev/null) || return 1 ;;
+-    *) return 1 ;;
++    *) identity=$(python3 "$_FM_PENDING_REPLY_LIB_DIR/fm-proc-info.py" identity "$pid" 2>/dev/null) || return 1 ;;
+   esac
+   [ -n "$identity" ] || return 1
+   printf '%s' "$identity"
