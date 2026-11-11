@@ -18,7 +18,7 @@ test_derived_author_coverage() {
   url=https://github.com/example/repo/pull/9
   groups='{"ship":["gpt-5.1-codex"],"no-mistakes:anthropic":["claude-sonnet-5-5"]}'
   unknown_groups='{"ship":["gpt-5.1-codex"],"no-mistakes:unknown":["unknown"]}'
-  for scenario in claude-only two-readers ship-only omitted-pipeline unreadable named-ship-only exact-head-fail config-fallback changed-config head-mismatch ship-history ship-prior ship-multi-read ship-default ship-reused ship-all-extra typed-unknown alias-command relative-nm-home unknown-captain-word ship-unknown-reader mixed-unknown cancelled-claude errored-omp rebased-openai rebase-claude rebase-deepseek rebase-two-readers rebase-unreadable all-prefixed fail-partial review-only-run rebase-then-clean unopenable-ship query-fails missing-db-nm missing-db-direct denied-parent fail-typed-group unknown-two-families unknown-fail-clears unreadable-one-reader conflict-one-reader relative-one-reader absent-one-reader; do
+  for scenario in claude-only two-readers ship-only omitted-pipeline unreadable named-ship-only exact-head-fail config-fallback changed-config head-mismatch ship-history ship-prior ship-multi-read ship-default ship-reused ship-all-extra typed-unknown alias-command relative-nm-home unknown-captain-word ship-unknown-reader mixed-unknown cancelled-claude errored-omp rebased-openai rebase-claude rebase-deepseek rebase-two-readers rebase-unreadable all-prefixed fail-partial review-only-run rebase-then-clean unopenable-ship query-fails missing-db-nm missing-db-direct denied-parent fail-typed-group unknown-two-families unknown-fail-clears unreadable-one-reader conflict-one-reader relative-one-reader absent-one-reader conflict-two-readers; do
     if [ "$scenario" = denied-parent ] && [ "$(id -u)" = 0 ]; then
       printf 'skip: denied-parent (chmod 0 does not deny root)\n'
       continue
@@ -62,7 +62,7 @@ CREATE TABLE agent_invocations (run_id TEXT, step_name TEXT, agent TEXT, model T
         db.execute('INSERT INTO runs VALUES (?, ?, ?, ?, ?, ?, ?)', ('run-a', 'repo', 'fm/fixture', sys.argv[3], sys.argv[7], sys.argv[7], sys.argv[5]))
         db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?, ?)', ('run-a', 'rebase', 'claude', 'claude-sonnet-5-5', 'anthropic', 'completed'))
     step = 'rebase' if sys.argv[6].startswith('rebase-') else 'review'
-    if not sys.argv[6].startswith('ship-') and sys.argv[6] not in ('missing-db-direct', 'fail-typed-group', 'rebase-then-clean', 'unknown-two-families', 'unknown-fail-clears', 'conflict-one-reader'):
+    if not sys.argv[6].startswith('ship-') and sys.argv[6] not in ('missing-db-direct', 'fail-typed-group', 'rebase-then-clean', 'unknown-two-families', 'unknown-fail-clears', 'conflict-one-reader', 'conflict-two-readers'):
         db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?, ?)', ('run', step, 'claude', 'mystery-9' if sys.argv[6] in ('typed-unknown', 'alias-command') else 'claude-sonnet-5-5', 'anthropic', 'completed'))
     if sys.argv[6] == 'mixed-unknown':
         db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?, ?)', ('run', 'review', 'acp:omp', None, None, 'completed'))
@@ -72,7 +72,7 @@ CREATE TABLE agent_invocations (run_id TEXT, step_name TEXT, agent TEXT, model T
         db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?, ?)', ('run', 'review', 'acp:omp', '', None, 'error'))
     if sys.argv[6] in ('unknown-two-families', 'unknown-fail-clears'):
         db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?, ?)', ('run', 'review', 'acp:omp', '', None, 'completed'))
-    if sys.argv[6] == 'conflict-one-reader':
+    if sys.argv[6] in ('conflict-one-reader', 'conflict-two-readers'):
         db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?, ?)', ('run', 'review', 'claude', 'claude-sonnet-5-5', 'openai', 'completed'))
     if sys.argv[6] == 'rebase-unreadable':
         db.execute('DROP TABLE agent_invocations')
@@ -162,6 +162,10 @@ PY
       unreadable-one-reader|conflict-one-reader|relative-one-reader|absent-one-reader)
         # One Claude read outside the OpenAI ship family; only absent evidence earns relief.
         record_review "$case_dir" "$url" "$head" --author-groups "$unknown_groups" >/dev/null || fail "record one outside-ship read for $scenario" ;;
+      conflict-two-readers)
+        # Recorded but conflicting evidence gets no relief; two families prove independence.
+        record_review "$case_dir" "$url" "$head" --author-groups "$unknown_groups" >/dev/null || fail 'record Claude read of the conflicting pipeline'
+        record_review "$case_dir" "$url" "$head" --author-groups "$unknown_groups" --reader-model gemini-3-pro >/dev/null || fail 'record Gemini read of the conflicting pipeline' ;;
       unknown-two-families)
         record_review "$case_dir" "$url" "$head" --author-groups "$unknown_groups" >/dev/null || fail 'record first-family read of the unknown group' ;;
       unknown-fail-clears)
@@ -246,7 +250,12 @@ PY
       rc=0
       run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     fi
-    if [ "$scenario" = unknown-two-families ] || [ "$scenario" = unknown-fail-clears ] || [ "$scenario" = absent-one-reader ]; then
+    if [ "$scenario" = unknown-fail-clears ] || [ "$scenario" = conflict-two-readers ]; then
+      expect_code 0 "$rc" "$scenario is covered by two known reader families: $(cat "$case_dir/stderr")"
+      assert_no_grep 'pipeline author family not recorded' "$case_dir/stderr" "$scenario two-family cover prints no verify fact"
+      assert_no_grep 'pipeline author family not recorded' "$case_dir/state/task-x1.merge-authority" "$scenario two-family cover records no merge fact"
+    fi
+    if [ "$scenario" = unknown-two-families ] || [ "$scenario" = absent-one-reader ]; then
       expect_code 0 "$rc" "$scenario needs no redundant second-family read: $(cat "$case_dir/stderr")"
       assert_grep 'review: pipeline author family not recorded' "$case_dir/stderr" 'pipeline relief prints its verify fact'
       assert_grep 'pipeline author family not recorded' "$case_dir/state/task-x1.merge-authority" \
@@ -282,7 +291,7 @@ PY
       run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     fi
     case "$scenario" in
-      absent-one-reader|two-readers|ship-only|ship-multi-read|ship-history|ship-reused|ship-all-extra|alias-command|unknown-captain-word|ship-unknown-reader|cancelled-claude|exact-head-fail|rebase-deepseek|rebase-two-readers|missing-db-direct|fail-typed-group|unknown-two-families|unknown-fail-clears)
+      absent-one-reader|conflict-two-readers|two-readers|ship-only|ship-multi-read|ship-history|ship-reused|ship-all-extra|alias-command|unknown-captain-word|ship-unknown-reader|cancelled-claude|exact-head-fail|rebase-deepseek|rebase-two-readers|missing-db-direct|fail-typed-group|unknown-two-families|unknown-fail-clears)
         expect_code 0 "$rc" "$scenario must merge: $(cat "$case_dir/stderr")"
         assert_logged_gh_merge "$case_dir" 9 example/repo --squash ;;
       *)
@@ -992,8 +1001,7 @@ test_merge_records_unrecorded_pipeline_family() {
   groups='{"ship":["gpt-5.1-codex"],"no-mistakes:unknown":["unknown"]}'
   rm "$case_dir/user-home/.no-mistakes/state.sqlite"
   add_gh_mocks "$case_dir" "$head"
-  record_review "$case_dir" "$url" "$head" --author-groups "$groups" >/dev/null || fail 'record Claude PASS'
-  record_review "$case_dir" "$url" "$head" --author-groups "$groups" --reader-model gemini-3-pro >/dev/null || fail 'record Google PASS'
+  record_review "$case_dir" "$url" "$head" --author-groups "$groups" >/dev/null || fail 'record the single outside-ship Claude PASS'
   run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 0 "$rc" "T6 merge fixture must succeed: $(cat "$case_dir/stderr")"
   assert_logged_gh_merge "$case_dir" 9 example/repo --squash

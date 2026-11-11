@@ -80,13 +80,16 @@ present but unusable: they give no relief and keep the two-reader rule, so a
 read fault is never easier than a successful read. Unknown ship
 constraints still need two different known reader families. Multiple reads may
 collectively cover known author families; a third family is not required for mixed-family work.
-An accepted independent review with a derived no-mistakes:unknown group prints
+An accepted independent review whose derived no-mistakes:unknown group is
+covered only through the single-reader rule above (the rule applies and fewer
+than two different known reader families read that group) prints
 'pipeline author family not recorded'; --json includes that string in optional
 facts. fm-pr-merge.sh writes it into its merge-authority record from the same
 verification read. That record is short-lived: the merge poll in fm-watch.sh
 deletes it when it records the merge outcome, whose ledger does not keep the
 fact, and fm-teardown.sh deletes any record left at teardown.
-Known pipeline groups emit no fact.
+An unknown pipeline group read by two different known reader families, and
+every known pipeline group, emit no fact.
 This preserves known-builder independence but not the former guarantee for
 all possible pipeline authors: the unrecorded pipeline family may actually
 match the sole reader. Local invocation evidence and ship launch history
@@ -525,7 +528,7 @@ def verify(records, rows, head, home, pr, task, base, review_only=False):
     def unknown_reader_placeholder(group):
         return "OUTSIDE_SHIP_FAMILY_MODEL" if group == "no-mistakes:unknown" and pipeline_relief else "SECOND_KNOWN_FAMILY_MODEL"
 
-    def uncovered(group, authors, reads):
+    def readers_of(group, authors, reads):
         families = {a["family"] for a in authors}
         readers = set()
         for row in reads:
@@ -538,6 +541,11 @@ def verify(records, rows, head, home, pr, task, base, review_only=False):
             required = derived_families if "all" in row["author_groups"] else families
             if (group in named or "all" in named) and required <= declared_families and reader != "unknown":
                 readers.add(reader)
+        return readers
+
+    def uncovered(group, authors, reads):
+        families = {a["family"] for a in authors}
+        readers = readers_of(group, authors, reads)
         # Known authors retain different-family coverage. Unknown builders and
         # other unknown groups retain the two-reader guarantee; only a derived
         # unknown pipeline group whose ship families are all known may use
@@ -576,7 +584,8 @@ def verify(records, rows, head, home, pr, task, base, review_only=False):
     yes = [trigger for trigger in TRIGGERS if review[trigger] == "yes"]
     if yes and review_only:
         raise VerificationError(f"{', '.join(yes)} is yes at live head {head}; --review-only requires an independent PASS with no escalation trigger, and a captain-word is not a substitute")
-    facts = ["pipeline author family not recorded"] if "no-mistakes:unknown" in derived else []
+    relief_only = pipeline_relief and len(readers_of("no-mistakes:unknown", groups["no-mistakes:unknown"], passes)) < 2
+    facts = ["pipeline author family not recorded"] if relief_only else []
     return "independent-review", {**review, "facts": facts}
 
 

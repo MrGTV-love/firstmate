@@ -264,13 +264,22 @@ test_unknown_pipeline_fact_output() {
   case_dir=$(make_case pipeline-fact)
   printf 'mode=no-mistakes\n' >> "$case_dir/home/state/task-x1.meta"
   record_review "$case_dir" "$HEAD1" PASS sonnet \
-    '{"ship":["gpt-5.1"],"no-mistakes:unknown":["unknown"]}' >/dev/null || fail 'record first pipeline read'
-  record_review "$case_dir" "$HEAD1" PASS gemini-3-pro \
-    '{"ship":["gpt-5.1"],"no-mistakes:unknown":["unknown"]}' >/dev/null || fail 'record second pipeline read'
+    '{"ship":["gpt-5.1"],"no-mistakes:unknown":["unknown"]}' >/dev/null || fail 'record the single pipeline read'
   out=$(NM_HOME="$case_dir/absent-nm" FM_HOME="$case_dir/home" "$RECORD" verify --pr "$URL" \
     --head "$HEAD1" --task task-x1 --base "$BASE") || fail "T6 pipeline verifies: $out"
   assert_contains "$out" 'pipeline author family not recorded' 'T6 verify discloses missing pipeline provenance'
-  pass 'T6 verify text discloses unrecorded pipeline author family'
+  record_review "$case_dir" "$HEAD1" PASS gemini-3-pro \
+    '{"ship":["gpt-5.1"],"no-mistakes:unknown":["unknown"]}' >/dev/null || fail 'record second pipeline read'
+  out=$(NM_HOME="$case_dir/absent-nm" FM_HOME="$case_dir/home" "$RECORD" verify --pr "$URL" \
+    --head "$HEAD1" --task task-x1 --base "$BASE") || fail "two-family pipeline verifies: $out"
+  case "$out" in
+    *'pipeline author family not recorded'*) fail "two known reader families prove independence, so no fact is printed: $out" ;;
+  esac
+  out=$(NM_HOME="$case_dir/absent-nm" FM_HOME="$case_dir/home" "$RECORD" verify --pr "$URL" \
+    --head "$HEAD1" --task task-x1 --base "$BASE" --json) || fail "two-family pipeline verifies as JSON: $out"
+  "$JQ_BIN" -e '.ok == true and (has("facts") | not)' <<<"$out" >/dev/null \
+    || fail "two-family pipeline JSON must carry no facts: $out"
+  pass 'T6 verify discloses the fact only for single-reader pipeline relief'
 }
 
 test_unknown_pipeline_preserves_coverage_boundaries() {
