@@ -167,6 +167,7 @@ fm_merge_authority_read() {  # <state> <task-id> <provider> <host> <path> <numbe
   local state=$1 id=$2 provider=$3 host=$4 path=$5 number=$6
   local record state_device lock status=0
   FM_MERGE_AUTHORITY='external'
+  # shellcheck disable=SC2034 # Public result consumed by sourcing callers.
   FM_MERGE_AUTHORITY_REVIEW_FACT=
   FM_MERGE_AUTHORITY_RECORD_IDENTITY=
   fm_pr_task_id_valid "$id" || return 1
