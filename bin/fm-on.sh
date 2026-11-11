@@ -25,6 +25,11 @@
 # configured SendEnv patterns. The remote entrypoint executes the selected
 # command under an empty environment with only its fixed runtime values.
 #
+# ConnectTimeout bounds connection setup, which ServerAlive probes cannot
+# protect, and avoids the macOS mDNS connect path that can hang before opening
+# a socket when no timeout is set. FM_SSH_CONNECT_TIMEOUT overrides the default
+# of 15 seconds; OpenSSH applies this bound per address, not per command.
+#
 # ServerAliveInterval/ServerAliveCountMax arm dead-peer detection so a vanished
 # peer (a reboot, a dropped link) becomes a bounded ssh failure (exit 255)
 # instead of an indefinite hang on a half-open TCP connection. The remote
@@ -104,6 +109,10 @@ ROOT_B64=$(printf '%s' "$ROOT" | encode_base64)
 HOME_B64=$(printf '%s' "$HOME_PATH" | encode_base64)
 ARGV_B64=$(printf '%s\0' "$COMMAND" "$@" | encode_base64)
 SSH_BIN=${FM_SSH_BIN:-ssh}
+# measured: value=15 date=2026-11-07 host=Mac-Studio margin=15x (five diagnosed mDNS connects took 0-1 s with a connect timeout).
+CONNECT_TIMEOUT=${FM_SSH_CONNECT_TIMEOUT:-15}
+case "${FM_SSH_CONNECT_TIMEOUT-$CONNECT_TIMEOUT}" in ''|*[!0-9]*) die "FM_SSH_CONNECT_TIMEOUT must be a positive integer: ${FM_SSH_CONNECT_TIMEOUT-}" ;; esac
+[ "$CONNECT_TIMEOUT" -gt 0 ] || die "FM_SSH_CONNECT_TIMEOUT must be a positive integer: $CONNECT_TIMEOUT"
 ALIVE_INTERVAL=${FM_SSH_ALIVE_INTERVAL:-15}
 ALIVE_COUNT_MAX=${FM_SSH_ALIVE_COUNT_MAX:-3}
 case "$ALIVE_INTERVAL" in ''|*[!0-9]*) die "FM_SSH_ALIVE_INTERVAL must be a positive integer: $ALIVE_INTERVAL" ;; esac
@@ -115,6 +124,7 @@ SSH_ARGS=(
   -o ForwardAgent=no
   -o ClearAllForwardings=yes
   -o 'SendEnv=-*'
+  -o "ConnectTimeout=$CONNECT_TIMEOUT"
   -o "ServerAliveInterval=$ALIVE_INTERVAL"
   -o "ServerAliveCountMax=$ALIVE_COUNT_MAX"
   -- "$HOST" fm-remote-entrypoint.sh "$PROTOCOL" "$ROOT_B64" "$HOME_B64" "$ARGV_B64"

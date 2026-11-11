@@ -63,6 +63,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-load-report.py`      | The engine behind `fm-load-report.sh`                                                |
 | `fm-proc-guard.sh`       | Count the user's processes against the per-user limit and write one process census when a pile-up holds ([framework](host-guards.md)) |
 | `fm-proc-guard.py`       | The engine behind `fm-proc-guard.sh`                                                 |
+| [`fm-github-accounting.py`](../bin/fm-github-accounting.py) | Record standing GitHub quota and `gh`/`gh-axi` caller observations in private state, without controlling callers or proving attribution ([operator contract](configuration.md#standing-github-caller-accounting)) |
 | `fm-ensure-agents-md.sh` | Manually initialize project agent-memory files (see the helper's header and help) |
 | `fm-guard.sh`            | Warn on primary-checkout tangles, main-session pending wakes, and unhealthy supervision |
 | `fm-guard-lint.sh`       | Validate the guard registry against the nine spec rules, require every refusal site to map to a guard, and enforce the shrink-only allowlist ([spec](guard-spec.md)) |
@@ -73,7 +74,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-guard-workarounds.py` | Report read-only evidence of tree-equal merges and base-merge-only head changes ([spec](guard-spec.md#instrumentation)) |
 | `fm-supervision-liveness-lib.sh` | Shared supervision-liveness predicate and reason vocabulary for the turn-end guards and the fleet guard |
 | `fm-primary-scope-lib.sh` | Shared marker-or-plain-checkout primary-home predicate for tracked hooks             |
-| `fm-session-lock-lib.sh` | Shared session-lock ownership from harness ancestry or a trusted Claude session id for fm-lock.sh and the Claude Stop auto-arm, plus the read-only lock inspection behind `fm-lock.sh status` and `fm-inbox.sh ready` |
+| `fm-session-lock-lib.sh` | Shared session-lock ownership from harness ancestry, a trusted Claude session id, or a tagged native DSH Web session id for fm-lock.sh and the Claude Stop auto-arm, plus the read-only lock inspection behind `fm-lock.sh status` and `fm-inbox.sh ready` |
 | `fm-claude-stop-autoarm.sh` | Claude Stop `asyncRewake` hook owning tokenless watcher continuity with single-flight exit-2 rewake (docs/watcher-continuity.md) |
 | `fm-claude-hold-release.sh` | Claude `UserPromptSubmit` and `StopFailure` hook releasing main's presentation hold when a turn ends without Stop (docs/watcher-continuity.md) |
 | `fm-turnend-guard.sh`    | Shared primary turn-end guard predicate so no turn ends blind (docs/turnend-guard.md) |
@@ -170,7 +171,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-peek.sh`             | Print a bounded tail of a crewmate endpoint                                          |
 | `fm-check-register.sh`   | Bind an intentional custom watcher check to its current bytes                       |
 | `fm-check-unregister.sh` | Retire a custom watcher check and its trust binding by validated task id            |
-| `fm-check-lib.sh`        | Validate custom-check registrations and prepare private execution snapshots          |
+| `fm-check-lib.sh`        | Validate custom-check registrations, prepare private execution snapshots, and queue custom-check event and state output |
 | `fm-tool-update-check.sh` | Report watched tooling with an update available, and updates installed but left inert by PATH order |
 | `fm-startup-growth-check.sh` | Daily metadata-only growth check for startup memory and tracked startup/instruction surfaces |
 | `fm-pr-lib.sh`           | Own canonical task and PR validation plus private atomic PR-poll publication, merge-notification identity, and retirement |
