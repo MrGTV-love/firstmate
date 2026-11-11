@@ -651,6 +651,9 @@ def post_hold_observer(replay, directory, violations):
 
 
 BASE_SCOPES = ('chat:write', 'im:write', 'im:history', 'reactions:read', 'reactions:write', 'users:read')
+# A replay a test builds without the fixture still holds both I5b-scope rules (the scope rule and the allowlist) and the base scopes, as every intake scenario's does.
+STRICT_REPLAY = {'schema': 'fm-slack-replay.v1', 'channel': 'D0123456789', 'scopes': list(BASE_SCOPES), 'enforce_scopes': True,
+                 'method_allowlist': list(ReplayShapeTest.POPULATION)}
 
 
 class IntakeTest(unittest.TestCase):
@@ -3586,7 +3589,7 @@ class IntakeTest(unittest.TestCase):
                 self.assertEqual((network.called, request.called), (False, False), fields)
             with tempfile.TemporaryDirectory(dir=Path.cwd()) as directory:
                 transcript = Path(directory) / 'transcript.json'
-                transcript.write_text(json.dumps({'schema': 'fm-slack-replay.v1', 'channel': 'D0123456789'}))
+                transcript.write_text(json.dumps(STRICT_REPLAY))
                 replay = Replay(transcript, Path(directory) / 'state')
                 with self.assertRaisesRegex(SlackError, '^secret_collides_with_marker$'):
                     replay.call('chat.postMessage', channel='D0123456789', text='before ' + value)
@@ -3617,7 +3620,7 @@ class IntakeTest(unittest.TestCase):
         for suffix, refused in (('', True), ('X', False)):
             with tempfile.TemporaryDirectory(dir=Path.cwd()) as directory:
                 transcript = Path(directory) / 'transcript.json'
-                transcript.write_text(json.dumps({'schema': 'fm-slack-replay.v1', 'channel': 'D0123456789'}))
+                transcript.write_text(json.dumps(STRICT_REPLAY))
                 replay = Replay(transcript, Path(directory) / 'state')
                 first = 'a log line ending in the head'
                 second = 'the tail begins this log line'
