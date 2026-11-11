@@ -1,0 +1,180 @@
+cases: test_auto_review_events_reach_the_fleet_ledger test_auto_review_protected_class_counts_every_recorded_review test_auto_review_reaches_the_merge_gate_on_a_recorded_routine_pass test_auto_review_incomplete_review_pack_is_held_and_never_dispatched test_auto_review_reads_the_definition_of_done_as_fm_dod_lib_does test_auto_review_judges_each_check_before_spending_a_read test_auto_review_treats_a_failed_runner_exit_as_a_failed_read test_auto_review_retries_a_wake_that_failed_to_append
+  step -> state=[reading c12ed853117c by claude-sonnet-5-5[1m]] reads=0 reviews=0 merges=0
+  step -> state=[merged https://github.com/example/repo/pull/9] reads=1 reviews=1 merges=1
+## G5 merge reaches the fleet ledger, events stay in the sidecar
+  fake runner argv:
+    argv: <tmp>/auto-ledger/state/.pr-auto-review/task-x1.d/c12ed853117c-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|c12ed853117c7d17a20f6e012e584056a47be1a5|pr.diff|<tmp>/auto-ledger/project|claude-sonnet-5-5[1m] contract=200 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1794416221 c12ed853117c reading c12ed853117c by claude-sonnet-5-5[1m] for openai
+    1794416222 c12ed853117c verdict recorded: PASS for c12ed853117c by claude-sonnet-5-5[1m], report <tmp>/auto-ledger/state/.pr-auto-review/task-x1.d/c12ed853117c-claude-sonnet-5-5_1m_/review.md
+    1794416228 c12ed853117c merged: https://github.com/example/repo/pull/9 at c12ed853117c
+  review records (state/review-records.jsonl):
+    {"verdict":"PASS","head":"c12ed853117c","reader_model":"claude-sonnet-5-5[1m]","reader_family":"anthropic","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
+  forge merge calls (fake gh log):
+    pr merge 9 --repo example/repo --match-head-commit c12ed853117c7d17a20f6e012e584056a47be1a5 --squash
+  current state: merged https://github.com/example/repo/pull/9
+ok - the merge reaches the fleet ledger, the events stay in the sidecar, and the worker's status log is never written
+  step -> state=[reading da0f7a452fd3 by claude-sonnet-5-5[1m]] reads=0 reviews=1 merges=0
+  step -> state=[held: protected class yes - security-sensitive fixture] reads=1 reviews=2 merges=0
+  step -> state=[held: protected class yes - security-sensitive fixture] reads=1 reviews=2 merges=0
+## F1 earlier recorded review said yes, later lane review said no
+  fake runner argv:
+    argv: <tmp>/auto-prot-ext-yes/state/.pr-auto-review/task-x1.d/da0f7a452fd3-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|da0f7a452fd3748fc9ef867afe3d3ef5a0da1404|pr.diff|<tmp>/auto-prot-ext-yes/project|claude-sonnet-5-5[1m] contract=200 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1794416231 da0f7a452fd3 reading da0f7a452fd3 by claude-sonnet-5-5[1m] for openai
+    1794416232 da0f7a452fd3 verdict recorded: PASS for da0f7a452fd3 by claude-sonnet-5-5[1m], report <tmp>/auto-prot-ext-yes/state/.pr-auto-review/task-x1.d/da0f7a452fd3-claude-sonnet-5-5_1m_/review.md
+    1794416232 da0f7a452fd3 held: protected class yes - security-sensitive fixture at da0f7a452fd3; the merge is Main's
+  review records (state/review-records.jsonl):
+    {"verdict":"PASS","head":"da0f7a452fd3","reader_model":"openai-codex/gpt-6.1-terra","reader_family":"openai","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
+    {"verdict":"PASS","head":"da0f7a452fd3","reader_model":"claude-sonnet-5-5[1m]","reader_family":"anthropic","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
+  forge merge calls (fake gh log):
+  current state: held: protected class yes - security-sensitive fixture
+  step -> state=[reading b124ecfb3941 by claude-sonnet-5-5[1m]] reads=0 reviews=1 merges=0
+  step -> state=[merged https://github.com/example/repo/pull/9] reads=1 reviews=2 merges=1
+## F1 every recorded review said no
+  fake runner argv:
+    argv: <tmp>/auto-prot-ext-no/state/.pr-auto-review/task-x1.d/b124ecfb3941-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|b124ecfb39417e6de939140b433486cd70789fbe|pr.diff|<tmp>/auto-prot-ext-no/project|claude-sonnet-5-5[1m] contract=200 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1794416235 b124ecfb3941 reading b124ecfb3941 by claude-sonnet-5-5[1m] for openai
+    1794416236 b124ecfb3941 verdict recorded: PASS for b124ecfb3941 by claude-sonnet-5-5[1m], report <tmp>/auto-prot-ext-no/state/.pr-auto-review/task-x1.d/b124ecfb3941-claude-sonnet-5-5_1m_/review.md
+    1794416240 b124ecfb3941 merged: https://github.com/example/repo/pull/9 at b124ecfb3941
+  review records (state/review-records.jsonl):
+    {"verdict":"PASS","head":"b124ecfb3941","reader_model":"openai-codex/gpt-6.1-terra","reader_family":"openai","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
+    {"verdict":"PASS","head":"b124ecfb3941","reader_model":"claude-sonnet-5-5[1m]","reader_family":"anthropic","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
+  forge merge calls (fake gh log):
+    pr merge 9 --repo example/repo --match-head-commit b124ecfb39417e6de939140b433486cd70789fbe --squash
+  current state: merged https://github.com/example/repo/pull/9
+  step -> state=[reading afbe246d2121 by claude-sonnet-5-5[1m]] reads=0 reviews=1 merges=0
+  step -> state=[held: protected class line missing in a report] reads=1 reviews=2 merges=0
+  step -> state=[held: protected class line missing in a report] reads=1 reviews=2 merges=0
+ok - every exact-head recorded review counts: any yes or missing protected-class answer holds, and all-no evidence merges
+  step -> state=[reading 92ea05db8d10 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[waiting: a check is still pending: ci] reads=1 reviews=1 merges=0
+  step -> state=[merged https://github.com/example/repo/pull/9] reads=1 reviews=1 merges=1
+## F5 recorded routine PASS, no sidecar attempt
+  fake runner argv:
+    argv: <tmp>/auto-prot-recorded-routine/state/.pr-auto-review/task-x1.d/92ea05db8d10-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|92ea05db8d10528e6d561393b0491ae1f17a90c1|pr.diff|<tmp>/auto-prot-recorded-routine/project|claude-sonnet-5-5[1m] contract=200 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1794416258 92ea05db8d10 merged: https://github.com/example/repo/pull/9 at 92ea05db8d10
+  review records (state/review-records.jsonl):
+    {"verdict":"PASS","head":"92ea05db8d10","reader_model":"claude-sonnet-5-5[1m]","reader_family":"anthropic","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
+  forge merge calls (fake gh log):
+    pr merge 9 --repo example/repo --match-head-commit 92ea05db8d10528e6d561393b0491ae1f17a90c1 --squash
+  current state: merged https://github.com/example/repo/pull/9
+  step -> state=[reading 8cea39dc2ced by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[waiting: a check is still pending: ci] reads=1 reviews=1 merges=0
+  step -> state=[held: the PASS review by claude-sonnet-5-5[1m] cannot be verified: its report is missing or changed since it was recorded] reads=1 reviews=1 merges=0
+  step -> state=[held: the PASS review by claude-sonnet-5-5[1m] cannot be verified: its report is missing or changed since it was recorded] reads=1 reviews=1 merges=0
+  step -> state=[reading c016fafd9aed by claude-sonnet-5-5[1m]] reads=0 reviews=0 merges=0
+  step -> state=[waiting: a check is still pending: ci] reads=1 reviews=1 merges=0
+  step -> state=[held: the PASS review by claude-sonnet-5-5[1m] cannot be verified: its report is missing or changed since it was recorded] reads=1 reviews=1 merges=0
+  step -> state=[held: the PASS review by claude-sonnet-5-5[1m] cannot be verified: its report is missing or changed since it was recorded] reads=1 reviews=1 merges=0
+ok - a recorded routine PASS that verify accepts reaches the merge gate with no sidecar attempt, and unverifiable report evidence holds
+  step -> state=[held: review pack not built: contract source missing: brief.md, a Definition Of Done (the brief's section, a DoD file it names, or dod/<task>.md)] reads=0 reviews=0 merges=0
+  step -> state=[held: review pack not built: contract source missing: brief.md, a Definition Of Done (the brief's section, a DoD file it names, or dod/<task>.md)] reads=0 reviews=0 merges=0
+  step -> state=[held: review pack not built: contract source missing: brief.md, a Definition Of Done (the brief's section, a DoD file it names, or dod/<task>.md)] reads=0 reviews=0 merges=0
+  step -> state=[held: review pack not built: contract source missing: brief.md, a Definition Of Done (the brief's section, a DoD file it names, or dod/<task>.md)] reads=0 reviews=0 merges=0
+  step -> state=[held: review pack not built: contract source missing: a Definition Of Done (the brief's section, a DoD file it names, or dod/<task>.md)] reads=0 reviews=0 merges=0
+  step -> state=[held: review pack not built: contract source missing: a Definition Of Done (the brief's section, a DoD file it names, or dod/<task>.md)] reads=0 reviews=0 merges=0
+  step -> state=[held: review pack not built: contract source missing: a Definition Of Done (the brief's section, a DoD file it names, or dod/<task>.md)] reads=0 reviews=0 merges=0
+  step -> state=[held: review pack not built: contract source missing: a Definition Of Done (the brief's section, a DoD file it names, or dod/<task>.md)] reads=0 reviews=0 merges=0
+  step -> state=[held: review pack not built: contract source missing: DoD file missing-dod.md, a Definition Of Done (the brief's section, a DoD file it names, or dod/<task>.md)] reads=0 reviews=0 merges=0
+  step -> state=[held: review pack not built: contract source missing: DoD file missing-dod.md, a Definition Of Done (the brief's section, a DoD file it names, or dod/<task>.md)] reads=0 reviews=0 merges=0
+  step -> state=[held: review pack not built: contract source missing: DoD file empty-dod.md, a Definition Of Done (the brief's section, a DoD file it names, or dod/<task>.md)] reads=0 reviews=0 merges=0
+  step -> state=[held: review pack not built: contract source missing: DoD file empty-dod.md, a Definition Of Done (the brief's section, a DoD file it names, or dod/<task>.md)] reads=0 reviews=0 merges=0
+  step -> state=[held: review pack not built: contract source missing: brief.md, a Definition Of Done (the brief's section, a DoD file it names, or dod/<task>.md)] reads=0 reviews=0 merges=0
+  step -> state=[reading 7086983a25a2 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+ok - an incomplete review pack is held with its missing source and never dispatched; a complete or repaired one is read
+  step -> state=[reading e71c502410c6 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+## DoD presence: inline
+  fake runner argv:
+    argv: <tmp>/auto-dod-inline/state/.pr-auto-review/task-x1.d/e71c502410c6-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|e71c502410c6ed1c259584e0bd86d07e068bfedf|pr.diff|<tmp>/auto-dod-inline/project|claude-sonnet-5-5[1m] contract=200 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1794416316 e71c502410c6 reading e71c502410c6 by claude-sonnet-5-5[1m] for openai
+  review records (state/review-records.jsonl):
+  forge merge calls (fake gh log):
+  current state: reading e71c502410c6 by claude-sonnet-5-5[1m]
+  step -> state=[reading 0165a18cf701 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+## DoD presence: fenced-pointer
+  fake runner argv:
+    argv: <tmp>/auto-dod-fenced-pointer/state/.pr-auto-review/task-x1.d/0165a18cf701-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|0165a18cf7013adab7d95a14e985add1e0a40ed7|pr.diff|<tmp>/auto-dod-fenced-pointer/project|claude-sonnet-5-5[1m] contract=324 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1794416323 0165a18cf701 reading 0165a18cf701 by claude-sonnet-5-5[1m] for openai
+  review records (state/review-records.jsonl):
+  forge merge calls (fake gh log):
+  current state: reading 0165a18cf701 by claude-sonnet-5-5[1m]
+  step -> state=[reading cd65ee8db76f by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+## DoD presence: pointer
+  fake runner argv:
+    argv: <tmp>/auto-dod-pointer/state/.pr-auto-review/task-x1.d/cd65ee8db76f-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|cd65ee8db76f134cc8cd7a63257943be3df009d0|pr.diff|<tmp>/auto-dod-pointer/project|claude-sonnet-5-5[1m] contract=344 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1794416326 cd65ee8db76f reading cd65ee8db76f by claude-sonnet-5-5[1m] for openai
+  review records (state/review-records.jsonl):
+  forge merge calls (fake gh log):
+  current state: reading cd65ee8db76f by claude-sonnet-5-5[1m]
+  step -> state=[reading 9b21a537a6f3 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+## DoD presence: outside-pointer
+  fake runner argv:
+    argv: <tmp>/auto-dod-outside-pointer/state/.pr-auto-review/task-x1.d/9b21a537a6f3-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|9b21a537a6f3139fae120cf0c2e4b3d9f057849c|pr.diff|<tmp>/auto-dod-outside-pointer/project|claude-sonnet-5-5[1m] contract=335 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1794416331 9b21a537a6f3 reading 9b21a537a6f3 by claude-sonnet-5-5[1m] for openai
+  review records (state/review-records.jsonl):
+  forge merge calls (fake gh log):
+  current state: reading 9b21a537a6f3 by claude-sonnet-5-5[1m]
+  step -> state=[reading 9c6679a633b0 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+## DoD presence: dod-file-only
+  fake runner argv:
+    argv: <tmp>/auto-dod-dod-file-only/state/.pr-auto-review/task-x1.d/9c6679a633b0-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|9c6679a633b0a03d2e3a3c818209fc28ef6afbce|pr.diff|<tmp>/auto-dod-dod-file-only/project|claude-sonnet-5-5[1m] contract=158 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1794416337 9c6679a633b0 reading 9c6679a633b0 by claude-sonnet-5-5[1m] for openai
+  review records (state/review-records.jsonl):
+  forge merge calls (fake gh log):
+  current state: reading 9c6679a633b0 by claude-sonnet-5-5[1m]
+ok - a Definition Of Done is the brief's own section, the file its unfenced in-section pointer names under data/, or data/dod/<task>.md; a fenced or outside pointer names nothing
+  step -> state=[waiting: check ci is not green] reads=0 reviews=0 merges=0
+  step -> state=[waiting: check ci is not green] reads=0 reviews=0 merges=0
+  step -> state=[waiting: check lint is not green] reads=0 reviews=0 merges=0
+  step -> state=[waiting: check lint is not green] reads=0 reviews=0 merges=0
+  step -> state=[waiting: check deploy is not green] reads=0 reviews=0 merges=0
+  step -> state=[waiting: check deploy is not green] reads=0 reviews=0 merges=0
+  step -> state=[waiting: check deploy is not green] reads=0 reviews=0 merges=0
+  step -> state=[waiting: check deploy is not green] reads=0 reviews=0 merges=0
+  step -> state=[waiting: required check lint has not reported] reads=0 reviews=0 merges=0
+  step -> state=[waiting: required check lint has not reported] reads=0 reviews=0 merges=0
+  step -> state=[waiting: required check lint has not reported] reads=0 reviews=0 merges=0
+  step -> state=[waiting: required check lint has not reported] reads=0 reviews=0 merges=0
+  step -> state=[reading 43c5a6448f47 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[reading 02a30158e086 by claude-sonnet-5-5[1m]] reads=0 reviews=0 merges=0
+ok - a red or cancelled check, a failed status context and an unreported required check stop a read; a green, re-run or reported head is read
+  step -> state=[reading 13b1e2edb23e by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[reading 13b1e2edb23e by deepseek/deepseek-v4-flash] reads=2 reviews=0 merges=0
+  step -> state=[merged https://github.com/example/repo/pull/9] reads=2 reviews=1 merges=1
+## F4 nonzero runner exit after a PASS report
+  fake runner argv:
+    argv: <tmp>/auto-rc-pass/state/.pr-auto-review/task-x1.d/13b1e2edb23e-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|13b1e2edb23eb149110d37002a5a27444ca067f5|pr.diff|<tmp>/auto-rc-pass/project|claude-sonnet-5-5[1m] contract=200 ci=117 diff=205
+    argv: <tmp>/auto-rc-pass/state/.pr-auto-review/task-x1.d/13b1e2edb23e-deepseek_deepseek-v4-flash|https://github.com/example/repo/pull/9|13b1e2edb23eb149110d37002a5a27444ca067f5|pr.diff|<tmp>/auto-rc-pass/project|deepseek/deepseek-v4-flash contract=200 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1794416361 13b1e2edb23e reading 13b1e2edb23e by claude-sonnet-5-5[1m] for openai
+    1794416362 13b1e2edb23e read of 13b1e2edb23e by claude-sonnet-5-5[1m] failed: the runner exited 17
+    1794416363 13b1e2edb23e reading 13b1e2edb23e by deepseek/deepseek-v4-flash for openai
+    1794416364 13b1e2edb23e verdict recorded: PASS for 13b1e2edb23e by deepseek/deepseek-v4-flash, report <tmp>/auto-rc-pass/state/.pr-auto-review/task-x1.d/13b1e2edb23e-deepseek_deepseek-v4-flash/review.md
+    1794416371 13b1e2edb23e merged: https://github.com/example/repo/pull/9 at 13b1e2edb23e
+  review records (state/review-records.jsonl):
+    {"verdict":"PASS","head":"13b1e2edb23e","reader_model":"deepseek/deepseek-v4-flash","reader_family":"deepseek","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
+  forge merge calls (fake gh log):
+    pr merge 9 --repo example/repo --match-head-commit 13b1e2edb23eb149110d37002a5a27444ca067f5 --squash
+  current state: merged https://github.com/example/repo/pull/9
+  step -> state=[reading be3781740fa4 by claude-sonnet-5-5[1m]] reads=0 reviews=0 merges=0
+  step -> state=[fail report <tmp>/auto-rc-fail/state/.pr-auto-review/task-x1.d/be3781740fa4-claude-sonnet-5-5_1m_/review.md] reads=1 reviews=1 merges=0
+  step -> state=[fail report <tmp>/auto-rc-fail/state/.pr-auto-review/task-x1.d/be3781740fa4-claude-sonnet-5-5_1m_/review.md] reads=1 reviews=1 merges=0
+ok - a nonzero runner exit is a failed read even with a report: a PASS is not recorded and the next model is asked, a FAIL still ends the head
+  step -> state=[held: review runner unavailable: FM_REVIEW_RUNNER and config/review-runner are both unset] reads=0 reviews=0 merges=0
+  step -> state=[held: review runner unavailable: FM_REVIEW_RUNNER and config/review-runner are both unset] reads=0 reviews=0 merges=0
+  step -> state=[held: review runner unavailable: FM_REVIEW_RUNNER and config/review-runner are both unset] reads=0 reviews=0 merges=0
+  step -> state=[held: review runner unavailable: FM_REVIEW_RUNNER and config/review-runner are both unset] reads=0 reviews=0 merges=0
+  step -> state=[reading 9e1e9e1c9d2e by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[fail report <tmp>/auto-wake-retry-fail/state/.pr-auto-review/task-x1.d/9e1e9e1c9d2e-claude-sonnet-5-5_1m_/review.md] reads=1 reviews=1 merges=0
+  step -> state=[fail report <tmp>/auto-wake-retry-fail/state/.pr-auto-review/task-x1.d/9e1e9e1c9d2e-claude-sonnet-5-5_1m_/review.md] reads=1 reviews=1 merges=0
+  step -> state=[fail report <tmp>/auto-wake-retry-fail/state/.pr-auto-review/task-x1.d/9e1e9e1c9d2e-claude-sonnet-5-5_1m_/review.md] reads=1 reviews=1 merges=0
+ok - a failed wake append is never marked emitted: it is delivered after recovery, including for a terminal hold, and never repeated
+exit=0
