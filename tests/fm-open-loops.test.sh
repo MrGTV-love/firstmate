@@ -265,6 +265,25 @@ for _ in range(2):  # a fresh collector process must recover the same unfinished
     assert set(completed) == {'finished-review', 'candidate-ready'}, completed
     assert all(r['owner'] == 'firstmate' and r['overdue'] for r in completed.values()), completed
     assert 'failed-review' in rows(completion_report, 'failed_task'), completion_report
+    # The reviewed-inventory attestation alone is not owner acceptance: the row stays until teardown or a drop.
+    with (home / 'state/finished-review.meta').open('a') as meta:
+        meta.write('decisions_reviewed=1\ndecision_keys=\n')
+# A completed task whose status log cannot be folded degrades coverage for that
+# one read; it keeps its own row and never hides a later task's obligations.
+blind = task('blind-review', world / 'no-review-copy', state='done', alive='dead', kind='scout')
+after_blind = task('after-blind', lost, state='failed', exists=False, alive='dead')
+(home / 'state/blind-review.status').write_text(f'working [at={hours(2)}]: {"x" * 80}\n' * 40
+                                                + f'done [at={hours(1)}]: ready for owner\n')
+(home / 'snapshot.json').write_text(json.dumps(dict(schema='fm-fleet-home-input.v1', tasks=[blind, after_blind],
+                                                    backlog=dict(present=True, records=backlog))))
+blind_report = json.loads(out([code / 'bin/fm-open-loops.sh', '--json'],
+                              env=dict(env, FM_STATUS_CAP_BYTES='2048', FM_STATUS_CAP_RESERVE_BYTES='1')))
+assert not blind_report['complete'], blind_report
+assert 'completion status blind-review' in rows(blind_report, 'coverage')['ledger degraded']['evidence'], blind_report
+assert rows(blind_report, 'completed_task')['blind-review']['overdue'], blind_report
+for category in ('failed_task', 'missing_worker', 'unlanded_commit'):
+    assert 'after-blind' in rows(blind_report, category), (category, blind_report)
+(home / 'state/blind-review.status').unlink()
 # Retirement is owned elsewhere; collection never launches or accepts the work.
 (home / 'snapshot.json').write_text(json.dumps(dict(schema='fm-fleet-home-input.v1', tasks=tasks,
                                                     backlog=dict(present=True, records=backlog))))
@@ -837,6 +856,7 @@ local_task['current_state']['state'] = 'done'
 fixture([local_task])
 pending_local = ledger()
 assert 'local-delivery' in rows(pending_local, 'completed_task'), pending_local
+assert 'local-delivery' in rows(pending_local, 'unlanded_commit'), 'the commits stay a separate obligation'
 local_task['current_state']['state'] = 'failed'
 git(local, 'update-ref', 'refs/heads/trunk', local_head)
 git(local, 'symbolic-ref', 'refs/remotes/origin/HEAD', 'refs/remotes/origin/trunk')
@@ -1569,7 +1589,7 @@ for overrides, expected_home in address_cases:
     assert set(rows(addressed, 'ready_not_started')) == {'address-ready'}, addressed
     assert rows(addressed, 'ready_not_started')['address-ready']['limit_seconds'] == 77, addressed
     assert set(rows(addressed, 'unanswered_question')) == {'address:home'}, addressed
-    assert not rows(addressed, 'failed_task'), addressed
+    assert set(rows(addressed, 'failed_task')) == {'address-report'}, addressed
     assert set(rows(addressed, 'open_pr')) == {address_url}, addressed
     assert (expected_home / 'state/.open-loops.lock').is_file(), overrides
     assert json.loads((expected_home / 'state/open-loops.json').read_text()) == addressed

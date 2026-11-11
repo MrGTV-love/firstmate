@@ -543,9 +543,11 @@ class Collector:
                       "completed deliverable " + task["id"], self.deliverable_landed, task))):
                 # A report still needs owner consumption, but an already landed
                 # ship has no remaining review or validation handoff to advance.
-                status_at, _, _, _, _, _ = self.report_status(task["id"])
+                status = self.source("completion status " + task["id"], self.report_status, task["id"])
+                status_at = status[0] if status else mtime(self.state / (task["id"] + ".status"))
                 self.add("completed_task", task["id"],
-                         "consume the report and complete the owner handoff" if task["kind"] == "scout"
+                         "consume the report, complete the owner handoff and tear the task down"
+                         if task["kind"] == "scout"
                          else "advance the committed candidate through its selected delivery path",
                          status_at, evidence="worker completion is a handoff, not final acceptance",
                          source=self.source("completion provenance " + task["id"], self.task_source, task["id"]))
@@ -703,7 +705,7 @@ class Collector:
         return merged_tree == default_tree
 
     def captain_dropped(self, task):
-        return any(record["id"] == task["id"] and record.get("captain_drop") for record in self.backlog)
+        return any(record.get("id") == task["id"] and record.get("captain_drop") for record in self.backlog)
 
     def deliverable_landed(self, task):
         if self.captain_dropped(task):
