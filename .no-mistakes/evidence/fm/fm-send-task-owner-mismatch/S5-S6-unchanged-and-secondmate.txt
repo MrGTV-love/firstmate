@@ -1,0 +1,27 @@
+### S5 a steer that names no task id: base vs head, same target (other)
+## base a7c35400
+fm-send: doorbell not typed because the agent in lab:fm-other has exited; the steer is durably recorded at /Users/charlesabrooker/tmp/fm-lab.uy9qUf/state/other.inbox/002.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane
+exit=0
+001.msg
+002.msg
+handled
+## head aab8440c
+fm-send: doorbell not typed because the agent in lab:fm-other has exited; the steer is durably recorded at /Users/charlesabrooker/tmp/fm-lab.uy9qUf/state/other.inbox/003.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane
+exit=0
+001.msg
+002.msg
+003.msg
+handled
+--- base record 002 vs head record 003 (headers without at=):
+IDENTICAL record bytes (except timestamp)
+
+### S6 secondmate own child task (child-task lives only in fm-mini home): head
+fm-send: doorbell not typed because the agent in lab:fm-fm-mini has exited; the steer is durably recorded at /Users/charlesabrooker/tmp/fm-lab.uy9qUf/state/fm-mini.inbox/001.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane
+exit=0
+--- fm-mini.inbox/001.msg body:
+[fm-from-firstmate]⁣corr=25566d2daf30fb0e Continue child-task and report
+--- pending reply armed:
+25566d2daf30fb0e
+### S6b same steer naming a task this home owns (not fm-mini) is refused
+error: refused task 'fm-slack-main-window-intake': this home's direct report 'fm-slack-main-window-intake' owns it, not target 'fm-mini'; nothing was sent. Send to 'fm-slack-main-window-intake', or use --relay for a deliberate cross-task mention.
+exit=1

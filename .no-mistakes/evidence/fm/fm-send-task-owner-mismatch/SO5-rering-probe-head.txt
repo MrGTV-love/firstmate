@@ -1,0 +1,16 @@
+run1: RERING_PROBE ticks=10 of 100 first_ring_elapsed_s=2.47 load={ 15.23 13.99 13.86 }
+run1: ok - watcher: an aged message with an ordinary unknown-idle composer re-rings quietly, and the ack silences it
+run2: RERING_PROBE ticks=9 of 100 first_ring_elapsed_s=2.20 load={ 14.19 13.81 13.80 }
+run2: ok - watcher: an aged message with an ordinary unknown-idle composer re-rings quietly, and the ack silences it
+run3: RERING_PROBE ticks=9 of 100 first_ring_elapsed_s=2.26 load={ 13.31 13.63 13.74 }
+run3: ok - watcher: an aged message with an ordinary unknown-idle composer re-rings quietly, and the ack silences it
+run4: RERING_PROBE ticks=9 of 100 first_ring_elapsed_s=2.20 load={ 13.20 13.60 13.73 }
+run4: ok - watcher: an aged message with an ordinary unknown-idle composer re-rings quietly, and the ack silences it
+run5: RERING_PROBE ticks=12 of 100 first_ring_elapsed_s=2.92 load={ 13.67 13.68 13.75 }
+run5: ok - watcher: an aged message with an ordinary unknown-idle composer re-rings quietly, and the ack silences it
+run6: RERING_PROBE ticks=9 of 100 first_ring_elapsed_s=2.24 load={ 12.72 13.48 13.68 }
+run6: ok - watcher: an aged message with an ordinary unknown-idle composer re-rings quietly, and the ack silences it
+run7: RERING_PROBE ticks=11 of 100 first_ring_elapsed_s=2.74 load={ 11.84 13.27 13.60 }
+run7: ok - watcher: an aged message with an ordinary unknown-idle composer re-rings quietly, and the ack silences it
+run8: RERING_PROBE ticks=9 of 100 first_ring_elapsed_s=2.21 load={ 11.54 13.16 13.56 }
+run8: ok - watcher: an aged message with an ordinary unknown-idle composer re-rings quietly, and the ack silences it

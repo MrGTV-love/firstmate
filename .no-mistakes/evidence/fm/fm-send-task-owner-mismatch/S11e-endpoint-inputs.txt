@@ -1,0 +1,13 @@
+### S11e declared input on a truly unrecorded explicit endpoint (lab:scratch):
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+error: --require-input needs a recorded receiving task; keys and unrecorded endpoints have no declared receiving home
+exit=1
+### S11f explicit recorded endpoint lab:fm-other, plain text: base vs head (pre-existing typed-path outcome)
+## base
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+error: text not submitted to lab:fm-other (delivery unconfirmed; verdict=unknown; tried explicit target 'lab:fm-other' matched /Users/charlesabrooker/tmp/fm-lab.uy9qUf/state/other.meta; backend=tmux)
+exit=1
+## head
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+error: text not submitted to lab:fm-other (delivery unconfirmed; verdict=unknown; tried explicit target 'lab:fm-other' matched /Users/charlesabrooker/tmp/fm-lab.uy9qUf/state/other.meta; backend=tmux)
+exit=1

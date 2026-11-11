@@ -1,0 +1,44 @@
+### S13 correct-owner steer with no other task id: base vs head to the real Claude worker
+## base a7c35400
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+exit=0
+## head aab8440c
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+exit=0
+--- base record 003 / head record 004 headers (minus at=):
+IDENTICAL headers
+--- full pane capture:
+  What the message said: Resume task fm-slack-main-window-intake. Make a file recovered.txt with the word RECOVERED in it. Then move the message to handled/.
+  What I did:
+  1. I made /Users/charlesabrooker/tmp/fm-lab.uy9qUf/data/work-intake/recovered.txt. It has one word: RECOVERED. No file with that name was there before, so nothing was overwritten.
+  2. I moved 002.msg to /Users/charlesabrooker/tmp/fm-lab.uy9qUf/state/fm-slack-main-window-intake.inbox/handled/002.msg.
+  Checks:
+  - The inbox has no other messages now.
+  - handled/ now has 001.msg and 002.msg.
+  - resumed.txt from the last task is still there. I did not change it.
+  What you do now: Nothing.
+✻ Worked for 15s · done 11:33 AM
+❯ : Firstmate instruction waiting: 'fm-slack-main-window-intake.inbox/003.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+  Listed 1 directory
+❯ : Firstmate instruction waiting: 'fm-slack-main-window-intake.inbox/004.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+  Ran 2 shell commands
+⏺ I did the tasks in messages 003 and 004. Both worked.
+  Message 003: It said to make parity-base.txt with BASE in it, then move the message to handled/.
+  - I made /Users/charlesabrooker/tmp/fm-lab.uy9qUf/data/work-intake/parity-base.txt. It has one word: BASE.
+  - I moved 003.msg to handled/.
+  Message 004: It said to make parity-head.txt with HEAD in it, then move the message to handled/.
+  - I made /Users/charlesabrooker/tmp/fm-lab.uy9qUf/data/work-intake/parity-head.txt. It has one word: HEAD.
+  - I moved 004.msg to handled/.
+  Checks:
+  - Before I made each file, no file with that name was there. Nothing was overwritten.
+  - The inbox has no other messages now.
+  - handled/ now has 001.msg, 002.msg, 003.msg, and 004.msg.
+  - work-intake/ now has 4 files: resumed.txt, recovered.txt, parity-base.txt, and parity-head.txt.
+  One small thing: Messages 003 and 004 did not say "in your current directory," as 001 and 002 did. I put both files in work-intake/, the same folder as before.
+  What you do now: Nothing.
+✻ Churned for 20s · done 11:35 AM
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 ░░░░░░░░░░ 3% 39k/1.0M work-intake:e5443133
+  ⏵⏵ auto mode on (shift+tab to cycle)

@@ -1,0 +1,19 @@
+### S8b full open-loops reconcile while the dependency is open
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M75QTTCF611NRYJ2BYGJEH79/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: false
+generated_epoch: 1794418273
+rows[4]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "coverage","ledger degraded","firstmate","restore the unreadable sources and rerun the reconciler",null,true,"fleet snapshot: backlog is unavailable; worker current state fm-slack-main-window-intake: harness state unavailable (unknown missing); unlanded work fm-slack-main-window-intake: default branch is unknown; worker current state other: harness state unavailable (unknown missing); unlanded work other: default branch is unknown"
+  "missing_worker","other","firstmate","recover the assigned worker without discarding work",184,false,""
+  "silent_report","fm-slack-main-window-intake","firstmate","check in: progress, blockers, cross-workstream dependencies",97,false,"last heard: status=None; inbox acknowledgement=1794418176; resolved reply=None"
+  "unanswered_question","fm-mini:pr370-fix-round-no-owner-here","firstmate","answer or close this question, or record why it no longer applies",null,true,"needs-decision: the PR 370 fix round is not owned in this home"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+## Firstmate answers the dependency with a deliberate relay (names the real owner):
+fm-send: doorbell not typed because the agent in lab:fm-fm-mini has exited; the steer is durably recorded at /Users/charlesabrooker/tmp/fm-lab.uy9qUf/state/fm-mini.inbox/003.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane
+exit=0
+--- fm-mini.status after:
+needs-decision [key=pr370-fix-round-no-owner-here]: the PR 370 fix round is not owned in this home
+resolved [key=pr370-fix-round-no-owner-here] [at=1794418275]: answered: Not yours: I rerouted it to fm-slack-main-window-intake
+--- open-loops rows for the key after the answer:
+0

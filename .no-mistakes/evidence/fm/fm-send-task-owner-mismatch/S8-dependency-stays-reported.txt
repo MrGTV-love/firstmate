@@ -1,0 +1,10 @@
+### S8 legitimate dependency stays reported
+append exit=0
+--- open-loops BEFORE (rows naming fm-mini):
+  "unanswered_question","fm-mini:pr370-fix-round-no-owner-here","firstmate","answer or close this question, or record why it no longer applies",null,true,"needs-decision: the PR 370 fix round is not owned in this home"
+## wrong-owner answer that also closes the decision key:
+error: refused task 'fm-slack-main-window-intake': this home's direct report 'fm-slack-main-window-intake' owns it, not target 'fm-mini'; nothing was sent. Send to 'fm-slack-main-window-intake', or use --relay for a deliberate cross-task mention.
+exit=1
+fm-mini.status UNCHANGED: decision still open
+--- open-loops AFTER refusal (rows naming fm-mini):
+  "unanswered_question","fm-mini:pr370-fix-round-no-owner-here","firstmate","answer or close this question, or record why it no longer applies",null,true,"needs-decision: the PR 370 fix round is not owned in this home"

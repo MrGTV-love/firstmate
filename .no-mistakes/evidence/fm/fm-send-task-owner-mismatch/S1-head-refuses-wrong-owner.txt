@@ -1,0 +1,15 @@
+### S1 HEAD aab8440c: bin/fm-send.sh fm-mini "Start the fix round for fm-slack-main-window-intake"
+error: refused task 'fm-slack-main-window-intake': this home's direct report 'fm-slack-main-window-intake' owns it, not target 'fm-mini'; nothing was sent. Send to 'fm-slack-main-window-intake', or use --relay for a deliberate cross-task mention.
+exit=1
+--- fm-mini.inbox exists? no; pending-replies exists? no
+### S1 HEAD aab8440c: bin/fm-send.sh other "Start the fix round for fm-slack-main-window-intake"
+error: refused task 'fm-slack-main-window-intake': this home's direct report 'fm-slack-main-window-intake' owns it, not target 'other'; nothing was sent. Send to 'fm-slack-main-window-intake', or use --relay for a deliberate cross-task mention.
+exit=1
+--- other.inbox exists? no; pending-replies exists? no
+--- fm-mini pane:
+bash-3.2$
+--- other pane:
+bash-3.2$
+--- guard-events (task-owner rule):
+{"ts":"2026-11-11T17:29:03Z","guard":"send-task-prerequisites","rule":"task-owner","task":"fm-slack-main-window-intake","version":"1","system":"firstmate","session":"fm-slack-main-window-intake","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false,"head":"","base":"","actor":"main","opportunity":true}
+{"ts":"2026-11-11T17:29:03Z","guard":"send-task-prerequisites","rule":"task-owner","task":"fm-slack-main-window-intake","version":"1","system":"firstmate","session":"fm-slack-main-window-intake","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false,"head":"","base":"","actor":"main","opportunity":true}

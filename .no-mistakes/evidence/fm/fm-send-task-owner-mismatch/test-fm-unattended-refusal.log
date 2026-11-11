@@ -1,0 +1,14 @@
+PASS: pending-worker
+PASS: pending-refusal
+PASS: retry-worker
+PASS: retry-refusal
+PASS: checkin-worker
+PASS: checkin-refusal
+PASS: hold-scan noise only
+PASS: hold-scan refusal after noise
+PASS: hold-scan other key resolved
+PASS: hold-scan own key resolved
+PASS: hold-scan note-head key
+PASS: hold-scan unrelated own-key note
+PASS: hold-scan refusal after resolution
+exit=0 secs=47

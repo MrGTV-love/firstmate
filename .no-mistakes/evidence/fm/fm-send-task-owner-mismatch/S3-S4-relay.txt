@@ -1,0 +1,18 @@
+### S3 relay: deliberate cross-task mention to other with --relay
+fm-send: doorbell not typed because the agent in lab:fm-other has exited; the steer is durably recorded at /Users/charlesabrooker/tmp/fm-lab.uy9qUf/state/other.inbox/001.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane
+exit=0
+--- other.inbox/001.msg body:
+FYI: fm-slack-main-window-intake owns the PR 370 fix round; no action for you.--- guard events for relay:
+{"ts":"2026-11-11T17:30:15Z","guard":"send-task-prerequisites","rule":"task-owner","task":"fm-slack-main-window-intake","version":"1","system":"firstmate","session":"fm-slack-main-window-intake","decision":"bypass","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":true,"head":"","base":"","actor":"main","opportunity":true}
+
+### S4 relay grants nothing else
+## S4a: --relay with --resolve-key for a decision that does not exist
+error: --resolve-key 'nonexistent': no open decision or blocker with that key in /Users/charlesabrooker/tmp/fm-lab.uy9qUf/state/fm-mini.status, and no captain-held task 'nonexistent' or 'fm-mini-decision-nonexistent' still open (already closed or mistyped). Re-check the OPEN DECISIONS listing, then resend without that key or with the right one; nothing was sent.
+exit=1
+## S4b: --relay with a whitespace-only message
+error: a text steer requires a nonempty message; nothing was sent (an empty marked request would deliver only marker and correlation bytes and leave the parent waiting on a reply to nothing)
+exit=1
+## S4c: --relay with a missing declared input
+error: refused required input 'data/never-made.md': unavailable to receiver 'other'; nothing was sent and any earlier record is unchanged. Stage only this declared artifact through the existing authorized transfer mechanism; no access was granted.
+exit=4
+--- fm-mini.inbox exists? no; other.inbox records: 1

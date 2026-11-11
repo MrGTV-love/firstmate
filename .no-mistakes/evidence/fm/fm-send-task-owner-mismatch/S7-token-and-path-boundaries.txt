@@ -1,0 +1,33 @@
+### S7 adversarial: text that must NOT be refused (sent to other)
+## other <- "fm-slack-main-window-intake-v2 is a different task"
+exit=0
+## other <- "prefix-fm-slack-main-window-intake is not a task id"
+exit=0
+## other <- "review data/fm-slack-main-window-intake/review.md when it exists"
+exit=0
+## other <- "Write output to /not-created/yet/out.md; example /examples/x.md; the other computer has /Users/studio/report.md and C:\reports\r.md"
+exit=0
+## other <- "task-not-recorded-here should continue"
+exit=0
+## other <- "Fm-Slack-Main-Window-Intake in another spelling"
+exit=0
+## fm-mini <- its own id: "Continue fm-mini work"
+exit=0
+
+### S7b adversarial: text that MUST be refused (sent to other)
+## other <- \(fm-slack-main-window-intake\)
+error: refused task 'fm-slack-main-window-intake': this home's direct report 'fm-slack-main-window-intake' owns it, not target 'other'; nothing was sent. Send to 'fm-slack-main-window-intake', or use --relay for a deliberate cross-task mention.
+exit=1
+## other <- Resume\ fm-fm-slack-main-window-intake.
+error: refused task 'fm-slack-main-window-intake': this home's direct report 'fm-slack-main-window-intake' owns it, not target 'other'; nothing was sent. Send to 'fm-slack-main-window-intake', or use --relay for a deliberate cross-task mention.
+exit=1
+## other <- $'next action:\nfm-slack-main-window-intake'
+error: refused task 'fm-slack-main-window-intake': this home's direct report 'fm-slack-main-window-intake' owns it, not target 'other'; nothing was sent. Send to 'fm-slack-main-window-intake', or use --relay for a deliberate cross-task mention.
+exit=1
+## other <- use\ --relay\ inside\ text:\ fm-slack-main-window-intake\ --relay
+error: refused task 'fm-slack-main-window-intake': this home's direct report 'fm-slack-main-window-intake' owns it, not target 'other'; nothing was sent. Send to 'fm-slack-main-window-intake', or use --relay for a deliberate cross-task mention.
+exit=1
+## other <- Continue\ fm-slack-main-window-intake...........................
+error: refused task 'fm-slack-main-window-intake': this home's direct report 'fm-slack-main-window-intake' owns it, not target 'other'; nothing was sent. Send to 'fm-slack-main-window-intake', or use --relay for a deliberate cross-task mention.
+exit=1
+--- other.inbox records now: 9

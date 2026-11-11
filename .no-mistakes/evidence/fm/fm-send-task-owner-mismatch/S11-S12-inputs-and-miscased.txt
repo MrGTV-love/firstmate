@@ -1,0 +1,38 @@
+### S11 declared required inputs (local receiver: other, home=/Users/charlesabrooker/tmp/fm-lab.uy9qUf)
+## S11a two missing declared inputs:
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+error: refused required input 'data/plan-a.md': unavailable to receiver 'other'; nothing was sent and any earlier record is unchanged. Stage only this declared artifact through the existing authorized transfer mechanism; no access was granted.
+error: refused required input 'data/plan-b.md': unavailable to receiver 'other'; nothing was sent and any earlier record is unchanged. Stage only this declared artifact through the existing authorized transfer mechanism; no access was granted.
+exit=4
+records before/after: 10 / 10
+## S11b outside the receiving boundary (/etc/hosts):
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+error: refused required input '/etc/hosts': outside the transfer boundary for receiver 'other'; nothing was sent and any earlier record is unchanged. Stage only this declared artifact through the existing authorized transfer mechanism; no access was granted.
+exit=4
+records: 10
+## S11c present, but unreadable to the receiver (mode 000) - permissions must stay unchanged:
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+error: refused required input 'data/locked.md': unavailable to receiver 'other'; nothing was sent and any earlier record is unchanged. Stage only this declared artifact through the existing authorized transfer mechanism; no access was granted.
+exit=4
+mode before/after: 0 / 0
+## S11d the declared input exists:
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+fm-send: doorbell not typed because the agent in lab:fm-other has exited; the steer is durably recorded at /Users/charlesabrooker/tmp/fm-lab.uy9qUf/state/other.inbox/011.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane
+exit=0
+records before/after: 10 / 11
+--- delivered body (declaration not appended):
+Use data/plan-a.md and write /not/yet/out.md
+## S11e declared input on an unrecorded explicit endpoint is refused:
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+error: text not submitted to lab:fm-other (delivery unconfirmed; verdict=unknown; tried explicit target 'lab:fm-other' matched /Users/charlesabrooker/tmp/fm-lab.uy9qUf/state/other.meta; backend=tmux)
+exit=1
+
+### S12 miscased selector on this case-insensitive APFS state dir
+state dir is case-insensitive (OTHER.meta opens other.meta)
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+fm-send: doorbell not typed because the agent in lab:fm-other has exited; the steer is durably recorded at /Users/charlesabrooker/tmp/fm-lab.uy9qUf/state/Other.inbox/012.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane
+exit=0
+records before/after: 11 / 12
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+error: refused task 'fm-slack-main-window-intake': this home's direct report 'fm-slack-main-window-intake' owns it, not target 'Other'; nothing was sent. Send to 'fm-slack-main-window-intake', or use --relay for a deliberate cross-task mention.
+exit=1

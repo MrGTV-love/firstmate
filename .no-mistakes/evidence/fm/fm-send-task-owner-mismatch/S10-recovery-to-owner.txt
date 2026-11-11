@@ -1,0 +1,12 @@
+### S10 Firstmate recovers the refused unattended instruction from the recorded argv
+recorded argv: other Resume\ task\ fm-slack-main-window-intake:\ create\ the\ file\ recovered.txt\ in\ your\ current\ directory\ containing\ the\ single\ word\ RECOVERED\,\ then\ move\ this\ inbox\ record\ into\ the\ handled/\ folder\ next\ to\ it. 
+## resend the same text to the designated owner:
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+exit=0
+## Firstmate closes the unattended hold:
+append exit=0
+## next unattended send to other with neutral text:
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+fm-send: doorbell not typed because the agent in lab:fm-other has exited; the steer is durably recorded at /Users/charlesabrooker/tmp/fm-lab.uy9qUf/state/other.inbox/010.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane
+exit=0
+--- other.inbox records: 10

@@ -1,0 +1,12 @@
+### S2 HEAD: bin/fm-send.sh fm-slack-main-window-intake "Resume task fm-slack-main-window-intake: create the file resumed.txt in your current directory containing the single word RESUMED, then move this inbox record into the handled/ folder next to it."
+exit=0
+--- inbox:
+001.msg
+handled
+
+/Users/charlesabrooker/tmp/fm-lab.uy9qUf/state/fm-slack-main-window-intake.inbox/handled:
+--- record 001.msg:
+schema=fm-task-inbox.v1
+at=2026-11-11T17:29:19Z
+--
+Resume task fm-slack-main-window-intake: create the file resumed.txt in your current directory containing the single word RESUMED, then move this inbox record into the handled/ folder next to it.

@@ -1,0 +1,48 @@
+empty-check-cost: locale=en_US.UTF-8 cpu ms at 2000 chars=1338, at 8000 chars=1287, growth=-51
+ok - fm-send: a long message with a space costs CPU in proportion to its length
+empty-check-diff: 30 string and locale pairs agree between the case and the old deletion
+ok - fm-send: empty-looking messages, short or very long, are still refused; non-empty ones still send unchanged
+split-diff: 98 tokens split like the one-dot-at-a-time reference
+ok - fm-send: the trailing-dot split counts the same dots as stripping them one at a time
+ok - fm-send: a recorded id followed by a long run of dots is refused and a longer id is delivered unchanged
+scan-diff: 1008 token and meta-set pairs agree with the reference scan
+ok - fm-send: the single-pass mention scan resolves every token like the one-dot-at-a-time scan
+ok - fm-send: outside-home input is reported as the transfer boundary without reading its contents
+ok - fm-send: all missing inputs report their own cause, status 4, and leave absent or existing inbox unchanged
+ok - fm-send: known-owner explicit endpoint validates inputs without changing its typed plane
+ok - fm-send: a shared explicit endpoint accepts either owner but refuses a different endpoint's task
+ok - fm-send: explicit, typed and fire-and-forget mismatches emit one deny or effective escape; owner and earlier guards stay intact
+ok - fm-send: unavailable and failing telemetry writers preserve relay delivery and ownership/input refusals
+ok - fm-send: output, example and other-computer paths are not input declarations or task tokens
+ok - fm-send: declared local inputs gate inbox and typed delivery without changing the message, permissions, or transfers
+owner-mismatch target=fm-mini exit=1 diagnostic=●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the requested message WILL still be sent.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-send-strict.j45NuS/fm-mini-12781/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+error: refused task 'fm-slack-main-window-intake': this home's direct report 'fm-slack-main-window-intake' owns it, not target 'fm-mini'; nothing was sent. Send to 'fm-slack-main-window-intake', or use --relay for a deliberate cross-task mention.
+owner-mismatch target=another-worker exit=1 diagnostic=●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the requested message WILL still be sent.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-send-strict.j45NuS/another-worker-21136/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+error: refused task 'fm-slack-main-window-intake': this home's direct report 'fm-slack-main-window-intake' owns it, not target 'another-worker'; nothing was sent. Send to 'fm-slack-main-window-intake', or use --relay for a deliberate cross-task mention.
+ok - fm-send: a wrong worker or secondmate is refused before delivery or decision closure
+ok - fm-send: correct-owner selectors and explicit cross-task relays retain the message
+ok - fm-send: whole task tokens and legacy labels reject; longer, unknown and path-embedded ids do not
+ok - fm-send: only the recorded id spelling is a task mention, in short and long dotted forms
+ok - fm-send: a selector that names a task's own meta in another case keeps its mentions and its refusals
+ok - fm-send: a secondmate's own child routes normally and relay grants no decision authority
+ok - fm-send strict: exact task/lane ids resolve through home metadata
+ok - fm-send --key: exit status follows delivery, and an undelivered key never reports success
+ok - fm-send strict: unset FM_HOME fails before target resolution
+ok - fm-send strict: unresolvable selectors do not fall back to tmux
+ok - fm-send strict: prefixless herdr pane ids are rejected before tmux fallback
+ok - fm-send strict: unmatched single-colon explicit targets must verify live before sending
+ok - fm-send strict: fm-prefixed Herdr sessions remain explicit backend targets
+ok - fm-send strict: healthy fm-<id> sends record the steer and ring once
+exit=0 secs=138

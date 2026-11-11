@@ -1,0 +1,34 @@
+### S10b real Claude worker pane after the recovered instruction
+ ▝▝   ▝▝   ~/tmp/fm-lab.uy9qUf/data/work-intake
+⚠ Your login expires in 1 day · run /login to renew
+❯ : Firstmate instruction waiting: 'fm-slack-main-window-intake.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+  Read 1 file, listed 1 directory, ran 1 shell command
+⏺ I did the task in the message. It worked.
+  What the message said: Resume task fm-slack-main-window-intake. Make a file resumed.txt with the word RESUMED in it. Then move the message to handled/.
+  What I did:
+  1. I made /Users/charlesabrooker/tmp/fm-lab.uy9qUf/data/work-intake/resumed.txt. It has one word: RESUMED. No file with that name was there before, so nothing was overwritten.
+  2. I moved 001.msg to /Users/charlesabrooker/tmp/fm-lab.uy9qUf/state/fm-slack-main-window-intake.inbox/handled/001.msg.
+  Checks: The inbox has no other messages now.
+  One small thing: Your note gave the path as fm-slack-main-window-intake.inbox/001.msg inside $FM_TASK_INBOX. But $FM_TASK_INBOX already points to that inbox folder, so the real path is $FM_TASK_INBOX/001.msg.
+  What you do now: Nothing.
+✻ Sautéed for 22s · done 11:29 AM
+❯ : Firstmate instruction waiting: 'fm-slack-main-window-intake.inbox/002.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+  Listed 1 directory, ran 1 shell command
+⏺ I did the task in message 002. It worked.
+  What the message said: Resume task fm-slack-main-window-intake. Make a file recovered.txt with the word RECOVERED in it. Then move the message to handled/.
+  What I did:
+  1. I made /Users/charlesabrooker/tmp/fm-lab.uy9qUf/data/work-intake/recovered.txt. It has one word: RECOVERED. No file with that name was there before, so nothing was overwritten.
+  2. I moved 002.msg to /Users/charlesabrooker/tmp/fm-lab.uy9qUf/state/fm-slack-main-window-intake.inbox/handled/002.msg.
+  Checks:
+  - The inbox has no other messages now.
+  - handled/ now has 001.msg and 002.msg.
+  - resumed.txt from the last task is still there. I did not change it.
+  What you do now: Nothing.
+✻ Worked for 15s · done 11:33 AM
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 ░░░░░░░░░░ 3% 36k/1.0M work-intake:e5443133
+  ⏵⏵ auto mode on (shift+tab to cycle)
+--- recovered.txt:
+RECOVERED

@@ -1,0 +1,14 @@
+### S9 unattended wrong-owner send is refused and handed to Firstmate
+error: refused task 'fm-slack-main-window-intake': this home's direct report 'fm-slack-main-window-intake' owns it, not target 'other'; nothing was sent. Send to 'fm-slack-main-window-intake', or use --relay for a deliberate cross-task mention.
+exit=1
+--- other.status after:
+note [key=unattended-steer]: unattended-refusal: error: refused task 'fm-slack-main-window-intake': this home's direct report 'fm-slack-main-window-intake' owns it, not target 'other'; nothing was sent. Send to 'fm-slack-main-window-intake', or use --relay for a deliberate cross-task mention. Instruction argv: other Resume\ task\ fm-slack-main-window-intake:\ create\ the\ file\ recovered.txt\ in\ your\ current\ directory\ containing\ the\ single\ word\ RECOVERED\,\ then\ move\ this\ inbox\ record\ into\ the\ handled/\ folder\ next\ to\ it. 
+--- other.inbox records before/after: 9 / 9
+## S9b retry of the same unattended send while held:
+notice: unattended steer to other awaits Firstmate handling of /Users/charlesabrooker/tmp/fm-lab.uy9qUf/state/other.status [key=unattended-steer]; no send attempted
+exit=1
+--- other.inbox records: 9
+--- open-loops rows naming unattended-steer:
+--- guard events:
+{"ts":"2026-11-11T17:31:36Z","guard":"send-task-prerequisites","rule":"task-owner","task":"fm-slack-main-window-intake","version":"1","system":"firstmate","session":"fm-slack-main-window-intake","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false,"head":"","base":"","actor":"main","opportunity":true}
+{"ts":"2026-11-11T17:31:36Z","guard":"send-task-prerequisites","rule":"unattended-hold","task":"other","version":"1","system":"firstmate","session":"other","decision":"warn","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false,"head":"","base":"","actor":"main","opportunity":true}
