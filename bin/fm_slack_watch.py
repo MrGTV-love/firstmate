@@ -987,7 +987,15 @@ def emit(watch, command):
         while shown > 1 and len('; '.join(lines[:shown]) + queue_tail(queued + len(lines) - shown)) > WAKE_LIMIT:
             shown -= 1
         if lines:
-            print(wake_line(lines[:shown], queued + len(lines) - shown), flush=True)
+            remaining = queued + len(lines) - shown
+            if env_value('FM_CHECK_EVENT_OUTPUT') == '1':
+                for index, line in enumerate(lines[:shown]):
+                    # Hash the journaled event, not a batch or its changing queue tail.
+                    identity = hashlib.sha256(line.encode()).hexdigest()
+                    payload = wake_line([line], remaining if index == shown - 1 else 0)
+                    print('fm-check-event %s\t%s' % (identity, payload), flush=True)
+            else:
+                print(wake_line(lines[:shown], remaining), flush=True)
             watch.printed(shown)
         return
     if lines:

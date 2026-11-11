@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# Authenticated custom checks normally report latest state under their check path.
+# The watcher sets FM_CHECK_EVENT_OUTPUT=1 and parses event lines only for an
+# authenticated custom check other than contributions; PR-poll, X, contribution
+# and stop-notice output stays ordinary state. Event producers may then print
+# one `fm-check-event <identity><TAB><payload>` line per event, with a stable
+# nonempty [A-Za-z0-9._-] identity. Identity excludes changing presentation
+# metadata such as queued counts. Ordinary output keeps
+# latest-state semantics; events use <check-path>#event:<identity> as opaque keys.
+# Only the existing queue/drain owns presentation, actor claims and acknowledgement.
 
 FM_CUSTOM_CHECK_HASH=
 FM_CUSTOM_CHECK_SNAPSHOT=
@@ -71,4 +80,47 @@ fm_custom_check_snapshot_prepare() {
 fm_custom_check_snapshot_cleanup() {
   [ -z "$FM_CUSTOM_CHECK_SNAPSHOT" ] || rm -f -- "$FM_CUSTOM_CHECK_SNAPSHOT"
   FM_CUSTOM_CHECK_SNAPSHOT=
+}
+
+FM_CHECK_WAKE_REASON=
+fm_check_queue_output() {  # <check-path> <captured-output>
+  local check=$1 output=$2 line event payload reason malformed=0 state_output=
+  FM_CHECK_WAKE_REASON=
+  while IFS= read -r line; do
+    case "$line" in
+      'fm-check-event '*)
+        event=${line#fm-check-event }
+        case "$event" in
+          *$'\t'*) payload=${event#*$'\t'}; event=${event%%$'\t'*} ;;
+          *) event= ;;
+        esac
+        case "$event" in
+          ''|*[!A-Za-z0-9._-]*)
+            echo "error: malformed event output from $check" >&2
+            malformed=$((malformed + 1))
+            continue
+            ;;
+        esac
+        reason="check: $check: $payload"
+        fm_wake_append check "$check#event:$event" "$reason" || return 1
+        [ -n "$FM_CHECK_WAKE_REASON" ] || FM_CHECK_WAKE_REASON=$reason
+        ;;
+      *)
+        [ -z "$state_output" ] || state_output="$state_output"$'\n'
+        state_output="$state_output$line"
+        ;;
+    esac
+  done <<EOF
+$output
+EOF
+  if [ "$malformed" -gt 0 ]; then
+    [ -z "$state_output" ] || state_output="$state_output"$'\n'
+    state_output="${state_output}refused $malformed malformed fm-check-event line(s)"
+  fi
+  if [ -n "$state_output" ]; then
+    reason="check: $check: $state_output"
+    fm_wake_append check "$check" "$reason" || return 1
+    [ -n "$FM_CHECK_WAKE_REASON" ] || FM_CHECK_WAKE_REASON=$reason
+  fi
+  return 0
 }

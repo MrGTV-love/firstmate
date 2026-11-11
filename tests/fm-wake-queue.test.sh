@@ -265,6 +265,163 @@ SH
   pass "registered custom check output is queued before cadence suppression"
 }
 
+# Export the isolated home shared by the check-event cases. Call it only from a
+# ( ) test body, so the exports end with that case's subshell.
+use_check_event_home() {  # <case-dir>
+  export FM_HOME="$1" FM_STATE_OVERRIDE="$1/state" FM_CONFIG_OVERRIDE="$1/config" FM_DATA_OVERRIDE="$1/data"
+  export FM_GITHUB_ACCOUNTING=0 FM_MEMORY_GUARD_BIN=/usr/bin/true FM_OPEN_LOOPS_BIN=/usr/bin/true FM_WATCH_HANDLING_SUCCESSOR=1
+}
+
+# Controlled journal entries exercise the maintained Slack emitter, authenticated
+# check scheduling and the real consumer, without claiming Slack eligibility proof.
+test_check_events_survive_batch_changes_and_state_coalescing() (
+  set -e
+  local dir state leg
+  dir=$(make_case check-events)
+  state="$dir/state"
+  mkdir -p "$dir/config" "$dir/data"
+  use_check_event_home "$dir"
+  export SLACK_BOT_TOKEN=fixture FM_SLACK_ALLOWED_AUTHORS=U0TESTOWNER FM_SLACK_DM_USER=U0TESTOWNER
+  export FM_EVENT_TEST_ROOT="$ROOT" FM_EVENT_TEST_REPLAY="$dir/replay.json"
+  printf '%s\n' '{"schema":"fm-slack-replay.v1","skip_mirror":true}' > "$dir/replay.json"
+  bash "$ROOT/bin/fm-captain-hold.sh" bind slack-dm >/dev/null
+  cat > "$state/slack.check.sh" <<'SH'
+#!/usr/bin/env bash
+set -eu
+python3 - "$FM_STATE_OVERRIDE" <<'PY'
+import json, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+counter = root / 'event-counter'
+leg = int(counter.read_text()) + 1 if counter.exists() else 1
+counter.write_text(str(leg))
+path = root / 'slack-watch/state.json'
+path.parent.mkdir(exist_ok=True)
+state = {'schema': 'fm-slack-watch.v1', 'threads': {}, 'seen': {}, 'pending': [], 'failure': ''}
+events = {1: [1, 2], 2: [1], 3: [1, 3]}.get(leg, [])
+state['outbox'] = ['check: slack request 900.00000%d from U0TESTOWNER: [unverified data] "request %d"' % (n, n) for n in events]
+path.write_text(json.dumps(state))
+PY
+exec bash "$FM_EVENT_TEST_ROOT/bin/fm-slack-check.sh" check --replay "$FM_EVENT_TEST_REPLAY"
+SH
+  cat > "$state/status.check.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'state round %s\n' "$(cat "$FM_STATE_OVERRIDE/event-counter")"
+SH
+  chmod 0700 "$state/slack.check.sh" "$state/status.check.sh"
+  bash "$ROOT/bin/fm-check-register.sh" slack >/dev/null
+  bash "$ROOT/bin/fm-check-register.sh" status >/dev/null
+  for leg in 1 2; do
+    # Keep the production cadence and age its input instead of shortening it.
+    touch -t 200001010000 "$state/.last-check"
+    PATH="$dir/fakebin:$PATH" bash "$WATCH" > "$dir/watch-$leg.out" 2> "$dir/watch-$leg.err"
+  done
+  "$DRAIN" > "$dir/drain.out" 2> "$dir/drain.err"
+  [ "$(grep -c 'check: slack request 900.000001 ' "$dir/drain.out")" = 1 ] || fail "request 1 was lost or replayed with its changed batch"
+  [ "$(grep -c 'check: slack request 900.000002 ' "$dir/drain.out")" = 1 ] || fail "request 2 was lost or duplicated"
+  grep -F 'state round 2' "$dir/drain.out" >/dev/null || fail "latest state was not presented"
+  ! grep -F 'state round 1' "$dir/drain.out" >/dev/null || fail "ordinary state checks stopped coalescing"
+  touch -t 200001010000 "$state/.last-check"
+  PATH="$dir/fakebin:$PATH" bash "$WATCH" > "$dir/watch-newer.out" 2> "$dir/watch-newer.err"
+  ack_drain_err "$state" "$dir/drain.err" || fail "event drain acknowledgement failed"
+  "$DRAIN" --queued > "$dir/remaining"
+  ! grep -E '900\.000001|900\.000002|state round [12]' "$dir/remaining" >/dev/null || fail "acknowledged event/state rows remained"
+  grep -F '900.000003' "$dir/remaining" >/dev/null || fail "old acknowledgement removed the unpresented event"
+  grep -F 'state round 3' "$dir/remaining" >/dev/null || fail "old acknowledgement removed newer state"
+  "$DRAIN" > "$dir/newer.out" 2> "$dir/newer.err"
+  [ "$(grep -c 'check: slack request 900.000003 ' "$dir/newer.out")" = 1 ] || fail "newer event was not presented exactly once"
+  ack_drain_err "$state" "$dir/newer.err" || fail "newer event acknowledgement failed"
+  [ ! -s "$state/.wake-queue" ] || fail "handled event rows remained queued"
+  pass "distinct events survive regrouping and acknowledgement while ordinary state checks coalesce"
+)
+
+# A malformed marker from one authenticated check must not end the watcher pass,
+# and marker-looking text from routes outside the event protocol stays state.
+test_malformed_check_events_keep_delivery_and_cadence() (
+  set -e
+  local dir state queue pass_no
+  dir=$(make_case malformed-check-events)
+  state="$dir/state"
+  queue="$state/.wake-queue"
+  mkdir -p "$dir/config" "$dir/data" "$dir/root/bin"
+  use_check_event_home "$dir"
+  export FM_ROOT_OVERRIDE="$dir/root"
+  cat > "$state/aa-events.check.sh" <<'SH'
+#!/usr/bin/env bash
+counter="$FM_STATE_OVERRIDE/malformed-counter"
+pass=$(( $(cat "$counter" 2>/dev/null || echo 0) + 1 ))
+printf '%s' "$pass" > "$counter"
+printf 'fm-check-event before\tbefore payload\n'
+printf 'fm-check-event missing-tab\n'
+if [ "$pass" = 1 ]; then
+  printf 'fm-check-event ts:channel\tinvalid identity payload\n'
+  printf 'fm-check-event after\tafter payload\n'
+else
+  printf 'fm-check-event next\tnext payload\n'
+fi
+printf 'ordinary state %s\n' "$pass"
+SH
+  cat > "$state/contributions.check.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'fm-check-event contrib\tcontribution text\n'
+SH
+  chmod 0700 "$state/aa-events.check.sh" "$state/contributions.check.sh"
+  bash "$ROOT/bin/fm-check-register.sh" aa-events >/dev/null
+  bash "$ROOT/bin/fm-check-register.sh" contributions >/dev/null
+  cat > "$dir/root/bin/fm-x-poll.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'fm-check-event xpoll\tx text\n'
+SH
+  chmod 0700 "$dir/root/bin/fm-x-poll.sh"
+  bash -c '. "$1"; fmx_poll_shim_content "$2" "$3"' _ "$ROOT/bin/fm-x-lib.sh" "$dir" "$dir/root" > "$state/x-watch.check.sh"
+  chmod 0700 "$state/x-watch.check.sh"
+  touch -t 200001010000 "$dir/aged"
+  key_rows() { awk -F '\t' -v key="$1" '$4 == key' "$queue"; }
+  for pass_no in 1 2; do
+    touch -t 200001010000 "$state/.last-check"
+    PATH="$dir/fakebin:$PATH" bash "$WATCH" > "$dir/watch-$pass_no.out" 2> "$dir/watch-$pass_no.err" \
+      || fail "malformed event output failed watcher pass $pass_no"
+    [ "$state/.last-check" -nt "$dir/aged" ] || fail "pass $pass_no did not advance the check cadence"
+    [ "$(key_rows "$state/aa-events.check.sh#event:before" | wc -l | tr -d ' ')" = 1 ] \
+      || fail "valid event before the malformed lines was lost or duplicated on pass $pass_no"
+    [ "$(key_rows "$state/aa-events.check.sh#event:after" | wc -l | tr -d ' ')" = 1 ] \
+      || fail "valid event after the malformed lines was lost on pass $pass_no"
+    ! grep -E '#event:(ts:channel|missing-tab)' "$queue" >/dev/null || fail "malformed input became an event"
+    ! grep -E 'fm-check-event missing-tab|invalid identity payload' "$queue" >/dev/null \
+      || fail "malformed input became ordinary check output"
+    key_rows "$state/aa-events.check.sh" | grep -F " $((3 - pass_no)) malformed fm-check-event" >/dev/null \
+      || fail "pass $pass_no had an incorrect malformed-line count"
+    key_rows "$state/aa-events.check.sh" | grep -F "ordinary state $pass_no" >/dev/null \
+      || fail "ordinary state was not delivered on pass $pass_no"
+    key_rows "$state/contributions.check.sh" | grep -F 'fm-check-event contrib' >/dev/null \
+      || fail "later contribution check output was not delivered as state on pass $pass_no"
+    key_rows "$state/x-watch.check.sh" | grep -F 'fm-check-event xpoll' >/dev/null \
+      || fail "X output was not delivered as state on pass $pass_no"
+  done
+  [ "$(key_rows "$state/aa-events.check.sh#event:next" | wc -l | tr -d ' ')" = 1 ] || fail "second-pass event was not delivered"
+  ! grep -E '(contributions|x-watch)\.check\.sh#event:' "$queue" >/dev/null || fail "non-event route parsed a marker-looking line"
+  "$DRAIN" > "$dir/drain.out" 2> "$dir/drain.err"
+  [ "$(grep -c 'before payload' "$dir/drain.out")" = 1 ] || fail "retried event was presented more than once"
+  grep -F 'next payload' "$dir/drain.out" >/dev/null || fail "second-pass event was not presented"
+  grep -F 'ordinary state 2' "$dir/drain.out" >/dev/null || fail "latest state was not presented"
+  ! grep -F 'ordinary state 1' "$dir/drain.out" >/dev/null || fail "ordinary state stopped coalescing"
+  pass "malformed event output keeps valid events, state, later checks and cadence"
+)
+
+test_unpresentable_row_cannot_suppress_a_check_event() {
+  local dir state event_key
+  dir=$(make_case malformed-pending-event)
+  state="$dir/state"
+  event_key="$state/slack.check.sh#event:request-1"
+  printf '1700000000\tbroken\tcheck\t%s\tcheck: incomplete event\n' "$event_key" > "$state/.wake-queue"
+  append_wake "$state" check "$event_key" 'check: complete request 1' || fail "valid event append failed"
+  FM_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/drain.out" 2> "$dir/drain.err" || fail "event recovery drain failed"
+  grep -F 'check: complete request 1' "$dir/drain.out" >/dev/null || fail "unpresentable row suppressed the real event"
+  ! grep -F 'check: incomplete event' "$dir/drain.out" >/dev/null || fail "unpresentable row was presented"
+  ack_drain_err "$state" "$dir/drain.err" || fail "recovered event could not be acknowledged"
+  [ ! -s "$state/.wake-queue" ] || fail "recovered event remained queued"
+  pass "an unpresentable row cannot suppress a consumable pending event"
+}
+
 test_atomic_double_drain() {
   local dir state out1 out2 count1 count2 sequence generation leftover
   dir=$(make_case double-drain)
@@ -3380,6 +3537,61 @@ drain_elapsed_ms() {  # <state> <out> <err>; elapsed wall time of one bounded dr
 # mistaken for lock waiting.
 DRAIN_DEADLINE_MARGIN_MS=1500
 
+# lock_deadline_sample <label> <lock-name>: time one identical control drain and
+# one drain behind a live holder of <lock-name>, each in its own fresh case.
+lock_deadline_sample() {
+  local label=$1 lock_name=$2 control held holder i case_dir
+  control=$(make_case "$label-control")
+  held=$(make_case "$label-held")
+  for case_dir in "$control" "$held"; do
+    printf 'needs-decision [key=fixture]: presentation remains retriable\n' > "$case_dir/state/task.status"
+    append_wake "$case_dir/state" signal task.status "signal: $case_dir/state/task.status" || return 1
+  done
+  drain_elapsed_ms "$control/state" "$control/drain.out" "$control/drain.err" || return 1
+  LOCK_SAMPLE_CONTROL_MS=$DRAIN_ELAPSED_MS
+  FM_STATE_OVERRIDE="$held/state" bash -c '
+    . "$1"
+    fm_lock_acquire_wait "$2"
+    printf "ready\n" > "$3"
+    exec sleep 30
+  ' _ "$ROOT/bin/fm-wake-lib.sh" "$held/state/$lock_name" "$held/holder.ready" &
+  holder=$!
+  i=0
+  while [ "$i" -lt 100 ] && [ ! -s "$held/holder.ready" ]; do
+    sleep 0.05
+    i=$((i + 1))
+  done
+  if [ ! -s "$held/holder.ready" ] \
+    || ! drain_elapsed_ms "$held/state" "$held/drain.out" "$held/drain.err"; then
+    kill "$holder" 2>/dev/null || true
+    wait "$holder" 2>/dev/null || true
+    return 1
+  fi
+  LOCK_SAMPLE_HELD_MS=$DRAIN_ELAPSED_MS
+  kill "$holder" 2>/dev/null || true
+  wait "$holder" 2>/dev/null || true
+}
+
+# lock_deadline_best_ms <label> <lock-name> <held-ms> <control-ms>: host load only
+# adds time to a drain, and a no-holder control alone has swung from 1.5s to 6s
+# on a busy host, so one held/control pair measures the scheduler. Compare the
+# fastest of three samples per side; a drain that really waits longer stays slow
+# in all three, and a spiked control can no longer hide it.
+lock_deadline_best_ms() {
+  local label=$1 lock_name=$2 sample
+  LOCK_DEADLINE_HELD_MS=$3
+  LOCK_DEADLINE_CONTROL_MS=$4
+  for sample in 2 3; do
+    lock_deadline_sample "$label-sample-$sample" "$lock_name" || return 1
+    if [ "$LOCK_SAMPLE_HELD_MS" -lt "$LOCK_DEADLINE_HELD_MS" ]; then
+      LOCK_DEADLINE_HELD_MS=$LOCK_SAMPLE_HELD_MS
+    fi
+    if [ "$LOCK_SAMPLE_CONTROL_MS" -lt "$LOCK_DEADLINE_CONTROL_MS" ]; then
+      LOCK_DEADLINE_CONTROL_MS=$LOCK_SAMPLE_CONTROL_MS
+    fi
+  done
+}
+
 # A live-but-stuck presentation lock must not strand the executable drain. The
 # presentation remains retriable on the next pass, while the separate queue
 # mutation lock keeps its blocking all-or-nothing acknowledgement contract.
@@ -3431,6 +3643,10 @@ test_live_presentation_holder_is_deadlined_without_weakening_ack() {
   held_ms=$DRAIN_ELAPSED_MS
   kill -0 "$queue_holder" 2>/dev/null \
     || fail "queue presentation returned only after its live holder exited"
+  lock_deadline_best_ms presentation-lock-deadline-queue .wake-queue.lock "$held_ms" "$control_ms" \
+    || { kill "$queue_holder" 2>/dev/null || true; fail "queue lock deadline timing sample failed"; }
+  held_ms=$LOCK_DEADLINE_HELD_MS
+  control_ms=$LOCK_DEADLINE_CONTROL_MS
   [ $((held_ms - control_ms)) -le $((1000 + DRAIN_DEADLINE_MARGIN_MS)) ] \
     || { kill "$queue_holder" 2>/dev/null || true; fail "queue lock delayed the drain ${held_ms}ms against a ${control_ms}ms control"; }
   printf 'drain timing: queue held=%sms control=%sms\n' "$held_ms" "$control_ms" >&2
@@ -3499,6 +3715,10 @@ test_live_presentation_holder_is_deadlined_without_weakening_ack() {
   held_ms=$DRAIN_ELAPSED_MS
   kill -0 "$presentation_holder" 2>/dev/null \
     || fail "status presentation returned only after its live holder exited"
+  lock_deadline_best_ms presentation-lock-deadline-presentation .status-presentation-lock "$held_ms" "$control_ms" \
+    || { kill "$presentation_holder" 2>/dev/null || true; fail "presentation lock deadline timing sample failed"; }
+  held_ms=$LOCK_DEADLINE_HELD_MS
+  control_ms=$LOCK_DEADLINE_CONTROL_MS
   [ $((held_ms - control_ms)) -le $((1000 + DRAIN_DEADLINE_MARGIN_MS)) ] \
     || { kill "$presentation_holder" 2>/dev/null || true; fail "presentation lock delayed the drain ${held_ms}ms against a ${control_ms}ms control"; }
   printf 'drain timing: presentation held=%sms control=%sms\n' "$held_ms" "$control_ms" >&2
@@ -3702,6 +3922,8 @@ test_wake_queue_prune_task() {
   append_wake "$state" signal "task-a.status" "signal: $state/task-a.status"
   append_wake "$state" signal "task-a.turn-ended" "signal: $state/task-a.turn-ended"
   append_wake "$state" check "$state/task-a.check.sh" "check: $state/task-a.check.sh: merged: https://example.test/pr/1"
+  append_wake "$state" check "$state/task-a.check.sh#event:request-1" "check: task-a event"
+  append_wake "$state" check "$state/task-a.check.sh-other#event:request-1" "check: neighboring check event"
   append_wake "$state" stale "test:window-b" "stale: test:window-b"
   append_wake "$state" signal "task-b.status" "signal: $state/task-b.status"
   append_wake "$state" check "$state/task-b.check.sh" "check: $state/task-b.check.sh: merged: https://example.test/pr/2"
@@ -3712,7 +3934,9 @@ test_wake_queue_prune_task() {
   grep -F 'test:window-a' "$queue" >/dev/null && fail "prune left stale wake for task-a"
   grep -F 'task-a.status' "$queue" >/dev/null && fail "prune left status wake for task-a"
   grep -F 'task-a.turn-ended' "$queue" >/dev/null && fail "prune left turn-ended wake for task-a"
-  grep -F 'task-a.check.sh' "$queue" >/dev/null && fail "prune left check wake for task-a"
+  grep -F "$state/task-a.check.sh"$'\t' "$queue" >/dev/null && fail "prune left check wake for task-a"
+  grep -F "$state/task-a.check.sh#event:" "$queue" >/dev/null && fail "prune left event wake for task-a"
+  grep -F "$state/task-a.check.sh-other#event:request-1" "$queue" >/dev/null || fail "prune removed a neighboring check event"
   grep -F 'test:window-b' "$queue" >/dev/null || fail "prune removed stale wake for task-b"
   grep -F 'task-b.status' "$queue" >/dev/null || fail "prune removed status wake for task-b"
   grep -F 'task-b.check.sh' "$queue" >/dev/null || fail "prune removed check wake for task-b"
@@ -3853,6 +4077,25 @@ drain_liveness_wakes() {
     > /dev/null 2>&1 || true
 }
 
+# wait_liveness_polls <pid> <polls-file> <more>: wait until the leg's watcher has
+# completed <more> further poll cycles, the watcher's own unit of work. The caller
+# has already called count_watch_polls, and each case undoes it with unset -f sleep.
+wait_liveness_polls() {
+  local pid=$1 polls=$2 more=$3 count target
+  count=$(cat "$polls" 2>/dev/null || true)
+  case "$count" in ''|*[!0-9]*) count=0 ;; esac
+  target=$((count + more))
+  fm_test_wait_until --while-alive "$pid" --cycles "$((more + 2))" "$polls" \
+    -- liveness_polls_reached "$polls" "$target"
+}
+
+liveness_polls_reached() {  # <polls-file> <count>
+  local count
+  count=$(cat "$1" 2>/dev/null || true)
+  case "$count" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$count" -ge "$2" ]
+}
+
 test_secondmate_liveness_tick_relaunches_dead_endpoint_once() {
   local dir state pid out ledger
   dir=$(make_secondmate_liveness_case liveness-dead)
@@ -3972,18 +4215,17 @@ test_secondmate_liveness_tick_relaunches_every_dead_mate_before_waking() {
 }
 
 test_secondmate_liveness_tick_leaves_alive_and_inconclusive_untouched() {
-  local dir state pid i
+  local dir state pid polls
   dir=$(make_secondmate_liveness_case liveness-quiet)
   state="$dir/state"
+  count_watch_polls
 
-  # A live endpoint probes every cadence and never acts.
+  # A live endpoint probes every cadence and never acts. Each completed poll
+  # cycle has run the tick, so four of them prove repeated quiet probes.
   run_liveness_leg "$dir" alive FM_FAKE_TMUX_CURRENT_COMMAND=claude; pid=$LIVENESS_PID
-  i=0
-  while [ "$i" -lt 300 ] && [ ! -e "$state/.secondmate-liveness-tick" ] && is_live_non_zombie "$pid"; do
-    sleep 0.1
-    i=$((i + 1))
-  done
-  sleep 4
+  polls=$(watch_polls_file "$state" "$pid")
+  wait_liveness_polls "$pid" "$polls" 4 \
+    || { kill_liveness_leg "$pid"; fail "the watcher did not keep polling against an alive secondmate: $(cat "$dir/watch-alive.out" "$dir/watch-alive.err")"; }
   is_live_non_zombie "$pid" \
     || fail "the watcher exited against an alive secondmate: $(cat "$dir/watch-alive.out" "$dir/watch-alive.err")"
   kill_liveness_leg "$pid"
@@ -3993,19 +4235,23 @@ test_secondmate_liveness_tick_leaves_alive_and_inconclusive_untouched() {
   [ -e "$state/.secondmate-liveness-tick" ] || fail "the liveness tick did not stamp its cadence marker"
 
   # An ambiguous existing process is evidence of nothing; it is triage-only
-  # and never a relaunch. Drain the killed leg's downtime marker first so the
-  # next watcher does not resurface instead of exercising the tick.
+  # and never a relaunch. Drain the killed leg's downtime marker and clear its
+  # cycle markers first so the next watcher runs the whole cycle, tick included.
   drain_liveness_wakes "$dir"
+  clear_watcher_cycle "$state"
   run_liveness_leg "$dir" ambiguous FM_FAKE_TMUX_CURRENT_COMMAND=node; pid=$LIVENESS_PID
-  sleep 4
+  polls=$(watch_polls_file "$state" "$pid")
+  fm_test_wait_until --while-alive "$pid" --cycles 5 "$polls" \
+    -- grep -F 'secondmate sm1 liveness: existing endpoint has ambiguous agent process (backend=tmux)' "$state/.watch-triage.log" \
+    || { kill_liveness_leg "$pid"; fail "the ambiguous probe did not land in the triage log: $(cat "$state/.watch-triage.log" "$dir/watch-ambiguous.out" "$dir/watch-ambiguous.err" 2>/dev/null)"; }
+  wait_liveness_polls "$pid" "$polls" 1 \
+    || { kill_liveness_leg "$pid"; fail "the watcher did not finish its cycle against an ambiguous secondmate endpoint: $(cat "$dir/watch-ambiguous.out" "$dir/watch-ambiguous.err")"; }
   is_live_non_zombie "$pid" \
     || fail "the watcher exited against an ambiguous secondmate endpoint: $(cat "$dir/watch-ambiguous.out" "$dir/watch-ambiguous.err")"
   kill_liveness_leg "$pid"
   [ ! -s "$dir/tmux.log" ] || fail "an ambiguous endpoint was killed or relaunched: $(cat "$dir/tmux.log")"
   [ ! -s "$state/.wake-queue" ] || fail "an ambiguous endpoint queued a wake: $(cat "$state/.wake-queue")"
-  grep -F 'secondmate sm1 liveness: existing endpoint has ambiguous agent process (backend=tmux)' \
-    "$state/.watch-triage.log" >/dev/null \
-    || fail "the ambiguous probe did not land in the triage log: $(cat "$state/.watch-triage.log" 2>/dev/null)"
+  unset -f sleep
   pass "watch liveness: alive and ambiguous endpoints are probed, logged, and never touched"
 }
 
@@ -4243,9 +4489,17 @@ test_secondmate_liveness_tick_skips_mate_whose_lock_is_held() {
 }
 
 test_secondmate_liveness_tick_preserves_unreachable_remote() {
-  local dir state
+  local dir state code_root pid polls
   dir=$(make_secondmate_liveness_case liveness-remote-down)
   state="$dir/state"
+  count_watch_polls
+  # bin/fm-on.sh runs only a command git tracks in its code root. This leg owns
+  # that root, so the probe does not depend on the runner's copy having git data.
+  code_root="$dir/code-root"
+  mkdir -p "$code_root/bin"
+  git init -q -b main "$code_root"
+  cp "$ROOT/bin/fm-remote-secondmate-control.sh" "$code_root/bin/"
+  git -C "$code_root" add bin
   rm -f "$state/sm1.meta"
   cat > "$state/rsm1.meta" <<EOF
 window=remote:rsm1
@@ -4269,8 +4523,13 @@ SH
   chmod +x "$dir/fakebin/ssh"
   : > "$dir/ssh.log"
 
-  run_liveness_leg "$dir" unreachable FM_SSH_BIN="$dir/fakebin/ssh" FM_FAKE_SSH_LOG="$dir/ssh.log"; pid=$LIVENESS_PID
-  sleep 4
+  run_liveness_leg "$dir" unreachable FM_ROOT_OVERRIDE="$code_root" FM_SSH_BIN="$dir/fakebin/ssh" FM_FAKE_SSH_LOG="$dir/ssh.log"; pid=$LIVENESS_PID
+  polls=$(watch_polls_file "$state" "$pid")
+  fm_test_wait_until --while-alive "$pid" --cycles 5 "$polls" \
+    -- grep -F 'secondmate rsm1 liveness: remote host unavailable or endpoint state unknown; route preserved on lab-host' "$state/.watch-triage.log" \
+    || { kill_liveness_leg "$pid"; fail "the unreachable remote probe did not report its preserved route: $(cat "$state/.watch-triage.log" "$dir/watch-unreachable.out" "$dir/watch-unreachable.err" 2>/dev/null)"; }
+  wait_liveness_polls "$pid" "$polls" 1 \
+    || { kill_liveness_leg "$pid"; fail "the watcher did not finish its cycle against an unreachable remote secondmate: $(cat "$dir/watch-unreachable.out" "$dir/watch-unreachable.err")"; }
   is_live_non_zombie "$pid" \
     || fail "the watcher exited against an unreachable remote secondmate: $(cat "$dir/watch-unreachable.out" "$dir/watch-unreachable.err")"
   kill_liveness_leg "$pid"
@@ -4282,6 +4541,7 @@ SH
   [ ! -e "$state/.secondmate-relaunch-rsm1" ] \
     || fail "an unreachable remote probe ledgered a relaunch attempt"
   [ ! -s "$dir/tmux.log" ] || fail "an unreachable remote probe touched a local endpoint"
+  unset -f sleep
   pass "watch liveness: an unreachable remote secondmate is probed, preserved, and never failed over"
 }
 
@@ -4329,6 +4589,9 @@ test_signal_catchup_without_running_watcher
 test_stale_enqueue_before_suppressor
 test_not_working_stale_enqueue_before_suppressor
 test_check_output_is_queued
+test_check_events_survive_batch_changes_and_state_coalescing
+test_malformed_check_events_keep_delivery_and_cadence
+test_unpresentable_row_cannot_suppress_a_check_event
 test_atomic_double_drain
 test_drain_dedupes_obvious_duplicates
 test_drain_asserts_watcher_liveness
