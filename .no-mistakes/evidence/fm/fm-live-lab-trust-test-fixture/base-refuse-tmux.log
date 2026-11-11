@@ -1,0 +1,20 @@
+# tree: base (30914c32)
+# cmd: bash /tmp/fmll.QNRO1f/base/tests/focus-refuse-tmux.test.sh
+# start: 2026-11-10T23:47:44Z
+[eval]:1
+const fs=require("node:fs");const [s,k]=process.argv.slice(1);const j=JSON.parse(fs.readFileSync(s,"utf8"));delete j.projects[k];fs.writeFileSync(s,JSON.stringify(j))
+                                                                                                                              ^
+
+TypeError: Cannot convert undefined or null to object
+    at [eval]:1:127
+    at runScriptInThisContext (node:internal/vm:219:10)
+    at node:internal/process/execution:485:12
+    at [eval]-wrapper:6:24
+    at runScriptInContext (node:internal/process/execution:483:60)
+    at evalFunction (node:internal/process/execution:317:30)
+    at evalTypeScript (node:internal/process/execution:329:3)
+    at node:internal/main/eval_string:71:3
+
+Node.js v26.11.1
+not ok - primary launched trusted after the rival write (expected 'present', got '')
+# exit: 1  end: 2026-11-10T23:47:46Z

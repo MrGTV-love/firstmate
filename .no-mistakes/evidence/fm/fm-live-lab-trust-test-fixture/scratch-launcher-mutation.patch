@@ -1,0 +1,16 @@
+--- /tmp/fmll.QNRO1f/head/bin/fm-live-lab.sh	2026-11-10 16:22:21
++++ /tmp/fmll.QNRO1f/head-mut/bin/fm-live-lab.sh	2026-11-10 17:32:54
+@@ -579,12 +579,7 @@
+       [ "$(date +%s)" -lt "$settle" ] || break
+       sleep 2
+     done
+-    for (( retry=0; retry<3; retry++ )); do
+-      lab_run "$CLAUDE_TRUST" --lab-home "$LAB" >/dev/null || die "cannot register Claude trust for the lab home"
+-      sleep 1
+-      lab_trust_present && break
+-    done
+-    lab_trust_present || die "the lab home's Claude trust keeps disappearing from $CLAUDE_STORE"
++    lab_run "$CLAUDE_TRUST" --lab-home "$LAB" >/dev/null || die "cannot register Claude trust for the lab home"
+     primary=(claude --setting-sources "project,local" --model "$model" --effort "$effort" --permission-mode auto)
+   else
+     primary=(pi --approve --session-dir "$ROOT/pi-sessions" --model "$model" --thinking "$effort")

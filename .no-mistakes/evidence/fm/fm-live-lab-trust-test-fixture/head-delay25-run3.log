@@ -1,0 +1,5 @@
+# tree: head (6691f9da)
+# cmd: bash /tmp/fmll.QNRO1f/head/tests/focus-delay25.test.sh
+# start: 2026-11-10T23:35:17Z
+ok - up re-registers primary trust after a concurrent Claude write
+# exit: 0  end: 2026-11-10T23:35:34Z

@@ -1,0 +1,17 @@
+# tree: head-mut (6691f9da + scratch-only launcher mutation: trust retry loop and final read removed)
+# cmd: bash /tmp/fmll.QNRO1f/head-mut/tests/focus.test.sh
+# start: 2026-11-10T23:47:26Z
+not ok - primary launched trusted after the rival write (expected 'present', got 'absent')
+rival trust case up output:
+lab: /Users/charlesabrooker/tmp/fm-live-lab.cYdo7z/up-lab (tear down with: /tmp/fmll.QNRO1f/head-mut/bin/fm-live-lab.sh down /Users/charlesabrooker/tmp/fm-live-lab.cYdo7z/up-lab)
+tree: 974908b199a5d05a83947c0e301d56e733798ea4 from /Users/charlesabrooker/tmp/fm-live-lab.cYdo7z/up-source
+primary: claude --setting-sources project,local --model sonnet --effort medium --permission-mode auto
+fail primary: the lab session lock names no live process (session start has not run)
+fail probe: no LABREADY-c2e038ee0121 reply in window main (model refused, turn still running, or a dialog is open)
+fail trust: /Users/charlesabrooker/tmp/fm-live-lab.cYdo7z/up-lab/home has no registered Claude workspace trust
+fail mirror: fm-host-mirror.sh check exited 1 
+ok host: skipped (empty fleet arms no supervision)
+ok watcher: skipped (empty fleet)
+ok treehouse: ~/.treehouse unchanged
+not ready after 1s; the lab is left up for inspection: /tmp/fmll.QNRO1f/head-mut/bin/fm-live-lab.sh pane /Users/charlesabrooker/tmp/fm-live-lab.cYdo7z/up-lab, then /tmp/fmll.QNRO1f/head-mut/bin/fm-live-lab.sh down /Users/charlesabrooker/tmp/fm-live-lab.cYdo7z/up-lab
+# exit: 1  end: 2026-11-10T23:47:44Z

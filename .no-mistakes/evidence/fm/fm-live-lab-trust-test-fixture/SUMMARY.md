@@ -1,15 +1,22 @@
-# Rival trust case validation (head 3fe2ac82 vs base 37a733cb)
+# Test-phase evidence: fm-live-lab rival trust fixture (head 6691f9da, base 30914c32)
 
-Drivers: trimmed copies of tests/fm-live-lab.test.sh (header setup + UPSRC setup + rival case),
-built by driver-generator-mk.sh. They run the real bin/fm-live-lab.sh `up`/`down` against a
-private tmux server and a fake HOME. bin/ is byte-identical at base and head (LL4-scope.txt).
-"seeded" runs pre-create $HOME/.claude.json as the earlier suite cases do. The unseeded base runs
-(unseeded-store/) hang the old rival on a missing store, so they are a setup artifact, not a verdict.
+Scratch trees: `git archive` of base and head into /tmp/fmll.QNRO1f (removed after the run).
+Focused files hold the suite setup, the up-source block, and the rival trust case only (scratch-mkfocus.sh).
+Base focused files and both seeded head reruns pre-create `$HOME/.claude.json` as `{}`, which the full suite leaves in place.
 
-| Variant | Head | Base |
-|---|---|---|
-| full tests/fm-live-lab.test.sh | pass (head-full-run-1.log) | not run |
-| rival 0.5 s (plain) | 7/7 pass | 2/2 pass |
-| rival 2.5 s (slow) | 7/7 pass | 2/3 FAIL: expected 'present', got 'absent' |
-| persistent rival -> pre-launch refusal | FAIL "up refused before primary launch (missing: 'primary: claude')" + up output printed | FAIL "expected 'present', got ''" (the CI symptom, no diagnostics) |
-| rival deletes after launch -> trust failure | FAIL "expected 'present', got 'absent'" + up output printed | same assertion, no up output |
+| Log | Tree | What it shows | Exit |
+|---|---|---|---|
+| full-suite-head.log | head | whole tests/fm-live-lab.test.sh passes; no "rival trust case up output" noise | 0 |
+| head-focus-run1..5 | head | case passes 5/5 at the shipped 0.5 s delay | 0 |
+| head-delay25-run1..5, head-delay25-seeded-run1 | head | case passes 6/6 with rival delay 2.5 s | 0 |
+| head-delay6-run1 | head | case passes with rival delay 6 s | 0 |
+| head-full-delay25.log | head | whole file passes with rival delay 2.5 s | 0 |
+| head-saw-run1, head-saw-seeded-run1 | head | rival saw the primary entry PRESENT before it deleted | 0 |
+| base-saw-run1 | base | inverted wait: rival saw entry ABSENT, deleted nothing (TypeError), still wrote "dropped", case passed vacuously | 0 |
+| base-delay25-run1/2, base-delay-2.0, base-delay-3.0 | base | case fails at 2.0-3.0 s rival delay: wall-clock dependent (marker 'absent') | 1 |
+| base-full-delay25.log | base | whole file with 2.5 s delay fails at the same case (marker 'absent', not '') | 1 |
+| base-refuse-tmux | base | pre-launch refusal ("cannot start the lab tmux server") masquerades as the exact `expected 'present', got ''` failure, refusal text hidden | 1 |
+| head-refuse-tmux | head | same refusal now fails as "up refused before primary launch" and prints up output with "cannot start the lab tmux server" | 1 |
+| head-refuse-trust | head | fail-closed launcher refusal "trust keeps disappearing" (rival keeps deleting) fails as "up refused before primary launch" with the refusal text | 1 |
+| head-mut-no-trust-recheck | head + scratch launcher mutation | launcher launches without its trust re-check: case fails as a trust failure (marker 'absent') and prints up output incl. "fail trust" | 1 |
+| LL4-scope.txt | git | diff touches tests/fm-live-lab.test.sh only; bin/fm-live-lab.sh, bin/fm-claude-trust.sh, bin/fm-lab-home.sh blob-identical | - |

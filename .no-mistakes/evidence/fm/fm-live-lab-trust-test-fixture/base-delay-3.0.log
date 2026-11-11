@@ -1,0 +1,5 @@
+# tree: base (30914c32)
+# cmd: bash /tmp/fmll.QNRO1f/base/tests/focus-d3.0.test.sh
+# start: 2026-11-10T23:48:15Z
+not ok - primary launched trusted after the rival write (expected 'present', got 'absent')
+# exit: 1  end: 2026-11-10T23:48:27Z

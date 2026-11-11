@@ -1,0 +1,15 @@
+--- /tmp/fmll.QNRO1f/base/tests/focus.test.sh	2026-11-10 17:45:22
++++ /tmp/fmll.QNRO1f/base/tests/focus-refuse-tmux.test.sh	2026-11-10 17:47:17
+@@ -181,6 +181,12 @@
+ SH
+ chmod +x "$FAKEBIN/claude"
+ U="$TMP_ROOT/up-lab"
++cat > "$FAKEBIN/tmux" <<SH
++#!/usr/bin/env bash
++for a in "\$@"; do [ "\$a" = new-session ] && exit 1; done
++exec /opt/homebrew/bin/tmux "\$@"
++SH
++chmod +x "$FAKEBIN/tmux"
+ # scratch seed: the full suite leaves this store in place before this case
+ [ -e "$HOME/.claude.json" ] || printf "{}\n" > "$HOME/.claude.json"
+ (

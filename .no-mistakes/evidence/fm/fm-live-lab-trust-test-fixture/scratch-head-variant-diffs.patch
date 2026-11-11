@@ -1,0 +1,72 @@
+--- /tmp/fmll.QNRO1f/head/tests/focus.test.sh	2026-11-10 17:45:22
++++ /tmp/fmll.QNRO1f/head/tests/focus-saw.test.sh	2026-11-10 17:45:22
+@@ -208,6 +208,7 @@
+     sleep 0.05
+   done
+   sleep 0.5
++  node -e 'const j=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8"));process.exit(j.projects?.[process.argv[2]]?.hasTrustDialogAccepted===true?0:1)' "$HOME/.claude.json" "$U/home" && echo present > "$TMP_ROOT/rival-saw" || echo absent > "$TMP_ROOT/rival-saw"
+   node -e 'const fs=require("node:fs");const [s,k]=process.argv.slice(1);const j=JSON.parse(fs.readFileSync(s,"utf8"));delete j.projects[k];fs.writeFileSync(s,JSON.stringify(j))' "$HOME/.claude.json" "$U/home"
+   echo dropped > "$TMP_ROOT/rival-dropped"
+ ) &
+@@ -225,5 +226,6 @@
+ assert_contains "$out" "ok trust: $U/home is trusted in the Claude store" "readiness sees primary trust"
+ out=$("$LIVE_LAB" down "$U" 2>&1)
+ expect_code 0 "$?" "down removes the up-built lab: $out"
++echo "# rival saw primary entry before delete: $(cat "$TMP_ROOT/rival-saw")"
+ pass "up re-registers primary trust after a concurrent Claude write"
+ RIVAL_CASE_ACTIVE=no
+--- /tmp/fmll.QNRO1f/head/tests/focus.test.sh	2026-11-10 17:45:22
++++ /tmp/fmll.QNRO1f/head/tests/focus-refuse-tmux.test.sh	2026-11-10 17:32:54
+@@ -184,8 +184,6 @@
+ SH
+ chmod +x "$FAKEBIN/claude"
+ U="$TMP_ROOT/up-lab"
+-# scratch seed: the full suite leaves this store in place before this case
+-[ -e "$HOME/.claude.json" ] || printf "{}\n" > "$HOME/.claude.json"
+ RIVAL_CASE_ACTIVE=yes
+ # Hold the launcher's presence read until the rival has finished, then run the
+ # real read. Even a slow rival must delete before stabilization can succeed.
+@@ -201,6 +199,12 @@
+ exec "$(command -v node)" "\$@"
+ SH
+ chmod +x "$FAKEBIN/node"
++cat > "$FAKEBIN/tmux" <<SH
++#!/usr/bin/env bash
++for a in "\$@"; do [ "\$a" = new-session ] && exit 1; done
++exec /opt/homebrew/bin/tmux "\$@"
++SH
++chmod +x "$FAKEBIN/tmux"
+ (
+   end=$(( $(date +%s) + 120 ))
+   until node -e 'const j=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8"));process.exit(j.projects?.[process.argv[2]]?.hasTrustDialogAccepted===true?0:1)' "$HOME/.claude.json" "$U/home" 2>/dev/null; do
+--- /tmp/fmll.QNRO1f/head/tests/focus.test.sh	2026-11-10 17:45:22
++++ /tmp/fmll.QNRO1f/head/tests/focus-refuse-trust.test.sh	2026-11-10 17:32:54
+@@ -184,8 +184,6 @@
+ SH
+ chmod +x "$FAKEBIN/claude"
+ U="$TMP_ROOT/up-lab"
+-# scratch seed: the full suite leaves this store in place before this case
+-[ -e "$HOME/.claude.json" ] || printf "{}\n" > "$HOME/.claude.json"
+ RIVAL_CASE_ACTIVE=yes
+ # Hold the launcher's presence read until the rival has finished, then run the
+ # real read. Even a slow rival must delete before stabilization can succeed.
+@@ -210,6 +208,8 @@
+   sleep 0.5
+   node -e 'const fs=require("node:fs");const [s,k]=process.argv.slice(1);const j=JSON.parse(fs.readFileSync(s,"utf8"));delete j.projects[k];fs.writeFileSync(s,JSON.stringify(j))' "$HOME/.claude.json" "$U/home"
+   echo dropped > "$TMP_ROOT/rival-dropped"
++  e2=$(( $(date +%s) + 15 ))
++  while [ "$(date +%s)" -lt "$e2" ]; do node -e 'const fs=require("node:fs");const [s,k]=process.argv.slice(1);const j=JSON.parse(fs.readFileSync(s,"utf8"));if(j.projects&&j.projects[k]){delete j.projects[k];fs.writeFileSync(s,JSON.stringify(j))}' "$HOME/.claude.json" "$U/home"; sleep 0.05; done
+ ) &
+ RIVAL=$!
+ printf '%s\n' "$RIVAL" >> "$TMP_ROOT/pids"
+--- /tmp/fmll.QNRO1f/head/tests/focus.test.sh	2026-11-10 17:45:22
++++ /tmp/fmll.QNRO1f/head/tests/focus-delay25.test.sh	2026-11-10 17:45:22
+@@ -207,7 +207,7 @@
+     [ "$(date +%s)" -lt "$end" ] || exit 1
+     sleep 0.05
+   done
+-  sleep 0.5
++  sleep 2.5
+   node -e 'const fs=require("node:fs");const [s,k]=process.argv.slice(1);const j=JSON.parse(fs.readFileSync(s,"utf8"));delete j.projects[k];fs.writeFileSync(s,JSON.stringify(j))' "$HOME/.claude.json" "$U/home"
+   echo dropped > "$TMP_ROOT/rival-dropped"
+ ) &

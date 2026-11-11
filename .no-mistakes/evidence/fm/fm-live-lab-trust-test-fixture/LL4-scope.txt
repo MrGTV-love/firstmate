@@ -1,9 +1,13 @@
-## git diff --stat 37a733cba39a0e185884328ff4364fdb17387798 HEAD
+# git diff --stat 30914c32900315bcab2c2999b977e33550967fd3 HEAD
  tests/fm-live-lab.test.sh | 31 +++++++++++++++++++++++++++----
  1 file changed, 27 insertions(+), 4 deletions(-)
-
-## git diff --name-only 37a733cba39a0e185884328ff4364fdb17387798 HEAD -- bin/
-(empty above = no bin/ change)
+# git diff --name-only 30914c32900315bcab2c2999b977e33550967fd3 HEAD
+tests/fm-live-lab.test.sh
+# blob ids: base vs head
 bin/fm-live-lab.sh base=6e743eaca46ad69e038456a58681c4bf4404adc9 head=6e743eaca46ad69e038456a58681c4bf4404adc9
 bin/fm-claude-trust.sh base=d5212aa0667ffefbd74385f6e7c31deb1502f69d head=d5212aa0667ffefbd74385f6e7c31deb1502f69d
 bin/fm-lab-home.sh base=4ac7dc02da3c69d8661a8f5a276ff732f4873c5e head=4ac7dc02da3c69d8661a8f5a276ff732f4873c5e
+tests/lib.sh base=ae159fceeb25fa82718e36fb141ce5195bde02aa head=ae159fceeb25fa82718e36fb141ce5195bde02aa
+tests/fixtures.sh base=1adcacf3b2b5a65b9d4e2efebbe5ff4314071a7d head=1adcacf3b2b5a65b9d4e2efebbe5ff4314071a7d
+# git diff 30914c32900315bcab2c2999b977e33550967fd3 HEAD -- bin/ (expect empty)
+       0
