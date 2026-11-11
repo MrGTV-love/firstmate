@@ -1224,10 +1224,136 @@ test_fm_send_marked_secondmate_creates_pending_and_embeds_corr() {
   pass "fm-send marked secondmate path creates pending and embeds corr"
 }
 
+test_relayed_request_recovery_reaches_the_mate() (
+  local dir fb log home state rc corr body
+  local FM_PENDING_REPLY_SEND_HOOK FM_PENDING_REPLY_NOW
+  unset FM_PENDING_REPLY_SEND_HOOK FM_PENDING_REPLY_NOW
+  dir="$TMP_ROOT/relay-recovery"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); log="$dir/send.log"
+  home=$(setup_parent relay-recovery); state="$home/state"
+  fm_write_secondmate_meta "$state/hibit.meta" "$home/sm" "sess:fm-hibit"
+  fm_write_meta "$state/other-task.meta" "window=sess:fm-other-task" "kind=ship"
+  run_send "$fb" "$home" "$log" hibit --relay "relay the fix round for other-task"; rc=$?
+  expect_code 0 "$rc" "setup: relayed secondmate request should send"
+  corr=$(fm_pending_reply_extract_corr "$(latest_record_body "$home" hibit)")
+  fm_pending_reply_observe_busy "$state" "$corr" busy
+  fm_pending_reply_observe_busy "$state" "$corr" idle
+  PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$home" FM_SEND_LOG="$log" \
+    fm_pending_reply_send_recovery "$state" "$corr" 2>/dev/null \
+    || fail "recovery of a relayed request must reach the mate, phase $(phase_of "$state" "$corr")"
+  [ "$(phase_of "$state" "$corr")" = recovery_sent ] \
+    || fail "phase should be recovery_sent, got $(phase_of "$state" "$corr")"
+  body=$(latest_record_body "$home" hibit)
+  case "$body" in
+    *"REPOST REQUIRED"*other-task*) : ;;
+    *) fail "mate inbox must hold the repost of the relayed request"$'\n'"$body" ;;
+  esac
+  pass "recovery of a relayed cross-task request reaches the mate"
+)
+
+# Exercise the native reader even on an unrestricted macOS CI runner. Only the
+# unavailable ps executable is simulated; recovery still reads real process facts
+# and must deliver exactly once through both the hook and the durable mate inbox.
+test_recovery_when_ps_is_not_executable() (
+  local sender_pid native expected
+  local FM_PENDING_REPLY_SEND_HOOK FM_PENDING_REPLY_NOW
+  [ "$(uname -s)" = Darwin ] || return 0
+  sender_pid=${BASHPID:-$$}
+  native=$(python3 "$ROOT/bin/fm-proc-info.py" identity "$sender_pid") \
+    || fail "native reader must identify the real recovery sender"
+  expected=$(COLUMNS=10000 LC_ALL=C command ps -p "$sender_pid" -o lstart= -o command= 2>/dev/null)
+  case $? in
+    0)
+      [ "$native" = "$expected" ] || fail "native and ps sender identities must match exactly"
+      pass "native sender identity matches executable ps"
+      ;;
+    126) ;; # The confined worker cannot execute ps; CI checks parity above.
+    *) fail "unexpected failure reading the real sender with ps" ;;
+  esac
+  # shellcheck disable=SC2329
+  ps() { return 126; }
+  test_completed_turn_no_report_triggers_one_recovery
+  test_relayed_request_recovery_reaches_the_mate
+)
+
+test_recovery_refuses_unreadable_sender_identity() (
+  local home state corr rec hook_log ps_status
+  # These function-local overrides deliberately do not escape the subshell.
+  # shellcheck disable=SC2030,SC2031
+  local FM_PENDING_REPLY_SEND_HOOK=unreadable_sender_hook FM_PENDING_REPLY_NOW=2000
+  home=$(setup_parent unreadable-sender); state="$home/state"
+  hook_log="$home/send.log"
+  # shellcheck disable=SC2329
+  unreadable_sender_hook() { printf 'sent\n' >> "$hook_log"; }
+  corr=$(fm_pending_reply_create "$home" "$state" hibit "report the result")
+  fm_pending_reply_mark_delivered "$state" "$corr"
+  fm_pending_reply_observe_busy "$state" "$corr" busy
+  fm_pending_reply_observe_busy "$state" "$corr" idle
+  rec=$(fm_pending_reply_path "$state" "$corr")
+  # An ordinary failed read and an unavailable executable with no working
+  # native reader must both preserve the unattempted request, not send blind.
+  # shellcheck disable=SC2329
+  ps() { return "$ps_status"; }
+  # shellcheck disable=SC2329
+  python3() { return 1; }
+  for ps_status in 1 126; do
+    if fm_pending_reply_send_recovery "$state" "$corr"; then
+      fail "unreadable sender identity must refuse recovery (ps=$ps_status)"
+    fi
+    [ "$(phase_of "$state" "$corr")" = awaiting_report ] \
+      || fail "unreadable sender must leave the request awaiting its report"
+    [ -z "$(fm_pending_reply_get "$rec" recovery_attempted_epoch)" ] \
+      || fail "identity failure must not consume the single recovery attempt"
+    [ ! -e "$hook_log" ] || fail "unreadable sender must never deliver a recovery"
+  done
+  pass "unreadable sender identity refuses recovery without consuming its attempt"
+)
+
+test_recovery_refuses_other_ps_failures_with_working_native_reader() (
+  local home state corr rec hook_log native_log rejected_ps_status fixture_identity recovery_status
+  # shellcheck disable=SC2030,SC2031
+  local FM_PENDING_REPLY_SEND_HOOK=other_ps_failure_hook FM_PENDING_REPLY_NOW=2000
+  home=$(setup_parent other-ps-failure); state="$home/state"
+  hook_log="$home/send.log"
+  native_log="$home/native-reader.log"
+  fixture_identity=$(fm_pending_reply_pid_identity "${BASHPID:-$$}") \
+    || fail "fixture must have a valid sender identity"
+  # shellcheck disable=SC2329
+  other_ps_failure_hook() { printf 'sent\n' >> "$hook_log"; }
+  corr=$(fm_pending_reply_create "$home" "$state" hibit "report the result")
+  fm_pending_reply_mark_delivered "$state" "$corr"
+  fm_pending_reply_observe_busy "$state" "$corr" busy
+  fm_pending_reply_observe_busy "$state" "$corr" idle
+  rec=$(fm_pending_reply_path "$state" "$corr")
+  # A working alternate reader must not turn an ordinary ps read failure into
+  # authority to send. Only an unavailable executable (126) permits fallback.
+  # shellcheck disable=SC2329
+  ps() { return "$rejected_ps_status"; }
+  # shellcheck disable=SC2329
+  python3() {
+    printf 'called\n' >> "$native_log"
+    printf '%s\n' "$fixture_identity"
+  }
+  for rejected_ps_status in 1 2 127; do
+    recovery_status=0
+    fm_pending_reply_send_recovery "$state" "$corr" || recovery_status=$?
+    [ ! -e "$native_log" ] || fail "non-126 ps failure must not call the native reader (ps=$rejected_ps_status)"
+    [ "$recovery_status" -ne 0 ] || fail "non-126 ps failure must refuse recovery (ps=$rejected_ps_status)"
+    [ "$(phase_of "$state" "$corr")" = awaiting_report ] \
+      || fail "non-126 ps failure must leave the request awaiting its report"
+    [ -z "$(fm_pending_reply_get "$rec" recovery_attempted_epoch)" ] \
+      || fail "non-126 ps failure must not consume the single recovery attempt"
+    [ ! -e "$hook_log" ] || fail "non-126 ps failure must never deliver a recovery"
+  done
+  pass "non-126 ps failures refuse recovery without calling a working native reader"
+)
+
 test_document_pointer_resolves() {
   local home state corr
   home=$(setup_parent doc-pointer)
   state="$home/state"
+  # This fixture sets its own clock; the preceding subshell's clock is private.
+  # shellcheck disable=SC2031
   export FM_PENDING_REPLY_NOW=9000
   corr=$(fm_pending_reply_create "$home" "$state" "hibit" "deep audit")
   fm_pending_reply_mark_delivered "$state" "$corr"
@@ -2437,6 +2563,12 @@ test_tick_beats_between_records() {
 
 # --- run --------------------------------------------------------------------
 
+fm_test_only
+
+test_recovery_when_ps_is_not_executable || exit $?
+test_recovery_refuses_unreadable_sender_identity || exit $?
+test_recovery_refuses_other_ps_failures_with_working_native_reader || exit $?
+test_relayed_request_recovery_reaches_the_mate || exit $?
 test_normal_correlated_reply_resolves_once
 test_completed_turn_no_report_triggers_one_recovery
 test_recovery_waits_while_the_mate_has_an_open_decision

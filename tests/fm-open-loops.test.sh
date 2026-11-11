@@ -240,6 +240,72 @@ assert bad.returncode == 1 and 'unknown open-loop age category' in bad.stdout, b
 (home / 'config/open-loops.json').unlink()
 print('PASS: ordinary categories, PR proof, ages and configuration', flush=True)
 
+# A terminal declaration hands report/candidate ownership back even when there
+# is no PR. A failed scout does not become resolved merely by writing a report.
+completion_tasks = [task('finished-review', world / 'no-review-copy', state='done', kind='scout'),
+                    task('failed-review', world / 'no-review-copy', state='failed', kind='scout'),
+                    task('candidate-ready', fresh, state='done'),
+                    task('dropped-review', world / 'no-review-copy', state='done', kind='scout'),
+                    task('dropped-candidate', fresh, state='done'),
+                    # The durable `done` line owns the handoff when the pane closed or cannot be read.
+                    task('closed-review', world / 'no-review-copy', state='unknown', exists=False, alive='dead',
+                         kind='scout'),
+                    task('unread-review', world / 'no-review-copy', state='unknown', kind='scout'),
+                    task('paused-review', world / 'no-review-copy', state='unknown', kind='scout')]
+declared = dict.fromkeys(('closed-review', 'unread-review'), 'done')
+declared['paused-review'] = 'paused'
+completion_backlog = backlog + [dict(id=name, structured=True, state='done', captain_drop=True)
+                                for name in ('dropped-review', 'dropped-candidate')]
+for item in completion_tasks:
+    name = item['id']
+    (home / f'state/{name}.status').write_text(f"{declared.get(name, item['current_state']['state'])} [at={hours(1)}]: ready for owner\n")
+    (home / f'state/{name}.meta').write_text(f"kind={item['kind']}\nspawn_gen=fixture-{name}\n")
+    if item['kind'] == 'scout':
+        report_dir = home / 'data' / name
+        report_dir.mkdir()
+        (report_dir / 'report.md').write_text('fixture review result\n')
+(home / 'snapshot.json').write_text(json.dumps(dict(schema='fm-fleet-home-input.v1', tasks=tasks + completion_tasks,
+                                                    backlog=dict(present=True, records=completion_backlog))))
+for _ in range(2):  # a fresh collector process must recover the same unfinished handoff
+    completion_report = ledger()
+    completed = rows(completion_report, 'completed_task')
+    assert set(completed) == {'finished-review', 'candidate-ready', 'closed-review', 'unread-review'}, completed
+    assert all(r['owner'] == 'firstmate' and r['overdue'] for r in completed.values()), completed
+    assert 'failed-review' in rows(completion_report, 'failed_task'), completion_report
+    # The reviewed-inventory attestation alone is not owner acceptance: the row stays until teardown or a drop.
+    with (home / 'state/finished-review.meta').open('a') as meta:
+        meta.write('decisions_reviewed=1\ndecision_keys=\n')
+# A completed task whose status log cannot be folded degrades coverage for that
+# one read; it keeps its own row and never hides a later task's obligations.
+blind = task('blind-review', world / 'no-review-copy', state='done', alive='dead', kind='scout')
+# The same unreadable log behind a closed pane still keeps its row: the declaration read does not fold.
+blind_closed = task('blind-closed', world / 'no-review-copy', state='unknown', exists=False, alive='dead', kind='scout')
+after_blind = task('after-blind', lost, state='failed', exists=False, alive='dead')
+(home / 'state/blind-review.status').write_text(f'working [at={hours(2)}]: {"x" * 80}\n' * 40
+                                                + f'done [at={hours(1)}]: ready for owner\n')
+shutil.copy(home / 'state/blind-review.status', home / 'state/blind-closed.status')
+(home / 'snapshot.json').write_text(json.dumps(dict(schema='fm-fleet-home-input.v1', tasks=[blind, blind_closed, after_blind],
+                                                    backlog=dict(present=True, records=backlog))))
+blind_report = json.loads(out([code / 'bin/fm-open-loops.sh', '--json'],
+                              env=dict(env, FM_STATUS_CAP_BYTES='2048', FM_STATUS_CAP_RESERVE_BYTES='1')))
+assert not blind_report['complete'], blind_report
+assert 'completion status blind-review' in rows(blind_report, 'coverage')['ledger degraded']['evidence'], blind_report
+for name in ('blind-review', 'blind-closed'):
+    assert f'completion status {name}' in rows(blind_report, 'coverage')['ledger degraded']['evidence'], blind_report
+    assert rows(blind_report, 'completed_task')[name]['overdue'], blind_report
+for category in ('failed_task', 'missing_worker', 'unlanded_commit'):
+    assert 'after-blind' in rows(blind_report, category), (category, blind_report)
+(home / 'state/blind-review.status').unlink()
+(home / 'state/blind-closed.status').unlink()
+# Retirement is owned elsewhere; collection never launches or accepts the work.
+(home / 'snapshot.json').write_text(json.dumps(dict(schema='fm-fleet-home-input.v1', tasks=tasks,
+                                                    backlog=dict(present=True, records=backlog))))
+assert not rows(ledger(), 'completed_task')
+for item in completion_tasks:
+    for suffix in ('status', 'meta'):
+        (home / f"state/{item['id']}.{suffix}").unlink()
+print('PASS: completed reviews and committed candidates retain their owner action; failed reports do not imply acceptance', flush=True)
+
 # Independent review is only the record owner's verified exact-head evidence.
 # review_lanes is a discovery hint, not authority: the ledger asks
 # bin/fm-review-record.py once for the live head and consumes one atomic
@@ -785,9 +851,13 @@ assert git(local, 'rev-parse', 'refs/heads/main') == local_head
 for pushed in (False, True):
     if pushed:
         git(local_worker, 'push', '-q', 'origin', 'HEAD:refs/heads/fm/local-delivery')
-    fixture([local_task])
-    delivered = ledger()
-    assert not rows(delivered, 'failed_task') and not rows(delivered, 'unlanded_commit'), delivered
+    for state in ('failed', 'done'):
+        local_task['current_state']['state'] = state
+        fixture([local_task])
+        delivered = ledger()
+        assert not rows(delivered, 'failed_task') and not rows(delivered, 'unlanded_commit'), delivered
+        assert not rows(delivered, 'completed_task'), delivered
+local_task['current_state']['state'] = 'failed'
 local_task['mode'] = 'no-mistakes'
 fixture([local_task])
 assert 'local-delivery' in rows(ledger(), 'failed_task')
@@ -795,6 +865,12 @@ local_task['mode'] = 'local-only'
 git(local, 'update-ref', 'refs/heads/main', local_base)
 fixture([local_task])
 assert 'local-delivery' in rows(ledger(), 'unlanded_commit')
+local_task['current_state']['state'] = 'done'
+fixture([local_task])
+pending_local = ledger()
+assert 'local-delivery' in rows(pending_local, 'completed_task'), pending_local
+assert 'local-delivery' in rows(pending_local, 'unlanded_commit'), 'the commits stay a separate obligation'
+local_task['current_state']['state'] = 'failed'
 git(local, 'update-ref', 'refs/heads/trunk', local_head)
 git(local, 'symbolic-ref', 'refs/remotes/origin/HEAD', 'refs/remotes/origin/trunk')
 git(local, 'update-ref', 'refs/remotes/origin/trunk', local_base)
@@ -813,13 +889,16 @@ for exists, alive in ((False, 'dead'), (True, 'dead'), (True, 'missing'), (True,
         task('axis-missing-pr', world / 'missing-pr-copy', state='failed', exists=exists, alive=alive,
              pr=PR_URL + '5'),
         task('axis-drop', lost, state='failed', exists=exists, alive=alive),
-        task('axis-report', lost, state='failed', exists=exists, alive=alive, kind='scout')]
-    (home / 'data/axis-report').mkdir(exist_ok=True)
-    (home / 'data/axis-report/report.md').write_text('Delivered findings\n')
-    fixture(failed_axes, [dict(id='axis-drop', structured=True, state='done', captain_drop=True)])
+        task('axis-report', lost, state='failed', exists=exists, alive=alive, kind='scout'),
+        task('axis-dropped-report', lost, state='failed', exists=exists, alive=alive, kind='scout')]
+    for name in ('axis-report', 'axis-dropped-report'):
+        (home / 'data' / name).mkdir(exist_ok=True)
+        (home / 'data' / name / 'report.md').write_text('Delivered findings\n')
+    fixture(failed_axes, [dict(id=name, structured=True, state='done', captain_drop=True)
+                         for name in ('axis-drop', 'axis-dropped-report')])
     (home / 'config/open-loops.json').write_text(json.dumps(dict(age_limits_seconds=dict(failed_task=123))))
     axes = ledger()
-    assert set(rows(axes, 'failed_task')) == {'axis-pending'}, axes
+    assert set(rows(axes, 'failed_task')) == {'axis-pending', 'axis-report'}, axes
     assert rows(axes, 'failed_task')['axis-pending']['limit_seconds'] == 123
     if not exists or alive in ('dead', 'missing'):
         assert set(rows(axes, 'missing_worker')) == {t['id'] for t in failed_axes}, axes
@@ -1523,7 +1602,7 @@ for overrides, expected_home in address_cases:
     assert set(rows(addressed, 'ready_not_started')) == {'address-ready'}, addressed
     assert rows(addressed, 'ready_not_started')['address-ready']['limit_seconds'] == 77, addressed
     assert set(rows(addressed, 'unanswered_question')) == {'address:home'}, addressed
-    assert not rows(addressed, 'failed_task'), addressed
+    assert set(rows(addressed, 'failed_task')) == {'address-report'}, addressed
     assert set(rows(addressed, 'open_pr')) == {address_url}, addressed
     assert (expected_home / 'state/.open-loops.lock').is_file(), overrides
     assert json.loads((expected_home / 'state/open-loops.json').read_text()) == addressed
