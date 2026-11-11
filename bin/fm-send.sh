@@ -1023,8 +1023,6 @@ else
   # A final prose period is punctuation only when no exact meta names it. awk
   # splits each token into its text and the count of dots that end it, in one
   # pass, so a long run of dots costs no more than the same length of any text.
-  owner_target=
-  [ -z "$TARGET_META" ] || owner_target=$(fm_send_id_from_meta "$TARGET_META")
   fm_send_load_recorded_ids
   while IFS=$'\t' read -r mention_dots mention_base; do
     [ -n "$mention_base" ] || [ "$mention_dots" != 0 ] || continue
@@ -1034,7 +1032,7 @@ else
     fm_send_resolve_mention "$mention_base" "$mention_dots"
     mentioned_id=$MENTION_ID
     [ -n "$mentioned_id" ] || continue
-    [ "$mentioned_id" != "$owner_target" ] || continue
+    [ ! "$STATE/$mentioned_id.meta" -ef "$TARGET_META" ] || continue
     # Explicit endpoints can be shared by several recorded tasks. A selector
     # still names exactly one task; an endpoint owns every meta that names it.
     if [ -z "$TARGET_SELECTOR" ] &&

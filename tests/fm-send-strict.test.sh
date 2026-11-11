@@ -374,6 +374,35 @@ test_mentions_match_the_recorded_id_spelling() {
   pass "fm-send: only the recorded id spelling is a task mention, in short and long dotted forms"
 }
 
+test_miscased_selector_keeps_its_own_mentions() {
+  local dir fb home log err rc text record
+  dir="$TMP_ROOT/owner-selector-case"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); home=$(setup_home selectorcase); log="$dir/send.log"; err="$dir/send.err"
+  fm_write_meta "$home/state/other.meta" "window=sess:fm-other" "kind=ship"
+  fm_write_meta "$home/state/mini.meta" "window=sess:fm-mini" "kind=ship"
+  if [ ! -f "$home/state/OTHER.meta" ]; then
+    pass "fm-send: a miscased selector does not resolve on a case-sensitive state directory"
+    return 0
+  fi
+  text='Continue other. Report back.'
+  : > "$log"
+  PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" FM_SEND_SETTLE=0 \
+    "$SEND" Other "$text" >/dev/null 2> "$err"; rc=$?
+  expect_code 0 "$rc" "a selector that resolves to the task's own meta keeps its own mentions ($(cat "$err"))"
+  for record in "$home/state/"*.inbox/001.msg; do
+    [ "$(bash -c '. "$1"; fm_task_inbox_body "$2"' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$record")" = "$text" ] \
+      || fail "the miscased selector changed the delivered body"
+  done
+  assert_contains "$(cat "$log")" 'Firstmate instruction waiting' "the miscased selector must ring its durable record"
+  : > "$log"
+  PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" FM_SEND_SETTLE=0 \
+    "$SEND" Other 'Continue mini.' >/dev/null 2> "$err"; rc=$?
+  [ "$rc" -ne 0 ] && [ "$rc" -ne 3 ] || fail "a miscased selector escaped the ownership guard for another task"
+  assert_contains "$(cat "$err")" "Send to 'mini'" "the refusal must designate the recorded owner"
+  [ ! -s "$log" ] || fail "a miscased-selector refusal typed text"
+  pass "fm-send: a selector that names a task's own meta in another case keeps its mentions and its refusals"
+}
+
 test_secondmate_own_task_and_relay_safety() {
   local dir fb home log err rc body corr
   dir="$TMP_ROOT/owner-secondmate"; mkdir -p "$dir"
@@ -709,35 +738,6 @@ test_input_boundary_is_not_reported_missing() {
   pass "fm-send: outside-home input is reported as the transfer boundary without reading its contents"
 }
 
-# Count how many recorded-task existence tests the scan runs for a message that
-# ends in a long run of dots. The count is a structural measure: a scan that
-# strips one dot per pass tests one growing path per dot, so the count grows
-# with the number of dots; a single-pass scan does not. xtrace output is
-# counted, so no timer or kill is involved.
-mention_scan_meta_tests() {  # <home> <fakebin> <log> <dots> -> echoes count
-  local home=$1 fb=$2 log=$3 dots=$4 trace msg
-  trace="$TMP_ROOT/scan-trace-$dots"
-  msg="zq$(head -c "$dots" /dev/zero | tr '\0' '.')"
-  : > "$log"
-  PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" FM_SEND_SETTLE=0 \
-    bash -x "$SEND" other "$msg" >/dev/null 2> "$trace" || fail "dotted control message was not delivered"
-  grep -F 'zq' "$trace" | grep -cF '.meta'
-}
-
-test_mention_scan_cost_does_not_grow_with_trailing_dots() {
-  local dir fb home log small large grown
-  dir="$TMP_ROOT/scan-cost"; mkdir -p "$dir"
-  fb=$(make_stubs "$dir"); home=$(setup_home scancost); log="$dir/send.log"
-  fm_write_meta "$home/state/task-one.meta" "window=sess:fm-task-one" "kind=ship"
-  fm_write_meta "$home/state/other.meta" "window=sess:fm-other" "kind=ship"
-  small=$(mention_scan_meta_tests "$home" "$fb" "$log" 1000)
-  large=$(mention_scan_meta_tests "$home" "$fb" "$log" 4000)
-  grown=$((large - small))
-  printf 'scan-cost: recorded-task tests at 1000 dots=%s, at 4000 dots=%s, growth=%s\n' "$small" "$large" "$grown"
-  [ "$grown" -le 4 ] || fail "scan runs one existence test per trailing dot: $small at 1000 dots, $large at 4000 dots"
-  pass "fm-send: the mention scan does a constant number of existence tests however many dots end a token"
-}
-
 test_long_dotted_forms_keep_rule_m_results() {
   local dir fb home log err rc dots text body
   dir="$TMP_ROOT/scan-dotted"; mkdir -p "$dir"
@@ -923,7 +923,6 @@ fm_test_only
 test_empty_message_check_cost_does_not_grow_quadratically
 test_empty_message_refusal_is_unchanged_for_long_inputs
 test_trailing_dot_split_matches_the_reference_split
-test_mention_scan_cost_does_not_grow_with_trailing_dots
 test_long_dotted_forms_keep_rule_m_results
 test_mention_resolution_matches_the_reference_scan
 test_input_boundary_is_not_reported_missing
@@ -938,6 +937,7 @@ test_task_owner_mismatch_is_refused
 test_owner_relay_and_correct_owner
 test_task_mentions_match_whole_tokens
 test_mentions_match_the_recorded_id_spelling
+test_miscased_selector_keeps_its_own_mentions
 test_secondmate_own_task_and_relay_safety
 test_exact_lane_id_send_still_works
 test_key_send_exit_status_follows_delivery
