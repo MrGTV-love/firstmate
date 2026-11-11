@@ -348,12 +348,18 @@ test_unknown_pipeline_after_fail() {
   case_dir=$(make_case pipeline-after-fail)
   printf 'mode=no-mistakes\n' >> "$case_dir/home/state/task-x1.meta"
   authors='{"ship":["gpt-5.1"],"no-mistakes:unknown":["unknown"]}'
-  record_review "$case_dir" "$HEAD1" FAIL gemini-3-pro "$authors" >/dev/null || fail 'record FAIL'
+  record_review "$case_dir" "$HEAD1" PASS gemini-3-pro "$authors" >/dev/null || fail 'record pre-FAIL second-family PASS'
+  record_review "$case_dir" "$HEAD1" FAIL deepseek-v3 "$authors" >/dev/null || fail 'record FAIL'
   record_review "$case_dir" "$HEAD1" PASS sonnet "$authors" >/dev/null || fail 'record later independent PASS'
   out=$(NM_HOME="$case_dir/absent-nm" FM_HOME="$case_dir/home" "$RECORD" verify --pr "$URL" \
     --head "$HEAD1" --task task-x1 --base "$BASE" --json) || rc=$?
   expect_code 0 "$rc" "later qualifying read clears FAIL under the same coverage rule: $out"
-  pass 'a later outside-ship-family pipeline read clears an exact-head FAIL'
+  "$JQ_BIN" -e '.facts == ["pipeline author family not recorded"]' <<<"$out" >/dev/null \
+    || fail "relief that clears the FAIL must disclose the fact despite a pre-FAIL second family: $out"
+  out=$(NM_HOME="$case_dir/absent-nm" FM_HOME="$case_dir/home" "$RECORD" verify --pr "$URL" \
+    --head "$HEAD1" --task task-x1 --base "$BASE") || fail "text verify after FAIL: $out"
+  assert_contains "$out" 'pipeline author family not recorded' 'after-FAIL relief discloses the fact in text'
+  pass 'a later outside-ship-family pipeline read clears an exact-head FAIL and discloses the relief'
 }
 
 test_native_claude_aliases_are_anthropic() {
