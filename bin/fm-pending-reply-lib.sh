@@ -1055,7 +1055,14 @@ fm_pending_reply_send_recovery() {  # <state-dir> <corr_id>
 fm_pending_reply_pid_identity() {  # <pid>
   local pid=$1 identity
   case "$pid" in ''|*[!0-9]*) return 1 ;; esac
-  identity=$(COLUMNS=10000 LC_ALL=C ps -p "$pid" -o lstart= -o command= 2>/dev/null) || return 1
+  # Match the wake owner's confined-macOS fallback without changing the stored
+  # identity: the native reader emits the same start time and command as ps.
+  identity=$(COLUMNS=10000 LC_ALL=C ps -p "$pid" -o lstart= -o command= 2>/dev/null)
+  case $? in
+    0) ;;
+    126) identity=$(python3 "$_FM_PENDING_REPLY_LIB_DIR/fm-proc-info.py" identity "$pid" 2>/dev/null) || return 1 ;;
+    *) return 1 ;;
+  esac
   [ -n "$identity" ] || return 1
   printf '%s' "$identity"
 }
