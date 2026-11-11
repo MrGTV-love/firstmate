@@ -67,15 +67,17 @@ PASS. Unknown ship authors and other unknown constraints require exact-head
 PASS reads of their group from at least two different known reader families:
 whatever that unknown family really is, at least one reader differs from it.
 Only the derived no-mistakes:unknown group may instead use one such PASS whose
-known reader family differs from EVERY known ship family, provided at least
-one known ship family exists. A ship with no known family gets no relief.
-Unknown ship constraints still need two different known reader families, even
-when a pipeline group receives relief. Multiple reads may collectively cover
-known author families; a third family is not required for mixed-family work.
+known reader family differs from EVERY ship family, provided the ship group
+has at least one derived family and every ship family, derived or typed, is
+known. A ship group with no derived family or with any unknown family gives
+the pipeline group no relief, so it keeps the two-reader rule. Unknown ship
+constraints still need two different known reader families. Multiple reads may
+collectively cover known author families; a third family is not required for mixed-family work.
 An accepted independent review with a derived no-mistakes:unknown group prints
 'pipeline author family not recorded'; --json includes that string in optional
-facts. fm-pr-merge.sh persists it in its merge-authority record from the same
-verification read. Known pipeline groups emit no fact.
+facts. fm-pr-merge.sh writes it into its merge-authority record from the same
+verification read; teardown deletes that record with the task's other state.
+Known pipeline groups emit no fact.
 This preserves known-builder independence but not the former guarantee for
 all possible pipeline authors: the unrecorded pipeline family may actually
 match the sole reader. Local invocation evidence and ship launch history
@@ -92,8 +94,10 @@ never decide independence. Uncovered-group refusals name each uncovered family,
 reporting any group with an unknown author family before known-family groups.
 For known families they print a review recording command; substitute the actual
 reader, local report and trigger answers. An unknown-family refusal prints
-that command with the same substitutions and offers two different known reader
-families, or the pipeline-only single-reader rule above. It also offers repaired author evidence or the
+that command with the same substitutions and asks for two different known
+reader families; when the pipeline-only rule above applies to the group, it
+names the ship families and says one PASS from a known reader family outside
+all of them is enough instead. It also offers repaired author evidence or the
 exact-head captain-word command, whose words must be the captain's actual fresh
 instruction. When every group is covered but the newest reader is unknown, the
 refusal names that reader and prints a known-family reread command.
@@ -494,6 +498,19 @@ def verify(records, rows, head, home, pr, task, base, review_only=False):
                            "--loosens-deny-allow-list", "no", "--widens-guard", "no",
                            "--customer-data-billing-spend", "no", "--report", "LOCAL_READER_REPORT"])
 
+    ship_families = {a["family"] for a in groups.get("ship", [])}
+    pipeline_relief = "no-mistakes:unknown" in derived and derived.get("ship") and "unknown" not in ship_families
+
+    def unknown_need(group, later):
+        two = f"{later}exact-head PASS reads of {'that' if later else 'this'} group from two different known reader families"
+        if group == "no-mistakes:unknown" and pipeline_relief:
+            return (f"model family unknown needs one {later}exact-head PASS of {'that' if later else 'this'} group from a known reader family "
+                    f"outside every ship family ({','.join(sorted(ship_families))}), or {two}; obtain the reads one of those rules needs")
+        return f"model family unknown needs {two}; obtain reads until both families count"
+
+    def unknown_reader_placeholder(group):
+        return "OUTSIDE_SHIP_FAMILY_MODEL" if group == "no-mistakes:unknown" and pipeline_relief else "SECOND_KNOWN_FAMILY_MODEL"
+
     def uncovered(group, authors, reads):
         families = {a["family"] for a in authors}
         readers = set()
@@ -509,10 +526,9 @@ def verify(records, rows, head, home, pr, task, base, review_only=False):
                 readers.add(reader)
         # Known authors retain different-family coverage. Unknown builders and
         # other unknown groups retain the two-reader guarantee; only a derived
-        # unknown pipeline group may use builder-independent single coverage.
-        ship_families = {a["family"] for a in derived.get("ship", [])} - {"unknown"}
-        pipeline_read = (group == "no-mistakes:unknown" and group in derived
-                         and ship_families and readers - ship_families)
+        # unknown pipeline group whose ship families are all known may use
+        # builder-independent single coverage.
+        pipeline_read = group == "no-mistakes:unknown" and pipeline_relief and readers - ship_families
         return sorted(f for f in families if (len(readers) < 2 and not pipeline_read
                                               if f == "unknown" else not readers - {f}))
 
@@ -528,7 +544,7 @@ def verify(records, rows, head, home, pr, task, base, review_only=False):
             reason = (f"verdict is FAIL at live head {head} (reader {failed['reader_model']}, report {failed['report']}); "
                       f"no later exact-head PASS covers group {group}, family {','.join(missing)}, that this FAIL read; ")
             if "unknown" in missing:
-                raise VerificationError(f"{reason}model family unknown needs later exact-head PASS reads of that group from two different known reader families; obtain reads until both families count, set each read's actual trigger answers and local report, then record each with: {env} {review_command('SECOND_KNOWN_FAMILY_MODEL', [group], {**groups, group: authors})}; or {captain_help}")
+                raise VerificationError(f"{reason}{unknown_need(group, 'later ')}, set each read's actual trigger answers and local report, then record each with: {env} {review_command(unknown_reader_placeholder(group), [group], {**groups, group: authors})}; or {captain_help}")
             raise VerificationError(f"{reason}record later exact-head PASS reads of that group from readers outside each of its families with: {env} {review_command('OUTSIDE_FAMILY_MODEL', [group], {**groups, group: authors})}; or {captain_help}")
     if at_word:
         return "captain-word", word
@@ -539,7 +555,7 @@ def verify(records, rows, head, home, pr, task, base, review_only=False):
             continue
         reason = f"model family unknown for newest reader {review['reader_model']}; " if unknown_reader else ""
         if "unknown" in missing:
-            raise VerificationError(f"{reason}uncovered commit group {group}, family {','.join(missing)}; model family unknown needs exact-head PASS reads of this group from two different known reader families; obtain reads until both families count, set each read's actual trigger answers and local report, then record each with: {env} {review_command('SECOND_KNOWN_FAMILY_MODEL', [group], groups)}; or repair the author evidence so every author model has a known family, or {captain_help}")
+            raise VerificationError(f"{reason}uncovered commit group {group}, family {','.join(missing)}; {unknown_need(group, '')}, set each read's actual trigger answers and local report, then record each with: {env} {review_command(unknown_reader_placeholder(group), [group], groups)}; or repair the author evidence so every author model has a known family, or {captain_help}")
         raise VerificationError(f"{reason}uncovered commit group {group}, family {','.join(missing)}; each author family needs an exact-head PASS reading this group whose reader_family is known and different from it (see --help for unknown-pipeline coverage); obtain the named read, set its actual trigger answers and local report, then record it with: {env} {review_command('OUTSIDE_FAMILY_MODEL', [group], groups)}")
     if unknown_reader:
         raise VerificationError(f"model family unknown for newest reader {review['reader_model']}; every group is covered by known-family reads, but the newest review must name a known reader family; obtain a reread from a known-family reader, set its actual trigger answers and local report, then record it with: {env} {review_command('KNOWN_FAMILY_MODEL', sorted(groups), groups)}")

@@ -211,14 +211,14 @@ PY
     fi
     if [ "$scenario" = mixed-unknown ]; then
       expect_code 1 "$rc" "a mixed known and unknown pipeline must refuse: $(cat "$case_dir/stderr")"
-      assert_grep 'uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families' "$case_dir/stderr" 'the unknown group is reported first'
+      assert_grep 'uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs one exact-head PASS of this group from a known reader family outside every ship family (openai), or exact-head PASS reads of this group from two different known reader families' "$case_dir/stderr" 'the unknown group is reported first with its single-reader rule'
       assert_grep 'captain-word --pr' "$case_dir/stderr" 'the unknown group names the captain-word route'
       assert_no_grep 'OUTSIDE_FAMILY_MODEL' "$case_dir/stderr" 'no known-family read is requested ahead of the unknown group'
     fi
     if [ "$scenario" = unknown-captain-word ]; then
       expect_code 1 "$rc" "an unknown pipeline family must refuse a one-family PASS: $(cat "$case_dir/stderr")"
-      assert_grep 'uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families' "$case_dir/stderr" 'unknown group is named accurately'
-      assert_grep 'SECOND_KNOWN_FAMILY_MODEL' "$case_dir/stderr" 'the unknown group names the second-family review route'
+      assert_grep 'uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs one exact-head PASS of this group from a known reader family outside every ship family (openai), or exact-head PASS reads of this group from two different known reader families' "$case_dir/stderr" 'unknown group offers the single outside-ship-family read'
+      assert_grep 'OUTSIDE_SHIP_FAMILY_MODEL' "$case_dir/stderr" 'the unknown group names the outside-ship-family review route'
       command=$(sed -n 's/.* in place of FRESH_CAPTAIN_WORDS with: //p' "$case_dir/stderr")
       command=${command%; inspect review-records.jsonl in the PR task home before retrying}
       [ -n "$command" ] || fail "unknown-family refusal printed no captain-word command: $(cat "$case_dir/stderr")"
@@ -230,7 +230,7 @@ PY
     if [ "$scenario" = unknown-two-families ] || [ "$scenario" = unknown-fail-clears ]; then
       expect_code 0 "$rc" "$scenario needs no redundant second-family read: $(cat "$case_dir/stderr")"
       assert_grep 'pipeline author family not recorded' "$case_dir/state/task-x1.merge-authority" \
-        'pipeline relief leaves a durable provenance fact'
+        'pipeline relief writes its provenance fact into the merge record'
       "$JQ_BIN" -s -e 'all(.kind != "captain-word")' "$case_dir/state/review-records.jsonl" >/dev/null \
         || fail "$scenario must merge without a captain-word record"
     fi

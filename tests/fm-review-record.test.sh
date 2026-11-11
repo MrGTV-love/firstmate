@@ -315,6 +315,25 @@ test_unknown_pipeline_preserves_coverage_boundaries() {
   done
 }
 
+test_unknown_pipeline_no_relief_for_partly_unknown_ship() {
+  local case_dir out rc=0 authors
+  case_dir=$(make_case pipeline-partly-unknown-ship)
+  printf 'mode=no-mistakes\n' >> "$case_dir/home/state/task-x1.meta"
+  printf 'model=mystery-9\n' > "$case_dir/home/state/task-x1.control-relaunch.meta-prior"
+  authors='{"ship":["gpt-5.1","mystery-9"],"no-mistakes:unknown":["unknown"]}'
+  record_review "$case_dir" "$HEAD1" PASS sonnet "$authors" >/dev/null || fail 'record Claude read of all groups'
+  record_review "$case_dir" "$HEAD1" PASS gemini-3-pro "$authors" --covered-groups '["ship"]' >/dev/null \
+    || fail 'record Google read of ship only'
+  out=$(NM_HOME="$case_dir/absent-nm" FM_HOME="$case_dir/home" "$RECORD" verify --pr "$URL" \
+    --head "$HEAD1" --task task-x1 --base "$BASE" --json) || rc=$?
+  expect_code 1 "$rc" "a ship group with an unknown family gives the pipeline group no single-reader relief: $out"
+  expect_not_qualified "$out" 'uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families' \
+    'partly unknown ship keeps the two-reader pipeline rule'
+  "$JQ_BIN" -e '.error.message | contains("outside every ship family") | not' <<<"$out" >/dev/null \
+    || fail "partly unknown ship must not offer the single-reader rule: $out"
+  pass 'a ship group with any unknown family gives the unknown pipeline group no relief'
+}
+
 test_unknown_pipeline_after_fail() {
   local case_dir out rc=0 authors
   case_dir=$(make_case pipeline-after-fail)
@@ -465,6 +484,7 @@ fm_test_run_cases \
   test_unknown_pipeline_one_independent_reader \
   test_unknown_pipeline_fact_output \
   test_unknown_pipeline_preserves_coverage_boundaries \
+  test_unknown_pipeline_no_relief_for_partly_unknown_ship \
   test_unknown_pipeline_after_fail \
   test_native_claude_aliases_are_anthropic \
   test_stored_family_fields_cannot_retroactively_change_independence \
