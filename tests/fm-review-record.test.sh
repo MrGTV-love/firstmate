@@ -106,7 +106,8 @@ test_review_only_json_is_immutable_record_time_evidence() {
     and .author_groups == {"ship":[{model:"gpt-5.1",family:"openai"}],
                            "fixes":[{model:"Gemini-3-Pro",family:"google"},
                                     {model:"deepseek-v3",family:"deepseek"}]}
-    and .report == $report and .report_sha256 == $digest' <<<"$out" >/dev/null \
+    and .report == $report and .report_sha256 == $digest
+    and (has("facts") | not)' <<<"$out" >/dev/null \
     || fail "review-only JSON must carry immutable record-time evidence: $out"
   pass "review-only --json reports immutable record-time independent evidence"
 }
@@ -241,7 +242,144 @@ test_unknown_author_covered_by_two_reader_families() {
   out=$(run_verify "$case_dir" "$HEAD1" --review-only --json) || rc=$?
   expect_code 1 "$rc" "a second family read of another head must not cover an unknown author"
   expect_not_qualified "$out" "uncovered commit group ship, family unknown" "unknown author, second family on another head"
-  pass "an unknown author family is covered only by exact-head PASS reads from two known reader families"
+  pass "an unknown ship author family requires exact-head PASS reads from two known reader families"
+}
+
+test_unknown_pipeline_one_independent_reader() {
+  local case_dir out rc=0
+  case_dir=$(make_case pipeline-one-reader)
+  printf 'mode=no-mistakes\n' >> "$case_dir/home/state/task-x1.meta"
+  record_review "$case_dir" "$HEAD1" PASS sonnet \
+    '{"ship":["gpt-5.1"],"no-mistakes:unknown":["unknown"]}' >/dev/null || fail 'record pipeline read'
+  out=$(NM_HOME="$case_dir/absent-nm" FM_HOME="$case_dir/home" "$RECORD" verify --pr "$URL" \
+    --head "$HEAD1" --task task-x1 --base "$BASE" --json) || rc=$?
+  expect_code 0 "$rc" "T1 one reader outside every known ship family covers unknown pipeline: $out"
+  "$JQ_BIN" -e '.facts == ["pipeline author family not recorded"]' <<<"$out" >/dev/null \
+    || fail "T1 records the missing pipeline provenance: $out"
+  pass 'T1 unknown pipeline accepts one different-builder-family reader'
+}
+
+test_unknown_pipeline_fact_output() {
+  local case_dir out
+  case_dir=$(make_case pipeline-fact)
+  printf 'mode=no-mistakes\n' >> "$case_dir/home/state/task-x1.meta"
+  record_review "$case_dir" "$HEAD1" PASS sonnet \
+    '{"ship":["gpt-5.1"],"no-mistakes:unknown":["unknown"]}' >/dev/null || fail 'record the single pipeline read'
+  out=$(NM_HOME="$case_dir/absent-nm" FM_HOME="$case_dir/home" "$RECORD" verify --pr "$URL" \
+    --head "$HEAD1" --task task-x1 --base "$BASE") || fail "T6 pipeline verifies: $out"
+  assert_contains "$out" 'pipeline author family not recorded' 'T6 verify discloses missing pipeline provenance'
+  record_review "$case_dir" "$HEAD1" PASS gemini-3-pro \
+    '{"ship":["gpt-5.1"],"no-mistakes:unknown":["unknown"]}' >/dev/null || fail 'record second pipeline read'
+  out=$(NM_HOME="$case_dir/absent-nm" FM_HOME="$case_dir/home" "$RECORD" verify --pr "$URL" \
+    --head "$HEAD1" --task task-x1 --base "$BASE") || fail "two-family pipeline verifies: $out"
+  case "$out" in
+    *'pipeline author family not recorded'*) fail "two known reader families prove independence, so no fact is printed: $out" ;;
+  esac
+  out=$(NM_HOME="$case_dir/absent-nm" FM_HOME="$case_dir/home" "$RECORD" verify --pr "$URL" \
+    --head "$HEAD1" --task task-x1 --base "$BASE" --json) || fail "two-family pipeline verifies as JSON: $out"
+  "$JQ_BIN" -e '.ok == true and (has("facts") | not)' <<<"$out" >/dev/null \
+    || fail "two-family pipeline JSON must carry no facts: $out"
+  pass 'T6 verify discloses the fact only for single-reader pipeline relief'
+}
+
+test_unknown_pipeline_preserves_coverage_boundaries() {
+  local scenario case_dir authors reader out rc expected
+  for scenario in same-ship unknown-ship unknown-reader mixed-ship no-ship no-ship-declared uncovered-known-pipeline stale-head; do
+    case_dir=$(make_case "pipeline-$scenario")
+    printf 'mode=no-mistakes\n' >> "$case_dir/home/state/task-x1.meta"
+    authors='{"ship":["gpt-5.1"],"no-mistakes:unknown":["unknown"]}'
+    reader=sonnet
+    expected='uncovered commit group no-mistakes:unknown'
+    case "$scenario" in
+      same-ship) reader=gpt-5.1 ;;
+      unknown-ship)
+        printf 'model=mystery-9\n' >> "$case_dir/home/state/task-x1.meta"
+        authors='{"ship":["mystery-9"],"no-mistakes:unknown":["unknown"]}' ;;
+      unknown-reader) reader=mystery-9; expected='model family unknown for newest reader' ;;
+      mixed-ship)
+        printf 'model=sonnet\n' > "$case_dir/home/state/task-x1.control-relaunch.meta-prior"
+        authors='{"ship":["gpt-5.1","sonnet"],"no-mistakes:unknown":["unknown"]}' ;;
+      no-ship|no-ship-declared)
+        printf 'model=\n' >> "$case_dir/home/state/task-x1.meta"
+        git -C "$case_dir/wt" -c user.name=Tests -c user.email=tests@example.invalid \
+          commit -q --amend --allow-empty -m 'no-mistakes(review): pipeline only'
+        if [ "$scenario" = no-ship ]; then
+          authors='{"no-mistakes:unknown":["unknown"]}'
+        fi ;;
+      uncovered-known-pipeline)
+        authors='{"ship":["gpt-5.1"],"no-mistakes:unknown":["unknown"],"no-mistakes:anthropic":["sonnet"]}'
+        expected='uncovered commit group no-mistakes:anthropic' ;;
+      stale-head) expected='head mismatch' ;;
+    esac
+    local current_head
+    current_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+    record_review "$case_dir" "$current_head" PASS "$reader" "$authors" >/dev/null || fail "record $scenario"
+    [ "$scenario" != stale-head ] || current_head=$HEAD2
+    rc=0
+    out=$(NM_HOME="$case_dir/absent-nm" FM_HOME="$case_dir/home" "$RECORD" verify --pr "$URL" \
+      --head "$current_head" --task task-x1 --base "$BASE" --json) || rc=$?
+    expect_code 1 "$rc" "$scenario must refuse: $out"
+    expect_not_qualified "$out" "$expected" "$scenario"
+    pass "pipeline boundary: $scenario"
+  done
+}
+
+test_unknown_pipeline_no_relief_for_partly_unknown_ship() {
+  local case_dir out rc=0 authors
+  case_dir=$(make_case pipeline-partly-unknown-ship)
+  printf 'mode=no-mistakes\n' >> "$case_dir/home/state/task-x1.meta"
+  printf 'model=mystery-9\n' > "$case_dir/home/state/task-x1.control-relaunch.meta-prior"
+  authors='{"ship":["gpt-5.1","mystery-9"],"no-mistakes:unknown":["unknown"]}'
+  record_review "$case_dir" "$HEAD1" PASS sonnet "$authors" >/dev/null || fail 'record Claude read of all groups'
+  record_review "$case_dir" "$HEAD1" PASS gemini-3-pro "$authors" --covered-groups '["ship"]' >/dev/null \
+    || fail 'record Google read of ship only'
+  out=$(NM_HOME="$case_dir/absent-nm" FM_HOME="$case_dir/home" "$RECORD" verify --pr "$URL" \
+    --head "$HEAD1" --task task-x1 --base "$BASE" --json) || rc=$?
+  expect_code 1 "$rc" "a ship group with an unknown family gives the pipeline group no single-reader relief: $out"
+  expect_not_qualified "$out" 'uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families' \
+    'partly unknown ship keeps the two-reader pipeline rule'
+  "$JQ_BIN" -e '.error.message | contains("outside every ship family") | not' <<<"$out" >/dev/null \
+    || fail "partly unknown ship must not offer the single-reader rule: $out"
+  pass 'a ship group with any unknown family gives the unknown pipeline group no relief'
+}
+
+test_unknown_pipeline_after_fail() {
+  local case_dir out rc=0 authors
+  case_dir=$(make_case pipeline-after-fail)
+  printf 'mode=no-mistakes\n' >> "$case_dir/home/state/task-x1.meta"
+  authors='{"ship":["gpt-5.1"],"no-mistakes:unknown":["unknown"]}'
+  record_review "$case_dir" "$HEAD1" PASS gemini-3-pro "$authors" >/dev/null || fail 'record pre-FAIL second-family PASS'
+  record_review "$case_dir" "$HEAD1" FAIL deepseek-v3 "$authors" >/dev/null || fail 'record FAIL'
+  record_review "$case_dir" "$HEAD1" PASS sonnet "$authors" >/dev/null || fail 'record later independent PASS'
+  out=$(NM_HOME="$case_dir/absent-nm" FM_HOME="$case_dir/home" "$RECORD" verify --pr "$URL" \
+    --head "$HEAD1" --task task-x1 --base "$BASE" --json) || rc=$?
+  expect_code 0 "$rc" "later qualifying read clears FAIL under the same coverage rule: $out"
+  "$JQ_BIN" -e '.facts == ["pipeline author family not recorded"]' <<<"$out" >/dev/null \
+    || fail "relief that clears the FAIL must disclose the fact despite a pre-FAIL second family: $out"
+  out=$(NM_HOME="$case_dir/absent-nm" FM_HOME="$case_dir/home" "$RECORD" verify --pr "$URL" \
+    --head "$HEAD1" --task task-x1 --base "$BASE") || fail "text verify after FAIL: $out"
+  assert_contains "$out" 'pipeline author family not recorded' 'after-FAIL relief discloses the fact in text'
+  pass 'a later outside-ship-family pipeline read clears an exact-head FAIL and discloses the relief'
+}
+
+test_unknown_pipeline_relief_after_captain_word() {
+  local case_dir out rc=0 authors
+  case_dir=$(make_case pipeline-word-fail)
+  printf 'mode=no-mistakes\n' >> "$case_dir/home/state/task-x1.meta"
+  authors='{"ship":["gpt-5.1"],"no-mistakes:unknown":["unknown"]}'
+  record_word "$case_dir" "$HEAD1" 'Merge this PR.' >/dev/null || fail 'record captain word'
+  record_review "$case_dir" "$HEAD1" FAIL deepseek-v3 "$authors" >/dev/null || fail 'record FAIL after word'
+  record_review "$case_dir" "$HEAD1" PASS sonnet "$authors" >/dev/null || fail 'record sole outside-ship PASS'
+  out=$(NM_HOME="$case_dir/absent-nm" FM_HOME="$case_dir/home" "$RECORD" verify --pr "$URL" \
+    --head "$HEAD1" --task task-x1 --base "$BASE" --json) || rc=$?
+  expect_code 0 "$rc" "relief clears the FAIL after the captain-word: $out"
+  "$JQ_BIN" -e '.basis == "captain-word" and .facts == ["pipeline author family not recorded"]' <<<"$out" >/dev/null \
+    || fail "captain-word accepted through relief must disclose the fact in JSON: $out"
+  out=$(NM_HOME="$case_dir/absent-nm" FM_HOME="$case_dir/home" "$RECORD" verify --pr "$URL" \
+    --head "$HEAD1" --task task-x1 --base "$BASE") || fail "text verify after word and FAIL: $out"
+  assert_equals $'review: captain-word\nreview: pipeline author family not recorded' "$out" \
+    'captain-word accepted through relief discloses the fact in text'
+  pass 'relief that clears a FAIL after a captain-word discloses the fact'
 }
 
 test_native_claude_aliases_are_anthropic() {
@@ -406,14 +544,64 @@ test_plan_names_the_owed_families_and_decides_nothing() {
   pass "plan names the owed author families from the exact head, ignores a FAIL and a captain-word, and writes nothing"
 }
 
-test_review_only_json_is_immutable_record_time_evidence
-test_default_text_and_captain_word_json
-test_review_only_cannot_be_satisfied_by_captain_word
-test_review_only_rejections_are_typed_not_qualified
-test_unknown_author_covered_by_two_reader_families
-test_native_claude_aliases_are_anthropic
-test_stored_family_fields_cannot_retroactively_change_independence
-test_typed_failures_distinguish_unavailable_and_invalid_input
-test_default_fail_after_captain_word_precedence_holds
-test_legacy_record_without_report_digest_omits_the_field
-test_plan_names_the_owed_families_and_decides_nothing
+test_plan_agrees_with_verify_for_an_unrecorded_pipeline_family() {
+  local case_dir out rc=0
+  case_dir=$(make_case plan-pipeline-relief)
+  printf 'mode=no-mistakes\n' >> "$case_dir/home/state/task-x1.meta"
+  run_plan() {
+    NM_HOME="$case_dir/absent-nm" FM_HOME="$case_dir/home" "$RECORD" plan --pr "$URL" --head "$HEAD1" \
+      --task task-x1 --base "$BASE" "$@"
+  }
+  out=$(run_plan)
+  # shellcheck disable=SC2016  # jq program; single quotes are intended.
+  "$JQ_BIN" -e '.ok == true and (.groups | has("no-mistakes:unknown"))
+    and ([.uncovered[] | select(.group == "no-mistakes:unknown") | .families] == [["unknown"]])
+    and ([.uncovered[] | select(.group == "ship") | .families] == [["openai"]])' <<<"$out" >/dev/null \
+    || fail "plan with no read must owe the unrecorded pipeline family and the ship family: $out"
+  # A reader of the ship family covers neither group: plan and verify must both refuse to call it covered.
+  record_review "$case_dir" "$HEAD1" PASS gpt-5.2 \
+    '{"ship":["gpt-5.1"],"no-mistakes:unknown":["unknown"]}' >/dev/null || fail "record same-family read"
+  out=$(run_plan)
+  "$JQ_BIN" -e '[.uncovered[].group] | sort == ["no-mistakes:unknown","ship"]' <<<"$out" >/dev/null \
+    || fail "a reader of the ship family must leave both groups owed in plan: $out"
+  out=$(NM_HOME="$case_dir/absent-nm" FM_HOME="$case_dir/home" "$RECORD" verify --pr "$URL" \
+    --head "$HEAD1" --task task-x1 --base "$BASE" --json) || rc=$?
+  expect_code 1 "$rc" "verify must refuse the same state plan calls owed: $out"
+  # A fresh case with one read outside every ship family: the relief covers the unrecorded pipeline family
+  # in plan and in verify. (The case above must not be reused: its same-family read would count as a second
+  # known family and so leave verify nothing to disclose.)
+  case_dir=$(make_case plan-pipeline-relief-one-reader)
+  printf 'mode=no-mistakes\n' >> "$case_dir/home/state/task-x1.meta"
+  record_review "$case_dir" "$HEAD1" PASS sonnet \
+    '{"ship":["gpt-5.1"],"no-mistakes:unknown":["unknown"]}' >/dev/null || fail "record outside-family read"
+  out=$(run_plan)
+  "$JQ_BIN" -e '.ok == true and .uncovered == []' <<<"$out" >/dev/null \
+    || fail "plan must apply the one-reader relief that verify applies: $out"
+  rc=0
+  out=$(NM_HOME="$case_dir/absent-nm" FM_HOME="$case_dir/home" "$RECORD" verify --pr "$URL" \
+    --head "$HEAD1" --task task-x1 --base "$BASE" --json) || rc=$?
+  expect_code 0 "$rc" "verify must accept the state plan calls covered: $out"
+  "$JQ_BIN" -e '.facts == ["pipeline author family not recorded"]' <<<"$out" >/dev/null \
+    || fail "verify keeps its disclosure of the unrecorded pipeline family: $out"
+  pass "plan applies the one-reader relief for an unrecorded pipeline family exactly as verify does, and verify keeps its disclosure"
+}
+
+fm_test_run_cases \
+  test_review_only_json_is_immutable_record_time_evidence \
+  test_default_text_and_captain_word_json \
+  test_review_only_cannot_be_satisfied_by_captain_word \
+  test_review_only_rejections_are_typed_not_qualified \
+  test_unknown_author_covered_by_two_reader_families \
+  test_unknown_pipeline_one_independent_reader \
+  test_unknown_pipeline_fact_output \
+  test_unknown_pipeline_preserves_coverage_boundaries \
+  test_unknown_pipeline_no_relief_for_partly_unknown_ship \
+  test_unknown_pipeline_after_fail \
+  test_unknown_pipeline_relief_after_captain_word \
+  test_native_claude_aliases_are_anthropic \
+  test_stored_family_fields_cannot_retroactively_change_independence \
+  test_typed_failures_distinguish_unavailable_and_invalid_input \
+  test_default_fail_after_captain_word_precedence_holds \
+  test_legacy_record_without_report_digest_omits_the_field \
+  test_plan_names_the_owed_families_and_decides_nothing \
+  test_plan_agrees_with_verify_for_an_unrecorded_pipeline_family -- "$@"
