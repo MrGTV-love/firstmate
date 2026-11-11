@@ -413,9 +413,13 @@ publish_parent_hold() {  # <task-id> <occurrence> <verb> <note>
 
 CAPTAIN_META_LOCK=
 CAPTAIN_META_LOCK_HELD=0
+CAPTAIN_META_TMP=
 CAPTAIN_CONTROL_LOCK=
 CAPTAIN_CONTROL_LOCK_HELD=0
 captain_hold_cleanup() {
+  if [ -n "$CAPTAIN_META_TMP" ]; then
+    rm -f -- "$CAPTAIN_META_TMP" || true
+  fi
   if [ "$CAPTAIN_META_LOCK_HELD" = 1 ]; then
     fm_lock_release "$CAPTAIN_META_LOCK" || true
     CAPTAIN_META_LOCK_HELD=0
@@ -2946,7 +2950,7 @@ reconcile_note() {
 }
 
 command_complete() {
-  local origin=${1:-} meta previous='' supplied='' keys='' entry key status_file open has_meta=0 transfer_rc transfers=() resolved
+  local origin=${1:-} meta previous='' supplied='' keys='' entry key line status_file open has_meta=0 transfer_rc transfers=() resolved
   local resolved_how attested_by_prefix='' attested_by_archive='' attested_by_archive_resolved='' origin_state unrecorded_origin=''
   [ "$#" -ge 2 ] || { usage >&2; exit 2; }
   validate_slug origin-id "$origin"
@@ -3009,7 +3013,29 @@ EOF
 
   if [ "$has_meta" = 1 ]; then
     if [ "$(meta_value "$meta" decisions_reviewed)" != 1 ] || [ "$previous" != "$keys" ]; then
-      printf 'decisions_reviewed=1\ndecision_keys=%s\n' "$keys" >> "$meta"
+      CAPTAIN_META_TMP=$(umask 077; mktemp "$STATE/.fm-captain-meta.XXXXXX") \
+        || fail "cannot stage the reviewed inventory"
+      # Use the existing metadata publication pattern: refreshed fields first,
+      # remaining fields in their original order, then a rename under the same
+      # metadata lock as PR registration. In particular, never append inventory
+      # fields after the PR identity footer or move an unknown trailing field
+      # ahead of it: the managed poll must keep enforcing that boundary.
+      printf 'decisions_reviewed=1\ndecision_keys=%s\n' "$keys" > "$CAPTAIN_META_TMP" \
+        || fail "cannot stage the reviewed inventory"
+      while IFS= read -r line || [ -n "$line" ]; do
+        case "$line" in
+          decisions_reviewed=*|decision_keys=*) ;;
+          *) printf '%s\n' "$line" >> "$CAPTAIN_META_TMP" \
+            || fail "cannot preserve task metadata while recording the reviewed inventory" ;;
+        esac
+      done < "$meta" || fail "cannot read task metadata while recording the reviewed inventory"
+      if ! chmod 0600 "$CAPTAIN_META_TMP"; then
+        fail "cannot publish the reviewed inventory"
+      fi
+      if ! mv -f -- "$CAPTAIN_META_TMP" "$meta"; then
+        fail "cannot publish the reviewed inventory"
+      fi
+      CAPTAIN_META_TMP=
     fi
     fm_lock_release "$CAPTAIN_META_LOCK"
     CAPTAIN_META_LOCK_HELD=0
