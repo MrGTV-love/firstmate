@@ -1,0 +1,106 @@
+# live verify driver; code root label: head b754fd3b
+
+=== S1-absent-one-outside-reader ===
+ship=gpt-5.1-codex; NM state.sqlite absent; one sonnet PASS. Expect accept + fact.
+  $ verify 
+    review: PASS
+    review: pipeline author family not recorded
+    [exit 0]
+  $ verify --json
+    {"schema":"fm-review-verification.v1","ok":true,"basis":"independent-review","pr":"https://github.com/example/repo/pull/9","head":"f137aa44a4d3c203b70d506e78f0526815425765","at":1794372437,"reader_model":"claude-sonnet-5-5","reader_family":"anthropic","author_groups":{"ship":[{"model":"gpt-5.1-codex","family":"openai"}],"no-mistakes:unknown":[{"model":"unknown","family":"unknown"}]},"report":"/Users/charlesabrooker/tmp/fm-live-verify.eWa3Qb/s1/report-claude-sonnet-5-5-PASS.md","report_sha256":"f74c55f9742f9a4068b693f02f39357c4687716912a5133c3a2ffb48c243045c","facts":["pipeline author family not recorded"]}
+    [exit 0]
+
+=== S1b-nomodel-invocation-one-reader ===
+ship=gpt-5.1-codex; run recorded acp:omp invocation with no model/provider; one sonnet PASS. Expect accept + fact.
+  $ verify 
+    review: PASS
+    review: pipeline author family not recorded
+    [exit 0]
+
+=== S2-reader-same-as-ship ===
+ship=gpt-5.1-codex; absent NM; one gpt-5.1 PASS (same openai family). Expect refuse; message offers one-reader rule naming (openai).
+  $ verify 
+    error: uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs one exact-head PASS of this group from a known reader family outside every ship family (openai), or exact-head PASS reads of this group from two different known reader families; obtain the reads one of those rules needs, set each read's actual trigger answers and local report, then record each with: FM_HOME=/Users/charlesabrooker/tmp/fm-live-verify.eWa3Qb/s2/home FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp/fm-live-verify.eWa3Qb/s2/home/state /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M749RT8NV660PX0A0YHM974C/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/9 --head 5bfd0bb6aae46550625233fbfc2962e64f9de809 --verdict PASS --reader-model OUTSIDE_SHIP_FAMILY_MODEL --author-groups '{"ship":["gpt-5.1-codex"],"no-mistakes:unknown":["unknown"]}' --covered-groups '["no-mistakes:unknown"]' --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report LOCAL_READER_REPORT; or repair the author evidence so every author model has a known family, or obtain a fresh explicit captain merge instruction for this PR at this exact head and record the captain's actual words (never fabricated ones) in place of FRESH_CAPTAIN_WORDS with: FM_HOME=/Users/charlesabrooker/tmp/fm-live-verify.eWa3Qb/s2/home FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp/fm-live-verify.eWa3Qb/s2/home/state /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M749RT8NV660PX0A0YHM974C/bin/fm-review-record.py captain-word --pr https://github.com/example/repo/pull/9 --head 5bfd0bb6aae46550625233fbfc2962e64f9de809 --words FRESH_CAPTAIN_WORDS; inspect review-records.jsonl in the PR task home before retrying
+    [exit 1]
+
+=== S3-unknown-ship-one-reader ===
+ship=mystery-9 (unknown); absent NM; one sonnet PASS. Expect refuse, two-reader text, no relief.
+  $ verify 
+    error: uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families; obtain reads until both families count, set each read's actual trigger answers and local report, then record each with: FM_HOME=/Users/charlesabrooker/tmp/fm-live-verify.eWa3Qb/s3/home FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp/fm-live-verify.eWa3Qb/s3/home/state /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M749RT8NV660PX0A0YHM974C/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/9 --head 5bfd0bb6aae46550625233fbfc2962e64f9de809 --verdict PASS --reader-model SECOND_KNOWN_FAMILY_MODEL --author-groups '{"ship":["mystery-9"],"no-mistakes:unknown":["unknown"]}' --covered-groups '["no-mistakes:unknown"]' --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report LOCAL_READER_REPORT; or repair the author evidence so every author model has a known family, or obtain a fresh explicit captain merge instruction for this PR at this exact head and record the captain's actual words (never fabricated ones) in place of FRESH_CAPTAIN_WORDS with: FM_HOME=/Users/charlesabrooker/tmp/fm-live-verify.eWa3Qb/s3/home FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp/fm-live-verify.eWa3Qb/s3/home/state /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M749RT8NV660PX0A0YHM974C/bin/fm-review-record.py captain-word --pr https://github.com/example/repo/pull/9 --head 5bfd0bb6aae46550625233fbfc2962e64f9de809 --words FRESH_CAPTAIN_WORDS; inspect review-records.jsonl in the PR task home before retrying
+    [exit 1]
+
+=== S3b-partly-unknown-ship ===
+ship=gpt-5.1-codex + prior mystery-9; absent NM; sonnet PASS all + gemini PASS ship only. Expect refuse on no-mistakes:unknown, two-reader text.
+  $ verify 
+    error: uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families; obtain reads until both families count, set each read's actual trigger answers and local report, then record each with: FM_HOME=/Users/charlesabrooker/tmp/fm-live-verify.eWa3Qb/s3b/home FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp/fm-live-verify.eWa3Qb/s3b/home/state /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M749RT8NV660PX0A0YHM974C/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/9 --head d99f28f6c6645a0f39de1703f5c055ee58f1c539 --verdict PASS --reader-model SECOND_KNOWN_FAMILY_MODEL --author-groups '{"ship":["gpt-5.1-codex","mystery-9"],"no-mistakes:unknown":["unknown"]}' --covered-groups '["no-mistakes:unknown"]' --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report LOCAL_READER_REPORT; or repair the author evidence so every author model has a known family, or obtain a fresh explicit captain merge instruction for this PR at this exact head and record the captain's actual words (never fabricated ones) in place of FRESH_CAPTAIN_WORDS with: FM_HOME=/Users/charlesabrooker/tmp/fm-live-verify.eWa3Qb/s3b/home FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp/fm-live-verify.eWa3Qb/s3b/home/state /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M749RT8NV660PX0A0YHM974C/bin/fm-review-record.py captain-word --pr https://github.com/example/repo/pull/9 --head d99f28f6c6645a0f39de1703f5c055ee58f1c539 --words FRESH_CAPTAIN_WORDS; inspect review-records.jsonl in the PR task home before retrying
+    [exit 1]
+
+=== S4-unknown-newest-reader ===
+ship=gpt-5.1-codex; absent NM; sonnet PASS then mystery-9 PASS (unknown reader newest). Expect refuse: newest reader unknown.
+  $ verify 
+    error: model family unknown for newest reader mystery-9; every group is covered by known-family reads, but the newest review must name a known reader family; obtain a reread from a known-family reader, set its actual trigger answers and local report, then record it with: FM_HOME=/Users/charlesabrooker/tmp/fm-live-verify.eWa3Qb/s4/home FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp/fm-live-verify.eWa3Qb/s4/home/state /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M749RT8NV660PX0A0YHM974C/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/9 --head d99f28f6c6645a0f39de1703f5c055ee58f1c539 --verdict PASS --reader-model KNOWN_FAMILY_MODEL --author-groups '{"ship":["gpt-5.1-codex"],"no-mistakes:unknown":["unknown"]}' --covered-groups '["no-mistakes:unknown", "ship"]' --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report LOCAL_READER_REPORT; inspect review-records.jsonl in the PR task home before retrying
+    [exit 1]
+
+=== S5a-known-pipeline-same-family-reader ===
+ship=gpt-5.1-codex; NM db records claude-sonnet-5-5/anthropic; one sonnet PASS. Expect refuse (no-mistakes:anthropic uncovered).
+  $ verify 
+    error: uncovered commit group no-mistakes:anthropic, family anthropic; each author family needs an exact-head PASS reading this group whose reader_family is known and different from it (see --help for unknown-pipeline coverage); obtain the named read, set its actual trigger answers and local report, then record it with: FM_HOME=/Users/charlesabrooker/tmp/fm-live-verify.eWa3Qb/s5a/home FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp/fm-live-verify.eWa3Qb/s5a/home/state /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M749RT8NV660PX0A0YHM974C/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/9 --head f115ff55d0404b62a6d8a8e75aeae09078874217 --verdict PASS --reader-model OUTSIDE_FAMILY_MODEL --author-groups '{"ship":["gpt-5.1-codex"],"no-mistakes:anthropic":["claude-sonnet-5-5"]}' --covered-groups '["no-mistakes:anthropic"]' --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report LOCAL_READER_REPORT; inspect review-records.jsonl in the PR task home before retrying
+    [exit 1]
+
+=== S5b-known-pipeline-two-families ===
+same as S5a plus gemini PASS. Expect accept, NO fact.
+  $ verify 
+    review: PASS
+    [exit 0]
+  $ verify --json
+    {"schema":"fm-review-verification.v1","ok":true,"basis":"independent-review","pr":"https://github.com/example/repo/pull/9","head":"f115ff55d0404b62a6d8a8e75aeae09078874217","at":1794372441,"reader_model":"gemini-3-pro","reader_family":"google","author_groups":{"ship":[{"model":"gpt-5.1-codex","family":"openai"}],"no-mistakes:anthropic":[{"model":"claude-sonnet-5-5","family":"anthropic"}]},"report":"/Users/charlesabrooker/tmp/fm-live-verify.eWa3Qb/s5a/report-gemini-3-pro-PASS.md","report_sha256":"d05656afe5c1b1fcd65990324b7f9efb392e182aa287ed570dcb82a718540585"}
+    [exit 0]
+
+=== S6a-corrupt-db-one-reader ===
+ship=gpt-5.1-codex; NM state.sqlite exists but is corrupt; one sonnet PASS. Expect refuse, two-reader text, no single-reader offer.
+  $ verify 
+    error: uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families; obtain reads until both families count, set each read's actual trigger answers and local report, then record each with: FM_HOME=/Users/charlesabrooker/tmp/fm-live-verify.eWa3Qb/s6a/home FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp/fm-live-verify.eWa3Qb/s6a/home/state /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M749RT8NV660PX0A0YHM974C/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/9 --head ffba800d909209e6ee0c053146d033c60f3020af --verdict PASS --reader-model SECOND_KNOWN_FAMILY_MODEL --author-groups '{"ship":["gpt-5.1-codex"],"no-mistakes:unknown":["unknown"]}' --covered-groups '["no-mistakes:unknown"]' --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report LOCAL_READER_REPORT; or repair the author evidence so every author model has a known family, or obtain a fresh explicit captain merge instruction for this PR at this exact head and record the captain's actual words (never fabricated ones) in place of FRESH_CAPTAIN_WORDS with: FM_HOME=/Users/charlesabrooker/tmp/fm-live-verify.eWa3Qb/s6a/home FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp/fm-live-verify.eWa3Qb/s6a/home/state /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M749RT8NV660PX0A0YHM974C/bin/fm-review-record.py captain-word --pr https://github.com/example/repo/pull/9 --head ffba800d909209e6ee0c053146d033c60f3020af --words FRESH_CAPTAIN_WORDS; inspect review-records.jsonl in the PR task home before retrying
+    [exit 1]
+
+=== S6b-conflicting-provider-one-reader ===
+ship=gpt-5.1-codex; db claude-sonnet-5-5 with provider openai (conflict); one sonnet PASS. Expect refuse, two-reader text.
+  $ verify 
+    error: uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families; obtain reads until both families count, set each read's actual trigger answers and local report, then record each with: FM_HOME=/Users/charlesabrooker/tmp/fm-live-verify.eWa3Qb/s6b/home FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp/fm-live-verify.eWa3Qb/s6b/home/state /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M749RT8NV660PX0A0YHM974C/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/9 --head c98d4b577cfe5920c6541f4b8b9e1d742e41c08e --verdict PASS --reader-model SECOND_KNOWN_FAMILY_MODEL --author-groups '{"ship":["gpt-5.1-codex"],"no-mistakes:unknown":["claude-sonnet-5-5","unknown"]}' --covered-groups '["no-mistakes:unknown"]' --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report LOCAL_READER_REPORT; or repair the author evidence so every author model has a known family, or obtain a fresh explicit captain merge instruction for this PR at this exact head and record the captain's actual words (never fabricated ones) in place of FRESH_CAPTAIN_WORDS with: FM_HOME=/Users/charlesabrooker/tmp/fm-live-verify.eWa3Qb/s6b/home FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp/fm-live-verify.eWa3Qb/s6b/home/state /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M749RT8NV660PX0A0YHM974C/bin/fm-review-record.py captain-word --pr https://github.com/example/repo/pull/9 --head c98d4b577cfe5920c6541f4b8b9e1d742e41c08e --words FRESH_CAPTAIN_WORDS; inspect review-records.jsonl in the PR task home before retrying
+    [exit 1]
+
+=== S6c-relative-nm-home-one-reader ===
+ship=gpt-5.1-codex; NM_HOME=relative path; one sonnet PASS. Expect refuse, two-reader text.
+  $ verify 
+    error: uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families; obtain reads until both families count, set each read's actual trigger answers and local report, then record each with: FM_HOME=/Users/charlesabrooker/tmp/fm-live-verify.eWa3Qb/s6c/home FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp/fm-live-verify.eWa3Qb/s6c/home/state /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M749RT8NV660PX0A0YHM974C/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/9 --head c98d4b577cfe5920c6541f4b8b9e1d742e41c08e --verdict PASS --reader-model SECOND_KNOWN_FAMILY_MODEL --author-groups '{"ship":["gpt-5.1-codex"],"no-mistakes:unknown":["unknown"]}' --covered-groups '["no-mistakes:unknown"]' --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report LOCAL_READER_REPORT; or repair the author evidence so every author model has a known family, or obtain a fresh explicit captain merge instruction for this PR at this exact head and record the captain's actual words (never fabricated ones) in place of FRESH_CAPTAIN_WORDS with: FM_HOME=/Users/charlesabrooker/tmp/fm-live-verify.eWa3Qb/s6c/home FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp/fm-live-verify.eWa3Qb/s6c/home/state /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M749RT8NV660PX0A0YHM974C/bin/fm-review-record.py captain-word --pr https://github.com/example/repo/pull/9 --head c98d4b577cfe5920c6541f4b8b9e1d742e41c08e --words FRESH_CAPTAIN_WORDS; inspect review-records.jsonl in the PR task home before retrying
+    [exit 1]
+
+=== S7-absent-two-families ===
+ship=gpt-5.1-codex; absent NM; sonnet PASS + gemini PASS. Expect accept, NO fact.
+  $ verify 
+    review: PASS
+    [exit 0]
+  $ verify --json
+    {"schema":"fm-review-verification.v1","ok":true,"basis":"independent-review","pr":"https://github.com/example/repo/pull/9","head":"3fabafc7ea4da54604c8f7e18b84774bbda4b25f","at":1794372443,"reader_model":"gemini-3-pro","reader_family":"google","author_groups":{"ship":[{"model":"gpt-5.1-codex","family":"openai"}],"no-mistakes:unknown":[{"model":"unknown","family":"unknown"}]},"report":"/Users/charlesabrooker/tmp/fm-live-verify.eWa3Qb/s7/report-gemini-3-pro-PASS.md","report_sha256":"a085c433fe02f3c25ad68639e8e6488b3bcab72ca430a9e0726660221e3cf320"}
+    [exit 0]
+
+=== S8-after-fail-relief-fact ===
+ship=gpt-5.1-codex; absent NM; gemini PASS, deepseek FAIL, then sole sonnet PASS. Expect accept + fact (pre-FAIL gemini must not hide it).
+  $ verify 
+    review: PASS
+    review: pipeline author family not recorded
+    [exit 0]
+  $ verify --json
+    {"schema":"fm-review-verification.v1","ok":true,"basis":"independent-review","pr":"https://github.com/example/repo/pull/9","head":"6c1c5bd2146f36811b933a54a7284ae9a633c0e1","at":1794372444,"reader_model":"claude-sonnet-5-5","reader_family":"anthropic","author_groups":{"ship":[{"model":"gpt-5.1-codex","family":"openai"}],"no-mistakes:unknown":[{"model":"unknown","family":"unknown"}]},"report":"/Users/charlesabrooker/tmp/fm-live-verify.eWa3Qb/s8/report-claude-sonnet-5-5-PASS.md","report_sha256":"50eca17b2ab2747b123e638cda6daf3afcb9cdcdf763cdb0d122ab440aa4627c","facts":["pipeline author family not recorded"]}
+    [exit 0]
+
+=== S8b-after-fail-only-preFAIL-outside-reader ===
+ship=gpt-5.1-codex; absent NM; sonnet PASS, gemini FAIL, then nothing. Expect refuse; after-FAIL text offers one outside-ship read.
+  $ verify 
+    error: verdict is FAIL at live head 4593a4b0e28caa8e7bbbbe845d77df77ef187930 (reader gemini-3-pro, report /Users/charlesabrooker/tmp/fm-live-verify.eWa3Qb/s8b/report-gemini-3-pro-FAIL.md); no later exact-head PASS covers group no-mistakes:unknown, family unknown, that this FAIL read; model family unknown needs one later exact-head PASS of that group from a known reader family outside every ship family (openai), or later exact-head PASS reads of that group from two different known reader families; obtain the reads one of those rules needs, set each read's actual trigger answers and local report, then record each with: FM_HOME=/Users/charlesabrooker/tmp/fm-live-verify.eWa3Qb/s8b/home FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp/fm-live-verify.eWa3Qb/s8b/home/state /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M749RT8NV660PX0A0YHM974C/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/9 --head 4593a4b0e28caa8e7bbbbe845d77df77ef187930 --verdict PASS --reader-model OUTSIDE_SHIP_FAMILY_MODEL --author-groups '{"ship":["gpt-5.1-codex"],"no-mistakes:unknown":["unknown"]}' --covered-groups '["no-mistakes:unknown"]' --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report LOCAL_READER_REPORT; or obtain a fresh explicit captain merge instruction for this PR at this exact head and record the captain's actual words (never fabricated ones) in place of FRESH_CAPTAIN_WORDS with: FM_HOME=/Users/charlesabrooker/tmp/fm-live-verify.eWa3Qb/s8b/home FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp/fm-live-verify.eWa3Qb/s8b/home/state /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M749RT8NV660PX0A0YHM974C/bin/fm-review-record.py captain-word --pr https://github.com/example/repo/pull/9 --head 4593a4b0e28caa8e7bbbbe845d77df77ef187930 --words FRESH_CAPTAIN_WORDS; inspect review-records.jsonl in the PR task home before retrying
+    [exit 1]
+
+=== S9-stale-head ===
+ship=gpt-5.1-codex; absent NM; sonnet PASS at head, verify a different head. Expect refuse.
+  $ verify 
+    error: head mismatch: review names 4593a4b0e28caa8e7bbbbe845d77df77ef187930, live head is a38bded8c038d083ea0c8dcdfc320bcf2a48063b; review the live head and record its PASS with fm-review-record.py review, then retry the merge; inspect review-records.jsonl in the PR task home before retrying
+    [exit 1]

@@ -1,0 +1,66 @@
+
+=== M1 absent pipeline evidence + one Claude PASS (ship gpt-5.1-codex) ===
+  fm-pr-merge.sh exit: 0
+  stderr review lines:
+    review: PASS
+    review: pipeline author family not recorded
+  gh merge call: pr merge 9 --repo example/repo --match-head-commit 0c4890645027ac2ee4e6d6a3bd798a5647db3252 --squash
+  state/task-x1.merge-authority:
+    | fm-merge-authority-v1
+    | github
+    | github.com
+    | example/repo
+    | 9
+    | attended
+    | pipeline author family not recorded
+  reader: FM_MERGE_AUTHORITY=attended FM_MERGE_AUTHORITY_REVIEW_FACT=[pipeline author family not recorded]
+
+=== M2 absent pipeline evidence + Claude and Gemini PASS ===
+  fm-pr-merge.sh exit: 0
+  stderr review lines:
+    review: PASS
+  gh merge call: pr merge 9 --repo example/repo --match-head-commit 2e5ae68654cef1db8bb5c9d8cd5db860ddaf6521 --squash
+  state/task-x1.merge-authority:
+    | fm-merge-authority-v1
+    | github
+    | github.com
+    | example/repo
+    | 9
+    | attended
+  reader: FM_MERGE_AUTHORITY=attended FM_MERGE_AUTHORITY_REVIEW_FACT=[]
+
+=== M3 readable pipeline DB, ship-only work, one Claude PASS ===
+  fm-pr-merge.sh exit: 0
+  stderr review lines:
+    review: PASS
+  gh merge call: pr merge 9 --repo example/repo --match-head-commit 845581cfe4a5354637e41e89d8ea375eea2a74a7 --squash
+  state/task-x1.merge-authority:
+    | fm-merge-authority-v1
+    | github
+    | github.com
+    | example/repo
+    | 9
+    | attended
+  reader: FM_MERGE_AUTHORITY=attended FM_MERGE_AUTHORITY_REVIEW_FACT=[]
+
+=== M4 absent pipeline evidence + one same-family gpt-5.1 PASS ===
+  fm-pr-merge.sh exit: 1
+  stderr review lines:
+    error: uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs one exact-head PASS of this group from a known reader family outside every ship family (openai), or exact-head PASS reads of this group from two different known reader families; obtain the reads one of thos
+  gh merge call: none
+  state/task-x1.merge-authority:
+    (absent)
+
+=== M5 corrupt pipeline DB + one Claude PASS ===
+  fm-pr-merge.sh exit: 1
+  stderr review lines:
+    error: uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families; obtain reads until both families count, set each read's actual trigger answers and local report, then record each with: FM_HOME=
+  gh merge call: none
+  state/task-x1.merge-authority:
+    (absent)
+
+=== R1 legacy six-line record ===
+  reader: FM_MERGE_AUTHORITY=attended FM_MERGE_AUTHORITY_REVIEW_FACT=[]
+
+=== R2 record with an unexpected 7th line ===
+  reader: rc=1 FM_MERGE_AUTHORITY=external (record rejected)
