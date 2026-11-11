@@ -154,7 +154,9 @@
     "compact-adviser",
     "secondmate-inherit",
     "secondmate-sync",
-    "check-event-output-integrity"
+    "check-event-output-integrity",
+    "slack-call-fields-hold-a-plane-value",
+    "slack-command-refusal-line"
   ],
   "guards": [
     {
