@@ -18,7 +18,7 @@ test_derived_author_coverage() {
   url=https://github.com/example/repo/pull/9
   groups='{"ship":["gpt-5.1-codex"],"no-mistakes:anthropic":["claude-sonnet-5-5"]}'
   unknown_groups='{"ship":["gpt-5.1-codex"],"no-mistakes:unknown":["unknown"]}'
-  for scenario in claude-only two-readers ship-only omitted-pipeline unreadable named-ship-only exact-head-fail config-fallback changed-config head-mismatch ship-history ship-prior ship-multi-read ship-default ship-reused ship-all-extra typed-unknown alias-command relative-nm-home unknown-captain-word ship-unknown-reader mixed-unknown cancelled-claude errored-omp rebased-openai rebase-claude rebase-deepseek rebase-two-readers rebase-unreadable all-prefixed fail-partial review-only-run rebase-then-clean unopenable-ship query-fails missing-db-nm missing-db-direct denied-parent fail-typed-group unknown-two-families unknown-fail-clears; do
+  for scenario in claude-only two-readers ship-only omitted-pipeline unreadable named-ship-only exact-head-fail config-fallback changed-config head-mismatch ship-history ship-prior ship-multi-read ship-default ship-reused ship-all-extra typed-unknown alias-command relative-nm-home unknown-captain-word ship-unknown-reader mixed-unknown cancelled-claude errored-omp rebased-openai rebase-claude rebase-deepseek rebase-two-readers rebase-unreadable all-prefixed fail-partial review-only-run rebase-then-clean unopenable-ship query-fails missing-db-nm missing-db-direct denied-parent fail-typed-group unknown-two-families unknown-fail-clears unreadable-one-reader conflict-one-reader relative-one-reader absent-one-reader conflict-two-readers fail-relief-fact; do
     if [ "$scenario" = denied-parent ] && [ "$(id -u)" = 0 ]; then
       printf 'skip: denied-parent (chmod 0 does not deny root)\n'
       continue
@@ -62,7 +62,7 @@ CREATE TABLE agent_invocations (run_id TEXT, step_name TEXT, agent TEXT, model T
         db.execute('INSERT INTO runs VALUES (?, ?, ?, ?, ?, ?, ?)', ('run-a', 'repo', 'fm/fixture', sys.argv[3], sys.argv[7], sys.argv[7], sys.argv[5]))
         db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?, ?)', ('run-a', 'rebase', 'claude', 'claude-sonnet-5-5', 'anthropic', 'completed'))
     step = 'rebase' if sys.argv[6].startswith('rebase-') else 'review'
-    if not sys.argv[6].startswith('ship-') and sys.argv[6] not in ('missing-db-direct', 'fail-typed-group', 'rebase-then-clean', 'unknown-two-families', 'unknown-fail-clears'):
+    if not sys.argv[6].startswith('ship-') and sys.argv[6] not in ('missing-db-direct', 'fail-typed-group', 'rebase-then-clean', 'unknown-two-families', 'unknown-fail-clears', 'conflict-one-reader', 'conflict-two-readers'):
         db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?, ?)', ('run', step, 'claude', 'mystery-9' if sys.argv[6] in ('typed-unknown', 'alias-command') else 'claude-sonnet-5-5', 'anthropic', 'completed'))
     if sys.argv[6] == 'mixed-unknown':
         db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?, ?)', ('run', 'review', 'acp:omp', None, None, 'completed'))
@@ -72,15 +72,17 @@ CREATE TABLE agent_invocations (run_id TEXT, step_name TEXT, agent TEXT, model T
         db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?, ?)', ('run', 'review', 'acp:omp', '', None, 'error'))
     if sys.argv[6] in ('unknown-two-families', 'unknown-fail-clears'):
         db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?, ?)', ('run', 'review', 'acp:omp', '', None, 'completed'))
+    if sys.argv[6] in ('conflict-one-reader', 'conflict-two-readers'):
+        db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?, ?)', ('run', 'review', 'claude', 'claude-sonnet-5-5', 'openai', 'completed'))
     if sys.argv[6] == 'rebase-unreadable':
         db.execute('DROP TABLE agent_invocations')
-    if sys.argv[6] == 'query-fails':
+    if sys.argv[6] in ('query-fails', 'unreadable-one-reader'):
         db.execute('DROP TABLE runs')
 PY
     case "$scenario" in
       unreadable|config-fallback|changed-config|unknown-captain-word|unopenable-ship)
         printf 'unreadable sqlite record\n' > "$case_dir/user-home/.no-mistakes/state.sqlite" ;;
-      missing-db-*) rm "$case_dir/user-home/.no-mistakes/state.sqlite" ;;
+      missing-db-*|absent-one-reader|fail-relief-fact) rm "$case_dir/user-home/.no-mistakes/state.sqlite" ;;
     esac
     case "$scenario" in
       missing-db-direct|denied-parent) printf 'mode=direct-pr\n' >> "$case_dir/state/task-x1.meta" ;;
@@ -98,7 +100,7 @@ PY
       ship-prior)
         printf 'model=claude-opus-5-5\n' > "$case_dir/state/task-x1.control-relaunch.meta-prior" ;;
       ship-default) printf 'gen-current\t\tdefault\n' > "$case_dir/state/task-x1.launch-models" ;;
-      relative-nm-home)
+      relative-nm-home|relative-one-reader)
         # A worker-planted database under a relative NM_HOME is never evidence.
         mkdir -p "$case_dir/wt/.no-mistakes"
         cp "$case_dir/user-home/.no-mistakes/state.sqlite" "$case_dir/wt/.no-mistakes/state.sqlite" ;;
@@ -157,13 +159,27 @@ PY
         record_review "$case_dir" "$url" "$head" --reader-model mistral-large >/dev/null || fail 'record newest unknown-family read' ;;
       unreadable|unknown-captain-word)
         record_review "$case_dir" "$url" "$head" --author-groups '{"all":["gpt-5.1-codex","unknown"]}' --reader-model gemini-3-pro >/dev/null || fail 'record unknown pipeline read' ;;
+      unreadable-one-reader|conflict-one-reader|relative-one-reader|absent-one-reader)
+        # One Claude read outside the OpenAI ship family; only absent evidence earns relief.
+        record_review "$case_dir" "$url" "$head" --author-groups "$unknown_groups" >/dev/null || fail "record one outside-ship read for $scenario" ;;
+      fail-relief-fact)
+        # A second family before the FAIL does not count; one later Claude read clears it by relief.
+        record_review "$case_dir" "$url" "$head" --author-groups "$unknown_groups" --reader-model gemini-3-pro >/dev/null || fail 'record pre-FAIL Gemini read'
+        record_review "$case_dir" "$url" "$head" --verdict FAIL --author-groups "$unknown_groups" --reader-model deepseek-v4 >/dev/null || fail 'record FAIL of the unknown group'
+        record_review "$case_dir" "$url" "$head" --author-groups "$unknown_groups" >/dev/null || fail 'record sole later Claude read' ;;
+      conflict-two-readers)
+        # Recorded but conflicting evidence gets no relief; two families prove independence.
+        record_review "$case_dir" "$url" "$head" --author-groups "$unknown_groups" >/dev/null || fail 'record Claude read of the conflicting pipeline'
+        record_review "$case_dir" "$url" "$head" --author-groups "$unknown_groups" --reader-model gemini-3-pro >/dev/null || fail 'record Gemini read of the conflicting pipeline' ;;
       unknown-two-families)
         record_review "$case_dir" "$url" "$head" --author-groups "$unknown_groups" >/dev/null || fail 'record first-family read of the unknown group' ;;
       unknown-fail-clears)
-        # The OpenAI PASS predates the FAIL, so only the later Claude PASS counts.
-        record_review "$case_dir" "$url" "$head" --author-groups "$unknown_groups" --reader-model gpt-5.1-codex >/dev/null || fail 'record pre-FAIL OpenAI read'
+        # The outside-ship Claude PASS predates the FAIL, so it cannot clear it;
+        # after the FAIL only a same-ship OpenAI read covers the unknown group.
+        record_review "$case_dir" "$url" "$head" --author-groups "$unknown_groups" >/dev/null || fail 'record pre-FAIL Claude read'
         record_review "$case_dir" "$url" "$head" --verdict FAIL --author-groups "$unknown_groups" --reader-model gemini-3-pro >/dev/null || fail 'record FAIL of the unknown group'
-        record_review "$case_dir" "$url" "$head" --author-groups "$unknown_groups" >/dev/null || fail 'record later Claude read' ;;
+        record_review "$case_dir" "$url" "$head" --author-groups "$unknown_groups" --covered-groups '["ship"]' >/dev/null || fail 'record later Claude read of ship'
+        record_review "$case_dir" "$url" "$head" --author-groups "$unknown_groups" --reader-model gpt-5.1-codex >/dev/null || fail 'record later same-ship OpenAI read' ;;
       *)
         record_review "$case_dir" "$url" "$head" --author-groups "$groups" >/dev/null || fail "record Claude read for $scenario"
         if [ "$scenario" != claude-only ] && [ "$scenario" != mixed-unknown ]; then
@@ -180,7 +196,7 @@ PY
       # Existing report evidence cannot authorize a different, unavailable head.
     fi
     rc=0
-    if [ "$scenario" = relative-nm-home ]; then
+    if [ "$scenario" = relative-nm-home ] || [ "$scenario" = relative-one-reader ]; then
       (cd "$case_dir/wt" && NM_HOME=.no-mistakes run_pr_merge "$case_dir" task-x1 "$url") > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     elif [ "$scenario" = denied-parent ]; then
       mkdir -p "$case_dir/denied/nm"
@@ -209,13 +225,14 @@ PY
     fi
     if [ "$scenario" = mixed-unknown ]; then
       expect_code 1 "$rc" "a mixed known and unknown pipeline must refuse: $(cat "$case_dir/stderr")"
-      assert_grep 'uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families' "$case_dir/stderr" 'the unknown group is reported first'
+      assert_grep 'uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs one exact-head PASS of this group from a known reader family outside every ship family (openai), or exact-head PASS reads of this group from two different known reader families' "$case_dir/stderr" 'the unknown group is reported first with its single-reader rule'
       assert_grep 'captain-word --pr' "$case_dir/stderr" 'the unknown group names the captain-word route'
       assert_no_grep 'OUTSIDE_FAMILY_MODEL' "$case_dir/stderr" 'no known-family read is requested ahead of the unknown group'
     fi
     if [ "$scenario" = unknown-captain-word ]; then
       expect_code 1 "$rc" "an unknown pipeline family must refuse a one-family PASS: $(cat "$case_dir/stderr")"
-      assert_grep 'uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families' "$case_dir/stderr" 'unknown group is named accurately'
+      assert_grep 'uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families' "$case_dir/stderr" 'unreadable evidence keeps the two-reader rule'
+      assert_no_grep 'outside every ship family' "$case_dir/stderr" 'unreadable evidence offers no single-reader relief'
       assert_grep 'SECOND_KNOWN_FAMILY_MODEL' "$case_dir/stderr" 'the unknown group names the second-family review route'
       command=$(sed -n 's/.* in place of FRESH_CAPTAIN_WORDS with: //p' "$case_dir/stderr")
       command=${command%; inspect review-records.jsonl in the PR task home before retrying}
@@ -225,23 +242,29 @@ PY
       rc=0
       run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     fi
-    if [ "$scenario" = unknown-two-families ] || [ "$scenario" = unknown-fail-clears ]; then
-      expect_code 1 "$rc" "$scenario must refuse before the second family reads: $(cat "$case_dir/stderr")"
-      if [ "$scenario" = unknown-two-families ]; then
-        assert_grep 'uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families' "$case_dir/stderr" 'the real unknown group is refused on one family'
-      else
-        assert_grep 'no later exact-head PASS covers group no-mistakes:unknown, family unknown, that this FAIL read' "$case_dir/stderr" 'a PASS from before the FAIL does not count toward two families'
-      fi
-      assert_grep "set each read's actual trigger answers and local report" "$case_dir/stderr" 'the refusal asks for the real trigger answers'
+    if [ "$scenario" = unknown-fail-clears ]; then
+      expect_code 1 "$rc" "a pre-FAIL outside-ship read must not clear the FAIL: $(cat "$case_dir/stderr")"
+      assert_grep 'no later exact-head PASS covers group no-mistakes:unknown, family unknown, that this FAIL read; model family unknown needs one later exact-head PASS of that group from a known reader family outside every ship family (openai)' "$case_dir/stderr" 'the after-FAIL refusal offers the single outside-ship-family read'
       command=$(sed -n 's/.*then record each with: //p' "$case_dir/stderr")
       command=${command%%; or *}
-      [ -n "$command" ] || fail "$scenario refusal printed no recording command: $(cat "$case_dir/stderr")"
-      printf 'VERDICT: PASS head=%s\nOpenAI read of the unknown-family commits.\n' "$head" > "$case_dir/second-family.md"
-      command=${command//SECOND_KNOWN_FAMILY_MODEL/gpt-5.1-codex}
-      command=${command//LOCAL_READER_REPORT/$case_dir/second-family.md}
-      eval "$command" > "$case_dir/second-family.out" 2>&1 || fail "the printed second-family command failed: $(cat "$case_dir/second-family.out")"
+      [ -n "$command" ] || fail "after-FAIL refusal printed no recording command: $(cat "$case_dir/stderr")"
+      printf 'VERDICT: PASS head=%s\nClaude read of the unknown pipeline commits.\n' "$head" > "$case_dir/outside-ship.md"
+      command=${command//OUTSIDE_SHIP_FAMILY_MODEL/claude-opus-5-5}
+      command=${command//LOCAL_READER_REPORT/$case_dir/outside-ship.md}
+      eval "$command" > "$case_dir/outside-ship.out" 2>&1 || fail "the printed outside-ship command failed: $(cat "$case_dir/outside-ship.out")"
       rc=0
       run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    fi
+    if [ "$scenario" = unknown-fail-clears ] || [ "$scenario" = conflict-two-readers ]; then
+      expect_code 0 "$rc" "$scenario is covered by two known reader families: $(cat "$case_dir/stderr")"
+      assert_no_grep 'pipeline author family not recorded' "$case_dir/stderr" "$scenario two-family cover prints no verify fact"
+      assert_no_grep 'pipeline author family not recorded' "$case_dir/state/task-x1.merge-authority" "$scenario two-family cover records no merge fact"
+    fi
+    if [ "$scenario" = unknown-two-families ] || [ "$scenario" = absent-one-reader ] || [ "$scenario" = fail-relief-fact ]; then
+      expect_code 0 "$rc" "$scenario needs no redundant second-family read: $(cat "$case_dir/stderr")"
+      assert_grep 'review: pipeline author family not recorded' "$case_dir/stderr" 'pipeline relief prints its verify fact'
+      assert_grep 'pipeline author family not recorded' "$case_dir/state/task-x1.merge-authority" \
+        'pipeline relief writes its provenance fact into the merge record'
       "$JQ_BIN" -s -e 'all(.kind != "captain-word")' "$case_dir/state/review-records.jsonl" >/dev/null \
         || fail "$scenario must merge without a captain-word record"
     fi
@@ -273,7 +296,7 @@ PY
       run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     fi
     case "$scenario" in
-      two-readers|ship-only|ship-multi-read|ship-history|ship-reused|ship-all-extra|alias-command|unknown-captain-word|ship-unknown-reader|cancelled-claude|exact-head-fail|rebase-deepseek|rebase-two-readers|missing-db-direct|fail-typed-group|unknown-two-families|unknown-fail-clears)
+      absent-one-reader|conflict-two-readers|fail-relief-fact|two-readers|ship-only|ship-multi-read|ship-history|ship-reused|ship-all-extra|alias-command|unknown-captain-word|ship-unknown-reader|cancelled-claude|exact-head-fail|rebase-deepseek|rebase-two-readers|missing-db-direct|fail-typed-group|unknown-two-families|unknown-fail-clears)
         expect_code 0 "$rc" "$scenario must merge: $(cat "$case_dir/stderr")"
         assert_logged_gh_merge "$case_dir" 9 example/repo --squash ;;
       *)
@@ -283,6 +306,7 @@ PY
           fail-partial) expected='no later exact-head PASS covers group no-mistakes:anthropic, family anthropic, that this FAIL read' ;;
           all-prefixed) expected='uncovered commit group ship, family openai' ;;
           head-mismatch) expected='head mismatch' ;;
+          unreadable-one-reader|conflict-one-reader|relative-one-reader) expected='uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families' ;;
           unreadable|config-fallback|changed-config|relative-nm-home|mixed-unknown|errored-omp|rebase-unreadable|unopenable-ship|query-fails|missing-db-nm|denied-parent) expected='uncovered commit group no-mistakes:unknown, family unknown' ;;
           ship-prior) expected='uncovered commit group ship, family anthropic,openai' ;;
           ship-default) expected='uncovered commit group ship, family openai,unknown' ;;
@@ -294,6 +318,10 @@ PY
         assert_grep 'fm-review-record.py' "$case_dir/stderr" "$scenario names recording command"
         ;;
     esac
+    if [ "$scenario" = two-readers ]; then
+      assert_no_grep 'pipeline author family not recorded' "$case_dir/stderr" 'fully known pipeline has no verify fact'
+      assert_no_grep 'pipeline author family not recorded' "$case_dir/state/task-x1.merge-authority" 'fully known pipeline has no merge fact'
+    fi
     after=$(shasum -a 256 "$case_dir/user-home/.no-mistakes/state.sqlite" 2>/dev/null || true)
     [ "$before" = "$after" ] || fail "$scenario mutated the pipeline database"
     pass "derived author coverage: $scenario"
@@ -968,6 +996,31 @@ test_github_conflicting_queue_rules_report_ambiguity() {
   pass "fm-pr-merge reports ambiguity for conflicting merge-queue rules"
 }
 
+test_merge_records_unrecorded_pipeline_family() {
+  local case_dir head url rc=0 groups
+  case_dir=$(make_case pipeline-author-fact)
+  rm "$case_dir/fakebin/git"
+  : > "$case_dir/explicit-review"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  url=https://github.com/example/repo/pull/9
+  groups='{"ship":["gpt-5.1-codex"],"no-mistakes:unknown":["unknown"]}'
+  rm "$case_dir/user-home/.no-mistakes/state.sqlite"
+  add_gh_mocks "$case_dir" "$head"
+  record_review "$case_dir" "$url" "$head" --author-groups "$groups" >/dev/null || fail 'record the single outside-ship Claude PASS'
+  run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "T6 merge fixture must succeed: $(cat "$case_dir/stderr")"
+  assert_logged_gh_merge "$case_dir" 9 example/repo --squash
+  assert_grep 'pipeline author family not recorded' "$case_dir/state/task-x1.merge-authority" \
+    'T6 accepted merge record must disclose missing pipeline provenance'
+  bash -c 'FM_HOME="$2/home"; FM_STATE_OVERRIDE="$2/state";
+    . "$1/bin/fm-wake-lib.sh"; . "$1/bin/fm-merge-authority-lib.sh";
+    fm_merge_authority_read "$2/state" task-x1 github github.com example/repo 9 &&
+    [ "$FM_MERGE_AUTHORITY" = attended ] &&
+    [ "$FM_MERGE_AUTHORITY_REVIEW_FACT" = "pipeline author family not recorded" ]' \
+    test "$ROOT" "$case_dir" || fail 'extended record must retain its authority and expose its fact to the reader'
+  pass 'T6 merge record persists the pipeline provenance fact and remains readable'
+}
+
 test_verified_merge_records_pr_and_head() {
   local case_dir rc
   case_dir=$(make_case records-before-merge)
@@ -985,6 +1038,13 @@ test_verified_merge_records_pr_and_head() {
   assert_grep 'pr_head=deadbeefcafefeed0000000000000000deadbeef' "$case_dir/state/task-x1.meta" \
     "records-before-merge: pr_head= was not recorded"
   assert_logged_gh_merge "$case_dir" 9 example/repo --squash
+  assert_no_grep 'pipeline author family not recorded' "$case_dir/state/task-x1.merge-authority" \
+    'known pipeline merge must not invent missing provenance'
+  bash -c 'FM_HOME="$2/home"; FM_STATE_OVERRIDE="$2/state";
+    . "$1/bin/fm-wake-lib.sh"; . "$1/bin/fm-merge-authority-lib.sh";
+    fm_merge_authority_read "$2/state" task-x1 github github.com example/repo 9 &&
+    [ "$FM_MERGE_AUTHORITY" = attended ] && [ -z "$FM_MERGE_AUTHORITY_REVIEW_FACT" ]' \
+    test "$ROOT" "$case_dir" || fail 'legacy six-line authority record remains readable without a fact'
   pass "fm-pr-merge records pr= and pr_head= for a verified GitHub merge"
 }
 
@@ -2313,6 +2373,7 @@ test_github_zero_exit_queue_required_refuses_with_exact_retry
 test_github_closed_unqueued_outcome_omits_retry_flags
 test_github_agreeing_queue_rules_keep_retry_guidance
 test_github_conflicting_queue_rules_report_ambiguity
+test_merge_records_unrecorded_pipeline_family
 test_verified_merge_records_pr_and_head
 test_pr_metadata_is_recorded_before_the_forge_call
 test_merge_failure_propagates_after_recording

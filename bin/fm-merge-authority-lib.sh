@@ -11,6 +11,14 @@
 #   <path>
 #   <number>
 #   <authority>                 away | attended
+#   [pipeline author family not recorded]
+# The optional final line carries the verifier's missing-pipeline-provenance
+# fact from the same accepted read only while the record exists: the merge poll
+# in bin/fm-watch.sh deletes the record when it records the merge outcome, whose
+# ledger does not keep the fact, and bin/fm-teardown.sh deletes any record left
+# at teardown. Legacy six-line v1 records remain readable;
+# known pipeline evidence adds no line. Readers expose the validated optional
+# line as FM_MERGE_AUTHORITY_REVIEW_FACT; it changes no merge authority.
 # While an away record exists every merge runs under away authority (the
 # record's presence is the whole mechanical fact; which merge the captain's
 # away words meant is the supervision session's reading); without one, or while
@@ -49,6 +57,8 @@ FM_MERGE_AUTHORITY=
 FM_MERGE_AUTHORITY_REASON=
 # shellcheck disable=SC2034 # Public results consumed by sourcing callers.
 FM_MERGE_AUTHORITY_RECORD_IDENTITY=
+# shellcheck disable=SC2034 # Public result consumed by sourcing callers.
+FM_MERGE_AUTHORITY_REVIEW_FACT=
 
 fm_merge_authority_resolve() {  # <home> <state> <meta> <task-id>
   local home=${1-} state=${2-} meta=${3-} id=${4-}
@@ -79,7 +89,8 @@ fm_merge_authority_resolve() {  # <home> <state> <meta> <task-id>
 
 fm_merge_authority_record_matches() {  # <record> <device> <provider> <host> <path> <number>
   local record=$1 device=$2 expected_provider=$3 expected_host=$4 expected_path=$5 expected_number=$6
-  local version provider host path number authority
+  local version provider host path number authority fact=
+  FM_MERGE_AUTHORITY_REVIEW_FACT=
   fm_pr_private_file_valid "$record" 600 "$device" || return 1
   exec 8< "$record" || return 1
   IFS= read -r version <&8 || { exec 8<&-; return 1; }
@@ -88,7 +99,12 @@ fm_merge_authority_record_matches() {  # <record> <device> <provider> <host> <pa
   IFS= read -r path <&8 || { exec 8<&-; return 1; }
   IFS= read -r number <&8 || { exec 8<&-; return 1; }
   IFS= read -r authority <&8 || { exec 8<&-; return 1; }
-  if IFS= read -r _extra <&8; then
+  if IFS= read -r fact <&8; then
+    if [ "$fact" != 'pipeline author family not recorded' ] || IFS= read -r _extra <&8; then
+      exec 8<&-
+      return 1
+    fi
+  elif [ -n "$fact" ]; then
     exec 8<&-
     return 1
   fi
@@ -100,13 +116,15 @@ fm_merge_authority_record_matches() {  # <record> <device> <provider> <host> <pa
     && [ "$path" = "$expected_path" ] \
     && [ "$number" = "$expected_number" ] || return 1
   FM_MERGE_AUTHORITY=$authority
+  FM_MERGE_AUTHORITY_REVIEW_FACT=$fact
 }
 
-fm_merge_authority_persist() {  # <state> <task-id> <meta> <provider> <host> <path> <number> <authority>
+fm_merge_authority_persist() {  # <state> <task-id> <meta> <provider> <host> <path> <number> <authority> [review-fact]
   local state=$1 id=$2 meta=$3 provider=$4 host=$5 path=$6 number=$7 authority=$8
-  local record tmp='' state_device lock status=0
+  local record tmp='' state_device lock status=0 fact=${9-}
   fm_pr_task_id_valid "$id" || return 1
   case "$authority" in away|attended) ;; *) return 1 ;; esac
+  case "$fact" in ''|'pipeline author family not recorded') ;; *) return 1 ;; esac
   [ -d "$state" ] && [ ! -L "$state" ] || return 1
   state_device=$(fm_pr_file_device "$state") || return 1
   fm_pr_metadata_identity_parse "$meta" || return 1
@@ -126,6 +144,9 @@ fm_merge_authority_persist() {  # <state> <task-id> <meta> <provider> <host> <pa
     printf '%s\n%s\n%s\n%s\n%s\n%s\n' \
       fm-merge-authority-v1 "$provider" "$host" "$path" "$number" "$authority" > "$tmp" \
       || status=1
+    if [ -n "$fact" ]; then
+      printf '%s\n' "$fact" >> "$tmp" || status=1
+    fi
   fi
   if [ "$status" -eq 0 ]; then
     chmod 0600 "$tmp" \
@@ -146,6 +167,8 @@ fm_merge_authority_read() {  # <state> <task-id> <provider> <host> <path> <numbe
   local state=$1 id=$2 provider=$3 host=$4 path=$5 number=$6
   local record state_device lock status=0
   FM_MERGE_AUTHORITY='external'
+  # shellcheck disable=SC2034 # Public result consumed by sourcing callers.
+  FM_MERGE_AUTHORITY_REVIEW_FACT=
   FM_MERGE_AUTHORITY_RECORD_IDENTITY=
   fm_pr_task_id_valid "$id" || return 1
   [ -d "$state" ] && [ ! -L "$state" ] || return 1
