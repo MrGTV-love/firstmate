@@ -510,6 +510,107 @@ test_legacy_record_without_report_digest_omits_the_field() {
   pass "a legacy record without report_sha256 omits the digest instead of fabricating it"
 }
 
+test_plan_names_the_owed_families_and_decides_nothing() {
+  local case_dir out
+  case_dir=$(make_case plan-owed gpt-5.1)
+  run_plan() {
+    NM_HOME="$NM_FIXTURE" FM_HOME="$case_dir/home" "$RECORD" plan --pr "$URL" --head "$HEAD1" \
+      --task task-x1 --base "$BASE" "$@"
+  }
+  out=$(run_plan)
+  # shellcheck disable=SC2016  # jq program; single quotes are intended.
+  "$JQ_BIN" -e --arg head "$HEAD1" '.schema == "fm-review-plan.v1" and .ok == true and .head == $head
+    and .groups.ship == [{"model":"gpt-5.1","family":"openai"}]
+    and .uncovered == [{"group":"ship","families":["openai"]}]' <<<"$out" >/dev/null \
+    || fail "plan with no review must name the ship group and the openai family it owes: $out"
+  [ ! -e "$case_dir/home/state/review-records.jsonl" ] || fail "plan wrote a review record"
+  record_review "$case_dir" "$HEAD1" PASS gpt-5.2 '{"ship":["gpt-5.1"]}' >/dev/null
+  out=$(run_plan)
+  "$JQ_BIN" -e '.uncovered == [{"group":"ship","families":["openai"]}]' <<<"$out" >/dev/null \
+    || fail "a reader of the author's own family must leave the family owed: $out"
+  record_review "$case_dir" "$HEAD1" PASS claude-opus-5-5 '{"ship":["gpt-5.1"]}' >/dev/null
+  out=$(run_plan)
+  "$JQ_BIN" -e '.uncovered == []' <<<"$out" >/dev/null || fail "a different-family PASS must clear the owed family: $out"
+  record_review "$case_dir" "$HEAD1" FAIL claude-opus-5-5 '{"ship":["gpt-5.1"]}' >/dev/null
+  record_word "$case_dir" "$HEAD1" 'merge it' >/dev/null
+  out=$(run_plan)
+  "$JQ_BIN" -e '.ok == true and .uncovered == []' <<<"$out" >/dev/null \
+    || fail "plan must ignore a FAIL and a captain-word and report coverage only: $out"
+  out=$(run_verify "$case_dir" "$HEAD1" --json)
+  "$JQ_BIN" -e '.ok == true and .basis == "captain-word"' <<<"$out" >/dev/null \
+    || fail "verify itself must still follow the captain-word rule: $out"
+  out=$(run_plan --nonsense 2>&1 || true)
+  case "$out" in *usage*|*unrecognized*) ;; *) fail "plan must reject an unknown flag: $out" ;; esac
+  pass "plan names the owed author families from the exact head, ignores a FAIL and a captain-word, and writes nothing"
+}
+
+test_plan_agrees_with_verify_for_an_unrecorded_pipeline_family() {
+  local case_dir out rc=0
+  case_dir=$(make_case plan-pipeline-relief)
+  printf 'mode=no-mistakes\n' >> "$case_dir/home/state/task-x1.meta"
+  run_plan() {
+    NM_HOME="$case_dir/absent-nm" FM_HOME="$case_dir/home" "$RECORD" plan --pr "$URL" --head "$HEAD1" \
+      --task task-x1 --base "$BASE" "$@"
+  }
+  out=$(run_plan)
+  # shellcheck disable=SC2016  # jq program; single quotes are intended.
+  "$JQ_BIN" -e '.ok == true and (.groups | has("no-mistakes:unknown"))
+    and ([.uncovered[] | select(.group == "no-mistakes:unknown") | .families] == [["unknown"]])
+    and ([.uncovered[] | select(.group == "ship") | .families] == [["openai"]])
+    and ([.uncovered[] | select(.group == "no-mistakes:unknown") | .reader_outside] == [["openai"]])
+    and ([.uncovered[] | select(.group == "ship") | has("reader_outside")] == [false])' <<<"$out" >/dev/null \
+    || fail "plan with no read must owe the unrecorded pipeline family and the ship family, and ask for a reader outside every ship family: $out"
+  # A reader of the ship family covers neither group: plan and verify must both refuse to call it covered.
+  record_review "$case_dir" "$HEAD1" PASS gpt-5.2 \
+    '{"ship":["gpt-5.1"],"no-mistakes:unknown":["unknown"]}' >/dev/null || fail "record same-family read"
+  out=$(run_plan)
+  "$JQ_BIN" -e '([.uncovered[].group] | sort == ["no-mistakes:unknown","ship"])
+    and ([.uncovered[] | select(.group == "no-mistakes:unknown") | .reader_outside] == [["openai"]])' <<<"$out" >/dev/null \
+    || fail "a reader of the ship family must leave both groups owed in plan, the pipeline group still needing a reader outside it: $out"
+  out=$(NM_HOME="$case_dir/absent-nm" FM_HOME="$case_dir/home" "$RECORD" verify --pr "$URL" \
+    --head "$HEAD1" --task task-x1 --base "$BASE" --json) || rc=$?
+  expect_code 1 "$rc" "verify must refuse the same state plan calls owed: $out"
+  # A fresh case with one read outside every ship family: the relief covers the unrecorded pipeline family
+  # in plan and in verify. (The case above must not be reused: its same-family read would count as a second
+  # known family and so leave verify nothing to disclose.)
+  case_dir=$(make_case plan-pipeline-relief-one-reader)
+  printf 'mode=no-mistakes\n' >> "$case_dir/home/state/task-x1.meta"
+  record_review "$case_dir" "$HEAD1" PASS sonnet \
+    '{"ship":["gpt-5.1"],"no-mistakes:unknown":["unknown"]}' >/dev/null || fail "record outside-family read"
+  out=$(run_plan)
+  "$JQ_BIN" -e '.ok == true and .uncovered == []' <<<"$out" >/dev/null \
+    || fail "plan must apply the one-reader relief that verify applies: $out"
+  rc=0
+  out=$(NM_HOME="$case_dir/absent-nm" FM_HOME="$case_dir/home" "$RECORD" verify --pr "$URL" \
+    --head "$HEAD1" --task task-x1 --base "$BASE" --json) || rc=$?
+  expect_code 0 "$rc" "verify must accept the state plan calls covered: $out"
+  "$JQ_BIN" -e '.facts == ["pipeline author family not recorded"]' <<<"$out" >/dev/null \
+    || fail "verify keeps its disclosure of the unrecorded pipeline family: $out"
+  # An unknown ship author keeps the two-reader rule: plan asks for any known reader, then one outside the first.
+  case_dir=$(make_case plan-unknown-two-readers mystery-9)
+  run_plan() {
+    NM_HOME="$NM_FIXTURE" FM_HOME="$case_dir/home" "$RECORD" plan --pr "$URL" --head "$HEAD1" \
+      --task task-x1 --base "$BASE" "$@"
+  }
+  out=$(run_plan)
+  "$JQ_BIN" -e '.uncovered == [{"group":"ship","families":["unknown"],"reader_outside":[]}]' <<<"$out" >/dev/null \
+    || fail "plan must let any known reader count first toward an unknown ship author: $out"
+  record_review "$case_dir" "$HEAD1" PASS sonnet '{"ship":["mystery-9"]}' >/dev/null || fail "record first-family read"
+  out=$(run_plan)
+  "$JQ_BIN" -e '.uncovered == [{"group":"ship","families":["unknown"],"reader_outside":["anthropic"]}]' <<<"$out" >/dev/null \
+    || fail "plan must ask for a second known family outside the first: $out"
+  rc=0
+  out=$(run_verify "$case_dir" "$HEAD1" --review-only --json) || rc=$?
+  expect_code 1 "$rc" "verify must refuse the one-family state plan calls owed: $out"
+  record_review "$case_dir" "$HEAD1" PASS gpt-5.1 '{"ship":["mystery-9"]}' >/dev/null || fail "record second-family read"
+  out=$(run_plan)
+  "$JQ_BIN" -e '.uncovered == []' <<<"$out" >/dev/null || fail "two known reader families must leave nothing owed: $out"
+  rc=0
+  out=$(run_verify "$case_dir" "$HEAD1" --review-only --json) || rc=$?
+  expect_code 0 "$rc" "verify must accept the state plan calls covered: $out"
+  pass "plan applies the one-reader relief for an unrecorded pipeline family and the two-reader rule for any other unknown group exactly as verify does, names the families a reader must lie outside, and verify keeps its disclosure"
+}
+
 fm_test_run_cases \
   test_review_only_json_is_immutable_record_time_evidence \
   test_default_text_and_captain_word_json \
@@ -526,4 +627,6 @@ fm_test_run_cases \
   test_stored_family_fields_cannot_retroactively_change_independence \
   test_typed_failures_distinguish_unavailable_and_invalid_input \
   test_default_fail_after_captain_word_precedence_holds \
-  test_legacy_record_without_report_digest_omits_the_field -- "$@"
+  test_legacy_record_without_report_digest_omits_the_field \
+  test_plan_names_the_owed_families_and_decides_nothing \
+  test_plan_agrees_with_verify_for_an_unrecorded_pipeline_family -- "$@"

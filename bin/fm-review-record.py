@@ -10,6 +10,7 @@ Usage (FM_HOME must name the absolute home holding the PR task record):
   fm-review-record.py captain-word --pr URL --head SHA --words 'Exact captain merge instruction'
   fm-review-record.py latest --pr URL
   fm-review-record.py verify --pr URL --head SHA --task TASK --base BASE_SHA [--review-only] [--json]
+  fm-review-record.py plan --pr URL --head SHA --task TASK --base BASE_SHA
 
 The relay lane stages the reader report on the receiving host before recording
 into the receiving home by setting FM_HOME explicitly.
@@ -150,6 +151,17 @@ JSON keeps the existing exit status (1 evidence/unavailable, 2 input) and never
 looks like a success object. Without --json, a successful verify prints
 review: PASS (plus review: pipeline author family not recorded when applicable)
 or review: captain-word (plus the same fact line when applicable); a refusal prints an error: line and exits 1.
+plan prints one fm-review-plan.v1 object and decides nothing: the derived author groups of the exact head
+with each model's family, and every group family that the recorded exact-head PASS reads leave uncovered under
+the same coverage rule verify applies, including its one-reader relief for an unrecorded pipeline author family,
+whether or not any review or captain-word exists. An uncovered item whose families include unknown
+also names reader_outside, the families a known reader must lie outside for its exact-head PASS of that
+group to count toward that rule: the known readers already counted, or with none counted every ship family
+under the one-reader relief and no family under the two-reader rule. An unknown item without reader_outside
+is one no known reader can count toward. It ignores a
+captain-word and a FAIL, so a caller that asks which reads are still owed (bin/fm-pr-auto-review.py) gets the
+families without parsing a refusal message, and it writes nothing. Failures carry the failure object and exit
+status verify uses.
 latest emits the complete newest review and captain-word as JSON for relay reads.
 Missing/invalid input exits 2; missing/mismatched evidence or unreadable history
 exits 1. Corrupt/partial history is preserved for reconciliation, never repaired.
@@ -458,16 +470,16 @@ def derived_authors(home, pr, head, task, base):
     return task, groups
 
 
-def verify(records, rows, head, home, pr, task, base, review_only=False):
+def verify(records, rows, head, home, pr, task, base, review_only=False, plan=False):
     word = records["captain-word"]
     review = records["review"]
-    at_word = not review_only and word is not None and word["head"] == head
+    at_word = not (review_only or plan) and word is not None and word["head"] == head
     start = max(i for i, row in enumerate(rows) if row["kind"] == "captain-word") + 1 if at_word else 0
     fails = [i for i in range(start, len(rows)) if rows[i]["kind"] == "review"
              and rows[i]["head"] == head and rows[i]["verdict"] == "FAIL"]
     if at_word and not fails:
         return "captain-word", word
-    if not at_word:
+    if not at_word and not plan:
         if review is None and review_only:
             raise VerificationError(f"no independent review record at live head {head}; --review-only requires a PASS recorded with fm-review-record.py review, and a captain-word is not a substitute")
         if review is None:
@@ -531,6 +543,7 @@ def verify(records, rows, head, home, pr, task, base, review_only=False):
         return "OUTSIDE_SHIP_FAMILY_MODEL" if group == "no-mistakes:unknown" and pipeline_relief else "SECOND_KNOWN_FAMILY_MODEL"
 
     relief_used = []
+    unknown_outside = {}
 
     def with_facts(row):
         return {**row, "facts": ["pipeline author family not recorded"] if relief_used else []}
@@ -555,11 +568,14 @@ def verify(records, rows, head, home, pr, task, base, review_only=False):
         pipeline_read = group == "no-mistakes:unknown" and pipeline_relief and readers - ship_families
         if "unknown" in families and pipeline_read and len(readers) < 2:
             relief_used.append(group)
-        return sorted(f for f in families if (len(readers) < 2 and not pipeline_read
-                                              if f == "unknown" else not readers - {f}))
+        missing = sorted(f for f in families if (len(readers) < 2 and not pipeline_read
+                                                 if f == "unknown" else not readers - {f}))
+        if "unknown" in missing:
+            unknown_outside[group] = readers or (ship_families if group == "no-mistakes:unknown" and pipeline_relief else set())
+        return missing
 
     # A FAIL stands until later exact-head PASS reads cover every group it read.
-    for index in fails:
+    for index in ([] if plan else fails):
         failed = rows[index]
         named = failed.get("covered_groups", list(failed["author_groups"]))
         for group in sorted(groups) if "all" in named else named:
@@ -574,6 +590,18 @@ def verify(records, rows, head, home, pr, task, base, review_only=False):
             raise VerificationError(f"{reason}record later exact-head PASS reads of that group from readers outside each of its families with: {env} {review_command('OUTSIDE_FAMILY_MODEL', [group], {**groups, group: authors})}; or {captain_help}")
     if at_word:
         return "captain-word", with_facts(word)
+    if plan:
+        owed = []
+        for group, authors in sorted(groups.items(), key=lambda item: ("unknown" not in {a["family"] for a in item[1]}, item[0])):
+            missing = uncovered(group, authors, passes)
+            if not missing:
+                continue
+            item = {"group": group, "families": missing}
+            if "unknown" in missing and RECORDED_FAMILIES - {"unknown"} - unknown_outside[group]:
+                item["reader_outside"] = sorted(unknown_outside[group])
+            owed.append(item)
+        return "plan", {"groups": {group: [{"model": a["model"], "family": a["family"]} for a in authors]
+                                  for group, authors in groups.items()}, "uncovered": owed}
     unknown_reader = model(review["reader_model"], "reader_model") == "unknown"
     for group, authors in sorted(groups.items(), key=lambda item: ("unknown" not in {a["family"] for a in item[1]}, item[0])):
         missing = uncovered(group, authors, passes)
@@ -620,12 +648,12 @@ def failure_json(kind, message):
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     commands = parser.add_subparsers(dest="command", required=True)
-    for name in ("review", "captain-word", "latest", "verify"):
+    for name in ("review", "captain-word", "latest", "verify", "plan"):
         command = commands.add_parser(name, description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
         command.add_argument("--pr", required=True)
         if name != "latest":
             command.add_argument("--head", required=True)
-        if name == "verify":
+        if name in ("verify", "plan"):
             command.add_argument("--task", required=True)
             command.add_argument("--base", required=True)
         if name == "review":
@@ -638,10 +666,10 @@ def main():
             command.add_argument("--review-only", action="store_true", help="require the recorded independent PASS itself; a captain-word is not a substitute")
             command.add_argument("--json", action="store_true", help="print one fm-review-verification.v1 object built from the same locked read")
     args = parser.parse_args()
-    emit_json = getattr(args, "json", False)
+    emit_json = getattr(args, "json", False) or args.command == "plan"
     try:
         home = task_home()
-        if args.command == "verify" and not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", args.base):
+        if args.command in ("verify", "plan") and not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", args.base):
             raise RecordError("author evidence requires --base with the forge's exact full base commit SHA (40 or 64 hex)")
         pr = canonical_pr(args.pr)
         row = {"schema": "fm-review-record.v1", "kind": args.command, "pr": pr, "at": int(time.time())}
@@ -689,6 +717,10 @@ def main():
                 print(f"recorded: {args.command}")
             elif args.command == "latest":
                 print(json.dumps(records, separators=(",", ":")))
+            elif args.command == "plan":
+                _, evidence = verify(records, rows, args.head, home, pr, args.task, args.base, plan=True)
+                print(json.dumps({"schema": "fm-review-plan.v1", "ok": True, "pr": pr, "head": args.head, **evidence},
+                                 separators=(",", ":")))
             else:
                 basis, evidence = verify(records, rows, args.head, home, pr, args.task, args.base, args.review_only)
                 if emit_json:
