@@ -381,7 +381,16 @@ test_miscased_selector_keeps_its_own_mentions() {
   fm_write_meta "$home/state/other.meta" "window=sess:fm-other" "kind=ship"
   fm_write_meta "$home/state/mini.meta" "window=sess:fm-mini" "kind=ship"
   if [ ! -f "$home/state/OTHER.meta" ]; then
-    pass "fm-send: a miscased selector does not resolve on a case-sensitive state directory"
+    : > "$log"
+    PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" FM_SEND_SETTLE=0 \
+      "$SEND" Other 'Continue other. Report back.' >/dev/null 2> "$err"; rc=$?
+    [ "$rc" -ne 0 ] || fail "a miscased selector resolved on a case-sensitive state directory"
+    assert_contains "$(cat "$err")" "not resolvable" "a miscased selector must be refused as unresolved"
+    [ ! -s "$log" ] || fail "an unresolved miscased selector typed text"
+    for record in "$home/state/"*.inbox; do
+      [ ! -e "$record" ] || fail "an unresolved miscased selector left a durable inbox: $record"
+    done
+    pass "fm-send: a miscased selector is refused as unresolved, with no effect, on a case-sensitive state directory"
     return 0
   fi
   text='Continue other. Report back.'
