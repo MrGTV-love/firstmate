@@ -1,0 +1,537 @@
+{
+ "passed": true,
+ "assertions": {
+  "drained": true
+ },
+ "extra": {
+  "request1": 1,
+  "request2": 0,
+  "round2": true,
+  "round1": false,
+  "queue_keys": [
+   "slack.check.sh",
+   "status.check.sh",
+   "slack.check.sh",
+   "status.check.sh"
+  ]
+ }
+}
+{
+ "passed": true,
+ "assertions": {
+  "drained": true
+ },
+ "extra": {
+  "request1": 1,
+  "request2": 1,
+  "round2": true,
+  "round1": false,
+  "queue_keys": [
+   "slack.check.sh#event:0729e5f8f63482ec715440b4de680c6fa48d03bc7d2b055b2f0c605c3e42cd7e",
+   "slack.check.sh#event:72f40b047af513685f775564db67e74159e99347b0265e27da884fd44f552eb5",
+   "status.check.sh",
+   "status.check.sh"
+  ]
+ }
+}
+{
+ "passed": true,
+ "assertions": {
+  "base_loses_a_request": true,
+  "candidate_presents_request1_once": true,
+  "candidate_presents_request2_once": true,
+  "candidate_presents_latest_state": true,
+  "candidate_coalesces_old_state": true
+ },
+ "observed": {
+  "base": {
+   "request1": 1,
+   "request2": 0,
+   "round2": true,
+   "round1": false,
+   "queue_keys": [
+    "slack.check.sh",
+    "status.check.sh",
+    "slack.check.sh",
+    "status.check.sh"
+   ]
+  },
+  "candidate": {
+   "request1": 1,
+   "request2": 1,
+   "round2": true,
+   "round1": false,
+   "queue_keys": [
+    "slack.check.sh#event:0729e5f8f63482ec715440b4de680c6fa48d03bc7d2b055b2f0c605c3e42cd7e",
+    "slack.check.sh#event:72f40b047af513685f775564db67e74159e99347b0265e27da884fd44f552eb5",
+    "status.check.sh",
+    "status.check.sh"
+   ]
+  }
+ }
+}
+{
+ "passed": true,
+ "assertions": {
+  "first_drain_has_1_and_2_once": true,
+  "retry_keeps_one_row": true,
+  "retry_keeps_original_sequence": true,
+  "ack_ok": true,
+  "acked_events_gone": true,
+  "event3_survives_older_ack": true,
+  "newest_state_survives_older_ack": true,
+  "second_drain_event3_once": true,
+  "second_drain_newest_state_once": true,
+  "second_drain_no_old_state": true,
+  "queue_empty_at_end": true
+ },
+ "extra": {
+  "seq_before": "1",
+  "seq_after": "1",
+  "drain1": "1794358273\t1\tcheck\t/Users/charlesabrooker/tmp/fm-lab.shad5i2s/state/slack.check.sh#event:0729e5f8f63482ec715440b4de680c6fa48d03bc7d2b055b2f0c605c3e42cd7e\tcheck: /Users/charlesabrooker/tmp/fm-lab.shad5i2s/state/slack.check.sh: check: slack request 900.000001 from U0TESTOWNER: [unverified data] \"request 1\"\n1794358274\t2\tcheck\t/Users/charlesabrooker/tmp/fm-lab.shad5i2s/state/slack.check.sh#event:72f40b047af513685f775564db67e74159e99347b0265e27da884fd44f552eb5\tcheck: /Users/charlesabrooker/tmp/fm-lab.shad5i2s/state/slack.check.sh: check: slack request 900.000002 from U0TESTOWNER: [unverified data] \"request 2\"\n1794358277\t4\tcheck\t/Users/charlesabrooker/tmp/fm-lab.shad5i2s/state/status.check.sh\tcheck: /Users/charlesabrooker/tmp/fm-lab.shad5i2s/state/status.check.sh: state round 2\n",
+  "drain2": "1794358283\t7\tcheck\t/Users/charlesabrooker/tmp/fm-lab.shad5i2s/state/status.check.sh\tcheck: /Users/charlesabrooker/tmp/fm-lab.shad5i2s/state/status.check.sh: state round 4\n1794358283\t6\tcheck\t/Users/charlesabrooker/tmp/fm-lab.shad5i2s/state/slack.check.sh#event:d15f02415a3b1785f8d86c269bf83dae4a51653608fcaf638dff3e24e3f5007e\tcheck: /Users/charlesabrooker/tmp/fm-lab.shad5i2s/state/slack.check.sh: check: slack request 900.000003 from U0TESTOWNER: [unverified data] \"request 3\"\n"
+ }
+}
+{
+ "passed": true,
+ "assertions": {
+  "pass1_exit0": true,
+  "pass1_cadence_advanced": true,
+  "pass1_stderr_names_check": true,
+  "pass1_before_one_row": true,
+  "pass1_after_kept": true,
+  "pass1_diagnostic_count_5": true,
+  "pass1_ordinary_state": true,
+  "pass1_inline_marker_stays_state": true,
+  "pass1_later_check_delivered": true,
+  "pass2_exit0": true,
+  "pass2_cadence_advanced": true,
+  "pass2_stderr_names_check": true,
+  "pass2_before_one_row": true,
+  "pass2_after_kept": true,
+  "pass2_diagnostic_count_5": true,
+  "pass2_ordinary_state": true,
+  "pass2_inline_marker_stays_state": true,
+  "pass2_later_check_delivered": true,
+  "no_malformed_identity_became_event": true,
+  "second_pass_event_delivered": true,
+  "drain_before_once": true,
+  "drain_after_once": true,
+  "drain_next_once": true,
+  "drain_latest_state_only": true,
+  "drain_shows_diagnostic": true
+ },
+ "extra": {
+  "keys": [
+   "/Users/charlesabrooker/tmp/fm-lab.q6qmi4c1/state/aa-events.check.sh#event:before",
+   "/Users/charlesabrooker/tmp/fm-lab.q6qmi4c1/state/aa-events.check.sh#event:after",
+   "/Users/charlesabrooker/tmp/fm-lab.q6qmi4c1/state/aa-events.check.sh",
+   "/Users/charlesabrooker/tmp/fm-lab.q6qmi4c1/state/zz-later.check.sh",
+   "/Users/charlesabrooker/tmp/fm-lab.q6qmi4c1/state/aa-events.check.sh#event:next",
+   "/Users/charlesabrooker/tmp/fm-lab.q6qmi4c1/state/aa-events.check.sh",
+   "/Users/charlesabrooker/tmp/fm-lab.q6qmi4c1/state/zz-later.check.sh"
+  ],
+  "passes": [
+   {
+    "exit": 0,
+    "stderr": "error: malformed event output from /Users/charlesabrooker/tmp/fm-lab.q6qmi4c1/state/aa-events.check.sh\nerror: malformed event output from /Users/charlesabrooker/tmp/fm-lab.q6qmi4c1/state/aa-events.check.sh\nerror: malformed event output from /Users/charlesabrooker/tmp/fm-lab.q6qmi4c1/state/aa-events.check.sh\nerror: malformed event output from /Users/charlesabrooker/tmp/fm-lab.q6qmi4c1/state/aa-events.check.sh\nerror: malformed event output from /Users/charlesabrooker/tmp/fm-lab.q6qmi4c1/state/aa-events.check.sh\n",
+    "last_check_advanced": true
+   },
+   {
+    "exit": 0,
+    "stderr": "error: malformed event output from /Users/charlesabrooker/tmp/fm-lab.q6qmi4c1/state/aa-events.check.sh\nerror: malformed event output from /Users/charlesabrooker/tmp/fm-lab.q6qmi4c1/state/aa-events.check.sh\nerror: malformed event output from /Users/charlesabrooker/tmp/fm-lab.q6qmi4c1/state/aa-events.check.sh\nerror: malformed event output from /Users/charlesabrooker/tmp/fm-lab.q6qmi4c1/state/aa-events.check.sh\nerror: malformed event output from /Users/charlesabrooker/tmp/fm-lab.q6qmi4c1/state/aa-events.check.sh\n",
+    "last_check_advanced": true
+   }
+  ],
+  "drain": "1794358289\t1\tcheck\t/Users/charlesabrooker/tmp/fm-lab.q6qmi4c1/state/aa-events.check.sh#event:before\tcheck: /Users/charlesabrooker/tmp/fm-lab.q6qmi4c1/state/aa-events.check.sh: before payload\n1794358289\t2\tcheck\t/Users/charlesabrooker/tmp/fm-lab.q6qmi4c1/state/aa-events.check.sh#event:after\tcheck: /Users/charlesabrooker/tmp/fm-lab.q6qmi4c1/state/aa-events.check.sh: after payload\n1794358293\t6\tcheck\t/Users/charlesabrooker/tmp/fm-lab.q6qmi4c1/state/aa-events.check.sh\tcheck: /Users/charlesabrooker/tmp/fm-lab.q6qmi4c1/state/aa-events.check.sh: ordinary text that mentions fm-check-event inside inline ordinary state 2 refused 5 malformed fm-check-event line(s)\n1794358293\t7\tcheck\t/Users/charlesabrooker/tmp/fm-lab.q6qmi4c1/state/zz-later.check.sh\tcheck: /Users/charlesabrooker/tmp/fm-lab.q6qmi4c1/state/zz-later.check.sh: later check 2\n1794358293\t5\tcheck\t/Users/charlesabrooker/tmp/fm-lab.q6qmi4c1/state/aa-events.check.sh#event:next\tcheck: /Users/charlesabrooker/tmp/fm-lab.q6qmi4c1/state/aa-events.check.sh: next payload\n"
+ }
+}
+{
+ "passed": true,
+ "assertions": {
+  "exit0": true,
+  "cadence_advanced": true,
+  "diagnostic_row": true,
+  "no_event_row": true
+ },
+ "extra": {
+  "rows": [
+   [
+    "1794358298",
+    "1",
+    "check",
+    "/Users/charlesabrooker/tmp/fm-lab.g9eqg_1l/state/bad.check.sh",
+    "check: /Users/charlesabrooker/tmp/fm-lab.g9eqg_1l/state/bad.check.sh: refused 1 malformed fm-check-event line(s)"
+   ]
+  ],
+  "stdout": "check: /Users/charlesabrooker/tmp/fm-lab.g9eqg_1l/state/bad.check.sh: refused 1 malformed fm-check-event line(s)\n",
+  "stderr": "error: malformed event output from /Users/charlesabrooker/tmp/fm-lab.g9eqg_1l/state/bad.check.sh\n"
+ }
+}
+{
+ "passed": true,
+ "assertions": {
+  "watcher_exits_nonzero": true,
+  "cadence_not_advanced": true,
+  "no_row_written": true
+ },
+ "extra": {
+  "exit": 1,
+  "stderr": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-wake-lib.sh: line 2811: /Users/charlesabrooker/tmp/fm-lab.o3yo962r/state/.wake-queue.seq: Is a directory\n"
+ }
+}
+{
+ "passed": true,
+ "assertions": {
+  "tampered_did_not_run": true,
+  "unregistered_did_not_run": true,
+  "no_event_rows": true,
+  "no_forged_payload_presented": true
+ },
+ "extra": {
+  "exit": 0,
+  "timed_out": false,
+  "stdout": "check: rejected unauthenticated state checks: /Users/charlesabrooker/tmp/fm-lab.j69gk4a4/state/neverreg.check.sh /Users/charlesabrooker/tmp/fm-lab.j69gk4a4/state/tampered.check.sh\n",
+  "stderr": "",
+  "rows": [
+   [
+    "1794358303",
+    "1",
+    "check",
+    "unauthenticated-state-checks",
+    "check: rejected unauthenticated state checks: /Users/charlesabrooker/tmp/fm-lab.j69gk4a4/state/neverreg.check.sh /Users/charlesabrooker/tmp/fm-lab.j69gk4a4/state/tampered.check.sh"
+   ]
+  ]
+ }
+}
+{
+ "passed": true,
+ "assertions": {
+  "exit0": true,
+  "no_event_keys_for_contrib_or_x": true,
+  "contribution_marker_kept_as_state": true,
+  "x_marker_kept_as_state": true,
+  "contrib_env_not_1": true,
+  "x_env_not_1": true,
+  "custom_env_is_1": true
+ },
+ "extra": {
+  "envs": {
+   "contrib": "0",
+   "regular": "1",
+   "x": "unset"
+  },
+  "keys": [
+   "/Users/charlesabrooker/tmp/fm-lab.vkuh0khu/state/contributions.check.sh",
+   "/Users/charlesabrooker/tmp/fm-lab.vkuh0khu/state/regular.check.sh",
+   "/Users/charlesabrooker/tmp/fm-lab.vkuh0khu/state/x-watch.check.sh"
+  ]
+ }
+}
+{
+ "passed": true,
+ "assertions": {
+  "exit0": true,
+  "stop_notice_row_on_check_key": true,
+  "no_event_row_from_stopped_check": true
+ },
+ "extra": {
+  "rows": [
+   [
+    "1794358315",
+    "1",
+    "check",
+    "/Users/charlesabrooker/tmp/fm-lab.zg5j6z6e/state/stuck.check.sh",
+    "check: /Users/charlesabrooker/tmp/fm-lab.zg5j6z6e/state/stuck.check.sh: check stuck stopped after 5s (no progress); result unknown, retry next pass"
+   ]
+  ],
+  "stdout": "check: /Users/charlesabrooker/tmp/fm-lab.zg5j6z6e/state/stuck.check.sh: check stuck stopped after 5s (no progress); result unknown, retry next pass\n",
+  "stderr": "no_progress: \"pid=57473 no CPU or watched-file progress for 3.4s\"\n"
+ }
+}
+{
+ "passed": true,
+ "assertions": {
+  "exit0": true,
+  "real_event_presented": true,
+  "broken_row_not_presented": true,
+  "ack_ok": true,
+  "queue_empty": true
+ },
+ "extra": {
+  "drain": "1794358322\t1\tcheck\t/Users/charlesabrooker/tmp/fm-lab.ad2tnrcb/state/ev.check.sh#event:request-1\tcheck: /Users/charlesabrooker/tmp/fm-lab.ad2tnrcb/state/ev.check.sh: complete request 1\n",
+  "drain_err": "andling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 87621.1794358322.fYdwzA\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\u25cf  WATCHER DOWN - SUPERVISION IS OFF\n\u25cf  1 registered custom check(s), but no live watcher process holds this home lock (last beat: 2s ago).\n\u25cf  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.\n\u25cf  This is a supervision warning only; the guarded operation WILL still run.\n\u25cf  After draining queued wakes, repair missing watcher supervision according to the session-start block for this harness; do not use shell &.\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\nWARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.\n",
+  "remaining": []
+ }
+}
+{
+ "passed": true,
+ "assertions": {
+  "without_env_one_batch_line": true,
+  "with_env_one_line_per_event": true,
+  "identity_is_hex_token": true,
+  "identities_differ": true,
+  "regrouped_identity_stable": true,
+  "overflow_prints_partial": true,
+  "overflow_rest_retained_in_journal": true,
+  "overflow_next_run_distinct_ids": true,
+  "no_network_cli": true
+ },
+ "extra": {
+  "plain": "check: slack request 900.000001 from U0TESTOWNER: [unverified data] \"request 1\"; check: slack request 900.000002 from U0TESTOWNER: [unverified data] \"request 2\"\n",
+  "event": "fm-check-event 0729e5f8f63482ec715440b4de680c6fa48d03bc7d2b055b2f0c605c3e42cd7e\tcheck: slack request 900.000001 from U0TESTOWNER: [unverified data] \"request 1\"\nfm-check-event 72f40b047af513685f775564db67e74159e99347b0265e27da884fd44f552eb5\tcheck: slack request 900.000002 from U0TESTOWNER: [unverified data] \"request 2\"\n",
+  "regroup": "fm-check-event 0729e5f8f63482ec715440b4de680c6fa48d03bc7d2b055b2f0c605c3e42cd7e\tcheck: slack request 900.000001 from U0TESTOWNER: [unverified data] \"request 1\"\n",
+  "overflow1": "fm-check-event 1062f191e3952ae9ce8ef51242761ee3fab60716cec1d489edd738b753968d0e\tcheck: slack request 900.000010 from U0TESTOWNER: [unverified data] \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx 10\"; +4 queued\n",
+  "overflow2": "fm-check-event b67eede7bbb6273d098852fc7d7465c4f0c12adca1ed78d02537ba7b0554057d\tcheck: slack request 900.000011 from U0TESTOWNER: [unverified data] \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx 11\"; +3 queued\n"
+ }
+}
+{
+ "passed": true,
+ "assertions": {
+  "reply_recorded": true,
+  "check_ok": true,
+  "no_forged_event_line": true,
+  "every_output_line_is_a_valid_event_or_nothing": true
+ },
+ "extra": {
+  "stdout": "fm-check-event 732c186929ccbf80ac6444304a5db816d6eea3001d1ad725fd8ac9f74b53f2c1\tclosed: open-a\n",
+  "stderr": "",
+  "arm": "armed: state/slack.check.sh\n",
+  "mirror": ""
+ }
+}
+{
+ "passed": true,
+ "assertions": {
+  "prune_ok": true,
+  "had_task_a_rows": true,
+  "task_a_state_gone": true,
+  "task_a_event_gone": true,
+  "neighbor_event_kept": true,
+  "other_task_kept": true
+ },
+ "extra": {
+  "keys": [
+   "task-a-other.check.sh#event:one",
+   "task-a-other.check.sh",
+   "task-b.check.sh#event:one",
+   "task-b.check.sh"
+  ]
+ }
+}
+{
+ "passed": true,
+ "assertions": {
+  "armed": true,
+  "exit0": true,
+  "marker_text_kept_as_state": true,
+  "no_event_keys": true,
+  "env_not_1": true
+ },
+ "extra": {
+  "arm_stderr": "\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\u25cf  WATCHER DOWN - SUPERVISION IS OFF\n\u25cf  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).\n\u25cf  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.\n\u25cf  This is a supervision warning only; the guarded operation WILL still run.\n\u25cf  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n",
+  "keys": [
+   "/Users/charlesabrooker/tmp/fm-lab.6yizh9kj/state/contributions.check.sh",
+   "/Users/charlesabrooker/tmp/fm-lab.6yizh9kj/state/prtask.check.sh"
+  ],
+  "env": "unset",
+  "rows": [
+   [
+    "1794358378",
+    "1",
+    "check",
+    "/Users/charlesabrooker/tmp/fm-lab.6yizh9kj/state/contributions.check.sh",
+    "check: /Users/charlesabrooker/tmp/fm-lab.6yizh9kj/state/contributions.check.sh: contributions: observation unavailable for https://github.com/o/r/pull/8"
+   ],
+   [
+    "1794358378",
+    "2",
+    "check",
+    "/Users/charlesabrooker/tmp/fm-lab.6yizh9kj/state/prtask.check.sh",
+    "check: /Users/charlesabrooker/tmp/fm-lab.6yizh9kj/state/prtask.check.sh: fm-check-event prpoll pr text"
+   ]
+  ],
+  "stdout": "check: /Users/charlesabrooker/tmp/fm-lab.6yizh9kj/state/contributions.check.sh: contributions: observation unavailable for https://github.com/o/r/pull/8\n",
+  "stderr": ""
+ }
+}
+{
+ "passed": true,
+ "assertions": {
+  "ran": true
+ },
+ "extra": {
+  "exit": 0,
+  "reports_newer_episode": true,
+  "unpresented_row_retained": true,
+  "stderr": "wake drain: acknowledged wakes through 1 (1 row(s) consumed), but a newer recovery episode is pending; re-run bin/fm-wake-drain.sh and use the new WAKE_ACK_REQUIRED command\n"
+ }
+}
+{
+ "passed": true,
+ "assertions": {
+  "ran": true
+ },
+ "extra": {
+  "exit": 0,
+  "reports_newer_episode": true,
+  "unpresented_row_retained": true,
+  "stderr": "wake drain: acknowledged wakes through 1 (1 row(s) consumed), but a newer recovery episode is pending; re-run bin/fm-wake-drain.sh and use the new WAKE_ACK_REQUIRED command\n"
+ }
+}
+{
+ "passed": true,
+ "assertions": {
+  "candidate_reports_newer_episode": true,
+  "candidate_keeps_unpresented_row": true,
+  "same_as_base": true
+ },
+ "observed": {
+  "base": {
+   "exit": 0,
+   "reports_newer_episode": true,
+   "unpresented_row_retained": true,
+   "stderr": "wake drain: acknowledged wakes through 1 (1 row(s) consumed), but a newer recovery episode is pending; re-run bin/fm-wake-drain.sh and use the new WAKE_ACK_REQUIRED command\n"
+  },
+  "candidate": {
+   "exit": 0,
+   "reports_newer_episode": true,
+   "unpresented_row_retained": true,
+   "stderr": "wake drain: acknowledged wakes through 1 (1 row(s) consumed), but a newer recovery episode is pending; re-run bin/fm-wake-drain.sh and use the new WAKE_ACK_REQUIRED command\n"
+  }
+ }
+}
+{
+ "passed": true,
+ "assertions": {
+  "teardown_ok": true,
+  "had_rows": true,
+  "task_a_rows_gone": true,
+  "neighbor_kept": true,
+  "task_b_kept": true
+ },
+ "extra": {
+  "exit": 0,
+  "stdout": "teardown task-a complete (window isolated:fm-task-a, worktree /Users/charlesabrooker/tmp/fm-lab.urtxdlee/projects/worktree-a)\nBacklog: task-a is closed in /Users/charlesabrooker/tmp/fm-lab.urtxdlee/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.\n",
+  "stderr": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.urtxdlee\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\u25cf  WATCHER DOWN - SUPERVISION IS OFF\n\u25cf  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 6s ago).\n\u25cf  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.\n\u25cf  This is a supervision warning only; the guarded operation WILL still run.\n\u25cf  After draining queued wakes, repair missing watcher supervision according to the session-start block for this harness; do not use shell &.\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\nWARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.\n",
+  "keys": [
+   "task-a-other.check.sh#event:one",
+   "task-a-other.check.sh",
+   "task-b.check.sh#event:one",
+   "task-b.check.sh"
+  ]
+ }
+}
+{
+ "passed": true,
+ "assertions": {
+  "exit0": true,
+  "every_row_five_fields": true,
+  "tabbed_event_row": true,
+  "normal_event_row": true,
+  "long_identity_row": true,
+  "tabbed_payload_presented": true,
+  "normal_presented_once": true,
+  "long_presented_once": true,
+  "ack_ok": true,
+  "queue_empty": true
+ },
+ "extra": {
+  "rows": [
+   [
+    "1794358415",
+    "1",
+    "check",
+    "/Users/charlesabrooker/tmp/fm-lab.03469kg6/state/odd.check.sh#event:tabbed",
+    "check: /Users/charlesabrooker/tmp/fm-lab.03469kg6/state/odd.check.sh: payload with tabs"
+   ],
+   [
+    "1794358416",
+    "2",
+    "check",
+    "/Users/charlesabrooker/tmp/fm-lab.03469kg6/state/odd.check.sh#event:blank",
+    "check: /Users/charlesabrooker/tmp/fm-lab.03469kg6/state/odd.check.sh: "
+   ],
+   [
+    "1794358416",
+    "3",
+    "check",
+    "/Users/charlesabrooker/tmp/fm-lab.03469kg6/state/odd.check.sh#event:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "check: /Users/charlesabrooker/tmp/fm-lab.03469kg6/state/odd.check.sh: long identity payload"
+   ],
+   [
+    "1794358416",
+    "4",
+    "check",
+    "/Users/charlesabrooker/tmp/fm-lab.03469kg6/state/odd.check.sh#event:normal",
+    "check: /Users/charlesabrooker/tmp/fm-lab.03469kg6/state/odd.check.sh: normal payload"
+   ]
+  ],
+  "drain": "1794358415\t1\tcheck\t/Users/charlesabrooker/tmp/fm-lab.03469kg6/state/odd.check.sh#event:tabbed\tcheck: /Users/charlesabrooker/tmp/fm-lab.03469kg6/state/odd.check.sh: payload with tabs\n1794358416\t2\tcheck\t/Users/charlesabrooker/tmp/fm-lab.03469kg6/state/odd.check.sh#event:blank\tcheck: /Users/charlesabrooker/tmp/fm-lab.03469kg6/state/odd.check.sh: \n1794358416\t3\tcheck\t/Users/charlesabrooker/tmp/fm-lab.03469kg6/state/odd.check.sh#event:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\tcheck: /Users/charlesabrooker/tmp/fm-lab.03469kg6/state/odd.check.sh: long identity payload\n1794358416\t4\tcheck\t/Users/charlesabrooker/tmp/fm-lab.03469kg6/state/odd.check.sh#event:normal\tcheck: /Users/charlesabrooker/tmp/fm-lab.03469kg6/state/odd.check.sh: normal payload\n",
+  "drain_err": "RVISION IS OFF\n\u25cf  1 registered custom check(s), but no live watcher process holds this home lock (last beat: 2s ago).\n\u25cf  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.\n\u25cf  This is a supervision warning only; the guarded operation WILL still run.\n\u25cf  After draining queued wakes, repair missing watcher supervision according to the session-start block for this harness; do not use shell &.\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\nWARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.\n"
+ }
+}
+{
+ "passed": true,
+ "assertions": {
+  "ran": true
+ },
+ "extra": {
+  "exit": 0,
+  "payloads": [
+   "check: <HOME>/state/multi.check.sh: line one  line three   indented literal back\\\\slash dollar trailing $(not run) `not run`"
+  ],
+  "keys": [
+   "<HOME>/state/multi.check.sh"
+  ],
+  "drain": "1794358420\t1\tcheck\t<HOME>/state/multi.check.sh\tcheck: <HOME>/state/multi.check.sh: line one  line three   indented literal back\\\\slash dollar trailing $(not run) `not run`\n"
+ }
+}
+{
+ "passed": true,
+ "assertions": {
+  "ran": true
+ },
+ "extra": {
+  "exit": 0,
+  "payloads": [
+   "check: <HOME>/state/multi.check.sh: line one  line three   indented literal back\\\\slash dollar trailing $(not run) `not run`"
+  ],
+  "keys": [
+   "<HOME>/state/multi.check.sh"
+  ],
+  "drain": "1794358423\t1\tcheck\t<HOME>/state/multi.check.sh\tcheck: <HOME>/state/multi.check.sh: line one  line three   indented literal back\\\\slash dollar trailing $(not run) `not run`\n"
+ }
+}
+{
+ "passed": true,
+ "assertions": {
+  "same_row_payloads": true,
+  "same_row_keys": true,
+  "one_row": true,
+  "no_event_keys": true
+ },
+ "observed": {
+  "base": {
+   "exit": 0,
+   "payloads": [
+    "check: <HOME>/state/multi.check.sh: line one  line three   indented literal back\\\\slash dollar trailing $(not run) `not run`"
+   ],
+   "keys": [
+    "<HOME>/state/multi.check.sh"
+   ],
+   "drain": "1794358420\t1\tcheck\t<HOME>/state/multi.check.sh\tcheck: <HOME>/state/multi.check.sh: line one  line three   indented literal back\\\\slash dollar trailing $(not run) `not run`\n"
+  },
+  "candidate": {
+   "exit": 0,
+   "payloads": [
+    "check: <HOME>/state/multi.check.sh: line one  line three   indented literal back\\\\slash dollar trailing $(not run) `not run`"
+   ],
+   "keys": [
+    "<HOME>/state/multi.check.sh"
+   ],
+   "drain": "1794358423\t1\tcheck\t<HOME>/state/multi.check.sh\tcheck: <HOME>/state/multi.check.sh: line one  line three   indented literal back\\\\slash dollar trailing $(not run) `not run`\n"
+  }
+ }
+}
+SUMMARY {'s1-two-requests-base': True, 's1-two-requests-candidate': True, 's1-summary': True, 's2-retry-ack-second-drain': True, 's3-malformed-markers': True, 's3b-only-malformed-output': True, 's4-queue-write-failure-is-fatal': True, 's5-unauthenticated-check': True, 's6-non-event-routes-stay-state': True, 's6b-stop-notice-stays-state': True, 's7-unpresentable-pending-row': True, 's8-slack-emitter-identities': True, 's8b-slack-text-cannot-forge-events': True, 's9-prune-task-events': True, 's6c-pr-poll-stays-state': True, 's2b-stale-generation-base': True, 's2b-stale-generation-candidate': True, 's2b-summary': True, 's9b-real-teardown-prunes-events': True, 's11-odd-payloads': True, 's12-state-parity-base': True, 's12-state-parity-candidate': True, 's12-summary': True}

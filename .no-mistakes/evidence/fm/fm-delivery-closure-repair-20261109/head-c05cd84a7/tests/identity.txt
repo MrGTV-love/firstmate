@@ -1,0 +1,11 @@
+candidate=c05cd84a7a418f4dbd0660fa87ebe1c4d25007fc
+tree=cdd5f96db3e6c8ceb9f2812c648fdc747db41c6a
+test_file_blob=3a3c56477a667c13f3ad5c0cf2447caaf095795e
+status_lines= 0
+fixture=/Users/charlesabrooker/tmp/fm-gate-loops-test.pPbs7I
+command=HOME=$FX/home TMPDIR=$FX/tmp bash bin/fm-test-run.sh --json $EV/tests/timing.json tests/fm-open-loops.test.sh
+start=2026-11-11T03:02:18Z
+exit=0
+end=2026-11-11T03:31:10Z
+head_after=c05cd84a7a418f4dbd0660fa87ebe1c4d25007fc
+status_lines_after= 0

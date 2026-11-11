@@ -1,0 +1,7 @@
+{
+  "secondmate_brief_unchanged_from_base": true,
+  "ship_forbids_terminal_while_key_open": true,
+  "scout_forbids_terminal_while_key_open": true,
+  "scout_no_longer_self_gates": true,
+  "scout_loads_policy": true
+}

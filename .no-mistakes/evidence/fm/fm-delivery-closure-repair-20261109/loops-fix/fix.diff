@@ -1,0 +1,124 @@
+diff --git a/bin/fm_open_loops.py b/bin/fm_open_loops.py
+index 729df45cf..bbc562119 100755
+--- a/bin/fm_open_loops.py
++++ b/bin/fm_open_loops.py
+@@ -475,6 +475,11 @@ class Collector:
+                          'status_is_paused "$(status_declared_wait_line "$2")"; then printf stopped; fi',
+                          BIN / "fm-status-event-lib.sh", self.state / (task["id"] + ".status")).strip() == "stopped"
+ 
++    def declared_done(self, task_id):
++        """True when the task's latest durable status event is `done`; read without folding the log."""
++        return self.bash('. "$1"; status_line_verb "$(last_status_line "$2")"', BIN / "fm-status-event-lib.sh",
++                         self.state / (task_id + ".status")).strip() == "done"
++
+     def backlog_rows(self):
+         by_id = {t["id"]: t for t in self.tasks}
+         dispatched = {p.name.rsplit(".", 1)[0] for p in self.state_files if p.name.endswith((".meta", ".status"))}
+@@ -530,15 +535,20 @@ class Collector:
+             if not stopped and (task["endpoint"].get("exists") is False or alive in ("dead", "missing")):
+                 self.add("missing_worker", task["id"], "recover the assigned worker without discarding work",
+                          mtime(self.state / (task["id"] + ".status")) or mtime(self.state / (task["id"] + ".meta")))
+-            if task["current_state"].get("state") == "failed":
++            state = task["current_state"].get("state")
++            if state == "failed":
+                 # A scout's report is output to consume, not proof its failed
+                 # investigation has been resolved by the supervising owner.
+                 if not self.captain_dropped(task) and (task["kind"] == "scout" or not self.source(
+                         "failed deliverable " + task["id"], self.deliverable_landed, task)):
+                     self.add("failed_task", task["id"], "recover the failed work or record why it ends",
+                              mtime(self.state / (task["id"] + ".status")))
+-            elif (task["current_state"].get("state") == "done" and not task["pr"].get("url")
++            elif ((state == "done" or (state == "unknown" and stopped)) and not task["pr"].get("url")
+                   and not self.captain_dropped(task)
++                  # The durable status log, not the live pane, owns the completion declaration: a closed
++                  # or unreadable pane must not retire the owner handoff its last `done` line created.
++                  and (state == "done" or self.source("completion declaration " + task["id"],
++                                                      self.declared_done, task["id"]))
+                   and (task["kind"] == "scout" or not self.source(
+                       "completed deliverable " + task["id"], self.deliverable_landed, task))):
+                 # A report still needs owner consumption, but an already landed
+@@ -551,7 +561,7 @@ class Collector:
+                          else "advance the committed candidate through its selected delivery path",
+                          status_at, evidence="worker completion is a handoff, not final acceptance",
+                          source=self.source("completion provenance " + task["id"], self.task_source, task["id"]))
+-            elif task["current_state"].get("state") == "working" and alive == "alive":
++            elif state == "working" and alive == "alive":
+                 self.source("progress " + task["id"], self.stalled, task)
+             self.source("unlanded work " + task["id"], self.unlanded, task)
+ 
+diff --git a/docs/configuration.md b/docs/configuration.md
+index 49ad280a7..44e94a936 100644
+--- a/docs/configuration.md
++++ b/docs/configuration.md
+@@ -866,7 +866,7 @@ For a non-informational row, an unknown age stays `null` and counts as overdue,
+ | `unhandled_board_answer` | this home's `state/procevent-inbox/*.result` has a `lavish` `.adapter` sibling and no `.handled` sibling; captures from other adapters never appear; firstmate owns routing, the next action names the captured board-answer file and its `.owner-task` value (or an unknown owner), and age comes from the result's mtime regardless of a parked, dead, or missing owner task; a result whose owner task is a current, live `working` task is an informational row owned by `worker:<id>` whose action says that worker holds the round | 300 s |
+ | `interrupted_teardown` | this home's `state/<id>.teardown-return-pending` record names the current `state/<id>.meta` spawn generation: a teardown reserved that pool task's slot and was interrupted before returning it, possibly after closing its processes or endpoint; the next action is re-running teardown (the idle reaper retries ordinary tasks itself) and the evidence is the slot path; age comes from the record's mtime | 1800 s |
+ | `failed_task` | a task record's current state is `failed` and its deliverable is neither landed nor recorded as dropped; a failed scout remains actionable even when its report exists | 1800 s |
+-| `completed_task` | an ordinary task is `done` without a recorded PR and is not recorded as dropped: firstmate must consume a scout report and complete its owner handoff, or advance an unlanded ship candidate through its selected delivery path; existing delivery proof excludes already landed ships, but a scout report alone does not establish owner consumption; collection never accepts, launches or lands work; a status log that cannot be read degrades coverage for that task and its row uses the log's mtime | 1800 s |
++| `completed_task` | an ordinary task's current state is `done`, or its pane is closed or unreadable and its latest status event is `done`, without a recorded PR and is not recorded as dropped: firstmate must consume a scout report and complete its owner handoff, or advance an unlanded ship candidate through its selected delivery path; existing delivery proof excludes already landed ships, but a scout report alone does not establish owner consumption; collection never accepts, launches or lands work; a status log that cannot be read degrades coverage for that task and its row uses the log's mtime | 1800 s |
+ | `stalled_worker` | a live worker reads `working` but has no recent commit, status line, or pipeline progress within its limit; the row names the concrete wait from the worker's active pipeline step, declared status, or bounded pane evidence, its stable step, declaration, and last-progress timestamps when known, and any last error-looking pane line; pane-derived text has every digit run masked as `#`, so retry counters and countdowns do not change the evidence, and elapsed time stays in `age_seconds` rather than changing the evidence digest; missing wait evidence is stated explicitly rather than reported as merely busy | 3600 s |
+ | `silent_report` | a live direct ship, scout, or secondmate has not reported to this home; excluded reports remain informational with their reason in evidence, and declared waits use the existing long cadence | 900 s |
+ | `unlanded_commit` | a ship task's copy holds nonmerge commits absent from the default branch and not represented by its open or merged PR's actual head | 86400 s |
+diff --git a/tests/fm-open-loops.test.sh b/tests/fm-open-loops.test.sh
+index d06d9ee2b..3a3c56477 100755
+--- a/tests/fm-open-loops.test.sh
++++ b/tests/fm-open-loops.test.sh
+@@ -246,12 +246,19 @@ completion_tasks = [task('finished-review', world / 'no-review-copy', state='don
+                     task('failed-review', world / 'no-review-copy', state='failed', kind='scout'),
+                     task('candidate-ready', fresh, state='done'),
+                     task('dropped-review', world / 'no-review-copy', state='done', kind='scout'),
+-                    task('dropped-candidate', fresh, state='done')]
++                    task('dropped-candidate', fresh, state='done'),
++                    # The durable `done` line owns the handoff when the pane closed or cannot be read.
++                    task('closed-review', world / 'no-review-copy', state='unknown', exists=False, alive='dead',
++                         kind='scout'),
++                    task('unread-review', world / 'no-review-copy', state='unknown', kind='scout'),
++                    task('paused-review', world / 'no-review-copy', state='unknown', kind='scout')]
++declared = dict.fromkeys(('closed-review', 'unread-review'), 'done')
++declared['paused-review'] = 'paused'
+ completion_backlog = backlog + [dict(id=name, structured=True, state='done', captain_drop=True)
+                                 for name in ('dropped-review', 'dropped-candidate')]
+ for item in completion_tasks:
+     name = item['id']
+-    (home / f'state/{name}.status').write_text(f"{item['current_state']['state']} [at={hours(1)}]: ready for owner\n")
++    (home / f'state/{name}.status').write_text(f"{declared.get(name, item['current_state']['state'])} [at={hours(1)}]: ready for owner\n")
+     (home / f'state/{name}.meta').write_text(f"kind={item['kind']}\nspawn_gen=fixture-{name}\n")
+     if item['kind'] == 'scout':
+         report_dir = home / 'data' / name
+@@ -262,7 +269,7 @@ for item in completion_tasks:
+ for _ in range(2):  # a fresh collector process must recover the same unfinished handoff
+     completion_report = ledger()
+     completed = rows(completion_report, 'completed_task')
+-    assert set(completed) == {'finished-review', 'candidate-ready'}, completed
++    assert set(completed) == {'finished-review', 'candidate-ready', 'closed-review', 'unread-review'}, completed
+     assert all(r['owner'] == 'firstmate' and r['overdue'] for r in completed.values()), completed
+     assert 'failed-review' in rows(completion_report, 'failed_task'), completion_report
+     # The reviewed-inventory attestation alone is not owner acceptance: the row stays until teardown or a drop.
+@@ -271,19 +278,25 @@ for _ in range(2):  # a fresh collector process must recover the same unfinished
+ # A completed task whose status log cannot be folded degrades coverage for that
+ # one read; it keeps its own row and never hides a later task's obligations.
+ blind = task('blind-review', world / 'no-review-copy', state='done', alive='dead', kind='scout')
++# The same unreadable log behind a closed pane still keeps its row: the declaration read does not fold.
++blind_closed = task('blind-closed', world / 'no-review-copy', state='unknown', exists=False, alive='dead', kind='scout')
+ after_blind = task('after-blind', lost, state='failed', exists=False, alive='dead')
+ (home / 'state/blind-review.status').write_text(f'working [at={hours(2)}]: {"x" * 80}\n' * 40
+                                                 + f'done [at={hours(1)}]: ready for owner\n')
+-(home / 'snapshot.json').write_text(json.dumps(dict(schema='fm-fleet-home-input.v1', tasks=[blind, after_blind],
++shutil.copy(home / 'state/blind-review.status', home / 'state/blind-closed.status')
++(home / 'snapshot.json').write_text(json.dumps(dict(schema='fm-fleet-home-input.v1', tasks=[blind, blind_closed, after_blind],
+                                                     backlog=dict(present=True, records=backlog))))
+ blind_report = json.loads(out([code / 'bin/fm-open-loops.sh', '--json'],
+                               env=dict(env, FM_STATUS_CAP_BYTES='2048', FM_STATUS_CAP_RESERVE_BYTES='1')))
+ assert not blind_report['complete'], blind_report
+ assert 'completion status blind-review' in rows(blind_report, 'coverage')['ledger degraded']['evidence'], blind_report
+-assert rows(blind_report, 'completed_task')['blind-review']['overdue'], blind_report
++for name in ('blind-review', 'blind-closed'):
++    assert f'completion status {name}' in rows(blind_report, 'coverage')['ledger degraded']['evidence'], blind_report
++    assert rows(blind_report, 'completed_task')[name]['overdue'], blind_report
+ for category in ('failed_task', 'missing_worker', 'unlanded_commit'):
+     assert 'after-blind' in rows(blind_report, category), (category, blind_report)
+ (home / 'state/blind-review.status').unlink()
++(home / 'state/blind-closed.status').unlink()
+ # Retirement is owned elsewhere; collection never launches or accepts the work.
+ (home / 'snapshot.json').write_text(json.dumps(dict(schema='fm-fleet-home-input.v1', tasks=tasks,
+                                                     backlog=dict(present=True, records=backlog))))

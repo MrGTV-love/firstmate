@@ -1,0 +1,2 @@
+scratch removed after runs: base/prefix trees, r2r3 driver scratch, test fixture homes
+retained (not re-run): full-wake-queue/ at 1a1fb7c65; test blob 306dd7b9 unchanged at c05cd84a7; that test stubs FM_OPEN_LOOPS_BIN=/usr/bin/true (tests/lib.sh:656) so it does not reach bin/fm_open_loops.py, the only runtime file changed since

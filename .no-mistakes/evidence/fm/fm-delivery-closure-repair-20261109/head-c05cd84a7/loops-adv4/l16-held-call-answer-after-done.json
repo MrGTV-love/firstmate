@@ -1,0 +1,699 @@
+{
+  "scenario": "l16-held-call-answer-after-done",
+  "candidate": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6",
+  "passed": true,
+  "assertions": {
+    "hold_complete_verify_ok": true,
+    "live_task_keeps_an_owner_row_after_real_answer": true,
+    "closed_task_keeps_an_owner_row_after_real_answer": true,
+    "live_task_keeps_an_owner_row_at_end": true,
+    "closed_task_keeps_an_owner_row_at_end": true
+  },
+  "extra": {
+    "owner_exits": {
+      "ans-live": {
+        "hold": 0,
+        "complete": 0,
+        "verify": 0
+      },
+      "ans-closed": {
+        "hold": 0,
+        "complete": 0,
+        "verify": 0
+      }
+    },
+    "steps": {
+      "1-before-owner": {
+        "ans-live": {
+          "last_line": "done [at=1794360830]: report ready for owner; one open choice",
+          "crew": "state: done \u00b7 source: status-log \u00b7 report ready for owner; one open choice",
+          "categories": [
+            "completed_task",
+            "silent_report"
+          ]
+        },
+        "ans-closed": {
+          "last_line": "done [at=1794360830]: report ready for owner; one open choice",
+          "crew": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-ans-closed",
+          "categories": [
+            "completed_task"
+          ]
+        },
+        "complete": true,
+        "coverage": []
+      },
+      "2-after-hold-and-complete": {
+        "ans-live": {
+          "last_line": "done [at=1794360830]: report ready for owner; one open choice",
+          "crew": "state: done \u00b7 source: status-log \u00b7 report ready for owner; one open choice",
+          "categories": [
+            "completed_task",
+            "silent_report"
+          ]
+        },
+        "ans-closed": {
+          "last_line": "done [at=1794360830]: report ready for owner; one open choice",
+          "crew": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-ans-closed",
+          "categories": [
+            "completed_task"
+          ]
+        },
+        "complete": true,
+        "coverage": []
+      },
+      "3-after-real-answer": {
+        "ans-live": {
+          "last_line": "done [at=1794360830]: report ready for owner; one open choice",
+          "crew": "state: done \u00b7 source: status-log \u00b7 report ready for owner; one open choice",
+          "categories": [
+            "completed_task",
+            "silent_report"
+          ]
+        },
+        "ans-closed": {
+          "last_line": "done [at=1794360830]: report ready for owner; one open choice",
+          "crew": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-ans-closed",
+          "categories": [
+            "completed_task"
+          ]
+        },
+        "complete": true,
+        "coverage": []
+      },
+      "4-after-close-key": {
+        "ans-live": {
+          "last_line": "done [at=1794360830]: report ready for owner; one open choice",
+          "crew": "state: done \u00b7 source: status-log \u00b7 report ready for owner; one open choice",
+          "categories": [
+            "completed_task",
+            "silent_report"
+          ]
+        },
+        "ans-closed": {
+          "last_line": "done [at=1794360830]: report ready for owner; one open choice",
+          "crew": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-ans-closed",
+          "categories": [
+            "completed_task"
+          ]
+        },
+        "complete": true,
+        "coverage": []
+      }
+    },
+    "send": {
+      "ans-live": [
+        0,
+        "",
+        "ask(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).\n\u25cf  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.\n\u25cf  This is a supervision warning only; the requested message WILL still be sent.\n\u25cf  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n"
+      ],
+      "ans-closed": [
+        0,
+        "",
+        "ab home /Users/charlesabrooker/tmp/fm-lab.9zrqy2iu\nWARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\nfm-send: doorbell not typed because the agent in isolated:fm-ans-closed has exited; the steer is durably recorded at /Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/state/ans-closed.inbox/001.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane\n"
+      ]
+    },
+    "close_key": {
+      "ans-live": [
+        1,
+        "",
+        "fm-captain-hold: key route is not open in ans-live; no matching evidence-backed close to replay\n"
+      ],
+      "ans-closed": [
+        1,
+        "",
+        "fm-captain-hold: key route is not open in ans-closed; no matching evidence-backed close to replay\n"
+      ]
+    },
+    "status_logs": {
+      "ans-live": [
+        "needs-decision [key=route] [at=1794360830]: route north or south",
+        "done [at=1794360830]: report ready for owner; one open choice"
+      ],
+      "ans-closed": [
+        "needs-decision [key=route] [at=1794360830]: route north or south",
+        "done [at=1794360830]: report ready for owner; one open choice"
+      ]
+    }
+  },
+  "env": {
+    "PATH": "/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/fakebin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.8.14/libexec:/opt/homebrew/Cellar/pyenv/2.8.14/plugins/python-build/bin:/opt/homebrew/Cellar/pyenv/2.8.14/plugins/pyenv-link/bin:/opt/homebrew/Cellar/pyenv/2.8.14/plugins/pyenv-binary/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources",
+    "HOME": "/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu",
+    "TMPDIR": "/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/tmp",
+    "FM_HOME": "/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu",
+    "TMUX_TMPDIR": "/tmp/fml.Yrbm6r",
+    "FM_GITHUB_ACCOUNTING": "0",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "NO_MISTAKES_GATE": "1",
+    "GIT_CONFIG_NOSYSTEM": "1",
+    "GIT_CONFIG_GLOBAL": "/dev/null",
+    "GIT_AUTHOR_NAME": "Fixture",
+    "GIT_AUTHOR_EMAIL": "fixture@example.invalid",
+    "GIT_COMMITTER_NAME": "Fixture",
+    "GIT_COMMITTER_EMAIL": "fixture@example.invalid"
+  },
+  "transcript": [
+    {
+      "label": "backlog-add-ans-live",
+      "argv": [
+        "tasks-axi",
+        "add",
+        "ans-live",
+        "fixture scout",
+        "--kind",
+        "scout",
+        "--repo",
+        "sample"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: added ans-live (scout, repo sample) -> Queued\ntask:\n  id: ans-live\n  title: fixture scout\n  state: queued\n  blocked: no\n  blocked_by: none\n  held: no\n  hold_reason: \"-\"\n  hold_kind: \"-\"\n  hold_until: \"-\"\n  kind: scout\n  repo: sample\n  priority: \"-\"\n  created: 2026-11-10\n  closed: \"-\"\n  deps: none\n  links: none\n  body: \"\"\nhelp[2]:\n  - Run `tasks-axi start ans-live` to move it to in flight\n  - Run `tasks-axi block ans-live --by <other>` to record a dependency\n",
+      "stderr": ""
+    },
+    {
+      "label": "backlog-start-ans-live",
+      "argv": [
+        "tasks-axi",
+        "start",
+        "ans-live"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: start ans-live -> In flight\nhelp[1]:\n  - Run `tasks-axi done ans-live --pr <url>` when it ships\n",
+      "stderr": ""
+    },
+    {
+      "label": "status-append needs-decision [key=route] [at=1794360830]: route ",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-status-append.sh",
+        "/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/state/ans-live.status",
+        "needs-decision [key=route] [at=1794360830]: route north or south"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "tmux-window-ans-live",
+      "argv": [
+        "tmux",
+        "new-session",
+        "-d",
+        "-s",
+        "isolated",
+        "-n",
+        "fm-ans-live",
+        "/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/fakebin/claude-idle-stand-in 900"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "busy-arm-ans-live",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-busy-event.sh",
+        "arm",
+        "/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/state",
+        "ans-live"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "g1794368030.48109.6608\n",
+      "stderr": ""
+    },
+    {
+      "label": "busy-idle-ans-live",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-busy-event.sh",
+        "apply",
+        "/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/state",
+        "ans-live",
+        "idle",
+        "--gen",
+        "g1794368030.48109.6608",
+        "--source",
+        "claude-hook",
+        "--event",
+        "stop"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "status-append done [at=1794360830]: report ready for owner; one ",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-status-append.sh",
+        "/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/state/ans-live.status",
+        "done [at=1794360830]: report ready for owner; one open choice"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "backlog-add-ans-closed",
+      "argv": [
+        "tasks-axi",
+        "add",
+        "ans-closed",
+        "fixture scout",
+        "--kind",
+        "scout",
+        "--repo",
+        "sample"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: added ans-closed (scout, repo sample) -> Queued\ntask:\n  id: ans-closed\n  title: fixture scout\n  state: queued\n  blocked: no\n  blocked_by: none\n  held: no\n  hold_reason: \"-\"\n  hold_kind: \"-\"\n  hold_until: \"-\"\n  kind: scout\n  repo: sample\n  priority: \"-\"\n  created: 2026-11-10\n  closed: \"-\"\n  deps: none\n  links: none\n  body: \"\"\nhelp[2]:\n  - Run `tasks-axi start ans-closed` to move it to in flight\n  - Run `tasks-axi block ans-closed --by <other>` to record a dependency\n",
+      "stderr": ""
+    },
+    {
+      "label": "backlog-start-ans-closed",
+      "argv": [
+        "tasks-axi",
+        "start",
+        "ans-closed"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: start ans-closed -> In flight\nhelp[1]:\n  - Run `tasks-axi done ans-closed --pr <url>` when it ships\n",
+      "stderr": ""
+    },
+    {
+      "label": "status-append needs-decision [key=route] [at=1794360830]: route ",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-status-append.sh",
+        "/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/state/ans-closed.status",
+        "needs-decision [key=route] [at=1794360830]: route north or south"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "tmux-window-ans-closed",
+      "argv": [
+        "tmux",
+        "new-window",
+        "-d",
+        "-t",
+        "isolated:",
+        "-n",
+        "fm-ans-closed",
+        "/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/fakebin/claude-idle-stand-in 900"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "busy-arm-ans-closed",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-busy-event.sh",
+        "arm",
+        "/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/state",
+        "ans-closed"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "g1794368031.48389.19580\n",
+      "stderr": ""
+    },
+    {
+      "label": "busy-idle-ans-closed",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-busy-event.sh",
+        "apply",
+        "/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/state",
+        "ans-closed",
+        "idle",
+        "--gen",
+        "g1794368031.48389.19580",
+        "--source",
+        "claude-hook",
+        "--event",
+        "stop"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "status-append done [at=1794360830]: report ready for owner; one ",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-status-append.sh",
+        "/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/state/ans-closed.status",
+        "done [at=1794360830]: report ready for owner; one open choice"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "close-window-ans-closed",
+      "argv": [
+        "tmux",
+        "kill-window",
+        "-t",
+        "isolated:fm-ans-closed"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "ledger-1-before-owner",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-open-loops.sh",
+        "--json"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1794368032, \"home\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu\", \"complete\": true, \"rows\": [{\"id\": \"8dfd9ee57e810aa8ca8459a7\", \"category\": \"completed_task\", \"subject\": \"ans-closed\", \"owner\": \"firstmate\", \"next_action\": \"consume the report, complete the owner handoff and tear the task down\", \"age_seconds\": 7202, \"limit_seconds\": 1800, \"overdue\": true, \"evidence\": \"worker completion is a handoff, not final acceptance\", \"source\": {\"home\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu\", \"state\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/state\", \"data\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/data\", \"config\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/config\", \"task\": \"ans-closed\", \"generation\": \"e2046774ede850f0231ee0503c1acd8a68900952f92422e96e6fb27a5c2a51fe\"}}, {\"id\": \"d684e5d4e2c05c0e36bffc70\", \"category\": \"completed_task\", \"subject\": \"ans-live\", \"owner\": \"firstmate\", \"next_action\": \"consume the report, complete the owner handoff and tear the task down\", \"age_seconds\": 7202, \"limit_seconds\": 1800, \"overdue\": true, \"evidence\": \"worker completion is a handoff, not final acceptance\", \"source\": {\"home\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu\", \"state\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/state\", \"data\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/data\", \"config\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/config\", \"task\": \"ans-live\", \"generation\": \"dce5e4045d3cdf8a33086054489a172e452a8d639dd58e402c3fa40e00c3a062\"}}, {\"id\": \"3fc11e345acbbaa6ab92423c\", \"category\": \"silent_report\", \"subject\": \"ans-live\", \"owner\": \"firstmate\", \"next_action\": \"check in: progress, blockers, cross-workstream dependencies\", \"age_seconds\": 7202, \"limit_seconds\": 900, \"overdue\": false, \"evidence\": \"last heard: status=1794360830; inbox acknowledgement=None; resolved reply=None; excluded: done/ready task is covered by PR or completion handoff\", \"informational\": true}]}\n",
+      "stderr": "",
+      "rows_summary": [
+        "completed_task ans-closed overdue=True",
+        "completed_task ans-live overdue=True",
+        "silent_report ans-live overdue=False"
+      ]
+    },
+    {
+      "label": "crew-state-ans-live",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-crew-state.sh",
+        "ans-live"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "state: done \u00b7 source: status-log \u00b7 report ready for owner; one open choice\n",
+      "stderr": ""
+    },
+    {
+      "label": "crew-state-ans-closed",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-crew-state.sh",
+        "ans-closed"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-ans-closed\n",
+      "stderr": ""
+    },
+    {
+      "label": "owner-hold-ans-live",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-captain-hold.sh",
+        "hold",
+        "ans-live-decision-route",
+        "--title",
+        "Choose route",
+        "--reason",
+        "Question: route? Options: north; south",
+        "--repo",
+        "sample",
+        "--origin",
+        "ans-live"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ans-live-decision-route\n",
+      "stderr": ""
+    },
+    {
+      "label": "owner-complete-ans-live",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-captain-hold.sh",
+        "complete",
+        "ans-live",
+        "ans-live-decision-route"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "complete: ans-live captain-call inventory reviewed (ans-live-decision-route)\n",
+      "stderr": ""
+    },
+    {
+      "label": "owner-verify-ans-live",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-captain-hold.sh",
+        "verify",
+        "ans-live"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "verified: ans-live captain-call inventory\n",
+      "stderr": ""
+    },
+    {
+      "label": "owner-hold-ans-closed",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-captain-hold.sh",
+        "hold",
+        "ans-closed-decision-route",
+        "--title",
+        "Choose route",
+        "--reason",
+        "Question: route? Options: north; south",
+        "--repo",
+        "sample",
+        "--origin",
+        "ans-closed"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ans-closed-decision-route\n",
+      "stderr": ""
+    },
+    {
+      "label": "owner-complete-ans-closed",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-captain-hold.sh",
+        "complete",
+        "ans-closed",
+        "ans-closed-decision-route"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "complete: ans-closed captain-call inventory reviewed (ans-closed-decision-route)\n",
+      "stderr": ""
+    },
+    {
+      "label": "owner-verify-ans-closed",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-captain-hold.sh",
+        "verify",
+        "ans-closed"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "verified: ans-closed captain-call inventory\n",
+      "stderr": ""
+    },
+    {
+      "label": "ledger-2-after-hold-and-complete",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-open-loops.sh",
+        "--json"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1794368048, \"home\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu\", \"complete\": true, \"rows\": [{\"id\": \"8dfd9ee57e810aa8ca8459a7\", \"category\": \"completed_task\", \"subject\": \"ans-closed\", \"owner\": \"firstmate\", \"next_action\": \"consume the report, complete the owner handoff and tear the task down\", \"age_seconds\": 7218, \"limit_seconds\": 1800, \"overdue\": true, \"evidence\": \"worker completion is a handoff, not final acceptance\", \"source\": {\"home\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu\", \"state\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/state\", \"data\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/data\", \"config\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/config\", \"task\": \"ans-closed\", \"generation\": \"b3e8a4973253e4c4f5095f09eb694e8ae780b90a68321ab773cd923b63e99d09\"}}, {\"id\": \"d684e5d4e2c05c0e36bffc70\", \"category\": \"completed_task\", \"subject\": \"ans-live\", \"owner\": \"firstmate\", \"next_action\": \"consume the report, complete the owner handoff and tear the task down\", \"age_seconds\": 7218, \"limit_seconds\": 1800, \"overdue\": true, \"evidence\": \"worker completion is a handoff, not final acceptance\", \"source\": {\"home\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu\", \"state\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/state\", \"data\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/data\", \"config\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/config\", \"task\": \"ans-live\", \"generation\": \"9d62f28c1c89ee0aebe3dae36c326e9bd3659b6d3568600e5ec936b68181eb67\"}}, {\"id\": \"3fc11e345acbbaa6ab92423c\", \"category\": \"silent_report\", \"subject\": \"ans-live\", \"owner\": \"firstmate\", \"next_action\": \"check in: progress, blockers, cross-workstream dependencies\", \"age_seconds\": 7218, \"limit_seconds\": 900, \"overdue\": false, \"evidence\": \"last heard: status=1794360830; inbox acknowledgement=None; resolved reply=None; excluded: done/ready task is covered by PR or completion handoff\", \"informational\": true}, {\"id\": \"031a1f8921a33117a5d51bb6\", \"category\": \"unanswered_question\", \"subject\": \"ans-closed-decision-route:captain-hold\", \"owner\": \"captain\", \"next_action\": \"resolve the captain hold or record its next decision date\", \"age_seconds\": 8, \"limit_seconds\": 1800, \"overdue\": false, \"evidence\": \"Question: route? Options: north; south\", \"source\": {\"home\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu\", \"state\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/state\", \"data\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/data\", \"config\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/config\", \"kind\": \"captain_hold\", \"task\": \"ans-closed-decision-route\", \"decision\": \"e0adbcb92671f78bdbb673f1a7cf8ad8f2d39ad7187b368cf2bfbff3bc54dd93\"}}, {\"id\": \"edd8a498817ba3424371eeb1\", \"category\": \"unanswered_question\", \"subject\": \"ans-live-decision-route:captain-hold\", \"owner\": \"captain\", \"next_action\": \"resolve the captain hold or record its next decision date\", \"age_seconds\": 15, \"limit_seconds\": 1800, \"overdue\": false, \"evidence\": \"Question: route? Options: north; south\", \"source\": {\"home\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu\", \"state\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/state\", \"data\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/data\", \"config\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/config\", \"kind\": \"captain_hold\", \"task\": \"ans-live-decision-route\", \"decision\": \"0216a8a00dab1969d5620e86e5d8fb2abfdd1646054311295325e7683d8d2bff\"}}]}\n",
+      "stderr": "",
+      "rows_summary": [
+        "completed_task ans-closed overdue=True",
+        "completed_task ans-live overdue=True",
+        "silent_report ans-live overdue=False",
+        "unanswered_question ans-closed-decision-route:captain-hold overdue=False",
+        "unanswered_question ans-live-decision-route:captain-hold overdue=False"
+      ]
+    },
+    {
+      "label": "crew-state-ans-live",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-crew-state.sh",
+        "ans-live"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "state: done \u00b7 source: status-log \u00b7 report ready for owner; one open choice\n",
+      "stderr": ""
+    },
+    {
+      "label": "crew-state-ans-closed",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-crew-state.sh",
+        "ans-closed"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-ans-closed\n",
+      "stderr": ""
+    },
+    {
+      "label": "owner-answer-ans-live",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-send.sh",
+        "ans-live",
+        "--resolve-key",
+        "route",
+        "go north"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.9zrqy2iu\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\u25cf  WATCHER DOWN - SUPERVISION IS OFF\n\u25cf  2 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).\n\u25cf  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.\n\u25cf  This is a supervision warning only; the requested message WILL still be sent.\n\u25cf  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n"
+    },
+    {
+      "label": "owner-answer-ans-closed",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-send.sh",
+        "ans-closed",
+        "--resolve-key",
+        "route",
+        "go north"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.9zrqy2iu\nWARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\nfm-send: doorbell not typed because the agent in isolated:fm-ans-closed has exited; the steer is durably recorded at /Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/state/ans-closed.inbox/001.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane\n"
+    },
+    {
+      "label": "ledger-3-after-real-answer",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-open-loops.sh",
+        "--json"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1794368065, \"home\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu\", \"complete\": true, \"rows\": [{\"id\": \"8dfd9ee57e810aa8ca8459a7\", \"category\": \"completed_task\", \"subject\": \"ans-closed\", \"owner\": \"firstmate\", \"next_action\": \"consume the report, complete the owner handoff and tear the task down\", \"age_seconds\": 7235, \"limit_seconds\": 1800, \"overdue\": true, \"evidence\": \"worker completion is a handoff, not final acceptance\", \"source\": {\"home\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu\", \"state\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/state\", \"data\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/data\", \"config\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/config\", \"task\": \"ans-closed\", \"generation\": \"b3e8a4973253e4c4f5095f09eb694e8ae780b90a68321ab773cd923b63e99d09\"}}, {\"id\": \"d684e5d4e2c05c0e36bffc70\", \"category\": \"completed_task\", \"subject\": \"ans-live\", \"owner\": \"firstmate\", \"next_action\": \"consume the report, complete the owner handoff and tear the task down\", \"age_seconds\": 7235, \"limit_seconds\": 1800, \"overdue\": true, \"evidence\": \"worker completion is a handoff, not final acceptance\", \"source\": {\"home\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu\", \"state\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/state\", \"data\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/data\", \"config\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/config\", \"task\": \"ans-live\", \"generation\": \"9d62f28c1c89ee0aebe3dae36c326e9bd3659b6d3568600e5ec936b68181eb67\"}}, {\"id\": \"3fc11e345acbbaa6ab92423c\", \"category\": \"silent_report\", \"subject\": \"ans-live\", \"owner\": \"firstmate\", \"next_action\": \"check in: progress, blockers, cross-workstream dependencies\", \"age_seconds\": 7235, \"limit_seconds\": 900, \"overdue\": false, \"evidence\": \"last heard: status=1794360830; inbox acknowledgement=None; resolved reply=None; excluded: done/ready task is covered by PR or completion handoff\", \"informational\": true}]}\n",
+      "stderr": "",
+      "rows_summary": [
+        "completed_task ans-closed overdue=True",
+        "completed_task ans-live overdue=True",
+        "silent_report ans-live overdue=False"
+      ]
+    },
+    {
+      "label": "crew-state-ans-live",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-crew-state.sh",
+        "ans-live"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "state: done \u00b7 source: status-log \u00b7 report ready for owner; one open choice\n",
+      "stderr": ""
+    },
+    {
+      "label": "crew-state-ans-closed",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-crew-state.sh",
+        "ans-closed"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-ans-closed\n",
+      "stderr": ""
+    },
+    {
+      "label": "owner-close-key-ans-live",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-captain-hold.sh",
+        "reconcile",
+        "close-key",
+        "ans-live",
+        "--key",
+        "route",
+        "--verified-outcome",
+        "answered",
+        "--evidence-file",
+        "/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/tmp/evidence.txt"
+      ],
+      "exit": 1,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": "fm-captain-hold: key route is not open in ans-live; no matching evidence-backed close to replay\n"
+    },
+    {
+      "label": "owner-close-key-ans-closed",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-captain-hold.sh",
+        "reconcile",
+        "close-key",
+        "ans-closed",
+        "--key",
+        "route",
+        "--verified-outcome",
+        "answered",
+        "--evidence-file",
+        "/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/tmp/evidence.txt"
+      ],
+      "exit": 1,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": "fm-captain-hold: key route is not open in ans-closed; no matching evidence-backed close to replay\n"
+    },
+    {
+      "label": "ledger-4-after-close-key",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-open-loops.sh",
+        "--json"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1794368072, \"home\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu\", \"complete\": true, \"rows\": [{\"id\": \"8dfd9ee57e810aa8ca8459a7\", \"category\": \"completed_task\", \"subject\": \"ans-closed\", \"owner\": \"firstmate\", \"next_action\": \"consume the report, complete the owner handoff and tear the task down\", \"age_seconds\": 7242, \"limit_seconds\": 1800, \"overdue\": true, \"evidence\": \"worker completion is a handoff, not final acceptance\", \"source\": {\"home\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu\", \"state\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/state\", \"data\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/data\", \"config\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/config\", \"task\": \"ans-closed\", \"generation\": \"b3e8a4973253e4c4f5095f09eb694e8ae780b90a68321ab773cd923b63e99d09\"}}, {\"id\": \"d684e5d4e2c05c0e36bffc70\", \"category\": \"completed_task\", \"subject\": \"ans-live\", \"owner\": \"firstmate\", \"next_action\": \"consume the report, complete the owner handoff and tear the task down\", \"age_seconds\": 7242, \"limit_seconds\": 1800, \"overdue\": true, \"evidence\": \"worker completion is a handoff, not final acceptance\", \"source\": {\"home\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu\", \"state\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/state\", \"data\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/data\", \"config\": \"/Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/config\", \"task\": \"ans-live\", \"generation\": \"9d62f28c1c89ee0aebe3dae36c326e9bd3659b6d3568600e5ec936b68181eb67\"}}, {\"id\": \"3fc11e345acbbaa6ab92423c\", \"category\": \"silent_report\", \"subject\": \"ans-live\", \"owner\": \"firstmate\", \"next_action\": \"check in: progress, blockers, cross-workstream dependencies\", \"age_seconds\": 7242, \"limit_seconds\": 900, \"overdue\": false, \"evidence\": \"last heard: status=1794360830; inbox acknowledgement=None; resolved reply=None; excluded: done/ready task is covered by PR or completion handoff\", \"informational\": true}]}\n",
+      "stderr": "",
+      "rows_summary": [
+        "completed_task ans-closed overdue=True",
+        "completed_task ans-live overdue=True",
+        "silent_report ans-live overdue=False"
+      ]
+    },
+    {
+      "label": "crew-state-ans-live",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-crew-state.sh",
+        "ans-live"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "state: done \u00b7 source: status-log \u00b7 report ready for owner; one open choice\n",
+      "stderr": ""
+    },
+    {
+      "label": "crew-state-ans-closed",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-crew-state.sh",
+        "ans-closed"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-ans-closed\n",
+      "stderr": ""
+    }
+  ]
+}

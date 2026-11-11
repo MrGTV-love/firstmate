@@ -1,0 +1,244 @@
+[
+ {
+  "file": "drivers/briefs/r5a-scout-no-choices.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "drivers/briefs/r5b-scout-open-choice.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "drivers/briefs/r5c-fold-scout.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "drivers/briefs/r5c-fold-secondmate.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "drivers/briefs/r5c-fold-ship.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "drivers/briefs/r5c-summary.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "drivers/briefs/r5d-role-briefs.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "drivers/queue/s1-summary.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "drivers/queue/s1-two-requests-base.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "drivers/queue/s1-two-requests-candidate.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "drivers/queue/s11-odd-payloads.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "drivers/queue/s12-state-parity-base.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "drivers/queue/s12-state-parity-candidate.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "drivers/queue/s12-summary.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "drivers/queue/s2-retry-ack-second-drain.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "drivers/queue/s2b-stale-generation-base.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "drivers/queue/s2b-stale-generation-candidate.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "drivers/queue/s2b-summary.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "drivers/queue/s3-malformed-markers.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "drivers/queue/s3b-only-malformed-output.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "drivers/queue/s4-queue-write-failure-is-fatal.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "drivers/queue/s5-unauthenticated-check.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "drivers/queue/s6-non-event-routes-stay-state.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "drivers/queue/s6b-stop-notice-stays-state.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "drivers/queue/s6c-pr-poll-stays-state.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "drivers/queue/s7-unpresentable-pending-row.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "drivers/queue/s8-slack-emitter-identities.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "drivers/queue/s8b-slack-text-cannot-forge-events.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "drivers/queue/s9-prune-task-events.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "drivers/queue/s9b-real-teardown-prunes-events.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "loops-adv/l10-closed-pane-no-false-completion-rows.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "loops-adv/l11-closed-pane-row-retires-at-teardown.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "loops-adv/l12-done-line-under-other-live-states.json",
+  "passed": false,
+  "failed_assertions": [
+   "resolved_line_after_done_live_pane_keeps_an_owner_row"
+  ],
+  "superseded": "wrong oracle; see loops-adv/NOTE-l12-superseded.txt"
+ },
+ {
+  "file": "loops-adv/l9-closed-pane-owner-actions-keep-row.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "loops-adv2/l13-owner-answer-after-done.json",
+  "passed": false,
+  "failed_assertions": [
+   "real_answer_delivered",
+   "answer_wrote_resolved_line"
+  ],
+  "superseded": "wrong oracle; see loops-adv/NOTE-l12-superseded.txt"
+ },
+ {
+  "file": "loops-adv3/l14-real-answer-after-done-cannot-displace-done.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "loops-adv3/l15-new-turn-after-done-then-idle.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "loops-adv4/l16-held-call-answer-after-done.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "loops/l1-done-scout-owner-handoff.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "loops/l2-failed-scout-with-report.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "loops/l3-done-ship-candidate.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "loops/l4-captain-drop.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "loops/l5-unreadable-completion-status-isolated.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "loops/l6-done-scout-pane-gone.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "loops/l7-complete-keeps-pr-footer-base.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "loops/l7-complete-keeps-pr-footer-candidate.json",
+  "passed": true,
+  "failed_assertions": []
+ },
+ {
+  "file": "loops/l8-done-scout-pane-not-provably-idle.json",
+  "passed": true,
+  "failed_assertions": []
+ }
+]

@@ -1,0 +1,12 @@
+{
+  "l16-held-call-answer-after-done": {
+    "passed": true,
+    "assertions": {
+      "hold_complete_verify_ok": true,
+      "live_task_keeps_an_owner_row_after_real_answer": true,
+      "closed_task_keeps_an_owner_row_after_real_answer": true,
+      "live_task_keeps_an_owner_row_at_end": true,
+      "closed_task_keeps_an_owner_row_at_end": true
+    }
+  }
+}

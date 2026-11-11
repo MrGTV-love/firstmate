@@ -1,0 +1,257 @@
+{
+ "scenario": "l9-closed-pane-owner-actions-keep-row",
+ "passed": true,
+ "assertions": {
+  "windows_closed": true,
+  "closed_rows_before_owner": true,
+  "complete_none_ok": true,
+  "row_stays_after_complete_none_on_closed_pane": true,
+  "hold_complete_verify_ok": true,
+  "closed_pane_task_keeps_an_owner_row_after_held_transfer": true,
+  "live_pane_task_keeps_an_owner_row_after_held_transfer": true
+ },
+ "extra": {
+  "crew_before": {
+   "review-none": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-review-none",
+   "review-held": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-review-held",
+   "review-held-live": "state: done \u00b7 source: status-log \u00b7 report ready for owner; one open choice"
+  },
+  "crew_after": {
+   "review-none": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-review-none",
+   "review-held": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-review-held",
+   "review-held-live": "state: done \u00b7 source: status-log \u00b7 report ready for owner; one open choice"
+  },
+  "last_status_line": {
+   "review-none": "done [at=1794359053]: report ready for owner",
+   "review-held": "done [at=1794359053]: report ready for owner; one open choice",
+   "review-held-live": "done [at=1794359053]: report ready for owner; one open choice"
+  },
+  "owner_exits": {
+   "review-held": [
+    0,
+    0,
+    0
+   ],
+   "review-held-live": [
+    0,
+    0,
+    0
+   ]
+  },
+  "rows_before": [
+   [
+    "completed_task",
+    "review-held",
+    true
+   ],
+   [
+    "completed_task",
+    "review-held-live",
+    true
+   ],
+   [
+    "completed_task",
+    "review-none",
+    true
+   ],
+   [
+    "silent_report",
+    "review-held-live",
+    false
+   ]
+  ],
+  "rows_after_none": [
+   [
+    "completed_task",
+    "review-held",
+    true
+   ],
+   [
+    "completed_task",
+    "review-held-live",
+    true
+   ],
+   [
+    "completed_task",
+    "review-none",
+    true
+   ],
+   [
+    "silent_report",
+    "review-held-live",
+    false
+   ]
+  ],
+  "rows_after_held": [
+   [
+    "completed_task",
+    "review-held",
+    true
+   ],
+   [
+    "completed_task",
+    "review-held-live",
+    true
+   ],
+   [
+    "completed_task",
+    "review-none",
+    true
+   ],
+   [
+    "silent_report",
+    "review-held-live",
+    false
+   ],
+   [
+    "unanswered_question",
+    "review-held-live-route-call:captain-hold",
+    false
+   ],
+   [
+    "unanswered_question",
+    "review-held-route-call:captain-hold",
+    false
+   ]
+  ],
+  "complete": true,
+  "coverage": []
+ }
+}
+{
+ "scenario": "l10-closed-pane-no-false-completion-rows",
+ "passed": true,
+ "assertions": {
+  "windows_closed": true,
+  "resumed_work_has_no_completed_task": true,
+  "resumed_work_is_a_missing_worker": true,
+  "paused_has_no_completed_task": true,
+  "dropped_has_no_completed_task": true,
+  "snapshot_records_pr": true,
+  "recorded_pr_has_no_completed_task": true,
+  "landed_ship_has_no_completed_task": true,
+  "unlanded_ship_keeps_completed_task": true,
+  "unlanded_ship_keeps_unlanded_commit": true
+ },
+ "extra": {
+  "crew": {
+   "resumed": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-resumed",
+   "paused-x": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-paused-x",
+   "dropped-gone": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-dropped-gone",
+   "pr-ship": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-pr-ship",
+   "landed-ship": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-landed-ship",
+   "unlanded-ship": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-unlanded-ship"
+  },
+  "prs": {
+   "dropped-gone": null,
+   "landed-ship": null,
+   "paused-x": null,
+   "pr-ship": "https://github.com/example/sample/pull/7",
+   "resumed": null,
+   "unlanded-ship": null
+  },
+  "categories": {
+   "resumed": [
+    "missing_worker"
+   ],
+   "paused-x": [],
+   "dropped-gone": [],
+   "pr-ship": [
+    "unlanded_commit"
+   ],
+   "landed-ship": [],
+   "unlanded-ship": [
+    "completed_task",
+    "unlanded_commit"
+   ]
+  },
+  "complete": false,
+  "coverage": [
+   "open PRs example/sample: unexpected network CLI: /Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/fakebin/gh; PR state https://github.com/example/sample/pull/7: unexpected network CLI: /Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/fakebin/gh"
+  ]
+ }
+}
+{
+ "scenario": "l11-closed-pane-row-retires-at-teardown",
+ "passed": true,
+ "assertions": {
+  "window_closed": true,
+  "row_present_with_closed_pane": true,
+  "teardown_refused_before_owner_complete": true,
+  "row_stays_after_refused_teardown": true,
+  "owner_complete_and_verify_ok": true,
+  "teardown_ok": true,
+  "no_rows_after_teardown": true
+ },
+ "extra": {
+  "rows_first": [
+   [
+    "completed_task",
+    "review-retire",
+    true
+   ]
+  ],
+  "rows_final": [],
+  "complete_final": true,
+  "teardown_early_stderr": "mitted supervision protocol for this harness; do not use shell & for watcher repair.\n\u25cf  This is a supervision warning only; the guarded operation WILL still run.\n\u25cf  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\nfm-captain-hold: origin review-retire has no completed captain-call inventory\nREFUSED: scout task review-retire has not passed the captain-call completion gate.\nInventory its report and any visual review through bin/fm-captain-hold.sh before teardown.\n",
+  "teardown_stderr": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.8eysc4wx\nWARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\n"
+ }
+}
+{
+ "scenario": "l12-done-line-under-other-live-states",
+ "passed": false,
+ "assertions": {
+  "resolved_line_after_done_live_pane_keeps_an_owner_row": false,
+  "resolved_line_after_done_closed_pane_keeps_an_owner_row": true
+ },
+ "extra": {
+  "crew": {
+   "busy-done": "state: working \u00b7 source: pane \u00b7 harness busy (claude-hook)",
+   "resolved-after-done": "state: unknown \u00b7 source: none \u00b7 no current-state source available",
+   "resolved-closed": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-resolved-closed"
+  },
+  "busy_apply": [
+   0,
+   ""
+  ],
+  "categories": {
+   "busy-done": [
+    "silent_report"
+   ],
+   "resolved-after-done": [
+    "silent_report"
+   ],
+   "resolved-closed": [
+    "missing_worker"
+   ]
+  },
+  "rows": [
+   [
+    "coverage",
+    "ledger degraded",
+    true
+   ],
+   [
+    "missing_worker",
+    "resolved-closed",
+    false
+   ],
+   [
+    "silent_report",
+    "busy-done",
+    false
+   ],
+   [
+    "silent_report",
+    "resolved-after-done",
+    false
+   ]
+  ],
+  "complete": false,
+  "coverage": [
+   "progress busy-done: fatal: not a git repository (or any of the parent directories): .git; worker current state resolved-after-done: no current-state source available"
+  ],
+  "note": "the resolved lines are appended with the real fm-status-append.sh in the exact form fm-send.sh --resolve-key writes"
+ }
+}
+SUMMARY {"l9-closed-pane-owner-actions-keep-row": true, "l10-closed-pane-no-false-completion-rows": true, "l11-closed-pane-row-retires-at-teardown": true, "l12-done-line-under-other-live-states": false}

@@ -1,0 +1,22 @@
+{
+  "l14-real-answer-after-done-cannot-displace-done": {
+    "passed": true,
+    "assertions": {
+      "rows_before_answer": true,
+      "real_answer_tool_refuses_closed_key": true,
+      "status_logs_unchanged_by_refusal": true,
+      "live_pane_keeps_completed_task": true,
+      "closed_pane_keeps_completed_task": true
+    }
+  },
+  "l15-new-turn-after-done-then-idle": {
+    "passed": true,
+    "assertions": {
+      "row_present_before_turn": true,
+      "busy_and_idle_records_applied": true,
+      "busy_pane_reads_working": true,
+      "worker_stays_visible_during_turn": true,
+      "row_returns_when_turn_ends": true
+    }
+  }
+}

@@ -1,5 +1,5 @@
 {
-  "observed_at": "2026-11-09T10:12:38.333421+00:00",
+  "observed_at": "2026-11-11T00:51:12.203514+00:00",
   "original_sha256": "fcd8ff43bae34f03e76ccab15dd864a9a842a79a951e46dad540736b35b34eff",
   "proposal_sha256": "66001fad4cafebbb83b5c15dfb949e6e1ac08021a9f43c75928c8fe3643d13c4",
   "records": [
@@ -9,44 +9,44 @@
       "source_sha256": "fcd8ff43bae34f03e76ccab15dd864a9a842a79a951e46dad540736b35b34eff",
       "argv": [
         "bash",
-        "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/baseline-relative/lane/run-review.sh",
+        "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/baseline-relative/lane/run-review.sh",
         "packs/review pack",
         "https://github.com/example/fixture/pull/1",
         "1111111111111111111111111111111111111111",
         "change.diff",
-        "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/baseline-relative",
+        "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/baseline-relative",
         "fixture/model"
       ],
-      "cwd": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/baseline-relative",
+      "cwd": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/baseline-relative",
       "expected_exit": 1,
       "exit": 1,
       "stdout": "rc=1 report=packs/review pack/review.md\nserved-model: fixture/nonqualifying-model\nfixture qualifier: plumbing only; independent qualification NOT RUN\nfixture route handoff written; independent qualification NOT RUN\n",
-      "stderr": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/baseline-relative/lane/run-review.sh: line 74: packs/review pack/review-run.log: No such file or directory\n",
+      "stderr": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/baseline-relative/lane/run-review.sh: line 74: packs/review pack/review-run.log: No such file or directory\n",
       "invoked_model_stub": false,
       "live_observation": null,
       "report_copied": false,
       "model_review_qualification": "NOT RUN; fixture helpers demonstrate plumbing only",
-      "owner_pid": 85496,
+      "owner_pid": 59713,
       "owner_reaped": true,
       "destination_observation": {
-        "caller_cwd": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/baseline-relative",
+        "caller_cwd": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/baseline-relative",
         "pack_argument": "packs/review pack",
-        "resolved_pack": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/baseline-relative/packs/review pack",
-        "fixture_home": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/baseline-relative",
+        "resolved_pack": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/baseline-relative/packs/review pack",
+        "fixture_home": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/baseline-relative",
         "log": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/baseline-relative/packs/review pack/review-run.log",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/baseline-relative/packs/review pack/review-run.log",
           "is_file": false
         },
         "session": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/baseline-relative/packs/review pack/omp-session",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/baseline-relative/packs/review pack/omp-session",
           "is_dir": true
         },
         "model_report": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/baseline-relative/work/packs-review pack/review.md",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/baseline-relative/work/packs-review pack/review.md",
           "is_file": false
         },
         "copied_report": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/baseline-relative/packs/review pack/review.md",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/baseline-relative/packs/review pack/review.md",
           "is_file": false
         }
       },
@@ -65,58 +65,58 @@
       "source_sha256": "fcd8ff43bae34f03e76ccab15dd864a9a842a79a951e46dad540736b35b34eff",
       "argv": [
         "bash",
-        "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/baseline-absolute-control/lane/run-review.sh",
-        "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/baseline-absolute-control/packs/review pack",
+        "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/baseline-absolute-control/lane/run-review.sh",
+        "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/baseline-absolute-control/packs/review pack",
         "https://github.com/example/fixture/pull/1",
         "1111111111111111111111111111111111111111",
         "change.diff",
-        "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/baseline-absolute-control",
+        "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/baseline-absolute-control",
         "fixture/model"
       ],
-      "cwd": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/baseline-absolute-control",
+      "cwd": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/baseline-absolute-control",
       "expected_exit": 0,
       "exit": 0,
-      "stdout": "rc=0 report=/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/baseline-absolute-control/packs/review pack/review.md\nVERDICT: PASS head=1111111111111111111111111111111111111111\nserved-model: fixture/nonqualifying-model\nfixture qualifier: plumbing only; independent qualification NOT RUN\nfixture route handoff written; independent qualification NOT RUN\n",
+      "stdout": "rc=0 report=/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/baseline-absolute-control/packs/review pack/review.md\nVERDICT: PASS head=1111111111111111111111111111111111111111\nserved-model: fixture/nonqualifying-model\nfixture qualifier: plumbing only; independent qualification NOT RUN\nfixture route handoff written; independent qualification NOT RUN\n",
       "stderr": "",
       "invoked_model_stub": true,
       "live_observation": null,
       "report_copied": true,
       "model_review_qualification": "NOT RUN; fixture helpers demonstrate plumbing only",
-      "owner_pid": 86027,
+      "owner_pid": 60082,
       "owner_reaped": true,
       "destination_observation": {
-        "caller_cwd": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/baseline-absolute-control",
-        "pack_argument": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/baseline-absolute-control/packs/review pack",
-        "resolved_pack": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/baseline-absolute-control/packs/review pack",
-        "fixture_home": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/baseline-absolute-control",
+        "caller_cwd": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/baseline-absolute-control",
+        "pack_argument": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/baseline-absolute-control/packs/review pack",
+        "resolved_pack": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/baseline-absolute-control/packs/review pack",
+        "fixture_home": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/baseline-absolute-control",
         "log": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/baseline-absolute-control/packs/review pack/review-run.log",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/baseline-absolute-control/packs/review pack/review-run.log",
           "is_file": true,
           "content": "fixture model process completed; real model NOT RUN\n",
           "sha256": "b1efc236e3d379b1dc7713a67d8425f7a831247c992c32d51440203fa5b9bf51"
         },
         "session": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/baseline-absolute-control/packs/review pack/omp-session",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/baseline-absolute-control/packs/review pack/omp-session",
           "is_dir": true
         },
         "model_report": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/baseline-absolute-control/work/packs-review pack/review.md",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/baseline-absolute-control/work/packs-review pack/review.md",
           "is_file": true
         },
         "copied_report": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/baseline-absolute-control/packs/review pack/review.md",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/baseline-absolute-control/packs/review pack/review.md",
           "is_file": true
         }
       },
       "invocation": {
-        "cwd": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/baseline-absolute-control/work/packs-review pack",
-        "diff": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/baseline-absolute-control/packs/review pack/change.diff",
-        "session": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/baseline-absolute-control/packs/review pack/omp-session",
-        "prompt_report_destination": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/baseline-absolute-control/work/packs-review pack/review.md",
-        "prompt_root": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/baseline-absolute-control",
-        "resolved_prompt_root": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/baseline-absolute-control",
+        "cwd": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/baseline-absolute-control/work/packs-review pack",
+        "diff": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/baseline-absolute-control/packs/review pack/change.diff",
+        "session": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/baseline-absolute-control/packs/review pack/omp-session",
+        "prompt_report_destination": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/baseline-absolute-control/work/packs-review pack/review.md",
+        "prompt_root": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/baseline-absolute-control",
+        "resolved_prompt_root": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/baseline-absolute-control",
         "root_marker": null,
-        "log_destination": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/baseline-absolute-control/packs/review pack/review-run.log",
+        "log_destination": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/baseline-absolute-control/packs/review pack/review-run.log",
         "log_exists_at_model_entry": true,
         "stdout_is_log": true,
         "stderr_is_log": true
@@ -127,7 +127,7 @@
         "fixture": true,
         "qualifying": false,
         "actual_review": "NOT RUN",
-        "pack": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/baseline-absolute-control/packs/review pack",
+        "pack": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/baseline-absolute-control/packs/review pack",
         "fixture_helper_exit": "0"
       }
     },
@@ -137,58 +137,58 @@
       "source_sha256": "0ef9674fa1fd71c51ff03ffa0679710c3541d824d4a115ec0ad86f6a05cb948f",
       "argv": [
         "bash",
-        "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-relative/lane/run-review.sh",
+        "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-relative/lane/run-review.sh",
         "packs/review pack",
         "https://github.com/example/fixture/pull/1",
         "1111111111111111111111111111111111111111",
         "change.diff",
-        "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-relative",
+        "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-relative",
         "fixture/model"
       ],
-      "cwd": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-relative",
+      "cwd": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-relative",
       "expected_exit": 0,
       "exit": 0,
-      "stdout": "rc=0 report=/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-relative/packs/review pack/review.md\nVERDICT: PASS head=1111111111111111111111111111111111111111\nserved-model: fixture/nonqualifying-model\nfixture qualifier: plumbing only; independent qualification NOT RUN\nfixture route handoff written; independent qualification NOT RUN\n",
+      "stdout": "rc=0 report=/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-relative/packs/review pack/review.md\nVERDICT: PASS head=1111111111111111111111111111111111111111\nserved-model: fixture/nonqualifying-model\nfixture qualifier: plumbing only; independent qualification NOT RUN\nfixture route handoff written; independent qualification NOT RUN\n",
       "stderr": "",
       "invoked_model_stub": true,
       "live_observation": null,
       "report_copied": true,
       "model_review_qualification": "NOT RUN; fixture helpers demonstrate plumbing only",
-      "owner_pid": 87113,
+      "owner_pid": 61290,
       "owner_reaped": true,
       "destination_observation": {
-        "caller_cwd": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-relative",
+        "caller_cwd": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-relative",
         "pack_argument": "packs/review pack",
-        "resolved_pack": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-relative/packs/review pack",
-        "fixture_home": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-relative",
+        "resolved_pack": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-relative/packs/review pack",
+        "fixture_home": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-relative",
         "log": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-relative/packs/review pack/review-run.log",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-relative/packs/review pack/review-run.log",
           "is_file": true,
           "content": "fixture model process completed; real model NOT RUN\n",
           "sha256": "b1efc236e3d379b1dc7713a67d8425f7a831247c992c32d51440203fa5b9bf51"
         },
         "session": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-relative/packs/review pack/omp-session",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-relative/packs/review pack/omp-session",
           "is_dir": true
         },
         "model_report": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-relative/work/packs-review pack/review.md",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-relative/work/packs-review pack/review.md",
           "is_file": true
         },
         "copied_report": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-relative/packs/review pack/review.md",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-relative/packs/review pack/review.md",
           "is_file": true
         }
       },
       "invocation": {
-        "cwd": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-relative/work/packs-review pack",
-        "diff": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-relative/packs/review pack/change.diff",
-        "session": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-relative/packs/review pack/omp-session",
-        "prompt_report_destination": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-relative/work/packs-review pack/review.md",
-        "prompt_root": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-relative",
-        "resolved_prompt_root": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-relative",
+        "cwd": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-relative/work/packs-review pack",
+        "diff": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-relative/packs/review pack/change.diff",
+        "session": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-relative/packs/review pack/omp-session",
+        "prompt_report_destination": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-relative/work/packs-review pack/review.md",
+        "prompt_root": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-relative",
+        "resolved_prompt_root": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-relative",
         "root_marker": null,
-        "log_destination": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-relative/packs/review pack/review-run.log",
+        "log_destination": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-relative/packs/review pack/review-run.log",
         "log_exists_at_model_entry": true,
         "stdout_is_log": true,
         "stderr_is_log": true
@@ -199,7 +199,7 @@
         "fixture": true,
         "qualifying": false,
         "actual_review": "NOT RUN",
-        "pack": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-relative/packs/review pack",
+        "pack": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-relative/packs/review pack",
         "fixture_helper_exit": "0"
       }
     },
@@ -209,58 +209,58 @@
       "source_sha256": "0ef9674fa1fd71c51ff03ffa0679710c3541d824d4a115ec0ad86f6a05cb948f",
       "argv": [
         "bash",
-        "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute/lane/run-review.sh",
-        "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute/packs/review pack",
+        "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute/lane/run-review.sh",
+        "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute/packs/review pack",
         "https://github.com/example/fixture/pull/1",
         "1111111111111111111111111111111111111111",
         "change.diff",
-        "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute",
+        "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute",
         "fixture/model"
       ],
-      "cwd": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute",
+      "cwd": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute",
       "expected_exit": 0,
       "exit": 0,
-      "stdout": "rc=0 report=/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute/packs/review pack/review.md\nVERDICT: PASS head=1111111111111111111111111111111111111111\nserved-model: fixture/nonqualifying-model\nfixture qualifier: plumbing only; independent qualification NOT RUN\nfixture route handoff written; independent qualification NOT RUN\n",
+      "stdout": "rc=0 report=/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute/packs/review pack/review.md\nVERDICT: PASS head=1111111111111111111111111111111111111111\nserved-model: fixture/nonqualifying-model\nfixture qualifier: plumbing only; independent qualification NOT RUN\nfixture route handoff written; independent qualification NOT RUN\n",
       "stderr": "",
       "invoked_model_stub": true,
       "live_observation": null,
       "report_copied": true,
       "model_review_qualification": "NOT RUN; fixture helpers demonstrate plumbing only",
-      "owner_pid": 87479,
+      "owner_pid": 61952,
       "owner_reaped": true,
       "destination_observation": {
-        "caller_cwd": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute",
-        "pack_argument": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute/packs/review pack",
-        "resolved_pack": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute/packs/review pack",
-        "fixture_home": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute",
+        "caller_cwd": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute",
+        "pack_argument": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute/packs/review pack",
+        "resolved_pack": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute/packs/review pack",
+        "fixture_home": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute",
         "log": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute/packs/review pack/review-run.log",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute/packs/review pack/review-run.log",
           "is_file": true,
           "content": "fixture model process completed; real model NOT RUN\n",
           "sha256": "b1efc236e3d379b1dc7713a67d8425f7a831247c992c32d51440203fa5b9bf51"
         },
         "session": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute/packs/review pack/omp-session",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute/packs/review pack/omp-session",
           "is_dir": true
         },
         "model_report": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute/work/packs-review pack/review.md",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute/work/packs-review pack/review.md",
           "is_file": true
         },
         "copied_report": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute/packs/review pack/review.md",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute/packs/review pack/review.md",
           "is_file": true
         }
       },
       "invocation": {
-        "cwd": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute/work/packs-review pack",
-        "diff": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute/packs/review pack/change.diff",
-        "session": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute/packs/review pack/omp-session",
-        "prompt_report_destination": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute/work/packs-review pack/review.md",
-        "prompt_root": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute",
-        "resolved_prompt_root": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute",
+        "cwd": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute/work/packs-review pack",
+        "diff": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute/packs/review pack/change.diff",
+        "session": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute/packs/review pack/omp-session",
+        "prompt_report_destination": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute/work/packs-review pack/review.md",
+        "prompt_root": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute",
+        "resolved_prompt_root": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute",
         "root_marker": null,
-        "log_destination": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute/packs/review pack/review-run.log",
+        "log_destination": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute/packs/review pack/review-run.log",
         "log_exists_at_model_entry": true,
         "stdout_is_log": true,
         "stderr_is_log": true
@@ -271,7 +271,7 @@
         "fixture": true,
         "qualifying": false,
         "actual_review": "NOT RUN",
-        "pack": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute/packs/review pack",
+        "pack": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute/packs/review pack",
         "fixture_helper_exit": "0"
       }
     },
@@ -281,15 +281,15 @@
       "source_sha256": "0ef9674fa1fd71c51ff03ffa0679710c3541d824d4a115ec0ad86f6a05cb948f",
       "argv": [
         "bash",
-        "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-invalid/lane/run-review.sh",
+        "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-invalid/lane/run-review.sh",
         "packs/absent",
         "https://github.com/example/fixture/pull/1",
         "1111111111111111111111111111111111111111",
         "change.diff",
-        "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-invalid",
+        "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-invalid",
         "fixture/model"
       ],
-      "cwd": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-invalid",
+      "cwd": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-invalid",
       "expected_exit": 2,
       "exit": 2,
       "stdout": "",
@@ -298,27 +298,27 @@
       "live_observation": null,
       "report_copied": false,
       "model_review_qualification": "NOT RUN; fixture helpers demonstrate plumbing only",
-      "owner_pid": 87745,
+      "owner_pid": 62638,
       "owner_reaped": true,
       "destination_observation": {
-        "caller_cwd": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-invalid",
+        "caller_cwd": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-invalid",
         "pack_argument": "packs/absent",
-        "resolved_pack": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-invalid/packs/review pack",
-        "fixture_home": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-invalid",
+        "resolved_pack": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-invalid/packs/review pack",
+        "fixture_home": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-invalid",
         "log": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-invalid/packs/review pack/review-run.log",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-invalid/packs/review pack/review-run.log",
           "is_file": false
         },
         "session": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-invalid/packs/review pack/omp-session",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-invalid/packs/review pack/omp-session",
           "is_dir": false
         },
         "model_report": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-invalid/work/packs-review pack/review.md",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-invalid/work/packs-review pack/review.md",
           "is_file": false
         },
         "copied_report": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-invalid/packs/review pack/review.md",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-invalid/packs/review pack/review.md",
           "is_file": false
         }
       },
@@ -330,15 +330,15 @@
       "source_sha256": "0ef9674fa1fd71c51ff03ffa0679710c3541d824d4a115ec0ad86f6a05cb948f",
       "argv": [
         "bash",
-        "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-empty/lane/run-review.sh",
+        "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-empty/lane/run-review.sh",
         "",
         "https://github.com/example/fixture/pull/1",
         "1111111111111111111111111111111111111111",
         "change.diff",
-        "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-empty",
+        "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-empty",
         "fixture/model"
       ],
-      "cwd": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-empty",
+      "cwd": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-empty",
       "expected_exit": 2,
       "exit": 2,
       "stdout": "",
@@ -347,27 +347,27 @@
       "live_observation": null,
       "report_copied": false,
       "model_review_qualification": "NOT RUN; fixture helpers demonstrate plumbing only",
-      "owner_pid": 87781,
+      "owner_pid": 62684,
       "owner_reaped": true,
       "destination_observation": {
-        "caller_cwd": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-empty",
+        "caller_cwd": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-empty",
         "pack_argument": "",
-        "resolved_pack": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-empty/packs/review pack",
-        "fixture_home": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-empty",
+        "resolved_pack": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-empty/packs/review pack",
+        "fixture_home": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-empty",
         "log": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-empty/packs/review pack/review-run.log",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-empty/packs/review pack/review-run.log",
           "is_file": false
         },
         "session": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-empty/packs/review pack/omp-session",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-empty/packs/review pack/omp-session",
           "is_dir": false
         },
         "model_report": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-empty/work/packs-review pack/review.md",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-empty/work/packs-review pack/review.md",
           "is_file": false
         },
         "copied_report": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-empty/packs/review pack/review.md",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-empty/packs/review pack/review.md",
           "is_file": false
         }
       },
@@ -379,56 +379,56 @@
       "source_sha256": "0ef9674fa1fd71c51ff03ffa0679710c3541d824d4a115ec0ad86f6a05cb948f",
       "argv": [
         "bash",
-        "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-launch-failure/lane/run-review.sh",
+        "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-launch-failure/lane/run-review.sh",
         "packs/review pack",
         "https://github.com/example/fixture/pull/1",
         "1111111111111111111111111111111111111111",
         "change.diff",
-        "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-launch-failure",
+        "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-launch-failure",
         "fixture/model"
       ],
-      "cwd": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-launch-failure",
+      "cwd": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-launch-failure",
       "expected_exit": "nonzero",
       "exit": 126,
-      "stdout": "rc=126 report=/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-launch-failure/packs/review pack/review.md\nserved-model: fixture/nonqualifying-model\nfixture qualifier: plumbing only; independent qualification NOT RUN\nfixture route handoff written; independent qualification NOT RUN\n",
+      "stdout": "rc=126 report=/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-launch-failure/packs/review pack/review.md\nserved-model: fixture/nonqualifying-model\nfixture qualifier: plumbing only; independent qualification NOT RUN\nfixture route handoff written; independent qualification NOT RUN\n",
       "stderr": "",
       "invoked_model_stub": false,
       "live_observation": null,
       "report_copied": false,
       "model_review_qualification": "NOT RUN; fixture helpers demonstrate plumbing only",
-      "owner_pid": 87834,
+      "owner_pid": 62722,
       "owner_reaped": true,
       "destination_observation": {
-        "caller_cwd": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-launch-failure",
+        "caller_cwd": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-launch-failure",
         "pack_argument": "packs/review pack",
-        "resolved_pack": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-launch-failure/packs/review pack",
-        "fixture_home": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-launch-failure",
+        "resolved_pack": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-launch-failure/packs/review pack",
+        "fixture_home": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-launch-failure",
         "log": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-launch-failure/packs/review pack/review-run.log",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-launch-failure/packs/review pack/review-run.log",
           "is_file": true,
-          "content": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-launch-failure/fakebin/omp: line 2: /fixture/missing-review-executable: No such file or directory\n/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-launch-failure/fakebin/omp: line 2: exec: /fixture/missing-review-executable: cannot execute: No such file or directory\n",
-          "sha256": "034820d28171eab32d5eebecd40266b50fcd290b01e8485aa1f93165d650f650"
+          "content": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-launch-failure/fakebin/omp: line 2: /fixture/missing-review-executable: No such file or directory\n/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-launch-failure/fakebin/omp: line 2: exec: /fixture/missing-review-executable: cannot execute: No such file or directory\n",
+          "sha256": "a9ad5a061a51b0c7194f95c385a509626cbcec18afdb8c88952c3b3daeebe836"
         },
         "session": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-launch-failure/packs/review pack/omp-session",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-launch-failure/packs/review pack/omp-session",
           "is_dir": true
         },
         "model_report": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-launch-failure/work/packs-review pack/review.md",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-launch-failure/work/packs-review pack/review.md",
           "is_file": false
         },
         "copied_report": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-launch-failure/packs/review pack/review.md",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-launch-failure/packs/review pack/review.md",
           "is_file": false
         }
       },
       "consumer_action": "consume nonzero exit 126 and launch error; repair executable path before a deliberate retry",
-      "launch_log": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-launch-failure/fakebin/omp: line 2: /fixture/missing-review-executable: No such file or directory\n/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-launch-failure/fakebin/omp: line 2: exec: /fixture/missing-review-executable: cannot execute: No such file or directory\n",
+      "launch_log": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-launch-failure/fakebin/omp: line 2: /fixture/missing-review-executable: No such file or directory\n/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-launch-failure/fakebin/omp: line 2: exec: /fixture/missing-review-executable: cannot execute: No such file or directory\n",
       "fixture_route": {
         "fixture": true,
         "qualifying": false,
         "actual_review": "NOT RUN",
-        "pack": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-launch-failure/packs/review pack",
+        "pack": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-launch-failure/packs/review pack",
         "fixture_helper_exit": "8"
       }
     },
@@ -438,63 +438,63 @@
       "source_sha256": "0ef9674fa1fd71c51ff03ffa0679710c3541d824d4a115ec0ad86f6a05cb948f",
       "argv": [
         "bash",
-        "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-running/lane/run-review.sh",
+        "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-running/lane/run-review.sh",
         "packs/review pack",
         "https://github.com/example/fixture/pull/1",
         "1111111111111111111111111111111111111111",
         "change.diff",
-        "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-running",
+        "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-running",
         "fixture/model"
       ],
-      "cwd": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-running",
+      "cwd": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-running",
       "expected_exit": 0,
       "exit": 0,
-      "stdout": "rc=0 report=/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-running/packs/review pack/review.md\nVERDICT: PASS head=1111111111111111111111111111111111111111\nserved-model: fixture/nonqualifying-model\nfixture qualifier: plumbing only; independent qualification NOT RUN\nfixture route handoff written; independent qualification NOT RUN\n",
+      "stdout": "rc=0 report=/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-running/packs/review pack/review.md\nVERDICT: PASS head=1111111111111111111111111111111111111111\nserved-model: fixture/nonqualifying-model\nfixture qualifier: plumbing only; independent qualification NOT RUN\nfixture route handoff written; independent qualification NOT RUN\n",
       "stderr": "",
       "invoked_model_stub": true,
       "live_observation": {
-        "owner_pid": 88498,
+        "owner_pid": 63407,
         "owner_running": true,
         "required_report_exists": false,
         "consumer_action": "retain the running owner; do not duplicate or mark failed"
       },
       "report_copied": true,
       "model_review_qualification": "NOT RUN; fixture helpers demonstrate plumbing only",
-      "owner_pid": 88498,
+      "owner_pid": 63407,
       "owner_reaped": true,
       "destination_observation": {
-        "caller_cwd": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-running",
+        "caller_cwd": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-running",
         "pack_argument": "packs/review pack",
-        "resolved_pack": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-running/packs/review pack",
-        "fixture_home": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-running",
+        "resolved_pack": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-running/packs/review pack",
+        "fixture_home": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-running",
         "log": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-running/packs/review pack/review-run.log",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-running/packs/review pack/review-run.log",
           "is_file": true,
           "content": "fixture model process completed; real model NOT RUN\n",
           "sha256": "b1efc236e3d379b1dc7713a67d8425f7a831247c992c32d51440203fa5b9bf51"
         },
         "session": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-running/packs/review pack/omp-session",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-running/packs/review pack/omp-session",
           "is_dir": true
         },
         "model_report": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-running/work/packs-review pack/review.md",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-running/work/packs-review pack/review.md",
           "is_file": true
         },
         "copied_report": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-running/packs/review pack/review.md",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-running/packs/review pack/review.md",
           "is_file": true
         }
       },
       "invocation": {
-        "cwd": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-running/work/packs-review pack",
-        "diff": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-running/packs/review pack/change.diff",
-        "session": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-running/packs/review pack/omp-session",
-        "prompt_report_destination": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-running/work/packs-review pack/review.md",
-        "prompt_root": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-running",
-        "resolved_prompt_root": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-running",
+        "cwd": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-running/work/packs-review pack",
+        "diff": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-running/packs/review pack/change.diff",
+        "session": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-running/packs/review pack/omp-session",
+        "prompt_report_destination": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-running/work/packs-review pack/review.md",
+        "prompt_root": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-running",
+        "resolved_prompt_root": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-running",
         "root_marker": null,
-        "log_destination": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-running/packs/review pack/review-run.log",
+        "log_destination": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-running/packs/review pack/review-run.log",
         "log_exists_at_model_entry": true,
         "stdout_is_log": true,
         "stderr_is_log": true
@@ -505,7 +505,7 @@
         "fixture": true,
         "qualifying": false,
         "actual_review": "NOT RUN",
-        "pack": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-running/packs/review pack",
+        "pack": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-running/packs/review pack",
         "fixture_helper_exit": "0"
       }
     },
@@ -515,58 +515,58 @@
       "source_sha256": "0ef9674fa1fd71c51ff03ffa0679710c3541d824d4a115ec0ad86f6a05cb948f",
       "argv": [
         "bash",
-        "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-missing-output/lane/run-review.sh",
+        "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-missing-output/lane/run-review.sh",
         "packs/review pack",
         "https://github.com/example/fixture/pull/1",
         "1111111111111111111111111111111111111111",
         "change.diff",
-        "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-missing-output",
+        "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-missing-output",
         "fixture/model"
       ],
-      "cwd": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-missing-output",
+      "cwd": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-missing-output",
       "expected_exit": 8,
       "exit": 8,
-      "stdout": "rc=0 report=/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-missing-output/packs/review pack/review.md\nserved-model: fixture/nonqualifying-model\nfixture qualifier: plumbing only; independent qualification NOT RUN\nfixture route handoff written; independent qualification NOT RUN\n",
+      "stdout": "rc=0 report=/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-missing-output/packs/review pack/review.md\nserved-model: fixture/nonqualifying-model\nfixture qualifier: plumbing only; independent qualification NOT RUN\nfixture route handoff written; independent qualification NOT RUN\n",
       "stderr": "",
       "invoked_model_stub": true,
       "live_observation": null,
       "report_copied": false,
       "model_review_qualification": "NOT RUN; fixture helpers demonstrate plumbing only",
-      "owner_pid": 89139,
+      "owner_pid": 64223,
       "owner_reaped": true,
       "destination_observation": {
-        "caller_cwd": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-missing-output",
+        "caller_cwd": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-missing-output",
         "pack_argument": "packs/review pack",
-        "resolved_pack": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-missing-output/packs/review pack",
-        "fixture_home": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-missing-output",
+        "resolved_pack": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-missing-output/packs/review pack",
+        "fixture_home": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-missing-output",
         "log": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-missing-output/packs/review pack/review-run.log",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-missing-output/packs/review pack/review-run.log",
           "is_file": true,
           "content": "fixture model process completed; real model NOT RUN\n",
           "sha256": "b1efc236e3d379b1dc7713a67d8425f7a831247c992c32d51440203fa5b9bf51"
         },
         "session": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-missing-output/packs/review pack/omp-session",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-missing-output/packs/review pack/omp-session",
           "is_dir": true
         },
         "model_report": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-missing-output/work/packs-review pack/review.md",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-missing-output/work/packs-review pack/review.md",
           "is_file": false
         },
         "copied_report": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-missing-output/packs/review pack/review.md",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-missing-output/packs/review pack/review.md",
           "is_file": false
         }
       },
       "invocation": {
-        "cwd": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-missing-output/work/packs-review pack",
-        "diff": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-missing-output/packs/review pack/change.diff",
-        "session": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-missing-output/packs/review pack/omp-session",
-        "prompt_report_destination": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-missing-output/work/packs-review pack/review.md",
-        "prompt_root": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-missing-output",
-        "resolved_prompt_root": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-missing-output",
+        "cwd": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-missing-output/work/packs-review pack",
+        "diff": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-missing-output/packs/review pack/change.diff",
+        "session": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-missing-output/packs/review pack/omp-session",
+        "prompt_report_destination": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-missing-output/work/packs-review pack/review.md",
+        "prompt_root": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-missing-output",
+        "resolved_prompt_root": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-missing-output",
         "root_marker": null,
-        "log_destination": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-missing-output/packs/review pack/review-run.log",
+        "log_destination": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-missing-output/packs/review pack/review-run.log",
         "log_exists_at_model_entry": true,
         "stdout_is_log": true,
         "stderr_is_log": true
@@ -576,7 +576,78 @@
         "fixture": true,
         "qualifying": false,
         "actual_review": "NOT RUN",
-        "pack": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-missing-output/packs/review pack",
+        "pack": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-missing-output/packs/review pack",
+        "fixture_helper_exit": "8"
+      }
+    },
+    {
+      "label": "prior-relative-root",
+      "source_version": "proposal",
+      "source_sha256": "66001fad4cafebbb83b5c15dfb949e6e1ac08021a9f43c75928c8fe3643d13c4",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/prior-relative-root/lane/run-review.sh",
+        "packs/review pack",
+        "https://github.com/example/fixture/pull/1",
+        "1111111111111111111111111111111111111111",
+        "change.diff",
+        "source repo",
+        "fixture/model"
+      ],
+      "cwd": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/prior-relative-root",
+      "expected_exit": 19,
+      "exit": 19,
+      "stdout": "rc=19 report=/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/prior-relative-root/packs/review pack/review.md\nserved-model: fixture/nonqualifying-model\nfixture qualifier: plumbing only; independent qualification NOT RUN\nfixture route handoff written; independent qualification NOT RUN\n",
+      "stderr": "",
+      "invoked_model_stub": true,
+      "live_observation": null,
+      "report_copied": false,
+      "model_review_qualification": "NOT RUN; fixture helpers demonstrate plumbing only",
+      "owner_pid": 65018,
+      "owner_reaped": true,
+      "destination_observation": {
+        "caller_cwd": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/prior-relative-root",
+        "pack_argument": "packs/review pack",
+        "resolved_pack": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/prior-relative-root/packs/review pack",
+        "fixture_home": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/prior-relative-root",
+        "log": {
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/prior-relative-root/packs/review pack/review-run.log",
+          "is_file": true,
+          "content": "fixture prompt ROOT resolved to decoy, not caller repository\n",
+          "sha256": "cff2d0bdadc344b65c0ca1948964ffa31c9560bbae7b847917fd38ac5aeb1baf"
+        },
+        "session": {
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/prior-relative-root/packs/review pack/omp-session",
+          "is_dir": true
+        },
+        "model_report": {
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/prior-relative-root/work/packs-review pack/review.md",
+          "is_file": false
+        },
+        "copied_report": {
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/prior-relative-root/packs/review pack/review.md",
+          "is_file": false
+        }
+      },
+      "invocation": {
+        "cwd": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/prior-relative-root/work/packs-review pack",
+        "diff": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/prior-relative-root/packs/review pack/change.diff",
+        "session": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/prior-relative-root/packs/review pack/omp-session",
+        "prompt_report_destination": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/prior-relative-root/work/packs-review pack/review.md",
+        "prompt_root": "source repo",
+        "resolved_prompt_root": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/prior-relative-root/work/packs-review pack/source repo",
+        "root_marker": "wrong reviewer-cwd repository\n",
+        "log_destination": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/prior-relative-root/packs/review pack/review-run.log",
+        "log_exists_at_model_entry": true,
+        "stdout_is_log": true,
+        "stderr_is_log": true
+      },
+      "consumer_action": "reject actual prompt reference to decoy repository; no real model or qualified review ran",
+      "fixture_route": {
+        "fixture": true,
+        "qualifying": false,
+        "actual_review": "NOT RUN",
+        "pack": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/prior-relative-root/packs/review pack",
         "fixture_helper_exit": "8"
       }
     },
@@ -586,7 +657,7 @@
       "source_sha256": "0ef9674fa1fd71c51ff03ffa0679710c3541d824d4a115ec0ad86f6a05cb948f",
       "argv": [
         "bash",
-        "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-relative-root/lane/run-review.sh",
+        "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-relative-root/lane/run-review.sh",
         "packs/review pack",
         "https://github.com/example/fixture/pull/1",
         "1111111111111111111111111111111111111111",
@@ -594,50 +665,50 @@
         "source repo",
         "fixture/model"
       ],
-      "cwd": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-relative-root",
+      "cwd": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-relative-root",
       "expected_exit": 0,
       "exit": 0,
-      "stdout": "rc=0 report=/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-relative-root/packs/review pack/review.md\nVERDICT: PASS head=1111111111111111111111111111111111111111\nserved-model: fixture/nonqualifying-model\nfixture qualifier: plumbing only; independent qualification NOT RUN\nfixture route handoff written; independent qualification NOT RUN\n",
+      "stdout": "rc=0 report=/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-relative-root/packs/review pack/review.md\nVERDICT: PASS head=1111111111111111111111111111111111111111\nserved-model: fixture/nonqualifying-model\nfixture qualifier: plumbing only; independent qualification NOT RUN\nfixture route handoff written; independent qualification NOT RUN\n",
       "stderr": "",
       "invoked_model_stub": true,
       "live_observation": null,
       "report_copied": true,
       "model_review_qualification": "NOT RUN; fixture helpers demonstrate plumbing only",
-      "owner_pid": 89750,
+      "owner_pid": 65659,
       "owner_reaped": true,
       "destination_observation": {
-        "caller_cwd": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-relative-root",
+        "caller_cwd": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-relative-root",
         "pack_argument": "packs/review pack",
-        "resolved_pack": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-relative-root/packs/review pack",
-        "fixture_home": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-relative-root",
+        "resolved_pack": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-relative-root/packs/review pack",
+        "fixture_home": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-relative-root",
         "log": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-relative-root/packs/review pack/review-run.log",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-relative-root/packs/review pack/review-run.log",
           "is_file": true,
           "content": "fixture model process completed; real model NOT RUN\n",
           "sha256": "b1efc236e3d379b1dc7713a67d8425f7a831247c992c32d51440203fa5b9bf51"
         },
         "session": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-relative-root/packs/review pack/omp-session",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-relative-root/packs/review pack/omp-session",
           "is_dir": true
         },
         "model_report": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-relative-root/work/packs-review pack/review.md",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-relative-root/work/packs-review pack/review.md",
           "is_file": true
         },
         "copied_report": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-relative-root/packs/review pack/review.md",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-relative-root/packs/review pack/review.md",
           "is_file": true
         }
       },
       "invocation": {
-        "cwd": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-relative-root/work/packs-review pack",
-        "diff": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-relative-root/packs/review pack/change.diff",
-        "session": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-relative-root/packs/review pack/omp-session",
-        "prompt_report_destination": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-relative-root/work/packs-review pack/review.md",
-        "prompt_root": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-relative-root/source repo",
-        "resolved_prompt_root": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-relative-root/source repo",
+        "cwd": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-relative-root/work/packs-review pack",
+        "diff": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-relative-root/packs/review pack/change.diff",
+        "session": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-relative-root/packs/review pack/omp-session",
+        "prompt_report_destination": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-relative-root/work/packs-review pack/review.md",
+        "prompt_root": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-relative-root/source repo",
+        "resolved_prompt_root": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-relative-root/source repo",
         "root_marker": "intended caller repository\n",
-        "log_destination": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-relative-root/packs/review pack/review-run.log",
+        "log_destination": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-relative-root/packs/review pack/review-run.log",
         "log_exists_at_model_entry": true,
         "stdout_is_log": true,
         "stderr_is_log": true
@@ -648,7 +719,7 @@
         "fixture": true,
         "qualifying": false,
         "actual_review": "NOT RUN",
-        "pack": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-relative-root/packs/review pack",
+        "pack": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-relative-root/packs/review pack",
         "fixture_helper_exit": "0"
       }
     },
@@ -658,58 +729,58 @@
       "source_sha256": "0ef9674fa1fd71c51ff03ffa0679710c3541d824d4a115ec0ad86f6a05cb948f",
       "argv": [
         "bash",
-        "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute-root/lane/run-review.sh",
-        "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute-root/packs/review pack",
+        "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute-root/lane/run-review.sh",
+        "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute-root/packs/review pack",
         "https://github.com/example/fixture/pull/1",
         "1111111111111111111111111111111111111111",
         "change.diff",
-        "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute-root/source repo",
+        "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute-root/source repo",
         "fixture/model"
       ],
-      "cwd": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute-root",
+      "cwd": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute-root",
       "expected_exit": 0,
       "exit": 0,
-      "stdout": "rc=0 report=/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute-root/packs/review pack/review.md\nVERDICT: PASS head=1111111111111111111111111111111111111111\nserved-model: fixture/nonqualifying-model\nfixture qualifier: plumbing only; independent qualification NOT RUN\nfixture route handoff written; independent qualification NOT RUN\n",
+      "stdout": "rc=0 report=/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute-root/packs/review pack/review.md\nVERDICT: PASS head=1111111111111111111111111111111111111111\nserved-model: fixture/nonqualifying-model\nfixture qualifier: plumbing only; independent qualification NOT RUN\nfixture route handoff written; independent qualification NOT RUN\n",
       "stderr": "",
       "invoked_model_stub": true,
       "live_observation": null,
       "report_copied": true,
       "model_review_qualification": "NOT RUN; fixture helpers demonstrate plumbing only",
-      "owner_pid": 90207,
+      "owner_pid": 66132,
       "owner_reaped": true,
       "destination_observation": {
-        "caller_cwd": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute-root",
-        "pack_argument": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute-root/packs/review pack",
-        "resolved_pack": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute-root/packs/review pack",
-        "fixture_home": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute-root",
+        "caller_cwd": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute-root",
+        "pack_argument": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute-root/packs/review pack",
+        "resolved_pack": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute-root/packs/review pack",
+        "fixture_home": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute-root",
         "log": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute-root/packs/review pack/review-run.log",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute-root/packs/review pack/review-run.log",
           "is_file": true,
           "content": "fixture model process completed; real model NOT RUN\n",
           "sha256": "b1efc236e3d379b1dc7713a67d8425f7a831247c992c32d51440203fa5b9bf51"
         },
         "session": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute-root/packs/review pack/omp-session",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute-root/packs/review pack/omp-session",
           "is_dir": true
         },
         "model_report": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute-root/work/packs-review pack/review.md",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute-root/work/packs-review pack/review.md",
           "is_file": true
         },
         "copied_report": {
-          "resolved": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute-root/packs/review pack/review.md",
+          "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute-root/packs/review pack/review.md",
           "is_file": true
         }
       },
       "invocation": {
-        "cwd": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute-root/work/packs-review pack",
-        "diff": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute-root/packs/review pack/change.diff",
-        "session": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute-root/packs/review pack/omp-session",
-        "prompt_report_destination": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute-root/work/packs-review pack/review.md",
-        "prompt_root": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute-root/source repo",
-        "resolved_prompt_root": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute-root/source repo",
+        "cwd": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute-root/work/packs-review pack",
+        "diff": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute-root/packs/review pack/change.diff",
+        "session": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute-root/packs/review pack/omp-session",
+        "prompt_report_destination": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute-root/work/packs-review pack/review.md",
+        "prompt_root": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute-root/source repo",
+        "resolved_prompt_root": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute-root/source repo",
         "root_marker": "intended caller repository\n",
-        "log_destination": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute-root/packs/review pack/review-run.log",
+        "log_destination": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute-root/packs/review pack/review-run.log",
         "log_exists_at_model_entry": true,
         "stdout_is_log": true,
         "stderr_is_log": true
@@ -720,7 +791,7 @@
         "fixture": true,
         "qualifying": false,
         "actual_review": "NOT RUN",
-        "pack": "/Users/charlesabrooker/tmp/fm-delivery-r2-j7cxq_1k/repaired-absolute-root/packs/review pack",
+        "pack": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r2-0ahtvkal/repaired-absolute-root/packs/review pack",
         "fixture_helper_exit": "0"
       }
     }
@@ -728,11 +799,11 @@
   "actual_independent_review": "NOT RUN",
   "live_private_lane": "untouched",
   "scratch_cleanup": "all fixture owners reaped; temporary tree removed",
-  "driver_sha256": "632a194180c2ffb263bbdf19025084f3fae3c6a1af4c8d058d73b2f002fd086c",
+  "driver_sha256": "125373f3d5246a3d72fa26755540774618a88c5cd537950a041b67427a44ad4e",
   "driver_argv": [
-    "driver/replay.py"
+    "r2/replay.py"
   ],
-  "observation_root": "/Users/charlesabrooker/.no-mistakes/evidence/01M6ZSG3ND8GVWFQPSXNBHQFQZ/r2",
+  "observation_root": "/Users/charlesabrooker/.no-mistakes/evidence/01M73WWY8ESTCS9VBM9A6W09X6/r2",
   "selected_cases": [],
   "root_proposal_sha256": "0ef9674fa1fd71c51ff03ffa0679710c3541d824d4a115ec0ad86f6a05cb948f",
   "scratch_exists_after_cleanup": false

@@ -1,0 +1,21 @@
+{
+  "assertions": {
+    "scout_done_retires_key": true,
+    "ship_done_retires_key": true,
+    "secondmate_done_keeps_key": true
+  },
+  "observed": {
+    "scout": {
+      "before": "route\tneeds-decision\tchoose",
+      "after": ""
+    },
+    "ship": {
+      "before": "route\tneeds-decision\tchoose",
+      "after": ""
+    },
+    "secondmate": {
+      "before": "route\tneeds-decision\tchoose",
+      "after": "route\tneeds-decision\tchoose"
+    }
+  }
+}

@@ -1,0 +1,105 @@
+{
+  "l1-done-scout-owner-handoff": {
+    "passed": true,
+    "assertions": {
+      "snapshot_reads_done": true,
+      "base_has_no_owner_row": true,
+      "candidate_has_completed_task": true,
+      "row_is_overdue_and_firstmate_owned": true,
+      "action_names_owner_handoff": true,
+      "fresh_process_recovers_same_row": true,
+      "teardown_refused_before_owner_complete": true,
+      "row_stays_after_refused_teardown": true,
+      "owner_complete_ok": true,
+      "row_stays_after_inventory_attestation_only": true,
+      "verify_ok": true,
+      "teardown_ok_after_owner_complete": true,
+      "row_gone_after_teardown": true,
+      "ledger_complete": true
+    }
+  },
+  "l2-failed-scout-with-report": {
+    "passed": true,
+    "assertions": {
+      "snapshot_reads_failed": true,
+      "base_has_no_failed_task_row": true,
+      "candidate_has_failed_task_row": true,
+      "row_overdue": true,
+      "no_completed_task_for_failed": true
+    }
+  },
+  "l3-done-ship-candidate": {
+    "passed": true,
+    "assertions": {
+      "snapshot_reads_done": true,
+      "base_has_no_completed_task": true,
+      "unlanded_has_completed_task": true,
+      "action_names_delivery_path": true,
+      "unlanded_has_unlanded_commit": true,
+      "landed_has_no_completed_task": true,
+      "landed_has_no_unlanded_commit": true
+    }
+  },
+  "l4-captain-drop": {
+    "passed": true,
+    "assertions": {
+      "before_done_row": true,
+      "before_failed_row": true,
+      "snapshot_records_drop": true,
+      "dropped_done_row_gone": true,
+      "dropped_failed_row_gone": true,
+      "undropped_twin_keeps_row": true
+    }
+  },
+  "l5-unreadable-completion-status-isolated": {
+    "passed": true,
+    "assertions": {
+      "control_without_cap_is_complete": true,
+      "control_has_all_rows": true,
+      "candidate_reports_incomplete": true,
+      "candidate_names_the_unreadable_read": true,
+      "candidate_keeps_blind_task_row": true,
+      "candidate_keeps_later_failed_task": true,
+      "candidate_keeps_later_unlanded_commit": true,
+      "candidate_keeps_later_missing_worker": true,
+      "prefix_tree_loses_later_failed_task": true,
+      "prefix_tree_loses_later_unlanded_commit": true,
+      "prefix_tree_degrades_all_workers_not_one_read": true,
+      "prefix_tree_also_loses_blind_row": true
+    }
+  },
+  "l6-done-scout-pane-gone": {
+    "passed": true,
+    "assertions": {
+      "row_present_while_pane_live": true,
+      "windows_closed": true,
+      "failed_twin_keeps_an_owner_row": true,
+      "done_scout_keeps_an_owner_row_after_pane_gone": true
+    }
+  },
+  "l7-complete-keeps-pr-footer-base": {
+    "passed": true,
+    "assertions": {
+      "complete_ok": true,
+      "attested": true
+    }
+  },
+  "l7-complete-keeps-pr-footer-candidate": {
+    "passed": true,
+    "assertions": {
+      "complete_ok": true,
+      "verify_ok": true,
+      "attested": true,
+      "pr_footer_still_last": true,
+      "other_fields_kept_in_order": true,
+      "no_stray_temp_file": true,
+      "base_put_inventory_after_the_footer": true
+    }
+  },
+  "l8-done-scout-pane-not-provably-idle": {
+    "passed": true,
+    "assertions": {
+      "done_scout_has_completed_task_row": true
+    }
+  }
+}

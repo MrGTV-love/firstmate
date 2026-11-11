@@ -1,0 +1,397 @@
+{
+  "scenario": "l4-captain-drop",
+  "candidate": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6",
+  "passed": true,
+  "assertions": {
+    "before_done_row": true,
+    "before_failed_row": true,
+    "snapshot_records_drop": true,
+    "dropped_done_row_gone": true,
+    "dropped_failed_row_gone": true,
+    "undropped_twin_keeps_row": true
+  },
+  "extra": {
+    "drops": {
+      "keep-done": false,
+      "drop-failed": true,
+      "drop-done": true
+    },
+    "before": [
+      [
+        "completed_task",
+        "drop-done"
+      ],
+      [
+        "completed_task",
+        "keep-done"
+      ],
+      [
+        "failed_task",
+        "drop-failed"
+      ],
+      [
+        "silent_report",
+        "drop-done"
+      ],
+      [
+        "silent_report",
+        "drop-failed"
+      ],
+      [
+        "silent_report",
+        "keep-done"
+      ]
+    ],
+    "after": [
+      [
+        "completed_task",
+        "keep-done"
+      ],
+      [
+        "silent_report",
+        "drop-done"
+      ],
+      [
+        "silent_report",
+        "drop-failed"
+      ],
+      [
+        "silent_report",
+        "keep-done"
+      ]
+    ]
+  },
+  "env": {
+    "PATH": "/Users/charlesabrooker/tmp/fm-lab.reeo5dkx/fakebin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.8.14/libexec:/opt/homebrew/Cellar/pyenv/2.8.14/plugins/python-build/bin:/opt/homebrew/Cellar/pyenv/2.8.14/plugins/pyenv-link/bin:/opt/homebrew/Cellar/pyenv/2.8.14/plugins/pyenv-binary/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources",
+    "HOME": "/Users/charlesabrooker/tmp/fm-lab.reeo5dkx",
+    "TMPDIR": "/Users/charlesabrooker/tmp/fm-lab.reeo5dkx/tmp",
+    "FM_HOME": "/Users/charlesabrooker/tmp/fm-lab.reeo5dkx",
+    "TMUX_TMPDIR": "/tmp/fml.MkurGE",
+    "FM_GITHUB_ACCOUNTING": "0",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "NO_MISTAKES_GATE": "1",
+    "GIT_CONFIG_NOSYSTEM": "1",
+    "GIT_CONFIG_GLOBAL": "/dev/null",
+    "GIT_AUTHOR_NAME": "Fixture",
+    "GIT_AUTHOR_EMAIL": "fixture@example.invalid",
+    "GIT_COMMITTER_NAME": "Fixture",
+    "GIT_COMMITTER_EMAIL": "fixture@example.invalid"
+  },
+  "transcript": [
+    {
+      "label": "backlog-add-drop-done",
+      "argv": [
+        "tasks-axi",
+        "add",
+        "drop-done",
+        "fixture scout",
+        "--kind",
+        "scout",
+        "--repo",
+        "sample"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: added drop-done (scout, repo sample) -> Queued\ntask:\n  id: drop-done\n  title: fixture scout\n  state: queued\n  blocked: no\n  blocked_by: none\n  held: no\n  hold_reason: \"-\"\n  hold_kind: \"-\"\n  hold_until: \"-\"\n  kind: scout\n  repo: sample\n  priority: \"-\"\n  created: 2026-11-10\n  closed: \"-\"\n  deps: none\n  links: none\n  body: \"\"\nhelp[2]:\n  - Run `tasks-axi start drop-done` to move it to in flight\n  - Run `tasks-axi block drop-done --by <other>` to record a dependency\n",
+      "stderr": ""
+    },
+    {
+      "label": "backlog-start-drop-done",
+      "argv": [
+        "tasks-axi",
+        "start",
+        "drop-done"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: start drop-done -> In flight\nhelp[1]:\n  - Run `tasks-axi done drop-done --pr <url>` when it ships\n",
+      "stderr": ""
+    },
+    {
+      "label": "status-append done [at=1794350946]: report ready for owner",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-status-append.sh",
+        "/Users/charlesabrooker/tmp/fm-lab.reeo5dkx/state/drop-done.status",
+        "done [at=1794350946]: report ready for owner"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "tmux-window-drop-done",
+      "argv": [
+        "tmux",
+        "new-session",
+        "-d",
+        "-s",
+        "isolated",
+        "-n",
+        "fm-drop-done",
+        "/Users/charlesabrooker/tmp/fm-lab.reeo5dkx/fakebin/claude-idle-stand-in 900"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "busy-arm-drop-done",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-busy-event.sh",
+        "arm",
+        "/Users/charlesabrooker/tmp/fm-lab.reeo5dkx/state",
+        "drop-done"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "g1794358193.85855.21012\n",
+      "stderr": ""
+    },
+    {
+      "label": "busy-idle-drop-done",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-busy-event.sh",
+        "apply",
+        "/Users/charlesabrooker/tmp/fm-lab.reeo5dkx/state",
+        "drop-done",
+        "idle",
+        "--gen",
+        "g1794358193.85855.21012",
+        "--source",
+        "claude-hook",
+        "--event",
+        "stop"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "backlog-add-drop-failed",
+      "argv": [
+        "tasks-axi",
+        "add",
+        "drop-failed",
+        "fixture scout",
+        "--kind",
+        "scout",
+        "--repo",
+        "sample"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: added drop-failed (scout, repo sample) -> Queued\ntask:\n  id: drop-failed\n  title: fixture scout\n  state: queued\n  blocked: no\n  blocked_by: none\n  held: no\n  hold_reason: \"-\"\n  hold_kind: \"-\"\n  hold_until: \"-\"\n  kind: scout\n  repo: sample\n  priority: \"-\"\n  created: 2026-11-10\n  closed: \"-\"\n  deps: none\n  links: none\n  body: \"\"\nhelp[2]:\n  - Run `tasks-axi start drop-failed` to move it to in flight\n  - Run `tasks-axi block drop-failed --by <other>` to record a dependency\n",
+      "stderr": ""
+    },
+    {
+      "label": "backlog-start-drop-failed",
+      "argv": [
+        "tasks-axi",
+        "start",
+        "drop-failed"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: start drop-failed -> In flight\nhelp[1]:\n  - Run `tasks-axi done drop-failed --pr <url>` when it ships\n",
+      "stderr": ""
+    },
+    {
+      "label": "status-append failed [at=1794350946]: report ready for owner",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-status-append.sh",
+        "/Users/charlesabrooker/tmp/fm-lab.reeo5dkx/state/drop-failed.status",
+        "failed [at=1794350946]: report ready for owner"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "tmux-window-drop-failed",
+      "argv": [
+        "tmux",
+        "new-window",
+        "-d",
+        "-t",
+        "isolated:",
+        "-n",
+        "fm-drop-failed",
+        "/Users/charlesabrooker/tmp/fm-lab.reeo5dkx/fakebin/claude-idle-stand-in 900"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "busy-arm-drop-failed",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-busy-event.sh",
+        "arm",
+        "/Users/charlesabrooker/tmp/fm-lab.reeo5dkx/state",
+        "drop-failed"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "g1794358194.87065.13667\n",
+      "stderr": ""
+    },
+    {
+      "label": "busy-idle-drop-failed",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-busy-event.sh",
+        "apply",
+        "/Users/charlesabrooker/tmp/fm-lab.reeo5dkx/state",
+        "drop-failed",
+        "idle",
+        "--gen",
+        "g1794358194.87065.13667",
+        "--source",
+        "claude-hook",
+        "--event",
+        "stop"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "backlog-add-keep-done",
+      "argv": [
+        "tasks-axi",
+        "add",
+        "keep-done",
+        "fixture scout",
+        "--kind",
+        "scout",
+        "--repo",
+        "sample"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: added keep-done (scout, repo sample) -> Queued\ntask:\n  id: keep-done\n  title: fixture scout\n  state: queued\n  blocked: no\n  blocked_by: none\n  held: no\n  hold_reason: \"-\"\n  hold_kind: \"-\"\n  hold_until: \"-\"\n  kind: scout\n  repo: sample\n  priority: \"-\"\n  created: 2026-11-10\n  closed: \"-\"\n  deps: none\n  links: none\n  body: \"\"\nhelp[2]:\n  - Run `tasks-axi start keep-done` to move it to in flight\n  - Run `tasks-axi block keep-done --by <other>` to record a dependency\n",
+      "stderr": ""
+    },
+    {
+      "label": "backlog-start-keep-done",
+      "argv": [
+        "tasks-axi",
+        "start",
+        "keep-done"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: start keep-done -> In flight\nhelp[1]:\n  - Run `tasks-axi done keep-done --pr <url>` when it ships\n",
+      "stderr": ""
+    },
+    {
+      "label": "status-append done [at=1794350946]: report ready for owner",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-status-append.sh",
+        "/Users/charlesabrooker/tmp/fm-lab.reeo5dkx/state/keep-done.status",
+        "done [at=1794350946]: report ready for owner"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "tmux-window-keep-done",
+      "argv": [
+        "tmux",
+        "new-window",
+        "-d",
+        "-t",
+        "isolated:",
+        "-n",
+        "fm-keep-done",
+        "/Users/charlesabrooker/tmp/fm-lab.reeo5dkx/fakebin/claude-idle-stand-in 900"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "busy-arm-keep-done",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-busy-event.sh",
+        "arm",
+        "/Users/charlesabrooker/tmp/fm-lab.reeo5dkx/state",
+        "keep-done"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "g1794358194.88153.503\n",
+      "stderr": ""
+    },
+    {
+      "label": "busy-idle-keep-done",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-busy-event.sh",
+        "apply",
+        "/Users/charlesabrooker/tmp/fm-lab.reeo5dkx/state",
+        "keep-done",
+        "idle",
+        "--gen",
+        "g1794358194.88153.503",
+        "--source",
+        "claude-hook",
+        "--event",
+        "stop"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "ledger-before-drop",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-open-loops.sh",
+        "--json"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1794358194, \"home\": \"/Users/charlesabrooker/tmp/fm-lab.reeo5dkx\", \"complete\": true, \"rows\": [{\"id\": \"c878f45083a1ff22359957ca\", \"category\": \"completed_task\", \"subject\": \"drop-done\", \"owner\": \"firstmate\", \"next_action\": \"consume the report, complete the owner handoff and tear the task down\", \"age_seconds\": 7248, \"limit_seconds\": 1800, \"overdue\": true, \"evidence\": \"worker completion is a handoff, not final acceptance\", \"source\": {\"home\": \"/Users/charlesabrooker/tmp/fm-lab.reeo5dkx\", \"state\": \"/Users/charlesabrooker/tmp/fm-lab.reeo5dkx/state\", \"data\": \"/Users/charlesabrooker/tmp/fm-lab.reeo5dkx/data\", \"config\": \"/Users/charlesabrooker/tmp/fm-lab.reeo5dkx/config\", \"task\": \"drop-done\", \"generation\": \"5e22f19c9912fd76985a8bb483264a78044be86a571bac4e53f5d511bb06ba3d\"}}, {\"id\": \"67bb2ee09a9756de8275f8ed\", \"category\": \"completed_task\", \"subject\": \"keep-done\", \"owner\": \"firstmate\", \"next_action\": \"consume the report, complete the owner handoff and tear the task down\", \"age_seconds\": 7248, \"limit_seconds\": 1800, \"overdue\": true, \"evidence\": \"worker completion is a handoff, not final acceptance\", \"source\": {\"home\": \"/Users/charlesabrooker/tmp/fm-lab.reeo5dkx\", \"state\": \"/Users/charlesabrooker/tmp/fm-lab.reeo5dkx/state\", \"data\": \"/Users/charlesabrooker/tmp/fm-lab.reeo5dkx/data\", \"config\": \"/Users/charlesabrooker/tmp/fm-lab.reeo5dkx/config\", \"task\": \"keep-done\", \"generation\": \"d0e4adfddabef74f618ff1b4cf80de2f6934de29d6c72f727a6ada49d906a800\"}}, {\"id\": \"2cff1f8285f3c6090860f61e\", \"category\": \"failed_task\", \"subject\": \"drop-failed\", \"owner\": \"firstmate\", \"next_action\": \"recover the failed work or record why it ends\", \"age_seconds\": 7248, \"limit_seconds\": 1800, \"overdue\": true, \"evidence\": \"\"}, {\"id\": \"4b8c9e1f2d3ddbf95653a220\", \"category\": \"silent_report\", \"subject\": \"drop-done\", \"owner\": \"firstmate\", \"next_action\": \"check in: progress, blockers, cross-workstream dependencies\", \"age_seconds\": 7248, \"limit_seconds\": 900, \"overdue\": false, \"evidence\": \"last heard: status=1794350946; inbox acknowledgement=None; resolved reply=None; excluded: done/ready task is covered by PR or completion handoff\", \"informational\": true}, {\"id\": \"118480286661fe872b6cc35f\", \"category\": \"silent_report\", \"subject\": \"drop-failed\", \"owner\": \"firstmate\", \"next_action\": \"check in: progress, blockers, cross-workstream dependencies\", \"age_seconds\": 7248, \"limit_seconds\": 900, \"overdue\": true, \"evidence\": \"last heard: status=1794350946; inbox acknowledgement=None; resolved reply=None\"}, {\"id\": \"08a679afc0880eec9911f713\", \"category\": \"silent_report\", \"subject\": \"keep-done\", \"owner\": \"firstmate\", \"next_action\": \"check in: progress, blockers, cross-workstream dependencies\", \"age_seconds\": 7248, \"limit_seconds\": 900, \"overdue\": false, \"evidence\": \"last heard: status=1794350946; inbox acknowledgement=None; resolved reply=None; excluded: done/ready task is covered by PR or completion handoff\", \"informational\": true}]}\n",
+      "stderr": "",
+      "rows_summary": [
+        "completed_task drop-done overdue=True",
+        "completed_task keep-done overdue=True",
+        "failed_task drop-failed overdue=True",
+        "silent_report drop-done overdue=False",
+        "silent_report drop-failed overdue=True",
+        "silent_report keep-done overdue=False"
+      ]
+    },
+    {
+      "label": "record the captain drop as the backlog body line the snapshot reads",
+      "backlog": "## In flight\n- [ ] keep-done - fixture scout (repo: sample) (kind: scout) (since 2026-11-10)\n- [ ] drop-failed - fixture scout (repo: sample) (kind: scout) (since 2026-11-10)\n  dropped\n- [ ] drop-done - fixture scout (repo: sample) (kind: scout) (since 2026-11-10)\n  dropped\n\n## Queued\n## Done\n"
+    },
+    {
+      "label": "ledger-after-drop",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-open-loops.sh",
+        "--json"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1794358196, \"home\": \"/Users/charlesabrooker/tmp/fm-lab.reeo5dkx\", \"complete\": true, \"rows\": [{\"id\": \"67bb2ee09a9756de8275f8ed\", \"category\": \"completed_task\", \"subject\": \"keep-done\", \"owner\": \"firstmate\", \"next_action\": \"consume the report, complete the owner handoff and tear the task down\", \"age_seconds\": 7250, \"limit_seconds\": 1800, \"overdue\": true, \"evidence\": \"worker completion is a handoff, not final acceptance\", \"source\": {\"home\": \"/Users/charlesabrooker/tmp/fm-lab.reeo5dkx\", \"state\": \"/Users/charlesabrooker/tmp/fm-lab.reeo5dkx/state\", \"data\": \"/Users/charlesabrooker/tmp/fm-lab.reeo5dkx/data\", \"config\": \"/Users/charlesabrooker/tmp/fm-lab.reeo5dkx/config\", \"task\": \"keep-done\", \"generation\": \"d0e4adfddabef74f618ff1b4cf80de2f6934de29d6c72f727a6ada49d906a800\"}}, {\"id\": \"4b8c9e1f2d3ddbf95653a220\", \"category\": \"silent_report\", \"subject\": \"drop-done\", \"owner\": \"firstmate\", \"next_action\": \"check in: progress, blockers, cross-workstream dependencies\", \"age_seconds\": 7250, \"limit_seconds\": 900, \"overdue\": false, \"evidence\": \"last heard: status=1794350946; inbox acknowledgement=None; resolved reply=None; excluded: done/ready task is covered by PR or completion handoff\", \"informational\": true}, {\"id\": \"118480286661fe872b6cc35f\", \"category\": \"silent_report\", \"subject\": \"drop-failed\", \"owner\": \"firstmate\", \"next_action\": \"check in: progress, blockers, cross-workstream dependencies\", \"age_seconds\": 7250, \"limit_seconds\": 900, \"overdue\": true, \"evidence\": \"last heard: status=1794350946; inbox acknowledgement=None; resolved reply=None\"}, {\"id\": \"08a679afc0880eec9911f713\", \"category\": \"silent_report\", \"subject\": \"keep-done\", \"owner\": \"firstmate\", \"next_action\": \"check in: progress, blockers, cross-workstream dependencies\", \"age_seconds\": 7250, \"limit_seconds\": 900, \"overdue\": false, \"evidence\": \"last heard: status=1794350946; inbox acknowledgement=None; resolved reply=None; excluded: done/ready task is covered by PR or completion handoff\", \"informational\": true}]}\n",
+      "stderr": "",
+      "rows_summary": [
+        "completed_task keep-done overdue=True",
+        "silent_report drop-done overdue=False",
+        "silent_report drop-failed overdue=True",
+        "silent_report keep-done overdue=False"
+      ]
+    }
+  ]
+}

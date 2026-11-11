@@ -1,18 +1,18 @@
 {
-  "source": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ",
-  "revision": "c9a8142bbe148d9ac6f9348cb94931849b2ab686",
-  "observed_at": "2026-11-09T10:12:39.939415+00:00",
+  "source": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6",
+  "revision": "1a1fb7c6585d6f8ff34f4739bdd6bbc30245e77b",
+  "observed_at": "2026-11-11T00:51:13.901986+00:00",
   "scope": "Maintained review identity CLI only. No live checks, forge calls, or real review qualification claimed.",
-  "base": "f2eaf09a6f6235bac6a1c72291d279a26f2242a2",
-  "candidate_a": "cde4aafb94d1b117dbe55ce56ef2ecbe114d00ed",
-  "candidate_b": "177465261b7003bb7f20a5a5d0b7b6f9967c9833",
+  "base": "d7cac043dc99cdbace690f899c06e1d4396effe5",
+  "candidate_a": "5fd5a82f300f64f752a75c1297f890bb61899e4d",
+  "candidate_b": "88d2b06656b765cfd8a6ff1eaff2c0bfc8b749ba",
   "records": [
     {
       "label": "init",
       "argv": [
         "git",
         "-C",
-        "/Volumes/Mac-HD-extension/cache/fm-test-tmp/fm-delivery-r3-i_rdht0a/fixture-repository",
+        "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r3-a_ogmrym/fixture-repository",
         "init",
         "-q"
       ],
@@ -26,7 +26,7 @@
       "argv": [
         "git",
         "-C",
-        "/Volumes/Mac-HD-extension/cache/fm-test-tmp/fm-delivery-r3-i_rdht0a/fixture-repository",
+        "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r3-a_ogmrym/fixture-repository",
         "commit",
         "--allow-empty",
         "-qm",
@@ -42,13 +42,13 @@
       "argv": [
         "git",
         "-C",
-        "/Volumes/Mac-HD-extension/cache/fm-test-tmp/fm-delivery-r3-i_rdht0a/fixture-repository",
+        "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r3-a_ogmrym/fixture-repository",
         "rev-parse",
         "HEAD"
       ],
       "expected_exit": 0,
       "exit": 0,
-      "stdout": "f2eaf09a6f6235bac6a1c72291d279a26f2242a2\n",
+      "stdout": "d7cac043dc99cdbace690f899c06e1d4396effe5\n",
       "stderr": ""
     },
     {
@@ -56,7 +56,7 @@
       "argv": [
         "git",
         "-C",
-        "/Volumes/Mac-HD-extension/cache/fm-test-tmp/fm-delivery-r3-i_rdht0a/fixture-repository",
+        "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r3-a_ogmrym/fixture-repository",
         "commit",
         "--allow-empty",
         "-qm",
@@ -72,13 +72,13 @@
       "argv": [
         "git",
         "-C",
-        "/Volumes/Mac-HD-extension/cache/fm-test-tmp/fm-delivery-r3-i_rdht0a/fixture-repository",
+        "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r3-a_ogmrym/fixture-repository",
         "rev-parse",
         "HEAD"
       ],
       "expected_exit": 0,
       "exit": 0,
-      "stdout": "cde4aafb94d1b117dbe55ce56ef2ecbe114d00ed\n",
+      "stdout": "5fd5a82f300f64f752a75c1297f890bb61899e4d\n",
       "stderr": ""
     },
     {
@@ -86,7 +86,7 @@
       "argv": [
         "git",
         "-C",
-        "/Volumes/Mac-HD-extension/cache/fm-test-tmp/fm-delivery-r3-i_rdht0a/fixture-repository",
+        "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r3-a_ogmrym/fixture-repository",
         "commit",
         "--allow-empty",
         "-qm",
@@ -102,25 +102,25 @@
       "argv": [
         "git",
         "-C",
-        "/Volumes/Mac-HD-extension/cache/fm-test-tmp/fm-delivery-r3-i_rdht0a/fixture-repository",
+        "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r3-a_ogmrym/fixture-repository",
         "rev-parse",
         "HEAD"
       ],
       "expected_exit": 0,
       "exit": 0,
-      "stdout": "177465261b7003bb7f20a5a5d0b7b6f9967c9833\n",
+      "stdout": "88d2b06656b765cfd8a6ff1eaff2c0bfc8b749ba\n",
       "stderr": ""
     },
     {
       "label": "record-candidate-a",
       "argv": [
         "/Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3",
-        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-review-record.py",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-review-record.py",
         "review",
         "--pr",
         "https://github.com/example/fixture/pull/1",
         "--head",
-        "cde4aafb94d1b117dbe55ce56ef2ecbe114d00ed",
+        "5fd5a82f300f64f752a75c1297f890bb61899e4d",
         "--verdict",
         "PASS",
         "--reader-model",
@@ -134,7 +134,7 @@
         "--customer-data-billing-spend",
         "no",
         "--report",
-        "/Volumes/Mac-HD-extension/cache/fm-test-tmp/fm-delivery-r3-i_rdht0a/synthetic-report.txt"
+        "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r3-a_ogmrym/synthetic-report.txt"
       ],
       "expected_exit": 0,
       "exit": 0,
@@ -145,56 +145,56 @@
       "label": "matching-candidate",
       "argv": [
         "/Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3",
-        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-review-record.py",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-review-record.py",
         "verify",
         "--pr",
         "https://github.com/example/fixture/pull/1",
         "--head",
-        "cde4aafb94d1b117dbe55ce56ef2ecbe114d00ed",
+        "5fd5a82f300f64f752a75c1297f890bb61899e4d",
         "--task",
         "fixture",
         "--base",
-        "f2eaf09a6f6235bac6a1c72291d279a26f2242a2",
+        "d7cac043dc99cdbace690f899c06e1d4396effe5",
         "--review-only",
         "--json"
       ],
       "expected_exit": 0,
       "exit": 0,
-      "stdout": "{\"schema\":\"fm-review-verification.v1\",\"ok\":true,\"basis\":\"independent-review\",\"pr\":\"https://github.com/example/fixture/pull/1\",\"head\":\"cde4aafb94d1b117dbe55ce56ef2ecbe114d00ed\",\"at\":1794219159,\"reader_model\":\"sonnet\",\"reader_family\":\"anthropic\",\"author_groups\":{\"ship\":[{\"model\":\"gpt-6.1-sol\",\"family\":\"openai\"}]},\"report\":\"/Volumes/Mac-HD-extension/cache/fm-test-tmp/fm-delivery-r3-i_rdht0a/synthetic-report.txt\",\"report_sha256\":\"c9d7cfd44b64d390b8ef23337a2feac1527c2de4ab0b86b6b6d6dba9bd917e9e\"}\n",
+      "stdout": "{\"schema\":\"fm-review-verification.v1\",\"ok\":true,\"basis\":\"independent-review\",\"pr\":\"https://github.com/example/fixture/pull/1\",\"head\":\"5fd5a82f300f64f752a75c1297f890bb61899e4d\",\"at\":1794358272,\"reader_model\":\"sonnet\",\"reader_family\":\"anthropic\",\"author_groups\":{\"ship\":[{\"model\":\"gpt-6.1-sol\",\"family\":\"openai\"}]},\"report\":\"/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r3-a_ogmrym/synthetic-report.txt\",\"report_sha256\":\"2f23fa39fd8646999ed18a573f90af73f1053d58351a0fb3d9e096798bf25376\"}\n",
       "stderr": ""
     },
     {
       "label": "changed-candidate",
       "argv": [
         "/Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3",
-        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-review-record.py",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-review-record.py",
         "verify",
         "--pr",
         "https://github.com/example/fixture/pull/1",
         "--head",
-        "177465261b7003bb7f20a5a5d0b7b6f9967c9833",
+        "88d2b06656b765cfd8a6ff1eaff2c0bfc8b749ba",
         "--task",
         "fixture",
         "--base",
-        "f2eaf09a6f6235bac6a1c72291d279a26f2242a2",
+        "d7cac043dc99cdbace690f899c06e1d4396effe5",
         "--review-only",
         "--json"
       ],
       "expected_exit": 1,
       "exit": 1,
-      "stdout": "{\"schema\":\"fm-review-verification.v1\",\"ok\":false,\"error\":{\"kind\":\"not-qualified\",\"message\":\"head mismatch: review names cde4aafb94d1b117dbe55ce56ef2ecbe114d00ed, live head is 177465261b7003bb7f20a5a5d0b7b6f9967c9833; review the live head and record its PASS with fm-review-record.py review, then retry the merge\"}}\n",
+      "stdout": "{\"schema\":\"fm-review-verification.v1\",\"ok\":false,\"error\":{\"kind\":\"not-qualified\",\"message\":\"head mismatch: review names 5fd5a82f300f64f752a75c1297f890bb61899e4d, live head is 88d2b06656b765cfd8a6ff1eaff2c0bfc8b749ba; review the live head and record its PASS with fm-review-record.py review, then retry the merge\"}}\n",
       "stderr": ""
     },
     {
       "label": "wrong-head-report",
       "argv": [
         "/Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3",
-        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-review-record.py",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-review-record.py",
         "review",
         "--pr",
         "https://github.com/example/fixture/pull/1",
         "--head",
-        "177465261b7003bb7f20a5a5d0b7b6f9967c9833",
+        "88d2b06656b765cfd8a6ff1eaff2c0bfc8b749ba",
         "--verdict",
         "PASS",
         "--reader-model",
@@ -208,7 +208,7 @@
         "--customer-data-billing-spend",
         "no",
         "--report",
-        "/Volumes/Mac-HD-extension/cache/fm-test-tmp/fm-delivery-r3-i_rdht0a/synthetic-report.txt"
+        "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r3-a_ogmrym/synthetic-report.txt"
       ],
       "expected_exit": 2,
       "exit": 2,
@@ -219,22 +219,22 @@
       "label": "original-evidence-preserved",
       "argv": [
         "/Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3",
-        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-review-record.py",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-review-record.py",
         "verify",
         "--pr",
         "https://github.com/example/fixture/pull/1",
         "--head",
-        "cde4aafb94d1b117dbe55ce56ef2ecbe114d00ed",
+        "5fd5a82f300f64f752a75c1297f890bb61899e4d",
         "--task",
         "fixture",
         "--base",
-        "f2eaf09a6f6235bac6a1c72291d279a26f2242a2",
+        "d7cac043dc99cdbace690f899c06e1d4396effe5",
         "--review-only",
         "--json"
       ],
       "expected_exit": 0,
       "exit": 0,
-      "stdout": "{\"schema\":\"fm-review-verification.v1\",\"ok\":true,\"basis\":\"independent-review\",\"pr\":\"https://github.com/example/fixture/pull/1\",\"head\":\"cde4aafb94d1b117dbe55ce56ef2ecbe114d00ed\",\"at\":1794219159,\"reader_model\":\"sonnet\",\"reader_family\":\"anthropic\",\"author_groups\":{\"ship\":[{\"model\":\"gpt-6.1-sol\",\"family\":\"openai\"}]},\"report\":\"/Volumes/Mac-HD-extension/cache/fm-test-tmp/fm-delivery-r3-i_rdht0a/synthetic-report.txt\",\"report_sha256\":\"c9d7cfd44b64d390b8ef23337a2feac1527c2de4ab0b86b6b6d6dba9bd917e9e\"}\n",
+      "stdout": "{\"schema\":\"fm-review-verification.v1\",\"ok\":true,\"basis\":\"independent-review\",\"pr\":\"https://github.com/example/fixture/pull/1\",\"head\":\"5fd5a82f300f64f752a75c1297f890bb61899e4d\",\"at\":1794358272,\"reader_model\":\"sonnet\",\"reader_family\":\"anthropic\",\"author_groups\":{\"ship\":[{\"model\":\"gpt-6.1-sol\",\"family\":\"openai\"}]},\"report\":\"/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r3-a_ogmrym/synthetic-report.txt\",\"report_sha256\":\"2f23fa39fd8646999ed18a573f90af73f1053d58351a0fb3d9e096798bf25376\"}\n",
       "stderr": ""
     },
     {
@@ -242,9 +242,9 @@
       "argv": [
         "git",
         "-C",
-        "/Volumes/Mac-HD-extension/cache/fm-test-tmp/fm-delivery-r3-i_rdht0a/fixture-repository",
+        "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r3-a_ogmrym/fixture-repository",
         "rev-parse",
-        "177465261b7003bb7f20a5a5d0b7b6f9967c9833^{tree}"
+        "88d2b06656b765cfd8a6ff1eaff2c0bfc8b749ba^{tree}"
       ],
       "expected_exit": 0,
       "exit": 0,
@@ -255,12 +255,12 @@
       "label": "matching-check-head",
       "argv": [
         "/Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3",
-        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-tested-tree.py",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-tested-tree.py",
         "example/fixture",
-        "177465261b7003bb7f20a5a5d0b7b6f9967c9833",
-        "f2eaf09a6f6235bac6a1c72291d279a26f2242a2",
-        "/Volumes/Mac-HD-extension/cache/fm-test-tmp/fm-delivery-r3-i_rdht0a/tested-tree-scratch",
-        "/Volumes/Mac-HD-extension/cache/fm-test-tmp/fm-delivery-r3-i_rdht0a/fixture-repository"
+        "88d2b06656b765cfd8a6ff1eaff2c0bfc8b749ba",
+        "d7cac043dc99cdbace690f899c06e1d4396effe5",
+        "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r3-a_ogmrym/tested-tree-scratch",
+        "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r3-a_ogmrym/fixture-repository"
       ],
       "expected_exit": 0,
       "exit": 0,
@@ -271,17 +271,17 @@
       "label": "wrong-check-head",
       "argv": [
         "/Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3",
-        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ZSG3ND8GVWFQPSXNBHQFQZ/bin/fm-tested-tree.py",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-tested-tree.py",
         "example/fixture",
-        "177465261b7003bb7f20a5a5d0b7b6f9967c9833",
-        "f2eaf09a6f6235bac6a1c72291d279a26f2242a2",
-        "/Volumes/Mac-HD-extension/cache/fm-test-tmp/fm-delivery-r3-i_rdht0a/tested-tree-scratch",
-        "/Volumes/Mac-HD-extension/cache/fm-test-tmp/fm-delivery-r3-i_rdht0a/fixture-repository"
+        "88d2b06656b765cfd8a6ff1eaff2c0bfc8b749ba",
+        "d7cac043dc99cdbace690f899c06e1d4396effe5",
+        "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r3-a_ogmrym/tested-tree-scratch",
+        "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r3-a_ogmrym/fixture-repository"
       ],
       "expected_exit": 3,
       "exit": 3,
       "stdout": "",
-      "stderr": "error: check run 101 did not run at head 177465261b7003bb7f20a5a5d0b7b6f9967c9833; no waiver applies\n"
+      "stderr": "error: check run 101 did not run at head 88d2b06656b765cfd8a6ff1eaff2c0bfc8b749ba; no waiver applies\n"
     }
   ],
   "matching": {
@@ -289,8 +289,8 @@
     "ok": true,
     "basis": "independent-review",
     "pr": "https://github.com/example/fixture/pull/1",
-    "head": "cde4aafb94d1b117dbe55ce56ef2ecbe114d00ed",
-    "at": 1794219159,
+    "head": "5fd5a82f300f64f752a75c1297f890bb61899e4d",
+    "at": 1794358272,
     "reader_model": "sonnet",
     "reader_family": "anthropic",
     "author_groups": {
@@ -301,15 +301,15 @@
         }
       ]
     },
-    "report": "/Volumes/Mac-HD-extension/cache/fm-test-tmp/fm-delivery-r3-i_rdht0a/synthetic-report.txt",
-    "report_sha256": "c9d7cfd44b64d390b8ef23337a2feac1527c2de4ab0b86b6b6d6dba9bd917e9e"
+    "report": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r3-a_ogmrym/synthetic-report.txt",
+    "report_sha256": "2f23fa39fd8646999ed18a573f90af73f1053d58351a0fb3d9e096798bf25376"
   },
   "changed": {
     "schema": "fm-review-verification.v1",
     "ok": false,
     "error": {
       "kind": "not-qualified",
-      "message": "head mismatch: review names cde4aafb94d1b117dbe55ce56ef2ecbe114d00ed, live head is 177465261b7003bb7f20a5a5d0b7b6f9967c9833; review the live head and record its PASS with fm-review-record.py review, then retry the merge"
+      "message": "head mismatch: review names 5fd5a82f300f64f752a75c1297f890bb61899e4d, live head is 88d2b06656b765cfd8a6ff1eaff2c0bfc8b749ba; review the live head and record its PASS with fm-review-record.py review, then retry the merge"
     }
   },
   "preserved": {
@@ -317,8 +317,8 @@
     "ok": true,
     "basis": "independent-review",
     "pr": "https://github.com/example/fixture/pull/1",
-    "head": "cde4aafb94d1b117dbe55ce56ef2ecbe114d00ed",
-    "at": 1794219159,
+    "head": "5fd5a82f300f64f752a75c1297f890bb61899e4d",
+    "at": 1794358272,
     "reader_model": "sonnet",
     "reader_family": "anthropic",
     "author_groups": {
@@ -329,7 +329,7 @@
         }
       ]
     },
-    "report": "/Volumes/Mac-HD-extension/cache/fm-test-tmp/fm-delivery-r3-i_rdht0a/synthetic-report.txt",
-    "report_sha256": "c9d7cfd44b64d390b8ef23337a2feac1527c2de4ab0b86b6b6d6dba9bd917e9e"
+    "report": "/Users/charlesabrooker/tmp/fm-r2r3-driver.76tJgQ/tmp/fm-delivery-r3-a_ogmrym/synthetic-report.txt",
+    "report_sha256": "2f23fa39fd8646999ed18a573f90af73f1053d58351a0fb3d9e096798bf25376"
   }
 }

@@ -1,0 +1,123 @@
+{
+  "scenario": "r5b-scout-open-choice",
+  "passed": true,
+  "assertions": {
+    "key_open_before_owner": true,
+    "verify_refuses_before_owner": true,
+    "none_refused_with_open_key": true,
+    "refusal_left_metadata_unchanged": true,
+    "hold_ok": true,
+    "complete_with_held_id_ok": true,
+    "verify_ok_after_owner": true,
+    "held_id_recorded": true,
+    "task_in_backlog": true
+  },
+  "extra": {
+    "none_stderr": "fm-captain-hold: origin fixture-scout-choice still has open captain decisions in its status stream; hold a captain task for what remains, or answer them, before attesting --none\n",
+    "meta_after": "decisions_reviewed=1\ndecision_keys=fixture-scout-choice-route-call\nkind=scout\nmode=scout\nspawn_gen=fixture\n"
+  },
+  "transcript": [
+    {
+      "label": "scaffold-fixture-scout-choice",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-brief.sh",
+        "fixture-scout-choice",
+        "sample",
+        "--scout"
+      ],
+      "exit": 0,
+      "stdout": "scaffolded: /Users/charlesabrooker/tmp/fm-lab.n3ibi61b/data/fixture-scout-choice/brief.md (scout; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE})\n",
+      "stderr": ""
+    },
+    {
+      "label": "status: needs-decision [key=route] [at=179435822",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-status-append.sh",
+        "/Users/charlesabrooker/tmp/fm-lab.n3ibi61b/state/fixture-scout-choice.status",
+        "needs-decision [key=route] [at=1794358226]: report ready at /Users/charlesabrooker/tmp/fm-lab.n3ibi61b/data/fixture-scout-choice/report.md; route north or south"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "fold-open",
+      "argv": [
+        "bash",
+        "-c",
+        ". \"$1/bin/fm-classify-lib.sh\"; status_open_decisions \"$2\"",
+        "_",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6",
+        "/Users/charlesabrooker/tmp/fm-lab.n3ibi61b/state/fixture-scout-choice.status"
+      ],
+      "exit": 0,
+      "stdout": "route\tneeds-decision\treport ready at /Users/charlesabrooker/tmp/fm-lab.n3ibi61b/data/fixture-scout-choice/report.md; route north or south",
+      "stderr": ""
+    },
+    {
+      "label": "verify-before-owner",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-captain-hold.sh",
+        "verify",
+        "fixture-scout-choice"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "fm-captain-hold: origin fixture-scout-choice has no completed captain-call inventory\n"
+    },
+    {
+      "label": "none-refuses-open-key",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-captain-hold.sh",
+        "complete",
+        "fixture-scout-choice",
+        "--none"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "fm-captain-hold: origin fixture-scout-choice still has open captain decisions in its status stream; hold a captain task for what remains, or answer them, before attesting --none\n"
+    },
+    {
+      "label": "owner-hold",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-captain-hold.sh",
+        "hold",
+        "fixture-scout-choice-route-call",
+        "--title",
+        "Choose route",
+        "--reason",
+        "Question: route? Options: north; south",
+        "--repo",
+        "sample",
+        "--origin",
+        "fixture-scout-choice"
+      ],
+      "exit": 0,
+      "stdout": "fixture-scout-choice-route-call\n",
+      "stderr": ""
+    },
+    {
+      "label": "owner-complete-inventory",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-captain-hold.sh",
+        "complete",
+        "fixture-scout-choice",
+        "fixture-scout-choice-route-call"
+      ],
+      "exit": 0,
+      "stdout": "complete: fixture-scout-choice captain-call inventory reviewed (fixture-scout-choice-route-call)\n",
+      "stderr": ""
+    },
+    {
+      "label": "owner-attested-verifies",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-captain-hold.sh",
+        "verify",
+        "fixture-scout-choice"
+      ],
+      "exit": 0,
+      "stdout": "verified: fixture-scout-choice captain-call inventory\n",
+      "stderr": ""
+    }
+  ]
+}

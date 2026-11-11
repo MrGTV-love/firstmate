@@ -1,0 +1,4 @@
+ok - completion preserves the reviewed inventory and the existing authenticated managed poll
+ok - completion does not authorize unknown trailing metadata or a mismatched PR identity
+ok - captain-hold lifecycle leaves no runner or watchdog processes
+exit=0

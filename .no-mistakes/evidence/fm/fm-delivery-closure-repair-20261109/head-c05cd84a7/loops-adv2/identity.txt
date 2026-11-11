@@ -1,0 +1,7 @@
+candidate_head=c05cd84a7a418f4dbd0660fa87ebe1c4d25007fc
+candidate_tree=cdd5f96db3e6c8ceb9f2812c648fdc747db41c6a
+status_lines=0
+a6a453b7db56b344bd7a166a5b15deba51c2ee64a8161c43668131b5ff96ba8d  /Users/charlesabrooker/.no-mistakes/evidence/01M73WWY8ESTCS9VBM9A6W09X6/head-c05cd84a7/drive_loops_adv2.py
+driver_exit=0
+SUMMARY {"l13-owner-answer-after-done": false}
+base/prefix slots: git archive extracts of 30914c329 / eabb93a43 (adv4: unused, candidate path passed)

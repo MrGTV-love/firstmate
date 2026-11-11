@@ -1,0 +1,799 @@
+{
+  "scenario": "l10-closed-pane-no-false-completion-rows",
+  "candidate": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6",
+  "passed": true,
+  "assertions": {
+    "windows_closed": true,
+    "resumed_work_has_no_completed_task": true,
+    "resumed_work_is_a_missing_worker": true,
+    "paused_has_no_completed_task": true,
+    "dropped_has_no_completed_task": true,
+    "snapshot_records_pr": true,
+    "recorded_pr_has_no_completed_task": true,
+    "landed_ship_has_no_completed_task": true,
+    "unlanded_ship_keeps_completed_task": true,
+    "unlanded_ship_keeps_unlanded_commit": true
+  },
+  "extra": {
+    "crew": {
+      "resumed": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-resumed",
+      "paused-x": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-paused-x",
+      "dropped-gone": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-dropped-gone",
+      "pr-ship": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-pr-ship",
+      "landed-ship": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-landed-ship",
+      "unlanded-ship": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-unlanded-ship"
+    },
+    "prs": {
+      "dropped-gone": null,
+      "landed-ship": null,
+      "paused-x": null,
+      "pr-ship": "https://github.com/example/sample/pull/7",
+      "resumed": null,
+      "unlanded-ship": null
+    },
+    "categories": {
+      "resumed": [
+        "missing_worker"
+      ],
+      "paused-x": [],
+      "dropped-gone": [],
+      "pr-ship": [
+        "unlanded_commit"
+      ],
+      "landed-ship": [],
+      "unlanded-ship": [
+        "completed_task",
+        "unlanded_commit"
+      ]
+    },
+    "complete": false,
+    "coverage": [
+      "open PRs example/sample: unexpected network CLI: /Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/fakebin/gh; PR state https://github.com/example/sample/pull/7: unexpected network CLI: /Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/fakebin/gh"
+    ]
+  },
+  "env": {
+    "PATH": "/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/fakebin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.8.14/libexec:/opt/homebrew/Cellar/pyenv/2.8.14/plugins/python-build/bin:/opt/homebrew/Cellar/pyenv/2.8.14/plugins/pyenv-link/bin:/opt/homebrew/Cellar/pyenv/2.8.14/plugins/pyenv-binary/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources",
+    "HOME": "/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w",
+    "TMPDIR": "/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/tmp",
+    "FM_HOME": "/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w",
+    "TMUX_TMPDIR": "/tmp/fml.IxA5oA",
+    "FM_GITHUB_ACCOUNTING": "0",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "NO_MISTAKES_GATE": "1",
+    "GIT_CONFIG_NOSYSTEM": "1",
+    "GIT_CONFIG_GLOBAL": "/dev/null",
+    "GIT_AUTHOR_NAME": "Fixture",
+    "GIT_AUTHOR_EMAIL": "fixture@example.invalid",
+    "GIT_COMMITTER_NAME": "Fixture",
+    "GIT_COMMITTER_EMAIL": "fixture@example.invalid"
+  },
+  "transcript": [
+    {
+      "label": "backlog-add-resumed",
+      "argv": [
+        "tasks-axi",
+        "add",
+        "resumed",
+        "fixture scout",
+        "--kind",
+        "scout",
+        "--repo",
+        "sample"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: added resumed (scout, repo sample) -> Queued\ntask:\n  id: resumed\n  title: fixture scout\n  state: queued\n  blocked: no\n  blocked_by: none\n  held: no\n  hold_reason: \"-\"\n  hold_kind: \"-\"\n  hold_until: \"-\"\n  kind: scout\n  repo: sample\n  priority: \"-\"\n  created: 2026-11-10\n  closed: \"-\"\n  deps: none\n  links: none\n  body: \"\"\nhelp[2]:\n  - Run `tasks-axi start resumed` to move it to in flight\n  - Run `tasks-axi block resumed --by <other>` to record a dependency\n",
+      "stderr": ""
+    },
+    {
+      "label": "backlog-start-resumed",
+      "argv": [
+        "tasks-axi",
+        "start",
+        "resumed"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: start resumed -> In flight\nhelp[1]:\n  - Run `tasks-axi done resumed --pr <url>` when it ships\n",
+      "stderr": ""
+    },
+    {
+      "label": "status-append done [at=1794359053]: report ready for owner",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-status-append.sh",
+        "/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/state/resumed.status",
+        "done [at=1794359053]: report ready for owner"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "tmux-window-resumed",
+      "argv": [
+        "tmux",
+        "new-session",
+        "-d",
+        "-s",
+        "isolated",
+        "-n",
+        "fm-resumed",
+        "/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/fakebin/claude-idle-stand-in 900"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "busy-arm-resumed",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-busy-event.sh",
+        "arm",
+        "/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/state",
+        "resumed"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "g1794366275.66660.2194\n",
+      "stderr": ""
+    },
+    {
+      "label": "busy-idle-resumed",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-busy-event.sh",
+        "apply",
+        "/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/state",
+        "resumed",
+        "idle",
+        "--gen",
+        "g1794366275.66660.2194",
+        "--source",
+        "claude-hook",
+        "--event",
+        "stop"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "status-append working [at=1794359113]: owner asked for one more ",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-status-append.sh",
+        "/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/state/resumed.status",
+        "working [at=1794359113]: owner asked for one more pass"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "backlog-add-paused-x",
+      "argv": [
+        "tasks-axi",
+        "add",
+        "paused-x",
+        "fixture scout",
+        "--kind",
+        "scout",
+        "--repo",
+        "sample"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: added paused-x (scout, repo sample) -> Queued\ntask:\n  id: paused-x\n  title: fixture scout\n  state: queued\n  blocked: no\n  blocked_by: none\n  held: no\n  hold_reason: \"-\"\n  hold_kind: \"-\"\n  hold_until: \"-\"\n  kind: scout\n  repo: sample\n  priority: \"-\"\n  created: 2026-11-10\n  closed: \"-\"\n  deps: none\n  links: none\n  body: \"\"\nhelp[2]:\n  - Run `tasks-axi start paused-x` to move it to in flight\n  - Run `tasks-axi block paused-x --by <other>` to record a dependency\n",
+      "stderr": ""
+    },
+    {
+      "label": "backlog-start-paused-x",
+      "argv": [
+        "tasks-axi",
+        "start",
+        "paused-x"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: start paused-x -> In flight\nhelp[1]:\n  - Run `tasks-axi done paused-x --pr <url>` when it ships\n",
+      "stderr": ""
+    },
+    {
+      "label": "status-append paused [at=1794359053]: waiting on an external dep",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-status-append.sh",
+        "/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/state/paused-x.status",
+        "paused [at=1794359053]: waiting on an external dependency"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "tmux-window-paused-x",
+      "argv": [
+        "tmux",
+        "new-window",
+        "-d",
+        "-t",
+        "isolated:",
+        "-n",
+        "fm-paused-x",
+        "/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/fakebin/claude-idle-stand-in 900"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "busy-arm-paused-x",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-busy-event.sh",
+        "arm",
+        "/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/state",
+        "paused-x"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "g1794366275.67143.8632\n",
+      "stderr": ""
+    },
+    {
+      "label": "busy-idle-paused-x",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-busy-event.sh",
+        "apply",
+        "/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/state",
+        "paused-x",
+        "idle",
+        "--gen",
+        "g1794366275.67143.8632",
+        "--source",
+        "claude-hook",
+        "--event",
+        "stop"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "backlog-add-dropped-gone",
+      "argv": [
+        "tasks-axi",
+        "add",
+        "dropped-gone",
+        "fixture scout",
+        "--kind",
+        "scout",
+        "--repo",
+        "sample"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: added dropped-gone (scout, repo sample) -> Queued\ntask:\n  id: dropped-gone\n  title: fixture scout\n  state: queued\n  blocked: no\n  blocked_by: none\n  held: no\n  hold_reason: \"-\"\n  hold_kind: \"-\"\n  hold_until: \"-\"\n  kind: scout\n  repo: sample\n  priority: \"-\"\n  created: 2026-11-10\n  closed: \"-\"\n  deps: none\n  links: none\n  body: \"\"\nhelp[2]:\n  - Run `tasks-axi start dropped-gone` to move it to in flight\n  - Run `tasks-axi block dropped-gone --by <other>` to record a dependency\n",
+      "stderr": ""
+    },
+    {
+      "label": "backlog-start-dropped-gone",
+      "argv": [
+        "tasks-axi",
+        "start",
+        "dropped-gone"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: start dropped-gone -> In flight\nhelp[1]:\n  - Run `tasks-axi done dropped-gone --pr <url>` when it ships\n",
+      "stderr": ""
+    },
+    {
+      "label": "status-append done [at=1794359053]: report ready for owner",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-status-append.sh",
+        "/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/state/dropped-gone.status",
+        "done [at=1794359053]: report ready for owner"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "tmux-window-dropped-gone",
+      "argv": [
+        "tmux",
+        "new-window",
+        "-d",
+        "-t",
+        "isolated:",
+        "-n",
+        "fm-dropped-gone",
+        "/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/fakebin/claude-idle-stand-in 900"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "busy-arm-dropped-gone",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-busy-event.sh",
+        "arm",
+        "/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/state",
+        "dropped-gone"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "g1794366276.67623.14161\n",
+      "stderr": ""
+    },
+    {
+      "label": "busy-idle-dropped-gone",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-busy-event.sh",
+        "apply",
+        "/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/state",
+        "dropped-gone",
+        "idle",
+        "--gen",
+        "g1794366276.67623.14161",
+        "--source",
+        "claude-hook",
+        "--event",
+        "stop"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "backlog-add-pr-ship",
+      "argv": [
+        "tasks-axi",
+        "add",
+        "pr-ship",
+        "fixture ship",
+        "--kind",
+        "ship",
+        "--repo",
+        "sample"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: added pr-ship (ship, repo sample) -> Queued\ntask:\n  id: pr-ship\n  title: fixture ship\n  state: queued\n  blocked: no\n  blocked_by: none\n  held: no\n  hold_reason: \"-\"\n  hold_kind: \"-\"\n  hold_until: \"-\"\n  kind: ship\n  repo: sample\n  priority: \"-\"\n  created: 2026-11-10\n  closed: \"-\"\n  deps: none\n  links: none\n  body: \"\"\nhelp[2]:\n  - Run `tasks-axi start pr-ship` to move it to in flight\n  - Run `tasks-axi block pr-ship --by <other>` to record a dependency\n",
+      "stderr": ""
+    },
+    {
+      "label": "backlog-start-pr-ship",
+      "argv": [
+        "tasks-axi",
+        "start",
+        "pr-ship"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: start pr-ship -> In flight\nhelp[1]:\n  - Run `tasks-axi done pr-ship --pr <url>` when it ships\n",
+      "stderr": ""
+    },
+    {
+      "label": "status-append done [at=1794359053]: candidate committed; PR http",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-status-append.sh",
+        "/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/state/pr-ship.status",
+        "done [at=1794359053]: candidate committed; PR https://github.com/example/sample/pull/7"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "tmux-window-pr-ship",
+      "argv": [
+        "tmux",
+        "new-window",
+        "-d",
+        "-t",
+        "isolated:",
+        "-n",
+        "fm-pr-ship",
+        "/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/fakebin/claude-idle-stand-in 900"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "busy-arm-pr-ship",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-busy-event.sh",
+        "arm",
+        "/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/state",
+        "pr-ship"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "g1794366276.68178.20541\n",
+      "stderr": ""
+    },
+    {
+      "label": "busy-idle-pr-ship",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-busy-event.sh",
+        "apply",
+        "/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/state",
+        "pr-ship",
+        "idle",
+        "--gen",
+        "g1794366276.68178.20541",
+        "--source",
+        "claude-hook",
+        "--event",
+        "stop"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "backlog-add-landed-ship",
+      "argv": [
+        "tasks-axi",
+        "add",
+        "landed-ship",
+        "fixture ship",
+        "--kind",
+        "ship",
+        "--repo",
+        "sample"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: added landed-ship (ship, repo sample) -> Queued\ntask:\n  id: landed-ship\n  title: fixture ship\n  state: queued\n  blocked: no\n  blocked_by: none\n  held: no\n  hold_reason: \"-\"\n  hold_kind: \"-\"\n  hold_until: \"-\"\n  kind: ship\n  repo: sample\n  priority: \"-\"\n  created: 2026-11-10\n  closed: \"-\"\n  deps: none\n  links: none\n  body: \"\"\nhelp[2]:\n  - Run `tasks-axi start landed-ship` to move it to in flight\n  - Run `tasks-axi block landed-ship --by <other>` to record a dependency\n",
+      "stderr": ""
+    },
+    {
+      "label": "backlog-start-landed-ship",
+      "argv": [
+        "tasks-axi",
+        "start",
+        "landed-ship"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: start landed-ship -> In flight\nhelp[1]:\n  - Run `tasks-axi done landed-ship --pr <url>` when it ships\n",
+      "stderr": ""
+    },
+    {
+      "label": "status-append done [at=1794359053]: candidate committed",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-status-append.sh",
+        "/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/state/landed-ship.status",
+        "done [at=1794359053]: candidate committed"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "tmux-window-landed-ship",
+      "argv": [
+        "tmux",
+        "new-window",
+        "-d",
+        "-t",
+        "isolated:",
+        "-n",
+        "fm-landed-ship",
+        "/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/fakebin/claude-idle-stand-in 900"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "busy-arm-landed-ship",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-busy-event.sh",
+        "arm",
+        "/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/state",
+        "landed-ship"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "g1794366277.68753.20078\n",
+      "stderr": ""
+    },
+    {
+      "label": "busy-idle-landed-ship",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-busy-event.sh",
+        "apply",
+        "/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/state",
+        "landed-ship",
+        "idle",
+        "--gen",
+        "g1794366277.68753.20078",
+        "--source",
+        "claude-hook",
+        "--event",
+        "stop"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "backlog-add-unlanded-ship",
+      "argv": [
+        "tasks-axi",
+        "add",
+        "unlanded-ship",
+        "fixture ship",
+        "--kind",
+        "ship",
+        "--repo",
+        "sample"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: added unlanded-ship (ship, repo sample) -> Queued\ntask:\n  id: unlanded-ship\n  title: fixture ship\n  state: queued\n  blocked: no\n  blocked_by: none\n  held: no\n  hold_reason: \"-\"\n  hold_kind: \"-\"\n  hold_until: \"-\"\n  kind: ship\n  repo: sample\n  priority: \"-\"\n  created: 2026-11-10\n  closed: \"-\"\n  deps: none\n  links: none\n  body: \"\"\nhelp[2]:\n  - Run `tasks-axi start unlanded-ship` to move it to in flight\n  - Run `tasks-axi block unlanded-ship --by <other>` to record a dependency\n",
+      "stderr": ""
+    },
+    {
+      "label": "backlog-start-unlanded-ship",
+      "argv": [
+        "tasks-axi",
+        "start",
+        "unlanded-ship"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: start unlanded-ship -> In flight\nhelp[1]:\n  - Run `tasks-axi done unlanded-ship --pr <url>` when it ships\n",
+      "stderr": ""
+    },
+    {
+      "label": "status-append done [at=1794359053]: candidate committed",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-status-append.sh",
+        "/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/state/unlanded-ship.status",
+        "done [at=1794359053]: candidate committed"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "tmux-window-unlanded-ship",
+      "argv": [
+        "tmux",
+        "new-window",
+        "-d",
+        "-t",
+        "isolated:",
+        "-n",
+        "fm-unlanded-ship",
+        "/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/fakebin/claude-idle-stand-in 900"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "busy-arm-unlanded-ship",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-busy-event.sh",
+        "arm",
+        "/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/state",
+        "unlanded-ship"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "g1794366277.69469.17681\n",
+      "stderr": ""
+    },
+    {
+      "label": "busy-idle-unlanded-ship",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-busy-event.sh",
+        "apply",
+        "/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/state",
+        "unlanded-ship",
+        "idle",
+        "--gen",
+        "g1794366277.69469.17681",
+        "--source",
+        "claude-hook",
+        "--event",
+        "stop"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "close-window-resumed",
+      "argv": [
+        "tmux",
+        "kill-window",
+        "-t",
+        "isolated:fm-resumed"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "close-window-paused-x",
+      "argv": [
+        "tmux",
+        "kill-window",
+        "-t",
+        "isolated:fm-paused-x"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "close-window-dropped-gone",
+      "argv": [
+        "tmux",
+        "kill-window",
+        "-t",
+        "isolated:fm-dropped-gone"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "close-window-pr-ship",
+      "argv": [
+        "tmux",
+        "kill-window",
+        "-t",
+        "isolated:fm-pr-ship"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "close-window-landed-ship",
+      "argv": [
+        "tmux",
+        "kill-window",
+        "-t",
+        "isolated:fm-landed-ship"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "close-window-unlanded-ship",
+      "argv": [
+        "tmux",
+        "kill-window",
+        "-t",
+        "isolated:fm-unlanded-ship"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "crew-state-resumed",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-crew-state.sh",
+        "resumed"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-resumed\n",
+      "stderr": ""
+    },
+    {
+      "label": "crew-state-paused-x",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-crew-state.sh",
+        "paused-x"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-paused-x\n",
+      "stderr": ""
+    },
+    {
+      "label": "crew-state-dropped-gone",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-crew-state.sh",
+        "dropped-gone"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-dropped-gone\n",
+      "stderr": ""
+    },
+    {
+      "label": "crew-state-pr-ship",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-crew-state.sh",
+        "pr-ship"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-pr-ship\n",
+      "stderr": ""
+    },
+    {
+      "label": "crew-state-landed-ship",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-crew-state.sh",
+        "landed-ship"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-landed-ship\n",
+      "stderr": ""
+    },
+    {
+      "label": "crew-state-unlanded-ship",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-crew-state.sh",
+        "unlanded-ship"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-unlanded-ship\n",
+      "stderr": ""
+    },
+    {
+      "label": "ledger-all-panes-closed",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-open-loops.sh",
+        "--json"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1794366281, \"home\": \"/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w\", \"complete\": false, \"rows\": [{\"id\": \"96bb31db098118fe30ff4568\", \"category\": \"completed_task\", \"subject\": \"unlanded-ship\", \"owner\": \"firstmate\", \"next_action\": \"advance the committed candidate through its selected delivery path\", \"age_seconds\": 7228, \"limit_seconds\": 1800, \"overdue\": true, \"evidence\": \"worker completion is a handoff, not final acceptance\", \"source\": {\"home\": \"/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w\", \"state\": \"/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/state\", \"data\": \"/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/data\", \"config\": \"/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/config\", \"task\": \"unlanded-ship\", \"generation\": \"cd90b81d815895f07a46e4f089bea5e7ac807501479abc8981da9c1b413c7bf8\"}}, {\"id\": \"74d0cc7c3e2552f07a14ee0f\", \"category\": \"coverage\", \"subject\": \"ledger degraded\", \"owner\": \"firstmate\", \"next_action\": \"restore the unreadable sources and rerun the reconciler\", \"age_seconds\": null, \"limit_seconds\": 0, \"overdue\": true, \"evidence\": \"open PRs example/sample: unexpected network CLI: /Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/fakebin/gh; PR state https://github.com/example/sample/pull/7: unexpected network CLI: /Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/fakebin/gh\"}, {\"id\": \"2e128a8fde8ed48a2eff3cd3\", \"category\": \"missing_worker\", \"subject\": \"resumed\", \"owner\": \"firstmate\", \"next_action\": \"recover the assigned worker without discarding work\", \"age_seconds\": 6, \"limit_seconds\": 600, \"overdue\": false, \"evidence\": \"\"}, {\"id\": \"6d0313ac20f6196bf18e46f3\", \"category\": \"unlanded_commit\", \"subject\": \"pr-ship\", \"owner\": \"firstmate\", \"next_action\": \"land this work through its PR, or obtain the captain's drop\", \"age_seconds\": 5, \"limit_seconds\": 86400, \"overdue\": false, \"evidence\": \"1 commit(s) not on refs/heads/main; newest: candidate work for pr-ship\", \"source\": {\"home\": \"/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w\", \"state\": \"/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/state\", \"data\": \"/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/data\", \"config\": \"/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/config\", \"task\": \"pr-ship\", \"generation\": \"530b08dc152b1db57df545c900fd904307deab8daa14adf96cadcf30ed1fb916\", \"kind\": \"commits\", \"worktree\": \"/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/projects/wt-pr-ship\", \"head\": \"9bdc796bc02692ab80455c40d44cd1628719d11d\", \"commits\": \"478c8f6f3e69a2a52a69f21b80d2509e4acbbcc6092f0a8965d4dbf2aed52c26\"}}, {\"id\": \"6e5409d698201020383e7206\", \"category\": \"unlanded_commit\", \"subject\": \"unlanded-ship\", \"owner\": \"firstmate\", \"next_action\": \"land this work through its PR, or obtain the captain's drop\", \"age_seconds\": 4, \"limit_seconds\": 86400, \"overdue\": false, \"evidence\": \"1 commit(s) not on refs/heads/main; newest: candidate work for unlanded-ship\", \"source\": {\"home\": \"/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w\", \"state\": \"/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/state\", \"data\": \"/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/data\", \"config\": \"/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/config\", \"task\": \"unlanded-ship\", \"generation\": \"cd90b81d815895f07a46e4f089bea5e7ac807501479abc8981da9c1b413c7bf8\", \"kind\": \"commits\", \"worktree\": \"/Users/charlesabrooker/tmp/fm-lab.vfu7dt1w/projects/wt-unlanded-ship\", \"head\": \"87848ec188e4ac344c902282facc1ecc55dddcfb\", \"commits\": \"faf59daae6696564c2c6833a1e5078f6fdbad8e7637112a094cedd0e66906794\"}}]}\n",
+      "stderr": "",
+      "rows_summary": [
+        "completed_task unlanded-ship overdue=True",
+        "coverage ledger degraded overdue=True",
+        "missing_worker resumed overdue=False",
+        "unlanded_commit pr-ship overdue=False",
+        "unlanded_commit unlanded-ship overdue=False"
+      ]
+    }
+  ]
+}

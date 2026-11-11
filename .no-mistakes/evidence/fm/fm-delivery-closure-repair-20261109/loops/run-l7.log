@@ -1,0 +1,48 @@
+{
+ "scenario": "l7-complete-keeps-pr-footer-base",
+ "passed": true,
+ "assertions": {
+  "complete_ok": true,
+  "attested": true
+ },
+ "extra": {
+  "complete_exit": 0,
+  "verify_exit": 0,
+  "last_two_lines": [
+   "decisions_reviewed=1",
+   "decision_keys="
+  ],
+  "footer_still_last": false,
+  "attested": true,
+  "other_fields_kept_in_order": true,
+  "mode": "0o644",
+  "stray_temp_files": []
+ }
+}
+{
+ "scenario": "l7-complete-keeps-pr-footer-candidate",
+ "passed": true,
+ "assertions": {
+  "complete_ok": true,
+  "verify_ok": true,
+  "attested": true,
+  "pr_footer_still_last": true,
+  "other_fields_kept_in_order": true,
+  "no_stray_temp_file": true,
+  "base_put_inventory_after_the_footer": true
+ },
+ "extra": {
+  "complete_exit": 0,
+  "verify_exit": 0,
+  "last_two_lines": [
+   "pr=https://github.com/example/repo/pull/1",
+   "pr_head=1111111111111111111111111111111111111111"
+  ],
+  "footer_still_last": true,
+  "attested": true,
+  "other_fields_kept_in_order": true,
+  "mode": "0o600",
+  "stray_temp_files": []
+ }
+}
+SUMMARY {"l7-complete-keeps-pr-footer-base": true, "l7-complete-keeps-pr-footer-candidate": true}

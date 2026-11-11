@@ -1,0 +1,15 @@
+candidate=1a1fb7c6585d6f8ff34f4739bdd6bbc30245e77b
+tree=2e4577fdea1b1e69a59fefb18d23320212989620
+test_file_blob=306dd7b9e65311ea6ae00d18064ac600ade7c7ca
+test_file_sha256=8f75c941ce890e77d360e109a285a9a1185c102475b7adcea18f09b54fcdbcde
+status_lines=0
+fixture_home=/Users/charlesabrooker/tmp/fm-gate-full-wake.zQfySX/home
+fixture_tmpdir=/Users/charlesabrooker/tmp/fm-gate-full-wake.zQfySX/tmp
+command=HOME=$FX/home TMPDIR=$FX/tmp bash bin/fm-test-run.sh --json $D/timing.json tests/fm-wake-queue.test.sh
+start=2026-11-11T00:40:23Z
+18:40  up 6 days, 16:35, 1 user, load averages: 19.03 20.66 22.18
+exit=0
+end=2026-11-11T00:52:18Z
+18:52  up 6 days, 16:47, 1 user, load averages: 18.34 25.87 25.77
+head_after=1a1fb7c6585d6f8ff34f4739bdd6bbc30245e77b
+status_lines_after=0

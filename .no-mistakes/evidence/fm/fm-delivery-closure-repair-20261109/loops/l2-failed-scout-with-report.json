@@ -1,0 +1,185 @@
+{
+  "scenario": "l2-failed-scout-with-report",
+  "candidate": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6",
+  "passed": true,
+  "assertions": {
+    "snapshot_reads_failed": true,
+    "base_has_no_failed_task_row": true,
+    "candidate_has_failed_task_row": true,
+    "row_overdue": true,
+    "no_completed_task_for_failed": true
+  },
+  "extra": {
+    "crew_state": "state: failed \u00b7 source: status-log \u00b7 could not finish; partial report written",
+    "row": {
+      "id": "50a30b9a0fd22d87699d8224",
+      "category": "failed_task",
+      "subject": "review-failed",
+      "owner": "firstmate",
+      "next_action": "recover the failed work or record why it ends",
+      "age_seconds": 7237,
+      "limit_seconds": 1800,
+      "overdue": true,
+      "evidence": ""
+    },
+    "base_categories": [
+      "silent_report"
+    ],
+    "candidate_categories": [
+      "failed_task",
+      "silent_report"
+    ]
+  },
+  "env": {
+    "PATH": "/Users/charlesabrooker/tmp/fm-lab.zvu7sp0_/fakebin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.8.14/libexec:/opt/homebrew/Cellar/pyenv/2.8.14/plugins/python-build/bin:/opt/homebrew/Cellar/pyenv/2.8.14/plugins/pyenv-link/bin:/opt/homebrew/Cellar/pyenv/2.8.14/plugins/pyenv-binary/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources",
+    "HOME": "/Users/charlesabrooker/tmp/fm-lab.zvu7sp0_",
+    "TMPDIR": "/Users/charlesabrooker/tmp/fm-lab.zvu7sp0_/tmp",
+    "FM_HOME": "/Users/charlesabrooker/tmp/fm-lab.zvu7sp0_",
+    "TMUX_TMPDIR": "/tmp/fml.IuX3Rr",
+    "FM_GITHUB_ACCOUNTING": "0",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "NO_MISTAKES_GATE": "1",
+    "GIT_CONFIG_NOSYSTEM": "1",
+    "GIT_CONFIG_GLOBAL": "/dev/null",
+    "GIT_AUTHOR_NAME": "Fixture",
+    "GIT_AUTHOR_EMAIL": "fixture@example.invalid",
+    "GIT_COMMITTER_NAME": "Fixture",
+    "GIT_COMMITTER_EMAIL": "fixture@example.invalid"
+  },
+  "transcript": [
+    {
+      "label": "backlog-add-review-failed",
+      "argv": [
+        "tasks-axi",
+        "add",
+        "review-failed",
+        "fixture scout",
+        "--kind",
+        "scout",
+        "--repo",
+        "sample"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: added review-failed (scout, repo sample) -> Queued\ntask:\n  id: review-failed\n  title: fixture scout\n  state: queued\n  blocked: no\n  blocked_by: none\n  held: no\n  hold_reason: \"-\"\n  hold_kind: \"-\"\n  hold_until: \"-\"\n  kind: scout\n  repo: sample\n  priority: \"-\"\n  created: 2026-11-10\n  closed: \"-\"\n  deps: none\n  links: none\n  body: \"\"\nhelp[2]:\n  - Run `tasks-axi start review-failed` to move it to in flight\n  - Run `tasks-axi block review-failed --by <other>` to record a dependency\n",
+      "stderr": ""
+    },
+    {
+      "label": "backlog-start-review-failed",
+      "argv": [
+        "tasks-axi",
+        "start",
+        "review-failed"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: start review-failed -> In flight\nhelp[1]:\n  - Run `tasks-axi done review-failed --pr <url>` when it ships\n",
+      "stderr": ""
+    },
+    {
+      "label": "status-append failed [at=1794350946]: could not finish; partial ",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-status-append.sh",
+        "/Users/charlesabrooker/tmp/fm-lab.zvu7sp0_/state/review-failed.status",
+        "failed [at=1794350946]: could not finish; partial report written"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "tmux-window-review-failed",
+      "argv": [
+        "tmux",
+        "new-session",
+        "-d",
+        "-s",
+        "isolated",
+        "-n",
+        "fm-review-failed",
+        "/Users/charlesabrooker/tmp/fm-lab.zvu7sp0_/fakebin/claude-idle-stand-in 900"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "busy-arm-review-failed",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-busy-event.sh",
+        "arm",
+        "/Users/charlesabrooker/tmp/fm-lab.zvu7sp0_/state",
+        "review-failed"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "g1794358181.57966.10243\n",
+      "stderr": ""
+    },
+    {
+      "label": "busy-idle-review-failed",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-busy-event.sh",
+        "apply",
+        "/Users/charlesabrooker/tmp/fm-lab.zvu7sp0_/state",
+        "review-failed",
+        "idle",
+        "--gen",
+        "g1794358181.57966.10243",
+        "--source",
+        "claude-hook",
+        "--event",
+        "stop"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "crew-state-review-failed",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-crew-state.sh",
+        "review-failed"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "state: failed \u00b7 source: status-log \u00b7 could not finish; partial report written\n",
+      "stderr": ""
+    },
+    {
+      "label": "ledger-base",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/tmp/fm-trees.dYAiaH/base/bin/fm-open-loops.sh",
+        "--json"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1794358181, \"home\": \"/Users/charlesabrooker/tmp/fm-lab.zvu7sp0_\", \"complete\": true, \"rows\": [{\"id\": \"45fa5013acc027a5a39ad90e\", \"category\": \"silent_report\", \"subject\": \"review-failed\", \"owner\": \"firstmate\", \"next_action\": \"check in: progress, blockers, cross-workstream dependencies\", \"age_seconds\": 7235, \"limit_seconds\": 900, \"overdue\": true, \"evidence\": \"last heard: status=1794350946; inbox acknowledgement=None; resolved reply=None\"}]}\n",
+      "stderr": "",
+      "rows_summary": [
+        "silent_report review-failed overdue=True"
+      ]
+    },
+    {
+      "label": "ledger-candidate",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-open-loops.sh",
+        "--json"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1794358183, \"home\": \"/Users/charlesabrooker/tmp/fm-lab.zvu7sp0_\", \"complete\": true, \"rows\": [{\"id\": \"50a30b9a0fd22d87699d8224\", \"category\": \"failed_task\", \"subject\": \"review-failed\", \"owner\": \"firstmate\", \"next_action\": \"recover the failed work or record why it ends\", \"age_seconds\": 7237, \"limit_seconds\": 1800, \"overdue\": true, \"evidence\": \"\"}, {\"id\": \"45fa5013acc027a5a39ad90e\", \"category\": \"silent_report\", \"subject\": \"review-failed\", \"owner\": \"firstmate\", \"next_action\": \"check in: progress, blockers, cross-workstream dependencies\", \"age_seconds\": 7237, \"limit_seconds\": 900, \"overdue\": true, \"evidence\": \"last heard: status=1794350946; inbox acknowledgement=None; resolved reply=None\"}]}\n",
+      "stderr": "",
+      "rows_summary": [
+        "failed_task review-failed overdue=True",
+        "silent_report review-failed overdue=True"
+      ]
+    }
+  ]
+}

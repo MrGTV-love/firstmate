@@ -1,0 +1,235 @@
+{
+  "scenario": "l3-done-ship-candidate",
+  "candidate": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6",
+  "passed": true,
+  "assertions": {
+    "snapshot_reads_done": true,
+    "base_has_no_completed_task": true,
+    "unlanded_has_completed_task": true,
+    "action_names_delivery_path": true,
+    "unlanded_has_unlanded_commit": true,
+    "landed_has_no_completed_task": true,
+    "landed_has_no_unlanded_commit": true
+  },
+  "extra": {
+    "crew_state": "state: done \u00b7 source: status-log \u00b7 candidate committed",
+    "crew_state_landed": "state: done \u00b7 source: status-log \u00b7 candidate committed",
+    "row": {
+      "id": "b67897e82fe7eebff6254a48",
+      "category": "completed_task",
+      "subject": "ship-a",
+      "owner": "firstmate",
+      "next_action": "advance the committed candidate through its selected delivery path",
+      "age_seconds": 7241,
+      "limit_seconds": 1800,
+      "overdue": true,
+      "evidence": "worker completion is a handoff, not final acceptance",
+      "source": {
+        "home": "/Users/charlesabrooker/tmp/fm-lab.49b_pgiz",
+        "state": "/Users/charlesabrooker/tmp/fm-lab.49b_pgiz/state",
+        "data": "/Users/charlesabrooker/tmp/fm-lab.49b_pgiz/data",
+        "config": "/Users/charlesabrooker/tmp/fm-lab.49b_pgiz/config",
+        "task": "ship-a",
+        "generation": "86735f25cffad92b279ade5e0d1c6c2d191ec694d2e6aa85767350985b0a6da2"
+      }
+    },
+    "unlanded_categories": [
+      "completed_task",
+      "silent_report",
+      "unlanded_commit"
+    ],
+    "landed_categories": [
+      "silent_report"
+    ],
+    "base_categories": [
+      "silent_report",
+      "unlanded_commit"
+    ]
+  },
+  "env": {
+    "PATH": "/Users/charlesabrooker/tmp/fm-lab.49b_pgiz/fakebin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.8.14/libexec:/opt/homebrew/Cellar/pyenv/2.8.14/plugins/python-build/bin:/opt/homebrew/Cellar/pyenv/2.8.14/plugins/pyenv-link/bin:/opt/homebrew/Cellar/pyenv/2.8.14/plugins/pyenv-binary/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources",
+    "HOME": "/Users/charlesabrooker/tmp/fm-lab.49b_pgiz",
+    "TMPDIR": "/Users/charlesabrooker/tmp/fm-lab.49b_pgiz/tmp",
+    "FM_HOME": "/Users/charlesabrooker/tmp/fm-lab.49b_pgiz",
+    "TMUX_TMPDIR": "/tmp/fml.SfLmw9",
+    "FM_GITHUB_ACCOUNTING": "0",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "NO_MISTAKES_GATE": "1",
+    "GIT_CONFIG_NOSYSTEM": "1",
+    "GIT_CONFIG_GLOBAL": "/dev/null",
+    "GIT_AUTHOR_NAME": "Fixture",
+    "GIT_AUTHOR_EMAIL": "fixture@example.invalid",
+    "GIT_COMMITTER_NAME": "Fixture",
+    "GIT_COMMITTER_EMAIL": "fixture@example.invalid"
+  },
+  "transcript": [
+    {
+      "label": "backlog-add-ship-a",
+      "argv": [
+        "tasks-axi",
+        "add",
+        "ship-a",
+        "fixture ship",
+        "--kind",
+        "ship",
+        "--repo",
+        "sample"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: added ship-a (ship, repo sample) -> Queued\ntask:\n  id: ship-a\n  title: fixture ship\n  state: queued\n  blocked: no\n  blocked_by: none\n  held: no\n  hold_reason: \"-\"\n  hold_kind: \"-\"\n  hold_until: \"-\"\n  kind: ship\n  repo: sample\n  priority: \"-\"\n  created: 2026-11-10\n  closed: \"-\"\n  deps: none\n  links: none\n  body: \"\"\nhelp[2]:\n  - Run `tasks-axi start ship-a` to move it to in flight\n  - Run `tasks-axi block ship-a --by <other>` to record a dependency\n",
+      "stderr": ""
+    },
+    {
+      "label": "backlog-start-ship-a",
+      "argv": [
+        "tasks-axi",
+        "start",
+        "ship-a"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: start ship-a -> In flight\nhelp[1]:\n  - Run `tasks-axi done ship-a --pr <url>` when it ships\n",
+      "stderr": ""
+    },
+    {
+      "label": "status-append done [at=1794350946]: candidate committed",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-status-append.sh",
+        "/Users/charlesabrooker/tmp/fm-lab.49b_pgiz/state/ship-a.status",
+        "done [at=1794350946]: candidate committed"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "tmux-window-ship-a",
+      "argv": [
+        "tmux",
+        "new-session",
+        "-d",
+        "-s",
+        "isolated",
+        "-n",
+        "fm-ship-a",
+        "/Users/charlesabrooker/tmp/fm-lab.49b_pgiz/fakebin/claude-idle-stand-in 900"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "busy-arm-ship-a",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-busy-event.sh",
+        "arm",
+        "/Users/charlesabrooker/tmp/fm-lab.49b_pgiz/state",
+        "ship-a"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "g1794358185.64482.23200\n",
+      "stderr": ""
+    },
+    {
+      "label": "busy-idle-ship-a",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-busy-event.sh",
+        "apply",
+        "/Users/charlesabrooker/tmp/fm-lab.49b_pgiz/state",
+        "ship-a",
+        "idle",
+        "--gen",
+        "g1794358185.64482.23200",
+        "--source",
+        "claude-hook",
+        "--event",
+        "stop"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "crew-state-ship-a",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-crew-state.sh",
+        "ship-a"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "state: done \u00b7 source: status-log \u00b7 candidate committed\n",
+      "stderr": ""
+    },
+    {
+      "label": "ledger-base-unlanded",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/tmp/fm-trees.dYAiaH/base/bin/fm-open-loops.sh",
+        "--json"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1794358185, \"home\": \"/Users/charlesabrooker/tmp/fm-lab.49b_pgiz\", \"complete\": true, \"rows\": [{\"id\": \"6ee8fbac7f5182baf843e540\", \"category\": \"silent_report\", \"subject\": \"ship-a\", \"owner\": \"firstmate\", \"next_action\": \"check in: progress, blockers, cross-workstream dependencies\", \"age_seconds\": 7239, \"limit_seconds\": 900, \"overdue\": false, \"evidence\": \"last heard: status=1794350946; inbox acknowledgement=None; resolved reply=None; excluded: done/ready task is covered by PR or landing evidence\", \"informational\": true}, {\"id\": \"c196795ec7418d765058cda7\", \"category\": \"unlanded_commit\", \"subject\": \"ship-a\", \"owner\": \"firstmate\", \"next_action\": \"land this work through its PR, or obtain the captain's drop\", \"age_seconds\": 1, \"limit_seconds\": 86400, \"overdue\": false, \"evidence\": \"1 commit(s) not on refs/heads/main; newest: candidate work for ship-a\", \"source\": {\"home\": \"/Users/charlesabrooker/tmp/fm-lab.49b_pgiz\", \"state\": \"/Users/charlesabrooker/tmp/fm-lab.49b_pgiz/state\", \"data\": \"/Users/charlesabrooker/tmp/fm-lab.49b_pgiz/data\", \"config\": \"/Users/charlesabrooker/tmp/fm-lab.49b_pgiz/config\", \"task\": \"ship-a\", \"generation\": \"86735f25cffad92b279ade5e0d1c6c2d191ec694d2e6aa85767350985b0a6da2\", \"kind\": \"commits\", \"worktree\": \"/Users/charlesabrooker/tmp/fm-lab.49b_pgiz/projects/wt-ship-a\", \"head\": \"192e30a51902af298a2c099ac421cc30232025f6\", \"commits\": \"5805fdfdc87b5f1f3e339b3565c6edb05eb58752281aadd2a838abae4acf73b2\"}}]}\n",
+      "stderr": "",
+      "rows_summary": [
+        "silent_report ship-a overdue=False",
+        "unlanded_commit ship-a overdue=False"
+      ]
+    },
+    {
+      "label": "ledger-candidate-unlanded",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-open-loops.sh",
+        "--json"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1794358187, \"home\": \"/Users/charlesabrooker/tmp/fm-lab.49b_pgiz\", \"complete\": true, \"rows\": [{\"id\": \"b67897e82fe7eebff6254a48\", \"category\": \"completed_task\", \"subject\": \"ship-a\", \"owner\": \"firstmate\", \"next_action\": \"advance the committed candidate through its selected delivery path\", \"age_seconds\": 7241, \"limit_seconds\": 1800, \"overdue\": true, \"evidence\": \"worker completion is a handoff, not final acceptance\", \"source\": {\"home\": \"/Users/charlesabrooker/tmp/fm-lab.49b_pgiz\", \"state\": \"/Users/charlesabrooker/tmp/fm-lab.49b_pgiz/state\", \"data\": \"/Users/charlesabrooker/tmp/fm-lab.49b_pgiz/data\", \"config\": \"/Users/charlesabrooker/tmp/fm-lab.49b_pgiz/config\", \"task\": \"ship-a\", \"generation\": \"86735f25cffad92b279ade5e0d1c6c2d191ec694d2e6aa85767350985b0a6da2\"}}, {\"id\": \"6ee8fbac7f5182baf843e540\", \"category\": \"silent_report\", \"subject\": \"ship-a\", \"owner\": \"firstmate\", \"next_action\": \"check in: progress, blockers, cross-workstream dependencies\", \"age_seconds\": 7241, \"limit_seconds\": 900, \"overdue\": false, \"evidence\": \"last heard: status=1794350946; inbox acknowledgement=None; resolved reply=None; excluded: done/ready task is covered by PR or completion handoff\", \"informational\": true}, {\"id\": \"c196795ec7418d765058cda7\", \"category\": \"unlanded_commit\", \"subject\": \"ship-a\", \"owner\": \"firstmate\", \"next_action\": \"land this work through its PR, or obtain the captain's drop\", \"age_seconds\": 3, \"limit_seconds\": 86400, \"overdue\": false, \"evidence\": \"1 commit(s) not on refs/heads/main; newest: candidate work for ship-a\", \"source\": {\"home\": \"/Users/charlesabrooker/tmp/fm-lab.49b_pgiz\", \"state\": \"/Users/charlesabrooker/tmp/fm-lab.49b_pgiz/state\", \"data\": \"/Users/charlesabrooker/tmp/fm-lab.49b_pgiz/data\", \"config\": \"/Users/charlesabrooker/tmp/fm-lab.49b_pgiz/config\", \"task\": \"ship-a\", \"generation\": \"86735f25cffad92b279ade5e0d1c6c2d191ec694d2e6aa85767350985b0a6da2\", \"kind\": \"commits\", \"worktree\": \"/Users/charlesabrooker/tmp/fm-lab.49b_pgiz/projects/wt-ship-a\", \"head\": \"192e30a51902af298a2c099ac421cc30232025f6\", \"commits\": \"5805fdfdc87b5f1f3e339b3565c6edb05eb58752281aadd2a838abae4acf73b2\"}}]}\n",
+      "stderr": "",
+      "rows_summary": [
+        "completed_task ship-a overdue=True",
+        "silent_report ship-a overdue=False",
+        "unlanded_commit ship-a overdue=False"
+      ]
+    },
+    {
+      "label": "land: fast-forward project main to the candidate head",
+      "head": "192e30a51902af298a2c099ac421cc30232025f6",
+      "main": "192e30a51902af298a2c099ac421cc30232025f6"
+    },
+    {
+      "label": "crew-state-ship-a",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-crew-state.sh",
+        "ship-a"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "state: done \u00b7 source: status-log \u00b7 candidate committed\n",
+      "stderr": ""
+    },
+    {
+      "label": "ledger-candidate-landed",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-open-loops.sh",
+        "--json"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1794358191, \"home\": \"/Users/charlesabrooker/tmp/fm-lab.49b_pgiz\", \"complete\": true, \"rows\": [{\"id\": \"6ee8fbac7f5182baf843e540\", \"category\": \"silent_report\", \"subject\": \"ship-a\", \"owner\": \"firstmate\", \"next_action\": \"check in: progress, blockers, cross-workstream dependencies\", \"age_seconds\": 7245, \"limit_seconds\": 900, \"overdue\": false, \"evidence\": \"last heard: status=1794350946; inbox acknowledgement=None; resolved reply=None; excluded: done/ready task is covered by PR or completion handoff\", \"informational\": true}]}\n",
+      "stderr": "",
+      "rows_summary": [
+        "silent_report ship-a overdue=False"
+      ]
+    }
+  ]
+}

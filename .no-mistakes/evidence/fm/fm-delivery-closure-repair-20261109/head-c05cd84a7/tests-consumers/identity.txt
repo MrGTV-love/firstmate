@@ -1,0 +1,8 @@
+candidate=c05cd84a7a418f4dbd0660fa87ebe1c4d25007fc
+tree=cdd5f96db3e6c8ceb9f2812c648fdc747db41c6a
+fixture=/Users/charlesabrooker/tmp/fm-gate-consumers.C1zRU2
+command=HOME=$FX/home TMPDIR=$FX/tmp bash bin/fm-test-run.sh --json $EV/tests-consumers/timing.json tests/fm-watch-open-loops.test.sh tests/fm-work-progress.test.sh
+start=2026-11-11T03:07:51Z
+exit=0
+end=2026-11-11T03:18:18Z
+head_after=c05cd84a7a418f4dbd0660fa87ebe1c4d25007fc

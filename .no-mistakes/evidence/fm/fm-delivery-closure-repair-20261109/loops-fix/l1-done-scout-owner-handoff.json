@@ -1,0 +1,310 @@
+{
+  "scenario": "l1-done-scout-owner-handoff",
+  "candidate": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6",
+  "passed": true,
+  "assertions": {
+    "snapshot_reads_done": true,
+    "base_has_no_owner_row": true,
+    "candidate_has_completed_task": true,
+    "row_is_overdue_and_firstmate_owned": true,
+    "action_names_owner_handoff": true,
+    "fresh_process_recovers_same_row": true,
+    "teardown_refused_before_owner_complete": true,
+    "row_stays_after_refused_teardown": true,
+    "owner_complete_ok": true,
+    "row_stays_after_inventory_attestation_only": true,
+    "verify_ok": true,
+    "teardown_ok_after_owner_complete": true,
+    "row_gone_after_teardown": true,
+    "ledger_complete": true
+  },
+  "extra": {
+    "crew_state": "state: done \u00b7 source: status-log \u00b7 report ready for owner",
+    "row": {
+      "id": "fc761d76f85ba1c0cc8d2012",
+      "category": "completed_task",
+      "subject": "review-a",
+      "owner": "firstmate",
+      "next_action": "consume the report, complete the owner handoff and tear the task down",
+      "age_seconds": 7206,
+      "limit_seconds": 1800,
+      "overdue": true,
+      "evidence": "worker completion is a handoff, not final acceptance",
+      "source": {
+        "home": "/Users/charlesabrooker/tmp/fm-lab.ai087mff",
+        "state": "/Users/charlesabrooker/tmp/fm-lab.ai087mff/state",
+        "data": "/Users/charlesabrooker/tmp/fm-lab.ai087mff/data",
+        "config": "/Users/charlesabrooker/tmp/fm-lab.ai087mff/config",
+        "task": "review-a",
+        "generation": "e15b28a3b4f188a25feb7e3d0b3aa1ad3c695dcf89e42d92bf1a3acc6f3dde21"
+      }
+    },
+    "base_categories": [
+      "silent_report"
+    ],
+    "teardown_early_stderr": "rust the emitted supervision protocol for this harness; do not use shell & for watcher repair.\n\u25cf  This is a supervision warning only; the guarded operation WILL still run.\n\u25cf  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\nfm-captain-hold: origin review-a has no completed captain-call inventory\nREFUSED: scout task review-a has not passed the captain-call completion gate.\nInventory its report and any visual review through bin/fm-captain-hold.sh before teardown.\n",
+    "teardown_stderr": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ai087mff\nWARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\n"
+  },
+  "env": {
+    "PATH": "/Users/charlesabrooker/tmp/fm-lab.ai087mff/fakebin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.8.14/libexec:/opt/homebrew/Cellar/pyenv/2.8.14/plugins/python-build/bin:/opt/homebrew/Cellar/pyenv/2.8.14/plugins/pyenv-link/bin:/opt/homebrew/Cellar/pyenv/2.8.14/plugins/pyenv-binary/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources",
+    "HOME": "/Users/charlesabrooker/tmp/fm-lab.ai087mff",
+    "TMPDIR": "/Users/charlesabrooker/tmp/fm-lab.ai087mff/tmp",
+    "FM_HOME": "/Users/charlesabrooker/tmp/fm-lab.ai087mff",
+    "TMUX_TMPDIR": "/tmp/fml.dlNgDG",
+    "FM_GITHUB_ACCOUNTING": "0",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "NO_MISTAKES_GATE": "1",
+    "GIT_CONFIG_NOSYSTEM": "1",
+    "GIT_CONFIG_GLOBAL": "/dev/null",
+    "GIT_AUTHOR_NAME": "Fixture",
+    "GIT_AUTHOR_EMAIL": "fixture@example.invalid",
+    "GIT_COMMITTER_NAME": "Fixture",
+    "GIT_COMMITTER_EMAIL": "fixture@example.invalid"
+  },
+  "transcript": [
+    {
+      "label": "backlog-add-review-a",
+      "argv": [
+        "tasks-axi",
+        "add",
+        "review-a",
+        "fixture scout",
+        "--kind",
+        "scout",
+        "--repo",
+        "sample"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: added review-a (scout, repo sample) -> Queued\ntask:\n  id: review-a\n  title: fixture scout\n  state: queued\n  blocked: no\n  blocked_by: none\n  held: no\n  hold_reason: \"-\"\n  hold_kind: \"-\"\n  hold_until: \"-\"\n  kind: scout\n  repo: sample\n  priority: \"-\"\n  created: 2026-11-10\n  closed: \"-\"\n  deps: none\n  links: none\n  body: \"\"\nhelp[2]:\n  - Run `tasks-axi start review-a` to move it to in flight\n  - Run `tasks-axi block review-a --by <other>` to record a dependency\n",
+      "stderr": ""
+    },
+    {
+      "label": "backlog-start-review-a",
+      "argv": [
+        "tasks-axi",
+        "start",
+        "review-a"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: start review-a -> In flight\nhelp[1]:\n  - Run `tasks-axi done review-a --pr <url>` when it ships\n",
+      "stderr": ""
+    },
+    {
+      "label": "status-append done [at=1794353842]: report ready for owner",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-status-append.sh",
+        "/Users/charlesabrooker/tmp/fm-lab.ai087mff/state/review-a.status",
+        "done [at=1794353842]: report ready for owner"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "tmux-window-review-a",
+      "argv": [
+        "tmux",
+        "new-session",
+        "-d",
+        "-s",
+        "isolated",
+        "-n",
+        "fm-review-a",
+        "/Users/charlesabrooker/tmp/fm-lab.ai087mff/fakebin/claude-idle-stand-in 900"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "busy-arm-review-a",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-busy-event.sh",
+        "arm",
+        "/Users/charlesabrooker/tmp/fm-lab.ai087mff/state",
+        "review-a"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "g1794361044.66523.21077\n",
+      "stderr": ""
+    },
+    {
+      "label": "busy-idle-review-a",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-busy-event.sh",
+        "apply",
+        "/Users/charlesabrooker/tmp/fm-lab.ai087mff/state",
+        "review-a",
+        "idle",
+        "--gen",
+        "g1794361044.66523.21077",
+        "--source",
+        "claude-hook",
+        "--event",
+        "stop"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "crew-state-review-a",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-crew-state.sh",
+        "review-a"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "state: done \u00b7 source: status-log \u00b7 report ready for owner\n",
+      "stderr": ""
+    },
+    {
+      "label": "ledger-base",
+      "argv": [
+        "bash",
+        "/private/tmp/fm-trees.kZTkCA/base/bin/fm-open-loops.sh",
+        "--json"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1794361046, \"home\": \"/Users/charlesabrooker/tmp/fm-lab.ai087mff\", \"complete\": true, \"rows\": [{\"id\": \"9c5378b9ca9687c17a93e89a\", \"category\": \"silent_report\", \"subject\": \"review-a\", \"owner\": \"firstmate\", \"next_action\": \"check in: progress, blockers, cross-workstream dependencies\", \"age_seconds\": 7204, \"limit_seconds\": 900, \"overdue\": false, \"evidence\": \"last heard: status=1794353842; inbox acknowledgement=None; resolved reply=None; excluded: done/ready task is covered by PR or landing evidence\", \"informational\": true}]}\n",
+      "stderr": "",
+      "rows_summary": [
+        "silent_report review-a overdue=False"
+      ]
+    },
+    {
+      "label": "ledger-candidate-1",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-open-loops.sh",
+        "--json"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1794361048, \"home\": \"/Users/charlesabrooker/tmp/fm-lab.ai087mff\", \"complete\": true, \"rows\": [{\"id\": \"fc761d76f85ba1c0cc8d2012\", \"category\": \"completed_task\", \"subject\": \"review-a\", \"owner\": \"firstmate\", \"next_action\": \"consume the report, complete the owner handoff and tear the task down\", \"age_seconds\": 7206, \"limit_seconds\": 1800, \"overdue\": true, \"evidence\": \"worker completion is a handoff, not final acceptance\", \"source\": {\"home\": \"/Users/charlesabrooker/tmp/fm-lab.ai087mff\", \"state\": \"/Users/charlesabrooker/tmp/fm-lab.ai087mff/state\", \"data\": \"/Users/charlesabrooker/tmp/fm-lab.ai087mff/data\", \"config\": \"/Users/charlesabrooker/tmp/fm-lab.ai087mff/config\", \"task\": \"review-a\", \"generation\": \"e15b28a3b4f188a25feb7e3d0b3aa1ad3c695dcf89e42d92bf1a3acc6f3dde21\"}}, {\"id\": \"9c5378b9ca9687c17a93e89a\", \"category\": \"silent_report\", \"subject\": \"review-a\", \"owner\": \"firstmate\", \"next_action\": \"check in: progress, blockers, cross-workstream dependencies\", \"age_seconds\": 7206, \"limit_seconds\": 900, \"overdue\": false, \"evidence\": \"last heard: status=1794353842; inbox acknowledgement=None; resolved reply=None; excluded: done/ready task is covered by PR or completion handoff\", \"informational\": true}]}\n",
+      "stderr": "",
+      "rows_summary": [
+        "completed_task review-a overdue=True",
+        "silent_report review-a overdue=False"
+      ]
+    },
+    {
+      "label": "ledger-candidate-fresh-process",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-open-loops.sh",
+        "--json"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1794361050, \"home\": \"/Users/charlesabrooker/tmp/fm-lab.ai087mff\", \"complete\": true, \"rows\": [{\"id\": \"fc761d76f85ba1c0cc8d2012\", \"category\": \"completed_task\", \"subject\": \"review-a\", \"owner\": \"firstmate\", \"next_action\": \"consume the report, complete the owner handoff and tear the task down\", \"age_seconds\": 7208, \"limit_seconds\": 1800, \"overdue\": true, \"evidence\": \"worker completion is a handoff, not final acceptance\", \"source\": {\"home\": \"/Users/charlesabrooker/tmp/fm-lab.ai087mff\", \"state\": \"/Users/charlesabrooker/tmp/fm-lab.ai087mff/state\", \"data\": \"/Users/charlesabrooker/tmp/fm-lab.ai087mff/data\", \"config\": \"/Users/charlesabrooker/tmp/fm-lab.ai087mff/config\", \"task\": \"review-a\", \"generation\": \"e15b28a3b4f188a25feb7e3d0b3aa1ad3c695dcf89e42d92bf1a3acc6f3dde21\"}}, {\"id\": \"9c5378b9ca9687c17a93e89a\", \"category\": \"silent_report\", \"subject\": \"review-a\", \"owner\": \"firstmate\", \"next_action\": \"check in: progress, blockers, cross-workstream dependencies\", \"age_seconds\": 7208, \"limit_seconds\": 900, \"overdue\": false, \"evidence\": \"last heard: status=1794353842; inbox acknowledgement=None; resolved reply=None; excluded: done/ready task is covered by PR or completion handoff\", \"informational\": true}]}\n",
+      "stderr": "",
+      "rows_summary": [
+        "completed_task review-a overdue=True",
+        "silent_report review-a overdue=False"
+      ]
+    },
+    {
+      "label": "teardown-before-owner-complete",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-teardown.sh",
+        "review-a"
+      ],
+      "exit": 1,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ai087mff\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\u25cf  WATCHER DOWN - SUPERVISION IS OFF\n\u25cf  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).\n\u25cf  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.\n\u25cf  This is a supervision warning only; the guarded operation WILL still run.\n\u25cf  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\nfm-captain-hold: origin review-a has no completed captain-call inventory\nREFUSED: scout task review-a has not passed the captain-call completion gate.\nInventory its report and any visual review through bin/fm-captain-hold.sh before teardown.\n"
+    },
+    {
+      "label": "ledger-after-refused-teardown",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-open-loops.sh",
+        "--json"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1794361062, \"home\": \"/Users/charlesabrooker/tmp/fm-lab.ai087mff\", \"complete\": true, \"rows\": [{\"id\": \"fc761d76f85ba1c0cc8d2012\", \"category\": \"completed_task\", \"subject\": \"review-a\", \"owner\": \"firstmate\", \"next_action\": \"consume the report, complete the owner handoff and tear the task down\", \"age_seconds\": 7220, \"limit_seconds\": 1800, \"overdue\": true, \"evidence\": \"worker completion is a handoff, not final acceptance\", \"source\": {\"home\": \"/Users/charlesabrooker/tmp/fm-lab.ai087mff\", \"state\": \"/Users/charlesabrooker/tmp/fm-lab.ai087mff/state\", \"data\": \"/Users/charlesabrooker/tmp/fm-lab.ai087mff/data\", \"config\": \"/Users/charlesabrooker/tmp/fm-lab.ai087mff/config\", \"task\": \"review-a\", \"generation\": \"e15b28a3b4f188a25feb7e3d0b3aa1ad3c695dcf89e42d92bf1a3acc6f3dde21\"}}, {\"id\": \"9c5378b9ca9687c17a93e89a\", \"category\": \"silent_report\", \"subject\": \"review-a\", \"owner\": \"firstmate\", \"next_action\": \"check in: progress, blockers, cross-workstream dependencies\", \"age_seconds\": 7220, \"limit_seconds\": 900, \"overdue\": false, \"evidence\": \"last heard: status=1794353842; inbox acknowledgement=None; resolved reply=None; excluded: done/ready task is covered by PR or completion handoff\", \"informational\": true}]}\n",
+      "stderr": "",
+      "rows_summary": [
+        "completed_task review-a overdue=True",
+        "silent_report review-a overdue=False"
+      ]
+    },
+    {
+      "label": "owner-complete-none",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-captain-hold.sh",
+        "complete",
+        "review-a",
+        "--none"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "complete: review-a captain-call inventory reviewed\n",
+      "stderr": ""
+    },
+    {
+      "label": "ledger-after-complete",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-open-loops.sh",
+        "--json"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1794361065, \"home\": \"/Users/charlesabrooker/tmp/fm-lab.ai087mff\", \"complete\": true, \"rows\": [{\"id\": \"fc761d76f85ba1c0cc8d2012\", \"category\": \"completed_task\", \"subject\": \"review-a\", \"owner\": \"firstmate\", \"next_action\": \"consume the report, complete the owner handoff and tear the task down\", \"age_seconds\": 7223, \"limit_seconds\": 1800, \"overdue\": true, \"evidence\": \"worker completion is a handoff, not final acceptance\", \"source\": {\"home\": \"/Users/charlesabrooker/tmp/fm-lab.ai087mff\", \"state\": \"/Users/charlesabrooker/tmp/fm-lab.ai087mff/state\", \"data\": \"/Users/charlesabrooker/tmp/fm-lab.ai087mff/data\", \"config\": \"/Users/charlesabrooker/tmp/fm-lab.ai087mff/config\", \"task\": \"review-a\", \"generation\": \"d1adaac72744c1c7fbed78d7f6bd4480fec585334704746b0c7f49839e90acb7\"}}, {\"id\": \"9c5378b9ca9687c17a93e89a\", \"category\": \"silent_report\", \"subject\": \"review-a\", \"owner\": \"firstmate\", \"next_action\": \"check in: progress, blockers, cross-workstream dependencies\", \"age_seconds\": 7223, \"limit_seconds\": 900, \"overdue\": false, \"evidence\": \"last heard: status=1794353842; inbox acknowledgement=None; resolved reply=None; excluded: done/ready task is covered by PR or completion handoff\", \"informational\": true}]}\n",
+      "stderr": "",
+      "rows_summary": [
+        "completed_task review-a overdue=True",
+        "silent_report review-a overdue=False"
+      ]
+    },
+    {
+      "label": "owner-verify",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-captain-hold.sh",
+        "verify",
+        "review-a"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "verified: review-a captain-call inventory\n",
+      "stderr": ""
+    },
+    {
+      "label": "teardown-after-owner-complete",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-teardown.sh",
+        "review-a"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "teardown review-a complete (window isolated:fm-review-a, worktree /Users/charlesabrooker/tmp/fm-lab.ai087mff/projects/wt-review-a)\nBacklog: review-a is closed in /Users/charlesabrooker/tmp/fm-lab.ai087mff/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.\n",
+      "stderr": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ai087mff\nWARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\n"
+    },
+    {
+      "label": "ledger-after-teardown",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-open-loops.sh",
+        "--json"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1794361074, \"home\": \"/Users/charlesabrooker/tmp/fm-lab.ai087mff\", \"complete\": true, \"rows\": []}\n",
+      "stderr": "",
+      "rows_summary": []
+    }
+  ]
+}

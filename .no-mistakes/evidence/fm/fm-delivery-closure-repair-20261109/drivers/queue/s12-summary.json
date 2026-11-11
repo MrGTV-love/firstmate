@@ -1,0 +1,31 @@
+{
+  "passed": true,
+  "assertions": {
+    "same_row_payloads": true,
+    "same_row_keys": true,
+    "one_row": true,
+    "no_event_keys": true
+  },
+  "observed": {
+    "base": {
+      "exit": 0,
+      "payloads": [
+        "check: <HOME>/state/multi.check.sh: line one  line three   indented literal back\\\\slash dollar trailing $(not run) `not run`"
+      ],
+      "keys": [
+        "<HOME>/state/multi.check.sh"
+      ],
+      "drain": "1794358420\t1\tcheck\t<HOME>/state/multi.check.sh\tcheck: <HOME>/state/multi.check.sh: line one  line three   indented literal back\\\\slash dollar trailing $(not run) `not run`\n"
+    },
+    "candidate": {
+      "exit": 0,
+      "payloads": [
+        "check: <HOME>/state/multi.check.sh: line one  line three   indented literal back\\\\slash dollar trailing $(not run) `not run`"
+      ],
+      "keys": [
+        "<HOME>/state/multi.check.sh"
+      ],
+      "drain": "1794358423\t1\tcheck\t<HOME>/state/multi.check.sh\tcheck: <HOME>/state/multi.check.sh: line one  line three   indented literal back\\\\slash dollar trailing $(not run) `not run`\n"
+    }
+  }
+}

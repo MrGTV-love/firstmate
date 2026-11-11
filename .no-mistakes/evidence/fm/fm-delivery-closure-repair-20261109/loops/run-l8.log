@@ -1,0 +1,17 @@
+{
+ "scenario": "l8-done-scout-pane-not-provably-idle",
+ "passed": false,
+ "assertions": {
+  "done_scout_has_completed_task_row": false
+ },
+ "extra": {
+  "crew_state": "state: unknown \u00b7 source: pane \u00b7 harness state unavailable (unknown missing)",
+  "categories": [
+   "silent_report"
+  ],
+  "ledger_complete": true,
+  "silent_report_evidence": "last heard: status=1794352606; inbox acknowledgement=None; resolved reply=None; excluded: done/ready task is covered by PR or completion handoff",
+  "coverage": []
+ }
+}
+SUMMARY {"l8-done-scout-pane-not-provably-idle": false}

@@ -1,0 +1,20 @@
+67c67
+< with tempfile.TemporaryDirectory(prefix='fm-delivery-r2-', dir='/Volumes/Mac-HD-extension/cache/fm-test-tmp') as scratch:
+---
+> with tempfile.TemporaryDirectory(prefix='fm-delivery-r2-', dir=os.environ['TMPDIR']) as scratch:
+71,77c71,77
+<              ('repaired-relative', 'proposal', 'relative', 'complete', 0),
+<              ('repaired-absolute', 'proposal', 'absolute', 'complete', 0),
+<              ('repaired-invalid', 'proposal', 'missing', 'complete', 2),
+<              ('repaired-empty', 'proposal', 'empty', 'complete', 2),
+<              ('repaired-launch-failure', 'proposal', 'relative', 'launch-failure', 'nonzero'),
+<              ('repaired-running', 'proposal', 'relative', 'running', 0),
+<              ('repaired-missing-output', 'proposal', 'relative', 'missing-report', 8),
+---
+>              ('repaired-relative', 'proposal-root-v2', 'relative', 'complete', 0),
+>              ('repaired-absolute', 'proposal-root-v2', 'absolute', 'complete', 0),
+>              ('repaired-invalid', 'proposal-root-v2', 'missing', 'complete', 2),
+>              ('repaired-empty', 'proposal-root-v2', 'empty', 'complete', 2),
+>              ('repaired-launch-failure', 'proposal-root-v2', 'relative', 'launch-failure', 'nonzero'),
+>              ('repaired-running', 'proposal-root-v2', 'relative', 'running', 0),
+>              ('repaired-missing-output', 'proposal-root-v2', 'relative', 'missing-report', 8),

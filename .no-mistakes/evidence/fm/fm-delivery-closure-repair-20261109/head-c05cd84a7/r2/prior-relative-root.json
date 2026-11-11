@@ -1,0 +1,71 @@
+{
+  "label": "prior-relative-root",
+  "source_version": "proposal",
+  "source_sha256": "66001fad4cafebbb83b5c15dfb949e6e1ac08021a9f43c75928c8fe3643d13c4",
+  "argv": [
+    "bash",
+    "/Users/charlesabrooker/tmp/fm-r2r3-driver.OXxbTD/tmp/fm-delivery-r2-aaj6_svk/prior-relative-root/lane/run-review.sh",
+    "packs/review pack",
+    "https://github.com/example/fixture/pull/1",
+    "1111111111111111111111111111111111111111",
+    "change.diff",
+    "source repo",
+    "fixture/model"
+  ],
+  "cwd": "/Users/charlesabrooker/tmp/fm-r2r3-driver.OXxbTD/tmp/fm-delivery-r2-aaj6_svk/prior-relative-root",
+  "expected_exit": 19,
+  "exit": 19,
+  "stdout": "rc=19 report=/Users/charlesabrooker/tmp/fm-r2r3-driver.OXxbTD/tmp/fm-delivery-r2-aaj6_svk/prior-relative-root/packs/review pack/review.md\nserved-model: fixture/nonqualifying-model\nfixture qualifier: plumbing only; independent qualification NOT RUN\nfixture route handoff written; independent qualification NOT RUN\n",
+  "stderr": "",
+  "invoked_model_stub": true,
+  "live_observation": null,
+  "report_copied": false,
+  "model_review_qualification": "NOT RUN; fixture helpers demonstrate plumbing only",
+  "owner_pid": 75790,
+  "owner_reaped": true,
+  "destination_observation": {
+    "caller_cwd": "/Users/charlesabrooker/tmp/fm-r2r3-driver.OXxbTD/tmp/fm-delivery-r2-aaj6_svk/prior-relative-root",
+    "pack_argument": "packs/review pack",
+    "resolved_pack": "/Users/charlesabrooker/tmp/fm-r2r3-driver.OXxbTD/tmp/fm-delivery-r2-aaj6_svk/prior-relative-root/packs/review pack",
+    "fixture_home": "/Users/charlesabrooker/tmp/fm-r2r3-driver.OXxbTD/tmp/fm-delivery-r2-aaj6_svk/prior-relative-root",
+    "log": {
+      "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.OXxbTD/tmp/fm-delivery-r2-aaj6_svk/prior-relative-root/packs/review pack/review-run.log",
+      "is_file": true,
+      "content": "fixture prompt ROOT resolved to decoy, not caller repository\n",
+      "sha256": "cff2d0bdadc344b65c0ca1948964ffa31c9560bbae7b847917fd38ac5aeb1baf"
+    },
+    "session": {
+      "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.OXxbTD/tmp/fm-delivery-r2-aaj6_svk/prior-relative-root/packs/review pack/omp-session",
+      "is_dir": true
+    },
+    "model_report": {
+      "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.OXxbTD/tmp/fm-delivery-r2-aaj6_svk/prior-relative-root/work/packs-review pack/review.md",
+      "is_file": false
+    },
+    "copied_report": {
+      "resolved": "/Users/charlesabrooker/tmp/fm-r2r3-driver.OXxbTD/tmp/fm-delivery-r2-aaj6_svk/prior-relative-root/packs/review pack/review.md",
+      "is_file": false
+    }
+  },
+  "invocation": {
+    "cwd": "/Users/charlesabrooker/tmp/fm-r2r3-driver.OXxbTD/tmp/fm-delivery-r2-aaj6_svk/prior-relative-root/work/packs-review pack",
+    "diff": "/Users/charlesabrooker/tmp/fm-r2r3-driver.OXxbTD/tmp/fm-delivery-r2-aaj6_svk/prior-relative-root/packs/review pack/change.diff",
+    "session": "/Users/charlesabrooker/tmp/fm-r2r3-driver.OXxbTD/tmp/fm-delivery-r2-aaj6_svk/prior-relative-root/packs/review pack/omp-session",
+    "prompt_report_destination": "/Users/charlesabrooker/tmp/fm-r2r3-driver.OXxbTD/tmp/fm-delivery-r2-aaj6_svk/prior-relative-root/work/packs-review pack/review.md",
+    "prompt_root": "source repo",
+    "resolved_prompt_root": "/Users/charlesabrooker/tmp/fm-r2r3-driver.OXxbTD/tmp/fm-delivery-r2-aaj6_svk/prior-relative-root/work/packs-review pack/source repo",
+    "root_marker": "wrong reviewer-cwd repository\n",
+    "log_destination": "/Users/charlesabrooker/tmp/fm-r2r3-driver.OXxbTD/tmp/fm-delivery-r2-aaj6_svk/prior-relative-root/packs/review pack/review-run.log",
+    "log_exists_at_model_entry": true,
+    "stdout_is_log": true,
+    "stderr_is_log": true
+  },
+  "consumer_action": "reject actual prompt reference to decoy repository; no real model or qualified review ran",
+  "fixture_route": {
+    "fixture": true,
+    "qualifying": false,
+    "actual_review": "NOT RUN",
+    "pack": "/Users/charlesabrooker/tmp/fm-r2r3-driver.OXxbTD/tmp/fm-delivery-r2-aaj6_svk/prior-relative-root/packs/review pack",
+    "fixture_helper_exit": "8"
+  }
+}

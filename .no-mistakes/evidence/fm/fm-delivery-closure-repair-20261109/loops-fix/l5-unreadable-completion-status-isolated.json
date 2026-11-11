@@ -1,0 +1,357 @@
+{
+  "scenario": "l5-unreadable-completion-status-isolated",
+  "candidate": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6",
+  "passed": true,
+  "assertions": {
+    "control_without_cap_is_complete": true,
+    "control_has_all_rows": true,
+    "candidate_reports_incomplete": true,
+    "candidate_names_the_unreadable_read": true,
+    "candidate_keeps_blind_task_row": true,
+    "candidate_keeps_later_failed_task": true,
+    "candidate_keeps_later_unlanded_commit": true,
+    "candidate_keeps_later_missing_worker": true,
+    "prefix_tree_loses_later_failed_task": true,
+    "prefix_tree_loses_later_unlanded_commit": true,
+    "prefix_tree_degrades_all_workers_not_one_read": true,
+    "prefix_tree_also_loses_blind_row": true
+  },
+  "extra": {
+    "candidate_coverage": "completion status a-blind: fm-status: refused to read a-blind.status: a span of 4278 bytes is past the read limit of 2049 bytes (cap plus reserve); nothing was read and nothing was change; report silence a-blind: fm-status: refused to read a-blind.status: a span of 4278 bytes is past the read limit of 2049 bytes (cap plus reserve); nothing was read and nothing was change; questions a-blind.status:",
+    "prefix_coverage": "workers: fm-status: refused to read a-blind.status: a span of 4278 bytes is past the read limit of 2049 bytes (cap plus reserve); nothing was read and nothing was change; report silence a-blind: fm-status: refused to read a-blind.status: a span of 4278 bytes is past the read limit of 2049 bytes (cap plus reserve); nothing was read and nothing was change; questions a-blind.status: fm-status: refuse",
+    "control_later_rows": [
+      "failed_task",
+      "missing_worker",
+      "silent_report",
+      "unlanded_commit"
+    ],
+    "candidate_later_rows": [
+      "failed_task",
+      "missing_worker",
+      "silent_report",
+      "unlanded_commit"
+    ],
+    "prefix_later_rows": [
+      "missing_worker",
+      "silent_report"
+    ],
+    "candidate_a_blind": [
+      "completed_task"
+    ],
+    "prefix_a_blind": []
+  },
+  "env": {
+    "PATH": "/Users/charlesabrooker/tmp/fm-lab.ag8wit7n/fakebin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.8.14/libexec:/opt/homebrew/Cellar/pyenv/2.8.14/plugins/python-build/bin:/opt/homebrew/Cellar/pyenv/2.8.14/plugins/pyenv-link/bin:/opt/homebrew/Cellar/pyenv/2.8.14/plugins/pyenv-binary/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources",
+    "HOME": "/Users/charlesabrooker/tmp/fm-lab.ag8wit7n",
+    "TMPDIR": "/Users/charlesabrooker/tmp/fm-lab.ag8wit7n/tmp",
+    "FM_HOME": "/Users/charlesabrooker/tmp/fm-lab.ag8wit7n",
+    "TMUX_TMPDIR": "/tmp/fml.TCkC3f",
+    "FM_GITHUB_ACCOUNTING": "0",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "NO_MISTAKES_GATE": "1",
+    "GIT_CONFIG_NOSYSTEM": "1",
+    "GIT_CONFIG_GLOBAL": "/dev/null",
+    "GIT_AUTHOR_NAME": "Fixture",
+    "GIT_AUTHOR_EMAIL": "fixture@example.invalid",
+    "GIT_COMMITTER_NAME": "Fixture",
+    "GIT_COMMITTER_EMAIL": "fixture@example.invalid"
+  },
+  "transcript": [
+    {
+      "label": "backlog-add-a-blind",
+      "argv": [
+        "tasks-axi",
+        "add",
+        "a-blind",
+        "fixture scout",
+        "--kind",
+        "scout",
+        "--repo",
+        "sample"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: added a-blind (scout, repo sample) -> Queued\ntask:\n  id: a-blind\n  title: fixture scout\n  state: queued\n  blocked: no\n  blocked_by: none\n  held: no\n  hold_reason: \"-\"\n  hold_kind: \"-\"\n  hold_until: \"-\"\n  kind: scout\n  repo: sample\n  priority: \"-\"\n  created: 2026-11-10\n  closed: \"-\"\n  deps: none\n  links: none\n  body: \"\"\nhelp[2]:\n  - Run `tasks-axi start a-blind` to move it to in flight\n  - Run `tasks-axi block a-blind --by <other>` to record a dependency\n",
+      "stderr": ""
+    },
+    {
+      "label": "backlog-start-a-blind",
+      "argv": [
+        "tasks-axi",
+        "start",
+        "a-blind"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: start a-blind -> In flight\nhelp[1]:\n  - Run `tasks-axi done a-blind --pr <url>` when it ships\n",
+      "stderr": ""
+    },
+    {
+      "label": "status-append done [at=1794353842]: report ready for owner",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-status-append.sh",
+        "/Users/charlesabrooker/tmp/fm-lab.ag8wit7n/state/a-blind.status",
+        "done [at=1794353842]: report ready for owner"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "tmux-window-a-blind",
+      "argv": [
+        "tmux",
+        "new-session",
+        "-d",
+        "-s",
+        "isolated",
+        "-n",
+        "fm-a-blind",
+        "/Users/charlesabrooker/tmp/fm-lab.ag8wit7n/fakebin/claude-idle-stand-in 900"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "busy-arm-a-blind",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-busy-event.sh",
+        "arm",
+        "/Users/charlesabrooker/tmp/fm-lab.ag8wit7n/state",
+        "a-blind"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "g1794361092.73805.8807\n",
+      "stderr": ""
+    },
+    {
+      "label": "busy-idle-a-blind",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-busy-event.sh",
+        "apply",
+        "/Users/charlesabrooker/tmp/fm-lab.ag8wit7n/state",
+        "a-blind",
+        "idle",
+        "--gen",
+        "g1794361092.73805.8807",
+        "--source",
+        "claude-hook",
+        "--event",
+        "stop"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "backlog-add-b-after",
+      "argv": [
+        "tasks-axi",
+        "add",
+        "b-after",
+        "fixture ship",
+        "--kind",
+        "ship",
+        "--repo",
+        "sample"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: added b-after (ship, repo sample) -> Queued\ntask:\n  id: b-after\n  title: fixture ship\n  state: queued\n  blocked: no\n  blocked_by: none\n  held: no\n  hold_reason: \"-\"\n  hold_kind: \"-\"\n  hold_until: \"-\"\n  kind: ship\n  repo: sample\n  priority: \"-\"\n  created: 2026-11-10\n  closed: \"-\"\n  deps: none\n  links: none\n  body: \"\"\nhelp[2]:\n  - Run `tasks-axi start b-after` to move it to in flight\n  - Run `tasks-axi block b-after --by <other>` to record a dependency\n",
+      "stderr": ""
+    },
+    {
+      "label": "backlog-start-b-after",
+      "argv": [
+        "tasks-axi",
+        "start",
+        "b-after"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: start b-after -> In flight\nhelp[1]:\n  - Run `tasks-axi done b-after --pr <url>` when it ships\n",
+      "stderr": ""
+    },
+    {
+      "label": "status-append failed [at=1794353842]: push failed; commits are l",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-status-append.sh",
+        "/Users/charlesabrooker/tmp/fm-lab.ag8wit7n/state/b-after.status",
+        "failed [at=1794353842]: push failed; commits are local only"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "tmux-window-b-after",
+      "argv": [
+        "tmux",
+        "new-window",
+        "-d",
+        "-t",
+        "isolated:",
+        "-n",
+        "fm-b-after",
+        "/Users/charlesabrooker/tmp/fm-lab.ag8wit7n/fakebin/claude-idle-stand-in 900"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "busy-arm-b-after",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-busy-event.sh",
+        "arm",
+        "/Users/charlesabrooker/tmp/fm-lab.ag8wit7n/state",
+        "b-after"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "g1794361093.75519.17894\n",
+      "stderr": ""
+    },
+    {
+      "label": "busy-idle-b-after",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-busy-event.sh",
+        "apply",
+        "/Users/charlesabrooker/tmp/fm-lab.ag8wit7n/state",
+        "b-after",
+        "idle",
+        "--gen",
+        "g1794361093.75519.17894",
+        "--source",
+        "claude-hook",
+        "--event",
+        "stop"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "backlog-add-c-gone",
+      "argv": [
+        "tasks-axi",
+        "add",
+        "c-gone",
+        "fixture scout",
+        "--kind",
+        "scout",
+        "--repo",
+        "sample"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: added c-gone (scout, repo sample) -> Queued\ntask:\n  id: c-gone\n  title: fixture scout\n  state: queued\n  blocked: no\n  blocked_by: none\n  held: no\n  hold_reason: \"-\"\n  hold_kind: \"-\"\n  hold_until: \"-\"\n  kind: scout\n  repo: sample\n  priority: \"-\"\n  created: 2026-11-10\n  closed: \"-\"\n  deps: none\n  links: none\n  body: \"\"\nhelp[2]:\n  - Run `tasks-axi start c-gone` to move it to in flight\n  - Run `tasks-axi block c-gone --by <other>` to record a dependency\n",
+      "stderr": ""
+    },
+    {
+      "label": "backlog-start-c-gone",
+      "argv": [
+        "tasks-axi",
+        "start",
+        "c-gone"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: start c-gone -> In flight\nhelp[1]:\n  - Run `tasks-axi done c-gone --pr <url>` when it ships\n",
+      "stderr": ""
+    },
+    {
+      "label": "status-append failed [at=1794353842]: worker died mid-investigat",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-status-append.sh",
+        "/Users/charlesabrooker/tmp/fm-lab.ag8wit7n/state/c-gone.status",
+        "failed [at=1794353842]: worker died mid-investigation"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "a-blind status log is larger than the fold cap used below",
+      "bytes": 4278
+    },
+    {
+      "label": "snapshot wrapper (the only replaced file)",
+      "text": "#!/usr/bin/env bash\nexec env -u FM_STATUS_CAP_BYTES -u FM_STATUS_CAP_RESERVE_BYTES bash \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-fleet-snapshot.sh\" \"$@\"\n"
+    },
+    {
+      "label": "ledger-candidate-real-tree-no-cap",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-open-loops.sh",
+        "--json"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1794361094, \"home\": \"/Users/charlesabrooker/tmp/fm-lab.ag8wit7n\", \"complete\": true, \"rows\": [{\"id\": \"1bd7e58594c045ee8a806555\", \"category\": \"completed_task\", \"subject\": \"a-blind\", \"owner\": \"firstmate\", \"next_action\": \"consume the report, complete the owner handoff and tear the task down\", \"age_seconds\": 7252, \"limit_seconds\": 1800, \"overdue\": true, \"evidence\": \"worker completion is a handoff, not final acceptance\", \"source\": {\"home\": \"/Users/charlesabrooker/tmp/fm-lab.ag8wit7n\", \"state\": \"/Users/charlesabrooker/tmp/fm-lab.ag8wit7n/state\", \"data\": \"/Users/charlesabrooker/tmp/fm-lab.ag8wit7n/data\", \"config\": \"/Users/charlesabrooker/tmp/fm-lab.ag8wit7n/config\", \"task\": \"a-blind\", \"generation\": \"bbad161a0faddc2c3e4169086a61463d8631c73c8d1b2af3a3b112fb32910db6\"}}, {\"id\": \"0b2bd17f4731881e297ac905\", \"category\": \"failed_task\", \"subject\": \"b-after\", \"owner\": \"firstmate\", \"next_action\": \"recover the failed work or record why it ends\", \"age_seconds\": 7252, \"limit_seconds\": 1800, \"overdue\": true, \"evidence\": \"\"}, {\"id\": \"a1bf741d4d4ab1d01ddf9bd0\", \"category\": \"missing_worker\", \"subject\": \"c-gone\", \"owner\": \"firstmate\", \"next_action\": \"recover the assigned worker without discarding work\", \"age_seconds\": 7252, \"limit_seconds\": 600, \"overdue\": true, \"evidence\": \"\"}, {\"id\": \"cdc56032f9fc13395ed593a5\", \"category\": \"silent_report\", \"subject\": \"a-blind\", \"owner\": \"firstmate\", \"next_action\": \"check in: progress, blockers, cross-workstream dependencies\", \"age_seconds\": 7252, \"limit_seconds\": 900, \"overdue\": false, \"evidence\": \"last heard: status=1794353842; inbox acknowledgement=None; resolved reply=None; excluded: done/ready task is covered by PR or completion handoff\", \"informational\": true}, {\"id\": \"e5abc5324dd4b6d6c2275650\", \"category\": \"silent_report\", \"subject\": \"b-after\", \"owner\": \"firstmate\", \"next_action\": \"check in: progress, blockers, cross-workstream dependencies\", \"age_seconds\": 7252, \"limit_seconds\": 900, \"overdue\": true, \"evidence\": \"last heard: status=1794353842; inbox acknowledgement=None; resolved reply=None\"}, {\"id\": \"286366d27cf80ecfe5cb21ea\", \"category\": \"unlanded_commit\", \"subject\": \"b-after\", \"owner\": \"firstmate\", \"next_action\": \"land this work through its PR, or obtain the captain's drop\", \"age_seconds\": 2, \"limit_seconds\": 86400, \"overdue\": false, \"evidence\": \"1 commit(s) not on refs/heads/main; newest: candidate work for b-after\", \"source\": {\"home\": \"/Users/charlesabrooker/tmp/fm-lab.ag8wit7n\", \"state\": \"/Users/charlesabrooker/tmp/fm-lab.ag8wit7n/state\", \"data\": \"/Users/charlesabrooker/tmp/fm-lab.ag8wit7n/data\", \"config\": \"/Users/charlesabrooker/tmp/fm-lab.ag8wit7n/config\", \"task\": \"b-after\", \"generation\": \"c351037909c281b97c1fe68d4896fb2424259453a3ef01a073f79c161d5e20b6\", \"kind\": \"commits\", \"worktree\": \"/Users/charlesabrooker/tmp/fm-lab.ag8wit7n/projects/wt-b-after\", \"head\": \"eda5220eee6188b01d7829f909d63bfcf092cb91\", \"commits\": \"b2400925a9dcba01f33dda90fa48022099a92d8fb690ffe18254b3aacc6d761d\"}}]}\n",
+      "stderr": "",
+      "rows_summary": [
+        "completed_task a-blind overdue=True",
+        "failed_task b-after overdue=True",
+        "missing_worker c-gone overdue=True",
+        "silent_report a-blind overdue=False",
+        "silent_report b-after overdue=True",
+        "unlanded_commit b-after overdue=False"
+      ]
+    },
+    {
+      "label": "ledger-candidate-capped-fold",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/tmp/fm-lab.ag8wit7n/seam-candidate/bin/fm-open-loops.sh",
+        "--json"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1794361098, \"home\": \"/Users/charlesabrooker/tmp/fm-lab.ag8wit7n\", \"complete\": false, \"rows\": [{\"id\": \"1bd7e58594c045ee8a806555\", \"category\": \"completed_task\", \"subject\": \"a-blind\", \"owner\": \"firstmate\", \"next_action\": \"consume the report, complete the owner handoff and tear the task down\", \"age_seconds\": 7256, \"limit_seconds\": 1800, \"overdue\": true, \"evidence\": \"worker completion is a handoff, not final acceptance\", \"source\": {\"home\": \"/Users/charlesabrooker/tmp/fm-lab.ag8wit7n\", \"state\": \"/Users/charlesabrooker/tmp/fm-lab.ag8wit7n/state\", \"data\": \"/Users/charlesabrooker/tmp/fm-lab.ag8wit7n/data\", \"config\": \"/Users/charlesabrooker/tmp/fm-lab.ag8wit7n/config\", \"task\": \"a-blind\", \"generation\": \"bbad161a0faddc2c3e4169086a61463d8631c73c8d1b2af3a3b112fb32910db6\"}}, {\"id\": \"81e59fe1eb2179a8169f2068\", \"category\": \"coverage\", \"subject\": \"ledger degraded\", \"owner\": \"firstmate\", \"next_action\": \"restore the unreadable sources and rerun the reconciler\", \"age_seconds\": null, \"limit_seconds\": 0, \"overdue\": true, \"evidence\": \"completion status a-blind: fm-status: refused to read a-blind.status: a span of 4278 bytes is past the read limit of 2049 bytes (cap plus reserve); nothing was read and nothing was change; report silence a-blind: fm-status: refused to read a-blind.status: a span of 4278 bytes is past the read limit of 2049 bytes (cap plus reserve); nothing was read and nothing was change; questions a-blind.status:\"}, {\"id\": \"0b2bd17f4731881e297ac905\", \"category\": \"failed_task\", \"subject\": \"b-after\", \"owner\": \"firstmate\", \"next_action\": \"recover the failed work or record why it ends\", \"age_seconds\": 7256, \"limit_seconds\": 1800, \"overdue\": true, \"evidence\": \"\"}, {\"id\": \"a1bf741d4d4ab1d01ddf9bd0\", \"category\": \"missing_worker\", \"subject\": \"c-gone\", \"owner\": \"firstmate\", \"next_action\": \"recover the assigned worker without discarding work\", \"age_seconds\": 7256, \"limit_seconds\": 600, \"overdue\": true, \"evidence\": \"\"}, {\"id\": \"e5abc5324dd4b6d6c2275650\", \"category\": \"silent_report\", \"subject\": \"b-after\", \"owner\": \"firstmate\", \"next_action\": \"check in: progress, blockers, cross-workstream dependencies\", \"age_seconds\": 7256, \"limit_seconds\": 900, \"overdue\": true, \"evidence\": \"last heard: status=1794353842; inbox acknowledgement=None; resolved reply=None\"}, {\"id\": \"286366d27cf80ecfe5cb21ea\", \"category\": \"unlanded_commit\", \"subject\": \"b-after\", \"owner\": \"firstmate\", \"next_action\": \"land this work through its PR, or obtain the captain's drop\", \"age_seconds\": 6, \"limit_seconds\": 86400, \"overdue\": false, \"evidence\": \"1 commit(s) not on refs/heads/main; newest: candidate work for b-after\", \"source\": {\"home\": \"/Users/charlesabrooker/tmp/fm-lab.ag8wit7n\", \"state\": \"/Users/charlesabrooker/tmp/fm-lab.ag8wit7n/state\", \"data\": \"/Users/charlesabrooker/tmp/fm-lab.ag8wit7n/data\", \"config\": \"/Users/charlesabrooker/tmp/fm-lab.ag8wit7n/config\", \"task\": \"b-after\", \"generation\": \"c351037909c281b97c1fe68d4896fb2424259453a3ef01a073f79c161d5e20b6\", \"kind\": \"commits\", \"worktree\": \"/Users/charlesabrooker/tmp/fm-lab.ag8wit7n/projects/wt-b-after\", \"head\": \"eda5220eee6188b01d7829f909d63bfcf092cb91\", \"commits\": \"b2400925a9dcba01f33dda90fa48022099a92d8fb690ffe18254b3aacc6d761d\"}}]}\n",
+      "stderr": "",
+      "extra_env": {
+        "FM_STATUS_CAP_BYTES": "2048",
+        "FM_STATUS_CAP_RESERVE_BYTES": "1"
+      },
+      "rows_summary": [
+        "completed_task a-blind overdue=True",
+        "coverage ledger degraded overdue=True",
+        "failed_task b-after overdue=True",
+        "missing_worker c-gone overdue=True",
+        "silent_report b-after overdue=True",
+        "unlanded_commit b-after overdue=False"
+      ]
+    },
+    {
+      "label": "ledger-prefix-capped-fold",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/tmp/fm-lab.ag8wit7n/seam-prefix/bin/fm-open-loops.sh",
+        "--json"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1794361105, \"home\": \"/Users/charlesabrooker/tmp/fm-lab.ag8wit7n\", \"complete\": false, \"rows\": [{\"id\": \"81e59fe1eb2179a8169f2068\", \"category\": \"coverage\", \"subject\": \"ledger degraded\", \"owner\": \"firstmate\", \"next_action\": \"restore the unreadable sources and rerun the reconciler\", \"age_seconds\": null, \"limit_seconds\": 0, \"overdue\": true, \"evidence\": \"workers: fm-status: refused to read a-blind.status: a span of 4278 bytes is past the read limit of 2049 bytes (cap plus reserve); nothing was read and nothing was change; report silence a-blind: fm-status: refused to read a-blind.status: a span of 4278 bytes is past the read limit of 2049 bytes (cap plus reserve); nothing was read and nothing was change; questions a-blind.status: fm-status: refuse\"}, {\"id\": \"a1bf741d4d4ab1d01ddf9bd0\", \"category\": \"missing_worker\", \"subject\": \"c-gone\", \"owner\": \"firstmate\", \"next_action\": \"recover the assigned worker without discarding work\", \"age_seconds\": 92305, \"limit_seconds\": 600, \"overdue\": true, \"evidence\": \"\"}, {\"id\": \"e5abc5324dd4b6d6c2275650\", \"category\": \"silent_report\", \"subject\": \"b-after\", \"owner\": \"firstmate\", \"next_action\": \"check in: progress, blockers, cross-workstream dependencies\", \"age_seconds\": 7263, \"limit_seconds\": 900, \"overdue\": true, \"evidence\": \"last heard: status=1794353842; inbox acknowledgement=None; resolved reply=None\"}]}\n",
+      "stderr": "",
+      "extra_env": {
+        "FM_STATUS_CAP_BYTES": "2048",
+        "FM_STATUS_CAP_RESERVE_BYTES": "1"
+      },
+      "rows_summary": [
+        "coverage ledger degraded overdue=True",
+        "missing_worker c-gone overdue=True",
+        "silent_report b-after overdue=True"
+      ]
+    }
+  ]
+}

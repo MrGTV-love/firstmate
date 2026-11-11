@@ -1,0 +1,10 @@
+l12 and loops-adv2/l13 are kept as run. They are not product failures. Their oracles were wrong.
+l12 hand-appended a `resolved [key=route]` line after a `done` line with fm-status-append.sh.
+Three real owner routes for that line were then driven in the same state (key logged, then `done`):
+1. loops-adv3/l14: bin/fm-send.sh --resolve-key with no held task. Refused, exit 1, "nothing was sent". Status log unchanged.
+2. loops-adv4/l16: held task named <id>-decision-route, complete with that id, then bin/fm-send.sh --resolve-key. Exit 0, answer delivered. No line was written after `done`.
+3. loops-adv4/l16: bin/fm-captain-hold.sh reconcile close-key. Refused, exit 1, "key route is not open". No line written.
+In every case `done` stayed the latest status event and the completed_task row stayed, live pane and closed pane.
+So the real owner tools did not produce the l12 state in these drives.
+loops-adv3/l15 covers the busy-turn observation from l12: the row returns when the turn ends.
+l9 note: hold + complete with a held id wrote no transfer line there; the last line stayed `done`.

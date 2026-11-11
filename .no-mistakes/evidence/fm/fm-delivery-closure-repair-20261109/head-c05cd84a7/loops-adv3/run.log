@@ -1,0 +1,60 @@
+{
+ "scenario": "l14-real-answer-after-done-cannot-displace-done",
+ "passed": true,
+ "assertions": {
+  "rows_before_answer": true,
+  "real_answer_tool_refuses_closed_key": true,
+  "status_logs_unchanged_by_refusal": true,
+  "live_pane_keeps_completed_task": true,
+  "closed_pane_keeps_completed_task": true
+ },
+ "extra": {
+  "send": {
+   "answered-live": [
+    1,
+    "\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\nerror: --resolve-key 'route': no open decision or blocker with that key in /Users/charlesabrooker/tmp/fm-lab.4_uxpdxc/state/answered-live.status, and no captain-held task 'route' or 'answered-live-decision-route' still open (already closed or mistyped). Re-check the OPEN DECISIONS listing, then resend without that key or with the right one; nothing was sent.\n"
+   ],
+   "answered-closed": [
+    1,
+    "race 300s) - full banner already printed this episode.\nerror: --resolve-key 'route': no open decision or blocker with that key in /Users/charlesabrooker/tmp/fm-lab.4_uxpdxc/state/answered-closed.status, and no captain-held task 'route' or 'answered-closed-decision-route' still open (already closed or mistyped). Re-check the OPEN DECISIONS listing, then resend without that key or with the right one; nothing was sent.\n"
+   ]
+  },
+  "crew_after": {
+   "answered-live": "state: done \u00b7 source: status-log \u00b7 report ready for owner; one open choice",
+   "answered-closed": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-answered-closed"
+  },
+  "categories_after": {
+   "answered-live": [
+    "completed_task",
+    "silent_report"
+   ],
+   "answered-closed": [
+    "completed_task"
+   ]
+  },
+  "complete_after": true
+ }
+}
+{
+ "scenario": "l15-new-turn-after-done-then-idle",
+ "passed": true,
+ "assertions": {
+  "row_present_before_turn": true,
+  "busy_and_idle_records_applied": true,
+  "busy_pane_reads_working": true,
+  "worker_stays_visible_during_turn": true,
+  "row_returns_when_turn_ends": true
+ },
+ "extra": {
+  "crew_busy": "state: working \u00b7 source: pane \u00b7 harness busy (claude-hook)",
+  "crew_idle": "state: done \u00b7 source: status-log \u00b7 report ready for owner",
+  "categories_during": [
+   "silent_report"
+  ],
+  "categories_after": [
+   "completed_task",
+   "silent_report"
+  ]
+ }
+}
+SUMMARY {"l14-real-answer-after-done-cannot-displace-done": true, "l15-new-turn-after-done-then-idle": true}

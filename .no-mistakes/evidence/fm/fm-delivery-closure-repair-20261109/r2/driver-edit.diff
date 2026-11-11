@@ -2,7 +2,7 @@
 < with tempfile.TemporaryDirectory(prefix='fm-delivery-r2-', dir='/Volumes/Mac-HD-extension/cache/fm-test-tmp') as scratch:
 ---
 > with tempfile.TemporaryDirectory(prefix='fm-delivery-r2-', dir=os.environ['TMPDIR']) as scratch:
-71,78c71,77
+71,77c71,77
 <              ('repaired-relative', 'proposal', 'relative', 'complete', 0),
 <              ('repaired-absolute', 'proposal', 'absolute', 'complete', 0),
 <              ('repaired-invalid', 'proposal', 'missing', 'complete', 2),
@@ -10,7 +10,6 @@
 <              ('repaired-launch-failure', 'proposal', 'relative', 'launch-failure', 'nonzero'),
 <              ('repaired-running', 'proposal', 'relative', 'running', 0),
 <              ('repaired-missing-output', 'proposal', 'relative', 'missing-report', 8),
-<              ('prior-relative-root', 'proposal', 'relative', 'root-control', 19),
 ---
 >              ('repaired-relative', 'proposal-root-v2', 'relative', 'complete', 0),
 >              ('repaired-absolute', 'proposal-root-v2', 'absolute', 'complete', 0),

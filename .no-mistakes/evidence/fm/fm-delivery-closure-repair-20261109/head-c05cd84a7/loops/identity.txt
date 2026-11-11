@@ -1,0 +1,8 @@
+candidate_head=c05cd84a7a418f4dbd0660fa87ebe1c4d25007fc
+candidate_tree=cdd5f96db3e6c8ceb9f2812c648fdc747db41c6a
+status_lines= 0
+base_commit=30914c32900315bcab2c2999b977e33550967fd3 (git archive extract at /Users/charlesabrooker/tmp/fm-trees.wAikbq/base)
+prefix_commit=eabb93a43796e85b5edc43e32da48f7264c17686 (git archive extract at /Users/charlesabrooker/tmp/fm-trees.wAikbq/prefix)
+846a2b8aff73d4aae08da4d2899b559db24ba2d410e0a6de2aff1173f83c27c7  /Users/charlesabrooker/.no-mistakes/evidence/01M73WWY8ESTCS9VBM9A6W09X6/head-c05cd84a7/drive_loops.py
+Wed Nov 11 03:03:03 UTC 2026
+exit=0

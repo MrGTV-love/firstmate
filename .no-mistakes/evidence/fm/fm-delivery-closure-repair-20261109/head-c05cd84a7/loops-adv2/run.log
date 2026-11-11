@@ -1,0 +1,67 @@
+{
+ "scenario": "l13-owner-answer-after-done",
+ "passed": false,
+ "assertions": {
+  "rows_before_answer": true,
+  "real_answer_delivered": false,
+  "answer_wrote_resolved_line": false,
+  "live_pane_keeps_an_owner_row_after_answer": true,
+  "closed_pane_keeps_an_owner_row_after_answer": true
+ },
+ "extra": {
+  "send": {
+   "answered-live": [
+    1,
+    "",
+    "ning only; the requested message WILL still be sent.\n\u25cf  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\nerror: --resolve-key 'route': no open decision or blocker with that key in /Users/charlesabrooker/tmp/fm-lab.n8udxiql/state/answered-live.status, and no captain-held task 'route' or 'answered-live-decision-route' still open (already closed or mistyped). Re-check the OPEN DECISIONS listing, then resend without that key or with the right one; nothing was sent.\n"
+   ],
+   "answered-closed": [
+    1,
+    "",
+    "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.n8udxiql\nWARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\nerror: --resolve-key 'route': no open decision or blocker with that key in /Users/charlesabrooker/tmp/fm-lab.n8udxiql/state/answered-closed.status, and no captain-held task 'route' or 'answered-closed-decision-route' still open (already closed or mistyped). Re-check the OPEN DECISIONS listing, then resend without that key or with the right one; nothing was sent.\n"
+   ]
+  },
+  "status_tail": {
+   "answered-live": [
+    "needs-decision [key=route] [at=1794359182]: route north or south",
+    "done [at=1794359182]: report ready for owner; one open choice"
+   ],
+   "answered-closed": [
+    "needs-decision [key=route] [at=1794359182]: route north or south",
+    "done [at=1794359182]: report ready for owner; one open choice"
+   ]
+  },
+  "crew_after": {
+   "answered-live": "state: done \u00b7 source: status-log \u00b7 report ready for owner; one open choice",
+   "answered-closed": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-answered-closed"
+  },
+  "categories_before": {
+   "answered-live": [
+    "completed_task",
+    "silent_report"
+   ],
+   "answered-closed": [
+    "completed_task",
+    "silent_report"
+   ]
+  },
+  "categories_after": {
+   "answered-live": [
+    "completed_task",
+    "silent_report"
+   ],
+   "answered-closed": [
+    "completed_task"
+   ]
+  },
+  "base_categories_after": {
+   "answered-live": [
+    "silent_report"
+   ],
+   "answered-closed": []
+  },
+  "complete_after": true,
+  "coverage_after": []
+ }
+}
+SUMMARY {"l13-owner-answer-after-done": false}

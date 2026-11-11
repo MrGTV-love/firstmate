@@ -1,0 +1,693 @@
+{
+  "scenario": "l9-closed-pane-owner-actions-keep-row",
+  "candidate": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6",
+  "passed": true,
+  "assertions": {
+    "windows_closed": true,
+    "closed_rows_before_owner": true,
+    "complete_none_ok": true,
+    "row_stays_after_complete_none_on_closed_pane": true,
+    "hold_complete_verify_ok": true,
+    "closed_pane_task_keeps_an_owner_row_after_held_transfer": true,
+    "live_pane_task_keeps_an_owner_row_after_held_transfer": true
+  },
+  "extra": {
+    "crew_before": {
+      "review-none": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-review-none",
+      "review-held": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-review-held",
+      "review-held-live": "state: done \u00b7 source: status-log \u00b7 report ready for owner; one open choice"
+    },
+    "crew_after": {
+      "review-none": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-review-none",
+      "review-held": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-review-held",
+      "review-held-live": "state: done \u00b7 source: status-log \u00b7 report ready for owner; one open choice"
+    },
+    "last_status_line": {
+      "review-none": "done [at=1794359053]: report ready for owner",
+      "review-held": "done [at=1794359053]: report ready for owner; one open choice",
+      "review-held-live": "done [at=1794359053]: report ready for owner; one open choice"
+    },
+    "owner_exits": {
+      "review-held": [
+        0,
+        0,
+        0
+      ],
+      "review-held-live": [
+        0,
+        0,
+        0
+      ]
+    },
+    "rows_before": [
+      [
+        "completed_task",
+        "review-held",
+        true
+      ],
+      [
+        "completed_task",
+        "review-held-live",
+        true
+      ],
+      [
+        "completed_task",
+        "review-none",
+        true
+      ],
+      [
+        "silent_report",
+        "review-held-live",
+        false
+      ]
+    ],
+    "rows_after_none": [
+      [
+        "completed_task",
+        "review-held",
+        true
+      ],
+      [
+        "completed_task",
+        "review-held-live",
+        true
+      ],
+      [
+        "completed_task",
+        "review-none",
+        true
+      ],
+      [
+        "silent_report",
+        "review-held-live",
+        false
+      ]
+    ],
+    "rows_after_held": [
+      [
+        "completed_task",
+        "review-held",
+        true
+      ],
+      [
+        "completed_task",
+        "review-held-live",
+        true
+      ],
+      [
+        "completed_task",
+        "review-none",
+        true
+      ],
+      [
+        "silent_report",
+        "review-held-live",
+        false
+      ],
+      [
+        "unanswered_question",
+        "review-held-live-route-call:captain-hold",
+        false
+      ],
+      [
+        "unanswered_question",
+        "review-held-route-call:captain-hold",
+        false
+      ]
+    ],
+    "complete": true,
+    "coverage": []
+  },
+  "env": {
+    "PATH": "/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/fakebin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.8.14/libexec:/opt/homebrew/Cellar/pyenv/2.8.14/plugins/python-build/bin:/opt/homebrew/Cellar/pyenv/2.8.14/plugins/pyenv-link/bin:/opt/homebrew/Cellar/pyenv/2.8.14/plugins/pyenv-binary/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources",
+    "HOME": "/Users/charlesabrooker/tmp/fm-lab.gvndiiy4",
+    "TMPDIR": "/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/tmp",
+    "FM_HOME": "/Users/charlesabrooker/tmp/fm-lab.gvndiiy4",
+    "TMUX_TMPDIR": "/tmp/fml.GZgMzP",
+    "FM_GITHUB_ACCOUNTING": "0",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "NO_MISTAKES_GATE": "1",
+    "GIT_CONFIG_NOSYSTEM": "1",
+    "GIT_CONFIG_GLOBAL": "/dev/null",
+    "GIT_AUTHOR_NAME": "Fixture",
+    "GIT_AUTHOR_EMAIL": "fixture@example.invalid",
+    "GIT_COMMITTER_NAME": "Fixture",
+    "GIT_COMMITTER_EMAIL": "fixture@example.invalid"
+  },
+  "transcript": [
+    {
+      "label": "backlog-add-review-none",
+      "argv": [
+        "tasks-axi",
+        "add",
+        "review-none",
+        "fixture scout",
+        "--kind",
+        "scout",
+        "--repo",
+        "sample"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: added review-none (scout, repo sample) -> Queued\ntask:\n  id: review-none\n  title: fixture scout\n  state: queued\n  blocked: no\n  blocked_by: none\n  held: no\n  hold_reason: \"-\"\n  hold_kind: \"-\"\n  hold_until: \"-\"\n  kind: scout\n  repo: sample\n  priority: \"-\"\n  created: 2026-11-10\n  closed: \"-\"\n  deps: none\n  links: none\n  body: \"\"\nhelp[2]:\n  - Run `tasks-axi start review-none` to move it to in flight\n  - Run `tasks-axi block review-none --by <other>` to record a dependency\n",
+      "stderr": ""
+    },
+    {
+      "label": "backlog-start-review-none",
+      "argv": [
+        "tasks-axi",
+        "start",
+        "review-none"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: start review-none -> In flight\nhelp[1]:\n  - Run `tasks-axi done review-none --pr <url>` when it ships\n",
+      "stderr": ""
+    },
+    {
+      "label": "status-append done [at=1794359053]: report ready for owner",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-status-append.sh",
+        "/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/state/review-none.status",
+        "done [at=1794359053]: report ready for owner"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "tmux-window-review-none",
+      "argv": [
+        "tmux",
+        "new-session",
+        "-d",
+        "-s",
+        "isolated",
+        "-n",
+        "fm-review-none",
+        "/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/fakebin/claude-idle-stand-in 900"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "busy-arm-review-none",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-busy-event.sh",
+        "arm",
+        "/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/state",
+        "review-none"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "g1794366254.20188.31873\n",
+      "stderr": ""
+    },
+    {
+      "label": "busy-idle-review-none",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-busy-event.sh",
+        "apply",
+        "/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/state",
+        "review-none",
+        "idle",
+        "--gen",
+        "g1794366254.20188.31873",
+        "--source",
+        "claude-hook",
+        "--event",
+        "stop"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "backlog-add-review-held",
+      "argv": [
+        "tasks-axi",
+        "add",
+        "review-held",
+        "fixture scout",
+        "--kind",
+        "scout",
+        "--repo",
+        "sample"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: added review-held (scout, repo sample) -> Queued\ntask:\n  id: review-held\n  title: fixture scout\n  state: queued\n  blocked: no\n  blocked_by: none\n  held: no\n  hold_reason: \"-\"\n  hold_kind: \"-\"\n  hold_until: \"-\"\n  kind: scout\n  repo: sample\n  priority: \"-\"\n  created: 2026-11-10\n  closed: \"-\"\n  deps: none\n  links: none\n  body: \"\"\nhelp[2]:\n  - Run `tasks-axi start review-held` to move it to in flight\n  - Run `tasks-axi block review-held --by <other>` to record a dependency\n",
+      "stderr": ""
+    },
+    {
+      "label": "backlog-start-review-held",
+      "argv": [
+        "tasks-axi",
+        "start",
+        "review-held"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: start review-held -> In flight\nhelp[1]:\n  - Run `tasks-axi done review-held --pr <url>` when it ships\n",
+      "stderr": ""
+    },
+    {
+      "label": "status-append needs-decision [key=route] [at=1794359053]: route ",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-status-append.sh",
+        "/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/state/review-held.status",
+        "needs-decision [key=route] [at=1794359053]: route north or south"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "tmux-window-review-held",
+      "argv": [
+        "tmux",
+        "new-window",
+        "-d",
+        "-t",
+        "isolated:",
+        "-n",
+        "fm-review-held",
+        "/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/fakebin/claude-idle-stand-in 900"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "busy-arm-review-held",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-busy-event.sh",
+        "arm",
+        "/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/state",
+        "review-held"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "g1794366254.21473.9448\n",
+      "stderr": ""
+    },
+    {
+      "label": "busy-idle-review-held",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-busy-event.sh",
+        "apply",
+        "/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/state",
+        "review-held",
+        "idle",
+        "--gen",
+        "g1794366254.21473.9448",
+        "--source",
+        "claude-hook",
+        "--event",
+        "stop"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "status-append done [at=1794359053]: report ready for owner; one ",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-status-append.sh",
+        "/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/state/review-held.status",
+        "done [at=1794359053]: report ready for owner; one open choice"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "backlog-add-review-held-live",
+      "argv": [
+        "tasks-axi",
+        "add",
+        "review-held-live",
+        "fixture scout",
+        "--kind",
+        "scout",
+        "--repo",
+        "sample"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: added review-held-live (scout, repo sample) -> Queued\ntask:\n  id: review-held-live\n  title: fixture scout\n  state: queued\n  blocked: no\n  blocked_by: none\n  held: no\n  hold_reason: \"-\"\n  hold_kind: \"-\"\n  hold_until: \"-\"\n  kind: scout\n  repo: sample\n  priority: \"-\"\n  created: 2026-11-10\n  closed: \"-\"\n  deps: none\n  links: none\n  body: \"\"\nhelp[2]:\n  - Run `tasks-axi start review-held-live` to move it to in flight\n  - Run `tasks-axi block review-held-live --by <other>` to record a dependency\n",
+      "stderr": ""
+    },
+    {
+      "label": "backlog-start-review-held-live",
+      "argv": [
+        "tasks-axi",
+        "start",
+        "review-held-live"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "ok: start review-held-live -> In flight\nhelp[1]:\n  - Run `tasks-axi done review-held-live --pr <url>` when it ships\n",
+      "stderr": ""
+    },
+    {
+      "label": "status-append needs-decision [key=route] [at=1794359053]: route ",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-status-append.sh",
+        "/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/state/review-held-live.status",
+        "needs-decision [key=route] [at=1794359053]: route north or south"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "tmux-window-review-held-live",
+      "argv": [
+        "tmux",
+        "new-window",
+        "-d",
+        "-t",
+        "isolated:",
+        "-n",
+        "fm-review-held-live",
+        "/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/fakebin/claude-idle-stand-in 900"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "busy-arm-review-held-live",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-busy-event.sh",
+        "arm",
+        "/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/state",
+        "review-held-live"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "g1794366255.22582.22208\n",
+      "stderr": ""
+    },
+    {
+      "label": "busy-idle-review-held-live",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-busy-event.sh",
+        "apply",
+        "/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/state",
+        "review-held-live",
+        "idle",
+        "--gen",
+        "g1794366255.22582.22208",
+        "--source",
+        "claude-hook",
+        "--event",
+        "stop"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "status-append done [at=1794359053]: report ready for owner; one ",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-status-append.sh",
+        "/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/state/review-held-live.status",
+        "done [at=1794359053]: report ready for owner; one open choice"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "close-window-review-none",
+      "argv": [
+        "tmux",
+        "kill-window",
+        "-t",
+        "isolated:fm-review-none"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "close-window-review-held",
+      "argv": [
+        "tmux",
+        "kill-window",
+        "-t",
+        "isolated:fm-review-held"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "crew-state-review-none",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-crew-state.sh",
+        "review-none"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-review-none\n",
+      "stderr": ""
+    },
+    {
+      "label": "crew-state-review-held",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-crew-state.sh",
+        "review-held"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-review-held\n",
+      "stderr": ""
+    },
+    {
+      "label": "crew-state-review-held-live",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-crew-state.sh",
+        "review-held-live"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "state: done \u00b7 source: status-log \u00b7 report ready for owner; one open choice\n",
+      "stderr": ""
+    },
+    {
+      "label": "ledger-closed-before-owner",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-open-loops.sh",
+        "--json"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1794366256, \"home\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4\", \"complete\": true, \"rows\": [{\"id\": \"978504f828b403223e06798b\", \"category\": \"completed_task\", \"subject\": \"review-held\", \"owner\": \"firstmate\", \"next_action\": \"consume the report, complete the owner handoff and tear the task down\", \"age_seconds\": 7203, \"limit_seconds\": 1800, \"overdue\": true, \"evidence\": \"worker completion is a handoff, not final acceptance\", \"source\": {\"home\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4\", \"state\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/state\", \"data\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/data\", \"config\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/config\", \"task\": \"review-held\", \"generation\": \"4ffdc76e40bf9443054197e9e484b58f9d7388a2b47f3077cad1b23a7f48e6d4\"}}, {\"id\": \"6fa327ed9e56d00b2ea7b496\", \"category\": \"completed_task\", \"subject\": \"review-held-live\", \"owner\": \"firstmate\", \"next_action\": \"consume the report, complete the owner handoff and tear the task down\", \"age_seconds\": 7203, \"limit_seconds\": 1800, \"overdue\": true, \"evidence\": \"worker completion is a handoff, not final acceptance\", \"source\": {\"home\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4\", \"state\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/state\", \"data\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/data\", \"config\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/config\", \"task\": \"review-held-live\", \"generation\": \"b6a7eb181037e91502f13267f794f02e56cd28d31d93c6fb3427179d62497859\"}}, {\"id\": \"b5b87eccd55bf88df8b0869f\", \"category\": \"completed_task\", \"subject\": \"review-none\", \"owner\": \"firstmate\", \"next_action\": \"consume the report, complete the owner handoff and tear the task down\", \"age_seconds\": 7203, \"limit_seconds\": 1800, \"overdue\": true, \"evidence\": \"worker completion is a handoff, not final acceptance\", \"source\": {\"home\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4\", \"state\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/state\", \"data\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/data\", \"config\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/config\", \"task\": \"review-none\", \"generation\": \"d9c3d4b02fa0216cf5289727296efd79f2eb2bd595d23fb44e3194f882024358\"}}, {\"id\": \"2fceeebf36ad187afaef366c\", \"category\": \"silent_report\", \"subject\": \"review-held-live\", \"owner\": \"firstmate\", \"next_action\": \"check in: progress, blockers, cross-workstream dependencies\", \"age_seconds\": 7203, \"limit_seconds\": 900, \"overdue\": false, \"evidence\": \"last heard: status=1794359053; inbox acknowledgement=None; resolved reply=None; excluded: done/ready task is covered by PR or completion handoff\", \"informational\": true}]}\n",
+      "stderr": "",
+      "rows_summary": [
+        "completed_task review-held overdue=True",
+        "completed_task review-held-live overdue=True",
+        "completed_task review-none overdue=True",
+        "silent_report review-held-live overdue=False"
+      ]
+    },
+    {
+      "label": "owner-complete-none",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-captain-hold.sh",
+        "complete",
+        "review-none",
+        "--none"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "complete: review-none captain-call inventory reviewed\n",
+      "stderr": ""
+    },
+    {
+      "label": "ledger-after-complete-none",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-open-loops.sh",
+        "--json"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1794366259, \"home\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4\", \"complete\": true, \"rows\": [{\"id\": \"978504f828b403223e06798b\", \"category\": \"completed_task\", \"subject\": \"review-held\", \"owner\": \"firstmate\", \"next_action\": \"consume the report, complete the owner handoff and tear the task down\", \"age_seconds\": 7206, \"limit_seconds\": 1800, \"overdue\": true, \"evidence\": \"worker completion is a handoff, not final acceptance\", \"source\": {\"home\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4\", \"state\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/state\", \"data\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/data\", \"config\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/config\", \"task\": \"review-held\", \"generation\": \"4ffdc76e40bf9443054197e9e484b58f9d7388a2b47f3077cad1b23a7f48e6d4\"}}, {\"id\": \"6fa327ed9e56d00b2ea7b496\", \"category\": \"completed_task\", \"subject\": \"review-held-live\", \"owner\": \"firstmate\", \"next_action\": \"consume the report, complete the owner handoff and tear the task down\", \"age_seconds\": 7206, \"limit_seconds\": 1800, \"overdue\": true, \"evidence\": \"worker completion is a handoff, not final acceptance\", \"source\": {\"home\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4\", \"state\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/state\", \"data\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/data\", \"config\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/config\", \"task\": \"review-held-live\", \"generation\": \"b6a7eb181037e91502f13267f794f02e56cd28d31d93c6fb3427179d62497859\"}}, {\"id\": \"b5b87eccd55bf88df8b0869f\", \"category\": \"completed_task\", \"subject\": \"review-none\", \"owner\": \"firstmate\", \"next_action\": \"consume the report, complete the owner handoff and tear the task down\", \"age_seconds\": 7206, \"limit_seconds\": 1800, \"overdue\": true, \"evidence\": \"worker completion is a handoff, not final acceptance\", \"source\": {\"home\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4\", \"state\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/state\", \"data\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/data\", \"config\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/config\", \"task\": \"review-none\", \"generation\": \"94411e2d049cc959ac932895082b582464811368090f49dee1ade3d37e119c95\"}}, {\"id\": \"2fceeebf36ad187afaef366c\", \"category\": \"silent_report\", \"subject\": \"review-held-live\", \"owner\": \"firstmate\", \"next_action\": \"check in: progress, blockers, cross-workstream dependencies\", \"age_seconds\": 7206, \"limit_seconds\": 900, \"overdue\": false, \"evidence\": \"last heard: status=1794359053; inbox acknowledgement=None; resolved reply=None; excluded: done/ready task is covered by PR or completion handoff\", \"informational\": true}]}\n",
+      "stderr": "",
+      "rows_summary": [
+        "completed_task review-held overdue=True",
+        "completed_task review-held-live overdue=True",
+        "completed_task review-none overdue=True",
+        "silent_report review-held-live overdue=False"
+      ]
+    },
+    {
+      "label": "owner-hold-review-held",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-captain-hold.sh",
+        "hold",
+        "review-held-route-call",
+        "--title",
+        "Choose route",
+        "--reason",
+        "Question: route? Options: north; south",
+        "--repo",
+        "sample",
+        "--origin",
+        "review-held"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "review-held-route-call\n",
+      "stderr": ""
+    },
+    {
+      "label": "owner-complete-held-review-held",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-captain-hold.sh",
+        "complete",
+        "review-held",
+        "review-held-route-call"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "complete: review-held captain-call inventory reviewed (review-held-route-call)\n",
+      "stderr": ""
+    },
+    {
+      "label": "owner-verify-review-held",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-captain-hold.sh",
+        "verify",
+        "review-held"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "verified: review-held captain-call inventory\n",
+      "stderr": ""
+    },
+    {
+      "label": "owner-hold-review-held-live",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-captain-hold.sh",
+        "hold",
+        "review-held-live-route-call",
+        "--title",
+        "Choose route",
+        "--reason",
+        "Question: route? Options: north; south",
+        "--repo",
+        "sample",
+        "--origin",
+        "review-held-live"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "review-held-live-route-call\n",
+      "stderr": ""
+    },
+    {
+      "label": "owner-complete-held-review-held-live",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-captain-hold.sh",
+        "complete",
+        "review-held-live",
+        "review-held-live-route-call"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "complete: review-held-live captain-call inventory reviewed (review-held-live-route-call)\n",
+      "stderr": ""
+    },
+    {
+      "label": "owner-verify-review-held-live",
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-captain-hold.sh",
+        "verify",
+        "review-held-live"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "verified: review-held-live captain-call inventory\n",
+      "stderr": ""
+    },
+    {
+      "label": "crew-state-review-none",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-crew-state.sh",
+        "review-none"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-review-none\n",
+      "stderr": ""
+    },
+    {
+      "label": "crew-state-review-held",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-crew-state.sh",
+        "review-held"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-review-held\n",
+      "stderr": ""
+    },
+    {
+      "label": "crew-state-review-held-live",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-crew-state.sh",
+        "review-held-live"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "state: done \u00b7 source: status-log \u00b7 report ready for owner; one open choice\n",
+      "stderr": ""
+    },
+    {
+      "label": "ledger-after-held-transfer",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-open-loops.sh",
+        "--json"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1794366273, \"home\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4\", \"complete\": true, \"rows\": [{\"id\": \"978504f828b403223e06798b\", \"category\": \"completed_task\", \"subject\": \"review-held\", \"owner\": \"firstmate\", \"next_action\": \"consume the report, complete the owner handoff and tear the task down\", \"age_seconds\": 7220, \"limit_seconds\": 1800, \"overdue\": true, \"evidence\": \"worker completion is a handoff, not final acceptance\", \"source\": {\"home\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4\", \"state\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/state\", \"data\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/data\", \"config\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/config\", \"task\": \"review-held\", \"generation\": \"2c72a3fe84e39a3dbfd5217526754e05c15b5932b76051db75f3c238ca53d149\"}}, {\"id\": \"6fa327ed9e56d00b2ea7b496\", \"category\": \"completed_task\", \"subject\": \"review-held-live\", \"owner\": \"firstmate\", \"next_action\": \"consume the report, complete the owner handoff and tear the task down\", \"age_seconds\": 7220, \"limit_seconds\": 1800, \"overdue\": true, \"evidence\": \"worker completion is a handoff, not final acceptance\", \"source\": {\"home\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4\", \"state\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/state\", \"data\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/data\", \"config\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/config\", \"task\": \"review-held-live\", \"generation\": \"a0a0381f5d3286ce16dc9939b7e26fb00d32df72944c3165c6f886155b6d77fd\"}}, {\"id\": \"b5b87eccd55bf88df8b0869f\", \"category\": \"completed_task\", \"subject\": \"review-none\", \"owner\": \"firstmate\", \"next_action\": \"consume the report, complete the owner handoff and tear the task down\", \"age_seconds\": 7220, \"limit_seconds\": 1800, \"overdue\": true, \"evidence\": \"worker completion is a handoff, not final acceptance\", \"source\": {\"home\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4\", \"state\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/state\", \"data\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/data\", \"config\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/config\", \"task\": \"review-none\", \"generation\": \"94411e2d049cc959ac932895082b582464811368090f49dee1ade3d37e119c95\"}}, {\"id\": \"2fceeebf36ad187afaef366c\", \"category\": \"silent_report\", \"subject\": \"review-held-live\", \"owner\": \"firstmate\", \"next_action\": \"check in: progress, blockers, cross-workstream dependencies\", \"age_seconds\": 7220, \"limit_seconds\": 900, \"overdue\": false, \"evidence\": \"last heard: status=1794359053; inbox acknowledgement=None; resolved reply=None; excluded: done/ready task is covered by PR or completion handoff\", \"informational\": true}, {\"id\": \"110b42607ea0194243493524\", \"category\": \"unanswered_question\", \"subject\": \"review-held-live-route-call:captain-hold\", \"owner\": \"captain\", \"next_action\": \"resolve the captain hold or record its next decision date\", \"age_seconds\": 7, \"limit_seconds\": 1800, \"overdue\": false, \"evidence\": \"Question: route? Options: north; south\", \"source\": {\"home\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4\", \"state\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/state\", \"data\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/data\", \"config\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/config\", \"kind\": \"captain_hold\", \"task\": \"review-held-live-route-call\", \"decision\": \"eab4dfdc4bcb1173c39b1b71cabe3e8b9212ed3a3ed3e66b9091cf501be7a11d\"}}, {\"id\": \"4e205491536ce6652e15f6fe\", \"category\": \"unanswered_question\", \"subject\": \"review-held-route-call:captain-hold\", \"owner\": \"captain\", \"next_action\": \"resolve the captain hold or record its next decision date\", \"age_seconds\": 13, \"limit_seconds\": 1800, \"overdue\": false, \"evidence\": \"Question: route? Options: north; south\", \"source\": {\"home\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4\", \"state\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/state\", \"data\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/data\", \"config\": \"/Users/charlesabrooker/tmp/fm-lab.gvndiiy4/config\", \"kind\": \"captain_hold\", \"task\": \"review-held-route-call\", \"decision\": \"10d4535c69cc52822ddff60d4bfc626594536a0a605905df10e7664323ce9033\"}}]}\n",
+      "stderr": "",
+      "rows_summary": [
+        "completed_task review-held overdue=True",
+        "completed_task review-held-live overdue=True",
+        "completed_task review-none overdue=True",
+        "silent_report review-held-live overdue=False",
+        "unanswered_question review-held-live-route-call:captain-hold overdue=False",
+        "unanswered_question review-held-route-call:captain-hold overdue=False"
+      ]
+    }
+  ]
+}

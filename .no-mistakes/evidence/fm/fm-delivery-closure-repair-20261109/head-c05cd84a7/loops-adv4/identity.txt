@@ -1,0 +1,7 @@
+candidate_head=c05cd84a7a418f4dbd0660fa87ebe1c4d25007fc
+candidate_tree=cdd5f96db3e6c8ceb9f2812c648fdc747db41c6a
+status_lines=0
+a0a7e90b2558c368b3184a3cf10e37b651964b18122843a13f997706d46b3eb7  /Users/charlesabrooker/.no-mistakes/evidence/01M73WWY8ESTCS9VBM9A6W09X6/head-c05cd84a7/drive_loops_adv4.py
+driver_exit=0
+SUMMARY {"l16-held-call-answer-after-done": true}
+base/prefix slots: git archive extracts of 30914c329 / eabb93a43 (adv4: unused, candidate path passed)

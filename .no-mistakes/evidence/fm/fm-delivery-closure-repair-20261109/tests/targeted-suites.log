@@ -1,0 +1,166 @@
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-11-11T00:53:16Z tests/fm-brief.test.sh family=pure-contract-unit expected_gate_skip=none
+ok - fm-brief: scaffolds leave the worker role scope to the launch boundary and keep the secondmate contract
+ok - fm-brief.sh: bash -n succeeds
+/Users/charlesabrooker/tmp/fm-gate-tests.eTT3l9/tmp/fm-test-run.XvmNWS/w1/tmp/fm-brief.E0SwzH/heredoc-in-substitution.sh:2
+ok - fm-brief.sh: no heredoc is nested inside a command substitution (Bash 3.2 parse-safe)
+ok - fm-brief: generated verification-plan command creates the separate input with criteria and exclusions
+ok - fm-brief.sh: --help renders the complete header
+ok - fm-brief.sh: no-mistakes/direct-PR/local-only briefs generate cleanly
+ok - fm-brief.sh: --forge forgejo names tea in Rule 3, the direct-PR DOD, and the draft read-back, marks the delivery contract, and the closed set refuses everything else
+ok - fm-brief.sh: ship --mode is required and closed-set validated
+ok - fm-brief.sh: every crewmate scaffold routes scratch scripts through the process budget
+ok - fm-brief.sh: emitted process-budget commands execute from foreign paths
+ok - fm-brief.sh: a ship brief forbids the nested worktree and gives the lane a blocked route
+ok - fm-brief.sh: the explicit ship mode wins over the registered posture
+ok - fm-brief.sh: --yolo and scout/secondmate --mode are refused, never silently dropped
+ok - fm-brief.sh: faster paths use configured authority without stacked review
+ok - fm-brief.sh: no-mistakes DOD keeps its apostrophe prose and bans --yes outright
+ok - fm-brief.sh: no-mistakes DOD detects a green PR from the drive call, not a status poll
+ok - fm-brief.sh: PR-based done requires a non-draft PR; a deliberate draft declares a wait
+ok - fm-brief.sh: no-mistakes ask-user findings use one event plus a verbatim snapshot
+ok - fm-brief.sh: ship project-memory wording bounds edits to corrections of wrong information
+ok - fm-brief.sh: --herdr-lab emits the complete hard safety contract
+ok - fm-brief.sh: --herdr-lab uses its quoted Firstmate-owned helper path
+ok - fm-brief.sh: ship and scout scaffolds make omitted Herdr intent fail-visible
+ok - fm-brief.sh: the documented {TASK} and {FIRSTMATE_SPEC} fills cannot corrupt the Herdr safety gate
+ok - fm-brief.sh: Herdr lab contract covers scouts and rejects secondmate misuse
+ok - fm-brief.sh: --no-projects scaffolds a project-less charter and guards misuse
+ok - fm-brief.sh: marked requests avoid generic acknowledgements and preserve material reporting
+ok - fm-brief.sh: relative directory inputs ignore CDPATH, render stable absolute charter paths, or fail loudly
+ok - fm-brief.sh: custom pause verb renders in every scaffold
+ok - fm-brief.sh: ship and scout scaffolds declare a validation-round pause once, then hold it
+ok - fm-brief: scout and secondmate code paths still scaffold well-formed briefs
+ok - fm-brief: ship and scout briefs carry the task Definition of Done and grading sections, charters do not
+ok - fm-spawn: a half-filled brief produces one refusal naming all five tokens and the repair
+ok - fm-spawn: the worktree-isolation refusal prints the relaunch and reassociation repair
+ok - fm-spawn: the backend refusal names the spawn-capable backends and the invocation
+ok - the API-key guard refusal prints the env-u relaunch and the deliberate opt-in
+ok - fm-brief.sh: scout Lavish hosting follows the bootstrap lavish-axi floor
+ok - fm-brief: workers end the turn on a decision, wait in one blocking shell command, and never poll
+ok - fm-brief: without config/wait-no-turns the brief and drive text stay as they were
+ok - fm-brief.sh: the home brief include lands last on ship and scout, verbatim, and fails closed
+ok - fm-brief.sh: --base-branch records the base, targets the PR at it, and is refused where no PR carries it
+ok - fm-brief.sh: --branch-prefix omitted defaults every ship mode to fm/<task-id>
+ok - fm-brief.sh: a --branch-prefix override renders identically across every generated section
+ok - fm-brief.sh: an empty --branch-prefix override resolves to a bare <task-id> branch
+ok - fm-brief.sh: --branch-prefix is refused on scout and secondmate scaffolds
+ok - fm-brief.sh: --branch-prefix value is validated against embedded spaces and a leading dash
+Switched to a new branch '$(touch${IFS}/Users/charlesabrooker/tmp/fm-gate-tests.eTT3l9/tmp/fm-test-run.XvmNWS/w1/tmp/fm-brief.E0SwzH/branch-prefix-shell-safe-marker)brief-branch-safe-g3'
+ok - fm-brief.sh: ref-format-valid shell metacharacters stay literal in generated branch commands
+ok - fm-brief.sh: every crewmate scaffold forbids administering the shared worktree pool
+ok - fm-brief.sh: ship and scout scaffolds require stopping private services and naming them in the status line
+ok - fm-brief.sh: every crewmate scaffold teaches the Docker task marker and the secondmate charter does not
+ok - fm-brief.sh: every forge-PR delivery teaches the Closes: line and its re-check route; local-only, Gerrit and scout briefs do not
+FM_TEST_END 2026-11-11T00:54:17Z tests/fm-brief.test.sh exit=0 duration_ms=60690 gate_skip=false
+FM_TEST_BEGIN 2026-11-11T00:54:18Z tests/fm-open-loops.test.sh family=pr-forge expected_gate_skip=none
+PASS: ordinary categories, PR proof, ages and configuration
+PASS: completed reviews and committed candidates retain their owner action; failed reports do not imply acceptance
+PASS: record-owned live-head review, discovery hint, typed absence versus degraded, interval boundary, required checks, merge completion
+PASS: stale non-overdue retention, receipt pruning, corrupt-ledger replacement, deferral bound
+PASS: failed question, PR and commit provenance preserves confirmed acknowledgement obligations on collection and refresh
+PASS: board answer ages, handling, live and dead parked missing owners, non-board captures, and home-local secondmate publication
+PASS: interrupted teardown records bound to the current task record
+PASS: correction coverage and landed/drop exclusions
+PASS: recorded task-only PR classification, fork landing, and correction coverage
+PASS: patch-equivalent delivery
+PASS: approved local landing and qualified defaults
+PASS: independent failed delivery and worker liveness axes
+PASS: unknown current state degrades independently of live verdict
+PASS: future pipeline stamps do not mask older valid progress
+PASS: future status commit and reflog cannot hide unknown-age stalls
+PASS: absolute relative empty and default pipeline stores preserve task-scoped progress
+PASS: collection leaves Git index and object inventory unchanged
+PASS: last-error JSON and human representations
+PASS: local-path origins are disclosed without degrading the ledger
+PASS: exact GitHub host admission and PR projection
+PASS: unreadable shared state inventory cannot publish complete empty coverage
+PASS: PR ownership matches the head repository and branch or an exact recorded URL; unowned checks are not fetched
+PASS: standing pauses survive unrelated answers; resumption and authoritative current states override them
+PASS: generation-invalidated snapshots retain coverage failures despite live stop events
+PASS: only dispatched ready work is overdue
+PASS: ordinary recovery adapters and source degradation
+PASS: publication suppression reset success/failure/skip
+PASS: held-gate singleflight and child cleanup
+PASS: unset and empty address overrides share shell defaults before collection
+PASS: no-progress source failure owns resistant descendant cleanup
+PASS: live process-group EPERM still refuses and leaves the process running
+PASS: an all-zombie or vanished process group swallows the Darwin EPERM race
+PASS: no-progress expiry reports the configured interval and keeps captured output
+PASS: unchanged forge reads are 304s and a run below the quota floor publishes stale rows with the reset time
+PASS: owned-work categories, owners, ages, degraded row, and atomic publication
+PASS: silence clock resets, exclusions, check-in inbox/correlation deduplication, and secondmate-home run
+PASS: home-input carries a large inventory, retains direct secondmates, and marks a captain drop
+PASS: live and aged captain holds share unresolved-question coverage with status decisions
+PASS: unreadable tmux degrades coverage without fabricating missing worker
+PASS: current-state timeout retains independent observation failure
+PASS: real snapshot unreadable metadata/status inventory stays degraded
+PASS: real snapshot nested no-progress cut reaps its group and removes temporary inventory
+PASS: new/changed gate, unchanged acknowledgement, no unproved captain-delivery label, and gate/digest coverage
+PASS: a stamped escalation is never captain waiting; unchanged work stays listed and changed work gates
+PASS: each actor gates only the rows its own drain presented
+PASS: PR provenance steers use own inbox or handled records, reject foreign and old evidence, and permit acknowledgement
+PASS: a steer on a row with a non-object source falls back to its owner inbox
+PASS: refused acknowledgement, four verified action kinds, second deferral escalation, host and secondmate gates, repeat, fresh steers, standing captain receipts, and empty turns
+PASS: local-only Gerrit completion keeps unproved prerequisites actionable without forge reads across receipt paths and completion callers
+PASS: bound PR/status and Main-owned routed waits survive unchanged presentations; real obligations remain visible; changed, answered, released, unreadable, due and unanswered-reply boundaries reactivate followup
+PASS: a parked firstmate-owned row escalation covers unchanged evidence and is listed as waiting on the captain, also on a quota-stale ledger; a changed row or an answered, released, blocked, re-held or unreadable bound hold needs a new action while a hold deferred to a date keeps covering; evidence text, other owners, reviewed PRs and other categories cannot bind holds, so their escalations are never captain waiting; the deferral limit remains enforced; one presentation reads the backlog once; an unverifiable escalation answers only the turn it followed
+PASS: a paused worker status append changes its collected row and gates acknowledgement again
+PASS: batch validates per row, preserves valid actions and uses one real snapshot
+PASS: drain and refused acknowledgement preserve unchanged recorded work
+PASS: stdin batch recovery and partial acknowledgements preserve completed actions
+PASS: every obligation identity change requires new evidence
+PASS: firstmate escalations and steers need no new action on unchanged work, only on changed work
+PASS: a free-text escalation stays listed without proof it reached the captain, not re-gated by time
+PASS: elapsed-time counters never void a deferral, steer or escalation; real evidence changes do
+PASS: a pane timer in any unit changes no obligation; a different task still does
+PASS: an unreadable config file never blocks the receipt gate
+PASS: second deferral requires new follow-up even after a standing escalation
+PASS: reviewed PRs keep their next-turn action requirement
+PASS: a refused batch line leaks no state into its siblings
+PASS: a hold ending or becoming unreadable restores the same-turn action requirement
+PASS: a home without a ledger acknowledges without the receipt command
+PASS: a slow batch producer holds no ledger lock and unactioned rows stay gated
+PASS: a steer delivered after the overdue episode began counts on every re-presentation of the unchanged row
+PASS: a steer older than four hours, one sent before the episode, or one predating changed evidence is refused
+PASS: the overdue episode opens when the row became overdue, or at first presentation when the record cannot say
+PASS: a delivered pending-reply correlation id is accepted as steered evidence; undelivered, foreign, early and linked ids are refused
+PASS: captain_visible is one derived value for the printed row, the stored action and the deferral check
+PASS: a red PR row waits on a named live task, idle or parked, and resurfaces when it merges, fails, stalls, loses its session or record, is replaced, lands done with no PR or comes due; a prerequisite that is not live is refused
+PASS: a prerequisite-task delivery sent inside the current overdue episode counts after a re-presentation; one older than the episode is refused; a row no longer overdue closes its episode
+PASS: open_pr and red_check rows wait on a live task by reason; unanswered_question and unlanded_commit rows are refused that form and still wait through a delivery naming them
+ok - open-work reconciliation reports owned obligations from live records
+FM_TEST_END 2026-11-11T01:27:51Z tests/fm-open-loops.test.sh exit=0 duration_ms=2013667 gate_skip=false
+FM_TEST_BEGIN 2026-11-11T01:27:52Z tests/fm-guard-audit-closure.test.sh family=unclassified expected_gate_skip=none
+ok - G-10 enforce-mode lint validates the audit arithmetic as registered families grow
+ok - G-10b the spec and the registry are checked in and agree
+ok - G-11 the lint rules are proven by a fixture suite, including a prose-only remedy
+ok - G-23 the ratchet is enforcing and the allowlist holds only legacy refusal sites
+ok - G-02 every wired hook path and registry path resolves
+ok - G-03 no retired guard is referenced from live code
+ok - G-28 every retired guard ships a retirement test
+ok - G-15/G-17 one event writer, one metrics reader, and a twenty-row replay
+ok - G-16 all 22 instrumented guards call the event writer
+ok - G-12 every registered remedy carries an executable token or path
+ok - G-14 a malformed brief is refused once with every problem listed
+ok - G-20 worktree isolation names the reassociation repair
+ok - G-22 gate containment names the one-command lab home it permits
+ok - G-21 publication role names where authority is granted
+ok - G-05 send names the working invocation
+ok - G-06 kimi refusal names the install step
+ok - G-13 merge names the attended waiver
+ok - G-13b merge names the hold release command
+ok - G-01 one liveness owner, and the Claude repair line is a command
+ok - G-04 every retired guard is absent from bin/ and the advisory cut is recorded
+ok - G-31 discovery finds the pool-slot allocation guard and the shared-slot teardown guard
+ok - fm-guard-audit-closure
+FM_TEST_END 2026-11-11T01:31:48Z tests/fm-guard-audit-closure.test.sh exit=0 duration_ms=236621 gate_skip=false
+FM_TEST_SUMMARY total=3 failed=0 skipped_gate=0 duration_ms=2315548
+FM_TEST_SUMMARY_FAMILY family=pr-forge count=1 duration_ms=2013667 failed=0
+FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=1 duration_ms=60690 failed=0
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=236621 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-open-loops.test.sh duration_ms=2013667
+FM_TEST_SLOWEST rank=2 script=tests/fm-guard-audit-closure.test.sh duration_ms=236621
+FM_TEST_SLOWEST rank=3 script=tests/fm-brief.test.sh duration_ms=60690
+fm-test-run: wrote timing artifact: /Users/charlesabrooker/.no-mistakes/evidence/01M73WWY8ESTCS9VBM9A6W09X6/tests/timing.json
+exit=0

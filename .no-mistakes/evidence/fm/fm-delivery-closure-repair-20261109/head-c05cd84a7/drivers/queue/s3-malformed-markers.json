@@ -1,0 +1,143 @@
+{
+  "scenario": "s3-malformed-markers",
+  "source": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6",
+  "passed": true,
+  "assertions": {
+    "pass1_exit0": true,
+    "pass1_cadence_advanced": true,
+    "pass1_stderr_names_check": true,
+    "pass1_before_one_row": true,
+    "pass1_after_kept": true,
+    "pass1_diagnostic_count_5": true,
+    "pass1_ordinary_state": true,
+    "pass1_inline_marker_stays_state": true,
+    "pass1_later_check_delivered": true,
+    "pass2_exit0": true,
+    "pass2_cadence_advanced": true,
+    "pass2_stderr_names_check": true,
+    "pass2_before_one_row": true,
+    "pass2_after_kept": true,
+    "pass2_diagnostic_count_5": true,
+    "pass2_ordinary_state": true,
+    "pass2_inline_marker_stays_state": true,
+    "pass2_later_check_delivered": true,
+    "no_malformed_identity_became_event": true,
+    "second_pass_event_delivered": true,
+    "drain_before_once": true,
+    "drain_after_once": true,
+    "drain_next_once": true,
+    "drain_latest_state_only": true,
+    "drain_shows_diagnostic": true
+  },
+  "extra": {
+    "keys": [
+      "/Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh#event:before",
+      "/Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh#event:after",
+      "/Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh",
+      "/Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/zz-later.check.sh",
+      "/Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh#event:next",
+      "/Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh",
+      "/Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/zz-later.check.sh"
+    ],
+    "passes": [
+      {
+        "exit": 0,
+        "stderr": "error: malformed event output from /Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh\nerror: malformed event output from /Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh\nerror: malformed event output from /Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh\nerror: malformed event output from /Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh\nerror: malformed event output from /Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh\n",
+        "last_check_advanced": true
+      },
+      {
+        "exit": 0,
+        "stderr": "error: malformed event output from /Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh\nerror: malformed event output from /Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh\nerror: malformed event output from /Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh\nerror: malformed event output from /Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh\nerror: malformed event output from /Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh\n",
+        "last_check_advanced": true
+      }
+    ],
+    "drain": "1794366395\t1\tcheck\t/Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh#event:before\tcheck: /Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh: before payload\n1794366395\t2\tcheck\t/Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh#event:after\tcheck: /Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh: after payload\n1794366399\t6\tcheck\t/Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh\tcheck: /Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh: ordinary text that mentions fm-check-event inside inline ordinary state 2 refused 5 malformed fm-check-event line(s)\n1794366399\t7\tcheck\t/Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/zz-later.check.sh\tcheck: /Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/zz-later.check.sh: later check 2\n1794366398\t5\tcheck\t/Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh#event:next\tcheck: /Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh: next payload\n"
+  },
+  "transcript": [
+    {
+      "label": "register-aa-events",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-check-register.sh",
+        "aa-events"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "registered: state/aa-events.check.sh\n",
+      "stderr": ""
+    },
+    {
+      "label": "register-zz-later",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-check-register.sh",
+        "zz-later"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "registered: state/zz-later.check.sh\n",
+      "stderr": ""
+    },
+    {
+      "label": "watch-1",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-watch.sh"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "check: /Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh: before payload\n",
+      "stderr": "error: malformed event output from /Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh\nerror: malformed event output from /Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh\nerror: malformed event output from /Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh\nerror: malformed event output from /Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh\nerror: malformed event output from /Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh\n",
+      "last_check_advanced": true
+    },
+    {
+      "label": "watch-2",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-watch.sh"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "check: /Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh: before payload\n",
+      "stderr": "error: malformed event output from /Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh\nerror: malformed event output from /Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh\nerror: malformed event output from /Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh\nerror: malformed event output from /Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh\nerror: malformed event output from /Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh\n",
+      "last_check_advanced": true
+    },
+    {
+      "label": "queue-after-pass-2",
+      "queue_tsv": "1794366395\t1\tcheck\t/Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh#event:before\tcheck: /Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh: before payload\n1794366395\t2\tcheck\t/Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh#event:after\tcheck: /Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh: after payload\n1794366395\t3\tcheck\t/Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh\tcheck: /Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh: ordinary text that mentions fm-check-event inside inline ordinary state 1 refused 5 malformed fm-check-event line(s)\n1794366396\t4\tcheck\t/Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/zz-later.check.sh\tcheck: /Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/zz-later.check.sh: later check 1\n1794366398\t5\tcheck\t/Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh#event:next\tcheck: /Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh: next payload\n1794366399\t6\tcheck\t/Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh\tcheck: /Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh: ordinary text that mentions fm-check-event inside inline ordinary state 2 refused 5 malformed fm-check-event line(s)\n1794366399\t7\tcheck\t/Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/zz-later.check.sh\tcheck: /Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/zz-later.check.sh: later check 2\n"
+    },
+    {
+      "label": "drain",
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6/bin/fm-wake-drain.sh"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "1794366395\t1\tcheck\t/Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh#event:before\tcheck: /Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh: before payload\n1794366395\t2\tcheck\t/Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh#event:after\tcheck: /Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh: after payload\n1794366399\t6\tcheck\t/Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh\tcheck: /Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh: ordinary text that mentions fm-check-event inside inline ordinary state 2 refused 5 malformed fm-check-event line(s)\n1794366399\t7\tcheck\t/Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/zz-later.check.sh\tcheck: /Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/zz-later.check.sh: later check 2\n1794366398\t5\tcheck\t/Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh#event:next\tcheck: /Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/state/aa-events.check.sh: next payload\n",
+      "stderr": "WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 7 --recovery-generation 45197.1794366398.ORIqk0\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\u25cf  WATCHER DOWN - SUPERVISION IS OFF\n\u25cf  2 registered custom check(s), but no live watcher process holds this home lock (last beat: 4s ago).\n\u25cf  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.\n\u25cf  This is a supervision warning only; the guarded operation WILL still run.\n\u25cf  After draining queued wakes, repair missing watcher supervision according to the session-start block for this harness; do not use shell &.\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\nWARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.\n",
+      "ack": [
+        "7",
+        "45197.1794366398.ORIqk0"
+      ]
+    }
+  ],
+  "env": {
+    "PATH": "/Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/fakebin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.8.14/libexec:/opt/homebrew/Cellar/pyenv/2.8.14/plugins/python-build/bin:/opt/homebrew/Cellar/pyenv/2.8.14/plugins/pyenv-link/bin:/opt/homebrew/Cellar/pyenv/2.8.14/plugins/pyenv-binary/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources",
+    "HOME": "/Users/charlesabrooker/tmp/fm-lab.ozm8fy0r",
+    "TMPDIR": "/Users/charlesabrooker/tmp/fm-lab.ozm8fy0r/tmp",
+    "FM_HOME": "/Users/charlesabrooker/tmp/fm-lab.ozm8fy0r",
+    "TMUX_TMPDIR": "/tmp/fml.j1Qq6Z",
+    "FM_GITHUB_ACCOUNTING": "0",
+    "FM_MEMORY_GUARD_BIN": "/usr/bin/true",
+    "FM_OPEN_LOOPS_BIN": "/usr/bin/true",
+    "FM_WATCH_HANDLING_SUCCESSOR": "1",
+    "FM_OPEN_LOOPS_INTERVAL": "99999999",
+    "FM_HOME_SUMMARY_INTERVAL": "99999999",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "NO_MISTAKES_GATE": "1",
+    "FM_SLACK_ALLOWED_AUTHORS": "U0TESTOWNER",
+    "FM_SLACK_DM_USER": "U0TESTOWNER",
+    "FM_EVENT_TEST_ROOT": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M73WWY8ESTCS9VBM9A6W09X6"
+  }
+}

@@ -1,0 +1,138 @@
+{
+ "scenario": "l16-held-call-answer-after-done",
+ "passed": true,
+ "assertions": {
+  "hold_complete_verify_ok": true,
+  "live_task_keeps_an_owner_row_after_real_answer": true,
+  "closed_task_keeps_an_owner_row_after_real_answer": true,
+  "live_task_keeps_an_owner_row_at_end": true,
+  "closed_task_keeps_an_owner_row_at_end": true
+ },
+ "extra": {
+  "owner_exits": {
+   "ans-live": {
+    "hold": 0,
+    "complete": 0,
+    "verify": 0
+   },
+   "ans-closed": {
+    "hold": 0,
+    "complete": 0,
+    "verify": 0
+   }
+  },
+  "steps": {
+   "1-before-owner": {
+    "ans-live": {
+     "last_line": "done [at=1794360830]: report ready for owner; one open choice",
+     "crew": "state: done \u00b7 source: status-log \u00b7 report ready for owner; one open choice",
+     "categories": [
+      "completed_task",
+      "silent_report"
+     ]
+    },
+    "ans-closed": {
+     "last_line": "done [at=1794360830]: report ready for owner; one open choice",
+     "crew": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-ans-closed",
+     "categories": [
+      "completed_task"
+     ]
+    },
+    "complete": true,
+    "coverage": []
+   },
+   "2-after-hold-and-complete": {
+    "ans-live": {
+     "last_line": "done [at=1794360830]: report ready for owner; one open choice",
+     "crew": "state: done \u00b7 source: status-log \u00b7 report ready for owner; one open choice",
+     "categories": [
+      "completed_task",
+      "silent_report"
+     ]
+    },
+    "ans-closed": {
+     "last_line": "done [at=1794360830]: report ready for owner; one open choice",
+     "crew": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-ans-closed",
+     "categories": [
+      "completed_task"
+     ]
+    },
+    "complete": true,
+    "coverage": []
+   },
+   "3-after-real-answer": {
+    "ans-live": {
+     "last_line": "done [at=1794360830]: report ready for owner; one open choice",
+     "crew": "state: done \u00b7 source: status-log \u00b7 report ready for owner; one open choice",
+     "categories": [
+      "completed_task",
+      "silent_report"
+     ]
+    },
+    "ans-closed": {
+     "last_line": "done [at=1794360830]: report ready for owner; one open choice",
+     "crew": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-ans-closed",
+     "categories": [
+      "completed_task"
+     ]
+    },
+    "complete": true,
+    "coverage": []
+   },
+   "4-after-close-key": {
+    "ans-live": {
+     "last_line": "done [at=1794360830]: report ready for owner; one open choice",
+     "crew": "state: done \u00b7 source: status-log \u00b7 report ready for owner; one open choice",
+     "categories": [
+      "completed_task",
+      "silent_report"
+     ]
+    },
+    "ans-closed": {
+     "last_line": "done [at=1794360830]: report ready for owner; one open choice",
+     "crew": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-ans-closed",
+     "categories": [
+      "completed_task"
+     ]
+    },
+    "complete": true,
+    "coverage": []
+   }
+  },
+  "send": {
+   "ans-live": [
+    0,
+    "",
+    "ask(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).\n\u25cf  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.\n\u25cf  This is a supervision warning only; the requested message WILL still be sent.\n\u25cf  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n"
+   ],
+   "ans-closed": [
+    0,
+    "",
+    "ab home /Users/charlesabrooker/tmp/fm-lab.9zrqy2iu\nWARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\nfm-send: doorbell not typed because the agent in isolated:fm-ans-closed has exited; the steer is durably recorded at /Users/charlesabrooker/tmp/fm-lab.9zrqy2iu/state/ans-closed.inbox/001.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane\n"
+   ]
+  },
+  "close_key": {
+   "ans-live": [
+    1,
+    "",
+    "fm-captain-hold: key route is not open in ans-live; no matching evidence-backed close to replay\n"
+   ],
+   "ans-closed": [
+    1,
+    "",
+    "fm-captain-hold: key route is not open in ans-closed; no matching evidence-backed close to replay\n"
+   ]
+  },
+  "status_logs": {
+   "ans-live": [
+    "needs-decision [key=route] [at=1794360830]: route north or south",
+    "done [at=1794360830]: report ready for owner; one open choice"
+   ],
+   "ans-closed": [
+    "needs-decision [key=route] [at=1794360830]: route north or south",
+    "done [at=1794360830]: report ready for owner; one open choice"
+   ]
+  }
+ }
+}
+SUMMARY {"l16-held-call-answer-after-done": true}

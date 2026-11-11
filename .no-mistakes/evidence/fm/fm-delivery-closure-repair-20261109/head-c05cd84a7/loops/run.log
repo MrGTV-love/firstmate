@@ -1,0 +1,326 @@
+{
+ "scenario": "l1-done-scout-owner-handoff",
+ "passed": true,
+ "assertions": {
+  "snapshot_reads_done": true,
+  "base_has_no_owner_row": true,
+  "candidate_has_completed_task": true,
+  "row_is_overdue_and_firstmate_owned": true,
+  "action_names_owner_handoff": true,
+  "fresh_process_recovers_same_row": true,
+  "teardown_refused_before_owner_complete": true,
+  "row_stays_after_refused_teardown": true,
+  "owner_complete_ok": true,
+  "row_stays_after_inventory_attestation_only": true,
+  "verify_ok": true,
+  "teardown_ok_after_owner_complete": true,
+  "row_gone_after_teardown": true,
+  "ledger_complete": true
+ },
+ "extra": {
+  "crew_state": "state: done \u00b7 source: status-log \u00b7 report ready for owner",
+  "row": {
+   "id": "e6a56ab3c5c5d1af58a1306a",
+   "category": "completed_task",
+   "subject": "review-a",
+   "owner": "firstmate",
+   "next_action": "consume the report, complete the owner handoff and tear the task down",
+   "age_seconds": 7202,
+   "limit_seconds": 1800,
+   "overdue": true,
+   "evidence": "worker completion is a handoff, not final acceptance",
+   "source": {
+    "home": "/Users/charlesabrooker/tmp/fm-lab.5qeyquux",
+    "state": "/Users/charlesabrooker/tmp/fm-lab.5qeyquux/state",
+    "data": "/Users/charlesabrooker/tmp/fm-lab.5qeyquux/data",
+    "config": "/Users/charlesabrooker/tmp/fm-lab.5qeyquux/config",
+    "task": "review-a",
+    "generation": "2a89274240d095086a0414ddc847a6e6799a0efeb342e1cc9a8a243a7e5877a0"
+   }
+  },
+  "base_categories": [
+   "silent_report"
+  ],
+  "teardown_early_stderr": "rust the emitted supervision protocol for this harness; do not use shell & for watcher repair.\n\u25cf  This is a supervision warning only; the guarded operation WILL still run.\n\u25cf  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\nfm-captain-hold: origin review-a has no completed captain-call inventory\nREFUSED: scout task review-a has not passed the captain-call completion gate.\nInventory its report and any visual review through bin/fm-captain-hold.sh before teardown.\n",
+  "teardown_stderr": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.5qeyquux\nWARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\n"
+ }
+}
+{
+ "scenario": "l2-failed-scout-with-report",
+ "passed": true,
+ "assertions": {
+  "snapshot_reads_failed": true,
+  "base_has_no_failed_task_row": true,
+  "candidate_has_failed_task_row": true,
+  "row_overdue": true,
+  "no_completed_task_for_failed": true
+ },
+ "extra": {
+  "crew_state": "state: failed \u00b7 source: status-log \u00b7 could not finish; partial report written",
+  "row": {
+   "id": "65de26551657f10363f43a2a",
+   "category": "failed_task",
+   "subject": "review-failed",
+   "owner": "firstmate",
+   "next_action": "recover the failed work or record why it ends",
+   "age_seconds": 7220,
+   "limit_seconds": 1800,
+   "overdue": true,
+   "evidence": ""
+  },
+  "base_categories": [
+   "silent_report"
+  ],
+  "candidate_categories": [
+   "failed_task",
+   "silent_report"
+  ]
+ }
+}
+{
+ "scenario": "l3-done-ship-candidate",
+ "passed": true,
+ "assertions": {
+  "snapshot_reads_done": true,
+  "base_has_no_completed_task": true,
+  "unlanded_has_completed_task": true,
+  "action_names_delivery_path": true,
+  "unlanded_has_unlanded_commit": true,
+  "landed_has_no_completed_task": true,
+  "landed_has_no_unlanded_commit": true
+ },
+ "extra": {
+  "crew_state": "state: done \u00b7 source: status-log \u00b7 candidate committed",
+  "crew_state_landed": "state: done \u00b7 source: status-log \u00b7 candidate committed",
+  "row": {
+   "id": "6743f5eaf8912b6686c9b2db",
+   "category": "completed_task",
+   "subject": "ship-a",
+   "owner": "firstmate",
+   "next_action": "advance the committed candidate through its selected delivery path",
+   "age_seconds": 7223,
+   "limit_seconds": 1800,
+   "overdue": true,
+   "evidence": "worker completion is a handoff, not final acceptance",
+   "source": {
+    "home": "/Users/charlesabrooker/tmp/fm-lab.bqxghc6y",
+    "state": "/Users/charlesabrooker/tmp/fm-lab.bqxghc6y/state",
+    "data": "/Users/charlesabrooker/tmp/fm-lab.bqxghc6y/data",
+    "config": "/Users/charlesabrooker/tmp/fm-lab.bqxghc6y/config",
+    "task": "ship-a",
+    "generation": "0e1d33766840412a5040541184593cba331794d7791ab549986ebf96902e0f5e"
+   }
+  },
+  "unlanded_categories": [
+   "completed_task",
+   "silent_report",
+   "unlanded_commit"
+  ],
+  "landed_categories": [
+   "silent_report"
+  ],
+  "base_categories": [
+   "silent_report",
+   "unlanded_commit"
+  ]
+ }
+}
+{
+ "scenario": "l4-captain-drop",
+ "passed": true,
+ "assertions": {
+  "before_done_row": true,
+  "before_failed_row": true,
+  "snapshot_records_drop": true,
+  "dropped_done_row_gone": true,
+  "dropped_failed_row_gone": true,
+  "undropped_twin_keeps_row": true
+ },
+ "extra": {
+  "drops": {
+   "keep-done": false,
+   "drop-failed": true,
+   "drop-done": true
+  },
+  "before": [
+   [
+    "completed_task",
+    "drop-done"
+   ],
+   [
+    "completed_task",
+    "keep-done"
+   ],
+   [
+    "failed_task",
+    "drop-failed"
+   ],
+   [
+    "silent_report",
+    "drop-done"
+   ],
+   [
+    "silent_report",
+    "drop-failed"
+   ],
+   [
+    "silent_report",
+    "keep-done"
+   ]
+  ],
+  "after": [
+   [
+    "completed_task",
+    "keep-done"
+   ],
+   [
+    "silent_report",
+    "drop-done"
+   ],
+   [
+    "silent_report",
+    "drop-failed"
+   ],
+   [
+    "silent_report",
+    "keep-done"
+   ]
+  ]
+ }
+}
+{
+ "scenario": "l5-unreadable-completion-status-isolated",
+ "passed": true,
+ "assertions": {
+  "control_without_cap_is_complete": true,
+  "control_has_all_rows": true,
+  "candidate_reports_incomplete": true,
+  "candidate_names_the_unreadable_read": true,
+  "candidate_keeps_blind_task_row": true,
+  "candidate_keeps_later_failed_task": true,
+  "candidate_keeps_later_unlanded_commit": true,
+  "candidate_keeps_later_missing_worker": true,
+  "prefix_tree_loses_later_failed_task": true,
+  "prefix_tree_loses_later_unlanded_commit": true,
+  "prefix_tree_degrades_all_workers_not_one_read": true,
+  "prefix_tree_also_loses_blind_row": true
+ },
+ "extra": {
+  "candidate_coverage": "completion status a-blind: fm-status: refused to read a-blind.status: a span of 4278 bytes is past the read limit of 2049 bytes (cap plus reserve); nothing was read and nothing was change; report silence a-blind: fm-status: refused to read a-blind.status: a span of 4278 bytes is past the read limit of 2049 bytes (cap plus reserve); nothing was read and nothing was change; questions a-blind.status:",
+  "prefix_coverage": "workers: fm-status: refused to read a-blind.status: a span of 4278 bytes is past the read limit of 2049 bytes (cap plus reserve); nothing was read and nothing was change; report silence a-blind: fm-status: refused to read a-blind.status: a span of 4278 bytes is past the read limit of 2049 bytes (cap plus reserve); nothing was read and nothing was change; questions a-blind.status: fm-status: refuse",
+  "control_later_rows": [
+   "failed_task",
+   "missing_worker",
+   "silent_report",
+   "unlanded_commit"
+  ],
+  "candidate_later_rows": [
+   "failed_task",
+   "missing_worker",
+   "silent_report",
+   "unlanded_commit"
+  ],
+  "prefix_later_rows": [
+   "missing_worker",
+   "silent_report"
+  ],
+  "candidate_a_blind": [
+   "completed_task"
+  ],
+  "prefix_a_blind": []
+ }
+}
+{
+ "scenario": "l6-done-scout-pane-gone",
+ "passed": true,
+ "assertions": {
+  "row_present_while_pane_live": true,
+  "windows_closed": true,
+  "failed_twin_keeps_an_owner_row": true,
+  "done_scout_keeps_an_owner_row_after_pane_gone": true
+ },
+ "extra": {
+  "crew_state_after": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-review-gone",
+  "twin_crew_state_after": "state: unknown \u00b7 source: none \u00b7 backend target gone: isolated:fm-review-gone-failed",
+  "categories_live": [
+   "completed_task",
+   "silent_report"
+  ],
+  "categories_gone": [
+   "completed_task"
+  ],
+  "twin_categories_gone": [
+   "missing_worker"
+  ],
+  "base_categories_gone": [],
+  "ledger_complete_after": true,
+  "report_still_present": true,
+  "meta_still_present": true,
+  "decisions_reviewed_recorded": false
+ }
+}
+{
+ "scenario": "l7-complete-keeps-pr-footer-base",
+ "passed": true,
+ "assertions": {
+  "complete_ok": true,
+  "attested": true
+ },
+ "extra": {
+  "complete_exit": 0,
+  "verify_exit": 0,
+  "last_two_lines": [
+   "decisions_reviewed=1",
+   "decision_keys="
+  ],
+  "footer_still_last": false,
+  "attested": true,
+  "other_fields_kept_in_order": true,
+  "mode": "0o644",
+  "stray_temp_files": []
+ }
+}
+{
+ "scenario": "l7-complete-keeps-pr-footer-candidate",
+ "passed": true,
+ "assertions": {
+  "complete_ok": true,
+  "verify_ok": true,
+  "attested": true,
+  "pr_footer_still_last": true,
+  "other_fields_kept_in_order": true,
+  "no_stray_temp_file": true,
+  "base_put_inventory_after_the_footer": true
+ },
+ "extra": {
+  "complete_exit": 0,
+  "verify_exit": 0,
+  "last_two_lines": [
+   "pr=https://github.com/example/repo/pull/1",
+   "pr_head=1111111111111111111111111111111111111111"
+  ],
+  "footer_still_last": true,
+  "attested": true,
+  "other_fields_kept_in_order": true,
+  "mode": "0o600",
+  "stray_temp_files": []
+ }
+}
+{
+ "scenario": "l8-done-scout-pane-not-provably-idle",
+ "passed": true,
+ "assertions": {
+  "done_scout_has_completed_task_row": true
+ },
+ "extra": {
+  "crew_state": "state: unknown \u00b7 source: pane \u00b7 harness state unavailable (unknown missing)",
+  "categories": [
+   "completed_task",
+   "silent_report"
+  ],
+  "ledger_complete": true,
+  "silent_report_evidence": "last heard: status=1794358989; inbox acknowledgement=None; resolved reply=None; excluded: done/ready task is covered by PR or completion handoff",
+  "coverage": []
+ }
+}
+SUMMARY {"l1-done-scout-owner-handoff": true, "l2-failed-scout-with-report": true, "l3-done-ship-candidate": true, "l4-captain-drop": true, "l5-unreadable-completion-status-isolated": true, "l6-done-scout-pane-gone": true, "l7-complete-keeps-pr-footer-base": true, "l7-complete-keeps-pr-footer-candidate": true, "l8-done-scout-pane-not-provably-idle": true}

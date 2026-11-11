@@ -1,0 +1,13 @@
+candidate_head=1a1fb7c6585d6f8ff34f4739bdd6bbc30245e77b
+candidate_tree=2e4577fdea1b1e69a59fefb18d23320212989620
+status_lines=0
+base_commit=30914c32900315bcab2c2999b977e33550967fd3 (git archive extract at /Users/charlesabrooker/tmp/fm-trees.dYAiaH/base)
+prefix_commit=eabb93a43796e85b5edc43e32da48f7264c17686 (tree just before the R1 isolation fix; git archive extract at /Users/charlesabrooker/tmp/fm-trees.dYAiaH/prefix)
+324b7af8092746e60a09c5f3eeee8639397a0f9ef072f6debbb1329c7548e43b  /Users/charlesabrooker/.no-mistakes/evidence/01M73WWY8ESTCS9VBM9A6W09X6/drive_loops.py
+Wed Nov 11 00:49:06 UTC 2026
+exit=0
+l7 added after the first six ran; driver hash now:
+fffe76e23d8533ae013398c29eedcc30d9ac1572cc083432e3899bad2be687f2  /Users/charlesabrooker/.no-mistakes/evidence/01M73WWY8ESTCS9VBM9A6W09X6/drive_loops.py
+scratch removed after runs: base/prefix trees, r2r3 driver scratch, probe
+l8 added last (candidate only; base/prefix slots unused); driver hash now:
+846a2b8aff73d4aae08da4d2899b559db24ba2d410e0a6de2aff1173f83c27c7  /Users/charlesabrooker/.no-mistakes/evidence/01M73WWY8ESTCS9VBM9A6W09X6/drive_loops.py

@@ -1,0 +1,7 @@
+candidate_head=c05cd84a7a418f4dbd0660fa87ebe1c4d25007fc
+candidate_tree=cdd5f96db3e6c8ceb9f2812c648fdc747db41c6a
+status_lines=0
+c9c2733260673e990918394a7af0d7f30b99a09ef33a2aecc285a8718bec48bb  /Users/charlesabrooker/.no-mistakes/evidence/01M73WWY8ESTCS9VBM9A6W09X6/head-c05cd84a7/drive_loops_adv.py
+driver_exit=0
+SUMMARY {"l9-closed-pane-owner-actions-keep-row": true, "l10-closed-pane-no-false-completion-rows": true, "l11-closed-pane-row-retires-at-teardown": true, "l12-done-line-under-other-live-states": false}
+base/prefix slots: git archive extracts of 30914c329 / eabb93a43 (adv4: unused, candidate path passed)

@@ -1,0 +1,12 @@
+{
+  "l13-owner-answer-after-done": {
+    "passed": false,
+    "assertions": {
+      "rows_before_answer": true,
+      "real_answer_delivered": false,
+      "answer_wrote_resolved_line": false,
+      "live_pane_keeps_an_owner_row_after_answer": true,
+      "closed_pane_keeps_an_owner_row_after_answer": true
+    }
+  }
+}

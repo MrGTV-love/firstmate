@@ -1,0 +1,48 @@
+{
+  "l9-closed-pane-owner-actions-keep-row": {
+    "passed": true,
+    "assertions": {
+      "windows_closed": true,
+      "closed_rows_before_owner": true,
+      "complete_none_ok": true,
+      "row_stays_after_complete_none_on_closed_pane": true,
+      "hold_complete_verify_ok": true,
+      "closed_pane_task_keeps_an_owner_row_after_held_transfer": true,
+      "live_pane_task_keeps_an_owner_row_after_held_transfer": true
+    }
+  },
+  "l10-closed-pane-no-false-completion-rows": {
+    "passed": true,
+    "assertions": {
+      "windows_closed": true,
+      "resumed_work_has_no_completed_task": true,
+      "resumed_work_is_a_missing_worker": true,
+      "paused_has_no_completed_task": true,
+      "dropped_has_no_completed_task": true,
+      "snapshot_records_pr": true,
+      "recorded_pr_has_no_completed_task": true,
+      "landed_ship_has_no_completed_task": true,
+      "unlanded_ship_keeps_completed_task": true,
+      "unlanded_ship_keeps_unlanded_commit": true
+    }
+  },
+  "l11-closed-pane-row-retires-at-teardown": {
+    "passed": true,
+    "assertions": {
+      "window_closed": true,
+      "row_present_with_closed_pane": true,
+      "teardown_refused_before_owner_complete": true,
+      "row_stays_after_refused_teardown": true,
+      "owner_complete_and_verify_ok": true,
+      "teardown_ok": true,
+      "no_rows_after_teardown": true
+    }
+  },
+  "l12-done-line-under-other-live-states": {
+    "passed": false,
+    "assertions": {
+      "resolved_line_after_done_live_pane_keeps_an_owner_row": false,
+      "resolved_line_after_done_closed_pane_keeps_an_owner_row": true
+    }
+  }
+}

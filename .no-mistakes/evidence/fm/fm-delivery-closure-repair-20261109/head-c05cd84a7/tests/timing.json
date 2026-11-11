@@ -1,0 +1,32 @@
+{
+  "families": [
+    {
+      "count": 1,
+      "duration_ms": 1724636,
+      "failed": 0,
+      "name": "pr-forge"
+    }
+  ],
+  "finished_at": "2026-11-11T03:31:10Z",
+  "run_id": "fm-test-run-1794366144572-88294",
+  "scripts": [
+    {
+      "cpu_ms": 1140480,
+      "duration_ms": 1724636,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "pr-forge",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-open-loops.test.sh"
+    }
+  ],
+  "selection": "scripts;jobs=1",
+  "started_at": "2026-11-11T03:02:24Z",
+  "summary": {
+    "duration_ms": 1726003,
+    "failed": 0,
+    "skipped_gate": 0,
+    "total": 1
+  }
+}
