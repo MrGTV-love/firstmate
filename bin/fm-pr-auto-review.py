@@ -41,10 +41,12 @@ without a usable report is never asked again for that head; the next eligible mo
 
 Reader models come from the single rule in config/crew-dispatch.json whose `when` starts with
 "Isolated independent quality review" (the rule bin/fm-review-agent-select.sh reads): its `use`
-entries in order, then its `fallback` entries. A model covers every uncovered family but its own;
-the model that covers most is taken (rule order breaks a tie), and a model of an uncovered family
-is never taken to cover that family. An unknown author family is never asked for: it is reported once
-per head as `author family unknown`.
+entries in order, then its `fallback` entries. A model covers every uncovered known family but its own
+and every unknown group whose plan `reader_outside` list leaves its family out; the model that covers
+most is taken (rule order breaks a tie), and a model of an uncovered family is never taken to cover that
+family. So an unrecorded pipeline family under the one-reader relief gets one read outside every ship
+family, and any other unknown group gets reads from two different known families, one at a time. Only an
+unknown group no known reader can count toward is held, once per head, as `author family unknown`.
 The review runner is a home setting, never a path in this script: FM_REVIEW_RUNNER, else the first
 non-comment line of config/review-runner. Unset, relative or not executable makes no request and records one
 `review runner unavailable: <why>` line per head.
@@ -404,15 +406,15 @@ def candidate_models(home):
     return tiers, ""
 
 
-def choose_reader(tiers, tried, owed):
-    """The first tier's model covering most owed families, rule order breaking a tie; None when none covers any."""
+def choose_reader(tiers, tried, needs):
+    """The first tier's model covering most owed needs (name -> families its reader must lie outside), rule order breaking a tie; None when none covers any."""
     for models in tiers:
         best = None
         for model_id in models:
             fam = family(model_id)
             if model_id in tried or fam == "unknown":
                 continue
-            covers = sorted(f for f in owed if f != fam)
+            covers = sorted(need for need, outside in needs.items() if fam not in outside)
             if covers and (best is None or len(covers) > len(best[1])):
                 best = (model_id, covers)
         if best:
@@ -869,13 +871,21 @@ def advance(home, task, url, meta, side):
         phase(side, sha, "held", why)
         emit(home, task, side, sha, f"plan:{why}", f"held: {why}", f"{why} at {sha[:12]}")
         return
-    owed = sorted({f for item in plan["uncovered"] for f in item["families"]})
-    if "unknown" in owed:
-        phase(side, sha, "held", "author family unknown")
-        emit(home, task, side, sha, "unknown-family", f"held: author family unknown at {sha[:12]}",
-             f"author family unknown at {sha[:12]}; no read can cover it, repair the author evidence or give the merge word")
+    needs, stuck = {}, []
+    for item in plan["uncovered"]:
+        for fam in item["families"]:
+            if fam != "unknown":
+                needs[fam] = {fam}
+            elif "reader_outside" in item:
+                needs[f"unknown:{item['group']}"] = set(item["reader_outside"])
+            else:
+                stuck.append(item["group"])
+    if stuck:
+        phase(side, sha, "held", f"author family unknown in {','.join(stuck)}")
+        emit(home, task, side, sha, "unknown-family", f"held: author family unknown in {','.join(stuck)} at {sha[:12]}",
+             f"author family unknown in {','.join(stuck)} at {sha[:12]}; no known reader can count toward it, repair the author evidence or give the merge word")
         return
-    if not owed:
+    if not needs:
         reason = "review record leaves nothing to read"
         phase(side, sha, "held", reason)
         emit(home, task, side, sha, "nothing-to-read", f"held: {reason} at {sha[:12]}",
@@ -888,11 +898,11 @@ def advance(home, task, url, meta, side):
              f"review runner unavailable: {why}; set FM_REVIEW_RUNNER or config/review-runner")
         return
     tiers, why = candidate_models(home)
-    pick = choose_reader(tiers, set(head["attempts"]), owed) if tiers else None
+    pick = choose_reader(tiers, set(head["attempts"]), needs) if tiers else None
     if not pick:
         if tiers:
             # Only an exhaustion of the eligible models ends the head; a config read that fails is retried.
-            why = f"no model outside {','.join(owed)} is left for {sha[:12]}"
+            why = f"no model left for {','.join(sorted(needs))} at {sha[:12]}"
             head["outcome"] = {"kind": "no-eligible-reader", "detail": why}
         phase(side, sha, "held", f"no eligible reader: {why}")
         emit(home, task, side, sha, f"no-eligible-reader:{why}", f"held: no eligible reader: {why}", f"no eligible reader at {sha[:12]}: {why}")

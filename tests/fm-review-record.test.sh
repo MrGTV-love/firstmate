@@ -556,14 +556,17 @@ test_plan_agrees_with_verify_for_an_unrecorded_pipeline_family() {
   # shellcheck disable=SC2016  # jq program; single quotes are intended.
   "$JQ_BIN" -e '.ok == true and (.groups | has("no-mistakes:unknown"))
     and ([.uncovered[] | select(.group == "no-mistakes:unknown") | .families] == [["unknown"]])
-    and ([.uncovered[] | select(.group == "ship") | .families] == [["openai"]])' <<<"$out" >/dev/null \
-    || fail "plan with no read must owe the unrecorded pipeline family and the ship family: $out"
+    and ([.uncovered[] | select(.group == "ship") | .families] == [["openai"]])
+    and ([.uncovered[] | select(.group == "no-mistakes:unknown") | .reader_outside] == [["openai"]])
+    and ([.uncovered[] | select(.group == "ship") | has("reader_outside")] == [false])' <<<"$out" >/dev/null \
+    || fail "plan with no read must owe the unrecorded pipeline family and the ship family, and ask for a reader outside every ship family: $out"
   # A reader of the ship family covers neither group: plan and verify must both refuse to call it covered.
   record_review "$case_dir" "$HEAD1" PASS gpt-5.2 \
     '{"ship":["gpt-5.1"],"no-mistakes:unknown":["unknown"]}' >/dev/null || fail "record same-family read"
   out=$(run_plan)
-  "$JQ_BIN" -e '[.uncovered[].group] | sort == ["no-mistakes:unknown","ship"]' <<<"$out" >/dev/null \
-    || fail "a reader of the ship family must leave both groups owed in plan: $out"
+  "$JQ_BIN" -e '([.uncovered[].group] | sort == ["no-mistakes:unknown","ship"])
+    and ([.uncovered[] | select(.group == "no-mistakes:unknown") | .reader_outside] == [["openai"]])' <<<"$out" >/dev/null \
+    || fail "a reader of the ship family must leave both groups owed in plan, the pipeline group still needing a reader outside it: $out"
   out=$(NM_HOME="$case_dir/absent-nm" FM_HOME="$case_dir/home" "$RECORD" verify --pr "$URL" \
     --head "$HEAD1" --task task-x1 --base "$BASE" --json) || rc=$?
   expect_code 1 "$rc" "verify must refuse the same state plan calls owed: $out"
@@ -583,7 +586,29 @@ test_plan_agrees_with_verify_for_an_unrecorded_pipeline_family() {
   expect_code 0 "$rc" "verify must accept the state plan calls covered: $out"
   "$JQ_BIN" -e '.facts == ["pipeline author family not recorded"]' <<<"$out" >/dev/null \
     || fail "verify keeps its disclosure of the unrecorded pipeline family: $out"
-  pass "plan applies the one-reader relief for an unrecorded pipeline family exactly as verify does, and verify keeps its disclosure"
+  # An unknown ship author keeps the two-reader rule: plan asks for any known reader, then one outside the first.
+  case_dir=$(make_case plan-unknown-two-readers mystery-9)
+  run_plan() {
+    NM_HOME="$NM_FIXTURE" FM_HOME="$case_dir/home" "$RECORD" plan --pr "$URL" --head "$HEAD1" \
+      --task task-x1 --base "$BASE" "$@"
+  }
+  out=$(run_plan)
+  "$JQ_BIN" -e '.uncovered == [{"group":"ship","families":["unknown"],"reader_outside":[]}]' <<<"$out" >/dev/null \
+    || fail "plan must let any known reader count first toward an unknown ship author: $out"
+  record_review "$case_dir" "$HEAD1" PASS sonnet '{"ship":["mystery-9"]}' >/dev/null || fail "record first-family read"
+  out=$(run_plan)
+  "$JQ_BIN" -e '.uncovered == [{"group":"ship","families":["unknown"],"reader_outside":["anthropic"]}]' <<<"$out" >/dev/null \
+    || fail "plan must ask for a second known family outside the first: $out"
+  rc=0
+  out=$(run_verify "$case_dir" "$HEAD1" --review-only --json) || rc=$?
+  expect_code 1 "$rc" "verify must refuse the one-family state plan calls owed: $out"
+  record_review "$case_dir" "$HEAD1" PASS gpt-5.1 '{"ship":["mystery-9"]}' >/dev/null || fail "record second-family read"
+  out=$(run_plan)
+  "$JQ_BIN" -e '.uncovered == []' <<<"$out" >/dev/null || fail "two known reader families must leave nothing owed: $out"
+  rc=0
+  out=$(run_verify "$case_dir" "$HEAD1" --review-only --json) || rc=$?
+  expect_code 0 "$rc" "verify must accept the state plan calls covered: $out"
+  pass "plan applies the one-reader relief for an unrecorded pipeline family and the two-reader rule for any other unknown group exactly as verify does, names the families a reader must lie outside, and verify keeps its disclosure"
 }
 
 fm_test_run_cases \

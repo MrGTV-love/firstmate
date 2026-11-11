@@ -2682,17 +2682,27 @@ test_auto_review_chooses_readers_by_author_family() {
   cp "$case_dir/dispatch.json" "$case_dir/home/config/crew-dispatch.json"
   auto_step "$case_dir"; auto_wait "$case_dir"
   expect_code 1 "$(auto_calls "$case_dir")" "fam-config: a repaired config must be read on the same head"
-  # Unknown author family: nothing can cover it, so no read, and one report.
+  # Unknown ship author family: the verifier counts two different known reader families, so two reads, one at a time.
   case_dir=$(auto_case fam-unknown mystery-9)
-  auto_step "$case_dir"; auto_step "$case_dir"; auto_step "$case_dir"
-  expect_code 0 "$(auto_calls "$case_dir")" "fam-unknown: a read was requested for an unknown author family"
-  expect_code 1 "$(auto_notes "$case_dir" 'held: author family unknown')" "fam-unknown: reported once per head"
-  # Repairing the author evidence lets the same head go on without a push.
-  sed -i.bak 's/^model=.*/model=gpt-5.1-codex/' "$case_dir/state/task-x1.meta"
   auto_step "$case_dir"; auto_wait "$case_dir"
-  expect_code 1 "$(auto_calls "$case_dir")" "fam-unknown: a repaired author family must be read on the same head"
-  auto_dump "$case_dir" "G2 unknown author family"
-  pass "readers differ from the family they cover, mixed heads use the complementary pair or one third-family reader, unknown and same-family gaps request nothing"
+  expect_code "$AUTO_TERRA" "$(auto_runner_models "$case_dir")" "fam-unknown: the first known reader is read"
+  expect_code 0 "$(auto_merges "$case_dir")" "fam-unknown: one known reader family must not merge an unknown author family"
+  auto_step "$case_dir"; auto_wait "$case_dir"
+  expect_code "$AUTO_TERRA,$AUTO_SONNET" "$(auto_runner_models "$case_dir")" "fam-unknown: the second read comes from a different known family"
+  auto_step "$case_dir"; auto_step "$case_dir"
+  expect_code 2 "$(auto_calls "$case_dir")" "fam-unknown: no third read"
+  expect_code 1 "$(auto_merges "$case_dir")" "fam-unknown: two known reader families must merge once"
+  expect_code 0 "$(auto_notes "$case_dir" 'held: author family unknown')" "fam-unknown: a coverable unknown family must not be held"
+  auto_dump "$case_dir" "G2 unknown ship author family (two known reader families)"
+  # Unrecorded pipeline family (no state database, mode no-mistakes) under a known ship family: one read outside every ship family.
+  case_dir=$(auto_case fam-pipeline-absent)
+  rm -f "$case_dir/user-home/.no-mistakes/state.sqlite"
+  auto_step "$case_dir"; auto_wait "$case_dir"; auto_step "$case_dir"; auto_step "$case_dir"
+  expect_code "$AUTO_SONNET" "$(auto_runner_models "$case_dir")" "fam-pipeline-absent: one read from outside the OpenAI ship family"
+  expect_code 1 "$(auto_merges "$case_dir")" "fam-pipeline-absent: the relief PASS must merge once"
+  expect_code 0 "$(auto_notes "$case_dir" 'held: author family unknown')" "fam-pipeline-absent: must not be held for the captain's merge word"
+  auto_dump "$case_dir" "G2 unrecorded pipeline author family (one-reader relief)"
+  pass "readers differ from the family they cover, mixed heads use the complementary pair or one third-family reader, unknown families get the reads the verifier counts, and same-family gaps request nothing"
 }
 
 test_auto_review_switches_after_a_failed_read_and_never_retries_the_failed_model() {

@@ -154,7 +154,11 @@ or review: captain-word (plus the same fact line when applicable); a refusal pri
 plan prints one fm-review-plan.v1 object and decides nothing: the derived author groups of the exact head
 with each model's family, and every group family that the recorded exact-head PASS reads leave uncovered under
 the same coverage rule verify applies, including its one-reader relief for an unrecorded pipeline author family,
-whether or not any review or captain-word exists. It ignores a
+whether or not any review or captain-word exists. An uncovered item whose families include unknown
+also names reader_outside, the families a known reader must lie outside for its exact-head PASS of that
+group to count toward that rule: the known readers already counted, or with none counted every ship family
+under the one-reader relief and no family under the two-reader rule. An unknown item without reader_outside
+is one no known reader can count toward. It ignores a
 captain-word and a FAIL, so a caller that asks which reads are still owed (bin/fm-pr-auto-review.py) gets the
 families without parsing a refusal message, and it writes nothing. Failures carry the failure object and exit
 status verify uses.
@@ -539,6 +543,7 @@ def verify(records, rows, head, home, pr, task, base, review_only=False, plan=Fa
         return "OUTSIDE_SHIP_FAMILY_MODEL" if group == "no-mistakes:unknown" and pipeline_relief else "SECOND_KNOWN_FAMILY_MODEL"
 
     relief_used = []
+    unknown_outside = {}
 
     def with_facts(row):
         return {**row, "facts": ["pipeline author family not recorded"] if relief_used else []}
@@ -563,8 +568,11 @@ def verify(records, rows, head, home, pr, task, base, review_only=False, plan=Fa
         pipeline_read = group == "no-mistakes:unknown" and pipeline_relief and readers - ship_families
         if "unknown" in families and pipeline_read and len(readers) < 2:
             relief_used.append(group)
-        return sorted(f for f in families if (len(readers) < 2 and not pipeline_read
-                                              if f == "unknown" else not readers - {f}))
+        missing = sorted(f for f in families if (len(readers) < 2 and not pipeline_read
+                                                 if f == "unknown" else not readers - {f}))
+        if "unknown" in missing:
+            unknown_outside[group] = readers or (ship_families if group == "no-mistakes:unknown" and pipeline_relief else set())
+        return missing
 
     # A FAIL stands until later exact-head PASS reads cover every group it read.
     for index in ([] if plan else fails):
@@ -583,9 +591,15 @@ def verify(records, rows, head, home, pr, task, base, review_only=False, plan=Fa
     if at_word:
         return "captain-word", with_facts(word)
     if plan:
-        owed = [{"group": group, "families": missing}
-                for group, authors in sorted(groups.items(), key=lambda item: ("unknown" not in {a["family"] for a in item[1]}, item[0]))
-                for missing in [uncovered(group, authors, passes)] if missing]
+        owed = []
+        for group, authors in sorted(groups.items(), key=lambda item: ("unknown" not in {a["family"] for a in item[1]}, item[0])):
+            missing = uncovered(group, authors, passes)
+            if not missing:
+                continue
+            item = {"group": group, "families": missing}
+            if "unknown" in missing and RECORDED_FAMILIES - {"unknown"} - unknown_outside[group]:
+                item["reader_outside"] = sorted(unknown_outside[group])
+            owed.append(item)
         return "plan", {"groups": {group: [{"model": a["model"], "family": a["family"]} for a in authors]
                                   for group, authors in groups.items()}, "uncovered": owed}
     unknown_reader = model(review["reader_model"], "reader_model") == "unknown"
