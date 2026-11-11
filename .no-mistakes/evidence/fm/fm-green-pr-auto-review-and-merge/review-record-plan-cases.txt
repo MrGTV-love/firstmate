@@ -1,0 +1,2 @@
+ok - an unknown ship author family requires exact-head PASS reads from two known reader families
+ok - plan applies the one-reader relief for an unrecorded pipeline family and the two-reader rule for any other unknown group exactly as verify does, names the families a reader must lie outside, and verify keeps its disclosure

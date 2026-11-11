@@ -1,0 +1,8 @@
+ok - a green uncovered PR gets one read with its pack, a recorded PASS and one merge through fm-pr-merge.sh
+ok - readers differ from the family they cover, mixed heads use the complementary pair or one third-family reader, unknown families get the reads the verifier counts, and same-family gaps request nothing
+ok - a failed or exhausted reader is not retried, the next eligible model is used, none left records no eligible reader, and the model that actually ran is the one judged
+g6 FAKE reader, fake forge, real housekeeping pass with fm-pr-check.sh registration, record and merge scripts
+g6 P1 green+uncovered : state=merged https://github.com/example/repo/pull/9 merges=1 reviews=1
+g6 P2 green+FAIL      : state=fail report /Users/charlesabrooker/tmp/fm-pr-merge-tests.MBqXNm/auto-e2e-p2/state/.pr-auto-review/task-x1.d/3d9230a9deec-claude-sonnet-5-5_1m_/review.md merges=0 reviews=1 wake=1
+g6 P3 head moved      : state=merged https://github.com/example/repo/pull/9 merges=1 reviews=2 reads=2 merged-head=376d0628b4e5cc8be1ea88cddb16eb727e252c3a
+ok - three registered PRs run through the housekeeping pass: P1 merged, P2 FAIL not merged and owner told, P3 old PASS voided and new head merged once

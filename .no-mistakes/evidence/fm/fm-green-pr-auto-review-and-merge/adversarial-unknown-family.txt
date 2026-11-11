@@ -1,0 +1,61 @@
+  step -> state=[held: no eligible reader: no model left for openai,unknown:no-mistakes:unknown at a12f7e991d7d] reads=0 reviews=0 merges=0
+  step -> state=[held: no eligible reader: no model left for openai,unknown:no-mistakes:unknown at a12f7e991d7d] reads=0 reviews=0 merges=0
+  step -> state=[held: no eligible reader: no model left for openai,unknown:no-mistakes:unknown at a12f7e991d7d] reads=0 reviews=0 merges=0
+## ADV pipeline-absent, only ship-family readers configured
+  fake runner argv:
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1794428725 a12f7e991d7d held: no eligible reader: no model left for openai,unknown:no-mistakes:unknown at a12f7e991d7d
+  review records (state/review-records.jsonl):
+  forge merge calls (fake gh log):
+  current state: held: no eligible reader: no model left for openai,unknown:no-mistakes:unknown at a12f7e991d7d
+ok - pipeline-absent: only ship-family readers configured -> no read, no merge, one no-eligible-reader hold
+  step -> state=[reading 3db654f7e573 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[held: no eligible reader: no model left for unknown:ship at 3db654f7e573] reads=1 reviews=1 merges=0
+  step -> state=[held: no eligible reader: no model left for unknown:ship at 3db654f7e573] reads=1 reviews=1 merges=0
+  step -> state=[held: no eligible reader: no model left for unknown:ship at 3db654f7e573] reads=1 reviews=1 merges=0
+## ADV unknown ship author, two Anthropic readers configured
+  fake runner argv:
+    argv: <tmp>/auto-adv-unk-same/state/.pr-auto-review/task-x1.d/3db654f7e573-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|3db654f7e573e2bd4b7820ec814b49e32856ae56|pr.diff|<tmp>/auto-adv-unk-same/project|claude-sonnet-5-5[1m] contract=200 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1794428738 3db654f7e573 reading 3db654f7e573 by claude-sonnet-5-5[1m] for unknown:ship
+    1794428740 3db654f7e573 verdict recorded: PASS for 3db654f7e573 by claude-sonnet-5-5[1m], report <tmp>/auto-adv-unk-same/state/.pr-auto-review/task-x1.d/3db654f7e573-claude-sonnet-5-5_1m_/review.md
+    1794428743 3db654f7e573 held: no eligible reader: no model left for unknown:ship at 3db654f7e573
+  review records (state/review-records.jsonl):
+    {"verdict":"PASS","head":"3db654f7e573","reader_model":"claude-sonnet-5-5[1m]","reader_family":"anthropic","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
+  forge merge calls (fake gh log):
+  current state: held: no eligible reader: no model left for unknown:ship at 3db654f7e573
+ok - unknown ship author: a second reader of the first reader's family is never sent, nothing merges
+  step -> state=[reading 775c065741b4 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[reading 775c065741b4 by deepseek/deepseek-v4-flash] reads=2 reviews=0 merges=0
+  step -> state=[merged https://github.com/example/repo/pull/9] reads=2 reviews=1 merges=1
+  step -> state=[merged https://github.com/example/repo/pull/9] reads=2 reviews=1 merges=1
+## ADV pipeline-absent, first outside reader hits quota
+  fake runner argv:
+    argv: <tmp>/auto-adv-pa-quota/state/.pr-auto-review/task-x1.d/775c065741b4-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|775c065741b4c91cf4beb83095d6709ac402248f|pr.diff|<tmp>/auto-adv-pa-quota/project|claude-sonnet-5-5[1m] contract=200 ci=117 diff=205
+    argv: <tmp>/auto-adv-pa-quota/state/.pr-auto-review/task-x1.d/775c065741b4-deepseek_deepseek-v4-flash|https://github.com/example/repo/pull/9|775c065741b4c91cf4beb83095d6709ac402248f|pr.diff|<tmp>/auto-adv-pa-quota/project|deepseek/deepseek-v4-flash contract=200 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1794428748 775c065741b4 reading 775c065741b4 by claude-sonnet-5-5[1m] for openai,unknown:no-mistakes:unknown
+    1794428748 775c065741b4 read of 775c065741b4 by claude-sonnet-5-5[1m] failed: the runner exited 1 (usage limit reached)
+    1794428751 775c065741b4 reading 775c065741b4 by deepseek/deepseek-v4-flash for openai,unknown:no-mistakes:unknown
+    1794428752 775c065741b4 verdict recorded: PASS for 775c065741b4 by deepseek/deepseek-v4-flash, report <tmp>/auto-adv-pa-quota/state/.pr-auto-review/task-x1.d/775c065741b4-deepseek_deepseek-v4-flash/review.md
+    1794428762 775c065741b4 merged: https://github.com/example/repo/pull/9 at 775c065741b4
+  review records (state/review-records.jsonl):
+    {"verdict":"PASS","head":"775c065741b4","reader_model":"deepseek/deepseek-v4-flash","reader_family":"deepseek","covered_groups":["no-mistakes:unknown","ship"],"loosens":"no","widens":"no","data":"no"}
+  forge merge calls (fake gh log):
+    pr merge 9 --repo example/repo --match-head-commit 775c065741b4c91cf4beb83095d6709ac402248f --squash
+  current state: merged https://github.com/example/repo/pull/9
+ok - pipeline-absent: a quota failure switches to the next reader outside the ship family and merges once
+  step -> state=[reading f85397d9f629 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[fail report <tmp>/auto-adv-pa-fail/state/.pr-auto-review/task-x1.d/f85397d9f629-claude-sonnet-5-5_1m_/review.md] reads=1 reviews=1 merges=0
+  step -> state=[fail report <tmp>/auto-adv-pa-fail/state/.pr-auto-review/task-x1.d/f85397d9f629-claude-sonnet-5-5_1m_/review.md] reads=1 reviews=1 merges=0
+## ADV pipeline-absent, reader FAIL
+  fake runner argv:
+    argv: <tmp>/auto-adv-pa-fail/state/.pr-auto-review/task-x1.d/f85397d9f629-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|f85397d9f6290a69318c1a332d9a782fb5e90bb5|pr.diff|<tmp>/auto-adv-pa-fail/project|claude-sonnet-5-5[1m] contract=200 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1794428767 f85397d9f629 reading f85397d9f629 by claude-sonnet-5-5[1m] for openai,unknown:no-mistakes:unknown
+    1794428774 f85397d9f629 fail: f85397d9f629 read by claude-sonnet-5-5[1m], report <tmp>/auto-adv-pa-fail/state/.pr-auto-review/task-x1.d/f85397d9f629-claude-sonnet-5-5_1m_/review.md
+  review records (state/review-records.jsonl):
+    {"verdict":"FAIL","head":"f85397d9f629","reader_model":"claude-sonnet-5-5[1m]","reader_family":"anthropic","covered_groups":["no-mistakes:unknown","ship"],"loosens":"no","widens":"no","data":"no"}
+  forge merge calls (fake gh log):
+  current state: fail report <tmp>/auto-adv-pa-fail/state/.pr-auto-review/task-x1.d/f85397d9f629-claude-sonnet-5-5_1m_/review.md
+ok - pipeline-absent: a FAIL from the outside reader never merges and asks no second read
