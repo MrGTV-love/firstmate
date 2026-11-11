@@ -2797,6 +2797,7 @@ class IntakeTest(unittest.TestCase):
             self.assertFalse(self.wake_parts(line)['flag'])
 
     def test_a_value_that_is_part_of_the_fixed_wake_text_is_refused_at_arm_and_at_check(self):
+        """I4a (Amendment (br)): arm and check refuse such a value; the arm case with a run of the label is the one the review of b6879468 found missing (F1)."""
         for value in (plane.REQUEST_LABEL[1:30], plane.REQUEST_PREFIX[:-1], '; ' + plane.SECRET_FLAG, plane.REQUEST_UNACKNOWLEDGED[2:]):
             with self.subTest(value=value), patch.dict(os.environ, {'SLACK_SIGNING_SECRET': value}):
                 with self.assertRaisesRegex(SlackError, '^secret_collides_with_marker$'):
@@ -2813,9 +2814,18 @@ class IntakeTest(unittest.TestCase):
                      contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
                     code = plane.main(['check', '--replay', transcript])
                 self.assertEqual((code, expected in out.getvalue() + err.getvalue()), (1, True), (action, out.getvalue(), err.getvalue()))
-            # Arm prints none of the wake text (Main 3266: the check runs on what THAT command emits): a value in it does not stop arm.
+            # The adopted I4a (Amendment (br)): arm refuses a value that is part of the wake text too, because every check would refuse a plane armed with it
+            # (the review of b6879468, F1). The refusal comes before anything is written, and a clean value is not refused.
+            registered = Path(os.environ['FM_STATE_OVERRIDE']) / 'slack.check.sh'
+            for run_of_the_label in (plane.REQUEST_LABEL[:24], plane.REQUEST_LABEL[1:30], plane.REQUEST_PREFIX[:-1] + ' '):
+                out, err = io.StringIO(), io.StringIO()
+                with patch.dict(os.environ, {'FM_SLACK_CHECK_ACTION': 'arm', 'SLACK_SIGNING_SECRET': run_of_the_label}), \
+                     contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                    code = plane.main(['check', '--replay', transcript])
+                self.assertEqual((code, 'slack: refused: secret_collides_with_marker' in out.getvalue() + err.getvalue(), 'armed:' in out.getvalue(), registered.exists()),
+                                 (1, True, False, False), (run_of_the_label, out.getvalue(), err.getvalue()))
             out, err = io.StringIO(), io.StringIO()
-            with patch.dict(os.environ, {'FM_SLACK_CHECK_ACTION': 'arm', 'SLACK_SIGNING_SECRET': plane.REQUEST_LABEL[1:30]}), \
+            with patch.dict(os.environ, {'FM_SLACK_CHECK_ACTION': 'arm', 'SLACK_SIGNING_SECRET': 'unrelated-signing-value-24chars-b'}), \
                  contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
                 plane.main(['check', '--replay', transcript])
             self.assertNotIn('secret_collides_with_marker', out.getvalue() + err.getvalue())
@@ -3776,7 +3786,7 @@ class IntakeTest(unittest.TestCase):
 
     def test_resolve_and_disarm_check_only_what_they_print_and_a_value_in_the_listing_text_does_not_stop_them(self):
         """F4: the population of each command is its own constants. A value in the failed-row listing suffix stops the runs that print the listing and
-        wake lines, not resolve, disarm, arm or retarget; a value in a command's own confirmation stops that command."""
+        wake lines and arm (the adopted I4a), not resolve, disarm or retarget; a value in a command's own confirmation stops that command."""
         listing = ' not acknowledged (failed'
         confirmations = {'resolve': 'resolved: slack request ', 'disarm': 'disarmed: state/slack.check.sh', 'arm': 'armed: state/slack.check.sh',
                          'retarget': 'unchanged: FM_SLACK_DM_USER matches'}
@@ -3784,7 +3794,11 @@ class IntakeTest(unittest.TestCase):
             with self.assertRaisesRegex(SlackError, '^secret_collides_with_marker$'):
                 plane.refuse_a_value_that_the_marker_holds()
             for command, texts in plane.COMMAND_FIXED_TEXT.items():
-                plane.refuse_a_value_that_the_marker_holds(texts)
+                if command == 'arm':   # the one exception: the adopted I4a makes arm refuse a value in the wake or listing text (the review of b6879468, F1)
+                    with self.assertRaisesRegex(SlackError, '^secret_collides_with_marker$'):
+                        plane.refuse_a_value_that_the_marker_holds(texts)
+                else:
+                    plane.refuse_a_value_that_the_marker_holds(texts)
         for command, value in confirmations.items():
             with patch.dict(os.environ, {'SLACK_SIGNING_SECRET': value}):
                 with self.assertRaisesRegex(SlackError, '^secret_collides_with_marker$'):

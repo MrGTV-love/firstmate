@@ -244,7 +244,7 @@ SINK_WORD = '[redacted]'
 WAKE_FIXED_TEXT = (REQUEST_PREFIX, CHECK_EVENT_PREFIX, ' from ', REQUEST_UNACKNOWLEDGED, REQUEST_UNKNOWN, REQUEST_LABEL, '; ' + SECRET_FLAG, '; full: ', '; +', ' queued',
                    SECRET_MARKER, SECRET_FLAG, SINK_WORD, 'slack: request ', ' not acknowledged (failed, owner Main)', 'slack: request finished')
 # The constants each other command prints and nothing else of its own (Main 3266: the check runs on what THAT command emits): a plane value inside
-# one of them is refused at the start of that command only, so a collision in the wake or listing text never stops resolve, disarm, arm or retarget.
+# one of them is refused at the start of that command only, so a collision in the wake or listing text never stops resolve, disarm or retarget.
 COMMAND_FIXED_TEXT = {
     'arm': ('slack: refused: ', 'slack: refused: unsafe_state_path', 'slack: refused: unsafe_check_shim', 'slack: refused: check_registration_failed',
             'armed: state/slack.check.sh', SINK_WORD),
@@ -254,6 +254,9 @@ COMMAND_FIXED_TEXT = {
                  'retargeted: the old DM is no longer tracked; the DM of FM_SLACK_DM_USER is open and its starting point is recorded; the next poll takes in the requests sent after it',
                  'unchanged: FM_SLACK_DM_USER matches the DM already in use; nothing to retarget', SINK_WORD),
 }
+# ARM is the one exception, by the adopted I4a (Amendment (br), Main 2602: "arm or check" refuse a value that is part of the wake or listing text): a plane
+# armed with such a value would be refused by every check, so arm refuses it too, before it writes anything, besides its own constants.
+COMMAND_FIXED_TEXT['arm'] = WAKE_FIXED_TEXT + COMMAND_FIXED_TEXT['arm']
 # Every fixed text any command can print: the inventory test reads the print calls and holds this list complete.
 FIXED_WAKE_TEXT = WAKE_FIXED_TEXT + tuple(text for texts in COMMAND_FIXED_TEXT.values() for text in texts if text not in WAKE_FIXED_TEXT)
 
@@ -2432,7 +2435,7 @@ def main(argv, out=None):
         if action == 'check':
             watch.api.on_reply = lambda: note_progress(out)
         # A plane value that is part of a fixed text this command prints could never be replaced for good: refuse (the wake text for the runs that
-        # print wake lines, the command's own constants for arm and retarget).
+        # print wake lines, the wake text and arm's own constants for arm (the adopted I4a), the command's own constants for retarget).
         refuse_a_value_that_the_marker_holds(COMMAND_FIXED_TEXT.get(action, WAKE_FIXED_TEXT))
         if action == 'arm':
             # Only an explicit retarget may move the plane to a changed owner DM. The poll and the mirror look at the owner
