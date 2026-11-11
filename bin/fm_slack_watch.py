@@ -74,6 +74,7 @@ SLACK_TS = re.compile(r'[0-9]{1,12}\.[0-9]{1,9}')
 # wait is longer than this many messages (Slack's own advice is no more than 200 at a time).
 REQUEST_PAGE = 200
 REQUEST_PREFIX = 'check: slack request '
+CHECK_EVENT_PREFIX = 'fm-check-event '  # the event protocol of bin/fm-check-lib.sh: `fm-check-event <identity>` TAB <payload>, one text per event, printed under FM_CHECK_EVENT_OUTPUT=1
 # The one acknowledgement posted in a request's thread; it never repeats the request text.
 REQUEST_ACK = 'Request received. Firstmate has been notified; any change is confirmed in the terminal chat first.'
 # Sits before the text so that a cut can never remove it.
@@ -240,7 +241,7 @@ SINK_WORD = '[redacted]'
 # Every constant that a wake line, the failed-row listing or the record pointer carries: a plane value that is part of any of
 # them could never be replaced for good, so a run that prints wake lines (poll, mirror, check) refuses it at its start (F1 of Main 2602). The diagnostic
 # prefixes are not in this list: redact_sink protects them.
-WAKE_FIXED_TEXT = (REQUEST_PREFIX, ' from ', REQUEST_UNACKNOWLEDGED, REQUEST_UNKNOWN, REQUEST_LABEL, '; ' + SECRET_FLAG, '; full: ', '; +', ' queued',
+WAKE_FIXED_TEXT = (REQUEST_PREFIX, CHECK_EVENT_PREFIX, ' from ', REQUEST_UNACKNOWLEDGED, REQUEST_UNKNOWN, REQUEST_LABEL, '; ' + SECRET_FLAG, '; full: ', '; +', ' queued',
                    SECRET_MARKER, SECRET_FLAG, SINK_WORD, 'slack: request ', ' not acknowledged (failed, owner Main)', 'slack: request finished')
 # The constants each other command prints and nothing else of its own (Main 3266: the check runs on what THAT command emits): a plane value inside
 # one of them is refused at the start of that command only, so a collision in the wake or listing text never stops resolve, disarm, arm or retarget.
@@ -2234,6 +2235,14 @@ def segment_units(text):
     return found
 
 
+def request_text(text):
+    """Whether a printed text is a request wake line, also behind the event prefix of the check-event protocol (`fm-check-event <identity>` TAB payload):
+    the hold of settle_lines withholds every later request text, so an event text must count as one."""
+    if text.startswith(CHECK_EVENT_PREFIX):
+        text = text.split('\t', 1)[-1]
+    return text.startswith(REQUEST_PREFIX)
+
+
 def settle_lines(watch, texts):
     """The lines one call will print, made free of a plane value in the COMPLETE stream (what was already sent plus these lines, a newline after
     each): a hit that holds characters of a request's text (class 2: the join of a line with its queue marker or with its neighbour) is removed by
@@ -2265,7 +2274,7 @@ def settle_lines(watch, texts):
                 last = max((n for n, text in enumerate(lines) if starts[n] < b and starts[n] + len(text) + 1 > a), default=0)
                 held = last if held is None else min(held, last)
         if held is not None:
-            kept = [item for n, item in enumerate(items) if n < held or (n > held and not item[1].startswith(REQUEST_PREFIX))]
+            kept = [item for n, item in enumerate(items) if n < held or (n > held and not request_text(item[1]))]
             if len(kept) == len(items):
                 break
             items = kept
@@ -2290,6 +2299,34 @@ def settle_lines(watch, texts):
     return [], []
 
 
+def check_event_texts(watch, lines, chosen, left):
+    """The texts of FM_CHECK_EVENT_OUTPUT=1 for the chosen journal lines, in order: `fm-check-event `, the sha256 of the JOURNALED line (not of a batch, not of
+    the queue marker that changes from run to run), a tab, the wake line of that one line. The marker `; +N queued` (N = what is left behind) is on the last text only."""
+    texts = []
+    for n, index in enumerate(chosen):
+        count = left if n == len(chosen) - 1 else 0
+        line = watch.fit(lines[index], WAKE_LIMIT - len(queue_tail(count)))
+        texts.append('%s%s\t%s' % (CHECK_EVENT_PREFIX, hashlib.sha256(lines[index].encode()).hexdigest(), wake_line([line], count)))
+    return texts
+
+
+def event_plan(watch, lines, shown, queued):
+    """The plan of a check run under FM_CHECK_EVENT_OUTPUT=1 (the watcher sets it for an authenticated custom check): one text per selected journal line, each
+    its own check wake, through the same settle_lines as every other text. A hold (class 3) withholds the text it first touches and every later request text,
+    which stay journaled; the third value keeps the meaning it has for a poll (a line was withheld). The queue marker is never lost: it is recounted for what is
+    left behind and sits on the last text that is kept; when no text is kept, nothing is printed and the next run prints the lines with the marker it counts then."""
+    chosen, withheld = list(range(shown)), False
+    for _ in range(SETTLE_PASSES + 1):
+        texts, kept = settle_lines(watch, check_event_texts(watch, lines, chosen, queued + len(lines) - len(chosen)))
+        if len(kept) == len(chosen):
+            return texts, [lines[index] for index in chosen], withheld
+        withheld = True
+        if not kept:
+            break
+        chosen = [chosen[k] for k in kept]
+    return [], [], True
+
+
 def emit_plan(watch, command, bound):
     """What to print and which journal lines the print clears: ([text, ...], [journal line, ...], whether a line was withheld). Nothing is written."""
     lines = watch.deliverable(bound)
@@ -2302,6 +2339,8 @@ def emit_plan(watch, command, bound):
             shown -= 1
         if not lines:
             return [], [], False
+        if env_value('FM_CHECK_EVENT_OUTPUT') == '1':
+            return event_plan(watch, lines, shown, queued)
         while True:
             tail = queue_tail(queued + len(lines) - shown)
             chosen = lines[:shown]

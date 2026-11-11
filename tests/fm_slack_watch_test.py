@@ -55,6 +55,7 @@ import contextlib
 import copy
 import fcntl
 import glob
+import hashlib
 import io
 import itertools
 import json
@@ -1747,6 +1748,98 @@ class IntakeTest(unittest.TestCase):
             self.assertTrue(set(parts['text']) == {'a'} and 0 < len(parts['text']) < 700)
             self.assertEqual([row['ts'] for row in map(json.loads, (watch.root / 'requests.jsonl').read_text().split('\n')[:-1])],
                              ['200.000100', '200.000200'])
+
+    def event_text(self, line, queued=0):
+        """What FM_CHECK_EVENT_OUTPUT=1 prints for one selected journal line, in the format of the event protocol of bin/fm-check-lib.sh: `fm-check-event `, the
+        sha256 of the JOURNALED line (not of a batch or of the queue marker), a tab, then the wake line of that one line (the marker only on the last text)."""
+        return 'fm-check-event %s\t%s' % (hashlib.sha256(line.encode()).hexdigest(), plane.wake_line([line], queued))
+
+    def three_requests(self, watch, replay):
+        """Two short requests that fit one wake line together and a long one that does not: a check run selects the first two and leaves one behind the queue marker."""
+        self.say(replay, '200.000100', 'first request')
+        self.say(replay, '200.000200', 'second request')
+        self.say(replay, '200.000300', 'c' * 300)
+        watch.poll()
+        return list(watch.state['outbox'])
+
+    def test_event_output_prints_one_text_per_selected_line_with_the_marker_on_the_last_and_every_other_output_is_unchanged(self):
+        """The check-event behavior of PR 387 carried through the one writer: with FM_CHECK_EVENT_OUTPUT=1 a check run prints one text per selected journal line
+        (identity = sha256 of the journaled line), the queue marker on the last; without the variable, or with any other value, the output is the joined wake line
+        byte for byte; a poll prints its lines as it always did."""
+        for case, env in (('event', {'FM_CHECK_EVENT_OUTPUT': '1'}), ('unset', {}), ('zero', {'FM_CHECK_EVENT_OUTPUT': '0'}), ('empty', {'FM_CHECK_EVENT_OUTPUT': ''})):
+            with self.fixture(env=env) as (watch, replay):
+                lines = self.three_requests(watch, replay)
+                self.assertEqual(len(lines), 3)
+                out = io.StringIO()
+                with contextlib.redirect_stdout(out):
+                    plane.emit(watch, 'check')
+                if case == 'event':
+                    self.assertEqual(out.getvalue().splitlines(), [self.event_text(lines[0]), self.event_text(lines[1], 1)], case)
+                else:
+                    self.assertEqual(out.getvalue().splitlines(), [plane.wake_line(lines[:2], 1)], case)
+                self.assertEqual(watch.load_state()['outbox'], lines[2:], case)
+        with self.fixture(env={'FM_CHECK_EVENT_OUTPUT': '1'}) as (watch, replay):
+            lines = self.three_requests(watch, replay)
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                plane.emit(watch, 'poll')
+            self.assertEqual(out.getvalue().splitlines(), lines[:2] + [lines[2]])
+
+    def test_a_check_event_text_counts_as_a_request_line_for_a_hold_and_its_prefix_is_a_fixed_text(self):
+        line = 'check: slack request 200.000100 from U0TESTOWNER: [unverified data] "x"'
+        notice = 'check: slack 120.000100 - unmatched reply 120.000100'
+        self.assertTrue(plane.request_text(line) and plane.request_text(self.event_text(line)))
+        self.assertFalse(plane.request_text(notice) or plane.request_text(self.event_text(notice)))
+        self.assertEqual(plane.CHECK_EVENT_PREFIX, 'fm-check-event ')
+        self.assertIn(plane.CHECK_EVENT_PREFIX, plane.WAKE_FIXED_TEXT)
+
+    def test_event_output_withholds_the_later_text_of_a_hold_and_moves_the_marker_to_the_last_kept_text(self):
+        """A hit with no request-text character in the printed stream (class 3, Main 3197) withholds the text it first touches and every later request text, which
+        stay journaled. In event mode the flag of the plan keeps the meaning it has for a poll (a line was withheld), and the queue marker is never lost: it is
+        recounted for what is left behind and sits on the last text that is kept."""
+        with self.fixture(env={'FM_CHECK_EVENT_OUTPUT': '1'}) as (watch, replay):
+            lines = self.three_requests(watch, replay)
+        first, second = self.event_text(lines[0]), self.event_text(lines[1], 1)
+        # the closing quote of the first text, the line break, and the start of the second text (`fm-check-event ` and part of its identity): no character of any request text
+        value = first[-1:] + '\n' + second[:20]
+        with self.fixture(env={'FM_CHECK_EVENT_OUTPUT': '1', 'SLACK_SIGNING_SECRET': value}) as (watch, replay):
+            self.assertEqual(self.three_requests(watch, replay), lines)
+            # the plan: the second text is withheld, the marker counts the two lines left behind and moves to the first text
+            self.assertEqual(plane.emit_plan(watch, 'check', True), ([self.event_text(lines[0], 2)], [lines[0]], True))
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                plane.emit(watch, 'check')
+            self.assertNotIn(value, out.getvalue())
+            report = 'slack: transport failure: secret_collides_with_marker'
+            # the collision is reported once and the report joins the journal behind the lines that wait: three lines are left behind the first text
+            self.assertEqual(out.getvalue().splitlines(), [self.event_text(lines[0], 3)])
+            self.assertEqual(watch.load_state()['outbox'], lines[1:] + [report])
+            later = io.StringIO()
+            with contextlib.redirect_stdout(later):
+                plane.emit(watch, 'check')
+            self.assertEqual(later.getvalue().splitlines(), [self.event_text(lines[1], 2)])
+            self.assertEqual(watch.load_state()['outbox'], lines[2:] + [report])
+
+    def test_event_output_prints_nothing_when_a_hold_touches_the_first_text_and_the_next_run_prints_every_line_with_its_marker(self):
+        with self.fixture(env={'FM_CHECK_EVENT_OUTPUT': '1'}) as (watch, replay):
+            lines = self.three_requests(watch, replay)
+        value = self.event_text(lines[0])[:30]  # `fm-check-event ` and the first 15 characters of the identity: no character of any request text
+        with self.fixture(env={'FM_CHECK_EVENT_OUTPUT': '1', 'SLACK_SIGNING_SECRET': value}) as (watch, replay):
+            self.assertEqual(self.three_requests(watch, replay), lines)
+            self.assertEqual(plane.emit_plan(watch, 'check', True), ([], [], True))
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                plane.emit(watch, 'check')
+            self.assertEqual(out.getvalue(), '')
+            report = 'slack: transport failure: secret_collides_with_marker'
+            self.assertEqual(watch.load_state()['outbox'], lines + [report])
+            with patch.dict(os.environ, {'SLACK_SIGNING_SECRET': 'a-signing-value-that-is-in-no-printed-text'}):
+                later = io.StringIO()
+                with contextlib.redirect_stdout(later):
+                    plane.emit(watch, 'check')
+            # nothing was lost: the first two lines print now with a marker that counts the line and the report left behind
+            self.assertEqual(later.getvalue().splitlines(), [self.event_text(lines[0]), self.event_text(lines[1], 2)])
+            self.assertEqual(watch.load_state()['outbox'], lines[2:] + [report])
 
     def test_the_intake_needs_no_scope_or_method_outside_the_base_card_population(self):
         scopes = ('chat:write', 'im:write', 'im:history', 'reactions:read', 'reactions:write', 'users:read')
