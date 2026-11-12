@@ -1,0 +1,33 @@
+ref=5d960771fd10b49f9a97eea4e0d240c638d66ee6 kind=foreign-late rc=0
+ok - .omp watch extension: controlled foreign-late delivery preserves continuity and wake ownership
+--- lifecycle.log (extension-written) ---
+2026-11-12T21:24:00.034Z pid=37908 instance=1 event=generation-create generation=1 cause=factory-bind
+2026-11-12T21:24:00.034Z pid=37908 instance=1 event=generation-activate generation=1 cause=factory-bind
+2026-11-12T21:24:00.034Z pid=37908 instance=1 event=factory-bind generation=1
+2026-11-12T21:24:00.197Z pid=37908 instance=1 event=session_start generation=1 stopping=false
+2026-11-12T21:24:00.197Z pid=37908 instance=1 event=generation-activate generation=1 cause=session_start
+2026-11-12T21:24:00.614Z pid=37908 instance=1 event=actionable-close generation=1 predecessor=38183
+2026-11-12T21:24:00.615Z pid=37908 instance=1 event=restore-start generation=1 predecessor=38183
+2026-11-12T21:24:00.649Z pid=37908 instance=1 event=wake-delivery-start generation=1 predecessor=38183
+2026-11-12T21:24:00.677Z pid=37908 instance=1 event=session_shutdown generation=1
+2026-11-12T21:24:00.882Z pid=37908 instance=1 event=generation-stop generation=1
+2026-11-12T21:24:00.882Z pid=37908 instance=1 event=session_start generation=1 stopping=true
+2026-11-12T21:24:00.882Z pid=37908 instance=1 event=generation-create generation=2 cause=session_start
+2026-11-12T21:24:00.882Z pid=37908 instance=1 event=generation-activate generation=2 cause=session_start
+2026-11-12T21:24:00.889Z pid=37908 instance=1 event=restore-claim-wait generation=2 predecessor=38183
+2026-11-12T21:24:01.151Z pid=37908 instance=1 event=actionable-close generation=2 predecessor=39273
+2026-11-12T21:24:01.151Z pid=37908 instance=1 event=restore-start generation=2 predecessor=39273
+2026-11-12T21:24:01.169Z pid=37908 instance=1 event=wake-delivery-start generation=2 predecessor=39273
+2026-11-12T21:24:01.173Z pid=37908 instance=1 event=wake-delivery-settled generation=2 predecessor=39273
+2026-11-12T21:24:01.501Z pid=37908 instance=1 event=wake-delivery-settled generation=1 predecessor=38183
+2026-11-12T21:24:01.501Z pid=37908 instance=1 event=restore-start generation=2 predecessor=38183
+2026-11-12T21:24:01.501Z pid=37908 instance=1 event=restore-unchanged generation=2 predecessor=38183 reason=owned-child
+2026-11-12T21:24:01.501Z pid=37908 instance=1 event=wake-delivery-start generation=2 predecessor=38183
+2026-11-12T21:24:01.507Z pid=37908 instance=1 event=wake-delivery-settled generation=2 predecessor=38183
+
+arms:
+38183 
+38832 38183
+39273 38183
+39788 39273
+sends=3 failures=0

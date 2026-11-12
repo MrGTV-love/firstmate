@@ -1,0 +1,14 @@
+ref=99f53265372f437a457c087ff132b653d4c92eb9 kind=pending rc=1
+not ok - omp pending delivery (pending): file:///private/tmp/fmnm-life.leSZYP/tree/[eval1]:8
+Error: second actionable close has no extension-started successor while first delivery is pending
+--- lifecycle.log (extension-written) ---
+2026-11-12T21:22:50.504Z pid=88243 instance=1 event=generation-create generation=1 cause=factory-bind
+2026-11-12T21:22:50.505Z pid=88243 instance=1 event=generation-activate generation=1 cause=factory-bind
+2026-11-12T21:22:50.505Z pid=88243 instance=1 event=factory-bind generation=1
+2026-11-12T21:22:50.656Z pid=88243 instance=1 event=session_start generation=1 stopping=false
+2026-11-12T21:22:50.656Z pid=88243 instance=1 event=generation-activate generation=1 cause=session_start
+
+arms:
+88415 
+88546 88415
+sends=1 failures=0

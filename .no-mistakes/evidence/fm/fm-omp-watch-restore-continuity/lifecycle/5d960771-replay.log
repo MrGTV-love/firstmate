@@ -1,0 +1,33 @@
+ref=5d960771fd10b49f9a97eea4e0d240c638d66ee6 kind=replay rc=0
+ok - .omp watch extension: controlled replay delivery preserves continuity and wake ownership
+--- lifecycle.log (extension-written) ---
+2026-11-12T21:23:56.096Z pid=33488 instance=1 event=generation-create generation=1 cause=factory-bind
+2026-11-12T21:23:56.097Z pid=33488 instance=1 event=generation-activate generation=1 cause=factory-bind
+2026-11-12T21:23:56.097Z pid=33488 instance=1 event=factory-bind generation=1
+2026-11-12T21:23:56.247Z pid=33488 instance=1 event=session_start generation=1 stopping=false
+2026-11-12T21:23:56.247Z pid=33488 instance=1 event=generation-activate generation=1 cause=session_start
+2026-11-12T21:23:56.619Z pid=33488 instance=1 event=actionable-close generation=1 predecessor=33817
+2026-11-12T21:23:56.620Z pid=33488 instance=1 event=restore-start generation=1 predecessor=33817
+2026-11-12T21:23:56.648Z pid=33488 instance=1 event=wake-delivery-start generation=1 predecessor=33817
+2026-11-12T21:23:56.900Z pid=33488 instance=1 event=actionable-close generation=1 predecessor=34167
+2026-11-12T21:23:56.900Z pid=33488 instance=1 event=restore-start generation=1 predecessor=34167
+2026-11-12T21:23:56.933Z pid=33488 instance=1 event=wake-delivery-start generation=1 predecessor=34167
+2026-11-12T21:23:56.933Z pid=33488 instance=1 event=wake-delivery-settled generation=1 predecessor=34167
+2026-11-12T21:23:56.981Z pid=33488 instance=1 event=session_shutdown generation=1
+2026-11-12T21:23:57.184Z pid=33488 instance=1 event=generation-stop generation=1
+2026-11-12T21:23:57.185Z pid=33488 instance=1 event=session_start generation=1 stopping=true
+2026-11-12T21:23:57.185Z pid=33488 instance=1 event=generation-create generation=2 cause=session_start
+2026-11-12T21:23:57.185Z pid=33488 instance=1 event=generation-activate generation=2 cause=session_start
+2026-11-12T21:23:57.196Z pid=33488 instance=1 event=restore-claim-wait generation=2 predecessor=33817
+2026-11-12T21:23:57.197Z pid=33488 instance=1 event=wake-delivery-settled generation=1 predecessor=33817
+2026-11-12T21:23:57.197Z pid=33488 instance=1 event=restore-start generation=2 predecessor=33817
+2026-11-12T21:23:57.197Z pid=33488 instance=1 event=restore-unchanged generation=2 predecessor=33817 reason=owned-child
+2026-11-12T21:23:57.219Z pid=33488 instance=1 event=wake-delivery-start generation=2 predecessor=33817
+2026-11-12T21:23:57.222Z pid=33488 instance=1 event=wake-delivery-settled generation=2 predecessor=33817
+
+arms:
+33817 
+34167 33817
+34426 34167
+34689 33817
+sends=2 failures=0

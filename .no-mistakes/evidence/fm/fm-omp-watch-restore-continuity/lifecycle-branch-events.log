@@ -1,0 +1,48 @@
+Scratch-only instrumentation: case 'control' = sendUserMessage always returns undefined (omp sync shape). Lifecycle log printed at end of each case (event names + fields only).
+===== ref=99f53265 kind=control rc=0
+ok - .omp watch extension: controlled control delivery preserves continuity and wake ownership
+===== ref=99f53265 kind=pending rc=1
+not ok - omp pending delivery (pending): --- lifecycle.log ---
+2026-11-12T21:21:56.118Z pid=28619 instance=1 event=generation-create generation=1 cause=factory-bind
+2026-11-12T21:21:56.119Z pid=28619 instance=1 event=generation-activate generation=1 cause=factory-bind
+2026-11-12T21:21:56.119Z pid=28619 instance=1 event=factory-bind generation=1
+2026-11-12T21:21:56.265Z pid=28619 instance=1 event=session_start generation=1 stopping=false
+2026-11-12T21:21:56.265Z pid=28619 instance=1 event=generation-activate generation=1 cause=session_start
+
+file:///private/tmp/fmnm-life.3nU7XU/tree/[eval1]:8
+  if (!predicate()) throw new Error(failure);
+                          ^
+
+Error: second actionable close has no extension-started successor while first delivery is pending
+    at until (file:///private/tmp/fmnm-life.3nU7XU/tree/[eval1]:8:27)
+    at async file:///private/tmp/fmnm-life.3nU7XU/tree/[eval1]:47:5
+
+Node.js v26.11.1: expected exit 0, got 1
+===== ref=99f53265 kind=foreign-never rc=1
+not ok - omp pending delivery (foreign-never): --- lifecycle.log ---
+2026-11-12T21:22:09.187Z pid=48738 instance=1 event=generation-create generation=1 cause=factory-bind
+2026-11-12T21:22:09.189Z pid=48738 instance=1 event=generation-activate generation=1 cause=factory-bind
+2026-11-12T21:22:09.189Z pid=48738 instance=1 event=factory-bind generation=1
+2026-11-12T21:22:09.350Z pid=48738 instance=1 event=session_start generation=1 stopping=false
+2026-11-12T21:22:09.350Z pid=48738 instance=1 event=generation-activate generation=1 cause=session_start
+2026-11-12T21:22:09.619Z pid=48738 instance=1 event=session_shutdown generation=1
+2026-11-12T21:22:09.857Z pid=48738 instance=1 event=generation-stop generation=1
+2026-11-12T21:22:09.858Z pid=48738 instance=1 event=session_start generation=1 stopping=true
+2026-11-12T21:22:09.858Z pid=48738 instance=1 event=generation-create generation=2 cause=session_start
+2026-11-12T21:22:09.858Z pid=48738 instance=1 event=generation-activate generation=2 cause=session_start
+
+file:///private/tmp/fmnm-life.HYHfWR/tree/[eval1]:8
+  if (!predicate()) throw new Error(failure);
+                          ^
+
+Error: replacement close has no extension-started successor while an earlier generation's claim is pending
+    at until (file:///private/tmp/fmnm-life.HYHfWR/tree/[eval1]:8:27)
+    at async file:///private/tmp/fmnm-life.HYHfWR/tree/[eval1]:39:5
+
+Node.js v26.11.1: expected exit 0, got 1
+===== ref=5d960771 kind=control rc=0
+ok - .omp watch extension: controlled control delivery preserves continuity and wake ownership
+===== ref=5d960771 kind=pending rc=0
+ok - .omp watch extension: controlled pending delivery preserves continuity and wake ownership
+===== ref=5d960771 kind=foreign-never rc=0
+ok - .omp watch extension: controlled foreign-never delivery preserves continuity and wake ownership

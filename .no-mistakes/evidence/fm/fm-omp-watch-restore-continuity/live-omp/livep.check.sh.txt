@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+for f in "/Users/charlesabrooker/tmp/fm-lab.Q1AgbY/livefire"/fire-*; do
+  [ -e "$f" ] || continue
+  n=${f##*/}
+  rm -f -- "$f"
+  printf 'fm-check-event %s\tlab validation wake %s; acknowledge it only, no other action is needed\n' "$n" "$n"
+done

@@ -1,0 +1,14 @@
+ref=99f53265372f437a457c087ff132b653d4c92eb9 kind=replay rc=1
+not ok - omp pending delivery (replay): file:///private/tmp/fmnm-life.va026e/tree/[eval1]:8
+Error: second actionable close has no extension-started successor while first delivery is pending
+--- lifecycle.log (extension-written) ---
+2026-11-12T21:23:07.164Z pid=1167 instance=1 event=generation-create generation=1 cause=factory-bind
+2026-11-12T21:23:07.165Z pid=1167 instance=1 event=generation-activate generation=1 cause=factory-bind
+2026-11-12T21:23:07.165Z pid=1167 instance=1 event=factory-bind generation=1
+2026-11-12T21:23:07.318Z pid=1167 instance=1 event=session_start generation=1 stopping=false
+2026-11-12T21:23:07.318Z pid=1167 instance=1 event=generation-activate generation=1 cause=session_start
+
+arms:
+1552 
+2370 1552
+sends=1 failures=0

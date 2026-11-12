@@ -1,0 +1,20 @@
+ref=99f53265372f437a457c087ff132b653d4c92eb9 kind=foreign-never rc=1
+not ok - omp pending delivery (foreign-never): file:///private/tmp/fmnm-life.0U9QrW/tree/[eval1]:8
+Error: replacement close has no extension-started successor while an earlier generation's claim is pending
+--- lifecycle.log (extension-written) ---
+2026-11-12T21:23:31.834Z pid=25889 instance=1 event=generation-create generation=1 cause=factory-bind
+2026-11-12T21:23:31.834Z pid=25889 instance=1 event=generation-activate generation=1 cause=factory-bind
+2026-11-12T21:23:31.835Z pid=25889 instance=1 event=factory-bind generation=1
+2026-11-12T21:23:32.011Z pid=25889 instance=1 event=session_start generation=1 stopping=false
+2026-11-12T21:23:32.011Z pid=25889 instance=1 event=generation-activate generation=1 cause=session_start
+2026-11-12T21:23:32.488Z pid=25889 instance=1 event=session_shutdown generation=1
+2026-11-12T21:23:32.709Z pid=25889 instance=1 event=generation-stop generation=1
+2026-11-12T21:23:32.710Z pid=25889 instance=1 event=session_start generation=1 stopping=true
+2026-11-12T21:23:32.710Z pid=25889 instance=1 event=generation-create generation=2 cause=session_start
+2026-11-12T21:23:32.710Z pid=25889 instance=1 event=generation-activate generation=2 cause=session_start
+
+arms:
+25966 
+26012 25966
+26169 25966
+sends=1 failures=0

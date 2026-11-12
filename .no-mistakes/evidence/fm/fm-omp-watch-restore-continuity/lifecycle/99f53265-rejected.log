@@ -1,0 +1,13 @@
+ref=99f53265372f437a457c087ff132b653d4c92eb9 kind=rejected rc=0
+ok - .omp watch extension: controlled rejected delivery preserves continuity and wake ownership
+--- lifecycle.log (extension-written) ---
+2026-11-12T21:23:02.836Z pid=95476 instance=1 event=generation-create generation=1 cause=factory-bind
+2026-11-12T21:23:02.837Z pid=95476 instance=1 event=generation-activate generation=1 cause=factory-bind
+2026-11-12T21:23:02.837Z pid=95476 instance=1 event=factory-bind generation=1
+2026-11-12T21:23:02.983Z pid=95476 instance=1 event=session_start generation=1 stopping=false
+2026-11-12T21:23:02.983Z pid=95476 instance=1 event=generation-activate generation=1 cause=session_start
+
+arms:
+95876 
+96478 95876
+sends=2 failures=1

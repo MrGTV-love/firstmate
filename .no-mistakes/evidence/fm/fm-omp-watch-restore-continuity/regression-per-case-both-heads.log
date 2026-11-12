@@ -1,0 +1,11 @@
+Per-case run. Extension from base 99f53265 vs head 5d960771; test file from head with the case list narrowed to one kind (scratch trees only).
+ref=99f53265 kind=pending rc=1 :: not ok - omp pending delivery (pending): file:///private/tmp/fmnm-case.nRCqal/tree/[eval1]:8 Error: second actionable close has no extension-started successor while first delivery is pending 
+ref=99f53265 kind=rejected rc=0 :: ok - .omp watch extension: controlled rejected delivery preserves continuity and wake ownership 
+ref=99f53265 kind=replay rc=1 :: not ok - omp pending delivery (replay): file:///private/tmp/fmnm-case.snCxTR/tree/[eval1]:8 Error: second actionable close has no extension-started successor while first delivery is pending 
+ref=99f53265 kind=foreign-late rc=1 :: not ok - omp pending delivery (foreign-late): file:///private/tmp/fmnm-case.2dhIQG/tree/[eval1]:8 Error: replacement close has no extension-started successor while an earlier generation's claim is pending 
+ref=99f53265 kind=foreign-never rc=1 :: not ok - omp pending delivery (foreign-never): file:///private/tmp/fmnm-case.cTNf7K/tree/[eval1]:8 Error: replacement close has no extension-started successor while an earlier generation's claim is pending 
+ref=5d960771 kind=pending rc=0 :: ok - .omp watch extension: controlled pending delivery preserves continuity and wake ownership 
+ref=5d960771 kind=rejected rc=0 :: ok - .omp watch extension: controlled rejected delivery preserves continuity and wake ownership 
+ref=5d960771 kind=replay rc=0 :: ok - .omp watch extension: controlled replay delivery preserves continuity and wake ownership 
+ref=5d960771 kind=foreign-late rc=0 :: ok - .omp watch extension: controlled foreign-late delivery preserves continuity and wake ownership 
+ref=5d960771 kind=foreign-never rc=0 :: ok - .omp watch extension: controlled foreign-never delivery preserves continuity and wake ownership 

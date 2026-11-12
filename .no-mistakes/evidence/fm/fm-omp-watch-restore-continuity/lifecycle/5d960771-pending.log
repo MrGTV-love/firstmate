@@ -1,0 +1,22 @@
+ref=5d960771fd10b49f9a97eea4e0d240c638d66ee6 kind=pending rc=0
+ok - .omp watch extension: controlled pending delivery preserves continuity and wake ownership
+--- lifecycle.log (extension-written) ---
+2026-11-12T21:23:47.908Z pid=30031 instance=1 event=generation-create generation=1 cause=factory-bind
+2026-11-12T21:23:47.909Z pid=30031 instance=1 event=generation-activate generation=1 cause=factory-bind
+2026-11-12T21:23:47.909Z pid=30031 instance=1 event=factory-bind generation=1
+2026-11-12T21:23:48.097Z pid=30031 instance=1 event=session_start generation=1 stopping=false
+2026-11-12T21:23:48.098Z pid=30031 instance=1 event=generation-activate generation=1 cause=session_start
+2026-11-12T21:23:48.509Z pid=30031 instance=1 event=actionable-close generation=1 predecessor=30072
+2026-11-12T21:23:48.510Z pid=30031 instance=1 event=restore-start generation=1 predecessor=30072
+2026-11-12T21:23:48.555Z pid=30031 instance=1 event=wake-delivery-start generation=1 predecessor=30072
+2026-11-12T21:23:48.810Z pid=30031 instance=1 event=actionable-close generation=1 predecessor=30121
+2026-11-12T21:23:48.810Z pid=30031 instance=1 event=restore-start generation=1 predecessor=30121
+2026-11-12T21:23:48.848Z pid=30031 instance=1 event=wake-delivery-start generation=1 predecessor=30121
+2026-11-12T21:23:48.848Z pid=30031 instance=1 event=wake-delivery-settled generation=1 predecessor=30121
+2026-11-12T21:23:48.893Z pid=30031 instance=1 event=wake-delivery-settled generation=1 predecessor=30072
+
+arms:
+30072 
+30121 30072
+30173 30121
+sends=1 failures=0

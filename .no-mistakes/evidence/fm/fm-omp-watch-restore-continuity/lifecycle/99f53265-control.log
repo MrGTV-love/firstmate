@@ -1,0 +1,14 @@
+ref=99f53265372f437a457c087ff132b653d4c92eb9 kind=control rc=0
+ok - .omp watch extension: controlled control delivery preserves continuity and wake ownership
+--- lifecycle.log (extension-written) ---
+2026-11-12T21:22:47.027Z pid=86180 instance=1 event=generation-create generation=1 cause=factory-bind
+2026-11-12T21:22:47.028Z pid=86180 instance=1 event=generation-activate generation=1 cause=factory-bind
+2026-11-12T21:22:47.028Z pid=86180 instance=1 event=factory-bind generation=1
+2026-11-12T21:22:47.174Z pid=86180 instance=1 event=session_start generation=1 stopping=false
+2026-11-12T21:22:47.174Z pid=86180 instance=1 event=generation-activate generation=1 cause=session_start
+
+arms:
+86340 
+86598 86340
+86754 86598
+sends=1 failures=0

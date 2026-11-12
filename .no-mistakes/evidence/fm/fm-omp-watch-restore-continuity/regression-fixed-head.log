@@ -1,5 +1,6 @@
-head=570d87d8280138d5b4142a8b1e1b829ea70d07b5
-OMP_API_BILLING=unset
+head=5d960771fd10b49f9a97eea4e0d240c638d66ee6
+OMP_API_BILLING=<unset in caller> (env -i run: unset)
+cmd: env -i HOME=/tmp/fmnm-test.hWY0h2/home TMPDIR=/tmp/fmnm-test.hWY0h2/tmp PATH=<node,bin> FM_TEST_ONLY=test_watch_extension_restores_while_delivery_pending bash tests/fm-omp-harness.test.sh
 ok - .omp watch extension: controlled pending delivery preserves continuity and wake ownership
 ok - .omp watch extension: controlled rejected delivery preserves continuity and wake ownership
 ok - .omp watch extension: controlled replay delivery preserves continuity and wake ownership

@@ -1,0 +1,19 @@
+2026-11-12T21:25:09.806Z pid=1809 instance=1 event=generation-create generation=1 cause=factory-bind
+2026-11-12T21:25:09.806Z pid=1809 instance=1 event=generation-activate generation=1 cause=factory-bind
+2026-11-12T21:25:09.806Z pid=1809 instance=1 event=factory-bind generation=1
+2026-11-12T21:25:10.281Z pid=1809 instance=1 event=session_start generation=1 stopping=false
+2026-11-12T21:25:10.281Z pid=1809 instance=1 event=generation-activate generation=1 cause=session_start
+2026-11-12T21:28:06.774Z pid=1809 instance=1 event=actionable-close generation=1 predecessor=30437
+2026-11-12T21:28:06.774Z pid=1809 instance=1 event=restore-start generation=1 predecessor=30437
+2026-11-12T21:28:07.795Z pid=1809 instance=1 event=actionable-close generation=1 predecessor=45578
+2026-11-12T21:28:07.795Z pid=1809 instance=1 event=restore-skipped generation=1 predecessor=45578 reason=restoring
+2026-11-12T21:28:09.110Z pid=1809 instance=1 event=wake-delivery-start generation=1 predecessor=30437
+2026-11-12T21:28:09.222Z pid=1809 instance=1 event=restore-start generation=1 predecessor=45578
+2026-11-12T21:28:09.222Z pid=1809 instance=1 event=restore-unchanged generation=1 predecessor=45578 reason=owned-child
+2026-11-12T21:28:09.222Z pid=1809 instance=1 event=wake-delivery-start generation=1 predecessor=45578
+2026-11-12T21:28:09.322Z pid=1809 instance=1 event=wake-delivery-settled generation=1 predecessor=45578
+2026-11-12T21:28:09.325Z pid=1809 instance=1 event=wake-delivery-settled generation=1 predecessor=30437
+2026-11-12T21:33:09.288Z pid=1809 instance=1 event=actionable-close generation=1 predecessor=47134
+2026-11-12T21:33:09.288Z pid=1809 instance=1 event=restore-start generation=1 predecessor=47134
+2026-11-12T21:33:10.390Z pid=1809 instance=1 event=wake-delivery-start generation=1 predecessor=47134
+2026-11-12T21:33:10.552Z pid=1809 instance=1 event=wake-delivery-settled generation=1 predecessor=47134

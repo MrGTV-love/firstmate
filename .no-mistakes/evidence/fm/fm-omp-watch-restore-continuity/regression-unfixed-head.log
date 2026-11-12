@@ -1,0 +1,12 @@
+unfixed extension from base=99f53265372f437a457c087ff132b653d4c92eb9; test file from head=5d960771fd10b49f9a97eea4e0d240c638d66ee6 (scratch tree, not a git checkout)
+OMP_API_BILLING unset (env -i)
+not ok - omp pending delivery (pending): file:///private/tmp/fmnm-base.TmuMO3/tree/[eval1]:8
+  if (!predicate()) throw new Error(failure);
+                          ^
+
+Error: second actionable close has no extension-started successor while first delivery is pending
+    at until (file:///private/tmp/fmnm-base.TmuMO3/tree/[eval1]:8:27)
+    at async file:///private/tmp/fmnm-base.TmuMO3/tree/[eval1]:47:5
+
+Node.js v26.11.1: expected exit 0, got 1
+exit=1

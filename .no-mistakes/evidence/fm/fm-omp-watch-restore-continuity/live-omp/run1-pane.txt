@@ -1,0 +1,250 @@
+│ ├─ ☑ Reconcile startup and operational home                                                                                                                                                          │
+│ ├─ ☐ Calibrate memory alarm from healthy readings                                                                                                                                                    │
+│ ├─ ☐ Restore open-loop ledger source and reconcile                                                                                                                                                   │
+│ └─ ☐ Acknowledge handled wake generation                                                                                                                                                             │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ Reviewing creation docs
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ bin/fm-tasks-axi.sh --help                                                                                                                                                                         │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ … (82 earlier lines, showing 10 of 92) ⟦⌃O: Expand⟧                                                                                                                                                  │
+│ new item also appends one task.filed record, and a `done`/`close` that passed                                                                                                                        │
+│ the proof check above and moved a row to Done appends one task.closed record                                                                                                                         │
+│ (bin/fm-backlog-transition-lib.sh, which writes a repeat of a close once). The                                                                                                                       │
+│ command's stdout and exit status stay tasks-axi's own (stderr carries only the                                                                                                                       │
+│ `unblocked:`/`actionable:` lines above and tasks-axi's own diagnostics); an add that                                                                                                                 │
+│ found the id already present (tasks-axi reports `already`) writes nothing, and                                                                                                                       │
+│ a failed ledger write costs one stderr line. While config/fleet-ledger is                                                                                                                            │
+│ absent the command runs as before.                                                                                                                                                                   │
+│ Otherwise the exit status is tasks-axi's own, unless decoding a read fails;                                                                                                                          │
+│ in that case the decoder's nonzero status is returned.                                                                                                                                               │
+│ ⟦Wall: 0.06s | Timeout: 30s⟧                                                                                                                                                                         │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ cd ~/tmp/fm-lab.Q1AgbY && tasks-axi --help                                                                                                                                                         │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ … (6 earlier lines, showing 10 of 16) ⟦⌃O: Expand⟧                                                                                                                                                   │
+│   tasks-axi                                                                                                                                                                                          │
+│   tasks-axi add homemux-h7 "owns HomeMux end to end" --kind secondmate --start                                                                                                                       │
+│   tasks-axi list --state queued                                                                                                                                                                      │
+│   tasks-axi show homemux-h7 --full                                                                                                                                                                   │
+│   tasks-axi done sm-idle-handoff-q8 --pr https://github.com/o/r/pull/42                                                                                                                              │
+│   tasks-axi block fm-x --by treehouse-lease-t4                                                                                                                                                       │
+│   tasks-axi hold fm-x --reason "captain decision pending" --kind captain                                                                                                                             │
+│   tasks-axi ready                                                                                                                                                                                    │
+│   tasks-axi public-followup ready --json                                                                                                                                                             │
+│   tasks-axi setup hooks                                                                                                                                                                              │
+│ ⟦Wall: 0.10s | Timeout: 30s⟧                                                                                                                                                                         │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭─── • Read artifact://4:raw:1-1 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│  1 {"schema": "fm-memory-reading.v1", "checked_at": "2026-11-12T21:28:55.917833+00:00", "platform": "darwin", "host": "GTT-CB.local", "fixture": null, "errors": [], "total_bytes": 34359738368,     │
+│    "pressure_level": 1, "swap_total_bytes": 4294967296, "swap_used_bytes": 3284014202, "swap_free_bytes": 1010953093, "page_size_bytes": 16384, "unused_bytes": 382189568, "available_bytes":        │
+│    3764092928, "anonymous_bytes": 14068809728, "compressor_bytes": 4423565312, "runs": {"no-mistakes:eded895c05cf/01M78SWXCCR94VMNBRT8JTX3B7": {"rss_bytes": 890683392, "processes": 17,             │
+│    "unreadable": 0}, "task:fm-slack-main-thread-replies": {"rss_bytes": 552091648, "processes": 1, "unreadable": 0}, "task:vernant-provisioner-relaunch-admitted-scope-s3": {"rss_bytes": 419332096, │
+│    "processes": 1, "unreadable": 0}, "task:fm-omp-watch-restore-continuity": {"rss_bytes": 447250432, "processes": 3, "unreadable": 0}, "task:vernant-grants-am36-build": {"rss_bytes": 575225856,   │
+│    "processes": 1, "unreadable": 0}, "task:vernant-grants-d2-c8": {"rss_bytes": 437141504, "processes": 1, "unreadable": 0}, "task:vernant-session-put-status-guard-s2": {"rss_bytes": 626245632,    │
+│    "processes": 1, "unreadable": 0}, "task:vernant-grants-d2-test-adapters": {"rss_bytes": 187547648, "processes": 3, "unreadable": 0}, "task:fm-test-suites-real-treehouse-leak": {"rss_bytes":     │
+│    224215040, "processes": 3, "unreadable": 0}, "task:vernant-grants-d2-build": {"rss_bytes": 255229952, "processes": 4, "unreadable": 0}, "task:vernant-grants-d2-test-fake": {"rss_bytes":         │
+│    297746432, "processes": 6, "unreadable": 0}, "task:fm-declared-pause-vs-open-blocker-churn": {"rss_bytes": 212500480, "processes": 2, "unreadable": 0},                                           │
+│    "task:fm-host-suite-codex-home-branch-outcomes": {"rss_bytes": 201637888, "processes": 2, "unreadable": 0}, "task:fm-teardown-nested-lane-process-ownership": {"rss_bytes": 200704000,            │
+│    "processes": 2, "unreadable": 0}, "task:fm-test-exit-trap-leaks-temp-dirs": {"rss_bytes": 208617472, "processes": 2, "unreadable": 0}, "task:vernant-grants-d2-c6c-client": {"rss_bytes":         │
+│    182796288, "processes": 3, "unreadable": 0}, "task:vernant-b12-h0-scope-guard-s3": {"rss_bytes": 459472896, "processes": 1, "unreadable": 0}, "task:vernant-p12-cancel-ends-case-s3":             │
+│    {"rss_bytes": 526254080, "processes": 1, "unreadable": 0}, "task:vernant-grants-stage1-r23-s3": {"rss_bytes": 237633536, "processes": 4, "unreadable": 0}, "task:vernant-ci-per-test-report-s2":  │
+│    {"rss_bytes": 478986240, "processes": 1, "unreadable": 0}}, "rss_unreadable_pids": [98625], "source": "probe", "non_fleet_max_bytes": 844775424, "baseline": null, "calibration": "no baseline at │
+│    /Users/charlesabrooker/tmp/fm-lab.Q1AgbY/state/.memory-baseline.json", "headroom": null, "headroom_calibration": "calibration                                                                     │
+│    /Users/charlesabrooker/tmp/fm-lab.Q1AgbY/state/.memory-calibration.json: no reading at native pressure 2 or higher has been recorded", "admission": "admit", "reasons": [], "alarms": [],         │
+│    "alarm_hold": [], "top_processes": [{"pid": 915, "ppid": 52405, "comm": "2.1.321", "started": "Mon Nov 9 17:35:17 2026", "rss_bytes": 844775424, "fleet": false, "run": null}, {"pid": 10766,     │
+│    "ppid": 10365, "comm": "omp", "started": "Thu Nov 12 15:15:07 2026", "rss_bytes": 646152192, "fleet": false, "run": null}, {"pid": 36165, "ppid": 22247, "comm": "2.1.322", "started": "Tue Nov   │
+│    10 14:51:16 2026", "rss_bytes": 626245632, "fleet": true, "run": "task:vernant-session-put-status-guard-s2"}, {"pid": 68913, "ppid": 53519, "comm": "2.1.322", "started": "Tue Nov 10 18:03:38    │
+│    2026", "rss_bytes": 575225856, "fleet": true, "run": "task:vernant-grants-am36-build"}, {"pid": 85335, "ppid": 62486, "comm": "2.1.321", "started": "Mon Nov 9 17:37:06 2026", "rss_bytes":       │
+│    564297728, "fleet": false, "run": null}, {"pid": 88742, "ppid": 2010, "comm": "2.1.322", "started": "Thu Nov 12 13:28:09 2026", "rss_bytes": 552091648, "fleet": true, "run":                     │
+│    "task:fm-slack-main-thread-replies"}, {"pid": 11429, "ppid": 98131, "comm": "2.1.321", "started": "Mon Nov 9 19:22:37 2026", "rss_bytes": 526254080, "fleet": true, "run":                        │
+│    "task:vernant-p12-cancel-ends-case-s3"}, {"pid": 2930, "ppid": 79001, "comm": "2.1.321", "started": "Mon Nov 9 15:16:51 2026", "rss_bytes": 478986240, "fleet": true, "run":                      │
+│    "task:vernant-ci-per-test-report-s2"}, {"pid": 62747, "ppid": 53479, "comm": "2.1.322", "started": "Tue Nov 10 00:24:03 2026", "rss_bytes": 459472896, "fleet": true, "run":                      │
+│    "task:vernant-b12-h0-scope-guard-s3"}, {"pid": 7603, "ppid": 7307, "comm": "2.1.319", "started": "Mon Nov 9 12:53:09 2026", "rss_bytes": 445612032, "fleet": false, "run": null}]}                │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ ⟦Resolved path: /Users/charlesabrooker/.omp/agent/sessions/-.no-mistakes-worktrees-eded895c05cf-01M78SWXCCR94VMNBRT8JTX3B7/2026-11-12T21-25-09-998Z_01a1d1a6-76ee-7587-a997-6f99dcf29ee1/4.bash.log⟧ │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ ⚠ Grep: empty backlog|# Backlog|## Queued|backlog.md.*creat|creat.*backlog.md 6 matches · 3 files · in docs/configuration.md, bin/fm-backlog-transition-lib.sh, bin/fm-tasks-axi-lib.sh · truncated
+ ├─ # docs/
+ │  ## configuration.md#360D
+ │   *451│## Backlog backend (.tasks.toml / config/backlog-backend)
+ │   *497│It moves in-scope `## Queued` items only and refuses `## In flight` and historical `## Done` records, which stay with their home for pruning or archiving.
+ │   *511│On the default markdown adapter, tasks-axi and manual edits produce the same `## In flight`, `## Queued`, and `## Done` sections.
+ └─ … 3 more matches
+
+ Creating empty backlog file
+
+╭─── ✎ Write: 📝 ~/tmp/fm-lab.Q1AgbY/data/backlog.md · 8 lines ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│   1 # Backlog                                                                                                                                                                                        │
+│   2                                                                                                                                                                                                  │
+│   3 ## In flight                                                                                                                                                                                     │
+│   4                                                                                                                                                                                                  │
+│   5 ## Queued                                                                                                                                                                                        │
+│   6                                                                                                                                                                                                  │
+│ … 2 more lines ⟦⌃O: Expand⟧                                                                                                                                                                          │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ cd ~/tmp/fm-lab.Q1AgbY && /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M78SWXCCR94VMNBRT8JTX3B7/bin/fm-mem-guard.sh baseline                                                       │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ {"schema": "fm-memory-reading.v1", "checked_at": "2026-11-12T21:29:12.703056+00:00", "platform": "darwin", "host": "GTT-CB.local", "fixture": null, "errors": [], "total_bytes": 34359738368,        │
+│ "pressure_level": 1, "swap_total_bytes": 4294967296, "swap_used_bytes": 3284014202, "swap_free_bytes": 1010953093, "page_size_bytes": 16384, "unused_bytes": 525156352, "available_bytes":           │
+│ 3936665600, "anonymous_bytes": 13738295296, "compressor_bytes": 4580376576, "runs": {"no-mistakes:eded895c05cf/01M78SWXCCR94VMNBRT8JTX3B7": {"rss_bytes": 843579392, "processes": 10, "unreadable":  │
+│ 0}, "task:fm-slack-main-thread-replies": {"rss_bytes": 544260096, "processes": 1, "unreadable": 0}, "task:vernant-provisioner-relaunch-admitted-scope-s3": {"rss_bytes": 383631360, "processes":…    │
+│ ⟦Wall: 0.31s | Timeout: 30s⟧                                                                                                                                                                         │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ ● Read ~/tmp/fm-lab.Q1AgbY/state/.memory-baseline.json:1-70
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ bin/fm-open-loops.sh --heartbeat --json                                                                                                                                                            │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ {"schema": "fm-open-loops.v1", "generated_epoch": 1794518961, "home": "/Users/charlesabrooker/tmp/fm-lab.Q1AgbY", "complete": true, "rows": [], "handling": {"sequence": 0, "presentations":         │
+│ {"main": {}}, "presented_at": {"main": {}}, "actions": {}, "episodes": {}}}                                                                                                                          │
+│ ⟦Wall: 0.40s | Timeout: 60s⟧                                                                                                                                                                         │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ cd ~/tmp/fm-lab.Q1AgbY && /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M78SWXCCR94VMNBRT8JTX3B7/bin/fm-mem-guard.sh probe                                                          │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ {"schema": "fm-memory-reading.v1", "checked_at": "2026-11-12T21:29:21.302580+00:00", "platform": "darwin", "host": "GTT-CB.local", "fixture": null, "errors": [], "total_bytes": 34359738368,        │
+│ "pressure_level": 1, "swap_total_bytes": 4294967296, "swap_used_bytes": 3284014202, "swap_free_bytes": 1010953093, "page_size_bytes": 16384, "unused_bytes": 577798144, "available_bytes":           │
+│ 3996860416, "anonymous_bytes": 13698711552, "compressor_bytes": 4561764352, "runs": {"no-mistakes:eded895c05cf/01M78SWXCCR94VMNBRT8JTX3B7": {"rss_bytes": 924925952, "processes": 12, "unreadable":  │
+│ 0}, "task:fm-slack-main-thread-replies": {"rss_bytes": 547651584, "processes": 1, "unreadable": 0}, "task:vernant-provisioner-relaunch-admitted-scope-s3": {"rss_bytes": 383893504, "processes":…    │
+│ ⟦Wall: 0.39s | Timeout: 30s⟧                                                                                                                                                                         │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭─── • Read skill://captain-facing-wording ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ ────────────────────────────────────────────────────────────────────────────────                                                                                                                     │
+│                                                                                                                                                                                                      │
+│ name: captain-facing-wording                                                                                                                                                                         │
+│ description: Load before translating worker or supervision evidence into captain-facing chat, including PR review or merge replies.                                                                  │
+│ user-invocable: false                                                                                                                                                                                │
+│ metadata:                                                                                                                                                                                            │
+│                                                                                                                                                                                                      │
+│   internal: true                                                                                                                                                                                     │
+│                                                                                                                                                                                                      │
+│ Captain-facing wording                                                                                                                                                                               │
+│                                                                                                                                                                                                      │
+│ - Protocol regression example: reporting a completed fix and its recorded PR URL mid-turn, then using tools and ending with only Awaiting your merge call., is incomplete; the final message must    │
+│ … 22 more lines ⟦⌃O: Expand⟧                                                                                                                                                                         │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ ⟦Resolved path: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M78SWXCCR94VMNBRT8JTX3B7/.claude/skills/captain-facing-wording/SKILL.md⟧                                                │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ Acknowledging foreground item
+
+╭─── • Read artifact://10:raw:1-1 ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│  1 {"schema": "fm-memory-reading.v1", "checked_at": "2026-11-12T21:29:21.302580+00:00", "platform": "darwin", "host": "GTT-CB.local", "fixture": null, "errors": [], "total_bytes": 34359738368,     │
+│    "pressure_level": 1, "swap_total_bytes": 4294967296, "swap_used_bytes": 3284014202, "swap_free_bytes": 1010953093, "page_size_bytes": 16384, "unused_bytes": 577798144, "available_bytes":        │
+│    3996860416, "anonymous_bytes": 13698711552, "compressor_bytes": 4561764352, "runs": {"no-mistakes:eded895c05cf/01M78SWXCCR94VMNBRT8JTX3B7": {"rss_bytes": 924925952, "processes": 12,             │
+│    "unreadable": 0}, "task:fm-slack-main-thread-replies": {"rss_bytes": 547651584, "processes": 1, "unreadable": 0}, "task:vernant-provisioner-relaunch-admitted-scope-s3": {"rss_bytes": 383893504, │
+│    "processes": 1, "unreadable": 0}, "task:fm-omp-watch-restore-continuity": {"rss_bytes": 443760640, "processes": 3, "unreadable": 0}, "task:vernant-grants-am36-build": {"rss_bytes": 525877248,   │
+│    "processes": 1, "unreadable": 0}, "task:vernant-grants-d2-c8": {"rss_bytes": 421937152, "processes": 1, "unreadable": 0}, "task:vernant-session-put-status-guard-s2": {"rss_bytes": 626720768,    │
+│    "processes": 1, "unreadable": 0}, "task:vernant-grants-d2-test-adapters": {"rss_bytes": 187629568, "processes": 3, "unreadable": 0}, "task:fm-test-suites-real-treehouse-leak": {"rss_bytes":     │
+│    223920128, "processes": 3, "unreadable": 0}, "task:vernant-grants-d2-build": {"rss_bytes": 255688704, "processes": 4, "unreadable": 0}, "task:vernant-grants-d2-test-fake": {"rss_bytes":         │
+│    297533440, "processes": 6, "unreadable": 0}, "task:fm-declared-pause-vs-open-blocker-churn": {"rss_bytes": 212533248, "processes": 2, "unreadable": 0},                                           │
+│    "task:fm-host-suite-codex-home-branch-outcomes": {"rss_bytes": 201801728, "processes": 2, "unreadable": 0}, "task:fm-teardown-nested-lane-process-ownership": {"rss_bytes": 200294400,            │
+│    "processes": 2, "unreadable": 0}, "task:fm-test-exit-trap-leaks-temp-dirs": {"rss_bytes": 208633856, "processes": 2, "unreadable": 0}, "task:vernant-grants-d2-c6c-client": {"rss_bytes":         │
+│    182697984, "processes": 3, "unreadable": 0}, "task:vernant-b12-h0-scope-guard-s3": {"rss_bytes": 434733056, "processes": 1, "unreadable": 0}, "task:vernant-p12-cancel-ends-case-s3":             │
+│    {"rss_bytes": 523829248, "processes": 1, "unreadable": 0}, "task:vernant-grants-stage1-r23-s3": {"rss_bytes": 237584384, "processes": 4, "unreadable": 0}, "task:vernant-ci-per-test-report-s2":  │
+│    {"rss_bytes": 445399040, "processes": 1, "unreadable": 0}}, "rss_unreadable_pids": [], "source": "probe", "non_fleet_max_bytes": 838959104, "baseline": {"schema": "fm-memory-baseline.v1",       │
+│    "checked_at": "2026-11-12T21:29:12.703056+00:00", "host": "GTT-CB.local", "total_bytes": 34359738368, "non_fleet_max_bytes": 978780160, "non_fleet_max_share": 0.028486251831054688,              │
+│    "smallest_reading_max_bytes": 844775424, "samples": 2, "first_checked_at": "2026-11-12T21:27:50.479495+00:00", "last_checked_at": "2026-11-12T21:28:55.917833+00:00", "incomplete_samples": 1,    │
+│    "derivation": "largest non-fleet RSS observed across recorded healthy root probe readings; incomplete samples are lower bounds"}, "calibration": null, "headroom": null, "headroom_calibration":  │
+│    "calibration /Users/charlesabrooker/tmp/fm-lab.Q1AgbY/state/.memory-calibration.json: no reading at native pressure 2 or higher has been recorded", "admission": "admit", "reasons": [],          │
+│    "alarms": [], "alarm_hold": [], "top_processes": [{"pid": 915, "ppid": 52405, "comm": "2.1.321", "started": "Mon Nov 9 17:35:17 2026", "rss_bytes": 838959104, "fleet": false, "run": null},      │
+│    {"pid": 36165, "ppid": 22247, "comm": "2.1.322", "started": "Tue Nov 10 14:51:16 2026", "rss_bytes": 626720768, "fleet": true, "run": "task:vernant-session-put-status-guard-s2"}, {"pid": 10766, │
+│    "ppid": 10365, "comm": "omp", "started": "Thu Nov 12 15:15:07 2026", "rss_bytes": 581173248, "fleet": false, "run": null}, {"pid": 85335, "ppid": 62486, "comm": "2.1.321", "started": "Mon Nov 9 │
+│    17:37:06 2026", "rss_bytes": 562331648, "fleet": false, "run": null}, {"pid": 88742, "ppid": 2010, "comm": "2.1.322", "started": "Thu Nov 12 13:28:09 2026", "rss_bytes": 547651584, "fleet":     │
+│    true, "run": "task:fm-slack-main-thread-replies"}, {"pid": 68913, "ppid": 53519, "comm": "2.1.322", "started": "Tue Nov 10 18:03:38 2026", "rss_bytes": 525877248, "fleet": true, "run":          │
+│    "task:vernant-grants-am36-build"}, {"pid": 11429, "ppid": 98131, "comm": "2.1.321", "started": "Mon Nov 9 19:22:37 2026", "rss_bytes": 523829248, "fleet": true, "run":                           │
+│    "task:vernant-p12-cancel-ends-case-s3"}, {"pid": 2930, "ppid": 79001, "comm": "2.1.321", "started": "Mon Nov 9 15:16:51 2026", "rss_bytes": 445399040, "fleet": true, "run":                      │
+│    "task:vernant-ci-per-test-report-s2"}, {"pid": 62747, "ppid": 53479, "comm": "2.1.322", "started": "Tue Nov 10 00:24:03 2026", "rss_bytes": 434733056, "fleet": true, "run":                      │
+│    "task:vernant-b12-h0-scope-guard-s3"}, {"pid": 7603, "ppid": 7307, "comm": "2.1.319", "started": "Mon Nov 9 12:53:09 2026", "rss_bytes": 425017344, "fleet": false, "run": null}]}                │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ ⟦Resolved path:                                                                                                                                                                                      │
+│ /Users/charlesabrooker/.omp/agent/sessions/-.no-mistakes-worktrees-eded895c05cf-01M78SWXCCR94VMNBRT8JTX3B7/2026-11-12T21-25-09-998Z_01a1d1a6-76ee-7587-a997-6f99dcf29ee1/10.bash.log⟧                │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ Marking the todo done
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 31897.1794518870.L9xz5x                                                                                                                 │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ (no output)                                                                                                                                                                                          │
+│ ⟦Wall: 0.68s | Timeout: 30s⟧                                                                                                                                                                         │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ Updating task checklist
+
+╭─── ☑ Todo 4 tasks ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ ├─ ☑ Reconcile startup and operational home                                                                                                                                                          │
+│ ├─ ☑ Calibrate memory alarm from healthy readings                                                                                                                                                    │
+│ ├─ ☑ Restore open-loop ledger source and reconcile                                                                                                                                                   │
+│ └─ ☑ Acknowledge handled wake generation                                                                                                                                                             │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ bin/fm-open-loops.sh --check-actions                                                                                                                                                               │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ (no output)                                                                                                                                                                                          │
+│ ⟦Wall: 0.45s | Timeout: 30s⟧                                                                                                                                                                         │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ complete obligation tracking with no outstanding items. Both notifications were acknowledged.
+
+
+ ⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: live-probe-1: lab validation wake; no action is needed
+
+ Run bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ bin/fm-wake-drain.sh                                                                                                                                                                               │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ 1794518966   3   check   live-probe-1   check: live-probe-1: lab validation wake; no action is needed                                                                                                │
+│ WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 31897.1794518870.L9xz5x                                                                   │
+│ WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.                                                                                                           │
+│ ⟦Wall: 1.71s | Timeout: 30s⟧                                                                                                                                                                         │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 31897.1794518870.L9xz5x                                                                                                                 │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ (no output)                                                                                                                                                                                          │
+│ ⟦Wall: 1.79s | Timeout: 30s⟧                                                                                                                                                                         │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ Captain, shipshape.
+
+
+ ⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: live-probe-2: lab validation wake; acknowledge it only, no other action is needed
+ and 2 more queued
+
+ Run bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ bin/fm-wake-drain.sh                                                                                                                                                                               │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ 1794519060   4   check   live-probe-2   check: live-probe-2: lab validation wake; acknowledge it only, no other action is needed                                                                     │
+│ 1794519107   5   check   live-probe-3   check: live-probe-3: lab validation wake; acknowledge it only, no other action is needed                                                                     │
+│ 1794519173   6   check   memory-health   check: memory-health: non-fleet process 2.1.321 PID 915 RSS 1020919808 bytes exceeds the largest non-fleet RSS observed across 2 healthy readings           │
+│ (978780160 bytes); see /Users/charlesabrooker/tmp/fm-lab.Q1AgbY/state/memory-readings.jsonl. This is an observation, not a leak diagnosis; restarting any system daemon requires the captain's       │
+│ decision.                                                                                                                                                                                            │
+│ WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 6 --recovery-generation 37576.1794519061.jBOFxU                                                                   │
+│ WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.                                                                                                           │
+│ ⟦Wall: 0.82s | Timeout: 30s⟧                                                                                                                                                                         │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+  ⎋ Draining queued validation notifications
+
+╭── ⠦ 5s > ◒ GPT-6.1 Sol 👁 > 🌳 eded895c05cf/01M78SWXCCR94VMNBRT8JTX3B7 > ⑂ detached > S0.22 + 👁 0.19 ▶──12%────────────╎┃──500K─◀ 🧠 MEMORY: Drain wake and calibrate memory baseline < 🆔 01a1d1a6 ──╮
+╰─                                                                                                                                                                                                    ─╯

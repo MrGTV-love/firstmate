@@ -1,0 +1,40 @@
+ref=5d960771fd10b49f9a97eea4e0d240c638d66ee6 kind=foreign-never rc=0
+ok - .omp watch extension: controlled foreign-never delivery preserves continuity and wake ownership
+--- lifecycle.log (extension-written) ---
+2026-11-12T21:24:04.328Z pid=45409 instance=1 event=generation-create generation=1 cause=factory-bind
+2026-11-12T21:24:04.329Z pid=45409 instance=1 event=generation-activate generation=1 cause=factory-bind
+2026-11-12T21:24:04.329Z pid=45409 instance=1 event=factory-bind generation=1
+2026-11-12T21:24:04.478Z pid=45409 instance=1 event=session_start generation=1 stopping=false
+2026-11-12T21:24:04.478Z pid=45409 instance=1 event=generation-activate generation=1 cause=session_start
+2026-11-12T21:24:04.861Z pid=45409 instance=1 event=actionable-close generation=1 predecessor=45799
+2026-11-12T21:24:04.862Z pid=45409 instance=1 event=restore-start generation=1 predecessor=45799
+2026-11-12T21:24:04.893Z pid=45409 instance=1 event=wake-delivery-start generation=1 predecessor=45799
+2026-11-12T21:24:04.901Z pid=45409 instance=1 event=session_shutdown generation=1
+2026-11-12T21:24:05.138Z pid=45409 instance=1 event=generation-stop generation=1
+2026-11-12T21:24:05.139Z pid=45409 instance=1 event=session_start generation=1 stopping=true
+2026-11-12T21:24:05.139Z pid=45409 instance=1 event=generation-create generation=2 cause=session_start
+2026-11-12T21:24:05.139Z pid=45409 instance=1 event=generation-activate generation=2 cause=session_start
+2026-11-12T21:24:05.151Z pid=45409 instance=1 event=restore-claim-wait generation=2 predecessor=45799
+2026-11-12T21:24:05.422Z pid=45409 instance=1 event=actionable-close generation=2 predecessor=46865
+2026-11-12T21:24:05.422Z pid=45409 instance=1 event=restore-start generation=2 predecessor=46865
+2026-11-12T21:24:05.454Z pid=45409 instance=1 event=wake-delivery-start generation=2 predecessor=46865
+2026-11-12T21:24:05.458Z pid=45409 instance=1 event=wake-delivery-settled generation=2 predecessor=46865
+2026-11-12T21:24:05.948Z pid=45409 instance=1 event=actionable-close generation=2 predecessor=47121
+2026-11-12T21:24:05.948Z pid=45409 instance=1 event=restore-start generation=2 predecessor=47121
+2026-11-12T21:24:05.984Z pid=45409 instance=1 event=wake-delivery-start generation=2 predecessor=47121
+2026-11-12T21:24:05.987Z pid=45409 instance=1 event=wake-delivery-settled generation=2 predecessor=47121
+2026-11-12T21:24:06.025Z pid=45409 instance=1 event=session_shutdown generation=2
+2026-11-12T21:24:06.236Z pid=45409 instance=1 event=generation-stop generation=2
+2026-11-12T21:24:06.237Z pid=45409 instance=1 event=session_start generation=2 stopping=true
+2026-11-12T21:24:06.237Z pid=45409 instance=1 event=generation-create generation=3 cause=session_start
+2026-11-12T21:24:06.237Z pid=45409 instance=1 event=generation-activate generation=3 cause=session_start
+2026-11-12T21:24:06.253Z pid=45409 instance=1 event=restore-claim-wait generation=3 predecessor=45799
+
+arms:
+45799 
+46436 45799
+46865 45799
+47121 46865
+47615 47121
+47828 45799
+sends=3 failures=0
