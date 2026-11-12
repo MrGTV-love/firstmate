@@ -2310,6 +2310,127 @@ class IntakeTest(unittest.TestCase):
             tail = self.wake_parts(second.getvalue().splitlines()[0])
             self.assertTrue(tail['text'].startswith(plane.SECRET_MARKER + 'extra (https://example.com)bbb'), tail['text'][:80])
 
+    def joined_forms(self, text, presented=True):
+        """The forms of one stored text in which a value that only the presentation joins could show (Amendment (cm)): the text as stored; the pieces it
+        keeps, joined in order with every marker left out; and, for a decoded text value, the presentation of that join."""
+        left_out = ''.join(text.split(plane.SECRET_MARKER))
+        return [text, left_out] + ([plane.present(left_out)[0]] if presented else [])
+
+    def json_strings(self, node):
+        """Every string, keys included, of a decoded JSON document."""
+        if isinstance(node, str):
+            yield node
+        elif isinstance(node, dict):
+            for key, item in node.items():
+                yield from self.json_strings(key)
+                yield from self.json_strings(item)
+        elif isinstance(node, list):
+            for item in node:
+                yield from self.json_strings(item)
+
+    def sink_strings(self, watch, replay):
+        """Every decoded string of the sinks that keep something of a request: the journal, the whole-text record store, the outbound log file and the
+        replay's list of the same entries."""
+        def documents(path):
+            found = []
+            for line in (path.read_text().split('\n') if path.is_file() else []):
+                try:
+                    found.append(json.loads(line))
+                except ValueError:
+                    continue
+            return found
+        return {'journal': list(self.json_strings(json.loads((watch.root / 'state.json').read_text()))),
+                'record': [s for doc in documents(watch.root / plane.RECORD_FILE) for s in self.json_strings(doc)],
+                'outbound file': [s for doc in documents(watch.root / 'outbound.jsonl') for s in self.json_strings(doc)],
+                'outbound list': list(self.json_strings(replay.state['log']))}
+
+    def test_the_pieces_a_split_link_request_leaves_in_every_sink_join_to_no_value_with_the_markers_left_out(self):
+        # Amendment (cm), I4c: the pieces that the record, the journal and the outbound log keep from a request whose pieces the presentation joins are joined
+        # in order with the markers left out, and the value is looked for in that join as well as in each piece.
+        value, raw = 'fixturesigning1234', 'fixturesig<https://example.com|ning1234extra>'
+        with self.fixture(env={'SLACK_SIGNING_SECRET': value}) as (watch, replay):
+            self.say(replay, '200.000100', raw)
+            watch.poll()
+            record = watch.record('200.000100')
+            # The record keeps the link target, the tail of the label and the trailing word, and nothing that forms the value.
+            self.assertEqual(record['text'], plane.SECRET_MARKER + '<https://example.com|' + plane.SECRET_MARKER + 'extra>')
+            kept = [piece for piece in record['text'].split(plane.SECRET_MARKER) if piece]
+            self.assertEqual((kept, ''.join(kept)), (['<https://example.com|', 'extra>'], '<https://example.com|extra>'))
+            sinks = self.sink_strings(watch, replay)
+            # The sinks were really read: the record holds the pieces, and the outbound log (file and list) holds the fixed acknowledgement.
+            self.assertIn(record['text'], sinks['record'])
+            self.assertIn(plane.REQUEST_ACK, sinks['outbound file'])
+            self.assertIn(plane.REQUEST_ACK, sinks['outbound list'])
+            for name, strings in sinks.items():
+                for text in strings:
+                    for form in self.joined_forms(text):
+                        self.assertNotIn(value, form, name)
+        # The joins are not empty: the same joins find the value in the unreplaced pieces, and where a marker stands between the two halves.
+        self.assertIn(value, self.joined_forms(raw)[2])
+        self.assertIn(value, self.joined_forms('fixturesig' + plane.SECRET_MARKER + 'ning1234')[1])
+        self.assertTrue(all(value not in form for form in self.joined_forms(record['text'])))
+
+    def test_a_split_link_request_staged_when_the_run_stops_leaves_no_piece_in_the_journal_that_joins_to_the_value(self):
+        # Amendment (cm), I4c: the journal while the request is staged (a stop at `after-stage`), then the run that finishes it.
+        value, raw = 'fixturesigning1234', 'fixturesig<https://example.com|ning1234extra>'
+        with self.fixture(env={'SLACK_SIGNING_SECRET': value}) as (watch, replay):
+            writes = []
+            self.say(replay, '200.000100', raw)
+            with patch.dict(os.environ, {'FM_SLACK_FAULT': 'after-stage'}), self.observe_every_write(watch, writes), self.assertRaises(RuntimeError):
+                watch.poll()
+            staged = json.loads((watch.root / 'state.json').read_text())
+            [row] = staged['pending']
+            self.assertEqual((row['kind'], row['thread'], row['replaced']), ('request', '200.000100', True))
+            self.assertEqual(row['text'], plane.SECRET_MARKER + '<https://example.com|' + plane.SECRET_MARKER + 'extra>')
+            self.assertIn('extra (https://example.com)', row['shown'])
+            for text in self.json_strings(staged):
+                for form in self.joined_forms(text):
+                    self.assertNotIn(value, form)
+            # Every write of the stopped run, as the observer saw it (whole texts of files included), joins to no value either.
+            self.assertTrue(any(plane.SECRET_MARKER in text for text in writes))
+            for text in writes:
+                for form in self.joined_forms(text, presented=False):
+                    self.assertNotIn(value, form)
+            self.assertEqual(self.acks(replay), [])
+            # The next run finishes the staged row: one acknowledgement, one wake line, the journal row closed.
+            watch.state, watch.advanced = watch.load_state(), 0
+            watch.poll()
+            self.assertEqual(self.acks(replay), ['200.000100'])
+            self.assertEqual(len(self.wakes(watch)), 1)
+            self.assertEqual(watch.load_state()['pending'], [])
+        # The check is not empty: with a value that is not in the request nothing is replaced, and the same join finds the value in the staged row.
+        with self.fixture(env={'SLACK_SIGNING_SECRET': 'unrelated-fixture-value-0123456789'}) as (watch, replay):
+            self.say(replay, '200.000100', raw)
+            with patch.dict(os.environ, {'FM_SLACK_FAULT': 'after-stage'}), self.assertRaises(RuntimeError):
+                watch.poll()
+            [unreplaced] = json.loads((watch.root / 'state.json').read_text())['pending']
+            self.assertIn(value, self.joined_forms(unreplaced['text'])[2])
+
+    def test_the_acknowledgement_of_a_split_link_request_is_the_fixed_text_and_holds_no_piece_of_the_request(self):
+        # Amendment (cm), I1 (b), I4c: the one post for a request whose pieces the presentation joins is the fixed sentence in the request's thread; the
+        # outbound log (the file and the replay's list of the same entries) holds no piece of the request.
+        value, raw = 'fixturesigning1234', 'fixturesig<https://example.com|ning1234extra>'
+        pieces = ('fixturesig', 'ning1234', 'extra', 'example.com', 'https')
+
+        def leftovers(entry):
+            held = json.dumps(entry, ensure_ascii=False)
+            return [piece for piece in pieces if piece in held]
+        posted = []
+        for text in (raw, 'an ordinary request'):
+            with self.fixture(env={'SLACK_SIGNING_SECRET': value}) as (watch, replay):
+                self.say(replay, '200.000100', text)
+                watch.poll()
+                listed = [e for e in replay.state['log'] if e['method'] == 'chat.postMessage']
+                on_disk = [json.loads(line) for line in (watch.root / 'outbound.jsonl').read_text().split('\n') if line]
+                self.assertEqual([e for e in on_disk if e['method'] == 'chat.postMessage'], listed)
+                self.assertEqual([(e['text'], e['thread_ts']) for e in listed], [(plane.REQUEST_ACK, '200.000100')])
+                self.assertEqual([leftovers(entry) for entry in on_disk + replay.state['log']], [[]] * (len(on_disk) + len(replay.state['log'])))
+                posted.append(listed)
+        # The split-link request is acknowledged with exactly the entry that an ordinary request gets.
+        self.assertEqual(posted[0], posted[1])
+        # The check is not empty: an acknowledgement that carried a piece of the request is found.
+        self.assertEqual(leftovers({'method': 'chat.postMessage', 'text': 'Request received: extra'}), ['extra'])
+
     def test_the_replacement_leaves_no_plane_value_and_leaves_value_free_text_alone(self):
         values = ['abc12', 'x' + plane.SECRET_MARKER + 'y']
         pieces = ['a', 'b', 'c', '1', '2', 'x', 'y', 'z', ' ', 'ab', 'abc', 'c12', '&amp;', '&lt;', '<https://e.com|', '>', '|',
