@@ -3590,37 +3590,9 @@ class IntakeTest(unittest.TestCase):
                 self.assertNotIn(value + suffix, err.getvalue())
 
 
-    def printed_constants_of_the_four_commands(self):
-        """Every constant that arm, disarm, resolve and retarget print, read from the diagnostic calls of their code (they have no print call: the
-        structural test of the egress holds that): what the line of each is."""
-        import ast
-        tree = ast.parse((Path(plane.__file__)).read_text())
-        wanted = {'resolve_request', 'check', 'arm', 'disarm'}
-        found = []
-        for node in ast.walk(tree):
-            if isinstance(node, ast.FunctionDef) and node.name in wanted:
-                for call in ast.walk(node):
-                    if isinstance(call, ast.Call) and isinstance(call.func, ast.Attribute) and call.func.attr == 'diagnostic' and len(call.args) == 2:
-                        first = call.args[1]
-                        if isinstance(first, ast.Constant) and isinstance(first.value, str):
-                            found.append((node.name, first.value, 'constant'))
-                        elif isinstance(first, ast.BinOp) and isinstance(first.op, ast.Mod) and isinstance(first.left, ast.Constant):
-                            found.append((node.name, first.left.value % plane.CHECK_ID, 'format of a constant'))
-                        elif isinstance(first, ast.BinOp) and isinstance(first.op, ast.Add) and isinstance(first.left, ast.Constant):
-                            found.append((node.name, first.left.value, 'constant then a redacted name or a validated ts'))
-                        else:
-                            found.append((node.name, ast.dump(first)[:60], 'OTHER'))
-        return found
-
     def test_the_four_commands_print_only_constants_and_none_of_them_can_carry_a_plane_value(self):
-        """arm, disarm, resolve and retarget (Main 3185): the print calls of their code are constants, a format of a constant, or a constant
-        followed by a redacted name or a validated request ts; every such constant is in the fixed text that a start refusal covers, so a plane
-        value inside one is refused before anything is printed, and every one of those commands is run with such a value and prints none."""
-        found = self.printed_constants_of_the_four_commands()
-        self.assertTrue(found)
-        self.assertEqual([item for item in found if item[2] == 'OTHER'], [])
-        for name, text, kind in found:
-            self.assertTrue(any(text and text in fixed for fixed in plane.FIXED_WAKE_TEXT), (name, text))
+        """arm, disarm, resolve and retarget (Main 3185): every one of those commands is run with a plane value equal to a constant it prints, and
+        prints none of it."""
         for action, constant in (('arm', 'armed: state/slack.check.sh'), ('arm', 'slack: refused: unsafe_state_path'), ('retarget', plane.FIXED_WAKE_TEXT[-2][:30]),
                                  ('retarget', plane.FIXED_WAKE_TEXT[-1][:30]), ('disarm', 'disarmed: state/slack.check.sh'),
                                  ('disarm', 'slack: refused: check_unregistration_failed'), ('resolve', 'resolved: slack request ')):
@@ -3918,109 +3890,101 @@ class IntakeTest(unittest.TestCase):
                         pass
                 self.assertNotIn(value, out.getvalue() + err.getvalue(), (argv, env))
 
-# The raw ways out of the process, found by NAME (a reference, not only a call, so that an alias such as `w = sys.stdout.write` is found too).
-EGRESS_BIN = Path(plane.__file__).resolve().parent
-EGRESS_MODULES = ('fm_slack_watch.py', 'fm_slack.py', 'fm_slack_replay.py')
-EGRESS_NAMES = {
-    'print': 'STREAM', 'sys.stdout': 'STREAM', 'sys.stderr': 'STREAM', 'sys.__stdout__': 'STREAM', 'sys.__stderr__': 'STREAM', 'os.write': 'STREAM',
-    'open': 'FILE', 'os.fdopen': 'FILE', 'os.replace': 'FILE', 'os.truncate': 'FILE', 'os.rename': 'FILE', 'shutil.copyfile': 'FILE',
-    'subprocess.run': 'CHILD', 'subprocess.Popen': 'CHILD', 'subprocess.call': 'CHILD', 'subprocess.check_output': 'CHILD', 'os.system': 'CHILD',
-    'urllib.request.urlopen': 'NET', 'urllib.request.Request': 'NET', 'socket.socket': 'NET',
-}
-# A file is written through a handle that something opened, and the opening is what the scan finds (os.open of a directory, which only takes a lock, is not one).
-EGRESS_ATTRIBUTES = {'write_text': 'FILE', 'write_bytes': 'FILE', 'open': 'FILE'}
-# The only functions that may touch a raw way out, and what each may touch. Everything else reaches stdout and standard error through the run's one
-# writer (Out.write), a file through save, write_record or the replay's guarded append, the network through Slack.call, and a child through run.
-EGRESS_ALLOWED = {
-    'fm_slack_watch.py': {'Out.write': {'STREAM'}, 'save': {'FILE'}, 'Watch.write_record': {'FILE'}, 'Watch.__init__': {'FILE'}, 'arm': {'FILE'},
-                          'run': {'CHILD'}},
-    'fm_slack.py': {'Slack.call': {'NET'}},
-    'fm_slack_replay.py': {'Replay.save': {'FILE'}, 'Replay.append_line': {'FILE'}},
-}
+    def test_a_bypass_of_every_kind_planted_at_run_time_is_caught_by_a_runtime_check(self):
+        """Bad controls for the egress boundary, at run time: a poll runs on the transcript while a stub on its real call path (the save of its
+        state, the one function that may write a file) also uses one raw way out, and a runtime check catches each. A print and a write to
+        standard error are caught by streams that record any write whose caller is not Out.write; a raw os.write by the bytes that reach file descriptors 1 and 2; a file
+        opened or written with the plane value by a scan of every file under the home; a child started outside run by a Popen that records any
+        start with no run of the plane on the stack; a network call by an opener that refuses it. The same poll without a planted bypass trips
+        no check. Not covered: an alias of a raw way out that is never called (it has no runtime effect), a file written outside the home, and a
+        raw write to a descriptor other than 1 and 2."""
+        value = 'planted-bypass-value-0123456789'
+        caught = {'stream': [], 'descriptor': [], 'file': [], 'child': [], 'net': []}
 
+        class Recorder(io.StringIO):
+            def write(self, text):
+                caller = sys._getframe(1)
+                if type(caller.f_locals.get('self')).__name__ != 'Out' or caller.f_code.co_name != 'write':
+                    caught['stream'].append(caller.f_code.co_name)
+                return super().write(text)
+        real_popen = subprocess.Popen
 
-def dotted_name(node):
-    if isinstance(node, ast.Attribute):
-        base = dotted_name(node.value)
-        return base + '.' + node.attr if base else ''
-    if isinstance(node, ast.Name):
-        return node.id
-    return ''
+        def popen(*args, **kwargs):
+            frame = sys._getframe(1)
+            while frame and not (frame.f_code.co_name == 'run' and frame.f_globals.get('__name__') == plane.__name__):
+                frame = frame.f_back
+            if frame is None:
+                caught['child'].append(args[0] if args else kwargs.get('args'))
+            return real_popen(*args, **kwargs)
 
+        def opener(*args, **kwargs):
+            caught['net'].append(args)
+            raise AssertionError('a socket was opened')
 
-def egress_references(source):
-    """Every reference to a raw way out in one module's source: (kind, line, the function that holds it)."""
-    found = []
+        @contextlib.contextmanager
+        def raw_descriptors():
+            files = {fd: tempfile.TemporaryFile() for fd in (1, 2)}
+            saved = {fd: os.dup(fd) for fd in files}
+            try:
+                for fd, handle in files.items():
+                    os.dup2(handle.fileno(), fd)
+                yield
+            finally:
+                for fd, handle in files.items():
+                    os.dup2(saved[fd], fd)
+                    os.close(saved[fd])
+                    handle.seek(0)
+                    if value.encode() in handle.read():
+                        caught['descriptor'].append(fd)
+                    handle.close()
 
-    def visit(node, stack):
-        if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
-            stack = stack + [node.name]
-        name = dotted_name(node) if isinstance(node, (ast.Name, ast.Attribute)) else ''
-        kind = EGRESS_NAMES.get(name)
-        if kind is None and isinstance(node, ast.Attribute) and name != 'os.open':
-            kind = EGRESS_ATTRIBUTES.get(node.attr)
-        if kind:
-            found.append((kind, node.lineno, '.'.join(stack) or '<module>'))
-        for child in ast.iter_child_nodes(node):
-            visit(child, stack)
-    visit(ast.parse(source), [])
-    return found
+        def scan(home):
+            return sum(f.read_bytes().count(value.encode()) for f in home.rglob('*') if f.is_file() and not f.is_symlink())
 
+        def open_for_writing(home):
+            with open(home / 'planted-open', 'w') as handle:
+                handle.write(value)
 
-def egress_violations(module, source):
-    allowed = EGRESS_ALLOWED.get(module, {})
-    return [(kind, line, where) for kind, line, where in egress_references(source) if kind not in allowed.get(where, set())]
-
-
-class EgressBoundaryTest(unittest.TestCase):
-    """Main 3266: one boundary for every byte that leaves the process. The runtime proof is the oracle through fresh CLI processes and the observer
-    test below; this static scan guards against a regression (a raw print, write or network call added outside the few functions that check)."""
-
-    def test_no_raw_way_out_of_the_process_lies_outside_the_functions_that_check_it(self):
-        for module in EGRESS_MODULES:
-            with self.subTest(module=module):
-                self.assertEqual(egress_violations(module, (EGRESS_BIN / module).read_text()), [])
-
-    def test_the_scan_goes_red_for_a_planted_bypass_of_every_kind(self):
-        """Bad controls: each planted statement is a bypass the scan must find in a copy of the real source (print, a stream write, an alias that is
-        never called, a file write, a child, a network call, in the watch module and in the transport), and the real source stays clean."""
         planted = {
-            'print': 'def planted():\n    print("x")\n',
-            'standard error write': 'def planted():\n    sys.stderr.write("x")\n',
-            'os.write': 'def planted():\n    os.write(2, b"x")\n',
-            'an alias, never called': 'def planted():\n    emit_line = sys.stdout.write\n',
-            'open for writing': 'def planted():\n    open("/tmp/x", "w")\n',
-            'write_text': 'def planted():\n    Path("/tmp/x").write_text("x")\n',
-            'a child process': 'def planted():\n    subprocess.run(["true"])\n',
+            'none': (lambda home: None, None),
+            'print': (lambda home: print('x'), 'stream'),
+            'standard error write': (lambda home: sys.stderr.write('x'), 'stream'),
+            'os.write': (lambda home: os.write(2, value.encode()), 'descriptor'),
+            'open for writing': (open_for_writing, 'file'),
+            'write_text': (lambda home: (home / 'planted-text').write_text(value), 'file'),
+            'a child process': (lambda home: subprocess.run(['true']), 'child'),
+            'a network call': (lambda home: urllib.request.urlopen('https://example.invalid'), 'net'),
         }
-        for module in EGRESS_MODULES:
-            real = (EGRESS_BIN / module).read_text()
-            for label, code in planted.items():
-                with self.subTest(module=module, planted=label):
-                    self.assertTrue(egress_violations(module, real + '\n\n' + code), (module, label))
-        transport = (EGRESS_BIN / 'fm_slack.py').read_text()
-        self.assertTrue(egress_violations('fm_slack.py', transport + '\n\ndef planted():\n    urllib.request.urlopen("https://example.invalid")\n'))
-        # A bypass inside a function that is allowed one kind of way out is still found for any other kind.
-        watch = (EGRESS_BIN / 'fm_slack_watch.py').read_text()
-        self.assertTrue(egress_violations('fm_slack_watch.py', watch.replace('def save(path, value):\n', 'def save(path, value):\n    print("x")\n', 1)))
+        real_save = plane.save
+        for label, (plant, kind) in planted.items():
+            with self.subTest(planted=label), self.fixture(env={'SLACK_SIGNING_SECRET': value}) as (watch, replay):
+                watch.lock.close()
+                home = watch.root.parent
+                transcript = str(home / 'transcript.json')
+                self.say(replay, '200.000100', 'a plain owner request')
+                replay.save()
+                for found in caught.values():
+                    found.clear()
+                ran = []
 
-    def test_the_transports_check_their_fields_before_any_byte_of_a_call_exists(self):
-        """Slack.call and Replay.call run the outbound check as their first act: before the request is built, before an attempt is recorded, before the
-        network or a log is touched."""
-        def first_act(module, qualified):
-            tree = ast.parse((EGRESS_BIN / module).read_text())
-            cls, name = qualified.split('.')
-            node = next(n for c in tree.body if isinstance(c, ast.ClassDef) and c.name == cls for n in c.body if isinstance(n, ast.FunctionDef) and n.name == name)
-            body = [s for s in node.body if not (isinstance(s, ast.Expr) and isinstance(s.value, ast.Constant))]
-            calls = [dotted_name(n.func) for s in body for n in ast.walk(s) if isinstance(n, ast.Call)]
-            return body, calls
-        body, calls = first_act('fm_slack_replay.py', 'Replay.call')
-        self.assertEqual(dotted_name(body[0].value.func), 'refuse_outbound')
-        body, calls = first_act('fm_slack.py', 'Slack.call')
-        index = [dotted_name(n.func) for s in body for n in ast.walk(s) if isinstance(n, ast.Call)]
-        self.assertIn('refuse_outbound', index)
-        self.assertLess(index.index('refuse_outbound'), index.index('urllib.request.Request'))
-        self.assertLess(index.index('refuse_outbound'), index.index('urllib.request.urlopen'))
+                def save(path, state, plant=plant):
+                    ran.append(path)
+                    try:
+                        plant(home)
+                    except AssertionError:
+                        pass
+                    return real_save(path, state)
+                before = scan(home)
+                out, err = Recorder(), Recorder()
+                with raw_descriptors(), patch.dict(os.environ, {'FM_SLACK_CHECK_ACTION': ''}), contextlib.redirect_stdout(out), \
+                     contextlib.redirect_stderr(err), patch.object(plane, 'save', save), patch('subprocess.Popen', popen), \
+                     patch('urllib.request.urlopen', opener), patch.object(Watch, 'bound', return_value='any-origin'), \
+                     patch.object(Watch, 'backlog', return_value=[]):
+                    plane.main(['poll', '--replay', transcript])
+                if scan(home) > before:
+                    caught['file'].append(label)
+                self.assertTrue(ran, label)
+                self.assertEqual(sorted(name for name, found in caught.items() if found), [kind] if kind else [], label)
 
 
 class ClosedTransportTest(unittest.TestCase):
