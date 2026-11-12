@@ -1,0 +1,13 @@
+test_a_bypass_of_every_kind_planted_at_run_time_is_caught_by_a_runtime_check (fm_slack_watch_test.IntakeTest.test_a_bypass_of_every_kind_planted_at_run_time_is_caught_by_a_runtime_check)
+Bad controls for the egress boundary, at run time: a poll runs on the transcript while a stub on its real call path (the save of its ... ok
+test_every_stream_write_of_every_command_goes_through_the_one_writer (fm_slack_watch_test.IntakeTest.test_every_stream_write_of_every_command_goes_through_the_one_writer)
+The runtime view of the egress boundary: standard output and standard error are replaced by streams that fail any write whose caller is ... ok
+test_the_four_commands_print_only_constants_and_none_of_them_can_carry_a_plane_value (fm_slack_watch_test.IntakeTest.test_the_four_commands_print_only_constants_and_none_of_them_can_carry_a_plane_value)
+arm, disarm, resolve and retarget (Main 3185): every one of those commands is run with a plane value equal to a constant it prints, and ... ok
+test_the_transports_refuse_a_call_whose_fields_hold_a_value_before_any_byte_exists (fm_slack_watch_test.IntakeTest.test_the_transports_refuse_a_call_whose_fields_hold_a_value_before_any_byte_exists)
+The real transport builds no request and the replay records no attempt for a call whose field (a string, or the JSON of a dict) holds a ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 2.519s
+
+OK
