@@ -107,6 +107,12 @@ SH
 exit 0
 SH
   chmod +x "$fb/sleep"
+  # These fixtures never own a real Herdr endpoint on the developer's host.
+  cat > "$fb/herdr" <<'SH'
+#!/usr/bin/env bash
+exit 1
+SH
+  chmod +x "$fb/herdr"
   cat > "$fb/fake-ssh" <<'SH'
 #!/usr/bin/env bash
 set -u
@@ -843,6 +849,248 @@ test_local_pending_does_not_close_resolve_key() {
   pass "fm-send local: an unconfirmed submit still never closes a --resolve-key decision"
 }
 
+test_remote_input_refusal_leaves_no_trace_with_writer_outages() {
+  local dir fb ssh_log home rhome rc writer existing events before after
+  dir="$TMP_ROOT/remote-input-refusal"; mkdir -p "$dir/copy"
+  cp -R "$ROOT/bin" "$dir/copy/bin"
+  fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; events="$dir/events.jsonl"
+  for writer in executable unavailable failed; do
+    [ "$writer" != unavailable ] || chmod -x "$dir/copy/bin/fm-guard-event.sh"
+    if [ "$writer" = failed ]; then
+      printf '#!/usr/bin/env bash\nexit 7\n' > "$dir/copy/bin/fm-guard-event.sh"
+      chmod +x "$dir/copy/bin/fm-guard-event.sh"
+    fi
+    for existing in no yes; do
+      rhome=$(setup_remote_secondmate_home "input-$writer-$existing")
+      home=$(setup_remote_parent_home "input-$writer-$existing" "$rhome")
+      if [ "$existing" = yes ]; then
+        FM_HOME="$rhome" FM_STATE_OVERRIDE="$rhome/state/parent-route" bash -c \
+          '. "$1"; fm_task_inbox_write "$2" rsm previous' _ \
+          "$ROOT/bin/fm-task-inbox-lib.sh" "$rhome/state/parent-route" >/dev/null
+        cp "$rhome/state/parent-route/rsm.inbox/001.msg" "$dir/previous.msg"
+      fi
+      before=$(find "$rhome/state/parent-route/rsm.inbox" -print 2>/dev/null | sort)
+      : > "$events"; : > "$ssh_log"
+      rc=0
+      send_env "$fb" "$home" "$ssh_log" FM_REMOTE_CODE_ROOT="$dir/copy" FM_GUARD_EVENT_LOG="$events" \
+        "$ROOT/bin/fm-on.sh" rsm fm-remote-secondmate-control.sh send rsm 'Use inputs' \
+        --require-input first.md --require-input last.md > "$dir/out" 2> "$dir/err" || rc=$?
+      expect_code 4 "$rc" "receiving-host validator refusal must remain distinct"
+      assert_contains "$(cat "$dir/err")" 'first.md' "remote refusal names the first input"
+      assert_contains "$(cat "$dir/err")" 'last.md' "remote refusal names the last input"
+      assert_contains "$(cat "$dir/err")" "receiver 'rsm'" "remote refusal names its receiver"
+      assert_not_contains "$(cat "$dir/err")" 'record could not be written' "remote input refusal must not claim a write failure"
+      after=$(find "$rhome/state/parent-route/rsm.inbox" -print 2>/dev/null | sort)
+      [ "$before" = "$after" ] || fail "remote refusal changed the inbox tree"
+      [ "$existing" != no ] || [ ! -e "$rhome/state/parent-route/rsm.inbox" ] || fail "remote refusal created an inbox"
+      if [ "$existing" = yes ]; then
+        cmp -s "$dir/previous.msg" "$rhome/state/parent-route/rsm.inbox/001.msg" || fail "remote refusal changed an existing record"
+      fi
+      if [ "$writer" = executable ]; then
+        jq -es 'map(select(.guard == "send-task-prerequisites" and .decision == "deny" and .task == "rsm")) | length == 1' "$events" >/dev/null \
+          || fail "remote refusal needs exactly one receiver-attributed event"
+      else
+        [ ! -s "$events" ] || fail "unavailable or failing remote writer unexpectedly wrote a row"
+      fi
+      printf 'remote-input-refusal writer=%s existing=%s exit=%s stderr=%s\n' "$writer" "$existing" "$rc" "$(cat "$dir/err")"
+    done
+  done
+  pass "remote host: input refusal preserves status, cause and inbox under working, unavailable or failing telemetry"
+}
+
+test_declared_remote_input_is_reported_without_access_grants() {
+  local dir fb ssh_log home rhome rc before after rec corr body
+  dir="$TMP_ROOT/required-remote-input"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
+  rhome=$(setup_remote_secondmate_home required-input)
+  home=$(setup_remote_parent_home required-input "$rhome")
+  mkdir -p "$rhome/data"
+  printf 'source report\n' > "$home/data/required.md"
+  printf 'undeclared source neighbor\n' > "$home/data/neighbor.md"
+  chmod 600 "$home/data/required.md" "$home/data/neighbor.md"
+  before=$(LC_ALL=C ls -ld "$home/data" "$home/data/required.md" "$home/data/neighbor.md" "$rhome/data")
+  rc=0
+  send_env "$fb" "$home" "$ssh_log" FM_GUARD_EVENT_LOG="$dir/input-events.jsonl" "$SEND" rsm --relay --require-input data/required.md \
+    'Use the declared input report' > "$dir/out" 2> "$dir/err" || rc=$?
+  [ "$rc" -ne 0 ] || fail "sender-only file was accepted as an accessible remote input"
+  assert_contains "$(cat "$dir/err")" 'data/required.md' "remote failure must name the declared artifact"
+  assert_contains "$(cat "$dir/err")" "receiver 'rsm'" "remote failure must name its actual receiver"
+  jq -es 'map(select(.guard == "send-task-prerequisites")) | length == 1 and .[0].decision == "deny" and .[0].rule == "required-input" and .[0].task == "rsm"' "$dir/input-events.jsonl" >/dev/null \
+    || fail "missing remote input must emit one receiver-attributed denial"
+  [ -z "$(remote_inbox_records "$rhome")" ] || fail "missing required input published a remote steer"
+  [ -z "$(pending_record "$home")" ] || fail "missing required input left a false pending reply"
+  [ ! -e "$rhome/data/required.md" ] && [ ! -e "$rhome/data/neighbor.md" ] \
+    || fail "validation silently transferred declared or undeclared files"
+  after=$(LC_ALL=C ls -ld "$home/data" "$home/data/required.md" "$home/data/neighbor.md" "$rhome/data")
+  [ "$before" = "$after" ] || fail "input failure changed file or directory permissions"
+  # Fixture setup makes only the declared input available, without extending
+  # the production transfer writer beyond its existing handoff confinement.
+  cp "$home/data/required.md" "$rhome/data/required.md"
+  rc=0
+  send_env "$fb" "$home" "$ssh_log" "$SEND" rsm --require-input data/required.md \
+    'Use the declared input report' > "$dir/out" 2> "$dir/err" || rc=$?
+  expect_code 0 "$rc" "a receiver-accessible declared input should allow delivery"
+  rec=$(remote_inbox_records "$rhome")
+  body=$(cat "$rec")
+  case "$(fm_task_inbox_body "$rec")" in
+    *' Use the declared input report') : ;;
+    *) fail "a declared input changed the delivered remote message"$'\n'"$body" ;;
+  esac
+  corr=$(fm_pending_reply_extract_corr "$body")
+  [ -n "$corr" ] || fail "input steer lost its request identity"
+  # A declared input is checked even on an idempotent retry. Removing it must
+  # refuse before another expectation, record or doorbell, preserving the old
+  # record byte for byte rather than reporting delivery of an unusable input.
+  cp "$rec" "$dir/original.msg"
+  rm "$rhome/data/required.md"
+  rc=0
+  send_env "$fb" "$home" "$ssh_log" FM_PENDING_REPLY_EXISTING_CORR="$corr" \
+    "$SEND" rsm --require-input data/required.md 'Use the declared input report' \
+    > "$dir/retry.out" 2> "$dir/retry.err" || rc=$?
+  expect_code 4 "$rc" "an unhandled retry must validate a declared input"
+  assert_contains "$(cat "$dir/retry.err")" 'earlier record is unchanged' "retry refusal explains prior record is unchanged"
+  cmp -s "$dir/original.msg" "$rec" || fail "input refusal changed original record"
+  [ "$(remote_inbox_records "$rhome")" = "$rec" ] || fail "input retry added a record"
+  printf 'restored report\n' > "$rhome/data/required.md"
+  mv "$rec" "$rhome/state/parent-route/rsm.inbox/handled/"
+  rc=0
+  send_env "$fb" "$home" "$ssh_log" FM_PENDING_REPLY_EXISTING_CORR="$corr" \
+    "$SEND" rsm --require-input data/required.md 'Use the declared input report' \
+    > "$dir/retry-present.out" 2> "$dir/retry-present.err" || rc=$?
+  expect_code 0 "$rc" "an accessible declared-input retry still deduplicates"
+  [ -z "$(remote_inbox_records "$rhome")" ] || fail "accessible retry duplicated the instruction"
+  cmp -s "$dir/original.msg" "$rhome/state/parent-route/rsm.inbox/handled/001.msg" || fail "retry changed the handled record"
+  pass "fm-send remote: receiver inputs gate unhandled retries, and accessible retries preserve the original record"
+}
+
+test_remote_input_check_transport_failure_is_not_a_missing_input() {
+  local dir fb ssh_log home rhome rc err began elapsed events
+  dir="$TMP_ROOT/input-check-transport"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
+  rhome=$(setup_remote_secondmate_home input-check-transport)
+  home=$(setup_remote_parent_home input-check-transport "$rhome")
+  mkdir -p "$rhome/data"
+  printf 'receiver report\n' > "$rhome/data/required.md"
+  events="$dir/events.jsonl"
+  for mode in lost bounded unattended; do
+    : > "$events"; printf '0\n' > "$ssh_log.count"
+    rc=0
+    began=$(date +%s)
+    case "$mode" in
+      lost)
+        send_env "$fb" "$home" "$ssh_log" FM_FAKE_SSH_RC=255 FM_GUARD_EVENT_LOG="$events" \
+          "$SEND" rsm --require-input data/required.md 'Use the declared input report' \
+          >"$dir/out" 2>"$dir/err" || rc=$? ;;
+      bounded)
+        send_env "$fb" "$home" "$ssh_log" FM_FAKE_SSH_HANG=25 FM_SEND_REMOTE_BUDGET=2 FM_GUARD_EVENT_LOG="$events" \
+          "$SEND" rsm --require-input data/required.md 'Use the declared input report' \
+          >"$dir/out" 2>"$dir/err" || rc=$? ;;
+      unattended)
+        send_env "$fb" "$home" "$ssh_log" FM_FAKE_SSH_RC=255 FM_GUARD_EVENT_LOG="$events" \
+          "$ROOT/bin/fm-send-unattended.sh" rsm --require-input data/required.md 'Use the declared input report' \
+          >"$dir/out" 2>"$dir/err" || rc=$? ;;
+    esac
+    elapsed=$(( $(date +%s) - began ))
+    err=$(cat "$dir/err")
+    expect_code 1 "$rc" "an input check that could not run must not exit as a validation refusal ($mode): $err"
+    [ "$elapsed" -le 15 ] || fail "the input check waited ${elapsed}s behind the transport ($mode)"
+    assert_contains "$err" "could not be checked on receiver 'rsm'" "the check failure must name its receiver ($mode)"
+    assert_contains "$err" 'data/required.md' "the check failure must name the declared input ($mode)"
+    assert_not_contains "$err" 'refused required input' "a transport failure must not report the input as missing ($mode)"
+    assert_not_contains "$err" 'Stage only this declared artifact' "a transport failure must not ask to stage the input ($mode)"
+    [ "$(cat "$ssh_log.count")" = 1 ] || fail "an unchecked input must stop before the enqueue leg ($mode), got $(cat "$ssh_log.count") attempts"
+    jq -es 'map(select(.guard == "send-task-prerequisites")) | length == 0' "$events" >/dev/null \
+      || fail "a transport failure recorded an input decision ($mode): $(cat "$events")"
+    [ -z "$(remote_inbox_records "$rhome")" ] || fail "an unchecked input published a remote steer ($mode)"
+    [ -z "$(pending_record "$home")" ] || fail "an unchecked input armed a pending reply ($mode)"
+    if [ -f "$home/state/rsm.status" ]; then
+      assert_not_contains "$(cat "$home/state/rsm.status")" 'unattended-steer' \
+        "a transport failure must not open an unattended hold ($mode)"
+    fi
+  done
+  mv "$home/data/secondmates.md" "$dir/secondmates.md"
+  : > "$events"; printf '0\n' > "$ssh_log.count"
+  rc=0
+  send_env "$fb" "$home" "$ssh_log" FM_GUARD_EVENT_LOG="$events" \
+    "$SEND" rsm --require-input data/required.md 'Use the declared input report' \
+    >"$dir/out" 2>"$dir/err" || rc=$?
+  err=$(cat "$dir/err")
+  expect_code 1 "$rc" "a local route failure must not exit as a validation refusal: $err"
+  assert_contains "$err" "could not be checked on receiver 'rsm'" "a local route failure must say the input was not checked"
+  assert_not_contains "$err" 'refused required input' "a local route failure must not report the input as missing"
+  [ "$(cat "$ssh_log.count")" = 0 ] || fail "a local route failure reached the transport"
+  jq -es 'map(select(.guard == "send-task-prerequisites")) | length == 0' "$events" >/dev/null \
+    || fail "a local route failure recorded an input decision: $(cat "$events")"
+  [ -z "$(remote_inbox_records "$rhome")" ] || fail "a local route failure published a remote steer"
+  [ -z "$(pending_record "$home")" ] || fail "a local route failure armed a pending reply"
+  mv "$dir/secondmates.md" "$home/data/secondmates.md"
+  pass "fm-send remote: a lost, bounded or unrouted input check exits 1 without a missing-input refusal or hold"
+}
+
+test_declared_input_cannot_expand_transfer_confinement() {
+  local dir fb ssh_log home rhome rc before after
+  dir="$TMP_ROOT/confined-input"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
+  rhome=$(setup_remote_secondmate_home confined-input)
+  home=$(setup_remote_parent_home confined-input "$rhome")
+  mkdir -p "$rhome/data"
+  printf 'outside sentinel, must not be opened\n' > "$dir/outside.md"
+  chmod 600 "$dir/outside.md"
+  ln -s "$dir/outside.md" "$rhome/data/escape.md"
+  before=$(LC_ALL=C ls -ld "$dir/outside.md" "$rhome/data" "$rhome/data/escape.md")
+  rc=0
+  send_env "$fb" "$home" "$ssh_log" "$SEND" rsm --require-input data/escape.md \
+    'Use the declared input' > "$dir/out" 2> "$dir/err" || rc=$?
+  [ "$rc" -ne 0 ] || fail "declared input bypassed the existing symlink confinement"
+  [ -z "$(remote_inbox_records "$rhome")" ] || fail "unsafe declared input published a steer"
+  after=$(LC_ALL=C ls -ld "$dir/outside.md" "$rhome/data" "$rhome/data/escape.md")
+  [ "$before" = "$after" ] || fail "validation broadened the existing access"
+  assert_not_contains "$(cat "$dir/out" "$dir/err")" 'outside sentinel' "validation must not read or disclose input contents"
+  rc=0
+  send_env "$fb" "$home" "$ssh_log" "$SEND" rsm --require-input "$dir/outside.md" \
+    'Use the declared input' > "$dir/out" 2> "$dir/err" || rc=$?
+  [ "$rc" -ne 0 ] || fail "an absolute input escaped the existing receiving-home confinement"
+  [ -z "$(remote_inbox_records "$rhome")" ] || fail "outside input published a steer"
+  pass "fm-send remote: declaring an input grants neither symlink escape nor broader file access"
+}
+
+test_remote_wrong_owner_and_logged_relay() {
+  local dir fb ssh_log home rhome rc events rec
+  dir="$TMP_ROOT/remote-owner"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
+  rhome=$(setup_remote_secondmate_home remote-owner)
+  home=$(setup_remote_parent_home remote-owner "$rhome")
+  fm_write_meta "$home/state/task-one.meta" "window=sess:fm-task-one" "kind=ship"
+  events="$home/state/guard-events.jsonl"
+  rc=0
+  send_env "$fb" "$home" "$ssh_log" FM_GUARD_EVENT_LOG="$events" "$SEND" rsm 'Continue task-one' > "$dir/out" 2> "$dir/err" || rc=$?
+  expect_code 1 "$rc" "remote wrong-owner steer must fail before transport"
+  [ ! -s "$ssh_log" ] || fail "remote wrong-owner refusal used transport"
+  [ -z "$(remote_inbox_records "$rhome")" ] || fail "remote refusal published an instruction"
+  [ -z "$(pending_record "$home")" ] || fail "remote refusal armed a pending reply"
+  jq -es 'map(select(.guard == "send-task-prerequisites")) | length == 1 and .[0].decision == "deny" and .[0].task == "task-one"' "$events" >/dev/null \
+    || fail "remote wrong-owner denial must be attributed once"
+  : > "$events"
+  rc=0
+  send_env "$fb" "$home" "$ssh_log" FM_GUARD_EVENT_LOG="$events" "$SEND" rsm --relay 'Continue task-one' > "$dir/out" 2> "$dir/err" || rc=$?
+  expect_code 0 "$rc" "deliberate remote relay must send"
+  rec=$(remote_inbox_records "$rhome")
+  case "$(fm_task_inbox_body "$rec")" in
+    *' Continue task-one') : ;;
+    *) fail "remote relay changed instruction" ;;
+  esac
+  jq -es 'map(select(.guard == "send-task-prerequisites")) | length == 1 and .[0].decision == "bypass" and .[0].override == true and .[0].task == "task-one"' "$events" >/dev/null \
+    || fail "remote relay must emit one effective escape"
+  pass "fm-send remote: wrong-owner refusal precedes transport and explicit relay is attributed once"
+}
+
+fm_test_only
+
+test_remote_input_refusal_leaves_no_trace_with_writer_outages
+test_remote_wrong_owner_and_logged_relay
+test_declared_remote_input_is_reported_without_access_grants
+test_declared_input_cannot_expand_transfer_confinement
+test_remote_input_check_transport_failure_is_not_a_missing_input
 test_remote_steer_lands_in_remote_inbox
 test_remote_rerun_is_idempotent
 test_remote_retry_failure_preserves_ambiguous_expectation

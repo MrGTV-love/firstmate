@@ -1804,24 +1804,29 @@ test_terminal_passed_with_merged_gitlab_mr_reports_merged() {
 # "timed out; try again" so it is not mistaken for a read that failed.
 test_forge_read_bound_follows_the_measured_ledger() {
   reset_fakes
-  local d out ledger i
+  local d out ledger bound i
   d=$(new_case passed-forge-read-measured)
   make_repo_on_branch "$d/wt" fm/feat-dforgeslow
   make_fakebin "$d" >/dev/null
   fm_write_meta "$d/state/feat-dforgeslow.meta" "window=fm:fm-feat-dforgeslow" \
     "worktree=$d/wt" "kind=ship" "pr=https://gitlab.com/group/repo/-/merge_requests/14"
-  ledger="$d/durations.jsonl"
+  # TMPDIR may be inside another checkout; keep its ledger in the fixture home's
+  # data directory so the unchanged duration guard accepts both writes and reads.
+  ledger="$d/data/durations.jsonl"
   for i in 1 2 3 4 5; do
-    FM_DURATION_FILE="$ledger" python3 "$ROOT/bin/fm-duration.py" record crew-state.forge-read 5000 0 >/dev/null 2>&1 \
+    FM_DURATION_HOME="$d" FM_DURATION_FILE="$ledger" python3 "$ROOT/bin/fm-duration.py" record crew-state.forge-read 5000 0 \
       || fail "could not seed the duration ledger"
   done
+  bound=$(FM_DURATION_HOME="$d" FM_DURATION_FILE="$ledger" python3 "$ROOT/bin/fm-duration.py" limit crew-state.forge-read --fallback 5) \
+    || fail "could not read the seeded duration bound"
+  [ "$bound" = 15 ] || fail "the seeded ledger must supply the measured bound before the forge read (got: $bound)"
   FM_FAKE_GLAB_STATE=opened
   FM_FAKE_AXI_STATUS="$(run_passed_with_pr fm/feat-dforgeslow https://gitlab.com/group/repo/-/merge_requests/14)"
   FM_FAKE_GLAB_READ_DELAY=8
-  out=$(FM_DURATION_FILE="$ledger" run_crew_state "$d" feat-dforgeslow)
+  out=$(FM_DURATION_HOME="$d" FM_DURATION_FILE="$ledger" run_crew_state "$d" feat-dforgeslow)
   assert_contains "$out" "run passed: PR open" "a forge read slower than the cold-start floor but inside the measured bound was dropped"
   FM_FAKE_GLAB_READ_DELAY=40
-  out=$(FM_DURATION_FILE="$ledger" run_crew_state "$d" feat-dforgeslow)
+  out=$(FM_DURATION_HOME="$d" FM_DURATION_FILE="$ledger" run_crew_state "$d" feat-dforgeslow)
   assert_contains "$out" "run passed: PR state unknown (forge read timed out; try again)" "a forge read that never answered was not reported as a timeout"
   assert_not_contains "$out" "(unreadable)" "a timed-out forge read was reported as an unreadable one"
   assert_not_contains "$out" "PR merged" "a timed-out forge read must not be reported merged"
@@ -3275,8 +3280,9 @@ test_no_run_idle_pane_uses_keyed_log() {
   arm_idle_record "$d/state" feat-keyed
   local out; out=$(run_crew_state "$d" feat-keyed)
   assert_contains "$out" "state: parked" "keyed needs-decision log -> parked"
-  assert_contains "$out" "which database?" "key token is excluded from status detail"
-  pass "no run + idle pane parses keyed status syntax"
+  assert_contains "$out" "which database?" "the dependency detail remains visible"
+  assert_contains "$out" "[key=q1]" "the open dependency key remains actionable"
+  pass "no run + idle pane preserves the dependency key and detail"
 }
 
 # (g') no run + idle pane on a DECLARED external-wait pause -> state: paused, so a

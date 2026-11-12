@@ -1371,9 +1371,9 @@ fm_config_reread_send_pointer() {
     return 1
   fi
   selector="fm-$id"
-  send_bin="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/fm-send.sh"
+  send_bin="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/fm-send-unattended.sh"
   if [ ! -x "$send_bin" ]; then
-    fm_config_reread_send_failure "$id" "$instruction_path" "$pending_path" "fm-send.sh not executable at $send_bin"
+    fm_config_reread_send_failure "$id" "$instruction_path" "$pending_path" "unattended steer entry point not executable at $send_bin"
     return 1
   fi
   if [ -z "${FM_HOME:-}" ]; then

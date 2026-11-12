@@ -154,11 +154,52 @@
     "compact-adviser",
     "secondmate-inherit",
     "secondmate-sync",
+    "send-task-prerequisites",
     "check-event-output-integrity",
     "slack-call-fields-hold-a-plane-value",
     "slack-command-refusal-line"
   ],
   "guards": [
+    {
+      "id": "send-task-prerequisites",
+      "owner": "bin/fm-send.sh",
+      "emitters": ["bin/fm-remote-secondmate-control.sh", "bin/fm-send-unattended.sh"],
+      "invariant": "a text steer satisfies recorded task ownership or an explicit relay and its declared receiving-host input prerequisites before publication",
+      "source": "this home's state/<id>.meta direct reports, fm-remote-file.sh check on the receiving host, and an unresolved unattended-refusal note event in the existing task status log",
+      "trigger": "message names another recorded task owner without --relay, an explicitly declared required input is inaccessible, or the caller is holding that prerequisite refusal for Firstmate handling",
+      "remedy": "FM_HOME=<home> bin/fm-send.sh <recorded-owner> <message>; for a deliberate cross-task mention use bin/fm-send.sh <target> --relay <message>; stage a missing declared input through the authorized transfer before retrying; Firstmate handles the surfaced instruction and appends resolved [key=unattended-steer] before automatic sending resumes",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "budget": 1,
+      "test": "tests/fm-send-strict.test.sh",
+      "sites": [
+        {"file": "bin/fm-send.sh", "match": "error: refused task"},
+        {"file": "bin/fm-send.sh", "match": "error: refused required input"},
+        {"file": "bin/fm-send.sh", "match": "send-task-prerequisites deny", "count": 2},
+        {"file": "bin/fm-send.sh", "match": "send-task-prerequisites bypass"},
+        {"file": "bin/fm-remote-secondmate-control.sh", "match": "error: refused required input"},
+        {"file": "bin/fm-remote-secondmate-control.sh", "match": "send-task-prerequisites deny"},
+        {"file": "bin/fm-send-unattended.sh", "match": "send-task-prerequisites warn"}
+      ],
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [
+        {
+          "case": "--relay deliberately addresses a task other than the recorded owner",
+          "derivation": "Main 716 item 2 and SO2 require deliberate cross-task relays; Main 933/977 retain --relay as the designed escape, not broader decision or input authority; every effective use is logged",
+          "demotion": "send-task-relay-demotion"
+        }
+      ],
+      "instrumented": true,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "layer": "runtime-block",
+      "tier": "C",
+      "harm": "reversible",
+      "remedy_verified": "fixture"
+    },
     {
       "id": "backlog-transition",
       "owner": "bin/fm-backlog-transition-lib.sh",

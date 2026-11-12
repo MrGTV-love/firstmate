@@ -144,6 +144,30 @@ age_path() {  # <path>  (set mtime well past any grace under test)
   touch -t 202001010000 "$1"
 }
 
+test_validator_refusal_has_no_inbox_effect() {
+  local state fn rc rec
+  for fn in fm_task_inbox_write fm_task_inbox_write_idempotent; do
+    state="$TMP_ROOT/validator-$fn/state"; mkdir -p "$state"
+    rc=0
+    inbox_lib "$state" "$fn" "$state" t1 'use input' '' false >/dev/null || rc=$?
+    expect_code 4 "$rc" "validator refusal must differ from generic write failure"
+    [ ! -e "$state/t1.inbox" ] || fail "validator refusal created inbox entries"
+    rec=$(inbox_lib "$state" "$fn" "$state" t1 'use input') || fail "fixture enqueue failed"
+    cp "$rec" "$state/original.msg"
+    rc=0
+    inbox_lib "$state" "$fn" "$state" t1 'use input' '' false >/dev/null || rc=$?
+    expect_code 4 "$rc" "retry must not skip input validation"
+    cmp -s "$state/original.msg" "$rec" || fail "validator refusal changed existing record"
+    [ ! -e "$state/t1.inbox/002.msg" ] || fail "validator refusal published a second record"
+    [ ! -e "$state/t1.inbox/.seq.lock" ] || fail "validator refusal left sequence lock"
+    printf 'not a directory\n' > "$state/t2.inbox"
+    rc=0
+    inbox_lib "$state" "$fn" "$state" t2 'ordinary write' >/dev/null 2>&1 || rc=$?
+    expect_code 1 "$rc" "a generic write failure without a validator must stay generic"
+  done
+  pass "inbox: validator refusal returns 4 before mutation, including an existing dedup match"
+}
+
 test_write_is_durable_and_exact() {
   local state rec rec2 doorbell doorbell2 doorbell3 expected actual expected2 actual2 text
   state="$TMP_ROOT/write/state"; mkdir -p "$state"
@@ -1202,6 +1226,7 @@ test_watcher_holds_retry_while_the_worker_decides() {
   pass "watcher: a fire-and-forget retry waits out the worker's own decision, then rings once"
 }
 
+
 test_watcher_retry_keeps_a_newer_mark() {
   local dir state log fire newer rings
   dir=$(setup_watch_case faf-retry-newer)
@@ -1302,6 +1327,7 @@ test_watcher_dead_pane_ignores_stale_busy_state() {
   pass "watcher: dead-pane recovery overrides stale busy state"
 }
 
+test_validator_refusal_has_no_inbox_effect
 test_write_is_durable_and_exact
 test_doorbell_is_a_shell_noop
 test_doorbell_rejects_terminal_controls

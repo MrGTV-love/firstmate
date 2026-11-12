@@ -31,6 +31,8 @@
 # heartbeat:
 #
 #   state: <working|parked|done|blocked|paused|failed|unknown> · source: <run-step|pane|status-log|remote-endpoint|none> · <detail>
+# A keyed parked/blocked status-log dependency retains its [key=<id>] after
+# the worker's detail so its reported prerequisite remains actionable.
 #
 # An omp session that publishes a live-model record (bin/fm-omp-live-model.ts)
 # adds trailing components, after any detail, on every line this helper prints:
@@ -294,8 +296,18 @@ nm_note_cut() {  # <exit-status>
 
 # Emit the one canonical line and exit 0. Detail is optional.
 emit() {  # <state> <source> [detail]
-  local line="state: $1${SEP}source: $2"
+  local line="state: $1${SEP}source: $2" key=''
   [ -n "${3:-}" ] && line="$line${SEP}$3"
+  # Keep the authoritative open dependency actionable without calling an
+  # acknowledged instruction unread or changing the worker's reported detail.
+  case "$1:$2" in
+    parked:status-log|blocked:status-log)
+      if [ -n "${LOG_LINE:-}" ]; then
+        key=$(_fm_decision_key "$LOG_LINE" '') || key=''
+        [ -z "$key" ] || line="$line${SEP}[key=$key]"
+      fi
+      ;;
+  esac
   [ -z "$LIVE_NOTE" ] || line="$line$LIVE_NOTE"
   printf '%s\n' "$line"
   exit 0

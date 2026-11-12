@@ -7,7 +7,10 @@
 #   fm-remote-secondmate-control.sh state <id>
 #   fm-remote-secondmate-control.sh route <id>
 #   fm-remote-secondmate-control.sh stay <id>
-#   fm-remote-secondmate-control.sh send <id> <message> [fire-and-forget]
+#   fm-remote-secondmate-control.sh send <id> <message> [fire-and-forget] [--require-input <path>]...
+# Required input declarations are metadata-checked on this receiving host,
+# under fm-remote-file.sh's existing confinement, before a new record is
+# published. Retries of an already-delivered record retain their dedup outcome.
 #   fm-remote-secondmate-control.sh key <id> <key>
 #   fm-remote-secondmate-control.sh capture <id> [lines]
 #   fm-remote-secondmate-control.sh observe <id>
@@ -70,7 +73,7 @@ CONTROL_DATA="$TARGET_HOME/data/.parent-route"
 REMOTE_HERDR_SESSION=fm-remote
 
 die() { printf 'error: %s\n' "$1" >&2; exit 1; }
-usage() { sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
+usage() { sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
 validate_id() { case "$1" in ''|*[!A-Za-z0-9._-]*) die "invalid secondmate id: $1" ;; esac; }
 
 # Sourcing fm-wake-lib.sh through the libraries below creates "$FM_HOME/state",
@@ -336,10 +339,35 @@ cmd_stay() {
     "$SCRIPT_DIR/fm-control.sh" "$id" stay
 }
 
+remote_send_check_inputs() { # <newline-delimited-inputs> <receiver-id>
+  local declared=$1 id=$2 input rc failed=0 reason
+  [ -n "$declared" ] || return 0
+  while IFS= read -r input; do
+    rc=0
+    "$SCRIPT_DIR/fm-remote-file.sh" check "$input" >/dev/null 2>&1 || rc=$?
+    [ "$rc" -ne 0 ] || continue
+    failed=1
+    reason='unavailable to'
+    [ "$rc" -ne 5 ] || reason='outside the transfer boundary for'
+    printf "error: refused required input '%s': %s receiver '%s' on its receiving host; nothing was sent and any earlier record is unchanged; stage only this declared artifact through the existing authorized transfer mechanism; no access was granted\n" "$input" "$reason" "$id" >&2
+  done <<< "$declared"
+  [ "$failed" -ne 0 ] || return 0
+  "$SCRIPT_DIR/fm-guard-event.sh" send-task-prerequisites deny --rule required-input --task "$id" 2>/dev/null || true
+  return "$FM_TASK_INBOX_INPUT_REFUSED"
+}
+
 cmd_send() {
-  local id=$1 message=$2 delivery_mode=${3:-} rec ring_rc=0 meta meta_lock
+  local id=$1 message=$2 delivery_mode='' required_inputs='' input rec ring_rc=0 meta meta_lock write_rc=0
+  shift 2
+  if [ "${1:-}" = fire-and-forget ]; then delivery_mode=$1; shift; fi
+  while [ "$#" -gt 0 ]; do
+    [ "$1" = --require-input ] && [ "$#" -ge 2 ] && [ -n "$2" ] || die "invalid send input declaration"
+    input=$2
+    case "$input" in *$'\n'*|*$'\r'*|*$'\t'*) die "declared input path contains control characters" ;; esac
+    required_inputs="${required_inputs}${required_inputs:+$'\n'}$input"
+    shift 2
+  done
   validate_id "$id"
-  [ -z "$delivery_mode" ] || [ "$delivery_mode" = fire-and-forget ] || die "invalid send delivery mode"
   validate_home "$id"
   meta=$(meta_path "$id")
   meta_lock=$(fm_meta_lock_path "$meta") || die "remote secondmate metadata lock path is invalid"
@@ -358,8 +386,11 @@ cmd_send() {
   # the parent may safely repeat this leg. Exit 0 once the record durably
   # exists; no ring outcome changes it, because the parent transport owns any
   # retry or reply-tracking policy from here.
-  if ! rec=$(fm_task_inbox_write_idempotent "$CONTROL_STATE" "$id" "$message" "$delivery_mode"); then
+  rec=$(fm_task_inbox_write_idempotent "$CONTROL_STATE" "$id" "$message" "$delivery_mode" \
+    remote_send_check_inputs "$required_inputs" "$id") || write_rc=$?
+  if [ "$write_rc" -ne 0 ]; then
     fm_lock_release "$meta_lock"
+    [ "$write_rc" -ne "$FM_TASK_INBOX_INPUT_REFUSED" ] || return "$write_rc"
     die "steering-inbox record could not be written under $CONTROL_STATE/$id.inbox"
   fi
   fm_lock_release "$meta_lock"
@@ -504,7 +535,7 @@ case "${1:-}" in
   state) shift; [ "$#" -eq 1 ] || usage; validate_id "$1"; validate_home "$1"; state_value "$1" ;;
   route) shift; [ "$#" -eq 1 ] || usage; cmd_route "$1" ;;
   stay) shift; [ "$#" -eq 1 ] || usage; cmd_stay "$1" ;;
-  send) shift; [ "$#" -ge 2 ] && [ "$#" -le 3 ] || usage; cmd_send "$@" ;;
+  send) shift; [ "$#" -ge 2 ] || usage; cmd_send "$@" ;;
   key) shift; [ "$#" -eq 2 ] || usage; cmd_key "$@" ;;
   capture) shift; [ "$#" -ge 1 ] && [ "$#" -le 2 ] || usage; cmd_capture "$@" ;;
   observe) shift; [ "$#" -eq 1 ] || usage; cmd_observe "$@" ;;

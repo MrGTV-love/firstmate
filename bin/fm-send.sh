@@ -1,7 +1,40 @@
 #!/usr/bin/env bash
 # Steer a task by durable record: write the message into the task's steering
 # inbox and ring its doorbell (bin/fm-task-inbox-lib.sh), best-effort.
-# Usage: fm-send.sh <target> [--resolve-key <key>]... [--fire-and-forget <delivery-id>] <text...>
+# Usage: fm-send.sh <target> [--relay] [--require-input <path>]... [--resolve-key <key>]... [--fire-and-forget <delivery-id>] <text...>
+# --require-input declares a required artifact on the receiving host, relative
+# to its FM_HOME or absolute within that home (a local task's recorded worktree
+# is also allowed). Only declared inputs are checked, under the existing file
+# transfer's confinement before any delivery or reply-tracking effect, including
+# an idempotent retry. Validation refusal exits 4 (FM_TASK_INBOX_INPUT_REFUSED
+# in fm-task-inbox-lib.sh); other write failures retain their existing status.
+# A check that cannot answer (a local fm-on.sh route failure, remote transport
+# failure or its FM_SEND_REMOTE_BUDGET bound) exits 1 and never reports the
+# input as missing.
+# An input outside the receiving boundary is reported as outside the transfer
+# boundary, not as missing. Missing/inaccessible inputs name receiver and path: stage the
+# declared artifact through the existing authorized transfer, then correct the
+# instruction. No automatic transfer, permission grant, or resend is added.
+# Ordinary output/example/other-host paths in message text are never validated.
+# Declarations never change the delivered message bytes; --relay does
+# not bypass their validation. Keys and unrecorded endpoints cannot declare inputs.
+# Text naming a whole task id recorded in this home's state/<id>.meta, or its
+# legacy fm-<id> label, must target that owner. A task id inside a path is not
+# checked, so a wrong-owner path mention such as data/<other-id>/review.md is
+# accepted. A separate task-id token inside a quoted path with spaces is still
+# a mention and needs its owner or --relay. A URL scheme or drive letter that
+# is itself a recorded id also counts. Shared explicit endpoints own every task
+# whose recorded endpoint equals that target. The pending-reply repost relays
+# its already-routed request.
+# A wrong-owner steer, including an unmatched explicit endpoint naming a
+# recorded task, is refused before enqueue, reply tracking, or typing and names
+# the correct selector. Send a refused steer to that owner, or use --relay before
+# the text only for a deliberate cross-task mention. --relay is this guard's
+# registered escape; every effective use is logged through fm-guard-event.sh.
+# It changes only ownership checking, never decision, lease, target, declared
+# input, or delivery safeguards.
+# Tasks owned inside a secondmate's home are not inferred from that home:
+# without a direct-report meta here, their mentions remain ordinary text.
 #   <target> may be an exact task id, a legacy fm-<id> task label resolved
 #   through this home's state/<id>.meta, or an explicit well-formed backend
 #   target. fm-send refuses unresolved guesses rather than falling back to a
@@ -25,8 +58,9 @@
 # doorbell line plus Enter, best-effort. The durable record IS
 # the delivery, so the record's fate alone governs the exit: 0 = the steer is
 # durably sent (recorded); nonzero = nothing was confirmed delivered and a
-# resend is appropriate (unresolvable target, an endpoint that cannot be
-# locked and revalidated or that retired or changed, an unwritable record, a
+# corrected send is appropriate (a wrong-owner refusal must be addressed to
+# its named owner or explicitly relayed; an unresolvable target, an endpoint
+# that cannot be locked and revalidated or that retired or changed, an unwritable record, a
 # failed or lost remote transport) or a decision-close append failed after
 # delivery (the error then carries the exact manual close). The remote enqueue
 # is idempotent: the remote leg deduplicates an exact re-run of the same
@@ -277,6 +311,100 @@ fm_send_id_from_meta() { # <meta-file>
   printf '%s' "${base%.meta}"
 }
 
+# fm_send_split_trailing_dots: read one token per line and print, for each, the
+# count of '.' characters that end it, a tab, and the token without them. awk
+# copies the whole line on every substr call, so the run is found by binary
+# search (about twenty passes) instead of one call per dot.
+fm_send_split_trailing_dots() {
+  LC_ALL=C awk '{
+    n = length($0); lo = 0; hi = n
+    while (lo < hi) {
+      mid = int((lo + hi + 1) / 2)
+      if (substr($0, n - mid + 1) ~ /[^.]/) hi = mid - 1; else lo = mid
+    }
+    printf "%d\t%s\n", lo, substr($0, 1, n - lo)
+  }'
+}
+
+# fm_send_resolve_mention <text> <dots>: set MENTION_ID to the recorded task id
+# that the token <text> followed by <dots> trailing '.' characters mentions
+# (rule M), or to nothing. The caller has split the token so <text> does not
+# end in '.'. Forms are tried from the longest, all dots kept, down to <text>
+# alone: an exact meta first, then the legacy fm-<id> label, and the first form
+# that resolves wins. Every form is matched by string against RECORDED_IDS, the
+# newline-framed ids read once per message by fm_send_load_recorded_ids, so a
+# case-insensitive volume cannot resolve a token to a spelling no meta has. Up
+# to eight dots are tried one form at a time. A longer run is resolved in one
+# walk of the recorded ids, so the work stays linear in the token and no form is
+# skipped for its length.
+fm_send_load_recorded_ids() {
+  local name
+  RECORDED_IDS=$'\n'
+  while IFS= read -r name; do
+    case "$name" in *.meta) ;; *) continue ;; esac
+    [ -f "$STATE/$name" ] || continue
+    RECORDED_IDS="$RECORDED_IDS${name%.meta}"$'\n'
+  done < <(LC_ALL=C ls -A "$STATE" 2>/dev/null)
+}
+
+fm_send_resolve_mention() {
+  local text=$1 dots=$2 pad='........' j form id rest label_text
+  local best_j=-1 best_rank=-1 cand_j cand_rank
+  MENTION_ID=
+  if [ "$dots" -le 8 ]; then
+    j=$dots
+    while :; do
+      form=$text${pad:0:j}
+      case "$RECORDED_IDS" in *$'\n'"$form"$'\n'*)
+        MENTION_ID=$form
+        return 0 ;;
+      esac
+      case "$form" in fm-?*)
+        case "$RECORDED_IDS" in *$'\n'"${form#fm-}"$'\n'*)
+          MENTION_ID=${form#fm-}
+          return 0 ;;
+        esac ;;
+      esac
+      [ "$j" -gt 0 ] || return 0
+      j=$((j - 1))
+    done
+  fi
+  label_text=
+  case "$text" in fm-*) label_text=${text#fm-} ;; esac
+  while IFS= read -r id; do
+    [ -n "$id" ] || continue
+    cand_j=-1
+    cand_rank=-1
+    case "$id" in "$text"*)
+      rest=${id#"$text"}
+      case "$rest" in *[!.]*) ;; *)
+        cand_j=${#rest}
+        cand_rank=1 ;;
+      esac ;;
+    esac
+    if [ "$cand_j" -lt 0 ]; then
+      case "$text" in fm-*)
+        case "$id" in "$label_text"*)
+          rest=${id#"$label_text"}
+          case "$rest" in *[!.]*) ;; *)
+            # The label form needs at least one character after fm-.
+            if [ "${#label_text}" -gt 0 ] || [ "${#rest}" -gt 0 ]; then
+              cand_j=${#rest}
+              cand_rank=0
+            fi ;;
+          esac ;;
+        esac ;;
+      esac
+    fi
+    [ "$cand_j" -ge 0 ] && [ "$cand_j" -le "$dots" ] || continue
+    if [ "$cand_j" -gt "$best_j" ] || { [ "$cand_j" -eq "$best_j" ] && [ "$cand_rank" -gt "$best_rank" ]; }; then
+      best_j=$cand_j
+      best_rank=$cand_rank
+      MENTION_ID=$id
+    fi
+  done <<< "$RECORDED_IDS"
+}
+
 # fm_send_clear_after_interrupt: muse RESTORES the interrupted prompt back into
 # the composer when Escape cancels a turn, as real bright text (verified: fg
 # 38;2;204;211;219, luminance ~210, muse 0.1.0-R708.1), not de-emphasised ghost
@@ -474,6 +602,8 @@ fi
 # message exactly as before, so ordinary sends are byte-identical.
 RESOLVE_KEYS=
 FIRE_AND_FORGET_ID=
+RELAY=0
+REQUIRED_INPUTS=
 fm_send_add_resolve_key() { # <key>
   local k=$1
   case "$k" in
@@ -492,6 +622,22 @@ fm_send_add_resolve_key() { # <key>
 }
 while :; do
   case "${1:-}" in
+  --relay)
+    RELAY=1
+    shift
+    ;;
+  --require-input)
+    [ "$#" -ge 2 ] && [ -n "$2" ] || {
+      echo 'error: --require-input requires a nonempty receiving-host path' >&2
+      exit 1
+    }
+    case "$2" in *$'\n'*|*$'\r'*|*$'\t'*)
+      echo 'error: a declared input path cannot contain control characters' >&2
+      exit 1 ;;
+    esac
+    REQUIRED_INPUTS="${REQUIRED_INPUTS}${REQUIRED_INPUTS:+$'\n'}$2"
+    shift 2
+    ;;
   --resolve-key)
     [ $# -ge 2 ] || {
       echo "error: --resolve-key requires a key" >&2
@@ -527,6 +673,50 @@ while :; do
   *) break ;;
   esac
 done
+
+if [ -n "$REQUIRED_INPUTS" ] && { [ -z "$TARGET_META" ] || [ "${1:-}" = --key ]; }; then
+  echo 'error: --require-input needs a recorded receiving task; keys and unrecorded endpoints have no declared receiving home' >&2
+  exit 1
+fi
+
+fm_send_check_required_inputs() { # <newline-delimited-declarations>
+  local declared=$1 input receiver_home=$FM_HOME root worktree rc failed=0 unchecked=0 reason
+  [ -n "$declared" ] || return 0
+  if [ "$(fm_meta_get "$TARGET_META" kind)" = secondmate ]; then
+    receiver_home=$(fm_meta_get "$TARGET_META" home)
+    [ -n "$receiver_home" ] || receiver_home=$FM_HOME
+  fi
+  worktree=$(fm_meta_get "$TARGET_META" worktree)
+  while IFS= read -r input; do
+    root=$receiver_home
+    case "$worktree" in /*) case "$input" in "$worktree"/*) root=$worktree ;; esac ;; esac
+    rc=0
+    if [ "$TARGET_BACKEND" = remote ]; then
+      fm_run_timed "$FM_SEND_REMOTE_BUDGET" "$SCRIPT_DIR/fm-on.sh" "$TARGET_REMOTE_ID" \
+        fm-remote-file.sh check "$input" </dev/null >/dev/null 2>&1 || rc=$?
+    else
+      FM_HOME="$root" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-remote-file.sh" check "$input" >/dev/null 2>&1 || rc=$?
+    fi
+    case "$rc" in
+    0) continue ;;
+    6) reason='unavailable to' ;;
+    5) reason='outside the transfer boundary for' ;;
+    *)
+      unchecked=1
+      echo "error: required input '$input' could not be checked on receiver '$RAW_TARGET' (check exit $rc: transport failure, timeout, or check error; the input is not known to be missing); nothing was sent and any earlier record is unchanged. Retry the same send once the receiver is reachable." >&2
+      continue
+      ;;
+    esac
+    failed=1
+    echo "error: refused required input '$input': $reason receiver '$RAW_TARGET'; nothing was sent and any earlier record is unchanged. Stage only this declared artifact through the existing authorized transfer mechanism; no access was granted." >&2
+  done <<< "$declared"
+  if [ "$failed" -eq 0 ]; then
+    [ "$unchecked" -eq 0 ] || return 1
+    return 0
+  fi
+  "$SCRIPT_DIR/fm-guard-event.sh" send-task-prerequisites deny --rule required-input --task "$(fm_send_id_from_meta "$TARGET_META")" 2>/dev/null || true
+  return "$FM_TASK_INBOX_INPUT_REFUSED"
+}
 
 if [ "$TARGET_BACKEND" != remote ]; then
   fm_backend_validate "$TARGET_BACKEND" || exit 1
@@ -819,10 +1009,45 @@ if [ "${1:-}" = "--key" ]; then
   fm_send_record_interrupt "$semantic_key" || exit 1
 else
   MESSAGE=$*
-  if [ -z "${MESSAGE//[[:space:]]/}" ]; then
+  # A message is empty when it holds no character outside [[:space:]]. The case
+  # pattern stops at the first such character; deleting every space with
+  # ${MESSAGE//[[:space:]]/} was quadratic in a UTF-8 locale.
+  case "$MESSAGE" in
+  *[![:space:]]*) ;;
+  *)
     echo "error: a text steer requires a nonempty message; nothing was sent (an empty marked request would deliver only marker and correlation bytes and leave the parent waiting on a reply to nothing)" >&2
     exit 1
-  fi
+    ;;
+  esac
+  # Tokenize once without treating pathname components as standalone task ids.
+  # A final prose period is punctuation only when no exact meta names it. awk
+  # splits each token into its text and the count of dots that end it, in one
+  # pass, so a long run of dots costs no more than the same length of any text.
+  fm_send_load_recorded_ids
+  while IFS=$'\t' read -r mention_dots mention_base; do
+    [ -n "$mention_base" ] || [ "$mention_dots" != 0 ] || continue
+    # A task name embedded in a pathname is not a task-id token.
+    case "$mention_base" in */*|*\\*) continue ;; esac
+    MENTION_ID=
+    fm_send_resolve_mention "$mention_base" "$mention_dots"
+    mentioned_id=$MENTION_ID
+    [ -n "$mentioned_id" ] || continue
+    [ ! "$STATE/$mentioned_id.meta" -ef "$TARGET_META" ] || continue
+    # Explicit endpoints can be shared by several recorded tasks. A selector
+    # still names exactly one task; an endpoint owns every meta that names it.
+    if [ -z "$TARGET_SELECTOR" ] &&
+      [ "$(fm_backend_target_of_meta "$STATE/$mentioned_id.meta")" = "$T" ]; then
+      continue
+    fi
+    if [ "$RELAY" = 1 ]; then
+      "$SCRIPT_DIR/fm-guard-event.sh" send-task-prerequisites bypass --rule task-owner --override --task "$mentioned_id" 2>/dev/null || true
+      break
+    fi
+    "$SCRIPT_DIR/fm-guard-event.sh" send-task-prerequisites deny --rule task-owner --task "$mentioned_id" 2>/dev/null || true
+    echo "error: refused task '$mentioned_id': this home's direct report '$mentioned_id' owns it, not target '$RAW_TARGET'; nothing was sent. Send to '$mentioned_id', or use --relay for a deliberate cross-task mention." >&2
+    exit 1
+  done < <(printf '%s\n' "$MESSAGE" | LC_ALL=C tr -cs 'A-Za-z0-9_./\\-' '\n' |
+    fm_send_split_trailing_dots)
   if [ "$TARGET_BACKEND" = remote ]; then
     FM_SEND_REMOTE_BUDGET=${FM_SEND_REMOTE_BUDGET:-30}
     case "$FM_SEND_REMOTE_BUDGET" in
@@ -832,6 +1057,9 @@ else
       ;;
     esac
   fi
+  # A declared-input refusal must precede even a transient reply expectation,
+  # as well as any inbox directory, typed text or doorbell.
+  fm_send_check_required_inputs "$REQUIRED_INPUTS" || exit $?
   # The pre-marker answer text, kept for the closing resolved note so the
   # durable ledger records the plain answer without marker or corr bytes.
   RESOLVE_ANSWER_TEXT=$MESSAGE
@@ -960,6 +1188,9 @@ else
     remote_completion_unknown=0
     REMOTE_SEND_ARGS=("$TARGET_REMOTE_ID" "$MESSAGE")
     [ -z "$FIRE_AND_FORGET_ID" ] || REMOTE_SEND_ARGS+=(fire-and-forget)
+    # Declared inputs were checked on this receiving host before reply-state
+    # creation. The enqueue leg must not turn a later recheck into a refusal
+    # after that invocation already created an expectation.
     # Each transport attempt is bounded by FM_SEND_REMOTE_BUDGET seconds.
     # fm_run_timed's 124 means the attempt was killed at the bound with remote
     # completion unknown - the enqueue may have landed - so it exits through
@@ -1009,6 +1240,7 @@ else
     if [ "$remote_rc" -ne 0 ]; then
       fm_send_known_undelivered_cleanup ||
         echo "error: known-undelivered pending-reply state could not be reset for $TARGET_TASK_ID" >&2
+      [ "$remote_rc" -ne "$FM_TASK_INBOX_INPUT_REFUSED" ] || exit "$remote_rc"
       echo "error: steer not sent to remote secondmate $TARGET_REMOTE_ID (the remote steering-inbox record could not be written; the remote leg's stderr above has the reason)" >&2
       exit 1
     fi
