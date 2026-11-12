@@ -3895,8 +3895,8 @@ class IntakeTest(unittest.TestCase):
         state, the one function that may write a file) also uses one raw way out, and a runtime check catches each. A print and a write to
         standard error are caught by streams that record any write whose caller is not Out.write; a raw os.write by the bytes that reach file descriptors 1 and 2; a file
         opened or written with the plane value by a scan of every file under the home; a child started outside run by a Popen that records any
-        start with no run of the plane on the stack; a network call by an opener that refuses it. The same poll without a planted bypass trips
-        no check. Not covered: an alias of a raw way out that is never called (it has no runtime effect), a file written outside the home, and a
+        start with no run of the plane on the stack; a network call by an opener that refuses it. The owner request carries the value, which
+        the plane replaces before it stores or prints anything, so the same poll without a planted bypass trips no check. Not covered: an alias of a raw way out that is never called (it has no runtime effect), a file written outside the home, and a
         raw write to a descriptor other than 1 and 2."""
         value = 'planted-bypass-value-0123456789'
         caught = {'stream': [], 'descriptor': [], 'file': [], 'child': [], 'net': []}
@@ -3961,7 +3961,7 @@ class IntakeTest(unittest.TestCase):
                 watch.lock.close()
                 home = watch.root.parent
                 transcript = str(home / 'transcript.json')
-                self.say(replay, '200.000100', 'a plain owner request')
+                self.say(replay, '200.000100', 'a plain owner request ' + value)
                 replay.save()
                 for found in caught.values():
                     found.clear()

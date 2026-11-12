@@ -7042,7 +7042,7 @@
       "test": "tests/fm_slack_watch_test.py",
       "tier": "C",
       "harm": "reversible",
-      "layer_note": "added by Main 3266 (the outcome review of b86f8e55e, F1): deny without a guard event: the refusal text goes through Out.diagnostic, which shows every plane value in it as [redacted] and prints a line only while the complete stream holds none; test_every_stream_write_of_every_command_goes_through_the_one_writer and test_a_bypass_of_every_kind_planted_at_run_time_is_caught_by_a_runtime_check in tests/fm_slack_watch_test.py prove it"
+      "layer_note": "added by Main 3266 (the outcome review of b86f8e55e, F1): deny without a guard event: the refusal text goes through Out.diagnostic, which shows every plane value in it as [redacted] and prints a line only while the complete stream holds none; test_every_stream_write_of_every_command_goes_through_the_one_writer in tests/fm_slack_watch_test.py proves it"
     },
     {
       "decision": "deny",
