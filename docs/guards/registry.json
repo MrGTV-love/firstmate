@@ -5196,6 +5196,9 @@
         {"file": "bin/fm-slot-provision-lib.sh", "match": "refusing to reset or overwrite it"},
         {"file": "bin/fm-slot-provision-lib.sh", "match": "slot provisioner refused task"},
         {"file": "bin/fm-slot-provision-lib.sh", "match": "created by this refused promotion"},
+        {"file": "bin/fm-slot-provision-lib.sh", "match": "changed its task record after it was checked"},
+        {"file": "bin/fm-slot-provision-lib.sh", "match": "copy is no longer on its recorded branch"},
+        {"file": "bin/fm-slot-provision-lib.sh", "match": "successor_predecessor_moved"},
         {"file": "bin/fm-spawn.sh", "match": "could not record the refused slot checkpoint"},
         {"file": "bin/fm-spawn.sh", "match": "could not be confirmed stopped"},
         {"file": "bin/fm-control.sh", "match": "refused invalid --owned-path"},
@@ -5204,13 +5207,13 @@
       "invariant": "a governed assigned copy never admits a worker or ship transition without a matching PASS attestation from the project provisioner",
       "layer": "runtime-block",
       "source": "the report and manifest of the copy's scripts/git-stability/provision_existing_slot.py, plus the copy's git status, operation markers, common dir and task branch",
-      "trigger": "the assigned copy is not isolated, belongs to another repository, is dirty, has an operation in progress, has a task or prepared branch that moved, the provisioner exits nonzero or reports anything but a PASS whose manifest matches the copy, owner, branch, base and owned paths, or the acquired shell does not start the provisioner within the no-progress budget or it reaches the absolute extreme",
-      "remedy": "preserve and reconcile the assigned copy's scratch state, then bin/fm-control.sh <task> relaunch --note <reason>, or bin/fm-spawn.sh <task> <project-clone> --mode <mode> --yolo <on|off> --owned-path <tracked-path>",
+      "trigger": "the assigned copy is not isolated, belongs to another repository, is dirty, has an operation in progress, has a task or prepared branch that moved, the provisioner exits nonzero or reports anything but a PASS whose manifest matches the copy, owner, branch, base and owned paths, a declared successor predecessor whose task record or recorded branch changed or whose copy left that branch after the check and before the provisioner call, or the acquired shell does not start the provisioner within the no-progress budget or it reaches the absolute extreme",
+      "remedy": "preserve and reconcile the assigned copy's scratch state, then bin/fm-control.sh <task> relaunch --note <reason>, or bin/fm-spawn.sh <task> <project-clone> --mode <mode> --yolo <on|off> --owned-path <tracked-path> [--successor-of <predecessor-task-id> when the retained record keeps successor_of]",
       "budget": 1,
-      "test": "tests/fm-spawn-dispatch-profile.test.sh",
+      "test": "tests/fm-spawn-pool-base-freshen.test.sh",
       "tier": "C",
       "harm": "irreversible",
-      "layer_note": "deny without a guard event: bin/fm-spawn.sh and bin/fm-promote.sh stop before admission and print the refusal and the provisioner report on stderr, and bin/fm-control.sh refuses an unattestable governed relaunch before stopping the running agent; a refused spawn keeps the copy and records recovery=slot-provision-refused"
+      "layer_note": "deny without a guard event: bin/fm-spawn.sh and bin/fm-promote.sh stop before admission and print the refusal and the provisioner report on stderr, and bin/fm-control.sh refuses an unattestable governed relaunch before stopping the running agent; a refused spawn keeps the copy and records recovery=slot-provision-refused; the attestation rows are driven by tests/fm-spawn-dispatch-profile.test.sh; the declared-successor re-check refusals are driven in tests/fm-spawn-pool-base-freshen.test.sh by test_successor_of_branch_is_rechecked_at_handover (copy left its recorded branch, and the successor_predecessor_moved report), test_successor_of_task_record_is_rechecked_at_handover (task record changed) and test_successor_of_checks_are_load_bearing (the re-check is removed)"
     },
     {
       "decision": "deny",
