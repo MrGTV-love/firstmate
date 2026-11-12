@@ -6,8 +6,9 @@
 //   - omp auto-discovers this file from <cwd>/.omp/extensions with no trust
 //     gate, so an omp primary or secondmate started inside its home loads it
 //     without -e (naming it both ways loads it twice - verified, omp 18.1.11).
-//   - pi.sendUserMessage returns synchronously (no promise) in omp, so accepting
-//     a wake means the call returned, not that a turn consumed it.
+//   - Accepting a wake means sendUserMessage returned or its promise settled,
+//     not that a turn consumed it. Delivery settlement is awaited separately
+//     from serialized successor restoration, so a model turn cannot hold re-arm.
 //   - omp reports no session_shutdown reason, so EVERY shutdown with a pending
 //     actionable close persists the replacement handoff. The next owning
 //     activation, through session_start, self-heal, or an arm call, replays it;
@@ -184,9 +185,9 @@ type SessionGeneration = {
   queueReadFailures: number;
   restorePendingWaits: number;
   queueStuckReported: boolean;
-  // A verified successor's failure close that arrived while the pipeline was
-  // still delivering the wake it was started for; its bounded retry runs once
-  // that delivery settles instead of being skipped by the single-flight guard.
+  // A verified successor's failure close that arrived while restoration was
+  // still in flight; its bounded retry runs once restoration settles instead
+  // of being skipped by the single-flight guard.
   deferredClose: { message: string; predecessorArmPid: string } | null;
 };
 
@@ -977,8 +978,8 @@ export default function (pi: ExtensionAPI) {
       throw error;
     }
     if (generationIsLive(owner)) scheduleWakeFlush(owner);
-    // Accepted by omp (sendUserMessage returns synchronously there; awaiting a
-    // non-promise resolves at once). A generation replaced while omp was
+    // Accepted by omp (a synchronous return or a fulfilled promise).
+    // A generation replaced while omp was
     // accepting it may have lost the wake with the old session, so report
     // it undelivered and let the replacement replay the still-pending record.
     return generationIsLive(owner) ? "sent" : false;
@@ -1464,8 +1465,12 @@ export default function (pi: ExtensionAPI) {
     owner.cleanupTimer = timer;
   }
 
-  async function processPendingActionables(owner: SessionGeneration): Promise<void> {
-    if (!generationIsLive(owner) || owner.restoring || owner.pendingActionables.length === 0) return;
+  async function processPendingActionables(owner: SessionGeneration, predecessorArmPid?: string): Promise<void> {
+    if (owner.pendingActionables.length === 0) return;
+    if (!generationIsLive(owner) || owner.restoring) {
+      lifecycle("restore-skipped", { generation: owner.id, predecessor: predecessorArmPid, reason: !generationIsLive(owner) ? "generation-not-live" : "restoring" });
+      return;
+    }
     owner.restoring = true;
     const attemptedCleanup = new Set<string>();
     try {
@@ -1481,11 +1486,13 @@ export default function (pi: ExtensionAPI) {
         // A record omp has accepted but not consumed is neither redelivered
         // nor finished here: consumption finishes it, replacement replays it.
         const pending = owner.pendingActionables.find(
-          (item) => !item.delivered && !owner.unconsumedWakes.has(item.token) && !owner.heldWakes.has(item.token),
+          (item) => !item.delivered && !owner.unconsumedWakes.has(item.token) && !owner.heldWakes.has(item.token)
+            && replacementCoordinator.deliveries.get(item.token)?.owner !== owner,
         );
         if (!pending) break;
         const existingClaim = replacementCoordinator.deliveries.get(pending.token);
         if (existingClaim && existingClaim.owner !== owner) {
+          lifecycle("restore-claim-wait", { generation: owner.id, predecessor: pending.predecessorArmPid });
           const settlement = await existingClaim.settlement;
           if (!generationIsLive(owner)) return;
           if (settlement === "delivered") {
@@ -1520,45 +1527,48 @@ export default function (pi: ExtensionAPI) {
           const note = restoration.failure || restoration.notice;
           if (note && !operationalHandback(pending.message)) surfaceFailure(owner, note);
           const message = note ? `${pending.message}\n\n${note}` : pending.message;
-          const delivered = await deliverActionableWake(owner, message, pending, restoration.recovery);
-          if (!delivered) {
-            settleClaim("failed");
-            releaseClaim();
-            return;
-          }
-          if (delivered === "held") {
-            // Queued behind nothing: the flush delivers or retires it once the
-            // session is idle. A replacement generation that was waiting on
-            // this claim takes the still-pending record from the handoff.
-            settleClaim("failed");
-            releaseClaim();
-            continue;
-          }
-          if (delivered === "dropped") {
-            settleClaim("delivered");
-            releaseClaim();
-            continue;
-          }
-          const awaitingConsumption = owner.unconsumedWakes.has(pending.token);
-          if (awaitingConsumption && !generationIsLive(owner)) {
-            // omp accepted the wake, then the session was replaced before
-            // this continuation ran: the shutdown persisted the still-pending
-            // record, so a replacement waiting on this claim must replay it.
-            settleClaim("failed");
-            releaseClaim();
-            return;
-          }
-          settleClaim("delivered");
-          if (!awaitingConsumption) {
-            // omp consumed it before this ran.
-            pending.delivered = true;
+          // Serialize restoration, not the host's model turn. Keep the claim
+          // until the awaited delivery settles, so another processing pass
+          // cannot submit this record twice and a replacement can still replay it.
+          const completeDelivery = async (): Promise<void> => {
+            lifecycle("wake-delivery-start", { generation: owner.id, predecessor: pending.predecessorArmPid });
             try {
-              finishPendingActionable(owner, pending);
+              const delivered = await deliverActionableWake(owner, message, pending, restoration.recovery);
+              if (!delivered || delivered === "held") {
+                // The idle flush or replacement keeps the still-pending record.
+                settleClaim("failed");
+                return;
+              }
+              if (delivered === "dropped") {
+                settleClaim("delivered");
+                return;
+              }
+              const awaitingConsumption = owner.unconsumedWakes.has(pending.token);
+              if (awaitingConsumption && !generationIsLive(owner)) {
+                // Accepted but not consumed by the replaced session: replay it.
+                settleClaim("failed");
+                return;
+              }
+              settleClaim("delivered");
+              if (!awaitingConsumption) {
+                pending.delivered = true;
+                try {
+                  finishPendingActionable(owner, pending);
+                } catch (error) {
+                  surfaceCleanupFailure(owner, error);
+                }
+              }
             } catch (error) {
-              surfaceCleanupFailure(owner, error);
+              settleClaim("failed");
+              const detail = error instanceof Error ? error.message : String(error);
+              surfaceFailure(owner, `watcher: FAILED - omp extension could not deliver an actionable wake\n${detail}`);
+            } finally {
+              releaseClaim();
+              if (pending.delivered) schedulePendingCleanup(owner);
+              lifecycle("wake-delivery-settled", { generation: owner.id, predecessor: pending.predecessorArmPid });
             }
-          }
-          releaseClaim();
+          };
+          void completeDelivery();
         } catch (error) {
           settleClaim("failed");
           releaseClaim();
@@ -1649,10 +1659,17 @@ export default function (pi: ExtensionAPI) {
     notice?: string;
     recovery?: { generation: string; watcherPid: string };
   }> {
+    lifecycle("restore-start", { generation: owner.id, predecessor: predecessorArmPid });
     let failure = "";
     for (let attempt = 0; attempt <= retryLimit; attempt += 1) {
-      if (!generationIsLive(owner)) return { failure: "" };
+      if (!generationIsLive(owner)) {
+        lifecycle("restore-skipped", { generation: owner.id, predecessor: predecessorArmPid, reason: "generation-not-live" });
+        return { failure: "" };
+      }
       const replacement = startArm(owner, predecessorArmPid);
+      if (replacement.ok && replacement.message.startsWith("watcher: unchanged")) {
+        lifecycle("restore-unchanged", { generation: owner.id, predecessor: predecessorArmPid, reason: owner.child ? "owned-child" : "scheduled-retry" });
+      }
       const successorChild = owner.child;
       const readiness = replacement.ok && successorChild ? await waitForReadiness(successorChild) : "failed";
       if (successorChild && readiness === "ready") {
@@ -1665,6 +1682,7 @@ export default function (pi: ExtensionAPI) {
       if (replacement.ok) {
         failure = "watcher: FAILED - omp extension could not verify a ready successor watcher";
         if (!(await retireArm(successorChild))) {
+          lifecycle("restore-failed", { generation: owner.id, predecessor: predecessorArmPid, reason: "unready-arm-retirement" });
           return {
             failure: `${failure}\nwatcher: FAILED - omp extension could not restore watcher continuity because the unready successor arm did not exit within ${armRetireTimeoutMs}ms`,
           };
@@ -1678,6 +1696,7 @@ export default function (pi: ExtensionAPI) {
       if (attempt === retryLimit) break;
       await waitForRetry(attempt + 1);
     }
+    lifecycle("restore-failed", { generation: owner.id, predecessor: predecessorArmPid, reason: "retries-exhausted" });
     return { failure: `${failure}\nwatcher: FAILED - omp extension could not restore watcher continuity after ${retryLimit} retries` };
   }
 
@@ -1826,9 +1845,13 @@ export default function (pi: ExtensionAPI) {
         const pending = (owner.stopping && !operationalHandback(classification.message) ? undefined : armPendingActionable.get(armChild))
           ?? createPendingActionable(classification.message, predecessor);
         enqueuePendingActionable(owner, pending);
-        if (!generationIsLive(owner)) return;
+        lifecycle("actionable-close", { generation: owner.id, predecessor });
+        if (!generationIsLive(owner)) {
+          lifecycle("restore-skipped", { generation: owner.id, predecessor, reason: "generation-not-live" });
+          return;
+        }
         owner.retryFailures = 0;
-        void processPendingActionables(owner);
+        void processPendingActionables(owner, predecessor);
         return;
       }
       if (!generationIsLive(owner)) return;
@@ -1838,10 +1861,10 @@ export default function (pi: ExtensionAPI) {
         surfaceFailure(owner, classification.message);
       }
       if (owner.restoring) {
-        // The pipeline is still delivering the wake this successor was
-        // started for. A verified or still-starting successor that failed on
-        // its own keeps its bounded retry for the end of that delivery; an unready child closing
-        // here was retired by the restoration itself.
+        // Restoration is still in flight. A verified or still-starting
+        // successor that failed on its own keeps its bounded retry for the
+        // end of restoration; an unready child closing here was retired by
+        // the restoration itself.
         if ((verified || armLeftStarting.has(armChild)) && !armRetired.has(armChild)) {
           owner.deferredClose = { message: classification.message, predecessorArmPid: predecessor };
         }
