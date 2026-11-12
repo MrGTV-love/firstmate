@@ -1600,8 +1600,8 @@ export default function (pi: ExtensionAPI) {
         // bounded retries, which hands repair to main through fm_watch_arm_omp
         // (one more silent launch past the bound could hold a hung child that
         // the repair call would then report as "unchanged"), or lost a
-        // verified successor during the delivery, which takes the ordinary
-        // bounded, lock-checked retry it would have taken had the pipeline
+        // verified successor during restoration, which takes the ordinary
+        // bounded, lock-checked retry it would have taken had restoration
         // been idle.
         const deferred = owner.deferredClose;
         owner.deferredClose = null;
