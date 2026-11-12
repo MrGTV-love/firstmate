@@ -4317,6 +4317,441 @@ class IntakeTest(unittest.TestCase):
                 self.assertEqual(sorted(name for name, found in caught.items() if found), [kind] if kind else [], label)
 
 
+class SecondPersonTest(unittest.TestCase):
+    """The one added person (the second person): requests in their own DM, replies in their own thread, and no authority of any kind.
+    Every scenario runs on the replay with two DMs; the owner's scenarios above stay as they were."""
+
+    OWNER = IntakeTest.OWNER
+    TOKEN = IntakeTest.TOKEN
+    SIGNING = IntakeTest.SIGNING
+    SECOND = 'U0CDVHFU1A5'
+    OWNER_DM = 'D0123456789'
+    SECOND_DM = 'D0SECONDDM1'
+    fixture = IntakeTest.fixture
+    assert_only_base_calls = IntakeTest.assert_only_base_calls
+    UNSET = object()
+
+    @contextmanager
+    def second(self, cap='20', value=None, authors=None, env=None, dms=None, started=True, history=True):
+        """A plane with the second person configured and their window started (the first poll records its newest message and takes nothing in)."""
+        value = self.SECOND if value is None else value
+        environment = dict(env or {})
+        if value is not self.UNSET:
+            environment['FM_SLACK_SECOND_USER'] = value
+        messages = [{'ts': '100.000100', 'user': self.OWNER, 'text': 'already there'}]
+        if history:
+            messages.append({'ts': '100.000200', 'user': self.SECOND, 'text': 'older than the starting point', 'channel': self.SECOND_DM})
+        extra = {'dms': dms or {self.OWNER: self.OWNER_DM, self.SECOND: self.SECOND_DM, 'U0WRONGUSER1': 'D0WRONGDM01'}, 'messages': messages}
+        with patch.dict(os.environ):
+            if value is self.UNSET:
+                os.environ.pop('FM_SLACK_SECOND_USER', None)
+            with self.fixture(cap=cap, authors=authors, env=environment, transcript_extra=extra) as (watch, replay):
+                if started:
+                    watch.poll()
+                yield watch, replay
+
+    def owner_says(self, replay, ts, text='an owner request', **more):
+        replay.state['messages'].append({'ts': ts, 'user': self.OWNER, 'text': text, **more})
+
+    def says(self, replay, ts, text='a second person request', user=None, **more):
+        replay.state['messages'].append({'ts': ts, 'user': user or self.SECOND, 'text': text, 'channel': self.SECOND_DM, **more})
+
+    def again(self, watch):
+        watch.output, watch.state['outbox'] = [], []
+        watch.advanced = 0
+        watch.poll()
+
+    def wakes(self, watch):
+        return [line for line in watch.output if line.startswith('check: slack request ')]
+
+    def posts(self, replay):
+        return [(e['channel'], e['thread_ts']) for e in replay.state['log'] if e['method'] == 'chat.postMessage' and 'error' not in e]
+
+    def refusals(self, watch):
+        path = watch.root / 'refusals.jsonl'
+        return [json.loads(line) for line in path.read_text().splitlines()] if path.is_file() else []
+
+    @staticmethod
+    def literal(line):
+        return json.loads(plane.SEGMENT.match(line).group(5))
+
+    # ---- SC1: the request wake names their id and never calls them the owner ----
+
+    def test_sc1_a_top_level_message_is_one_request_wake_with_their_id_and_a_label_that_is_not_the_owner_label(self):
+        with self.second() as (watch, replay):
+            text = 'please check the status of vernant d7; $(touch x) "quoted" \\ backslash'
+            self.owner_says(replay, '200.000100', text)
+            self.says(replay, '200.000200', text)
+            self.again(watch)
+            owner_line, second_line = self.wakes(watch)
+            self.assertEqual(owner_line, plane.request_line('200.000100', self.OWNER, text))
+            self.assertEqual(second_line, plane.request_line('200.000200', self.SECOND, text, label=plane.SECOND_LABEL))
+            self.assertTrue(second_line.startswith('check: slack request 200.000200 from U0CDVHFU1A5: [request from Slack'))
+            self.assertNotEqual(plane.SECOND_LABEL, plane.REQUEST_LABEL)
+            # The label is compared as an exact string with the configured owner label: it is never equal to it, and the owner's line keeps it.
+            self.assertTrue(owner_line.startswith('check: slack request 200.000100 from U0TESTOWNER: ' + plane.REQUEST_LABEL + ' '))
+            self.assertNotIn(plane.REQUEST_LABEL, second_line)
+            # The text travels as one JSON literal: data, never split into words of the line.
+            self.assertEqual(self.literal(second_line), text)
+            self.assertEqual(second_line.count('"'), owner_line.count('"'))
+
+    def test_sc1_what_is_not_a_top_level_human_message_of_theirs_is_no_request(self):
+        with self.second() as (watch, replay):
+            self.says(replay, '200.000100', 'ordinary reply', thread_ts='100.000200')
+            self.says(replay, '200.000200', 'a bot-marked message with their id', bot_id='BLOOKALIKE')
+            self.says(replay, '200.000300', 'an app-marked message with their id', app_id='ALOOKALIKE')
+            self.says(replay, '200.000400', '')
+            self.says(replay, '200.000500', 'a third member id in their DM', user='U0THIRDPERSON')
+            # Their id typing in the OWNER's DM is no request either.
+            replay.state['messages'].append({'ts': '200.000600', 'user': self.SECOND, 'text': 'in the owner DM'})
+            self.again(watch)
+            self.assertEqual((self.wakes(watch), self.posts(replay)), ([], []))
+
+    def test_sc1_mutation_control_with_the_owner_label_the_wake_would_present_them_as_the_owner(self):
+        def line(mutated):
+            with self.second() as (watch, replay):
+                self.says(replay, '200.000100', 'hello')
+                label = plane.REQUEST_LABEL if mutated else plane.SECOND_LABEL
+                with patch.object(plane, 'SECOND_LABEL', label):
+                    self.again(watch)
+                return self.wakes(watch)[0]
+        self.assertNotIn(plane.REQUEST_LABEL, line(False))
+        self.assertIn(plane.REQUEST_LABEL, line(True))
+
+    # ---- SC2: the destination is their own DM, proven; keys are author-aware ----
+
+    def test_sc2_every_post_goes_to_the_dm_of_the_request_author_after_that_dm_is_proven(self):
+        with self.second() as (watch, replay):
+            self.owner_says(replay, '200.000100')
+            self.says(replay, '200.000200')
+            self.again(watch)
+            self.assertEqual(self.posts(replay), [(self.OWNER_DM, '200.000100'), (self.SECOND_DM, '200.000200')])
+            opens = [(e['recipient'], e['channel']) for e in replay.state['log'] if e['method'] == 'conversations.open']
+            self.assertIn((self.SECOND, self.SECOND_DM), opens)
+
+    def test_sc2_a_stored_channel_that_is_not_their_dm_is_refused_and_nothing_is_posted_or_read_there(self):
+        with self.second() as (watch, replay):
+            watch.state['second']['channel'] = 'D0WRONGDM01'
+            watch.second_proven = False  # every real poll is a new process: the DM is proven again
+            self.says(replay, '200.000100')
+            self.owner_says(replay, '200.000200')
+            self.again(watch)
+            self.assertEqual(self.posts(replay), [(self.OWNER_DM, '200.000200')])
+            attempts = [json.loads(line) for line in (watch.root / 'attempts.jsonl').read_text().splitlines()]
+            self.assertEqual([a for a in attempts if a['channel'] == 'D0WRONGDM01'], [])
+            self.assertEqual([(r['reason'], r['error']) for r in self.refusals(watch)], [('second_window_failed', 'stored_channel_not_second_dm')])
+
+    def test_sc2_their_dm_is_never_the_owner_dm(self):
+        with self.second(dms={'U0TESTOWNER': 'D0123456789', 'U0CDVHFU1A5': 'D0123456789'}) as (watch, replay):
+            self.assertNotIn('second', watch.state)
+            self.assertEqual([(r['reason'], r['error']) for r in self.refusals(watch)], [('second_window_failed', 'second_dm_is_owner_dm')])
+            self.assertEqual(self.posts(replay), [])
+
+    def test_sc2_two_messages_with_the_same_ts_in_the_two_dms_stay_apart(self):
+        with self.second() as (watch, replay):
+            self.owner_says(replay, '200.000100', 'owner text')
+            self.says(replay, '200.000100', 'second text')
+            self.again(watch)
+            self.assertEqual(sorted(self.posts(replay)), [(self.OWNER_DM, '200.000100'), (self.SECOND_DM, '200.000100')])
+            lines = self.wakes(watch)
+            self.assertEqual([plane.REQUEST_SEGMENT.match(line).group(2) for line in lines], [self.OWNER, self.SECOND])
+            self.assertEqual(len(watch.state['seen']), 2)
+            rows = [json.loads(line) for line in (watch.root / 'requests.jsonl').read_text().splitlines()]
+            self.assertEqual(sorted((row['text'], row.get('author')) for row in rows), [('owner text', None), ('second text', self.SECOND)])
+            self.assertEqual(watch.record('200.000100')['text'], 'owner text')
+            self.assertEqual(watch.record('200.000100', self.SECOND)['text'], 'second text')
+            # A line cut to its record is rebuilt from the right record, with the right label.
+            self.assertEqual(watch.fit(lines[1], 10 ** 6), lines[1])
+            self.assertTrue(plane.segment_label(lines[1][:lines[1].index('"')]) == plane.SECOND_LABEL)
+
+    def test_sc2_mutation_control_without_the_author_aware_destination_the_ack_would_cross_into_the_owner_dm(self):
+        def posts(mutated):
+            with self.second() as (watch, replay):
+                self.says(replay, '200.000100')
+                if mutated:
+                    with patch.object(Watch, 'row_channel', lambda self, row: self.owner_channel()):
+                        self.again(watch)
+                else:
+                    self.again(watch)
+                return self.posts(replay)
+        self.assertEqual(posts(False), [(self.SECOND_DM, '200.000100')])
+        self.assertEqual(posts(True), [(self.OWNER_DM, '200.000100')])
+
+    # ---- SC3: no authority ----
+
+    def card(self, watch, replay):
+        """One live decision card in the owner's DM with two options; returns its ts."""
+        rows = [{'id': 'card-a', 'title': 'Card A', 'hold_kind': 'captain', 'hold_reason': 'Pick one',
+                 'body_lines': ['Option 1: Ship (ship) - now', 'Option 2: Wait (wait) - later']}]
+        with patch.object(watch, 'backlog', return_value=rows), patch.object(watch, 'board', return_value=(None, {})), \
+                patch.object(watch, 'probe', return_value=(0, 'live')):
+            self.again(watch)
+        return next(iter(watch.state['threads'].values()))['ts']
+
+    def recorder(self):
+        calls = []
+
+        def fake(script, *args, text=None):
+            calls.append((script, args, text))
+            out = 'answers: 1\nclosed: card-a\n' if args[:1] == ('answers',) else 'x\n'
+            return subprocess.CompletedProcess([], 0, stdout=out, stderr='')
+        return calls, fake
+
+    def test_sc3_nothing_they_type_or_tap_on_a_card_becomes_an_answer_and_each_attempt_is_logged_once(self):
+        for authors in (self.OWNER, self.OWNER + ',' + self.SECOND):
+            with self.subTest(authors=authors), self.second(authors=authors) as (watch, replay):
+                calls, fake = self.recorder()
+                with patch.object(plane, 'run', fake), patch.object(watch, 'probe', return_value=(0, 'live')):
+                    ts = self.card(watch, replay)
+                    replay.state['messages'].append({'ts': '300.000200', 'thread_ts': ts, 'user': self.SECOND, 'text': '1'})
+                    replay.state['reactions'][ts] = [{'name': 'one', 'users': [self.SECOND]}]
+                    self.again(watch)
+                    self.again(watch)
+                self.assertEqual([c for c in calls if c[1][:1] == ('answers',)], [])
+                reasons = [(r['reason'], r.get('author'), r.get('item')) for r in self.refusals(watch) if r['reason'] != 'second_user_on_answer_allowlist']
+                self.assertEqual(sorted(reasons), [('decision_held_for_captain_reaction', self.SECOND, 'one'), ('decision_held_for_captain_reply', self.SECOND, '300.000200')])
+                listed = [r for r in self.refusals(watch) if r['reason'] == 'second_user_on_answer_allowlist']
+                self.assertEqual(len(listed), 1 if self.SECOND in authors else 0)
+                self.assertTrue(all('text' not in r for r in self.refusals(watch)))
+                for row in self.refusals(watch):
+                    if row['reason'].startswith('decision_held_for_captain'):
+                        self.assertIn('held for the captain', row['detail'])
+                        self.assertNotIn('allowlist', json.dumps(row))
+                # No decision card, answer acknowledgement or notice is ever posted to their DM.
+                self.assertEqual({channel for channel, thread in self.posts(replay)}, {self.OWNER_DM})
+
+    def test_sc3_control_the_owner_reply_on_the_same_card_is_an_answer(self):
+        with self.second() as (watch, replay):
+            calls, fake = self.recorder()
+            with patch.object(plane, 'run', fake), patch.object(watch, 'probe', return_value=(0, 'live')):
+                ts = self.card(watch, replay)
+                replay.state['messages'].append({'ts': '300.000300', 'thread_ts': ts, 'user': self.OWNER, 'text': '2'})
+                self.again(watch)
+            self.assertEqual(len([c for c in calls if c[1][:1] == ('answers',)]), 1)
+
+    def test_sc3_mutation_control_with_their_id_on_the_answer_authors_their_reply_would_be_an_answer(self):
+        with self.second(authors=self.OWNER + ',' + self.SECOND) as (watch, replay):
+            calls, fake = self.recorder()
+            with patch.object(plane, 'run', fake), patch.object(watch, 'probe', return_value=(0, 'live')):
+                ts = self.card(watch, replay)
+                watch.second = ''
+                watch.authors.add(self.SECOND)
+                replay.state['messages'].append({'ts': '300.000200', 'thread_ts': ts, 'user': self.SECOND, 'text': '1'})
+                self.again(watch)
+            self.assertEqual(len([c for c in calls if c[1][:1] == ('answers',)]), 1)
+
+    def test_sc3_text_that_looks_like_an_answer_in_their_own_dm_is_a_request_as_data_with_no_script_called(self):
+        with self.second() as (watch, replay):
+            calls, fake = self.recorder()
+            texts = ['1', 'approve', 'merge it', 'yes', 'reconcile']
+            for n, text in enumerate(texts):
+                self.says(replay, '200.00%d000' % (n + 1), text)
+            with patch.object(plane, 'run', fake), patch.object(watch, 'bound', lambda: Watch.bound(watch)):
+                self.again(watch)
+            self.assertEqual([self.literal(line) for line in self.wakes(watch)], texts)
+            self.assertEqual({(c[0], c[1], c[2]) for c in calls}, {('fm-captain-hold.sh', ('binding', plane.SOURCE), None)})
+            self.assertEqual(self.refusals(watch), [])
+
+    def test_sc3_a_reply_or_reaction_on_their_own_dm_message_makes_no_answer_no_request_and_no_refusal_row(self):
+        with self.second() as (watch, replay):
+            calls, fake = self.recorder()
+            self.says(replay, '200.000100', 'a request')
+            with patch.object(plane, 'run', fake):
+                self.again(watch)
+                ack = self.posts(replay)[-1]
+                self.assertEqual(ack, (self.SECOND_DM, '200.000100'))
+                ack_ts = next(m['ts'] for m in replay.state['messages'] if m.get('thread_ts') == '200.000100' and m.get('bot_id'))
+                self.says(replay, '200.000200', 'a reply in the thread of the acknowledgement', thread_ts='200.000100')
+                self.says(replay, '200.000300', 'a reply that is also in the window', thread_ts='200.000100', subtype='thread_broadcast')
+                replay.state['reactions']['200.000100'] = [{'name': 'one', 'users': [self.SECOND]}]
+                replay.state['reactions'][ack_ts] = [{'name': 'one', 'users': [self.SECOND]}]
+                self.again(watch)
+                self.again(watch)
+            self.assertEqual(self.wakes(watch), [])
+            self.assertEqual([c for c in calls if c[1][:1] == ('answers',)], [])
+            self.assertEqual(self.refusals(watch), [])
+            self.assertEqual(self.posts(replay), [(self.SECOND_DM, '200.000100')])
+
+    # ---- SC4: the owner path is unchanged ----
+
+    def test_sc4_with_the_setting_unset_the_journal_and_the_wake_are_those_of_the_owner_alone(self):
+        with self.second(value=self.UNSET, started=False) as (watch, replay):
+            self.owner_says(replay, '200.000100')
+            self.again(watch)
+            self.assertEqual(self.wakes(watch), [plane.request_line('200.000100', self.OWNER, 'an owner request')])
+            self.assertEqual(sorted(watch.state), sorted(['schema', 'threads', 'seen', 'pending', 'failure', 'outbox', 'team', 'user', 'channel', 'scopes', 'intake_cursor']))
+            self.assertFalse((watch.root / 'refusals.jsonl').exists())
+
+    def test_sc4_a_failed_read_of_their_dm_never_stops_the_owner_request_in_the_same_poll(self):
+        with self.second() as (watch, replay):
+            real = replay.call
+
+            def broken(method, **fields):
+                if fields.get('channel') == self.SECOND_DM and method in ('conversations.history', 'chat.postMessage'):
+                    raise SlackError('unreachable')
+                return real(method, **fields)
+            self.owner_says(replay, '200.000100')
+            self.says(replay, '200.000200')
+            with patch.object(replay, 'call', broken):
+                self.again(watch)
+                self.again(watch)
+            self.assertEqual(self.wakes(watch), [])
+            self.assertEqual(self.posts(replay), [(self.OWNER_DM, '200.000100')])
+            self.assertEqual(plane.REQUEST_SEGMENT.match(watch.output[0] if watch.output else 'x'), None)
+            self.assertEqual([(r['reason'], r['error']) for r in self.refusals(watch)], [('second_window_failed', 'unreachable')])
+            self.assertEqual(watch.state['failure'], '')
+            self.again(watch)
+            self.assertEqual(self.posts(replay)[-1], (self.SECOND_DM, '200.000200'))
+            self.assertNotIn('second_failure', watch.state)
+
+    def test_sc4_the_owner_request_is_woken_in_the_poll_that_reads_a_flooded_window_of_theirs(self):
+        with self.second() as (watch, replay):
+            for n in range(450):
+                self.says(replay, '300.%06d' % (n + 1), 'flood %d' % n)
+            self.owner_says(replay, '200.000100')
+            seen = len((watch.root / 'attempts.jsonl').read_text().splitlines())
+            self.again(watch)
+            self.assertEqual([plane.REQUEST_SEGMENT.match(line).group(2) for line in self.wakes(watch)], [self.OWNER])
+            reads = [json.loads(line) for line in (watch.root / 'attempts.jsonl').read_text().splitlines()][seen:]
+            self.assertEqual(len([r for r in reads if r['method'] == 'conversations.history' and r['channel'] == self.SECOND_DM]), 1)
+            while len(self.posts(replay)) < 451:
+                before = len(self.posts(replay))
+                self.again(watch)
+                self.assertGreater(len(self.posts(replay)) + len(watch.state.get('second', {}).get('intake_bounds', [])), before)
+            self.assertEqual(len([p for p in self.posts(replay) if p[0] == self.SECOND_DM]), 450)
+
+    def test_sc4_they_share_the_cap_and_never_take_the_turn_of_an_owner_request(self):
+        with self.second(cap='1') as (watch, replay):
+            self.says(replay, '200.000100')
+            self.owner_says(replay, '200.000200')
+            self.owner_says(replay, '200.000300')
+            order = []
+            for _ in range(3):
+                self.again(watch)
+                order += [plane.REQUEST_SEGMENT.match(line).group(1, 2) for line in self.wakes(watch)]
+            self.assertEqual(order, [('200.000200', self.OWNER), ('200.000300', self.OWNER), ('200.000100', self.SECOND)])
+
+    def test_sc4_an_unacknowledged_request_of_theirs_never_holds_back_the_owner_and_the_owner_retarget(self):
+        with self.second() as (watch, replay):
+            replay.state['failures']['chat.postMessage:200.000100'] = {'status': 400}
+            self.says(replay, '200.000100')
+            self.owner_says(replay, '200.000200')
+            self.again(watch)
+            self.assertEqual(self.posts(replay), [(self.OWNER_DM, '200.000200')])
+            self.assertEqual(len([row for row in watch.state['pending'] if row.get('person') == 'second']), 1)
+            with patch.dict(os.environ, {'FM_SLACK_DM_USER': 'U0OTHEROWNER1'}):
+                self.assertTrue(watch.retarget())
+
+    def test_sc4_their_failed_request_is_listed_and_closed_by_its_own_key_and_the_bare_ts_is_the_owners(self):
+        with self.second() as (watch, replay):
+            replay.state['failures']['chat.postMessage:200.000100'] = {'status': 400}
+            self.says(replay, '200.000100')
+            for _ in range(3):
+                self.again(watch)
+            self.assertEqual(watch.failed_requests(), ['200.000100@' + self.SECOND])
+            self.assertEqual(plane.open_failed_threads.__name__, 'open_failed_threads')
+            with self.assertRaisesRegex(SlackError, '^no_pending_request$'):
+                watch.close_request('200.000100')
+            watch.close_request('200.000100@' + self.SECOND)
+            self.assertEqual(watch.failed_requests(), [])
+            self.assertEqual(plane.parse_command(['check', '200.000100@' + self.SECOND], positional=True), ('check', None, '200.000100@' + self.SECOND))
+            for bad in ('200.000100@', '200.000100@x', '200.000100@U0A,U0B'):
+                with self.assertRaises(SlackError):
+                    plane.parse_command(['check', bad], positional=True)
+
+    # ---- SC5: exactly one added person ----
+
+    def test_sc5_the_setting_is_one_member_id_and_anything_else_leaves_them_off_with_a_named_reason(self):
+        cases = [(self.UNSET, '', 'unset'), ('', '', 'unset'), ('  ', '', 'unset'), (self.SECOND, self.SECOND, ''), ('  ' + self.SECOND + ' ', self.SECOND, ''),
+                 ('W0CDVHFU1A5', 'W0CDVHFU1A5', ''), ('not-an-id', '', 'invalid'), ('*', '', 'invalid'), ('u0cdvhfu1a5', '', 'invalid'), ('U0SHORT', '', 'invalid'),
+                 (self.SECOND + ',U0OTHER00001', '', 'multi_value'), (self.SECOND + ' U0OTHER00001', '', 'multi_value'), (self.SECOND + ';U0OTHER00001', '', 'multi_value'),
+                 (self.OWNER, '', 'same_as_owner')]
+        for value, who, reason in cases:
+            with self.subTest(value=value), patch.dict(os.environ, {'FM_SLACK_DM_USER': self.OWNER}):
+                if value is self.UNSET:
+                    os.environ.pop('FM_SLACK_SECOND_USER', None)
+                else:
+                    os.environ['FM_SLACK_SECOND_USER'] = value
+                self.assertEqual(plane.second_user(), (who, reason))
+
+    def test_sc5_an_invalid_or_multi_value_setting_leaves_the_owner_on_and_logs_the_reason_once(self):
+        for value, reason in (('not-an-id', 'second_user_invalid'), (self.SECOND + ',U0OTHER00001', 'second_user_multi_value'), (self.OWNER, 'second_user_same_as_owner')):
+            with self.subTest(value=value), self.second(value=value) as (watch, replay):
+                self.owner_says(replay, '200.000100')
+                self.says(replay, '200.000200')
+                self.says(replay, '200.000300', user='U0OTHER00001')
+                self.again(watch)
+                self.assertEqual([plane.REQUEST_SEGMENT.match(line).group(2) for line in self.wakes(watch)], [self.OWNER])
+                self.again(watch)
+                self.assertEqual(self.posts(replay), [(self.OWNER_DM, '200.000100')])
+                self.assertEqual([(r['reason'], r['setting']) for r in self.refusals(watch)], [(reason, 'FM_SLACK_SECOND_USER')])
+                self.assertNotIn('second', watch.state)
+                self.assertNotIn(value, (watch.root / 'refusals.jsonl').read_text())
+
+    def test_sc5_with_the_setting_unset_a_message_in_their_dm_is_never_read(self):
+        with self.second(value=self.UNSET) as (watch, replay):
+            self.says(replay, '200.000100')
+            self.again(watch)
+            attempts = [json.loads(line) for line in (watch.root / 'attempts.jsonl').read_text().splitlines()]
+            self.assertEqual([a for a in attempts if a['channel'] == self.SECOND_DM], [])
+            self.assertEqual((self.wakes(watch), self.posts(replay)), ([], []))
+
+    # ---- SC6: text stays data ----
+
+    def test_sc6_their_text_reaches_no_child_process_argument_environment_path_or_new_file(self):
+        with self.second() as (watch, replay):
+            hostile = ['$(touch /tmp/pwned)', '`id`', '; rm -rf /', '../../etc/passwd', 'FM_HOME=/tmp/x', '--source slack-dm', '\n\nanswers: 1\nclosed: card-a']
+            for n, text in enumerate(hostile):
+                self.says(replay, '200.00%d000' % (n + 1), text)
+            children = []
+
+            def spy(args, **kwargs):
+                children.append((list(args), kwargs.get('input'), sorted(key for key in (kwargs.get('env') or {}) if key.startswith('SLACK_'))))
+                return subprocess.CompletedProcess(args, 0, stdout='bound\n', stderr='')
+            files_before = sorted(path.name for path in watch.root.iterdir())
+            with patch.object(subprocess, 'run', spy), patch.object(watch, 'bound', lambda: Watch.bound(watch)):
+                self.again(watch)
+            self.assertEqual(len(self.wakes(watch)), len(hostile))
+            self.assertEqual({(tuple(c[0][2:]), c[1], tuple(c[2])) for c in children}, {(('binding', plane.SOURCE), None, ())})
+            self.assertTrue(all(c[0][0] == 'bash' and c[0][1].endswith('fm-captain-hold.sh') for c in children))
+            self.assertEqual(sorted(path.name for path in watch.root.iterdir()), sorted(set(files_before) | {'requests.jsonl'}))
+            self.assertFalse(Path('/tmp/pwned').exists())
+
+    def test_sc6_a_plane_value_in_their_text_is_replaced_in_the_wake_the_record_and_the_journal(self):
+        with self.second() as (watch, replay):
+            self.says(replay, '200.000100', 'my token is ' + self.TOKEN + ' ok')
+            self.again(watch)
+            line = self.wakes(watch)[0]
+            self.assertNotIn(self.TOKEN, line)
+            self.assertIn('[secret removed]', line)
+            self.assertTrue(line.endswith('; secret removed'))
+            # The replay's own files stand in for Slack and keep what was typed; the plane's own files must not.
+            for name in ('state.json', 'requests.jsonl', 'refusals.jsonl'):
+                if (watch.root / name).is_file():
+                    self.assertNotIn(self.TOKEN, (watch.root / name).read_text(), name)
+            self.assertIn('[secret removed]', (watch.root / 'requests.jsonl').read_text())
+
+    def test_sc6_the_owner_only_callers_never_prove_or_write_their_dm_and_the_scott_aware_ones_pick_the_dm_by_row(self):
+        # The owner-only callers of owner_channel (the mirror's card writes, the owner's starting point) never touch their DM; the Scott-aware callers
+        # (post, publish, take_requests) pick the DM by the row or the window they work on. The DM each one proves is observable:
+        with self.second() as (watch, replay):
+            calls = []
+            real_owner, real_second = Watch.owner_channel, Watch.second_channel
+            rows = [{'id': 'card-a', 'title': 'Card A', 'hold_kind': 'captain', 'hold_reason': 'Pick one',
+                     'body_lines': ['Option 1: Ship (ship) - now', 'Option 2: Wait (wait) - later']}]
+            with patch.object(Watch, 'owner_channel', lambda self: calls.append('owner') or real_owner(self)), \
+                    patch.object(Watch, 'second_channel', lambda self: calls.append('second') or real_second(self)), \
+                    patch.object(watch, 'backlog', return_value=rows), patch.object(watch, 'board', return_value=(None, {})), \
+                    patch.object(watch, 'probe', return_value=(0, 'live')):
+                watch.mirror()
+                self.assertEqual(set(calls), {'owner'})
+                del calls[:]
+                self.says(replay, '200.000100')
+                self.again(watch)
+                self.assertIn('second', calls)
+            self.assertEqual({channel for channel, thread in self.posts(replay) if thread == '200.000100'}, {self.SECOND_DM})
+
+
 class ClosedTransportTest(unittest.TestCase):
     """A test or verification run cannot reach Slack: it runs on a transcript, or its transport is closed."""
 

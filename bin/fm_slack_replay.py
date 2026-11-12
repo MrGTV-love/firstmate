@@ -154,9 +154,9 @@ class Replay:
                     'user_id': self.transcript.get('bot_user', 'UBOT0123456')}
         elif method == 'conversations.open':
             target = fields.get('users')
-            # The configured owner, or one whose DM this conversation already opened (a retarget reads the DM it leaves).
+            # The configured owner or second person, or one whose DM this conversation already opened (a retarget reads the DM it leaves).
             opened = self.state.setdefault('opened', [])
-            if target != os.environ.get('FM_SLACK_DM_USER') and target not in opened:
+            if target not in (os.environ.get('FM_SLACK_DM_USER'), os.environ.get('FM_SLACK_SECOND_USER')) and target not in opened:
                 raise SlackError('target_mismatch')
             if target not in opened:
                 opened.append(target)
