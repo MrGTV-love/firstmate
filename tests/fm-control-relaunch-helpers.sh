@@ -123,9 +123,12 @@ SH
   # somewhere else, standing in for the several servers a busy machine always
   # has. lsof-mode: holder adds the staged holder; broken fails; partial lists some
   # processes and then fails; nocwd lists a process with no directory; empty is blind.
+  # A real table always lists its caller; asked for parent pids (-F pRcn, the
+  # spawn reset guard's form), the caller is listed with its whole parent chain.
   cat > "$1/fakebin/lsof" <<'SH'
 #!/usr/bin/env bash
 D=$FM_FAKE_DIR
+args=" $* "
 if [ -f "$D/adoption-cwd" ] && [ "${*: -1}" = pn0 ]; then
   [ ! -f "$D/adoption-cwd-unreadable" ] || exit 1
   printf 'p%s\0\nn%s\0\n' "$(cat "$D/recovery-pid")" "$(cat "$D/adoption-cwd")"
@@ -147,6 +150,17 @@ mode=$(cat "$D/lsof-mode" 2>/dev/null || printf none)
 if [ "$excluded" != "^$$" ]; then
   printf 'p%s\nn%s\n' "$$" "$(encode_cwd "$(pwd -P)")"
 fi
+case "$args" in
+  *' pRcn '*)
+    pid=$$ hops=0
+    while [ "$pid" -gt 1 ] && [ "$hops" -lt 64 ]; do
+      ppid=$(/bin/ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')
+      [ -n "$ppid" ] || break
+      printf 'p%s\nR%s\nn/\n' "$pid" "$ppid"
+      pid=$ppid hops=$((hops + 1))
+    done
+    ;;
+esac
 case "$mode" in
   broken) echo 'lsof: WARNING: could not read the process table' >&2; exit 1 ;;
   partial) printf 'p111\nn/\np222\nn/private/tmp\n'; echo 'lsof: WARNING: read timeout' >&2; exit 1 ;;

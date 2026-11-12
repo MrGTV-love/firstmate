@@ -632,6 +632,11 @@ test_slot_left_by_reassociated_task_is_allocatable() {
   git -C "$SLOT_DIR" commit -qm unlanded
   git -C "$PROJECT_DIR" update-ref "refs/fm/anchor/mover-$(git -C "$SLOT_DIR" rev-parse --short HEAD)" \
     "$(git -C "$SLOT_DIR" rev-parse HEAD)"
+  # This case is about allocation, not about the base reset. The reset guard refuses a slot whose
+  # branch carries a commit contained in neither origin's default branch nor a recorded base (an
+  # anchor ref does not count), so the left-behind commit is landed on origin first; the unlanded
+  # case is the reset guard's own regression (tests/fm-spawn-pool-base-freshen.test.sh).
+  git -C "$SLOT_DIR" push --quiet origin HEAD:refs/heads/main
   git -C "$PROJECT_DIR" worktree add --quiet -b mover-v2 "$CASE_DIR/replacement"
   fm_write_meta "$HOME_DIR/state/mover.meta" "window=fmses:fm-mover" \
     "worktree=$CASE_DIR/replacement" "released_worktree=$SLOT_DIR" "project=$PROJECT_DIR" "kind=ship"

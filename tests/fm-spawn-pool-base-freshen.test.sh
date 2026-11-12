@@ -1540,12 +1540,1044 @@ PY
   pass 'legacy relaunch refuses inferred scope, retains refused explicit scope, adopts it, and never overrides it'
 }
 
-# Explicit selection keeps focused acquisition regressions independently runnable.
+# --- Reset guard (S0-S7): fm-spawn proves a pooled slot holds no unique work
+# before its destroying reset. Every case runs on scratch repositories.
+#
+# S7: guard_snapshot records HEAD, every ref, the index, the status and a
+# path-sorted sha256 of every file outside .git (tracked, untracked and ignored).
+# A refusal must leave all of it equal; equal status is not equal work.
+guard_snapshot() { # <slot> <out>
+  local slot=$1 out=$2
+  {
+    printf 'HEAD %s\n' "$(git -C "$slot" rev-parse HEAD)"
+    printf 'SYMREF %s\n' "$(git -C "$slot" symbolic-ref -q HEAD || echo detached)"
+    printf '%s\n' '--- show-ref'
+    git -C "$slot" show-ref
+    printf '%s\n' '--- index'
+    git -C "$slot" ls-files -s --debug
+    printf '%s\n' '--- status'
+    git -C "$slot" status --porcelain=v1 --untracked-files=all --ignored
+    printf '%s\n' '--- files'
+    (
+      cd "$slot" || exit 1
+      find . -name .git -prune -o \( -type f -o -type l \) -print | LC_ALL=C sort | while IFS= read -r f; do
+        if [ -L "$f" ]; then
+          printf 'L %s -> %s\n' "$f" "$(readlink "$f")"
+        else
+          printf '%s  %s\n' "$(shasum -a 256 <"$f" | cut -d' ' -f1)" "$f"
+        fi
+      done
+    )
+  } >"$out" 2>&1
+}
+export -f guard_snapshot
+
+# A snapshot's refs section, one "<sha> <ref>" line each, and everything else.
+guard_snapshot_refs() { sed -n '/^--- show-ref$/,/^--- index$/p' "$1" | sed '1d;$d'; }
+guard_snapshot_rest() { sed '/^--- show-ref$/,/^--- index$/{/^--- index$/!d;}' "$1"; }
+
+# The S7 comparison of a refusal. HEAD, the index, the status and every file must equal
+# the reference (the state before the spawn, or right after a transition seam). Every ref
+# must equal its value before the spawn, with exactly two exceptions that change no local
+# work: refs/remotes/origin/<fetched branch> and refs/remotes/origin/HEAD may be created
+# or moved forward, and refs/fm/anchor/<task>-* may be added.
+guard_refusal_diff() { # <before> <reference> <after> <slot> <fetched-branch> <task-id>
+  local before=$1 reference=$2 after=$3 slot=$4 branch=$5 id=$6
+  if ! diff <(guard_snapshot_rest "$reference") <(guard_snapshot_rest "$after") >&2; then
+    echo 'HEAD, the index, the status or file bytes changed' >&2
+    return 1
+  fi
+  python3 - "$slot" "$branch" "$id" <(guard_snapshot_refs "$before") <(guard_snapshot_refs "$after") <<'PY'
+import subprocess, sys
+slot, branch, task, before_path, after_path = sys.argv[1:6]
+def refs(path):
+    found = {}
+    for line in open(path):
+        sha, _, ref = line.rstrip("\n").partition(" ")
+        found[ref] = sha
+    return found
+before, after = refs(before_path), refs(after_path)
+forward = {"refs/remotes/origin/" + branch, "refs/remotes/origin/HEAD"}
+bad = []
+for ref in sorted(set(before) | set(after)):
+    old, new = before.get(ref), after.get(ref)
+    if old == new:
+        continue
+    if ref in forward and new is not None and (
+            old is None or subprocess.run(["git", "-C", slot, "merge-base", "--is-ancestor", old, new]).returncode == 0):
+        continue
+    if ref.startswith("refs/fm/anchor/%s-" % task) and old is None:
+        continue
+    bad.append("%s: %s -> %s" % (ref, old or "absent", new or "absent"))
+if bad:
+    print("refs changed beyond the two allowed exceptions: " + "; ".join(bad), file=sys.stderr)
+    sys.exit(1)
+PY
+}
+
+# The S7 witness: one dirty file changes its bytes while HEAD, refs and porcelain
+# status stay equal. The comparison must see it.
+test_reset_guard_snapshot_witness() {
+  local rec id before after
+  id='guard-witness-s7'
+  rec=$(make_case guard-witness "$id")
+  read_case_record "$rec"
+  printf 'AAAA\n' >"$POOL_DIR/dirty.txt"
+  guard_snapshot "$POOL_DIR" "$CASE_DIR/before.snap"
+  printf 'BBBB\n' >"$POOL_DIR/dirty.txt"
+  guard_snapshot "$POOL_DIR" "$CASE_DIR/after.snap"
+  cmp -s "$CASE_DIR/before.snap" "$CASE_DIR/after.snap" \
+    && fail 'the snapshot comparison could not see a changed dirty file with equal status'
+  [ "$(sed -n '/--- status/,/--- files/p' "$CASE_DIR/before.snap")" = "$(sed -n '/--- status/,/--- files/p' "$CASE_DIR/after.snap")" ] \
+    || fail 'the witness changed the porcelain status'
+  [ "$(sed -n '1,/--- index/p' "$CASE_DIR/before.snap")" = "$(sed -n '1,/--- index/p' "$CASE_DIR/after.snap")" ] \
+    || fail 'the witness changed HEAD or refs'
+  guard_refusal_diff "$CASE_DIR/before.snap" "$CASE_DIR/before.snap" "$CASE_DIR/after.snap" "$POOL_DIR" main "$id" 2>/dev/null \
+    && fail 'the refusal comparison accepted a changed dirty file'
+  if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
+    printf 'EVIDENCE S7 witness: status equal, HEAD equal, refs equal, file digest differs; diff=%s\n' \
+      "$(diff "$CASE_DIR/before.snap" "$CASE_DIR/after.snap" | tr '\n' '|')"
+  fi
+  # The ref comparison: a forward origin move and an added anchor of this task pass; a moved
+  # local branch, a backward origin move and another task's anchor are each refused.
+  local base child
+  printf 'AAAA\n' >"$POOL_DIR/dirty.txt"
+  base=$(git -C "$POOL_DIR" rev-parse HEAD)
+  child=$(git -C "$POOL_DIR" commit-tree "$base^{tree}" -p "$base" -m child)
+  git -C "$POOL_DIR" branch witness-branch "$base"
+  git -C "$POOL_DIR" update-ref refs/remotes/origin/main "$base"
+  guard_snapshot "$POOL_DIR" "$CASE_DIR/before.snap"
+  git -C "$POOL_DIR" update-ref refs/remotes/origin/main "$child"
+  git -C "$POOL_DIR" update-ref "refs/fm/anchor/$id-$base" "$base"
+  guard_snapshot "$POOL_DIR" "$CASE_DIR/after.snap"
+  guard_refusal_diff "$CASE_DIR/before.snap" "$CASE_DIR/before.snap" "$CASE_DIR/after.snap" "$POOL_DIR" main "$id" \
+    || fail 'the refusal comparison rejected the two allowed exceptions'
+  git -C "$POOL_DIR" update-ref refs/heads/witness-branch "$child"
+  guard_snapshot "$POOL_DIR" "$CASE_DIR/branch.snap"
+  guard_refusal_diff "$CASE_DIR/before.snap" "$CASE_DIR/before.snap" "$CASE_DIR/branch.snap" "$POOL_DIR" main "$id" 2>/dev/null \
+    && fail 'the refusal comparison accepted a moved local branch'
+  git -C "$POOL_DIR" update-ref refs/heads/witness-branch "$base"
+  git -C "$POOL_DIR" update-ref refs/remotes/origin/main "$child"
+  guard_snapshot "$POOL_DIR" "$CASE_DIR/forward.snap"
+  git -C "$POOL_DIR" update-ref refs/remotes/origin/main "$base"
+  guard_snapshot "$POOL_DIR" "$CASE_DIR/backward.snap"
+  guard_refusal_diff "$CASE_DIR/forward.snap" "$CASE_DIR/forward.snap" "$CASE_DIR/backward.snap" "$POOL_DIR" main "$id" 2>/dev/null \
+    && fail 'the refusal comparison accepted a backward origin move'
+  git -C "$POOL_DIR" update-ref "refs/fm/anchor/other-task-$base" "$base"
+  guard_snapshot "$POOL_DIR" "$CASE_DIR/other-anchor.snap"
+  guard_refusal_diff "$CASE_DIR/backward.snap" "$CASE_DIR/backward.snap" "$CASE_DIR/other-anchor.snap" "$POOL_DIR" main "$id" 2>/dev/null \
+    && fail 'the refusal comparison accepted another task'"'"'s anchor'
+  pass 'the S7 snapshot comparison detects changed bytes under equal status and every ref change beyond the two exceptions'
+}
+
+# Run one blocking case: spawn, then require a non-zero exit, no launch, the
+# named reason and the slot path in the message, and an identical snapshot.
+# $1 = fact, $2 = case label, $3 = reason code, $4 = task id, $5.. = spawn args.
+# Sets GUARD_OUT. The caller has already set CASE_DIR, HOME_DIR and POOL_DIR.
+guard_expect_refusal() {
+  local fact=$1 label=$2 code=$3 id=$4 status=0 reference
+  shift 4
+  guard_snapshot "$POOL_DIR" "$CASE_DIR/before.snap"
+  GUARD_OUT=$(run_spawn "$id" "$@") || status=$?
+  guard_snapshot "$POOL_DIR" "$CASE_DIR/after.snap"
+  [ "$status" -ne 0 ] || fail "$fact $label: the spawn launched on a slot that should refuse"$'\n'"$GUARD_OUT"
+  assert_contains "$GUARD_OUT" "$code" "$fact $label: the refusal did not name $code"$'\n'"$GUARD_OUT"
+  assert_contains "$GUARD_OUT" "$POOL_DIR" "$fact $label: the refusal did not name the slot path"
+  if [ ! -s "$CASE_DIR/launch.log" ] && [ -e "$HOME_DIR/state/$id.meta" ] &&
+    ! grep -q '^recovery=slot-provision-refused' "$HOME_DIR/state/$id.meta"; then
+    fail "$fact $label: a worker record was published"
+  fi
+  # A transition case changes the slot itself after the first observation; the
+  # refusal must then leave exactly that state (the seam records it as post-seam.snap).
+  reference="$CASE_DIR/before.snap"
+  [ ! -f "$CASE_DIR/post-seam.snap" ] || reference="$CASE_DIR/post-seam.snap"
+  guard_refusal_diff "$CASE_DIR/before.snap" "$reference" "$CASE_DIR/after.snap" "$POOL_DIR" "${GUARD_FETCHED_BRANCH:-main}" "$id" \
+    || fail "$fact $label: the refusal changed the slot (HEAD, refs, index or file bytes)"
+  if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
+    printf 'EVIDENCE %s | %s | exit=%s | reason=%s | slot=%s | HEAD+refs+index+files equal=yes (%s sha256 of before.snap)\n' \
+      "$fact" "$label" "$status" "$code" "$POOL_DIR" "$(shasum -a 256 <"$CASE_DIR/before.snap" | cut -c1-16)"
+    printf 'EVIDENCE   message: %s\n' "$(printf '%s\n' "$GUARD_OUT" | grep -F 'reset refused' | head -n 1 | cut -c1-300)"
+  fi
+}
+
+# A pass case: the spawn launches and the slot reaches the origin tip.
+guard_expect_launch() {
+  local fact=$1 label=$2 id=$3 status=0
+  shift 3
+  GUARD_OUT=$(run_spawn "$id" "$@") || status=$?
+  expect_code 0 "$status" "$fact $label: a slot with clear evidence should launch"$'\n'"$GUARD_OUT"
+  if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
+    printf 'EVIDENCE %s | %s | exit=0 | launched, slot HEAD now %s\n' "$fact" "$label" "$(git -C "$POOL_DIR" rev-parse --short HEAD)"
+  fi
+}
+
+guard_prefetch() { git -C "$PROJECT_DIR" fetch --quiet origin; }
+
+guard_commit() { # <repo> <message>
+  git -C "$1" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -q --allow-empty -m "$2"
+}
+
+# A fake git that fails when FM_TEST_GIT_FAIL appears among the arguments.
+guard_install_git_shim() { # <fakebin>
+  local real
+  real=$(command -v git)
+  cat >"$1/git" <<SH
+#!/usr/bin/env bash
+if [ -n "\${FM_TEST_GIT_FAIL:-}" ]; then
+  case " \$* " in
+    *" \${FM_TEST_GIT_FAIL} "*) echo "fixture: injected git failure" >&2; exit 128 ;;
+  esac
+fi
+exec "$real" "\$@"
+SH
+  chmod +x "$1/git"
+}
+
+# A PATH identical to the current one except that the tool is gone: every other
+# executable of the directory that held it is linked into a private directory.
+guard_path_without() { # <tool> <dir>
+  local tool=$1 dir=$2 holder entry new_path='' part found
+  mkdir -p "$dir"
+  while IFS= read -r part; do
+    found=0
+    if [ -x "$part/$tool" ]; then
+      found=1
+      for entry in "$part"/*; do
+        [ -x "$entry" ] && [ "${entry##*/}" != "$tool" ] || continue
+        [ -e "$dir/${entry##*/}" ] || ln -s "$entry" "$dir/${entry##*/}"
+      done
+      holder=$dir
+    fi
+    if [ "$found" = 1 ]; then part=$holder; fi
+    case ":$new_path:" in *":$part:"*) ;; *) new_path="${new_path:+$new_path:}$part" ;; esac
+  done < <(printf '%s' "$PATH" | tr ':' '\n')
+  printf '%s' "$new_path"
+}
+
+# A governed project: a provisioner stub makes the project governed, so its
+# lifecycle manifest, lease store and contention log count.
+make_guard_governed_case() { # <name> <id>
+  local name=$1 id=$2 case_dir home project origin pool publisher fakebin initial
+  fm_git_identity
+  case_dir="$TMP_ROOT/$name"
+  home="$case_dir/home" project="$case_dir/project" origin="$case_dir/origin.git"
+  pool="$case_dir/pool" publisher="$case_dir/publisher"
+  fakebin=$(make_spawn_fakebin "$case_dir/fake" codex)
+  fm_test_fake_no_mistakes "$fakebin"
+  fm_test_fake_gh "$fakebin"
+  fm_test_fake_gh_axi "$fakebin"
+  fm_test_spawn_home "$home" codex
+  printf 'manual\n' >"$home/config/backlog-backend"
+  fm_test_spawn_brief "$home" "$id"
+  fm_git_init_commit "$project"
+  write_passing_slot_owner "$project"
+  git -C "$project" add scripts
+  git -C "$project" commit -qm 'governed copy'
+  fm_git_add_origin "$project" "$origin"
+  git -C "$project" worktree add --quiet --detach "$pool" HEAD
+  initial=$(git -C "$pool" rev-parse HEAD)
+  git clone --quiet "file://$origin" "$publisher"
+  printf 'advanced\n' >"$publisher/advanced.txt"
+  git -C "$publisher" add .
+  git -C "$publisher" commit -qm 'advance origin'
+  git -C "$publisher" push --quiet origin main
+  printf '%s\n' "$case_dir|$home|$project|$pool|$fakebin|$initial|main"
+}
+
+run_governed_spawn() { # <id> [<arg>...]
+  local id=$1
+  shift
+  FM_TEST_PROVISION_CALLED="$CASE_DIR/provisioner.called" FM_TEST_SLOT_RECORD="$CASE_DIR/slot-record.json" \
+    FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" \
+    fm_test_run_spawn "$HOME_DIR" "$POOL_DIR" "$FAKEBIN_DIR" "$id" "$PROJECT_DIR" --backend tmux --scout --owned-path scripts "$@"
+}
+
+# Place the slot's lifecycle manifest where the governed project keeps it.
+GUARD_MANIFEST_FILE=
+guard_write_manifest() { # <branch-or--> <base-sha> [<raw-bytes>]
+  local common real name
+  common=$(git -C "$POOL_DIR" rev-parse --path-format=absolute --git-common-dir)
+  real=$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$POOL_DIR")
+  name="$(printf '%s' "$real" | shasum -a 256 | cut -c1-16).json"
+  mkdir -p "$common/vernant-worktree-lifecycle"
+  GUARD_MANIFEST_FILE="$common/vernant-worktree-lifecycle/$name"
+  if [ "$#" -ge 3 ]; then
+    printf '%s' "$3" >"$GUARD_MANIFEST_FILE"
+  else
+    python3 - "$GUARD_MANIFEST_FILE" "$1" "$2" "$real" <<'PY'
+import json, sys
+path, branch, base, real = sys.argv[1:5]
+json.dump({"schema_version": "1.1.0", "lifecycle_state": "worktree_active", "worktree_path": real,
+           "branch": None if branch == "-" else branch, "base_sha": base, "owner_id": "previous"},
+          open(path, "w"))
+PY
+  fi
+}
+
+guard_iso_ago() { # <hours>
+  python3 -c 'import datetime,sys; print((datetime.datetime.now(datetime.timezone.utc)-datetime.timedelta(hours=float(sys.argv[1]))).isoformat())' "$1"
+}
+
+# ---- S1: HEAD contained -------------------------------------------------------
+test_reset_guard_s1_detached_extra_commit() {
+  local rec id extra
+  id='guard-s1-extra-commit'
+  rec=$(make_case guard-s1 "$id")
+  read_case_record "$rec"
+  guard_commit "$POOL_DIR" 'unique work on a detached HEAD'
+  extra=$(git -C "$POOL_DIR" rev-parse HEAD)
+  guard_expect_refusal S1 'detached HEAD with one extra commit' 'reset refused (head_not_contained)' "$id" --scout
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$extra" ] || fail 'the extra commit is no longer the slot HEAD'
+  pass 'S1: a detached HEAD with an uncontained commit is refused and keeps its commit'
+}
+
+# ---- S2: owner branch tip contained ---------------------------------------------
+test_reset_guard_s2_attached_branch() {
+  local rec id tip
+  id='guard-s2-attached'
+  rec=$(make_case guard-s2a "$id")
+  read_case_record "$rec"
+  git -C "$POOL_DIR" checkout --quiet -b owner-topic
+  guard_commit "$POOL_DIR" 'unique work on the owner branch'
+  tip=$(git -C "$POOL_DIR" rev-parse refs/heads/owner-topic)
+  guard_expect_refusal S2 'slot attached to a branch with one uncontained commit' 'reset refused (owner_branch_not_contained)' "$id" --scout
+  [ "$(git -C "$POOL_DIR" rev-parse refs/heads/owner-topic)" = "$tip" ] || fail 'the owner branch ref moved'
+  # Paired pass: the same attached branch, fully contained.
+  id='guard-s2-attached-contained'
+  rec=$(make_case guard-s2b "$id")
+  read_case_record "$rec"
+  git -C "$POOL_DIR" checkout --quiet -b owner-topic
+  tip=$(git -C "$POOL_DIR" rev-parse HEAD)
+  guard_expect_launch S2 'the same attached branch fully contained' "$id" --scout
+  git -C "$POOL_DIR" merge-base --is-ancestor "$tip" refs/heads/owner-topic || fail 'the contained branch lost its old tip'
+  pass 'S2: an attached owner branch is refused with an uncontained commit and passes when contained'
+}
+
+test_reset_guard_s2_manifest_branch() {
+  local rec id tip
+  id='guard-s2-manifest'
+  rec=$(make_guard_governed_case guard-s2m "$id")
+  read_case_record "$rec"
+  git -C "$POOL_DIR" checkout --quiet -b previous-owner
+  guard_commit "$POOL_DIR" 'unique work on the manifest branch'
+  tip=$(git -C "$POOL_DIR" rev-parse HEAD)
+  git -C "$POOL_DIR" checkout --quiet --detach "$INITIAL_SHA"
+  guard_write_manifest previous-owner "$INITIAL_SHA"
+  guard_expect_refusal S2 'detached slot whose manifest branch has one uncontained commit' 'reset refused (owner_branch_not_contained)' "$id" --scout --owned-path scripts
+  [ "$(git -C "$POOL_DIR" rev-parse refs/heads/previous-owner)" = "$tip" ] || fail 'the manifest branch ref moved'
+  # Paired pass: the same branch name, fully contained.
+  id='guard-s2-manifest-contained'
+  rec=$(make_guard_governed_case guard-s2n "$id")
+  read_case_record "$rec"
+  git -C "$POOL_DIR" branch previous-owner "$INITIAL_SHA"
+  guard_write_manifest previous-owner "$INITIAL_SHA"
+  GUARD_OUT=$(run_governed_spawn "$id") || fail "S2: the contained manifest branch refused: $GUARD_OUT"
+  pass 'S2: a manifest owner branch is refused with an uncontained commit and passes when contained'
+}
+
+# The recorded base is an anchor: HEAD contained only in the manifest's base_sha passes.
+test_reset_guard_s1_manifest_base_anchor() {
+  local rec id
+  id='guard-s1-base-anchor'
+  rec=$(make_guard_governed_case guard-s1b "$id")
+  read_case_record "$rec"
+  guard_commit "$POOL_DIR" 'work contained only in the recorded base'
+  git -C "$POOL_DIR" branch recorded-base HEAD
+  guard_write_manifest - "$(git -C "$POOL_DIR" rev-parse HEAD)"
+  GUARD_OUT=$(run_governed_spawn "$id") || fail "S1: HEAD contained in the recorded base refused: $GUARD_OUT"
+  # Without that manifest the same HEAD is uncontained.
+  id='guard-s1-no-base-anchor'
+  rec=$(make_guard_governed_case guard-s1c "$id")
+  read_case_record "$rec"
+  guard_commit "$POOL_DIR" 'work contained nowhere'
+  guard_expect_refusal S1 'governed slot, HEAD in neither origin nor a recorded base' 'reset refused (head_not_contained)' "$id" --scout --owned-path scripts
+  pass 'S1: the manifest base_sha is an anchor, and without it uncontained HEAD still refuses'
+}
+
+# ---- S3: clean tree -----------------------------------------------------------------
+test_reset_guard_s3_dirty_kinds() {
+  local rec id kind
+  for kind in modified staged untracked-in-new-dir; do
+    id="guard-s3-$kind"
+    rec=$(make_case "guard-s3-$kind" "$id")
+    read_case_record "$rec"
+    case "$kind" in
+      modified) printf 'edit\n' >>"$POOL_DIR/README.md" ;;
+      staged) printf 'staged\n' >"$POOL_DIR/staged.txt"; git -C "$POOL_DIR" add staged.txt ;;
+      untracked-in-new-dir) mkdir -p "$POOL_DIR/new/dir"; printf 'untracked\n' >"$POOL_DIR/new/dir/file.txt" ;;
+    esac
+    guard_expect_refusal S3 "$kind" 'is not clean' "$id" --scout
+    assert_contains "$GUARD_OUT" 'reset refused: tree_not_clean' "S3 $kind: the refusal did not name tree_not_clean"
+  done
+  pass 'S3: a modified, staged or untracked-in-new-directory slot is refused untouched'
+}
+
+# ---- S3b: ignored work at a path the reset target tracks -------------------------------
+guard_publish_tracked() { # <path> <content>   publish a file the reset target will track
+  mkdir -p "$(dirname "$CASE_DIR/publisher/$1")"
+  printf '%s' "$2" >"$CASE_DIR/publisher/$1"
+  git -C "$CASE_DIR/publisher" add "$1"
+  git -C "$CASE_DIR/publisher" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm "track $1"
+  git -C "$CASE_DIR/publisher" push --quiet origin main
+}
+
+guard_ignore() { # <pattern>   ignore it in every worktree of the project
+  printf '%s\n' "$1" >>"$(git -C "$POOL_DIR" rev-parse --path-format=absolute --git-path info/exclude)"
+}
+
+test_reset_guard_s3b_same_path() {
+  local rec id
+  id='guard-s3b-same-path'
+  rec=$(make_case guard-s3b-i "$id")
+  read_case_record "$rec"
+  guard_ignore notes.local
+  printf 'private notes the target tracks something else at\n' >"$POOL_DIR/notes.local"
+  guard_publish_tracked notes.local $'tracked content\n'
+  guard_expect_refusal S3b '(i) same path, ignored, tracked by the target, unarchived' 'reset refused (ignored_collision)' "$id" --scout
+  assert_grep 'private notes' "$POOL_DIR/notes.local" 'the ignored file bytes changed'
+  pass 'S3b (i): an ignored file at a path the target tracks is refused and keeps its bytes'
+}
+
+test_reset_guard_s3b_ancestor_path() {
+  local rec id
+  id='guard-s3b-ancestor'
+  rec=$(make_case guard-s3b-ib "$id")
+  read_case_record "$rec"
+  guard_ignore notes.local
+  printf 'a regular ignored file the target needs as a directory\n' >"$POOL_DIR/notes.local"
+  guard_publish_tracked notes.local/entry.txt $'entry\n'
+  guard_expect_refusal S3b '(i-b) ignored regular file is an ancestor of a tracked target path' 'reset refused (ignored_collision)' "$id" --scout
+  [ -f "$POOL_DIR/notes.local" ] || fail 'the ignored file was replaced by a directory'
+  assert_grep 'regular ignored file' "$POOL_DIR/notes.local" 'the ignored file bytes changed'
+  pass 'S3b (i-b): an ignored file that is an ancestor of a tracked target path is refused and keeps its bytes'
+}
+
+test_reset_guard_s3b_inside_tracked_file() {
+  local rec id
+  id='guard-s3b-inside'
+  rec=$(make_case guard-s3b-ic "$id")
+  read_case_record "$rec"
+  guard_ignore cache.d
+  mkdir -p "$POOL_DIR/cache.d"
+  printf 'ignored content inside a directory the target tracks as a file\n' >"$POOL_DIR/cache.d/entry.txt"
+  guard_publish_tracked cache.d $'tracked file\n'
+  guard_expect_refusal S3b '(i-c) ignored entry lies inside a path the target tracks as a file' 'reset refused (ignored_collision)' "$id" --scout
+  assert_grep 'ignored content inside' "$POOL_DIR/cache.d/entry.txt" 'the ignored file bytes changed'
+  pass 'S3b (i-c): an ignored entry inside a tracked target path is refused and keeps its bytes'
+}
+
+test_reset_guard_s3b_control_no_collision() {
+  local rec id
+  id='guard-s3b-control'
+  rec=$(make_case guard-s3b-ii "$id")
+  read_case_record "$rec"
+  guard_ignore local-only.note
+  printf 'untouched ignored bytes\n' >"$POOL_DIR/local-only.note"
+  guard_expect_launch S3b '(ii) control: an ignored file at a path the target does not track' "$id" --scout
+  assert_grep 'untouched ignored bytes' "$POOL_DIR/local-only.note" 'the non-colliding ignored file changed bytes after the reset'
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$(git -C "$POOL_DIR" rev-parse origin/main)" ] || fail 'the control did not reset to origin'
+  pass 'S3b (ii): an ignored file the target does not track passes and keeps its bytes after the reset'
+}
+
+test_reset_guard_s3b_scratch_and_archive() {
+  local rec id sums
+  # A colliding entry the existing classifier calls scratch does not refuse.
+  id='guard-s3b-scratch'
+  rec=$(make_case guard-s3b-scratch "$id")
+  read_case_record "$rec"
+  guard_ignore .DS_Store
+  printf 'scratch\n' >"$POOL_DIR/.DS_Store"
+  guard_publish_tracked .DS_Store $'tracked\n'
+  guard_expect_launch S3b 'a colliding ignored entry the classifier calls scratch' "$id" --scout
+  # A verified archive holding the exact bytes lets a colliding entry pass; other bytes do not.
+  id='guard-s3b-archived'
+  rec=$(make_case guard-s3b-archived "$id")
+  read_case_record "$rec"
+  guard_ignore notes.local
+  printf 'archived notes\n' >"$POOL_DIR/notes.local"
+  guard_publish_tracked notes.local $'tracked\n'
+  mkdir -p "$HOME_DIR/data/earlier-task/merge-prune-preserved/20261101/tag"
+  cp "$POOL_DIR/notes.local" "$HOME_DIR/data/earlier-task/merge-prune-preserved/20261101/tag/notes.local"
+  sums="$HOME_DIR/data/earlier-task/merge-prune-preserved/20261101/tag/SHA256SUMS"
+  (cd "$POOL_DIR" && shasum -a 256 -- notes.local) >"$sums"
+  guard_expect_launch S3b 'a colliding ignored entry held by a verified archive' "$id" --scout
+  id='guard-s3b-archive-mismatch'
+  rec=$(make_case guard-s3b-mismatch "$id")
+  read_case_record "$rec"
+  guard_ignore notes.local
+  printf 'newer notes\n' >"$POOL_DIR/notes.local"
+  guard_publish_tracked notes.local $'tracked\n'
+  mkdir -p "$HOME_DIR/data/earlier-task/merge-prune-preserved/20261101/tag"
+  printf 'older notes\n' >"$HOME_DIR/data/earlier-task/merge-prune-preserved/20261101/tag/notes.local"
+  (cd "$HOME_DIR/data/earlier-task/merge-prune-preserved/20261101/tag" && shasum -a 256 -- notes.local) \
+    | sed 's|notes.local|notes.local|' >"$HOME_DIR/data/earlier-task/merge-prune-preserved/20261101/tag/SHA256SUMS"
+  guard_expect_refusal S3b 'an archive that does not hold the current bytes' 'reset refused (ignored_collision)' "$id" --scout
+  pass 'S3b: classifier-scratch and a verified matching archive pass; a mismatching archive refuses'
+}
+
+test_reset_guard_s3b_inventory_failure() {
+  local rec id
+  id='guard-s3b-inventory'
+  rec=$(make_case guard-s3b-iii "$id")
+  read_case_record "$rec"
+  guard_install_git_shim "$FAKEBIN_DIR"
+  FM_TEST_GIT_FAIL='ls-files -o -i' guard_expect_refusal S3b '(iii) the ignored-entry inventory fails' 'reset refused (unknown_ignored_inventory)' "$id" --scout
+  pass 'S3b (iii): an unreadable ignored-entry inventory refuses untouched'
+}
+
+# ---- S4: no live holder -----------------------------------------------------------------
+test_reset_guard_s4_cwd_holder() {
+  local rec id holder
+  id='guard-s4-cwd'
+  rec=$(make_case guard-s4i "$id")
+  read_case_record "$rec"
+  (cd "$POOL_DIR" && exec sleep 600) &
+  holder=$!
+  guard_expect_refusal S4 '(i) an unrelated process has its cwd in the slot' 'reset refused (holder_cwd)' "$id" --scout
+  kill "$holder" 2>/dev/null || true
+  wait "$holder" 2>/dev/null || true
+  guard_expect_launch S4 '(i) paired pass: the holder has exited' "$id" --scout
+  pass 'S4 (i): a foreign process with its cwd in the slot refuses, and passes once it exits'
+}
+
+test_reset_guard_s4_worktree_lock() {
+  local rec id
+  id='guard-s4-lock'
+  rec=$(make_case guard-s4ii "$id")
+  read_case_record "$rec"
+  git -C "$PROJECT_DIR" worktree lock --reason 'held by a foreign holder' "$POOL_DIR"
+  guard_expect_refusal S4 '(ii) a git worktree lock is on the slot' 'reset refused (holder_worktree_lock)' "$id" --scout
+  git -C "$PROJECT_DIR" worktree unlock "$POOL_DIR"
+  guard_expect_launch S4 '(ii) paired pass: the lock is released' "$id" --scout
+  pass 'S4 (ii): a git worktree lock refuses, and passes once released'
+}
+
+test_reset_guard_s4_foreign_lease() {
+  local rec id state
+  id='guard-s4-lease'
+  rec=$(make_case guard-s4iii "$id")
+  read_case_record "$rec"
+  lay_out_as_pool_slot
+  state="$CASE_DIR/slots/treehouse-state.json"
+  printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"another-task"}]}\n' "$POOL_DIR" >"$state"
+  guard_expect_refusal S4 '(iii) a durable lease held by another holder' 'reset refused (holder_lease)' "$id" --scout
+  printf '{"worktrees":[{"name":"1","path":"%s"}]}\n' "$POOL_DIR" >"$state"
+  guard_expect_launch S4 '(iii) paired pass: the lease is released' "$id" --scout
+  pass 'S4 (iii): a foreign durable lease refuses, and passes once released'
+}
+
+# A process lease is this spawn's own only by the identity recorded when it took the slot
+# (the pool entry's owner_pid at claim time), never by process ancestry.
+guard_set_lease_owner() { # <state-file> <pid>
+  jq --argjson pid "$2" '.worktrees[0].owner_pid = $pid' "$1" >"$1.tmp" && mv "$1.tmp" "$1"
+}
+
+test_reset_guard_s4_process_lease_recorded_identity() {
+  local rec id state own other shell child
+  # The entry's owner at claim time is the spawn's own acquisition: it passes though that
+  # process is alive and in no lineage of the spawn.
+  id='guard-s4-lease-recorded'
+  rec=$(make_case guard-s4lrec "$id")
+  read_case_record "$rec"
+  lay_out_as_pool_slot
+  state="$CASE_DIR/slots/treehouse-state.json"
+  (cd / && exec sleep 600) >/dev/null 2>&1 </dev/null &
+  own=$!
+  printf '{"worktrees":[{"name":"1","path":"%s","owner_pid":%s}]}\n' "$POOL_DIR" "$own" >"$state"
+  guard_expect_launch S4 '(iii-b) the live process lease recorded as this spawn'"'"'s own acquisition' "$id" --scout
+  # The owner changes after the claim to another live process: refused.
+  id='guard-s4-lease-swapped'
+  rec=$(make_case guard-s4lsw "$id")
+  read_case_record "$rec"
+  lay_out_as_pool_slot
+  state="$CASE_DIR/slots/treehouse-state.json"
+  (cd / && exec sleep 600) >/dev/null 2>&1 </dev/null &
+  other=$!
+  printf '{"worktrees":[{"name":"1","path":"%s","owner_pid":%s}]}\n' "$POOL_DIR" "$own" >"$state"
+  FM_SLOT_RESET_GUARD_SEAM="jq --argjson pid $other '.worktrees[0].owner_pid = \$pid' '$state' >'$state.tmp' && mv '$state.tmp' '$state'; guard_snapshot '$POOL_DIR' '$CASE_DIR/post-seam.snap'" \
+    guard_expect_refusal S4 '(iii-b) the lease owner changes after the claim to another live process' 'reset refused (holder_lease)' "$id" --scout
+  # The owner changes to a process inside the acquired pane's tree: ancestry does not exempt it.
+  id='guard-s4-lease-pane-tree'
+  rec=$(make_case guard-s4lpt "$id")
+  read_case_record "$rec"
+  lay_out_as_pool_slot
+  state="$CASE_DIR/slots/treehouse-state.json"
+  shell=$(guard_start_pane_shell "$POOL_DIR" "$CASE_DIR/pane.ready")
+  printf '%s' "$shell" >"$CASE_DIR/pane.pid"
+  guard_wrap_tmux_pane_pid "$FAKEBIN_DIR" "$CASE_DIR/pane.pid"
+  child=$(pgrep -P "$shell" | head -n 1)
+  [ -n "$child" ] || fail 'the pane shell has no child to hold the lease'
+  printf '{"worktrees":[{"name":"1","path":"%s","owner_pid":%s}]}\n' "$POOL_DIR" "$own" >"$state"
+  FM_SLOT_RESET_GUARD_SEAM="jq --argjson pid $child '.worktrees[0].owner_pid = \$pid' '$state' >'$state.tmp' && mv '$state.tmp' '$state'; guard_snapshot '$POOL_DIR' '$CASE_DIR/post-seam.snap'" \
+    guard_expect_refusal S4 '(iii-b) the lease owner is a live process inside the pane tree that is not the recorded acquisition' 'reset refused (holder_lease)' "$id" --scout
+  pkill -P "$shell" 2>/dev/null || true
+  kill "$shell" 2>/dev/null || true
+  # The owner changes to a process that is gone: nothing holds the lease any more.
+  id='guard-s4-lease-dead'
+  rec=$(make_case guard-s4ld "$id")
+  read_case_record "$rec"
+  lay_out_as_pool_slot
+  state="$CASE_DIR/slots/treehouse-state.json"
+  printf '{"worktrees":[{"name":"1","path":"%s","owner_pid":%s}]}\n' "$POOL_DIR" "$own" >"$state"
+  FM_SLOT_RESET_GUARD_SEAM="jq --argjson pid 2147483000 '.worktrees[0].owner_pid = \$pid' '$state' >'$state.tmp' && mv '$state.tmp' '$state'" \
+    guard_expect_launch S4 '(iii-b) paired pass: the changed owner is a process that is gone' "$id" --scout
+  kill "$own" "$other" 2>/dev/null || true
+  pass 'S4 (iii-b): a process lease is this spawn'"'"'s only by its recorded identity, never by ancestry'
+}
+
+test_reset_guard_s4_vernant_lease_and_contention() {
+  local rec id holder common real name
+  id='guard-s4-store-lease'
+  rec=$(make_guard_governed_case guard-s4store "$id")
+  read_case_record "$rec"
+  common=$(git -C "$POOL_DIR" rev-parse --path-format=absolute --git-common-dir)
+  real=$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$POOL_DIR")
+  name="lease-$(printf 'worktree:%s' "$real" | shasum -a 256 | cut -c1-16).json"
+  mkdir -p "$common/vernant-worktree-leases"
+  sleep 600 &
+  holder=$!
+  printf '{"status":"active","owner_id":"session-x","owner_pid":%s,"expires_at_iso":"2099-01-01T00:00:00Z"}\n' "$holder" \
+    >"$common/vernant-worktree-leases/$name"
+  guard_expect_refusal S4 '(iii-c) the project lease store holds a live lease' 'reset refused (holder_lease)' "$id" --scout --owned-path scripts
+  printf '{"status":"released","owner_id":"session-x","owner_pid":%s}\n' "$holder" >"$common/vernant-worktree-leases/$name"
+  GUARD_OUT=$(run_governed_spawn "$id") || fail "S4: the released store lease still refused: $GUARD_OUT"
+  kill "$holder" 2>/dev/null || true
+  wait "$holder" 2>/dev/null || true
+
+  id='guard-s4-contention'
+  rec=$(make_guard_governed_case guard-s4iv "$id")
+  read_case_record "$rec"
+  common=$(git -C "$POOL_DIR" rev-parse --path-format=absolute --git-common-dir)
+  real=$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$POOL_DIR")
+  mkdir -p "$common/vernant-worktree-leases"
+  printf '{"worktree_id":"%s","ts_iso":"%s","session_id":"co-tenant"}\n' "$real" "$(guard_iso_ago 1)" \
+    >"$common/vernant-worktree-leases/contention.jsonl"
+  guard_expect_refusal S4 '(iv) a contention row one hour old' 'reset refused (holder_contention)' "$id" --scout --owned-path scripts
+  printf '{"worktree_id":"%s","ts_iso":"%s","session_id":"co-tenant"}\n' "$real" "$(guard_iso_ago 30)" \
+    >"$common/vernant-worktree-leases/contention.jsonl"
+  GUARD_OUT=$(run_governed_spawn "$id") || fail "S4: a contention row older than 24 hours still refused: $GUARD_OUT"
+  [ "${FM_TEST_EVIDENCE:-0}" != 1 ] || printf 'EVIDENCE S4 | (iv) paired control | exit=0 | row 30h old (outside the 24h window) passes\n'
+  pass 'S4 (iii-c, iv): a live store lease and recent contention refuse, and pass once released or aged out'
+}
+
+# ---- S4: the acquired pane's own shell is not a foreign holder ---------------------------------
+# A real shell holds the slot as its cwd, as the pane's `treehouse get` subshell does, with a
+# real child that does too. The pane pid comes from the vendor (tmux `#{pane_pid}`), so the
+# fake tmux here answers it with the pid of that real shell.
+guard_start_pane_shell() { # <slot> <ready-file>  -> prints the shell's pid
+  bash -c 'cd "$1" && touch "$2" && { sleep 600 & wait; }' _ "$1" "$2" >/dev/null 2>&1 </dev/null &
+  printf '%s' "$!"
+  for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+    [ -e "$2" ] && break
+    command sleep 0.2
+  done
+  [ -e "$2" ] || fail 'the pane shell never reached the slot'
+}
+
+guard_wrap_tmux_pane_pid() { # <fakebin> <file-holding-the-pid>
+  mv "$1/tmux" "$1/tmux.real"
+  cat >"$1/tmux" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *"#{pane_pid}"*) cat "$2"; exit 0 ;;
+esac
+exec "$1/tmux.real" "\$@"
+SH
+  chmod +x "$1/tmux"
+}
+
+test_reset_guard_s4_pane_pid_exemption() {
+  local rec id shell foreign bystander
+  # Healthy control: the pane shell and its child hold the slot cwd; the endpoint reports the shell's pid.
+  id='guard-s4-pane-pid'
+  rec=$(make_case guard-s4pane "$id")
+  read_case_record "$rec"
+  shell=$(guard_start_pane_shell "$POOL_DIR" "$CASE_DIR/pane.ready")
+  printf '%s' "$shell" >"$CASE_DIR/pane.pid"
+  guard_wrap_tmux_pane_pid "$FAKEBIN_DIR" "$CASE_DIR/pane.pid"
+  guard_expect_launch S4 'the acquired pane shell and its child hold the slot cwd and are excluded by the endpoint pane pid' "$id" --scout
+  pkill -P "$shell" 2>/dev/null || true
+  kill "$shell" 2>/dev/null || true
+  # Paired refusal: the same holders, but the endpoint reports some other pid.
+  id='guard-s4-pane-pid-mismatch'
+  rec=$(make_case guard-s4panemis "$id")
+  read_case_record "$rec"
+  shell=$(guard_start_pane_shell "$POOL_DIR" "$CASE_DIR/pane.ready")
+  (cd / && exec sleep 600) >/dev/null 2>&1 </dev/null &
+  bystander=$!
+  printf '%s' "$bystander" >"$CASE_DIR/pane.pid"
+  guard_wrap_tmux_pane_pid "$FAKEBIN_DIR" "$CASE_DIR/pane.pid"
+  guard_expect_refusal S4 'the same holders, with the endpoint reporting an unrelated pid' 'reset refused (holder_cwd)' "$id" --scout
+  pkill -P "$shell" 2>/dev/null || true
+  kill "$shell" "$bystander" 2>/dev/null || true
+  # A foreign holder beside the excluded pane shell still refuses.
+  id='guard-s4-pane-pid-foreign'
+  rec=$(make_case guard-s4panefor "$id")
+  read_case_record "$rec"
+  shell=$(guard_start_pane_shell "$POOL_DIR" "$CASE_DIR/pane.ready")
+  printf '%s' "$shell" >"$CASE_DIR/pane.pid"
+  guard_wrap_tmux_pane_pid "$FAKEBIN_DIR" "$CASE_DIR/pane.pid"
+  (cd "$POOL_DIR" && exec sleep 600) &
+  foreign=$!
+  guard_expect_refusal S4 'a foreign holder beside the excluded pane shell' 'reset refused (holder_cwd)' "$id" --scout
+  pkill -P "$shell" 2>/dev/null || true
+  kill "$foreign" "$shell" 2>/dev/null || true
+  pass 'S4: the pane shell is excluded by the endpoint pane pid, a mismatching pid or a foreign holder still refuses'
+}
+
+# A backend that reports no pane pid (zellij, cmux, orca): the pane is a real shell that runs the
+# lines it is sent, as a pane does. The probe runs inside it, so the shell is a true ancestor.
+guard_start_pane_emulator() { # <slot> <dir> -> prints the emulator's pid
+  mkdir -p "$2"
+  cat >"$2/pane.sh" <<'SH'
+#!/usr/bin/env bash
+cd "$1" || exit 1
+: >"$2/ready"
+while :; do
+  if [ -s "$2/cmd" ]; then
+    line=$(cat "$2/cmd")
+    : >"$2/cmd"
+    bash -c "$line" </dev/null >/dev/null 2>&1
+    : >"$2/done"
+  else
+    command sleep 0.1
+  fi
+done
+SH
+  bash "$2/pane.sh" "$1" "$2" >/dev/null 2>&1 </dev/null &
+  printf '%s' "$!"
+  for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+    [ -e "$2/ready" ] && break
+    command sleep 0.2
+  done
+  [ -e "$2/ready" ] || fail 'the pane emulator never reached the slot'
+}
+
+guard_wrap_tmux_into_pane() { # <fakebin> <emulator-dir>
+  mv "$1/tmux" "$1/tmux.real"
+  cat >"$1/tmux" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = send-keys ]; then
+  for a in "\$@"; do
+    case "\$a" in
+      "bash -- '"*".slot-provision."*)
+        rm -f "$2/done"
+        printf '%s\n' "\$a" >"$2/cmd"
+        for i in \$(seq 1 300); do [ -e "$2/done" ] && exit 0; command sleep 0.1; done
+        exit 1
+        ;;
+    esac
+  done
+fi
+exec "$1/tmux.real" "\$@"
+SH
+  chmod +x "$1/tmux"
+}
+
+test_reset_guard_s4_in_pane_probe_without_pane_pid() {
+  local rec id pane foreign
+  id='guard-s4-in-pane'
+  rec=$(make_case guard-s4inpane "$id")
+  read_case_record "$rec"
+  pane=$(guard_start_pane_emulator "$POOL_DIR" "$CASE_DIR/emulator")
+  guard_wrap_tmux_into_pane "$FAKEBIN_DIR" "$CASE_DIR/emulator"
+  guard_expect_launch S4 'no pane pid is reported; the pane shell holds the slot cwd and is excluded by running the probe inside it' "$id" --scout
+  kill "$pane" 2>/dev/null || true
+  id='guard-s4-in-pane-foreign'
+  rec=$(make_case guard-s4inpanef "$id")
+  read_case_record "$rec"
+  pane=$(guard_start_pane_emulator "$POOL_DIR" "$CASE_DIR/emulator")
+  guard_wrap_tmux_into_pane "$FAKEBIN_DIR" "$CASE_DIR/emulator"
+  (cd "$POOL_DIR" && exec sleep 600) &
+  foreign=$!
+  guard_expect_refusal S4 'no pane pid is reported; a foreign holder beside the pane shell' 'reset refused (holder_cwd)' "$id" --scout
+  kill "$foreign" "$pane" 2>/dev/null || true
+  pass 'S4: with no pane pid the probe runs inside the pane, excluding its shell and still refusing a foreign holder'
+}
+
+# ---- S5: unknown refuses --------------------------------------------------------------------
+test_reset_guard_s5_unknown_classes() {
+  local rec id common farm
+  # A failed git read.
+  id='guard-s5-git-read'
+  rec=$(make_case guard-s5git "$id")
+  read_case_record "$rec"
+  guard_install_git_shim "$FAKEBIN_DIR"
+  FM_TEST_GIT_FAIL='merge-base --is-ancestor' guard_expect_refusal S5 'a failed git read (containment)' 'reset refused (unknown_git_read)' "$id" --scout
+  # A failed fetch of the origin default branch.
+  id='guard-s5-fetch'
+  rec=$(make_case guard-s5fetch "$id")
+  read_case_record "$rec"
+  git -C "$POOL_DIR" remote set-url origin "file://$CASE_DIR/missing-origin.git"
+  git -C "$PROJECT_DIR" remote set-url origin "file://$CASE_DIR/missing-origin.git"
+  guard_expect_refusal S5 'a failed fetch of the origin default branch' 'could not fetch' "$id" --mode no-mistakes --yolo off
+  # An unreadable lifecycle manifest.
+  id='guard-s5-manifest'
+  rec=$(make_guard_governed_case guard-s5man "$id")
+  read_case_record "$rec"
+  guard_write_manifest - - $'{ this is not json'
+  guard_expect_refusal S5 'an unparsable lifecycle manifest' 'reset refused (unknown_manifest)' "$id" --scout --owned-path scripts
+  # lsof made unavailable through PATH.
+  id='guard-s5-lsof'
+  rec=$(make_case guard-s5lsof "$id")
+  read_case_record "$rec"
+  farm=$(guard_path_without lsof "$CASE_DIR/no-lsof")
+  PATH="$farm" guard_expect_refusal S5 'lsof unavailable through PATH' 'reset refused (unknown_holder_probe)' "$id" --scout
+  # An unreadable worktree list (the lock source).
+  id='guard-s5-lock'
+  rec=$(make_case guard-s5lock "$id")
+  read_case_record "$rec"
+  guard_install_git_shim "$FAKEBIN_DIR"
+  FM_TEST_GIT_FAIL='worktree list --porcelain' guard_expect_refusal S5 'an unreadable worktree list (lock source)' 'reset refused (unknown_lock)' "$id" --scout
+  # An unreadable lease state (the pool's treehouse-state.json).
+  id='guard-s5-lease'
+  rec=$(make_case guard-s5lease "$id")
+  read_case_record "$rec"
+  lay_out_as_pool_slot
+  printf '{ not json' >"$CASE_DIR/slots/treehouse-state.json"
+  guard_expect_refusal S5 'an unreadable pool lease state' 'reset refused (unknown_lease)' "$id" --scout
+  # An unreadable project lease record and contention log.
+  id='guard-s5-store'
+  rec=$(make_guard_governed_case guard-s5store "$id")
+  read_case_record "$rec"
+  common=$(git -C "$POOL_DIR" rev-parse --path-format=absolute --git-common-dir)
+  mkdir -p "$common/vernant-worktree-leases"
+  printf '{"worktree_id":"x","ts_iso":"2026-01-01T00:00:00Z"}\n' >"$common/vernant-worktree-leases/contention.jsonl"
+  chmod 000 "$common/vernant-worktree-leases/contention.jsonl"
+  guard_expect_refusal S5 'an unreadable contention log' 'reset refused (unknown_contention)' "$id" --scout --owned-path scripts
+  chmod 644 "$common/vernant-worktree-leases/contention.jsonl"
+  pass 'S5: every unknown class (git read, fetch, manifest, lsof, lock, lease, contention) refuses untouched with its name'
+}
+
+# ---- S5b: the final pre-reset revalidation ----------------------------------------------------
+test_reset_guard_s5b_transitions() {
+  local rec id
+  # (i) a tracked edit appears after the first clean observation.
+  id='guard-s5b-edit'
+  rec=$(make_case guard-s5b-i "$id")
+  read_case_record "$rec"
+  FM_SLOT_RESET_GUARD_SEAM="printf 'late edit\\n' >>'$POOL_DIR/README.md'; guard_snapshot '$POOL_DIR' '$CASE_DIR/post-seam.snap'" \
+    guard_expect_refusal S5b '(i) a tracked edit appears after the first observation' 'is not clean' "$id" --scout
+  assert_grep 'late edit' "$POOL_DIR/README.md" 'S5b (i): the late edit was lost'
+  # (ii) a new commit lands on HEAD.
+  id='guard-s5b-commit'
+  rec=$(make_case guard-s5b-ii "$id")
+  read_case_record "$rec"
+  FM_SLOT_RESET_GUARD_SEAM="git -C '$POOL_DIR' -c user.name=t -c user.email=t@e.invalid commit -q --allow-empty -m late; guard_snapshot '$POOL_DIR' '$CASE_DIR/post-seam.snap'" \
+    guard_expect_refusal S5b '(ii) a new commit lands on HEAD after the first observation' 'reset refused (head_not_contained)' "$id" --scout
+  # (iii) the lifecycle manifest is rewritten with unparsable bytes.
+  id='guard-s5b-manifest'
+  rec=$(make_guard_governed_case guard-s5b-iii "$id")
+  read_case_record "$rec"
+  guard_write_manifest - "$INITIAL_SHA"
+  FM_SLOT_RESET_GUARD_SEAM="printf '{ garbage' >'$GUARD_MANIFEST_FILE'; guard_snapshot '$POOL_DIR' '$CASE_DIR/post-seam.snap'" \
+    guard_expect_refusal S5b '(iii) the manifest is rewritten with unparsable bytes' 'reset refused (unknown_manifest)' "$id" --scout --owned-path scripts
+  # (iii-b) the manifest names another base, with the bytes still parsable.
+  id='guard-s5b-manifest-base'
+  rec=$(make_guard_governed_case guard-s5b-iiib "$id")
+  read_case_record "$rec"
+  guard_write_manifest - "$INITIAL_SHA"
+  FM_SLOT_RESET_GUARD_SEAM="python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); d[\"owner_id\"]=\"someone-else\"; json.dump(d,open(sys.argv[1],\"w\"))' '$GUARD_MANIFEST_FILE'; guard_snapshot '$POOL_DIR' '$CASE_DIR/post-seam.snap'" \
+    guard_expect_refusal S5b '(iii-b) the manifest bytes change though still parsable' 'reset refused (changed_since_first_read)' "$id" --scout --owned-path scripts
+  # (iv) a contention row appears after the first observation.
+  id='guard-s5b-contention'
+  rec=$(make_guard_governed_case guard-s5b-iv "$id")
+  read_case_record "$rec"
+  local common real
+  common=$(git -C "$POOL_DIR" rev-parse --path-format=absolute --git-common-dir)
+  real=$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$POOL_DIR")
+  mkdir -p "$common/vernant-worktree-leases"
+  FM_SLOT_RESET_GUARD_SEAM="printf '{\"worktree_id\":\"%s\",\"ts_iso\":\"%s\",\"session_id\":\"co\"}\\n' '$real' \"\$(date -u +%Y-%m-%dT%H:%M:%SZ)\" >'$common/vernant-worktree-leases/contention.jsonl'; guard_snapshot '$POOL_DIR' '$CASE_DIR/post-seam.snap'" \
+    guard_expect_refusal S5b '(iv) a co-tenant contention row appears after the first observation' 'reset refused (holder_contention)' "$id" --scout --owned-path scripts
+  # (v) a new ignored file appears at a path the target tracks.
+  id='guard-s5b-ignored'
+  rec=$(make_case guard-s5b-v "$id")
+  read_case_record "$rec"
+  guard_ignore notes.local
+  guard_publish_tracked notes.local $'tracked\n'
+  FM_SLOT_RESET_GUARD_SEAM="printf 'late ignored notes\\n' >'$POOL_DIR/notes.local'; guard_snapshot '$POOL_DIR' '$CASE_DIR/post-seam.snap'" \
+    guard_expect_refusal S5b '(v) an ignored collision appears after the first observation' 'reset refused (ignored_collision)' "$id" --scout
+  # Control: stable evidence resets successfully, with the seam firing a harmless command.
+  id='guard-s5b-control'
+  rec=$(make_case guard-s5b-ctl "$id")
+  read_case_record "$rec"
+  FM_SLOT_RESET_GUARD_SEAM=true guard_expect_launch S5b 'control: stable evidence resets and launches' "$id" --scout
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$(git -C "$POOL_DIR" rev-parse origin/main)" ] || fail 'S5b control: the slot did not reach origin'
+  pass 'S5b: a change after the first observation refuses with the work preserved, and stable evidence resets'
+}
+
+# A late refusal on a slot whose origin ref is behind: the fetch moved
+# refs/remotes/origin/main forward (exception 1) and nothing else changed.
+test_reset_guard_stale_origin_late_refusal() {
+  local rec id stale now
+  id='guard-stale-origin-late'
+  rec=$(make_case guard-stale-late "$id")
+  read_case_record "$rec"
+  guard_prefetch
+  stale=$(git -C "$POOL_DIR" rev-parse refs/remotes/origin/main)
+  guard_publish_tracked later.txt $'later\n'
+  FM_SLOT_RESET_GUARD_SEAM="printf 'late edit\\n' >>'$POOL_DIR/README.md'; guard_snapshot '$POOL_DIR' '$CASE_DIR/post-seam.snap'" \
+    guard_expect_refusal S7 'a late refusal on a slot whose origin ref was behind' 'is not clean' "$id" --scout
+  now=$(git -C "$POOL_DIR" rev-parse refs/remotes/origin/main)
+  [ "$now" != "$stale" ] || fail 'the stale-origin case did not move the origin ref, so it proves nothing'
+  [ "$now" = "$(git -C "$CASE_DIR/publisher" rev-parse HEAD)" ] || fail 'the origin ref did not reach the fetched tip'
+  git -C "$POOL_DIR" merge-base --is-ancestor "$stale" "$now" || fail 'the origin ref moved backward'
+  assert_grep 'late edit' "$POOL_DIR/README.md" 'the late edit was lost'
+  pass 'S7: a late refusal moves only the fetched origin ref forward and leaves everything else byte-identical'
+}
+
+# ---- S1/S2 anchor: origin's default branch, never a --base-branch ---------------------
+# Work held only in origin/X is not contained: X can be deleted after a squash merge.
+test_reset_guard_base_branch_is_not_an_anchor() {
+  local rec id held
+  id='guard-anchor-base-only'
+  rec=$(make_case guard-anchor-base "$id")
+  read_case_record "$rec"
+  publish_feature_branch feature/x
+  guard_prefetch
+  held=$(git -C "$POOL_DIR" rev-parse refs/remotes/origin/feature/x)
+  git -C "$POOL_DIR" checkout --quiet --detach "$held"
+  brief_with_base "$id" feature/x
+  GUARD_FETCHED_BRANCH=feature/x guard_expect_refusal S1 'HEAD held only in the --base-branch origin/X' \
+    'reset refused (head_not_contained)' "$id" --scout --base-branch feature/x
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$held" ] || fail 'the slot left the commit held only in origin/X'
+  pass 'S1: a HEAD contained only in a --base-branch is refused, because origin/X is no anchor'
+}
+
+# A clean slot contained in origin's default branch but past X's fork point passes.
+test_reset_guard_origin_default_anchors_base_branch_spawn() {
+  local rec id
+  id='guard-anchor-past-fork'
+  rec=$(make_case guard-anchor-fork "$id")
+  read_case_record "$rec"
+  git -C "$CASE_DIR/publisher" checkout --quiet -b feature/x "$INITIAL_SHA"
+  printf 'only on feature/x\n' >"$CASE_DIR/publisher/feature-only.txt"
+  git -C "$CASE_DIR/publisher" add feature-only.txt
+  git -C "$CASE_DIR/publisher" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm feature
+  git -C "$CASE_DIR/publisher" push --quiet origin feature/x
+  guard_prefetch
+  git -C "$POOL_DIR" checkout --quiet --detach refs/remotes/origin/main
+  git -C "$POOL_DIR" merge-base --is-ancestor HEAD refs/remotes/origin/feature/x \
+    && fail 'the fixture slot is not past the fork point of feature/x'
+  brief_with_base "$id" feature/x
+  guard_expect_launch S1 'a clean slot in origin main, past the fork point of the --base-branch' "$id" --scout --base-branch feature/x
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$(git -C "$POOL_DIR" rev-parse refs/remotes/origin/feature/x)" ] \
+    || fail 'the slot did not start from origin/feature/x'
+  pass 'S1: a slot contained in origin'"'"'s default branch passes a --base-branch spawn past that branch'"'"'s fork point'
+}
+
+# A pool that does not share the project's objects (a sibling clone) lacks the tip the
+# spawn fetched, so the refresh fetches under the lock into FETCH_HEAD only. It still
+# starts from the origin tip, with and without --base-branch, and moves no other ref.
+make_sibling_clone_pool() {
+  git -C "$PROJECT_DIR" worktree remove --force "$POOL_DIR"
+  git clone --quiet --no-local "$PROJECT_DIR" "$POOL_DIR"
+  git -C "$POOL_DIR" remote set-url origin "file://$CASE_DIR/origin.git"
+  git -C "$POOL_DIR" checkout --quiet --detach "$INITIAL_SHA"
+  git -C "$POOL_DIR" branch --quiet -D main
+}
+
+test_sibling_clone_pool_fetches_under_the_lock() {
+  local rec id out status tip refs_before refs_after
+  id='pool-sibling-default'
+  rec=$(make_case sibling-default "$id")
+  read_case_record "$rec"
+  make_sibling_clone_pool
+  tip=$(git -C "$CASE_DIR/publisher" rev-parse HEAD)
+  git -C "$POOL_DIR" cat-file -e "$tip^{commit}" 2>/dev/null && fail 'the sibling clone already holds the origin tip'
+  out=$(run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  expect_code 0 "$status" "a sibling-clone pool should refresh and launch"$'\n'"$out"
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$tip" ] || fail 'the sibling clone did not start from the origin tip'
+  [ "$(git -C "$POOL_DIR" rev-parse refs/remotes/origin/main)" = "$tip" ] || fail 'origin/main did not move forward to the fetched tip'
+  [ "$(git -C "$POOL_DIR" symbolic-ref refs/remotes/origin/HEAD)" = refs/remotes/origin/main ] || fail 'origin/HEAD does not name origin main'
+
+  id='pool-sibling-base'
+  rec=$(make_case sibling-base "$id")
+  read_case_record "$rec"
+  make_sibling_clone_pool
+  publish_feature_branch feature/hub
+  tip=$(git -C "$CASE_DIR/publisher" rev-parse HEAD)
+  brief_with_base "$id" feature/hub
+  refs_before=$(git -C "$POOL_DIR" show-ref | grep -v ' refs/remotes/origin/feature/hub$')
+  out=$(run_spawn "$id" --scout --base-branch feature/hub)
+  status=$?
+  expect_code 0 "$status" "a sibling-clone pool with --base-branch should refresh and launch"$'\n'"$out"
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$tip" ] || fail 'the sibling clone did not start from origin/feature/hub'
+  [ "$(git -C "$POOL_DIR" rev-parse refs/remotes/origin/feature/hub)" = "$tip" ] || fail 'origin/feature/hub was not recorded'
+  refs_after=$(git -C "$POOL_DIR" show-ref | grep -v ' refs/remotes/origin/feature/hub$')
+  [ "$refs_before" = "$refs_after" ] || fail "the --base-branch refresh moved another ref: $(diff <(printf '%s\n' "$refs_before") <(printf '%s\n' "$refs_after") | tr '\n' '|')"
+  pass 'a sibling-clone pool fetches under the lock and starts from the origin tip, with and without --base-branch'
+}
+
+# S3b on a case-insensitive file system (core.ignorecase): the ignored Notes.local and the
+# target's notes.local are one file there, so the reset would overwrite it.
+test_reset_guard_s3b_case_insensitive_collision() {
+  local rec id
+  id='guard-s3b-ignorecase'
+  rec=$(make_case guard-s3b-icase "$id")
+  read_case_record "$rec"
+  git -C "$POOL_DIR" config core.ignorecase true
+  guard_ignore Notes.local
+  printf 'private notes under another case\n' >"$POOL_DIR/Notes.local"
+  guard_publish_tracked notes.local $'tracked content\n'
+  guard_expect_refusal S3b '(i-d) an ignored path equal to a tracked target path but for case, under core.ignorecase' \
+    'reset refused (ignored_collision)' "$id" --scout
+  assert_grep 'private notes under another case' "$POOL_DIR/Notes.local" 'the ignored file bytes changed'
+  pass 'S3b (i-d): under core.ignorecase a case-only collision is refused and keeps its bytes'
+}
+
+# S3b: an ancestor with a scratch name (venv) that holds tracked files is not wholly ignored,
+# so an ignored file inside it is judged by its own name and kept.
+test_reset_guard_s3b_tracked_scratch_named_ancestor() {
+  local rec id
+  id='guard-s3b-venv-secret'
+  rec=$(make_case guard-s3b-venv "$id")
+  read_case_record "$rec"
+  guard_publish_tracked venv/keep.txt $'kept\n'
+  guard_prefetch
+  git -C "$POOL_DIR" checkout --quiet --detach refs/remotes/origin/main
+  guard_ignore venv/secrets.env
+  printf 'secret the target tracks something else at\n' >"$POOL_DIR/venv/secrets.env"
+  guard_publish_tracked venv/secrets.env $'tracked\n'
+  guard_expect_refusal S3b '(i-e) an ignored file inside a tracked directory named like scratch' \
+    'reset refused (ignored_collision)' "$id" --scout
+  assert_grep 'secret the target tracks' "$POOL_DIR/venv/secrets.env" 'the ignored file bytes changed'
+  pass 'S3b (i-e): an ignored file inside a tracked venv/ is not scratch by its ancestor and is refused'
+}
+
+# S5b: the final pass probes the holders first, so a change landing during or right after
+# that slow probe is still seen by the git reads that follow it.
+test_reset_guard_s5b_after_holder_probe() {
+  local rec id
+  id='guard-s5b-holder-edit'
+  rec=$(make_case guard-s5b-h-i "$id")
+  read_case_record "$rec"
+  FM_SLOT_RESET_GUARD_HOLDER_SEAM="printf 'late edit\\n' >>'$POOL_DIR/README.md'; guard_snapshot '$POOL_DIR' '$CASE_DIR/post-seam.snap'" \
+    guard_expect_refusal S5b '(vi) a tracked edit lands after the final holder probe' 'is not clean' "$id" --scout
+  assert_grep 'late edit' "$POOL_DIR/README.md" 'S5b (vi): the late edit was lost'
+  id='guard-s5b-holder-commit'
+  rec=$(make_case guard-s5b-h-ii "$id")
+  read_case_record "$rec"
+  FM_SLOT_RESET_GUARD_HOLDER_SEAM="git -C '$POOL_DIR' -c user.name=t -c user.email=t@e.invalid commit -q --allow-empty -m late; guard_snapshot '$POOL_DIR' '$CASE_DIR/post-seam.snap'" \
+    guard_expect_refusal S5b '(vii) a new commit lands on HEAD after the final holder probe' 'reset refused (head_not_contained)' "$id" --scout
+  id='guard-s5b-holder-anchor'
+  rec=$(make_case guard-s5b-h-iii "$id")
+  read_case_record "$rec"
+  FM_SLOT_RESET_GUARD_HOLDER_SEAM="git -C '$POOL_DIR' update-ref refs/remotes/origin/main \"\$(git -C '$POOL_DIR' -c user.name=t -c user.email=t@e.invalid commit-tree 'refs/remotes/origin/main^{tree}' -p refs/remotes/origin/main -m later)\"; guard_snapshot '$POOL_DIR' '$CASE_DIR/post-seam.snap'" \
+    guard_expect_refusal S5b '(viii) the origin default anchor moves after the final holder probe' 'reset refused (changed_since_first_read)' "$id" --scout
+  pass 'S5b: a change after the final holder probe refuses with the work preserved'
+}
+
+# Explicit selection keeps focused regressions independently runnable by name.
 if [ "$#" -gt 0 ]; then
   for selected_test in "$@"; do
     case "$selected_test" in
-      test_freshness_introduces_slot_owner|test_freshness_introduces_scout_slot_owner|test_freshness_slot_owner_requires_scope|test_freshness_present_slot_owner_refuses|test_freshness_absent_slot_owner_launches|test_freshness_removed_slot_owner_refuses|test_local_only_source_selection|test_local_only_source_binding|test_local_only_unprepared_retry|test_local_only_origin_early|test_local_only_origin_late|test_local_only_origin_freshness|test_local_only_origin_copy_missing|test_local_only_origin_primary_missing|test_local_only_equal_retry_selects_local|test_local_only_equal_retry_divergence|test_local_only_adopted_scope_retry|test_local_only_equal_retry_invalid_ref|test_legacy_relaunch_scope_adoption) "$selected_test" ;;
-      *) fail "unknown selected acquisition test: $selected_test" ;;
+      test_*)
+        declare -F "$selected_test" >/dev/null 2>&1 || fail "unknown selected test: $selected_test"
+        "$selected_test"
+        ;;
+      *) fail "unknown selected test: $selected_test" ;;
     esac
   done
   exit 0
@@ -1594,5 +2626,34 @@ test_unpushed_submodule_commit_is_still_uncommitted_work
 test_work_inside_submodule_is_still_uncommitted_work
 test_stale_pin_carrying_real_work_is_not_called_stale
 test_stale_pin_beside_other_dirt_reports_one_verdict
+
+test_reset_guard_snapshot_witness
+test_reset_guard_stale_origin_late_refusal
+test_reset_guard_base_branch_is_not_an_anchor
+test_reset_guard_origin_default_anchors_base_branch_spawn
+test_sibling_clone_pool_fetches_under_the_lock
+test_reset_guard_s1_detached_extra_commit
+test_reset_guard_s1_manifest_base_anchor
+test_reset_guard_s2_attached_branch
+test_reset_guard_s2_manifest_branch
+test_reset_guard_s3_dirty_kinds
+test_reset_guard_s3b_same_path
+test_reset_guard_s3b_ancestor_path
+test_reset_guard_s3b_inside_tracked_file
+test_reset_guard_s3b_case_insensitive_collision
+test_reset_guard_s3b_tracked_scratch_named_ancestor
+test_reset_guard_s3b_control_no_collision
+test_reset_guard_s3b_scratch_and_archive
+test_reset_guard_s3b_inventory_failure
+test_reset_guard_s4_cwd_holder
+test_reset_guard_s4_worktree_lock
+test_reset_guard_s4_foreign_lease
+test_reset_guard_s4_process_lease_recorded_identity
+test_reset_guard_s4_vernant_lease_and_contention
+test_reset_guard_s4_pane_pid_exemption
+test_reset_guard_s4_in_pane_probe_without_pane_pid
+test_reset_guard_s5_unknown_classes
+test_reset_guard_s5b_transitions
+test_reset_guard_s5b_after_holder_probe
 
 echo "# all fm-spawn-pool-base-freshen tests passed"
