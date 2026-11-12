@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Fixture only: runs the real perl (FM_REAL_PERL) with FakeClock loaded. Put this directory first on PATH for the
+# one process under test, and never for a process that must really wait.
+exec "${FM_REAL_PERL:?FM_REAL_PERL names the real perl}" -I"$(dirname "${BASH_SOURCE[0]}")" -MFakeClock "$@"

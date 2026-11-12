@@ -1,15 +1,36 @@
 #!/usr/bin/env python3
 """Deterministic replay of the Slack Web API methods this plane uses.
 
-Transcripts never contain a token. Replay state and the outbound log live under
-the fixture home's state directory, so a mirror leg followed by a poll leg sees
-the same conversation. No socket is opened.
+Transcripts never contain a token. Replay state, the outbound log and the log of
+every attempted call live under the fixture home's state directory, so a mirror
+leg followed by a poll leg sees the same conversation. No socket is opened.
 """
+import copy
 import json
 import os
 from pathlib import Path
 
-from fm_slack import SlackError
+from fm_slack import SecretCollision, SlackError, refuse_outbound, value_hits
+
+# The scope Slack requires for each method the plane calls. A transcript that sets
+# "enforce_scopes" fails a call whose scope its "scopes" list lacks, as Slack does; one that sets
+# "method_allowlist" fails a call to a method outside that list.
+METHOD_SCOPES = {
+    'chat.postMessage': 'chat:write',
+    'chat.update': 'chat:write',
+    'conversations.open': 'im:write',
+    'conversations.history': 'im:history',
+    'conversations.replies': 'im:history',
+    'reactions.get': 'reactions:read',
+    'reactions.add': 'reactions:write',
+    'users.info': 'users:read',
+}
+
+
+def ts_key(ts):
+    """Order Slack timestamps as numbers, never as floats."""
+    seconds, _, fraction = str(ts or 0).partition('.')
+    return int(seconds or 0), int((fraction + '000000000')[:9])
 
 
 class Replay:
@@ -25,8 +46,10 @@ class Replay:
         digest = __import__('hashlib').sha256(str(self.path.resolve()).encode()).hexdigest()[:16]
         self.state_path = self.state_dir / ('replay-state-' + digest + '.json')
         self.log_path = self.state_dir / 'outbound.jsonl'
+        # Every call that reaches the replay, including one that fails, is recorded here before it is judged.
+        self.attempts_path = self.state_dir / 'attempts.jsonl'
         self.token_present = token_present
-        if self.state_path.is_symlink() or self.log_path.is_symlink():
+        if self.state_path.is_symlink() or self.log_path.is_symlink() or self.attempts_path.is_symlink():
             raise SlackError('unsafe_replay_state_path')
         if self.state_path.exists():
             self.state = json.loads(self.state_path.read_text())
@@ -45,15 +68,40 @@ class Replay:
     def save(self):
         self.state_path.write_text(json.dumps(self.state, ensure_ascii=False))
 
+    @staticmethod
+    def append_line(path, line):
+        """Append one line to a log file only while the COMPLETE file after the append holds no plane value (a value that two clean lines form is
+        found here); nothing is written otherwise."""
+        try:
+            existing = path.read_text()
+        except OSError:
+            existing = ''
+        if value_hits(existing + line):
+            raise SecretCollision('secret_collides_with_marker')
+        with path.open('a') as out:
+            out.write(line)
+
     def log(self, entry):
+        line = json.dumps(entry, ensure_ascii=False) + '\n'
+        self.append_line(self.log_path, line)
         self.state['log'].append(entry)
-        with self.log_path.open('a') as out:
-            out.write(json.dumps(entry, ensure_ascii=False) + '\n')
         self.save()
 
-    def fail(self, method, target=None):
-        # A rule keyed "<method>:<ts>" fails only the call about that one message.
-        rule = (self.state['failures'].get('%s:%s' % (method, target)) if target else None) \
+    def dm_of(self, user):
+        """The DM that Slack opens for a user: the transcript's `dms` names it; a user it does not name gets the transcript's DM
+        (`owner_dm` where the channel that accepts posts is another one)."""
+        named = (self.transcript.get('dms') or {}).get(user)
+        return named or self.transcript.get('owner_dm', self.transcript.get('channel', 'D0123456789'))
+
+    def known_channels(self):
+        """Every DM id of this conversation: the transcript's own and those its `dms` names."""
+        return {self.transcript.get('channel', 'D0123456789'), *(self.transcript.get('dms') or {}).values()}
+
+    def fail(self, method, *targets):
+        # A rule keyed "<method>:<ts>" fails only the call about that one message: by the message a call names (ts or
+        # timestamp) or by the thread it posts into (thread_ts).
+        rule = next((self.state['failures'].get('%s:%s' % (method, target)) for target in targets
+                     if target and self.state['failures'].get('%s:%s' % (method, target))), None) \
             or self.state['failures'].get(method)
         if not rule:
             return None
@@ -64,10 +112,38 @@ class Replay:
         self.save()
         return rule
 
+    def attempt(self, method, fields):
+        entry = {'method': method, 'channel': fields.get('channel'), 'thread_ts': fields.get('thread_ts'),
+                 'oldest': fields.get('oldest'), 'latest': fields.get('latest')}
+        self.append_line(self.attempts_path, json.dumps(entry, ensure_ascii=False) + '\n')
+
     def call(self, method, **fields):
+        """One replayed call. The fields are checked first, as the real transport checks them, before any record of the attempt exists; a call that
+        a log refuses part-way (a value that the log's own lines form) leaves the replayed conversation as it was."""
+        refuse_outbound(fields, wire=True)
+        snapshot = copy.deepcopy(self.state)
+        try:
+            return self.replayed(method, **fields)
+        except SecretCollision:
+            self.state = snapshot
+            self.save()
+            raise
+
+    def replayed(self, method, **fields):
+        self.attempt(method, fields)
         if not self.token_present:
             raise SlackError('missing_token')
-        rule = self.fail(method, fields.get('ts') or fields.get('timestamp'))
+        # A transcript that sets "method_allowlist" holds the methods the plane may call; a call to any other method
+        # fails by the allowlist, a rule of its own beside the scope rule below.
+        allowed = self.transcript.get('method_allowlist')
+        if allowed is not None and method not in allowed:
+            self.log({'method': method, 'error': 'method_not_allowed'})
+            raise SlackError('method_not_allowed')
+        needed = METHOD_SCOPES.get(method)
+        if self.transcript.get('enforce_scopes') and needed and needed not in self.scopes:
+            self.log({'method': method, 'error': 'missing_scope', 'scope': needed})
+            raise SlackError('missing_scope')
+        rule = self.fail(method, fields.get('ts'), fields.get('timestamp'), fields.get('thread_ts'))
         if rule:
             status = int(rule.get('status', 503))
             if status == 429:
@@ -78,21 +154,43 @@ class Replay:
                     'user_id': self.transcript.get('bot_user', 'UBOT0123456')}
         elif method == 'conversations.open':
             target = fields.get('users')
-            if target != os.environ.get('FM_SLACK_DM_USER'):
+            # The configured owner, or one whose DM this conversation already opened (a retarget reads the DM it leaves).
+            opened = self.state.setdefault('opened', [])
+            if target != os.environ.get('FM_SLACK_DM_USER') and target not in opened:
                 raise SlackError('target_mismatch')
+            if target not in opened:
+                opened.append(target)
             # owner_dm names the DM that really belongs to the opened user when it is not the channel that accepts posts.
-            channel = self.transcript.get('owner_dm', self.transcript.get('channel', 'D0123456789'))
+            channel = self.dm_of(target)
             self.log({'method': method, 'recipient': target, 'channel': channel})
             data = {'ok': True, 'channel': {'id': channel, 'is_im': True} if fields.get('return_im') else {'id': channel}}
         elif method in ('conversations.history', 'conversations.replies'):
             channel = fields.get('channel')
-            if channel != self.transcript.get('channel', 'D0123456789'):
+            if channel not in self.known_channels():
                 raise SlackError('channel_not_found')
+            # A message may name its own channel; the default is the transcript's DM.
+            here = [m for m in self.state['messages']
+                    if m.get('channel', self.transcript.get('channel', 'D0123456789')) == channel]
             if method.endswith('history'):
-                messages = [m for m in reversed(self.state['messages']) if not m.get('thread_ts')]
+                # Slack's history lists the channel's top-level messages, newest first: a thread
+                # root (thread_ts equal to its own ts, once it has replies) and a reply that was
+                # also sent to the channel (subtype thread_broadcast, thread_ts different from ts).
+                # An ordinary thread reply is read through conversations.replies only.
+                # Newest first by the timestamp as a number, whatever order the fixture inserted the messages in.
+                messages = sorted((m for m in here
+                                   if not m.get('thread_ts') or m['thread_ts'] == m.get('ts')
+                                   or m.get('subtype') == 'thread_broadcast'),
+                                  key=lambda m: ts_key(m.get('ts')), reverse=True)
+                oldest = fields.get('oldest')
+                if oldest:
+                    messages = [m for m in messages if ts_key(m.get('ts')) > ts_key(oldest)]
+                # Like Slack, both bounds are exclusive, and a page is the newest messages inside them.
+                latest = fields.get('latest')
+                if latest:
+                    messages = [m for m in messages if ts_key(m.get('ts')) < ts_key(latest)]
             else:
                 root = fields.get('ts')
-                messages = [m for m in self.state['messages']
+                messages = [m for m in here
                             if m.get('ts') == root or m.get('thread_ts') == root]
             if not fields.get('include_all_metadata'):
                 messages = [{k: v for k, v in m.items() if k != 'metadata'} for m in messages]
@@ -100,13 +198,14 @@ class Replay:
             size = int(fields.get('limit') or 100)
             page = messages[start:start + size]
             self.log({'method': method, 'recipient': os.environ.get('FM_SLACK_DM_USER'),
-                      'channel': channel, 'thread_ts': fields.get('ts'), 'cursor': start})
-            data = {'ok': True, 'messages': page,
-                    'response_metadata': {'next_cursor': str(start + size)
-                                          if len(messages) > start + size else ''}}
+                      'channel': channel, 'thread_ts': fields.get('ts'), 'cursor': start,
+                      'oldest': fields.get('oldest'), 'latest': fields.get('latest'), 'limit': size})
+            more = len(messages) > start + size
+            data = {'ok': True, 'messages': page, 'has_more': more,
+                    'response_metadata': {'next_cursor': str(start + size) if more else ''}}
         elif method == 'chat.postMessage':
             channel = fields.get('channel')
-            if channel != self.transcript.get('channel', 'D0123456789'):
+            if channel not in self.known_channels():
                 raise SlackError('channel_not_found')
             if len(fields.get('text', '')) > 40000:
                 raise SlackError('api_error')
@@ -120,6 +219,8 @@ class Replay:
                        'metadata': fields.get('metadata')}
             if fields.get('thread_ts'):
                 message['thread_ts'] = fields['thread_ts']
+            if channel != self.transcript.get('channel', 'D0123456789'):
+                message['channel'] = channel
             self.state['messages'].append(message)
             self.state['reactions'].setdefault(ts, [])
             self.save()
@@ -129,7 +230,7 @@ class Replay:
             data = {'ok': True, 'ts': ts, 'channel': channel}
         elif method == 'chat.update':
             channel, ts = fields.get('channel'), fields.get('ts')
-            if channel != self.transcript.get('channel', 'D0123456789'):
+            if channel not in self.known_channels():
                 raise SlackError('channel_not_found')
             message = next((m for m in self.state['messages'] if m.get('ts') == ts), None)
             if message is None or len(fields.get('text', '')) > 40000:
