@@ -3,7 +3,7 @@
 # The plane runs with a known token and signing secret (mirror, poll, arm, check, a transport
 # failure, the owner-request intake: arm, a poll, and a standing check that each take in
 # a typed request, and the thread conversation: a follow-up typed in a request thread and
-# Firstmate's answer posted into it), its stdout and stderr are captured inside the scanned home, and the
+# Firstmate's answer posted into it, and the full-text read of them), its stdout and stderr are captured inside the scanned home, and the
 # scan then looks for either secret anywhere in tracked files, state, data, and
 # config. The scan prints paths and counts only; never a secret or contents.
 set -euo pipefail
@@ -88,6 +88,21 @@ printf '%s' "an answer that holds $SECRET" | run_plane "${HOMES[2]}" reply-secre
 grep -q '^slack: refused: secret_collides_with_marker' "${HOMES[2]}/data/captured/reply-secret.err" || fail "an answer that holds the token was not refused"
 grep -q '^replied: ' "${HOMES[2]}/data/captured/reply.out" || fail "the reply command did not post the answer"
 [ "$(grep -c '"method": "chat.postMessage"' "${HOMES[2]}/state/slack-watch/outbound.jsonl")" = 6 ] || fail "the thread conversation did not add exactly the one answer (five acknowledgements and the answer)"
+
+# The full-text read: the requests that hold the plane's own values, and the follow-up that holds both, read in full; each value shows as the marker.
+run_plane "${HOMES[2]}" read-request-token "$ROOT/bin/fm-slack-read.sh" --thread 2000.000300 --replay "$INTAKE"
+run_plane "${HOMES[2]}" read-request-signing "$ROOT/bin/fm-slack-read.sh" --thread 2000.000400 --replay "$INTAKE"
+run_plane "${HOMES[2]}" read-request-entity "$ROOT/bin/fm-slack-read.sh" --thread 2000.000500 --replay "$INTAKE"
+run_plane "${HOMES[2]}" read-followup "$ROOT/bin/fm-slack-read.sh" --thread 2000.000100 --message 2000.000400 --replay "$INTAKE"
+for name in read-request-token:2000.000300:2000.000300 read-request-signing:2000.000400:2000.000400 read-request-entity:2000.000500:2000.000500 \
+    read-followup:2000.000400:2000.000100; do
+  IFS=: read -r capture message request <<<"$name"
+  head -n 1 "${HOMES[2]}/data/captured/$capture.out" | grep -q "^slack message $message in request $request from U0TESTOWNER: " \
+    || fail "the read $capture did not print the message"
+  tail -n 1 "${HOMES[2]}/data/captured/$capture.out" | grep -qF '[secret removed]' || fail "the read $capture did not carry the marker"
+done
+[ "$(tail -n 1 "${HOMES[2]}/data/captured/read-followup.out" | grep -oF '[secret removed]' | wc -l | tr -d ' ')" = 2 ] \
+  || fail "the follow-up read did not replace both values"
 
 scan() {  # <output-file>; prints matches=N
   FM_SLACK_SCAN_SECRET="$SECRET" FM_SLACK_SCAN_SIGNING="$SIGNING" python3 - "$1" "${HOMES[@]}" <<'PY'

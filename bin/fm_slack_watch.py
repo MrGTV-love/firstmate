@@ -2230,7 +2230,8 @@ class Watch:
                 deferred = deferred or error
         deferred = self.resolve() or deferred
         # Last, so that the replies on tracked threads and the resolutions are never held back by it.
-        deferred = deferred or self.take_in(max(0, remaining - self.notices_handled))
+        error = self.take_in(max(0, remaining - self.notices_handled))
+        deferred = deferred or error
         if deferred:
             raise deferred
 

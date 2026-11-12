@@ -1006,6 +1006,26 @@ class SchedulingTest(unittest.TestCase):
             self.assertIn('transport failure: api_error', out)
             self.assertLess(out.index('check: slack follow-up'), out.index('transport failure'))   # the failure is reported after the healthy read
 
+    def test_a_failing_card_thread_holds_back_neither_a_follow_up_nor_a_new_request_and_is_still_reported(self):
+        with case() as home:
+            thread = home.take_in('an old request')
+            follow = home.reply_in(thread, 'a follow-up')
+            new = home.say('a new request')
+            card = '300.000100'
+            home.add({'ts': card, 'user': 'UBOT0123456', 'text': 'a decision card'})
+            state = home.journal()
+            state['threads']['task-card:id'] = {'key': 'task-card', 'identity': 'id', 'ts': card, 'options': [], 'mode': 'done', 'reactions': False, 'retired': False}
+            (home.root / 'state.json').write_text(json.dumps(state))
+            replay, path = home.replay_state()
+            replay['failures']['conversations.replies:%s' % card] = {'status': 400}
+            path.write_text(json.dumps(replay))
+            Traced.TRACE.clear()
+            rc, out, _ = home.poll()
+            self.assertEqual([row['outcome'] for row in home.calls('conversations.replies') if row['thread'] == card], ['failed:api_error'])
+            self.assertEqual([f['reply'] for f in home.followups(out)], [follow])
+            self.assertEqual([r['ts'] for r in home.requests(out)], [new])
+            self.assertEqual(out.count('transport failure: api_error'), 1)
+
     def test_the_call_order_of_one_poll_is_pending_cards_resolution_follow_ups_then_requests(self):
         with case(cap='5') as home:
             r = home.take_in('an old request')
