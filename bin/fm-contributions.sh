@@ -30,8 +30,31 @@
 # is refused. A comment's arrival time never supplies its judged head. Record a
 # prose verdict only after its source identifies that head; otherwise leave it unbound and
 # triage its signal. Formal reviews carry GitHub's own commit_id. Neither kind
-# can grant merge authority. Captain-actor prose requires an existing live hold;
-# an eligible merge remains a captain call, never an automatic forge action.
+# can grant merge authority. Only a live captain hold projects a captain actor;
+# a recorded captain verdict without one asks the fleet to record the arbitration
+# as a hold. Maintainer and nobody verdicts do not override the observed row.
+# The former ordinary-mode merge call is fleet work: refresh an unknown base,
+# update a stale branch, route the independent review when no PASS qualifies,
+# recheck an unknown PASS fact, or merge under the standing rule. REVIEW_REQUIRED,
+# can_merge false and away-mode rows keep their prior actor and reason. A known
+# stale base outranks every recorded verdict within that eligible scope.
+# Otherwise fleet and captain verdicts keep their prior dispositions, including
+# on unknown bases. A shared URL keeps a live hold first, then any owner whose
+# observation needs refresh. Among current ordinary owners, a stale base wins,
+# then a current captain or fleet verdict, then an unknown base, then any
+# qualifying PASS, then any unknown PASS, and only then review absence.
+# A captain verdict wins over a fleet verdict; differing fleet summaries are
+# chosen deterministically. These are action labels, not forge writes.
+# Optional PR facts share checked_at's freshness window: base_sha is the pull
+# resource's base SHA passed to the review verifier; base_containment records
+# behind_by from compare/<encoded live base branch>...<head>.
+# A missing, stopped or unreadable comparison is null (unknown), never fresh.
+# review_verification binds pr, head, task and base to the unchanged typed
+# fm-review-verification.v1 answer from fm-review-record.py verify --review-only.
+# Missing, unreadable or invalid answers are unknown, not qualifying reviews.
+# The local verifier call has no stopping limit; only its own typed result decides.
+# Pre-fact records remain valid; eligible rows without a current fleet or captain
+# verdict report base unknown.
 #
 # retire ends one task's observation of a contribution whose forge object can
 # never be read again, such as a PR in a deleted repository. It records retired
@@ -60,9 +83,12 @@
 # pass prints a contribution-wake line for each contribution row still waiting
 # in the wake queue, so a row queued by a pass that was later stopped still
 # doorbells.
-# A pull observation has three waves: core, six independent reads, closing
-# head; an issue has two. URLs are sorted and rotated by the five-minute
-# epoch bucket modulo their count; each distinct URL is attempted at most
+# A pull observation reads core, six independent resources, the closing head,
+# then the optional base comparison; an issue has two waves.
+# A stopped base comparison follows a complete head-checked observation, so that
+# observation is saved with base_containment null while the URL still moves to
+# the back of the order and no further URL is dialed this pass.
+# URLs are sorted and rotated by the five-minute epoch bucket modulo their count; each distinct URL is attempted at most
 # once per poll and applied to every owner. Final URLs settle locally before
 # rotation and are never re-read. Genuine forge failures or head changes
 # record an error. docs/configuration.md "GitHub REST reads and the quota floor"
@@ -310,14 +336,29 @@ observe() { # canonical GitHub URL -> normalized JSON
     forge pr view "$url" --json headRefOid,reviewDecision > "$TMP/after.json" || return 1
     after=$(jq -er .headRefOid "$TMP/after.json")
     [ "$head" = "$after" ] || { printf 'head changed during observation\n' > "$TMP/forge.err"; return 1; }
+    printf 'null\n' > "$TMP/base-containment.json"
+    local base_ref comparison
+    base_ref=$(jq -r '.base.ref // "" | @uri' "$TMP/core.json")
+    if [ -n "$base_ref" ]; then
+      if FORGE_ERR="$TMP/base.err" forge api "repos/$part/compare/$base_ref...$head?per_page=1" > "$TMP/compare.json"; then
+        if comparison=$(jq -ce '
+          select(.behind_by | type == "number" and . >= 0 and . == floor)
+          | {behind_by}' "$TMP/compare.json" 2>/dev/null); then
+          printf '%s\n' "$comparison" > "$TMP/base-containment.json"
+        fi
+      fi
+    fi
     jq -n --slurpfile core "$TMP/core.json" --slurpfile comments "$TMP/comments.json" \
       --slurpfile reviews "$TMP/reviews.json" --slurpfile inline "$TMP/inline.json" --slurpfile after "$TMP/after.json" --slurpfile checks "$TMP/checks.json" \
-      --slurpfile statuses "$TMP/statuses.json" --slurpfile repo "$TMP/repo.json" '
+      --slurpfile statuses "$TMP/statuses.json" --slurpfile repo "$TMP/repo.json" \
+      --slurpfile containment "$TMP/base-containment.json" '
       $core[0] as $c
       | ($reviews[0] | add // []) as $reviews
       | {head:$c.head.sha,state:(if $c.merged_at != null then "merged" else $c.state end),
           draft:$c.draft,mergeable:(if $c.mergeable == true then "mergeable" elif $c.mergeable == false then "conflicting" else "unknown" end),
           can_merge:($repo[0].permissions.push // false),
+          base_sha:($c.base.sha | if type == "string" and test("^[a-fA-F0-9]{40}$") then . else null end),
+          base_containment:$containment[0],
           review_decision:($after[0].reviewDecision // ""),
           reviews:$reviews,
           checks:([ $checks[0][] | .check_runs[] | {name,id,status,conclusion,started_at} ]
@@ -351,6 +392,28 @@ observe() { # canonical GitHub URL -> normalized JSON
     {schema:"fm-contributions.v1",task:"observation",records:[{url:$url,
       kind:(if $kind == "pull" then "pr" else "issue" end),pending:[],seen:[],observation:$observed[0]}]}
     | valid_record' >/dev/null
+}
+
+observe_review() { # task canonical-url: attach this owner's local review-only answer
+  local task=$1 url=$2 head base rc=0
+  printf 'null\n' > "$TMP/review-answer.json"
+  head=$(jq -r '.head // ""' "$TMP/observation.json")
+  base=$(jq -r '.base_sha // ""' "$TMP/observation.json")
+  if [ -n "$head" ] && [ -n "$base" ]; then
+    # Local review verification has no stopping limit; only its own result
+    # determines whether a typed answer is available.
+    "$FM_ROOT/bin/fm-review-record.py" verify --pr "$url" --head "$head" \
+      --task "$task" --base "$base" --review-only --json \
+      > "$TMP/review-output.json" 2> "$TMP/review.err" || rc=$?
+    if [ "$rc" -eq 0 ] || [ "$rc" -eq 1 ] || [ "$rc" -eq 2 ]; then
+      jq -nce --slurpfile answer "$TMP/review-output.json" '
+        select(($answer | length) == 1) | $answer[0]' \
+        > "$TMP/review-answer.json" 2>/dev/null || printf 'null\n' > "$TMP/review-answer.json"
+    fi
+  fi
+  jq -n --arg pr "$url" --arg head "$head" --arg task "$task" --arg base "$base" \
+    --slurpfile answer "$TMP/review-answer.json" \
+    '{pr:$pr,head:$head,task:$task,base:$base,answer:$answer[0]}' > "$TMP/review-fact.json"
 }
 
 publish_pending() { # task canonical-url record-file
@@ -451,13 +514,12 @@ poll() {
       mark_quota_stale "$url" "${row[@]:1}"
       continue
     fi
+    deferred_drop "$url"
     if [ "$READ_UNKNOWN" -ne 0 ]; then
       PASS_UNKNOWN=1
-      deferred_drop "$url"
       DEFERRED=${DEFERRED:+$DEFERRED$'\n'}$url
-      continue
+      [ "$observed" -eq 0 ] || continue
     fi
-    deferred_drop "$url"
     # Wake once per failure episode: only when no owner has a prior error.
     if [ "$observed" -ne 0 ] && jq -ne --slurpfile saved "$TMP/saved.json" --arg url "$url" --args \
       'all($ARGS.positional[] as $task | [$saved[0][] | select(.task == $task) | .records[] | select(.url == $url)] | first;
@@ -472,13 +534,16 @@ poll() {
         ([$saved[0][] | select(.task == $task) | .records[] | select(.url == $url)] | first)
         // {url:$url,kind:$kind,checked_at:null,observation:null,verdict:null,seen:[],pending:[],notified:[]}' > "$old"
       if [ "$observed" -eq 0 ]; then
-        jq -n --arg now "$NOW" --slurpfile old "$old" --slurpfile observation "$TMP/observation.json" '
+        printf 'null\n' > "$TMP/review-fact.json"
+        [ "$kind" != pr ] || observe_review "$task" "$url"
+        jq -n --arg now "$NOW" --slurpfile old "$old" --slurpfile observation "$TMP/observation.json" \
+          --slurpfile review "$TMP/review-fact.json" '
           $old[0] as $old | $observation[0] as $o
           | ($o.events + (if $o.ready == true and $old.observation.ready != true and (any($o.events[]; .type == "ready-for-pr") | not) then
               [{token:("ready-for-pr:" + $now),type:"ready-for-pr",source:$old.url,head:null,body:"filed issue reached ready-for-pr"}]
               else [] end)) as $events
           | $old + {checked_at:$now,error:null,
-            observation:($o + {absent_checks:((($old.observation.absent_checks // []) + [($old.observation.checks // [])[] | .name]) - [$o.checks[].name] | unique)}),
+            observation:($o + {review_verification:$review[0],absent_checks:((($old.observation.absent_checks // []) + [($old.observation.checks // [])[] | .name]) - [$o.checks[].name] | unique)}),
             seen:($events | map(.token)),
             pending:(($old.pending // []) + [$events[] | select(.token as $t | ($old.seen // [] | index($t)) == null)] | unique_by(.token))}' > "$TMP/row.json"
       else
