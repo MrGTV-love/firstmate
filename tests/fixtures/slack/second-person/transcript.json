@@ -1,0 +1,54 @@
+{
+  "schema": "fm-slack-replay.v1",
+  "team": "T0123456789",
+  "channel": "D0123456789",
+  "bot_user": "UBOT0123456",
+  "bot_id": "BBOT0123456",
+  "next_ts": 899,
+  "scopes": [
+    "chat:write",
+    "im:write",
+    "im:history",
+    "reactions:read",
+    "reactions:write",
+    "users:read"
+  ],
+  "method_allowlist": [
+    "auth.test",
+    "chat.postMessage",
+    "chat.update",
+    "conversations.open",
+    "conversations.history",
+    "conversations.replies",
+    "reactions.get",
+    "reactions.add",
+    "users.info"
+  ],
+  "enforce_scopes": true,
+  "users": {
+    "U0TESTOWNER": {
+      "is_bot": false
+    },
+    "U0CDVHFU1A5": {
+      "is_bot": false
+    }
+  },
+  "messages": [
+    {
+      "ts": "100.000100",
+      "user": "U0TESTOWNER",
+      "text": "A message the owner typed before the plane was armed"
+    },
+    {
+      "ts": "100.000200",
+      "user": "U0CDVHFU1A5",
+      "text": "A message the second person typed before the plane was armed",
+      "channel": "D0SECONDDM1"
+    }
+  ],
+  "reactions": {},
+  "dms": {
+    "U0TESTOWNER": "D0123456789",
+    "U0CDVHFU1A5": "D0SECONDDM1"
+  }
+}

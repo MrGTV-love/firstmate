@@ -2768,7 +2768,7 @@ def help_text(command):
         'mirror': 'Usage: fm-slack-mirror.sh [--replay transcript.json]\nMirror open captain calls into owner DM threads.',
         'poll': 'Usage: fm-slack-poll.sh [--replay transcript.json]\nDeliver authorized Slack signals through the keyed-answer intake, and take in new owner DM messages as acknowledged, woken requests.',
         'check': 'Usage: fm-slack-check.sh [arm|check|disarm|retarget] [--replay transcript.json]\n'
-                 '       fm-slack-check.sh resolve <request-ts>',
+                 '       fm-slack-check.sh resolve <request-ts>[@<member id>]',
     }.get(command, 'Usage: fm-slack-{mirror,poll,check}.sh [--replay transcript.json]')
 
 
