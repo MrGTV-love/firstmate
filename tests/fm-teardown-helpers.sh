@@ -498,8 +498,17 @@ setup_squash_rebased_history() {
 # Echoes: <pr_head>
 setup_pushed_prerebase_history() {
   local case_dir=$1 mode=$2 tmp pr_head
-  wt_commit_file "$case_dir" a.txt alpha "add a"
-  wt_commit_file "$case_dir" b.txt bravo "add b"
+  if [ "$mode" = combined-commit ]; then
+    # One copy commit holds both files; the PR head replays them as two commits, so no
+    # PR commit has this commit's patch id.
+    printf '%s\n' alpha > "$case_dir/wt/a.txt"
+    printf '%s\n' bravo > "$case_dir/wt/b.txt"
+    git -C "$case_dir/wt" add -- a.txt b.txt
+    git -C "$case_dir/wt" -c user.email=t@t -c user.name=t commit -q -m "add a and b"
+  else
+    wt_commit_file "$case_dir" a.txt alpha "add a"
+    wt_commit_file "$case_dir" b.txt bravo "add b"
+  fi
 
   tmp="$case_dir/_main_move"
   git clone -q "$case_dir/origin.git" "$tmp"
@@ -773,6 +782,10 @@ if [ "${1:-}" = return ]; then
     else
       echo "fatal: Unable to create 'index.lock': File exists." >&2
     fi
+    # TREEHOUSE_LOCK_PAD_LINES=<n>: n more stderr lines after the signature, so the
+    # text the classifier reads is far larger than a pipe buffer.
+    [ -z "${TREEHOUSE_LOCK_PAD_LINES:-}" ] \
+      || awk -v n="$TREEHOUSE_LOCK_PAD_LINES" 'BEGIN { for (i = 0; i < n; i++) printf "padding line %d of the treehouse return failure text\n", i }' >&2
     exit 128
   fi
   exit 0
@@ -2312,6 +2325,37 @@ SH
   chmod +x "$case_dir/fakebin/git"
 }
 
+# add_git_read_fault <case-dir> <needle> <emit>: a git shim that fails the one read
+# whose command line contains <needle> with status 128, and runs everything else on the
+# real git. <emit> is what the failing read prints first: none, text:<printf %b text>
+# (a NUL-terminated path list, say), firstpatch (the real patch up to its second
+# file, so a valid prefix patch) or lastpatch (the real patch's last file alone, a
+# valid partial patch). The fault is armed by the case's fault.needle file,
+# so a case can build its history on the real git and arm the fault for the teardown
+# alone. Every hit is logged to fault.hits.
+add_git_read_fault() {
+  local case_dir=$1 needle=$2 emit=$3
+  cat > "$case_dir/fakebin/git" <<SH
+#!/usr/bin/env bash
+c='$case_dir'
+if [ -e "\$c/fault.needle" ] && [[ " \$* " == *"\$(cat "\$c/fault.needle")"* ]]; then
+  mode=\$(cat "\$c/fault.mode")
+  printf '%s\\n' "\$*" >> "\$c/fault.hits"
+  case "\$mode" in
+    none) exit 128 ;;
+    text:*) printf '%b' "\${mode#text:}"; exit 128 ;;
+    firstpatch) "\${REAL_GIT_FOR_TEST:?}" "\$@" | awk '/^diff --git /{n++} n<2'; exit 128 ;;
+    lastpatch) "\${REAL_GIT_FOR_TEST:?}" "\$@" | awk '/^diff --git /{blk=""} {blk=blk \$0 "\\n"} END{printf "%s", blk}'; exit 128 ;;
+  esac
+fi
+exec "\${REAL_GIT_FOR_TEST:?}" "\$@"
+SH
+  chmod +x "$case_dir/fakebin/git"
+  printf '%s' "$needle" > "$case_dir/fault.needle"
+  printf '%s' "$emit" > "$case_dir/fault.mode"
+  rm -f "$case_dir/fault.hits"
+}
+
 # A concurrent fresh allocator for the reservation window: it waits until the
 # run is inside the window, takes the project lock as bin/fm-spawn.sh does,
 # replaces the lapsed slot claim through the real claim helper, publishes its
@@ -3294,3 +3338,311 @@ SH
   chmod +x "$case_dir/fakebin/mv"
 }
 
+
+# Merge-train fixtures. A train member PR (pull/7) is CLOSED, not merged, because
+# a merged train PR (pull/9) carried its head unchanged. The forge is a fake gh
+# that answers from files under $case/gh-fixture, so a case edits one fact at a
+# time; every call is logged to calls.log so a case can prove which reads ran.
+TRAIN_MEMBER_URL=https://github.com/example/repo/pull/7
+TRAIN_URL=https://github.com/example/repo/pull/9
+TRAIN_MEMBER_HEAD=
+TRAIN_HEAD=
+TRAIN_COPY_HEAD=
+# The member PR's base oid as the forge records it: main's tip when the member was opened.
+TRAIN_BASE_OID=
+
+# setup_train_history <case-dir> <landing: none|squash|merge|ours> <copy: head|prerebase|inside|extra> [train: merge|flat|flat-missing|ours-flat|flat-hidden]
+# Builds the member PR head H (two commits on top of a moved main: feature.txt, then
+# feature2.txt), the train head (a merge of H plus a second member's commit), and
+# then moves the default branch
+# on by editing feature.txt, so the content-in-default proof can never match.
+#   landing squash: the default branch also holds the train's squash commit.
+#   landing merge: the train head is merged into the default branch by a merge commit.
+#   landing ours: the train head is `ours`-merged into the default branch, so it is
+#     reachable there but the default branch holds none of its change.
+#   TRAIN_LANDING_COMMIT is the commit the fake forge reports as the train's mergeCommit
+#   (empty for landing none, which a real merged train never is).
+#   TRAIN_REVERT_MEMBER=1: the train's last commit reverts the member's feature.txt.
+#   TRAIN_HIDDEN_OURS=1: the member is built on a commit K (hidden.txt) that main took
+#     in by an `ours` merge, so K is reachable from main yet main never holds
+#     hidden.txt. Train ours-flat: the train `ours`-merges H, making H and K its
+#     ancestors, and replays only the member's two commits, so hidden.txt is never in
+#     the train. flat-hidden: the train replays K as well and really carries it.
+#   train flat: the pipeline rebased the train flat, so it replays the member's two
+#     commits as new commits and does not contain H. flat-missing: it replays only
+#     the second, so one of the member's commits never reached the train.
+#   copy head: the copy sits at H. prerebase: at a commit with H's patch on the old
+#     main. inside: at the train's merge of H, later than H. extra: at H plus a
+#     commit the train never merged.
+# TRAIN_MAIN_EDIT=0 skips the last commit on main (an edit of feature.txt), so the
+# default branch still holds the member's change as landed: the content-in-default proof
+# can then decide the copy by itself, and a case can ask whether it should.
+# TRAIN_MAIN_EDIT_FILE names the file that edit changes (default feature.txt).
+# TRAIN_SHARED_APPEND=1: main has shared.txt; the member appends a line to it; the train
+#   first rewrites the first line of it, so the train's shared.txt is a version the member
+#   never had, which differs from the member's by a removed line and an added one.
+# TRAIN_PREFETCH_TRAIN=0 leaves the train head out of the copy's object store.
+# TRAIN_HIDDEN_ORDER=1: the member is built on K (hidden.txt), a sibling of D (side.txt)
+#   on the old main. The default branch holds a merge M whose FIRST parent is K and
+#   whose SECOND parent is D, with D's tree, and was fast-forwarded from D to M. K is
+#   on the first-parent line of the default branch, yet hidden.txt is in no tree
+#   from M on. Parent order is all that puts K there. Sets TRAIN_HIDDEN_COMMIT to K.
+#   TRAIN_HIDDEN_ORDER=2 makes K and D both add hidden.txt with different content, so
+#   the merge of K and D conflicts; M still has D's tree.
+# TRAIN_MEMBER_ON_LINE=1: the default branch is fast-forwarded to the member head H
+#   before the train starts, so H is on its first-parent line; the train then adds a
+#   commit on H and lands by squash, so the landing's first parent is H.
+#   Copy kinds: hidden is K (needs TRAIN_HIDDEN_ORDER=1), train is the train head.
+# Sets TRAIN_MEMBER_HEAD, TRAIN_HEAD and TRAIN_COPY_HEAD.
+setup_train_history() {
+  local case_dir=$1 landing=$2 copy=$3 shape=${4:-merge} tmp="$1/_train" prerebase='' merge_commit
+  if [ "$copy" = prerebase ]; then
+    wt_commit_file "$case_dir" feature.txt hello "add feature"
+    prerebase=$(git -C "$case_dir/wt" rev-parse HEAD)
+  fi
+  git clone -q "$case_dir/origin.git" "$tmp"
+  git -C "$tmp" config user.email t@t
+  git -C "$tmp" config user.name t
+  printf '%s\n' moved > "$tmp/m.txt"
+  git -C "$tmp" add -- m.txt
+  git -C "$tmp" commit -q -m "main moves"
+  git -C "$tmp" push -q origin main
+  if [ "${TRAIN_SHARED_APPEND:-0}" = 1 ]; then
+    printf '%s\n' base-one base-two base-three base-four > "$tmp/shared.txt"
+    git -C "$tmp" add -- shared.txt
+    git -C "$tmp" commit -q -m "shared file"
+    git -C "$tmp" push -q origin main
+  fi
+  if [ "${TRAIN_HIDDEN_OURS:-0}" = 1 ]; then
+    # K: a commit whose change never lands. The default branch takes it in by an
+    # `ours` merge, so K is reachable from main but main's tree lacks hidden.txt;
+    # the member is built on K.
+    git -C "$tmp" checkout -q -b hidden
+    printf '%s\n' hidden > "$tmp/hidden.txt"
+    git -C "$tmp" add -- hidden.txt
+    git -C "$tmp" commit -q -m "hidden change"
+    git -C "$tmp" checkout -q main
+    git -C "$tmp" merge -q -s ours --no-edit hidden >/dev/null
+    git -C "$tmp" push -q origin main
+    TRAIN_BASE_OID=$(git -C "$tmp" rev-parse HEAD)
+    git -C "$tmp" checkout -q -b member hidden
+  elif [ "${TRAIN_HIDDEN_ORDER:-0}" = 1 ] || [ "${TRAIN_HIDDEN_ORDER:-0}" = 2 ]; then
+    git -C "$tmp" checkout -q -b hidden
+    printf '%s\n' hidden > "$tmp/hidden.txt"
+    git -C "$tmp" add -- hidden.txt
+    git -C "$tmp" commit -q -m "hidden change"
+    TRAIN_HIDDEN_COMMIT=$(git -C "$tmp" rev-parse HEAD)
+    git -C "$tmp" checkout -q main
+    if [ "${TRAIN_HIDDEN_ORDER:-0}" = 2 ]; then
+      # D adds hidden.txt too, with other content: the merge of K and D conflicts.
+      printf '%s\n' different-side > "$tmp/hidden.txt"
+      git -C "$tmp" add -- hidden.txt
+    else
+      printf '%s\n' side > "$tmp/side.txt"
+      git -C "$tmp" add -- side.txt
+    fi
+    git -C "$tmp" commit -q -m "side change"
+    git -C "$tmp" push -q origin main
+    # M: first parent K, second parent D, D's tree. The branch moves from D to M.
+    merge_commit=$(git -C "$tmp" commit-tree "$(git -C "$tmp" rev-parse 'HEAD^{tree}')" \
+      -p "$TRAIN_HIDDEN_COMMIT" -p HEAD -m "merge that kept the side's tree")
+    git -C "$tmp" reset -q --hard "$merge_commit"
+    git -C "$tmp" push -q origin main
+    TRAIN_BASE_OID=$(git -C "$tmp" rev-parse HEAD)
+    git -C "$tmp" checkout -q -b member "$TRAIN_HIDDEN_COMMIT"
+  elif [ "${TRAIN_BASE_AHEAD:-0}" = 1 ]; then
+    # The forge records the base branch's tip as the member's base, and that tip is one
+    # commit ahead of the commit the member forked from.
+    git -C "$tmp" branch -q member
+    printf '%s\n' ahead > "$tmp/ahead.txt"
+    git -C "$tmp" add -- ahead.txt
+    git -C "$tmp" commit -q -m "main moves past the fork point"
+    git -C "$tmp" push -q origin main
+    TRAIN_BASE_OID=$(git -C "$tmp" rev-parse HEAD)
+    git -C "$tmp" checkout -q member
+  else
+    TRAIN_BASE_OID=$(git -C "$tmp" rev-parse HEAD)
+    git -C "$tmp" checkout -q -b member
+  fi
+  printf '%s\n' hello > "$tmp/feature.txt"
+  git -C "$tmp" add -- feature.txt
+  if [ "${TRAIN_SHARED_APPEND:-0}" = 1 ]; then
+    printf '%s\n' member >> "$tmp/shared.txt"
+    git -C "$tmp" add -- shared.txt
+  fi
+  git -C "$tmp" commit -q -m "add feature"
+  printf '%s\n' hello2 > "$tmp/feature2.txt"
+  git -C "$tmp" add -- feature2.txt
+  git -C "$tmp" commit -q -m "add feature two"
+  TRAIN_MEMBER_HEAD=$(git -C "$tmp" rev-parse HEAD)
+  git -C "$tmp" push -q origin "HEAD:refs/pull/7/head"
+  if [ "${TRAIN_MEMBER_ON_LINE:-0}" = 1 ]; then
+    git -C "$tmp" checkout -q main
+    git -C "$tmp" merge -q --ff-only member
+    git -C "$tmp" push -q origin main
+  fi
+  git -C "$tmp" checkout -q -b train main
+  if [ "${TRAIN_SHARED_APPEND:-0}" = 1 ]; then
+    # Another member of the train appended to the same file first.
+    sed 's/^base-one$/base-one-edited-by-other/' "$tmp/shared.txt" > "$tmp/shared.new" && mv "$tmp/shared.new" "$tmp/shared.txt"
+    git -C "$tmp" add -- shared.txt
+    git -C "$tmp" commit -q -m "other member appends"
+  fi
+  case "$shape" in
+    merge) git -C "$tmp" merge -q --no-ff --no-edit member ;;
+    ours-flat)
+      # The member head is an ancestor of the train, yet the train holds only the
+      # member's own two commits, replayed: the `ours` merge brings in no change.
+      git -C "$tmp" merge -q -s ours --no-edit member >/dev/null
+      GIT_COMMITTER_DATE="2030-01-01T00:00:00Z" git -C "$tmp" cherry-pick member~1 member >/dev/null
+      ;;
+    flat-hidden)
+      # Needs TRAIN_HIDDEN_OURS=1: the train replays K too, so it really carries it.
+      GIT_COMMITTER_DATE="2030-01-01T00:00:00Z" git -C "$tmp" cherry-pick hidden member~1 member >/dev/null
+      ;;
+    flat) GIT_COMMITTER_DATE="2030-01-01T00:00:00Z" git -C "$tmp" cherry-pick member~1 member >/dev/null ;;
+    flat-missing) GIT_COMMITTER_DATE="2030-01-01T00:00:00Z" git -C "$tmp" cherry-pick member >/dev/null ;;
+    *) fail "setup_train_history: unknown train shape $shape" ;;
+  esac
+  merge_commit=$(git -C "$tmp" rev-parse HEAD)
+  printf '%s\n' second > "$tmp/second.txt"
+  git -C "$tmp" add -- second.txt
+  git -C "$tmp" commit -q -m "second member work"
+  if [ "${TRAIN_REVERT_MEMBER:-0}" = 1 ]; then
+    git -C "$tmp" rm -q -- feature.txt
+    git -C "$tmp" commit -q -m "revert member feature"
+  fi
+  TRAIN_HEAD=$(git -C "$tmp" rev-parse HEAD)
+  git -C "$tmp" push -q origin "HEAD:refs/pull/9/head"
+  git -C "$tmp" checkout -q main
+  TRAIN_LANDING_COMMIT=
+  if [ "$landing" = squash ]; then
+    git -C "$tmp" merge -q --squash train >/dev/null
+    git -C "$tmp" commit -q -m "train squash (#9)"
+    git -C "$tmp" push -q origin main
+    TRAIN_LANDING_COMMIT=$(git -C "$tmp" rev-parse HEAD)
+  elif [ "$landing" = merge ]; then
+    git -C "$tmp" merge -q --no-ff --no-edit train >/dev/null
+    git -C "$tmp" push -q origin main
+    TRAIN_LANDING_COMMIT=$(git -C "$tmp" rev-parse HEAD)
+  elif [ "$landing" = ours ]; then
+    # The forge records the train merged, but the merge took no change in.
+    git -C "$tmp" merge -q -s ours --no-edit train >/dev/null
+    git -C "$tmp" push -q origin main
+    TRAIN_LANDING_COMMIT=$(git -C "$tmp" rev-parse HEAD)
+  fi
+  if [ "${TRAIN_MAIN_EDIT:-1}" = 1 ]; then
+    printf '%s\n' changed-on-main > "$tmp/${TRAIN_MAIN_EDIT_FILE:-feature.txt}"
+    git -C "$tmp" add -- "${TRAIN_MAIN_EDIT_FILE:-feature.txt}"
+    git -C "$tmp" commit -q -m "main edits feature"
+    git -C "$tmp" push -q origin main
+  fi
+  rm -rf "$tmp"
+  git -C "$case_dir/project" fetch -q origin
+  git -C "$case_dir/wt" fetch -q origin refs/pull/7/head
+  [ "${TRAIN_PREFETCH_TRAIN:-1}" != 1 ] || git -C "$case_dir/wt" fetch -q origin refs/pull/9/head
+  case "$copy" in
+    head) git -C "$case_dir/wt" reset -q --hard "$TRAIN_MEMBER_HEAD" ;;
+    prerebase) ;;
+    inside) git -C "$case_dir/wt" reset -q --hard "$merge_commit" ;;
+    hidden) git -C "$case_dir/wt" reset -q --hard "$TRAIN_HIDDEN_COMMIT" ;;
+    train) git -C "$case_dir/wt" reset -q --hard "$TRAIN_HEAD" ;;
+    extra)
+      git -C "$case_dir/wt" reset -q --hard "$TRAIN_MEMBER_HEAD"
+      wt_commit_file "$case_dir" extra.txt unmerged "unmerged follow-up"
+      ;;
+    *) fail "setup_train_history: unknown copy $copy" ;;
+  esac
+  TRAIN_COPY_HEAD=$(git -C "$case_dir/wt" rev-parse HEAD)
+  [ "$prerebase" = "" ] || [ "$prerebase" = "$TRAIN_COPY_HEAD" ] || fail "setup_train_history: prerebase copy moved"
+}
+
+# add_gh_train_fake <case-dir> <member state> <member head>: the member PR's state
+# and head, an empty train search, and a log of every call. A member-view.once file
+# answers the first full member read and fails every later one.
+add_gh_train_fake() {
+  local case_dir=$1 fx="$1/gh-fixture"
+  mkdir -p "$fx"
+  printf '%s\n' "$2" > "$fx/member-state"
+  printf '%s\n' "$3" > "$fx/member-head"
+  printf '[]\n' > "$fx/list.json"
+  printf '%s\n' "${TRAIN_BASE_OID:-}" > "$fx/member-base"
+  rm -f "$fx/list.fail" "$fx/calls.log" "$fx/member-view.once" "$fx/member-view.seen" "$fx/member-base.fail"
+  cat > "$case_dir/fakebin/gh" <<SH
+#!/usr/bin/env bash
+fx='$fx'
+printf '%s\n' "\$*" >> "\$fx/calls.log"
+case "\${1:-} \${2:-}" in
+  "pr view")
+    case " \$* " in
+      *"--json baseRefOid"*)
+        [ ! -e "\$fx/member-base.fail" ] || { echo "error: forge unavailable" >&2 ; exit 1 ; }
+        cat "\$fx/member-base" ; exit 0 ;;
+      *"state,headRefOid,url"*)
+        if [ -e "\$fx/member-view.once" ]; then
+          [ ! -e "\$fx/member-view.seen" ] || { echo "error: forge unavailable" >&2 ; exit 1 ; }
+          : > "\$fx/member-view.seen"
+        fi
+        case " \$* " in
+          *"url,baseRefOid"*)
+            if [ -e "\$fx/member-base.fail" ]; then echo "error: forge unavailable" >&2 ; exit 1 ; fi
+            printf '%s\t%s\t%s\t%s\n' "\$(cat "\$fx/member-state")" "\$(cat "\$fx/member-head")" '$TRAIN_MEMBER_URL' "\$(cat "\$fx/member-base")" ; exit 0 ;;
+        esac
+        printf '%s\t%s\t%s\n' "\$(cat "\$fx/member-state")" "\$(cat "\$fx/member-head")" '$TRAIN_MEMBER_URL' ; exit 0 ;;
+      *"--json state "*) cat "\$fx/member-state" ; exit 0 ;;
+    esac ;;
+  "pr list")
+    [ ! -e "\$fx/list.fail" ] || { echo "error: forge unavailable" >&2 ; exit 1 ; }
+    cat "\$fx/list.json" ; exit 0 ;;
+esac
+echo "error: pull request not found" >&2
+exit 1
+SH
+  chmod +x "$case_dir/fakebin/gh"
+}
+
+# train_list <case-dir> <number> <state> <base> <head> <body>: the one PR the
+# forge's search returns.
+train_list() {
+  jq -n --argjson number "$2" --arg url "https://github.com/example/repo/pull/$2" \
+    --arg state "$3" --arg base "$4" --arg head "$5" --arg body "$6" \
+    --arg landing "${TRAIN_LANDING_COMMIT:-}" \
+    '[{number: $number, url: $url, state: $state, baseRefName: $base, headRefOid: $head,
+       mergeCommit: (if $state == "MERGED" and $landing != "" then {oid: $landing} else null end), body: $body}]' \
+    > "$1/gh-fixture/list.json"
+}
+
+# train_body <member url> <sha>: a train body that lists this member and another.
+train_body() {
+  printf 'Merge train\n\nComponents, in order:\n- %s at %s\n- https://github.com/example/repo/pull/8 at %s\n' \
+    "$1" "$2" cccccccccccccccccccccccccccccccccccccccc
+}
+
+# train_default_list <case-dir>: a MERGED train into main listing the member at H.
+train_default_list() {
+  train_list "$1" 9 MERGED main "$TRAIN_HEAD" "$(train_body "$TRAIN_MEMBER_URL" "$TRAIN_MEMBER_HEAD")"
+}
+
+# add_logging_treehouse <case-dir>: the pool stub, recording every call.
+add_logging_treehouse() {
+  cat > "$1/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$1/treehouse.log"
+exit 0
+SH
+  chmod +x "$1/fakebin/treehouse"
+}
+
+# train_case <name> <landing> <copy> [<base-branch recorded in meta>] [<train shape>]: a task whose
+# member PR is CLOSED and whose train is listed and merged, ready to run teardown.
+# Sets TRAIN_CASE.
+train_case() {
+  TRAIN_CASE=$(make_case "$1")
+  write_meta "$TRAIN_CASE" no-mistakes ship
+  append_pr_meta_url "$TRAIN_CASE"
+  [ -z "${4:-}" ] || printf 'base_branch=%s\n' "$4" >> "$TRAIN_CASE/state/task-x1.meta"
+  setup_train_history "$TRAIN_CASE" "$2" "$3" "${5:-merge}"
+  add_gh_train_fake "$TRAIN_CASE" CLOSED "$TRAIN_MEMBER_HEAD"
+  train_default_list "$TRAIN_CASE"
+  add_logging_treehouse "$TRAIN_CASE"
+}

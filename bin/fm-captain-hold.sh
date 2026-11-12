@@ -1871,8 +1871,13 @@ apply_pending_retained_artifact() {  # <task-id>
         return 0
       fi
       fm_backlog_row_artifact_supported "$id" "${args[@]}" || return 0
-      fm_backlog_mutate "$DATA" update "$id" "${args[@]}" \
+      fm_backlog_mutate "$DATA" update "$id" "${args[@]:0:2}" \
         || { report_retained_artifact_failure "$id" "$marker"; return 1; }
+      # The validator admits a 4-arg record only as --pr <train> --note
+      # "closed by merge train: <member>"; record that note on the close too.
+      if [ "${#args[@]}" -eq 4 ]; then
+        RETAINED_CLOSE_ARGS=(--note "${args[3]}")
+      fi
       ;;
   esac
 }
