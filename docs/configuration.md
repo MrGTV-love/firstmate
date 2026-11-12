@@ -15,6 +15,7 @@ Start with the directory layout, then use the setting reference for the behavior
 | Disk held by nested task copies | [Nested task copy sweep](#nested-task-copy-sweep-configcopy-budget) |
 | Pool copies left behind after a merge | [Pool-copy prune after a merge](#pool-copy-prune-after-a-merge-fm_merge_prune) |
 | Review-agent model choice | [Review-agent selection](#review-agent-selection-binfm-review-agent-selectsh) |
+| Automatic exact-head review and merge of a green PR | [Automatic review and merge](#automatic-review-and-merge-configreview-runner) |
 | Model-picker benchmark data | [Model-picker benchmark data](#model-picker-benchmark-data-fm_model_picker_data) |
 | Persistent secondmates | [Secondmate routes](#secondmate-routes-datasecondmatesmd) |
 | Per-run overrides and tuning | [Environment variables](#environment-variables) |
@@ -104,7 +105,7 @@ Each effective `FM_HOME` contains private operational directories.
 - The dated open-work ledger `state/open-loops.json`, published by `bin/fm-open-loops.sh --heartbeat`.
 - The review-agent selector's dry-run evidence log `state/review-agent-select.jsonl`, appended by `bin/fm-review-agent-select.sh --log`.
 - The heartbeat guard-workaround report `state/.guard-workarounds-next`, written by `bin/fm-watch.sh` as file output only; no wake presents it.
-- The append-only review-verdict and captain-word ledger `state/review-records.jsonl`, written only by `bin/fm-review-record.py`, whose header owns author-evidence derivation, unknown-family refusal, named-group coverage, and its format.
+- The append-only review-verdict and captain-word ledger `state/review-records.jsonl`, written only by `bin/fm-review-record.py`, whose header owns author-evidence derivation, pipeline-only unknown-family relief, named-group coverage, and its format; see [Unrecorded pipeline author families](#unrecorded-pipeline-author-families) for the gate's harm-model reassessment.
 - The append-only launch author history `state/<id>.launch-models`, published by `bin/fm-spawn.sh`, whose header owns its format and relaunch behavior.
 - The append-only refusal friction ledger `state/friction.jsonl`, written only by `bin/fm-friction-ledger.py`; [Friction ledger](#friction-ledger) owns its schema and privacy contract.
 - The conditional-read ETag cache `state/gh-rest-cache/` and the last-seen GitHub quota buckets `state/gh-ratelimit.<resource>.json`, both owned by `bin/fm-gh-rest.sh`.
@@ -123,6 +124,32 @@ Each effective `FM_HOME` contains private operational directories.
 `projects/` holds local project clones.
 Firstmate reads these clones, but changes them only through the narrow guarded and concrete captain-approved exceptions in `AGENTS.md`.
 Untracked files and directories whose names begin with `scratchpad` are also gitignored, so temporary scratch does not make porcelain-based secondmate sync guards treat a home as dirty.
+
+### Unrecorded pipeline author families
+
+The review landing gate's coverage contract is owned by [`bin/fm-review-record.py`](../bin/fm-review-record.py)'s header and `--help`, including its bounded single-reader relief for `no-mistakes:unknown` and unchanged two-reader requirement for an unknown builder.
+The relief applies only when the ship group has at least one derived family and every ship family, derived or typed, is known; the sole reader's known family must differ from every ship family.
+It also applies only when the pipeline evidence is proven absent: no state database, no matching run or invocation, or an invocation that records no model and no provider.
+Evidence that is present but unusable gets no relief and keeps the two-known-reader-families rule: an unreadable, corrupt or schema-changed database, a relative `NM_HOME`, conflicting provider/model families, or a recorded model of unknown family.
+The verifier reads the verifying host's `NM_HOME/state.sqlite`, so a run performed elsewhere can lack local invocation evidence even when the exact head has already received a known different-builder-family PASS.
+
+#### Guard harm-model reassessment
+
+Two known reader families guarantee that at least one differs from an unknown author, protecting against an author's family-specific blind spot receiving no independent read.
+The pipeline-only relief preserves known-builder independence, not that stronger guarantee for every possible pipeline author.
+The residual case is an unrecorded pipeline family that really equals the sole reader family, leaving pipeline-authored defects without a different-family read; a pipeline author or operator able to withhold run evidence could exploit it.
+Ship launch history, locally available invocation/provider evidence, exact-head report binding, and continued coverage of every known author family narrow the gap but cannot prove an unknown pipeline author's independence.
+One reader different from every ship family is enough for the builder-independence objective and avoids repeat reads caused only by a cross-host evidence gap, while unknown builders receive no relief.
+A ship group that holds any unknown family, even beside a known one, cannot prove that the sole pipeline reader differs from every builder, so its `no-mistakes:unknown` group keeps the two-known-reader-families rule.
+A host that holds the evidence but cannot read it must not get an easier rule than a successful read, which could have named a pipeline family equal to the sole reader's, so a read fault fails closed as before.
+The remaining residual case is therefore limited to a ship group whose families are all known, with the pipeline author family proven absent from the verifying host.
+When that single-reader relief is needed to cover the `no-mistakes:unknown` group in any window the verifier checks, that is the PASS reads after an exact-head FAIL that read the group or all exact-head PASS reads, with fewer than two different known reader families counted for the group in that window, the verifier discloses it on any accepted basis, including a captain-word whose later FAIL the relief cleared, as `pipeline author family not recorded`, and `bin/fm-pr-merge.sh` writes that fact into the existing merge-authority record rather than presenting pipeline independence as proven.
+A second family read before such a FAIL does not suppress the disclosure, because only the reads after the FAIL clear it.
+An unknown pipeline group read by two different known reader families in every checked window proves independence, and a fully known pipeline group needs no disclosure, so neither prints nor records the fact.
+That record is short-lived and is not an archive: the merge poll in `bin/fm-watch.sh` deletes it when it records the merge outcome, the outcome ledger does not keep the fact, and `bin/fm-teardown.sh` deletes any record left at task teardown.
+[`bin/fm-merge-authority-lib.sh`](../bin/fm-merge-authority-lib.sh) owns its optional-line extension and backward-compatible reader; legacy records without the fact remain readable.
+A portable authenticated run-author evidence carrier needs a separate producer, transfer, trust and replay contract and is not provided by this relief.
+The regressions are [`tests/fm-review-record.test.sh`](../tests/fm-review-record.test.sh) and [`tests/fm-pr-merge.test.sh`](../tests/fm-pr-merge.test.sh).
 
 ### Friction ledger
 
@@ -2654,6 +2681,54 @@ The script header owns flags, the output block, and exit status.
 - With `--log`, every run appends one `fm-review-agent-select.v1` JSON line to `state/review-agent-select.jsonl`, errors included.
 - A record holds the status, reason, rule, task horizon, selection, the live `current` agent order read from the no-mistakes config, and every candidate with its eligibility, exhaustion, scalar, headroom, runway, and uncertainty.
 - The watcher starts one detached `--dry-run --log` run on each heartbeat tick when the home has `config/crew-dispatch.json`, and starts no new run while its previous run is still alive.
+
+## Automatic review and merge (config/review-runner)
+
+When a registered ship PR turns green, the watcher's housekeeping pass requests the independent exact-head read the standing merge rule needs and merges on a covering PASS.
+`bin/fm-pr-auto-review.py`'s header owns the sequence, the counting rule and the report format; this section owns the setting and what it records.
+The merge poll is a static program that prints only `merged`, so it makes no request; the single caller is [`bin/fm-pr-ready-reconcile.sh`](../bin/fm-pr-ready-reconcile.sh), which adds no daemon, check or schedule.
+
+**The review runner setting**
+
+- `FM_REVIEW_RUNNER`, else the first non-comment line of `config/review-runner`, names an absolute path to the review lane's runner.
+- The runner is called as `<runner> <review-dir> <pr-url> <head> pr.diff <project-path> <model>`; `<review-dir>` holds `contract.md`, `pr.diff` and `ci-evidence.md`, and the runner writes `review.md` there.
+- `pr.diff` comes from `bin/fm-review-diff.sh` and is used only when the PR head it fetched is the head being read; otherwise the pack is not built.
+- The model that served the read is taken only from one runner stdout line exactly `served-model: <model id>`, never from prose notices or logs. With none, the read is not recorded, the head is held as `served model unknown` with the report path and the requested model, Main is woken, and no further read is requested for that head. Main's runner prints the line only when one model served every reply and no fallback was recorded, and prints nothing otherwise, so a read it cannot vouch for holds for Main.
+- No path is hardcoded in a tracked script, and the runner's own internals are out of scope.
+- Unset, relative or not executable makes no request and records one `review runner unavailable: <why>` event and one check wake per head.
+
+**What is read, and by whom**
+
+- Reader models come from the review rule in `config/crew-dispatch.json` (see Review-agent selection): its `use` entries in order, then its `fallback` entries.
+- A model covers every uncovered known author family but its own, and the model covering most is taken, rule order breaking a tie.
+- Uncovered families come from `bin/fm-review-record.py plan`, which applies the verifier's own coverage rule to the author groups derived from the exact head.
+- An uncovered unknown author family is read too: `plan` names, for that group, the families a known reader must lie outside. Under the one-reader relief for an unrecorded pipeline family that is every ship family, so one read covers it; any other unknown group gets reads from two different known families, one at a time.
+- A model whose read failed without a usable report, or whose runner exited nonzero even though it left a report, is not asked again for that head; none left records `no eligible reader`, and an unknown group no known reader can count toward records `author family unknown`, each once per head. A reported FAIL from a runner that then exited nonzero still ends the head at `fail`.
+- A read is requested only when the forge reports the PR open, not a draft, mergeable and CLEAN or HAS_HOOKS, and judges each check on its own: a status context must be SUCCESS, a check run must conclude SUCCESS, NEUTRAL or SKIPPED unless a later green run of the same name replaced it, and every check the base branch requires through classic protection or an active ruleset must have reported. An unreadable required set waits. This is a prefilter for spending a read; `bin/fm-pr-merge.sh` re-reads every condition live.
+- The contract text is the task's `data/<task>/brief.md`, the file under `data/` that its `## Definition Of Done (task)` section names on an unfenced `DoD file: <absolute path>` line, `data/dod/<task>.md`, and every steering message in `state/<task>.inbox/`; a ruling given only in chat is not in it. The section and its pointer are read by `bin/fm-dod-lib.sh`, the one owner of that reading, so a pointer inside a code fence names nothing and a pointer outside `data/` is never read.
+- The contract must be complete before any reader is dispatched: a non-empty brief, at least one non-empty Definition Of Done (the brief's own section as `bin/fm-brief.sh` scaffolds it, the file its `DoD file:` line names in place of that section, or `data/dod/<task>.md`) and that named file under `data/`. A missing source holds the head as `review pack not built: contract source missing: <names>` with one check wake, writes no request and starts no reader; the head is read on a later pass once the source exists.
+
+**Report format**
+
+- The raw first line is exactly `VERDICT: <PASS|FAIL|INCOMPLETE> head=<head>` for the requested head, the rule `fm-review-record.py review` applies, and the last line repeats the verdict word.
+- Each fact stands on its own line that names it, followed by `yes` or `no`: `loosens a deny or allow list`, `widens what a guard permits`, `touches customer data, billing or spend`.
+- A PASS missing a fact, naming another head, from a reader whose family covers no author group, or one that cannot be recorded is not recorded and burns that reader for the head.
+- A FAIL from any reader is recorded as FAIL against every group it read; a FAIL that cannot be recorded still ends the head at `fail`. An INCOMPLETE is held and never recorded as PASS, and each tells Main through a check wake with the report path.
+- The runner asks the reader for one line exactly `Protected class: yes - <why>` or `Protected class: no - <why>`. `yes`, a missing line or a malformed one holds the merge and wakes Main; only `no` lets a covering PASS merge. `protected=<class>[,<class>]` in the task meta also holds it with that class named.
+- The decision counts every review recorded for the exact head, whoever recorded it and in whatever order: a yes, a missing or malformed answer, a report that is gone or changed since it was recorded, and a history that cannot be read each hold, and a later `no` never clears an earlier answer. A recorded routine PASS that `verify` accepts and whose every exact-head report answers `no` goes to the merge gate whether or not this lane requested it. The hold is read again on every pass and wakes Main once per distinct reason.
+
+**Records**
+
+- The sidecar `state/.pr-auto-review/<task>.json` holds the request, the outstanding read, the recorded verdict, the merge attempt and the events already emitted; each request's review pack, lock and result sit under `state/.pr-auto-review/<task>.d/`.
+- A read runs detached under a lock, so a restart neither loses nor repeats it; a pass never waits for it.
+- Outcomes are sidecar events (read requested, verdict recorded, queued, merged with the full PR URL, fail, held with its reason, no eligible reader, runner unavailable), printed oldest first by `bin/fm-pr-auto-review.py events <task>`, and `bin/fm-pr-auto-review.py state <task>` prints `reading`, `waiting: <reason>` (the PR is not yet green), `queued`, `merged`, `fail`, `held: <reason>` or `idle`.
+- A check wake `check: pr-review <task>: ...` tells Main, once per head and reason, about a FAIL, an INCOMPLETE, a held protected class or missing protected-class answer, an unknown served model, an unknown author family, a missing reader or runner, a refused merge, a PR that left the merge queue and is still open, an unavailable verify or plan, a review record that leaves nothing to read yet does not qualify, a PASS that cannot be recorded, and a review pack that was not built. A wake that could not be appended is kept in the sidecar as pending, is not counted as emitted, and is retried by every later pass until it is delivered, once.
+- A read still out for an older head never stops a newer head from being read on the normal cadence; once it ends it is marked returned and is never recorded, planned or reported, so it cannot displace the live head's verdict.
+- Nothing is written to the task's status log: a trailing `note:` there would replace the worker's `done:` as the latest event and change how `bin/fm-crew-state.sh` reads a ship whose PR is in review.
+- The merge is `bin/fm-pr-merge.sh <task> <url>` with no other argument, only after `verify` accepts an independent-review PASS for the live head; a refusal holds with its reason and is retried after ten minutes, and an away record is left to `bin/fm-pr-merge.sh`'s own away handling. A captain-word recorded for the head is left to Main.
+- When `bin/fm-pr-merge.sh` reports the PR queued, the state reads `queued` and nothing is called again while the forge reports it queued; a merged PR then reads `merged`. If the forge instead reports the PR open and out of the queue, for example because someone removed it or the queue ejected it, the head is held once with one check wake, `bin/fm-pr-merge.sh` is not called again for that head, and a new head is judged fresh.
+- The sidecar's next due time spaces each task's forge read; a task is swept with its meta.
+- `FM_PR_AUTO_REVIEW_INTERVAL` (seconds, default 120) spaces the forge read per task, and `FM_PR_AUTO_REVIEW_MERGE_RETRY` (seconds, default 600) spaces merge retries; both are cadences, not bounds on any work.
 
 ## Typed dispatch resolution (.env TYPESAFE_API_KEY)
 
