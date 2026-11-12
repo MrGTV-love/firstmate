@@ -30,10 +30,11 @@ command -v treehouse >/dev/null 2>&1 || { echo "skip: treehouse not found"; exit
 REAL_HERDR=$(command -v herdr)
 REAL_TREEHOUSE=$(command -v treehouse)
 HERDR_ORIGINAL_PATH=$PATH
-# Keep every disposable allocation inside this worktree, including a pane whose
-# daemon did not inherit the controller's TREEHOUSE_ROOT.
-mkdir -p "$ROOT/.no-mistakes/test-tmp"
-TMP_ROOT=$(mktemp -d "$ROOT/.no-mistakes/test-tmp/fm-herdr-presentation.XXXXXX")
+# Keep fixtures outside the code checkout, including allocations made by a
+# pane whose daemon did not inherit the controller's TREEHOUSE_ROOT.
+TMP_ROOT=$(mktemp -d "$(cd "${TMPDIR:-/tmp}" && pwd -P)/fm-herdr-presentation.XXXXXX")
+# shellcheck source=tests/treehouse-test-safety.sh
+. "$ROOT/tests/treehouse-test-safety.sh"
 # This standalone suite does not source tests/lib.sh; ordinary-work teardown --force needs the captain's words.
 fm_test_drop_file() {
   [ -f "$TMP_ROOT/captain-words.txt" ] || printf 'Fixture: the captain approved discarding this work.\n' > "$TMP_ROOT/captain-words.txt"
@@ -55,8 +56,8 @@ git -C "$FIXTURE_ROOT" -c user.name='Firstmate Tests' -c user.email='tests@examp
 export FM_HERDR_LAB_STATE_DIR="$TMP_ROOT/herdr-lab-state"
 export CLAUDE_CONFIG_DIR="$TMP_ROOT/claude-config"
 mkdir -p "$CLAUDE_CONFIG_DIR"
-# Ambient path templates can otherwise bypass even an explicitly confined root.
-unset TREEHOUSE_ROOT TREEHOUSE_WORKTREE_PATH
+# fm_test_treehouse_init clears ambient templates; each project also carries
+# its sandbox configuration for panes without the controller environment.
 FAKEBIN="$TMP_ROOT/fakebin"
 HERDR_CALL_LOG="$TMP_ROOT/herdr-calls.log"
 TREEHOUSE_CALL_LOG="$TMP_ROOT/treehouse-calls.log"
@@ -318,13 +319,12 @@ HERDR_LAB_SESSION=$(PATH="$HERDR_ORIGINAL_PATH" \
   "$HERDR_LAB_HELPER" name fm-herdr-presentation-projection)
 export HERDR_SESSION="$HERDR_LAB_SESSION" HERDR_LAB_SESSION
 LAB_READY=0
-RECORDED_WORKTREES=""
 LOCK_CONTENTION_OWNER_PID=
 LOCK_REFUSE_HOLDER_PID=
 LOCK_WAIT_HOLDER_PID=
 CROSS_LOCK_PID=
 cleanup_all() {
-  local wt pid
+  local pid status=0
   for pid in "$LOCK_CONTENTION_OWNER_PID" "$LOCK_REFUSE_HOLDER_PID" "$LOCK_WAIT_HOLDER_PID" "$CROSS_LOCK_PID"; do
     [ -n "$pid" ] || continue
     kill "$pid" 2>/dev/null || true
@@ -334,23 +334,25 @@ cleanup_all() {
   LOCK_REFUSE_HOLDER_PID=
   LOCK_WAIT_HOLDER_PID=
   CROSS_LOCK_PID=
-  while IFS= read -r wt; do
-    [ -n "$wt" ] || continue
-    [ -d "$wt" ] || continue
-    "$REAL_TREEHOUSE" return --force "$wt" >/dev/null 2>&1 || true
-  done <<EOF
-$RECORDED_WORKTREES
-EOF
   if [ "$LAB_READY" -eq 1 ]; then
     PATH="$HERDR_ORIGINAL_PATH" \
-      "$HERDR_LAB_HELPER" teardown "$HERDR_LAB_SESSION" >/dev/null 2>&1 || true
+      "$HERDR_LAB_HELPER" teardown "$HERDR_LAB_SESSION" || status=$?
     LAB_READY=0
   fi
+  fm_test_treehouse_cleanup || [ "$status" != 0 ] || status=1
   # Spawn-owned Git-hook directories are intentionally read-only.
   chmod -R u+w "$TMP_ROOT" 2>/dev/null || true
   rm -rf "$TMP_ROOT"
+  return "$status"
 }
-trap cleanup_all EXIT
+on_exit() {
+  local status=$?
+  cleanup_all || status=$?
+  trap - EXIT
+  exit "$status"
+}
+trap on_exit EXIT
+fm_test_treehouse_init "$TMP_ROOT" || fail "could not isolate Treehouse"
 
 lab() {
   PATH="$HERDR_ORIGINAL_PATH" "$HERDR_LAB_HELPER" run "$HERDR_LAB_SESSION" "$@"
@@ -425,10 +427,9 @@ remember_meta_worktree() {  # <meta>
   wt=$(grep '^worktree=' "$1" | cut -d= -f2-)
   [ -n "$wt" ] || fail "metadata did not record a worktree"
   case "$wt" in
-    "$TMP_ROOT"/*) : ;;
+    "$FM_TEST_TREEHOUSE_ROOT"/.treehouse/*) : ;;
     *) fail "Treehouse allocated outside the disposable sandbox: $wt" ;;
   esac
-  RECORDED_WORKTREES="${RECORDED_WORKTREES}${wt}"$'\n'
   printf '%s' "$wt"
 }
 
@@ -437,7 +438,7 @@ make_project() {  # <dir>
   mkdir -p "$dir"
   git -C "$dir" init -q
   printf '# Herdr projection E2E fixture\n' > "$dir/README.md"
-  printf 'root = "%s"\n' "$TMP_ROOT" > "$dir/treehouse.toml"
+  fm_test_treehouse_project "$dir" || fail "could not configure isolated Treehouse"
   git -C "$dir" add README.md treehouse.toml
   git -C "$dir" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm initial
   git clone --quiet --bare "$dir" "$dir.origin.git"
@@ -464,9 +465,8 @@ if [ "${1:-}" = --sandbox-only ]; then
     "$TMP_ROOT"/*) : ;;
     *) fail "Treehouse allocated outside the disposable sandbox: $SANDBOX_WT" ;;
   esac
-  RECORDED_WORKTREES="${RECORDED_WORKTREES}${SANDBOX_WT}"$'\n'
   case "$SANDBOX_WT" in
-    "$TMP_ROOT"/.treehouse/*) : ;;
+    "$FM_TEST_TREEHOUSE_ROOT"/.treehouse/*) : ;;
     *) fail "allocator without controller environment escaped configured pool: $SANDBOX_WT" ;;
   esac
   HOME="$SANDBOX_FALLBACK_HOME" "$ROOT/bin/fm-claude-trust.sh" \
@@ -1725,5 +1725,5 @@ PATH="$HERDR_ORIGINAL_PATH" \
 LAB_READY=0
 pass "real Herdr lab validation completed on Herdr $HERDR_VERSION with the default-session tripwire intact"
 
-cleanup_all
+cleanup_all || fail "isolated Treehouse cleanup failed"
 trap - EXIT

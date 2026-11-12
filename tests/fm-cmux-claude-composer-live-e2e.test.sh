@@ -8,6 +8,8 @@ set -u
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=tests/treehouse-test-safety.sh
+. "$ROOT/tests/treehouse-test-safety.sh"
 TASK="fm-test-cmux-claude-composer-$$"
 LAB=
 SPAWNED=0
@@ -21,6 +23,7 @@ pass() { printf 'ok - %s\n' "$1"; }
 untimed_status() { sed -E 's/ \[at=[0-9]+\]//g' "$1" 2>/dev/null; }
 
 cleanup() {
+  local status=0
   [ "$SPAWNED" -eq 0 ] || {
     mkdir -p "$LAB/data/$TASK"
     : > "$LAB/data/$TASK/report.md"
@@ -29,9 +32,18 @@ cleanup() {
       printf '%s\n' 'resolved [key=probe-decision]: live guard cleanup' >> "$LAB/state/$TASK.status"
     fi
     FM_HOME="$LAB" "$ROOT/bin/fm-decision-hold.sh" complete "$TASK" --none >/dev/null 2>&1 || true
-    FM_HOME="$LAB" "$ROOT/bin/fm-teardown.sh" "$TASK" >/dev/null 2>&1 || true
+    FM_HOME="$LAB" "$ROOT/bin/fm-teardown.sh" "$TASK" || status=$?
   }
+  fm_test_treehouse_cleanup || [ "$status" != 0 ] || status=1
   [ -z "$LAB" ] || rm -rf -- "$LAB"
+  fm_test_cleanup
+  return "$status"
+}
+on_exit() {
+  local status=$?
+  cleanup || status=$?
+  trap - EXIT
+  exit "$status"
 }
 
 fm_live_gate opt-in FM_CMUX_CLAUDE_COMPOSER_LIVE claude cmux jq treehouse python3
@@ -39,7 +51,8 @@ fm_live_gate opt-in FM_CMUX_CLAUDE_COMPOSER_LIVE claude cmux jq treehouse python
 cmux ping >/dev/null 2>&1 || fail "FM_CMUX_CLAUDE_COMPOSER_LIVE=1 but the cmux socket is unavailable"
 
 LAB=$(mktemp -d "${TMPDIR:-/tmp}/fm-cmux-claude-composer.XXXXXX") || fail "could not create an isolated cmux Claude lab"
-trap cleanup EXIT
+trap on_exit EXIT
+fm_test_treehouse_init "$LAB" || fail "could not isolate Treehouse"
 mkdir -p "$LAB/config" "$LAB/data/$TASK" "$LAB/projects/comms" "$LAB/state"
 printf 'cmux\n' > "$LAB/config/backend"
 
@@ -47,7 +60,8 @@ git -C "$LAB/projects/comms" init -q -b main || fail "could not initialize the i
 git -C "$LAB/projects/comms" config user.email 'cmux-composer-test@example.invalid'
 git -C "$LAB/projects/comms" config user.name 'cmux composer test'
 printf 'cmux Claude composer probe\n' > "$LAB/projects/comms/README.md"
-git -C "$LAB/projects/comms" add README.md
+fm_test_treehouse_project "$LAB/projects/comms" || fail "could not configure isolated Treehouse"
+git -C "$LAB/projects/comms" add README.md treehouse.toml
 git -C "$LAB/projects/comms" commit -qm 'fixture: initialize cmux Claude composer probe'
 
 STATUS="$LAB/state/$TASK.status"
