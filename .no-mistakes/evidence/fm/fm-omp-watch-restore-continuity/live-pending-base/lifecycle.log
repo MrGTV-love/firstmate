@@ -1,0 +1,5 @@
+2026-11-12T18:23:07.828Z pid=39254 instance=1 event=generation-create generation=1 cause=factory-bind
+2026-11-12T18:23:07.828Z pid=39254 instance=1 event=generation-activate generation=1 cause=factory-bind
+2026-11-12T18:23:07.828Z pid=39254 instance=1 event=factory-bind generation=1
+2026-11-12T18:23:08.020Z pid=39254 instance=1 event=session_start generation=1 stopping=false
+2026-11-12T18:23:08.020Z pid=39254 instance=1 event=generation-activate generation=1 cause=session_start

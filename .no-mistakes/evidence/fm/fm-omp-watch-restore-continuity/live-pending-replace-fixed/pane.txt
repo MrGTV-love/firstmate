@@ -1,0 +1,50 @@
+
+                                                                                    ████████████
+                                                                                       ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                                                                       ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                                                                       ▒▒  ██                  █
+                                                                                           ██       v18.11.2
+
+                                                                Tip: Try starting your prompt with a ->, and writing a list (1. Do X, 2.
+                                                                                                 Do Y)
+
+ ✔ New session started
+
+
+ ⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+ and 4 more queued
+
+ Run bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.
+
+
+ ack
+
+❯
+ π · ⬢ m1 · 🗑 fmlive-src-pend-fixed · ⑂ main · ◫ 8.9%/200K ⟲
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

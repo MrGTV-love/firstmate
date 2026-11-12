@@ -1,0 +1,8 @@
+head=570d87d8280138d5b4142a8b1e1b829ea70d07b5
+OMP_API_BILLING=unset
+ok - .omp watch extension: controlled pending delivery preserves continuity and wake ownership
+ok - .omp watch extension: controlled rejected delivery preserves continuity and wake ownership
+ok - .omp watch extension: controlled replay delivery preserves continuity and wake ownership
+ok - .omp watch extension: controlled foreign-late delivery preserves continuity and wake ownership
+ok - .omp watch extension: controlled foreign-never delivery preserves continuity and wake ownership
+exit=0

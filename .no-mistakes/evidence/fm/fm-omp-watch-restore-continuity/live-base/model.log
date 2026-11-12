@@ -1,0 +1,16 @@
+{"t": 1794507472.601, "event": "request", "wakes_in_context": 0, "last": "Compress into one routing hint of at most 12 words: WHEN to use; WHEN NOT only if it prevents confusion. Retain recognizable trigger words. Do not restate the s"}
+{"t": 1794507472.602, "event": "request", "wakes_in_context": 0, "last": "Compress into one routing hint of at most 12 words: WHEN to use; WHEN NOT only if it prevents confusion. Retain recognizable trigger words. Do not restate the s"}
+{"t": 1794507472.601, "event": "request", "wakes_in_context": 0, "last": "Compress into one routing hint of at most 12 words: WHEN to use; WHEN NOT only if it prevents confusion. Retain recognizable trigger words. Do not restate the s"}
+{"t": 1794507472.602, "event": "request", "wakes_in_context": 0, "last": "Compress into one routing hint of at most 12 words: WHEN to use; WHEN NOT only if it prevents confusion. Retain recognizable trigger words. Do not restate the s"}
+{"t": 1794507480.987, "event": "request", "wakes_in_context": 1, "last": "\u2063FIRSTMATE_OP: v1 session-start: ================================================================================\nSESSION START - /Users/charlesabrooker/tmp/fm-"}
+{"t": 1794507492.717, "event": "response", "after_s": 20.1}
+{"t": 1794507492.717, "event": "response", "after_s": 20.1}
+{"t": 1794507492.721, "event": "request", "wakes_in_context": 0, "last": "Compress into one routing hint of at most 12 words: WHEN to use; WHEN NOT only if it prevents confusion. Retain recognizable trigger words. Do not restate the s"}
+{"t": 1794507492.723, "event": "request", "wakes_in_context": 0, "last": "Compress into one routing hint of at most 12 words: WHEN to use; WHEN NOT only if it prevents confusion. Retain recognizable trigger words. Do not restate the s"}
+{"t": 1794507492.746, "event": "response", "after_s": 20.1}
+{"t": 1794507492.746, "event": "response", "after_s": 20.1}
+{"t": 1794507492.749, "event": "request", "wakes_in_context": 0, "last": "Compress into one routing hint of at most 12 words: WHEN to use; WHEN NOT only if it prevents confusion. Retain recognizable trigger words. Do not restate the s"}
+{"t": 1794507492.75, "event": "request", "wakes_in_context": 0, "last": "Compress into one routing hint of at most 12 words: WHEN to use; WHEN NOT only if it prevents confusion. Retain recognizable trigger words. Do not restate the s"}
+{"t": 1794507501.136, "event": "response", "after_s": 20.1}
+{"t": 1794507501.18, "event": "request", "wakes_in_context": 1, "last": "<title-request>\nSession UI request, not from the user. Your main reply continues separately; NEVER start on the task here.\nName this session for a small card: a"}
+{"t": 1794507502.723, "event": "request", "wakes_in_context": 2, "last": "\u2063FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: memory-health: the non-fleet RSS alarm is uncalibrated (no baseline at /Users/charlesabrooker/tmp/fm-l"}

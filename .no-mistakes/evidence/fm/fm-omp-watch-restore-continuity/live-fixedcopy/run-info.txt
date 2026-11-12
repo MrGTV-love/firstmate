@@ -1,0 +1,4 @@
+label=fixedcopy src=/tmp/fmlive-src-fixedcopy FM_HOME=/Users/charlesabrooker/tmp/fm-lab.FVmxlp AUX=/tmp/fmlive-aux.grt32z OMP_API_BILLING=unset omp=omp/18.11.2
+src head=c81151c1b10aa2cc99e436928202c8fb5533baeb
+cd20cf83ebea1c461ea1fb69105dd9a03b202e3582b531f63b58924d23e8d48e  /tmp/fmlive-src-fixedcopy/.omp/extensions/fm-primary-omp-watch.ts
+initial watcher pid=65493

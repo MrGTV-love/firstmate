@@ -1,0 +1,3 @@
+export FM_HOME=/Users/charlesabrooker/tmp/fm-lab.FVmxlp
+export TMUX_TMPDIR=/tmp/fml.BNcwl8
+fm-lab-home: teardown: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M78E48V6WPVZCB3M81FKRCM2/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.FVmxlp && rm -rf /Users/charlesabrooker/tmp/fm-lab.FVmxlp

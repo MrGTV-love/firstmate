@@ -1,0 +1,50 @@
+
+                                                                                    ████████████
+                                                                                       ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                                                                       ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                                                                       ▒▒  ██                  █
+                                                                                           ██       v18.11.2
+
+                                                                                      Tip: Please use nerdfont 😭.
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.19.0 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+ ⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: memory-health: the non-fleet RSS alarm is uncalibrated (no baseline at /Users/charlesabrooker/tmp/fm-lab.D8rbCU/state/.memory-baseline.json);
+ admission is unaffected. Record healthy readings, then read fm-mem-guard.sh --help before running its baseline command in /Users/charlesabrooker/tmp/fm-lab.D8rbCU.
+ and 1 more queued
+
+ Run bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.
+
+
+ ack
+
+
+ ⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: watcher: FAILED - handling delivery confirmation was rejected (status=1 generation=94270.1794507402.eHC8WR watcherPid=7520)
+
+ Run bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.
+
+
+  ⎋ Working…
+
+❯
+ ⠴ 22s · ⬢ m1 · 🌳 eded895c05cf/01M78E48V6WPVZCB3M81FKRCM2 · ⑂ detached · ◫ 9.0%/200K ⟲
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

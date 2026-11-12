@@ -1,0 +1,21 @@
+2026-11-12T18:24:40.747Z pid=65296 instance=1 event=generation-create generation=1 cause=factory-bind
+2026-11-12T18:24:40.747Z pid=65296 instance=1 event=generation-activate generation=1 cause=factory-bind
+2026-11-12T18:24:40.748Z pid=65296 instance=1 event=factory-bind generation=1
+2026-11-12T18:24:40.935Z pid=65296 instance=1 event=session_start generation=1 stopping=false
+2026-11-12T18:24:40.935Z pid=65296 instance=1 event=generation-activate generation=1 cause=session_start
+2026-11-12T18:24:44.179Z pid=65296 instance=1 event=actionable-close generation=1 predecessor=66591
+2026-11-12T18:24:44.179Z pid=65296 instance=1 event=restore-start generation=1 predecessor=66591
+2026-11-12T18:24:45.704Z pid=65296 instance=1 event=wake-delivery-start generation=1 predecessor=66591
+2026-11-12T18:24:47.847Z pid=65296 instance=1 event=actionable-close generation=1 predecessor=73304
+2026-11-12T18:24:47.847Z pid=65296 instance=1 event=restore-start generation=1 predecessor=73304
+2026-11-12T18:24:48.903Z pid=65296 instance=1 event=wake-delivery-start generation=1 predecessor=73304
+2026-11-12T18:24:49.000Z pid=65296 instance=1 event=wake-delivery-settled generation=1 predecessor=73304
+2026-11-12T18:24:51.620Z pid=65296 instance=1 event=actionable-close generation=1 predecessor=79755
+2026-11-12T18:24:51.620Z pid=65296 instance=1 event=restore-start generation=1 predecessor=79755
+2026-11-12T18:24:53.956Z pid=65296 instance=1 event=wake-delivery-start generation=1 predecessor=79755
+2026-11-12T18:24:54.358Z pid=65296 instance=1 event=wake-delivery-settled generation=1 predecessor=79755
+2026-11-12T18:24:56.596Z pid=65296 instance=1 event=actionable-close generation=1 predecessor=86738
+2026-11-12T18:24:56.596Z pid=65296 instance=1 event=restore-start generation=1 predecessor=86738
+2026-11-12T18:24:58.885Z pid=65296 instance=1 event=wake-delivery-start generation=1 predecessor=86738
+2026-11-12T18:25:00.140Z pid=65296 instance=1 event=wake-delivery-settled generation=1 predecessor=86738
+2026-11-12T18:25:16.178Z pid=65296 instance=1 event=wake-delivery-settled generation=1 predecessor=66591

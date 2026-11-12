@@ -1,0 +1,50 @@
+
+                                                                                    ████████████
+                                                                                       ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                                                                       ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                                                                       ▒▒  ██                  █
+                                                                                           ██       v18.11.2
+
+                                                                   Tip: Psst, omp has a natural habitat 🐦 tern (https://scl.so/tern)
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.19.0 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+ ⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+
+ Run bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.
+
+
+ ack
+
+
+ ⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: watcher: FAILED - handling delivery confirmation was rejected (status=3 generation=66634.1794507883.wgkELD watcherPid=96064)
+
+ Run bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.
+
+
+ ack
+
+
+ ⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+ and 4 more queued
+
+ Run bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.
+
+
+  ⎋ Working…
+
+❯
+ ⠏ 10s · ⬢ m1 · 🗑 fmlive-src-pend-fixed · ⑂ main · ◫ 10.0%/200K ⟲
+
+
+
+
+
+
+
+
+

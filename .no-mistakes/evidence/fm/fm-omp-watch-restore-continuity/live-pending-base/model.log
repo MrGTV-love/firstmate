@@ -1,0 +1,46 @@
+{"t": 1794507787.907, "event": "request", "wakes_in_context": 0, "last": "Compress into one routing hint of at most 12 words: WHEN to use; WHEN NOT only if it prevents confusion. Retain recognizable trigger words. Do not restate the s"}
+{"t": 1794507787.908, "event": "request", "wakes_in_context": 0, "last": "Compress into one routing hint of at most 12 words: WHEN to use; WHEN NOT only if it prevents confusion. Retain recognizable trigger words. Do not restate the s"}
+{"t": 1794507787.907, "event": "request", "wakes_in_context": 0, "last": "Compress into one routing hint of at most 12 words: WHEN to use; WHEN NOT only if it prevents confusion. Retain recognizable trigger words. Do not restate the s"}
+{"t": 1794507787.907, "event": "request", "wakes_in_context": 0, "last": "Compress into one routing hint of at most 12 words: WHEN to use; WHEN NOT only if it prevents confusion. Retain recognizable trigger words. Do not restate the s"}
+{"t": 1794507796.091, "event": "request", "wakes_in_context": 1, "last": "\u2063FIRSTMATE_OP: v1 session-start: ================================================================================\nSESSION START - /Users/charlesabrooker/tmp/fm-"}
+{"t": 1794507808.025, "event": "response", "after_s": 20.1}
+{"t": 1794507808.035, "event": "request", "wakes_in_context": 0, "last": "Compress into one routing hint of at most 12 words: WHEN to use; WHEN NOT only if it prevents confusion. Retain recognizable trigger words. Do not restate the s"}
+{"t": 1794507808.049, "event": "response", "after_s": 20.1}
+{"t": 1794507808.056, "event": "response", "after_s": 20.1}
+{"t": 1794507808.056, "event": "response", "after_s": 20.1}
+{"t": 1794507808.057, "event": "request", "wakes_in_context": 0, "last": "Compress into one routing hint of at most 12 words: WHEN to use; WHEN NOT only if it prevents confusion. Retain recognizable trigger words. Do not restate the s"}
+{"t": 1794507808.063, "event": "request", "wakes_in_context": 0, "last": "Compress into one routing hint of at most 12 words: WHEN to use; WHEN NOT only if it prevents confusion. Retain recognizable trigger words. Do not restate the s"}
+{"t": 1794507808.068, "event": "request", "wakes_in_context": 0, "last": "Compress into one routing hint of at most 12 words: WHEN to use; WHEN NOT only if it prevents confusion. Retain recognizable trigger words. Do not restate the s"}
+{"t": 1794507816.233, "event": "response", "after_s": 20.1}
+{"t": 1794507816.27, "event": "request", "wakes_in_context": 1, "last": "<title-request>\nSession UI request, not from the user. Your main reply continues separately; NEVER start on the task here.\nName this session for a small card: a"}
+{"t": 1794507816.631, "event": "request", "wakes_in_context": 1, "last": "\u2063FIRSTMATE_OP: v1 turn-end-guard: TURN WOULD END BLIND - supervision is off. The watcher cycle is missing, failed, or unhealthy. Follow the harness recovery ins"}
+{"t": 1794507828.177, "event": "response", "after_s": 20.1}
+{"t": 1794507828.181, "event": "request", "wakes_in_context": 0, "last": "Compress into one routing hint of at most 12 words: WHEN to use; WHEN NOT only if it prevents confusion. Retain recognizable trigger words. Do not restate the s"}
+{"t": 1794507828.192, "event": "response", "after_s": 20.1}
+{"t": 1794507828.192, "event": "response", "after_s": 20.1}
+{"t": 1794507828.194, "event": "request", "wakes_in_context": 0, "last": "Compress into one routing hint of at most 12 words: WHEN to use; WHEN NOT only if it prevents confusion. Retain recognizable trigger words. Do not restate the s"}
+{"t": 1794507828.196, "event": "request", "wakes_in_context": 0, "last": "Compress into one routing hint of at most 12 words: WHEN to use; WHEN NOT only if it prevents confusion. Retain recognizable trigger words. Do not restate the s"}
+{"t": 1794507828.212, "event": "response", "after_s": 20.1}
+{"t": 1794507828.214, "event": "request", "wakes_in_context": 0, "last": "Compress into one routing hint of at most 12 words: WHEN to use; WHEN NOT only if it prevents confusion. Retain recognizable trigger words. Do not restate the s"}
+{"t": 1794507831.262, "event": "request", "wakes_in_context": 1, "last": "<user>\n\u2063FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)\n\nRun bin/fm-wake-"}
+{"t": 1794507836.41, "event": "response", "after_s": 20.1}
+{"t": 1794507836.761, "event": "response", "after_s": 20.1}
+{"t": 1794507837.433, "event": "request", "wakes_in_context": 2, "last": "\u2063FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)\nand 4 more queued\n\nRun b"}
+{"t": 1794507848.315, "event": "response", "after_s": 20.1}
+{"t": 1794507848.32, "event": "request", "wakes_in_context": 0, "last": "Compress into one routing hint of at most 12 words: WHEN to use; WHEN NOT only if it prevents confusion. Retain recognizable trigger words. Do not restate the s"}
+{"t": 1794507848.327, "event": "response", "after_s": 20.1}
+{"t": 1794507848.327, "event": "response", "after_s": 20.1}
+{"t": 1794507848.329, "event": "request", "wakes_in_context": 0, "last": "Compress into one routing hint of at most 12 words: WHEN to use; WHEN NOT only if it prevents confusion. Retain recognizable trigger words. Do not restate the s"}
+{"t": 1794507848.331, "event": "request", "wakes_in_context": 0, "last": "Compress into one routing hint of at most 12 words: WHEN to use; WHEN NOT only if it prevents confusion. Retain recognizable trigger words. Do not restate the s"}
+{"t": 1794507848.362, "event": "response", "after_s": 20.1}
+{"t": 1794507848.365, "event": "request", "wakes_in_context": 0, "last": "Compress into one routing hint of at most 12 words: WHEN to use; WHEN NOT only if it prevents confusion. Retain recognizable trigger words. Do not restate the s"}
+{"t": 1794507851.412, "event": "response", "after_s": 20.1}
+{"t": 1794507857.567, "event": "response", "after_s": 20.1}
+{"t": 1794507868.46, "event": "response", "after_s": 20.1}
+{"t": 1794507868.464, "event": "request", "wakes_in_context": 0, "last": "Compress into one routing hint of at most 12 words: WHEN to use; WHEN NOT only if it prevents confusion. Retain recognizable trigger words. Do not restate the s"}
+{"t": 1794507868.468, "event": "response", "after_s": 20.1}
+{"t": 1794507868.474, "event": "request", "wakes_in_context": 0, "last": "Compress into one routing hint of at most 12 words: WHEN to use; WHEN NOT only if it prevents confusion. Retain recognizable trigger words. Do not restate the s"}
+{"t": 1794507868.475, "event": "response", "after_s": 20.1}
+{"t": 1794507868.477, "event": "request", "wakes_in_context": 0, "last": "Compress into one routing hint of at most 12 words: WHEN to use; WHEN NOT only if it prevents confusion. Retain recognizable trigger words. Do not restate the s"}
+{"t": 1794507868.514, "event": "response", "after_s": 20.1}
+{"t": 1794507868.517, "event": "request", "wakes_in_context": 0, "last": "Compress into one routing hint of at most 12 words: WHEN to use; WHEN NOT only if it prevents confusion. Retain recognizable trigger words. Do not restate the s"}

@@ -1,0 +1,4 @@
+2026-11-12T18:27:32.951Z send-accepted-by-omp held=30000ms "⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: open-loop-ledger (1 overdue assigned obligations; read state/o"
+2026-11-12T18:28:02.953Z send-promise-settled "⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: open-loop-ledger (1 overdue assigned obligations; read state/o"
+2026-11-12T18:28:04.002Z send-accepted-by-omp held=30000ms "⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: open-loop-ledger (1 overdue assigned obligations; read state/o"
+2026-11-12T18:28:34.004Z send-promise-settled "⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: open-loop-ledger (1 overdue assigned obligations; read state/o"

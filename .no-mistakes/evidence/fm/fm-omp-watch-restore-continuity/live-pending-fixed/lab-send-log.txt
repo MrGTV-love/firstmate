@@ -1,0 +1,5 @@
+2026-11-12T18:24:46.174Z send-accepted-by-omp held=30000ms "⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: open-loop-ledger (1 overdue assigned obligations; read state/o"
+2026-11-12T18:25:00.140Z send-accepted-by-omp held=30000ms "⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: watcher: FAILED - handling delivery confirmation was rejected (status"
+2026-11-12T18:25:16.177Z send-promise-settled "⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: open-loop-ledger (1 overdue assigned obligations; read state/o"
+2026-11-12T18:25:28.248Z send-accepted-by-omp held=30000ms "⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: open-loop-ledger (1 overdue assigned obligations; read state/o"
+2026-11-12T18:25:30.142Z send-promise-settled "⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: watcher: FAILED - handling delivery confirmation was rejected (status"

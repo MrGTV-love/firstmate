@@ -1,0 +1,15 @@
+tests from head=570d87d8280138d5b4142a8b1e1b829ea70d07b5; extension from 405a361c24101a36c0a2a6dc28ccc04978675920
+OMP_API_BILLING=unset
+ok - .omp watch extension: controlled pending delivery preserves continuity and wake ownership
+ok - .omp watch extension: controlled rejected delivery preserves continuity and wake ownership
+ok - .omp watch extension: controlled replay delivery preserves continuity and wake ownership
+not ok - omp pending delivery (foreign-late): file:///private/tmp/fmbase.yBVkjY/src/[eval1]:8
+  if (!predicate()) throw new Error(failure);
+                          ^
+
+Error: replacement close has no extension-started successor while an earlier generation's claim is pending
+    at until (file:///private/tmp/fmbase.yBVkjY/src/[eval1]:8:27)
+    at async file:///private/tmp/fmbase.yBVkjY/src/[eval1]:39:5
+
+Node.js v26.11.1: expected exit 0, got 1
+exit=1

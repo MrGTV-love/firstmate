@@ -1,0 +1,4 @@
+label=base src=/tmp/fmlive-src-base FM_HOME=/Users/charlesabrooker/tmp/fm-lab.INyWJK AUX=/tmp/fmlive-aux.364j9h OMP_API_BILLING=unset omp=omp/18.11.2
+src head=b476d1755e754c6768440ebaecbd713ee644503e
+31306ade68a733df943b284f038aaf9409179228e4b72f34cda1e6be2dae0c88  /tmp/fmlive-src-base/.omp/extensions/fm-primary-omp-watch.ts
+initial watcher pid=6308

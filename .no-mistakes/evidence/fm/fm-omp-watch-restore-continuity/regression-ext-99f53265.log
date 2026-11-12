@@ -1,0 +1,12 @@
+tests from head=570d87d8280138d5b4142a8b1e1b829ea70d07b5; extension from 99f53265372f437a457c087ff132b653d4c92eb9
+OMP_API_BILLING=unset
+not ok - omp pending delivery (pending): file:///private/tmp/fmbase.hPVN4f/src/[eval1]:8
+  if (!predicate()) throw new Error(failure);
+                          ^
+
+Error: second actionable close has no extension-started successor while first delivery is pending
+    at until (file:///private/tmp/fmbase.hPVN4f/src/[eval1]:8:27)
+    at async file:///private/tmp/fmbase.hPVN4f/src/[eval1]:47:5
+
+Node.js v26.11.1: expected exit 0, got 1
+exit=1

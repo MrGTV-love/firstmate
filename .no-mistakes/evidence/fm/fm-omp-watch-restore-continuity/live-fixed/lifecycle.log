@@ -1,0 +1,27 @@
+2026-11-12T18:16:39.018Z pid=86552 instance=1 event=generation-create generation=1 cause=factory-bind
+2026-11-12T18:16:39.018Z pid=86552 instance=1 event=generation-activate generation=1 cause=factory-bind
+2026-11-12T18:16:39.018Z pid=86552 instance=1 event=factory-bind generation=1
+2026-11-12T18:16:39.508Z pid=86552 instance=1 event=session_start generation=1 stopping=false
+2026-11-12T18:16:39.508Z pid=86552 instance=1 event=generation-activate generation=1 cause=session_start
+2026-11-12T18:16:46.001Z pid=86552 instance=1 event=actionable-close generation=1 predecessor=90611
+2026-11-12T18:16:46.002Z pid=86552 instance=1 event=restore-start generation=1 predecessor=90611
+2026-11-12T18:16:47.401Z pid=86552 instance=1 event=wake-delivery-start generation=1 predecessor=90611
+2026-11-12T18:16:47.650Z pid=86552 instance=1 event=wake-delivery-settled generation=1 predecessor=90611
+2026-11-12T18:16:48.249Z pid=86552 instance=1 event=actionable-close generation=1 predecessor=1936
+2026-11-12T18:16:48.250Z pid=86552 instance=1 event=restore-start generation=1 predecessor=1936
+2026-11-12T18:16:49.489Z pid=86552 instance=1 event=wake-delivery-start generation=1 predecessor=1936
+2026-11-12T18:16:50.284Z pid=86552 instance=1 event=actionable-close generation=1 predecessor=7325
+2026-11-12T18:16:50.285Z pid=86552 instance=1 event=restore-start generation=1 predecessor=7325
+2026-11-12T18:16:50.290Z pid=86552 instance=1 event=wake-delivery-settled generation=1 predecessor=1936
+2026-11-12T18:16:51.416Z pid=86552 instance=1 event=actionable-close generation=1 predecessor=12920
+2026-11-12T18:16:51.416Z pid=86552 instance=1 event=restore-skipped generation=1 predecessor=12920 reason=restoring
+2026-11-12T18:16:52.920Z pid=86552 instance=1 event=wake-delivery-start generation=1 predecessor=7325
+2026-11-12T18:16:53.108Z pid=86552 instance=1 event=restore-start generation=1 predecessor=12920
+2026-11-12T18:16:53.108Z pid=86552 instance=1 event=restore-unchanged generation=1 predecessor=12920 reason=owned-child
+2026-11-12T18:16:53.108Z pid=86552 instance=1 event=wake-delivery-settled generation=1 predecessor=7325
+2026-11-12T18:16:53.108Z pid=86552 instance=1 event=wake-delivery-start generation=1 predecessor=12920
+2026-11-12T18:16:53.745Z pid=86552 instance=1 event=wake-delivery-settled generation=1 predecessor=12920
+2026-11-12T18:16:54.500Z pid=86552 instance=1 event=actionable-close generation=1 predecessor=15608
+2026-11-12T18:16:54.501Z pid=86552 instance=1 event=restore-start generation=1 predecessor=15608
+2026-11-12T18:16:55.684Z pid=86552 instance=1 event=wake-delivery-start generation=1 predecessor=15608
+2026-11-12T18:16:55.831Z pid=86552 instance=1 event=wake-delivery-settled generation=1 predecessor=15608

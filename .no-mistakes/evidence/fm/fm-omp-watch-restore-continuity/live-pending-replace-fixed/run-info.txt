@@ -1,0 +1,4 @@
+label=pending-replace-fixed src=/tmp/fmlive-src-pend-fixed FM_HOME=/Users/charlesabrooker/tmp/fm-lab.JH3VPA AUX=/tmp/fmlive-aux.7wMkuk OMP_API_BILLING=unset omp=omp/18.11.2
+src head=65dd6b9483995021ecc7ffc09569676b119157be
+memory-health check deferred in lab
+initial watcher pid=59846
