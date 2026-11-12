@@ -483,7 +483,8 @@ bind
 out=$(poll long-text)
 assert_eq "$(closed_count "$out")" 1 "S1 close"
 line=$(answer_line long-call)
-[ "$(printf '%s' "$line" | wc -m | tr -d ' ')" -le 512 ] || fail "S1 answer exceeded intake limit"
+# wc -m counts bytes without a UTF-8 locale; pin one so the count is characters.
+[ "$(printf '%s' "$line" | LC_ALL=C.UTF-8 wc -m | tr -d ' ')" -le 512 ] || fail "S1 answer exceeded intake limit"
 assert_contains "$line" 'Keep exact words.' "S1 the answer starts with the reply"
 assert_eq "$(find "$FM_HOME/state" -name 'full-*' | wc -l | tr -d ' ')" 0 "S1 a raw-text copy of the reply was kept"
 assert_not_contains "$(label_line long-call)" 'full text' "S1 the label points at a copy"

@@ -192,6 +192,10 @@ class Replay:
                 root = fields.get('ts')
                 messages = [m for m in here
                             if m.get('ts') == root or m.get('thread_ts') == root]
+                # Like Slack, a thread read can start after a timestamp: later messages only.
+                oldest = fields.get('oldest')
+                if oldest:
+                    messages = [m for m in messages if ts_key(m.get('ts')) > ts_key(oldest)]
             if not fields.get('include_all_metadata'):
                 messages = [{k: v for k, v in m.items() if k != 'metadata'} for m in messages]
             start = int(fields.get('cursor') or 0)
