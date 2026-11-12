@@ -185,6 +185,9 @@ type SessionGeneration = {
   queueReadFailures: number;
   restorePendingWaits: number;
   queueStuckReported: boolean;
+  // Tokens of pending records held by an earlier generation's delivery claim
+  // that this generation reprocesses once that claim settles.
+  claimWaits: Set<string>;
   // A verified successor's failure close that arrived while restoration was
   // still in flight; its bounded retry runs once restoration settles instead
   // of being skipped by the single-flight guard.
@@ -632,6 +635,7 @@ function createGeneration(): SessionGeneration {
     queueReadFailures: 0,
     restorePendingWaits: 0,
     queueStuckReported: false,
+    claimWaits: new Set(),
     deferredClose: null,
   };
 }
@@ -1465,6 +1469,22 @@ export default function (pi: ExtensionAPI) {
     owner.cleanupTimer = timer;
   }
 
+  function awaitForeignClaim(owner: SessionGeneration, pending: PendingActionableClose, claim: ActionableDeliveryClaim): void {
+    if (owner.claimWaits.has(pending.token)) return;
+    owner.claimWaits.add(pending.token);
+    lifecycle("restore-claim-wait", { generation: owner.id, predecessor: pending.predecessorArmPid });
+    void claim.settlement.then((settlement) => {
+      owner.claimWaits.delete(pending.token);
+      if (!generationIsLive(owner)) return;
+      if (settlement === "delivered") {
+        pending.delivered = true;
+      } else if (replacementCoordinator.deliveries.get(pending.token) === claim) {
+        replacementCoordinator.deliveries.delete(pending.token);
+      }
+      void processPendingActionables(owner);
+    });
+  }
+
   async function processPendingActionables(owner: SessionGeneration, predecessorArmPid?: string): Promise<void> {
     if (owner.pendingActionables.length === 0) return;
     if (!generationIsLive(owner) || owner.restoring) {
@@ -1483,26 +1503,19 @@ export default function (pi: ExtensionAPI) {
             surfaceCleanupFailure(owner, error);
           }
         }
+        // An earlier generation's claim is never taken over or awaited here:
+        // its record waits for that claim to settle while later closes restore.
+        for (const item of owner.pendingActionables) {
+          const claim = replacementCoordinator.deliveries.get(item.token);
+          if (claim && claim.owner !== owner) awaitForeignClaim(owner, item, claim);
+        }
         // A record omp has accepted but not consumed is neither redelivered
         // nor finished here: consumption finishes it, replacement replays it.
         const pending = owner.pendingActionables.find(
           (item) => !item.delivered && !owner.unconsumedWakes.has(item.token) && !owner.heldWakes.has(item.token)
-            && replacementCoordinator.deliveries.get(item.token)?.owner !== owner,
+            && !replacementCoordinator.deliveries.has(item.token),
         );
         if (!pending) break;
-        const existingClaim = replacementCoordinator.deliveries.get(pending.token);
-        if (existingClaim && existingClaim.owner !== owner) {
-          lifecycle("restore-claim-wait", { generation: owner.id, predecessor: pending.predecessorArmPid });
-          const settlement = await existingClaim.settlement;
-          if (!generationIsLive(owner)) return;
-          if (settlement === "delivered") {
-            pending.delivered = true;
-            continue;
-          }
-          if (replacementCoordinator.deliveries.get(pending.token) === existingClaim) {
-            replacementCoordinator.deliveries.delete(pending.token);
-          }
-        }
         let settleClaim: (settlement: "delivered" | "failed") => void = () => {};
         const settlement = new Promise<"delivered" | "failed">((resolveSettlement) => {
           settleClaim = resolveSettlement;

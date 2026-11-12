@@ -87,7 +87,7 @@ For a lifecycle gap, inspect `state/extensions/pi-primary-watch/lifecycle.log` o
 Pi's `successor-missing` diagnostic calls for reloading the extension in a live session; omp's `self-heal-failed` identifies a recovery failure for later repair.
 omp's `home-claimed`, `arm-owner-stale`, and `bound-expired` with `waited-on=arm-output-drain` record ownership transitions.
 Its `actionable-close` and `restore-start` correlate close and restoration by generation and predecessor arm PID; `restore-skipped`, `restore-unchanged`, and `restore-failed` name alternate branches without recording wake text.
-`restore-claim-wait` distinguishes an earlier generation's delivery claim from `wake-delivery-start` without a corresponding `wake-delivery-settled`.
+`restore-claim-wait` names a record an earlier generation's delivery claim still holds; omp reprocesses that record once the claim settles, and later closes restore successors meanwhile.
 The shared [lifecycle helper](../.pi/extensions/lib/fm-watch-lifecycle.ts) owns the record format, expiry fields, rotation, and best-effort evidence policy. Expiry waits recheck a monotonic deadline before settling; early timer callbacks wait only the remaining duration. The `actual` field records measured monotonic elapsed milliseconds, not a value clamped to the bound, so wall-clock changes do not distort deadline evidence.
 These logs are evidence, not proof of a healthy arm or permission to use a retired runtime.
 

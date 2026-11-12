@@ -1945,9 +1945,10 @@ EOF
 
 # A send may settle only after the model turn. Close the successor while that
 # promise is still pending: continuity must advance without a repair tool call.
+# The foreign rows replace the session while that send still holds its claim.
 test_watch_extension_restores_while_delivery_pending() {
   local kind repo home out status
-  for kind in pending rejected replay; do
+  for kind in pending rejected replay foreign-late foreign-never; do
     repo="$TMP_ROOT/watch-pending-$kind/repo"; home="$TMP_ROOT/watch-pending-$kind/home"
     install_omp_extension_fixture "$repo"
     mkdir -p "$home/state" "$home/config"
@@ -2001,6 +2002,18 @@ try {
   if (kind === "rejected") {
     await until(() => failures.some((m) => m.includes("controlled delivery refusal")), "rejected delivery did not surface its failure");
     await until(() => sends.length === 2, "rejected wake was lost rather than retried");
+  } else if (kind.startsWith("foreign")) {
+    await until(() => arms().length === 2, "first actionable close has no extension-started successor");
+    await handlers.get("session_shutdown")({}, {});
+    await handlers.get("session_start")({}, ctx);
+    await until(() => arms().length === 3, "replacement session never armed");
+    writeFileSync(`${home}/close-3`, "");
+    await until(() => arms().length === 4, "replacement close has no extension-started successor while an earlier generation's claim is pending");
+    await until(() => sends.length === 2, "replacement close wake was not delivered");
+    await sleep(300);
+    if (!unsettled || sends.length !== 2) throw new Error("earlier generation's claimed wake was taken over before its claim settled");
+    const observed = arms();
+    if (observed[3][1] !== observed[2][0]) throw new Error(`replacement successor did not follow its predecessor: ${JSON.stringify(observed)}`);
   } else {
     writeFileSync(`${home}/close-2`, "");
     await until(() => arms().length === 3, "second actionable close has no extension-started successor while first delivery is pending");
@@ -2019,6 +2032,34 @@ try {
     await handlers.get("message_start")({ message: { role: "user", content: sends[1] } }, ctx);
     await sleep(1300);
     if (sends.length !== 2 || existsSync(handoff)) throw new Error("replacement replay duplicated or retained consumed work");
+  } else if (kind === "foreign-late") {
+    const handoff = `${home}/state/extensions/omp-primary-watch/session-replacement-actionable.json`;
+    await handlers.get("message_start")({ message: { role: "user", content: sends[1] } }, ctx);
+    settle();
+    await until(() => sends.length === 3, "replacement did not replay the held wake once the earlier claim settled");
+    writeFileSync(`${home}/drained`, "");
+    await handlers.get("message_start")({ message: { role: "user", content: sends[2] } }, ctx);
+    await sleep(1300);
+    if (sends.length !== 3 || arms().length !== 4 || existsSync(handoff)) {
+      throw new Error(`late claim settlement duplicated, lost or retained work: ${JSON.stringify({ sends: sends.length, arms: arms().length, handoff: existsSync(handoff) })}`);
+    }
+  } else if (kind === "foreign-never") {
+    const handoff = `${home}/state/extensions/omp-primary-watch/session-replacement-actionable.json`;
+    await handlers.get("message_start")({ message: { role: "user", content: sends[1] } }, ctx);
+    writeFileSync(`${home}/close-4`, "");
+    await until(() => arms().length === 5, "later close has no extension-started successor while an earlier claim never settles");
+    const observed = arms();
+    if (observed[4][1] !== observed[3][0]) throw new Error(`later successor did not follow its predecessor: ${JSON.stringify(observed)}`);
+    await until(() => sends.length === 3, "later close wake was not delivered");
+    writeFileSync(`${home}/drained`, "");
+    await handlers.get("message_start")({ message: { role: "user", content: sends[2] } }, ctx);
+    await handlers.get("session_shutdown")({}, {});
+    const held = () => existsSync(handoff) && JSON.parse(readFileSync(handoff, "utf8")).pending.some((item) => item.predecessorArmPid === observed[0][0]);
+    if (!held()) throw new Error("claimed wake was not kept durable for replay");
+    await handlers.get("session_start")({}, ctx);
+    await until(() => arms().length === 6, "second replacement session never armed");
+    await sleep(500);
+    if (sends.length !== 3 || !held()) throw new Error(`never-settled claim was taken over or dropped: ${sends.length}`);
   } else {
     writeFileSync(`${home}/drained`, "");
     if (settle) settle();
