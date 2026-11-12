@@ -1674,6 +1674,7 @@ export default function (pi: ExtensionAPI) {
   }> {
     lifecycle("restore-start", { generation: owner.id, predecessor: predecessorArmPid });
     let failure = "";
+    let failureReason = "retries-exhausted";
     for (let attempt = 0; attempt <= retryLimit; attempt += 1) {
       if (!generationIsLive(owner)) {
         lifecycle("restore-skipped", { generation: owner.id, predecessor: predecessorArmPid, reason: "generation-not-live" });
@@ -1704,12 +1705,15 @@ export default function (pi: ExtensionAPI) {
         failure = /(?:read-only|no live session)/.test(replacement.message)
           ? `watcher: FAILED - omp extension cannot restore continuity because this session no longer owns the lock\n${replacement.message}`
           : `watcher: FAILED - omp extension could not start the successor watcher cycle\n${replacement.message}`;
-        if (/(?:read-only|no live session)/.test(replacement.message)) break;
+        if (/(?:read-only|no live session)/.test(replacement.message)) {
+          failureReason = "lock-lost";
+          break;
+        }
       }
       if (attempt === retryLimit) break;
       await waitForRetry(attempt + 1);
     }
-    lifecycle("restore-failed", { generation: owner.id, predecessor: predecessorArmPid, reason: "retries-exhausted" });
+    lifecycle("restore-failed", { generation: owner.id, predecessor: predecessorArmPid, reason: failureReason });
     return { failure: `${failure}\nwatcher: FAILED - omp extension could not restore watcher continuity after ${retryLimit} retries` };
   }
 

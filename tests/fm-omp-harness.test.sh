@@ -1943,6 +1943,73 @@ EOF
   pass ".omp turn-end guard: digest delivery, seatbelt block, one compelled continuation, flagged stop stands down"
 }
 
+test_watch_extension_distinguishes_lock_loss_from_retry_exhaustion() {
+  local kind repo home out status
+  for kind in other missing exhausted; do
+    repo="$TMP_ROOT/watch-restore-reason-$kind/repo"; home="$TMP_ROOT/watch-restore-reason-$kind/home"
+    install_omp_extension_fixture "$repo"
+    mkdir -p "$home/state" "$home/config"
+    cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" != --handling-delivered ] || exit 0
+printf '%s\n' "$$" >> "$FM_HOME/arms"
+n=$(wc -l < "$FM_HOME/arms" | tr -d ' ')
+if [ "$n" -gt 1 ]; then
+  printf 'watcher: FAILED - controlled successor startup refusal\n'
+  exit 1
+fi
+printf 'watcher: started pid=%s\n' "$$"
+while [ ! -e "$FM_HOME/close" ]; do sleep 0.1; done
+printf 'check: restoration branch fixture\n'
+SH
+    chmod +x "$repo/bin/fm-watch-arm.sh"
+    out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" \
+      FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
+      RESTORE_CASE="$kind" EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { writeFileSync, readFileSync, existsSync, unlinkSync } from "node:fs";
+const home = process.env.FM_HOME, kind = process.env.RESTORE_CASE;
+const handlers = new Map();
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const until = async (predicate, failure) => {
+  for (let i = 0; i < 200 && !predicate(); i++) await sleep(25);
+  if (!predicate()) throw new Error(failure);
+};
+const arms = () => existsSync(`${home}/arms`) ? readFileSync(`${home}/arms`, "utf8").trim().split("\n").length : 0;
+const failures = () => {
+  const file = `${home}/state/extensions/omp-primary-watch/lifecycle.log`;
+  return existsSync(file) ? readFileSync(file, "utf8").split("\n").filter((line) => line.includes("event=restore-failed ")) : [];
+};
+const pi = { on(e, h) { handlers.set(e, h); }, registerCommand() {}, registerTool() {}, sendUserMessage() {} };
+writeFileSync(`${home}/state/.lock`, `${process.pid}\n`);
+(await import(pathToFileURL(process.env.EXT).href)).default(pi);
+try {
+  await handlers.get("session_start")({}, { isIdle: () => true });
+  await until(() => arms() === 1, "initial watcher never started");
+  if (kind === "other") writeFileSync(`${home}/state/.lock`, "1\n");
+  if (kind === "missing") unlinkSync(`${home}/state/.lock`);
+  writeFileSync(`${home}/close`, "");
+  await until(() => failures().length > 0, "restoration failure never reached the lifecycle log");
+  const reason = kind === "exhausted" ? "retries-exhausted" : "lock-lost";
+  const rows = failures();
+  if (rows.length !== 1 || !rows[0].endsWith(`reason=${reason}`)) {
+    throw new Error(`${kind}: expected one restore-failed reason=${reason}, got ${JSON.stringify(rows)}`);
+  }
+  const expectedArms = kind === "exhausted" ? 3 : 1;
+  if (arms() !== expectedArms) throw new Error(`${kind}: expected ${expectedArms} arm launches, got ${arms()}`);
+  console.log(`${kind}: restore-failed reason=${reason}; arm launches=${arms()}`);
+} finally {
+  await handlers.get("session_shutdown")({}, {});
+}
+process.exit(0);
+EOF
+)
+    status=$?
+    expect_code 0 "$status" "omp restoration failure reason ($kind): $out"
+    pass ".omp watch extension: $kind restoration has its own failure reason and arm count"
+  done
+}
+
 # A send may settle only after the model turn. Close the successor while that
 # promise is still pending: continuity must advance without a repair tool call.
 # The foreign rows replace the session while that send still holds its claim.
@@ -5096,6 +5163,7 @@ test_watch_lifecycle_deadline_diagnostics() {
 test_spawn_fixed_family
 test_watch_lifecycle_deadline_diagnostics
 
+test_watch_extension_distinguishes_lock_loss_from_retry_exhaustion
 test_watch_extension_restores_while_delivery_pending
 test_detection_anchored_name_and_marker_precedence
 test_lock_identity_and_liveness_classification
