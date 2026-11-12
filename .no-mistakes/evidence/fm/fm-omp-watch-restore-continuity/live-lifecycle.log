@@ -1,0 +1,26 @@
+2026-11-12T23:13:15.406Z pid=2673 instance=1 event=generation-create generation=1 cause=factory-bind
+2026-11-12T23:13:15.406Z pid=2673 instance=1 event=generation-activate generation=1 cause=factory-bind
+2026-11-12T23:13:15.406Z pid=2673 instance=1 event=factory-bind generation=1
+2026-11-12T23:13:15.954Z pid=2673 instance=1 event=session_start generation=1 stopping=false
+2026-11-12T23:13:15.955Z pid=2673 instance=1 event=generation-activate generation=1 cause=session_start
+2026-11-12T23:15:05.822Z pid=2673 instance=1 event=actionable-close generation=1 predecessor=63924
+2026-11-12T23:15:05.823Z pid=2673 instance=1 event=restore-start generation=1 predecessor=63924
+2026-11-12T23:15:06.978Z pid=2673 instance=1 event=wake-delivery-start generation=1 predecessor=63924
+2026-11-12T23:15:07.281Z pid=2673 instance=1 event=wake-delivery-settled generation=1 predecessor=63924
+2026-11-12T23:15:10.802Z pid=2673 instance=1 event=actionable-close generation=1 predecessor=69489
+2026-11-12T23:15:10.802Z pid=2673 instance=1 event=restore-start generation=1 predecessor=69489
+2026-11-12T23:15:12.228Z pid=2673 instance=1 event=wake-delivery-start generation=1 predecessor=69489
+2026-11-12T23:15:12.432Z pid=2673 instance=1 event=wake-delivery-settled generation=1 predecessor=69489
+2026-11-12T23:18:01.887Z pid=2673 instance=1 event=actionable-close generation=1 predecessor=74273
+2026-11-12T23:18:01.888Z pid=2673 instance=1 event=restore-start generation=1 predecessor=74273
+2026-11-12T23:18:04.249Z pid=2673 instance=1 event=wake-delivery-start generation=1 predecessor=74273
+2026-11-12T23:18:04.717Z pid=2673 instance=1 event=wake-delivery-settled generation=1 predecessor=74273
+2026-11-12T23:18:22.661Z pid=2673 instance=1 event=actionable-close generation=1 predecessor=37586
+2026-11-12T23:18:22.661Z pid=2673 instance=1 event=restore-start generation=1 predecessor=37586
+2026-11-12T23:18:24.187Z pid=2673 instance=1 event=wake-delivery-start generation=1 predecessor=37586
+2026-11-12T23:18:24.441Z pid=2673 instance=1 event=wake-delivery-settled generation=1 predecessor=37586
+2026-11-12T23:19:51.008Z pid=2673 instance=1 event=actionable-close generation=1 predecessor=68064
+2026-11-12T23:19:51.008Z pid=2673 instance=1 event=restore-start generation=1 predecessor=68064
+2026-11-12T23:19:51.008Z pid=2673 instance=1 event=restore-failed generation=1 predecessor=68064 reason=lock-lost
+2026-11-12T23:19:51.008Z pid=2673 instance=1 event=wake-delivery-start generation=1 predecessor=68064
+2026-11-12T23:19:51.108Z pid=2673 instance=1 event=wake-delivery-settled generation=1 predecessor=68064

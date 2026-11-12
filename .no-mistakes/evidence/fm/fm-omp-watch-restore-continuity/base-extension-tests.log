@@ -1,0 +1,24 @@
+tests from head=00c19d7eeebde38f5343ea5896648c434fcddd2a; extension from base=5abdbbbb163f6b44c6871582d16ca7dec4113df8
+OMP_API_BILLING=<unset>
+== FM_TEST_ONLY=test_watch_extension_restores_while_delivery_pending
+not ok - omp pending delivery (pending): file:///private/tmp/nm-omp-base.HoL2p1/repo/[eval1]:8
+  if (!predicate()) throw new Error(failure);
+                          ^
+
+Error: second actionable close has no extension-started successor while first delivery is pending
+    at until (file:///private/tmp/nm-omp-base.HoL2p1/repo/[eval1]:8:27)
+    at async file:///private/tmp/nm-omp-base.HoL2p1/repo/[eval1]:47:5
+
+Node.js v26.11.1: expected exit 0, got 1
+exit=1
+== FM_TEST_ONLY=test_watch_extension_distinguishes_lock_loss_from_retry_exhaustion
+not ok - omp restoration failure reason (other): file:///private/tmp/nm-omp-base.HoL2p1/repo/[eval1]:8
+  if (!predicate()) throw new Error(failure);
+                          ^
+
+Error: restoration failure never reached the lifecycle log
+    at until (file:///private/tmp/nm-omp-base.HoL2p1/repo/[eval1]:8:27)
+    at async file:///private/tmp/nm-omp-base.HoL2p1/repo/[eval1]:24:3
+
+Node.js v26.11.1: expected exit 0, got 1
+exit=1

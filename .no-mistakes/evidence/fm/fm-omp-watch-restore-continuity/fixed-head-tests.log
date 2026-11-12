@@ -1,0 +1,14 @@
+head=00c19d7eeebde38f5343ea5896648c434fcddd2a
+OMP_API_BILLING=<unset>
+== FM_TEST_ONLY=test_watch_extension_restores_while_delivery_pending
+ok - .omp watch extension: controlled pending delivery preserves continuity and wake ownership
+ok - .omp watch extension: controlled rejected delivery preserves continuity and wake ownership
+ok - .omp watch extension: controlled replay delivery preserves continuity and wake ownership
+ok - .omp watch extension: controlled foreign-late delivery preserves continuity and wake ownership
+ok - .omp watch extension: controlled foreign-never delivery preserves continuity and wake ownership
+exit=
+== FM_TEST_ONLY=test_watch_extension_distinguishes_lock_loss_from_retry_exhaustion
+ok - .omp watch extension: other restoration has its own failure reason and arm count
+ok - .omp watch extension: missing restoration has its own failure reason and arm count
+ok - .omp watch extension: exhausted restoration has its own failure reason and arm count
+exit=

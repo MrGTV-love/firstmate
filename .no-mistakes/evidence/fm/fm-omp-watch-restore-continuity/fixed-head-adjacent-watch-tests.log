@@ -1,0 +1,37 @@
+head=00c19d7eeebde38f5343ea5896648c434fcddd2a
+== test_watch_extension_arms_and_delivers
+ok - .omp watch extension: fm_watch_arm_omp arms once, repeats as a no-op, and delivers an actionable close as one follow-up
+exit=0
+== test_watch_extension_reads_durable_payloads
+ok - .omp watch extension: decision, merge and multiline payloads come from the queue; unqueued closes inject nothing
+exit=0
+== test_watch_extension_migrates_legacy_handoffs
+ok - .omp watch extension: legacy operational handoffs load and watcher records collapse into a queue-read mark
+exit=0
+== test_watch_extension_delivers_a_split_host_close_whole
+ok - .omp watch extension: a host close split across stream chunks reaches main as one whole follow-up
+exit=0
+== test_watch_extension_queue_read_delivery
+Unknown test case: test_watch_extension_queue_read_delivery (not defined by fm-omp-harness.test.sh)
+exit=2
+== test_watch_extension_heals_a_generation_stopped_without_a_successor
+Unknown test case: test_watch_extension_heals_a_generation_stopped_without_a_successor (not defined by fm-omp-harness.test.sh)
+exit=2
+== test_watch_extension_is_single_instance_per_home
+Unknown test case: test_watch_extension_is_single_instance_per_home (not defined by fm-omp-harness.test.sh)
+exit=2
+== test_watch_extension_repairs_a_stale_arm_owner
+Unknown test case: test_watch_extension_repairs_a_stale_arm_owner (not defined by fm-omp-harness.test.sh)
+exit=2
+== test_watch_extension_rebound_primary_keeps_the_home
+Unknown test case: test_watch_extension_rebound_primary_keeps_the_home (not defined by fm-omp-harness.test.sh)
+exit=2
+== test_watch_extension_heals_a_failed_session_bind
+Unknown test case: test_watch_extension_heals_a_failed_session_bind (not defined by fm-omp-harness.test.sh)
+exit=2
+== test_watch_extension_judges_readiness_by_liveness
+Unknown test case: test_watch_extension_judges_readiness_by_liveness (not defined by fm-omp-harness.test.sh)
+exit=2
+== test_watch_extension_repairs_after_handoff_publication_failure
+Unknown test case: test_watch_extension_repairs_after_handoff_publication_failure (not defined by fm-omp-harness.test.sh)
+exit=2
