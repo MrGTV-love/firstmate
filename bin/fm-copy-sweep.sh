@@ -170,6 +170,12 @@
 # So does an allowed plan whose document reports ignored_payload_disposition=
 # archive_then_retain_tree: the driver archives a tree's unique ignored files and
 # then keeps the tree, so the sweep neither preserves them nor executes the driver.
+# A copy that data/supersedence-records.tsv names at its tip is planned and
+# executed through the driver's own --pr route instead, and its plan allows only on
+# that route's dry-run answer (exit 3, state BLOCKED, predicates_failed exactly
+# ["cleanup_not_executed"]); bin/fm-teardown-nested-lib.sh's header owns the record
+# format and the merged-PR conditions, and a record that fails one, or any other
+# answer, holds the copy as above with the route and PR named.
 # The timeout is deliberate (FM_COPY_SWEEP_PLAN_TIMEOUT seconds, 120 by default):
 # the owner's rule holds a copy whose plan does not answer. The plan runs as a
 # process group of its own and the timeout kills that whole group, so neither the
@@ -353,6 +359,7 @@ MAX_LINE=1600
 . "$SCRIPT_DIR/fm-line-cap-lib.sh"
 # shellcheck source=bin/fm-check-lib.sh
 . "$SCRIPT_DIR/fm-check-lib.sh"
+TEARDOWN_ROUTE_DATA=$DATA_DIR
 
 usage() {
   sed -n '2,/^set -u$/{/^set -u$/d;s/^# \{0,1\}//;p;}' "$0"
@@ -1363,7 +1370,7 @@ plan_verdict_allows() {  # <driver output>
 # reason first. It is display text only and never grants or refuses anything.
 driver_reason_prefix() {  # <driver output>
   local reason
-  reason=$(printf '%s' "$1" | jq -s -r 'if length == 1 and (.[0] | type == "object" and (.reason | type == "string") and .reason != "") then .[0].reason else empty end' 2>/dev/null) || return 0
+  reason=$(printf '%s' "$1" | jq -s -r 'if length == 1 and (.[0] | type == "object") then (.[0] | (if (.reason | type) == "string" and .reason != "" then .reason elif (.cleanup_recovery_reason | type) == "string" and .cleanup_recovery_reason != "" then .cleanup_recovery_reason else empty end)) else empty end' 2>/dev/null) || return 0
   [ -z "$reason" ] || printf '%s: ' "$(fm_refuse_text "${reason:0:600}")"
 }
 
@@ -1404,7 +1411,7 @@ driver_plan_allows() {  # <clone> <copy>
   set -m
   (
     local r=0
-    teardown_run_closeout "$1" "$2" plan "$dir/verdict" || r=$?
+    TEARDOWN_CLOSEOUT_ROUTE_FILE=$dir/route teardown_run_closeout "$1" "$2" plan "$dir/verdict" || r=$?
     printf '%s' "$TEARDOWN_CLOSEOUT_OUT" > "$dir/out"
     printf '%s' "$r" > "$dir/rc"
   ) </dev/null &
@@ -1423,7 +1430,13 @@ driver_plan_allows() {  # <clone> <copy>
   rc=$(cat "$dir/rc" 2>/dev/null) || rc=1
   TEARDOWN_CLOSEOUT_OUT=$(cat "$dir/out" 2>/dev/null) || TEARDOWN_CLOSEOUT_OUT=
   TEARDOWN_CLOSEOUT_STDOUT=$(cat "$dir/verdict" 2>/dev/null) || TEARDOWN_CLOSEOUT_STDOUT=
-  rm -f "$dir/out" "$dir/rc" "$dir/verdict"
+  TEARDOWN_CLOSEOUT_ROUTE=
+  TEARDOWN_CLOSEOUT_ROUTE_PR=
+  TEARDOWN_CLOSEOUT_ROUTE_WHY=
+  if [ -f "$dir/route" ]; then
+    { IFS= read -r TEARDOWN_CLOSEOUT_ROUTE; IFS= read -r TEARDOWN_CLOSEOUT_ROUTE_PR; IFS= read -r TEARDOWN_CLOSEOUT_ROUTE_WHY; } < "$dir/route" || true
+  fi
+  rm -f "$dir/out" "$dir/rc" "$dir/verdict" "$dir/route"
   rmdir "$dir" 2>/dev/null
   if [ "$timed_out" = 1 ]; then
     PLAN_WHY="its closeout driver did not answer within ${limit}s"
@@ -1431,7 +1444,11 @@ driver_plan_allows() {  # <clone> <copy>
   fi
   PLAN_WHY=$(printf '%s' "$TEARDOWN_CLOSEOUT_OUT" | tr '\n\t' '  ')
   PLAN_WHY="$(driver_reason_prefix "$TEARDOWN_CLOSEOUT_STDOUT")${PLAN_WHY:0:600}"
-  if [ "$rc" != 0 ] || ! plan_verdict_allows "$TEARDOWN_CLOSEOUT_STDOUT"; then
+  if [ "$TEARDOWN_CLOSEOUT_ROUTE" = invalid ]; then
+    PLAN_WHY="its supersedence record cannot be used (the closeout driver was not asked): $TEARDOWN_CLOSEOUT_ROUTE_WHY"
+    return 1
+  fi
+  if [ "$rc" != 0 ] || { [ "$TEARDOWN_CLOSEOUT_ROUTE" != pr ] && ! plan_verdict_allows "$TEARDOWN_CLOSEOUT_STDOUT"; }; then
     PLAN_WHY="its closeout driver would not release it (exit ${rc:-1}): ${PLAN_WHY:-no output}"
     return 1
   fi
@@ -1465,6 +1482,10 @@ release_still_proven() {  # <clone> <copy> <pool> <container> <HEAD> <lock-sha25
 # reason cleanup_lease_conflict or cleanup_skipped_live_or_unknown.
 execute_refusal_is_temporary() {  # <exit>
   [ "$1" = 3 ] || return 1
+  if [ "$TEARDOWN_CLOSEOUT_ROUTE" = pr ]; then
+    printf '%s' "$TEARDOWN_CLOSEOUT_STDOUT" | jq -s -e 'length == 1 and (.[0] | type == "object" and .state == "BLOCKED" and (.predicates_failed | index("cleanup_gate")) != null and (.cleanup_recovery_reason == "cleanup_lease_conflict" or .cleanup_recovery_reason == "cleanup_skipped_live_or_unknown"))' >/dev/null 2>&1
+    return
+  fi
   printf '%s' "$TEARDOWN_CLOSEOUT_STDOUT" | jq -s -e 'length == 1 and (.[0] | type == "object" and .allowed == false and (.reason == "cleanup_lease_conflict" or .reason == "cleanup_skipped_live_or_unknown"))' >/dev/null 2>&1
 }
 
@@ -1643,6 +1664,15 @@ teardown_driver_release() {  # <clone> <copy> <release-id> <pool> <container> <H
   teardown_run_closeout "$clone" "$copy" || rc=$?
   if [ "$rc" != 0 ]; then
     words="$(driver_reason_prefix "$TEARDOWN_CLOSEOUT_STDOUT")$(fm_refuse_text "${TEARDOWN_CLOSEOUT_OUT:0:600}")"
+    if [ "$TEARDOWN_CLOSEOUT_ROUTE" = invalid ] && copy_still_holds "$copy" "$identity" "$7"; then
+      # The record stopped holding after the plan, so the driver was never asked:
+      # nothing was released, and the receipt written for the execute goes again.
+      retry_after_preserve "$copy" "$identity" "$7" "$3"
+      if rm -f -- "$(retained_receipt "$copy")"; then
+        echo "$shown was not released: its supersedence record cannot be used (the closeout driver was not asked): $TEARDOWN_CLOSEOUT_ROUTE_WHY; $RETRY_PRESERVE; the next sweep run plans it again." >&2
+        return 2
+      fi
+    fi
     if execute_refusal_is_temporary "$rc" && copy_still_holds "$copy" "$identity" "$7"; then
       retry_after_preserve "$copy" "$identity" "$7" "$3"
       if rm -f -- "$(retained_receipt "$copy")"; then

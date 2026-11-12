@@ -66,7 +66,54 @@
 # the final project-lock wait, so the driver never runs while the lock is held,
 # except when teardown keeps project custody through the return.
 #
-# Requires bin/fm-task-copy-lib.sh, bin/fm-lock-lib.sh and bin/fm-refuse-lib.sh first,
+# Supersedence route. Vernant's no-PR lane cannot release the rebased or squashed
+# twin of a merged PR, or a copy whose tip rode into one; only the driver's own
+# --pr lane can, and only when an owner attests the copy. The carrier is
+# $TEARDOWN_ROUTE_DATA/supersedence-records.tsv in the home that runs the script
+# (bin/fm-teardown.sh and bin/fm-copy-sweep.sh set it to their data directory):
+# one line per copy of four tab-separated fields - the copy's absolute path, its
+# 40-hex tip, the merged PR number (a decimal integer) and the absolute path of a
+# Vernant supersedence profile. Blank lines and lines starting with # are ignored.
+# A copy no line names is called exactly as above. For a copy a line names,
+# teardown_closeout_route uses the route only when all of these hold, read afresh
+# at every call (the sweep's plan and execute, teardown's execute): one record
+# binds the copy's full live HEAD (a line for another tip of the path is history,
+# two for this tip with different PRs or profiles conflict, and a line with other
+# than four fields refuses); the PR field is a decimal integer; the profile is an
+# absolute, regular, non-symlink, readable JSON file whose pr is the record's PR
+# and whose superseded_tip_sha is the record's tip; and gh, naming the repository
+# from the clone's origin URL (GitHub only), shows that PR MERGED with a merge
+# commit that the clone has and that is an ancestor of origin/<landing branch>,
+# read with git and no fetch; and the clone's primary checkout is not on that
+# PR's head branch (forge headRefName), where the driver's DONE-state finish would
+# switch it to the base branch even on a plan. The landing branch is the task's
+# base_branch= (TEARDOWN_ROUTE_BASE) or else the clone's default branch. A forge read that
+# fails, times out (FM_TEARDOWN_FORGE_TIMEOUT seconds, 60 by default) or cannot be
+# parsed is unknown, never merged. A record that names the copy and fails any of
+# these keeps the copy with no driver call and the failed condition named.
+# The route's call is closeout_pr.py --cleanup-worktree <copy> [--execute-cleanup]
+# --pr <PR> --supersedence-profile <profile> --no-evidence-files, run from the
+# slot with the same interpreter and no other option. Its answer has no top-level
+# "allowed", so teardown_closeout_route_answer reads the --pr lane's own shape: a
+# plan allows only on exit 3 with state BLOCKED, predicates_failed exactly
+# ["cleanup_not_executed"], cleanup_requested true and worktree_removed false; an
+# execute releases only on exit 0 with state DONE or DONE_WITH_SUPERSEDENCE, no
+# failed predicate and worktree_removed true, and the removal is proved as for
+# the plain call. Any other exit, shape, silence or parse failure keeps the copy
+# with the driver's words and the route and PR named. The driver stays the only
+# authority and is not widened. The lane's side effects are the driver's own
+# (closeout_pr.py at Vernant origin/main 1cf0e36): git fetch --prune origin in
+# the clone, for a plan too; the evidence files, which
+# --no-evidence-files suppresses; the closeout-state marker, which the driver
+# writes on any call, a plan too, whose state reaches DONE (its --verify-only mode
+# refuses --cleanup-worktree and still writes the marker, so no quieter plan
+# exists); a repair of the clone's primary checkout, which never runs because the
+# route is refused while that checkout is on the PR's head branch
+# (--repair-primary-base is never passed); and deletion of the PR's local branch
+# after an executed cleanup.
+#
+# Requires bin/fm-task-copy-lib.sh, bin/fm-lock-lib.sh, bin/fm-refuse-lib.sh,
+# bin/fm-pr-lib.sh and bin/fm-timeout-lib.sh first,
 # and runs inside bin/fm-teardown.sh, whose globals (PROJ, ID, DATA, META,
 # STATE, WT, TASK_TMP, FORCE, KIND, LEGACY_RECORD_GIVEN, TEARDOWN_NESTED_COPIES,
 # TEARDOWN_RETURN_SLOT, TEARDOWN_PEER_SLOT, TEARDOWN_HELD_SLOT) and functions
@@ -74,7 +121,8 @@
 # task_process_identity_matches, task_record_process_signal) it uses.
 # bin/fm-copy-sweep.sh also calls teardown_preserve_ignored, with DATA set to its
 # data directory and ID to a per-release id, for a copy it proved on its own, and
-# teardown_run_closeout for such a copy that is locked.
+# teardown_run_closeout (with TEARDOWN_ROUTE_DATA set to that directory) for such
+# a copy that is locked.
 
 # One entry per proved copy.
 TEARDOWN_FOREIGN_COPIES=()
@@ -1237,23 +1285,281 @@ teardown_foreign_procs_retire() {
   done
 }
 
+# The supersedence route's owner. A record in $TEARDOWN_ROUTE_DATA/
+# supersedence-records.tsv binds a copy's exact tip to a merged PR and a Vernant
+# profile; the header owns the format and the conditions. teardown_closeout_route
+# decides, for one call of the driver, between the plain call (no record names
+# the copy), the --pr route (a record names it and every condition holds) and a
+# non-use (a record names it and one condition fails, so the driver is not
+# called and the reason names that condition).
+TEARDOWN_ROUTE_DATA=
+TEARDOWN_ROUTE_BASE=
+TEARDOWN_ROUTE_TIP=
+TEARDOWN_CLOSEOUT_ROUTE=
+TEARDOWN_CLOSEOUT_ROUTE_PR=
+TEARDOWN_CLOSEOUT_ROUTE_PROFILE=
+TEARDOWN_CLOSEOUT_ROUTE_WHY=
+
+# 0: one record binds <copy> at its live tip (PR and profile set), 1: no record
+# names <copy> (the plain call), 2: a record names it and cannot be used (WHY set).
+# Records for another tip of the same path are history and are ignored while one
+# binds the live tip; two that bind it to different PRs or profiles conflict.
+teardown_route_record() {  # <copy>
+  local copy=$1 file=${TEARDOWN_ROUTE_DATA:+$TEARDOWN_ROUTE_DATA/supersedence-records.tsv}
+  local line rest first stale='' pr='' profile='' count
+  local -a fields named=()
+  TEARDOWN_CLOSEOUT_ROUTE_PR=
+  TEARDOWN_CLOSEOUT_ROUTE_PROFILE=
+  TEARDOWN_ROUTE_TIP=
+  [ -n "$file" ] && [ -f "$file" ] && [ -r "$file" ] || return 1
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in '' | '#'*) continue ;; esac
+    [[ $line =~ ^[[:space:]]*$ ]] && continue
+    first=${line%%$'\t'*}
+    [ "$first" = "$copy" ] && named+=("$line")
+  done < "$file"
+  [ "${#named[@]}" -gt 0 ] || return 1
+  TEARDOWN_ROUTE_TIP=$(git -C "$copy" rev-parse --verify --quiet 'HEAD^{commit}' 2>/dev/null) || TEARDOWN_ROUTE_TIP=
+  if [[ ! $TEARDOWN_ROUTE_TIP =~ ^[0-9a-f]{40}$ ]]; then
+    TEARDOWN_CLOSEOUT_ROUTE_WHY="the live tip of the copy cannot be read"
+    return 2
+  fi
+  for line in "${named[@]}"; do
+    fields=()
+    rest=$line
+    while :; do
+      case "$rest" in
+        *$'\t'*) fields+=("${rest%%$'\t'*}"); rest=${rest#*$'\t'} ;;
+        *) fields+=("$rest"); break ;;
+      esac
+    done
+    count=${#fields[@]}
+    if [ "$count" != 4 ]; then
+      TEARDOWN_CLOSEOUT_ROUTE_WHY="a record naming the copy has $count tab-separated fields, not four"
+      return 2
+    fi
+    if [ "${fields[1]}" != "$TEARDOWN_ROUTE_TIP" ]; then
+      [ -n "$stale" ] || stale=${fields[1]}
+      continue
+    fi
+    if [ -z "$pr$profile" ]; then
+      pr=${fields[2]}
+      profile=${fields[3]}
+    elif [ "$pr" != "${fields[2]}" ] || [ "$profile" != "${fields[3]}" ]; then
+      TEARDOWN_CLOSEOUT_ROUTE_WHY="two records bind this copy at its tip to different PRs or profiles"
+      return 2
+    fi
+  done
+  if [ -z "$pr$profile" ]; then
+    TEARDOWN_CLOSEOUT_ROUTE_WHY="the record names tip ${stale:-?} but the copy is at $TEARDOWN_ROUTE_TIP"
+    return 2
+  fi
+  if [[ ! $pr =~ ^[1-9][0-9]{0,8}$ ]]; then
+    TEARDOWN_CLOSEOUT_ROUTE_WHY="the record's PR field '$pr' is not a decimal integer"
+    return 2
+  fi
+  TEARDOWN_CLOSEOUT_ROUTE_PR=$pr
+  TEARDOWN_CLOSEOUT_ROUTE_PROFILE=$profile
+}
+
+# True when <profile> is an absolute, regular, non-symlink, readable JSON file
+# whose pr is <pr> and whose superseded_tip_sha is <tip>. WHY names what failed.
+teardown_route_profile_ok() {  # <profile> <pr> <tip>
+  local profile=$1 pr=$2 tip=$3 got
+  if [ "${profile#/}" = "$profile" ]; then
+    TEARDOWN_CLOSEOUT_ROUTE_WHY="the profile path '$profile' is not absolute"
+  elif [ -L "$profile" ] || [ ! -f "$profile" ]; then
+    TEARDOWN_CLOSEOUT_ROUTE_WHY="the profile $profile is not a regular file (a symlink or a missing path does not qualify)"
+  elif [ ! -r "$profile" ] || ! jq -e 'type == "object"' "$profile" >/dev/null 2>&1; then
+    TEARDOWN_CLOSEOUT_ROUTE_WHY="the profile $profile cannot be read as a JSON object"
+  elif ! got=$(jq -r 'if (.pr | type) == "number" then (.pr | tostring) else "none" end' "$profile" 2>/dev/null) || [ "$got" != "$pr" ]; then
+    TEARDOWN_CLOSEOUT_ROUTE_WHY="the profile $profile names PR ${got:-none}, not PR $pr"
+  elif ! got=$(jq -r 'if (.superseded_tip_sha | type) == "string" then .superseded_tip_sha else "none" end' "$profile" 2>/dev/null) || [ "$got" != "$tip" ]; then
+    TEARDOWN_CLOSEOUT_ROUTE_WHY="the profile $profile binds superseded_tip_sha ${got:-none}, not the copy's tip $tip"
+  else
+    return 0
+  fi
+  return 1
+}
+
+# True when the forge shows PR <pr> MERGED with a merge commit that the clone has
+# and that is an ancestor of origin/<landing branch>, read with git and no fetch.
+# The landing branch is the task's base_branch= (TEARDOWN_ROUTE_BASE) or the
+# clone's default branch. False too while the clone's primary checkout is on the
+# PR's head branch. The forge is read with gh and the repository named from the
+# clone's origin URL; a read that fails, times out or cannot be parsed is
+# unknown, never merged.
+teardown_route_pr_landed() {  # <slot> <pr>
+  local slot=$1 pr=$2 url path owner repo out limit rc=0 forge_state merge head current branch ref
+  # fm_pr_url_parse writes these globals; keep them out of the calling script.
+  local FM_PR_PROVIDER FM_PR_URL FM_PR_HOST FM_PR_PATH FM_PR_OWNER FM_PR_REPO FM_PR_NUMBER
+  url=$(git -C "$slot" config --get-all remote.origin.url 2>/dev/null) || url=
+  case "$url" in
+    https://github.com/*) path=${url#https://github.com/} ;;
+    ssh://git@github.com/*) path=${url#ssh://git@github.com/} ;;
+    git@github.com:*) path=${url#git@github.com:} ;;
+    *) path= ;;
+  esac
+  path=${path%/}
+  path=${path%.git}
+  owner=${path%%/*}
+  repo=${path#*/}
+  if [ -z "$path" ] || [ "$owner" = "$path" ] || [[ $repo == */* ]] \
+    || ! fm_pr_url_parse "https://github.com/$owner/$repo/pull/$pr"; then
+    TEARDOWN_CLOSEOUT_ROUTE_WHY="the clone's origin URL does not name a GitHub repository, so PR $pr cannot be read on the forge"
+    return 1
+  fi
+  limit=${FM_TEARDOWN_FORGE_TIMEOUT:-60}
+  [[ $limit =~ ^[1-9][0-9]{0,3}$ ]] || limit=60
+  if ! command -v gh >/dev/null 2>&1; then
+    TEARDOWN_CLOSEOUT_ROUTE_WHY="gh is not available, so PR $pr cannot be read on the forge (unknown, not merged)"
+    return 1
+  fi
+  out=$(fm_run_timed "$limit" gh pr view "$pr" --repo "$FM_PR_OWNER/$FM_PR_REPO" --json state,mergeCommit,headRefName \
+    -q '[.state, (.mergeCommit.oid // ""), .headRefName] | join("\t")' 2>/dev/null </dev/null) || rc=$?
+  if [ "$rc" != 0 ]; then
+    if fm_timed_out "$rc"; then
+      TEARDOWN_CLOSEOUT_ROUTE_WHY="the forge read of PR $pr timed out after ${limit}s (unknown, not merged)"
+    else
+      TEARDOWN_CLOSEOUT_ROUTE_WHY="the forge read of PR $pr failed (exit $rc; unknown, not merged)"
+    fi
+    return 1
+  fi
+  if [[ ! $out =~ ^(MERGED|OPEN|CLOSED)$'\t'([0-9a-f]*)$'\t'([^[:space:]]+)$ ]]; then
+    TEARDOWN_CLOSEOUT_ROUTE_WHY="the forge answer for PR $pr cannot be parsed (unknown, not merged)"
+    return 1
+  fi
+  forge_state=${BASH_REMATCH[1]}
+  merge=${BASH_REMATCH[2]}
+  head=${BASH_REMATCH[3]}
+  if [ "$forge_state" != MERGED ]; then
+    TEARDOWN_CLOSEOUT_ROUTE_WHY="the forge shows PR $pr as $forge_state, not MERGED"
+    return 1
+  fi
+  if ! fm_pr_head_valid "$merge"; then
+    TEARDOWN_CLOSEOUT_ROUTE_WHY="the forge shows PR $pr MERGED but reports no merge commit"
+    return 1
+  fi
+  if ! current=$(git -C "$slot" worktree list --porcelain 2>/dev/null); then
+    TEARDOWN_CLOSEOUT_ROUTE_WHY="the clone's primary checkout cannot be read, so the driver might switch it off PR $pr's head branch"
+    return 1
+  fi
+  current=$(printf '%s\n' "$current" | awk 'NF == 0 { exit } $1 == "branch" { sub(/^refs\/heads\//, "", $2); print $2 }')
+  if [ "$current" = "$head" ]; then
+    TEARDOWN_CLOSEOUT_ROUTE_WHY="the clone's primary checkout is on PR $pr's head branch $head, which the driver would switch to the base branch even on a plan"
+    return 1
+  fi
+  branch=${TEARDOWN_ROUTE_BASE:-}
+  [ -n "$branch" ] || branch=$(fm_task_copy_default_branch "$slot") || branch=
+  ref=refs/remotes/origin/$branch
+  if [ -z "$branch" ] || ! git check-ref-format "$ref" 2>/dev/null \
+    || ! git -C "$slot" rev-parse --verify --quiet "$ref^{commit}" >/dev/null 2>&1; then
+    TEARDOWN_CLOSEOUT_ROUTE_WHY="the landing branch ${branch:-?} has no origin/${branch:-?} in the clone, so the merge commit of PR $pr cannot be placed on it"
+    return 1
+  fi
+  if ! git -C "$slot" cat-file -e "$merge^{commit}" 2>/dev/null; then
+    TEARDOWN_CLOSEOUT_ROUTE_WHY="the merge commit $merge of PR $pr is not in the clone (not landed)"
+    return 1
+  fi
+  rc=0
+  git -C "$slot" merge-base --is-ancestor "$merge" "$ref" >/dev/null 2>&1 || rc=$?
+  if [ "$rc" != 0 ]; then
+    TEARDOWN_CLOSEOUT_ROUTE_WHY="the merge commit $merge of PR $pr is not on origin/$branch (not landed)"
+    [ "$rc" = 1 ] || TEARDOWN_CLOSEOUT_ROUTE_WHY="the merge commit $merge of PR $pr could not be placed on origin/$branch (unknown, not landed)"
+    return 1
+  fi
+}
+
+# Sets TEARDOWN_CLOSEOUT_ROUTE for <copy>: empty (the plain call), pr (the route,
+# with PR and PROFILE) or invalid (return 1, with WHY). It reads the live tip and
+# the forge each time it runs, so the plan and the execute each prove the record.
+teardown_closeout_route() {  # <slot> <copy>
+  local rc=0
+  TEARDOWN_CLOSEOUT_ROUTE=
+  TEARDOWN_CLOSEOUT_ROUTE_WHY=
+  teardown_route_record "$2" || rc=$?
+  [ "$rc" != 1 ] || return 0
+  if [ "$rc" = 0 ] && teardown_route_profile_ok "$TEARDOWN_CLOSEOUT_ROUTE_PROFILE" "$TEARDOWN_CLOSEOUT_ROUTE_PR" "$TEARDOWN_ROUTE_TIP" \
+    && teardown_route_pr_landed "$1" "$TEARDOWN_CLOSEOUT_ROUTE_PR"; then
+    TEARDOWN_CLOSEOUT_ROUTE='pr'
+    return 0
+  fi
+  TEARDOWN_CLOSEOUT_ROUTE=invalid
+  return 1
+}
+
+# A caller that bounds the call from outside (the sweep's plan) names a file in
+# TEARDOWN_CLOSEOUT_ROUTE_FILE to learn the route and its reason, even when the
+# bound kills the call before it returns.
+teardown_closeout_route_publish() {
+  [ -n "${TEARDOWN_CLOSEOUT_ROUTE_FILE:-}" ] || return 0
+  printf '%s\n%s\n%s\n' "$TEARDOWN_CLOSEOUT_ROUTE" "$TEARDOWN_CLOSEOUT_ROUTE_PR" \
+    "$(printf '%s' "$TEARDOWN_CLOSEOUT_ROUTE_WHY" | tr '\n\t' '  ')" > "$TEARDOWN_CLOSEOUT_ROUTE_FILE" 2>/dev/null || true
+}
+
+# The one reader of the route's answer, in the shape the driver's --pr lane
+# prints (its compact envelope, with no top-level "allowed"). A plan allows only
+# on exit 3 with state BLOCKED, predicates_failed exactly ["cleanup_not_executed"],
+# cleanup_requested true and worktree_removed false; an execute only on exit 0
+# with state DONE or DONE_WITH_SUPERSEDENCE, no failed predicate and
+# worktree_removed true. Any other exit, shape, silence or parse failure, and any
+# answer that shows the driver keeping a tree for its unique ignored files, does
+# not allow. WHY names what the answer lacked.
+teardown_closeout_route_answer() {  # <plan|execute> <driver-exit>
+  local stage=$1 rc=$2 want
+  case "$TEARDOWN_CLOSEOUT_STDOUT$TEARDOWN_CLOSEOUT_OUT" in
+    *cleanup_ignored_payload_archived_tree_retained* | *archive_then_retain_tree*)
+      TEARDOWN_CLOSEOUT_ROUTE_WHY="the driver keeps a tree with unique ignored files after archiving them and never removes it automatically"
+      return 1
+      ;;
+  esac
+  if [ "$stage" = plan ]; then
+    want=3
+    if [ "$rc" = "$want" ] && printf '%s' "$TEARDOWN_CLOSEOUT_STDOUT" | jq -s -e 'length == 1 and (.[0] | type == "object" and .state == "BLOCKED" and .predicates_failed == ["cleanup_not_executed"] and .cleanup_requested == true and .worktree_removed == false)' >/dev/null 2>&1; then
+      return 0
+    fi
+    TEARDOWN_CLOSEOUT_ROUTE_WHY="the plan did not answer with exit 3 and the dry-run envelope (BLOCKED, cleanup_not_executed only)"
+  else
+    want=0
+    if [ "$rc" = "$want" ] && printf '%s' "$TEARDOWN_CLOSEOUT_STDOUT" | jq -s -e 'length == 1 and (.[0] | type == "object" and (.state == "DONE" or .state == "DONE_WITH_SUPERSEDENCE") and .predicates_failed == [] and .worktree_removed == true)' >/dev/null 2>&1; then
+      return 0
+    fi
+    TEARDOWN_CLOSEOUT_ROUTE_WHY="the execute did not answer with exit 0 and the success envelope (DONE or DONE_WITH_SUPERSEDENCE, no failed predicate, worktree_removed true)"
+  fi
+  return 1
+}
+
 # Runs Vernant's closeout driver on <copy>: it releases its own creation lock
 # and removes the copy. With "plan" it omits --execute-cleanup, so the driver
 # only says whether it would. TEARDOWN_CLOSEOUT_STDOUT is verdict input;
 # TEARDOWN_CLOSEOUT_OUT retains stdout and stderr for display and refusal records.
 # An optional capture file belongs to the caller (so a killed plan can clean it).
-# Exit 0 means the driver allowed and, unless planning, ran the cleanup.
+# Exit 0 means the driver allowed and, unless planning, ran the cleanup. A copy
+# that a supersedence record names is called through teardown_closeout_route
+# and judged by teardown_closeout_route_answer; exit 0 then still means allowed.
 teardown_run_closeout() {  # <slot> <copy> [plan] [stdout-capture-file]
-  local slot=$1 copy=$2 execute=--execute-cleanup driver py rc=0 capture=${4:-} own_capture=0
-  [ "${3:-}" != plan ] || execute=
+  local slot=$1 copy=$2 stage=execute driver py rc=0 capture=${4:-} own_capture=0
+  local -a argv=(--cleanup-worktree "$copy")
+  [ "${3:-}" != plan ] || stage=plan
   TEARDOWN_CLOSEOUT_STDOUT=
   TEARDOWN_CLOSEOUT_OUT=
+  TEARDOWN_CLOSEOUT_ROUTE=
+  TEARDOWN_CLOSEOUT_ROUTE_WHY=
   driver=$slot/scripts/git-stability/closeout_pr.py
   py=${FM_TEARDOWN_VERNANT_PYTHON:-$slot/.venv/bin/python}
   if [ ! -f "$driver" ] || [ ! -x "$py" ]; then
     TEARDOWN_CLOSEOUT_OUT="Vernant's closeout driver $driver or its interpreter $py is not available"
     return 127
   fi
+  teardown_closeout_route "$slot" "$copy" || rc=$?
+  teardown_closeout_route_publish
+  if [ "$rc" != 0 ]; then
+    TEARDOWN_CLOSEOUT_OUT="the supersedence record for $copy cannot be used: $TEARDOWN_CLOSEOUT_ROUTE_WHY; Vernant's closeout driver was not called"
+    return 1
+  fi
+  [ "$stage" = plan ] || argv+=(--execute-cleanup)
+  [ "$TEARDOWN_CLOSEOUT_ROUTE" != pr ] \
+    || argv+=(--pr "$TEARDOWN_CLOSEOUT_ROUTE_PR" --supersedence-profile "$TEARDOWN_CLOSEOUT_ROUTE_PROFILE" --no-evidence-files)
   if [ -z "$capture" ]; then
     capture=$(mktemp "${TMPDIR:-/tmp}/fm-closeout-stdout.XXXXXX") || {
       TEARDOWN_CLOSEOUT_OUT="Vernant's closeout stdout could not be captured"
@@ -1267,7 +1573,7 @@ teardown_run_closeout() {  # <slot> <copy> [plan] [stdout-capture-file]
   TEARDOWN_CLOSEOUT_OUT=$(
     set -o pipefail
     local status=0
-    { ( cd "$slot" && "$py" "$driver" --cleanup-worktree "$copy" ${execute:+"$execute"} ) | tee "$capture"; } 2>&1 || status=$?
+    { ( cd "$slot" && "$py" "$driver" "${argv[@]}" ) | tee "$capture"; } 2>&1 || status=$?
     printf '.'
     exit "$status"
   ) || rc=$?
@@ -1275,6 +1581,15 @@ teardown_run_closeout() {  # <slot> <copy> [plan] [stdout-capture-file]
   TEARDOWN_CLOSEOUT_STDOUT=$(cat "$capture" || exit 1; printf '.') || rc=1
   TEARDOWN_CLOSEOUT_STDOUT=${TEARDOWN_CLOSEOUT_STDOUT%.}
   [ "$own_capture" = 0 ] || rm -f -- "$capture"
+  if [ "$TEARDOWN_CLOSEOUT_ROUTE" = pr ]; then
+    if teardown_closeout_route_answer "$stage" "$rc"; then
+      rc=0
+    else
+      [ "$rc" != 0 ] || rc=1
+      TEARDOWN_CLOSEOUT_OUT="supersedence route (--pr $TEARDOWN_CLOSEOUT_ROUTE_PR): $TEARDOWN_CLOSEOUT_ROUTE_WHY"$'\n'"$TEARDOWN_CLOSEOUT_OUT"
+    fi
+    teardown_closeout_route_publish
+  fi
   return "$rc"
 }
 
