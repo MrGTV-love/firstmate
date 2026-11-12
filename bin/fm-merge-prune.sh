@@ -135,7 +135,11 @@
 #
 # Anything else stays, is never forced or discarded, and raises exactly ONE wake
 # naming the copy and the reason (recorded as sent only once the queue took it). A retained copy is retried silently every six
-# hours in case the cause cleared. The hourly `treehouse prune --all --yes`
+# hours in case the cause cleared, except a copy that Vernant's closeout driver
+# retained after archiving its ignored files: each try would write another
+# archive, so teardown does not run again while the copy is unchanged
+# (bin/fm-idle-reap-lib.sh, fm_closeout_retained_check, owns the record that
+# bin/fm-idle-session-reap.sh shares, and the one wake). The hourly `treehouse prune --all --yes`
 # safety net is not duplicated.
 #
 # A teardown that succeeds and returns the slot to the pool leaves it reset in
@@ -359,6 +363,7 @@ run_teardown() {
   TD_RC=0
   TD_OUT=$(FM_HOME="$FM_HOME" FM_IDLE_REAP_ADMISSION=1 FM_IDLE_REAP_MERGE_PRUNE=1 \
     fm_run_progress "$TEARDOWN_STALL_SECS" "$TEARDOWN_BIN" "$ID" </dev/null 2>&1) || TD_RC=$?
+  [ "$TD_RC" -ne 0 ] || fm_closeout_retained_clear "$STATE" "$ID"
 }
 
 # The outcome of a pruned copy: one log line and no wake.
@@ -405,7 +410,7 @@ raise_wake() {  # <text>
 }
 
 # A copy that stays: one wake and one log line per reason, a quiet retry later.
-retain() {  # <copy> <reason>
+retain() {  # <copy> <reason> [<nowake>: the caller already settled the wake]
   local copy=$1 reason=$2 changed=1
   [ "$R_STATE" = retained ] && [ "$R_REASON" = "$(clean_detail "$reason")" ] && changed=0
   R_ATTEMPTS=$((R_ATTEMPTS + 1))
@@ -413,11 +418,28 @@ retain() {  # <copy> <reason>
   R_REASON=$reason
   R_COPY=$copy
   R_NEXT=$((NOW + RETAINED_RETRY))
-  raise_wake "check: merge-prune kept $copy for $ID: $(clean_detail "$reason")"
+  [ -n "${3-}" ] || raise_wake "check: merge-prune kept $copy for $ID: $(clean_detail "$reason")"
   rec_save "$ID" || true
   if [ "$changed" = 1 ]; then
     log_line "retained $copy: $reason"
   fi
+}
+
+# A copy the closeout driver retained is kept with one wake across both sweeps:
+# the shared record, not R_WAKE, says whether this fingerprint's wake was sent,
+# and fm_closeout_retained_wake makes that disposition durable before it appends.
+retain_closeout() {  # <copy> <wake-sent: 0|1, from the record>
+  local copy=$1 reason
+  reason=$(fm_closeout_retained_reason)
+  R_WAKE=$2
+  if [ "$2" = 0 ]; then
+    if fm_closeout_retained_wake "$STATE" "$ID" "merge-prune:$ID" "check: merge-prune kept $copy for $ID: $(clean_detail "$reason")"; then
+      R_WAKE=1
+    else
+      log_line "wake could not be raised; the next attempt raises it again"
+    fi
+  fi
+  retain "$copy" "$reason" nowake
 }
 
 # The classifier must still call the finished worker reapable. It is asked
@@ -826,7 +848,19 @@ remove_returned_locked() {  # <real-copy> <detail>
   return 0
 }
 
+# One attempt under the task's closeout lock, shared with idle-reap: a sweep that
+# finds the lock busy leaves the task for its next due time instead of calling
+# teardown while the other sweep's refusal is not yet on record.
 attempt() {
+  if ! fm_closeout_lock_take "$STATE" "$ID"; then
+    log_line "another cleanup sweep is working on the task's copy; the next due attempt looks again"
+    return 0
+  fi
+  attempt_locked
+  fm_closeout_lock_drop "$STATE" "$ID"
+}
+
+attempt_locked() {
   local reason wt project branch
   wt=$(fm_meta_get "$META" worktree)
   project=$(fm_meta_get "$META" project)
@@ -840,6 +874,12 @@ attempt() {
   fi
   FM_MP_TASK_BRANCH=$R_BRANCH
   prove_nested_first || return 0
+  if fm_closeout_retained_check "$STATE" "$ID" "$wt"; then
+    retain_closeout "$wt" "$CLOSEOUT_RETAINED_WAKE"
+    return 0
+  fi
+  # A record that no longer stands describes an earlier fingerprint of the copy.
+  fm_closeout_retained_clear "$STATE" "$ID"
   run_teardown
   if [ "$TD_RC" -eq 0 ]; then
     settle_copy "$wt" "$project" "teardown completed"
@@ -863,6 +903,10 @@ attempt() {
   [ -n "$reason" ] || reason="exit status $TD_RC"
   if [ "$TD_RC" -ne 1 ]; then
     retain "$(fm_meta_get "$META" worktree)" "teardown exit $TD_RC: $reason"
+    return 0
+  fi
+  if fm_closeout_retained_record "$STATE" "$ID" "$wt" "$TD_OUT"; then
+    retain_closeout "$wt" 0
     return 0
   fi
   if transient_refusal "$TD_OUT"; then

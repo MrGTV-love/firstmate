@@ -43,6 +43,234 @@ fm_idle_reap_refusal_stands() {
   IDLE_REAP_DETAIL=$reason
 }
 
+# A closeout-retained copy is held, not retried. When teardown's refusal is
+# Vernant's closeout driver exiting 3 with the top-level reason
+# cleanup_ignored_payload_archived_tree_retained, every teardown try writes one
+# more byte-identical archive of the copy's ignored files and keeps the tree, so
+# trying again against the unchanged copy only fills the disk. Both automatic
+# cleanup sweeps (bin/fm-idle-session-reap.sh, bin/fm-merge-prune.sh) share one
+# record, state/.closeout-retained/<task-id>, owned here: mode 0600, a regular
+# file, rewritten atomically, with one line each for the version
+# (fm-closeout-retained-v1), the epoch, the refusal class and wake_sent=0|1,
+# then one `<HEAD> <digest of git status> <path>` line for the task copy and for
+# each copy the refusal names. The record is written after the refusing try, so
+# it holds what the driver left behind. It stands while those lines read the
+# same again, with no age limit. wake_sent lives in the record, so the one wake
+# is not raised again after the queue is drained. A completed teardown clears
+# it. Only the printed refusal decides the class (fm_closeout_retained_class),
+# never the token elsewhere in the output. A copy that cannot be read as a git
+# repository gives no record, so its retry stays as it was.
+# Both sweeps take the task's closeout lock (fm_closeout_lock_take, never
+# waited for) around the whole of one attempt: the record check, the teardown,
+# the record write and the wake. A sweep that finds the lock busy skips the task
+# this round, so no second teardown starts before the first refusal is on
+# record, and the wake_sent decision, the queue append and the record update
+# cannot interleave between the two processes. A record that no longer reads the
+# same (fm_closeout_retained_check says "changed") lifts the hold at once; it
+# does not wait for the older refusal memo to age out.
+FM_CLOSEOUT_RETAINED_CLASS=cleanup_ignored_payload_archived_tree_retained
+CLOSEOUT_RETAINED_PATHS=()
+CLOSEOUT_RETAINED_ENTRIES=()
+CLOSEOUT_RETAINED_WAKE=0
+
+fm_closeout_retained_reason() {
+  printf '%s' "the closeout driver retained the copy and archived its ignored files; it is not retried while the copy is unchanged; a human or Main decides the release"
+}
+
+# Succeeds when every refusal line of <teardown-output> is a closeout-driver
+# refusal with (exit 3), at least one exists, and the driver's one JSON line
+# has the retained class as its top-level reason. Sets CLOSEOUT_RETAINED_PATHS
+# to the copies the refusal lines name. The JSON line can be hundreds of KB, so
+# it goes to python on stdin.
+fm_closeout_retained_class() {  # <teardown-output>
+  local paths path
+  CLOSEOUT_RETAINED_PATHS=()
+  paths=$(printf '%s' "$1" | python3 -I -c '
+import json, re, sys
+want = sys.argv[1]
+line_re = re.compile(r"REFUSED: Vernant'"'"'s closeout driver did not release (?:own nested|foreign) copy (.+?) \(exit 3\): (?:full output: .+|full output could not be saved under .+)")
+paths, docs = [], []
+for line in sys.stdin.buffer.read().decode("utf-8", "surrogateescape").split("\n"):
+    if line.startswith(("REFUSED", "error:", "refused")):
+        m = line_re.fullmatch(line)
+        if m is None:
+            sys.exit(1)
+        paths.append(m.group(1))
+    elif line[:1] in (" ", "\t") and line.lstrip().startswith("{\"allowed\":"):
+        docs.append(line)
+if not paths or len(docs) != 1:
+    sys.exit(1)
+try:
+    doc = json.loads(docs[0])
+except Exception:
+    sys.exit(1)
+if not isinstance(doc, dict) or doc.get("reason") != want:
+    sys.exit(1)
+sys.stdout.buffer.write("\n".join(paths).encode("utf-8", "surrogateescape"))
+' "$FM_CLOSEOUT_RETAINED_CLASS" 2>/dev/null) || return 1
+  while IFS= read -r path; do
+    [ -z "$path" ] || CLOSEOUT_RETAINED_PATHS+=("$path")
+  done <<CLOSEOUT_PATHS
+$paths
+CLOSEOUT_PATHS
+  [ "${#CLOSEOUT_RETAINED_PATHS[@]}" -gt 0 ]
+}
+
+# One fingerprint line for <path>; fails when it cannot be read as a git
+# repository. Untracked files are listed one by one, so a new file inside an
+# untracked directory changes the digest too.
+fm_closeout_retained_entry() {  # <path>
+  local p=$1 head digest
+  [ -n "$p" ] && [ -d "$p" ] && [ -e "$p/.git" ] || return 1
+  head=$(git --no-optional-locks -C "$p" rev-parse --verify -q HEAD 2>/dev/null) && [ -n "$head" ] || return 1
+  digest=$(set -o pipefail; git --no-optional-locks -C "$p" status --porcelain=v1 -z --untracked-files=all 2>/dev/null \
+    | git hash-object --stdin 2>/dev/null) && [ -n "$digest" ] || return 1
+  printf '%s %s %s' "$head" "$digest" "$p"
+}
+
+# Writes the record from CLOSEOUT_RETAINED_ENTRIES, atomically.
+fm_closeout_retained_write() {  # <state> <id> <wake-sent>
+  local dir="$1/.closeout-retained" tmp now entry
+  [ ! -L "$dir" ] || return 1
+  mkdir -p "$dir" 2>/dev/null || return 1
+  tmp=$(mktemp "$dir/.new.XXXXXX" 2>/dev/null) || return 1
+  fm_epoch_seconds_to now
+  if {
+    printf 'fm-closeout-retained-v1\n%s\n%s\nwake_sent=%s\n' "$now" "$FM_CLOSEOUT_RETAINED_CLASS" "$3"
+    for entry in "${CLOSEOUT_RETAINED_ENTRIES[@]}"; do printf '%s\n' "$entry"; done
+  } > "$tmp" && chmod 0600 "$tmp" && mv -f -- "$tmp" "$dir/$2"; then
+    return 0
+  fi
+  rm -f -- "$tmp"
+  return 1
+}
+
+# Loads the record into CLOSEOUT_RETAINED_ENTRIES and CLOSEOUT_RETAINED_WAKE.
+fm_closeout_retained_read() {  # <state> <id>
+  local file="$1/.closeout-retained/$2" n=0 line version="" at="" class="" wake=""
+  CLOSEOUT_RETAINED_ENTRIES=()
+  [ -f "$file" ] && [ ! -L "$file" ] || return 1
+  while IFS= read -r line || [ -n "$line" ]; do
+    n=$((n + 1))
+    case "$n" in
+      1) version=$line ;;
+      2) at=$line ;;
+      3) class=$line ;;
+      4) wake=$line ;;
+      *) CLOSEOUT_RETAINED_ENTRIES+=("$line") ;;
+    esac
+  done < "$file"
+  [ "$version" = fm-closeout-retained-v1 ] && [ "$class" = "$FM_CLOSEOUT_RETAINED_CLASS" ] || return 1
+  case "$at" in ''|*[!0-9]*) return 1 ;; esac
+  case "$wake" in
+    wake_sent=0) CLOSEOUT_RETAINED_WAKE=0 ;;
+    wake_sent=1) CLOSEOUT_RETAINED_WAKE=1 ;;
+    *) return 1 ;;
+  esac
+  [ "${#CLOSEOUT_RETAINED_ENTRIES[@]}" -gt 0 ]
+}
+
+# After a refusing teardown try: writes the record when <teardown-output> is
+# the retained class and the task copy <worktree> and every copy the refusal
+# names can be fingerprinted. A new record starts with its wake unsent.
+fm_closeout_retained_record() {  # <state> <id> <worktree> <teardown-output>
+  local p e dup entries=()
+  fm_closeout_retained_class "$4" || return 1
+  e=$(fm_closeout_retained_entry "$3") || return 1
+  entries+=("$e")
+  for p in "${CLOSEOUT_RETAINED_PATHS[@]}"; do
+    dup=0
+    for e in "${entries[@]}"; do [ "${e#* * }" != "$p" ] || dup=1; done
+    [ "$dup" = 0 ] || continue
+    e=$(fm_closeout_retained_entry "$p") || return 1
+    entries+=("$e")
+  done
+  CLOSEOUT_RETAINED_ENTRIES=("${entries[@]}")
+  fm_closeout_retained_write "$1" "$2" 0
+}
+
+# Reads the record against the copy as it is now. Succeeds, with
+# CLOSEOUT_RETAINED_STATE=stands, when the record exists, its first line is for
+# the task copy <worktree>, and every copy it names still reads the same; the
+# record's wake flag is then in CLOSEOUT_RETAINED_WAKE. It fails with "changed"
+# when a copy reads differently (HEAD, tracked changes or untracked files) or
+# the task copy moved, and with "none" when there is no valid record or a copy
+# cannot be read now (that copy's hold then stays as it was).
+CLOSEOUT_RETAINED_STATE=none
+fm_closeout_retained_check() {  # <state> <id> <worktree>
+  local e p first=1 now
+  CLOSEOUT_RETAINED_STATE=none
+  fm_closeout_retained_read "$1" "$2" || return 1
+  for e in "${CLOSEOUT_RETAINED_ENTRIES[@]}"; do
+    p=${e#* * }
+    if [ "$first" = 1 ]; then
+      [ "$p" = "$3" ] || { CLOSEOUT_RETAINED_STATE=changed; return 1; }
+      first=0
+    fi
+    now=$(fm_closeout_retained_entry "$p") || return 1
+    [ "$now" = "$e" ] || { CLOSEOUT_RETAINED_STATE=changed; return 1; }
+  done
+  CLOSEOUT_RETAINED_STATE=stands
+}
+
+# The task's closeout lock: one holder at a time across both sweeps, taken
+# without waiting and recovered by the shared lock library when its owner is
+# gone. Release it with fm_closeout_lock_drop.
+fm_closeout_lock_take() {  # <state> <id>
+  mkdir -p "$1/.closeout-lock" 2>/dev/null || return 1
+  fm_lock_try_acquire "$1/.closeout-lock/$2"
+}
+
+fm_closeout_lock_drop() {  # <state> <id>
+  fm_lock_release "$1/.closeout-lock/$2" || true
+}
+
+# Rewrites the record's wake flag; the entries come from the last read.
+fm_closeout_retained_mark_wake() {  # <state> <id> [<wake-sent: 1, default>]
+  fm_closeout_retained_read "$1" "$2" || return 1
+  fm_closeout_retained_write "$1" "$2" "${3:-1}"
+}
+
+# The one wake of a record. The sent disposition is made durable first and the
+# wake is appended second, so a failed marker write appends nothing (the next
+# sweep tries both again) and a wake the queue accepted can never be raised a
+# second time, even once it is drained. A real failed append puts the flag back
+# to 0, so the next sweep raises it again. The caller holds the task's closeout
+# lock, so the read, the marker, the append and the rollback are one step
+# across both sweeps. Only the double fault, an append that fails and then a
+# rollback that cannot be written, loses the wake; it prints that on stderr.
+fm_closeout_retained_wake() {  # <state> <id> <wake-key> <wake-text>
+  fm_closeout_retained_read "$1" "$2" || return 1
+  [ "$CLOSEOUT_RETAINED_WAKE" = 0 ] || return 0
+  fm_closeout_retained_write "$1" "$2" 1 || return 1
+  fm_wake_append check "$3" "$4" && return 0
+  fm_closeout_retained_write "$1" "$2" 0 \
+    || echo "fm: the closeout wake for $2 could not be appended and its sent marker could not be put back; it is not raised again" >&2
+  return 1
+}
+
+fm_closeout_retained_clear() {  # <state> <id>
+  rm -f -- "$1/.closeout-retained/$2"
+}
+
+# A standing refusal that keeps the task out of the next sweep: a standing
+# closeout record (no age limit) or the refusal memo.
+fm_idle_reap_refusal_holds() {  # <state> <id> <status-line> <now>
+  local wt
+  wt=$(fm_meta_get "$1/$2.meta" worktree)
+  if [ -n "$wt" ]; then
+    if fm_closeout_retained_check "$1" "$2" "$wt"; then
+      # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
+      IDLE_REAP_HELD=closeout
+      IDLE_REAP_DETAIL=$(fm_closeout_retained_reason)
+      return 0
+    fi
+    # The older refusal memo describes the earlier fingerprint of the copy.
+    [ "$CLOSEOUT_RETAINED_STATE" != changed ] || return 1
+  fi
+  fm_idle_reap_refusal_stands "$1/.idle-reap/$2.refused" "$3" "$4"
+}
+
 # FM_IDLE_REAP_MERGE_PRUNE=1 is set by bin/fm-merge-prune.sh, which asks about a
 # task the moment its merge is verified: the grace period is waived and an old
 # refusal memo is ignored (the prune keeps its own backoff). Every other gate
@@ -98,6 +326,8 @@ fm_idle_reap_classify() {
   IDLE_REAP_AGE=-
   IDLE_REAP_DETAIL="missing or unreadable metadata"
   IDLE_REAP_LAST=
+  # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
+  IDLE_REAP_HELD=
   [ -f "$meta" ] && [ ! -L "$meta" ] && [ -r "$meta" ] || return 0
   IDLE_REAP_KIND=$(fm_meta_get "$meta" kind)
   [ -n "$IDLE_REAP_KIND" ] || IDLE_REAP_KIND=ship
@@ -130,7 +360,7 @@ fm_idle_reap_classify() {
     fi
     fm_epoch_seconds_to now
     if [ "$memo_applies" = 1 ] \
-      && fm_idle_reap_refusal_stands "$state/.idle-reap/$id.refused" "$IDLE_REAP_LAST" "$now"; then
+      && fm_idle_reap_refusal_holds "$state" "$id" "$IDLE_REAP_LAST" "$now"; then
       IDLE_REAP_CLASS=refused
       return 0
     fi
@@ -228,7 +458,7 @@ fm_idle_reap_classify() {
     return 0
   fi
   if [ "$memo_applies" = 1 ] \
-    && fm_idle_reap_refusal_stands "$state/.idle-reap/$id.refused" "$IDLE_REAP_LAST" "$now"; then
+    && fm_idle_reap_refusal_holds "$state" "$id" "$IDLE_REAP_LAST" "$now"; then
     IDLE_REAP_CLASS=refused
     return 0
   fi

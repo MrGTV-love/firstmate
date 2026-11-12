@@ -21,7 +21,11 @@ OLD=$((NOW - 7200))
 STUB="$TMP_ROOT/teardown-stub.sh"
 STUB_LOG="$TMP_ROOT/teardown-calls.log"
 STUB_MODE_FILE="$TMP_ROOT/teardown-mode"
-export STUB_LOG STUB_MODE_FILE
+STUB_ADMIT_LOG="$TMP_ROOT/teardown-admission.log"
+STUB_ARCHIVE_DIR="$TMP_ROOT/driver-archives"
+export STUB_LOG STUB_MODE_FILE STUB_ADMIT_LOG STUB_ARCHIVE_DIR
+CLOSEOUT_OUT_FILE="$TMP_ROOT/closeout-output.txt"
+export CLOSEOUT_OUT_FILE
 export ROOT
 cat > "$STUB" <<'SH'
 #!/usr/bin/env bash
@@ -32,6 +36,37 @@ printf '%s|argc=%s|args=%s|home=%s\n' "$$" "$#" "$*" "${FM_HOME:-}" >> "$STUB_LO
 case "$mode" in
   ok) rm -f "$FM_STATE_OVERRIDE/$1".*; exit 0 ;;
   refuse) echo "REFUSED: task $1 has work that has not landed" >&2; exit 1 ;;
+  closeout) cat "$CLOSEOUT_OUT_FILE" >&2; exit 1 ;;
+  closeout-admit)
+    # The admission check bin/fm-teardown.sh runs before it touches the copy.
+    memo=0
+    [ ! -e "$FM_STATE_OVERRIDE/.idle-reap/$1.refused" ] || memo=1
+    class=$(. "$ROOT/bin/fm-idle-reap-lib.sh"
+      fm_idle_reap_classify "$FM_HOME" "$FM_STATE_OVERRIDE" "$FM_DATA_OVERRIDE" "$1"
+      printf '%s' "$IDLE_REAP_CLASS")
+    printf 'memo=%s class=%s\n' "$memo" "$class" >> "$STUB_ADMIT_LOG"
+    if [ "$class" != reap ]; then
+      echo "REFUSED: automatic reap ineligible: $class" >&2
+      exit 1
+    fi
+    cat "$CLOSEOUT_OUT_FILE" >&2; exit 1 ;;
+  closeout-archive)
+    # The closeout driver as the incident showed it: each admitted try writes one
+    # more archive of the copy's ignored files and keeps the tree.
+    memo=0
+    [ ! -e "$FM_STATE_OVERRIDE/.idle-reap/$1.refused" ] || memo=1
+    class=$(. "$ROOT/bin/fm-idle-reap-lib.sh"
+      fm_idle_reap_classify "$FM_HOME" "$FM_STATE_OVERRIDE" "$FM_DATA_OVERRIDE" "$1"
+      printf '%s' "$IDLE_REAP_CLASS")
+    printf 'memo=%s class=%s\n' "$memo" "$class" >> "$STUB_ADMIT_LOG"
+    if [ "$class" != reap ]; then
+      echo "REFUSED: automatic reap ineligible: $class" >&2
+      exit 1
+    fi
+    mkdir -p "$STUB_ARCHIVE_DIR"
+    n=$(find "$STUB_ARCHIVE_DIR" -type f | wc -l | tr -d ' ')
+    printf 'ignored payload\n' > "$STUB_ARCHIVE_DIR/archive.$((n + 1))"
+    cat "$CLOSEOUT_OUT_FILE" >&2; exit 1 ;;
   lease) echo "error: lease held" >&2; exit 6 ;;
   nm-unknown) echo "unknown: the no-mistakes run record did not answer; retry teardown" >&2; exit 75 ;;
   hang) exec sleep 30 ;;
@@ -1113,3 +1148,266 @@ test_return_pending_task_is_selected_unless_busy
 test_single_flight_lock
 test_stale_memo_is_pruned
 test_bad_usage
+
+# --- a copy the closeout driver retained is not retried while unchanged ----------
+
+# The recorded incident output of a refused closeout (the shape of
+# data/main2662-disk/vernant-d1-intake-limits-estimate-teardown.log): the REFUSED
+# line, one indented env_loading line, and the driver's JSON on one indented
+# line of well over 100,000 bytes with the class as the top-level reason and
+# other reasons nested. The stub prints it; the real driver is never run.
+# mk_closeout_output <file> <own|foreign|unsaved> <named-copy> [top-reason [nested-reason [extra-line [broken]]]]
+mk_closeout_output() {
+  python3 -I -c '
+import json, sys
+out, form, named, top, nested, extra, broken = sys.argv[1:8]
+kind = "foreign" if form == "foreign" else "own nested"
+tail = "full output could not be saved under /tmp/data/cl" if form == "unsaved" else "full output: /tmp/data/cl/vernant-closeout.AbCdEf"
+doc = {
+    "allowed": False,
+    "cleanup_command": ["git", "worktree", "remove", named],
+    "ignored_payload_disposition": {"reason": nested, "paths": ["ignored/%d" % i for i in range(3000)]},
+    "ignored_payload_preservation": {"result": {"reason": nested}},
+    "landed_pr_discovery": {"reason": "no_open_pr"},
+    "reason": top,
+    "uncovered_paths": ["src/module_%d/file_%d.py" % (i, i) for i in range(6000)],
+}
+text = json.dumps(doc)
+if broken == "1":
+    text = text[:-1]
+lines = [
+    "teardown: preserved ignored files from %s in /tmp/preserved" % named,
+    "REFUSED: Vernant'"'"'s closeout driver did not release %s copy %s (exit 3): %s" % (kind, named, tail),
+    "  env_loading: no .env found for scripts/reap_core.py; tried in order: /tmp/a/.env",
+    "  " + text,
+]
+if extra:
+    lines.append(extra)
+open(out, "w").write("\n".join(lines) + "\n")
+' "$1" "$2" "$3" "${4:-cleanup_ignored_payload_archived_tree_retained}" "${5:-other_nested_reason}" "${6:-}" "${7:-0}"
+}
+
+# closeout_home <name> <form> [mk_closeout_output args after the copy...]: a home
+# with a reap-ready scout cl whose worktree= is a real git copy with one commit
+# and a stub teardown that refuses the way the closeout driver does. Sets HOME_C
+# and COPY_C.
+closeout_home() {
+  local name=$1 form=$2
+  shift 2
+  HOME_C=$(make_home "$name")
+  COPY_C="$HOME_C/copy"
+  fm_git_init_commit "$COPY_C"
+  mk_closeout_output "$CLOSEOUT_OUT_FILE" "$form" "$COPY_C" "$@"
+  : > "$STUB_LOG"
+  printf 'closeout\n' > "$STUB_MODE_FILE"
+  mk_task "$HOME_C" cl scout idle "done [at=$OLD]: report written" -- "worktree=$COPY_C"
+  scout_report "$HOME_C" cl
+}
+
+# The refusal memo as it would look after the retry interval: older than 21600 s.
+age_refusal_memo() {  # <home> <id> <seconds-old>
+  printf 'fm-idle-reap-refused-v1\n%s\n%s\nold reason\n' "$((NOW - $3))" "$(tail -n 1 "$1/state/$2.status")" > "$1/state/.idle-reap/$2.refused"
+}
+
+wake_rows() {  # <home> <pattern>: rows of the wake queue that match
+  local n
+  n=$(grep -cF -- "$2" "$1/state/.wake-queue" 2>/dev/null) || n=0
+  printf '%s' "$n"
+}
+
+closeout_record() { printf '%s/state/.closeout-retained/%s' "$1" "$2"; }
+
+test_closeout_retained_copy_is_not_retried_while_unchanged() {
+  local form out row
+  for form in own foreign unsaved; do
+    closeout_home "closeout-$form" "$form"
+    out=$(run_reap "$HOME_C" reap) || fail "$form: reap failed: $out"
+    expect_class "$out" cl teardown-refused "$form: the first refusal is reported"
+    [ "$(calls)" = 1 ] || fail "$form: first sweep asks teardown once (calls=$(calls))"
+
+    age_refusal_memo "$HOME_C" cl 100000
+    out=$(run_reap "$HOME_C" reap) || fail "$form: second reap failed: $out"
+    [ "$(calls)" = 1 ] || fail "$form: an unchanged retained copy is not offered to teardown again (calls=$(calls))"
+    out=$(run_reap "$HOME_C" scan) || fail "$form: scan failed: $out"
+    expect_class "$out" cl refused "$form: the held copy is reported as refused"
+    case "$(row_detail "$out" cl)" in *unchanged*retained*|*retained*unchanged*) ;; *) fail "$form: the scan detail says nothing of an unchanged retained copy: $(row_detail "$out" cl)" ;; esac
+
+    age_refusal_memo "$HOME_C" cl 186400
+    out=$(run_reap "$HOME_C" reap) || fail "$form: third reap failed: $out"
+    [ "$(calls)" = 1 ] || fail "$form: a further day changes nothing (calls=$(calls))"
+    assert_present "$COPY_C/README.md" "$form: the copy stays"
+    assert_present "$(closeout_record "$HOME_C" cl)" "$form: the closeout refusal is recorded"
+    [ "$(wake_rows "$HOME_C" "$COPY_C")" = 1 ] || fail "$form: exactly one wake names the copy: $(cat "$HOME_C/state/.wake-queue" 2>/dev/null)"
+    row=$(grep -F -- "$COPY_C" "$HOME_C/state/.wake-queue")
+    case "$row" in *"cl"*"closeout driver retained the copy"*"not retried while the copy is unchanged"*"human or Main decides the release"*) ;; *) fail "$form: the wake text is incomplete: $row" ;; esac
+  done
+  pass "an unchanged copy the closeout driver retained is not offered to teardown again, in all three producer forms, and raises one wake"
+}
+
+test_closeout_wake_survives_a_drained_queue_and_a_failed_append() {
+  closeout_home closeout-wake own
+  run_reap "$HOME_C" reap >/dev/null || fail "reap failed"
+  : > "$HOME_C/state/.wake-queue"
+  age_refusal_memo "$HOME_C" cl 100000
+  run_reap "$HOME_C" reap >/dev/null || fail "second reap failed"
+  [ "$(calls)" = 1 ] || fail "a drained wake does not lift the hold (calls=$(calls))"
+  [ "$(wake_rows "$HOME_C" "$COPY_C")" = 0 ] || fail "a drained wake was raised again"
+
+  closeout_home closeout-wake-fail own
+  mkdir "$HOME_C/state/.wake-queue"
+  run_reap "$HOME_C" reap >/dev/null 2>&1 || fail "reap with a broken queue failed"
+  grep -q '^wake_sent=0$' "$(closeout_record "$HOME_C" cl)" || fail "a wake that could not be appended was recorded as sent"
+  rmdir "$HOME_C/state/.wake-queue"
+  run_reap "$HOME_C" reap >/dev/null || fail "reap with a repaired queue failed"
+  [ "$(wake_rows "$HOME_C" "$COPY_C")" = 1 ] || fail "after the queue was repaired want one wake, got $(wake_rows "$HOME_C" "$COPY_C")"
+  run_reap "$HOME_C" reap >/dev/null || fail "third reap failed"
+  [ "$(wake_rows "$HOME_C" "$COPY_C")" = 1 ] || fail "a later sweep raised another wake"
+  [ "$(calls)" = 1 ] || fail "the wake retry asked teardown again (calls=$(calls))"
+  pass "the one closeout wake does not depend on the queue and is raised again after a failed append"
+}
+
+# T3 (H2): disk growth is bounded by changes, not by sweeps. Each admitted try
+# of the driver writes one archive, so the number of archives must follow the
+# number of distinct fingerprints of the copy: an unchanged copy gets one, however
+# many sweeps run and however old the refusal memo is, and a changed copy gets
+# exactly one more try, which the new record then holds.
+test_closeout_archives_grow_with_changes_not_with_sweeps() {
+  local n
+  closeout_home closeout-growth own
+  printf 'closeout-archive\n' > "$STUB_MODE_FILE"
+  : > "$STUB_ADMIT_LOG"
+  rm -rf "$STUB_ARCHIVE_DIR"
+  archives() { find "$STUB_ARCHIVE_DIR" -type f 2>/dev/null | wc -l | tr -d ' '; }
+  run_reap "$HOME_C" reap >/dev/null || fail "first reap failed"
+  [ "$(archives)" = 1 ] || fail "the first try writes one archive (got $(archives))"
+  # T1 (H2, unchanged): a fresh memo and an unchanged fingerprint make no further try.
+  run_reap "$HOME_C" reap >/dev/null || fail "second reap failed"
+  [ "$(archives)" = 1 ] || fail "a fresh memo with an unchanged copy was tried again (archives=$(archives))"
+  for n in 1 2 3; do
+    age_refusal_memo "$HOME_C" cl $((100000 * n))
+    run_reap "$HOME_C" reap >/dev/null || fail "aged reap $n failed"
+  done
+  [ "$(archives)" = 1 ] || fail "an unchanged copy gained an archive while its memo aged (archives=$(archives))"
+  [ "$(calls)" = 1 ] || fail "an unchanged copy reached teardown again (calls=$(calls))"
+  printf 'more\n' > "$COPY_C/more.txt"
+  git -C "$COPY_C" add more.txt
+  git -C "$COPY_C" -c user.name=t -c user.email=t@example.invalid commit -qm more
+  for n in 1 2 3; do
+    run_reap "$HOME_C" reap >/dev/null || fail "changed reap $n failed"
+  done
+  [ "$(archives)" = 2 ] || fail "a changed copy must get exactly one more try, then be held (archives=$(archives))"
+  [ "$(sed -n 2p "$STUB_ADMIT_LOG")" = "memo=0 class=reap" ] || fail "the changed copy was held by the old memo at admission: $(sed -n 2p "$STUB_ADMIT_LOG")"
+  pass "the closeout driver's archives follow the copy's changes: one for an unchanged copy however many sweeps run, one more for each change"
+}
+
+test_closeout_changed_copy_is_retried() {
+  local change
+  for change in commit untracked modified; do
+    closeout_home "closeout-change-$change" own
+    printf 'closeout-admit\n' > "$STUB_MODE_FILE"
+    : > "$STUB_ADMIT_LOG"
+    run_reap "$HOME_C" reap >/dev/null || fail "$change: reap failed"
+    assert_present "$HOME_C/state/.idle-reap/cl.refused" "$change: the first refusal leaves a refusal memo"
+    case "$change" in
+      commit) printf 'more\n' > "$COPY_C/more.txt"; git -C "$COPY_C" add more.txt; git -C "$COPY_C" -c user.name=t -c user.email=t@example.invalid commit -qm more ;;
+      untracked) printf 'new\n' > "$COPY_C/new.txt" ;;
+      modified) printf 'edit\n' >> "$COPY_C/README.md" ;;
+    esac
+    run_reap "$HOME_C" reap >/dev/null || fail "$change: second reap failed"
+    [ "$(calls)" = 2 ] || fail "$change: a changed copy is offered to teardown again (calls=$(calls))"
+    [ "$(sed -n 2p "$STUB_ADMIT_LOG")" = "memo=0 class=reap" ] \
+      || fail "$change: teardown admission of the changed copy is not held by the older memo: $(sed -n 2p "$STUB_ADMIT_LOG")"
+    [ "$(wake_rows "$HOME_C" "$COPY_C")" = 2 ] || fail "$change: the refusal of the changed copy raises one new wake (rows=$(wake_rows "$HOME_C" "$COPY_C"))"
+    age_refusal_memo "$HOME_C" cl 100000
+    run_reap "$HOME_C" reap >/dev/null || fail "$change: third reap failed"
+    [ "$(calls)" = 2 ] || fail "$change: the new fingerprint is held too (calls=$(calls))"
+  done
+  pass "a copy whose HEAD or status changed is retried by the next sweep, and its new refusal raises a new wake"
+}
+
+test_closeout_other_refusals_keep_their_retry() {
+  local variant
+  closeout_home closeout-other own
+  printf 'refuse\n' > "$STUB_MODE_FILE"
+  run_reap "$HOME_C" reap >/dev/null || fail "reap failed"
+  assert_absent "$(closeout_record "$HOME_C" cl)" "a refusal of another class makes no closeout record"
+  age_refusal_memo "$HOME_C" cl 100000
+  run_reap "$HOME_C" reap >/dev/null || fail "second reap failed"
+  [ "$(calls)" = 2 ] || fail "a refusal of another class is retried after the interval (calls=$(calls))"
+
+  # The class is the top-level reason, not the token anywhere in the output.
+  closeout_home closeout-nested own different_closeout_refusal_class cleanup_ignored_payload_archived_tree_retained
+  run_reap "$HOME_C" reap >/dev/null || fail "reap failed"
+  assert_absent "$(closeout_record "$HOME_C" cl)" "a nested retained reason under another top-level reason makes no record"
+  [ "$(wake_rows "$HOME_C" "$COPY_C")" = 0 ] || fail "a refusal of another class raised a closeout wake"
+  age_refusal_memo "$HOME_C" cl 100000
+  run_reap "$HOME_C" reap >/dev/null || fail "second reap failed"
+  [ "$(calls)" = 2 ] || fail "the same-form refusal of another class is retried after the interval (calls=$(calls))"
+
+  closeout_home closeout-broken own "" "" "" 1
+  run_reap "$HOME_C" reap >/dev/null || fail "reap failed"
+  assert_absent "$(closeout_record "$HOME_C" cl)" "a JSON line that does not parse makes no record"
+
+  closeout_home closeout-mixed own "" "" "REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion."
+  run_reap "$HOME_C" reap >/dev/null || fail "reap failed"
+  assert_absent "$(closeout_record "$HOME_C" cl)" "a closeout line next to another refusal line makes no record"
+  age_refusal_memo "$HOME_C" cl 100000
+  run_reap "$HOME_C" reap >/dev/null || fail "second reap failed"
+  [ "$(calls)" = 2 ] || fail "a mixed refusal is retried after the interval (calls=$(calls))"
+
+  for variant in missing plain-dir named-missing; do
+    closeout_home "closeout-unreadable-$variant" own
+    case "$variant" in
+      missing) rm -rf "$COPY_C" ;;
+      plain-dir) rm -rf "$COPY_C"; mkdir "$COPY_C" ;;
+      named-missing) mk_closeout_output "$CLOSEOUT_OUT_FILE" own "$HOME_C/no-such-nested" ;;
+    esac
+    run_reap "$HOME_C" reap >/dev/null || fail "$variant: reap failed"
+    assert_absent "$(closeout_record "$HOME_C" cl)" "$variant: a copy that cannot be fingerprinted makes no record"
+    age_refusal_memo "$HOME_C" cl 100000
+    run_reap "$HOME_C" reap >/dev/null || fail "$variant: second reap failed"
+    [ "$(calls)" = 2 ] || fail "$variant: an unreadable copy is retried as before (calls=$(calls))"
+  done
+  pass "other refusal classes, nested tokens, unparsable output, mixed refusals and unreadable copies keep today's retry"
+}
+
+test_closeout_record_is_cleared_and_pruned() {
+  local rec
+  closeout_home closeout-clear own
+  run_reap "$HOME_C" reap >/dev/null || fail "reap failed"
+  printf 'x\n' >> "$COPY_C/README.md"
+  age_refusal_memo "$HOME_C" cl 100000
+  printf 'ok\n' > "$STUB_MODE_FILE"
+  run_reap "$HOME_C" reap >/dev/null || fail "second reap failed"
+  [ "$(calls)" = 2 ] || fail "the changed copy was offered again (calls=$(calls))"
+  assert_absent "$(closeout_record "$HOME_C" cl)" "a completed teardown clears the record"
+
+  # A record whose task record is gone is dropped by the next reap; one whose task is still there stays.
+  closeout_home closeout-prune own
+  run_reap "$HOME_C" reap >/dev/null || fail "reap failed"
+  rec=$(closeout_record "$HOME_C" cl)
+  cp "$rec" "$(closeout_record "$HOME_C" gone)"
+  run_reap "$HOME_C" reap >/dev/null || fail "second reap failed"
+  assert_absent "$(closeout_record "$HOME_C" gone)" "a record for a task with no record is dropped"
+  assert_present "$rec" "a record for a task that still exists is kept"
+  pass "a completed teardown clears the closeout record, and a stale record is pruned"
+}
+test_closeout_orphan_record_is_pruned_on_the_first_reap() {
+  local rec
+  closeout_home closeout-orphan-first own
+  run_reap "$HOME_C" reap >/dev/null || fail "reap failed"
+  rec=$(closeout_record "$HOME_C" cl)
+  cp "$rec" "$(closeout_record "$HOME_C" gone)"
+  rm -rf "$HOME_C/state/.idle-reap"
+  run_reap "$HOME_C" reap >/dev/null || fail "second reap failed"
+  assert_absent "$(closeout_record "$HOME_C" gone)" "a record for a task with no record is dropped even when no refusal memo directory exists yet"
+  assert_present "$rec" "a record for a task that still exists is kept"
+  pass "a stale closeout record is pruned by the first reap, with or without the refusal memo directory"
+}
+test_closeout_archives_grow_with_changes_not_with_sweeps
+test_closeout_orphan_record_is_pruned_on_the_first_reap
+test_closeout_retained_copy_is_not_retried_while_unchanged
+test_closeout_wake_survives_a_drained_queue_and_a_failed_append
+test_closeout_changed_copy_is_retried
+test_closeout_other_refusals_keep_their_retry
+test_closeout_record_is_cleared_and_pruned

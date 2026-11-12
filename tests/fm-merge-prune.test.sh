@@ -209,6 +209,7 @@ case "$mode" in
   ineligible) echo "REFUSED: automatic reap ineligible: active: busy state busy" >&2; exit 1 ;;
   lifecycle) echo "error: another lifecycle action is already running for task $1; nothing was changed" >&2; exit 1 ;;
   pipeline) echo "REFUSED: no-mistakes run for $1 is still parked after axi abort" >&2; exit 1 ;;
+  closeout) cat "$CLOSEOUT_OUT_FILE" >&2; exit 1 ;;
   false-positive|ship-not-landed|closeout-own)
     # The two refusal classes that reach the fallback, in the words of
     # bin/fm-teardown.sh and bin/fm-teardown-nested-lib.sh; they stop once the
@@ -346,7 +347,7 @@ prune() {
   HOME="$W/fakehome" FM_HOME="$HOME_DIR" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" \
     TREEHOUSE_ROOT="$POOL" PATH="$W/bin:$PATH" \
     TH_LOG="$W/th.log" TH_FAIL="$W/th.fail" STUB_LOG="$W/stub.log" STUB_MODE="$W/stub.mode" \
-    STUB_COUNT="$W/stub.count" CONTROL_LOG="$W/control.log" WORKER_PID_FILE="$W/worker.pid" \
+    STUB_COUNT="$W/stub.count" CLOSEOUT_OUT_FILE="$W/closeout.out" CONTROL_LOG="$W/control.log" WORKER_PID_FILE="$W/worker.pid" \
     PANE_PID_FILE="$W/pane.pid" STEAL_FILE="$W/steal" SLOT_MARKER="$POOL/pool1/1/.fm-slot-owner" \
     STOP_FAIL_FILE="$W/stop-fail" BUSY_EVENT_BIN="$BIN_DIR/fm-busy-event.sh" \
     FM_MERGE_PRUNE_TEARDOWN_BIN="$W/bin/teardown-stub" FM_MERGE_PRUNE_CONTROL_BIN="$W/bin/control-stub" \
@@ -2903,6 +2904,397 @@ scn_failed_wake_append_is_not_recorded_as_sent() {
   return 0
 }
 
+# --- a copy the closeout driver retained is not retried while unchanged ----------
+#
+# The stub teardown prints the shape of the recorded incident output (the REFUSED
+# line, one indented env_loading line, then the driver's JSON on one indented
+# line of well over 100,000 bytes with the class as the top-level reason and
+# other reasons nested); the real driver is never run.
+
+# mk_closeout_out <own|foreign|unsaved> <named-copy> [top-reason [nested-reason [extra-line [broken]]]]
+mk_closeout_out() {
+  python3 -I -c '
+import json, sys
+out, form, named, top, nested, extra, broken = sys.argv[1:8]
+kind = "foreign" if form == "foreign" else "own nested"
+tail = "full output could not be saved under /tmp/data/t1" if form == "unsaved" else "full output: /tmp/data/t1/vernant-closeout.AbCdEf"
+doc = {
+    "allowed": False,
+    "cleanup_command": ["git", "worktree", "remove", named],
+    "ignored_payload_disposition": {"reason": nested, "paths": ["ignored/%d" % i for i in range(3000)]},
+    "ignored_payload_preservation": {"result": {"reason": nested}},
+    "landed_pr_discovery": {"reason": "no_open_pr"},
+    "reason": top,
+    "uncovered_paths": ["src/module_%d/file_%d.py" % (i, i) for i in range(6000)],
+}
+text = json.dumps(doc)
+if broken == "1":
+    text = text[:-1]
+lines = [
+    "teardown: preserved ignored files from %s in /tmp/preserved" % named,
+    "REFUSED: Vernant'"'"'s closeout driver did not release %s copy %s (exit 3): %s" % (kind, named, tail),
+    "  env_loading: no .env found for scripts/reap_core.py; tried in order: /tmp/a/.env",
+    "  " + text,
+]
+if extra:
+    lines.append(extra)
+open(out, "w").write("\n".join(lines) + "\n")
+' "$W/closeout.out" "$1" "$2" "${3:-cleanup_ignored_payload_archived_tree_retained}" "${4:-other_nested_reason}" "${5:-}" "${6:-0}"
+  printf 'closeout\n' > "$W/stub.mode"
+}
+
+# A real git copy outside the task's copy, for the refusal to name.
+mk_nested() {
+  NESTED="$W/nested-copy"
+  fm_git_init_commit "$NESTED"
+}
+
+# One sweep of the idle-reap script against this world, with the same stub teardown.
+idle_reap() {
+  HOME="$W/fakehome" FM_HOME="$HOME_DIR" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" \
+    TREEHOUSE_ROOT="$POOL" PATH="$W/bin:$PATH" \
+    STUB_LOG="$W/stub.log" STUB_MODE="$W/stub.mode" STUB_COUNT="$W/stub.count" CLOSEOUT_OUT_FILE="$W/closeout.out" \
+    FM_IDLE_REAP_TEARDOWN_BIN="$W/bin/teardown-stub" \
+    "$BIN_DIR/fm-idle-session-reap.sh" reap >/dev/null 2>&1
+}
+
+idle_scan() {
+  HOME="$W/fakehome" FM_HOME="$HOME_DIR" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" \
+    TREEHOUSE_ROOT="$POOL" PATH="$W/bin:$PATH" \
+    "$BIN_DIR/fm-idle-session-reap.sh" scan 2>&1
+}
+
+# Moves every clock-based retry past due: the prune record's next_at and the idle-reap refusal memo.
+make_retries_due() {
+  [ ! -e "$STATE/t1.merge-prune" ] || set_rec t1 next_at 0
+  if [ -e "$STATE/.idle-reap/t1.refused" ]; then
+    printf 'fm-idle-reap-refused-v1\n%s\n%s\nold reason\n' "$((NOW - 200000))" "$(tail -n 1 "$STATE/t1.status")" > "$STATE/.idle-reap/t1.refused"
+  fi
+}
+
+copy_wakes() {
+  local n
+  n=$(grep -cF -- "$COPY" "$STATE/.wake-queue" 2>/dev/null) || n=0
+  printf '%s' "$n"
+}
+
+closeout_file() { printf '%s/.closeout-retained/t1' "$STATE"; }
+
+scn_closeout_retained_copy_is_not_retried() {  # <form>
+  local row
+  make_world
+  mk_nested; mk_closeout_out "$1" "$NESTED"
+  go
+  [ "$(stub_calls)" = 1 ] || why "the first attempt calls teardown $(stub_calls) times" || return 1
+  [ "$(rec_field t1 state)" = retained ] || why "the record is not retained: $(cat "$STATE/t1.merge-prune")" || return 1
+  prune run t1 --now >/dev/null 2>&1
+  make_retries_due
+  prune sweep >/dev/null 2>&1
+  prune run t1 >/dev/null 2>&1
+  [ "$(stub_calls)" = 1 ] || why "an unchanged retained copy ran teardown again (calls=$(stub_calls))" || return 1
+  [ -e "$COPY" ] || why "the copy was removed" || return 1
+  [ "$(rec_field t1 state)" = retained ] || why "the record is no longer retained" || return 1
+  [ "$(destroy_calls)" = 0 ] || why "the copy was destroyed" || return 1
+  [ -f "$(closeout_file)" ] || why "no closeout record was written" || return 1
+  [ "$(copy_wakes)" = 1 ] || why "want exactly one wake naming the copy, got $(copy_wakes)" || return 1
+  row=$(grep -F -- "$COPY" "$STATE/.wake-queue")
+  case "$row" in *"$COPY"*"closeout driver retained the copy"*"not retried while the copy is unchanged"*"human or Main decides the release"*) ;; *) why "the wake text is incomplete: $row" || return 1 ;; esac
+  return 0
+}
+scn_closeout_own_is_not_retried() { scn_closeout_retained_copy_is_not_retried own; }
+scn_closeout_foreign_is_not_retried() { scn_closeout_retained_copy_is_not_retried foreign; }
+scn_closeout_unsaved_is_not_retried() { scn_closeout_retained_copy_is_not_retried unsaved; }
+
+# The four orders of the two sweeps, and a wake consumed in between.
+scn_closeout_one_attempt_and_one_wake_across_both_sweeps() {  # <order> [drain]
+  local step
+  make_world
+  mk_nested; mk_closeout_out own "$NESTED"
+  for step in $1; do
+    case "$step" in
+      idle) idle_reap ;;
+      prune) go ;;
+    esac
+    if [ "$step" = "${1%% *}" ]; then
+      [ "$(stub_calls)" = 1 ] || why "the first step ($step) called teardown $(stub_calls) times" || return 1
+      [ -f "$(closeout_file)" ] || why "the first step ($step) left no closeout record" || return 1
+      [ "$(grep -cF -- "$([ "$step" = idle ] && echo idle-reap:t1 || echo merge-prune:t1)" "$STATE/.wake-queue" 2>/dev/null)" = 1 ] \
+        || why "the first step ($step) did not raise the one wake: $(cat "$STATE/.wake-queue" 2>/dev/null)" || return 1
+      [ "${2:-}" != drain ] || : > "$STATE/.wake-queue"
+    fi
+    make_retries_due
+  done
+  idle_scan | grep -q "^refused	t1	.*retained.*unchanged\|^refused	t1	.*unchanged.*retained" \
+    || why "idle-reap does not report the held copy as refused: $(idle_scan)" || return 1
+  make_retries_due
+  idle_reap
+  prune run t1 --now >/dev/null 2>&1
+  prune sweep >/dev/null 2>&1
+  [ "$(stub_calls)" = 1 ] || why "order '$1' called teardown $(stub_calls) times, want 1" || return 1
+  if [ "${2:-}" = drain ]; then
+    [ "$(copy_wakes)" = 0 ] || why "order '$1': a drained wake was raised again ($(copy_wakes))" || return 1
+  else
+    [ "$(copy_wakes)" = 1 ] || why "order '$1' raised $(copy_wakes) wakes naming the copy, want 1: $(cat "$STATE/.wake-queue" 2>/dev/null)" || return 1
+  fi
+  [ -e "$COPY" ] || why "the copy was removed" || return 1
+  return 0
+}
+scn_closeout_idle_reap_only() { scn_closeout_one_attempt_and_one_wake_across_both_sweeps "idle idle"; }
+scn_closeout_idle_reap_then_prune() { scn_closeout_one_attempt_and_one_wake_across_both_sweeps "idle prune"; }
+scn_closeout_prune_then_idle_reap() { scn_closeout_one_attempt_and_one_wake_across_both_sweeps "prune idle"; }
+scn_closeout_drained_wake_is_not_raised_again_after_prune() { scn_closeout_one_attempt_and_one_wake_across_both_sweeps "prune idle" drain; }
+scn_closeout_drained_wake_is_not_raised_again_after_idle_reap() { scn_closeout_one_attempt_and_one_wake_across_both_sweeps "idle prune" drain; }
+
+scn_closeout_failed_wake_append_is_raised_again() {
+  make_world
+  mk_nested; mk_closeout_out own "$NESTED"
+  mkdir "$STATE/.wake-queue"
+  go
+  grep -q '^wake_sent=0$' "$(closeout_file)" || why "a wake that could not be appended was recorded as sent: $(cat "$(closeout_file)")" || return 1
+  [ "$(rec_field t1 wake_sent)" = 0 ] || why "the prune record marks the failed wake as sent" || return 1
+  rmdir "$STATE/.wake-queue"
+  make_retries_due
+  prune run t1 >/dev/null 2>&1
+  [ "$(copy_wakes)" = 1 ] || why "after the queue was repaired want one wake, got $(copy_wakes)" || return 1
+  grep -q '^wake_sent=1$' "$(closeout_file)" || why "the sent wake was not recorded: $(cat "$(closeout_file)")" || return 1
+  make_retries_due
+  prune run t1 >/dev/null 2>&1
+  idle_reap
+  [ "$(copy_wakes)" = 1 ] || why "a later attempt raised another wake: $(copy_wakes)" || return 1
+  [ "$(stub_calls)" = 1 ] || why "teardown ran $(stub_calls) times, want 1" || return 1
+  return 0
+}
+
+scn_closeout_changed_copy_is_retried() {  # <commit|untracked|modified>
+  make_world
+  mk_nested; mk_closeout_out own "$NESTED"
+  go
+  case "$1" in
+    commit) printf 'more\n' > "$COPY/more.txt"; git -C "$COPY" add more.txt; git -C "$COPY" commit -q -m more ;;
+    untracked) printf 'new\n' > "$COPY/new-file.txt" ;;
+    modified) printf 'edit\n' >> "$COPY/README.md" ;;
+  esac
+  make_retries_due
+  prune run t1 >/dev/null 2>&1
+  [ "$(stub_calls)" = 2 ] || why "a copy changed by '$1' was not retried (calls=$(stub_calls))" || return 1
+  [ "$(copy_wakes)" = 2 ] || why "the new refusal of the changed copy raised $(copy_wakes) wakes in all, want 2" || return 1
+  make_retries_due
+  prune run t1 >/dev/null 2>&1
+  [ "$(stub_calls)" = 2 ] || why "the new fingerprint is not held (calls=$(stub_calls))" || return 1
+  return 0
+}
+scn_closeout_new_commit_is_retried() { scn_closeout_changed_copy_is_retried commit; }
+scn_closeout_new_untracked_file_is_retried() { scn_closeout_changed_copy_is_retried untracked; }
+scn_closeout_modified_file_is_retried() { scn_closeout_changed_copy_is_retried modified; }
+
+# Every row that must keep today's retry: no record, and the next due attempt calls teardown.
+scn_closeout_other_refusal_is_retried() {  # <variant>
+  make_world
+  case "$1" in
+    pipeline) printf 'pipeline\n' > "$W/stub.mode" ;;
+    nested-token) mk_nested; mk_closeout_out own "$NESTED" different_closeout_refusal_class cleanup_ignored_payload_archived_tree_retained ;;
+    unparsable) mk_nested; mk_closeout_out own "$NESTED" "" "" "" 1 ;;
+    mixed) mk_nested; mk_closeout_out own "$NESTED" "" "" "REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion." ;;
+    unreadable-nested) mk_closeout_out own "$W/no-such-nested" ;;
+    missing-copy) mk_nested; mk_closeout_out own "$NESTED"; sed -i.bak "s#^worktree=.*#worktree=$W/no-such-copy#" "$STATE/t1.meta" ;;
+  esac
+  go
+  [ "$(stub_calls)" = 1 ] || why "$1: the first attempt calls teardown $(stub_calls) times" || return 1
+  [ ! -e "$(closeout_file)" ] || why "$1: a closeout record was written" || return 1
+  make_retries_due
+  prune run t1 >/dev/null 2>&1
+  [ "$(stub_calls)" = 2 ] || why "$1: the due retry did not call teardown (calls=$(stub_calls))" || return 1
+  [ "$(wake_count)" = 1 ] || why "$1: want the one ordinary wake, got $(wake_count)" || return 1
+  return 0
+}
+scn_closeout_retry_pipeline() { scn_closeout_other_refusal_is_retried pipeline; }
+scn_closeout_retry_nested_token() { scn_closeout_other_refusal_is_retried nested-token; }
+scn_closeout_retry_unparsable() { scn_closeout_other_refusal_is_retried unparsable; }
+scn_closeout_retry_mixed() { scn_closeout_other_refusal_is_retried mixed; }
+scn_closeout_retry_unreadable_nested() { scn_closeout_other_refusal_is_retried unreadable-nested; }
+scn_closeout_retry_missing_copy() { scn_closeout_other_refusal_is_retried missing-copy; }
+
+scn_closeout_completed_teardown_clears_the_record() {
+  make_world
+  mk_nested; mk_closeout_out own "$NESTED"
+  go
+  [ -f "$(closeout_file)" ] || why "no closeout record was written" || return 1
+  printf 'edit\n' >> "$COPY/README.md"
+  printf 'ok\n' > "$W/stub.mode"
+  make_retries_due
+  prune run t1 >/dev/null 2>&1
+  [ "$(stub_calls)" = 2 ] || why "the changed copy was not retried (calls=$(stub_calls))" || return 1
+  [ ! -e "$(closeout_file)" ] || why "a completed teardown left the closeout record" || return 1
+  return 0
+}
+
+# --- the two sweeps overlap ------------------------------------------------------
+#
+# Neither sweep may start a second teardown against a copy whose first refusal is
+# not yet on record, and the one wake is raised once even when both sweeps hold
+# the same unsent wake. The parser stand-in pauses the first sweep after its
+# teardown has returned and before the refusal is recorded.
+
+mk_parser_gate() {
+  local real_py
+  real_py=$(command -v python3)
+  cat > "$W/bin/python3" <<SH
+#!/usr/bin/env bash
+case "\$*" in
+  *"did not release"*)
+    if [ -n "\${PARSER_GATE:-}" ]; then
+      : > "\$PARSER_GATE.reached"
+      n=0
+      while [ ! -e "\$PARSER_GATE.release" ] && [ "\$n" -lt 600 ]; do sleep 0.1; n=\$((n + 1)); done
+    fi ;;
+esac
+exec "$real_py" "\$@"
+SH
+  chmod +x "$W/bin/python3"
+}
+
+wait_for_file() {  # <file>: up to 30 s
+  local n=0
+  while [ ! -e "$1" ] && [ "$n" -lt 300 ]; do sleep 0.1; n=$((n + 1)); done
+  [ -e "$1" ]
+}
+
+scn_closeout_overlapping_sweeps_make_one_attempt() {  # <idle|prune>: the sweep that is paused first
+  local gate pid
+  make_world
+  gate="$W/gate"
+  mk_nested; mk_closeout_out own "$NESTED"; mk_parser_gate
+  [ -e "$STATE/t1.merge-prune" ] || prune arm t1 >/dev/null 2>&1
+  if [ "$1" = idle ]; then
+    PARSER_GATE=$gate idle_reap &
+  else
+    PARSER_GATE=$gate prune run t1 --now >/dev/null 2>&1 &
+  fi
+  pid=$!
+  if ! wait_for_file "$gate.reached"; then
+    : > "$gate.release"; wait "$pid"
+    why "the first sweep never reached the refusal parser" || return 1
+  fi
+  [ "$(stub_calls)" = 1 ] || { : > "$gate.release"; wait "$pid"; why "the first sweep called teardown $(stub_calls) times" || return 1; }
+  if [ "$1" = idle ]; then
+    prune run t1 --now >/dev/null 2>&1
+  else
+    idle_reap
+  fi
+  : > "$gate.release"
+  wait "$pid"
+  [ "$(stub_calls)" = 1 ] || why "a sweep started while the first refusal was unrecorded called teardown again (calls=$(stub_calls))" || return 1
+  [ "$(copy_wakes)" = 1 ] || why "want one wake for the copy, got $(copy_wakes): $(cat "$STATE/.wake-queue" 2>/dev/null)" || return 1
+  [ -f "$(closeout_file)" ] || why "no closeout record was written" || return 1
+  grep -q '^wake_sent=1$' "$(closeout_file)" || why "the sent wake is not recorded: $(cat "$(closeout_file)")" || return 1
+  return 0
+}
+scn_closeout_overlap_idle_reap_first() { scn_closeout_overlapping_sweeps_make_one_attempt idle; }
+scn_closeout_overlap_prune_first() { scn_closeout_overlapping_sweeps_make_one_attempt prune; }
+
+# An unsent wake (the first append failed) that both sweeps try to raise at the
+# same moment: the queue lock serializes the appends, so only the decision to
+# append can tell them apart.
+scn_closeout_unsent_wake_is_raised_once_by_two_sweeps() {
+  local ticks i pids=0 idle_pid prune_pid
+  make_world
+  ticks="$W/ticks"
+  mk_nested; mk_closeout_out own "$NESTED"
+  mkdir "$STATE/.wake-queue"
+  go
+  grep -q '^wake_sent=0$' "$(closeout_file)" || why "the failed append was recorded as sent" || return 1
+  rmdir "$STATE/.wake-queue"
+  cat > "$W/tick" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$PPID" >> "$ticks"
+SH
+  chmod +x "$W/tick"
+  mkdir "$STATE/.wake-queue.lock"
+  printf '%s\n' "$$" > "$STATE/.wake-queue.lock/pid"
+  make_retries_due
+  FM_LOCK_WAIT_TICK="$W/tick" idle_reap &
+  idle_pid=$!
+  FM_LOCK_WAIT_TICK="$W/tick" prune run t1 --now >/dev/null 2>&1 &
+  prune_pid=$!
+  i=0
+  while [ "$i" -lt 300 ]; do
+    pids=$(sort -u "$ticks" 2>/dev/null | wc -l | tr -d ' ')
+    [ "$pids" -lt 2 ] || break
+    if [ "$pids" -ge 1 ] && { ! kill -0 "$idle_pid" 2>/dev/null || ! kill -0 "$prune_pid" 2>/dev/null; }; then break; fi
+    sleep 0.1; i=$((i + 1))
+  done
+  rm -rf "$STATE/.wake-queue.lock"
+  wait "$idle_pid"; wait "$prune_pid"
+  [ "$(stub_calls)" = 1 ] || why "teardown ran $(stub_calls) times, want 1" || return 1
+  [ "$(copy_wakes)" = 1 ] || why "two sweeps raised $(copy_wakes) wakes for one refusal: $(cat "$STATE/.wake-queue" 2>/dev/null)" || return 1
+  grep -q '^wake_sent=1$' "$(closeout_file)" || why "the sent wake is not recorded: $(cat "$(closeout_file)")" || return 1
+  return 0
+}
+
+# The wake the queue accepted and the sent marker that could not be written. The
+# marker is made durable before the append, so a record directory that refuses
+# the write appends nothing, and once it takes the write again one wake follows
+# and no later sweep, even after the wake was consumed, raises another.
+scn_closeout_wake_survives_a_failed_marker_write() {  # <idle|prune>: the sweep that raises the wake
+  local dir n
+  make_world
+  mk_nested; mk_closeout_out own "$NESTED"
+  mkdir "$STATE/.wake-queue"
+  go
+  grep -q '^wake_sent=0$' "$(closeout_file)" || why "the failed append was recorded as sent" || return 1
+  rmdir "$STATE/.wake-queue"
+  dir="$STATE/.closeout-retained"
+  chmod 500 "$dir"
+  for n in 1 2; do
+    make_retries_due
+    if [ "$1" = idle ]; then idle_reap; else prune run t1 --now >/dev/null 2>&1; fi
+  done
+  chmod 700 "$dir"
+  [ "$(copy_wakes)" = 0 ] || why "a wake was appended although its sent marker could not be written: $(cat "$STATE/.wake-queue" 2>/dev/null)" || return 1
+  grep -q '^wake_sent=0$' "$(closeout_file)" || why "the record changed while it could not be written: $(cat "$(closeout_file)")" || return 1
+  make_retries_due
+  if [ "$1" = idle ]; then idle_reap; else prune run t1 --now >/dev/null 2>&1; fi
+  [ "$(copy_wakes)" = 1 ] || why "after the record took writes again want one wake, got $(copy_wakes)" || return 1
+  grep -q '^wake_sent=1$' "$(closeout_file)" || why "the accepted wake is not recorded as sent: $(cat "$(closeout_file)")" || return 1
+  : > "$STATE/.wake-queue"
+  for n in 1 2; do
+    make_retries_due
+    idle_reap
+    prune run t1 --now >/dev/null 2>&1
+  done
+  [ "$(copy_wakes)" = 0 ] || why "a consumed wake was raised again: $(cat "$STATE/.wake-queue" 2>/dev/null)" || return 1
+  [ "$(stub_calls)" = 1 ] || why "teardown ran $(stub_calls) times, want 1" || return 1
+  return 0
+}
+scn_closeout_marker_failure_by_idle_reap() { scn_closeout_wake_survives_a_failed_marker_write idle; }
+scn_closeout_marker_failure_by_prune() { scn_closeout_wake_survives_a_failed_marker_write prune; }
+
+test_closeout_retained_own_copy_is_not_retried() { assert_scenario scn_closeout_own_is_not_retried "an unchanged own nested copy the closeout driver retained is not offered to teardown again by run, run --now or sweep, and raises one wake"; }
+test_closeout_retained_foreign_copy_is_not_retried() { assert_scenario scn_closeout_foreign_is_not_retried "the same holds for a foreign copy refusal"; }
+test_closeout_retained_unsaved_output_is_not_retried() { assert_scenario scn_closeout_unsaved_is_not_retried "the same holds when the driver output could not be saved"; }
+test_closeout_idle_reap_only_makes_one_attempt() { assert_scenario scn_closeout_idle_reap_only "idle-reap alone: one teardown call and one wake"; }
+test_closeout_idle_reap_then_prune_make_one_attempt() { assert_scenario scn_closeout_idle_reap_then_prune "idle-reap then merge-prune: one teardown call and one wake"; }
+test_closeout_prune_then_idle_reap_make_one_attempt() { assert_scenario scn_closeout_prune_then_idle_reap "merge-prune then idle-reap: one teardown call and one wake"; }
+test_closeout_drained_wake_stays_drained_after_prune() { assert_scenario scn_closeout_drained_wake_is_not_raised_again_after_prune "a consumed wake is not raised again by either sweep (merge-prune first)"; }
+test_closeout_drained_wake_stays_drained_after_idle_reap() { assert_scenario scn_closeout_drained_wake_is_not_raised_again_after_idle_reap "a consumed wake is not raised again by either sweep (idle-reap first)"; }
+test_closeout_failed_wake_append_is_raised_again() { assert_scenario scn_closeout_failed_wake_append_is_raised_again "a closeout wake that could not be appended is raised again, once"; }
+test_closeout_new_commit_is_retried() { assert_scenario scn_closeout_new_commit_is_retried "a new commit in the retained copy lifts the hold, and its refusal raises a new wake"; }
+test_closeout_new_untracked_file_is_retried() { assert_scenario scn_closeout_new_untracked_file_is_retried "a new untracked file in the retained copy lifts the hold"; }
+test_closeout_modified_file_is_retried() { assert_scenario scn_closeout_modified_file_is_retried "a modified tracked file in the retained copy lifts the hold"; }
+test_closeout_other_pipeline_refusal_keeps_its_retry() { assert_scenario scn_closeout_retry_pipeline "a refusal of another retained class makes no closeout record and is retried when due"; }
+test_closeout_nested_token_keeps_its_retry() { assert_scenario scn_closeout_retry_nested_token "a closeout refusal whose top-level reason differs, with the retained token only nested, makes no record"; }
+test_closeout_unparsable_json_keeps_its_retry() { assert_scenario scn_closeout_retry_unparsable "a driver JSON line that cannot be parsed makes no record"; }
+test_closeout_mixed_refusal_keeps_its_retry() { assert_scenario scn_closeout_retry_mixed "a closeout refusal next to another refusal line makes no record"; }
+test_closeout_unreadable_nested_copy_keeps_its_retry() { assert_scenario scn_closeout_retry_unreadable_nested "a named copy that cannot be fingerprinted makes no record"; }
+test_closeout_missing_task_copy_keeps_its_retry() { assert_scenario scn_closeout_retry_missing_copy "a task copy that cannot be fingerprinted makes no record"; }
+test_closeout_completed_teardown_clears_the_record() { assert_scenario scn_closeout_completed_teardown_clears_the_record "a teardown that completes clears the closeout record"; }
+
+test_closeout_overlap_idle_reap_first_makes_one_attempt() { assert_scenario scn_closeout_overlap_idle_reap_first "a merge-prune attempt that starts while idle-reap's first refusal is not yet recorded calls no second teardown and raises one wake"; }
+test_closeout_overlap_prune_first_makes_one_attempt() { assert_scenario scn_closeout_overlap_prune_first "an idle-reap sweep that starts while merge-prune's first refusal is not yet recorded calls no second teardown and raises one wake"; }
+test_closeout_unsent_wake_is_raised_once_by_two_sweeps() { assert_scenario scn_closeout_unsent_wake_is_raised_once_by_two_sweeps "two sweeps that both hold the same unsent wake raise it once"; }
+test_closeout_marker_failure_by_idle_reap_raises_one_wake() { assert_scenario scn_closeout_marker_failure_by_idle_reap "a sent marker that cannot be written appends nothing; idle-reap then raises one wake, and none again after it is consumed"; }
+test_closeout_marker_failure_by_prune_raises_one_wake() { assert_scenario scn_closeout_marker_failure_by_prune "a sent marker that cannot be written appends nothing; merge-prune then raises one wake, and none again after it is consumed"; }
+
 # --- 1. arming ----------------------------------------------------------------
 
 test_arm_needs_a_verified_merge() {
@@ -3781,6 +4173,76 @@ test_e2e_pushed_follow_up_commit_after_the_merge_keeps_the_copy() {
   pass "end to end: a copy with a pushed follow-up commit that is not merged stays before anything is stopped, forces nothing and raises exactly one wake"
 }
 
+# --- the guard reassessment: what a changed fingerprint may and may not do -------
+#
+# Main's recorded reassessment of the closeout refusal memo (PR 365): the memo
+# judges only the retry of an unchanged refusal (H2); a changed fingerprint is
+# re-admitted, and the admission still passes through the unchanged landed-work
+# test of bin/fm-teardown.sh (H1). The records below are written by the library
+# that owns them, for the copy as it is at that moment, so a later change to the
+# copy is a change to a real fingerprint.
+
+seed_closeout_record() {  # <wake-sent: 0|1> [<head to record instead of the copy's>]
+  local rec="$STATE/.closeout-retained/t1"
+  bash -c '. "$1/fm-idle-reap-lib.sh"
+    CLOSEOUT_RETAINED_ENTRIES=("$(fm_closeout_retained_entry "$3")")
+    fm_closeout_retained_write "$2" t1 "$4"' _ "$BIN_DIR" "$STATE" "$COPY" "$1" || fail "could not seed the closeout record"
+  if [ -n "${2:-}" ]; then
+    sed -i.bak "5s/^[0-9a-f]* /$2 /" "$rec" && rm -f "$rec.bak"
+  fi
+}
+
+# T1 (H2, unchanged): an unchanged fingerprint makes no teardown call across two
+# sweeps, so the closeout driver is not run again.
+test_e2e_closeout_unchanged_fingerprint_makes_no_teardown_call() {
+  make_e2e_world
+  seed_closeout_record 1
+  prune_real arm t1
+  prune_real run t1 --now >/dev/null 2>&1
+  prune_real run t1 --now >/dev/null 2>&1
+  [ ! -s "$W/stub.log" ] || fail "an unchanged retained copy was offered to the real teardown: $(cat "$W/stub.log")"
+  [ -e "$COPY" ] && [ -e "$STATE/t1.meta" ] || fail "the held copy or its record is gone"
+  assert_not_destroyed "e2e unchanged fingerprint"
+  assert_nothing_forced "e2e unchanged fingerprint"
+  pass "end to end: an unchanged closeout fingerprint makes no call to the real teardown in two sweeps and removes nothing"
+}
+
+# T2 (H1, changed): a changed copy that holds an unlanded commit is re-admitted
+# and the real teardown refuses it; nothing is removed or forced.
+test_e2e_closeout_changed_copy_with_an_unlanded_commit_is_refused_by_teardown() {
+  make_e2e_world
+  seed_closeout_record 1
+  printf 'unlanded\n' > "$COPY/unlanded.txt"
+  git -C "$COPY" add unlanded.txt
+  git -C "$COPY" commit -q -m "unlanded work after the refusal"
+  prune_real arm t1
+  prune_real run t1 --now >/dev/null 2>&1
+  [ "$(wc -l < "$W/stub.log" | tr -d ' ')" = 1 ] || fail "the changed copy was not offered to the real teardown exactly once: $(cat "$W/stub.log" 2>/dev/null)"
+  [ -e "$COPY" ] || fail "a copy holding an unlanded commit was removed"
+  [ "$(git -C "$COPY" log -1 --format=%s)" = "unlanded work after the refusal" ] || fail "the unlanded commit is gone"
+  [ -e "$STATE/t1.meta" ] || fail "the task record was closed over a copy with unlanded work"
+  [ ! -e "$STATE/.closeout-retained/t1" ] || fail "the stale closeout record was left behind"
+  assert_not_destroyed "e2e changed with unlanded work"
+  assert_nothing_forced "e2e changed with unlanded work"
+  pass "end to end: a changed copy with an unlanded commit is re-admitted, the real teardown refuses it, and nothing is removed or forced"
+}
+
+# T4 (R4): a changed copy whose work is landed is re-admitted and cleaned up in
+# the same sweep.
+test_e2e_closeout_changed_copy_with_landed_work_is_cleaned_up_in_the_same_sweep() {
+  make_e2e_world
+  seed_closeout_record 1 0000000000000000000000000000000000000000
+  prune_real arm t1
+  prune_real run t1 --now >/dev/null 2>&1
+  [ "$(wc -l < "$W/stub.log" | tr -d ' ')" = 1 ] || fail "the changed copy was not offered to the real teardown: $(cat "$W/stub.log" 2>/dev/null)"
+  [ ! -e "$COPY" ] || fail "a changed copy whose work is landed was not cleaned up: $(cat "$DATA/t1/merge-prune.log" 2>/dev/null)"
+  assert_copy_removed
+  [ ! -e "$STATE/t1.meta" ] || fail "the task record is still there"
+  [ ! -e "$STATE/.closeout-retained/t1" ] || fail "the stale closeout record is still there"
+  assert_nothing_forced "e2e changed with landed work"
+  pass "end to end: a changed copy whose work is landed is re-admitted and cleaned up by the real teardown in the same sweep"
+}
+
 test_e2e_unsafe_copies_are_never_removed() {
   local what
   for what in dirty unpushed nested-unpushed; do
@@ -3905,6 +4367,30 @@ ALL_TESTS=(
   test_fallback_destroy_failure_keeps_the_copy
   test_retained_copy_is_reaped_quietly_when_the_cause_clears
   test_long_retained_reason_is_logged_once
+  test_closeout_retained_own_copy_is_not_retried
+  test_closeout_retained_foreign_copy_is_not_retried
+  test_closeout_retained_unsaved_output_is_not_retried
+  test_closeout_idle_reap_only_makes_one_attempt
+  test_closeout_idle_reap_then_prune_make_one_attempt
+  test_closeout_prune_then_idle_reap_make_one_attempt
+  test_closeout_drained_wake_stays_drained_after_prune
+  test_closeout_drained_wake_stays_drained_after_idle_reap
+  test_closeout_failed_wake_append_is_raised_again
+  test_closeout_new_commit_is_retried
+  test_closeout_new_untracked_file_is_retried
+  test_closeout_modified_file_is_retried
+  test_closeout_other_pipeline_refusal_keeps_its_retry
+  test_closeout_nested_token_keeps_its_retry
+  test_closeout_unparsable_json_keeps_its_retry
+  test_closeout_mixed_refusal_keeps_its_retry
+  test_closeout_unreadable_nested_copy_keeps_its_retry
+  test_closeout_missing_task_copy_keeps_its_retry
+  test_closeout_completed_teardown_clears_the_record
+  test_closeout_overlap_idle_reap_first_makes_one_attempt
+  test_closeout_overlap_prune_first_makes_one_attempt
+  test_closeout_unsent_wake_is_raised_once_by_two_sweeps
+  test_closeout_marker_failure_by_idle_reap_raises_one_wake
+  test_closeout_marker_failure_by_prune_raises_one_wake
   test_fallback_ends_the_tasks_idle_pane_shell_on_tmux
   test_fallback_ends_the_tasks_idle_pane_shell_on_herdr
   test_fallback_keeps_a_non_shell_process_in_the_pane
@@ -3964,6 +4450,9 @@ ALL_TESTS=(
   test_e2e_worker_exited_before_the_merge_is_pruned
   test_e2e_squash_merged_copy_with_ignored_files_is_reaped_by_the_fallback
   test_e2e_pushed_follow_up_commit_after_the_merge_keeps_the_copy
+  test_e2e_closeout_unchanged_fingerprint_makes_no_teardown_call
+  test_e2e_closeout_changed_copy_with_an_unlanded_commit_is_refused_by_teardown
+  test_e2e_closeout_changed_copy_with_landed_work_is_cleaned_up_in_the_same_sweep
   test_e2e_unsafe_copies_are_never_removed
   test_unsafe_mutations_are_caught
   test_over_strict_mutations_are_caught
