@@ -6,7 +6,7 @@
 //   - omp auto-discovers this file from <cwd>/.omp/extensions with no trust
 //     gate, so an omp primary or secondmate started inside its home loads it
 //     without -e (naming it both ways loads it twice - verified, omp 18.1.11).
-//   - Accepting a wake means sendUserMessage returned or its promise settled,
+//   - Accepting a wake means sendUserMessage returned or its promise fulfilled,
 //     not that a turn consumed it. Delivery settlement is awaited separately
 //     from serialized successor restoration, so a model turn cannot hold re-arm.
 //   - omp reports no session_shutdown reason, so EVERY shutdown with a pending
@@ -90,7 +90,7 @@
 // at state/extensions/omp-primary-watch/lifecycle.log.
 //
 // Delivery versus consumption (stated once here):
-// A main wake is delivered once omp accepts it (sendUserMessage returns).
+// A main wake is delivered once omp accepts it (sendUserMessage returns or its promise fulfills).
 // docs/watcher-continuity.md owns idle queue-read delivery, consumption, and
 // restored-editor safety; accepted watcher text is never replay authority.
 //
