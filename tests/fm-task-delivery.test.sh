@@ -634,20 +634,20 @@ STUB
     printf 'window=fm-%s\nkind=scout\nworktree=/tmp/wt\n' "$id" > "$home/state/$id.meta"
     FM_HOME="$home" "$BRIEF" "$id" fixture-project --scout >/dev/null 2>&1 || fail "$mode: scout brief generation should succeed"
     fill_brief_subsections "$home/data/$id/brief.md" "Ship the change." "Keep the contract."
-    assert_no_grep 'Closes: <task-id>' "$home/data/$id/brief.md" "$mode: an unpromoted scout brief taught the Closes: line"
+    assert_no_grep "Closes-backlog-item: $id" "$home/data/$id/brief.md" "$mode: an unpromoted scout brief taught the Closes-backlog-item: line"
     out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$PROMOTE" "$id" --mode "$mode" --yolo off 2>&1) || fail "$mode: promotion should succeed"
     payload="$TMP_ROOT/promote-closes/payload-$id"
     ( cd "$sendroot" && FM_TEST_CAPTURE="$payload" eval "$(printf '%s\n' "$out" | sed -n 's/^next: //p' | grep 'fm-send\.sh')" ) \
       || fail "$mode: promotion's delivery command did not run"
     if [ "$mode" = local-only ]; then
-      assert_no_grep 'Closes: <task-id>' "$payload" "local-only: the delivered ship instructions taught a Closes: line"
-      assert_no_grep 'Closes: <task-id>' "$home/data/$id/brief.md" "local-only: the relaunch brief taught a Closes: line"
+      assert_no_grep "Closes-backlog-item: $id" "$payload" "local-only: the delivered ship instructions taught a Closes-backlog-item: line"
+      assert_no_grep "Closes-backlog-item: $id" "$home/data/$id/brief.md" "local-only: the relaunch brief taught a Closes-backlog-item: line"
     else
-      assert_grep 'Closes: <task-id>' "$payload" "$mode: the delivered ship instructions did not teach the Closes: line"
-      assert_grep 'Closes: <task-id>' "$home/data/$id/brief.md" "$mode: the relaunch brief did not teach the Closes: line"
+      assert_grep "Closes-backlog-item: $id" "$payload" "$mode: the delivered ship instructions did not teach the Closes-backlog-item: line"
+      assert_grep "Closes-backlog-item: $id" "$home/data/$id/brief.md" "$mode: the relaunch brief did not teach the Closes-backlog-item: line"
     fi
   done
-  pass "promotion teaches the Closes: line in the delivered text and the relaunch brief for PR modes only"
+  pass "promotion teaches the Closes-backlog-item: line in the delivered text and the relaunch brief for PR modes only"
 }
 
 test_promotion_persists_the_selected_ship_branch() {
