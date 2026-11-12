@@ -62,12 +62,14 @@ import json
 import os
 import random
 import re
+import runpy
 import shutil
 import subprocess
 import sys
 import time
 import unicodedata
 import unittest
+import urllib.parse
 import urllib.request
 import tempfile
 from unittest.mock import patch
@@ -3867,14 +3869,49 @@ class IntakeTest(unittest.TestCase):
 
     def test_every_stream_write_of_every_command_goes_through_the_one_writer(self):
         """The runtime view of the egress boundary: standard output and standard error are replaced by streams that fail any write whose caller is
-        not Out.write, and the commands are run (help, a missing and an unknown command, an unexpected argument, a refused and an unconfigured
-        plane for poll and arm, resolve of an unknown request): every line they print passes the writer."""
+        not Out.write, and the commands are run: help, a missing and an unknown command, an unexpected argument, a refused and an unconfigured plane
+        for poll and arm, resolve of an unknown request. Then every other line a command can print is reached through the public entry points, each
+        run in a home of its own with the replay transport (or, for the progress line of a check, the real transport on an opener that answers from the
+        replay) and the synthetic token and signing secret: arm and its refusals (the source not bound, an unreadable transcript, a state folder that is a
+        link, a check file or a trust file that is a link, a check file that is a folder, a registration that fails), disarm and its failure, retarget
+        changed and unchanged, resolve of a failed request, the help text of the check script, a poll that takes a request in, a poll with an unreadable
+        transcript, a transport that fails with an error of its own (arm and poll), a check that finishes requests, and the two last lines of the entry
+        point (a collision in the constants of disarm, and the last resort). Each run must print exactly the fixed line it is meant to reach, every byte
+        of it through Out.write, nothing to file descriptor 1 or 2 outside the two streams, and no value of the plane. A raw print or os.write on any of
+        these paths therefore fails here at run time. The runs are plane.main in this process (and the file run as __main__ with runpy for the entry
+        point's own two lines), against the replay transport, a transport class of the test that fails, or, for the progress line only, the real
+        transport on an opener that answers from the replay, with every socket, the name lookup and the connection refused for the whole of each run.
+        What these runs check is the two streams and descriptors 1 and 2; the file, child and network kinds of raw way out are checked only by the
+        planted test, and only on the path of a poll.
+        Not covered, by name: a raw file write, a raw child start or a raw network call on a path other than a poll; the one line that Watch.report_failure prints directly when the save of the state is refused for a collision (the only
+        output site of the plane that none of these runs reaches); the journaled lines of Watch.say other than the request line, which leave through
+        the same emit that the request line takes; an alias of a raw way out that is never called; a file written outside the home; and a raw write
+        to a descriptor other than 1 and 2."""
         class Observer(io.StringIO):
             def write(self, text):
                 caller = sys._getframe(1)
                 if type(caller.f_locals.get('self')).__name__ != 'Out' or caller.f_code.co_name != 'write':
                     raise AssertionError('a stream write that did not go through Out.write, from %s' % caller.f_code.co_name)
                 return super().write(text)
+
+        @contextlib.contextmanager
+        def raw_descriptors():
+            """What is written to the real file descriptors 1 and 2 while the block runs, outside the two Python streams."""
+            files = {fd: tempfile.TemporaryFile() for fd in (1, 2)}
+            saved = {fd: os.dup(fd) for fd in files}
+            seen = {}
+            try:
+                for fd, handle in files.items():
+                    os.dup2(handle.fileno(), fd)
+                yield seen
+            finally:
+                for fd, handle in files.items():
+                    os.dup2(saved[fd], fd)
+                    os.close(saved[fd])
+                    handle.seek(0)
+                    seen[fd] = handle.read()
+                    handle.close()
+
         value = 'invalid_FM_SLACK_POLL_MAX_ANSWERS_1_to_200'
         runs = [([], {}), (['bogus'], {}), (['poll', 'unexpected'], {}), (['poll', '--help'], {}), (['poll'], {'FM_SLACK_POLL_MAX_ANSWERS': 'x'}),
                 (['check'], {'FM_SLACK_CHECK_ACTION': 'arm', 'FM_SLACK_POLL_MAX_ANSWERS': 'x'}), (['poll'], {'SLACK_BOT_TOKEN': ''})]
@@ -3889,6 +3926,178 @@ class IntakeTest(unittest.TestCase):
                     except SystemExit:
                         pass
                 self.assertNotIn(value, out.getvalue() + err.getvalue(), (argv, env))
+
+        class Failing(Replay):
+            def call(self, method, **fields):
+                raise RuntimeError('a transport that fails with an error of its own')
+
+        class FailingElse(Replay):
+            def __init__(self, *args, **kwargs):
+                raise ZeroDivisionError('a transport that cannot even be built, with an error that no handler of the plane names')
+
+        def invoke(argv, env, bound=True, drop=(), transport=None, entry=False, stdin=None, entry_transport=None):
+            """One run of the plane from its public entry (plane.main, or the file run as __main__ for the entry point's own last line): the streams are
+            Observers, the real descriptors are captured, no socket, name lookup or connection may be made, and the result is (exit code, standard output,
+            standard error, bytes on descriptors 1 and 2, the attempts to reach the network)."""
+            out, err = Observer(), Observer()
+            attempts = []
+
+            def refuse(*args, **kwargs):
+                attempts.append(args)
+                raise AssertionError('a socket was opened')
+            with contextlib.ExitStack() as stack:
+                stack.enter_context(patch.dict(os.environ, env))
+                for key in drop:
+                    os.environ.pop(key, None)
+                stack.enter_context(contextlib.redirect_stdout(out))
+                stack.enter_context(contextlib.redirect_stderr(err))
+                stack.enter_context(patch.object(Watch, 'bound', return_value=bound))
+                for guarded in ('socket.socket', 'socket.create_connection', 'socket.getaddrinfo'):
+                    stack.enter_context(patch(guarded, side_effect=refuse))
+                if transport is not None:
+                    stack.enter_context(patch.object(plane, 'Replay', transport))
+                if entry_transport is not None:
+                    stack.enter_context(patch.object(sys.modules['fm_slack_replay'], 'Replay', entry_transport))   # the entry point imports it afresh when it runs as __main__
+                if stdin is not None:
+                    stack.enter_context(patch.object(sys, 'stdin', io.StringIO(stdin)))
+                raw = stack.enter_context(raw_descriptors())
+                try:
+                    if entry:
+                        stack.enter_context(patch.object(sys, 'argv', ['fm_slack_watch.py', *argv]))
+                        runpy.run_path(str(Path(plane.__file__)), run_name='__main__')
+                        code = 'returned'
+                    else:
+                        code = plane.main(argv)
+                except SystemExit as stop:
+                    code = stop.code
+                except SlackError as error:
+                    code = 'raised ' + str(error)
+            return code, out.getvalue(), err.getvalue(), raw, attempts
+
+        armed = 'armed: state/%s.check.sh\n' % plane.CHECK_ID
+        disarmed = 'disarmed: state/%s.check.sh\n' % plane.CHECK_ID
+        refused = lambda name: 'slack: refused: %s\n' % name
+        unchanged = 'unchanged: FM_SLACK_DM_USER matches the DM already in use; nothing to retarget\n'
+
+        def fake_opener(replay_path, home):
+            """The real transport talks to this opener: it answers every call from the replay, as the deadline test's fake HTTP bodies do."""
+            answers = Replay(replay_path, home / 'slack-watch')
+
+            class Response(io.BytesIO):
+                headers = {'x-oauth-scopes': ','.join(answers.scopes)}
+
+            def urlopen(request, timeout):
+                method = request.full_url.rsplit('/', 1)[-1]
+                fields = dict(urllib.parse.parse_qsl(request.data.decode()))
+                for key, field in fields.items():
+                    with contextlib.suppress(ValueError):
+                        fields[key] = json.loads(field)
+                return Response(json.dumps(answers.call(method, **fields)).encode())
+            return urlopen
+
+        def link_to(home, name='link'):
+            link = home.parent / ('%s-%s' % (name, home.name))
+            link.symlink_to(home)
+            return link
+
+        # each case: label, the work done in its home before the run (returns env additions), argv, extra env, how the run is made, the exact (stdout, stderr)
+        check_shim = lambda home: home / ('%s.check.sh' % plane.CHECK_ID)
+        check_trust = lambda home: home / ('%s.check-trust' % plane.CHECK_ID)
+
+        def make_link_state(home, watch=None, replay=None):
+            return {'FM_STATE_OVERRIDE': str(link_to(home))}
+
+        def make_shim_link(home, watch=None, replay=None):
+            check_shim(home).symlink_to(home / 'transcript.json')
+            return {}
+
+        def make_trust_link(home, watch=None, replay=None):
+            check_trust(home).symlink_to(home / 'transcript.json')
+            return {}
+
+        def make_shim_folder(home, watch=None, replay=None):
+            check_shim(home).mkdir()
+            return {}
+
+        def make_shared_shim(home, watch=None, replay=None):
+            check_shim(home).write_text('#!/usr/bin/env bash\n')
+            check_shim(home).chmod(0o700)
+            os.link(check_shim(home), home / 'second-name-of-the-check-file')   # a check file with two names cannot be registered
+            return {}
+
+        def make_other_owner(home, watch=None, replay=None):
+            return {'FM_SLACK_DM_USER': self.NEW_OWNER}
+
+        def make_unreadable_transcript(home, watch=None, replay=None):
+            (home / 'transcript.json').rename(home / 'moved-transcript.json')
+            return {}
+
+        def make_registered(home, watch=None, replay=None):
+            first = invoke(['check', '--replay', str(home / 'transcript.json')], {'FM_SLACK_CHECK_ACTION': 'arm', 'FM_SLACK_NO_NETWORK': '1'})
+            self.assertEqual((first[:2], first[4]), ((0, armed), []))
+            return {}
+
+        def make_failed_request(home, watch, replay):
+            self.release(watch, replay)   # leaves the failed request 200.000100 open
+            return {}
+
+        def make_a_request(home, watch, replay):
+            self.say(replay, '200.000100', 'a plain owner request')
+            replay.save()   # the command builds its own replay from this file
+            return {}
+
+        entry_value = disarmed.strip()   # a plane value equal to a constant that disarm prints: the entry point refuses it with its own last line
+        cases = [
+            ('arm', None, ['check', '--replay', 'T'], {'FM_SLACK_CHECK_ACTION': 'arm'}, {}, (armed, '')),
+            ('arm, the source not bound', None, ['check', '--replay', 'T'], {'FM_SLACK_CHECK_ACTION': 'arm'}, {'bound': False}, ('', refused('source_not_bound'))),
+            ('arm, an unreadable transcript', make_unreadable_transcript, ['check', '--replay', 'T'], {'FM_SLACK_CHECK_ACTION': 'arm'}, {}, ('', refused('replay_transcript_unreadable'))),
+            ('arm, a state folder that is a link', make_link_state, ['check', '--replay', 'T'], {'FM_SLACK_CHECK_ACTION': 'arm'}, {}, ('', refused('unsafe_state_path'))),
+            ('arm, a check file that is a link', make_shim_link, ['check', '--replay', 'T'], {'FM_SLACK_CHECK_ACTION': 'arm'}, {}, ('', refused('unsafe_state_path'))),
+            ('arm, a trust file that is a link', make_trust_link, ['check', '--replay', 'T'], {'FM_SLACK_CHECK_ACTION': 'arm'}, {}, ('', refused('unsafe_state_path'))),
+            ('arm, a check file that is a folder', make_shim_folder, ['check', '--replay', 'T'], {'FM_SLACK_CHECK_ACTION': 'arm'}, {}, ('', refused('unsafe_check_shim'))),
+            ('arm, a registration that fails', make_shared_shim, ['check', '--replay', 'T'], {'FM_SLACK_CHECK_ACTION': 'arm'}, {}, ('', refused('check_registration_failed'))),
+            ('arm, a transport that fails with an error of its own', None, ['check', '--replay', 'T'], {'FM_SLACK_CHECK_ACTION': 'arm'}, {'transport': Failing}, ('', refused('local_runtime_error'))),
+            ('disarm', None, ['check'], {'FM_SLACK_CHECK_ACTION': 'disarm'}, {}, (disarmed, '')),
+            ('disarm, a state folder that is a link', make_link_state, ['check'], {'FM_SLACK_CHECK_ACTION': 'disarm'}, {}, ('slack: refused: check_unregistration_failed\n', '')),
+            ('retarget, the owner unchanged', None, ['check', '--replay', 'T'], {'FM_SLACK_CHECK_ACTION': 'retarget'}, {}, (unchanged, '')),
+            ('retarget, the owner changed', make_other_owner, ['check', '--replay', 'T'], {'FM_SLACK_CHECK_ACTION': 'retarget'}, {}, ('retargeted: the old DM is no longer tracked; ', '')),
+            ('poll, an unreadable transcript', make_unreadable_transcript, ['poll', '--replay', 'T'], {}, {}, ('slack: transport failure: replay_transcript_unreadable\n', '')),
+            ('poll, a transport that fails with an error of its own', None, ['poll', '--replay', 'T'], {}, {'transport': Failing}, ('slack: local_runtime_error\n', '')),
+            ('resolve', make_failed_request, ['check', '200.000100'], {'FM_SLACK_CHECK_ACTION': 'resolve'}, {}, ('resolved: slack request 200.000100\n', '')),
+            ('the help text of the check script', None, ['--print-help-text'], {}, {'stdin': 'usage: a help text that the check script feeds to the plane\n'}, ('usage: a help text that the check script feeds to the plane\n', '')),
+            ('poll, a request taken in', make_a_request, ['poll', '--replay', 'T'], {}, {}, ('check: slack request 200.000100 from U0TESTOWNER: ', '')),
+            ('check, the real transport on a fake opener', make_registered, ['check'], {'FM_SLACK_CHECK_ACTION': 'check'}, {'drop': ('FM_SLACK_NO_NETWORK',), 'opener': True}, ('', 'slack: request finished\n')),
+            ('the entry point\'s last resort', None, ['poll', '--replay', 'T'], {}, {'entry': True, 'entry_transport': FailingElse}, ('', 'slack: local_runtime_error\n')),
+            ('the entry point\'s last line', None, ['check'], {'FM_SLACK_CHECK_ACTION': 'disarm', 'SLACK_SIGNING_SECRET': entry_value}, {'entry': True}, ('error: slack secret_collides_with_marker\n', '')),
+        ]
+        for label, prepare, argv, env, how, (want_out, want_err) in cases:
+            with self.fixture() as (watch, replay):
+                watch.lock.close()
+                home = watch.root.parent
+                try:
+                    extra = prepare(home, watch, replay) if prepare else {}
+                    argv = [str(home / 'transcript.json') if word == 'T' else word for word in argv]
+                    options = {key: val for key, val in how.items() if key != 'opener'}
+                    run_env = {'FM_SLACK_NO_NETWORK': '1', **extra, **env}
+                    with contextlib.ExitStack() as stack:
+                        if how.get('opener'):
+                            stack.enter_context(patch.object(urllib.request, 'urlopen', fake_opener(home / 'transcript.json', home)))
+                        code, out, err, raw, attempts = invoke(argv, run_env, **options)
+                finally:
+                    for link in home.parent.glob('link-%s' % home.name):
+                        link.unlink()
+                # the lines of the progress run are one per reply of the transport; every other line is exactly the one the case is meant to reach
+                if label.startswith('check, the real transport'):
+                    self.assertEqual((out, set(err.splitlines()), err.endswith('\n')), (want_out, {want_err.strip()}, True), label)
+                    self.assertGreaterEqual(len(err.splitlines()), 1, label)
+                elif want_out.endswith('; ') or want_out.endswith('U0TESTOWNER: '):
+                    self.assertTrue(out.startswith(want_out) and out.count('\n') == 1 and err == want_err, (label, out, err))
+                else:
+                    self.assertEqual((out, err), (want_out, want_err), label)
+                self.assertEqual(raw, {1: b'', 2: b''}, '%s wrote to a file descriptor outside the two streams' % label)
+                self.assertEqual(attempts, [], '%s tried to reach the network' % label)
+                for secret in (self.TOKEN, self.SIGNING):
+                    self.assertNotIn(secret, out + err, label)
 
     def test_a_bypass_of_every_kind_planted_at_run_time_is_caught_by_a_runtime_check(self):
         """Bad controls for the egress boundary, at run time: a poll runs on the transcript while a stub on its real call path (the save of its
