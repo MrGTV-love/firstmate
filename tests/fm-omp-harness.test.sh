@@ -5052,8 +5052,6 @@ test_watch_lifecycle_deadline_diagnostics() {
   pass "omp explicit shutdown logs its retirement expiry; readiness has no wall-clock cutoff"
 }
 
-fm_test_only
-
 test_spawn_fixed_family
 test_watch_lifecycle_deadline_diagnostics
 
