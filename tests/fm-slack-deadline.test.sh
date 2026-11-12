@@ -7,5 +7,9 @@ set -euo pipefail
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+# This suite runs the registered check file of a fixture home, which only Main or the grader runs (Main 2180).
+# shellcheck source=tests/fixtures/slack/registered-gate.sh
+. "$ROOT/tests/fixtures/slack/registered-gate.sh"
+fm_slack_registered_allowed "the Slack deadline suite" || exit 0
 command -v tasks-axi >/dev/null || { printf 'skip: tasks-axi not found\n'; exit 0; }
 python3 "$ROOT/tests/fm_slack_deadline_test.py"
