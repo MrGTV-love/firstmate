@@ -2311,7 +2311,9 @@ command_unbind() {
   perl -e '
     use strict; use warnings; use Fcntl qw(:flock);
     my ($dir, $path) = @ARGV;
-    # A delivery under the shared hold makes at most three Slack calls, each bound by the 10 s timeout of bin/fm_slack.py, so 30 s at worst: 60 s is twice that.
+    # A request acknowledgement under the shared hold makes at most three Slack calls, each bound by the 10 s timeout of bin/fm_slack.py, so 30 s at worst.
+    # A mirror card post holds it longer: the probe child, owner_channel (it can call conversations.open), the lookup in post, chat.postMessage, and one
+    # reactions.add call per option, each Slack call bound by the same 10 s timeout, so a slow Slack can pass 60 s. The alarm is only a message: the wait never ends because of it.
     my $alarm_after = 60;
     if (!stat($dir)) {
       exit 0 if $!{ENOENT};
