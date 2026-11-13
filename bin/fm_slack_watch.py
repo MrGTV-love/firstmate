@@ -1261,7 +1261,7 @@ class Watch:
             channel = self.row_channel(row)
             marker = hashlib.sha256(event.encode()).hexdigest()
             try:
-                earlier = self.recent(thread, channel) if row and row.get('person') == 'second' else self.recent(thread)
+                earlier = self.recent(thread, channel)
             except SlackError as error:
                 if row is None:
                     raise
@@ -2351,7 +2351,7 @@ class Watch:
         error, left = self.take_in(max(0, remaining - self.notices_handled))
         deferred = deferred or error
         # The second person's work comes after all of the owner's, and takes only what the cap leaves of it.
-        self.second_poll(left if isinstance(left, int) else 0)
+        self.second_poll(left)
         if deferred:
             raise deferred
 
@@ -2384,14 +2384,17 @@ class Watch:
         # request is no longer retried; it waits in the journal for `fm-slack-check.sh resolve`. Each person's rows hold only their own window.
         if any(row.get('kind') == 'request' and not failed(row) and (row.get('person') == 'second') == second for row in self.state['pending']):
             return None
-        self.second_channel() if second else self.owner_channel()
+        if second:
+            self.second_channel()
+        else:
+            self.owner_channel()
         bounds = win.get('intake_bounds')
         bounds = bounds if isinstance(bounds, list) else []
         bound = bounds[-1] if bounds else None
         fields = {'oldest': cursor, 'limit': REQUEST_PAGE}
         if bound:
             fields['latest'] = bound
-        data = self.read_window(channel, second=True, **fields) if second else self.read_window(channel, **fields)
+        data = self.read_window(channel, second=second, **fields)
         if not isinstance(data.get('messages'), list):
             raise SlackError('unreadable_dm_history')
         window = [message for message in data['messages']
@@ -2484,7 +2487,7 @@ class Watch:
     def second_poll(self, remaining):
         """Everything of the second person's, last, so that nothing of the owner's waits for it: it starts after the owner's requests are taken in, uses only what
         the per-poll cap leaves, and a failure of any Slack call of it (the read of their window, an acknowledgement) is isolated: logged once per episode in the
-        plane's log, never raised, so the owner's poll, its failure state and its exit status are what they are without them. An unbind and a plane value still end the run."""
+        plane's log with one notice line naming only the error, never raised, so the owner's poll, its failure state and its exit status are what they are without them. An unbind and a plane value still end the run."""
         self.second_config()
         if not self.second:
             return
@@ -2497,6 +2500,7 @@ class Watch:
         except SlackError as error:
             name = redact_sink(str(error))
             if self.state.get('second_failure') != name and self.second_log('second_window_failed', error=name):
+                self.say(redact_sink('slack: second person window failure: ' + name))
                 self.state['second_failure'] = name
                 self.commit()
         else:
