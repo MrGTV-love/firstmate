@@ -23,10 +23,11 @@ HELPER="$ROOT/tests/fm_slack_watch_test.py"
 planted="$ROOT/tests/.fm-slack-secret-planted"
 cleanup() { rm -f "$planted"; }
 trap cleanup EXIT HUP INT TERM
-HOMES=("$TMP/ok" "$TMP/failing" "$TMP/intake")
+HOMES=("$TMP/ok" "$TMP/failing" "$TMP/intake" "$TMP/second")
 bash "$FIX/make-home.sh" mirror "${HOMES[0]}" >/dev/null
 bash "$FIX/make-home.sh" unreachable "${HOMES[1]}" >/dev/null
 bash "$FIX/make-home.sh" intake "${HOMES[2]}" >/dev/null
+bash "$FIX/make-home.sh" intake "${HOMES[3]}" >/dev/null
 
 run_plane() {  # <home> <capture-name> <command> [args...]
   local h=$1 name=$2
@@ -62,6 +63,22 @@ run_plane "${HOMES[2]}" request-secrets "$ROOT/bin/fm-slack-poll.sh" --replay "$
 for ts in 2000.000300 2000.000400 2000.000500; do
   grep -q "^check: slack request $ts .*secret removed" "${HOMES[2]}/data/captured/request-secrets.out" || fail "the request $ts did not carry the marker and its flag"
 done
+
+# The second person's requests: their own DM window, with the same values in their text (the token, the signing secret, and the token as an entity).
+SECOND="$FIX/second-person/transcript.json"
+run_second() { FM_SLACK_SECOND_USER=U0CDVHFU1A5 run_plane "$@"; }
+run_second "${HOMES[3]}" arm "$ROOT/bin/fm-slack-check.sh" arm --replay "$SECOND"
+run_second "${HOMES[3]}" start-poll "$ROOT/bin/fm-slack-poll.sh" --replay "$SECOND"
+second_replay=$(python3 "$HELPER" replay-file "${HOMES[3]}/state/slack-watch")
+python3 "$HELPER" owner-message "$second_replay" 3000.000100 U0CDVHFU1A5 "second person request that holds $SECRET" '{"channel": "D0SECONDDM1"}'
+python3 "$HELPER" owner-message "$second_replay" 3000.000200 U0CDVHFU1A5 "second person request that holds $SIGNING" '{"channel": "D0SECONDDM1"}'
+python3 "$HELPER" owner-message "$second_replay" 3000.000300 U0CDVHFU1A5 "second person request whose entity joins it: $joined" '{"channel": "D0SECONDDM1"}'
+run_second "${HOMES[3]}" request-secrets "$ROOT/bin/fm-slack-poll.sh" --replay "$SECOND"
+for ts in 3000.000100 3000.000200 3000.000300; do
+  grep -q "^check: slack request $ts from U0CDVHFU1A5: .*secret removed" "${HOMES[3]}/data/captured/request-secrets.out" || fail "the second person request $ts did not carry the marker and its flag"
+done
+[ "$(grep -c '"method": "chat.postMessage"' "${HOMES[3]}/state/slack-watch/outbound.jsonl")" = 3 ] || fail "the second person requests were not all acknowledged"
+[ -s "${HOMES[3]}/state/slack-watch/requests.jsonl" ] || fail "the second person requests left no record to scan"
 
 # The scan is only meaningful if the plane really ran with the token.
 [ -s "${HOMES[0]}/state/slack-watch/state.json" ] || fail "the plane left no state to scan"
