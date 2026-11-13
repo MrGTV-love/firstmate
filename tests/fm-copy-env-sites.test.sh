@@ -7,7 +7,7 @@
 # variables never reach the run, and a tree with no usable interpreter is refused
 # by name with no fallback to this process's interpreter.
 #   C1-C6  teardown_run_closeout (default interpreter, the explicit override,
-#          scrub, pass-through, refusal, agreement with the sweep's predicate)
+#          scrub, pass-through, refusal, override over default)
 #   S4*    bin/fm-slot-manifest-retire.py: script and interpreter from one tree
 set -u
 
@@ -152,46 +152,26 @@ test_c5_closeout_without_tree_environment_refuses() {
   pass 'C5: a closeout tree with no interpreter is refused by name with no fallback and nothing created'
 }
 
-# The copy sweep decides whether a closeout can run with an existence test
-# ([ -x ... ]) that must agree with what teardown_run_closeout does.
-slot_env_sweep_predicate() { # <clone> [<override>]; exit 0 when the sweep thinks the driver can run
-  # shellcheck disable=SC2016 # The script is for the child shell to expand.
-  env -i "FM_TEARDOWN_VERNANT_PYTHON=${2:-}" "$SLOT_ENV_BASH" -c '
-    clone=$1
-    [ -f "$clone/scripts/git-stability/closeout_pr.py" ] || exit 1
-    [ -x "${FM_TEARDOWN_VERNANT_PYTHON:-$clone/.venv/bin/python}" ] || exit 1
-  ' bash "$1"
-}
-
-test_c6_sweep_predicate_agrees_with_closeout() {
-  local dir rc_closeout rc_pred
+# The operator's explicit interpreter wins over the tree's default, and a run
+# with neither is refused. tests/fm-copy-sweep.test.sh drives the real sweep's
+# existence test against the same choice.
+test_c6_closeout_default_and_override_choice() {
+  local dir rc
   dir=$(make_closeout_world c6 symlinks)
-  # Default interpreter present: both say it can run.
-  rc_closeout=0 rc_pred=0
-  slot_env_run_closeout "$dir" "$dir/copy" || rc_closeout=$?
-  slot_env_sweep_predicate "$dir/copy" || rc_pred=$?
-  assert_equals 0 "$rc_closeout" 'C6: closeout refused a usable default interpreter'
-  assert_equals 0 "$rc_pred" 'C6: the sweep predicate refused a usable default interpreter'
-  # An explicit override that is not executable wins over the usable default: both refuse.
-  rc_closeout=0 rc_pred=0
-  slot_env_run_closeout "$dir" "$dir/copy" "FM_TEARDOWN_VERNANT_PYTHON=$dir/nonexistent-python" || rc_closeout=$?
-  slot_env_sweep_predicate "$dir/copy" "$dir/nonexistent-python" || rc_pred=$?
-  assert_equals 127 "$rc_closeout" 'C6: closeout ran an interpreter the operator did not name'
-  assert_equals 1 "$rc_pred" 'C6: the sweep predicate fell back to the default interpreter'
-  # An explicit override that is usable runs even where the default is absent.
+  rc=0
+  slot_env_run_closeout "$dir" "$dir/copy" || rc=$?
+  assert_equals 0 "$rc" 'C6: closeout refused a usable default interpreter'
+  rc=0
+  slot_env_run_closeout "$dir" "$dir/copy" "FM_TEARDOWN_VERNANT_PYTHON=$dir/nonexistent-python" || rc=$?
+  assert_equals 127 "$rc" 'C6: closeout ran an interpreter the operator did not name'
   rm -rf "$dir/copy/.venv"
-  rc_closeout=0 rc_pred=0
-  slot_env_run_closeout "$dir" "$dir/copy" "FM_TEARDOWN_VERNANT_PYTHON=$dir/pybin/python3" || rc_closeout=$?
-  slot_env_sweep_predicate "$dir/copy" "$dir/pybin/python3" || rc_pred=$?
-  assert_equals 0 "$rc_closeout" 'C6: closeout refused a usable explicit interpreter'
-  assert_equals 0 "$rc_pred" 'C6: the sweep predicate refused a usable explicit interpreter'
-  # Neither default nor override: both refuse.
-  rc_closeout=0 rc_pred=0
-  slot_env_run_closeout "$dir" "$dir/copy" || rc_closeout=$?
-  slot_env_sweep_predicate "$dir/copy" || rc_pred=$?
-  assert_equals 127 "$rc_closeout" 'C6: closeout ran with no interpreter at all'
-  assert_equals 1 "$rc_pred" 'C6: the sweep predicate admitted no interpreter at all'
-  pass 'C6: the sweep existence test and teardown_run_closeout agree on the default and the override'
+  rc=0
+  slot_env_run_closeout "$dir" "$dir/copy" "FM_TEARDOWN_VERNANT_PYTHON=$dir/pybin/python3" || rc=$?
+  assert_equals 0 "$rc" 'C6: closeout refused a usable explicit interpreter'
+  rc=0
+  slot_env_run_closeout "$dir" "$dir/copy" || rc=$?
+  assert_equals 127 "$rc" 'C6: closeout ran with no interpreter at all'
+  pass 'C6: teardown_run_closeout takes the explicit interpreter over the default and refuses when neither is usable'
 }
 
 # ---- slot-record retirement --------------------------------------------------
@@ -432,7 +412,7 @@ fm_test_run_cases \
   test_c3_override_under_tree_venv \
   test_c4_override_under_another_venv \
   test_c5_closeout_without_tree_environment_refuses \
-  test_c6_sweep_predicate_agrees_with_closeout \
+  test_c6_closeout_default_and_override_choice \
   test_s4a_clone_without_script_or_venv_retires_in_copy \
   test_s4c_clone_script_without_venv_uses_copy_tree \
   test_s4_project_with_script_and_venv_still_wins \

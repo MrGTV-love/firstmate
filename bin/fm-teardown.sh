@@ -813,6 +813,7 @@ for _teardown_source in \
   fm-path-lib.sh \
   fm-refuse-lib.sh \
   fm-teardown-nested-lib.sh \
+  fm-copy-env-lib.sh \
   fm-hold-reason-lib.sh \
   fm-lease-lib.sh
 do
