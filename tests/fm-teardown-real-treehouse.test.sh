@@ -38,9 +38,11 @@ if ! command -v tmux >/dev/null 2>&1 || ! command -v docker >/dev/null 2>&1 || !
   exit 0
 fi
 
-# The task's tmux window lives on a real scratch server: its own socket directory
-# (short, a unix socket path is limited), and TMUX unset so a harness inside the
-# user's tmux never reaches that server. Every scratch server is stopped on exit.
+# The task's tmux window lives on a real scratch server: its own socket directory,
+# and TMUX unset so a harness inside the user's tmux never reaches that server.
+# A unix socket path is limited (104 bytes on macOS), so the directory is made
+# under /tmp whatever TMPDIR is, never under a long TMPDIR. Every scratch server
+# is stopped on exit.
 unset TMUX
 REAL_TMUX_REGISTRY=$TMP_ROOT/real-tmux-dirs
 real_tmux_stop_all() {
@@ -59,13 +61,19 @@ trap 'real_tmux_stop_all; fm_test_cleanup; exit 143' TERM
 trap 'real_tmux_stop_all; fm_test_cleanup; exit 129' HUP
 trap 'real_tmux_stop_all; fm_test_cleanup; exit 131' QUIT
 
+# real_tmux_scratch_dir: a new short socket directory under /tmp, registered for
+# the exit cleanup, in REAL_TMUX_DIR. It never depends on TMPDIR.
+real_tmux_scratch_dir() {
+  REAL_TMUX_DIR=$(TMPDIR=/tmp mktemp -d /tmp/fm-rtmux.XXXXXX) || fail "no scratch tmux directory"
+  printf '%s\n' "$REAL_TMUX_DIR" >> "$REAL_TMUX_REGISTRY"
+}
+
 # real_local_tools: drop the case's tmux and docker fakes so teardown reaches the
 # real tools, and start a real scratch tmux server holding the task's window.
 real_local_tools() {
   local case_dir=$FOREIGN_CASE
   rm -f "$case_dir/fakebin/tmux" "$case_dir/fakebin/docker"
-  REAL_TMUX_DIR=$(mktemp -d "${TMPDIR:-/tmp}/fm-rtmux.XXXXXX") || fail "no scratch tmux directory"
-  printf '%s\n' "$REAL_TMUX_DIR" >> "$REAL_TMUX_REGISTRY"
+  real_tmux_scratch_dir
   export TMUX_TMPDIR=$REAL_TMUX_DIR
   tmux new-session -d -s firstmate -n fm-task-x1 -c "$case_dir" 'exec sleep 3600' \
     || fail "the real scratch tmux server did not start"
@@ -703,6 +711,25 @@ test_an_ignored_file_created_while_the_driver_runs_is_not_closed_over_on_a_real_
   pass "c-late-file: an ignored file created while the driver runs refuses the first close with the copy, claim and real lease unchanged, and the next run assesses it once and holds it in the preserve"
 }
 
+test_the_scratch_tmux_server_starts_whatever_the_length_of_tmpdir() {
+  local long_tmp socket
+  long_tmp=$TMP_ROOT/$(printf 'long-tmpdir-segment-%.0s' 1 2 3 4 5 6)
+  mkdir -p "$long_tmp"
+  assert_equals "1" "$([ "${#long_tmp}" -gt 120 ] && echo 1 || echo 0)" "the TMPDIR under test is longer than a unix socket path allows"
+  (
+    export TMPDIR=$long_tmp
+    real_tmux_scratch_dir
+    export TMUX_TMPDIR=$REAL_TMUX_DIR
+    tmux new-session -d -s firstmate -n fm-task-x1 'exec sleep 3600' || exit 11
+    tmux list-windows -t firstmate -F '#{window_name}' | grep -Fxq fm-task-x1 || exit 12
+    socket=$(tmux display-message -p -t firstmate '#{socket_path}') || exit 13
+    [ "${#socket}" -lt 104 ] || exit 14
+    case $socket in "$long_tmp"/*) exit 15 ;; esac
+  ) || fail "the scratch tmux server did not start under a TMPDIR of ${#long_tmp} bytes (exit $?)"
+  real_tmux_stop_all
+  pass "the scratch tmux server starts and keeps its socket path short under a TMPDIR of ${#long_tmp} bytes"
+}
+
 teardown_test_cases=(
 test_a_real_pool_slot_keeps_its_lease_and_the_unique_files_are_preserved_and_the_control_is_left_out
 test_a_real_pool_slot_is_returned_after_the_unique_file_is_preserved_and_the_control_is_removed
@@ -715,6 +742,7 @@ test_a_start_racing_the_close_never_receives_the_held_slot
 test_a_start_racing_the_close_of_an_unleased_slot_never_resets_the_copy
 test_an_ignored_file_created_while_the_driver_runs_is_not_closed_over_on_a_real_pool_slot
 test_a_copy_sweep_apply_during_a_teardown_in_the_driver_makes_no_second_archive
+test_the_scratch_tmux_server_starts_whatever_the_length_of_tmpdir
 )
 
 fm_test_run_cases "${teardown_test_cases[@]}" -- "$@"
