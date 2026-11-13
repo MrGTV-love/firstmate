@@ -3988,13 +3988,14 @@ sweep_gate() {
   sweep_write "$SWEEP_OPEN" "$SWEEP_ID" || SWEEP_ID=
   return 0
 }
-# A record for a check that no longer exists is dropped.
+# An in-flight mark of a check that no longer exists is dropped. Stamps and attempts stay until the
+# close: a merged PR poll retires its own check script inside the sweep, and its wake must still be read.
 sweep_prune() {
   local f id
-  for f in "$STATE"/*.check-stamp "$STATE"/*.check-attempt "$STATE"/*.check-inflight; do
+  for f in "$STATE"/*.check-inflight; do
     [ -e "$f" ] || continue
     id=${f##*/}
-    id=${id%.check-*}
+    id=${id%.check-inflight}
     [ -e "$STATE/$id.check.sh" ] || rm -f -- "$f"
   done
 }
@@ -4070,29 +4071,27 @@ sweep_wake_append() {  # <kind> <key> <payload>
 # first wake reason a check raised, and the contributions reason that is only the last
 # fallback, exactly as the in-memory sweep chose them.
 sweep_collect() {
-  local c id f sid kind reason
+  local f id sid kind reason
   rejected_checks=
   SWEEP_FIRST_REASON=
   SWEEP_CONTRIB_REASON=
-  for c in "$STATE"/*.check.sh; do
-    [ -e "$c" ] || continue
-    id=${c##*/}
-    id=${id%.check.sh}
-    for f in "$STATE/$id.check-stamp" "$STATE/$id.check-attempt"; do
-      [ -e "$f" ] || continue
-      IFS=$'\t' read -r sid kind reason < "$f" 2>/dev/null || continue
-      [ "$sid" = "$SWEEP_ID" ] || continue
-      if [ "$kind" = rejected ]; then
-        rejected_checks="$rejected_checks $c"
-      elif [ -n "$reason" ]; then
-        reason=$(sweep_decode "$reason")
-        if [ "$kind" = contributions ]; then
-          [ -n "$SWEEP_CONTRIB_REASON" ] || SWEEP_CONTRIB_REASON=$reason
-        else
-          [ -n "$SWEEP_FIRST_REASON" ] || SWEEP_FIRST_REASON=$reason
-        fi
+  # The records themselves, in id order: a check that retired itself during the sweep has no script left.
+  for f in "$STATE"/*.check-[sa]*; do
+    [ -e "$f" ] || continue
+    id=${f##*/}
+    id=${id%.check-*}
+    IFS=$'\t' read -r sid kind reason < "$f" 2>/dev/null || continue
+    [ "$sid" = "$SWEEP_ID" ] || continue
+    if [ "$kind" = rejected ]; then
+      [ ! -e "$STATE/$id.check.sh" ] || rejected_checks="$rejected_checks $STATE/$id.check.sh"
+    elif [ -n "$reason" ]; then
+      reason=$(sweep_decode "$reason")
+      if [ "$kind" = contributions ]; then
+        [ -n "$SWEEP_CONTRIB_REASON" ] || SWEEP_CONTRIB_REASON=$reason
+      else
+        [ -n "$SWEEP_FIRST_REASON" ] || SWEEP_FIRST_REASON=$reason
       fi
-    done
+    fi
   done
 }
 
@@ -4288,10 +4287,9 @@ EOF
           if [ -n "$contribution_check_diagnostics" ]; then
             out=${contribution_check_diagnostics%$'\n'}
           elif [ -n "$contribution_check_output" ]; then
-            # The base queued nothing for this wake before the sweep ended. It is queued
-            # now, under a key of its own, before the check's stamp, so a cut sweep
-            # neither loses it nor repeats it; the close prints it as the last fallback.
-            sweep_wake_append check "$c#contributions" "$contribution_check_output" || exit 1
+            # bin/fm-contributions.sh queued each of these rows durably (key contribution-<id>) before
+            # it printed them, so the wake is durable before this stamp. The stamp keeps the text
+            # the close prints as the last fallback, exactly as the in-memory sweep did.
             sweep_stamp "$sweep_cid" contributions "$contribution_check_output"
             contribution_check_output=
             continue

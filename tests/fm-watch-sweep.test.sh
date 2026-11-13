@@ -331,26 +331,26 @@ test_a_home_with_no_sweep_record_runs_every_check_with_the_production_defaults()
   pass "sweep: with FM_CHECK_INTERVAL and FM_CHECK_TIMEOUT unset a home with no record runs every check once and leaves no record"
 }
 
-# contributions: its wake is queued before its stamp, and the delivered text equals the base's.
-test_contributions_wake_is_durable_before_its_stamp_and_text_is_unchanged() {
+# contributions: the check queues its own durable rows before it prints its contribution-wake lines (the real
+# bin/fm-contributions.sh does), so the sweep only keeps the printed text. A cut right after its stamp leaves
+# the text to the resumed watcher's close, which prints it once, unchanged.
+test_contributions_text_survives_a_cut_at_its_stamp_and_is_printed_once() {
   local home
   home=$(make_sweep_home sweep-contributions c1 contributions c3)
   printf 'contribution-wake: check: contributions 2 new upstream items\n' > "$home/out-contributions"
-  printf 'hold\n' > /dev/null
   printf 'after-stamp:contributions\n' > "$home/hold"
   rm -f "$home/held"
   start_watch "$home" FM_CHECK_INTERVAL=2
   wait_for 300 test -e "$home/held" || fail "contributions: the watcher never reached the stamp"
-  [ "$(queue_rows "$home" 'contributions')" = 1 ] || fail "contributions: its wake was not queued before its stamp: $(cat "$home/state/.wake-queue")"
   cut_watch "$W" KILL
   rm -f "$home/hold" "$home/held"
   start_watch "$home" FM_CHECK_INTERVAL=2
   wait_for 300 sweep_closed "$home" || fail "contributions: the resumed sweep never closed"
   expect_runs "$home" "contributions" c1=1 contributions=1 c3=1
-  [ "$(queue_rows "$home" 'contributions')" = 1 ] || fail "contributions: its wake was queued more than once: $(cat "$home/state/.wake-queue")"
   wait_for 100 grep -qx 'check: contributions 2 new upstream items' "$home"/watch.*.out || fail "contributions: the delivered text differs from the base's: $(cat "$home"/watch.*.out)"
+  [ "$(printed "$home" '^check: contributions 2 new upstream items')" = 1 ] || fail "contributions: the text was printed other than once: $(cat "$home"/watch.*.out)"
   cut_watch "$W" TERM
-  pass "sweep: the contributions wake is durable before its stamp, queued once and delivered with the base's text"
+  pass "sweep: the contributions text survives a cut at its stamp and is printed once with the base's text"
 }
 
 # A cut right after a rejected check's attempt record, and one after the aggregate rejected wake is queued
@@ -424,7 +424,7 @@ for t in \
   test_a_last_check_touch_between_cuts_leaves_the_open_sweep_open \
   test_stale_unreadable_and_removed_records_are_handled \
   test_a_home_with_no_sweep_record_runs_every_check_with_the_production_defaults \
-  test_contributions_wake_is_durable_before_its_stamp_and_text_is_unchanged
+  test_contributions_text_survives_a_cut_at_its_stamp_and_is_printed_once
 do
   run_case "$t"
 done

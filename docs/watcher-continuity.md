@@ -621,7 +621,7 @@ The sweep keeps these records under `state/`, none of which depends on a file ti
 | `.sweep-closing` | The close record, written after every wake is queued and before `.last-check` is touched. |
 
 A fresh watcher skips a check whose stamp or attempt names the open sweep and runs every other check, including one added after the cut.
-A record that is unreadable or names another sweep means the check runs, and a record for a check that no longer exists is removed.
+A record that is unreadable or names another sweep means the check runs, and every record goes when the sweep closes, so a check that retired itself during the sweep, as a merged PR poll does, still has its wake read at the close.
 A `.last-check` touch that is not a close, such as the retirement receipt's, neither closes nor invalidates an open sweep; it can only postpone the start of the next new sweep.
 A home with no record behaves as before: no open sweep, no skipped check.
 The close writes `.sweep-closing`, touches `.last-check`, then removes the records.
@@ -631,7 +631,7 @@ Cadence after a close is unchanged: the next sweep opens `FM_CHECK_INTERVAL` aft
 
 Each wake a check raises is durable before that check's record.
 The sweep skips queueing a row that is already queued with the same key and text, so a check rerun after a cut between its queued wake and its stamp does not queue it twice.
-The `contributions` check had no queued row before the sweep ended; it now queues its `check: contributions` text under the key `<state>/contributions.check.sh#contributions` before its stamp, and the close prints the same text it printed before.
+The `contributions` check queues its own durable rows (`bin/fm-contributions.sh`, key `contribution-<id>`) before it prints its `contribution-wake:` lines, so its wake is durable before its stamp; the stamp keeps the printed text, and the close prints the same text it printed before.
 The stopped-check notice is queued before the episode file `<id>.check-stopped` is created.
 The aggregate `check: rejected unauthenticated state checks: <paths>` wake keeps its text and key; the close rebuilds its list from the attempt records, so a resumed sweep lists every rejected check once.
 The close prints the first wake reason of a check in check order, then the rejected aggregate, then the `contributions` text, as the in-memory sweep did.
@@ -712,7 +712,7 @@ The pull guard suite proves that no extension hand-off evidence replaces the [sh
 - A cut between the close record and the `.last-check` touch, after which no check runs.
 - A cut after a rejected check's attempt, one after the aggregate rejected wake is queued, and one between a stopped check's notice and its episode file, each leaving one queued row that is printed once.
 - The unchanged cadence after a close, a `.last-check` touch between cuts, and unreadable, removed and added checks.
-- A home with no record and both defaults unset, and the `contributions` wake durable before its stamp with its text unchanged.
+- A home with no record and both defaults unset, and the `contributions` text printed once at the close, unchanged, after a cut at its stamp.
 
 `tests/fm-watch-checkpoint.test.sh` covers usable-Perl selection, both `timeout` and `gtimeout` fallbacks for a broken Perl installation (without renaming the installed timeout executable), and monotonic stop limits for ordinary and delayed-start group-killed checkpoints.
 Its measured limit and calibration evidence are recorded beside the assertions rather than changing the production cleanup grace.
