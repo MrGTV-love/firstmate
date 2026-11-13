@@ -2408,7 +2408,7 @@ class Watch:
             win['intake_bounds'] = bounds + [min((message['ts'] for message in window), key=ts_key)]
             self.commit()
             return None
-        return {'bounds': bounds, 'page': [(message, self.request_from(message, second=True) if second else self.request_from(message)) for message in sorted(window, key=lambda m: ts_key(m['ts']))]}
+        return {'bounds': bounds, 'page': [(message, self.request_from(message, second=second)) for message in sorted(window, key=lambda m: ts_key(m['ts']))]}
 
     def ready_requests(self, plan):
         """How many requests the page read holds that are ready to be taken in."""
