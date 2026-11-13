@@ -2769,16 +2769,29 @@ run_foreign_teardown() {
 # directory (path and SHA-256 of every tar), and the task, copy and record state.
 retained_observe() {  # <status> [env...]
   [ -n "${FM_RETAINED_EVIDENCE:-}" ] || return 0
-  local fn test_name=unknown tars rec
+  local fn test_name=unknown tars rec refused slot survivors cause
   for fn in "${FUNCNAME[@]}"; do
     case "$fn" in test_*) test_name=$fn; break ;; esac
   done
   tars=$(find "$FOREIGN_SLOT/.claude/bug-evidence/worktree-preservation" -name '*.tar' -type f -exec shasum -a 256 {} + 2>/dev/null | LC_ALL=C sort | shasum -a 256 | awk '{print substr($1,1,16)}')
   rec=absent
   [ ! -e "$(retained_record_path 2>/dev/null)" ] || rec=present
-  printf '%s | case=%s | args=%s | exit=%s | driver-calls=%s | tar-files=%s tar-listing-sha256=%s | task-record=%s | copy=%s | retained-record=%s\n' \
+  # Beyond the contract's four fields: whether the slot went back to the pool, whether
+  # the closeout-refused record exists, which top-level paths survive in the copy, and
+  # the first REFUSED line teardown printed (absolute paths cut to their last name).
+  refused=absent
+  [ ! -e "$(retained_refused_record_path 2>/dev/null)" ] || refused=present
+  slot=held
+  [ ! -s "$FOREIGN_CASE/treehouse.log" ] || slot=returned
+  ! grep -q '|return ' "$FOREIGN_CASE/treehouse.calls.log" 2>/dev/null || slot=returned
+  survivors=none
+  [ ! -d "$FOREIGN_COPY" ] || survivors=$(find "$FOREIGN_COPY" -mindepth 1 -maxdepth 1 ! -name .git -exec basename {} \; 2>/dev/null | LC_ALL=C sort | paste -sd, -)
+  cause=none
+  [ ! -f "$FOREIGN_CASE/stderr" ] || cause=$(grep -m1 '^REFUSED' "$FOREIGN_CASE/stderr" 2>/dev/null | sed -E 's# (/[^ /]+)+/([^ /]+)# \2#g' | tr '|' '/' | cut -c1-220)
+  printf '%s | case=%s | args=%s | exit=%s | driver-calls=%s | tar-files=%s tar-listing-sha256=%s | task-record=%s | copy=%s | retained-record=%s | slot=%s | refused-record=%s | survivors=%s | cause=%s\n' \
     "$test_name" "${FOREIGN_CASE##*/}" "${FOREIGN_TEARDOWN_ARGS[*]:-none}" "$1" "$(retained_call_count)" "$(retained_tar_count)" "${tars:-none}" \
-    "$([ -e "$FOREIGN_CASE/state/task-x1.meta" ] && echo kept || echo gone)" "$([ -e "$FOREIGN_COPY/.git" ] && echo kept || echo gone)" "$rec" >> "$FM_RETAINED_EVIDENCE"
+    "$([ -e "$FOREIGN_CASE/state/task-x1.meta" ] && echo kept || echo gone)" "$([ -e "$FOREIGN_COPY/.git" ] && echo kept || echo gone)" "$rec" \
+    "$slot" "$refused" "${survivors:-none}" "${cause:-none}" >> "$FM_RETAINED_EVIDENCE"
 }
 
 # Nothing moved: the copy, its branch and the slot are intact and no closeout

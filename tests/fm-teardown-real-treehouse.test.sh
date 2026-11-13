@@ -2,12 +2,13 @@
 # Real-path checks for the close of a task whose own nested copy Vernant's closeout
 # driver keeps: the pool slot comes from the REAL treehouse binary in a scratch pool
 # (leased to the task as fm-spawn leases it), and every treehouse call teardown
-# makes runs through that binary. Only the closeout driver is a stand-in (the real
-# Vernant driver is never run), `tmux` and `docker` are the real local tools (a
-# scratch tmux server on its own socket holds the task's window; Docker is the
-# host's real daemon, queried and never given an object), and only `gh`, `gh-axi`
-# and `no-mistakes` stay the suite's fakes: a test must not reach the real forge or
-# the shared pipeline daemon. The cases cover the three cleanup paths that matter on a real pool:
+# makes runs through that binary. `tmux` and `docker` are the real local tools too (a
+# scratch tmux server on its own socket holds the task's window; Docker is the host's
+# real daemon, queried and never given an object). The only stand-ins are the closeout
+# driver (the real Vernant driver is never run) and `gh`, `gh-axi` and `no-mistakes`: a
+# test must not reach the real forge or the shared pipeline daemon, and in every case
+# here their true answers are "no pull request" and "no active run".
+# The cases cover the three cleanup paths that matter on a real pool:
 #   a. unique ignored files are preserved and verified before anything is removed,
 #      and the regenerable control is left out of the preserve (kept route and
 #      released route);

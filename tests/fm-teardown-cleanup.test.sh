@@ -7204,6 +7204,50 @@ test_the_kept_route_refuses_an_anchored_but_unlanded_commit_and_an_untracked_cla
   pass "a kept copy with an anchored but unlanded commit or an untracked .claude file is refused, with and without --force, and its retry asks the driver nothing"
 }
 
+# C3 (a2), the shape where the ordinary proof passes: the task's current copy is the
+# pool slot (clean and landed), and its prior copy, nested in the slot and locked by
+# Vernant, holds a commit only a refs/fm/anchor ref keeps. The pre-driver proof accepts
+# an anchored prior copy, so the driver IS asked (1 call, 1 tar); the kept route then
+# proves the copy itself and refuses it (an anchor ref alone does not land it), writes
+# the closeout-refused record, and keeps the task, the copy, the slot and its claim. Two
+# retries, with and without --force, add no driver call and no tar. (The enclosing shape
+# is refused by the ordinary landed-work proof before the driver; the test above covers
+# it.) If the kept route's proof were broken, this copy would be accepted and closed.
+test_an_anchor_only_prior_copy_passes_the_ordinary_proof_and_is_refused_by_the_kept_route_after_the_driver() {
+  local rc mode sha run record
+  for mode in plain force; do
+    make_retained_case "retained-anchor-after-driver-$mode" reverse
+    printf 'new work\n' > "$FOREIGN_COPY/work.txt"
+    git -C "$FOREIGN_COPY" add work.txt
+    git -C "$FOREIGN_COPY" -c user.email=t@t -c user.name=t commit -qm "unlanded work"
+    sha=$(git -C "$FOREIGN_COPY" rev-parse HEAD)
+    git -C "$FOREIGN_CASE/project" update-ref "refs/fm/anchor/task-x1-$sha" "$sha"
+    held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY"
+    FOREIGN_TEARDOWN_ARGS=()
+    [ "$mode" = plain ] || FOREIGN_TEARDOWN_ARGS=(--force --drop-file "$(fm_test_drop_file)")
+    record=$(retained_refused_record_path)
+    for run in 1 2 3; do
+      run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+      expect_code 1 "$rc" "anchor-after-driver-$mode run $run: an anchor-only prior copy must not be closed over: $(cat "$FOREIGN_CASE/stderr")"
+      assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "anchor-after-driver-$mode run $run: the driver must have been asked once and written one tar, and never again"
+      assert_no_grep 'ship deliverable is not landed' "$FOREIGN_CASE/stderr" "anchor-after-driver-$mode run $run: the ordinary proof refused before the driver, so this is not the kept route's refusal"
+      assert_grep 'a refs/fm/anchor ref alone does not land it' "$FOREIGN_CASE/stderr" "anchor-after-driver-$mode run $run: the kept route's cause was not printed"
+      assert_present "$record" "anchor-after-driver-$mode run $run: no closeout-refused record was written"
+      assert_absent "$(retained_record_path)" "anchor-after-driver-$mode run $run: a retained record was written for an unlanded copy"
+      assert_present "$FOREIGN_CASE/state/task-x1.meta" "anchor-after-driver-$mode run $run: the task record was removed"
+      assert_present "$FOREIGN_COPY/work.txt" "anchor-after-driver-$mode run $run: the unlanded work was removed"
+      assert_absent "$FOREIGN_CASE/treehouse.log" "anchor-after-driver-$mode run $run: the pool slot was returned"
+      if [ "$run" = 1 ]; then
+        assert_grep "Vernant's closeout driver did not release" "$FOREIGN_CASE/stderr" "anchor-after-driver-$mode run 1: the driver's answer was not the refusal's setting"
+      else
+        assert_grep "unchanged since Vernant's closeout driver last kept it" "$FOREIGN_CASE/stderr" "anchor-after-driver-$mode run $run: the retry did not stop on the recorded refusal"
+      fi
+    done
+    FOREIGN_TEARDOWN_ARGS=()
+  done
+  pass "an anchor-only prior copy passes the ordinary proof, is refused by the kept route after the driver's one call and one tar with its closeout-refused record written, and two retries, with and without --force, ask the driver nothing"
+}
+
 test_a_driver_path_of_only_slashes_is_refused_and_recorded() {
   local rc run
   make_retained_case retained-slash enclosing
@@ -8306,6 +8350,7 @@ test_a_file_created_in_the_copy_while_the_driver_runs_is_not_closed_over
 test_two_overlapping_teardowns_of_one_kept_copy_make_one_archive
 test_a_run_without_the_per_task_lifecycle_locks_calls_the_driver_twice_so_the_overlap_check_discriminates
 test_the_kept_route_refuses_an_anchored_but_unlanded_commit_and_an_untracked_claude_file
+test_an_anchor_only_prior_copy_passes_the_ordinary_proof_and_is_refused_by_the_kept_route_after_the_driver
 test_a_driver_path_of_only_slashes_is_refused_and_recorded
 test_ignored_names_that_differ_after_a_tab_are_different_payloads
 test_a_changed_retry_after_a_refusal_after_the_driver_keeps_the_earlier_preserve

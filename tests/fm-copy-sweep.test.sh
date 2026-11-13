@@ -166,6 +166,33 @@ sweep_cmd() {
 run_sweep() {
   RC=0
   OUT=$( ( sweep_cmd "$@" ) 2>&1) || RC=$?
+  sweep_observe "$@"
+}
+
+# With FM_RETAINED_EVIDENCE=<file>, one line per sweep run, written by the run itself:
+# the form (report or --apply), exit status, the class the sweep gave the nested copy
+# named "locked", whether that copy is still on disk and registered, the closeout
+# driver's call count, this home's retention receipts (count and a hash of their
+# bytes), other homes' receipts (count and hash), and whether the run listed a
+# RECEIPT-CLEARED line. Nothing here changes what a test asserts.
+sweep_observe() {
+  [ -n "${FM_RETAINED_EVIDENCE:-}" ] || return 0
+  local fn test_name=unknown form=report arg calls=0 mine others copy class present registered cleared=no
+  for fn in "${FUNCNAME[@]}"; do
+    case "$fn" in test_*) test_name=$fn; break ;; esac
+  done
+  for arg in "$@"; do [ "$arg" != --apply ] || form=apply; done
+  copy=$SLOT/.claude/worktrees/locked
+  class=$(printf '%s\n' "$OUT" | awk -F '\t' -v p="$copy" '$3 == p { print $1 }' | head -n 1)
+  present=gone; [ ! -e "$copy" ] || present=present
+  registered=no; git -C "$SLOT" worktree list --porcelain 2>/dev/null | grep -qxF "worktree $copy" && registered=yes
+  [ ! -e "$W/closeout.log" ] || calls=$(wc -l < "$W/closeout.log" | tr -d ' ')
+  mine="$(find "$HOMED/data/copy-sweep/retained" -type f 2>/dev/null | wc -l | tr -d ' ') sha256=$(find "$HOMED/data/copy-sweep/retained" -type f -exec shasum -a 256 {} + 2>/dev/null | awk '{print $1}' | LC_ALL=C sort | shasum -a 256 | cut -c1-16)"
+  others="$(find "$W"/lane-*/data/copy-sweep/retained -type f 2>/dev/null | wc -l | tr -d ' ') sha256=$(find "$W"/lane-*/data/copy-sweep/retained -type f -exec shasum -a 256 {} + 2>/dev/null | awk '{print $1}' | LC_ALL=C sort | shasum -a 256 | cut -c1-16)"
+  case "$OUT" in *RECEIPT-CLEARED*) cleared=yes ;; esac
+  printf '%s | case=%s | form=%s | exit=%s | class=%s | copy=%s registered=%s | driver-calls=%s | own-receipts=%s | other-home-receipts=%s | receipt-cleared=%s\n' \
+    "$test_name" "${W##*/}" "$form" "$RC" "${class:-none}" "$present" "$registered" "$calls" "$mine" "$others" "$cleared" >> "$FM_RETAINED_EVIDENCE"
+  return 0
 }
 
 # add_copy <name>: a nested copy of the slot on branch fm/<name>, one commit,
