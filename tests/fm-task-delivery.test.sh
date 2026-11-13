@@ -2179,6 +2179,7 @@ PY
   git -C "$proj" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'fixture governed provisioner'
   git -C "$proj" push -q origin main
   git -C "$slot" merge --ff-only main >/dev/null
+  fm_test_copy_venv "$slot"
   write_brief "$home" "$id"
   printf 'kind=scout\nproject=%s\nworktree=%s\nwindow=fm-%s\nslot_owned_path=scripts\n' "$proj" "$slot" "$id" > "$home/state/$id.meta"
   printf '%s\n' "$home|$proj|$slot"
@@ -2339,6 +2340,7 @@ PY
   git -C "$proj" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'fixture governed provisioner'
   git -C "$proj" push -q origin main
   git -C "$slot" merge --ff-only main >/dev/null
+  fm_test_copy_venv "$slot"
   meta="$home/state/$id.meta"
   brief="$home/data/$id/brief.md"
   write_brief "$home" "$id"

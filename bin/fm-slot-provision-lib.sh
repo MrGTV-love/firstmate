@@ -8,11 +8,20 @@
 # A selected local-default ref/SHA is passed explicitly by spawn; no local choice
 # is rederived from origin/main, and legacy callers send no new project flag.
 # Firstmate never deletes/replaces its manifests or creates another worktree.
-# Call from a clean checkout on the task branch, using the project's existing
-# Python environment (no environment installation/sync). Preserve its full report.
+# Call from a clean checkout on the task branch. The provisioner lives in the
+# assigned copy, so it runs in that copy's own environment (<copy>/.venv/bin/python,
+# chosen by bin/fm-copy-env-lib.sh, the one owner of the rule), never the nested
+# project clone's and never an inherited VIRTUAL_ENV. A copy with no usable
+# environment is refused by name before any change, and nothing is installed or
+# created (no environment installation/sync). Preserve its full report.
 # Requires fm-task-copy-lib.sh for isolation and preservation predicates.
 # shellcheck disable=SC2034 # Output globals consumed by the entrypoints.
+FM_SLOT_LIB_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)"
+# shellcheck source=bin/fm-copy-env-lib.sh
+. "$FM_SLOT_LIB_DIR/fm-copy-env-lib.sh"
 FM_SLOT_PROVISIONED=0
+FM_SLOT_ENV_REASON=''
+
 FM_SLOT_MANIFEST=
 FM_SLOT_BASE_SHA=
 FM_SLOT_BASE_REF=
@@ -35,8 +44,30 @@ fm_slot_require_scope() { # <owned-path>...
   done
 }
 
+# The copy runs its own provisioner, so it needs a usable environment of its own.
+# One named refusal for every caller: fm_slot_check_copy (so prepare_base, provision
+# and fm-control relaunch all refuse before any change) and the freshness check
+# in bin/fm-spawn.sh.
+fm_slot_check_env() { # <copy>
+  FM_SLOT_ENV_REASON=
+  fm_copy_env_check "$1" || {
+    FM_SLOT_ENV_REASON=$FM_COPY_ENV_REASON
+    echo "error: slot provisioning refused: $FM_COPY_ENV_REASON" >&2
+    return 1
+  }
+}
+
+# Used before the ordinary freshness reset moves a copy: when the revision it is
+# about to check out carries the project's provisioner, the copy needs its
+# environment first, so a refusal leaves HEAD and the working tree untouched.
+fm_slot_check_env_for_revision() { # <copy> <revision>
+  git -C "$1" cat-file -e "$2:scripts/git-stability/provision_existing_slot.py" 2>/dev/null || return 0
+  fm_slot_check_env "$1"
+}
+
 fm_slot_check_copy() { # <project> <copy>
   local project=$1 copy=$2 common slot_common status marker git_path
+  FM_SLOT_ENV_REASON=
   fm_task_copy_isolated "$copy" "$project" || {
     echo "error: slot provisioning refused: $FM_TASK_COPY_REASON" >&2
     return 1
@@ -50,6 +81,7 @@ fm_slot_check_copy() { # <project> <copy>
     git_path=$(git -C "$copy" rev-parse --path-format=absolute --git-path "$marker") || return 1
     [ ! -e "$git_path" ] || { echo 'error: slot provisioning refused: operation_in_progress' >&2; return 1; }
   done
+  fm_slot_check_env "$copy"
 }
 
 fm_slot_prepare_base() { # <project> <copy> <task-id>
@@ -102,12 +134,14 @@ fm_slot_resume_prepared() { # <project> <copy> <task-id> <branch> <prepared-head
   fi
 }
 
-fm_slot_run_local() { # <project> <report> <provisioner> <arg>...
-  local project=$1 report=$2
-  shift 2
+# The provisioner runs from <project> as its working directory by design, in the
+# environment of <copy>, the tree that owns the script.
+fm_slot_run_local() { # <project> <copy> <report> <provisioner> <arg>...
+  local project=$1 copy=$2 report=$3
+  shift 3
   (
     cd "$project" || exit 1
-    PATH="$project/.venv/bin:$PATH" PYTHONDONTWRITEBYTECODE=1 python3 "$@"
+    PYTHONDONTWRITEBYTECODE=1 fm_copy_env_run "$copy" "" "$@"
   ) >"$report" 2>&1
 }
 
@@ -170,7 +204,7 @@ fm_slot_provision() { # <runner> <project> <copy> <task-id> <branch> <report> <l
   # Spawn executes in the acquired pane's ancestry, so its own cwd holder is
   # attributable to this invocation. The provisioner still rejects unrelated
   # live holders. Promotion's same-owner declaration uses the local runner.
-  "$runner" "$project" "$report" "$copy/scripts/git-stability/provision_existing_slot.py" \
+  "$runner" "$project" "$copy" "$report" "$copy/scripts/git-stability/provision_existing_slot.py" \
     --repo-root "$project" --worktree-path "$copy" --owner-id "$id" \
     --branch "$branch" --base-sha "$base" "${args[@]}" || rc=$?
   if [ "$rc" -eq 0 ]; then

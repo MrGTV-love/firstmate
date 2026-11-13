@@ -101,7 +101,9 @@ fm_test_fake_gh_axi() {
 # answers <NAME> from FM_FAKE_TMUX_ENV_<NAME> (session scope, -t) or
 # FM_FAKE_TMUX_GLOBAL_ENV_<NAME> (global scope, -g): a value of "-" prints the
 # removal marker -NAME, any other value prints NAME=value, and an unset knob
-# fails like tmux's "unknown variable".
+# fails like tmux's "unknown variable". The staged slot-provisioning script runs
+# with the shell assignments of FM_FAKE_PANE_ENV_FILE (when set) in its
+# environment, the way a real pane carries its own ambient environment.
 #
 # The pane path defaults to empty when FM_FAKE_PANE_PATH is unset. Window
 # cleanup and option operations are no-ops. Launch logging is env-gated, so
@@ -163,7 +165,10 @@ case "${1:-}" in
         "bash -- '"*"/.slot-provision."*"'")
           staged=${a#"bash -- '"}
           staged=${staged%"'"}
-          bash -- "$staged" </dev/null || exit 1
+          # FM_FAKE_PANE_ENV_FILE holds shell assignments the acquired pane's own
+          # environment carries (a suite injects an ambient VIRTUAL_ENV there, where
+          # the staged script inherits it, not in the spawn caller's shell).
+          ( set -a; [ -z "${FM_FAKE_PANE_ENV_FILE:-}" ] || . "$FM_FAKE_PANE_ENV_FILE"; set +a; exec bash -- "$staged" </dev/null ) || exit 1
           ;;
       esac
     done
@@ -308,6 +313,23 @@ printf '%s\n' "${1:-}" >> "${FM_SLEEP_LOG:-/dev/null}"
 exit 0
 SH
   chmod +x "$fakebin/sleep"
+}
+
+# fm_test_copy_venv <copy>
+# A scratch environment for a fixture copy of a project that carries
+# scripts/git-stability/provision_existing_slot.py: the provisioner runs in the
+# copy's own <copy>/.venv/bin/python (bin/fm-copy-env-lib.sh), and a copy with no
+# usable environment is refused before any change. <copy>/.venv/bin/python links
+# to a working python3, and the copy ignores .venv (the pattern without a trailing
+# slash, so a symlinked .venv is ignored too) because a governed copy must be clean.
+fm_test_copy_venv() {
+  local copy=$1 py exclude
+  py=$(python3 -c 'import sys; print(sys.executable)') || return 1
+  mkdir -p "$copy/.venv/bin" || return 1
+  ln -sf "$py" "$copy/.venv/bin/python" || return 1
+  exclude=$(git -C "$copy" rev-parse --path-format=absolute --git-path info/exclude) || return 1
+  mkdir -p "$(dirname "$exclude")"
+  grep -qxF .venv "$exclude" 2>/dev/null || printf '.venv\n' >> "$exclude"
 }
 
 # --- spawn-world ------------------------------------------------------------

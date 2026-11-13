@@ -10,6 +10,10 @@
 # ever releases that lock, so the slot could never be returned. This library
 # proves such a copy is nobody's and landed, then releases and removes it.
 # bin/fm-teardown.sh's header owns the rule; this file owns the mechanics.
+# The closeout driver lives in the tree it releases a copy for, so it runs in that
+# tree's own environment through bin/fm-copy-env-lib.sh (the one owner of the
+# rule): <tree>/.venv/bin/python, or the operator's FM_TEARDOWN_VERNANT_PYTHON,
+# with an inherited VIRTUAL_ENV and the ambient interpreter variables cleared.
 #
 # A copy is released only when every proof holds, and each proof fails closed:
 #   - it is a clean worktree root, and each ignored file it holds is either
@@ -75,6 +79,10 @@
 # bin/fm-copy-sweep.sh also calls teardown_preserve_ignored, with DATA set to its
 # data directory and ID to a per-release id, for a copy it proved on its own, and
 # teardown_run_closeout for such a copy that is locked.
+
+FM_TEARDOWN_NESTED_LIB_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)"
+# shellcheck source=bin/fm-copy-env-lib.sh
+. "$FM_TEARDOWN_NESTED_LIB_DIR/fm-copy-env-lib.sh"
 
 # One entry per proved copy.
 TEARDOWN_FOREIGN_COPIES=()
@@ -1267,7 +1275,7 @@ teardown_run_closeout() {  # <slot> <copy> [plan] [stdout-capture-file]
   TEARDOWN_CLOSEOUT_OUT=$(
     set -o pipefail
     local status=0
-    { ( cd "$slot" && "$py" "$driver" --cleanup-worktree "$copy" ${execute:+"$execute"} ) | tee "$capture"; } 2>&1 || status=$?
+    { ( cd "$slot" && fm_copy_env_run "$slot" "${FM_TEARDOWN_VERNANT_PYTHON:-}" "$driver" --cleanup-worktree "$copy" ${execute:+"$execute"} ) | tee "$capture"; } 2>&1 || status=$?
     printf '.'
     exit "$status"
   ) || rc=$?

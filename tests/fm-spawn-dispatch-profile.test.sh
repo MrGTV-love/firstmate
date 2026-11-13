@@ -2746,6 +2746,7 @@ PY
   git -C "$PROJ_DIR" add scripts
   git -C "$PROJ_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'fixture governed provisioner'
   git -C "$PROJ_DIR" push -q origin main
+  fm_test_copy_venv "$WT_DIR"
   printf 'retained work\n' > "$WT_DIR/retained.txt"
   git -C "$WT_DIR" add retained.txt
   git -C "$WT_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'unrelated previous task work'

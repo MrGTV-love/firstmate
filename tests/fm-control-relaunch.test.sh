@@ -2318,7 +2318,7 @@ fi
 # live worker is stopped or its record changes; fm-spawn stays the final guard.
 test_owned_path_relaunch_refuses_before_stop() {
   local shape dir id out rc before meta note_args scope_args
-  for shape in scoped ungoverned secondmate empty multiline unscoped dirty; do
+  for shape in scoped ungoverned secondmate empty multiline unscoped dirty noenv; do
     id="rl-owned-$shape-$$"
     [ ! -e "/tmp/fm-$id" ] && [ ! -L "/tmp/fm-$id" ] || fail "task temp already exists: /tmp/fm-$id"
     dir=$(new_case "owned-$shape" "$id")
@@ -2364,6 +2364,11 @@ test_owned_path_relaunch_refuses_before_stop() {
         assert_contains "$out" 'must be a nonempty single-line tracked path' "$shape scope value refusal reason missing"
         assert_contains "$out" 'refused invalid --owned-path' "$shape scope value was not refused by control" ;;
       unscoped) assert_contains "$out" 'governed slot provisioning requires --owned-path' 'missing governed scope remedy missing' ;;
+      noenv)
+        # A clean governed copy with no environment of its own carries the named
+        # usability reason in the control refusal, not only the attestation text.
+        assert_contains "$out" 'copy_environment_missing' 'a governed copy with no environment was refused without its named reason'
+        assert_contains "$out" 'cannot pass slot attestation' 'a governed copy with no environment was not refused by control' ;;
       dirty)
         assert_contains "$out" 'dirty_worktree' 'dirty governed copy reason missing'
         assert_contains "$out" 'cannot pass slot attestation' 'dirty governed copy was not refused by control'
@@ -2375,7 +2380,7 @@ test_owned_path_relaunch_refuses_before_stop() {
     [ "$before" = "$(cat "$meta")" ] || fail "$shape scope refusal changed the task record"
     [ ! -e "$dir/home/state/$id.control-relaunch" ] || fail "$shape scope refusal opened a relaunch transaction"
   done
-  pass "fm-control relaunch: invalid scope or an unattestable governed copy refuses before stopping a live worker"
+  pass "fm-control relaunch: invalid scope or an unattestable governed copy (dirty, or with no usable environment) refuses before stopping a live worker"
 }
 
 control_relaunch_test_cases=(

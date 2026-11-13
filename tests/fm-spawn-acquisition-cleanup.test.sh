@@ -650,6 +650,7 @@ SH
   SLOT_ID="get-slot-provision-$$"
   mkdir -p "$SLOT_CASE"
   fm_git_worktree "$SLOT_PROJECT" "$SLOT_COPY" slot-before
+  fm_test_copy_venv "$SLOT_COPY"
   mkdir -p "$SLOT_PROJECT/scripts/git-stability"
   cat > "$SLOT_PROJECT/scripts/git-stability/provision_existing_slot.py" <<'PY'
 import argparse
@@ -721,6 +722,7 @@ PY
     wproject="$wcase/project" wcopy="$wcase/copy"
     mkdir -p "$wcase"
     fm_git_worktree "$wproject" "$wcopy" "slot-wait-$shape-before"
+    fm_test_copy_venv "$wcopy"
     mkdir -p "$wproject/scripts/git-stability"
     cat > "$wproject/scripts/git-stability/provision_existing_slot.py" <<'PY'
 import os
