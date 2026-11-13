@@ -552,8 +552,13 @@ test_relaunch_profile_covers_exactly_the_recorded_successor() {
       printf '(allow file-write* (literal "%s.lock"))\n' "$path"
     done
   } | sed "s#$dir#<CASE>#g" | LC_ALL=C sort > "$dir/expected-added"
-  diff "$dir/p0" "$dir/p1" | sed -n 's/^> //p' | LC_ALL=C sort > "$dir/actual-added"
-  assert_equals "" "$(diff "$dir/p0" "$dir/p1" | sed -n 's/^< //p')" "the new profile dropped a line the old one had"
+  # Only allow lines are compared: the deny lines also name every sibling folder of
+  # the shared Claude temp root at build time, which other sessions change between
+  # the two builds and which has nothing to do with the successor.
+  grep '^(allow' "$dir/p0" > "$dir/p0.allow"
+  grep '^(allow' "$dir/p1" > "$dir/p1.allow"
+  diff "$dir/p0.allow" "$dir/p1.allow" | sed -n 's/^> //p' | LC_ALL=C sort > "$dir/actual-added"
+  assert_equals "" "$(diff "$dir/p0.allow" "$dir/p1.allow" | sed -n 's/^< //p')" "the new profile dropped an allow line the old one had"
   assert_equals "$(cat "$dir/expected-added")" "$(cat "$dir/actual-added")" "the profile may gain exactly the successor's four literal allow lines"
   pass "successor: the profile the next relaunch generates gains exactly the successor's literal allow lines"
 }
@@ -584,7 +589,7 @@ test_relaunch_of_a_task_with_no_successor_generates_the_unchanged_profile() {
     "a task with no successor must allow exactly its branch, its lock and their reflog lines as literals"
   assert_equals 2 "$(printf '%s\n' "$allowed" | grep -c '^(allow file-write\* (regex #.*refs/heads/archive/')" "the two archive rules must remain"
   assert_equals 2 "$(printf '%s\n' "$allowed" | grep -c '^(allow file-write-create (require-all (literal ')" "the two archive folders must remain"
-  profile_without_session_lines "$dir" "$dir/home/state/$id.write-confinement.sb" "$s" | shasum -a 256 | cut -d' ' -f1 > "$dir/profile.digest"
+  profile_without_session_lines "$dir" "$dir/home/state/$id.write-confinement.sb" "$s" | grep '^(allow' | shasum -a 256 | cut -d' ' -f1 > "$dir/profile.digest"
   printf 'DIGEST no-successor-relaunch-profile=%s\n' "$(cat "$dir/profile.digest")"
   pass "successor: a relaunch of a task with no successor generates the profile it always did"
 }

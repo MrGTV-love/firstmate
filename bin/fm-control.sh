@@ -847,12 +847,12 @@ do_successor() {
   [ "$brief_branch_other" = 0 ] \
     || die "task $ID's instructions name a Ship branch other than its recorded branch $old_branch; reconcile the two before recording a successor branch"
 
-  su_outcome=successor-recorded
+  su_outcome="successor-recorded"
   action="recorded"
   if [ -n "$recorded_succ" ]; then
     [ "$recorded_succ" = "$SUCC_BRANCH" ] \
       || die "task $ID already records successor branch $recorded_succ; one successor per task, so nothing was changed"
-    su_outcome=successor-already-recorded
+    su_outcome="successor-already-recorded"
   else
     fm_local_firstmate_state_dirs "$STATE" \
       || die "cannot list the local Firstmate homes to compare successor names against: $FM_LOCAL_FIRSTMATE_ERROR; nothing was changed"
@@ -891,7 +891,7 @@ do_successor() {
 
   next_note="apply recorded successor branch $SUCC_BRANCH"
   if [ "$SUCC_CHECK" = 1 ]; then
-    su_outcome=successor-check
+    su_outcome="successor-check"
     if [ -n "$recorded_succ" ]; then action="none: already recorded; would write nothing"; else action="would record"; fi
   elif [ "$su_outcome" = successor-already-recorded ]; then
     action="none: task $ID already records successor_branch=$SUCC_BRANCH; wrote nothing"
