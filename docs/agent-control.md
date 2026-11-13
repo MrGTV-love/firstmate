@@ -18,7 +18,7 @@ The failure repeated across harnesses and homes, and the workaround (remember to
 
 `bin/fm-control-lib.sh` is the single executable owner of three capability tables, which have no side effects, so they can be read as a contract:
 
-- The **verb allowlist**: `interrupt`, `exit`, `stay`, `relaunch`, `authorize-continuation`, `reassociate`, `adopt`.
+- The **verb allowlist**: `interrupt`, `exit`, `stay`, `relaunch`, `authorize-continuation`, `reassociate`, `successor`, `adopt`.
   There is no arbitrary-text and no generic raw-key entry point.
   A caller either names an allowlisted verb or is refused.
 - **Per-harness mechanics**: the key that cancels a running turn, how many times it must be delivered, whether the composer needs clearing afterwards, the command that exits the agent, and which task kinds the adapter is verified to run.
@@ -42,6 +42,7 @@ A recorded `harness=` is not always an exact adapter name: a task launched from 
 | `adopt` | Repair a live local Herdr omp task's session record without sending input or restarting anything. | The recorded pane, unique foreground PID, unique deepest workspace match, exclusive local pane claim, and unchanged generation are proved before publishing; see [Repairing a restored omp session record](#repairing-a-restored-omp-session-record). |
 | `authorize-continuation` | Clear a ship or scout's recorded reconciliation-only restriction without launching or messaging a worker. | Only `recovery=reconcile-only` is removed atomically; unrelated metadata, holds, and dependencies are preserved. |
 | `reassociate` | Re-point a ship or scout's record at the replacement copy its work moved to, without stopping, starting, or removing anything. With `--also <task>=<copy>` it re-points several records that share one pool slot root in the same call. | The record names the replacement copy and the copy it left as `prior_worktree=` (or `released_worktree=` for a pool slot it left); the old copy, the endpoint, and any pipeline run are untouched. Every record named in one call is re-pointed or none is. See [Reassociating a task with a replacement copy](#reassociating-a-task-with-a-replacement-copy). |
+| `successor` | Record one successor task branch for a ship so the write profile of its next launch also covers it, without touching a work tree, a ref, a process, a profile or a run. | The record gains `successor_branch=` directly after `branch=` and the instructions gain a dated section; both are written or neither is. See [Recording a successor branch](#recording-a-successor-branch). |
 
 An exit that delivers lifecycle input but cannot prove the agent stopped fails with `exit=unconfirmed`, reports the observed agent state and any interrupt cancellation claim, and never claims that nothing changed.
 Interrupt never rewrites busy state as proof of its own success.
@@ -527,6 +528,32 @@ The [measurement record](verification/runtime-backends.md#treehouse-get-entry-wa
 The shared project-lock wait follows observed holder progress rather than total hold age; [`bin/fm-project-lock-lib.sh`](../bin/fm-project-lock-lib.sh) owns its sampling and idle allowance.
 
 Standalone PR registration locks its task-copy snapshot before retirement recovery, guard execution, or any forge request, and refuses publication if the recorded worktree or branch changed while the PR was being checked.
+
+### Recording a successor branch
+
+A worker's write profile is generated at launch from the task's recorded branch and denies every other ref under `.git/refs/heads`.
+A task that needs a successor branch in the same copy therefore has no profile that covers it until its record names that branch.
+
+The actual lock-owning main Firstmate runs `fm-control <task-id> successor --branch <successor> --note <why>`.
+It takes the task's lifecycle lock, then the record lock, and refuses without changing the record, the instructions, the profile, a copy or a ref when:
+
+- the caller is a worker, the supervision branch in any posture, or a session that does not own the home's lock;
+- the task is a scout, a secondmate, a remotely placed task or an unknown task, has no regular record or instructions, has a pending backlog close or an unfinished relaunch transaction, or has a `Ship branch:` line that disagrees with its recorded branch;
+- the name is not a plain git branch name of letters, digits, `.`, `_`, `-` and `/`, is under `archive/`, equals the task's recorded branch or base branch, is the project's default branch, or is already the branch or successor branch of another task record in this home or a locally registered home ([`bin/fm-successor-branch-lib.sh`](../bin/fm-successor-branch-lib.sh) owns the name rule, which `bin/fm-spawn.sh` applies again when it builds the next profile);
+- the task already records a different successor, because a task has one successor;
+- the ref does not exist in the project's ref store, or the branch is checked out in a worktree other than the task's own recorded copy;
+- the branch is not proved to be this task's: it must be the branch checked out in the task's recorded copy and contain the recorded branch's tip, or its tip must be the tip of one of the task's own `archive/<task>-(submitted|pipeline)-<8 hex>` custody branches, whose hex is the first eight digits of that tip.
+
+The proofs read the project's ref store and its worktree list and never open a work tree.
+The same successor again is a no-op that says so, and `--check` runs every proof and writes nothing.
+
+The operation records `successor_branch=` directly after `branch=`, keeps the prior `branch=` and the brief's `Ship branch:` line unchanged, and appends a dated section naming the successor and the note to the instructions.
+If either write fails it restores both.
+It prints a receipt with three named parts: the owner, the action, and the next command, the exact relaunch that applies the new profile.
+It starts, stops and signals nothing, runs no command that changes a ref or the index, writes no profile, and touches no run record, so a running worker keeps the profile it was launched with.
+The next `fm-control <task-id> relaunch` generates a profile that permits exactly the task's branch, the recorded successor and the task's archive names under `refs/heads`, each branch as one literal ref with its lock and reflog; [Worker OS write confinement](configuration.md#worker-os-write-confinement) owns the profile.
+Removing the `successor_branch=` line from the record and relaunching drops the grant.
+Readers that take the branch from `branch=` (landing, pruning, teardown and relocation) keep reading the prior branch.
 
 ### Reclaiming a task whose endpoint is gone
 

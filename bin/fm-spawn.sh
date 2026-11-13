@@ -1089,6 +1089,8 @@ fi
 . "$SCRIPT_DIR/fm-ff-lib.sh"
 # shellcheck source=bin/fm-wake-lib.sh
 . "$SCRIPT_DIR/fm-wake-lib.sh"
+# shellcheck source=bin/fm-successor-branch-lib.sh
+. "$SCRIPT_DIR/fm-successor-branch-lib.sh"
 # shellcheck source=bin/fm-status-cap-lib.sh
 . "$SCRIPT_DIR/fm-status-cap-lib.sh"
 # shellcheck source=bin/fm-project-lock-lib.sh
@@ -1158,6 +1160,9 @@ BACKEND_ARG=
 MODE=
 YOLO=
 BRANCH=
+# The one successor branch a ship's record names (successor_branch=), read on a
+# relaunch only; bin/fm-control.sh successor is the only writer of that record.
+SUCCESSOR_BRANCH=
 BRANCH_PREFIX=fm/
 TRACEPARENT_ARG=
 HARNESS_SET=0
@@ -2706,6 +2711,11 @@ if [ "$RELAUNCH" -eq 1 ]; then
       echo "error: task $ID has an invalid recorded ship branch '$BRANCH'" >&2
       exit 1
     fi
+    if [ "$(grep -c '^successor_branch=' "$RELAUNCH_META" 2>/dev/null || true)" -gt 1 ]; then
+      echo "error: task $ID records more than one successor branch" >&2
+      exit 1
+    fi
+    SUCCESSOR_BRANCH=$(fm_meta_get "$RELAUNCH_META" successor_branch)
   fi
   RELAUNCH_WT=$(fm_meta_get "$RELAUNCH_META" worktree)
   if [ "$RELOCATE_SET" -eq 1 ]; then
@@ -7065,6 +7075,20 @@ if [ "$KIND" != secondmate ]; then
       confinement_args=()
       [ -z "$confinement_agent" ] || confinement_args=(--agent-dir "$confinement_agent")
       [ -z "${BRANCH:-}" ] || confinement_args+=(--branch "$BRANCH")
+      if [ -n "${SUCCESSOR_BRANCH:-}" ]; then
+        # The same name rule fm-control.sh successor applied at admission, so a
+        # record edited by hand to name a branch it would have refused never
+        # widens a launch; the generator re-checks that the name is one exact literal.
+        if ! fm_local_firstmate_state_dirs "$STATE"; then
+          confinement_refuse false "cannot list the local Firstmate homes to check the recorded successor branch against: $FM_LOCAL_FIRSTMATE_ERROR"
+          exit 1
+        fi
+        if ! confinement_successor_reason=$(fm_successor_name_refusal "$SUCCESSOR_BRANCH" "$BRANCH" "$BASE_BRANCH" "$STATE/$ID.meta" "$PROJ_ABS" "${FM_LOCAL_FIRSTMATE_STATES[@]}"); then
+          confinement_refuse false "task $ID records successor branch '$SUCCESSOR_BRANCH', which is not admissible: $confinement_successor_reason"
+          exit 1
+        fi
+        confinement_args+=(--successor-branch "$SUCCESSOR_BRANCH")
+      fi
       # Each Claude launch gets a fresh session id: Claude refuses to start a
       # new conversation under an id that is already in use.
       if [ "$HARNESS" = claude ]; then

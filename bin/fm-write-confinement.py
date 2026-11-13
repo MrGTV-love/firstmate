@@ -4,7 +4,7 @@
 Usage: fm-write-confinement.py --worktree DIR --home DIR --config DIR
        --projects DIR --data DIR --state DIR --task ID
        --harness {omp,claude} --profile FILE
-       [--agent-dir DIR] [--branch NAME] [--protect DIR ...]
+       [--agent-dir DIR] [--branch NAME [--successor-branch NAME]] [--protect DIR ...]
        [--claude-session UUID]
        fm-write-confinement.py --check-active STATE TASK
 
@@ -17,7 +17,9 @@ assets: project primary checkouts, other task worktrees, other tasks' state
 records, every task's metadata and relaunch records, the home data root apart
 from this task's directory and the duration ledger, other tasks' branches, loose
 or packed (this task keeps its declared branch and its
-archive/<task>-{submitted,pipeline}-<hex8> recovery branches), temp roots, Main-owned
+archive/<task>-{submitted,pipeline}-<hex8> recovery branches, and the one
+--successor-branch the task record names, each as an exact literal ref, lock and
+reflog), temp roots, Main-owned
 records of this task, the shared legacy Jev audit, this home's config and .env,
 harness config homes apart from
 the running harness's measured runtime state, other Firstmate homes (--protect)
@@ -134,7 +136,7 @@ def child_dirs(root, keep):
     return [canonical(path) for path in Path(root).iterdir() if path.is_dir() and canonical(path) not in keep] if Path(root).is_dir() else []
 
 
-def extra_links(common, gitdir, own_branch):
+def extra_links(common, gitdir, own_branches):
     """Protected shared ref paths that another name reaches.
 
     The profile denies these paths by their own name, but a write opened
@@ -144,12 +146,12 @@ def extra_links(common, gitdir, own_branch):
     alias that already exists when the profile is built can sit at any path the
     worker may write, so the build refuses while one exists. A HEAD that is a
     symbolic link to a refs/heads name is Git's core.preferSymlinkRefs form,
-    which Git reads as the name and never follows. The task's own branch, its
-    reflog and its own worktree Git directory are writable by design and are
+    which Git reads as the name and never follows. The task's own branch and its
+    recorded successor branch, their reflogs and its own worktree Git directory are writable by design and are
     not checked.
     """
     root = Path(common)
-    own = {root / "refs/heads" / own_branch, root / "logs/refs/heads" / own_branch} if own_branch else set()
+    own = {root / folder / name for name in own_branches for folder in ("refs/heads", "logs/refs/heads")}
     heads = {root / "HEAD"}
     paths = [root / name for name in ("packed-refs", "HEAD", "index", "commondir", "refs", "logs", "logs/refs", "worktrees")]
     for folder in ("refs/heads", "logs/refs/heads", "refs/replace"):
@@ -181,6 +183,30 @@ def extra_links(common, gitdir, own_branch):
     return found
 
 
+BRANCH_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]*")
+
+
+def declared_branches(args):
+    """The task's branch, then its recorded successor, each valid as one exact literal.
+
+    The successor is granted only beside a declared branch, only as a plain name
+    (no wildcard, space, quote or backslash can reach a profile line), never under
+    archive/ and never equal to the task's branch.
+    """
+    names = [args.branch] if args.branch else []
+    if args.successor_branch is None:
+        return names
+    successor = args.successor_branch
+    if not args.branch:
+        raise ValueError("a successor branch needs the task's own --branch")
+    if not BRANCH_NAME.fullmatch(successor) or successor.startswith("archive/") or successor == args.branch:
+        raise ValueError(f"successor branch {successor!r} cannot be granted as one exact literal ref")
+    if subprocess.run(["git", "check-ref-format", "--branch", successor],
+                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
+        raise ValueError(f"successor branch {successor!r} is not a valid git branch name")
+    return names + [successor]
+
+
 def build(args):
     if not re.fullmatch(TASK_ID, args.task):
         raise ValueError("invalid task id")
@@ -196,7 +222,8 @@ def build(args):
         # Reftable keeps every branch in files this profile cannot tell apart
         # from the task's own, so a launch over it would confine nothing.
         raise ValueError("a repository with reftable ref storage cannot be confined")
-    linked = extra_links(common, gitdir, args.branch)
+    branches = declared_branches(args)
+    linked = extra_links(common, gitdir, branches)
     if linked:
         shown = ", ".join(f"{path} ({why})" for path, why in linked[:5])
         raise ValueError(
@@ -345,10 +372,12 @@ def build(args):
         lines.append("(allow file-write* " + under(state, re.escape(args.task + ".") + record) + ")")
     # A task's declared branch and its atomic lock/reflog are separate from
     # other tasks' branches in the same shared refs directory.
-    if args.branch:
-        subprocess.run(["git", "check-ref-format", "--branch", args.branch],
+    # A recorded successor branch is granted the same way: one exact literal
+    # ref, its lock and its reflog, never a pattern or a folder.
+    for branch in branches:
+        subprocess.run(["git", "check-ref-format", "--branch", branch],
                        check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        ref = "refs/heads/" + args.branch
+        ref = "refs/heads/" + branch
         for path in (Path(common) / ref, Path(common) / "logs" / ref):
             # Git must create only the declared ref and atomic lock, not gain
             # write permission to the shared parent of other tasks' refs.
@@ -416,6 +445,7 @@ def main():
     parser.add_argument("--harness", choices=("omp", "claude"), required=True)
     parser.add_argument("--agent-dir")
     parser.add_argument("--branch", default="")
+    parser.add_argument("--successor-branch", default=None)
     parser.add_argument("--claude-session")
     parser.add_argument("--protect", action="append", default=[])
     args = parser.parse_args()

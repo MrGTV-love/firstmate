@@ -555,6 +555,7 @@ family_for_basename() {
     fm-control.test.sh|fm-control-relaunch.test.sh|\
     fm-control-relaunch-recovery.test.sh|fm-control-relaunch-backends.test.sh|\
     fm-control-reassociate.test.sh|\
+    fm-control-successor.test.sh|fm-control-successor-scott.test.sh|\
     fm-launch-proof.test.sh|\
     fm-session-launch-policy.test.sh|\
     fm-herdr-session-cleanup.test.sh|fm-send-resolve-key.test.sh|fm-send-strict.test.sh|\
