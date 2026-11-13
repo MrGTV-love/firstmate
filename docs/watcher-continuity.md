@@ -606,6 +606,38 @@ The EXIT cleanup bounds its wait for `state/.watcher-down.lock` while persisting
 Only positive decimal integers are accepted, including leading-zero forms such as `08`; empty, non-numeric, and zero values (including `00`) fall back to 2 seconds.
 A live foreign holder therefore cannot strand a TERM'd watcher in this marker-lock wait: on timeout the recovery transition fails without releasing the singleton, leaving dead-pid stale evidence for the next arm to republish and clear.
 
+## Check sweep records
+
+The custom-check sweep (prelude step 10) opens when `state/.last-check` is `FM_CHECK_INTERVAL` old (default 300 seconds) and closes when every check has a disposition.
+A watcher that ends inside the sweep therefore no longer makes the next one start at the first check.
+The sweep keeps these records under `state/`, none of which depends on a file time:
+
+| Record | Meaning |
+|---|---|
+| `.sweep-open` | The open sweep's id. An open sweep resumes at every watcher start, whatever the age of `.last-check`. |
+| `<id>.check-stamp` | The check finished in this sweep. Every wake it raised was durably queued before the stamp was written. |
+| `<id>.check-attempt` | The check was stopped by the no-progress rule, rejected, found a stale PR-poll snapshot, or was dropped. It is not run again in this sweep and runs again in the next. |
+| `<id>.check-inflight` | The check started and did not end in a record. A mark that survives once means a watcher ended inside it, so it runs once more; a second survivor is dropped for this sweep and logged. |
+| `.sweep-closing` | The close record, written after every wake is queued and before `.last-check` is touched. |
+
+A fresh watcher skips a check whose stamp or attempt names the open sweep and runs every other check, including one added after the cut.
+A record that is unreadable or names another sweep means the check runs, and a record for a check that no longer exists is removed.
+A `.last-check` touch that is not a close, such as the retirement receipt's, neither closes nor invalidates an open sweep; it can only postpone the start of the next new sweep.
+A home with no record behaves as before: no open sweep, no skipped check.
+The close writes `.sweep-closing`, touches `.last-check`, then removes the records.
+A watcher that finds `.sweep-closing` finishes that close and runs no check, so a cut between the record and the touch costs nothing.
+Cadence after a close is unchanged: the next sweep opens `FM_CHECK_INTERVAL` after the close.
+`FM_CHECK_TIMEOUT` stays a no-progress minimum and `FM_CHECK_INTERVAL` stays 300 by default.
+
+Each wake a check raises is durable before that check's record.
+The sweep skips queueing a row that is already queued with the same key and text, so a check rerun after a cut between its queued wake and its stamp does not queue it twice.
+The `contributions` check had no queued row before the sweep ended; it now queues its `check: contributions` text under the key `<state>/contributions.check.sh#contributions` before its stamp, and the close prints the same text it printed before.
+The stopped-check notice is queued before the episode file `<id>.check-stopped` is created.
+The aggregate `check: rejected unauthenticated state checks: <paths>` wake keeps its text and key; the close rebuilds its list from the attempt records, so a resumed sweep lists every rejected check once.
+The close prints the first wake reason of a check in check order, then the rejected aggregate, then the `contributions` text, as the in-memory sweep did.
+A check whose handling ends the watcher (`exit 1`) leaves its in-flight mark, is retried once, and is then dropped for the sweep; the one wake lost this way is that check's output for that sweep, and the drop is logged.
+The sweep paths that neither run nor finish a check are dispositioned as follows: a stale PR-poll snapshot is attempted, a merge poll armed on a secondmate and an absorbed duplicate merged poll are stamped without a wake, and a rejected check is attempted.
+
 ## Regression coverage
 
 ### Pi and OpenCode watch extension
@@ -669,6 +701,17 @@ The pull guard suite proves that no extension hand-off evidence replaces the [sh
 - The disposable-checkout arm refusal.
 - The home-gone and state-gone watcher exits.
 - The test reaper that stops a watcher armed for a temporary home.
+
+`tests/fm-watch-sweep.test.sh` covers the check sweep records with real watchers and five registered checks:
+
+- A TERM cut and a SIGKILL cut inside the third of five checks, after which checks 1 and 2 are not run again before the sweep closes.
+- A wake-driven watcher exit between checks.
+- Five SIGKILL cuts over a sweep longer than `FM_CHECK_INTERVAL`, which still closes with no finished check rerun.
+- A stopped check and two rejected checks, with the sweep closed, the next sweep running every check, the aggregate listing each rejected check once and the stopped notice queued once.
+- A cut after a check's wake is queued and before its stamp, with one queue row and one delivery.
+- A cut between the close record and the `.last-check` touch, after which no check runs.
+- The unchanged cadence after a close, a `.last-check` touch between cuts, and unreadable, removed and added checks.
+- A home with no record and both defaults unset, and the `contributions` wake durable before its stamp with its text unchanged.
 
 `tests/fm-watch-checkpoint.test.sh` covers usable-Perl selection, both `timeout` and `gtimeout` fallbacks for a broken Perl installation (without renaming the installed timeout executable), and monotonic stop limits for ordinary and delayed-start group-killed checkpoints.
 Its measured limit and calibration evidence are recorded beside the assertions rather than changing the production cleanup grace.

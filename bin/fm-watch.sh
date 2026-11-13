@@ -2320,6 +2320,7 @@ FM_CHECK_RESULT=
 FM_CHECK_STATUS=0
 FM_CHECK_STOPPED=
 FM_CHECK_STOP_NOTICE=
+FM_CHECK_STOP_EPISODE=
 FM_CHECK_SIGNAL_PENDING=
 FM_CHECK_WAIT_FD=
 FM_CHECK_WAIT_WRITER=
@@ -2468,6 +2469,7 @@ run_check_capture() {  # <check-id> <check> [args...]
   local name=$1 started episode notice
   shift
   FM_CHECK_STOP_NOTICE=
+  FM_CHECK_STOP_EPISODE=
   episode="$STATE/$name.check-stopped"
   started=$SECONDS
   FM_CAPTURE_OWNER=1 FM_CAPTURE_PROGRESS=1 run_owned_capture "$CHECK_TIMEOUT" 0 discard run_check_process "$@" || return $?
@@ -2476,7 +2478,10 @@ run_check_capture() {  # <check-id> <check> [args...]
     triage_log "$notice"
     FM_CHECK_RESULT=
     if [ ! -e "$episode" ]; then
-      : 2>/dev/null > "$episode" || true
+      # The sweep (FM_CHECK_DEFER_EPISODE=1) queues the notice first and creates the
+      # episode file after it, so a watcher that ends between the two loses neither.
+      FM_CHECK_STOP_EPISODE=$episode
+      [ -n "${FM_CHECK_DEFER_EPISODE:-}" ] || { : 2>/dev/null > "$episode" || true; }
       FM_CHECK_STOP_NOTICE=$notice
     fi
   else
@@ -3915,6 +3920,182 @@ watch_after_wake() {
   prelude_step_commit
 }
 
+# The check sweep (prelude step 10) keeps one record per check so a sweep that a
+# watcher end cuts resumes after the last finished check instead of at the first.
+# docs/watcher-continuity.md "Check sweep records" owns the contract. Files under state/:
+#   .sweep-open           the open sweep's id; the sweep resumes at every watcher start
+#                         whatever the age of .last-check, which only gates a NEW sweep
+#   <id>.check-stamp      "<sweep>\t<kind>\t<reason>": the check finished, and every wake it
+#                         raised was durably queued before this record was written
+#   <id>.check-attempt    "<sweep>\t<kind>\t<reason>": stopped, rejected, stale-snapshot or
+#                         dropped; not run again in this sweep, run again in the next
+#   <id>.check-inflight   "<sweep>\t<n>": written before a check runs, removed when it ends in
+#                         a record; a mark that survives means the watcher ended inside the check
+#   .sweep-closing        the close record, written after every wake is queued and before
+#                         .last-check is touched, so a cut between the two finishes the close
+#                         at the next start and runs no check
+# Records name the sweep id, never a file time, so no comparison depends on timestamp
+# resolution, and a record from another sweep is ignored.
+SWEEP_OPEN="$STATE/.sweep-open"
+SWEEP_CLOSING="$STATE/.sweep-closing"
+SWEEP_ID=
+SWEEP_FIELD_SEP=$'\036'
+# Test seam (FM_TEST_SEAM=1): hold the watcher at a named point of the sweep while the
+# file FM_TEST_SWEEP_HOLD names that point, so a test can cut it exactly there.
+sweep_point() {  # <point>
+  local want=''
+  [ "${FM_TEST_SEAM:-}" = 1 ] && [ -n "${FM_TEST_SWEEP_HOLD:-}" ] && [ -e "$FM_TEST_SWEEP_HOLD" ] || return 0
+  IFS= read -r want < "$FM_TEST_SWEEP_HOLD" 2>/dev/null || return 0
+  [ "$want" = "$1" ] || return 0
+  [ -z "${FM_TEST_SWEEP_HELD:-}" ] || : > "$FM_TEST_SWEEP_HELD"
+  while [ -e "$FM_TEST_SWEEP_HOLD" ]; do sleep 0.05; done
+}
+sweep_write() {  # <file> <text>
+  if printf '%s\n' "$2" > "$1.tmp.$$" && mv -f "$1.tmp.$$" "$1"; then
+    return 0
+  fi
+  rm -f -- "$1.tmp.$$"
+  return 1
+}
+sweep_clear_records() {
+  rm -f -- "${STATE:?}"/*.check-stamp "${STATE:?}"/*.check-attempt "${STATE:?}"/*.check-inflight
+}
+# Remove the records of the closed sweep, after .last-check carries the close.
+sweep_finish_close() {
+  touch "$STATE/.last-check"
+  sweep_clear_records
+  rm -f -- "$SWEEP_OPEN" "$SWEEP_CLOSING"
+}
+# Returns 0 when the sweep body runs: an open sweep resumes whatever the age of
+# .last-check; otherwise a new one opens when .last-check is CHECK_INTERVAL old, the
+# base cadence. A finished-but-unclosed close is completed and runs no check.
+sweep_gate() {
+  local epoch
+  SWEEP_ID=
+  if [ -e "$SWEEP_CLOSING" ]; then
+    sweep_finish_close
+    return 1
+  fi
+  if [ -e "$SWEEP_OPEN" ]; then
+    IFS= read -r SWEEP_ID < "$SWEEP_OPEN" 2>/dev/null || SWEEP_ID=
+    [ -z "$SWEEP_ID" ] || return 0
+    rm -f -- "$SWEEP_OPEN"
+  fi
+  [ "$(age_of "$STATE/.last-check")" -ge "$CHECK_INTERVAL" ] || return 1
+  fm_epoch_seconds_to epoch
+  SWEEP_ID="$epoch.$WATCHER_PID"
+  # An unwritable record leaves SWEEP_ID empty and the sweep runs as it always did.
+  sweep_write "$SWEEP_OPEN" "$SWEEP_ID" || SWEEP_ID=
+  return 0
+}
+# A record for a check that no longer exists is dropped.
+sweep_prune() {
+  local f id
+  for f in "$STATE"/*.check-stamp "$STATE"/*.check-attempt "$STATE"/*.check-inflight; do
+    [ -e "$f" ] || continue
+    id=${f##*/}
+    id=${id%.check-*}
+    [ -e "$STATE/$id.check.sh" ] || rm -f -- "$f"
+  done
+}
+# 0 when <id> has a stamp or an attempt record in the open sweep. A record that is
+# unreadable or names another sweep is no record: the check runs.
+sweep_disposed() {  # <id>
+  local f rec
+  [ -n "$SWEEP_ID" ] || return 1
+  for f in "$STATE/$1.check-stamp" "$STATE/$1.check-attempt"; do
+    [ -e "$f" ] || continue
+    IFS= read -r rec < "$f" 2>/dev/null || rec=
+    case "$rec" in
+      "$SWEEP_ID"|"$SWEEP_ID"$'\t'*) return 0 ;;
+    esac
+  done
+  return 1
+}
+sweep_encode() { printf '%s' "$1" | LC_ALL=C tr '\n' "$SWEEP_FIELD_SEP"; }
+sweep_decode() { printf '%s' "$1" | LC_ALL=C tr "$SWEEP_FIELD_SEP" '\n'; }
+sweep_stamp() {  # <id> <kind> <reason>
+  [ -n "$SWEEP_ID" ] || return 0
+  sweep_point "before-stamp:$1"
+  sweep_write "$STATE/$1.check-stamp" "$SWEEP_ID"$'\t'"$2"$'\t'"$(sweep_encode "$3")" || return 0
+  rm -f -- "$STATE/$1.check-inflight"
+  sweep_point "after-stamp:$1"
+}
+sweep_attempt() {  # <id> <kind> [reason]
+  [ -n "$SWEEP_ID" ] || return 0
+  sweep_point "before-attempt:$1"
+  sweep_write "$STATE/$1.check-attempt" "$SWEEP_ID"$'\t'"$2"$'\t'"$(sweep_encode "${3:-}")" || return 0
+  rm -f -- "$STATE/$1.check-inflight"
+  sweep_point "after-attempt:$1"
+}
+# Before a check runs: count the start. A mark that survived once means a watcher ended
+# inside the check, which is retried once; a second survivor is dropped for this sweep
+# (logged, its output for the sweep lost) so a check that ends its watcher cannot hold
+# the sweep, or the checks before it, hostage.
+sweep_check_begin() {  # <id>; returns 1 when the check is dropped
+  local f="$STATE/$1.check-inflight" sid='' n=0
+  [ -n "$SWEEP_ID" ] || return 0
+  if [ -e "$f" ]; then
+    IFS=$'\t' read -r sid n < "$f" 2>/dev/null || { sid=; n=0; }
+    [ "$sid" = "$SWEEP_ID" ] || n=0
+    case "$n" in ''|*[!0-9]*) n=0 ;; esac
+  fi
+  if [ "$n" -ge 2 ]; then
+    triage_log "check $1 ended its watcher twice in sweep $SWEEP_ID; dropped for this sweep"
+    sweep_attempt "$1" dropped
+    return 1
+  fi
+  sweep_write "$f" "$SWEEP_ID"$'\t'"$((n + 1))" || return 0
+}
+# Queue a check wake unless the same row is already queued (unacknowledged): the wake a
+# watcher queued before a cut is not queued again by the resumed sweep. A stopped
+# notice names its elapsed seconds, so those compare by the text before them.
+sweep_wake_append() {  # <kind> <key> <payload>
+  local dup rc=0 clean
+  clean=$(printf '%s' "$3" | fm_wake_clean_field)
+  fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || return 1
+  dup=$(awk -F '\t' -v key="$2" -v payload="$clean" '
+    function head(t,   i) { i = index(t, " stopped after "); return i ? substr(t, 1, i) : t }
+    NF >= 5 && $3 == "check" && $4 == key {
+      if ($5 == payload || (index(payload, " stopped after ") && head($5) == head(payload))) found = 1
+    }
+    END { print found + 0 }' "$FM_WAKE_QUEUE" 2>/dev/null)
+  if [ "$dup" != 1 ]; then
+    fm_wake_append_locked "$@" || rc=$?
+  fi
+  fm_lock_release "$FM_WAKE_QUEUE_LOCK"
+  return "$rc"
+}
+# Read the sweep's records back, in check order, for the close: the rejected checks, the
+# first wake reason a check raised, and the contributions reason that is only the last
+# fallback, exactly as the in-memory sweep chose them.
+sweep_collect() {
+  local c id f sid kind reason
+  rejected_checks=
+  SWEEP_FIRST_REASON=
+  SWEEP_CONTRIB_REASON=
+  for c in "$STATE"/*.check.sh; do
+    [ -e "$c" ] || continue
+    id=${c##*/}
+    id=${id%.check.sh}
+    for f in "$STATE/$id.check-stamp" "$STATE/$id.check-attempt"; do
+      [ -e "$f" ] || continue
+      IFS=$'\t' read -r sid kind reason < "$f" 2>/dev/null || continue
+      [ "$sid" = "$SWEEP_ID" ] || continue
+      if [ "$kind" = rejected ]; then
+        rejected_checks="$rejected_checks $c"
+      elif [ -n "$reason" ]; then
+        reason=$(sweep_decode "$reason")
+        if [ "$kind" = contributions ]; then
+          [ -n "$SWEEP_CONTRIB_REASON" ] || SWEEP_CONTRIB_REASON=$reason
+        else
+          [ -n "$SWEEP_FIRST_REASON" ] || SWEEP_FIRST_REASON=$reason
+        fi
+      fi
+    done
+  done
+}
+
 prelude_phase() {
   local PRELUDE_STEP=1 check_wake_reason=
   prelude_inflight_enter || return 0
@@ -4025,9 +4206,10 @@ prelude_phase() {
 
   # Slow per-task checks (firstmate writes these, e.g. a merged-PR poll).
   # Time-based via .last-check mtime so the cadence survives watcher restarts.
-  if prelude_step_begin 10 && [ "$(age_of "$STATE/.last-check")" -ge "$CHECK_INTERVAL" ]; then
+  if prelude_step_begin 10 && sweep_gate; then
     rejected_checks=
     contribution_check_output=
+    sweep_prune
     for stopped in "$STATE"/*.check-stopped; do
       [ -e "$stopped" ] || continue
       [ -e "${stopped%-stopped}.sh" ] || rm -f -- "$stopped"
@@ -4036,19 +4218,24 @@ prelude_phase() {
       signal_phase_flush
       [ -e "$c" ] || continue
       watcher_beat
+      sweep_cid=${c##*/}
+      sweep_cid=${sweep_cid%.check.sh}
+      sweep_disposed "$sweep_cid" && continue
+      sweep_check_begin "$sweep_cid" || continue
       is_pr_poll=0
       check_events=0
-      if [ "$(basename "$c")" = x-watch.check.sh ]; then
+      sweep_reason=
+      if [ "$sweep_cid" = x-watch ]; then
         if fmx_poll_shim_valid "$c" "$FM_HOME" "$FM_ROOT" \
           && [ -f "$FM_ROOT/bin/fm-x-poll.sh" ] && [ ! -L "$FM_ROOT/bin/fm-x-poll.sh" ]; then
-          FM_HOME="$FM_HOME" run_check_capture x-watch "$FM_ROOT/bin/fm-x-poll.sh" || exit 1
+          FM_HOME="$FM_HOME" FM_CHECK_DEFER_EPISODE=1 run_check_capture x-watch "$FM_ROOT/bin/fm-x-poll.sh" || exit 1
           out=$FM_CHECK_RESULT
         else
-          rejected_checks="$rejected_checks $c"
+          sweep_attempt "$sweep_cid" rejected
           continue
         fi
       else
-        id=$(basename "$c" .check.sh)
+        id=$sweep_cid
         if fm_pr_poll_snapshot_capture "$STATE" "$id" "$SCRIPT_DIR/fm-pr-poll.sh" \
           || { rerecord_device_shifted_pr_poll "$id" \
             && fm_pr_poll_snapshot_capture "$STATE" "$id" "$SCRIPT_DIR/fm-pr-poll.sh"; }; then
@@ -4063,26 +4250,29 @@ prelude_phase() {
           if ! fm_pr_poll_snapshot_matches "$STATE" "$id" "$SCRIPT_DIR/fm-pr-poll.sh"; then
             pr_poll_control_release || exit 1
             triage_log "PR poll for $id changed before its validated check; skipping the stale snapshot"
+            sweep_attempt "$id" stale-snapshot
             continue
           fi
-          run_check_capture "$id" "$SCRIPT_DIR/fm-pr-poll.sh" --validated \
+          FM_CHECK_DEFER_EPISODE=1 run_check_capture "$id" "$SCRIPT_DIR/fm-pr-poll.sh" --validated \
             "$provider" "$url" "$host" "$path" "$number" || exit 1
           out=$FM_CHECK_RESULT
         elif fm_custom_check_snapshot_prepare "$STATE" "$id"; then
           custom_snapshot=$FM_CUSTOM_CHECK_SNAPSHOT
           [ "$id" = contributions ] || check_events=1
-          FM_CHECK_EVENT_OUTPUT=$check_events run_check_capture "$id" "$custom_snapshot" || exit 1
+          FM_CHECK_DEFER_EPISODE=1 FM_CHECK_EVENT_OUTPUT=$check_events run_check_capture "$id" "$custom_snapshot" || exit 1
           out=$FM_CHECK_RESULT
           fm_custom_check_snapshot_cleanup
         else
           fm_custom_check_snapshot_cleanup
-          rejected_checks="$rejected_checks $c"
+          sweep_attempt "$id" rejected
           continue
         fi
       fi
+      sweep_stopped=
+      [ -z "$FM_CHECK_STOPPED" ] || sweep_stopped=1
       [ -z "$FM_CHECK_STOP_NOTICE" ] || { out=$FM_CHECK_STOP_NOTICE; check_events=0; }
       if [ -n "$out" ]; then
-        if [ "$(basename "$c")" = contributions.check.sh ]; then
+        if [ "$sweep_cid" = contributions ]; then
           contribution_check_output=
           contribution_check_diagnostics=
           while IFS= read -r contribution_check_line; do
@@ -4098,6 +4288,12 @@ EOF
           if [ -n "$contribution_check_diagnostics" ]; then
             out=${contribution_check_diagnostics%$'\n'}
           elif [ -n "$contribution_check_output" ]; then
+            # The base queued nothing for this wake before the sweep ended. It is queued
+            # now, under a key of its own, before the check's stamp, so a cut sweep
+            # neither loses it nor repeats it; the close prints it as the last fallback.
+            sweep_wake_append check "$c#contributions" "$contribution_check_output" || exit 1
+            sweep_stamp "$sweep_cid" contributions "$contribution_check_output"
+            contribution_check_output=
             continue
           fi
         fi
@@ -4111,6 +4307,7 @@ EOF
             retire_merged_pr_poll "$id"
             pr_poll_control_release || exit 1
             triage_log "retired a merge poll armed on secondmate $id without reporting an outcome"
+            sweep_stamp "$sweep_cid" plain ""
             continue
           fi
           if ! fm_merge_authority_read "$STATE" "$id" \
@@ -4141,31 +4338,50 @@ EOF
             "$MERGE_PRUNE_BIN" arm "$id" </dev/null >/dev/null 2>&1 || true
           if [ "$FM_MERGE_OUTCOME_ALREADY_RECORDED" = true ]; then
             triage_log "absorbed duplicate merged PR poll result for $id"
+            sweep_stamp "$sweep_cid" plain ""
             continue
           fi
-          [ -n "$check_wake_reason" ] || check_wake_reason=$reason
+          sweep_stamp "$sweep_cid" plain "$reason"
           continue
         fi
         pr_poll_control_release || exit 1
         if [ "$check_events" -eq 1 ]; then
-          fm_check_queue_output "$c" "$out" || exit 1
-          [ -n "$check_wake_reason" ] || check_wake_reason=$FM_CHECK_WAKE_REASON
+          FM_CHECK_APPEND=sweep_wake_append fm_check_queue_output "$c" "$out" || exit 1
+          sweep_reason=$FM_CHECK_WAKE_REASON
         else
-          fm_wake_append check "$c" "$reason" || exit 1
-          [ -n "$check_wake_reason" ] || check_wake_reason=$reason
+          sweep_wake_append check "$c" "$reason" || exit 1
+          sweep_reason=$reason
         fi
       fi
       pr_poll_control_release || exit 1
+      if [ -n "$sweep_stopped" ]; then
+        # The notice above is queued before the episode file, which is created now.
+        sweep_point "before-episode:$sweep_cid"
+        [ -z "$FM_CHECK_STOP_EPISODE" ] || { : 2>/dev/null > "$FM_CHECK_STOP_EPISODE" || true; }
+        sweep_attempt "$sweep_cid" stopped "$sweep_reason"
+        continue
+      fi
+      sweep_stamp "$sweep_cid" plain "$sweep_reason"
     done
+    sweep_collect
+    check_wake_reason=$SWEEP_FIRST_REASON
     if [ -n "$rejected_checks" ]; then
       reason="check: rejected unauthenticated state checks:$rejected_checks"
-      fm_wake_append check unauthenticated-state-checks "$reason" || exit 1
+      sweep_wake_append check unauthenticated-state-checks "$reason" || exit 1
       [ -n "$check_wake_reason" ] || check_wake_reason=$reason
     fi
+    sweep_point after-aggregate
     signal_phase_flush
-    touch "$STATE/.last-check"
-    if [ -n "$contribution_check_output" ]; then
-      [ -n "$check_wake_reason" ] || check_wake_reason=$contribution_check_output
+    if [ -n "$SWEEP_ID" ]; then
+      # The close record goes down after every wake is queued and before the touch.
+      sweep_write "$SWEEP_CLOSING" "$SWEEP_ID" || exit 1
+      sweep_point close-record
+      sweep_finish_close
+    else
+      touch "$STATE/.last-check"
+    fi
+    if [ -n "$SWEEP_CONTRIB_REASON" ]; then
+      [ -n "$check_wake_reason" ] || check_wake_reason=$SWEEP_CONTRIB_REASON
     fi
   fi
   prelude_step_commit || exit 1
