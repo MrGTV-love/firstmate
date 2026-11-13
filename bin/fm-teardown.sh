@@ -321,8 +321,9 @@
 # owner=launcher:<pid> launcher=<pid>) is released and removed by Vernant's own
 # driver, scripts/git-stability/closeout_pr.py --cleanup-worktree <copy>
 # --execute-cleanup, run from the slot in the slot's own environment through
-# bin/fm-copy-env-lib.sh (FM_TEARDOWN_VERNANT_PYTHON names the interpreter); an unlocked copy is removed with a plain non-forced git worktree
-# remove. Removal deletes the copy's checkout and the allow-listed ignored files
+# bin/fm-copy-env-lib.sh (FM_TEARDOWN_VERNANT_PYTHON names the interpreter); an
+# unlocked copy is removed with a plain non-forced git worktree remove.
+# Removal deletes the copy's checkout and the allow-listed ignored files
 # in it (symlinks, virtual environments, node_modules and tool caches,
 # .DS_Store, Firstmate's hook files, regenerable build caches, and anything
 # ignored under its .claude and .opencode trees); any other ignored entry is
