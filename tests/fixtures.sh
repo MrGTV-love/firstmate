@@ -315,23 +315,6 @@ SH
   chmod +x "$fakebin/sleep"
 }
 
-# fm_test_copy_venv <copy>
-# A scratch environment for a fixture copy of a project that carries
-# scripts/git-stability/provision_existing_slot.py: the provisioner runs in the
-# copy's own <copy>/.venv/bin/python (bin/fm-copy-env-lib.sh), and a copy with no
-# usable environment is refused before any change. <copy>/.venv/bin/python links
-# to a working python3, and the copy ignores .venv (the pattern without a trailing
-# slash, so a symlinked .venv is ignored too) because a governed copy must be clean.
-fm_test_copy_venv() {
-  local copy=$1 py exclude
-  py=$(python3 -c 'import sys; print(sys.executable)') || return 1
-  mkdir -p "$copy/.venv/bin" || return 1
-  ln -sf "$py" "$copy/.venv/bin/python" || return 1
-  exclude=$(git -C "$copy" rev-parse --path-format=absolute --git-path info/exclude) || return 1
-  mkdir -p "$(dirname "$exclude")"
-  grep -qxF .venv "$exclude" 2>/dev/null || printf '.venv\n' >> "$exclude"
-}
-
 # --- spawn-world ------------------------------------------------------------
 
 # fm_test_spawn_home <home> [harness]

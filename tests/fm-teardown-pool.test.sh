@@ -3364,6 +3364,9 @@ for path in ['$records/worktree-lifecycle/$digest.json','$common/vernant-worktre
     pathlib.Path(path).unlink()
 print(json.dumps({'status':'retired'}))
 PY
+    # The entry point runs in the environment of the tree that holds it, so that
+    # tree needs its own interpreter (nothing falls back to firstmate's python).
+    fm_test_copy_venv "$case_dir/project"
     if [ "$variant" = absent ]; then
       rm "$case_dir/project/scripts/git-stability/retire_slot_manifest.py"
       touch "$case_dir/project/scripts/git-stability/provision_existing_slot.py"
@@ -3372,6 +3375,7 @@ PY
       mkdir -p "$NESTED_SLOT/scripts/git-stability"
       mv "$case_dir/project/scripts/git-stability/retire_slot_manifest.py" "$NESTED_SLOT/scripts/git-stability/"
       printf 'scripts/\n' >> "$common/info/exclude"
+      fm_test_copy_venv "$NESTED_SLOT"
     fi
     if [ "$variant" = detached ]; then
       git -C "$NESTED_SLOT" checkout -q --detach
