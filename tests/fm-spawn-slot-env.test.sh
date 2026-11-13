@@ -66,6 +66,7 @@ write_pane_env() { # <dir>
   local dir=$1
   {
     printf 'VIRTUAL_ENV=%q\n' "$dir/decoy"
+    # shellcheck disable=SC2031 # run_spawn's PATH change stays in its subshell; this reads the parent PATH.
     printf 'PATH=%q\n' "$dir/decoy/bin:$dir/project/.venv/bin:$PATH"
     local assignment
     for assignment in "${SLOT_ENV_POLLUTION[@]}"; do
