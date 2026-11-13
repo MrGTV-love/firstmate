@@ -87,6 +87,8 @@ slot_env_write_stubs() { # <dir>
 }
 
 # slot_env_make_world <name> <copies|symlinks|none>: prints the world directory.
+# It runs in a command substitution, where fail ends only that subshell, so every
+# caller stops on its status: dir=$(slot_env_make_world ...) || fail ...
 slot_env_make_world() {
   local name=$1 mode=$2 dir project origin copy exclude site
   dir="$TMP_ROOT/$name"
@@ -108,7 +110,14 @@ slot_env_make_world() {
     none) ;;
     copies|symlinks)
       if [ "$mode" = copies ]; then
-        "$SLOT_ENV_BASE_PY" -m venv --without-pip --copies "$copy/.venv" || fail 'fixture venv build failed'
+        # A framework build (the macOS Command Line Tools python3) refuses
+        # --copies; then python is one direct link to the base interpreter.
+        if ! "$SLOT_ENV_BASE_PY" -m venv --without-pip --copies "$copy/.venv" 2>/dev/null; then
+          rm -rf "$copy/.venv"
+          "$SLOT_ENV_BASE_PY" -m venv --without-pip "$copy/.venv" || fail 'fixture venv build failed'
+          rm -f "$copy/.venv/bin/python"
+          ln -s "$SLOT_ENV_BASE_PY" "$copy/.venv/bin/python"
+        fi
         rm -f "$copy/.venv/bin/python3" "$copy"/.venv/bin/python3.[0-9]*
       else
         "$SLOT_ENV_BASE_PY" -m venv --without-pip "$copy/.venv" || fail 'fixture venv build failed'

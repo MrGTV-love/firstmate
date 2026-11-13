@@ -28,7 +28,7 @@ slot_env_setup_base_python
 # the stubs the spawn path needs. The copy is the pool slot the spawn is handed.
 make_spawn_world() { # <name> <copies|symlinks|none>
   local name=$1 mode=$2 dir fakebin
-  dir=$(slot_env_make_world "$name" "$mode")
+  dir=$(slot_env_make_world "$name" "$mode") || return 1
   fakebin=$(make_spawn_fakebin "$dir/fake" codex)
   fm_test_fake_no_mistakes "$fakebin"
   fm_test_fake_gh "$fakebin"
@@ -76,7 +76,7 @@ write_pane_env() { # <dir>
 
 test_p1_clone_without_venv_spawns_in_copy_env() {
   local dir rc=0
-  dir=$(make_spawn_world p1-$$ copies)
+  dir=$(make_spawn_world p1-$$ copies) || fail 'the fixture world was not built'
   run_spawn "$dir" "p1-$$" || rc=$?
   expect_code 0 "$rc" "P1: spawn failed: $(tail -n 15 "$dir/spawn.out")"
   assert_equals "$dir/copy/.venv/bin/python" "$(slot_env_field "$dir" sys_executable)" 'P1: the pane provisioner did not run in the copy venv python'
@@ -87,7 +87,7 @@ test_p1_clone_without_venv_spawns_in_copy_env() {
 
 test_p1b_real_venv_links_outside_copy() {
   local dir rc=0
-  dir=$(make_spawn_world p1b-$$ symlinks)
+  dir=$(make_spawn_world p1b-$$ symlinks) || fail 'the fixture world was not built'
   run_spawn "$dir" "p1b-$$" || rc=$?
   expect_code 0 "$rc" "P1b: spawn failed: $(tail -n 15 "$dir/spawn.out")"
   assert_equals "$dir/copy/.venv/bin/python" "$(slot_env_field "$dir" sys_executable)" 'P1b: sys.executable is not the unresolved copy venv python'
@@ -97,7 +97,7 @@ test_p1b_real_venv_links_outside_copy() {
 
 test_p2_pane_pollution_never_reaches_the_provisioner() {
   local dir rc=0 field
-  dir=$(make_spawn_world p2-$$ copies)
+  dir=$(make_spawn_world p2-$$ copies) || fail 'the fixture world was not built'
   slot_env_add_clone_venv "$dir"
   slot_env_add_decoy_venv "$dir"
   write_pane_env "$dir"
@@ -137,7 +137,7 @@ tree_listing() { # <copy>
 run_p3_shape() { # <shape>
   local shape=$1 dir id rc=0 head branch refs out
   id="p3-$shape-$$"
-  dir=$(make_spawn_world "$id" none)
+  dir=$(make_spawn_world "$id" none) || fail 'the fixture world was not built'
   slot_env_break_copy_env "$dir" "$shape"
   head=$(git -C "$dir/copy" rev-parse HEAD)
   branch=$(git -C "$dir/copy" branch --show-current)
@@ -187,7 +187,7 @@ advance_origin_with_provisioner() { # <dir> <with|without>
 
 make_ungoverned_spawn_world() { # <name> <venv: none|copies>
   local name=$1 mode=$2 dir
-  dir=$(make_spawn_world "$name" "$mode")
+  dir=$(make_spawn_world "$name" "$mode") || return 1
   # The base revision carries no provisioner at all: remove it from project and copy.
   git -C "$dir/project" rm -q scripts/git-stability/provision_existing_slot.py
   git -C "$dir/project" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'no provisioner yet'
@@ -199,7 +199,7 @@ make_ungoverned_spawn_world() { # <name> <venv: none|copies>
 test_p3f_freshness_target_with_provisioner_refuses_before_reset() {
   local dir id rc=0 head advanced out
   id="p3f-$$"
-  dir=$(make_ungoverned_spawn_world "$id" none)
+  dir=$(make_ungoverned_spawn_world "$id" none) || fail 'the fixture world was not built'
   head=$(git -C "$dir/copy" rev-parse HEAD)
   advanced=$(advance_origin_with_provisioner "$dir" with)
   mkdir -p "$dir/copy/.venv/bin"
@@ -221,7 +221,7 @@ test_p3f_freshness_target_with_provisioner_refuses_before_reset() {
 test_p3f_freshness_target_with_provisioner_and_environment_provisions() {
   local dir id rc=0 advanced
   id="p3fok-$$"
-  dir=$(make_ungoverned_spawn_world "$id" copies)
+  dir=$(make_ungoverned_spawn_world "$id" copies) || fail 'the fixture world was not built'
   advanced=$(advance_origin_with_provisioner "$dir" with)
   run_spawn "$dir" "$id" || rc=$?
   expect_code 0 "$rc" "P3f: spawn with an environment failed: $(tail -n 15 "$dir/spawn.out")"
@@ -235,7 +235,7 @@ test_p3f_freshness_target_with_provisioner_and_environment_provisions() {
 test_p4_ordinary_copy_without_venv_spawns() {
   local dir id rc=0 advanced
   id="p4-$$"
-  dir=$(make_ungoverned_spawn_world "$id" none)
+  dir=$(make_ungoverned_spawn_world "$id" none) || fail 'the fixture world was not built'
   advanced=$(advance_origin_with_provisioner "$dir" without)
   run_spawn "$dir" "$id" || rc=$?
   expect_code 0 "$rc" "P4: an ordinary copy was refused: $(tail -n 15 "$dir/spawn.out")"

@@ -63,14 +63,14 @@ slot_env_run_closeout() {
 
 make_closeout_world() { # <name> <copies|symlinks|none>
   local dir
-  dir=$(slot_env_make_world "$1" "$2")
+  dir=$(slot_env_make_world "$1" "$2") || return 1
   slot_env_write_closeout_driver "$dir/copy"
   printf '%s\n' "$dir"
 }
 
 test_c1_closeout_pollution_never_reaches_the_driver() {
   local dir rc=0 field
-  dir=$(make_closeout_world c1 symlinks)
+  dir=$(make_closeout_world c1 symlinks) || fail 'the fixture world was not built'
   slot_env_add_decoy_venv "$dir"
   slot_env_snapshot_decoy "$dir" before
   slot_env_run_closeout "$dir" "$dir/copy" "${SLOT_ENV_POLLUTION[@]}" "VIRTUAL_ENV=$dir/decoy" \
@@ -99,7 +99,7 @@ test_c1_closeout_pollution_never_reaches_the_driver() {
 closeout_with_override() { # <name> <python-relative-to-dir> [NAME=value...]
   local name=$1 override=$2 dir rc=0
   shift 2
-  dir=$(make_closeout_world "$name" symlinks)
+  dir=$(make_closeout_world "$name" symlinks) || fail 'the fixture world was not built'
   slot_env_add_decoy_venv "$dir"
   slot_env_run_closeout "$dir" "$dir/copy" "FM_TEARDOWN_VERNANT_PYTHON=$dir/$override" "VIRTUAL_ENV=$dir/decoy" \
     "PATH=$dir/decoy/bin:$dir/stubs:$dir/pybin:/usr/bin:/bin" "${SLOT_ENV_POLLUTION[@]}" || rc=$?
@@ -138,7 +138,7 @@ test_c4_override_under_another_venv() {
 # is never used in its place, and nothing is created or installed.
 test_c5_closeout_without_tree_environment_refuses() {
   local dir rc=0 out
-  dir=$(make_closeout_world c5 none)
+  dir=$(make_closeout_world c5 none) || fail 'the fixture world was not built'
   slot_env_listing "$dir" > "$dir/listing-before.txt"
   slot_env_run_closeout "$dir" "$dir/copy" || rc=$?
   expect_code 127 "$rc" 'C5: a tree with no interpreter must be refused'
@@ -157,7 +157,7 @@ test_c5_closeout_without_tree_environment_refuses() {
 # existence test against the same choice.
 test_c6_closeout_default_and_override_choice() {
   local dir rc
-  dir=$(make_closeout_world c6 symlinks)
+  dir=$(make_closeout_world c6 symlinks) || fail 'the fixture world was not built'
   rc=0
   slot_env_run_closeout "$dir" "$dir/copy" || rc=$?
   assert_equals 0 "$rc" 'C6: closeout refused a usable default interpreter'
@@ -212,7 +212,7 @@ PY
 # tree holds: script, venv, both, or none.
 make_retire_world() { # <name> <project: none|script|venv|both> <copy: none|script|venv|both>
   local name=$1 pshape=$2 cshape=$3 dir slot hashname
-  dir=$(slot_env_make_world "$name" none)
+  dir=$(slot_env_make_world "$name" none) || return 1
   slot=$dir/copy
   retire_tree_shape "$dir/project" "$pshape" clone
   retire_tree_shape "$slot" "$cshape" copy
@@ -261,7 +261,7 @@ retire_record_script() { slot_env_field "$1" script; }
 
 test_s4a_clone_without_script_or_venv_retires_in_copy() {
   local dir rc=0
-  dir=$(make_retire_world s4a none both)
+  dir=$(make_retire_world s4a none both) || fail 'the fixture world was not built'
   slot_env_run_retire "$dir" apply || rc=$?
   expect_code 0 "$rc" "S4a: retire failed: $(cat "$dir/retire.out" "$dir/retire.err")"
   assert_equals "$dir/copy/scripts/git-stability/retire_slot_manifest.py" "$(retire_record_script "$dir")" 'S4a: the copy script did not run'
@@ -272,7 +272,7 @@ test_s4a_clone_without_script_or_venv_retires_in_copy() {
 
 test_s4c_clone_script_without_venv_uses_copy_tree() {
   local dir rc=0
-  dir=$(make_retire_world s4c script both)
+  dir=$(make_retire_world s4c script both) || fail 'the fixture world was not built'
   slot_env_run_retire "$dir" apply || rc=$?
   expect_code 0 "$rc" "S4c: retire failed: $(cat "$dir/retire.out" "$dir/retire.err")"
   assert_equals "$dir/copy/scripts/git-stability/retire_slot_manifest.py" "$(retire_record_script "$dir")" 'S4c: the clone script ran without its interpreter'
@@ -282,7 +282,7 @@ test_s4c_clone_script_without_venv_uses_copy_tree() {
 
 test_s4_project_with_script_and_venv_still_wins() {
   local dir rc=0
-  dir=$(make_retire_world s4keep both both)
+  dir=$(make_retire_world s4keep both both) || fail 'the fixture world was not built'
   slot_env_run_retire "$dir" apply || rc=$?
   expect_code 0 "$rc" "S4 preserve: retire failed: $(cat "$dir/retire.out" "$dir/retire.err")"
   assert_equals "$dir/project/scripts/git-stability/retire_slot_manifest.py" "$(retire_record_script "$dir")" 'S4 preserve: the project script no longer wins'
@@ -294,7 +294,7 @@ test_s4b_script_without_usable_interpreter_refuses_by_name() {
   local shape pshape cshape dir rc out
   for shape in "script none" "none script" "script script" "script venv" "venv script"; do
     read -r pshape cshape <<<"$shape"
-    dir=$(make_retire_world "s4b-$pshape-$cshape" "$pshape" "$cshape")
+    dir=$(make_retire_world "s4b-$pshape-$cshape" "$pshape" "$cshape") || fail 'the fixture world was not built'
     rc=0
     slot_env_run_retire "$dir" apply || rc=$?
     [ "$rc" = 1 ] || fail "S4b ($shape): expected a refusal, got exit $rc: $(cat "$dir/retire.out" "$dir/retire.err")"
@@ -310,7 +310,7 @@ test_s4b_script_without_usable_interpreter_refuses_by_name() {
 
 test_s4d_no_script_keeps_the_old_behavior() {
   local dir rc=0
-  dir=$(make_retire_world s4d none none)
+  dir=$(make_retire_world s4d none none) || fail 'the fixture world was not built'
   slot_env_run_retire "$dir" apply || rc=$?
   expect_code 0 "$rc" "S4d: a slot with no entry point must not fail: $(cat "$dir/retire.err")"
   assert_contains "$(cat "$dir/retire.out")" 'retire_slot_manifest.py; lifecycle records unchanged' 'S4d: the old report line changed'
@@ -323,11 +323,11 @@ test_s4d_no_script_keeps_the_old_behavior() {
 # proof phase; with no script it writes nothing, as before.
 test_s4f_prove_phase_follows_the_same_rule() {
   local dir rc=0
-  dir=$(make_retire_world s4f-script script none)
+  dir=$(make_retire_world s4f-script script none) || fail 'the fixture world was not built'
   slot_env_run_retire "$dir" prove || rc=$?
   expect_code 0 "$rc" "S4f: the proof phase must not refuse: $(cat "$dir/retire.err")"
   [ -s "$dir/proof-out.json" ] || fail 'S4f: no landing proof was built although the script exists'
-  dir=$(make_retire_world s4f-none none none)
+  dir=$(make_retire_world s4f-none none none) || fail 'the fixture world was not built'
   rc=0
   slot_env_run_retire "$dir" prove || rc=$?
   expect_code 0 "$rc" 'S4f: the proof phase with no script failed'
@@ -337,7 +337,7 @@ test_s4f_prove_phase_follows_the_same_rule() {
 
 test_s2_retire_pollution_never_reaches_the_entry_point() {
   local dir rc=0 field
-  dir=$(make_retire_world s2retire none both)
+  dir=$(make_retire_world s2retire none both) || fail 'the fixture world was not built'
   slot_env_add_decoy_venv "$dir"
   slot_env_snapshot_decoy "$dir" before
   slot_env_run_retire "$dir" apply "${SLOT_ENV_POLLUTION[@]}" "VIRTUAL_ENV=$dir/decoy" \
@@ -366,7 +366,7 @@ test_s2_retire_pollution_never_reaches_the_entry_point() {
 # copy of bin with stubs for those two (and the guard-event writer).
 test_s4e_sweep_loop_applies_the_same_rule() {
   local dir rc=0 head bin out
-  dir=$(make_retire_world s4e none none)
+  dir=$(make_retire_world s4e none none) || fail 'the fixture world was not built'
   head=$(git -C "$dir/project" rev-parse HEAD)
   bin="$dir/binroot"
   mkdir -p "$bin"

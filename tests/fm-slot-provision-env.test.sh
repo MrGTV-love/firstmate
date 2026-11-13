@@ -37,7 +37,7 @@ run_local_provision() { # <world-dir> [NAME=value...]
 
 test_s1_clone_without_venv_runs_in_copy_env() {
   local dir rc=0
-  dir=$(slot_env_make_world s1 copies)
+  dir=$(slot_env_make_world s1 copies) || fail 'the fixture world was not built'
   run_local_provision "$dir" || rc=$?
   expect_code 0 "$rc" "S1: provisioning failed: $(slot_env_tail "$dir")"
   [ -f "$dir/env-record.json" ] || fail 'S1: the fixture provisioner recorded nothing'
@@ -49,7 +49,7 @@ test_s1_clone_without_venv_runs_in_copy_env() {
 
 test_s1b_real_venv_links_outside_copy() {
   local dir rc=0 target
-  dir=$(slot_env_make_world s1b symlinks)
+  dir=$(slot_env_make_world s1b symlinks) || fail 'the fixture world was not built'
   target=$(readlink "$dir/copy/.venv/bin/python") || fail 'S1b: the copy venv python is not a symlink'
   case "$target" in "$dir/copy"/*) fail 'S1b: the venv python does not link outside the copy' ;; esac
   [ -f "$dir/copy/.venv/pyvenv.cfg" ] || fail 'S1b: the copy venv has no pyvenv.cfg'
@@ -64,7 +64,7 @@ test_s1b_real_venv_links_outside_copy() {
 # compared by the path as given, never by realpath.
 test_s1_symlinked_copy_path_is_not_resolved() {
   local dir rc=0 alias
-  dir=$(slot_env_make_world s1sym copies)
+  dir=$(slot_env_make_world s1sym copies) || fail 'the fixture world was not built'
   alias="$dir/alias-copy"
   ln -s "$dir/copy" "$alias"
   SLOT_ENV_COPY_ARG=$alias run_local_provision "$dir" || rc=$?
@@ -82,7 +82,7 @@ test_s1_symlinked_copy_path_is_not_resolved() {
 
 test_s2_pollution_never_reaches_the_provisioner() {
   local dir rc=0 field
-  dir=$(slot_env_make_world s2 copies)
+  dir=$(slot_env_make_world s2 copies) || fail 'the fixture world was not built'
   slot_env_add_clone_venv "$dir"
   slot_env_add_decoy_venv "$dir"
   slot_env_snapshot_decoy "$dir" before
@@ -112,7 +112,7 @@ test_s2_pollution_never_reaches_the_provisioner() {
 
 test_s2_pass_through_variables_arrive_unchanged() {
   local dir rc=0
-  dir=$(slot_env_make_world s2pass copies)
+  dir=$(slot_env_make_world s2pass copies) || fail 'the fixture world was not built'
   run_local_provision "$dir" "FM_SENTINEL=sentinel-value" "CODEX_HOOK_STATE_DIR=$dir/codex-hooks" \
     "WORKTREE_LIFECYCLE_STORE_DIR=$dir/lifecycle" "GIT_AUTHOR_NAME=Pass Through" || rc=$?
   expect_code 0 "$rc" "S2 pass-through: provisioning failed: $(slot_env_tail "$dir")"
@@ -129,7 +129,7 @@ test_s2_pass_through_variables_arrive_unchanged() {
 # <shape> is one of the unusable shapes; <label> names the check.
 run_s3_shape() { # <shape>
   local shape=$1 dir rc=0 out head branch
-  dir=$(slot_env_make_world "s3-$shape" none)
+  dir=$(slot_env_make_world "s3-$shape" none) || fail 'the fixture world was not built'
   slot_env_break_copy_env "$dir" "$shape"
   slot_env_listing "$dir" > "$dir/listing-before.txt"
   head=$(git -C "$dir/copy" rev-parse HEAD)
@@ -163,7 +163,7 @@ test_s3_venv_bin_resolves_outside_copy() { run_s3_shape bin-outside; }
 # fm-spawn's governed branch call, so it must carry the named reason itself.
 test_s3_check_copy_carries_the_reason() {
   local dir out rc=0
-  dir=$(slot_env_make_world s3check none)
+  dir=$(slot_env_make_world s3check none) || fail 'the fixture world was not built'
   out=$(slot_env_run_check_copy "$dir" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail 'S3: fm_slot_check_copy admitted a copy with no environment'
   assert_contains "$out" 'slot provisioning refused: copy_environment_missing' 'S3: fm_slot_check_copy lost the named reason'
@@ -175,7 +175,7 @@ test_s3_check_copy_carries_the_reason() {
 # copy that has one is run, not rebuilt.
 test_no_stopgap_creates_nothing() {
   local dir rc=0
-  dir=$(slot_env_make_world nostop none)
+  dir=$(slot_env_make_world nostop none) || fail 'the fixture world was not built'
   slot_env_listing "$dir" > "$dir/listing-before.txt"
   run_local_provision "$dir" >/dev/null 2>&1 || rc=$?
   [ "$rc" -ne 0 ] || fail 'NO-STOPGAP: a copy with no environment was provisioned'
@@ -188,7 +188,7 @@ test_no_stopgap_creates_nothing() {
 
 test_no_stopgap_runs_existing_env_without_rebuilding() {
   local dir rc=0
-  dir=$(slot_env_make_world nostop-ok copies)
+  dir=$(slot_env_make_world nostop-ok copies) || fail 'the fixture world was not built'
   slot_env_listing "$dir" | grep -v '/.venv/.*__pycache__' > "$dir/listing-before.txt"
   run_local_provision "$dir" >/dev/null 2>&1 || rc=$?
   expect_code 0 "$rc" "NO-STOPGAP: provisioning failed: $(slot_env_tail "$dir")"
@@ -201,7 +201,7 @@ test_no_stopgap_runs_existing_env_without_rebuilding() {
 # for the exact PATH and the explicit-interpreter cases.
 test_owner_path_filter_and_override() {
   local dir out
-  dir=$(slot_env_make_world owner copies)
+  dir=$(slot_env_make_world owner copies) || fail 'the fixture world was not built'
   slot_env_add_decoy_venv "$dir"
   mkdir -p "$dir/home/cfgvenv/bin"
   : > "$dir/home/cfgvenv/pyvenv.cfg"
