@@ -279,7 +279,8 @@ teardown_process_env_has() {  # <pid> <entry>
     return
   fi
   command -v python3 >/dev/null 2>&1 || return 1
-  python3 - "$1" "$2" <<'PY'
+  # The kernel call exists only on macOS; elsewhere it fails quietly (not readable).
+  python3 - "$1" "$2" 2>/dev/null <<'PY'
 import sys, ctypes, ctypes.util, struct
 pid, want = int(sys.argv[1]), sys.argv[2].encode()
 libc = ctypes.CDLL(ctypes.util.find_library("c"), use_errno=True)
@@ -349,7 +350,9 @@ teardown_process_recorded() {  # <pid>
 # environment? Any one of: its readable environment carries the marker; it is in the
 # owned record with a matching birth identity; a live parent chain reaches such a
 # process. Anything else is not proved: the caller refuses by name and leaves it
-# running, and a foreign process is never ended.
+# running, and a foreign process is never ended. The task's own pane shell is added
+# to the record the first time a process is not proved (teardown_owned_record_pane_shell),
+# so a close with nothing unproved at its roots never asks the backend.
 teardown_process_proved_own() {  # <pid>
   local cur=$1 hops=0
   while [ -n "$cur" ] && [ "$cur" -gt 1 ] 2>/dev/null && [ "$hops" -lt 64 ]; do
@@ -358,7 +361,10 @@ teardown_process_proved_own() {  # <pid>
     cur=$(LC_ALL=C ps -o ppid= -p "$cur" 2>/dev/null | tr -d '[:space:]') || return 1
     hops=$((hops + 1))
   done
-  return 1
+  [ "${TEARDOWN_PANE_SHELL_READ:-0}" = 0 ] || return 1
+  TEARDOWN_PANE_SHELL_READ=1
+  teardown_owned_record_pane_shell
+  teardown_process_proved_own "$1"
 }
 
 # Writes the owned record from the live processes: every descendant (by live
@@ -366,13 +372,17 @@ teardown_process_proved_own() {  # <pid>
 # bearers included, except this teardown's own process and its ancestors. Run once
 # at the start of a teardown, before anything is reaped or any endpoint is closed.
 # Entries already recorded stay; nothing is added when no bearer is alive, so the
-# record is never extended after the worker is gone. Failure to read the process
+# record is never extended from the process table after the worker is gone (the
+# task's own pane shell is added from its endpoint, teardown_owned_record_pane_shell).
+# Failure to read the process
 # table records nothing and is not an error (unrecorded processes stay unproved).
 teardown_owned_record_write() {
   local rec expected table ancestors cur pids line pid identity tmp proc_root candidates bearers=" "
   rec=$(teardown_owned_record_path)
   expected=$(teardown_owner_marker) || return 0
-  table=$(LC_ALL=C ps -A -ww -E -o pid=,ppid=,command= 2>/dev/null) || return 0
+  # procps (Linux) has no -E; there the /proc environments below pick the candidates.
+  table=$(LC_ALL=C ps -A -ww -E -o pid=,ppid=,command= 2>/dev/null \
+    || LC_ALL=C ps -A -ww -o pid=,ppid=,command= 2>/dev/null) || return 0
   [ -n "$table" ] || return 0
   ancestors=" $$ "
   cur=$$
@@ -441,6 +451,26 @@ teardown_owned_record_write() {
   done
   LC_ALL=C sort -u "$tmp" > "$tmp.sorted" 2>/dev/null && mv -- "$tmp.sorted" "$rec" || true
   rm -f -- "$tmp" "$tmp.sorted"
+}
+
+# Adds to the owned record the shell that the task's own terminal pane was started
+# with, as the backend reports it for the endpoint the task record names (tmux and
+# herdr, through bin/fm-merge-prune-lib.sh's fm_mp_pane_pid). That shell, and the
+# idle shell `treehouse get` opened in the copy below it, have no launch marker
+# (the launch exports it only inside the command the pane runs) and can outlive
+# every marker bearer, yet they are the task's own: the live parent chain reaches
+# the recorded shell. A pane that cannot be read, or another backend, adds nothing.
+teardown_owned_record_pane_shell() {
+  local rec pane identity
+  rec=$(teardown_owned_record_path)
+  # shellcheck source=/dev/null # bin/fm-merge-prune-lib.sh sources this lib itself; it is read only in this subshell.
+  pane=$( { . "${SCRIPT_DIR:-}/fm-merge-prune-lib.sh" && fm_mp_pane_pid "${META:-}"; } 2>/dev/null) || return 0
+  [ -n "$pane" ] || return 0
+  identity=$(task_process_identity "$pane" 2>/dev/null) || return 0
+  [ -n "$identity" ] || return 0
+  [ ! -L "$rec" ] || return 0
+  ! grep -Fxq -- "$pane"$'\t'"$identity" "$rec" 2>/dev/null || return 0
+  printf '%s\t%s\n' "$pane" "$identity" >> "$rec" 2>/dev/null || true
 }
 
 # Reads into TEARDOWN_OWN_SCAN the "pid<TAB>cwd" lines of the processes whose cwd

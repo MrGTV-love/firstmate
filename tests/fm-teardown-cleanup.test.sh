@@ -2442,6 +2442,11 @@ grace_spawn_case() {
   local kind=$1 name=$2 case_dir rc pid child_file child_pid="" parent_survived=0 child_survived=0 diag py=""
   if [ "$kind" = nonapple ]; then
     py=$(teardown_nonapple_python) || { echo "NOT RUN - $name needs a non-Apple python3; a skip is not a pass"; return 0; }
+  elif [ "$(uname -s)" != Darwin ]; then
+    # Only macOS hides an Apple binary's environment; elsewhere the child's marker is
+    # readable, so it is proved and reaped, which the nonapple case already covers.
+    echo "NOT RUN - $name needs macOS, where an Apple binary's environment is hidden; a skip is not a pass"
+    return 0
   fi
   case_dir=$(make_case "$name")
   write_meta "$case_dir" no-mistakes ship
@@ -7540,7 +7545,7 @@ test_a_process_is_proved_the_tasks_own_by_marker_record_or_live_chain_never_by_p
   m=$(cd "$dir/state" && pwd -P)/task-x1.inbox
   t=$dir/ps-table
   rec=$dir/state/task-x1.teardown-owned
-  eval "$(sed -n '/^fm_nm_trim_stub/d; /^task_process_identity() {/,/^}/p; /^teardown_process_env_has() {/,/^}/p; /^teardown_owner_marker() {/,/^}/p; /^teardown_process_env_marked() {/,/^}/p; /^teardown_owned_record_path() {/,/^}/p; /^teardown_process_recorded() {/,/^}/p; /^teardown_process_proved_own() {/,/^}/p; /^teardown_owned_record_write() {/,/^}/p' "$ROOT/bin/fm-teardown.sh" "$ROOT/bin/fm-teardown-nested-lib.sh")"
+  eval "$(sed -n '/^fm_nm_trim_stub/d; /^task_process_identity() {/,/^}/p; /^teardown_process_env_has() {/,/^}/p; /^teardown_owner_marker() {/,/^}/p; /^teardown_process_env_marked() {/,/^}/p; /^teardown_owned_record_path() {/,/^}/p; /^teardown_process_recorded() {/,/^}/p; /^teardown_process_proved_own() {/,/^}/p; /^teardown_owned_record_write() {/,/^}/p; /^teardown_owned_record_pane_shell() {/,/^}/p' "$ROOT/bin/fm-teardown.sh" "$ROOT/bin/fm-teardown-nested-lib.sh")"
   # shellcheck disable=SC2329 # called by the evaluated task_process_identity.
   fm_nm_trim() { printf '%s' "$1" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'; }
   # shellcheck disable=SC2034 # read by the evaluated functions.
@@ -7679,9 +7684,13 @@ test_two_overlapping_teardowns_of_one_kept_copy_make_one_archive() {
   make_retained_case retained-overlap-teardown enclosing
   retained_overlap_run retained-overlap-teardown run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
   cp "$FOREIGN_CASE/stderr" "$FOREIGN_CASE/stderr.second"
-  [ -s "$FOREIGN_CASE/waiting-at-release.txt" ] || fail "retained-overlap-teardown: the second teardown was never observed waiting on the first one's lock before the driver was released"
+  # The overlap is real when the second either queued on a lock the first holds or was
+  # refused at once by the first's lifecycle lock, both while the first was in the driver.
+  [ -s "$FOREIGN_CASE/waiting-at-release.txt" ] \
+    || grep -Fq 'another lifecycle action is already running for task task-x1' "$FOREIGN_CASE/stderr.second" \
+    || fail "retained-overlap-teardown: the second teardown was neither observed waiting on the first one's lock nor refused by it before the driver was released"
   assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-overlap-teardown: two overlapping teardowns made more than one driver call or tar (first rc $(cat "$FOREIGN_CASE/rc.first"), second rc $rc: $(tail -3 "$FOREIGN_CASE/stderr.second"))"
-  pass "two overlapping teardowns of one kept copy ask the driver once and write one tar (first rc $(cat "$FOREIGN_CASE/rc.first"), second rc $rc; the second waited on: $(sed -n 2p "$FOREIGN_CASE/waiting-at-release.txt" | sed "s#$FOREIGN_CASE/##" | tr '\n' ' '))"
+  pass "two overlapping teardowns of one kept copy ask the driver once and write one tar (first rc $(cat "$FOREIGN_CASE/rc.first"), second rc $rc; the second waited on: $(sed -n 2p "$FOREIGN_CASE/waiting-at-release.txt" 2>/dev/null | sed "s#$FOREIGN_CASE/##" | tr '\n' ' '))"
 }
 
 test_a_file_created_in_the_copy_while_the_driver_runs_is_not_closed_over() {

@@ -680,8 +680,11 @@
 #     an argument or as text inside another value); a place in
 #     state/<id>.teardown-owned (pid AND birth identity), written at the start of
 #     the teardown, before any reaping or endpoint closure, from the live
-#     descendants of the marker-bearing worker, never extended once no bearer
-#     is alive, kept by a refusal for its retry and removed by the successful close; or a live parent chain to either (teardown_process_proved_own).
+#     descendants of the marker-bearing worker, never extended from the
+#     process table once no bearer is alive, plus the shell of the task's own
+#     terminal pane as its backend reports it for the recorded endpoint (tmux
+#     and herdr; read only when a process at a root is not otherwise proved,
+#     teardown_owned_record_pane_shell), kept by a refusal for its retry and removed by the successful close; or a live parent chain to either (teardown_process_proved_own).
 #     Anything else is not proved: teardown refuses by naming its pid and leaves it
 #     running, on every route; a foreign process is never ended. A process that
 #     has exited by the time it is checked (the kernel answers "no such process",

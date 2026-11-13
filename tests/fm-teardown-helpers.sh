@@ -114,6 +114,14 @@ teardown_fixture_record_owned() {  # <cwd> <pid>
   d=$(teardown_fixture_case_dir "$1") || return 0
   birth=$(teardown_fixture_birth "$2") || fail "cannot read the identity of fixture process $2"
   printf '%s\t%s\n' "$2" "$birth" >> "$d/state/task-x1.teardown-owned"
+  # A case that hides /proc (FM_PROC_ROOT_OVERRIDE) makes teardown read the identity from
+  # ps lstart even on Linux, so the record names that form of the same birth too.
+  case "$birth" in starttime=*)
+    birth=$(LC_ALL=C "$REAL_PS_FOR_TEST" -p "$2" -o lstart=) || fail "cannot read the start time of fixture process $2"
+    birth=${birth#"${birth%%[![:space:]]*}"}
+    printf '%s\tlstart=%s\n' "$2" "${birth%"${birth##*[![:space:]]}"}" >> "$d/state/task-x1.teardown-owned"
+    ;;
+  esac
 }
 
 teardown_fixture_start_foreign() {
