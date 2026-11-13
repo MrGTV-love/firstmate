@@ -162,7 +162,7 @@ drain_ack_pair() {  # <drain-stderr>
 start_rearm_arm() {  # <home> <state> <fakebin> <arm-out> [predecessor-arm-pid]
   local home=$1 state=$2 fakebin=$3 armout=$4 predecessor=${5:-} i
   PATH="$fakebin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$state" \
-    FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
+    FM_POLL="${REARM_POLL:-1}" FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
     FM_ARM_CONFIRM_TIMEOUT="$REARM_CONFIRM_SECONDS" \
     FM_WATCH_PREDECESSOR_ARM_PID="$predecessor" \
     "$WATCH_ARM" --restart > "$armout" &
@@ -1166,7 +1166,9 @@ test_take_over_attaches_to_a_cycle_the_named_arm_does_not_own() {
 
 # --take-over stops the named real arm's watcher, as it would a successor
 # left for main, and owns a fresh cycle. The stop must not open recovery over an episode
-# main already acknowledged, and must not hide work still queued.
+# main already acknowledged, and must not hide work still queued. A take-over attaches
+# to a watcher inside its prelude instead, so each seed watcher polls slowly under
+# count_watch_polls and the take-over starts only once it has begun a poll sleep.
 test_take_over_owns_a_fresh_cycle_and_keeps_queued_work_surfacing() {
   local dir state fakebin armout status owner
   dir=$(make_case take-over-owner)
@@ -1175,12 +1177,14 @@ test_take_over_owns_a_fresh_cycle_and_keeps_queued_work_surfacing() {
   armout="$dir/arm.out"
 
   # Main acknowledged everything: the fresh cycle stays quiet.
-  start_rearm_arm "$dir" "$state" "$fakebin" "$dir/owner.out" "$$"
+  count_watch_polls
+  REARM_POLL=6 start_rearm_arm "$dir" "$state" "$fakebin" "$dir/owner.out" "$$"
   owner=$ARM_PID
   SEED_PID=$(cat "$state/.watch.lock/pid")
   append_wake "$state" signal take-over "signal: fixture handled by main"
   ack_wakes "$state" >/dev/null || fail "fixture: main could not acknowledge the handled wake"
   case "$(cat "$state/.watcher-down" 2>/dev/null)" in acked:*) ;; *) fail "fixture: the episode was not acknowledged" ;; esac
+  wait_for_idle_poll "$state" "$SEED_PID"
   PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" \
     FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
     "$WATCH_ARM" --take-over "$owner" > "$armout" &
@@ -1202,10 +1206,11 @@ test_take_over_owns_a_fresh_cycle_and_keeps_queued_work_surfacing() {
   wait_for_exit "$ARM_PID" 50 >/dev/null 2>&1 || true
 
   # A wake still queued for main resurfaces from the cycle the arm took over.
-  start_rearm_arm "$dir" "$state" "$fakebin" "$dir/owner2.out" "$$"
+  REARM_POLL=6 start_rearm_arm "$dir" "$state" "$fakebin" "$dir/owner2.out" "$$"
   owner=$ARM_PID
   SEED_PID=$(cat "$state/.watch.lock/pid")
   append_wake "$state" signal take-over "signal: fixture still queued for main"
+  wait_for_idle_poll "$state" "$SEED_PID"
   PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" \
     FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
     FM_ARM_CONFIRM_TIMEOUT="$REARM_CONFIRM_SECONDS" "$WATCH_ARM" --take-over "$owner" > "$armout" &
@@ -1216,6 +1221,7 @@ test_take_over_owns_a_fresh_cycle_and_keeps_queued_work_surfacing() {
   grep -q '^check: rearm-resurface' "$armout" \
     || fail "work queued for main did not resurface after the takeover: $(cat "$armout")"
   ! is_live_non_zombie "$SEED_PID" || fail "--take-over left the second watcher running"
+  unset -f sleep
   pass "watch-arm: --take-over owns a fresh cycle without a recovery wake and still surfaces queued work"
 }
 

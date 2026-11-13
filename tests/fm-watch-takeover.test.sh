@@ -164,17 +164,6 @@ prepare_acknowledged_session() {  # <home>
   watcher_live "$home" || fail "fixture: no successor was left for main"$'\n'"$(fixture_diagnostics "$home")"
 }
 
-# Hold the take-over until the left watcher has just begun a poll sleep, so no prelude step is
-# in flight: the watcher announces each completed poll (tests/wake-helpers.sh count_watch_polls)
-# as it enters the terminal sleep, and FM_POLL is long enough that the sleep outlasts the arm's check.
-wait_for_idle_poll() {  # <home> <watcher-pid>
-  local f first
-  f=$(watch_polls_file "$1/state" "$2")
-  wait_until 300 test -s "$f" || fail "no poll sleep was announced by watcher $2"
-  first=$(cat "$f")
-  wait_until 300 bash -c '[ "$(cat "$1")" != "$2" ]' _ "$f" "$first" || fail "watcher $2 never began another poll sleep"
-}
-
 signals_to() {  # <home> <pid>: kill-log lines sending a real signal to the pid or its group
   awk -v p="$2" '$2 != "-0" && ($NF == p || $NF == "-" p)' "$1/kill.log" 2>/dev/null || true
 }
@@ -248,7 +237,7 @@ test_idle_take_over_stops_the_watcher_and_the_new_arm_prints_the_next_wake() {
   export FM_POLL=6
   count_watch_polls
   prepare_acknowledged_session "$home"
-  wait_for_idle_poll "$home" "$W_LEFT"
+  wait_for_idle_poll "$home/state" "$W_LEFT"
   turn_end "$home"
   wait_until 300 bash -c '[ "$(cat "$1/state/.watch.lock/pid" 2>/dev/null)" != "$2" ] && [ -s "$1/state/.watch.lock/pid" ]' _ "$home" "$W_LEFT" \
     || fail "idle: the taking arm never started its own watcher"$'\n'"$(fixture_diagnostics "$home")"$'\n'"kill log: $(tail -5 "$home/kill.log")"
@@ -321,7 +310,7 @@ test_a_prelude_starting_after_the_arms_check_does_not_start_its_step() {
   export FM_POLL=6
   count_watch_polls
   prepare_acknowledged_session "$home"
-  wait_for_idle_poll "$home" "$W_LEFT"
+  wait_for_idle_poll "$home/state" "$W_LEFT"
   : > "$home/arm-pause"
   turn_end "$home"
   wait_until 300 test -e "$home/arm-paused" || { unset FM_TEST_SEAM; fail "window: the arm never reached its pause: $(cat "$home/state/.supervision-host.log")"; }
@@ -338,14 +327,10 @@ test_a_prelude_starting_after_the_arms_check_does_not_start_its_step() {
   pass "take-over: a prelude that starts after the arm's check does not start its step"
 }
 
-# FM_TEST_ONLY=<function> runs a single case while debugging.
-run_case() {
-  [ -z "${FM_TEST_ONLY:-}" ] || [ "$1" = "$FM_TEST_ONLY" ] || return 0
-  run_host_case "$1"
-}
-run_case test_kill_shim_logs_a_known_kill_and_keeps_signal_names
-run_case test_take_over_attaches_to_a_watcher_inside_prelude_step9
-run_case test_take_over_attaches_to_a_watcher_inside_prelude_step10
-run_case test_idle_take_over_stops_the_watcher_and_the_new_arm_prints_the_next_wake
-run_case test_a_stop_deferred_outside_the_prelude_leaves_no_empty_recovery_wake
-run_case test_a_prelude_starting_after_the_arms_check_does_not_start_its_step
+fm_test_only
+run_host_case test_kill_shim_logs_a_known_kill_and_keeps_signal_names
+run_host_case test_take_over_attaches_to_a_watcher_inside_prelude_step9
+run_host_case test_take_over_attaches_to_a_watcher_inside_prelude_step10
+run_host_case test_idle_take_over_stops_the_watcher_and_the_new_arm_prints_the_next_wake
+run_host_case test_a_stop_deferred_outside_the_prelude_leaves_no_empty_recovery_wake
+run_host_case test_a_prelude_starting_after_the_arms_check_does_not_start_its_step

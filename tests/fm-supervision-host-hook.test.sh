@@ -394,6 +394,10 @@ host_owns_the_only_cycle() {  # <home>
 # A main-only pass-through in <home> leaves its successor cycle running, main
 # handles and acknowledges the close, and the session restarts. Sets
 # LEFT_WATCHER and LEFT_ARM to the successor watcher and the arm that owns it.
+# A take-over attaches to a watcher inside its prelude rather than stop it, so
+# each caller runs its watchers with a long FM_POLL under count_watch_polls and
+# lets the take-over reach the left watcher only once it has begun a poll sleep
+# (wait_for_idle_poll), then restores FM_POLL=1.
 LEFT_WATCHER=
 LEFT_ARM=
 leave_a_cycle_for_main_and_restart() {  # <home>
@@ -424,9 +428,12 @@ leave_a_cycle_for_main_and_restart() {  # <home>
 test_next_park_takes_over_the_cycle_a_pass_through_left_for_main() {
   local home left_watcher left_arm
   home=$(make_primary_home hook-takeover)
+  export FM_POLL=6
+  count_watch_polls
   leave_a_cycle_for_main_and_restart "$home"
   left_watcher=$LEFT_WATCHER
   left_arm=$LEFT_ARM
+  wait_for_idle_poll "$home/state" "$left_watcher"
   turn_end "$home"
   wait_until 150 host_owns_the_only_cycle "$home" \
     || fail "takeover: the next park did not own the home's only watcher cycle (left arm $left_arm, watcher $left_watcher):"$'\n'"$(home_arms "$home")"$'\n'"$(cat "$home/state/.supervision-host.log")"
@@ -441,6 +448,7 @@ test_next_park_takes_over_the_cycle_a_pass_through_left_for_main() {
   wait_until 250 hook_exited "$home" || fail "takeover: the owned cycle did not deliver the next close: $(cat "$home/state/.supervision-host.log")"
   assert_rewoke_main "$home" "takeover (next close)"
   assert_re '^signal: .*demo.status' "$home/hook.err" "takeover: the next close must carry the watcher's reason line"
+  export FM_POLL=1
   pass "host+hook: the next park takes over the cycle a main-only pass-through left, so one arm owns it"
 }
 
@@ -451,6 +459,8 @@ test_next_park_takes_over_the_cycle_a_pass_through_left_for_main() {
 test_a_park_stopped_mid_take_over_leaves_the_take_over_to_the_next_park() {
   local home holder host
   home=$(make_primary_home hook-takeover-interrupted)
+  export FM_POLL=6
+  count_watch_polls
   leave_a_cycle_for_main_and_restart "$home"
   FM_STATE_OVERRIDE="$home/state" bash -c '
     . "$1"
@@ -469,12 +479,14 @@ test_a_park_stopped_mid_take_over_leaves_the_take_over_to_the_next_park() {
   kill -0 "$LEFT_WATCHER" 2>/dev/null || fail "fixture: the take-over stopped the left watcher before the park was stopped"
   kill -TERM "$host" 2>/dev/null || fail "fixture: the park host $host was not running"
   wait_until 150 sh -c '! kill -0 "$1" 2>/dev/null' _ "$host" || fail "fixture: the park host did not stop"
+  wait_for_idle_poll "$home/state" "$LEFT_WATCHER"
   : > "$home/marker-lock-release"
   wait "$holder" 2>/dev/null || true
   # The Stop hook runs the next park in place of the one stopped by a signal.
   wait_until 150 host_owns_the_only_cycle "$home" \
     || fail "interrupted takeover: the next park did not own the home's only watcher cycle (left arm $LEFT_ARM):"$'\n'"$(home_arms "$home")"$'\n'"$(cat "$home/state/.supervision-host.log")"
   ! kill -0 "$LEFT_ARM" 2>/dev/null || fail "interrupted takeover: the left arm still runs (pid $LEFT_ARM)"
+  export FM_POLL=1
   pass "host+hook: a park stopped mid take-over leaves the take-over to the next park"
 }
 

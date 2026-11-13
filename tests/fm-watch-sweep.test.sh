@@ -475,8 +475,8 @@ test_cut_between_the_stopped_notice_and_its_episode_file_queues_one_notice() {
   pass "sweep: a cut between the stopped notice and its episode file keeps one notice and creates the episode on the rerun"
 }
 
-run_case() { [ -z "${FM_TEST_ONLY:-}" ] || [ "$1" = "$FM_TEST_ONLY" ] || return 0; "$1"; }
-for t in \
+fm_test_only
+fm_test_run_cases \
   test_term_cut_at_the_third_of_five_checks \
   test_sigkill_cut_at_the_third_of_five_checks \
   test_wake_driven_exit_after_the_close_repeats_no_check_and_loses_no_wake \
@@ -494,7 +494,5 @@ for t in \
   test_a_last_check_touch_between_cuts_leaves_the_open_sweep_open \
   test_stale_unreadable_and_removed_records_are_handled \
   test_a_home_with_no_sweep_record_runs_every_check_with_the_production_defaults \
-  test_contributions_text_survives_a_cut_at_its_stamp_and_is_printed_once
-do
-  run_case "$t"
-done
+  test_contributions_text_survives_a_cut_at_its_stamp_and_is_printed_once \
+  --

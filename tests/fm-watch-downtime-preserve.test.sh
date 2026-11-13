@@ -149,8 +149,8 @@ test_watcher_error_exit_with_announced_downtime() { preserve_case error-announce
 test_close_with_an_undelivered_wake_announces_once() { preserve_case undelivered kill9 announced:downtime:seedgen undelivered 1; }
 test_take_over_of_a_watcher_whose_downtime_was_never_announced() { preserve_case takeover-unannounced take-over pending:downtime:seedgen empty 1; }
 
-run_case() { [ -z "${FM_TEST_ONLY:-}" ] || [ "$1" = "$FM_TEST_ONLY" ] || return 0; "$1"; }
-for t in \
+fm_test_only
+fm_test_run_cases \
   test_kill9_with_pending_downtime \
   test_kill9_with_announced_downtime \
   test_operator_term_with_pending_downtime \
@@ -160,7 +160,5 @@ for t in \
   test_watcher_error_exit_with_pending_downtime \
   test_watcher_error_exit_with_announced_downtime \
   test_close_with_an_undelivered_wake_announces_once \
-  test_take_over_of_a_watcher_whose_downtime_was_never_announced
-do
-  run_case "$t"
-done
+  test_take_over_of_a_watcher_whose_downtime_was_never_announced \
+  --
