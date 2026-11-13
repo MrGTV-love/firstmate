@@ -710,6 +710,7 @@ The pull guard suite proves that no extension hand-off evidence replaces the [sh
 - A stopped check and two rejected checks, with the sweep closed, the next sweep running every check, the aggregate listing each rejected check once and the stopped notice queued once.
 - A cut after a check's wake is queued and before its stamp, with one queue row and one delivery.
 - A cut between the close record and the `.last-check` touch, after which no check runs.
+- A cut after a rejected check's attempt, one after the aggregate rejected wake is queued, and one between a stopped check's notice and its episode file, each leaving one queued row that is printed once.
 - The unchanged cadence after a close, a `.last-check` touch between cuts, and unreadable, removed and added checks.
 - A home with no record and both defaults unset, and the `contributions` wake durable before its stamp with its text unchanged.
 

@@ -353,6 +353,61 @@ test_contributions_wake_is_durable_before_its_stamp_and_text_is_unchanged() {
   pass "sweep: the contributions wake is durable before its stamp, queued once and delivered with the base's text"
 }
 
+# A cut right after a rejected check's attempt record, and one after the aggregate rejected wake is queued
+# and before the close record: the resumed sweep reruns no finished check, rebuilds the aggregate from the
+# attempt records, and the queue holds one aggregate row that lists every rejected check and is printed once.
+cut_rejected_sweep() {  # <name> <point>
+  local home
+  home=$(make_sweep_home "$1" c1 c2 c3 c4)
+  write_check "$home" c5 reject
+  write_check "$home" c6 reject
+  printf '%s\n' "$2" > "$home/hold"
+  rm -f "$home/held"
+  start_watch "$home" FM_CHECK_INTERVAL=2
+  wait_for 300 test -e "$home/held" || fail "$1: the watcher never reached $2"
+  cut_watch "$W" KILL
+  rm -f "$home/hold" "$home/held"
+  start_watch "$home" FM_CHECK_INTERVAL=2
+  wait_for 300 sweep_closed "$home" || fail "$1: the resumed sweep never closed"
+  expect_runs "$home" "$1" c1=1 c2=1 c3=1 c4=1
+  [ "$(queue_rows "$home" 'unauthenticated-state-checks')" = 1 ] || fail "$1: the aggregate rejected wake was not queued exactly once: $(cat "$home/state/.wake-queue")"
+  grep -F "c5.check.sh" "$home/state/.wake-queue" | grep -qF "c6.check.sh" || fail "$1: the aggregate does not list both rejected checks: $(cat "$home/state/.wake-queue")"
+  wait_for 100 grep -q '^check: rejected unauthenticated state checks' "$home"/watch.*.out || fail "$1: the resumed watcher did not print the aggregate"
+  [ "$(printed "$home" '^check: rejected unauthenticated state checks')" = 1 ] || fail "$1: the aggregate was printed other than once: $(cat "$home"/watch.*.out)"
+  cut_watch "$W" TERM
+}
+test_cut_after_a_rejected_attempt_rebuilds_the_aggregate_once() {
+  cut_rejected_sweep sweep-after-attempt after-attempt:c5
+  pass "sweep: a cut after a rejected check's attempt resumes with one aggregate wake listing every rejected check"
+}
+test_cut_after_the_aggregate_wake_and_before_the_close_record_queues_it_once() {
+  cut_rejected_sweep sweep-after-aggregate after-aggregate
+  pass "sweep: a cut after the aggregate wake is queued and before the close record queues it once"
+}
+
+# A cut between a stopped check's queued notice and its episode file: the resumed sweep reruns the check, it
+# stops again, and the queue still holds one notice for it.
+test_cut_between_the_stopped_notice_and_its_episode_file_queues_one_notice() {
+  local home
+  home=$(make_sweep_home sweep-before-episode c1 c2 c3 c4)
+  : > "$home/stall-c2"
+  printf 'before-episode:c2\n' > "$home/hold"
+  rm -f "$home/held"
+  start_watch "$home" FM_CHECK_INTERVAL=3 FM_CHECK_TIMEOUT=2
+  wait_for 600 test -e "$home/held" || fail "before-episode: the watcher never reached the point: $(cat "$home/watch.1.out")"
+  [ "$(grep -c 'check c2 stopped after' "$home/state/.wake-queue")" = 1 ] || fail "before-episode: the notice was not queued before the episode file: $(cat "$home/state/.wake-queue")"
+  [ ! -e "$home/state/c2.check-stopped" ] || fail "before-episode: the episode file existed before the notice point"
+  cut_watch "$W" KILL
+  rm -f "$home/hold" "$home/held"
+  start_watch "$home" FM_CHECK_INTERVAL=3 FM_CHECK_TIMEOUT=2
+  wait_for 600 sweep_closed "$home" || fail "before-episode: the resumed sweep never closed"
+  expect_runs "$home" "before-episode" c1=1 c2=2 c3=1 c4=1
+  [ "$(grep -c 'check c2 stopped after' "$home/state/.wake-queue")" = 1 ] || fail "before-episode: the rerun queued a second notice: $(cat "$home/state/.wake-queue")"
+  [ -e "$home/state/c2.check-stopped" ] || fail "before-episode: the resumed sweep never created the episode file"
+  cut_watch "$W" TERM
+  pass "sweep: a cut between the stopped notice and its episode file keeps one notice and creates the episode on the rerun"
+}
+
 run_case() { [ -z "${FM_TEST_ONLY:-}" ] || [ "$1" = "$FM_TEST_ONLY" ] || return 0; "$1"; }
 for t in \
   test_term_cut_at_the_third_of_five_checks \
@@ -362,6 +417,9 @@ for t in \
   test_stopped_and_rejected_checks_close_the_sweep_and_run_again_next_sweep \
   test_cut_after_the_wake_and_before_the_stamp_queues_and_delivers_once \
   test_cut_between_the_close_record_and_the_touch_runs_no_check \
+  test_cut_after_a_rejected_attempt_rebuilds_the_aggregate_once \
+  test_cut_after_the_aggregate_wake_and_before_the_close_record_queues_it_once \
+  test_cut_between_the_stopped_notice_and_its_episode_file_queues_one_notice \
   test_after_a_close_the_cadence_is_unchanged \
   test_a_last_check_touch_between_cuts_leaves_the_open_sweep_open \
   test_stale_unreadable_and_removed_records_are_handled \
