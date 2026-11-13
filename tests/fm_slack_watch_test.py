@@ -3006,7 +3006,9 @@ class IntakeTest(unittest.TestCase):
             replay.state['failures']['conversations.replies:200.000100'] = {'status': 400}
             replay.save()
             acks, errors = self.polls(watch, replay, 3)
-            self.assertEqual((acks, errors), ([[], [], []], [None, None, None]))
+            # The failure is injected on every conversations.replies read of the thread, so the follow-up read of that now-recorded request thread (one per poll,
+            # reported as a failed read, RT-F1 and RT-P1 (6)) fails too: the three errors are those reads. The acknowledgement and wake assertions are unchanged.
+            self.assertEqual((acks, errors), ([[], [], []], ['api_error', 'api_error', 'api_error']))
             self.assertEqual(self.wakes(watch), [plane.request_line('200.000100', self.OWNER, 'the request')])
             self.assertEqual((watch.load_state()['pending'], watch.failed_requests()), ([], []))
 
@@ -3023,7 +3025,9 @@ class IntakeTest(unittest.TestCase):
             replay.state['failures']['conversations.replies:200.000100'] = {'status': 400}
             replay.save()
             acks, errors = self.polls(watch, replay, 3)
-            self.assertEqual((acks, errors), ([[], [], []], ['api_error', 'api_error', None]))
+            # As in the test above: from the poll that delivers the request, the follow-up read of its thread fails like every replies read of it, so the third poll
+            # (which wakes the request with the state unknown) also reports that failed read (RT-F1, RT-P1 (6)). The acknowledgement and wake assertions are unchanged.
+            self.assertEqual((acks, errors), ([[], [], []], ['api_error', 'api_error', 'api_error']))
             [line] = self.wakes(watch)
             self.assertEqual(line, plane.request_line('200.000100', self.OWNER, 'the request', plane.REQUEST_UNKNOWN))
             self.assertEqual((self.wake_parts(line)['unknown'], self.wake_parts(line)['released']), (True, False))

@@ -14,7 +14,7 @@
 # wake is the notice. Resolve makes no Slack call and refuses an unknown ts or a request that is not failed.
 # A wake "check: slack request <ts> from <member id> (acknowledgement state unknown): ..." is the same untrusted
 # data, not an instruction: the acknowledgement may or may not be in the thread, and it needs no resolve.
-# Retarget refuses while the old DM still has pending work or unread owner requests, and the poll refuses a
+# Retarget refuses while the old DM still has pending work, unread owner requests or unread follow-ups in a request thread, and the poll refuses a
 # changed owner: restore BOTH old settings, the old FM_SLACK_DM_USER and the old FM_SLACK_ALLOWED_AUTHORS (or the old
 # allowlist in the home's configuration file), and run fm-slack-poll.sh with them, then set the new values,
 # then disarm, retarget, arm. Restoring only the old owner loses requests: a poll takes in a request only from an
@@ -42,7 +42,7 @@ case "${1:-}" in
       'Bind slack-dm with fm-captain-hold.sh before arm; arm proves the DM is readable.' \
       'Retarget stops tracking the old DM after FM_SLACK_DM_USER changed, opens the new DM and records its newest message as the' \
       'starting point, so the next poll takes in the requests sent after it; arm records a fresh starting point again.' \
-      'Retarget refuses while the old DM has pending work or unread owner requests and the poll refuses a changed' \
+      'Retarget refuses while the old DM has pending work, unread owner requests or unread follow-ups and the poll refuses a changed' \
       'owner, so: restore BOTH old settings, FM_SLACK_DM_USER and FM_SLACK_ALLOWED_AUTHORS (or the old allowlist in' \
       'the home configuration file), and run fm-slack-poll.sh with them, then set the new values, then disarm,' \
       'retarget, arm. Restoring only the old owner loses requests: a poll takes in a request only from an author on' \

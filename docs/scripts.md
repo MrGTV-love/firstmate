@@ -210,9 +210,11 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-slack-lib.sh`        | Slack environment resolution and the Python entry point used by the Slack commands |
 | `fm_slack.py`            | Slack Web API client with bounded waits, classified errors, and token redaction |
 | `fm_slack_replay.py`     | Deterministic replay of the Slack methods the plane uses; opens no socket |
-| `fm_slack_watch.py`      | Mirror open captain calls into DM threads, deliver authorized replies to the keyed-answer intake, take in new owner DM messages as acknowledged, woken requests, and journal pending publication |
+| `fm_slack_watch.py`      | Mirror open captain calls into DM threads, deliver authorized replies to the keyed-answer intake, take in new owner DM messages as acknowledged, woken requests and their thread follow-ups, post Firstmate's answer into a request thread, and journal pending publication |
 | `fm-slack-mirror.sh`     | Mirror open captain calls into one owner-DM thread per call |
-| `fm-slack-poll.sh`       | Poll tracked DM threads and deliver authorized typed or reaction answers through `fm-captain-hold.sh answers`, and take in new owner DM messages as acknowledged, woken requests |
+| `fm-slack-poll.sh`       | Poll tracked DM threads and deliver authorized typed or reaction answers through `fm-captain-hold.sh answers`, and take in new owner DM messages as acknowledged, woken requests and the owner's follow-ups in their threads |
+| `fm-slack-reply.sh`      | Post Firstmate's answer, read from standard input, into the thread of one request the plane took in; the same answer event posts once |
+| `fm-slack-read.sh`       | Print the full text of a request or follow-up that a wake line only previewed, with what came before a follow-up in its thread, as labeled unverified data |
 | `fm-slack-check.sh`      | Standing Slack poll: ordered `arm` after the `slack-dm` binding, `check` on the watcher cadence, `disarm` as the hard off switch, `retarget` after `FM_SLACK_DM_USER` changes, and `resolve <request-ts>` to close one failed owner request |
 | `fm-voice-relay.py`      | Hold the spoken conversation on this host, answer from the records, and hand real work to `fm-inbox.sh` ([voice-relay.md](voice-relay.md)) |
 | `fm-voice-client.py`     | The laptop end of the spoken interface: capture, playback, and turn timing over SSH; audio devices unverified |
