@@ -1943,6 +1943,211 @@ EOF
   pass ".omp turn-end guard: digest delivery, seatbelt block, one compelled continuation, flagged stop stands down"
 }
 
+test_watch_extension_distinguishes_lock_loss_from_retry_exhaustion() {
+  local kind repo home out status
+  for kind in other missing exhausted; do
+    repo="$TMP_ROOT/watch-restore-reason-$kind/repo"; home="$TMP_ROOT/watch-restore-reason-$kind/home"
+    install_omp_extension_fixture "$repo"
+    mkdir -p "$home/state" "$home/config"
+    cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" != --handling-delivered ] || exit 0
+printf '%s\n' "$$" >> "$FM_HOME/arms"
+n=$(wc -l < "$FM_HOME/arms" | tr -d ' ')
+if [ "$n" -gt 1 ]; then
+  printf 'watcher: FAILED - controlled successor startup refusal\n'
+  exit 1
+fi
+printf 'watcher: started pid=%s\n' "$$"
+while [ ! -e "$FM_HOME/close" ]; do sleep 0.1; done
+printf 'check: restoration branch fixture\n'
+SH
+    chmod +x "$repo/bin/fm-watch-arm.sh"
+    out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" \
+      FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
+      RESTORE_CASE="$kind" EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { writeFileSync, readFileSync, existsSync, unlinkSync } from "node:fs";
+const home = process.env.FM_HOME, kind = process.env.RESTORE_CASE;
+const handlers = new Map();
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const until = async (predicate, failure) => {
+  for (let i = 0; i < 200 && !predicate(); i++) await sleep(25);
+  if (!predicate()) throw new Error(failure);
+};
+const arms = () => existsSync(`${home}/arms`) ? readFileSync(`${home}/arms`, "utf8").trim().split("\n").length : 0;
+const failures = () => {
+  const file = `${home}/state/extensions/omp-primary-watch/lifecycle.log`;
+  return existsSync(file) ? readFileSync(file, "utf8").split("\n").filter((line) => line.includes("event=restore-failed ")) : [];
+};
+const pi = { on(e, h) { handlers.set(e, h); }, registerCommand() {}, registerTool() {}, sendUserMessage() {} };
+writeFileSync(`${home}/state/.lock`, `${process.pid}\n`);
+(await import(pathToFileURL(process.env.EXT).href)).default(pi);
+try {
+  await handlers.get("session_start")({}, { isIdle: () => true });
+  await until(() => arms() === 1, "initial watcher never started");
+  if (kind === "other") writeFileSync(`${home}/state/.lock`, "1\n");
+  if (kind === "missing") unlinkSync(`${home}/state/.lock`);
+  writeFileSync(`${home}/close`, "");
+  await until(() => failures().length > 0, "restoration failure never reached the lifecycle log");
+  const reason = kind === "exhausted" ? "retries-exhausted" : "lock-lost";
+  const rows = failures();
+  if (rows.length !== 1 || !rows[0].endsWith(`reason=${reason}`)) {
+    throw new Error(`${kind}: expected one restore-failed reason=${reason}, got ${JSON.stringify(rows)}`);
+  }
+  const expectedArms = kind === "exhausted" ? 3 : 1;
+  if (arms() !== expectedArms) throw new Error(`${kind}: expected ${expectedArms} arm launches, got ${arms()}`);
+  console.log(`${kind}: restore-failed reason=${reason}; arm launches=${arms()}`);
+} finally {
+  await handlers.get("session_shutdown")({}, {});
+}
+process.exit(0);
+EOF
+)
+    status=$?
+    expect_code 0 "$status" "omp restoration failure reason ($kind): $out"
+    pass ".omp watch extension: $kind restoration has its own failure reason and arm count"
+  done
+}
+
+# A send may settle only after the model turn. Close the successor while that
+# promise is still pending: continuity must advance without a repair tool call.
+# The foreign rows replace the session while that send still holds its claim.
+test_watch_extension_restores_while_delivery_pending() {
+  local kind repo home out status
+  for kind in pending rejected replay foreign-late foreign-never; do
+    repo="$TMP_ROOT/watch-pending-$kind/repo"; home="$TMP_ROOT/watch-pending-$kind/home"
+    install_omp_extension_fixture "$repo"
+    mkdir -p "$home/state" "$home/config"
+    cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" != --handling-delivered ] || exit 0
+printf '%s %s\n' "$$" "$FM_WATCH_PREDECESSOR_ARM_PID" >> "$FM_HOME/arms"
+n=$(wc -l < "$FM_HOME/arms" | tr -d ' ')
+printf 'watcher: started pid=%s\n' "$$"
+while [ ! -e "$FM_HOME/close-$n" ]; do sleep 0.1; done
+printf 'check: pending-delivery-%s\n' "$n"
+SH
+    chmod +x "$repo/bin/fm-watch-arm.sh"
+    # A queue query is an external boundary, not an internal pending-record oracle.
+    cat > "$repo/bin/fm-wake-drain.sh" <<'SH'
+#!/usr/bin/env bash
+[ -e "$FM_HOME/drained" ] || printf 'check\t1\tfixture\t0\tcheck: controlled delivery\n'
+SH
+    out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" \
+      FM_OMP_SUCCESSOR_GRACE_MS=60000 DELIVERY_CASE="$kind" EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" \
+      node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { writeFileSync, readFileSync, existsSync } from "node:fs";
+const home = process.env.FM_HOME, kind = process.env.DELIVERY_CASE;
+const handlers = new Map(), sends = [], failures = [];
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const until = async (predicate, failure) => {
+  for (let i = 0; i < 200 && !predicate(); i++) await sleep(50);
+  if (!predicate()) throw new Error(failure);
+};
+const arms = () => existsSync(`${home}/arms`) ? readFileSync(`${home}/arms`, "utf8").trim().split("\n").map((line) => line.split(" ")) : [];
+let settle, unsettled = true, rejected = false;
+const ctx = { isIdle: () => true };
+const pi = {
+  on(e, h) { handlers.set(e, h); }, registerCommand() {}, registerTool() {},
+  sendUserMessage(message) {
+    if (message.includes("watcher: FAILED")) { failures.push(message); return undefined; }
+    sends.push(message);
+    if (kind === "rejected" && !rejected) { rejected = true; return Promise.reject(new Error("controlled delivery refusal")); }
+    if (sends.length === 1) return new Promise((resolve) => { settle = () => { unsettled = false; resolve(); }; });
+    return undefined;
+  },
+};
+writeFileSync(`${home}/state/.lock`, `${process.pid}\n`);
+(await import(pathToFileURL(process.env.EXT).href)).default(pi);
+try {
+  await handlers.get("session_start")({}, ctx);
+  await until(() => arms().length === 1, "initial watcher never started");
+  writeFileSync(`${home}/close-1`, "");
+  await until(() => sends.length === 1, "first wake never reached delivery");
+  if (kind === "rejected") {
+    await until(() => failures.some((m) => m.includes("controlled delivery refusal")), "rejected delivery did not surface its failure");
+    await until(() => sends.length === 2, "rejected wake was lost rather than retried");
+  } else if (kind.startsWith("foreign")) {
+    await until(() => arms().length === 2, "first actionable close has no extension-started successor");
+    await handlers.get("session_shutdown")({}, {});
+    await handlers.get("session_start")({}, ctx);
+    await until(() => arms().length === 3, "replacement session never armed");
+    writeFileSync(`${home}/close-3`, "");
+    await until(() => arms().length === 4, "replacement close has no extension-started successor while an earlier generation's claim is pending");
+    await until(() => sends.length === 2, "replacement close wake was not delivered");
+    await sleep(300);
+    if (!unsettled || sends.length !== 2) throw new Error("earlier generation's claimed wake was taken over before its claim settled");
+    const observed = arms();
+    if (observed[3][1] !== observed[2][0]) throw new Error(`replacement successor did not follow its predecessor: ${JSON.stringify(observed)}`);
+  } else {
+    writeFileSync(`${home}/close-2`, "");
+    await until(() => arms().length === 3, "second actionable close has no extension-started successor while first delivery is pending");
+    if (!unsettled || sends.length !== 1) throw new Error("pending wake settled early or was submitted twice");
+    const observed = arms();
+    if (observed[1][1] !== observed[0][0] || observed[2][1] !== observed[1][0]) throw new Error(`successors were not in close order: ${JSON.stringify(observed)}`);
+  }
+  if (kind === "replay") {
+    await handlers.get("session_shutdown")({}, {});
+    const handoff = `${home}/state/extensions/omp-primary-watch/session-replacement-actionable.json`;
+    if (!existsSync(handoff)) throw new Error("unconsumed accepted wake was not persisted");
+    await handlers.get("session_start")({}, ctx);
+    settle();
+    await until(() => sends.length === 2, "replacement did not replay the unconsumed wake");
+    writeFileSync(`${home}/drained`, "");
+    await handlers.get("message_start")({ message: { role: "user", content: sends[1] } }, ctx);
+    await sleep(1300);
+    if (sends.length !== 2 || existsSync(handoff)) throw new Error("replacement replay duplicated or retained consumed work");
+  } else if (kind === "foreign-late") {
+    const handoff = `${home}/state/extensions/omp-primary-watch/session-replacement-actionable.json`;
+    await handlers.get("message_start")({ message: { role: "user", content: sends[1] } }, ctx);
+    settle();
+    await until(() => sends.length === 3, "replacement did not replay the held wake once the earlier claim settled");
+    writeFileSync(`${home}/drained`, "");
+    await handlers.get("message_start")({ message: { role: "user", content: sends[2] } }, ctx);
+    await sleep(1300);
+    if (sends.length !== 3 || arms().length !== 4 || existsSync(handoff)) {
+      throw new Error(`late claim settlement duplicated, lost or retained work: ${JSON.stringify({ sends: sends.length, arms: arms().length, handoff: existsSync(handoff) })}`);
+    }
+  } else if (kind === "foreign-never") {
+    const handoff = `${home}/state/extensions/omp-primary-watch/session-replacement-actionable.json`;
+    await handlers.get("message_start")({ message: { role: "user", content: sends[1] } }, ctx);
+    writeFileSync(`${home}/close-4`, "");
+    await until(() => arms().length === 5, "later close has no extension-started successor while an earlier claim never settles");
+    const observed = arms();
+    if (observed[4][1] !== observed[3][0]) throw new Error(`later successor did not follow its predecessor: ${JSON.stringify(observed)}`);
+    await until(() => sends.length === 3, "later close wake was not delivered");
+    writeFileSync(`${home}/drained`, "");
+    await handlers.get("message_start")({ message: { role: "user", content: sends[2] } }, ctx);
+    await handlers.get("session_shutdown")({}, {});
+    const held = () => existsSync(handoff) && JSON.parse(readFileSync(handoff, "utf8")).pending.some((item) => item.predecessorArmPid === observed[0][0]);
+    if (!held()) throw new Error("claimed wake was not kept durable for replay");
+    await handlers.get("session_start")({}, ctx);
+    await until(() => arms().length === 6, "second replacement session never armed");
+    await sleep(500);
+    if (sends.length !== 3 || !held()) throw new Error(`never-settled claim was taken over or dropped: ${sends.length}`);
+  } else {
+    writeFileSync(`${home}/drained`, "");
+    if (settle) settle();
+    await handlers.get("message_start")({ message: { role: "user", content: sends.at(-1) } }, ctx);
+    await sleep(1300);
+    const expected = kind === "rejected" ? 2 : 1;
+    if (sends.length !== expected) throw new Error(`delivery was lost or doubled after settlement: ${sends.length}`);
+  }
+  console.log(`controlled-${kind}: successor order, delivery settlement and consumption verified`);
+} finally {
+  await handlers.get("session_shutdown")({}, {});
+}
+process.exit(0);
+EOF
+)
+    status=$?
+    expect_code 0 "$status" "omp pending delivery ($kind): $out"
+    pass ".omp watch extension: controlled $kind delivery preserves continuity and wake ownership"
+  done
+}
+
 test_watch_extension_arms_and_delivers() {
   local repo home out status
   repo="$TMP_ROOT/watch/repo"; home="$TMP_ROOT/watch/home"
@@ -4957,6 +5162,9 @@ test_watch_lifecycle_deadline_diagnostics() {
 
 test_spawn_fixed_family
 test_watch_lifecycle_deadline_diagnostics
+
+test_watch_extension_distinguishes_lock_loss_from_retry_exhaustion
+test_watch_extension_restores_while_delivery_pending
 test_detection_anchored_name_and_marker_precedence
 test_lock_identity_and_liveness_classification
 test_spawn_refuses_api_billed_routes
