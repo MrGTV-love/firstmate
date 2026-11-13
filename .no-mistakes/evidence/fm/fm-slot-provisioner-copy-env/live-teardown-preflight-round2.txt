@@ -1,0 +1,4 @@
+$ bin/fm-teardown.sh lab-task   (scratch copy of head bin/ WITHOUT fm-copy-env-lib.sh, empty scratch FM_HOME; head bb07aa64)
+error: teardown refused: required source fm-copy-env-lib.sh is missing or unreadable; nothing was changed
+exit=1
+scratch FM_HOME entries after: 

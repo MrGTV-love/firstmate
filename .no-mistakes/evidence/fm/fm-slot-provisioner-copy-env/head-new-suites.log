@@ -1,0 +1,52 @@
+FM_TEST_BEGIN 2026-11-13T10:02:57Z tests/fm-slot-provision-env.test.sh family=unclassified expected_gate_skip=none
+ok - S1: a clone with no .venv provisions in the copy environment
+ok - S1b: a real python -m venv copy environment provisions although its interpreter links outside the copy
+ok - S1: the copy path is used as given when it is reached through a symlink
+ok - S2: an inherited VIRTUAL_ENV, ambient interpreter variables and a clone .venv never reach the provisioner
+ok - S2: named pass-through variables reach the provisioner unchanged
+ok - S3: missing refuses by name before any change
+ok - S3: notexec refuses by name before any change
+ok - S3: venv-outside refuses by name before any change
+ok - S3: bin-outside refuses by name before any change
+ok - S3: fm_slot_check_copy names the missing environment
+ok - NO-STOPGAP: provisioning a copy with no environment creates no venv and installs nothing
+ok - NO-STOPGAP: an existing copy environment is run, never rebuilt
+ok - owner: PATH filter and explicit-interpreter cases
+FM_TEST_END 2026-11-13T10:03:17Z tests/fm-slot-provision-env.test.sh exit=0 duration_ms=20219 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7A5FJN72F85EGBD5P2GDVQA/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-11-13T10:03:18Z tests/fm-spawn-slot-env.test.sh family=unclassified expected_gate_skip=none
+ok - P1: a spawn with no clone .venv provisions in the copy environment
+ok - P1b: a real python -m venv copy environment provisions through the spawn path
+ok - P2: an ambient VIRTUAL_ENV in the pane, interpreter variables and a clone .venv never reach the spawn provisioner
+ok - P3: missing is refused through the spawn entry before any change
+ok - P3: notexec is refused through the spawn entry before any change
+ok - P3: venv-outside is refused through the spawn entry before any change
+ok - P3: bin-outside is refused through the spawn entry before any change
+ok - P3f: a freshness target that brings the provisioner is refused for a missing environment before the reset
+ok - P3f: a freshness target that brings the provisioner provisions in the copy environment
+ok - P4: an ordinary copy with no provisioner and no .venv spawns exactly as before
+FM_TEST_END 2026-11-13T10:04:24Z tests/fm-spawn-slot-env.test.sh exit=0 duration_ms=66852 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7A5FJN72F85EGBD5P2GDVQA/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-11-13T10:04:25Z tests/fm-copy-env-sites.test.sh family=unclassified expected_gate_skip=none
+ok - C1: the closeout driver runs in its tree environment with the ambient environment scrubbed
+ok - C2: an explicit interpreter outside any .venv runs with VIRTUAL_ENV unset and its own bin not put on PATH
+ok - C3: an explicit interpreter under the tree venv gets the tree environment
+ok - C4: an explicit interpreter under another venv runs with VIRTUAL_ENV unset and its bin filtered
+ok - C5: a closeout tree with no interpreter is refused by name with no fallback and nothing created
+ok - C6: teardown_run_closeout takes the explicit interpreter over the default and refuses when neither is usable
+ok - S4a: a clone with no script and no .venv retires through the copy script and the copy interpreter
+ok - S4c: a clone script with no .venv yields to the copy script and the copy interpreter
+ok - S4 preserve: a project holding script and interpreter still runs its own
+ok - S4b: a script with no usable interpreter is refused by name with its next step and no fallback
+ok - S4d: no entry point in either tree keeps the existing report-and-continue behavior
+ok - S4f: --prove-to builds the proof when the script exists and writes none otherwise
+ok - S2: the retire entry point runs in its tree environment with the ambient environment scrubbed
+ok - S4e: the sweep-loop caller refuses without an interpreter and runs in the owning tree with one
+FM_TEST_END 2026-11-13T10:04:38Z tests/fm-copy-env-sites.test.sh exit=0 duration_ms=13321 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7A5FJN72F85EGBD5P2GDVQA/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=3 failed=0 skipped_gate=0 duration_ms=101514
+FM_TEST_SUMMARY_FAMILY family=unclassified count=3 duration_ms=100392 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-spawn-slot-env.test.sh duration_ms=66852
+FM_TEST_SLOWEST rank=2 script=tests/fm-slot-provision-env.test.sh duration_ms=20219
+FM_TEST_SLOWEST rank=3 script=tests/fm-copy-env-sites.test.sh duration_ms=13321
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7A5FJN72F85EGBD5P2GDVQA/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"

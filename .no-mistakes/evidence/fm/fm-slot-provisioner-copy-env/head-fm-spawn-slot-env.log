@@ -1,0 +1,15 @@
+ok - P1: a spawn with no clone .venv provisions in the copy environment
+ok - P1b: a real python -m venv copy environment provisions through the spawn path
+ok - P2: an ambient VIRTUAL_ENV in the pane, interpreter variables and a clone .venv never reach the spawn provisioner
+ok - P3: missing is refused through the spawn entry before any change
+ok - P3: notexec is refused through the spawn entry before any change
+ok - P3: venv-outside is refused through the spawn entry before any change
+ok - P3: bin-outside is refused through the spawn entry before any change
+ok - P3f: a freshness target that brings the provisioner is refused for a missing environment before the reset
+ok - P3f: a freshness target that brings the provisioner provisions in the copy environment
+ok - P4: an ordinary copy with no provisioner and no .venv spawns exactly as before
+
+real	1m41.884s
+user	0m19.324s
+sys	0m26.069s
+exit=0

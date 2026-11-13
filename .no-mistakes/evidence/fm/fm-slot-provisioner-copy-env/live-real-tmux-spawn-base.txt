@@ -1,0 +1,53 @@
+lab FM_HOME=/private/tmp/fm-lab.14CmkM TMUX_TMPDIR=/tmp/fml.woH0d3
+real tmux server: socket=/private/tmp/fml.woH0d3/tmux-501/fm-lab pid=92512
+--- pane environment as tmux will give new windows:
+CONDA_PREFIX=/polluted/conda
+PYTHONHOME=/opt/homebrew/opt/python@3.14/Frameworks/Python.framework/Versions/3.14
+PYTHONPATH=/polluted/pythonpath
+PYTHONSTARTUP=/polluted/startup.py
+PYTHONUSERBASE=/polluted/userbase
+UV_PROJECT_ENVIRONMENT=/polluted/uv-env
+VIRTUAL_ENV=/tmp/fm-tmuxlabb.rr5y/world/tmuxlab/decoy
+__PYVENV_LAUNCHER__=/polluted/launcher
+fm-spawn.sh exit=1
+--- spawn output (tail):
+warning: task tmuxlab-90087: /private/tmp/fm-lab.14CmkM/data/tmuxlab-90087/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /private/tmp/fm-lab.14CmkM/data/tmuxlab-90087/launch-brief.md records no ship branch; defaulting to legacy branch fm/tmuxlab-90087
+warning: /private/tmp/fm-lab.14CmkM/data/tmuxlab-90087/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: tmuxlab-90087 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+local-only source: local=main@3e304bb280b13faadb0dfd580527e57ccb05d98d origin=main@3e304bb280b13faadb0dfd580527e57ccb05d98d selected=origin/main@3e304bb280b13faadb0dfd580527e57ccb05d98d
+Traceback (most recent call last):
+  File "/private/tmp/fm-tmuxlabb.rr5y/world/tmuxlab/copy/scripts/git-stability/provision_existing_slot.py", line 21, in <module>
+    import fm_fixture_env_mod  # noqa: E402,F401 only the copy's venv can import this
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+ModuleNotFoundError: No module named 'fm_fixture_env_mod'
+error: slot provisioner refused task tmuxlab-90087 (exit 1); no agent or ship transition admitted; report: /private/tmp/fm-lab.14CmkM/data/tmuxlab-90087/slot-provision-spawn.92689.json
+error: assigned copy /private/tmp/fm-tmuxlabb.rr5y/world/tmuxlab/copy and endpoint firstmate:fm-tmuxlab-90087 retained; no worker admitted
+--- tmux windows:
+firstmate:bash /private/tmp/fm-tmuxlabb.rr5y/world/tmuxlab/project
+firstmate:fm-tmuxlab-90087 /private/tmp/fm-tmuxlabb.rr5y/world/tmuxlab/copy
+--- pane firstmate:0:
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+lab$
+--- pane firstmate:1:
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+lab$ treehouse get
+lab$ bash -- '/private/tmp/fm-lab.14CmkM/data/tmuxlab-90087/.slot-provision.IFkx2v/run'
+lab$
+--- provisioner env record:
+{"VIRTUAL_ENV": "/tmp/fm-tmuxlabb.rr5y/world/tmuxlab/decoy", "PYTHONPATH": "/polluted/pythonpath", "PYTHONHOME": "/opt/homebrew/opt/python@3.14/Frameworks/Python.framework/Versions/3.14", "PYTHONUSERBASE": "/polluted/userbase", "PYTHONSTARTUP": "/polluted/startup.py", "__PYVENV_LAUNCHER__": null, "UV_PROJECT_ENVIRONMENT": "/polluted/uv-env", "CONDA_PREFIX": "/polluted/conda", "FM_SENTINEL": "sentinel", "HOME": "/tmp/fm-tmuxlabb.rr5y/h", "TMPDIR": "/tmp", "CODEX_HOOK_STATE_DIR": "/tmp/fm-tmuxlabb.rr5y/world/tmuxlab/codex-hooks", "WORKTREE_LIFECYCLE_STORE_DIR": "/tmp/fm-tmuxlabb.rr5y/world/tmuxlab/lifecycle", "GIT_AUTHOR_NAME": null, "sys_executable": "/opt/homebrew/opt/python@3.14/bin/python3.14", "sys_prefix": "/opt/homebrew/opt/python@3.14/Frameworks/Python.framework/Versions/3.14", "path": "/tmp/fm-tmuxlabb.rr5y/world/tmuxlab/project/.venv/bin:/tmp/fm-tmuxlabb.rr5y/world/tmuxlab/decoy/bin:/tmp/fm-tmuxlabb.rr5y/world/tmuxlab/project/.venv/bin:/tmp/fm-tmuxlabb.rr5y/world/tmuxlab/stubs:/tmp/fm-tmuxlabb.rr5y/world/tmuxlab/pybin:/tmp/fm-tmuxlabb.rr5y/world/tmuxlab/fakebin:/opt/homebrew/bin:/usr/bin:/bin", "path_head": "/tmp/fm-tmuxlabb.rr5y/world/tmuxlab/project/.venv/bin", "cwd": "/private/tmp/fm-tmuxlabb.rr5y/world/tmuxlab/project", "sys_path0": "/private/tmp/fm-tmuxlabb.rr5y/world/tmuxlab/copy/scripts/git-stability", "argv": ["--repo-root", "/tmp/fm-tmuxlabb.rr5y/world/tmuxlab/project", "--worktree-path", "/private/tmp/fm-tmuxlabb.rr5y/world/tmuxlab/copy", "--owner-id", "tmuxlab-90087", "--branch", "fm/tmuxlab-90087", "--base-sha", "3e304bb280b13faadb0dfd580527e57ccb05d98d", "--owned-path", "scripts"]}
+--- borrowed interpreter log:
+clone-python3 /private/tmp/fm-tmuxlabb.rr5y/world/tmuxlab/copy/scripts/git-stability/provision_existing_slot.py
+--- foreign-only tool found:
+/tmp/fm-tmuxlabb.rr5y/world/tmuxlab/project/.venv/bin/fm-env-tool--- pip/uv/venv stub calls:
+--- decoy unchanged: yes
+--- slot record:
+NONE
+
+--- copy branch: 
+WORLD=/tmp/fm-tmuxlabb.rr5y/world/tmuxlab
+lab torn down: yes

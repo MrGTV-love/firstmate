@@ -1,0 +1,12 @@
+not ok - P1: spawn failed: warning: task p1-41811: /private/tmp/fmtest-home.Nmr6/fm-spawn-slot-env.E5ayQi/p1-41811/home/data/p1-41811/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /private/tmp/fmtest-home.Nmr6/fm-spawn-slot-env.E5ayQi/p1-41811/home/data/p1-41811/launch-brief.md records no ship branch; defaulting to legacy branch fm/p1-41811
+warning: /private/tmp/fmtest-home.Nmr6/fm-spawn-slot-env.E5ayQi/p1-41811/home/data/p1-41811/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: p1-41811 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+local-only source: local=main@ba96437b3fea13cb5474860612657445f8bc0d7e origin=main@ba96437b3fea13cb5474860612657445f8bc0d7e selected=origin/main@ba96437b3fea13cb5474860612657445f8bc0d7e
+Traceback (most recent call last):
+  File "/private/tmp/fmtest-home.Nmr6/fm-spawn-slot-env.E5ayQi/p1-41811/copy/scripts/git-stability/provision_existing_slot.py", line 21, in <module>
+    import fm_fixture_env_mod  # noqa: E402,F401 only the copy's venv can import this
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+ModuleNotFoundError: No module named 'fm_fixture_env_mod'
+error: slot provisioner refused task p1-41811 (exit 1); no agent or ship transition admitted; report: /private/tmp/fmtest-home.Nmr6/fm-spawn-slot-env.E5ayQi/p1-41811/home/data/p1-41811/slot-provision-spawn.43375.json
+error: assigned copy /private/tmp/fmtest-home.Nmr6/fm-spawn-slot-env.E5ayQi/p1-41811/copy and endpoint firstmate:fm-p1-41811 retained; no worker admitted: expected exit 0, got 1

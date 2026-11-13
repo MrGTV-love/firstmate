@@ -1,0 +1,53 @@
+lab FM_HOME=/private/tmp/fm-lab.Vm08kR TMUX_TMPDIR=/tmp/fml.3M7RGz
+real tmux server: socket=/private/tmp/fml.3M7RGz/tmux-501/fm-lab pid=32853
+--- pane environment as tmux will give new windows:
+CONDA_PREFIX=/polluted/conda
+PYTHONHOME=/opt/homebrew/opt/python@3.14/Frameworks/Python.framework/Versions/3.14
+PYTHONPATH=/polluted/pythonpath
+PYTHONSTARTUP=/polluted/startup.py
+PYTHONUSERBASE=/polluted/userbase
+UV_PROJECT_ENVIRONMENT=/polluted/uv-env
+VIRTUAL_ENV=/tmp/fm-tmuxlab.8Prn/world/tmuxlab/decoy
+__PYVENV_LAUNCHER__=/polluted/launcher
+fm-spawn.sh exit=0
+--- spawn output (tail):
+warning: task tmuxlab-30589: /private/tmp/fm-lab.Vm08kR/data/tmuxlab-30589/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /private/tmp/fm-lab.Vm08kR/data/tmuxlab-30589/launch-brief.md records no ship branch; defaulting to legacy branch fm/tmuxlab-30589
+warning: /private/tmp/fm-lab.Vm08kR/data/tmuxlab-30589/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: tmuxlab-30589 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+local-only source: local=main@f60a41d392385a689995816d5d48ce953bf539a9 origin=main@f60a41d392385a689995816d5d48ce953bf539a9 selected=origin/main@f60a41d392385a689995816d5d48ce953bf539a9
+{"state": "PASS", "manifest_path": "/tmp/fm-tmuxlab.8Prn/world/tmuxlab/slot-record.json", "worktree_path": "/private/tmp/fm-tmuxlab.8Prn/world/tmuxlab/copy", "owner_id": "tmuxlab-30589", "branch": "fm/tmuxlab-30589", "base_sha": "f60a41d392385a689995816d5d48ce953bf539a9", "owned_paths": ["scripts"], "lifecycle_state": "worktree_active"}
+skill selection for tmuxlab-30589: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=codex write_confinement=unconfined-macos-codex
+spawned tmuxlab-30589 harness=codex kind=ship mode=local-only yolo=off window=firstmate:fm-tmuxlab-30589 worktree=/private/tmp/fm-tmuxlab.8Prn/world/tmuxlab/copy
+--- tmux windows:
+firstmate:bash /private/tmp/fm-tmuxlab.8Prn/world/tmuxlab/project
+firstmate:fm-tmuxlab-30589 /private/tmp/fm-tmuxlab.8Prn/world/tmuxlab/copy
+--- pane firstmate:0:
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+lab$
+--- pane firstmate:1:
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+lab$ treehouse get
+lab$ bash -- '/private/tmp/fm-lab.Vm08kR/data/tmuxlab-30589/.slot-provision.4rnhfn/run'
+lab$ cd -- '/private/tmp/fm-tmuxlab.8Prn/world/tmuxlab/copy'
+lab$ export GOTMPDIR=/tmp/fm-tmuxlab-30589/gotmp
+lab$ export COMPACT_ADVISER_DISABLE=1
+lab$ export FM_TASK_ID=tmuxlab-30589
+lab$ . '/tmp/fm-tmuxlab-30589+ec72017bdaca3e7c39d0b95e7552e1a2f36db116bf4a80cbfd20d9992e37d23d/launch.s1794564580.33009.14641.sh'
+--- provisioner env record:
+{"VIRTUAL_ENV": "/private/tmp/fm-tmuxlab.8Prn/world/tmuxlab/copy/.venv", "PYTHONPATH": null, "PYTHONHOME": null, "PYTHONUSERBASE": null, "PYTHONSTARTUP": null, "__PYVENV_LAUNCHER__": null, "UV_PROJECT_ENVIRONMENT": null, "CONDA_PREFIX": null, "FM_SENTINEL": "sentinel", "HOME": "/tmp/fm-tmuxlab.8Prn/h", "TMPDIR": "/tmp", "CODEX_HOOK_STATE_DIR": "/tmp/fm-tmuxlab.8Prn/world/tmuxlab/codex-hooks", "WORKTREE_LIFECYCLE_STORE_DIR": "/tmp/fm-tmuxlab.8Prn/world/tmuxlab/lifecycle", "GIT_AUTHOR_NAME": null, "sys_executable": "/private/tmp/fm-tmuxlab.8Prn/world/tmuxlab/copy/.venv/bin/python", "sys_prefix": "/private/tmp/fm-tmuxlab.8Prn/world/tmuxlab/copy/.venv", "path": "/private/tmp/fm-tmuxlab.8Prn/world/tmuxlab/copy/.venv/bin:/tmp/fm-tmuxlab.8Prn/world/tmuxlab/stubs:/tmp/fm-tmuxlab.8Prn/world/tmuxlab/pybin:/tmp/fm-tmuxlab.8Prn/world/tmuxlab/fakebin:/opt/homebrew/bin:/usr/bin:/bin", "path_head": "/private/tmp/fm-tmuxlab.8Prn/world/tmuxlab/copy/.venv/bin", "cwd": "/private/tmp/fm-tmuxlab.8Prn/world/tmuxlab/project", "sys_path0": "/private/tmp/fm-tmuxlab.8Prn/world/tmuxlab/copy/scripts/git-stability", "argv": ["--repo-root", "/tmp/fm-tmuxlab.8Prn/world/tmuxlab/project", "--worktree-path", "/private/tmp/fm-tmuxlab.8Prn/world/tmuxlab/copy", "--owner-id", "tmuxlab-30589", "--branch", "fm/tmuxlab-30589", "--base-sha", "f60a41d392385a689995816d5d48ce953bf539a9", "--owned-path", "scripts"]}
+--- borrowed interpreter log:
+--- foreign-only tool found:
+--- pip/uv/venv stub calls:
+--- decoy unchanged: yes
+--- slot record:
+{"worktree_path": "/private/tmp/fm-tmuxlab.8Prn/world/tmuxlab/copy", "owner_id": "tmuxlab-30589", "branch": "fm/tmuxlab-30589", "base_sha": "f60a41d392385a689995816d5d48ce953bf539a9", "owned_paths": ["scripts"], "lifecycle_state": "worktree_active"}
+--- copy branch: fm/tmuxlab-30589
+WORLD=/tmp/fm-tmuxlab.8Prn/world/tmuxlab
+lab torn down: NO
+lab teardown: fm-lab-home.sh teardown ran (socket dir removed); the lab home held read-only git-hook files, so it was removed after chmod -R u+w; the leftover fake-codex launch shell (pid 43239, sleep 600) was killed; no fm-lab process remains.

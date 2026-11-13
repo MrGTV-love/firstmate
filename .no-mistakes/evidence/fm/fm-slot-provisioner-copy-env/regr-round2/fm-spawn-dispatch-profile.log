@@ -1,0 +1,21 @@
+ok - allowlist=absent preserves the operational floor and filters the ambient environment
+ok - allowlist=missing-config preserves the operational floor and filters the ambient environment
+ok - allowlist=enabled preserves the operational floor and filters the ambient environment
+ok - allowlist=empty preserves the operational floor and filters the ambient environment
+ok - default codex mutable export absent from env, Python and child Bash in /bin/bash; task, TERM and operational carriers kept
+ok - default codex readonly export absent from env, Python and child Bash in /bin/bash; task, TERM and operational carriers kept
+ok - default codex non-identifier export absent from env, Python and child Bash in /bin/bash; task, TERM and operational carriers kept
+ok - default codex mutable export absent from env, Python and child Bash in /bin/zsh; task, TERM and operational carriers kept
+ok - default codex readonly export absent from env, Python and child Bash in /bin/zsh; task, TERM and operational carriers kept
+# /bin/zsh removes non-identifier entries before the production launch; not counted as boundary proof
+ok - invalid allowlist names refuse before launch or task publication
+ok - inaccessible config with present allowlist refuses before launch or task publication
+ok - inaccessible config with absent allowlist refuses before launch or task publication
+ok - inaccessible ancestor with present allowlist refuses before launch or task publication
+ok - inaccessible ancestor with absent allowlist refuses before launch or task publication
+ok - secondmate launch inherits the allowlist for subsequent worker launches
+ok - local inheritance preserves the allowlist on source errors and mirrors proven absence
+ok - remote inheritance preserves the allowlist on source errors and mirrors proven absence
+ok - spawn records and launches concrete role ids and refuses retired literals before publication
+ok - a config/secondmate-harness model pin resolves roles and refuses retired ids through the model index
+exit=143 seconds=201

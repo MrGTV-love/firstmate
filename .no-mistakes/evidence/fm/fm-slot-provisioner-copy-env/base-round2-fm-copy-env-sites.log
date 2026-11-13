@@ -1,0 +1,3 @@
+BASE 9d516486 bin/ with head test files
+not ok - C1: VIRTUAL_ENV is not the tree venv (expected '/private/tmp/nm-basesuite/fm-copy-env-sites.lMdDuu/c1/copy/.venv', got '/private/tmp/nm-basesuite/fm-copy-env-sites.lMdDuu/c1/decoy')
+exit=1

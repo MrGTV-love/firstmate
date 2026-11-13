@@ -1,0 +1,18 @@
+ok - S1: a clone with no .venv provisions in the copy environment
+ok - S1b: a real python -m venv copy environment provisions although its interpreter links outside the copy
+ok - S1: the copy path is used as given when it is reached through a symlink
+ok - S2: an inherited VIRTUAL_ENV, ambient interpreter variables and a clone .venv never reach the provisioner
+ok - S2: named pass-through variables reach the provisioner unchanged
+ok - S3: missing refuses by name before any change
+ok - S3: notexec refuses by name before any change
+ok - S3: venv-outside refuses by name before any change
+ok - S3: bin-outside refuses by name before any change
+ok - S3: fm_slot_check_copy names the missing environment
+ok - NO-STOPGAP: provisioning a copy with no environment creates no venv and installs nothing
+ok - NO-STOPGAP: an existing copy environment is run, never rebuilt
+ok - owner: PATH filter and explicit-interpreter cases
+
+real	0m37.349s
+user	0m6.075s
+sys	0m7.308s
+exit=0

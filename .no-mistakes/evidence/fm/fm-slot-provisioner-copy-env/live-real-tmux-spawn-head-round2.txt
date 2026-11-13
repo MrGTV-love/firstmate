@@ -1,0 +1,71 @@
+head commit: bb07aa64efd6275477a83df203f45a6857c2e32e
+lab FM_HOME=/private/tmp/fm-lab.DdHno5 TMUX_TMPDIR=/tmp/fml.4s4EXp
+real tmux server: socket=/private/tmp/fml.4s4EXp/tmux-501/fm-lab pid=11428
+--- pane environment as tmux will give new windows:
+CONDA_PREFIX=/polluted/conda
+PYTHONHOME=/Users/charlesabrooker/.pyenv/versions/3.13.6
+PYTHONPATH=/polluted/pythonpath
+PYTHONSTARTUP=/polluted/startup.py
+PYTHONUSERBASE=/polluted/userbase
+UV_PROJECT_ENVIRONMENT=/polluted/uv-env
+VIRTUAL_ENV=/tmp/nm-tmux-head/tmuxlab/decoy
+__PYVENV_LAUNCHER__=/polluted/launcher
+fm-spawn.sh exit=0
+--- spawn output (tail):
+warning: task tmuxlab-8873: /private/tmp/fm-lab.DdHno5/data/tmuxlab-8873/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /private/tmp/fm-lab.DdHno5/data/tmuxlab-8873/launch-brief.md records no ship branch; defaulting to legacy branch fm/tmuxlab-8873
+warning: /private/tmp/fm-lab.DdHno5/data/tmuxlab-8873/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: tmuxlab-8873 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+local-only source: local=main@b980f4076e7c1c63448b1afa51393adb7c8f1166 origin=main@b980f4076e7c1c63448b1afa51393adb7c8f1166 selected=origin/main@b980f4076e7c1c63448b1afa51393adb7c8f1166
+{"state": "PASS", "manifest_path": "/tmp/nm-tmux-head/tmuxlab/slot-record.json", "worktree_path": "/private/tmp/nm-tmux-head/tmuxlab/copy", "owner_id": "tmuxlab-8873", "branch": "fm/tmuxlab-8873", "base_sha": "b980f4076e7c1c63448b1afa51393adb7c8f1166", "owned_paths": ["scripts"], "lifecycle_state": "worktree_active"}
+skill selection for tmuxlab-8873: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=codex write_confinement=unconfined-macos-codex
+spawned tmuxlab-8873 harness=codex kind=ship mode=local-only yolo=off window=firstmate:fm-tmuxlab-8873 worktree=/private/tmp/nm-tmux-head/tmuxlab/copy
+--- tmux windows:
+firstmate:bash /private/tmp/nm-tmux-head/tmuxlab/project
+firstmate:fm-tmuxlab-8873 /private/tmp/nm-tmux-head/tmuxlab/copy
+--- pane firstmate:0:
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+lab$
+--- pane firstmate:1:
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+lab$ treehouse get
+lab$ bash -- '/private/tmp/fm-lab.DdHno5/data/tmuxlab-8873/.slot-provision.RTdTVf/run'
+lab$ cd -- '/private/tmp/nm-tmux-head/tmuxlab/copy'
+lab$ export GOTMPDIR=/tmp/fm-tmuxlab-8873/gotmp
+lab$ export COMPACT_ADVISER_DISABLE=1
+lab$ export FM_TASK_ID=tmuxlab-8873
+lab$ . '/tmp/fm-tmuxlab-8873+822d59aabc8cfa772b15cc38cdf1d15c075c50e436596f7ffe631ebdefb00dab/launch.s1794568754.11572.30807.sh'
+--- provisioner env record:
+{"VIRTUAL_ENV": "/private/tmp/nm-tmux-head/tmuxlab/copy/.venv", "PYTHONPATH": null, "PYTHONHOME": null, "PYTHONUSERBASE": null, "PYTHONSTARTUP": null, "__PYVENV_LAUNCHER__": null, "UV_PROJECT_ENVIRONMENT": null, "CONDA_PREFIX": null, "FM_SENTINEL": "sentinel", "HOME": "/Users/charlesabrooker/.no-mistakes/evidence/01M7A5FJN72F85EGBD5P2GDVQA/home", "TMPDIR": null, "CODEX_HOOK_STATE_DIR": "/tmp/nm-tmux-head/tmuxlab/codex-hooks", "WORKTREE_LIFECYCLE_STORE_DIR": "/tmp/nm-tmux-head/tmuxlab/lifecycle", "GIT_AUTHOR_NAME": null, "sys_executable": "/private/tmp/nm-tmux-head/tmuxlab/copy/.venv/bin/python", "sys_prefix": "/private/tmp/nm-tmux-head/tmuxlab/copy/.venv", "path": "/private/tmp/nm-tmux-head/tmuxlab/copy/.venv/bin:/tmp/nm-tmux-head/tmuxlab/stubs:/tmp/nm-tmux-head/tmuxlab/pybin:/tmp/nm-tmux-head/tmuxlab/fakebin:/opt/homebrew/bin:/usr/bin:/bin", "path_head": "/private/tmp/nm-tmux-head/tmuxlab/copy/.venv/bin", "cwd": "/private/tmp/nm-tmux-head/tmuxlab/project", "sys_path0": "/private/tmp/nm-tmux-head/tmuxlab/copy/scripts/git-stability", "argv": ["--repo-root", "/tmp/nm-tmux-head/tmuxlab/project", "--worktree-path", "/private/tmp/nm-tmux-head/tmuxlab/copy", "--owner-id", "tmuxlab-8873", "--branch", "fm/tmuxlab-8873", "--base-sha", "b980f4076e7c1c63448b1afa51393adb7c8f1166", "--owned-path", "scripts"]}
+--- borrowed interpreter log:
+--- foreign-only tool found:
+--- pip/uv/venv stub calls:
+--- decoy unchanged: yes
+--- slot record:
+{"worktree_path": "/private/tmp/nm-tmux-head/tmuxlab/copy", "owner_id": "tmuxlab-8873", "branch": "fm/tmuxlab-8873", "base_sha": "b980f4076e7c1c63448b1afa51393adb7c8f1166", "owned_paths": ["scripts"], "lifecycle_state": "worktree_active"}
+--- copy branch: fm/tmuxlab-8873
+WORLD=/tmp/nm-tmux-head/tmuxlab
+rm: /private/tmp/fm-lab.DdHno5/state/tmuxlab-8873.git-hooks/pre-rebase: Permission denied
+rm: /private/tmp/fm-lab.DdHno5/state/tmuxlab-8873.git-hooks/pre-applypatch: Permission denied
+rm: /private/tmp/fm-lab.DdHno5/state/tmuxlab-8873.git-hooks/pre-auto-gc: Permission denied
+rm: /private/tmp/fm-lab.DdHno5/state/tmuxlab-8873.git-hooks/pre-merge-commit: Permission denied
+rm: /private/tmp/fm-lab.DdHno5/state/tmuxlab-8873.git-hooks/post-commit: Permission denied
+rm: /private/tmp/fm-lab.DdHno5/state/tmuxlab-8873.git-hooks/sendemail-validate: Permission denied
+rm: /private/tmp/fm-lab.DdHno5/state/tmuxlab-8873.git-hooks/applypatch-msg: Permission denied
+rm: /private/tmp/fm-lab.DdHno5/state/tmuxlab-8873.git-hooks/prepare-commit-msg: Permission denied
+rm: /private/tmp/fm-lab.DdHno5/state/tmuxlab-8873.git-hooks/post-checkout: Permission denied
+rm: /private/tmp/fm-lab.DdHno5/state/tmuxlab-8873.git-hooks/post-applypatch: Permission denied
+rm: /private/tmp/fm-lab.DdHno5/state/tmuxlab-8873.git-hooks/post-rewrite: Permission denied
+rm: /private/tmp/fm-lab.DdHno5/state/tmuxlab-8873.git-hooks/commit-msg: Permission denied
+rm: /private/tmp/fm-lab.DdHno5/state/tmuxlab-8873.git-hooks/pre-push: Permission denied
+rm: /private/tmp/fm-lab.DdHno5/state/tmuxlab-8873.git-hooks/post-merge: Permission denied
+rm: /private/tmp/fm-lab.DdHno5/state/tmuxlab-8873.git-hooks/pre-commit: Permission denied
+rm: /private/tmp/fm-lab.DdHno5/state/tmuxlab-8873.git-hooks: Directory not empty
+rm: /private/tmp/fm-lab.DdHno5/state: Directory not empty
+rm: /private/tmp/fm-lab.DdHno5: Directory not empty
+lab torn down: NO

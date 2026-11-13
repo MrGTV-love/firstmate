@@ -1,0 +1,9 @@
+warning: task tmuxlab-30589: /private/tmp/fm-lab.Vm08kR/data/tmuxlab-30589/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /private/tmp/fm-lab.Vm08kR/data/tmuxlab-30589/launch-brief.md records no ship branch; defaulting to legacy branch fm/tmuxlab-30589
+warning: /private/tmp/fm-lab.Vm08kR/data/tmuxlab-30589/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: tmuxlab-30589 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+local-only source: local=main@f60a41d392385a689995816d5d48ce953bf539a9 origin=main@f60a41d392385a689995816d5d48ce953bf539a9 selected=origin/main@f60a41d392385a689995816d5d48ce953bf539a9
+{"state": "PASS", "manifest_path": "/tmp/fm-tmuxlab.8Prn/world/tmuxlab/slot-record.json", "worktree_path": "/private/tmp/fm-tmuxlab.8Prn/world/tmuxlab/copy", "owner_id": "tmuxlab-30589", "branch": "fm/tmuxlab-30589", "base_sha": "f60a41d392385a689995816d5d48ce953bf539a9", "owned_paths": ["scripts"], "lifecycle_state": "worktree_active"}
+skill selection for tmuxlab-30589: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=codex write_confinement=unconfined-macos-codex
+spawned tmuxlab-30589 harness=codex kind=ship mode=local-only yolo=off window=firstmate:fm-tmuxlab-30589 worktree=/private/tmp/fm-tmuxlab.8Prn/world/tmuxlab/copy

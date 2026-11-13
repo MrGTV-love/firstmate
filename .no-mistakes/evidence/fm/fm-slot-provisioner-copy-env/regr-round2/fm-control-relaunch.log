@@ -1,0 +1,5 @@
+ok - fm-control relaunch: a manual-backlog home records one backlog skip per relaunch
+ok - fm-control relaunch: a same-harness relaunch replaces the agent in the same endpoint and worktree
+ok - fm-control relaunch: unsupported omp preserves the running agent and task
+ok - fm-control relaunch: missing dsh models and DeepSeek-through-omp refuse before stopping
+exit=143 seconds=196

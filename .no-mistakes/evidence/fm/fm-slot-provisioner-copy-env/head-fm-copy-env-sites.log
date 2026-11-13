@@ -1,0 +1,19 @@
+ok - C1: the closeout driver runs in its tree environment with the ambient environment scrubbed
+ok - C2: an explicit interpreter outside any .venv runs with VIRTUAL_ENV unset and its own bin not put on PATH
+ok - C3: an explicit interpreter under the tree venv gets the tree environment
+ok - C4: an explicit interpreter under another venv runs with VIRTUAL_ENV unset and its bin filtered
+ok - C5: a closeout tree with no interpreter is refused by name with no fallback and nothing created
+ok - C6: teardown_run_closeout takes the explicit interpreter over the default and refuses when neither is usable
+ok - S4a: a clone with no script and no .venv retires through the copy script and the copy interpreter
+ok - S4c: a clone script with no .venv yields to the copy script and the copy interpreter
+ok - S4 preserve: a project holding script and interpreter still runs its own
+ok - S4b: a script with no usable interpreter is refused by name with its next step and no fallback
+ok - S4d: no entry point in either tree keeps the existing report-and-continue behavior
+ok - S4f: --prove-to builds the proof when the script exists and writes none otherwise
+ok - S2: the retire entry point runs in its tree environment with the ambient environment scrubbed
+ok - S4e: the sweep-loop caller refuses without an interpreter and runs in the owning tree with one
+
+real	0m36.173s
+user	0m6.627s
+sys	0m7.489s
+exit=0

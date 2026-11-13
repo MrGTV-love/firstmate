@@ -1,0 +1,66 @@
+base commit: 9d516486d631432dfe05e9b1cff865d9941da655
+
+### A. r2 shape: nested clone has no .venv, copy 88 has its own .venv (pydantic stub). Promote-path runner.
+. .. .git scripts  <- clone entries (no .venv)
+Traceback (most recent call last):
+  File "/tmp/nm-r2-base/a/treehouse/88/scripts/git-stability/provision_existing_slot.py", line 9, in <module>
+    import worktree_liveness  # noqa
+    ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nm-r2-base/a/treehouse/88/scripts/git-stability/worktree_liveness.py", line 1, in <module>
+    import pydantic  # line 61 in the real file; only the copy's venv has it
+    ^^^^^^^^^^^^^^^
+ModuleNotFoundError: No module named 'pydantic'
+error: slot provisioner refused task lab-task (exit 1); no agent or ship transition admitted; report: /tmp/nm-r2-base/a/report.json
+exit=1
+--- what the provisioner saw (side file):
+provisioner sys.executable = /private/tmp/nm-r2-base/a/decoy/bin/python3
+provisioner VIRTUAL_ENV    = /tmp/nm-r2-base/a/decoy
+provisioner PYTHONPATH     = /polluted/pythonpath
+provisioner PATH head      = /tmp/nm-r2-base/a/home/projects/vernant/.venv/bin
+provisioner LAB_SENTINEL   = kept
+--- provisioner report:
+Traceback (most recent call last):
+  File "/tmp/nm-r2-base/a/treehouse/88/scripts/git-stability/provision_existing_slot.py", line 9, in <module>
+    import worktree_liveness  # noqa
+    ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nm-r2-base/a/treehouse/88/scripts/git-stability/worktree_liveness.py", line 1, in <module>
+    import pydantic  # line 61 in the real file; only the copy's venv has it
+    ^^^^^^^^^^^^^^^
+ModuleNotFoundError: No module named 'pydantic'
+--- copy branch now: HEAD
+--- slot manifest: none
+--- clone .venv exists after run? no
+
+### B. Copy with NO .venv: refused by name before any change
+Traceback (most recent call last):
+  File "/tmp/nm-r2-base/b/treehouse/88/scripts/git-stability/provision_existing_slot.py", line 9, in <module>
+    import worktree_liveness  # noqa
+  File "/tmp/nm-r2-base/b/treehouse/88/scripts/git-stability/worktree_liveness.py", line 1, in <module>
+    import pydantic  # line 61 in the real file; only the copy's venv has it
+ModuleNotFoundError: No module named 'pydantic'
+error: slot provisioner refused task lab-task (exit 1); no agent or ship transition admitted; report: /tmp/nm-r2-base/b/report.json
+exit=1
+--- HEAD unchanged? yes  ref: detached -> detached
+--- task branch fm/lab-task created? YES
+--- full listing of copy+clone (ignored files and .git included) unchanged? NO
+--- report file written? YES
+
+### C. Copy .venv is a symlink to another tree's venv: refused by name
+Traceback (most recent call last):
+  File "/tmp/nm-r2-base/c/treehouse/88/scripts/git-stability/provision_existing_slot.py", line 9, in <module>
+    import worktree_liveness  # noqa
+  File "/tmp/nm-r2-base/c/treehouse/88/scripts/git-stability/worktree_liveness.py", line 1, in <module>
+    import pydantic  # line 61 in the real file; only the copy's venv has it
+ModuleNotFoundError: No module named 'pydantic'
+error: slot provisioner refused task lab-task (exit 1); no agent or ship transition admitted; report: /tmp/nm-r2-base/c/report.json
+exit=1
+
+### D. bin/fm-copy-env.sh CLI after the review decision
+/Users/charlesabrooker/.no-mistakes/evidence/01M7A5FJN72F85EGBD5P2GDVQA/live-r2-shape-drive.sh: line 99: /tmp/nm-base-01M7A5/bin/fm-copy-env.sh: No such file or directory
+check exit=127
+/Users/charlesabrooker/.no-mistakes/evidence/01M7A5FJN72F85EGBD5P2GDVQA/live-r2-shape-drive.sh: line 100: /tmp/nm-base-01M7A5/bin/fm-copy-env.sh: No such file or directory
+run --python exit=127
+env: /tmp/nm-base-01M7A5/bin/fm-copy-env.sh: No such file or directory
+run exit=127
+/Users/charlesabrooker/.no-mistakes/evidence/01M7A5FJN72F85EGBD5P2GDVQA/live-r2-shape-drive.sh: line 102: /tmp/nm-base-01M7A5/bin/fm-copy-env.sh: No such file or directory
+run on copy with no venv exit=127

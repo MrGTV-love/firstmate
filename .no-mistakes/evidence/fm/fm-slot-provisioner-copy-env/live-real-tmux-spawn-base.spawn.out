@@ -1,0 +1,12 @@
+warning: task tmuxlab-90087: /private/tmp/fm-lab.14CmkM/data/tmuxlab-90087/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /private/tmp/fm-lab.14CmkM/data/tmuxlab-90087/launch-brief.md records no ship branch; defaulting to legacy branch fm/tmuxlab-90087
+warning: /private/tmp/fm-lab.14CmkM/data/tmuxlab-90087/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: tmuxlab-90087 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+local-only source: local=main@3e304bb280b13faadb0dfd580527e57ccb05d98d origin=main@3e304bb280b13faadb0dfd580527e57ccb05d98d selected=origin/main@3e304bb280b13faadb0dfd580527e57ccb05d98d
+Traceback (most recent call last):
+  File "/private/tmp/fm-tmuxlabb.rr5y/world/tmuxlab/copy/scripts/git-stability/provision_existing_slot.py", line 21, in <module>
+    import fm_fixture_env_mod  # noqa: E402,F401 only the copy's venv can import this
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+ModuleNotFoundError: No module named 'fm_fixture_env_mod'
+error: slot provisioner refused task tmuxlab-90087 (exit 1); no agent or ship transition admitted; report: /private/tmp/fm-lab.14CmkM/data/tmuxlab-90087/slot-provision-spawn.92689.json
+error: assigned copy /private/tmp/fm-tmuxlabb.rr5y/world/tmuxlab/copy and endpoint firstmate:fm-tmuxlab-90087 retained; no worker admitted

@@ -1,0 +1,41 @@
+
+### A. r2 shape: nested clone has no .venv, copy 88 has its own .venv (pydantic stub). Promote-path runner.
+. .. .git scripts  <- clone entries (no .venv)
+{"state": "PASS", "manifest_path": "/tmp/fm-live.VLjO/head/a/manifest.json", "worktree_path": "/private/tmp/fm-live.VLjO/head/a/treehouse/88", "owner_id": "lab-task", "branch": "fm/lab-task", "base_sha": "81f7ce32c8b5c4a5dd1974a52db4c9cb232f04cd", "owned_paths": ["scripts"], "lifecycle_state": "worktree_active"}
+exit=0
+--- what the provisioner saw (side file):
+provisioner sys.executable = /private/tmp/fm-live.VLjO/head/a/treehouse/88/.venv/bin/python
+provisioner VIRTUAL_ENV    = /tmp/fm-live.VLjO/head/a/treehouse/88/.venv
+provisioner PYTHONPATH     = None
+provisioner PATH head      = /tmp/fm-live.VLjO/head/a/treehouse/88/.venv/bin
+provisioner LAB_SENTINEL   = kept
+--- provisioner report:
+{"state": "PASS", "manifest_path": "/tmp/fm-live.VLjO/head/a/manifest.json", "worktree_path": "/private/tmp/fm-live.VLjO/head/a/treehouse/88", "owner_id": "lab-task", "branch": "fm/lab-task", "base_sha": "81f7ce32c8b5c4a5dd1974a52db4c9cb232f04cd", "owned_paths": ["scripts"], "lifecycle_state": "worktree_active"}
+--- copy branch now: fm/lab-task
+--- slot manifest: {"worktree_path": "/private/tmp/fm-live.VLjO/head/a/treehouse/88", "owner_id": "lab-task", "branch": "fm/lab-task", "base_sha": "81f7ce32c8b5c4a5dd1974a52db4c9cb232f04cd", "owned_paths": ["scripts"], "lifecycle_state": "worktree_active"}
+--- clone .venv exists after run? no
+
+### B. Copy with NO .venv: refused by name before any change
+error: slot provisioning refused: copy_environment_missing: /tmp/fm-live.VLjO/head/b/treehouse/88/.venv/bin/python is not an executable file; /tmp/fm-live.VLjO/head/b/treehouse/88 has no usable environment of its own, so nothing was changed, installed or created (give the copy its own .venv, then retry)
+exit=1
+--- HEAD unchanged? yes  ref: detached -> detached
+--- task branch fm/lab-task created? no
+--- full listing of copy+clone (ignored files and .git included) unchanged? yes
+--- report file written? no
+
+### C. Copy .venv is a symlink to another tree's venv: refused by name
+error: slot provisioning refused: copy_environment_outside_copy: /tmp/fm-live.VLjO/head/c/treehouse/88/.venv resolves to /private/tmp/fm-live.VLjO/head/c/othertree/.venv, outside the copy /tmp/fm-live.VLjO/head/c/treehouse/88; another tree's environment is never used, and nothing was changed, installed or created
+exit=1
+
+### D. bin/fm-copy-env.sh CLI after the review decision
+Command-line entry to bin/fm-copy-env-lib.sh, the one owner of the interpreter
+environment for a script that lives in a task copy or a clone. The library
+header owns the rule, the usable-environment test and the exact environment.
+check exit=2
+Command-line entry to bin/fm-copy-env-lib.sh, the one owner of the interpreter
+environment for a script that lives in a task copy or a clone. The library
+run --python exit=2
+run -> /private/tmp/fm-live.VLjO/head/a/treehouse/88/.venv/bin/python /tmp/fm-live.VLjO/head/a/treehouse/88/.venv None
+run exit=0
+error: copy_environment_missing: /tmp/fm-live.VLjO/head/b/treehouse/88/.venv/bin/python is not an executable file; nothing was changed, installed or created
+run on copy with no venv exit=127

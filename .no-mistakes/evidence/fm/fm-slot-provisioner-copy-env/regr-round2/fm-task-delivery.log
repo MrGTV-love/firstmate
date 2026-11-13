@@ -1,0 +1,3 @@
+ok - scaffold headings cannot hide active spec placeholders; fenced examples remain valid
+ok - complete CRLF briefs preserve admission and intent; NUL briefs fail explicitly
+exit=143 seconds=196

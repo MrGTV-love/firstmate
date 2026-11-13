@@ -1,0 +1,386 @@
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7A5FJN72F85EGBD5P2GDVQA/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-11-13T10:06:31Z tests/fm-task-delivery.test.sh family=pure-contract-unit expected_gate_skip=none
+ok - scaffold headings cannot hide active spec placeholders; fenced examples remain valid
+ok - complete CRLF briefs preserve admission and intent; NUL briefs fail explicitly
+ok - fm-spawn: fresh ships/scouts refuse empty or pointer-only asks and admit substantive asks
+ok - fm-promote: a promoted plan labels scout DoD and exclusions as context under the ship intent
+ok - fm-spawn/fm-promote: authorized intent preserves exact words and refuses operator-address lines
+ok - fm-spawn: every legacy worker receives scoped role instructions without changing project or primary instructions
+ok - fm-spawn: a ship spawn requires a valid explicit mode and yolo before anything is created
+ok - fm-spawn: scout and secondmate spawns refuse ship delivery flags
+ok - fm-spawn: the brief's recorded mode and the spawn's explicit mode must agree
+ok - fm-spawn: a rigor downgrade against the registered posture is announced, never blocked
+ok - fm-spawn: a scout spawn resolves no delivery posture from the registry
+ok - fm-promote: promotion requires the delivery contract and records it exactly once
+ok - fm-promote: a symlinked task record is refused and its target is left untouched
+ok - fm-promote: a promoted worker receives the same mode-specific delivery contract a briefed one does
+ok - promotion teaches the Closes: line in the delivered text and the relaunch brief for PR modes only
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ok - fm-promote: a selected branch prefix reaches both worker instructions and durable task state
+Switched to a new branch '$(touch${IFS}/private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w1/tmp/fm-task-delivery.lsax4n/promote-branch-shell-safe-marker)/promote-branch-safe-e3'
+ok - fm-promote: ref-format-valid shell metacharacters stay literal in promotion branch commands
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ok - fm-merge-local: a registry change cannot redirect an in-flight local-only task
+ok - fm-project-mode: the registry lookup matches a whole multi-word name, not just its first token
+ok - fm-project-mode: the conditional policy is accepted, mapped for mechanical callers, and readable raw
+ok - fm-project-mode: the forge binds from its own token and is reported only through --forge
+ok - fm-project-mode: only a malformed forge binding refuses; every other token keeps its old tolerance
+ok - forge=gerrit: yolo is refused with its reason, never silently dropped
+ok - forge=gerrit: no-mistakes runs with its forge steps skipped, recovers its fixes, then publishes one change
+ok - forge=gerrit: direct-PR publishes one squashed change and a stack is refused with its reason
+ok - fm-spawn: a registered forge must reach the worker's brief
+ok - fm-spawn: the brief must carry the spawn's selected ship branch, and the selection is validated before anything is created
+ok - fm-spawn: a ship branch that deviates from the registered prefix is announced, never blocked
+ok - fm-spawn: a registry forge token the parser refuses stops the launch, reason included
+ok - fm-promote: a promoted worker receives the project's registered forge contract with no flag to remember
+ok - forge=forgejo: spawn agreement and promotion carry the binding, name tea, and keep yolo
+ok - fm-spawn/fm-promote: leftover Task placeholders are refused until both subsections are filled
+ok - fm-spawn: a leftover task Definition of Done placeholder is refused, a filled one proceeds
+ok - fm-spawn: the Definition of Done check reads the whole section and matches placeholders only where the scaffold puts them
+ok - fm-spawn: a DoD file line outside the task Definition of Done section is ignored
+ok - fm-spawn: a DoD file line inside the task section naming a finished criteria file is the only Definition of Done escape
+ok - fm-project-mode: --branch-prefix resolves order-independently and defaults to the legacy fm/ prefix
+warning: re-init: ignored --initial-branch=main
+ok - governed promotion preserves scout metadata, instructions, checkout and work on refusal, and a retry after the scout advances reaches the project owner
+warning: re-init: ignored --initial-branch=main
+ok - promotion refuses a governed copy with no usable environment by name before any change
+warning: re-init: ignored --initial-branch=main
+warning: re-init: ignored --initial-branch=main
+ok - refused promotion preserves a pre-existing task branch and one that gained work
+warning: re-init: ignored --initial-branch=main
+ok - refused detached promotion removes only its own alias, and a retry after the scout advances reaches the project owner
+warning: re-init: ignored --initial-branch=main
+ok - refused promotion preserves a task branch the project declared before attestation refused it
+warning: re-init: ignored --initial-branch=main
+ok - promotion refuses to override recorded slot scope before provisioning or rewriting the record
+# all fm-task-delivery tests passed
+FM_TEST_END 2026-11-13T10:14:23Z tests/fm-task-delivery.test.sh exit=0 duration_ms=471462 gate_skip=false
+FM_TEST_BEGIN 2026-11-13T10:14:23Z tests/fm-teardown-pool.test.sh family=pr-forge expected_gate_skip=none
+ok - Vernant retirement honors landing proof, recorded branch, lock-free forge proof, kept records, live owners, both copies, refusals, and old checkouts
+ok - the shared project lock path is the same from an unresolvable git directory and from the recorded project
+ok - a shared-slot claim release survives an endpoint refusal and session start, and the sharer then finishes normally
+ok - an interrupted legacy pool teardown keeps its record through session start and its retry returns the slot once
+ok - a rolled-back legacy stamp leaves its return-pending record bound to the unstamped record
+ok - a failed return-pending record write refuses before any destruction and the retry returns the slot once
+ok - a stale directory at the return-pending path refuses before any destruction and the retry returns the slot once
+ok - an unreadable return-pending generation refuses before any destruction and the retry returns the slot once
+ok - an endpoint refusal after reservation keeps its record through session start and the retry returns the slot
+ok - a waited return that meets a project-lock error exits 1, not the contention exit
+ok - a closed task whose return stalled survives session start and the next sweep finishes it behind a queued waiter
+ok - a refusal before cleanup leaves the pool slot unreserved, and the clean retry still returns it
+ok - recovered, conflicting and unreadable slot states fall back to whole-cleanup project custody and return the slot
+ok - an unleased pool slot is reserved only when the installed Treehouse has a lease command, else project custody covers the return
+ok - a copy in a superseded pool folder is returned by path and no slot of the current pool is leased, returned or changed
+ok - a lease this task took on a same-named slot of the current pool is released by the conditional return, and no other holder is touched
+ok - only the current-pool slot that shares the recorded slot name is released; another lease this task holds stays byte-identical
+grep: /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w2/tmp/fm-teardown-tests.Df6hXI/pool-superseded-unlanded-dirty/treehouse.log: No such file or directory
+grep: /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w2/tmp/fm-teardown-tests.Df6hXI/pool-superseded-unlanded-commit/treehouse.log: No such file or directory
+ok - an unlanded copy in a superseded pool folder is refused without touching any pool, and the landed retry returns it by path
+grep: /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w2/tmp/fm-teardown-tests.Df6hXI/pool-superseded-unique-work/treehouse.log: No such file or directory
+ok - unique unlanded work in an older pool folder is refused before any return or lease release, and every byte stays as it was
+ok - an unreadable Treehouse status keeps project custody and never leases a slot by name
+ok - a copy in the pool folder treehouse pool-dir names is reserved by name with no listing, and the same folder name under another root is returned by path
+ok - the current-pool proof follows the directory treehouse pool-dir prints, and otherwise reads one status listing per project
+ok - an automatic teardown that has closed its endpoint waits for project custody and returns its slot
+ok - ordinary pool return preserves dirt and new commits produced while final project custody is queued
+ok - a completed teardown records one landed-work allow and a forced one only its escape
+ok - a lease command without durable state proof cannot reap processes or return the slot, even with authorized discard
+ok - every forced return checks registered copies without pool inventory, and recovery names the owning home
+ok - an uncanonicalizable return target reports an explicit refusal and preserves its record
+ok - a custody refusal at a non-pool child return keeps the child worktree and its parked copy
+ok - a custody refusal at a deferred child pool return keeps the slot, its claim and its parked copy
+ok - a finished task on a dirty reassigned slot retires only its own records and endpoint, preserving claimant work and processes
+ok - a task on a reassigned slot with no merged PR and an unlanded own branch refuses and keeps its records
+ok - a fresh allocation in the reservation window retires only the retiring record, preserving the new owner
+ok - a slot reassigned in the reservation window is proved again from the retiring record, never from the claimant copy
+ok - a fresh allocation in the enclosing-slot window leaves the claimant slot and the retiring copy untouched
+ok - a slot claim decides slot administration while the retiring copy decides runtime retirement, for every claimant and copy shape
+ok - teardown of a reassociated record keeps the non-pool current copy and every prior copy untouched
+ok - teardown of a reassociated record still refuses unlanded work in the current copy
+ok - teardown of a record whose old slot was released keeps the non-pool current copy
+ok - teardown refuses to return a pool slot another record preserves as a prior copy
+ok - own prior copies refuse only a pool return that cannot prove them landed; a prior that is or encloses the slot does not block it, with or without --force
+ok - the reverse nested shape with a prior copy outside .claude/ proves and removes it, then returns the slot
+ok - returning the enclosing slot aborts its parked run and retires its launch agent before the return
+ok - a forced teardown over a silent daemon waits one stall interval, not one per root
+ok - shared nested cleanup concludes an owned run, retires its launch agent and reaps its process, preserving the parked root, foreign runs and late work
+ok - a stale-lock cleanup in the enclosing slot proves it again before the reset, with or without --force
+ok - a plain re-run after the post-lock refusal proves the enclosing slot again and returns it once its work lands
+ok - a plain re-run of a landed local-only nested ship is recorded as landed, not dropped
+ok - a refusal at the slot proof, the retire step, either proof before removal or the return is safe to re-run with a plain teardown
+ok - a removed nested copy is judged by its own branch ref: unlanded refuses, content landed by squash passes
+ok - a removed nested copy whose branch is gone is settled by its recorded PR: merged finishes as landed, otherwise it refuses
+ok - the enclosing slot is measured at its own HEAD, not proven by the nested copy's pipeline-input record
+ok - a removed nested copy whose branch was the merged run's input is proven by the run record
+ok - an endpoint-refused retry keeps the reservation until closure and records the nested ship landed
+ok - the post-lock proof does not refuse over nested copies teardown itself already removed
+ok - other home and prior custody overlap refuses in both directions, another task's worktree only on an exact match, and siblings never
+ok - forced descendant admission preserves prior copies inside child worktrees and retiring homes before any cascade cleanup
+ok - tasktmp admission preserves both the current nested replacement and a nested prior copy before signalling
+ok - tasktmp admission counts all cross-home copy fields in both containment directions
+ok - secondmate retirement preserves original copy custody in this home and registered peer homes
+ok - recursive retirement admits locked copies, preserves reassigned external slots, and refuses overlapping home custody
+ok - forced retirement preserves reassociated non-pool copies and refuses their checkout or shared-storage destruction before mutation
+ok - home, worktree, and tasktmp roots preserve Git storage of every foreign copy field in local and peer homes
+ok - tasktmp protects external reassociated current and prior copies' Git storage before endpoint or copy mutation
+ok - ordinary subordinate cleanup admits validated ancestors but preserves their priors and Git storage
+FM_TEST_END 2026-11-13T10:38:02Z tests/fm-teardown-pool.test.sh exit=0 duration_ms=1419249 gate_skip=false
+FM_TEST_BEGIN 2026-11-13T10:38:02Z tests/fm-gotmp.test.sh family=session-bootstrap expected_gate_skip=none
+ok - fm-teardown removes the dir pointed to by tasktmp= in meta
+ok - fm-teardown skips gracefully when tasktmp= is absent (backward compat)
+ok - fm-teardown skips gracefully when tasktmp= points to a nonexistent dir
+FM_TEST_END 2026-11-13T10:38:08Z tests/fm-gotmp.test.sh exit=0 duration_ms=5916 gate_skip=false
+FM_TEST_BEGIN 2026-11-13T10:38:08Z tests/fm-spawn-pool-base-freshen.test.sh family=standalone expected_gate_skip=none
+ok - local-only source selection: local
+ok - local-only source selection: equal
+ok - local-only source selection: remote
+ok - local-only source selection: diverged
+ok - local-only source selection: missing
+ok - local-only source selection: alias
+ok - local-only source selection: moved
+ok - local-only source selection: feature
+ok - local-only source selection: dirty
+ok - local-only source selection: dirty-copy
+ok - local-only source selection: publish
+ok - local-only source selection: scout
+ok - local-only source selection: no-origin
+ok - local-only source selection: named
+ok - qualified local source is bound to provisioner arguments, refusal metadata and relaunch
+ok - unprepared refused retry preserves local evidence and work without origin fallback
+ok - origin-equal refused retry after local advance: advanced
+ok - origin-equal refused retry after local advance: diverged
+ok - origin-equal refused retry after local advance: adopted-scope
+ok - origin-equal refused retry after local advance: invalid-ref
+ok - legacy relaunch refuses inferred scope, retains refused explicit scope, adopts it, and never overrides it
+origin_control=origin-early task=pool-local-origin-early-1794566452-49762 exit=1 expected_local=88b109e59d56805ad0b2e32be1913cd4e5911fcb assigned_before=8ffe327036c993eba3dcf85a535e645704c4f38d assigned_after=8ffe327036c993eba3dcf85a535e645704c4f38d
+A_FILE_MISSING
+error: local-only origin qualification changed since source planning; preserving the assigned copy
+ok - local-only source selection: origin-early
+origin_control=origin-late task=pool-local-origin-late-1794566454-49762 exit=1 expected_local=76f10cd656480280ff0d7110f9f880500b5e380e assigned_before=d622e73c47a2013eee538595d9b1c2aaf8b7a399 assigned_after=d622e73c47a2013eee538595d9b1c2aaf8b7a399
+A_FILE_MISSING
+warning: task pool-local-origin-late-1794566454-49762: /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-local-origin-late-1794566454-49762/home/data/pool-local-origin-late-1794566454-49762/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-local-origin-late-1794566454-49762/home/data/pool-local-origin-late-1794566454-49762/launch-brief.md records no ship branch; defaulting to legacy branch fm/pool-local-origin-late-1794566454-49762
+warning: /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-local-origin-late-1794566454-49762/home/data/pool-local-origin-late-1794566454-49762/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: pool-local-origin-late-1794566454-49762 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+error: local-only origin qualification changed since source planning; preserving the assigned copy
+ok - local-only source selection: origin-late
+origin_control=origin-freshness task=pool-local-origin-freshness-1794566459-49762 exit=1 expected_local=72b335600c277dd14d8106b36c971ed28afdc3fb assigned_before=df08d8691803940e39b710b71bdeeef871cf5ac1 assigned_after=df08d8691803940e39b710b71bdeeef871cf5ac1
+A_FILE_MISSING
+warning: task pool-local-origin-freshness-1794566459-49762: /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-local-origin-freshness-1794566459-49762/home/data/pool-local-origin-freshness-1794566459-49762/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-local-origin-freshness-1794566459-49762/home/data/pool-local-origin-freshness-1794566459-49762/launch-brief.md records no ship branch; defaulting to legacy branch fm/pool-local-origin-freshness-1794566459-49762
+warning: /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-local-origin-freshness-1794566459-49762/home/data/pool-local-origin-freshness-1794566459-49762/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: pool-local-origin-freshness-1794566459-49762 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+error: planned local-only origin qualification vanished at freshness; preserving the assigned copy
+ok - local-only source selection: origin-freshness
+origin_control=origin-copy-missing task=pool-local-origin-copy-missing-1794566463-49762 exit=1 expected_local=8a2a0ee8a6e2bdb723a9d26cbad60a8cb64cdfe2 assigned_before=ff73995454ca5435998811647d4f54c5f98879d9 assigned_after=ff73995454ca5435998811647d4f54c5f98879d9
+A_FILE_MISSING
+warning: task pool-local-origin-copy-missing-1794566463-49762: /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-local-origin-copy-missing-1794566463-49762/home/data/pool-local-origin-copy-missing-1794566463-49762/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-local-origin-copy-missing-1794566463-49762/home/data/pool-local-origin-copy-missing-1794566463-49762/launch-brief.md records no ship branch; defaulting to legacy branch fm/pool-local-origin-copy-missing-1794566463-49762
+warning: /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-local-origin-copy-missing-1794566463-49762/home/data/pool-local-origin-copy-missing-1794566463-49762/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: pool-local-origin-copy-missing-1794566463-49762 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+error: local-only primary and assigned-copy origin qualification disagree; preserving the assigned copy
+ok - local-only source selection: origin-copy-missing
+origin_control=origin-primary-missing task=pool-local-origin-primary-missing-1794566468-49762 exit=1 expected_local=2c383f6251af47da0f15bd741815e6867ecb9549 assigned_before=3f6fe5f5fec580659384fcfa06a76e209059c79c assigned_after=3f6fe5f5fec580659384fcfa06a76e209059c79c
+A_FILE_MISSING
+warning: task pool-local-origin-primary-missing-1794566468-49762: /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-local-origin-primary-missing-1794566468-49762/home/data/pool-local-origin-primary-missing-1794566468-49762/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-local-origin-primary-missing-1794566468-49762/home/data/pool-local-origin-primary-missing-1794566468-49762/launch-brief.md records no ship branch; defaulting to legacy branch fm/pool-local-origin-primary-missing-1794566468-49762
+warning: /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-local-origin-primary-missing-1794566468-49762/home/data/pool-local-origin-primary-missing-1794566468-49762/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: pool-local-origin-primary-missing-1794566468-49762 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+error: local-only primary and assigned-copy origin qualification disagree; preserving the assigned copy
+ok - local-only source selection: origin-primary-missing
+case=introduced kind=ship task=pool-owner-introduced-ship-1794566472-49762 root=/private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-owner-introduced-ship-1794566472-49762 before=9f7a6f74b6b5fdefd3fa7e576cbce86ae8ebccd8 advanced=47f7c4cbc4659675168dffcafb848580295c639a temp=/tmp/fm-pool-owner-introduced-ship-1794566472-49762 staging=/tmp/fm-pool-owner-introduced-ship-1794566472-49762+7b0b905d383b1c7eecbf82c6b1ffcaeb5f174ab5c27c3127fa5b28b871f666d3
+spawn_exit=1 after=47f7c4cbc4659675168dffcafb848580295c639a
+warning: task pool-owner-introduced-ship-1794566472-49762: /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-owner-introduced-ship-1794566472-49762/home/data/pool-owner-introduced-ship-1794566472-49762/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-owner-introduced-ship-1794566472-49762/home/data/pool-owner-introduced-ship-1794566472-49762/launch-brief.md records no ship branch; defaulting to legacy branch fm/pool-owner-introduced-ship-1794566472-49762
+warning: /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-owner-introduced-ship-1794566472-49762/home/data/pool-owner-introduced-ship-1794566472-49762/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: pool-owner-introduced-ship-1794566472-49762 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+local-only source: local=main@9f7a6f74b6b5fdefd3fa7e576cbce86ae8ebccd8 origin=main@47f7c4cbc4659675168dffcafb848580295c639a selected=origin/main@47f7c4cbc4659675168dffcafb848580295c639a
+{"state": "BLOCKED", "reason": "fixture_provisioner_must_refuse"}
+error: slot provisioner refused task pool-owner-introduced-ship-1794566472-49762 (exit 2); no agent or ship transition admitted; report: /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-owner-introduced-ship-1794566472-49762/home/data/pool-owner-introduced-ship-1794566472-49762/slot-provision-spawn.25181.json
+error: assigned copy /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-owner-introduced-ship-1794566472-49762/pool and endpoint firstmate:fm-pool-owner-introduced-ship-1794566472-49762 retained; no worker admitted
+ok - final revision governance: introduced ship
+case=introduced kind=scout task=pool-owner-introduced-scout-1794566478-49762 root=/private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-owner-introduced-scout-1794566478-49762 before=feceb9ffde1e9c6810c412b7960425fa7ca7f7e8 advanced=7d7650099bd42455b2aa64e732d069a88bd7b0e7 temp=/tmp/fm-pool-owner-introduced-scout-1794566478-49762 staging=/tmp/fm-pool-owner-introduced-scout-1794566478-49762+93ac016ff81c6754039da1be3d226c5bf77bee3cd97baa59debe61c11c309355
+spawn_exit=1 after=7d7650099bd42455b2aa64e732d069a88bd7b0e7
+warning: task pool-owner-introduced-scout-1794566478-49762: /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-owner-introduced-scout-1794566478-49762/home/data/pool-owner-introduced-scout-1794566478-49762/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+{"state": "BLOCKED", "reason": "fixture_provisioner_must_refuse"}
+error: slot provisioner refused task pool-owner-introduced-scout-1794566478-49762 (exit 2); no agent or ship transition admitted; report: /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-owner-introduced-scout-1794566478-49762/home/data/pool-owner-introduced-scout-1794566478-49762/slot-provision-spawn.34851.json
+error: assigned copy /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-owner-introduced-scout-1794566478-49762/pool and endpoint firstmate:fm-pool-owner-introduced-scout-1794566478-49762 retained; no worker admitted
+ok - final revision governance: introduced scout
+case=missing-scope kind=ship task=pool-owner-missing-scope-ship-1794566486-49762 root=/private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-owner-missing-scope-ship-1794566486-49762 before=c89dc71886379f8c57ffa76713c45c55d67a55d9 advanced=147fe43514fed6bc0ff47141fc94f50932d3858a temp=/tmp/fm-pool-owner-missing-scope-ship-1794566486-49762 staging=/tmp/fm-pool-owner-missing-scope-ship-1794566486-49762+2c5db1fbc910fa9a832e835b59d2e8bbb5f5dbdfaf35746e047a9faa4e8e0485
+spawn_exit=1 after=147fe43514fed6bc0ff47141fc94f50932d3858a
+warning: task pool-owner-missing-scope-ship-1794566486-49762: /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-owner-missing-scope-ship-1794566486-49762/home/data/pool-owner-missing-scope-ship-1794566486-49762/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-owner-missing-scope-ship-1794566486-49762/home/data/pool-owner-missing-scope-ship-1794566486-49762/launch-brief.md records no ship branch; defaulting to legacy branch fm/pool-owner-missing-scope-ship-1794566486-49762
+warning: /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-owner-missing-scope-ship-1794566486-49762/home/data/pool-owner-missing-scope-ship-1794566486-49762/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: pool-owner-missing-scope-ship-1794566486-49762 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+local-only source: local=main@c89dc71886379f8c57ffa76713c45c55d67a55d9 origin=main@147fe43514fed6bc0ff47141fc94f50932d3858a selected=origin/main@147fe43514fed6bc0ff47141fc94f50932d3858a
+error: governed slot provisioning requires --owned-path <tracked-path> (repeatable)
+error: assigned copy /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-owner-missing-scope-ship-1794566486-49762/pool and endpoint firstmate:fm-pool-owner-missing-scope-ship-1794566486-49762 retained; no worker admitted
+ok - final revision governance: missing-scope ship
+case=present kind=ship task=pool-owner-present-ship-1794566493-49762 root=/private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-owner-present-ship-1794566493-49762 before=6f6203b61f643bbdd569801ec597245890a8c607 advanced=b6edb0fae76207546214ac4e41172afa88a340e9 temp=/tmp/fm-pool-owner-present-ship-1794566493-49762 staging=/tmp/fm-pool-owner-present-ship-1794566493-49762+48d33c065c8802a632748db0ba8fa29997da84a52a5695a7eeb004c2c161ae76
+spawn_exit=1 after=6f6203b61f643bbdd569801ec597245890a8c607
+warning: task pool-owner-present-ship-1794566493-49762: /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-owner-present-ship-1794566493-49762/home/data/pool-owner-present-ship-1794566493-49762/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-owner-present-ship-1794566493-49762/home/data/pool-owner-present-ship-1794566493-49762/launch-brief.md records no ship branch; defaulting to legacy branch fm/pool-owner-present-ship-1794566493-49762
+warning: /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-owner-present-ship-1794566493-49762/home/data/pool-owner-present-ship-1794566493-49762/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: pool-owner-present-ship-1794566493-49762 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+local-only source: local=main@6f6203b61f643bbdd569801ec597245890a8c607 origin=main@b6edb0fae76207546214ac4e41172afa88a340e9 selected=origin/main@b6edb0fae76207546214ac4e41172afa88a340e9
+{"state": "BLOCKED", "reason": "fixture_provisioner_must_refuse"}
+error: slot provisioner refused task pool-owner-present-ship-1794566493-49762 (exit 2); no agent or ship transition admitted; report: /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-owner-present-ship-1794566493-49762/home/data/pool-owner-present-ship-1794566493-49762/slot-provision-spawn.55845.json
+error: assigned copy /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-owner-present-ship-1794566493-49762/pool and endpoint firstmate:fm-pool-owner-present-ship-1794566493-49762 retained; no worker admitted
+ok - final revision governance: present ship
+case=absent kind=ship task=pool-owner-absent-ship-1794566501-49762 root=/private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-owner-absent-ship-1794566501-49762 before=dcc001bf7ca075243c340ec1974f05387359b334 advanced=91d9294a3e415a286347a2ea1a6b260a7b6e3426 temp=/tmp/fm-pool-owner-absent-ship-1794566501-49762 staging=/tmp/fm-pool-owner-absent-ship-1794566501-49762+db7abf1fb58d8bc47036e0022b53589f56eeefe5c2092f51493186081271393a
+spawn_exit=0 after=91d9294a3e415a286347a2ea1a6b260a7b6e3426
+warning: task pool-owner-absent-ship-1794566501-49762: /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-owner-absent-ship-1794566501-49762/home/data/pool-owner-absent-ship-1794566501-49762/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-owner-absent-ship-1794566501-49762/home/data/pool-owner-absent-ship-1794566501-49762/launch-brief.md records no ship branch; defaulting to legacy branch fm/pool-owner-absent-ship-1794566501-49762
+warning: /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-owner-absent-ship-1794566501-49762/home/data/pool-owner-absent-ship-1794566501-49762/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: pool-owner-absent-ship-1794566501-49762 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+local-only source: local=main@dcc001bf7ca075243c340ec1974f05387359b334 origin=main@91d9294a3e415a286347a2ea1a6b260a7b6e3426 selected=origin/main@91d9294a3e415a286347a2ea1a6b260a7b6e3426
+skill selection for pool-owner-absent-ship-1794566501-49762: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=codex write_confinement=unconfined-macos-codex
+spawned pool-owner-absent-ship-1794566501-49762 harness=codex kind=ship mode=local-only yolo=off window=firstmate:fm-pool-owner-absent-ship-1794566501-49762 worktree=/private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-owner-absent-ship-1794566501-49762/pool
+ok - final revision governance: absent ship
+case=removed kind=ship task=pool-owner-removed-ship-1794566510-49762 root=/private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-owner-removed-ship-1794566510-49762 before=5c450df90f88edfbab371d676fb4058510eafb4b advanced=b47204387944f81baa7c95fb3e2530ffd7b73ba2 temp=/tmp/fm-pool-owner-removed-ship-1794566510-49762 staging=/tmp/fm-pool-owner-removed-ship-1794566510-49762+a683c5c4533224120fd1504089d7b9f1cecef8a1e87154284b42c967be245162
+spawn_exit=1 after=5c450df90f88edfbab371d676fb4058510eafb4b
+warning: task pool-owner-removed-ship-1794566510-49762: /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-owner-removed-ship-1794566510-49762/home/data/pool-owner-removed-ship-1794566510-49762/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-owner-removed-ship-1794566510-49762/home/data/pool-owner-removed-ship-1794566510-49762/launch-brief.md records no ship branch; defaulting to legacy branch fm/pool-owner-removed-ship-1794566510-49762
+warning: /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-owner-removed-ship-1794566510-49762/home/data/pool-owner-removed-ship-1794566510-49762/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: pool-owner-removed-ship-1794566510-49762 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+local-only source: local=main@5c450df90f88edfbab371d676fb4058510eafb4b origin=main@b47204387944f81baa7c95fb3e2530ffd7b73ba2 selected=origin/main@b47204387944f81baa7c95fb3e2530ffd7b73ba2
+error: slot provisioner is missing from assigned copy /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-owner-removed-ship-1794566510-49762/pool
+error: assigned copy /private/tmp/fmtest-home.ovaR/fm-test-run.UTT14T/w4/tmp/fm-spawn-pool-base-freshen.b7ft9W/pool-owner-removed-ship-1794566510-49762/pool and endpoint firstmate:fm-pool-owner-removed-ship-1794566510-49762 retained; no worker admitted
+ok - final revision governance: removed ship
+ok - a remote-seeded secondmate home allocates and launches from its Treehouse pool
+ok - a Treehouse slot claim names the launched task, refuses when unclaimable, and is dropped by a locked abort
+ok - linked spawning home: primary preserves the primary before any refresh
+ok - linked spawning home: primary-alias preserves the primary before any refresh
+ok - linked spawning home: spawning preserves the primary before any refresh
+ok - linked spawning home: scout preserves the primary before any refresh
+ok - a stale pooled worktree refreshes to current origin/main before a crew branch is created
+ok - --base-branch picks the copy's starting point and is recorded; a missing or local-only base refuses
+ok - a spawn refuses when --base-branch and the brief's Base branch lines disagree
+ok - a Base branch line in the captain's intent neither blocks nor redirects a spawn
+ok - a based scout on a forge=gerrit project is refused at spawn
+ok - a stale pooled worktree resolves and refreshes a non-main default branch
+ok - direct-PR ships and scouts both refresh stale pooled worktrees before launch
+ok - a dirty pooled worktree is refused without discarding its local work
+ok - an unresolved remote default branch refuses the pooled worktree
+ok - an unreachable origin refuses a potentially stale pooled worktree
+ok - an origin-less pooled worktree launches as-is, skipping the freshness gate
+ok - a dirty origin-less pooled worktree is refused without discarding its local work
+ok - an origin configuration without a URL refuses the pooled worktree
+ok - an empty origin configuration section refuses the pooled worktree
+ok - an empty-only included origin section documents the accepted detection boundary
+ok - an inactive conditional origin include leaves the pooled worktree origin-less
+ok - an origin-less pool with a stale submodule pin refuses while naming both pins and no remedy
+ok - an unpushed submodule commit keeps the uncommitted-work refusal and survives it
+ok - work inside a submodule is still refused as uncommitted work, not called stale
+ok - a stale pin carrying real work is refused conservatively, never called stale
+ok - a stale pin beside other dirt yields the conservative refusal alone, with no stale-pin line
+# all fm-spawn-pool-base-freshen tests passed
+FM_TEST_END 2026-11-13T10:45:55Z tests/fm-spawn-pool-base-freshen.test.sh exit=0 duration_ms=466755 gate_skip=false
+FM_TEST_BEGIN 2026-11-13T10:45:55Z tests/fm-control-relaunch.test.sh family=backend-dispatch expected_gate_skip=none
+ok - fm-control relaunch: a manual-backlog home records one backlog skip per relaunch
+ok - fm-control relaunch: a same-harness relaunch replaces the agent in the same endpoint and worktree
+ok - fm-control relaunch: unsupported omp preserves the running agent and task
+ok - fm-control relaunch: missing dsh models and DeepSeek-through-omp refuse before stopping
+ok - fm-control relaunch: a config dsh secondmate keeps or refuses to discard its bound dsh profile, else carries the DSH session's bound model, and refuses without one before stopping
+not ok - explicit relaunch billing admission for openai-codex: warning: /private/tmp/fmtest-home.ovaR/fm-control-relaunch.JTrHSo/rl-billing-openai-codex-explicit-2431/home/data/rl-billing-openai-codex-explicit/launch-brief.md records no ship branch; defaulting to legacy branch fm/rl-billing-openai-codex-explicit
+warning: /private/tmp/fmtest-home.ovaR/fm-control-relaunch.JTrHSo/rl-billing-openai-codex-explicit-2431/home/data/rl-billing-openai-codex-explicit/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+skill selection for rl-billing-openai-codex-explicit: unavailable - no TypeSafe or OpenRouter key
+error: cannot prepare worker write confinement: [Errno 2] No such file or directory: 'bun'
+error: cannot derive the protected-asset write profile
+repair: preserve this task's worktree; ask Main to resolve its measured root contract before retrying bin/fm-spawn.sh rl-billing-openai-codex-explicit <project> --mode <mode> --yolo <on|off>
+error: the replacement agent for rl-billing-openai-codex-explicit could not be launched on omp
+error: rl-billing-openai-codex-explicit's agent was stopped but the replacement did not launch; no agent is running, and its work plus the recorded progress note are preserved at /private/tmp/fmtest-home.ovaR/fm-control-relaunch.JTrHSo/rl-billing-openai-codex-explicit-2431/wt: expected exit 0, got 1
+FM_TEST_END 2026-11-13T10:47:20Z tests/fm-control-relaunch.test.sh exit=1 duration_ms=84605 gate_skip=false
+FM_TEST_BEGIN 2026-11-13T10:47:20Z tests/fm-copy-sweep.test.sh family=unclassified expected_gate_skip=none
+ok - report mode lists every copy with class and reason, changes nothing, and repeats exactly
+ok - live nested copies are named once with lock/directory ages, below budget, without changing copies or locks
+ok - a lock probe cut by the time bound names the copy with an unknown source and age, never its directory age
+ok - a registered copy whose directory is gone is not named as a live nested copy
+ok - the wake carries the count, the oldest five live copies and a pointer to the report, as one line
+ok - a new youngest copy is named first, the wake names five copies in all, and an unchanged set stays silent
+ok - home-project nested copies are reported while their task is live, but not after closure or for a secondmate home
+ok - unreadable registered-worktree enumeration reports the gap without a directory-walk fallback
+ok - apply removes only the REAPABLE-PROVEN copy; dirty, unpushed, live, orphan, locked and in-use copies stay byte-identical; a rerun is idempotent
+ok - a live recycled launcher pid holds its copy and unchanged lock, with age and lock mtime reported
+ok - a dead-launcher locked copy with untracked work stays registered and locked, without a driver call or sweep data
+ok - a dead-launcher locked copy with a process inside stays registered and locked, without a driver call or sweep data
+ok - a locked copy whose launcher pid has finished is planned, preserved, released by the driver and removed, one run, with the net GiB freed reported
+ok - an exact env_loading missing-.env warning on stderr does not veto an allowed stdout plan, and the cap still limits executes
+ok - missing-.env stderr warnings remain visible but do not turn either temporary stdout refusal into a permanent receipt
+ok - a failed nested-registration enumeration holds a clean locked copy before any driver call
+ok - a failed post-removal registration proof reports unproved, keeps the receipt, and never reports or logs REMOVED
+ok - the default cap releases five of seven locked copies and defers two unchanged until the next run; an explicit cap of two behaves the same way
+ok - a refused plan, a failed preservation, a failed reproof and temporary driver refusals use no release slot, so five copies that refuse on every run cannot starve the clean copies behind them: one run releases five clean copies and defers two, and the next run releases those two
+ok - a post-execute enumeration that prints the candidate and then fails is unknown, uses a release slot, and limits seven untouched driver refusals to five executes with two deferred
+ok - a driver execute that reports success but leaves the copy registered, or fails after releasing its lock, uses a release slot, so a systematic partial release reaches at most five copies per run and defers the rest
+ok - a dead-launcher UUID-owner creation lock uses the same supported driver release
+ok - a dead-launcher creation lock with an owner=ppid:<pid> owner uses the same driver release, because only its launcher pid and the other proofs decide
+ok - exit-3 ignored-payload retention is KEPT, keeps its lock and source, and repeated sweeps neither preserve nor execute again
+ok - a task record appearing during the driver plan prevents preservation and release
+ok - a different but valid Vernant lock appearing during the plan is never released
+ok - extra lock lines stay byte-identical and never reach the driver
+ok - NUL bytes cannot normalize an unsupported lock into an allowed creation lock
+ok - a driver that releases its lock but fails removal leaves a durable protection against later plain removal
+ok - a retention receipt whose copy is gone or whose path now holds a different copy, locked or not, is ignored by classification, left by report, and removed and listed by apply, so a new copy at that path is judged on its own proofs
+ok - report distinguishes a local-proof candidate from a driver-approved removal without executing the driver
+ok - only a boolean positive verdict with exit zero is permission; invalid types, documents, suffixes and nonzero exit keep lock bytes unchanged
+ok - a copy whose plan the driver refuses is held with the driver's reason, nothing is copied, the run exits 0, and the next run releases it once the plan allows it
+ok - a plan that reports the driver's retain rule holds the copy with the driver's words, copies nothing, never executes, and exits 0
+ok - a failure after an allowed plan leaves the copy locked and registered, the run exits 1, and the FAILED line carries the driver's refusal lines and exit code
+ok - an execute refusal the driver names temporary (lease conflict, live or unknown tenant) that released nothing leaves no receipt and discards its own run's preserve, so repeated refusals add no preserve while the copy keeps its originals, and the next allowed run preserves once and releases the copy; an original that changed in the copy during preservation stops the release before execute, keeps the preserve of the old content and the next run still retries the copy; an original that changed during execute before the same temporary refusal keeps that preserve with no receipt and the next quiet run releases the copy; the same refusal after an unlock stays held with its preserve
+ok - a copy whose preserved content changed after its preservation reports WAITING, never HELD, with no new preserve and no driver call while its content keeps changing across runs; the first run that sees it unchanged preserves once and releases it through the driver, and no preserve is lost; content that changes back to its latest preserve is released without a duplicate preserve
+ok - ignored content that changes after the last proof, after a preserve was built or an earlier preserve was reused, stops the release before the driver's execute, uses no release slot and keeps every preserved byte, and a later quiet run preserves the new content once and releases the copy
+ok - a new ignored file that appears after preservation, with or without an earlier preservable file, stops the release before execute with no release slot and no lost bytes, records the copy's content, so the next run that still sees it changing reports WAITING with no preserve and no driver call, and the first quiet run preserves once and releases the copy
+ok - a preservable ignored directory holding a FIFO and a stale socket is compared as preservation copies it: temporary refusals discard each run's preserve with no waiting record, so preserves never accumulate, and the allowed run preserves once and releases the copy
+ok - a driver-retention receipt that cannot be written before execute stops the release, discards that run's preserve while the copy still holds its lock and originals, so repeated refusals add no preserve, and the next run that can write it preserves once and releases the copy
+ok - a driver answer whose sorted keys put its reason past 600 characters still shows that reason first in the plan hold, the KEPT or FAILED line, the receipt and the later held reason
+ok - a copy whose ignored files cannot be preserved stays locked and registered, the sweep's own FAILED line ends in a human-only question with no command and no friction event, and the run exits 1
+ok - a failed preservation removes the staging directory it built, so repeated failed sweeps leave no staging bytes behind
+ok - a copy whose creation lock became someone else's after its plan stays locked, is not released by the driver, and is reported as the sweep's own refusal
+ok - a task record or a different valid lock appearing during preservation stops the release after the copy, with no execute and no receipt; this run's preserve is discarded only while the copy keeps the plan's lock and every preserved original unchanged, and a later quiet run whose content equals that kept preserve releases the copy through the driver without preserving it again
+ok - an empty, malformed, missing, false-with-text or garbage-literal plan verdict and a plan that never answers all hold the copy locked, copy nothing, run the driver only in plan mode, leave no driver process running, and exit 0
+ok - a plan whose whole answer is the bare text allowed=true holds the copy and never executes the driver
+ok - a zero-padded plan bound is decimal: 08 holds a hung plan at 8s and 08 or 09 releases a copy whose plan allows it
+ok - a sweep stopped while its plan hangs stops the driver and its child too
+ok - new copies at the same path and HEAD retain both versions of their preserved ignored bytes
+ok - a removal whose size was not measured shows - and unmeasured, and the closing total counts it
+ok - a locked copy with an unpushed but content-equivalent commit is held, and the driver never runs
+ok - a live launcher, a lock that is not Vernant's, and a missing driver all keep their copy untouched
+ok - a dirty copy and an unpushed copy with a verified recorded bundle are both kept
+ok - a copy whose tip is on no remote but whose content already landed is removed by the teardown landed rule
+ok - a project clone under a Firstmate home is enumerated, budgeted as a container, and swept
+ok - a failing git worktree remove leaves the copy, is reported, exits 1, and is attempted once
+ok - apply never forces, cleans, unlocks, recursively deletes or calls treehouse
+ok - a load above the limit skips only the sizing, says so in the report and the record, and listing, classes and apply still run
+ok - 6 skipped runs in a row raise one wake, none while the streak stands, and again after a sized run breaks it
+ok - du runs one at a time as nice -n 20 du -sk, with and without a deadline
+ok - sizes are cached by copy path and mtime and expire with cache-max-age
+ok - a copy nested in another copy is subtracted from the enclosing one
+ok - the budget wake names budget, total and the five largest copies with class, fires once, and fires again after a drop and a new overrun
+ok - a pool budget and a container budget that go over together raise one wake
+ok - apply raises the budget wake once through the wake queue
+ok - a scan cut at its time bound wakes only on bytes it measured and records no completed scan
+ok - a registered copy whose directory is gone counts as 0 KiB, so it never latches a budget record
+ok - a git or lsof call that cannot finish inside check's time leaves the copy UNCLASSIFIED and the wake is still printed in time
+ok - run from the root home, a lane's proven copy is reaped, its own live record holds a copy, and an unreadable lane holds every copy
+ok - an outer copy that holds a dirty inner copy is held and apply keeps both, even when git status cannot see the inner copy
+ok - an outer copy is held while an inner copy exists, reaped by the next run once it is removed, and not held by a registration whose directory is gone
+ok - a zero-padded or non-numeric FM_CHECK_TIMEOUT no longer aborts the check
+ok - a copy holding an ignored file that exists nowhere else is kept, regenerable machinery is reaped, and a failed listing holds the copy
+ok - graft output alone is reaped, and a custom .ignore or a clone below graft/ still holds the copy
+ok - a check whose enumeration is slow stops looking for clones at its time bound and still prints the wake for the clones it reached
+ok - a check stops looking at a home's project clones at its time bound
+ok - a cut check keeps the standing budgets it did not reach and counts toward the streak of skipped runs

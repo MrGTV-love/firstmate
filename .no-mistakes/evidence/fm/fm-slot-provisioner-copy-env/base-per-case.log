@@ -1,0 +1,91 @@
+== test_s1b_real_venv_links_outside_copy
+not ok - S1b: provisioning failed: Traceback (most recent call last):
+  File "/private/tmp/fmtest-home.Ae17/fm-slot-provision-env.XGvC2L/s1b/copy/scripts/git-stability/provision_existing_slot.py", line 21, in <module>
+    import fm_fixture_env_mod  # noqa: E402,F401 only the copy's venv can import this
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+ModuleNotFoundError: No module named 'fm_fixture_env_mod'
+error: slot provisioner refused task slot-env-task (exit 1); no agent or ship transition admitted; report: /private/tmp/fmtest-home.Ae17/fm-slot-provision-env.XGvC2L/s1b/report.json
+Traceback (most recent call last):
+  File "/private/tmp/fmtest-home.Ae17/fm-slot-provision-env.XGvC2L/s1b/copy/scripts/git-stability/provision_existing_slot.py", line 21, in <module>
+    import fm_fixture_env_mod  # noqa: E402,F401 only the copy's venv can import this
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+ModuleNotFoundError: No module named 'fm_fixture_env_mod': expected exit 0, got 1
+== test_s2_pollution_never_reaches_the_provisioner
+not ok - S2: provisioning failed: Traceback (most recent call last):
+  File "/private/tmp/fmtest-home.Ae17/fm-slot-provision-env.9uRFH0/s2/copy/scripts/git-stability/provision_existing_slot.py", line 21, in <module>
+    import fm_fixture_env_mod  # noqa: E402,F401 only the copy's venv can import this
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+ModuleNotFoundError: No module named 'fm_fixture_env_mod'
+error: slot provisioner refused task slot-env-task (exit 1); no agent or ship transition admitted; report: /private/tmp/fmtest-home.Ae17/fm-slot-provision-env.9uRFH0/s2/report.json
+Traceback (most recent call last):
+  File "/private/tmp/fmtest-home.Ae17/fm-slot-provision-env.9uRFH0/s2/copy/scripts/git-stability/provision_existing_slot.py", line 21, in <module>
+    import fm_fixture_env_mod  # noqa: E402,F401 only the copy's venv can import this
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+ModuleNotFoundError: No module named 'fm_fixture_env_mod': expected exit 0, got 1
+== test_s3_missing_python
+not ok - S3 missing: the refusal is not named (missing: 'slot provisioning refused:')
+--- output ---
+Traceback (most recent call last):
+  File "/private/tmp/fmtest-home.Ae17/fm-slot-provision-env.9eIMch/s3-missing/copy/scripts/git-stability/provision_existing_slot.py", line 21, in <module>
+    import fm_fixture_env_mod  # noqa: E402,F401 only the copy's venv can import this
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+ModuleNotFoundError: No module named 'fm_fixture_env_mod'
+error: slot provisioner refused task slot-env-task (exit 1); no agent or ship transition admitted; report: /private/tmp/fmtest-home.Ae17/fm-slot-provision-env.9eIMch/s3-missing/report.json
+Traceback (most recent call last):
+  File "/private/tmp/fmtest-home.Ae17/fm-slot-provision-env.9eIMch/s3-missing/copy/scripts/git-stability/provision_existing_slot.py", line 21, in <module>
+    import fm_fixture_env_mod  # noqa: E402,F401 only the copy's venv can import this
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+ModuleNotFoundError: No module named 'fm_fixture_env_mod'
+== test_p1b_real_venv_links_outside_copy
+not ok - P1b: spawn failed: warning: task p1b-70705: /private/tmp/fmtest-home.Ae17/fm-spawn-slot-env.qqlUFd/p1b-70705/home/data/p1b-70705/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /private/tmp/fmtest-home.Ae17/fm-spawn-slot-env.qqlUFd/p1b-70705/home/data/p1b-70705/launch-brief.md records no ship branch; defaulting to legacy branch fm/p1b-70705
+warning: /private/tmp/fmtest-home.Ae17/fm-spawn-slot-env.qqlUFd/p1b-70705/home/data/p1b-70705/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: p1b-70705 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+local-only source: local=main@b2c6403da163445de9ed68cd32700330af4ff87f origin=main@b2c6403da163445de9ed68cd32700330af4ff87f selected=origin/main@b2c6403da163445de9ed68cd32700330af4ff87f
+Traceback (most recent call last):
+  File "/private/tmp/fmtest-home.Ae17/fm-spawn-slot-env.qqlUFd/p1b-70705/copy/scripts/git-stability/provision_existing_slot.py", line 21, in <module>
+    import fm_fixture_env_mod  # noqa: E402,F401 only the copy's venv can import this
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+ModuleNotFoundError: No module named 'fm_fixture_env_mod'
+error: slot provisioner refused task p1b-70705 (exit 1); no agent or ship transition admitted; report: /private/tmp/fmtest-home.Ae17/fm-spawn-slot-env.qqlUFd/p1b-70705/home/data/p1b-70705/slot-provision-spawn.71654.json
+error: assigned copy /private/tmp/fmtest-home.Ae17/fm-spawn-slot-env.qqlUFd/p1b-70705/copy and endpoint firstmate:fm-p1b-70705 retained; no worker admitted: expected exit 0, got 1
+== test_p2_pane_pollution_never_reaches_the_provisioner
+not ok - P2: spawn failed: warning: task p2-80875: /private/tmp/fmtest-home.Ae17/fm-spawn-slot-env.ajpVTm/p2-80875/home/data/p2-80875/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /private/tmp/fmtest-home.Ae17/fm-spawn-slot-env.ajpVTm/p2-80875/home/data/p2-80875/launch-brief.md records no ship branch; defaulting to legacy branch fm/p2-80875
+warning: /private/tmp/fmtest-home.Ae17/fm-spawn-slot-env.ajpVTm/p2-80875/home/data/p2-80875/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: p2-80875 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+local-only source: local=main@02512874fdfe4d0aee8dc4802d4fda5448be1a68 origin=main@02512874fdfe4d0aee8dc4802d4fda5448be1a68 selected=origin/main@02512874fdfe4d0aee8dc4802d4fda5448be1a68
+Traceback (most recent call last):
+  File "/private/tmp/fmtest-home.Ae17/fm-spawn-slot-env.ajpVTm/p2-80875/copy/scripts/git-stability/provision_existing_slot.py", line 21, in <module>
+    import fm_fixture_env_mod  # noqa: E402,F401 only the copy's venv can import this
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+ModuleNotFoundError: No module named 'fm_fixture_env_mod'
+error: slot provisioner refused task p2-80875 (exit 1); no agent or ship transition admitted; report: /private/tmp/fmtest-home.Ae17/fm-spawn-slot-env.ajpVTm/p2-80875/home/data/p2-80875/slot-provision-spawn.82121.json
+error: assigned copy /private/tmp/fmtest-home.Ae17/fm-spawn-slot-env.ajpVTm/p2-80875/copy and endpoint firstmate:fm-p2-80875 retained; no worker admitted: expected exit 0, got 1
+== test_p3_missing_python
+not ok - P3 missing: the refusal is not named (missing: 'slot provisioning refused:')
+--- output ---
+warning: task p3-missing-90291: /private/tmp/fmtest-home.Ae17/fm-spawn-slot-env.4DOZJX/p3-missing-90291/home/data/p3-missing-90291/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /private/tmp/fmtest-home.Ae17/fm-spawn-slot-env.4DOZJX/p3-missing-90291/home/data/p3-missing-90291/launch-brief.md records no ship branch; defaulting to legacy branch fm/p3-missing-90291
+warning: /private/tmp/fmtest-home.Ae17/fm-spawn-slot-env.4DOZJX/p3-missing-90291/home/data/p3-missing-90291/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: p3-missing-90291 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+local-only source: local=main@e2c0362a5b6ada577bf65cceb75157252700aee2 origin=main@e2c0362a5b6ada577bf65cceb75157252700aee2 selected=origin/main@e2c0362a5b6ada577bf65cceb75157252700aee2
+Traceback (most recent call last):
+  File "/private/tmp/fmtest-home.Ae17/fm-spawn-slot-env.4DOZJX/p3-missing-90291/copy/scripts/git-stability/provision_existing_slot.py", line 21, in <module>
+    import fm_fixture_env_mod  # noqa: E402,F401 only the copy's venv can import this
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+ModuleNotFoundError: No module named 'fm_fixture_env_mod'
+error: slot provisioner refused task p3-missing-90291 (exit 1); no agent or ship transition admitted; report: /private/tmp/fmtest-home.Ae17/fm-spawn-slot-env.4DOZJX/p3-missing-90291/home/data/p3-missing-90291/slot-provision-spawn.91176.json
+error: assigned copy /private/tmp/fmtest-home.Ae17/fm-spawn-slot-env.4DOZJX/p3-missing-90291/copy and endpoint firstmate:fm-p3-missing-90291 retained; no worker admitted
+== test_p4_ordinary_copy_without_venv_spawns
+ok - P4: an ordinary copy with no provisioner and no .venv spawns exactly as before
+rm: /private/tmp/fmtest-home.Ae17/fm-spawn-slot-env.1Sa3Yo/p4-98899/home/state: Directory not empty
+rm: /private/tmp/fmtest-home.Ae17/fm-spawn-slot-env.1Sa3Yo/p4-98899/home: Directory not empty
+rm: /private/tmp/fmtest-home.Ae17/fm-spawn-slot-env.1Sa3Yo/p4-98899: Directory not empty
+rm: /private/tmp/fmtest-home.Ae17/fm-spawn-slot-env.1Sa3Yo: Directory not empty
+== test_s4c_clone_script_without_venv_uses_copy_tree
+not ok - S4c: the clone script ran without its interpreter (expected '/private/tmp/fmtest-home.Ae17/fm-copy-env-sites.zxE5Dq/s4c/copy/scripts/git-stability/retire_slot_manifest.py', got '/private/tmp/fmtest-home.Ae17/fm-copy-env-sites.zxE5Dq/s4c/project/scripts/git-stability/retire_slot_manifest.py')
+== test_s4b_script_without_usable_interpreter_refuses_by_name
+not ok - S4b (script none): expected a refusal, got exit 0: {"status": "retired"}
+== test_c1_closeout_pollution_never_reaches_the_driver
+not ok - C1: VIRTUAL_ENV is not the tree venv (expected '/private/tmp/fmtest-home.Ae17/fm-copy-env-sites.wk4K3l/c1/copy/.venv', got '/private/tmp/fmtest-home.Ae17/fm-copy-env-sites.wk4K3l/c1/decoy')

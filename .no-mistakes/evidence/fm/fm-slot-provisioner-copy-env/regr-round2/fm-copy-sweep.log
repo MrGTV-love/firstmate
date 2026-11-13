@@ -1,0 +1,9 @@
+ok - report mode lists every copy with class and reason, changes nothing, and repeats exactly
+ok - live nested copies are named once with lock/directory ages, below budget, without changing copies or locks
+ok - a lock probe cut by the time bound names the copy with an unknown source and age, never its directory age
+ok - a registered copy whose directory is gone is not named as a live nested copy
+ok - the wake carries the count, the oldest five live copies and a pointer to the report, as one line
+ok - a new youngest copy is named first, the wake names five copies in all, and an unchanged set stays silent
+ok - home-project nested copies are reported while their task is live, but not after closure or for a secondmate home
+ok - unreadable registered-worktree enumeration reports the gap without a directory-walk fallback
+exit=143 seconds=200

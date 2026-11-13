@@ -1,0 +1,13 @@
+BASE 9d516486 bin/ with head test files
+not ok - S1: provisioning failed: Traceback (most recent call last):
+  File "/private/tmp/nm-basesuite/fm-slot-provision-env.uXVD5q/s1/copy/scripts/git-stability/provision_existing_slot.py", line 21, in <module>
+    import fm_fixture_env_mod  # noqa: E402,F401 only the copy's venv can import this
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+ModuleNotFoundError: No module named 'fm_fixture_env_mod'
+error: slot provisioner refused task slot-env-task (exit 1); no agent or ship transition admitted; report: /private/tmp/nm-basesuite/fm-slot-provision-env.uXVD5q/s1/report.json
+Traceback (most recent call last):
+  File "/private/tmp/nm-basesuite/fm-slot-provision-env.uXVD5q/s1/copy/scripts/git-stability/provision_existing_slot.py", line 21, in <module>
+    import fm_fixture_env_mod  # noqa: E402,F401 only the copy's venv can import this
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+ModuleNotFoundError: No module named 'fm_fixture_env_mod': expected exit 0, got 1
+exit=1
