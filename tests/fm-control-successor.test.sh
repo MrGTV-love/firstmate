@@ -592,7 +592,16 @@ test_relaunch_of_a_task_with_no_successor_generates_the_unchanged_profile() {
     "a task with no successor must allow exactly its branch, its lock and their reflog lines as literals"
   assert_equals 2 "$(printf '%s\n' "$allowed" | grep -c '^(allow file-write\* (regex #.*refs/heads/archive/')" "the two archive rules must remain"
   assert_equals 2 "$(printf '%s\n' "$allowed" | grep -c '^(allow file-write-create (require-all (literal ')" "the two archive folders must remain"
-  profile_without_session_lines "$dir" "$dir/home/state/$id.write-confinement.sb" "$s" | grep '^(allow' | shasum -a 256 | cut -d' ' -f1 > "$dir/profile.digest"
+  # The case root is random and the profile names it three ways: as written, as a
+  # regex-escaped path, and as the dash-encoded Claude project folder name; each
+  # becomes <CASE> so the digest compares across runs and trees.
+  profile_without_session_lines "$dir" "$dir/home/state/$id.write-confinement.sb" "$s" | grep '^(allow' \
+    | python3 -I -c 'import re, sys
+root = sys.argv[1]
+text = sys.stdin.read()
+for form in (re.escape(root), root, re.sub(r"[^A-Za-z0-9]", "-", root)):
+    text = text.replace(form, "<CASE>")
+sys.stdout.write(text)' "$dir" | shasum -a 256 | cut -d' ' -f1 > "$dir/profile.digest"
   printf 'DIGEST no-successor-relaunch-profile=%s\n' "$(cat "$dir/profile.digest")"
   pass "successor: a relaunch of a task with no successor generates the profile it always did"
 }

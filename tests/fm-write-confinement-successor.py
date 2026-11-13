@@ -163,7 +163,12 @@ def unit(base):
     # Allow lines only: the deny lines also name every sibling folder of the shared
     # Claude temp root at build time, which other sessions change between runs.
     allow_only = "\n".join(line for line in before.splitlines() if line.startswith("(allow"))
-    digest = hashlib.sha256(allow_only.replace(str(base.resolve()), "<BASE>").encode()).hexdigest()
+    # The run root is random, and the profile names it three ways: as written, as a
+    # regex-escaped path, and as the dash-encoded Claude project folder name.
+    root = str(base.resolve())
+    for form in (re.escape(root), root, re.sub(r"[^A-Za-z0-9]", "-", root)):
+        allow_only = allow_only.replace(form, "<BASE>")
+    digest = hashlib.sha256(allow_only.encode()).hexdigest()
     print(f"DIGEST no-successor-generator-profile={digest}")
 
     # 2. The same inputs plus a recorded successor differ by exactly the
