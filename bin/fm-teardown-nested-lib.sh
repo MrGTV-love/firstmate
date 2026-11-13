@@ -355,10 +355,53 @@ teardown_process_proved_own() {  # <pid>
   while [ -n "$cur" ] && [ "$cur" -gt 1 ] 2>/dev/null && [ "$hops" -lt 64 ]; do
     teardown_process_env_marked "$cur" && return 0
     teardown_process_recorded "$cur" && return 0
+    cur=$(LC_ALL=C ps -o ppid= -p "$cur" 2>/dev/null | tr -d '[:space:]') || break
+    hops=$((hops + 1))
+  done
+  teardown_process_in_task_pane "$1"
+}
+
+# Is <pid> the shell of the task's own terminal pane, or a process below it by live parent
+# chain? The endpoint is asked only when a process is not proved by its marker or the owned
+# record, so a teardown that refuses before it reaches any process never touches it.
+teardown_process_in_task_pane() {  # <pid>
+  local cur=$1 hops=0 pane
+  pane=$(teardown_pane_shell_pid) || return 1
+  [ -n "$pane" ] || return 1
+  while [ -n "$cur" ] && [ "$cur" -gt 1 ] 2>/dev/null && [ "$hops" -lt 64 ]; do
+    [ "$cur" != "$pane" ] || return 0
     cur=$(LC_ALL=C ps -o ppid= -p "$cur" 2>/dev/null | tr -d '[:space:]') || return 1
     hops=$((hops + 1))
   done
   return 1
+}
+
+# The pid of the shell the task's own terminal pane was started with, for the backends
+# that report it (tmux, herdr): the endpoint this teardown validated against the task's
+# record ($BACKEND, $T), read only through teardown_process_in_task_pane. That shell is
+# the task's by its endpoint, not by its place: the `export FM_TASK_INBOX=...` fm-spawn
+# types into it never reaches its own environment (only the processes it starts inherit
+# the marker), so after the worker has exited the shell and an idle shell below it carry
+# no marker at all. Prints nothing for any other backend, for an endpoint that cannot be
+# read and for anything that is not a pid above 1.
+teardown_pane_shell_pid() {
+  local out pid=
+  [ -n "${T:-}" ] || return 0
+  case "${BACKEND:-}" in
+    tmux)
+      pid=$(fm_run_timed 15 tmux display-message -p -t "$T" '#{pane_pid}' 2>/dev/null </dev/null) || pid=
+      ;;
+    herdr)
+      # shellcheck disable=SC2016 # The single-quoted bash -c program expands its own positional arguments.
+      out=$(fm_run_timed 30 bash -c '. "$1/fm-backend.sh" && fm_backend_source herdr && fm_backend_herdr_cli "$2" pane process-info --pane "$3"' \
+        _ "$FM_ROOT/bin" "${T%%:*}" "${T#*:}" 2>/dev/null </dev/null) || out=
+      pid=$(printf '%s' "$out" | jq -r --arg pane "${T#*:}" \
+        'select(.result.process_info.pane_id == $pane) | .result.process_info.shell_pid // empty' 2>/dev/null) || pid=
+      ;;
+  esac
+  case "$pid" in ''|*[!0-9]*) return 0 ;; esac
+  [ "$pid" -gt 1 ] || return 0
+  printf '%s\n' "$pid"
 }
 
 # Writes the owned record from the live processes: every descendant (by live
@@ -372,7 +415,10 @@ teardown_owned_record_write() {
   local rec expected table ancestors cur pids line pid identity tmp proc_root candidates bearers=" "
   rec=$(teardown_owned_record_path)
   expected=$(teardown_owner_marker) || return 0
-  table=$(LC_ALL=C ps -A -ww -E -o pid=,ppid=,command= 2>/dev/null) || return 0
+  # `ps -E` (the environment printed after the command) is a BSD option; procps (Linux) refuses
+  # it, and there /proc publishes every readable environment, so the plain table is enough.
+  table=$(LC_ALL=C ps -A -ww -E -o pid=,ppid=,command= 2>/dev/null) \
+    || table=$(LC_ALL=C ps -A -ww -o pid=,ppid=,command= 2>/dev/null) || return 0
   [ -n "$table" ] || return 0
   ancestors=" $$ "
   cur=$$

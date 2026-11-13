@@ -681,7 +681,14 @@
 #     state/<id>.teardown-owned (pid AND birth identity), written at the start of
 #     the teardown, before any reaping or endpoint closure, from the live
 #     descendants of the marker-bearing worker, never extended once no bearer
-#     is alive, kept by a refusal for its retry and removed by the successful close; or a live parent chain to either (teardown_process_proved_own).
+#     is alive, kept by a refusal for its retry and removed by the successful close; a
+#     live parent chain to either; or the shell of the task's own terminal pane (the
+#     tmux or herdr pane this teardown validated against the task's record, its shell
+#     pid read from the backend) or a process below it by live parent chain, because
+#     the export that fm-spawn types into that shell reaches only its children, never
+#     its own environment (teardown_process_proved_own, teardown_process_in_task_pane).
+#     The pane is asked only when a process is not already proved, never by a working
+#     directory, so a teardown that refuses first never touches the endpoint.
 #     Anything else is not proved: teardown refuses by naming its pid and leaves it
 #     running, on every route; a foreign process is never ended. A process that
 #     has exited by the time it is checked (the kernel answers "no such process",

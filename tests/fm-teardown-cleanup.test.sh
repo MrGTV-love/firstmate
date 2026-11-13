@@ -1668,6 +1668,65 @@ test_the_owned_record_is_removed_at_a_successful_close_and_kept_by_a_refusal() {
   pass "the owned record survives a refused teardown for its retry and is removed by the successful close"
 }
 
+# The shell a task's own terminal pane was started with is the task's process by its endpoint,
+# not by its place: `export FM_TASK_INBOX=...` typed into that shell never reaches its own
+# environment (only its children inherit it), so it, and an idle shell below it after the
+# worker exited, carry no launch marker. The endpoint teardown validated names the pane, so
+# the pane's shell and everything below it are the task's own; a process in the same copy that
+# the endpoint does not name stays unproved, is named in the refusal and is left running.
+test_the_shell_of_the_tasks_own_pane_is_the_tasks_own_without_a_launch_marker() {
+  local case_dir rc pane_pid child_pid other_pid table
+  case_dir=$(make_case pane-shell-own)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  teardown_fixture_start_foreign "$case_dir/wt" KILL bash -c 'sleep 300 & wait'
+  pane_pid=$TEARDOWN_FIXTURE_PID
+  sleep 0.3
+  table=$("$REAL_PS_FOR_TEST" -axo pid=,ppid=)
+  child_pid=$(printf '%s\n' "$table" | awk -v p="$pane_pid" '$2 == p { print $1; exit }')
+  [ -n "$child_pid" ] || fail "pane-shell-own: the pane shell started no child, so the case proves nothing"
+  cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+case "\$*" in *display-message*pane_pid*) printf '%s\\n' '$pane_pid'; exit 0 ;; esac
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/tmux"
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "pane-shell-own: the pane's own shell has no marker and must still be the task's own: $(cat "$case_dir/stderr")"
+  if kill -0 "$pane_pid" 2>/dev/null || kill -0 "$child_pid" 2>/dev/null; then
+    teardown_fixture_stop "$pane_pid"
+    kill -9 "$child_pid" 2>/dev/null || true
+    fail "pane-shell-own: the pane's shell or its child survived the teardown"
+  fi
+  assert_absent "$case_dir/state/task-x1.meta" "pane-shell-own: the task record stayed"
+  # The same process is not the task's own when the endpoint does not name it.
+  case_dir=$(make_case pane-shell-not-named)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  teardown_fixture_start_foreign "$case_dir/wt" KILL sleep 300
+  other_pid=$TEARDOWN_FIXTURE_PID
+  mkdir -p "$case_dir/elsewhere"
+  teardown_fixture_start_foreign "$case_dir/elsewhere" KILL sleep 300
+  pane_pid=$TEARDOWN_FIXTURE_PID
+  sleep 0.2
+  cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+case "\$*" in *display-message*pane_pid*) printf '%s\\n' '$pane_pid'; exit 0 ;; esac
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/tmux"
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "pane-shell-not-named: a process the endpoint does not name must refuse"
+  assert_grep "REFUSED: process $other_pid" "$case_dir/stderr" "pane-shell-not-named: the refusal does not name the process"
+  kill -0 "$other_pid" 2>/dev/null || fail "pane-shell-not-named: the unproved process was signalled"
+  teardown_fixture_stop "$other_pid"
+  teardown_fixture_stop "$pane_pid"
+  assert_present "$case_dir/state/task-x1.meta" "pane-shell-not-named: the refusal removed the task record"
+  pass "the shell of the task's own pane and its children are the task's own without a launch marker, and a process the endpoint does not name is still refused"
+}
+
 test_process_identity_is_recorded_before_term_and_kill() {
   local case_dir rc pid journal expected_start expected_cwd epoch signal audit_pid birth command start cwd matched
   case_dir=$(make_case durable-process-identity)
@@ -2442,6 +2501,11 @@ grace_spawn_case() {
   local kind=$1 name=$2 case_dir rc pid child_file child_pid="" parent_survived=0 child_survived=0 diag py=""
   if [ "$kind" = nonapple ]; then
     py=$(teardown_nonapple_python) || { echo "NOT RUN - $name needs a non-Apple python3; a skip is not a pass"; return 0; }
+  else
+    # The Apple case is about a platform binary whose environment no other process can read, so
+    # that its launch marker cannot be proved. Where /proc publishes every environment (Linux) the
+    # same child carries a readable marker and is, rightly, proved the task's own and reaped.
+    [ "$(uname -s)" = Darwin ] || { echo "NOT RUN - $name needs a host whose platform binaries hide their environment (macOS); a skip is not a pass"; return 0; }
   fi
   case_dir=$(make_case "$name")
   write_meta "$case_dir" no-mistakes ship
@@ -7540,7 +7604,7 @@ test_a_process_is_proved_the_tasks_own_by_marker_record_or_live_chain_never_by_p
   m=$(cd "$dir/state" && pwd -P)/task-x1.inbox
   t=$dir/ps-table
   rec=$dir/state/task-x1.teardown-owned
-  eval "$(sed -n '/^fm_nm_trim_stub/d; /^task_process_identity() {/,/^}/p; /^teardown_process_env_has() {/,/^}/p; /^teardown_owner_marker() {/,/^}/p; /^teardown_process_env_marked() {/,/^}/p; /^teardown_owned_record_path() {/,/^}/p; /^teardown_process_recorded() {/,/^}/p; /^teardown_process_proved_own() {/,/^}/p; /^teardown_owned_record_write() {/,/^}/p' "$ROOT/bin/fm-teardown.sh" "$ROOT/bin/fm-teardown-nested-lib.sh")"
+  eval "$(sed -n '/^fm_nm_trim_stub/d; /^task_process_identity() {/,/^}/p; /^teardown_process_env_has() {/,/^}/p; /^teardown_owner_marker() {/,/^}/p; /^teardown_process_env_marked() {/,/^}/p; /^teardown_owned_record_path() {/,/^}/p; /^teardown_process_recorded() {/,/^}/p; /^teardown_process_proved_own() {/,/^}/p; /^teardown_process_in_task_pane() {/,/^}/p; /^teardown_pane_shell_pid() {/,/^}/p; /^teardown_owned_record_write() {/,/^}/p' "$ROOT/bin/fm-teardown.sh" "$ROOT/bin/fm-teardown-nested-lib.sh")"
   # shellcheck disable=SC2329 # called by the evaluated task_process_identity.
   fm_nm_trim() { printf '%s' "$1" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'; }
   # shellcheck disable=SC2034 # read by the evaluated functions.
@@ -7679,7 +7743,14 @@ test_two_overlapping_teardowns_of_one_kept_copy_make_one_archive() {
   make_retained_case retained-overlap-teardown enclosing
   retained_overlap_run retained-overlap-teardown run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
   cp "$FOREIGN_CASE/stderr" "$FOREIGN_CASE/stderr.second"
-  [ -s "$FOREIGN_CASE/waiting-at-release.txt" ] || fail "retained-overlap-teardown: the second teardown was never observed waiting on the first one's lock before the driver was released"
+  # The second activation queued behind the first (the lock monitor's wait marker was seen) or, on a
+  # host whose lifecycle lock does not queue, was refused at once because another lifecycle action
+  # holds the task; either way it never reached the driver while the first was in it. A second run
+  # that did neither would have run beside the first, and the count below would not mean anything.
+  if [ ! -s "$FOREIGN_CASE/waiting-at-release.txt" ]; then
+    assert_grep "another lifecycle action is already running for task task-x1" "$FOREIGN_CASE/stderr.second" \
+      "retained-overlap-teardown: the second teardown neither waited on the first one's lock nor was refused because of it: $(tail -3 "$FOREIGN_CASE/stderr.second")"
+  fi
   assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-overlap-teardown: two overlapping teardowns made more than one driver call or tar (first rc $(cat "$FOREIGN_CASE/rc.first"), second rc $rc: $(tail -3 "$FOREIGN_CASE/stderr.second"))"
   pass "two overlapping teardowns of one kept copy ask the driver once and write one tar (first rc $(cat "$FOREIGN_CASE/rc.first"), second rc $rc; the second waited on: $(sed -n 2p "$FOREIGN_CASE/waiting-at-release.txt" | sed "s#$FOREIGN_CASE/##" | tr '\n' ' '))"
 }
@@ -8180,6 +8251,7 @@ test_own_autonomous_run_is_left_alone
 test_leaked_worktree_process_is_reaped
 test_leaked_tasktmp_process_is_reaped
 test_the_owned_record_is_removed_at_a_successful_close_and_kept_by_a_refusal
+test_the_shell_of_the_tasks_own_pane_is_the_tasks_own_without_a_launch_marker
 test_process_identity_is_recorded_before_term_and_kill
 test_process_audit_collection_exit_races
 test_nested_registered_worktree_process_is_not_reaped

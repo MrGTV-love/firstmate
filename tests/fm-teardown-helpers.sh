@@ -110,10 +110,22 @@ teardown_fixture_marker() {  # <cwd>
 
 # Adds <pid> with its birth identity to the case's owned record, as the product writes it.
 teardown_fixture_record_owned() {  # <cwd> <pid>
-  local d birth
+  local d birth start
   d=$(teardown_fixture_case_dir "$1") || return 0
   birth=$(teardown_fixture_birth "$2") || fail "cannot read the identity of fixture process $2"
   printf '%s\t%s\n' "$2" "$birth" >> "$d/state/task-x1.teardown-owned"
+  # A case that sets FM_PROC_ROOT_OVERRIDE to a directory without /proc makes the teardown read
+  # identities through `ps` (an `lstart=` identity), whatever the host. Where /proc is readable the
+  # entry above is a start-tick identity, which that teardown would never match; the entry for the
+  # same process in the form `ps` reports lets the same fixture be the task's own on every host.
+  case "$birth" in
+    starttime=*)
+      start=$(LC_ALL=C "$REAL_PS_FOR_TEST" -p "$2" -o lstart= 2>/dev/null) || start=
+      start=${start#"${start%%[![:space:]]*}"}
+      start=${start%"${start##*[![:space:]]}"}
+      [ -z "$start" ] || printf '%s\tlstart=%s\n' "$2" "$start" >> "$d/state/task-x1.teardown-owned"
+      ;;
+  esac
 }
 
 teardown_fixture_start_foreign() {

@@ -286,8 +286,17 @@ STATE="$TEST_DIR/home-primary/state"
 . "$ROOT/bin/fm-wake-lib.sh"
 (
   export PROJ="$TEST_DIR/project-primary" STATE="$TEST_DIR/home-primary/state"
+  # The extracted functions prove a process the task's own with teardown_process_proved_own, which
+  # bin/fm-teardown.sh gets from the nested-copy library it sources.
+  # shellcheck source=bin/fm-teardown-nested-lib.sh
+  . "$ROOT/bin/fm-teardown-nested-lib.sh"
   # shellcheck source=/dev/null
   . "$TEST_DIR/runtime-cleanup.sh"
+  # The owned fixture is the task's own by the owned record (the host-independent proof: a launch
+  # marker cannot be read from every host's process), written with the identity the teardown reads.
+  export ID=offline-owned
+  mkdir -p "$STATE"
+  printf '%s\t%s\n' "$OFFLINE_OWNED_PID" "$(task_process_identity "$OFFLINE_OWNED_PID")" > "$STATE/$ID.teardown-owned"
   task_pids_under_roots "$TEST_DIR/offline-owned" || fail "offline owned inventory failed"
   [ "$TASK_PIDS" = "$OFFLINE_OWNED_PID" ] || fail "offline inventory did not isolate the owned process: $TASK_PIDS"
   ID=offline-owned BACKEND=herdr reap_task_worktree_processes worktree "$TEST_DIR/offline-owned" || fail "offline owned reaper failed"
