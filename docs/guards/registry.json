@@ -140,6 +140,10 @@
     "teardown-superseded-slot-lease",
     "captain-hold-withdraw-ruling",
     "slack-dm-retarget-pending-work",
+    "slack-thread-reply-read-boundary",
+    "slack-request-resolve-failed-only",
+    "slack-request-secret-collides-with-marker",
+    "slack-dm-unbind-refuses-an-unreadable-folder",
     "github-accounting-foreign-database",
     "open-loops-one-deferral",
     "pipeline-start-unreadable-source",
@@ -150,7 +154,10 @@
     "backlog-transition",
     "compact-adviser",
     "secondmate-inherit",
-    "secondmate-sync"
+    "secondmate-sync",
+    "check-event-output-integrity",
+    "slack-call-fields-hold-a-plane-value",
+    "slack-command-refusal-line"
   ],
   "guards": [
     {
@@ -2083,11 +2090,11 @@
         },
         {
           "file": "bin/fm_slack_watch.py",
-          "match": "print('slack: refused: unsafe_check_shim', file=sys.stderr)"
+          "match": "out.diagnostic('err', 'slack: refused: unsafe_check_shim')"
         },
         {
           "file": "bin/fm_slack_watch.py",
-          "match": "print('slack: refused: unsafe_state_path', file=sys.stderr)",
+          "match": "out.diagnostic('err', 'slack: refused: unsafe_state_path')",
           "count": 2
         }
       ]
@@ -6916,16 +6923,282 @@
           "match": "A retarget that still refuses with dm_user_changed_with_pending_work"
         }
       ],
-      "invariant": "a Slack retarget never drops answers or notices still pending on the old DM",
+      "invariant": "a Slack retarget never drops answers, notices, or requests still pending or unread on the old DM",
       "layer": "runtime-block",
-      "source": "the pending journal in state/slack-watch/state.json, read by Watch.retarget() in bin/fm_slack_watch.py against the owner id stored for the established DM and FM_SLACK_DM_USER",
-      "trigger": "bin/fm-slack-check.sh retarget runs after FM_SLACK_DM_USER changed while the pending journal still holds an answer or a notice for a thread in the old DM, or when the retarget's own read of an old thread stages one",
-      "remedy": "restore the old FM_SLACK_DM_USER in .env, run bin/fm-slack-poll.sh until python3 -c 'import json; print(len(json.load(open(\"state/slack-watch/state.json\"))[\"pending\"]))' prints 0, set the new value, then run bin/fm-slack-check.sh disarm, bin/fm-slack-check.sh retarget, bin/fm-slack-check.sh arm; last resort, when a pending row can never drain because its thread or channel is gone: run bin/fm-slack-check.sh disarm, check the pending rows by hand, then remove state/slack-watch/ to start a fresh DM, which can re-read replies that were already answered; the same last resort covers an old thread that retarget can never read or judge (a hold id that can never be probed, a tapper whose users.info lookup keeps failing, a deleted card): first read that thread in Slack by hand and record any answer with bin/fm-captain-hold.sh answer, then disarm and remove state/slack-watch/, which abandons that thread's unread reply",
+      "source": "the pending journal in state/slack-watch/state.json and, for owner requests no poll has taken in, the old DM's history since the request starting point (intake_cursor in the same file), read through the plane's existing conversations.history call, and, for owner follow-ups no poll has taken in, each recorded request thread since its saved follow-up cursor (followups in the same file), read through the plane's existing conversations.replies call, by Watch.retarget() in bin/fm_slack_watch.py against the owner id stored for the established DM and FM_SLACK_DM_USER",
+      "trigger": "bin/fm-slack-check.sh retarget runs after FM_SLACK_DM_USER changed while the pending journal still holds an answer, notice, or request for a thread in the old DM, or when the retarget's own read of an old thread stages one, or while the old DM still holds an owner request, or a recorded request thread still holds an owner follow-up, that no poll has taken in (dm_user_changed_with_unread_requests)",
+      "remedy": "restore BOTH old settings, the old FM_SLACK_DM_USER and the old FM_SLACK_ALLOWED_AUTHORS (or the old allowlist in the home configuration file), and run bin/fm-slack-poll.sh with them until it drains the old DM, then set the new values, then run bin/fm-slack-check.sh disarm, bin/fm-slack-check.sh retarget, bin/fm-slack-check.sh arm (restoring only the old owner loses requests: a poll takes in a request only from an author on the allowlist that is set when it runs); if retarget refuses with dm_user_changed_with_pending_work or dm_user_changed_with_unread_requests, restore both old settings and poll again, or run bin/fm-slack-check.sh resolve <ts> for each open failed request the poll lists; last resort, when a pending row can never drain because its thread or channel is gone: run bin/fm-slack-check.sh disarm, check the pending rows by hand, then remove state/slack-watch/ to start a fresh DM, which can re-read replies that were already answered; the same last resort covers an old thread that retarget can never read or judge (a hold id that can never be probed, a tapper whose users.info lookup keeps failing, a deleted card): first read that thread in Slack by hand and record any answer with bin/fm-captain-hold.sh answer, then disarm and remove state/slack-watch/, which abandons that thread's unread reply",
       "budget": 1,
       "test": "tests/fm-slack-watch.test.sh",
       "tier": "C",
       "harm": "irreversible",
-      "layer_note": "added by the Slack watch activation-readiness change; deny without a guard event: retarget exits non-zero with slack: refused: dm_user_changed_with_pending_work (raised in Watch.retarget in bin/fm_slack_watch.py) and changes the journal only by the rows its own read of the old threads staged; without the guard, answers pending on the old DM would be lost or misrouted after a retarget; the two bin/fm-slack-check.sh help lines document the refusal and its remedy; test X26 proves the refusal on a journal that already holds work and the retarget that succeeds once the journal is empty; test X41 proves the refusal after the retarget read stages an unread reply, that only that row is added, and the retarget that succeeds once it drains"
+      "layer_note": "added by the Slack watch activation-readiness change; deny without a guard event: retarget exits non-zero with slack: refused: dm_user_changed_with_pending_work (raised in Watch.retarget in bin/fm_slack_watch.py) and changes the journal only by the rows its own read of the old threads staged; without the guard, answers pending on the old DM would be lost or misrouted after a retarget; the two bin/fm-slack-check.sh help lines document the refusal and its remedy; test X26 proves the refusal on a journal that already holds work and the retarget that succeeds once the journal is empty; test X41 proves the refusal after the retarget read stages an unread reply, that only that row is added, and the retarget that succeeds once it drains; retarget also exits non-zero with slack: refused: dm_user_changed_with_unread_requests (raised in Watch.retarget through Watch.unread_requests) while the old DM still holds an owner request newer than its starting point that no poll has taken in, and it only looks and never takes a request or a follow-up in itself; the INTAKE-5 drain scenario in tests/fm-slack-watch.test.sh proves the refusal after a capped poll and the retarget that succeeds once polling has delivered every request, and the retarget unit tests in tests/fm_slack_watch_test.py prove that messages which are not requests do not block it"
+    },
+    {
+      "decision": "deny",
+      "fail_direction": "closed",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "id": "slack-request-resolve-failed-only",
+      "owner": "bin/fm_slack_watch.py",
+      "sites": [
+        {
+          "file": "bin/fm-slack-check.sh",
+          "match": "call and refuses an unknown ts or a request that is not failed."
+        },
+        {
+          "file": "bin/fm_slack_watch.py",
+          "match": "out.diagnostic('err', 'slack: refused: ' + (str(error) if isinstance(error, SlackError) else 'local_state_or_response_error'))"
+        }
+      ],
+      "invariant": "fm-slack-check.sh resolve closes only an open failed Slack request row",
+      "layer": "runtime-block",
+      "source": "the pending journal in state/slack-watch/state.json, read by Watch.close_request() in bin/fm_slack_watch.py",
+      "trigger": "bin/fm-slack-check.sh resolve <request-ts> names a ts with no pending request row (no_pending_request), a request row that is not failed (request_not_failed), or the state cannot be read or written",
+      "remedy": "run bin/fm-slack-poll.sh and pass bin/fm-slack-check.sh resolve <request-ts> one ts from a slack: request <ts> not acknowledged (failed, owner Main) line it prints; a request that is not failed needs no resolve, because polling acknowledges and delivers it",
+      "budget": 1,
+      "test": "tests/fm-slack-watch.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "layer_note": "added by the Slack main-window intake change; deny without a guard event: resolve exits non-zero with one slack: refused: line on stderr, printed through the run's one writer (no_pending_request or request_not_failed, raised in Watch.close_request in bin/fm_slack_watch.py, or local_state_or_response_error), makes no Slack call and leaves the journal unchanged; the bin/fm-slack-check.sh help line documents the refusal; the INTAKE-3 [resolve] scenario in tests/fm-slack-watch.test.sh proves the refusal for an unknown ts and a request that is not failed and the resolve that closes the failed row, and test_resolve_closes_only_a_failed_request_and_makes_no_slack_call in tests/fm_slack_watch_test.py proves the same at the unit level"
+    },
+    {
+      "decision": "deny",
+      "fail_direction": "closed",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "id": "slack-request-secret-collides-with-marker",
+      "owner": "bin/fm_slack_watch.py",
+      "sites": [
+        {
+          "file": "bin/fm_slack_watch.py",
+          "match": "refuse_a_value_that_the_marker_holds()",
+          "count": 1
+        },
+        {
+          "file": "bin/fm_slack_watch.py",
+          "match": "refuse_a_value_that_the_marker_holds(COMMAND_FIXED_TEXT[action])",
+          "count": 1
+        },
+        {
+          "file": "bin/fm_slack_watch.py",
+          "match": "refuse_a_value_that_the_marker_holds(COMMAND_FIXED_TEXT.get(action, WAKE_FIXED_TEXT))",
+          "count": 1
+        },
+        {
+          "file": "bin/fm_slack_watch.py",
+          "match": "'arm': ('slack: refused: ', 'slack: refused: unsafe_state_path'",
+          "count": 1
+        },
+        {
+          "file": "bin/fm_slack_watch.py",
+          "match": "'disarm': ('slack: refused: check_unregistration_failed'",
+          "count": 1
+        },
+        {
+          "file": "bin/fm_slack_watch.py",
+          "match": "'resolve': ('slack: refused: ', 'resolved: slack request '",
+          "count": 1
+        },
+        {
+          "file": "bin/fm_slack_watch.py",
+          "match": "'retarget': ('slack: refused: ',",
+          "count": 1
+        }
+      ],
+      "invariant": "the Slack intake takes no request in, poll, mirror, check and arm refuse, and the failed-row listing prints no row text, while a plane secret value is part of the replacement marker, the flag text or any other fixed text of a wake line or of the listing, because such a value could never be replaced for good; disarm, resolve and retarget refuse only for a value inside a constant that command prints itself, so a collision in the wake or listing text never stops resolve or disarm",
+      "layer": "runtime-block",
+      "source": "the bot token and signing secret in the plane process environment, compared with the fixed marker and flag texts by refuse_a_value_that_the_marker_holds() in bin/fm_slack_watch.py",
+      "trigger": "a plane secret value (SLACK_BOT_TOKEN or SLACK_SIGNING_SECRET) occurs inside the marker, the flag text or another fixed text of a wake line (the prefix, the label, the unacknowledged note, the pointer words, the queue marker) when poll, mirror, check or arm starts or a new owner message is about to be taken in, or inside a constant that arm, disarm, resolve or retarget prints when that command starts",
+      "remedy": "run bin/fm-slack-check.sh arm or bin/fm-slack-poll.sh again with a bot token and a signing secret that are not part of those texts; a real Slack credential never is, so this fires only for a test or a misconfigured value",
+      "budget": 2,
+      "test": "tests/fm_slack_watch_test.py",
+      "tier": "C",
+      "harm": "reversible",
+      "layer_note": "added by the r46 repair of the Slack main-window intake and extended to all fixed wake text by Main 2602; narrowed to what each command prints by Main 3266 (a collision in the wake or listing text no longer stops resolve, disarm or retarget; arm refuses it too, as the adopted I4a (Amendment br) requires, the review of b6879468 F1); deny without a guard event: the intake raises SlackError secret_collides_with_marker before it stores or prints anything, so no request is taken in and the failure is reported once per episode like any other plane failure; test_a_plane_value_inside_the_marker_fails_closed_without_looping and test_resolve_and_disarm_check_only_what_they_print_and_a_value_in_the_listing_text_does_not_stop_them and test_a_value_that_is_part_of_the_fixed_wake_text_is_refused_at_arm_and_at_check in tests/fm_slack_watch_test.py prove it"
+    },
+    {
+      "decision": "deny",
+      "fail_direction": "closed",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "id": "slack-call-fields-hold-a-plane-value",
+      "owner": "bin/fm_slack.py",
+      "sites": [
+        {
+          "file": "bin/fm_slack.py",
+          "match": "refuse_outbound(fields, wire=True)",
+          "count": 1
+        },
+        {
+          "file": "bin/fm_slack_replay.py",
+          "match": "refuse_outbound(fields, wire=True)",
+          "count": 1
+        },
+        {
+          "file": "bin/fm_slack_watch.py",
+          "match": "refuse_outbound(args, wire=True)",
+          "count": 1
+        },
+        {
+          "file": "bin/fm_slack_watch.py",
+          "match": "refuse_outbound(handed)",
+          "count": 1
+        },
+        {
+          "file": "bin/fm_slack_watch.py",
+          "match": "refuse_outbound(self.post_fields('ack:' + pending['event'], REQUEST_ACK",
+          "count": 1
+        }
+      ],
+      "invariant": "no call to Slack is made, no line of the replay attempt log or outbound log is written, no child process is started and the registered check file is not written while a string field, a child argument or input, or the file text holds a plane secret value; the one fixed acknowledgement of a request is checked before the request is taken in",
+      "layer": "runtime-block",
+      "source": "the string fields of one call to Slack (the text of a message, a thread, the metadata) and the bot token and signing secret in the plane process environment, compared by refuse_outbound() in bin/fm_slack.py",
+      "trigger": "a plane secret value (SLACK_BOT_TOKEN or SLACK_SIGNING_SECRET) occurs inside a field of a call to Slack, inside a line a replay log would append, or inside the one fixed acknowledgement of a request about to be taken in",
+      "remedy": "run bin/fm-slack-poll.sh again with a bot token and a signing secret that are not part of the text the plane sends; a real Slack credential never is, so this fires only for a test or a misconfigured value",
+      "budget": 1,
+      "test": "tests/fm_slack_watch_test.py",
+      "tier": "C",
+      "harm": "reversible",
+      "layer_note": "added by Main 3266 (the outcome review of b86f8e55e, F1): deny without a guard event: the call is refused before the transport builds a request or the replay records an attempt, a post is refused before its attempt mark is written (it counts for none of the three tries), a request whose acknowledgement would hold the value is not taken in, and the collision is reported once per episode; test_a_post_body_that_holds_a_value_is_refused_before_the_attempt_mark_and_counts_for_nothing, test_a_request_whose_acknowledgement_would_hold_a_value_is_not_taken_in_and_waits_until_the_value_goes and test_the_transports_refuse_a_call_whose_fields_hold_a_value_before_any_byte_exists in tests/fm_slack_watch_test.py prove it"
+    },
+    {
+      "decision": "deny",
+      "fail_direction": "closed",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "id": "slack-command-refusal-line",
+      "owner": "bin/fm_slack_watch.py",
+      "sites": [
+        {
+          "file": "bin/fm_slack_watch.py",
+          "match": "out.diagnostic('err', 'slack: refused: ' + reason)",
+          "count": 1
+        },
+        {
+          "file": "bin/fm_slack_watch.py",
+          "match": "out.diagnostic('out', 'slack: refused: ' + reason)",
+          "count": 1
+        },
+        {
+          "file": "bin/fm_slack_watch.py",
+          "match": "out.diagnostic('err', 'slack: refused: ' + name)",
+          "count": 1
+        },
+        {
+          "file": "bin/fm_slack_watch.py",
+          "match": "out.diagnostic(refusals, 'slack: refused: local_runtime_error' if action == 'arm'",
+          "count": 1
+        },
+        {
+          "file": "bin/fm_slack_watch.py",
+          "match": "watch.out.diagnostic('err', 'slack: refused: ' + str(error))",
+          "count": 1
+        },
+        {
+          "file": "bin/fm_slack_watch.py",
+          "match": "out.diagnostic('err', 'slack: refused: check_registration_failed')",
+          "count": 1
+        },
+        {
+          "file": "bin/fm_slack_watch.py",
+          "match": "out.diagnostic('out', 'slack: refused: check_unregistration_failed')",
+          "count": 1
+        }
+      ],
+      "invariant": "a Slack plane command that cannot proceed prints one slack: refused: line through the run's one writer, with no plane secret value in it, and starts no work",
+      "layer": "runtime-block",
+      "source": "the plane settings (mode() in bin/fm_slack_watch.py), the check registration scripts and the local state, compared with what a command needs",
+      "trigger": "arm or retarget with the plane unconfigured or misconfigured (the allowlist, the owner id or the per-poll cap), a poll or mirror in the same refused state, a failure of the check registration or unregistration, or an unexpected local error",
+      "remedy": "run bin/fm-slack-check.sh arm after fixing the setting the refusal names; a refusal changes nothing and is safe to repeat",
+      "budget": 1,
+      "test": "tests/fm_slack_watch_test.py",
+      "tier": "C",
+      "harm": "reversible",
+      "layer_note": "added by Main 3266 (the outcome review of b86f8e55e, F1): deny without a guard event: the refusal text goes through Out.diagnostic, which shows every plane value in it as [redacted] and prints a line only while the complete stream holds none; test_every_stream_write_of_every_command_goes_through_the_one_writer in tests/fm_slack_watch_test.py proves it"
+    },
+    {
+      "decision": "deny",
+      "fail_direction": "closed",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "id": "slack-dm-unbind-refuses-an-unreadable-folder",
+      "owner": "bin/fm-captain-hold.sh",
+      "sites": [],
+      "invariant": "fm-captain-hold.sh unbind exits 0 only when the binding is gone: on a binding folder that exists and cannot be examined or opened it exits non-zero and removes nothing; a Slack delivery under way is waited for with no time limit",
+      "layer": "runtime-block",
+      "source": "the exclusive lock on state/decision-bindings and the binding record, read by command_unbind in bin/fm-captain-hold.sh",
+      "trigger": "bin/fm-captain-hold.sh unbind <source> runs while state/decision-bindings exists and cannot be examined or opened",
+      "remedy": "restore access to the state/decision-bindings folder and run the unbind again",
+      "budget": 1,
+      "test": "tests/fm-slack-watch.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "layer_note": "added by the Slack main-window intake change; deny without a guard event: unbind exits non-zero with one fm-captain-hold: line on stderr and no unbound: line, the binding is unchanged, and the wait has no override; the INTAKE-6 [unbind inaccessible state] scenario in tests/fm-slack-watch.test.sh proves the refusal, and [unbind wait], [unbind no override] and [unbind slow] prove that a delivery under way is waited for with no time limit and one alarm line after 60 seconds"
+    },
+    {
+      "decision": "deny",
+      "fail_direction": "closed",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "id": "slack-thread-reply-read-boundary",
+      "owner": "bin/fm_slack_watch.py",
+      "sites": [
+        {
+          "file": "bin/fm_slack_watch.py",
+          "match": "REPLY_REFUSAL = 'slack: refused: '"
+        },
+        {
+          "file": "bin/fm_slack_watch.py",
+          "match": "refuse_a_value_that_the_marker_holds(COMMAND_FIXED_TEXT[name])"
+        }
+      ],
+      "invariant": "Firstmate's Slack answer and full-text read touch only an allowlisted human's messages in a request thread the plane took in, in the owner DM Slack itself opens",
+      "layer": "runtime-block",
+      "source": "the request and follow-up events in state/slack-watch/state.json (seen), the conversations.open proof of the owner DM, and the thread read through the plane's existing conversations.replies call by Watch.reply_to() and Watch.read_message() in bin/fm_slack_watch.py, against FM_SLACK_DM_USER and FM_SLACK_ALLOWED_AUTHORS",
+      "trigger": "bin/fm-slack-reply.sh or bin/fm-slack-read.sh runs with a thread the plane never took in as a request, a --to or --message that is not that request or an allowlisted human's follow-up in it (a stranger's, a bot's or app's message, or the plane's own), an empty or over-long answer, a malformed ts, the plane off, the slack-dm source unbound, a changed FM_SLACK_DM_USER, or a stored channel that is not the owner's proven DM",
+      "remedy": "name the request's ts from its `check: slack request <ts>` wake and a message of that same thread from its `check: slack follow-up <reply ts> to request <ts>` wake, then run bin/fm-slack-reply.sh --thread <request ts> --to <message ts> with the answer on standard input, or bin/fm-slack-read.sh --thread <request ts> --message <message ts>; for source_not_bound run bin/fm-captain-hold.sh bind slack-dm; for dm_user_changed or stored_channel_not_owner_dm follow the retarget order in bin/fm-slack-check.sh --help",
+      "budget": 1,
+      "test": "tests/fm-slack-reply.test.sh",
+      "tier": "C",
+      "harm": "irreversible",
+      "layer_note": "added by the Slack thread-reply change; deny without a guard event: the command exits non-zero with slack: refused: <reason> (unknown_request_thread, unknown_reply_target, not_an_owner_message, message_not_found, invalid_message_ts, empty_answer, answer_too_long, invalid_arguments, source_not_bound, dm_not_prepared, stored_channel_not_owner_dm, dm_user_changed or a configuration refusal) and posts or prints nothing; without the guard an answer could land outside the request's thread or in a conversation that is not the owner's DM, and a stranger's or bot's text could reach Firstmate as if it were the owner's; tests/fm_slack_reply_test.py ReplyPostTest, ReadTest and SafetyTest and tests/fm-slack-reply.test.sh REPLY-2 and REPLY-9 prove each refusal and the legitimate control beside it"
     },
     {
       "id": "pipeline-start-unreadable-source",
@@ -6987,6 +7260,38 @@
       "instrumented": false,
       "status": "active",
       "layer_note": "added with the standing GitHub accounting owner; deny without a guard event: the check reads the id before any write, so the foreign file keeps its rows and the owner does not start; the fixed stderr line withholds the exception text because command output can hold secrets; test_symlink_and_foreign_database_are_not_modified in tests/fm-github-accounting.behavior.test.py proves the refusal leaves the rows unchanged, the other owner tests prove a database the owner created opens, and tests/fm-watch-github-accounting.test.sh proves a watcher reports this failed start with a wake that names the owner log; the trigger covers only nonempty files because a zero-size file left by an interrupted start holds no data, and test_zero_size_database_is_treated_as_new and test_nonempty_non_database_file_is_refused_unchanged prove both sides"
+    },
+    {
+      "id": "check-event-output-integrity",
+      "version": "1",
+      "owner": "bin/fm-check-lib.sh",
+      "invariant": "Malformed fm-check-event lines are refused before event or ordinary-payload delivery.",
+      "layer": "runtime-block",
+      "source": "The captured output line parsed by fm_check_queue_output in bin/fm-check-lib.sh: an event requires a TAB delimiter and a nonempty identity containing only A-Za-z0-9._-.",
+      "trigger": "An authenticated event-bearing check emits an fm-check-event line without a TAB delimiter or with an empty or invalid identity.",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Correct the producer to emit fm-check-event <identity><TAB><payload> lines; re-register a changed check with bin/fm-check-register.sh <check-id> before its next watcher pass.",
+      "budget": 1,
+      "budget_reason": "One aggregate check-state diagnostic per check invocation; malformed lines are counted individually. No cross-invocation refusal counter is implemented, and valid events, ordinary state, later checks and the watcher cadence continue.",
+      "telemetry": "Not instrumented under this family id; existing per-line stderr diagnostics and the check-keyed malformed count remain the caller evidence. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-wake-queue.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-check-lib.sh",
+          "key": "site:bin/fm-check-lib.sh:0dbd13e423",
+          "match": "state_output=\"${state_output}refused $malformed malformed fm-check-event line(s)\""
+        }
+      ],
+      "layer_note": "Registers the existing per-line protection, not a new refusal or permission. test_malformed_check_events_keep_delivery_and_cadence drives the real watcher with missing delimiters, invalid identities, valid events and ordinary state; it checks malformed payload exclusion and reported counts while valid delivery, coalescing and cadence continue. The site mapping preserves S1/S2 visibility rather than removing refusal vocabulary from the scan."
     }
   ],
   "excluded": [

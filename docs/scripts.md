@@ -171,17 +171,18 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-peek.sh`             | Print a bounded tail of a crewmate endpoint                                          |
 | `fm-check-register.sh`   | Bind an intentional custom watcher check to its current bytes                       |
 | `fm-check-unregister.sh` | Retire a custom watcher check and its trust binding by validated task id            |
-| `fm-check-lib.sh`        | Validate custom-check registrations and prepare private execution snapshots          |
+| `fm-check-lib.sh`        | Validate custom-check registrations, prepare private execution snapshots, and queue custom-check event and state output |
 | `fm-tool-update-check.sh` | Report watched tooling with an update available, and updates installed but left inert by PATH order |
 | `fm-startup-growth-check.sh` | Daily metadata-only growth check for startup memory and tracked startup/instruction surfaces |
 | `fm-pr-lib.sh`           | Own canonical task and PR validation plus private atomic PR-poll publication, merge-notification identity, and retirement |
 | `fm-pr-poll.sh`          | Provide the byte-static watcher program for validated pull-request, merge-request, and Gerrit-change poll sidecars |
 | `fm-contributions.sh`    | Observe owned publications, retain exact-head judgments, measure required actors, and wake on maintainer signals |
 | `fm-pr-check.sh`         | Record validated task `pr=` and `pr_head=` values, then atomically arm a static merge poll; refuses GitHub drafts and persistent secondmate records (see [architecture.md](architecture.md)) |
-| `fm-pr-ready-reconcile.sh` | Watcher-run: register each ship's declared `PR <url>` ready signal, or its checks-green `fm-crew-state.sh` PR from a full ci log reading skipped for that pass as unknown when it goes silent, through `fm-pr-check.sh` so a missed supervisor step cannot hold a project-capacity place; a refusal raises a check wake and is retried after ten minutes |
+| `fm-pr-ready-reconcile.sh` | Watcher-run: register each ship's declared `PR <url>` ready signal, or its checks-green `fm-crew-state.sh` PR from a full ci log reading skipped for that pass as unknown when it goes silent, through `fm-pr-check.sh` so a missed supervisor step cannot hold a project-capacity place; a refusal raises a check wake and is retried after ten minutes; a registered PR is stepped through `fm-pr-auto-review.py` |
+| `fm-pr-auto-review.py` | Called by `fm-pr-ready-reconcile.sh`: request the missing different-family exact-head reads of a green registered PR, record each verdict, and merge through `fm-pr-merge.sh` on a covering PASS; its header and [Automatic review and merge](configuration.md#automatic-review-and-merge-configreview-runner) own the sequence and the runner setting |
 | `fm-pr-merge.sh`         | Record PR metadata, enforce the header's review and live-forge preconditions, verify the tested landing tree or conservative ancestry fallback on GitHub, and refuse an outcome it cannot prove landed or queued |
 | `fm-tested-tree.py`      | The tested-landing-tree verifier behind `fm-pr-merge.sh`; its header owns the exit contract |
-| `fm-review-record.py`    | Record reviews and captain merge words, derive author evidence and verify named independent coverage; its header and `--help` own the record and relay interface |
+| `fm-review-record.py`    | Record reviews and captain merge words, derive author evidence, verify named independent coverage and plan the reads still owed; its header and `--help` own the record and relay interface |
 | `fm-pr-state.sh`         | Read-only: print one line per GitHub pull-request blocker it can see, reporting on checks that have reported rather than verdicting merge-readiness |
 | `fm-pr-reviewers.sh`     | Read-only: suggest reviewers from GitHub's own author mapping of recent commits on a pull request's changed files, never requesting one |
 | `fm-merge-outcome-lib.sh` | Publish a confirmed merge's durable, role-routed supervision outcome                 |
@@ -209,10 +210,12 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-slack-lib.sh`        | Slack environment resolution and the Python entry point used by the Slack commands |
 | `fm_slack.py`            | Slack Web API client with bounded waits, classified errors, and token redaction |
 | `fm_slack_replay.py`     | Deterministic replay of the Slack methods the plane uses; opens no socket |
-| `fm_slack_watch.py`      | Mirror open captain calls into DM threads, deliver authorized replies to the keyed-answer intake, and journal pending publication |
+| `fm_slack_watch.py`      | Mirror open captain calls into DM threads, deliver authorized replies to the keyed-answer intake, take in new owner DM messages as acknowledged, woken requests and their thread follow-ups, post Firstmate's answer into a request thread, and journal pending publication |
 | `fm-slack-mirror.sh`     | Mirror open captain calls into one owner-DM thread per call |
-| `fm-slack-poll.sh`       | Poll tracked DM threads and deliver authorized typed or reaction answers through `fm-captain-hold.sh answers` |
-| `fm-slack-check.sh`      | Standing Slack poll: ordered `arm` after the `slack-dm` binding, `check` on the watcher cadence, `disarm` as the hard off switch, and `retarget` after `FM_SLACK_DM_USER` changes |
+| `fm-slack-poll.sh`       | Poll tracked DM threads and deliver authorized typed or reaction answers through `fm-captain-hold.sh answers`, and take in new owner DM messages as acknowledged, woken requests and the owner's follow-ups in their threads |
+| `fm-slack-reply.sh`      | Post Firstmate's answer, read from standard input, into the thread of one request the plane took in; the same answer event posts once |
+| `fm-slack-read.sh`       | Print the full text of a request or follow-up that a wake line only previewed, with what came before a follow-up in its thread, as labeled unverified data |
+| `fm-slack-check.sh`      | Standing Slack poll: ordered `arm` after the `slack-dm` binding, `check` on the watcher cadence, `disarm` as the hard off switch, `retarget` after `FM_SLACK_DM_USER` changes, and `resolve <request-ts>` to close one failed owner request |
 | `fm-voice-relay.py`      | Hold the spoken conversation on this host, answer from the records, and hand real work to `fm-inbox.sh` ([voice-relay.md](voice-relay.md)) |
 | `fm-voice-client.py`     | The laptop end of the spoken interface: capture, playback, and turn timing over SSH; audio devices unverified |
 | `fm_voice_frame.py`      | The wire format both machines share, copied to the laptop beside the client          |

@@ -1406,41 +1406,6 @@
       "text": "return 'refused', 'invalid_FM_SLACK_POLL_MAX_ANSWERS_1_to_200'"
     },
     {
-      "id": "site:bin/fm_slack_watch.py:63af952b65",
-      "rule": "S1",
-      "text": "print('slack: refused: ' + reason, file=sys.stderr)"
-    },
-    {
-      "id": "site:bin/fm_slack_watch.py:0524075519",
-      "rule": "S1",
-      "text": "print('slack: refused: ' + reason)"
-    },
-    {
-      "id": "site:bin/fm_slack_watch.py:70a8e31da5",
-      "rule": "S1",
-      "text": "print('slack: refused: ' + name, file=sys.stderr)"
-    },
-    {
-      "id": "site:bin/fm_slack_watch.py:d0be25f74e",
-      "rule": "S1",
-      "text": "print('slack: refused: local_runtime_error' if action == 'arm' else 'slack: local_runtime_error',"
-    },
-    {
-      "id": "site:bin/fm_slack_watch.py:b87590d7e0",
-      "rule": "S1",
-      "text": "print('slack: refused: ' + str(error), file=sys.stderr)"
-    },
-    {
-      "id": "site:bin/fm_slack_watch.py:d8412fdb5f",
-      "rule": "S1",
-      "text": "print('slack: refused: check_registration_failed', file=sys.stderr)"
-    },
-    {
-      "id": "site:bin/fm_slack_watch.py:f3f5b3cb62",
-      "rule": "S1",
-      "text": "print('slack: refused: check_unregistration_failed')"
-    },
-    {
       "id": "site:bin/fm_voice_records.py:3ad1f9034a",
       "rule": "S1",
       "text": "raise RecordError(\"refusing to queue an empty request\")"
