@@ -320,9 +320,10 @@
 # A copy locked by Vernant's creation lock (vernant-session-active
 # owner=launcher:<pid> launcher=<pid>) is released and removed by Vernant's own
 # driver, scripts/git-stability/closeout_pr.py --cleanup-worktree <copy>
-# --execute-cleanup, run from the slot (FM_TEARDOWN_VERNANT_PYTHON names the
-# interpreter); an unlocked copy is removed with a plain non-forced git worktree
-# remove. Removal deletes the copy's checkout and the allow-listed ignored files
+# --execute-cleanup, run from the slot in the slot's own environment through
+# bin/fm-copy-env-lib.sh (FM_TEARDOWN_VERNANT_PYTHON names the interpreter); an
+# unlocked copy is removed with a plain non-forced git worktree remove.
+# Removal deletes the copy's checkout and the allow-listed ignored files
 # in it (symlinks, virtual environments, node_modules and tool caches,
 # .DS_Store, Firstmate's hook files, regenerable build caches, and anything
 # ignored under its .claude and .opencode trees); any other ignored entry is
@@ -813,6 +814,7 @@ for _teardown_source in \
   fm-path-lib.sh \
   fm-refuse-lib.sh \
   fm-teardown-nested-lib.sh \
+  fm-copy-env-lib.sh \
   fm-hold-reason-lib.sh \
   fm-lease-lib.sh
 do

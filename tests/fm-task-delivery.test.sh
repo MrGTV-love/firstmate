@@ -2179,6 +2179,7 @@ PY
   git -C "$proj" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'fixture governed provisioner'
   git -C "$proj" push -q origin main
   git -C "$slot" merge --ff-only main >/dev/null
+  fm_test_copy_venv "$slot"
   write_brief "$home" "$id"
   printf 'kind=scout\nproject=%s\nworktree=%s\nwindow=fm-%s\nslot_owned_path=scripts\n' "$proj" "$slot" "$id" > "$home/state/$id.meta"
   printf '%s\n' "$home|$proj|$slot"
@@ -2226,6 +2227,39 @@ EOF
   [ "$(cat "$slot/scout-work.txt")" = 'scout work' ] || fail 'retry lost the scout content'
   ! git -C "$slot" rev-parse --verify --quiet "refs/heads/fm/$id" >/dev/null || fail 'refused retry left its own task branch behind'
   pass 'governed promotion preserves scout metadata, instructions, checkout and work on refusal, and a retry after the scout advances reaches the project owner'
+}
+
+# A governed scout copy with no usable environment of its own is refused by name
+# at the promote entry, before the checkout changes, a task branch appears or the
+# project owner runs; nothing is installed or created for it.
+test_promotion_refuses_a_copy_with_no_environment_before_any_change() {
+  local rec home proj id=promote-slot-noenv slot meta brief out status before_tree after_tree called refs
+  called="$TMP_ROOT/$id/provisioner-called"
+  rec=$(promotion_refusal_fixture "$id" "$id" "open('$called', 'w').write('called')")
+  IFS='|' read -r home proj slot <<EOF
+$rec
+EOF
+  rm -rf "$slot/.venv"
+  meta="$home/state/$id.meta"
+  brief="$home/data/$id/brief.md"
+  cp "$meta" "$meta.before"
+  cp "$brief" "$brief.before"
+  refs=$(git -C "$slot" for-each-ref --format='%(refname) %(objectname)' refs/heads)
+  before_tree=$(cd "$slot" && find . -path ./.git -prune -o -print | LC_ALL=C sort)
+  out=$(run_promotion "$home" "$id")
+  status=$?
+  [ "$status" -ne 0 ] || fail 'promotion admitted a copy with no environment'
+  assert_contains "$out" 'slot provisioning refused: copy_environment_missing' 'promotion lost the named environment refusal'
+  assert_contains "$out" "$slot" 'the refusal does not name the copy'
+  assert_absent "$called" 'the project owner ran for a copy with no environment'
+  cmp -s "$meta" "$meta.before" || fail 'refused promotion changed scout metadata'
+  cmp -s "$brief" "$brief.before" || fail 'refused promotion changed the scout contract'
+  [ "$(git -C "$slot" for-each-ref --format='%(refname) %(objectname)' refs/heads)" = "$refs" ] || fail 'refused promotion changed a branch ref'
+  ! git -C "$slot" rev-parse --verify --quiet "refs/heads/fm/$id" >/dev/null || fail 'refused promotion left its own task branch behind'
+  after_tree=$(cd "$slot" && find . -path ./.git -prune -o -print | LC_ALL=C sort)
+  [ "$before_tree" = "$after_tree" ] || fail 'refused promotion changed the copy'
+  assert_absent "$slot/.venv" 'refused promotion created an environment'
+  pass 'promotion refuses a governed copy with no usable environment by name before any change'
 }
 
 # Only the alias this refused call created is removed: a task branch that
@@ -2339,6 +2373,7 @@ PY
   git -C "$proj" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'fixture governed provisioner'
   git -C "$proj" push -q origin main
   git -C "$slot" merge --ff-only main >/dev/null
+  fm_test_copy_venv "$slot"
   meta="$home/state/$id.meta"
   brief="$home/data/$id/brief.md"
   write_brief "$home" "$id"
@@ -2358,6 +2393,7 @@ PY
 }
 
 test_governed_promotion_preserves_scout_on_refusal
+test_promotion_refuses_a_copy_with_no_environment_before_any_change
 test_refused_promotion_preserves_other_task_branches
 test_refused_detached_promotion_retries_after_scout_advances
 test_refused_promotion_preserves_project_declared_branch

@@ -2752,7 +2752,7 @@ do_relaunch() {
     [ "${#OWNED_PATHS[@]}" -gt 0 ] || grep -q '^slot_owned_path=' "$META" \
       || die "refused relaunch of governed task $ID: governed slot provisioning requires --owned-path <tracked-path> (repeatable); the running agent was not stopped"
     fm_slot_check_copy "$slot_project" "$slot_copy" \
-      || die "refused relaunch of governed task $ID: its assigned copy $slot_copy cannot pass slot attestation; preserve and reconcile it first; the running agent was not stopped"
+      || die "refused relaunch of governed task $ID: its assigned copy $slot_copy cannot pass slot attestation${FM_SLOT_ENV_REASON:+ ($FM_SLOT_ENV_REASON)}; preserve and reconcile it first; the running agent was not stopped"
   fi
   if [ "$KIND" = secondmate ]; then
     secondmate_home=$(fm_meta_get "$META" home)

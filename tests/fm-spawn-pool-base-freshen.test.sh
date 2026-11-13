@@ -927,6 +927,7 @@ run_freshness_slot_case() { # <introduced|present|absent|missing-scope|removed> 
   fi
   fm_git_add_origin "$project" "$origin"
   git -C "$project" worktree add --quiet --detach "$pool" HEAD
+  fm_test_copy_venv "$pool"
   before=$(git -C "$pool" rev-parse HEAD)
   if [ "$shape" = present ] || [ "$shape" = removed ]; then
     git -C "$pool" checkout --quiet -b previous-owner
@@ -1200,6 +1201,7 @@ run_local_only_binding_case() { # <prepared|unprepared>
   git -C "$PROJECT_DIR" merge --ff-only origin/main >/dev/null
   remote=$(git -C "$PROJECT_DIR" rev-parse origin/main)
   write_refusing_slot_owner "$PROJECT_DIR"
+  fm_test_copy_venv "$POOL_DIR"
   git -C "$PROJECT_DIR" add scripts
   git -C "$PROJECT_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'accepted local owner'
   selected=$(git -C "$PROJECT_DIR" rev-parse main)
@@ -1319,6 +1321,7 @@ run_local_only_equal_retry_case() { # <advanced|adopted-scope|diverged|invalid-r
   git -C "$PROJECT_DIR" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
   git -C "$PROJECT_DIR" merge --ff-only origin/main >/dev/null
   write_refusing_slot_owner "$PROJECT_DIR"
+  fm_test_copy_venv "$POOL_DIR"
   git -C "$PROJECT_DIR" add scripts
   git -C "$PROJECT_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'published owner'
   git -C "$PROJECT_DIR" push --quiet origin main
@@ -1483,6 +1486,7 @@ test_legacy_relaunch_scope_adoption() {
   cmp -s "$meta" "$CASE_DIR/meta.ungoverned" || fail 'ungoverned scope refusal changed the task record'
 
   write_passing_slot_owner "$PROJECT_DIR"
+  fm_test_copy_venv "$POOL_DIR"
   git -C "$PROJECT_DIR" add scripts
   git -C "$PROJECT_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'project gains owner'
   git -C "$PROJECT_DIR" push --quiet origin main

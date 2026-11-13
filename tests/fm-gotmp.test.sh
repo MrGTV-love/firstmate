@@ -110,6 +110,9 @@ SH
   ln -s "$ROOT/bin/fm-task-copy-lib.sh" "$fake/bin/fm-task-copy-lib.sh"
   # fm-teardown-nested-lib.sh: teardown sources it to release foreign nested copies.
   ln -s "$ROOT/bin/fm-teardown-nested-lib.sh" "$fake/bin/fm-teardown-nested-lib.sh"
+  # fm-copy-env-lib.sh: the nested library sources it, the one owner of the
+  # environment a closeout driver runs in.
+  ln -s "$ROOT/bin/fm-copy-env-lib.sh" "$fake/bin/fm-copy-env-lib.sh"
   # fm-hold-reason-lib.sh: teardown sources it to read captain-hold reasons for the bundle route.
   ln -s "$ROOT/bin/fm-hold-reason-lib.sh" "$fake/bin/fm-hold-reason-lib.sh"
   # fm-refuse-lib.sh and the friction writer it runs: teardown requires the typed refusal envelope.
