@@ -4792,39 +4792,86 @@ class SecondPersonTest(unittest.TestCase):
                 with self.assertRaises(SlackError):
                     plane.parse_command(['check', bad], positional=True)
 
+    def requests_woken(self, watch):
+        return [plane.REQUEST_SEGMENT.match(line).group(1, 2) for line in self.wakes(watch)]
+
     def test_sc4_arm_records_a_fresh_starting_point_for_them_so_a_message_typed_before_it_is_never_taken_in(self):
         with self.second() as (watch, replay):
             self.says(replay, '150.000100', 'taken in before the disarm')
             self.again(watch)
-            self.assertEqual([plane.REQUEST_SEGMENT.match(line).group(1, 2) for line in self.wakes(watch)], [('150.000100', self.SECOND)])
+            self.assertEqual(self.requests_woken(watch), [('150.000100', self.SECOND)])
             # Disarmed: they type while no poll runs; then the owner arms again.
             self.says(replay, '200.000100', 'typed while disarmed')
             self.says(replay, '200.000200', 'also typed while disarmed')
             watch.prepare()
-            self.assertEqual((watch.state['second']['user'], watch.state['second']['channel']), (self.SECOND, self.SECOND_DM))
+            self.assertEqual(watch.state['second'], {'user': self.SECOND, 'channel': self.SECOND_DM, 'intake_cursor': '200.000200'})
             self.assertEqual(watch.request_target('150.000100@' + self.SECOND), ('150.000100', self.SECOND_DM, 'second'))
             for _ in range(2):
                 self.again(watch)
                 self.assertEqual(self.wakes(watch), [])
-            self.assertEqual(watch.state['second']['intake_cursor'], '200.000200')
             self.says(replay, '300.000100', 'typed after the arm')
             self.again(watch)
-            self.assertEqual([plane.REQUEST_SEGMENT.match(line).group(1, 2) for line in self.wakes(watch)], [('300.000100', self.SECOND)])
+            self.assertEqual(self.requests_woken(watch), [('300.000100', self.SECOND)])
             self.assertEqual(self.posts(replay)[-1], (self.SECOND_DM, '300.000100'))
 
-    def test_sc4_arm_keeps_their_window_while_a_request_of_theirs_is_pending_so_it_drains(self):
+    def test_sc4_a_message_of_theirs_typed_after_arm_and_before_the_first_poll_is_taken_in(self):
+        with self.second() as (watch, replay):
+            self.says(replay, '200.000100', 'typed while disarmed')
+            watch.prepare()
+            self.says(replay, '200.000200', 'typed after the arm, before any poll')
+            self.again(watch)
+            self.assertEqual(self.requests_woken(watch), [('200.000200', self.SECOND)])
+            self.assertEqual(self.posts(replay), [(self.SECOND_DM, '200.000200')])
+
+    def test_sc4_arm_resets_their_starting_point_while_a_failed_request_of_theirs_waits_for_resolve(self):
+        with self.second() as (watch, replay):
+            replay.state['failures']['chat.postMessage:150.000100'] = {'status': 400}
+            self.says(replay, '150.000100')
+            for _ in range(3):
+                self.again(watch)
+            self.assertEqual(watch.failed_requests(), ['150.000100@' + self.SECOND])
+            self.says(replay, '200.000100', 'typed while disarmed')
+            self.says(replay, '200.000200', 'also typed while disarmed')
+            watch.prepare()
+            self.assertEqual(watch.state['second'], {'user': self.SECOND, 'channel': self.SECOND_DM, 'intake_cursor': '200.000200'})
+            for _ in range(2):
+                self.again(watch)
+                self.assertEqual(self.wakes(watch), [])
+            self.assertEqual(watch.failed_requests(), ['150.000100@' + self.SECOND])
+            watch.close_request('150.000100@' + self.SECOND)
+            self.assertEqual(watch.failed_requests(), [])
+            self.says(replay, '300.000100', 'typed after the arm')
+            self.again(watch)
+            self.assertEqual(self.requests_woken(watch), [('300.000100', self.SECOND)])
+            self.assertEqual(self.posts(replay)[-1], (self.SECOND_DM, '300.000100'))
+
+    def test_sc4_arm_keeps_their_user_and_dm_and_a_pending_request_of_theirs_still_drains(self):
         with self.second() as (watch, replay):
             replay.state['failures']['chat.postMessage:200.000100'] = {'status': 400}
             self.says(replay, '200.000100')
             self.again(watch)
             self.assertEqual(len([row for row in watch.state['pending'] if row.get('person') == 'second']), 1)
-            window = json.loads(json.dumps(watch.state['second']))
+            self.says(replay, '200.000200', 'typed while disarmed')
             watch.prepare()
-            self.assertEqual(watch.state['second'], window)
+            self.assertEqual(watch.state['second'], {'user': self.SECOND, 'channel': self.SECOND_DM, 'intake_cursor': '200.000200'})
             replay.state['failures'].pop('chat.postMessage:200.000100')
-            self.again(watch)
+            for _ in range(2):
+                self.again(watch)
             self.assertEqual(self.posts(replay), [(self.SECOND_DM, '200.000100')])
             self.assertEqual([row for row in watch.state['pending'] if row.get('person') == 'second'], [])
+
+    def test_sc4_a_failed_read_of_their_dm_never_fails_the_owner_arm_and_the_next_poll_records_their_starting_point(self):
+        with self.second() as (watch, replay):
+            self.says(replay, '200.000100', 'typed while disarmed')
+            self.owner_says(replay, '200.000200', 'owner typed while disarmed')
+            with patch.object(watch, 'second_channel', side_effect=SlackError('stored_channel_not_second_dm')):
+                watch.prepare()
+            self.assertEqual(watch.state['intake_cursor'], '200.000200')
+            self.assertEqual(watch.state['second'], {'user': self.SECOND, 'channel': self.SECOND_DM})
+            for _ in range(2):
+                self.again(watch)
+                self.assertEqual(self.wakes(watch), [])
+            self.assertEqual(watch.state['second']['intake_cursor'], '200.000100')
 
     # ---- SC5: exactly one added person ----
 

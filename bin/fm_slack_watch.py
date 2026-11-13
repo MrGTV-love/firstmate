@@ -1410,11 +1410,26 @@ class Watch:
             raise SlackError('source_not_bound')
         self.state.update(self.dm_boundary())
         self.state.pop('intake_bounds', None)
-        if not any(row.get('person') == 'second' for row in self.state['pending']):
-            for key in ('intake_cursor', 'intake_bounds'):
-                self.second_window().pop(key, None)
+        self.reseed_second()
         self.commit()
         self.dm_proven = True
+
+    def reseed_second(self):
+        """Arm's fresh starting point for the second person: their user and DM are kept, their page bounds are dropped, and their cursor is set to the newest
+        message of their proven DM, as dm_boundary sets the owner's. A pending or failed row of theirs drains through its own DM and needs no old cursor. A
+        failed read of their DM never fails the owner's arm: their cursor is then dropped, and the next poll records it."""
+        win = self.second_window()
+        win.pop('intake_bounds', None)
+        win.pop('intake_cursor', None)
+        if not self.second or win.get('user') != self.second:
+            return
+        try:
+            cursor = self.newest(self.read_window(self.second_channel(), second=True, limit=1).get('messages'))
+        except SecretCollision:
+            raise
+        except SlackError:
+            return
+        win['intake_cursor'] = cursor
 
     @staticmethod
     def newest(messages):
@@ -2477,9 +2492,10 @@ class Watch:
         if not self.second or not self.state.get('channel'):
             return
         win = self.second_window()
-        if win.get('user') == self.second and win.get('intake_cursor') is not None:
-            return
-        if any(row.get('person') == 'second' for row in self.state['pending']):
+        if win.get('user') == self.second:
+            if win.get('intake_cursor') is not None:
+                return
+        elif any(row.get('person') == 'second' for row in self.state['pending']):
             return
         opened = self.api.call('conversations.open', users=self.second, return_im=True).get('channel', {})
         if not DM_CHANNEL.fullmatch(opened.get('id') or '') or not opened.get('is_im'):
