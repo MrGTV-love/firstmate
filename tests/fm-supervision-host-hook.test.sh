@@ -8,66 +8,6 @@ set -u
 
 # --- the Claude re-arm owner around the host ----------------------------------
 
-# A fixture home that is also a genuine primary checkout whose bin is this
-# repo's, so the real Claude Stop hook (bin/fm-claude-stop-autoarm.sh) runs the
-# real host in it.
-make_primary_home() {  # <name>
-  local home
-  home=$(make_home "$1" attended)
-  git init -q "$home"
-  : > "$home/AGENTS.md"
-  ln -s "$ROOT/bin" "$home/bin"
-  printf '%s\n' "$home"
-}
-
-# One Claude main session under the fake harness. Each turn_end fires the real
-# Stop hook as the tracked asyncRewake registration does, and records its exit
-# status and stderr (the rewake banner Claude delivers on exit 2).
-start_hook_session() {  # <home>
-  local home=$1
-  FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_CREW_STATE_BIN="$home/fakebin/fm-crew-state.sh" \
-    PATH="$home/fakebin:$PATH" "$FAKE_CLAUDE" -c '
-      printf "%s\n" "$$" > "$FM_HOME/state/.lock"
-      printf "%s\n" "$$" >> "$FM_HOME/claude-pids"
-      for seed in "$FM_HOME"/mirror-seed.*; do
-        [ -f "$seed" ] || continue
-        "$FM_HOME/bin/fm-host-mirror.sh" hook claude < "$seed"
-      done
-      while [ ! -e "$FM_HOME/session.stop" ]; do
-        if [ -e "$FM_HOME/stop.go" ]; then
-          rm -f "$FM_HOME/stop.go"
-          if [ -e "$FM_HOME/hook.own-group" ]; then
-            # Claude owns the hook as a process group of its own and tears the
-            # whole group down once the hook has exited.
-            printf "{\"session_id\":\"sess-host-hook\",\"stop_hook_active\":false}\n" > "$FM_HOME/hook.stdin"
-            set -m
-            "$FM_HOME/bin/fm-claude-stop-autoarm.sh" < "$FM_HOME/hook.stdin" > "$FM_HOME/hook.out" 2> "$FM_HOME/hook.err" &
-            printf "%s\n" "$!" > "$FM_HOME/hook.pgid"
-            wait "$!"
-            printf "%s\n" "$?" > "$FM_HOME/hook.rc"
-            set +m
-          else
-            printf "{\"session_id\":\"sess-host-hook\",\"stop_hook_active\":false}\n" \
-              | "$FM_HOME/bin/fm-claude-stop-autoarm.sh" > "$FM_HOME/hook.out" 2> "$FM_HOME/hook.err"
-            printf "%s\n" "$?" > "$FM_HOME/hook.rc"
-          fi
-        fi
-        sleep 0.1
-      done
-    ' 2>> "$home/claude.err" &
-}
-turn_end() { rm -f "$1/hook.rc"; : > "$1/stop.go"; }
-hook_exited() { [ -s "$1/hook.rc" ]; }
-
-# Main's rewoken turn drains; the caller runs the printed acknowledgement
-# (MAIN_ACK) when that turn's handling is done.
-main_drain() {  # <home>; prints the drain and sets MAIN_ACK
-  local out
-  out=$(FM_HOME="$1" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/fm-wake-drain.sh")
-  MAIN_ACK=$(printf '%s\n' "$out" | sed -n 's/^WAKE_ACK_REQUIRED: after handling completes run bin\/fm-wake-drain.sh //p' | tail -1)
-  printf '%s\n' "$out"
-}
-
 assert_rewoke_main() {  # <home> <label>
   expect_code 2 "$(cat "$1/hook.rc")" "$2: the Stop hook must rewake main: $(cat "$1/hook.err"; cat "$1/state/.watcher-down" 2>/dev/null)"
   assert_grep 'firstmate watcher wake - one supervision event needs a handling turn now.' "$1/hook.err" "$2: the rewake banner is missing"
@@ -454,6 +394,10 @@ host_owns_the_only_cycle() {  # <home>
 # A main-only pass-through in <home> leaves its successor cycle running, main
 # handles and acknowledges the close, and the session restarts. Sets
 # LEFT_WATCHER and LEFT_ARM to the successor watcher and the arm that owns it.
+# A take-over attaches to a watcher inside its prelude rather than stop it, so
+# each caller runs its watchers with a long FM_POLL under count_watch_polls and
+# lets the take-over reach the left watcher only once it has begun a poll sleep
+# (wait_for_idle_poll), then restores FM_POLL=1.
 LEFT_WATCHER=
 LEFT_ARM=
 leave_a_cycle_for_main_and_restart() {  # <home>
@@ -484,9 +428,12 @@ leave_a_cycle_for_main_and_restart() {  # <home>
 test_next_park_takes_over_the_cycle_a_pass_through_left_for_main() {
   local home left_watcher left_arm
   home=$(make_primary_home hook-takeover)
+  export FM_POLL=6
+  count_watch_polls
   leave_a_cycle_for_main_and_restart "$home"
   left_watcher=$LEFT_WATCHER
   left_arm=$LEFT_ARM
+  wait_for_idle_poll "$home/state" "$left_watcher"
   turn_end "$home"
   wait_until 150 host_owns_the_only_cycle "$home" \
     || fail "takeover: the next park did not own the home's only watcher cycle (left arm $left_arm, watcher $left_watcher):"$'\n'"$(home_arms "$home")"$'\n'"$(cat "$home/state/.supervision-host.log")"
@@ -501,6 +448,7 @@ test_next_park_takes_over_the_cycle_a_pass_through_left_for_main() {
   wait_until 250 hook_exited "$home" || fail "takeover: the owned cycle did not deliver the next close: $(cat "$home/state/.supervision-host.log")"
   assert_rewoke_main "$home" "takeover (next close)"
   assert_re '^signal: .*demo.status' "$home/hook.err" "takeover: the next close must carry the watcher's reason line"
+  export FM_POLL=1
   pass "host+hook: the next park takes over the cycle a main-only pass-through left, so one arm owns it"
 }
 
@@ -511,6 +459,8 @@ test_next_park_takes_over_the_cycle_a_pass_through_left_for_main() {
 test_a_park_stopped_mid_take_over_leaves_the_take_over_to_the_next_park() {
   local home holder host
   home=$(make_primary_home hook-takeover-interrupted)
+  export FM_POLL=6
+  count_watch_polls
   leave_a_cycle_for_main_and_restart "$home"
   FM_STATE_OVERRIDE="$home/state" bash -c '
     . "$1"
@@ -529,12 +479,14 @@ test_a_park_stopped_mid_take_over_leaves_the_take_over_to_the_next_park() {
   kill -0 "$LEFT_WATCHER" 2>/dev/null || fail "fixture: the take-over stopped the left watcher before the park was stopped"
   kill -TERM "$host" 2>/dev/null || fail "fixture: the park host $host was not running"
   wait_until 150 sh -c '! kill -0 "$1" 2>/dev/null' _ "$host" || fail "fixture: the park host did not stop"
+  wait_for_idle_poll "$home/state" "$LEFT_WATCHER"
   : > "$home/marker-lock-release"
   wait "$holder" 2>/dev/null || true
   # The Stop hook runs the next park in place of the one stopped by a signal.
   wait_until 150 host_owns_the_only_cycle "$home" \
     || fail "interrupted takeover: the next park did not own the home's only watcher cycle (left arm $LEFT_ARM):"$'\n'"$(home_arms "$home")"$'\n'"$(cat "$home/state/.supervision-host.log")"
   ! kill -0 "$LEFT_ARM" 2>/dev/null || fail "interrupted takeover: the left arm still runs (pid $LEFT_ARM)"
+  export FM_POLL=1
   pass "host+hook: a park stopped mid take-over leaves the take-over to the next park"
 }
 

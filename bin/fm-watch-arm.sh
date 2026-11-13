@@ -86,8 +86,11 @@
 # arm would, and otherwise this arm owns a fresh cycle as a plain arm does.
 # Recovery restoration follows docs/watcher-continuity.md "Generation reuse";
 # an unconfirmed stop leaves downtime for the fresh cycle's recovery check.
-# Any other watcher, or one that outlives the stop,
-# is attached to exactly as a plain arm attaches.
+# Any other watcher, one inside its prelude (state/.prelude-inflight, which
+# docs/watcher-continuity.md "Take-over and the prelude" owns, never signalled),
+# or one proven to make no progress for the stall bound, is attached to exactly
+# as a plain arm attaches. A stop it did send is waited out however long a
+# command substitution holds the TERM.
 #
 # --stop: the same home-scoped stop without re-arming, for an owner that ends
 # its own supervision cycle on purpose (the supervision host's park boundary,
@@ -152,6 +155,7 @@ arm_failed() {  # <FAILED line>
 # shellcheck disable=SC2329 # Invoked by the EXIT trap.
 report_late_failure() {
   local mark=${FM_WATCH_LATE_FAILURE_MARK:-}
+  takeover_claim_release 2>/dev/null || true
   [ -n "$mark" ] && [ "$ARM_STARTED" -eq 0 ] && [ -n "$ARM_FAILURE_LINE" ] || return 0
   rm "$mark" 2>/dev/null || return 0
   fm_wake_append check watcher-successor-failed \
@@ -620,26 +624,68 @@ if [ "$mode" = stop ]; then
   exit 0
 fi
 
+# A taking arm claims the cycle before it reads the watcher's prelude marker, and
+# a watcher writes that marker before it reads the claim (bin/fm-watch.sh
+# prelude_inflight_enter), so a prelude never starts unseen between this arm's
+# check and its signal. State files: .takeover-claim ("<pid><TAB><identity>" of this arm) and
+# .prelude-inflight ("<pid><TAB><identity>" of the watcher inside its prelude).
+TAKEOVER_CLAIM="$STATE/.takeover-claim"
+PRELUDE_INFLIGHT="$STATE/.prelude-inflight"
+takeover_claim_acquire() {
+  local identity
+  identity=$(fm_pid_identity "$ARM_PID" 2>/dev/null) && [ -n "$identity" ] || return 1
+  printf '%s\t%s\n' "$ARM_PID" "$identity" > "$TAKEOVER_CLAIM.tmp.$ARM_PID" \
+    && mv -f "$TAKEOVER_CLAIM.tmp.$ARM_PID" "$TAKEOVER_CLAIM" 2>/dev/null
+}
+takeover_claim_release() {
+  local holder=
+  [ -e "$TAKEOVER_CLAIM" ] || return 0
+  IFS=$'\t' read -r holder _ < "$TAKEOVER_CLAIM" 2>/dev/null || true
+  [ "$holder" != "$ARM_PID" ] || rm -f -- "$TAKEOVER_CLAIM"
+}
+# True while <pid> is the lock holder and its own marker says it is inside its
+# prelude. A marker a dead (killed) watcher left names another pid or identity.
+watcher_in_prelude() {  # <pid>
+  local marker_pid marker_identity
+  [ -e "$PRELUDE_INFLIGHT" ] || return 1
+  IFS=$'\t' read -r marker_pid marker_identity < "$PRELUDE_INFLIGHT" 2>/dev/null || return 1
+  [ "$marker_pid" = "$1" ] && [ "$marker_identity" = "$cycle_watcher_identity" ] || return 1
+  attached_holder_live "$1"
+}
+
 # Stop the watcher the named arm owns, by its locked identity, and wait for it
 # to exit (header, --take-over). Returns 3 after printing the reason that cycle
 # delivered before the stop landed, 0 once it stopped without delivering, and
-# 1 when it was not stopped (its handover state was unreadable, or it outlived
-# the stop), which leaves it to the plain attach below.
+# 1 when it was not stopped (its handover state was unreadable, it is inside its
+# prelude, or it is proven to make no progress), which leaves it to the plain
+# attach below. A watcher inside a command substitution holds a TERM until that
+# child ends, so the wait has no fixed bound: the stop was requested, and the
+# stall proof the attach path uses is the only exit.
 take_over_cycle() {  # <watcher-pid> <identity>
   local pid=$1 i owner_signal
   cycle_begin "$pid" attached "$2"
   fm_recovery_marker_handover_snapshot "$STATE/.watcher-down" || return 1
+  takeover_claim_acquire || return 1
+  if watcher_in_prelude "$pid"; then
+    takeover_claim_release
+    return 1
+  fi
+  # Test seam: hold the arm between its no-step check and its signal.
+  if [ "${FM_TEST_SEAM:-}" = 1 ] && [ -n "${FM_TEST_TAKEOVER_PAUSE_FILE:-}" ]; then
+    [ -z "${FM_TEST_TAKEOVER_PAUSED_FILE:-}" ] || : > "$FM_TEST_TAKEOVER_PAUSED_FILE"
+    while [ -e "$FM_TEST_TAKEOVER_PAUSE_FILE" ]; do sleep 0.05; done
+  fi
   if attached_holder_live "$pid"; then
     kill -TERM "$pid" 2>/dev/null || true
   fi
-  i=0
-  while [ "$i" -lt 50 ] && fm_pid_alive "$pid"; do
+  while fm_pid_alive "$pid"; do
+    if attached_holder_live "$pid" && attached_holder_proven_stalled "$pid"; then
+      takeover_claim_release
+      return 1
+    fi
     sleep 0.1
-    i=$((i + 1))
   done
-  if fm_pid_alive "$pid"; then
-    return 1
-  fi
+  takeover_claim_release
   if cycle_delivered_reason; then
     cycle_log_append unknown unknown taken-over-delivered-wake none
     printf '%s\n' "$DELIVERED_REASON"
