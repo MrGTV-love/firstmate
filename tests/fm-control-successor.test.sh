@@ -208,6 +208,9 @@ test_successor_goes_before_a_recorded_pr() {
   rc=0
   out=$(sc "$dir" "$id" --branch "fm/$id-v2" --note "v2 for the PR") || rc=$?
   expect_code 0 "$rc" "a task with a recorded PR may record a successor"$'\n'"$out"
+  assert_equals "successor_branch=fm/$id-v2" "$(grep '^successor_branch=' "$dir/home/state/$id.meta")" "the successor was not recorded"
+  [ "$(grep -n '^successor_branch=' "$dir/home/state/$id.meta" | cut -d: -f1)" -lt "$(grep -n '^pr=' "$dir/home/state/$id.meta" | cut -d: -f1)" ] \
+    || fail "successor_branch= must come before the pr= line"
   fm_pr_metadata_identity_parse "$dir/home/state/$id.meta" \
     || fail "the PR monitor can no longer parse the record: successor_branch= was written after pr="
   assert_equals "https://github.com/example/repo/pull/7" "$FM_PR_META_URL" "the PR identity changed"
@@ -358,7 +361,7 @@ test_successor_refuses_other_tasks_and_records() {
 test_successor_refuses_inadmissible_names() {
   local id=suc-names dir name
   dir=$(new_successor_case names "$id")
-  for name in 'bad..name' 'with space' 'wild*card' 'qu?stion' 'br[acket' '-leading' 'back\slash' '@{-1}' 'trailing.lock' 'trailing/' 'tab	name'; do
+  for name in 'bad..name' 'with space' 'wild*card' 'qu?stion' 'br[acket' '-leading' 'back\slash' '@{-1}' 'trailing.lock' 'trailing/' 'tab	name' 'qu"ote' "a'b" 'with#hash' 'a@b' 'a=b' 'a;b' 'a$b'; do
     expect_successor_refusal "$dir" "$id" "name-$name" "is not admissible" 1 --branch "$name" --note why
   done
   expect_successor_refusal "$dir" "$id" equals-branch "equals the task's recorded branch" 1 --branch "fm/$id" --note why
