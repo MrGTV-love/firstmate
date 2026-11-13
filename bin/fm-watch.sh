@@ -3939,6 +3939,7 @@ watch_after_wake() {
 SWEEP_OPEN="$STATE/.sweep-open"
 SWEEP_CLOSING="$STATE/.sweep-closing"
 SWEEP_ID=
+SWEEP_OWN=
 SWEEP_FIELD_SEP=$'\036'
 # Test seam (FM_TEST_SEAM=1): hold the watcher at a named point of the sweep while the
 # file FM_TEST_SWEEP_HOLD names that point, so a test can cut it exactly there.
@@ -4019,6 +4020,7 @@ sweep_stamp() {  # <id> <kind> <reason>
   [ -n "$SWEEP_ID" ] || return 0
   sweep_point "before-stamp:$1"
   sweep_write "$STATE/$1.check-stamp" "$SWEEP_ID"$'\t'"$2"$'\t'"$(sweep_encode "$3")" || return 0
+  SWEEP_OWN="$SWEEP_OWN $1"
   rm -f -- "$STATE/$1.check-inflight"
   sweep_point "after-stamp:$1"
 }
@@ -4026,6 +4028,7 @@ sweep_attempt() {  # <id> <kind> [reason]
   [ -n "$SWEEP_ID" ] || return 0
   sweep_point "before-attempt:$1"
   sweep_write "$STATE/$1.check-attempt" "$SWEEP_ID"$'\t'"$2"$'\t'"$(sweep_encode "${3:-}")" || return 0
+  SWEEP_OWN="$SWEEP_OWN $1"
   rm -f -- "$STATE/$1.check-inflight"
   sweep_point "after-attempt:$1"
 }
@@ -4067,11 +4070,34 @@ sweep_wake_append() {  # <kind> <key> <payload>
   fm_lock_release "$FM_WAKE_QUEUE_LOCK"
   return "$rc"
 }
+# Print the part of a reason an earlier watcher recorded whose row is still queued: the
+# check's own rows (its output, its events, its merge outcome) for a check reason, each
+# line's contribution-<key> row for the contributions text.
+sweep_still_queued() {  # <id> <kind> <reason> <queued check keys>
+  local path="$STATE/$1.check.sh" key line kept=
+  if [ "$2" = contributions ]; then
+    while IFS= read -r line; do
+      [ -n "$line" ] || continue
+      if printf '%s\n' "$4" | grep -Fxq -- "contribution-${line##* }"; then
+        kept="$kept$line"$'\n'
+      fi
+    done <<< "$3"
+    printf '%s' "$kept"
+    return 0
+  fi
+  while IFS= read -r key; do
+    case "$key" in
+      "$path"|"$path#event:"*|"merged-$1-"*) printf '%s' "$3"; return 0 ;;
+    esac
+  done <<< "$4"
+}
 # Read the sweep's records back, in check order, for the close: the rejected checks, the
 # first wake reason a check raised, and the contributions reason that is only the last
-# fallback, exactly as the in-memory sweep chose them.
+# fallback, exactly as the in-memory sweep chose them. A reason this watcher recorded is
+# used as is; one an earlier watcher recorded is used only while its row is still queued,
+# since once Main acknowledged that row an earlier wake already presented it.
 sweep_collect() {
-  local f id sid kind reason
+  local f id sid kind reason queued='' queued_read=''
   rejected_checks=
   SWEEP_FIRST_REASON=
   SWEEP_CONTRIB_REASON=
@@ -4086,6 +4112,19 @@ sweep_collect() {
       [ ! -e "$STATE/$id.check.sh" ] || rejected_checks="$rejected_checks $STATE/$id.check.sh"
     elif [ -n "$reason" ]; then
       reason=$(sweep_decode "$reason")
+      case " $SWEEP_OWN " in
+        *" $id "*) ;;
+        *)
+          if [ -z "$queued_read" ]; then
+            fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || return 1
+            queued=$(fm_wake_queued_keys_locked check)
+            fm_lock_release "$FM_WAKE_QUEUE_LOCK" || return 1
+            queued_read=1
+          fi
+          reason=$(sweep_still_queued "$id" "$kind" "$reason" "$queued")
+          [ -n "$reason" ] || continue
+          ;;
+      esac
       if [ "$kind" = contributions ]; then
         [ -n "$SWEEP_CONTRIB_REASON" ] || SWEEP_CONTRIB_REASON=$reason
       else
@@ -4206,6 +4245,7 @@ prelude_phase() {
   # Slow per-task checks (firstmate writes these, e.g. a merged-PR poll).
   # Time-based via .last-check mtime so the cadence survives watcher restarts.
   if prelude_step_begin 10 && sweep_gate; then
+    SWEEP_OWN=
     rejected_checks=
     contribution_check_output=
     sweep_prune
@@ -4361,7 +4401,7 @@ EOF
       fi
       sweep_stamp "$sweep_cid" plain "$sweep_reason"
     done
-    sweep_collect
+    sweep_collect || exit 1
     check_wake_reason=$SWEEP_FIRST_REASON
     if [ -n "$rejected_checks" ]; then
       reason="check: rejected unauthenticated state checks:$rejected_checks"

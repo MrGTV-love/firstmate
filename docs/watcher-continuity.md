@@ -635,6 +635,9 @@ The `contributions` check queues its own durable rows (`bin/fm-contributions.sh`
 The stopped-check notice is queued before the episode file `<id>.check-stopped` is created.
 The aggregate `check: rejected unauthenticated state checks: <paths>` wake keeps its text and key; the close rebuilds its list from the attempt records, so a resumed sweep lists every rejected check once.
 The close prints the first wake reason of a check in check order, then the rejected aggregate, then the `contributions` text, as the in-memory sweep did.
+A reason the closing watcher recorded itself is used as is.
+A reason an earlier watcher recorded is used only while that check's row is still queued: the check's own key, one of its `#event:` keys or its `merged-<id>-` outcome key, and for the `contributions` text each line's `contribution-<key>` row.
+So a cut watcher that queued a wake and delivered nothing leaves it to the resumed watcher, which prints it once, and a wake whose row Main already acknowledged, because an earlier wake presented it, is not printed again.
 A check whose handling ends the watcher (`exit 1`) leaves its in-flight mark, is retried once, and is then dropped for the sweep; the one wake lost this way is that check's output for that sweep, and the drop is logged.
 The sweep paths that neither run nor finish a check are dispositioned as follows: a stale PR-poll snapshot is attempted, a merge poll armed on a secondmate and an absorbed duplicate merged poll are stamped without a wake, and a rejected check is attempted.
 
@@ -709,6 +712,7 @@ The pull guard suite proves that no extension hand-off evidence replaces the [sh
 - Five SIGKILL cuts over a sweep longer than `FM_CHECK_INTERVAL`, which still closes with no finished check rerun.
 - A stopped check and two rejected checks, with the sweep closed, the next sweep running every check, the aggregate listing each rejected check once and the stopped notice queued once.
 - A cut after a check's wake is queued and before its stamp, with one queue row and one delivery.
+- A cut after a check's stamp, before any delivery, whose still-queued row the resumed watcher prints once without rerunning the check.
 - A cut between the close record and the `.last-check` touch, after which no check runs.
 - A cut after a rejected check's attempt, one after the aggregate rejected wake is queued, and one between a stopped check's notice and its episode file, each leaving one queued row that is printed once.
 - The unchanged cadence after a close, a `.last-check` touch between cuts, and unreadable, removed and added checks.

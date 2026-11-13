@@ -157,7 +157,7 @@ test_wake_driven_exit_after_the_close_repeats_no_check_and_loses_no_wake() {
   start_watch "$home" FM_CHECK_INTERVAL=4
   pid=$W
   wait_for_exit "$pid" 200 >/dev/null 2>&1
-  grep -q '^check: .*c3.check.sh' "$home/watch.1.out" || fail "wake: the watcher did not exit on the check's wake: $(cat "$home/watch.1.out")"
+  grep -q '^check: .*c3.check.sh' "$home/watch.$WATCH_N.out" || fail "wake: the watcher did not exit on the check's wake: $(cat "$home/watch.$WATCH_N.out")"
   sweep_closed "$home" || fail "wake: the sweep was not closed when the watcher exited on its wake"
   [ "$(queue_rows "$home" 'c3.check.sh')" = 1 ] || fail "wake: the check wake was not queued exactly once: $(cat "$home/state/.wake-queue")"
   start_watch "$home" FM_CHECK_INTERVAL=4
@@ -200,7 +200,7 @@ test_stopped_and_rejected_checks_close_the_sweep_and_run_again_next_sweep() {
   write_check "$home" c6 reject
   : > "$home/stall-c2"
   start_watch "$home" FM_CHECK_INTERVAL=3 FM_CHECK_TIMEOUT=2
-  wait_for 600 sweep_closed "$home" || fail "nonfinishing: the sweep never closed: $(cat "$home/watch.1.out")"
+  wait_for 600 sweep_closed "$home" || fail "nonfinishing: the sweep never closed: $(cat "$home"/watch.*.out)"
   expect_runs "$home" "nonfinishing sweep 1" c1=1 c2=1 c3=1 c4=1
   [ "$(queue_rows "$home" 'unauthenticated-state-checks')" = 1 ] || fail "nonfinishing: the aggregate rejected wake was not queued exactly once: $(cat "$home/state/.wake-queue")"
   grep -F "c5.check.sh" "$home/state/.wake-queue" | grep -qF "c6.check.sh" || fail "nonfinishing: the aggregate does not list both rejected checks: $(cat "$home/state/.wake-queue")"
@@ -243,6 +243,24 @@ test_cut_after_the_wake_and_before_the_stamp_queues_and_delivers_once() {
   [ "$(printed "$home" 'c2.check.sh')" = 1 ] || fail "before-stamp: the wake was printed other than once: $(cat "$home"/watch.*.out)"
   cut_watch "$W" TERM
   pass "sweep: a cut between a check's queued wake and its stamp keeps one queue row and one delivery"
+}
+
+# A check with output, cut after its stamp: the cut watcher queued the wake and delivered nothing. The
+# resumed sweep does not rerun it, its row is still queued, and the resumed watcher prints the wake once.
+test_cut_after_the_stamp_with_the_row_still_queued_delivers_once() {
+  local home
+  home=$(cut_at_point sweep-after-stamp after-stamp:c2 c2)
+  [ -e "$home/state/c2.check-stamp" ] || fail "after-stamp: the stamp was not written before the cut"
+  [ "$(queue_rows "$home" 'c2.check.sh')" = 1 ] || fail "after-stamp: the wake was not durable before the cut: $(cat "$home/state/.wake-queue")"
+  [ "$(printed "$home" 'c2.check.sh')" = 0 ] || fail "after-stamp: the cut watcher delivered the wake: $(cat "$home"/watch.*.out)"
+  start_watch "$home" FM_CHECK_INTERVAL=2
+  wait_for 300 sweep_closed "$home" || fail "after-stamp: the resumed sweep never closed"
+  expect_runs "$home" "after-stamp" c1=1 c2=1 c3=1 c4=1 c5=1
+  [ "$(queue_rows "$home" 'c2.check.sh')" = 1 ] || fail "after-stamp: the resumed sweep queued the wake again: $(cat "$home/state/.wake-queue")"
+  wait_for 100 grep -q '^check: .*c2.check.sh: state-of-c2' "$home"/watch.*.out || fail "after-stamp: the resumed watcher did not print the still-queued wake: $(cat "$home"/watch.*.out)"
+  [ "$(printed "$home" 'c2.check.sh')" = 1 ] || fail "after-stamp: the wake was printed other than once: $(cat "$home"/watch.*.out)"
+  cut_watch "$W" TERM
+  pass "sweep: a wake a cut watcher stamped and never delivered is printed once while its row is still queued"
 }
 
 # The close record is down and the touch is not: the next watcher finishes the close and runs no check,
@@ -332,8 +350,9 @@ test_a_home_with_no_sweep_record_runs_every_check_with_the_production_defaults()
 }
 
 # contributions: the check queues its own durable rows before it prints its contribution-wake lines (the real
-# bin/fm-contributions.sh does), so the sweep only keeps the printed text. A cut right after its stamp leaves
-# the text to the resumed watcher's close, which prints it once, unchanged.
+# bin/fm-contributions.sh does, key contribution-<key>; this fixture's row is seeded the same way), so the
+# sweep only keeps the printed text. A cut right after its stamp leaves the text to the resumed watcher's
+# close, which prints it once, unchanged, while that row is still queued.
 test_contributions_text_survives_a_cut_at_its_stamp_and_is_printed_once() {
   local home
   home=$(make_sweep_home sweep-contributions c1 contributions c3)
@@ -344,6 +363,8 @@ test_contributions_text_survives_a_cut_at_its_stamp_and_is_printed_once() {
   wait_for 300 test -e "$home/held" || fail "contributions: the watcher never reached the stamp"
   cut_watch "$W" KILL
   rm -f "$home/hold" "$home/held"
+  append_wake "$home/state" check contribution-items 'check: contributions 2 new upstream items' \
+    || fail "contributions: could not queue the check's own row"
   start_watch "$home" FM_CHECK_INTERVAL=2
   wait_for 300 sweep_closed "$home" || fail "contributions: the resumed sweep never closed"
   expect_runs "$home" "contributions" c1=1 contributions=1 c3=1
@@ -394,7 +415,7 @@ test_cut_between_the_stopped_notice_and_its_episode_file_queues_one_notice() {
   printf 'before-episode:c2\n' > "$home/hold"
   rm -f "$home/held"
   start_watch "$home" FM_CHECK_INTERVAL=3 FM_CHECK_TIMEOUT=2
-  wait_for 600 test -e "$home/held" || fail "before-episode: the watcher never reached the point: $(cat "$home/watch.1.out")"
+  wait_for 600 test -e "$home/held" || fail "before-episode: the watcher never reached the point: $(cat "$home"/watch.*.out)"
   [ "$(grep -c 'check c2 stopped after' "$home/state/.wake-queue")" = 1 ] || fail "before-episode: the notice was not queued before the episode file: $(cat "$home/state/.wake-queue")"
   [ ! -e "$home/state/c2.check-stopped" ] || fail "before-episode: the episode file existed before the notice point"
   cut_watch "$W" KILL
@@ -416,6 +437,7 @@ for t in \
   test_repeated_cuts_with_a_sweep_longer_than_the_interval_still_close \
   test_stopped_and_rejected_checks_close_the_sweep_and_run_again_next_sweep \
   test_cut_after_the_wake_and_before_the_stamp_queues_and_delivers_once \
+  test_cut_after_the_stamp_with_the_row_still_queued_delivers_once \
   test_cut_between_the_close_record_and_the_touch_runs_no_check \
   test_cut_after_a_rejected_attempt_rebuilds_the_aggregate_once \
   test_cut_after_the_aggregate_wake_and_before_the_close_record_queues_it_once \
