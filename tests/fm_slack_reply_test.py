@@ -73,6 +73,15 @@ class Traced(Replay):
         return data
 
 
+class LiveScrub(Traced):
+    """The replay as the live client returns it: the transport carries scrub_with, and replaces the bot token with it in every response."""
+    scrub_with = '[REDACTED]'
+
+    def call(self, method, **fields):
+        data = super().call(method, **fields)
+        return json.loads(json.dumps(data, ensure_ascii=False).replace(os.environ['SLACK_BOT_TOKEN'], self.scrub_with))
+
+
 class Children:
     """The stand-in for subprocess.run: every child start is recorded with its arguments and its effective environment (names only)."""
 
@@ -682,6 +691,27 @@ class FollowUpTest(unittest.TestCase):
             self.assertEqual(home.requests(out), [])
             self.assertEqual({name for name, _ in home.children.scripts()}, {'fm-captain-hold.sh'})
 
+    def test_the_live_transport_scrub_leaves_the_marker_and_the_flag_on_the_follow_up_and_read_paths(self):
+        token = DEFAULT_ENV['SLACK_BOT_TOKEN']
+        with case() as home, patch.object(plane, 'Replay', LiveScrub):
+            request = home.take_in('a request with ' + token + ' in it')
+            f1 = home.reply_in(request, 'a follow-up with ' + token + ' in it')
+            rc, out, _ = home.poll()
+            [line] = home.followups(out)
+            self.assertEqual((line['reply'], line['text'], line['flag']), (f1, 'a follow-up with [secret removed] in it', '; secret removed'))
+            f2 = home.reply_in(request, 'and the one after it?')
+            home.poll()
+            reads = [home.read(request), home.read(request, f1, no_context=True), home.read(request, f2)]
+            for rc, shown, err in reads:
+                self.assertEqual((rc, err), (0, ''))
+                self.assertNotIn('[REDACTED]', shown)
+                self.assertNotIn(plane.SCRUB_MARK, shown)
+                self.assertNotIn(token, shown)
+            self.assertTrue(reads[0][1].endswith('a request with [secret removed] in it\n'))
+            self.assertTrue(reads[1][1].endswith('a follow-up with [secret removed] in it\n'))
+            self.assertIn(json.dumps('a request with [secret removed] in it'), reads[2][1])
+            self.assertIn(json.dumps('a follow-up with [secret removed] in it'), reads[2][1])
+
 
 class OwnThreadTest(unittest.TestCase):
     """RT-T1: each request keeps its own thread."""
@@ -1105,6 +1135,23 @@ class SchedulingTest(unittest.TestCase):
                     last = poll
             self.assertEqual(order, sent)
             self.assertLessEqual(last, 6)
+
+    def test_a_new_request_before_each_poll_never_goes_ahead_of_an_older_thread_with_a_follow_up(self):
+        with case(cap='1') as home:
+            a, b = home.take_in('request A'), home.take_in('request B')
+            home.poll()
+            Traced.TRACE.clear()
+            home.poll()
+            self.assertEqual([row['thread'] for row in home.calls('conversations.replies')], [b])   # B was read last: it is last in the order
+            follow = home.reply_in(b, 'the follow-up in B')
+            woken = []
+            for poll in range(1, 5):
+                home.say('N%d' % poll)
+                rc, out, _ = home.poll()
+                woken += [poll for f in home.followups(out) if f['reply'] == follow]
+            # RT-P1 (5) with a new request waiting at every poll at cap 1 (c = 1, s = 2), R = 2, F = 0, P = 0, k = 0: 2 * ceil(1 / 1) * ceil(2 / 1) = 4.
+            self.assertEqual(len(woken), 1, woken)
+            self.assertLessEqual(woken[0], 4)
 
     def test_a_failed_read_delays_the_follow_up_by_one_poll_and_is_reported_once(self):
         with case(cap='1') as home:

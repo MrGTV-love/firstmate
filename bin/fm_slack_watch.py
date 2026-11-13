@@ -1286,19 +1286,23 @@ class Watch:
                 return True
         return False
 
+    def scrubbed(self, read):
+        """Run one read of owner text (a request, a follow-up or what came before it) and return its result."""
+        if not hasattr(self.api, 'scrub_with'):
+            return read()
+        # The transport removes the plane's token from a response before it is decoded (a defense that stays); here it
+        # also leaves the declared marker and a mark that tells sanitize that a value was removed at the boundary.
+        self.read_mark = self.read_mark or SCRUB_MARK + os.urandom(6).hex() + SCRUB_MARK
+        self.api.scrub_with = self.read_mark + SECRET_MARKER
+        try:
+            return read()
+        finally:
+            self.api.scrub_with = Slack.scrub_with
+
     def read_window(self, channel, **fields):
         """The one conversations.history read of the owner DM that a poll may make for requests."""
         self.window_reads += 1
-        if hasattr(self.api, 'scrub_with'):
-            # The transport removes the plane's token from a response before it is decoded (a defense that stays); here it
-            # also leaves the declared marker and a mark that tells sanitize that a value was removed at the boundary.
-            self.read_mark = SCRUB_MARK + os.urandom(6).hex() + SCRUB_MARK
-            self.api.scrub_with = self.read_mark + SECRET_MARKER
-            try:
-                return self.api.call('conversations.history', channel=channel, **fields)
-            finally:
-                self.api.scrub_with = Slack.scrub_with
-        return self.api.call('conversations.history', channel=channel, **fields)
+        return self.scrubbed(lambda: self.api.call('conversations.history', channel=channel, **fields))
 
     def start_requests(self):
         """A plane armed before requests existed starts at the DM's latest message on its first poll, never at
@@ -1417,7 +1421,7 @@ class Watch:
         text = message.get('text')
         if not isinstance(text, str) or text == '':
             return None
-        whole, shown, replaced, extra = sanitize_counted(text)
+        whole, shown, replaced, extra = sanitize_counted(text, self.read_mark)
         row = {'event': self.followup_event(thread, ts), 'key': '', 'thread': thread, 'reply': ts, 'author': author, 'shown': shown,
                'replaced': replaced, 'kind': 'followup', 'stage': 'followup'}
         if value_hits(self.followup_wake_line(row)):
@@ -1433,10 +1437,10 @@ class Watch:
         channel = self.state.get('channel')
         if not channel:
             raise SlackError('dm_not_prepared')
-        found = [m for m in self.api.pages('conversations.replies', 'messages', channel=channel, ts=thread,
-                                           oldest=cursor, include_all_metadata=True)
-                 if isinstance(m, dict) and isinstance(m.get('ts'), str) and SLACK_TS.fullmatch(m['ts'])
-                 and ts_key(m['ts']) > ts_key(cursor) and m['ts'] != thread]
+        found = self.scrubbed(lambda: [m for m in self.api.pages('conversations.replies', 'messages', channel=channel, ts=thread,
+                                                                 oldest=cursor, include_all_metadata=True)
+                                       if isinstance(m, dict) and isinstance(m.get('ts'), str) and SLACK_TS.fullmatch(m['ts'])
+                                       and ts_key(m['ts']) > ts_key(cursor) and m['ts'] != thread])
         return sorted(found, key=lambda m: ts_key(m['ts']))
 
     def followup_entry(self, thread):
@@ -1472,6 +1476,13 @@ class Watch:
         # Words are taken in only from a conversation proven to be the owner's DM, as for a request's acknowledgement.
         self.owner_channel()
         entries = self.state.get('followups', {})
+        if len(threads) > self.cap:
+            entries = self.state.setdefault('followups', {})
+            last = max((item.get('turn', 0) for item in entries.values()), default=0)
+            for thread in threads:
+                if thread not in entries:
+                    last += 1
+                    entries[thread] = {'cursor': thread, 'turn': last}
         order = sorted(threads, key=lambda t: (entries.get(t, {}).get('turn', 0), ts_key(t)))[:self.cap]
         read, deferred = [], None
         for thread in order:
@@ -1483,10 +1494,8 @@ class Watch:
                 deferred = deferred or error
         if len(threads) > self.cap:
             # The thread just visited goes to the back, whether its read worked or not, so that a thread that fails never keeps the first place.
-            entries = self.state.setdefault('followups', {})
             for thread in order:
-                entry = entries.setdefault(thread, {'cursor': thread, 'turn': 0})
-                entry['turn'] = max(item.get('turn', 0) for item in entries.values()) + 1
+                entries[thread]['turn'] = max(item.get('turn', 0) for item in entries.values()) + 1
             self.commit()
         return read, deferred
 
@@ -1522,8 +1531,8 @@ class Watch:
                 break
 
     def read_message(self, thread, ts):
-        """(kind, author, full text) of one message of a recorded request thread that is the owner's: the request itself or a follow-up of that request.
-        Anything else, the plane's own messages and a bot's included, is refused."""
+        """(kind, author, full text, the thread's messages as read) of one message of a recorded request thread that is the owner's: the request itself
+        or a follow-up of that request. Anything else, the plane's own messages and a bot's included, is refused."""
         if not self.bound():
             raise SlackError('source_not_bound')
         if not self.state.get('channel'):
@@ -1533,27 +1542,27 @@ class Watch:
         if thread not in self.request_threads():
             raise SlackError('unknown_request_thread')
         self.owner_channel()
-        message = next((m for m in self.messages(thread) if isinstance(m, dict) and m.get('ts') == ts), None)
+        read = self.scrubbed(lambda: self.messages(thread))
+        message = next((m for m in read if isinstance(m, dict) and m.get('ts') == ts), None)
         if message is None:
             raise SlackError('message_not_found')
         valid = self.request_from(message) if ts == thread else self.followup_from(thread, message)
         if not valid:
             raise SlackError('not_an_owner_message')
-        return valid['kind'], message['user'], self.permitted_full_text(message['text'])
+        return valid['kind'], message['user'], self.permitted_full_text(message['text']), read
 
-    @staticmethod
-    def permitted_full_text(raw):
+    def permitted_full_text(self, raw):
         """The whole text of a message as Firstmate reads it: every plane secret value of the plane's own replaced first (Amendment ai), then the
         reading normalization."""
-        return full_text(sanitize_counted(raw)[0])
+        return full_text(sanitize_counted(raw, self.read_mark)[0])
 
-    def thread_context(self, thread, ts):
+    def thread_context(self, thread, ts, messages):
         """What came before one message of a recorded request thread, oldest first, so that a follow-up that does not restate its subject can be understood:
-        the owner's request and earlier follow-ups and this plane's own earlier answers, as (kind, ts, author, full text). Only this thread is read; the
+        the owner's request and earlier follow-ups and this plane's own earlier answers, as (kind, ts, author, full text), from the messages of that thread as read_message read them; the
         plane's fixed acknowledgement, a stranger's, a bot's and an app's message are left out."""
         ack = hashlib.sha256(('ack:' + self.request_event(thread)).encode()).hexdigest()
         earlier = []
-        for message in sorted((m for m in self.messages(thread) if isinstance(m, dict) and isinstance(m.get('ts'), str)
+        for message in sorted((m for m in messages if isinstance(m, dict) and isinstance(m.get('ts'), str)
                                and SLACK_TS.fullmatch(m['ts'])), key=lambda m: ts_key(m['ts'])):
             if ts_key(message['ts']) >= ts_key(ts) or not isinstance(message.get('text'), str):
                 continue
@@ -2834,9 +2843,9 @@ def read_command(argv, out):
         watch = plane_watch('read', options, out)
         thread = options['thread']
         ts = options.get('message') or thread
-        kind, user, text = watch.read_message(thread, ts)
+        kind, user, text, read = watch.read_message(thread, ts)
         lines = ['%s%s in request %s from %s: %s' % (READ_HEADER, ts, thread, user, REQUEST_LABEL if kind == 'request' else FOLLOWUP_LABEL)]
-        context = [] if ts == thread or options.get('no_context') else watch.thread_context(thread, ts)
+        context = [] if ts == thread or options.get('no_context') else watch.thread_context(thread, ts, read)
         for earlier, before, author, body in context:
             lines.append('%s%s %s posted by this plane: %s' % (READ_EARLIER, earlier, before, ANSWER_LABEL) if earlier == 'answer'
                          else '%s%s %s from %s: %s' % (READ_EARLIER, earlier, before, author, REQUEST_LABEL if earlier == 'request' else FOLLOWUP_LABEL))
