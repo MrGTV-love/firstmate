@@ -143,7 +143,13 @@ real_record() {
   { docker ps -a --filter "label=fm.task=task-x1" --format '{{.ID}} {{.Names}}' 2>&1 || true; } > "$dir/$phase.docker-task-objects"
   (cd "$FOREIGN_CASE/project" && treehouse status --json </dev/null 2>&1) > "$dir/$phase.status.json"
   shasum -a 256 "$FOREIGN_CASE/pool/treehouse-state.json" > "$dir/$phase.state.sha256" 2>&1
-  cp "$FOREIGN_CASE/pool/1/.fm-slot-owner" "$dir/$phase.claim" 2>&1
+  # The claim file is the lease's mark on the slot. A released close returns the slot and the
+  # real treehouse removes it, so the record says so instead of leaving no file.
+  if [ -f "$FOREIGN_CASE/pool/1/.fm-slot-owner" ]; then
+    cp "$FOREIGN_CASE/pool/1/.fm-slot-owner" "$dir/$phase.claim"
+  else
+    printf 'absent: %s does not exist at the %s record (the slot was returned and its claim released)\n' "$FOREIGN_CASE/pool/1/.fm-slot-owner" "$phase" > "$dir/$phase.claim"
+  fi
   held_fingerprint "$FOREIGN_COPY" > "$dir/$phase.copy.fingerprint" 2>&1
   git -C "$FOREIGN_CASE/project" worktree list --porcelain > "$dir/$phase.registrations" 2>&1
   real_tar_inventory > "$dir/$phase.tars" 2>&1
@@ -673,6 +679,10 @@ test_a_copy_sweep_apply_during_a_teardown_in_the_driver_makes_no_second_archive(
   wait "$first_pid" 2>/dev/null || true
   if [ -n "$REAL_DIR" ]; then
     cp "$FOREIGN_CASE"/sweep.*.out "$FOREIGN_CASE"/sweep.*.rc "$REAL_DIR/" 2>/dev/null || true
+    cp "$FOREIGN_CASE/stdout.first" "$REAL_DIR/teardown.stdout"
+    cp "$FOREIGN_CASE/stderr.first" "$REAL_DIR/teardown.stderr"
+    printf 'exit %s\n' "$(cat "$FOREIGN_CASE/rc.first")" > "$REAL_DIR/teardown.exit"
+    real_record after
   fi
   grep -q "$FOREIGN_COPY" "$FOREIGN_CASE/sweep.report.out" || fail "f-sweep-race: the sweep never listed the copy, so it proves nothing: $(head -c 600 "$FOREIGN_CASE/sweep.report.out")"
   assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "f-sweep-race: a sweep apply during a teardown called the driver or archived again"
