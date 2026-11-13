@@ -1,0 +1,42 @@
+== tree: base (base-9d516486)  lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.Hb1xAC
+== arm1 pid=67265 started watcher pid=67803; watcher is inside check c1 (step 10): yes
+/tmp/fmlive-drv/takeover.sh: line 29: /Users/charlesabrooker/tmp/fm-lab.Hb1xAC/state/.prelude-inflight: No such file or directory
+   prelude-inflight marker: none   token= seq=
+== BUSY TAKE-OVER: arm2 --take-over 67265 at 11:59:09
+   after 9 s: arm2 says: watcher: started pid=93408 (beacon fresh)|
+   watcher 67803 alive: no; still in check: yes
+   signals (not -0) sent to watcher 67803 so far: 1
+== check c1 unblocked at 11:59:18
+   watcher 67803 alive after its step ended: no; lock holder:   token=announced:downtime:67803.1794592750.UThzAX  seq=
+   arm1 alive: no  arm2 alive: no
+== no live watcher; plain arm3 re-arms (as the host would)
+   arm3 says: watcher: started pid=19037 (beacon fresh)|
+== IDLE TAKE-OVER: watcher 19037 (parent arm 18746) idle in its poll; token=announced:downtime:67803.1794592750.UThzAX  seq=; prelude marker: none
+   arm4 says: watcher: started pid=45746 (beacon fresh)|
+   TERM sent to 19037: 1; old watcher alive: no; new lock holder: 45746  token=announced:downtime:67803.1794592750.UThzAX  seq=
+== all arm outputs:
+-- arm1.out: watcher: started pid=67803 (beacon fresh)|watcher: FAILED - watcher cycle exited 143 without an actionable reason|
+-- arm2.out: watcher: started pid=93408 (beacon fresh)|check: rearm-resurface|
+-- arm3.out: watcher: started pid=19037 (beacon fresh)|watcher: FAILED - watcher cycle exited 143 without an actionable reason|
+-- arm4.out: watcher: started pid=45746 (beacon fresh)|
+== empty 'check: rearm-resurface' wakes printed by any arm: 1
+== kill log (signals other than -0):
+11:59:10 88346 kill -TERM 67803
+11:59:10 67803 kill -TERM -- -86934
+11:59:10 67803 kill -TERM 86934
+11:59:10 67803 kill -KILL -- -86934
+11:59:10 67803 kill -KILL 86934
+11:59:18 93408 kill -TERM -- -3851
+11:59:18 93408 kill -KILL -- -3851
+11:59:32 37603 kill -TERM 19037
+== cycle ledger:
+arm_pid=67265	watcher_pid=67803	origin=started	started_at=1794592740	ended_at=1794592750	exit_code=143	signal=TERM	reason=signal-exit	beacon_age=6	lock_before=pid:67803|identity:Fri Nov 13 11:59:00 2026     bash /tmp/fmlive-base/bin/fm-watch.sh	lock_after=pid:none|identity:none	successor=none
+arm_pid=88346	watcher_pid=67803	origin=attached	started_at=1794592749	ended_at=1794592751	exit_code=unknown	signal=unknown	reason=taken-over	beacon_age=7	lock_before=pid:67803|identity:Fri Nov 13 11:59:00 2026     bash /tmp/fmlive-base/bin/fm-watch.sh	lock_after=pid:none|identity:none	successor=started:93408
+arm_pid=88346	watcher_pid=93408	origin=started	started_at=1794592751	ended_at=1794592761	exit_code=0	signal=none	reason=actionable-check	beacon_age=1	lock_before=pid:93408|identity:Fri Nov 13 11:59:11 2026     bash /tmp/fmlive-base/bin/fm-watch.sh	lock_after=pid:none|identity:none	successor=none
+arm_pid=18746	watcher_pid=19037	origin=started	started_at=1794592763	ended_at=1794592773	exit_code=143	signal=TERM	reason=signal-exit	beacon_age=4	lock_before=pid:19037|identity:Fri Nov 13 11:59:23 2026     bash /tmp/fmlive-base/bin/fm-watch.sh	lock_after=pid:none|identity:none	successor=none
+arm_pid=37603	watcher_pid=19037	origin=attached	started_at=1794592771	ended_at=1794592773	exit_code=unknown	signal=unknown	reason=taken-over	beacon_age=4	lock_before=pid:19037|identity:Fri Nov 13 11:59:23 2026     bash /tmp/fmlive-base/bin/fm-watch.sh	lock_after=pid:none|identity:none	successor=started:45746
+== runs:
+c1 start 11:59:09
+c1 start 11:59:16
+c1 end 11:59:18
+== lab torn down

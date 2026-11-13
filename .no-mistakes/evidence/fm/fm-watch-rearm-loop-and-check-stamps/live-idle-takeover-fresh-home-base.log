@@ -1,0 +1,6 @@
+== tree: base  lab=/Users/charlesabrooker/tmp/fm-lab.QZ0GWA
+token before take-over: '' prelude marker: ''
+arm1: watcher: started pid=55675 (beacon fresh)|watcher: FAILED - watcher cycle exited 143 without an actionable reason|
+arm2: watcher: started pid=79939 (beacon fresh)|check: rearm-resurface|
+token after: 'announced:downtime:55675.1794592830.VICqkV'
+== lab torn down

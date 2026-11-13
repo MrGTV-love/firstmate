@@ -1,0 +1,32 @@
+== tree: head (6da31e83)
+== lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.pOCrjj
+== watcher 1 pid=13878 reached check 3: yes
+-- state files at the cut:
+.sweep-open .wake-queue 
+== SIGKILL sent to watcher 1 (pid 13878) inside check 3
+== watcher 2 (pid 45225) exited with wake: check: memory-health: the non-fleet RSS alarm is uncalibrated (no baseline at /Users/charlesabrooker/tmp/fm-lab.pOCrjj/state/.memory-baseline.json); admission i
+== watcher 3 (pid 54290) exited with wake: check: /Users/charlesabrooker/tmp/fm-lab.pOCrjj/state/c1.check.sh: owner-dm-from-c1
+== watcher 4 (pid 83828) idle after the close; stopped
+-- runs.log (each check start/end):
+c1 start 11:55:09
+c1 end 11:55:10
+c2 start 11:55:12
+c2 end 11:55:13
+c3 start 11:55:14
+c3 start 11:55:22
+c3 end 11:55:23
+c4 start 11:55:25
+c4 end 11:55:26
+c5 start 11:55:27
+c5 end 11:55:28
+c1 runs=1  c2 runs=1  c3 runs=2  c4 runs=1  c5 runs=1  
+-- watch.1.out:
+-- watch.2.out:
+check: memory-health: the non-fleet RSS alarm is uncalibrated (no baseline at /Users/charlesabrooker/tmp/fm-lab.pOCrjj/state/.memory-baseline.json); admission is unaffected. Record healthy readings, then read fm-mem-guard.sh --help before running its baseline command in /Users/charlesabrooker/tmp/fm-lab.pOCrjj.
+-- watch.3.out:
+check: /Users/charlesabrooker/tmp/fm-lab.pOCrjj/state/c1.check.sh: owner-dm-from-c1
+-- watch.4.out:
+-- times the c1 wake was printed across both watchers: 1
+-- .wake-queue rows with the c1 output: 1
+-- state after: .last-check 
+== lab torn down

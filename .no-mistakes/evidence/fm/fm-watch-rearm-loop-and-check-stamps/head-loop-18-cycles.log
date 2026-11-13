@@ -1,0 +1,10 @@
+head=6da31e83359ef35a14cf9ff7445b328dffba0ba1 FM_TEST_LOOP_CYCLES=18
+FM_TEST_BEGIN 2026-11-13T18:13:55Z tests/fm-watch-takeover.test.sh family=unclassified expected_gate_skip=none
+ok - take-over: 18 consecutive stops deferred outside the prelude leave no empty rearm-resurface wake
+FM_TEST_END 2026-11-13T18:26:57Z tests/fm-watch-takeover.test.sh exit=0 duration_ms=781971 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7AVDZEX62EMDR2C1KR0AQPX/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=782949
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=781971 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watch-takeover.test.sh duration_ms=781971
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7AVDZEX62EMDR2C1KR0AQPX/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+exit=0

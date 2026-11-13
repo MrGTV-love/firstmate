@@ -1,0 +1,31 @@
+tree=base 9d516486 + head tests copied in
+### FM_TEST_ONLY=test_a_stop_deferred_outside_the_prelude_leaves_no_empty_recovery_wake
+FM_TEST_BEGIN 2026-11-13T18:08:15Z tests/fm-watch-takeover.test.sh family=unclassified expected_gate_skip=none
+not ok - cycle 1: the stop opened a recovery episode over acknowledged work: announced:downtime:31065.1794593344.UKqQdL
+FM_TEST_END 2026-11-13T18:09:47Z tests/fm-watch-takeover.test.sh exit=1 duration_ms=91469 gate_skip=false
+ledger: "/private/tmp/fmlive-base/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=92972
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=91469 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watch-takeover.test.sh duration_ms=91469
+ledger: "/private/tmp/fmlive-base/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+exit=1
+### FM_TEST_ONLY=test_take_over_attaches_to_a_watcher_inside_prelude_step10
+FM_TEST_BEGIN 2026-11-13T18:09:48Z tests/fm-watch-takeover.test.sh family=unclassified expected_gate_skip=none
+not ok - step10: the lock moved from the busy watcher 86081 to '' while its step was in flight
+FM_TEST_END 2026-11-13T18:10:19Z tests/fm-watch-takeover.test.sh exit=1 duration_ms=30286 gate_skip=false
+ledger: "/private/tmp/fmlive-base/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=31724
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=30286 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watch-takeover.test.sh duration_ms=30286
+ledger: "/private/tmp/fmlive-base/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+exit=1
+### FM_TEST_ONLY=test_take_over_attaches_to_a_watcher_inside_prelude_step9
+FM_TEST_BEGIN 2026-11-13T18:10:20Z tests/fm-watch-takeover.test.sh family=unclassified expected_gate_skip=none
+not ok - step9: the take-over signalled the watcher inside its step: 70518 -TERM 47981
+FM_TEST_END 2026-11-13T18:10:58Z tests/fm-watch-takeover.test.sh exit=1 duration_ms=38296 gate_skip=false
+ledger: "/private/tmp/fmlive-base/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=39443
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=38296 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watch-takeover.test.sh duration_ms=38296
+ledger: "/private/tmp/fmlive-base/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+exit=1

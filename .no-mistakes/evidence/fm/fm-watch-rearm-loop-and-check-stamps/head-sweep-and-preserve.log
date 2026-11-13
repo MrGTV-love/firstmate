@@ -1,0 +1,41 @@
+head=6da31e83359ef35a14cf9ff7445b328dffba0ba1
+FM_TEST_BEGIN 2026-11-13T18:08:06Z tests/fm-watch-sweep.test.sh family=unclassified expected_gate_skip=none
+ok - sweep: a TERM cut at the third of five checks resumes at the third (checks 1 and 2 are not run again)
+ok - sweep: a KILL cut at the third of five checks resumes at the third (checks 1 and 2 are not run again)
+ok - sweep: a watcher that exits on a check wake leaves the sweep closed, runs no check again and loses no wake
+ok - sweep: five SIGKILL cuts over a sweep longer than the interval close it, no finished check rerun
+ok - sweep: a stopped and a rejected check close the sweep and run again in the next one
+ok - sweep: a cut between a check's queued wake and its stamp keeps one queue row and one delivery
+ok - sweep: a wake a cut watcher stamped and never delivered is printed once while its row is still queued
+ok - sweep: a backslash payload rerun after a cut between its wake and its stamp keeps one queue row and one delivery
+ok - sweep: a take-over claim holds off the prelude only while its pid keeps its identity
+ok - sweep: a cut between the close record and the .last-check touch runs no check at the next start
+ok - sweep: a cut after a rejected check's attempt resumes with one aggregate wake listing every rejected check
+ok - sweep: a cut after the aggregate wake is queued and before the close record queues it once
+ok - sweep: a cut between the stopped notice and its episode file keeps one notice and creates the episode on the rerun
+ok - sweep: within the interval after a close no check runs; past it every check runs
+ok - sweep: a .last-check touch between cuts neither closes nor invalidates the open sweep
+ok - sweep: an unreadable stamp reruns its check, a removed check's stamp goes, an added check runs
+ok - sweep: with FM_CHECK_INTERVAL and FM_CHECK_TIMEOUT unset a home with no record runs every check once and leaves no record
+ok - sweep: the contributions text survives a cut at its stamp and is printed once with the base's text
+FM_TEST_END 2026-11-13T18:11:46Z tests/fm-watch-sweep.test.sh exit=0 duration_ms=219586 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7AVDZEX62EMDR2C1KR0AQPX/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-11-13T18:11:46Z tests/fm-watch-downtime-preserve.test.sh family=unclassified expected_gate_skip=none
+ok - downtime: kill9 of a watcher whose token was pending:downtime:seedgen (queue empty) announces 1 time(s)
+ok - downtime: kill9 of a watcher whose token was announced:downtime:seedgen (queue empty) announces 0 time(s)
+ok - downtime: term of a watcher whose token was pending:downtime:seedgen (queue empty) announces 1 time(s)
+ok - downtime: term of a watcher whose token was announced:downtime:seedgen (queue empty) announces 0 time(s)
+ok - downtime: arm-stop of a watcher whose token was pending:downtime:seedgen (queue empty) announces 1 time(s)
+ok - downtime: arm-stop of a watcher whose token was announced:downtime:seedgen (queue empty) announces 0 time(s)
+ok - downtime: error-exit of a watcher whose token was pending:downtime:seedgen (queue empty) announces 1 time(s)
+ok - downtime: error-exit of a watcher whose token was announced:downtime:seedgen (queue empty) announces 0 time(s)
+ok - downtime: kill9 of a watcher whose token was announced:downtime:seedgen (queue undelivered) announces 1 time(s)
+ok - downtime: a take-over of a watcher whose token was pending:downtime:seedgen announces 1 time(s)
+FM_TEST_END 2026-11-13T18:13:30Z tests/fm-watch-downtime-preserve.test.sh exit=0 duration_ms=103849 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7AVDZEX62EMDR2C1KR0AQPX/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=2 failed=0 skipped_gate=0 duration_ms=324546
+FM_TEST_SUMMARY_FAMILY family=unclassified count=2 duration_ms=323435 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watch-sweep.test.sh duration_ms=219586
+FM_TEST_SLOWEST rank=2 script=tests/fm-watch-downtime-preserve.test.sh duration_ms=103849
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7AVDZEX62EMDR2C1KR0AQPX/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+exit=0

@@ -1,0 +1,26 @@
+head=6da31e83359ef35a14cf9ff7445b328dffba0ba1
+FM_TEST_BEGIN 2026-11-13T17:51:23Z tests/fm-watch-takeover.test.sh family=unclassified expected_gate_skip=none
+ok - take-over fixture: the kill shim logs a known kill and keeps kill -l TERM
+ok - take-over: a watcher inside prelude step9 is attached to, never signalled, and its wake is delivered once
+ok - take-over: a watcher inside prelude step10 is attached to, never signalled, and its wake is delivered once
+ok - take-over: an idle watcher is TERMed, main's acknowledgement survives, and the new arm prints the next wake
+ok - take-over: 2 consecutive stops deferred outside the prelude leave no empty rearm-resurface wake
+ok - take-over: a prelude that starts after the arm's check does not start its step
+FM_TEST_END 2026-11-13T17:57:21Z tests/fm-watch-takeover.test.sh exit=0 duration_ms=358024 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7AVDZEX62EMDR2C1KR0AQPX/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-11-13T17:57:21Z tests/fm-watch-sweep.test.sh family=unclassified expected_gate_skip=none
+ok - sweep: a TERM cut at the third of five checks resumes at the third (checks 1 and 2 are not run again)
+ok - sweep: a KILL cut at the third of five checks resumes at the third (checks 1 and 2 are not run again)
+ok - sweep: a watcher that exits on a check wake leaves the sweep closed, runs no check again and loses no wake
+ok - sweep: five SIGKILL cuts over a sweep longer than the interval close it, no finished check rerun
+ok - sweep: a stopped and a rejected check close the sweep and run again in the next one
+ok - sweep: a cut between a check's queued wake and its stamp keeps one queue row and one delivery
+ok - sweep: a wake a cut watcher stamped and never delivered is printed once while its row is still queued
+ok - sweep: a backslash payload rerun after a cut between its wake and its stamp keeps one queue row and one delivery
+ok - sweep: a take-over claim holds off the prelude only while its pid keeps its identity
+ok - sweep: a cut between the close record and the .last-check touch runs no check at the next start
+ok - sweep: a cut after a rejected check's attempt resumes with one aggregate wake listing every rejected check
+ok - sweep: a cut after the aggregate wake is queued and before the close record queues it once
+ok - sweep: a cut between the stopped notice and its episode file keeps one notice and creates the episode on the rerun
+ok - sweep: within the interval after a close no check runs; past it every check runs
+ok - sweep: a .last-check touch between cuts neither closes nor invalidates the open sweep
