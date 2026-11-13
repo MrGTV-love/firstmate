@@ -37,10 +37,18 @@
 #     their static source annotations intentionally isolate adapter analysis.
 #     Unresolved runtime imports select possible callers on changed/deleted shell
 #     or known source inputs and disable cache reuse, regardless of annotations.
-#     Discovery recognizes source/. command words, balanced substitutions, and
-#     executable bash/sh -c and program-stdin heredocs. Source annotations remain
-#     inputs; ordinary comments, inert quoted programs, and heredoc data do not.
-#     Quoted child positional arguments are resolved; <<- strips leading tabs.
+#     Discovery follows the files ShellCheck itself reads: source/. command
+#     words, balanced substitutions, and substitutions in unquoted heredoc
+#     bodies. Source annotations remain inputs; ordinary comments, quoted
+#     strings, and heredoc data do not. Child-shell -c strings and heredocs fed
+#     to a shell are runtime data ShellCheck never parses: a source target they
+#     spell, directly or through a positional argument, selects the root, as a
+#     possible caller, but stays out of its cache inputs, and anything else in
+#     them never makes the root unknown or guesses a target. Whole-word quoted
+#     aliases from an immediately preceding simple scalar declaration are
+#     resolved; intervening commands/control boundaries and effectful
+#     declarations remain unknown.
+#     Comments/blank lines do not execute commands; <<- strips leading tabs.
 #     Changes to bin/fm-lint.sh or bin/fm-lint-cache.pl select all. An empty
 #     set skips ShellCheck but still checks backend purity and workflows. A
 #     changed widely sourced library still costs a cold source-aware analysis
@@ -53,7 +61,8 @@
 # backlog backend follows the same tasks-axi lifecycle path.
 # Successful source-aware checks are shared across worktrees via content hashes
 # of the root, its source closure, the analysis arguments, owner, helper, platform,
-# and ShellCheck binary. Identical concurrent misses share one check through flock.
+# and ShellCheck binary and reported version. Identical concurrent misses share
+# one check through flock.
 # Only successful, input-stable results are retained; findings always run again.
 # FM_LINT_CACHE_DIR overrides ${XDG_CACHE_HOME:-$HOME/.cache}/firstmate/lint;
 # "off" disables reuse. CI always disables reuse so every canonical root is checked.
@@ -94,7 +103,7 @@
 # and its physical footprint (FM_LINT_ROOT_RSS_KIB, default 8388608 = 8 GiB, a
 # positive decimal integer or lint exits 2 on every host). A root that crosses
 # it is ended and takes the memory retry described below, and the roots log's
-# last end-record column counts the samples each source gave (libproc, or ps
+# sample-count end-record column counts the samples each source gave (libproc, or ps
 # for a tick libproc did not answer in time) and names any attempt that gave
 # up its libproc reader, with the reason. Linux runs are never watched, and CI
 # runs under FM_LINT_REQUIRE_BOUNDS=1 keep their ulimit envelope.
@@ -107,6 +116,8 @@
 # Partitions are complete, disjoint, and measured-duration balanced; --list-files
 # exposes their actual roots. A root without a measured hint gets 6000 ms,
 # rounded above the observed 5352 ms per-root mean; it is never omitted.
+# Each partition packs its two workers by the same hints, so a byte edit to a
+# root cannot move roots between shards or reorder replayed stdout.
 # Partition mode starts with full source-aware analysis, never changed-only
 # or --fast, and does not accept explicit paths. Each partition also runs
 # workflow lint and backend-purity checks, keeping either invocation
@@ -158,9 +169,13 @@
 # timeout, memory, signal:<sig>, limit-unavailable, or error:<rc>.
 # Memory requires process-level evidence (a GHC exhaustion status or runtime
 # error on stderr), not an echoed source excerpt or an OOM phrase in a
-# filename. In partition mode begin/end
-# lines also stream to stderr, and an abnormal root end is always reported
-# there.
+# filename. Begin/end lines stream to stderr in every mode, including local
+# changed-file lint and cache hits. End records append queue milliseconds
+# (cache-key plus host-slot waits) and the initial cache outcome; duration_ms
+# excludes that queue time but still includes scheduling delay and bookkeeping.
+# A memory retry retains its initial cache outcome and still checks the retry's
+# own inputs; it is never a source-following cache success. A cache hit's notice
+# stays on stderr too, so a reused success leaves stdout as an uncached run does.
 # Duration observations are appended through fm-duration.py in one batch from
 # the roots log when lint exits; cache-hit, partial selection and
 # memory-fallback successes are not cold calibration evidence.
@@ -415,14 +430,13 @@ fm_lint_run_root() {  # <index> <path> <output-dir> <shard-index>
       "$index" "$path" "$shard_index" "${FM_LINT_INTERNAL_MODE:-}" "$start_ms" \
       >> "$FM_LINT_INTERNAL_ROOTS_LOG"
   fi
-  if [ "${FM_LINT_INTERNAL_PROGRESS:-0}" = 1 ]; then
-    printf 'fm-lint: begin %s (shard %s, %s mode)\n' \
-      "$path" "$shard_index" "${FM_LINT_INTERNAL_MODE:-unknown}" >&2
-  fi
+  printf 'fm-lint: begin %s (shard %s, %s mode)\n' \
+    "$path" "$shard_index" "${FM_LINT_INTERNAL_MODE:-unknown}" >&2
   fm_lint_exec_root "$path" "$root_out" "$root_err" "$rss_file" \
     "$root_seconds" "${FM_LINT_WORKER_ARGS[@]}"
   invocation_rc=$FM_LINT_LAST_RC
   queued_ms=$FM_LINT_LAST_WAIT_MS
+  cache_outcome=$(cat "$rss_file.cache" 2>/dev/null || true)
   reason=$(fm_lint_classify_root "$invocation_rc" "$root_err")
   initial_rc=$invocation_rc
   initial_reason=$reason
@@ -464,30 +478,36 @@ fm_lint_run_root() {  # <index> <path> <output-dir> <shard-index>
       printf '; fallback reason=%s rc=%s\n' "$reason" "$invocation_rc" \
         >> "$output_dir/shard.$shard_index.out"
     fi
-    cat "$fallback_out" "$fallback_err" >> "$output_dir/shard.$shard_index.out"
+    if [ "$(cat "$fallback_rss.cache" 2>/dev/null || true)" = cache-hit ]; then
+      cat "$fallback_err" >&2
+    else
+      cat "$fallback_out" "$fallback_err" >> "$output_dir/shard.$shard_index.out"
+    fi
   else
     rss_kib=$(fm_lint_root_rss "$rss_file")
-    cat "$root_out" "$root_err" >> "$output_dir/shard.$shard_index.out"
+    if [ "$cache_outcome" = cache-hit ]; then
+      cat "$root_err" >&2
+    else
+      cat "$root_out" "$root_err" >> "$output_dir/shard.$shard_index.out"
+    fi
   fi
   end_ms=$(fm_lint_now_ms)
   if declare -F fm_duration_load >/dev/null 2>&1; then
     load_end=$(fm_duration_load)
   fi
   duration_ms=$((end_ms - start_ms - queued_ms))
-  cache_outcome=$(cat "$rss_file.cache" 2>/dev/null || true)
   if [ "$cache_outcome" = analyzed ] && [ "$reason" != memory-fallback ]; then
     calibration=1
   fi
   if [ -n "${FM_LINT_INTERNAL_ROOTS_LOG:-}" ]; then
-    printf 'end\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+    printf 'end\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
       "$index" "$path" "$shard_index" "${FM_LINT_INTERNAL_MODE:-}" \
       "$start_ms" "$end_ms" "$duration_ms" "$invocation_rc" "$reason" "$rss_kib" "$final_follow_sources" "$calibration" \
-      "$load_start" "$load_end" "$(fm_lint_root_rss_samples "$rss_file" "$fallback_rss")" >> "$FM_LINT_INTERNAL_ROOTS_LOG"
+      "$load_start" "$load_end" "$(fm_lint_root_rss_samples "$rss_file" "$fallback_rss")" \
+      "$queued_ms" "${cache_outcome:-unknown}" >> "$FM_LINT_INTERNAL_ROOTS_LOG"
   fi
-  if [ "${FM_LINT_INTERNAL_PROGRESS:-0}" = 1 ] || { [ "$reason" != ok ] && [ "$reason" != findings ] && [ "$reason" != memory-fallback ]; }; then
-    printf 'fm-lint: end %s reason=%s rc=%s duration_ms=%s rss_kib=%s\n' \
-      "$path" "$reason" "$invocation_rc" "$duration_ms" "$rss_kib" >&2
-  fi
+  printf 'fm-lint: end %s reason=%s rc=%s duration_ms=%s queue_ms=%s cache=%s rss_kib=%s\n' \
+    "$path" "$reason" "$invocation_rc" "$duration_ms" "$queued_ms" "${cache_outcome:-unknown}" "$rss_kib" >&2
   return "$invocation_rc"
 }
 
@@ -1081,7 +1101,8 @@ else
   fi
 fi
 # Stable largest-first packing uses measured durations across CI runners and
-# direct bytes across the two local workers. Neither weight is a skip rule.
+# their two workers, and direct bytes across the two local workers. Neither
+# weight is a skip rule.
 TAB=$(printf '\t')
 # Slowest successful per-root duration_ms from three Ubuntu main runs.
 # docs/fm-test-portable-shards.md owns measurement provenance and refresh.
@@ -1700,12 +1721,19 @@ fm_lint_root_weights() {
   done
 }
 
+fm_lint_root_hint_weights() {
+  (
+    set -o pipefail
+    fm_lint_root_weights | awk -F '\t' '
+      NR == FNR { hint[$1]=$2; next }
+      { printf "%s\t%s\t%s\n", (($3 in hint) ? hint[$3] : 6000), $2, $3 }
+    ' <(fm_lint_partition_weight_hints) -
+  )
+}
+
 if [ -n "$PARTITION" ]; then
   PARTITION_ROOTS=()
-  partition_weights=$(set -o pipefail; fm_lint_root_weights | awk -F '\t' '
-    NR == FNR { hint[$1]=$2; next }
-    { printf "%s\t%s\t%s\n", (($3 in hint) ? hint[$3] : 6000), $2, $3 }
-  ' <(fm_lint_partition_weight_hints) -) || exit $?
+  partition_weights=$(fm_lint_root_hint_weights) || exit $?
   while IFS="$TAB" read -r index path; do
     PARTITION_ROOTS+=("$path")
   done < <(printf '%s\n' "$partition_weights" | LC_ALL=C sort -t "$TAB" -k1,1nr -k2,2n | awk -F '\t' -v want="${PARTITION%%of*}" '
@@ -1880,11 +1908,6 @@ if [ "$SLOT_DIR" != off ]; then
   case "$NCPU" in ''|0*|*[!0-9]*) NCPU=1 ;; esac
 fi
 
-PROGRESS=0
-if [ -n "$PARTITION" ]; then
-  PROGRESS=1
-fi
-
 TMP_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/fm-lint.XXXXXX") || exit 1
 ACTIVE_PIDS=()
 # shellcheck disable=SC2329 # Registered by the EXIT and signal traps below.
@@ -1989,11 +2012,15 @@ while [ "$worker" -lt "$SHARD_COUNT" ]; do
   worker=$((worker + 1))
 done
 
-fm_lint_root_weights > "$WEIGHTS" || exit $?
+if [ -n "$PARTITION" ]; then
+  fm_lint_root_hint_weights > "$WEIGHTS" || exit $?
+else
+  fm_lint_root_weights > "$WEIGHTS" || exit $?
+fi
 
 # Largest-first deterministic greedy assignment balances the two worker
-# queues without affecting replay order. Direct bytes are a stable portable
-# proxy after the expensive dynamic adapter source fan-out is cut.
+# queues. Outside a partition, direct bytes are a stable portable proxy after
+# the expensive dynamic adapter source fan-out is cut.
 WORKER_LOADS=(0 0)
 LC_ALL=C sort -t "$TAB" -k1,1nr -k2,2n "$WEIGHTS" > "$WEIGHTS.sorted"
 while IFS="$TAB" read -r weight index path; do
@@ -2062,8 +2089,8 @@ fm_lint_run_worker() {  # <worker-index>
     FM_LINT_INTERNAL_GRACE="$ROOT_GRACE"
     FM_LINT_INTERNAL_ROOTS_LOG="$ROOTS_LOG"
     FM_LINT_INTERNAL_MODE="$ANALYSIS_MODE"
-    FM_LINT_INTERNAL_PROGRESS="$PROGRESS"
     FM_LINT_SHELLCHECK="$SHELLCHECK_BIN"
+    FM_LINT_INTERNAL_SHELLCHECK_VERSION="$resolved"
     FM_LINT_PERL_BIN="$PERL_BIN"
   )
   worker_env+=(FM_LINT_INTERNAL_CACHE="$CACHE_DIR" FM_LINT_INTERNAL_SLOT_DIR="$SLOT_DIR" FM_LINT_INTERNAL_NCPU="$NCPU")
@@ -2268,8 +2295,8 @@ EOF
     printf 'source_boundary_directives\t%s\n' "$source_boundaries"
     printf 'source_followed_directives\t%s\n' "$source_followed"
     printf 'source_target_count\t%s\n' "$source_targets"
-    printf 'shard_1_weight_bytes\t%s\n' "${WORKER_LOADS[0]}"
-    printf 'shard_2_weight_bytes\t%s\n' "${WORKER_LOADS[1]:-0}"
+    printf 'shard_1_weight\t%s\n' "${WORKER_LOADS[0]}"
+    printf 'shard_2_weight\t%s\n' "${WORKER_LOADS[1]:-0}"
     printf 'wall_seconds\t%s\n' "$((TELEMETRY_END_EPOCH - TELEMETRY_START_EPOCH))"
     printf 'worker_wall_sum_seconds\t%s\n' "$timing_worker_wall"
     printf 'max_worker_wall_seconds\t%s\n' "$max_worker_wall"

@@ -464,7 +464,8 @@ The four teardown rows (`tests/fm-teardown-cleanup.test.sh` 4219, `tests/fm-tear
 The four control-relaunch rows (`tests/fm-control-relaunch.test.sh` 2922, `tests/fm-control-relaunch-recovery.test.sh` 2724, `tests/fm-control-relaunch-backends.test.sh` 2997, and `tests/fm-control-relaunch-helpers.sh` 1839) divide the former combined file's measured 9888 ms roughly by each file's line share, with the backends and helpers rows scaled by their growth to 2123 and 1325 lines for the omp `adopt` cases; they are not measurements, so replace them from the lint sidecars of the next three Ubuntu main runs.
 The telemetry records ShellCheck 0.11.0 on Linux x86_64, Ubuntu 24, image `20261004.327.1`.
 Longest-processing-time packing uses those durations, not direct file bytes: equal byte totals previously carried 1240 and 1781 seconds of measured lint work in run 38312847224.
-The script header owns missing-root fallback and partition syntax; local worker balancing and its telemetry weight fields still use direct bytes.
+Each partition packs its two workers by the same durations, so a byte edit cannot reorder CI stdout; local worker balancing still uses direct bytes, and the telemetry weight fields carry whichever weight the run packed by.
+The script header owns missing-root fallback and partition syntax.
 Refresh the duration table from successful `end` records' `duration_ms`, retaining complete canonical root coverage independently of hints.
 `tests/fm-lint.test.sh` proves the measured-cost selection with equal-byte roots whose independently seeded durations require a different split.
 CI requires its per-root bounds, so an unenforceable deadline or address-space limit refuses lint rather than running uncapped; the script header owns the envelope, per-root execution contract, and memory fallback.
