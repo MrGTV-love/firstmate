@@ -160,7 +160,10 @@ def unit(base):
     assert ref_allows(before, common) == (sorted(expected_branch_lines(common, BRANCH)), 2, 2), \
         "a task with no successor must allow exactly its branch, lock, reflog and archive names: " + repr(ref_allows(before, common))
     results["no-successor-allows-exactly-the-branch"] = True
-    digest = hashlib.sha256(before.replace(str(base.resolve()), "<BASE>").encode()).hexdigest()
+    # Allow lines only: the deny lines also name every sibling folder of the shared
+    # Claude temp root at build time, which other sessions change between runs.
+    allow_only = "\n".join(line for line in before.splitlines() if line.startswith("(allow"))
+    digest = hashlib.sha256(allow_only.replace(str(base.resolve()), "<BASE>").encode()).hexdigest()
     print(f"DIGEST no-successor-generator-profile={digest}")
 
     # 2. The same inputs plus a recorded successor differ by exactly the
