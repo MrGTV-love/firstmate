@@ -1,0 +1,83 @@
+=== tests/fm-slack-reply.test.sh
+ok - REPLY-1
+ok - REPLY-1b
+ok - REPLY-2
+ok - REPLY-3
+ok - REPLY-3b
+ok - REPLY-4
+ok - REPLY-5
+ok - REPLY-6
+ok - REPLY-7
+ok - REPLY-8 [poll]
+ok - REPLY-8 [check]
+ok - REPLY-9
+ok - REPLY-10
+ok - REPLY-11 [poll/default]
+ok - REPLY-11 [poll/cap1]
+ok - REPLY-11 [check/default]
+ok - REPLY-11 [check/cap1]
+ok - REPLY-12 [poll]
+ok - REPLY-12 [check]
+ok - all Slack reply checks
+rc=0
+=== tests/fm-slack-secret-scan.test.sh
+ok - scan redacted and detected both planted copies
+rc=0
+=== tests/fm-slack-watch.test.sh
+..........................................................................................................................................................................................................
+----------------------------------------------------------------------
+Ran 202 tests in 25.477s
+
+OK
+ok - HELPERS
+ok - DOD-01
+ok - DOD-02
+ok - DOD-03
+ok - DOD-04
+ok - DOD-05
+ok - DOD-06
+ok - DOD-07
+ok - DOD-08
+ok - DOD-09
+ok - DOD-10
+ok - DOD-12
+ok - DOD-13
+ok - DOD-14
+ok - DOD-15
+ok - DOD-16
+ok - DOD-17
+ok - S1
+ok - S2
+ok - S3
+ok - X1
+ok - X2
+ok - X3
+ok - X4
+ok - X5
+ok - X6
+ok - X7
+ok - X8
+ok - X9
+ok - X10
+ok - X11
+ok - X12
+ok - X13
+ok - X14
+ok - X15
+ok - X16
+ok - X17
+ok - X18
+ok - X19
+ok - X20
+ok - X21
+ok - X22
+ok - X23
+ok - X24
+ok - X25
+ok - X26
+ok - X27
+ok - X28
+ok - X29
+ok - X30
+ok - X31
+Terminated: 15

@@ -1,0 +1,115 @@
+=== tests/fm-slack-watch.test.sh
+..........................................................................................................................................................................................................
+----------------------------------------------------------------------
+Ran 202 tests in 19.818s
+
+OK
+ok - HELPERS
+ok - DOD-01
+ok - DOD-02
+ok - DOD-03
+ok - DOD-04
+ok - DOD-05
+ok - DOD-06
+ok - DOD-07
+ok - DOD-08
+ok - DOD-09
+ok - DOD-10
+ok - DOD-12
+ok - DOD-13
+ok - DOD-14
+ok - DOD-15
+ok - DOD-16
+ok - DOD-17
+ok - S1
+ok - S2
+ok - S3
+ok - X1
+ok - X2
+ok - X3
+ok - X4
+ok - X5
+ok - X6
+ok - X7
+ok - X8
+ok - X9
+ok - X10
+ok - X11
+ok - X12
+ok - X13
+ok - X14
+ok - X15
+ok - X16
+ok - X17
+ok - X18
+ok - X19
+ok - X20
+ok - X21
+ok - X22
+ok - X23
+ok - X24
+ok - X25
+ok - X26
+ok - X27
+ok - X28
+ok - X29
+ok - X30
+ok - X31
+ok - X32
+ok - X33
+ok - X34
+ok - X35
+ok - X36
+ok - X37
+ok - X38
+ok - X39
+ok - X40
+ok - X41
+ok - X42
+ok - X43
+ok - X44
+ok - X45
+ok - X46
+ok - X47
+ok - X48
+ok - X49
+ok - INTAKE-1
+ok - INTAKE-2
+ok - INTAKE-3
+ok - INTAKE-4
+ok - INTAKE-5
+ok - INTAKE-6
+ok - INTAKE-7
+ok - INTAKE-8
+ok - INTAKE-9
+ok - INTAKE-10
+ok - INTAKE-11
+ok - INTAKE-12
+ok - INTAKE-13
+ok - INTAKE-14
+ok - all Slack watch checks
+rc=0
+=== tests/fm-slack-intake-unchanged.test.sh
+ok - intake refusals hold
+rc=0
+=== tests/fm-slack-deadline.test.sh
+slow check elapsed: 30.120s; request timings: [{"method": "conversations.open", "timeout": 10, "seconds": 0.000670666981022805}, {"method": "conversations.history", "timeout": 10, "seconds": 0.004396458039991558}, {"method": "chat.postMessage", "timeout": 10, "seconds": 0.001772582996636629}, {"method": "conversations.history", "timeout": 10, "seconds": 0.0006898750434629619}, {"method": "chat.postMessage", "timeout": 10, "seconds": 0.0004932910087518394}, {"method": "conversations.history", "timeout": 10, "seconds": 0.0007559580262750387}, {"method": "chat.postMessage", "timeout": 10, "seconds": 0.000533499987795949}, {"method": "conversations.history", "timeout": 10, "seconds": 0.00074562500230968}, {"method": "chat.postMessage", "timeout": 10, "seconds": 0.0005743330111727118}, {"method": "conversations.replies", "timeout": 10, "seconds": 0.00043587497202679515}, {"method": "conversations.replies", "timeout": 10, "seconds": 0.00047737499698996544}, {"method": "conversations.replies", "timeout": 10, "seconds": 0.00045016600051894784}, {"method": "conversations.replies", "timeout": 10, "seconds": 0.0004588749725371599}, {"method": "conversations.history", "timeout": 10, "seconds": 0.0007906660321168602}]
+ok - slow standing check completes after 30.120s; four cards remain four on repeat
+ok - watcher lets 6 requests of 3s each finish under a 6s no-progress bound
+ok - longest silent read ends after 10.002s, before owner no-progress bound 30s; one report per episode
+hanging request timings: [{"method": "conversations.replies", "timeout": 10, "seconds": 10.001946332980879}, {"method": "conversations.replies", "timeout": 10, "seconds": 10.002443834033329}]
+rc=0
+=== tests/fm_slack_reply_test.py
+.......................................................
+----------------------------------------------------------------------
+Ran 55 tests in 2.321s
+
+OK
+rc=0
+=== tests/fm_slack_watch_test.py
+..........................................................................................................................................................................................................
+----------------------------------------------------------------------
+Ran 202 tests in 18.601s
+
+OK
+rc=0

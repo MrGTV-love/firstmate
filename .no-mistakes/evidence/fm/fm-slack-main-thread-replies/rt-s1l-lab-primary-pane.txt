@@ -1,0 +1,11 @@
+# Lab primary pane after `claude` start in tmux -L fm-lab (session list of other sessions redacted)
+ ▐▛███▛█   Claude Code v2.1.323
+▝▜██████▀  New sessions: Opus 5.5 · high effort · ~/.no-mistakes/worktrees/eded895c05cf/01M79718NYS0QF6564AW22BVKK
+ ▝▝   ▝▝   0 awaiting input · 1 working · 1 completed
+ Pinned
+ [redacted: names of the operator's other sessions]
+~/.no-mistakes/repos/eded895c05cf.git
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ describe a task for a new session
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  enter to collapse · hold space to speak · ctrl+x to remove all · ? for shortcuts
