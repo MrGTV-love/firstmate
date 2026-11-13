@@ -3052,6 +3052,7 @@ Writes are allowed by default; the profile denies writes to these named protecte
 Task ids come from the `state/<id>.meta` records of this home and of every other local home.
 Each protected folder, each folder that holds protected entries, and every folder above them also refuses rename and deletion, so moving a parent cannot carry a protected asset away; creating new entries inside them stays allowed.
 In that shared Git directory the task keeps its own declared branch and the two recovery archives of the custody-return route in [`validation-supervision`](../.agents/skills/validation-supervision/SKILL.md), `archive/<task>-submitted-<8 lowercase hex>` and `archive/<task>-pipeline-<8 lowercase hex>`, each with its lock file and reflog.
+When the task's record names one `successor_branch=` (written only by [`fm-control successor`](agent-control.md#recording-a-successor-branch)), the launch also keeps that one branch as an exact literal ref, lock file and reflog, and never a pattern, folder or prefix of it.
 Both archive names are anchored at both ends on the whole task id, so another task's archive, including one whose id contains or extends this task's id, stays protected like its other branches.
 That holds for a task created after the profile was built, because the profile names only these two exact shapes and never a prefix.
 Any other archive name, such as `archive/<task>-submitted` without the hex suffix, stays refused.
@@ -3061,7 +3062,7 @@ The shared `packed-refs` file and its `packed-refs.new` rewrite file refuse ever
 A hard link or symbolic link that already exists for a protected ref path in this repository's shared Git directory is closed at the build, wherever the hard link sits: the profile builder refuses to build while `packed-refs`, `HEAD`, `index`, `commondir`, any branch ref or reflog under `refs/heads` other than the task's own branch, a replace ref, or another worktree's `worktrees/<name>/HEAD`, `index` or `commondir` has a second hard link or is a symbolic link, or while a folder above one of them, such as a folder under `refs/heads`, is a symbolic link.
 Its error names the path with the link count or the link target (for example `packed-refs (2 links)` or `refs/heads/fm (symbolic link to /tmp/dir)`), so a refused launch writes no profile.
 A `HEAD` that is a symbolic link to a `refs/heads/` name, the form Git's `core.preferSymlinkRefs` writes, stays allowed, because Git reads that name and never follows the link.
-The task's own branch, its reflog and its own worktree Git directory are writable by design and are not checked.
+The task's own branch, its recorded successor branch, their reflogs and its own worktree Git directory are writable by design and are not checked.
 The builder does not scan other projects' Git directories or other gate repositories, so a link that already exists to a protected ref file there is not refused.
 A link that an unconfined actor adds after the profile is built is also not refused; that actor could write the file directly, and a confined process cannot create the link at a protected path itself.
 A Git command can still repoint a packed ref outside `refs/heads`, such as `refs/stash`, a tag or a remote-tracking ref, by writing a loose ref, which takes precedence over the packed line.

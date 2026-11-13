@@ -12,6 +12,8 @@
 #                                            (--note <text> | --note-file <path>)
 # Reassociation holds the task control lock, so it makes one nonwaiting
 # bin/fm-project-lock-lib.sh attempt that never jumps a queued waiter.
+#        fm-control.sh <task-id> successor --branch <successor-branch>
+#                                          (--note <text> | --note-file <path>) [--check]
 #        fm-control.sh <task-id> relaunch [--harness <name>] [--model <name>]
 #                                         [--effort <level>] [--claude-debug]
 #                                         [--captain-model-pin <model-id>]
@@ -76,6 +78,31 @@
 # record, instructions file, and slot claim already published.
 # docs/agent-control.md "Reassociating a task with a replacement
 # copy" owns every refusal and what each reader of the record does after it.
+# successor is metadata-only as well: the lock-owning main Firstmate records one
+# successor task branch (successor_branch=, directly after the task's branch=)
+# so that the write profile bin/fm-write-confinement.py generates for the task's
+# NEXT launch also permits that one literal ref, its lock and its reflog. The
+# prior branch= stays recorded and so does the brief's Ship branch line; the
+# brief gains a dated section naming the successor and the note. It takes the
+# lifecycle lock, then the metadata lock, and refuses, naming the missing proof
+# and changing nothing, unless the caller is the lock-owning main Firstmate, the
+# task is a local ship with a regular record and brief, no relaunch transaction
+# or backlog close is pending, the name passes bin/fm-successor-branch-lib.sh
+# (valid, plain, not archive/, not the task's branch, base branch or the
+# project's default branch, not another task's branch or successor), the task
+# records no different successor, the ref exists in the project's ref store, it
+# is not checked out in any worktree but the task's own recorded copy (read from the
+# project's worktree list, never from a copy), and it is proved to be this task's:
+# either it is checked out in the task's recorded copy and contains the recorded
+# branch's tip, or its tip is the tip of one of the task's own custody archive
+# branches archive/<id>-(submitted|pipeline)-<8 hex>. The same
+# successor again is a no-op that says so. --check runs every proof and writes
+# nothing. It never reads or writes a work tree, runs no command that changes a
+# ref or the index, signals no process, writes no profile and touches no run
+# record: a running worker keeps the profile it was launched with, and the
+# receipt's next line is the relaunch that applies the new one. A failed write
+# restores the record and the brief. docs/agent-control.md "Recording a
+# successor branch" owns the contract and what each reader of the record does.
 # adopt repairs only a local Herdr omp task's state/<id>.omp-session.json,
 # under the task's control and metadata locks. The lock-owning main Firstmate
 # alone may run it: a worker, the supervision branch, or a session that does
@@ -354,6 +381,8 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 . "$SCRIPT_DIR/fm-dispatch-capacity-lib.sh"
 # shellcheck source=bin/fm-timeout-lib.sh
 . "$SCRIPT_DIR/fm-timeout-lib.sh"
+# shellcheck source=bin/fm-successor-branch-lib.sh
+. "$SCRIPT_DIR/fm-successor-branch-lib.sh"
 
 POLL=${FM_CONTROL_POLL:-0.5}
 SETTLE_WAIT=${FM_CONTROL_SETTLE_WAIT:-5}
@@ -380,6 +409,13 @@ CONTROL_META_TMP=
 CONTROL_PROJECT_LOCK=
 CONTROL_PROJECT_LOCK_HELD=0
 REASSOCIATE_ACTIVE=0
+SUCCESSOR_ACTIVE=0
+SU_META_TMP=
+SU_BRIEF_TMP=
+SU_META_BACKUP=
+SU_BRIEF_BACKUP=
+SU_META_PUBLISHED=0
+SU_BRIEF_PUBLISHED=0
 # The extra locks reassociate --also holds for its other tasks.
 RA_CONTROL_LOCKS=()
 RA_META_LOCKS=()
@@ -397,6 +433,10 @@ control_cleanup() {
   if [ "$REASSOCIATE_ACTIVE" = 1 ] \
      && declare -F reassociate_rollback >/dev/null 2>&1; then
     reassociate_rollback || true
+  fi
+  if [ "$SUCCESSOR_ACTIVE" = 1 ] \
+     && declare -F successor_rollback >/dev/null 2>&1; then
+    successor_rollback || true
   fi
   [ -z "$CONTROL_META_TMP" ] || rm -f "$CONTROL_META_TMP"
   [ -z "$RELAUNCH_PAIR_DIR" ] || rm -rf -- "$RELAUNCH_PAIR_DIR"
@@ -468,6 +508,9 @@ RECOVER_LAUNCH=0
 OWNED_PATHS=()
 ALSO_IDS=()
 ALSO_COPIES=()
+SUCC_BRANCH=
+SUCC_BRANCH_SET=0
+SUCC_CHECK=0
 # --also <task-id>=<replacement-copy>: another task reassociate re-points in the same call.
 parse_also() {  # <value>
   local value=$1 also_id also_copy existing
@@ -500,6 +543,7 @@ for control_arg in "$@"; do
       worktree) RELOCATE_TO=$control_arg; RELOCATE_SET=1 ;;
       owned-path) OWNED_PATHS+=("$control_arg") ;;
       also) parse_also "$control_arg" ;;
+      branch) SUCC_BRANCH=$control_arg; SUCC_BRANCH_SET=1 ;;
       note_file)
         [ -f "$control_arg" ] || die "--note-file '$control_arg' is not a readable file"
         NOTE=$(cat "$control_arg")
@@ -522,6 +566,19 @@ for control_arg in "$@"; do
     --worktree=*) RELOCATE_TO=${control_arg#--worktree=}; RELOCATE_SET=1 ;;
     --owned-path) control_want_value="owned-path" ;;
     --owned-path=*) OWNED_PATHS+=("${control_arg#--owned-path=}") ;;
+    --branch)
+      [ "$VERB" = successor ] || die "unexpected argument '$control_arg'"
+      control_want_value=branch
+      ;;
+    --branch=*)
+      [ "$VERB" = successor ] || die "unexpected argument '$control_arg'"
+      SUCC_BRANCH=${control_arg#--branch=}
+      SUCC_BRANCH_SET=1
+      ;;
+    --check)
+      [ "$VERB" = successor ] || die "unexpected argument '$control_arg'"
+      SUCC_CHECK=1
+      ;;
     --also) control_want_value=also ;;
     --also=*) parse_also "${control_arg#--also=}" ;;
     --note) control_want_value=note ;;
@@ -547,7 +604,10 @@ fi
   || die "--also applies to 'reassociate' only"
 [ "${#OWNED_PATHS[@]}" = 0 ] || { [ "$VERB" = relaunch ] && [ "$RECOVER_LAUNCH" = 0 ]; } \
   || die "--owned-path applies to 'relaunch' only and cannot be combined with --recover-launch"
-if [ "$VERB" = reassociate ]; then
+if [ "$VERB" = successor ]; then
+  [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$CLAUDE_DEBUG" = 0 ] && [ "$CAPTAIN_MODEL_PIN_SET" = 0 ] && [ "$RECOVER_LAUNCH" = 0 ] && [ "$RECONCILE_ONLY" = 0 ] && [ "$RELOCATE_SET" = 0 ] \
+    || die "successor takes only --branch, --note (or --note-file) and --check; the relaunch options apply to 'relaunch' only"
+elif [ "$VERB" = reassociate ]; then
   # reassociate takes --worktree, --also, and --note; every other relaunch option stays refused.
   [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$CLAUDE_DEBUG" = 0 ] && [ "$CAPTAIN_MODEL_PIN_SET" = 0 ] && [ "$RECOVER_LAUNCH" = 0 ] && [ "$RECONCILE_ONLY" = 0 ] \
     || die "--harness, --model, --effort, --claude-debug, --captain-model-pin, --recover-launch, and --reconcile-only apply to 'relaunch' only"
@@ -647,6 +707,285 @@ if [ "$VERB" = authorize-continuation ]; then
     || die "$FM_BACKLOG_TRANSITION_ERROR"
   CONTROL_META_TMP=
   echo "continuation-authorized $ID"
+  exit 0
+fi
+
+# --- successor: record one successor task branch -----------------------------
+#
+# Nothing here reads or writes a work tree, changes a ref or the index, signals
+# a process, writes a profile or touches a run record. It writes exactly two
+# files: the task's record (one added line) and the task's instructions (one
+# added section), both restored if either write fails.
+
+# Undo whatever this attempt published before it failed. The record is
+# published last, so a failure before it never leaves a half-recorded successor.
+successor_rollback() {
+  [ -z "$SU_META_TMP" ] || rm -f -- "$SU_META_TMP"
+  [ -z "$SU_BRIEF_TMP" ] || rm -f -- "$SU_BRIEF_TMP"
+  if [ "$SU_META_PUBLISHED" = 1 ] && [ -n "$SU_META_BACKUP" ]; then
+    if fm_backlog_atomic_transition publish "$SU_META_BACKUP" "$META" "task record" "$STATE"; then
+      SU_META_BACKUP=
+    else
+      echo "error: task $ID's record could not be restored after the failed successor recording; the prior record is at $SU_META_BACKUP" >&2
+    fi
+  elif [ -n "$SU_META_BACKUP" ]; then
+    rm -f -- "$SU_META_BACKUP"
+  fi
+  if [ "$SU_BRIEF_PUBLISHED" = 1 ] && [ -n "$SU_BRIEF_BACKUP" ]; then
+    if mv -f -- "$SU_BRIEF_BACKUP" "$DATA/$ID/brief.md" 2>/dev/null; then
+      SU_BRIEF_BACKUP=
+    else
+      echo "error: task $ID's instructions could not be restored after the failed successor recording; the prior copy is at $SU_BRIEF_BACKUP" >&2
+    fi
+  elif [ -n "$SU_BRIEF_BACKUP" ]; then
+    rm -f -- "$SU_BRIEF_BACKUP"
+  fi
+}
+
+# The worktree that has refs/heads/<successor> attached, read from the project's
+# worktree list so no work tree is opened. Prints its path (nothing when no
+# worktree has it); fails only when the list cannot be read.
+successor_checkout_path() {  # <project> <successor>
+  local project=$1 successor=$2 line path="" attached="" listed
+  listed=$(git -C "$project" worktree list --porcelain 2>/dev/null) || return 1
+  while IFS= read -r line; do
+    case "$line" in
+      'worktree '*) path=${line#worktree }; attached= ;;
+      'branch '*) attached=${line#branch } ;;
+      '')
+        if [ -n "$path" ] && [ "$attached" = "refs/heads/$successor" ]; then
+          printf '%s\n' "$path"
+          return 0
+        fi
+        path=
+        attached=
+        ;;
+    esac
+  done <<< "$listed"$'\n\n'
+  return 0
+}
+
+# Route 2 of the successor proof: the successor's tip is the tip of one of this
+# task's own custody archive branches, archive/<id>-(submitted|pipeline)-<8 hex>
+# whose hex is the first eight digits of its own tip. Prints the matching
+# archive name; fails when none matches.
+successor_archive_match() {  # <project> <task-id> <successor-sha>
+  local project=$1 id=$2 sha=$3 name tip rest
+  while read -r name tip; do
+    rest=${name#"archive/$id-"}
+    [ "$rest" != "$name" ] || continue
+    [[ $rest =~ ^(submitted|pipeline)-([0-9a-f]{8})$ ]] || continue
+    [ "${tip:0:8}" = "${BASH_REMATCH[2]}" ] || continue
+    [ "$tip" = "$sha" ] || continue
+    printf '%s\n' "$name"
+    return 0
+  done < <(git -C "$project" for-each-ref --format='%(refname:short) %(objectname)' "refs/heads/archive/$id-submitted-*" "refs/heads/archive/$id-pipeline-*" 2>/dev/null)
+  return 1
+}
+
+do_successor() {
+  local project wt copy kind kind_count branch_count succ_count old_branch recorded_succ base_branch reason
+  local other_path why1 archive_name proof_text="recorded earlier"
+  local line brief_branch_other=0 succ_sha prior_sha="" stamp brief_text meta_text next_note su_outcome action
+  local inserted=0
+  local -a homes=()
+
+  [ "$SUCC_BRANCH_SET" = 1 ] && [ -n "$SUCC_BRANCH" ] \
+    || die "successor requires --branch <successor-branch>"
+  if [ "$SUCC_CHECK" = 0 ]; then
+    [ "$NOTE_SET" = 1 ] && [ -n "$NOTE" ] \
+      || die "successor requires --note (or --note-file) saying why the successor is needed; it is recorded in the task's instructions"
+  fi
+
+  CONTROL_META_LOCK=$(fm_meta_lock_path "$META") || exit 1
+  fm_lock_acquire_wait "$CONTROL_META_LOCK"
+  CONTROL_META_LOCK_HELD=1
+
+  # Everything below is read under both locks, so the proofs and the write see
+  # one record.
+  fm_backlog_record_present "$META" "task record" "$STATE" \
+    || die "$FM_BACKLOG_TRANSITION_ERROR"
+  [ -z "$(fm_meta_get "$META" remote_host)" ] \
+    || die "task $ID is a remotely placed secondmate; a successor branch applies to a local ship"
+  fm_backend_validate_task_endpoint "$META" "$ID" || exit 1
+  kind_count=$(grep -c '^kind=' "$META" 2>/dev/null || true)
+  [ "${kind_count:-0}" -le 1 ] || die "task $ID records more than one kind; nothing was changed"
+  kind=$(fm_meta_get "$META" kind)
+  [ -n "$kind" ] || kind=ship
+  [ "$kind" = ship ] \
+    || die "a successor branch applies to a ship; task $ID is a $kind; nothing was changed"
+  [ ! -e "$STATE/$ID.backlog-close" ] && [ ! -L "$STATE/$ID.backlog-close" ] \
+    || die "task $ID has a pending authoritative backlog close from an interrupted cleanup; finish or repair it before recording a successor branch"
+  if [ -e "$STATE/$ID.control-relaunch" ] || [ -L "$STATE/$ID.control-relaunch" ]; then
+    [ -f "$STATE/$ID.control-relaunch" ] && [ ! -L "$STATE/$ID.control-relaunch" ] \
+      && [ "$(fm_meta_get "$STATE/$ID.control-relaunch" task)" = "$ID" ] \
+      && [ "$(fm_meta_get "$STATE/$ID.control-relaunch" phase)" = complete ] \
+      || die "task $ID has an unfinished relaunch transaction at $STATE/$ID.control-relaunch; reconcile it before recording a successor branch"
+  fi
+  project=$(fm_backend_meta_exact_value "$META" project) \
+    || die "task $ID has no unambiguous project; nothing was changed"
+  wt=$(fm_backend_meta_exact_value "$META" worktree) \
+    || die "task $ID has no unambiguous worktree; nothing was changed"
+  [ -d "$project" ] || die "task $ID's recorded project $project is not a directory; nothing was changed"
+  branch_count=$(grep -c '^branch=' "$META" 2>/dev/null || true)
+  [ "${branch_count:-0}" -le 1 ] || die "task $ID records more than one branch; nothing was changed"
+  succ_count=$(grep -c '^successor_branch=' "$META" 2>/dev/null || true)
+  [ "${succ_count:-0}" -le 1 ] || die "task $ID records more than one successor branch; nothing was changed"
+  old_branch=$(fm_meta_get "$META" branch)
+  # The default every launch and landing path applies to a record without one.
+  [ -n "$old_branch" ] || old_branch="fm/$ID"
+  recorded_succ=$(fm_meta_get "$META" successor_branch)
+  base_branch=$(fm_meta_get "$META" base_branch)
+  [ -f "$DATA/$ID/brief.md" ] && [ ! -L "$DATA/$ID/brief.md" ] \
+    || die "task $ID has no regular instructions file at $DATA/$ID/brief.md; the successor must be recorded there for any future worker, so nothing was changed"
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      "Ship branch: $old_branch") ;;
+      "Ship branch: "*) brief_branch_other=$((brief_branch_other + 1)) ;;
+    esac
+  done < "$DATA/$ID/brief.md"
+  [ "$brief_branch_other" = 0 ] \
+    || die "task $ID's instructions name a Ship branch other than its recorded branch $old_branch; reconcile the two before recording a successor branch"
+
+  su_outcome=successor-recorded
+  action="recorded"
+  if [ -n "$recorded_succ" ]; then
+    [ "$recorded_succ" = "$SUCC_BRANCH" ] \
+      || die "task $ID already records successor branch $recorded_succ; one successor per task, so nothing was changed"
+    su_outcome=successor-already-recorded
+  else
+    fm_local_firstmate_state_dirs "$STATE" \
+      || die "cannot list the local Firstmate homes to compare successor names against: $FM_LOCAL_FIRSTMATE_ERROR; nothing was changed"
+    homes=("${FM_LOCAL_FIRSTMATE_STATES[@]}")
+    reason=$(fm_successor_name_refusal "$SUCC_BRANCH" "$old_branch" "$base_branch" "$META" "$project" "${homes[@]}") \
+      || die "successor branch '$SUCC_BRANCH' is not admissible: $reason; nothing was changed"
+    succ_sha=$(git -C "$project" rev-parse --verify --quiet "refs/heads/$SUCC_BRANCH^{commit}" 2>/dev/null) \
+      || die "successor branch '$SUCC_BRANCH' does not exist in the project's ref store ($project); create it first; nothing was changed"
+    copy=$(fm_task_copy_canonical_dir "$wt") \
+      || die "task $ID's recorded copy $wt is not a directory, so the successor cannot be proved to be this task's; nothing was changed"
+    other_path=$(successor_checkout_path "$project" "$SUCC_BRANCH") \
+      || die "cannot read $project's worktree list, so the successor cannot be proved to be this task's; nothing was changed"
+    if [ -n "$other_path" ] && [ "$other_path" != "$copy" ] && [ "$(fm_task_copy_canonical_dir "$other_path" 2>/dev/null || true)" != "$copy" ]; then
+      die "successor branch '$SUCC_BRANCH' is checked out in $other_path, which is not this task's recorded copy $wt; nothing was changed"
+    fi
+    # The branch must be proved to be this task's. Route 1: it is the branch
+    # checked out in the task's own recorded copy and contains the recorded
+    # branch's tip. Route 2: its tip is the tip of one of the task's own custody
+    # archive branches. Either route is enough.
+    why1=
+    if [ -z "$other_path" ]; then
+      why1="it is not checked out in the recorded copy $wt"
+    elif ! prior_sha=$(git -C "$project" rev-parse --verify --quiet "refs/heads/$old_branch^{commit}" 2>/dev/null); then
+      why1="the recorded branch '$old_branch' does not exist in the project's ref store"
+    elif ! git -C "$project" merge-base --is-ancestor "$prior_sha" "$succ_sha" 2>/dev/null; then
+      why1="the recorded tip $prior_sha is not an ancestor of the successor tip $succ_sha"
+    fi
+    if [ -n "$why1" ]; then
+      archive_name=$(successor_archive_match "$project" "$ID" "$succ_sha") \
+        || die "successor branch '$SUCC_BRANCH' is not proved to be this task's successor; route 1 (checked out in the recorded copy and containing the recorded branch's tip) fails because $why1; route 2 (its tip $succ_sha is the tip of one of the task's own archive/$ID-(submitted|pipeline)-<8 hex> branches) fails because none points there; nothing was changed"
+      proof_text="route 2: its tip $succ_sha is the tip of the task's own archive branch $archive_name"
+    else
+      proof_text="route 1: it is checked out in the recorded copy and contains the recorded branch's tip $prior_sha"
+    fi
+  fi
+
+  next_note="apply recorded successor branch $SUCC_BRANCH"
+  if [ "$SUCC_CHECK" = 1 ]; then
+    su_outcome=successor-check
+    if [ -n "$recorded_succ" ]; then action="none: already recorded; would write nothing"; else action="would record"; fi
+  elif [ "$su_outcome" = successor-already-recorded ]; then
+    action="none: task $ID already records successor_branch=$SUCC_BRANCH; wrote nothing"
+  else
+    # Stage both files and keep a copy of both before publishing either.
+    SUCCESSOR_ACTIVE=1
+    stamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    SU_BRIEF_TMP=$(mktemp "$DATA/$ID/.brief.successor.XXXXXX") \
+      || die "could not stage task $ID's instructions"
+    brief_text=$(cat -- "$DATA/$ID/brief.md" && printf .) \
+      || die "could not read task $ID's instructions; nothing was changed"
+    brief_text=${brief_text%.}
+    (
+      printf '%s' "$brief_text" || exit 1
+      printf '%s\n' "" "## Successor branch ($stamp)" "" \
+        "This task now records a successor branch in the same copy." \
+        "Prior branch: $old_branch (still recorded; the Ship branch line above is unchanged)." \
+        "Successor branch: $SUCC_BRANCH" \
+        "The write profile of this task's next launch allows writes to exactly its prior branch, the successor branch (each with its lock and reflog) and its archive recovery branches, and nothing more." \
+        "" "$NOTE"
+    ) > "$SU_BRIEF_TMP" || die "could not stage task $ID's instructions"
+    SU_META_TMP=$(mktemp "$STATE/.$ID.meta.successor.XXXXXX") \
+      || die "could not stage task $ID's record"
+    meta_text=$(cat -- "$META" && printf .) \
+      || die "could not read task $ID's record; nothing was changed"
+    meta_text=${meta_text%.}
+    (
+      # successor_branch= goes directly after branch=, else before the first
+      # pr= line (nothing but PR fields may follow it), else last.
+      while IFS= read -r line || [ -n "$line" ]; do
+        case "$line" in
+          pr=*)
+            if [ "$inserted" = 0 ]; then
+              printf 'successor_branch=%s\n' "$SUCC_BRANCH" || exit 1
+              inserted=1
+            fi
+            ;;
+        esac
+        printf '%s\n' "$line" || exit 1
+        case "$line" in
+          branch=*)
+            if [ "$inserted" = 0 ]; then
+              printf 'successor_branch=%s\n' "$SUCC_BRANCH" || exit 1
+              inserted=1
+            fi
+            ;;
+        esac
+      done < <(printf '%s' "$meta_text")
+      [ "$inserted" = 1 ] || printf 'successor_branch=%s\n' "$SUCC_BRANCH" || exit 1
+    ) > "$SU_META_TMP" || die "could not stage task $ID's record"
+    SU_META_BACKUP=$(mktemp "$STATE/.$ID.meta.prior.XXXXXX") \
+      || die "could not preserve task $ID's record"
+    cp -p -- "$META" "$SU_META_BACKUP" \
+      || die "could not preserve task $ID's record"
+    SU_BRIEF_BACKUP=$(mktemp "$DATA/$ID/.brief.prior.XXXXXX") \
+      || die "could not preserve task $ID's instructions"
+    cp -p -- "$DATA/$ID/brief.md" "$SU_BRIEF_BACKUP" \
+      || die "could not preserve task $ID's instructions"
+    # Publish the instructions first and the record last, so every earlier
+    # failure rolls back to the record that was there.
+    mv -f -- "$SU_BRIEF_TMP" "$DATA/$ID/brief.md" \
+      || die "could not publish task $ID's instructions"
+    SU_BRIEF_TMP=
+    SU_BRIEF_PUBLISHED=1
+    fm_backlog_atomic_transition publish "$SU_META_TMP" "$META" "task record" "$STATE" \
+      || die "$FM_BACKLOG_TRANSITION_ERROR"
+    SU_META_TMP=
+    SU_META_PUBLISHED=1
+    # Committed: nothing below may roll anything back.
+    SUCCESSOR_ACTIVE=0
+    rm -f -- "$SU_META_BACKUP" "$SU_BRIEF_BACKUP"
+    SU_META_BACKUP=
+    SU_BRIEF_BACKUP=
+    action="recorded; wrote $META and $DATA/$ID/brief.md"
+  fi
+
+  printf '%s %s branch=%s successor_branch=%s\n' "$su_outcome" "$ID" "$old_branch" "$SUCC_BRANCH"
+  printf 'owner: the lock-owning main Firstmate of %s\n' "$FM_HOME"
+  printf 'action: task=%s prior_branch=%s successor_branch=%s; %s; proof: %s; no work tree, ref, index, process, run record or profile file was touched\n' \
+    "$ID" "$old_branch" "$SUCC_BRANCH" "$action" "$proof_text"
+  printf 'next: FM_HOME=%q bash %q %q relaunch --note %q\n' "$FM_HOME" "$SCRIPT_DIR/fm-control.sh" "$ID" "$next_note"
+  printf 'effect: a running worker keeps the profile it was launched with; that relaunch exits it and starts a replacement in the same copy and endpoint, and the replacement'"'"'s write profile is generated from the record to allow exactly branch %s and successor %s (each with its lock and reflog) and the task'"'"'s archive recovery branches. It touches no ref, no run record and no task file except the worker wiring files every relaunch rewrites.\n' \
+    "$old_branch" "$SUCC_BRANCH"
+}
+
+if [ "$VERB" = successor ]; then
+  [ -z "${FM_TASK_ID:-}" ] \
+    || die "workers cannot record a successor branch"
+  fm_lease_forbid_branch "successor branch recording (fm-control)"
+  # shellcheck source=bin/fm-session-lock-lib.sh
+  . "$SCRIPT_DIR/fm-session-lock-lib.sh"
+  fm_session_lock_owned_by_self "$STATE" \
+    || die "successor branch recording requires the actual lock-owning main Firstmate"
+  do_successor
   exit 0
 fi
 
