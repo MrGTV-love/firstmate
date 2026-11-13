@@ -351,8 +351,21 @@ A watcher close leaves an announced downtime episode announced, while a successf
 An announced handling episode becomes pending downtime on the same generation because its handling turn may have been interrupted.
 That handling republication gives a successor exactly one recovery presentation without orphaning the acknowledgement already printed for that generation.
 A watcher stopped so an arm can take its cycle over (`bin/fm-watch-arm.sh --take-over`) publishes downtime like any close, but the taking arm restores an acknowledged episode that stop reopened only when the taken-over arm's cycle-ledger row for that exact arm and watcher records the watcher ending by the take-over's TERM and no wake was appended in between.
-The taking arm waits within a short bound for that row; a missing row or any other signal leaves downtime for the fresh cycle's ordinary recovery wake, while take-over still proceeds.
+The taking arm waits for the stopped watcher to exit with no fixed bound, because bash holds a TERM while a command substitution child runs and a watcher inside one dies only when that child ends.
+That wait ends early only when the watcher is proven to make no progress for the stall bound, which leaves it to the plain attach.
+Once the watcher is gone the arm waits within a short bound for the owner's row; a missing row or any other signal leaves downtime for the fresh cycle's ordinary recovery wake, while take-over still proceeds.
+An ordinary close, one that no take-over stopped, still publishes downtime, so the next watcher announces it once even with an empty queue; only a take-over's own TERM is restored.
 Any other episode is left for the next cycle's arm check.
+
+### Take-over and the prelude
+
+A take-over never signals a watcher that is inside its prelude, the run of steps at the top of every poll.
+The watcher publishes `state/.prelude-inflight` (its pid and identity) for the whole prelude and removes it when the prelude ends or the watcher closes.
+The taking arm writes `state/.takeover-claim` (its own pid) first and reads the marker second, and the watcher writes the marker first and reads the claim second, so one always sees the other.
+When the arm finds the marker it removes its claim and attaches to the busy watcher through the ordinary attach path with no TERM, and the left arm and the new arm report the cycle's wake as an attached arm does.
+When the watcher starts a prelude after the arm's check, it sees the live claim and skips the prelude that pass, so the arm's TERM lands on a watcher inside no step.
+A marker a killed watcher left names another pid or identity and does not hold off the stop of a live idle successor.
+`--restart`, `--stop` and the watchdog's eviction do not read the marker and behave as before.
 
 ### What an acknowledgement retires
 
@@ -645,6 +658,14 @@ The pull guard suite proves that no extension hand-off evidence replaces the [sh
 - The already-acknowledged confirmation no-op for a matching generation, with its mismatched-generation, dead-pid, and lock-mismatch rejections preserved.
 - The manual-restart generation churn that makes a confirmation for the churned generation report a mismatch, which an arm check without a reopen leaves in place.
 - A take-over that stays quiet after a confirmed TERM, still surfaces queued work and self-exit downtime, and attaches without stopping a cycle the named arm does not own.
+
+`tests/fm-watch-takeover.test.sh` covers the take-over against the real Stop hook, supervision host, arm and watcher:
+
+- A kill shim that logs a known kill and keeps `kill -l 15` as `TERM`, which every no-signal claim below first proves reaches the arm.
+- A watcher inside prelude step 9 (a command substitution) and step 10 (the check sweep) that is attached to with no TERM or KILL to it or its group, with one lock holder at every sample and its wake delivered once by the taking arm.
+- An idle watcher that is still TERMed, the owner arm's TERM row, the taking arm's `taken-over` row, main's acknowledgement kept, and the next wake printed once by the new arm.
+- Consecutive stops deferred outside the prelude (a blocked command substitution in the stale-pane loop) that leave no empty `check: rearm-resurface`.
+- A prelude that would start after the arm's check, held by a test seam, that sees the claim and does not start its step.
 - The disposable-checkout arm refusal.
 - The home-gone and state-gone watcher exits.
 - The test reaper that stops a watcher armed for a temporary home.

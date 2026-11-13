@@ -8,66 +8,6 @@ set -u
 
 # --- the Claude re-arm owner around the host ----------------------------------
 
-# A fixture home that is also a genuine primary checkout whose bin is this
-# repo's, so the real Claude Stop hook (bin/fm-claude-stop-autoarm.sh) runs the
-# real host in it.
-make_primary_home() {  # <name>
-  local home
-  home=$(make_home "$1" attended)
-  git init -q "$home"
-  : > "$home/AGENTS.md"
-  ln -s "$ROOT/bin" "$home/bin"
-  printf '%s\n' "$home"
-}
-
-# One Claude main session under the fake harness. Each turn_end fires the real
-# Stop hook as the tracked asyncRewake registration does, and records its exit
-# status and stderr (the rewake banner Claude delivers on exit 2).
-start_hook_session() {  # <home>
-  local home=$1
-  FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_CREW_STATE_BIN="$home/fakebin/fm-crew-state.sh" \
-    PATH="$home/fakebin:$PATH" "$FAKE_CLAUDE" -c '
-      printf "%s\n" "$$" > "$FM_HOME/state/.lock"
-      printf "%s\n" "$$" >> "$FM_HOME/claude-pids"
-      for seed in "$FM_HOME"/mirror-seed.*; do
-        [ -f "$seed" ] || continue
-        "$FM_HOME/bin/fm-host-mirror.sh" hook claude < "$seed"
-      done
-      while [ ! -e "$FM_HOME/session.stop" ]; do
-        if [ -e "$FM_HOME/stop.go" ]; then
-          rm -f "$FM_HOME/stop.go"
-          if [ -e "$FM_HOME/hook.own-group" ]; then
-            # Claude owns the hook as a process group of its own and tears the
-            # whole group down once the hook has exited.
-            printf "{\"session_id\":\"sess-host-hook\",\"stop_hook_active\":false}\n" > "$FM_HOME/hook.stdin"
-            set -m
-            "$FM_HOME/bin/fm-claude-stop-autoarm.sh" < "$FM_HOME/hook.stdin" > "$FM_HOME/hook.out" 2> "$FM_HOME/hook.err" &
-            printf "%s\n" "$!" > "$FM_HOME/hook.pgid"
-            wait "$!"
-            printf "%s\n" "$?" > "$FM_HOME/hook.rc"
-            set +m
-          else
-            printf "{\"session_id\":\"sess-host-hook\",\"stop_hook_active\":false}\n" \
-              | "$FM_HOME/bin/fm-claude-stop-autoarm.sh" > "$FM_HOME/hook.out" 2> "$FM_HOME/hook.err"
-            printf "%s\n" "$?" > "$FM_HOME/hook.rc"
-          fi
-        fi
-        sleep 0.1
-      done
-    ' 2>> "$home/claude.err" &
-}
-turn_end() { rm -f "$1/hook.rc"; : > "$1/stop.go"; }
-hook_exited() { [ -s "$1/hook.rc" ]; }
-
-# Main's rewoken turn drains; the caller runs the printed acknowledgement
-# (MAIN_ACK) when that turn's handling is done.
-main_drain() {  # <home>; prints the drain and sets MAIN_ACK
-  local out
-  out=$(FM_HOME="$1" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/fm-wake-drain.sh")
-  MAIN_ACK=$(printf '%s\n' "$out" | sed -n 's/^WAKE_ACK_REQUIRED: after handling completes run bin\/fm-wake-drain.sh //p' | tail -1)
-  printf '%s\n' "$out"
-}
-
 assert_rewoke_main() {  # <home> <label>
   expect_code 2 "$(cat "$1/hook.rc")" "$2: the Stop hook must rewake main: $(cat "$1/hook.err"; cat "$1/state/.watcher-down" 2>/dev/null)"
   assert_grep 'firstmate watcher wake - one supervision event needs a handling turn now.' "$1/hook.err" "$2: the rewake banner is missing"

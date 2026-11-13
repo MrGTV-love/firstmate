@@ -3657,6 +3657,40 @@ pr_poll_publish_release() {
   PR_POLL_PUBLISH_LOCK=
 }
 
+# A watcher inside the prelude is never stopped by a take-over. Bash defers a
+# stop signal while a command substitution child runs, so a TERM sent into a
+# prelude step lands late or kills the step half done. The watcher therefore
+# publishes "<pid> <identity>" in state/.prelude-inflight for the whole prelude
+# phase, and a taking arm (bin/fm-watch-arm.sh take_over_cycle) that finds it
+# attaches instead of sending TERM. The arm first writes state/.takeover-claim
+# (its own pid) and reads this marker second; the watcher writes the marker first
+# and reads the claim second, so one of them always sees the other: a prelude that
+# starts after the arm's check sees the live claim, does not run this pass, and
+# the arm's TERM lands on a watcher that is in no step.
+PRELUDE_INFLIGHT_MARKER="$STATE/.prelude-inflight"
+PRELUDE_CLAIM_MARKER="$STATE/.takeover-claim"
+prelude_inflight_clear() {
+  local pid=
+  [ -e "$PRELUDE_INFLIGHT_MARKER" ] || return 0
+  IFS=$'\t' read -r pid _ < "$PRELUDE_INFLIGHT_MARKER" 2>/dev/null || true
+  [ "$pid" = "$WATCHER_PID" ] || return 0
+  rm -f -- "$PRELUDE_INFLIGHT_MARKER"
+}
+# Returns 1 when a live taking arm has claimed the cycle: the prelude must not start.
+prelude_inflight_enter() {
+  local claimer=
+  printf '%s\t%s\n' "$WATCHER_PID" "$FM_WATCH_DELIVERY_IDENTITY" > "$PRELUDE_INFLIGHT_MARKER.tmp.$$" \
+    && mv -f "$PRELUDE_INFLIGHT_MARKER.tmp.$$" "$PRELUDE_INFLIGHT_MARKER" || return 0
+  if [ -e "$PRELUDE_CLAIM_MARKER" ]; then
+    IFS= read -r claimer < "$PRELUDE_CLAIM_MARKER" 2>/dev/null || true
+    if [ -n "$claimer" ] && fm_pid_alive "$claimer"; then
+      prelude_inflight_clear
+      return 1
+    fi
+  fi
+  return 0
+}
+
 watcher_cleanup() {
   local cleanup_status=0 owns_lock=0 transition=release-lock
   # A stop that lands inside `read -t` runs this cleanup inside that read, whose
@@ -3676,6 +3710,7 @@ watcher_cleanup() {
       transition=release-lock-existing
     fi
   fi
+  prelude_inflight_clear
   fm_active_check_stop || cleanup_status=1
   fm_check_output_cleanup
   fm_capture_output_cleanup
@@ -3882,6 +3917,7 @@ watch_after_wake() {
 
 prelude_phase() {
   local PRELUDE_STEP=1 check_wake_reason=
+  prelude_inflight_enter || return 0
   if [ -e "$PRELUDE_PROGRESS_MARKER" ]; then
     IFS= read -r PRELUDE_STEP < "$PRELUDE_PROGRESS_MARKER" || PRELUDE_STEP=1
     case "$PRELUDE_STEP" in 1|2|3|4|5|6|7|8|9|10|11) ;; *) PRELUDE_STEP=1 ;; esac
@@ -4135,6 +4171,7 @@ EOF
   prelude_step_commit || exit 1
   PRELUDE_NEXT_STEP=
   rm -f -- "$PRELUDE_DEFER_MARKER" "$PRELUDE_PROGRESS_MARKER" || exit 1
+  prelude_inflight_clear
   [ -z "$check_wake_reason" ] || wake "$check_wake_reason"
   [ -z "$SIGNAL_PHASE_QUEUED_REASON" ] || wake "$SIGNAL_PHASE_QUEUED_REASON"
   watcher_beat
