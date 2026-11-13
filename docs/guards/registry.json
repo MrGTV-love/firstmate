@@ -5601,6 +5601,14 @@
         },
         {
           "file": "bin/fm-spawn.sh",
+          "match": "confinement_refuse false \"cannot list the local Firstmate homes to check the recorded successor branch against: $FM_LOCAL_FIRSTMATE_ERROR\""
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "confinement_refuse false \"task $ID records successor branch '$SUCCESSOR_BRANCH', which is not admissible: $confinement_successor_reason\""
+        },
+        {
+          "file": "bin/fm-spawn.sh",
           "match": "confinement_refuse false \"this raw $HARNESS launch command sets $confinement_raw_var to a value that needs shell expansion or is not one leading assignment, so its write profile cannot follow it; pass the resolved absolute path as a leading literal $confinement_raw_var= assignment instead\""
         },
         {
