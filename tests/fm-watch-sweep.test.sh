@@ -263,6 +263,52 @@ test_cut_after_the_stamp_with_the_row_still_queued_delivers_once() {
   pass "sweep: a wake a cut watcher stamped and never delivered is printed once while its row is still queued"
 }
 
+# A check whose output holds backslashes, cut after its wake is queued and before its stamp: the rerun
+# compares the stored row byte for byte, so the queue still holds one row and the wake is printed once.
+test_a_backslash_payload_rerun_after_a_cut_queues_one_row() {
+  local home
+  home=$(make_sweep_home sweep-backslash)
+  printf '%s\n' 'C:\temp\new {"a":"x\ny"}' > "$home/out-c2"
+  printf 'before-stamp:c2\n' > "$home/hold"
+  rm -f "$home/held"
+  start_watch "$home" FM_CHECK_INTERVAL=2
+  wait_for 300 test -e "$home/held" || fail "backslash: the watcher never reached the stamp"
+  cut_watch "$W" KILL
+  rm -f "$home/hold" "$home/held"
+  [ "$(queue_rows "$home" 'c2.check.sh')" = 1 ] || fail "backslash: the wake was not durable before the cut: $(cat "$home/state/.wake-queue")"
+  start_watch "$home" FM_CHECK_INTERVAL=2
+  wait_for 300 sweep_closed "$home" || fail "backslash: the resumed sweep never closed"
+  expect_runs "$home" "backslash" c1=1 c2=2 c3=1 c4=1 c5=1
+  [ "$(queue_rows "$home" 'c2.check.sh')" = 1 ] || fail "backslash: the rerun queued the wake twice: $(cat "$home/state/.wake-queue")"
+  wait_for 100 grep -q '^check: .*c2.check.sh' "$home"/watch.*.out || fail "backslash: the resumed watcher did not print the wake"
+  [ "$(printed "$home" 'c2.check.sh')" = 1 ] || fail "backslash: the wake was printed other than once: $(cat "$home"/watch.*.out)"
+  cut_watch "$W" TERM
+  pass "sweep: a backslash payload rerun after a cut between its wake and its stamp keeps one queue row and one delivery"
+}
+
+# The take-over claim (bin/fm-watch-arm.sh takeover_claim_acquire) holds off the prelude only while
+# its pid still has the identity it was written with: a live claim holds off the sweep, and the same
+# live pid under another identity, a reused pid, does not.
+test_a_takeover_claim_naming_a_reused_pid_does_not_hold_off_the_prelude() {
+  local home sleeper identity
+  home=$(make_sweep_home sweep-claim c1)
+  sleep 300 &
+  sleeper=$!
+  identity=$(FM_STATE_OVERRIDE="$home/state" bash -c '. "$1"; fm_pid_identity "$2"' _ "$ROOT/bin/fm-wake-lib.sh" "$sleeper")
+  [ -n "$identity" ] || { kill "$sleeper"; fail "claim: could not read the identity of a live process"; }
+  printf '%s\t%s\n' "$sleeper" "$identity" > "$home/state/.takeover-claim"
+  start_watch "$home" FM_CHECK_INTERVAL=1
+  sleep 4
+  expect_runs "$home" "claim held" c1=0
+  printf '%s\t%s\n' "$sleeper" "reused-$identity" > "$home/state/.takeover-claim"
+  wait_for 300 sweep_closed "$home" || { kill "$sleeper"; fail "claim: a claim naming a reused pid held off the sweep"; }
+  expect_runs "$home" "claim reused" c1=1
+  kill "$sleeper" 2>/dev/null || true
+  wait "$sleeper" 2>/dev/null || true
+  cut_watch "$W" TERM
+  pass "sweep: a take-over claim holds off the prelude only while its pid keeps its identity"
+}
+
 # The close record is down and the touch is not: the next watcher finishes the close and runs no check,
 # whatever the age of .last-check.
 test_cut_between_the_close_record_and_the_touch_runs_no_check() {
@@ -438,6 +484,8 @@ for t in \
   test_stopped_and_rejected_checks_close_the_sweep_and_run_again_next_sweep \
   test_cut_after_the_wake_and_before_the_stamp_queues_and_delivers_once \
   test_cut_after_the_stamp_with_the_row_still_queued_delivers_once \
+  test_a_backslash_payload_rerun_after_a_cut_queues_one_row \
+  test_a_takeover_claim_naming_a_reused_pid_does_not_hold_off_the_prelude \
   test_cut_between_the_close_record_and_the_touch_runs_no_check \
   test_cut_after_a_rejected_attempt_rebuilds_the_aggregate_once \
   test_cut_after_the_aggregate_wake_and_before_the_close_record_queues_it_once \

@@ -3668,7 +3668,8 @@ pr_poll_publish_release() {
 # publishes "<pid> <identity>" in state/.prelude-inflight for the whole prelude
 # phase, and a taking arm (bin/fm-watch-arm.sh take_over_cycle) that finds it
 # attaches instead of sending TERM. The arm first writes state/.takeover-claim
-# (its own pid) and reads this marker second; the watcher writes the marker first
+# ("<pid> <identity>" of the arm, honored only while that pid keeps that identity)
+# and reads this marker second; the watcher writes the marker first
 # and reads the claim second, so one of them always sees the other: a prelude that
 # starts after the arm's check sees the live claim, does not run this pass, and
 # the arm's TERM lands on a watcher that is in no step.
@@ -3683,12 +3684,13 @@ prelude_inflight_clear() {
 }
 # Returns 1 when a live taking arm has claimed the cycle: the prelude must not start.
 prelude_inflight_enter() {
-  local claimer=
+  local claimer='' claimer_identity=''
   printf '%s\t%s\n' "$WATCHER_PID" "$FM_WATCH_DELIVERY_IDENTITY" > "$PRELUDE_INFLIGHT_MARKER.tmp.$$" \
     && mv -f "$PRELUDE_INFLIGHT_MARKER.tmp.$$" "$PRELUDE_INFLIGHT_MARKER" || return 0
   if [ -e "$PRELUDE_CLAIM_MARKER" ]; then
-    IFS= read -r claimer < "$PRELUDE_CLAIM_MARKER" 2>/dev/null || true
-    if [ -n "$claimer" ] && fm_pid_alive "$claimer"; then
+    IFS=$'\t' read -r claimer claimer_identity < "$PRELUDE_CLAIM_MARKER" 2>/dev/null || true
+    if [ -n "$claimer" ] && [ -n "$claimer_identity" ] && fm_pid_alive "$claimer" \
+      && [ "$(fm_pid_identity "$claimer" 2>/dev/null || true)" = "$claimer_identity" ]; then
       prelude_inflight_clear
       return 1
     fi
@@ -3985,8 +3987,8 @@ sweep_gate() {
   [ "$(age_of "$STATE/.last-check")" -ge "$CHECK_INTERVAL" ] || return 1
   fm_epoch_seconds_to epoch
   SWEEP_ID="$epoch.$WATCHER_PID"
-  # An unwritable record leaves SWEEP_ID empty and the sweep runs as it always did.
-  sweep_write "$SWEEP_OPEN" "$SWEEP_ID" || SWEEP_ID=
+  # A sweep never runs without its records: an unwritable record ends the watcher.
+  sweep_write "$SWEEP_OPEN" "$SWEEP_ID" || exit 1
   return 0
 }
 # An in-flight mark of a check that no longer exists is dropped. Stamps and attempts stay until the
@@ -4004,7 +4006,6 @@ sweep_prune() {
 # unreadable or names another sweep is no record: the check runs.
 sweep_disposed() {  # <id>
   local f rec
-  [ -n "$SWEEP_ID" ] || return 1
   for f in "$STATE/$1.check-stamp" "$STATE/$1.check-attempt"; do
     [ -e "$f" ] || continue
     IFS= read -r rec < "$f" 2>/dev/null || rec=
@@ -4017,17 +4018,15 @@ sweep_disposed() {  # <id>
 sweep_encode() { printf '%s' "$1" | LC_ALL=C tr '\n' "$SWEEP_FIELD_SEP"; }
 sweep_decode() { printf '%s' "$1" | LC_ALL=C tr "$SWEEP_FIELD_SEP" '\n'; }
 sweep_stamp() {  # <id> <kind> <reason>
-  [ -n "$SWEEP_ID" ] || return 0
   sweep_point "before-stamp:$1"
-  sweep_write "$STATE/$1.check-stamp" "$SWEEP_ID"$'\t'"$2"$'\t'"$(sweep_encode "$3")" || return 0
+  sweep_write "$STATE/$1.check-stamp" "$SWEEP_ID"$'\t'"$2"$'\t'"$(sweep_encode "$3")" || exit 1
   SWEEP_OWN="$SWEEP_OWN $1"
   rm -f -- "$STATE/$1.check-inflight"
   sweep_point "after-stamp:$1"
 }
 sweep_attempt() {  # <id> <kind> [reason]
-  [ -n "$SWEEP_ID" ] || return 0
   sweep_point "before-attempt:$1"
-  sweep_write "$STATE/$1.check-attempt" "$SWEEP_ID"$'\t'"$2"$'\t'"$(sweep_encode "${3:-}")" || return 0
+  sweep_write "$STATE/$1.check-attempt" "$SWEEP_ID"$'\t'"$2"$'\t'"$(sweep_encode "${3:-}")" || exit 1
   SWEEP_OWN="$SWEEP_OWN $1"
   rm -f -- "$STATE/$1.check-inflight"
   sweep_point "after-attempt:$1"
@@ -4038,7 +4037,6 @@ sweep_attempt() {  # <id> <kind> [reason]
 # the sweep, or the checks before it, hostage.
 sweep_check_begin() {  # <id>; returns 1 when the check is dropped
   local f="$STATE/$1.check-inflight" sid='' n=0
-  [ -n "$SWEEP_ID" ] || return 0
   if [ -e "$f" ]; then
     IFS=$'\t' read -r sid n < "$f" 2>/dev/null || { sid=; n=0; }
     [ "$sid" = "$SWEEP_ID" ] || n=0
@@ -4049,26 +4047,53 @@ sweep_check_begin() {  # <id>; returns 1 when the check is dropped
     sweep_attempt "$1" dropped
     return 1
   fi
-  sweep_write "$f" "$SWEEP_ID"$'\t'"$((n + 1))" || return 0
+  sweep_write "$f" "$SWEEP_ID"$'\t'"$((n + 1))" || exit 1
 }
-# Queue a check wake unless the same row is already queued (unacknowledged): the wake a
-# watcher queued before a cut is not queued again by the resumed sweep. A stopped
-# notice names its elapsed seconds, so those compare by the text before them.
+# Queue a check wake unless the same row is already queued (unacknowledged) or spilled:
+# the wake a watcher queued before a cut is not queued again by the resumed sweep. The
+# stopped notice of run_check_capture names its elapsed seconds, so two notices of one
+# check compare by the text before them. The row is pending while the lock is awaited,
+# and fm_wake_append queues it, so a lock alarm settles it as it does any append.
 sweep_wake_append() {  # <kind> <key> <payload>
-  local dup rc=0 clean
-  clean=$(printf '%s' "$3" | fm_wake_clean_field)
-  fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || return 1
-  dup=$(awk -F '\t' -v key="$2" -v payload="$clean" '
-    function head(t,   i) { i = index(t, " stopped after "); return i ? substr(t, 1, i) : t }
-    NF >= 5 && $3 == "check" && $4 == key {
-      if ($5 == payload || (index(payload, " stopped after ") && head($5) == head(payload))) found = 1
-    }
-    END { print found + 0 }' "$FM_WAKE_QUEUE" 2>/dev/null)
-  if [ "$dup" != 1 ]; then
-    fm_wake_append_locked "$@" || rc=$?
+  local dup=0 f
+  local -a files=()
+  FM_WAKE_PENDING_KIND=$1 FM_WAKE_PENDING_KEY=$2 FM_WAKE_PENDING_PAYLOAD=$3
+  if ! fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"; then
+    FM_WAKE_PENDING_KIND=
+    return 1
   fi
-  fm_lock_release "$FM_WAKE_QUEUE_LOCK"
-  return "$rc"
+  if [ -z "$FM_WAKE_PENDING_KIND" ]; then
+    fm_lock_release "$FM_WAKE_QUEUE_LOCK"
+    return 0
+  fi
+  FM_WAKE_PENDING_KIND=
+  [ ! -f "$FM_WAKE_QUEUE" ] || files+=("$FM_WAKE_QUEUE")
+  for f in "$STATE"/.wake-spill.[0-9]*; do
+    [ ! -f "$f" ] || files+=("$f")
+  done
+  if [ "${#files[@]}" -gt 0 ]; then
+    dup=$(SWEEP_DUP_QUEUE=$FM_WAKE_QUEUE SWEEP_DUP_KIND=$1 \
+      SWEEP_DUP_KEY=$(printf '%s' "$2" | fm_wake_clean_field) \
+      SWEEP_DUP_PAYLOAD=$(printf '%s' "$3" | fm_wake_clean_field) awk -F '\t' '
+      function norm(t,   pre, rest) {
+        pre = "check: " key ": check "
+        if (substr(t, 1, length(pre)) != pre) return t
+        rest = substr(t, length(pre) + 1)
+        if (!match(rest, /^[^ ]+ stopped after [0-9]+s \(/)) return t
+        return "\001" pre substr(rest, 1, index(rest, " stopped after ") - 1)
+      }
+      BEGIN { kind = ENVIRON["SWEEP_DUP_KIND"]; key = ENVIRON["SWEEP_DUP_KEY"]; want = norm(ENVIRON["SWEEP_DUP_PAYLOAD"]) }
+      FILENAME == ENVIRON["SWEEP_DUP_QUEUE"] {
+        if (NF >= 5 && $3 == kind && $4 == key && norm($5) == want) found = 1
+        next
+      }
+      FNR == 1 { spill_kind = $0 }
+      FNR == 2 { spill_key = $0 }
+      FNR == 3 && spill_kind == kind && spill_key == key && norm($0) == want { found = 1 }
+      END { print found + 0 }' "${files[@]}" 2>/dev/null) || dup=0
+  fi
+  fm_lock_release "$FM_WAKE_QUEUE_LOCK" || return 1
+  [ "$dup" = 1 ] || fm_wake_append "$@"
 }
 # Print the part of a reason an earlier watcher recorded whose row is still queued: the
 # check's own rows (its output, its events, its merge outcome) for a check reason, each
@@ -4410,14 +4435,10 @@ EOF
     fi
     sweep_point after-aggregate
     signal_phase_flush
-    if [ -n "$SWEEP_ID" ]; then
-      # The close record goes down after every wake is queued and before the touch.
-      sweep_write "$SWEEP_CLOSING" "$SWEEP_ID" || exit 1
-      sweep_point close-record
-      sweep_finish_close
-    else
-      touch "$STATE/.last-check"
-    fi
+    # The close record goes down after every wake is queued and before the touch.
+    sweep_write "$SWEEP_CLOSING" "$SWEEP_ID" || exit 1
+    sweep_point close-record
+    sweep_finish_close
     if [ -n "$SWEEP_CONTRIB_REASON" ]; then
       [ -n "$check_wake_reason" ] || check_wake_reason=$SWEEP_CONTRIB_REASON
     fi

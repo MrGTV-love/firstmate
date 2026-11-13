@@ -361,7 +361,8 @@ Any other episode is left for the next cycle's arm check.
 
 A take-over never signals a watcher that is inside its prelude, the run of steps at the top of every poll.
 The watcher publishes `state/.prelude-inflight` (its pid and identity) for the whole prelude and removes it when the prelude ends or the watcher closes.
-The taking arm writes `state/.takeover-claim` (its own pid) first and reads the marker second, and the watcher writes the marker first and reads the claim second, so one always sees the other.
+The taking arm writes `state/.takeover-claim` (its own pid and identity) first and reads the marker second, and the watcher writes the marker first and reads the claim second, so one always sees the other.
+The watcher honors the claim only while that pid is alive with the same identity, so a claim a killed arm left behind never holds off the prelude of a later watcher, even after its pid is reused.
 When the arm finds the marker it removes its claim and attaches to the busy watcher through the ordinary attach path with no TERM, and the left arm and the new arm report the cycle's wake as an attached arm does.
 When the watcher starts a prelude after the arm's check, it sees the live claim and skips the prelude that pass, so the arm's TERM lands on a watcher inside no step.
 A marker a killed watcher left names another pid or identity and does not hold off the stop of a live idle successor.
@@ -630,7 +631,9 @@ Cadence after a close is unchanged: the next sweep opens `FM_CHECK_INTERVAL` aft
 `FM_CHECK_TIMEOUT` stays a no-progress minimum and `FM_CHECK_INTERVAL` stays 300 by default.
 
 Each wake a check raises is durable before that check's record.
-The sweep skips queueing a row that is already queued with the same key and text, so a check rerun after a cut between its queued wake and its stamp does not queue it twice.
+The sweep skips queueing a row that is already queued, or spilled for the next append, with the same key and text, so a check rerun after a cut between its queued wake and its stamp does not queue it twice.
+Only the stopped-check notice of the no-progress rule, which names its elapsed seconds, compares by the text before those seconds.
+A record the sweep cannot write ends the watcher, as an unwritable close record does, so a sweep never runs without its records.
 The `contributions` check queues its own durable rows (`bin/fm-contributions.sh`, key `contribution-<id>`) before it prints its `contribution-wake:` lines, so its wake is durable before its stamp; the stamp keeps the printed text, and the close prints the same text it printed before.
 The stopped-check notice is queued before the episode file `<id>.check-stopped` is created.
 The aggregate `check: rejected unauthenticated state checks: <paths>` wake keeps its text and key; the close rebuilds its list from the attempt records, so a resumed sweep lists every rejected check once.
@@ -708,11 +711,13 @@ The pull guard suite proves that no extension hand-off evidence replaces the [sh
 `tests/fm-watch-sweep.test.sh` covers the check sweep records with real watchers and five registered checks:
 
 - A TERM cut and a SIGKILL cut inside the third of five checks, after which checks 1 and 2 are not run again before the sweep closes.
-- A wake-driven watcher exit between checks.
+- A watcher that exits on a check wake, which it raises only after the close, so the next watcher runs no check and the wake is queued and printed once.
 - Five SIGKILL cuts over a sweep longer than `FM_CHECK_INTERVAL`, which still closes with no finished check rerun.
 - A stopped check and two rejected checks, with the sweep closed, the next sweep running every check, the aggregate listing each rejected check once and the stopped notice queued once.
 - A cut after a check's wake is queued and before its stamp, with one queue row and one delivery.
 - A cut after a check's stamp, before any delivery, whose still-queued row the resumed watcher prints once without rerunning the check.
+- A cut before the stamp of a check whose output holds backslashes, whose rerun keeps one queue row and one delivery.
+- A take-over claim that holds off the prelude while its pid keeps its identity and does not once that pid names another identity.
 - A cut between the close record and the `.last-check` touch, after which no check runs.
 - A cut after a rejected check's attempt, one after the aggregate rejected wake is queued, and one between a stopped check's notice and its episode file, each leaving one queued row that is printed once.
 - The unchanged cadence after a close, a `.last-check` touch between cuts, and unreadable, removed and added checks.

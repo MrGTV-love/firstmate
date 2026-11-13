@@ -627,18 +627,20 @@ fi
 # A taking arm claims the cycle before it reads the watcher's prelude marker, and
 # a watcher writes that marker before it reads the claim (bin/fm-watch.sh
 # prelude_inflight_enter), so a prelude never starts unseen between this arm's
-# check and its signal. State files: .takeover-claim (this arm's pid) and
+# check and its signal. State files: .takeover-claim ("<pid><TAB><identity>" of this arm) and
 # .prelude-inflight ("<pid><TAB><identity>" of the watcher inside its prelude).
 TAKEOVER_CLAIM="$STATE/.takeover-claim"
 PRELUDE_INFLIGHT="$STATE/.prelude-inflight"
 takeover_claim_acquire() {
-  printf '%s\n' "$ARM_PID" > "$TAKEOVER_CLAIM.tmp.$ARM_PID" \
+  local identity
+  identity=$(fm_pid_identity "$ARM_PID" 2>/dev/null) && [ -n "$identity" ] || return 1
+  printf '%s\t%s\n' "$ARM_PID" "$identity" > "$TAKEOVER_CLAIM.tmp.$ARM_PID" \
     && mv -f "$TAKEOVER_CLAIM.tmp.$ARM_PID" "$TAKEOVER_CLAIM" 2>/dev/null
 }
 takeover_claim_release() {
   local holder=
   [ -e "$TAKEOVER_CLAIM" ] || return 0
-  IFS= read -r holder < "$TAKEOVER_CLAIM" 2>/dev/null || true
+  IFS=$'\t' read -r holder _ < "$TAKEOVER_CLAIM" 2>/dev/null || true
   [ "$holder" != "$ARM_PID" ] || rm -f -- "$TAKEOVER_CLAIM"
 }
 # True while <pid> is the lock holder and its own marker says it is inside its
