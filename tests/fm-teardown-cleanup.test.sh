@@ -1727,6 +1727,131 @@ SH
   pass "the shell of the task's own pane and its children are the task's own without a launch marker, and a process the endpoint does not name is still refused"
 }
 
+# A proved process that forks while the teardown reaps it leaves a fresh child the scan did not
+# list. The child carries no launch marker, so only its live chain to the parent can prove it;
+# once the parent is gone nothing does, and the close refused on a process the reaping itself
+# had made unprovable. The reaping now freezes the proved processes first (a stopped process
+# cannot fork), scans again through the frozen parents, and signals the whole set.
+# The fake lsof makes the race exact: on every scan that lists the worker it reads the real
+# answer, asks the worker to fork one more unmarked child, waits a bounded time for the fork,
+# and hands back the answer from before it. A worker that is not stopped forks on every scan
+# without end; a worker that is stopped forks nothing after the freeze.
+test_a_proved_process_that_forks_while_it_is_reaped_does_not_leave_an_unproved_child() {
+  local case_dir rc parent child other i real_lsof journal children
+  case_dir=$(make_case fork-during-reap)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  real_lsof=$(command -v lsof) || fail "fork-during-reap: no lsof on this host"
+  teardown_fixture_start "$case_dir/wt" KILL perl -e "$(cat <<'PERL'
+    my ($req, $done, $ready) = @ARGV;
+    open my $r, ">", $ready or die "ready"; close $r;
+    while (1) {
+      if (-e $req) {
+        my $pid = fork();
+        if (!$pid) { delete $ENV{FM_TASK_INBOX}; exec "sleep", "300"; exit 1; }
+        open my $o, ">>", $done or die "done"; print {$o} "$pid\n"; close $o;
+        unlink $req;
+      }
+      select(undef, undef, undef, 0.02);
+    }
+PERL
+  )" "$case_dir/fork-request" "$case_dir/fork-done" "$case_dir/ready"
+  parent=$TEARDOWN_FIXTURE_PID
+  i=0
+  while [ ! -e "$case_dir/ready" ] && [ "$i" -lt 100 ]; do sleep 0.1; i=$((i + 1)); done
+  [ -e "$case_dir/ready" ] || { teardown_fixture_stop "$parent"; fail "fork-during-reap: the worker did not start"; }
+  cat > "$case_dir/fakebin/lsof" <<EOF
+#!/usr/bin/env bash
+out=\$('$real_lsof' "\$@" 2>/dev/null); status=\$?
+count=0
+[ ! -f '$case_dir/fork-triggers' ] || count=\$(cat '$case_dir/fork-triggers')
+if [ "\$count" -lt 40 ] && printf '%s\n' "\$out" | grep -qx 'p$parent'; then
+  count=\$((count + 1))
+  printf '%s\n' "\$count" > '$case_dir/fork-triggers'
+  [ -e '$case_dir/fork-request' ] || : > '$case_dir/fork-request'
+  limit=20
+  [ "\$count" -ne 1 ] || limit=100
+  n=0
+  while [ -e '$case_dir/fork-request' ] && [ "\$n" -lt "\$limit" ]; do sleep 0.05; n=\$((n + 1)); done
+fi
+printf '%s\n' "\$out"
+exit \$status
+EOF
+  chmod +x "$case_dir/fakebin/lsof"
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  [ -s "$case_dir/fork-done" ] || { teardown_fixture_stop "$parent"; fail "fork-during-reap: the worker never forked, so the case proves nothing: $(cat "$case_dir/stderr")"; }
+  children=$(cat "$case_dir/fork-done")
+  for child in $parent $children; do
+    if kill -0 "$child" 2>/dev/null; then
+      teardown_fixture_stop "$parent"
+      for other in $children; do kill -9 "$other" 2>/dev/null || true; done
+      fail "fork-during-reap: process $child survived the teardown: $(cat "$case_dir/stderr")"
+    fi
+  done
+  expect_code 0 "$rc" "fork-during-reap: a child forked after a scan must be signalled with its parent, not refused: $(cat "$case_dir/stderr")"
+  assert_no_grep "not proved this task's own" "$case_dir/stderr" "fork-during-reap: a fresh child was refused as not proved"
+  journal="$case_dir/state/task-x1.teardown-processes"
+  assert_grep $'\tSTOP\t'"$parent"$'\t' "$journal" "fork-during-reap: the worker was not audited before it was stopped"
+  for child in $children; do
+    assert_grep $'\tTERM\t'"$child"$'\t' "$journal" "fork-during-reap: fresh child $child was not audited before the retire signal"
+  done
+  # The stopped processes ran again after the TERM, so they ended on it and no force-kill was needed.
+  assert_no_grep $'\tKILL\t' "$journal" "fork-during-reap: a KILL was needed, so the stopped processes never ran again after the TERM"
+  assert_no_grep "force-killing" "$case_dir/stderr" "fork-during-reap: the stopped processes were force-killed"
+  [ "$(wc -l < "$case_dir/fork-done" | tr -d '[:space:]')" -le 3 ] \
+    || fail "fork-during-reap: the worker kept forking after the freeze ($(wc -l < "$case_dir/fork-done" | tr -d '[:space:]') children)"
+  assert_absent "$case_dir/state/task-x1.meta" "fork-during-reap: the task record stayed"
+  pass "a proved process that forks while it is reaped is frozen first, and its fresh children are signalled with it and never refused"
+}
+
+# A refusal after the freeze leaves nothing stopped: the proved processes run again, and the one
+# that is not proved is neither stopped nor signalled.
+test_a_refusal_after_the_freeze_resumes_the_frozen_processes() {
+  local case_dir rc parent foreign real_lsof state
+  case_dir=$(make_case freeze-refusal-resumes)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  real_lsof=$(command -v lsof) || fail "freeze-refusal: no lsof on this host"
+  teardown_fixture_start "$case_dir/wt" KILL sleep 300
+  parent=$TEARDOWN_FIXTURE_PID
+  teardown_fixture_start_foreign "$case_dir/wt" KILL sleep 300
+  foreign=$TEARDOWN_FIXTURE_PID
+  sleep 0.2
+  # The foreign process is invisible to the first two scans (the audit scan and the first scan of
+  # the freeze, after which the proved process is stopped) and appears at the third, as a process
+  # started by someone else while the proved one is frozen would.
+  cat > "$case_dir/fakebin/lsof" <<EOF
+#!/usr/bin/env bash
+out=\$('$real_lsof' "\$@" 2>/dev/null); status=\$?
+count=0
+[ ! -f '$case_dir/scan-count' ] || count=\$(cat '$case_dir/scan-count')
+count=\$((count + 1))
+printf '%s\n' "\$count" > '$case_dir/scan-count'
+if [ "\$count" -le 2 ]; then
+  printf '%s\n' "\$out" | awk -v f='p$foreign' '\$0 == f { skip = 3 } skip > 0 { skip--; next } { print }'
+else
+  printf '%s\n' "\$out"
+fi
+exit \$status
+EOF
+  chmod +x "$case_dir/fakebin/lsof"
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "freeze-refusal: a process that is not proved must still refuse: $(cat "$case_dir/stderr")"
+  assert_grep "REFUSED: process $foreign" "$case_dir/stderr" "freeze-refusal: the refusal does not name the foreign process"
+  state=$("$REAL_PS_FOR_TEST" -o stat= -p "$parent" 2>/dev/null | tr -d '[:space:]')
+  case "$state" in
+    '') fail "freeze-refusal: the proved process is gone after a refusal" ;;
+    T*) teardown_fixture_stop "$parent"; teardown_fixture_stop "$foreign"; fail "freeze-refusal: the proved process was left stopped after the refusal" ;;
+  esac
+  kill -0 "$foreign" 2>/dev/null || fail "freeze-refusal: the foreign process was signalled"
+  teardown_fixture_stop "$parent"
+  teardown_fixture_stop "$foreign"
+  assert_present "$case_dir/state/task-x1.meta" "freeze-refusal: the refusal removed the task record"
+  pass "a refusal after the freeze resumes the frozen processes and leaves the unproved one running"
+}
+
 test_process_identity_is_recorded_before_term_and_kill() {
   local case_dir rc pid journal expected_start expected_cwd epoch signal audit_pid birth command start cwd matched
   case_dir=$(make_case durable-process-identity)
@@ -1762,7 +1887,10 @@ PERL
     "durable-process-identity: TERM preceded its durable identity record"
   assert_grep $'\tKILL\t'"$pid"$'\t' "$journal" \
     "durable-process-identity: KILL has no durable identity record"
-  IFS=$'\t' read -r epoch signal audit_pid birth command start cwd matched < "$case_dir/term-observed"
+  # The worker is stopped before it is signalled, so its STOP row comes first in the journal the TERM handler read.
+  assert_grep $'\tSTOP\t'"$pid"$'\t' "$case_dir/term-observed" \
+    "durable-process-identity: STOP did not precede TERM in the audit"
+  IFS=$'\t' read -r epoch signal audit_pid birth command start cwd matched < <(grep -m 1 $'\tTERM\t'"$pid"$'\t' "$case_dir/term-observed")
   case "$epoch" in ''|*[!0-9]*) fail "durable-process-identity: invalid timestamp" ;; esac
   case "$command" in *perl*) ;; *) fail "durable-process-identity: command line missing" ;; esac
   case "$birth" in lstart=*|starttime=*) ;; *) fail "durable-process-identity: birth identity missing" ;; esac
@@ -2071,7 +2199,7 @@ SH
 
 test_process_audit_collection_exit_races() {
   local signal field outcome case_dir pid birth other_pid other_birth journal rc i term_audit kill_audit target_alive other_alive
-  for signal in TERM KILL; do
+  for signal in STOP TERM KILL; do
     for field in command lstart; do
       for outcome in exit live-failure uncertain-live-failure control; do
         [ "$outcome" != uncertain-live-failure ] || [ "$field" = lstart ] || continue
@@ -2121,8 +2249,9 @@ if [[ "$args" == *" -p $FM_AUDIT_TARGET "* ]]; then
     [ ! -f "$FM_AUDIT_CASE/command-count" ] || read -r n < "$FM_AUDIT_CASE/command-count"
     n=$((n + 1))
     printf '%s\n' "$n" > "$FM_AUDIT_CASE/command-count"
-    round=1
-    [ "$FM_AUDIT_SIGNAL" != KILL ] || round=2
+    # The audited signals of one process come in this order: the freeze (STOP), the retire signal
+    # (TERM), then, for a process that survives it, the freeze again and the force-kill (KILL).
+    case "$FM_AUDIT_SIGNAL" in STOP) round=1 ;; TERM) round=2 ;; *) round=4 ;; esac
     if [ "$n" -eq "$round" ]; then
       if [ "$FM_AUDIT_FIELD" = command ]; then
         boundary=1
@@ -2147,6 +2276,8 @@ if [ "$boundary" -eq 1 ]; then
     live-failure) exit 1 ;;
     uncertain-live-failure) : > "$FM_AUDIT_CASE/lstart-failed"; exit 1 ;;
     exit)
+      # By the TERM and KILL rounds the worker is frozen and cannot exit on its own: run it again first.
+      kill -CONT "$FM_AUDIT_TARGET" 2>/dev/null || true
       : > "$FM_AUDIT_CASE/finite-exit"
       for ((i=0; i<1000; i++)); do
         state=$("$REAL_PS_FOR_TEST" -p "$FM_AUDIT_TARGET" -o stat= 2>/dev/null) || break
@@ -2214,7 +2345,7 @@ SH
             || fail "audit-collection-$signal-$field: control lacks durable TERM/KILL"
         else
           [ "$kill_audit" -eq 0 ] || fail "audit-collection-$signal-$field-$outcome: failed collection audited KILL"
-          if [ "$signal" = TERM ]; then
+          if [ "$signal" != KILL ]; then
             [ "$term_audit" -eq 0 ] || fail "audit-collection-$signal-$field-$outcome: failed collection audited TERM"
             assert_absent "$case_dir/term-observed" "audit-collection-$signal-$field-$outcome: TERM reached target"
           else
@@ -2234,7 +2365,7 @@ SH
       done
     done
   done
-  pass "TERM and KILL audit collection tolerates synchronized real exits, refuses live failures, and preserves unrelated identities"
+  pass "STOP, TERM and KILL audit collection tolerates synchronized real exits, refuses live failures, and preserves unrelated identities"
 }
 
 test_process_audit_failure_refuses_before_signal() {
@@ -2380,7 +2511,7 @@ count=0
 [ ! -f '$case_dir/lsof-count' ] || count=\$(cat '$case_dir/lsof-count')
 count=\$((count + 1))
 printf '%s\n' "\$count" > '$case_dir/lsof-count'
-if [ "\$count" -le 3 ]; then printf 'p%s\nfcwd\nn%s\n' '$pid' '$case_dir/wt'; fi
+if [ "\$count" -le 4 ]; then printf 'p%s\nfcwd\nn%s\n' '$pid' '$case_dir/wt'; fi
 EOF
   cat > "$case_dir/fakebin/ps" <<'SH'
 #!/usr/bin/env bash
@@ -8252,6 +8383,8 @@ test_leaked_worktree_process_is_reaped
 test_leaked_tasktmp_process_is_reaped
 test_the_owned_record_is_removed_at_a_successful_close_and_kept_by_a_refusal
 test_the_shell_of_the_tasks_own_pane_is_the_tasks_own_without_a_launch_marker
+test_a_proved_process_that_forks_while_it_is_reaped_does_not_leave_an_unproved_child
+test_a_refusal_after_the_freeze_resumes_the_frozen_processes
 test_process_identity_is_recorded_before_term_and_kill
 test_process_audit_collection_exit_races
 test_nested_registered_worktree_process_is_not_reaped

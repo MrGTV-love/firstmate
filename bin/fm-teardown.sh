@@ -689,6 +689,14 @@
 #     its own environment (teardown_process_proved_own, teardown_process_in_task_pane).
 #     The pane is asked only when a process is not already proved, never by a working
 #     directory, so a teardown that refuses first never touches the endpoint.
+#     Freeze before the signal: the proved processes are first stopped (SIGSTOP, each
+#     audited like any signal) so none can fork, the scan is read again (a child a
+#     stopped process had already forked is proved by its live chain to that process)
+#     until a scan finds nothing left to stop, and only then does the TERM go out to the
+#     whole set, followed at once by SIGCONT so the stopped processes can act on it; the
+#     force-kill stage freezes again first. Without this a worker that forks while it is
+#     reaped leaves an orphan nothing proves, and the close would refuse on a process
+#     teardown itself made unprovable. A refusal, and every exit, resumes what was stopped.
 #     Anything else is not proved: teardown refuses by naming its pid and leaves it
 #     running, on every route; a foreign process is never ended. A process that
 #     has exited by the time it is checked (the kernel answers "no such process",
@@ -1270,6 +1278,10 @@ teardown_descendant_slot_leased() {  # <slot>
 }
 teardown_release_locks() {
   local status=$? i
+  # A process the reaper froze never stays stopped when this teardown ends for any reason.
+  if declare -F reap_resume_frozen >/dev/null 2>&1; then
+    reap_resume_frozen || true
+  fi
   if [ -n "$BACKLOG_CLOSE_STAGE" ]; then
     fm_backlog_record_remove "$BACKLOG_CLOSE_STAGE" "pending-close staged record" "$STATE" || true
   fi
@@ -4002,8 +4014,103 @@ task_record_process_signal() {  # <pid> <birth-identity> <signal>
     "$start" "$cwd" "$cwd" >> "$record") || return 1
 }
 
-# Fix 2 in the script header owns exact-root custody and pre-signal auditing.
-reap_task_worktree_processes() {  # <label> <dir>...
+# Freeze before signalling. A proved process that forks while it is being reaped leaves a
+# fresh child behind: the parent dies, the child is orphaned, and nothing proves it the
+# task's own any more, so the whole close would refuse on a process teardown itself made
+# unprovable. A frozen process (SIGSTOP) cannot fork, and while it is only stopped its
+# descendants still prove their own chain to it. Every pid and birth identity frozen here
+# is listed in REAP_FROZEN_PIDS and REAP_FROZEN_IDS; each was recorded before the STOP,
+# as every signal is, and is resumed (SIGCONT) by reap_resume_frozen after the retire
+# signal, on every refusal and at exit, so a refusal never leaves a process stopped.
+REAP_TRACK_PIDS=()
+REAP_TRACK_IDS=()
+REAP_FROZEN_PIDS=()
+REAP_FROZEN_IDS=()
+
+reap_track_index() {  # <pid> -> prints the index in REAP_TRACK_PIDS, fails when absent
+  local i=0
+  while [ "$i" -lt "${#REAP_TRACK_PIDS[@]}" ]; do
+    [ "${REAP_TRACK_PIDS[$i]}" != "$1" ] || { printf '%s\n' "$i"; return 0; }
+    i=$((i + 1))
+  done
+  return 1
+}
+
+reap_is_frozen() {  # <pid> <identity>
+  local i=0
+  while [ "$i" -lt "${#REAP_FROZEN_PIDS[@]}" ]; do
+    if [ "${REAP_FROZEN_PIDS[$i]}" = "$1" ] && [ "${REAP_FROZEN_IDS[$i]}" = "$2" ]; then
+      return 0
+    fi
+    i=$((i + 1))
+  done
+  return 1
+}
+
+# Resumes every frozen process whose birth identity still matches, then forgets them.
+reap_resume_frozen() {
+  local i=0
+  while [ "$i" -lt "${#REAP_FROZEN_PIDS[@]}" ]; do
+    if task_process_identity_matches "${REAP_FROZEN_PIDS[$i]}" "${REAP_FROZEN_IDS[$i]}"; then
+      kill -CONT "${REAP_FROZEN_PIDS[$i]}" 2>/dev/null || true
+    fi
+    i=$((i + 1))
+  done
+  REAP_FROZEN_PIDS=()
+  REAP_FROZEN_IDS=()
+}
+
+# Freezes every process of REAP_TRACK_PIDS that the scan of <dir>... still finds, adds each
+# process a scan finds that is not tracked yet (the scan itself proved it the task's own,
+# by marker, record, pane or live chain through a frozen parent), freezes it too, and scans
+# again until a scan finds nothing left to freeze. Leaves TASK_PIDS as of that last scan.
+reap_freeze_and_collect() {  # <dir>...
+  local pid identity idx froze round=0
+  while :; do
+    if ! task_pids_under_roots "$@"; then
+      echo "REFUSED: cannot determine leaked processes under ${TASK_PIDS_FAILED_DIR:-<missing>} for $ID ($TASK_PIDS_ERROR); preserving the worktree/tasktmp for manual inspection or retry." >&2
+      return 1
+    fi
+    froze=0
+    while IFS= read -r pid; do
+      [ -n "$pid" ] || continue
+      if idx=$(reap_track_index "$pid"); then
+        identity=${REAP_TRACK_IDS[$idx]}
+      else
+        if ! identity=$(task_process_identity "$pid"); then
+          ! task_pid_positively_gone "$pid" || continue
+          echo "REFUSED: cannot verify leaked process $pid identity for $ID; preserving the worktree/tasktmp for manual inspection or retry." >&2
+          return 1
+        fi
+        REAP_TRACK_PIDS+=("$pid")
+        REAP_TRACK_IDS+=("$identity")
+      fi
+      ! reap_is_frozen "$pid" "$identity" || continue
+      task_process_identity_matches "$pid" "$identity" || continue
+      if task_record_process_signal "$pid" "$identity" STOP; then
+        :
+      else
+        [ "$?" -ne 2 ] || continue
+        echo "REFUSED: cannot durably record leaked process $pid identity for $ID; preserving the worktree/tasktmp without signalling it." >&2
+        return 1
+      fi
+      task_process_identity_matches "$pid" "$identity" || continue
+      kill -STOP "$pid" 2>/dev/null || continue
+      REAP_FROZEN_PIDS+=("$pid")
+      REAP_FROZEN_IDS+=("$identity")
+      froze=1
+    done <<REAP_SCAN
+$TASK_PIDS
+REAP_SCAN
+    [ "$froze" -eq 1 ] || return 0
+    round=$((round + 1))
+    # Everything the scan finds is frozen, so a further new process can only come from a
+    # source this teardown does not own; the next stage's scan refuses it by name.
+    [ "$round" -lt 16 ] || return 0
+  done
+}
+
+reap_task_worktree_processes_run() {  # <label> <dir>...
   local label=$1 pids pid identity current_pids i pass=1 max_passes=3
   local -a tracked_pids tracked_identities remaining_pids remaining_identities
   shift
@@ -4038,12 +4145,13 @@ EOF
       pass=$((pass + 1))
       continue
     fi
-    if ! task_pids_under_roots "$@"; then
-      echo "REFUSED: cannot determine leaked processes under ${TASK_PIDS_FAILED_DIR:-<missing>} for $ID ($TASK_PIDS_ERROR); preserving the worktree/tasktmp for manual inspection or retry." >&2
-      return 1
-    fi
+    REAP_TRACK_PIDS=("${tracked_pids[@]}")
+    REAP_TRACK_IDS=("${tracked_identities[@]}")
+    reap_freeze_and_collect "$@" || return 1
+    tracked_pids=("${REAP_TRACK_PIDS[@]}")
+    tracked_identities=("${REAP_TRACK_IDS[@]}")
     current_pids=$TASK_PIDS
-    echo "teardown: reaping leaked $label process(es) for $ID: $(printf '%s' "$pids" | tr '\n' ' ')" >&2
+    echo "teardown: reaping leaked $label process(es) for $ID: ${tracked_pids[*]}" >&2
     for i in "${!tracked_pids[@]}"; do
       pid=${tracked_pids[$i]}
       identity=${tracked_identities[$i]}
@@ -4060,6 +4168,8 @@ EOF
         kill -TERM "$pid" 2>/dev/null || true
       fi
     done
+    # A stopped process acts on TERM only when it runs again.
+    reap_resume_frozen
     sleep 1
     if ! task_pids_under_roots "$@"; then
       echo "REFUSED: cannot determine leaked processes under ${TASK_PIDS_FAILED_DIR:-<missing>} for $ID ($TASK_PIDS_ERROR); preserving the worktree/tasktmp for manual inspection or retry." >&2
@@ -4079,10 +4189,11 @@ EOF
     done
     if [ "${#remaining_pids[@]}" -gt 0 ]; then
       echo "teardown: force-killing leaked $label process(es) for $ID: ${remaining_pids[*]}" >&2
-      if ! task_pids_under_roots "$@"; then
-        echo "REFUSED: cannot determine leaked processes under ${TASK_PIDS_FAILED_DIR:-<missing>} for $ID ($TASK_PIDS_ERROR); preserving the worktree/tasktmp for manual inspection or retry." >&2
-        return 1
-      fi
+      REAP_TRACK_PIDS=("${remaining_pids[@]}")
+      REAP_TRACK_IDS=("${remaining_identities[@]}")
+      reap_freeze_and_collect "$@" || return 1
+      remaining_pids=("${REAP_TRACK_PIDS[@]}")
+      remaining_identities=("${REAP_TRACK_IDS[@]}")
       current_pids=$TASK_PIDS
       for i in "${!remaining_pids[@]}"; do
         pid=${remaining_pids[$i]}
@@ -4110,6 +4221,18 @@ EOF
   [ -z "$TASK_PIDS" ] && return 0
   echo "REFUSED: leaked $label processes for $ID remain after $max_passes reap attempts; preserving the worktree/tasktmp for manual inspection or retry." >&2
   return 1
+}
+
+# Fix 2 in the script header owns exact-root custody and pre-signal auditing. This wrapper is
+# the last function of the reaper on purpose: tests/fm-backend-herdr-recovery-lock-e2e.test.sh
+# lifts everything from pids_with_cwd_under through the end of this function.
+reap_task_worktree_processes() {  # <label> <dir>...
+  local rc=0
+  REAP_FROZEN_PIDS=()
+  REAP_FROZEN_IDS=()
+  reap_task_worktree_processes_run "$@" || rc=$?
+  reap_resume_frozen
+  return "$rc"
 }
 
 # A Docker compose working directory inside a nested lane (a linked worktree

@@ -1799,7 +1799,8 @@
         },
         {
           "file": "bin/fm-teardown.sh",
-          "match": "echo \"REFUSED: cannot durably record leaked process $pid identity for $ID; preserving the worktree/tasktmp without signalling it.\" >&2"
+          "match": "echo \"REFUSED: cannot durably record leaked process $pid identity for $ID; preserving the worktree/tasktmp without signalling it.\" >&2",
+          "count": 2
         }
       ]
     },
@@ -2276,11 +2277,12 @@
         {
           "file": "bin/fm-teardown.sh",
           "match": "echo \"REFUSED: cannot determine leaked processes under ${TASK_PIDS_FAILED_DIR:-<missing>} for $ID ($TASK_PIDS_ERROR); preserving the worktree/tasktmp for manual inspection or retry.\" >&2",
-          "count": 6
+          "count": 5
         },
         {
           "file": "bin/fm-teardown.sh",
-          "match": "echo \"REFUSED: cannot verify leaked process $pid identity for $ID; preserving the worktree/tasktmp for manual inspection or retry.\" >&2"
+          "match": "echo \"REFUSED: cannot verify leaked process $pid identity for $ID; preserving the worktree/tasktmp for manual inspection or retry.\" >&2",
+          "count": 2
         },
         {
           "file": "bin/fm-teardown.sh",

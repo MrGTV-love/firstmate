@@ -396,8 +396,13 @@ spawn() { # <home> <task-id> <lane>
   exec env FM_HOME="$TEST_DIR/home-$1" FM_ROOT_OVERRIDE="$ROOT" FM_GATE_REFUSE_BYPASS=1 FM_SPAWN_NO_GUARD=1 \
     bash "$ROOT/bin/fm-spawn.sh" "$2" "$TEST_DIR/project-$3" "sh -c 'while :; do sleep 60; done'" --mode no-mistakes --yolo off --backend herdr
 }
+# This suite does not source tests/lib.sh, so a run launched from a Claude primary would make
+# bin/fm-harness.sh report claude, the home would run the supervision host, and a second teardown
+# of a task another one holds would wait on that task's lease lock (fm_lease_guard) instead of
+# refusing at its control lock, which hangs the held-cleanup cases. The seam pins the primary
+# harness the way every other suite does.
 teardown() { # <home> <task-id>
-  exec env PATH="$TEST_DIR/teardownbin:$PATH" FIXTURE_REAP_LANE="${FIXTURE_REAP_LANE:-}" FM_GATE_REFUSE_BYPASS=1 FM_HOME="$TEST_DIR/home-$1" FM_ROOT_OVERRIDE="$ROOT" \
+  exec env PATH="$TEST_DIR/teardownbin:$PATH" FM_TEST_SEAM=1 FM_TEST_HARNESS=unknown FIXTURE_REAP_LANE="${FIXTURE_REAP_LANE:-}" FM_GATE_REFUSE_BYPASS=1 FM_HOME="$TEST_DIR/home-$1" FM_ROOT_OVERRIDE="$ROOT" \
     FM_STATE_OVERRIDE="$TEST_DIR/home-$1/state" FM_DATA_OVERRIDE="$TEST_DIR/home-$1/data" FM_CONFIG_OVERRIDE="$TEST_DIR/home-$1/config" \
     bash "$ROOT/bin/fm-teardown.sh" "$2" --force --drop-file "$(fm_test_drop_file)"
 }
