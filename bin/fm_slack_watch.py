@@ -1410,6 +1410,9 @@ class Watch:
             raise SlackError('source_not_bound')
         self.state.update(self.dm_boundary())
         self.state.pop('intake_bounds', None)
+        if not any(row.get('person') == 'second' for row in self.state['pending']):
+            for key in ('intake_cursor', 'intake_bounds'):
+                self.second_window().pop(key, None)
         self.commit()
         self.dm_proven = True
 
