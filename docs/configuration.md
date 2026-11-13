@@ -88,7 +88,7 @@ Each effective `FM_HOME` contains private operational directories.
 - The typed dispatch resolver's result log `dispatch-resolve.jsonl`, produced by `bin/fm-dispatch-resolve.sh`; the typed-resolution "Result log" owns its fields and the measurement.
 - The append-only held-copy record `held-foreign-copies.log`, written by `bin/fm-teardown.sh` once a task has closed beside foreign copies it leaves standing; it lists them and returns nothing, and [Agent control](agent-control.md)'s held-copy rule owns its fields.
 - Explicitly installed content-addressed extension packages under `data/extensions/packages/`.
-- The nested-copy sweep's removal log `data/copy-sweep.log` and preservation, driver-retention receipts and per-copy waiting records under `data/copy-sweep/`, owned by `bin/fm-copy-sweep.sh --apply`.
+- The nested-copy sweep's removal log `data/copy-sweep.log` and preservation, driver-retention receipts and per-copy waiting records under `data/copy-sweep/`, owned by `bin/fm-copy-sweep.sh --apply`; `bin/fm-teardown.sh` also writes a receipt, in its complete form, when it closes a task around an own nested copy that Vernant's closeout driver kept, and [Agent control](agent-control.md)'s kept-own-copy rule owns its fields.
 - The model picker's benchmark cache, database, and projections under `data/model-picker/`, produced by `bin/fm-model-picker.sh`; [Model-picker benchmark data](#model-picker-benchmark-data-fm_model_picker_data) owns its layout and the `FM_MODEL_PICKER_DATA` relocation.
 
 `state/` holds runtime records:

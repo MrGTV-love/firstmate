@@ -190,7 +190,10 @@
 # copy, except as below for a refusal the driver names temporary. A receipt whose path is gone, whose path now holds a different copy, whose
 # copy now has a different lock, or that records no hash or identity is stale:
 # classification ignores it, report mode leaves it, and --apply removes it and
-# lists RECEIPT-CLEARED.
+# lists RECEIPT-CLEARED. bin/fm-teardown.sh writes the same receipt, in a complete
+# form with more lines after the first four, when it closes a task around an own
+# nested copy the driver kept (bin/fm-teardown-nested-lib.sh owns the fields); the
+# sweep holds that copy the same way and shows only the fourth line as its reason.
 # Exit 3 with cleanup_ignored_payload_archived_tree_retained is KEPT, not FAILED:
 # the run exits 0 and later runs neither preserve nor execute that copy again.
 # Exit 3 whose one JSON document refuses with cleanup_lease_conflict or
@@ -376,19 +379,6 @@ file_mtime() {
   else
     stat -c %Y "$1" 2>/dev/null
   fi
-}
-
-# The inode and birth time of the copy's own .git file, "<inode>:<birth>", or
-# failure when either cannot be read.
-copy_identity() {  # <copy>
-  local identity
-  if [ "$(uname)" = Darwin ]; then
-    identity=$(/usr/bin/stat -f %i:%B "$1/.git" 2>/dev/null) || return 1
-  else
-    identity=$(stat -c %i:%W "$1/.git" 2>/dev/null) || return 1
-  fi
-  [[ $identity =~ ^[0-9]+:[0-9]+$ ]] || return 1
-  printf '%s\n' "$identity"
 }
 
 gib_to_kib() {  # <GiB, may be decimal>
@@ -726,9 +716,7 @@ sweep_vernant_lock_pid() {  # <lock-file>
 # records the SHA-256 of the creation lock the driver was asked to release, the
 # copy's path and the copy's identity (see copy_identity).
 retained_receipt() {  # <copy>
-  local hash
-  hash=$(printf '%s' "$1" | teardown_ignored_sha256) || return 1
-  printf '%s/%s/retained/%s\n' "$DATA_DIR" "$CHECK_ID" "$hash"
+  teardown_retained_receipt "$DATA_DIR" "$1"
 }
 
 record_driver_retention() {  # <copy> <lock-sha256> <identity> <reason>
@@ -747,9 +735,17 @@ record_driver_retention() {  # <copy> <lock-sha256> <identity> <reason>
 # copy is there, or the copy there has a different creation lock. The same copy
 # with no lock stays protected, because the driver may have released the lock and
 # then failed to remove the copy. Sets RECEIPT_STALE_COPY and RECEIPT_STALE_WHY.
-# A receipt or copy that cannot be read is not stale.
+# A receipt or copy that cannot be read or looked up is not stale.
 RECEIPT_STALE_COPY=
 RECEIPT_STALE_WHY=
+
+# Is <path> positively gone? Only the kernel's answer ENOENT or ENOTDIR counts. A path that
+# exists, or that cannot be looked up (a parent it cannot search, any other error), is not
+# gone: an unknown is never answered as absent. Exit 0 gone, 1 present, 2 unknown.
+path_positively_gone() {  # <path>
+  perl -e 'exit(lstat($ARGV[0]) ? 1 : (($!{ENOENT} || $!{ENOTDIR}) ? 0 : 2))' -- "$1"
+}
+
 receipt_is_stale() {  # <receipt>
   local hash='' copy='' identity='' current actual rc=0
   RECEIPT_STALE_COPY=
@@ -763,10 +759,13 @@ receipt_is_stale() {  # <receipt>
     RECEIPT_STALE_WHY="it records no lock hash, copy path and copy identity"
     return 0
   fi
-  if [ ! -e "$copy" ] && [ ! -L "$copy" ]; then
-    RECEIPT_STALE_WHY="its copy is gone"
-    return 0
-  fi
+  rc=0; path_positively_gone "$copy" || rc=$?
+  case "$rc" in
+    0) RECEIPT_STALE_WHY="its copy is gone"; return 0 ;;
+    1) ;;
+    *) return 1 ;;
+  esac
+  rc=0
   current=$(copy_identity "$copy") || return 1
   if [ "$current" != "$identity" ]; then
     RECEIPT_STALE_WHY="a different copy is now at its path"
@@ -777,6 +776,53 @@ receipt_is_stale() {  # <receipt>
   actual=$(teardown_ignored_sha256 "$TEARDOWN_FOREIGN_LOCK_FILE") || return 1
   [ "$actual" != "$hash" ] || return 1
   RECEIPT_STALE_WHY="the copy there now has a different creation lock"
+}
+
+# A retained record another local home wrote for <copy> (a lane closed its task
+# around the kept copy in a shared pool) holds it for this sweep too, so a sweep
+# run from this home never asks the driver for another archive. Read-only: another
+# home's record is never written, cleared, claimed or closed from here, and a
+# stale one is ignored, not removed. A record or a folder that cannot be read
+# holds the copy as well, since an unknown is never answered with an archive.
+# Sets CLASS and REASON and succeeds when another home holds <copy>.
+# Is <dir> a directory this process cannot both read and search? An unknown is a hold.
+other_home_dir_blocked() {  # <dir>
+  [ -d "$1" ] && { [ ! -r "$1" ] || [ ! -x "$1" ]; }
+}
+
+other_home_retained() {  # <copy>
+  local state_dir data rec own_data
+  own_data=$(fm_task_copy_canonical_dir "$DATA_DIR" 2>/dev/null) || own_data=$DATA_DIR
+  for state_dir in ${FM_LOCAL_FIRSTMATE_STATES[@]+"${FM_LOCAL_FIRSTMATE_STATES[@]}"}; do
+    data=${state_dir%/*}/data
+    # A data directory that exists but cannot be read or searched hides every record in it:
+    # an unknown, so the copy is held (an absent one holds nothing).
+    if other_home_dir_blocked "$data"; then
+      CLASS=HELD-LOCKED
+      REASON="the data directory of another local home ($data) cannot be read or searched, so its retained records cannot be read and the driver is not asked"
+      return 0
+    fi
+    [ -d "$data" ] || continue
+    [ "$(fm_task_copy_canonical_dir "$data" 2>/dev/null)" != "$own_data" ] || continue
+    if other_home_dir_blocked "$data/$CHECK_ID" || other_home_dir_blocked "$data/$CHECK_ID/retained"; then
+      CLASS=HELD-LOCKED
+      REASON="the retained records of another local home ($data/$CHECK_ID) cannot be read, so the driver is not asked"
+      return 0
+    fi
+    rec=$(teardown_retained_receipt "$data" "$1") || continue
+    [ -e "$rec" ] || [ -L "$rec" ] || continue
+    if [ ! -r "$rec" ]; then
+      CLASS=HELD-LOCKED
+      REASON="a retained record of another local home ($rec) cannot be read, so the driver is not asked"
+      return 0
+    fi
+    if ! receipt_is_stale "$rec"; then
+      CLASS=HELD-LOCKED
+      REASON="driver retained this copy: recorded by another local home in $rec; no retry from this home"
+      return 0
+    fi
+  done
+  return 1
 }
 
 # A copy whose preserve stayed after a retryable refusal gets a waiting record:
@@ -830,34 +876,40 @@ tree_fingerprint() {  # <root> <find-args>...
   printf '%s' "$out" | LC_ALL=C sort | teardown_ignored_sha256
 }
 
-# The fingerprint of the newline-separated entries of <copy>.
-entries_fingerprint() {  # <copy> <entries>
-  local entry paths=()
-  while IFS= read -r entry; do
+# The fingerprint of the entries (paths relative to <copy>) given as arguments.
+entries_fingerprint() {  # <copy> <entry>...
+  local entry copy=$1 paths=()
+  shift
+  for entry in "$@"; do
     [ -z "$entry" ] || paths+=("./$entry")
-  done <<< "$2"
+  done
   if [ "${#paths[@]}" = 0 ]; then
     printf '' | teardown_ignored_sha256
     return
   fi
-  tree_fingerprint "$1" "${paths[@]}"
+  tree_fingerprint "$copy" "${paths[@]}"
 }
 
 # The fingerprint of every entry a release of proven <copy> preserves: the locked
-# route's by default, the unlocked route's when all mode is requested.
+# route's by default, the unlocked route's when all mode is requested. The entries come
+# as NUL-ended names, so a name that holds a newline is fingerprinted as itself.
 content_fingerprint() {  # <copy> [all]
-  local entries
-  entries=$(teardown_preservable_ignored "$1" "${2:-releasable}") || return 1
-  entries_fingerprint "$1" "$entries"
+  teardown_ignored_list "$1" "${2:-releasable}" || return 1
+  entries_fingerprint "$1" ${TEARDOWN_IGNORED_LIST[@]+"${TEARDOWN_IGNORED_LIST[@]}"}
 }
 
 # What shows whether <copy> is idle: those same entries and its regenerable
 # directories, which only preservation leaves out.
 activity_fingerprint() {  # <copy> [all]
-  local entries dirs
-  entries=$(teardown_preservable_ignored "$1" "${2:-releasable}") || return 1
+  local dirs dir
+  local -a more=()
+  teardown_ignored_list "$1" "${2:-releasable}" || return 1
+  more=(${TEARDOWN_IGNORED_LIST[@]+"${TEARDOWN_IGNORED_LIST[@]}"})
   dirs=$(teardown_regenerable_ignored "$1") || return 1
-  entries_fingerprint "$1" "$entries"$'\n'"$dirs"
+  while IFS= read -r dir; do
+    [ -z "$dir" ] || more+=("$dir")
+  done <<< "$dirs"
+  entries_fingerprint "$1" ${more[@]+"${more[@]}"}
 }
 
 # The fingerprint of preserve <dir>, without the library's metadata.
@@ -962,7 +1014,10 @@ classify() {  # <copy> <clone> <pool> <container>
   }
   if { [ -e "$pending" ] || [ -L "$pending" ]; } && ! receipt_is_stale "$pending"; then
     CLASS=HELD-LOCKED
-    REASON="driver retained this copy: $(sed -n '4,$p' "$pending" 2>/dev/null || printf 'receipt unreadable'); no retry until its retained disposition is reconciled"
+    REASON="driver retained this copy: $(sed -n '4p' "$pending" 2>/dev/null || printf 'receipt unreadable'); no retry until its retained disposition is reconciled"
+    return 0
+  fi
+  if other_home_retained "$copy"; then
     return 0
   fi
   rc=0
@@ -994,6 +1049,10 @@ classify() {  # <copy> <clone> <pool> <container>
       if [ ! -f "$clone/scripts/git-stability/closeout_pr.py" ] \
         || [ ! -x "${FM_TEARDOWN_VERNANT_PYTHON:-$clone/.venv/bin/python}" ]; then
         REASON="$REASON; closeout driver or interpreter unavailable"
+        return 0
+      fi
+      if [ -n "${FM_LOCAL_FIRSTMATE_SKIPPED[*]:-}" ]; then
+        REASON="$REASON; a local home's records were not read, so another home's retained record cannot be ruled out and the driver is not asked"
         return 0
       fi
       launcher=$pid
@@ -1663,7 +1722,7 @@ teardown_driver_release() {  # <clone> <copy> <release-id> <pool> <container> <H
 # receipt_is_stale proves no longer describes its path is removed. Also removes,
 # without listing, each waiting record whose copy is gone or is a different copy.
 clear_stale_receipts() {
-  local receipt copy identity
+  local receipt copy identity rc
   for receipt in "$DATA_DIR/$CHECK_ID/retained"/*; do
     [ -e "$receipt" ] || [ -L "$receipt" ] || continue
     receipt_is_stale "$receipt" || continue
@@ -1677,9 +1736,16 @@ clear_stale_receipts() {
   for receipt in "$DATA_DIR/$CHECK_ID/waiting"/*; do
     [ -e "$receipt" ] || [ -L "$receipt" ] || continue
     copy=$(sed -n '1s/^copy=//p' "$receipt" 2>/dev/null) || continue
-    if [ -n "$copy" ] && { [ -e "$copy" ] || [ -L "$copy" ]; }; then
-      identity=$(copy_identity "$copy") || continue
-      ! read_waiting "$receipt" "$copy" "$identity" || continue
+    if [ -n "$copy" ]; then
+      rc=0; path_positively_gone "$copy" || rc=$?
+      case "$rc" in
+        0) ;;
+        1)
+          identity=$(copy_identity "$copy") || continue
+          ! read_waiting "$receipt" "$copy" "$identity" || continue
+          ;;
+        *) continue ;;
+      esac
     fi
     rm -f -- "$receipt" 2>/dev/null || true
   done

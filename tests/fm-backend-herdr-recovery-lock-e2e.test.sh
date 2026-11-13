@@ -257,8 +257,8 @@ if (cd "$TEST_DIR/project-primary" && treehouse return --force "$TEST_DIR/projec
 [ "$(cat "$TEST_DIR/returns")" = primary ] || fail "return interception recorded an unexpected call"
 rm "$TEST_DIR/primary-at-allocation" "$TEST_DIR/bravo-at-allocation" "$TEST_DIR/primary-at-return" "$TEST_DIR/returns"
 mkdir "$TEST_DIR/offline-owned" "$TEST_DIR/offline-unrelated"
-fixture_process() {
-  (cd "$1" && exec python3 -c 'import os, pathlib, sys; pathlib.Path(sys.argv[1]).touch(); os.execlp("sleep", "sleep", "3600")' "$TEST_DIR/ready-${1##*/}") &
+fixture_process() {  # <cwd> [FM_TASK_INBOX launch marker the process inherits, as a spawned worker's do]
+  (cd "$1" && exec env ${2:+"$2"} python3 -c 'import os, pathlib, sys; pathlib.Path(sys.argv[1]).touch(); os.execlp("sleep", "sleep", "3600")' "$TEST_DIR/ready-${1##*/}") &
   FIXTURE_PID=$!
   FIXTURE_PIDS="$FIXTURE_PIDS $FIXTURE_PID"
   while [ ! -e "$TEST_DIR/ready-${1##*/}" ]; do
@@ -288,9 +288,14 @@ STATE="$TEST_DIR/home-primary/state"
   export PROJ="$TEST_DIR/project-primary" STATE="$TEST_DIR/home-primary/state"
   # shellcheck source=/dev/null
   . "$TEST_DIR/runtime-cleanup.sh"
+  # The inventory signals a process at a scan root only when it is proved the task's
+  # own (bin/fm-teardown-nested-lib.sh): here by the owned record teardown writes.
+  . "$ROOT/bin/fm-teardown-nested-lib.sh"
+  ID=offline-owned
+  printf '%s\t%s\n' "$OFFLINE_OWNED_PID" "$(task_process_identity "$OFFLINE_OWNED_PID")" > "$(teardown_owned_record_path)"
   task_pids_under_roots "$TEST_DIR/offline-owned" || fail "offline owned inventory failed"
   [ "$TASK_PIDS" = "$OFFLINE_OWNED_PID" ] || fail "offline inventory did not isolate the owned process: $TASK_PIDS"
-  ID=offline-owned BACKEND=herdr reap_task_worktree_processes worktree "$TEST_DIR/offline-owned" || fail "offline owned reaper failed"
+  BACKEND=herdr reap_task_worktree_processes worktree "$TEST_DIR/offline-owned" || fail "offline owned reaper failed"
   task_pids_under_roots "$TEST_DIR/offline-owned" || fail "offline post-reap inventory failed"
   [ -z "$TASK_PIDS" ] || fail "offline owned process survived reaping"
 ) >"$TEST_DIR/offline.out" 2>"$TEST_DIR/offline.err" || fail "offline executable inventory/reaper failed: $(cat "$TEST_DIR/offline.err")"
@@ -575,7 +580,7 @@ for phase in conclude reap; do
   touch "$TEST_DIR/fail-$abort" "$TEST_DIR/fail-$fresh"
   owned_meta="$TEST_DIR/home-primary/state/$id.meta"
   owned_pane=$(field "$owned_meta" herdr_pane_id)
-  fixture_process "$TEST_DIR/copy-$lane"
+  fixture_process "$TEST_DIR/copy-$lane" "FM_TASK_INBOX=$(cd "$TEST_DIR/home-primary/state" && pwd -P)/$id.inbox"
   owned_pid=$FIXTURE_PID
   touch "$TEST_DIR/hold-$phase-$lane"
   [ "$phase" != conclude ] || touch "$TEST_DIR/run-$lane"

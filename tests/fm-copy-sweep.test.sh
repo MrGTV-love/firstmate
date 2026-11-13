@@ -166,6 +166,33 @@ sweep_cmd() {
 run_sweep() {
   RC=0
   OUT=$( ( sweep_cmd "$@" ) 2>&1) || RC=$?
+  sweep_observe "$@"
+}
+
+# With FM_RETAINED_EVIDENCE=<file>, one line per sweep run, written by the run itself:
+# the form (report or --apply), exit status, the class the sweep gave the nested copy
+# named "locked", whether that copy is still on disk and registered, the closeout
+# driver's call count, this home's retention receipts (count and a hash of their
+# bytes), other homes' receipts (count and hash), and whether the run listed a
+# RECEIPT-CLEARED line. Nothing here changes what a test asserts.
+sweep_observe() {
+  [ -n "${FM_RETAINED_EVIDENCE:-}" ] || return 0
+  local fn test_name=unknown form=report arg calls=0 mine others copy class present registered cleared=no
+  for fn in "${FUNCNAME[@]}"; do
+    case "$fn" in test_*) test_name=$fn; break ;; esac
+  done
+  for arg in "$@"; do [ "$arg" != --apply ] || form=apply; done
+  copy=$SLOT/.claude/worktrees/locked
+  class=$(printf '%s\n' "$OUT" | awk -F '\t' -v p="$copy" '$3 == p { print $1 }' | head -n 1)
+  present=gone; [ ! -e "$copy" ] || present=present
+  registered=no; git -C "$SLOT" worktree list --porcelain 2>/dev/null | grep -qxF "worktree $copy" && registered=yes
+  [ ! -e "$W/closeout.log" ] || calls=$(wc -l < "$W/closeout.log" | tr -d ' ')
+  mine="$(find "$HOMED/data/copy-sweep/retained" -type f 2>/dev/null | wc -l | tr -d ' ') sha256=$(find "$HOMED/data/copy-sweep/retained" -type f -exec shasum -a 256 {} + 2>/dev/null | awk '{print $1}' | LC_ALL=C sort | shasum -a 256 | cut -c1-16)"
+  others="$(find "$W"/lane-*/data/copy-sweep/retained -type f 2>/dev/null | wc -l | tr -d ' ') sha256=$(find "$W"/lane-*/data/copy-sweep/retained -type f -exec shasum -a 256 {} + 2>/dev/null | awk '{print $1}' | LC_ALL=C sort | shasum -a 256 | cut -c1-16)"
+  case "$OUT" in *RECEIPT-CLEARED*) cleared=yes ;; esac
+  printf '%s | case=%s | form=%s | exit=%s | class=%s | copy=%s registered=%s | driver-calls=%s | own-receipts=%s | other-home-receipts=%s | receipt-cleared=%s\n' \
+    "$test_name" "${W##*/}" "$form" "$RC" "${class:-none}" "$present" "$registered" "$calls" "$mine" "$others" "$cleared" >> "$FM_RETAINED_EVIDENCE"
+  return 0
 }
 
 # add_copy <name>: a nested copy of the slot on branch fm/<name>, one commit,
@@ -1601,6 +1628,158 @@ test_a_receipt_that_cannot_be_written_keeps_no_preserve_and_retries() {
   assert_equals 1 "$(preserved_unique | grep -c .)" "the release did not leave exactly one preserve"
   assert_equals 'durable state' "$(cat "$(preserved_unique)")" "the released copy's preserve changed"
   pass "a driver-retention receipt that cannot be written before execute stops the release, discards that run's preserve while the copy still holds its lock and originals, so repeated refusals add no preserve, and the next run that can write it preserves once and releases the copy"
+}
+
+# The record bin/fm-teardown.sh writes when it closes a task around an own copy
+# the driver kept is this sweep's receipt in its complete form: the same first
+# four lines plus key=value lines. The sweep neither executes, preserves nor
+# removes that copy while the record matches, and clears the record once the copy
+# is gone.
+test_a_teardown_retained_record_protects_the_copy_and_is_cleared_with_it() {
+  local copy admin hash record identity lock before line calls
+  make_locked_copy_case teardown-record dead
+  install_driver "$SLOT" "$W"
+  copy=$(copy_path locked)
+  admin=$(git -C "$copy" rev-parse --absolute-git-dir)
+  lock=$(shasum -a 256 "$admin/locked" | awk '{print $1}')
+  if [ "$(uname)" = Darwin ]; then identity=$(/usr/bin/stat -f %i:%B "$copy/.git"); else identity=$(stat -c %i:%W "$copy/.git"); fi
+  hash=$(printf '%s' "$copy" | shasum -a 256 | awk '{print $1}')
+  record="$HOMED/data/copy-sweep/retained/$hash"
+  mkdir -p "${record%/*}"
+  {
+    printf 'lock-sha256=%s\ncopy=%s\nidentity=%s\n' "$lock" "$copy" "$identity"
+    printf 'the closeout driver kept this copy (exit 3, cleanup_ignored_payload_archived_tree_retained); task t verified its ignored payload byte for byte\n'
+    printf 'task=t\nslot=%s\npreserve=/p\nreason=cleanup_ignored_payload_archived_tree_retained\nclosed-at=2026-11-03T00:00:00Z\nhead=h\nstatus-sha256=s\npayload-sha256=p\nunique=.claude/channel-outbox/a.jsonl\n' "$SLOT"
+  } > "$record"
+  before=$(shasum -a 256 "$record")
+  snap "$copy" > "$W/copy.before"
+  for mode in report apply apply; do
+    if [ "$mode" = report ]; then run_sweep; else FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply; fi
+    [ "$RC" = 0 ] || fail "$mode: the run failed ($RC): $OUT"
+    assert_class locked HELD-LOCKED
+    line=$(printf '%s\n' "$OUT" | grep -F "$copy" | head -n 1)
+    assert_contains "$line" "driver retained this copy: the closeout driver kept this copy (exit 3, cleanup_ignored_payload_archived_tree_retained)" "$mode: the held reason did not show the record's sentence"
+    assert_not_contains "$line" "payload-sha256" "$mode: the held reason leaked the record's key lines"
+    calls=0
+    [ ! -e "$W/closeout.log" ] || calls=$(wc -l < "$W/closeout.log" | tr -d ' ')
+    assert_equals 0 "$calls" "$mode: the sweep asked the driver about a copy the record keeps"
+    assert_equals "$before" "$(shasum -a 256 "$record")" "$mode: the sweep rewrote the teardown record"
+    snap "$copy" | cmp -s - "$W/copy.before" || fail "$mode: the sweep changed the kept copy"
+    registered locked || fail "$mode: the kept copy is no longer registered"
+  done
+  git -C "$SLOT" worktree unlock "$copy"
+  git -C "$SLOT" worktree remove --force "$copy"
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 0 ] || fail "the run after the copy was removed failed ($RC): $OUT"
+  assert_contains "$OUT" "RECEIPT-CLEARED" "a record for a copy that is gone was not cleared"
+  [ ! -e "$record" ] || fail "a record for a copy that is gone survived"
+  pass "a teardown-written retained record keeps the sweep from executing, preserving or removing the copy, shows one line as the hold reason, and is cleared with the copy"
+}
+
+# A lane home wrote the retained record (it closed its task around the kept copy in
+# the shared pool); a sweep run from another home must not ask the driver for the
+# copy again, must not write, clear or claim the lane's record, and holds the copy
+# when the lane's records cannot be read.
+xhome_record() {  # <copy> <record-path>
+  local copy=$1 record=$2 admin lock identity
+  admin=$(git -C "$copy" rev-parse --absolute-git-dir)
+  lock=$(shasum -a 256 "$admin/locked" | awk '{print $1}')
+  if [ "$(uname)" = Darwin ]; then identity=$(/usr/bin/stat -f %i:%B "$copy/.git"); else identity=$(stat -c %i:%W "$copy/.git"); fi
+  mkdir -p "${record%/*}"
+  {
+    printf 'lock-sha256=%s\ncopy=%s\nidentity=%s\n' "$lock" "$copy" "$identity"
+    printf 'the closeout driver kept this copy (exit 3, cleanup_ignored_payload_archived_tree_retained); task t verified its ignored payload byte for byte\n'
+    printf 'task=t\nslot=%s\npreserve=/p\nreason=cleanup_ignored_payload_archived_tree_retained\nclosed-at=2026-11-03T00:00:00Z\nhead=h\nstatus-sha256=s\npayload-sha256=p\n' "$SLOT"
+  } > "$record"
+}
+
+test_a_sweep_from_another_home_does_not_ask_the_driver_for_a_copy_a_lane_record_holds() {
+  local copy hash record before mode line calls
+  make_locked_copy_case xhome-record dead
+  install_driver "$SLOT" "$W"
+  make_lane l1
+  copy=$(copy_path locked)
+  hash=$(printf '%s' "$copy" | shasum -a 256 | awk '{print $1}')
+  # Control: with no record anywhere the copy goes to the driver as before.
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep
+  [ "$RC" = 0 ] || fail "control report failed ($RC): $OUT"
+  assert_class locked PENDING-DRIVER
+  record="$W/lane-l1/data/copy-sweep/retained/$hash"
+  xhome_record "$copy" "$record"
+  before=$(shasum -a 256 "$record")
+  snap "$copy" > "$W/copy.before"
+  for mode in report apply apply; do
+    if [ "$mode" = report ]; then FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep; else FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply; fi
+    [ "$RC" = 0 ] || fail "$mode: the run failed ($RC): $OUT"
+    assert_class locked HELD-LOCKED
+    line=$(printf '%s\n' "$OUT" | grep -F "$copy" | head -n 1)
+    assert_contains "$line" "recorded by another local home" "$mode: the hold reason did not name the other home's record"
+    calls=0
+    [ ! -e "$W/closeout.log" ] || calls=$(wc -l < "$W/closeout.log" | tr -d ' ')
+    assert_equals 0 "$calls" "$mode: the sweep asked the driver about a copy another home's record keeps"
+    assert_equals "$before" "$(shasum -a 256 "$record")" "$mode: the sweep rewrote the lane's record"
+    [ ! -e "$HOMED/data/copy-sweep/retained/$hash" ] || fail "$mode: the sweep wrote a competing record of its own"
+    snap "$copy" | cmp -s - "$W/copy.before" || fail "$mode: the sweep changed the kept copy"
+  done
+  pass "a sweep run from another home holds a copy a lane's retained record keeps: no driver call, no write to the lane's record, no competing record"
+}
+
+test_a_sweep_holds_a_copy_when_another_homes_records_cannot_be_read() {
+  local copy mode calls
+  for mode in unreadable-folder unsearchable-data skipped-home searchable-unreadable-retained searchable-unreadable-folder searchable-unreadable-data; do
+    make_locked_copy_case "xhome-$mode" dead
+    install_driver "$SLOT" "$W"
+    make_lane l1
+    copy=$(copy_path locked)
+    case "$mode" in
+      unreadable-folder) mkdir -p "$W/lane-l1/data/copy-sweep/retained"; chmod 000 "$W/lane-l1/data/copy-sweep/retained" ;;
+      unsearchable-data) mkdir -p "$W/lane-l1/data/copy-sweep/retained"; chmod 000 "$W/lane-l1/data" ;;
+      skipped-home) rm -rf "$W/lane-l1" ;;
+      # Searchable but not readable: the directory lists as empty, so its records are unknown.
+      searchable-unreadable-retained) mkdir -p "$W/lane-l1/data/copy-sweep/retained"; chmod 111 "$W/lane-l1/data/copy-sweep/retained" ;;
+      searchable-unreadable-folder) mkdir -p "$W/lane-l1/data/copy-sweep/retained"; chmod 111 "$W/lane-l1/data/copy-sweep" ;;
+      searchable-unreadable-data) mkdir -p "$W/lane-l1/data/copy-sweep/retained"; chmod 111 "$W/lane-l1/data" ;;
+    esac
+    FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+    chmod 755 "$W/lane-l1/data" 2>/dev/null || true
+    chmod 755 "$W/lane-l1/data/copy-sweep" 2>/dev/null || true
+    chmod 755 "$W/lane-l1/data/copy-sweep/retained" 2>/dev/null || true
+    [ "$RC" = 0 ] || fail "$mode: the run failed ($RC): $OUT"
+    assert_class locked HELD-LOCKED
+    calls=0
+    [ ! -e "$W/closeout.log" ] || calls=$(wc -l < "$W/closeout.log" | tr -d ' ')
+    assert_equals 0 "$calls" "$mode: the sweep asked the driver when another home's records were unknown"
+    registered locked || fail "$mode: the copy is no longer registered"
+  done
+  pass "a sweep holds a locked copy and asks the driver nothing when another home's retained records, or the home itself, cannot be read"
+}
+
+# A receipt is cleared only when its copy is positively gone (the kernel says it does not
+# exist). A copy that cannot be looked up because a directory above it cannot be searched is
+# unknown, not gone: its receipt stays, and is still there when the access is restored.
+test_a_receipt_survives_while_its_copy_cannot_be_looked_up_and_is_cleared_only_when_it_is_gone() {
+  local copy hash record parent
+  [ "$(id -u)" != 0 ] || { pass "skipped as root: a directory permission does not stop root"; return 0; }
+  make_locked_copy_case receipt-unobservable dead
+  install_driver "$SLOT" "$W"
+  copy=$(copy_path locked)
+  hash=$(printf '%s' "$copy" | shasum -a 256 | awk '{print $1}')
+  record="$HOMED/data/copy-sweep/retained/$hash"
+  xhome_record "$copy" "$record"
+  parent=$(dirname "$copy")
+  chmod 000 "$parent"
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  chmod 755 "$parent"
+  assert_not_contains "$OUT" "RECEIPT-CLEARED" "a receipt was cleared while its copy could not be looked up"
+  [ -e "$record" ] || fail "the receipt of a copy that could not be looked up was removed"
+  [ -e "$copy" ] || fail "the copy is gone after the access was restored"
+  # Control: once the copy really is gone the apply clears the receipt.
+  git -C "$SLOT" worktree unlock "$copy"
+  git -C "$SLOT" worktree remove --force "$copy"
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  assert_contains "$OUT" "RECEIPT-CLEARED" "the receipt of a copy that is gone was not cleared"
+  [ ! -e "$record" ] || fail "the receipt of a copy that is gone survived"
+  pass "a retained receipt survives while its copy cannot be looked up and is cleared only once the copy is positively gone"
 }
 
 test_a_long_sorted_key_refusal_still_shows_the_drivers_reason() {
@@ -3098,6 +3277,10 @@ test_a_new_ignored_file_after_preservation_waits_then_releases_once
 test_a_fifo_and_a_stale_socket_neither_block_release_nor_accumulate_preserves
 test_a_receipt_that_cannot_be_written_keeps_no_preserve_and_retries
 test_a_long_sorted_key_refusal_still_shows_the_drivers_reason
+test_a_teardown_retained_record_protects_the_copy_and_is_cleared_with_it
+test_a_sweep_from_another_home_does_not_ask_the_driver_for_a_copy_a_lane_record_holds
+test_a_sweep_holds_a_copy_when_another_homes_records_cannot_be_read
+test_a_receipt_survives_while_its_copy_cannot_be_looked_up_and_is_cleared_only_when_it_is_gone
 test_a_failed_preservation_is_the_sweeps_own_human_only_refusal
 test_a_failed_preservation_leaves_no_staging_directory
 test_a_lock_that_stops_being_vernants_after_the_plan_is_not_released
