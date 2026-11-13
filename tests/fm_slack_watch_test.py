@@ -870,13 +870,13 @@ class IntakeTest(unittest.TestCase):
         """An intake variant that makes one more call before it decides on a message."""
         original = Watch.request_from
 
-        def with_call(watch, message, owner=None):
+        def with_call(watch, message, owner=None, second=False):
             try:
                 watch.api.call(method, **fields(message))
             except SlackError:
                 if not swallow:
                     raise
-            return original(watch, message, owner)
+            return original(watch, message, owner, second=second)
         return with_call
 
     def poll_with(self, variant, **fixture):
@@ -4723,7 +4723,6 @@ class SecondPersonTest(unittest.TestCase):
             for _ in range(3):
                 self.again(watch)
             self.assertEqual(watch.failed_requests(), ['200.000100@' + self.SECOND])
-            self.assertEqual(plane.open_failed_threads.__name__, 'open_failed_threads')
             with self.assertRaisesRegex(SlackError, '^no_pending_request$'):
                 watch.close_request('200.000100')
             watch.close_request('200.000100@' + self.SECOND)

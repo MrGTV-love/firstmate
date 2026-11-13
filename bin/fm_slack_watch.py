@@ -2106,7 +2106,7 @@ class Watch:
             return remaining
         moved, finished = False, True
         for message in sorted(window, key=lambda m: ts_key(m['ts'])):
-            row = self.request_from(message, second=True) if second else self.request_from(message)
+            row = self.request_from(message, second=second)
             if row and row['event'] not in self.state['seen']:
                 if remaining <= 0:
                     finished = False
