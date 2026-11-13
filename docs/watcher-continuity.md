@@ -696,6 +696,9 @@ The pull guard suite proves that no extension hand-off evidence replaces the [sh
 - The already-acknowledged confirmation no-op for a matching generation, with its mismatched-generation, dead-pid, and lock-mismatch rejections preserved.
 - The manual-restart generation churn that makes a confirmation for the churned generation report a mismatch, which an arm check without a reopen leaves in place.
 - A take-over that stays quiet after a confirmed TERM, still surfaces queued work and self-exit downtime, and attaches without stopping a cycle the named arm does not own.
+- The disposable-checkout arm refusal.
+- The home-gone and state-gone watcher exits.
+- The test reaper that stops a watcher armed for a temporary home.
 
 `tests/fm-watch-takeover.test.sh` covers the take-over against the real Stop hook, supervision host, arm and watcher:
 
@@ -704,9 +707,8 @@ The pull guard suite proves that no extension hand-off evidence replaces the [sh
 - An idle watcher that is still TERMed, the owner arm's TERM row, the taking arm's `taken-over` row, main's acknowledgement kept, and the next wake printed once by the new arm.
 - Consecutive stops deferred outside the prelude (a blocked command substitution in the stale-pane loop) that leave no empty `check: rearm-resurface`.
 - A prelude that would start after the arm's check, held by a test seam, that sees the claim and does not start its step.
-- The disposable-checkout arm refusal.
-- The home-gone and state-gone watcher exits.
-- The test reaper that stops a watcher armed for a temporary home.
+
+`tests/fm-watch-downtime-preserve.test.sh` proves that pending downtime is still announced once after a SIGKILL, an operator TERM, an arm `--stop`, a watcher error exit or a take-over, that announced downtime with an empty queue stays quiet, and that a close with an undelivered wake announces once.
 
 `tests/fm-watch-sweep.test.sh` covers the check sweep records with real watchers and five registered checks:
 

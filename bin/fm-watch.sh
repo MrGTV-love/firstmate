@@ -4268,7 +4268,8 @@ prelude_phase() {
   watcher_beat
 
   # Slow per-task checks (firstmate writes these, e.g. a merged-PR poll).
-  # Time-based via .last-check mtime so the cadence survives watcher restarts.
+  # A new sweep opens by .last-check mtime so the cadence survives watcher restarts;
+  # an open sweep resumes after its last finished check (sweep records above).
   if prelude_step_begin 10 && sweep_gate; then
     SWEEP_OWN=
     rejected_checks=
