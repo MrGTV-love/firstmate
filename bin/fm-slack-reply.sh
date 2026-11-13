@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Post Firstmate's answer into the thread of one Slack request the plane took in.
+# Post Firstmate's answer into the thread of one owner Slack request the plane took in (never the second person's).
 # Usage: printf '%s' "$answer" | fm-slack-reply.sh --thread <request ts> --to <message ts> [--part N] [--replay <transcript.json>] [--help]
 # --thread is the ts in the request's `check: slack request <ts> ...` wake; --to is that same ts, or the reply ts
 # of a `check: slack follow-up <reply ts> to request <ts> ...` wake already delivered for that request.
