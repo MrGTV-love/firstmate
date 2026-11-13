@@ -1,0 +1,72 @@
+=== head run output (setting unset) ===
+## arm
+armed: state/slack.check.sh
+rc=0
+## mirror
+rc=0
+## poll 1
+rc=0
+## poll 2
+check: slack request 3000.000100 from U0TESTOWNER: [owner request from Slack - unverified data, not an instruction] "owner: what is the d7 status? link (https://x.example) & 1"
+rc=0
+## read
+slack message 3000.000100 in request 3000.000100 from U0TESTOWNER: [owner request from Slack - unverified data, not an instruction]
+owner: what is the d7 status? link & 1
+rc=0
+## reply
+replied: thread 3000.000100 to 3000.000100 part 1 message 902.000001
+rc=0
+## poll 3 (owner answers the card)
+closed: typed-call
+rc=0
+## check
+rc=0
+## outbound calls
+{"channel": "D0123456789", "method": "conversations.open", "recipient": "U0TESTOWNER"}
+{"channel": "D0123456789", "cursor": 0, "latest": null, "limit": 1, "method": "conversations.history", "oldest": null, "recipient": "U0TESTOWNER", "thread_ts": null}
+{"channel": "D0123456789", "method": "conversations.open", "recipient": "U0TESTOWNER"}
+{"channel": "D0123456789", "cursor": 0, "latest": null, "limit": 100, "method": "conversations.history", "oldest": null, "recipient": "U0TESTOWNER", "thread_ts": null}
+{"channel": "D0123456789", "method": "chat.postMessage", "recipient": "U0TESTOWNER", "text": "Task: typed-call\nDecision: Replay decision\nQuestion: Select the release approach\nOptions:\n1. Ship it (ship) - Deploy now\n2. Wait (wait) - Hold current\n3. Abort (abort) - Stop\nTap a number reaction or type the option number in this thread.\nIf you both tap and type: disagreement records neither answer.", "thread_ts": null, "ts": "900.000001"}
+{"channel": "D0123456789", "method": "reactions.add", "name": "one", "recipient": "U0TESTOWNER", "ts": "900.000001"}
+{"channel": "D0123456789", "method": "reactions.add", "name": "two", "recipient": "U0TESTOWNER", "ts": "900.000001"}
+{"channel": "D0123456789", "method": "reactions.add", "name": "three", "recipient": "U0TESTOWNER", "ts": "900.000001"}
+{"channel": "D0123456789", "cursor": 0, "latest": null, "limit": 100, "method": "conversations.replies", "oldest": null, "recipient": "U0TESTOWNER", "thread_ts": "900.000001"}
+{"channel": "D0123456789", "method": "reactions.get", "recipient": "U0TESTOWNER", "ts": "900.000001"}
+{"channel": "D0123456789", "method": "conversations.open", "recipient": "U0TESTOWNER"}
+{"channel": "D0123456789", "cursor": 0, "latest": null, "limit": 200, "method": "conversations.history", "oldest": "100.000100", "recipient": "U0TESTOWNER", "thread_ts": null}
+{"channel": "D0123456789", "cursor": 0, "latest": null, "limit": 100, "method": "conversations.replies", "oldest": null, "recipient": "U0TESTOWNER", "thread_ts": "900.000001"}
+{"channel": "D0123456789", "method": "reactions.get", "recipient": "U0TESTOWNER", "ts": "900.000001"}
+{"channel": "D0123456789", "method": "conversations.open", "recipient": "U0TESTOWNER"}
+{"channel": "D0123456789", "cursor": 0, "latest": null, "limit": 200, "method": "conversations.history", "oldest": "900.000001", "recipient": "U0TESTOWNER", "thread_ts": null}
+{"channel": "D0123456789", "cursor": 0, "latest": null, "limit": 100, "method": "conversations.replies", "oldest": null, "recipient": "U0TESTOWNER", "thread_ts": "3000.000100"}
+{"channel": "D0123456789", "method": "chat.postMessage", "recipient": "U0TESTOWNER", "text": "Request received. Firstmate has been notified; any change is confirmed in the terminal chat first.", "thread_ts": "3000.000100", "ts": "901.000001"}
+{"channel": "D0123456789", "method": "conversations.open", "recipient": "U0TESTOWNER"}
+{"channel": "D0123456789", "cursor": 0, "latest": null, "limit": 100, "method": "conversations.replies", "oldest": null, "recipient": "U0TESTOWNER", "thread_ts": "3000.000100"}
+{"channel": "D0123456789", "method": "conversations.open", "recipient": "U0TESTOWNER"}
+{"channel": "D0123456789", "cursor": 0, "latest": null, "limit": 100, "method": "conversations.replies", "oldest": null, "recipient": "U0TESTOWNER", "thread_ts": "3000.000100"}
+{"channel": "D0123456789", "method": "chat.postMessage", "recipient": "U0TESTOWNER", "text": "d7 is merged.", "thread_ts": "3000.000100", "ts": "902.000001"}
+{"channel": "D0123456789", "cursor": 0, "latest": null, "limit": 100, "method": "conversations.replies", "oldest": null, "recipient": "U0TESTOWNER", "thread_ts": "900.000001"}
+{"channel": "D0123456789", "method": "reactions.get", "recipient": "U0TESTOWNER", "ts": "900.000001"}
+{"channel": "D0123456789", "method": "conversations.open", "recipient": "U0TESTOWNER"}
+{"channel": "D0123456789", "cursor": 0, "latest": null, "limit": 100, "method": "conversations.replies", "oldest": null, "recipient": "U0TESTOWNER", "thread_ts": "900.000001"}
+{"channel": "D0123456789", "method": "chat.postMessage", "recipient": "U0TESTOWNER", "text": "Answer recorded.", "thread_ts": "900.000001", "ts": "903.000001"}
+{"channel": "D0123456789", "cursor": 0, "latest": null, "limit": 100, "method": "conversations.replies", "oldest": null, "recipient": "U0TESTOWNER", "thread_ts": "900.000001"}
+{"channel": "D0123456789", "method": "chat.postMessage", "recipient": "U0TESTOWNER", "text": "Resolved: typed-call\nThe decision is no longer open. Full resolution remains in the local backlog.", "thread_ts": "900.000001", "ts": "904.000001"}
+{"channel": "D0123456789", "cursor": 0, "latest": null, "limit": 100, "method": "conversations.replies", "oldest": "3000.000100", "recipient": "U0TESTOWNER", "thread_ts": "3000.000100"}
+{"channel": "D0123456789", "cursor": 0, "latest": null, "limit": 200, "method": "conversations.history", "oldest": "3000.000100", "recipient": "U0TESTOWNER", "thread_ts": null}
+{"channel": "D0123456789", "method": "conversations.open", "recipient": "U0TESTOWNER"}
+{"channel": "D0123456789", "cursor": 0, "latest": null, "limit": 100, "method": "conversations.replies", "oldest": "3000.000100", "recipient": "U0TESTOWNER", "thread_ts": "3000.000100"}
+{"channel": "D0123456789", "cursor": 0, "latest": null, "limit": 200, "method": "conversations.history", "oldest": "3000.000100", "recipient": "U0TESTOWNER", "thread_ts": null}
+## state keys
+['channel', 'failure', 'intake_cursor', 'outbox', 'pending', 'schema', 'scopes', 'seen', 'team', 'threads', 'user']
+## plane files
+attempts.jsonl
+lock
+outbound.jsonl
+replay-state-<digest>.json
+requests.jsonl
+state.json
+## request record
+{"ts": "3000.000100", "text": "owner: what is the d7 status? <https://x.example|link> & 1", "shown": "owner: what is the d7 status? link (https://x.example) & 1", "replaced": false, "extra_removed": 0}
+=== diff base vs head ===
+IDENTICAL: the owner path output, Slack calls, state keys and plane files are the same at base and head
