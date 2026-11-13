@@ -44,6 +44,7 @@ Each adapter:
 
 Pi treats an arm child whose process is already gone as an empty slot even while its close event is still pending, so a repair call or a scheduled retry starts a fresh arm instead of answering unchanged.
 A failed wake delivery never cancels continuity restoration.
+omp also keeps successor restoration independent of a pending `sendUserMessage` promise; the [extension header](../.omp/extensions/fm-primary-omp-watch.ts) owns delivery settlement and replay.
 
 ### Pi session replacement
 
@@ -85,11 +86,15 @@ The [instance registry contract](../.pi/extensions/lib/fm-watch-lifecycle.ts) ow
 For a lifecycle gap, inspect `state/extensions/pi-primary-watch/lifecycle.log` or `state/extensions/omp-primary-watch/lifecycle.log`.
 Pi's `successor-missing` diagnostic calls for reloading the extension in a live session; omp's `self-heal-failed` identifies a recovery failure for later repair.
 omp's `home-claimed`, `arm-owner-stale`, and `bound-expired` with `waited-on=arm-output-drain` record ownership transitions.
+Its `actionable-close` and `restore-start` correlate close and restoration by generation and predecessor arm PID; `restore-skipped`, `restore-unchanged`, and `restore-failed` name alternate branches without recording wake text.
+`restore-failed reason=lock-lost` distinguishes a lost or missing session lock from `reason=retries-exhausted`, which means the restoration loop used its retries.
+`restore-claim-wait` names a record an earlier generation's delivery claim still holds; omp reprocesses that record once the claim settles, and later closes restore successors meanwhile.
+`wake-delivery-start` and `wake-delivery-settled` mark the start and settlement of wake delivery.
 The shared [lifecycle helper](../.pi/extensions/lib/fm-watch-lifecycle.ts) owns the record format, expiry fields, rotation, and best-effort evidence policy. Expiry waits recheck a monotonic deadline before settling; early timer callbacks wait only the remaining duration. The `actual` field records measured monotonic elapsed milliseconds, not a value clamped to the bound, so wall-clock changes do not distort deadline evidence.
 These logs are evidence, not proof of a healthy arm or permission to use a retired runtime.
 
 `tests/fm-pi-watch-extension.test.sh` covers missing-successor expiry without reviving the outgoing API, live successor activation, duplicate-instance handoff, repeated binding predecessor release, and owner-marker publication failures.
-`tests/fm-omp-harness.test.sh` covers missing-successor self-heal, shutdown followed by start without a duplicate arm, instance replacement, wake delivery after recovery, replacement of a dead arm owner, an arm whose exit is observed while a descendant holds its output pipe, a helper session that never takes the primary's home or wakes, a rebound primary that keeps the home, and a slow but progressing successor that is never dropped.
+`tests/fm-omp-harness.test.sh` covers missing-successor self-heal, shutdown followed by start without a duplicate arm, instance replacement, wake delivery after recovery, replacement of a dead arm owner, an arm whose exit is observed while a descendant holds its output pipe, a helper session that never takes the primary's home or wakes, a rebound primary that keeps the home, a slow but progressing successor that is never dropped, and successor restoration while a wake delivery or an earlier generation's delivery claim is still pending.
 Both suites use `tests/watch-lifecycle-expiry.mjs` for explicit shutdown child-close expiry evidence and deterministic early-callback, wall-clock-change, cancellation, and unref coverage for the shared deadline timer.
 Pi also exercises its unready-arm retirement expiry for a successor that reported failure but does not exit; `tests/fm-work-progress.test.sh` proves that a slow omp or Claude successor does not hold the wake and stays alive until readiness, and `tests/fm-pi-watch-extension.test.sh` and `tests/fm-supervision-host.test.sh` prove the same for Pi, OpenCode and the supervision host.
 
