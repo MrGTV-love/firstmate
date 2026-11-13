@@ -3,8 +3,11 @@
 # driver keeps: the pool slot comes from the REAL treehouse binary in a scratch pool
 # (leased to the task as fm-spawn leases it), and every treehouse call teardown
 # makes runs through that binary. Only the closeout driver is a stand-in (the real
-# Vernant driver is never run), and `gh`, `tmux` and the endpoint are the suite's
-# usual fakes. The cases cover the three cleanup paths that matter on a real pool:
+# Vernant driver is never run), `tmux` and `docker` are the real local tools (a
+# scratch tmux server on its own socket holds the task's window; Docker is the
+# host's real daemon, queried and never given an object), and only `gh`, `gh-axi`
+# and `no-mistakes` stay the suite's fakes: a test must not reach the real forge or
+# the shared pipeline daemon. The cases cover the three cleanup paths that matter on a real pool:
 #   a. unique ignored files are preserved and verified before anything is removed,
 #      and the regenerable control is left out of the preserve (kept route and
 #      released route);
@@ -30,6 +33,52 @@ if [ -z "$REAL_TREEHOUSE" ] || ! treehouse lease --help 2>&1 | grep -Eq '(^|[^[:
   exit 0
 fi
 export FM_TEST_REAL_TREEHOUSE=$REAL_TREEHOUSE
+if ! command -v tmux >/dev/null 2>&1 || ! command -v docker >/dev/null 2>&1 || ! docker info >/dev/null 2>&1; then
+  echo "skip - no real tmux, or no Docker with a reachable daemon, is installed; the real-binary cases did not run"
+  exit 0
+fi
+
+# The task's tmux window lives on a real scratch server: its own socket directory
+# (short, a unix socket path is limited), and TMUX unset so a harness inside the
+# user's tmux never reaches that server. Every scratch server is stopped on exit.
+unset TMUX
+REAL_TMUX_REGISTRY=$TMP_ROOT/real-tmux-dirs
+real_tmux_stop_all() {
+  local dir
+  [ -f "$REAL_TMUX_REGISTRY" ] || return 0
+  while IFS= read -r dir; do
+    [ -n "$dir" ] || continue
+    TMUX_TMPDIR=$dir tmux kill-server >/dev/null 2>&1 || true
+    rm -rf "$dir"
+  done < "$REAL_TMUX_REGISTRY"
+  : > "$REAL_TMUX_REGISTRY"
+}
+trap 'real_tmux_stop_all; fm_test_cleanup' EXIT
+trap 'real_tmux_stop_all; fm_test_cleanup; exit 130' INT
+trap 'real_tmux_stop_all; fm_test_cleanup; exit 143' TERM
+trap 'real_tmux_stop_all; fm_test_cleanup; exit 129' HUP
+trap 'real_tmux_stop_all; fm_test_cleanup; exit 131' QUIT
+
+# real_local_tools: drop the case's tmux and docker fakes so teardown reaches the
+# real tools, and start a real scratch tmux server holding the task's window.
+real_local_tools() {
+  local case_dir=$FOREIGN_CASE
+  rm -f "$case_dir/fakebin/tmux" "$case_dir/fakebin/docker"
+  REAL_TMUX_DIR=$(mktemp -d "${TMPDIR:-/tmp}/fm-rtmux.XXXXXX") || fail "no scratch tmux directory"
+  printf '%s\n' "$REAL_TMUX_DIR" >> "$REAL_TMUX_REGISTRY"
+  export TMUX_TMPDIR=$REAL_TMUX_DIR
+  tmux new-session -d -s firstmate -n fm-task-x1 -c "$case_dir" 'exec sleep 3600' \
+    || fail "the real scratch tmux server did not start"
+  tmux list-windows -t firstmate -F '#{window_name}' | grep -Fxq fm-task-x1 \
+    || fail "the real scratch tmux server has no fm-task-x1 window"
+}
+
+# real_assert_window_gone <label>: the real tmux no longer holds the task's window.
+real_assert_window_gone() {
+  if tmux list-windows -t firstmate -F '#{window_name}' 2>/dev/null | grep -Fxq fm-task-x1; then
+    fail "$1: the real tmux still holds the task's window"
+  fi
+}
 
 retained_field() {  # <record> <key>
   sed -n "s/^$2=//p" "$1" | head -n 1
@@ -40,6 +89,7 @@ retained_field() {  # <record> <key>
 real_case() {
   make_retained_case "real-$1" enclosing
   export TREEHOUSE_ROOT=$FOREIGN_CASE/realroot
+  real_local_tools
   # A regenerable control the preserve must leave out, and one the copy keeps.
   printf '%s\n' '.venv/' 'node_modules/' >> "$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)"
   mkdir -p "$FOREIGN_COPY/.venv/bin" "$FOREIGN_COPY/node_modules/dep"
@@ -73,11 +123,15 @@ real_record() {
   local phase=$1 dir=$REAL_DIR hash preserve
   {
     echo "treehouse $(treehouse --version 2>&1)"
+    echo "tmux $(tmux -V 2>&1)"
+    echo "docker $(docker --version 2>&1)"
     echo "pool-dir $(cd "$FOREIGN_CASE/project" && treehouse pool-dir </dev/null 2>&1)"
     echo "slot $FOREIGN_SLOT"
     echo "copy $FOREIGN_COPY"
   } > "$dir/$phase.env"
   real_slot_entry > "$dir/$phase.slot.json" 2>&1
+  { tmux list-windows -t firstmate -F '#{session_name}:#{window_name}' 2>&1 || true; } > "$dir/$phase.tmux-windows"
+  { docker ps -a --filter "label=fm.task=task-x1" --format '{{.ID}} {{.Names}}' 2>&1 || true; } > "$dir/$phase.docker-task-objects"
   (cd "$FOREIGN_CASE/project" && treehouse status --json </dev/null 2>&1) > "$dir/$phase.status.json"
   shasum -a 256 "$FOREIGN_CASE/pool/treehouse-state.json" > "$dir/$phase.state.sha256" 2>&1
   cp "$FOREIGN_CASE/pool/1/.fm-slot-owner" "$dir/$phase.claim" 2>&1
@@ -150,6 +204,7 @@ test_a_real_pool_slot_keeps_its_lease_and_the_unique_files_are_preserved_and_the
   real_record after
   expect_code 0 "$rc" "a-kept: the close must succeed on a real pool slot: $(cat "$FOREIGN_CASE/stderr")"
   retained_assert_closed "a-kept"
+  real_assert_window_gone "a-kept"
   assert_equals 0 "$(real_returns)" "a-kept: the real slot was returned"
   real_assert_slot_unchanged "a-kept"
   assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "a-kept: the driver was not asked exactly once"
@@ -183,6 +238,7 @@ test_a_real_pool_slot_is_returned_after_the_unique_file_is_preserved_and_the_con
   real_teardown rc
   real_record after
   expect_code 0 "$rc" "a-released: the close must succeed on a real pool slot: $(cat "$FOREIGN_CASE/stderr")"
+  real_assert_window_gone "a-released"
   assert_absent "$FOREIGN_COPY" "a-released: the copy survived the release"
   assert_absent "$FOREIGN_CASE/state/task-x1.meta" "a-released: the task record survived"
   hash=$(printf '%s' "$FOREIGN_COPY" | shasum -a 256 | awk '{print $1}')
