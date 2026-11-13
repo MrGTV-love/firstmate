@@ -875,7 +875,6 @@ class Watch:
         self.authors = set(a for a in re.split(r'[\s,]+', env_value('FM_SLACK_ALLOWED_AUTHORS').strip()) if a)
         # The second person holds no authority: whatever the allowlist says, their id is never an author whose reply or reaction is an answer.
         self.second, self.second_reason = second_user()
-        self.second_listed = bool(self.second) and self.second in self.authors
         self.authors.discard(self.second)
         self.cap = answer_cap()
         self.changed = False
@@ -2490,6 +2489,9 @@ class Watch:
         plane's log with one notice line naming only the error, never raised, so the owner's poll, its failure state and its exit status are what they are without them. An unbind and a plane value still end the run."""
         self.second_config()
         if not self.second:
+            if 'second_failure' in self.state:
+                self.state.pop('second_failure')
+                self.commit()
             return
         try:
             self.start_second()
@@ -2509,13 +2511,11 @@ class Watch:
                 self.commit()
 
     def second_config(self):
-        """Name, once per episode, why the second person is off or restricted: a setting that is not exactly one member id, the owner's own id, or an id that is
-        also on the answer allowlist (it stays off that list for answers). The default, unset, is silent and writes nothing."""
+        """Name, once per episode, why the second person is off: a setting that is not exactly one member id, or the owner's own id. The default, unset, is
+        silent and writes nothing."""
         note = ''
         if self.second_reason not in ('', 'unset'):
             note = 'second_user_' + self.second_reason
-        elif self.second_listed:
-            note = 'second_user_on_answer_allowlist'
         if note == self.state.get('second_note', ''):
             return
         if note:

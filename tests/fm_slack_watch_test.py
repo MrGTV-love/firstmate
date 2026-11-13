@@ -4542,10 +4542,8 @@ class SecondPersonTest(unittest.TestCase):
                     self.again(watch)
                     self.again(watch)
                 self.assertEqual([c for c in calls if c[1][:1] == ('answers',)], [])
-                reasons = [(r['reason'], r.get('author'), r.get('item')) for r in self.refusals(watch) if r['reason'] != 'second_user_on_answer_allowlist']
+                reasons = [(r['reason'], r.get('author'), r.get('item')) for r in self.refusals(watch)]
                 self.assertEqual(sorted(reasons), [('decision_held_for_captain_reaction', self.SECOND, 'one'), ('decision_held_for_captain_reply', self.SECOND, '300.000200')])
-                listed = [r for r in self.refusals(watch) if r['reason'] == 'second_user_on_answer_allowlist']
-                self.assertEqual(len(listed), 1 if self.SECOND in authors else 0)
                 self.assertTrue(all('text' not in r for r in self.refusals(watch)))
                 for row in self.refusals(watch):
                     if row['reason'].startswith('decision_held_for_captain'):
@@ -4676,6 +4674,37 @@ class SecondPersonTest(unittest.TestCase):
             self.assertNotIn(notice, out.getvalue())
             self.assertEqual([plane.REQUEST_SEGMENT.match(line).group(2) for line in out.getvalue().splitlines() if line.startswith('check: slack request ')],
                              [self.SECOND])
+
+    def test_sc4_turning_the_setting_off_ends_their_failure_episode_so_the_same_failure_is_reported_again_when_it_is_set_again(self):
+        notice = 'slack: second person window failure: channel_not_found'
+        with self.second() as (watch, replay):
+            watch.lock.close()
+            transcript = str(watch.root.parent / 'transcript.json')
+            real = Replay.replayed
+
+            def missing(self_, method, **fields):
+                if method == 'conversations.history' and fields.get('channel') == self.SECOND_DM:
+                    self_.attempt(method, fields)
+                    raise SlackError('channel_not_found')
+                return real(self_, method, **fields)
+
+            def run(value):
+                out = io.StringIO()
+                with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': value}), contextlib.redirect_stdout(out), \
+                     contextlib.redirect_stderr(io.StringIO()):
+                    code = plane.main(['poll', '--replay', transcript])
+                return code, out.getvalue().splitlines().count(notice), sorted(json.loads(watch.path.read_text()))
+            with patch.object(Replay, 'replayed', missing), patch.object(Watch, 'bound', return_value=True), \
+                 patch.object(Watch, 'backlog', return_value=[]):
+                first = run(self.SECOND)
+                off = run('')
+                again = run(self.SECOND)
+            self.assertEqual(first[:2], (0, 1))
+            self.assertIn('second_failure', first[2])
+            self.assertEqual(off[:2], (0, 0))
+            self.assertNotIn('second_failure', off[2])
+            self.assertEqual(again[:2], (0, 1))
+            self.assertEqual([(r['reason'], r['error']) for r in self.refusals(watch)], [('second_window_failed', 'channel_not_found')] * 2)
 
     def test_sc4_the_owner_request_is_woken_in_the_poll_that_reads_a_flooded_window_of_theirs(self):
         with self.second() as (watch, replay):
