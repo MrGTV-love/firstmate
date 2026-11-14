@@ -6686,6 +6686,44 @@ SH
   pass 'a process holding a file in a copy with a non-ASCII path keeps it, whatever locale lsof spells the name in; with no holder it closes'
 }
 
+# A direct release whose non-forced removal fails puts the lock back, and says
+# so only when the lock reads back: when the relock fails too, the refusal says
+# the copy is now unlocked. The copy and the record stay either way.
+test_direct_release_reports_a_failed_relock_truthfully() {
+  local rc relock label
+  for relock in restored fails; do
+    label="relock-$relock"
+    dead_launcher_pid
+    make_own_locked_copy_case "$label" enclosing "$FOREIGN_DEAD_PID"
+    rm -f "$FOREIGN_CASE/vernant-python"
+    cat > "$FOREIGN_CASE/fakebin/git" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" worktree remove "*) echo 'fatal: simulated removal failure' >&2; exit 1 ;;
+  *" worktree lock "*) [ "$relock" = restored ] || { echo 'fatal: simulated relock failure' >&2; exit 1; } ;;
+esac
+exec "\${REAL_GIT_FOR_TEST:?}" "\$@"
+SH
+    chmod +x "$FOREIGN_CASE/fakebin/git"
+    run_foreign_teardown rc
+    expect_code 1 "$rc" "$label: a failed removal must refuse: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+    assert_present "$FOREIGN_COPY/.git" "$label: the copy was removed"
+    assert_present "$FOREIGN_CASE/state/task-x1.meta" "$label: the task record was removed"
+    if [ "$relock" = restored ]; then
+      git -C "$FOREIGN_CASE/project" worktree list --porcelain | grep -A4 -F "worktree $FOREIGN_COPY" | grep -q '^locked' \
+        || fail "$label: the lock was not put back"
+      assert_grep 'its lock was restored' "$FOREIGN_CASE/stderr" "$label: the restored lock was not reported: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -4)"
+    else
+      if git -C "$FOREIGN_CASE/project" worktree list --porcelain | grep -A4 -F "worktree $FOREIGN_COPY" | grep -q '^locked'; then
+        fail "$label: the fixture's relock did not fail"
+      fi
+      assert_no_grep 'its lock was restored' "$FOREIGN_CASE/stderr" "$label: an absent lock was reported restored"
+      assert_grep 'its lock could not be restored, so the copy is now unlocked' "$FOREIGN_CASE/stderr" "$label: the absent lock was not reported: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -4)"
+    fi
+  done
+  pass 'a failed direct removal reports its lock restored only when it reads back, and says the copy is unlocked when the relock fails'
+}
+
 # The open-file listing is filtered in one pass, and a listing line of a shape
 # the filter does not know still fails the scan, so the copy stays locked.
 test_direct_release_refuses_a_malformed_open_file_listing() {
@@ -7265,6 +7303,7 @@ test_history_landed_copy_keeps_its_unique_ignored_file
 test_direct_release_rechecks_the_bundle_and_head_at_the_unlock
 test_confined_launcher_state_is_never_taken_for_absence
 test_direct_release_sees_a_holder_under_an_escaped_lsof_name
+test_direct_release_reports_a_failed_relock_truthfully
 test_direct_release_refuses_a_process_holding_a_file_in_the_copy_open
 test_task_own_descendant_holding_a_file_open_refuses_and_is_not_signalled
 test_direct_release_refuses_an_unreadable_process_table

@@ -1489,7 +1489,11 @@ teardown_dead_launcher_release() {  # <slot> <copy> <head> <foreign|own nested>
   git -C "$slot" worktree unlock "$copy" >/dev/null 2>&1 || { TEARDOWN_RELEASE_WHY='git worktree unlock failed'; return 1; }
   if ! git -C "$slot" worktree remove "$copy" >/dev/null 2>&1; then
     git -C "$slot" worktree lock --reason "$lock" "$copy" >/dev/null 2>&1 || true
-    TEARDOWN_RELEASE_WHY='git worktree remove (without force) failed; its lock was restored'
+    if teardown_copy_lock_file "$copy" && [ "$TEARDOWN_FOREIGN_LOCK" = "$lock" ]; then
+      TEARDOWN_RELEASE_WHY='git worktree remove (without force) failed; its lock was restored'
+    else
+      TEARDOWN_RELEASE_WHY="git worktree remove (without force) failed, and its lock could not be restored, so the copy is now unlocked; lock it again with its old reason ($lock) before anything else runs in it"
+    fi
     return 1
   fi
   echo "teardown: released creation lock '$lock' on $kind copy $copy (launcher $pid is gone; proof: $TEARDOWN_CLOSEOUT_PROOF) and removed it without force" >&2
