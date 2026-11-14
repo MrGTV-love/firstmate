@@ -591,6 +591,31 @@ test_detached_copy_unlanded_work_is_still_refused() {
   pass "a detached copy holding a commit the merged PR lacks, or whose record branch matches a PR that lacks its work, is still refused and kept"
 }
 
+# The merge-notified marker is removed only after the task record, so an unsafe
+# marker (a directory here) must stop teardown before anything is retired: the
+# record stays, with the copy, and the refusal names the unsafe artifact. A valid
+# marker is removed with the rest and the teardown completes.
+test_unsafe_merge_notified_marker_keeps_the_record() {
+  local case_dir rc
+  case_dir=$(detached_copy_case marker-unsafe - no own)
+  mkdir "$case_dir/state/task-x1.pr-poll-merge-notified"
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  [ "$rc" -ne 0 ] || fail "unsafe marker: teardown succeeded over an unremovable merge-notified marker"
+  assert_present "$case_dir/state/task-x1.meta" "unsafe marker: the record was removed before the marker failed (stderr: $(tail -2 "$case_dir/stderr" | tr '\n' ' '))"
+  assert_grep 'unsafe task PR-check artifact' "$case_dir/stderr" "unsafe marker: the refusal does not name the unsafe artifact"
+  [ -d "$case_dir/wt" ] || fail "unsafe marker: the copy was removed"
+  case_dir=$(detached_copy_case marker-valid - no own)
+  printf 'fm-pr-poll-merge-notified-v1\ngithub\ngithub.com\nacme/widget\n7\n' > "$case_dir/state/task-x1.pr-poll-merge-notified"
+  chmod 600 "$case_dir/state/task-x1.pr-poll-merge-notified"
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "valid marker: teardown refused: $(cat "$case_dir/stderr")"
+  assert_absent "$case_dir/state/task-x1.meta" "valid marker: the record stayed open"
+  assert_absent "$case_dir/state/task-x1.pr-poll-merge-notified" "valid marker: the marker outlived its record"
+  pass "an unsafe merge-notified marker stops teardown before the record is removed; a valid one goes with the record"
+}
+
 test_named_branch_copy_without_pr_meta_behaves_as_before() {
   local case_dir rc
   case_dir=$(make_case named-branch-no-pr)
@@ -4037,6 +4062,7 @@ teardown_test_cases=(
 test_detached_copy_is_judged_through_the_record_branch
 test_detached_copy_unlanded_work_is_still_refused
 test_named_branch_copy_without_pr_meta_behaves_as_before
+test_unsafe_merge_notified_marker_keeps_the_record
 test_empty_recorded_slot_nested_drop
 test_recorded_slot_lost_lease_still_refuses
 test_recorded_slot_intact_lease_completes
