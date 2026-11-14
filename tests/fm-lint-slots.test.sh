@@ -3384,6 +3384,59 @@ SH
   pass "the resident-memory watch samples only its command's own tree: an unrelated process is not counted, and a descendant that leaves the process group is"
 }
 
+test_the_watch_ends_a_descendant_that_left_the_process_group() {
+  if [ "$(uname)" != Darwin ]; then
+    pass "SKIP (the libproc tree reader is macOS only): group-leaving descendant termination"
+    return
+  fi
+  local tmp rc pid i alive=1
+  tmp=$(fm_test_tmproot fm-lint-leaver-kill)
+  # The command starts a descendant in its own process group that holds 160 MiB,
+  # against a 100 MiB bound. The watch counts it (the reader follows descendants
+  # across groups) and must end it with the root: the test never kills it, and a
+  # survivor is cleaned up only after it is reported as a failure. No tree leash
+  # here: a leash would end the descendant itself and hide the defect.
+  cat > "$tmp/leaver-parent.sh" <<'SH'
+perl -MPOSIX -e 'POSIX::setpgid(0, 0); my $held = "x" x (160 * 1024 * 1024); sleep 30' &
+echo "$!" > "$1"
+sleep 6
+SH
+  rc=0
+  perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 102400 "$tmp/rss" -- \
+    bash "$tmp/leaver-parent.sh" "$tmp/leaver.pid" > /dev/null 2>&1 || rc=$?
+  pid=$(cat "$tmp/leaver.pid" 2>/dev/null || true)
+  [ -n "$pid" ] || fail "the group-leaving descendant did not start"
+  [ "$rc" -eq 98 ] || { kill -KILL "$pid" 2>/dev/null || true; fail "the watch exited $rc, expected 98 for a root over its bound"; }
+  for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+    kill -0 "$pid" 2>/dev/null || { alive=0; break; }
+    sleep 0.2
+  done
+  if [ "$alive" -eq 1 ]; then
+    kill -KILL "$pid" 2>/dev/null || true
+    fail "the watch ended its command but left a counted descendant that moved to another process group running (pid $pid)"
+  fi
+  # The control: a descendant under the bound is not ended, and the root finishes
+  # on its own with its own status and no retry mark.
+  cat > "$tmp/small-parent.sh" <<'SH'
+perl -MPOSIX -e 'POSIX::setpgid(0, 0); my $held = "x" x (8 * 1024 * 1024); sleep 8' &
+echo "$!" > "$1"
+sleep 3
+SH
+  rm -f "$tmp/rss"
+  rc=0
+  perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 102400 "$tmp/rss" -- \
+    bash "$tmp/small-parent.sh" "$tmp/small.pid" > /dev/null 2>&1 || rc=$?
+  pid=$(cat "$tmp/small.pid" 2>/dev/null || true)
+  [ -n "$pid" ] || fail "the under-bound descendant did not start"
+  alive=0
+  kill -0 "$pid" 2>/dev/null && alive=1
+  kill -KILL "$pid" 2>/dev/null || true
+  [ "$rc" -eq 0 ] || fail "a root whose tree stays under the bound exited $rc, expected 0"
+  ! grep -q '^max_rss_kib=' "$tmp/rss" || fail "a tree under the bound was recorded as over it"
+  [ "$alive" -eq 1 ] || fail "the watch ended a descendant that was under the bound"
+  pass "the resident-memory watch ends a counted descendant that left the process group, and leaves an under-bound tree alone"
+}
+
 # fm_lint_footprint_lint <tmp> [<env>...]: lint <tmp>/footprint.sh, whose
 # source-following run holds 8 MiB for 4 s, under the resident-watch shims and a
 # process budget, with a fake reader that reports 1024 KiB resident and 204800
@@ -3977,6 +4030,7 @@ test_rss_shim_that_resolves_to_itself_is_refused
 test_resident_watch_reads_only_its_own_tree
 test_resident_watch_bounds_footprint_beyond_resident
 test_resident_watch_ends_a_tree_whose_memory_sits_in_descendants_and_an_orphan
+test_the_watch_ends_a_descendant_that_left_the_process_group
 test_resident_watch_replaces_a_stalled_reader
 test_resident_watch_waits_for_a_slow_first_reply
 test_resident_watch_samples_a_slow_later_reply_by_ps

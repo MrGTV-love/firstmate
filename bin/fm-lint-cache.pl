@@ -640,6 +640,7 @@ if (($ARGV[0] // '') eq 'rsswatch') {
     my $python = $ENV{FM_LINT_INTERNAL_PYTHON} || 'python3';
     my ($to_reader, $from_reader, $reader_pid, $reader_fresh, $reader_down, $reader_answered);
     my ($reader_failures, %samples) = (0, libproc => 0, ps => 0);
+    my @members;
     my $stop_reader = sub {
         return unless $reader_pid;
         kill 'KILL', $reader_pid;
@@ -677,9 +678,16 @@ if (($ARGV[0] // '') eq 'rsswatch') {
                 $gone = !sysread($from_reader, $answer, 64, length $answer);
             }
             if ($answer =~ /\A\{"rss_kib":([0-9]+),[^\n]*\}\n\z/) {
+                my $kib = $1 + 0;
                 ($reader_failures, $reader_fresh, $reader_answered) = (0, 0, 1);
                 $samples{libproc}++;
-                return $1 + 0;
+                # The reader names every member of the tree it counted, including a
+                # descendant that left the root's process group: those are the
+                # processes this watch ends along with the group.
+                my $named = eval { require JSON::PP; JSON::PP::decode_json($answer)->{members} };
+                @members = map { $_->[0] } grep { ref $_ eq 'ARRAY' && defined $_->[0] && $_->[0] =~ /\A[0-9]+\z/ } @$named
+                    if ref $named eq 'ARRAY';
+                return $kib;
             }
             my $fresh = $reader_fresh;
             $stop_reader->();
@@ -708,6 +716,13 @@ if (($ARGV[0] // '') eq 'rsswatch') {
         return $total;
     };
     my ($child, $caught, $term_at, $over, $warned);
+    # End the whole counted tree: the root's process group, and every member the
+    # reader last named, which also reaches a descendant that moved to another
+    # group or was orphaned. The watch's own pid is never a target.
+    my $end_tree = sub {
+        kill 'KILL', -$child if $child;
+        for my $pid (@members) { kill 'KILL', $pid unless $pid == $$ || $pid == ($child // 0); }
+    };
     my ($peak, $misses) = (0, 0);
     my %signal_number = (HUP => 1, INT => 2, TERM => 15);
     for my $name (keys %signal_number) {
@@ -726,7 +741,7 @@ if (($ARGV[0] // '') eq 'rsswatch') {
             $term_at = Time::HiRes::time();
             kill 'TERM', -$child;
         }
-        kill 'KILL', -$child if $caught && Time::HiRes::time() - $term_at >= 5;
+        $end_tree->() if $caught && Time::HiRes::time() - $term_at >= 5;
         return if $caught || $over;
         my $rss = $tree_rss->($child);
         # A root that exits mid-sample is a zombie no sampler can read, so only
@@ -749,7 +764,7 @@ if (($ARGV[0] // '') eq 'rsswatch') {
         }
         return unless $rss > $limit;
         $over = 1;
-        kill 'KILL', -$child;
+        $end_tree->();
         if (open(my $fh, '>', $rss_file)) { printf {$fh} "max_rss_kib=%d\n", $peak; close $fh; }
         warn sprintf("fm-lint: root exceeded the %d KiB resident-memory bound (FM_LINT_ROOT_RSS_KIB) at %d KiB; ended\n", $limit, $peak);
     };
@@ -774,7 +789,7 @@ if (($ARGV[0] // '') eq 'rsswatch') {
     my $reaped = waitpid($child, 0);
     my $status = $reaped == $child ? $? : 127 << 8;
     Time::HiRes::setitimer(Time::HiRes::ITIMER_REAL(), 0, 0);
-    kill 'KILL', -$child if $over || $caught;
+    $end_tree->() if $over || $caught;
     $stop_reader->();
     if (open(my $fh, '>>', $rss_file)) {
         printf {$fh} "rss_samples=libproc:%d,ps:%d\n", @samples{qw(libproc ps)};
