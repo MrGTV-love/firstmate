@@ -888,7 +888,7 @@ SH
     cmp -s "$dir/before.meta" "$dir/home/state/$id.meta" || fail "the record is not back to its prior bytes after a post-rename failure ($mode): $(cat "$dir/home/state/$id.meta" 2>&1 | tail -3)"
     cmp -s "$dir/before.brief" "$dir/home/data/$id/brief.md" || fail "the instructions are not back to their prior bytes ($mode)"
     cmp -s "$dir/before.sb" "$dir/home/state/$id.write-confinement.sb" || fail "the profile changed ($mode)"
-    leftovers=$(ls -A "$dir/home/state" "$dir/home/data/$id" | grep -E '\.(meta|brief)\.(prior|successor)\.' || true)
+    leftovers=$(find "$dir/home/state" "$dir/home/data/$id" -maxdepth 1 \( -name '*.meta.prior.*' -o -name '*.brief.prior.*' -o -name '*.meta.successor.*' -o -name '*.brief.successor.*' \) -print)
     [ -z "$leftovers" ] || fail "the failed call left staging or backup files behind ($mode): $leftovers"
     [ ! -e "$dir/home/state/.control-$id.lock" ] || fail "the failed call left the lifecycle lock behind ($mode)"
     rm -f "$dir/fakebin/mv"
@@ -904,7 +904,7 @@ SH
 # the control script's own gate-containment check before the verb runs; that row predates the
 # verb and is not this verb's write, so it is the only row a refusal may add.
 test_successor_refusals_write_no_file_under_the_default_event_log() {
-  local id=suc-nofile dir log before after rows other
+  local id=suc-nofile dir log before after other
   dir=$(new_successor_case nofile "$id")
   git -C "$dir/proj" branch "fm/$id-v2b" "fm/$id-v2"
   log=$dir/home/state/guard-events.jsonl
@@ -940,14 +940,14 @@ test_successor_requires_its_event_to_be_written() {
   cp -p "$dir/home/state/$id.meta" "$dir/before.meta"
   cp -p "$dir/home/data/$id/brief.md" "$dir/before.brief"
   rc=0
-  out=$( export FM_GUARD_EVENT_LOG="$dir/event-sink-dir"; sc "$dir" "$id" --branch "fm/$id-v2" --note why ) || rc=$?
+  out=$(FM_GUARD_EVENT_LOG="$dir/event-sink-dir" sc "$dir" "$id" --branch "fm/$id-v2" --note why) || rc=$?
   expect_code 1 "$rc" "a record whose event cannot be written must refuse"$'\n'"$out"
   assert_contains "$out" "event" "the refusal must name the event"
   cmp -s "$dir/before.meta" "$dir/home/state/$id.meta" || fail "the record was kept although its event was not written"
   cmp -s "$dir/before.brief" "$dir/home/data/$id/brief.md" || fail "the instructions were kept although the event was not written"
   log=$dir/event-log.jsonl
   rc=0
-  out=$( export FM_GUARD_EVENT_LOG="$log"; sc "$dir" "$id" --branch "fm/$id-v2" --note why ) || rc=$?
+  out=$(FM_GUARD_EVENT_LOG="$log" sc "$dir" "$id" --branch "fm/$id-v2" --note why) || rc=$?
   expect_code 0 "$rc" "a writable sink must let the record succeed"$'\n'"$out"
   assert_contains "$out" "$log" "the receipt must list the event file it wrote"
   jq -e 'select(.guard == "successor-branch-admission" and .rule == "record" and .decision == "allow")' "$log" >/dev/null \

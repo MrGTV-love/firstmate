@@ -127,13 +127,12 @@ fm_successor_name_refusal() {
         echo "cannot read task $other_id's record $meta, so the name cannot be checked against the branches other tasks own"
         return 1
       fi
-      other_kind=$(LC_ALL=C awk -F= '$1 == "kind" { sub(/^[^=]*=/, ""); v = $0 } END { print v }' "$meta" 2>/dev/null) \
-        && other_branch=$(LC_ALL=C awk -F= '$1 == "branch" { sub(/^[^=]*=/, ""); v = $0 } END { print v }' "$meta" 2>/dev/null) \
-        && other_succ=$(LC_ALL=C awk -F= '$1 == "successor_branch" { sub(/^[^=]*=/, ""); print }' "$meta" 2>/dev/null) \
-        || {
-          echo "cannot read task $other_id's record $meta, so the name cannot be checked against the branches other tasks own"
-          return 1
-        }
+      if ! other_kind=$(LC_ALL=C awk -F= '$1 == "kind" { sub(/^[^=]*=/, ""); v = $0 } END { print v }' "$meta" 2>/dev/null) \
+        || ! other_branch=$(LC_ALL=C awk -F= '$1 == "branch" { sub(/^[^=]*=/, ""); v = $0 } END { print v }' "$meta" 2>/dev/null) \
+        || ! other_succ=$(LC_ALL=C awk -F= '$1 == "successor_branch" { sub(/^[^=]*=/, ""); print }' "$meta" 2>/dev/null); then
+        echo "cannot read task $other_id's record $meta, so the name cannot be checked against the branches other tasks own"
+        return 1
+      fi
       if [ -z "$other_branch" ]; then
         case "$other_kind" in
           ''|ship) other_branch="fm/$other_id" ;;

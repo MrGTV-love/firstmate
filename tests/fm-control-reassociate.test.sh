@@ -2607,7 +2607,7 @@ SH
     || fail "the task record is not back to its prior bytes after a post-rename failure: $(cat "$dir/home/state/$id.meta" 2>&1 | head -3)"
   cmp -s "$dir/before/data/$id/brief.md" "$dir/home/data/$id/brief.md" \
     || fail "the instructions are not back to their prior bytes after a post-rename failure"
-  leftovers=$(ls -A "$dir/home/state" "$dir/home/data/$id" | grep -E '\.(meta|brief)\.(prior|reassociate)\.' || true)
+  leftovers=$(find "$dir/home/state" "$dir/home/data/$id" -maxdepth 1 \( -name '*.meta.prior.*' -o -name '*.brief.prior.*' -o -name '*.meta.reassociate.*' -o -name '*.brief.reassociate.*' \) -print)
   [ -z "$leftovers" ] || fail "the failed reassociation left staging or backup files behind: $leftovers"
   copy_fingerprint "$dir/old" | cmp -s - "$dir/before/old.fp" || fail "the failed reassociation changed the original copy"
   pass "a publication that fails after the rename restores the record and the instructions and leaves no backup"
