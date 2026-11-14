@@ -2366,6 +2366,58 @@ test_claude_restore_restart_decides_attribution_before_its_first_effect() {
   pass "claude restore: the restart decides attribution before any pending reply, inbox write, request or nudge"
 }
 
+# N4 host leg: the real fm-remote-secondmate-control.sh attribution verb, run as
+# the host runs it (FM_HOME is the seeded secondmate home, the endpoint record is
+# its private parent-route record in the fm-remote session), on the fake Herdr.
+remote_attribution() { # <case-dir> <id>; sets REMOTE_ATTRIBUTION_OUT and _RC
+  local dir=$1 id=$2
+  REMOTE_ATTRIBUTION_RC=0
+  REMOTE_ATTRIBUTION_OUT=$(env -u HERDR_ENV -u HERDR_PANE_ID -u HERDR_SESSION -u HERDR_SOCKET_PATH \
+    PATH="$dir/fakebin:$PATH" FM_HOME="$dir/wt" FM_FAKE_DIR="$dir/fake" \
+    HOME="$dir/user-home" CLAUDE_CONFIG_DIR='' \
+    "$ROOT/bin/fm-remote-secondmate-control.sh" attribution "$id" 2>/dev/null) || REMOTE_ATTRIBUTION_RC=$?
+}
+
+test_remote_attribution_verb_reads_the_host_verdict() {
+  local dir id meta
+  recovery_case_or_skip claude-remote-attribution claude-remote-attribution fm-remote \
+    || fail "remote attribution needs jq"
+  dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
+  prepare_herdr_recovery "$dir" "$id" secondmate
+  meta="$dir/home/state/$id.meta"
+  grep -v '^harness=' "$meta" > "$meta.new" && mv "$meta.new" "$meta"
+  printf 'harness=claude\n' >> "$meta"
+  printf '%s' "$CLAUDE_RESTORE_UUID" > "$dir/fake/claude-restore"
+  mkdir -p "$dir/claude-home" "$dir/user-home"
+  printf '%s' "$dir/claude-home" > "$dir/fake/claude-home"
+  printf '%s' "$dir/wt" > "$dir/fake/adoption-cwd"
+
+  remote_attribution "$dir" "$id"
+  assert_equals "attribution=refuse: no endpoint record for $id on this host" "$REMOTE_ATTRIBUTION_OUT" \
+    "a host without the endpoint record refuses"
+  mkdir -p "$dir/wt/state/parent-route"
+  cp "$meta" "$dir/wt/state/parent-route/$id.meta"
+
+  remote_attribution "$dir" "$id"
+  assert_contains "$REMOTE_ATTRIBUTION_OUT" "attribution=refuse: its live Herdr agent cannot be positively attributed to this task: live agent is an unpinned native restore" \
+    "an unpinned live agent is refused on its host with the true cause"
+  [ "$(printf '%s\n' "$REMOTE_ATTRIBUTION_OUT" | wc -l | tr -d ' ')" = 1 ] || fail "the verb printed more than one line: $REMOTE_ATTRIBUTION_OUT"
+  : > "$dir/fake/recovery-env-unreadable"
+  remote_attribution "$dir" "$id"
+  assert_contains "$REMOTE_ATTRIBUTION_OUT" "attribution=refuse: its live Herdr agent cannot be positively attributed to this task: live launch settings are unreadable" \
+    "an unreadable live agent is refused on its host"
+  rm -f "$dir/fake/recovery-env-unreadable"
+  printf old > "$dir/fake/recovery-spawn-gen"
+  remote_attribution "$dir" "$id"
+  assert_equals attribution=proceed "$REMOTE_ATTRIBUTION_OUT" "a live agent pinned to this launch proceeds"
+  : > "$dir/fake/recovery-spawn-gen"
+  rm -f "$dir/fake/herdr-agent-live"
+  remote_attribution "$dir" "$id"
+  assert_equals attribution=proceed "$REMOTE_ATTRIBUTION_OUT" "a positively stopped agent proceeds to the host's own stopped-agent proofs"
+  assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "the verb sends nothing to the pane"
+  pass "remote attribution: the host verb prints one decision line from the one verdict owner"
+}
+
 # N5: the persistence wait can last minutes; a pane that changes hands during it
 # must get no fallback nudge, while an agent still attributed keeps the nudge.
 claude_restart_fallback_case() { # <case-name> <handoff:yes|no>; sets CLAUDE_FALLBACK_OUT and _RC
@@ -2647,6 +2699,7 @@ test_claude_pruned_brief_adopts_only_on_the_owner_statement
 test_claude_owner_statement_never_ties_a_personal_session
 test_claude_stated_adoption_is_inert_once_its_doorbell_is_gone
 test_claude_restart_rechecks_attribution_before_its_fallback_nudge
+test_remote_attribution_verb_reads_the_host_verdict
 test_restart_refuses_an_unproven_agent_state
 test_restart_attributes_before_a_raw_command_fallback_nudge
 test_claude_pinned_elsewhere_names_its_own_cause
