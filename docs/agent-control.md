@@ -533,25 +533,31 @@ Standalone PR registration locks its task-copy snapshot before retirement recove
 
 A worker's write profile is generated at launch from the task's recorded branch and denies every other ref under `.git/refs/heads`.
 A task that needs a successor branch in the same copy therefore has no profile that covers it until its record names that branch.
+This operation widens what the write guard permits by one ref, so the guard `successor-branch-admission` in [`docs/guards/registry.json`](guards/registry.json) owns the admission decision.
 
 The actual lock-owning main Firstmate runs `fm-control <task-id> successor --branch <successor> --note <why>`.
 It takes the task's lifecycle lock, then the record lock, and refuses without changing the record, the instructions, the profile, a copy or a ref when:
 
 - the caller is a worker, the supervision branch in any posture, or a session that does not own the home's lock;
 - the task is a scout, a secondmate, a remotely placed task or an unknown task, has no regular record or instructions, has a pending backlog close or an unfinished relaunch transaction, or has a `Ship branch:` line that disagrees with its recorded branch;
-- the name is not a plain git branch name of letters, digits, `.`, `_`, `-` and `/`, is under `archive/`, equals the task's recorded branch or base branch, is the project's default branch, or is already the branch or successor branch of another task record in this home or a locally registered home ([`bin/fm-successor-branch-lib.sh`](../bin/fm-successor-branch-lib.sh) owns the name rule, which `bin/fm-spawn.sh` applies again when it builds the next profile);
+- the name is not a plain git branch name of letters, digits, `.`, `_`, `-` and `/`, is under `archive/`, equals the task's recorded branch or base branch, is the project's default branch, or is already the branch or successor branch of another task record in this home or a locally registered home, each compared without regard to case;
+- the name is outside the task's own name family: the recorded branch name, then `-`, then one or more of letters, digits, `.`, `_` and `-`, which keeps `develop`, `release/*` and every other lineage out of the task's profile whichever route proves the branch ([`bin/fm-successor-branch-lib.sh`](../bin/fm-successor-branch-lib.sh) owns the name rule and the proof, which `bin/fm-spawn.sh` applies again when it builds a profile);
 - the task already records a different successor, because a task has one successor;
 - the ref does not exist in the project's ref store, or the branch is checked out in a worktree other than the task's own recorded copy;
-- the branch is not proved to be this task's: it must be the branch checked out in the task's recorded copy and contain the recorded branch's tip, or its tip must be the tip of one of the task's own `archive/<task>-(submitted|pipeline)-<8 hex>` custody branches, whose hex is the first eight digits of that tip.
+- the branch is not proved to be this task's by one of two routes: `route=checked-out`, where it is the branch checked out in the task's recorded copy and contains the recorded branch's tip, or `route=archive-tip`, where its tip is the tip of one of the task's own `archive/<task>-(submitted|pipeline)-<8 hex>` custody branches, whose hex is the first eight digits of that tip.
 
 The proofs read the project's ref store and its worktree list and never open a work tree.
-The same successor again is a no-op that says so, and `--check` runs every proof and writes nothing.
+The whole admission runs on every call: for a successor the record already names, which is then a no-op that says so, and under `--check`, which writes nothing.
+A recorded successor that no longer passes it is refused, because the next launch would refuse it.
+An archive-tip proof holds only while the successor's tip is that archive's tip, so a successor that has moved past it needs the checked-out route or a new record.
 
 The operation records `successor_branch=` directly after `branch=`, keeps the prior `branch=` and the brief's `Ship branch:` line unchanged, and appends a dated section naming the successor and the note to the instructions.
 If either write fails it restores both.
-It prints a receipt with three named parts: the owner, the action, and the next command, the exact relaunch that applies the new profile.
+It prints a receipt with named parts: the owner, the action, the route (`route=checked-out`, or `route=archive-tip` with the matched archive name, and the successor), and the next command, the exact relaunch that applies the new profile.
+The guard writes an event to `state/guard-events.jsonl` at record time and another at the launch that applies the grant, each naming the route and the successor, and a deny event naming the rule and the successor for every refusal.
 It starts, stops and signals nothing, runs no command that changes a ref or the index, writes no profile, and touches no run record, so a running worker keeps the profile it was launched with.
-The next `fm-control <task-id> relaunch` generates a profile that permits exactly the task's branch, the recorded successor and the task's archive names under `refs/heads`, each branch as one literal ref with its lock and reflog; [Worker OS write confinement](configuration.md#worker-os-write-confinement) owns the profile.
+The next `fm-control <task-id> relaunch` runs the same admission again and refuses, writing no profile line for the name, when it fails.
+When it passes, the relaunch generates a profile that permits exactly the task's branch, the recorded successor and the task's archive names under `refs/heads`, each branch as one literal ref with its lock and reflog, and the profile builder runs its hard-link and symbolic-link check on the successor's ref and reflog paths; [Worker OS write confinement](configuration.md#worker-os-write-confinement) owns the profile.
 Removing the `successor_branch=` line from the record and relaunching drops the grant.
 Readers that take the branch from `branch=` (landing, pruning, teardown and relocation) keep reading the prior branch.
 
