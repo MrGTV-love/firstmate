@@ -241,8 +241,9 @@
 # A landed merge whose outcome cannot be written is reported loudly rather than
 # misreported as a failed merge.
 # Once the outcome is recorded, bin/fm-pr-close-items.sh closes every backlog item the
-# merged pull request names with a `Closes-backlog-item: <item-id>` line, and the items of each
-# pull request a merge train lists with a `Train-member: <url>` line; an item it cannot close is
+# merged pull request names with a `Closes-backlog-item: <item-id>` line in its closes block, and
+# the items of each pull request a merge train lists there with a `Train-member: <url>` line
+# (bin/fm-pr-closes-lib.sh owns the block); an item it cannot close is
 # reported by id with its reason and never changes this script's exit status.
 set -eu
 
@@ -2442,7 +2443,7 @@ case "$outcome_rc" in
     ;;
 esac
 
-# The merge is verified: close the backlog items its body names with
+# The merge is verified: close the backlog items its body's closes block names with
 # `Closes-backlog-item: <item-id>` lines, and a merge train's members' items too, but only when its
 # outcome was recorded above. A merge that could not be recorded runs no close and lists
 # the items it names as not closed. A failure here never changes the merge result: the
