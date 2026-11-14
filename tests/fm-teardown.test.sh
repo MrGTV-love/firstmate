@@ -875,9 +875,9 @@ test_squash_merged_rebased_branch_allows() {
   pass "squash-merged task whose local branch followed the pipeline rebase is torn down"
 }
 
-# A Forgejo task whose default branch moved on after the squash merge, editing
-# the same lines, leaves the content check inconclusive, so only the forge's
-# merged record can prove the work landed. With the record merged teardown
+# A Forgejo task whose squash merge reworded the same lines leaves the copy's
+# content in no default-branch commit, so the content check cannot prove it
+# landed and only the forge's merged record can. With the record merged teardown
 # proceeds; with it unmerged the same history refuses.
 test_squash_merged_forgejo_pr_allows_when_main_moved_on() {
   local case_dir rc pr_head tmp merged expected
@@ -885,12 +885,16 @@ test_squash_merged_forgejo_pr_allows_when_main_moved_on() {
     case_dir=$(make_case "forgejo-merged-$merged")
     write_meta "$case_dir" no-mistakes ship
     pr_head=$(setup_squash_rebased_history "$case_dir" rebased)
+    # The maintainer reworded the change while squashing: the fixture's squash
+    # commit is replaced by one whose shared.txt is not the copy's.
     tmp="$case_dir/_main_later"
     git clone -q "$case_dir/origin.git" "$tmp"
+    git -C "$tmp" reset -q --hard HEAD~1
+    printf '%s\n' hello > "$tmp/feature.txt"
     printf '%s\n' base main-edit feature-edit-reworded > "$tmp/shared.txt"
-    git -C "$tmp" add -- shared.txt
-    git -C "$tmp" -c user.email=t@t -c user.name=t commit -q -m "main rewords shared"
-    git -C "$tmp" push -q origin main
+    git -C "$tmp" add -- feature.txt shared.txt
+    git -C "$tmp" -c user.email=t@t -c user.name=t commit -q -m "feat: squash, reworded (#7)"
+    git -C "$tmp" push -q -f origin main
     rm -rf "$tmp"
     printf '%s\n' \
       'pr=https://git.example.org/team/repo/pulls/7' \
