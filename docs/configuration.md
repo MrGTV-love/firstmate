@@ -1515,24 +1515,26 @@ A presentation manifest larger than one tail window, and the legacy open-decisio
 ## Test slots per key (FM_TEST_KEY_SLOTS)
 
 The same heavy test suite is often started in several worktrees at once, and each copy forks thousands of short-lived processes.
-The CPU pass pool ([`cpu-pass-pool.md`](cpu-pass-pool.md)) bounds how many scripts run in total; this gate bounds how many copies of one `test.<script>` key run, host-wide, so the copies take turns instead of multiplying.
-`python3 bin/fm-duration.py run test.<script> -- <command>` takes a slot before it starts its clock, and `bin/fm-test-run.sh` takes the same slot around every script it runs through `python3 bin/fm-duration.py gate`, so a wait is never part of a recorded sample, a run's stop or slower-than-usual clock, or a per-script bound: `gate --wait-file` reports the milliseconds it queued behind busy slots, and 0 when a slot was free at once, and the runner subtracts them from the script's duration (its `FM_TEST_END` line, its timing record and its `test.<script>` sample).
+The CPU pass pool ([`cpu-pass-pool.md`](cpu-pass-pool.md)) bounds how many CPU-bound workers run in total; this gate bounds how many copies of one `test.<script>` key run, host-wide, so the copies take turns instead of multiplying.
+`python3 bin/fm-duration.py run test.<script> -- <command>` takes a slot, then one pool pass, before it starts its clock, and `bin/fm-test-run.sh` takes the same slot around every script it runs through `python3 bin/fm-duration.py gate`, with its own pass inside the slot, so a wait is never part of a recorded sample, a run's stop or slower-than-usual clock, or a per-script bound: `gate --wait-file` reports the milliseconds it queued behind busy slots, and 0 when a slot was free at once, and the runner subtracts them from the script's duration (its `FM_TEST_END` line, its timing record and its `test.<script>` sample).
+A process that already holds passes (`FM_CPU_PASS_HELD` above 0) takes no slot, so it never waits behind a slot whose holder waits for a pass.
 `--max-wall-ms` and the run's `FM_TEST_SUMMARY` duration are real elapsed time and still count the wait.
 A script that queued records its `test.<script>` sample with no start load, because the runner read the load before the queue, while `fm-duration.py run` reads it after taking its slot.
-The [`fm-duration.py` header](../bin/fm-duration.py) owns the protocol: the slot files, the holder record, the waiter notice, the bounded wait, the nested-run rule and the exit codes.
+The [`fm-duration.py` header](../bin/fm-duration.py) owns the protocol: the slot files, the holder record, the waiter notice, the wait until a holder ends, the nested-run and pass-holder rules and the exit codes.
 
 | Setting | Default | Range | Purpose |
 | --- | --- | --- | --- |
 | `FM_TEST_KEY_SLOTS` | 2 | 0..16 | Concurrent copies of one `test.*` key allowed host-wide; `0` turns the gate off. Other keys are never gated. |
-| `FM_TEST_SLOT_WAIT_SECONDS` | 7200 | at least 1 | How long a waiter queues before it runs without a slot and says so. |
+| `FM_TEST_SLOT_WAIT_SECONDS` | retired | none | No longer read: a waiter waits until a holder ends and is never admitted by elapsed time, so any value is ignored. |
 | `FM_TEST_SLOT_DIR` | `$HOME/.cache/fm-test-slots` | an absolute path | Where the per-key slot directories live; tests point it at a fixture directory. |
 
-**Why two copies and 7200 seconds**
+**Why two copies, and no wait limit**
 
 A day of the host's own timings (`data/command-durations.jsonl`, 2026-10-17) shows `tests/fm-teardown.test.sh` run 6 times for 13,276 seconds in total, with a median of 2,175 seconds and a longest run of 6,884, and three copies alive at once in three worktrees.
 One slot would queue those six runs behind each other for about 3.7 hours of waiting between them; two slots cap the overlap at two copies while the third waits for the first of the two to finish, typically one median run.
-A waiter gives up after 7,200 seconds, a little longer than the longest run seen, so a queued copy outlasts a holder that is merely slow, and a holder that never finishes can delay a copy by at most that long.
-The gate shapes throughput and is not a safety boundary: a waiter that gives up, a slot directory or slot file that cannot be used, or a Python without POSIX file locks, runs the suite without a slot and says so.
+A waiter used to give up after 7,200 seconds and run beside the limit, so a day of slow holders let every copy through together, which is the harm the gate exists to prevent.
+Waiting is now by capacity alone: a waiter starts when a holder ends, whatever time has passed, and a holder that never ends is bounded only by the stop rules of its own runner.
+The gate shapes throughput and is not a safety boundary: a slot directory or slot file that cannot be used, or a Python without POSIX file locks, runs the suite without a slot and says so, and never blocks it.
 A native Windows bash (`uname` MINGW, MSYS or CYGWIN) never calls the gate.
 
 **Release and stale holders**
@@ -4861,7 +4863,7 @@ FM_GITHUB_ACCOUNTING=1   # 0 stops a primary home's watcher from keeping the sta
 FM_GITHUB_ACCOUNTING_BIN=   # test seam: the owner the watcher starts instead of bin/fm-github-accounting.py
 FM_LAVISH_AUTO_RETIRE_INTERVAL=900   # seconds between the watcher's detached `bin/fm-procevent-lavish.sh sweep --auto` runs; 0 turns them off; a fresh watcher waits one full interval; invalid values use 900
 FM_TEST_KEY_SLOTS=2   # concurrent copies of one test.* key allowed host-wide by bin/fm-duration.py run and gate (bin/fm-test-run.sh wraps each script in gate); 0 turns the gate off; whole numbers up to 16 (docs/configuration.md "Test slots per key")
-FM_TEST_SLOT_WAIT_SECONDS=7200   # seconds a waiter queues for a slot before it runs without one and says so; whole number of at least 1
+FM_TEST_SLOT_WAIT_SECONDS=   # retired and ignored: a waiter waits for a slot until a holder ends (docs/configuration.md "Test slots per key")
 FM_TEST_SLOT_DIR=   # absolute path of the per-key slot directories; unset means $HOME/.cache/fm-test-slots; tests point it at a fixture directory
 FM_LAVISH_AUTO_RETIRE_BIN=   # test seam: the sweep the watcher launches instead of bin/fm-procevent-lavish.sh
 FM_HOME_SUMMARY_TIMEOUT=900    # no-output/no-CPU seconds for home-summary initialization through atomic publication, never a wall-clock cutoff; independent failure-accounting bounds are owned by bin/fm-home-summary-refresh.sh's header; invalid or zero values use 900

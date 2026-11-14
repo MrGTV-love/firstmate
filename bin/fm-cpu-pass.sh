@@ -10,9 +10,10 @@ if ! command -v python3 >/dev/null 2>&1 && [ "${1:-}" = run ]; then
   shift
   log_fd=2
   passes=1
+  wait_file=
   while [ "$#" -gt 0 ] && [ "$1" != -- ]; do
     case "$1" in
-      --passes|--label|--log-fd)
+      --passes|--label|--log-fd|--wait-file)
         if [ "$#" -lt 2 ]; then
           echo "fm-cpu-pass: $1 needs a value" >&2
           exit 125
@@ -20,11 +21,13 @@ if ! command -v python3 >/dev/null 2>&1 && [ "${1:-}" = run ]; then
         case "$1" in
           --passes) passes=$2 ;;
           --log-fd) log_fd=$2 ;;
+          --wait-file) wait_file=$2 ;;
         esac
         shift ;;
       --passes=*) passes=${1#--passes=} ;;
       --label=*) ;;
       --log-fd=*) log_fd=${1#--log-fd=} ;;
+      --wait-file=*) wait_file=${1#--wait-file=} ;;
       --*) exit 125 ;;
       *) break ;;
     esac
@@ -68,8 +71,10 @@ if ! command -v python3 >/dev/null 2>&1 && [ "${1:-}" = run ]; then
       echo "fm-cpu-pass: --passes must not exceed FM_CPU_PASS_HELD ($held)" >&2
       exit 125
     fi
+    [ -z "$wait_file" ] || printf '0\n' >"$wait_file" 2>/dev/null || true
     exec "$@"
   fi
+  [ -z "$wait_file" ] || printf '0\n' >"$wait_file" 2>/dev/null || true
   if { : >&"$log_fd"; } 2>/dev/null; then
     printf '%s\n' "fm-cpu-pass: running $1 without a CPU pass: python3 not found" >&"$log_fd" || true
   fi

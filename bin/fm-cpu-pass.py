@@ -3,7 +3,7 @@
 fm-cpu-pass.py - host-wide CPU pass pool for CPU-heavy test bursts.
 
 Usage:
-  fm-cpu-pass.sh run [--passes K] [--label TEXT] [--log-fd N] -- COMMAND [ARGS...]
+  fm-cpu-pass.sh run [--passes K] [--label TEXT] [--log-fd N] [--wait-file PATH] -- COMMAND [ARGS...]
   fm-cpu-pass.sh pipeline-start [--priority CLASS] -- COMMAND [ARGS...]
   fm-cpu-pass.sh status [--json]
   fm-cpu-pass.sh size
@@ -13,7 +13,7 @@ exits with COMMAND's status (128+n when a signal n ended it).
 `status` reports how many passes are held and by whom; `size` prints the pool
 size so a caller can size its own worker count (for example pytest -n).
 
-The pool bounds CPU-heavy bursts (test suites and their workers), not agents
+The pool bounds CPU-heavy bursts (test suites, their workers and lint roots), not agents
 or sessions: interactive work never asks for a pass and is never queued.
 docs/cpu-pass-pool.md owns the cross-repository protocol this command
 implements: pool directory and size, slot and turnstile locks, the
@@ -28,6 +28,9 @@ Waiting:
   - After 2 s of waiting it writes one notice, then one every 60 s, to the log
     fd, naming the pool size and the current holders; on acquisition after a
     notice it writes the wait time.
+  - --wait-file PATH writes the milliseconds spent queued (0 when no wait, nested
+    or degraded) before COMMAND starts, so a caller can leave the wait out of its
+    own timing; a path that cannot be written never changes COMMAND's status.
   - K must be a positive integer no larger than size; otherwise exit 125.
   - SIGTERM or SIGHUP while waiting ends the waiter with 128+n; SIGINT with 130.
 
@@ -336,6 +339,16 @@ def exec_direct(command: List[str], env: dict, log_fd: int) -> int:
     return 126  # pragma: no cover - execvpe does not return
 
 
+def write_wait(path: str, started: float) -> None:
+    """Record the milliseconds queued since STARTED for a caller that times COMMAND itself."""
+    if not path:
+        return
+    try:
+        Path(path).write_text("%d\n" % round((time.monotonic() - started) * 1000), encoding="utf-8")
+    except OSError:
+        pass
+
+
 def cmd_run(args: argparse.Namespace) -> int:
     command = list(args.command)
     if command and command[0] == "--":
@@ -359,6 +372,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         if held_count and passes > held_count:
             log(log_fd, "--passes must not exceed %s (%d)" % (HELD_ENV, held_count))
             return 125
+        write_wait(args.wait_file, time.monotonic())
         return exec_direct(command, env, log_fd)
     label = args.label or os.path.basename(command[0])
     try:
@@ -367,9 +381,11 @@ def cmd_run(args: argparse.Namespace) -> int:
     except PoolUnavailable as exc:
         log(log_fd, "running %s without a CPU pass: %s" % (label, exc))
         env[HELD_ENV] = "0"
+        write_wait(args.wait_file, time.monotonic())
         return exec_direct(command, env, log_fd)
     for signum in (signal.SIGTERM, signal.SIGHUP):
         signal.signal(signum, signal.SIG_DFL)
+    queued_at = time.monotonic()
     try:
         held = acquire(directory, size, passes, label, log_fd)
     except KeyboardInterrupt:
@@ -377,7 +393,9 @@ def cmd_run(args: argparse.Namespace) -> int:
     except OSError as exc:
         log(log_fd, "running %s without a CPU pass: %s" % (label, exc))
         env[HELD_ENV] = "0"
+        write_wait(args.wait_file, queued_at)
         return exec_direct(command, env, log_fd)
+    write_wait(args.wait_file, queued_at)
     env[HELD_ENV] = str(passes)
     try:
         return run_child(command, env, log_fd)
@@ -703,6 +721,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--passes", type=int, default=1, help="exact passes to hold (default 1; must be between 1 and the pool size)")
     run.add_argument("--label", default="", help="holder label shown in status and notices")
     run.add_argument("--log-fd", type=int, default=2, help="fd for wait notices (default 2)")
+    run.add_argument("--wait-file", default="", help="file receiving the milliseconds spent queued before COMMAND starts")
     run.add_argument("command", nargs=argparse.REMAINDER, help="-- COMMAND [ARGS...]")
     start = sub.add_parser("pipeline-start", help="queue a fresh pipeline start before its execution clock")
     start.add_argument("--priority", choices=PIPELINE_PRIORITIES, default="other", help="start class in descending priority order")

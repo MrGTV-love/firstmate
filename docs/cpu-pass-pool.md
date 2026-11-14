@@ -1,8 +1,8 @@
 # CPU pass pool
 
 The CPU pass pool is one host-wide budget for CPU-heavy test bursts.
-A test script, a parallel test worker, or a load test takes a pass before it runs and returns it when it ends.
-When every pass is held, the next burst waits for one instead of adding to the run queue.
+A test script, a parallel test worker, a lint root, or a load test takes a pass before it runs and returns it when it ends.
+When every pass is held, the next burst waits for one instead of adding to the run queue, and starts by itself when a holder ends.
 
 Burst passes count CPU workers, not agents.
 Fresh Firstmate-driven pipeline starts additionally queue through this same pool's start-admission owner, described below.
@@ -63,6 +63,16 @@ bin/fm-cpu-pass.sh size
 
 A repository that cannot assume a Firstmate checkout implements the protocol directly with its language's `flock`, as rules 1-8 describe.
 The [`bin/fm-test-run.sh` header](../bin/fm-test-run.sh) owns Firstmate's runner integration.
+
+Firstmate's own heavy entry points take passes outside their timing and bounds; each script's header owns the details:
+
+- `bin/fm-test-run.sh` takes one per executed script, and one for a whole `--check-coverage` scan.
+- `bin/fm-duration.py run test.<key>`, the route the generated worker instructions name for an individual suite, takes one after its per-key slot and before its clock.
+- `bin/fm-lint.sh` takes one per cold ShellCheck root and one for the changed-root dependency scan.
+- `bin/fm-test-isolation-proof.sh` takes min(`--jobs`, pool size) for its whole run; its header owns how it counts and records concurrency.
+
+A pass holder never waits for a per-key slot ([configuration.md](configuration.md#test-slots-per-key-fm_test_key_slots)), so a slot holder waiting for a pass cannot deadlock against it.
+Waiting for a pass or a slot is by capacity alone: no elapsed time admits a waiter.
 
 ## Fresh pipeline starts
 

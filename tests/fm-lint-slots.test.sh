@@ -1559,8 +1559,10 @@ test_resident_watch_ends_its_command_when_its_owner_dies() {
 
 # fm_lint_write_rss_shims <dir>: ps and python3 stand-ins for the resident watch.
 # Each runs the absolute binary in FM_TEST_REAL_PS or FM_TEST_REAL_PYTHON once.
-# A shim reached again below itself (FM_TEST_RSS_SHIM_DEPTH already set) refuses
-# with status 99, so a real path that resolves back to a shim cannot recurse.
+# A shim reached again below itself refuses with status 99, so a real path that
+# resolves back to a shim cannot recurse: the ps shim marks every call below it,
+# and the python3 shim marks its own process (FM_TEST_RSS_SHIM_DEPTH=<pid>), which
+# the interpreter it execs keeps, so that interpreter's children may still use the shims.
 # Every entry appends its pid to FM_TEST_SHIM_TRACE when that is set. The ps
 # shim logs how many processes each call listed to FM_TEST_PS_LOG; the python3 shim logs each
 # call's arguments to FM_TEST_PY_LOG, fails at once under FM_TEST_PY_REFUSE=1,
@@ -1576,16 +1578,16 @@ fm_lint_write_rss_shims() {  # <dir>
   guard=$(cat <<'SH'
 #!/usr/bin/env bash
 [ -z "${FM_TEST_SHIM_TRACE:-}" ] || printf '%s\n' "$$" >> "$FM_TEST_SHIM_TRACE"
-if [ -n "${FM_TEST_RSS_SHIM_DEPTH:-}" ]; then
+if [ "${FM_TEST_RSS_SHIM_DEPTH:-}" = 1 ] || [ "${FM_TEST_RSS_SHIM_DEPTH:-}" = "$$" ]; then
   echo "rss shim: refused a call from inside a shim" >&2
   exit 99
 fi
-export FM_TEST_RSS_SHIM_DEPTH=1
 SH
 )
   {
     printf '%s\n' "$guard"
     cat <<'SH'
+export FM_TEST_RSS_SHIM_DEPTH=1
 out=$("$FM_TEST_REAL_PS" "$@") || exit
 printf '%s\n' "$out" | grep -c . >> "$FM_TEST_PS_LOG"
 printf '%s\n' "$out"
@@ -1594,6 +1596,7 @@ SH
   {
     printf '%s\n' "$guard"
     cat <<'SH'
+export FM_TEST_RSS_SHIM_DEPTH=$$
 if [ "$*" = "-c import sys; print(sys.executable)" ]; then
   printf '%s\n' "$0"
   exit 0
