@@ -202,6 +202,47 @@ def unit(base):
         assert refused_build(manifest, "bad.sb", successor=bad), f"the generator accepted the inadmissible successor {bad!r}"
     assert refused_build(manifest, "nobranch.sb", successor=SUCCESSOR, branch=""), "a successor without a task branch must refuse"
     results["generator-refuses-inadmissible-successors"] = True
+
+    # 4. C1: the generator repeats the name-family bound. A successor is the task's
+    #    branch name, then '-', then one or more of letters, digits, '.', '_', '-'.
+    for outside in ("develop", "fm/other", "fm/task-", "fm/task-a/b", "FM/task-v2", "fm/task2-v2", "release/1.x"):
+        error = refused_build(manifest, "family.sb", successor=outside)
+        assert error and ("name family" in error or "exact literal" in error), \
+            f"the generator must refuse {outside!r} as outside the task's name family, got {error!r}"
+    for inside in ("fm/task-v2.1", "fm/task-x_y-Z", "fm/task--2"):
+        build(manifest, "family-ok.sb", successor=inside)
+    results["generator-holds-the-name-family-bound"] = True
+
+    # 5. C5: the alias check runs on the successor's ref and reflog paths. A hard
+    #    link or a symbolic link there makes the build refuse and name the path; the
+    #    task's own branch keeps the base behaviour (exempt).
+    project, common = manifest["project"], common_dir(manifest)
+    git("-C", str(project), "branch", SUCCESSOR, manifest["sha"])
+    ref, reflog = common / "refs/heads" / SUCCESSOR, common / "logs/refs/heads" / SUCCESSOR
+    assert ref.is_file() and reflog.is_file(), "the scratch repository must hold the successor's ref and reflog files"
+    assert build(manifest, "alias-clean.sb", successor=SUCCESSOR), "a clean successor must build"
+    for path in (ref, reflog):
+        alias = manifest["base"] / ("alias-" + path.parent.name + "-" + path.name)
+        os.link(path, alias)
+        error = refused_build(manifest, "alias.sb", successor=SUCCESSOR)
+        assert error and str(path) in error and "links" in error, \
+            f"a hard link at the successor's {path} must refuse the build and name the path, got {error!r}"
+        alias.unlink()
+        moved = path.with_name(path.name + ".real")
+        path.rename(moved)
+        os.symlink(moved, path)
+        error = refused_build(manifest, "alias.sb", successor=SUCCESSOR)
+        assert error and str(path) in error and "symbolic link" in error, \
+            f"a symbolic link at the successor's {path} must refuse the build and name the path, got {error!r}"
+        path.unlink()
+        moved.rename(path)
+    assert build(manifest, "alias-restored.sb", successor=SUCCESSOR), "removing every alias must let the build pass again"
+    own = common / "refs/heads" / BRANCH
+    own_alias = manifest["base"] / "alias-own"
+    os.link(own, own_alias)
+    assert build(manifest, "alias-own.sb", successor=SUCCESSOR), "a second link at the task's own branch keeps the base behaviour and builds"
+    own_alias.unlink()
+    results["alias-check-covers-the-successor-and-spares-the-own-branch"] = True
     for name in results:
         print(f"ok - {name}")
     return 0
