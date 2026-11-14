@@ -2142,6 +2142,7 @@ fi
 # never waits behind a pool that is full.
 probe_rc=0
 resolved=
+# shellcheck disable=SC2016  # the single quotes are deliberate: $fh is a Perl variable in the -e program, not a shell expansion.
 version_digest=$("$PERL_BIN" -MDigest::SHA -e 'open(my $fh, "<", $ARGV[0]) or exit 1; binmode $fh; print Digest::SHA->new(256)->addfile($fh)->hexdigest' \
   "$SHELLCHECK_BIN" 2>/dev/null) || version_digest=
 version_file=
