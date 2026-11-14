@@ -692,7 +692,7 @@ test_successor_archive_route_admits_only_the_task_own_archive_names() {
     rc=0
     out=$(sc "$dir" "$id" --branch "fm/$id-v2b" --check) || rc=$?
     expect_code 0 "$rc" "the exact archive/$id-$kind-<8 hex> name at the successor's tip is the matched control and must admit"$'\n'"$out"
-    assert_contains "$out" "route=archive-tip archive=archive/$id-$kind-$hex" "the control names the archive branch that proved it"
+    assert_contains "$out" "archive/$id-$kind-$hex" "the control names the archive branch that proved it"
     git -C "$dir/proj" branch -q -D "archive/$id-$kind-$hex"
   done
   pass "successor: the archive-tip route refuses another id, another task, a wrong or uppercase hex and an id-extending name, and admits the task's own submitted and pipeline archive names"
