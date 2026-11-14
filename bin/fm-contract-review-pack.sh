@@ -9,7 +9,7 @@
 #       [--context <file>]... --root <repo-root>
 #       [--exclude <path>]...
 #       [--register <path>] [--history <path>] [--policy <file>]
-#       [--out-root <dir>] [--label <text>]
+#       [--out-root <dir>]
 #   fm-contract-review-pack.sh check --pack <dir> --report <file>
 #       [--log <file>] [--manifest <file>]
 #
@@ -281,7 +281,7 @@ policy_block() { # <policy> -> block with marker lines on stdout, nonzero unless
 }
 
 cmd_build() {
-  local contract='' request='' root='' policy='' out_root='' label=''
+  local contract='' request='' root='' policy='' out_root=''
   local -a contexts=() excludes=()
   while [ $# -gt 0 ]; do
     case "$1" in
@@ -293,7 +293,6 @@ cmd_build() {
         [ $# -ge 2 ] || die "$1 needs a path"; excludes+=("$2"); shift 2 ;;
       --policy) [ $# -ge 2 ] || die "--policy needs a file"; policy=$2; shift 2 ;;
       --out-root) [ $# -ge 2 ] || die "--out-root needs a directory"; out_root=$2; shift 2 ;;
-      --label) [ $# -ge 2 ] || die "--label needs text"; label=$2; shift 2 ;;
       -h | --help) usage; exit 0 ;;
       *) die "unknown argument: $1" ;;
     esac
@@ -379,7 +378,7 @@ cmd_build() {
   printf '%s\n' "$head" >"$pack/head.txt"
   printf '%s\n' "Not applicable: this is a definition-of-done document review. There is no PR, no head commit and no CI. The 'head' passed to the review lane is the first 40 hex digits of sha256(target.md), recorded in head.txt." >"$pack/ci-evidence.md"
   {
-    printf '# Review of the definition-of-done contract%s\n\n' "${label:+: $label}"
+    printf '# Review of the definition-of-done contract\n\n'
     # shellcheck disable=SC2016 # literal backticks in generated Markdown
     printf 'Target: `target.md` in this folder (the diff slot, `diff.patch`, is empty). It is the definition of done under review. There is no PR and no CI; `ci-evidence.md` says so.\n'
     if [ -n "$request" ]; then

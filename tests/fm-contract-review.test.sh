@@ -1391,6 +1391,21 @@ test_rubric_revision_is_pinned_with_a_root() {
   pass "with a root, a revision path to the rubric is allowed only at the pinned revision"
 }
 
+test_label_argument_is_gone() {
+  local src="$TMP_ROOT/s-label.md" rc=0 pack
+  write_fixture_contract "$src"
+  # Noncompliant: --label adds title text no requirement needs, so it is an unknown argument.
+  "$PACK_BIN" --root "$ROOT" --contract "$src" --label probe-label --out-root "$TMP_ROOT/l1" >/dev/null 2>"$TMP_ROOT/l.err" || rc=$?
+  assert_equals 2 "$rc" "--label was accepted"
+  assert_contains "$(cat "$TMP_ROOT/l.err")" "unknown argument: --label" "--label was refused for another cause"
+  assert_absent "$TMP_ROOT/l1" "a refused --label left an output directory"
+  # Compliant: the same build without it succeeds, and its title names no label.
+  pack=''
+  build_pack pack --contract "$src" || fail "build without --label failed: $(cat "$TMP_ROOT/build.err")"
+  assert_equals "# Review of the definition-of-done contract" "$(head -1 "$pack/contract.md")" "the pack title changed"
+  pass "the builder has no --label argument"
+}
+
 test_policy_is_named_only_by_the_policy_argument() {
   local src="$TMP_ROOT/s-one-way.md" pack policy2="$TMP_ROOT/policy-env.md"
   write_fixture_contract "$src"
@@ -1530,4 +1545,5 @@ fm_test_run_cases \
   test_unopened_file_named_under_inputs_read_voids_and_the_reviewer_is_told \
   test_leak_check_splits_candidates_at_any_non_path_character \
   test_policy_is_named_only_by_the_policy_argument \
+  test_label_argument_is_gone \
   -- "$@"
