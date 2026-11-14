@@ -6,6 +6,94 @@ set -u
 
 # shellcheck source=tests/fm-captain-hold-lifecycle-helpers.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fm-captain-hold-lifecycle-helpers.sh"
+# shellcheck source=bin/fm-pr-lib.sh
+. "$ROOT/bin/fm-pr-lib.sh"
+
+make_completion_poll_home() {  # <name>
+  local home id=completion-pr-origin
+  home=$(make_home "$1")
+  tasks_in "$home" add "$id" "Review the completion inventory" --kind ship --repo sample --start >/dev/null \
+    || fail "could not create PR completion origin"
+  write_origin_meta "$home" "$id" ship
+  printf 'pr=https://github.com/example/repo/pull/1\npr_head=1111111111111111111111111111111111111111\n' \
+    >> "$home/state/$id.meta"
+  fm_pr_poll_prepare "$home/state" "$id" github https://github.com/example/repo/pull/1 \
+    github.com example/repo 1 "$ROOT/bin/fm-pr-poll.sh" \
+    || fail "could not prepare managed completion poll"
+  fm_pr_poll_publish_prepared || fail "could not publish managed completion poll"
+  printf '%s\n' "$home"
+}
+
+# Completion can happen after PR registration and again as the reviewed
+# inventory grows. Neither publication may invalidate or re-arm that poll.
+test_complete_preserves_authenticated_pr_poll() {
+  local home id=completion-pr-origin out
+  home=$(make_completion_poll_home completion-pr-footer)
+  fm_pr_poll_snapshot_capture "$home/state" "$id" "$ROOT/bin/fm-pr-poll.sh" \
+    || fail "initial completion poll did not authenticate"
+  run_captain "$home" hold completion-call-a --title "Choose the first route" \
+    --reason "first route remains undecided" --repo sample --origin "$id" >/dev/null \
+    || fail "could not create the first completion call"
+  run_captain "$home" complete "$id" completion-call-a >/dev/null \
+    || fail "could not publish the first inventory after PR registration"
+  fm_pr_poll_snapshot_matches "$home/state" "$id" "$ROOT/bin/fm-pr-poll.sh" \
+    || fail "the first inventory invalidated or replaced managed poll provenance"
+  run_captain "$home" hold completion-call-b --title "Choose the second route" \
+    --reason "second route remains undecided" --repo sample --origin "$id" >/dev/null \
+    || fail "could not create the second completion call"
+  run_captain "$home" complete "$id" completion-call-b >/dev/null \
+    || fail "could not extend the inventory after PR registration"
+  run_captain "$home" verify "$id" >/dev/null \
+    || fail "the published inventory did not pass its normal completion gate"
+  assert_grep 'decision_keys=completion-call-a,completion-call-b' "$home/state/$id.meta" \
+    "completion lost an earlier reviewed call while publishing the union"
+  fm_pr_poll_snapshot_matches "$home/state" "$id" "$ROOT/bin/fm-pr-poll.sh" \
+    || fail "inventory publication invalidated or replaced managed poll provenance"
+
+  cat > "$home/fakebin/gh" <<'SH'
+#!/usr/bin/env bash
+printf 'query\n' >> "$FM_TEST_POLL_LOG"
+printf 'OPEN\n'
+SH
+  chmod +x "$home/fakebin/gh"
+  out=$(FM_TEST_POLL_LOG="$home/poll.calls" PATH="$home/fakebin:$PATH" \
+    bash "$ROOT/bin/fm-pr-poll.sh" --validated \
+      "$FM_PR_POLL_SNAPSHOT_PROVIDER" "$FM_PR_POLL_SNAPSHOT_URL" \
+      "$FM_PR_POLL_SNAPSHOT_HOST" "$FM_PR_POLL_SNAPSHOT_PATH" "$FM_PR_POLL_SNAPSHOT_NUMBER") \
+    || fail "the authenticated canonical poll failed"
+  [ -z "$out" ] || fail "an open fixture PR was falsely reported merged: $out"
+  [ "$(wc -l < "$home/poll.calls" | tr -d ' ')" = 1 ] \
+    || fail "the authenticated canonical poll did not query its fixture forge exactly once"
+  pass "completion preserves the reviewed inventory and the existing authenticated managed poll"
+}
+
+# Refresh only the fields completion owns. In particular, moving every PR
+# field to the end would silently bless an unknown trailing field, while
+# re-registering the poll could silently bless a foreign PR identity.
+test_complete_does_not_authenticate_invalid_pr_metadata() {
+  local mutation home id=completion-pr-origin
+  for mutation in trailing foreign; do
+    home=$(make_completion_poll_home "completion-invalid-$mutation")
+    fm_pr_poll_snapshot_capture "$home/state" "$id" "$ROOT/bin/fm-pr-poll.sh" \
+      || fail "initial $mutation completion poll did not authenticate"
+    case "$mutation" in
+      trailing) printf 'untrusted_after_pr=1\n' >> "$home/state/$id.meta" ;;
+      foreign)
+        write_origin_meta "$home" "$id" ship
+        printf 'pr=https://github.com/example/repo/pull/2\npr_head=1111111111111111111111111111111111111111\n' \
+          >> "$home/state/$id.meta"
+        ;;
+    esac
+    run_captain "$home" complete "$id" --none >/dev/null \
+      || fail "could not record the empty inventory for $mutation metadata"
+    run_captain "$home" verify "$id" >/dev/null \
+      || fail "the $mutation fixture did not retain its legitimate inventory attestation"
+    if fm_pr_poll_snapshot_capture "$home/state" "$id" "$ROOT/bin/fm-pr-poll.sh"; then
+      fail "completion authorized a managed poll with $mutation metadata"
+    fi
+  done
+  pass "completion does not authorize unknown trailing metadata or a mismatched PR identity"
+}
 
 # Reproduces the loss exactly with privacy-safe synthetic names: the investigation
 # and visual review have ended, the only genuine unresolved captain call is report
@@ -1771,6 +1859,8 @@ test_freeze_declaration_scopes_one_project() {
 }
 
 tests=(
+test_complete_preserves_authenticated_pr_poll
+test_complete_does_not_authenticate_invalid_pr_metadata
 test_hold_reason_round_trips_awkward_characters
 test_hold_origins_precede_backend_holds
 test_historical_self_inventory_has_workable_repair

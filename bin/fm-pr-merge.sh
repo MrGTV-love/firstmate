@@ -38,6 +38,9 @@
 # hold immediately before its merge command. bin/fm-review-record.py's header owns
 # the review/captain-word rule and recording CLI; neither --attended-override nor
 # away authority substitutes for this evidence, and captain words waive no guard.
+# An accepted verify's 'pipeline author family not recorded' fact is written into
+# the existing merge-authority record; bin/fm-merge-authority-lib.sh owns its
+# backward-compatible optional-line format, reader and short record lifetime.
 #
 # Merge method on GitHub defaults to --squash when the caller passes none of
 # --squash, --merge, --rebase, or --method after the optional -- separator.
@@ -679,10 +682,22 @@ if [ "$PROVIDER" = gitlab ] || [ "$PROVIDER" = forgejo ]; then
   RECORDED_HEAD=$(grep '^pr_head=' "$META" | tail -1 | cut -d= -f2- || true)
 fi
 
+FM_PR_REVIEW_FACT=
 require_recorded_review() {
-  FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+  local verification line status=0
+  FM_PR_REVIEW_FACT=
+  verification=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
     python3 "$SCRIPT_DIR/fm-review-record.py" verify --pr "$URL" --head "$FM_PR_MERGE_HEAD" \
-      --task "$ID" --base "$FM_PR_MERGE_BASE" >&2
+      --task "$ID" --base "$FM_PR_MERGE_BASE") || status=$?
+  printf '%s\n' "$verification" >&2
+  [ "$status" -eq 0 ] || return "$status"
+  while IFS= read -r line; do
+    case "$line" in
+      'review: pipeline author family not recorded') FM_PR_REVIEW_FACT='pipeline author family not recorded' ;;
+    esac
+  done <<VERIFICATION
+$verification
+VERIFICATION
 }
 
 # Pre-merge conditions for a GitLab merge request, read from one live view of
@@ -1874,7 +1889,7 @@ persist_accepted_merge_authority() {
   MERGE_META_LOCK=$(fm_meta_lock_path "$META") || return 1
   fm_lock_acquire_wait "$MERGE_META_LOCK" || return 1
   fm_merge_authority_persist "$STATE" "$ID" "$META" \
-    "$PROVIDER" "$PR_HOST" "$PR_PATH" "$PR_NUMBER" "$FM_PR_MERGE_AUTHORITY" \
+    "$PROVIDER" "$PR_HOST" "$PR_PATH" "$PR_NUMBER" "$FM_PR_MERGE_AUTHORITY" "$FM_PR_REVIEW_FACT" \
     || status=1
   fm_lock_release "$MERGE_META_LOCK" || status=1
   MERGE_META_LOCK=
