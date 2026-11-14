@@ -810,6 +810,27 @@ test_view_renders_snapshot() {
   pass "fleet view renders the snapshot without secondmate peek guidance"
 }
 
+# The send hint names a choice of two flags; a literal "|" inside it splits the
+# markdown table cell, so the secondmate row gets more cells than the header and
+# a renderer drops the tail of the guidance.
+test_view_secondmate_row_keeps_header_cell_count() {
+  local home fakebin view header row
+  home=$(make_home view-cells)
+  write_fixture "$home"
+  fakebin=$(make_fakebin "$home")
+  view=$(PATH="$fakebin:$PATH" FM_HOME="$home" "$VIEW")
+  header=$(printf '%s\n' "$view" | awk '/^## Under Way/{f=1;next} f && /^\| /{print; exit}')
+  row=$(printf '%s\n' "$view" | grep '^| secondmate-task |')
+  [ -n "$header" ] || fail "fleet view has no Under Way table header"
+  [ -n "$row" ] || fail "fleet view has no secondmate-task row"
+  assert_equals "$(printf '%s' "$header" | tr -cd '|' | wc -c | tr -d ' ')" \
+    "$(printf '%s' "$row" | tr -cd '|' | wc -c | tr -d ' ')" \
+    "secondmate row must have the header's cell count: $row"
+  assert_contains "$row" "--resolve-key <key>" "secondmate row must keep the full send choice"
+  assert_contains "$row" "do not routinely fm-peek a secondmate" "secondmate row must keep the watch guidance"
+  pass "fleet view secondmate row keeps the header's cell count and the full send guidance"
+}
+
 test_view_renders_dead_secondmate_agent_status() {
   local home fakebin view
   home=$(make_home dead-secondmate)
@@ -1312,4 +1333,5 @@ test_parked_scout_decision_stays_pending
 test_scout_reports_include_teardown_reports
 test_backlog_tasks_axi_forms_and_overrides
 test_view_renders_snapshot
+test_view_secondmate_row_keeps_header_cell_count
 test_view_renders_dead_secondmate_agent_status
