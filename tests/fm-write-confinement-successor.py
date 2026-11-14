@@ -175,8 +175,13 @@ def unit(base):
     #    successor's four literal lines: ref, ref.lock, reflog, reflog.lock.
     after = build(manifest, "after.sb", successor=SUCCESSOR)
     before_lines, after_lines = before.splitlines(), after.splitlines()
-    added = [line for line in after_lines if line not in before_lines]
-    removed = [line for line in before_lines if line not in after_lines]
+    # Allow lines only: the deny lines also name every sibling of the shared Claude
+    # temp root at build time, and another session can add or remove one between
+    # the two builds.
+    before_allow = [line for line in before_lines if line.startswith("(allow")]
+    after_allow = [line for line in after_lines if line.startswith("(allow")]
+    added = [line for line in after_allow if line not in before_allow]
+    removed = [line for line in before_allow if line not in after_allow]
     assert not removed, f"the successor profile dropped lines: {removed}"
     assert sorted(added) == sorted(expected_branch_lines(common, SUCCESSOR)), \
         "the profile may gain exactly the successor's four literal allow lines, got " + repr(sorted(added))
