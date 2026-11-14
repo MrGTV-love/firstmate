@@ -612,10 +612,18 @@ test_bootstrap_nudge_is_delivered_to_a_secondmate_with_an_open_keyed_decision() 
   bump_primary "$w" instr
   fakebin=$(make_fake_toolchain "$w")
   printf 'blocked [key=staging-token]: need the staging token\n' > "$w/home/state/sm-instr.status"
+  before=$(cat "$w/home/state/sm-instr.status")
   out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
     FM_SEND_SETTLE=0 "$ROOT/bin/fm-bootstrap.sh" 2>/dev/null)
   assert_contains "$out" "BOOTSTRAP_INFO: nudged fm-sm-instr with" "the first nudge was refused by the open keyed blocker"
   assert_not_contains "$out" "NUDGE_SECONDMATES:" "a delivered nudge leaves no action item"
+  [ -f "$w/home/state/sm-instr.inbox/001.msg" ] || fail "the first-send nudge left no inbox record"
+  assert_contains "$(cat "$w/home/state/sm-instr.inbox/001.msg")" "re-read your AGENTS.md" "the first-send nudge did not reach the record"
+  assert_equals "$before" "$(cat "$w/home/state/sm-instr.status")" "the first-send nudge closed or appended something in the secondmate's status log"
+  case $'\n'"$(bash -c '. "$1/bin/fm-status-decision-lib.sh"; status_open_decisions "$2"' _ "$ROOT" "$w/home/state/sm-instr.status")" in
+    *$'\n'"staging-token"$'\t'*) : ;;
+    *) fail "the first-send nudge left the staging-token blocker no longer open" ;;
+  esac
   pass "T8e bootstrap nudges reach a secondmate that has an open keyed decision and leave it open"
 }
 

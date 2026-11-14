@@ -163,11 +163,14 @@
 # it unconditionally). A send with neither refuses with exit 1 and lists each
 # open key with its verb and both flags; the two flags together are refused as
 # contradictory. Gate-agent containment (bin/fm-gate-refuse-lib.sh) runs first,
-# as a security guard, and may write its one guard event. After it, both
-# refusals, and the refusal when the open set cannot be read (a log past the
-# status read limits), come before any other guard telemetry, the supervision
-# warning (bin/fm-guard.sh), the lease guard, and anything marked, locked,
-# recorded, or typed, so a refused send changes nothing else. A --key send and
+# as a security guard, and may write its one guard event: to
+# state/guard-events.jsonl by default, or, with an explicit FM_GUARD_EVENT_LOG,
+# to that log, creating its directory when needed, as on base
+# (bin/fm-guard-event.sh). After it, both refusals, and the refusal when the
+# open set cannot be read (a log past the status read limits), come before any
+# other guard telemetry, the supervision warning (bin/fm-guard.sh), the lease
+# guard, and anything marked, locked, recorded, or typed, so a refused send
+# changes nothing else. A --key send and
 # a send to an explicit backend target cannot answer a decision, so the rule
 # does not apply to them. The printed FM_PENDING_REPLY_EXISTING_CORR=<corr>
 # resend of an unconfirmed secondmate request re-delivers that same request and

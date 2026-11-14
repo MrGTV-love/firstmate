@@ -230,11 +230,14 @@ fm_pending_reply_summarize() {  # <text>
 # nothing and returns 1 when neither yields a 64-hex digest, so create refuses
 # rather than writing a record without one.
 fm_pending_reply_body_digest() {  # <text>
-  local digest tool
+  local out digest tool
   for tool in sha256sum 'shasum -a 256'; do
     command -v "${tool%% *}" >/dev/null 2>&1 || continue
+    # The hash tool's own exit status decides: its output is captured whole
+    # (pipefail, so the tool is not masked by printf), and only then parsed.
     # shellcheck disable=SC2086 # $tool is a fixed command plus its options.
-    digest=$(printf '%s' "$1" | $tool 2>/dev/null | awk '{print $1}') || continue
+    out=$(set -o pipefail; printf '%s' "$1" | $tool 2>/dev/null) || continue
+    digest=${out%%[[:space:]]*}
     case "$digest" in
       *[!0-9a-f]* | '') continue ;;
     esac
