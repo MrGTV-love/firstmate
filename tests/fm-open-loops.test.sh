@@ -2113,6 +2113,11 @@ v4_task('unl-refused', copy=unl_refused, pr=14, note=f'{V4_PR}14 merged by anoth
 reap_refusal = 'REFUSED: t1 has commits the merged PR head does not contain; the ship deliverable is not landed'
 (v4 / 'state/.idle-reap').mkdir()
 (v4 / 'state/.idle-reap/unl-refused.refused').write_text(f'fm-idle-reap-refused-v1\n{now - 600}\ndone [at={now}]: merged\n{reap_refusal}\n')
+return_refusal = 'REFUSED: fin-return slot return could not reach the pool lease'
+(v4 / 'state/.idle-reap/fin-return.refused').write_text(
+    f'fm-idle-reap-refused-v1\n{now - 600}\ndone [at={now}]: merged\n{return_refusal}\n')
+(v4 / 'state/.idle-reap/fin-pending.refused').write_text(
+    f'fm-idle-reap-refused-v1\n{now - 7000}\ndone [at={now}]: merged\nREFUSED: an older idle-reaper refusal\n')
 (v4 / 'state/.idle-reap/fin-scout-refused.refused').write_text(
     f'fm-idle-reap-refused-v1\n{now - 600}\ndone [at={now}]: report delivered\n{scout_refusal}\n')
 gate_refusal = 'named head 0123abc is unreachable outside the worker copy'
@@ -2144,6 +2149,24 @@ v4_task('pend-scout', kind='scout', copy=None, note='delivered, report pending r
 v4_task('src-report', copy=world / 'v4-nowhere', note='delivered, branch pushed', state='unknown')
 v4_task('src-state', copy=world / 'v4-nowhere', verb='working', note='building', state='done')
 v4_task('src-backlog', copy=world / 'v4-nowhere', verb='working', note='building', state='paused')
+# Round-2 review F4: a merged PR while the worker still reads working; a clean copy that never committed;
+# an interrupted slot return over a landed task with a recorded refusal; a refused done claim another row covers.
+fin_working = v4_copy('fin-working'); v4_merged_pr(16, fin_working)
+v4_task('fin-working', copy=fin_working, pr=16, note=f'{V4_PR}16 merged by another lane', state='working', live=True)
+v4_task('pend-clean', copy=v4_copy('pend-clean', work=False), note='delivered')
+fin_return = v4_copy('fin-return'); v4_merged_pr(17, fin_return)
+v4_task('fin-return', copy=fin_return, pr=17, note=f'{V4_PR}17 merged by another lane')
+(v4 / 'state/fin-return.teardown-return-pending').write_text('slot=/pool/fin-return/project\n')
+gate_covered_reason = 'named head 4567def is unreachable outside the worker copy'
+# F5 as ruled: the newest recorded refusal wins, a prune attempt it will retry (state=pending) included.
+fin_pending = v4_copy('fin-pending'); v4_merged_pr(18, fin_pending)
+v4_task('fin-pending', copy=fin_pending, pr=18, note=f'{V4_PR}18 merged by another lane')
+pending_refusal = 'REFUSED: fin-pending copy is busy: a process still runs inside it'
+(v4 / 'state/fin-pending.merge-prune').write_text(
+    f'version=fm-merge-prune-v1\npr={V4_PR}18\nattempts=1\nnext_at={now + 60}\nstate=pending\nreason={pending_refusal}\n'
+    f'wake_sent=0\ncopy={fin_pending}\narmed_at={now - 3600}\nproject=\nreturned=0\n')
+v4_task('gate-covered', copy=v4_copy('gate-covered'), note='delivered, branch pushed', state='blocked', live=True,
+        detail=gate_covered_reason)
 mate_home = world / 'v4-mate'
 for name in ('state', 'data', 'config', 'projects'):
     (mate_home / name).mkdir(parents=True)
@@ -2233,6 +2256,30 @@ for name in ('wait-paused', 'wait-held', 'v4-mate'):
     assert not any(r['overdue'] for r in mine(name)), ('a waiting task or idle mate reported overdue because it is quiet', name, mine(name))
 assert 'unfin-dirty' in by_cat('unlanded_commit'), 'unfinished changes keep their existing row'
 assert not any(r['category'] in ('missing_worker', 'unlanded_commit') for r in mine('v4-mate'))
+# Round-2 F4 witnesses, each reported, then all required.
+clean_rows = [r for r in mine('pend-clean') if r['category'] in ('completed_task', 'pending_acceptance', 'pending_cleanup')]
+ret = by_cat('interrupted_teardown').get('fin-return')
+covered = by_cat('unlanded_commit').get('gate-covered')
+f4 = [
+    # A merged PR whose worker still reads working is still owed cleanup.
+    ('merged-while-working', 'fin-working' in cleanup and 'bin/fm-teardown.sh fin-working' in cleanup['fin-working']['next_action'],
+     mine('fin-working')),
+    # A clean copy that never committed has delivered nothing on record: review and acceptance, never plain teardown.
+    ('never-committed', [r['category'] for r in clean_rows] == ['pending_acceptance']
+     and 'review and accept' in clean_rows[0]['next_action'] and 'plain bin/fm-teardown.sh' not in clean_rows[0]['next_action'],
+     mine('pend-clean')),
+    # An interrupted slot return already owns the landed task's cleanup: one row, and it carries the refusal.
+    ('interrupted-return', bool(ret) and 'fin-return' not in cleanup and return_refusal in ret['next_action']
+     and return_refusal in ret['evidence'], mine('fin-return')),
+    # A refused done claim another row covers still names the gate's reason on that row.
+    ('refused-claim-covered', bool(covered) and gate_covered_reason in covered['next_action'], mine('gate-covered')),
+    # The newest recorded refusal is on the row, a pending prune attempt's included.
+    ('newest-recorded-refusal', 'fin-pending' in cleanup and pending_refusal in cleanup['fin-pending']['next_action'],
+     mine('fin-pending')),
+]
+for name, ok, got in f4:
+    print('F4', name, 'ok' if ok else 'FAILED', '' if ok else [(r['category'], r['next_action'][:160]) for r in got], flush=True)
+assert all(ok for _, ok, _ in f4), 'an F4 witness failed'
 # A record whose last report was done with no accepted deliverable and no live worker is never left with no row.
 # A done task, or a stopped one whose last report is done, with no PR and nothing landed is the completed_task
 # handoff's, so it gets that one row.
