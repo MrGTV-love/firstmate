@@ -1639,6 +1639,11 @@ test_ship_scaffolds_teach_the_closes_line() {
       assert_grep "then read the body again and confirm each of those lines is there" "$brief" "$mode/$forge ship brief did not say to confirm the re-added lines"
       assert_grep 'any `Train-member:` line for a component that landed' "$brief" "$mode/$forge ship brief did not make the body repair cover the Train-member: lines of a merge train"
       assert_grep "keep every one of them through the pipeline's body rewrite" "$brief" "$mode/$forge ship brief did not say that Train-member: lines must survive the pipeline body rewrite"
+      # Main 043: the lines close only inside the one closes block, between its exact marker lines.
+      assert_grep '<!-- firstmate-backlog-closes:begin -->' "$brief" "$mode/$forge ship brief did not teach the closes block's begin line"
+      assert_grep '<!-- firstmate-backlog-closes:end -->' "$brief" "$mode/$forge ship brief did not teach the closes block's end line"
+      assert_grep 'exactly one closes block' "$brief" "$mode/$forge ship brief did not say the body holds exactly one closes block"
+      assert_no_grep 'in a paragraph of directive lines alone' "$brief" "$mode/$forge ship brief still teaches the old paragraph rule"
       if [ "$mode" = no-mistakes ]; then
         # The pipeline writes the PR body after the handoff, so the check belongs after the
         # CI-ready return point and before the CI-ready done, never before the handoff done.
