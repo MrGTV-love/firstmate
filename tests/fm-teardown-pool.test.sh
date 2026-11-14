@@ -1059,6 +1059,132 @@ test_nested_pending_close_dangling_link_refuses_at_entry_enclosing() {
   pass "a pending-close path that is a dangling link refuses a prior-shape nested close before any lease or marker write, and the retry closes"
 }
 
+# Whether this host can make a regular file that rm -f cannot remove with the
+# user-immutable flag: not where chflags is missing, and not for root.
+pending_close_immutable_supported() {  # <dir>
+  local twin=$1/immutable-twin removed=0
+  command -v chflags >/dev/null 2>&1 || return 1
+  printf 'twin\n' > "$twin"
+  chflags uchg "$twin" 2>/dev/null || { rm -f "$twin"; return 1; }
+  rm -f "$twin" 2>/dev/null || true
+  [ -e "$twin" ] || removed=1
+  chflags nouchg "$twin" 2>/dev/null || true
+  rm -f "$twin"
+  [ "$removed" = 0 ]
+}
+
+# A previous pending-close record that is a regular file the clear cannot remove
+# (its user-immutable flag, set before the run) is decidable at entry too: on an
+# unleased slot, the nested close of either record shape takes no lease and the
+# return-pending marker keeps its bytes, or stays absent. Once the flag is
+# cleared the same teardown closes.
+assert_nested_unremovable_pending_close_refused_at_entry() {  # <plain|enclosing> <absent|present>
+  local shape=$1 pending=$2 case_dir rc=0 record label="nested-pending-close-immutable-$1-$2"
+  nested_fixture "$label" "$shape" mine landed
+  case_dir=$NESTED_CASE
+  held_plain_get_slot "$case_dir" "$NESTED_SLOT"
+  nested_place_leftovers "$case_dir"
+  [ "$pending" = present ] || rm -f "$case_dir/state/task-x1.teardown-return-pending"
+  record=$case_dir/state/task-x1.backlog-close
+  chflags uchg "$record"
+  nested_snapshot "$case_dir" "$case_dir/snapshot.before"
+  nested_run "$case_dir" || rc=$?
+  chflags nouchg "$record"
+  assert_nested_refused_untouched "$case_dir" "$rc" "$label" "pending-close record could not be removed at $record"
+  assert_absent "$case_dir/lease.log" "$label: the refused close took a lease"
+  jq -e '.worktrees[0].leased == false' "$case_dir/pool/treehouse-state.json" >/dev/null \
+    || fail "$label: the refused close left the slot leased"
+  rc=0
+  nested_run "$case_dir" || rc=$?
+  expect_code 0 "$rc" "$label: the retry after the flag is cleared must close: $(tail -3 "$case_dir/stderr")"
+  assert_nested_closed "$case_dir" "$label"
+}
+
+assert_nested_unremovable_pending_close_case() {  # <plain|enclosing> <absent|present>
+  if ! pending_close_immutable_supported "$TMP_ROOT"; then
+    pass "an unremovable pending-close record refuses a $1 nested close before any lease or marker write (skipped: this host cannot make an unremovable file with chflags uchg)"
+    return 0
+  fi
+  assert_nested_unremovable_pending_close_refused_at_entry "$1" "$2"
+  pass "an unremovable pending-close record refuses a $1 nested close before any lease or marker write, with the return-pending marker $2, and the retry closes"
+}
+
+test_nested_pending_close_immutable_refuses_at_entry_plain_marker_absent() {
+  assert_nested_unremovable_pending_close_case plain absent
+}
+
+test_nested_pending_close_immutable_refuses_at_entry_plain_marker_present() {
+  assert_nested_unremovable_pending_close_case plain present
+}
+
+test_nested_pending_close_immutable_refuses_at_entry_enclosing_marker_absent() {
+  assert_nested_unremovable_pending_close_case enclosing absent
+}
+
+test_nested_pending_close_immutable_refuses_at_entry_enclosing_marker_present() {
+  assert_nested_unremovable_pending_close_case enclosing present
+}
+
+# A pending-close record that is read-only but removable (mode 0444 in a
+# writable state directory) is not refused: the entry check asks whether the
+# clear can remove it, not whether it can be written.
+test_nested_read_only_pending_close_still_closes() {
+  local shape case_dir rc label
+  for shape in plain enclosing; do
+    label="nested-pending-close-read-only-$shape"
+    nested_fixture "$label" "$shape" mine landed
+    case_dir=$NESTED_CASE
+    held_plain_get_slot "$case_dir" "$NESTED_SLOT"
+    nested_place_leftovers "$case_dir"
+    chmod 444 "$case_dir/state/task-x1.backlog-close"
+    rc=0
+    nested_run "$case_dir" || rc=$?
+    expect_code 0 "$rc" "$label: a removable read-only record must not refuse: $(tail -3 "$case_dir/stderr")"
+    assert_nested_closed "$case_dir" "$label"
+  done
+  pass "a read-only but removable pending-close record lets a plain and a prior-shape nested close finish"
+}
+
+# The same entry refusal holds off the nested route: a ship whose copy is the
+# pool slot itself, with no backlog transition, takes no lease and writes no
+# return-pending marker when its previous pending-close record is a directory or
+# a file it cannot remove, and closes once the record is fixed.
+test_pool_slot_root_unremovable_pending_close_refuses_before_lease() {
+  local form case_dir slot record rc forms=directory
+  ! pending_close_immutable_supported "$TMP_ROOT" || forms="directory immutable"
+  for form in $forms; do
+    make_lease_modeling_pool_case "pool-root-pending-close-$form" ''
+    case_dir=$POOL_CASE
+    slot=$POOL_SLOT
+    record=$case_dir/state/task-x1.backlog-close
+    if [ "$form" = directory ]; then
+      mkdir "$record"
+    else
+      printf 'id=task-x1\ndata=%s\nspawn_gen=teardown-test-task-x1\ncleanup_incomplete=0\n' "$case_dir/data" > "$record"
+      chflags uchg "$record"
+    fi
+    rc=0
+    FM_HOME="$case_dir/primary-home" FM_POOL_CASE="$case_dir" \
+      run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    [ "$form" = directory ] || chflags nouchg "$record"
+    expect_code 1 "$rc" "pool-root-$form: the teardown must refuse: $(cat "$case_dir/stderr")"
+    assert_grep 'previous pending backlog close for task-x1 could not be cleared' "$case_dir/stderr" "pool-root-$form: the refusal did not name the previous pending-close record"
+    ! grep -q '^lease [^-]' "$case_dir/treehouse.log" 2>/dev/null || fail "pool-root-$form: the refused close took a lease"
+    jq -e '.worktrees[0].leased == false' "$case_dir/pool/treehouse-state.json" >/dev/null \
+      || fail "pool-root-$form: the refused close left the slot leased"
+    assert_absent "$case_dir/state/task-x1.teardown-return-pending" "pool-root-$form: the refused close wrote a return-pending marker"
+    assert_present "$case_dir/state/task-x1.meta" "pool-root-$form: the refused close removed the task record"
+    assert_present "$slot/.git" "pool-root-$form: the refused close removed the slot copy"
+    rm -rf "${record:?}"
+    rc=0
+    FM_HOME="$case_dir/primary-home" FM_POOL_CASE="$case_dir" \
+      run_teardown "$case_dir" > "$case_dir/stdout2" 2> "$case_dir/stderr2" || rc=$?
+    expect_code 0 "$rc" "pool-root-$form: the retry after the record is fixed must close: $(cat "$case_dir/stderr2")"
+    assert_absent "$case_dir/state/task-x1.meta" "pool-root-$form: the retry kept the task record"
+  done
+  pass "a pool-slot-root close with an unremovable previous pending-close record ($forms) refuses before any lease or marker write, and the fixed retry closes"
+}
+
 # The plain shape gets the prior shape's disposition for every claim state and
 # fixture: the same exit class, the same removals, the same number of slot
 # returns and the same markers.
@@ -1081,8 +1207,9 @@ test_plain_nested_disposition_equals_the_prior_shape() {
 }
 
 # A scout's teardown is outside the plain nested route: the same plain nested
-# path, claim and clean landed copies leave a scout exactly as before - refused,
-# with the copy, claim and record kept and no slot returned.
+# path, claim and clean landed copies leave a scout on the route it has without
+# this change - ordinary copy cleanup, which retires the record, keeps the claim
+# and returns no pool slot, only the nested copy itself.
 test_scout_with_a_plain_nested_copy_keeps_its_own_route() {
   local case_dir rc=0 observed
   nested_fixture nested-scout plain mine landed
@@ -1094,10 +1221,12 @@ test_scout_with_a_plain_nested_copy_keeps_its_own_route() {
   nested_run "$case_dir" || rc=$?
   observed=$(nested_observe "$case_dir" "$rc")
   case "$observed" in
-    "exit=nonzero copy=kept claim=kept record=kept "*" returns=0 "*) ;;
+    "exit=0 copy=kept claim=kept record=removed "*" returns=1 "*) ;;
     *) fail "nested-scout: a scout with a plain nested copy must keep the route it had: $observed" ;;
   esac
-  pass "a scout with a plain nested copy in its claimed slot is left as before: refused, copy, claim and record kept, no slot returned"
+  ! grep -qxF "return --force $NESTED_SLOT" "$case_dir/treehouse.log" || fail "nested-scout: the scout returned the pool slot"
+  grep -qxF "return --force $NESTED_COPY" "$case_dir/treehouse.log" || fail "nested-scout: the scout did not take ordinary copy cleanup"
+  pass "a scout with a plain nested copy in its claimed slot keeps its own route: ordinary copy cleanup, claim kept, no slot returned"
 }
 
 # The recorded gate-409 case: a Herdr-backed ship whose current copy is nested
@@ -3789,6 +3918,12 @@ test_nested_pending_close_directory_refuses_at_entry_plain
 test_nested_pending_close_directory_refuses_at_entry_enclosing
 test_nested_pending_close_dangling_link_refuses_at_entry_plain
 test_nested_pending_close_dangling_link_refuses_at_entry_enclosing
+test_nested_pending_close_immutable_refuses_at_entry_plain_marker_absent
+test_nested_pending_close_immutable_refuses_at_entry_plain_marker_present
+test_nested_pending_close_immutable_refuses_at_entry_enclosing_marker_absent
+test_nested_pending_close_immutable_refuses_at_entry_enclosing_marker_present
+test_nested_read_only_pending_close_still_closes
+test_pool_slot_root_unremovable_pending_close_refuses_before_lease
 test_plain_nested_disposition_equals_the_prior_shape
 test_scout_with_a_plain_nested_copy_keeps_its_own_route
 test_gate_409_recorded_case_tears_down

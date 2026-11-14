@@ -3036,7 +3036,8 @@ make_held_case() {  # <name>
   seed_backlog_in_flight "$FOREIGN_CASE"
 }
 
-# held_plain_get_slot <case-dir>: the case's slot holds only the process lease a
+# held_plain_get_slot <case-dir> [<slot>]: the case's slot (FOREIGN_SLOT unless
+# named) holds only the process lease a
 # plain treehouse get records (leased=false), with a Treehouse stand-in that
 # models lease and return. Its lease command fails while <case-dir>/lease-fails
 # exists, and reports no lease command while <case-dir>/no-lease-command exists.
@@ -3045,8 +3046,8 @@ make_held_case() {  # <name>
 # whose current pool is another folder, else the case's own pool.
 # Lease calls land in lease.log and returns in treehouse.log.
 held_plain_get_slot() {
-  local case_dir=$1
-  printf '{"worktrees":[{"name":"1","path":"%s","leased":false}]}\n' "$FOREIGN_SLOT" > "$case_dir/pool/treehouse-state.json"
+  local case_dir=$1 slot=${2:-$FOREIGN_SLOT}
+  printf '{"worktrees":[{"name":"1","path":"%s","leased":false}]}\n' "$slot" > "$case_dir/pool/treehouse-state.json"
   cat > "$case_dir/fakebin/treehouse" <<SH
 #!/usr/bin/env bash
 state="$case_dir/pool/treehouse-state.json"
