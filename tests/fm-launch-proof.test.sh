@@ -347,7 +347,7 @@ test_launch_proof_recorded_native_identity() {
 # is refused: the forwarding-launcher allow-list is empty.
 test_launch_proof_claude_adoption() (
   local T="$TMP/claude-adopt" UUID=5a3eec19-de12-4999-bed2-bbd561089154 OTHER_UUID=0b4c1d2e-3f40-4a51-8b62-7c83d94ea5f6
-  local LANE="$T/lane/firstmate" OPERATOR="$T/operator" STATE="$T/main-state" META out err rc DOORBELL
+  local LANE="$T/lane/firstmate" OPERATOR="$T/operator" STATE="$T/main/state" META out err rc DOORBELL
   mkdir -p "$T"
   META="$STATE/vernant-t1.meta"
   PIN_GEN=s1793120312.10459.5003
@@ -366,12 +366,14 @@ test_launch_proof_claude_adoption() (
     proc 56557 53733 53539 railway railway 'railway mcp'
     printf 53539 > "$T/fg-group"
   }
+  # $T/table-omit names one pid the process table leaves out; $T/gone-<pid> marks a
+  # process that exited after the table was read.
   ps() {
     case "$*" in
-      '-axo pid=,ppid=,pgid=') awk -F'\t' '{print $1, $2, $3}' "$T/procs" ;;
+      '-axo pid=,ppid=,pgid=') awk -F'\t' -v o="$(cat "$T/table-omit" 2>/dev/null)" '$1 != o {print $1, $2, $3}' "$T/procs" ;;
       '-axo pid=,ppid=') awk -F'\t' '{print $1, $2}' "$T/procs" ;;
-      '-p '*' -o comm='*) awk -F'\t' -v p="$2" '$1 == p {print $4; found=1} END {exit !found}' "$T/procs" ;;
-      '-p '*' -o args='*) awk -F'\t' -v p="$2" '$1 == p {print $6; found=1} END {exit !found}' "$T/procs" ;;
+      '-p '*' -o comm='*) [ ! -e "$T/gone-$2" ] || return 1; awk -F'\t' -v p="$2" '$1 == p {print $4; found=1} END {exit !found}' "$T/procs" ;;
+      '-p '*' -o args='*) [ ! -e "$T/gone-$2" ] || return 1; awk -F'\t' -v p="$2" '$1 == p {print $6; found=1} END {exit !found}' "$T/procs" ;;
       *) fail "unexpected ps query: $*" ;;
     esac
   }
@@ -411,11 +413,11 @@ test_launch_proof_claude_adoption() (
     } > "$(transcript_dir)/${3:-$UUID}.jsonl"
   }
   fresh_case() {
-    rm -rf "$T/lane" "$STATE" "$T/operator" "$T"/env-* "$T"/cwd-* "$T/pane-missing"
+    rm -rf "$T/lane" "$T/main" "$T/sib" "$T/nested" "$T/operator" "$T"/env-* "$T"/cwd-* "$T/pane-missing" "$T/table-omit" "$T"/gone-*
     mkdir -p "$LANE/state" "$STATE" "$OPERATOR"
     default_procs
     write_meta
-    env_of 53539; env_of 53733
+    env_of 53539; env_of 53733; env_of 56557
     printf '%s' "$LANE" > "$T/cwd-53733"; printf '%s' "$LANE" > "$T/cwd-53539"
     fm_operational_record_write "$LANE/state" launch-brief 'task brief' DOORBELL
     write_transcript "$DOORBELL" 30
@@ -633,6 +635,82 @@ test_launch_proof_claude_adoption() (
   assert_equals operator "$(printf '%s' "$out" | jq -r .tie)" 'the past-retention statement names the operator tie'
   row 'with --session-id: a lane whose first message is its own doorbell and whose brief is gone' "authorized: $(printf '%s' "$out" | jq -c '{pid,harness_pid,tie}')"
   pass 'the owner statement ties only a past-retention launch-brief session, never a personal one'
+
+  # N1: a forked resume runs a new conversation, so no tie of its source applies.
+  for fork in '--fork-session' '--session-id 0b4c1d2e-3f40-4a51-8b62-7c83d94ea5f6' '--continue'; do
+    fresh_case; : > "$T/procs"; proc 53733 1 53733 2.1.316 claude "claude --resume $UUID $fork"; printf 53733 > "$T/fg-group"
+    refuses 'runs a conversation other than the one it resumes' "(h) N1 launch-brief tie: claude --resume <id> $fork"
+    printf 'claude_session_id=%s\n' "$UUID" >> "$META"
+    refuses 'runs a conversation other than the one it resumes' "(h) N1 recorded tie: claude --resume <id> $fork"
+    write_meta; rm -f "$LANE"/state/operational-inbox/*.msg
+    refuses_stated 'runs a conversation other than the one it resumes' "(h) N1 owner statement: claude --resume <id> $fork"
+  done
+  fresh_case
+  accepts 'N1 control: an ordinary resume of the same session adopts'
+
+  # N2: every local home the root inventory reaches, and no unreadable record.
+  register() { # <home-dir> <id> <child-home>
+    mkdir -p "$1/data"
+    printf -- '- %s - lane (home: %s; scope: s; projects: p; added 2026-11-14)\n' "$2" "$3" >> "$1/data/secondmates.md"
+  }
+  fresh_case; mkdir -p "$T/sib/state"; register "$T/main" sib "$T/sib"
+  printf 'window=lab:w1:p2\nharness=claude\n' > "$T/sib/state/claimer.meta"
+  refuses 'claimed by claimer.meta' '(f) N2 a sibling home registered at the root claims the same pane'
+  fresh_case; mkdir -p "$T/sib/state" "$T/nested/state"; register "$T/main" sib "$T/sib"; register "$T/sib" nested "$T/nested"
+  printf 'window=lab:w9:p9\nharness=claude\nhome=%s\n' "$LANE" > "$T/nested/state/deep.meta"
+  refuses 'claimed by deep.meta' '(f) N2 a nested home two registries down claims the same home'
+  fresh_case; mkdir -p "$T/sib/state"; register "$T/main" sib "$T/sib"
+  printf 'window=lab:w9:p9\nharness=claude\n' > "$T/sib/state/locked.meta"; chmod 000 "$T/sib/state/locked.meta"
+  refuses 'cannot be read' '(f) N2 an unreadable peer record is unknown, never "no conflict"'
+  chmod 600 "$T/sib/state/locked.meta"
+  fresh_case; register "$T/main" gone "$T/does-not-exist"
+  refuses 'complete inventory' '(f) N2 a registered home that cannot be resolved refuses'
+  fresh_case; mkdir -p "$T/sib/state"; register "$T/main" sib "$T/sib"
+  printf 'window=lab:w9:p9\nharness=claude\nhome=%s\n' "$T/sib" > "$T/sib/state/own.meta"
+  accepts 'N2 control: readable sibling and nested homes without a conflicting claim'
+
+  # N3: every member of the harness's process group is read, and the table must list the anchor.
+  fresh_case; rm -f "$T/env-56557"
+  refuses 'cannot be read' '(e) N3 a live group member whose environment cannot be read'
+  fresh_case; printf 'ONLY=1\n' > "$T/env-56557"
+  refuses 'cannot be read' '(e) N3 a live group member whose environment carries neither PATH nor HOME'
+  fresh_case; printf 53733 > "$T/table-omit"; env_of 56557 'FM_SPAWN_GEN=s9.9.9
+'
+  refuses 'process table' '(e) N3 the process table omits the anchor while a foreign-pinned member is listed'
+  fresh_case; printf 53733 > "$T/table-omit"
+  refuses 'process table' '(e) N3 the process table omits the anchor'
+  fresh_case; rm -f "$T/env-56557"; : > "$T/gone-56557"
+  accepts 'N3 control: a group member that exited after the table was read'
+  fresh_case
+  accepts 'N3 control: every group member readable and unpinned'
+
+  # N6: a line before the first user record that cannot be classified hides which message came first.
+  for bad in '{"type":"user","message":{"role":"user","content":"personal' '[1]' 'not json'; do
+    fresh_case
+    { printf '{"type":"last-prompt","sessionId":"%s"}\n' "$UUID"; printf '%s\n' "$bad"
+      jq -nc --arg text "$DOORBELL" --arg ts 2099-01-01T00:00:00.000Z '{type:"user",timestamp:$ts,message:{role:"user",content:$text}}'
+    } > "$(transcript_dir)/$UUID.jsonl"
+    refuses 'no task-specific session tie' "(h) N6 an unclassifiable line before the doorbell: $bad"
+  done
+  fresh_case
+  { printf '\n{"type":"last-prompt","sessionId":"%s"}\n\n' "$UUID"
+    jq -nc --arg text "$DOORBELL" --arg ts 2099-01-01T00:00:00.000Z '{type:"user",timestamp:$ts,message:{role:"user",content:$text}}'
+    printf 'trailing junk after the first user record\n'
+  } > "$(transcript_dir)/$UUID.jsonl"
+  accepts 'N6 control: blank lines before, and anything after, the doorbell'
+
+  # N7: lsof escapes a backslash in the cwd; the decoded physical path is compared exactly.
+  local SAVED_LANE=$LANE
+  LANE="$T/back\\slash/firstmate"
+  fresh_case; printf '%s' "${LANE//\\/\\\\}" > "$T/cwd-53733"
+  accepts 'N7 a recorded home whose name holds a backslash, read through the lsof escape'
+  printf '%s' "$T/back\\x41slash/firstmate" > "$T/cwd-53733"
+  refuses 'cwd' '(d) N7 an escape that decodes to another directory'
+  printf '%s' "$T/back\\qslash/firstmate" > "$T/cwd-53733"
+  refuses 'cwd' '(d) N7 an ambiguous escape'
+  rm -rf "$T/back\\slash"
+  LANE=$SAVED_LANE
+  pass 'N1-N3, N6 and N7: forks, unreached or unreadable homes and processes, a hidden first message, and escaped paths'
 )
 
 test_launch_proof_claude_verdict_and_refusal() (
@@ -646,7 +724,8 @@ test_launch_proof_claude_verdict_and_refusal() (
       '-axo pid=,ppid=,pgid=') [ -f "$T/table-empty" ] && return 0; printf '%s\n' '53733 1 53733'; [ ! -f "$T/env-56557" ] || printf '%s\n' '56557 53733 53733' ;;
       '-axo pid=,ppid=') printf '%s\n' '53733 1' ;;
       '-p 53733 -o comm=') echo 2.1.316 ;;
-      '-p 53733 -o args=') echo "claude --resume $UUID" ;;
+      '-p 53733 -o args=') if [ -f "$T/args" ]; then cat "$T/args"; else echo "claude --resume $UUID"; fi ;;
+      '-p 56557 -o args=') [ -f "$T/env-56557" ] && echo 'railway mcp' ;;
       *) fail "unexpected ps query: $*" ;;
     esac
   }
@@ -817,6 +896,33 @@ test_launch_proof_claude_verdict_and_refusal() (
     assert_equals unmanaged "$(fm_launch_proof_herdr "$META")" "a hand-written $tie record does not tie a personal session"
   done
   cp "$T/task-transcript" "$TRANSCRIPT"
+  rm -f "$STATE/vernant-t1.claude-adoption.json"
+  # A verdict read, recheck included, changes no file anywhere.
+  snapshot() { python3 -I -c 'import os,sys
+for root in sys.argv[1:]:
+    for d, dirs, files in os.walk(root):
+        dirs.sort()
+        for n in sorted(dirs + files):
+            st = os.lstat(os.path.join(d, n)); print(os.path.join(d, n), st.st_size, st.st_mtime_ns)' "$T" "$FM_HOME"; }
+  fm_launch_proof_claude_adoption "$META" "$UUID" operator > "$ADOPTION" 2>/dev/null || fail 'could not re-adopt on the statement'
+  local BEFORE
+  BEFORE=$(snapshot)
+  assert_equals managed "$(fm_launch_proof_herdr "$META")" 'the stated adoption is managed while every proof holds'
+  [ "$BEFORE" = "$(snapshot)" ] || fail 'a verdict read created or changed a file'
+  # N1 at use: the same pane now runs a fork of the adopted session.
+  printf 'claude --resume %s --fork-session\n' "$UUID" > "$T/args"
+  assert_equals unmanaged "$(fm_launch_proof_herdr "$META")" 'N1 a forked resume voids the adoption at use'
+  rm -f "$T/args"
+  assert_equals managed "$(fm_launch_proof_herdr "$META")" 'N1 control: the ordinary resume is managed again'
+  # N6 at use: an unclassifiable line now precedes the doorbell.
+  { printf 'not json\n'; cat "$T/task-transcript"; } > "$TRANSCRIPT"
+  assert_equals unmanaged "$(fm_launch_proof_herdr "$META")" 'N6 an unclassifiable line before the doorbell voids the adoption at use'
+  cp "$T/task-transcript" "$TRANSCRIPT"
+  # N3 at use: a live group member whose environment cannot be read.
+  : > "$T/env-56557"
+  assert_equals unmanaged "$(fm_launch_proof_herdr "$META")" 'N3 an unreadable live group member voids the adoption at use'
+  rm -f "$T/env-56557"
+  assert_equals managed "$(fm_launch_proof_herdr "$META")" 'N3 control: managed again once the member is gone'
   rm -f "$STATE/vernant-t1.claude-adoption.json"
   pass 'claude verdicts: unpinned is unmanaged, adoption is rechecked at use, legacy and other harnesses are unchanged'
 )
