@@ -591,8 +591,6 @@ PY
       fm_launch_proof_adopt_refuse 'no task-specific session tie: the first user message is not the launch-brief doorbell of a record in this task'"'"'s own home'; return 1
     fi
     if [ -e "$record" ] || [ -L "$record" ]; then
-      [ "$tie" != operator ] \
-        || { fm_launch_proof_adopt_refuse 'the owner statement applies only when the launch brief is gone, and the launch-brief record still exists; run adopt without --session-id'; return 1; }
       if ! fm_operational_doorbell_kind "$message" "$home/state" kind || [ "$kind" != launch-brief ]; then
         fm_launch_proof_adopt_refuse 'no task-specific session tie: the first user message is not the launch-brief doorbell of a record in this task'"'"'s own home'; return 1
       fi
@@ -600,6 +598,8 @@ PY
       if ! [[ $mtime =~ ^[0-9]+$ ]] || [ "$mtime" -gt "${epoch%.*}" ]; then
         fm_launch_proof_adopt_refuse 'no task-specific session tie: the launch-brief record is newer than the first user message'; return 1
       fi
+      [ "$tie" != operator ] \
+        || { fm_launch_proof_adopt_refuse 'the owner statement applies only when the launch brief is gone, and the launch-brief record still exists; run adopt without --session-id'; return 1; }
     elif [ -z "$proven" ]; then
       # A gone record proves no kind; only a published tie or the owner's statement carries one.
       fm_launch_proof_adopt_refuse 'no task-specific session tie: the launch-brief record the first user message names is gone; when the owner knows this live session is the task'"'"'s, run adopt --session-id <live-session-id>, otherwise decide the lane by hand'; return 1
