@@ -67,6 +67,8 @@ class Replay:
         # Slack's own clock, as the real transport records it from the Date of each reply: here the transcript's `slack_clock` (seconds since the epoch), set only
         # after a call that succeeds, and left None when the transcript has none, so that a test can order it against this host's clock as it likes.
         self.server_time = None
+        # Called with Slack's clock each time a reply reports it, as the real transport does.
+        self.on_date = None
 
     def save(self):
         self.state_path.write_text(json.dumps(self.state, ensure_ascii=False))
@@ -144,6 +146,10 @@ class Replay:
             clock = self.transcript.get('slack_clock')
             if isinstance(clock, (int, float)) and not isinstance(clock, bool):
                 self.server_time = self.clock_reading(float(clock))
+                if self.on_date:
+                    self.on_date(self.server_time)
+            else:
+                self.server_time = None
             return result
         except SecretCollision:
             self.state = snapshot

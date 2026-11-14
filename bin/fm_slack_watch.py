@@ -46,6 +46,7 @@ import tempfile
 import time
 import unicodedata
 import uuid
+import weakref
 
 from fm_slack import SCRUB_MARK, SecretCollision, Slack, SlackError, outbound_texts, plane_secrets, refuse_outbound, value_hits
 from fm_slack_replay import Replay
@@ -159,6 +160,7 @@ class NoNetwork:
     """The transport of a run that must not reach Slack: every call is refused before any socket exists."""
     scopes = set()
     on_reply = None
+    on_date = None
 
     def call(self, method, **fields):
         raise SlackError('network_closed')
@@ -790,6 +792,17 @@ def slack_ts(seconds):
     return '%d.%06d' % (micro // 1000000, micro % 1000000)
 
 
+# How many times, and how far apart (seconds), an arm whose read of the second person's DM failed asks Slack for its clock until it shows the next whole second.
+ARM_CLOCK_TRIES = 4
+ARM_CLOCK_PAUSE = 0.35
+pause = time.sleep
+
+
+def whole_second_before(seconds):
+    """The Slack timestamp just before a whole second: a cursor that takes in every message whose ts is that second or later."""
+    return '%d.999999' % (int(seconds) - 1)
+
+
 class SecondBudgetSpent(Exception):
     """The time that the second person's Slack I/O may take in one run is used up: the rest of their work waits for the next run, and nothing is logged as a failure."""
 
@@ -947,6 +960,17 @@ class Watch:
         self.no_authority = (second_named_ids() | {self.second} | {i for i in (known if isinstance(known, list) else []) if isinstance(i, str)}) - {''}
         self.no_authority.discard(env_value('FM_SLACK_DM_USER').strip())
         self.authors -= self.no_authority
+        # Slack's clock as this run's replies report it (the first and the latest), and the newest Slack instant known from earlier runs: the Date this plane
+        # recorded at the end of its last run, and every message ts its cursors have passed. Only Slack's clock orders a Slack timestamp (findings 1 and 2).
+        self.clock_first = None
+        self.clock_last = None
+        self.arming = False
+        self.clock_before = self.known_instant()
+        if hasattr(self.api, 'on_date'):
+            # A weak reference: the transport must not keep this Watch (and its open lock) alive after the run lets it go (Main 1304: a reference cycle here
+            # left the lock held, and the next Watch of the same process waited for ever on it).
+            owner = weakref.ref(self)
+            self.api.on_date = lambda value: owner() is not None and owner().note_date(value)
         self.cap = answer_cap()
         self.changed = False
         # Wake lines are journaled with the state change that earned them and cleared only
@@ -1389,6 +1413,31 @@ class Watch:
             else:
                 api.call = earlier
 
+    def note_date(self, value):
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            self.clock_first = value if self.clock_first is None else self.clock_first
+            self.clock_last = value if self.clock_last is None else max(self.clock_last, value)
+
+    def known_instant(self):
+        """The newest Slack instant this plane knew before this run began, or None: the Slack clock it recorded at the end of a run (state['slack_seen']), and the
+        timestamps its owner and second-person cursors have passed (each a message that already existed). Everything typed after it is newer."""
+        found = []
+        window = self.second_window()
+        for value in (self.state.get('slack_seen'), self.state.get('intake_cursor'), window.get('intake_cursor')):
+            if isinstance(value, str) and SLACK_TS.fullmatch(value):
+                found.append(float(value))
+        return max(found) if found else None
+
+    def record_clock(self):
+        """Keep the latest Slack clock of this run in the journal (state['slack_seen']), the starting point that a window started by a later run (the setting turned
+        on, or naming another id, on an armed plane) takes (finding 1 of the review of d0b0c216)."""
+        if self.clock_last is None:
+            return
+        known = self.state.get('slack_seen')
+        if not (isinstance(known, str) and SLACK_TS.fullmatch(known) and float(known) >= self.clock_last):
+            self.state['slack_seen'] = slack_ts(self.clock_last)
+            self.commit()
+
     def slack_now(self):
         """Slack's own clock as of the last answer this run received (the transport records the Date of each reply), or None when no reply carried one. It is the
         only clock a Slack timestamp may be ordered against."""
@@ -1587,6 +1636,7 @@ class Watch:
 
     def prepare(self):
         self.started = monotonic()
+        self.begin_clock()
         if not self.bound():
             raise SlackError('source_not_bound')
         self.state.update(self.dm_boundary())
@@ -1595,21 +1645,27 @@ class Watch:
         self.commit()
         self.dm_proven = True
         self.arm_second()
+        self.record_clock()
 
     def arm_second(self):
         """Arm's durable starting point for the second person (invariant 1), after the owner's own state is committed and isolated from it: whatever the
-        window's state (none yet, started, or a person the setting no longer names), a message typed before the arm is never taken in and one typed after it
-        always is. Their user and DM are kept; the starting point is the newest message of their proven DM, or, when that read fails or runs out of its time
-        budget, Slack's own clock as of the owner's arm (the Date of the last reply it received), recorded in the window itself so that the recovery cannot take
-        the cursor past a message typed after the arm and cannot take one typed before it; this host's clock is never used, because a Slack timestamp can only be
-        ordered against Slack's clock. When no reply carried a Date there is no starting point to record: their intake is held (hold) until the next arm, which
-        is the one case that fails closed. Slack's clock has a resolution of one second, so a message typed in the same second as that reply cannot be placed.
-        A pending or failed row of theirs drains through its own DM and needs no old cursor. Never raises Slack's errors: the owner's arm never fails because of
-        their DM."""
+        window's state (none yet, started, held, or a person the setting no longer names), a message typed before the arm is never taken in, and one typed after
+        it is taken in or, when Slack gives no way to place it, named in a durable unplaced row and a notice line; it is never dropped silently. Their user and
+        DM are kept. The starting point is the newest message of their proven DM. When that read fails or runs out of its time budget, it is taken from Slack's
+        own clock, which has whole seconds: the arm's first reply says second D, so every message typed before the arm began has a ts before D+1; the arm then
+        asks Slack for its clock until a reply shows D+1 or later, so every message typed after the arm ends has a ts of D+1 or later, and D+1 is exact. If the
+        clock does not reach D+1 in those tries, a message with a ts from the newest Slack instant known before the arm (L) to D+1 could be from either side: the
+        span [L, D+1) is named (unplaced) and its messages are not taken in. When no reply carries a Date at all, their intake is held until a later run reads
+        Slack's clock (its first Date D' gives the span [L, D'+1)), never until a new arm. This host's clock is never used. A span left unplaced by an earlier
+        arm is carried into the next one. A pending or failed row of theirs drains through its own DM and needs no cursor. Never raises Slack's errors: the
+        owner's arm never fails because of their DM (findings 1 and 2 of the review of d0b0c216)."""
         win = self.second_window()
+        carried = self.unplaced_after(win)
         win.pop('intake_bounds', None)
         win.pop('intake_cursor', None)
         win.pop('hold', None)
+        win.pop('after', None)
+        win.pop('unplaced', None)
         if not self.second:
             if win:
                 self.commit()
@@ -1618,6 +1674,9 @@ class Watch:
             # Rows taken in from the person the setting no longer names drain first, under the old setting (start_second); their window is left as it is.
             self.commit()
             return
+        if win.get('user') != self.second:
+            carried = None
+        self.arming = True
         try:
             with self.second_budget():
                 self.start_second()
@@ -1627,12 +1686,55 @@ class Watch:
             kept = self.second_window()
             if kept.get('user') != self.second:
                 kept = self.state['second'] = {'user': self.second}
-            now = self.slack_now()
-            if now is None:
+            lower = self.arm_lower()
+            if self.clock_first is None:
                 kept['hold'] = 'boundary_unknown'
+                kept['after'] = slack_ts(lower if carried is None else min(lower, carried))
             else:
-                kept['intake_cursor'] = slack_ts(now)
+                boundary = int(self.clock_first) + 1
+                kept['intake_cursor'] = whole_second_before(boundary)
+                if not self.clock_reaches(boundary):
+                    carried = lower if carried is None else min(lower, carried)
+                if carried is not None:
+                    kept['unplaced'] = {'after': slack_ts(carried), 'before': slack_ts(boundary)}
+        else:
+            if carried is not None:
+                cursor = self.second_window().get('intake_cursor')
+                if isinstance(cursor, str) and SLACK_TS.fullmatch(cursor):
+                    self.second_window()['unplaced'] = {'after': slack_ts(carried), 'before': slack_ts(float(cursor) + 0.000001)}
+        finally:
+            self.arming = False
         self.commit()
+
+    @staticmethod
+    def unplaced_after(win):
+        """The lower end of the span an earlier arm could not place (a held window, or an unplaced span not yet reported), or None."""
+        for value in (win.get('after') if win.get('hold') else None, (win.get('unplaced') or {}).get('after') if isinstance(win.get('unplaced'), dict) else None):
+            if isinstance(value, str) and SLACK_TS.fullmatch(value):
+                return float(value)
+        return None
+
+    def arm_lower(self):
+        """The newest Slack instant known to precede this arm: the instant known before this run, and the owner DM's newest message that the arm just read (it
+        existed before the arm read it). A message with a ts before it was typed before the arm, or during it."""
+        found = [value for value in (self.clock_before,) if value is not None]
+        cursor = self.state.get('intake_cursor')
+        if isinstance(cursor, str) and SLACK_TS.fullmatch(cursor):
+            found.append(float(cursor))
+        return max(found) if found else 0.0
+
+    def clock_reaches(self, boundary):
+        """Ask Slack for its clock (auth.test, which changes nothing) until a reply shows the whole second boundary or later: True when one does, False after
+        ARM_CLOCK_TRIES tries or a failed call."""
+        for _ in range(ARM_CLOCK_TRIES):
+            if self.clock_last is not None and self.clock_last >= boundary:
+                return True
+            pause(ARM_CLOCK_PAUSE)
+            try:
+                self.api.call('auth.test')
+            except SlackError:
+                return False
+        return self.clock_last is not None and self.clock_last >= boundary
 
     @staticmethod
     def newest(messages):
@@ -2610,8 +2712,14 @@ class Watch:
         if self.second and self.second not in known:
             self.state['second_ids'] = sorted(known + [self.second])
 
+    def begin_clock(self):
+        """Each poll and each arm is one run: its Slack clock starts unknown, and the instant known before it is read from the journal as it stands now."""
+        self.clock_first = self.clock_last = None
+        self.clock_before = self.known_instant()
+
     def poll(self):
         self.started = monotonic()
+        self.begin_clock()
         self.reaction_cache = {}
         self.window_reads = 0
         self.second_reads = 0
@@ -2628,6 +2736,7 @@ class Watch:
         except SourceUnbound:
             # Unbound at the moment of a post (an unbind returned in between): nothing was posted, the staged row stays journaled.
             self.ran_unbound = True
+        self.record_clock()
 
     def poll_work(self):
         # The starting point of requests is set before anything uses the per-poll cap, so that a busy first
@@ -2799,6 +2908,13 @@ class Watch:
             return
         if not same and any(row.get('person') == 'second' for row in self.state['pending']):
             return
+        if not same and not self.arming and self.clock_before is not None:
+            # The setting named them after this plane was armed (turned on, or changed to their id): the setting took effect after the plane's last run, so the
+            # newest Slack instant known before this run is their starting point. A request they typed after the setting changed is taken in, and the history
+            # of their DM before that run is not (finding 1 of the review of d0b0c216). It is committed at once, so a failed open keeps it for the next run.
+            self.state['second'] = {'user': self.second, 'intake_cursor': slack_ts(self.clock_before)}
+            self.commit()
+            win, same = self.second_window(), True
         opened = self.api.call('conversations.open', users=self.second, return_im=True).get('channel', {})
         if not DM_CHANNEL.fullmatch(opened.get('id') or '') or not opened.get('is_im'):
             raise SlackError('target_is_not_a_DM')
@@ -2809,6 +2925,9 @@ class Watch:
         else:
             cursor = self.newest(self.read_window(opened['id'], second=True, limit=1).get('messages'))
         self.state['second'] = {'user': self.second, 'channel': opened['id'], 'intake_cursor': cursor}
+        if same and isinstance(win.get('unplaced'), dict):
+            # A span an arm could not place stays with the window it completes, to be named by report_unplaced.
+            self.state['second']['unplaced'] = win['unplaced']
         self.commit()
         self.second_proven = True
 
@@ -2841,15 +2960,18 @@ class Watch:
         try:
             with self.second_budget(start=monotonic()):
                 self.retry_unlogged()
+                self.resolve_hold()
                 self.start_second()
                 remaining = self.resume_second(remaining)
                 if self.second_window().get('hold'):
-                    # An arm that could not date its starting point left their intake held: nothing of theirs is read or taken in until the next arm.
+                    # An arm that could not date its starting point left their intake held, and no reply of this run carried Slack's clock: nothing of theirs is
+                    # read or taken in until a run reads it (resolve_hold).
                     if self.state.get('second_failure') != 'boundary_unknown' and self.second_log('second_window_failed', error='boundary_unknown'):
                         self.say('slack: second person window failure: boundary_unknown')
                         self.state['second_failure'] = 'boundary_unknown'
                         self.commit()
                     return
+                self.report_unplaced()
                 self.take_requests(remaining, second=True)
                 self.observe_second_cards()
         except SecretCollision:
@@ -2866,6 +2988,43 @@ class Watch:
             if self.state.get('second_failure'):
                 self.state.pop('second_failure')
                 self.commit()
+
+    def resolve_hold(self):
+        """A held window (an arm that read no Slack clock at all) is resolved by the first run whose replies carry it: that run's first Date D' is after the arm
+        ended, so every message of D'+1 or later is newer than the arm and is taken in; the span from the newest instant known before the arm to D'+1 is named
+        (unplaced) and its messages are not taken in (finding 2 of the review of d0b0c216). No new arm is needed."""
+        win = self.second_window()
+        if not win.get('hold') or self.clock_first is None:
+            return
+        boundary = int(self.clock_first) + 1
+        after = win.get('after') if isinstance(win.get('after'), str) and SLACK_TS.fullmatch(win.get('after')) else slack_ts(0)
+        win.pop('hold')
+        win.pop('after', None)
+        win['intake_cursor'] = whole_second_before(boundary)
+        win['unplaced'] = {'after': after, 'before': slack_ts(boundary)}
+        self.commit()
+
+    def report_unplaced(self):
+        """Name, once, the messages of theirs that an arm could not place before or after itself (window['unplaced'], a span [after, before) of Slack time): one
+        durable row in the plane's log with their count and the span, and one notice line. They are not taken in; none is dropped without this record."""
+        win = self.second_window()
+        span = win.get('unplaced')
+        if not isinstance(span, dict) or not win.get('channel'):
+            return
+        after, before = span.get('after'), span.get('before')
+        count = 0
+        if isinstance(after, str) and isinstance(before, str) and SLACK_TS.fullmatch(after) and SLACK_TS.fullmatch(before):
+            channel = self.second_channel()
+            messages = self.read_window(channel, second=True, oldest=after, latest=before, limit=200).get('messages')
+            count = sum(1 for m in messages if isinstance(m, dict) and m.get('user') == self.second and self.human(m) and self.top_level(m)
+                        and isinstance(m.get('ts'), str) and SLACK_TS.fullmatch(m['ts']) and ts_key(after) <= ts_key(m['ts']) < ts_key(before)) \
+                if isinstance(messages, list) else 0
+        if count and not self.second_log('second_intake_unplaced', count=count, after=after, before=before):
+            return
+        if count:
+            self.say('slack: second person unplaced: %d message(s) typed between %s and %s could not be placed before or after the arm' % (count, after, before))
+        win.pop('unplaced')
+        self.commit()
 
     def second_episode(self, name):
         """One failure episode of the second person's work: one durable log row and one notice line naming only the error, the first time it is seen in a row of
@@ -3472,11 +3631,17 @@ def plane_watch(name, options, out):
     replay = Replay(options['replay'], state_home() / STATE_KEY,
                     token_present=bool(env_value('SLACK_BOT_TOKEN'))) if options.get('replay') else None
     watch = Watch(replay=replay, token=env_value('SLACK_BOT_TOKEN').strip())
-    watch.out = out
-    if name == 'read' and '@' in (options.get('thread') or ''):
-        # Only the read of the second person's request prints their label; the owner's reads never depend on it (finding 6).
-        refuse_a_value_that_the_marker_holds(watch.second_fixed_texts())
-    watch.verify_target()
+    try:
+        watch.out = out
+        if name == 'read' and '@' in (options.get('thread') or ''):
+            # Only the read of the second person's request prints their label; the owner's reads never depend on it (finding 6).
+            refuse_a_value_that_the_marker_holds(watch.second_fixed_texts())
+        watch.verify_target()
+    except BaseException:
+        # The caller never receives this Watch, so it cannot close it: release the lock here, so that no later Watch of this process waits on it (Main 1304).
+        with contextlib.suppress(OSError):
+            watch.lock.close()
+        raise
     return watch
 
 

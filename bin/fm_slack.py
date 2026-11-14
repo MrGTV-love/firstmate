@@ -93,18 +93,22 @@ SCRUB_MARK = '\ufdd0'
 class Slack:
     base = 'https://slack.com/api/'
     on_reply = None
+    # Called with Slack's clock (seconds since the epoch) each time a reply carries a Date the transport can read.
+    on_date = None
     scrub_with = '[REDACTED]'
 
     def __init__(self, token):
         self.token = token
         self.scopes = set()
-        # Slack's own clock as of the last reply that carried a Date header (seconds since the epoch), or None. The only clock a Slack timestamp may be ordered against.
+        # Slack's own clock as the last reply reported it in its Date header (seconds since the epoch), or None when that reply carried no Date that can be read: each
+        # reply alone, never a value kept from an earlier one (finding 2 of the review of d0b0c216). The only clock a Slack timestamp may be ordered against.
         self.server_time = None
 
     def call(self, method, **fields):
         if not self.token:
             raise SlackError('missing_token')
         refuse_outbound(fields, wire=True)
+        self.server_time = None
         request = urllib.request.Request(self.base + method,
             data=wire_body(fields).encode(),
             headers={'Authorization': 'Bearer ' + self.token,
@@ -139,8 +143,8 @@ class Slack:
         return data
 
     def _note_date(self, value):
-        """Record Slack's clock from a reply's Date header; a header that is missing or cannot be read leaves the last value as it was. A date with no zone
-        (`-0000`) is read as UTC, as an HTTP date always is, and never as this host's local time."""
+        """Record Slack's clock from this reply's Date header; a header that is missing or cannot be read gives no clock for this reply (server_time stays None).
+        A date with no zone (`-0000`) is read as UTC, as an HTTP date always is, and never as this host's local time."""
         try:
             moment = email.utils.parsedate_to_datetime(value)
         except (TypeError, ValueError, IndexError):
@@ -148,6 +152,8 @@ class Slack:
         if moment.tzinfo is None:
             moment = moment.replace(tzinfo=datetime.timezone.utc)
         self.server_time = moment.timestamp()
+        if self.on_date:
+            self.on_date(self.server_time)
 
     def pages(self, method, field, **fields):
         cursor = ''

@@ -54,6 +54,7 @@ import ast
 import contextlib
 import copy
 import fcntl
+import gc
 import glob
 import hashlib
 import io
@@ -4525,8 +4526,10 @@ class SecondPersonTest(unittest.TestCase):
 
     def test_sc2_their_dm_is_never_the_owner_dm(self):
         with self.second(dms={'U0TESTOWNER': 'D0123456789', 'U0SYNTHSEC1': 'D0123456789'}, clock=200.0) as (watch, replay):
-            # The arm could not open their DM (it is the owner's): their window holds only their id and the starting point of the arm (Slack's clock), never a DM.
-            self.assertEqual(sorted(watch.state['second']), ['intake_cursor', 'user'])
+            # The arm could not open their DM (it is the owner's): their window holds their id and the starting point of the arm (Slack's clock), never a DM.
+            self.assertEqual(watch.state['second']['user'], self.SECOND)
+            self.assertIn('intake_cursor', watch.state['second'])
+            self.assertNotIn('channel', watch.state['second'])
             self.assertEqual([(r['reason'], r['error']) for r in self.refusals(watch)], [('second_window_failed', 'second_dm_is_owner_dm')])
             self.assertEqual(self.posts(replay), [])
 
@@ -4939,14 +4942,17 @@ class SecondPersonTest(unittest.TestCase):
                 if second:
                     raise SlackError('unreachable')
                 return real(channel, second=second, **fields)
-            replay.transcript['slack_clock'] = 200.00015       # Slack's own clock; this host's is never consulted
+            # Slack's own clock, moving on 0.4 s a call and reported in whole seconds as an HTTP Date is; this host's is never consulted.
+            replay.transcript.update(slack_clock=200.3, slack_clock_step=0.4, slack_clock_whole=True)
             with patch.object(watch, 'read_window', failing):
                 watch.prepare()
             self.assertEqual(watch.state['intake_cursor'], '200.000200')
-            self.assertEqual(watch.state['second'], {'user': self.SECOND, 'channel': self.SECOND_DM, 'intake_cursor': '200.000150'})
-            self.says(replay, '200.000300', 'typed after the arm whose read of their DM failed')
+            # The arm's first Date says 200; it then saw 201, so 201 is exact: everything typed after the arm is at 201 or later.
+            self.assertEqual(watch.state['second'], {'user': self.SECOND, 'channel': self.SECOND_DM, 'intake_cursor': '200.999999'})
+            after = '%.6f' % (200.3 + 0.4 * replay.state['clock_calls'] + 0.05)
+            self.says(replay, after, 'typed after the arm whose read of their DM failed')
             self.again(watch)
-            self.assertEqual([plane.REQUEST_SEGMENT.match(line).group(1) for line in self.wakes(watch)], ['200.000300'])
+            self.assertEqual([plane.REQUEST_SEGMENT.match(line).group(1) for line in self.wakes(watch)], [after])
             self.again(watch)
             self.assertEqual(self.wakes(watch), [])
 
@@ -5243,38 +5249,41 @@ class Invariant1Boundary(InvariantScenario):
             return real(replay, method, **fields)
         return call
 
-    # Slack's clock against this host's clock (fixed at 150 in every case): the same pair of messages, one typed before the arm and one after it.
-    CLOCK_CASES = [('host equal to Slack', 150.0, '149.900000', '150.100000'),
-                   ('host ahead of Slack', 149.0, '148.900000', '149.100000'),
-                   ('host behind Slack', 151.0, '150.900000', '151.100000')]
+    # Slack's clock against this host's clock (fixed at 150 in every case). Slack's clock moves on 0.4 s with every call and is reported in whole seconds, as an
+    # HTTP Date is (the review of d0b0c216 showed that a fixed, sub-second clock let these cases pass while a same-second pre-arm message was taken in): the
+    # same pair of messages, one typed just before the arm began (in the second of its first Date) and one typed once it has ended.
+    CLOCK_CASES = [('host equal to Slack', 150.3), ('host ahead of Slack', 149.3), ('host behind Slack', 151.3)]
+    STEP = 0.4
 
-    def failed_arm_case(self, slack_clock, pre, post, fresh, fail=True):
+    def failed_arm_case(self, start, fresh, fail=True):
         with self.home(history=False, arm=not fresh) as home:
-            home.set_clock(slack_clock)
+            home.moving_clock(start, self.STEP)
+            pre = '%.6f' % (start - 0.1)
             home.say(pre, 'typed before the arm')
             call = self.failing_history_read()
             context = patch.object(Replay, 'call', call) if fail else contextlib.nullcontext()
             with context, patch.object(plane.time, 'time', lambda: 150.0):
                 arm = home.cli('check', action='arm')
                 call.recovered = True                                        # their read recovers after the arm
+                post = '%.6f' % (home.replay_time(start, self.STEP) + 0.05)
                 home.say(post, 'typed after the arm')
                 polls = [home.cli('poll'), home.cli('poll')]
             woken = [re.search(r'slack request (\S+) from', line).group(1) for result in polls for line in self.requests_woken(result)]
-            return arm.rc, woken, home.posts()
+            return arm.rc, woken, home.posts(), pre, post
 
     def test_inv1_a_failed_arm_time_read_takes_in_only_what_is_typed_after_the_arm_whatever_the_host_clock_says(self):
-        for label, clock, pre, post in self.CLOCK_CASES:
+        for label, start in self.CLOCK_CASES:
             for fresh in (False, True):
                 with self.subTest(case=label, fresh=fresh):
-                    rc, woken, posts = self.failed_arm_case(clock, pre, post, fresh)
+                    rc, woken, posts, pre, post = self.failed_arm_case(start, fresh)
                     self.assertEqual((rc, woken), (0, [post]))
                     self.assertNotIn((INV_SECOND_DM, pre), posts)
 
     def test_inv1_control_a_read_that_succeeds_takes_in_only_what_is_typed_after_the_arm_in_every_clock_case(self):
-        for label, clock, pre, post in self.CLOCK_CASES:
+        for label, start in self.CLOCK_CASES:
             for fresh in (False, True):
                 with self.subTest(case=label, fresh=fresh):
-                    rc, woken, posts = self.failed_arm_case(clock, pre, post, fresh, fail=False)
+                    rc, woken, posts, pre, post = self.failed_arm_case(start, fresh, fail=False)
                     self.assertEqual((rc, woken), (0, [post]))
 
     def test_inv1_the_real_transport_takes_slack_clock_from_the_date_of_each_reply_and_never_from_this_host(self):
@@ -5302,9 +5311,9 @@ class Invariant1Boundary(InvariantScenario):
             with patch('fm_slack.urllib.request.urlopen', fake), patch('socket.socket', side_effect=OSError('no sockets in this test')):
                 steps = [('Thu, 01 Jan 1970 00:02:30 GMT', 150.0),     # an HTTP date
                          ('Thu, 01 Jan 1970 00:02:40 -0000', 160.0),   # a date with no zone is UTC, never this host's time
-                         (None, 160.0),                                # no Date: the last value stays
-                         ('not a date', 160.0),                        # an unreadable Date: the last value stays
-                         (OSError('down'), 160.0)]                     # a failed call: the last value stays
+                         (None, None),                                 # no Date: no clock from this reply, never an earlier one (review of d0b0c216)
+                         ('not a date', None),                         # an unreadable Date: no clock from this reply
+                         (OSError('down'), None)]                      # a failed call: no clock
                 for date, expected in steps:
                     dates.append(date)
                     with contextlib.suppress(SlackError):
@@ -5347,8 +5356,8 @@ class Invariant1Boundary(InvariantScenario):
 
     def test_inv1_an_arm_whose_second_person_calls_run_out_of_their_time_budget_still_keeps_only_what_is_typed_after_it(self):
         with self.home(history=False) as home:
-            home.set_clock(150.0)
-            home.say('149.900000', 'typed before the arm')
+            home.moving_clock(150.3, 0.4)
+            home.say('150.200000', 'typed before the arm')
             clock = [0.0]
             real = Replay.call
             def slow(replay, method, **fields):
@@ -5357,9 +5366,10 @@ class Invariant1Boundary(InvariantScenario):
                 return real(replay, method, **fields)
             with patch.object(Replay, 'call', slow), patch.object(plane, 'monotonic', lambda: clock[0]):
                 self.assertEqual(home.cli('check', action='arm', extra=None).rc, 0)
-            home.say('150.100000', 'typed after the arm')
+            post = '%.6f' % (home.replay_time(150.3, 0.4) + 0.05)
+            home.say(post, 'typed after the arm')
             polls = [home.cli('poll'), home.cli('poll')]
-            self.assertEqual([re.search(r'slack request (\S+) from', l).group(1) for r in polls for l in self.requests_woken(r)], ['150.100000'])
+            self.assertEqual([re.search(r'slack request (\S+) from', l).group(1) for r in polls for l in self.requests_woken(r)], [post])
 
 
 
@@ -6262,6 +6272,57 @@ class Invariant6Collision(InvariantScenario):
             self.assertEqual(result.rc, 0, (result.out, result.err))
             self.assertEqual(len(self.requests_woken(result)), 1, result.out)
             self.assertNotIn(value, (home.state_dir / 'state.json').read_text())
+
+class WatchLockReleaseTest(InvariantScenario):
+    """Every command run through the public entry point returns with the plane's lock released, whether or not Python's cycle collector has run. A run that kept
+    its lock would make the next run in the same process wait for ever on fcntl.flock (Main 1304: the reply suite deadlocked when a reference cycle kept the
+    first Watch, and its open lock, alive). The probe takes the lock without waiting, so a held lock fails at once instead of hanging."""
+
+    def lock_is_free(self, home):
+        with open(home.state_dir / 'lock', 'a') as probe:
+            try:
+                fcntl.flock(probe, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                return False
+            fcntl.flock(probe, fcntl.LOCK_UN)
+            return True
+
+    def test_r3_a_command_run_returns_with_its_watch_lock_released_without_the_cycle_collector(self):
+        with self.home(arm=False) as home:
+            home.trust_check()
+            home.set_clock(300.0)
+            freed = []
+            gc.disable()
+            try:
+                for argv, action in ((('check',), 'arm'), (('poll',), ''), (('check',), 'check'), (('read', '--thread', '100.000100'), '')):
+                    home.cli(*argv, action=action)
+                    freed.append((argv[0], action, self.lock_is_free(home)))
+                    if not freed[-1][2]:
+                        break
+            finally:
+                gc.enable()
+            self.assertEqual([f for f in freed if not f[2]], [], freed)
+            self.assertEqual(len(freed), 4)
+
+    def test_r3_a_read_or_reply_that_is_refused_after_its_watch_is_built_returns_with_the_lock_released(self):
+        # The refusal comes after the plane's Watch exists (a changed FM_SLACK_DM_USER fails verify_target inside plane_watch), so the command never receives
+        # the Watch to close: the lock must still be released when the command returns, with the cycle collector off.
+        with self.home() as home:
+            home.set_clock(300.0)
+            home.cli('poll')
+            freed = []
+            gc.disable()
+            try:
+                with patch.dict(os.environ, {'FM_SLACK_DM_USER': 'U0OTHEROWNER1'}):
+                    for argv, stdin in ((('read', '--thread', '100.000100'), ''), (('reply', '--thread', '100.000100', '--to', '100.000100'), 'an answer')):
+                        result = home.cli(*argv, stdin=stdin)
+                        freed.append((argv[0], result.rc, self.lock_is_free(home)))
+                        if not freed[-1][2]:
+                            break
+            finally:
+                gc.enable()
+            self.assertEqual([(name, rc != 0, free) for name, rc, free in freed], [('read', True, True), ('reply', True, True)], freed)
+
 
 class ClosedTransportTest(unittest.TestCase):
     """A test or verification run cannot reach Slack: it runs on a transcript, or its transport is closed."""
