@@ -437,6 +437,14 @@
       "status": "active",
       "sites": [
         {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "teardown_refuse_copy final-removal-proof \"foreign copy $copy was not removed: the final proof before its removal failed: $TEARDOWN_FINAL_WHY.\" \"$copy\""
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: $ID's nested copy $copy was not removed $1: the final proof before its removal failed: $TEARDOWN_FINAL_WHY; teardown aborted\" >&2"
+        },
+        {
           "file": "bin/fm-copy-sweep.sh",
           "match": "echo \"REFUSED: $2 changed HEAD or creation-lock bytes after its plan; it was not released.\" >&2"
         },
