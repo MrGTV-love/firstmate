@@ -372,7 +372,10 @@
 # keeps the tree on every call) does not stop the close once teardown has judged
 # the harm itself: the clean and landed proof again, no other repository in the
 # copy, every ignored file the driver names or preservation selects held byte for
-# byte in data/<task>/nested-copy-preserved, and the copy unchanged meanwhile.
+# byte in data/<task>/nested-copy-preserved (with every other ignored entry of the payload
+# fingerprint, as independent bytes), the creation lock the one its launcher was proved
+# under, and the copy unchanged meanwhile; the same checks run once more immediately before
+# the task record is removed, and the receipt is then marked by the close.
 # The task then closes as a held copy does, the copy and its slot untouched under
 # a durable lease, and one record, the copy sweep's receipt
 # data/copy-sweep/retained/<sha256 of the copy path>, names it
@@ -681,14 +684,18 @@
 #     state/<id>.teardown-owned (pid AND birth identity), written at the start of
 #     the teardown, before any reaping or endpoint closure, from the live
 #     descendants of the marker-bearing worker, never extended once no bearer
-#     is alive, kept by a refusal for its retry and removed by the successful close; a
-#     live parent chain to either; or the shell of the task's own terminal pane (the
-#     tmux or herdr pane this teardown validated against the task's record, its shell
-#     pid read from the backend) or a process below it by live parent chain, because
-#     the export that fm-spawn types into that shell reaches only its children, never
-#     its own environment (teardown_process_proved_own, teardown_process_in_task_pane).
-#     The pane is asked only when a process is not already proved, never by a working
-#     directory, so a teardown that refuses first never touches the endpoint.
+#     is alive, kept by a refusal for its retry and removed by the successful close; or a
+#     live parent chain to either. Those three are the only proofs. The shell of the task's
+#     own terminal pane (the tmux or herdr pane this teardown validated against the task's
+#     record, its shell pid read from the backend) is one case of the record: the export
+#     that fm-spawn types into that shell reaches only its children, never its own
+#     environment, so the first time a process is not proved the shell is added to the
+#     record with its pid and birth identity, and a process below it is proved by its live
+#     chain (teardown_process_proved_own, teardown_owned_record_pane_shell). The pane is
+#     asked only then, never by a working directory, so a teardown that refuses first never
+#     touches the endpoint. Every proof is bound to the process it was made for: its birth
+#     identity is read before and after the proof, and the signal goes only to that identity
+#     (task_scan_identity, teardown_pid_own_bound).
 #     Freeze before the signal: the proved processes are first stopped (SIGSTOP, each
 #     audited like any signal) so none can fork, the scan is read again (a child a
 #     stopped process had already forked is proved by its live chain to that process)
@@ -1340,9 +1347,14 @@ fm_refuse_if_gate_agent
 FM_LOCK_LOG_PREFIX=teardown
 
 fm_backlog_record_present "$META" "task record" "$STATE" || {
-  # A task that closed around a kept own copy has no record any more; its retained
-  # record still names the task, so a retry is told so instead of a missing record.
-  if closed_by=$(teardown_retained_closed_by "$DATA" "$ID"); then
+  # A task that closed around a kept own copy has no record any more, and its retained
+  # record carries the mark of that close, so a retry is told so instead of a missing
+  # record. Only a record that is positively gone, under its authorized parent, counts as
+  # gone: a record that is not a regular file, or cannot be looked up, is damaged, not
+  # closed; and a retained record without the close's mark was written by an acceptance
+  # whose close may have refused afterwards.
+  if fm_backlog_record_parent_authorized "$META" "task record" "$STATE" parent-only \
+     && path_positively_gone "$META" && closed_by=$(teardown_retained_closed_by "$DATA" "$ID"); then
     echo "teardown $ID: already closed; its own nested copy was kept by Vernant's closeout driver and stays recorded in $closed_by; nothing was changed and the driver was not asked."
     exit 0
   fi
@@ -3914,7 +3926,8 @@ task_pids_under_roots() {  # <dir>...
   TASK_PIDS_ERROR="lsof failed"
   TASK_PID_CWDS=()
   TASK_SCAN_PIDS=()
-  local dir dir_matches pid path lane identity root pids=""
+  TASK_SCAN_IDS=()
+  local dir dir_matches pid path lane identity root pids="" bound after
   local -a scan_roots
   scan_roots=()
   for dir in "$@"; do
@@ -3963,7 +3976,15 @@ task_pids_under_roots() {  # <dir>...
         TASK_PIDS_ERROR="descendant cwd holds process $pid without proven task custody"
         return 1
       fi
-      if ! teardown_process_proved_own "$pid"; then
+      # The proof is bound to the process it was made for: the birth identity read before it
+      # must still be the process's after it, and that identity is the one every later
+      # stage signals (task_scan_identity), so a pid that belongs to another process by the
+      # end of the proof is not proved.
+      bound=
+      if bound=$(task_process_identity "$pid") && [ -n "$bound" ] && teardown_process_proved_own "$pid" \
+         && after=$(task_process_identity "$pid") && [ "$after" = "$bound" ]; then
+        :
+      else
         # A process that exited after lsof listed it has no environment, record entry or
         # parent chain left to prove; it is dropped, never signalled and never refused.
         # Only a positive "no such process" counts: a live process whose ownership cannot
@@ -3977,6 +3998,7 @@ task_pids_under_roots() {  # <dir>...
       fi
       TASK_SCAN_PIDS+=("$pid")
       TASK_PID_CWDS+=("$path")
+      TASK_SCAN_IDS+=("$bound")
       pids="$pids
 $pid"
     done <<EOF
@@ -3984,6 +4006,16 @@ $dir_matches
 EOF
   done
   TASK_PIDS=$(printf '%s\n' "$pids" | grep -E '^[0-9]+$' | sort -un || true)
+}
+
+# The birth identity the last task_pids_under_roots proved <pid> for. Fails when that scan
+# did not prove it.
+task_scan_identity() {  # <pid>
+  local i
+  for i in "${!TASK_SCAN_PIDS[@]}"; do
+    [ "${TASK_SCAN_PIDS[$i]}" != "$1" ] || { [ -n "${TASK_SCAN_IDS[$i]:-}" ] || return 1; printf '%s\n' "${TASK_SCAN_IDS[$i]}"; return 0; }
+  done
+  return 1
 }
 
 task_record_process_signal() {  # <pid> <birth-identity> <signal>
@@ -4077,7 +4109,7 @@ reap_freeze_and_collect() {  # <dir>...
       if idx=$(reap_track_index "$pid"); then
         identity=${REAP_TRACK_IDS[$idx]}
       else
-        if ! identity=$(task_process_identity "$pid"); then
+        if ! identity=$(task_scan_identity "$pid"); then
           ! task_pid_positively_gone "$pid" || continue
           echo "REFUSED: cannot verify leaked process $pid identity for $ID; preserving the worktree/tasktmp for manual inspection or retry." >&2
           return 1
@@ -4125,7 +4157,7 @@ reap_task_worktree_processes_run() {  # <label> <dir>...
     tracked_identities=()
     while IFS= read -r pid; do
       [ -n "$pid" ] || continue
-      if ! identity=$(task_process_identity "$pid"); then
+      if ! identity=$(task_scan_identity "$pid"); then
         if ! task_pids_under_roots "$@"; then
           echo "REFUSED: cannot determine leaked processes under ${TASK_PIDS_FAILED_DIR:-<missing>} for $ID ($TASK_PIDS_ERROR); preserving the worktree/tasktmp for manual inspection or retry." >&2
           return 1
@@ -7031,6 +7063,9 @@ if [ -n "$TEARDOWN_DEFERRED_POOL_CLEANUP" ]; then
       teardown_nested_slot return
     fi
   fi
+  # A kept own copy is checked once more immediately before the task record goes: it still
+  # matches its retained record and its preserve still holds its bytes (bin/fm-teardown-nested-lib.sh).
+  teardown_retained_close_check || exit 1
   fm_backlog_atomic_transition remove "$META" "task record" "$STATE" || exit 1
   TEARDOWN_META_REMOVED=1
   teardown_release_project_lock || exit 1
@@ -7043,6 +7078,7 @@ fi
 # ordering, the row returns to Queued with its deliverable recorded.
 TEARDOWN_CLOSE_META=$META
 [ "$TEARDOWN_META_REMOVED" != 1 ] || TEARDOWN_CLOSE_META=
+[ -z "$TEARDOWN_CLOSE_META" ] || teardown_retained_close_check || exit 1
 if [ "$BACKLOG_CLOSED" = 1 ]; then
   if ! fm_backlog_atomic_transition "$BACKLOG_TRANSITION" "$TEARDOWN_CLOSE_META" "$BACKLOG_CLOSE_MARKER" \
       "$DATA" "$ID" "$STATE" "${BACKLOG_DONE_ARGS[@]+"${BACKLOG_DONE_ARGS[@]}"}"; then

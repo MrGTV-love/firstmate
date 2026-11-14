@@ -193,7 +193,10 @@
 # lists RECEIPT-CLEARED. bin/fm-teardown.sh writes the same receipt, in a complete
 # form with more lines after the first four, when it closes a task around an own
 # nested copy the driver kept (bin/fm-teardown-nested-lib.sh owns the fields); the
-# sweep holds that copy the same way and shows only the fourth line as its reason.
+# sweep holds that copy the same way and shows only the fourth line as its reason. A
+# complete receipt is the driver's answer for the copy's whole state, so it is stale as
+# well once the creation-lock file, HEAD, status or ignored payload it records differs,
+# or when it records no creation-lock file identity; one whose copy cannot be read holds.
 # Exit 3 with cleanup_ignored_payload_archived_tree_retained is KEPT, not FAILED:
 # the run exits 0 and later runs neither preserve nor execute that copy again.
 # Exit 3 whose one JSON document refuses with cleanup_lease_conflict or
@@ -732,22 +735,21 @@ record_driver_retention() {  # <copy> <lock-sha256> <identity> <reason>
 
 # True when a receipt no longer describes what is at its path: it records no lock
 # hash, path or copy identity (an older receipt), its path is gone, a different
-# copy is there, or the copy there has a different creation lock. The same copy
-# with no lock stays protected, because the driver may have released the lock and
-# then failed to remove the copy. Sets RECEIPT_STALE_COPY and RECEIPT_STALE_WHY.
-# A receipt or copy that cannot be read or looked up is not stale.
+# copy is there, or the copy there has a different creation lock. A complete record
+# (bin/fm-teardown.sh's, with a task= line) is the driver's answer for the copy's whole
+# state, so it is also stale once the lock file, HEAD, status or ignored payload it
+# recorded differs, or when it records no lock identity. The same copy with no lock stays
+# protected, because the driver may have released the lock and then failed to remove the
+# copy. Sets RECEIPT_STALE_COPY and RECEIPT_STALE_WHY. A receipt or copy that cannot be
+# read or looked up is not stale.
 RECEIPT_STALE_COPY=
 RECEIPT_STALE_WHY=
 
-# Is <path> positively gone? Only the kernel's answer ENOENT or ENOTDIR counts. A path that
-# exists, or that cannot be looked up (a parent it cannot search, any other error), is not
-# gone: an unknown is never answered as absent. Exit 0 gone, 1 present, 2 unknown.
-path_positively_gone() {  # <path>
-  perl -e 'exit(lstat($ARGV[0]) ? 1 : (($!{ENOENT} || $!{ENOTDIR}) ? 0 : 2))' -- "$1"
-}
+# path_positively_gone (bin/fm-teardown-nested-lib.sh) tells a path that is gone from one
+# that exists or cannot be looked up.
 
 receipt_is_stale() {  # <receipt>
-  local hash='' copy='' identity='' current actual rc=0
+  local hash='' copy='' identity='' current actual recorded rc=0
   RECEIPT_STALE_COPY=
   RECEIPT_STALE_WHY=
   [ -r "$1" ] || return 1
@@ -774,8 +776,29 @@ receipt_is_stale() {  # <receipt>
   teardown_copy_lock_file "$copy" || rc=$?
   [ "$rc" = 0 ] || return 1
   actual=$(teardown_ignored_sha256 "$TEARDOWN_FOREIGN_LOCK_FILE") || return 1
-  [ "$actual" != "$hash" ] || return 1
-  RECEIPT_STALE_WHY="the copy there now has a different creation lock"
+  if [ "$actual" != "$hash" ]; then
+    RECEIPT_STALE_WHY="the copy there now has a different creation lock"
+    return 0
+  fi
+  [ -n "$(teardown_retained_fields "$1" task)" ] || return 1
+  recorded=$(teardown_retained_fields "$1" lock-identity)
+  if [ -z "$recorded" ]; then
+    RECEIPT_STALE_WHY="its complete form records no creation-lock identity"
+    return 0
+  fi
+  actual=$(teardown_lock_identity "$TEARDOWN_FOREIGN_LOCK_FILE") || return 1
+  if [ "$actual" != "$recorded" ]; then
+    RECEIPT_STALE_WHY="the copy there now has a different creation-lock file"
+    return 0
+  fi
+  teardown_retained_snapshot "$copy" || return 1
+  if [ "$(teardown_retained_fields "$1" head)" != "$TEARDOWN_RET_HEAD" ] \
+     || [ "$(teardown_retained_fields "$1" status-sha256)" != "$TEARDOWN_RET_STATUS" ] \
+     || [ "$(teardown_retained_fields "$1" payload-sha256)" != "$TEARDOWN_RET_PAYLOAD" ]; then
+    RECEIPT_STALE_WHY="the copy changed since the driver kept it (its HEAD, status or ignored payload)"
+    return 0
+  fi
+  return 1
 }
 
 # A retained record another local home wrote for <copy> (a lane closed its task

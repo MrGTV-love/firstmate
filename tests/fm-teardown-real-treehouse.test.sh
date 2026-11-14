@@ -608,6 +608,7 @@ real_race() {  # <label> <rc-var>
   local label=$1 rc_var=$2 project=$FOREIGN_CASE/project first_pid n out
   rm -f "$FOREIGN_CASE/entered" "$FOREIGN_CASE/release"
   (
+    first_rc=
     real_teardown first_rc FM_STUB_CLOSEOUT=retained \
       "FM_STUB_AFTER=: > '$FOREIGN_CASE/entered'; n=0; until [ -e '$FOREIGN_CASE/release' ]; do sleep 0.1; n=\$((n + 1)); [ \"\$n\" -ne 300 ] || echo 'slow: the stand-in driver is still waiting for release' >&2; done"
     echo "$first_rc" > "$FOREIGN_CASE/race.teardown.rc"

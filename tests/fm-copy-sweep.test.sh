@@ -1742,10 +1742,10 @@ test_a_teardown_retained_record_no_longer_holds_a_copy_that_changed() {
       unreadable-record) chmod 000 "$record" ;;
       unreadable-payload) chmod 000 "$copy/unique.dat" ;;
     esac
-    before=$(ls -l "$record" | awk '{print $1}')$(cat "$record" 2>/dev/null | shasum -a 256)
+    before=$(perl -e 'printf "%o", (lstat $ARGV[0])[2]' "$record")$(cat "$record" 2>/dev/null | shasum -a 256)
     run_sweep
     line=$(printf '%s\n' "$OUT" | grep -F "$copy" | head -n 1)
-    assert_equals "$before" "$(ls -l "$record" | awk '{print $1}')$(cat "$record" 2>/dev/null | shasum -a 256)" "$kind changed report: the report form wrote or cleared the record"
+    assert_equals "$before" "$(perl -e 'printf "%o", (lstat $ARGV[0])[2]' "$record")$(cat "$record" 2>/dev/null | shasum -a 256)" "$kind changed report: the report form wrote or cleared the record"
     case "$kind" in
       payload|head)
         assert_not_contains "$line" "driver retained this copy" "$kind changed report: a record that no longer describes the copy still held it: $line"

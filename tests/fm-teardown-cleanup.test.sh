@@ -1672,8 +1672,10 @@ test_the_owned_record_is_removed_at_a_successful_close_and_kept_by_a_refusal() {
 # not by its place: `export FM_TASK_INBOX=...` typed into that shell never reaches its own
 # environment (only its children inherit it), so it, and an idle shell below it after the
 # worker exited, carry no launch marker. The endpoint teardown validated names the pane, so
-# the pane's shell and everything below it are the task's own; a process in the same copy that
-# the endpoint does not name stays unproved, is named in the refusal and is left running.
+# the pane's shell enters the owned record with its birth identity and everything below it is
+# proved by its live chain to that record (Main 4885 R1: one case of the three proofs, not a
+# fourth); a process in the same copy that the endpoint does not name stays unproved, is
+# named in the refusal and is left running.
 test_the_shell_of_the_tasks_own_pane_is_the_tasks_own_without_a_launch_marker() {
   local case_dir rc pane_pid child_pid other_pid table
   case_dir=$(make_case pane-shell-own)
@@ -6817,7 +6819,9 @@ test_a_landed_task_closes_around_an_own_copy_the_driver_keeps() {
     case "$(retained_field "$record" closed-at)" in 20*Z) ;; *) fail "retained-close-$shape: the record carries no time" ;; esac
     case "$(retained_field "$record" identity)" in [0-9]*:[0-9]*) ;; *) fail "retained-close-$shape: the record carries no identity" ;; esac
     assert_equals ".claude/channel-outbox/a.jsonl .claude/channel-outbox/b.jsonl" "$(retained_field "$record" unique | paste -sd ' ' -)" "retained-close-$shape: the record does not list the driver's unique paths"
-    assert_equals "task slot preserve reason closed-at head status-sha256 payload-sha256 unique unique" "$(sed -n '5,$p' "$record" | sed 's/=.*//' | paste -sd ' ' -)" "retained-close-$shape: the record does not hold exactly its fields"
+    assert_equals "task slot preserve reason closed-at head status-sha256 payload-sha256 lock-identity task-closed unique unique" "$(sed -n '5,$p' "$record" | sed 's/=.*//' | paste -sd ' ' -)" "retained-close-$shape: the record does not hold exactly its fields"
+    assert_equals task-x1 "$(retained_field "$record" task-closed)" "retained-close-$shape: the completed close did not mark the record"
+    case "$(retained_field "$record" lock-identity)" in [0-9]*:[0-9]*) ;; *) fail "retained-close-$shape: the record carries no creation-lock identity" ;; esac
     assert_no_grep 'REFUSED' "$FOREIGN_CASE/stderr" "retained-close-$shape: a close that succeeded printed a refusal"
     assert_equals 1 "$(cat "$FOREIGN_CASE/stdout" "$FOREIGN_CASE/stderr" | grep -c "notice: own nested copy $FOREIGN_COPY was kept")" "retained-close-$shape: the kept copy was not reported exactly once"
     assert_no_grep 'the driver was not asked again' "$FOREIGN_CASE/stderr" "retained-close-$shape: the run that asked the driver said it did not"
@@ -7735,7 +7739,7 @@ test_a_process_is_proved_the_tasks_own_by_marker_record_or_live_chain_never_by_p
   m=$(cd "$dir/state" && pwd -P)/task-x1.inbox
   t=$dir/ps-table
   rec=$dir/state/task-x1.teardown-owned
-  eval "$(sed -n '/^fm_nm_trim_stub/d; /^task_process_identity() {/,/^}/p; /^teardown_process_env_has() {/,/^}/p; /^teardown_owner_marker() {/,/^}/p; /^teardown_process_env_marked() {/,/^}/p; /^teardown_owned_record_path() {/,/^}/p; /^teardown_process_recorded() {/,/^}/p; /^teardown_process_proved_own() {/,/^}/p; /^teardown_process_in_task_pane() {/,/^}/p; /^teardown_pane_shell_pid() {/,/^}/p; /^teardown_pane_shell_pid_of() {/,/^}/p; /^teardown_owned_record_write() {/,/^}/p' "$ROOT/bin/fm-teardown.sh" "$ROOT/bin/fm-teardown-nested-lib.sh")"
+  eval "$(sed -n '/^fm_nm_trim_stub/d; /^task_process_identity() {/,/^}/p; /^teardown_process_env_has() {/,/^}/p; /^teardown_owner_marker() {/,/^}/p; /^teardown_process_env_marked() {/,/^}/p; /^teardown_owned_record_path() {/,/^}/p; /^teardown_process_recorded() {/,/^}/p; /^teardown_process_proved_own() {/,/^}/p; /^teardown_owned_record_pane_shell() {/,/^}/p; /^teardown_pane_shell_pid() {/,/^}/p; /^teardown_pane_shell_pid_of() {/,/^}/p; /^teardown_owned_record_write() {/,/^}/p' "$ROOT/bin/fm-teardown.sh" "$ROOT/bin/fm-teardown-nested-lib.sh")"
   # shellcheck disable=SC2329 # called by the evaluated task_process_identity.
   fm_nm_trim() { printf '%s' "$1" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'; }
   # shellcheck disable=SC2034 # read by the evaluated functions.
@@ -8126,16 +8130,18 @@ test_a_process_below_the_copy_root_is_named_and_never_queued_for_the_retire_sign
   fake=$dir/fakebin
   root=$(cd "$dir/wt" && pwd -P)
   mkdir -p "$root/notes"
-  eval "$(sed -n '/^teardown_pid_is_task_own() {/,/^}/p; /^teardown_foreign_proc_record() {/,/^}/p; /^teardown_foreign_copy_unowned() {/,/^}/p' "$ROOT/bin/fm-teardown-nested-lib.sh")"
+  eval "$(sed -n '/^teardown_pid_is_task_own() {/,/^}/p; /^teardown_pid_own_bound() {/,/^}/p; /^teardown_foreign_proc_record() {/,/^}/p; /^teardown_foreign_copy_unowned() {/,/^}/p' "$ROOT/bin/fm-teardown-nested-lib.sh")"
   # shellcheck disable=SC2329 # called by the evaluated functions.
   fm_task_copy_other_record() { return 1; }
   # shellcheck disable=SC2329
   teardown_copy_lock_file() { return 1; }
   # The scan of the processes proved the task's own: only 100, at the root.
   # shellcheck disable=SC2329,SC2034 # the evaluated functions read what it sets.
-  teardown_own_scan() { TEARDOWN_OWN_SCAN=$(printf '100\t%s\n' "$root"); TEARDOWN_OWN_SCANNED=1; }
+  teardown_own_scan() { TEARDOWN_OWN_SCAN=$(printf '100\t%s\tlstart=Sun Nov  8 08:00:00 2026\n' "$root"); TEARDOWN_OWN_SCANNED=1; }
   # shellcheck disable=SC2329
   task_process_identity() { printf 'lstart=Sun Nov  8 08:00:00 2026\n'; }
+  # shellcheck disable=SC2329
+  task_process_identity_matches() { [ "$(task_process_identity "$1")" = "$2" ]; }
   # shellcheck disable=SC2329
   pids_with_cwd_under() { printf '100\t%s\n' "$root"; [ "$BELOW_ROOT_CASE" != child ] || printf '101\t%s/notes\n' "$root"; }
   cat > "$fake/ps" <<'SH'
@@ -8576,24 +8582,36 @@ test_an_unreadable_copy_identity_or_lock_never_lets_a_retry_ask_the_driver() {
     # shellcheck disable=SC2034 # read by the library functions.
     DATA=$dir/data ID=task-x1
     printf 'vernant-session-active owner=launcher:999999 launcher=999999' > "$dir/locked"
+    # shellcheck disable=SC2329,SC2034 # a stand-in the library functions call.
     teardown_copy_lock_file() { TEARDOWN_FOREIGN_LOCK=$(cat "$dir/locked"); TEARDOWN_FOREIGN_LOCK_FILE=$dir/locked${LOCK_SUFFIX:-}; return 0; }
+    # shellcheck disable=SC2329,SC2034 # a stand-in the library functions call.
     copy_identity() { [ ! -e "$dir/identity-broken" ] || return 1; echo 11:22; }
+    # shellcheck disable=SC2329,SC2034 # a stand-in the library functions call.
     teardown_retained_prepare_preserve() { TEARDOWN_PRE_SNAPSHOT="h s p"; return 0; }
+    # shellcheck disable=SC2329,SC2034 # a stand-in the library functions call.
     teardown_run_closeout() {
       echo call >> "$dir/calls"
       TEARDOWN_CLOSEOUT_STDOUT='{"allowed":false,"reason":"cleanup_ignored_payload_archived_tree_retained","ignored_payload_disposition":"archive_then_retain_tree","tracked_uncovered_paths":[],"uncovered_paths":[],"unique_ignored_paths":["a"]}'
       return 3
     }
+    # shellcheck disable=SC2329,SC2034 # a stand-in the library functions call.
     teardown_closeout_refusal() { :; }
+    # shellcheck disable=SC2329,SC2034 # a stand-in the library functions call.
     teardown_retained_accept() { return 1; }
+    # shellcheck disable=SC2329,SC2034 # a stand-in the library functions call.
     fm_task_copy_canonical_dir() { printf '%s\n' "$1"; }
     for kind in identity lock; do
       : > "$dir/calls"
       if [ "$kind" = identity ]; then : > "$dir/identity-broken"; LOCK_SUFFIX=; else rm -f "$dir/identity-broken"; LOCK_SUFFIX=.missing; fi
+      # Each call follows the proof step that notes the lock it judged, as
+      # teardown_own_locked_copies_release does.
+      teardown_copy_lock_file "$dir/copy"; teardown_lock_proved_note "$dir/copy"
       teardown_own_copy_dispose "$dir/slot" "$dir/copy" 2>/dev/null || true
+      teardown_copy_lock_file "$dir/copy"; teardown_lock_proved_note "$dir/copy"
       teardown_own_copy_dispose "$dir/slot" "$dir/copy" 2>/dev/null || true
       printf '%s=%s ' "$kind" "$(wc -l < "$dir/calls" | tr -d ' ')"
       rm -f "$dir/identity-broken"; LOCK_SUFFIX=
+      teardown_copy_lock_file "$dir/copy"; teardown_lock_proved_note "$dir/copy"
       teardown_own_copy_dispose "$dir/slot" "$dir/copy" 2>/dev/null || true
       printf '%s-repaired=%s ' "$kind" "$(wc -l < "$dir/calls" | tr -d ' ')"
     done
@@ -8644,10 +8662,15 @@ test_a_damaged_or_unclosed_task_record_is_never_reported_as_already_closed() {
 # written for the replacement. Controls: a stable own process is queued and signalled on both
 # routes; a pid replaced after it was queued is not signalled.
 f1_stub_processes() {  # <dir> <root>
+  # shellcheck disable=SC2034 # read by the library functions.
   F1_DIR=$1
+  # shellcheck disable=SC2034 # read by the library functions.
   F1_ROOT=$2
+  # shellcheck disable=SC2329,SC2034 # a stand-in the library functions call.
   task_process_identity() { [ ! -e "$F1_DIR/dead.$1" ] || return 1; cat "$F1_DIR/id.$1" 2>/dev/null || return 1; }
+  # shellcheck disable=SC2329,SC2034 # a stand-in the library functions call.
   task_process_identity_matches() { local current; current=$(task_process_identity "$1") || return 1; [ "$current" = "$2" ]; }
+  # shellcheck disable=SC2329,SC2034 # a stand-in the library functions call.
   teardown_process_proved_own() {
     [ -e "$F1_DIR/own.$1" ] || return 1
     if [ -e "$F1_DIR/recycle-in-proof" ]; then
@@ -8656,13 +8679,18 @@ f1_stub_processes() {  # <dir> <root>
     fi
     return 0
   }
+  # shellcheck disable=SC2329,SC2034 # a stand-in the library functions call.
   pids_with_cwd_under() { [ -e "$F1_DIR/dead.100" ] || printf '100\t%s\n' "$F1_ROOT"; }
+  # shellcheck disable=SC2329,SC2034 # a stand-in the library functions call.
   task_record_process_signal() { printf '%s\t%s\t%s\n' "$3" "$1" "$2" >> "$F1_DIR/audit"; }
+  # shellcheck disable=SC2329,SC2034 # a stand-in the library functions call.
   kill() {
     printf '%s\n' "$*" >> "$F1_DIR/kills"
     case "$1" in -TERM|-KILL) : > "$F1_DIR/dead.$2" ;; esac
   }
+  # shellcheck disable=SC2329,SC2034 # a stand-in the library functions call.
   sleep() { :; }
+  # shellcheck disable=SC2329,SC2034 # a stand-in the library functions call.
   task_pid_positively_gone() { return 1; }
 }
 
@@ -8683,6 +8711,7 @@ test_a_pid_replaced_after_its_ownership_proof_is_never_signalled() {
   printf '#!/usr/bin/env bash\ncase "$*" in *"-o ppid= -p 100"*) echo 1 ;; *) exit 1 ;; esac\n' > "$fake/ps"
   printf '#!/usr/bin/env bash\nexit 0\n' > "$fake/lsof"
   chmod +x "$fake/ps" "$fake/lsof"
+  # shellcheck disable=SC2030,SC2031 # PATH and the stand-ins stay inside this subshell.
   out=$(
     PATH="$fake:$PATH"
     # shellcheck source=/dev/null
@@ -8691,8 +8720,11 @@ test_a_pid_replaced_after_its_ownership_proof_is_never_signalled() {
     . "$ROOT/bin/fm-teardown-nested-lib.sh"
     # shellcheck disable=SC2034 # read by the library functions.
     WT=$root TEARDOWN_RETURN_SLOT='' TASK_TMP='' META=$dir/state/task-x1.meta STATE=$dir/state ID=task-x1
+    # shellcheck disable=SC2034 # read by the library functions.
     TEARDOWN_NESTED_COPIES=()
+    # shellcheck disable=SC2329,SC2034 # a stand-in the library functions call.
     fm_task_copy_other_record() { return 1; }
+    # shellcheck disable=SC2329,SC2034 # a stand-in the library functions call.
     teardown_copy_lock_file() { return 1; }
     f1_stub_processes "$dir" "$root"
     for c in stable recycle-in-proof recycle-after-queue; do
@@ -8710,12 +8742,15 @@ test_a_pid_replaced_after_its_ownership_proof_is_never_signalled() {
   assert_grep 'queue:recycle-in-proof rc=1 queued=0 kills=0 audit=0' <(printf '%s\n' "$out") "own-proof-replaced: a pid replaced after its proof was queued or signalled: $out"
   assert_grep 'queue:recycle-after-queue rc=0 queued=1 kills=0 audit=0' <(printf '%s\n' "$out") "own-proof-replaced: a pid replaced after it was queued was signalled: $out"
 
+  # shellcheck disable=SC2030,SC2031 # PATH and the stand-ins stay inside this subshell.
   out=$(
     PATH="$fake:$PATH"
     eval "$(awk '/^pids_with_cwd_under\(\) \{/ { on = 1 } on { print } on && /^reap_task_worktree_processes\(\) \{/ { last = 1 } last && /^}/ { exit }' "$ROOT/bin/fm-teardown.sh")"
     # shellcheck disable=SC2034 # read by the evaluated functions.
     ID=task-x1 STATE=$dir/state
+    # shellcheck disable=SC2329,SC2034 # a stand-in the library functions call.
     task_registered_lanes_under_roots() { return 0; }
+    # shellcheck disable=SC2329,SC2034 # a stand-in the library functions call.
     task_nested_lane_for_path() { printf '%s\n' "$1"; }
     f1_stub_processes "$dir" "$root"
     for c in stable recycle-in-proof; do
