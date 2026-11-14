@@ -320,7 +320,9 @@
 # driver, scripts/git-stability/closeout_pr.py --cleanup-worktree <copy>
 # --execute-cleanup, run from the slot (FM_TEARDOWN_VERNANT_PYTHON names the
 # interpreter) with the one credit teardown proved, printed before the call:
-# --pr <N> when a merged pull request holds the whole copy head, else
+# --pr <N> when a merged GitHub pull request holds the whole copy head (the
+# driver reads --pr with gh pr view; a merged pull request on another forge is
+# named on the credit line instead), else
 # --bundle-record <file> when a verified recorded bundle holds it and every
 # commit of git rev-list HEAD --not --remotes is both recorded and advertised as
 # a bundle head (the record is built by teardown from its own proof in a private
@@ -329,10 +331,13 @@
 # (exit 127), or it names the verdict verification_stale_or_uncovered_paths, and
 # the lock names a launcher that is gone (absent from a readable process table,
 # or a pid that started after the lock was written), teardown makes its own
-# proofs again, reads the lock and the process table once more immediately
-# before the unlock, and then releases the lock itself with a non-forced git
-# worktree unlock followed by a non-forced git worktree remove; a removal that
-# fails restores the lock. The release is printed with its lock text and proof.
+# proofs again, then scans for processes in the copy, reads its HEAD and, when a
+# bundle proved it, the record and stored bundle again, reads the lock and the
+# process table once more immediately before the unlock, and then releases the
+# lock itself with a non-forced git worktree unlock followed by a non-forced git
+# worktree remove; a removal that fails puts the lock back and says it is back
+# only when it reads back, and otherwise that the copy is now unlocked. The
+# release is printed with its lock text and proof.
 # A live launcher, an unreadable process table, a process that runs in the copy
 # or holds a file in it open, a failed scan for one, or any other driver verdict
 # keeps the copy locked and names that fact. An unlocked copy is removed with a
@@ -348,7 +353,9 @@
 # that holds an untracked file. On the pool-slot route the release runs before
 # the final project-lock wait, so the driver never runs while the lock is held,
 # except when teardown keeps project custody through the return. A lock in any
-# other format, a driver refusal, or a copy still registered afterwards refuses.
+# other format, a driver refusal (except the dead-launcher takeover in the
+# creation-lock paragraph above, which releases the copy itself), or a copy still
+# registered afterwards refuses.
 # A driver refusal saves its complete combined output unchanged in a private
 # data/<task>/vernant-closeout.XXXXXX file, names that file (or the data/<task>
 # directory it could not save into), and prints the last 20 lines with control
