@@ -126,15 +126,12 @@ real_case() {
 
 # real_assert_no_signal_audited <pid> <label>: the signal audit holds no STOP, TERM or KILL
 # line for <pid>. Every signal teardown sends is audited first (task_record_process_signal), so
-# the audit is the no-signal oracle; an audit that does not exist means no signal was
-# recorded, but one that exists and cannot be read, or a grep that fails for any other
-# reason, proves nothing and fails the case (a plain negative grep would pass it).
+# the audit is the no-signal oracle. The case seeds an empty audit before the run, so an audit
+# that is missing, is not a regular readable file, or that grep cannot search proves nothing
+# and fails the case (a plain negative grep would pass each of them).
 real_assert_no_signal_audited() {
   local pid=$1 label=$2 audit=$FOREIGN_CASE/state/task-x1.teardown-processes rc=0
-  if [ ! -e "$audit" ] && [ ! -L "$audit" ]; then
-    return 0
-  fi
-  [ -f "$audit" ] && [ -r "$audit" ] || fail "$label: the signal audit $audit exists but cannot be read"
+  [ -f "$audit" ] && [ ! -L "$audit" ] && [ -r "$audit" ] || fail "$label: the signal audit $audit is missing or cannot be read, so the no-signal oracle proves nothing"
   grep -E -- $'\t(STOP|TERM|KILL)\t'"$pid"$'\t' "$audit" >/dev/null || rc=$?
   case "$rc" in
     1) ;;
@@ -521,6 +518,10 @@ test_real_leftover_processes_at_the_copy_root_are_ended_only_when_proved_the_tas
       esac
       pid=$PROC_PID
       parent=$PROC_PARENT
+      # The no-signal oracle reads the signal audit, so the audit exists before the run (an
+      # empty regular file teardown appends to): afterwards a missing or unreadable audit
+      # fails the case instead of passing as "no signal".
+      [ -e "$FOREIGN_CASE/state/task-x1.teardown-processes" ] || : > "$FOREIGN_CASE/state/task-x1.teardown-processes"
       if [ "$route" = kept ]; then real_teardown rc FM_STUB_CLOSEOUT=retained; else real_teardown rc; fi
       real_record after
       if [ "$want" = ended ]; then

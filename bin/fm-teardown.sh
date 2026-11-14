@@ -4094,7 +4094,7 @@ reap_resume_frozen() {
 
 # Freezes every process of REAP_TRACK_PIDS that the scan of <dir>... still finds, adds each
 # process a scan finds that is not tracked yet (the scan itself proved it the task's own,
-# by marker, record, pane or live chain through a frozen parent), freezes it too, and scans
+# by marker, record (the pane shell included) or live chain through a frozen parent), freezes it too, and scans
 # again until a scan finds nothing left to freeze. Leaves TASK_PIDS as of that last scan.
 reap_freeze_and_collect() {  # <dir>...
   local pid identity idx froze round=0
