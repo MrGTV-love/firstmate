@@ -2694,6 +2694,9 @@ make_bundle_copy_case() {  # <name> [mode]
 
 # A nested task copy is not its enclosing task's reserved pool slot.
 # Empty slot fields also occur on retries whose earlier cleanup wrote a marker.
+# The slot's claim names another task, so an authorized drop retires this
+# task's record and leaves the nested copy, as it does for a record that names
+# the slot as prior_worktree=: nothing in that task's slot is administered.
 test_empty_recorded_slot_nested_drop() {
   local case_dir slot copy head slot_head bundle rc
   make_bundle_copy_case empty-recorded-slot-nested-drop
@@ -2740,7 +2743,8 @@ SH
   expect_code 0 "$rc" "empty recorded slot authorized nested drop refused: $(cat "$case_dir/stderr")"
   assert_no_grep 'REFUSED: reserved pool slot  lost its durable lease; retaining the task record and contents' \
     "$case_dir/stderr" 'empty slot entered reserved-slot return'
-  assert_absent "$copy" 'authorized drop retained the nested copy'
+  assert_present "$copy/.git" 'authorized drop removed the nested copy in another task'"'"'s claimed slot'
+  assert_equals "$head" "$(git -C "$copy" rev-parse HEAD)" 'authorized drop changed the nested copy HEAD'
   assert_absent "$case_dir/state/task-x1.meta" 'authorized drop retained task metadata'
   assert_absent "$case_dir/state/task-x1.teardown-return-pending" 'authorized drop retained pending metadata'
   cmp -s "$case_dir/other.before" "$case_dir/state/other.meta" || fail 'nested drop changed the enclosing owner record'
@@ -2749,13 +2753,13 @@ SH
   assert_equals 'other task bytes' "$(cat "$slot/other.txt")" 'nested drop removed enclosing task bytes'
   assert_equals "$slot_head" "$(git -C "$slot" rev-parse HEAD)" 'nested drop changed enclosing task HEAD'
   if [ -s "$case_dir/treehouse.log" ]; then
-    assert_equals "return --force $copy" "$(cat "$case_dir/treehouse.log")" 'nested drop administered the enclosing slot'
+    ! grep -q '^return' "$case_dir/treehouse.log" || fail 'nested drop returned a copy through the provider'
   fi
   cmp -s "$FM_TEST_DROP_WORDS" "$case_dir/data/task-x1/captain-drop.md" || fail 'owner drop words were not retained'
   git init -q --bare "$case_dir/restored.git"
   git -C "$case_dir/restored.git" fetch -q "$bundle" 'refs/heads/*:refs/heads/*' || fail 'verified bundle cannot restore commits'
   assert_equals 'recoverable work' "$(git -C "$case_dir/restored.git" show "$head:work.txt")" 'bundle lost the removed commit contents'
-  pass 'empty recorded slot drops only the owner-authorized nested copy and preserves its bundled commits and enclosing owner'
+  pass 'empty recorded slot retires only the owner-authorized record, keeps the nested copy in the other task'"'"'s slot, and preserves its bundled commits and enclosing owner'
 }
 
 test_recorded_slot_lost_lease_still_refuses() {
