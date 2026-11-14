@@ -6071,9 +6071,10 @@ sys.exit(plane.main(sys.argv[1:]))
 
     # ---- Round 6 (the outside review of fca2a73d): findings 3, 5, 6 and 7 through the public entry point ----
 
-    def test_r6_f6_the_owner_check_delivers_its_wake_before_any_call_of_theirs_begins(self):
-        # At the transport boundary the watcher sees: the owner's check runs, exits and its output is delivered; only then does the second person's check run.
-        # Every call of theirs is slow (7 fake s): the owner's run makes none, so its delivery cannot wait on one (Main 1553 on SC4). Their check then wakes them.
+    def test_r6_f6_the_owner_check_ends_with_its_wake_before_any_call_of_theirs_begins(self):
+        # At the transport boundary the watcher sees: the owner's check runs and exits with its wake in its output, which the watcher queues at that exit; only
+        # then does the second person's check run. Every call of theirs is slow (7 fake s): the owner's run makes none. The watcher tells Firstmate once, after
+        # the sweep, so the owner's wake still waits for their check; that wait is bounded by their total deadline (Round6TotalBound, Main 1593).
         with self.home() as home:
             home.trust_check()
             self.owner_and_second_waiting(home)
