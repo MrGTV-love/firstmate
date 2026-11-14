@@ -588,9 +588,11 @@
 #      FM_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS name when the new one is unset) between
 #      attempts. Retries key off the error text, not whether the lock file still
 #      exists after the failed attempt - a lock that self-clears mid-check still
-#      deserves a retry of the return. Before each retry the caller's post-lock
-#      safety check runs, as after step 3's cleanup: the process that held the
-#      lock may have left work the forced return would reset.
+#      deserves a retry of the return. When the caller passes a post-lock
+#      safety check, a retry waits on while the lock is still there and, once
+#      it has cleared, runs that check first, as after step 3's cleanup: the
+#      process that held the lock may have left work the forced return would
+#      reset.
 #   2. Other treehouse return failures still abort immediately and loudly (no retry).
 #   3. If every retry still hits the lock signature and the lock remains, it is removed
 #      and the return tried once more ONLY when the lock is provably stale per
@@ -3240,12 +3242,18 @@ teardown_treehouse_return() {  # <dir> <cd-dir> <label> <owner-task> [<post-clea
     echo "teardown: $label return failed with transient git lock ($lock_desc); waiting ${TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS}s and retrying ($attempt/${max_retries})" >&2
     sleep "$TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS"
 
-    # A lock that cleared on its own was held by a process writing here, so
-    # the work it may have left is proved again before the forced return can
-    # reset it, as after a stale-lock cleanup below.
-    if [ -n "$post_cleanup_check" ] && ! "$post_cleanup_check"; then
-      echo "teardown: $label return aborted on its lock retry because safety checks failed" >&2
-      return 1
+    # While the lock is still there a return would fail on it again, so wait
+    # on. Once it has cleared on its own, the process that held it may have
+    # left work here, so that work is proved again before the forced return
+    # can reset it, as after a stale-lock cleanup below.
+    if [ -n "$post_cleanup_check" ]; then
+      if [ -n "$lock" ] && { [ -e "$lock" ] || [ -L "$lock" ]; }; then
+        continue
+      fi
+      if ! "$post_cleanup_check"; then
+        echo "teardown: $label return aborted on its lock retry because safety checks failed" >&2
+        return 1
+      fi
     fi
     [ "$check_custody" = 0 ] || require_registered_slot_copies "$owner" "$dir" \
       || return "$TEARDOWN_TREEHOUSE_CUSTODY_REFUSED"

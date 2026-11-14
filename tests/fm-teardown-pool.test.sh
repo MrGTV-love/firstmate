@@ -3640,6 +3640,24 @@ test_return_pending_write_failure_refuses_and_the_retry_finishes() {
   pass 'a failed return-pending record write refuses before any destruction and the retry returns the slot once'
 }
 
+# assert_return_pending_entry_refusal_state <case-dir> <slot> <label>: a
+# return-pending path that cannot take the record is decidable at entry, so the
+# refusal comes before the slot lease: the record, backlog row, endpoint, claim
+# and slot are as they were, nothing was returned and the slot stays unleased.
+assert_return_pending_entry_refusal_state() {  # <case-dir> <slot> <label>
+  local case_dir=$1 slot=$2 label=$3
+  assert_present "$case_dir/state/task-x1.meta" "$label: the refused teardown retired the task record"
+  assert_absent "$case_dir/state/task-x1.backlog-close" "$label: the refused teardown published the backlog close"
+  [ "$(backlog_row_state "$case_dir")" = in_flight ] \
+    || fail "$label: the refused teardown closed the backlog row: $(backlog_row_state "$case_dir")"
+  assert_absent "$case_dir/endpoint-closed" "$label: the refused teardown closed the endpoint"
+  ! grep -q '^return' "$case_dir/treehouse.log" 2>/dev/null || fail "$label: the refused teardown returned the pool slot"
+  ! grep -q '^lease ' "$case_dir/treehouse.log" 2>/dev/null || fail "$label: the refused teardown took a lease"
+  jq -e '.worktrees[0].leased == false' "$case_dir/pool/treehouse-state.json" >/dev/null \
+    || fail "$label: the refused teardown left the slot leased: $(cat "$case_dir/pool/treehouse-state.json")"
+  assert_present "${slot%/*}/.fm-slot-owner" "$label: the refused teardown dropped the slot claim"
+}
+
 test_return_pending_occupied_marker_path_refuses_and_the_retry_finishes() {
   local case_dir slot rc out
   make_lease_modeling_pool_case pool-pending-occupied-path ''
@@ -3654,20 +3672,20 @@ test_return_pending_occupied_marker_path_refuses_and_the_retry_finishes() {
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 1 "$rc" \
     "pending-path: an unrecordable return-pending record must stop teardown: $(cat "$case_dir/stderr")"
-  assert_unrecorded_return_refusal_state "$case_dir" "$slot" pending-path
+  assert_return_pending_entry_refusal_state "$case_dir" "$slot" pending-path
   rm -rf "$case_dir/state/task-x1.teardown-return-pending"
   out=$(PATH="$case_dir/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$case_dir/primary-home" \
     FM_STATE_OVERRIDE="$case_dir/state" FM_DATA_OVERRIDE="$case_dir/data" \
     FM_CONFIG_OVERRIDE="$case_dir/config" FM_BOOTSTRAP_NETWORK=skip \
     "$ROOT/bin/fm-bootstrap.sh" 2>&1) \
     || fail "pending-path: session start failed beside the refused record: $out"
-  assert_unrecorded_return_refusal_state "$case_dir" "$slot" pending-path
+  assert_return_pending_entry_refusal_state "$case_dir" "$slot" pending-path
   rc=0
   FM_HOME="$case_dir/primary-home" FM_POOL_CASE="$case_dir" \
     run_teardown "$case_dir" > "$case_dir/stdout2" 2> "$case_dir/stderr2" || rc=$?
   expect_code 0 "$rc" "pending-path: the retry must finish: $(cat "$case_dir/stderr2")"
   assert_unrecorded_return_retry_finished "$case_dir" "$slot" pending-path
-  pass 'a stale directory at the return-pending path refuses before any destruction and the retry returns the slot once'
+  pass 'a stale directory at the return-pending path refuses before any lease or destruction and the retry returns the slot once'
 }
 
 test_return_pending_unreadable_generation_refuses_and_the_retry_finishes() {
