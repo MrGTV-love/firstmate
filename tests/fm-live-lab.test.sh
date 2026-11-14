@@ -18,7 +18,10 @@ LIVE_LAB="$ROOT/bin/fm-live-lab.sh"
 TRUST="$ROOT/bin/fm-claude-trust.sh"
 
 live_lab_cleanup() {
-  local dir pid marker
+  local exit_code=$? dir pid marker
+  if [ "$exit_code" -ne 0 ] && [ "${RIVAL_CASE_ACTIVE:-no}" = yes ]; then
+    printf 'rival trust case up output:\n%s\n' "${RIVAL_UP_OUTPUT:-up did not finish}" >&2
+  fi
   for marker in "$TMP_ROOT/orphan-child" "$TMP_ROOT/late-child" "$TMP_ROOT/reused-child"; do
     [ ! -s "$marker" ] || printf '%s\n' "$(<"$marker")" >> "$TMP_ROOT/pids"
   done
@@ -715,9 +718,24 @@ exec sleep 45 >/dev/null 2>&1
 SH
 chmod +x "$FAKEBIN/claude"
 U="$TMP_ROOT/up-lab"
+RIVAL_CASE_ACTIVE=yes
+# Hold the launcher's presence read until the rival has finished, then run the
+# real read. Even a slow rival must delete before stabilization can succeed.
+cat > "$FAKEBIN/node" <<SH
+#!/usr/bin/env bash
+if [ "\$#" -eq 4 ] && [ "\$1" = -e ] && [ "\$3" = "$HOME/.claude.json" ] && [ "\$4" = "$U/home" ]; then
+  end=\$(( \$(date +%s) + 120 ))
+  until [ -f "$TMP_ROOT/rival-dropped" ]; do
+    [ "\$(date +%s)" -lt "\$end" ] || exit 1
+    sleep 0.05
+  done
+fi
+exec "$(command -v node)" "\$@"
+SH
+chmod +x "$FAKEBIN/node"
 (
   end=$(( $(date +%s) + 120 ))
-  until node -e 'const j=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8"));process.exit(j.projects?.[process.argv[2]]?1:0)' "$HOME/.claude.json" "$U/home" 2>/dev/null; do
+  until node -e 'const j=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8"));process.exit(j.projects?.[process.argv[2]]?.hasTrustDialogAccepted===true?0:1)' "$HOME/.claude.json" "$U/home" 2>/dev/null; do
     [ "$(date +%s)" -lt "$end" ] || exit 1
     sleep 0.05
   done
@@ -728,14 +746,19 @@ U="$TMP_ROOT/up-lab"
 RIVAL=$!
 printf '%s\n' "$RIVAL" >> "$TMP_ROOT/pids"
 out=$(SHELL=/bin/sh PATH="$FAKEBIN:$PATH" "$LIVE_LAB" up --harness claude --source "$UPSRC" --ref HEAD --timeout 1 "$U" 2>&1)
-expect_code 1 "$?" "stand-in primary does not answer probe"
-wait "$RIVAL" 2>/dev/null || true
+up_exit=$?
+RIVAL_UP_OUTPUT=$out
+expect_code 1 "$up_exit" "stand-in primary does not answer probe"
+assert_contains "$out" "primary: claude" "up refused before primary launch"
+assert_contains "$out" "fail probe:" "launched primary must reach the unanswered probe"
+wait "$RIVAL" 2>/dev/null || fail "rival failed before deleting registered primary trust"
 assert_equals dropped "$(cat "$TMP_ROOT/rival-dropped" 2>/dev/null)" "rival dropped primary trust once"
 assert_equals present "$(cat "$U/claude-launch-trust" 2>/dev/null)" "primary launched trusted after the rival write"
 assert_contains "$out" "ok trust: $U/home is trusted in the Claude store" "readiness sees primary trust"
 out=$("$LIVE_LAB" down "$U" 2>&1)
 expect_code 0 "$?" "down removes the up-built lab: $out"
 pass "up re-registers primary trust after a concurrent Claude write"
+RIVAL_CASE_ACTIVE=no
 
 # ---- fm-claude-trust.sh --lab-home -------------------------------------------
 

@@ -378,7 +378,8 @@ A later in-process `clear` re-emits only when this lock owner completed a full s
 
 ### DSH
 
-`bin/fm-dsh-primary.sh` and DSH secondmate launches add the tracked `.dsh/fm-primary.mjs` Cordis plugin to a private launch patch.
+For launch-owned TUI sessions, `bin/fm-dsh-primary.sh` and DSH secondmate launches add the tracked `.dsh/fm-primary.mjs` Cordis plugin to a private launch patch.
+Explicit existing-conversation native Web attachment does not replay startup; [the DSH protocol](supervision-protocols/dsh.md) owns its activation and lifecycle.
 The launch passes its opening prompt or secondmate brief to `dsh-tui` positionally.
 The installed DSH (the `dsh` CLI's own agent runtime) awaits the `agent/created` callback, which invokes `bin/fm-sessionstart-run.sh --source startup` from real DSH ancestry, before it publishes the session; no turn starts, and a spawn's start proof cannot pass, until the digest is ready.
 The plugin's awaited `agent/pre-step` waterfall then enters the digest ahead of the opening prompt in the first step, and would hold that step for the digest under a runtime that did not await the callback; DSH's own checkpoint runs first in that waterfall, so an open turn is durable during such a hold.
