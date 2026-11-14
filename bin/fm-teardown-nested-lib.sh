@@ -227,10 +227,18 @@ teardown_vernant_lock_pid() {  # <reason>
   printf '%s\n' "$pid"
 }
 
-# Seconds since <pid> started, from ps etime ([[dd-]hh:]mm:ss).
+# Seconds since <pid> started, from ps etime ([[dd-]hh:]mm:ss), or, where ps
+# cannot run (a confined worker), from the confined table's start time
+# (bin/fm-proc-info.py lstart, in local time).
 teardown_pid_age_secs() {  # <pid>
-  local etime days=0 a b c hours minutes seconds
-  etime=$(LC_ALL=C ps -p "$1" -o etime= 2>/dev/null) || return 1
+  local etime days=0 a b c hours minutes seconds start started
+  if ! etime=$(LC_ALL=C ps -p "$1" -o etime= 2>/dev/null); then
+    start=$(python3 "$FM_TASK_COPY_LIB_DIR/fm-proc-info.py" lstart "$1" 2>/dev/null) || return 1
+    started=$(python3 -c 'import sys, time; print(int(time.mktime(time.strptime(sys.argv[1], "%a %b %d %H:%M:%S %Y"))))' "$start" 2>/dev/null) || return 1
+    case "$started" in ''|*[!0-9]*) return 1 ;; esac
+    printf '%s\n' "$(( $(date +%s) - started ))"
+    return 0
+  fi
   etime=${etime//[[:space:]]/}
   [ -n "$etime" ] || return 1
   case "$etime" in *-*) days=${etime%%-*}; etime=${etime#*-} ;; esac
@@ -243,10 +251,17 @@ teardown_pid_age_secs() {  # <pid>
 # Is the pid in a creation lock a launcher that may still be alive? A pid that
 # started after the lock file was written cannot be the process that wrote it:
 # pids are recycled. A start time that cannot be read counts as live. Returns 0
-# when it may be alive, 1 when it is gone or a recycled pid.
+# when it may be alive, 1 when it is gone or a recycled pid, and 2 when the
+# process table cannot be read (fm_task_copy_launcher_state), which is never
+# taken for absence.
 teardown_lock_launcher_may_be_live() {  # <pid> <lock-file>
-  local pid=$1 lock=$2 age mtime now
-  ps -p "$pid" -o pid= >/dev/null 2>&1 || return 1
+  local pid=$1 lock=$2 age mtime now rc=0
+  fm_task_copy_launcher_state "$pid" || rc=$?
+  case "$rc" in
+    0) ;;
+    1) return 1 ;;
+    *) return 2 ;;
+  esac
   age=$(teardown_pid_age_secs "$pid") || return 0
   mtime=$(fm_lock_path_mtime "$lock") || return 0
   case "$mtime" in ''|*[!0-9]*) return 0 ;; esac
@@ -880,15 +895,26 @@ teardown_foreign_copy_unowned() {  # <copy>
         TEARDOWN_FOREIGN_WHY="it is locked by something other than Vernant's creation lock (${TEARDOWN_FOREIGN_LOCK:-no reason given})"
         return 1
       fi
-      if teardown_lock_launcher_may_be_live "$pid" "$TEARDOWN_FOREIGN_LOCK_FILE"; then
-        if ! teardown_pid_is_task_own "$pid"; then
-          TEARDOWN_FOREIGN_RULE='lock-launcher-owner'
-          TEARDOWN_FOREIGN_PID=$pid
-          TEARDOWN_FOREIGN_WHY="its creation-lock launcher process $pid may still be running"
+      rc=0
+      teardown_lock_launcher_may_be_live "$pid" "$TEARDOWN_FOREIGN_LOCK_FILE" || rc=$?
+      case "$rc" in
+        0)
+          if ! teardown_pid_is_task_own "$pid"; then
+            TEARDOWN_FOREIGN_RULE='lock-launcher-owner'
+            TEARDOWN_FOREIGN_PID=$pid
+            TEARDOWN_FOREIGN_WHY="its creation-lock launcher process $pid may still be running"
+            return 1
+          fi
+          teardown_foreign_proc_record "$pid"
+          ;;
+        1) ;;
+        *)
+          TEARDOWN_FOREIGN_RULE=inspection-unavailable
+          TEARDOWN_FOREIGN_WHY="the process table cannot be read, so its creation-lock launcher process $pid is not proved gone"
           return 1
-        fi
-        teardown_foreign_proc_record "$pid"
-      fi
+          ;;
+      esac
+      rc=0
       ;;
     1) ;;
     *)
@@ -1383,10 +1409,10 @@ teardown_driver_gap() {  # <driver-exit>
 # An unreadable table is never taken for absence.
 teardown_launcher_gone() {  # <pid> <lock-file>
   local rc=0
-  fm_task_copy_launcher_state "$1" || rc=$?
+  teardown_lock_launcher_may_be_live "$1" "$2" || rc=$?
   case "$rc" in
+    0) return 1 ;;
     1) return 0 ;;
-    0) ! teardown_lock_launcher_may_be_live "$1" "$2" ;;
     *) return 2 ;;
   esac
 }

@@ -6566,6 +6566,68 @@ SH
   pass 'a bundle truncated or a HEAD committed during the last holder scan keeps a dead launcher'"'"'s copy locked; unchanged, it closes and restores'
 }
 
+# Where ps cannot run (a confined worker: exit 126) the launcher's state comes
+# from the confined process table alone, and every read of it keeps its third
+# answer: a live launcher is never taken for gone, and an unreadable table is
+# never taken for absence. Both direct-release routes (the driver unavailable,
+# and its uncovered-content verdict) keep the copy locked for a live or unknown
+# launcher; a gone launcher's copy still closes.
+test_confined_launcher_state_is_never_taken_for_absence() {
+  local rc route state label live args
+  for route in unavailable uncovered; do
+    for state in live unknown gone; do
+      label="confined-$route-$state"
+      args=()
+      if [ "$route" = unavailable ]; then
+        dead_launcher_pid
+        make_own_locked_copy_case "$label" enclosing "$FOREIGN_DEAD_PID"
+        add_git_worktree_log "$FOREIGN_CASE"
+        rm -f "$FOREIGN_CASE/vernant-python"
+      else
+        make_locked_bundle_case "$label" own interior
+        args=(FM_STUB_REQUIRE_CREDIT=1)
+      fi
+      live=
+      if [ "$state" = live ]; then
+        sleep 600 &
+        live=$!
+        git -C "$FOREIGN_CASE/project" worktree unlock "$FOREIGN_COPY"
+        git -C "$FOREIGN_CASE/project" worktree lock --reason "vernant-session-active owner=launcher:$live launcher=$live" "$FOREIGN_COPY"
+      fi
+      # ps always fails as a confined worker's does; python3 fails only the
+      # confined table read when the table must be unreadable.
+      printf '#!/usr/bin/env bash\necho "ps: Operation not permitted" >&2\nexit 126\n' > "$FOREIGN_CASE/fakebin/ps"
+      cat > "$FOREIGN_CASE/fakebin/python3" <<SH
+#!/usr/bin/env bash
+case "\$*" in *"fm-proc-info.py table pid"*) [ "$state" != unknown ] || exit 1 ;; esac
+exec "$(command -v python3)" "\$@"
+SH
+      chmod +x "$FOREIGN_CASE/fakebin/ps" "$FOREIGN_CASE/fakebin/python3"
+      run_foreign_teardown rc ${args[@]+"${args[@]}"}
+      if [ "$state" = gone ]; then
+        expect_code 0 "$rc" "$label: a gone launcher's copy must close: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+        assert_absent "$FOREIGN_COPY" "$label: the copy survived"
+      else
+        expect_code 1 "$rc" "$label: the copy must stay locked: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+        assert_present "$FOREIGN_COPY/.git" "$label: the copy was removed"
+        git -C "$FOREIGN_CASE/project" worktree list --porcelain | grep -A4 -F "worktree $FOREIGN_COPY" | grep -q '^locked' \
+          || fail "$label: the copy is no longer locked"
+        if grep -q 'worktree unlock' "$FOREIGN_CASE/git-worktree.log" 2>/dev/null; then fail "$label: the script unlocked the copy"; fi
+        assert_present "$FOREIGN_CASE/state/task-x1.meta" "$label: the task record was removed"
+        assert_no_grep 'released creation lock' "$FOREIGN_CASE/stderr" "$label: a release was printed"
+      fi
+      if [ "$state" = live ]; then
+        kill -0 "$live" 2>/dev/null || fail "$label: the live launcher was ended"
+        assert_grep "launcher process $live may still be running" "$FOREIGN_CASE/stderr" "$label: the refusal did not name the live launcher"
+        kill "$live" 2>/dev/null || true
+        wait "$live" 2>/dev/null || true
+      fi
+      [ "$state" != unknown ] || assert_grep 'cannot be read' "$FOREIGN_CASE/stderr" "$label: the refusal did not name the unreadable process table"
+    done
+  done
+  pass 'with ps confined, a live or unreadable launcher keeps its locked copy on both direct-release routes, and a gone one closes'
+}
+
 # The open-file listing is filtered in one pass, and a listing line of a shape
 # the filter does not know still fails the scan, so the copy stays locked.
 test_direct_release_refuses_a_malformed_open_file_listing() {
@@ -7143,6 +7205,7 @@ test_direct_release_scans_for_processes_after_the_landed_and_git_proofs
 test_direct_release_refuses_a_malformed_open_file_listing
 test_history_landed_copy_keeps_its_unique_ignored_file
 test_direct_release_rechecks_the_bundle_and_head_at_the_unlock
+test_confined_launcher_state_is_never_taken_for_absence
 test_direct_release_refuses_a_process_holding_a_file_in_the_copy_open
 test_task_own_descendant_holding_a_file_open_refuses_and_is_not_signalled
 test_direct_release_refuses_an_unreadable_process_table
