@@ -789,6 +789,41 @@ printf '%s\n' "$out" | grep -q 'late: the recorded PR changed during this pass' 
 [ ! -e "$CASE/home/state/late.check.sh" ] || fail 'the late re-arm published a poll for the old PR'
 pass 'a re-arm whose recorded PR changes between its commit and its publication publishes nothing'
 
+# A first registration is never re-armed by a pass that runs while it is between
+# committing pr= and publishing its poll: the registrar holds the poll publication
+# lock across that gap, so the pass leaves the poll to it and one pr_ready event
+# is written.
+make_case registrar-gap
+: > "$CASE/home/config/fleet-ledger"
+write_ship gap ship direct-PR
+cat > "$FAKEBIN/rm" <<SH
+#!/usr/bin/env bash
+/bin/rm "\$@"
+rc=\$?
+case " \$* " in
+  *"/.meta-gap.lock "*)
+    if [ -e "$CASE/run-pass-in-gap" ] && grep -q '^pr=' "$CASE/home/state/gap.meta"; then
+      /bin/rm -f "$CASE/run-pass-in-gap"
+      FM_READY_CASE="$CASE" FM_ROOT_OVERRIDE="$CASE/root" FM_HOME="$CASE/home" FM_STATE_OVERRIDE="$CASE/home/state" \
+        FM_CONFIG_OVERRIDE="$CASE/home/config" FM_CREW_STATE_BIN="$FAKEBIN/fm-crew-state" PATH="$FAKEBIN:\$PATH" \
+        bash "$ROOT/bin/fm-pr-ready-reconcile.sh" > "$CASE/gap-pass.out" 2>&1
+    fi ;;
+esac
+exit "\$rc"
+SH
+chmod +x "$FAKEBIN/rm"
+: > "$CASE/run-pass-in-gap"
+FM_READY_CASE="$CASE" FM_ROOT_OVERRIDE="$CASE/root" FM_HOME="$CASE/home" FM_STATE_OVERRIDE="$CASE/home/state" \
+  FM_CONFIG_OVERRIDE="$CASE/home/config" PATH="$FAKEBIN:$PATH" \
+  bash "$ROOT/bin/fm-pr-check.sh" gap "$URL" > "$CASE/first.out" 2>&1 || fail "the first registration failed: $(cat "$CASE/first.out")"
+[ ! -e "$CASE/run-pass-in-gap" ] || fail 'the pass in the registration gap was never run'
+! grep -q 're-armed' "$CASE/gap-pass.out" || fail "a pass in the registration gap re-armed a live first registration: $(cat "$CASE/gap-pass.out")"
+assert_registered gap
+gap_events=$({ grep -h '"task":"gap"' "$CASE/home/state/fleet-ledger.jsonl" 2>/dev/null || true; } | grep -c '"event":"task.pr_ready"' || true)
+[ "$gap_events" -eq 1 ] || fail "the first registration wrote $gap_events pr_ready events, not one"
+rm -f "$FAKEBIN/rm"
+pass 'a pass that runs while a first registration is between pr= and its poll leaves the poll to it'
+
 # A merge-notified marker counts only for the PR it names: a record whose pr= is
 # a newer PR than the marker's is re-armed, a marker naming the recorded PR is not.
 B_URL=https://github.com/example/project/pull/44
