@@ -385,8 +385,8 @@ test_successor_refuses_unproved_successors() {
   git -C "$dir/proj" branch "fm/$id-v2b" "fm/$id-v2"
   expect_successor_refusal "$dir" "$id" not-checked-out "is not proved to be this task's successor" 1 --branch "fm/$id-v2b" --note why
   expect_successor_refusal "$dir" "$id" default-branch "is the project's default branch" 1 --branch main --note why
-  git -C "$dir/wt-other" checkout -q -b "fm/other-$id-x"
-  expect_successor_refusal "$dir" "$id" other-copys-branch "which is not this task's recorded copy" 1 --branch "fm/other-$id-x" --note why
+  git -C "$dir/wt-other" checkout -q -b "fm/$id-elsewhere"
+  expect_successor_refusal "$dir" "$id" other-copys-branch "which is not this task's recorded copy" 1 --branch "fm/$id-elsewhere" --note why
   git -C "$dir/wt-other" checkout -q "fm/other-$id"
   git -C "$dir/wt" checkout -q -b "fm/$id-div" "fm/$id~1"
   commit_file "$dir/wt" div.txt "divergent work"
@@ -646,6 +646,125 @@ test_branch_and_check_stay_refused_on_every_other_verb() {
   pass "successor: --branch and --check stay refused, with the same message, on every other verb"
 }
 
+# C1: both routes admit only a name in the task's own family. Here the checked-out
+# route: a branch of another lineage that descends from the recorded tip and is
+# checked out in the recorded copy proves everything else and is still refused.
+test_successor_name_family_bounds_the_checked_out_route() {
+  local id=suc-family dir name out rc=0
+  dir=$(new_successor_case family "$id")
+  for name in develop release/1.x; do
+    git -C "$dir/wt" checkout -q -b "$name" "fm/$id-v2"
+    expect_successor_refusal "$dir" "$id" "family-${name%%/*}" "outside the task's own name family" 1 --branch "$name" --note why
+    git -C "$dir/wt" checkout -q "fm/$id-v2"
+    git -C "$dir/proj" branch -q -D "$name"
+  done
+  git -C "$dir/wt" checkout -q -b "fm/$id-v3"
+  out=$(sc "$dir" "$id" --branch "fm/$id-v3" --check) || rc=$?
+  expect_code 0 "$rc" "a name in the family, checked out in the copy and containing the recorded tip, is the matched control and must be admitted"$'\n'"$out"
+  assert_contains "$out" "route=checked-out" "the control is proved by the checked-out route"
+  pass "successor: develop and release/1.x are refused for the name family on the checked-out route, and a name in the family there is admitted"
+}
+
+# C2: the archive-tip route compares a successor's tip only with an archive branch
+# named exactly archive/<task>-(submitted|pipeline)-<8 lowercase hex> whose hex
+# is the first eight digits of its own tip. Each forged name below sits at the
+# successor's tip and proves nothing; each exact name proves it.
+test_successor_archive_route_admits_only_the_task_own_archive_names() {
+  local id=suc-archive dir tree tip hex upper forged kind i=0 out rc
+  dir=$(new_successor_case archive "$id")
+  tree=$(git -C "$dir/proj" rev-parse "fm/$id-v2^{tree}")
+  while :; do
+    tip=$(git -C "$dir/proj" -c user.name=fmtest -c user.email=fmtest@example.invalid commit-tree -m "successor $i" -p "fm/$id-v2" "$tree")
+    hex=$(printf '%s' "$tip" | cut -c1-8)
+    case "$hex" in *[a-f]*) break ;; esac
+    i=$((i + 1))
+    [ "$i" -lt 60 ] || fail "no commit whose first eight hex digits hold a letter"
+  done
+  upper=$(printf '%s' "$hex" | tr 'a-f' 'A-F')
+  git -C "$dir/proj" branch "fm/$id-v2b" "$tip"
+  for forged in "archive/$id-other-$hex" "archive/other-$id-submitted-$hex" "archive/$id-pipeline-deadbeef" "archive/$id-submitted-$upper" "archive/$id-x-submitted-$hex"; do
+    git -C "$dir/proj" branch "$forged" "$tip"
+    expect_successor_refusal "$dir" "$id" "archive-${forged##*/}" "is not proved to be this task's successor" 1 --branch "fm/$id-v2b" --note why
+    git -C "$dir/proj" branch -q -D "$forged"
+  done
+  for kind in submitted pipeline; do
+    git -C "$dir/proj" branch "archive/$id-$kind-$hex" "$tip"
+    rc=0
+    out=$(sc "$dir" "$id" --branch "fm/$id-v2b" --check) || rc=$?
+    expect_code 0 "$rc" "the exact archive/$id-$kind-<8 hex> name at the successor's tip is the matched control and must admit"$'\n'"$out"
+    assert_contains "$out" "route=archive-tip archive=archive/$id-$kind-$hex" "the control names the archive branch that proved it"
+    git -C "$dir/proj" branch -q -D "archive/$id-$kind-$hex"
+  done
+  pass "successor: the archive-tip route refuses another id, another task, a wrong or uppercase hex and an id-extending name, and admits the task's own submitted and pipeline archive names"
+}
+
+# C3: the receipt carries a structured route token and the guard writes one event
+# at record time naming the route and the successor; a refusal writes a deny event
+# naming the rule and the successor.
+test_successor_receipt_and_events_name_the_checked_out_route() {
+  local id=suc-route dir out rc=0 row
+  dir=$(new_successor_case route "$id")
+  : > "$FM_GUARD_EVENT_LOG"
+  out=$(sc "$dir" "$id" --branch "fm/$id-v3" --note why) || rc=$?
+  expect_code 1 "$rc" "an in-family branch that does not exist must refuse"$'\n'"$out"
+  row=$(admission_event proof deny)
+  [ -n "$row" ] || fail "no successor-branch-admission deny event was written for a refused proof"
+  assert_equals "fm/$id-v3" "$(printf '%s' "$row" | jq -r .successor)" "the deny event must name the successor"
+  assert_equals "$id" "$(printf '%s' "$row" | jq -r .task)" "the deny event must name the task"
+  rc=0
+  out=$(sc "$dir" "$id" --branch "fm/$id-v2" --note why) || rc=$?
+  expect_code 0 "$rc" "recording should succeed"$'\n'"$out"
+  assert_contains "$out" "route: route=checked-out successor=fm/$id-v2" "the receipt must carry the structured route and the successor"
+  row=$(admission_event record allow)
+  [ -n "$row" ] || fail "no successor-branch-admission allow event was written at record time"
+  assert_equals checked-out "$(printf '%s' "$row" | jq -r .route)" "the record-time event must name the route"
+  assert_equals "fm/$id-v2" "$(printf '%s' "$row" | jq -r .successor)" "the record-time event must name the successor"
+  assert_equals "$id" "$(printf '%s' "$row" | jq -r .task)" "the record-time event must name the task"
+  pass "successor: the receipt names route=checked-out, and the guard writes an allow event with route and successor at record time and a deny event with the successor for a refusal"
+}
+
+# C6: every comparison against another task's branch or successor, the recorded
+# branch, the base branch and the default branch ignores case. The control is a
+# name that differs by more than case.
+test_successor_names_compare_without_regard_to_case() {
+  local id=suc-case dir out rc=0 upper_id
+  dir=$(new_successor_case case "$id")
+  upper_id=$(printf '%s' "$id" | tr '[:lower:]' '[:upper:]')
+  expect_successor_refusal "$dir" "$id" case-other-branch "task other-$id already records it as its branch" 1 --branch "FM/OTHER-$upper_id" --note why
+  expect_successor_refusal "$dir" "$id" case-other-branch-mixed "task other-$id already records it as its branch" 1 --branch "Fm/other-$id" --note why
+  expect_successor_refusal "$dir" "$id" case-recorded "equals the task's recorded branch" 1 --branch "FM/$upper_id" --note why
+  printf 'base_branch=release\n' >> "$dir/home/state/$id.meta"
+  expect_successor_refusal "$dir" "$id" case-base "recorded base branch" 1 --branch RELEASE --note why
+  expect_successor_refusal "$dir" "$id" case-default "is the project's default branch" 1 --branch MAIN --note why
+  printf 'successor_branch=fm/other-successor\n' >> "$dir/home/state/other-$id.meta"
+  expect_successor_refusal "$dir" "$id" case-other-successor "task other-$id already records it as its successor branch" 1 --branch FM/Other-Successor --note why
+  out=$(sc "$dir" "$id" --branch "fm/$id-v2" --check) || rc=$?
+  expect_code 0 "$rc" "a name that differs from every compared name by more than case must be admitted"$'\n'"$out"
+  pass "successor: a case variant of another task's branch or successor, the recorded, base or default branch is refused, and a name that differs by more than case is admitted"
+}
+
+# C8: the registry owns the admission decision. The real metrics reader, run over the
+# events a refusal and a record wrote, knows the guard and its harm only when the
+# registry holds the entry, and the spawn-write-confinement entry names the permit.
+test_registry_owns_the_successor_admission_and_the_reader_attributes_it() {
+  local id=suc-registry dir out rc=0 report registry=$ROOT/docs/guards/registry.json
+  dir=$(new_successor_case registry "$id")
+  : > "$FM_GUARD_EVENT_LOG"
+  sc "$dir" "$id" --branch "fm/$id-v3" --note why >/dev/null || true
+  out=$(sc "$dir" "$id" --branch "fm/$id-v2" --note why) || rc=$?
+  expect_code 0 "$rc" "recording should succeed"$'\n'"$out"
+  report=$(env -u FM_TASK_ID bash "$ROOT/bin/fm-guard-metrics.sh" --log "$FM_GUARD_EVENT_LOG" --guards successor-branch-admission --json) \
+    || fail "the metrics reader failed: $report"
+  assert_equals irreversible "$(printf '%s' "$report" | jq -r '.guards[0].harm')" "the registry must own successor-branch-admission, or the reader cannot name its harm"
+  assert_equals 1 "$(printf '%s' "$report" | jq -r '.guards[0].allows')" "the reader must count the record-time allow"
+  assert_equals 1 "$(printf '%s' "$report" | jq -r '.guards[0].denies')" "the reader must count the refusal"
+  jq -e '.guards[] | select(.id == "successor-branch-admission") | select(.owner == "bin/fm-successor-branch-lib.sh" and .decision == "deny" and .fail_direction == "closed" and .instrumented == true)' "$registry" >/dev/null \
+    || fail "the registry must hold a closed, instrumented deny guard owned by the successor library"
+  jq -e '.guards[] | select(.id == "spawn-write-confinement") | .layer_note | test("successor-branch-admission")' "$registry" >/dev/null \
+    || fail "the spawn-write-confinement entry must name the successor permit"
+  pass "successor: the registry holds the admission guard, the reader attributes the record and the refusal to it, and spawn-write-confinement names the permit"
+}
+
 control_relaunch_test_cases=(
 test_successor_records_the_branch_and_is_idempotent
 test_successor_goes_before_a_recorded_pr
@@ -656,6 +775,11 @@ test_successor_refuses_callers_without_authority
 test_successor_refuses_other_tasks_and_records
 test_successor_refuses_inadmissible_names
 test_successor_refuses_unproved_successors
+test_successor_name_family_bounds_the_checked_out_route
+test_successor_archive_route_admits_only_the_task_own_archive_names
+test_successor_receipt_and_events_name_the_checked_out_route
+test_successor_names_compare_without_regard_to_case
+test_registry_owns_the_successor_admission_and_the_reader_attributes_it
 test_successor_failure_at_each_write_step_changes_nothing
 test_successor_serializes_on_the_lifecycle_and_metadata_locks
 test_relaunch_profile_covers_exactly_the_recorded_successor

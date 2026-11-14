@@ -95,6 +95,17 @@ done
 [ "$(printf '%s' "$row" | jq -r .override)" = true ] || fail "override not recorded"
 pass "the writer appends one schema-complete row per decision"
 
+# --- optional route and successor fields ---------------------------------------
+: >"$LOG"
+"$EVENT" gschema allow --log "$LOG" --session s1
+"$EVENT" gschema allow --log "$LOG" --session s1 --route archive-tip --successor fm/task-v2
+plain=$(sed -n 1p "$LOG")
+routed=$(sed -n 2p "$LOG")
+printf '%s' "$plain" | jq -e 'has("route") or has("successor") | not' >/dev/null || fail "a row written without --route and --successor must not carry either field: $plain"
+[ "$(printf '%s' "$routed" | jq -r .route)" = archive-tip ] || fail "route not recorded: $routed"
+[ "$(printf '%s' "$routed" | jq -r .successor)" = fm/task-v2 ] || fail "successor not recorded: $routed"
+pass "route and successor appear only on rows that pass them"
+
 # --- writer never fails the caller -----------------------------------------
 mkdir -p "$TMP/readonly"
 chmod 500 "$TMP/readonly"

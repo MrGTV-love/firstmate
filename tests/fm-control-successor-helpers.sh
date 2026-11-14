@@ -113,3 +113,12 @@ successor_assert_read_only_run_calls() {  # <case-dir> <what>
   [ -z "$unexpected" ] || fail "$2 made a no-mistakes call that is not a read-only status read: $unexpected"
   printf 'note: %s made these no-mistakes calls: %s\n' "$2" "$(LC_ALL=C sort "$log" | uniq -c | tr '\n' ';' | sed 's/  */ /g')"
 }
+
+# The newest event row of the successor-branch-admission guard for one rule and
+# decision, as JSON (empty when none). tests/lib.sh points FM_GUARD_EVENT_LOG at
+# this run's own log, so no real home's log is written; a test that reads it
+# empties it first.
+admission_event() {  # <rule> <decision>
+  [ -f "$FM_GUARD_EVENT_LOG" ] || return 0
+  jq -c --arg rule "$1" --arg decision "$2" 'select(.guard == "successor-branch-admission" and .rule == $rule and .decision == $decision)' "$FM_GUARD_EVENT_LOG" | tail -n 1
+}

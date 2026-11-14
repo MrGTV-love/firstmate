@@ -171,18 +171,38 @@ test_scott_admission_proves_the_successor_by_the_task_own_archive_branch() {
   out=$(sc "$dir" --branch "$SUCC" --check) || rc=$?
   expect_code 0 "$rc" "the successor of the Scott shape must be admitted by --check"$'\n'"$out"
   assert_contains "$out" "successor-check $TASK" "--check names its outcome"
-  # The same fixture refuses a branch with no proof tying it to the task.
-  git -C "$dir/fx/project" branch fm/scott-unproved "$(git -C "$dir/fx/project" rev-parse main)"
+  # The same fixture refuses a branch with no proof tying it to the task: in the
+  # task's name family, but at no archive tip and checked out nowhere.
+  git -C "$dir/fx/project" branch "$OLD-unproved" "$(git -C "$dir/fx/project" rev-parse main)"
   rc=0
-  out=$(sc "$dir" --branch fm/scott-unproved --check) || rc=$?
+  out=$(sc "$dir" --branch "$OLD-unproved" --check) || rc=$?
   expect_code 1 "$rc" "an unproved branch must refuse on the Scott shape"$'\n'"$out"
   assert_contains "$out" "is not proved to be this task's successor" "the refusal must name the missing proof"
-  # The old branch's own archive tip does not make a different branch the successor.
-  git -C "$dir/fx/project" branch fm/scott-s-copy "refs/heads/$OLD"
-  rc=0
-  out=$(sc "$dir" --branch fm/scott-s-copy --check) || rc=$?
-  expect_code 0 "$rc" "a branch at the tip of the task's own submitted archive is proved by route 2"$'\n'"$out"
   pass "the Scott shape: the successor is admitted by the task's own archive branch, and a branch with no proof is refused"
+}
+
+# C1: the archive-tip route proves a tip, not a name, so it admits only a name in
+# the task's own family. Every name below sits at the tip of the task's own
+# archive branch; only the one in the family is admitted.
+test_scott_name_family_bounds_the_archive_route() {
+  local dir out rc name tip
+  dir=$(new_scott_case family)
+  tip=$(git -C "$dir/fx/project" rev-parse "refs/heads/$OLD")
+  git -C "$dir/fx/project" for-each-ref --format='%(objectname)' "refs/heads/archive/$TASK-*" | grep -qx "$tip" \
+    || fail "the fixture must hold a task archive branch at the old branch's tip"
+  for name in develop release/1.x fm/scott-s-copy; do
+    git -C "$dir/fx/project" branch "$name" "$tip"
+    rc=0
+    out=$(sc "$dir" --branch "$name" --check) || rc=$?
+    expect_code 1 "$rc" "$name at a task archive tip is outside the task's name family and must refuse"$'\n'"$out"
+    assert_contains "$out" "outside the task's own name family" "the refusal for $name must name the bound"
+  done
+  git -C "$dir/fx/project" branch "$OLD-copy" "$tip"
+  rc=0
+  out=$(sc "$dir" --branch "$OLD-copy" --check) || rc=$?
+  expect_code 0 "$rc" "a name in the family at the same archive tip is the matched control and must be admitted"$'\n'"$out"
+  assert_contains "$out" "route=archive-tip" "the control is proved by the archive-tip route"
+  pass "the Scott shape: develop, release/1.x and another lineage's name at a task archive tip are refused for the name family, and a name in the family there is admitted"
 }
 
 test_scott_operation_then_relaunch_keeps_every_custody_relationship() {
@@ -290,9 +310,105 @@ test_scott_hand_edited_record_cannot_widen_a_launch() {
   pass "Scott shape: a hand-edited successor record that the operation would refuse never reaches a launch profile"
 }
 
+# C3: the receipt carries a structured route token, and the guard writes one event
+# when the record is made and one at the launch that applies the grant, each naming
+# the route and the successor. The Scott shape is proved by the archive-tip route.
+test_scott_receipt_and_events_name_the_archive_tip_route() {
+  local dir out rc row archive
+  dir=$(new_scott_case route)
+  : > "$FM_GUARD_EVENT_LOG"
+  rc=0
+  out=$(sc "$dir" --branch "$SUCC" --note "route evidence") || rc=$?
+  expect_code 0 "$rc" "recording the Scott successor should succeed"$'\n'"$out"
+  archive=$(printf '%s\n' "$out" | sed -n 's/^route: route=archive-tip archive=\([^ ]*\) .*/\1/p')
+  case "$archive" in
+    "archive/$TASK-submitted-"* | "archive/$TASK-pipeline-"*) ;;
+    *) fail "the receipt must carry route=archive-tip and the matched archive name: $out" ;;
+  esac
+  assert_contains "$out" "successor=$SUCC" "the receipt route line must name the successor"
+  row=$(admission_event record allow)
+  [ -n "$row" ] || fail "no successor-branch-admission allow event was written at record time"
+  assert_equals archive-tip "$(printf '%s' "$row" | jq -r .route)" "the record-time event must name the route"
+  assert_equals "$SUCC" "$(printf '%s' "$row" | jq -r .successor)" "the record-time event must name the successor"
+  assert_equals "$TASK" "$(printf '%s' "$row" | jq -r .task)" "the record-time event must name the task"
+  rc=0
+  out=$(run_control "$dir" "$TASK" relaunch --note "apply") || rc=$?
+  expect_code 0 "$rc" "the relaunch should succeed"$'\n'"$out"
+  if [ "$(uname -s)" = Darwin ]; then
+    row=$(admission_event launch allow)
+    [ -n "$row" ] || fail "no successor-branch-admission allow event was written at the launch that applies the grant"
+    assert_equals archive-tip "$(printf '%s' "$row" | jq -r .route)" "the launch event must name the route"
+    assert_equals "$SUCC" "$(printf '%s' "$row" | jq -r .successor)" "the launch event must name the successor"
+  else
+    printf 'skip: the launch grant is applied on macOS only; Linux remains unconfined\n'
+  fi
+  pass "Scott shape: the receipt names route=archive-tip and the matched archive, and the guard writes an event with route and successor at record time and at the launch that applies the grant"
+}
+
+# C4: the launch re-runs the whole admission and fails closed. Each hand-edited
+# record below passes the name rule; each is refused at the launch, and no line
+# for its name reaches a profile.
+test_scott_launch_re_proves_the_whole_admission() {
+  local dir out rc fx sb tip bad want
+  if [ "$(uname -s)" != Darwin ]; then
+    printf 'skip: the write profile is generated on macOS only; Linux remains unconfined\n'
+    return 0
+  fi
+  dir=$(new_scott_case reprove)
+  fx=$dir/fx
+  sb=$dir/home/state/$TASK.write-confinement.sb
+  tip=$(git -C "$fx/project" rev-parse "refs/heads/$OLD")
+  git -C "$fx/project" branch "$OLD-unproved" "$(git -C "$fx/project" rev-parse main)"
+  git -C "$fx/project" worktree add -q -b "$OLD-elsewhere" "$dir/wt-elsewhere" "$tip"
+  git -C "$fx/project" branch develop "$tip"
+  for bad in "$OLD-ghost" "$OLD-elsewhere" "$OLD-unproved" develop; do
+    case "$bad" in
+      "$OLD-ghost") want="does not exist in the project's ref store" ;;
+      "$OLD-elsewhere") want="which is not this task's recorded copy" ;;
+      "$OLD-unproved") want="is not proved to be this task's successor" ;;
+      develop) want="outside the task's own name family" ;;
+    esac
+    sed -i.bak '/^successor_branch=/d' "$dir/home/state/$TASK.meta" && rm -f "$dir/home/state/$TASK.meta.bak"
+    printf 'successor_branch=%s\n' "$bad" >> "$dir/home/state/$TASK.meta"
+    rm -f "$sb"
+    rc=0
+    out=$(run_control "$dir" "$TASK" relaunch --note "hand edited") || rc=$?
+    [ "$rc" != 0 ] || fail "a hand-edited successor '$bad' that the admission refuses must refuse the launch"$'\n'"$out"
+    assert_contains "$out" "$want" "the launch refusal of '$bad' must name the missing proof"
+    [ ! -f "$sb" ] || ! grep -qF -e "$bad\"" -e "$bad.lock\"" "$sb" || fail "a line for '$bad' reached the launch profile"
+  done
+  pass "Scott shape: a hand-edited record naming a missing branch, a branch checked out in another work tree, a branch neither route proves or a name outside the family is refused at the launch with no profile line for it"
+}
+
+# C4: --check on a successor the record already names proves it again.
+test_scott_check_proves_a_recorded_successor_again() {
+  local dir out rc fx
+  dir=$(new_scott_case recheck)
+  fx=$dir/fx
+  rc=0
+  out=$(sc "$dir" --branch "$SUCC" --note "recorded") || rc=$?
+  expect_code 0 "$rc" "recording should succeed"$'\n'"$out"
+  rc=0
+  out=$(sc "$dir" --branch "$SUCC" --check) || rc=$?
+  expect_code 0 "$rc" "--check of a still proved recorded successor should succeed"$'\n'"$out"
+  assert_contains "$out" "route=archive-tip" "--check of a recorded successor must show the route it proved again"
+  # The ref moves off every archive tip after it was recorded.
+  git -C "$fx/project" update-ref "refs/heads/$SUCC" "$(git -C "$fx/project" rev-parse main)"
+  rc=0
+  out=$(sc "$dir" --branch "$SUCC" --check) || rc=$?
+  expect_code 1 "$rc" "--check of a recorded successor that is no longer proved must refuse"$'\n'"$out"
+  assert_contains "$out" "is no longer proved" "the refusal must say the recorded successor no longer holds"
+  case "$out" in *"recorded earlier"*) fail "the check must not report a stale proof: $out" ;; esac
+  pass "Scott shape: --check on a recorded successor proves it again and refuses once it is no longer proved"
+}
+
 control_relaunch_test_cases=(
 test_scott_fixture_has_the_shape_the_amendment_names
 test_scott_admission_proves_the_successor_by_the_task_own_archive_branch
+test_scott_name_family_bounds_the_archive_route
+test_scott_receipt_and_events_name_the_archive_tip_route
+test_scott_launch_re_proves_the_whole_admission
+test_scott_check_proves_a_recorded_successor_again
 test_scott_operation_then_relaunch_keeps_every_custody_relationship
 test_scott_record_revocation_restores_the_launch_profile
 test_scott_hand_edited_record_cannot_widen_a_launch
