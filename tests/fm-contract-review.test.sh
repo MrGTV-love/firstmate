@@ -368,9 +368,14 @@ write_transcript() {
   done
 }
 
+# The run's own work folder, as the entrypoint names it: <work root>/<pack parent>-<pack>.
+work_of() { # <pack>
+  printf '%s/work/%s-%s' "$TMP_ROOT" "$(basename "$(dirname "$1")")" "$(basename "$1")"
+}
+
 # A clean transcript beside the leak world's pack: the reviewer read only the pack's contract.
 clean_transcript() { # <file> [pack]
-  write_transcript "$1" "$TMP_ROOT/work" "$(tool_call read path "${2:-$LEAK_PACK}/contract.md")"
+  write_transcript "$1" "$(work_of "${2:-$LEAK_PACK}")" "$(tool_call read path "${2:-$LEAK_PACK}/contract.md")"
 }
 
 run_check() { # <report> [transcript] -> sets CHECK_OUT and CHECK_RC
@@ -440,15 +445,13 @@ test_leak_check_revision_paths_and_excluded_directories() {
   write_report "$rep" "$pack2/contract.md" "$LEAK_ROOT/bin/fm-spawn.sh"
   CHECK_RC=0
   CHECK_OUT=$(REVIEW_SKILLS_DIR="$LEAK_SKILLS" REVIEW_RUBRIC="$LEAK_ROOT/docs/review-rubric.md" \
-    "$PACK_BIN" check --pack "$pack2" --report "$rep" 2>&1) || CHECK_RC=$?
+    "$PACK_BIN" check --pack "$pack2" --report "$rep" --log "$(clean_transcript "$TMP_ROOT/ct2.jsonl" "$pack2" && echo "$TMP_ROOT/ct2.jsonl")" 2>&1) || CHECK_RC=$?
   assert_equals 3 "$CHECK_RC" "a file below an excluded directory was allowed"
-  # A run log that names an excluded path voids the round.
-  printf 'I also read %s\n' "$LEAK_ROOT/sources/notes.md" >"$TMP_ROOT/run.log"
+  # A run transcript that records a read of an excluded path voids the round.
+  write_transcript "$TMP_ROOT/run.jsonl" "$(work_of "$LEAK_PACK")" "$(tool_call read path "$LEAK_ROOT/sources/notes.md")"
   write_report "$rep" "$LEAK_PACK/contract.md"
-  CHECK_RC=0
-  CHECK_OUT=$(REVIEW_SKILLS_DIR="$LEAK_SKILLS" REVIEW_RUBRIC="$LEAK_ROOT/docs/review-rubric.md" \
-    "$PACK_BIN" check --pack "$LEAK_PACK" --report "$rep" --log "$TMP_ROOT/run.log" 2>&1) || CHECK_RC=$?
-  assert_equals 3 "$CHECK_RC" "an excluded path named in the run log was allowed"
+  run_check "$rep" "$TMP_ROOT/run.jsonl"
+  assert_equals 3 "$CHECK_RC" "an excluded path read in the run transcript was allowed"
   pass "revision paths, excluded directories and the run log are judged by the same rules"
 }
 
@@ -564,7 +567,7 @@ test_leak_check_pins_the_rubric_revision() {
     write_report "$rep" "$pack/contract.md" "$1"
     CHECK_RC=0
     CHECK_OUT=$(REVIEW_FM_ROOT="$LEAK_ROOT" REVIEW_SKILLS_DIR="$LEAK_SKILLS" REVIEW_RUBRIC="$LEAK_ROOT/docs/review-rubric.md" \
-      "$PACK_BIN" check --pack "$pack" --report "$rep" 2>&1) || CHECK_RC=$?
+      "$PACK_BIN" check --pack "$pack" --report "$rep" --log "$(clean_transcript "$TMP_ROOT/ct3.jsonl" "$pack" && echo "$TMP_ROOT/ct3.jsonl")" 2>&1) || CHECK_RC=$?
   }
   rubric_check "$rev:docs/review-rubric.md"
   assert_equals 0 "$CHECK_RC" "the pinned rubric revision was flagged: $CHECK_OUT"
@@ -621,6 +624,8 @@ test_leak_check_pinned_rubric_url_and_own_report() {
   mkdir -p "$wr"
   printf 'own report\n' >"$wr/review.md"
   printf 'own log\n' >"$LEAK_PACK/review-run.log"
+  mkdir -p "$LEAK_PACK/omp-session"
+  clean_transcript "$LEAK_PACK/omp-session/s.jsonl"
   printf 'report\n' >"$LEAK_PACK/review.md"
   # Compliant: the pinned rubric by either URL form, the run's own report and log, and the work-root report.
   write_report "$rep" "$LEAK_PACK/contract.md" "$pinned_raw" "$pinned_blob" "$LEAK_PACK/review.md" "$LEAK_PACK/review-run.log" "$wr/review.md"
@@ -628,7 +633,7 @@ test_leak_check_pinned_rubric_url_and_own_report() {
   cp "$rep" "$LEAK_PACK/review.md"
   CHECK_RC=0
   CHECK_OUT=$(REVIEW_FM_ROOT="$LEAK_ROOT" REVIEW_WORK_ROOT="$TMP_ROOT/work" REVIEW_SKILLS_DIR="$LEAK_SKILLS" REVIEW_RUBRIC="$LEAK_ROOT/docs/review-rubric.md" \
-    "$PACK_BIN" check --pack "$LEAK_PACK" --report "$LEAK_PACK/review.md" --log "$LEAK_PACK/review-run.log" 2>&1) || CHECK_RC=$?
+    "$PACK_BIN" check --pack "$LEAK_PACK" --report "$LEAK_PACK/review.md" --log "$LEAK_PACK/omp-session" 2>&1) || CHECK_RC=$?
   assert_equals 0 "$CHECK_RC" "the pinned rubric URL or the run's own report was flagged: $CHECK_OUT"
   assert_contains "$CHECK_OUT" "INPUT CLEAN" "the compliant list was not reported clean"
   # Noncompliant: each of these still leaks.
@@ -636,7 +641,7 @@ test_leak_check_pinned_rubric_url_and_own_report() {
     write_report "$LEAK_PACK/review.md" "$LEAK_PACK/contract.md" "$1"
     CHECK_RC=0
     CHECK_OUT=$(REVIEW_FM_ROOT="$LEAK_ROOT" REVIEW_WORK_ROOT="$TMP_ROOT/work" REVIEW_SKILLS_DIR="$LEAK_SKILLS" REVIEW_RUBRIC="$LEAK_ROOT/docs/review-rubric.md" \
-      "$PACK_BIN" check --pack "$LEAK_PACK" --report "$LEAK_PACK/review.md" --log "$LEAK_PACK/review-run.log" 2>&1) || CHECK_RC=$?
+      "$PACK_BIN" check --pack "$LEAK_PACK" --report "$LEAK_PACK/review.md" --log "$LEAK_PACK/omp-session" 2>&1) || CHECK_RC=$?
     assert_equals 3 "$CHECK_RC" "$2 was allowed"
   }
   leak_one "https://raw.githubusercontent.com/owner/repo/0000000000000000000000000000000000000000/docs/review-rubric.md" "an unpinned rubric revision"
@@ -1213,7 +1218,7 @@ test_build_requires_a_root() {
   printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- target.md\n- %s\n\n## Findings\n' "$pack/contract.md" >"$rep"
   CHECK_RC=0
   CHECK_OUT=$(REVIEW_SKILLS_DIR="$LEAK_SKILLS" REVIEW_RUBRIC="$LEAK_ROOT/docs/review-rubric.md" \
-    "$PACK_BIN" check --pack "$pack" --report "$rep" 2>&1) || CHECK_RC=$?
+    "$PACK_BIN" check --pack "$pack" --report "$rep" --log "$(clean_transcript "$TMP_ROOT/ct4.jsonl" "$pack" && echo "$TMP_ROOT/ct4.jsonl")" 2>&1) || CHECK_RC=$?
   assert_equals 0 "$CHECK_RC" "a relative pack file was flagged: $CHECK_OUT"
   pass "a build needs --root, and a relative pack file is clean"
 }
@@ -1405,7 +1410,7 @@ test_rubric_revision_is_pinned_with_a_root() {
     write_report "$rep" "$pack/contract.md" "$1"
     CHECK_RC=0
     CHECK_OUT=$(REVIEW_FM_ROOT="$LEAK_ROOT" REVIEW_SKILLS_DIR="$LEAK_SKILLS" REVIEW_RUBRIC="$LEAK_ROOT/docs/review-rubric.md" \
-      "$PACK_BIN" check --pack "$pack" --report "$rep" 2>&1) || CHECK_RC=$?
+      "$PACK_BIN" check --pack "$pack" --report "$rep" --log "$(clean_transcript "$TMP_ROOT/ct5.jsonl" "$pack" && echo "$TMP_ROOT/ct5.jsonl")" 2>&1) || CHECK_RC=$?
   }
   rubric_check "$pin:docs/review-rubric.md"
   assert_equals 0 "$CHECK_RC" "the pinned rubric revision was flagged with a root: $CHECK_OUT"
@@ -1616,21 +1621,21 @@ test_transcript_reads_are_audited_and_the_log_is_required() {
   make_leak_world
   write_report "$rep" "$LEAK_PACK/target.md"
   # Noncompliant: the transcript records a read of an earlier report the list does not name.
-  write_transcript "$log" "$TMP_ROOT/work" "$(tool_call read path "$LEAK_PACK/target.md")" \
+  write_transcript "$log" "$(work_of "$LEAK_PACK")" "$(tool_call read path "$LEAK_PACK/target.md")" \
     "$(tool_call read path "$LEAK_ROOT/data/case/truth/r23-review.md:raw:1-20")"
   run_check "$rep" "$log"
   assert_equals 3 "$CHECK_RC" "a transcript read of an earlier report was accepted: $CHECK_OUT"
   assert_contains "$CHECK_OUT" "INPUT LEAK" "the transcript read did not void as a leak"
   # Noncompliant: a search over an ignored folder, and shell text that opens one.
-  write_transcript "$log" "$TMP_ROOT/work" "$(tool_call grep pattern F1 path "$LEAK_ROOT/data/case" gitignore false)"
+  write_transcript "$log" "$(work_of "$LEAK_PACK")" "$(tool_call grep pattern F1 path "$LEAK_ROOT/data/case" gitignore false)"
   run_check "$rep" "$log"
   assert_equals 3 "$CHECK_RC" "a transcript search of an ignored folder was accepted: $CHECK_OUT"
-  write_transcript "$log" "$TMP_ROOT/work" "$(tool_call bash command "cat '$LEAK_ROOT/data/case/truth/r23-review.md'")"
+  write_transcript "$log" "$(work_of "$LEAK_PACK")" "$(tool_call bash command "cat '$LEAK_ROOT/data/case/truth/r23-review.md'")"
   run_check "$rep" "$log"
   assert_equals 3 "$CHECK_RC" "a shell read of an earlier report was accepted: $CHECK_OUT"
   # Compliant: pack files, the two named skills by skill URL and by path, the rubric, a tracked
   # file, a relative read of the work folder's own review, and an absent file the reviewer tried.
-  write_transcript "$log" "$TMP_ROOT/work" "$(tool_call read path skill://assess-done-and-grade)" \
+  write_transcript "$log" "$(work_of "$LEAK_PACK")" "$(tool_call read path skill://assess-done-and-grade)" \
     "$(tool_call read path "$LEAK_PACK/contract.md:12-40")" "$(tool_call read path "$LEAK_PACK/target.md")" \
     "$(tool_call read path "$LEAK_SKILLS/define-done-and-grading/SKILL.md")" \
     "$(tool_call read path "$LEAK_ROOT/docs/review-rubric.md")" "$(tool_call read path "$LEAK_ROOT/bin/fm-spawn.sh")" \
@@ -1638,6 +1643,17 @@ test_transcript_reads_are_audited_and_the_log_is_required() {
     "$(tool_call grep pattern A1 path "$LEAK_PACK" gitignore true)"
   run_check "$rep" "$log"
   assert_equals 0 "$CHECK_RC" "a clean transcript was flagged: $CHECK_OUT"
+  # The reviewer's own scratch in its work folder is clean; the entrypoint's copy of
+  # OPERATIONAL-BOUNDARIES.md there is not an authorized input (not widened; Main decides).
+  mkdir -p "$(work_of "$LEAK_PACK")"
+  printf 'probe\n' >"$(work_of "$LEAK_PACK")/probe.txt"
+  printf 'boundaries\n' >"$(work_of "$LEAK_PACK")/OPERATIONAL-BOUNDARIES.md"
+  write_transcript "$log" "$(work_of "$LEAK_PACK")" "$(tool_call read path probe.txt)"
+  run_check "$rep" "$log"
+  assert_equals 0 "$CHECK_RC" "a read of the reviewer's own scratch was flagged: $CHECK_OUT"
+  write_transcript "$log" "$(work_of "$LEAK_PACK")" "$(tool_call read path OPERATIONAL-BOUNDARIES.md)"
+  run_check "$rep" "$log"
+  assert_equals 3 "$CHECK_RC" "a read of the entrypoint's OPERATIONAL-BOUNDARIES.md copy was accepted: $CHECK_OUT"
   # The log is required, and a text log that records no tool call cannot be audited.
   rc=0
   REVIEW_SKILLS_DIR="$LEAK_SKILLS" REVIEW_RUBRIC="$LEAK_ROOT/docs/review-rubric.md" \
@@ -1743,4 +1759,7 @@ fm_test_run_cases \
   test_author_history_subheading_in_contract_refused \
   test_author_conclusion_line_in_request_or_context_refused \
   test_responses_criterion_and_contract_review_scope_build \
+  test_headingless_list_of_an_extensionless_path_voids \
+  test_transcript_reads_are_audited_and_the_log_is_required \
+  test_authorized_spaced_path_is_clean \
   -- "$@"

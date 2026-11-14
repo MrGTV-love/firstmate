@@ -11,7 +11,7 @@
 #       [--register <path>] [--history <path>] [--policy <file>]
 #       [--out-root <dir>]
 #   fm-contract-review-pack.sh check --pack <dir> --report <file>
-#       [--log <file>] [--manifest <file>]
+#       --log <session-transcript> [--manifest <file>]
 #
 # build: prints the pack directory on stdout, and nothing else there.
 #   The pack is <out-root>/pack. <out-root> is a fresh mktemp -d unless --out-root
@@ -52,9 +52,22 @@
 #   It always holds the real path of every input file (the contract, the request,
 #   each context file), the register and history paths when given, and every
 #   --exclude path. The policy is --policy, else the skill next to this script.
-# check: reads the report's `Inputs read` list and, when given, the run log, and
-#   prints INPUT LEAK lines plus ROUND VOID (exit 3) when the list is missing or a
-#   listed path is not an authorized input; prints INPUT CLEAN (exit 0) otherwise.
+# check: reads the report's `Inputs read` list and the run's session transcript (--log,
+#   required: the entrypoint's omp-session folder or one of its .jsonl files; a log that
+#   records no tool call exits 2, because the run's reads cannot be audited from it), and
+#   prints INPUT LEAK lines plus ROUND VOID (exit 3) when the list is missing, a listed path
+#   is not an authorized input, or the transcript records a read that is not one; prints
+#   INPUT CLEAN (exit 0) otherwise. From the transcript, every read path, every grep, glob
+#   or find root, and every path the shared tokenizer finds in shell or eval text is judged
+#   by the same rules as the list, and none of them is counted as a listed input. A path
+#   that no longer exists is skipped, and so is a shell or eval path in a system or tool
+#   folder (/usr, /bin, /opt, /dev, /etc and the like). A folder read or search is
+#   authorized inside the pack; inside the run's work folder (the session's folder) unless
+#   it holds the entrypoint's OPERATIONAL-BOUNDARIES.md copy; and under the root when the
+#   folder is not ignored and the search honours .gitignore. The run's own subagent,
+#   artifact, background-job and session reads (agent://, artifact://, proc://,
+#   history://) and the two named skills by skill:// are authorized; another skill, any
+#   other scheme (pr://, ssh://) and any other tool that can read are leaks.
 #   Each report field sits under a Markdown heading of its own (ATX, or setext at level 1
 #   or 2). An `Inputs read` bold line, `Label:` line or inline list with no heading voids
 #   the round (REPORT STRUCTURE, not INPUT LEAK) when it holds a path or the next
@@ -86,8 +99,9 @@
 #   Two exact exemptions: the pinned rubric read by URL (raw.githubusercontent.com or
 #   github.com blob URL of this repository's origin at exactly the rubric revision the
 #   entrypoint pins; any other URL, repository or revision is a leak), and the run's own
-#   report and log (--report, --log, and the entrypoint's work-root review.md for this
-#   pack; no other review.md).
+#   report, transcript and work folder (--report, --log and anything below it, the
+#   entrypoint's work-root review.md for this pack, and the session's own folder except its
+#   OPERATIONAL-BOUNDARIES.md copy; no other review.md).
 #   Skill directory: $REVIEW_SKILLS_DIR, default ~/.agents/skills. Rubric:
 #   $REVIEW_RUBRIC, else $REVIEW_FM_ROOT/docs/review-rubric.md (the entrypoint's
 #   own variables), else this repository's docs/review-rubric.md.
@@ -451,13 +465,39 @@ cmd_build() {
   printf '%s\n' "$pack"
 }
 
+# The one candidate tokenizer, shared by the report's list and the transcript's shell text.
+# shellcheck disable=SC2016 # awk program, not shell
+PIECES_AWK='
+# The path candidates in s: cut s at every character that cannot be part of a path, and
+# at a dot that ends a word; then every word of a piece that holds a "/" or a ".", and
+# every run of words in the same piece that starts with one. Prints each new candidate,
+# or with mark set only records it as seen.
+function pieces(s, mark,   np, seg, p, n, tok, k, m, run) {
+  gsub(/\.+([ \t]|$)/, " ", s)
+  np = split(s, seg, /[^A-Za-z0-9_.\/~@+% \t-]/)
+  for (p = 1; p <= np; p++) {
+    n = split(seg[p], tok, /[ \t]+/)
+    for (k = 1; k <= n; k++) {
+      if (tok[k] !~ /[\/.]/) continue
+      run = ""
+      for (m = k; m <= n; m++) {
+        if (tok[m] == "") break
+        run = (m == k) ? tok[m] : run " " tok[m]
+        if (!(run in seen)) { seen[run] = 1; if (!mark) print "?\t" run }
+      }
+    }
+  }
+}
+'
+
 # Print the entries of the report's `Inputs read` list, one per line.
 inputs_read() { # <report>
-  awk '
+  awk "$PIECES_AWK"'
     function entry(s,   t) {
       sub(/^[ \t]*([-*+]|[0-9]+[.)])[ \t]+/, "", s)
       gsub(/^[ \t]+/, "", s)
-      if (substr(s, 1, 1) == "`") {
+      quoted = substr(s, 1, 1) == "`"
+      if (quoted) {
         t = substr(s, 2)
         sub(/`.*/, "", t)
       } else {
@@ -483,26 +523,6 @@ inputs_read() { # <report>
     function pathlike(s) {
       return s ~ /(^|[^A-Za-z0-9_.-])~?\/[A-Za-z0-9._-]/ || s ~ /[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\.[A-Za-z0-9]+/ ||
         s ~ /https?:\/\// || s ~ /(^|[^A-Za-z0-9])([0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]+|HEAD):[^ \t:]/
-    }
-    # The path candidates in s: cut s at every character that cannot be part of a path, and
-    # at a dot that ends a word; then every word of a piece that holds a "/" or a ".", and
-    # every run of words in the same piece that starts with one. Prints each new candidate,
-    # or with mark set only records it as seen.
-    function pieces(s, mark,   np, seg, p, n, tok, k, m, run) {
-      gsub(/\.+([ \t]|$)/, " ", s)
-      np = split(s, seg, /[^A-Za-z0-9_.\/~@+% \t-]/)
-      for (p = 1; p <= np; p++) {
-        n = split(seg[p], tok, /[ \t]+/)
-        for (k = 1; k <= n; k++) {
-          if (tok[k] !~ /[\/.]/) continue
-          run = ""
-          for (m = k; m <= n; m++) {
-            if (tok[m] == "") break
-            run = (m == k) ? tok[m] : run " " tok[m]
-            if (!(run in seen)) { seen[run] = 1; if (!mark) print "?\t" run }
-          }
-        }
-      }
     }
     function hlevel(s,   n) {
       n = 0
@@ -556,7 +576,8 @@ inputs_read() { # <report>
         lead = state == 1 && is_path(L[i])
         if (lead) {
           t = entry(L[i])
-          if (t !~ /^[A-Za-z0-9_.~\/:#@+%-]+$/ || pathlike(rest_of(L[i]))) badpath = 1
+          # Inside backticks a full path may hold spaces; elsewhere a space ends it.
+          if (t !~ (quoted ? "^[A-Za-z0-9_.~/:#@+% -]+$" : "^[A-Za-z0-9_.~/:#@+%-]+$") || pathlike(rest_of(L[i]))) badpath = 1
           else print t
         }
         if (!body[i]) {
@@ -564,13 +585,16 @@ inputs_read() { # <report>
           # The list starts at a heading of its own, ATX or setext.
           if (low ~ ("^#+[ \t]+" name "$")) { start = hlevel(l); state = 1; continue }
           if (sl && low ~ ("^" name "$")) { start = sl; state = 1; i++; continue }
-          # Any other `Inputs read` line that holds a path, or whose next non-blank line
-          # starts with a path, is a list with no heading and voids the round (exit 4).
+          # Any other `Inputs read` label is a list with no heading and voids the round
+          # (exit 4) when nothing follows it on its line, so the list is what comes next, or
+          # when what follows names a path (a leading path, or a word with a "/" or a "." once
+          # a dot that ends a word is dropped). Only a label followed by prose is a mention.
           if (low ~ label) {
             rest = low
             sub(/^.*inputs read[*]*:?[*]*[ \t]*/, "", rest)
-            for (j = i + 1; j <= N && L[j] ~ /^[ \t]*$/; j++) ;
-            if (is_path(rest) || (j <= N && is_path(L[j]))) noheading = 1
+            words = rest
+            gsub(/\.+([ \t]|$)/, " ", words)
+            if (rest ~ /^[ \t]*$/ || is_path(rest) || words ~ /[\/.]/) noheading = 1
             continue
           }
           if (state == 1 && ((l ~ /^#+([ \t]|$)/ && hlevel(l) <= start) || (sl && sl <= start))) { state = 2; continue }
@@ -596,6 +620,103 @@ inputs_read() { # <report>
   ' "$1"
 }
 
+# Read the run's session transcript (the entrypoint's omp-session folder, or one of its .jsonl
+# files) and print one line per recorded read, all tab-separated:
+#   R <path>          a file or folder the run read (absolute; relative ones resolve against the
+#                     session's own folder); judged when it exists
+#   U <url>           a URL the run read
+#   L <what> <why>    a read that is never an authorized input
+#   D <flag> <path>   a search root (grep, glob, find); flag is the call's gitignore setting
+#   W <path>          the session's own folder (the reviewer's work folder)
+# Shell and eval text goes to the file named by the first argument, one call per line, for the
+# shared candidate tokenizer. Exit 4 when no session record holds a tool call.
+# shellcheck disable=SC2016 # python program, not shell
+TRANSCRIPT_PY='
+import json, os, re, sys
+code_out = open(sys.argv[1], "w")
+files = []
+for a in sys.argv[2:]:
+    if os.path.isdir(a):
+        for d, _, names in os.walk(a):
+            files += [os.path.join(d, n) for n in sorted(names) if n.endswith(".jsonl")]
+    else:
+        files.append(a)
+NAMED = ("assess-done-and-grade", "define-done-and-grading")
+SKIP = {"todo", "wait", "write", "edit", "task", "ask", "notebook_edit"}
+calls = 0
+out = set()
+def emit(*f):
+    out.add("\t".join(str(x).replace("\t", " ").replace("\n", " ") for x in f))
+def read_path(p, cwd):
+    p = re.sub(r"(:raw)?(:L?[0-9]+(-L?[0-9]+)?)?(:raw)?$", "", p)
+    m = re.match(r"^([a-z][a-z0-9+.-]*)://(.*)$", p)
+    if m:
+        scheme, rest = m.group(1), m.group(2)
+        if scheme in ("http", "https"):
+            emit("U", p)
+        elif scheme == "skill":
+            if rest.split("/")[0] not in NAMED:
+                emit("L", p, "a skill other than the two named references")
+        elif scheme not in ("agent", "artifact", "proc", "history"):
+            # agent, artifact, proc and history are the subagents, tool output,
+            # background jobs and session of this run; anything else (pr, ssh) is outside the inputs.
+            emit("L", p, "a " + scheme + ":// read outside the allowed inputs")
+        return
+    if p:
+        emit("R", os.path.normpath(os.path.join(cwd, os.path.expanduser(p))))
+def search_root(p, cwd, flag):
+    for part in [x.strip() for x in str(p).split(";")]:
+        if not part:
+            continue
+        comps = []
+        for c in os.path.expanduser(part).split("/"):
+            if re.search(r"[*?\[{]", c):
+                break
+            comps.append(c)
+        root = "/".join(comps) or "."
+        emit("D", flag, os.path.normpath(os.path.join(cwd, root)))
+for f in files:
+    cwd = "/"
+    try:
+        lines = open(f, encoding="utf-8", errors="replace").read().splitlines()
+    except OSError:
+        continue
+    for line in lines:
+        try:
+            o = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(o, dict):
+            continue
+        if o.get("type") == "session" and o.get("cwd"):
+            cwd = o["cwd"]
+            emit("W", os.path.normpath(cwd))
+        msg = o.get("message")
+        content = msg.get("content") if isinstance(msg, dict) else None
+        if not isinstance(content, list):
+            continue
+        for c in content:
+            if not isinstance(c, dict) or c.get("type") != "toolCall":
+                continue
+            calls += 1
+            name = c.get("name") or ""
+            a = c.get("arguments") if isinstance(c.get("arguments"), dict) else {}
+            here = a.get("cwd") or cwd
+            if name == "read":
+                read_path(str(a.get("path", "")), here)
+            elif name in ("grep", "glob", "find"):
+                g = a.get("gitignore")
+                search_root(a.get("path") or ".", here, "false" if g is False or str(g).lower() == "false" else "true")
+            elif name in ("bash", "eval"):
+                text = str(a.get("command") or a.get("code") or "")
+                code_out.write(text.replace("\n", " ") + "\n")
+            elif name not in SKIP:
+                emit("L", name, "an unaudited tool call")
+code_out.close()
+print("\n".join(sorted(out)))
+sys.exit(0 if calls else 4)
+'
+
 manifest_lines() { # <manifest> <kind>
   awk -F '\t' -v k="$2" '$1 == k { print $2 }' "$1"
 }
@@ -606,13 +727,40 @@ path_under() { # <path> <dir>: true when path equals dir or lies below it
   return 1
 }
 
+# Why a search or folder read is a leak, or nothing when it is authorized: inside the pack;
+# inside the work folder when that holds no copy of OPERATIONAL-BOUNDARIES.md below it; or a
+# folder under the root that is not ignored, by a search that honours .gitignore.
+search_leak() { # <dir> <gitignore-flag> <pack> <root> <work> <opb> <manifest>
+  local d=$1 x
+  while IFS= read -r x; do
+    [ -n "$x" ] || continue
+    if path_under "$d" "$x" || path_under "$x" "$d"; then echo "a search that reaches excluded path $x"; return; fi
+  done <<EOF
+$(manifest_lines "$7" exclude)
+EOF
+  if path_under "$d" "$3"; then return; fi
+  if [ -n "$5" ] && path_under "$d" "$5"; then
+    if [ -e "$6" ] && path_under "$6" "$d"; then echo "a search of the work folder, which holds the entrypoint's copy of OPERATIONAL-BOUNDARIES.md"; fi
+    return
+  fi
+  if path_under "$d" "$4"; then
+    if env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_COMMON_DIR git -C "$4" check-ignore -q -- "$d" 2>/dev/null; then
+      echo "a search of an ignored folder under the root"
+    elif [ "$2" = false ]; then
+      echo "a search under the root that reads ignored files"
+    fi
+    return
+  fi
+  echo "a search or folder read outside the allowed inputs"
+}
+
 cmd_check() {
   local pack='' report='' log='' manifest=''
   while [ $# -gt 0 ]; do
     case "$1" in
       --pack) [ $# -ge 2 ] || die "--pack needs a directory"; pack=$2; shift 2 ;;
       --report) [ $# -ge 2 ] || die "--report needs a file"; report=$2; shift 2 ;;
-      --log) [ $# -ge 2 ] || die "--log needs a file"; log=$2; shift 2 ;;
+      --log) [ $# -ge 2 ] || die "--log needs the run's session transcript"; log=$2; shift 2 ;;
       --manifest) [ $# -ge 2 ] || die "--manifest needs a file"; manifest=$2; shift 2 ;;
       -h | --help) usage; exit 0 ;;
       *) die "unknown argument: $1" ;;
@@ -620,7 +768,8 @@ cmd_check() {
   done
   [ -d "$pack" ] || die "pack is not a directory: $pack"
   [ -f "$report" ] && [ -r "$report" ] || die "report not readable: $report"
-  [ -z "$log" ] || { [ -f "$log" ] && [ -r "$log" ] || die "log not readable: $log"; }
+  [ -n "$log" ] || die "--log is required: the run's session transcript (the entrypoint's omp-session folder or one of its .jsonl files)"
+  { [ -f "$log" ] || [ -d "$log" ]; } && [ -r "$log" ] || die "log not readable: $log"
   pack=$(real "$pack")
   [ -n "$manifest" ] || manifest="$(dirname "$pack").excluded-paths"
   [ -f "$manifest" ] && [ -r "$manifest" ] || die "manifest not readable: $manifest"
@@ -642,10 +791,9 @@ cmd_check() {
   origin=$(env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_COMMON_DIR git -C "$fmroot" remote get-url origin 2>/dev/null || true)
   slug=$(printf '%s' "$origin" | sed -nE 's#^(https?://[^/]*github\.com/|git@github\.com:|ssh://git@github\.com/)([^/]+/[^/]+)$#\2#p' | sed -E 's#\.git$##')
   report_real=$(real "$report")
-  log_real=''
-  [ -z "$log" ] || log_real=$(real "$log")
+  log_real=$(real "$log")
   work_report=$(real "${REVIEW_WORK_ROOT:-$fmroot/data/review-lane/work}/$(basename "$(dirname "$pack")")-$(basename "$pack")/review.md")
-  local leaks=0 count=0 entry prev path revpath rel rev excluded x ok why mention
+  local leaks=0 count=0 entry prev path revpath rel rev excluded x ok why mention work='' opb='' flag
   local list raw rc=0
   raw=$(inputs_read "$report") || rc=$?
   case $rc in
@@ -670,6 +818,30 @@ cmd_check() {
     echo "ROUND VOID: the report must list every file the reviewer opened under Inputs read"
     exit 3
   fi
+  # The transcript is the record of what the run opened: every read, search root and path in
+  # shell or eval text it records is judged by the same rules as the list, and never counted.
+  local tx code txrc=0
+  code=$(mktemp) || die "cannot create a scratch file"
+  # shellcheck disable=SC2064
+  trap "rm -f '$code'" EXIT
+  tx=$(python3 -I -c "$TRANSCRIPT_PY" "$code" "$log") || txrc=$?
+  [ "$txrc" = 0 ] || die "log records no tool call, so it is not a session transcript and the run's reads cannot be audited: $log"
+  work=$(printf '%s\n' "$tx" | awk -F '\t' '$1 == "W" { print $2; exit }')
+  if [ -n "$work" ]; then
+    work=$(real "$work")
+    # The entrypoint copies OPERATIONAL-BOUNDARIES.md into the work folder; it is not an
+    # authorized input, so the work folder authorizes everything but that copy.
+    opb="$work/OPERATIONAL-BOUNDARIES.md"
+  fi
+  list=$(
+    printf '%s\n' "$list"
+    printf '%s\n' "$tx" | grep -v '^W	' || true
+    awk "$PIECES_AWK"'{ delete seen; pieces($0, 0) }' "$code" | awk -F '\t' '
+      # A shell or eval path outside the places inputs live (system and tool folders) is no input.
+      $2 ~ /^(\/(usr|bin|sbin|opt|System|Library|dev|etc|private\/etc|Applications|nix|proc)(\/|$)|\/?$)/ { next }
+      $2 ~ /^(\/|~\/)/ { print "R\t" $2; next }
+      { print }' | sort -u
+  )
   while IFS= read -r entry; do
     [ -n "$entry" ] || continue
     rev=''
@@ -680,6 +852,30 @@ cmd_check() {
         mention=1
         entry=${entry#"?	"}
         [ -e "$pack/$entry" ] || [ -e "$root/$entry" ] || [ -L "$root/$entry" ] || continue
+        ;;
+      "L	"*)
+        entry=${entry#"L	"}
+        leaks=$((leaks + 1))
+        echo "INPUT LEAK: ${entry%%	*}: ${entry#*	} (session transcript)"
+        continue
+        ;;
+      "U	"*)
+        mention=1
+        entry=${entry#"U	"}
+        ;;
+      "R	"* | "D	"*)
+        mention=1
+        flag=true
+        case $entry in "D	"*) entry=${entry#"D	"}; flag=${entry%%	*}; entry=${entry#*	} ;; *) entry=${entry#"R	"} ;; esac
+        [ -e "$entry" ] || [ -L "$entry" ] || continue
+        if [ -d "$entry" ]; then
+          why=$(search_leak "$(real "$entry")" "$flag" "$pack" "$root" "$work" "$opb" "$manifest")
+          if [ -n "$why" ]; then
+            leaks=$((leaks + 1))
+            echo "INPUT LEAK: $entry: $why (session transcript)"
+          fi
+          continue
+        fi
         ;;
     esac
     # A trailing line reference (path:12, path:12-40, path:L10-L40, path#L10) names the same file.
@@ -727,10 +923,14 @@ cmd_check() {
     done <<EOF
 $(manifest_lines "$manifest" exclude)
 EOF
-    if [ "$path" = "$report_real" ] || { [ -n "$log_real" ] && [ "$path" = "$log_real" ]; } || [ "$path" = "$work_report" ]; then
+    if [ "$path" = "$report_real" ] || path_under "$path" "$log_real" || [ "$path" = "$work_report" ]; then
       ok=1
     elif [ -n "$excluded" ]; then
       why="excluded path $excluded"
+    elif [ -n "$work" ] && [ "$path" = "$opb" ]; then
+      why="the entrypoint's copy of OPERATIONAL-BOUNDARIES.md, which is not an authorized input"
+    elif [ -n "$work" ] && path_under "$path" "$work"; then
+      ok=1
     elif [ -z "$rev" ] && path_under "$path" "$pack"; then
       ok=1
     elif [ -z "$rev" ] && { [ "$path" = "$rubric_real" ] || [ "$path" = "$assess_dir/SKILL.md" ] || [ "$path" = "$define_dir/SKILL.md" ]; }; then
@@ -758,17 +958,6 @@ EOF
   done <<EOF
 $list
 EOF
-  if [ -n "$log" ]; then
-    while IFS= read -r x; do
-      [ -n "$x" ] || continue
-      if grep -qF -- "$x" "$log"; then
-        leaks=$((leaks + 1))
-        echo "INPUT LEAK: $x: excluded path named in the run log"
-      fi
-    done <<EOF
-$(manifest_lines "$manifest" exclude)
-EOF
-  fi
   if [ "$leaks" -gt 0 ]; then
     echo "ROUND VOID: $leaks input leak(s); rerun on a fresh pack, and do not count this round"
     exit 3

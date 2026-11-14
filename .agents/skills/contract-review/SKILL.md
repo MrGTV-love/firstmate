@@ -39,7 +39,8 @@ Use a reviewer model outside the author's family.
 Never retry a model that failed; switch to another allowed model.
 Never run a review in a pack folder that already holds a report.
 
-After the run, run `bin/fm-contract-review-pack.sh check`.
+After the run, run `bin/fm-contract-review-pack.sh check` with `--log <pack>/omp-session`, the session transcript the entrypoint writes into the pack folder.
+The transcript is the record of what the run opened: the check judges every read, search and shell path it records by the same rules as the list, and refuses a log that records no tool call.
 A report with no `Inputs read` list, or a listed path that is not an authorized input, is an `INPUT LEAK`.
 A report field under a bold or plain label instead of a heading of its own (an `Inputs read` list with no heading, or a bold or plain label inside the list that starts with a report field name), and a list line that holds a path other than its one leading full path, are `REPORT STRUCTURE` faults, and each voids the round the same way.
 A leaked round is void: it is not a round, it is not recorded in the register, and it is rerun on a fresh pack.
