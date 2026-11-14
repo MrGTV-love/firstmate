@@ -4405,6 +4405,26 @@ class SecondPersonTest(unittest.TestCase):
             self.assertEqual(self.literal(second_line), text)
             self.assertEqual(second_line.count('"'), owner_line.count('"'))
 
+    def test_r3_f7_the_preflight_predicts_the_exact_bytes_of_every_state_their_request_leaves(self):
+        """Finding 7 of the review of d0b0c216: the drift guard of request_artifacts for the second person's request as for the owner's. The journal states that the
+        pre-flight builds as copies (staged, attempted, posted, delivered) are byte for byte states the real run writes."""
+        with self.second() as (watch, replay):
+            self.says(replay, '200.000100', 'their request with "quotes", a backslash \\ and   spaces')
+            message = [m for m in replay.state['messages'] if m['ts'] == '200.000100'][0]
+            row = watch.request_from(message, second=True)
+            artifacts = watch.request_artifacts(row)
+            written, real = [], plane.save
+
+            def spy(path, value):
+                written.append(json.dumps(value, ensure_ascii=False))
+                return real(path, value)
+            with patch.object(plane, 'save', spy):
+                self.again(watch)
+            self.assertEqual(len(self.wakes(watch)), 1)
+            staged, attempted, posted, delivered = artifacts[0][0], artifacts[1][0], artifacts[2][0], artifacts[7][0]
+            for label, text in (('staged', staged), ('attempted', attempted), ('posted', posted), ('delivered', delivered)):
+                self.assertIn(text, written, label)
+
     SECOND_B = 'U0SYNTHSEC2'
 
     @staticmethod

@@ -1970,7 +1970,13 @@ class Watch:
 
         def add_state(shape, note=None, tail=None):
             state, mine, line, count, start = copy.deepcopy(self.state), dict(row), None, 0, 0
-            state['intake_cursor'] = row['thread']
+            # The cursor that intake really moves (take_in_requests): the owner's at the top of the state, the second person's in their own window; the
+            # model never writes a cursor that the intake leaves as it is, so it can neither miss a value the real journal forms nor refuse one it never forms.
+            if row.get('person') == 'second':
+                window = state.get('second') if isinstance(state.get('second'), dict) else {}
+                state['second'] = dict(window, intake_cursor=row['thread'])
+            else:
+                state['intake_cursor'] = row['thread']
             mine.update(tail or {})
             if note is not None:
                 line, count, start = self.request_wake_parts(mine, note)
