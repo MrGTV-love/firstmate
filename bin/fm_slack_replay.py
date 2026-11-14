@@ -64,6 +64,9 @@ class Replay:
             }
             self.save()
         self.scopes = set(self.transcript.get('scopes', []))
+        # Slack's own clock, as the real transport records it from the Date of each reply: here the transcript's `slack_clock` (seconds since the epoch), set only
+        # after a call that succeeds, and left None when the transcript has none, so that a test can order it against this host's clock as it likes.
+        self.server_time = None
 
     def save(self):
         self.state_path.write_text(json.dumps(self.state, ensure_ascii=False))
@@ -123,7 +126,10 @@ class Replay:
         refuse_outbound(fields, wire=True)
         snapshot = copy.deepcopy(self.state)
         try:
-            return self.replayed(method, **fields)
+            result = self.replayed(method, **fields)
+            if isinstance(self.transcript.get('slack_clock'), (int, float)):
+                self.server_time = float(self.transcript['slack_clock'])
+            return result
         except SecretCollision:
             self.state = snapshot
             self.save()

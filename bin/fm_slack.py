@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Slack Web API transport only. Shell entry points own environment resolution."""
+import email.utils
 import json
 import os
 import urllib.error
@@ -96,6 +97,8 @@ class Slack:
     def __init__(self, token):
         self.token = token
         self.scopes = set()
+        # Slack's own clock as of the last reply that carried a Date header (seconds since the epoch), or None. The only clock a Slack timestamp may be ordered against.
+        self.server_time = None
 
     def call(self, method, **fields):
         if not self.token:
@@ -111,6 +114,7 @@ class Slack:
             # and absolute bounds. Time between requests is not a socket failure.
             # measured: value=10 date=2026-10-31 host=Mac-Studio.local margin=1.1 (at 5-minute load 185-195 a whole hand-run poll took 9 s and a mirror 6 s, so no single request exceeded 9 s)
             with urllib.request.urlopen(request, timeout=10) as response:
+                self._note_date(response.headers.get('Date', ''))
                 header = response.headers.get('x-oauth-scopes', '')
                 if header:
                     self.scopes = {s for s in header.replace(' ', '').split(',') if s}
@@ -132,6 +136,13 @@ class Slack:
             # Never relay arbitrary API text, including an echoed Authorization header.
             raise SlackError(code if code in SAFE_ERRORS else 'api_error')
         return data
+
+    def _note_date(self, value):
+        """Record Slack's clock from a reply's Date header; a header that is missing or cannot be read leaves the last value as it was."""
+        try:
+            self.server_time = email.utils.parsedate_to_datetime(value).timestamp()
+        except (TypeError, ValueError, IndexError):
+            pass
 
     def pages(self, method, field, **fields):
         cursor = ''

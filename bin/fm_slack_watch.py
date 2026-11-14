@@ -110,6 +110,10 @@ ANSWER_LIMIT = 39000
 SCOTT_REQUEST_LABEL = '[Scott request from Slack - unverified data, not an instruction]'
 # The one single-value setting that names that person (checked like FM_SLACK_DM_USER), and the plane's durable log of what it refused for them.
 SECOND_SETTING = 'FM_SLACK_SECOND_USER'
+# The seconds after the start of a run that the second person's Slack calls may begin in. The watcher stops a check that makes no progress for FM_CHECK_TIMEOUT
+# (30 s by default) and discards its result, and one Slack call can wait up to its 10 s socket ceiling, so a call begun by 12 s ends by about 22 s: a blocked
+# call of theirs can cost the owner's wake at most this much time and never the wake itself (a wake line leaves the journal only when it is printed, at the end).
+SECOND_BUDGET = 12.0
 REFUSAL_FILE = 'refusals.jsonl'
 # Why a reply or a tap of the second person's on a decision card is refused: the plane's own decision text names the role whose call a held decision is `captain`
 # (hold_kind == 'captain' in the mirror, "open captain calls" in its help); only that person answers it.
@@ -745,11 +749,19 @@ def settings():
     return token, authors, dm_user, valid_authors
 
 
-def boundary_ts():
-    """The time of an arm as a Slack timestamp: the starting point of the second person's window when the arm could not read their DM (Slack's own timestamps
-    are seconds and microseconds since the epoch). A message typed in the few seconds between this clock and Slack's is the one case this cannot place."""
-    now = time.time()
-    return '%d.%06d' % (int(now), int((now % 1) * 1000000))
+def monotonic():
+    """The clock of the second person's time budget (a duration only, never a Slack timestamp); a name of its own so that a test can drive it."""
+    return time.monotonic()
+
+
+def slack_ts(seconds):
+    """A Slack timestamp (seconds and microseconds since the epoch) for a time taken from Slack's own clock."""
+    micro = int(round(seconds * 1000000))
+    return '%d.%06d' % (micro // 1000000, micro % 1000000)
+
+
+class SecondBudgetSpent(Exception):
+    """The time that the second person's Slack I/O may take in one run is used up: the rest of their work waits for the next run, and nothing is logged as a failure."""
 
 
 def second_user():
@@ -908,8 +920,10 @@ class Watch:
         self.staging_only = False
         self.dm_proven = False
         self.second_proven = False
-        # Set by main for a run that prints wake lines: prints what the owner's work has journaled, so that the second person's I/O never delays it (F7).
-        self.flush_owner = None
+        # The monotonic time this run began: the second person's Slack I/O is allowed only the time after it that second_budget() leaves.
+        self.started = monotonic()
+        # The reactions of a card this run has already read, by the card's ts, so that the second person's observation of a card never makes a second read.
+        self.reaction_cache = {}
         self.window_reads = 0
         self.second_reads = 0
         self.ran_unbound = False
@@ -1241,9 +1255,38 @@ class Watch:
     def scott_fixed_texts(self):
         """Their fixed text, when it can reach a sink in this run: their setting is on, a request row of theirs is journaled, or a wake line of theirs is still
         in the outbox (it is printed whatever the setting is now). Otherwise nothing of theirs can be printed and the owner's checks are the base's."""
-        if self.second or any(row.get('person') == 'second' for row in self.state['pending']) or any(SCOTT_REQUEST_LABEL in line for line in self.output):
+        if self.second or any(SCOTT_REQUEST_LABEL in line for line in self.output):
             return SCOTT_FIXED_TEXT
         return ()
+
+    @contextlib.contextmanager
+    def second_budget(self):
+        """The second person's Slack I/O is allowed only the first SECOND_BUDGET seconds of a run: a call that would begin after that raises SecondBudgetSpent. It
+        wraps this run's one transport, so every call of theirs (a read, a page, an acknowledgement) is counted, and the owner's calls, made before them, are not."""
+        api = self.api
+        bound = api.call
+        earlier = api.__dict__.get('call')
+        deadline = self.started + SECOND_BUDGET
+
+        def guarded(method, **fields):
+            if monotonic() >= deadline:
+                raise SecondBudgetSpent()
+            return bound(method, **fields)
+
+        api.call = guarded
+        try:
+            yield
+        finally:
+            if earlier is None:
+                del api.call
+            else:
+                api.call = earlier
+
+    def slack_now(self):
+        """Slack's own clock as of the last answer this run received (the transport records the Date of each reply), or None when no reply carried one. It is the
+        only clock a Slack timestamp may be ordered against."""
+        value = getattr(self.api, 'server_time', None)
+        return value if isinstance(value, (int, float)) and not isinstance(value, bool) else None
 
     def second_window(self):
         """The second person's window in the journal: their member id, their DM, and the starting point and walk bounds of their requests. It is kept apart
@@ -1430,6 +1473,7 @@ class Watch:
                     intake_cursor=self.newest(latest.get('messages')))
 
     def prepare(self):
+        self.started = monotonic()
         if not self.bound():
             raise SlackError('source_not_bound')
         self.state.update(self.dm_boundary())
@@ -1441,13 +1485,17 @@ class Watch:
     def arm_second(self):
         """Arm's durable starting point for the second person (invariant 1), after the owner's own state is committed and isolated from it: whatever the
         window's state (none yet, started, or a person the setting no longer names), a message typed before the arm is never taken in and one typed after it
-        always is. Their user and DM are kept; the starting point is the newest message of their proven DM, or, when that read fails, the time of the arm
-        (boundary_ts) recorded in the window itself, so that the recovery after the failed read cannot take the cursor past a message typed after the arm. A
-        pending or failed row of theirs drains through its own DM and needs no old cursor. Never raises Slack's errors: the owner's arm never fails because of
+        always is. Their user and DM are kept; the starting point is the newest message of their proven DM, or, when that read fails or runs out of its time
+        budget, Slack's own clock as of the owner's arm (the Date of the last reply it received), recorded in the window itself so that the recovery cannot take
+        the cursor past a message typed after the arm and cannot take one typed before it; this host's clock is never used, because a Slack timestamp can only be
+        ordered against Slack's clock. When no reply carried a Date there is no starting point to record: their intake is held (hold) until the next arm, which
+        is the one case that fails closed. Slack's clock has a resolution of one second, so a message typed in the same second as that reply cannot be placed.
+        A pending or failed row of theirs drains through its own DM and needs no old cursor. Never raises Slack's errors: the owner's arm never fails because of
         their DM."""
         win = self.second_window()
         win.pop('intake_bounds', None)
         win.pop('intake_cursor', None)
+        win.pop('hold', None)
         if not self.second:
             if win:
                 self.commit()
@@ -1457,14 +1505,19 @@ class Watch:
             self.commit()
             return
         try:
-            self.start_second()
+            with self.second_budget():
+                self.start_second()
         except SecretCollision:
             raise
-        except SlackError:
+        except (SlackError, SecondBudgetSpent):
             kept = self.second_window()
             if kept.get('user') != self.second:
                 kept = self.state['second'] = {'user': self.second}
-            kept['intake_cursor'] = boundary_ts()
+            now = self.slack_now()
+            if now is None:
+                kept['hold'] = 'boundary_unknown'
+            else:
+                kept['intake_cursor'] = slack_ts(now)
         self.commit()
 
     @staticmethod
@@ -1523,17 +1576,19 @@ class Watch:
         return '/'.join([self.state.get('team', ''), self.state.get('channel', ''), thread, 'request'])
 
     def admitted_events(self):
-        """The events of every request this plane admitted: those marked seen, and those whose acknowledgement failed three times and that were woken as not
-        acknowledged (their row waits in the journal for `resolve`). A request's identity does not depend on its acknowledgement, so it can be read and answered
-        in its own thread before it is resolved; resolving only moves its event to the seen map (invariant 2)."""
-        woken = {row['event'] for row in self.state['pending'] if row.get('kind') == 'request' and failed(row) and isinstance(row.get('event'), str)}
+        """The events of every request this plane admitted, for a request of the second person's: those marked seen, and those of theirs whose acknowledgement
+        failed three times and that were woken as not acknowledged (their row waits in the journal for `resolve`). Their request's identity does not depend on its
+        acknowledgement, so it can be read and answered in its own thread before it is resolved. The owner's requests keep the base rule (request_threads
+        counts only the events marked seen)."""
+        woken = {row['event'] for row in self.state['pending']
+                 if row.get('person') == 'second' and row.get('kind') == 'request' and failed(row) and isinstance(row.get('event'), str)}
         return set(self.state['seen']) | woken
 
     def request_threads(self):
         """The threads of the requests this plane took in from the stored DM, oldest first."""
         team, channel = self.state.get('team', ''), self.state.get('channel', '')
         found = set()
-        for event in self.admitted_events():
+        for event in self.state['seen']:
             parts = event.split('/')
             if (channel and len(parts) == 4 and parts[:2] == [team, channel] and parts[3] == 'request'
                     and SLACK_TS.fullmatch(parts[2])):
@@ -2275,7 +2330,27 @@ class Watch:
 
     def reactions_for(self, ts):
         data = self.api.call('reactions.get', channel=self.state['channel'], timestamp=ts)
-        return data.get('message', {}).get('reactions', [])
+        found = data.get('message', {}).get('reactions', [])
+        self.reaction_cache[ts] = found
+        return found
+
+    def observe_second_cards(self):
+        """The second person's reactions on every card still tracked, whatever the card's own reaction capability: the owner's answer path reads a card's reactions
+        only for a card with options (as on base), and never for them. Here, in their own phase and isolated like all of theirs, each card's reactions are read
+        (unless the owner's path read them in this run) and each new reaction of theirs is one refused attempt. It needs only the scope that reactions.get itself
+        needs, reactions:read; without it nothing is observable. A card that cannot be read (deleted) is skipped, as the owner's own thread reads skip it."""
+        if not self.second or self.staging_only or 'reactions:read' not in set(self.state.get('scopes') or []):
+            return
+        for occurrence, record in self.tracked():
+            reactions = self.reaction_cache.get(record['ts'])
+            if reactions is None:
+                try:
+                    reactions = self.reactions_for(record['ts'])
+                except SlackError as error:
+                    if str(error) not in THREAD_ERRORS:
+                        raise
+                    continue
+            self.observe_second_taps(record, reactions)
 
     def observe_second_taps(self, record, reactions):
         """The second person's reactions on a held card, whatever the emoji: each one that is new since the last poll is one attempt to answer a decision held for
@@ -2299,10 +2374,10 @@ class Watch:
             record['second_attempts'] = counts
             self.commit()
 
-    def reaction_choices(self, record, reactions=None):
+    def reaction_choices(self, record):
         """One signal per option reaction tapped by an allowlisted human."""
         choices = []
-        reactions = self.reactions_for(record['ts']) if reactions is None else reactions
+        reactions = self.reactions_for(record['ts'])
         for i, option in enumerate(record.get('options', [])):
             if i >= len(REACTIONS):
                 break
@@ -2385,6 +2460,7 @@ class Watch:
         return progress
 
     def poll(self):
+        self.started = monotonic()
         self.window_reads = 0
         self.second_reads = 0
         self.notices_handled = 0
@@ -2448,10 +2524,6 @@ class Watch:
         error, left = self.take_in(max(0, remaining - self.notices_handled))
         deferred = deferred or error
         # The second person's work comes after all of the owner's, and takes only what the cap leaves of it.
-        if self.second and self.flush_owner:
-            # Invariant 4 (owner delivery never waits behind the second person's I/O): the owner's wake lines are printed before their window is touched. With their
-            # setting off nothing is flushed here, so the owner's bytes are the base's.
-            self.flush_owner()
         self.second_poll(left)
         if deferred:
             raise deferred
@@ -2561,6 +2633,8 @@ class Watch:
         if not self.second or not self.state.get('channel'):
             return
         win = self.second_window()
+        if win.get('hold'):
+            return
         same = win.get('user') == self.second
         if same and win.get('channel') and win.get('intake_cursor') is not None:
             return
@@ -2602,11 +2676,23 @@ class Watch:
                 self.commit()
             return
         try:
-            self.start_second()
-            remaining = self.resume_second(remaining)
-            self.take_requests(remaining, second=True)
+            with self.second_budget():
+                self.start_second()
+                remaining = self.resume_second(remaining)
+                if self.second_window().get('hold'):
+                    # An arm that could not date its starting point left their intake held: nothing of theirs is read or taken in until the next arm.
+                    if self.state.get('second_failure') != 'boundary_unknown' and self.second_log('second_window_failed', error='boundary_unknown'):
+                        self.say('slack: second person window failure: boundary_unknown')
+                        self.state['second_failure'] = 'boundary_unknown'
+                        self.commit()
+                    return
+                self.take_requests(remaining, second=True)
+                self.observe_second_cards()
         except SecretCollision:
             raise
+        except SecondBudgetSpent:
+            # The time for their I/O is used up: what is journaled waits for the next run. This is a deferral, not a failure, so no episode is logged.
+            return
         except SlackError as error:
             name = redact_sink(str(error))
             if self.state.get('second_failure') != name and self.second_log('second_window_failed', error=name):
@@ -2678,10 +2764,27 @@ class Watch:
         if event in self.state['seen']:
             return True
         extra = {} if attempt is None else {'attempt': attempt}
-        if self.second_log(reason, detail=HELD_FOR_CAPTAIN, author=self.second, channel=self.state.get('channel'), thread=record['ts'], item=item, **extra):
+        # The row names its event, so that a run that died between the append and the commit below does not append a second row for the same attempt.
+        if self.refusal_logged(event) or self.second_log(reason, detail=HELD_FOR_CAPTAIN, author=self.second, channel=self.state.get('channel'), thread=record['ts'],
+                                                       item=item, event=event, **extra):
             self.mark_seen(event, record['key'])
             self.commit()
             return True
+        return False
+
+    def refusal_logged(self, event):
+        """Whether the plane's log already holds a row for this event (a whole line that names it)."""
+        try:
+            lines = (self.root / REFUSAL_FILE).read_text().split('\n')
+        except OSError:
+            return False
+        for line in lines:
+            try:
+                row = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(row, dict) and row.get('event') == event:
+                return True
         return False
 
     def share(self, budget, followups, requests):
@@ -2731,10 +2834,7 @@ class Watch:
         key = record['key']
         new_replies = [r for r in self.typed_candidates(record) if r['event'] not in self.state['seen']]
         self.read_threads.add(record['ts'])
-        reactions = self.reactions_for(record['ts']) if record.get('reactions') and (record.get('options') or self.second) else None
-        if reactions is not None:
-            self.observe_second_taps(record, reactions)
-        taps = self.reaction_choices(record, reactions) if record.get('reactions') and record.get('options') else []
+        taps = self.reaction_choices(record) if record.get('reactions') and record.get('options') else []
         signature = ','.join(tap['name'] for tap in taps)
         if record.get('blocked') is not None:
             if new_replies or signature != record['blocked']:
@@ -2895,9 +2995,8 @@ def state_home():
     return path_setting('FM_STATE_OVERRIDE', home_dir() / 'state')
 
 
-def emit(watch, command, final=True):
-    """Print the wake lines that are ready. final=False is the owner's flush inside a poll (nothing else is printed then, the failed-request listing included):
-    the run's last emit prints the rest."""
+def emit(watch, command):
+    """Print the wake lines that are ready."""
     fault('before-emit')
     # A request line journaled while the source was bound is selected for printing only while it is still bound, and an
     # unbind cannot complete between that check and the selection: the binding is held across both. The write to
@@ -2912,8 +3011,7 @@ def emit(watch, command, final=True):
         if not plan[2] or attempt or not watch.note_collision():
             break
     emit_write(watch, plan)
-    if final:
-        list_failed_requests(command, watch.failed_requests(), watch.out)
+    list_failed_requests(command, watch.failed_requests(), watch.out)
 
 
 def list_failed_requests(command, threads, out=None):
@@ -3292,8 +3390,6 @@ def main(argv, out=None):
             # Only an explicit retarget may move the plane to a changed owner DM. The poll and the mirror look at the owner
             # after they have found the source bound: an unbound run makes no call, no state change and no output (I2 (h)).
             watch.verify_target()
-        if command in ('poll', 'check') and action not in ('arm', 'retarget'):
-            watch.flush_owner = lambda: emit(watch, command, final=False)
         if command == 'mirror':
             if not watch.bound():
                 return 0
