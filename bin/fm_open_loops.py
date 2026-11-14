@@ -1151,21 +1151,36 @@ class Collector:
         bin/fm-idle-session-reap.sh in state/.idle-reap/<id>.refused (fm-idle-reap-refused-v1: epoch, status line,
         reason). A manual teardown records nothing.
         """
+        return self.teardown_refusal_record(task_id)[0]
+
+    def teardown_refusal_record(self, task_id):
+        """(reason, producer) of the newest recorded refusal, or ("", "").
+
+        Newest means written last: both records are ordered by their file's write time in nanoseconds,
+        because the idle reaper's memo stamps the reaper's start time, not the time it wrote the refusal.
+        The prune record's reason may come from the prune's own landed proof before any teardown ran, so it
+        is labeled as the prune's.
+        """
         found = []
         prune = self.state / (task_id + ".merge-prune")
         try:
             fields = dict(line.split("=", 1) for line in prune.read_text().splitlines() if "=" in line)
             if fields.get("state") in ("retained", "pending") and fields.get("reason"):
-                found.append((mtime(prune) or 0, fields["reason"]))
+                found.append((prune.stat().st_mtime_ns, 0, fields["reason"], "recorded by bin/fm-merge-prune.sh"))
         except OSError:
             pass
+        memo_path = self.state / ".idle-reap" / (task_id + ".refused")
         try:
-            memo = (self.state / ".idle-reap" / (task_id + ".refused")).read_text().splitlines()
+            memo = memo_path.read_text().splitlines()
             if len(memo) >= 4 and memo[0] == "fm-idle-reap-refused-v1" and memo[3] and memo[1].isdigit():
-                found.append((int(memo[1]), memo[3]))
+                found.append((memo_path.stat().st_mtime_ns, 1, memo[3],
+                              "a plain bin/fm-teardown.sh run by bin/fm-idle-session-reap.sh"))
         except OSError:
             pass
-        return max(found)[1] if found else ""
+        if not found:
+            return "", ""
+        _, _, reason, producer = max(found)
+        return reason, producer
 
     def covering_rows(self, ident, pr_url):
         """The rows another source already raised for this task: its own subject, a keyed subject, or its PR."""
@@ -1202,9 +1217,9 @@ class Collector:
         """One task's completion row; see completion_rows."""
         ident = task["id"]
         pr_url = task["pr"].get("url")
-        refusal = self.teardown_refusal(ident)
-        refused = (f"plain bin/fm-teardown.sh {ident} ended in a refusal: {refusal}; the owning home clears that cause and "
-                   "runs it again (dropping the work needs the captain's own words)") if refusal else ""
+        refusal, producer = self.teardown_refusal_record(ident)
+        refused = (f"the last recorded cleanup refusal ({producer}): {refusal}; the owning home clears that cause and "
+                   f"runs plain bin/fm-teardown.sh {ident} again (dropping the work needs the captain's own words)") if refusal else ""
         _, verb, open_decision, pause_limit, _, _ = self.report_status(ident)
         state = task["current_state"].get("state")
         detail = task["current_state"].get("detail") or ""
@@ -1212,13 +1227,19 @@ class Collector:
         closed = backlog_closed or self.captain_dropped(task)
         done_refused = verb == "done" and state == "blocked" and not closed and NM_DAEMON_DOWN not in detail
         landed = None
-        if not (closed or verb == "done" or state == "done") or open_decision or pause_limit:
+        if open_decision or pause_limit:
+            self.attach_refusal(ident, pr_url, refusal, refused)
+            return
+        # A merged PR is a finished deliverable whether or not the worker ever reported done.
+        pr = self.source("completion PR " + ident, self.pr_state, pr_url) if pr_url else None
+        merged = bool(pr and pr.get("merged_at"))
+        if not (closed or verb == "done" or state == "done" or merged):
             self.attach_refusal(ident, pr_url, refusal, refused)
             return
         if state in ("working", "paused", "blocked", "parked") and not closed and not done_refused:
             # A worker still reading working after its done report may be running its pipeline: that is
             # progress, not a stranded task. Once its deliverable is delivered, the cleanup is owed anyway.
-            if state == "working" and verb == "done":
+            if state == "working" and (verb == "done" or merged):
                 landed = self.source("finished deliverable " + ident, self.delivered, task)
             if not landed:
                 self.attach_refusal(ident, pr_url, refusal, refused)
@@ -1235,7 +1256,7 @@ class Collector:
                 self.attach_refusal(ident, pr_url, refusal, refused)
                 return
             self.add("pending_acceptance", ident, gate + (f"; {refused}" if refused else ""), since, "firstmate",
-                     evidence=(f"last teardown refusal: {refusal}; " if refusal else "")
+                     evidence=(f"last recorded cleanup refusal ({producer}): {refusal}; " if refusal else "")
                               + "the last report was done and the ship-done gate did not accept it")
             return
         if landed is None:
@@ -1272,9 +1293,9 @@ class Collector:
                               f"words are recorded at {words}: Main needs the captain's own words before an attended "
                               f"bin/fm-teardown.sh {ident} --force --drop-file")
                 if refusal:
-                    action = f"{action}; the last plain teardown ended in a refusal: {refusal}"
+                    action = f"{action}; the last recorded cleanup refusal ({producer}): {refusal}"
             self.add("pending_cleanup", ident, action, merged_at or since, row_owner,
-                     evidence=(f"last teardown refusal: {refusal}; " if refusal else "")
+                     evidence=(f"last recorded cleanup refusal ({producer}): {refusal}; " if refusal else "")
                               + f"finished: {why}; the record is still open")
             return
         if self.covering_rows(ident, pr_url):
@@ -1291,7 +1312,7 @@ class Collector:
                                            ("the task state is done", state == "done"),
                                            ("its backlog item is closed", backlog_closed)) if held]
         self.add("pending_acceptance", ident, action, since, owner,
-                 evidence=(f"last teardown refusal: {refusal}; " if refusal else "")
+                 evidence=(f"last recorded cleanup refusal ({producer}): {refusal}; " if refusal else "")
                           + " and ".join(holds) + ", and no accepted or landed deliverable is on record"
                           + ("; landing could not be read" if landed is None else ""))
 
@@ -1301,7 +1322,7 @@ class Collector:
             return
         for row in self.covering_rows(ident, pr_url):
             row["next_action"] = f"{row['next_action']}; {refused}"
-            row["evidence"] = f"last teardown refusal: {refusal}; {row['evidence']}"[:400]
+            row["evidence"] = f"last recorded cleanup refusal: {refusal}; {row['evidence']}"[:400]
 
     def interrupted_teardown_rows(self):
         """A teardown that closed a pool task but has not returned its slot leaves a record naming that task."""
