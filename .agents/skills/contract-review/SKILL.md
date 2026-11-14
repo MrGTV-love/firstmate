@@ -28,6 +28,7 @@ Its header owns the arguments, the section rules and the exit codes.
 It copies the reviewer block below byte for byte into the pack's `contract.md`, so a rule changes in this file and nowhere else.
 It builds the pack in a directory it creates fresh, drops the author's sections, refuses a top-level section it does not recognise, and writes a manifest of excluded paths outside the pack.
 It never drops contract text without listing it: a sub-heading or preamble line it does not recognise stays in the pack where it is, and the manifest lists it as unrecognised.
+A sub-heading that names author history or an author section stops the build instead, because its end is unknown.
 It refuses a contract whose code fence never closes, and a request or context file that holds author text.
 Read those lines before the run, and move any author text they show out of the contract.
 Keep the register and every earlier report, review history and `truth` file outside the pack, and pass them to the builder with `--exclude` so the leak check refuses them.

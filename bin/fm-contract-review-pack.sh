@@ -22,7 +22,11 @@
 #   without the author's sections), request.md and context-<name> for each
 #   --request and --context file, head.txt, ci-evidence.md and an empty diff.patch,
 #   which is the layout data/review-lane/run-review.sh takes (pass diff.patch).
-#   The author's sections are dropped by heading. A level 1 or 2 heading (ATX `#`/`##`
+#   The author's sections are dropped by heading. An author section is named by an
+#   attributive start (author's, author, worker's, response to, prior review, prior
+#   findings) or by an author section name alone or followed only by a qualifier ("(",
+#   ":", ",", "." or a dash), so "Contract Review (r3)" drops and "Contract review scope"
+#   is neutral. A level 1 or 2 heading (ATX `#`/`##`
 #   or setext, a title line over `===` or `---`) the builder does not recognise stops
 #   the build with exit 3 naming it, and nothing is written. So does a recognised title or
 #   level 1 to 3 heading outside a dropped section that names author history (findings,
@@ -32,13 +36,17 @@
 #   Under a kept section, a sub-heading the builder does not recognise (an unknown
 #   level 3 heading, a level 4 or deeper heading or a bold-only line) stays in
 #   target.md where it is, and so does a preamble line it does not drop; each is
-#   listed in the manifest as unrecognised. No contract text is dropped without a
-#   dropped line in the manifest.
+#   listed in the manifest as unrecognised. Such a sub-heading that names author history
+#   (as above, but "response" only as "response(s) to", since an interface's responses
+#   are contract text), or a level 4 or bold-only line that names an author section,
+#   stops the build with exit 3 instead. No contract text is dropped without a dropped
+#   line in the manifest.
 #   A first level 1 heading that names an author section drops with its text, and one
 #   counts as a section of its own only when it is exactly a kept section name.
 #   The request and each context file go through the same filter and are copied
 #   whole; one with an author section under any heading (its title, a level 1 to 4
-#   heading, setext or bold-only) or an author preamble line is refused with exit 2, and
+#   heading, setext or bold-only) or an author line anywhere in it (an author term used
+#   as a label, or attributed to an author or worker) is refused with exit 2, and
 #   one with any such heading that names author history is refused with exit 3.
 #   The manifest of excluded paths is <out-root>.excluded-paths, outside the pack.
 #   It always holds the real path of every input file (the contract, the request,
@@ -137,9 +145,18 @@ function norm(t) {
   gsub(/^[ \t]+|[ \t]+$/, "", t)
   return t
 }
-function classify(t,   i, n, parts) {
+# An author section is named by an attributive start (author'"'"'s ..., response to ...) or by an
+# author section name standing alone or followed only by a qualifier: "(", ":", ",", ".", or a dash.
+# So "contract review (r3)" is the author section and "contract review scope" is not.
+function classify(t,   i, n, parts, r) {
+  n = split(DROP_START, parts, "|")
+  for (i = 1; i <= n; i++) if (parts[i] != "" && index(t " ", parts[i] " ") == 1) return "drop"
   n = split(DROP, parts, "|")
-  for (i = 1; i <= n; i++) if (parts[i] != "" && index(t, parts[i]) == 1) return "drop"
+  for (i = 1; i <= n; i++) {
+    if (parts[i] == "" || index(t, parts[i]) != 1) continue
+    r = substr(t, length(parts[i]) + 1)
+    if (r == "" || r ~ /^[ \t]*([(:,.]|-|\342\200\223|\342\200\224)/) return "drop"
+  }
   n = split(KEEP, parts, "|")
   for (i = 1; i <= n; i++) if (parts[i] != "" && index(t, parts[i]) == 1) return "keep"
   return "unknown"
@@ -193,6 +210,12 @@ END {
       if (ht == "") { ht = line; sub(/^[ \t]*#+[ \t]*/, "", ht); gsub(/\*\*|__/, "", ht); sub(/:[ \t]*$/, "", ht) }
       print ht > HEADS_OUT
       if (STRICT && (level == 4 || bold) && classify(norm(ht)) == "drop") print ht > DROPPED_OUT
+      # In a contract, a level 4 or bold-only line under a kept section that names an author
+      # section or author history has no known end, so it stops the build.
+      if (!STRICT && mode == "keep" && (level == 4 || bold) && (classify(norm(ht)) == "drop" || norm(ht) ~ HIST_SUB)) {
+        print ht " (under: " ptitle ")" > UNKNOWN_OUT
+        mode = "refused"
+      }
     }
     if (level == 1 && !seen_heading) {
       seen_heading = 1
@@ -220,6 +243,7 @@ END {
     if (level == 3) {
       c = classify(norm(title))
       if (parent != "drop" && c == "keep" && norm(title) ~ HIST) { mode = "drop"; print title > UNKNOWN_OUT; continue }
+      if (parent == "keep" && c == "unknown" && norm(title) ~ HIST_SUB) { mode = "drop"; print title " (under: " ptitle ")" > UNKNOWN_OUT; continue }
       if (parent == "keep" && c != "drop") mode = "keep"
       else mode = "drop"
       if (c == "drop") print title > DROPPED_OUT
@@ -230,7 +254,7 @@ END {
       continue
     }
     if (mode == "keep") {
-      if (pre && tolower(line) ~ PREAMBLE_DROP) { print "preamble line: " line > DROPPED_OUT; continue }
+      if ((pre || STRICT) && tolower(line) ~ PREAMBLE_DROP) { print (pre ? "preamble line: " : "author line: ") line > DROPPED_OUT; continue }
       if (level == 4 || bold) print line " (under: " ptitle ")" > UNREC_OUT
       else if (pre && line !~ /^[ \t]*$/) print "preamble line: " line > UNREC_OUT
       print line > KEEP_OUT
@@ -244,7 +268,11 @@ END {
 '
 
 SECTION_KEEP="request|context|captain's intent|captain intent|rulings|terms|amendment|definition of done|how you're graded|how you are graded|assumptions|decisive scenario|out of scope|known limits|hard gates|execution constraints|honesty rule|supporting"
-SECTION_DROP="author self-check|author's all-green|author all-green|all-green|author's|author notes|boundary dispositions|contract review|review history|revision log|revision history|self-check|prior findings|prior review|responses|response to|suggested attack|open findings|finding register|register"
+# Author section names, matched as names (see classify). Bare "responses" is not one: a
+# criterion section may be about an interface's responses.
+SECTION_DROP="all-green|author's all-green candidate|boundary dispositions|contract review|contract review history|review history|revision log|revision history|self-check|suggested attack|suggested attacks|open findings|finding register|register"
+# Attributive starts: a title that starts with one of these words names author material.
+SECTION_DROP_START="author's|author|authors'|worker's|response to|responses to|prior findings|prior review|prior reviews"
 # A preamble line that holds author text. Whole words only, so Authority, Authorized and
 # Authoritative stay. The contract drops such a line wherever the word sits in it. A request
 # or context file is the captain's or Main's text, which may name these terms as its subject
@@ -259,6 +287,9 @@ PREAMBLE_REFUSE="(^|[^a-z0-9])((authors?|workers?)[^a-z0-9]*s?[ ]+($PREAMBLE_TER
 # history noun, so free owner headings ("Current review authority", "Context (prior art)")
 # hold none of these terms.
 HISTORY_HEADING='(^|[^a-z0-9])(findings?|answered|responses?|self-checks?|all-green|revision logs?|prior (findings?|reviews?|rounds?|responses?|reports?|revisions?|answers?))([^a-z0-9]|$)'
+# The same test for a sub-heading under a kept contract section, without bare "response": an
+# interface's responses are contract text there, while "responses to" names author history.
+HISTORY_SUBHEADING='(^|[^a-z0-9])(findings?|answered|responses? to|self-checks?|all-green|revision logs?|prior (findings?|reviews?|rounds?|responses?|reports?|revisions?|answers?))([^a-z0-9]|$)'
 
 filter_sections() { # <in> <keep-out> <dropped-out> <unknown-out> <unrecognised-out> <titles-out> <heads-out> [preamble-pattern for a request or context file]
   local pre=${8:-$PREAMBLE_DROP}
@@ -269,7 +300,8 @@ filter_sections() { # <in> <keep-out> <dropped-out> <unknown-out> <unrecognised-
   : >"$6"
   : >"$7"
   awk -v SRC="$1" -v KEEP_OUT="$2" -v DROPPED_OUT="$3" -v UNKNOWN_OUT="$4" -v UNREC_OUT="$5" -v TITLES_OUT="$6" -v HEADS_OUT="$7" \
-    -v KEEP="$SECTION_KEEP" -v DROP="$SECTION_DROP" -v PREAMBLE_DROP="$pre" -v HIST="$HISTORY_HEADING" -v STRICT="${8:+1}" \
+    -v KEEP="$SECTION_KEEP" -v DROP="$SECTION_DROP" -v DROP_START="$SECTION_DROP_START" -v PREAMBLE_DROP="$pre" \
+    -v HIST="$HISTORY_HEADING" -v HIST_SUB="$HISTORY_SUBHEADING" -v STRICT="${8:+1}" \
     "$SECTION_AWK" <"$1"
 }
 

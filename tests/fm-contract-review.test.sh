@@ -109,6 +109,9 @@ ZZ-UNKNOWN-ZZ something the builder has no rule for.'
 
 test_unrecognised_subheadings_stay_and_are_listed() {
   local src="$TMP_ROOT/sub.md" pack manifest target m
+  # Neutral unknown sub-headings stay in the pack and are listed (Main 024). Sub-headings that
+  # name author history or an author section stop the build instead (Main 050 F1); see
+  # test_author_history_subheading_in_contract_refused.
   cat >"$src" <<'EOF'
 # Fixture contract
 
@@ -118,15 +121,15 @@ ZZ-PREAMBLE-ZZ a neutral preamble line.
 
 - **A1** (mandatory): ZZ-KEEP-DOD-ZZ the thing exists.
 
-### Earlier findings and how I answered them
+### Worked example
 
 ZZ-SUB-L3-ZZ text under an unknown level 3 heading.
 
-#### Author's all-green candidate
+#### Field notes
 
 ZZ-SUB-L4-ZZ text under a level 4 heading.
 
-**Contract Review**
+**Reference values**
 
 ZZ-SUB-BOLD-ZZ text under a bold-only line.
 
@@ -142,9 +145,9 @@ EOF
   done
   assert_no_grep "ZZ-ALLGREEN-ZZ" "$target" "a recognised author sub-section reached the pack"
   grep -qxF "$(printf 'dropped\tAuthor self-check')" "$manifest" || fail "the dropped sub-section is not listed in the manifest"
-  for m in "### Earlier findings and how I answered them (under: Definition Of Done)" \
-    "#### Author's all-green candidate (under: Definition Of Done)" \
-    "**Contract Review** (under: Definition Of Done)" \
+  for m in "### Worked example (under: Definition Of Done)" \
+    "#### Field notes (under: Definition Of Done)" \
+    "**Reference values** (under: Definition Of Done)" \
     "preamble line: ZZ-PREAMBLE-ZZ a neutral preamble line."; do
     grep -qxF "$(printf 'unrecognised\t%s' "$m")" "$manifest" || fail "the manifest does not list as unrecognised: $m"
   done
@@ -346,10 +349,36 @@ write_report() { # <file> <path>...: a report whose Inputs read lists the given 
   } >"$f"
 }
 
-run_check() { # <report> -> sets CHECK_OUT and CHECK_RC
+# One tool call of a reviewer session transcript, as the entrypoint's harness records it:
+# tool_call <name> <key> <value> [<key> <value>]... prints one JSON object.
+tool_call() {
+  python3 -I -c 'import json, sys
+a = sys.argv[2:]
+print(json.dumps({"type": "toolCall", "name": sys.argv[1], "arguments": dict(zip(a[0::2], a[1::2]))}))' "$@"
+}
+
+# write_transcript <file> <cwd> <tool-call-json>...: a session transcript with one assistant
+# message per tool call.
+write_transcript() {
+  local f=$1 cwd=$2 call
+  shift 2
+  python3 -I -c 'import json, sys; print(json.dumps({"type": "session", "version": 3, "id": "t", "cwd": sys.argv[1]}))' "$cwd" >"$f"
+  for call in "$@"; do
+    printf '{"type":"message","message":{"role":"assistant","content":[%s]}}\n' "$call" >>"$f"
+  done
+}
+
+# A clean transcript beside the leak world's pack: the reviewer read only the pack's contract.
+clean_transcript() { # <file> [pack]
+  write_transcript "$1" "$TMP_ROOT/work" "$(tool_call read path "${2:-$LEAK_PACK}/contract.md")"
+}
+
+run_check() { # <report> [transcript] -> sets CHECK_OUT and CHECK_RC
+  local log=${2:-$TMP_ROOT/clean-transcript.jsonl}
+  [ -n "${2:-}" ] || clean_transcript "$log"
   CHECK_RC=0
   CHECK_OUT=$(REVIEW_SKILLS_DIR="$LEAK_SKILLS" REVIEW_RUBRIC="$LEAK_ROOT/docs/review-rubric.md" \
-    "$PACK_BIN" check --pack "$LEAK_PACK" --report "$1" 2>&1) || CHECK_RC=$?
+    "$PACK_BIN" check --pack "$LEAK_PACK" --report "$1" --log "$log" 2>&1) || CHECK_RC=$?
 }
 
 test_leak_check_judges_what_a_path_is() {
@@ -1509,6 +1538,153 @@ test_unopened_file_named_under_inputs_read_voids_and_the_reviewer_is_told() {
   pass "an unopened file named under Inputs read voids, and the pack tells the reviewer to list it under Checks not performed"
 }
 
+test_author_history_subheading_in_contract_refused() {
+  local src="$TMP_ROOT/f1-contract.md" heading n=0 rc
+  # Noncompliant: each author-history or author-section sub-heading under a kept section,
+  # followed by real author conclusions, must never reach target.md.
+  for heading in '### Earlier findings and how I answered them' "#### Author's all-green candidate" '**Contract Review**'; do
+    n=$((n + 1))
+    printf '# Fixture contract\n\n## Definition Of Done\n\n- **A1** (mandatory): ZZ-KEEP-DOD-ZZ the thing exists.\n\n%s\n\nZZ-AUTHOR-ZZ F1 answered: fixed; every mandatory item passes.\n' "$heading" >"$src"
+    rc=0
+    "$PACK_BIN" --root "$ROOT" --contract "$src" --out-root "$TMP_ROOT/f1-out-$n" >"$TMP_ROOT/f1.out" 2>"$TMP_ROOT/f1.err" || rc=$?
+    assert_equals 3 "$rc" "author sub-heading $n ($heading) was not refused: $(cat "$TMP_ROOT/f1.err")"
+    assert_absent "$TMP_ROOT/f1-out-$n" "a refused author sub-heading $n left an output directory"
+    assert_contains "$(cat "$TMP_ROOT/f1.err")" "unrecognised section:" "the refusal of sub-heading $n does not name it"
+  done
+  pass "an author-history or author-section sub-heading in a contract stops the build and reaches no pack"
+}
+
+test_author_conclusion_line_in_request_or_context_refused() {
+  local src="$TMP_ROOT/f1b-contract.md" ctx="$TMP_ROOT/f1b-context.md" pack kind rc
+  write_fixture_contract "$src"
+  # Noncompliant: an author conclusion line in the body of a request or context file.
+  printf '# Owner context\n\n## Context\n\nAuthor'"'"'s all-green self-check: F1 is fixed and every mandatory item passes.\n' >"$ctx"
+  for kind in --context --request; do
+    rc=0
+    "$PACK_BIN" --root "$ROOT" --contract "$src" "$kind" "$ctx" --out-root "$TMP_ROOT/f1b-out${kind}" >/dev/null 2>"$TMP_ROOT/f1b.err" || rc=$?
+    assert_equals 2 "$rc" "an author conclusion line in a $kind file was not refused: $(cat "$TMP_ROOT/f1b.err")"
+    assert_absent "$TMP_ROOT/f1b-out${kind}" "a refused $kind file left an output directory"
+  done
+  # Compliant: the owner's text may name a contract review as its subject.
+  printf '# Owner context\n\n## Context\n\nThe owner asked for an independent contract review of the steer.\n' >"$ctx"
+  pack=''
+  build_pack pack --contract "$src" --context "$ctx" || fail "a neutral context naming a contract review was refused: $(cat "$TMP_ROOT/build.err")"
+  assert_grep "independent contract review of the steer" "$pack/context-f1b-context.md" "the neutral context was not copied"
+  pass "an author conclusion line in a request or context file is refused, and neutral owner text builds"
+}
+
+test_responses_criterion_and_contract_review_scope_build() {
+  local src="$TMP_ROOT/f2-contract.md" ctx="$TMP_ROOT/f2-context.md" pack rc
+  # Compliant: a DoD sub-section named Responses that holds a mandatory criterion is contract text.
+  printf '# Fixture contract\n\n## Definition Of Done\n\n### Responses\n\n- **A1** (mandatory): ZZ-RESPONSES-A1-ZZ return 204 for a successful request.\n\n### Recovery\n\n- **A2** (mandatory): ZZ-RECOVERY-A2-ZZ retry once.\n' >"$src"
+  pack=''
+  build_pack pack --contract "$src" || fail "a Responses criterion section was refused: $(cat "$TMP_ROOT/build.err")"
+  assert_grep "ZZ-RESPONSES-A1-ZZ" "$pack/target.md" "the mandatory criterion under Responses was dropped"
+  assert_grep "ZZ-RECOVERY-A2-ZZ" "$pack/target.md" "the criterion under Recovery was dropped"
+  # Compliant (Main 034): a neutral Contract review scope label in a context file builds.
+  write_fixture_contract "$TMP_ROOT/f2-plain.md"
+  printf '# Owner context\n\n## Context\n\n**Contract review scope**\n\nZZ-SCOPE-ZZ review only the G2 contract.\n' >"$ctx"
+  pack=''
+  build_pack pack --contract "$TMP_ROOT/f2-plain.md" --context "$ctx" || fail "a neutral Contract review scope context was refused: $(cat "$TMP_ROOT/build.err")"
+  assert_grep "ZZ-SCOPE-ZZ" "$pack/context-f2-context.md" "the scope context was not copied"
+  # Noncompliant control: an actual Contract Review author section in a context file is still refused.
+  printf '# Owner context\n\n## Context\n\n**Contract Review**\n\nF1 answered: fixed.\n' >"$ctx"
+  rc=0
+  "$PACK_BIN" --root "$ROOT" --contract "$TMP_ROOT/f2-plain.md" --context "$ctx" --out-root "$TMP_ROOT/f2-out" >/dev/null 2>&1 || rc=$?
+  assert_equals 2 "$rc" "an author Contract Review section in a context file was accepted"
+  pass "a Responses criterion and a Contract review scope context build; an author Contract Review section does not"
+}
+
+test_headingless_list_of_an_extensionless_path_voids() {
+  local rep="$TMP_ROOT/report-f3.md"
+  make_leak_world
+  printf 'no extension\n' >"$LEAK_ROOT/data/case/truth/r23-review"
+  # Noncompliant: a heading-less list before the headed one, naming an extensionless ignored file.
+  printf 'VERDICT: FAIL head=abc\n\nInputs read:\n- data/case/truth/r23-review\n\n## Inputs read\n\n- %s\n\n## Findings\n\nEXIT: needs-revision\n\nVERDICT: FAIL\n' "$LEAK_PACK/target.md" >"$rep"
+  run_check "$rep"
+  assert_equals 3 "$CHECK_RC" "a heading-less list of an extensionless path was accepted: $CHECK_OUT"
+  assert_contains "$CHECK_OUT" "not under its own heading" "the heading-less list did not void for its cause"
+  # Compliant control: the headed list alone is clean.
+  printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- %s\n\n## Findings\n\nEXIT: needs-revision\n\nVERDICT: FAIL\n' "$LEAK_PACK/target.md" >"$rep"
+  run_check "$rep"
+  assert_equals 0 "$CHECK_RC" "a headed list alone was flagged: $CHECK_OUT"
+  pass "a heading-less Inputs read list voids whatever the shape of its paths"
+}
+
+test_transcript_reads_are_audited_and_the_log_is_required() {
+  local rep="$TMP_ROOT/report-f4.md" log="$TMP_ROOT/f4-transcript.jsonl" rc
+  make_leak_world
+  write_report "$rep" "$LEAK_PACK/target.md"
+  # Noncompliant: the transcript records a read of an earlier report the list does not name.
+  write_transcript "$log" "$TMP_ROOT/work" "$(tool_call read path "$LEAK_PACK/target.md")" \
+    "$(tool_call read path "$LEAK_ROOT/data/case/truth/r23-review.md:raw:1-20")"
+  run_check "$rep" "$log"
+  assert_equals 3 "$CHECK_RC" "a transcript read of an earlier report was accepted: $CHECK_OUT"
+  assert_contains "$CHECK_OUT" "INPUT LEAK" "the transcript read did not void as a leak"
+  # Noncompliant: a search over an ignored folder, and shell text that opens one.
+  write_transcript "$log" "$TMP_ROOT/work" "$(tool_call grep pattern F1 path "$LEAK_ROOT/data/case" gitignore false)"
+  run_check "$rep" "$log"
+  assert_equals 3 "$CHECK_RC" "a transcript search of an ignored folder was accepted: $CHECK_OUT"
+  write_transcript "$log" "$TMP_ROOT/work" "$(tool_call bash command "cat '$LEAK_ROOT/data/case/truth/r23-review.md'")"
+  run_check "$rep" "$log"
+  assert_equals 3 "$CHECK_RC" "a shell read of an earlier report was accepted: $CHECK_OUT"
+  # Compliant: pack files, the two named skills by skill URL and by path, the rubric, a tracked
+  # file, a relative read of the work folder's own review, and an absent file the reviewer tried.
+  write_transcript "$log" "$TMP_ROOT/work" "$(tool_call read path skill://assess-done-and-grade)" \
+    "$(tool_call read path "$LEAK_PACK/contract.md:12-40")" "$(tool_call read path "$LEAK_PACK/target.md")" \
+    "$(tool_call read path "$LEAK_SKILLS/define-done-and-grading/SKILL.md")" \
+    "$(tool_call read path "$LEAK_ROOT/docs/review-rubric.md")" "$(tool_call read path "$LEAK_ROOT/bin/fm-spawn.sh")" \
+    "$(tool_call read path "$LEAK_PACK/request.md")" \
+    "$(tool_call grep pattern A1 path "$LEAK_PACK" gitignore true)"
+  run_check "$rep" "$log"
+  assert_equals 0 "$CHECK_RC" "a clean transcript was flagged: $CHECK_OUT"
+  # The log is required, and a text log that records no tool call cannot be audited.
+  rc=0
+  REVIEW_SKILLS_DIR="$LEAK_SKILLS" REVIEW_RUBRIC="$LEAK_ROOT/docs/review-rubric.md" \
+    "$PACK_BIN" check --pack "$LEAK_PACK" --report "$rep" >/dev/null 2>&1 || rc=$?
+  assert_equals 2 "$rc" "a check with no --log ran"
+  printf 'I also read %s\n' "$LEAK_ROOT/data/case/truth/r23-review.md" >"$TMP_ROOT/f4-text.log"
+  run_check "$rep" "$TMP_ROOT/f4-text.log"
+  assert_equals 2 "$CHECK_RC" "a text log with no tool-call record was certified: $CHECK_OUT"
+  pass "the run's transcript is required, and every read, search or shell path it records is judged"
+}
+
+test_authorized_spaced_path_is_clean() {
+  local rep="$TMP_ROOT/report-f5.md" pack log="$TMP_ROOT/f5-transcript.jsonl"
+  make_leak_world
+  pack=''
+  build_pack pack --contract "$LEAK_ROOT/sources/raw-contract.md" --root "$LEAK_ROOT" --out-root "$TMP_ROOT/parent with spaces" ||
+    fail "build into a spaced parent failed: $(cat "$TMP_ROOT/build.err")"
+  printf 'spaced\n' >"$LEAK_ROOT/data/case/truth/r23 review.md"
+  # Compliant: one backticked full path with spaces to the pack's own file.
+  # shellcheck disable=SC2016 # literal backticks in a report line
+  printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- `%s`\n\n## Findings\n\nEXIT: needs-revision\n\nVERDICT: FAIL\n' "$pack/target.md" >"$rep"
+  clean_transcript "$log" "$pack"
+  CHECK_RC=0
+  CHECK_OUT=$(REVIEW_SKILLS_DIR="$LEAK_SKILLS" REVIEW_RUBRIC="$LEAK_ROOT/docs/review-rubric.md" \
+    "$PACK_BIN" check --pack "$pack" --report "$rep" --log "$log" 2>&1) || CHECK_RC=$?
+  assert_equals 0 "$CHECK_RC" "an authorized spaced path was voided: $CHECK_OUT"
+  assert_contains "$CHECK_OUT" "1 listed input(s)" "the spaced path was not counted"
+  # Noncompliant: an unauthorized spaced path still voids.
+  # shellcheck disable=SC2016 # literal backticks in a report line
+  printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- `%s`\n\n## Findings\n' "$LEAK_ROOT/data/case/truth/r23 review.md" >"$rep"
+  CHECK_RC=0
+  CHECK_OUT=$(REVIEW_SKILLS_DIR="$LEAK_SKILLS" REVIEW_RUBRIC="$LEAK_ROOT/docs/review-rubric.md" \
+    "$PACK_BIN" check --pack "$pack" --report "$rep" --log "$log" 2>&1) || CHECK_RC=$?
+  assert_equals 3 "$CHECK_RC" "an unauthorized spaced path passed: $CHECK_OUT"
+  assert_contains "$CHECK_OUT" "INPUT LEAK" "the unauthorized spaced path voided for another cause"
+  pass "one backticked full path with spaces is judged as a path: clean when authorized, a leak when not"
+}
+
+test_reviewer_is_told_the_exit_for_a_conflict_with_an_unjudged_criterion() {
+  local src="$TMP_ROOT/f6.md" pack
+  write_fixture_contract "$src"
+  build_pack pack --contract "$src" || fail "build failed"
+  assert_contains "$(cat "$pack/contract.md")" "cannot be judged as well" \
+    "the pack does not say which exit a conflict takes when another criterion cannot be judged"
+  pass "the reviewer block names one exit for a conflict beside an unjudged criterion"
+}
+
 fm_test_run_cases \
   test_markers_kept_and_dropped \
   test_unrecognised_section_refused \
@@ -1564,4 +1740,7 @@ fm_test_run_cases \
   test_policy_is_named_only_by_the_policy_argument \
   test_label_argument_is_gone \
   test_prose_mention_is_judged_but_is_no_list \
+  test_author_history_subheading_in_contract_refused \
+  test_author_conclusion_line_in_request_or_context_refused \
+  test_responses_criterion_and_contract_review_scope_build \
   -- "$@"
