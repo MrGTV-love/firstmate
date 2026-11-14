@@ -1567,6 +1567,16 @@ test_the_directive_block_rule_keeps_real_blocks_and_reports_the_rest() {
   pass "the block rule keeps blocks under a heading, after a fence, a comment or a closed <details>, and reports a directive glued to prose, beside a malformed line or above a setext underline"
 }
 
+# Review b4182820 F1, sibling witnesses: a quoting element opened on the same line as a
+# comment's or a <pre> block's end, or after a mid-line comment's close, still holds what follows.
+test_f1_a_container_opened_on_a_comment_or_pre_edge_line_closes_nothing() {
+  f1_witness_case f1-edge-comment 105 wit-edge-comment '<!-- note --> <blockquote>' '' 'Closes-backlog-item: wit-edge-comment' '' '</blockquote>'
+  f1_witness_case f1-edge-close 106 wit-edge-close '<!-- note' '--> <details>' '' 'Closes-backlog-item: wit-edge-close' '' '</details>'
+  f1_witness_case f1-edge-pre 107 wit-edge-pre '<pre>x</pre> <blockquote>' '' 'Closes-backlog-item: wit-edge-pre' '' '</blockquote>'
+  f1_witness_case f1-edge-midline 108 wit-edge-midline 'Intro <!-- a' 'b --> <blockquote>' '' 'Closes-backlog-item: wit-edge-midline' '' '</blockquote>'
+  pass "F1: a quoting element opened after a comment's end, a <pre> block's end or a mid-line comment's close holds its directive, which closes nothing and keeps the edge"
+}
+
 # Review b4182820 F1, member side: a Train-member line inside a code span that spans lines
 # lists no member, so the task whose pr= is that URL keeps its state and its dependent's edge,
 # while a real Train-member line in the same body closes its member's item.
@@ -1594,6 +1604,28 @@ test_f1_a_train_member_inside_a_code_span_lists_no_member() {
 
 # Review b4182820 F2: a pull request link that only a train member's body holds is reported,
 # never closed; the listed member and an unrelated item are not reported.
+# Review b4182820 F2, the directive shape: a Train-member line in a member's own body lists
+# nothing (a member's members are not read), so it is reported like a link and closes nothing.
+test_f2_a_members_own_train_member_line_is_reported_and_never_closed() {
+  local case_dir
+  case_dir=$(gh_case f2-member-member 109)
+  cx_add "$case_dir" member-member-control
+  cx_add "$case_dir" nested-72-item
+  cx_add "$case_dir" nested-72-docs docs
+  cx_meta "$case_dir" nested-72-docs docs "$REPO_URL/72"
+  printf '%s\n' "Train-member: $REPO_URL/71" > "$case_dir/bodies/109"
+  printf '%s\n' 'Closes-backlog-item: member-member-control' "Train-member: $REPO_URL/72" > "$case_dir/bodies/71"
+  printf '%s\n' 'Closes-backlog-item: nested-72-item' > "$case_dir/bodies/72"
+  printf '%s\n' 71 72 >> "$case_dir/merged-prs"
+  gh_merge "$case_dir" 109 --merge
+  [ "$(cx_state "$case_dir" member-member-control)" = "done" ] || fail "f2-member-member: the listed member's item did not close"
+  [ "$(cx_state "$case_dir" nested-72-item)" = queued ] || fail "f2-member-member: a member's own Train-member line closed its pull request's item"
+  [ "$(cx_state "$case_dir" nested-72-docs)" = queued ] || fail "f2-member-member: a member's own Train-member line closed a pr= item"
+  assert_match "^actionable: close-at-merge: .*$REPO_URL/72 .*train member $REPO_URL/71" "$case_dir/stderr" \
+    "f2-member-member: the member's own Train-member line was not reported"
+  pass "F2: a Train-member line in a member's body lists nothing, closes nothing and is reported"
+}
+
 test_f2_a_train_members_prose_pr_link_is_reported_and_never_closed() {
   local case_dir
   case_dir=$(gh_case f2-member-link 104)
@@ -1673,5 +1705,7 @@ test_f1_an_open_html_quote_or_example_element_closes_nothing
 test_the_directive_block_rule_keeps_real_blocks_and_reports_the_rest
 test_f1_a_train_member_inside_a_code_span_lists_no_member
 test_f2_a_train_members_prose_pr_link_is_reported_and_never_closed
+test_f1_a_container_opened_on_a_comment_or_pre_edge_line_closes_nothing
+test_f2_a_members_own_train_member_line_is_reported_and_never_closed
 )
 fm_test_run_cases "${pr_close_test_cases[@]}" -- "$@"
