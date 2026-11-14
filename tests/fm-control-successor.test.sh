@@ -499,12 +499,36 @@ SH
   i=0
   while [ ! -e "$dir/meta-held" ] && [ "$i" -lt 1000 ]; do /bin/sleep 0.01; i=$((i + 1)); done
   [ -e "$dir/meta-held" ] || fail "the metadata lock holder never started"
+  # The call parks at its record publication, so "has the call got past the lock"
+  # is observed and not guessed from a fixed sleep: while another process holds
+  # the metadata lock it must not reach the publication; once the lock is
+  # released it must.
+  cat > "$dir/fakebin/mv" <<SH
+#!/usr/bin/env bash
+for arg in "\$@"; do
+  case "\$arg" in
+    */.$id.meta.successor.*)
+      : > "$dir/parked"
+      i=0
+      while [ ! -e "$dir/release" ] && [ "\$i" -lt 2000 ]; do /bin/sleep 0.01; i=\$((i + 1)); done
+      ;;
+  esac
+done
+exec "$real_mv" "\$@"
+SH
+  chmod +x "$dir/fakebin/mv"
   sc "$dir" "$id" --branch "fm/$id-v2" --note why > "$dir/out-c" 2>&1 &
   rc_a=$!
-  /bin/sleep 0.5
+  i=0
+  while [ ! -e "$dir/parked" ] && [ "$i" -lt 400 ]; do /bin/sleep 0.01; i=$((i + 1)); done
+  [ ! -e "$dir/parked" ] || fail "the call reached its record publication while another process held the metadata lock"
   assert_equals 0 "$(grep -c '^successor_branch=' "$dir/home/state/$id.meta")" "the call wrote while another process held the metadata lock"
   : > "$dir/meta-release"
   wait "$holder_pid" || true
+  i=0
+  while [ ! -e "$dir/parked" ] && [ "$i" -lt 1000 ]; do /bin/sleep 0.01; i=$((i + 1)); done
+  [ -e "$dir/parked" ] || fail "the call did not reach its record publication once the metadata lock was released: $(cat "$dir/out-c")"
+  : > "$dir/release"
   wait "$rc_a" || fail "the call did not finish once the metadata lock was released: $(cat "$dir/out-c")"
   assert_equals 1 "$(grep -c '^successor_branch=' "$dir/home/state/$id.meta")" "the call did not record after the metadata lock was released"
   pass "successor: two calls serialize on the lifecycle lock, and the call waits on the metadata lock before it writes"
