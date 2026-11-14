@@ -43,8 +43,9 @@
 #     merging task's own id is left out, because its teardown owns that item. A member's
 #     prose never closes anything. In the same bodies, a link in the prose to a pull
 #     request that is neither the merged one nor listed by a `Train-member:` line is also a
-#     `mentioned ...` line, once per link; links are read for GitHub, GitLab and Forgejo
-#     alike. The id check
+#     `mentioned ...` line, once per link, and a `Train-member:` line in a member's own body
+#     (a member's members are not read) is a `named ...` line; links are read for GitHub,
+#     GitLab and Forgejo alike. The id check
 #     reads the backlog once; when the backlog cannot be listed, each body that has prose gets
 #     one `actionable:` line that names it, whether or not it holds a directive line.
 # The same read gives that pull request's merge state: when it is not merged (a hand run
@@ -384,6 +385,17 @@ while [ "$k" -lt "${#MENTION_BODIES[@]}" ]; do
     LINKED_SEEN="$LINKED_SEEN$FM_PR_URL"$'\n'
     printf 'actionable: close-at-merge: mentioned %s in %s: no item was closed for it; list it as a Train-member: line if it landed with this merge\n' "$FM_PR_URL" "${MENTION_WHERE[$k]}" >&2
   done < <(fm_pr_closes_prose_prs "${MENTION_BODIES[$k]}")
+  # A member's own Train-member lines list nothing: a member's members are not read.
+  if [ "$k" -gt 0 ]; then
+    while IFS= read -r linked; do
+      fm_pr_url_parse "$linked" || continue
+      [ "$FM_PR_URL" != "$URL" ] || continue
+      case "$LINKED_SEEN" in *$'\n'"$FM_PR_URL"$'\n'*) continue ;; esac
+      LINKED_SEEN="$LINKED_SEEN$FM_PR_URL"$'\n'
+      printf 'actionable: close-at-merge: named %s with a Train-member: line in the body of %s: a member body lists no members, so no item was closed for it; list it as a Train-member: line in the train body if it landed with this merge\n' \
+        "$FM_PR_URL" "${MENTION_WHERE[$k]#the prose of }" >&2
+    done < <(fm_pr_closes_members "${MENTION_BODIES[$k]}")
+  fi
   k=$((k + 1))
 done
 

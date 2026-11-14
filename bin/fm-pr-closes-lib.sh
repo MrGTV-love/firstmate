@@ -22,7 +22,10 @@
 #   span that spans lines, a malformed directive line - is no block, and neither is a
 #   paragraph inside a quoting or example HTML element (`<blockquote>`, `<details>`, `<pre>`,
 #   `<code>`, `<div>`, `<table>` and the rest of FM_PR_CLOSES_CONTAINERS) that an earlier line
-#   opened and has not closed. A well-formed directive line outside a block closes nothing
+#   opened and has not closed. A tag counts wherever HTML is read: in the raw HTML of a
+#   `<pre>`, `<script>`, `<style>` or `<textarea>` block, after the end of a comment or other
+#   HTML block on its last line, and after a mid-line comment's `-->`; not inside a fence, a
+#   comment or a code span on one line. A well-formed directive line outside a block closes nothing
 #   and is reported (fm_pr_closes_outside). Several blocks may be in one body; the pipeline's
 #   body rewrite keeps a section above its own, so put the block there under a heading.
 # - An item id is letters, digits, `.`, `_` and `-`, not starting with `.` (the ids
@@ -123,8 +126,15 @@ fm_pr_closes_inline() {
 # fm_pr_closes_unfenced <body-file|-> [prose]: every line outside a fence and an HTML comment.
 # With `prose`, only the text a reader sees: comment text is left out and the text after any
 # comment's `-->` on its closing line is kept, on a line of its own after a space.
+# Without it, each fence, comment or HTML block is one or more lines that start with
+# FM_PR_CLOSES_RAW (a control character): the raw HTML of a <pre>, <script>, <style> or
+# <textarea> block, and the text after the end of any other HTML block or comment, so
+# fm_pr_closes_blocks can see the elements they open; a fence is one empty line. The text
+# after a mid-line comment's `-->`, when it holds text, is a line of its own, after a space.
+FM_PR_CLOSES_RAW=$'\001'
 fm_pr_closes_unfenced() {
   local mode=${2:-lines} line seg in_fence=0 in_comment=0 char='' len=0 run i=0 j k count=0
+  local raw=$FM_PR_CLOSES_RAW
   local open_re='^[ ]{0,3}(`{3,}|~{3,})(.*)$'
   local close_re='^[ ]{0,3}(`{3,}|~{3,})[[:space:]]*$'
   local block_re='^[ ]{0,3}<!--'
@@ -148,8 +158,13 @@ fm_pr_closes_unfenced() {
       continue
     fi
     if [ -n "$html_end" ]; then
-      if [ "$html_end" = 1 ]; then [[ "$line" =~ $html1_end ]] && html_end=
-      else case "$line" in *"$html_end"*) html_end= ;; esac
+      if [ "$html_end" = 1 ]; then
+        [ "$mode" = prose ] || printf '%s\n' "$raw$line"
+        [[ "$line" =~ $html1_end ]] && html_end=
+      else
+        case "$line" in
+          *"$html_end"*) [ "$mode" = prose ] || printf '%s\n' "$raw ${line#*"$html_end"}"; html_end= ;;
+        esac
       fi
       continue
     fi
@@ -157,7 +172,9 @@ fm_pr_closes_unfenced() {
       case "$line" in
         *'-->'*)
           in_comment=0
-          if [ "$mode" = prose ]; then fm_pr_closes_inline " ${line#*'-->'}"; printf '%s\n' "$FM_PR_CLOSES_VIS"; fi ;;
+          if [ "$mode" = prose ]; then fm_pr_closes_inline " ${line#*'-->'}"; printf '%s\n' "$FM_PR_CLOSES_VIS"
+          else printf '%s\n' "$raw ${line#*'-->'}"
+          fi ;;
       esac
       continue
     fi
@@ -173,30 +190,48 @@ fm_pr_closes_unfenced() {
       fi
     fi
     if [[ "$line" =~ $block_re ]]; then
-      printf '\n'
       seg=${line#*'<!'}
-      case "$seg" in
-        *'-->'*) if [ "$mode" = prose ]; then fm_pr_closes_inline " ${seg#*'-->'}"; printf '%s\n' "$FM_PR_CLOSES_VIS"; fi ;;
-        *) in_comment=1 ;;
-      esac
+      if [ "$mode" = prose ]; then
+        printf '\n'
+        case "$seg" in
+          *'-->'*) fm_pr_closes_inline " ${seg#*'-->'}"; printf '%s\n' "$FM_PR_CLOSES_VIS" ;;
+          *) in_comment=1 ;;
+        esac
+      else
+        case "$seg" in
+          *'-->'*) printf '%s\n' "$raw ${seg#*'-->'}" ;;
+          *) printf '%s\n' "$raw"; in_comment=1 ;;
+        esac
+      fi
       continue
     fi
     # The other HTML blocks that run past a blank line: <pre>, <script>, <style> and
     # <textarea> to their end tag, `<?` to `?>`, `<![CDATA[` to `]]>`, `<!` and a letter to `>`.
     html_end=
+    run=
     if [[ "$line" =~ $html1_re ]]; then
       [[ "$line" =~ $html1_end ]] || html_end=1
+      run=$line
     elif [[ "$line" =~ ^[\ ]{0,3}'<![CDATA[' ]]; then
-      seg=${line#*'<![CDATA['}; case "$seg" in *']]>'*) ;; *) html_end=']]>' ;; esac
+      run=']]>'
     elif [[ "$line" =~ ^[\ ]{0,3}'<!'[A-Za-z] ]]; then
-      seg=${line#*'<!'}; case "$seg" in *'>'*) ;; *) html_end='>' ;; esac
+      run='>'
     elif [[ "$line" =~ ^[\ ]{0,3}'<?' ]]; then
-      seg=${line#*'<?'}; case "$seg" in *'?>'*) ;; *) html_end='?>' ;; esac
-    else
-      seg=
+      run='?>'
     fi
-    if [ -n "$html_end" ] || [ -n "$seg" ] || [[ "$line" =~ $html1_re ]]; then
-      printf '\n'
+    if [ -n "$run" ]; then
+      if [ "$mode" = prose ]; then
+        printf '\n'
+      elif [ "$html_end" = 1 ] || [ "$run" = "$line" ]; then
+        printf '%s\n' "$raw$line"
+      fi
+      if [ "$run" != "$line" ]; then
+        seg=${line#*<[?!]}
+        case "$seg" in
+          *"$run"*) [ "$mode" = prose ] || printf '%s\n' "$raw ${seg#*"$run"}" ;;
+          *) html_end=$run; [ "$mode" = prose ] || printf '%s\n' "$raw" ;;
+        esac
+      fi
       continue
     fi
     case "$line" in *'<!--'*) ;; *) printf '%s\n' "$line"; continue ;; esac
@@ -219,6 +254,8 @@ fm_pr_closes_unfenced() {
       [ "$mode" != prose ] || printf '%s\n' "$FM_PR_CLOSES_HEAD"
       i=$((j + 1))
       seg=" ${lines[j]#*'-->'}"
+      # The text after `-->` stays in the paragraph: a line of its own only when it holds text.
+      [ "$mode" = prose ] || [[ "$seg" =~ ^[[:space:]]*$ ]] || printf '%s\n' "$seg"
     done
   done
 }
@@ -282,19 +319,26 @@ fm_pr_closes_blocks() {
       return depth
     }
     function bound(line) {
-      return line ~ /^[[:blank:]]*$/ || line ~ /^ ? ? ?##?#?#?#?#?([[:blank:]]|$)/
+      return substr(line, 1, 1) == raw || line ~ /^[[:blank:]]*$/ || line ~ /^ ? ? ?##?#?#?#?#?([[:blank:]]|$)/
     }
     function wellformed(line) {
       return line ~ /^(Closes-backlog-item|Closes):[[:blank:]]+[A-Za-z0-9_-][A-Za-z0-9._-]*[[:blank:]]*$/ ||
         line ~ /^Train-member:[[:blank:]]+[^[:blank:]`<>]+[[:blank:]]*$/
     }
-    BEGIN { n = split(names, list, " "); for (k = 1; k <= n; k++) box[list[k]] = 1 }
+    BEGIN { raw = sprintf("%c", 1); n = split(names, list, " "); for (k = 1; k <= n; k++) box[list[k]] = 1 }
     { line[NR] = $0 }
     END {
       depth = 0
       i = 1
       while (i <= NR) {
-        if (bound(line[i])) { print "0\t" line[i]; depth = count(depth, line[i]); i++; continue }
+        if (bound(line[i])) {
+          s = line[i]
+          if (substr(s, 1, 1) == raw) s = substr(s, 2)
+          print "0\t" s
+          depth = count(depth, s)
+          i++
+          continue
+        }
         first = i
         clean = depth == 0
         while (i <= NR && !bound(line[i])) { if (!wellformed(line[i])) clean = 0; i++ }

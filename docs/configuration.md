@@ -1194,6 +1194,7 @@ An HTML comment is read as CommonMark reads it: a line that starts with `<!--`, 
 Text inside a comment is never read as a mention.
 When the merged pull request's body, or the body of a train member the merge read, mentions outside those lines an active backlog id that no directive line, task record or old line names, it closes nothing for it, and the merge prints one `actionable:` line per mention; an id is matched as spelled, so a trailing `_` or `-` belongs to it, and only leading and trailing `.` and one matched emphasis pair (`_id_` or `__id__`) are dropped.
 When the merged pull request's body, or the body of a train member the merge read, links another pull request that is neither the merged one nor listed by a `Train-member:` line, the merge prints one `actionable:` line per link too, and closes nothing for it.
+A `Train-member:` line in a member's own body lists nothing, because a member's members are not read, so the merge reports it the same way.
 The merging task's own id is not reported, because its teardown owns that item.
 When the backlog cannot be listed, the merge prints one `actionable:` line for each body that has prose, naming that body and saying its id check was skipped, with or without a directive line.
 An old `Closes: <item-id>` line and a malformed directive line are reported the same way.
