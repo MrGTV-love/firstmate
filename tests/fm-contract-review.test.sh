@@ -1391,6 +1391,33 @@ test_rubric_revision_is_pinned_with_a_root() {
   pass "with a root, a revision path to the rubric is allowed only at the pinned revision"
 }
 
+test_unopened_file_named_under_inputs_read_voids_and_the_reviewer_is_told() {
+  local rep="$TMP_ROOT/report-z2.md" line
+  make_leak_world
+  # The recorded g5-R2 reviewer line (evidence/main-grader-replay-f07cd4f8/g5-R2-report.md:139).
+  # shellcheck disable=SC2016 # literal backticks in a report line
+  line='The named but absent `request.md` was attempted and is not an opened file. No credential or `.env` file was opened.'
+  # Noncompliant (the old prompt let a reviewer write this): an unopened file named under
+  # Inputs read stays a void, because no text test can tell a mention from a read.
+  printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n%s\n\n%s\n%s\n\n## Checks not performed\n\nNone.\n\nEXIT: needs-revision\nVERDICT: FAIL\n' \
+    "$line" "$LEAK_PACK/contract.md" "$LEAK_PACK/target.md" >"$rep"
+  run_check "$rep"
+  assert_equals 3 "$CHECK_RC" "an unopened .env named under Inputs read passed: $CHECK_OUT"
+  assert_contains "$CHECK_OUT" "INPUT LEAK: .env" "the unopened .env did not void as a leak"
+  # Compliant (what the new prompt asks for): the same sentence under Checks not performed is clean.
+  printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n%s\n%s\n\n## Checks not performed\n\n%s\n\nEXIT: needs-revision\nVERDICT: FAIL\n' \
+    "$LEAK_PACK/contract.md" "$LEAK_PACK/target.md" "$line" >"$rep"
+  run_check "$rep"
+  assert_equals 0 "$CHECK_RC" "the unopened file under Checks not performed was flagged: $CHECK_OUT"
+  assert_contains "$CHECK_OUT" "2 listed input(s)" "the compliant list was not read"
+  # The reviewer is told so in the pack it reads.
+  assert_contains "$(cat "$LEAK_PACK/contract.md")" "unopened file under \`Inputs read\`" \
+    "the pack does not tell the reviewer to keep unopened files out of Inputs read"
+  assert_contains "$(cat "$LEAK_PACK/contract.md")" "list it under Checks not performed" \
+    "the pack does not tell the reviewer where an unopened file goes"
+  pass "an unopened file named under Inputs read voids, and the pack tells the reviewer to list it under Checks not performed"
+}
+
 fm_test_run_cases \
   test_markers_kept_and_dropped \
   test_unrecognised_section_refused \
@@ -1441,4 +1468,5 @@ fm_test_run_cases \
   test_definition_of_done_in_every_heading_form \
   test_fences_and_headings_accept_up_to_three_spaces \
   test_rubric_revision_is_pinned_with_a_root \
+  test_unopened_file_named_under_inputs_read_voids_and_the_reviewer_is_told \
   -- "$@"

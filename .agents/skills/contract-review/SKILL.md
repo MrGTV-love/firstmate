@@ -125,6 +125,7 @@ A worker declaration, an author's analysis and a green self-run are context, nev
 Report these fields.
 Put every field below under a Markdown heading of its own, all at the level of `Inputs read`; a bold or plain label is not a heading.
 - `Inputs read`: every file you opened, one full path per line and nothing else path-like on the line, under a Markdown heading of its own named `Inputs read`.
+  Do not name an unopened file under `Inputs read`; list it under Checks not performed.
 - Your identity, model and session ID when known.
 - Each criterion by id with its judgment.
 - Outcome-escape and evidence-escape candidates, each with its disposition.
