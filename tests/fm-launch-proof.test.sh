@@ -612,6 +612,14 @@ test_launch_proof_claude_adoption() (
   refuses_stated 'no task-specific session tie' 'with --session-id: a doorbell of another home is not this task'"'"'s'
   fresh_case
   refuses_stated 'launch-brief record still exists' 'with --session-id: a present launch brief is proven by plain adopt, not by the statement'
+  # A present record that plain adopt would also refuse gets that record's own cause, never advice to run plain adopt.
+  fresh_case; fm_operational_record_write "$LANE/state" session-start 'not a launch brief' OTHERBELL
+  write_transcript "$OTHERBELL" 30
+  refuses_stated 'is not the launch-brief doorbell' 'with --session-id: a present record that is not a launch brief keeps its own cause'
+  assert_not_contains "$err" 'run adopt without --session-id' 'a present non-launch-brief record is not sent to plain adopt'
+  fresh_case; write_transcript "$DOORBELL" -3600
+  refuses_stated 'newer than the first user message' 'with --session-id: a present record newer than the message keeps its own cause'
+  assert_not_contains "$err" 'run adopt without --session-id' 'a present record newer than the message is not sent to plain adopt'
   fresh_case; rm -f "$LANE"/state/operational-inbox/*.msg
   stated
   [ "$rc" = 0 ] || fail "with --session-id: the past-retention lane must adopt: $err"
