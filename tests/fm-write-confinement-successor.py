@@ -23,6 +23,8 @@ import re
 import subprocess
 import sys
 
+# What the confinement's refusal looks like in git's output; any other failure is not a refusal.
+CONFINEMENT_REFUSAL = re.compile(r"(Operation not permitted|Permission denied)")
 GIT_ENV = {"GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_NOSYSTEM": "1", "GIT_AUTHOR_NAME": "Fixture",
            "GIT_AUTHOR_EMAIL": "fixture@example.invalid", "GIT_COMMITTER_NAME": "Fixture",
            "GIT_COMMITTER_EMAIL": "fixture@example.invalid"}
@@ -121,6 +123,19 @@ def ref_allows(profile, common):
     return sorted(literals), regexes, creates
 
 
+def comparable(profile):
+    """The profile's lines, every allow and every deny line, minus the one volatile class.
+
+    The generator denies each per-session folder that other sessions have created
+    directly under Claude's shared temp root, by literal path, so those lines change
+    between two builds whenever another session starts or ends. Every other line,
+    deny lines included, must compare equal for equal inputs.
+    """
+    claude_tmp = os.path.realpath("/tmp") + "/claude-" + str(os.getuid())
+    sibling = re.compile(r'^\(deny file-write\* \(literal "' + re.escape(claude_tmp) + r'/[^/"]+"\)\)$')
+    return [line for line in profile.splitlines() if not sibling.match(line)]
+
+
 def literal(path):
     return f'(allow file-write* (literal "{path}"))'
 
@@ -160,28 +175,26 @@ def unit(base):
     assert ref_allows(before, common) == (sorted(expected_branch_lines(common, BRANCH)), 2, 2), \
         "a task with no successor must allow exactly its branch, lock, reflog and archive names: " + repr(ref_allows(before, common))
     results["no-successor-allows-exactly-the-branch"] = True
-    # Allow lines only: the deny lines also name every sibling folder of the shared
-    # Claude temp root at build time, which other sessions change between runs.
-    allow_only = "\n".join(line for line in before.splitlines() if line.startswith("(allow"))
-    # The run root is random, and the profile names it three ways: as written, as a
-    # regex-escaped path, and as the dash-encoded Claude project folder name.
+    # Every allow and deny line, minus the per-session sibling folders of Claude's shared
+    # temp root (comparable); the run root is random and the profile names it three
+    # ways: as written, as a regex-escaped path, and as the dash-encoded Claude project
+    # folder name.
+    whole = "\n".join(comparable(before))
     root = str(base.resolve())
     for form in (re.escape(root), root, re.sub(r"[^A-Za-z0-9]", "-", root)):
-        allow_only = allow_only.replace(form, "<BASE>")
-    digest = hashlib.sha256(allow_only.encode()).hexdigest()
+        whole = whole.replace(form, "<BASE>")
+    digest = hashlib.sha256(whole.encode()).hexdigest()
     print(f"DIGEST no-successor-generator-profile={digest}")
 
     # 2. The same inputs plus a recorded successor differ by exactly the
     #    successor's four literal lines: ref, ref.lock, reflog, reflog.lock.
     after = build(manifest, "after.sb", successor=SUCCESSOR)
     before_lines, after_lines = before.splitlines(), after.splitlines()
-    # Allow lines only: the deny lines also name every sibling of the shared Claude
-    # temp root at build time, and another session can add or remove one between
-    # the two builds.
-    before_allow = [line for line in before_lines if line.startswith("(allow")]
-    after_allow = [line for line in after_lines if line.startswith("(allow")]
-    added = [line for line in after_allow if line not in before_allow]
-    removed = [line for line in before_allow if line not in after_allow]
+    # Allow and deny lines alike: a successor build may add its four allow lines and
+    # nothing else, and may drop no line, so a removed protected-ref deny is seen.
+    before_cmp, after_cmp = comparable(before), comparable(after)
+    added = [line for line in after_cmp if line not in before_cmp]
+    removed = [line for line in before_cmp if line not in after_cmp]
     assert not removed, f"the successor profile dropped lines: {removed}"
     assert sorted(added) == sorted(expected_branch_lines(common, SUCCESSOR)), \
         "the profile may gain exactly the successor's four literal allow lines, got " + repr(sorted(added))
@@ -203,7 +216,15 @@ def unit(base):
     assert refused_build(manifest, "nobranch.sb", successor=SUCCESSOR, branch=""), "a successor without a task branch must refuse"
     results["generator-refuses-inadmissible-successors"] = True
 
-    # 4. C1: the generator repeats the name-family bound. A successor is the task's
+    for name in results:
+        print(f"ok - {name}")
+    return 0
+
+
+def family(base):
+    manifest = layout(base / "fixture")
+    results = {}
+    # C1: the generator repeats the name-family bound. A successor is the task's
     #    branch name, then '-', then one or more of letters, digits, '.', '_', '-'.
     for outside in ("develop", "fm/other", "fm/task-", "fm/task-a/b", "FM/task-v2", "fm/task2-v2", "release/1.x"):
         error = refused_build(manifest, "family.sb", successor=outside)
@@ -213,7 +234,15 @@ def unit(base):
         build(manifest, "family-ok.sb", successor=inside)
     results["generator-holds-the-name-family-bound"] = True
 
-    # 5. C5: the alias check runs on the successor's ref and reflog paths. A hard
+    for name in results:
+        print(f"ok - {name}")
+    return 0
+
+
+def alias(base):
+    manifest = layout(base / "fixture")
+    results = {}
+    # C5: the alias check runs on the successor's ref and reflog paths. A hard
     #    link or a symbolic link there makes the build refuse and name the path; the
     #    task's own branch keeps the base behaviour (exempt).
     project, common = manifest["project"], common_dir(manifest)
@@ -303,45 +332,76 @@ def kernel(repo, base):
         found = git("-C", str(project), "rev-parse", "--verify", "-q", "refs/heads/" + name, check=False)
         return found.stdout.strip() if found.returncode == 0 else None
 
-    def attempt(profile, name, target, how):
-        """Run one ref write under the profile; True only when the ref ends at target."""
-        before = ref(name)
+    def argv_for(name, target, how):
         if how == "create":
-            argv = ["git", "-C", str(copy), "branch", name, target]
-        elif how == "move":
-            argv = ["git", "-C", str(copy), "update-ref", "-m", "kernel proof", "refs/heads/" + name, target]
-        else:
-            argv = ["git", "-C", str(copy), "branch", "-D", name]
-        confined(profile, None, *argv)
-        after = ref(name)
-        changed = after != before
-        # Put the ref back unconfined so every attempt starts from the same refs.
+            return ["git", "-C", str(copy), "branch", name, target]
+        if how == "move":
+            return ["git", "-C", str(copy), "update-ref", "-m", "kernel proof", "refs/heads/" + name, target]
+        return ["git", "-C", str(copy), "branch", "-D", name]
+
+    def restore(name, before):
         if before is None:
             git("-C", str(project), "update-ref", "-d", "refs/heads/" + name, check=False)
         else:
             git("-C", str(project), "update-ref", "refs/heads/" + name, before)
-        return changed
+
+    def unconfined(name, target, how):
+        return subprocess.run(argv_for(name, target, how), capture_output=True, text=True, env=dict(os.environ, **GIT_ENV))
+
+    def allowed(profile, name, target, how, label):
+        """The write must succeed under the profile: exit 0 and the ref moved where it was told to."""
+        before = ref(name)
+        result = confined(profile, None, *argv_for(name, target, how))
+        after = ref(name)
+        restore(name, before)
+        assert result.returncode == 0, f"{label}: the confined git command must exit 0, got {result.returncode}: {result.stderr.strip()}"
+        want = None if how == "delete" else target
+        assert after == want, f"{label}: the ref must end at {want!r}, ended at {after!r}"
+
+    def refused(profile, name, target, how, label):
+        """The write must be refused by the confinement, and by nothing else.
+
+        The same command is first run unconfined, so a command that is wrong in itself
+        (a name that collides with an existing ref, a bad object) cannot pass as a
+        refusal; then, confined, it must exit nonzero with the kernel's
+        operation-not-permitted error and leave the ref where it was.
+        """
+        before = ref(name)
+        control = unconfined(name, target, how)
+        moved = ref(name)
+        restore(name, before)
+        assert control.returncode == 0 and moved != before, \
+            f"{label}: the command must be valid when unconfined, or its refusal proves nothing: {control.stderr.strip()}"
+        result = confined(profile, None, *argv_for(name, target, how))
+        after = ref(name)
+        restore(name, before)
+        assert after == before, f"{label}: the confined write changed the ref"
+        assert result.returncode != 0, f"{label}: the confined git command must exit nonzero"
+        assert CONFINEMENT_REFUSAL.search(result.stderr or ""), \
+            f"{label}: git failed for a reason other than the confinement refusing it: {(result.stderr or '').strip()}"
 
     # With the new profile the successor is allowed: moved, created after deletion, deleted.
-    assert attempt(new_profile, succ, s_tip, "move"), "new profile: moving the successor ref must succeed"
-    assert attempt(new_profile, succ, p_tip, "move") is False, "new profile: moving the successor to its own tip changes nothing"
+    allowed(new_profile, succ, s_tip, "move", "new profile: moving the successor ref")
     git("-C", str(project), "update-ref", "-d", "refs/heads/" + succ)
-    created = attempt(new_profile, succ, p_tip, "create")
+    allowed(new_profile, succ, p_tip, "create", "new profile: git branch <successor> <sha>")
     git("-C", str(project), "update-ref", "refs/heads/" + succ, p_tip)
-    assert created, "new profile: git branch <successor> <sha> must succeed"
+    allowed(new_profile, succ, None, "delete", "new profile: deleting the successor")
     # With the old profile the same writes are refused as today.
-    assert not attempt(old_profile, succ, s_tip, "move"), "old profile: moving the successor must be refused"
+    refused(old_profile, succ, s_tip, "move", "old profile: moving the successor")
     git("-C", str(project), "update-ref", "-d", "refs/heads/" + succ)
-    created_old = attempt(old_profile, succ, p_tip, "create")
+    refused(old_profile, succ, p_tip, "create", "old profile: git branch <successor> <sha>")
     git("-C", str(project), "update-ref", "refs/heads/" + succ, p_tip)
-    assert not created_old, "old profile: git branch <successor> <sha> must be refused"
-    # With the new profile an unrelated name, another task's branch and names that
-    # share the successor as a prefix or a suffix are refused.
+    # With the new profile an unrelated name and names that share the successor as a prefix
+    # or a suffix are refused; so is a folder under the successor, which is a valid name only
+    # while the successor ref itself is absent.
     for label, name in (("unrelated", "fm/unrelated"), ("successor-as-prefix", succ + "-x"), ("successor-as-suffix", "fm/pre-" + succ),
-                        ("successor-as-folder", succ + "/child"), ("old-branch-as-prefix", old + "-x")):
-        assert not attempt(new_profile, name, p_tip, "create"), f"new profile: creating {name!r} ({label}) must be refused"
-    assert not attempt(new_profile, "fm/other-task", p_tip, "move"), "new profile: moving another task's branch must be refused"
-    assert not attempt(new_profile, "fm/other-task", p_tip, "delete"), "new profile: deleting another task's branch must be refused"
+                        ("old-branch-as-prefix", old + "-x")):
+        refused(new_profile, name, p_tip, "create", f"new profile: creating {name!r} ({label})")
+    git("-C", str(project), "update-ref", "-d", "refs/heads/" + succ)
+    refused(new_profile, succ + "/child", p_tip, "create", f"new profile: creating {succ + '/child'!r} (successor-as-folder)")
+    git("-C", str(project), "update-ref", "refs/heads/" + succ, p_tip)
+    refused(new_profile, "fm/other-task", p_tip, "move", "new profile: moving another task's branch")
+    refused(new_profile, "fm/other-task", None, "delete", "new profile: deleting another task's branch")
     assert ref("fm/other-task") == s_tip, "another task's branch must stay where it was"
     assert ref(succ) == p_tip and ref(old) == s_tip, "the fixture's refs must be back where they were"
     print("ok - kernel proof: the new profile allows the successor and refuses an unrelated name, another task's branch and prefix- or suffix-sharing names; the old profile refuses the successor")
@@ -352,12 +412,18 @@ def main():
     global REPO
     REPO = Path(sys.argv[1]).resolve()
     base = Path(sys.argv[2])
-    mode = sys.argv[3] if len(sys.argv) > 3 else "unit"
+    mode = sys.argv[3] if len(sys.argv) > 3 else "all"
+    if mode == "all":
+        return unit(base / "unit") or family(base / "family") or alias(base / "alias")
     if mode == "unit":
         return unit(base)
+    if mode == "family":
+        return family(base)
+    if mode == "alias":
+        return alias(base)
     if mode == "kernel":
         return kernel(REPO, base)
-    raise SystemExit("mode must be unit or kernel")
+    raise SystemExit("mode must be all, unit, family, alias or kernel")
 
 
 if __name__ == "__main__":

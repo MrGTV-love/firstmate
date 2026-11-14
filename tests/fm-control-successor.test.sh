@@ -579,21 +579,19 @@ test_relaunch_profile_covers_exactly_the_recorded_successor() {
   s1=$(meta_field "$dir" "$id" claude_session_id)
   common=$(git -C "$dir/proj" rev-parse --path-format=absolute --git-common-dir)
   common=$(cd "$common" && pwd -P)
-  profile_without_session_lines "$dir" "$dir/profile.before" "$s0" > "$dir/p0"
-  profile_without_session_lines "$dir" "$dir/home/state/$id.write-confinement.sb" "$s1" > "$dir/p1"
+  profile_without_session_lines "$dir" "$dir/profile.before" "$s0" | profile_comparable > "$dir/p0"
+  profile_without_session_lines "$dir" "$dir/home/state/$id.write-confinement.sb" "$s1" | profile_comparable > "$dir/p1"
   {
     for path in "$common/refs/heads/fm/$id-v2" "$common/logs/refs/heads/fm/$id-v2"; do
       printf '(allow file-write* (literal "%s"))\n' "$path"
       printf '(allow file-write* (literal "%s.lock"))\n' "$path"
     done
   } | sed "s#$dir#<CASE>#g" | LC_ALL=C sort > "$dir/expected-added"
-  # Only allow lines are compared: the deny lines also name every sibling folder of
-  # the shared Claude temp root at build time, which other sessions change between
-  # the two builds and which has nothing to do with the successor.
-  grep '^(allow' "$dir/p0" > "$dir/p0.allow"
-  grep '^(allow' "$dir/p1" > "$dir/p1.allow"
-  diff "$dir/p0.allow" "$dir/p1.allow" | sed -n 's/^> //p' | LC_ALL=C sort > "$dir/actual-added"
-  assert_equals "" "$(diff "$dir/p0.allow" "$dir/p1.allow" | sed -n 's/^< //p')" "the new profile dropped an allow line the old one had"
+  # Every allow and deny line is compared (profile_comparable leaves out only the
+  # per-session sibling folders of Claude's shared temp root): the new profile may gain
+  # the four literal allow lines and may drop nothing, so a removed deny is seen.
+  diff "$dir/p0" "$dir/p1" | sed -n 's/^> //p' | LC_ALL=C sort > "$dir/actual-added"
+  assert_equals "" "$(diff "$dir/p0" "$dir/p1" | sed -n 's/^< //p')" "the new profile dropped a line the old one had"
   assert_equals "$(cat "$dir/expected-added")" "$(cat "$dir/actual-added")" "the profile may gain exactly the successor's four literal allow lines"
   pass "successor: the profile the next relaunch generates gains exactly the successor's literal allow lines"
 }
@@ -627,7 +625,7 @@ test_relaunch_of_a_task_with_no_successor_generates_the_unchanged_profile() {
   # The case root is random and the profile names it three ways: as written, as a
   # regex-escaped path, and as the dash-encoded Claude project folder name; each
   # becomes <CASE> so the digest compares across runs and trees.
-  profile_without_session_lines "$dir" "$dir/home/state/$id.write-confinement.sb" "$s" | grep '^(allow' \
+  profile_without_session_lines "$dir" "$dir/home/state/$id.write-confinement.sb" "$s" | profile_comparable \
     | python3 -I -c 'import re, sys
 root = sys.argv[1]
 text = sys.stdin.read()
@@ -714,10 +712,7 @@ test_successor_receipt_and_events_name_the_checked_out_route() {
   : > "$FM_GUARD_EVENT_LOG"
   out=$(sc "$dir" "$id" --branch "fm/$id-v3" --note why) || rc=$?
   expect_code 1 "$rc" "an in-family branch that does not exist must refuse"$'\n'"$out"
-  row=$(admission_event proof deny)
-  [ -n "$row" ] || fail "no successor-branch-admission deny event was written for a refused proof"
-  assert_equals "fm/$id-v3" "$(printf '%s' "$row" | jq -r .successor)" "the deny event must name the successor"
-  assert_equals "$id" "$(printf '%s' "$row" | jq -r .task)" "the deny event must name the task"
+  [ -z "$(admission_event proof deny)" ] || fail "a refusal wrote a successor-branch-admission event; a refusal writes no file"
   rc=0
   out=$(sc "$dir" "$id" --branch "fm/$id-v2" --note why) || rc=$?
   expect_code 0 "$rc" "recording should succeed"$'\n'"$out"
@@ -727,7 +722,7 @@ test_successor_receipt_and_events_name_the_checked_out_route() {
   assert_equals checked-out "$(printf '%s' "$row" | jq -r .route)" "the record-time event must name the route"
   assert_equals "fm/$id-v2" "$(printf '%s' "$row" | jq -r .successor)" "the record-time event must name the successor"
   assert_equals "$id" "$(printf '%s' "$row" | jq -r .task)" "the record-time event must name the task"
-  pass "successor: the receipt names route=checked-out, and the guard writes an allow event with route and successor at record time and a deny event with the successor for a refusal"
+  pass "successor: the receipt names route=checked-out, the guard writes an allow event with route and successor at record time, and a refusal writes no event"
 }
 
 # C6: every comparison against another task's branch or successor, the recorded
@@ -754,7 +749,7 @@ test_successor_names_compare_without_regard_to_case() {
 # events a refusal and a record wrote, knows the guard and its harm only when the
 # registry holds the entry, and the spawn-write-confinement entry names the permit.
 test_registry_owns_the_successor_admission_and_the_reader_attributes_it() {
-  local id=suc-registry dir out rc=0 report registry=$ROOT/docs/guards/registry.json
+  local id=suc-registry dir out rc=0 report
   dir=$(new_successor_case registry "$id")
   : > "$FM_GUARD_EVENT_LOG"
   sc "$dir" "$id" --branch "fm/$id-v3" --note why >/dev/null || true
@@ -764,12 +759,8 @@ test_registry_owns_the_successor_admission_and_the_reader_attributes_it() {
     || fail "the metrics reader failed: $report"
   assert_equals irreversible "$(printf '%s' "$report" | jq -r '.guards[0].harm')" "the registry must own successor-branch-admission, or the reader cannot name its harm"
   assert_equals 1 "$(printf '%s' "$report" | jq -r '.guards[0].allows')" "the reader must count the record-time allow"
-  assert_equals 1 "$(printf '%s' "$report" | jq -r '.guards[0].denies')" "the reader must count the refusal"
-  jq -e '.guards[] | select(.id == "successor-branch-admission") | select(.owner == "bin/fm-successor-branch-lib.sh" and .decision == "deny" and .fail_direction == "closed" and .instrumented == true)' "$registry" >/dev/null \
-    || fail "the registry must hold a closed, instrumented deny guard owned by the successor library"
-  jq -e '.guards[] | select(.id == "spawn-write-confinement") | .layer_note | test("successor-branch-admission")' "$registry" >/dev/null \
-    || fail "the spawn-write-confinement entry must name the successor permit"
-  pass "successor: the registry holds the admission guard, the reader attributes the record and the refusal to it, and spawn-write-confinement names the permit"
+  assert_equals 0 "$(printf '%s' "$report" | jq -r '.guards[0].denies')" "a refusal writes no event, so the reader counts no deny"
+  pass "successor: the real metrics reader attributes the record's event to the registered admission guard and knows its harm"
 }
 
 # --- Round 2 (outside review of 71d56288f): one failing-first test per finding ---
@@ -908,19 +899,36 @@ SH
   pass "successor: a publication that fails after the rename restores the record, the instructions and the profile, with no backup or lock left"
 }
 
-# F5 (a): a refusal writes no file, the default event log included.
+# F5 (a): a refusal writes no file of its own, and no event of the successor guard. Under a
+# home's default event log, every control call (any verb, refusals included) appends one row of
+# the control script's own gate-containment check before the verb runs; that row predates the
+# verb and is not this verb's write, so it is the only row a refusal may add.
 test_successor_refusals_write_no_file_under_the_default_event_log() {
-  local id=suc-nofile dir
+  local id=suc-nofile dir log before after rows other
   dir=$(new_successor_case nofile "$id")
   git -C "$dir/proj" branch "fm/$id-v2b" "fm/$id-v2"
+  log=$dir/home/state/guard-events.jsonl
+  : > "$log"
+  state_without_log() { (cd "$dir/home/state" && find . -type f ! -name guard-events.jsonl | LC_ALL=C sort | while read -r f; do shasum -a 256 "$f"; done); }
+  before=$(state_without_log)
+  snap "$dir" before
   (
-    unset FM_GUARD_EVENT_LOG
-    expect_successor_refusal "$dir" "$id" no-file-nonexistent "does not exist in the project's ref store" 1 --branch "fm/$id-v3" --note why
-    expect_successor_refusal "$dir" "$id" no-file-name "is not admissible" 1 --branch "develop" --note why
-    expect_successor_refusal "$dir" "$id" no-file-unproved "is not proved to be this task's successor" 1 --branch "fm/$id-v2b" --note why
+    # The harness exports FM_GUARD_EVENT_LOG (a per-run log) and FM_GATE_REFUSE_BYPASS
+    # (which appends a bypass row to every control call); neither exists in a home, so both are
+    # unset to leave the home's own default event log in play.
+    unset FM_GUARD_EVENT_LOG FM_GATE_REFUSE_BYPASS
+    for branch in "fm/$id-v3" develop "fm/$id-v2b"; do
+      out=$(sc "$dir" "$id" --branch "$branch" --note why) && fail "a refusal was expected for $branch: $out"
+      :
+    done
   ) || exit 1
-  [ ! -e "$dir/home/state/guard-events.jsonl" ] || fail "a refusal created the home's event log"
-  pass "successor: a refusal changes no file, and the home's default event log is not created"
+  snap "$dir" after
+  same "$dir" before after "the refusals" data wt wt-other proj-git nm fake sentinel
+  after=$(state_without_log)
+  [ "$before" = "$after" ] || fail "a refusal changed a state file other than the event log"
+  other=$(jq -r 'select(.guard != "gate-agent-containment") | .guard' "$log" | sort -u | tr '\n' ' ')
+  [ -z "$other" ] || fail "a refusal wrote an event of another guard than the control script's gate check: $other"
+  pass "successor: a refusal changes no file of its own and writes no successor-branch-admission event"
 }
 
 # F5 (b): the event the record owes is not best-effort. A sink that cannot take it

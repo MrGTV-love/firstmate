@@ -135,3 +135,14 @@ mode_zero_binds() {  # <scratch-file>
   chmod 600 "$1"
   return 0
 }
+
+# Filter a profile (stdin to stdout) down to the lines two builds must agree on: every
+# allow and deny line except the deny of each per-session folder that other sessions
+# create directly under Claude's shared temp root, which the generator names by literal
+# path and which changes whenever another session starts or ends.
+profile_comparable() {
+  python3 -I -c 'import os, re, sys
+claude_tmp = os.path.realpath("/tmp") + "/claude-" + str(os.getuid())
+sibling = re.compile(r"^\(deny file-write\* \(literal \"" + re.escape(claude_tmp) + r"/[^/\"]+\"\)\)$")
+sys.stdout.write("".join(line for line in sys.stdin if not sibling.match(line.rstrip("\n"))))'
+}

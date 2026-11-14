@@ -490,8 +490,14 @@ test_scott_launch_refuses_a_copy_outside_the_projects_ref_store() {
   git -C "$dir/other-repo" -c user.name=fmtest -c user.email=fmtest@example.invalid commit -q --allow-empty -m init
   git -C "$dir/other-repo" worktree add -q -b "$SUCC" "$dir/other-copy"
   cp -p "$dir/home/state/$TASK.meta" "$dir/meta.good"
-  sed -i.bak "s#^worktree=.*#worktree=$dir/other-copy#" "$dir/home/state/$TASK.meta" && rm -f "$dir/home/state/$TASK.meta.bak"
+  # The omp harness: a claude launch is stopped earlier by the workspace-trust pre-registration,
+  # which refuses a copy that is not a worktree of the project, so for omp the proof is the
+  # only guard between the record and the profile.
+  sed -i.bak -e "s#^worktree=.*#worktree=$dir/other-copy#" -e 's#^harness=.*#harness=omp#' "$dir/home/state/$TASK.meta" && rm -f "$dir/home/state/$TASK.meta.bak"
   printf 'successor_branch=%s\n' "$SUCC" >> "$dir/home/state/$TASK.meta"
+  # The control relaunches only an endpoint that sits in the recorded copy, so the fake
+  # endpoint is moved into the other repository's copy as well; the proof is then what stops the launch.
+  printf '%s' "$dir/other-copy" > "$dir/fake/cwd"
   rm -f "$sb"
   rc=0; out=$(run_control "$dir" "$TASK" relaunch --note "mismatched repositories") || rc=$?
   [ "$rc" != 0 ] || fail "a launch whose copy is in another repository must refuse the grant"$'\n'"$out"
@@ -499,7 +505,9 @@ test_scott_launch_refuses_a_copy_outside_the_projects_ref_store() {
   [ ! -f "$sb" ] || ! grep -qF "$SUCC\"" "$sb" || fail "a line for the successor reached the profile for a copy in another repository"
   # Matched control: the copy that shares the project's ref store, with the same record, launches.
   cp -p "$dir/meta.good" "$dir/home/state/$TASK.meta"
+  sed -i.bak 's#^harness=.*#harness=omp#' "$dir/home/state/$TASK.meta" && rm -f "$dir/home/state/$TASK.meta.bak"
   printf 'successor_branch=%s\n' "$SUCC" >> "$dir/home/state/$TASK.meta"
+  printf '%s' "$fx/slots/22/project" > "$dir/fake/cwd"
   rc=0; out=$(run_control "$dir" "$TASK" relaunch --note "matching repositories") || rc=$?
   expect_code 0 "$rc" "the copy that shares the project's ref store must launch"$'\n'"$out"
   grep -qF "refs/heads/$SUCC\"" "$sb" || fail "the matching control launch must carry the successor"
