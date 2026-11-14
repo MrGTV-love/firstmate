@@ -2195,7 +2195,8 @@ assert 'pending_cleanup' not in DEFAULT_AGES_FOR_TEST and 'pending_acceptance' n
 handoff = by_cat('completed_task')
 assert 'fin-scout' in handoff and 'consume the report' in handoff['fin-scout']['next_action'] \
     and 'tear the task down' in handoff['fin-scout']['next_action'] and handoff['fin-scout']['overdue'], handoff.get('fin-scout')
-assert [r['category'] for r in mine('fin-scout')] == ['completed_task'], ('one obligation, one row', mine('fin-scout'))
+assert [r['category'] for r in mine('fin-scout') if r['category'] in ('completed_task', 'pending_acceptance', 'pending_cleanup')] \
+    == ['completed_task'], ('one obligation, one row', mine('fin-scout'))
 # A drop ruling over a copy that still holds unlanded work names the attended drop path with the recorded words.
 moot = cleanup['fin-moot']
 assert moot['owner'] == 'firstmate' and 'Main' in moot['next_action'], ('the drop path belongs to Main', moot)
@@ -2221,9 +2222,10 @@ for name in ('wait-paused', 'wait-held', 'v4-mate'):
 assert 'unfin-dirty' in by_cat('unlanded_commit'), 'unfinished changes keep their existing row'
 assert not any(r['category'] in ('missing_worker', 'unlanded_commit') for r in mine('v4-mate'))
 # A record whose last report was done with no accepted deliverable and no live worker is never left with no row.
-# A task state of done with no PR and nothing landed is the completed_task handoff's, so it gets that one row.
+# A done task, or a stopped one whose last report is done, with no PR and nothing landed is the completed_task
+# handoff's, so it gets that one row.
 acceptance = by_cat('pending_acceptance')
-for name in ('pend-ship', 'pend-scout', 'src-state'):
+for name in ('pend-ship', 'pend-scout', 'src-state', 'src-report'):
     assert [r['category'] for r in mine(name) if r['category'] in ('completed_task', 'pending_acceptance', 'pending_cleanup')] \
         == ['completed_task'], ('done with no accepted deliverable needs one owned row', name, mine(name))
     row = handoff[name]
@@ -2232,7 +2234,7 @@ for name in ('pend-ship', 'pend-scout', 'src-state'):
 # It never claims a source that did not put the task there.
 sources = {'last report was done': 'the last report was done', 'task state is done': 'the task state is done',
            'backlog item is closed': 'its backlog item is closed'}
-expected = {'src-report': {'last report was done'}, 'src-backlog': {'backlog item is closed'},
+expected = {'src-backlog': {'backlog item is closed'},
             'fin-dirty': {'last report was done', 'task state is done'}}
 for name, held in expected.items():
     row = acceptance.get(name)
