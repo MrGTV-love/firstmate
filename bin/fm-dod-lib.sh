@@ -1507,7 +1507,7 @@ fm_dod_nm_expected_plan() {  # <state> <task-id>
 # (the status answers with no `run:` line, or the repository is not initialized
 # for no-mistakes); 4 when the read failed and a bounded `no-mistakes daemon
 # status` then answers that the daemon is down: non-zero with its own `daemon not
-# running` line or a missing socket (fm_dod_nm_probe_says_down); 1
+# running` line or a refused or missing socket (fm_dod_nm_probe_says_down); 1
 # when the status is otherwise unreadable, including a probe that fails for any
 # other reason (a permission error, a runner that cannot start), which proves
 # nothing about the daemon. fm_dod_nm_unread_reason words each refusal.
@@ -1522,7 +1522,7 @@ fm_dod_nm_status_out() {  # <worktree>
     return 0
   fi
   [ "$(fm_nm_strip_quotes "$(fm_nm_field "$out" error)")" != "repo not initialized (run 'no-mistakes init' first)" ] || return 3
-  # Both streams: a missing socket is reported on stderr, which fm_nm_run_checked drops.
+  # Both streams: a refused or missing socket is reported on stderr, which fm_nm_run_checked drops.
   out=$(FM_NM_READ_PROGRESS=1 fm_nm_run_bounded "$wt" "$stall" daemon status 2>&1) || probe=$?
   case "$probe" in 0|124) return 1 ;; esac
   fm_dod_nm_probe_says_down "$out" || return 1
@@ -1530,10 +1530,10 @@ fm_dod_nm_status_out() {  # <worktree>
 }
 
 # 0 when a failed `no-mistakes daemon status` answer positively says the daemon
-# is down: its own `daemon not running` line, or a missing socket.
+# is down: its own `daemon not running` line, or a refused or missing socket.
 fm_dod_nm_probe_says_down() {  # <probe output>
   case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
-    *"daemon not running"*|*"no such file or directory"*sock*|*sock*"no such file or directory"*) return 0 ;;
+    *"daemon not running"*|*"connection refused"*|*"no such file or directory"*"sock"*|*"sock"*"no such file or directory"*) return 0 ;;
   esac
   return 1
 }

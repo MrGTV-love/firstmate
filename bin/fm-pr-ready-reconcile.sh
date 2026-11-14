@@ -8,10 +8,10 @@
 # bin/fm-pr-auto-review.py, whose header owns the request, record and merge sequence (the
 # merge poll, a static program that prints only `merged`, cannot request a read). That step
 # is stopped only when it goes silent for this pass's stall interval, like every other read
-# here. A recorded pr= whose merge poll was never published (the registrar was interrupted
-# between committing pr= and publishing the poll) is then also registered again for that
-# recorded PR, unless a merge notification, a pending poll retirement, an armed prune or a
-# pending slot return says the poll ended on purpose. That re-arm is the same registrar
+# here. A recorded pr= with no runnable merge poll (the registrar was interrupted between
+# committing pr= and publishing every poll file; pr_poll_lost owns the test) is then also
+# registered again for that recorded PR, unless a merge notification or armed prune for
+# that PR, a pending poll retirement or a pending slot return says the poll ended on purpose. That re-arm is the same registrar
 # call, so the merge poll then finds a merge nobody told this home about.
 # Read at most the final 64 KiB / 200 lines of each eligible status log. The
 # window comes from fm-status-event-lib.sh and the ready gate from fm-dod-lib.sh,
