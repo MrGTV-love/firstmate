@@ -130,9 +130,12 @@ fm_secondmate_restart_attribution() {  # <meta-file>
         ;;
     esac
     # The trailing marker keeps every byte of the reply, trailing newlines too,
-    # and carries the transport status.
+    # and carries the transport status. Bash drops NUL bytes from a command
+    # substitution, so each is turned into another byte first: a reply with a NUL
+    # can then never equal the exact token.
     out=$(FM_HOME="$FM_HOME" "$_FM_SECONDMATE_RESTART_LIB_DIR/fm-on.sh" "$id" \
-      fm-remote-secondmate-control.sh attribution "$id" < /dev/null 2>/dev/null; printf 'x%d' "$?")
+      fm-remote-secondmate-control.sh attribution "$id" < /dev/null 2>/dev/null | LC_ALL=C tr '\000' '\001'
+      printf 'x%d' "${PIPESTATUS[0]}")
     rc=${out##*x}; out=${out%x*}
     [ "$rc" != 0 ] || [ "$out" != $'attribution=proceed\n' ] || return 0
     case "$rc:$out" in
