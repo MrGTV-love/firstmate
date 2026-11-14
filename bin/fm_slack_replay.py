@@ -71,6 +71,20 @@ class Replay:
     def save(self):
         self.state_path.write_text(json.dumps(self.state, ensure_ascii=False))
 
+    def clock_reading(self, start):
+        """Slack's clock as this reply reports it. With `slack_clock_step` in the transcript the clock moves on by that many seconds with every successful call
+        (counted in the replay state, so it keeps moving across runs); with `slack_clock_whole` it is reported in whole seconds, as an HTTP Date is."""
+        value = start
+        step = self.transcript.get('slack_clock_step')
+        if isinstance(step, (int, float)) and not isinstance(step, bool) and step:
+            calls = int(self.state.get('clock_calls', 0))
+            value += step * calls
+            self.state['clock_calls'] = calls + 1
+            self.save()
+        if self.transcript.get('slack_clock_whole'):
+            value = float(int(value // 1))
+        return value
+
     @staticmethod
     def append_line(path, line):
         """Append one line to a log file only while the COMPLETE file after the append holds no plane value (a value that two clean lines form is
@@ -127,8 +141,9 @@ class Replay:
         snapshot = copy.deepcopy(self.state)
         try:
             result = self.replayed(method, **fields)
-            if isinstance(self.transcript.get('slack_clock'), (int, float)):
-                self.server_time = float(self.transcript['slack_clock'])
+            clock = self.transcript.get('slack_clock')
+            if isinstance(clock, (int, float)) and not isinstance(clock, bool):
+                self.server_time = self.clock_reading(float(clock))
             return result
         except SecretCollision:
             self.state = snapshot
