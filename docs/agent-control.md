@@ -226,14 +226,17 @@ It sends no input and starts or stops nothing.
 - The harness's kernel working directory is exactly the task's recorded home or worktree; a subdirectory of either is refused.
   The `lsof` name is decoded the way the omp proof decodes it, so a home whose name holds a backslash is compared by its real path; an ambiguous escape or a decoded control character is refused.
 - Neither the attributed process nor the harness carries a launch pin, and no process in the harness's process group carries one for another generation.
-  The process table must list the attributed process, and every other live process of the group must have a readable environment, or be proven to descend from the harness: its live parent chain matches the table up to the harness, and its birth time is the same across the read, so a helper the agent spawned (such as `caffeinate`) is the agent's own whatever its environment reads; a process that exited after the table was read is not a member.
+  Every process Herdr lists in the pane's foreground must be in the process table, and the table must list the attributed process.
+  Each process is judged on one environment read, for both readability and pin.
+  Every other process of the group must have a readable environment, or be proven to descend from the harness: its live parent chain matches the table up to the harness, and its birth time is the same across the read, so a helper the agent spawned (such as `caffeinate`) is the agent's own whatever its environment reads.
+  A process that is missing, cannot be read, or reads differently is not proven to have exited, and it refuses.
 - No other task record claims the pane, the home, or the worktree, in any local home the root inventory reaches (the root home, every registered local secondmate home below it, nested ones included) or in a secondmate home a record here names.
   An inventory that cannot be completed, or a peer record that cannot be read, refuses: it is unknown, never "no conflict".
 - A task-specific session tie exists.
-  The harness argv names one `--resume` session id, and either the task's recorded `claude_session_id` equals it, or the first user message of that session's transcript is the launch-brief doorbell of a record that sits in the task's own `state/operational-inbox/`, that `bin/fm-operational-input.sh` identifies as kind `launch-brief`, and that is not newer than the message.
+  The harness argv, read as separate arguments from the kernel (never the flattened `ps` text, so prompt text never acts as an option), names one `--resume` session id that stands where an option can stand (right after argv[0], after a boolean flag, or after an operand), and either the task's recorded `claude_session_id` equals it, or the first user message of that session's transcript is the launch-brief doorbell of a record that sits in the task's own `state/operational-inbox/`, that `bin/fm-operational-input.sh` identifies as kind `launch-brief`, and that is not newer than the message.
   A recorded `claude_session_id` that differs from the live id vetoes the adoption even when the doorbell holds.
   A harness started with `--fork-session`, `--continue`, or a `--session-id` other than its `--resume` id runs a conversation other than the one its `--resume` id names, so no tie of that session counts, whichever tie is offered; a `--session-id` equal to the `--resume` id names the same conversation.
-  The first user message is the first user record of the transcript; any line before it that cannot be classified (not JSON, or not an object) refuses, because it may be the real first message.
+  The first user message is the first user record of the transcript; any line before it that cannot be classified (not JSON, not an object, or an `isSidechain` that is not a boolean) refuses, because it may be the real first message; only `isSidechain` true marks a record to skip.
   A first message that merely names the inbox, and anything the agent does later in the session, never counts, because a personal session in the same directory can produce both.
   The operational inbox deletes records older than seven days, so a launch brief can be gone before the lane is adopted.
   The lock-owning main Firstmate may then run `adopt --session-id <live-session-id>`: the id must equal the live `--resume` id, a differing recorded `claude_session_id` still vetoes it, and every other proof still holds.
@@ -249,7 +252,10 @@ Once a published adoption's launch-brief record is gone, that doorbell alone kee
 The record is bound to the task's `spawn_gen`, so a relaunch makes it inert, and `fm-control.sh` removes it once the replacement is confirmed.
 A teardown does not yet remove a leftover record, which stays inert.
 A genuinely unproven agent, including a personal session in the same pane, home, and directory, keeps its refusal on every consumer, and the secondmate restart decides that before its pending-reply record, persistence request, or fallback nudge, and decides it again on the mate's own record right before a fallback nudge, since the persistence wait can last minutes.
-For a remote Herdr mate the restart reads the same decision on its host through the read-only `fm-remote-secondmate-control.sh attribution` verb and goes on only on its exact `attribution=proceed` line; a refusal, no answer, or a host whose code lacks the verb leaves the mate unreached with nothing sent.
+For a mate whose record names a `remote_host`, the restart reads the same decision on its host through the read-only `fm-remote-secondmate-control.sh attribution` verb, whatever its capability verdict.
+It goes on only on the exact bytes `attribution=proceed` plus one newline with a zero transport status.
+A `remote_backend` other than herdr (omitted means herdr), a refusal, no answer, extra output, or a host whose code lacks the verb leaves the mate unreached with nothing sent.
+The verb writes nothing and creates no directory.
 
 **Residual risk:** nothing watches which conversation an adopted process runs.
 An adopted process has no pin, so a switch to a personal conversation after the adoption is not seen, exactly as for an adopted omp process.

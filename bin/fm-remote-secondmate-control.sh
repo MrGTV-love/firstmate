@@ -94,14 +94,18 @@ fi
 
 # shellcheck source=bin/fm-backend.sh
 . "$SCRIPT_DIR/fm-backend.sh"
-# shellcheck source=bin/fm-ff-lib.sh
-. "$SCRIPT_DIR/fm-ff-lib.sh"
-# shellcheck source=bin/fm-pending-reply-lib.sh
-. "$SCRIPT_DIR/fm-pending-reply-lib.sh"
-# shellcheck source=bin/fm-task-inbox-lib.sh
-. "$SCRIPT_DIR/fm-task-inbox-lib.sh"
-# shellcheck source=bin/fm-session-launch-policy-lib.sh
-. "$SCRIPT_DIR/fm-session-launch-policy-lib.sh"
+# The read-only attribution verb loads only fm-backend.sh, which writes nothing:
+# the libraries below can create "$FM_HOME/state" when sourced.
+if [ "${1:-}" != attribution ]; then
+  # shellcheck source=bin/fm-ff-lib.sh
+  . "$SCRIPT_DIR/fm-ff-lib.sh"
+  # shellcheck source=bin/fm-pending-reply-lib.sh
+  . "$SCRIPT_DIR/fm-pending-reply-lib.sh"
+  # shellcheck source=bin/fm-task-inbox-lib.sh
+  . "$SCRIPT_DIR/fm-task-inbox-lib.sh"
+  # shellcheck source=bin/fm-session-launch-policy-lib.sh
+  . "$SCRIPT_DIR/fm-session-launch-policy-lib.sh"
+fi
 
 validate_home() { # <id>
   local id=$1 marker

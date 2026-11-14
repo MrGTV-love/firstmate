@@ -108,27 +108,41 @@ fm_secondmate_restart_capable() {  # <meta-file>
 # control plane's exemption: a pane whose agent is positively dead or missing is
 # governed by fm-control's own stopped-agent proofs, unchanged. Any other state,
 # an endpoint that does not validate, or a backend that does not load is
-# unproven and refuses. A remote Herdr mate is decided on its host by the same
-# owner, through the read-only `fm-remote-secondmate-control.sh attribution`
-# verb over bin/fm-on.sh: only its exact proceed line lets the restart go on,
-# and a transport failure, any other output, or a host whose code lacks the
-# verb refuses.
+# unproven and refuses. A mate whose record names a remote_host is decided on
+# its host by the same owner, through the read-only
+# `fm-remote-secondmate-control.sh attribution` verb over bin/fm-on.sh, whatever
+# its capability verdict: a remote_backend other than herdr (or omitted, which
+# is herdr) refuses, and only the exact bytes "attribution=proceed" plus one
+# newline, with a zero transport status, let the restart go on; a transport
+# failure, any other or extra output, or a host whose code lacks the verb refuses.
 # Returns 1 with FM_SECONDMATE_RESTART_REASON set when the agent is unproven.
 fm_secondmate_restart_attribution() {  # <meta-file>
-  local meta=$1 id cause state out
-  [ "$FM_SECONDMATE_RESTART_BACKEND" = herdr ] || return 0
+  local meta=$1 id cause state out rc remote_host remote_backend
   id=${meta##*/}; id=${id%.meta}
-  if [ "$FM_SECONDMATE_RESTART_PLACEMENT" = remote ]; then
-    out=$(FM_HOME="$FM_HOME" "$_FM_SECONDMATE_RESTART_LIB_DIR/fm-on.sh" "$id" \
-      fm-remote-secondmate-control.sh attribution "$id" < /dev/null 2>/dev/null) || out=''
-    [ "$out" != attribution=proceed ] || return 0
-    case "$out" in
-      'attribution=refuse: '*) cause=${out#attribution=refuse: }; cause=${cause%%$'\n'*} ;;
-      *) cause="its host returned no attribution decision (unreachable, or its code lacks the attribution verb until it is synced)" ;;
+  remote_host=$(fm_meta_get "$meta" remote_host 2>/dev/null)
+  if [ -n "$remote_host" ]; then
+    remote_backend=$(fm_meta_get "$meta" remote_backend 2>/dev/null)
+    case "$remote_backend" in
+      ''|herdr) ;;
+      *)
+        FM_SECONDMATE_RESTART_REASON="its record names remote_backend '$remote_backend', not herdr, so its host cannot decide the attribution and no request, record or nudge was sent to it"
+        return 1
+        ;;
     esac
-    FM_SECONDMATE_RESTART_REASON="its remote agent on ${FM_SECONDMATE_RESTART_HOST:-its host} was not attributed to this task, so no request, record or nudge was sent to it: $cause"
+    # The trailing marker keeps every byte of the reply, trailing newlines too,
+    # and carries the transport status.
+    out=$(FM_HOME="$FM_HOME" "$_FM_SECONDMATE_RESTART_LIB_DIR/fm-on.sh" "$id" \
+      fm-remote-secondmate-control.sh attribution "$id" < /dev/null 2>/dev/null; printf 'x%d' "$?")
+    rc=${out##*x}; out=${out%x*}
+    [ "$rc" != 0 ] || [ "$out" != $'attribution=proceed\n' ] || return 0
+    case "$rc:$out" in
+      '0:attribution=refuse: '*) cause=${out#attribution=refuse: }; cause=${cause%%$'\n'*} ;;
+      *) cause="its host returned no attribution decision in the exact form (unreachable, extra output, or its code lacks the attribution verb until it is synced)" ;;
+    esac
+    FM_SECONDMATE_RESTART_REASON="its remote agent on $remote_host was not attributed to this task, so no request, record or nudge was sent to it: $cause"
     return 1
   fi
+  [ "$FM_SECONDMATE_RESTART_BACKEND" = herdr ] || return 0
   [ "$FM_SECONDMATE_RESTART_PLACEMENT" = local ] || return 0
   # shellcheck source=bin/fm-launch-proof-lib.sh disable=SC1091
   . "$_FM_SECONDMATE_RESTART_LIB_DIR/fm-launch-proof-lib.sh"

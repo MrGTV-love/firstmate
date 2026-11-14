@@ -67,28 +67,40 @@ fm_launch_proof_tree_pinned_elsewhere() { # <spawn-gen> <process-table> <anchor-
   return 1
 }
 
-# Adoption proves the absence of a foreign pin only for processes it read.
-# Succeeds, printing why, when <anchor> (the proven harness) is missing from
-# <process-table> (pid ppid pgid rows), or when a process of its group other
-# than <anchor> and the listed pids (whose environments adoption reads on its
-# own) is still live, its environment cannot be read, and it is not proven to
-# descend from <anchor>. A member that exited after the table was read is not a
-# member. The lifecycle verdict keeps fm_launch_proof_tree_pinned_elsewhere.
-fm_launch_proof_tree_unread() { # <process-table> <anchor-pid> [<pid>...]
-  local table=$1 anchor=$2 group kid known environment birth
-  shift 2
+# Adoption judges every process of <anchor>'s (the proven harness's) process group
+# in <process-table> (pid ppid pgid rows), plus <anchor> and the listed pids, on
+# ONE environment read each, so readability and pin are judged on the same
+# evidence. Prints nothing when all are proven, else one cause, checked in this
+# order: "foreign:<pid>" a readable pin for another generation anywhere;
+# "own:<pid>" <anchor> or a listed pid unreadable or carrying a pin; "unread:<why>"
+# <anchor> missing from the table, or another member whose environment cannot be
+# read and that is not proven to descend from <anchor> (Main 022). A member that
+# cannot be read is not proven to have exited. The lifecycle verdict keeps
+# fm_launch_proof_tree_pinned_elsewhere.
+fm_launch_proof_tree_judge() { # <spawn-gen> <process-table> <anchor-pid> [<pid>...]
+  local gen=$1 table=$2 anchor=$3 group kid known environment birth pinned own
+  local foreign='' ownbad='' unread=''
+  shift 3
   group=$(awk -v p="$anchor" '$1 == p {print $3; exit}' <<< "$table")
-  if [ -z "$group" ]; then
-    printf 'the process table does not list the attributed process %s' "$anchor"; return 0
-  fi
+  [ -n "$group" ] || { printf 'unread:the process table does not list the attributed process %s' "$anchor"; return 0; }
   while read -r kid <&3; do
-    for known in "$anchor" "$@"; do [ "$kid" != "$known" ] || continue 2; done
+    own=''
+    for known in "$anchor" "$@"; do [ "$kid" != "$known" ] || own=1; done
     birth=$(LC_ALL=C ps -p "$kid" -o lstart= 2>/dev/null) || birth=''
     if environment=$(fm_remote_herdr_process_env "$kid") \
       && printf '%s\n' "$environment" | grep -Eq '^(PATH|HOME)='; then
+      pinned=$(printf '%s\n' "$environment" | sed -n 's/^FM_SPAWN_GEN=//p')
+      if [ -n "$pinned" ] && [ "$pinned" != "$gen" ]; then
+        [ -n "$foreign" ] || foreign=$kid
+      elif [ -n "$own" ] && [ -n "$pinned" ]; then
+        [ -n "$ownbad" ] || ownbad=$kid
+      fi
       continue
     fi
-    LC_ALL=C ps -p "$kid" -o args= >/dev/null 2>&1 || continue
+    if [ -n "$own" ]; then
+      [ -n "$ownbad" ] || ownbad=$kid
+      continue
+    fi
     # Spawned within our own proven conversation, it is ours whatever its
     # environment reads (Main 022): the same process across the read (birth
     # time), and a live parent chain that matches the table up to <anchor>.
@@ -96,9 +108,13 @@ fm_launch_proof_tree_unread() { # <process-table> <anchor-pid> [<pid>...]
       && [ "$(LC_ALL=C ps -p "$kid" -o lstart= 2>/dev/null)" = "$birth" ]; then
       continue
     fi
-    printf 'the environment of live group process %s cannot be read, and it is not proven to descend from the harness' "$kid"; return 0
-  done 3< <(awk -v g="$group" '$3 == g {print $1}' <<< "$table")
-  return 1
+    [ -n "$unread" ] || unread="the environment of live group process $kid cannot be read, and it is not proven to descend from the harness"
+  done 3< <({ printf '%s\n' "$anchor" "$@"; awk -v g="$group" '$3 == g {print $1}' <<< "$table"; } | awk '!seen[$0]++')
+  if [ -n "$foreign" ]; then printf 'foreign:%s' "$foreign"
+  elif [ -n "$ownbad" ]; then printf 'own:%s' "$ownbad"
+  elif [ -n "$unread" ]; then printf 'unread:%s' "$unread"
+  fi
+  return 0
 }
 
 # Succeeds when <pid>'s parent chain in <process-table> reaches <ancestor>, with
@@ -380,6 +396,74 @@ PY
 FM_LAUNCH_PROOF_FORWARDING_LAUNCHERS=''
 
 fm_launch_proof_adopt_refuse() { echo "adopt refused: $1" >&2; return 1; }
+
+# Claude options that take no operand and may stand before a session option.
+# Any other option before one makes it that option's operand.
+fm_launch_proof_claude_boolean_flag() { # <arg>
+  case "$1" in
+    --dangerously-skip-permissions|--verbose) return 0 ;;
+  esac
+  return 1
+}
+
+# Prints <pid>'s argv as separate fields, each NUL-terminated, after a first
+# field holding their count: Darwin KERN_PROCARGS2, Linux /proc/<pid>/cmdline.
+# Fails, printing nothing, when the argv cannot be read whole.
+fm_launch_proof_pid_argv() { # <pid>
+  case "$1" in ''|*[!0-9]*) return 1 ;; esac
+  python3 -I - argv "$1" 2>/dev/null <<'ARGVPY'
+import ctypes
+import struct
+import sys
+
+def darwin(pid):
+    libc = ctypes.CDLL(None, use_errno=True)
+    sysctl = libc.sysctl
+    sysctl.argtypes = [ctypes.POINTER(ctypes.c_int), ctypes.c_uint, ctypes.c_void_p,
+                       ctypes.POINTER(ctypes.c_size_t), ctypes.c_void_p, ctypes.c_size_t]
+    sysctl.restype = ctypes.c_int
+    argmax = ctypes.c_int()
+    size = ctypes.c_size_t(ctypes.sizeof(argmax))
+    if sysctl((ctypes.c_int * 2)(1, 8), 2, ctypes.byref(argmax), ctypes.byref(size), None, 0) != 0 or argmax.value <= 0:
+        raise ValueError()
+    buffer = ctypes.create_string_buffer(argmax.value + ctypes.sizeof(ctypes.c_int))
+    size = ctypes.c_size_t(ctypes.sizeof(buffer))
+    if sysctl((ctypes.c_int * 3)(1, 49, pid), 3, buffer, ctypes.byref(size), None, 0) != 0:
+        raise ValueError()
+    data = buffer.raw[:size.value]
+    argc = struct.unpack_from("=i", data)[0]
+    if argc <= 0 or argc > len(data):
+        raise ValueError()
+    offset = data.index(b"\0", ctypes.sizeof(ctypes.c_int))
+    while offset < len(data) and data[offset] == 0:
+        offset += 1
+    fields = []
+    for _ in range(argc):
+        end = data.index(b"\0", offset)
+        fields.append(data[offset:end])
+        offset = end + 1
+    return fields
+
+def linux(pid):
+    with open(f"/proc/{pid}/cmdline", "rb") as stream:
+        data = stream.read()
+    if not data or not data.endswith(b"\0"):
+        raise ValueError()
+    return data[:-1].split(b"\0")
+
+try:
+    pid = int(sys.argv[2])
+    fields = darwin(pid) if sys.platform == "darwin" else linux(pid)
+    if not fields:
+        raise ValueError()
+    out = sys.stdout.buffer
+    out.write(str(len(fields)).encode() + b"\0")
+    for field in fields:
+        out.write(field + b"\0")
+except Exception:
+    sys.exit(1)
+ARGVPY
+}
 # A missing session tie: its cause, then what lets Main go on (plan row E2(b)).
 fm_launch_proof_adopt_refuse_no_tie() {
   fm_launch_proof_adopt_refuse "no task-specific session tie: $1; next action: a person or Main supplies the task's recorded claude_session_id, or decides the lane by hand"
@@ -404,7 +488,8 @@ fm_launch_proof_claude_project_dir() { # <absolute-directory>
 # Prints the physical kernel working directory of <pid> (never argv or env).
 fm_launch_proof_pid_cwd() { # <pid>
   local pid=$1 out line path='' pids=0 names=0
-  out=$(lsof -w -a -p "$pid" -d cwd -F pn0 2>/dev/null | tr '\0' '\n') || return 1
+  # pipefail: a reader that fails gives no proof, whatever it printed.
+  out=$(set -o pipefail; lsof -w -a -p "$pid" -d cwd -F pn0 2>/dev/null | tr '\0' '\n') || return 1
   while IFS= read -r line; do
     case "$line" in
       p*) [ "$line" = "p$pid" ] || return 1; pids=$((pids + 1)) ;;
@@ -528,7 +613,8 @@ fm_launch_proof_claude_adoption() { # <meta> [<session-id> <tie>] -> candidate a
   local meta=$1 proven=${2:-} proven_tie=${3:-} target session pane home root gen pid harness_pid table kids kid args
   local resume_count=0 session_id='' forked='' named='' named_id='' i recorded tie transcript config_dir claude_home env_text
   local first epoch message kind record mtime launcher_args harness_args claim peer_state cwd
-  local peer_meta peer_home peer_states inbox member
+  local peer_meta peer_home peer_states peer_state peer_seen peer_key inbox member prev field fields
+  local -a hfields
   local -a argv hargv
 
   target=$(fm_backend_meta_exact_value "$meta" window) \
@@ -597,35 +683,73 @@ fm_launch_proof_claude_adoption() { # <meta> [<session-id> <tie>] -> candidate a
   # Generation and launch-pin proof, then unique ownership of pane and home.
   # Every process of the harness's group is part of the tree: a helper pinned to
   # another launch belongs to a different incarnation.
-  if fm_launch_proof_tree_pinned_elsewhere "$gen" "$table" "$harness_pid" "$pid"; then
-    fm_launch_proof_adopt_refuse 'generation proof needs no process in the tree to be pinned to another launch generation'; return 1
-  fi
-  if member=$(fm_launch_proof_tree_unread "$table" "$harness_pid" "$pid"); then
-    fm_launch_proof_adopt_refuse "generation proof needs every live process of the harness's process group to be read; $member; next action: retry once it has exited, or Main decides the lane by hand"; return 1
-  fi
-  for kid in $pid $harness_pid; do
-    fm_launch_proof_pid_unpinned "$kid" \
-      || { fm_launch_proof_adopt_refuse 'launch-pin proof needs a positively readable environment without a usable launch pin; pinned or unreadable processes are not adoption candidates'; return 1; }
+  # Every process Herdr lists in the pane's foreground must be in the table:
+  # a listed process the table lacks is unknown, never exited.
+  for kid in $(fm_backend_herdr_cli "$session" pane process-info --pane "$pane" 2>/dev/null \
+    | jq -r '.result.process_info.foreground_processes[]?.pid // empty' 2>/dev/null); do
+    awk -v p="$kid" '$1 == p {found=1} END {exit !found}' <<< "$table" \
+      || { fm_launch_proof_adopt_refuse "generation proof needs the process table to list every foreground process; it does not list $kid; next action: retry, or Main decides the lane by hand"; return 1; }
   done
+  # One environment read per process judges both readability and pin.
+  member=$(fm_launch_proof_tree_judge "$gen" "$table" "$harness_pid" "$pid")
+  case "$member" in
+    '') ;;
+    foreign:*) fm_launch_proof_adopt_refuse 'generation proof needs no process in the tree to be pinned to another launch generation'; return 1 ;;
+    own:*) fm_launch_proof_adopt_refuse 'launch-pin proof needs a positively readable environment without a usable launch pin; pinned or unreadable processes are not adoption candidates'; return 1 ;;
+    *) fm_launch_proof_adopt_refuse "generation proof needs every live process of the harness's process group to be read; ${member#*:}; next action: retry once it has exited, or Main decides the lane by hand"; return 1 ;;
+  esac
   # Every local home the root inventory reaches (root, siblings, nested), plus
   # each secondmate home a record here names. An inventory that cannot be
   # completed proves no exclusivity.
   peer_states=$(fm_launch_proof_claim_states "$meta") \
     || { fm_launch_proof_adopt_refuse "unique-claim proof needs a complete inventory of local homes; $peer_states; next action: repair the named home or registry, or Main decides the lane by hand"; return 1; }
-  for peer_meta in "$(dirname -- "$meta")"/*.meta; do
-    [ "$(fm_meta_get "$peer_meta" kind)" = secondmate ] || continue
-    peer_home=$(fm_meta_get "$peer_meta" home)
-    [ -z "$peer_home" ] || peer_states="$peer_states"$'\n'"$peer_home/state"
-  done
-  while IFS= read -r peer_state; do
+  # Homes a secondmate record names are followed to a fixed point: each newly
+  # reached state directory is scanned for claims and for further records; the
+  # seen list (physical paths) is the cycle guard.
+  peer_states=$(printf '%s\n' "$(dirname -- "$meta")" "$peer_states")
+  peer_seen='|'
+  while [ -n "$peer_states" ]; do
+    peer_state=${peer_states%%$'\n'*}
+    if [ "$peer_state" = "$peer_states" ]; then peer_states=''; else peer_states=${peer_states#*$'\n'}; fi
+    [ -n "$peer_state" ] || continue
+    peer_key=$(fm_launch_proof_physical_path "$peer_state")
+    case "$peer_seen" in *"|$peer_key|"*) continue ;; esac
+    peer_seen="$peer_seen$peer_key|"
     if claim=$(fm_launch_proof_claude_claimed "$meta" "$peer_state" "$target" "$home" "$root" "$cwd"); then
       fm_launch_proof_adopt_refuse "unique-claim proof needs no other task record to claim this pane or home; claimed by $claim"; return 1
     fi
-  done <<< "$(printf '%s\n' "$peer_states" | sort -u)"
+    for peer_meta in "$peer_state"/*.meta; do
+      [ -f "$peer_meta" ] || continue
+      [ "$(fm_meta_get "$peer_meta" kind)" = secondmate ] || continue
+      [ -z "$(fm_meta_get "$peer_meta" remote_host)" ] || continue
+      peer_home=$(fm_meta_get "$peer_meta" home)
+      [ -z "$peer_home" ] || peer_states="$peer_states"$'\n'"$peer_home/state"
+    done
+  done
 
-  # Task-specific session tie: the conversation, not just the directory.
-  read -r -a hargv <<< "$(LC_ALL=C ps -p "$harness_pid" -o args= 2>/dev/null)"
+  # Task-specific session tie: the conversation, not just the directory. The
+  # argv is read as separate fields (fm_launch_proof_pid_argv), never from the
+  # flattened ps text, so prompt text never acts as an option. A session option
+  # counts only where an option can stand: right after argv[0], after a known
+  # boolean flag, or after an operand; after any other option it is that
+  # option's operand, and the argv proves nothing.
+  hfields=()
+  while IFS= read -r -d '' field; do hfields+=("$field"); done < <(fm_launch_proof_pid_argv "$harness_pid" 2>/dev/null)
+  fields=${hfields[0]:-}
+  if ! [[ $fields =~ ^[1-9][0-9]*$ ]] || [ "$fields" -ne $((${#hfields[@]} - 1)) ]; then
+    fm_launch_proof_adopt_refuse_no_tie 'the harness argv cannot be read as separate arguments'; return 1
+  fi
+  hargv=("${hfields[@]:1}")
   for ((i = 1; i < ${#hargv[@]}; i++)); do
+    case "${hargv[i]}" in
+      --resume|-r|--resume=*|--fork-session|--fork-session=*|-c|--continue|--continue=*|--session-id|--session-id=*)
+        prev=${hargv[i-1]}
+        if [ "$i" -gt 1 ] && [[ $prev == -* ]] \
+          && ! fm_launch_proof_claude_boolean_flag "$prev"; then
+          fm_launch_proof_adopt_refuse_no_tie "the harness argv carries ${hargv[i]%%=*} as the operand of $prev, not as an option"; return 1
+        fi
+        ;;
+    esac
     case "${hargv[i]}" in
       --resume|-r) resume_count=$((resume_count + 1)); session_id=${hargv[i+1]:-}; i=$((i + 1)) ;;
       --resume=*) resume_count=$((resume_count + 1)); session_id=${hargv[i]#--resume=} ;;
@@ -689,7 +813,12 @@ try:
             record = json.loads(line)
             if not isinstance(record, dict):
                 sys.exit(1)
-            if record.get("type") != "user" or record.get("isSidechain"):
+            # Only the JSON boolean true marks a sidechain; any other value is
+            # malformed and the first message is unproven.
+            sidechain = record.get("isSidechain", False)
+            if not isinstance(sidechain, bool):
+                sys.exit(1)
+            if record.get("type") != "user" or sidechain:
                 continue
             content = (record.get("message") or {}).get("content")
             if isinstance(content, list) and len(content) == 1 and isinstance(content[0], dict) \

@@ -7203,7 +7203,7 @@
       "owner": "bin/fm-launch-proof-lib.sh",
       "invariant": "Claude adoption authorizes lifecycle input only to a restored process proven to be this task's own conversation, and rechecks every proof at each use.",
       "layer": "runtime-block",
-      "source": "the recorded task endpoint, the unique attributed foreground process (the claude harness or a listed forwarding launcher whose direct child is the harness), the harness kernel working directory (lsof escapes decoded, ambiguous ones refused), the absence of any foreign launch pin with the attributed process listed in the process table and every other live member of its process group read or proven, by a live parent chain matching the table and an unchanged birth time, to descend from the harness, an exclusive pane and home claim across every local home the root inventory reaches with no unreadable peer record, and the task-specific session tie of a harness that does not fork, continue or rename its resumed session, read from a transcript whose lines before the first user record are all classifiable (a recorded session id equal to the live one, a transcript whose first user message is the launch-brief doorbell of a record in the task's own home, or, once that launch-brief record is gone, the lock owner's own --session-id statement equal to the live one while the transcript still opens with that doorbell); every recheck rereads the transcript doorbell, never only the adoption record",
+      "source": "the recorded task endpoint, the unique attributed foreground process (the claude harness or a listed forwarding launcher whose direct child is the harness), the harness kernel working directory (a failed lsof read gives no proof; lsof escapes decoded, ambiguous ones refused), the absence of any foreign launch pin with every Herdr-listed foreground process and the attributed process in the process table, each process judged on one environment read, and every other live member of its process group read or proven, by a live parent chain matching the table and an unchanged birth time, to descend from the harness, an exclusive pane and home claim across every local home the root inventory reaches with no unreadable peer record, and the task-specific session tie, from the harness argv read as separate kernel arguments, of a harness that does not fork, continue or rename its resumed session, read from a transcript whose lines before the first user record are all classifiable (isSidechain only a boolean) (a recorded session id equal to the live one, a transcript whose first user message is the launch-brief doorbell of a record in the task's own home, or, once that launch-brief record is gone, the lock owner's own --session-id statement equal to the live one while the transcript still opens with that doorbell); every recheck rereads the transcript doorbell, never only the adoption record",
       "trigger": "fm-control adopt of a restored claude agent as a task's agent unless all proofs hold, and any lifecycle reader that would authorize it from the adoption record without rechecking them",
       "decision": "deny",
       "fail_direction": "closed",
@@ -7231,7 +7231,7 @@
         },
         {
           "file": "bin/fm-launch-proof-lib.sh",
-          "match": "fm_launch_proof_adopt_refuse \"generation proof needs every live process of the harness's process group to be read; $member; next action: retry once it has exited, or Main decides the lane by hand\"; return 1"
+          "match": "*) fm_launch_proof_adopt_refuse \"generation proof needs every live process of the harness's process group to be read; ${member#*:}; next action: retry once it has exited, or Main decides the lane by hand\"; return 1 ;;"
         },
         {
           "file": "bin/fm-launch-proof-lib.sh",
@@ -7303,7 +7303,19 @@
         },
         {
           "file": "bin/fm-launch-proof-lib.sh",
-          "match": "|| { fm_launch_proof_adopt_refuse 'launch-pin proof needs a positively readable environment without a usable launch pin; pinned or unreadable processes are not adoption candidates'; return 1; }"
+          "match": "own:*) fm_launch_proof_adopt_refuse 'launch-pin proof needs a positively readable environment without a usable launch pin; pinned or unreadable processes are not adoption candidates'; return 1 ;;"
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "|| { fm_launch_proof_adopt_refuse \"generation proof needs the process table to list every foreground process; it does not list $kid; next action: retry, or Main decides the lane by hand\"; return 1; }"
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "fm_launch_proof_adopt_refuse_no_tie 'the harness argv cannot be read as separate arguments'; return 1"
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "fm_launch_proof_adopt_refuse_no_tie \"the harness argv carries ${hargv[i]%%=*} as the operand of $prev, not as an option\"; return 1"
         },
         {
           "file": "bin/fm-launch-proof-lib.sh",
@@ -7362,7 +7374,7 @@
       "owner": "bin/fm-secondmate-restart.sh",
       "invariant": "The secondmate restart sends no request, record or nudge to a live Herdr agent that is not positively attributed to the task.",
       "layer": "runtime-block",
-      "source": "the one launch-proof verdict owner (fm_launch_proof_herdr_refusal) read before the restart's pending-reply record, persistence request and fallback nudge, and read again on the mate's own record right before a fallback nudge; for a remote Herdr mate the same owner read on its host by the read-only fm-remote-secondmate-control.sh attribution verb, whose exact attribution=proceed line is the only accepted answer; a pane whose agent is positively dead or missing stays with the control plane's own stopped-agent proofs",
+      "source": "the one launch-proof verdict owner (fm_launch_proof_herdr_refusal) read before the restart's pending-reply record, persistence request and fallback nudge, and read again on the mate's own record right before a fallback nudge; for a mate whose record names a remote_host, the same owner read on its host by the read-only fm-remote-secondmate-control.sh attribution verb whatever its capability verdict, whose exact bytes attribution=proceed plus one newline with a zero transport status are the only accepted answer, and a remote_backend other than herdr refuses; a pane whose agent is positively dead or missing stays with the control plane's own stopped-agent proofs",
       "trigger": "restart of a local Herdr secondmate whose live agent is unmanaged or unreadable by the launch-proof owner, or whose Herdr backend does not load, endpoint does not validate, or agent state is neither alive nor positively dead or missing, at the first effect or at a later fallback nudge; and restart of a remote Herdr secondmate whose host answers anything but attribution=proceed (a refusal, no answer, an unreachable host, or a code root without the verb)",
       "decision": "deny",
       "fail_direction": "closed",
