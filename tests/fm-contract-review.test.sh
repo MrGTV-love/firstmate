@@ -1391,6 +1391,23 @@ test_rubric_revision_is_pinned_with_a_root() {
   pass "with a root, a revision path to the rubric is allowed only at the pinned revision"
 }
 
+test_prose_mention_is_judged_but_is_no_list() {
+  local rep="$TMP_ROOT/report-z1.md"
+  make_leak_world
+  # Noncompliant: a prose summary that names a pack file names no input by path, so it is no list.
+  printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\nI read only the pack files (target.md and its folder), the two skills and the rubric.\n\n## Findings\n\nEXIT: needs-revision\n\nVERDICT: FAIL\n' >"$rep"
+  run_check "$rep"
+  assert_equals 3 "$CHECK_RC" "a prose-only Inputs read section was accepted: $CHECK_OUT"
+  assert_contains "$CHECK_OUT" "no Inputs read list" "a prose-only Inputs read section voided for another cause"
+  # Compliant: a full-path list plus a prose mention of target.md stays clean and counts the list only.
+  printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- %s\n- %s\n\nBoth are pack files; target.md is the contract under review.\n\n## Findings\n\nEXIT: needs-revision\n\nVERDICT: FAIL\n' \
+    "$LEAK_PACK/contract.md" "$LEAK_PACK/target.md" >"$rep"
+  run_check "$rep"
+  assert_equals 0 "$CHECK_RC" "a list with a prose mention was flagged: $CHECK_OUT"
+  assert_contains "$CHECK_OUT" "2 listed input(s)" "the prose mention was counted as a listed input"
+  pass "a prose mention is judged for leaks but never counts as a listed input"
+}
+
 test_label_argument_is_gone() {
   local src="$TMP_ROOT/s-label.md" rc=0 pack
   write_fixture_contract "$src"
@@ -1546,4 +1563,5 @@ fm_test_run_cases \
   test_leak_check_splits_candidates_at_any_non_path_character \
   test_policy_is_named_only_by_the_policy_argument \
   test_label_argument_is_gone \
+  test_prose_mention_is_judged_but_is_no_list \
   -- "$@"

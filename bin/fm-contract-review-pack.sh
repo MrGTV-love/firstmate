@@ -62,7 +62,8 @@
 #   and _ . / ~ @ + % -) and at a dot that ends a word; every word in a piece that holds a
 #   "/" or a ".", and every run of words in the same piece that starts with one, is judged
 #   when the pack or the root holds that path (a file or folder, with or without an
-#   extension, spaced, wrapped or mid-line); other text is skipped. Three shape rules
+#   extension, spaced, wrapped or mid-line); other text is skipped. Such a judged word is
+#   never a listed input: a list with no leading path is no list. Three shape rules
 #   remain, because a root lookup cannot replace them: a leading path is judged even when it does not exist; an
 #   absolute, `~`, http(s), <rev>:<path> or dir/file.ext text that is not the leading
 #   path voids the round, because it may point outside the root; and a word with no "/"
@@ -612,7 +613,7 @@ cmd_check() {
   log_real=''
   [ -z "$log" ] || log_real=$(real "$log")
   work_report=$(real "${REVIEW_WORK_ROOT:-$fmroot/data/review-lane/work}/$(basename "$(dirname "$pack")")-$(basename "$pack")/review.md")
-  local leaks=0 count=0 entry prev path revpath rel rev excluded x ok why
+  local leaks=0 count=0 entry prev path revpath rel rev excluded x ok why mention
   local list raw rc=0
   raw=$(inputs_read "$report") || rc=$?
   case $rc in
@@ -640,8 +641,11 @@ cmd_check() {
   while IFS= read -r entry; do
     [ -n "$entry" ] || continue
     rev=''
+    mention=0
     case $entry in
       "?	"*)
+        # A candidate from the rest of a line is judged for leaks but is never a listed input.
+        mention=1
         entry=${entry#"?	"}
         [ -e "$pack/$entry" ] || [ -e "$root/$entry" ] || [ -L "$root/$entry" ] || continue
         ;;
@@ -652,7 +656,7 @@ cmd_check() {
       prev=$entry
       entry=$(printf '%s' "$entry" | sed -E 's/(:[0-9]+(-[0-9]+)?|:L[0-9]+(-L?[0-9]+)?|#L[0-9]+(-L?[0-9]+)?)$//')
     done
-    count=$((count + 1))
+    [ "$mention" = 1 ] || count=$((count + 1))
     case "$entry" in
       http://* | https://*)
         if [ -n "$slug" ] && [ -n "$rubric_rev" ] &&
