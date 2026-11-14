@@ -1372,23 +1372,20 @@ fm_dod_should_gate_ship_done() {  # <kind> <mode> <line>
 }
 
 # The PR/MR URL a `done:` note names, or empty: the word after `PR `, or the
-# note's first word when that word is itself a pull request, merge request or
-# change URL (a close-evidence note leads with it). A URL later in the note, an
-# issue URL and a note with no URL name no PR. The bare form is judged by
-# fm_pr_url_parse in a subshell, so the caller's FM_PR_* values stay as they were.
+# note's first word, when that word is itself a pull request, merge request or
+# change URL (a close-evidence note leads with it). A word ends at any space or
+# tab. A URL later in the note, an issue or other non-pull URL in either place
+# and a note with no URL name no PR. Both forms are judged by fm_pr_url_parse in
+# a subshell, so the caller's FM_PR_* values stay as they were.
 fm_dod_pr_url_from_done_note() {  # <note>
   local note=$1 url
   case "$note" in
-    PR\ https://*|PR\ http://*)
-      url=${note#PR }
-      url=${url%% *}
-      ;;
-    https://*)
-      url=${note%% *}
-      ( fm_pr_url_parse "$url" ) || return 1
-      ;;
+    PR\ https://*|PR\ http://*) url=${note#PR } ;;
+    https://*) url=$note ;;
     *) return 1 ;;
   esac
+  url=${url%%[[:space:]]*}
+  ( fm_pr_url_parse "$url" ) || return 1
   printf '%s\n' "$url"
 }
 
@@ -1509,9 +1506,11 @@ fm_dod_nm_expected_plan() {  # <state> <task-id>
 # once, and the read is tried again later); 3 when no run exists for the copy
 # (the status answers with no `run:` line, or the repository is not initialized
 # for no-mistakes); 4 when the read failed and a bounded `no-mistakes daemon
-# status` then answers non-zero, the daemon-down rule bin/fm-crew-state.sh's
-# nm_daemon_answered_down uses; 1 when the status is otherwise unreadable.
-# fm_dod_nm_unread_reason words each refusal.
+# status` then answers that the daemon is down: non-zero with its own `daemon not
+# running` line or a refused or missing socket (fm_dod_nm_probe_says_down); 1
+# when the status is otherwise unreadable, including a probe that fails for any
+# other reason (a permission error, a runner that cannot start), which proves
+# nothing about the daemon. fm_dod_nm_unread_reason words each refusal.
 fm_dod_nm_status_out() {  # <worktree>
   local wt=$1 out rc=0 probe=0 stall=${FM_DOD_NM_STALL_SECS:-}
   case "$stall" in ''|*[!0-9]*|0*) stall=$(fm_progress_quiet_secs) ;; esac
@@ -1523,9 +1522,20 @@ fm_dod_nm_status_out() {  # <worktree>
     return 0
   fi
   [ "$(fm_nm_strip_quotes "$(fm_nm_field "$out" error)")" != "repo not initialized (run 'no-mistakes init' first)" ] || return 3
-  FM_NM_READ_PROGRESS=1 fm_nm_run_checked "$wt" "$stall" daemon status >/dev/null || probe=$?
+  # Both streams: a refused socket is reported on stderr, which fm_nm_run_checked drops.
+  out=$(FM_NM_READ_PROGRESS=1 fm_nm_run_bounded "$wt" "$stall" daemon status 2>&1) || probe=$?
   case "$probe" in 0|124) return 1 ;; esac
+  fm_dod_nm_probe_says_down "$out" || return 1
   return 4
+}
+
+# 0 when a failed `no-mistakes daemon status` answer positively says the daemon
+# is down: its own `daemon not running` line, or a refused or missing socket.
+fm_dod_nm_probe_says_down() {  # <probe output>
+  case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
+    *"daemon not running"*|*"connection refused"*|*"no such file or directory"*sock*|*sock*"no such file or directory"*) return 0 ;;
+  esac
+  return 1
 }
 
 # Reason line for a status read that refused with code <rc> from

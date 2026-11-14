@@ -100,16 +100,36 @@ crew_state_ready_url() {  # <id>
   printf '%s' "${component##*: }"
 }
 
-# 0 when <id> has a recorded pr= but no part of a merge poll was ever published and
-# nothing marks the poll as ended: a merge-notified marker, a pending retirement,
-# an armed prune record, a pending slot return and any published poll file
-# (sidecar, registration or check) all leave the record alone.
-pr_poll_lost() {  # <id>
-  local id=$1 suffix
-  for suffix in pr-poll-merge-notified pr-poll-retirement merge-prune teardown-return-pending check.sh pr-poll pr-poll-registration; do
+# 0 when <id>'s recorded pr= has no runnable merge poll and nothing says the poll
+# ended on purpose. A runnable poll is one the watcher itself admits
+# (fm_pr_poll_snapshot_capture) for that same PR; a sidecar or registration left
+# without its check by a registrar that died between its final renames is not
+# one. The poll ended on purpose when a pending retirement or a pending slot
+# return exists, when the merge-notified marker names this PR (a marker naming
+# another PR does not count), or when an armed prune record names this PR or
+# cannot be read. A registrar still publishing holds the task's poll publication
+# lock, so its partly published poll is left to it.
+pr_poll_lost() {  # <id> <recorded pr>
+  local id=$1 pr=$2 suffix canonical lost=0 lock
+  for suffix in pr-poll-retirement teardown-return-pending; do
     [ ! -e "$STATE/$id.$suffix" ] && [ ! -L "$STATE/$id.$suffix" ] || return 1
   done
-  return 0
+  fm_pr_url_parse "$pr" || return 1
+  canonical=$FM_PR_URL
+  ! fm_pr_poll_merge_already_notified "$STATE" "$id" "$FM_PR_PROVIDER" "$FM_PR_HOST" "$FM_PR_PATH" "$FM_PR_NUMBER" || return 1
+  if [ -e "$STATE/$id.merge-prune" ] || [ -L "$STATE/$id.merge-prune" ]; then
+    [ -f "$STATE/$id.merge-prune" ] && [ ! -L "$STATE/$id.merge-prune" ] || return 1
+    ! grep -qxF -e "pr=$pr" -e "pr=$canonical" "$STATE/$id.merge-prune" 2>/dev/null || return 1
+    grep -q '^pr=' "$STATE/$id.merge-prune" 2>/dev/null || return 1
+  fi
+  lock="$STATE/.pr-poll-publish-$id.lock"
+  fm_lock_try_acquire "$lock" || return 1
+  if fm_pr_poll_snapshot_capture "$STATE" "$id" "$SCRIPT_DIR/fm-pr-poll.sh" \
+    && [ "$FM_PR_POLL_SNAPSHOT_URL" = "$canonical" ]; then
+    lost=1
+  fi
+  fm_lock_release "$lock" || true
+  return "$lost"
 }
 
 # Metadata is read once, without sourcing worker-controlled bytes.
@@ -139,7 +159,7 @@ reconcile_one() {  # <meta> <id>
       "$AUTO_REVIEW_BIN" step "$id" || rc=$?
     ! fm_timed_out "$rc" || printf 'pr-ready: %s: the review step made no progress for %ss; stopped, read again next pass\n' "$id" "$CREW_STATE_STALL_SECS"
     rc=0
-    pr_poll_lost "$id" || return 0
+    pr_poll_lost "$id" "$pr" || return 0
   fi
   if [ -e "$refusal" ] || [ -L "$refusal" ]; then
     refused_at=$(_fm_status_file_mtime "$refusal") || refused_at=0
@@ -180,11 +200,16 @@ reconcile_one() {  # <meta> <id>
   fm_pr_url_parse "$url" || return 0
   url=$FM_PR_URL
   [ ! -f "$refusal" ] || [ -L "$refusal" ] || previous=$(cat -- "$refusal" 2>/dev/null) || previous=
-  if output=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DOD_NM_STALL_SECS="$CREW_STATE_STALL_SECS" \
-    "$SCRIPT_DIR/fm-pr-check.sh" "$id" "$url" 2>&1); then
+  rc=0
+  output=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DOD_NM_STALL_SECS="$CREW_STATE_STALL_SECS" \
+    FM_PR_CHECK_EXPECT_PR="$pr" "$SCRIPT_DIR/fm-pr-check.sh" "$id" "$url" 2>&1) || rc=$?
+  if [ "$rc" -eq 0 ]; then
     rm -f -- "$refusal"
     printf 'pr-ready: %s: %s %s\n' "$id" "$registered" "$url"
-  elif [ "$?" -eq 75 ]; then
+  elif [ "$rc" -eq 3 ] && [ -n "$pr" ]; then
+    # Another registration recorded a different PR during this pass: that one owns the record now.
+    printf 'pr-ready: %s: the recorded PR changed during this pass, so the re-arm of %s did nothing; read again next pass\n' "$id" "$url"
+  elif [ "$rc" -eq 75 ]; then
     # The run did not answer, so nothing was refused: no new wake, and the last
     # refusal memo stays as it is, so a repeat of that refusal is not woken twice;
     # its age is already past the back-off, so the next pass reads it again.

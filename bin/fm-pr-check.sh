@@ -20,10 +20,13 @@
 #     the PR merged (the merge poll's notified marker for that PR); otherwise it
 #     still refuses with the worktree missing.
 # (c) bin/fm-pr-ready-reconcile.sh calls this registrar again for a record that
-#     already has pr= but no merge poll and no sign that the poll ended. The call
-#     takes every gate here exactly as a first registration does, so it accepts
-#     nothing new; once the poll is published, retired or marked merged the record
-#     is not called again, so nothing registers twice.
+#     already has pr= but no runnable merge poll and no sign that the poll ended.
+#     The call takes every gate here exactly as a first registration does, so it
+#     accepts nothing new; once the poll is published, retired or marked merged
+#     the record is not called again, so nothing registers twice. That call sets
+#     FM_PR_CHECK_EXPECT_PR to the pr= it read; when the record names another PR
+#     by the time this registrar holds the metadata lock to commit, it changes
+#     nothing and exits 3, so a stale re-arm never replaces a newer registration.
 # (d) bin/fm-teardown.sh's lookup for a detached copy (the record's branch=, else
 #     fm/<id>) only finds the PR; pr_is_merged's containment proofs are unchanged
 #     and still refuse a copy whose work the PR's head does not carry.
@@ -272,6 +275,13 @@ CURRENT_BRANCH=$(grep '^branch=' "$META" | tail -1 | cut -d= -f2- || true)
 if [ "$CURRENT_WT" != "$WT" ] || [ "$CURRENT_BRANCH" != "$BRANCH" ]; then
   echo "error: task worktree or branch changed while preparing PR registration; refusing" >&2
   exit 1
+fi
+if [ -n "${FM_PR_CHECK_EXPECT_PR:-}" ]; then
+  CURRENT_PR=$(grep '^pr=' "$META" | tail -1 | cut -d= -f2- || true)
+  if [ "$CURRENT_PR" != "$FM_PR_CHECK_EXPECT_PR" ]; then
+    echo "pr-check: $ID now records ${CURRENT_PR:-no PR}, not $FM_PR_CHECK_EXPECT_PR; this re-arm is stale and changes nothing" >&2
+    exit 3
+  fi
 fi
 META_DEVICE=$(fm_pr_file_device "$META") || exit 1
 STATE_DEVICE=$(fm_pr_file_device "$STATE") || exit 1
