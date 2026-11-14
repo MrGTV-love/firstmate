@@ -3824,16 +3824,22 @@ test_e2e_unsafe_copies_are_never_removed() {
 XL_PR=https://github.com/acme/widget/pull/7
 
 # xl_env: the environment O's real scripts run in (as prune_real gives them).
+# xl_env_list: lane O's environment as assignments in XL_ENV, for xl_env and for
+# a subshell that exports them (the same-lane merge, whose own prune must see them).
+xl_env_list() {
+  XL_ENV=(HOME="$W/fakehome" FM_HOME="$HOME_DIR" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA"
+    FM_CONFIG_OVERRIDE="$HOME_DIR/config" FM_ROOT_OVERRIDE="$W/code-root" NM_HOME="$W/nm"
+    TREEHOUSE_ROOT="$POOL" PATH="$W/bin:$PATH" TH_LOG="$W/th.log" TH_FAIL="$W/th.fail"
+    FM_MERGE_PRUNE_EXIT_WAIT=0 FM_TEARDOWN_GUARD_DONE=1 ROOT="$ROOT" STUB_LOG="$W/stub.log"
+    FM_MERGE_PRUNE_TEARDOWN_BIN="$W/bin/teardown-real" REFUSE_FLAG="$W/refuse"
+    FM_MERGE_PRUNE_CONTROL_BIN="$W/bin/control-stub" CONTROL_LOG="$W/control.log"
+    WORKER_PID_FILE="$W/worker.pid" PANE_PID_FILE="$W/pane.pid" STEAL_FILE="$W/steal"
+    SLOT_MARKER="$POOL/pool1/1/.fm-slot-owner" STOP_FAIL_FILE="$W/stop-fail"
+    BUSY_EVENT_BIN="$BIN_DIR/fm-busy-event.sh")
+}
 xl_env() {
-  env HOME="$W/fakehome" FM_HOME="$HOME_DIR" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" \
-    FM_CONFIG_OVERRIDE="$HOME_DIR/config" FM_ROOT_OVERRIDE="$W/code-root" NM_HOME="$W/nm" \
-    TREEHOUSE_ROOT="$POOL" PATH="$W/bin:$PATH" TH_LOG="$W/th.log" TH_FAIL="$W/th.fail" \
-    FM_MERGE_PRUNE_EXIT_WAIT=0 FM_TEARDOWN_GUARD_DONE=1 ROOT="$ROOT" STUB_LOG="$W/stub.log" \
-    FM_MERGE_PRUNE_TEARDOWN_BIN="$W/bin/teardown-real" REFUSE_FLAG="$W/refuse" \
-    FM_MERGE_PRUNE_CONTROL_BIN="$W/bin/control-stub" CONTROL_LOG="$W/control.log" \
-    WORKER_PID_FILE="$W/worker.pid" PANE_PID_FILE="$W/pane.pid" STEAL_FILE="$W/steal" \
-    SLOT_MARKER="$POOL/pool1/1/.fm-slot-owner" STOP_FAIL_FILE="$W/stop-fail" \
-    BUSY_EVENT_BIN="$BIN_DIR/fm-busy-event.sh" "$@"
+  xl_env_list
+  env "${XL_ENV[@]}" "$@"
 }
 
 # make_xlane_world: lane O's world, then a second home for lane M.
@@ -3892,6 +3898,8 @@ xl_merge_case() {
   mv "$mc/fakebin/gh" "$mc/fakebin/gh.real"
   cat > "$mc/fakebin/gh" <<SH
 #!/usr/bin/env bash
+# Once the PR merged, every later read (the merge's own prune and teardown) asks the forge both lanes see.
+[ "\$(cat "$W/forge.state")" != MERGED ] || exec "$W/bin/gh" "\$@"
 "$mc/fakebin/gh.real" "\$@"
 rc=\$?
 case "\${1:-} \${2:-}" in
@@ -4063,11 +4071,12 @@ test_xlane_same_lane_path_completes_as_before() {
   grep -qx "pr=$XL_PR" "$STATE/t1.meta" || fail "fm-pr-check.sh recorded no pr="
   [ -e "$STATE/t1.check.sh" ] || fail "fm-pr-check.sh armed no merge poll"
   xl_merge_case samelane
-  ( export FM_TEST_HOME="$HOME_DIR" FM_TEST_STATE="$STATE" FM_MERGE_PRUNE=0
+  # The merge arms the prune itself (fm-pr-merge.sh's own `fm-merge-prune.sh arm --run`); the test arms nothing.
+  ( xl_env_list; export "${XL_ENV[@]}"; export FM_TEST_HOME="$HOME_DIR" FM_TEST_STATE="$STATE"; unset FM_MERGE_PRUNE
     run_pr_merge "$XL_MC" t1 "$XL_PR" > "$XL_MC/stdout" 2> "$XL_MC/stderr" ) || rc=$?
   [ "$rc" -eq 0 ] || fail "the task's own home could not merge its PR: $(cat "$XL_MC/stderr")"
   [ "$(cat "$W/forge.state")" = MERGED ] || fail "the merge did not reach the forge"
-  xl_env FM_MERGE_PRUNE=1 "$BIN_DIR/fm-merge-prune.sh" arm t1 --run || fail "the merge did not arm the prune"
+  [ -e "$STATE/t1.merge-prune" ] || [ ! -e "$STATE/t1.meta" ] || fail "the merge did not arm the prune of the task's copy"
   fm_test_wait_until --progress-file "$DATA/t1/merge-prune.log" -- xl_closed || { xl_print_state "same lane"; fail "the same-lane task was not closed"; }
   xl_print_state "same lane"
   xl_events_in_order task.pr_ready task.merged task.cleaned_up || fail "the same-lane ledger order is wrong: $(xl_ledger_events)"
@@ -4205,9 +4214,16 @@ test_xlane_protections_still_refuse() {
   xl_protection_case conflicting-owner
   rc=0
   xl_plain_teardown "$W/refusal.txt" || rc=$?
-  printf 'conflicting-owner-pr-merged: plain teardown exit %s; claimant copy=%s claimant record=%s\n' "$rc" \
-    "$([ -e "$COPY" ] && echo present || echo gone)" "$([ -e "$STATE/other-live.meta" ] && echo present || echo gone)"
+  printf 'conflicting-owner-pr-merged: plain teardown exit %s; t1 record=%s claimant copy=%s claimant record=%s; output: %s\n' "$rc" \
+    "$([ -e "$STATE/t1.meta" ] && echo present || echo gone)" \
+    "$([ -e "$COPY" ] && echo present || echo gone)" "$([ -e "$STATE/other-live.meta" ] && echo present || echo gone)" \
+    "$(grep -m2 -E 'REFUSED|refused|error|retir|reassigned' "$W/refusal.txt" | tr '\n' ' ')"
   [ -e "$COPY" ] && [ -e "$STATE/other-live.meta" ] || fail "conflicting owner: the claimant's copy or record was removed"
+  # V7 as amended (Main ruling F7=(a)): with the PR confirmed merged, only t1's own record retires.
+  [ "$rc" -eq 0 ] || fail "conflicting owner, PR merged: plain teardown exit $rc, not the records-only retirement: $(cat "$W/refusal.txt")"
+  [ ! -e "$STATE/t1.meta" ] || fail "conflicting owner, PR merged: t1's own record was not retired"
+  grep -q 'was reassigned to task other-live' "$W/refusal.txt" || fail "conflicting owner, PR merged: the output does not name the claimant"
+  grep -q "^task=other-live$" "$POOL/pool1/1/.fm-slot-owner" || fail "conflicting owner, PR merged: the claimant's slot marker changed"
   assert_nothing_forced "xlane conflicting owner merged"
   cleanup_workers
   pass "a merged cross-lane PR with a resolving branch, link and pr= never turns a changed file, an unlanded commit or a conflicting slot owner into a removal"
@@ -4374,6 +4390,7 @@ PYJ
 v5_install_review_reads() {
   printf 'BEHIND\n' > "$W/merge-state.7"
   printf 'BEHIND\n' > "$W/merge-state.9"
+  printf 'OPEN\n' > "$W/forge9.state"
   mv "$W/bin/gh" "$W/bin/gh.rest"
   cat > "$W/bin/gh" <<SH
 #!/usr/bin/env bash
@@ -4381,7 +4398,7 @@ if [ "\${1:-} \${2:-}" = "pr view" ] && [[ " \$* " = *mergeStateStatus* ]]; then
   number=\${3##*/}
   case "\$number" in
     7) state=\$(cat "$W/forge.state"); head=$1 ;;
-    9) state=OPEN; head=$2 ;;
+    9) state=\$(cat "$W/forge9.state"); head=$2 ;;
     *) echo "error: pull request not found" >&2; exit 1 ;;
   esac
   printf '{"state":"%s","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"%s","headRefOid":"%s","baseRefName":"main","baseRefOid":"%s","statusCheckRollup":[{"__typename":"CheckRun","name":"ci","status":"COMPLETED","conclusion":"SUCCESS","startedAt":"2026-11-03T00:00:00Z"}]}\n' \
@@ -4410,8 +4427,16 @@ v5_ledger() {  # <epoch> [--heartbeat]: the ledger process, run fresh from disk 
   xl_env "${V5_GIT_ENV[@]}" FM_OPEN_LOOPS_NOW="$at" "$ROOT/bin/fm-open-loops.sh" --json "$@" 2> "$W/ledger.err"
 }
 
-v5_record_review() {
-  printf 'VERDICT: PASS head=%s\nIndependent reader evidence.\n' "$V5_E_HEAD" > "$W/review-e.md"
+v5_record_review() {  # one complete, qualifying exact-head PASS report, the same in V5 and in its control
+  {
+    printf 'VERDICT: PASS head=%s\n' "$V5_E_HEAD"
+    printf 'Independent reader evidence.\n'
+    printf -- '- Loosens a deny or allow list: no - fixture\n'
+    printf -- '- Widens what a guard permits: no - fixture\n'
+    printf -- '- Touches customer data, billing or spend: no - fixture\n'
+    printf 'Protected class: no - fixture\n'
+    printf 'VERDICT: PASS\n'
+  } > "$W/review-e.md"
   xl_env "${V5_GIT_ENV[@]}" "$ROOT/bin/fm-review-record.py" review --pr "$V5_E_PR" --head "$V5_E_HEAD" --verdict PASS \
     --reader-model openai-codex/gpt-6.1-sol --author-groups '{"all":["anthropic/claude-sonnet-5"]}' \
     --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report "$W/review-e.md" > "$W/review-record.out" 2>&1 \
@@ -4446,19 +4471,22 @@ v5_table() {  # <ledger-json>: acceptance and cleanup per task, read from the re
     "idle secondmate, silent $(( (V5_NOW + 21600 - $(sed -n 's/.*\[at=\([0-9]*\)\].*/\1/p' "$STATE/mate1.status")) / 3600 ))h" "none: record $([ -e "$STATE/mate1.meta" ] && echo kept || echo gone)" \
     "$(v5_rows "$ledger" '^mate1$' | tr '\t' '|' | paste -sd ';' - | sed 's/^$/none/')"
   printf '%-4s %-46s %-46s %s\n' 'E t-e' \
-    "review ${review:-none} at head ${V5_E_HEAD:0:8}; PR 9 open at the forge, merge state $(cat "$W/merge-state.9"); review step: $(v5_e_review_state)" "none: record $([ -e "$STATE/t-e.meta" ] && echo kept || echo gone), pending merge" \
+    "review ${review:-none} at head ${V5_E_HEAD:0:8}; PR 9 $(cat "$W/forge9.state") at the forge, merge state $(cat "$W/merge-state.9"); review step: $(v5_e_review_state)" "none: record $([ -e "$STATE/t-e.meta" ] && echo kept || echo gone), pending merge" \
     "$(v5_rows "$ledger" "pull/9" | tr '\t' '|' | paste -sd ';' -)"
 }
 
 test_v5_missing_updates_restart_and_completed_review_cannot_strand_work() {
-  local frozen_before frozen_after l1 l2 key0 key1 wake_before wake_after t6
+  local frozen_before frozen_after l1 l2 key0 key1 wake_before wake_after t6 b_head b_bytes
   make_v5_world
   xl_write_done_note
   t6=$((V5_NOW + 21600))
   frozen_before=$(cd "$STATE" && cat t-b.status t-c.status t-e.status mate1.status | shasum | awk '{print $1}')
+  b_head=$(git -C "$W/b-copy" rev-parse HEAD)
+  b_bytes=$(cd "$W/b-copy" && shasum -a 256 b-work.txt b-dirty.txt)
   # (1) six hours pass and no worker reports.
   v5_ledger "$V5_NOW" > "$W/l0.json"
-  v5_ledger "$t6" > "$W/l1.json"; l1="$W/l1.json"
+  v5_ledger "$t6" --heartbeat > "$W/l1.json"; l1="$W/l1.json"
+  [ -s "$STATE/open-loops.json" ] || fail "the ledger published no saved state before the restart"
   frozen_after=$(cd "$STATE" && cat t-b.status t-c.status t-e.status mate1.status | shasum | awk '{print $1}')
   [ "$frozen_before" = "$frozen_after" ] || fail "a worker status changed during the silent period"
   [ "$(jq -r '.complete' "$l1")" = true ] || fail "the ledger was blind during the silent period: $(jq -c '[.rows[] | select(.category == "coverage")]' "$l1")"
@@ -4468,7 +4496,8 @@ test_v5_missing_updates_restart_and_completed_review_cannot_strand_work() {
     || fail "could not queue the wake"
   wake_before=$(grep -c 'v5 unacknowledged wake' "$STATE/.wake-queue")
   xl_start_watcher; sleep 3; xl_stop_watcher
-  rm -f "$STATE/open-loops.json"
+  # The restarted ledger is a fresh process that starts from the saved ledger state, which stays in place.
+  [ -s "$STATE/open-loops.json" ] || fail "the saved ledger state was lost across the restart"
   v5_ledger "$t6" --heartbeat > "$W/l2.json"; l2="$W/l2.json"
   wake_after=$(grep -c 'v5 unacknowledged wake' "$STATE/.wake-queue")
   [ "$wake_before" = 1 ] && [ "$wake_after" = 1 ] || fail "the unacknowledged wake was lost or duplicated by the restart ($wake_before -> $wake_after)"
@@ -4487,7 +4516,8 @@ test_v5_missing_updates_restart_and_completed_review_cannot_strand_work() {
   [ -z "$(v5_rows "$W/l3.json" '^t1$')" ] || fail "A: a ledger row outlived its record"
   # B is untouched, with its commit, its uncommitted file and a row naming an owner and a next action.
   [ -e "$STATE/t-b.meta" ] && [ -e "$W/b-copy/b-dirty.txt" ] || fail "B: record or uncommitted change was removed"
-  git -C "$W/b-copy" log -1 --format=%s | grep -q 'b unlanded work' || fail "B: its commit is gone"
+  [ "$(git -C "$W/b-copy" rev-parse HEAD)" = "$b_head" ] || fail "B: its commit changed or is gone"
+  [ "$(cd "$W/b-copy" && shasum -a 256 b-work.txt b-dirty.txt)" = "$b_bytes" ] || fail "B: its committed or uncommitted bytes changed"
   [ -n "$(v5_rows "$W/l3.json" '^t-b$' | awk -F'\t' '$3 != "" && $6 != ""')" ] || fail "B: no ledger row with an owner and a next action"
   # C keeps its wait and is not stranded.
   [ -e "$STATE/t-c.meta" ] || fail "C: the record was removed"
@@ -4495,7 +4525,8 @@ test_v5_missing_updates_restart_and_completed_review_cannot_strand_work() {
   ! v5_rows "$W/l3.json" '^t-c' | awk -F'\t' '$4 == "true" || $1 ~ /^pending_/ {bad=1} END {exit !bad}' || fail "C: reported as stranded or overdue: $(v5_rows "$W/l3.json" '^t-c')"
   # D is untouched and never stranded, actionable or overdue because it is quiet.
   [ -e "$STATE/mate1.meta" ] || fail "D: the secondmate record was removed"
-  ! v5_rows "$W/l3.json" '^mate1$' | awk -F'\t' '$4 == "true" || $1 ~ /^(pending_|missing_worker|unlanded)/ {bad=1} END {exit !bad}' || fail "D: reported as stranded: $(v5_rows "$W/l3.json" '^mate1$')"
+  ! v5_rows "$W/l3.json" '^mate1$' | awk -F'\t' '$4 == "true" || $5 != "true" {bad=1} END {exit !bad}' \
+    || fail "D: an idle secondmate has an actionable or overdue row: $(v5_rows "$W/l3.json" '^mate1$')"
   # E shows its review result, is pending its merge with an owner and a next action, and is not closed.
   [ -e "$STATE/t-e.meta" ] || fail "E: the record was closed with its PR still open"
   v5_rows "$W/l3.json" 'pull/9' | awk -F'\t' '$1 == "review_pass_not_merged" && $3 != "" && $6 != "" {ok=1} END {exit !ok}' \
@@ -4508,9 +4539,10 @@ test_v5_missing_updates_restart_and_completed_review_cannot_strand_work() {
   pass "five records survive silence, a restart and a completed review: A closed from the other lane's merge, B/C/D untouched and not stranded, E pending its merge with the review on record"
 }
 
-# The control for V5's E: the same world with the hold removed (checks green, merge state CLEAN)
-# and an exact-head PASS that answers every review fact. The reconciler's review step then passes
-# every gate it owns and calls bin/fm-pr-merge.sh for E, so the hold is what keeps E open in V5.
+# The control for V5's E: the same world and the same qualifying exact-head PASS report
+# (v5_record_review), with only the forge's merge state changed from BEHIND to CLEAN. The
+# reconciler's review step then passes every gate it owns and calls bin/fm-pr-merge.sh for E,
+# so the named hold alone is what keeps E open in V5.
 # Limit: this world's forge double does not land a merge, so the proof stops at the merge call
 # (a recorded merge attempt with fm-pr-merge.sh's own result); landing on PASS is
 # test_auto_review_green_uncovered_pr_is_read_recorded_and_merged in tests/fm-pr-merge.test.sh.
@@ -4518,19 +4550,7 @@ test_v5_e_without_its_hold_reaches_the_merge() {
   local step_state
   make_v5_world
   printf 'CLEAN\n' > "$W/merge-state.9"
-  {
-    printf 'VERDICT: PASS head=%s\n' "$V5_E_HEAD"
-    printf 'Independent reader evidence.\n'
-    printf -- '- Loosens a deny or allow list: no - fixture\n'
-    printf -- '- Widens what a guard permits: no - fixture\n'
-    printf -- '- Touches customer data, billing or spend: no - fixture\n'
-    printf 'Protected class: no - fixture\n'
-    printf 'VERDICT: PASS\n'
-  } > "$W/review-e.md"
-  xl_env "${V5_GIT_ENV[@]}" "$ROOT/bin/fm-review-record.py" review --pr "$V5_E_PR" --head "$V5_E_HEAD" --verdict PASS \
-    --reader-model openai-codex/gpt-6.1-sol --author-groups '{"all":["anthropic/claude-sonnet-5"]}' \
-    --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report "$W/review-e.md" > "$W/review-record.out" 2>&1 \
-    || fail "the review PASS could not be recorded: $(cat "$W/review-record.out")"
+  v5_record_review
   xl_env "${V5_GIT_ENV[@]}" bash "$ROOT/bin/fm-pr-ready-reconcile.sh" > "$W/reconcile.out" 2>&1 || fail "reconcile failed: $(cat "$W/reconcile.out")"
   step_state=$(v5_e_review_state)
   printf 'E without its hold: review step state: %s\n' "$step_state"
