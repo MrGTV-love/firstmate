@@ -492,9 +492,11 @@ esac
 case "${rargs[1]:-}" in
   attribution)
     # The host's read-only verdict; unset models a host that proves the agent.
-    # FM_FAKE_REMOTE_ATTRIBUTION=old-host models a code root without the verb.
+    # FM_FAKE_REMOTE_ATTRIBUTION=old-host models a code root without the verb;
+    # nul-proceed prints the proceed line with a NUL byte inside it.
     case "${FM_FAKE_REMOTE_ATTRIBUTION:-attribution=proceed}" in
       old-host) printf 'error: unknown command: attribution\n' >&2; exit 1 ;;
+      nul-proceed) printf 'attribution=pro\000ceed\n' ;;
       *) printf '%s\n' "${FM_FAKE_REMOTE_ATTRIBUTION:-attribution=proceed}" ;;
     esac
     ;;
@@ -589,7 +591,7 @@ test_remote_mate_restarts_over_the_transport_hop() {
 test_remote_unproven_agent_gets_no_request_record_or_nudge() {
   local dir out rc verdict
   for verdict in 'attribution=refuse: its live Herdr agent cannot be positively attributed to this task: live agent is an unpinned native restore' \
-    old-host '' 'attribution=proceed extra' 'attributed' $'attribution=proceed\n'; do
+    old-host '' 'attribution=proceed extra' 'attributed' $'attribution=proceed\n' nul-proceed; do
     dir=$(new_case remote-unproven)
     setup_remote_case "$dir" sm2 ok
     export FM_FAKE_ANSWER_STATUS="$dir/home/state/sm2.status"
