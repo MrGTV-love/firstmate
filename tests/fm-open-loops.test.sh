@@ -2164,6 +2164,14 @@ gate_covered_reason = 'named head 4567def is unreachable outside the worker copy
 # Round-3 F3: a merged, covered task whose worker never sent a done update still owes its cleanup.
 fin_noupdate = v4_copy('fin-noupdate'); v4_merged_pr(19, fin_noupdate)
 v4_task('fin-noupdate', copy=fin_noupdate, pr=19, verb='working', note='building', state='working', live=True)
+# F3 controls: a merged PR does not make a still-working copy with more unlanded work, or a declared wait,
+# into a cleanup obligation.
+merged_more = v4_copy('merged-more'); v4_merged_pr(21, merged_more)
+(merged_more / 'more.txt').write_text('more\n')
+git_('-C', merged_more, 'add', '.'); git_('-C', merged_more, 'commit', '-q', '-m', 'more work after the merge')
+v4_task('merged-more', copy=merged_more, pr=21, verb='working', note='building more', state='working', live=True)
+merged_wait = v4_copy('merged-wait'); v4_merged_pr(22, merged_wait)
+v4_task('merged-wait', copy=merged_wait, pr=22, verb='paused', note='waiting on Main decision d2', state='paused', live=True, age=3000)
 # Round-3 F4: the newest recorded refusal is the one written last, whichever producer wrote it. The idle
 # reaper's memo carries the reaper's start time, not its write time, so a memo written after a prune record
 # can carry an older stamp.
@@ -2294,6 +2302,11 @@ f4 = [
     # Round-3 F3: no done update, merged and covered: the cleanup row is still there.
     ('merged-without-done-update', 'fin-noupdate' in cleanup and 'bin/fm-teardown.sh fin-noupdate' in cleanup['fin-noupdate']['next_action'],
      mine('fin-noupdate')),
+    # F3 controls: more unlanded work after the merge, or a declared wait, adds no cleanup row.
+    ('merged-with-more-work-no-cleanup', 'merged-more' not in cleanup and 'merged-more' not in by_cat('pending_acceptance'),
+     mine('merged-more')),
+    ('merged-with-declared-wait-no-cleanup', 'merged-wait' not in cleanup and 'merged-wait' not in by_cat('pending_acceptance'),
+     mine('merged-wait')),
     # Round-3 F4: the refusal written last wins over an older-stamped memo order, and its producer is named.
     ('latest-written-refusal', 'fin-order' in cleanup and 'the newer reaper teardown refusal' in cleanup['fin-order']['next_action']
      and 'the older prune refusal' not in cleanup['fin-order']['next_action'] and 'idle-session-reap' in cleanup['fin-order']['next_action'],

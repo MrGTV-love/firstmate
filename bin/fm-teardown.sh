@@ -49,8 +49,10 @@
 # the PR head. A diverged copy is not treated as landed: path-set coverage, git
 # cherry, and merge-tree containment each fail to prove content landed without also
 # accepting unlanded edits to the same paths. Teardown still accepts a merged PR
-# whose head contains the current local work (ancestor or equivalent patch ids),
-# or a clean content-in-default tree match. A copy left on pre-rebase commits
+# whose head contains the current local work (ancestor, or equivalent patch ids for
+# every unpushed commit when every other commit the copy holds is already in the PR
+# head or the default branch), or a clean content-in-default tree match. With no
+# pr=, every PR the branch lookup lists is judged in turn, newest first. A copy left on pre-rebase commits
 # (even ones pushed to another remote) is also accepted when every commit the PR
 # head and the default branch lack has a patch id among the PR head's own commits
 # and each merge commit is exactly what git produces from its parents; a refusal

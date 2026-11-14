@@ -4600,14 +4600,22 @@ test_v5_missing_updates_restart_and_completed_review_cannot_strand_work() {
   pass "five records survive silence, a restart and a completed review: A closed from the other lane's merge, B/C/D untouched and not stranded, E pending its merge with the review on record"
 }
 
-# The control for V5's E: the same world and the same qualifying exact-head PASS
-# report (v5_record_review), with the forge answering E's PR as mergeable and CLEAN
-# with its check green instead of BEHIND. The forge is the pr-merge suite's fake
-# (add_gh_mocks for E's head), because fm-pr-merge.sh reads far more of the forge
-# than the V5 double answers; the reconciler runs through that suite's runner, with
-# this repository as code root so fm-pr-merge.sh can read lineage. A merge that
-# succeeds marks PR 9 merged. Only a landed merge passes: any held or queued state
-# fails, so the hold alone is what keeps E open in V5.
+# The control for V5's E, one variable at a time. One world, one qualifying
+# exact-head PASS report (v5_record_review) and one forge fake (the pr-merge
+# suite's add_gh_mocks, because fm-pr-merge.sh reads far more of the forge than
+# the V5 double answers), run through that suite's runner with this repository
+# as code root so fm-pr-merge.sh can read lineage, and with lane O's environment
+# so the merge's own prune stays inside the sandbox. Pass 1 has the forge report
+# E's PR BEHIND, as in V5: E waits for that named hold, PR 9 stays OPEN and no
+# merge is asked. Pass 2 changes only mergeStateStatus to CLEAN: E merges.
+v5e_pass() {  # <mc>: one reconcile pass in the merge harness
+  # shellcheck disable=SC2030,SC2031 # the subshell keeps these exports to the reconciler by design
+  ( xl_env_list; export "${XL_ENV[@]}" "${V5_GIT_ENV[@]}"
+    export FM_TEST_HOME="$HOME_DIR" FM_TEST_STATE="$STATE" FM_TEST_CODE_ROOT="$ROOT" FM_PR_AUTO_REVIEW_INTERVAL=0
+    PR_MERGE="$ROOT/bin/fm-pr-ready-reconcile.sh" run_pr_merge "$1" > "$W/reconcile.out" 2>&1 ) \
+    || fail "reconcile failed: $(cat "$W/reconcile.out")"
+}
+
 test_v5_e_without_its_hold_reaches_the_merge() {
   local step_state mc
   make_v5_world
@@ -4618,6 +4626,7 @@ test_v5_e_without_its_hold_reaches_the_merge() {
   mv "$mc/fakebin/gh" "$mc/fakebin/gh.real"
   cat > "$mc/fakebin/gh" <<SH
 #!/usr/bin/env bash
+case "\${1:-} \${2:-}" in "pr merge") printf '%s\\n' "\$*" >> "$W/pr-merge.calls" ;; esac
 "$mc/fakebin/gh.real" "\$@"
 rc=\$?
 case "\${1:-} \${2:-}" in
@@ -4626,9 +4635,17 @@ esac
 exit \$rc
 SH
   chmod +x "$mc/fakebin/gh"
-  # shellcheck disable=SC2030,SC2031 # the subshell keeps these exports to the reconciler by design
-  ( export FM_TEST_HOME="$HOME_DIR" FM_TEST_STATE="$STATE" FM_TEST_CODE_ROOT="$ROOT" FM_PR_AUTO_REVIEW_INTERVAL=0 "${V5_GIT_ENV[@]}"
-    PR_MERGE="$ROOT/bin/fm-pr-ready-reconcile.sh" run_pr_merge "$mc" > "$W/reconcile.out" 2>&1 ) || fail "reconcile failed: $(cat "$W/reconcile.out")"
+  : > "$W/pr-merge.calls"
+  # Pass 1: the named hold.
+  jq -c '.mergeStateStatus = "BEHIND"' "$mc/github-view.json" > "$mc/view.tmp" && mv "$mc/view.tmp" "$mc/github-view.json"
+  v5e_pass "$mc"
+  step_state=$(v5_e_review_state)
+  printf 'E with its hold: review step state: %s; PR 9 at the forge: %s; merge calls: %s\n' "$step_state" "$(cat "$W/forge9.state")" "$(wc -l < "$W/pr-merge.calls" | tr -d ' ')"
+  [ "$step_state" = "waiting: forge merge state is BEHIND, not green" ] || fail "E with its hold did not wait for it: $step_state"
+  [ "$(cat "$W/forge9.state")" = OPEN ] && [ ! -s "$W/pr-merge.calls" ] || fail "E with its hold was merged or a merge was asked"
+  # Pass 2: only the merge state changes.
+  jq -c '.mergeStateStatus = "CLEAN"' "$mc/github-view.json" > "$mc/view.tmp" && mv "$mc/view.tmp" "$mc/github-view.json"
+  v5e_pass "$mc"
   step_state=$(v5_e_review_state)
   printf 'E without its hold: review step state: %s; PR 9 at the forge: %s\n' "$step_state" "$(cat "$W/forge9.state")"
   xl_env "$ROOT/bin/fm-pr-auto-review.py" events t-e | sed 's/^/  event: /'
@@ -4637,7 +4654,8 @@ SH
     *) fail "E without its hold did not merge (a held or queued state is not a merge): $step_state" ;;
   esac
   [ "$(cat "$W/forge9.state")" = MERGED ] || fail "E's merge did not reach the forge"
-  pass "with E's hold removed and the same exact-head PASS, the review step merges E's PR"
+  assert_nothing_forced "v5 control"
+  pass "with only the forge's merge state changed from BEHIND to CLEAN and the same exact-head PASS, E waits and then merges"
 }
 
 # --- run ----------------------------------------------------------------------

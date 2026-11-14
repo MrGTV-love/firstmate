@@ -1569,9 +1569,11 @@ fm_pr_poll_merge_mark_notified() {  # <state> <id> <provider> <host> <path> <num
   fi
 }
 
-# Removed by bin/fm-teardown.sh only after the task record itself is removed, so
-# a retired task id leaves no residue behind; while the record still exists the
-# marker tells bin/fm-pr-ready-reconcile.sh the merge was already delivered.
+# bin/fm-teardown.sh moves the marker aside before it removes the task record and
+# deletes it after (merge_marker_retire_begin and _finish), so a retired task id
+# leaves no residue and a marker that cannot be moved stops teardown with the
+# record in place; until then the marker, or its set-aside copy, tells
+# bin/fm-pr-ready-reconcile.sh the merge was already delivered.
 fm_pr_poll_merge_notified_remove() {  # <state> <id>
   local state=$1 id=$2 marker
   fm_pr_task_id_valid "$id" || return 1
