@@ -60,6 +60,8 @@ A missed-reply escalation includes the complete first sighting path and line num
 `tests/fm-teardown-cleanup.test.sh` covers teardown delivering a child's final line and refusing when the channel cannot be written.
 `tests/fm-brief.test.sh` pins the charter's channel rule.
 `tests/fm-pending-reply.test.sh` covers helper-selected local routing, remote-channel classification, same-basename restatement before false escalation, readable wrong-home diagnostics, and the rule that arbitrary mate-home sightings never acknowledge a reply.
+It also exercises exactly-once recovery and relayed-request repost delivery when macOS cannot execute `ps`, using the native process reader while refusing recovery if the sender's identity remains unreadable.
+The stock macOS Bash CI job runs that native-reader recovery case explicitly; the portable serial lane runs the full suite.
 `tests/fm-parent-channel-scan-exclusion.test.sh` covers the home-shape-aware scan exclusion against real remote, main-home, and local-mate fixtures: the watcher signal scan, both heartbeat backstops, the fleet-wide folds, and the real `fm-wake-drain.sh` end to end.
 
 ## Live verification
