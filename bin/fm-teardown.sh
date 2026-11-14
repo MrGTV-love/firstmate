@@ -2268,7 +2268,7 @@ validate_pr_poll_cleanup() {
   for artifact in "$state_dir/$id.check.sh" "$state_dir/$id.pr-poll" \
     "$state_dir/$id.pr-poll-registration" "$state_dir/$id.pr-poll-retirement" \
     "$state_dir/$id.merge-authority" "$state_dir/$id.check-trust" \
-    "$state_dir/$id.pr-poll-merge-notified"; do
+    "$state_dir/$id.pr-poll-merge-notified" "$state_dir/$id.pr-poll-merge-notified.retiring"; do
     [ -e "$artifact" ] || [ -L "$artifact" ] || continue
     has_artifact=1
   done
@@ -2278,7 +2278,7 @@ validate_pr_poll_cleanup() {
   for artifact in "$state_dir/$id.check.sh" "$state_dir/$id.pr-poll" \
     "$state_dir/$id.pr-poll-registration" "$state_dir/$id.pr-poll-retirement" \
     "$state_dir/$id.merge-authority" "$state_dir/$id.check-trust" \
-    "$state_dir/$id.pr-poll-merge-notified"; do
+    "$state_dir/$id.pr-poll-merge-notified" "$state_dir/$id.pr-poll-merge-notified.retiring"; do
     [ -e "$artifact" ] || [ -L "$artifact" ] || continue
     if [ ! -f "$artifact" ] || [ -L "$artifact" ] \
       || [ "$(fm_pr_file_device "$artifact")" != "$state_device" ] \
@@ -2296,6 +2296,32 @@ validate_pr_poll_cleanup() {
       return 1
     }
   fi
+}
+
+# The merge-notified marker outlives the poll until the record goes, so a teardown
+# that fails earlier is not re-armed for a merge it already reported. It is moved
+# aside under a .retiring name before the record is removed: whatever cannot
+# remove it stops teardown there, with the record still in place for a retry.
+# bin/fm-pr-ready-reconcile.sh reads the .retiring name as the marker.
+merge_marker_retire_begin() {  # <state> <id>
+  local marker="$1/$2.pr-poll-merge-notified"
+  [ -e "$marker" ] || [ -L "$marker" ] || return 0
+  [ -f "$marker" ] && [ ! -L "$marker" ] || return 1
+  mv -f -- "$marker" "$marker.retiring" || {
+    echo "error: the merge-notified marker $marker could not be moved aside; the task record stays, so a later teardown retries" >&2
+    return 1
+  }
+}
+
+# After the record is removed: the set-aside marker, and a marker an older teardown left.
+merge_marker_retire_finish() {  # <state> <id>
+  local marker="$1/$2.pr-poll-merge-notified"
+  fm_pr_poll_merge_notified_remove "$1" "$2" || return 1
+  [ -e "$marker.retiring" ] || [ -L "$marker.retiring" ] || return 0
+  [ -f "$marker.retiring" ] && [ ! -L "$marker.retiring" ] && rm -f -- "$marker.retiring" || {
+    echo "error: the set-aside merge-notified marker $marker.retiring could not be removed after the task record" >&2
+    return 1
+  }
 }
 
 # Callers run this only after the busy-state and status retire steps succeed, so
@@ -2321,6 +2347,18 @@ pr_number_from_branch() {
   n=$(printf '%s\n' "$out" | sed -n 's/^[[:space:]]*\([0-9][0-9]*\),.*/\1/p' | head -1)
   [ -n "$n" ] || return 1
   printf '%s' "$n"
+}
+
+# Every PR number gh-axi lists for <branch>, newest first, one per line; non-zero on
+# no match or a lookup failure. A branch can have several PRs (an older merged one
+# and a newer open one), so the landed proof judges each in turn.
+pr_numbers_from_branch() {
+  local branch=$1 out numbers
+  [ -n "$branch" ] && [ "$branch" != HEAD ] || return 1
+  out=$( cd "${TEARDOWN_LANDED_DIR:-$WT}" && gh-axi pr list --state all --head "$branch" --limit 20 2>/dev/null ) || return 1
+  numbers=$(printf '%s\n' "$out" | sed -n 's/^[[:space:]]*\([0-9][0-9]*\),.*/\1/p')
+  [ -n "$numbers" ] || return 1
+  printf '%s\n' "$numbers"
 }
 
 pr_number_from_target() {
@@ -2369,7 +2407,7 @@ patch_id_for_commit() {
 }
 
 unpushed_patches_are_in_pr_head() {
-  local pr_head=$1 current base pr_patch_ids commit patch_id unpushed
+  local pr_head=$1 current base pr_patch_ids commit patch_id unpushed default_ref carried
   local dir=${TEARDOWN_LANDED_DIR:-$WT} ref=${TEARDOWN_LANDED_REF:-HEAD}
   current=$(git -C "$dir" rev-parse --verify "$ref" 2>/dev/null) || return 1
   base=$(git -C "$dir" merge-base "$current" "$pr_head" 2>/dev/null) || return 1
@@ -2391,6 +2429,17 @@ unpushed_patches_are_in_pr_head() {
     printf '%s\n' "$pr_patch_ids" | grep -qxF "$patch_id" || return 1
   done <<EOF
 $unpushed
+EOF
+  # Every other commit the copy holds must already be carried: a pushed commit that
+  # neither the PR head nor the default branch contains is work this proof did not
+  # check, so it proves nothing and the later proofs decide.
+  default_ref=$(landed_default_ref) || return 1
+  carried=$(git -C "$dir" rev-list "$ref" --not "$pr_head" "$default_ref" -- 2>/dev/null) || return 1
+  while IFS= read -r commit; do
+    [ -n "$commit" ] || continue
+    printf '%s\n' "$unpushed" | grep -qxF "$commit" || return 1
+  done <<EOF
+$carried
 EOF
 }
 
@@ -2616,14 +2665,26 @@ EOF
 # PR head, no PR is found, or any forge read error occurs - the caller then
 # falls back to the content check.
 pr_is_merged() {
-  local branch=$1 target view state remainder head resolved_url current landed=0
-  local dir=${TEARDOWN_LANDED_DIR:-$WT} ref=${TEARDOWN_LANDED_REF:-HEAD}
-  [ -d "$dir" ] || return 1
+  local branch=$1 target targets
+  [ -d "${TEARDOWN_LANDED_DIR:-$WT}" ] || return 1
   if [ -n "$PR_URL" ]; then
-    target=$PR_URL
-  else
-    target=$(pr_number_from_branch "$branch") || return 1
+    pr_is_merged_target "$PR_URL"
+    return
   fi
+  targets=$(pr_numbers_from_branch "$branch") || return 1
+  while IFS= read -r target; do
+    [ -n "$target" ] || continue
+    pr_is_merged_target "$target" && return 0
+  done <<EOF
+$targets
+EOF
+  return 1
+}
+
+# pr_is_merged for one PR (a URL or a number of the copy's repository).
+pr_is_merged_target() {
+  local target=$1 view state remainder head resolved_url current landed=0
+  local dir=${TEARDOWN_LANDED_DIR:-$WT} ref=${TEARDOWN_LANDED_REF:-HEAD}
   [ -n "$target" ] || return 1
   if fm_pr_url_parse "$target" && [ "$FM_PR_PROVIDER" = forgejo ]; then
     fm_pr_forgejo_read_record "$FM_PR_HOST" "$FM_PR_PATH" "$FM_PR_NUMBER" || {
@@ -6151,8 +6212,9 @@ cleanup_firstmate_home_children() {
         safe_rm_rf_child_worktree "$child_wt" "$child_proj" "$child_id" || return 1
       fi
     fi
+    merge_marker_retire_begin "$sub_state" "$child_id" || return 1
     fm_backlog_atomic_transition remove "$sub_state/$child_id.meta" "task record" "$sub_state" || return 1
-    fm_pr_poll_merge_notified_remove "$sub_state" "$child_id" || return 1
+    merge_marker_retire_finish "$sub_state" "$child_id" || return 1
     [ "$DESCENDANT_LEGACY_CUSTODY" = 1 ] || teardown_release_descendant_project_locks || return 1
     rm -f "$sub_state/$child_id.turn-ended" "$sub_state/$child_id.progress" \
       "$(fm_wake_signal_seen_path "$sub_state" "$sub_state/$child_id.turn-ended")" \
@@ -6834,9 +6896,10 @@ if [ -n "$TEARDOWN_DEFERRED_POOL_CLEANUP" ]; then
       teardown_nested_slot return
     fi
   fi
+  merge_marker_retire_begin "$STATE" "$ID" || exit 1
   fm_backlog_atomic_transition remove "$META" "task record" "$STATE" || exit 1
   TEARDOWN_META_REMOVED=1
-  fm_pr_poll_merge_notified_remove "$STATE" "$ID" || exit 1
+  merge_marker_retire_finish "$STATE" "$ID" || exit 1
   teardown_release_project_lock || exit 1
 fi
 [ -z "$TEARDOWN_HELD_SLOT" ] || ! teardown_owns_worktree || teardown_held_copies_report
@@ -6845,6 +6908,11 @@ fi
 # racing the same id stays serialized exactly as it was before. A captain-held
 # row takes the retain transition here instead of the close: same record, same
 # ordering, the row returns to Queued with its deliverable recorded.
+if [ "$TEARDOWN_META_REMOVED" != 1 ] && ! merge_marker_retire_begin "$STATE" "$ID"; then
+  fm_lock_release "$META_LOCK"
+  META_LOCK_HELD=0
+  exit 1
+fi
 TEARDOWN_CLOSE_META=$META
 [ "$TEARDOWN_META_REMOVED" != 1 ] || TEARDOWN_CLOSE_META=
 if [ "$BACKLOG_CLOSED" = 1 ]; then
@@ -6874,7 +6942,7 @@ else
 fi
 fm_lock_release "$META_LOCK"
 META_LOCK_HELD=0
-fm_pr_poll_merge_notified_remove "$STATE" "$ID" || exit 1
+merge_marker_retire_finish "$STATE" "$ID" || exit 1
 case "$KIND:$FORCE" in
   secondmate:*|scout:*|*:--force) ;;
   *) "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded allow --rule landed-work --task "$ID" 2>/dev/null || true ;;

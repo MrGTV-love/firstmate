@@ -118,6 +118,9 @@ pr_poll_lost() {  # <id> <recorded pr>
   fm_pr_url_parse "$pr" || return 1
   canonical=$FM_PR_URL
   ! fm_pr_poll_merge_already_notified "$STATE" "$id" "$FM_PR_PROVIDER" "$FM_PR_HOST" "$FM_PR_PATH" "$FM_PR_NUMBER" || return 1
+  # The marker a teardown moved aside before removing the record (bin/fm-teardown.sh merge_marker_retire_begin).
+  ! fm_pr_poll_merge_marker_matches "$STATE/$id.pr-poll-merge-notified.retiring" "$(fm_pr_file_device "$STATE")" \
+    "$FM_PR_PROVIDER" "$FM_PR_HOST" "$FM_PR_PATH" "$FM_PR_NUMBER" || return 1
   if [ -e "$STATE/$id.merge-prune" ] || [ -L "$STATE/$id.merge-prune" ]; then
     [ -f "$STATE/$id.merge-prune" ] && [ ! -L "$STATE/$id.merge-prune" ] || return 1
     ! grep -qxF -e "pr=$pr" -e "pr=$canonical" "$STATE/$id.merge-prune" 2>/dev/null || return 1
