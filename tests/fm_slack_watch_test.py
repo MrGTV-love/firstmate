@@ -4849,8 +4849,9 @@ class SecondPersonTest(unittest.TestCase):
             self.assertEqual(len([p for p in self.posts(replay) if p[0] == self.SECOND_DM]), 450)
 
     def test_sc4_they_share_the_cap_and_never_take_the_turn_of_an_owner_request(self):
-        # One shared cap (SC4; Main 1547 withdrew the separate cap of order 1307): with a cap of 1 the owner's requests go first, one per poll, and theirs
-        # takes the cap the owner leaves.
+        # One shared cap (SC4; Main 1547 withdrew the separate cap of order 1307). At cap 1 the slot alternates by poll when both have work (Main 1597, which
+        # replaced owner-always-first at cap 1): the first poll does not yet know their backlog, so the owner's first request goes first; their read records it,
+        # the next slot is theirs, and the owner's second request follows. No request is skipped, repeated or over the cap.
         with self.second(cap='1') as (watch, replay):
             self.says(replay, '200.000100')
             self.owner_says(replay, '200.000200')
@@ -4859,7 +4860,7 @@ class SecondPersonTest(unittest.TestCase):
             for _ in range(3):
                 self.again(watch)
                 polls.append([plane.REQUEST_SEGMENT.match(line).group(1, 2) for line in self.wakes(watch)])
-            self.assertEqual(polls, [[('200.000200', self.OWNER)], [('200.000300', self.OWNER)], [('200.000100', self.SECOND)]])
+            self.assertEqual(polls, [[('200.000200', self.OWNER)], [('200.000100', self.SECOND)], [('200.000300', self.OWNER)]])
 
     def test_sc4_an_unacknowledged_request_of_theirs_never_holds_back_the_owner_and_the_owner_retarget(self):
         with self.second() as (watch, replay):
