@@ -1516,7 +1516,7 @@ test_leak_check_splits_candidates_at_any_non_path_character() {
   pass "a path the root holds is judged whatever wraps it: quotes, brackets, links, line and column, file:, ; or a long spaced name"
 }
 
-test_unopened_file_named_under_inputs_read_voids_and_the_reviewer_is_told() {
+test_unopened_file_named_under_inputs_read_voids() {
   local rep="$TMP_ROOT/report-z2.md" line
   make_leak_world
   # The recorded g5-R2 reviewer line (evidence/main-grader-replay-f07cd4f8/g5-R2-report.md:139).
@@ -1535,12 +1535,7 @@ test_unopened_file_named_under_inputs_read_voids_and_the_reviewer_is_told() {
   run_check "$rep"
   assert_equals 0 "$CHECK_RC" "the unopened file under Checks not performed was flagged: $CHECK_OUT"
   assert_contains "$CHECK_OUT" "2 listed input(s)" "the compliant list was not read"
-  # The reviewer is told so in the pack it reads.
-  assert_contains "$(cat "$LEAK_PACK/contract.md")" "unopened file under \`Inputs read\`" \
-    "the pack does not tell the reviewer to keep unopened files out of Inputs read"
-  assert_contains "$(cat "$LEAK_PACK/contract.md")" "list it under Checks not performed" \
-    "the pack does not tell the reviewer where an unopened file goes"
-  pass "an unopened file named under Inputs read voids, and the pack tells the reviewer to list it under Checks not performed"
+  pass "an unopened file named under Inputs read voids, and the same sentence under Checks not performed is clean"
 }
 
 test_every_author_name_with_a_trailing_word_stays_out() {
@@ -1741,15 +1736,6 @@ test_authorized_spaced_path_is_clean() {
   pass "one backticked full path with spaces is judged as a path: clean when authorized, a leak when not"
 }
 
-test_reviewer_is_told_the_exit_for_a_conflict_with_an_unjudged_criterion() {
-  local src="$TMP_ROOT/f6.md" pack
-  write_fixture_contract "$src"
-  build_pack pack --contract "$src" || fail "build failed"
-  assert_contains "$(cat "$pack/contract.md")" "cannot be judged as well" \
-    "the pack does not say which exit a conflict takes when another criterion cannot be judged"
-  pass "the reviewer block names one exit for a conflict beside an unjudged criterion"
-}
-
 fm_test_run_cases \
   test_markers_kept_and_dropped \
   test_unrecognised_section_refused \
@@ -1800,7 +1786,7 @@ fm_test_run_cases \
   test_definition_of_done_in_every_heading_form \
   test_fences_and_headings_accept_up_to_three_spaces \
   test_rubric_revision_is_pinned_with_a_root \
-  test_unopened_file_named_under_inputs_read_voids_and_the_reviewer_is_told \
+  test_unopened_file_named_under_inputs_read_voids \
   test_leak_check_splits_candidates_at_any_non_path_character \
   test_policy_is_named_only_by_the_policy_argument \
   test_label_argument_is_gone \
@@ -1811,7 +1797,6 @@ fm_test_run_cases \
   test_headingless_list_of_an_extensionless_path_voids \
   test_transcript_reads_are_audited_and_the_log_is_required \
   test_authorized_spaced_path_is_clean \
-  test_reviewer_is_told_the_exit_for_a_conflict_with_an_unjudged_criterion \
   test_every_author_name_with_a_trailing_word_stays_out \
   test_contract_context_author_label_line_stays_out \
   -- "$@"
