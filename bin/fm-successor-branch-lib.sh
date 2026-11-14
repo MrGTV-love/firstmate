@@ -32,6 +32,9 @@
 #       then one or more of letters, digits, '.', '_' and '-'. That bound is what
 #       keeps a branch of another lineage (develop, release/*, a person's branch)
 #       out of a task's profile whichever route proves it.
+#   The other-task scan needs every task record it names to be readable; a record
+#   or a state folder that cannot be read refuses, because an unread record leaves
+#   the question of who owns the name unanswered.
 #   Every name comparison against the recorded, base, default and other tasks'
 #   branches ignores case, so a case variant never passes where the original is
 #   refused, on any file system. bin/fm-write-confinement.py repeats the family
@@ -43,10 +46,14 @@
 #   `successor_sha=<sha>` and `prior_sha=<sha>` (the recorded branch's tip, when
 #   it exists), and returns 0. On failure prints one reason line and returns 1.
 #   It reads the project's ref store and worktree list and never opens a work
-#   tree. The successor is proved to be this task's only when all of these hold:
+#   tree. Refs, archives and the worktree list are read through the recorded copy,
+#   the repository whose common directory the profile generator grants. The
+#   successor is proved to be this task's only when all of these hold:
+#     - the recorded copy is a directory whose git common directory is the
+#       project's, so the ref proved here is the ref the copy's profile grants;
 #     - refs/heads/<successor> exists as a commit in the project's ref store;
-#     - the recorded copy is a directory;
-#     - no work tree other than the recorded copy has it checked out;
+#     - no work tree other than the recorded copy has it checked out (every
+#       worktree on the branch is checked, not the first one listed);
 #     - and one of two routes holds:
 #         checked-out: it is the branch checked out in the recorded copy and the
 #           recorded branch's tip is an ancestor of, or equal to, its tip;
@@ -103,14 +110,30 @@ fm_successor_name_refusal() {
     [ "$lname" != "$ldefault" ] || { echo "it is the project's default branch"; return 1; }
   fi
   for state in "$@"; do
+    # The inventory of which task owns which branch is the proof that a name is
+    # not another task's. A folder or record that cannot be read leaves that proof
+    # unknown, so it refuses; it never reads as "no owner".
+    if [ ! -d "$state" ] || [ ! -r "$state" ] || [ ! -x "$state" ]; then
+      echo "cannot read the task records in $state, so the name cannot be checked against the branches other tasks own"
+      return 1
+    fi
     for meta in "$state"/*.meta; do
-      [ -f "$meta" ] || continue
+      [ -e "$meta" ] || [ -L "$meta" ] || continue
       [ "$meta" != "$own_meta" ] || continue
       [ ! "$meta" -ef "$own_meta" ] || continue
       other_id=$(basename "$meta" .meta)
-      other_kind=$(LC_ALL=C awk -F= '$1 == "kind" { sub(/^[^=]*=/, ""); v = $0 } END { print v }' "$meta" 2>/dev/null || true)
-      other_branch=$(LC_ALL=C awk -F= '$1 == "branch" { sub(/^[^=]*=/, ""); v = $0 } END { print v }' "$meta" 2>/dev/null || true)
-      other_succ=$(LC_ALL=C awk -F= '$1 == "successor_branch" { sub(/^[^=]*=/, ""); print }' "$meta" 2>/dev/null || true)
+      [ -f "$meta" ] || continue
+      if [ ! -r "$meta" ]; then
+        echo "cannot read task $other_id's record $meta, so the name cannot be checked against the branches other tasks own"
+        return 1
+      fi
+      other_kind=$(LC_ALL=C awk -F= '$1 == "kind" { sub(/^[^=]*=/, ""); v = $0 } END { print v }' "$meta" 2>/dev/null) \
+        && other_branch=$(LC_ALL=C awk -F= '$1 == "branch" { sub(/^[^=]*=/, ""); v = $0 } END { print v }' "$meta" 2>/dev/null) \
+        && other_succ=$(LC_ALL=C awk -F= '$1 == "successor_branch" { sub(/^[^=]*=/, ""); print }' "$meta" 2>/dev/null) \
+        || {
+          echo "cannot read task $other_id's record $meta, so the name cannot be checked against the branches other tasks own"
+          return 1
+        }
       if [ -z "$other_branch" ]; then
         case "$other_kind" in
           ''|ship) other_branch="fm/$other_id" ;;
@@ -137,10 +160,12 @@ fm_successor_name_refusal() {
   return 0
 }
 
-# The worktree that has refs/heads/<successor> attached, read from the project's
-# worktree list so no work tree is opened. Prints its path (nothing when no
-# worktree has it); fails only when the list cannot be read.
-fm_successor_checkout_path() {  # <project> <successor>
+# Every worktree that has refs/heads/<successor> attached, one path per line,
+# read from the project's worktree list so no work tree is opened. Prints nothing
+# when no worktree has it; fails only when the list cannot be read. Git lets a
+# branch be checked out in more than one worktree when it is forced, so a proof
+# that looked at the first listed worktree would miss the others.
+fm_successor_checkout_paths() {  # <project> <successor>
   local project=$1 successor=$2 line path="" attached="" listed
   listed=$(git -C "$project" worktree list --porcelain 2>/dev/null) || return 1
   while IFS= read -r line; do
@@ -150,7 +175,6 @@ fm_successor_checkout_path() {  # <project> <successor>
       '')
         if [ -n "$path" ] && [ "$attached" = "refs/heads/$successor" ]; then
           printf '%s\n' "$path"
-          return 0
         fi
         path=
         attached=
@@ -180,39 +204,64 @@ fm_successor_archive_match() {  # <project> <task-id> <successor-sha>
   return 1
 }
 
+# The git common directory of a path, canonical; empty when it has none.
+fm_successor_store_of() {  # <path>
+  local common
+  common=$(git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || return 1
+  [ -n "$common" ] || return 1
+  (cd "$common" 2>/dev/null && pwd -P)
+}
+
 fm_successor_proof() {  # <project> <task-id> <recorded-branch> <successor> <copy>
   local project=$1 id=$2 recorded=$3 successor=$4 wt=$5
-  local succ_sha copy other_path why1 archive_name prior_sha=""
-  succ_sha=$(git -C "$project" rev-parse --verify --quiet "refs/heads/$successor^{commit}" 2>/dev/null) || {
-    echo "successor branch '$successor' does not exist in the project's ref store ($project); create it first"
-    return 1
-  }
+  local succ_sha copy paths path elsewhere="" in_copy=0 why1 archive_name prior_sha="" copy_store project_store
   copy=$(fm_task_copy_canonical_dir "$wt") || {
     echo "task $id's recorded copy $wt is not a directory, so the successor cannot be proved to be this task's"
     return 1
   }
-  other_path=$(fm_successor_checkout_path "$project" "$successor") || {
+  # The profile is derived from the copy's own repository, so the ref the proof reads
+  # must be in that repository: a copy of some other repository proves nothing here.
+  copy_store=$(fm_successor_store_of "$copy" || true)
+  project_store=$(fm_successor_store_of "$project" || true)
+  if [ -z "$copy_store" ] || [ "$copy_store" != "$project_store" ]; then
+    echo "the recorded copy $wt does not share the project's ref store ($project), so a ref proved in the project is not the ref the copy's write profile would grant"
+    return 1
+  fi
+  succ_sha=$(git -C "$copy" rev-parse --verify --quiet "refs/heads/$successor^{commit}" 2>/dev/null) || {
+    echo "successor branch '$successor' does not exist in the project's ref store ($project); create it first"
+    return 1
+  }
+  paths=$(fm_successor_checkout_paths "$copy" "$successor") || {
     echo "cannot read $project's worktree list, so the successor cannot be proved to be this task's"
     return 1
   }
-  if [ -n "$other_path" ] && [ "$other_path" != "$copy" ] && [ "$(fm_task_copy_canonical_dir "$other_path" 2>/dev/null || true)" != "$copy" ]; then
-    echo "successor branch '$successor' is checked out in $other_path, which is not this task's recorded copy $wt"
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    if [ "$path" = "$copy" ] || [ "$(fm_task_copy_canonical_dir "$path" 2>/dev/null || true)" = "$copy" ]; then
+      in_copy=1
+    else
+      elsewhere=$path
+      break
+    fi
+  done <<< "$paths"
+  if [ -n "$elsewhere" ]; then
+    echo "successor branch '$successor' is checked out in $elsewhere, which is not this task's recorded copy $wt"
     return 1
   fi
-  prior_sha=$(git -C "$project" rev-parse --verify --quiet "refs/heads/$recorded^{commit}" 2>/dev/null || true)
+  prior_sha=$(git -C "$copy" rev-parse --verify --quiet "refs/heads/$recorded^{commit}" 2>/dev/null || true)
   why1=
-  if [ -z "$other_path" ]; then
+  if [ "$in_copy" = 0 ]; then
     why1="it is not checked out in the recorded copy $wt"
   elif [ -z "$prior_sha" ]; then
     why1="the recorded branch '$recorded' does not exist in the project's ref store"
-  elif ! git -C "$project" merge-base --is-ancestor "$prior_sha" "$succ_sha" 2>/dev/null; then
+  elif ! git -C "$copy" merge-base --is-ancestor "$prior_sha" "$succ_sha" 2>/dev/null; then
     why1="the recorded tip $prior_sha is not an ancestor of the successor tip $succ_sha"
   fi
   if [ -z "$why1" ]; then
     printf 'route=checked-out\nsuccessor_sha=%s\nprior_sha=%s\n' "$succ_sha" "$prior_sha"
     return 0
   fi
-  archive_name=$(fm_successor_archive_match "$project" "$id" "$succ_sha") || {
+  archive_name=$(fm_successor_archive_match "$copy" "$id" "$succ_sha") || {
     echo "successor branch '$successor' is not proved to be this task's successor; the checked-out route (checked out in the recorded copy and containing the recorded branch's tip) fails because $why1; the archive-tip route (its tip $succ_sha is the tip of one of the task's own archive/$id-(submitted|pipeline)-<8 hex> branches) fails because none points there"
     return 1
   }

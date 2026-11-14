@@ -6730,15 +6730,6 @@ confinement_refuse() {
   "$SCRIPT_DIR/fm-guard-event.sh" spawn-write-confinement deny --source-ok "$source_ok" \
     --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --task "$ID" 2>/dev/null || true
 }
-# The launch-time half of the successor-branch-admission guard: one deny event
-# naming the rule and the recorded successor, then the confinement refusal.
-confinement_successor_refuse() {  # <source-ok> <message>
-  local source_ok=$1
-  shift
-  "$SCRIPT_DIR/fm-guard-event.sh" successor-branch-admission deny --rule launch --source-ok "$source_ok" \
-    --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --task "$ID" --successor "${SUCCESSOR_BRANCH:-}" 2>/dev/null || true
-  confinement_refuse "$source_ok" "$@"
-}
 if [ "$KIND" != secondmate ]; then
   confinement_os=$(uname -s) || { confinement_refuse false "cannot identify worker OS"; exit 1; }
   case "$confinement_os:$HARNESS" in
@@ -6791,15 +6782,15 @@ if [ "$KIND" != secondmate ]; then
         # that fails either never reaches the profile; the generator then
         # re-checks that the name is one exact literal in the task's name family.
         if ! fm_local_firstmate_state_dirs "$STATE"; then
-          confinement_successor_refuse false "cannot list the local Firstmate homes to check the recorded successor branch against: $FM_LOCAL_FIRSTMATE_ERROR"
+          confinement_refuse false "cannot list the local Firstmate homes to check the recorded successor branch against: $FM_LOCAL_FIRSTMATE_ERROR"
           exit 1
         fi
         if ! confinement_successor_reason=$(fm_successor_name_refusal "$SUCCESSOR_BRANCH" "$BRANCH" "$BASE_BRANCH" "$STATE/$ID.meta" "$PROJ_ABS" "${FM_LOCAL_FIRSTMATE_STATES[@]}"); then
-          confinement_successor_refuse true "task $ID records successor branch '$SUCCESSOR_BRANCH', which is not admissible: $confinement_successor_reason"
+          confinement_refuse true "task $ID records successor branch '$SUCCESSOR_BRANCH', which is not admissible: $confinement_successor_reason"
           exit 1
         fi
         if ! confinement_successor_proof=$(fm_successor_proof "$PROJ_ABS" "$ID" "$BRANCH" "$SUCCESSOR_BRANCH" "$WT"); then
-          confinement_successor_refuse true "task $ID records successor branch '$SUCCESSOR_BRANCH', which is no longer proved to be this task's: $confinement_successor_proof"
+          confinement_refuse true "task $ID records successor branch '$SUCCESSOR_BRANCH', which is no longer proved to be this task's: $confinement_successor_proof"
           exit 1
         fi
         confinement_successor_route=$(printf '%s\n' "$confinement_successor_proof" | sed -n 's/^route=//p')
@@ -6846,9 +6837,16 @@ if [ "$KIND" != secondmate ]; then
       "$SCRIPT_DIR/fm-guard-event.sh" spawn-write-confinement allow --source-ok true \
         --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --task "$ID" --cleared-by proceed 2>/dev/null || true
       if [ -n "${SUCCESSOR_BRANCH:-}" ]; then
-        "$SCRIPT_DIR/fm-guard-event.sh" successor-branch-admission allow --rule launch --source-ok true \
+        # The event that applies the grant is owed, not best-effort: a sink that cannot take
+        # it refuses the launch, and the profile just written is removed so no line for
+        # the successor outlives the refusal.
+        if ! "$SCRIPT_DIR/fm-guard-event.sh" successor-branch-admission allow --strict --rule launch --source-ok true \
           --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --task "$ID" --cleared-by proceed \
-          --route "$confinement_successor_route" --successor "$SUCCESSOR_BRANCH" 2>/dev/null || true
+          --route "$confinement_successor_route" --successor "$SUCCESSOR_BRANCH" 2>/dev/null; then
+          rm -f "$WRITE_CONFINEMENT_PROFILE"
+          confinement_refuse true "the successor-branch-admission event for task $ID's successor branch '$SUCCESSOR_BRANCH' could not be written to $("$SCRIPT_DIR/fm-guard-event.sh" successor-branch-admission allow --log-path 2>/dev/null || echo 'the guard event log'); the launch was refused and no write profile was kept"
+          exit 1
+        fi
       fi
       "$SCRIPT_DIR/fm-guard-event.sh" spawn-shell-startup-confinement allow --source-ok true \
         --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --task "$ID" --cleared-by proceed 2>/dev/null || true
