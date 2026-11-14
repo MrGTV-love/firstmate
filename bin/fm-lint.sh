@@ -89,16 +89,17 @@
 # (FM_LINT_ROOT_RSS_KIB, default 8388608 KiB = 8 GiB; a larger value is clamped
 # to that default, and stderr and the roots log name the requested and the applied
 # value). The residual host total of one lone root, R, is therefore that cap plus
-# the watch's sampling overshoot: R = 10353888 KiB = 10602381312 bytes (9.87 GiB),
-# the cap of 8388608 KiB plus 1965280 KiB, the largest amount by which a root the
-# watch ended exceeded the cap in this repository's measured runs (the largest
-# peak of any root in those runs is 10353888 KiB).
+# the watch's sampling overshoot, set from this repository's measured runs: R =
+# 10956800 KiB = 11219763200 bytes (10.45 GiB), the largest peak of any root in the
+# real runs (10685235200 bytes, tests/fm-launch-prompt-signals-live-e2e.test.sh in
+# the head run) times 1.05, rounded up to a whole MiB. The watch is not tightened
+# to end a root that needs that memory.
 # Measured basis (this repository's real full lint, sampled every 0.25 s, each
 # ShellCheck process attributed to its lint run by its parent chain):
-#   the lint before this change peaked at T = 13.31 GiB (14287699968 bytes) with
+#   the lint before this change peaked at T = 13.31 GiB (14287716352 bytes) with
 #   two roots, above the budget;
-#   the lint with this budget had at most 3.16 GiB with two roots, and no sample
-#   above the budget;
+#   the lint with this budget had at most 3.05 GiB (3271426048 bytes) with two
+#   roots, and no sample above the budget;
 #   the smallest ShellCheck total among the memory-pressure level 2 readings in
 #   state/memory-readings.jsonl (processes among the ten largest) is
 #   3673.8125 MiB = 3761984 KiB (2026-11-02T21:11:32Z, 2 processes), 91968 KiB
