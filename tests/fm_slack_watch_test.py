@@ -5397,6 +5397,17 @@ class Invariant6Collision(InvariantScenario):
             self.assertNotEqual(result.rc, 0, (result.out, result.err))
             self.assertNotIn(self.SYNTHETIC, ''.join(l for l in result.out.splitlines() if 'from %s' % INV_SECOND in l))
 
+    def test_inv6_a_scott_request_row_still_journaled_when_the_setting_is_turned_off_keeps_the_protection(self):
+        with self.home(failures={'chat.postMessage:200.000100': {'status': 400}}) as home:
+            home.cli('poll')
+            home.say('200.000100', 'a request whose acknowledgement failed once')
+            home.cli('poll')                                 # taken in, acknowledgement failed: the row waits in the journal, no wake line is printed yet
+            self.assertTrue(any(row.get('person') == 'second' for row in home.state()['pending']), home.state()['pending'])
+            with patch.dict(os.environ):
+                os.environ.pop('FM_SLACK_SECOND_USER', None)
+                result = home.cli('poll', extra={'SLACK_SIGNING_SECRET': self.SYNTHETIC})
+            self.assertNotEqual(result.rc, 0, (result.out, result.err))
+
     def test_inv6_control_with_nothing_of_theirs_left_the_same_value_does_not_stop_the_owner(self):
         with self.home() as home:
             home.cli('poll')

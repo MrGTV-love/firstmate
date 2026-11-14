@@ -1444,6 +1444,18 @@ class SecondPersonReplyTest(unittest.TestCase):
         self.assertEqual(home.calls('chat.postMessage'), [])
         self.assertEqual([row for row in home.trace() if row['method'] == 'conversations.replies'], [])
 
+    def test_a_plane_value_that_is_part_of_their_label_stops_the_read_of_their_request_and_no_value_means_it_reads(self):
+        with self.scott() as home:
+            request = self.take_in_scott(home, 'a request read under a colliding value')
+            key = request + '@' + SCOTT
+            rc, out, err = home.read(key, env={'SLACK_SIGNING_SECRET': 'Scott request'})
+            self.assertNotEqual(rc, 0, (out, err))
+            self.assertNotIn('a request read under a colliding value', out)
+            self.assertNotIn('Scott request', out + err)
+            rc, out, err = home.read(key)
+            self.assertEqual((rc, err), (0, ''))
+            self.assertIn('a request read under a colliding value', out)
+
     def test_a_window_that_is_not_a_dm_or_is_the_owners_dm_is_refused_by_both_commands_and_the_untouched_window_is_the_control(self):
         for channel in ('C0NOTAMEMBERDM', OWNER_DM):
             with self.scott() as home:
