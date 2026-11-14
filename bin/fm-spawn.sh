@@ -543,7 +543,7 @@
 #   and no tracked or untracked change is overwritten. Before it, the copy must be clean,
 #   have no live holder (a process with its working directory in it that started before this
 #   spawn, a git worktree lock, a live project lease, recent contention) and have no ignored
-#   file at a path the move writes (git overwrites ignored files silently). Any other doubt, an
+#   file at a path the target tree tracks (git overwrites ignored files silently). Any other doubt, an
 #   unreadable inventory included, skips the copy: it is left exactly as found, leased durably
 #   in place (`treehouse lease --path`, because Treehouse resets a slot when its shell exits),
 #   and a second `treehouse get` in the same pane takes another copy. With no other copy the

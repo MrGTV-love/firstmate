@@ -273,7 +273,7 @@ EOF
 # `checkout` (it stops before overwriting a tracked change). No command in this file or
 # in bin/fm-spawn.sh forces, discards or removes anything in a slot, and a test scans
 # for that. Git does overwrite an ignored file without asking, so the move keeps one
-# narrow check for ignored work at a path the move writes.
+# narrow check for ignored work at a path the target tree tracks.
 # Any doubt skips the copy: the function returns FM_SLOT_SKIP_RC and leaves the slot
 # exactly as found. A fresh spawn then takes another slot (bin/fm-spawn.sh).
 # Nothing here proves that work is absent; a copy that is not plainly an idle, clean,
@@ -437,7 +437,6 @@ FMHOLDERPY
 # co-tenant contention on it) skips the copy; so does a holder list that cannot be read.
 fm_slot_holders_or_skip() { # <slot> [<project>]
   local slot=$1 project=${2:-} real common governed=0 out locked path line
-  command -v lsof >/dev/null 2>&1 || { fm_slot_skip "$slot" unknown_holders "lsof is not available, so the holder list cannot be read"; return; }
   real=$(CDPATH='' cd -- "$slot" 2>/dev/null && pwd -P) || { fm_slot_skip "$slot" unknown_holders "the slot directory cannot be entered"; return; }
   common=$(git -C "$slot" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) ||
     { fm_slot_skip "$slot" unknown_holders "the git common directory cannot be read"; return; }
@@ -513,12 +512,11 @@ fm_slot_entry_archived() { # <real-slot> <slot-relative path>
 }
 
 # The narrow ignored-work check. Git overwrites an ignored file silently, so before a
-# move that changes the tree: the paths the move writes are those added, copied, renamed
-# or type-changed between HEAD and the target. An ignored entry collides when it equals
-# one, lies inside one, or is an ancestor of one (an ignored file where a tracked
+# move that changes the tree the slot's ignored entries are compared with the paths the
+# target tree tracks. An ignored entry collides when it equals one, lies inside one, or is an ancestor of one (an ignored file where a tracked
 # directory must be created). A colliding entry is allowed only when the closeout
 # classifier calls it scratch or a verified archive holds its bytes. An unreadable
-# inventory skips the copy. Ignored entries at paths the move does not write never skip it.
+# inventory skips the copy. Ignored entries at paths the target does not track never skip it.
 fm_slot_ignored_or_skip() { # <slot> <target-commit>
   local slot=$1 target=$2 real scratch ignored written hits dirs entry bad='' settings
   real=$(CDPATH='' cd -- "$slot" 2>/dev/null && pwd -P) || { fm_slot_skip "$slot" unknown_ignored_inventory "the slot directory cannot be entered"; return; }
@@ -539,9 +537,9 @@ fm_slot_ignored_or_skip() { # <slot> <target-commit>
     }
     settings=
   }
-  if ! git -C "$slot" diff --name-only -z --no-renames --diff-filter=ACRT HEAD "$target" -- >"$written" 2>/dev/null; then
+  if ! git -C "$slot" ls-tree -r --name-only -z "$target" -- >"$written" 2>/dev/null; then
     rm -rf -- "$scratch"
-    fm_slot_skip "$slot" unknown_ignored_inventory "the paths the move writes cannot be listed"
+    fm_slot_skip "$slot" unknown_ignored_inventory "the target's tracked paths cannot be listed"
     return
   fi
   if ! python3 -I -c '
@@ -575,7 +573,7 @@ for entry in names(sys.argv[2]):
 open(sys.argv[3], "wb").write(b"".join(item + b"\0" for item in sorted(found)))
 ' "$written" "$ignored" "$hits" "$settings" 2>/dev/null; then
     rm -rf -- "$scratch"
-    fm_slot_skip "$slot" unknown_ignored_inventory "the ignored entries could not be compared with the paths the move writes"
+    fm_slot_skip "$slot" unknown_ignored_inventory "the ignored entries could not be compared with the target's tracked paths"
     return
   fi
   while IFS= read -r -d '' entry; do
@@ -588,7 +586,7 @@ open(sys.argv[3], "wb").write(b"".join(item + b"\0" for item in sorted(found)))
     bad="${bad:+$bad, }$entry"
   done <"$hits"
   rm -rf -- "$scratch"
-  [ -z "$bad" ] || fm_slot_skip "$slot" ignored_collision "ignored work at a path the move writes would be overwritten and no verified archive holds it: $bad"
+  [ -z "$bad" ] || fm_slot_skip "$slot" ignored_collision "ignored work at a path the target tracks would be overwritten and no verified archive holds it: $bad"
 }
 
 # Advance the slot to <target-sha>: clean tree, no holder, no ignored work in the way,

@@ -853,7 +853,7 @@
       "invariant": "Refreshing a pooled launch base never discards dirty, unlanded or ignored work: the copy moves only by a fast-forward that git itself refuses to complete over lost work, and any doubt skips the copy untouched.",
       "layer": "runtime-block",
       "source": "git status --porcelain and the checked-out submodule pins of the pooled copy; existing decision points: site:bin/fm-spawn.sh:6eceab4636",
-      "trigger": "refreshing a pooled worktree's base when it is dirty, holds commits the target lacks, has ignored work at a path the move writes, has a live holder, or has a stale submodule checkout; leaves it untouched",
+      "trigger": "refreshing a pooled worktree's base when it is dirty, holds commits the target lacks, has ignored work at a path the target tree tracks, has a live holder, or has a stale submodule checkout; leaves it untouched",
       "decision": "deny",
       "fail_direction": "closed",
       "remedy": "Preserve the task's current copy and endpoint; repair the named prerequisite with its owner, then retry bash bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on-or-off> without forcing or discarding work.",

@@ -209,7 +209,7 @@ test_ignored_file_at_a_path_the_move_writes_is_skipped() {
   make_world ignored-same
   advance_origin notes.local
   printf 'my ignored work\n' >"$W_SLOT/notes.local"
-  expect_skip "an ignored file at a path the move writes skips the copy" ignored_collision
+  expect_skip "an ignored file at a path the target tracks skips the copy" ignored_collision
   grep -q 'my ignored work' "$W_SLOT/notes.local" || fail "the ignored bytes changed"
 }
 
@@ -217,7 +217,7 @@ test_ignored_file_where_a_tracked_directory_must_be_created_is_skipped() {
   make_world ignored-ancestor
   advance_origin notes.local/entry.txt
   printf 'my ignored work\n' >"$W_SLOT/notes.local"
-  expect_skip "an ignored regular file that is an ancestor of a path the move writes skips the copy" ignored_collision
+  expect_skip "an ignored regular file that is an ancestor of a path the target tracks skips the copy" ignored_collision
   grep -q 'my ignored work' "$W_SLOT/notes.local" || fail "the ignored bytes changed"
 }
 
@@ -226,7 +226,7 @@ test_ignored_directory_below_a_path_the_move_writes_is_skipped() {
   advance_origin dir.local
   mkdir -p "$W_SLOT/dir.local"
   printf 'my ignored work\n' >"$W_SLOT/dir.local/inner.txt"
-  expect_skip "an ignored entry inside a path the move writes skips the copy" ignored_collision
+  expect_skip "an ignored entry inside a path the target tracks skips the copy" ignored_collision
   grep -q 'my ignored work' "$W_SLOT/dir.local/inner.txt" || fail "the ignored bytes changed"
 }
 
@@ -234,7 +234,7 @@ test_ignored_file_at_an_untouched_path_survives_the_move() {
   make_world ignored-control
   advance_origin advanced.txt
   printf 'keep me\n' >"$W_SLOT/scratch.local"
-  expect_moved "an ignored file at a path the move does not write passes"
+  expect_moved "an ignored file at a path the target does not track passes"
   grep -q 'keep me' "$W_SLOT/scratch.local" || fail "the ignored file's bytes changed across the move"
 }
 
