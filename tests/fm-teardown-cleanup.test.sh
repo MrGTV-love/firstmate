@@ -8312,6 +8312,425 @@ test_the_preserve_restores_to_the_builders_hashes() {
   pass "the preserve restores into a scratch path byte for byte against hashes computed from the fixture builder's own bytes"
 }
 
+# Round 4 of the outside outcome review (Main 4885): each case below is the reviewer's
+# witness at the real entry path where a seam exists, with its compliant control.
+
+# retained_open_case <name>: the C1 fixture in a pool whose slot cannot be durably leased,
+# so a close that keeps the copy refuses after its retained record is written and the
+# task stays open for a retry.
+retained_open_case() {
+  make_retained_case "$1" enclosing
+  held_plain_get_slot "$FOREIGN_CASE"
+  : > "$FOREIGN_CASE/no-lease-command"
+}
+
+# The creation-lock file of the case's own copy.
+retained_lock_file() {
+  printf '%s/locked\n' "$(git -C "$FOREIGN_COPY" rev-parse --absolute-git-dir)"
+}
+
+# The device and inode of <path>, without following a final symlink.
+retained_inode() {  # <path>
+  if [ "$(uname)" = Darwin ]; then /usr/bin/stat -f %d:%i "$1"; else stat -c %d:%i "$1"; fi
+}
+
+retained_base_preserve() {
+  printf '%s/data/task-x1/nested-copy-preserved/%s\n' "$FOREIGN_CASE" "$(printf '%s' "$FOREIGN_COPY" | shasum -a 256 | awk '{print $1}')"
+}
+
+# F2 (round 4): the preserve must still hold the copy's bytes when the task record goes. An
+# rm shim removes the preserved selected file right after its last byte check of the run
+# (the first preserve check of a matching retained record, which cleans its scratch folder
+# with rm; the trace of the plain close shows only that folder's removal and then the task
+# record's between that check and the close): the close must refuse and keep the task. The
+# unchanged retry makes the preserve whole again from the unchanged copy and closes without
+# asking the driver. The control is the plain C1 close of every other case.
+test_a_preserve_file_removed_after_its_verification_does_not_close_the_task() {
+  local rc preserve real_rm recorded
+  make_retained_case retained-late-removal enclosing
+  preserve=$(retained_base_preserve)
+  real_rm=$(command -v rm)
+  cat > "$FOREIGN_CASE/fakebin/rm" <<SH
+#!/usr/bin/env bash
+if [ -e "$FOREIGN_CASE/arm-late-removal" ] && [ -e "$(retained_record_path)" ]; then
+  case "\$*" in
+    *fm-retained-cover.*) "$real_rm" -f "$preserve/notes/unique.dat" "$FOREIGN_CASE/arm-late-removal" ;;
+  esac
+fi
+exec "$real_rm" "\$@"
+SH
+  chmod +x "$FOREIGN_CASE/fakebin/rm"
+  : > "$FOREIGN_CASE/arm-late-removal"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  assert_absent "$FOREIGN_CASE/arm-late-removal" "late-removal: the shim never fired, so the case tested nothing"
+  expect_code 1 "$rc" "late-removal: a close whose preserve lost a verified file must refuse: $(grep -m 3 -E 'REFUSED|error' "$FOREIGN_CASE/stderr")"
+  assert_present "$FOREIGN_CASE/state/task-x1.meta" "late-removal: the task record was removed with the preserve incomplete"
+  assert_equals in_flight "$(backlog_row_state "$FOREIGN_CASE")" "late-removal: the backlog item moved"
+  assert_grep 'REFUSED' "$FOREIGN_CASE/stderr" "late-removal: the refusal named no cause"
+  assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "late-removal: run 1 did not ask the driver exactly once"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  expect_code 0 "$rc" "late-removal: the unchanged retry must make the preserve whole and close: $(grep -m 3 -E 'REFUSED|error' "$FOREIGN_CASE/stderr")"
+  assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "late-removal: the retry asked the driver again"
+  retained_assert_closed late-removal
+  recorded=$(retained_field "$(retained_record_path)" preserve)
+  retained_preserve_intact "$FOREIGN_COPY" "$recorded" notes/unique.dat .claude/channel-outbox/a.jsonl .claude/channel-outbox/b.jsonl \
+    || fail "late-removal: the recorded preserve does not hold the copy's bytes after the close"
+  pass "a preserved file removed after the acceptance verified it stops the close with the task kept, and the unchanged retry restores it from the unchanged copy and closes with no second driver call"
+}
+
+# F2 (round 4): an existing preserve whose file is a hard link to the copy's own file holds
+# no independent bytes: editing the copy would change it. It is never accepted; the close
+# preserves into its own directory beside it, never over it, and the recorded preserve keeps
+# its bytes when the copy is edited after the close.
+test_a_preserve_hardlinked_to_the_copy_is_not_taken_for_independent_bytes() {
+  local rc preserve recorded
+  make_retained_case retained-hardlink enclosing
+  preserve=$(retained_base_preserve)
+  mkdir -p "$preserve/notes" "$preserve/.claude/channel-outbox"
+  printf '%s\n' "$FOREIGN_COPY" > "$preserve/copy-path"
+  ln "$FOREIGN_COPY/notes/unique.dat" "$preserve/notes/unique.dat"
+  cp "$FOREIGN_COPY/.claude/channel-outbox/a.jsonl" "$FOREIGN_COPY/.claude/channel-outbox/b.jsonl" "$preserve/.claude/channel-outbox/"
+  printf '%s  notes/unique.dat\n%s  .claude/channel-outbox/a.jsonl\n%s  .claude/channel-outbox/b.jsonl\n' \
+    "$(printf 'only here\n' | shasum -a 256 | awk '{print $1}')" "$(printf 'one\n' | shasum -a 256 | awk '{print $1}')" \
+    "$(printf 'two\n' | shasum -a 256 | awk '{print $1}')" > "$preserve/SHA256SUMS"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  expect_code 0 "$rc" "hardlink: the close must succeed with a preserve of its own: $(grep -m 3 -E 'REFUSED|error' "$FOREIGN_CASE/stderr")"
+  assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "hardlink: the driver was not asked exactly once"
+  recorded=$(retained_field "$(retained_record_path)" preserve)
+  [ "$(retained_inode "$recorded/notes/unique.dat")" != "$(retained_inode "$FOREIGN_COPY/notes/unique.dat")" ] \
+    || fail "hardlink: the recorded preserve shares its file with the copy"
+  printf 'edited after the close\n' > "$FOREIGN_COPY/notes/unique.dat"
+  assert_equals 'only here' "$(cat "$recorded/notes/unique.dat")" "hardlink: editing the copy after the close changed the recorded preserve"
+  assert_present "$preserve/notes/unique.dat" "hardlink: the earlier preserve lost its file"
+  pass "a preserve hard-linked to the copy is not accepted as independent bytes: the close preserves beside it, and the recorded preserve keeps its bytes when the copy is edited"
+}
+
+# F3 (round 4): a newly ignored entry the driver does not name, at the copy root and a
+# symlink, is part of the payload fingerprint, so it must be in the preserve too. The task
+# stays open (no durable lease), the link appears, the changed payload is assessed once,
+# and the preserve then holds the link with its target bytes; a .claude link is the control.
+test_a_new_unnamed_ignored_root_symlink_is_preserved_by_the_kept_route() {
+  local rc exclude recorded scratch
+  retained_open_case retained-root-link
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "root-link: run 1 did not ask the driver once"
+  assert_present "$(retained_record_path)" "root-link: run 1 wrote no retained record"
+  exclude=$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)
+  printf '%s\n' 'new-link' '.claude/new-link' >> "$exclude"
+  ln -s '../somewhere else' "$FOREIGN_COPY/new-link"
+  ln -s 'channel-outbox/a.jsonl' "$FOREIGN_COPY/.claude/new-link"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  assert_equals "2 2" "$(retained_call_count) $(retained_tar_count)" "root-link: the changed payload was not assessed exactly once"
+  recorded=$(retained_field "$(retained_record_path)" preserve)
+  [ -L "$recorded/new-link" ] || fail "root-link: the unnamed ignored root symlink is not in the recorded preserve $recorded"
+  assert_equals '../somewhere else' "$(readlink "$recorded/new-link")" "root-link: the preserved root link has other target bytes"
+  [ -L "$recorded/.claude/new-link" ] || fail "root-link control: the .claude link is not in the recorded preserve"
+  scratch=$FOREIGN_CASE/restore-root-link
+  mkdir -p "$scratch"
+  (cd "$recorded" && tar -cf - .) | (cd "$scratch" && tar -xf -)
+  assert_equals '../somewhere else' "$(readlink "$scratch/new-link")" "root-link: the restored root link has other target bytes"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  assert_equals "2 2" "$(retained_call_count) $(retained_tar_count)" "root-link: the unchanged retry asked the driver"
+  pass "a newly ignored root symlink the driver does not name is preserved with its target bytes once the changed payload is assessed, as a .claude link is, and an unchanged retry asks nothing"
+}
+
+# F4 (round 4): a driver-named symlink inside the copy whose target does not exist resolves
+# nowhere: the close refuses, records it, and two unchanged retries ask nothing. Controls: a
+# driver-named link to an existing file in the copy closes; a valid link whose target
+# later disappears is assessed again once and then refused and recorded.
+test_a_dangling_in_copy_driver_named_link_refuses_and_is_recorded() {
+  local rc run named
+  named='.claude/channel-outbox/a.jsonl .claude/channel-outbox/b.jsonl .claude/channel-outbox/link'
+  make_retained_case retained-dangling-in enclosing
+  ln -s missing-target "$FOREIGN_COPY/.claude/channel-outbox/link"
+  held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained "FM_STUB_UNIQUE=$named"
+  expect_code 1 "$rc" "dangling-in: a driver-named link that resolves nowhere must refuse: $(grep -m 3 -E 'REFUSED|error' "$FOREIGN_CASE/stderr")"
+  assert_present "$FOREIGN_CASE/state/task-x1.meta" "dangling-in: the task record was removed"
+  assert_present "$(retained_refused_record_path)" "dangling-in: the refusal was not recorded"
+  assert_absent "$(retained_record_path)" "dangling-in: a retained record was written"
+  for run in 2 3; do
+    run_foreign_teardown rc FM_STUB_CLOSEOUT=retained "FM_STUB_UNIQUE=$named"
+    expect_code 1 "$rc" "dangling-in: run $run must refuse again"
+    assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "dangling-in: run $run asked the driver again"
+  done
+
+  make_retained_case retained-dangling-control enclosing
+  ln -s a.jsonl "$FOREIGN_COPY/.claude/channel-outbox/link"
+  held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained "FM_STUB_UNIQUE=$named"
+  expect_code 0 "$rc" "dangling control: a driver-named link to an existing file in the copy must close: $(grep -m 3 -E 'REFUSED|error' "$FOREIGN_CASE/stderr")"
+
+  retained_open_case retained-dangling-later
+  ln -s unique-target "$FOREIGN_COPY/.claude/channel-outbox/link"
+  printf 'target\n' > "$FOREIGN_COPY/.claude/channel-outbox/unique-target"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained "FM_STUB_UNIQUE=$named"
+  assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "dangling-later: run 1 did not ask the driver once"
+  rm -f "$FOREIGN_COPY/.claude/channel-outbox/unique-target"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained "FM_STUB_UNIQUE=$named"
+  expect_code 1 "$rc" "dangling-later: the link whose target went must refuse"
+  assert_equals "2 2" "$(retained_call_count) $(retained_tar_count)" "dangling-later: the changed copy was not assessed exactly once"
+  assert_present "$(retained_refused_record_path)" "dangling-later: the refusal was not recorded"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained "FM_STUB_UNIQUE=$named"
+  assert_equals "2 2" "$(retained_call_count) $(retained_tar_count)" "dangling-later: the unchanged retry asked the driver"
+  pass "a driver-named link inside the copy that resolves nowhere refuses, is recorded and is not asked about again; a link to an existing file closes; a link whose target later goes is assessed once and recorded"
+}
+
+# F5 (round 4): the retained answer is bound to the creation lock itself, not only to its
+# bytes. Replacing the lock file with the same bytes (a new file) is a replaced lock: the
+# copy is assessed again once. The task stays open (no durable lease) so retries reach it.
+test_a_creation_lock_replaced_with_the_same_bytes_is_assessed_again() {
+  local rc lock before
+  retained_open_case retained-lock-same-bytes
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "lock-same-bytes: run 1 did not ask the driver once"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "lock-same-bytes: the unchanged retry asked the driver"
+  lock=$(retained_lock_file)
+  before=$(retained_inode "$lock")
+  cp -p "$lock" "$lock.new"
+  mv -f "$lock.new" "$lock"
+  [ "$(retained_inode "$lock")" != "$before" ] || fail "lock-same-bytes: the fixture did not replace the lock file"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  assert_equals "2 2" "$(retained_call_count) $(retained_tar_count)" "lock-same-bytes: a lock replaced with the same bytes was not assessed again exactly once"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  assert_equals "2 2" "$(retained_call_count) $(retained_tar_count)" "lock-same-bytes: the retry after the replaced lock asked the driver"
+  pass "a creation lock replaced by a file with the same bytes is a replaced lock: the copy is assessed once more and its retry asks nothing"
+}
+
+# F5 (round 4): a creation lock that changes while the driver runs is not the lock the answer
+# was asked under. The close refuses and records no retained answer; the next run assesses the
+# copy under its new lock. Dead-launcher control: the new lock's launcher is gone, so the next
+# run asks the driver once and closes. Live-launcher control (needs ps): the new lock's
+# launcher runs outside the task, so the next run refuses before the driver.
+test_a_creation_lock_that_changes_while_the_driver_runs_is_not_answered_for() {
+  local rc lock pid live
+  make_retained_case retained-lock-during enclosing
+  lock=$(retained_lock_file)
+  dead_launcher_pid
+  pid=$FOREIGN_DEAD_PID
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained \
+    "FM_STUB_AFTER=printf 'vernant-session-active owner=launcher:$pid launcher=$pid' > '$lock.new' && mv -f '$lock.new' '$lock'"
+  expect_code 1 "$rc" "lock-during: a lock replaced during the driver call must not close the task: $(grep -m 3 -E 'REFUSED|error' "$FOREIGN_CASE/stderr")"
+  assert_present "$FOREIGN_CASE/state/task-x1.meta" "lock-during: the task record was removed"
+  assert_grep 'REFUSED' "$FOREIGN_CASE/stderr" "lock-during: the refusal named no cause"
+  assert_absent "$(retained_record_path)" "lock-during: a retained record was written for the old lock"
+  assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "lock-during: run 1 did not ask the driver once"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  expect_code 0 "$rc" "lock-during dead-launcher control: the copy under its new lock must close: $(grep -m 3 -E 'REFUSED|error' "$FOREIGN_CASE/stderr")"
+  assert_equals "2 2" "$(retained_call_count) $(retained_tar_count)" "lock-during dead-launcher control: the new lock was not assessed exactly once"
+  if ps -p $$ -o pid= >/dev/null 2>&1; then
+    make_retained_case retained-lock-during-live enclosing
+    lock=$(retained_lock_file)
+    (cd "$FOREIGN_CASE" && exec sleep 600) & live=$!
+    run_foreign_teardown rc FM_STUB_CLOSEOUT=retained \
+      "FM_STUB_AFTER=printf 'vernant-session-active owner=launcher:$live launcher=$live' > '$lock.new' && mv -f '$lock.new' '$lock'"
+    expect_code 1 "$rc" "lock-during live-launcher control: run 1 must refuse"
+    run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+    expect_code 1 "$rc" "lock-during live-launcher control: a lock whose launcher runs outside the task must refuse"
+    assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "lock-during live-launcher control: the driver was asked under a live foreign launcher"
+    kill "$live" 2>/dev/null || true
+    wait "$live" 2>/dev/null || true
+  else
+    echo "# NOT RUN here: the live-launcher control of lock-during needs ps (ps -p $$ -o pid= is not permitted)"
+  fi
+  pass "a creation lock that changes while the driver runs records no answer; the copy is assessed once under its new lock and closes when that lock's launcher is gone"
+}
+
+# F6 (round 4): what the driver already answered is unknown when the folder of the retained
+# record cannot be searched: the driver is not asked while it stays so, and once the folder
+# is searchable again the recorded answer still holds, with no second call. The task stays
+# open (no durable lease) so retries reach it.
+test_an_unsearchable_record_folder_never_lets_a_retry_ask_the_driver() {
+  local rc run folder observed
+  retained_open_case retained-unsearchable
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "unsearchable: run 1 did not ask the driver once"
+  folder=$FOREIGN_CASE/data/copy-sweep/retained
+  chmod 000 "$folder"
+  observed=
+  for run in 2 3; do
+    run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+    observed="$observed run$run=rc:$rc,calls:$(retained_call_count),tars:$(retained_tar_count),meta:$([ -e "$FOREIGN_CASE/state/task-x1.meta" ] && echo kept || echo gone)"
+  done
+  chmod 755 "$folder"
+  assert_equals " run2=rc:1,calls:1,tars:1,meta:kept run3=rc:1,calls:1,tars:1,meta:kept" "$observed" "unsearchable: a retry asked the driver, closed or removed the task while its earlier answer could not be read"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "unsearchable: the repaired folder's recorded answer was not used"
+  pass "a retained-record folder that cannot be searched keeps every retry from asking the driver, and the recorded answer holds once it can be searched again"
+}
+
+# F6 (round 4): the copy's identity or its lock hash cannot be read, so no answer the driver
+# gives could be recorded: the driver is not asked. The actual teardown_own_copy_dispose runs
+# with the nested library, its identity read made to fail, and a stand-in for the driver
+# call that counts; two retries, then the repaired state asks exactly once.
+test_an_unreadable_copy_identity_or_lock_never_lets_a_retry_ask_the_driver() {
+  local dir calls rc kind
+  dir=$(make_case retained-identity-unknown)
+  mkdir -p "$dir/copy/.git" "$dir/data"
+  calls=$(
+    # shellcheck source=/dev/null
+    . "$ROOT/bin/fm-refuse-lib.sh"
+    # shellcheck source=/dev/null
+    . "$ROOT/bin/fm-teardown-nested-lib.sh"
+    # shellcheck disable=SC2034 # read by the library functions.
+    DATA=$dir/data ID=task-x1
+    printf 'vernant-session-active owner=launcher:999999 launcher=999999' > "$dir/locked"
+    teardown_copy_lock_file() { TEARDOWN_FOREIGN_LOCK=$(cat "$dir/locked"); TEARDOWN_FOREIGN_LOCK_FILE=$dir/locked${LOCK_SUFFIX:-}; return 0; }
+    copy_identity() { [ ! -e "$dir/identity-broken" ] || return 1; echo 11:22; }
+    teardown_retained_prepare_preserve() { TEARDOWN_PRE_SNAPSHOT="h s p"; return 0; }
+    teardown_run_closeout() {
+      echo call >> "$dir/calls"
+      TEARDOWN_CLOSEOUT_STDOUT='{"allowed":false,"reason":"cleanup_ignored_payload_archived_tree_retained","ignored_payload_disposition":"archive_then_retain_tree","tracked_uncovered_paths":[],"uncovered_paths":[],"unique_ignored_paths":["a"]}'
+      return 3
+    }
+    teardown_closeout_refusal() { :; }
+    teardown_retained_accept() { return 1; }
+    fm_task_copy_canonical_dir() { printf '%s\n' "$1"; }
+    for kind in identity lock; do
+      : > "$dir/calls"
+      if [ "$kind" = identity ]; then : > "$dir/identity-broken"; LOCK_SUFFIX=; else rm -f "$dir/identity-broken"; LOCK_SUFFIX=.missing; fi
+      teardown_own_copy_dispose "$dir/slot" "$dir/copy" 2>/dev/null || true
+      teardown_own_copy_dispose "$dir/slot" "$dir/copy" 2>/dev/null || true
+      printf '%s=%s ' "$kind" "$(wc -l < "$dir/calls" | tr -d ' ')"
+      rm -f "$dir/identity-broken"; LOCK_SUFFIX=
+      teardown_own_copy_dispose "$dir/slot" "$dir/copy" 2>/dev/null || true
+      printf '%s-repaired=%s ' "$kind" "$(wc -l < "$dir/calls" | tr -d ' ')"
+    done
+  )
+  rc=0
+  [ "$calls" = "identity=0 identity-repaired=1 lock=0 lock-repaired=1 " ] || rc=1
+  [ "$rc" = 0 ] || fail "identity-unknown: driver calls with an unreadable identity or lock, then repaired, were '$calls' (want 0 on two retries, then 1)"
+  pass "an unreadable copy identity or lock hash refuses before the driver on two retries, and the repaired state asks the driver exactly once"
+}
+
+# F8 (round 4): only a task whose record is positively gone after a completed close is
+# already closed. A record made a directory is damaged, not absent; a record removed by
+# hand after a close that refused (its retained record was written before the refusal) is
+# not a close. Both refuse and never say "already closed". Control: a real close, then a
+# retry, says already closed, exits 0 and asks the driver nothing.
+test_a_damaged_or_unclosed_task_record_is_never_reported_as_already_closed() {
+  local rc
+  retained_open_case retained-closed-shape
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  expect_code 1 "$rc" "closed-shape: the close without a durable lease must refuse"
+  assert_present "$(retained_record_path)" "closed-shape: the refused close wrote no retained record, so the case tests nothing"
+  mv "$FOREIGN_CASE/state/task-x1.meta" "$FOREIGN_CASE/meta.saved"
+  mkdir "$FOREIGN_CASE/state/task-x1.meta"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  expect_code 1 "$rc" "closed-shape: a task record that is a directory must refuse"
+  assert_no_grep 'already closed' "$FOREIGN_CASE/stdout" "closed-shape: a damaged task record was reported as already closed"
+  rmdir "$FOREIGN_CASE/state/task-x1.meta"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  expect_code 1 "$rc" "closed-shape: a record removed by hand after a refused close must refuse"
+  assert_no_grep 'already closed' "$FOREIGN_CASE/stdout" "closed-shape: a refused close was reported as already closed once its record went"
+  assert_equals in_flight "$(backlog_row_state "$FOREIGN_CASE")" "closed-shape: the backlog item moved"
+
+  make_retained_case retained-closed-control enclosing
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  expect_code 0 "$rc" "closed control: the close must succeed: $(grep -m 3 -E 'REFUSED|error' "$FOREIGN_CASE/stderr")"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  expect_code 0 "$rc" "closed control: the retry of a closed task must succeed"
+  assert_grep 'already closed' "$FOREIGN_CASE/stdout" "closed control: the retry of a closed task did not say it is already closed"
+  assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "closed control: the retry asked the driver"
+  pass "a damaged task record, and one removed after a refused close, are never reported as already closed; a completed close is"
+}
+
+# F1 (round 4): ownership is bound to the process it was proved for. The proof of pid 100
+# holds, and right after it the pid belongs to another process (another birth identity). The
+# actual queue and retire functions (nested library) and the actual scan, freeze and reap
+# functions (bin/fm-teardown.sh) run on a process table kept in files, with the signal and
+# its audit intercepted: the oracle is that no signal is attempted and no audit line is
+# written for the replacement. Controls: a stable own process is queued and signalled on both
+# routes; a pid replaced after it was queued is not signalled.
+f1_stub_processes() {  # <dir> <root>
+  F1_DIR=$1
+  F1_ROOT=$2
+  task_process_identity() { [ ! -e "$F1_DIR/dead.$1" ] || return 1; cat "$F1_DIR/id.$1" 2>/dev/null || return 1; }
+  task_process_identity_matches() { local current; current=$(task_process_identity "$1") || return 1; [ "$current" = "$2" ]; }
+  teardown_process_proved_own() {
+    [ -e "$F1_DIR/own.$1" ] || return 1
+    if [ -e "$F1_DIR/recycle-in-proof" ]; then
+      printf 'lstart=Mon Nov  9 10:00:00 2026\n' > "$F1_DIR/id.$1"
+      rm -f "$F1_DIR/own.$1" "$F1_DIR/recycle-in-proof"
+    fi
+    return 0
+  }
+  pids_with_cwd_under() { [ -e "$F1_DIR/dead.100" ] || printf '100\t%s\n' "$F1_ROOT"; }
+  task_record_process_signal() { printf '%s\t%s\t%s\n' "$3" "$1" "$2" >> "$F1_DIR/audit"; }
+  kill() {
+    printf '%s\n' "$*" >> "$F1_DIR/kills"
+    case "$1" in -TERM|-KILL) : > "$F1_DIR/dead.$2" ;; esac
+  }
+  sleep() { :; }
+  task_pid_positively_gone() { return 1; }
+}
+
+f1_reset() {  # <case>
+  rm -f "$F1_DIR"/own.* "$F1_DIR"/id.* "$F1_DIR"/dead.* "$F1_DIR/recycle-in-proof" "$F1_DIR/audit" "$F1_DIR/kills"
+  : > "$F1_DIR/audit"
+  : > "$F1_DIR/kills"
+  printf 'lstart=Sun Nov  8 08:00:00 2026\n' > "$F1_DIR/id.100"
+  : > "$F1_DIR/own.100"
+  [ "$1" != recycle-in-proof ] || : > "$F1_DIR/recycle-in-proof"
+}
+
+test_a_pid_replaced_after_its_ownership_proof_is_never_signalled() {
+  local dir root fake out
+  dir=$(make_case own-proof-replaced)
+  fake=$dir/fakebin
+  root=$(cd "$dir/wt" && pwd -P)
+  printf '#!/usr/bin/env bash\ncase "$*" in *"-o ppid= -p 100"*) echo 1 ;; *) exit 1 ;; esac\n' > "$fake/ps"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$fake/lsof"
+  chmod +x "$fake/ps" "$fake/lsof"
+  out=$(
+    PATH="$fake:$PATH"
+    # shellcheck source=/dev/null
+    . "$ROOT/bin/fm-refuse-lib.sh"
+    # shellcheck source=/dev/null
+    . "$ROOT/bin/fm-teardown-nested-lib.sh"
+    # shellcheck disable=SC2034 # read by the library functions.
+    WT=$root TEARDOWN_RETURN_SLOT='' TASK_TMP='' META=$dir/state/task-x1.meta STATE=$dir/state ID=task-x1
+    TEARDOWN_NESTED_COPIES=()
+    fm_task_copy_other_record() { return 1; }
+    teardown_copy_lock_file() { return 1; }
+    f1_stub_processes "$dir" "$root"
+    for c in stable recycle-in-proof recycle-after-queue; do
+      f1_reset "$c"
+      TEARDOWN_FOREIGN_PROCS=()
+      rc=0
+      teardown_foreign_copy_unowned "$root" 2>/dev/null || rc=$?
+      [ "$c" != recycle-after-queue ] || printf 'lstart=Mon Nov  9 10:00:00 2026\n' > "$dir/id.100"
+      [ "$rc" != 0 ] || teardown_foreign_procs_retire 2>/dev/null || true
+      printf 'queue:%s rc=%s queued=%s kills=%s audit=%s\n' "$c" "$rc" "${#TEARDOWN_FOREIGN_PROCS[@]}" "$(grep -c ' 100$' "$dir/kills")" "$(grep -c $'\t100\t' "$dir/audit")"
+    done
+  )
+  assert_grep 'queue:stable rc=0 queued=1 kills=1 audit=1' <(printf '%s\n' "$out") "own-proof-replaced: the stable own process was not queued and signalled once: $out"
+  assert_grep 'queue:recycle-in-proof rc=1 ' <(printf '%s\n' "$out") "own-proof-replaced: a pid replaced after its proof was not refused: $out"
+  assert_grep 'queue:recycle-in-proof rc=1 queued=0 kills=0 audit=0' <(printf '%s\n' "$out") "own-proof-replaced: a pid replaced after its proof was queued or signalled: $out"
+  assert_grep 'queue:recycle-after-queue rc=0 queued=1 kills=0 audit=0' <(printf '%s\n' "$out") "own-proof-replaced: a pid replaced after it was queued was signalled: $out"
+
+  out=$(
+    PATH="$fake:$PATH"
+    eval "$(awk '/^pids_with_cwd_under\(\) \{/ { on = 1 } on { print } on && /^reap_task_worktree_processes\(\) \{/ { last = 1 } last && /^}/ { exit }' "$ROOT/bin/fm-teardown.sh")"
+    # shellcheck disable=SC2034 # read by the evaluated functions.
+    ID=task-x1 STATE=$dir/state
+    task_registered_lanes_under_roots() { return 0; }
+    task_nested_lane_for_path() { printf '%s\n' "$1"; }
+    f1_stub_processes "$dir" "$root"
+    for c in stable recycle-in-proof; do
+      f1_reset "$c"
+      rc=0
+      reap_task_worktree_processes leaked "$root" 2>/dev/null || rc=$?
+      printf 'reap:%s rc=%s kills=%s audit=%s\n' "$c" "$rc" "$(grep -c ' 100$' "$dir/kills")" "$(grep -c $'\t100\t' "$dir/audit")"
+    done
+  )
+  assert_grep 'reap:stable rc=0 ' <(printf '%s\n' "$out") "own-proof-replaced: the stable own process was not reaped: $out"
+  grep -q 'reap:stable rc=0 kills=0 ' <<< "$out" && fail "own-proof-replaced: the stable own process was never signalled: $out"
+  assert_grep 'reap:recycle-in-proof rc=1 kills=0 audit=0' <(printf '%s\n' "$out") "own-proof-replaced: the reaper signalled or audited a pid replaced after its proof, or did not refuse it: $out"
+  pass "a pid that belongs to another process right after its ownership proof is refused and never queued, audited or signalled on the queue and the reap routes; a stable own process is signalled, and a pid replaced after it was queued is not"
+}
+
 teardown_test_cases=(
 test_fixture_cleanup_leaves_no_home_summary_refresh_worker
 test_teardown_never_holds_up_a_steer_to_another_task
@@ -8568,6 +8987,16 @@ test_a_preserve_that_does_not_hold_never_replaces_the_earlier_one_and_never_repe
 test_an_ignored_file_created_while_the_driver_runs_refuses_and_is_assessed_afresh
 test_a_process_is_proved_the_tasks_own_by_marker_record_or_live_chain_never_by_place
 test_a_marker_counts_only_as_one_whole_environment_entry_of_the_process
+test_a_preserve_file_removed_after_its_verification_does_not_close_the_task
+test_a_preserve_hardlinked_to_the_copy_is_not_taken_for_independent_bytes
+test_a_new_unnamed_ignored_root_symlink_is_preserved_by_the_kept_route
+test_a_dangling_in_copy_driver_named_link_refuses_and_is_recorded
+test_a_creation_lock_replaced_with_the_same_bytes_is_assessed_again
+test_a_creation_lock_that_changes_while_the_driver_runs_is_not_answered_for
+test_an_unsearchable_record_folder_never_lets_a_retry_ask_the_driver
+test_an_unreadable_copy_identity_or_lock_never_lets_a_retry_ask_the_driver
+test_a_damaged_or_unclosed_task_record_is_never_reported_as_already_closed
+test_a_pid_replaced_after_its_ownership_proof_is_never_signalled
 )
 
 # In the combined tests/fm-teardown.test.sh run,

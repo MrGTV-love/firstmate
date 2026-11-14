@@ -228,6 +228,30 @@ PERL
 #   $CASE/project/      - clone of origin; acts as the firstmate project dir
 #   $CASE/wt/           - a worktree of the project (the task worktree)
 # Echoes the case dir.
+# add_gh_no_pr <case-dir>: the default gh-axi and gh stand-ins: no PR is associated with the
+# branch, and viewing any PR number fails. This keeps the landed-work check hermetic (never
+# reaching the real gh-axi) and represents the common "no GitHub PR" baseline. Tests that need
+# a merged PR or a lookup error override these files with the helpers below.
+add_gh_no_pr() {
+  local fakebin=$1/fakebin
+  cat > "$fakebin/gh-axi" <<'SH'
+#!/usr/bin/env bash
+case "${1:-} ${2:-}" in
+  "pr list") printf '%s\n' "count: 0 (showing first 0)" "pull_requests[]: []" ; exit 0 ;;
+  "pr view") echo "error: pull request not found" >&2 ; exit 1 ;;
+esac
+exit 0
+SH
+  cat > "$fakebin/gh" <<'SH'
+#!/usr/bin/env bash
+case "${1:-} ${2:-}" in
+  "pr view") echo "error: pull request not found" >&2 ; exit 1 ;;
+esac
+exit 0
+SH
+  chmod +x "$fakebin/gh-axi" "$fakebin/gh"
+}
+
 make_case() {
   local name=$1 case_dir fakebin
   case_dir="$TMP_ROOT/$name"
@@ -250,25 +274,7 @@ SH
 # tmux kill-window etc.: succeed silently.
 exit 0
 SH
-  # Default gh-axi mock: no PR is associated with the branch, and viewing any PR
-  # number fails. This keeps the landed-work check hermetic (never reaching the real
-  # gh-axi) and represents the common "no GitHub PR" baseline. Tests that need a
-  # merged PR or a lookup error override this file with the helpers below.
-  cat > "$fakebin/gh-axi" <<'SH'
-#!/usr/bin/env bash
-case "${1:-} ${2:-}" in
-  "pr list") printf '%s\n' "count: 0 (showing first 0)" "pull_requests[]: []" ; exit 0 ;;
-  "pr view") echo "error: pull request not found" >&2 ; exit 1 ;;
-esac
-exit 0
-SH
-  cat > "$fakebin/gh" <<'SH'
-#!/usr/bin/env bash
-case "${1:-} ${2:-}" in
-  "pr view") echo "error: pull request not found" >&2 ; exit 1 ;;
-esac
-exit 0
-SH
+  add_gh_no_pr "$case_dir"
   # Default hermetic no-mistakes stub: `axi status` answers FM_FAKE_AXI_STATUS
   # verbatim (empty by default, i.e. no active run - the pre-teardown run-abort
   # step is then a no-op), `axi abort` appends one line to

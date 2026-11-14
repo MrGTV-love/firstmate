@@ -99,6 +99,14 @@ real_case() {
   make_retained_case "real-$1" enclosing
   export TREEHOUSE_ROOT=$FOREIGN_CASE/realroot
   real_local_tools
+  # Only the closeout driver, gh, gh-axi and no-mistakes are stand-ins (Main 4400): the
+  # retained fixture's empty-cwd lsof fake goes, so every case scans real processes with
+  # the real lsof, and the forge stand-ins answer the fixtures' true state, "no pull
+  # request" (no pr= in the task record and no merged PR from gh or gh-axi). Landing is
+  # proved from Git alone: the task's branch head is on the project's main.
+  rm -f "$FOREIGN_CASE/fakebin/lsof"
+  add_gh_no_pr "$FOREIGN_CASE"
+  sed -i.bak '/^pr=/d' "$FOREIGN_CASE/state/task-x1.meta" && rm -f "$FOREIGN_CASE/state/task-x1.meta.bak"
   # A regenerable control the preserve must leave out, and one the copy keeps.
   printf '%s\n' '.venv/' 'node_modules/' >> "$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)"
   mkdir -p "$FOREIGN_COPY/.venv/bin" "$FOREIGN_COPY/node_modules/dep"
@@ -114,6 +122,25 @@ real_case() {
     mkdir -p "$REAL_DIR"
     real_record before
   fi
+}
+
+# real_assert_no_signal_audited <pid> <label>: the signal audit holds no STOP, TERM or KILL
+# line for <pid>. Every signal teardown sends is audited first (task_record_process_signal), so
+# the audit is the no-signal oracle; an audit that does not exist means no signal was
+# recorded, but one that exists and cannot be read, or a grep that fails for any other
+# reason, proves nothing and fails the case (a plain negative grep would pass it).
+real_assert_no_signal_audited() {
+  local pid=$1 label=$2 audit=$FOREIGN_CASE/state/task-x1.teardown-processes rc=0
+  if [ ! -e "$audit" ] && [ ! -L "$audit" ]; then
+    return 0
+  fi
+  [ -f "$audit" ] && [ -r "$audit" ] || fail "$label: the signal audit $audit exists but cannot be read"
+  grep -E -- $'\t(STOP|TERM|KILL)\t'"$pid"$'\t' "$audit" >/dev/null || rc=$?
+  case "$rc" in
+    1) ;;
+    0) fail "$label: a signal was audited for process $pid, which is not proved the task's own" ;;
+    *) fail "$label: the signal audit $audit could not be searched (grep exit $rc)" ;;
+  esac
 }
 
 # The slot's entry in the real `treehouse status --json`, from the project.
@@ -285,7 +312,6 @@ real_assert_kept() {  # <label>: nothing moved
 test_a_copy_with_a_foreign_process_inside_it_is_kept_and_the_slot_stays_leased() {
   local rc pid
   real_case b-process
-  rm -f "$FOREIGN_CASE/fakebin/lsof"
   SLOT_ENTRY_BEFORE=$(real_slot_entry)
   # Its working directory is below the copy's root, so it is not a process the
   # task's own cleanup ends (those have their cwd exactly at a root retire sweeps).
@@ -309,7 +335,6 @@ test_a_foreign_or_scrubbed_process_at_the_copy_root_is_never_ended_and_refuses_t
   for route in kept released; do
     for shape in foreign scrubbed; do
       real_case b-process-root-$shape-$route
-      rm -f "$FOREIGN_CASE/fakebin/lsof"
       SLOT_ENTRY_BEFORE=$(real_slot_entry)
       case "$shape" in
         foreign) ( cd "$FOREIGN_COPY" && exec env "FM_TASK_INBOX=$(cd "$FOREIGN_CASE/state" && pwd -P)/other-task.inbox" sleep 600 ) & ;;
@@ -462,7 +487,6 @@ test_real_leftover_processes_at_the_copy_root_are_ended_only_when_proved_the_tas
   for route in kept released; do
     for state in live-apple live-nonapple orphan-nonapple daemon-nonapple orphan-apple daemon-apple foreign-apple foreign-argv-nonapple below-nonapple recorded-orphan-apple pid-reuse; do
       real_case "b-leftover-$state-$route"
-      rm -f "$FOREIGN_CASE/fakebin/lsof"
       SLOT_ENTRY_BEFORE=$(real_slot_entry)
       want=refused
       case "$state" in
@@ -526,7 +550,7 @@ test_real_leftover_processes_at_the_copy_root_are_ended_only_when_proved_the_tas
         expect_code 1 "$rc" "b-leftover-$state-$route: a process not proved the task's own must refuse: $(cat "$FOREIGN_CASE/stderr")"
         assert_grep "process $pid" "$FOREIGN_CASE/stderr" "b-leftover-$state-$route: the refusal did not name the process"
         assert_equals 0 "$(retained_call_count)" "b-leftover-$state-$route: the driver was asked about a copy with a live user"
-        assert_no_grep $'\tTERM\t'"$pid"$'\t' "$FOREIGN_CASE/state/task-x1.teardown-processes" "b-leftover-$state-$route: a TERM was audited for a process not proved the task's own"
+        real_assert_no_signal_audited "$pid" "b-leftover-$state-$route"
         real_assert_kept "b-leftover-$state-$route"
       fi
       [ -z "$parent" ] || { kill "$parent" 2>/dev/null || true; wait "$parent" 2>/dev/null || true; }
@@ -575,18 +599,38 @@ test_a_slot_another_task_claims_is_left_untouched_and_stays_leased() {
   pass "b-claim: a slot another task now claims is left untouched (no driver call, no return), with the copy, the claim and the real lease unchanged"
 }
 
-# c. A start racing the close. The stand-in driver runs a real `treehouse get`
-# from the project in the middle of the close (after the driver has written its
-# tar and before teardown records the copy); a second get follows the close.
+# c. A start racing the close, with the deterministic handshake the contract names: the
+# stand-in driver writes `entered` and waits for `release`; the racing real `treehouse get`
+# starts from the test only after `entered`, independently of the driver, and its outcome is
+# recorded before `release` is written. A second get follows the close. No wait has a
+# cut-off; a slow one prints one alarm line.
 real_race() {  # <label> <rc-var>
-  local label=$1 rc_var=$2 project=$FOREIGN_CASE/project
-  real_teardown "$rc_var" FM_STUB_CLOSEOUT=retained \
-    "FM_STUB_AFTER=(cd '$project' && TREEHOUSE_ROOT='$TREEHOUSE_ROOT' treehouse get --lease --lease-holder racer-1 --json </dev/null > '$FOREIGN_CASE/race1.out' 2> '$FOREIGN_CASE/race1.err'; echo \$? > '$FOREIGN_CASE/race1.rc')"
+  local label=$1 rc_var=$2 project=$FOREIGN_CASE/project first_pid n out
+  rm -f "$FOREIGN_CASE/entered" "$FOREIGN_CASE/release"
+  (
+    real_teardown first_rc FM_STUB_CLOSEOUT=retained \
+      "FM_STUB_AFTER=: > '$FOREIGN_CASE/entered'; n=0; until [ -e '$FOREIGN_CASE/release' ]; do sleep 0.1; n=\$((n + 1)); [ \"\$n\" -ne 300 ] || echo 'slow: the stand-in driver is still waiting for release' >&2; done"
+    echo "$first_rc" > "$FOREIGN_CASE/race.teardown.rc"
+  ) &
+  first_pid=$!
+  n=0
+  until [ -f "$FOREIGN_CASE/entered" ]; do
+    kill -0 "$first_pid" 2>/dev/null || break
+    sleep 0.2
+    n=$((n + 1))
+    [ "$n" -ne 150 ] || echo "slow: $label: the teardown has not entered the driver yet" >&2
+  done
+  [ -f "$FOREIGN_CASE/entered" ] || fail "$label: the teardown ended without entering the driver"
+  (cd "$project" && TREEHOUSE_ROOT="$TREEHOUSE_ROOT" treehouse get --lease --lease-holder racer-1 --json </dev/null > "$FOREIGN_CASE/race1.out" 2> "$FOREIGN_CASE/race1.err"; echo $? > "$FOREIGN_CASE/race1.rc")
+  [ ! -e "$FOREIGN_CASE/release" ] || fail "$label: release was written before the racing start's outcome was recorded"
+  [ -f "$FOREIGN_CASE/race1.rc" ] || fail "$label: the racing start's outcome was not recorded before release"
+  : > "$FOREIGN_CASE/release"
+  wait "$first_pid" 2>/dev/null || true
+  printf -v "$rc_var" '%s' "$(cat "$FOREIGN_CASE/race.teardown.rc" 2>/dev/null || echo missing)"
   (cd "$project" && treehouse get --lease --lease-holder racer-2 --json </dev/null > "$FOREIGN_CASE/race2.out" 2> "$FOREIGN_CASE/race2.err"; echo $? > "$FOREIGN_CASE/race2.rc")
   if [ -n "$REAL_DIR" ]; then
     cp "$FOREIGN_CASE"/race*.out "$FOREIGN_CASE"/race*.err "$FOREIGN_CASE"/race*.rc "$REAL_DIR/" 2>/dev/null || true
   fi
-  local n out
   for n in 1 2; do
     [ -f "$FOREIGN_CASE/race$n.rc" ] || fail "$label: racing start $n never ran"
     out=$(jq -r '.path // empty' "$FOREIGN_CASE/race$n.out" 2>/dev/null || true)
