@@ -257,8 +257,21 @@ if (cd "$TEST_DIR/project-primary" && treehouse return --force "$TEST_DIR/projec
 [ "$(cat "$TEST_DIR/returns")" = primary ] || fail "return interception recorded an unexpected call"
 rm "$TEST_DIR/primary-at-allocation" "$TEST_DIR/bravo-at-allocation" "$TEST_DIR/primary-at-return" "$TEST_DIR/returns"
 mkdir "$TEST_DIR/offline-owned" "$TEST_DIR/offline-unrelated"
+# fixture_process <cwd> [<task id>]. Without a task id the process execs /bin/sleep and is the
+# task's own only by the owned record (the offline fixtures). With a task id it is the task's own the
+# way a worker's child is: it carries the launch marker bin/fm-spawn.sh exports for that task
+# (FM_TASK_INBOX=<physical state dir>/<id>.inbox) and stays a resident python3, because the
+# environment of an Apple system binary such as /bin/sleep cannot be read on macOS, so a marker on
+# it would prove nothing. A process that is merely at the copy's root is not the task's own, and
+# teardown refuses it by name.
 fixture_process() {
-  (cd "$1" && exec python3 -c 'import os, pathlib, sys; pathlib.Path(sys.argv[1]).touch(); os.execlp("sleep", "sleep", "3600")' "$TEST_DIR/ready-${1##*/}") &
+  local marker=
+  if [ -n "${2:-}" ]; then
+    marker="FM_TASK_INBOX=$(cd "$TEST_DIR/home-primary/state" && pwd -P)/$2.inbox"
+    (cd "$1" && exec env "$marker" python3 -c 'import pathlib, sys, time; pathlib.Path(sys.argv[1]).touch(); time.sleep(3600)' "$TEST_DIR/ready-${1##*/}") &
+  else
+    (cd "$1" && exec python3 -c 'import os, pathlib, sys; pathlib.Path(sys.argv[1]).touch(); os.execlp("sleep", "sleep", "3600")' "$TEST_DIR/ready-${1##*/}") &
+  fi
   FIXTURE_PID=$!
   FIXTURE_PIDS="$FIXTURE_PIDS $FIXTURE_PID"
   while [ ! -e "$TEST_DIR/ready-${1##*/}" ]; do
@@ -589,7 +602,7 @@ for phase in conclude reap; do
   touch "$TEST_DIR/fail-$abort" "$TEST_DIR/fail-$fresh"
   owned_meta="$TEST_DIR/home-primary/state/$id.meta"
   owned_pane=$(field "$owned_meta" herdr_pane_id)
-  fixture_process "$TEST_DIR/copy-$lane"
+  fixture_process "$TEST_DIR/copy-$lane" "$id"
   owned_pid=$FIXTURE_PID
   touch "$TEST_DIR/hold-$phase-$lane"
   [ "$phase" != conclude ] || touch "$TEST_DIR/run-$lane"
