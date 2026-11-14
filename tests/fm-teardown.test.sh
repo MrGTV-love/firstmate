@@ -1061,13 +1061,11 @@ test_squash_merged_pr_allows_replayed_unpushed_patch() {
 # caller's directory fails. The landed-patch proof must depend only on the copy
 # it reads, or it reports landed work as unproven.
 test_landed_proof_ignores_unresolvable_git_directory_in_cwd() {
-  local case_dir rc parent_head pr_head dangling
+  local case_dir rc pr_head dangling
   case_dir=$(make_case landed-proof-dangling-cwd)
   write_meta "$case_dir" no-mistakes ship
-  wt_commit_file "$case_dir" local-parent.txt parent "local parent"
-  parent_head=$(git -C "$case_dir/wt" rev-parse HEAD)
-  git -C "$case_dir/wt" push -q origin "$parent_head:refs/heads/fm/task-x1"
-  git -C "$case_dir/project" fetch -q origin fm/task-x1
+  # No pushed parent: since Main 038 ruling (a) a parent the merged PR lacks refuses,
+  # and this case is about the caller's working directory, not about that history.
   wt_commit_file "$case_dir" feature.txt hello "add feature"
   append_pr_meta_url "$case_dir"
   pr_head=$(land_equivalent_patch_on_origin_branch "$case_dir" pr-head feature.txt hello "add feature")
