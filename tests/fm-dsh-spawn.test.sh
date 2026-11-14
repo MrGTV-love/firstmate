@@ -46,8 +46,9 @@ KNOWN_EMAIL=operator-known@example.test
 # real node-hosted dsh-tui carries.
 make_dsh_processes() {  # <dir> -> echoes <bindir>
   local dir=$1 name
-  mkdir -p "$dir/node_modules/@deepseek-harness-tui/dsh-tui/bin" "$dir/node_modules/other" "$dir/node_modules/claude-tool"
-  for name in dsh dsh-tui dshd node; do
+  mkdir -p "$dir/node_modules/@deepseek-harness-tui/dsh-tui/bin" "$dir/node_modules/other" "$dir/node_modules/claude-tool" \
+    "$dir/node_modules/@deepseek-ai/dsh/lib" "$dir/cli-bin" "$dir/unrelated"
+  for name in dsh dsh-tui dshd node claude; do
     ln -sf /bin/bash "$dir/$name"
   done
   # shellcheck disable=SC2016 # the body expands inside the named shell
@@ -56,6 +57,18 @@ make_dsh_processes() {  # <dir> -> echoes <bindir>
   printf '%s\n' 'export FM_ANCESTRY_FIXTURE_PID=$$' '"$1"' ':' > "$dir/node_modules/other/unrelated.js"
   # shellcheck disable=SC2016 # the body expands inside the named shell
   printf '%s\n' 'export FM_ANCESTRY_FIXTURE_PID=$$' '"$1"' ':' > "$dir/node_modules/claude-tool/run.js"
+  # shellcheck disable=SC2016 # the body expands inside the node-named shell
+  printf '%s\n' 'export FM_ANCESTRY_FIXTURE_PID=$$' '"$@"' ':' > "$dir/node_modules/@deepseek-ai/dsh/lib/bin.js"
+  ln -s ../node_modules/@deepseek-ai/dsh/lib/bin.js "$dir/cli-bin/dsh"
+  cp "$dir/node_modules/other/unrelated.js" "$dir/unrelated/dsh"
+  cp "$dir/node_modules/other/unrelated.js" "$dir/node_modules/@deepseek-ai/dsh/lib/not-cli.js"
+  ln -s ../node_modules/other/unrelated.js "$dir/cli-bin/not-dsh"
+  ln -s ../cli-bin/cycle-b "$dir/cli-bin/cycle-a"
+  ln -s ../cli-bin/cycle-a "$dir/cli-bin/cycle-b"
+  ln -s ../node_modules/@deepseek-ai/dsh/lib/bin.js "$dir/cli-bin/finite-17"
+  for ((name = 16; name >= 1; name--)); do
+    ln -s "finite-$((name + 1))" "$dir/cli-bin/finite-$name"
+  done
   printf '%s' "$dir"
 }
 
@@ -84,6 +97,18 @@ SH
   done
   out=$("${clean[@]}" PATH="$bin:$PATH" "$bin/node" "$bin/node_modules/@deepseek-harness-tui/dsh-tui/bin/dsh-tui.js" "$HARNESS")
   [ "$out" = dsh ] || fail "a node argv naming the dsh script must detect as dsh, got '$out'"
+  local script
+  for script in "$bin/node_modules/@deepseek-ai/dsh/lib/bin.js" "$bin/cli-bin/dsh" "$bin/cli-bin/finite-1"; do
+    out=$("${clean[@]}" CLAUDECODE=1 PATH="$bin:$PATH" "$bin/node" "$script" "$HARNESS")
+    [ "$out" = dsh ] || fail "the modern CLI must outrank inherited CLAUDECODE without a DSH marker, got '$out'"
+  done
+  ! fm_dsh_script_path "$bin/cli-bin/cycle-a" || fail "a symlink cycle must not establish DSH identity"
+  for script in "$bin/unrelated/dsh" "$bin/cli-bin/not-dsh" "$bin/node_modules/@deepseek-ai/dsh/lib/not-cli.js"; do
+    out=$("${clean[@]}" CLAUDECODE=1 PATH="$bin:$PATH" "$bin/node" "$script" "$HARNESS")
+    [ "$out" = claude ] || fail "an unrelated script or symlink must not acquire DSH identity, got '$out'"
+  done
+  ! fm_dsh_args_are_dsh "node $bin/node_modules/other/unrelated.js $bin/node_modules/@deepseek-ai/dsh/lib/bin.js" \
+    || fail "a later argument mentioning the DSH entrypoint must not identify another script"
   # shellcheck disable=SC2016 # the quoted body expands inside the named shell
   out=$("${clean[@]}" PATH="$bin:$PATH" "$bin/dshd" -c 'export FM_ANCESTRY_FIXTURE_PID=$$; "$1"; :' _ "$HARNESS")
   [ "$out" != dsh ] || fail "'dshd' merely contains dsh and must not detect as dsh"
@@ -123,7 +148,128 @@ SH
   pass "fm-harness: dsh detects by anchored name or script argv, including nested native startup; its marker needs real dsh ancestry"
 }
 
+test_modern_cli_finite_chain_and_relative_argv() {
+  local bin
+  bin=$(make_dsh_processes "$TMP_ROOT/finite-chain-procs")
+  [ -f "$bin/cli-bin/finite-1" ] || fail "the OS must resolve the finite 17-link fixture"
+  fm_dsh_args_are_dsh "node $bin/cli-bin/finite-1 web" \
+    || fail "an OS-valid finite 17-link launcher chain must identify DSH"
+  ! fm_dsh_args_are_dsh "node $bin/cli-bin/cycle-a web" \
+    || fail "a repeated canonical link path must reject the symlink cycle"
+  (cd "$bin" && [ -f node_modules/@deepseek-ai/dsh/lib/bin.js ] && \
+    ! fm_dsh_args_are_dsh 'node node_modules/@deepseek-ai/dsh/lib/bin.js web') \
+    || fail "a relative modern argv path must not be resolved using the observer's cwd"
+  pass "modern CLI: finite 17-link chains work, cycles and observer-relative argv stay out"
+}
+
+test_modern_cli_lock_boundary() {
+  local bin out
+  bin=$(make_dsh_processes "$TMP_ROOT/modern-lock-procs")
+  local -x FM_TEST_DETECTION_BOUNDARY=$$ FM_TEST_REAL_PS
+  FM_TEST_REAL_PS=$(command -v ps)
+  local PATH="$bin:$PATH"
+  cat > "$bin/ps" <<'SH'
+#!/usr/bin/env bash
+if [ "$*" = "-o ppid= -p $FM_TEST_DETECTION_BOUNDARY" ]; then
+  printf '1\n'
+else
+  exec "$FM_TEST_REAL_PS" "$@"
+fi
+SH
+  chmod +x "$bin/ps"
+  cat > "$bin/lock-probe.sh" <<'SH'
+#!/usr/bin/env bash
+set -eu
+. "$1/bin/fm-session-lock-lib.sh"
+state=$2
+mkdir -p "$state"
+[ "$(bash "$1/bin/fm-harness.sh")" = dsh ]
+[ "$(fm_harness_ancestry_pids)" = "$FM_ANCESTRY_FIXTURE_PID" ]
+[ "$(fm_session_lock_anchor_pid)" = "$FM_ANCESTRY_FIXTURE_PID" ]
+printf '%s\n' "$FM_OUTER_CLAUDE_PID" > "$state/.lock"
+if fm_session_lock_owned_by_self "$state"; then exit 1; fi
+printf '%s\n' "$FM_ANCESTRY_FIXTURE_PID" > "$state/.lock"
+fm_session_lock_owned_by_self "$state"
+printf 'modern DSH owns only its nearest-host lock\n'
+SH
+  # This recogniser-only case models non-Web ancestry ownership. Native Web
+  # sidecars and same-server sibling refusal are tested by fm-dsh-primary.test.sh.
+  # shellcheck disable=SC2016 # the body expands inside the outer Claude fixture
+  out=$(env -u PI_CODING_AGENT -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GROK_AGENT -u GEMINI_CLI \
+    -u DSH_PROFILE -u DSH_SESSION_ID -u DSH_SHELL \
+    -u FM_OMP_HARNESS -u FM_DSH_HARNESS -u CLAUDE_PID -u CLAUDE_CODE_SESSION_ID CLAUDECODE=1 \
+    PATH="$bin:$PATH" "$bin/claude" -c 'export FM_OUTER_CLAUDE_PID=$$; "$@"; :' _ \
+    "$bin/node" "$bin/cli-bin/dsh" bash "$bin/lock-probe.sh" "$ROOT" "$TMP_ROOT/modern-lock-state")
+  [ "$out" = 'modern DSH owns only its nearest-host lock' ] \
+    || fail "modern DSH must not inherit the outer Claude session lock, got '$out'"
+  pass "session lock: modern DSH is the nearest host and cannot own its outer Claude lock"
+}
+
+test_legacy_tui_launcher_lock_survives_modern_recognition() {
+  local bin out sibling
+  bin=$(make_dsh_processes "$TMP_ROOT/legacy-launcher-procs")
+  cat > "$bin/tui-probe.sh" <<'SH'
+#!/usr/bin/env bash
+set -eu
+. "$1/bin/fm-session-lock-lib.sh"
+state=$2
+mkdir -p "$state"
+cli=$FM_ANCESTRY_FIXTURE_PID
+parent=$(ps -o ppid= -p "$cli" | tr -d ' ')
+[ "$(fm_harness_ancestry_pids)" = "$cli" ]
+[ "$(fm_session_lock_anchor_pid)" = "$cli" ]
+if [ "$3" = direct ]; then
+  printf '%s\n' "$parent" > "$state/.lock"
+  fm_session_lock_owned_by_self "$state"
+  if fm_session_lock_foreign_owner_live "$state"; then exit 1; fi
+  out=$(FM_STATE_OVERRIDE="$state" bash "$1/bin/fm-lock.sh")
+  [ "$out" = "lock acquired: harness pid $parent" ]
+  [ "$(cat "$state/.lock")" = "$parent" ]
+  printf '%s\n' "$4" > "$state/.lock"
+  if fm_session_lock_owned_by_self "$state"; then exit 2; fi
+  fm_session_lock_foreign_owner_live "$state"
+  printf 'old launcher owns; live sibling launcher is foreign\n'
+else
+  launcher=$(ps -o ppid= -p "$parent" | tr -d ' ')
+  for pid in "$parent" "$launcher"; do
+    printf '%s\n' "$pid" > "$state/.lock"
+    if fm_session_lock_owned_by_self "$state"; then exit 3; fi
+  done
+  fm_session_lock_foreign_owner_live "$state"
+  printf 'a non-immediate launcher is foreign\n'
+fi
+SH
+  printf '%s\n' '#!/usr/bin/env bash' "exec \"$bin/node\" \"$bin/cli-bin/dsh\" bash \"$bin/tui-probe.sh\" \"$ROOT\" \"$TMP_ROOT/legacy-launcher-state\" direct \"\$FM_SIBLING_LAUNCHER\"" > "$bin/direct-cli.sh"
+  printf '%s\n' '#!/usr/bin/env bash' "\"$bin/node\" \"$bin/cli-bin/dsh\" bash \"$bin/tui-probe.sh\" \"$ROOT\" \"$TMP_ROOT/legacy-launcher-gap-state\" gap" ':' > "$bin/gap-cli.sh"
+  printf '%s\n' '#!/usr/bin/env bash' 'read -r _' > "$bin/hold.sh"
+  chmod +x "$bin/direct-cli.sh" "$bin/gap-cli.sh" "$bin/hold.sh"
+  local -a clean=(env -u PI_CODING_AGENT -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GROK_AGENT -u GEMINI_CLI
+    -u DSH_PROFILE -u DSH_SESSION_ID -u DSH_SHELL -u CLAUDECODE
+    -u FM_OMP_HARNESS -u FM_DSH_HARNESS -u CLAUDE_PID -u CLAUDE_CODE_SESSION_ID -u FM_STATE_OVERRIDE)
+  mkfifo "$bin/hold"
+  "${clean[@]}" "$bin/node" "$bin/node_modules/@deepseek-harness-tui/dsh-tui/bin/dsh-tui.js" "$bin/hold.sh" < "$bin/hold" &
+  sibling=$!
+  exec 3> "$bin/hold"
+  out=$("${clean[@]}" FM_SIBLING_LAUNCHER="$sibling" "$bin/node" \
+    "$bin/node_modules/@deepseek-harness-tui/dsh-tui/bin/dsh-tui.js" "$bin/direct-cli.sh") || out="probe failed: $out"
+  [ "$out" = 'old launcher owns; live sibling launcher is foreign' ] \
+    || fail "a live TUI must keep its recorded immediate dsh-tui launcher lock, and only that one, got '$out'"
+  out=$("${clean[@]}" "$bin/node" "$bin/node_modules/@deepseek-harness-tui/dsh-tui/bin/dsh-tui.js" "$bin/gap-cli.sh") \
+    || out="probe failed: $out"
+  [ "$out" = 'a non-immediate launcher is foreign' ] \
+    || fail "a dsh-tui launcher that is not the CLI's immediate parent must stay foreign, got '$out'"
+  exec 3>&-
+  wait "$sibling" 2>/dev/null || :
+  pass "session lock: a live TUI keeps its pre-recognition immediate launcher lock; sibling and non-immediate launchers stay foreign"
+}
+
 test_lock_identity_and_tmux_liveness_name_dsh() {
+  local bin
+  bin=$(make_dsh_processes "$TMP_ROOT/modern-classify-procs")
+  fm_harness_process_matches node "node $bin/cli-bin/dsh web" \
+    || fail "session-lock identity must accept the installed modern CLI symlink"
+  ! fm_harness_process_matches node "node $bin/unrelated/dsh web" \
+    || fail "session-lock identity must reject an unrelated script merely named dsh"
   fm_harness_process_matches dsh '' || fail "session-lock identity must accept the exact dsh name"
   fm_harness_process_matches dsh-tui '' || fail "session-lock identity must accept the exact dsh-tui name"
   fm_harness_process_matches /opt/nvm/bin/dsh-tui '' || fail "session-lock identity must accept a dsh-tui path"
@@ -136,6 +282,10 @@ test_lock_identity_and_tmux_liveness_name_dsh() {
   # shellcheck source=bin/fm-backend.sh
   . "$ROOT/bin/fm-backend.sh"
   fm_backend_source tmux || fail "fm_backend_source tmux failed"
+  [ "$(fm_agent_process_classify node '' "node $bin/cli-bin/dsh web")" = agent ] \
+    || fail "shared process classification must accept the installed modern CLI symlink"
+  [ "$(fm_agent_process_classify node '' "node $bin/unrelated/dsh web")" != agent ] \
+    || fail "shared process classification must reject an unrelated script merely named dsh"
   [ "$(fm_agent_process_classify_name dsh)" = agent ] || fail "tmux liveness must classify dsh as an agent"
   [ "$(fm_agent_process_classify_name /opt/nvm/bin/dsh-tui)" = agent ] || fail "tmux liveness must classify a dsh-tui path as an agent"
   [ "$(fm_agent_process_classify_name dshd)" != agent ] || fail "tmux liveness must not classify dshd as an agent"
@@ -899,7 +1049,12 @@ SH
   pass "live guards: an opted-in run with a missing lab input or no DeepSeek model preference fails before any lab action; the opt-out still skips"
 }
 
+fm_test_only
+
 test_detection_anchored_names_argv_and_marker_precedence
+test_modern_cli_finite_chain_and_relative_argv
+test_modern_cli_lock_boundary
+test_legacy_tui_launcher_lock_survives_modern_recognition
 test_lock_identity_and_tmux_liveness_name_dsh
 test_tmux_agent_state_names_dsh
 test_busy_classify_follows_the_launch_session_log
