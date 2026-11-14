@@ -10,9 +10,10 @@
 #
 # What it reads. The merged pull request's body, through bin/fm-pr-closes-lib.sh, which
 # owns the two directive lines that close anything: `Closes-backlog-item: <item-id>` and
-# `Train-member: <pull request URL>`. Nothing else in a body closes an item: a table, a
-# heading, a bullet, a link, a sentence, a fenced example or an HTML comment (read as the
-# library header says) names nothing. Each
+# `Train-member: <pull request URL>`, and only in a directive block (a paragraph of directive
+# lines alone, as the library header defines it). Nothing else in a body closes an item: a
+# table, a heading, a bullet, a link, a quote, a code span, a sentence, a fenced example, an
+# HTML block or an HTML comment (read as the library header says) names nothing. Each
 # `Train-member:` pull request is read the same way (its own `Closes-backlog-item:` lines),
 # and every task whose state/<task>.meta records pr= equal to that member's full URL is
 # considered too. Bodies are read from GitHub, GitLab and Forgejo, each member by its own
@@ -28,8 +29,10 @@
 #     task record named the same id, so that source decides the item. An old line that names
 #     the merging task's own id is a stdout line instead, not counted, saying its own teardown
 #     closes it;
-#   - a column-0 line that starts with a directive word but does not fit its form, and a
-#     `Train-member:` value that is no pull request URL. A `Train-member:` line that names the
+#   - a column-0 line that starts with a directive word but does not fit its form, a
+#     well-formed directive line outside a directive block (one per line, then one line per
+#     body with the fix), and a `Train-member:` value that is no pull request URL. A
+#     `Train-member:` line that names the
 #     merged pull request itself is ignored with its own `actionable:` line and is not counted;
 #   - in the merged pull request's body and in each train member's body that was read: an
 #     active, not-done backlog id that appears as a word in the prose is a `mentioned ...`
@@ -38,9 +41,10 @@
 #     Markdown emphasis pair, `_id_` or `__id__`, are dropped). An id
 #     a directive line, task record or old line already named gets no second line, and the
 #     merging task's own id is left out, because its teardown owns that item. A member's
-#     prose never closes anything. In the merged pull request's body only, a link in the
-#     prose to another pull request that no `Train-member:` line lists is also a
-#     `mentioned ...` line; links are read for GitHub, GitLab and Forgejo alike. The id check
+#     prose never closes anything. In the same bodies, a link in the prose to a pull
+#     request that is neither the merged one nor listed by a `Train-member:` line is also a
+#     `mentioned ...` line, once per link; links are read for GitHub, GitLab and Forgejo
+#     alike. The id check
 #     reads the backlog once; when the backlog cannot be listed, each body that has prose gets
 #     one `actionable:` line that names it, whether or not it holds a directive line.
 # The same read gives that pull request's merge state: when it is not merged (a hand run
@@ -256,7 +260,7 @@ while IFS= read -r id; do
 done < <(fm_pr_closes_ids "$WORK/body")
 
 : > "$WORK/old-form"
-report_old_form() {  # <body-file> <where>: queue the old `Closes:` lines, report malformed directive lines
+report_old_form() {  # <body-file> <where>: queue the old `Closes:` lines, report malformed and outside-block directive lines
   local old line
   while IFS= read -r old; do
     [ -z "$old" ] || printf '%s\t%s\n' "$old" "$2" >> "$WORK/old-form"
@@ -266,6 +270,14 @@ report_old_form() {  # <body-file> <where>: queue the old `Closes:` lines, repor
     LEFT=$((LEFT + 1))
     printf 'actionable: close-at-merge: ignored a malformed directive line in %s: %s; the forms are one Closes-backlog-item: <item-id> or Train-member: <pull request URL> per line\n' "$2" "$line" >&2
   done < <(fm_pr_closes_malformed "$1")
+  local outside=0
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    LEFT=$((LEFT + 1))
+    outside=1
+    printf 'actionable: close-at-merge: ignored a directive line outside a directive block in %s: %s\n' "$2" "$line" >&2
+  done < <(fm_pr_closes_outside "$1")
+  [ "$outside" = 0 ] || printf 'actionable: close-at-merge: a directive closes only in a paragraph of directive lines alone, with a blank line or a heading above and a blank line below, outside any quote, code span or HTML element; fix %s, then retry: %s %s %s\n' "$2" "$0" "$TASK_ID" "$URL" >&2
 }
 report_old_form "$WORK/body" "the body of $URL"
 
@@ -360,12 +372,20 @@ ROWS
     done
   fi
 fi
-while IFS= read -r linked; do
-  fm_pr_url_parse "$linked" || continue
-  [ "$FM_PR_URL" != "$URL" ] || continue
-  case "$MEMBER_SEEN" in *$'\n'"$FM_PR_URL"$'\n'*) continue ;; esac
-  printf 'actionable: close-at-merge: mentioned %s in the prose of %s: no item was closed for it; list it as a Train-member: line if it landed with this merge\n' "$FM_PR_URL" "$URL" >&2
-done < <(fm_pr_closes_prose_prs "$WORK/body")
+# Pull request links in the merged body and in every train member body that was read: each
+# link that is neither the merged pull request nor a listed member is reported once.
+LINKED_SEEN=$MEMBER_SEEN
+k=0
+while [ "$k" -lt "${#MENTION_BODIES[@]}" ]; do
+  while IFS= read -r linked; do
+    fm_pr_url_parse "$linked" || continue
+    [ "$FM_PR_URL" != "$URL" ] || continue
+    case "$LINKED_SEEN" in *$'\n'"$FM_PR_URL"$'\n'*) continue ;; esac
+    LINKED_SEEN="$LINKED_SEEN$FM_PR_URL"$'\n'
+    printf 'actionable: close-at-merge: mentioned %s in %s: no item was closed for it; list it as a Train-member: line if it landed with this merge\n' "$FM_PR_URL" "${MENTION_WHERE[$k]}" >&2
+  done < <(fm_pr_closes_prose_prs "${MENTION_BODIES[$k]}")
+  k=$((k + 1))
+done
 
 if [ "$CLOSED" -gt 0 ] || [ "$LEFT" -gt 0 ]; then
   printf 'close-at-merge: %s closed, %s left open\n' "$CLOSED" "$LEFT"

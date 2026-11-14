@@ -14,9 +14,17 @@
 #   else may share the line, so an indented line, a trailing comment, a quote (`>`), a
 #   list item, a table cell, a heading, a link, a code span or a sentence that holds the
 #   text names nothing.
-# - The block is every directive line in the body. Where the lines sit does not matter
-#   (the pipeline's body rewrite keeps a section above its own); put them together, one
-#   per line, in one section.
+# - A directive counts only inside a directive block: a paragraph made of directive lines
+#   alone, one per line (either form, or the old `Closes:` line). A blank line, an ATX
+#   heading (`## Backlog items`), the start or end of the body, or a fence, HTML comment or
+#   HTML block ends a block. A paragraph that holds any other line - a sentence, a setext
+#   underline (a line of only `=` or only `-`, which makes the paragraph a heading), a code
+#   span that spans lines, a malformed directive line - is no block, and neither is a
+#   paragraph inside a quoting or example HTML element (`<blockquote>`, `<details>`, `<pre>`,
+#   `<code>`, `<div>`, `<table>` and the rest of FM_PR_CLOSES_CONTAINERS) that an earlier line
+#   opened and has not closed. A well-formed directive line outside a block closes nothing
+#   and is reported (fm_pr_closes_outside). Several blocks may be in one body; the pipeline's
+#   body rewrite keeps a section above its own, so put the block there under a heading.
 # - An item id is letters, digits, `.`, `_` and `-`, not starting with `.` (the ids
 #   bin/fm-pr-lib.sh's fm_pr_task_id_valid and bin/fm-tasks-axi.sh accept), for example
 #   `fm-backlog-close-at-merge` or `ship-a` or `a.b_c-1`. A repeated id counts once.
@@ -29,6 +37,11 @@
 #   a run of the same character at least as long, after at most three spaces, with only
 #   whitespace after it; a fence that never closes runs to the end of the body.
 #   Pipeline bodies quote text they do not own, so quoted examples stay examples.
+# - The other CommonMark HTML blocks that run past a blank line are examples too: a line that
+#   starts, after at most three spaces, with `<pre`, `<script`, `<style` or `<textarea` (any
+#   case) through the first line that holds `</pre>`, `</script>`, `</style>` or `</textarea>`
+#   (any case), as CommonMark ends it, `<?` through `?>`,
+#   `<![CDATA[` through `]]>`, and `<!` and a letter through `>`.
 # - An HTML comment is an example too, read as CommonMark reads it. A line that starts with
 #   `<!--` after at most three spaces opens a comment block: that line through the first
 #   line that holds `-->` (the same line when `-->` follows the `<!`, so `<!-->` and
@@ -41,8 +54,8 @@
 #   break or setext underline (a line of only `=` or only `-`); otherwise the `<!--` is plain text and hides nothing. So a directive line with a
 #   trailing comment is still reported as malformed.
 # - A trailing carriage return is ignored, because GitHub bodies often use CRLF.
-# - Nothing else is read as a name: no table, heading, bullet, link or sentence ever
-#   closes an item or makes a member.
+# - Nothing else is read as a name: no table, heading, bullet, link, quote, code span or
+#   sentence ever closes an item or makes a member.
 # - The old `Closes: <item-id>` line closes nothing. It is reported (fm_pr_closes_legacy_ids),
 #   as is a column-0 line that starts with a directive word but does not fit its form
 #   (fm_pr_closes_malformed), so a misspelled block is never silent.
@@ -115,6 +128,9 @@ fm_pr_closes_unfenced() {
   local open_re='^[ ]{0,3}(`{3,}|~{3,})(.*)$'
   local close_re='^[ ]{0,3}(`{3,}|~{3,})[[:space:]]*$'
   local block_re='^[ ]{0,3}<!--'
+  local html1_re='^[ ]{0,3}<([Pp][Rr][Ee]|[Ss][Cc][Rr][Ii][Pp][Tt]|[Ss][Tt][Yy][Ll][Ee]|[Tt][Ee][Xx][Tt][Aa][Rr][Ee][Aa])([[:space:]>]|$)'
+  local html1_end='</([Pp][Rr][Ee]|[Ss][Cc][Rr][Ii][Pp][Tt]|[Ss][Tt][Yy][Ll][Ee]|[Tt][Ee][Xx][Tt][Aa][Rr][Ee][Aa])>'
+  local html_end=''
   local stop_re='^[[:space:]]*$|^[ ]{0,3}(#{1,6}([[:space:]]|$)|>|[-+*]([[:space:]]|$)|[0-9]{1,9}[.)]([[:space:]]|$)|(\*[[:space:]]*){3,}$|(-[[:space:]]*){3,}$|(_[[:space:]]*){3,}$|(=+|-+)[[:space:]]*$|<!--|`{3,}|~{3,})'
   local lines=()
   while IFS= read -r line || [ -n "$line" ]; do
@@ -128,6 +144,12 @@ fm_pr_closes_unfenced() {
       if [[ "$line" =~ $close_re ]]; then
         run=${BASH_REMATCH[1]}
         if [ "${run:0:1}" = "$char" ] && [ "${#run}" -ge "$len" ]; then in_fence=0; fi
+      fi
+      continue
+    fi
+    if [ -n "$html_end" ]; then
+      if [ "$html_end" = 1 ]; then [[ "$line" =~ $html1_end ]] && html_end=
+      else case "$line" in *"$html_end"*) html_end= ;; esac
       fi
       continue
     fi
@@ -146,15 +168,35 @@ fm_pr_closes_unfenced() {
         in_fence=1
         char=${run:0:1}
         len=${#run}
+        printf '\n'
         continue
       fi
     fi
     if [[ "$line" =~ $block_re ]]; then
+      printf '\n'
       seg=${line#*'<!'}
       case "$seg" in
         *'-->'*) if [ "$mode" = prose ]; then fm_pr_closes_inline " ${seg#*'-->'}"; printf '%s\n' "$FM_PR_CLOSES_VIS"; fi ;;
         *) in_comment=1 ;;
       esac
+      continue
+    fi
+    # The other HTML blocks that run past a blank line: <pre>, <script>, <style> and
+    # <textarea> to their end tag, `<?` to `?>`, `<![CDATA[` to `]]>`, `<!` and a letter to `>`.
+    html_end=
+    if [[ "$line" =~ $html1_re ]]; then
+      [[ "$line" =~ $html1_end ]] || html_end=1
+    elif [[ "$line" =~ ^[\ ]{0,3}'<![CDATA[' ]]; then
+      seg=${line#*'<![CDATA['}; case "$seg" in *']]>'*) ;; *) html_end=']]>' ;; esac
+    elif [[ "$line" =~ ^[\ ]{0,3}'<!'[A-Za-z] ]]; then
+      seg=${line#*'<!'}; case "$seg" in *'>'*) ;; *) html_end='>' ;; esac
+    elif [[ "$line" =~ ^[\ ]{0,3}'<?' ]]; then
+      seg=${line#*'<?'}; case "$seg" in *'?>'*) ;; *) html_end='?>' ;; esac
+    else
+      seg=
+    fi
+    if [ -n "$html_end" ] || [ -n "$seg" ] || [[ "$line" =~ $html1_re ]]; then
+      printf '\n'
       continue
     fi
     case "$line" in *'<!--'*) ;; *) printf '%s\n' "$line"; continue ;; esac
@@ -181,18 +223,100 @@ fm_pr_closes_unfenced() {
   done
 }
 
-# fm_pr_closes_directive <word> <body-file|->: the value of each well-formed `<word>: value`
-# line outside a fence, once each, in body order.
+# HTML elements that quote, hide or set apart what they hold. A block inside one that an earlier
+# line left open is an example, never a directive.
+FM_PR_CLOSES_CONTAINERS='a abbr article aside b blockquote center cite code del details dfn dialog div dl dd dt em fieldset figure font footer form header i iframe ins kbd li main mark math menu nav noscript object ol pre q s samp section small span strike strong sub summary sup svg table tbody td template textarea tfoot th thead tr tt u ul var xmp'
+
+# fm_pr_closes_blocks <body-file|->: every line fm_pr_closes_unfenced prints, after `1<TAB>`
+# when it sits in a directive block and `0<TAB>` when not. A directive block is a run of lines
+# with no blank line or ATX heading in it, in which every line is a well-formed directive line
+# (either directive word, or the old `Closes:`, with an id or one URL that holds no backtick, `<`
+# or `>`), and that no earlier line left inside an open container element. The run is bounded
+# by the start or end of the body, a blank line, an ATX heading, or a fence, comment or HTML
+# block (each of which fm_pr_closes_unfenced prints as a blank line).
+fm_pr_closes_blocks() {
+  fm_pr_closes_unfenced "${1:--}" | LC_ALL=C awk -v names="$FM_PR_CLOSES_CONTAINERS" '
+    function visible(s,   out, run, rest, k, found) {
+      out = ""
+      while (match(s, /`+/)) {
+        out = out substr(s, 1, RSTART - 1)
+        run = RLENGTH
+        rest = substr(s, RSTART + RLENGTH)
+        found = 0
+        k = 0
+        while (match(substr(rest, k + 1), /`+/)) {
+          if (RLENGTH == run) { found = k + RSTART + RLENGTH; break }
+          k = k + RSTART + RLENGTH - 1
+        }
+        if (found) { s = substr(rest, found); out = out " " }
+        else { out = out substr(s, RSTART, run); s = rest }
+      }
+      s = out s
+      out = ""
+      while ((k = index(s, "<!--")) > 0) {
+        out = out substr(s, 1, k - 1) " "
+        s = substr(s, k + 4)
+        if (substr(s, 1, 1) == ">") s = substr(s, 2)
+        else if (substr(s, 1, 2) == "->") s = substr(s, 3)
+        else if ((k = index(s, "-->")) > 0) s = substr(s, k + 3)
+        else s = ""
+      }
+      return out s
+    }
+    function count(depth, line,   s, tag, name, after, g) {
+      s = tolower(visible(line))
+      while (match(s, /<\/?[a-z][a-z0-9-]*/)) {
+        tag = substr(s, RSTART, RLENGTH)
+        s = substr(s, RSTART + RLENGTH)
+        after = substr(s, 1, 1)
+        if (after != "" && after !~ /[[:space:]\/>]/) continue
+        if (substr(tag, 2, 1) == "/") {
+          if ((substr(tag, 3) in box) && depth > 0) depth--
+          continue
+        }
+        if (!(substr(tag, 2) in box)) continue
+        g = index(s, ">")
+        if (g > 1 && substr(s, g - 1, 1) == "/") continue
+        depth++
+      }
+      return depth
+    }
+    function bound(line) {
+      return line ~ /^[[:blank:]]*$/ || line ~ /^ ? ? ?##?#?#?#?#?([[:blank:]]|$)/
+    }
+    function wellformed(line) {
+      return line ~ /^(Closes-backlog-item|Closes):[[:blank:]]+[A-Za-z0-9_-][A-Za-z0-9._-]*[[:blank:]]*$/ ||
+        line ~ /^Train-member:[[:blank:]]+[^[:blank:]`<>]+[[:blank:]]*$/
+    }
+    BEGIN { n = split(names, list, " "); for (k = 1; k <= n; k++) box[list[k]] = 1 }
+    { line[NR] = $0 }
+    END {
+      depth = 0
+      i = 1
+      while (i <= NR) {
+        if (bound(line[i])) { print "0\t" line[i]; depth = count(depth, line[i]); i++; continue }
+        first = i
+        clean = depth == 0
+        while (i <= NR && !bound(line[i])) { if (!wellformed(line[i])) clean = 0; i++ }
+        for (k = first; k < i; k++) { print (clean ? "1" : "0") "\t" line[k]; depth = count(depth, line[k]) }
+      }
+    }'
+}
+
+# fm_pr_closes_directive <word> <body-file|-> [anywhere]: the value of each well-formed
+# `<word>: value` line in a directive block (with `anywhere`, on any line outside a fence and a
+# comment), once each, in body order.
 fm_pr_closes_directive() {
-  local word=$1 line value seen=$'\n'
+  local word=$1 where=${3:-block} flag line value seen=$'\n'
   local re="^${word}:[[:space:]]+([^[:space:]]+)[[:space:]]*\$"
-  while IFS= read -r line; do
+  while IFS=$'\t' read -r flag line; do
+    [ "$flag" = 1 ] || [ "$where" = anywhere ] || continue
     [[ "$line" =~ $re ]] || continue
     value=${BASH_REMATCH[1]}
     case "$seen" in *$'\n'"$value"$'\n'*) continue ;; esac
     seen="$seen$value"$'\n'
     printf '%s\n' "$value"
-  done < <(fm_pr_closes_unfenced "${2:--}")
+  done < <(fm_pr_closes_blocks "${2:--}")
 }
 
 fm_pr_closes_ids() {  # <body-file|->
@@ -210,7 +334,25 @@ fm_pr_closes_members() {  # <body-file|->
 
 # The old line form: reported by the caller, never a directive.
 fm_pr_closes_legacy_ids() {  # <body-file|->
-  fm_pr_closes_directive 'Closes' "${1:--}"
+  fm_pr_closes_directive 'Closes' "${1:--}" anywhere
+}
+
+# A well-formed directive line that is not in a directive block: it shares its run with other
+# text (a sentence, a setext underline, a code span, a malformed line) or sits inside an open
+# container element. It closes nothing; the whole line is printed, once each.
+fm_pr_closes_outside() {  # <body-file|->
+  local flag line
+  local id_re="^Closes-backlog-item:[[:space:]]+(${FM_PR_CLOSES_ID_RE})[[:space:]]*\$"
+  local member_re='^Train-member:[[:space:]]+[^[:space:]]+[[:space:]]*$'
+  while IFS=$'\t' read -r flag line; do
+    [ "$flag" = 0 ] || continue
+    if [[ "$line" =~ $id_re ]]; then
+      case "${BASH_REMATCH[1]}" in .*) continue ;; esac
+    elif ! [[ "$line" =~ $member_re ]]; then
+      continue
+    fi
+    printf '%s\n' "$line"
+  done < <(fm_pr_closes_blocks "${1:--}") | LC_ALL=C awk '!seen[$0]++'
 }
 
 # A column-0 line that starts with a directive word (the two forms and the old `Closes:`)
