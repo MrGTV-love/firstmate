@@ -2764,6 +2764,7 @@ work_is_landed_proof() {
   fi
   if [ -z "$FM_TASK_COPY_UNASKED" ] && fm_task_copy_content_in_default_history "$dir" "$ref"; then
     echo "teardown: landed by content: every change of $dir at ${ref:0:12} is in a commit of ${FM_TASK_COPY_COMPARED%% *} after merge base ${FM_TASK_COPY_COMPARED##* }" >&2
+    teardown_history_admit "$dir"
     return 0
   fi
   [ -z "$FM_TASK_COPY_UNASKED" ] || TEARDOWN_LANDED_UNASKED=${TEARDOWN_LANDED_UNASKED:-$FM_TASK_COPY_UNASKED}
@@ -3348,6 +3349,7 @@ validate_worktree_teardown_safety() {
   if [ ! -d "$WT" ] || [ "$(git -C "$WT" rev-parse --is-inside-work-tree 2>/dev/null)" != true ]; then
     if teardown_nested_slot landed; then
       [ -z "$TEARDOWN_BUNDLE_PROOF" ] || teardown_bundle_swept_ignored_kept "$wt_real" || return 1
+      teardown_history_swept_ignored_kept "$wt_real" || return 1
       return 0
     fi
     if [ -n "$TEARDOWN_RECORD_SLOT" ] && [ ! -d "$WT" ] \
@@ -3421,6 +3423,7 @@ validate_worktree_teardown_safety() {
     if [ -n "$TEARDOWN_BUNDLE_PROOF" ]; then
       teardown_bundle_swept_ignored_kept "$wt_real" || return 1
     fi
+    teardown_history_swept_ignored_kept "$wt_real" || return 1
   fi
 }
 
@@ -4796,15 +4799,54 @@ teardown_remove_own_nested_copies() {  # <slot-label>
 # still needs an ignored-file proof, even when an anchor or landing holds HEAD.
 # The returned slot keeps its ignored files, so it needs no such proof.
 teardown_bundle_ignored_kept() {  # <copy> <refusal-subject> [proof-outcome]
-  local unique bundle=${TEARDOWN_BUNDLE_SWEEP_PROOF:-$TEARDOWN_BUNDLE_ACCEPTED}
+  teardown_admitted_ignored_kept "$1" "$2" "recorded bundle ${TEARDOWN_BUNDLE_SWEEP_PROOF:-$TEARDOWN_BUNDLE_ACCEPTED}" "${3:-}"
+}
+# The refusal both admissions share: <copy> holds an ignored file outside the
+# preserve allow-list (teardown_preservable_ignored) that its admission does not
+# hold, or its ignored files cannot be listed.
+teardown_admitted_ignored_kept() {  # <copy> <refusal-subject> <admission> [proof-outcome]
+  local unique
   if unique=$(teardown_preservable_ignored "$1"); then
     [ -n "$unique" ] || return 0
-    echo "REFUSED: $2 $1, during cleanup admitted by recorded bundle $bundle, but it holds ignored files no hash record preserves: $(printf '%s' "$unique" | paste -sd ' ' -)${3:+; $3}." >&2
+    echo "REFUSED: $2 $1, during cleanup admitted by $3, but it holds ignored files no hash record preserves: $(printf '%s' "$unique" | paste -sd ' ' -)${4:+; $4}." >&2
   else
-    echo "REFUSED: $2 $1, during cleanup admitted by recorded bundle $bundle, but its ignored files cannot be listed${3:+; $3}." >&2
+    echo "REFUSED: $2 $1, during cleanup admitted by $3, but its ignored files cannot be listed${4:+; $4}." >&2
   fi
   echo "Land that commit, or move those ignored files out of the copy, then re-run teardown." >&2
   return 1
+}
+# Each copy the squash-history landing alone proved (canonical paths). That
+# proof holds the copy's committed content in default-branch history; its
+# ignored files exist nowhere else, so every such copy a cleanup removes needs
+# the ignored-file proof, as a bundle-admitted copy does.
+TEARDOWN_HISTORY_ADMITTED=()
+teardown_history_admit() {  # <copy>
+  local copy
+  copy=$(fm_task_copy_canonical_dir "$1") || copy=$1
+  TEARDOWN_HISTORY_ADMITTED+=("$copy")
+}
+teardown_history_admitted() {  # <copy>
+  local copy admitted
+  copy=$(fm_task_copy_canonical_dir "$1") || copy=$1
+  for admitted in ${TEARDOWN_HISTORY_ADMITTED[@]+"${TEARDOWN_HISTORY_ADMITTED[@]}"}; do
+    [ "$admitted" != "$copy" ] || return 0
+  done
+  return 1
+}
+# Every copy this cleanup removes that only default-branch history proved:
+# <copy> and each of the task's own nested and proof copies, never the
+# returned slot.
+teardown_history_swept_ignored_kept() {  # <copy> [proof-outcome]
+  local copy
+  [ "$FORCE" != "--force" ] || return 0
+  [ "${#TEARDOWN_HISTORY_ADMITTED[@]}" -gt 0 ] || return 0
+  for copy in "$1" ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"} \
+      ${TEARDOWN_PROOF_COPIES[@]+"${TEARDOWN_PROOF_COPIES[@]}"}; do
+    [ -n "$copy" ] && [ "$copy" != "$TEARDOWN_RETURN_SLOT" ] && [ -d "$copy" ] || continue
+    teardown_history_admitted "$copy" || continue
+    teardown_admitted_ignored_kept "$copy" 'history-landed teardown would remove copy' \
+      'default-branch history (its committed content only)' "${2:-}" || return 1
+  done
 }
 teardown_bundle_swept_ignored_kept() {  # <admitted-copy> [proof-outcome]
   local copy
@@ -4982,6 +5024,7 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
       if [ "$FORCE" != "--force" ] && [ -n "$TEARDOWN_BUNDLE_SWEEP_PROOF" ]; then
         teardown_bundle_swept_ignored_kept "$WT" "$TEARDOWN_PROOF_OUTCOME" || return 1
       fi
+      teardown_history_swept_ignored_kept "$WT" "$TEARDOWN_PROOF_OUTCOME" || return 1
       ;;
     retire)
       # Fix 1, Fix 3 and Fix 2 of the script header, on every swept root.

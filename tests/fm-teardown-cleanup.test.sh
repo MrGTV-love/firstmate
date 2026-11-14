@@ -6464,6 +6464,45 @@ SH
   pass 'a process that appears in the copy after the driver refused keeps the copy locked, named by pid'
 }
 
+# The squash-history landing proves the copy's committed content, not its
+# ignored files: an unlocked own nested copy whose commit was squashed onto main
+# and then edited again there keeps a unique ignored file that no hash record
+# preserves, so teardown refuses and keeps the copy, the file and the record.
+# Without the ignored file the same history closes.
+test_history_landed_copy_keeps_its_unique_ignored_file() {
+  local rc shape exclude record
+  for record in enclosing reverse; do
+  for shape in unique-ignored clean; do
+    make_own_locked_copy_case "history-$record-$shape" "$record"
+    git -C "$FOREIGN_COPY" -c user.email=t@t -c user.name=t commit -q --allow-empty -m 'start' >/dev/null
+    printf 'hello\n' > "$FOREIGN_COPY/feature.txt"
+    git -C "$FOREIGN_COPY" add -- feature.txt
+    git -C "$FOREIGN_COPY" -c user.email=t@t -c user.name=t commit -q -m 'add feature'
+    land_on_origin_main "$FOREIGN_CASE" feature.txt hello
+    land_on_origin_main "$FOREIGN_CASE" feature.txt 'hello, then edited on main'
+    if [ "$shape" = unique-ignored ]; then
+      exclude=$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)
+      printf '%s\n' unique.dat >> "$exclude"
+      printf 'only here\n' > "$FOREIGN_COPY/unique.dat"
+    fi
+    run_foreign_teardown rc
+    assert_grep 'is in a commit of' "$FOREIGN_CASE/stderr" "history-$record-$shape: the history proof did not run: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+    if [ "$shape" = unique-ignored ]; then
+      expect_code 1 "$rc" "history-$record-$shape: a unique ignored file must keep the copy: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+      assert_grep 'unique.dat' "$FOREIGN_CASE/stderr" "history-$record-$shape: the refusal did not name the ignored file"
+      assert_no_grep 'recorded bundle' "$FOREIGN_CASE/stderr" "history-$record-$shape: the refusal named a bundle that does not exist"
+      assert_equals 'only here' "$(cat "$FOREIGN_COPY/unique.dat" 2>/dev/null)" "history-$record-$shape: the unique ignored file was lost"
+      assert_present "$FOREIGN_CASE/state/task-x1.meta" "history-$record-$shape: the task record was removed"
+    else
+      expect_code 0 "$rc" "history-$record-$shape: a clean history-landed copy must close: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+      assert_absent "$FOREIGN_COPY" "history-$record-$shape: the copy survived"
+      assert_absent "$FOREIGN_CASE/state/task-x1.meta" "history-$record-$shape: the task record survived"
+    fi
+  done
+  done
+  pass 'a copy landed only through default-branch history, recorded as the worktree or as a prior copy, keeps a unique ignored file; without one it closes'
+}
+
 # The open-file listing is filtered in one pass, and a listing line of a shape
 # the filter does not know still fails the scan, so the copy stays locked.
 test_direct_release_refuses_a_malformed_open_file_listing() {
@@ -7039,6 +7078,7 @@ test_locked_landed_copy_with_a_record_but_no_unlanded_commit_reaches_the_driver
 test_direct_release_refuses_a_process_that_appears_before_the_unlock
 test_direct_release_scans_for_processes_after_the_landed_and_git_proofs
 test_direct_release_refuses_a_malformed_open_file_listing
+test_history_landed_copy_keeps_its_unique_ignored_file
 test_direct_release_refuses_a_process_holding_a_file_in_the_copy_open
 test_task_own_descendant_holding_a_file_open_refuses_and_is_not_signalled
 test_direct_release_refuses_an_unreadable_process_table

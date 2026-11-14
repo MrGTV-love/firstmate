@@ -6069,7 +6069,7 @@
         {"file": "bin/fm-teardown.sh", "match": "teardown-unlanded deny", "count": 6},
         {"file": "bin/fm-teardown-nested-lib.sh", "match": "teardown_bundle_refuse ", "count": 7},
         {"file": "bin/fm-teardown.sh", "match": "holds bundle-preserved commits that only its data/ keeps"},
-        {"file": "bin/fm-teardown.sh", "match": "during cleanup admitted by recorded bundle $bundle", "count": 2},
+        {"file": "bin/fm-teardown.sh", "match": "during cleanup admitted by $3, but", "count": 2},
         {"file": "bin/fm-teardown.sh", "match": "echo \"REFUSED: $dir changed to HEAD $head after its landing proof; retain the lease and task record and retry for a fresh proof\" >&2"},
         {"file": "bin/fm-teardown.sh", "match": "echo \"REFUSED: cannot inspect worktree $WT for commits not on a remote.\" >&2"},
         {"file": "bin/fm-teardown.sh", "match": "echo \"REFUSED: cannot inspect worktree $WT for uncommitted changes.\" >&2"},
