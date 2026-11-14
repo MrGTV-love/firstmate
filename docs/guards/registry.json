@@ -6898,12 +6898,12 @@
         },
         {
           "file": "bin/fm_slack_watch.py",
-          "match": "refuse_a_value_that_the_marker_holds(COMMAND_FIXED_TEXT.get(action, WAKE_FIXED_TEXT) + (() if action == 'retarget' else watch.scott_fixed_texts()))",
+          "match": "refuse_a_value_that_the_marker_holds(COMMAND_FIXED_TEXT.get(action, WAKE_FIXED_TEXT) + (() if action == 'retarget' else watch.second_fixed_texts()))",
           "count": 1
         },
         {
           "file": "bin/fm_slack_watch.py",
-          "match": "refuse_a_value_that_the_marker_holds(watch.scott_fixed_texts())",
+          "match": "refuse_a_value_that_the_marker_holds(watch.second_fixed_texts())",
           "count": 1
         },
         {

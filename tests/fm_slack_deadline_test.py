@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parent.parent
 LATENCY_SECONDS = 3
 NO_PROGRESS_SECONDS = 6
 # The one added person of the second-person cases, and their DM in tests/fixtures/slack/second-person.
-SECOND, SECOND_DM, OWNER_DM = 'U0CDVHFU1A5', 'D0SECONDDM1', 'D0123456789'
+SECOND, SECOND_DM, OWNER_DM = 'U0SYNTHSEC1', 'D0SECONDDM1', 'D0123456789'
 
 
 def install():

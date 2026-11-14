@@ -29,7 +29,7 @@
     "U0TESTOWNER": {
       "is_bot": false
     },
-    "U0CDVHFU1A5": {
+    "U0SYNTHSEC1": {
       "is_bot": false
     }
   },
@@ -41,7 +41,7 @@
     },
     {
       "ts": "100.000200",
-      "user": "U0CDVHFU1A5",
+      "user": "U0SYNTHSEC1",
       "text": "A message the second person typed before the plane was armed",
       "channel": "D0SECONDDM1"
     }
@@ -49,6 +49,6 @@
   "reactions": {},
   "dms": {
     "U0TESTOWNER": "D0123456789",
-    "U0CDVHFU1A5": "D0SECONDDM1"
+    "U0SYNTHSEC1": "D0SECONDDM1"
   }
 }
