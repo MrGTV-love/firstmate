@@ -1362,7 +1362,7 @@ class SecondPersonReplyTest(unittest.TestCase):
 
     @contextlib.contextmanager
     def scott(self):
-        with case(extra={'dms': {OWNER: OWNER_DM, SCOTT: SCOTT_DM}}, env={'FM_SLACK_SECOND_USER': SCOTT}) as home:
+        with case(extra={'dms': {OWNER: OWNER_DM, SCOTT: SCOTT_DM}}, env={'FM_SLACK_SECOND_USER': SCOTT, 'FM_SLACK_SECOND_SINCE': '100.000500'}) as home:
             self.assertEqual(home.poll()[0], 0)
             yield home
 
