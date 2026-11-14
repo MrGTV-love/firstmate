@@ -6989,6 +6989,60 @@ test_pr_and_tip_landed_copies_keep_a_unique_ignored_file() {
   pass 'an own copy landed by a merged pull request or equal to the default branch tip keeps or preserves a unique ignored file; clean, it closes'
 }
 
+# R2-1 and R2-2 with real processes: a live process, its cwd outside the copy,
+# holds <copy>/.git open; the real lsof lists it. Its name is the one macOS ps
+# -o comm= prints (argv[0], set with exec -a); the stand-in ps answers only that
+# query, from the kernel through bin/fm-proc-info.py comm, and exits 126 (ps
+# confined) otherwise. Named as the Spotlight worker, it does not keep a dead
+# launcher's copy; named anything else, it keeps the copy, is named by pid, and
+# is never signalled (still alive after teardown, no TERM in the process record).
+test_real_holder_process_indexer_exempt_and_never_signalled() {
+  local rc name label pid held argv0
+  command -v "${REAL_LSOF_FOR_TEST:-}" >/dev/null 2>&1 || { pass 'real lsof absent on this host; skipped'; return 0; }
+  for name in indexer other; do
+    label="real-holder-$name"
+    dead_launcher_pid
+    make_own_locked_copy_case "$label" enclosing "$FOREIGN_DEAD_PID"
+    add_git_worktree_log "$FOREIGN_CASE"
+    rm -f "$FOREIGN_CASE/vernant-python" "$FOREIGN_CASE/fakebin/lsof"
+    held="$(cd "$FOREIGN_COPY" && pwd -P)/.git"
+    if [ "$name" = indexer ]; then
+      argv0=/System/Library/Frameworks/CoreServices.framework/Frameworks/Metadata.framework/Versions/A/Support/mdworker_shared
+    else
+      argv0=/usr/local/bin/fm-test-holder
+    fi
+    (cd / && exec bash -c 'exec 3<"$1"; exec -a "$2" sleep 600' _ "$held" "$argv0") &
+    pid=$!
+    for _ in $(seq 100); do "$REAL_LSOF_FOR_TEST" -p "$pid" -Fn 2>/dev/null | grep -qxF "n$held" && break; sleep 0.05; done
+    "$REAL_LSOF_FOR_TEST" -p "$pid" -Fn 2>/dev/null | grep -qxF "n$held" || fail "$label: the holder did not open the file"
+    cat > "$FOREIGN_CASE/fakebin/ps" <<SH
+#!/usr/bin/env bash
+case "\$*" in
+  "-o comm= -p "*) exec "$(command -v python3)" "$ROOT/bin/fm-proc-info.py" comm "\${4:?}" ;;
+esac
+echo "ps: Operation not permitted" >&2
+exit 126
+SH
+    chmod +x "$FOREIGN_CASE/fakebin/ps"
+    run_foreign_teardown rc
+    if [ "$name" = indexer ]; then
+      expect_code 0 "$rc" "$label: a copy only the Spotlight worker holds open must be released: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+      assert_absent "$FOREIGN_COPY" "$label: the copy survived"
+    else
+      expect_code 1 "$rc" "$label: a holder must keep the copy: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+      assert_grep "process $pid" "$FOREIGN_CASE/stderr" "$label: the refusal did not name the holder"
+      assert_present "$FOREIGN_COPY/.git" "$label: the copy was removed"
+    fi
+    kill -0 "$pid" 2>/dev/null || fail "$label: teardown ended the holder"
+    if grep -q "$(printf '\t')TERM$(printf '\t')" "$FOREIGN_CASE/state/task-x1.teardown-processes" 2>/dev/null; then
+      fail "$label: a signal was recorded: $(cat "$FOREIGN_CASE/state/task-x1.teardown-processes")"
+    fi
+    kill "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+  done
+  pass 'a real process holding a file in the copy open keeps it unless ps names it the Spotlight worker, and is never signalled'
+}
+
 # The open-file listing is filtered in one pass, and a listing line of a shape
 # the filter does not know still fails the scan, so the copy stays locked.
 test_direct_release_refuses_a_malformed_open_file_listing() {
@@ -7575,6 +7629,7 @@ test_late_bundle_truncation_stops_the_removal_at_every_call
 test_late_record_that_stops_covering_head_stops_the_removal
 test_launcher_start_time_not_observation_delay_decides_recycling
 test_pr_and_tip_landed_copies_keep_a_unique_ignored_file
+test_real_holder_process_indexer_exempt_and_never_signalled
 test_direct_release_refuses_a_process_holding_a_file_in_the_copy_open
 test_task_own_descendant_holding_a_file_open_refuses_and_is_not_signalled
 test_direct_release_refuses_an_unreadable_process_table
