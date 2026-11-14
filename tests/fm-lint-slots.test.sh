@@ -1094,27 +1094,50 @@ PL
 # fm_lint_sample_stand_ins <marker> <out> <stop-file>: an independent sampler,
 # one process table read about every 0.2 s through ps, that writes
 # "<time> <KiB resident in every process whose command holds <marker>> <the
-# largest single process KiB>" to <out> until <stop-file> exists. It reads
+# largest single process KiB> <how many processes>" to <out> until <stop-file> exists. It reads
 # nothing the gate keeps.
 fm_lint_sample_stand_ins() {
-  perl -MTime::HiRes=time,sleep -e '
+  FM_TEST_INFO="$ROOT/bin/fm-proc-info.py" perl -MTime::HiRes=time,sleep -MJSON::PP -e '
     my ($marker, $out, $stop) = @ARGV;
     open(my $fh, ">", $out) or die "$!";
     select((select($fh), $| = 1)[0]);
+    # Where ps is refused (a sandbox), the same census comes from the libproc
+    # helper, and the stand-ins are the processes the stand-in itself logged
+    # as started and not yet ended.
+    my $have_ps = system("ps -o pid= -p $$ >/dev/null 2>&1") == 0;
+    my $log = $ENV{FM_TEST_SAMPLER_LOG} // "";
     until (-e $stop) {
       my $t = time();
-      my ($sum, $top) = (0, 0);
-      if (open(my $ps, "-|", "ps", "-axww", "-o", "pid=,rss=,command=")) {
-        while (my $line = <$ps>) {
-          chomp $line;
-          next unless $line =~ /\A\s*[0-9]+\s+([0-9]+)\s+(.*)\z/;
-          my ($rss, $command) = ($1, $2);
-          next unless $command =~ /\A\S*perl\S*\s+\Q$marker\E(?:\s|\z)/;
-          $sum += $rss; $top = $rss if $rss > $top;
+      my ($sum, $top, $count) = (0, 0, 0);
+      if ($have_ps) {
+        if (open(my $ps, "-|", "ps", "-axww", "-o", "pid=,rss=,command=")) {
+          while (my $line = <$ps>) {
+            chomp $line;
+            next unless $line =~ /\A\s*[0-9]+\s+([0-9]+)\s+(.*)\z/;
+            my ($rss, $command) = ($1, $2);
+            next unless $command =~ /\A\S*perl\S*\s+\Q$marker\E(?:\s|\z)/;
+            $sum += $rss; $top = $rss if $rss > $top; $count++;
+          }
+          close $ps;
         }
-        close $ps;
+      } elsif (length $log && open(my $lf, "<", $log)) {
+        my %live;
+        while (my $line = <$lf>) {
+          $live{$2} = 1 if $line =~ /\A(start) ([0-9]+) /;
+          delete $live{$2} if $line =~ /\A(end) ([0-9]+) /;
+        }
+        close $lf;
+        if (%live && open(my $census, "-|", "python3", $ENV{FM_TEST_INFO}, "memory")) {
+          my $rows = eval { JSON::PP::decode_json(join "", <$census>) } || [];
+          close $census;
+          for my $row (@$rows) {
+            next unless $live{$row->{pid}} && defined $row->{rss_bytes};
+            my $rss = int($row->{rss_bytes} / 1024);
+            $sum += $rss; $top = $rss if $rss > $top; $count++;
+          }
+        }
       }
-      printf {$fh} "%.3f %d %d\n", $t, $sum, $top;
+      printf {$fh} "%.3f %d %d %d\n", $t, $sum, $top, $count;
       my $left = 0.2 - (time() - $t);
       sleep $left if $left > 0;
     }' "$1" "$2" "$3"
@@ -1161,7 +1184,7 @@ fm_lint_barrier_growth() {
   : > "$tmp/barrier.log"
   stop="$tmp/$label.stop"
   rm -f "$stop"
-  fm_lint_sample_stand_ins "$tmp/bin/shellcheck" "$tmp/$label.samples" "$stop" &
+  FM_TEST_SAMPLER_LOG="$tmp/barrier.log" fm_lint_sample_stand_ins "$tmp/bin/shellcheck" "$tmp/$label.samples" "$stop" &
   sampler=$!
   pids=()
   for run in 1 2 3 4; do
@@ -1217,6 +1240,79 @@ test_simultaneous_growth_after_admission_is_brought_back_within_the_allowance() 
   lone="$(grep -c '^start ' "$tmp/barrier.log") $(grep -c '^end ' "$tmp/barrier.log")"
   [ "$lone" = "2 2" ] || fail "two roots each larger than the budget did not each start and finish once (starts and ends: $lone)"$'\n'"$(cat "$tmp/lone.out")"
   pass "four roots whose records describe an older input, growing together after admission, never exceed the budget plus one root at any sample (bounded: $result as samples above, peak KiB, largest KiB, samples, starts, ends; unbudgeted control: $control)"
+}
+
+# fm_lint_trusted_growth <tmp> <label> <budget KiB> <record KiB> <actual MiB> <peers> [<barrier s>]:
+# four gates of one pool (the shape of the default host pool) run the same root,
+# whose record in the pool names <record KiB> on its present input, so the record
+# is trusted. Each stand-in waits until <peers> have started (or <barrier s>
+# pass, 20 by default), holding nothing meanwhile, then allocates and
+# holds <actual MiB>. An independent sampler reads every stand-in about every
+# 0.2 s. Prints "<peak total KiB> <largest single KiB> <most at once> <starts>
+# <ends>".
+fm_lint_trusted_growth() {
+  local tmp=$1 label=$2 budget=$3 record=$4 actual=$5 peers=$6 barrier=${7:-20} run rc=0 pid root sampler stop bytes key
+  local -a pids
+  root="$tmp/$label.sh"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$root"
+  : > "$tmp/barrier.log"
+  bytes=$(wc -c < "$root" | tr -d ' ')
+  key=$(printf 'full:%s' "$root" | perl -MDigest::SHA=sha256_hex -ne 'print sha256_hex($_)')
+  mkdir -p "$tmp/pool.$label/history"
+  printf '%s %s\n' "$record" "$bytes" > "$tmp/pool.$label/history/$key"
+  stop="$tmp/$label.stop"
+  rm -f "$stop"
+  FM_TEST_SAMPLER_LOG="$tmp/barrier.log" fm_lint_sample_stand_ins "$tmp/bin/shellcheck" "$tmp/$label.samples" "$stop" &
+  sampler=$!
+  pids=()
+  for run in 1 2 3 4; do
+    FM_TEST_GATE_POOL_PREFIX="$tmp/pool.$label" FM_TEST_BARRIER="$peers" FM_TEST_BARRIER_SECS="$barrier" \
+      FM_TEST_MEM_MIB="$actual" FM_TEST_MEM_HOLD=3 PATH="$tmp/bin:$PATH" \
+      fm_lint_gate_root "$budget" "$tmp/pool.$label" "$label$run" "$root" -- \
+      "$tmp/bin/shellcheck" --norc -- "$root" > "$tmp/$label.$run.out" 2>&1 &
+    pids+=("$!")
+  done
+  for pid in "${pids[@]}"; do wait "$pid" || rc=$?; done
+  : > "$stop"
+  wait "$sampler" 2>/dev/null || true
+  [ "$rc" -eq 0 ] || fail "a trusted-record run failed under budget $budget (rc=$rc)"$'\n'"$(cat "$tmp/$label".?.out)"
+  printf '%s %s %s %s\n' "$(perl -ane 'push @r, [@F[1, 2, 3]]; END { my ($p, $t, $n) = (0, 0, 0); for (@r) { $p = $_->[0] if $_->[0] > $p; $t = $_->[1] if $_->[1] > $t; $n = $_->[2] if $_->[2] > $n } print "$p $t $n" }' "$tmp/$label.samples")" \
+    "$(grep -c '^start ' "$tmp/barrier.log")" "$(grep -c '^end ' "$tmp/barrier.log")" ""
+}
+
+# The bound the admission really gives (the header states it): at admission the
+# charges of the running roots fit the budget; later the total is at most the
+# budget plus, for each running root, what it holds beyond its charge. A charge
+# is the root's record times 1.10 plus 64 MiB.
+test_the_stated_bound_holds_under_trusted_records_and_growth_beyond_the_charge() {
+  local tmp budget record charge peak top most starts ends control_peak limit
+  tmp=$(fm_test_tmproot fm-lint-stated-bound)
+  mkdir -p "$tmp/bin"
+  fm_lint_write_barrier_shellcheck "$tmp/bin" 64 "$tmp/barrier.log"
+  budget=256000                                  # 250 MiB
+  record=40960                                   # 40 MiB recorded on the present input
+  charge=$(( (record * 11 + 9) / 10 + 65536 ))   # 110592 KiB = 108 MiB: two fit, three do not (a charge of the record alone, 40 MiB, would admit all four)
+  # (1) Growth inside the charge (92 MiB held against a 108 MiB charge): no
+  # sample may exceed the budget itself, and two roots do run at once.
+  read -r peak top most starts ends _ <<<"$(fm_lint_trusted_growth "$tmp" within "$budget" "$record" 92 4 6)"
+  [ "$top" -gt 90000 ] || fail "the sampler saw no 92 MiB stand-in (largest $top KiB), so this test measured nothing"
+  { [ "$starts" -eq 4 ] && [ "$ends" -eq 4 ]; } || fail "$starts starts and $ends ends of 4 roots with trusted records (budget $budget KiB)"
+  [ "$most" -eq 2 ] || fail "$most roots ran at once, expected the two whose charges fit the budget"
+  [ "$peak" -le "$budget" ] || fail "roots growing inside their charge reached $peak KiB, above the $budget KiB budget"
+  # (2) Growth beyond the charge (200 MiB held against 108 MiB): the total may
+  # pass the budget by what the running roots hold beyond their charges, and no
+  # more; every root still finishes.
+  read -r peak top most starts ends _ <<<"$(fm_lint_trusted_growth "$tmp" beyond "$budget" "$record" 200 4 6)"
+  { [ "$starts" -eq 4 ] && [ "$ends" -eq 4 ]; } || fail "$starts starts and $ends ends of 4 roots growing beyond their charge"
+  [ "$most" -le 2 ] || fail "$most roots ran at once, more than the charges admit"
+  limit=$(( budget + most * (top - charge) ))
+  [ "$peak" -le "$limit" ] || fail "roots growing beyond their charge reached $peak KiB, above the stated bound $limit KiB (budget $budget plus $most roots times ($top minus charge $charge))"
+  # (3) The controls: with the admission broken (no effective budget) the same
+  # four roots stack above both bounds, so each check above can fail.
+  read -r control_peak top most starts ends _ <<<"$(fm_lint_trusted_growth "$tmp" unbounded 100000000 "$record" 200 4)"
+  [ "$control_peak" -gt $(( budget + 2 * (top - charge) )) ] \
+    || fail "four roots without a budget peaked at only $control_peak KiB, so this test cannot show the bound"
+  pass "with trusted records two roots run at once; growth inside the charge never passes the budget ($budget KiB), and growth beyond it passes by at most the running roots' excess (limit $limit KiB, peak seen $peak KiB; no budget: $control_peak KiB)"
 }
 
 test_an_unreadable_host_census_never_starts_a_root_in_any_pool() {
@@ -4048,6 +4144,7 @@ test_slot_file_failures_refuse_and_never_run_unbounded
 test_an_unusable_host_wide_budget_directory_refuses_before_any_root_starts
 test_growing_roots_are_held_to_the_budget_across_pools
 test_simultaneous_growth_after_admission_is_brought_back_within_the_allowance
+test_the_stated_bound_holds_under_trusted_records_and_growth_beyond_the_charge
 test_an_unreadable_host_census_never_starts_a_root_in_any_pool
 test_a_host_that_loses_its_process_table_stops_the_run_after_one_refusal
 test_an_unreadable_census_fails_one_run_once_and_does_not_delay_another_in_the_pool

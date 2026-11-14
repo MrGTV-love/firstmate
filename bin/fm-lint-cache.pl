@@ -40,7 +40,8 @@ use File::Basename qw(dirname basename);
 # alone enforce the capacity count.
 # The memory budget is checked only by the request whose turn it is, under
 # admission.lock, or without it on the stopped-gate path above. The request is
-# charged the recorded peak of its root (FM_LINT_INTERNAL_ROOT_KEY, kept in
+# charged the recorded peak of its root times 1.10 plus 64 MiB, at most the
+# per-root worst case (FM_LINT_INTERNAL_ROOT_KEY, kept in
 # history/<sha256 of the key> as "<peak KiB> <input bytes>") only when its input
 # now (FM_LINT_INTERNAL_ROOT_BYTES, the root file plus every file the analysis
 # follows, from check mode below) is more than 90 and less than 110 percent of
@@ -108,6 +109,7 @@ if (($ARGV[0] // '') eq 'gate') {
     my $in_band = sub { my ($line) = @_; ($line // '') =~ /\A([0-9]+) ([0-9]+)\n\z/
         && defined $root_bytes && $root_bytes * 10 > $2 * 9 && $root_bytes * 10 < $2 * 11 ? $1 + 0 : undef };
     my $max = sub { $_[0] > $_[1] ? $_[0] : $_[1] };
+    my $min = sub { $_[0] < $_[1] ? $_[0] : $_[1] };
     my $refuse = sub {
         my ($path, $why) = @_;
         $why = 'unknown error' unless defined $why && length $why;
@@ -411,7 +413,11 @@ if (($ARGV[0] // '') eq 'gate') {
                 # refused.
                 my $line = '';
                 if ($history_path && open(my $record, '<', $history_path)) { $line = <$record> // ''; }
-                $charge_kib = $in_band->($line) || $worst_kib;
+                # A trusted record's peak understates the next run by up to 8.5 percent
+                # in this repository's measured runs, so the charge is the record
+                # times 1.10 plus 64 MiB, never more than the per-root worst case.
+                my $recorded = $in_band->($line);
+                $charge_kib = $recorded ? $min->($worst_kib, int($recorded * 1.10 + 0.999) + 65536) : $worst_kib;
                 my $now = Time::HiRes::time();
                 my $fits;
                 my $held = !$host || flock($host, LOCK_EX | LOCK_NB);

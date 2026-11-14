@@ -110,7 +110,8 @@
 # An unrecorded root is charged more than that budget (the 8 GiB watch bound
 # below), so with no history each root runs alone, and recorded roots share the
 # budget.
-# Each root is charged its own recorded peak, the larger of resident size and
+# Each root is charged its own recorded peak times 1.10 plus 64 MiB (at most the
+# per-root worst case below), the peak being the larger of resident size and
 # physical footprint over its earlier complete analyses, kept per analysis mode
 # (full or fast) and repo-relative root path in the pool's history/ directory
 # together with the input size that peak was measured on: the root file plus
@@ -161,10 +162,20 @@
 # deadline, a gate ended by KILL or any other end raises no record. Without
 # /usr/bin/time and the macOS watch no record forms, so every root stays
 # charged the worst case. Because a record is trusted only for the input it
-# was measured on, the budget holds at every reading for roots whose records
-# match their input. The residual is a root that grows beyond its record on an
-# unchanged input (analysis noise, or a file it follows that the dependency
-# walk does not see), so each gate also watches the host
+# was measured on, the sum of the charges is at most the budget at every admission.
+# THE BOUND THIS GIVES, stated exactly (Main 1566, Design A): at admission,
+# T is at most the budget; afterwards, T is at most the budget plus the sum, over
+# the running roots, of (actual peak minus charge) where that is positive, each
+# root being ended at the 8 GiB per-root cap (plus the watch's sampling overshoot,
+# R above). The 10 percent and 64 MiB margin covers the 8.5 percent run-to-run
+# variation of one root's peak measured in this repository's runs (largest ratio
+# 1.085 over 463 common roots, 0 of 2632 samples with two or more roots above the
+# budget); it is not a proof for a root that grows past it. A strict byte bound at
+# every moment is not available on this host without a kernel limit or killing
+# and re-running a grown root (a design Main withdrew), and SIGSTOP releases
+# nothing. The residual is a root that grows beyond its charge (analysis noise,
+# or a file it follows that the dependency walk does not see), so each gate also
+# watches the host
 # while its root runs: while the lint trees of every pool on the
 # host, plus any other process named shellcheck, hold more than the budget, a
 # gate stops (SIGSTOP) the analysis processes of its own tree unless it belongs
