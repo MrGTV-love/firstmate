@@ -801,7 +801,7 @@ test_partition_checks_judge_loss_and_duplication() {
   pass "the partition checks catch an unregistered, ghost, duplicated, or unlisted case and accept an added test"
 }
 
-# The three teardown groups partition one former suite: every case a group file
+# The teardown groups partition one suite: every case a group file
 # defines is registered by that file, and no case is registered by two groups.
 test_teardown_groups_register_each_case_once() {
   assert_partition_exact teardown array teardown_test_cases '' fm-teardown fm-teardown-pool fm-teardown-cleanup fm-teardown-real-treehouse

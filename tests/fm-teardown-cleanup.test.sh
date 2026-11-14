@@ -7735,7 +7735,7 @@ test_a_process_is_proved_the_tasks_own_by_marker_record_or_live_chain_never_by_p
   m=$(cd "$dir/state" && pwd -P)/task-x1.inbox
   t=$dir/ps-table
   rec=$dir/state/task-x1.teardown-owned
-  eval "$(sed -n '/^fm_nm_trim_stub/d; /^task_process_identity() {/,/^}/p; /^teardown_process_env_has() {/,/^}/p; /^teardown_owner_marker() {/,/^}/p; /^teardown_process_env_marked() {/,/^}/p; /^teardown_owned_record_path() {/,/^}/p; /^teardown_process_recorded() {/,/^}/p; /^teardown_process_proved_own() {/,/^}/p; /^teardown_process_in_task_pane() {/,/^}/p; /^teardown_pane_shell_pid() {/,/^}/p; /^teardown_owned_record_write() {/,/^}/p' "$ROOT/bin/fm-teardown.sh" "$ROOT/bin/fm-teardown-nested-lib.sh")"
+  eval "$(sed -n '/^fm_nm_trim_stub/d; /^task_process_identity() {/,/^}/p; /^teardown_process_env_has() {/,/^}/p; /^teardown_owner_marker() {/,/^}/p; /^teardown_process_env_marked() {/,/^}/p; /^teardown_owned_record_path() {/,/^}/p; /^teardown_process_recorded() {/,/^}/p; /^teardown_process_proved_own() {/,/^}/p; /^teardown_process_in_task_pane() {/,/^}/p; /^teardown_pane_shell_pid() {/,/^}/p; /^teardown_pane_shell_pid_of() {/,/^}/p; /^teardown_owned_record_write() {/,/^}/p' "$ROOT/bin/fm-teardown.sh" "$ROOT/bin/fm-teardown-nested-lib.sh")"
   # shellcheck disable=SC2329 # called by the evaluated task_process_identity.
   fm_nm_trim() { printf '%s' "$1" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'; }
   # shellcheck disable=SC2034 # read by the evaluated functions.
@@ -7883,7 +7883,7 @@ test_two_overlapping_teardowns_of_one_kept_copy_make_one_archive() {
       "retained-overlap-teardown: the second teardown neither waited on the first one's lock nor was refused because of it: $(tail -3 "$FOREIGN_CASE/stderr.second")"
   fi
   assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-overlap-teardown: two overlapping teardowns made more than one driver call or tar (first rc $(cat "$FOREIGN_CASE/rc.first"), second rc $rc: $(tail -3 "$FOREIGN_CASE/stderr.second"))"
-  pass "two overlapping teardowns of one kept copy ask the driver once and write one tar (first rc $(cat "$FOREIGN_CASE/rc.first"), second rc $rc; the second waited on: $(sed -n 2p "$FOREIGN_CASE/waiting-at-release.txt" | sed "s#$FOREIGN_CASE/##" | tr '\n' ' '))"
+  pass "two overlapping teardowns of one kept copy ask the driver once and write one tar (first rc $(cat "$FOREIGN_CASE/rc.first"), second rc $rc; the second waited on: $(sed -n 2p "$FOREIGN_CASE/waiting-at-release.txt" 2>/dev/null | sed "s#$FOREIGN_CASE/##" | tr '\n' ' '))"
 }
 
 test_a_file_created_in_the_copy_while_the_driver_runs_is_not_closed_over() {

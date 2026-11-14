@@ -279,7 +279,8 @@ teardown_process_env_has() {  # <pid> <entry>
     return
   fi
   command -v python3 >/dev/null 2>&1 || return 1
-  python3 - "$1" "$2" <<'PY'
+  # The kernel call exists only on macOS; elsewhere it fails quietly (not readable).
+  python3 - "$1" "$2" 2>/dev/null <<'PY'
 import sys, ctypes, ctypes.util, struct
 pid, want = int(sys.argv[1]), sys.argv[2].encode()
 libc = ctypes.CDLL(ctypes.util.find_library("c"), use_errno=True)
@@ -385,17 +386,25 @@ teardown_process_in_task_pane() {  # <pid>
 # no marker at all. Prints nothing for any other backend, for an endpoint that cannot be
 # read and for anything that is not a pid above 1.
 teardown_pane_shell_pid() {
-  local out pid=
   [ -n "${T:-}" ] || return 0
-  case "${BACKEND:-}" in
+  teardown_pane_shell_pid_of "${BACKEND:-}" "$T" "$FM_ROOT/bin" 15 30
+}
+
+# The one reader of a pane's shell pid, for <backend> <target>: tmux asks `display-message`,
+# herdr asks `pane process-info` through <bin-dir>/fm-backend.sh, each bounded by its own
+# seconds. bin/fm-merge-prune-lib.sh (fm_mp_pane_pid) reads the same pane through it, with
+# its own limits, so the two never disagree about what a pane's shell is.
+teardown_pane_shell_pid_of() {  # <backend> <target> <bin-dir> <tmux-seconds> <herdr-seconds>
+  local out pid=
+  case "$1" in
     tmux)
-      pid=$(fm_run_timed 15 tmux display-message -p -t "$T" '#{pane_pid}' 2>/dev/null </dev/null) || pid=
+      pid=$(fm_run_timed "$4" tmux display-message -p -t "$2" '#{pane_pid}' 2>/dev/null </dev/null) || pid=
       ;;
     herdr)
       # shellcheck disable=SC2016 # The single-quoted bash -c program expands its own positional arguments.
-      out=$(fm_run_timed 30 bash -c '. "$1/fm-backend.sh" && fm_backend_source herdr && fm_backend_herdr_cli "$2" pane process-info --pane "$3"' \
-        _ "$FM_ROOT/bin" "${T%%:*}" "${T#*:}" 2>/dev/null </dev/null) || out=
-      pid=$(printf '%s' "$out" | jq -r --arg pane "${T#*:}" \
+      out=$(fm_run_timed "$5" bash -c '. "$1/fm-backend.sh" && fm_backend_source herdr && fm_backend_herdr_cli "$2" pane process-info --pane "$3"' \
+        _ "$3" "${2%%:*}" "${2#*:}" 2>/dev/null </dev/null) || out=
+      pid=$(printf '%s' "$out" | jq -r --arg pane "${2#*:}" \
         'select(.result.process_info.pane_id == $pane) | .result.process_info.shell_pid // empty' 2>/dev/null) || pid=
       ;;
   esac
