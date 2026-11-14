@@ -1687,9 +1687,9 @@ case "${1:-} ${2:-} ${FM_TEST_NM_WHY:-}" in
     printf '%s\n' 'error: status read failed'
     exit 1 ;;
   "daemon status unreadable") printf 'daemon: running\n' ;;
-  # Only a positive answer is a down daemon: its own "daemon not running" line, or a refused socket.
+  # Only a positive answer is a down daemon: its own "daemon not running" line, or a missing socket.
   "daemon status down") printf '  \342\227\213 daemon not running\n'; exit 1 ;;
-  "daemon status socket") printf '%s\n' 'error: dial unix /tmp/nm.sock: connect: connection refused' >&2; exit 1 ;;
+  "daemon status socket") printf '%s\n' 'error: dial unix /tmp/nm.sock: connect: no such file or directory' >&2; exit 1 ;;
   # A probe that fails for another reason proves nothing about the daemon.
   "daemon status denied") printf '%s\n' 'error: open /Users/x/.no-mistakes/daemon.pid: permission denied' >&2; exit 1 ;;
   "daemon status runner") exit 126 ;;
