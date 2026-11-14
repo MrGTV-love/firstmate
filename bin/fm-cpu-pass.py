@@ -1539,6 +1539,8 @@ def wait_for_admission(directory: str, priority: str, self_run: Optional[str] = 
                 else:
                     reason = "counted=%d priority=%s behind a higher-priority or earlier start" % (len(counted), priority)
                 fcntl.flock(admission_fd, fcntl.LOCK_UN)
+            if bound == 0 and decided:
+                raise HoldBound(reason)  # a zero hold is one decision: no hold begins, so no hold line is written
             if on_wait is not None:
                 on_wait(reason, time.monotonic() - started)
                 on_wait = None
@@ -2162,22 +2164,45 @@ def record_check(key: str, text: str) -> bool:
         return False
 
 
-def durable_line(text: str, key: str) -> None:
-    """Append one check wake to the root home's queue without waiting for its lock.
+def durable_line(text: str, key: str) -> bool:
+    """The first record of a gate line: one check wake in the root home's queue (record_check); False when not written."""
+    return record_check(key, "launch-gate: " + text)
 
-    When the queue lock is busy the wake is spilled to state/.wake-spill.<seq>,
-    which the next append to that queue, or the watcher's next start, replays;
-    a spill never replaces another producer's spill (fm_wake_pending_settle).
+
+def status_log_line(branch, key: str, text: str) -> bool:
+    """The second record of a refusal: one line in the run's own task status log (Main 4930 Q1); False when unwritable.
+
+    The task is the one whose ship branch is the run's branch (fm/<task-id>) and whose
+    state/<task-id>.meta exists in the root home; the line goes through the sanctioned
+    bin/fm-status-append.sh. A run with no such task (an unmapped launch, another
+    branch) has no status log: that record is unwritable for this refusal.
     """
+    if not isinstance(branch, str) or not branch.startswith("fm/") or not branch[3:] or "/" in branch[3:]:
+        return False
     try:
-        home = root_home()
-        subprocess.run(["bash", "-c", '. "$1" && FM_WAKE_PENDING_KIND=check FM_WAKE_PENDING_KEY=$2 FM_WAKE_PENDING_PAYLOAD=$3'
-                        ' && fm_wake_pending_settle', "bash",
-                        str(Path(__file__).with_name("fm-wake-lib.sh")), key, "check: launch-gate: " + text],
-                       env=dict(os.environ, FM_HOME=str(home)), stdin=subprocess.DEVNULL,
-                       stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=True)
-    except (OSError, ValueError, subprocess.SubprocessError) as exc:
-        log(2, "launch-gate: durable line not recorded (%s): %s" % (exc, text))
+        state = root_home() / "state"
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return False
+    task = branch[3:]
+    if not (state / (task + ".meta")).exists():
+        return False
+    line = "launch-gate [at=%d] [key=%s]: %s" % (int(time.time()), key, text)
+    try:
+        done = subprocess.run(["bash", str(Path(__file__).with_name("fm-status-append.sh")), str(state / (task + ".status")), line],
+                              stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=30)
+    except (OSError, subprocess.SubprocessError) as exc:
+        log(2, "launch-gate: status-log line not recorded (%s): %s" % (exc, text))
+        return False
+    if done.returncode != 0:
+        log(2, "launch-gate: status-log line not recorded (exit %d): %s" % (done.returncode, text))
+    return done.returncode == 0
+
+
+def refuse_visibly(text: str, key: str, branch) -> None:
+    """A refusal's records (the P9 storage table): the visible line on the caller's error output, then each record it can write."""
+    log(2, text)
+    durable_line(text, key)
+    status_log_line(branch, key, text)
 
 
 def start_watched(command: List[str]) -> Tuple[int, int]:
@@ -2297,8 +2322,11 @@ def cmd_launch_gate(args: argparse.Namespace) -> int:
         def on_wait(reason: str, waited: float) -> None:
             held.append(reason)
             record_hold(directory, run, step[0], gate_started, attempt)
-            durable_line("run %s (%s) held for capacity before its CI fix agent starts, waited %.2fs so far: %s; %s" % (
-                run, branch, waited, reason, bound_text), "launch-gate-" + run)
+            if not durable_line("run %s (%s) held for capacity before its %s agent starts, waited %.2fs so far: %s; %s" % (
+                    run, branch, step[0], waited, reason, bound_text), "launch-gate-" + run):
+                # A hold that cannot write its line does not wait silently (P9.visible): it refuses visibly.
+                raise LaunchRefused("hold line not recorded", "the first record (the root home's wake queue) is unwritable",
+                                    "restore the root home's state directory; the next launch enters the gate again")
 
         try:
             admission_fd, _, reason, waited = wait_for_admission(directory, "other", run, bound, on_wait,
@@ -2307,7 +2335,10 @@ def cmd_launch_gate(args: argparse.Namespace) -> int:
             raise LaunchRefused("hold bound reached", "%s; held %ds; last reading: %s" % (
                 bound_text, time.monotonic() - started, reached),
                 "this fix attempt ends and the run keeps its CI step; the daemon retries while auto_fix.ci allows, then "
-                "parks the CI findings as an ask-user decision; answer it once capacity has returned")
+                "parks the CI findings as an ask-user decision; answer it once capacity has returned"
+                if counted and step[0] == CI_STEP else
+                "this launch fails and its run fails with it (Main 1838: the run is outside the counted set, so it is "
+                "never started without capacity); restart the run once capacity has returned")
         admitted_ns = time.time_ns()
         reservation_fd = None
         try:
@@ -2334,16 +2365,14 @@ def cmd_launch_gate(args: argparse.Namespace) -> int:
         # With no run identified (unmapped, ambiguous, unreadable database) the line names the worktree and attempt.
         text = "launch-gate refused: %s: %s; %s; next action: %s" % (
             refused.cause, "run %s" % run if run else "worktree %s, attempt %s" % (cwd, attempt), refused.detail, refused.action)
-        log(2, text)
-        durable_line(text, "launch-gate-" + (run or "unmapped"))
+        refuse_visibly(text, "launch-gate-" + (run or "unmapped"), branch)
         return 75
     except KeyboardInterrupt:
         return 130
     except (PoolUnavailable, OSError, sqlite3.Error, ValueError, KeyError) as exc:
         text = "launch-gate refused: gate error: %s; %s; next action: repair the gate source named here; the next fix round enters the gate again" % (
             "run %s" % run if run else "worktree %s, attempt %s" % (cwd, attempt), exc)
-        log(2, text)
-        durable_line(text, "launch-gate-" + (run or "unmapped"))
+        refuse_visibly(text, "launch-gate-" + (run or "unmapped"), branch)
         return 75
 
 
@@ -2359,9 +2388,22 @@ def wait_child(pid: int) -> int:
 
 def wait_agent(child: int, watch_fd: int, reservation_fd: int) -> int:
     """Forward signals to the agent, keep its reservation while it lives, and return or re-raise its own ending."""
+    # The agent runs in the gate's process group (the daemon gives the launcher its own group). A signal sent to the
+    # gate goes to that whole group, so it reaches the agent below a dispatcher (tc run's spawnSync child), not only
+    # the gate's direct child; the gate ignores its own copy, and the watcher ignores these three. A gate that does not
+    # lead its group signals its direct child only, so it never signals its caller.
+    leads = os.getpgid(0) == os.getpid()
+
     def forward(signum, _frame):
-        with contextlib.suppress(OSError):
-            os.kill(child, signum)
+        previous = signal.signal(signum, signal.SIG_IGN)
+        try:
+            with contextlib.suppress(OSError):
+                if leads:
+                    os.killpg(os.getpid(), signum)
+                else:
+                    os.kill(child, signum)
+        finally:
+            signal.signal(signum, previous)
 
     for signum in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
         signal.signal(signum, forward)

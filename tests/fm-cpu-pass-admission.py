@@ -906,7 +906,7 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
         fcntl.flock(lock, fcntl.LOCK_UN); os.close(lock)
         assert child.wait(timeout=30) == 0
         queue = wakes(folder)
-        assert 'held for capacity before its CI fix agent starts, waited ' in queue and 'another start is registering' in queue, queue
+        assert 'held for capacity before its ci agent starts, waited ' in queue and 'another start is registering' in queue, queue
         assert 'run x (fm/x) admitted after ' in queue, queue
 
     for name, body in (('F1 nested expanded start', nested_expanded), ('F2 control: identical start from elsewhere', identical_sibling),
@@ -1454,7 +1454,7 @@ exec /bin/ln "$@"
             if hold is None:
                 assert 'launch-gate' not in queue, queue
             else:
-                assert re.search(r'run x \(fm/x\) held for capacity before its CI fix agent starts, waited \d+\.\d\ds so far: '
+                assert re.search(r'run x \(fm/x\) held for capacity before its ci agent starts, waited \d+\.\d\ds so far: '
                                  r'another start is registering', queue), queue
                 assert re.search(r'run x \(fm/x\) admitted after \d+\.\d\ds held: ', queue), queue
 

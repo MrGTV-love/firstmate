@@ -464,9 +464,133 @@ try:
         os.killpg(child.pid, signal.SIGKILL)
         finish(child, -signal.SIGKILL)
 
+    def storage_case(name, first_writable, status_writable, available=GIB):
+        """A refusal fixture for the P9 storage table: run x of task x (branch fm/x, state/x.meta present).
+
+        The first record (the root home's wake queue) is made unwritable through the wake library's own
+        FM_STATE_OVERRIDE, pointed at a 0500 directory, so neither the append nor a spill can land; the status log is
+        made unwritable as a 0400 file. A zero hold (a 1 s budget below the 2000 s percentile) on a full host refuses at once.
+        """
+        folder, db, env = gate_case(name, available=available, timeout='1s', ci_ms=(2000000,),
+                                    runs=[('x', 'ci', 'running', None), ('y', 'review', 'running', None)])
+        state = folder / 'fmhome' / 'state'
+        state.mkdir(parents=True, exist_ok=True)
+        (state / 'x.meta').write_text('kind=ship\n')
+        (state / 'x.status').write_text('working [at=1]: fixture\n')
+        if not status_writable:
+            (state / 'x.status').chmod(0o400)
+        if not first_writable:
+            locked = folder / 'locked-state'
+            locked.mkdir()
+            locked.chmod(0o500)
+            env = dict(env, FM_STATE_OVERRIDE=str(locked))
+        return folder, db, env
+
+    def storage_read(folder):
+        status = (folder / 'fmhome' / 'state' / 'x.status').read_text()
+        return [l for l in status.splitlines() if l.startswith('launch-gate ')], wakes(folder)
+
+    def storage_rows():
+        # P9 storage table: each row judges no start, the visible refusal and each line whose destination is writable;
+        # nothing is claimed at an unwritable destination (rows 3 and 4: not claimed: destination unwritable).
+        for row, first, status in ((1, True, True), (2, False, True), (3, False, False), (4, True, False)):
+            folder, db, env = storage_case('gate-storage-row-%d' % row, first, status)
+            child, log = gate(folder, env, 'x', mode='exit-0')
+            finish(child, 75)
+            text = stderr_of(log)
+            assert 'launch-gate refused: hold bound reached: run x' in text and 'next action: ' in text, (row, text)
+            assert not (folder / 'x.agent').exists(), (row, 'agent started')
+            lines, queue = storage_read(folder)
+            if first:
+                assert 'launch-gate refused: hold bound reached: run x' in queue and 'next action: ' in queue, (row, queue)
+            if status:
+                assert len(lines) == 1 and 'hold bound reached' in lines[0] and 'next action: ' in lines[0], (row, lines)
+                # Retention: with the first record drained (row 1) or unavailable (row 2), the status-log line keeps
+                # the cause and the next action.
+                (folder / 'fmhome' / 'state' / '.wake-queue').unlink(missing_ok=True)
+                kept = storage_read(folder)[0]
+                assert kept == lines and 'hold bound reached' in kept[0] and 'next action: ' in kept[0], (row, kept)
+            if row in (3, 4):
+                # Not claimed at the unwritable destination: no status-log line exists to judge.
+                assert lines == [], (row, lines)
+            (folder / 'fmhome' / 'state' / 'x.status').chmod(0o600)
+            if not first:
+                (folder / 'locked-state').chmod(0o700)
+
+    def hold_without_first_record():
+        # P9.visible: a hold that cannot write its line does not wait silently: with the first record unwritable on a
+        # full host and a positive bound, the gate refuses visibly at once and the agent never starts; its status-log
+        # line (row 2) carries the cause and the next action.
+        folder, db, env = storage_case('gate-hold-unwritable', False, True)
+        (folder / 'home' / '.no-mistakes' / 'config.yaml').write_text('agent: [claude]\nagent_timeout: "240m"\n')
+        change(db, "UPDATE agent_invocations SET duration_ms = 60000, completed_at = started_at + 60")
+        began = time.monotonic()
+        child, log = gate(folder, env, 'x')
+        finish(child, 75)
+        text = stderr_of(log)
+        assert time.monotonic() - began < 20 and 'launch-gate refused: hold line not recorded: run x' in text, text
+        assert not (folder / 'x.agent').exists()
+        lines = storage_read(folder)[0]
+        assert len(lines) == 1 and 'hold line not recorded' in lines[0] and 'next action: ' in lines[0], lines
+        (folder / 'locked-state').chmod(0o700)
+
+    def hold_then_admit_lines():
+        # P9.visible pair (7): on a normal hold and then admission with the first record writable, the hold line and the
+        # admission-after-hold line are both written.
+        folder, db, env = gate_case('gate-hold-admit-lines', available=GIB, runs=[('x', 'ci', 'running', None), ('y', 'review', 'running', None)])
+        child, log = gate(folder, env, 'x')
+        wait_for(lambda: 'run x (fm/x) held for capacity before its ci agent starts' in wakes(folder), 'hold line')
+        facts(folder, available=40 * GIB)
+        wait_for(lambda: 'run x (fm/x) admitted after' in wakes(folder), 'admission-after-hold line')
+        (folder / 'x.release').touch()
+        finish(child)
+
+    def outside_counted_refusal_text():
+        # P9.disposition (Main 1838): a gated launch of a run outside the counted set refused at its hold bound says that
+        # its run fails and that the owner restarts it, with both records written.
+        folder, db, env = storage_case('gate-outside-counted-refusal', True, True)
+        change(db, "UPDATE runs SET ci_ready_at = 1 WHERE id = 'x'")
+        child, log = gate(folder, env, 'x', mode='exit-0')
+        finish(child, 75)
+        text = stderr_of(log)
+        assert 'its run fails with it' in text and 'restart the run once capacity has returned' in text, text
+        assert 'its run fails with it' in wakes(folder) and 'its run fails with it' in storage_read(folder)[0][0]
+
+    def dispatcher_forwarding():
+        # P9.hygiene: through a dispatcher (the agent command's own child, as tc run's spawnSync child is claude), a
+        # SIGINT, SIGTERM or SIGHUP sent to the gate reaches the agent below the dispatcher: the gate signals its agent's
+        # process group, not only its direct child (a gate that signals only the dispatcher leaves the agent running).
+        dispatcher = root / 'dispatcher.py'
+        dispatcher.write_text("""import os, pathlib, signal, sys, time
+folder = pathlib.Path(os.environ['CASE_FOLDER'])
+child = os.fork()
+if child == 0:
+    for number in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+        signal.signal(number, lambda n, f: (folder / ('below.got-%d' % n)).touch() or os._exit(0))
+    (folder / 'below.ready').touch()
+    while True: time.sleep(0.05)
+os.waitpid(child, 0)
+""")
+        for number in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+            folder, db, env = gate_case('gate-dispatcher-%d' % number)
+            out, err = open(str(folder / 'gate.stdout'), 'w'), open(str(folder / 'gate.stderr'), 'w')
+            child = subprocess.Popen(['bash', str(repo / 'bin/fm-cpu-pass.sh'), 'launch-gate', '--', python, str(dispatcher)],
+                                     env=env, stdin=subprocess.DEVNULL, stdout=out, stderr=err, cwd=str(folder / 'wt-x'), start_new_session=True)
+            out.close(); err.close()
+            children.append(child)
+            wait_for(lambda: (folder / 'below.ready').exists(), 'the agent below the dispatcher runs')
+            os.kill(child.pid, number)
+            wait_for(lambda: (folder / ('below.got-%d' % number)).exists(), 'signal %d reached the agent below the dispatcher' % number)
+            child.wait(timeout=30)
+
     for name, body in (('P9.scope unknown steps refuse', unknown_steps), ('P9.scope uncounted runs are gated', uncounted_gated),
                        ('P9.map identified shape', identified_shape), ('P9.bound round start and zero hold', bound_from_round_start),
-                       ('P9.bound held rows', held_row_cases), ('P9.bound hold record', hold_record_written)):
+                       ('P9.bound held rows', held_row_cases), ('P9.bound hold record', hold_record_written),
+                       ('P9 storage table rows 1-4 with retention', storage_rows),
+                       ('P9.visible a hold with no first record refuses visibly', hold_without_first_record),
+                       ('P9.visible hold and admission-after-hold lines', hold_then_admit_lines),
+                       ('P9.disposition outside-counted refusal names the run failing', outside_counted_refusal_text),
+                       ('P9.hygiene a signal reaches the agent below a dispatcher', dispatcher_forwarding)):
         r28_case(name, body)
     (root / 'r28-gate.json').write_text(json.dumps(r28, indent=2))
     print(json.dumps(dict(r28=r28)), flush=True)
