@@ -115,6 +115,21 @@ SH
   cat > "$1/fakebin/python3" <<'SH'
 #!/usr/bin/env bash
 D=$FM_FAKE_DIR
+# The structured argv reader (python3 -I - argv <pid>): a count, then each field, NUL-terminated.
+if [ "${1:-}" = -I ] && [ "${2:-}" = - ] && [ "${3:-}" = argv ] && [ -f "$D/claude-restore" ]; then
+  uuid=$(cat "$D/claude-restore")
+  claude_args="claude --resume $uuid"
+  [ ! -f "$D/claude-args" ] || claude_args=$(cat "$D/claude-args")
+  if [ -f "$D/claude-wrapper" ] && [ "${4:-}" = 2000000000 ]; then
+    read -r -a words <<< "node /host/nvm/bin/teamclaude run -- --resume $uuid"
+  elif [ "${4:-}" = 2000000000 ] || { [ -f "$D/claude-wrapper" ] && [ "${4:-}" = 2000000001 ]; }; then
+    read -r -a words <<< "$claude_args"
+  else
+    exit 1
+  fi
+  printf '%s\0' "${#words[@]}" "${words[@]}"
+  exit 0
+fi
 if [ "$#" = 2 ] && [ "$1" = - ]; then
   pid=$2
   if [ -f "$D/herdr-pids/$pid" ]; then D=$(cat "$D/herdr-pids/$pid"); fi

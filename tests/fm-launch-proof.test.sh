@@ -373,7 +373,10 @@ test_launch_proof_claude_adoption() (
       '-axo pid=,ppid=,pgid=') awk -F'\t' -v o="$(cat "$T/table-omit" 2>/dev/null)" '$1 != o {print $1, $2, $3}' "$T/procs" ;;
       '-axo pid=,ppid=') awk -F'\t' '{print $1, $2}' "$T/procs" ;;
       '-p '*' -o comm='*) [ ! -e "$T/gone-$2" ] || return 1; awk -F'\t' -v p="$2" '$1 == p {print $4; found=1} END {exit !found}' "$T/procs" ;;
-      '-p '*' -o args='*) [ ! -e "$T/gone-$2" ] || return 1; awk -F'\t' -v p="$2" '$1 == p {print $6; found=1} END {exit !found}' "$T/procs" ;;
+      # With argv-<pid>, args is that argv flattened with spaces, as ps prints it.
+      '-p '*' -o args='*) [ ! -e "$T/gone-$2" ] && [ ! -e "$T/args-fail-$2" ] || return 1
+        if [ -f "$T/argv-$2" ]; then tr '\0' ' ' < "$T/argv-$2" | sed 's/ $//'; echo; return; fi
+        awk -F'\t' -v p="$2" '$1 == p {print $6; found=1} END {exit !found}' "$T/procs" ;;
       # live-ppid-<pid> overrides the live parent; lstart-<pid> (then lstart-next-<pid>
       # after its first read) overrides the birth time.
       '-p '*' -o ppid='*) [ ! -e "$T/gone-$2" ] || return 1
@@ -384,11 +387,32 @@ test_launch_proof_claude_adoption() (
       *) fail "unexpected ps query: $*" ;;
     esac
   }
-  lsof() { # -w -a -p <pid> -d cwd -F pn0
+  lsof() { # -w -a -p <pid> -d cwd -F pn0; $T/lsof-fail prints the fields and then fails
     [ -f "$T/cwd-$4" ] || return 1
     printf 'p%s\0\nfcwd\0n%s\0\n' "$4" "$(cat "$T/cwd-$4")"
+    [ ! -f "$T/lsof-fail" ]
   }
-  fm_remote_herdr_process_env() { [ -f "$T/env-$1" ] && cat "$T/env-$1"; }
+  # env-seq-<pid>: the first read fails, later reads return the file.
+  fm_remote_herdr_process_env() {
+    if [ -f "$T/env-seq-$1" ]; then
+      [ -f "$T/env-seq-read-$1" ] || { : > "$T/env-seq-read-$1"; return 1; }
+      cat "$T/env-seq-$1"; return
+    fi
+    [ -f "$T/env-$1" ] && cat "$T/env-$1"; }
+  # The structured argv reader: $T/argv-<pid> holds NUL-separated fields; otherwise
+  # the table's args split on spaces; $T/argv-fail-<pid> cannot be read.
+  fm_launch_proof_pid_argv() {
+    local f n=0
+    [ ! -e "$T/argv-fail-$1" ] || return 1
+    if [ -f "$T/argv-$1" ]; then
+      while IFS= read -r -d '' f; do n=$((n + 1)); done < "$T/argv-$1"
+      printf '%s\0' "$n"; cat "$T/argv-$1"
+    else
+      local -a words
+      read -r -a words <<< "$(awk -F'\t' -v p="$1" '$1 == p {print $6; found=1} END {exit !found}' "$T/procs")" || return 1
+      printf '%s\0' "${#words[@]}" "${words[@]}"
+    fi
+  }
   fm_backend_herdr_cli() {
     case "$*" in
       'lab pane get w1:p2')
@@ -420,7 +444,7 @@ test_launch_proof_claude_adoption() (
     } > "$(transcript_dir)/${3:-$UUID}.jsonl"
   }
   fresh_case() {
-    rm -rf "$T/lane" "$T/main" "$T/sib" "$T/nested" "$T/operator" "$T"/env-* "$T"/cwd-* "$T/pane-missing" "$T/table-omit" "$T"/gone-* "$T"/live-ppid-* "$T"/lstart-*
+    rm -rf "$T/lane" "$T/main" "$T/sib" "$T/nested" "$T/hA" "$T/hB" "$T/operator" "$T"/env-* "$T"/cwd-* "$T/pane-missing" "$T/table-omit" "$T"/gone-* "$T"/live-ppid-* "$T"/lstart-* "$T"/argv-* "$T"/args-fail-* "$T/lsof-fail"
     mkdir -p "$LANE/state" "$STATE" "$OPERATOR"
     default_procs
     write_meta
@@ -701,8 +725,9 @@ test_launch_proof_claude_adoption() (
   refuses 'process table' '(e) N3 the process table omits the anchor while a foreign-pinned member is listed'
   fresh_case; printf 53733 > "$T/table-omit"
   refuses 'process table' '(e) N3 the process table omits the anchor'
+  # Main 1564 (c): a member that cannot be read is not proven to have exited.
   fresh_case; rm -f "$T/env-56557"; : > "$T/gone-56557"
-  accepts 'N3 control: a group member that exited after the table was read'
+  refuses 'cannot be read' '(e) F3 a member that can no longer be read is not proven to have exited'
   fresh_case
   accepts 'N3 control: every group member readable and unpinned'
 
@@ -733,6 +758,67 @@ test_launch_proof_claude_adoption() (
   rm -rf "$T/back\\slash"
   LANE=$SAVED_LANE
   pass 'N1-N3, N6 and N7: forks, unreached or unreadable homes and processes, a hidden first message, and escaped paths'
+
+  # F1: the session tie reads argv as separate fields; prompt text never acts as an option.
+  fresh_case; printf 'claude_session_id=%s\n' "$UUID" >> "$META"
+  printf 'claude\0--append-system-prompt\0discuss --resume %s\0' "$UUID" > "$T/argv-53733"
+  refuses 'no task-specific session tie' '(h) F1 a prompt operand that reads like --resume is not a resume'
+  fresh_case; printf 'claude_session_id=%s\n' "$UUID" >> "$META"
+  printf 'claude\0--append-system-prompt\0--resume\0%s\0' "$UUID" > "$T/argv-53733"
+  refuses 'no task-specific session tie' '(h) F1 a --resume that is the operand of a value option is not a resume'
+  fresh_case; printf 'claude_session_id=%s\n' "$UUID" >> "$META"; : > "$T/argv-fail-53733"
+  refuses 'no task-specific session tie' '(h) F1 an argv that cannot be read as separate fields'
+  fresh_case
+  printf 'claude\0--resume\0%s\0--append-system-prompt\0please do not --fork-session here\0' "$UUID" > "$T/argv-53733"
+  accepts 'F1 control: a genuine resume whose prompt mentions --fork-session'
+  fresh_case; printf 'claude\0--dangerously-skip-permissions\0--resume\0%s\0' "$UUID" > "$T/argv-53733"
+  accepts 'F1 control: a resume after a boolean flag'
+
+  # F2: homes named by records are followed to a fixed point, with a cycle guard.
+  fresh_case; mkdir -p "$T/hA/state" "$T/hB/state"
+  printf 'kind=secondmate\nwindow=lab:w7:p7\nhome=%s\n' "$T/hA" > "$STATE/a.meta"
+  printf 'kind=secondmate\nwindow=lab:w6:p6\nhome=%s\n' "$T/hB" > "$T/hA/state/b.meta"
+  printf 'window=lab:w1:p2\nharness=claude\n' > "$T/hB/state/claim.meta"
+  refuses 'claimed by claim.meta' '(f) F2 a home two record-links away claims the same pane'
+  fresh_case; mkdir -p "$T/hA/state" "$T/hB/state"
+  printf 'kind=secondmate\nwindow=lab:w7:p7\nhome=%s\n' "$T/hA" > "$STATE/a.meta"
+  printf 'kind=secondmate\nwindow=lab:w6:p6\nhome=%s\n' "$T/hB" > "$T/hA/state/b.meta"
+  printf 'kind=secondmate\nwindow=lab:w5:p5\nhome=%s\n' "$T/hA" > "$T/hB/state/back.meta"
+  accepts 'F2 control: a record-linked chain with a cycle and no conflicting claim'
+
+  # F3: one read per member judges both readability and pin; missing or unreadable is unproven.
+  fresh_case; printf 56557 > "$T/table-omit"
+  refuses 'process table' '(e) F3 a Herdr foreground member the process table omits'
+  fresh_case; proc 56559 1 53733 helper helper 'helper'; : > "$T/args-fail-56559"
+  refuses 'cannot be read' '(e) F3 an unrelated unreadable member whose args query fails is not proven to have exited'
+  fresh_case; proc 56559 1 53733 helper helper 'helper'
+  printf 'PATH=/usr/bin\nHOME=/x\nFM_SPAWN_GEN=s9.9.9\n' > "$T/env-seq-56559"
+  refuses 'cannot be read' '(e) F3 a member unreadable on the first read and foreign-pinned on the second'
+
+  # F4: only the JSON boolean true marks a sidechain; another value refuses.
+  fresh_case
+  { printf '{"type":"last-prompt","sessionId":"%s"}\n' "$UUID"
+    printf '%s\n' '{"type":"user","isSidechain":"false","timestamp":"2026-01-01T00:00:00.000Z","message":{"role":"user","content":"my own project"}}'
+    jq -nc --arg text "$DOORBELL" --arg ts 2099-01-01T00:00:00.000Z '{type:"user",timestamp:$ts,message:{role:"user",content:$text}}'
+  } > "$(transcript_dir)/$UUID.jsonl"
+  refuses 'no task-specific session tie' '(h) F4 an earlier user record whose isSidechain is the string "false"'
+  fresh_case
+  { printf '{"type":"last-prompt","sessionId":"%s"}\n' "$UUID"
+    printf '%s\n' '{"type":"user","isSidechain":1,"timestamp":"2026-01-01T00:00:00.000Z","message":{"role":"user","content":"my own project"}}'
+    jq -nc --arg text "$DOORBELL" --arg ts 2099-01-01T00:00:00.000Z '{type:"user",timestamp:$ts,message:{role:"user",content:$text}}'
+  } > "$(transcript_dir)/$UUID.jsonl"
+  refuses 'no task-specific session tie' '(h) F4 an earlier user record whose isSidechain is not a boolean'
+  fresh_case
+  { printf '{"type":"last-prompt","sessionId":"%s"}\n' "$UUID"
+    printf '%s\n' '{"type":"user","isSidechain":true,"timestamp":"2026-01-01T00:00:00.000Z","message":{"role":"user","content":"a subagent prompt"}}'
+    jq -nc --arg text "$DOORBELL" --arg ts 2099-01-01T00:00:00.000Z '{type:"user",timestamp:$ts,message:{role:"user",content:$text}}'
+  } > "$(transcript_dir)/$UUID.jsonl"
+  accepts 'F4 control: a real sidechain record (boolean true) before the doorbell'
+
+  # F5: a cwd reader that fails gives no proof, whatever it printed.
+  fresh_case; : > "$T/lsof-fail"
+  refuses 'kernel cwd' '(d) F5 lsof prints the cwd fields and then fails'
+  pass 'F1-F5: argv fields, record-linked homes, one read per member, boolean sidechains, failed readers'
 )
 
 test_launch_proof_claude_verdict_and_refusal() (
@@ -746,7 +832,7 @@ test_launch_proof_claude_verdict_and_refusal() (
       '-axo pid=,ppid=,pgid=') [ -f "$T/table-empty" ] && return 0; printf '%s\n' '53733 1 53733'; [ ! -f "$T/env-56557" ] || printf '%s\n' '56557 53733 53733'; [ ! -f "$T/unrelated" ] || printf '%s\n' '56560 1 53733' ;;
       '-axo pid=,ppid=') printf '%s\n' '53733 1' ;;
       '-p 53733 -o comm=') echo 2.1.316 ;;
-      '-p 53733 -o args=') if [ -f "$T/args" ]; then cat "$T/args"; else echo "claude --resume $UUID"; fi ;;
+      '-p 53733 -o args=') if [ -f "$T/argv" ]; then tr '\0' ' ' < "$T/argv" | sed 's/ $//'; echo; elif [ -f "$T/args" ]; then cat "$T/args"; else echo "claude --resume $UUID"; fi ;;
       '-p 56557 -o args=') [ -f "$T/env-56557" ] && echo 'railway mcp' ;;
       '-p 56557 -o ppid=') [ -f "$T/env-56557" ] && echo 53733 ;;
       '-p 56557 -o lstart=') [ -f "$T/env-56557" ] && echo 'Sat Nov 14 10:00:00 2026' ;;
@@ -757,6 +843,17 @@ test_launch_proof_claude_verdict_and_refusal() (
     esac
   }
   lsof() { printf 'p%s\0\nfcwd\0n%s\0\n' "$4" "$LANE"; }
+  # The structured argv reader: $T/argv holds NUL-separated fields; otherwise the args text split on spaces.
+  fm_launch_proof_pid_argv() {
+    local f n=0
+    if [ "$1" = 53733 ] && [ -f "$T/argv" ]; then
+      while IFS= read -r -d '' f; do n=$((n + 1)); done < "$T/argv"
+      printf '%s\0' "$n"; cat "$T/argv"; return
+    fi
+    local -a words
+    read -r -a words <<< "$(ps -p "$1" -o args=)" || return 1
+    printf '%s\0' "${#words[@]}" "${words[@]}"
+  }
   fm_remote_herdr_process_env() {
     [ "$1" != 56557 ] || { cat "$T/env-56557"; return; }
     [ "$1" != 56560 ] || return 1
@@ -945,6 +1042,15 @@ for root in sys.argv[1:]:
   # N6 at use: an unclassifiable line now precedes the doorbell.
   { printf 'not json\n'; cat "$T/task-transcript"; } > "$TRANSCRIPT"
   assert_equals unmanaged "$(fm_launch_proof_herdr "$META")" 'N6 an unclassifiable line before the doorbell voids the adoption at use'
+  cp "$T/task-transcript" "$TRANSCRIPT"
+  # F1 at use: the live argv now has the resume only inside a prompt operand.
+  printf 'claude\0--append-system-prompt\0discuss --resume %s\0' "$UUID" > "$T/argv"
+  assert_equals unmanaged "$(fm_launch_proof_herdr "$META")" 'F1 a prompt operand that reads like --resume voids the adoption at use'
+  rm -f "$T/argv"
+  assert_equals managed "$(fm_launch_proof_herdr "$META")" 'F1 control: the separate --resume is managed again'
+  # F4 at use: a malformed sidechain value now precedes the doorbell.
+  { printf '%s\n' '{"type":"user","isSidechain":"false","timestamp":"2026-01-01T00:00:00.000Z","message":{"role":"user","content":"mine"}}'; cat "$T/task-transcript"; } > "$TRANSCRIPT"
+  assert_equals unmanaged "$(fm_launch_proof_herdr "$META")" 'F4 a non-boolean isSidechain before the doorbell voids the adoption at use'
   cp "$T/task-transcript" "$TRANSCRIPT"
   # N3 at use: an unreadable live member outside the harness descent voids the adoption;
   # one descending from the harness (the caffeinate shape, Main 022) does not.

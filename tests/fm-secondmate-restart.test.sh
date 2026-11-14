@@ -589,7 +589,7 @@ test_remote_mate_restarts_over_the_transport_hop() {
 test_remote_unproven_agent_gets_no_request_record_or_nudge() {
   local dir out rc verdict
   for verdict in 'attribution=refuse: its live Herdr agent cannot be positively attributed to this task: live agent is an unpinned native restore' \
-    old-host '' 'attribution=proceed extra' 'attributed'; do
+    old-host '' 'attribution=proceed extra' 'attributed' $'attribution=proceed\n'; do
     dir=$(new_case remote-unproven)
     setup_remote_case "$dir" sm2 ok
     export FM_FAKE_ANSWER_STATUS="$dir/home/state/sm2.status"
@@ -607,6 +607,35 @@ test_remote_unproven_agent_gets_no_request_record_or_nudge() {
       || fail "remote verdict '$verdict' created a pending-reply record"
   done
   pass "N4 a remote mate whose host does not prove its agent gets no request, record, nudge or relaunch"
+}
+
+# --- F6: every remote placement asks its host, or refuses, before any effect ----
+test_remote_backend_other_than_herdr_refuses_before_any_effect() {
+  local dir out rc backend meta
+  for backend in tmux bogus omitted; do
+    dir=$(new_case remote-backend)
+    setup_remote_case "$dir" sm2 ok
+    meta="$dir/home/state/sm2.meta"
+    grep -v '^remote_backend=' "$meta" > "$meta.new" && mv "$meta.new" "$meta"
+    [ "$backend" = omitted ] || printf 'remote_backend=%s\n' "$backend" >> "$meta"
+    export FM_FAKE_ANSWER_STATUS="$dir/home/state/sm2.status"
+    out=$(run_restart "$dir" sm2); rc=$?
+    unset FM_FAKE_ANSWER_STATUS
+    if [ "$backend" = omitted ]; then
+      # An omitted remote_backend is Herdr: the host is asked and the restart goes on.
+      expect_code 0 "$rc" "an omitted remote_backend must ask the host and restart"$'\n'"$out"
+      grep -q '^fm-remote-secondmate-control.sh attribution sm2$' "$dir/ssh.log" || fail "the host verdict was not asked for an omitted backend"
+      continue
+    fi
+    expect_code 3 "$rc" "remote_backend=$backend must leave the mate unreached"$'\n'"$out"
+    assert_contains "$out" "unreached: sm2:" "remote_backend=$backend must be reported unreached"
+    assert_contains "$out" "remote_backend" "remote_backend=$backend must name the backend it refused"
+    assert_no_grep 'fm-remote-secondmate-control.sh send' "$dir/ssh.log" "remote_backend=$backend must send no request or nudge"
+    assert_no_grep 'fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" "remote_backend=$backend must not relaunch"
+    [ -z "$(find "$dir/home/state/pending-replies" -type f 2>/dev/null)" ] \
+      || fail "remote_backend=$backend created a pending-reply record"
+  done
+  pass "F6 a remote mate whose backend is not Herdr refuses before any effect; an omitted backend asks its host"
 }
 
 test_remote_fleet_restart_obeys_initiating_policy() {
@@ -1025,6 +1054,7 @@ test_local_restart_uses_the_home_pin_and_reports_what_ran
 test_native_ultra_restart_keeps_local_and_remote_profiles
 test_remote_mate_restarts_over_the_transport_hop
 test_remote_unproven_agent_gets_no_request_record_or_nudge
+test_remote_backend_other_than_herdr_refuses_before_any_effect
 test_remote_fleet_restart_obeys_initiating_policy
 test_remote_role_restart_resolves_the_pair_selected_after_persist
 test_unreachable_host_is_reported_unknown

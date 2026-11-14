@@ -2416,6 +2416,22 @@ test_remote_attribution_verb_reads_the_host_verdict() {
   remote_attribution "$dir" "$id"
   assert_equals attribution=proceed "$REMOTE_ATTRIBUTION_OUT" "a positively stopped agent proceeds to the host's own stopped-agent proofs"
   assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "the verb sends nothing to the pane"
+  # F7: read-only. A decision changes no file, and a home without a state
+  # directory gets no directory created before the verb refuses.
+  local before after bare
+  before=$(find "$dir/wt" -print | sort)
+  remote_attribution "$dir" "$id"
+  after=$(find "$dir/wt" -print | sort)
+  [ "$before" = "$after" ] || fail "the attribution verb created or removed a file in the host home"
+  bare="$dir/bare-home"
+  mkdir -p "$bare/bin"; printf '%s\n' "$id" > "$bare/.fm-secondmate-home"; printf '# home\n' > "$bare/AGENTS.md"
+  before=$(find "$bare" -print | sort)
+  REMOTE_ATTRIBUTION_OUT=$(env -u HERDR_ENV -u HERDR_PANE_ID -u HERDR_SESSION -u HERDR_SOCKET_PATH \
+    PATH="$dir/fakebin:$PATH" FM_HOME="$bare" FM_FAKE_DIR="$dir/fake" HOME="$dir/user-home" CLAUDE_CONFIG_DIR='' \
+    "$ROOT/bin/fm-remote-secondmate-control.sh" attribution "$id" 2>/dev/null) || fail "the verb failed on a bare home"
+  assert_equals "attribution=refuse: no endpoint record for $id on this host" "$REMOTE_ATTRIBUTION_OUT" "a bare home refuses"
+  after=$(find "$bare" -print | sort)
+  [ "$before" = "$after" ] || fail "the attribution verb created a directory in a bare home: $(comm -13 <(printf '%s\n' "$before") <(printf '%s\n' "$after"))"
   pass "remote attribution: the host verb prints one decision line from the one verdict owner"
 }
 
