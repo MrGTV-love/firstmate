@@ -683,8 +683,9 @@
 #     an argument or as text inside another value); a place in
 #     state/<id>.teardown-owned (pid AND birth identity), written at the start of
 #     the teardown, before any reaping or endpoint closure, from the live
-#     descendants of the marker-bearing worker, never extended once no bearer
-#     is alive, kept by a refusal for its retry and removed by the successful close; or a
+#     descendants of the marker-bearing worker, never extended from the process table
+#     once no bearer is alive (only the pane shell below is added, from its endpoint),
+#     kept by a refusal for its retry and removed by the successful close; or a
 #     live parent chain to either. Those three are the only proofs. The shell of the task's
 #     own terminal pane (the tmux or herdr pane this teardown validated against the task's
 #     record, its shell pid read from the backend) is one case of the record: the export

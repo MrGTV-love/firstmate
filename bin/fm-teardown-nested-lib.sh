@@ -437,7 +437,8 @@ teardown_pane_shell_pid_of() {  # <backend> <target> <bin-dir> <tmux-seconds> <h
 # bearers included, except this teardown's own process and its ancestors. Run once
 # at the start of a teardown, before anything is reaped or any endpoint is closed.
 # Entries already recorded stay; nothing is added when no bearer is alive, so the
-# record is never extended after the worker is gone. Failure to read the process
+# record is never extended from the process table after the worker is gone (the task's
+# own pane shell is added from its endpoint, teardown_owned_record_pane_shell). Failure to read the process
 # table records nothing and is not an error (unrecorded processes stay unproved).
 teardown_owned_record_write() {
   local rec expected table ancestors cur pids line pid identity tmp proc_root candidates bearers=" "
