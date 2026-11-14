@@ -880,7 +880,7 @@ test_squash_merged_rebased_branch_allows() {
 # landed and only the forge's merged record can. With the record merged teardown
 # proceeds; with it unmerged the same history refuses.
 test_squash_merged_forgejo_pr_allows_when_main_moved_on() {
-  local case_dir rc pr_head tmp merged expected
+  local case_dir rc pr_head tmp merged expected reworded
   for merged in true false; do
     case_dir=$(make_case "forgejo-merged-$merged")
     write_meta "$case_dir" no-mistakes ship
@@ -895,6 +895,7 @@ test_squash_merged_forgejo_pr_allows_when_main_moved_on() {
     git -C "$tmp" add -- feature.txt shared.txt
     git -C "$tmp" -c user.email=t@t -c user.name=t commit -q -m "feat: squash, reworded (#7)"
     git -C "$tmp" push -q -f origin main
+    reworded=$(git -C "$tmp" rev-parse HEAD)
     rm -rf "$tmp"
     printf '%s\n' \
       'pr=https://git.example.org/team/repo/pulls/7' \
@@ -908,6 +909,12 @@ test_squash_merged_forgejo_pr_allows_when_main_moved_on() {
     expected=1
     [ "$merged" = false ] || expected=0
     expect_code "$expected" "$rc" "forgejo-merged-$merged: teardown exit"$'\n'"$(cat "$case_dir/stderr")"
+    if [ "$merged" = false ]; then
+      # The refusal judged the reworded default branch, not a stale or failed fetch.
+      assert_equals "$reworded" "$(git -C "$case_dir/wt" rev-parse refs/remotes/origin/main)" \
+        "forgejo-merged-false: the copy did not see the reworded default branch"
+      assert_grep 'REFUSED: the ship deliverable is not landed' "$case_dir/stderr" "forgejo-merged-false: the refusal was not the landing refusal"
+    fi
     grep -qF -- 'api --login fj --repo team/repo /repos/{owner}/{repo}/pulls/7' "$case_dir/tea.log" \
       || fail "forgejo-merged-$merged: teardown did not read the Forgejo pull request through tea"
   done
