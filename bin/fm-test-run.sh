@@ -142,18 +142,24 @@
 # An unnested --check-coverage takes one pass for its whole scan.
 # A runner already inside a pass (FM_CPU_PASS_HELD set) takes no additional pass
 # and runs at most that many concurrent scripts, reporting a reduced --jobs on stderr.
-# The marker must be a nonnegative decimal integer or execution exits 125;
-# 0 denotes degraded work with no CPU-pass concurrency limit.
+# Each script it runs beside others receives its share of the inherited count as its own
+# marker (the count divided by --jobs, rounded down), and a script it runs alone receives
+# the whole count, so scripts that run runners of their own stay within the count together.
+# The marker must be a nonnegative decimal integer (001 means 1) or every execution mode,
+# --check-coverage included, exits 125; 0 denotes degraded work with no CPU-pass
+# concurrency limit and is passed on unchanged.
 # Without python3 or the pool tool beside it, scripts run without a CPU pass.
 #
 # Each executed script also takes one slot of its test.<script> key from the
-# host-wide per-key gate (python3 bin/fm-duration.py gate), outside the CPU pass
-# and the per-script bound, so the same heavy suite started in several worktrees
-# runs at most FM_TEST_KEY_SLOTS (default 2) copies at a time. A waiter prints
-# which key it waits on and who holds the slots on the CPU-pass log descriptor
-# and waits until a holder ends, never admitted by elapsed time; a nested
-# run of a key already held (FM_TEST_SLOT_HELD) takes none, and a run inside a
-# pass (FM_CPU_PASS_HELD above 0) takes no slot. The time a script
+# host-wide per-key gate (python3 bin/fm-duration.py gate), outside the per-script
+# bound, so the same heavy suite started in several worktrees runs at most
+# FM_TEST_KEY_SLOTS (default 2) copies at a time. An unnested runner has the gate take
+# its CPU pass in the same acquisition (gate --cpu-pass), so a waiter holds neither and
+# no slot holder waits for a pass. A waiter prints which key it waits on and who holds
+# the slots on the CPU-pass log descriptor and waits until a holder ends, never admitted
+# by elapsed time; a nested run of a key already held (FM_TEST_SLOT_HELD) takes none, a
+# key asked for from inside another key's slot is counted at its own nesting level, and
+# FM_CPU_PASS_HELD never skips a slot (bin/fm-duration.py's header owns the rule). The time a script
 # queued for its slot is left out of its recorded duration, its FM_TEST_END
 # duration_ms and its test.<script> sample, and that sample records no start load
 # (the load was read before the queue); the run's own wall time (--max-wall-ms,
@@ -2741,6 +2747,15 @@ if [ "$LIST_LANES" -eq 1 ]; then
   exit 0
 fi
 
+# Every execution mode, including the coverage scan, refuses a malformed inherited marker.
+if [ -n "${FM_CPU_PASS_HELD+x}" ]; then
+  case "$FM_CPU_PASS_HELD" in
+    ''|*[!0-9]*)
+      log "FM_CPU_PASS_HELD must be a nonnegative decimal integer"
+      exit 125 ;;
+  esac
+fi
+
 if [ "$CHECK_COVERAGE" -eq 1 ]; then
   # The guard is one long sequential scan of the test inventory (measured 20 CPU seconds
   # over 37 s), so an unnested run takes one pass of the host-wide pool like a script does.
@@ -2939,13 +2954,12 @@ fi
 CPU_PASS_ACTIVE=1
 CPU_PASS_LOG_FD=8
 exec 8>&2
+# The scripts of a runner inside passes get their share of the inherited count; see run_script_bounded.
+RUN_PASS_SHARE=
+CONCURRENT_PASS_SHARE=
 if [ -n "${FM_CPU_PASS_HELD+x}" ]; then
+  # Validated above, before any execution mode ran; only a positive count is normalized here.
   inherited_passes=$FM_CPU_PASS_HELD
-  case "$inherited_passes" in
-    ''|*[!0-9]*)
-      log "FM_CPU_PASS_HELD must be a nonnegative decimal integer"
-      exit 125 ;;
-  esac
   while [ "${inherited_passes#0}" != "$inherited_passes" ]; do
     inherited_passes=${inherited_passes#0}
   done
@@ -2954,6 +2968,13 @@ if [ -n "${FM_CPU_PASS_HELD+x}" ]; then
     printf 'fm-test-run: reducing --jobs %s to inherited FM_CPU_PASS_HELD=%s\n' \
       "$JOBS" "$inherited_passes" >&"$CPU_PASS_LOG_FD"
     JOBS=$inherited_passes
+  fi
+  if [ -n "$inherited_passes" ]; then
+    RUN_PASS_SHARE=$inherited_passes
+    CONCURRENT_PASS_SHARE=$inherited_passes
+    if [ "${#inherited_passes}" -le 6 ] && [ "${#JOBS}" -le 6 ]; then
+      CONCURRENT_PASS_SHARE=$((inherited_passes / JOBS))
+    fi
   fi
   CPU_PASS_ACTIVE=0
 elif [ ! -x "$ROOT/bin/fm-cpu-pass.sh" ] || [ ! -r "$ROOT/bin/fm-cpu-pass.py" ]; then
@@ -3211,10 +3232,17 @@ run_script_bounded() {  # <script> <out> <stream> <id>
   # shellcheck source=tests/git-config-helpers.sh
   . "$ROOT/tests/git-config-helpers.sh" || return
   local rc script_seconds=$PER_SCRIPT_TIMEOUT_SECS
+  if [ -n "${RUN_PASS_SHARE:-}" ]; then
+    # A runner inside passes lets this script's own nested runners use only its share of them,
+    # so scripts running together never each spend the whole inherited count. Declared local so
+    # the runner's own marker is left as the caller had it.
+    local FM_CPU_PASS_HELD
+    export FM_CPU_PASS_HELD=$RUN_PASS_SHARE
+  fi
   if [ "$script_seconds" -gt 0 ] && declare -F fm_duration_limit >/dev/null 2>&1; then
     script_seconds=$(fm_duration_limit "test.$script" "$script_seconds" 99) || return $?
   fi
-  local -a cmd
+  local -a cmd pass_option
   : "$id"
   if [ "$PROGRESS_GUARD" -eq 1 ]; then
     # Expansion is intentionally deferred to the child bash passed to -c.
@@ -3249,14 +3277,20 @@ run_script_bounded() {  # <script> <out> <stream> <id>
     : >"$out.guarded"
     cmd=(python3 "$ROOT/bin/fm-duration.py" run "test.$script" -- "${cmd[@]}")
   fi
-  if [ "$CPU_PASS_ACTIVE" -eq 1 ]; then
+  if [ "$TEST_SLOT_ACTIVE" -eq 1 ]; then
+    # Outermost: a waiter holds neither a CPU pass nor any part of the bound. The gate
+    # takes the slot and the pass as one acquisition, so no process waits for a pass
+    # while it holds a slot (bin/fm-duration.py's header owns the protocol).
+    pass_option=()
+    if [ "$CPU_PASS_ACTIVE" -eq 1 ]; then
+      pass_option=(--cpu-pass "fm-test-run $script")
+    fi
+    cmd=(python3 "$ROOT/bin/fm-duration.py" gate --log-fd "$CPU_PASS_LOG_FD" \
+      --wait-file "$out.slotwait" --cpu-file "$out.cpu" ${pass_option[@]+"${pass_option[@]}"} \
+      "test.$script" -- "${cmd[@]}")
+  elif [ "$CPU_PASS_ACTIVE" -eq 1 ]; then
     cmd=("$ROOT/bin/fm-cpu-pass.sh" run --label "fm-test-run $script" \
       --log-fd "$CPU_PASS_LOG_FD" -- "${cmd[@]}")
-  fi
-  if [ "$TEST_SLOT_ACTIVE" -eq 1 ]; then
-    # Outermost: a waiter holds neither a CPU pass nor any part of the bound.
-    cmd=(python3 "$ROOT/bin/fm-duration.py" gate --log-fd "$CPU_PASS_LOG_FD" \
-      --wait-file "$out.slotwait" --cpu-file "$out.cpu" "test.$script" -- "${cmd[@]}")
   fi
   set +e
   if [ "$stream" -eq 1 ]; then
@@ -3427,6 +3461,7 @@ else
       fi
       begin_ms=$(now_ms)
       set +e
+      RUN_PASS_SHARE=$CONCURRENT_PASS_SHARE
       TMPDIR="$work/tmp" TMP="$work/tmp" run_script_bounded "$script" "$work/output" 0 "w$worker_n"
       rc=$?
       set -e

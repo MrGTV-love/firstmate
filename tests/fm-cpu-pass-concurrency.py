@@ -57,6 +57,16 @@ if len(sys.argv) > 1 and os.path.basename(sys.argv[1]) in ('fm-cpu-pass.py', 'fm
             def limit(self): return self.reading()['limit'], 'case'
             def count(self): return self.reading()['count']
         guard.open_source = lambda: Fake()
+    if os.environ.get('CASE_ADMISSION_LOG'):
+        import time as _time
+        _sleep = _time.sleep
+        def _logged(seconds):
+            frame = sys._getframe(1)
+            if frame.f_code.co_name == 'cmd_pipeline_start':
+                with open(os.environ['CASE_ADMISSION_LOG'], 'a') as log:
+                    log.write(str(frame.f_locals.get('reason', '?')) + '\\n')
+            _sleep(seconds)
+        _time.sleep = _logged
     if os.environ.get('CASE_DB'):
         connect = sqlite3.connect
         host = pathlib.Path('~/.no-mistakes/state.sqlite').expanduser().resolve().as_uri()
@@ -233,6 +243,13 @@ def kill_group(child):
         pass
 
 
+def sampling_valid(case, seen, label):
+    """A sampler that saw no worker, or that slept longer than a worker lives, proves nothing about a cap."""
+    case.check(seen['peak_total'] > 0, '%s: the sampler never saw a worker, so a cap that held proves nothing' % label)
+    case.check(seen['gap_p99_ms'] <= 100 and seen['gap_max_ms'] <= 1000,
+               '%s: the sampler skipped too long (p99 gap %d ms, max gap %d ms): it may have missed a short-lived worker' % (label, seen['gap_p99_ms'], seen['gap_max_ms']))
+
+
 def starts(world):
     log = world.alive / 'starts.log'
     rows = [line.split() for line in log.read_text().splitlines()] if log.exists() else []
@@ -280,6 +297,16 @@ def isolated_scripts(count):
     return names if count is None else names[:count]
 
 
+def nested_repo(world, outer, inner, seconds):
+    """A fixture repository whose OUTER scripts each run the real runner over the INNER worker scripts: two levels of runner."""
+    path = runner_repo(world, inner, seconds)
+    shutil.copy(repo / 'bin' / 'fm-duration.py', path / 'bin' / 'fm-duration.py')
+    for name in outer:
+        (path / 'tests' / name).write_text('#!/usr/bin/env bash\ncd "$(dirname "$0")/.." || exit 1\n'
+                                           'exec bin/fm-test-run.sh --jobs 2 %s\n' % ' '.join('tests/' + item for item in inner))
+    return path
+
+
 # --------------------------------------------------------------------------------------
 def case_nested():
     """H3 a-c: K outer runners holding p passes each, each running an inner runner that asks for more."""
@@ -299,6 +326,7 @@ def case_nested():
                  sampled_max_passes_held=seen['peak_held'], samples=seen['samples'], sampler_gap_p99_ms=seen['gap_p99_ms'],
                  sampler_gap_max_ms=seen['gap_max_ms'])
     case.check(codes == [0] * K, 'an outer runner failed: %s %s' % (codes, [world.text('outer%d' % i) for i in range(K)]))
+    sampling_valid(case, seen, 'nested')
     case.check(seen['peak_total'] <= N, 'workers alive together %d exceed the pool size %d' % (seen['peak_total'], N))
     case.check(seen['peak_total'] > 0 and sum(1 for g in seen['peak_group'] if g.startswith('outer')) == K, 'a sampler that saw no worker of some outer runner proves nothing: %s' % seen)
     for group, peak in seen['peak_group'].items():
@@ -309,6 +337,162 @@ def case_nested():
         reduced = world.text('outer%d' % i).count('reducing --jobs 6 to inherited FM_CPU_PASS_HELD=%d' % p)
         case.check(reduced == 1, 'outer%d printed %d reduction notices instead of 1' % (i, reduced))
         case.check(world.text('outer%d' % i, 'out').count('exit=0') == len(names), 'outer%d did not finish every script' % i)
+    return case
+
+
+def case_nested_two_level():
+    """H3 a-c, two levels: suites that each launch an inner runner share, not duplicate, the inherited passes."""
+    case = Case('H3 two-level', 'outer runner inside p passes -> suites that each run an inner runner --jobs 2 -> workers')
+    rows = {}
+    for label, cores, K, p in (('pool2-one-outer-2-passes', 2, 1, 2), ('pool%d-two-outers-%d-passes' % (N, N // 2), N, 2, N // 2)):
+        world = World('two-level-' + label, cores=cores)
+        names = isolated_scripts(4)
+        path = nested_repo(world, names[:2], names[2:], 0.5)
+        world.sample_start()
+        outers = [world.launch('outer%d' % i, ['bash', tool('fm-cpu-pass.sh'), 'run', '--passes', str(p), '--label', 'outer%d' % i, '--',
+                                              'bash', '-c', 'cd "$1" && shift && exec bin/fm-test-run.sh --jobs 2 "$@"', '_', str(path)]
+                               + ['tests/' + name for name in names[:2]], extra=dict(FM_CONC_GROUP='outer%d' % i)) for i in range(K)]
+        codes = wait_all(outers)
+        seen = world.sample_stop()
+        began = len(starts(world))
+        rows[label] = dict(outer_runners=K, passes_each=p, pool_size=cores, workers_started=began, sampled_max_workers_total=seen['peak_total'],
+                           sampled_max_per_outer=seen['peak_group'], sampled_max_passes_held=seen['peak_held'], samples=seen['samples'])
+        case.check(codes == [0] * K, '%s: an outer runner failed: %s %s' % (label, codes, [world.text('outer%d' % i) for i in range(K)]))
+        sampling_valid(case, seen, label)
+        case.check(began == 4 * K, '%s: only %d of %d workers started' % (label, began, 4 * K))
+        case.check(seen['peak_total'] <= cores, '%s: %d workers alive together on a pool of %d' % (label, seen['peak_total'], cores))
+        for group, peak in seen['peak_group'].items():
+            case.check(peak <= p, '%s: %s ran %d workers together inside %d passes' % (label, group, peak, p))
+        case.check(seen['peak_held'] <= cores, '%s: %d passes held together on a pool of %d' % (label, seen['peak_held'], cores))
+    case.measure(**rows)
+    return case
+
+
+def case_padded_marker():
+    """H3 d / nested-marker protocol: a valid decimal marker with leading zeros means the same count as its canonical form."""
+    case = Case('H3 padded marker', 'FM_CPU_PASS_HELD=001 inside one genuinely held pass limits every participant to one worker')
+    world = World('padded', cores=2)
+    holder = ['bash', tool('fm-cpu-pass.sh'), 'run', '--passes', '1', '--label', 'outer', '--', 'env', 'FM_CPU_PASS_HELD=001']
+    # The isolation proof.
+    family = proof_family_repo(world, ['fm-fam-%d.test.sh' % index for index in range(4)])
+    world.sample_start()
+    proof = world.launch('proof', holder + ['bash', str(family / 'bin' / 'fm-test-isolation-proof.sh'), '--pool', 'fam', '--jobs', '4'])
+    code = wait_all([proof])
+    seen = world.sample_stop()
+    case.measure(proof_markers=proof_markers(world.text('proof', 'out')), proof_sampled_max_workers=seen['peak_total'])
+    case.check(code == [0], 'the proof failed: %s %s' % (code, world.text('proof')[-300:]))
+    case.check(seen['peak_total'] == 1, 'the proof ran %d workers together inside one pass (marker 001)' % seen['peak_total'])
+    case.check(proof_markers(world.text('proof', 'out')) == ['FM_ISOLATION_BEGIN concurrency=1', 'FM_ISOLATION_SUMMARY concurrency=1'],
+               'the proof did not record the one worker it ran: %s' % proof_markers(world.text('proof', 'out')))
+    # Lint.
+    lint = World('padded-lint', cores=2)
+    required = subprocess.run(['bash', tool('fm-lint.sh'), '--required-version'], capture_output=True, text=True, check=True).stdout.strip()
+    fakebin = lint.folder / 'fakebin'
+    fakebin.mkdir()
+    (fakebin / 'shellcheck').write_text('#!/bin/sh\nif [ "$1" = "--version" ]; then printf "ShellCheck\\nversion: %s\\n" "' + required + '"; exit 0; fi\n'
+                                        'exec "$FM_CONC_PYTHON" "$FM_CONC_WORKER" "$FM_CONC_ALIVE" lint 0.4\n')
+    (fakebin / 'shellcheck').chmod(0o755)
+    roots = []
+    for index in range(4):
+        script = lint.folder / ('root%d.sh' % index)
+        script.write_text('#!/usr/bin/env bash\nexit 0\n')
+        roots.append(str(script))
+    lint.sample_start()
+    run = lint.launch('lint', holder + ['bash', tool('fm-lint.sh'), '--jobs', '2'] + roots,
+                      extra=dict(PATH=str(fakebin) + os.pathsep + lint.env['PATH'], FM_LINT_CACHE_DIR='off', FM_LINT_SLOT_DIR='off', FM_LINT_JOBS='2'))
+    lint_code = wait_all([run])
+    lint_seen = lint.sample_stop()
+    case.measure(lint_sampled_max_shellchecks=lint_seen['peak_total'])
+    case.check(lint_code == [0], 'lint failed: %s' % lint.text('lint')[-300:])
+    case.check(lint_seen['peak_total'] == 1, 'lint ran %d ShellChecks together inside one pass (marker 001)' % lint_seen['peak_total'])
+    # The runner.
+    runner = World('padded-runner', cores=2)
+    names = isolated_scripts(4)
+    path = runner_repo(runner, names, 0.4)
+    runner.sample_start()
+    job = runner.launch('runner', holder + ['bash', str(path / 'bin' / 'fm-test-run.sh'), '--jobs', '4'] + ['tests/' + name for name in names],
+                        extra=dict(FM_CONC_GROUP='runner'))
+    runner_code = wait_all([job])
+    runner_seen = runner.sample_stop()
+    case.measure(runner_sampled_max_workers=runner_seen['peak_total'])
+    case.check(runner_code == [0], 'runner failed: %s' % runner.text('runner')[-300:])
+    case.check(runner_seen['peak_total'] == 1, 'the runner ran %d workers together inside one pass (marker 001)' % runner_seen['peak_total'])
+    return case
+
+
+def case_key_guard():
+    """H8 guard widening: a claimed marker never skips the per-key slot, and degraded or genuine work still waits for it."""
+    case = Case('H8 key guard', 'an unverified FM_CPU_PASS_HELD, or an isolation proof that holds no pass, still waits for a held key slot')
+    world = World('key-guard')
+    only_one = dict(FM_TEST_KEY_SLOTS='1')
+    for mode, claim in (('gate', '3'), ('run', '3'), ('gate-padded', '003')):
+        ready = world.folder / (mode + '.ready')
+        holder = world.launch(mode + '-holder', [pyshim, tool('fm-duration.py'), 'gate', 'test.claim.' + mode, '--', 'bash', '-c', 'touch "$1"; sleep 4', '_', str(ready)], extra=only_one)
+        for _ in range(300):
+            if ready.exists():
+                break
+            time.sleep(0.05)
+        marker = world.folder / (mode + '.ran')
+        action = 'run' if mode == 'run' else 'gate'
+        waiter = world.launch(mode + '-waiter', [pyshim, tool('fm-duration.py'), action, 'test.claim.' + mode, '--', 'touch', str(marker)],
+                              extra=dict(only_one, FM_CPU_PASS_HELD=claim))
+        holder.wait(timeout=60)
+        ended = time.time()
+        wait_all([waiter])
+        ran = marker.stat().st_mtime if marker.exists() else None
+        case.measure(**{mode + '_waiter_ran_after_holder_end_s': None if ran is None else round(ran - ended, 2)})
+        case.check(ran is not None and ran >= ended - 0.05, '%s: a claimed FM_CPU_PASS_HELD=%s ran %.2f s before the key slot holder ended' % (mode, claim, ended - (ran or 0)))
+    # An isolation proof that holds no pass (pool unusable) or a real one: a candidate's nested gate waits for the held key.
+    blocker = world.folder / 'not-a-directory'
+    blocker.write_text('x')
+    for mode, extra in (('degraded-proof', dict(FM_CPU_POOL_DIR=str(blocker))), ('genuine-proof', {})):
+        probe = world.folder / (mode + '-probe')
+        probe.mkdir()
+        body = ('printf "%s\\n" "${FM_CPU_PASS_HELD-unset}" >"$FM_CONC_PROBE/marker"\n'
+                '"$FM_CONC_SHIM" "$FM_CONC_DURATION" gate test.proofkey.' + mode + ' -- touch "$FM_CONC_PROBE/ran"\n')
+        family = proof_family_repo(world, ['fm-fam-%d.test.sh' % index for index in range(2)], body=body, folder=mode + '-repo')
+        ready = world.folder / (mode + '.ready')
+        holder = world.launch(mode + '-holder', [pyshim, tool('fm-duration.py'), 'gate', 'test.proofkey.' + mode, '--', 'bash', '-c', 'touch "$1"; sleep 4', '_', str(ready)], extra=only_one)
+        for _ in range(300):
+            if ready.exists():
+                break
+            time.sleep(0.05)
+        proof = world.launch(mode, ['bash', str(family / 'bin' / 'fm-test-isolation-proof.sh'), '--pool', 'fam', '--jobs', '2'],
+                             extra=dict(only_one, **extra, FM_CONC_PROBE=str(probe), FM_CONC_SHIM=pyshim, FM_CONC_DURATION=tool('fm-duration.py')))
+        holder.wait(timeout=60)
+        ended = time.time()
+        code = wait_all([proof], timeout=120)
+        ran = (probe / 'ran').stat().st_mtime if (probe / 'ran').exists() else None
+        seen_marker = (probe / 'marker').read_text().strip() if (probe / 'marker').exists() else None
+        case.measure(**{mode + '_candidate_marker': seen_marker, mode + '_ran_after_holder_end_s': None if ran is None else round(ran - ended, 2)})
+        case.check(code == [0], '%s: the proof failed: %s' % (mode, world.text(mode)[-300:]))
+        case.check(ran is not None and ran >= ended - 0.05, '%s: a candidate gate ran %.2f s before the key slot holder ended' % (mode, ended - (ran or 0)))
+        case.check(seen_marker == ('0' if mode == 'degraded-proof' else '1'),
+                   '%s: the candidate saw FM_CPU_PASS_HELD=%s, but the proof holds %s' % (mode, seen_marker, 'no pass' if mode == 'degraded-proof' else 'one pass per worker'))
+    return case
+
+
+def case_cross_key():
+    """H4/H5: two gates that each hold one key and nest the other finish without any timeout, in every pass mode."""
+    case = Case('H4/H5 cross-key', 'gate A nests gate B while gate B nests gate A, one slot per key: neither waits for the other forever')
+    blocker_world = World('cross-blocker')
+    blocker = blocker_world.folder / 'not-a-directory'
+    blocker.write_text('x')
+    script = 'touch "$1"; while [ ! -e "$2" ]; do sleep 0.05; done; exec "$3" "$4" gate "$5" -- touch "$6"'
+    for mode, wrap, extra in (('no-pass-marker', [], {}), ('degraded-marker-0', ['bash', tool('fm-cpu-pass.sh'), 'run', '--'], dict(FM_CPU_POOL_DIR=str(blocker))),
+                              ('genuine-marker-1', ['bash', tool('fm-cpu-pass.sh'), 'run', '--'], {})):
+        world = World('cross-' + mode)
+        env = dict(FM_TEST_KEY_SLOTS='1', **extra)
+        a_ready, b_ready, a_done, b_done = (world.folder / name for name in ('a.ready', 'b.ready', 'a.done', 'b.done'))
+        gate_a = world.launch('a', wrap + [pyshim, tool('fm-duration.py'), 'gate', 'test.cross.a', '--', 'bash', '-c', script, '_',
+                                           str(a_ready), str(b_ready), pyshim, tool('fm-duration.py'), 'test.cross.b', str(a_done)], extra=env)
+        gate_b = world.launch('b', wrap + [pyshim, tool('fm-duration.py'), 'gate', 'test.cross.b', '--', 'bash', '-c', script, '_',
+                                           str(b_ready), str(a_ready), pyshim, tool('fm-duration.py'), 'test.cross.a', str(b_done)], extra=env)
+        began = time.monotonic()
+        codes = wait_all([gate_a, gate_b], timeout=30)
+        case.measure(**{mode + '_exit_codes': codes, mode + '_seconds': round(time.monotonic() - began, 1)})
+        case.check(codes == [0, 0] and a_done.exists() and b_done.exists(),
+                   '%s: the two gates did not both finish: %s %s %s' % (mode, codes, world.text('a')[-200:], world.text('b')[-200:]))
     return case
 
 
@@ -323,6 +507,7 @@ def case_malformed():
         'fm-duration.py gate': [pyshim, tool('fm-duration.py'), 'gate', 'test.malformed', '--', 'true'],
         'fm-duration.py run': [pyshim, tool('fm-duration.py'), 'run', 'test.malformed', '--', 'true'],
         'fm-lint.sh': ['bash', tool('fm-lint.sh'), '--list-files'],
+        'fm-test-run.sh --check-coverage': ['bash', tool('fm-test-run.sh'), '--check-coverage'],
     }
     codes = {}
     for name, command in rows.items():
@@ -413,9 +598,11 @@ def case_lint():
     return case
 
 
-def proof_family_repo(world, scripts):
-    """A fixture repository whose stub runner names one concurrent-safe family of SCRIPTS, jobs max 4."""
-    path = world.folder / 'family-repo'
+def proof_family_repo(world, scripts, body=None, folder='family-repo'):
+    """A fixture repository whose stub runner names one concurrent-safe family of SCRIPTS, jobs max 4.
+
+    Each candidate runs BODY when given, else it checks it holds one pass and runs one synthetic worker."""
+    path = world.folder / folder
     (path / 'bin').mkdir(parents=True)
     (path / 'tests').mkdir()
     for name in ('fm-test-isolation-proof.sh', 'fm-cpu-pass.sh', 'fm-cpu-pass.py'):
@@ -429,8 +616,9 @@ def proof_family_repo(world, scripts):
                                                  'esac\n')
     (path / 'bin' / 'fm-test-run.sh').chmod(0o755)
     for name in scripts:
-        (path / 'tests' / name).write_text('#!/usr/bin/env bash\n[ "$FM_CPU_PASS_HELD" = 1 ] || exit 3\n'
-                                           'exec "$FM_CONC_PYTHON" "$FM_CONC_WORKER" "$FM_CONC_ALIVE" proof 0.2\n')
+        (path / 'tests' / name).write_text('#!/usr/bin/env bash\n' + (body if body is not None else
+                                           '[ "$FM_CPU_PASS_HELD" = 1 ] || exit 3\n'
+                                           'exec "$FM_CONC_PYTHON" "$FM_CONC_WORKER" "$FM_CONC_ALIVE" proof 0.2\n'))
     return path
 
 
@@ -532,6 +720,7 @@ def case_waiting():
     runs = {
         'fm-cpu-pass.sh run': ['bash', tool('fm-cpu-pass.sh'), 'run', '--', 'bash', '-c', 'echo held=$FM_CPU_PASS_HELD'],
         'fm-duration.py run': [pyshim, tool('fm-duration.py'), 'run', 'test.unusable', '--', 'bash', '-c', 'echo held=$FM_CPU_PASS_HELD'],
+        'fm-duration.py gate --cpu-pass': [pyshim, tool('fm-duration.py'), 'gate', '--cpu-pass', 'unusable-gate', 'test.unusable', '--', 'bash', '-c', 'echo held=$FM_CPU_PASS_HELD'],
     }
     notices = {}
     for name, command in runs.items():
@@ -662,7 +851,8 @@ def case_soak():
     (world.folder / 'procs.json').write_text(json.dumps(dict(count=100, limit=10666, error=False)))
     (world.folder / 'fmhome').mkdir()
     facts(world.folder)
-    world.env.update(CASE_LOAD=str(world.folder / 'load.json'), CASE_DB=str(database), CASE_PROCS=str(world.folder / 'procs.json'),
+    admission_log = world.folder / 'admission-waits.log'
+    world.env.update(CASE_ADMISSION_LOG=str(admission_log), CASE_LOAD=str(world.folder / 'load.json'), CASE_DB=str(database), CASE_PROCS=str(world.folder / 'procs.json'),
                      FM_MEMORY_FIXTURE_DIR=str(world.folder / 'native'), FM_HOME=str(world.folder / 'fmhome'))
     burners = [subprocess.Popen([python, str(burner), str(60 + ROUNDS * 20)]) for _ in range(BURNERS)]
     completed = {'heavy': 0, 'brief': 0, 'light': 0}
@@ -711,23 +901,106 @@ def case_soak():
     status = json.loads(subprocess.run(['bash', tool('fm-cpu-pass.sh'), 'status', '--json'], env=world.env, capture_output=True, text=True, timeout=30).stdout)
     leftovers = sorted(path_.name for path_ in world.pool.glob('pipeline-waiter-*'))
     sample_decision = decisions[0][1] if decisions else ''
+    # Every sleep of the admission loop is recorded with its cause at the process boundary, so a wait shorter than
+    # the first notice (2 s) is seen too. Waiting for another start's registration or for an earlier start in the
+    # queue is ordering among starts; any other cause is a wait for capacity, memory, processes or load.
+    causes = admission_log.read_text().splitlines() if admission_log.exists() else []
+    ordering = [cause for cause in causes if cause == 'another start is registering' or 'behind a higher-priority or earlier start' in cause]
+    capacity = [cause for cause in causes if cause not in ordering]
     case.measure(lanes=LANES, rounds_per_lane=ROUNDS, pool_size=N, background_burners_without_passes=BURNERS, forced_load_average=500,
                  window_seconds=round(elapsed, 1), sampled_max_workers_total=seen['peak_total'], sampled_max_passes_held=seen['peak_held'],
                  samples=seen['samples'], sampler_gap_p99_ms=seen['gap_p99_ms'], sampler_gap_max_ms=seen['gap_max_ms'],
                  heavy_completed='%d of %d' % (completed['heavy'], expected), brief_route_completed='%d of %d' % (completed['brief'], 2 * expected),
                  light_starts_completed='%d of %d' % (completed['light'], expected), light_starts_admitted_at_once_counted_0=len(admitted),
-                 light_starts_with_a_wait_line=len(waits), sample_light_start_record=sample_decision,
+                 light_starts_with_a_wait_line=len(waits), admission_sleeps_waiting_for_another_start=len(ordering),
+                 admission_sleeps_waiting_for_capacity_or_load=len(capacity), sample_light_start_record=sample_decision,
                  final_status='held=%d free=%d' % (status['held'], status['free']), final_queue_entries=leftovers)
     case.check(not failures, 'requests failed: %s' % failures[:3])
     case.check(seen['peak_total'] <= N, 'the soak ran %d workers together on a pool of %d' % (seen['peak_total'], N))
     case.check(completed == dict(heavy=expected, brief=2 * expected, light=expected), 'not every request completed: %s' % completed)
+    sampling_valid(case, seen, 'soak')
     case.check(len(admitted) == expected and not waits, 'a light start waited or was not admitted at once under load 500: %s' % waits[:2])
+    case.check(not capacity, 'a light start slept for capacity or load although the count was below the limit: %s' % capacity[:3])
     case.check(status['held'] == 0 and not leftovers, 'the queue was not empty at the end: %s %s' % (status, leftovers))
     case.check(LANES >= 2 * N and ROUNDS >= 5, 'the soak must have at least 2 x N lanes and 5 rounds per lane for H7(a); this run is reduced')
     return case
 
 
-CASES = [case_nested, case_malformed, case_brief_route, case_runner_holder, case_lint, case_isolation_proof, case_waiting, case_drain, case_soak]
+def case_wait_cause_control():
+    """H7 a control: the soak's recorder does name a short wait for capacity, so a soak that finds none is not blind."""
+    import sqlite3
+    case = Case('H7a control', 'a light start held back by a process pile-up for about a second is recorded with a capacity cause')
+    world = World('cause-control')
+    database = world.folder / 'state.sqlite'
+    with sqlite3.connect(database) as connection:
+        connection.execute('CREATE TABLE runs (id TEXT PRIMARY KEY, status TEXT NOT NULL, ci_ready_at INTEGER, awaiting_agent_since INTEGER, repo_id TEXT)')
+    (world.folder / 'fmhome').mkdir()
+    facts(world.folder)
+    procs = world.folder / 'procs.json'
+    procs.write_text(json.dumps(dict(count=20000, limit=10666, error=False)))
+    log = world.folder / 'admission-waits.log'
+    world.env.update(CASE_ADMISSION_LOG=str(log), CASE_DB=str(database), CASE_PROCS=str(procs),
+                     FM_MEMORY_FIXTURE_DIR=str(world.folder / 'native'), FM_HOME=str(world.folder / 'fmhome'))
+    start = world.launch('start', ['bash', tool('fm-cpu-pass.sh'), 'pipeline-start', '--', 'true'])
+    time.sleep(1.0)
+    procs.write_text(json.dumps(dict(count=100, limit=10666, error=False)))
+    code = wait_all([start], timeout=60)
+    causes = log.read_text().splitlines() if log.exists() else []
+    notices = world.text('start').count('pipeline-start waiting')
+    case.measure(exit_code=code, recorded_causes=sorted(set(causes))[:3], sleeps=len(causes), first_notice_lines=notices)
+    case.check(code == [0], 'the held-back start never ran: %s' % world.text('start')[-300:])
+    case.check(any(cause.startswith('overload:') for cause in causes), 'the recorder did not name the wait for capacity: %s' % causes[:3])
+    case.check(notices == 0, 'the wait was shorter than the first notice, so only the recorder can see it: %d notices' % notices)
+    return case
+
+
+def case_sampler_control():
+    """Controls for the validators the other cases rely on: each one must reject the input it exists to reject."""
+    case = Case('validator controls', 'sampling_valid rejects a blind or slow sampler')
+    blind = Case('x', 'x')
+    sampling_valid(blind, dict(peak_total=0, gap_p99_ms=20, gap_max_ms=30), 'blind')
+    slow = Case('x', 'x')
+    sampling_valid(slow, dict(peak_total=3, gap_p99_ms=400, gap_max_ms=2500), 'slow')
+    sound = Case('x', 'x')
+    sampling_valid(sound, dict(peak_total=3, gap_p99_ms=31, gap_max_ms=44), 'sound')
+    case.measure(blind_sampler_violations=len(blind.violations), slow_sampler_violations=len(slow.violations), sound_sampler_violations=len(sound.violations))
+    case.check(len(blind.violations) == 1, 'a sampler that saw no worker was accepted')
+    case.check(len(slow.violations) == 1, 'a sampler that skipped for seconds was accepted')
+    case.check(not sound.violations, 'a sound sampler was rejected: %s' % sound.violations)
+    return case
+
+
+def case_same_class_order():
+    """H5: pipeline starts of one class are admitted in arrival order, and a higher class that arrives later goes first."""
+    import sqlite3
+    case = Case('H5 start order', 'three same-class starts and one later machinery start wait behind a pile-up, then run in class and arrival order')
+    world = World('start-order')
+    database = world.folder / 'state.sqlite'
+    with sqlite3.connect(database) as connection:
+        connection.execute('CREATE TABLE runs (id TEXT PRIMARY KEY, status TEXT NOT NULL, ci_ready_at INTEGER, awaiting_agent_since INTEGER, repo_id TEXT)')
+    (world.folder / 'fmhome').mkdir()
+    facts(world.folder)
+    procs = world.folder / 'procs.json'
+    procs.write_text(json.dumps(dict(count=20000, limit=10666, error=False)))
+    world.env.update(CASE_DB=str(database), CASE_PROCS=str(procs), FM_MEMORY_FIXTURE_DIR=str(world.folder / 'native'), FM_HOME=str(world.folder / 'fmhome'))
+    order = world.folder / 'order.log'
+    arrivals = (('other-1', 'other'), ('other-2', 'other'), ('other-3', 'other'), ('machinery-4', 'machinery'))
+    waiters = []
+    for name, priority in arrivals:
+        waiters.append(world.launch(name, ['bash', tool('fm-cpu-pass.sh'), 'pipeline-start', '--priority', priority, '--', 'bash', '-c', 'echo "$1" >>"$2"', '_', name, str(order)]))
+        time.sleep(0.4)
+    time.sleep(1.0)
+    case.check(not order.exists(), 'a start ran while the pile-up still held every start back')
+    procs.write_text(json.dumps(dict(count=100, limit=10666, error=False)))
+    codes = wait_all(waiters, timeout=90)
+    ran = order.read_text().split() if order.exists() else []
+    case.measure(arrival_order=' '.join(name for name, _ in arrivals), exit_codes=codes, admitted_order=' '.join(ran))
+    case.check(codes == [0] * len(arrivals), 'a start never ran: %s' % codes)
+    case.check(ran == ['machinery-4', 'other-1', 'other-2', 'other-3'], 'admission did not follow class and then arrival order: %s' % ran)
+    return case
+
+
+CASES = [case_nested, case_nested_two_level, case_padded_marker, case_key_guard, case_cross_key, case_malformed, case_brief_route, case_runner_holder, case_lint, case_isolation_proof, case_waiting, case_drain, case_wait_cause_control, case_same_class_order, case_sampler_control, case_soak]
 
 
 def main():

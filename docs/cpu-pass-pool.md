@@ -41,6 +41,7 @@ Every participant on a host follows these rules, so one pool is shared by every 
 6. **Nested work:** a holder exports `FM_CPU_PASS_HELD=<k>` to the work it runs.
    A participant that finds `FM_CPU_PASS_HELD` set runs without taking another pass, because taking another could deadlock a full pool.
    With a positive inherited count, nested work never runs more concurrent CPU-bound workers than that count; a caller needing parallel nested work reserves enough passes before starting the outer work.
+   A participant that runs several nested workers at once gives each of them its share of the count, the count divided by the workers and rounded down, never the whole count, so every level of nesting together stays within what the outermost holder took.
    An explicit pass request above a positive inherited count is a usage error; the [`fm-test-run.sh` header](../bin/fm-test-run.sh) owns the runner's concurrency-reduction behavior.
    The marker must be a nonnegative decimal integer in both Python and no-Python execution; a malformed marker is a usage error, while `0` denotes degraded work with no reservation or concurrency limit.
 7. **Degrade, never block:** a participant that cannot use the pool (no `flock`, no pool directory, a foreign-owned directory) runs its work without a pass and says so once.
@@ -67,11 +68,11 @@ The [`bin/fm-test-run.sh` header](../bin/fm-test-run.sh) owns Firstmate's runner
 Firstmate's own heavy entry points take passes outside their timing and bounds; each script's header owns the details:
 
 - `bin/fm-test-run.sh` takes one per executed script, and one for a whole `--check-coverage` scan.
-- `bin/fm-duration.py run test.<key>`, the route the generated worker instructions name for an individual suite, takes one after its per-key slot and before its clock.
+- `bin/fm-duration.py run test.<key>`, the route the generated worker instructions name for an individual suite, takes one together with its per-key slot, before its clock.
 - `bin/fm-lint.sh` takes one per cold ShellCheck root and one for the changed-root dependency scan.
 - `bin/fm-test-isolation-proof.sh` takes min(`--jobs`, pool size) for its whole run; its header owns how it counts and records concurrency.
 
-A pass holder never waits for a per-key slot ([configuration.md](configuration.md#test-slots-per-key-fm_test_key_slots)), so a slot holder waiting for a pass cannot deadlock against it.
+A command that needs both a pass and a per-key slot takes them as one acquisition and waits holding neither ([configuration.md](configuration.md#test-slots-per-key-fm_test_key_slots)), so a slot holder and a pass holder cannot wait on each other.
 Waiting for a pass or a slot is by capacity alone: no elapsed time admits a waiter.
 
 ## Fresh pipeline starts

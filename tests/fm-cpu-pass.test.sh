@@ -17,9 +17,9 @@ set -u
 
 PASS_TOOL="$ROOT/bin/fm-cpu-pass.sh"
 TMP_ROOT=$(fm_test_tmproot fm-cpu-pass)
-# A case below may inherit FM_CPU_PASS_HELD from an outer runner; every case
-# states the pass environment it needs instead.
-unset FM_CPU_PASS_HELD FM_CPU_POOL_DIR
+# A case below may inherit FM_CPU_PASS_HELD or the slots an outer runner holds;
+# every case states the pass and slot environment it needs instead.
+unset FM_CPU_PASS_HELD FM_CPU_POOL_DIR FM_TEST_SLOT_HELD
 
 REAL_PYTHON=$(python3 -c 'import sys; print(sys.executable)')
 mkdir -p "$TMP_ROOT/test-bin"

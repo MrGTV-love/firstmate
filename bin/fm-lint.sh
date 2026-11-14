@@ -1013,11 +1013,15 @@ if [ -n "${FM_CPU_PASS_HELD+x}" ]; then
       printf 'fm-lint.sh: FM_CPU_PASS_HELD must be a nonnegative decimal integer.\n' >&2
       exit 125 ;;
   esac
-  if [ "${#FM_CPU_PASS_HELD}" -le 2 ] && [ "$((10#$FM_CPU_PASS_HELD))" -gt 0 ] \
-    && [ "$((10#$FM_CPU_PASS_HELD))" -lt "$JOBS" ]; then
+  inherited_passes=$FM_CPU_PASS_HELD
+  while [ "${inherited_passes#0}" != "$inherited_passes" ]; do
+    inherited_passes=${inherited_passes#0}
+  done
+  # JOBS is 1 or 2, so a count below it can only be one pass; 0 is degraded work with no limit.
+  if [ "$inherited_passes" = 1 ] && [ "$JOBS" -gt 1 ]; then
     printf 'fm-lint.sh: reducing --jobs %s to inherited FM_CPU_PASS_HELD=%s\n' \
-      "$JOBS" "$FM_CPU_PASS_HELD" >&2
-    JOBS=$((10#$FM_CPU_PASS_HELD))
+      "$JOBS" "$inherited_passes" >&2
+    JOBS=1
   fi
 fi
 

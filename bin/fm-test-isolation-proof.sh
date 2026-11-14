@@ -37,8 +37,10 @@
 # Before it starts, the proof takes min(--jobs, pool size) passes of the host-wide CPU
 # pool (docs/cpu-pass-pool.md) for its whole run and runs that many workers; a proof
 # already inside a pass takes none and runs at most that many. The concurrency it
-# prints and records is the number of workers it ran, and each worker runs with
-# FM_CPU_PASS_HELD=1, so a candidate's nested runner does not fan out.
+# prints and records is the number of workers it ran. Each worker inherits the proof's
+# own marker divided among the workers (1 when the proof holds one pass per worker), so a
+# candidate's nested runner does not fan out; a proof that holds no pass leaves its workers
+# FM_CPU_PASS_HELD=0 (degraded) or unset, and never invents a reservation.
 #
 # Isolation contract for each concurrent worker:
 #   - distinct mode-0700 temporary root under a proof-owned parent
@@ -416,16 +418,28 @@ done
 # already inside a pass takes none and runs at most that many workers; without the
 # pool tool or python3 it runs without a pass.
 REQUESTED_JOBS=$JOBS
+CANDIDATE_MARKER=
 if [ -n "${FM_CPU_PASS_HELD+x}" ]; then
   case "$FM_CPU_PASS_HELD" in
     ''|*[!0-9]*)
       log "FM_CPU_PASS_HELD must be a nonnegative decimal integer"
       exit 125 ;;
   esac
-  if [ "${#FM_CPU_PASS_HELD}" -le 2 ] && [ "$((10#$FM_CPU_PASS_HELD))" -gt 0 ] \
-    && [ "$((10#$FM_CPU_PASS_HELD))" -lt "$JOBS" ]; then
-    log "reducing --jobs $JOBS to inherited FM_CPU_PASS_HELD=$FM_CPU_PASS_HELD"
-    JOBS=$((10#$FM_CPU_PASS_HELD))
+  inherited_passes=$FM_CPU_PASS_HELD
+  while [ "${inherited_passes#0}" != "$inherited_passes" ]; do
+    inherited_passes=${inherited_passes#0}
+  done
+  if [ -z "$inherited_passes" ]; then
+    CANDIDATE_MARKER=0
+  else
+    if [ "${#inherited_passes}" -le "${#JOBS}" ] && [ "$inherited_passes" -lt "$JOBS" ]; then
+      log "reducing --jobs $JOBS to inherited FM_CPU_PASS_HELD=$inherited_passes"
+      JOBS=$inherited_passes
+    fi
+    CANDIDATE_MARKER=$inherited_passes
+    if [ "${#inherited_passes}" -le 6 ] && [ "${#JOBS}" -le 6 ]; then
+      CANDIDATE_MARKER=$((inherited_passes / JOBS))
+    fi
   fi
 elif [ -x "$ROOT/bin/fm-cpu-pass.sh" ] && [ -r "$ROOT/bin/fm-cpu-pass.py" ] \
   && pool_size=$("$ROOT/bin/fm-cpu-pass.sh" size 2>/dev/null) \
@@ -561,7 +575,13 @@ for script in "${CANDIDATES[@]}"; do
     # Clear ambient fleet overrides so candidates cannot share a live home.
     unset FM_HOME FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_ROOT_OVERRIDE \
       FM_PROJECTS_OVERRIDE FM_CONFIG_OVERRIDE FM_BACKEND 2>/dev/null || true
-    export FM_CPU_PASS_HELD=1
+    # Each worker inherits the proof's own marker divided among the workers (0 stays 0 for degraded
+    # work, and a proof that holds no pass and was given none leaves its candidates with none).
+    if [ -n "$CANDIDATE_MARKER" ]; then
+      export FM_CPU_PASS_HELD=$CANDIDATE_MARKER
+    else
+      unset FM_CPU_PASS_HELD
+    fi
     cd "$ROOT" || exit 1
     begin_ms=$(now_ms)
     bash "$script" >"$work/out/output" 2>&1
