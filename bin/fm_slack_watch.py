@@ -2461,6 +2461,7 @@ class Watch:
 
     def poll(self):
         self.started = monotonic()
+        self.reaction_cache = {}
         self.window_reads = 0
         self.second_reads = 0
         self.notices_handled = 0

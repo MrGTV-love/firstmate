@@ -4602,6 +4602,24 @@ class SecondPersonTest(unittest.TestCase):
                 self.again(watch)
             self.assertEqual(len([c for c in calls if c[1][:1] == ('answers',)]), 1)
 
+    def test_sc3_one_watcher_that_polls_again_sees_their_removed_and_re_added_reaction_on_a_card_without_options(self):
+        # A card without options is read for their reactions only in their own phase. The same watcher polls three times: what it read in one poll must not
+        # stand for the next, so a removed and re-added reaction is a second refused attempt, and no answer is made.
+        rows = [{'id': 'card-a', 'title': 'Card A', 'hold_kind': 'captain', 'hold_reason': 'Pick one', 'body_lines': ['Decision sought: what to do']}]
+        with self.second() as (watch, replay):
+            calls, fake = self.recorder()
+            with patch.object(plane, 'run', fake), patch.object(watch, 'backlog', return_value=rows), patch.object(watch, 'board', return_value=(None, {})), \
+                    patch.object(watch, 'probe', return_value=(0, 'live')):
+                self.again(watch)
+                ts = next(iter(watch.state['threads'].values()))['ts']
+                counts = []
+                for users in ([self.SECOND], [], [self.SECOND]):
+                    replay.state['reactions'][ts] = [{'name': 'thumbsup', 'users': users}]
+                    self.again(watch)
+                    counts.append(len([r for r in self.refusals(watch) if r['reason'] == 'decision_held_for_captain_reaction']))
+            self.assertEqual(counts, [1, 1, 2])
+            self.assertEqual([c for c in calls if c[1][:1] == ('answers',)], [])
+
     def test_sc3_text_that_looks_like_an_answer_in_their_own_dm_is_a_request_as_data_with_no_script_called(self):
         with self.second() as (watch, replay):
             calls, fake = self.recorder()
