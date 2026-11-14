@@ -5169,6 +5169,21 @@ class Invariant2Identity(InvariantScenario):
             answers = [t for t in home.texts() if t[1] == '200.000100' and 'the answer' in (t[2] or '')]
             self.assertEqual([(c, th) for c, th, _ in answers], [(INV_SECOND_DM, '200.000100')])   # one reply, in their own DM, never the owner's
 
+    def test_inv2_the_request_is_still_read_and_answered_once_after_resolve_closes_its_failed_acknowledgement(self):
+        key = '200.000100@' + INV_SECOND
+        with self.home(failures={'chat.postMessage:200.000100': {'status': 400}}) as home:
+            home.cli('poll')
+            home.say('200.000100', 'a request resolved before it is answered')
+            for _ in range(3):
+                home.cli('poll')
+            home.edit_replay(lambda data: data['failures'].clear())
+            resolved = home.cli('check', key, action='resolve')
+            self.assertEqual(resolved.rc, 0, (resolved.out, resolved.err))
+            self.assertEqual(home.cli('read', '--thread', key).rc, 0)
+            self.assertEqual(home.cli('reply', '--thread', key, '--to', key, stdin='the answer').rc, 0)
+            self.assertIn('already replied', home.cli('reply', '--thread', key, '--to', key, stdin='the answer').out)
+            self.assertEqual([(c, th) for c, th, t in home.texts() if 'the answer' in (t or '')], [(INV_SECOND_DM, '200.000100')])
+
     def test_inv2_control_an_acknowledged_request_can_be_read_and_answered_once(self):
         key = '200.000100@' + INV_SECOND
         with self.home() as home:
@@ -5362,6 +5377,33 @@ class Invariant6Collision(InvariantScenario):
                 os.environ.pop('FM_SLACK_SECOND_USER', None)
                 result = home.cli('poll', extra={'SLACK_SIGNING_SECRET': self.SYNTHETIC})
             self.assertNotIn(self.SYNTHETIC, ''.join(l for l in result.out.splitlines() if 'from %s' % INV_SECOND in l))
+
+    def journal_unprinted_scott_wake(self, home):
+        """A request wake line of theirs that the journal still holds unprinted (their window is turned off afterwards): the line is put in the outbox as the
+        plane writes it, so the run that follows has a line of theirs that it would print whatever the setting is."""
+        home.cli('poll')
+        home.say('200.000100', 'Scott request journaled while on', user=INV_SECOND, dm=INV_SECOND_DM)
+        line = self.requests_woken(home.cli('poll'))[0]
+        state = home.state()
+        state['outbox'] = [line]
+        (home.state_dir / 'state.json').write_text(json.dumps(state))
+
+    def test_inv6_a_scott_wake_line_that_is_still_unprinted_when_the_setting_is_turned_off_keeps_the_protection(self):
+        with self.home() as home:
+            self.journal_unprinted_scott_wake(home)
+            with patch.dict(os.environ):
+                os.environ.pop('FM_SLACK_SECOND_USER', None)
+                result = home.cli('poll', extra={'SLACK_SIGNING_SECRET': self.SYNTHETIC})
+            self.assertNotEqual(result.rc, 0, (result.out, result.err))
+            self.assertNotIn(self.SYNTHETIC, ''.join(l for l in result.out.splitlines() if 'from %s' % INV_SECOND in l))
+
+    def test_inv6_control_with_nothing_of_theirs_left_the_same_value_does_not_stop_the_owner(self):
+        with self.home() as home:
+            home.cli('poll')
+            with patch.dict(os.environ):
+                os.environ.pop('FM_SLACK_SECOND_USER', None)
+                result = home.cli('poll', extra={'SLACK_SIGNING_SECRET': self.SYNTHETIC})
+            self.assertEqual(result.rc, 0, (result.out, result.err))
 
 
 class ClosedTransportTest(unittest.TestCase):
