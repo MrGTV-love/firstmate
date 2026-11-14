@@ -1371,6 +1371,10 @@ class SecondPersonReplyTest(unittest.TestCase):
         home.add({'ts': ts, 'user': SCOTT, 'text': text, 'channel': SCOTT_DM})
         rc, out, _ = home.poll()
         self.assertEqual(rc, 0)
+        if 'from %s:' % OWNER in out:
+            # A run with an owner wake to print leaves the second person's work to the next run (finding 4 of the review of d0b0c216).
+            rc, out, _ = home.poll()
+            self.assertEqual(rc, 0)
         self.assertIn('check: slack request %s from %s: %s %s' % (ts, SCOTT, SCOTT_LABEL, json.dumps(text)), out)
         return ts
 

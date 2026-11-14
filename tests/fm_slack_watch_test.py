@@ -4370,6 +4370,14 @@ class SecondPersonTest(unittest.TestCase):
     def wakes(self, watch):
         return [line for line in watch.output if line.startswith('check: slack request ')]
 
+    def both(self, watch):
+        """Two polls, as two runs of the check: a run with an owner line to print leaves the second person's work to the next run (finding 4 of the review of
+        d0b0c216), so the owner's lines come from the first and theirs from the second. Returns the wake lines of both, in order."""
+        self.again(watch)
+        first = self.wakes(watch)
+        self.again(watch)
+        return first + self.wakes(watch)
+
     def posts(self, replay):
         return [(e['channel'], e['thread_ts']) for e in replay.state['log'] if e['method'] == 'chat.postMessage' and 'error' not in e]
 
@@ -4388,8 +4396,7 @@ class SecondPersonTest(unittest.TestCase):
             text = 'please check the status of vernant d7; $(touch x) "quoted" \\ backslash'
             self.owner_says(replay, '200.000100', text)
             self.says(replay, '200.000200', text)
-            self.again(watch)
-            owner_line, second_line = self.wakes(watch)
+            owner_line, second_line = self.both(watch)
             self.assertEqual(owner_line, plane.request_line('200.000100', self.OWNER, text))
             # SC1 (Main 4902): the label read out of their wake line names the configured id, by the rule written out here, and is NOT the owner label.
             label = re.match(r'check: slack request \S+ from \S+: (\[[^\]]*\]) "', second_line).group(1)
@@ -4499,7 +4506,7 @@ class SecondPersonTest(unittest.TestCase):
         with self.second() as (watch, replay):
             self.owner_says(replay, '200.000100')
             self.says(replay, '200.000200')
-            self.again(watch)
+            self.both(watch)
             self.assertEqual(self.posts(replay), [(self.OWNER_DM, '200.000100'), (self.SECOND_DM, '200.000200')])
             opens = [(e['recipient'], e['channel']) for e in replay.state['log'] if e['method'] == 'conversations.open']
             self.assertIn((self.SECOND, self.SECOND_DM), opens)
@@ -4510,7 +4517,7 @@ class SecondPersonTest(unittest.TestCase):
             watch.second_proven = False  # every real poll is a new process: the DM is proven again
             self.says(replay, '200.000100')
             self.owner_says(replay, '200.000200')
-            self.again(watch)
+            self.both(watch)
             self.assertEqual(self.posts(replay), [(self.OWNER_DM, '200.000200')])
             attempts = [json.loads(line) for line in (watch.root / 'attempts.jsonl').read_text().splitlines()]
             self.assertEqual([a for a in attempts if a['channel'] == 'D0WRONGDM01'], [])
@@ -4533,8 +4540,7 @@ class SecondPersonTest(unittest.TestCase):
         with self.second() as (watch, replay):
             self.owner_says(replay, '200.000100', self.OWNER_TEXT)
             self.says(replay, '200.000100', self.SECOND_TEXT)
-            self.again(watch)
-            lines = self.wakes(watch)
+            lines = self.both(watch)
             room = len(lines[1]) - 3
             original = Watch.record
             with patch.object(Watch, 'record', (lambda self, ts, author=None: original(self, ts)) if mutated else original):
@@ -4748,7 +4754,8 @@ class SecondPersonTest(unittest.TestCase):
                         code = plane.main(['poll', '--replay', transcript])
                     runs.append((code, out.getvalue().splitlines()))
             self.assertEqual([code for code, _ in runs], [0, 0, 0])
-            self.assertEqual([lines.count(notice) for _, lines in runs], [1, 0, 0])
+            # The first run has the owner's wake to print, so their work, and with it the notice of its failure, comes in the second (finding 4).
+            self.assertEqual([lines.count(notice) for _, lines in runs], [0, 1, 0])
             self.assertEqual([line for line in runs[0][1] if line.startswith('check: slack request ')],
                              [plane.request_line('200.000100', self.OWNER, 'owner words')])
             printed = '\n'.join(line for _, lines in runs for line in lines)
@@ -4803,7 +4810,8 @@ class SecondPersonTest(unittest.TestCase):
             self.again(watch)
             self.assertEqual([plane.REQUEST_SEGMENT.match(line).group(2) for line in self.wakes(watch)], [self.OWNER])
             reads = [json.loads(line) for line in (watch.root / 'attempts.jsonl').read_text().splitlines()][seen:]
-            self.assertEqual(len([r for r in reads if r['method'] == 'conversations.history' and r['channel'] == self.SECOND_DM]), 1)
+            # The run that wakes the owner reads nothing of their flooded window (finding 4): that waits for the next run.
+            self.assertEqual(len([r for r in reads if r['method'] == 'conversations.history' and r['channel'] == self.SECOND_DM]), 0)
             while len(self.posts(replay)) < 451:
                 before = len(self.posts(replay))
                 self.again(watch)
@@ -4826,7 +4834,7 @@ class SecondPersonTest(unittest.TestCase):
             replay.state['failures']['chat.postMessage:200.000100'] = {'status': 400}
             self.says(replay, '200.000100')
             self.owner_says(replay, '200.000200')
-            self.again(watch)
+            self.both(watch)
             self.assertEqual(self.posts(replay), [(self.OWNER_DM, '200.000200')])
             self.assertEqual(len([row for row in watch.state['pending'] if row.get('person') == 'second']), 1)
             # Their row is journaled and still retryable (it is not failed) when a NEW owner request arrives: the owner is taken in at once, in that poll.
@@ -5544,7 +5552,7 @@ class Invariant2Identity(InvariantScenario):
             home.cli('poll')
             home.say('200.000100', 'an owner request', user=INV_OWNER, dm=INV_OWNER_DM)
             home.say('200.000100', 'a request of theirs with the same timestamp')
-            for _ in range(3):
+            for _ in range(6):                              # their work runs only in the runs that have no owner line to print (finding 4)
                 home.cli('poll')
             rows = lambda: sorted(row.get('person') or 'owner' for row in home.state()['pending'])
             self.assertEqual(rows(), ['owner', 'second'])
@@ -5714,27 +5722,34 @@ sys.exit(plane.main(sys.argv[1:]))
             self.assertEqual(len(self.wakes_of(again, INV_SECOND)), 1, again)              # their request, deferred by the budget, is taken in by the next run
             self.assertEqual(home.posts().count((INV_OWNER_DM, '200.000100')), 1)
 
-    def test_inv4_control_an_unblocked_second_person_is_taken_in_by_the_same_run(self):
+    def test_inv4_control_an_unblocked_second_person_is_taken_in_by_the_next_run(self):
+        # A run with the owner's wake to print does none of their work (finding 4 of the review of d0b0c216); the next run takes their request in.
         with self.home() as home:
             self.owner_and_second_waiting(home)
             rc, captured, calls = self.run_check(home, 'normal', 'unblocked')
             self.assertEqual(rc, 0)
-            self.assertEqual((len(self.wakes_of(captured, INV_OWNER)), len(self.wakes_of(captured, INV_SECOND))), (1, 1), captured)
+            self.assertEqual((len(self.wakes_of(captured, INV_OWNER)), len(self.wakes_of(captured, INV_SECOND)), calls), (1, 0, []), captured)
+            rc, captured, calls = self.run_check(home, 'normal', 'next')
+            self.assertEqual((len(self.wakes_of(captured, INV_OWNER)), len(self.wakes_of(captured, INV_SECOND))), (0, 1), captured)
             self.assertGreater(len(calls), 2, calls)
 
-    def test_inv4_a_check_stopped_during_a_second_person_call_leaves_the_owner_wake_to_the_next_run(self):
+    def test_inv4_a_check_stopped_during_a_second_person_call_loses_nothing_of_the_owner_and_their_request_is_taken_in_once_later(self):
+        # The run with the owner's wake to print makes no call of theirs (finding 4 of the review of d0b0c216), so it prints the owner wake. The next run, which
+        # does their work, is stopped inside their first call (a hard exit: no flush, no cleanup; the watcher discards its output). The run after it takes their
+        # request in once; the owner's wake and acknowledgement are never repeated.
         with self.home() as home:
             self.owner_and_second_waiting(home)
+            rc, captured, calls = self.run_check(home, 'normal', 'owner')
+            self.assertEqual((rc, len(self.wakes_of(captured, INV_OWNER)), calls), (0, 1, []), captured)
             rc, captured, calls = self.run_check(home, 'die', 'stopped')
             self.assertEqual(rc, 137)
             self.assertEqual(len(calls), 1, calls)                                        # the check was stopped inside their first call
-            self.assertEqual(home.posts().count((INV_OWNER_DM, '200.000100')), 1)          # the owner's acknowledgement was posted before it
-            # The watcher discards a stopped check's output, so whatever that file holds is never read: the wake must come from the next run.
             rc, recovered, _ = self.run_check(home, 'normal', 'next')
             self.assertEqual(rc, 0)
-            self.assertEqual(len(self.wakes_of(recovered, INV_OWNER)), 1, recovered)
-            self.assertEqual(home.posts().count((INV_OWNER_DM, '200.000100')), 1)          # no second acknowledgement
+            self.assertEqual(self.wakes_of(recovered, INV_OWNER), [])
             self.assertEqual(len(self.wakes_of(recovered, INV_SECOND)), 1, recovered)
+            self.assertEqual(home.posts().count((INV_OWNER_DM, '200.000100')), 1)          # no second acknowledgement
+            self.assertEqual(home.posts().count((INV_SECOND_DM, '200.000200')), 1)
 
     def test_inv4_control_with_the_second_person_off_the_owner_wake_is_printed(self):
         with self.home(scott=None) as home:

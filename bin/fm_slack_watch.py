@@ -658,6 +658,16 @@ def second_label(user):
 SECOND_LABEL = re.compile(re.escape(SECOND_LABEL_HEAD) + '(' + USER_ID.pattern + ')' + re.escape(SECOND_LABEL_TAIL))
 
 
+SECOND_NOTICE_PREFIX = 'slack: second person '
+SECOND_WAKE = re.compile(r'check: slack request [0-9]+\.[0-9]+ from ' + USER_ID.pattern + r'(?: \([^)]*\))?: ' + SECOND_LABEL.pattern)
+
+
+def is_second_line(line):
+    """Whether a journaled wake or notice line is the second person's: a request wake that carries their label, or one of their own notice lines. Every other
+    line is the owner's (finding 4 of the review of d0b0c216: an owner line is never behind one of theirs, and never waits for their work)."""
+    return bool(SECOND_WAKE.match(line)) or line.startswith(SECOND_NOTICE_PREFIX)
+
+
 def is_second_label(label):
     return bool(SECOND_LABEL.fullmatch(label))
 
@@ -961,6 +971,8 @@ class Watch:
         self.window_reads = 0
         self.second_reads = 0
         self.ran_unbound = False
+        # Whether this run left the second person's work to the next run because an owner line was waiting to be printed.
+        self.second_deferred = False
         self.hold_depth = 0
         self.hold_bound = False
         self.read_mark = None
@@ -1036,9 +1048,9 @@ class Watch:
         """The wake lines that may be printed now. A request line waits in the journal while the source is
         unbound: it is neither printed nor removed, and the rebind delivers it once. (A line of any other kind
         is printed as it always was, bound or not.)"""
-        if bound:
-            return list(self.output)
-        return [line for line in self.output if not line.startswith(OWNER_PREFIXES)]
+        lines = list(self.output) if bound else [line for line in self.output if not line.startswith(OWNER_PREFIXES)]
+        # The owner's lines go first, in their own order, then the second person's: a queued line of theirs never takes an owner line's turn (finding 4).
+        return [line for line in lines if not is_second_line(line)] + [line for line in lines if is_second_line(line)]
 
     def has_request_line(self):
         return any(line.startswith(OWNER_PREFIXES) for line in self.output)
@@ -2597,8 +2609,13 @@ class Watch:
         # Last, so that the replies on tracked threads and the resolutions are never held back by it.
         error, left = self.take_in(max(0, remaining - self.notices_handled))
         deferred = deferred or error
-        # The second person's work comes after all of the owner's, and takes only what the cap leaves of it.
-        self.second_poll(left)
+        # The second person's work comes after all of the owner's, and takes only what the cap leaves of it. The watcher reads a check's output only once the run
+        # has ended, so a run with an owner line to print does none of their work: it ends at once, and the next run does it (finding 4 of the review of
+        # d0b0c216: the owner's wake never waits for a call of theirs).
+        if any(not is_second_line(line) for line in self.output):
+            self.second_deferred = True
+        else:
+            self.second_poll(left)
         if deferred:
             raise deferred
 
