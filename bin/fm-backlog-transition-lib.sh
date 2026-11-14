@@ -1017,6 +1017,33 @@ fm_backlog_record_remove() {
   return 0
 }
 
+# Whether fm_backlog_record_remove would remove <path> now, decided without
+# removing it, so a caller can refuse before its first mutation. An absent path
+# passes. A present one must pass the same authorized-parent and regular-file
+# checks, and then a second name for the same file, .<name>.removal-probe beside
+# it, is linked and unlinked again: that meets the directory permissions,
+# sticky-bit ownership, file and directory flags and access-control entries that
+# removing <path> meets, so a file rm -f cannot remove fails here. When the
+# second name is linked but cannot be unlinked (an append-only directory or an
+# entry that denies delete) it stays, as unremovable as <path>, and the next call
+# retries its removal first. A filesystem without hard links, or a Linux
+# protected_hardlinks refusal for a file another user owns, also fails here
+# although rm -f could remove the file.
+fm_backlog_record_removable() {  # <path> <label> <root>
+  local path=$1 label=$2 root=$3 probe
+  fm_backlog_record_parent_authorized "$path" "$label" "$root" || return 1
+  { [ -e "$path" ] || [ -L "$path" ]; } || return 0
+  fm_backlog_record_present "$path" "$label" "$root" || return 1
+  probe="${path%/*}/.${path##*/}.removal-probe"
+  rm -f "$probe" 2>/dev/null
+  if [ ! -e "$probe" ] && [ ! -L "$probe" ] && ln "$path" "$probe" 2>/dev/null \
+      && rm -f "$probe" 2>/dev/null && [ ! -e "$probe" ] && [ ! -L "$probe" ]; then
+    return 0
+  fi
+  FM_BACKLOG_TRANSITION_ERROR="$label could not be removed at $path"
+  return 1
+}
+
 fm_backlog_record_publish() {
   local source=$1 target=$2 label=$3 root=$4
   fm_backlog_record_present "$source" "$label staged record" "$root" || return 1
