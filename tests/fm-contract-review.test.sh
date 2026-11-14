@@ -1391,6 +1391,47 @@ test_rubric_revision_is_pinned_with_a_root() {
   pass "with a root, a revision path to the rubric is allowed only at the pinned revision"
 }
 
+test_leak_check_splits_candidates_at_any_non_path_character() {
+  local rep="$TMP_ROOT/report-z3.md" row want line n=0
+  make_leak_world
+  printf 'no extension\n' >"$LEAK_ROOT/data/case/truth/r23-review"
+  printf 'long name\n' >"$LEAK_ROOT/data/case/truth/a b c d e f g h.md"
+  # One row per form: the expected exit, a tab, then the list line. Each line sits beside the
+  # pack's contract.md; the files above are gitignored under the root, so naming one is a leak.
+  # shellcheck disable=SC2016,SC1111 # literal backticks and curly quotes in report lines
+  local rows=(
+    "3	- 'data/case/truth/r23-review'"
+    "3	- “data/case/truth/r23-review”"
+    "3	- [r23](data/case/truth/r23-review)"
+    "3	- [data/case/truth/r23-review]"
+    "3	- data/case/truth/r23-review:12:3"
+    "3	- file:data/case/truth/r23-review"
+    "3	- data/case/truth/r23-review;data/x"
+    "3	- also read data/case/truth/r23-review."
+    "3	- also read {data/case/truth/r23-review}, then stopped"
+    "3	- also read data/case/truth/a b c d e f g h.md"
+    '3	- `data/case/truth/a b c d e f g h.md`'
+    "0	- N/A"
+    "0	- Helpers/subagents: none"
+    "0	- Checked e.g. the file list; nothing else."
+    "0	- 'Helpers/subagents' (none) [n/a]"
+  )
+  for row in "${rows[@]}"; do
+    n=$((n + 1))
+    want=${row%%	*}
+    line=${row#*	}
+    printf 'VERDICT: FAIL head=abc\n\n## Inputs read\n\n- %s\n%s\n\n## Findings\n\nEXIT: needs-revision\n\nVERDICT: FAIL\n' "$LEAK_PACK/contract.md" "$line" >"$rep"
+    run_check "$rep"
+    assert_equals "$want" "$CHECK_RC" "row $n ($line) gave exit $CHECK_RC: $CHECK_OUT"
+    if [ "$want" = 3 ]; then
+      assert_contains "$CHECK_OUT" "INPUT LEAK" "row $n ($line) voided for a cause other than a leak"
+    else
+      assert_contains "$CHECK_OUT" "1 listed input(s)" "row $n ($line) was counted as an input"
+    fi
+  done
+  pass "a path the root holds is judged whatever wraps it: quotes, brackets, links, line and column, file:, ; or a long spaced name"
+}
+
 test_unopened_file_named_under_inputs_read_voids_and_the_reviewer_is_told() {
   local rep="$TMP_ROOT/report-z2.md" line
   make_leak_world
@@ -1469,4 +1510,5 @@ fm_test_run_cases \
   test_fences_and_headings_accept_up_to_three_spaces \
   test_rubric_revision_is_pinned_with_a_root \
   test_unopened_file_named_under_inputs_read_voids_and_the_reviewer_is_told \
+  test_leak_check_splits_candidates_at_any_non_path_character \
   -- "$@"

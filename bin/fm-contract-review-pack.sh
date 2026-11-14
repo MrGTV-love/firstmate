@@ -58,11 +58,13 @@
 #   heading of its own level or higher; text inside a code fence is never a heading.
 #   In the list, a line that starts with a path is checked when that path is one full
 #   path and nothing else on the line is path-like; a line with any other path-like text
-#   voids the round (REPORT STRUCTURE). Every other word on a list line that holds a "/"
-#   or a ".", and every run of up to six words that starts with one, is judged when the
-#   pack or the root holds that path (a file or folder, with or without an extension,
-#   spaced or mid-line); other text is skipped. Three shape rules remain, because a root
-#   lookup cannot replace them: a leading path is judged even when it does not exist; an
+#   voids the round (REPORT STRUCTURE). The rest of each list line is cut into pieces at
+#   every character that cannot be part of a path (anything but letters, digits, spaces
+#   and _ . / ~ @ + % -) and at a dot that ends a word; every word in a piece that holds a
+#   "/" or a ".", and every run of words in the same piece that starts with one, is judged
+#   when the pack or the root holds that path (a file or folder, with or without an
+#   extension, spaced, wrapped or mid-line); other text is skipped. Three shape rules
+#   remain, because a root lookup cannot replace them: a leading path is judged even when it does not exist; an
 #   absolute, `~`, http(s), <rev>:<path> or dir/file.ext text that is not the leading
 #   path voids the round, because it may point outside the root; and a word with no "/"
 #   or "." is never a candidate, because prose words would match top-level root names.
@@ -451,6 +453,26 @@ inputs_read() { # <report>
       return s ~ /(^|[^A-Za-z0-9_.-])~?\/[A-Za-z0-9._-]/ || s ~ /[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\.[A-Za-z0-9]+/ ||
         s ~ /https?:\/\// || s ~ /(^|[^A-Za-z0-9])([0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]+|HEAD):[^ \t:]/
     }
+    # The path candidates in s: cut s at every character that cannot be part of a path, and
+    # at a dot that ends a word; then every word of a piece that holds a "/" or a ".", and
+    # every run of words in the same piece that starts with one. Prints each new candidate,
+    # or with mark set only records it as seen.
+    function pieces(s, mark,   np, seg, p, n, tok, k, m, run) {
+      gsub(/\.+([ \t]|$)/, " ", s)
+      np = split(s, seg, /[^A-Za-z0-9_.\/~@+% \t-]/)
+      for (p = 1; p <= np; p++) {
+        n = split(seg[p], tok, /[ \t]+/)
+        for (k = 1; k <= n; k++) {
+          if (tok[k] !~ /[\/.]/) continue
+          run = ""
+          for (m = k; m <= n; m++) {
+            if (tok[m] == "") break
+            run = (m == k) ? tok[m] : run " " tok[m]
+            if (!(run in seen)) { seen[run] = 1; if (!mark) print "?\t" run }
+          }
+        }
+      }
+    }
     function hlevel(s,   n) {
       n = 0
       while (substr(s, n + 1, 1) == "#") n++
@@ -526,24 +548,16 @@ inputs_read() { # <report>
           if (state == 1 && !lead && low ~ fieldlabel) unheaded = 1
         }
         if (state == 1 && !lead && pathlike(L[i])) badpath = 1
-        # Every word on a list line that holds a "/" or a ".", and every run of up to six
-        # words that starts with one, is a candidate: the check judges it when the pack or
-        # the root holds that path, whatever its shape, and skips it otherwise.
+        # A list line is cut into pieces at every character that cannot be part of a path,
+        # and at a dot that ends a word. Every word in a piece that holds a "/" or a ".",
+        # and every run of words in the same piece that starts with one, is a candidate: the
+        # check judges it when the pack or the root holds that path, and skips it otherwise.
         if (state == 1) {
           w = L[i]
           sub(/^[ \t]*([-*+]|[0-9]+[.)])[ \t]+/, "", w)
-          n = split(w, tok, /[ \t]+/)
           delete seen
-          for (k = 1; k <= n; k++) {
-            run = ""
-            for (m = k; m <= n && m < k + 6; m++) {
-              run = (m == k) ? tok[m] : run " " tok[m]
-              c = run
-              gsub(/^[`*"(<]+|[`*",;:.)>]+$/, "", c)
-              if (m == k && c !~ /[\/.]/) break
-              if (c != "" && !(c in seen) && !(lead && c == t)) { seen[c] = 1; print "?\t" c }
-            }
-          }
+          if (lead) pieces(t, 1)
+          pieces(w, 0)
         }
       }
       exit noheading ? 4 : unheaded ? 5 : badpath ? 6 : 0
@@ -631,9 +645,7 @@ cmd_check() {
     case $entry in
       "?	"*)
         entry=${entry#"?	"}
-        x=$entry
-        if [[ $x =~ ^(.*)(:[0-9]+(-[0-9]+)?|:L[0-9]+(-L?[0-9]+)?|#L[0-9]+(-L?[0-9]+)?)$ ]]; then x=${BASH_REMATCH[1]}; fi
-        [ -e "$pack/$x" ] || [ -e "$root/$x" ] || [ -L "$root/$x" ] || continue
+        [ -e "$pack/$entry" ] || [ -e "$root/$entry" ] || [ -L "$root/$entry" ] || continue
         ;;
     esac
     # A trailing line reference (path:12, path:12-40, path:L10-L40, path#L10) names the same file.
