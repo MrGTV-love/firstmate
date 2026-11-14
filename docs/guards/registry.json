@@ -7227,6 +7227,10 @@
         },
         {
           "file": "bin/fm-launch-proof-lib.sh",
+          "match": "fm_launch_proof_adopt_refuse \"no task-specific session tie: $1; next action: a person or Main supplies the task's recorded claude_session_id, or decides the lane by hand\""
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
           "match": "|| { fm_launch_proof_adopt_refuse 'endpoint proof needs one recorded window'; return 1; }"
         },
         {
@@ -7295,7 +7299,7 @@
         },
         {
           "file": "bin/fm-launch-proof-lib.sh",
-          "match": "fm_launch_proof_adopt_refuse 'no task-specific session tie: the harness argv exposes no single session id'; return 1"
+          "match": "fm_launch_proof_adopt_refuse_no_tie 'the harness argv exposes no single session id'; return 1"
         },
         {
           "file": "bin/fm-launch-proof-lib.sh",
@@ -7303,32 +7307,32 @@
         },
         {
           "file": "bin/fm-launch-proof-lib.sh",
-          "match": "|| { fm_launch_proof_adopt_refuse 'no task-specific session tie: the harness environment cannot be read to locate its transcript'; return 1; }"
+          "match": "|| { fm_launch_proof_adopt_refuse_no_tie 'the harness environment cannot be read to locate its transcript'; return 1; }"
         },
         {
           "file": "bin/fm-launch-proof-lib.sh",
-          "match": "fm_launch_proof_adopt_refuse 'no task-specific session tie: the session has no readable transcript whose first user message is a single line'; return 1"
+          "match": "fm_launch_proof_adopt_refuse_no_tie 'the session has no readable transcript whose first user message is a single line'; return 1"
         },
         {
           "file": "bin/fm-launch-proof-lib.sh",
-          "match": "fm_launch_proof_adopt_refuse 'no task-specific session tie: the first user message is not the launch-brief doorbell of a record in this task'\"'\"'s own home'; return 1",
+          "match": "fm_launch_proof_adopt_refuse_no_tie 'the first user message is not the launch-brief doorbell of a record in this task'\"'\"'s own home'; return 1",
           "count": 2
         },
         {
           "file": "bin/fm-launch-proof-lib.sh",
-          "match": "fm_launch_proof_adopt_refuse 'no task-specific session tie: the launch-brief record is newer than the first user message'; return 1"
+          "match": "fm_launch_proof_adopt_refuse_no_tie 'the launch-brief record is newer than the first user message'; return 1"
         },
         {
           "file": "bin/fm-launch-proof-lib.sh",
-          "match": "fm_launch_proof_adopt_refuse 'no task-specific session tie: the live session is not the session this adoption names'; return 1"
+          "match": "fm_launch_proof_adopt_refuse_no_tie 'the live session is not the session this adoption names'; return 1"
         },
         {
           "file": "bin/fm-launch-proof-lib.sh",
-          "match": "*) fm_launch_proof_adopt_refuse 'no task-specific session tie: the adoption names no known tie'; return 1 ;;"
+          "match": "*) fm_launch_proof_adopt_refuse_no_tie 'the adoption names no known tie'; return 1 ;;"
         },
         {
           "file": "bin/fm-launch-proof-lib.sh",
-          "match": "|| { fm_launch_proof_adopt_refuse 'no task-specific session tie: the task record names no claude_session_id'; return 1; }"
+          "match": "|| { fm_launch_proof_adopt_refuse_no_tie 'the task record names no claude_session_id'; return 1; }"
         },
         {
           "file": "bin/fm-launch-proof-lib.sh",

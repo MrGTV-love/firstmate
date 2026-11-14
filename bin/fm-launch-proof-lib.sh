@@ -329,6 +329,10 @@ PY
 FM_LAUNCH_PROOF_FORWARDING_LAUNCHERS=''
 
 fm_launch_proof_adopt_refuse() { echo "adopt refused: $1" >&2; return 1; }
+# A missing session tie: its cause, then what lets Main go on (plan row E2(b)).
+fm_launch_proof_adopt_refuse_no_tie() {
+  fm_launch_proof_adopt_refuse "no task-specific session tie: $1; next action: a person or Main supplies the task's recorded claude_session_id, or decides the lane by hand"
+}
 
 # Whether <script> names a launcher on the forwarding allow-list (by basename).
 fm_launch_proof_forwarding_launcher() { # <script-or-executable>
@@ -524,28 +528,28 @@ fm_launch_proof_claude_adoption() { # <meta> [<session-id> <tie>] -> candidate a
   done
   if [ "$resume_count" -ne 1 ] \
     || ! [[ $session_id =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
-    fm_launch_proof_adopt_refuse 'no task-specific session tie: the harness argv exposes no single session id'; return 1
+    fm_launch_proof_adopt_refuse_no_tie 'the harness argv exposes no single session id'; return 1
   fi
   recorded=$(fm_meta_get "$meta" claude_session_id)
   if [ -n "$recorded" ] && [ "$recorded" != "$session_id" ]; then
     fm_launch_proof_adopt_refuse 'recorded session id differs from the live session; the task record names another conversation'; return 1
   fi
   if [ -n "$proven" ] && [ "$proven" != "$session_id" ]; then
-    fm_launch_proof_adopt_refuse 'no task-specific session tie: the live session is not the session this adoption names'; return 1
+    fm_launch_proof_adopt_refuse_no_tie 'the live session is not the session this adoption names'; return 1
   fi
   case "$proven_tie" in
     '') if [ -n "$recorded" ]; then tie=recorded; else tie=launch-brief; fi ;;
     recorded|launch-brief|operator) tie=$proven_tie ;;
-    *) fm_launch_proof_adopt_refuse 'no task-specific session tie: the adoption names no known tie'; return 1 ;;
+    *) fm_launch_proof_adopt_refuse_no_tie 'the adoption names no known tie'; return 1 ;;
   esac
   if [ "$tie" = recorded ]; then
     [ -n "$recorded" ] \
-      || { fm_launch_proof_adopt_refuse 'no task-specific session tie: the task record names no claude_session_id'; return 1; }
+      || { fm_launch_proof_adopt_refuse_no_tie 'the task record names no claude_session_id'; return 1; }
   else
     # The launch-brief tie, and the owner's statement of one whose record is gone,
     # are read from the transcript itself at every use, never from a record file.
     env_text=$(fm_remote_herdr_process_env "$harness_pid") \
-      || { fm_launch_proof_adopt_refuse 'no task-specific session tie: the harness environment cannot be read to locate its transcript'; return 1; }
+      || { fm_launch_proof_adopt_refuse_no_tie 'the harness environment cannot be read to locate its transcript'; return 1; }
     config_dir=$(printf '%s\n' "$env_text" | sed -n 's/^CLAUDE_CONFIG_DIR=//p')
     claude_home=$(printf '%s\n' "$env_text" | sed -n 's/^HOME=//p')
     [ -n "$config_dir" ] || config_dir="$claude_home/.claude"
@@ -582,21 +586,21 @@ except Exception:
 sys.exit(1)
 PY
 ); then
-      fm_launch_proof_adopt_refuse 'no task-specific session tie: the session has no readable transcript whose first user message is a single line'; return 1
+      fm_launch_proof_adopt_refuse_no_tie 'the session has no readable transcript whose first user message is a single line'; return 1
     fi
     epoch=${first%%$'\n'*}; message=${first#*$'\n'}
     inbox=$(cd -P -- "$home/state/$FM_OPERATIONAL_RECORD_DIRNAME" 2>/dev/null && pwd -P) || inbox=''
     if ! fm_operational_doorbell_path "$message" record || [ -z "$inbox" ] \
       || [ "$(cd -P -- "${record%/*}" 2>/dev/null && pwd -P)" != "$inbox" ]; then
-      fm_launch_proof_adopt_refuse 'no task-specific session tie: the first user message is not the launch-brief doorbell of a record in this task'"'"'s own home'; return 1
+      fm_launch_proof_adopt_refuse_no_tie 'the first user message is not the launch-brief doorbell of a record in this task'"'"'s own home'; return 1
     fi
     if [ -e "$record" ] || [ -L "$record" ]; then
       if ! fm_operational_doorbell_kind "$message" "$home/state" kind || [ "$kind" != launch-brief ]; then
-        fm_launch_proof_adopt_refuse 'no task-specific session tie: the first user message is not the launch-brief doorbell of a record in this task'"'"'s own home'; return 1
+        fm_launch_proof_adopt_refuse_no_tie 'the first user message is not the launch-brief doorbell of a record in this task'"'"'s own home'; return 1
       fi
       if [ "$(uname)" = Darwin ]; then mtime=$(/usr/bin/stat -f %m "$record"); else mtime=$(stat -c %Y "$record"); fi
       if ! [[ $mtime =~ ^[0-9]+$ ]] || [ "$mtime" -gt "${epoch%.*}" ]; then
-        fm_launch_proof_adopt_refuse 'no task-specific session tie: the launch-brief record is newer than the first user message'; return 1
+        fm_launch_proof_adopt_refuse_no_tie 'the launch-brief record is newer than the first user message'; return 1
       fi
       [ "$tie" != operator ] \
         || { fm_launch_proof_adopt_refuse 'the owner statement applies only when the launch brief is gone, and the launch-brief record still exists; run adopt without --session-id'; return 1; }
