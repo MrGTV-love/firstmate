@@ -647,6 +647,8 @@ test_launch_proof_claude_adoption() (
   done
   fresh_case
   accepts 'N1 control: an ordinary resume of the same session adopts'
+  fresh_case; : > "$T/procs"; proc 53733 1 53733 2.1.316 claude "claude --session-id $UUID --resume $UUID"; printf 53733 > "$T/fg-group"
+  accepts 'N1 control: a --session-id naming the resumed id (a confined launch) is the same conversation'
 
   # N2: every local home the root inventory reaches, and no unreadable record.
   register() { # <home-dir> <id> <child-home>
