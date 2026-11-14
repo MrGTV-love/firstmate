@@ -2318,10 +2318,10 @@ merge_marker_retire_finish() {  # <state> <id>
   local marker="$1/$2.pr-poll-merge-notified"
   fm_pr_poll_merge_notified_remove "$1" "$2" || return 1
   [ -e "$marker.retiring" ] || [ -L "$marker.retiring" ] || return 0
-  [ -f "$marker.retiring" ] && [ ! -L "$marker.retiring" ] && rm -f -- "$marker.retiring" || {
+  if [ ! -f "$marker.retiring" ] || [ -L "$marker.retiring" ] || ! rm -f -- "$marker.retiring"; then
     echo "error: the set-aside merge-notified marker $marker.retiring could not be removed after the task record" >&2
     return 1
-  }
+  fi
 }
 
 # Callers run this only after the busy-state and status retire steps succeed, so
