@@ -2811,6 +2811,43 @@ test_root_memory_limit_reports_a_named_death() {
   pass "a root refused by its enforced memory limit fails by name with a memory reason"
 }
 
+test_the_analysis_process_sees_the_default_and_the_explicit_address_space_limit() {
+  if ! fm_lint_bounds_supported; then
+    pass "SKIP (host cannot enforce the bounded envelope): address-space limit observation"
+    return
+  fi
+  local tmp fakebin seen ok
+  tmp=$(fm_test_tmproot fm-lint-bound-observe)
+  fakebin="$tmp/bin"
+  mkdir -p "$fakebin"
+  ok="$tmp/ok.sh"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$ok"
+  # A stand-in analysis that records the address-space limit its own process sees.
+  cat > "$fakebin/shellcheck" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = --version ]; then
+  printf 'ShellCheck - shell script analysis tool\\nversion: 0.11.0\\n'
+  exit 0
+fi
+ulimit -v > "$tmp/limit.seen"
+exit 0
+SH
+  chmod +x "$fakebin/shellcheck"
+  fm_lint_hide_outside_shellcheck "$fakebin"
+  # The default: 12 GiB (12582912 KiB) when FM_LINT_ROOT_MEMORY_KIB is omitted.
+  PATH="$fakebin:$PATH" FM_LINT_REQUIRE_BOUNDS=1 FM_LINT_SLOT_DIR="$tmp/slots.default" "$LINT" --jobs 1 "$ok" > "$tmp/default.out" 2>&1 \
+    || fail "the bounded run with the default address-space limit failed"$'\n'"$(cat "$tmp/default.out")"
+  seen=$(cat "$tmp/limit.seen")
+  [ "$seen" = 12582912 ] || fail "the analysis process saw ulimit -v $seen, expected the 12582912 KiB default"
+  # An explicit lower value is the limit the analysis process sees.
+  rm -f "$tmp/limit.seen"
+  PATH="$fakebin:$PATH" FM_LINT_REQUIRE_BOUNDS=1 FM_LINT_ROOT_MEMORY_KIB=4194304 FM_LINT_SLOT_DIR="$tmp/slots.lower" "$LINT" --jobs 1 "$ok" > "$tmp/lower.out" 2>&1 \
+    || fail "the bounded run with an explicit lower limit failed"$'\n'"$(cat "$tmp/lower.out")"
+  seen=$(cat "$tmp/limit.seen")
+  [ "$seen" = 4194304 ] || fail "the analysis process saw ulimit -v $seen, expected the explicit 4194304 KiB"
+  pass "under the bounded envelope the analysis process sees the 12 GiB default and an explicit lower address-space limit"
+}
+
 test_memory_failure_retries_without_external_sources() {
   local tmp fakebin fixture out rc log rss_kib require_bounds=0 mode
   local -a modes=(0)
@@ -3931,6 +3968,7 @@ test_queued_roots_use_high_resolution_timings
 test_worker_trees_stop_on_signal
 test_root_deadline_names_the_root_and_reaps_the_tree
 test_root_memory_limit_reports_a_named_death
+test_the_analysis_process_sees_the_default_and_the_explicit_address_space_limit
 test_memory_failure_retries_without_external_sources
 test_unbounded_root_over_resident_bound_is_ended_and_retried_narrower
 test_unbounded_root_under_resident_bound_is_untouched
