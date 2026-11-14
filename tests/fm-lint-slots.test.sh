@@ -2426,17 +2426,17 @@ for my $case (['readable', $gate, {}, 3]) {
     release($dir, 'narrow', $pid);
 }
 # 8. A record is trusted only for the input it was measured on. Beside a held
-# root charged its 100000 KiB record, under a budget that fits two such records
-# and not the worst case, a root whose input grew or shrank by 10 percent or
+# root charged its 60000 KiB record times 1.10 plus 64 MiB (131536 KiB), under a
+# budget that fits two such charges (270000 KiB) and not the worst case, a root whose input grew or shrank by 10 percent or
 # more, whose record names no input size, or that has no input size is charged
 # the worst case and waits; a root whose input is within 10 percent of its
 # record's joins, so two roots with matching records run together.
 {
     my $dir = "$tmp/input";
     make_path("$dir/slots");
-    record($dir, $_, 100000) for qw(holder near grown shrunk unsized);
-    record($dir, 'legacy', 100000, '');
-    my %env = (FM_LINT_HOST_SLOTS => 9, FM_LINT_INTERNAL_HOST_RSS_KIB => 250000, FM_LINT_INTERNAL_ROOT_CAP_KIB => 1000000);
+    record($dir, $_, 60000) for qw(holder near grown shrunk unsized);
+    record($dir, 'legacy', 60000, '');
+    my %env = (FM_LINT_HOST_SLOTS => 9, FM_LINT_INTERNAL_HOST_RSS_KIB => 270000, FM_LINT_INTERNAL_ROOT_CAP_KIB => 1000000);
     my $holder = launch($gate, $dir, 'holder', {%env, FM_LINT_INTERNAL_ROOT_KEY => 'holder'});
     await("$dir/started.holder", 10) or do { kill 'KILL', $holder; die "the recorded holder never started\n" };
     for my $case (['grown', 1100], ['shrunk', 900], ['legacy', 1000], ['unsized', undef]) {
