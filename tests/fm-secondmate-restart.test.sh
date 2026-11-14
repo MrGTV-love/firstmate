@@ -485,6 +485,14 @@ case "${FM_FAKE_SSH_MODE:-ok}" in
   unreachable) exit 255 ;;
 esac
 case "${rargs[1]:-}" in
+  attribution)
+    # The host's read-only verdict; unset models a host that proves the agent.
+    # FM_FAKE_REMOTE_ATTRIBUTION=old-host models a code root without the verb.
+    case "${FM_FAKE_REMOTE_ATTRIBUTION:-attribution=proceed}" in
+      old-host) printf 'error: unknown command: attribution\n' >&2; exit 1 ;;
+      *) printf '%s\n' "${FM_FAKE_REMOTE_ATTRIBUTION:-attribution=proceed}" ;;
+    esac
+    ;;
   send)
     # Model the live remote mate: act on the instruction and report back on the
     # parent channel, carrying the correlation token the request embedded.
@@ -572,6 +580,30 @@ test_remote_mate_restarts_over_the_transport_hop() {
   pass "T6 a remote mate restarts through the host-local control plane over the fm-on hop"
 }
 
+# --- N4: a remote mate's agent is attributed on its host before any effect ------
+test_remote_unproven_agent_gets_no_request_record_or_nudge() {
+  local dir out rc verdict
+  for verdict in 'attribution=refuse: its live Herdr agent cannot be positively attributed to this task: live agent is an unpinned native restore' \
+    old-host '' 'attribution=proceed extra' 'attributed'; do
+    dir=$(new_case remote-unproven)
+    setup_remote_case "$dir" sm2 ok
+    export FM_FAKE_ANSWER_STATUS="$dir/home/state/sm2.status"
+    if [ -n "$verdict" ]; then export FM_FAKE_REMOTE_ATTRIBUTION="$verdict"; else export FM_FAKE_REMOTE_ATTRIBUTION=$'\n'; fi
+    out=$(run_restart "$dir" sm2); rc=$?
+    unset FM_FAKE_ANSWER_STATUS FM_FAKE_REMOTE_ATTRIBUTION
+    expect_code 3 "$rc" "remote verdict '$verdict' must leave the mate unreached"$'\n'"$out"
+    assert_contains "$out" "unreached: sm2: its remote agent on remote-mac was not attributed to this task" \
+      "remote verdict '$verdict' must be reported as an unattributed remote agent"
+    grep -q '^fm-remote-secondmate-control.sh attribution sm2$' "$dir/ssh.log" \
+      || fail "the host verdict was never asked for"$'\n'"$(cat "$dir/ssh.log")"
+    assert_no_grep 'fm-remote-secondmate-control.sh send' "$dir/ssh.log" "remote verdict '$verdict' must send no request or nudge"
+    assert_no_grep 'fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" "remote verdict '$verdict' must not relaunch"
+    [ -z "$(find "$dir/home/state/pending-replies" -type f 2>/dev/null)" ] \
+      || fail "remote verdict '$verdict' created a pending-reply record"
+  done
+  pass "N4 a remote mate whose host does not prove its agent gets no request, record, nudge or relaunch"
+}
+
 test_remote_fleet_restart_obeys_initiating_policy() {
   local dir out rc
   dir=$(new_case remote-policy)
@@ -651,7 +683,10 @@ test_unreachable_host_is_reported_unknown() {
   expect_code 3 "$rc" "an unreachable host must not be reported as a reload"$'\n'"$out"
   assert_not_contains "$out" "restarted: sm3" "an unreachable host must not be claimed as restarted"
   assert_contains "$out" "sm3:" "the unreachable mate must still be named"
-  assert_contains "$out" "could not be delivered" "an unreachable host must be reported as undelivered, not as reloaded"
+  # The host's attribution verdict cannot be read either, so nothing is sent at all.
+  assert_contains "$out" "unreached: sm3:" "an unreachable host must be reported unreached, not as reloaded"
+  assert_contains "$out" "returned no attribution decision" "an unreachable host must be reported as an unread attribution"
+  assert_no_grep 'fm-remote-secondmate-control.sh send' "$dir/ssh.log" "nothing is sent to a host whose verdict was not read"
   pass "T7 an unreachable host is reported honestly instead of claimed as reloaded"
 }
 
@@ -984,6 +1019,7 @@ test_refused_restart_falls_back_without_claiming_a_reload
 test_local_restart_uses_the_home_pin_and_reports_what_ran
 test_native_ultra_restart_keeps_local_and_remote_profiles
 test_remote_mate_restarts_over_the_transport_hop
+test_remote_unproven_agent_gets_no_request_record_or_nudge
 test_remote_fleet_restart_obeys_initiating_policy
 test_remote_role_restart_resolves_the_pair_selected_after_persist
 test_unreachable_host_is_reported_unknown

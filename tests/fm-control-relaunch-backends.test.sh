@@ -2366,6 +2366,52 @@ test_claude_restore_restart_decides_attribution_before_its_first_effect() {
   pass "claude restore: the restart decides attribution before any pending reply, inbox write, request or nudge"
 }
 
+# N5: the persistence wait can last minutes; a pane that changes hands during it
+# must get no fallback nudge, while an agent still attributed keeps the nudge.
+claude_restart_fallback_case() { # <case-name> <handoff:yes|no>; sets CLAUDE_FALLBACK_OUT and _RC
+  prepare_claude_restore "$1"
+  local CONTROL="$ROOT/bin/fm-secondmate-restart.sh"
+  local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID pid i sends inbox
+  # A pinned, managed lane: attributed without any adoption.
+  printf old > "$dir/fake/recovery-spawn-gen"
+  CLAUDE_FALLBACK_OUT="$dir/restart.out"
+  FM_SECONDMATE_PERSIST_WAIT=4 FM_SECONDMATE_PERSIST_POLL=1 run_control "$dir" "$id" > "$CLAUDE_FALLBACK_OUT" 2>&1 &
+  pid=$!
+  # The persistence request is out once its doorbell is typed and entered.
+  for ((i = 0; i < 100; i++)); do
+    ! grep -q 'pane send-keys .* enter' "$dir/fake/herdr-log" 2>/dev/null || break
+    /bin/sleep 0.05
+  done
+  [ "$i" -lt 100 ] || { wait "$pid" || true; fail "the persistence request never went out: $(cat "$CLAUDE_FALLBACK_OUT")"; }
+  sends=$(grep -c 'pane send-' "$dir/fake/herdr-log" || true)
+  inbox=$(find "$dir/home/state/$id.inbox" -type f -name '*.msg' 2>/dev/null | wc -l | tr -d ' ')
+  # The handoff: the pane now holds a process pinned to another launch.
+  [ "$2" = no ] || printf other > "$dir/fake/recovery-spawn-gen"
+  CLAUDE_FALLBACK_RC=0
+  wait "$pid" || CLAUDE_FALLBACK_RC=$?
+  CLAUDE_FALLBACK_SENDS_AFTER=$(( $(grep -c 'pane send-' "$dir/fake/herdr-log" || true) - sends ))
+  CLAUDE_FALLBACK_INBOX_AFTER=$(( $(find "$dir/home/state/$id.inbox" -type f -name '*.msg' 2>/dev/null | wc -l | tr -d ' ') - inbox ))
+  CLAUDE_FALLBACK_ID=$id
+}
+
+test_claude_restart_rechecks_attribution_before_its_fallback_nudge() {
+  local out
+  claude_restart_fallback_case fallback-handoff yes
+  out=$(cat "$CLAUDE_FALLBACK_OUT")
+  expect_code 3 "$CLAUDE_FALLBACK_RC" "a pane that changed hands during the wait is left unreached"$'\n'"$out"
+  assert_contains "$out" "unreached: $CLAUDE_FALLBACK_ID: it did not confirm" "the restart names the timeout"
+  assert_contains "$out" "at the fallback nudge, its live Herdr agent cannot be positively attributed" "the restart names the failed recheck"
+  assert_not_contains "$out" "nudged: $CLAUDE_FALLBACK_ID" "no fallback nudge reaches the new process"
+  [ "$CLAUDE_FALLBACK_SENDS_AFTER" -eq 0 ] || fail "keys reached the pane after the handoff ($CLAUDE_FALLBACK_SENDS_AFTER)"
+  [ "$CLAUDE_FALLBACK_INBOX_AFTER" -eq 0 ] || fail "an inbox record was written after the handoff ($CLAUDE_FALLBACK_INBOX_AFTER)"
+  claude_restart_fallback_case fallback-kept no
+  out=$(cat "$CLAUDE_FALLBACK_OUT")
+  expect_code 3 "$CLAUDE_FALLBACK_RC" "an unanswered persist still ends in the fallback"$'\n'"$out"
+  assert_contains "$out" "nudged: $CLAUDE_FALLBACK_ID" "an agent still attributed keeps its fallback nudge"
+  [ "$CLAUDE_FALLBACK_INBOX_AFTER" -eq 1 ] || fail "the kept fallback did not write its one re-read record ($CLAUDE_FALLBACK_INBOX_AFTER)"
+  pass "claude restart: the attribution is decided again right before the fallback nudge"
+}
+
 test_claude_restore_relaunch_after_adoption() {
   prepare_claude_restore relaunch-adopted
   local CONTROL="$ROOT/bin/fm-control.sh"
@@ -2600,6 +2646,7 @@ test_claude_adoption_outlives_the_inbox_prune
 test_claude_pruned_brief_adopts_only_on_the_owner_statement
 test_claude_owner_statement_never_ties_a_personal_session
 test_claude_stated_adoption_is_inert_once_its_doorbell_is_gone
+test_claude_restart_rechecks_attribution_before_its_fallback_nudge
 test_restart_refuses_an_unproven_agent_state
 test_restart_attributes_before_a_raw_command_fallback_nudge
 test_claude_pinned_elsewhere_names_its_own_cause
