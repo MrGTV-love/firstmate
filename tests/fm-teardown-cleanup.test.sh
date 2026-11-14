@@ -6560,6 +6560,7 @@ test_direct_release_refuses_a_process_holding_a_file_in_the_copy_open() {
       held="$(cd "$FOREIGN_COPY" && pwd -P)/.git"
       pid=
       if [ "$shape" != none ]; then
+        # shellcheck disable=SC2016 # $1 expands in the holder's own shell.
         teardown_fixture_start "$FOREIGN_CASE" KILL bash -c 'exec 3<"$1"; exec sleep 3600' holder "$held"
         pid=$TEARDOWN_FIXTURE_PID
         for _ in $(seq 100); do "$REAL_LSOF_FOR_TEST" -p "$pid" -Fn 2>/dev/null | grep -qxF "n$held" && break; sleep 0.05; done

@@ -1623,7 +1623,7 @@ test_squash_landed_content_refuses_whatever_differs() {
         git -C "$tmp" push -q origin HEAD:main
         rm -rf "$tmp"
         git -C "$case_dir/wt" fetch -q origin
-        tmp=$(git -C "$case_dir/wt" commit-tree "$(git -C "$case_dir/wt" rev-parse refs/remotes/origin/main^{tree})" -m 'same tree, other history')
+        tmp=$(git -C "$case_dir/wt" commit-tree "$(git -C "$case_dir/wt" rev-parse 'refs/remotes/origin/main^{tree}')" -m 'same tree, other history')
         git -C "$case_dir/wt" reset -q --hard "$tmp"
         ;;
     esac
@@ -3574,7 +3574,7 @@ test_bundle_route_needs_no_captains_call() {
     done
     case "$shape" in
       unheld)
-        [ "$(backlog_row_state "$case_dir")" = done ] || fail 'bundle-call-unheld: the row was not closed'
+        [ "$(backlog_row_state "$case_dir")" = 'done' ] || fail 'bundle-call-unheld: the row was not closed'
         assert_grep "preserved in bundle $stored, not landed" "$case_dir/data/backlog.md" 'bundle-call-unheld: the close note is missing'
         assert_no_grep 'hold_kind: *captain' "$case_dir/data/backlog.md" 'bundle-call-unheld: a captain hold exists'
         snapshot=$(bundle_case_snapshot "$case_dir") || fail 'bundle-call-unheld: fleet snapshot failed'
