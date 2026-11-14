@@ -2138,8 +2138,9 @@ fi
 # the pool and census checks above and before any root, in every mode except
 # --list-files (which starts no ShellCheck). What `--version` prints is a function
 # of the binary's bytes, so the pool keeps it under the SHA-256 of those bytes
-# (version/<digest>, written only after a probe the admission ran): a run whose
-# binary is already known starts no probe, as a cache hit starts no root, and so
+# (version/<digest>, written only after a probe the admission ran, in the local pool
+# and in the host-wide directory beside the default pool): a run whose
+# binary is already known to either starts no probe, as a cache hit starts no root, and so
 # never waits behind a pool that is full.
 probe_rc=0
 resolved=
@@ -2147,12 +2148,20 @@ resolved=
 version_digest=$("$PERL_BIN" -MDigest::SHA -e 'open(my $fh, "<", $ARGV[0]) or exit 1; binmode $fh; print Digest::SHA->new(256)->addfile($fh)->hexdigest' \
   "$SHELLCHECK_BIN" 2>/dev/null) || version_digest=
 version_file=
+host_version_file=
 if [ -n "$version_digest" ]; then
   version_file=$SLOT_DIR/version/$version_digest
-  if [ -f "$version_file" ] && [ ! -L "$version_file" ]; then
-    read -r resolved < "$version_file" || resolved=
-    case "$resolved" in ''|*[!0-9A-Za-z.+-]*) resolved= ;; esac
-  fi
+  host_version_file=$HOST_POOL_ROOT/version/$version_digest
+  # The local pool's record first, then the host-wide one: a binary some run of
+  # this user already probed is known to every pool, so a fresh local pool does
+  # not start a probe that would queue ahead of a cache hit.
+  for known_file in "$version_file" "$host_version_file"; do
+    if [ -f "$known_file" ] && [ ! -L "$known_file" ]; then
+      read -r resolved < "$known_file" || resolved=
+      case "$resolved" in ''|*[!0-9A-Za-z.+-]*) resolved= ;; esac
+      [ -z "$resolved" ] || break
+    fi
+  done
 fi
 if [ -z "$resolved" ]; then
   resolved=$(env FM_LINT_INTERNAL_HOST_LOCK="$HOST_POOL_ROOT/admission.lock" FM_LINT_INTERNAL_HOST_RSS_KIB="$HOST_RSS_KIB" \
@@ -2166,6 +2175,7 @@ if [ -z "$resolved" ]; then
   fi
   if [ -n "$version_file" ] && [ -n "$resolved" ]; then
     ( umask 077; mkdir -p "$SLOT_DIR/version" && printf '%s\n' "$resolved" > "$version_file.$$" && mv -f "$version_file.$$" "$version_file" ) 2>/dev/null || true
+    ( umask 077; mkdir -p "$HOST_POOL_ROOT/version" && printf '%s\n' "$resolved" > "$host_version_file.$$" && mv -f "$host_version_file.$$" "$host_version_file" ) 2>/dev/null || true
   fi
 fi
 printf 'fm-lint.sh: ShellCheck %s (pinned %s)\n' "$resolved" "$REQUIRED_SHELLCHECK" >&2

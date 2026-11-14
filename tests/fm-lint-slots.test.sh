@@ -810,6 +810,55 @@ PL
   pass "a content-identical cached success finishes while all host slots remain occupied"
 }
 
+test_a_warm_cache_hit_in_a_fresh_pool_starts_no_version_probe_and_waits_for_nothing() {
+  local tmp repo fakebin holder run deadline rc=0
+  tmp=$(fm_test_tmproot fm-lint-cache-fresh-pool)
+  repo="$tmp/repo"
+  fm_lint_small_repo "$repo"
+  fakebin=$(fm_fakebin "$tmp/fake")
+  cat > "$fakebin/shellcheck" <<SH
+#!/usr/bin/env bash
+printf '%s\\n' "\$*" >> "$tmp/starts.log"
+if [ "\${1:-}" = --version ]; then
+  printf 'ShellCheck - shell script analysis tool\\nversion: 0.11.0\\n'
+  exit 0
+fi
+exit 0
+SH
+  chmod +x "$fakebin/shellcheck"
+  # The host-wide directory of this copy of the lint is the test's own.
+  perl -pi -e "s{^HOST_POOL_ROOT=.*\$}{HOST_POOL_ROOT=$tmp/host}" "$repo/bin/fm-lint.sh"
+  grep -q "^HOST_POOL_ROOT=$tmp/host\$" "$repo/bin/fm-lint.sh" || fail "the copy's host-wide directory path was not replaced"
+  # Warm the analysis cache from one local pool ...
+  PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" FM_LINT_SLOT_DIR="$tmp/poolA" \
+    "$repo/bin/fm-lint.sh" bin/consumer.sh > "$tmp/warm.out" 2>&1 || fail "cache warm-up failed: $(cat "$tmp/warm.out")"
+  # ... then repeat the same root, binary and cache from a fresh local pool whose
+  # only slot another run holds. A cache hit consumes no reservation and waits
+  # for nothing, and the version probe is a start the pool already knows the
+  # answer to, so the run starts no ShellCheck at all.
+  mkdir -p "$tmp/poolB"
+  perl -MFcntl=:flock -e 'open(my $h, ">>", $ARGV[0]) or die; flock($h, LOCK_EX) or die; sleep 25' "$tmp/poolB/slot.0" &
+  holder=$!
+  : > "$tmp/starts.log"
+  ( cd "$repo" && PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" FM_LINT_SLOT_DIR="$tmp/poolB" FM_LINT_HOST_SLOTS=1 \
+      "$repo/bin/fm-lint.sh" bin/consumer.sh > "$tmp/hit.out" 2>&1 ) &
+  run=$!
+  deadline=$((SECONDS + 12))
+  while kill -0 "$run" 2>/dev/null && [ "$SECONDS" -lt "$deadline" ]; do sleep 0.1; done
+  if kill -0 "$run" 2>/dev/null; then
+    kill -TERM "$run" "$holder" 2>/dev/null || true
+    wait "$run" 2>/dev/null || true
+    fail "a warm cache hit in a fresh pool queued behind an occupied slot: $(cat "$tmp/starts.log" 2>/dev/null)"
+  fi
+  wait "$run" || rc=$?
+  kill -TERM "$holder" 2>/dev/null || true
+  wait "$holder" 2>/dev/null || true
+  [ "$rc" -eq 0 ] || fail "the warm cache hit failed ($rc): $(cat "$tmp/hit.out")"
+  grep -q 'cache hit bin/consumer[.]sh' "$tmp/hit.out" || fail "the run did not reuse the cached success: $(cat "$tmp/hit.out")"
+  [ ! -s "$tmp/starts.log" ] || fail "a warm cache hit started ShellCheck: $(cat "$tmp/starts.log")"
+  pass "a warm cache hit in a fresh local pool starts no version probe and no analysis, and waits for nothing"
+}
+
 test_slot_pool_cannot_be_disabled_and_refuses_bad_settings() {
   local tmp rc out
   tmp=$(fm_lint_slot_fixture fm-lint-slots-off)
@@ -3989,6 +4038,7 @@ test_stopped_admission_coordinator_does_not_freeze_free_capacity
 test_slow_ps_does_not_hold_admission_against_the_next_root
 test_queue_scan_survives_odd_slot_paths_and_vanishing_tickets
 test_cached_success_does_not_wait_for_host_slots
+test_a_warm_cache_hit_in_a_fresh_pool_starts_no_version_probe_and_waits_for_nothing
 test_slot_pool_cannot_be_disabled_and_refuses_bad_settings
 test_host_budget_default_is_one_number_stated_by_both_docs
 test_a_per_root_limit_above_the_default_is_clamped_and_a_lower_one_is_kept
