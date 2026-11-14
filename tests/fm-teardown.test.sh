@@ -616,6 +616,95 @@ test_unsafe_merge_notified_marker_keeps_the_record() {
   pass "an unsafe merge-notified marker stops teardown before the record is removed; a valid one goes with the record"
 }
 
+# A regular marker can still resist removal. Whatever cannot remove it must stop
+# teardown while the record is still there, so a later teardown retries; that
+# retry then removes the record and the marker together.
+test_unremovable_merge_notified_marker_leaves_a_retry() {
+  local case_dir rc
+  case_dir=$(detached_copy_case marker-unremovable - no own)
+  printf 'fm-pr-poll-merge-notified-v1\ngithub\ngithub.com\nacme/widget\n7\n' > "$case_dir/state/task-x1.pr-poll-merge-notified"
+  chmod 600 "$case_dir/state/task-x1.pr-poll-merge-notified"
+  for tool in rm mv; do
+    cat > "$case_dir/fakebin/$tool" <<SH
+#!/usr/bin/env bash
+case " \$* " in *pr-poll-merge-notified*) echo "$tool: cannot remove the marker (test)" >&2; exit 1 ;; esac
+exec /bin/$tool "\$@"
+SH
+    chmod +x "$case_dir/fakebin/$tool"
+  done
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  [ "$rc" -ne 0 ] || fail "unremovable marker: teardown reported success with the marker still in place"
+  assert_present "$case_dir/state/task-x1.meta" "unremovable marker: the record was removed, so no teardown can retry (stderr: $(tail -2 "$case_dir/stderr" | tr '\n' ' '))"
+  rm -f "$case_dir/fakebin/rm" "$case_dir/fakebin/mv"
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "unremovable marker: the retry did not complete: $(tail -3 "$case_dir/stderr")"
+  assert_absent "$case_dir/state/task-x1.meta" "unremovable marker: the retry left the record"
+  assert_absent "$case_dir/state/task-x1.pr-poll-merge-notified" "unremovable marker: the retry left the marker"
+  assert_absent "$case_dir/state/task-x1.pr-poll-merge-notified.retiring" "unremovable marker: the retry left the set-aside marker"
+  pass "a merge-notified marker that cannot be removed stops teardown before the record goes, and the retry removes both"
+}
+
+# A branch can have several PRs. A newer open PR returned first must not hide an
+# older merged PR that carries the detached copy's work; a merged PR that does not
+# carry it still leaves the copy refused.
+two_prs_case() {  # <name> <merged PR carries the work: yes|no>
+  local case_dir carried=$2 head
+  case_dir=$(make_case "$1")
+  write_meta "$case_dir" direct-PR ship
+  seed_backlog_in_flight "$case_dir" ship
+  wt_commit_file "$case_dir" feature.txt hello "add feature"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  [ "$carried" = yes ] || head=$(git -C "$case_dir/project" rev-parse main)
+  cat > "$case_dir/fakebin/gh-axi" <<SH
+#!/usr/bin/env bash
+printf '%s\\n' "\$*" >> "$case_dir/gh-axi.calls"
+case "\${1:-} \${2:-}" in
+  "pr list")
+    case " \$* " in
+      *" --head fm/task-x1 "*) printf '%s\\n' "count: 2 (showing first 2)" "pull_requests[2]{number,state}:" "  8,open" "  7,merged" ;;
+      *) printf '%s\\n' "count: 0 (showing first 0)" "pull_requests[]: []" ;;
+    esac
+    exit 0 ;;
+  "pr view") echo "error: pull request not found" >&2 ; exit 1 ;;
+esac
+exit 0
+SH
+  cat > "$case_dir/fakebin/gh" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-} \${2:-}" = "pr view" ]; then
+  case "\${3:-}:\$*" in
+    8:*"state,headRefOid,url"*) printf '%s\\t%s\\t%s\\n' OPEN '$(git -C "$case_dir/project" rev-parse main)' https://github.com/example/repo/pull/8; exit 0 ;;
+    7:*"state,headRefOid,url"*) printf '%s\\t%s\\t%s\\n' MERGED '$head' https://github.com/example/repo/pull/7; exit 0 ;;
+    *:*"headRefOid"*) printf '%s\\n' '$head'; exit 0 ;;
+  esac
+fi
+echo "error: pull request not found" >&2
+exit 1
+SH
+  chmod +x "$case_dir/fakebin/gh-axi" "$case_dir/fakebin/gh"
+  git -C "$case_dir/wt" checkout -q --detach
+  git -C "$case_dir/project" branch -q -D fm/task-x1
+  printf '%s\n' "$case_dir"
+}
+
+test_detached_copy_finds_the_merged_pr_among_several() {
+  local case_dir rc
+  case_dir=$(two_prs_case two-prs-carried yes)
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "two PRs: an older merged PR carrying the work was hidden by a newer open one: $(tail -3 "$case_dir/stderr")"
+  assert_absent "$case_dir/state/task-x1.meta" "two PRs: the record stayed open"
+  case_dir=$(two_prs_case two-prs-not-carried no)
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  [ "$rc" -ne 0 ] || fail "two PRs: a merged PR that does not carry the work let the copy go"
+  assert_present "$case_dir/state/task-x1.meta" "two PRs: the record was closed over unlanded work"
+  [ -d "$case_dir/wt" ] || fail "two PRs: the copy was removed"
+  pass "a detached copy is judged against every PR of its branch: a newer open PR does not hide an older merged one, and a non-carrying one still refuses"
+}
+
 test_named_branch_copy_without_pr_meta_behaves_as_before() {
   local case_dir rc
   case_dir=$(make_case named-branch-no-pr)
@@ -908,24 +997,61 @@ test_no_pr_recorded_discovers_merged_pr_by_branch_allows() {
   pass "teardown discovers a merged PR by branch name and tears down when no pr= was ever recorded"
 }
 
-test_squash_merged_pr_allows_replayed_unpushed_patch() {
-  local case_dir rc parent_head pr_head
-  case_dir=$(make_case squash-replayed-patch)
-  write_meta "$case_dir" no-mistakes ship
-  wt_commit_file "$case_dir" local-parent.txt parent "local parent"
-  parent_head=$(git -C "$case_dir/wt" rev-parse HEAD)
-  git -C "$case_dir/wt" push -q origin "$parent_head:refs/heads/fm/task-x1"
-  git -C "$case_dir/project" fetch -q origin fm/task-x1
+# A replayed unpushed patch is landed only when nothing else the copy holds is
+# missing: a pushed parent that neither the merged PR head nor the default branch
+# carries keeps the copy (Main 038 ruling (a); V2 safety over V6). The detached
+# variant finds the PR through the record's branch and is judged the same way.
+# Control: the same replay with no such parent is torn down.
+replayed_patch_case() {  # <name> <parent yes|no> <detached yes|no>
+  local name=$1 parent=$2 detached=$3 case_dir parent_head pr_head
+  case_dir=$(make_case "$name")
+  write_meta "$case_dir" direct-PR ship
+  seed_backlog_in_flight "$case_dir" ship
+  if [ "$parent" = yes ]; then
+    wt_commit_file "$case_dir" local-parent.txt parent "local parent the PR never carried"
+    parent_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+    git -C "$case_dir/wt" push -q origin "$parent_head:refs/heads/fm/task-x1"
+    git -C "$case_dir/project" fetch -q origin fm/task-x1
+  fi
   wt_commit_file "$case_dir" feature.txt hello "add feature"
-  append_pr_meta_url "$case_dir"
   pr_head=$(land_equivalent_patch_on_origin_branch "$case_dir" pr-head feature.txt hello "add feature")
   add_gh_pr_merged_for_head "$case_dir" "$pr_head"
+  if [ "$detached" = yes ]; then
+    add_gh_axi_pr_for_branch "$case_dir" fm/task-x1
+    git -C "$case_dir/wt" checkout -q --detach
+    git -C "$case_dir/project" branch -q -D fm/task-x1
+  else
+    append_pr_meta_url "$case_dir"
+  fi
+  printf '%s\n' "$case_dir"
+}
 
-  rc=0
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+test_squash_merged_replayed_patch_over_unlanded_parent_refuses() {
+  local variant case_dir rc before
+  for variant in named detached; do
+    case_dir=$(replayed_patch_case "replayed-parent-$variant" yes "$([ "$variant" = detached ] && echo yes || echo no)")
+    before=$(git -C "$case_dir/wt" rev-parse HEAD)
+    rc=0
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    [ "$rc" -ne 0 ] || fail "$variant: a copy holding a pushed parent the merged PR lacks was torn down"
+    assert_grep 'the ship deliverable is not landed' "$case_dir/stderr" "$variant: the refusal does not say not landed"
+    assert_grep 'local parent the PR never carried' "$case_dir/stderr" "$variant: the refusal does not name the pushed parent"
+    assert_present "$case_dir/state/task-x1.meta" "$variant: the record was closed over the unlanded parent"
+    [ "$(git -C "$case_dir/wt" rev-parse HEAD)" = "$before" ] || fail "$variant: the copy's HEAD changed"
+  done
+  pass "a replayed patch over a pushed parent the merged PR and default branch lack is refused and kept, detached or named"
+}
 
-  expect_code 0 "$rc" "squash-replayed-patch: teardown should succeed when unpushed local patch is in the merged PR head"
-  ! grep -q REFUSED "$case_dir/stderr" || fail "squash-replayed-patch: teardown printed a REFUSED line"
+test_squash_merged_pr_allows_replayed_unpushed_patch() {
+  local variant case_dir rc
+  for variant in named detached; do
+    case_dir=$(replayed_patch_case "replayed-clean-$variant" no "$([ "$variant" = detached ] && echo yes || echo no)")
+    rc=0
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "$variant: a replayed patch the merged PR head carries was refused: $(cat "$case_dir/stderr")"
+    ! grep -q REFUSED "$case_dir/stderr" || fail "$variant: teardown printed a REFUSED line"
+    assert_absent "$case_dir/state/task-x1.meta" "$variant: the record stayed open"
+  done
   pass "squash-merged PR accepts replayed unpushed local patches contained in the PR head"
 }
 
@@ -4063,6 +4189,8 @@ test_detached_copy_is_judged_through_the_record_branch
 test_detached_copy_unlanded_work_is_still_refused
 test_named_branch_copy_without_pr_meta_behaves_as_before
 test_unsafe_merge_notified_marker_keeps_the_record
+test_unremovable_merge_notified_marker_leaves_a_retry
+test_detached_copy_finds_the_merged_pr_among_several
 test_empty_recorded_slot_nested_drop
 test_recorded_slot_lost_lease_still_refuses
 test_recorded_slot_intact_lease_completes
@@ -4093,6 +4221,7 @@ test_task_archives_keep_refs_when_forge_is_unreachable
 test_squash_merged_pr_allows_when_head_ancestor_of_pr_head
 test_no_pr_recorded_discovers_merged_pr_by_branch_allows
 test_squash_merged_pr_allows_replayed_unpushed_patch
+test_squash_merged_replayed_patch_over_unlanded_parent_refuses
 test_landed_proof_ignores_unresolvable_git_directory_in_cwd
 test_merged_pr_with_later_local_commit_refuses
 test_squash_merged_rebased_branch_allows
