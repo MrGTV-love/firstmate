@@ -1579,6 +1579,32 @@ test_contract_context_author_label_line_stays_out() {
   pass "an author label line in the contract's CONTEXT is dropped and listed; neutral text naming the subject stays"
 }
 
+test_responses_section_with_a_status_claim_refused() {
+  local src="$TMP_ROOT/resp.md" rc pack line n=0
+  # Noncompliant (Main 053): a Responses section whose mandatory criterion carries a status claim
+  # is author self-grading; the build stops with a named reason.
+  for line in '- **A1** (mandatory): fixed, passes.' 'A1 (mandatory): met' '- **A1** (mandatory) - passed; closed by r22.'; do
+    n=$((n + 1))
+    printf '# C\n\n## Definition Of Done\n\n### Responses\n\n%s ZZ-STATUS-ZZ\n' "$line" >"$src"
+    rc=0
+    "$PACK_BIN" --root "$ROOT" --contract "$src" --out-root "$TMP_ROOT/resp-out-$n" >/dev/null 2>"$TMP_ROOT/resp.err" || rc=$?
+    assert_equals 3 "$rc" "a Responses section with a status claim ($line) was not refused: $(cat "$TMP_ROOT/resp.err")"
+    assert_absent "$TMP_ROOT/resp-out-$n" "a refused Responses section left an output directory"
+    assert_contains "$(cat "$TMP_ROOT/resp.err")" "author report" "the refusal does not tell the author where the status goes"
+  done
+  # Compliant controls: a Responses criterion with no status claim is kept (Main 050), including one
+  # whose text says a test passes; a Responses section with no mandatory criterion drops as before.
+  printf '# C\n\n## Definition Of Done\n\n### Responses\n\n- **A1** (mandatory): ZZ-KEEP-A1-ZZ the suite passes on CI and the endpoint returns 204.\n' >"$src"
+  pack=''
+  build_pack pack --contract "$src" || fail "a Responses criterion with no status claim was refused: $(cat "$TMP_ROOT/build.err")"
+  assert_grep "ZZ-KEEP-A1-ZZ" "$pack/target.md" "the Responses criterion with no status claim was dropped"
+  printf '# C\n\n## Definition Of Done\n\n- **A1** (mandatory): x.\n\n### Responses\n\nZZ-AUTHOR-RESP-ZZ F1 answered: fixed.\n' >"$src"
+  pack=''
+  build_pack pack --contract "$src" || fail "a Responses section with no mandatory criterion was refused: $(cat "$TMP_ROOT/build.err")"
+  assert_no_grep "ZZ-AUTHOR-RESP-ZZ" "$pack/target.md" "a Responses section with no mandatory criterion reached the pack"
+  pass "a Responses section whose mandatory criterion carries a status claim is refused; the other Responses cases are unchanged"
+}
+
 test_author_history_subheading_in_contract_refused() {
   local src="$TMP_ROOT/f1-contract.md" heading n=0 rc
   # Noncompliant: each author-history or author-section sub-heading under a kept section,
@@ -1799,4 +1825,5 @@ fm_test_run_cases \
   test_authorized_spaced_path_is_clean \
   test_every_author_name_with_a_trailing_word_stays_out \
   test_contract_context_author_label_line_stays_out \
+  test_responses_section_with_a_status_claim_refused \
   -- "$@"

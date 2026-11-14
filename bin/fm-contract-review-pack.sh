@@ -25,7 +25,9 @@
 #   The author's sections are dropped by heading: a title that starts with an author
 #   section name names that section. Two exact rulings: the title "Contract review scope"
 #   is neutral (Main 034), and a level 3 section titled exactly "Responses" under the
-#   Definition Of Done that holds a mandatory criterion is kept and listed (Main 050).
+#   Definition Of Done that holds a mandatory criterion is kept and listed (Main 050),
+#   unless that criterion carries a status claim (its text starts with fixed, passes, met
+#   and the like), which stops the build with exit 3 (Main 053).
 #   In a contract's request or context section, a line that uses an author term as a
 #   label (Self-check:, All-green:, Author:) is dropped and listed.
 #   A level 1 or 2 heading (ATX `#`/`##` or setext, a title line over `===` or `---`)
@@ -189,6 +191,17 @@ function mandatory_below(i,   j) {
   }
   return 0
 }
+# True when the section that starts after line i holds a mandatory criterion whose text, right
+# after "(mandatory)", starts with a status word (fixed, passes, met, closed and the like).
+function status_below(i,   j, t) {
+  for (j = i + 1; j <= N; j++) {
+    if (L[j] ~ /^ ? ? ?#[#]?[#]?[ \t]/) return 0
+    t = tolower(L[j])
+    if (!sub(/^.*\(mandatory\)[*_ \t]*[:.,-]?[ \t]*/, "", t)) continue
+    if (t ~ /^(fixed|passes|passed|pass|fails|failed|fail|met|unmet|done|closed|resolved|verified|answered|addressed|green|red|open)([^a-z]|$)/) return 1
+  }
+  return 0
+}
 function keep_heading(s) {
   print s > KEEP_OUT
   print norm(title) > TITLES_OUT
@@ -264,6 +277,12 @@ END {
       # Main 050 F2: a section titled exactly Responses under the Definition Of Done that holds a
       # mandatory criterion is contract text, so it is kept and listed.
       if (c == "drop" && norm(title) == "responses" && parent == "keep" && norm(ptitle) ~ /^definition of done/ && mandatory_below(i)) {
+        # Main 053: a mandatory criterion there that carries a status claim is author self-grading.
+        if (status_below(i)) {
+          print title " (under: " ptitle "): a mandatory criterion with a status claim is author self-grading; put the criterion under the mandatory items and the status in the author report" > UNKNOWN_OUT
+          mode = "drop"
+          continue
+        }
         mode = "keep"
         print line " (under: " ptitle "; kept: holds a mandatory criterion)" > UNREC_OUT
         keep_heading(line)
