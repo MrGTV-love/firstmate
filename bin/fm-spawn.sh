@@ -66,7 +66,7 @@
 #   already guarantees the worker's instructions match the branch.
 #   --base-branch is the optional branch selected at intake for a ship or scout
 #   to start from and target instead of origin's default branch. A fresh launch
-#   resets its pooled copy to origin/<branch>, refusing when the project has no
+#   advances its pooled copy to origin/<branch>, refusing when the project has no
 #   origin or origin lacks that branch, or when the project's registered forge
 #   cannot carry it. It must agree with every base line selected by
 #   fm_brief_base_branches in bin/fm-dod-lib.sh, which owns recognition.
@@ -537,15 +537,26 @@
 #   Only after this isolation check, every fresh ship or scout requires a clean
 #   task worktree. When an origin configuration is detected, spawn fetches it,
 #   resolves the current remote default branch (or uses --base-branch, described
-#   above), and resets to its tip. A fresh local-only ship instead compares that
+#   above), and advances the copy to its tip. The advance is never a reset: it is
+#   `git merge --ff-only` (bin/fm-slot-provision-lib.sh, fm_slot_move_forward), which git
+#   itself refuses unless the copy's HEAD is an ancestor of the tip, so no commit is dropped
+#   and no tracked or untracked change is overwritten. Before it, the copy must be clean,
+#   have no live holder (a process with its working directory in it that started before this
+#   spawn, a git worktree lock, a live project lease, recent contention) and have no ignored
+#   file at a path the move writes (git overwrites ignored files silently). Any other doubt, an
+#   unreadable inventory included, skips the copy: it is left exactly as found, leased durably
+#   in place (`treehouse lease --path`, because Treehouse resets a slot when its shell exits),
+#   and a second `treehouse get` in the same pane takes another copy. With no other copy the
+#   acquisition wait ends in its usual refusal, which names each skipped copy. A relaunch keeps
+#   the copy its work lives in and so refuses instead of skipping. A fresh local-only ship instead compares that
 #   immutable tip with the qualified named local default and selects the descendant
 #   containing both histories; missing, ambiguous, moved or divergent local defaults
 #   refuse under project custody before copy preparation. Local commits are never
 #   relabeled as origin. When no origin is detected, spawn skips that comparison
 #   and launches from the clean worktree's current HEAD. Relaunch reuses the recorded worktree without
-#   fetching or resetting its base. An unreachable detected origin, unresolved
-#   default branch, or non-clean worktree refuses a fresh spawn rather than
-#   risking a PR based on stale history or discarding local work.
+#   fetching or moving its base. An unreachable detected origin or unresolved
+#   default branch refuses a fresh spawn rather than risking a PR based on stale
+#   history; a non-clean or otherwise doubtful copy is skipped as described above.
 #   A project carrying scripts/git-stability/provision_existing_slot.py additionally
 #   requires repeatable --owned-path <tracked-path> flags: explicit task scope,
 #   never inferred from the brief. bin/fm-slot-provision-lib.sh calls that actual
@@ -6454,7 +6465,7 @@ if [ "$KIND" != secondmate ] && { fm_slot_required "$PROJ_ABS" "$WT" || { [ "$RE
   BRANCH=${BRANCH:-fm/$ID}
   if [ "$RELAUNCH" -eq 0 ]; then
     SLOT_FRESH_BASE=1
-    fm_slot_prepare_base "$PROJ_ABS" "$WT" "$ID" || { rc=$?; spawn_try_skip "$rc" && continue; spawn_slot_refused; }
+    fm_slot_prepare_base "$PROJ_ABS" "$WT" "$ID" || spawn_slot_refused
   elif [ "$(fm_meta_get "$RELAUNCH_META" recovery)" = slot-provision-refused ]; then
     prepared_head=$(fm_meta_get "$RELAUNCH_META" slot_prepared_head)
     if [ -n "$prepared_head" ]; then

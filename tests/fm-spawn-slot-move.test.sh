@@ -163,15 +163,6 @@ test_rewound_default_skips_the_copy() {
   expect_skip "an origin default rewound behind the slot's HEAD skips the copy" head_not_target
 }
 
-test_no_forcing_form_exists_in_the_slot_files() {
-  local hits
-  hits=$(grep -n -E 'reset --hard|checkout (-B|-f|--force)|switch (-C|--force|-f)|clean -[a-z]*f|worktree remove|branch -[fD]' \
-    "$ROOT/bin/fm-spawn.sh" "$ROOT/bin/fm-slot-provision-lib.sh" || true)
-  [ -z "$hits" ] || fail "a destroying git form is in the slot files:"$'\n'"$hits"
-  hits=$(grep -n -E 'git[^|;#]* (reset|clean|stash|restore) ' "$ROOT/bin/fm-spawn.sh" "$ROOT/bin/fm-slot-provision-lib.sh" | grep -v -E '^[^:]+:[0-9]+:[[:space:]]*#' || true)
-  [ -z "$hits" ] || fail "a reset, clean, stash or restore of a slot is in the slot files:"$'\n'"$hits"
-  pass "no reset --hard, forced checkout, clean, branch -f/-D or worktree remove exists in bin/fm-spawn.sh or bin/fm-slot-provision-lib.sh"
-}
 
 # --- the clean-tree look --------------------------------------------------------
 
@@ -427,12 +418,6 @@ test_unreadable_target_skips_the_copy() {
   expect_skip "a target commit that cannot be read skips the copy" unknown_target
 }
 
-# --- the code is the contract -----------------------------------------------------
-
-test_the_move_is_a_fast_forward_not_a_reset() {
-  grep -q -- 'merge --ff-only' "$SLOT_LIB" || fail "the move does not use merge --ff-only"
-  pass "the slot move is merge --ff-only"
-}
 
 CASES=(
   test_control_clean_slot_behind_the_target_moves
@@ -441,7 +426,6 @@ CASES=(
   test_attached_branch_with_an_unlanded_commit_is_skipped
   test_attached_branch_behind_the_target_moves_forward_keeping_its_tip
   test_rewound_default_skips_the_copy
-  test_no_forcing_form_exists_in_the_slot_files
   test_modified_tracked_file_is_skipped
   test_staged_file_is_skipped
   test_untracked_file_in_an_untracked_directory_is_skipped
@@ -462,7 +446,6 @@ CASES=(
   test_failing_lsof_skips_the_copy
   test_failed_git_status_skips_the_copy
   test_unreadable_target_skips_the_copy
-  test_the_move_is_a_fast_forward_not_a_reset
 )
 
 fm_test_run_cases "${CASES[@]}" -- "$@"

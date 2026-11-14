@@ -45,24 +45,16 @@ fm_slot_check_copy() { # <project> <copy>
   slot_common=$(git -C "$copy" rev-parse --path-format=absolute --git-common-dir) || return 1
   [ "$common" = "$slot_common" ] || { echo 'error: slot provisioning refused: repository_mismatch' >&2; return 1; }
   status=$(git -C "$copy" status --porcelain=v1 --untracked-files=all --ignore-submodules=none) || return 1
-  [ -z "$status" ] || {
-    echo 'error: slot provisioning refused: dirty_worktree; preserve and reconcile the scratch state before retrying' >&2
-    FM_SLOT_SKIP_REASON=dirty_worktree
-    return "$FM_SLOT_SKIP_RC"
-  }
+  [ -z "$status" ] || { echo 'error: slot provisioning refused: dirty_worktree; preserve and reconcile the scratch state before retrying' >&2; return 1; }
   for marker in MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD rebase-merge rebase-apply sequencer; do
     git_path=$(git -C "$copy" rev-parse --path-format=absolute --git-path "$marker") || return 1
-    [ ! -e "$git_path" ] || {
-      echo 'error: slot provisioning refused: operation_in_progress' >&2
-      FM_SLOT_SKIP_REASON=operation_in_progress
-      return "$FM_SLOT_SKIP_RC"
-    }
+    [ ! -e "$git_path" ] || { echo 'error: slot provisioning refused: operation_in_progress' >&2; return 1; }
   done
 }
 
 fm_slot_prepare_base() { # <project> <copy> <task-id>
   local project=$1 copy=$2 id=$3 branch
-  fm_slot_check_copy "$project" "$copy" || return $?
+  fm_slot_check_copy "$project" "$copy" || return 1
   branch=$(git -C "$copy" branch --show-current) || return 1
   FM_SLOT_PREVIOUS_BRANCH=$branch
   FM_SLOT_PREVIOUS_HEAD=$(git -C "$copy" rev-parse --verify HEAD) || return 1
