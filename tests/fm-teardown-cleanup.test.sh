@@ -6628,6 +6628,64 @@ SH
   pass 'with ps confined, a live or unreadable launcher keeps its locked copy on both direct-release routes, and a gone one closes'
 }
 
+# lsof spells a name byte by byte in the C locale: a non-ASCII byte as \\xNN and
+# a backslash doubled (checked against the real lsof on macOS). A copy whose path
+# holds a non-ASCII component (cafe with an acute e) still refuses a process
+# that holds a file in it open, whatever locale teardown runs in; with no holder
+# it closes. The fake lsof prints that spelling when LC_ALL=C and the raw bytes
+# otherwise, as the real one does, and the expected spelling is written by hand.
+test_direct_release_sees_a_holder_under_an_escaped_lsof_name() {
+  local rc shape label pid=999996 raw escaped locale
+  for shape in holder-c-locale holder-utf8-locale none; do
+    label="escaped-$shape"
+    dead_launcher_pid
+    make_own_locked_copy_case "$label" enclosing "$FOREIGN_DEAD_PID"
+    git -C "$FOREIGN_CASE/project" worktree unlock "$FOREIGN_COPY"
+    raw="${FOREIGN_COPY%/*}/caf$(printf '\303\251')-one"
+    git -C "$FOREIGN_CASE/project" worktree move "$FOREIGN_COPY" "$raw"
+    git -C "$FOREIGN_CASE/project" worktree lock --reason "vernant-session-active owner=launcher:$FOREIGN_DEAD_PID launcher=$FOREIGN_DEAD_PID" "$raw"
+    FOREIGN_COPY=$raw
+    # The slot's status would list the non-ASCII copy C-quoted; keep it out of
+    # the slot's clean check, which this case does not test.
+    printf '%s\n' '/.claude/worktrees/caf*-one/' >> "$(git -C "$FOREIGN_SLOT" rev-parse --path-format=absolute --git-path info/exclude)"
+    fm_write_meta "$FOREIGN_CASE/state/task-x1.meta" \
+      "window=firstmate:fm-task-x1" "endpoint_task_id=task-x1" \
+      "worktree=$FOREIGN_COPY" "branch=fm/task-x1-v2" "project=$FOREIGN_CASE/project" \
+      "kind=ship" "mode=no-mistakes" "spawn_gen=teardown-test-task-x1" \
+      "prior_worktree=$FOREIGN_SLOT"
+    escaped="${FOREIGN_COPY%/*}/caf\\xc3\\xa9-one"
+    add_git_worktree_log "$FOREIGN_CASE"
+    rm -f "$FOREIGN_CASE/vernant-python"
+    cat > "$FOREIGN_CASE/fakebin/lsof" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" -Fpfn "*)
+    [ "$shape" != none ] || exit 0
+    if [ "\${LC_ALL:-}" = C ]; then name='$escaped/.git'; else name='$FOREIGN_COPY/.git'; fi
+    printf 'p%s\nf4\nn%s\n' $pid "\$name"
+    exit 0 ;;
+  *" -d cwd "*) exit 0 ;;
+esac
+exit 1
+SH
+    chmod +x "$FOREIGN_CASE/fakebin/lsof"
+    locale=C
+    [ "$shape" != holder-utf8-locale ] || locale=en_US.UTF-8
+    run_foreign_teardown rc LC_ALL="$locale"
+    if [ "$shape" = none ]; then
+      expect_code 0 "$rc" "$label: a copy no process holds must close: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+      assert_absent "$FOREIGN_COPY" "$label: the copy survived"
+    else
+      expect_code 1 "$rc" "$label: a holder under an escaped name must keep the copy: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+      assert_grep "process $pid" "$FOREIGN_CASE/stderr" "$label: the refusal did not name the holder: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+      assert_present "$FOREIGN_COPY/.git" "$label: the copy was removed"
+      if grep -q 'worktree unlock' "$FOREIGN_CASE/git-worktree.log" 2>/dev/null; then fail "$label: the script unlocked the copy"; fi
+      assert_present "$FOREIGN_CASE/state/task-x1.meta" "$label: the task record was removed"
+    fi
+  done
+  pass 'a process holding a file in a copy with a non-ASCII path keeps it, whatever locale lsof spells the name in; with no holder it closes'
+}
+
 # The open-file listing is filtered in one pass, and a listing line of a shape
 # the filter does not know still fails the scan, so the copy stays locked.
 test_direct_release_refuses_a_malformed_open_file_listing() {
@@ -7206,6 +7264,7 @@ test_direct_release_refuses_a_malformed_open_file_listing
 test_history_landed_copy_keeps_its_unique_ignored_file
 test_direct_release_rechecks_the_bundle_and_head_at_the_unlock
 test_confined_launcher_state_is_never_taken_for_absence
+test_direct_release_sees_a_holder_under_an_escaped_lsof_name
 test_direct_release_refuses_a_process_holding_a_file_in_the_copy_open
 test_task_own_descendant_holding_a_file_open_refuses_and_is_not_signalled
 test_direct_release_refuses_an_unreadable_process_table

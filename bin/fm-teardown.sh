@@ -3717,26 +3717,49 @@ pids_with_open_file_under() {  # <dir>
 }
 
 lsof_pids_under() {  # <dir> <lsof-arguments...>
-  local dir=$1 out
+  local dir=$1 spelled out
   shift
   [ -n "$dir" ] && [ -d "$dir" ] || return 0
   dir=$(cd "$dir" && pwd -P) || return 1
-  out=$(lsof "$@" 2>/dev/null) || return 1
+  # lsof spells each name byte by byte in the C locale (a non-ASCII byte as
+  # \xNN, a backslash doubled, a control byte escaped); fm_control_lsof_path
+  # spells the root the same way, and failing to spell it fails the scan.
+  spelled=$(fm_control_lsof_path "$dir") || return 1
+  out=$(LC_ALL=C lsof "$@" 2>/dev/null) || return 1
   [ -n "$out" ] || return 0
   # One awk pass over the -F listing (a system-wide one holds tens of thousands
-  # of lines): the path prefix is compared as a literal string, the first
-  # matching path of each pid is printed, this shell is left out, and a line of
-  # any other shape, or a file or name line with no pid before it, fails.
-  FM_LSOF_DIR=$dir FM_LSOF_SELF=$$ LC_ALL=C awk '
-    BEGIN { dir = ENVIRON["FM_LSOF_DIR"]; self = ENVIRON["FM_LSOF_SELF"]; prefix = dir "/"; plen = length(prefix); pid = ""; printed = "" }
+  # of lines): the spelled root is compared as a literal string prefix, the first
+  # matching name of each pid is printed as the root followed by the rest of the
+  # name (its \xNN bytes of 127 and above and doubled backslashes decoded; a
+  # control-byte escape stays as text, so every line stays one line), this
+  # shell is left out, and a line of any other shape, or a
+  # file or name line with no pid before it, fails.
+  FM_LSOF_DIR=$dir FM_LSOF_SPELLED=$spelled FM_LSOF_SELF=$$ LC_ALL=C awk '
+    function decode(text,    out, i, c, n, hex, v) {
+      out = ""
+      for (i = 1; i <= length(text); i++) {
+        c = substr(text, i, 1)
+        if (c != "\\" || i == length(text)) { out = out c; continue }
+        n = substr(text, i + 1, 1)
+        if (n == "x" && substr(text, i + 2, 2) ~ /^[0-9a-fA-F][0-9a-fA-F]$/) {
+          hex = tolower(substr(text, i + 2, 2))
+          v = (index("0123456789abcdef", substr(hex, 1, 1)) - 1) * 16 + index("0123456789abcdef", substr(hex, 2, 1)) - 1
+          if (v >= 127) { out = out sprintf("%c", v); i += 3; continue }
+        }
+        if (n == "\\") { out = out "\\"; i++; continue }
+        out = out c
+      }
+      return out
+    }
+    BEGIN { dir = ENVIRON["FM_LSOF_DIR"]; spelled = ENVIRON["FM_LSOF_SPELLED"]; self = ENVIRON["FM_LSOF_SELF"]; prefix = spelled "/"; plen = length(prefix); pid = ""; printed = "" }
     {
       kind = substr($0, 1, 1); rest = substr($0, 2)
       if (kind == "p") { if (rest !~ /^[0-9]+$/) exit 1; pid = rest; next }
       if (kind == "f") { if (pid == "") exit 1; next }
       if (kind == "n") {
         if (pid == "") exit 1
-        if ((rest == dir || substr(rest, 1, plen) == prefix) && pid != self && pid != printed) {
-          printf "%s\t%s\n", pid, rest
+        if ((rest == spelled || substr(rest, 1, plen) == prefix) && pid != self && pid != printed) {
+          printf "%s\t%s%s\n", pid, dir, decode(substr(rest, length(spelled) + 1))
           printed = pid
         }
         next
