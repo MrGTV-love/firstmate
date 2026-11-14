@@ -2769,7 +2769,7 @@ fm_wake_append_locked() {
 
 _fm_wake_append_row_locked() {
   local kind=$1 key=$2 payload=$3 clean_key clean_payload epoch seq seq_file status
-  local recovery_marker
+  local recovery_marker pending_event
   case "$kind" in
     signal|stale|check|heartbeat) ;;
     *) printf 'fm_wake_append: invalid wake kind: %s\n' "$kind" >&2; return 2 ;;
@@ -2777,6 +2777,19 @@ _fm_wake_append_row_locked() {
 
   clean_key=$(printf '%s' "$key" | fm_wake_clean_field)
   clean_payload=$(printf '%s' "$payload" | fm_wake_clean_field)
+  case "$kind:$clean_key" in
+    check:*.check.sh\#event:*)
+      # Keep the original sequence while this event is pending, including after
+      # presentation. A retry must not escape that presentation's ack cutoff.
+      if [ -e "$FM_WAKE_QUEUE" ]; then
+        pending_event=$(awk -F '\t' -v key="$clean_key" '
+          NF == 5 && $1 ~ /^[0-9]+$/ && $2 ~ /^[0-9]+$/ && $3 == "check" && $4 == key { found=1 }
+          END { print found + 0 }
+        ' "$FM_WAKE_QUEUE") || return 1
+        [ "$pending_event" != 1 ] || return 0
+      fi
+      ;;
+  esac
   epoch=$(date +%s)
   seq_file="$STATE/.wake-queue.seq"
   recovery_marker="$STATE/.watcher-down"
@@ -2956,7 +2969,7 @@ fm_wake_queue_prune_task() {  # <state> <task-id> [target]
     NF >= 5 {
       if ($3 == "stale" && target != "" && $4 == target) next
       if ($3 == "signal" && ($4 == task || $4 == task ".status" || $4 == task ".turn-ended" || $4 == state "/" task ".status" || $4 == state "/" task ".turn-ended")) next
-      if ($3 == "check" && $4 == state "/" task ".check.sh") next
+      if ($3 == "check" && ($4 == state "/" task ".check.sh" || index($4, state "/" task ".check.sh#event:") == 1)) next
     }
     { print }
   ' "$queue" > "$tmp" || { rm -f "$tmp"; fm_lock_release "$lock"; return 1; }
