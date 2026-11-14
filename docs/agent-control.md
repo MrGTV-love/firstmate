@@ -68,7 +68,7 @@ The one answer `exit` gives a recognised dialog is the picker's, under the proof
 **Teardown and discard are not verbs and will not become verbs.**
 `exit` stops an agent and preserves everything else.
 Removing a worktree, closing an endpoint, or discarding work stays with [`bin/fm-teardown.sh`](../bin/fm-teardown.sh), whose header owns the landed-work test and the verified-bundle preservation record format, creation command and recovery command.
-The header's attended recorded-bundle exception permits cleanup without asserting delivery and without a captain call filed first; it never bypasses the other copy-removal proofs, and Vernant's independent closeout verdict is kept whenever the driver can run.
+The header's attended recorded-bundle exception permits cleanup without asserting delivery and without a captain call filed first; it never bypasses the other copy-removal proofs, and Vernant's independent closeout verdict is kept whenever the driver can run, except its uncovered-content verdict (`verification_stale_or_uncovered_paths`) on a lock whose launcher is gone, which teardown's direct release takes over (see the nested-copy rules below).
 
 **`resume` is not a verb.**
 It is not deterministic across the verified adapters: codex, grok, gemini, and devin resume only from a session id printed at exit, opencode continues the most recent session for the cwd, and claude, pi, pi-signed, omp, kimi, and agy have no verified general pane-resume contract.

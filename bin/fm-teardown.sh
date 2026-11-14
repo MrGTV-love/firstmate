@@ -131,7 +131,8 @@
 # drop. A later proof that changes the close's links restages the pending close.
 # The route needs no backlog row, so it also passes in a manual-backlog home and
 # an Orca cleanup recovery. A Vernant-locked copy keeps its driver's independent
-# landing verdict whenever the driver can run (see the creation-lock paragraph).
+# landing verdict whenever the driver can run, except its uncovered-content
+# verdict on a lock whose launcher is gone (see the creation-lock paragraph).
 # To create a self-contained bundle and its record (no creator is run by teardown),
 # choose an absolute source bundle path (temporary locations are supported),
 # set copy, task and FM_HOME explicitly, then run under bash:
