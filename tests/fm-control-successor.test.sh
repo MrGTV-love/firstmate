@@ -361,9 +361,16 @@ test_successor_refuses_other_tasks_and_records() {
 test_successor_refuses_inadmissible_names() {
   local id=suc-names dir name
   dir=$(new_successor_case names "$id")
+  # Each name is refused by the check that owns it, and the refusal names that
+  # check: the character rule for the names below, git's own name rule for the
+  # ones after them. The family bound would refuse every one of them too, so the
+  # reason text is what shows the earlier check still works.
   # shellcheck disable=SC2016 # 'a$b' must reach the verb as a literal name, not expand.
-  for name in 'bad..name' 'with space' 'wild*card' 'qu?stion' 'br[acket' '-leading' 'back\slash' '@{-1}' 'trailing.lock' 'trailing/' 'tab	name' 'qu"ote' "a'b" 'with#hash' 'a@b' 'a=b' 'a;b' 'a$b'; do
-    expect_successor_refusal "$dir" "$id" "name-$name" "is not admissible" 1 --branch "$name" --note why
+  for name in 'with space' 'wild*card' 'qu?stion' 'br[acket' '-leading' 'back\slash' '@{-1}' 'tab	name' 'qu"ote' "a'b" 'with#hash' 'a@b' 'a=b' 'a;b' 'a$b'; do
+    expect_successor_refusal "$dir" "$id" "name-$name" "it may use only letters, digits" 1 --branch "$name" --note why
+  done
+  for name in 'bad..name' 'trailing.lock' 'trailing/'; do
+    expect_successor_refusal "$dir" "$id" "name-$name" "it is not a valid git branch name" 1 --branch "$name" --note why
   done
   expect_successor_refusal "$dir" "$id" equals-branch "equals the task's recorded branch" 1 --branch "fm/$id" --note why
   expect_successor_refusal "$dir" "$id" archive-prefix "under archive/" 1 --branch "archive/$id-submitted-0123abcd" --note why
