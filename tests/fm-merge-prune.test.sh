@@ -3556,7 +3556,7 @@ wake_count_real() { wake_count; }
 # (Teardown's own `treehouse return --force` is the landed-work-guarded return
 # of the slot it has just proved safe; it is not a forced teardown.)
 assert_nothing_forced() {  # <label>
-  if [ -s "$W/stub.log" ] && grep -qvx 't1' "$W/stub.log"; then
+  if [ -s "$W/stub.log" ] && grep -qvxE '[A-Za-z0-9][A-Za-z0-9._-]*' "$W/stub.log"; then
     fail "$1: teardown was asked with extra arguments: $(cat "$W/stub.log")"
   fi
   if grep -Eq -- '--include-unlanded|--include-in-use|^destroy .*--force' "$W/th.log"; then
@@ -3921,10 +3921,16 @@ xl_merge_in_lane_m() {
   [ "$(cat "$W/forge.state")" = MERGED ] || fail "lane M's merge did not reach the forge"
   grep -qx "pr=$XL_PR" "$XL_MC/state/task-x1.meta" || fail "lane M's own record does not name the PR it merged"
   [ "$XL_O_BEFORE" = "$(xl_digest_o)" ] || fail "lane M's merge wrote into lane O's home"
+  XL_M_AFTER_MERGE=$(xl_digest_dir "$XL_MC/state" task-x1)
 }
 
 # A digest of every file in lane O's state directory (names and bytes), so a
 # write by another lane shows as a different digest.
+xl_digest_dir() {  # <dir> [<own task id>]: names and bytes of every file in it, except that task's own files
+  (cd "$1" && find . -type f ! -name '*.lock' ! -name "${2:-.none}.*" ! -path "./.idle-reap/${2:-.none}.*" -print0 2>/dev/null \
+    | sort -z | xargs -0 shasum 2>/dev/null | shasum | awk '{print $1}')
+}
+
 xl_digest_o() {
   (cd "$STATE" && find . -type f ! -name '.wake-queue.lock' -print0 2>/dev/null | sort -z | xargs -0 shasum 2>/dev/null | shasum | awk '{print $1}')
 }
@@ -4004,6 +4010,22 @@ xl_plain_teardown() {  # <stderr file>
   return "$rc"
 }
 
+# xl_t1_rows: t1's rows in O's open-work ledger, one "category | owner | informational | next action" line each.
+xl_t1_rows() {
+  xl_env "$ROOT/bin/fm-open-loops.sh" --json 2> "$W/ledger.err" \
+    | jq -r '.rows[] | select(.subject == "t1") | "\(.category) | \(.owner) | \(.informational // false) | \(.next_action)"'
+}
+
+# xl_observe_stranded <label>: what a stranded t1 looks like, printed from files:
+# its record, its ledger rows, and what a plain teardown says. Used where the
+# scenario failed, so the base record shows every observable point.
+xl_observe_stranded() {
+  xl_print_state "$1"
+  printf '%s: O ledger rows for t1: %s\n' "$1" "$(xl_t1_rows | paste -sd ';' - | sed 's/^$/none/')"
+  xl_plain_teardown "$W/observe-teardown.txt" || true
+  printf '%s: plain teardown of t1: %s\n' "$1" "$(grep -m1 -E 'REFUSED|refused|error|not landed' "$W/observe-teardown.txt" | sed 's/^$/no refusal line/')"
+}
+
 test_xlane_merge_by_another_lane_reaches_safe_closeout() {
   local variant
   for variant in unregistered poll-never-published branch-pruned; do
@@ -4025,8 +4047,12 @@ test_xlane_merge_by_another_lane_reaches_safe_closeout() {
     [ ! -e "$STATE/t1.check.sh" ] || fail "$variant: a poll existed before housekeeping"
     [ ! -e "$STATE/t1.merge-prune" ] || fail "$variant: a prune record existed before housekeeping"
     xl_supervise_until xl_closed \
-      || { xl_print_state "$variant after supervision"; fail "$variant: t1 stayed open after the other lane merged its PR: $(tail -5 "$W/watch.out")"; }
+      || { xl_observe_stranded "$variant after supervision"; fail "$variant: t1 stayed open after the other lane merged its PR: $(tail -5 "$W/watch.out")"; }
     xl_print_state "$variant after supervision"
+    # Lane M's own records are as its merge left them: O's closeout wrote nothing there.
+    # V3: lane M's records are unchanged except for M's own task.
+    [ "$XL_M_AFTER_MERGE" = "$(xl_digest_dir "$XL_MC/state" task-x1)" ] \
+      || fail "$variant: O's closeout changed lane M's records beyond its own task: $(cd "$XL_MC/state" && ls -A)"
     [ ! -e "$COPY" ] || fail "$variant: the copy is still on disk"
     [ ! -e "$STATE/t1.check.sh" ] && [ ! -e "$STATE/t1.pr-poll" ] || fail "$variant: the poll file outlived the record"
     xl_events_in_order task.merged task.cleaned_up || fail "$variant: O's ledger lacks task.merged then task.cleaned_up for t1: $(xl_ledger_events)"
@@ -4051,6 +4077,9 @@ test_xlane_open_or_closed_pr_keeps_the_record() {
     unset XL_BOUND
     xl_print_state "$state PR after supervision"
     [ -e "$COPY" ] && [ -e "$STATE/t1.meta" ] || fail "$state: the copy or the record was removed"
+    printf '%s PR: O ledger rows for t1: %s\n' "$state" "$(xl_t1_rows | paste -sd ';' -)"
+    xl_t1_rows | awk -F' [|] ' '$2 != "" && $3 == "false" && $4 != "" {ok=1} END {exit !ok}' \
+      || fail "$state: t1 has no owned, actionable ledger row: $(xl_t1_rows | paste -sd ';' -)"
     if xl_has_event task.merged || xl_has_event task.cleaned_up; then
       fail "$state: the ledger claims a merge or a cleanup: $(xl_ledger_events)"
     fi
@@ -4190,17 +4219,31 @@ xl_protection_case() {  # <dirty|unlanded-commit|conflicting-owner>
   esac
 }
 
+# The protected state, by content: the copy's tracked and untracked bytes and its
+# HEAD commit, t1's record, and (when present) the claimant's record and slot marker.
+xl_claimant_fingerprint() {
+  { git -C "$COPY" rev-parse HEAD; git -C "$COPY" status --porcelain=v1 --untracked-files=all
+    (cd "$COPY" && git ls-files -z --cached --others --exclude-standard | xargs -0 shasum 2>/dev/null)
+    for f in "$STATE/other-live.meta" "$POOL/pool1/1/.fm-slot-owner"; do [ ! -e "$f" ] || shasum < "$f"; done
+  } | shasum | awk '{print $1}'
+}
+xl_v7_fingerprint() {
+  { xl_claimant_fingerprint; shasum < "$STATE/t1.meta"; } | shasum | awk '{print $1}'
+}
+
 test_xlane_protections_still_refuse() {
-  local what rc
+  local what rc v7_before claimant_before
   for what in dirty unlanded-commit conflicting-owner-pr-open; do
     case "$what" in
       conflicting-owner-pr-open) xl_protection_case conflicting-owner; printf 'OPEN\n' > "$W/forge.state" ;;
       *) xl_protection_case "$what" ;;
     esac
+    v7_before=$(xl_v7_fingerprint)
     rc=0
     xl_plain_teardown "$W/refusal.txt" || rc=$?
     [ "$rc" -ne 0 ] || fail "$what: plain teardown succeeded over unsafe work"
     [ -e "$COPY" ] && [ -e "$STATE/t1.meta" ] || fail "$what: the copy or the record was removed"
+    [ "$v7_before" = "$(xl_v7_fingerprint)" ] || fail "$what: the copy's bytes, its commit, the record or the claimant changed"
     printf '%s: plain teardown exit %s; first refusal line: %s\n' "$what" "$rc" "$(grep -m1 -E 'REFUSED|refused|error' "$W/refusal.txt")"
     grep -qE 'REFUSED|refused|error' "$W/refusal.txt" || fail "$what: the refusal does not name a cause: $(cat "$W/refusal.txt")"
     [ "$what" != dirty ] || grep -q 'uncommitted changes' "$W/refusal.txt" || fail "dirty: the refusal does not name the uncommitted change"
@@ -4212,6 +4255,7 @@ test_xlane_protections_still_refuse() {
   # With the PR confirmed merged, a conflicting slot owner still never loses its copy:
   # only the finished task's own record retires and the claimant's slot stays as it is.
   xl_protection_case conflicting-owner
+  claimant_before=$(xl_claimant_fingerprint)
   rc=0
   xl_plain_teardown "$W/refusal.txt" || rc=$?
   printf 'conflicting-owner-pr-merged: plain teardown exit %s; t1 record=%s claimant copy=%s claimant record=%s; output: %s\n' "$rc" \
@@ -4223,7 +4267,8 @@ test_xlane_protections_still_refuse() {
   [ "$rc" -eq 0 ] || fail "conflicting owner, PR merged: plain teardown exit $rc, not the records-only retirement: $(cat "$W/refusal.txt")"
   [ ! -e "$STATE/t1.meta" ] || fail "conflicting owner, PR merged: t1's own record was not retired"
   grep -q 'was reassigned to task other-live' "$W/refusal.txt" || fail "conflicting owner, PR merged: the output does not name the claimant"
-  grep -q "^task=other-live$" "$POOL/pool1/1/.fm-slot-owner" || fail "conflicting owner, PR merged: the claimant's slot marker changed"
+  [ "$claimant_before" = "$(xl_claimant_fingerprint)" ] \
+    || fail "conflicting owner, PR merged: the claimant's copy bytes, commit, record or slot marker changed"
   assert_nothing_forced "xlane conflicting owner merged"
   cleanup_workers
   pass "a merged cross-lane PR with a resolving branch, link and pr= never turns a changed file, an unlanded commit or a conflicting slot owner into a removal"
@@ -4341,6 +4386,9 @@ make_v5_world() {
   git -C "$W/project" worktree add -q -b fm/t-e "$W/e-copy" origin/main
   printf 'e\n' > "$W/e-copy/e-work.txt"; git -C "$W/e-copy" add e-work.txt; git -C "$W/e-copy" commit -q -m "e work"
   e_head=$(git -C "$W/e-copy" rev-parse HEAD)
+  # E's PR head is published, as every PR head is: pushed to its branch and fetched back.
+  env "${V5_GIT_ENV[@]}" git -C "$W/e-copy" push -q origin "HEAD:refs/heads/fm/t-e"
+  env "${V5_GIT_ENV[@]}" git -C "$W/project" fetch -q origin fm/t-e
   V5_E_HEAD=$e_head
   V5_E_PR=https://github.com/acme/widget/pull/9
   mate_home="$W/mate-home"
@@ -4394,6 +4442,7 @@ v5_install_review_reads() {
   mv "$W/bin/gh" "$W/bin/gh.rest"
   cat > "$W/bin/gh" <<SH
 #!/usr/bin/env bash
+printf '%s\\n' "\$*" >> "$W/gh-v5.calls"
 if [ "\${1:-} \${2:-}" = "pr view" ] && [[ " \$* " = *mergeStateStatus* ]]; then
   number=\${3##*/}
   case "\$number" in
@@ -4404,6 +4453,17 @@ if [ "\${1:-} \${2:-}" = "pr view" ] && [[ " \$* " = *mergeStateStatus* ]]; then
   printf '{"state":"%s","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"%s","headRefOid":"%s","baseRefName":"main","baseRefOid":"%s","statusCheckRollup":[{"__typename":"CheckRun","name":"ci","status":"COMPLETED","conclusion":"SUCCESS","startedAt":"2026-11-03T00:00:00Z"}]}\n' \
     "\$state" "\$(cat "$W/merge-state.\$number")" "\$head" "$3"
   exit 0
+fi
+# Every other read of PR 9 answers from PR 9's own forge state and head.
+if [ "\${1:-} \${2:-}" = "pr view" ] && [ "\${3##*/}" = 9 ]; then
+  state9=\$(cat "$W/forge9.state")
+  case " \$* " in
+    *"--json isDraft"*) printf '{"isDraft":false}\\n'; exit 0 ;;
+    *"state,headRefOid,mergeCommit"*) printf '%s\\t%s\\t%s\\n' "\$state9" '$2' ''; exit 0 ;;
+    *"state,headRefOid,url"*) printf '%s\\t%s\\t%s\\n' "\$state9" '$2' 'https://github.com/acme/widget/pull/9'; exit 0 ;;
+    *"--json state "*) printf '%s\\n' "\$state9"; exit 0 ;;
+    *"headRefOid"*) printf '%s\\n' '$2'; exit 0 ;;
+  esac
 fi
 if [ "\${1:-}" = api ] && [ "\${2:-}" != -i ]; then
   case " \$* " in
@@ -4539,27 +4599,43 @@ test_v5_missing_updates_restart_and_completed_review_cannot_strand_work() {
   pass "five records survive silence, a restart and a completed review: A closed from the other lane's merge, B/C/D untouched and not stranded, E pending its merge with the review on record"
 }
 
-# The control for V5's E: the same world and the same qualifying exact-head PASS report
-# (v5_record_review), with only the forge's merge state changed from BEHIND to CLEAN. The
-# reconciler's review step then passes every gate it owns and calls bin/fm-pr-merge.sh for E,
-# so the named hold alone is what keeps E open in V5.
-# Limit: this world's forge double does not land a merge, so the proof stops at the merge call
-# (a recorded merge attempt with fm-pr-merge.sh's own result); landing on PASS is
-# test_auto_review_green_uncovered_pr_is_read_recorded_and_merged in tests/fm-pr-merge.test.sh.
+# The control for V5's E: the same world and the same qualifying exact-head PASS
+# report (v5_record_review), with the forge answering E's PR as mergeable and CLEAN
+# with its check green instead of BEHIND. The forge is the pr-merge suite's fake
+# (add_gh_mocks for E's head), because fm-pr-merge.sh reads far more of the forge
+# than the V5 double answers; the reconciler runs through that suite's runner, with
+# this repository as code root so fm-pr-merge.sh can read lineage. A merge that
+# succeeds marks PR 9 merged. Only a landed merge passes: any held or queued state
+# fails, so the hold alone is what keeps E open in V5.
 test_v5_e_without_its_hold_reaches_the_merge() {
-  local step_state
+  local step_state mc
   make_v5_world
-  printf 'CLEAN\n' > "$W/merge-state.9"
   v5_record_review
-  xl_env "${V5_GIT_ENV[@]}" bash "$ROOT/bin/fm-pr-ready-reconcile.sh" > "$W/reconcile.out" 2>&1 || fail "reconcile failed: $(cat "$W/reconcile.out")"
+  mc=$(make_case "v5e-$WN")
+  mkdir -p "$mc/wt"
+  add_gh_mocks "$mc" "$V5_E_HEAD"
+  mv "$mc/fakebin/gh" "$mc/fakebin/gh.real"
+  cat > "$mc/fakebin/gh" <<SH
+#!/usr/bin/env bash
+"$mc/fakebin/gh.real" "\$@"
+rc=\$?
+case "\${1:-} \${2:-}" in
+  "pr merge") case " \$* " in *" --disable-auto "*) ;; *) [ "\$rc" -ne 0 ] || printf 'MERGED\\n' > "$W/forge9.state" ;; esac ;;
+esac
+exit \$rc
+SH
+  chmod +x "$mc/fakebin/gh"
+  ( export FM_TEST_HOME="$HOME_DIR" FM_TEST_STATE="$STATE" FM_TEST_CODE_ROOT="$ROOT" FM_PR_AUTO_REVIEW_INTERVAL=0 "${V5_GIT_ENV[@]}"
+    PR_MERGE="$ROOT/bin/fm-pr-ready-reconcile.sh" run_pr_merge "$mc" > "$W/reconcile.out" 2>&1 ) || fail "reconcile failed: $(cat "$W/reconcile.out")"
   step_state=$(v5_e_review_state)
-  printf 'E without its hold: review step state: %s\n' "$step_state"
+  printf 'E without its hold: review step state: %s; PR 9 at the forge: %s\n' "$step_state" "$(cat "$W/forge9.state")"
   xl_env "$ROOT/bin/fm-pr-auto-review.py" events t-e | sed 's/^/  event: /'
   case "$step_state" in
-    "merged "*|"queued "*|"held: merge not landed: "*) ;;
-    *) fail "E without its hold did not reach the merge call: $step_state" ;;
+    "merged "*) ;;
+    *) fail "E without its hold did not merge (a held or queued state is not a merge): $step_state" ;;
   esac
-  pass "with E's hold removed and an exact-head PASS on record, the review step passes its gates and calls fm-pr-merge.sh for E"
+  [ "$(cat "$W/forge9.state")" = MERGED ] || fail "E's merge did not reach the forge"
+  pass "with E's hold removed and the same exact-head PASS, the review step merges E's PR"
 }
 
 # --- run ----------------------------------------------------------------------
