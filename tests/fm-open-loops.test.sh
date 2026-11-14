@@ -2116,6 +2116,9 @@ reap_refusal = 'REFUSED: t1 has commits the merged PR head does not contain; the
 return_refusal = 'REFUSED: fin-return slot return could not reach the pool lease'
 (v4 / 'state/.idle-reap/fin-return.refused').write_text(
     f'fm-idle-reap-refused-v1\n{now - 600}\ndone [at={now}]: merged\n{return_refusal}\n')
+(v4 / 'state/.idle-reap/fin-order.refused').write_text(
+    f'fm-idle-reap-refused-v1\n{now - 100}\ndone [at={now}]: merged\nREFUSED: the newer reaper teardown refusal\n')
+os.utime(v4 / 'state/.idle-reap/fin-order.refused', (now - 90, now - 90))
 (v4 / 'state/.idle-reap/fin-pending.refused').write_text(
     f'fm-idle-reap-refused-v1\n{now - 7000}\ndone [at={now}]: merged\nREFUSED: an older idle-reaper refusal\n')
 (v4 / 'state/.idle-reap/fin-scout-refused.refused').write_text(
@@ -2158,6 +2161,18 @@ fin_return = v4_copy('fin-return'); v4_merged_pr(17, fin_return)
 v4_task('fin-return', copy=fin_return, pr=17, note=f'{V4_PR}17 merged by another lane')
 (v4 / 'state/fin-return.teardown-return-pending').write_text('slot=/pool/fin-return/project\n')
 gate_covered_reason = 'named head 4567def is unreachable outside the worker copy'
+# Round-3 F3: a merged, covered task whose worker never sent a done update still owes its cleanup.
+fin_noupdate = v4_copy('fin-noupdate'); v4_merged_pr(19, fin_noupdate)
+v4_task('fin-noupdate', copy=fin_noupdate, pr=19, verb='working', note='building', state='working', live=True)
+# Round-3 F4: the newest recorded refusal is the one written last, whichever producer wrote it. The idle
+# reaper's memo carries the reaper's start time, not its write time, so a memo written after a prune record
+# can carry an older stamp.
+fin_order = v4_copy('fin-order'); v4_merged_pr(20, fin_order)
+v4_task('fin-order', copy=fin_order, pr=20, note=f'{V4_PR}20 merged by another lane')
+(v4 / 'state/fin-order.merge-prune').write_text(
+    f'version=fm-merge-prune-v1\npr={V4_PR}20\nattempts=1\nnext_at={now + 600}\nstate=retained\n'
+    f'reason=REFUSED: the older prune refusal\nwake_sent=1\ncopy={fin_order}\narmed_at={now - 3600}\nproject=\nreturned=0\n')
+os.utime(v4 / 'state/fin-order.merge-prune', (now - 95, now - 95))
 # F5 as ruled: the newest recorded refusal wins, a prune attempt it will retry (state=pending) included.
 fin_pending = v4_copy('fin-pending'); v4_merged_pr(18, fin_pending)
 v4_task('fin-pending', copy=fin_pending, pr=18, note=f'{V4_PR}18 merged by another lane')
@@ -2276,6 +2291,16 @@ f4 = [
     # The newest recorded refusal is on the row, a pending prune attempt's included.
     ('newest-recorded-refusal', 'fin-pending' in cleanup and pending_refusal in cleanup['fin-pending']['next_action'],
      mine('fin-pending')),
+    # Round-3 F3: no done update, merged and covered: the cleanup row is still there.
+    ('merged-without-done-update', 'fin-noupdate' in cleanup and 'bin/fm-teardown.sh fin-noupdate' in cleanup['fin-noupdate']['next_action'],
+     mine('fin-noupdate')),
+    # Round-3 F4: the refusal written last wins over an older-stamped memo order, and its producer is named.
+    ('latest-written-refusal', 'fin-order' in cleanup and 'the newer reaper teardown refusal' in cleanup['fin-order']['next_action']
+     and 'the older prune refusal' not in cleanup['fin-order']['next_action'] and 'idle-session-reap' in cleanup['fin-order']['next_action'],
+     mine('fin-order')),
+    # Round-3 F4: a prune record's reason is labeled as the prune's, not as a plain teardown's.
+    ('prune-reason-labeled', 'fin-pending' in cleanup and 'merge-prune' in cleanup['fin-pending']['next_action']
+     and 'plain bin/fm-teardown.sh fin-pending ended' not in cleanup['fin-pending']['next_action'], mine('fin-pending')),
 ]
 for name, ok, got in f4:
     print('F4', name, 'ok' if ok else 'FAILED', '' if ok else [(r['category'], r['next_action'][:160]) for r in got], flush=True)
