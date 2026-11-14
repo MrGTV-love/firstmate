@@ -33,7 +33,8 @@ It refuses a contract whose code fence never closes, and a request or context fi
 Read those lines before the run, and move any author text they show out of the contract.
 Keep the register and every earlier report, review history and `truth` file outside the pack, and pass them to the builder with `--exclude` so the leak check refuses them.
 
-Run the review through the existing entrypoint, `data/review-lane/run-review.sh <pack> no-pr <head> <diff-file> <repo-root> [model]`, with the pack's `head.txt` value as the head and the pack's empty diff file.
+Run the review through the existing entrypoint, `REVIEW_AUTHOR_FAMILY=<family> data/review-lane/run-review.sh <pack> no-pr <head> <diff-file> <repo-root> [model]`, with the pack's `head.txt` value as the head and the pack's empty diff file.
+`REVIEW_AUTHOR_FAMILY` is the contract author's model family (anthropic, openai, deepseek or google); the entrypoint refuses to start without it.
 For `<repo-root>`, pass the repository checkout, and give the builder the same path as `--root`, which the builder requires: the check then accepts only files that checkout tracks, so a gitignored file such as one under `config/` or `data/` is a leak.
 Use a reviewer model outside the author's family.
 Never retry a model that failed; switch to another allowed model.

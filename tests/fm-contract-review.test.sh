@@ -1543,6 +1543,47 @@ test_unopened_file_named_under_inputs_read_voids_and_the_reviewer_is_told() {
   pass "an unopened file named under Inputs read voids, and the pack tells the reviewer to list it under Checks not performed"
 }
 
+test_every_author_name_with_a_trailing_word_stays_out() {
+  local src="$TMP_ROOT/flip-c.md" ctx="$TMP_ROOT/flip-x.md" plain="$TMP_ROOT/flip-t.md" name heading n=0 rc pack form
+  printf '# T\n\n## REQUEST\n\nr\n\n## Definition Of Done\n\n- **A1** (mandatory): x.\n' >"$plain"
+  # Noncompliant: every author section name, followed by one more word, with author text below,
+  # as a contract sub-section and as a context level 4 or bold line, never reaches the pack.
+  for name in 'Author self-check' "Author's all-green" 'All-green' "Author's" 'Author notes' 'Boundary dispositions' \
+    'Contract review' 'Review history' 'Revision log' 'Revision history' 'Self-check' 'Prior findings' 'Prior review' \
+    'Responses' 'Response to' 'Suggested attack' 'Open findings' 'Finding register' 'Register'; do
+    n=$((n + 1))
+    heading="$name notes"
+    printf '# C\n\n## Definition Of Done\n\n- **A1** (mandatory): x.\n\n### %s\n\nZZ-FLIP-ZZ F1 answered: fixed, passes.\n' "$heading" >"$src"
+    rc=0
+    pack=$("$PACK_BIN" --root "$ROOT" --contract "$src" --out-root "$TMP_ROOT/flip-c-$n" 2>/dev/null) || rc=$?
+    [ "$rc" != 0 ] || assert_no_grep "ZZ-FLIP-ZZ" "$pack/target.md" "contract sub-section '### $heading' reached the pack"
+    for form in "#### $heading" "**$heading**"; do
+      printf '# O\n\n## Context\n\n%s\n\nZZ-FLIP-ZZ F1 answered: fixed, passes.\n' "$form" >"$ctx"
+      rc=0
+      "$PACK_BIN" --root "$ROOT" --contract "$plain" --context "$ctx" --out-root "$TMP_ROOT/flip-x-$n" >/dev/null 2>&1 || rc=$?
+      [ "$rc" != 0 ] || fail "context line '$form' with author text built"
+      rm -rf "$TMP_ROOT/flip-x-$n" "$TMP_ROOT/flip-x-$n.excluded-paths"
+    done
+  done
+  pass "every author section name with a trailing word stays out of the pack in every position"
+}
+
+test_contract_context_author_label_line_stays_out() {
+  local src="$TMP_ROOT/ctxline.md" pack manifest
+  # Noncompliant: an author self-check line in the contract's own CONTEXT section.
+  printf '# C\n\n## REQUEST\n\nZZ-KEEP-REQ-ZZ the owner wants a thing; a reviewer received the author'"'"'s all-green analysis.\n\n## CONTEXT\n\nAuthor'"'"'s all-green self-check: ZZ-SELFCHECK-ZZ F1 is fixed and every mandatory item passes.\n\nZZ-KEEP-CTX-ZZ neutral fact.\n\n## Definition Of Done\n\n- **A1** (mandatory): ZZ-KEEP-DOD-ZZ a worker self-check is context, never verification.\n' >"$src"
+  build_pack pack --contract "$src" || fail "build failed: $(cat "$TMP_ROOT/build.err")"
+  manifest="$(dirname "$pack").excluded-paths"
+  assert_no_grep "ZZ-SELFCHECK-ZZ" "$pack/target.md" "the CONTEXT self-check line reached target.md"
+  assert_grep "author line: " "$manifest" "the dropped CONTEXT line is not listed in the manifest"
+  # Compliant: the request's description of the cause, a neutral context line and a criterion that
+  # names a self-check all stay.
+  for m in ZZ-KEEP-REQ-ZZ ZZ-KEEP-CTX-ZZ ZZ-KEEP-DOD-ZZ; do
+    assert_grep "$m" "$pack/target.md" "contract text $m was dropped"
+  done
+  pass "an author label line in the contract's CONTEXT is dropped and listed; neutral text naming the subject stays"
+}
+
 test_author_history_subheading_in_contract_refused() {
   local src="$TMP_ROOT/f1-contract.md" heading n=0 rc
   # Noncompliant: each author-history or author-section sub-heading under a kept section,
@@ -1654,6 +1695,14 @@ test_transcript_reads_are_audited_and_the_log_is_required() {
   write_transcript "$log" "$(work_of "$LEAK_PACK")" "$(tool_call read path OPERATIONAL-BOUNDARIES.md)"
   run_check "$rep" "$log"
   assert_equals 3 "$CHECK_RC" "a read of the entrypoint's OPERATIONAL-BOUNDARIES.md copy was accepted: $CHECK_OUT"
+  # A single-file log that starts a subagent hides the subagent's reads, so it is not clean;
+  # a relative path in probe code resolves against the call's own folder, not the root.
+  write_transcript "$log" "$(work_of "$LEAK_PACK")" "$(tool_call task context probe)"
+  run_check "$rep" "$log"
+  assert_equals 3 "$CHECK_RC" "a single-file log with a subagent call was certified: $CHECK_OUT"
+  write_transcript "$log" "$(work_of "$LEAK_PACK")" "$(tool_call eval code "root = scratch / 'data/case'; (root / 'x').mkdir()")"
+  run_check "$rep" "$log"
+  assert_equals 0 "$CHECK_RC" "a relative path in probe code was judged against the root: $CHECK_OUT"
   # The log is required, and a text log that records no tool call cannot be audited.
   rc=0
   REVIEW_SKILLS_DIR="$LEAK_SKILLS" REVIEW_RUBRIC="$LEAK_ROOT/docs/review-rubric.md" \
@@ -1763,4 +1812,6 @@ fm_test_run_cases \
   test_transcript_reads_are_audited_and_the_log_is_required \
   test_authorized_spaced_path_is_clean \
   test_reviewer_is_told_the_exit_for_a_conflict_with_an_unjudged_criterion \
+  test_every_author_name_with_a_trailing_word_stays_out \
+  test_contract_context_author_label_line_stays_out \
   -- "$@"
