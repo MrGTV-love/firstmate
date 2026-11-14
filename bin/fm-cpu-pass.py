@@ -384,11 +384,82 @@ def exit_code_for(returncode: int) -> int:
     return returncode
 
 
-def run_child(command: List[str], env: dict, log_fd: int, on_poll=None) -> int:
+def spawn_after_go(command: List[str], env: dict) -> Tuple[int, int, int]:
+    """Fork COMMAND's child, which waits for one go byte before it execs; return (pid, go pipe, error pipe).
+
+    Closing the go pipe without the byte makes the child exit 125 without
+    starting COMMAND. FileNotFoundError or PermissionError when it cannot be
+    executed (reported after go).
+    """
+    go_read, go_write = os.pipe()
+    error_read, error_write = os.pipe()
+    os.set_inheritable(error_write, False)
+    child = os.fork()
+    if child == 0:  # pragma: no cover - exercised through the executable
+        try:
+            os.close(go_write)
+            os.close(error_read)
+            _restore_default_signals()
+            if os.read(go_read, 1) != b"g":
+                os._exit(125)
+            os.closerange(3, error_write)
+            os.closerange(error_write + 1, 65536)
+            os.execvpe(command[0], command, env)
+        except OSError as exc:
+            with contextlib.suppress(OSError):
+                os.write(error_write, str(exc.errno).encode())
+        finally:
+            os._exit(127)
+    os.close(go_read)
+    os.close(error_write)
+    return child, go_write, error_read
+
+
+def run_child(command: List[str], env: dict, log_fd: int, on_poll=None, cancellable: bool = False) -> int:
+    """Run COMMAND as a child, keep it in the caller's group, and return its exit status.
+
+    While the child runs, SIGTERM, SIGINT and SIGHUP are ignored here, so running
+    work is never cut short. With cancellable (a pipeline start), a signal that
+    arrives before COMMAND begins cancels it instead: the signals are recorded
+    from before the child is forked, the child waits for a go byte before it
+    execs, and a signal recorded by then closes the pipe, so the child exits
+    without starting COMMAND and this returns 128+n.
+    """
     previous = {}
+    received: List[int] = []
     for signum in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
-        previous[signum] = signal.signal(signum, signal.SIG_IGN)
+        previous[signum] = signal.signal(signum, (lambda number, _frame: received.append(number)) if cancellable else signal.SIG_IGN)
     try:
+        if cancellable:
+            if received:
+                return 128 + received[0]
+            pid, go_write, error_read = spawn_after_go(command, env)
+            if received:
+                os.close(go_write)
+                os.close(error_read)
+                os.waitpid(pid, 0)
+                return 128 + received[0]
+            for signum in previous:
+                signal.signal(signum, signal.SIG_IGN)
+            os.write(go_write, b"g")
+            os.close(go_write)
+            failure = os.read(error_read, 32)
+            os.close(error_read)
+            if failure:
+                os.waitpid(pid, 0)
+                missing = int(failure) == errno.ENOENT
+                log(log_fd, "command %s: %s" % ("not found" if missing else "not executable", command[0]))
+                return 127 if missing else 126
+            polled = 0.0
+            while True:
+                if on_poll is not None and polled <= 0 and on_poll():
+                    on_poll = None
+                finished, status = os.waitpid(pid, 0 if on_poll is None else os.WNOHANG)
+                if finished:
+                    return exit_code_for(os.waitstatus_to_exitcode(status))
+                # The registration poll runs every POLL_MAX_SECS; the exit is seen within POLL_MIN_SECS.
+                polled = polled - POLL_MIN_SECS if polled > 0 else POLL_MAX_SECS - POLL_MIN_SECS
+                time.sleep(POLL_MIN_SECS)
         try:
             child = subprocess.Popen(
                 command, env=env, close_fds=True,
@@ -1024,10 +1095,14 @@ def admission(reasons: List[str], report: Optional[dict], running: dict, counted
         return False, "overload: %s counted=%d priority=%s" % ("; ".join(reasons), len(counted), priority)
     if measured is None and report is not None:
         reserved, term = measured_reservations(report, running), active_term(report)
-        measured = (reserved, term) if reserved is not None and term is not None else None
+        # No qualifying reading for A is not a fallback trigger: every visible active run then counts at R,
+        # the base's per-run term, so only the base's three triggers fall back (Main 4930 Q5).
+        measured = (reserved, term if term is not None else (reserved[0], 0)) if reserved is not None else None
     if measured is None:
         limit = max(1, cores // 3)
-        return others < limit, "counted=%d limit=%d basis=fallback priority=%s" % (others, limit, priority)
+        launched = len([run for run in launches if run not in counted and run != self_run])
+        return others < limit, "counted=%d limit=%d basis=fallback launched=%d pending=%d priority=%s" % (
+            len([run for run in counted if run != self_run]), limit, launched, pending, priority)
     (reservation, slack, qualifying), (term, readings) = measured
     fit = project(report["available_bytes"], report["runs"], counted, steps, launches, reservation, slack, term, self_run,
                   waiting, pending=pending)
@@ -1304,12 +1379,13 @@ def wait_for_admission(directory: str, priority: str, self_run: Optional[str] = 
         admission_fd = open_lock(os.path.join(directory, "pipeline-start.lock"))
         next_notice = started + FIRST_NOTICE_SECS
         delay = POLL_MIN_SECS
-        waited = False
+        waited = decided = False
         while True:
             if interrupted:
                 raise KeyboardInterrupt
             reason = "another start is registering"
             if try_lock(admission_fd):
+                decided = True
                 before, cores = pipeline_observation()
                 counted = {run: repo for run, (repo, is_counted, _) in before.items() if is_counted}
                 first, waiting = first_pipeline_waiter(directory)
@@ -1335,7 +1411,8 @@ def wait_for_admission(directory: str, priority: str, self_run: Optional[str] = 
                 on_wait(reason, time.monotonic() - started)
                 on_wait = None
             now = time.monotonic()
-            if bound is not None and now - started >= bound:
+            # A zero bound is one decision: start-lock contention alone, before any decision, is not one.
+            if bound is not None and now - started >= bound and (bound > 0 or decided):
                 raise HoldBound(reason)
             if now >= next_notice:
                 log(2, "%s waiting: %s" % ("launch-gate" if self_run else "pipeline-start", reason))
@@ -1681,7 +1758,7 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
                     registration_error = True
             return False
 
-        return run_child(command, child_environment, 2, registered)
+        return run_child(command, child_environment, 2, registered, cancellable=True)
     except KeyboardInterrupt:
         return 130
     except (PoolUnavailable, OSError, sqlite3.Error, ValueError, KeyError) as exc:
@@ -1733,47 +1810,151 @@ def agent_budget_secs() -> Optional[float]:
         return None
 
 
-def ci_fix_p99_secs() -> Optional[float]:
-    """The nearest-rank 99th percentile of completed CI-step agent invocation durations, or None.
+HOLDS_RECORD = "launch-holds.jsonl"
 
-    Only invocations that ended ok count: a refused launch, a timed-out or
-    cancelled one is also recorded by the daemon, and counting it would let
-    refusals and holds shrink the next bound.
+
+def held_launches(directory: str) -> List[dict]:
+    """Every held launch the gate recorded in this pool (run, step, gate start epoch, attempt); OSError when unreadable."""
+    path = os.path.join(directory, HOLDS_RECORD)
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            lines = handle.read().splitlines()
+    except FileNotFoundError:
+        return []
+    found = []
+    for line in lines:
+        try:
+            entry = json.loads(line)
+            found.append(dict(run=str(entry["run"]), step=str(entry["step"]), gate_started=float(entry["gate_started"])))
+        except (ValueError, KeyError, TypeError):
+            raise OSError("unreadable hold record line in %s" % path)
+    return found
+
+
+def record_hold(directory: str, run: str, step: str, gate_started: float, attempt: str) -> None:
+    """Append one held launch, so a later bound can leave the invocation it spent out of its percentile."""
+    line = json.dumps(dict(run=run, step=step, gate_started=gate_started, attempt=attempt)) + "\n"
+    fd = os.open(os.path.join(directory, HOLDS_RECORD), os.O_WRONLY | os.O_APPEND | os.O_CREAT | getattr(os, "O_CLOEXEC", 0), 0o600)
+    try:
+        os.write(fd, line.encode())
+    finally:
+        os.close(fd)
+
+
+def step_p99(step: str, holds: List[dict]) -> Tuple[Optional[float], int, int, int]:
+    """(nearest-rank 99th percentile seconds or None, rows counted, rows left out as held, ambiguous holds).
+
+    The rows are this step's completed invocations (exit_status ok, duration_ms > 0):
+    a refused, timed-out or cancelled launch is recorded too, and counting it would
+    let refusals shrink the next bound. A held launch spent its own invocation's
+    clock waiting, so its row is left out. A hold's candidates are the rows of its
+    run and step that began no later than the gate and ended no earlier: one
+    candidate is that hold's row; with several the association is ambiguous, and
+    each ambiguous hold leaves out its smallest candidate not already left out, which
+    gives the largest feasible percentile (removing a smaller row never lowers an
+    order statistic); a hold with no candidate (its row not written yet) leaves
+    nothing out. Rows recorded before the gate existed match no hold.
     """
+    rows = read_host_db(
+        "SELECT rowid, run_id, started_at, completed_at, duration_ms FROM agent_invocations"
+        " WHERE step_name = ? AND exit_status = 'ok' AND duration_ms > 0", (step,))
+    excluded: set = set()
+    ambiguous = 0
+    choices = []
+    for hold in holds:
+        if hold["step"] != step:
+            continue
+        candidates = sorted((row[4], row[0]) for row in rows if row[1] == hold["run"]
+                            and type(row[2]) is int and type(row[3]) is int
+                            and row[2] <= math.ceil(hold["gate_started"]) and row[3] >= math.floor(hold["gate_started"]))
+        if len(candidates) > 1:
+            ambiguous += 1
+        if candidates:
+            choices.append(candidates)
+    for candidates in sorted(choices, key=lambda found: (len(found) > 1, found[0])):
+        for _, rowid in candidates:
+            if rowid not in excluded:
+                excluded.add(rowid)
+                break
+    values = [row[4] for row in rows if row[0] not in excluded]
+    p99 = rank_quantile(values, CI_FIX_QUANTILE) / 1000.0 if values else None
+    return p99, len(values), len(excluded), ambiguous
+
+
+def hold_bound(directory: str, step: str, round_started) -> Tuple[float, str]:
+    """How long a launch may wait for capacity inside what remains of its agent's budget, and its inputs.
+
+    The daemon's invocation deadline starts before the launcher runs and no earlier
+    than the current round's start (step_results.round_started_at), so the remaining
+    budget is the budget less the time since that start; the hold leaves the
+    step's 99th percentile of unheld completed invocations for the agent. Any
+    unreadable input, or a difference that is not positive, holds not at all.
+    """
+    budget = agent_budget_secs()
+    elapsed = None if type(round_started) is not int else max(0.0, time.time() - round_started)
     try:
-        values = [row[0] for row in read_host_db(
-            "SELECT duration_ms FROM agent_invocations WHERE step_name = ? AND exit_status = 'ok' AND duration_ms > 0",
-            (CI_STEP,))]
+        p99, counted, held, ambiguous = step_p99(step, held_launches(directory))
     except (OSError, sqlite3.Error, ValueError):
-        return None
-    return rank_quantile(values, CI_FIX_QUANTILE) / 1000.0 if values else None
+        p99, counted, held, ambiguous = None, 0, 0, 0
+    label = "ci_fix_p99" if step == CI_STEP else "%s_p99" % step
+    show = lambda value: "unreadable" if value is None else "%ds" % value  # noqa: E731
+    text = "budget=%s round_elapsed=%s %s=%s n=%d held=%d ambiguous=%d" % (
+        show(budget), show(elapsed), label, show(p99), counted, held, ambiguous)
+    if budget is None or elapsed is None or p99 is None or budget - elapsed - p99 <= 0:
+        return 0.0, "hold_bound=0s " + text
+    return budget - elapsed - p99, "hold_bound=%ds %s" % (budget - elapsed - p99, text)
 
 
-def hold_bound() -> Tuple[float, str]:
-    """How long a launch may wait for capacity inside the agent's own budget, and its inputs."""
-    budget, p99 = agent_budget_secs(), ci_fix_p99_secs()
-    if budget is None or p99 is None or budget - p99 <= 0:
-        return 0.0, "hold_bound=0s budget=%s ci_fix_p99=%s" % (
-            "unreadable" if budget is None else "%ds" % budget, "unreadable" if p99 is None else "%ds" % p99)
-    return budget - p99, "hold_bound=%ds budget=%ds ci_fix_p99=%ds" % (budget - p99, budget, p99)
+# The step names the daemon can write (no-mistakes fork internal/types/types.go: AllSteps, line 131-132;
+# custom gates "gate.<anchor>.<label>", decodeCustomGate and ValidCustomGateLabel, lines 166-224).
+CORE_STEPS = ("intent", "rebase", "review", "test", "document", "lint", "push", "pr", "ci")
+GATE_ANCHORS = ("rebase", "review", "test", "document", "lint")
+GATE_LABEL_MAX = 40
 
 
-def map_worktree(cwd: str) -> Tuple[str, str, str]:
-    """(run ID, repo ID, branch) of the one run whose worktree_dir is this directory, or LaunchRefused."""
+def recognized_step(name) -> bool:
+    """Whether NAME is a step the daemon can write: a core step or a well-formed custom gate."""
+    if not isinstance(name, str):
+        return False
+    if name in CORE_STEPS:
+        return True
+    anchor, _, label = name[len("gate."):].partition(".") if name.startswith("gate.") else ("", "", "")
+    return (anchor in GATE_ANCHORS and 0 < len(label) <= GATE_LABEL_MAX
+            and all(c.islower() and c.isascii() or c.isdigit() or (c == "-" and 0 < i < len(label) - 1)
+                    for i, c in enumerate(label)))
+
+
+class PassThrough(Exception):
+    """The launch is not gated work: exec the agent at once, unchanged."""
+
+
+def map_worktree(cwd: str) -> Tuple[str, str, str, bool]:
+    """(run ID, repo ID, branch, counted) of the one run whose worktree_dir is this directory.
+
+    A directory that is no run's worktree but is a registered repository's
+    checkout (repos.working_path) is the attach wizard's call and raises
+    PassThrough; every other outcome that is not exactly one run raises
+    LaunchRefused.
+    """
     paths = sorted({cwd, os.path.realpath(cwd)})
+    marks = ",".join("?" * len(paths))
     try:
-        rows = read_host_db("SELECT DISTINCT id, repo_id, branch FROM runs WHERE worktree_dir IN (%s)"
-                            % ",".join("?" * len(paths)), tuple(paths))
+        rows = read_host_db("SELECT DISTINCT id, repo_id, branch, status = 'running' AND ci_ready_at IS NULL"
+                            " AND awaiting_agent_since IS NULL FROM runs WHERE worktree_dir IN (%s)" % marks, tuple(paths))
+        checkout = [] if rows else read_host_db("SELECT id FROM repos WHERE working_path IN (%s)" % marks, tuple(paths))
     except (OSError, sqlite3.Error, ValueError) as exc:
         raise LaunchRefused("run database unreadable", str(exc),
                             "restore read access to the run database; the next fix round enters the gate again")
+    if checkout:
+        raise PassThrough()
     if not rows:
         raise LaunchRefused("unmapped worktree", "no run records %s" % cwd,
                             "launch the agent from a run worktree; a launch outside any run is not gated work")
     if len(rows) > 1:
         raise LaunchRefused("ambiguous worktree", "runs %s all record %s" % (",".join(r[0] for r in rows), cwd),
                             "resolve which run owns this worktree; the next fix round enters the gate again")
-    return rows[0]
+    run, repo, branch, counted = rows[0]
+    return run, repo, branch, bool(counted)
 
 
 def durable_line(text: str, key: str) -> None:
@@ -1879,23 +2060,38 @@ def cmd_launch_gate(args: argparse.Namespace) -> int:
     attempt = "%d:%d" % (os.getpid(), time.time_ns())
     try:
         cwd = os.getcwd()
-        run, repo, branch = map_worktree(cwd)
-        steps = open_steps()
-        step = None if steps is None else steps.get(run)
-        log(2, "launch-gate run=%s branch=%s step=%s agent_pid=%s attempt=%s" % (
-            run, branch, step[0] + ":" + step[1] if step else "unreadable" if steps is None else "none",
-            step[2] if step else "none", attempt))
-        if step is not None and step[0] != CI_STEP:
-            # Another step of a run already counted as active: unchanged, at once.
+        try:
+            run, repo, branch, counted = map_worktree(cwd)
+        except PassThrough:
+            # A registered checkout that is no run's worktree (the attach wizard): no run, no reservation.
             _restore_exec_signals()
             return exec_direct(command, dict(os.environ), 2)
+        steps = open_steps()
+        if steps is None:
+            raise LaunchRefused("step not established: step facts unreadable", "run %s" % run,
+                                "restore read access to the run database's step table; the next fix round enters the gate again")
+        step = steps.get(run)
+        if step is None:
+            raise LaunchRefused("step not established: no open step for run %s" % run, "no running or fixing step row",
+                                "check the run's step state in no-mistakes; a launch whose step cannot be established is never started")
+        if not recognized_step(step[0]):
+            raise LaunchRefused("step not established: unrecognized step %r" % step[0], "run %s" % run,
+                                "update the gate's step list to the daemon's; a launch whose step cannot be established is never started")
+        if counted and step[0] != CI_STEP:
+            # Another step of a run already counted as active: unchanged, at once, with no output of the gate's own.
+            _restore_exec_signals()
+            return exec_direct(command, dict(os.environ), 2)
+        log(2, "launch-gate run=%s branch=%s step=%s:%s counted=%s agent_pid=%s attempt=%s" % (
+            run, branch, step[0], step[1], "yes" if counted else "no", step[2], attempt))
         directory = pool_dir()
         ensure_pool_dir(directory)
-        bound, bound_text = hold_bound()
+        bound, bound_text = hold_bound(directory, step[0], step[3])
+        gate_started = time.time()
         held = []
 
         def on_wait(reason: str, waited: float) -> None:
             held.append(reason)
+            record_hold(directory, run, step[0], gate_started, attempt)
             durable_line("run %s (%s) held for capacity before its CI fix agent starts, waited %.2fs so far: %s; %s" % (
                 run, branch, waited, reason, bound_text), "launch-gate-" + run)
 

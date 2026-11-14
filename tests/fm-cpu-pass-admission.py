@@ -14,353 +14,10 @@ import sys
 import tempfile
 import time
 
-repo, parent, python = Path(sys.argv[1]).resolve(), Path(sys.argv[2]), sys.argv[3]
-root = Path(tempfile.mkdtemp(prefix='admission-', dir=parent))
-shim = root / 'bin'
-shim.mkdir()
-# Test-only injection at the native observation boundary, never a production
-# environment override. The same executable owners run normally underneath it.
-proxy = shim / 'python3'
-proxy.write_text('#!' + python + '\n' + '''import json, os, runpy, sys
-real = sys.executable
-if len(sys.argv) > 1 and os.path.basename(sys.argv[1]) in ('fm-cpu-pass.py', 'fm-duration.py'):
-    if os.environ.get('CASE_CORES'): os.cpu_count = lambda: int(os.environ['CASE_CORES'])
-    if os.environ.get('CASE_LOAD'): os.getloadavg = lambda: tuple(json.load(open(os.environ['CASE_LOAD'])))
-    import importlib.util, pathlib, sqlite3
-    if os.environ.get('CASE_PROCS'):
-        spec = importlib.util.spec_from_file_location('fm_proc_guard', os.path.join(os.path.dirname(os.path.abspath(sys.argv[1])), 'fm-proc-guard.py'))
-        guard = importlib.util.module_from_spec(spec)
-        sys.modules['fm_proc_guard'] = guard
-        spec.loader.exec_module(guard)
-        class Fake:
-            name = 'darwin'
-            def reading(self):
-                value = json.load(open(os.environ['CASE_PROCS']))
-                if value.get('error'): raise guard.ReadError('case count unreadable')
-                return value
-            def limit(self): return self.reading()['limit'], 'case'
-            def count(self): return self.reading()['count']
-        guard.open_source = lambda: Fake()
-    if os.environ.get('CASE_PLATFORM'):
-        sys.platform = os.environ['CASE_PLATFORM']
-    if os.environ.get('CASE_GATE_RAISE'):
-        import subprocess
-        import glob, time
-        real_waitpid, real_fork, forked, raised = os.waitpid, os.fork, [], []
-        def recording_fork():
-            pid = real_fork()
-            if pid:
-                forked.append(pid)
-            return pid
-        def broken_waitpid(pid, options):
-            # The gate's first wait on its agent (its second fork; the first is the watcher)
-            # raises once the agent has started, as an internal gate error would.
-            if not raised and len(forked) >= 2 and pid == forked[1]:
-                raised.append(pid)
-                while not glob.glob(os.path.join(os.environ['CASE_FOLDER'], '*.agent')): time.sleep(0.025)
-                raise RuntimeError('injected gate error after the agent started')
-            return real_waitpid(pid, options)
-        os.fork = recording_fork
-        os.waitpid = broken_waitpid
-        import subprocess
-        real_wait = subprocess.Popen.wait
-        def broken_wait(self, timeout=None):
-            # A gate that waits through subprocess.Popen (as 5d51fa8be did) meets the same injected error.
-            if not raised and any('agent.py' in str(part) for part in self.args):
-                raised.append(self.pid)
-                while not glob.glob(os.path.join(os.environ['CASE_FOLDER'], '*.agent')): time.sleep(0.025)
-                raise RuntimeError('injected gate error after the agent started')
-            return real_wait(self, timeout)
-        subprocess.Popen.wait = broken_wait
-    if os.environ.get('CASE_SLEEP_BARRIER'):
-        import time, pathlib
-        real_sleep = time.sleep
-        def barrier_sleep(seconds):
-            # The first queue sleep holds until the test releases it, so a wait can cross the hold bound
-            # exactly while the start lock frees (independent review F6 probe seam).
-            marker = pathlib.Path(os.environ['CASE_FOLDER']) / 'sleeping'
-            if not marker.exists():
-                marker.touch()
-                while not (marker.parent / 'release-sleep').exists(): real_sleep(0.01)
-            else:
-                real_sleep(seconds)
-        time.sleep = barrier_sleep
-    if os.environ.get('CASE_KILL_BEFORE_PID'):
-        import signal
-        real_write = os.write
-        def write_until_killed(fd, data):
-            # The gate dies at its pid handoff to the watcher (independent review F5 probe seam).
-            if len(data) == 32 and data.strip().isdigit():
-                os.kill(os.getpid(), signal.SIGKILL)
-            return real_write(fd, data)
-        os.write = write_until_killed
-    if os.environ.get('CASE_CLOCK_FILE'):
-        # The engine's monotonic clock runs ahead by the seconds in this file, so a test drives a real constant
-        # (the production hold bound) to its boundary without shortening it.
-        import time
-        real_monotonic = time.monotonic
-        def driven_monotonic():
-            try:
-                with open(os.environ['CASE_CLOCK_FILE']) as handle:
-                    return real_monotonic() + float(handle.read() or 0)
-            except (OSError, ValueError):
-                return real_monotonic()
-        time.monotonic = driven_monotonic
-    if os.environ.get('CASE_SWALLOW_INTERRUPT'):
-        # A KeyboardInterrupt raised inside a callee is lost there (as one raised in an import's module-lock
-        # callback is printed as ignored): the queue's sleep swallows it, so only a recorded signal can stop the wait.
-        import time
-        real_sleep = time.sleep
-        def swallowing_sleep(seconds):
-            try:
-                real_sleep(seconds)
-            except KeyboardInterrupt:
-                pass
-        time.sleep = swallowing_sleep
-    if os.environ.get('CASE_PROCESS_TABLE_UNREADABLE'):
-        # The process table cannot be read (both readers the engine uses), so no running client can be seen.
-        try:
-            import importlib.util
-            spec = importlib.util.spec_from_file_location('fm_proc_info', os.path.join(os.path.dirname(os.path.abspath(sys.argv[1])), 'fm-proc-info.py'))
-            info = importlib.util.module_from_spec(spec)
-            sys.modules['fm_proc_info'] = info
-            spec.loader.exec_module(info)
-            def unreadable(*selector): raise OSError('injected: process table unreadable')
-            info.processes = unreadable
-        except Exception:
-            sys.modules.pop('fm_proc_info', None)
-        real_listdir = os.listdir
-        def listdir(path='.'):
-            if str(path) == '/proc': raise OSError('injected: process table unreadable')
-            return real_listdir(path)
-        os.listdir = listdir
-    connect = sqlite3.connect
-    host = pathlib.Path('~/.no-mistakes/state.sqlite').expanduser().resolve().as_uri()
-    def isolated(database, *args, **kwargs):
-        path, separator, query = str(database).partition('?')
-        if path != host:
-            raise AssertionError('unexpected database ' + str(database))
-        return connect(pathlib.Path(os.environ['CASE_DB']).resolve().as_uri() + separator + query, *args, **kwargs)
-    sqlite3.connect = isolated
-    sys.executable = __file__
-    sys.argv = sys.argv[1:]
-    runpy.run_path(sys.argv[0], run_name='__main__')
-else:
-    os.execv(real, [real] + sys.argv[1:])
-''')
-proxy.chmod(0o700)
-cli = ['bash', str(repo / 'bin/fm-cpu-pass.sh')]
-base = dict(os.environ, PATH=str(shim) + os.pathsep + os.environ['PATH'], FM_DURATION_FILE='off')
-base.pop('FM_CPU_PASS_HELD', None)
-children = []
-records = []
 
-
-def write_json(path, value):
-    temp = path.with_suffix('.new')
-    temp.write_text(json.dumps(value))
-    temp.replace(path)
-
-
-def wait_for(predicate, description):
-    until = time.monotonic() + 30
-    while not predicate():
-        if time.monotonic() >= until:
-            raise AssertionError('fixture observation fence: ' + description)
-        time.sleep(0.025)
-
-
-GIB = 2 ** 30
-# Fixture per-run peaks (GiB) shaped like the measurements record, not its recorded
-# values: 13 runs, so the nearest-rank 75th percentile is 3 GiB and the largest peak is 8 GiB.
-PEAKS = [0.02, 0.1, 0.69, 0.75, 0.79, 0.8, 0.82, 0.96, 1.0, 3.0, 4.0, 5.8, 8.0]
-
-
-def facts(folder, available=40 * GIB, pressure=1, runs=(), total=128 * GIB, broken=False):
-    """Native memory facts at the fm-mem-guard fixture boundary: runs are (repo, id, rss_bytes)."""
-    fixture = folder / 'native'
-    fixture.mkdir(exist_ok=True)
-    for name in ('sysctl', 'vm_stat', 'processes.json'):
-        (fixture / name).unlink(missing_ok=True)
-    if broken:
-        return
-    (fixture / 'sysctl').write_text('%d\n%d\ntotal = 3072.00M used = 1565.88M free = 1506.12M\n' % (total, pressure))
-    (fixture / 'vm_stat').write_text(
-        'Mach Virtual Memory Statistics: (page size of 16384 bytes)\n'
-        'Pages free: 1000.\nPages speculative: 100.\n'
-        'Anonymous pages: 1048576.\nFile-backed pages: %d.\n'
-        'Pages purgeable: 100.\nPages occupied by compressor: 32768.\n' % (available // 16384 - 1100))
-    # pid 50 is the no-mistakes daemon; a run entry (repo, id, rss, True) is a process it started.
-    rows = [dict(pid=101, ppid=1, comm='daemon', started='s101', rss_bytes=GIB, fleet=False, run=None),
-            dict(pid=50, ppid=1, comm='no-mistakes', started='s50', rss_bytes=GIB // 8, fleet=False, run=None)]
-    for index, entry in enumerate(runs):
-        repo, run, rss = entry[:3]
-        rows.append(dict(pid=200 + index, ppid=50 if entry[3:] == (True,) else 1, comm='2.1.318' if entry[3:] == (True,) else 'node',
-                         started='s%d' % index, rss_bytes=rss, fleet=True, run='no-mistakes:%s/%s' % (repo, run)))
-    (fixture / 'processes.json').write_text(json.dumps(rows))
-
-
-def procs(folder, count=100, limit=10666, error=False):
-    write_json(folder / 'procs.json', dict(count=count, limit=limit, error=error))
-
-
-def readings(folder, active=GIB, total=128 * GIB, host=None):
-    """The root home's recorded readings: one reading whose two run trees make the active-run term A.
-
-    A is (sum - largest) / (count - 1) over recorded readings with at least two runs, so a
-    reading holding A and 5 x A gives A; an error reading and another host's reading are ignored.
-    """
-    state = folder / 'fmhome' / 'state'
-    state.mkdir(parents=True, exist_ok=True)
-    name = host or socket.gethostname()
-    lines = [dict(host=name, total_bytes=total, errors=[], runs={
-                 'no-mistakes:r/a': dict(rss_bytes=int(active)), 'no-mistakes:r/b': dict(rss_bytes=int(5 * active)),
-                 'task:crewmate': dict(rss_bytes=60 * GIB)}),
-             dict(host=name, total_bytes=total, errors=['memory: unreadable'], runs={
-                 'no-mistakes:r/c': dict(rss_bytes=40 * GIB), 'no-mistakes:r/d': dict(rss_bytes=40 * GIB)}),
-             dict(host='other-host', total_bytes=total, errors=[], runs={
-                 'no-mistakes:r/e': dict(rss_bytes=40 * GIB), 'no-mistakes:r/f': dict(rss_bytes=40 * GIB)})]
-    (state / 'memory-readings.jsonl').write_text(''.join(json.dumps(line) + '\n' for line in lines))
-
-
-def calibrate(folder, peaks=PEAKS, total=128 * GIB, host=None, live=(), extra=None, active=GIB):
-    """The root home's recorded calibration: one no-mistakes run per peak, 2 readings each.
-
-    live names runs (repo_id NULL) whose young, low peak the probe has folded in already;
-    extra maps more runs (repo_id NULL) to their recorded peak in bytes. The readings
-    record beside it sets the active-run term A (active, None for no record).
-    """
-    state = folder / 'fmhome' / 'state'
-    state.mkdir(parents=True, exist_ok=True)
-    if active is not None:
-        readings(folder, active, total, host)
-    runs = {'no-mistakes:repo/run-%d' % i: dict(peak_bytes=int(peak * GIB), samples=2, incomplete_samples=0,
-                                                 first_seen='x', last_seen='x', max_gap_seconds=0)
-            for i, peak in enumerate(peaks)}
-    runs['task:crewmate'] = dict(peak_bytes=64 * GIB, samples=9)
-    for run in live:
-        runs['no-mistakes:None/' + run] = dict(peak_bytes=GIB // 5, samples=2, incomplete_samples=0,
-                                                first_seen='x', last_seen='x', max_gap_seconds=0)
-    for run, peak in (extra or {}).items():
-        runs['no-mistakes:None/' + run] = dict(peak_bytes=peak, samples=2, incomplete_samples=0,
-                                                first_seen='x', last_seen='x', max_gap_seconds=0)
-    write_json(state / '.memory-calibration.json', dict(
-        schema='fm-memory-calibration.v1', host=host or socket.gethostname(), total_bytes=total, runs=runs, pressured=None))
-
-
-def case(name, cores=18, running=0, load=0, measured=False, available=40 * GIB):
-    folder = root / name
-    folder.mkdir()
-    db = folder / 'state.sqlite'
-    with sqlite3.connect(db) as connection:
-        connection.execute('CREATE TABLE runs (id TEXT PRIMARY KEY, status TEXT NOT NULL, ci_ready_at INTEGER, awaiting_agent_since INTEGER, repo_id TEXT, worktree_dir TEXT, branch TEXT)')
-        # The daemon's step_results columns this owner reads (PRAGMA table_info of the host database).
-        connection.execute('CREATE TABLE step_results (id TEXT PRIMARY KEY, run_id TEXT NOT NULL, step_name TEXT NOT NULL, step_order INTEGER NOT NULL, status TEXT NOT NULL, agent_pid INTEGER, round_started_at INTEGER)')
-        connection.executemany('INSERT INTO runs (id, status) VALUES (?, ?)', [('baseline-' + str(i), 'running') for i in range(running)])
-    load_file = folder / 'load.json'
-    write_json(load_file, [0, load, 0])
-    facts(folder, available=available)
-    procs(folder)
-    if measured:
-        calibrate(folder)
-    (folder / 'fmhome').mkdir(exist_ok=True)
-    env = dict(base, CASE_LOAD=str(load_file), CASE_DB=str(db), CASE_FOLDER=str(folder), FM_CPU_POOL_DIR=str(folder / 'pool'),
-               CASE_CORES=str(cores), CASE_PROCS=str(folder / 'procs.json'), FM_MEMORY_FIXTURE_DIR=str(folder / 'native'),
-               FM_HOME=str(folder / 'fmhome'))
-    return folder, db, env
-
-
-def change(db, sql, parameters=()):
-    with sqlite3.connect(db) as connection:
-        connection.execute(sql, parameters)
-
-
-def launch(command, env, log):
-    out = open(str(log) + '.stdout', 'w')
-    err = open(str(log) + '.stderr', 'w')
-    child = subprocess.Popen(command, env=env, stdout=out, stderr=err, start_new_session=True)
-    out.close()
-    err.close()
-    children.append(child)
-    records.append(dict(command=command, stdout=str(log) + '.stdout', stderr=str(log) + '.stderr'))
-    return child
-
-
-def finish(child, code=0):
-    actual = child.wait(timeout=30)
-    assert actual == code, (actual, code, records)
-
-
-SPACING_LIMIT = 1.5  # seconds: the median gap between consecutive grants; the handshake gives about 1.0, a 2 s injected delay gives 2 or more
-
-
-def grant_gaps(folder, names):
-    """Seconds between consecutive grants, from the nanosecond times the fake starts touched."""
-    stamps = sorted((folder / (name + '.started')).stat().st_mtime_ns for name in names)
-    return [(later - earlier) / 1e9 for earlier, later in zip(stamps, stamps[1:])]
-
-
-def assert_no_spacing(folder, names):
-    """Reject artificial spacing: ready starts follow each other by the registration handshake only.
-
-    The median gap decides, so one gap stretched by scheduling noise cannot fail a correct burst,
-    while a delay on every launch moves the median itself.
-    """
-    gaps = grant_gaps(folder, names)
-    assert statistics.median(gaps) < SPACING_LIMIT, ('artificial wait between grants', [round(gap, 2) for gap in gaps])
-    return gaps
-
-
-def live_entries(folder, pattern='pipeline-waiter-*.lock'):
-    """Entries whose owner still holds its lock; a dead owner's inert file does not count."""
-    import fcntl
-    live = 0
-    for path in (folder / 'pool').glob(pattern):
-        try:
-            fd = os.open(str(path), os.O_RDONLY)
-        except FileNotFoundError:
-            continue
-        try:
-            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except OSError:
-            live += 1
-        finally:
-            os.close(fd)
-    return live
-
-
-def pending(folder, count):
-    wait_for(lambda: live_entries(folder) == count, str(count) + ' registered waiters')
-
-
-def held(env):
-    return json.loads(subprocess.check_output(cli + ['status', '--json'], env=env, text=True))['held']
-
-
-def clean_stop(db, writer):
-    """Leave the state a real last writer leaves: all checkpointed, no side files.
-
-    Some SQLite builds keep the files on close, so the fixture removes them.
-    """
-    writer.execute('PRAGMA wal_checkpoint(TRUNCATE)').fetchall()
-    writer.close()
-    for side in ('-wal', '-shm'):
-        Path(str(db) + side).unlink(missing_ok=True)
-
-
-worker = root / 'start.py'
-worker.write_text('''import os, pathlib, sqlite3, sys, time
-folder, name = pathlib.Path(sys.argv[1]), sys.argv[2]
-# Test-only: a delay before this fake start registers, while the admission lock is held.
-time.sleep(float(os.environ.get('CASE_LAUNCH_DELAY', '0')))
-with sqlite3.connect(folder / 'state.sqlite') as db:
-    db.execute('INSERT INTO runs (id, status) VALUES (?, ?)', (name, 'running'))
-with (folder / 'order').open('a') as out: out.write(name + '\\n')
-(folder / (name + '.started')).touch()
-while not (folder / (name + '.release')).exists(): time.sleep(0.025)
-with sqlite3.connect(folder / 'state.sqlite') as db:
-    db.execute('UPDATE runs SET status=? WHERE id=?', ('completed', name))
-''')
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from fm_cpu_pass_fixture import *  # noqa: E402,F401,F403
+from fm_cpu_pass_fixture import cleanup  # noqa: E402
 
 try:
     # Native core scaling: 18 cores admit six counted runs and 10 cores three.
@@ -398,14 +55,12 @@ try:
     change(db, "UPDATE runs SET status='completed' WHERE id='baseline-0'")
     finish(child)
     assert marker.exists()
-    # One qualifying recorded run, a record for another host, unreadable text and no
-    # readings record of this host for A all fall back; none refuses and none reads as an empty host.
+    # One qualifying recorded run, a record for another host and unreadable text fall back (the base's three
+    # triggers); none refuses and none reads as an empty host.
     for name, record in (('one-run', lambda f: calibrate(f, peaks=[3.0])), ('other-host', lambda f: calibrate(f, host='other-host')),
                          ('other-ram', lambda f: calibrate(f, total=64 * GIB)),
                          ('garbage', lambda f: (f / 'fmhome/state').mkdir(parents=True, exist_ok=True) or (f / 'fmhome/state/.memory-calibration.json').write_text('{')),
-                         ('walk-fails', lambda f: calibrate(f) or (f / 'fmhome/.fm-secondmate-parent').write_text('garbage\n')),
-                         ('no-readings', lambda f: calibrate(f, active=None)),
-                         ('readings-other-host', lambda f: calibrate(f, active=None) or readings(f, host='other-host'))):
+                         ('walk-fails', lambda f: calibrate(f) or (f / 'fmhome/.fm-secondmate-parent').write_text('garbage\n'))):
         folder, db, env = case('fallback-' + name, running=6)
         record(folder)
         child = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'm')], env, folder / 'f')
@@ -1087,379 +742,6 @@ with (folder / 'order').open('a') as out: out.write(os.environ['CASE_NAME'] + '\
     change(db, "UPDATE runs SET status='completed' WHERE id='measured-machinery'")
     finish(first)
     assert (folder / 'order').read_text().splitlines() == ['measured-machinery', 'mem-guard-other']
-
-    # The launch gate: the agent launcher's final exec. It maps its directory to one run, passes
-    # every other step through, and before a CI fix agent starts it queues in class order, decides
-    # with the same owner for one more active run, publishes the run's reservation under the start
-    # lock, then starts the agent as its child.
-    agent = root / 'agent.py'
-    agent.write_text("""import json, os, pathlib, signal, sys, time
-folder, run = pathlib.Path(os.environ['CASE_FOLDER']), sys.argv[1]
-mode = os.environ.get('CASE_AGENT', 'wait')
-if mode == 'trap':  # installed before the marker that tells the test to signal
-    signal.signal(signal.SIGTERM, lambda *a: (folder / (run + '.got-term')).touch() or sys.exit(0))
-(folder / (run + '.agent')).write_text(json.dumps(dict(pid=os.getpid(), pgid=os.getpgid(0), started_ns=time.time_ns(),
-    cwd=os.getcwd(), argv=sys.argv[2:], stdin=sys.stdin.read() if mode not in ('wait', 'trap') else '')))
-if mode.startswith('exit-'): sys.exit(int(mode[5:]))
-if mode == 'self-term': os.kill(os.getpid(), signal.SIGTERM)
-while not (folder / (run + '.release')).exists(): time.sleep(0.025)
-""")
-
-    def gate_case(name, available=40 * GIB, runs=(('x', 'ci', 'running', None),), timeout='240m', ci_ms=(60000,)):
-        folder, db, env = case(name, measured=True, available=available)
-        home = folder / 'home'
-        (home / '.no-mistakes').mkdir(parents=True)
-        if timeout is not None:
-            (home / '.no-mistakes' / 'config.yaml').write_text('agent: [claude]\nagent_timeout: "%s"\n' % timeout)
-        with sqlite3.connect(db) as connection:
-            connection.execute('CREATE TABLE agent_invocations (id TEXT PRIMARY KEY, run_id TEXT, step_name TEXT, purpose TEXT, duration_ms INTEGER, exit_status TEXT)')
-            connection.executemany('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?, ?)',
-                                   [('i%d' % i, 'old', 'ci', 'ci', ms, 'ok') for i, ms in enumerate(ci_ms)] +
-                                   # A refused or timed-out invocation is recorded too, and never counts toward the bound.
-                                   [('refused', 'old', 'ci', 'ci', 10 ** 9, 'error'), ('review', 'old', 'review', 'review', 10 ** 9, 'ok')])
-        for run, step, status, pid in runs:
-            (folder / ('wt-' + run)).mkdir()
-            change(db, "INSERT INTO runs (id, status, repo_id, worktree_dir, branch) VALUES (?, 'running', 'repo', ?, ?)",
-                   (run, str(folder / ('wt-' + run)), 'fm/' + run))
-            if step:
-                change(db, 'INSERT INTO step_results (id, run_id, step_name, step_order, status, agent_pid) VALUES (?, ?, ?, 1, ?, ?)',
-                       (run + '-s', run, step, status, pid))
-        env.update(HOME=str(home))
-        return folder, db, env
-
-    def gate(folder, env, run, mode='wait', stdin=b'', cwd=None, log=None):
-        log = folder / (log or ('gate-' + run))
-        out, err = open(str(log) + '.stdout', 'w'), open(str(log) + '.stderr', 'w')
-        child = subprocess.Popen(['bash', str(repo / 'bin/fm-cpu-pass.sh'), 'launch-gate', '--', python, str(agent), run, '-p', '--flag'],
-                                 env=dict(env, CASE_AGENT=mode), stdin=subprocess.PIPE, stdout=out, stderr=err,
-                                 cwd=str(cwd or folder / ('wt-' + run)), start_new_session=True)
-        out.close(); err.close()
-        child.stdin.write(stdin); child.stdin.close()
-        children.append(child)
-        records.append(dict(command=['launch-gate', run], stdout=str(log) + '.stdout', stderr=str(log) + '.stderr'))
-        return child, log
-
-    def wakes(folder):
-        queue = folder / 'fmhome' / 'state' / '.wake-queue'
-        return queue.read_text() if queue.exists() else ''
-
-    def alive(pid):
-        try:
-            os.kill(pid, 0)
-        except ProcessLookupError:
-            return False
-        return True
-
-    retry_needles = [  # internal/agent/retry.go transientNeedles, terminalNeedles, usageLimitNeedles (fork 935aedf)
-        'overloaded_error', '"type":"overloaded"', 'rate_limit_error', 'rate_limited', 'service_unavailable', 'connection refused',
-        'connection reset', 'i/o timeout', 'no such host', 'temporary failure in name resolution', 'tls handshake', 'unexpected eof',
-        'ended its turn with prose', 'declaring permissions', 'invalid tool call', "invalid character '<' after top-level value",
-        'split bare json objects could not be fused into one valid object', 'freeusagelimit', 'free usage limit', 'free_usage_limit',
-        'insufficient quota', 'insufficient_quota', 'exceeded your current quota', 'quota exceeded', 'quota_exceeded',
-        'quota exhausted', 'quota_exhausted', 'usage_limit_reached', 'usage limit has been reached']
-
-    def no_retry_phrase(text):
-        import re
-        lowered = text.lower()
-        assert not [n for n in retry_needles if n in lowered] and not re.search(r'\b(429|503|529)\b', lowered), text
-
-    # First proof: one mapped run is gated and admitted; an unmapped, ambiguous or unreadable mapping refuses.
-    folder, db, env = gate_case('gate-map')
-    child, log = gate(folder, env, 'x', mode='exit-0', stdin=b'prompt text')
-    finish(child)
-    text = log.with_suffix('.stderr').read_text()
-    seen = json.loads((folder / 'x.agent').read_text())
-    assert 'launch-gate run=x branch=fm/x step=ci:running' in text and 'launch-gate admitted: ' in text, text
-    assert seen['stdin'] == 'prompt text' and seen['argv'] == ['-p', '--flag'] and seen['cwd'] == os.path.realpath(folder / 'wt-x'), seen
-    (folder / 'elsewhere').mkdir()
-    child, log = gate(folder, env, 'nowhere', cwd=folder / 'elsewhere', log='unmapped')
-    finish(child, 75)
-    assert not (folder / 'nowhere.agent').exists() and 'launch-gate refused: unmapped worktree' in log.with_suffix('.stderr').read_text()
-    no_retry_phrase(log.with_suffix('.stderr').read_text())
-    change(db, "INSERT INTO runs (id, status, repo_id, worktree_dir) VALUES ('twin', 'completed', 'repo', ?)", (str(folder / 'wt-x'),))
-    child, log = gate(folder, env, 'x', log='ambiguous')
-    finish(child, 75)
-    assert 'launch-gate refused: ambiguous worktree' in log.with_suffix('.stderr').read_text()
-    child, log = gate(folder, dict(env, CASE_DB=str(folder / 'missing.sqlite')), 'x', log='unreadable')
-    finish(child, 75)
-    assert 'launch-gate refused: run database unreadable' in log.with_suffix('.stderr').read_text()
-    queue = wakes(folder)
-    assert all(cause in queue for cause in ('unmapped worktree', 'ambiguous worktree', 'run database unreadable')), queue
-    assert 'next action: ' in queue, queue
-    # With no run identified, each durable refusal line names the worktree and the launch attempt, then the next action.
-    for cause, where in (('unmapped worktree', folder / 'elsewhere'), ('ambiguous worktree', folder / 'wt-x'),
-                         ('run database unreadable', folder / 'wt-x')):
-        line = next(l for l in queue.splitlines() if 'launch-gate refused: ' + cause in l)
-        assert re.search(r'launch-gate refused: %s: worktree %s, attempt \d+:\d+; .+; next action: \S' % (
-            re.escape(cause), re.escape(os.path.realpath(where))), line), line
-
-    # A busy wake-queue lock never holds the gate: the refusal exits at once and its wake is spilled to state/.wake-spill.<seq>,
-    # which the next append to that queue, or the watcher's next start, replays.
-    holder = subprocess.Popen(['bash', '-c', '. "$1" && fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" && touch "$2" && sleep 60', 'bash',
-                               str(repo / 'bin/fm-wake-lib.sh'), str(folder / 'queue-held')], env=env, start_new_session=True)
-    children.append(holder)
-    wait_for(lambda: (folder / 'queue-held').exists(), 'wake-queue lock held')
-    before = wakes(folder)
-    started_at = time.monotonic()
-    child, log = gate(folder, env, 'nowhere', cwd=folder / 'elsewhere', log='unmapped-busy')
-    finish(child, 75)
-    assert time.monotonic() - started_at < 10 and wakes(folder) == before
-    spilled = ''.join(p.read_text() for p in (folder / 'fmhome' / 'state').glob('.wake-spill.[0-9]*'))
-    assert 'launch-gate-unmapped' in spilled and 'unmapped worktree' in spilled, spilled
-    # Gates that spill at the same moment each keep their own spill file: none is overwritten.
-    burst = []
-    for i in range(3):
-        (folder / ('elsewhere-%d' % i)).mkdir()
-        burst.append(gate(folder, env, 'nowhere', cwd=folder / ('elsewhere-%d' % i), log='unmapped-burst-%d' % i)[0])
-    for child in burst:
-        finish(child, 75)
-    spills = [p.read_text() for p in (folder / 'fmhome' / 'state').glob('.wake-spill.[0-9]*')]
-    assert len(spills) == 4, spills
-    for i in range(3):
-        assert len([text for text in spills if os.path.realpath(folder / ('elsewhere-%d' % i)) in text]) == 1, (i, spills)
-    os.killpg(holder.pid, signal.SIGKILL)
-    holder.wait()
-
-    # The agent and every passthrough start with SIGPIPE at its default, as a shell's exec leaves it.
-    def pipe_status(command, env, cwd):
-        out = root / ('pipe-%d' % len(records))
-        probe = ['bash', '-c', 'yes | head -1 >/dev/null; echo "${PIPESTATUS[0]}" > "$1"', 'probe', str(out)]
-        records.append(dict(command=command + probe))
-        subprocess.run(command + probe, env=env, cwd=str(cwd), stdin=subprocess.DEVNULL, timeout=30, check=True)
-        return out.read_text().strip()
-    folder, db, env = gate_case('gate-sigpipe', runs=(('x', 'ci', 'running', None), ('y', 'review', 'fixing', 77)))
-    launch_gate = ['bash', str(repo / 'bin/fm-cpu-pass.sh'), 'launch-gate', '--']
-    assert pipe_status(launch_gate, env, folder / 'wt-x') == '141'
-    assert pipe_status(launch_gate, env, folder / 'wt-y') == '141'
-    assert pipe_status(['bash', str(repo / 'bin/fm-mem-guard.sh'), 'run', '--'], env, folder) == '141'
-    # The test-pass pool's direct execs keep the base disposition: SIGPIPE stays ignored, so yes exits 1 on EPIPE.
-    pass_run = ['bash', str(repo / 'bin/fm-cpu-pass.sh'), 'run', '--']
-    (folder / 'not-a-pool').write_text('')
-    assert pipe_status(pass_run, dict(env, FM_CPU_PASS_HELD='1'), folder) == '1'
-    assert pipe_status(pass_run, dict(env, FM_CPU_POOL_DIR=str(folder / 'not-a-pool')), folder) == '1'
-
-    # Scope: another step of a counted run passes through at once, even on a full host.
-    folder, db, env = gate_case('gate-scope', available=GIB, runs=(('x', 'review', 'fixing', 77),))
-    child, log = gate(folder, env, 'x', mode='exit-0')
-    finish(child)
-    assert 'admitted' not in log.with_suffix('.stderr').read_text() and (folder / 'x.agent').exists()
-    # An uncounted mapped run (CI-ready) at a non-CI step passes through too; a CI-step launch is gated (gate-three).
-    folder, db, env = gate_case('gate-scope-uncounted', available=GIB, runs=(('x', 'pr', 'running', None),))
-    change(db, "UPDATE runs SET ci_ready_at = 1 WHERE id = 'x'")
-    child, log = gate(folder, env, 'x', mode='exit-0')
-    finish(child)
-    assert 'admitted' not in log.with_suffix('.stderr').read_text() and (folder / 'x.agent').exists()
-
-    # Exit codes and signal deaths pass through; a signal sent to the gate reaches the agent.
-    for mode, code in (('exit-0', 0), ('exit-1', 1), ('exit-75', 75), ('self-term', -signal.SIGTERM)):
-        folder, db, env = gate_case('gate-exit-' + mode)
-        child, log = gate(folder, env, 'x', mode=mode)
-        finish(child, code)
-        assert not live_entries(folder, 'launch-*.lock')
-    folder, db, env = gate_case('gate-forward')
-    child, log = gate(folder, env, 'x', mode='trap')
-    wait_for(lambda: (folder / 'x.agent').exists(), 'agent started')
-    time.sleep(0.2)
-    os.kill(child.pid, signal.SIGTERM)
-    finish(child, 0)
-    assert (folder / 'x.got-term').exists()
-    # An agent that cannot be launched gives the shell's statuses unchanged and keeps no reservation.
-    for missing, code in ((str(folder / 'no-such-agent'), 127), (str(folder / 'wt-x'), 126)):
-        out = subprocess.run(['bash', str(repo / 'bin/fm-cpu-pass.sh'), 'launch-gate', '--', missing], env=env, cwd=str(folder / 'wt-x'),
-                             stdin=subprocess.DEVNULL, capture_output=True, text=True)
-        assert out.returncode == code and not live_entries(folder, 'launch-*.lock'), (out.returncode, out.stderr)
-
-    # Admission-to-launch order: the reservation is published under the start lock before the agent
-    # starts and the lock is released after both; the agent's start waits on no observation.
-    folder, db, env = gate_case('gate-order')
-    child, log = gate(folder, env, 'x')
-    wait_for(lambda: (folder / 'x.agent').exists(), 'agent started')
-    import re
-    stamps = dict(re.findall(r'(admitted_ns|published_ns|agent_started_ns|unlocked_ns)=(\d+)', log.with_suffix('.stderr').read_text()))
-    started = json.loads((folder / 'x.agent').read_text())['started_ns']
-    assert int(stamps['admitted_ns']) <= int(stamps['published_ns']) <= int(stamps['agent_started_ns']) <= int(stamps['unlocked_ns']), stamps
-    assert int(stamps['published_ns']) <= started, (stamps, started)
-    assert live_entries(folder, 'launch-*.lock') == 1
-    (folder / 'x.release').touch()
-    finish(child)
-    assert live_entries(folder, 'launch-*.lock') == 0
-
-    # Simultaneous resumes with a lagging reading: room for exactly two (S = 8, R = 3, 12 GiB).
-    # The first agent is never visible; the second is decided counting it at R, the third waits
-    # and starts by itself once the first exits.
-    folder, db, env = gate_case('gate-three', available=12 * GIB, runs=[(r, 'ci', 'running', None) for r in ('a', 'b', 'c')])
-    gates = {}
-    for run in ('a', 'b'):
-        gates[run] = gate(folder, env, run)[0]
-        wait_for(lambda: (folder / (run + '.agent')).exists(), run + ' admitted')
-    gates['c'] = gate(folder, env, 'c')[0]
-    wait_for(lambda: 'held for capacity' in wakes(folder), 'third decided')
-    assert not (folder / 'c.agent').exists()
-    text_b = (folder / 'gate-b.stderr').read_text()
-    assert 'a:launched:%d:unseen' % (3 * GIB) in text_b and 'projected=%d ' % (11 * GIB) in text_b, text_b
-    wait_for(lambda: 'launch-gate waiting: counted=3 projected=%d ' % (14 * GIB) in (folder / 'gate-c.stderr').read_text() or
-             'held for capacity' in wakes(folder), 'third holds')
-    assert 'run c (fm/c) held for capacity' in wakes(folder), wakes(folder)
-    # A fix round waits in the one queue at class other.
-    assert all('priority=other' in line for line in wakes(folder).splitlines() if 'held for capacity' in line), wakes(folder)
-    (folder / 'a.release').touch()
-    finish(gates['a'])
-    wait_for(lambda: (folder / 'c.agent').exists(), 'third starts by itself')
-    wait_for(lambda: 'run c (fm/c) admitted after' in wakes(folder), 'admission after a hold is recorded')
-    for run in ('b', 'c'):
-        (folder / (run + '.release')).touch()
-        finish(gates[run])
-
-    # Class: a fix round waits in class other, so a machinery fresh start that arrives after it is admitted first.
-    folder, db, env = gate_case('gate-class', available=GIB, runs=[('x', 'ci', 'running', None), ('y', 'review', 'running', None)])
-    gate_x = gate(folder, env, 'x')[0]
-    pending(folder, 1)
-    fresh = launch(cli + ['pipeline-start', '--priority', 'machinery', '--', 'touch', str(folder / 'm')], env, folder / 'fresh')
-    pending(folder, 2)
-    facts(folder, available=12 * GIB)
-    wait_for(lambda: (folder / 'x.agent').exists(), 'the fix round starts after the fresh start')
-    assert (folder / 'm').exists() and (folder / 'm').stat().st_mtime_ns <= (folder / 'x.agent').stat().st_mtime_ns, \
-        'the later machinery start was not admitted first'
-    finish(fresh)
-    (folder / 'x.release').touch()
-    finish(gate_x)
-
-    # After first appearance: a visible agent at 0.2 GiB still reserves A = 1 GiB. A later start that
-    # fits on startup memory alone (8.2 of 8.7 GiB) waits (9 > 8.7) and is admitted once the agent exits.
-    folder, db, env = gate_case('gate-after-visible', available=int(8.5 * GIB), runs=[('x', 'ci', 'running', None)])
-    child, log = gate(folder, env, 'x')
-    wait_for(lambda: (folder / 'x.agent').exists(), 'agent started')
-    facts(folder, available=int(8.5 * GIB), runs=[('repo', 'x', GIB // 5)])
-    later = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'later')], env, folder / 'later')
-    wait_for(lambda: 'waiting: counted=1 projected=%d ' % (9 * GIB) in (folder / 'later.stderr').read_text(), 'A, not startup memory')
-    assert 'x:launched:%d' % GIB in (folder / 'later.stderr').read_text()
-    (folder / 'x.release').touch()
-    finish(child)
-    facts(folder, available=int(8.5 * GIB))
-    finish(later)
-
-    # Gates that wait together, in the daemon's fix-time state: each run's ci step is fixing with the
-    # gate's pid recorded and the gate visible at 0.1 GiB. Another run's waiting gate adds only what it
-    # holds, so the first fits (8 + 0.4 of 8.9 GiB; counting the others at A would be 11.1) and each
-    # later one starts by itself once the run before it is a CI waiter again.
-    tenth = GIB // 10
-    names = ('a', 'b', 'c', 'd')
-    folder, db, env = gate_case('gate-waiters', available=int(8.5 * GIB), runs=[(r, 'ci', 'fixing', 4242) for r in names])
-    facts(folder, available=int(8.5 * GIB), pressure=2, runs=[('repo', r, tenth) for r in names])
-    gates = {}
-    for run in names:
-        gates[run] = gate(folder, env, run)[0]
-        wait_for(lambda: live_entries(folder) == len(gates), run + ' queued')
-    facts(folder, available=int(8.5 * GIB), runs=[('repo', r, tenth) for r in names])
-    for index, run in enumerate(names):
-        wait_for(lambda: (folder / (run + '.agent')).exists(), run + ' starts by itself')
-        assert not any((folder / (later + '.agent')).exists() for later in names[index + 1:]), run
-        text = (folder / ('gate-%s.stderr' % run)).read_text()
-        assert all('%s:waiter:%d' % (later, tenth) in text for later in names[index + 1:]), text
-        (folder / (run + '.release')).touch()
-        finish(gates[run])
-        change(db, "UPDATE step_results SET status = 'running', agent_pid = NULL WHERE run_id = ?", (run,))
-        facts(folder, available=int(8.5 * GIB), runs=[('repo', r, tenth) for r in names[index + 1:]])
-
-    # Dead holders and retries: an unlocked launch record reserves nothing and is removed; two live
-    # attempts of one run hold one reservation.
-    folder, db, env = gate_case('gate-holders', available=12 * GIB, runs=[('x', 'ci', 'running', None)])
-    (folder / 'pool').mkdir(exist_ok=True)
-    (folder / 'pool' / 'launch-dead.lock').write_text(json.dumps(dict(run='x', repo='repo', pid=999999, started_ns=1)))
-    finish(launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'm1')], env, folder / 'dead'))
-    assert 'holding_only=[x:ci-waiting:0:unseen]' in (folder / 'dead.stderr').read_text() and not (folder / 'pool/launch-dead.lock').exists()
-    first, _ = gate(folder, env, 'x', log='attempt-1')
-    wait_for(lambda: live_entries(folder, 'launch-*.lock') == 1, 'first attempt reserved')
-    (folder / 'x.agent').unlink(missing_ok=True)
-    second, _ = gate(folder, env, 'x', log='attempt-2')
-    wait_for(lambda: live_entries(folder, 'launch-*.lock') == 2, 'second attempt reserved')
-    # Two live attempts, both started and not yet visible, reserve 2 x R = 6 GiB: a start that would fit beside one
-    # (3 + 8 = 11 of 12 GiB) waits beside two (6 + 8 = 14), and starts once one attempt ends.
-    two = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'm2')], env, folder / 'two')
-    pending(folder, 1)
-    wait_for(lambda: 'x:launched:%d:unseen' % (6 * GIB) in (folder / 'two.stderr').read_text(), 'two live attempts count twice')
-    assert not (folder / 'm2').exists() and (folder / 'two.stderr').read_text().count('x:launched:') >= 1
-    (folder / 'x.release').touch()
-    finish(first); finish(second)
-    finish(two)
-    assert (folder / 'm2').exists()
-
-    # Hold bound: budget 3 s minus the CI-fix p99 of 1 s holds 2 s, then refuses visibly; the agent never starts.
-    folder, db, env = gate_case('gate-bound', available=GIB, runs=[('x', 'ci', 'running', None), ('y', 'review', 'running', None)],
-                                timeout='3s', ci_ms=(500, 1000))
-    began = time.monotonic()
-    child, log = gate(folder, env, 'x')
-    finish(child, 75)
-    text = log.with_suffix('.stderr').read_text()
-    assert time.monotonic() - began >= 2 and not (folder / 'x.agent').exists(), text
-    assert 'launch-gate refused: hold bound reached: run x; hold_bound=2s budget=3s ci_fix_p99=1s; held ' in text, text
-    assert 'next action: ' in text and 'auto_fix.ci' in text and 'ask-user decision' in text, text
-    no_retry_phrase(text)
-    assert 'refused: hold bound reached' in wakes(folder) and 'held for capacity' in wakes(folder)
-    assert not live_entries(folder) and not live_entries(folder, 'launch-*.lock')
-    # The real bound, driven by the clock: the host's 240-minute budget with a completed CI-fix p99 of 152.45 min
-    # (9147000 ms) gives 14400 - 9147 = 5253 s; the omitted budget (30 min default) with a p99 of 10 min gives 1200 s.
-    # Five seconds before the bound the gate still holds; a fit then is admitted; at the bound it refuses.
-    for label, timeout, ci_ms, bound, budget, p99 in (('override-240m', '240m', (9147000,), 5253, 14400, 9147),
-                                                      ('default-30m', None, (600000,), 1200, 1800, 600)):
-        for outcome in ('fits-before', 'refused-at'):
-            folder, db, env = gate_case('gate-real-bound-%s-%s' % (label, outcome), available=GIB, timeout=timeout, ci_ms=ci_ms,
-                                        runs=[('x', 'ci', 'running', None), ('y', 'review', 'running', None)])
-            if timeout is None:
-                # The key omitted from an existing config: the daemon's built-in 30 minutes apply.
-                (folder / 'home' / '.no-mistakes' / 'config.yaml').write_text('agent: [claude]\n')
-            clock = folder / 'clock'
-            clock.write_text('0')
-            child, log = gate(folder, dict(env, CASE_CLOCK_FILE=str(clock)), 'x')
-            pending(folder, 1)
-            clock.write_text(str(bound - 5))
-            time.sleep(1.5)
-            assert child.poll() is None and not (folder / 'x.agent').exists(), (label, log.with_suffix('.stderr').read_text())
-            if outcome == 'fits-before':
-                facts(folder, available=40 * GIB)
-                wait_for(lambda: (folder / 'x.agent').exists(), label + ': admitted before the bound')
-                (folder / 'x.release').touch()
-                finish(child)
-            else:
-                clock.write_text(str(bound + 1))
-                finish(child, 75)
-                text = log.with_suffix('.stderr').read_text()
-                assert 'launch-gate refused: hold bound reached: run x; hold_bound=%ds budget=%ds ci_fix_p99=%ds; held ' % (bound, budget, p99) in text, (label, text)
-                assert not (folder / 'x.agent').exists()
-
-    # No positive bound (budget not above p99, or no config) refuses at once when nothing fits.
-    for timeout in ('1s', None):
-        folder, db, env = gate_case('gate-nobound-%s' % timeout, available=GIB, runs=[('x', 'ci', 'running', None), ('y', 'review', 'running', None)],
-                                    timeout=timeout, ci_ms=(2000000,))
-        child, log = gate(folder, env, 'x')
-        finish(child, 75)
-        assert 'hold_bound=0s' in log.with_suffix('.stderr').read_text(), log.with_suffix('.stderr').read_text()
-
-    # Cleanup: a group kill mid-hold and mid-run, the gate alone killed mid-run, and an internal gate
-    # error after the admit each leave no agent, no live reservation and a free start lock.
-    folder, db, env = gate_case('gate-kill-hold', available=GIB, runs=[('x', 'ci', 'running', None), ('y', 'review', 'running', None)])
-    child, log = gate(folder, env, 'x')
-    wait_for(lambda: live_entries(folder) == 1, 'held')
-    os.killpg(child.pid, signal.SIGKILL)
-    finish(child, -signal.SIGKILL)
-    assert not (folder / 'x.agent').exists() and live_entries(folder) == 0
-    for label, kill in (('group', lambda c: os.killpg(c.pid, signal.SIGKILL)), ('gate-only', lambda c: os.kill(c.pid, signal.SIGKILL))):
-        folder, db, env = gate_case('gate-kill-' + label)
-        child, log = gate(folder, env, 'x')
-        wait_for(lambda: (folder / 'x.agent').exists(), 'agent started')
-        agent_pid = json.loads((folder / 'x.agent').read_text())['pid']
-        kill(child)
-        finish(child, -signal.SIGKILL)
-        wait_for(lambda: not alive(agent_pid), label + ': no agent left')
-        assert live_entries(folder, 'launch-*.lock') == 0 and live_entries(folder, 'pipeline-start.lock') == 0
-    folder, db, env = gate_case('gate-raise')
-    child, log = gate(folder, dict(env, CASE_GATE_RAISE='1'), 'x')
-    wait_for(lambda: (folder / 'x.agent').exists(), 'agent started')
-    agent_pid = json.loads((folder / 'x.agent').read_text())['pid']
-    finish(child, 1)
-    wait_for(lambda: not alive(agent_pid), 'no agent after an internal error')
-    assert live_entries(folder, 'launch-*.lock') == 0
-
     # Independent review of 5d51fa8be (F1-F7): each case fails on that head and passes on the fix.
     # Every case runs; the failures are collected and reported together.
     fixround = {}
@@ -2188,19 +1470,63 @@ exec /bin/ln "$@"
     assert all(value == 'pass' for value in review.values()), review
 
 
+    # Contract revision 28 admission cases. Every case runs; failures are collected and reported together.
+    r28 = {}
+
+    def r28_case(name, body):
+        try:
+            body()
+            r28[name] = 'pass'
+        except Exception as exc:  # noqa: BLE001 - every case's failure is reported
+            r28[name] = 'FAIL: %s: %s' % (type(exc).__name__, str(exc)[:1500])
+
+    def no_term_counts_r():
+        # No readings record of this host for A is not a fallback trigger (Main 4930 Q5): the fit runs with every
+        # visible active run counted at R, as the base counted every run, so a visible 0.2 GiB run reserves 3 GiB.
+        for name, record in (('no-readings', lambda f: calibrate(f, active=None)),
+                             ('readings-other-host', lambda f: calibrate(f, active=None) or readings(f, host='other-host'))):
+            folder, db, env = case('no-term-' + name, running=0)
+            record(folder)
+            change(db, "INSERT INTO runs (id, status, repo_id) VALUES ('v', 'running', 'repo')")
+            change(db, "INSERT INTO step_results (id, run_id, step_name, step_order, status) VALUES ('v-s', 'v', 'review', 1, 'fixing')")
+            facts(folder, available=40 * GIB, runs=[('repo', 'v', GIB // 5)])
+            finish(launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'm')], env, folder / 'f'))
+            text = (folder / 'f.stderr').read_text() if (folder / 'f.stderr').exists() else ''
+            assert (folder / 'm').exists(), (name, text)
+            folder, db, env = case('no-term-wait-' + name, running=0, available=11 * GIB)
+            record(folder)
+            change(db, "INSERT INTO runs (id, status, repo_id) VALUES ('v', 'running', 'repo')")
+            change(db, "INSERT INTO step_results (id, run_id, step_name, step_order, status) VALUES ('v-s', 'v', 'review', 1, 'fixing')")
+            facts(folder, available=11 * GIB, runs=[('repo', 'v', GIB // 5)])
+            # 3 + 8 = 11 GiB fits 11 + 0.2; with one page less available the start waits and names the R term.
+            facts(folder, available=11 * GIB - 16384 - GIB // 5, runs=[('repo', 'v', GIB // 5)])
+            child = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'm')], env, folder / 'f')
+            wait_for(lambda: 'v:active:%d' % (3 * GIB) in (folder / 'f.stderr').read_text(), name + ': visible run at R')
+            text = (folder / 'f.stderr').read_text()
+            assert 'basis=fallback' not in text and 'active_term=%d' % (3 * GIB) in text and child.poll() is None, (name, text)
+            facts(folder, available=40 * GIB)
+            finish(child)
+
+    def cancel_before_command():
+        # P5.preempt.cancel: a SIGINT or SIGTERM that lands after admission but before COMMAND begins (just before or just
+        # after its child is forked) cancels the start: COMMAND never runs, the start exits 128+n, its pending
+        # reservation ends, and a later fitting start is admitted and runs.
+        for when, name, code in (('before', 'INT', 130), ('after', 'INT', 130), ('before', 'TERM', 143), ('after', 'TERM', 143)):
+            folder, db, env = case('cancel-at-spawn-%s-%s' % (when, name.lower()), measured=True, available=10 * GIB)
+            finish(launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'cancelled')],
+                          dict(env, CASE_SIGNAL_AT_SPAWN='%s:%s' % (when, name)), folder / 'cancelled'), code)
+            assert not (folder / 'cancelled').exists() and not live_entries(folder, 'pending-*.lock'), (when, name)
+            # 10 GiB holds one start (S = 8) beside nothing; a leftover pending reservation (3 + 8 = 11) would hold this one.
+            finish(launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'later')], env, folder / 'later'))
+            assert (folder / 'later').exists(), (when, name)
+
+    for name, body in (('P5.errors.fallback no A counts visible runs at R', no_term_counts_r),
+                       ('P5.preempt.cancel a cancel before COMMAND begins', cancel_before_command)):
+        r28_case(name, body)
+    (root / 'r28-admission.json').write_text(json.dumps(r28, indent=2))
+    print(json.dumps(dict(r28=r28)), flush=True)
+    assert all(value == 'pass' for value in r28.values()), r28
+
     print(json.dumps(dict(result='pass', spacing=dict(limit=SPACING_LIMIT, burst_gaps=[round(g, 3) for g in burst_gaps], burst_median=round(statistics.median(burst_gaps), 3), injected_gaps=[round(g, 3) for g in injected_gaps], injected_median=round(statistics.median(injected_gaps), 3), injected_rejection=injected_rejection), artifacts=str(root), native_cpu_count=os.cpu_count(), invocations=records)), flush=True)
 finally:
-    for file in root.glob('*/release-children'):
-        file.touch()
-    for folder in root.glob('*'):
-        if folder.is_dir(): (folder / 'release-children').touch()
-    for pid_file in root.glob('*/nested.pid'):
-        if (pid_file.parent / 'nested.started').exists(): continue
-        try: os.killpg(int(pid_file.read_text()), signal.SIGKILL)
-        except (ProcessLookupError, ValueError): pass
-    for child in children:
-        if child.poll() is None:
-            try: os.killpg(child.pid, signal.SIGKILL)
-            except ProcessLookupError: pass
-        child.wait()
-    (root / 'commands.json').write_text(json.dumps(records, indent=2) + '\n')
+    cleanup()
