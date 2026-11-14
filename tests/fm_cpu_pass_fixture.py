@@ -272,7 +272,7 @@ def case(name, cores=18, running=0, load=0, measured=False, available=40 * GIB):
     folder.mkdir()
     db = folder / 'state.sqlite'
     with sqlite3.connect(db) as connection:
-        connection.execute('CREATE TABLE runs (id TEXT PRIMARY KEY, status TEXT NOT NULL, ci_ready_at INTEGER, awaiting_agent_since INTEGER, repo_id TEXT, worktree_dir TEXT, branch TEXT)')
+        connection.execute('CREATE TABLE runs (id TEXT PRIMARY KEY, status TEXT NOT NULL, ci_ready_at INTEGER, awaiting_agent_since INTEGER, repo_id TEXT, worktree_dir TEXT, branch TEXT, intent TEXT, created_at INTEGER)')
         # The daemon's step_results columns this owner reads (PRAGMA table_info of the host database).
         connection.execute('CREATE TABLE step_results (id TEXT PRIMARY KEY, run_id TEXT NOT NULL, step_name TEXT NOT NULL, step_order INTEGER NOT NULL, status TEXT NOT NULL, agent_pid INTEGER, round_started_at INTEGER)')
         connection.execute('CREATE TABLE repos (id TEXT PRIMARY KEY, working_path TEXT NOT NULL)')
@@ -295,10 +295,10 @@ def change(db, sql, parameters=()):
         connection.execute(sql, parameters)
 
 
-def launch(command, env, log):
+def launch(command, env, log, cwd=None):
     out = open(str(log) + '.stdout', 'w')
     err = open(str(log) + '.stderr', 'w')
-    child = subprocess.Popen(command, env=env, stdout=out, stderr=err, start_new_session=True)
+    child = subprocess.Popen(command, env=env, stdout=out, stderr=err, start_new_session=True, cwd=None if cwd is None else str(cwd))
     out.close()
     err.close()
     children.append(child)
@@ -368,13 +368,43 @@ def clean_stop(db, writer):
         Path(str(db) + side).unlink(missing_ok=True)
 
 
+def registered_checkout(folder, db):
+    """FOLDER/checkout: a git checkout on branch main, registered as repository 'repo' (repos.working_path)."""
+    checkout = folder / 'checkout'
+    if not checkout.exists():
+        subprocess.run(['git', 'init', '-q', '-b', 'main', str(checkout)], check=True, stdin=subprocess.DEVNULL)
+        change(db, "INSERT INTO repos (id, working_path) VALUES ('repo', ?)", (str(checkout),))
+    return checkout
+
+
+def client_start(folder, db, env, name):
+    """A fresh no-mistakes start whose own run this fixture registers: (command, cwd) for pipeline-start.
+
+    The fake client (start.py, reached as no-mistakes on PATH) runs in a registered git checkout on branch main,
+    registers its own running row (repo, branch, intent NAME) after CASE_LAUNCH_DELAY, touches NAME.started,
+    waits for NAME.release, then completes its run, as a real client's run does.
+    """
+    checkout = registered_checkout(folder, db)
+    if not (folder / 'clientbin').exists():
+        bin_dir = folder / 'clientbin'
+        bin_dir.mkdir()
+        (bin_dir / 'no-mistakes').write_text('#!' + python + '\n' + 'import runpy, sys\nrunpy.run_path(%r, run_name="__main__")\n' % str(worker))
+        (bin_dir / 'no-mistakes').chmod(0o700)
+        env.update(PATH=str(bin_dir) + os.pathsep + env['PATH'])
+    return ['no-mistakes', 'axi', 'run', '--intent', name], checkout
+
+
 worker = root / 'start.py'
 worker.write_text('''import os, pathlib, sqlite3, sys, time
-folder, name = pathlib.Path(sys.argv[1]), sys.argv[2]
+if sys.argv[1:3] == ['axi', 'run']:  # reached as the fake no-mistakes client (client_start)
+    folder, name = pathlib.Path(os.environ['CASE_FOLDER']), sys.argv[sys.argv.index('--intent') + 1]
+else:
+    folder, name = pathlib.Path(sys.argv[1]), sys.argv[2]
 # Test-only: a delay before this fake start registers, while the admission lock is held.
 time.sleep(float(os.environ.get('CASE_LAUNCH_DELAY', '0')))
 with sqlite3.connect(folder / 'state.sqlite') as db:
-    db.execute('INSERT INTO runs (id, status) VALUES (?, ?)', (name, 'running'))
+    db.execute('INSERT INTO runs (id, status, repo_id, branch, intent, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+               (name, 'running', 'repo', 'main', name, int(time.time())))
 with (folder / 'order').open('a') as out: out.write(name + '\\n')
 (folder / (name + '.started')).touch()
 while not (folder / (name + '.release')).exists(): time.sleep(0.025)
