@@ -90,10 +90,13 @@
 # to that default, and stderr and the roots log name the requested and the applied
 # value). The residual host total of one lone root, R, is therefore that cap plus
 # the watch's sampling overshoot, set from this repository's measured runs: R =
-# 10956800 KiB = 11219763200 bytes (10.45 GiB), the largest peak of any root in the
-# real runs (10685235200 bytes, tests/fm-launch-prompt-signals-live-e2e.test.sh in
-# the head run) times 1.05, rounded up to a whole MiB. The watch is not tightened
-# to end a root that needs that memory.
+# 11227136 KiB = 11496587264 bytes (10.71 GiB), the largest peak of any root in the
+# real runs (10948657152 bytes, tests/fm-launch-prompt-signals-live-e2e.test.sh in
+# the head run) times 1.05, rounded up to a whole MiB. The peak is the watch's own
+# reading, the larger of resident size and physical footprint of the root's whole
+# tree, which is the figure the watch compares with the cap and writes to the
+# roots log; the per-process sampler read 10685235200 bytes for the same root.
+# The watch is not tightened to end a root that needs that memory.
 # Measured basis (this repository's real full lint, sampled every 0.25 s, each
 # ShellCheck process attributed to its lint run by its parent chain):
 #   the lint before this change peaked at T = 13.31 GiB (14287716352 bytes) with
