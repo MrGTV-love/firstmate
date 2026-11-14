@@ -102,7 +102,8 @@ crew_state_ready_url() {  # <id>
 
 # 0 when <id>'s recorded pr= has no runnable merge poll and nothing says the poll
 # ended on purpose. A runnable poll is one the watcher itself admits
-# (fm_pr_poll_snapshot_capture) for that same PR; a sidecar or registration left
+# (fm_pr_poll_snapshot_capture, or a poll whose only fault is a moved volume device
+# number, which the watcher re-records) for that same PR; a sidecar or registration left
 # without its check by a registrar that died between its final renames is not
 # one. The poll ended on purpose when a pending retirement or a pending slot
 # return exists, when the merge-notified marker names this PR (a marker naming
@@ -127,6 +128,9 @@ pr_poll_lost() {  # <id> <recorded pr>
   if fm_pr_poll_snapshot_capture "$STATE" "$id" "$SCRIPT_DIR/fm-pr-poll.sh" \
     && [ "$FM_PR_POLL_SNAPSHOT_URL" = "$canonical" ]; then
     lost=1
+  elif fm_pr_poll_registration_device_shifted "$STATE" "$id" "$SCRIPT_DIR/fm-pr-poll.sh" \
+    && [ "$FM_PR_DATA_URL" = "$canonical" ]; then
+    lost=1  # only the volume's device number moved: the watcher re-records it, so it is not lost
   fi
   fm_lock_release "$lock" || true
   return "$lost"

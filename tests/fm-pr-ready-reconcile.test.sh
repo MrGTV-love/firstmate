@@ -719,6 +719,27 @@ out=$(run_pass)
 [ "$calls_before" -eq "$(grep -c -- '--json isDraft$' "$CASE/gh.calls" || true)" ] || fail "a valid poll left by a registrar that died after publishing was registered again: $out"
 pass 'a registrar that dies after any final rename short of its check is re-armed on the next pass; one that published its check is left alone'
 
+# A valid poll whose registration names an old device number for its files (the
+# volume was remounted) is the watcher's to re-record, not a lost poll.
+make_case device-shifted
+write_ship shifted ship direct-PR
+run_pass > /dev/null
+assert_registered shifted
+( . "$ROOT/bin/fm-pr-lib.sh"
+  reg="$CASE/home/state/shifted.pr-poll-registration"
+  device=$(fm_pr_file_device "$CASE/home/state")
+  awk -v live="$device" -v shifted="$((device + 1))" '(NR == 10 || NR == 11) { sub("^" live ":", shifted ":") } { print }' "$reg" > "$reg.tmp"
+  chmod 0600 "$reg.tmp" && /bin/mv -f "$reg.tmp" "$reg"
+  ! fm_pr_poll_artifacts_valid "$CASE/home/state" shifted "$ROOT/bin/fm-pr-poll.sh" \
+    && fm_pr_poll_registration_device_shifted "$CASE/home/state" shifted "$ROOT/bin/fm-pr-poll.sh"
+) || fail 'the device-shifted fixture is not a device-only shift'
+shifted_reg=$(shasum -a 256 "$CASE/home/state/shifted.pr-poll-registration")
+calls_before=$(grep -c -- '--json isDraft$' "$CASE/gh.calls" || true)
+out=$(run_pass)
+[ "$calls_before" -eq "$(grep -c -- '--json isDraft$' "$CASE/gh.calls" || true)" ] || fail "a device-shifted poll was re-armed: $out"
+[ "$shifted_reg" = "$(shasum -a 256 "$CASE/home/state/shifted.pr-poll-registration")" ] || fail 'the reconciler rewrote a device-shifted registration'
+pass 'a poll whose only fault is a moved device number is left for the watcher to re-record'
+
 # A merge-notified marker counts only for the PR it names: a record whose pr= is
 # a newer PR than the marker's is re-armed, a marker naming the recorded PR is not.
 B_URL=https://github.com/example/project/pull/44
