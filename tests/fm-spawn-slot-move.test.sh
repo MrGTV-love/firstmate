@@ -419,6 +419,249 @@ test_unreadable_target_skips_the_copy() {
 }
 
 
+# --- review round 023: findings the first build missed (red first) ---------------------------
+
+# The slot library needs the isolation predicates only for governed provisioning; these cases test
+# the git behaviour of the library, so the predicates are stubbed to "isolated" and "nothing to keep".
+fm_task_copy_isolated() { return 0; }
+fm_task_copy_preserve() { return 0; }
+
+# make_branch_slot <name>: a governed world whose slot sits on branch old-owner at the first commit.
+make_branch_slot() {
+  make_world "$1" 1
+  git -C "$W_PROJ" fetch --quiet origin
+  git -C "$W_SLOT" checkout --quiet -b old-owner
+}
+
+# --- finding 1: ignored work under an opened directory, and an archive that is only an alias -----
+
+test_an_ignored_directory_keeps_its_classifier_context() {
+  make_world f1-dir
+  printf 'data/\n' >>"$(git -C "$W_PROJ" rev-parse --path-format=absolute --git-common-dir)/info/exclude"
+  advance_origin data
+  mkdir -p "$W_SLOT/data"
+  printf 'private bytes\n' >"$W_SLOT/data/.DS_Store"
+  expect_skip "an ignored directory the target tracks as a file skips the copy, whatever its children are called" ignored_collision
+  grep -q 'private bytes' "$W_SLOT/data/.DS_Store" || fail "the ignored bytes changed"
+}
+
+test_an_archive_that_is_an_alias_of_the_ignored_file_does_not_excuse_the_collision() {
+  make_world f1-alias
+  advance_origin notes.local
+  printf 'private bytes\n' >"$W_SLOT/notes.local"
+  local arch="$W_DIR/archive/task/merge-prune-preserved/20260101T000000Z/x"
+  mkdir -p "$arch"
+  ln -s "$W_SLOT/notes.local" "$arch/notes.local"
+  (cd "$arch" && printf '%s  notes.local\n' "$(shasum -a 256 "$W_SLOT/notes.local" | awk '{print $1}')" >SHA256SUMS)
+  FM_SLOT_ARCHIVE_ROOT="$W_DIR/archive" expect_skip "a checksum-valid archive that is a symlink to the ignored file does not hold its bytes" ignored_collision
+  grep -q 'private bytes' "$W_SLOT/notes.local" || fail "the ignored bytes changed"
+}
+
+# --- finding 2: a refusal-time restore must never check out a moved branch or orphan a commit -----
+
+# provision_refused_after_a_writer_moved_old_owner: the real fm_slot_provision runs; its runner moves
+# the old owner branch to a commit that tracks notes.local, then refuses.
+moving_runner() { git -C "$W_SLOT" update-ref refs/heads/old-owner "$W_TARGET"; printf '{}\n' >"$2"; return 3; }
+quiet_runner() { printf '{}\n' >"$2"; return 3; }
+
+test_a_refusal_revert_does_not_check_out_a_branch_that_moved() {
+  make_branch_slot f2-moved
+  advance_origin notes.local
+  printf 'private bytes\n' >"$W_SLOT/notes.local"
+  local rc=0 out
+  out=$(fm_slot_provision moving_runner "$W_PROJ" "$W_SLOT" tid fm/tid "$W_DIR/report.json" '' '' scripts 2>&1) || rc=$?
+  [ "$rc" != 0 ] || fail "the refused provisioning reported success: $out"
+  grep -q 'private bytes' "$W_SLOT/notes.local" || fail "the revert overwrote the ignored bytes: $out"
+  pass "a revert after a refusal does not check out an owner branch a writer moved onto ignored work"
+}
+
+test_a_refusal_revert_returns_to_an_unchanged_owner_branch() {
+  make_branch_slot f2-unchanged
+  printf 'private bytes\n' >"$W_SLOT/notes.local"
+  local rc=0 out
+  out=$(fm_slot_provision quiet_runner "$W_PROJ" "$W_SLOT" tid fm/tid "$W_DIR/report.json" '' '' scripts 2>&1) || rc=$?
+  [ "$rc" != 0 ] || fail "the refused provisioning reported success: $out"
+  [ "$(git -C "$W_SLOT" symbolic-ref -q HEAD)" = refs/heads/old-owner ] || fail "the control revert did not return to the owner branch: $out"
+  grep -q 'private bytes' "$W_SLOT/notes.local" || fail "the ignored bytes changed"
+  pass "a revert after a refusal returns to the owner branch when nothing moved it"
+}
+
+test_restore_does_not_orphan_a_commit_made_after_preparation() {
+  make_world f2-late 1
+  git -C "$W_PROJ" fetch --quiet origin
+  fm_slot_prepare_base "$W_PROJ" "$W_SLOT" tid || fail "preparation failed"
+  commit_in_slot late.txt
+  local late
+  late=$(git -C "$W_SLOT" rev-parse HEAD)
+  advance_origin advanced.txt
+  fm_slot_move_forward "$W_SLOT" "$W_TARGET" "$W_PROJ" >/dev/null 2>&1 || true
+  fm_slot_restore_base "$W_SLOT" >/dev/null 2>&1 || true
+  [ "$(git -C "$W_SLOT" rev-parse HEAD)" = "$late" ] || [ -n "$(git -C "$W_SLOT" for-each-ref --contains "$late" refs/)" ] \
+    || fail "the late commit is no longer HEAD and no ref holds it"
+  pass "a restore after a late commit leaves that commit held by HEAD or a ref"
+}
+
+# --- finding 3: a checkout hook must not run on a slot ----------------------------------------
+
+test_a_checkout_hook_cannot_change_a_slot_during_preparation() {
+  make_branch_slot f3-hook
+  printf 'private bytes\n' >"$W_SLOT/notes.local"
+  local hooks
+  hooks="$(git -C "$W_PROJ" rev-parse --path-format=absolute --git-common-dir)/hooks"
+  mkdir -p "$hooks"
+  printf '#!/bin/sh\nprintf hooked >"$(git rev-parse --show-toplevel)/notes.local"\nexit 1\n' >"$hooks/post-checkout"
+  chmod +x "$hooks/post-checkout"
+  fm_slot_prepare_base "$W_PROJ" "$W_SLOT" tid >/dev/null 2>&1 || true
+  grep -q 'private bytes' "$W_SLOT/notes.local" || fail "a post-checkout hook rewrote the ignored bytes"
+  pass "no checkout hook runs while a slot is prepared"
+}
+
+# --- finding 4: the holder rule ----------------------------------------------------------------
+
+test_a_holder_is_seen_when_the_slot_is_already_at_the_target() {
+  make_world f4-equal
+  W_TARGET=$W_BASE
+  start_holder "$W_SLOT"
+  sleep 0.4
+  start_marker
+  FM_SLOT_SPAWN_PID=$MARKER_PID expect_skip "a live process in a slot already at the target still skips the copy" live_holder
+  cleanup_held
+}
+
+test_a_younger_unrelated_process_in_the_slot_is_a_holder() {
+  make_world f4-younger
+  advance_origin advanced.txt
+  start_marker
+  sleep 0.4
+  start_holder "$W_SLOT"
+  sleep 0.2
+  FM_SLOT_SPAWN_PID=$MARKER_PID expect_skip "a process that started after the spawn but is not the spawn's own acquisition is a holder" live_holder
+  cleanup_held
+}
+
+test_the_panes_own_process_tree_is_not_a_holder() {
+  make_world f4-pane
+  advance_origin advanced.txt
+  bash -c 'cd "$1" && sleep 300 & wait' _ "$W_SLOT" &
+  PANE_PID=$!
+  HELD_PIDS+=("$PANE_PID")
+  sleep 0.5
+  start_marker
+  FM_SLOT_PANE_PID=$PANE_PID FM_SLOT_SPAWN_PID=$MARKER_PID expect_moved "the processes under the spawn's own pane are not holders"
+  cleanup_held
+}
+
+test_a_holder_row_without_a_working_directory_is_a_holder() {
+  make_world f4-lsof-incomplete
+  advance_origin advanced.txt
+  start_holder "$W_DIR"
+  local bin="$W_DIR/partiallsof"
+  mkdir -p "$bin"
+  cat >"$bin/lsof" <<SH
+#!/bin/sh
+printf 'p$HOLDER_PID\ncsleep\n'
+SH
+  chmod +x "$bin/lsof"
+  MOVE_PATH="$bin:$PATH" expect_skip "an lsof row that names a process but no working directory is a holder" live_holder
+  cleanup_held
+}
+
+test_a_malformed_contention_row_counts_as_held() {
+  make_world f4-contention-malformed 1
+  advance_origin advanced.txt
+  local common store
+  common=$(git -C "$W_SLOT" rev-parse --path-format=absolute --git-common-dir)
+  store="$common/vernant-worktree-leases"
+  mkdir -p "$store"
+  printf '{"worktree_id": "%s", "ts_iso": "not a time"}\n' "$W_SLOT" >"$store/contention.jsonl"
+  expect_skip "a contention row that cannot be read counts as held" live_holder
+}
+
+# --- finding 6: a tracked edit made after the clean look ----------------------------------------
+
+test_a_tracked_edit_made_after_the_clean_look_fails_the_move() {
+  make_world f6-late-edit
+  advance_origin advanced.txt
+  local bin="$W_DIR/lateedit" real_git out rc=0
+  real_git=$(command -v git)
+  mkdir -p "$bin"
+  cat >"$bin/git" <<SH
+#!/usr/bin/env bash
+case "\$*" in *' merge '*) printf 'late edit\n' >>"$W_SLOT/README.md" ;; esac
+exec '$real_git' "\$@"
+SH
+  chmod +x "$bin/git"
+  out=$(PATH="$bin:$PATH" fm_slot_move_forward "$W_SLOT" "$W_TARGET" "$W_PROJ" 2>&1) || rc=$?
+  [ "$rc" != 0 ] || fail "a tracked edit that appeared between the clean look and the merge was admitted: $out"
+  grep -q 'late edit' "$W_SLOT/README.md" || fail "the late edit is gone"
+  pass "a tracked edit that appears after the clean look fails the move and is kept"
+}
+
+# --- finding 7: a read that fails after the move must not be reported as untouched ----------------
+
+test_a_failed_head_read_after_the_move_is_not_reported_as_untouched() {
+  make_world f7-head-read
+  advance_origin advanced.txt
+  local bin="$W_DIR/headread" real_git out rc=0
+  real_git=$(command -v git)
+  mkdir -p "$bin"
+  cat >"$bin/git" <<SH
+#!/usr/bin/env bash
+if [ -e '$W_DIR/merged' ]; then case "\$*" in *' rev-parse '*HEAD*) rm -f '$W_DIR/merged'; exit 1 ;; esac; fi
+case "\$*" in *' merge '*) '$real_git' "\$@"; rc=\$?; : >'$W_DIR/merged'; exit \$rc ;; esac
+exec '$real_git' "\$@"
+SH
+  chmod +x "$bin/git"
+  out=$(PATH="$bin:$PATH" fm_slot_move_forward "$W_SLOT" "$W_TARGET" "$W_PROJ" 2>&1) || rc=$?
+  [ "$rc" != 0 ] || fail "a failed read after the move was reported as success: $out"
+  [ "$rc" != 20 ] || fail "the slot was reported untouched although the merge had moved it: $out"
+  assert_not_contains "$out" "left untouched" "the failure message calls a moved slot untouched"
+  pass "a failed HEAD read after the move is a failure, not an untouched skip"
+}
+
+# --- finding 10 (validators): the snapshot must fail closed, and the destroying-command witness ------
+
+test_the_snapshot_fails_when_git_cannot_be_read() {
+  make_world f10-snapshot
+  local bin="$W_DIR/nogit" rc=0
+  mkdir -p "$bin"
+  printf '#!/bin/sh\nexit 128\n' >"$bin/git"
+  chmod +x "$bin/git"
+  PATH="$bin:$PATH" snapshot "$W_SLOT" "$W_DIR/snap" || rc=$?
+  [ "$rc" != 0 ] || fail "the snapshot reported success although every git read failed"
+  pass "the snapshot fails when its git reads fail"
+}
+
+# forbidden_git_calls <log>: print every recorded git call that could discard or force work.
+forbidden_git_calls() {
+  grep -E '(^| )(reset( |$).*--hard|checkout .*(-f|--force)|clean( |$)|branch .*(-D|-f|--force)|worktree remove|stash( |$)|restore .*--worktree|update-ref -d)' "$1" || true
+}
+
+test_no_destroying_git_command_runs_on_any_move_path() {
+  make_world d6-record
+  advance_origin advanced.txt
+  local bin="$W_DIR/recorder" real_git
+  real_git=$(command -v git)
+  mkdir -p "$bin"
+  cat >"$bin/git" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >>'$W_DIR/git-calls.log'
+exec '$real_git' "\$@"
+SH
+  chmod +x "$bin/git"
+  : >"$W_DIR/git-calls.log"
+  PATH="$bin:$PATH" fm_slot_move_forward "$W_SLOT" "$W_TARGET" "$W_PROJ" >/dev/null 2>&1 || fail "the recorded move did not succeed"
+  printf 'edited\n' >>"$W_SLOT/README.md"
+  advance_origin more.txt
+  PATH="$bin:$PATH" fm_slot_move_forward "$W_SLOT" "$W_TARGET" "$W_PROJ" >/dev/null 2>&1 || true
+  [ -s "$W_DIR/git-calls.log" ] || fail "the recorder saw no git call"
+  [ -z "$(forbidden_git_calls "$W_DIR/git-calls.log")" ] || fail "a destroying git call ran:"$'\n'"$(forbidden_git_calls "$W_DIR/git-calls.log")"
+  # The control: the same checker must flag a log that holds one.
+  printf 'reset --hard abc\ncheckout -f main\nclean -fd\n' >"$W_DIR/injected.log"
+  [ "$(forbidden_git_calls "$W_DIR/injected.log" | wc -l | tr -d ' ')" = 3 ] || fail "the checker missed an injected destroying call"
+  pass "no destroying git command runs on a clean move or a skip, and the checker flags one that does"
+}
+
 CASES=(
   test_control_clean_slot_behind_the_target_moves
   test_detached_extra_commit_is_skipped
@@ -446,6 +689,21 @@ CASES=(
   test_failing_lsof_skips_the_copy
   test_failed_git_status_skips_the_copy
   test_unreadable_target_skips_the_copy
+  test_an_ignored_directory_keeps_its_classifier_context
+  test_an_archive_that_is_an_alias_of_the_ignored_file_does_not_excuse_the_collision
+  test_a_refusal_revert_does_not_check_out_a_branch_that_moved
+  test_a_refusal_revert_returns_to_an_unchanged_owner_branch
+  test_restore_does_not_orphan_a_commit_made_after_preparation
+  test_a_checkout_hook_cannot_change_a_slot_during_preparation
+  test_a_holder_is_seen_when_the_slot_is_already_at_the_target
+  test_a_younger_unrelated_process_in_the_slot_is_a_holder
+  test_the_panes_own_process_tree_is_not_a_holder
+  test_a_holder_row_without_a_working_directory_is_a_holder
+  test_a_malformed_contention_row_counts_as_held
+  test_a_tracked_edit_made_after_the_clean_look_fails_the_move
+  test_a_failed_head_read_after_the_move_is_not_reported_as_untouched
+  test_the_snapshot_fails_when_git_cannot_be_read
+  test_no_destroying_git_command_runs_on_any_move_path
 )
 
 fm_test_run_cases "${CASES[@]}" -- "$@"
