@@ -7203,11 +7203,11 @@
       "owner": "bin/fm-launch-proof-lib.sh",
       "invariant": "Claude adoption authorizes lifecycle input only to a restored process proven to be this task's own conversation, and rechecks every proof at each use.",
       "layer": "runtime-block",
-      "source": "the recorded task endpoint, the unique attributed foreground process (the claude harness or a listed forwarding launcher whose direct child is the harness), the harness kernel working directory, the absence of any foreign launch pin, an exclusive pane and home claim, and the task-specific session tie (a recorded session id equal to the live one, a transcript whose first user message is the launch-brief doorbell of a record in the task's own home, or the lock owner's own --session-id statement equal to the live one); a published adoption keeps its tie at each recheck while the live session stays that one",
+      "source": "the recorded task endpoint, the unique attributed foreground process (the claude harness or a listed forwarding launcher whose direct child is the harness), the harness kernel working directory, the absence of any foreign launch pin, an exclusive pane and home claim, and the task-specific session tie (a recorded session id equal to the live one, a transcript whose first user message is the launch-brief doorbell of a record in the task's own home, or, once that launch-brief record is gone, the lock owner's own --session-id statement equal to the live one while the transcript still opens with that doorbell); every recheck rereads the transcript doorbell, never only the adoption record",
       "trigger": "fm-control adopt of a restored claude agent as a task's agent unless all proofs hold, and any lifecycle reader that would authorize it from the adoption record without rechecking them",
       "decision": "deny",
       "fail_direction": "closed",
-      "remedy": "Preserve the running agent and every record; establish the missing proof, or, when the task's launch brief is gone and the owner knows the live session is the task's, retry FM_HOME=<home> bash bin/fm-control.sh <task> adopt --session-id <live-session-id>; otherwise decide the lane by hand.",
+      "remedy": "Preserve the running agent and every record; establish the missing proof, or, when the task's launch brief is gone, the session's first user message is still its doorbell, and the owner knows the live session is the task's, retry FM_HOME=<home> bash bin/fm-control.sh <task> adopt --session-id <live-session-id>; otherwise decide the lane by hand.",
       "budget": 1,
       "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
       "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
@@ -7311,7 +7311,8 @@
         },
         {
           "file": "bin/fm-launch-proof-lib.sh",
-          "match": "fm_launch_proof_adopt_refuse 'no task-specific session tie: the first user message is not the launch-brief doorbell of a record in this task'\"'\"'s own home'; return 1"
+          "match": "fm_launch_proof_adopt_refuse 'no task-specific session tie: the first user message is not the launch-brief doorbell of a record in this task'\"'\"'s own home'; return 1",
+          "count": 2
         },
         {
           "file": "bin/fm-launch-proof-lib.sh",
@@ -7319,11 +7320,23 @@
         },
         {
           "file": "bin/fm-launch-proof-lib.sh",
-          "match": "|| { fm_launch_proof_adopt_refuse 'no task-specific session tie: the live session is not the session this adoption names'; return 1; }"
+          "match": "fm_launch_proof_adopt_refuse 'no task-specific session tie: the live session is not the session this adoption names'; return 1"
         },
         {
           "file": "bin/fm-launch-proof-lib.sh",
           "match": "*) fm_launch_proof_adopt_refuse 'no task-specific session tie: the adoption names no known tie'; return 1 ;;"
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "|| { fm_launch_proof_adopt_refuse 'no task-specific session tie: the task record names no claude_session_id'; return 1; }"
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "|| { fm_launch_proof_adopt_refuse 'the owner statement applies only when the launch brief is gone, and the launch-brief record still exists; run adopt without --session-id'; return 1; }"
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "fm_launch_proof_adopt_refuse 'no task-specific session tie: the launch-brief record the first user message names is gone; when the owner knows this live session is the task'\"'\"'s, run adopt --session-id <live-session-id>, otherwise decide the lane by hand'; return 1"
         }
       ]
     },

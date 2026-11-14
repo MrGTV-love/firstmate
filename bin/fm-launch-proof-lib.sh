@@ -417,12 +417,15 @@ fm_launch_proof_physical_path() { # <path>
 # candidate adoption record, or refuses on stderr naming the missing proof.
 # <session-id> and <tie> carry a tie already established for this task: the
 # owner's own statement (operator), or the tie a published adoption record names.
-# The live session must equal it; every other proof is still read live.
+# The live session must equal it, and every proof is still read live: a recorded
+# tie needs the record's claude_session_id; a launch-brief or operator tie needs
+# the transcript's first user message to be this task's own launch-brief doorbell.
+# The statement applies only once that doorbell's record is gone.
 fm_launch_proof_claude_adoption() { # <meta> [<session-id> <tie>] -> candidate adoption-record JSON
   local meta=$1 proven=${2:-} proven_tie=${3:-} target session pane home root gen pid harness_pid table kids kid args
   local resume_count=0 session_id='' i recorded tie transcript config_dir claude_home env_text
   local first epoch message kind record mtime launcher_args harness_args claim peer_state cwd
-  local peer_meta peer_home peer_states
+  local peer_meta peer_home peer_states inbox
   local -a argv hargv
 
   target=$(fm_backend_meta_exact_value "$meta" window) \
@@ -527,16 +530,20 @@ fm_launch_proof_claude_adoption() { # <meta> [<session-id> <tie>] -> candidate a
   if [ -n "$recorded" ] && [ "$recorded" != "$session_id" ]; then
     fm_launch_proof_adopt_refuse 'recorded session id differs from the live session; the task record names another conversation'; return 1
   fi
-  tie=recorded
-  if [ -n "$proven" ]; then
-    [ "$proven" = "$session_id" ] \
-      || { fm_launch_proof_adopt_refuse 'no task-specific session tie: the live session is not the session this adoption names'; return 1; }
-    case "$proven_tie" in
-      recorded|launch-brief|operator) tie=$proven_tie ;;
-      *) fm_launch_proof_adopt_refuse 'no task-specific session tie: the adoption names no known tie'; return 1 ;;
-    esac
-  elif [ -z "$recorded" ]; then
-    tie=launch-brief
+  if [ -n "$proven" ] && [ "$proven" != "$session_id" ]; then
+    fm_launch_proof_adopt_refuse 'no task-specific session tie: the live session is not the session this adoption names'; return 1
+  fi
+  case "$proven_tie" in
+    '') if [ -n "$recorded" ]; then tie=recorded; else tie=launch-brief; fi ;;
+    recorded|launch-brief|operator) tie=$proven_tie ;;
+    *) fm_launch_proof_adopt_refuse 'no task-specific session tie: the adoption names no known tie'; return 1 ;;
+  esac
+  if [ "$tie" = recorded ]; then
+    [ -n "$recorded" ] \
+      || { fm_launch_proof_adopt_refuse 'no task-specific session tie: the task record names no claude_session_id'; return 1; }
+  else
+    # The launch-brief tie, and the owner's statement of one whose record is gone,
+    # are read from the transcript itself at every use, never from a record file.
     env_text=$(fm_remote_herdr_process_env "$harness_pid") \
       || { fm_launch_proof_adopt_refuse 'no task-specific session tie: the harness environment cannot be read to locate its transcript'; return 1; }
     config_dir=$(printf '%s\n' "$env_text" | sed -n 's/^CLAUDE_CONFIG_DIR=//p')
@@ -578,13 +585,24 @@ PY
       fm_launch_proof_adopt_refuse 'no task-specific session tie: the session has no readable transcript whose first user message is a single line'; return 1
     fi
     epoch=${first%%$'\n'*}; message=${first#*$'\n'}
-    if ! fm_operational_doorbell_kind "$message" "$home/state" kind || [ "$kind" != launch-brief ] \
-      || ! fm_operational_doorbell_path "$message" record; then
+    inbox=$(cd -P -- "$home/state/$FM_OPERATIONAL_RECORD_DIRNAME" 2>/dev/null && pwd -P) || inbox=''
+    if ! fm_operational_doorbell_path "$message" record || [ -z "$inbox" ] \
+      || [ "$(cd -P -- "${record%/*}" 2>/dev/null && pwd -P)" != "$inbox" ]; then
       fm_launch_proof_adopt_refuse 'no task-specific session tie: the first user message is not the launch-brief doorbell of a record in this task'"'"'s own home'; return 1
     fi
-    if [ "$(uname)" = Darwin ]; then mtime=$(/usr/bin/stat -f %m "$record"); else mtime=$(stat -c %Y "$record"); fi
-    if ! [[ $mtime =~ ^[0-9]+$ ]] || [ "$mtime" -gt "${epoch%.*}" ]; then
-      fm_launch_proof_adopt_refuse 'no task-specific session tie: the launch-brief record is newer than the first user message'; return 1
+    if [ -e "$record" ] || [ -L "$record" ]; then
+      [ "$tie" != operator ] \
+        || { fm_launch_proof_adopt_refuse 'the owner statement applies only when the launch brief is gone, and the launch-brief record still exists; run adopt without --session-id'; return 1; }
+      if ! fm_operational_doorbell_kind "$message" "$home/state" kind || [ "$kind" != launch-brief ]; then
+        fm_launch_proof_adopt_refuse 'no task-specific session tie: the first user message is not the launch-brief doorbell of a record in this task'"'"'s own home'; return 1
+      fi
+      if [ "$(uname)" = Darwin ]; then mtime=$(/usr/bin/stat -f %m "$record"); else mtime=$(stat -c %Y "$record"); fi
+      if ! [[ $mtime =~ ^[0-9]+$ ]] || [ "$mtime" -gt "${epoch%.*}" ]; then
+        fm_launch_proof_adopt_refuse 'no task-specific session tie: the launch-brief record is newer than the first user message'; return 1
+      fi
+    elif [ -z "$proven" ]; then
+      # A gone record proves no kind; only a published tie or the owner's statement carries one.
+      fm_launch_proof_adopt_refuse 'no task-specific session tie: the launch-brief record the first user message names is gone; when the owner knows this live session is the task'"'"'s, run adopt --session-id <live-session-id>, otherwise decide the lane by hand'; return 1
     fi
   fi
   jq -cn --arg gen "$gen" --arg window "$target" --argjson pid "$pid" --argjson harness_pid "$harness_pid" \
@@ -594,8 +612,8 @@ PY
 
 # Succeeds only when the task's adoption record names exactly the proof the live
 # system gives right now for <pid>. A record alone never licenses lifecycle input.
-# The session tie the record names stands once published, so inbox retention
-# cannot end an adoption; the live session must still be that one.
+# The recheck rereads the transcript doorbell, so inbox retention cannot end an
+# adoption while the conversation still opens with this task's doorbell.
 fm_launch_proof_claude_adopted() { # <meta> <pid>
   local meta=$1 pid=$2 record fresh
   record=$(jq -cS --arg gen "$(fm_meta_get "$meta" spawn_gen)" --argjson pid "$pid" '

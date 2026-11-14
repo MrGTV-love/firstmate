@@ -121,8 +121,9 @@
 # claude harness (or a listed forwarding launcher around exactly one), its
 # kernel cwd, no launch pin, an exclusive pane and home claim, and a
 # task-specific session tie. --session-id is the owner's own statement of that
-# tie for a claude lane whose launch brief is gone. Lifecycle readers rerun those
-# proofs at every use, keeping the published tie; a relaunch removes the spent
+# tie for a claude lane whose launch-brief record is gone while its transcript
+# still opens with that record's doorbell. Lifecycle readers rerun those proofs,
+# the transcript doorbell included, at every use; a relaunch removes the spent
 # record. docs/agent-control.md "Adopting a restored claude agent" owns the
 # contract and its residual risk.
 # --worktree <path> is shared by two verbs and parsed once: relaunch accepts a

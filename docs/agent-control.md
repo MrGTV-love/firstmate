@@ -232,13 +232,15 @@ It sends no input and starts or stops nothing.
   A first message that merely names the inbox, and anything the agent does later in the session, never counts, because a personal session in the same directory can produce both.
   The operational inbox deletes records older than seven days, so a launch brief can be gone before the lane is adopted.
   The lock-owning main Firstmate may then run `adopt --session-id <live-session-id>`: the id must equal the live `--resume` id, a differing recorded `claude_session_id` still vetoes it, and every other proof still holds.
-  This option is the owner's own statement that the live session is the task's, exactly like a recorded `claude_session_id`; it proves nothing more, so a personal session adopted this way is the owner's error.
+  The statement ties only a session whose transcript's first user message is still a single-line doorbell naming a `*.msg` record under the task's own `state/operational-inbox/`, and only once that record is gone; while the record exists plain `adopt` is the route and the statement is refused.
+  The live id is readable from the process table, so the statement alone proves nothing, and a personal session whose conversation does not open with the task's doorbell stays refused with it.
   The adoption record names its tie: `recorded`, `launch-brief`, or `operator` for that statement.
 
 **This widens what authorizes lifecycle control: a process with no launch pin can become managed.**
 The record alone licenses nothing.
 `fm_launch_proof_herdr_verdict` takes it as a second route and runs every proof above again against the live system at each use, so a pane that changed hands, a new process, another session, or a pin for another generation makes it inert at once.
-The session tie is the one exception: the recheck keeps the tie the published record names while the live `--resume` id is still that session, so the inbox's seven-day retention never ends an adoption.
+The session tie is rechecked the same way: a `recorded` tie needs the task's `claude_session_id`, and a `launch-brief` or `operator` tie rereads the transcript's first user message at each use and needs it to be still the task's own doorbell, never only the record file.
+Once a published adoption's launch-brief record is gone, that doorbell alone keeps the tie, so the inbox's seven-day retention never ends an adoption.
 The record is bound to the task's `spawn_gen`, so a relaunch makes it inert, and `fm-control.sh` removes it once the replacement is confirmed.
 A teardown does not yet remove a leftover record, which stays inert.
 A genuinely unproven agent, including a personal session in the same pane, home, and directory, keeps its refusal on every consumer, and the secondmate restart decides that before its pending-reply record, persistence request, or fallback nudge.
