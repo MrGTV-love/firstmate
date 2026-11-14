@@ -48,7 +48,7 @@ import unicodedata
 import uuid
 import weakref
 
-from fm_slack import SCRUB_MARK, SecretCollision, Slack, SlackError, outbound_texts, plane_secrets, refuse_outbound, value_hits
+from fm_slack import SCRUB_MARK, DeadlineSpent, SecretCollision, Slack, SlackError, outbound_texts, plane_secrets, refuse_outbound, value_hits
 from fm_slack_replay import Replay
 
 ROOT = Path(__file__).resolve().parent
@@ -993,6 +993,8 @@ class Watch:
             owner = weakref.ref(self)
             self.api.on_date = lambda value: owner() is not None and owner().note_date(value)
         self.cap = answer_cap()
+        # The part of the shared cap the owner's work leaves for the second person's check of the same sweep (reserve_for_second); 0 outside a poll.
+        self.reserved = 0
         self.changed = False
         # Wake lines are journaled with the state change that earned them and cleared only
         # after they are printed, so a run that dies in between prints them next time.
@@ -1384,30 +1386,44 @@ class Watch:
     @contextlib.contextmanager
     def second_budget(self, start=None):
         """The second person's Slack I/O is allowed only SECOND_BUDGET seconds from start (the start of their own phase in a poll; the start of the run for an arm):
-        a call that would begin after that raises SecondBudgetSpent. It wraps this run's one transport, so every call of theirs (a read, a page, an
+        a call that would begin after that raises SecondBudgetSpent, and a call already begun is ended at that deadline by the real transport. It wraps this run's one transport, so every call of theirs (a read, a page, an
         acknowledgement) is counted, and the owner's calls, made before them, are not. A poll's phase of theirs runs only when no owner line waits to be printed
         (finding 4), so measuring from its own start costs the owner nothing, and every poll can begin the DM proof and one acknowledgement even when each call of
         theirs is slow (finding 3 of the review of d0b0c216)."""
         api = self.api
         bound = api.call
         earlier = api.__dict__.get('call')
+        earlier_left = api.__dict__.get('time_left')
         deadline = (self.started if start is None else start) + SECOND_BUDGET
+        if self.budget_deadline is not None:
+            deadline = min(deadline, self.budget_deadline)
 
         def guarded(method, **fields):
             if monotonic() >= deadline:
                 raise SecondBudgetSpent()
-            return bound(method, **fields)
+            try:
+                return bound(method, **fields)
+            except DeadlineSpent:
+                # The real transport cut the call off at the deadline (Main 1593): a deferral like a call that could not begin, never a failure.
+                raise SecondBudgetSpent() from None
 
+        # The time left is passed to every call of theirs, and the real transport ends a call at it however slowly its reply arrives (Slack._bounded): the
+        # budget is a total bound on their network I/O, not only on when a call may begin.
         api.call = guarded
-        self.budget_deadline = deadline
+        api.time_left = lambda: deadline - monotonic()
+        outer, self.budget_deadline = self.budget_deadline, deadline
         try:
             yield
         finally:
-            self.budget_deadline = None
+            self.budget_deadline = outer
             if earlier is None:
                 del api.call
             else:
                 api.call = earlier
+            if earlier_left is None:
+                del api.time_left
+            else:
+                api.time_left = earlier_left
 
     def slack_now(self):
         """Slack's own clock as of the last answer this run received (the transport records the Date of each reply), or None when no reply carried one. It is the
@@ -2470,7 +2486,7 @@ class Watch:
             fault('after-cursor')
 
     def resume(self):
-        remaining, deferred = self.cap, None
+        remaining, deferred = self.cap - self.reserved, None
         for pending in list(self.state['pending']):
             if remaining <= 0:
                 break
@@ -2902,6 +2918,42 @@ class Watch:
         except (SecretCollision, SlackError, OSError, ValueError):
             pass
 
+    def reserve_for_second(self):
+        """How much of the one shared cap the owner's work leaves untouched for the second person (Main 1578, 1593 and 1597). It reads only the parsed setting and
+        their local journal, never anything of theirs on Slack, so the owner's check makes no call of theirs.
+        At cap 2 or more: one request whenever the setting names them, so under sustained owner load at the cap they still get at least one request per sweep.
+        At cap 1 (fair alternation): when both sides have work (their journal shows a backlog or an undelivered row of theirs) the one slot alternates by pass,
+        by the turn kept in their journal; when only one side has work it gets the slot at once (an idle owner leaves the slot to their check of the same
+        sweep). A turn given to them is passed back at once, so a failed or cut-off pass of theirs never makes the owner wait a second pass."""
+        self.cap_one_contested = False
+        if not self.second or self.cap is None:
+            return 0
+        if self.cap >= 2:
+            return 1
+        try:
+            view = self.second_view()
+            state = view.state
+            self.cap_one_contested = bool(state.get('backlog')) or any(
+                isinstance(row, dict) and row.get('person') == 'second' and row.get('author') == self.second and not failed(row) for row in state['pending'])
+            if not (self.cap_one_contested and state.get('turn') == 'second'):
+                return 0
+            state['turn'] = 'owner'
+            view.commit()
+        except (SecretCollision, SlackError, OSError, ValueError):
+            return 0
+        return 1
+
+    def pass_turn(self, reserved, owner_left):
+        """At cap 1: when the owner's work used the one slot of a contested sweep, the next contested slot is theirs (the turn in their journal)."""
+        if reserved or not self.cap_one_contested or owner_left > 0:
+            return
+        try:
+            view = self.second_view()
+            view.state['turn'] = 'second'
+            view.commit()
+        except (SecretCollision, SlackError, OSError, ValueError):
+            pass
+
     def leave_cap(self, left):
         """The owner's check leaves what it left of the one shared cap (SC4) for the second person's check of the same watcher pass, in their journal; a failure
         here never touches the owner."""
@@ -2913,8 +2965,9 @@ class Watch:
             pass
 
     def second_check(self):
-        """The second person's standing check: no owner work at all; their pass takes what the owner's check of this watcher pass left of the shared cap (the
-        whole cap when no owner check ran since their last check), and a completed pass records the run's time (record_run)."""
+        """The second person's standing check: no owner work at all; their pass takes what the owner's check of this watcher pass left of the shared cap, which
+        holds the one request reserved for them (reserve_for_second), or the whole cap when no owner check ran since their last check; a completed pass records
+        the run's time (record_run)."""
         view = self.second_view()
         ledger = view.state.get('cap_left') if isinstance(view.state.get('cap_left'), dict) else {}
         left = ledger.get('left') if ledger.get('fresh') and isinstance(ledger.get('left'), int) else self.cap
@@ -2952,7 +3005,13 @@ class Watch:
             self.second_check()
             return
         try:
-            left = self.poll_work()
+            reserved = self.reserved = self.reserve_for_second()
+            try:
+                owner_left = self.poll_work()
+            finally:
+                self.reserved = 0
+            self.pass_turn(reserved, owner_left)
+            left = owner_left + reserved
             if part == 'owner':
                 self.leave_cap(left)
                 if self.owner_deferred:
@@ -3031,6 +3090,19 @@ class Watch:
         if self.request_plan is not None:
             # take_in has already made the one history read, to share the cap fairly with the follow-ups.
             plan, self.request_plan = self.request_plan[0], None
+        elif second:
+            # Their one history read is made even when nothing of the cap is left for them: it takes nothing in then (their cursor stays), and it records
+            # whether more of theirs waits than this pass can take (backlog), which the next owner check reads at cap 1 (reserve_for_second). With no read, or a
+            # failed one, the last record stands.
+            reads = self.second_reads
+            plan = self.read_requests(max(remaining, 1), second)
+            if self.second_reads > reads:
+                self.state['backlog'] = plan is None or self.ready_requests(plan) > max(remaining, 0)
+                if remaining <= 0 and self.state['backlog']:
+                    self.state['turn'] = 'second'               # the owner's work had this sweep's slot: the next contested one is theirs
+                self.commit()
+            if remaining <= 0:
+                return remaining
         else:
             plan = self.read_requests(remaining, second)
         return self.take_in_requests(plan, remaining, second) if plan else remaining

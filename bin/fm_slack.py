@@ -4,6 +4,7 @@ import datetime
 import email.utils
 import json
 import os
+import threading
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -15,6 +16,11 @@ class SlackError(Exception):
 
 class SecretCollision(SlackError):
     """A plane value that no replacement of request text can remove: it holds no request-text character."""
+
+
+class DeadlineSpent(Exception):
+    """A call of a caller with a total deadline (Slack.time_left) that could not be begun, or could not end, before that deadline. It is not a Slack failure:
+    whether a call that was cut off reached Slack is unknown, and the caller keeps its work for a later run."""
 
 
 def plane_secrets():
@@ -104,6 +110,9 @@ class Slack:
         # reply alone, never a value kept from an earlier one (finding 2 of the review of d0b0c216). The only clock a Slack timestamp may be ordered against.
         self.server_time = None
 
+    # A caller with a total deadline sets time_left to a function that gives the seconds left (the second person's pass, SECOND_BUDGET); None is no total bound.
+    time_left = None
+
     def call(self, method, **fields):
         if not self.token:
             raise SlackError('missing_token')
@@ -113,27 +122,20 @@ class Slack:
             data=wire_body(fields).encode(),
             headers={'Authorization': 'Bearer ' + self.token,
                      'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'})
-        try:
-            # Conservative socket ceiling, first set 2026-10-18 on the operator host.
-            # A hung check can starve supervision: fm-watch.sh owns its progress
-            # and absolute bounds. Time between requests is not a socket failure.
-            # measured: value=10 date=2026-10-31 host=Mac-Studio.local margin=1.1 (at 5-minute load 185-195 a whole hand-run poll took 9 s and a mirror 6 s, so no single request exceeded 9 s)
-            with urllib.request.urlopen(request, timeout=10) as response:
-                self._note_date(response.headers.get('Date', ''))
-                header = response.headers.get('x-oauth-scopes', '')
-                if header:
-                    self.scopes = {s for s in header.replace(' ', '').split(',') if s}
-                raw = response.read(4 * 1024 * 1024 + 1)
-                if len(raw) > 4 * 1024 * 1024:
-                    raise SlackError('response_too_large')
-                # Scrub before any successful body can reach output or state.
-                data = json.loads(raw.decode(errors='replace').replace(self.token, self.scrub_with))
-        except urllib.error.HTTPError as error:
-            if error.code == 429:
-                raise SlackError('rate_limited') from None
-            raise SlackError('http_' + str(error.code)) from None
-        except (OSError, ValueError, urllib.error.URLError):
-            raise SlackError('unreachable') from None
+        # Conservative socket ceiling, first set 2026-10-18 on the operator host.
+        # A hung check can starve supervision: fm-watch.sh owns its progress
+        # and absolute bounds. Time between requests is not a socket failure.
+        # measured: value=10 date=2026-10-31 host=Mac-Studio.local margin=1.1 (at 5-minute load 185-195 a whole hand-run poll took 9 s and a mirror 6 s, so no single request exceeded 9 s)
+        if self.time_left is None:
+            date, header, data, error = self._exchange(request, 10)
+        else:
+            date, header, data, error = self._bounded(request)
+        if date is not None:
+            self._note_date(date)
+        if header:
+            self.scopes = {s for s in header.replace(' ', '').split(',') if s}
+        if error is not None:
+            raise error
         if self.on_reply:
             self.on_reply()
         if not isinstance(data, dict) or not data.get('ok'):
@@ -141,6 +143,44 @@ class Slack:
             # Never relay arbitrary API text, including an echoed Authorization header.
             raise SlackError(code if code in SAFE_ERRORS else 'api_error')
         return data
+
+    def _bounded(self, request):
+        """One exchange under the caller's total deadline (Main 1593): the socket timeout bounds each wait, so a reply that trickles in byte by byte never hits it;
+        the exchange therefore runs in a worker thread that this call waits for only as long as time_left() allows. A call with no time left is not begun. A
+        cut-off exchange is abandoned to its daemon thread, which changes nothing of the transport (_exchange touches no state), and raises DeadlineSpent."""
+        left = self.time_left()
+        if left <= 0:
+            raise DeadlineSpent()
+        outcome = []
+        worker = threading.Thread(target=lambda: outcome.append(self._exchange(request, min(10, left))), daemon=True)
+        worker.start()
+        worker.join(max(0.0, self.time_left()))
+        if not outcome:
+            raise DeadlineSpent()
+        return outcome[0]
+
+    def _exchange(self, request, timeout):
+        """One HTTP exchange: (the reply's Date header or None, its x-oauth-scopes header, the parsed body or None, the error to raise or None). It reads and writes
+        no state of the transport, so that _bounded() can run it in a thread it may abandon; call() applies what it returns."""
+        date, header = None, ''
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                date = response.headers.get('Date', '')
+                header = response.headers.get('x-oauth-scopes', '')
+                raw = response.read(4 * 1024 * 1024 + 1)
+                if len(raw) > 4 * 1024 * 1024:
+                    return date, header, None, SlackError('response_too_large')
+                # Scrub before any successful body can reach output or state.
+                return date, header, json.loads(raw.decode(errors='replace').replace(self.token, self.scrub_with)), None
+        except urllib.error.HTTPError as error:
+            if error.code == 429:
+                return date, header, None, SlackError('rate_limited')
+            return date, header, None, SlackError('http_' + str(error.code))
+        except (OSError, ValueError, urllib.error.URLError):
+            return date, header, None, SlackError('unreachable')
+        except Exception as error:
+            # Any other error is raised by call() as it is, after the Date and scopes this reply gave, exactly as before this split.
+            return date, header, None, error
 
     def _note_date(self, value):
         """Record Slack's clock from this reply's Date header; a header that is missing or cannot be read gives no clock for this reply (server_time stays None).
