@@ -1607,14 +1607,37 @@ SH
   chmod +x "$FAKEBIN_DIR/treehouse"
 }
 
-slot_digest() { # <slot>: HEAD, its branch, the index and a sha256 of every file outside .git
-  # (the refs are shared by every pool slot, so a later copy's own branch must not count as a change here)
-  {
-    git -C "$1" rev-parse HEAD
-    git -C "$1" symbolic-ref -q HEAD || echo detached
-    git -C "$1" ls-files -s --debug
-    (cd "$1" && find . -path ./.git -prune -o \( -type f -o -type l \) -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256)
-  } 2>&1
+# slot_digest <slot>: HEAD, its branch, the index, every file outside .git (sha256) and every branch, tag and
+# remote-tracking ref except the exceptions below. It FAILS (prints nothing, returns nonzero) when any git read
+# fails, so a failed read can never compare equal to another. The exceptions are the refs a launch on the
+# second copy legitimately writes: its own task branch (refs/heads/fm/) and origin's default tip.
+DIGEST_REF_EXCEPT='^refs/(heads/fm/|remotes/origin/(HEAD|main)[ ])'
+slot_digest() {
+  local slot=$1 head sym refs
+  (
+    set -o pipefail
+    head=$(git -C "$slot" rev-parse HEAD) || exit 1
+    printf 'HEAD %s\n' "$head"
+    sym=$(git -C "$slot" symbolic-ref -q HEAD) || { [ "$?" = 1 ] || exit 1; sym=detached; }
+    printf 'SYMBOLIC %s\n' "$sym"
+    refs=$(git -C "$slot" for-each-ref --format='%(refname) %(objectname)' refs/heads refs/tags refs/remotes) || exit 1
+    printf '%s\n' "$refs" | grep -Ev "$DIGEST_REF_EXCEPT" || [ "$?" = 1 ] || exit 1
+    git -C "$slot" ls-files -s --debug || exit 1
+    cd "$slot" || exit 1
+    find . -path ./.git -prune -o \( -type f -o -type l \) -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256
+  ) 2>&1
+}
+
+# assert_digest_unchanged <slot> <before> <message>: the slot reads back exactly as it did.
+assert_digest_unchanged() {
+  local after
+  after=$(slot_digest "$1") || fail "$3 (the slot could not be read)"
+  [ "$after" = "$2" ] || fail "$3"
+}
+
+# assert_no_launch <launch-log>: no harness was launched (the fake launcher logs each launch).
+assert_no_launch() {
+  [ ! -s "$1" ] || fail "a harness was launched: $(cat "$1")"
 }
 
 test_a_skipped_dirty_copy_is_left_as_found_and_another_is_taken() {
@@ -1622,7 +1645,7 @@ test_a_skipped_dirty_copy_is_left_as_found_and_another_is_taken() {
   id='pool-skip-dirty-take-next'
   make_skip_case skip-dirty "$id" 2
   printf 'keep this local work\n' > "${SKIP_SLOTS[0]}/uncommitted.txt"
-  before=$(slot_digest "${SKIP_SLOTS[0]}")
+  before=$(slot_digest "${SKIP_SLOTS[0]}") || fail "the slot could not be read before the spawn"
 
   out=$(run_spawn "$id" --mode no-mistakes --yolo off)
   status=$?
@@ -1630,7 +1653,7 @@ test_a_skipped_dirty_copy_is_left_as_found_and_another_is_taken() {
   assert_contains "$out" "skipped: copy ${SKIP_SLOTS[0]}" "the skip was not reported"
   assert_contains "$out" "(dirty_tree)" "the skip did not name its reason"
   assert_grep "worktree=${SKIP_SLOTS[1]}" "$HOME_DIR/state/$id.meta" "the task was not recorded on the second copy"
-  [ "$(slot_digest "${SKIP_SLOTS[0]}")" = "$before" ] || fail "the skipped copy changed"
+  assert_digest_unchanged "${SKIP_SLOTS[0]}" "$before" "the skipped copy changed"
   assert_grep "lease --path ${SKIP_SLOTS[0]}" "$SKIP_LOG" "the skipped copy was not leased durably before it was left"
   [ "$(git -C "${SKIP_SLOTS[1]}" rev-parse HEAD)" = "$(git -C "${SKIP_SLOTS[1]}" rev-parse origin/main)" ] \
     || fail "the second copy was not moved to origin's tip"
@@ -1648,14 +1671,14 @@ test_a_skipped_copy_with_an_unlanded_commit_keeps_it_and_another_is_taken() {
   git -C "${SKIP_SLOTS[0]}" add mine.txt
   git -C "${SKIP_SLOTS[0]}" -c user.name=T -c user.email=t@example.invalid commit -qm unlanded
   extra=$(git -C "${SKIP_SLOTS[0]}" rev-parse HEAD)
-  before=$(slot_digest "${SKIP_SLOTS[0]}")
+  before=$(slot_digest "${SKIP_SLOTS[0]}") || fail "the slot could not be read before the spawn"
 
   out=$(run_spawn "$id" --mode no-mistakes --yolo off)
   status=$?
   expect_code 0 "$status" "a copy holding an unlanded commit should be skipped"$'\n'"$out"
   assert_contains "$out" "(not_fast_forward)" "the skip did not name its reason"
   [ "$(git -C "${SKIP_SLOTS[0]}" rev-parse HEAD)" = "$extra" ] || fail "the unlanded commit is no longer HEAD of the skipped copy"
-  [ "$(slot_digest "${SKIP_SLOTS[0]}")" = "$before" ] || fail "the skipped copy changed"
+  assert_digest_unchanged "${SKIP_SLOTS[0]}" "$before" "the skipped copy changed"
   assert_grep "worktree=${SKIP_SLOTS[1]}" "$HOME_DIR/state/$id.meta" "the task was not recorded on the second copy"
   pass "a copy holding an unlanded commit is skipped with the commit kept, and the task runs on another copy"
 }
@@ -1665,15 +1688,16 @@ test_no_other_copy_refuses_and_names_the_skipped_one() {
   id='pool-skip-no-other-copy'
   make_skip_case skip-none "$id" 1
   printf 'keep this local work\n' > "$POOL_DIR/uncommitted.txt"
-  before=$(slot_digest "$POOL_DIR")
+  before=$(slot_digest "$POOL_DIR") || fail "the slot could not be read before the spawn"
 
-  out=$(run_spawn_skipping "$id" --mode no-mistakes --yolo off)
+  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" run_spawn_skipping "$id" --mode no-mistakes --yolo off)
   status=$?
   [ "$status" -ne 0 ] || fail "spawn launched although its only copy was skipped"
+  assert_no_launch "$CASE_DIR/launch.log"
   assert_contains "$out" "copies skipped by this spawn: $POOL_DIR" "the refusal did not name the skipped copy"
   assert_contains "$out" "(dirty_tree)" "the refusal did not carry the skip reason"
   [ ! -f "$HOME_DIR/state/$id.meta" ] || fail "a refused spawn published task metadata"
-  [ "$(slot_digest "$POOL_DIR")" = "$before" ] || fail "the only copy changed"
+  assert_digest_unchanged "$POOL_DIR" "$before" "the only copy changed"
   pass "with no other copy the spawn refuses, names the skipped copy and its reason, and launches nothing"
 }
 
@@ -1682,7 +1706,7 @@ test_a_skip_that_cannot_lease_the_copy_stops_without_asking_for_another() {
   id='pool-skip-lease-fails'
   make_skip_case skip-lease-fails "$id" 2
   printf 'keep this local work\n' > "$POOL_DIR/uncommitted.txt"
-  before=$(slot_digest "$POOL_DIR")
+  before=$(slot_digest "$POOL_DIR") || fail "the slot could not be read before the spawn"
 
   out=$(FM_TEST_LEASE_RC=1 run_spawn "$id" --mode no-mistakes --yolo off)
   status=$?
@@ -1690,7 +1714,7 @@ test_a_skip_that_cannot_lease_the_copy_stops_without_asking_for_another() {
   assert_contains "$out" "could not lease skipped copy $POOL_DIR durably" "the lease failure was not reported"
   assert_contains "$out" "stays open on it, untouched" "the endpoint was not kept open on the copy"
   [ "$(cat "$CASE_DIR/get-count")" = 1 ] || fail "a second copy was requested although the first could not be protected"
-  [ "$(slot_digest "$POOL_DIR")" = "$before" ] || fail "the copy changed"
+  assert_digest_unchanged "$POOL_DIR" "$before" "the copy changed"
   pass "a copy that cannot be leased is not abandoned: no second copy is requested and the copy is untouched"
 }
 
@@ -1732,15 +1756,46 @@ test_an_originless_copy_with_a_live_holder_is_skipped() {
   pass "an origin-less copy with a live process in it is skipped, not launched from"
 }
 
-test_a_failed_fetch_skips_the_copy_and_takes_another() {
-  local id out
+# An unreachable origin is a fact about the project, not about a copy: it refuses before a copy is acquired, so
+# no copy is touched and none is leased. (Red at c3bb181b8: one copy was acquired first and then abandoned
+# without a lease, where closing its pane would let Treehouse reset it.)
+test_an_unreachable_origin_refuses_before_any_copy_is_taken() {
+  local id out status
   id='pool-skip-fetch-fails'
   make_skip_case skip-fetch "$id" 2
   git -C "$POOL_DIR" remote set-url origin "file://$CASE_DIR/missing-origin.git"
-  out=$(run_spawn_skipping "$id" --mode no-mistakes --yolo off) || true
-  assert_grep "lease --path ${SKIP_SLOTS[0]}" "$SKIP_LOG" "the first copy was not leased before the spawn went on"
-  [ "$(cat "$CASE_DIR/get-count")" -ge 2 ] || fail "no second copy was requested after the fetch failed"$'\n'"$out"
-  pass "a failed fetch leases the copy it was working in and asks for another"
+  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  [ "$status" -ne 0 ] || fail "spawn went on although origin cannot be fetched"
+  assert_contains "$out" "could not fetch origin" "the refusal did not name the fetch"
+  assert_contains "$out" "no copy was acquired" "the refusal did not say that no copy was taken"
+  [ "$(cat "$CASE_DIR/get-count")" = 0 ] || fail "a copy was requested before the origin was known to be usable"
+  assert_no_launch "$CASE_DIR/launch.log"
+  ! grep -q '^lease ' "$SKIP_LOG" || fail "a lease was taken although no copy was acquired"
+  pass "an unreachable origin refuses before any copy is acquired, leasing nothing"
+}
+
+# A copy that changes during the move (here a tracked edit appears between the proof and the merge) may hold
+# work: the spawn keeps it, leases it where it stands, and launches nothing.
+test_a_copy_that_changes_during_the_move_is_leased_where_it_stands() {
+  local id out status real_git
+  id='pool-skip-changes-during-move'
+  make_skip_case skip-changes "$id" 2
+  real_git=$(command -v git)
+  cat > "$FAKEBIN_DIR/git" <<SH
+#!/usr/bin/env bash
+case "\$*" in *' merge --ff-only'*) printf 'late edit\n' >> '${SKIP_SLOTS[0]}/README.md' ;; esac
+exec '$real_git' "\$@"
+SH
+  chmod +x "$FAKEBIN_DIR/git"
+  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  [ "$status" -ne 0 ] || fail "spawn launched on a copy that changed during the move"$'\n'"$out"
+  assert_no_launch "$CASE_DIR/launch.log"
+  assert_grep "lease --path ${SKIP_SLOTS[0]}" "$SKIP_LOG" "the changed copy was not leased where it stands"
+  grep -q 'late edit' "${SKIP_SLOTS[0]}/README.md" || fail "the late edit is gone"
+  [ "$(cat "$CASE_DIR/get-count")" = 1 ] || fail "a second copy was requested although the first one was changed under the move"
+  pass "a copy that changes during the move is kept, leased where it stands, and nothing is launched"
 }
 
 test_a_nondefault_base_ref_does_not_move_before_a_skip() {
@@ -1770,11 +1825,11 @@ test_a_governed_attached_copy_keeps_its_branch_when_skipped() {
   printf 'unlanded\n' > "${SKIP_SLOTS[0]}/mine.txt"
   git -C "${SKIP_SLOTS[0]}" add mine.txt
   git -C "${SKIP_SLOTS[0]}" -c user.name=T -c user.email=t@example.invalid commit -qm unlanded
-  before=$(slot_digest "${SKIP_SLOTS[0]}")
+  before=$(slot_digest "${SKIP_SLOTS[0]}") || fail "the slot could not be read before the spawn"
   out=$(FM_TEST_PROVISION_CALLED="$CASE_DIR/provisioner.called" run_spawn "$id" --mode no-mistakes --yolo off --owned-path scripts) || true
   [ "$(cat "$CASE_DIR/get-count")" -ge 2 ] || fail "no second copy was requested"$'\n'"$out"
   [ "$(git -C "${SKIP_SLOTS[0]}" symbolic-ref -q HEAD)" = refs/heads/previous-owner ] || fail "the skipped governed copy was left detached"
-  [ "$(slot_digest "${SKIP_SLOTS[0]}")" = "$before" ] || fail "the skipped governed copy changed"
+  assert_digest_unchanged "${SKIP_SLOTS[0]}" "$before" "the skipped governed copy changed"
   pass "a skipped governed copy keeps its branch and every byte"
 }
 
@@ -1794,7 +1849,8 @@ test_the_loop_budget_is_one_bound_across_all_gets() {
   id='pool-skip-budget'
   make_skip_case skip-budget "$id" 5
   for slot in "${SKIP_SLOTS[@]}"; do printf 'work\n' > "$slot/uncommitted.txt"; done
-  out=$(FM_TEST_TICK_SECONDS=1000 BASH_ENV="$SKIP_CLOCK" run_spawn "$id" --mode no-mistakes --yolo off) || true
+  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_TICK_SECONDS=1000 BASH_ENV="$SKIP_CLOCK" run_spawn "$id" --mode no-mistakes --yolo off) || true
+  assert_no_launch "$CASE_DIR/launch.log"
   [ "$(cat "$CASE_DIR/get-count")" -le 2 ] || fail "the loop went on to get $(cat "$CASE_DIR/get-count") copies past the absolute bound"$'\n'"$out"
   assert_contains "$out" "absolute extreme" "the refusal did not name the absolute bound"
   pass "one absolute bound covers every get in the skip loop"
@@ -1820,9 +1876,9 @@ test_slot_digest_sees_a_changed_local_branch() {
   id='pool-digest-refs'
   make_skip_case digest-refs "$id" 1
   git -C "$POOL_DIR" branch -q keep-me
-  before=$(slot_digest "$POOL_DIR")
+  before=$(slot_digest "$POOL_DIR") || fail "the slot could not be read before the spawn"
   git -C "$POOL_DIR" branch -q -f keep-me "$(git -C "$POOL_DIR" rev-parse origin/main)"
-  after=$(slot_digest "$POOL_DIR")
+  after=$(slot_digest "$POOL_DIR") || fail "the slot could not be read after the branch moved"
   [ "$before" != "$after" ] || fail "the digest missed a moved local branch"
   pass "the slot digest covers local branch refs"
 }
@@ -1913,7 +1969,8 @@ test_a_skipped_copy_with_an_unlanded_commit_keeps_it_and_another_is_taken
 test_no_other_copy_refuses_and_names_the_skipped_one
 test_a_skip_that_cannot_lease_the_copy_stops_without_asking_for_another
 test_an_originless_copy_with_a_live_holder_is_skipped
-test_a_failed_fetch_skips_the_copy_and_takes_another
+test_an_unreachable_origin_refuses_before_any_copy_is_taken
+test_a_copy_that_changes_during_the_move_is_leased_where_it_stands
 test_a_nondefault_base_ref_does_not_move_before_a_skip
 test_a_governed_attached_copy_keeps_its_branch_when_skipped
 test_a_dirty_governed_copy_is_skipped_and_another_is_taken

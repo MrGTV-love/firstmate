@@ -534,26 +534,34 @@
 #   their home markers, home watch, and home digest under it
 #   (.omp/extensions/lib/fm-task-worker.ts). A secondmate runs in its own home
 #   and is not marked.
-#   Only after this isolation check, every fresh ship or scout requires a clean
-#   task worktree. When an origin configuration is detected, spawn fetches it,
-#   resolves the current remote default branch (or uses --base-branch, described
-#   above), and advances the copy to its tip. The advance is never a reset: it is
-#   `git merge --ff-only` (bin/fm-slot-provision-lib.sh, fm_slot_move_forward), which git
-#   itself refuses unless the copy's HEAD is an ancestor of the tip, so no commit is dropped
-#   and no tracked or untracked change is overwritten. Before it, the copy must be clean,
-#   have no live holder (a process with its working directory in it that started before this
-#   spawn, a git worktree lock, a live project lease, recent contention) and have no ignored
-#   file at a path the target tree tracks (git overwrites ignored files silently). Any other doubt, an
-#   unreadable inventory included, skips the copy: it is left exactly as found, leased durably
-#   in place (`treehouse lease --path`, because Treehouse resets a slot when its shell exits),
-#   and a second `treehouse get` in the same pane takes another copy. With no other copy the
-#   acquisition wait ends in its usual refusal, which names each skipped copy. A relaunch keeps
-#   the copy its work lives in and so refuses instead of skipping. A fresh local-only ship instead compares that
+#   Only after this isolation check, every fresh ship or scout requires an idle, clean
+#   task worktree. When an origin configuration is detected, spawn fetches it
+#   (before any copy is acquired: an origin that cannot be fetched or resolved refuses
+#   there, with no copy touched), resolves the current remote default branch (or uses
+#   --base-branch, described above), and advances the copy to its tip. The advance is
+#   never a reset: it is `git merge --ff-only` (bin/fm-slot-provision-lib.sh,
+#   fm_slot_apply_move), which git itself refuses unless the copy's HEAD is an ancestor of
+#   the tip, so no commit is dropped and no tracked or untracked change is overwritten.
+#   It is preceded by a read-only proof (fm_slot_prove_idle) that writes nothing to the
+#   copy, no ref and no file: one snapshot must show the tree clean, no process with its
+#   working directory in the copy (no age exemption; only the spawn's own pane or `treehouse`
+#   launcher is excused), no git worktree lock, no live project lease or recent or unreadable
+#   contention row, no ignored file at a path the target tree tracks (git overwrites ignored
+#   files silently), and HEAD an ancestor of the target. Any doubt, an unreadable input
+#   included, skips the copy: it is left exactly as found (no checkout, ref, fetch ref or
+#   detach), leased durably in place to this home (`treehouse lease --path`, holder
+#   firstmate-skipped:<task>, because Treehouse resets a slot when its shell exits), recorded in
+#   $DATA/<task>/skipped-copies.tsv, listed in the spawn output, and a second `treehouse get`
+#   in the same pane takes another copy. One absolute thirty-minute bound covers every get.
+#   After the move a second snapshot is compared with the first: any difference beyond the
+#   expected HEAD/branch move fails the spawn, never reports success. A lease is released only
+#   by bin/fm-teardown.sh, after the copy passes its landed-work test. A relaunch keeps the
+#   copy its work lives in and so refuses instead of skipping. A fresh local-only ship instead compares that
 #   immutable tip with the qualified named local default and selects the descendant
 #   containing both histories; missing, ambiguous, moved or divergent local defaults
 #   refuse under project custody before copy preparation. Local commits are never
 #   relabeled as origin. When no origin is detected, spawn skips that comparison
-#   and launches from the clean worktree's current HEAD. Relaunch reuses the recorded worktree without
+#   and launches from the clean, idle worktree's current HEAD. Relaunch reuses the recorded worktree without
 #   fetching or moving its base. An unreachable detected origin or unresolved
 #   default branch refuses a fresh spawn rather than risking a PR based on stale
 #   history; a non-clean or otherwise doubtful copy is skipped as described above.
@@ -5017,9 +5025,16 @@ spawn_origin_head_older_than() { # <worktree> <epoch>
   [ -n "$written" ] && [ -n "$2" ] && [ "$written" -lt "$2" ]
 }
 
-freshen_spawn_worktree_base() { # <worktree> [<base-branch>]
-  local worktree=$1 base=${2:-} default target expected actual status current rc
-  status=$(git -C "$worktree" -c core.quotePath=false status --porcelain) || {
+# The read-only half of the freshness step: what would this copy move to? It writes nothing to the copy
+# and no ref. Sets SPAWN_MOVE_EXPECTED (empty: nothing to move), SPAWN_MOVE_TARGET (a label),
+# SPAWN_MOVE_ORIGIN_SHA and SPAWN_MOVE_DEFAULT (the origin tip to record once the copy is proven),
+# SPAWN_MOVE_REF_TODO and SPAWN_MOVE_DISCOVERED. Returns 0, FM_SLOT_SKIP_RC when the copy or its base is in
+# doubt (a dirty copy, no readable origin tip: skip the copy, never launch from a stale base), or 1 for a
+# refusal that is not about the copy's work.
+spawn_resolve_move_target() { # <worktree> [<base-branch>]
+  local worktree=$1 base=${2:-} default status advertised tip target
+  SPAWN_MOVE_EXPECTED= SPAWN_MOVE_TARGET= SPAWN_MOVE_ORIGIN_SHA= SPAWN_MOVE_DEFAULT= SPAWN_MOVE_REF_TODO=0 SPAWN_MOVE_DISCOVERED=0
+  status=$(GIT_OPTIONAL_LOCKS=0 git -C "$worktree" -c core.quotePath=false status --porcelain) || {
     fm_slot_skip "$worktree" unknown_git_read "git status failed before refreshing its base"
     return
   }
@@ -5044,70 +5059,99 @@ freshen_spawn_worktree_base() { # <worktree> [<base-branch>]
     return 0
   fi
   if [ -n "$SPAWN_BASE_ERROR" ]; then
-    echo "error: $SPAWN_BASE_ERROR for pooled worktree '$worktree'; refusing to launch from a potentially stale base" >&2
-    return 1
+    fm_slot_skip "$worktree" unknown_base "$SPAWN_BASE_ERROR for pooled worktree '$worktree'; refusing to launch from a potentially stale base"
+    return
   fi
   if [ -n "$SPAWN_BASE_SHA" ] &&
     git -C "$worktree" rev-parse --verify --quiet "$SPAWN_BASE_SHA^{commit}" >/dev/null 2>&1; then
     default=$SPAWN_BASE_DEFAULT
-    target="origin/$default"
-    expected=$SPAWN_BASE_SHA
-    spawn_advance_origin_ref "$worktree" "refs/remotes/origin/$default" "$expected"
-    if [ "$SPAWN_BASE_DISCOVERED" = 1 ]; then
-      current=$(git -C "$worktree" symbolic-ref --quiet refs/remotes/origin/HEAD 2>/dev/null || true)
-      if [ "$current" != "refs/remotes/origin/$default" ] &&
-        { [ -z "$current" ] ||
-          ! git -C "$worktree" rev-parse --verify --quiet "$current" >/dev/null 2>&1 ||
-          spawn_origin_head_older_than "$worktree" "$SPAWN_BASE_DISCOVERED_AT"; }; then
-        git -C "$worktree" symbolic-ref refs/remotes/origin/HEAD "refs/remotes/origin/$default" 2>/dev/null || true
-      fi
-    fi
+    SPAWN_MOVE_EXPECTED=$SPAWN_BASE_SHA
+    SPAWN_MOVE_DISCOVERED=$SPAWN_BASE_DISCOVERED
   else
-    if ! git -C "$worktree" fetch --quiet origin; then
-      echo "error: could not fetch origin for pooled worktree '$worktree'; refusing to launch from a potentially stale base" >&2
-      return 1
+    # No tip was fetched before this spawn queued. Ask origin what it advertises (read-only) and take the
+    # objects with no ref written: the tracking refs are recorded only after the copy is proven.
+    if ! advertised=$(GIT_TERMINAL_PROMPT=0 git -C "$worktree" ls-remote --symref origin HEAD 'refs/heads/*' </dev/null 2>/dev/null); then
+      fm_slot_skip "$worktree" unknown_base "could not fetch origin for pooled worktree '$worktree'; refusing to launch from a potentially stale base"
+      return
     fi
     if [ -n "$base" ]; then
       default=$base
     else
-      if ! git -C "$worktree" remote set-head origin --auto >/dev/null 2>&1; then
-        echo "error: could not resolve origin's current default branch for pooled worktree '$worktree'; refusing to launch from a potentially stale base" >&2
-        return 1
+      default=$(printf '%s\n' "$advertised" | sed -n 's|^ref: refs/heads/\(.*\)[[:space:]]HEAD$|\1|p' | head -n 1)
+      if [ -z "$default" ] || ! printf '%s\n' "$advertised" | awk -F'\t' -v b="refs/heads/$default" '$2 == b { found = 1 } END { exit !found }'; then
+        fm_slot_skip "$worktree" unknown_base "could not resolve origin's current default branch for pooled worktree '$worktree'; refusing to launch from a potentially stale base"
+        return
       fi
-      default=$(default_branch "$worktree") || {
-        echo "error: could not determine origin's default branch for pooled worktree '$worktree'; refusing to launch from a potentially stale base" >&2
-        return 1
-      }
+      SPAWN_MOVE_DISCOVERED=1
     fi
-    target="origin/$default"
-    if ! git -C "$worktree" fetch --quiet origin "+refs/heads/$default:refs/remotes/origin/$default"; then
-      echo "error: could not fetch '$target' for pooled worktree '$worktree'; refusing to launch from a potentially stale base" >&2
-      return 1
+    tip=$(printf '%s\n' "$advertised" | awk -F'\t' -v b="refs/heads/$default" '$2 == b { print $1; exit }')
+    if [ -z "$tip" ] ||
+      ! GIT_TERMINAL_PROMPT=0 git -C "$worktree" fetch --quiet --no-write-fetch-head --refmap= origin "refs/heads/$default" </dev/null >/dev/null 2>&1 ||
+      ! git -C "$worktree" rev-parse --verify --quiet "$tip^{commit}" >/dev/null 2>&1; then
+      fm_slot_skip "$worktree" unknown_base "could not fetch 'origin/$default' for pooled worktree '$worktree'; refusing to launch from a potentially stale base"
+      return
     fi
-    expected=$(git -C "$worktree" rev-parse --verify --quiet "$target^{commit}" 2>/dev/null) || {
-      echo "error: '$target' is not a commit for pooled worktree '$worktree'; refusing to launch from a potentially stale base" >&2
-      return 1
-    }
+    SPAWN_MOVE_EXPECTED=$tip
   fi
+  target="origin/$default"
+  SPAWN_MOVE_ORIGIN_SHA=$SPAWN_MOVE_EXPECTED
+  SPAWN_MOVE_DEFAULT=$default
+  SPAWN_MOVE_REF_TODO=1
   if [ -n "$SPAWN_SELECTED_BASE_SHA" ]; then
-    expected=$SPAWN_SELECTED_BASE_SHA
-    if [ "$expected" != "$SPAWN_BASE_SHA" ]; then
+    SPAWN_MOVE_EXPECTED=$SPAWN_SELECTED_BASE_SHA
+    if [ "$SPAWN_MOVE_EXPECTED" != "$SPAWN_BASE_SHA" ]; then
       target="refs/heads/$SPAWN_LOCAL_DEFAULT"
     fi
     printf 'local-only source: local=%s@%s origin=%s@%s selected=%s@%s\n' \
-      "$SPAWN_LOCAL_DEFAULT" "$SPAWN_LOCAL_SHA" "$SPAWN_BASE_DEFAULT" "$SPAWN_BASE_SHA" "$target" "$expected"
+      "$SPAWN_LOCAL_DEFAULT" "$SPAWN_LOCAL_SHA" "$SPAWN_BASE_DEFAULT" "$SPAWN_BASE_SHA" "$target" "$SPAWN_MOVE_EXPECTED"
   fi
-  # A move git itself refuses when work would be lost, never a reset; a copy that is not plainly
-  # behind the target is skipped untouched (bin/fm-slot-provision-lib.sh fm_slot_move_forward).
-  fm_slot_move_forward "$worktree" "$expected" "${PROJ_ABS:-}" || {
+  SPAWN_MOVE_TARGET=$target
+}
+
+# Record the origin tip this spawn resolved, only after the copy is proven: forward only, by compare-and-set.
+spawn_record_origin_refs() { # <worktree>
+  local worktree=$1 current
+  [ "$SPAWN_MOVE_REF_TODO" = 1 ] || return 0
+  spawn_advance_origin_ref "$worktree" "refs/remotes/origin/$SPAWN_MOVE_DEFAULT" "$SPAWN_MOVE_ORIGIN_SHA"
+  if [ "$SPAWN_MOVE_DISCOVERED" = 1 ]; then
+    current=$(git -C "$worktree" symbolic-ref --quiet refs/remotes/origin/HEAD 2>/dev/null || true)
+    if [ "$current" != "refs/remotes/origin/$SPAWN_MOVE_DEFAULT" ] &&
+      { [ -z "$current" ] ||
+        ! git -C "$worktree" rev-parse --verify --quiet "$current" >/dev/null 2>&1 ||
+        { [ "$SPAWN_BASE_DISCOVERED" = 1 ] && spawn_origin_head_older_than "$worktree" "$SPAWN_BASE_DISCOVERED_AT"; } ||
+        [ "$SPAWN_BASE_DISCOVERED" != 1 ]; }; then
+      git -C "$worktree" symbolic-ref refs/remotes/origin/HEAD "refs/remotes/origin/$SPAWN_MOVE_DEFAULT" 2>/dev/null || true
+    fi
+  fi
+}
+
+# The whole freshness step for one copy: resolve, prove (unless the fresh-spawn loop already did), record the
+# origin tip, then move. A copy in doubt returns FM_SLOT_SKIP_RC with nothing written to it. After the proof, a
+# failure sets SPAWN_APPLY_FAILED (the copy may have changed) and returns 1.
+freshen_spawn_worktree_base() { # <worktree> [<base-branch>]
+  local worktree=$1 base=${2:-} rc=0 actual
+  SPAWN_APPLY_FAILED=0
+  if [ "$SPAWN_PROVEN_COPY" != "$worktree" ]; then
+    spawn_resolve_move_target "$worktree" "$base" || return $?
+    fm_slot_prove_idle "$worktree" "$SPAWN_MOVE_EXPECTED" "${PROJ_ABS:-}" || return $?
+  fi
+  SPAWN_PROVEN_COPY=
+  spawn_record_origin_refs "$worktree"
+  if [ -z "$SPAWN_MOVE_EXPECTED" ]; then
+    fm_slot_proof_drop
+    return 0
+  fi
+  fm_slot_apply_move "$worktree" "$SPAWN_MOVE_EXPECTED" || {
     rc=$?
     [ "$rc" = "$FM_SLOT_SKIP_RC" ] && return "$rc"
-    echo "error: could not move pooled worktree '$worktree' to '$target'; refusing to launch from a potentially stale base" >&2
+    SPAWN_APPLY_FAILED=1
+    echo "error: could not move pooled worktree '$worktree' to '$SPAWN_MOVE_TARGET'; refusing to launch" >&2
     return 1
   }
   actual=$(git -C "$worktree" rev-parse --verify --quiet HEAD 2>/dev/null || true)
-  if [ "$actual" != "$expected" ]; then
-    echo "error: pooled worktree '$worktree' is at '${actual:-unknown}', not current '$target' ('$expected'); refusing to launch" >&2
+  if [ "$actual" != "$SPAWN_MOVE_EXPECTED" ]; then
+    SPAWN_APPLY_FAILED=1
+    echo "error: pooled worktree '$worktree' is at '${actual:-unknown}', not current '$SPAWN_MOVE_TARGET' ('$SPAWN_MOVE_EXPECTED'); refusing to launch" >&2
     return 1
   fi
 }
@@ -6123,6 +6167,37 @@ spawn_path_is_prior_copy() { # <path>
 # worktree, validate it and claim it for this task. A fresh spawn runs it again after a skipped
 # copy (spawn_skip_copy); the pane then still sits in the skipped copy until the new get moves it.
 SPAWN_SKIPPED_SLOTS=()
+SPAWN_SKIPPED_INFO=()
+SPAWN_PROVEN_COPY=
+SPAWN_APPLY_FAILED=0
+SPAWN_ACQUIRE_T0=
+# The pid of the shell this spawn's pane was started with (tmux and herdr report it); nothing for a backend
+# that does not, which makes the holder rule fall back to the `treehouse` launcher (bin/fm-slot-provision-lib.sh).
+spawn_pane_pid() {
+  local out pid=
+  case "$BACKEND" in
+    tmux) pid=$(tmux display-message -p -t "$WT_TARGET" '#{pane_pid}' 2>/dev/null </dev/null) || pid= ;;
+    herdr)
+      # shellcheck disable=SC2016 # The single-quoted bash -c program expands its own positional arguments.
+      out=$(bash -c '. "$1/fm-backend.sh" && fm_backend_source herdr && fm_backend_herdr_cli "$2" pane process-info --pane "$3"' \
+        _ "$SCRIPT_DIR" "${WT_TARGET%%:*}" "${WT_TARGET#*:}" 2>/dev/null </dev/null) || out=
+      pid=$(printf '%s' "$out" | jq -r --arg pane "${WT_TARGET#*:}" 'select(.result.process_info.pane_id == $pane) | .result.process_info.shell_pid // empty' 2>/dev/null) || pid=
+      ;;
+  esac
+  case "$pid" in ''|*[!0-9]*) return 0 ;; esac
+  [ "$pid" -gt 1 ] || return 0
+  printf '%s' "$pid"
+}
+# What this spawn left leased: each copy it skipped is leased in place to this home (holder
+# firstmate-skipped:<task>) and recorded in $DATA/<task>/skipped-copies.tsv. Nothing here releases a lease.
+spawn_report_leased_copies() {
+  local entry
+  [ "${#SPAWN_SKIPPED_INFO[@]}" -gt 0 ] || return 0
+  echo "leased copies (owned by this home; release one only through bin/fm-teardown.sh's landed-work test, never automatically; record: $DATA/$ID/skipped-copies.tsv):"
+  for entry in "${SPAWN_SKIPPED_INFO[@]}"; do
+    echo "  ${entry%%|*} (${entry#*|}) held by firstmate-skipped:$ID"
+  done
+}
 spawn_slot_skipped() { # <path>: whether this spawn skipped that copy
   local skipped real
   real=$(real_path_or_raw "$1")
@@ -6132,6 +6207,12 @@ spawn_slot_skipped() { # <path>: whether this spawn skipped that copy
   return 1
 }
 spawn_acquire_pool_slot() {
+  # No new get once the one absolute bound is spent: the copies skipped so far stay leased where they are.
+  if [ -n "$SPAWN_ACQUIRE_T0" ] && [ $((SECONDS - SPAWN_ACQUIRE_T0)) -ge "$SPAWN_ACQUIRE_CEILING" ]; then
+    echo "error: absolute extreme ${SPAWN_ACQUIRE_CEILING}s reached across every treehouse get of this spawn; no further copy is requested (spawning project '$PROJ_ABS'; copies skipped by this spawn: ${SPAWN_SKIPPED_SLOTS[*]:-none})" >&2
+    spawn_report_leased_copies >&2
+    exit 1
+  fi
   fm_task_copy_pool_slots_hold_no_current_copy "$PROJ_ABS" "$STATE" || exit 1
   spawn_send_or_abort "treehouse get" spawn_send_text_line "$WT_TARGET" 'treehouse get'
 
@@ -6177,7 +6258,9 @@ spawn_acquire_pool_slot() {
   acquire_stall=$SPAWN_ACQUIRE_STALL
   acquire_ceiling=$SPAWN_ACQUIRE_CEILING
   acquire_notice=60
-  acquire_start=$SECONDS
+  # One absolute bound covers every get this spawn types, not each get alone.
+  [ -n "$SPAWN_ACQUIRE_T0" ] || SPAWN_ACQUIRE_T0=$SECONDS
+  acquire_start=$SPAWN_ACQUIRE_T0
   acquire_progress=$SECONDS
   acquire_next_output=$SECONDS
   acquire_next_notice=$((SECONDS + acquire_notice))
@@ -6235,6 +6318,7 @@ spawn_acquire_pool_slot() {
   done
   if [ -z "$WT" ]; then
     echo "error: treehouse get did not enter an isolated worktree after ${tick} polls ($acquire_stop) (last seen '${last_seen:-none}': $last_reason; spawning project '$PROJ_ABS'; copies skipped by this spawn: ${SPAWN_SKIPPED_SLOTS[*]:-none}); aborting acquisition" >&2
+    spawn_report_leased_copies >&2
     exit 1
   fi
 
@@ -6285,6 +6369,11 @@ spawn_skip_copy() {
     return 1
   fi
   SPAWN_SKIPPED_SLOTS+=("$(real_path_or_raw "$skipped")")
+  SPAWN_SKIPPED_INFO+=("$skipped|${FM_SLOT_SKIP_REASON:-unknown}")
+  # The record is written when the lease is taken, so a spawn that fails later still leaves its owner a trail.
+  mkdir -p "$DATA/$ID" 2>/dev/null &&
+    printf '%s\t%s\tfirstmate-skipped:%s\t%s\n' "$skipped" "${FM_SLOT_SKIP_REASON:-unknown}" "$ID" "$(date +%s)" >>"$DATA/$ID/skipped-copies.tsv" ||
+    echo "warning: could not record skipped copy $skipped in $DATA/$ID/skipped-copies.tsv; it stays leased as firstmate-skipped:$ID" >&2
   echo "skipped: copy $skipped (${FM_SLOT_SKIP_REASON:-unknown}) is leased in place for its owner and left exactly as found; taking another copy" >&2
   WT=
 }
@@ -6329,6 +6418,12 @@ elif [ "$RELAUNCH" -eq 1 ]; then
   fi
   [ "$KIND" = secondmate ] || validate_spawn_worktree "relaunch" "$T"
 elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
+  # A base that could not be fetched or resolved is a fact about the project's origin, not about any copy, so
+  # it refuses here, before a copy is acquired: there is nothing in a copy to put at risk, and no copy is leased.
+  if [ -n "$SPAWN_BASE_ERROR" ] && spawn_worktree_has_origin_config "$PROJ_ABS"; then
+    echo "error: $SPAWN_BASE_ERROR for project '$PROJ_ABS'; refusing to launch from a potentially stale base (no copy was acquired)" >&2
+    exit 1
+  fi
   spawn_acquire_pool_slot
 fi
 # Select the unchanged guard policy before a pre-admission refusal can become
@@ -6346,6 +6441,7 @@ fi
 spawn_slot_refused() {
   local recovery="$STATE/.$ID.meta.slot-refused.${BASHPID:-$$}" window=$T owned_path update_recovery=0 fresh_ref='' adopt_scope=0 record_prepared=0
   [ "$BACKEND" != orca ] || window=$W
+  fm_slot_proof_drop
   SPAWN_TREEHOUSE_ABORT_TARGET=
   HERDR_PROJECTION_ABORT_CLEANUP=0
   ORCA_ABORT_CLEANUP=0
@@ -6449,13 +6545,40 @@ if [ "$RELAUNCH" -eq 1 ]; then
     }
   fi
 fi
-FM_SLOT_ARCHIVE_ROOT=$DATA
 FM_SLOT_SPAWN_PID=$$
-# One pass per copy: a copy the slot rules skip is left as found and the pass repeats on the next.
+# A fresh spawn proves each copy idle BEFORE anything is written to it (no detach, no ref, no checkout: only
+# bin/fm-slot-provision-lib.sh fm_slot_prove_idle may decide to skip), and a copy it cannot prove is leased in
+# place and left exactly as found while another is taken. Only a proven copy is prepared and moved. A relaunch
+# keeps the copy its task's work lives in, so it never skips: a copy in doubt is refused and retained.
 while :; do
 spawn_validate_local_base "$WT" || exit 1
 SLOT_GOVERNED=0
 SLOT_FRESH_BASE=0
+if [ "$KIND" != secondmate ] && [ "$RELAUNCH" -eq 0 ]; then
+  if fm_slot_required "$PROJ_ABS" "$WT"; then
+    fm_slot_require_scope ${SLOT_OWNED_PATHS[@]+"${SLOT_OWNED_PATHS[@]}"} >/dev/null 2>&1 || {
+      SLOT_GOVERNED=1
+      BRANCH=${BRANCH:-fm/$ID}
+      fm_slot_require_scope ${SLOT_OWNED_PATHS[@]+"${SLOT_OWNED_PATHS[@]}"} || true
+      spawn_slot_refused
+    }
+  fi
+  FM_SLOT_PANE_PID=$(spawn_pane_pid)
+  SPAWN_PROVEN_COPY=
+  spawn_proof_rc=0
+  spawn_resolve_move_target "$WT" "$BASE_BRANCH" &&
+    fm_slot_prove_idle "$WT" "$SPAWN_MOVE_EXPECTED" "$PROJ_ABS" || spawn_proof_rc=$?
+  if [ "$spawn_proof_rc" != 0 ]; then
+    spawn_try_skip "$spawn_proof_rc" && continue
+    if fm_slot_required "$PROJ_ABS" "$WT"; then
+      SLOT_GOVERNED=1
+      BRANCH=${BRANCH:-fm/$ID}
+      spawn_slot_refused
+    fi
+    exit 1
+  fi
+  SPAWN_PROVEN_COPY=$WT
+fi
 if [ "$KIND" != secondmate ] && { fm_slot_required "$PROJ_ABS" "$WT" || { [ "$RELAUNCH" -eq 1 ] && grep -q '^slot_manifest=' "$RELAUNCH_META"; }; }; then
   SLOT_GOVERNED=1
   if [ "$RELAUNCH" -eq 1 ]; then
@@ -6496,6 +6619,13 @@ if [ "$KIND" != secondmate ] && { [ "$RELAUNCH" -eq 0 ] || [ "$SLOT_FRESH_BASE" 
   freshen_spawn_worktree_base "$WT" "$BASE_BRANCH" || {
     rc=$?
     spawn_try_skip "$rc" && continue
+    if [ "$SPAWN_APPLY_FAILED" = 1 ] && [ "$RELAUNCH" -eq 0 ] && [ "$SLOT_GOVERNED" = 0 ]; then
+      # The copy changed (or could not be re-read) during the move: it may hold work, so it is leased where it
+      # stands before this spawn exits, never left for the pane close to return and reset.
+      FM_SLOT_SKIP_REASON=changed_during_move
+      spawn_skip_copy || true
+      spawn_report_leased_copies >&2
+    fi
     [ "$SLOT_GOVERNED" = 0 ] || spawn_slot_refused
     exit 1
   }
@@ -8508,4 +8638,5 @@ if { [ "$KIND" = ship ] || [ "$KIND" = scout ]; } && [ "$RELAUNCH" -eq 0 ]; then
     ) </dev/null >/dev/null 2>&1 &
   fi
 fi
+spawn_report_leased_copies
 echo "spawned $ID harness=$HARNESS kind=$KIND$SPAWN_DELIVERY window=$META_WINDOW worktree=$WT$SPAWN_ACCOUNT"

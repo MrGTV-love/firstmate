@@ -3545,6 +3545,61 @@ PY
   pass 'Vernant retirement honors landing proof, recorded branch, lock-free forge proof, kept records, live owners, both copies, refusals, and old checkouts'
 }
 
+# Copies a spawn skipped and left leased (bin/fm-spawn.sh) are released by teardown, and only by it, and only
+# when the copy is clean and landed, nobody runs in it, and its lease still names this task's holder.
+test_skipped_copies_are_released_only_when_clean_and_landed() {
+  local case_dir landed unlanded other busy log rec rc=0 canon
+  case_dir=$(make_case skipped-copies)
+  write_meta "$case_dir" no-mistakes ship
+  mkdir -p "$case_dir/data/task-x1"
+  landed="$case_dir/skip-landed" unlanded="$case_dir/skip-unlanded" other="$case_dir/skip-other-holder" busy="$case_dir/skip-busy"
+  for dir in "$landed" "$unlanded" "$other" "$busy"; do
+    git -C "$case_dir/project" worktree add -q --detach "$dir" main
+  done
+  printf 'work only in this copy\n' > "$unlanded/only-here.txt"
+  git -C "$unlanded" add only-here.txt
+  git -C "$unlanded" -c user.email=t@t -c user.name=t commit -q -m 'work only here'
+  log="$case_dir/treehouse.log"
+  rec="$case_dir/data/task-x1/skipped-copies.tsv"
+  : > "$rec"
+  : > "$log"
+  {
+    printf '['
+    sep=
+    for dir in "$landed" "$unlanded" "$other" "$busy"; do
+      canon=$(cd "$dir" && pwd -P)
+      holder='firstmate-skipped:task-x1'
+      [ "$dir" != "$other" ] || holder='someone-else'
+      procs='[]'
+      [ "$dir" != "$busy" ] || procs='[{"pid": 1}]'
+      printf '%s{"path": "%s", "lease_holder": "%s", "processes": %s}' "$sep" "$canon" "$holder" "$procs"
+      sep=,
+      printf '%s\tdirty_tree\tfirstmate-skipped:task-x1\t1\n' "$dir" >> "$rec"
+    done
+    printf ']\n'
+  } > "$case_dir/pool.json"
+  cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> '$log'
+case "\${1:-}" in status) cat '$case_dir/pool.json' ;; esac
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/treehouse"
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "skipped-copies: teardown should complete"$'\n'"$(cat "$case_dir/stderr")"
+  canon=$(cd "$landed" && pwd -P)
+  grep -Fq "return $canon --if-lease-holder firstmate-skipped:task-x1" "$log" || fail "skipped-copies: the clean, landed copy was not released"$'\n'"$(cat "$log")"
+  for dir in "$unlanded" "$other" "$busy"; do
+    canon=$(cd "$dir" && pwd -P)
+    ! grep -Fq "return $canon" "$log" || fail "skipped-copies: $dir was released although it is not clean and landed, or not this task's"
+  done
+  grep -Fq "$unlanded" "$rec" || fail "skipped-copies: the unlanded copy's record was dropped"
+  grep -Fq "$busy" "$rec" || fail "skipped-copies: the busy copy's record was dropped"
+  ! grep -Fq "$landed" "$rec" || fail "skipped-copies: the released copy's record was kept"
+  grep -Fq "release it by hand" "$case_dir/stderr" || fail "skipped-copies: no manual release command was printed for a kept copy"
+  pass "teardown releases a skipped copy only when it is clean and landed, idle, and still this task's lease"
+}
+
 teardown_test_cases=(
 test_vernant_slot_manifest_retirement
 test_shared_project_lock_path_ignores_unresolvable_git_directory_in_cwd
@@ -3611,6 +3666,7 @@ test_forced_descendant_reassociated_copy_preserves_checkout_and_storage
 test_cleanup_roots_preserve_foreign_copy_git_storage
 test_tasktmp_preserves_reassociated_copy_git_storage
 test_subordinate_slot_cleanup_preserves_ancestor_custody
+test_skipped_copies_are_released_only_when_clean_and_landed
 )
 
 # In the combined tests/fm-teardown.test.sh run,

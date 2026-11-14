@@ -21,7 +21,7 @@ GITID=(-c user.name='Firstmate Tests' -c user.email='tests@example.invalid')
 HELD_PIDS=()
 cleanup_held() {
   local pid
-  for pid in ${HELD_PIDS[@]+"${HELD_PIDS[@]}"}; do kill "$pid" 2>/dev/null || true; done
+  for pid in ${HELD_PIDS[@]+"${HELD_PIDS[@]}"}; do pkill -P "$pid" 2>/dev/null || true; kill "$pid" 2>/dev/null || true; done
   HELD_PIDS=()
 }
 trap cleanup_held EXIT
@@ -68,28 +68,37 @@ advance_origin() {
   W_TARGET=$(git -C "$W_PROJ" rev-parse origin/main)
 }
 
-# snapshot <slot> <out-file>: HEAD, show-ref, the index, and a path-sorted sha256 of every file outside .git.
+# snapshot <slot> <out-file>: HEAD, the branch, every ref, the index, and a path-sorted sha256 of every file
+# outside .git. It FAILS (nonzero, nothing written) when any read fails, so two failed reads can never
+# compare equal.
 snapshot() {
-  local slot=$1 out=$2
-  {
-    printf 'HEAD %s\n' "$(git -C "$slot" rev-parse HEAD)"
-    printf 'SYMBOLIC %s\n' "$(git -C "$slot" symbolic-ref -q HEAD || echo detached)"
-    git -C "$slot" show-ref
-    git -C "$slot" ls-files -s --debug
-    (cd "$slot" && find . -path ./.git -prune -o \( -type f -o -type l \) -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256)
-  } >"$out" 2>&1
+  local slot=$1 out=$2 tmp head sym
+  tmp="$out.part"
+  (
+    set -o pipefail
+    head=$(git -C "$slot" rev-parse HEAD) || exit 1
+    printf 'HEAD %s\n' "$head"
+    sym=$(git -C "$slot" symbolic-ref -q HEAD) || { [ "$?" = 1 ] || exit 1; sym=detached; }
+    printf 'SYMBOLIC %s\n' "$sym"
+    git -C "$slot" for-each-ref --format='%(refname) %(objectname)' || exit 1
+    git -C "$slot" ls-files -s --debug || exit 1
+    cd "$slot" || exit 1
+    find . -path ./.git -prune -o \( -type f -o -type l \) -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256
+  ) >"$tmp" 2>&1 || { rm -f "$tmp"; return 1; }
+  grep -q '^HEAD [0-9a-f]' "$tmp" || { rm -f "$tmp"; return 1; }
+  mv -f "$tmp" "$out"
 }
 
 # expect_skip <label> <reason-code> [<snapshot-after-move-allowed>]: run the move on the current world,
 # require the skip code, the reason, the slot path in the message, and a byte-identical slot.
 expect_skip() {
   local label=$1 reason=$2 out rc=0
-  snapshot "$W_SLOT" "$W_DIR/before"
+  snapshot "$W_SLOT" "$W_DIR/before" || fail "$label: the slot could not be read before the move"
   out=$(PATH="${MOVE_PATH:-$PATH}" fm_slot_move_forward "$W_SLOT" "$W_TARGET" "$W_PROJ" 2>&1) || rc=$?
   [ "$rc" = 20 ] || fail "$label: expected the skip code 20, got $rc: $out"
   assert_contains "$out" "($reason)" "$label: the skip did not name its reason $reason"
   assert_contains "$out" "$W_SLOT" "$label: the skip did not name the slot"
-  snapshot "$W_SLOT" "$W_DIR/after"
+  snapshot "$W_SLOT" "$W_DIR/after" || fail "$label: the slot could not be read after the move"
   cmp -s "$W_DIR/before" "$W_DIR/after" || fail "$label: the slot changed:"$'\n'"$(diff "$W_DIR/before" "$W_DIR/after")"
   pass "$label"
 }
@@ -253,7 +262,7 @@ SH
   MOVE_PATH="$bin:$PATH" expect_skip "a failed ignored inventory skips the copy" unknown_ignored_inventory
 }
 
-test_checkout_over_ignored_work_is_skipped() {
+test_a_switch_back_over_ignored_work_is_refused_and_leaves_the_slot_as_found() {
   make_world checkout-ignored
   git -C "$W_PUB" rm -q old.local
   git -C "$W_PUB" "${GITID[@]}" commit -qm 'drop old.local'
@@ -263,13 +272,12 @@ test_checkout_over_ignored_work_is_skipped() {
   expect_moved "the slot first moves to the target that drops old.local"
   printf 'my ignored work\n' >"$W_SLOT/old.local"
   local out rc=0
-  snapshot "$W_SLOT" "$W_DIR/before"
-  out=$(fm_slot_checkout "$W_SLOT" "$W_BASE" --detach "$W_BASE" 2>&1) || rc=$?
-  [ "$rc" = 20 ] || fail "a checkout back over ignored work was not skipped (rc $rc): $out"
-  assert_contains "$out" '(ignored_collision)' "the checkout skip did not name its reason"
-  snapshot "$W_SLOT" "$W_DIR/after"
-  cmp -s "$W_DIR/before" "$W_DIR/after" || fail "the slot changed on a skipped checkout"
-  pass "a tree-changing checkout over ignored work is skipped and leaves the slot as found"
+  snapshot "$W_SLOT" "$W_DIR/before" || fail "snapshot failed"
+  out=$(fm_slot_attach "$W_SLOT" "" "$W_BASE" 2>&1) || rc=$?
+  [ "$rc" != 0 ] || fail "a switch back over ignored work succeeded: $out"
+  snapshot "$W_SLOT" "$W_DIR/after" || fail "snapshot failed"
+  cmp -s "$W_DIR/before" "$W_DIR/after" || fail "the slot changed on a refused switch"
+  pass "a switch back over ignored work is refused and leaves the slot as found"
 }
 
 # --- the one holder rule ----------------------------------------------------------
@@ -298,17 +306,6 @@ test_process_in_the_slot_that_predates_the_spawn_skips_the_copy() {
   kill "$HOLDER_PID" 2>/dev/null
   wait "$HOLDER_PID" 2>/dev/null
   FM_SLOT_SPAWN_PID=$MARKER_PID expect_moved "the same slot is used once the holder is gone"
-  cleanup_held
-}
-
-test_process_in_the_slot_that_started_after_the_spawn_is_its_own() {
-  make_world holder-own
-  advance_origin advanced.txt
-  start_marker
-  sleep 0.4
-  start_holder "$W_SLOT"
-  sleep 0.2
-  FM_SLOT_SPAWN_PID=$MARKER_PID expect_moved "a process that started after the spawn (the shell treehouse opened for it) is not a holder"
   cleanup_held
 }
 
@@ -381,7 +378,7 @@ test_missing_lsof_skips_the_copy() {
   advance_origin advanced.txt
   local bin="$W_DIR/nolsof" tool path
   mkdir -p "$bin"
-  for tool in git python3 sed tr mktemp shasum awk grep cat rm dirname find sort xargs cut head readlink basename env uname; do
+  for tool in git python3 bash sed tr mktemp shasum awk grep cat rm dirname find sort xargs cut head readlink basename env uname; do
     path=$(command -v "$tool" 2>/dev/null) && ln -sf "$path" "$bin/$tool"
   done
   MOVE_PATH="$bin" expect_skip "an unavailable lsof skips the copy" unknown_holders
@@ -516,6 +513,18 @@ test_a_checkout_hook_cannot_change_a_slot_during_preparation() {
   pass "no checkout hook runs while a slot is prepared"
 }
 
+test_a_merge_hook_does_not_run_during_the_move() {
+  make_world f3-merge-hook
+  advance_origin advanced.txt
+  local hooks
+  hooks="$(git -C "$W_PROJ" rev-parse --path-format=absolute --git-common-dir)/hooks"
+  mkdir -p "$hooks"
+  printf '#!/bin/sh\nprintf hooked >"$(git rev-parse --show-toplevel)/hook-ran.local"\n' >"$hooks/post-merge"
+  chmod +x "$hooks/post-merge"
+  expect_moved "a clean slot behind the target moves although a post-merge hook exists"
+  [ ! -e "$W_SLOT/hook-ran.local" ] || fail "a post-merge hook ran during the move"
+}
+
 # --- finding 4: the holder rule ----------------------------------------------------------------
 
 test_a_holder_is_seen_when_the_slot_is_already_at_the_target() {
@@ -575,6 +584,65 @@ test_a_malformed_contention_row_counts_as_held() {
   mkdir -p "$store"
   printf '{"worktree_id": "%s", "ts_iso": "not a time"}\n' "$W_SLOT" >"$store/contention.jsonl"
   expect_skip "a contention row that cannot be read counts as held" live_holder
+}
+
+# A process that runs under a `treehouse` launcher the spawn started is the spawn's own shell, where the
+# backend reports no pane pid. The launcher here is a copy of bash named treehouse, so the kernel's name
+# for it is `treehouse`. Hosts that cannot run such a copy skip these two cases and say so.
+make_launcher() { # <dir>: a runnable executable named treehouse; returns nonzero when this host cannot make one
+  mkdir -p "$1"
+  cp /bin/bash "$1/treehouse" 2>/dev/null || return 1
+  [ "$(uname)" != Darwin ] || codesign -f -s - "$1/treehouse" >/dev/null 2>&1 || true
+  "$1/treehouse" -c true 2>/dev/null
+}
+
+test_a_treehouse_launcher_started_after_the_spawn_owns_its_shell() {
+  make_world f4-launcher-own
+  advance_origin advanced.txt
+  local dir="$W_DIR/launcher"
+  make_launcher "$dir" || { pass "SKIPPED: this host cannot run a renamed copy of bash"; return 0; }
+  start_marker
+  sleep 0.5
+  "$dir/treehouse" -c 'cd "$1" && sleep 300 & wait' get "$W_SLOT" &
+  HELD_PIDS+=("$!")
+  sleep 0.5
+  FM_SLOT_SPAWN_PID=$MARKER_PID expect_moved "a process under a treehouse launcher that started after the spawn is the spawn's own shell"
+  cleanup_held
+}
+
+test_a_treehouse_launcher_older_than_the_spawn_does_not_own_its_shell() {
+  make_world f4-launcher-old
+  advance_origin advanced.txt
+  local dir="$W_DIR/launcher"
+  make_launcher "$dir" || { pass "SKIPPED: this host cannot run a renamed copy of bash"; return 0; }
+  "$dir/treehouse" -c 'cd "$1" && sleep 300 & wait' get "$W_SLOT" &
+  HELD_PIDS+=("$!")
+  sleep 0.5
+  start_marker
+  FM_SLOT_SPAWN_PID=$MARKER_PID expect_skip "a process under a treehouse launcher that started before the spawn is somebody else's" live_holder
+  cleanup_held
+}
+
+# A commit that appears after the proof must never be merged over: git's fast-forward refuses, and the
+# move is reported as a failure, with the late commit still HEAD.
+test_a_commit_that_appears_after_the_proof_is_never_merged_over() {
+  make_world f6-late-commit
+  advance_origin advanced.txt
+  local bin="$W_DIR/latecommit" real_git out rc=0 late
+  real_git=$(command -v git)
+  mkdir -p "$bin"
+  cat >"$bin/git" <<SH
+#!/usr/bin/env bash
+case "\$*" in *' merge '*) if [ ! -e '$W_DIR/late-done' ]; then : >'$W_DIR/late-done'; printf 'late\n' >'$W_SLOT/late.txt'; '$real_git' -C '$W_SLOT' add late.txt; '$real_git' -C '$W_SLOT' -c user.name=T -c user.email=t@example.invalid commit -qm late; fi ;; esac
+exec '$real_git' "\$@"
+SH
+  chmod +x "$bin/git"
+  out=$(PATH="$bin:$PATH" fm_slot_move_forward "$W_SLOT" "$W_TARGET" "$W_PROJ" 2>&1) || rc=$?
+  [ "$rc" != 0 ] || fail "a commit that appeared after the proof was merged over: $out"
+  late=$(git -C "$W_SLOT" rev-parse HEAD)
+  [ "$(git -C "$W_SLOT" log -1 --format=%s "$late")" = late ] || fail "HEAD is no longer the late commit: $out"
+  [ "$(git -C "$W_SLOT" rev-list --parents -n1 "$late" | wc -w | tr -d ' ')" = 2 ] || fail "a merge commit was made over the late commit"
+  pass "a commit that appears after the proof is kept as HEAD and never merged over"
 }
 
 # --- finding 6: a tracked edit made after the clean look ----------------------------------------
@@ -678,9 +746,8 @@ CASES=(
   test_ignored_directory_below_a_path_the_move_writes_is_skipped
   test_ignored_file_at_an_untouched_path_survives_the_move
   test_unreadable_ignored_inventory_skips_the_copy
-  test_checkout_over_ignored_work_is_skipped
+  test_a_switch_back_over_ignored_work_is_refused_and_leaves_the_slot_as_found
   test_process_in_the_slot_that_predates_the_spawn_skips_the_copy
-  test_process_in_the_slot_that_started_after_the_spawn_is_its_own
   test_worktree_lock_skips_the_copy
   test_live_foreign_lease_skips_the_copy
   test_contention_inside_the_window_skips_and_outside_it_does_not
@@ -695,11 +762,15 @@ CASES=(
   test_a_refusal_revert_returns_to_an_unchanged_owner_branch
   test_restore_does_not_orphan_a_commit_made_after_preparation
   test_a_checkout_hook_cannot_change_a_slot_during_preparation
+  test_a_merge_hook_does_not_run_during_the_move
   test_a_holder_is_seen_when_the_slot_is_already_at_the_target
   test_a_younger_unrelated_process_in_the_slot_is_a_holder
   test_the_panes_own_process_tree_is_not_a_holder
   test_a_holder_row_without_a_working_directory_is_a_holder
   test_a_malformed_contention_row_counts_as_held
+  test_a_treehouse_launcher_started_after_the_spawn_owns_its_shell
+  test_a_treehouse_launcher_older_than_the_spawn_does_not_own_its_shell
+  test_a_commit_that_appears_after_the_proof_is_never_merged_over
   test_a_tracked_edit_made_after_the_clean_look_fails_the_move
   test_a_failed_head_read_after_the_move_is_not_reported_as_untouched
   test_the_snapshot_fails_when_git_cannot_be_read

@@ -2905,6 +2905,73 @@ teardown_landed() {  # <dir> <ref> <branch>
   work_is_landed "$3"
 }
 
+# Copies this task's spawn skipped and left leased in place (bin/fm-spawn.sh spawn_skip_copy writes one
+# $DATA/<id>/skipped-copies.tsv row per copy: path, reason, lease holder firstmate-skipped:<id>, epoch).
+# This home owns each lease. It is released here and nowhere else, never automatically at spawn or by any
+# sweep, and only when that copy passes the same landed-work test as any other copy: a clean worktree
+# root whose HEAD is anchored or landed (teardown_landed), with no process running in it and its lease still
+# held by this task's skipped-copy holder. The return is the conditional one the holder gates, never forced.
+# Any other outcome leaves the lease where it is and prints the exact command for a later release. A row
+# whose copy is gone, or whose lease another holder has taken, is dropped. This never changes the exit status.
+teardown_skipped_copies() {
+  local record="$DATA/$ID/skipped-copies.tsv" copy reason holder when canonical row lease_holder procs rc ok
+  local keep="$record.keep.${BASHPID:-$$}" changed=0
+  [ -f "$record" ] && [ ! -L "$record" ] || return 0
+  : > "$keep" || return 0
+  if ! fm_task_copy_current_pool_listing "$PROJ"; then
+    echo "warning: treehouse status cannot be read from $PROJ, so the copies this task's spawn skipped and left leased (listed in $record) stay leased; release one with: (cd '$PROJ' && treehouse return '<copy>' --if-lease-holder 'firstmate-skipped:$ID' </dev/null) once it is landed or unwanted" >&2
+    rm -f "$keep"
+    return 0
+  fi
+  while IFS=$'\t' read -r copy reason holder when || [ -n "$copy" ]; do
+    [ -n "$copy" ] || continue
+    canonical=$(fm_task_copy_canonical_dir "$copy") || canonical=
+    row=
+    [ -z "$canonical" ] || row=$(jq -r --arg p "$canonical" '.[] | select((.path // "" | tostring) == $p)
+      | [(.lease_holder // "" | tostring), ((.processes // []) | length | tostring)] | @tsv' <<<"$FM_TASK_COPY_CURRENT_POOL_JSON" 2>/dev/null | sed -n 1p)
+    if [ -z "$row" ]; then
+      echo "notice: skipped copy $copy is no longer a leased slot of this pool; its record is dropped" >&2
+      changed=1
+      continue
+    fi
+    lease_holder=${row%%$'\t'*}
+    procs=${row#*$'\t'}
+    if [ "$lease_holder" != "$holder" ]; then
+      echo "notice: skipped copy $copy is now leased to '${lease_holder:-nobody}', not $holder; it is not this task's to release, and its record is dropped" >&2
+      changed=1
+      continue
+    fi
+    ok=0
+    if [ "${procs:-1}" != 0 ]; then
+      echo "warning: leaving $copy leased to $holder: ${procs:-some} process(es) are running inside it (skipped for: $reason)" >&2
+    elif fm_task_copy_preserve "$PROJ" "$ID" "$canonical" 0; then
+      ok=1
+    else
+      rc=$?
+      TEARDOWN_BUNDLE_ACCEPTED=
+      if [ "$rc" = 2 ] && teardown_landed "$canonical" HEAD "" && [ -z "$TEARDOWN_BUNDLE_ACCEPTED" ]; then
+        ok=1
+      else
+        echo "warning: leaving $copy leased to $holder: it is not proved clean and landed (skipped for: $reason; ${FM_TASK_COPY_REASON:-its HEAD is neither landed nor anchored})" >&2
+      fi
+    fi
+    if [ "$ok" = 1 ] && (cd "$PROJ" && treehouse return "$canonical" --if-lease-holder "$holder" </dev/null) >/dev/null 2>&1; then
+      echo "teardown: released the lease on skipped copy $canonical (clean and landed)" >&2
+      changed=1
+      continue
+    fi
+    [ "$ok" = 0 ] || echo "warning: could not release the lease on skipped copy $canonical" >&2
+    echo "  release it by hand once it is landed or unwanted: (cd '$PROJ' && treehouse return '$canonical' --if-lease-holder '$holder' </dev/null)" >&2
+    printf '%s\t%s\t%s\t%s\n' "$copy" "$reason" "$holder" "$when" >> "$keep"
+  done < "$record"
+  if [ "$changed" = 1 ]; then
+    if [ -s "$keep" ]; then mv -f "$keep" "$record" 2>/dev/null || rm -f "$keep"; else rm -f "$keep" "$record"; fi
+  else
+    rm -f "$keep"
+  fi
+  return 0
+}
+
 TEARDOWN_DROPPING=0
 teardown_is_dropping() {
   local report="$DATA/$ID/report.md"
@@ -6907,5 +6974,6 @@ fi
 for teardown_prior_copy in ${TEARDOWN_PRIOR_COPIES[@]+"${TEARDOWN_PRIOR_COPIES[@]}"}; do
   echo "notice: $ID's prior copy $teardown_prior_copy (from a reassociation) was left untouched; return or remove it only after confirming its contents are landed or unwanted"
 done
+[ "$KIND" = secondmate ] || teardown_skipped_copies || true
 backlog_refresh_reminder
 [ "$TEARDOWN_POOL_SLOT_LOST" = 0 ] || exit "$TEARDOWN_LOST_SLOT_EXIT"

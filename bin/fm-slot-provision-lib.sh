@@ -19,6 +19,7 @@ FM_SLOT_BASE_REF=
 FM_SLOT_PREPARED_HEAD=
 FM_SLOT_PREVIOUS_BRANCH=
 FM_SLOT_PREVIOUS_HEAD=
+FM_SLOT_LEFT_HEAD=
 
 fm_slot_required() { # <project> <copy>
   [ -f "$1/scripts/git-stability/provision_existing_slot.py" ] ||
@@ -66,18 +67,18 @@ fm_slot_prepare_base() { # <project> <copy> <task-id>
       return 1
     }
   fi
-  git -C "$copy" checkout --quiet --detach || return 1
+  # Detaching moves no file: the same commit stays checked out. Hooks stay off for every checkout here.
+  git -C "$copy" -c core.hooksPath=/dev/null checkout --quiet --detach || return 1
+  FM_SLOT_LEFT_HEAD=$FM_SLOT_PREVIOUS_HEAD
+  if [ -n "$branch" ]; then FM_SLOT_PREPARE_DETACHED=1; else FM_SLOT_PREPARE_DETACHED=0; fi
 }
 
+# Put the copy back where it was found. The recorded branch must still hold the recorded commit, so a
+# writer that moved it is never checked out over ignored work; the tip is read once and the checkout
+# is by that commit (fm_slot_attach).
 fm_slot_restore_base() { # <copy>
-  local dest
   [ -n "$FM_SLOT_PREVIOUS_HEAD" ] || return 0
-  if [ -n "$FM_SLOT_PREVIOUS_BRANCH" ]; then
-    dest=$(git -C "$1" rev-parse --verify --quiet "refs/heads/$FM_SLOT_PREVIOUS_BRANCH^{commit}") || return 1
-    fm_slot_checkout "$1" "$dest" "$FM_SLOT_PREVIOUS_BRANCH" --
-  else
-    fm_slot_checkout "$1" "$FM_SLOT_PREVIOUS_HEAD" --detach "$FM_SLOT_PREVIOUS_HEAD"
-  fi
+  fm_slot_attach "$1" "$FM_SLOT_PREVIOUS_BRANCH" "$FM_SLOT_PREVIOUS_HEAD"
 }
 
 fm_slot_resume_prepared() { # <project> <copy> <task-id> <branch> <prepared-head>
@@ -96,7 +97,7 @@ fm_slot_resume_prepared() { # <project> <copy> <task-id> <branch> <prepared-head
     return 1
   }
   fm_slot_prepare_base "$project" "$copy" "$id" || return 1
-  fm_slot_checkout "$copy" "$expected" "$branch" -- || return $?
+  fm_slot_attach "$copy" "$branch" "$expected" || return $?
   if [ "$(git -C "$copy" rev-parse --verify HEAD)" != "$expected" ]; then
     fm_slot_restore_base "$copy" || true
     echo "error: prepared task branch $branch moved during recovery; no worker admitted" >&2
@@ -158,9 +159,9 @@ fm_slot_provision() { # <runner> <project> <copy> <task-id> <branch> <report> <l
         echo "error: existing task branch $branch is not at the assigned copy's HEAD; refusing to reset or overwrite it" >&2
         return 1
       }
-      git -C "$copy" checkout --quiet "$branch" -- || return 1
+      git -C "$copy" -c core.hooksPath=/dev/null checkout --quiet "$branch" -- || return 1
     else
-      git -C "$copy" checkout --quiet -b "$branch" -- || return 1
+      git -C "$copy" -c core.hooksPath=/dev/null checkout --quiet -b "$branch" -- || return 1
       FM_SLOT_CREATED=1
       FM_SLOT_CREATED_FROM=$old_branch
     fi
@@ -208,11 +209,7 @@ PY
   cat "$report" >&2
   if [ "$rc" -ne 0 ]; then
     if [ "$old_branch" != "$branch" ]; then
-      if [ -n "$old_branch" ]; then
-        fm_slot_checkout "$copy" "$old_head" "$old_branch" -- || true
-      else
-        fm_slot_checkout "$copy" "$old_head" --detach "$old_head" || true
-      fi
+      fm_slot_attach "$copy" "$old_branch" "$old_head" || true
     fi
     echo "error: slot provisioner refused task $id (exit $rc); no agent or ship transition admitted; report: $report" >&2
     return "$rc"
@@ -266,22 +263,27 @@ The governed provisioner owns repeat/adoption decisions; a refused renewal, bran
 EOF
 }
 
-# --- The slot move: git moves that refuse, and one skip rule -------------------
-# A pooled slot is advanced only by a move that git itself refuses when work would be
-# lost: `merge --ff-only` to the target commit (it stops unless HEAD is an ancestor of
-# the target, and stops before overwriting a tracked or untracked file), or a plain
-# `checkout` (it stops before overwriting a tracked change). No command in this file or
-# in bin/fm-spawn.sh forces, discards or removes anything in a slot, and a test scans
-# for that. Git does overwrite an ignored file without asking, so the move keeps one
-# narrow check for ignored work at a path the target tree tracks.
-# Any doubt skips the copy: the function returns FM_SLOT_SKIP_RC and leaves the slot
-# exactly as found. A fresh spawn then takes another slot (bin/fm-spawn.sh).
-# Nothing here proves that work is absent; a copy that is not plainly an idle, clean,
-# behind-the-target copy is not used.
+# --- The slot move: prove the copy idle, then move it with git, then check what moved ----------
+# A pooled slot is advanced only by `git merge --ff-only`, which git itself refuses unless HEAD is an
+# ancestor of the target and which stops before it overwrites a tracked or untracked file. Nothing in
+# this file or in bin/fm-spawn.sh forces, discards or removes anything in a slot.
+# Two steps, kept apart on purpose:
+#   fm_slot_prove_idle  reads the copy and writes nothing to it: not a checkout, a ref, a fetch ref or
+#                       a temp file. It is the only code that may return FM_SLOT_SKIP_RC. The caller
+#                       holds the shared project lock (the fresh-spawn path takes it before it
+#                       acquires a copy), so the snapshot and the move see one copy.
+#   fm_slot_apply_move  moves a copy the proof passed, with hooks off, re-reads it, and compares.
+#                       It never says "untouched" unless the re-read proves it. Any difference other
+#                       than the expected HEAD/branch move is a failure (return 1), never a skip.
+# A copy is proven idle only when ONE snapshot shows: HEAD and its branch readable, the tree clean
+# (tracked, staged and untracked), no process with its working directory in it, no git worktree
+# lock, no live lease or recent contention row, and no ignored file at a path the target tracks.
+# Every unreadable input is a doubt, and a doubt skips the copy (return FM_SLOT_SKIP_RC).
 FM_SLOT_SKIP_RC=20
 FM_SLOT_SKIP_REASON=
-FM_SLOT_ARCHIVE_ROOT=
-FM_SLOT_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+FM_SLOT_PROOF_SNAPSHOT=
+FM_SLOT_PROOF_DIR=
+FM_SLOT_PREPARE_DETACHED=0
 
 fm_slot_skip() { # <slot> <reason-code> <detail>
   FM_SLOT_SKIP_REASON=$2
@@ -289,22 +291,126 @@ fm_slot_skip() { # <slot> <reason-code> <detail>
   return "$FM_SLOT_SKIP_RC"
 }
 
-# The tree must show no tracked, staged or untracked change.
-fm_slot_clean_or_skip() { # <slot>
-  local status
-  status=$(git -C "$1" -c core.quotePath=false status --porcelain=v1 --untracked-files=all --ignore-submodules=none 2>/dev/null) ||
-    { fm_slot_skip "$1" unknown_git_read "git status failed"; return; }
-  [ -z "$status" ] || fm_slot_skip "$1" dirty_tree "it is not clean, it holds uncommitted work ($(printf '%s' "$status" | sed -n '1,3p' | tr '\n' ';'))"
-}
+# One embedded program with five read-only modes. It runs git and lsof through PATH, so a failing
+# tool fails closed (exit 3, the reason on stderr).
+FM_SLOT_PROBE_PY=$(cat <<'FMPROBEPY'
+import datetime, hashlib, json, os, subprocess, sys, time, unicodedata
 
-FM_SLOT_HOLDER_PY=$(cat <<'FMHOLDERPY'
-import datetime, hashlib, json, os, subprocess, sys, time
-slot, real, spawn, common, project_governed = sys.argv[1], sys.argv[2], int(sys.argv[3]), sys.argv[4], sys.argv[5]
 def fail(text):
     sys.stderr.write(text + "\n")
     sys.exit(3)
-# When a process started, in seconds since the epoch, or None when it cannot be read.
-def started_at(pid):
+
+def git(slot, *args, allow=(0,)):
+    try:
+        proc = subprocess.run(["git", "-C", slot] + list(args), capture_output=True, stdin=subprocess.DEVNULL,
+                              env=dict(os.environ, GIT_OPTIONAL_LOCKS="0"))
+    except OSError as exc:
+        fail("git cannot run: %s" % exc)
+    if proc.returncode not in allow:
+        fail("git %s exit %d: %s" % (" ".join(args[:3]), proc.returncode, proc.stderr.decode("utf-8", "replace").strip()[:200]))
+    return proc
+
+def enc(path):
+    return path.decode("utf-8", "surrogateescape") if isinstance(path, bytes) else path
+
+# ---- snapshot: HEAD, branch, the branch and tag refs, the status, and every ignored file with its
+# size and sha256. Anything that cannot be read fails the whole snapshot.
+def snapshot(slot, out):
+    head = git(slot, "rev-parse", "--verify", "HEAD").stdout.decode().strip()
+    sym = git(slot, "symbolic-ref", "-q", "HEAD", allow=(0, 1))
+    symref = sym.stdout.decode().strip() if sym.returncode == 0 else "detached"
+    refs = {}
+    for line in git(slot, "for-each-ref", "--format=%(refname) %(objectname)", "refs/heads", "refs/tags").stdout.decode("utf-8", "replace").splitlines():
+        name, _, sha = line.rpartition(" ")
+        refs[name] = sha
+    status = [enc(e) for e in git(slot, "-c", "core.quotePath=false", "status", "--porcelain=v1", "-z", "--untracked-files=all", "--ignore-submodules=none").stdout.split(b"\0") if e]
+    ignored = {}
+    for raw in git(slot, "ls-files", "-o", "-i", "--exclude-standard", "-z").stdout.split(b"\0"):
+        if not raw:
+            continue
+        path = os.path.join(os.fsencode(slot), raw.rstrip(b"/"))
+        try:
+            st = os.lstat(path)
+            if os.path.islink(path):
+                entry = ["link", 0, os.readlink(path).__repr__()]
+            elif os.path.isdir(path):
+                entry = ["dir", 0, ""]
+            elif os.path.isfile(path):
+                digest = hashlib.sha256()
+                with open(path, "rb") as handle:
+                    for chunk in iter(lambda: handle.read(1 << 20), b""):
+                        digest.update(chunk)
+                entry = ["file", st.st_size, digest.hexdigest()]
+            else:
+                entry = ["special", 0, ""]
+        except OSError as exc:
+            fail("ignored entry %r cannot be read: %s" % (enc(raw), exc))
+        ignored[enc(raw)] = entry
+    with open(out, "w", encoding="utf-8") as handle:
+        json.dump({"head": head, "symref": symref, "refs": refs, "status": status, "ignored": ignored}, handle, sort_keys=True)
+
+def load(path):
+    with open(path, encoding="utf-8") as handle:
+        return json.load(handle)
+
+# ---- compare two snapshots. same: nothing differs. moved <target> <attached-ref>: HEAD is the target,
+# the attached branch (if any) is the target and the rest of the refs are as they were, the status is
+# clean, and every ignored entry is exactly as it was.
+def compare(before, after, mode, target, attached, detached=""):
+    a, b, diffs = load(before), load(after), []
+    if detached == "1":
+        a["symref"] = "detached"
+    if mode == "same":
+        for key in ("head", "symref", "refs", "status", "ignored"):
+            if a[key] != b[key]:
+                diffs.append("%s changed" % key)
+    else:
+        if b["head"] != target:
+            diffs.append("HEAD is %s, not %s" % (b["head"], target))
+        if b["symref"] != a["symref"]:
+            diffs.append("the checked-out branch changed from %s to %s" % (a["symref"], b["symref"]))
+        want = dict(a["refs"])
+        if attached:
+            want[attached] = target
+        if b["refs"] != want:
+            changed = sorted(k for k in set(want) | set(b["refs"]) if want.get(k) != b["refs"].get(k))
+            diffs.append("refs changed beyond the move: %s" % ", ".join(changed[:3]))
+        if b["status"]:
+            diffs.append("the tree is not clean after the move: %s" % "; ".join(b["status"][:3]))
+        if a["ignored"] != b["ignored"]:
+            changed = sorted(k for k in set(a["ignored"]) | set(b["ignored"]) if a["ignored"].get(k) != b["ignored"].get(k))
+            diffs.append("ignored files changed: %s" % ", ".join(changed[:3]))
+    if diffs:
+        print("; ".join(diffs))
+        sys.exit(1)
+
+# ---- collide: ignored entries at a path the target tracks (the same path, below it, or above it).
+def collide(snap, tracked, settings):
+    cfg = dict(line.split(" ", 1) for line in settings.splitlines() if " " in line)
+    ignorecase = cfg.get("core.ignorecase") == "true"
+    precompose = cfg.get("core.precomposeunicode") == "true"
+    def key(text):
+        if precompose:
+            text = unicodedata.normalize("NFC", text)
+        return text.casefold() if ignorecase else text
+    written = set(key(enc(p)) for p in open(tracked, "rb").read().split(b"\0") if p)
+    below = set()
+    for path in written:
+        parts = path.split("/")
+        for i in range(1, len(parts)):
+            below.add("/".join(parts[:i]))
+    found = []
+    for entry in load(snap)["ignored"]:
+        folded = key(entry.rstrip("/"))
+        parts = folded.split("/")
+        inside = any("/".join(parts[:i]) in written for i in range(1, len(parts)))
+        if folded in written or folded in below or inside:
+            found.append(entry)
+    if found:
+        print(", ".join(sorted(found)[:3]).replace("\n", "\\n"))
+
+# ---- processes: parent, name and start time from the kernel, never from ps.
+def proc_info(pid):
     try:
         if sys.platform == "darwin":
             import ctypes, ctypes.util, struct
@@ -312,58 +418,93 @@ def started_at(pid):
             buf = ctypes.create_string_buffer(136)
             if lib.proc_pidinfo(pid, 3, 0, buf, 136) != 136:
                 return None
+            ppid = struct.unpack_from("<I", buf.raw, 16)[0]
+            comm = buf.raw[48:64].split(b"\0")[0].decode("utf-8", "replace")
             sec, usec = struct.unpack_from("<QQ", buf.raw, 120)
-            return sec + usec / 1e6
+            return ppid, comm, sec + usec / 1e6
         with open("/proc/%d/stat" % pid) as handle:
-            fields = handle.read().rsplit(")", 1)[1].split()
-        ticks = int(fields[19])
+            raw = handle.read()
+        comm = raw[raw.index("(") + 1:raw.rindex(")")]
+        fields = raw.rsplit(")", 1)[1].split()
         with open("/proc/stat") as handle:
             boot = [int(line.split()[1]) for line in handle if line.startswith("btime ")][0]
-        return boot + ticks / os.sysconf("SC_CLK_TCK")
+        return int(fields[1]), comm, boot + int(fields[19]) / os.sysconf("SC_CLK_TCK")
     except Exception:
         return None
-began = started_at(spawn)
-if began is None:
-    fail("the spawn's own start time cannot be read")
-try:
-    proc = subprocess.run(["lsof", "-n", "-P", "-w", "-d", "cwd", "-F", "pcn"], capture_output=True, text=True, stdin=subprocess.DEVNULL)
-except OSError as exc:
-    fail("lsof cannot run: %s" % exc)
-if proc.returncode != 0:
-    fail("lsof exit %d: %s" % (proc.returncode, proc.stderr.strip()[:300]))
-rows, cur = {}, None
-for line in proc.stdout.split("\n"):
-    if not line:
-        continue
-    tag, value = line[0], line[1:]
-    if tag == "p":
-        try:
-            cur = int(value)
-        except ValueError:
-            fail("lsof printed an unreadable process row")
-        rows[cur] = {"cmd": "", "cwd": None}
-    elif cur is None:
-        fail("lsof printed a row before any process")
-    elif tag == "c":
-        rows[cur]["cmd"] = value
-    elif tag == "n":
-        rows[cur]["cwd"] = value
-inside = (slot.rstrip("/"), real.rstrip("/"))
-for pid, row in sorted(rows.items()):
-    cwd = row["cwd"]
-    if not cwd or pid == os.getpid():
-        continue
-    if not any(cwd == base or cwd.startswith(base + "/") for base in inside):
-        continue
-    # A process that started after this spawn began is this spawn's own acquisition (the
-    # shell treehouse opened for it). One that started earlier, or whose start cannot be
-    # read, is somebody else's.
-    when = started_at(pid)
-    if when is not None and when > began:
-        continue
-    print("H\ta live process (pid %d, %s) has its working directory in the slot" % (pid, row["cmd"]))
-    sys.exit(0)
-if project_governed == "1":
+
+def chain(pid):
+    out, cur = [], pid
+    for _ in range(64):
+        info = proc_info(cur)
+        if info is None:
+            return out, False
+        out.append((cur, info))
+        if info[0] <= 1 or info[0] == cur:
+            return out, True
+        cur = info[0]
+    return out, True
+
+# A process is the spawn's own acquisition when it runs under the spawn's own pane (the pane's shell pid
+# is given) or, where the backend reports no pane pid, under a `treehouse` launcher that started after
+# the spawn began. A process that started after the spawn, but under neither, is somebody else's.
+def is_own(pid, pane, began):
+    path, complete = chain(pid)
+    if pane:
+        return any(p == pane for p, _ in path)
+    for p, info in path:
+        if os.path.basename(info[1]) == "treehouse" and info[2] >= began:
+            return True
+    return False
+
+def holders(slot, real, spawn, common, governed, pane):
+    me = os.getpid()
+    try:
+        spawn = int(spawn)
+        pane = int(pane) if pane else 0
+    except ValueError:
+        fail("the spawn or pane pid is not a number")
+    began = (proc_info(spawn) or (0, "", None))[2]
+    if began is None:
+        fail("the spawn's own start time cannot be read")
+    try:
+        proc = subprocess.run(["lsof", "-n", "-P", "-w", "-d", "cwd", "-F", "pcn"], capture_output=True, text=True, stdin=subprocess.DEVNULL)
+    except OSError as exc:
+        fail("lsof cannot run: %s" % exc)
+    if proc.returncode != 0:
+        fail("lsof exit %d: %s" % (proc.returncode, proc.stderr.strip()[:300]))
+    rows, cur = {}, None
+    for line in proc.stdout.split("\n"):
+        if not line:
+            continue
+        tag, value = line[0], line[1:]
+        if tag == "p":
+            try:
+                cur = int(value)
+            except ValueError:
+                fail("lsof printed an unreadable process row")
+            rows[cur] = {"cmd": "", "cwd": None}
+        elif cur is None:
+            fail("lsof printed a row before any process")
+        elif tag == "c":
+            rows[cur]["cmd"] = value
+        elif tag == "n":
+            rows[cur]["cwd"] = value
+    inside = (slot.rstrip("/"), real.rstrip("/"))
+    for pid, row in sorted(rows.items()):
+        cwd = row["cwd"]
+        if pid == me:
+            continue
+        if cwd is not None and not any(cwd == base or cwd.startswith(base + "/") for base in inside):
+            continue
+        if is_own(pid, pane, began):
+            continue
+        if cwd is None:
+            print("H\ta live process (pid %d, %s) has no readable working directory in the lsof listing" % (pid, row["cmd"]))
+        else:
+            print("H\ta live process (pid %d, %s) has its working directory in the slot" % (pid, row["cmd"]))
+        return
+    if governed != "1":
+        return
     store = os.path.join(common, "vernant-worktree-leases")
     now = time.time()
     def epoch(value):
@@ -401,7 +542,7 @@ if project_governed == "1":
             except PermissionError:
                 pass
             print("H\ta live lease is held by %s (pid %d)" % (lease.get("owner_id"), pid))
-            sys.exit(0)
+            return
         try:
             expired = epoch(lease["expires_at_iso"]) <= now
         except (KeyError, ValueError):
@@ -416,32 +557,56 @@ if project_governed == "1":
             fail("contention.jsonl: %s" % exc)
         hits = 0
         for line in text.splitlines():
+            if not line.strip():
+                continue
             try:
                 row = json.loads(line)
                 tree, ts = row["worktree_id"], row["ts_iso"]
                 if not isinstance(tree, str) or not isinstance(ts, str):
-                    continue
+                    raise ValueError("bad field")
                 age = max(0.0, now - epoch(ts))
             except (ValueError, KeyError, TypeError):
-                continue
+                print("H\ta contention row cannot be read, so it counts as held")
+                return
             if os.path.realpath(tree) not in (real, os.path.realpath(slot)) and tree not in (slot, real):
                 continue
             if age <= 24 * 60 * 60:
                 hits += 1
         if hits:
             print("H\t%d co-tenant contention row(s) for this slot within 24 hours" % hits)
-FMHOLDERPY
+
+mode, args = sys.argv[1], sys.argv[2:]
+if mode == "snapshot":
+    snapshot(*args)
+elif mode == "compare":
+    compare(*args)
+elif mode == "collide":
+    collide(*args)
+elif mode == "holders":
+    holders(*args)
+elif mode == "field":
+    value = load(args[0])[args[1]]
+    print(value if isinstance(value, str) else "\n".join(value))
+FMPROBEPY
 )
 
-# The one holder rule: a live process in the slot (or a live lease, a lock, or recent
-# co-tenant contention on it) skips the copy; so does a holder list that cannot be read.
+fm_slot_probe() { python3 -I -c "$FM_SLOT_PROBE_PY" "$@"; }
+
+# fm_slot_snapshot <slot> <out-file>: fails (nonzero) when any read fails.
+fm_slot_snapshot() { fm_slot_probe snapshot "$1" "$2" 2>&1; }
+
+# The one holder rule. A process with its working directory in the slot, or an lsof row that names a
+# process and no working directory, is a holder unless it runs under this spawn's own pane
+# (FM_SLOT_PANE_PID) or, for a backend with no pane pid, under a `treehouse` launcher that started
+# after the spawn began (FM_SLOT_SPAWN_PID). There is no age exemption. A live lease, a contention row
+# (or one that cannot be read) and a git worktree lock count too. A holder list that cannot be read skips.
 fm_slot_holders_or_skip() { # <slot> [<project>]
   local slot=$1 project=${2:-} real common governed=0 out locked path line
   real=$(CDPATH='' cd -- "$slot" 2>/dev/null && pwd -P) || { fm_slot_skip "$slot" unknown_holders "the slot directory cannot be entered"; return; }
   common=$(git -C "$slot" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) ||
     { fm_slot_skip "$slot" unknown_holders "the git common directory cannot be read"; return; }
   if [ -n "$project" ] && fm_slot_required "$project" "$slot"; then governed=1; fi
-  out=$(python3 -I -c "$FM_SLOT_HOLDER_PY" "$slot" "$real" "${FM_SLOT_SPAWN_PID:-$$}" "$common" "$governed" 2>&1) || {
+  out=$(fm_slot_probe holders "$slot" "$real" "${FM_SLOT_SPAWN_PID:-$$}" "$common" "$governed" "${FM_SLOT_PANE_PID:-}" 2>&1) || {
     fm_slot_skip "$slot" unknown_holders "the holder list cannot be read (${out:-no detail})"
     return
   }
@@ -459,172 +624,160 @@ fm_slot_holders_or_skip() { # <slot> [<project>]
   return 0
 }
 
-# One ignored entry is scratch when the existing closeout classifier says so, with
-# nothing it would preserve (sourced in a subshell, so no names leak into the spawn).
-fm_slot_entry_is_scratch() { # <real-slot> <slot-relative path> <NUL-delimited whole-ignored-directory list file>
-  local real=$1 rel=$2 dirs=$3 prefix='' part rest=$2
-  (
-    set +e
-    listed() {
-      local listed_dir
-      while IFS= read -r -d '' listed_dir; do
-        [ "${listed_dir%/}" != "$1" ] || return 0
-      done <"$dirs"
+# Release the proof's scratch directory (the snapshot lives there, outside the slot).
+fm_slot_proof_drop() {
+  [ -z "$FM_SLOT_PROOF_DIR" ] || rm -rf -- "$FM_SLOT_PROOF_DIR"
+  FM_SLOT_PROOF_DIR= FM_SLOT_PROOF_SNAPSHOT=
+}
+
+# fm_slot_prove_idle <slot> <target-sha-or-empty> [<project>]: 0 proven (FM_SLOT_PROOF_SNAPSHOT is set),
+# FM_SLOT_SKIP_RC doubt. Writes nothing to the slot. An empty target means the spawn moves nothing
+# (an origin-less copy): only the clean tree and the holder rule apply.
+fm_slot_prove_idle() {
+  local slot=$1 target=$2 project=${3:-} no_ancestry=${4:-} snap out head status settings tracked colliding reason=unknown_git_read
+  fm_slot_proof_drop
+  [ -d "$slot" ] || { fm_slot_skip "$slot" unknown_git_read "the slot directory cannot be read"; return; }
+  if [ -n "$target" ] && ! git -C "$slot" rev-parse --verify --quiet "$target^{commit}" >/dev/null 2>&1; then
+    fm_slot_skip "$slot" unknown_target "the target commit '$target' cannot be read"
+    return
+  fi
+  FM_SLOT_PROOF_DIR=$(mktemp -d "${TMPDIR:-/tmp}/fm-slot-proof.XXXXXX" 2>/dev/null) ||
+    { FM_SLOT_PROOF_DIR=; fm_slot_skip "$slot" unknown_git_read "a scratch directory for the snapshot cannot be created"; return; }
+  snap="$FM_SLOT_PROOF_DIR/before.json"
+  out=$(fm_slot_snapshot "$slot" "$snap") || {
+    case "$out" in *ls-files*|*'ignored entry'*) reason=unknown_ignored_inventory ;; esac
+    fm_slot_proof_drop
+    fm_slot_skip "$slot" "$reason" "the copy cannot be read in one snapshot (${out:-no detail})"
+    return
+  }
+  status=$(fm_slot_probe field "$snap" status 2>&1) || { fm_slot_proof_drop; fm_slot_skip "$slot" unknown_git_read "the snapshot cannot be read back"; return; }
+  if [ -n "$status" ]; then
+    out="it is not clean, it holds uncommitted work ($(printf '%s' "$status" | sed -n '1,3p' | tr '\n' ';'))"
+    fm_slot_proof_drop
+    fm_slot_skip "$slot" dirty_tree "$out"
+    return
+  fi
+  fm_slot_holders_or_skip "$slot" "$project" || { out=$?; fm_slot_proof_drop; return "$out"; }
+  if [ -n "$target" ]; then
+    settings=$(git -C "$slot" config --bool --get-regexp '^core\.(ignorecase|precomposeunicode)$' 2>/dev/null) || {
+      [ "$?" = 1 ] || { fm_slot_proof_drop; fm_slot_skip "$slot" unknown_ignored_inventory "the slot's path-comparison settings cannot be read"; return; }
+      settings=
+    }
+    tracked="$FM_SLOT_PROOF_DIR/tracked"
+    git -C "$slot" ls-tree -r --name-only -z "$target" -- >"$tracked" 2>/dev/null ||
+      { fm_slot_proof_drop; fm_slot_skip "$slot" unknown_ignored_inventory "the target's tracked paths cannot be listed"; return; }
+    colliding=$(fm_slot_probe collide "$snap" "$tracked" "$settings" 2>&1) ||
+      { out=$colliding; fm_slot_proof_drop; fm_slot_skip "$slot" unknown_ignored_inventory "the ignored entries could not be compared with the target's tracked paths (${out:-no detail})"; return; }
+    if [ -n "$colliding" ]; then
+      fm_slot_proof_drop
+      fm_slot_skip "$slot" ignored_collision "ignored work at a path the target tracks would be overwritten: $colliding"
+      return
+    fi
+    head=$(fm_slot_probe field "$snap" head 2>/dev/null) || { fm_slot_proof_drop; fm_slot_skip "$slot" unknown_git_read "HEAD cannot be read"; return; }
+    if [ "$head" != "$target" ] && [ "$no_ancestry" != noancestry ]; then
+      if git -C "$slot" merge-base --is-ancestor "$head" "$target" 2>/dev/null; then
+        :
+      else
+        out=$?
+        fm_slot_proof_drop
+        if [ "$out" = 1 ]; then
+          if git -C "$slot" merge-base --is-ancestor "$target" "$head" 2>/dev/null; then
+            fm_slot_skip "$slot" head_not_target "HEAD $head is ahead of the target $target and keeps its commits"
+          else
+            fm_slot_skip "$slot" not_fast_forward "HEAD $head is not an ancestor of the target $target (the copy holds commits the target lacks)"
+          fi
+        else
+          fm_slot_skip "$slot" unknown_git_read "the ancestry of HEAD and the target cannot be read"
+        fi
+        return
+      fi
+    fi
+  fi
+  FM_SLOT_PROOF_SNAPSHOT=$snap
+}
+
+# fm_slot_apply_move <slot> <target-sha>: move a copy the proof passed. 0 moved (or already there),
+# FM_SLOT_SKIP_RC git refused and a second snapshot is identical to the first (the copy really is untouched),
+# 1 anything else (the copy is kept as it now is; nothing is claimed about it).
+fm_slot_apply_move() {
+  local slot=$1 target=$2 snap=$FM_SLOT_PROOF_SNAPSHOT after head attached mode out merge_out detached_flag rc=0
+  [ -n "$snap" ] && [ -f "$snap" ] || { echo "error: pooled copy '$slot' was not proven idle before the move" >&2; return 1; }
+  after="$FM_SLOT_PROOF_DIR/after.json"
+  head=$(fm_slot_probe field "$snap" head 2>/dev/null) || head=
+  attached=$(fm_slot_probe field "$snap" symref 2>/dev/null) || attached=detached
+  # A copy this spawn detached while preparing it (fm_slot_prepare_base) moves as a detached HEAD.
+  [ "$attached" != detached ] && [ "$FM_SLOT_PREPARE_DETACHED" != 1 ] || attached=''
+  detached_flag=$FM_SLOT_PREPARE_DETACHED
+  mode=same
+  if [ "$head" != "$target" ]; then
+    mode=refused
+    if merge_out=$(git -C "$slot" -c core.hooksPath=/dev/null merge --ff-only --quiet "$target" 2>&1); then
+      mode=moved
+    fi
+  fi
+  if ! out=$(fm_slot_snapshot "$slot" "$after"); then
+    fm_slot_proof_drop
+    echo "error: pooled copy '$slot' could not be read after the move ($(printf '%s' "$out" | sed -n '1p')); its state is unknown, so it is kept as it is and no worker is admitted" >&2
+    return 1
+  fi
+  case "$mode" in
+    moved) out=$(fm_slot_probe compare "$snap" "$after" moved "$target" "$attached" "$detached_flag" 2>&1) || rc=$? ;;
+    *) out=$(fm_slot_probe compare "$snap" "$after" same "" "" "$detached_flag" 2>&1) || rc=$? ;;
+  esac
+  fm_slot_proof_drop
+  if [ "$rc" != 0 ]; then
+    echo "error: pooled copy '$slot' differs from the proven state beyond the expected move ($out); it is kept as it is and no worker is admitted" >&2
+    return 1
+  fi
+  case "$mode" in
+    refused) fm_slot_skip "$slot" not_fast_forward "git refused the move to $target and a second snapshot shows no change ($(printf '%s' "$merge_out" | sed -n '1p'))"; return ;;
+    moved) FM_SLOT_LEFT_HEAD=$target ;;
+  esac
+  return 0
+}
+
+# fm_slot_move_forward <slot> <target-sha> [<project>]: prove, then apply. 0 moved, FM_SLOT_SKIP_RC skipped
+# (untouched), 1 failed (see fm_slot_apply_move).
+fm_slot_move_forward() {
+  local slot=$1 target=$2 project=${3:-} rc=0
+  fm_slot_prove_idle "$slot" "$target" "$project" || return $?
+  fm_slot_apply_move "$slot" "$target" || rc=$?
+  return "$rc"
+}
+
+# fm_slot_attach <slot> <branch-or-empty> <sha>: put a copy on <sha>, attached to <branch> when one is named.
+# The branch must still hold <sha>, so a writer that moved it is never checked out over ignored work. The
+# checkout, when the tree must change, is by the commit and only from the commit this spawn left
+# (FM_SLOT_LEFT_HEAD), over a clean tree with no ignored file at a path <sha> tracks, with hooks off.
+fm_slot_attach() {
+  local slot=$1 branch=$2 sha=$3 head tip snap status colliding tracked settings
+  if [ -n "$branch" ]; then
+    tip=$(git -C "$slot" rev-parse --verify --quiet "refs/heads/$branch^{commit}" 2>/dev/null) || tip=
+    [ "$tip" = "$sha" ] || {
+      echo "error: branch $branch is at '${tip:-nothing}', not the $sha it held when this spawn found the copy; the copy is not switched back and every branch stays as it is" >&2
       return 1
     }
-    # shellcheck source=bin/fm-merge-prune-lib.sh
-    . "$FM_SLOT_LIB_DIR/fm-merge-prune-lib.sh" >/dev/null 2>&1 || exit 2
-    scratch() {
-      FM_MP_PRESERVE=()
-      fm_mp_classify_entry "$real" "$1" >/dev/null 2>&1 || return 1
-      [ "${#FM_MP_PRESERVE[@]}" -eq 0 ]
-    }
-    scratch "$rel" && exit 0
-    while :; do
-      part=${rest%%/*}
-      [ "$part" != "$rest" ] || exit 1
-      prefix="${prefix:+$prefix/}$part"
-      rest=${rest#*/}
-      listed "$prefix" || continue
-      scratch "$prefix" && exit 0
-    done
-  )
-}
-
-# Whether a verified archive holds the entry with the bytes it has now (the SHA256SUMS
-# written by fm_mp_preserve_one under data/<id>/merge-prune-preserved).
-fm_slot_entry_archived() { # <real-slot> <slot-relative path>
-  local real=$1 rel=$2 file sum sums
-  case "$rel" in *$'\n'* | *\\*) return 1 ;; esac
-  file="$real/$rel"
-  [ -f "$file" ] && [ ! -L "$file" ] || return 1
-  [ -n "$FM_SLOT_ARCHIVE_ROOT" ] || return 1
-  sum=$(shasum -a 256 -- "$file" 2>/dev/null | awk '{print $1}') || return 1
-  [ -n "$sum" ] || return 1
-  for sums in "$FM_SLOT_ARCHIVE_ROOT"/*/merge-prune-preserved/*/*/SHA256SUMS; do
-    [ -f "$sums" ] || continue
-    grep -Fxq -- "$sum  $rel" "$sums" 2>/dev/null || continue
-    if (cd "$(dirname "$sums")" && shasum -a 256 -c SHA256SUMS >/dev/null 2>&1); then
-      return 0
+  fi
+  head=$(git -C "$slot" rev-parse --verify --quiet HEAD 2>/dev/null) || { echo "error: HEAD of '$slot' cannot be read; the copy is not switched" >&2; return 1; }
+  if [ "$head" != "$sha" ]; then
+    if [ -n "$FM_SLOT_LEFT_HEAD" ] && [ "$head" != "$FM_SLOT_LEFT_HEAD" ]; then
+      echo "error: HEAD of '$slot' is $head, not the $FM_SLOT_LEFT_HEAD this spawn left; the copy is not switched, so no commit is orphaned" >&2
+      return 1
     fi
-  done
-  return 1
-}
-
-# The narrow ignored-work check. Git overwrites an ignored file silently, so before a
-# move that changes the tree the slot's ignored entries are compared with the paths the
-# target tree tracks. An ignored entry collides when it equals one, lies inside one, or is an ancestor of one (an ignored file where a tracked
-# directory must be created). A colliding entry is allowed only when the closeout
-# classifier calls it scratch or a verified archive holds its bytes. An unreadable
-# inventory skips the copy. Ignored entries at paths the target does not track never skip it.
-fm_slot_ignored_or_skip() { # <slot> <target-commit>
-  local slot=$1 target=$2 real scratch ignored written hits dirs entry bad='' settings
-  real=$(CDPATH='' cd -- "$slot" 2>/dev/null && pwd -P) || { fm_slot_skip "$slot" unknown_ignored_inventory "the slot directory cannot be entered"; return; }
-  scratch=$(mktemp -d "${TMPDIR:-/tmp}/fm-slot-move.XXXXXX" 2>/dev/null) ||
-    { fm_slot_skip "$slot" unknown_ignored_inventory "a scratch file for the ignored-entry inventory cannot be created"; return; }
-  ignored="$scratch/ignored" written="$scratch/written" hits="$scratch/hits" dirs="$scratch/dirs"
-  if ! git -C "$slot" ls-files -o -i --exclude-standard -z >"$ignored" 2>/dev/null ||
-    ! git -C "$slot" ls-files -o -i --exclude-standard --directory -z >"$dirs" 2>/dev/null; then
-    rm -rf -- "$scratch"
-    fm_slot_skip "$slot" unknown_ignored_inventory "the slot's ignored entries cannot be listed"
-    return
-  fi
-  settings=$(git -C "$slot" config --bool --get-regexp '^core\.(ignorecase|precomposeunicode)$' 2>/dev/null) || {
-    [ "$?" = 1 ] || {
-      rm -rf -- "$scratch"
-      fm_slot_skip "$slot" unknown_ignored_inventory "the slot's path-comparison settings cannot be read"
-      return
+    fm_slot_prove_idle "$slot" "$sha" "" noancestry >/dev/null 2>&1 || {
+      echo "error: '$slot' is not clean and idle with no ignored work in the way of $sha; the copy is not switched" >&2
+      fm_slot_proof_drop
+      return 1
     }
-    settings=
-  }
-  if ! git -C "$slot" ls-tree -r --name-only -z "$target" -- >"$written" 2>/dev/null; then
-    rm -rf -- "$scratch"
-    fm_slot_skip "$slot" unknown_ignored_inventory "the target's tracked paths cannot be listed"
-    return
+    fm_slot_proof_drop
+    git -C "$slot" -c core.hooksPath=/dev/null checkout --quiet --detach "$sha" || return 1
+    FM_SLOT_LEFT_HEAD=$sha
   fi
-  if ! python3 -I -c '
-import sys, unicodedata
-settings = dict(line.split(" ", 1) for line in sys.argv[4].splitlines() if " " in line)
-ignorecase = settings.get("core.ignorecase") == "true"
-precompose = settings.get("core.precomposeunicode") == "true"
-def key(path):
-    text = path.decode("utf-8", "surrogateescape")
-    if precompose:
-        text = unicodedata.normalize("NFC", text)
-    if ignorecase:
-        text = text.casefold()
-    return text
-def names(path):
-    return [item for item in open(path, "rb").read().split(b"\0") if item]
-written = set(key(item) for item in names(sys.argv[1]))
-below = set()
-for path in written:
-    parts = path.split("/")
-    for i in range(1, len(parts)):
-        below.add("/".join(parts[:i]))
-found = set()
-for entry in names(sys.argv[2]):
-    entry = entry.rstrip(b"/")
-    folded = key(entry)
-    parts = folded.split("/")
-    inside = any("/".join(parts[:i]) in written for i in range(1, len(parts)))
-    if folded in written or folded in below or inside:
-        found.add(entry)
-open(sys.argv[3], "wb").write(b"".join(item + b"\0" for item in sorted(found)))
-' "$written" "$ignored" "$hits" "$settings" 2>/dev/null; then
-    rm -rf -- "$scratch"
-    fm_slot_skip "$slot" unknown_ignored_inventory "the ignored entries could not be compared with the target's tracked paths"
-    return
+  if [ -n "$branch" ]; then
+    tip=$(git -C "$slot" rev-parse --verify --quiet "refs/heads/$branch^{commit}" 2>/dev/null) || tip=
+    [ "$tip" = "$sha" ] || { echo "error: branch $branch moved while the copy was switched back; the copy stays on $sha" >&2; return 1; }
+    git -C "$slot" -c core.hooksPath=/dev/null symbolic-ref HEAD "refs/heads/$branch" || return 1
+  elif git -C "$slot" symbolic-ref -q HEAD >/dev/null 2>&1; then
+    git -C "$slot" -c core.hooksPath=/dev/null checkout --quiet --detach "$sha" || return 1
   fi
-  while IFS= read -r -d '' entry; do
-    if fm_slot_entry_is_scratch "$real" "$entry" "$dirs"; then
-      continue
-    elif fm_slot_entry_archived "$real" "$entry"; then
-      continue
-    fi
-    entry=${entry//$'\n'/\\n}
-    bad="${bad:+$bad, }$entry"
-  done <"$hits"
-  rm -rf -- "$scratch"
-  [ -z "$bad" ] || fm_slot_skip "$slot" ignored_collision "ignored work at a path the target tracks would be overwritten and no verified archive holds it: $bad"
-}
-
-# Advance the slot to <target-sha>: clean tree, no holder, no ignored work in the way,
-# then `merge --ff-only`, then HEAD must be the target. The fast-forward moves HEAD (or
-# its attached branch) only to a commit that contains the old HEAD, so no commit is ever
-# dropped; a tracked or untracked change that appears after the checks is refused by git.
-# Hooks stay off for the merge: the reset it replaces ran none, and a post-merge hook must not run here.
-# Returns 0 moved, FM_SLOT_SKIP_RC skipped (slot untouched), 1 on an unexpected failure.
-fm_slot_move_forward() { # <slot> <target-sha> [<project>]
-  local slot=$1 target=$2 project=${3:-} head merge_out
-  git -C "$slot" rev-parse --verify --quiet "$target^{commit}" >/dev/null 2>&1 ||
-    { fm_slot_skip "$slot" unknown_target "the target commit '$target' cannot be read"; return; }
-  head=$(git -C "$slot" rev-parse --verify --quiet HEAD 2>/dev/null) ||
-    { fm_slot_skip "$slot" unknown_git_read "HEAD cannot be read"; return; }
-  [ "$head" != "$target" ] || return 0
-  fm_slot_clean_or_skip "$slot" || return $?
-  fm_slot_holders_or_skip "$slot" "$project" || return $?
-  fm_slot_ignored_or_skip "$slot" "$target" || return $?
-  if ! merge_out=$(git -C "$slot" -c core.hooksPath=/dev/null merge --ff-only --quiet "$target" 2>&1); then
-    fm_slot_skip "$slot" not_fast_forward "git refused the move to $target ($(printf '%s' "$merge_out" | sed -n '1p'))"
-    return
-  fi
-  head=$(git -C "$slot" rev-parse --verify --quiet HEAD 2>/dev/null) || head=
-  [ "$head" = "$target" ] ||
-    fm_slot_skip "$slot" head_not_target "HEAD is ${head:-unreadable} after the move, not $target (a copy ahead of the target keeps its commits)"
-}
-
-# A tree-changing checkout is a plain `checkout` (git refuses over a tracked change) after
-# the same clean-tree and ignored-work look. <target-commit> is the commit it moves HEAD to;
-# when that is the commit HEAD already holds, nothing in the tree changes and git runs alone.
-fm_slot_checkout() { # <slot> <target-commit> <git-checkout-arg>...
-  local slot=$1 target=$2 head
-  shift 2
-  head=$(git -C "$slot" rev-parse --verify --quiet HEAD 2>/dev/null) ||
-    { fm_slot_skip "$slot" unknown_git_read "HEAD cannot be read"; return; }
-  if [ "$head" != "$target" ]; then
-    fm_slot_clean_or_skip "$slot" || return $?
-    fm_slot_ignored_or_skip "$slot" "$target" || return $?
-  fi
-  git -C "$slot" checkout --quiet "$@"
 }
