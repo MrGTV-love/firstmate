@@ -114,7 +114,7 @@ test_closes_lines_close_each_eligible_item_and_report_the_rest() {
   # shellcheck disable=SC2016 # Backticks in the fixture body are literal Markdown.
   printf '%s\n' 'Fixes things; fm-fixture-prose-5 is related.' '' \
     'Closes-backlog-item: fm-fixture-alpha-1' 'Closes-backlog-item: fm-fixture-beta-2' 'Closes-backlog-item: fm-fixture-live-3' \
-    'Closes-backlog-item: ship-a' 'Closes-backlog-item: docs-live-4' 'Closes-backlog-item: ship-a' \
+    'Closes-backlog-item: ship-a' 'Closes-backlog-item: docs-live-4' 'Closes-backlog-item: ship-a' '' \
     'Mentions Closes-backlog-item: fm-fixture-prose-5 inline.' 'closes: fm-fixture-prose-5' \
     '  Closes-backlog-item: fm-fixture-prose-5' 'Closes-backlog-item: fm-fixture-prose-5 # comment' \
     'Closes: fm-fixture-legacy-6' > "$case_dir/bodies/61"
@@ -565,7 +565,7 @@ test_two_members_with_one_number_in_different_repos_match_by_full_url() {
   cx_add "$case_dir" repo-b-task docs
   cx_meta "$case_dir" repo-a-task docs "https://github.com/example/repo-a/pull/5"
   cx_meta "$case_dir" repo-b-task docs "https://github.com/example/repo-b/pull/5"
-  printf '%s\n' 'Train-member: https://github.com/example/repo-a/pull/5' \
+  printf '%s\n' 'Train-member: https://github.com/example/repo-a/pull/5' '' \
     'See https://github.com/example/repo-b/pull/5 for context.' > "$case_dir/bodies/83"
   gh_merge "$case_dir" 83
   [ "$(cx_state "$case_dir" repo-a-task)" = "done" ] || fail "c2-same-number: the matching member's task was not closed"
@@ -776,10 +776,23 @@ lib_call() {  # <function> [args...]; the body comes on standard input
   bash -c '. "$1"; shift; "$@"' _ "$ROOT/bin/fm-pr-closes-lib.sh" "$@"
 }
 
+# spaced <lines...>: each line followed by a blank line, so each is a paragraph of its own and
+# a case judges one line, not the block rule (test_the_directive_block_rule_... judges that).
+spaced() {
+  local line
+  for line in "$@"; do printf '%s\n\n' "$line"; done
+}
+
+# visible <body-file|->: every Closes-backlog-item value outside a fence and a comment, block
+# or not; the comment-scan cases below judge what a comment hides, not the block rule.
+visible() {
+  lib_call fm_pr_closes_directive Closes-backlog-item "${1:--}" anywhere
+}
+
 # shellcheck disable=SC2016 # Backticks in the fixture lines are literal Markdown.
 test_the_directive_parser_reads_real_lines_and_ignores_every_example() {
   local out
-  out=$(printf '%s\n' 'Closes-backlog-item: fm-backlog-close-at-merge' 'Closes-backlog-item: fm-backlog-finished-blocker-auto-clear' \
+  out=$(spaced 'Closes-backlog-item: fm-backlog-close-at-merge' 'Closes-backlog-item: fm-backlog-finished-blocker-auto-clear' \
     'Closes-backlog-item: ship-a' 'Closes-backlog-item: a.b_c-1' 'Closes-backlog-item:   spaced-id   ' $'Closes-backlog-item: crlf-id\r' \
     'Closes-backlog-item: .hidden' 'Closes-backlog-item: two words' 'Closes-backlog-item: tail # comment' \
     'closes-backlog-item: lower' ' Closes-backlog-item: indented' '> Closes-backlog-item: quoted' '- Closes-backlog-item: listed' \
@@ -795,7 +808,7 @@ test_the_directive_parser_reads_real_lines_and_ignores_every_example() {
     || fail "parser: unexpected ids: $(printf '%s' "$out" | tr '\n' ' ')"
   out=$(printf '%s\n' 'Closes-backlog-item: unclosed' '```' 'Closes-backlog-item: never-closed' 'Closes-backlog-item: also-never' | lib_call fm_pr_closes_ids -)
   [ "$out" = unclosed ] || fail "parser: a fence that never closes did not run to the end: $out"
-  out=$(printf '%s\n' $'\t```' 'Closes-backlog-item: after-tab' '```' 'Closes-backlog-item: tab-fenced' $'\t```' 'Closes-backlog-item: still-tab-fenced' \
+  out=$(spaced $'\t```' 'Closes-backlog-item: after-tab' '```' 'Closes-backlog-item: tab-fenced' $'\t```' 'Closes-backlog-item: still-tab-fenced' \
     | lib_call fm_pr_closes_ids -)
   [ "$out" = after-tab ] || fail "parser: a tab-indented fence line opened or closed a fence: $(printf '%s' "$out" | tr '\n' ' ')"
   out=$(printf '%s\n' 'Closes-backlog-item: real-one' '<!-- Example only, not a closure:' 'Closes-backlog-item: comment-example' '-->' \
@@ -810,7 +823,7 @@ test_the_directive_parser_reads_real_lines_and_ignores_every_example() {
   [ "$out" = 'text review-name_. review-name_ and review-dash- then x.y. x.y end ' ] \
     || fail "parser: prose words lost an id's own spelling: $out"
   out=$(printf '%s\n' 'Summary: skips every line after an unclosed `<!--` mention.' '' 'Closes-backlog-item: fm-a' \
-    "Train-member: https://github.com/o/r/pull/7" 'Also fm-b here.' > "$TMP_ROOT/unclosed-inline.md"; \
+    "Train-member: https://github.com/o/r/pull/7" '' 'Also fm-b here.' > "$TMP_ROOT/unclosed-inline.md"; \
     lib_call fm_pr_closes_ids "$TMP_ROOT/unclosed-inline.md"; lib_call fm_pr_closes_members "$TMP_ROOT/unclosed-inline.md"; \
     lib_call fm_pr_closes_prose_words "$TMP_ROOT/unclosed-inline.md" | grep -Fx fm-b)
   [ "$out" = "$(printf '%s\n' fm-a https://github.com/o/r/pull/7 fm-b)" ] \
@@ -819,30 +832,30 @@ test_the_directive_parser_reads_real_lines_and_ignores_every_example() {
   [ "$out" = 'Closes-backlog-item: fm-x <!-- note -->' ] || fail "parser: a directive with a trailing comment was not reported as malformed: $out"
   out=$(printf '%s\n' 'Closes-backlog-item: fm-x <!-- note -->' | lib_call fm_pr_closes_ids -)
   [ -z "$out" ] || fail "parser: a directive with a trailing comment closed $out"
-  out=$(printf '%s\n' 'Example: <!--' 'Closes-backlog-item: hidden' '-->' 'Closes-backlog-item: shown' | lib_call fm_pr_closes_ids -)
+  out=$(printf '%s\n' 'Example: <!--' 'Closes-backlog-item: hidden' '-->' 'Closes-backlog-item: shown' | visible -)
   [ "$out" = shown ] || fail "parser: a comment that opens mid-line and closes in its paragraph did not hide its lines: $(printf '%s' "$out" | tr '\n' ' ')"
-  out=$(printf '%s\n' 'Example: <!--' '' 'Closes-backlog-item: after-blank' '-->' | lib_call fm_pr_closes_ids -)
+  out=$(printf '%s\n' 'Example: <!--' '' 'Closes-backlog-item: after-blank' '-->' | visible -)
   [ "$out" = after-blank ] || fail "parser: a mid-line <!-- hid lines past a blank line: $(printf '%s' "$out" | tr '\n' ' ')"
   out=$(printf '%s\n' 'The rule: <!-- opens one:' '```' '<!-- example' '-->' '```' 'Closes-backlog-item: after-fence' | lib_call fm_pr_closes_ids -)
   [ "$out" = after-fence ] || fail "parser: a mid-line <!-- reached through a fence and lost the directive after it: $(printf '%s' "$out" | tr '\n' ' ')"
-  out=$(printf '%s\n' 'Summary: an unclosed <!-- mention.' 'Closes-backlog-item: before-block' '<!-- attestation -->' 'Closes-backlog-item: after-block' | lib_call fm_pr_closes_ids -)
+  out=$(printf '%s\n' 'Summary: an unclosed <!-- mention.' 'Closes-backlog-item: before-block' '<!-- attestation -->' 'Closes-backlog-item: after-block' | visible -)
   [ "$out" = "$(printf '%s\n' before-block after-block)" ] || fail "parser: a mid-line <!-- reached into a comment block and lost a directive: $(printf '%s' "$out" | tr '\n' ' ')"
   out=$(printf '%s\n' 'The rule: a line with `<!--`' 'Closes-backlog-item: span-a' 'ends at `-->`.' \
-    '- quote: `<!--`' 'Closes-backlog-item: span-b' '- and `-->`' | lib_call fm_pr_closes_ids -)
+    '- quote: `<!--`' 'Closes-backlog-item: span-b' '- and `-->`' | visible -)
   [ "$out" = "$(printf '%s\n' span-a span-b)" ] || fail "parser: a <!-- inside a code span hid the directive below it: $(printf '%s' "$out" | tr '\n' ' ')"
   out=$(printf '%s\n' 'Intro <!-- start' '## Backlog' 'Closes-backlog-item: after-heading' 'end -->' \
     'Intro <!-- a' '> quote' 'Closes-backlog-item: after-quote' '-->' 'Intro <!-- a' '- item' 'Closes-backlog-item: after-item' '-->' \
-    'Intro <!-- a' '***' 'Closes-backlog-item: after-break' '-->' | lib_call fm_pr_closes_ids -)
+    'Intro <!-- a' '***' 'Closes-backlog-item: after-break' '-->' | visible -)
   [ "$out" = "$(printf '%s\n' after-heading after-quote after-item after-break)" ] \
     || fail "parser: a mid-line <!-- reached past a heading, quote, list item or thematic break: $(printf '%s' "$out" | tr '\n' ' ')"
   out=$(printf '%s\n' 'Intro <!-- a' '===' 'Closes-backlog-item: after-setext' '-->' \
-    'Intro <!-- a' '--' 'Closes-backlog-item: after-dash-setext' '-->' | lib_call fm_pr_closes_ids -)
+    'Intro <!-- a' '--' 'Closes-backlog-item: after-dash-setext' '-->' | visible -)
   [ "$out" = "$(printf '%s\n' after-setext after-dash-setext)" ] \
     || fail "parser: a mid-line <!-- reached past a setext underline: $(printf '%s' "$out" | tr '\n' ' ')"
   out=$(printf '%s\n' 'Intro <!-- start' '## Backlog' 'Closes-backlog-item: fm-c x' 'end -->' | lib_call fm_pr_closes_malformed -)
   [ "$out" = 'Closes-backlog-item: fm-c x' ] || fail "parser: a malformed directive after a heading that ends the paragraph was hidden: $out"
   out=$(printf '%s\n' '<!-->' 'Closes-backlog-item: after-empty' '<!--->' 'Closes-backlog-item: after-dash' 'a <!--> b' 'Closes-backlog-item: after-inline' \
-    | lib_call fm_pr_closes_ids -)
+    | visible -)
   [ "$out" = "$(printf '%s\n' after-empty after-dash after-inline)" ] || fail "parser: an empty comment did not close on its own line: $(printf '%s' "$out" | tr '\n' ' ')"
   out=$(printf '%s\n' 'Fixes it. <!-- see fm-hidden and https://github.com/o/r/pull/12 -->' > "$TMP_ROOT/comment-prose.md"; \
     lib_call fm_pr_closes_prose_words "$TMP_ROOT/comment-prose.md"; lib_call fm_pr_closes_prose_prs "$TMP_ROOT/comment-prose.md")
@@ -860,7 +873,7 @@ test_the_directive_parser_reads_real_lines_and_ignores_every_example() {
     printf '%s\n' "$out" | grep -Fxq -- "$want" || fail "parser: prose words lost $want from an emphasis pair or its own spelling"
   done
   ! printf '%s\n' "$out" | grep -Fxq foo || fail "parser: a lone trailing underscore was stripped from foo_"
-  out=$(printf '%s\n' 'Train-member: https://github.com/a/b/pull/1' 'Train-member:  https://github.com/a/b/pull/2  ' 'Train-member: https://github.com/a/b/pull/1' \
+  out=$(spaced 'Train-member: https://github.com/a/b/pull/1' 'Train-member:  https://github.com/a/b/pull/2  ' 'Train-member: https://github.com/a/b/pull/1' \
     '  Train-member: https://github.com/a/b/pull/3' '| Train-member: https://github.com/a/b/pull/4 |' '   ```' 'Train-member: https://github.com/a/b/pull/5' '   ```' \
     | lib_call fm_pr_closes_members -)
   [ "$out" = "$(printf '%s\n' https://github.com/a/b/pull/1 https://github.com/a/b/pull/2)" ] || fail "parser: unexpected members: $(printf '%s' "$out" | tr '\n' ' ')"
@@ -1104,7 +1117,7 @@ test_f1_an_excluded_component_table_under_a_subheading_closes_nothing_and_is_rep
   assert_match "^actionable: close-at-merge: mentioned $REPO_URL/71 in the prose of $REPO_URL/80: no item was closed for it" "$case_dir/stderr" "f1: the unlisted legitimate link was not reported"
   assert_no_grep 'close-at-merge: closed' "$case_dir/stdout" "f1: something closed without a directive line"
   # Control: the same body with the legitimate member on a Train-member line closes it, and only it.
-  printf '%s\n' "Train-member: $REPO_URL/71" >> "$case_dir/bodies/80"
+  printf '%s\n' '' "Train-member: $REPO_URL/71" >> "$case_dir/bodies/80"
   gh_merge "$case_dir" 80
   [ "$(cx_state "$case_dir" actually-landed)" = "done" ] || fail "f1 control: a Train-member line did not close the member's item"
   [ "$(cx_state "$case_dir" explicitly-excluded)" = queued ] || fail "f1 control: the excluded item closed"
@@ -1146,7 +1159,7 @@ test_f3_a_component_table_with_a_negated_exclusion_heading_closes_nothing_withou
   assert_match "^actionable: close-at-merge: mentioned $REPO_URL/71 in the prose of $REPO_URL/80: no item was closed for it; list it as a Train-member: line" "$case_dir/stderr" \
     "f3: the unlisted member was silent"
   # Control: the Train-member line closes it, whatever the heading says.
-  printf '%s\n' "Train-member: $REPO_URL/71" >> "$case_dir/bodies/80"
+  printf '%s\n' '' "Train-member: $REPO_URL/71" >> "$case_dir/bodies/80"
   gh_merge "$case_dir" 80
   [ "$(cx_state "$case_dir" included-item)" = "done" ] || fail "f3 control: the Train-member line did not close the member's item"
   pass "F3: a negated exclusion heading no longer decides anything; the unlisted member is reported and a Train-member line closes it"
@@ -1279,7 +1292,7 @@ test_a_train_members_prose_only_mention_is_reported_and_never_closed() {
   cx_add "$case_dir" member-prose-only
   cx_add "$case_dir" unrelated-item
   printf '%s\n' "Train-member: $REPO_URL/71" > "$case_dir/bodies/95"
-  printf '%s\n' 'This also fixes member-prose-only.' 'Closes-backlog-item: member-directive' 'The member-directive item is the main one.' > "$case_dir/bodies/71"
+  printf '%s\n' 'This also fixes member-prose-only.' '' 'Closes-backlog-item: member-directive' '' 'The member-directive item is the main one.' > "$case_dir/bodies/71"
   printf '%s\n' 71 >> "$case_dir/merged-prs"
   gh_merge "$case_dir" 95
   [ "$(cx_state "$case_dir" member-directive)" = "done" ] || fail "f2: the member's directive did not close its item"
@@ -1476,6 +1489,134 @@ test_done_json_has_the_same_fields_and_values_as_tasks_axi_alone() {
   pass "done --json through the wrapper has the same fields and values as tasks-axi alone"
 }
 
+# Review b4182820 F1: a heading, a <pre> example and a code span that spans lines hold no
+# directive. Each witness closes nothing and keeps its dependent's edge, while a real block in
+# the same body closes; a directive line outside a block is reported.
+# The case folder is left in F1_CASE (no command substitution, so a fail stops the test).
+f1_witness_case() {  # <name> <number> <example-id> <example lines...>
+  local name=$1 number=$2 example=$3 case_dir
+  shift 3
+  case_dir=$(gh_case "$name" "$number")
+  cx_add "$case_dir" "$name-control"
+  cx_add "$case_dir" "$example"
+  cx_add "$case_dir" "$name-waiter"
+  cx "$case_dir" block "$name-waiter" --by "$example" >/dev/null
+  printf '%s\n' 'Real block:' '' "Closes-backlog-item: $name-control" '' "$@" > "$case_dir/bodies/$number"
+  gh_merge "$case_dir" "$number"
+  [ "$(cx_state "$case_dir" "$name-control")" = "done" ] || fail "$name: the real directive did not close its item"
+  assert_match "^close-at-merge: closed $name-control with $REPO_URL/$number " "$case_dir/stdout" "$name: the real directive's close was not reported with the merged URL"
+  [ "$(cx_state "$case_dir" "$example")" = queued ] || fail "$name: an item named only by an example was closed"
+  case "$(cx_deps "$case_dir" "$name-waiter")" in *"$example"*) ;; *) fail "$name: the dependent lost its edge on an item that did not finish" ;; esac
+  assert_no_grep "closed $example" "$case_dir/stdout" "$name: the example's close was reported"
+  F1_CASE=$case_dir
+}
+
+test_f1_a_setext_heading_directive_closes_nothing_and_is_reported() {
+  f1_witness_case f1-setext 96 wit-setext 'Closes-backlog-item: wit-setext' '=========================='
+  assert_match '^actionable: close-at-merge: ignored a directive line outside a directive block in the body of .*: Closes-backlog-item: wit-setext$' "$F1_CASE/stderr" \
+    "f1-setext: the heading's directive line was not reported"
+  pass "F1: a setext heading's directive line closes nothing, keeps the dependent's edge and is reported, while the real block closes"
+}
+
+test_f1_a_pre_example_closes_nothing_with_or_without_blank_lines() {
+  f1_witness_case f1-pre 97 wit-pre '<pre>' '' 'Closes-backlog-item: wit-pre' '' '</pre>'
+  f1_witness_case f1-pre-tight 98 wit-pre-tight '<pre>' 'Closes-backlog-item: wit-pre-tight' '</pre>'
+  pass "F1: a directive inside a <pre> example closes nothing and keeps the dependent's edge, with or without blank lines, while the real block closes"
+}
+
+# shellcheck disable=SC2016 # Backticks in the fixture lines are literal Markdown.
+test_f1_a_code_span_over_lines_closes_nothing_and_is_reported() {
+  f1_witness_case f1-code 99 wit-code 'The form is `' 'Closes-backlog-item: wit-code' '` on its own line.'
+  assert_match '^actionable: close-at-merge: ignored a directive line outside a directive block in the body of .*: Closes-backlog-item: wit-code$' "$F1_CASE/stderr" \
+    "f1-code: the code span's directive line was not reported"
+  pass "F1: a directive inside a code span over lines closes nothing, keeps the dependent's edge and is reported, while the real block closes"
+}
+
+test_f1_an_open_html_quote_or_example_element_closes_nothing() {
+  f1_witness_case f1-blockquote 100 wit-blockquote '<blockquote>' '' 'Closes-backlog-item: wit-blockquote' '' '</blockquote>'
+  f1_witness_case f1-details 101 wit-details '<details><summary>An example</summary>' '' 'Closes-backlog-item: wit-details' '' '</details>'
+  f1_witness_case f1-inline-pre 102 wit-inline-pre 'Example: <pre>' '' 'Closes-backlog-item: wit-inline-pre' '' '</pre>'
+  pass "F1: a directive inside an open <blockquote>, <details> or mid-line <pre> closes nothing and keeps the dependent's edge, while the real block closes"
+}
+
+# Review b4182820 F1, the rule itself: a directive counts only in a block of its own. A block
+# right under a heading, after a fence, after a comment or after a closed <details> counts; a
+# directive glued to prose, or in a run that holds a malformed directive line, is reported.
+test_the_directive_block_rule_keeps_real_blocks_and_reports_the_rest() {
+  local body=$TMP_ROOT/block-rule.md out
+  printf '%s\n' '## Backlog items' 'Closes-backlog-item: after-heading' '' \
+    '```text' 'Closes-backlog-item: fenced-example' '```' 'Closes-backlog-item: after-fence' \
+    '<!-- note -->' 'Closes-backlog-item: after-comment' '' \
+    '<details>' '<summary>Evidence</summary>' '' 'Body text.' '' '</details>' '' \
+    'Closes-backlog-item: after-details' 'Closes: legacy-in-block' 'Train-member: https://github.com/o/r/pull/5' '' \
+    'Text, then' 'Closes-backlog-item: glued-to-prose' '' \
+    'Closes-backlog-item: tainted-by-malformed' 'Closes-backlog-item: bad # x' '' \
+    'Train-member: https://github.com/o/r/pull/6' '---' > "$body"
+  out=$(lib_call fm_pr_closes_ids "$body")
+  [ "$out" = "$(printf '%s\n' after-heading after-fence after-comment after-details)" ] \
+    || fail "block rule: the item ids were not exactly the four real blocks: $(printf '%s' "$out" | tr '\n' ' ')"
+  out=$(lib_call fm_pr_closes_members "$body")
+  [ "$out" = https://github.com/o/r/pull/5 ] || fail "block rule: the members were not exactly the real block's line: $(printf '%s' "$out" | tr '\n' ' ')"
+  out=$(lib_call fm_pr_closes_outside "$body")
+  [ "$out" = "$(printf '%s\n' 'Closes-backlog-item: glued-to-prose' 'Closes-backlog-item: tainted-by-malformed' 'Train-member: https://github.com/o/r/pull/6')" ] \
+    || fail "block rule: the lines outside a block were not each reported once: $(printf '%s' "$out" | tr '\n' ' ')"
+  out=$(lib_call fm_pr_closes_malformed "$body")
+  [ "$out" = 'Closes-backlog-item: bad # x' ] || fail "block rule: the malformed line was not reported: $out"
+  out=$(lib_call fm_pr_closes_legacy_ids "$body")
+  [ "$out" = legacy-in-block ] || fail "block rule: the old line in a block was not read for its report: $out"
+  pass "the block rule keeps blocks under a heading, after a fence, a comment or a closed <details>, and reports a directive glued to prose, beside a malformed line or above a setext underline"
+}
+
+# Review b4182820 F1, member side: a Train-member line inside a code span that spans lines
+# lists no member, so the task whose pr= is that URL keeps its state and its dependent's edge,
+# while a real Train-member line in the same body closes its member's item.
+# shellcheck disable=SC2016 # Backticks in the fixture lines are literal Markdown.
+test_f1_a_train_member_inside_a_code_span_lists_no_member() {
+  local case_dir
+  case_dir=$(gh_case f1-member-code 103)
+  cx_add "$case_dir" member-control
+  cx_add "$case_dir" code-member-docs docs
+  cx_meta "$case_dir" code-member-docs docs "$REPO_URL/71"
+  cx_add "$case_dir" code-member-waiter
+  cx "$case_dir" block code-member-waiter --by code-member-docs >/dev/null
+  printf '%s\n' "Train-member: $REPO_URL/73" '' 'Example only: `' "Train-member: $REPO_URL/71" '` is the form.' > "$case_dir/bodies/103"
+  printf '%s\n' 'Closes-backlog-item: member-control' > "$case_dir/bodies/73"
+  printf '%s\n' 'Closes-backlog-item: never-read' > "$case_dir/bodies/71"
+  printf '%s\n' 71 73 >> "$case_dir/merged-prs"
+  gh_merge "$case_dir" 103 --merge
+  [ "$(cx_state "$case_dir" member-control)" = "done" ] || fail "f1-member: the real member's item did not close"
+  [ "$(cx_state "$case_dir" code-member-docs)" = queued ] || fail "f1-member: a code-span member's pr= item was closed"
+  case "$(cx_deps "$case_dir" code-member-waiter)" in *code-member-docs*) ;; *) fail "f1-member: the dependent lost its edge on an item that did not finish" ;; esac
+  assert_match "^actionable: close-at-merge: ignored a directive line outside a directive block in the body of .*: Train-member: $REPO_URL/71\$" "$case_dir/stderr" \
+    "f1-member: the code span's Train-member line was not reported"
+  pass "F1: a Train-member line inside a code span lists no member and keeps the pr= item and its dependent's edge, while the real member closes"
+}
+
+# Review b4182820 F2: a pull request link that only a train member's body holds is reported,
+# never closed; the listed member and an unrelated item are not reported.
+test_f2_a_train_members_prose_pr_link_is_reported_and_never_closed() {
+  local case_dir
+  case_dir=$(gh_case f2-member-link 104)
+  cx_add "$case_dir" member-link-control
+  cx_add "$case_dir" unlisted-72-item
+  cx_add "$case_dir" unrelated-link-item
+  printf '%s\n' "Train-member: $REPO_URL/71" > "$case_dir/bodies/104"
+  printf '%s\n' 'Closes-backlog-item: member-link-control' '' "Related member pull request: $REPO_URL/72" "It links itself too: $REPO_URL/71 and the train $REPO_URL/104." > "$case_dir/bodies/71"
+  printf '%s\n' 'Closes-backlog-item: unlisted-72-item' > "$case_dir/bodies/72"
+  printf '%s\n' 71 72 >> "$case_dir/merged-prs"
+  gh_merge "$case_dir" 104 --merge
+  [ "$(cx_state "$case_dir" member-link-control)" = "done" ] || fail "f2-link: the listed member's item did not close"
+  [ "$(cx_state "$case_dir" unlisted-72-item)" = queued ] || fail "f2-link: a pull request named only by a member's link was read as a member"
+  [ "$(cx_state "$case_dir" unrelated-link-item)" = queued ] || fail "f2-link: an unrelated item changed"
+  assert_match "^actionable: close-at-merge: mentioned $REPO_URL/72 in the prose of train member $REPO_URL/71: no item was closed for it" "$case_dir/stderr" \
+    "f2-link: the member body's pull request link was not reported"
+  [ "$(grep -c "mentioned $REPO_URL/72 " "$case_dir/stderr")" = 1 ] || fail "f2-link: the link was reported more than once"
+  assert_no_grep "mentioned $REPO_URL/71 " "$case_dir/stderr" "f2-link: the listed member was reported as a mention"
+  assert_no_grep "mentioned $REPO_URL/104 " "$case_dir/stderr" "f2-link: the merged train was reported as a mention"
+  assert_no_grep 'unrelated-link-item' "$case_dir/stderr" "f2-link: an unrelated item was reported"
+  pass "F2: a pull request link in a train member's body is reported once and never closed; the listed member, the train and an unrelated item are not reported"
+}
+
 pr_close_test_cases=(
 test_closes_lines_close_each_eligible_item_and_report_the_rest
 test_a_merge_naming_its_own_task_reports_the_live_record
@@ -1525,5 +1666,12 @@ test_the_named_item_matrix_with_production_prune_on
 test_a_second_merge_run_changes_nothing_with_the_record_present_and_after_prune
 test_the_typed_record_delivery_completion_clears_the_finished_edge
 test_done_json_has_the_same_fields_and_values_as_tasks_axi_alone
+test_f1_a_setext_heading_directive_closes_nothing_and_is_reported
+test_f1_a_pre_example_closes_nothing_with_or_without_blank_lines
+test_f1_a_code_span_over_lines_closes_nothing_and_is_reported
+test_f1_an_open_html_quote_or_example_element_closes_nothing
+test_the_directive_block_rule_keeps_real_blocks_and_reports_the_rest
+test_f1_a_train_member_inside_a_code_span_lists_no_member
+test_f2_a_train_members_prose_pr_link_is_reported_and_never_closed
 )
 fm_test_run_cases "${pr_close_test_cases[@]}" -- "$@"
