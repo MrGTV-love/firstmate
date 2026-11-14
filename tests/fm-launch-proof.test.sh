@@ -593,6 +593,7 @@ test_launch_proof_claude_adoption() (
   fresh_case; write_transcript "Please look at $LANE/state/operational-inbox and tell me what is there" 30
   refuses 'no task-specific session tie' '(h) the first message only names the inbox'
   fresh_case; mkdir -p "$T/foreign/state"; fm_operational_record_write "$T/foreign/state" launch-brief 'foreign brief' FOREIGN
+  # shellcheck disable=SC2153 # FOREIGN is assigned by name by fm_operational_record_write.
   write_transcript "$FOREIGN" 30
   refuses 'no task-specific session tie' '(h) the doorbell names a record outside the task home'
   fresh_case; rm -f "$LANE"/state/operational-inbox/*.msg
@@ -648,6 +649,7 @@ test_launch_proof_claude_adoption() (
   rm -f "$LANE"/state/operational-inbox/*.msg
   refuses_stated 'no task-specific session tie' '(h2) with --session-id: a personal session stays refused once the brief is gone'
   fresh_case; mkdir -p "$T/foreign/state"; fm_operational_record_write "$T/foreign/state" launch-brief 'foreign brief' FOREIGN
+  # shellcheck disable=SC2153 # FOREIGN is assigned by name by fm_operational_record_write.
   write_transcript "$FOREIGN" 30; rm -f "$T"/foreign/state/operational-inbox/*.msg
   refuses_stated 'no task-specific session tie' 'with --session-id: a doorbell of another home is not this task'"'"'s'
   fresh_case
