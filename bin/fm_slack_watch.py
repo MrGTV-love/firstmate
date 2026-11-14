@@ -43,6 +43,7 @@ import shlex
 import subprocess
 import sys
 import tempfile
+import time
 import unicodedata
 import uuid
 
@@ -275,13 +276,17 @@ SINK_WORD = '[redacted]'
 # Every constant that a wake line, the failed-row listing or the record pointer carries: a plane value that is part of any of
 # them could never be replaced for good, so a run that prints wake lines (poll, mirror, check) refuses it at its start (F1 of Main 2602). The diagnostic
 # prefixes are not in this list: redact_sink protects them.
-WAKE_FIXED_TEXT = (REQUEST_PREFIX, FOLLOWUP_PREFIX, FOLLOWUP_LABEL, FOLLOWUP_CUT, ' to request ', CHECK_EVENT_PREFIX, ' from ', REQUEST_UNACKNOWLEDGED, REQUEST_UNKNOWN, REQUEST_LABEL, SCOTT_REQUEST_LABEL, '; ' + SECRET_FLAG, '; full: ', '; +', ' queued',
+WAKE_FIXED_TEXT = (REQUEST_PREFIX, FOLLOWUP_PREFIX, FOLLOWUP_LABEL, FOLLOWUP_CUT, ' to request ', CHECK_EVENT_PREFIX, ' from ', REQUEST_UNACKNOWLEDGED, REQUEST_UNKNOWN, REQUEST_LABEL, '; ' + SECRET_FLAG, '; full: ', '; +', ' queued',
                    SECRET_MARKER, SECRET_FLAG, SINK_WORD, 'slack: request ', ' not acknowledged (failed, owner Main)', 'slack: request finished')
+# The second person's own fixed text: it is part of a run's collision check only while it can reach a sink (their setting is on, or a line of theirs is still
+# journaled: Watch.scott_fixed_texts), so that with their setting off a value that matches only their label cannot disable the owner (F6 of the outside review of
+# 5beee645). The protection is not removed: every line of theirs is still checked, a journaled one included.
+SCOTT_FIXED_TEXT = (SCOTT_REQUEST_LABEL,)
 # The constants each other command prints and nothing else of its own (Main 3266: the check runs on what THAT command emits): a plane value inside
 # one of them is refused at the start of that command only, so a collision in the wake or listing text never stops resolve, disarm or retarget.
 COMMAND_FIXED_TEXT = {
     'reply': (REPLY_REFUSAL, 'replied: thread ', 'already replied, nothing posted: thread ', SINK_WORD),
-    'read': (REPLY_REFUSAL, READ_HEADER, READ_EARLIER, READ_TEXT_RULE, REQUEST_LABEL, SCOTT_REQUEST_LABEL, FOLLOWUP_LABEL, ANSWER_LABEL, SINK_WORD),
+    'read': (REPLY_REFUSAL, READ_HEADER, READ_EARLIER, READ_TEXT_RULE, REQUEST_LABEL, FOLLOWUP_LABEL, ANSWER_LABEL, SINK_WORD),
     'arm': ('slack: refused: ', 'slack: refused: unsafe_state_path', 'slack: refused: unsafe_check_shim', 'slack: refused: check_registration_failed',
             'armed: state/slack.check.sh', SINK_WORD),
     'disarm': ('slack: refused: check_unregistration_failed', 'disarmed: state/slack.check.sh', SINK_WORD),
@@ -294,7 +299,7 @@ COMMAND_FIXED_TEXT = {
 # armed with such a value would be refused by every check, so arm refuses it too, before it writes anything, besides its own constants.
 COMMAND_FIXED_TEXT['arm'] = WAKE_FIXED_TEXT + COMMAND_FIXED_TEXT['arm']
 # Every fixed text any command can print: the inventory test reads the print calls and holds this list complete.
-FIXED_WAKE_TEXT = WAKE_FIXED_TEXT + tuple(text for texts in COMMAND_FIXED_TEXT.values() for text in texts if text not in WAKE_FIXED_TEXT)
+FIXED_WAKE_TEXT = WAKE_FIXED_TEXT + SCOTT_FIXED_TEXT + tuple(text for texts in COMMAND_FIXED_TEXT.values() for text in texts if text not in WAKE_FIXED_TEXT)
 
 
 def redacted_error(error):
@@ -571,7 +576,7 @@ def replace_request_text(row, marks):
 
 
 SEGMENT = re.compile(r'(check: slack request ([0-9]+\.[0-9]+) from (' + USER_ID.pattern + r')( \((?:not acknowledged after [0-9]+ tries|acknowledgement state unknown)\))?: '
-                     + '(?:' + re.escape(REQUEST_LABEL) + '|' + re.escape(SCOTT_REQUEST_LABEL) + r') )("(?:[^"\\]|\\.)*")((?:; ' + SECRET_FLAG + r')?)((?:; full: [^;#]*#[0-9]+\.[0-9]+)?)')
+                     + '(?:' + re.escape(REQUEST_LABEL) + '|' + re.escape(SCOTT_REQUEST_LABEL) + r') )("(?:[^"\\]|\\.)*")((?:; ' + SECRET_FLAG + r')?)((?:; full: [^;#]*#[0-9]+\.[0-9]+(?:@' + USER_ID.pattern + r')?)?)')
 LITERAL_UNIT = re.compile(r'\\u[0-9a-fA-F]{4}|\\.|.', re.S)
 
 
@@ -581,7 +586,7 @@ def sanitize(raw):
     return sanitize_counted(raw)[:3]
 
 
-def sanitize_counted(raw, mark=None):
+def sanitize_counted(raw, mark=None, extra_fixed=()):
     """sanitize, and a fourth value: the number of UTF-8 bytes of the raw text that redaction removed other than as an
     exact occurrence of a value in it (a cascade, or a value that only the presentation joins). It is 0 when no value
     occurs and when every value occurs whole; every other byte is kept exactly, in order (Amendment bq).
@@ -591,7 +596,7 @@ def sanitize_counted(raw, mark=None):
     The whole permitted text, the record (I4d), is the raw text with the same replacements; where a value appears only
     once the presentation joins its pieces, the raw characters that form it, the link or entity among them included,
     are replaced by the marker."""
-    refuse_a_value_that_the_marker_holds()
+    refuse_a_value_that_the_marker_holds(WAKE_FIXED_TEXT + tuple(extra_fixed))
     # The transport may already have removed the plane's token from the response (a mark and the marker stand where it was):
     # the mark is dropped, the marker stays, and the value counts as replaced.
     # Only the mark that this read asked the transport to leave is dropped; an owner's own U+FDD0 stays in the text.
@@ -655,13 +660,16 @@ def request_line_parts(ts, user, presented, note='', flagged=False, budget=WAKE_
     own text by the one replacer before the line is built."""
     # head and cut are the follow-up line's: its own head, and the sentence that names the Slack thread to read the rest from (it has no record).
     head = REQUEST_PREFIX + '%s from %s%s: %s ' % (ts, user, note, label) if head is None else head
+    # The key the pointer names: the Slack timestamp for the owner's request, `<ts>@<member id>` for the second person's (request_key), because the same timestamp can
+    # be in both DMs. A consumer takes the last line of the store whose key (its `key` field, else its `ts`) is the pointer's (invariant 3).
+    key = '%s@%s' % (ts, user) if label == SCOTT_REQUEST_LABEL else ts
     places = [place, *fallbacks] if place else list(fallbacks)
-    places = [value for value in places if not value_hits('; full: %s#%s' % (value, ts))]
+    places = [value for value in places if not value_hits('; full: %s#%s' % (value, key))]
     places = [value for index, value in enumerate(places) if value not in places[:index]] + ['']
     flag = '; ' + SECRET_FLAG if flagged else ''
     for where in places:
         def build(count, where=where):
-            more = '' if count == len(presented) else (cut if cut is not None else '; full: %s#%s' % (where, ts))
+            more = '' if count == len(presented) else (cut if cut is not None else '; full: %s#%s' % (where, key))
             return head + json.dumps(presented[:count], ensure_ascii=False) + flag + more
         if len(build(len(presented))) <= budget:
             return build(len(presented)), len(presented), len(head) + 1
@@ -735,6 +743,13 @@ def settings():
     dm_user = env_value('FM_SLACK_DM_USER').strip()
     valid_authors = bool(authors) and all(USER_ID.fullmatch(a) for a in authors)
     return token, authors, dm_user, valid_authors
+
+
+def boundary_ts():
+    """The time of an arm as a Slack timestamp: the starting point of the second person's window when the arm could not read their DM (Slack's own timestamps
+    are seconds and microseconds since the epoch). A message typed in the few seconds between this clock and Slack's is the one case this cannot place."""
+    now = time.time()
+    return '%d.%06d' % (int(now), int((now % 1) * 1000000))
 
 
 def second_user():
@@ -893,6 +908,8 @@ class Watch:
         self.staging_only = False
         self.dm_proven = False
         self.second_proven = False
+        # Set by main for a run that prints wake lines: prints what the owner's work has journaled, so that the second person's I/O never delays it (F7).
+        self.flush_owner = None
         self.window_reads = 0
         self.second_reads = 0
         self.ran_unbound = False
@@ -1221,6 +1238,13 @@ class Watch:
             raise SlackError('stored_channel_not_owner_dm')
         return channel
 
+    def scott_fixed_texts(self):
+        """Their fixed text, when it can reach a sink in this run: their setting is on, a request row of theirs is journaled, or a wake line of theirs is still
+        in the outbox (it is printed whatever the setting is now). Otherwise nothing of theirs can be printed and the owner's checks are the base's."""
+        if self.second or any(row.get('person') == 'second' for row in self.state['pending']) or any(SCOTT_REQUEST_LABEL in line for line in self.output):
+            return SCOTT_FIXED_TEXT
+        return ()
+
     def second_window(self):
         """The second person's window in the journal: their member id, their DM, and the starting point and walk bounds of their requests. It is kept apart
         from the owner's, whose keys stay at the top of the state; it is empty until the poll has started it."""
@@ -1410,26 +1434,38 @@ class Watch:
             raise SlackError('source_not_bound')
         self.state.update(self.dm_boundary())
         self.state.pop('intake_bounds', None)
-        self.reseed_second()
         self.commit()
         self.dm_proven = True
+        self.arm_second()
 
-    def reseed_second(self):
-        """Arm's fresh starting point for the second person: their user and DM are kept, their page bounds are dropped, and their cursor is set to the newest
-        message of their proven DM, as dm_boundary sets the owner's. A pending or failed row of theirs drains through its own DM and needs no old cursor. A
-        failed read of their DM never fails the owner's arm: their cursor is then dropped, and the next poll records it."""
+    def arm_second(self):
+        """Arm's durable starting point for the second person (invariant 1), after the owner's own state is committed and isolated from it: whatever the
+        window's state (none yet, started, or a person the setting no longer names), a message typed before the arm is never taken in and one typed after it
+        always is. Their user and DM are kept; the starting point is the newest message of their proven DM, or, when that read fails, the time of the arm
+        (boundary_ts) recorded in the window itself, so that the recovery after the failed read cannot take the cursor past a message typed after the arm. A
+        pending or failed row of theirs drains through its own DM and needs no old cursor. Never raises Slack's errors: the owner's arm never fails because of
+        their DM."""
         win = self.second_window()
         win.pop('intake_bounds', None)
         win.pop('intake_cursor', None)
-        if not self.second or win.get('user') != self.second:
+        if not self.second:
+            if win:
+                self.commit()
+            return
+        if win.get('user') != self.second and any(row.get('person') == 'second' for row in self.state['pending']):
+            # Rows taken in from the person the setting no longer names drain first, under the old setting (start_second); their window is left as it is.
+            self.commit()
             return
         try:
-            cursor = self.newest(self.read_window(self.second_channel(), second=True, limit=1).get('messages'))
+            self.start_second()
         except SecretCollision:
             raise
         except SlackError:
-            return
-        win['intake_cursor'] = cursor
+            kept = self.second_window()
+            if kept.get('user') != self.second:
+                kept = self.state['second'] = {'user': self.second}
+            kept['intake_cursor'] = boundary_ts()
+        self.commit()
 
     @staticmethod
     def newest(messages):
@@ -1473,7 +1509,7 @@ class Watch:
         # A message with no text (a file-only message has none) is not a request; any text, whatever it looks like, is.
         if not isinstance(text, str) or text == '':
             return None
-        whole, shown, replaced, extra = sanitize_counted(text, self.read_mark)
+        whole, shown, replaced, extra = sanitize_counted(text, self.read_mark, SCOTT_FIXED_TEXT if second else ())
         channel = self.second_window().get('channel', '') if second else self.state.get('channel', '')
         event = '/'.join([self.state.get('team', ''), channel, ts, 'request'])
         row = {'event': event, 'key': '', 'thread': ts, 'author': message['user'], 'text': whole, 'shown': shown,
@@ -1486,11 +1522,18 @@ class Watch:
         """The event of the request of one thread, as request_from builds it."""
         return '/'.join([self.state.get('team', ''), self.state.get('channel', ''), thread, 'request'])
 
+    def admitted_events(self):
+        """The events of every request this plane admitted: those marked seen, and those whose acknowledgement failed three times and that were woken as not
+        acknowledged (their row waits in the journal for `resolve`). A request's identity does not depend on its acknowledgement, so it can be read and answered
+        in its own thread before it is resolved; resolving only moves its event to the seen map (invariant 2)."""
+        woken = {row['event'] for row in self.state['pending'] if row.get('kind') == 'request' and failed(row) and isinstance(row.get('event'), str)}
+        return set(self.state['seen']) | woken
+
     def request_threads(self):
         """The threads of the requests this plane took in from the stored DM, oldest first."""
         team, channel = self.state.get('team', ''), self.state.get('channel', '')
         found = set()
-        for event in self.state['seen']:
+        for event in self.admitted_events():
             parts = event.split('/')
             if (channel and len(parts) == 4 and parts[:2] == [team, channel] and parts[3] == 'request'
                     and SLACK_TS.fullmatch(parts[2])):
@@ -1508,7 +1551,7 @@ class Watch:
             return ts, self.state['channel'], None
         channel = self.second_window().get('channel')
         if (not self.second or author != self.second or self.second_window().get('user') != author or not channel
-                or '/'.join([self.state.get('team', ''), channel, ts, 'request']) not in self.state['seen']):
+                or '/'.join([self.state.get('team', ''), channel, ts, 'request']) not in self.admitted_events()):
             raise SlackError('unknown_request_thread')
         return ts, channel, 'second'
 
@@ -1745,8 +1788,10 @@ class Watch:
         entry = {'ts': pending['thread'], 'text': pending['text'], 'shown': shown_text(pending),
                  'replaced': bool(pending.get('replaced')), 'extra_removed': int(pending.get('extra') or 0)}
         if pending.get('person') == 'second':
-            # The same ts can be in the owner's DM too: the second person's line names its author, and the owner's lines never do.
+            # The same ts can be in the owner's DM too: the second person's line names its author and carries the key `<ts>@<member id>` that the pointer of
+            # their wake line names; the owner's lines carry neither, and their key is their ts.
             entry['author'] = pending['author']
+            entry['key'] = '%s@%s' % (pending['thread'], pending['author'])
         return entry
 
     def store_after(self, entry_text):
@@ -2232,14 +2277,32 @@ class Watch:
         data = self.api.call('reactions.get', channel=self.state['channel'], timestamp=ts)
         return data.get('message', {}).get('reactions', [])
 
-    def reaction_choices(self, record):
+    def observe_second_taps(self, record, reactions):
+        """The second person's reactions on a held card, whatever the emoji: each one that is new since the last poll is one attempt to answer a decision held for
+        the captain, and gets one durable refusal row (reason, their id, the card, the emoji and the attempt number). A reaction that only persists across polls is
+        not a new attempt; one that was seen removed and is added again is. The card's record keeps which of their emoji were present at the last poll and how many
+        attempts each has had. No answer is made. A log that cannot be written leaves that attempt unrecorded, so the next poll writes it."""
+        if not self.second or self.staging_only:
+            return
+        now = {r.get('name') for r in reactions if isinstance(r, dict) and self.second in r.get('users', []) and isinstance(r.get('name'), str)}
+        before = set(record.get('second_taps', []))
+        counts = dict(record.get('second_attempts', {}))
+        kept = before & now
+        for emoji in sorted(now - before):
+            attempt = counts.get(emoji, 0) + 1
+            if not self.refuse_second('decision_held_for_captain_reaction', record, emoji, attempt):
+                break
+            counts[emoji] = attempt
+            kept.add(emoji)
+        if sorted(kept) != sorted(before) or counts != record.get('second_attempts', {}):
+            record['second_taps'] = sorted(kept)
+            record['second_attempts'] = counts
+            self.commit()
+
+    def reaction_choices(self, record, reactions=None):
         """One signal per option reaction tapped by an allowlisted human."""
         choices = []
-        reactions = self.reactions_for(record['ts'])
-        if self.second:
-            for i in range(min(len(record.get('options', [])), len(REACTIONS))):
-                if any(self.second in r.get('users', []) for r in reactions if r.get('name') == REACTIONS[i]):
-                    self.refuse_second('decision_held_for_captain_reaction', record, REACTIONS[i])
+        reactions = self.reactions_for(record['ts']) if reactions is None else reactions
         for i, option in enumerate(record.get('options', [])):
             if i >= len(REACTIONS):
                 break
@@ -2385,6 +2448,10 @@ class Watch:
         error, left = self.take_in(max(0, remaining - self.notices_handled))
         deferred = deferred or error
         # The second person's work comes after all of the owner's, and takes only what the cap leaves of it.
+        if self.second and self.flush_owner:
+            # Invariant 4 (owner delivery never waits behind the second person's I/O): the owner's wake lines are printed before their window is touched. With their
+            # setting off nothing is flushed here, so the owner's bytes are the base's.
+            self.flush_owner()
         self.second_poll(left)
         if deferred:
             raise deferred
@@ -2488,22 +2555,27 @@ class Watch:
     def start_second(self):
         """The second person's starting point, as the owner's is set: the poll opens their DM and records its newest message, never its history, and takes
         nothing in on that read. Their window is kept apart in state['second']; a person the setting no longer names is replaced by a fresh window unless
-        rows taken in from them are still pending (those drain first, under the old setting). Their DM is never the owner's."""
+        rows taken in from them are still pending (those drain first, under the old setting). Their DM is never the owner's. A starting point that an arm
+        recorded as the time of the arm (its read of their DM failed, so the window may hold no DM yet) is kept: the DM is opened and the window is completed
+        around that starting point instead of the newest message, which could be one typed after the arm."""
         if not self.second or not self.state.get('channel'):
             return
         win = self.second_window()
-        if win.get('user') == self.second:
-            if win.get('intake_cursor') is not None:
-                return
-        elif any(row.get('person') == 'second' for row in self.state['pending']):
+        same = win.get('user') == self.second
+        if same and win.get('channel') and win.get('intake_cursor') is not None:
+            return
+        if not same and any(row.get('person') == 'second' for row in self.state['pending']):
             return
         opened = self.api.call('conversations.open', users=self.second, return_im=True).get('channel', {})
         if not DM_CHANNEL.fullmatch(opened.get('id') or '') or not opened.get('is_im'):
             raise SlackError('target_is_not_a_DM')
         if opened['id'] == self.state.get('channel'):
             raise SlackError('second_dm_is_owner_dm')
-        latest = self.read_window(opened['id'], second=True, limit=1)
-        self.state['second'] = {'user': self.second, 'channel': opened['id'], 'intake_cursor': self.newest(latest.get('messages'))}
+        if same and win.get('intake_cursor') is not None:
+            cursor = win['intake_cursor']
+        else:
+            cursor = self.newest(self.read_window(opened['id'], second=True, limit=1).get('messages'))
+        self.state['second'] = {'user': self.second, 'channel': opened['id'], 'intake_cursor': cursor}
         self.commit()
         self.second_proven = True
 
@@ -2594,19 +2666,23 @@ class Watch:
             return False
         return True
 
-    def refuse_second(self, reason, record, item):
+    def refuse_second(self, reason, record, item, attempt=None):
         """The second person tried to answer a held decision: a reply in a card thread or a tap on an option of its card. No answer is made (their id is never an
         answering author); the attempt is refused once, with a row in the plane's log naming the reason (the decision is held for the captain, the role word of the
         plane's own decision text) and their id. A log that cannot be written leaves the
-        attempt unmarked, so the next poll writes it. A retarget's own read (staging_only) logs nothing."""
+        attempt unmarked, so the next poll writes it. A retarget's own read (staging_only) logs nothing. attempt (a reaction's number of tries) is part of the
+        row and of the event, so that a second attempt is its own row. Returns whether the attempt is on record."""
         if self.staging_only:
-            return
-        event = '/'.join([self.state.get('team', ''), self.state.get('channel', ''), record['ts'], item, 'second-refused'])
+            return True
+        event = '/'.join([self.state.get('team', ''), self.state.get('channel', ''), record['ts'], item if attempt is None else '%s#%d' % (item, attempt), 'second-refused'])
         if event in self.state['seen']:
-            return
-        if self.second_log(reason, detail=HELD_FOR_CAPTAIN, author=self.second, channel=self.state.get('channel'), thread=record['ts'], item=item):
+            return True
+        extra = {} if attempt is None else {'attempt': attempt}
+        if self.second_log(reason, detail=HELD_FOR_CAPTAIN, author=self.second, channel=self.state.get('channel'), thread=record['ts'], item=item, **extra):
             self.mark_seen(event, record['key'])
             self.commit()
+            return True
+        return False
 
     def share(self, budget, followups, requests):
         """How the per-poll cap that is left is divided between the follow-ups and the new requests that are ready: (follow-ups, requests). With only one
@@ -2655,7 +2731,10 @@ class Watch:
         key = record['key']
         new_replies = [r for r in self.typed_candidates(record) if r['event'] not in self.state['seen']]
         self.read_threads.add(record['ts'])
-        taps = self.reaction_choices(record) if record.get('reactions') and record.get('options') else []
+        reactions = self.reactions_for(record['ts']) if record.get('reactions') and (record.get('options') or self.second) else None
+        if reactions is not None:
+            self.observe_second_taps(record, reactions)
+        taps = self.reaction_choices(record, reactions) if record.get('reactions') and record.get('options') else []
         signature = ','.join(tap['name'] for tap in taps)
         if record.get('blocked') is not None:
             if new_replies or signature != record['blocked']:
@@ -2816,7 +2895,9 @@ def state_home():
     return path_setting('FM_STATE_OVERRIDE', home_dir() / 'state')
 
 
-def emit(watch, command):
+def emit(watch, command, final=True):
+    """Print the wake lines that are ready. final=False is the owner's flush inside a poll (nothing else is printed then, the failed-request listing included):
+    the run's last emit prints the rest."""
     fault('before-emit')
     # A request line journaled while the source was bound is selected for printing only while it is still bound, and an
     # unbind cannot complete between that check and the selection: the binding is held across both. The write to
@@ -2831,7 +2912,8 @@ def emit(watch, command):
         if not plan[2] or attempt or not watch.note_collision():
             break
     emit_write(watch, plan)
-    list_failed_requests(command, watch.failed_requests(), watch.out)
+    if final:
+        list_failed_requests(command, watch.failed_requests(), watch.out)
 
 
 def list_failed_requests(command, threads, out=None):
@@ -3068,6 +3150,8 @@ def plane_watch(name, options, out):
                     token_present=bool(env_value('SLACK_BOT_TOKEN'))) if options.get('replay') else None
     watch = Watch(replay=replay, token=env_value('SLACK_BOT_TOKEN').strip())
     watch.out = out
+    if name == 'read':
+        refuse_a_value_that_the_marker_holds(watch.scott_fixed_texts())
     watch.verify_target()
     return watch
 
@@ -3203,11 +3287,13 @@ def main(argv, out=None):
             watch.api.on_reply = lambda: note_progress(out)
         # A plane value that is part of a fixed text this command prints could never be replaced for good: refuse (the wake text for the runs that
         # print wake lines, the wake text and arm's own constants for arm (the adopted I4a), the command's own constants for retarget).
-        refuse_a_value_that_the_marker_holds(COMMAND_FIXED_TEXT.get(action, WAKE_FIXED_TEXT))
+        refuse_a_value_that_the_marker_holds(COMMAND_FIXED_TEXT.get(action, WAKE_FIXED_TEXT) + (() if action == 'retarget' else watch.scott_fixed_texts()))
         if action == 'arm':
             # Only an explicit retarget may move the plane to a changed owner DM. The poll and the mirror look at the owner
             # after they have found the source bound: an unbound run makes no call, no state change and no output (I2 (h)).
             watch.verify_target()
+        if command in ('poll', 'check') and action not in ('arm', 'retarget'):
+            watch.flush_owner = lambda: emit(watch, command, final=False)
         if command == 'mirror':
             if not watch.bound():
                 return 0
