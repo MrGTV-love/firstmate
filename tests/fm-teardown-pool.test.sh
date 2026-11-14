@@ -1449,6 +1449,155 @@ SH
   pass "a removable pending-close record lets a plain and a prior-shape nested close finish where hard links fail"
 }
 
+# The entry preflight covers the records later steps remove or replace: each of
+# these fixed conditions refuses before any lease, endpoint close, removal or
+# drop-record write, for both record shapes, and once only that condition is
+# repaired the same teardown closes. busy-state-directory and
+# merge-notified-directory put a directory where cleanup removes a file;
+# immutable-meta and immutable-return-pending make that record undeletable;
+# forced runs the immutable return-pending case with the drop words, whose
+# record must stay absent.
+nested_preflight_case() {  # <plain|enclosing> <cause>
+  local shape=$1 cause=$2 case_dir rc=0 label="nested-preflight-$2-$1" path fragment force=
+  nested_fixture "$label" "$shape" mine landed
+  case_dir=$NESTED_CASE
+  held_plain_get_slot "$case_dir" "$NESTED_SLOT"
+  nested_place_leftovers "$case_dir"
+  case "$cause" in
+    busy-state-directory)
+      printf 'busy_gen=g1\n' >> "$case_dir/state/task-x1.meta"
+      printf 'g1\n' > "$case_dir/state/task-x1.busy-gen"
+      path=$case_dir/state/task-x1.busy-state; mkdir "$path"; fragment="busy-state record at $path is a directory"
+      ;;
+    merge-notified-directory)
+      path=$case_dir/state/task-x1.pr-poll-merge-notified; mkdir "$path"; fragment="merge-notified record at $path is not a regular file"
+      ;;
+    immutable-meta)
+      path=$case_dir/state/task-x1.meta; fragment="record could not be removed"
+      ;;
+    immutable-return-pending|forced)
+      path=$case_dir/state/task-x1.teardown-return-pending; fragment="return-pending record path $path cannot take"
+      ;;
+  esac
+  [ "$cause" != forced ] || force=--force
+  case "$cause" in immutable-*|forced) chflags uchg "$path" ;; esac
+  nested_snapshot "$case_dir" "$case_dir/snapshot.before"
+  nested_run "$case_dir" $force || rc=$?
+  case "$cause" in immutable-*|forced) chflags nouchg "$path" ;; esac
+  assert_nested_refused_untouched "$case_dir" "$rc" "$label" "$fragment"
+  assert_absent "$case_dir/lease.log" "$label: the refused close took a lease"
+  assert_absent "$case_dir/endpoint.log" "$label: the refused close closed the endpoint"
+  assert_absent "$case_dir/data/task-x1/captain-drop.md" "$label: the refused close wrote the drop record"
+  case "$cause" in
+    busy-state-directory|merge-notified-directory) rmdir "$path" ;;
+  esac
+  rc=0
+  nested_run "$case_dir" $force || rc=$?
+  expect_code 0 "$rc" "$label: the retry after the condition is repaired must close: $(tail -3 "$case_dir/stderr")"
+  assert_nested_closed "$case_dir" "$label"
+}
+
+test_nested_entry_preflight_refuses_before_any_mutation() {
+  local shape cause causes="busy-state-directory merge-notified-directory"
+  pending_close_immutable_supported "$TMP_ROOT" && causes="$causes immutable-meta immutable-return-pending forced"
+  for shape in plain enclosing; do
+    for cause in $causes; do
+      nested_preflight_case "$shape" "$cause"
+    done
+  done
+  pass "the entry preflight refuses a plain and a prior-shape nested close before any mutation ($causes), and each repaired retry closes"
+}
+
+# A tracked hook file in a clean, landed slot is not slot work: when a return
+# fails on an index lock that clears on its own, the retry's reproof must not
+# count teardown's own handling of that hook, so the close finishes and returns
+# the slot once. A late change to the tracked hook made while the lock was held
+# is new work and refuses the return, keeping the change.
+test_nested_lock_retry_ignores_its_own_tracked_hook() {
+  local shape mode case_dir rc label hook=.opencode/plugins/fm-turn-end.js
+  for shape in plain enclosing; do
+    for mode in clean late-hook-change; do
+      label="nested-lock-retry-hook-$mode-$shape"
+      nested_fixture "$label" "$shape" mine landed
+      case_dir=$NESTED_CASE
+      mkdir -p "$NESTED_SLOT/${hook%/*}"
+      printf 'tracked hook\n' > "$NESTED_SLOT/$hook"
+      git -C "$NESTED_SLOT" add "$hook"
+      git -C "$NESTED_SLOT" -c user.email=t@t -c user.name=t commit -qm "tracked hook"
+      git -C "$NESTED_SLOT" push -q origin HEAD:main
+      git -C "$case_dir/project" fetch -q origin
+      cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+[ "\${1:-}" = return ] || exit 0
+wt=\${@: -1}
+count=\$(cat "$case_dir/return-attempts" 2>/dev/null || echo 0)
+count=\$((count + 1))
+printf '%s\n' "\$count" > "$case_dir/return-attempts"
+if [ "\$count" = 1 ]; then
+  [ "$mode" != late-hook-change ] || [ "\$wt" != "$NESTED_SLOT" ] || printf 'late hook change\n' >> "$NESTED_SLOT/$hook"
+  echo "fatal: Unable to create '\$wt/.git/index.lock': File exists." >&2
+  exit 128
+fi
+[ "\$wt" != "$NESTED_SLOT" ] || git -C "$NESTED_SLOT" reset -q --hard
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+exit 0
+SH
+      chmod +x "$case_dir/fakebin/treehouse"
+      rc=0
+      FM_TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS=0 nested_run "$case_dir" || rc=$?
+      if [ "$mode" = clean ]; then
+        expect_code 0 "$rc" "$label: a clean slot with a tracked hook must close on the retry: $(tail -3 "$case_dir/stderr")"
+        assert_nested_closed "$case_dir" "$label"
+      else
+        expect_code 1 "$rc" "$label: a late change to the tracked hook must refuse the return: $(tail -3 "$case_dir/stderr")"
+        ! grep -qxF "return --force $NESTED_SLOT" "$case_dir/treehouse.log" 2>/dev/null || fail "$label: the slot was returned"
+        grep -qF 'late hook change' "$NESTED_SLOT/$hook" || fail "$label: the late hook change was lost"
+        assert_present "$case_dir/state/task-x1.meta" "$label: the task record was retired"
+      fi
+    done
+  done
+  pass "a lock retry closes a clean slot with a tracked hook and refuses a late change to it, for a plain and a prior-shape record"
+}
+
+# The return-pending record is written by renaming over its path, which
+# replaces a link, not the link's target. A link to a regular file inside the
+# state directory is therefore accepted and the target keeps its bytes; a
+# dangling link, a link to a directory and a link to a regular file outside the
+# state directory refuse before any mutation, and the target is unchanged.
+test_nested_return_pending_link_shapes() {
+  local shape form case_dir rc label marker target
+  for shape in plain enclosing; do
+    for form in inside dangling directory outside; do
+      label="nested-return-pending-link-$form-$shape"
+      nested_fixture "$label" "$shape" mine landed
+      case_dir=$NESTED_CASE
+      held_plain_get_slot "$case_dir" "$NESTED_SLOT"
+      marker=$case_dir/state/task-x1.teardown-return-pending
+      case "$form" in
+        inside) target=$case_dir/state/return-pending-sentinel; printf 'sentinel\n' > "$target" ;;
+        dangling) target=$case_dir/state/no-such-record ;;
+        directory) target=$case_dir/state/return-pending-dir; mkdir "$target" ;;
+        outside) target=$case_dir/outside-sentinel; printf 'sentinel\n' > "$target" ;;
+      esac
+      ln -s "$target" "$marker"
+      nested_snapshot "$case_dir" "$case_dir/snapshot.before"
+      rc=0
+      nested_run "$case_dir" || rc=$?
+      if [ "$form" = inside ]; then
+        expect_code 0 "$rc" "$label: a link to a regular file in the state directory must close: $(tail -3 "$case_dir/stderr")"
+        assert_nested_closed "$case_dir" "$label"
+        assert_equals sentinel "$(cat "$target")" "$label: the link target changed"
+      else
+        assert_nested_refused_untouched "$case_dir" "$rc" "$label" "return-pending record path $marker cannot take"
+        assert_absent "$case_dir/lease.log" "$label: the refused close took a lease"
+        [ -L "$marker" ] || fail "$label: the refusal replaced the link"
+        [ "$form" != outside ] || assert_equals sentinel "$(cat "$target")" "$label: the outside target changed"
+      fi
+    done
+  done
+  pass "a return-pending link to a regular file in the state directory closes with its target unchanged; dangling, directory and outside links refuse before any mutation"
+}
+
 # The plain shape gets the prior shape's disposition for every claim state and
 # fixture: the same exit class, the same removals, the same number of slot
 # returns and the same markers.
@@ -4213,6 +4362,9 @@ test_nested_unwritable_return_pending_path_refuses_at_entry
 test_nested_delete_denied_pending_close_refuses_without_writing
 test_nested_forced_entry_refusal_keeps_the_drop_record
 test_nested_pending_close_check_needs_no_hard_link
+test_nested_entry_preflight_refuses_before_any_mutation
+test_nested_lock_retry_ignores_its_own_tracked_hook
+test_nested_return_pending_link_shapes
 test_plain_nested_disposition_equals_the_prior_shape
 test_scout_with_a_plain_nested_copy_keeps_its_own_route
 test_gate_409_recorded_case_tears_down
