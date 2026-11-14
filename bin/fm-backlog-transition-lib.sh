@@ -1017,22 +1017,19 @@ fm_backlog_record_remove() {
   return 0
 }
 
-# Whether fm_backlog_record_remove would remove <path> now, decided without
-# writing or removing anything, so a caller can refuse before its first
-# mutation. An absent path passes. A present one must pass the same
-# authorized-parent and regular-file checks, and then the operating system is
-# asked whether it may be deleted: on macOS, access(2) with _DELETE_OK, which
-# applies the directory permissions, sticky-bit ownership, file and directory
-# flags and access-control entries that rm -f meets; elsewhere, the directory's
-# write and search permission, the sticky-bit ownership rule, and the Linux
-# immutable and append-only attributes of the file and its directory where they
-# can be read. A cause neither covers, or a host without python3, passes here,
-# and the later remove still refuses it.
-fm_backlog_record_removable() {  # <path> <label> <root>
-  local path=$1 label=$2 root=$3 rc=0
-  fm_backlog_record_parent_authorized "$path" "$label" "$root" || return 1
-  { [ -e "$path" ] || [ -L "$path" ]; } || return 0
-  fm_backlog_record_present "$path" "$label" "$root" || return 1
+# Whether the operating system would let this process delete the directory
+# entry at <path> itself (a link is judged as the link, not its target),
+# decided without writing or removing anything: on macOS, faccessat(2) with
+# _DELETE_OK and AT_SYMLINK_NOFOLLOW, which applies the directory permissions,
+# sticky-bit ownership, file and directory flags and access-control entries
+# that rm -f meets; elsewhere, the directory's write and search permission, the
+# sticky-bit ownership rule, and the Linux immutable and append-only attributes
+# of the entry and its directory where they can be read. An absent path passes.
+# A cause neither covers, or a host without python3, passes too, and the removal
+# itself still refuses it.
+fm_backlog_path_deletable() {  # <path>
+  local rc=0
+  { [ -e "$1" ] || [ -L "$1" ]; } || return 0
   command -v python3 >/dev/null 2>&1 || return 0
   python3 -I -c '
 import ctypes, ctypes.util, os, stat, sys
@@ -1040,7 +1037,7 @@ path = sys.argv[1]
 parent = os.path.dirname(path) or "."
 if sys.platform == "darwin":
     libc = ctypes.CDLL(ctypes.util.find_library("c"), use_errno=True)
-    sys.exit(0 if libc.access(os.fsencode(path), 1 << 12) == 0 else 3)
+    sys.exit(0 if libc.faccessat(-2, os.fsencode(path), 1 << 12, 0x20) == 0 else 3)
 if not os.access(parent, os.W_OK | os.X_OK):
     sys.exit(3)
 info, pinfo, euid = os.lstat(path), os.stat(parent), os.geteuid()
@@ -1063,8 +1060,20 @@ if sys.platform.startswith("linux"):
         if flags.value & (0x10 | 0x20):
             sys.exit(3)
 sys.exit(0)
-' "$path" >/dev/null 2>&1 || rc=$?
-  [ "$rc" = 3 ] || return 0
+' "$1" >/dev/null 2>&1 || rc=$?
+  [ "$rc" != 3 ]
+}
+
+# Whether fm_backlog_record_remove would remove <path> now, decided without
+# writing or removing anything, so a caller can refuse before its first
+# mutation: absent, or an authorized regular file that fm_backlog_path_deletable
+# says the operating system lets this process delete.
+fm_backlog_record_removable() {  # <path> <label> <root>
+  local path=$1 label=$2 root=$3
+  fm_backlog_record_parent_authorized "$path" "$label" "$root" || return 1
+  { [ -e "$path" ] || [ -L "$path" ]; } || return 0
+  fm_backlog_record_present "$path" "$label" "$root" || return 1
+  fm_backlog_path_deletable "$path" && return 0
   FM_BACKLOG_TRANSITION_ERROR="$label could not be removed at $path"
   return 1
 }

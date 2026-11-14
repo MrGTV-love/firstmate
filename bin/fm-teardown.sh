@@ -1192,15 +1192,42 @@ teardown_reserve_pool_slot() {  # <slot> [project] [task-id]
   TEARDOWN_SLOT_CUSTODY=lease
 }
 
-# Whether this task's return-pending record path can take a new record: absent,
-# or a regular file that is not a link, which teardown_mark_return_pending
-# replaces. Anything else there would take the record, so the close refuses at
-# entry instead.
+# Whether this task's return-pending record path can take a new record, which
+# teardown_mark_return_pending writes by renaming over it: absent; a regular
+# file; or a link that resolves to a regular file inside this home's state
+# directory (the rename replaces the link, not its target). In each case the
+# entry itself must be one this user can delete or replace. A dangling link, a
+# link to anything else or to a place outside the state directory, and any other
+# kind of entry are refused. Sets TEARDOWN_RETURN_PENDING_ERROR on a refusal.
+TEARDOWN_RETURN_PENDING_ERROR=
 teardown_return_pending_target_ok() {
-  local marker="$STATE/$ID.teardown-return-pending"
-  if [ -e "$marker" ] || [ -L "$marker" ]; then
-    [ -f "$marker" ] && [ ! -L "$marker" ]
+  local marker="$STATE/$ID.teardown-return-pending" target state_real
+  TEARDOWN_RETURN_PENDING_ERROR=
+  { [ -e "$marker" ] || [ -L "$marker" ]; } || return 0
+  if [ -L "$marker" ]; then
+    if ! target=$(fm_backlog_canonical_existing "$marker") || [ ! -e "$target" ]; then
+      TEARDOWN_RETURN_PENDING_ERROR="it is a link that resolves to nothing"
+      return 1
+    fi
+    if [ ! -f "$target" ] || [ -L "$target" ]; then
+      TEARDOWN_RETURN_PENDING_ERROR="it is a link to something that is not a regular file"
+      return 1
+    fi
+    state_real=$(fm_backlog_canonical_existing "$STATE") || state_real=
+    case "$target" in
+      "${state_real:-/nonexistent}"/*) ;;
+      *)
+        TEARDOWN_RETURN_PENDING_ERROR="it is a link that resolves outside $STATE"
+        return 1
+        ;;
+    esac
+  elif [ ! -f "$marker" ]; then
+    TEARDOWN_RETURN_PENDING_ERROR="it is not a regular file"
+    return 1
   fi
+  fm_backlog_path_deletable "$marker" && return 0
+  TEARDOWN_RETURN_PENDING_ERROR="this user cannot replace it"
+  return 1
 }
 
 # Record, once this task's slot is reserved (or, for a slot shared with another
@@ -2310,6 +2337,92 @@ teardown_busy_retire_ready() {  # <state-dir> <id> <gen>
     fm_busy_current_gen "$1" "$2" >/dev/null || { TEARDOWN_BUSY_ERROR="no armed busy-state gen for $2"; return 1; }
   fi
   return 0
+}
+
+# One state record teardown removes later with rm -f, checked now: absent, or an
+# entry that is not a directory and that fm_backlog_path_deletable says can be
+# deleted. Sets TEARDOWN_PREFLIGHT_ERROR on a refusal.
+teardown_preflight_removable() {  # <path> <label>
+  { [ -e "$1" ] || [ -L "$1" ]; } || return 0
+  if [ -d "$1" ] && [ ! -L "$1" ]; then
+    TEARDOWN_PREFLIGHT_ERROR="task $ID's $2 at $1 is a directory, which cleanup cannot remove"
+    return 1
+  fi
+  fm_backlog_path_deletable "$1" && return 0
+  TEARDOWN_PREFLIGHT_ERROR="task $ID's $2 at $1 cannot be removed by this user"
+  return 1
+}
+
+# The entry preflight: every refusal that the state at entry already decides,
+# made in one pass that writes and removes nothing, before the first protected
+# mutation (the captain's drop record, the slot lease, the return-pending
+# record, the endpoint close, and any copy, tasktmp, record or slot removal).
+# It covers the records those later steps remove or replace (the previous
+# pending-close record, the return-pending record, the task record, the busy,
+# PR-poll, turn-end and status records), the busy generation, the held-copy
+# record and the Docker cleanup's Supabase project_id. Each later step keeps its
+# own check as the backstop for a change during the run. Sets
+# TEARDOWN_PREFLIGHT_ERROR on a refusal it reports to the caller; a check that
+# reports its own refusal leaves it empty.
+TEARDOWN_PREFLIGHT_ERROR=
+teardown_entry_preflight() {
+  local path harness token_path token
+  TEARDOWN_PREFLIGHT_ERROR=
+  path=$(fm_backlog_close_marker_path "$STATE" "$ID") || return 1
+  if ! fm_backlog_record_removable "$path" "pending-close record" "$STATE"; then
+    TEARDOWN_PREFLIGHT_ERROR="the previous pending backlog $TEARDOWN_BACKLOG_TRANSITION for $ID could not be cleared ($FM_BACKLOG_TRANSITION_ERROR)"
+    return 1
+  fi
+  if [ "$KIND" != secondmate ] && { [ -e "$META" ] || [ -L "$META" ]; } \
+     && ! fm_backlog_record_removable "$META" "task record" "$STATE"; then
+    TEARDOWN_PREFLIGHT_ERROR="task $ID's record could not be removed ($FM_BACKLOG_TRANSITION_ERROR)"
+    return 1
+  fi
+  if [ "$KIND" != secondmate ] && { [ "$TREEHOUSE_SLOT_LOCK_REQUIRED" = 1 ] || [ "$TEARDOWN_SLOT_SHARED" = 1 ]; } \
+     && ! teardown_return_pending_target_ok; then
+    TEARDOWN_PREFLIGHT_ERROR="task $ID's return-pending record path $STATE/$ID.teardown-return-pending cannot take the pool slot's return record ($TEARDOWN_RETURN_PENDING_ERROR)"
+    return 1
+  fi
+  if ! teardown_busy_retire_ready "$STATE" "$ID" "$BUSY_GEN"; then
+    TEARDOWN_PREFLIGHT_ERROR="$TEARDOWN_BUSY_ERROR (event rejected)"
+    return 1
+  fi
+  for path in "$STATE/$ID.busy-gen" "$STATE/$ID.busy-state" "$STATE/$ID.progress"; do
+    teardown_preflight_removable "$path" "busy-state record" || return 1
+  done
+  if ! validate_pr_poll_cleanup "$STATE" "$ID"; then
+    TEARDOWN_PREFLIGHT_ERROR="task $ID's PR-poll records are not in a shape cleanup can retire"
+    return 1
+  fi
+  path="$STATE/$ID.pr-poll-merge-notified"
+  if { [ -e "$path" ] || [ -L "$path" ]; } && { [ ! -f "$path" ] || [ -L "$path" ]; }; then
+    TEARDOWN_PREFLIGHT_ERROR="task $ID's PR merge-notified record at $path is not a regular file"
+    return 1
+  fi
+  for path in "$path" "$STATE/$ID.check.sh" "$STATE/$ID.pr-poll" "$STATE/$ID.pr-poll-registration" \
+      "$STATE/$ID.pr-poll-retirement" "$STATE/$ID.merge-authority" "$STATE/$ID.check-trust" \
+      "$STATE/.pr-ready-reconcile/$ID.refused" "$STATE/$ID.check-stopped"; do
+    teardown_preflight_removable "$path" "PR-poll record" || return 1
+  done
+  for harness in grok kimi; do
+    token_path=$(fm_control_harness_turnend_token_path "$harness" "$STATE" "$ID") || token_path=
+    token=
+    if [ -n "$token_path" ] && [ -f "$token_path" ]; then
+      if ! { IFS= read -r token < "$token_path" || [ -n "$token" ]; }; then
+        TEARDOWN_PREFLIGHT_ERROR="task $ID's $harness turn-end token at $token_path cannot be read"
+        return 1
+      fi
+    fi
+    path=$(fm_control_harness_turnend_auth_path "$harness" "$token") || path=
+    [ -z "$path" ] || teardown_preflight_removable "$path" "$harness turn-end authorization" || return 1
+  done
+  for path in "$STATE/$ID.status" "$STATE/.$ID.open-decisions-cursor" "$STATE/.$ID.home-appends" \
+      "$(status_signal_seen_marker_path "$STATE" "$ID")" "$(status_heartbeat_seen_marker_path "$STATE" "$ID")" \
+      "$(status_daemon_seen_marker_path "$STATE" "$ID")"; do
+    teardown_preflight_removable "$path" "status record" || return 1
+  done
+  [ "$KIND" = secondmate ] || teardown_held_copies_record_or_refuse check || return 1
+  [ "$KIND" = secondmate ] || teardown_docker_stacks_preflight "$ID" "$META" || return 1
 }
 
 retire_busy_state() {
@@ -4938,7 +5051,7 @@ teardown_nested_slot_reprove_after_lock() {
 }
 
 teardown_nested_slot() {  # prove | landed | retire | reprove | return
-  local phase=$1 current prior prior_real copy known root branch teardown_slot post_lock_check
+  local phase=$1 current prior prior_real copy known root branch teardown_slot post_lock_check hook
   local -a kept=() proofs=() swept=() still=()
   case "$phase" in
     prove)
@@ -5121,9 +5234,13 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
           git -C "$teardown_slot" branch -D "$branch" >/dev/null 2>&1 || true
         fi
       fi
-      # Remove our hook file so a reused pool worktree cannot fire signals for a dead task.
-      rm -f "$teardown_slot/.claude/settings.local.json" "$teardown_slot/.opencode/plugins/fm-turn-end.js" \
-        "$teardown_slot/.fm-grok-turnend" "$teardown_slot/.fm-kimi-turnend"
+      # Remove our hook files so a reused pool worktree cannot fire signals for
+      # a dead task. A hook file the slot's HEAD tracks is left: the forced
+      # return resets it to HEAD anyway, and deleting it would show as slot work
+      # to the post-lock reproof of a lock retry.
+      for hook in .claude/settings.local.json .opencode/plugins/fm-turn-end.js .fm-grok-turnend .fm-kimi-turnend; do
+        git -C "$teardown_slot" ls-files --error-unmatch -- "$hook" >/dev/null 2>&1 || rm -f "$teardown_slot/$hook"
+      done
       # Kills remaining processes in the worktree (including the agent), resets, returns
       # to pool. treehouse resolves the pool from the working directory, so run it from
       # the project. teardown_treehouse_return tolerates transient and stale git locks
@@ -6460,6 +6577,21 @@ if [ "$BACKEND" = herdr ]; then
   TEARDOWN_HERDR_PANE=$FM_BACKEND_HERDR_PANE
 fi
 teardown_release_herdr_locks
+# Every refusal the state at entry decides, in one pass that changes nothing,
+# before the first protected mutation (teardown_entry_preflight).
+if ! teardown_entry_preflight; then
+  [ -z "$TEARDOWN_PREFLIGHT_ERROR" ] \
+    || echo "REFUSED: $TEARDOWN_PREFLIGHT_ERROR; nothing was changed and every task record is retained. Fix what is named and re-run." >&2
+  exit 1
+fi
+# The captain's words are retained only after the preflight, and before the
+# first step that can discard anything.
+if [ "$FORCE" = "--force" ] && [ -n "$DROP_FILE" ] && [ "$KIND" != secondmate ]; then
+  fm_backlog_drop_record "$DATA" "$ID" "$DROP_FILE" || {
+    echo "REFUSED: cannot retain the captain's words for $ID; nothing was discarded." >&2
+    exit 1
+  }
+fi
 # Prepare the non-authoritative close record and retire any previous marker
 # outside presentation custody. The EXIT trap retires this stage on refusal;
 # the legacy stamp and authoritative publication wait for exact reacquisition.
@@ -6477,10 +6609,6 @@ if [ "$TEARDOWN_BACKLOG_APPLIES" = 1 ]; then
     exit 1
   }
   BACKLOG_CLOSE_MARKER=$(fm_backlog_close_marker_path "$STATE" "$ID") || exit 1
-  if ! fm_backlog_record_removable "$BACKLOG_CLOSE_MARKER" "pending-close record" "$STATE"; then
-    echo "error: the pending backlog $BACKLOG_TRANSITION for $ID could not be recorded ($FM_BACKLOG_TRANSITION_ERROR); retaining every durable task record" >&2
-    exit 1
-  fi
   if ! fm_backlog_close_marker_stage "$STATE/.$ID.backlog-close.${BASHPID:-$$}" \
       "$ID" "$DATA" "$TEARDOWN_META_SPAWN_GEN" "$STATE" 0 \
       "${BACKLOG_TRANSITION_FLAGS[@]+"${BACKLOG_TRANSITION_FLAGS[@]}"}" \
@@ -6512,39 +6640,6 @@ fi
 # copies it holds; a slot in a superseded pool folder is leased by its exact
 # path. This task's misdirected leases are released after the reservation and
 # the held-copy record checks below.
-# The previous pending-close record is cleared only after the reservation and
-# held-copy refusals below, so that a refusal there leaves its bytes, but a
-# record that clear cannot remove is refused here, before any lease or marker,
-# for every route (fm_backlog_record_removable). With a backlog transition the
-# record was already checked above, before its new close was staged.
-if [ "$TEARDOWN_BACKLOG_APPLIES" != 1 ] \
-   && ! fm_backlog_record_removable "$(fm_backlog_close_marker_path "$STATE" "$ID")" "pending-close record" "$STATE"; then
-  echo "error: the previous pending backlog $BACKLOG_TRANSITION for $ID could not be cleared ($FM_BACKLOG_TRANSITION_ERROR); refusing before any lease or marker write" >&2
-  exit 1
-fi
-[ "$KIND" = secondmate ] || teardown_held_copies_record_or_refuse check || exit 1
-# The other refusals the state at entry decides, made here before any lease,
-# marker, endpoint close or record write: a return-pending record path that
-# cannot take the reservation's record, a busy generation the retirement would
-# reject, and the Docker cleanup's own entry refusals.
-if [ "$KIND" != secondmate ] && { [ "$TREEHOUSE_SLOT_LOCK_REQUIRED" = 1 ] || [ "$TEARDOWN_SLOT_SHARED" = 1 ]; } \
-   && ! teardown_return_pending_target_ok; then
-  echo "REFUSED: task $ID's return-pending record path $STATE/$ID.teardown-return-pending is not a regular file, so the pool slot's return could not be recorded; nothing was changed. Remove what is there and re-run." >&2
-  exit 1
-fi
-if ! teardown_busy_retire_ready "$STATE" "$ID" "$BUSY_GEN"; then
-  echo "error: $TEARDOWN_BUSY_ERROR (event rejected); nothing was changed and every task record is retained" >&2
-  exit 1
-fi
-[ "$KIND" = secondmate ] || teardown_docker_stacks_preflight "$ID" "$META" || exit 1
-# The captain's words are retained only now, after every entry refusal and
-# before the first step that can discard anything.
-if [ "$FORCE" = "--force" ] && [ -n "$DROP_FILE" ] && [ "$KIND" != secondmate ]; then
-  fm_backlog_drop_record "$DATA" "$ID" "$DROP_FILE" || {
-    echo "REFUSED: cannot retain the captain's words for $ID; nothing was discarded." >&2
-    exit 1
-  }
-fi
 if [ "$TREEHOUSE_SLOT_LOCK_REQUIRED" = 1 ] && teardown_owns_worktree && [ -z "$TEARDOWN_PEER_SLOT" ]; then
   teardown_acquire_project_lock || exit $?
   if ! TEARDOWN_RESERVED_SLOT=$(teardown_live_slot_path); then
