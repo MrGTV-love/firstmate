@@ -264,7 +264,7 @@ def ts_key(ts):
 # when a value was replaced (Amendments ai and ak). The whole permitted text of each request is kept in one store
 # file, one JSON line per request keyed by its ts: {"ts", "text" (the whole permitted text), "shown" (the text the
 # wake line shows: the presentation rule with the replacement run on it), "replaced"}; a cut line names it as
-# `state/slack-watch/requests.jsonl#<ts>`, and the retrieval takes the last whole line whose ts is that key.
+# `state/slack-watch/requests.jsonl#<key>` (the ts; <ts>@<member id> for the second person), and the retrieval takes the last whole line whose key (its `key` field, else its ts) is that key.
 SECRET_MARKER = '[secret removed]'
 SECRET_FLAG = 'secret removed'
 RECORD_FILE = 'requests.jsonl'
