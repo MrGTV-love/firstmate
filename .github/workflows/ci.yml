@@ -529,6 +529,12 @@ jobs:
           # /bin/ps and libproc; each memory-growing case has its own 2 GiB stop.
           budget_output=$(/bin/bash tests/fm-proc-budget.test.sh)
           printf '%s\n' "$budget_output"
+      - name: Recover pending replies without an executable ps
+        shell: /bin/bash {0}
+        env:
+          PATH: /bin:/usr/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin
+          FM_TEST_ONLY: test_recovery_when_ps_is_not_executable
+        run: /bin/bash tests/fm-pending-reply.test.sh
 
   invariants:
     name: Repo invariants
