@@ -1426,6 +1426,49 @@ class SecondPersonReplyTest(unittest.TestCase):
             self.assertEqual(home.calls('chat.postMessage'), [])
             self.assertEqual([row for row in home.trace() if row['method'] == 'conversations.replies'], [])
 
+    def tamper_their_window(self, home, channel):
+        """The journal as a damaged or hand-edited one would hold it: their window names `channel`, and the event of their request names it too."""
+        state = home.journal()
+        old = state['second']['channel']
+        state['second']['channel'] = channel
+        state['seen'] = {event.replace('/%s/' % old, '/%s/' % channel): value for event, value in state['seen'].items()}
+        (home.root / 'state.json').write_text(json.dumps(state))
+
+    def refused_by_both_commands(self, home, key, reason, text):
+        Traced.TRACE.clear()
+        for argv in (['reply', key, key, 'an answer'], ['read', key]):
+            rc, out, err = home.reply(*argv[1:]) if argv[0] == 'reply' else home.read(argv[1])
+            self.assertNotEqual(rc, 0, argv)
+            self.assertIn('refused: ' + reason, err, argv)
+            self.assertNotIn(text, out, argv)
+        self.assertEqual(home.calls('chat.postMessage'), [])
+        self.assertEqual([row for row in home.trace() if row['method'] == 'conversations.replies'], [])
+
+    def test_a_window_that_is_not_a_dm_or_is_the_owners_dm_is_refused_by_both_commands_and_the_untouched_window_is_the_control(self):
+        for channel in ('C0NOTAMEMBERDM', OWNER_DM):
+            with self.scott() as home:
+                request = self.take_in_scott(home, 'a request the window of which is damaged')
+                key = request + '@' + SCOTT
+                self.tamper_their_window(home, channel)
+                self.refused_by_both_commands(home, key, 'target_is_not_a_DM', 'a request the window of which is damaged')
+        with self.scott() as home:
+            request = self.take_in_scott(home, 'a request with an intact window')
+            key = request + '@' + SCOTT
+            acknowledged = self.posted(home)
+            self.assertEqual(home.read(key)[0], 0)
+            self.assertEqual(home.reply(key, key, 'an answer')[0], 0)
+            self.assertEqual(self.posted(home), acknowledged + [(SCOTT_DM, request)])
+
+    def test_a_request_with_no_window_is_refused_as_an_unknown_thread_by_both_commands_and_never_as_an_unprepared_dm(self):
+        # second_dm_not_prepared is second_channel's own defence in depth: request_target refuses a key with no window first, so neither command can name it.
+        with self.scott() as home:
+            request = self.take_in_scott(home, 'a request whose window is gone')
+            key = request + '@' + SCOTT
+            state = home.journal()
+            state['second'] = {}
+            (home.root / 'state.json').write_text(json.dumps(state))
+            self.refused_by_both_commands(home, key, 'unknown_request_thread', 'a request whose window is gone')
+
     def test_the_read_prints_their_request_with_their_label_and_other_names_of_it_are_refused(self):
         with self.scott() as home:
             request = self.take_in_scott(home, 'the whole request text')
