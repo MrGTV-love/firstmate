@@ -5007,18 +5007,18 @@ spawn_origin_head_older_than() { # <worktree> <epoch>
 }
 
 freshen_spawn_worktree_base() { # <worktree> [<base-branch>]
-  local worktree=$1 base=${2:-} default target expected actual status current
+  local worktree=$1 base=${2:-} default target expected actual status current rc
   status=$(git -C "$worktree" -c core.quotePath=false status --porcelain) || {
-    echo "error: could not inspect pooled worktree '$worktree' before refreshing its base" >&2
-    return 1
+    fm_slot_skip "$worktree" unknown_git_read "git status failed before refreshing its base"
+    return
   }
   if [ -n "$status" ]; then
     if describe_stale_submodule_pins "$worktree" "$status"; then
       echo "error: pooled worktree '$worktree' has a stale submodule checkout, not uncommitted work; refusing to launch and leaving it untouched" >&2
-    else
-      echo "error: pooled worktree '$worktree' is not clean; refusing to discard uncommitted work while refreshing its base" >&2
+      return 1
     fi
-    return 1
+    fm_slot_skip "$worktree" dirty_tree "it is not clean, it holds uncommitted work ($(printf '%s' "$status" | sed -n '1,3p' | tr '\n' ';'))"
+    return
   fi
   spawn_validate_local_base "$worktree" || return 1
   if ! spawn_worktree_has_origin_config "$worktree"; then
@@ -5086,10 +5086,14 @@ freshen_spawn_worktree_base() { # <worktree> [<base-branch>]
     printf 'local-only source: local=%s@%s origin=%s@%s selected=%s@%s\n' \
       "$SPAWN_LOCAL_DEFAULT" "$SPAWN_LOCAL_SHA" "$SPAWN_BASE_DEFAULT" "$SPAWN_BASE_SHA" "$target" "$expected"
   fi
-  if ! git -C "$worktree" reset --hard "$expected" >/dev/null; then
-    echo "error: could not reset pooled worktree '$worktree' to '$target'; refusing to launch from a potentially stale base" >&2
+  # A move git itself refuses when work would be lost, never a reset; a copy that is not plainly
+  # behind the target is skipped untouched (bin/fm-slot-provision-lib.sh fm_slot_move_forward).
+  fm_slot_move_forward "$worktree" "$expected" "${PROJ_ABS:-}" || {
+    rc=$?
+    [ "$rc" = "$FM_SLOT_SKIP_RC" ] && return "$rc"
+    echo "error: could not move pooled worktree '$worktree' to '$target'; refusing to launch from a potentially stale base" >&2
     return 1
-  fi
+  }
   actual=$(git -C "$worktree" rev-parse --verify --quiet HEAD 2>/dev/null || true)
   if [ "$actual" != "$expected" ]; then
     echo "error: pooled worktree '$worktree' is at '${actual:-unknown}', not current '$target' ('$expected'); refusing to launch" >&2
@@ -6104,42 +6108,19 @@ spawn_path_is_prior_copy() { # <path>
   return 1
 }
 
-if [ "$RELAUNCH" -eq 1 ] && [ "$BACKEND" = orca ]; then
-  [ "$KIND" = secondmate ] || validate_spawn_worktree "relaunch" "$T"
-elif [ "$RELAUNCH" -eq 1 ]; then
-  [ "$RELAUNCH_RELOCATING" = 0 ] || spawn_enter_recorded_worktree
-  # No worktree is acquired: the selected pre-existing copy is used. The adopted
-  # endpoint's shell must be sitting in that copy, including after a relocation
-  # handoff, so the replacement never starts wherever the pane happened to drift.
-  relaunch_wt_real=$(real_path_or_raw "$WT")
-  relaunch_seen=
-  for _ in $(seq 1 10); do
-    relaunch_seen=$(spawn_current_path "$WT_TARGET" || true)
-    [ -z "$relaunch_seen" ] || [ "$(real_path_or_raw "$relaunch_seen")" != "$relaunch_wt_real" ] || break
-    sleep 0.5
+# Take a pool slot into the pane: type `treehouse get`, wait for the pane to enter an isolated
+# worktree, validate it and claim it for this task. A fresh spawn runs it again after a skipped
+# copy (spawn_skip_copy); the pane then still sits in the skipped copy until the new get moves it.
+SPAWN_SKIPPED_SLOTS=()
+spawn_slot_skipped() { # <path>: whether this spawn skipped that copy
+  local skipped real
+  real=$(real_path_or_raw "$1")
+  for skipped in ${SPAWN_SKIPPED_SLOTS[@]+"${SPAWN_SKIPPED_SLOTS[@]}"}; do
+    [ "$skipped" != "$real" ] || return 0
   done
-  if [ -z "$relaunch_seen" ] || [ "$(real_path_or_raw "$relaunch_seen")" != "$relaunch_wt_real" ]; then
-    if [ "$BACKEND" != herdr ] && ! spawn_path_is_prior_copy "$relaunch_seen"; then
-      echo "error: task $ID's endpoint is in '${relaunch_seen:-unknown}', not its recorded worktree '$WT'; refusing to relaunch an agent outside the copy holding its work" >&2
-      exit 1
-    fi
-    relaunch_cd_path=${WT//\'/\'\\\'\'}
-    spawn_send_text_line "$WT_TARGET" "cd -- '$relaunch_cd_path'" || {
-      echo "error: task $ID's endpoint is in '${relaunch_seen:-unknown}' and could not be told to return to its recorded worktree '$WT'; refusing to relaunch an agent outside the copy holding its work" >&2
-      exit 1
-    }
-    for _ in $(seq 1 10); do
-      relaunch_seen=$(spawn_current_path "$WT_TARGET" || true)
-      [ -z "$relaunch_seen" ] || [ "$(real_path_or_raw "$relaunch_seen")" != "$relaunch_wt_real" ] || break
-      sleep 0.5
-    done
-    if [ -z "$relaunch_seen" ] || [ "$(real_path_or_raw "$relaunch_seen")" != "$relaunch_wt_real" ]; then
-      echo "error: task $ID's endpoint is in '${relaunch_seen:-unknown}' and did not return to its recorded worktree '$WT' when told to; refusing to relaunch an agent outside the copy holding its work" >&2
-      exit 1
-    fi
-  fi
-  [ "$KIND" = secondmate ] || validate_spawn_worktree "relaunch" "$T"
-elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
+  return 1
+}
+spawn_acquire_pool_slot() {
   fm_task_copy_pool_slots_hold_no_current_copy "$PROJ_ABS" "$STATE" || exit 1
   spawn_send_or_abort "treehouse get" spawn_send_text_line "$WT_TARGET" 'treehouse get'
 
@@ -6202,7 +6183,12 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
       acquire_progress=$SECONDS
       last_seen="$p"
     fi
-    if [ -n "$p" ] && fm_task_copy_isolated "$p" "$PROJ_ABS"; then
+    p_skipped=0
+    [ -z "$p" ] || ! spawn_slot_skipped "$p" || p_skipped=1
+    if [ "$p_skipped" = 1 ]; then
+      candidate=""
+      last_reason="the pane is still in a copy this spawn skipped"
+    elif [ -n "$p" ] && fm_task_copy_isolated "$p" "$PROJ_ABS"; then
       p_real=$(real_path_or_raw "$p")
       last_reason="it is an isolated worktree, but no second read agreed with it"
       if [ -n "$candidate" ] && [ "$p_real" = "$candidate" ]; then
@@ -6237,7 +6223,7 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
     sleep 1
   done
   if [ -z "$WT" ]; then
-    echo "error: treehouse get did not enter an isolated worktree after ${tick} polls ($acquire_stop) (last seen '${last_seen:-none}': $last_reason; spawning project '$PROJ_ABS'); aborting acquisition" >&2
+    echo "error: treehouse get did not enter an isolated worktree after ${tick} polls ($acquire_stop) (last seen '${last_seen:-none}': $last_reason; spawning project '$PROJ_ABS'; copies skipped by this spawn: ${SPAWN_SKIPPED_SLOTS[*]:-none}); aborting acquisition" >&2
     exit 1
   fi
 
@@ -6262,6 +6248,77 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
     fi
     SPAWN_SLOT_CLAIMED=1
   fi
+}
+# A copy that is not plainly clean, idle and behind the target is never used and never touched
+# (bin/fm-slot-provision-lib.sh owns the rules). Treehouse resets a slot when its shell exits,
+# so the skipped copy is first leased durably, in place and without touching it: treehouse
+# then never hands it out again and never resets it, and its owner can still find it. Only
+# the claim this spawn just wrote is released. Then a second `treehouse get` in the same pane
+# hands another slot. A relaunch keeps the copy its task's work lives in, so it never skips.
+spawn_skip_copy() {
+  local skipped=$WT lease_out
+  if [ "$SPAWN_SLOT_CLAIMED" = 1 ]; then
+    fm_treehouse_slot_owner_release "$skipped" "$ID" || {
+      echo "error: could not release this spawn's claim on skipped copy $skipped; refusing to take another copy" >&2
+      return 1
+    }
+    SPAWN_SLOT_CLAIMED=0
+  fi
+  if ! lease_out=$(treehouse lease --path "$skipped" --lease-holder "firstmate-skipped:$ID" 2>&1 >/dev/null); then
+    # Closing the pane would let Treehouse return, and so reset, a copy that holds work. Keep the
+    # endpoint open on that copy, as a refused governed slot does, and say where it is.
+    SPAWN_TREEHOUSE_ABORT_TARGET=
+    HERDR_PROJECTION_ABORT_CLEANUP=0
+    ORCA_ABORT_CLEANUP=0
+    echo "error: could not lease skipped copy $skipped durably ($lease_out); its endpoint $T stays open on it, untouched, because closing that endpoint would let Treehouse reset it; no worker admitted" >&2
+    return 1
+  fi
+  SPAWN_SKIPPED_SLOTS+=("$(real_path_or_raw "$skipped")")
+  echo "skipped: copy $skipped (${FM_SLOT_SKIP_REASON:-unknown}) is leased in place for its owner and left exactly as found; taking another copy" >&2
+  WT=
+}
+spawn_try_skip() { # <rc of the failed slot step>
+  [ "$1" = "$FM_SLOT_SKIP_RC" ] && [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ] || return 1
+  spawn_skip_copy || return 1
+  spawn_acquire_pool_slot
+}
+if [ "$RELAUNCH" -eq 1 ] && [ "$BACKEND" = orca ]; then
+  [ "$KIND" = secondmate ] || validate_spawn_worktree "relaunch" "$T"
+elif [ "$RELAUNCH" -eq 1 ]; then
+  [ "$RELAUNCH_RELOCATING" = 0 ] || spawn_enter_recorded_worktree
+  # No worktree is acquired: the selected pre-existing copy is used. The adopted
+  # endpoint's shell must be sitting in that copy, including after a relocation
+  # handoff, so the replacement never starts wherever the pane happened to drift.
+  relaunch_wt_real=$(real_path_or_raw "$WT")
+  relaunch_seen=
+  for _ in $(seq 1 10); do
+    relaunch_seen=$(spawn_current_path "$WT_TARGET" || true)
+    [ -z "$relaunch_seen" ] || [ "$(real_path_or_raw "$relaunch_seen")" != "$relaunch_wt_real" ] || break
+    sleep 0.5
+  done
+  if [ -z "$relaunch_seen" ] || [ "$(real_path_or_raw "$relaunch_seen")" != "$relaunch_wt_real" ]; then
+    if [ "$BACKEND" != herdr ] && ! spawn_path_is_prior_copy "$relaunch_seen"; then
+      echo "error: task $ID's endpoint is in '${relaunch_seen:-unknown}', not its recorded worktree '$WT'; refusing to relaunch an agent outside the copy holding its work" >&2
+      exit 1
+    fi
+    relaunch_cd_path=${WT//\'/\'\\\'\'}
+    spawn_send_text_line "$WT_TARGET" "cd -- '$relaunch_cd_path'" || {
+      echo "error: task $ID's endpoint is in '${relaunch_seen:-unknown}' and could not be told to return to its recorded worktree '$WT'; refusing to relaunch an agent outside the copy holding its work" >&2
+      exit 1
+    }
+    for _ in $(seq 1 10); do
+      relaunch_seen=$(spawn_current_path "$WT_TARGET" || true)
+      [ -z "$relaunch_seen" ] || [ "$(real_path_or_raw "$relaunch_seen")" != "$relaunch_wt_real" ] || break
+      sleep 0.5
+    done
+    if [ -z "$relaunch_seen" ] || [ "$(real_path_or_raw "$relaunch_seen")" != "$relaunch_wt_real" ]; then
+      echo "error: task $ID's endpoint is in '${relaunch_seen:-unknown}' and did not return to its recorded worktree '$WT' when told to; refusing to relaunch an agent outside the copy holding its work" >&2
+      exit 1
+    fi
+  fi
+  [ "$KIND" = secondmate ] || validate_spawn_worktree "relaunch" "$T"
+elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
+  spawn_acquire_pool_slot
 fi
 # Select the unchanged guard policy before a pre-admission refusal can become
 # the task's only durable launch contract. Never turn that recovery into a
@@ -6381,6 +6438,10 @@ if [ "$RELAUNCH" -eq 1 ]; then
     }
   fi
 fi
+FM_SLOT_ARCHIVE_ROOT=$DATA
+FM_SLOT_SPAWN_PID=$$
+# One pass per copy: a copy the slot rules skip is left as found and the pass repeats on the next.
+while :; do
 spawn_validate_local_base "$WT" || exit 1
 SLOT_GOVERNED=0
 SLOT_FRESH_BASE=0
@@ -6393,7 +6454,7 @@ if [ "$KIND" != secondmate ] && { fm_slot_required "$PROJ_ABS" "$WT" || { [ "$RE
   BRANCH=${BRANCH:-fm/$ID}
   if [ "$RELAUNCH" -eq 0 ]; then
     SLOT_FRESH_BASE=1
-    fm_slot_prepare_base "$PROJ_ABS" "$WT" "$ID" || spawn_slot_refused
+    fm_slot_prepare_base "$PROJ_ABS" "$WT" "$ID" || { rc=$?; spawn_try_skip "$rc" && continue; spawn_slot_refused; }
   elif [ "$(fm_meta_get "$RELAUNCH_META" recovery)" = slot-provision-refused ]; then
     prepared_head=$(fm_meta_get "$RELAUNCH_META" slot_prepared_head)
     if [ -n "$prepared_head" ]; then
@@ -6411,7 +6472,7 @@ if [ "$KIND" != secondmate ] && { fm_slot_required "$PROJ_ABS" "$WT" || { [ "$RE
       if [ "$SPAWN_FRESH_SOURCE" = 0 ]; then
         # No worker was admitted and no prepared branch existed. Finish that
         # original immutable local plan, not a newly derived origin baseline.
-        git -C "$WT" reset --hard "$SLOT_SOURCE_SHA" >/dev/null || spawn_slot_refused
+        fm_slot_move_forward "$WT" "$SLOT_SOURCE_SHA" "$PROJ_ABS" || spawn_slot_refused
         SLOT_FRESH_BASE=0
       fi
     fi
@@ -6421,11 +6482,15 @@ elif [ "$RELAUNCH" -eq 1 ] && [ "${#SLOT_OWNED_PATHS[@]}" -gt 0 ]; then
   exit 1
 fi
 if [ "$KIND" != secondmate ] && { [ "$RELAUNCH" -eq 0 ] || [ "$SLOT_FRESH_BASE" = 1 ]; }; then
-  if ! freshen_spawn_worktree_base "$WT" "$BASE_BRANCH"; then
+  freshen_spawn_worktree_base "$WT" "$BASE_BRANCH" || {
+    rc=$?
+    spawn_try_skip "$rc" && continue
     [ "$SLOT_GOVERNED" = 0 ] || spawn_slot_refused
     exit 1
-  fi
+  }
 fi
+break
+done
 # Freshness can introduce the project owner after the initial classification.
 # Keep early governance sticky (including when freshness removes its owner),
 # but require the same explicit scope and preparation for a newly governed copy.

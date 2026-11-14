@@ -59,6 +59,23 @@ run_spawn() {
     "$id" "$PROJECT_DIR" "$@"
 }
 
+# A copy the slot rules skip is left as found and another is requested; this fake world has no other
+# copy, so the acquisition wait must reach its no-progress limit. The clock below advances SECONDS
+# by a minute per one-second sleep, so that wait ends at once and the refusal is what the case reads.
+SKIP_CLOCK="$TMP_ROOT/skip-clock.sh"
+cat > "$SKIP_CLOCK" <<'SH'
+sleep() {
+  if [ "${1:-}" = 1 ] && [ -n "${FM_TEST_TICK_SECONDS:-}" ]; then
+    SECONDS=$((SECONDS + FM_TEST_TICK_SECONDS))
+  fi
+  command sleep "$@"
+}
+SH
+
+run_spawn_skipping() {
+  FM_TEST_TICK_SECONDS=60 BASH_ENV="$SKIP_CLOCK" run_spawn "$@"
+}
+
 test_remote_seeded_home_spawns_from_treehouse_pool() {
   local rec id out status lock
   id='pool-remote-seeded-r13'
@@ -283,7 +300,7 @@ test_originless_dirty_pool_refuses_without_discarding_work() {
   before=$(git -C "$POOL_DIR" rev-parse HEAD)
   printf 'keep this local work\n' > "$POOL_DIR/uncommitted.txt"
 
-  out=$(run_spawn "$id" --mode no-mistakes --yolo off)
+  out=$(run_spawn_skipping "$id" --mode no-mistakes --yolo off)
   status=$?
   [ "$status" -ne 0 ] || fail "spawn succeeded despite a dirty origin-less pooled worktree"
   assert_contains "$out" "is not clean" \
@@ -430,7 +447,7 @@ test_dirty_pool_refuses_without_discarding_work() {
   before=$(git -C "$POOL_DIR" rev-parse HEAD)
   printf 'keep this local work\n' > "$POOL_DIR/uncommitted.txt"
 
-  out=$(run_spawn "$id" --mode no-mistakes --yolo off)
+  out=$(run_spawn_skipping "$id" --mode no-mistakes --yolo off)
   status=$?
   [ "$status" -ne 0 ] || fail "spawn succeeded despite a dirty pooled worktree"
   assert_contains "$out" "is not clean" "spawn did not clearly refuse a dirty pooled worktree"
@@ -600,10 +617,10 @@ test_unpushed_submodule_commit_is_still_uncommitted_work() {
   before=$(git -C "$POOL_DIR" rev-parse HEAD)
   before_sub=$unpushed
 
-  out=$(run_spawn "$id" --mode no-mistakes --yolo off)
+  out=$(run_spawn_skipping "$id" --mode no-mistakes --yolo off)
   status=$?
   [ "$status" -ne 0 ] || fail "spawn launched from a slot holding an unpushed submodule commit"
-  assert_contains "$out" "refusing to discard uncommitted work" \
+  assert_contains "$out" "holds uncommitted work" \
     "an unpushed submodule commit was not refused as uncommitted work"
   assert_not_contains "$out" "stale submodule checkout" \
     "an unpushed submodule commit was misreported as a stale pin"
@@ -631,10 +648,10 @@ test_work_inside_submodule_is_still_uncommitted_work() {
   git -C "$POOL_DIR/ui" checkout --quiet "$SUBPIN2"
   printf 'work that must survive\n' > "$POOL_DIR/ui/keep-me.txt"
 
-  out=$(run_spawn "$id" --mode no-mistakes --yolo off)
+  out=$(run_spawn_skipping "$id" --mode no-mistakes --yolo off)
   status=$?
   [ "$status" -ne 0 ] || fail "spawn launched from a slot holding work inside a submodule"
-  assert_contains "$out" "refusing to discard uncommitted work" \
+  assert_contains "$out" "holds uncommitted work" \
     "work inside a submodule was not refused as uncommitted work"
   assert_not_contains "$out" "stale submodule checkout" \
     "real work inside a submodule was misreported as a stale pin"
@@ -653,10 +670,10 @@ test_stale_pin_carrying_real_work_is_not_called_stale() {
   # the refusal must stay the conservative one.
   printf 'work that must survive\n' > "$POOL_DIR/ui/keep-me.txt"
 
-  out=$(run_spawn "$id" --mode no-mistakes --yolo off)
+  out=$(run_spawn_skipping "$id" --mode no-mistakes --yolo off)
   status=$?
   [ "$status" -ne 0 ] || fail "spawn launched from a slot with a stale pin and work inside it"
-  assert_contains "$out" "refusing to discard uncommitted work" \
+  assert_contains "$out" "holds uncommitted work" \
     "a stale pin carrying real work was not refused as uncommitted work"
   assert_not_contains "$out" "stale submodule checkout" \
     "a submodule holding real work was reported as merely stale"
@@ -675,10 +692,10 @@ test_stale_pin_beside_other_dirt_reports_one_verdict() {
   # The conservative verdict must not arrive contradicted by a stale-pin line.
   printf 'notes the operator still wants\n' > "$POOL_DIR/zz-notes.txt"
 
-  out=$(run_spawn "$id" --mode no-mistakes --yolo off)
+  out=$(run_spawn_skipping "$id" --mode no-mistakes --yolo off)
   status=$?
   [ "$status" -ne 0 ] || fail "spawn launched from a slot with a stale pin beside an untracked file"
-  assert_contains "$out" "refusing to discard uncommitted work" \
+  assert_contains "$out" "holds uncommitted work" \
     "a stale pin beside an untracked file was not refused as uncommitted work"
   assert_not_contains "$out" "stale submodule checkout" \
     "a slot carrying more than a stale pin was reported as merely stale"
@@ -1122,7 +1139,11 @@ SH
   token=$(printf '%s' "$HOME_DIR" | shasum -a 256 | awk '{print $1}')
   [ ! -e "/tmp/fm-$id" ] && [ ! -L "/tmp/fm-$id" ] || fail 'task temp already exists'
   [ ! -e "/tmp/fm-$id+$token" ] && [ ! -L "/tmp/fm-$id+$token" ] || fail 'staging temp already exists'
-  out=$(run_spawn "$id" "${args[@]}" 2>&1) || rc=$?
+  if [ "$shape" = dirty-copy ]; then
+    out=$(run_spawn_skipping "$id" "${args[@]}" 2>&1) || rc=$?
+  else
+    out=$(run_spawn "$id" "${args[@]}" 2>&1) || rc=$?
+  fi
   case "$shape" in origin-*)
     printf 'origin_control=%s task=%s exit=%s expected_local=%s assigned_before=%s assigned_after=%s\n' \
       "$shape" "$id" "$rc" "$local_sha" "$before" "$(git -C "$POOL_DIR" rev-parse HEAD)"
@@ -1540,11 +1561,145 @@ PY
   pass 'legacy relaunch refuses inferred scope, retains refused explicit scope, adopts it, and never overrides it'
 }
 
+
+# --- a skipped copy: another copy is taken, the skipped one is left exactly as found ----------------
+
+# make_skip_case <name> <id> <slot-count>: make_case plus extra pool slots at the same commit and a
+# tmux whose pane enters the next slot each time `treehouse get` is typed into it (an empty answer
+# once the slots run out). The treehouse stub records its calls; FM_TEST_LEASE_RC makes `lease` fail.
+# Sets SKIP_SLOTS (the slot paths in hand-out order) and SKIP_LOG.
+make_skip_case() {
+  local name=$1 id=$2 count=$3 rec n slot real_tmux
+  rec=$(make_case "$name" "$id")
+  read_case_record "$rec"
+  SKIP_SLOTS=("$POOL_DIR")
+  for ((n = 2; n <= count; n++)); do
+    slot="$CASE_DIR/pool$n"
+    git -C "$PROJECT_DIR" worktree add --quiet --detach "$slot" "$INITIAL_SHA"
+    SKIP_SLOTS+=("$slot")
+  done
+  printf '%s\n' "${SKIP_SLOTS[@]}" > "$CASE_DIR/slots"
+  : > "$CASE_DIR/panepath"
+  echo 0 > "$CASE_DIR/get-count"
+  SKIP_LOG="$CASE_DIR/treehouse.log"
+  : > "$SKIP_LOG"
+  real_tmux="$FAKEBIN_DIR/tmux.real"
+  mv "$FAKEBIN_DIR/tmux" "$real_tmux"
+  cat > "$FAKEBIN_DIR/tmux" <<SH
+#!/usr/bin/env bash
+case "\$*" in
+  *'#{pane_current_path}'*) cat '$CASE_DIR/panepath'; exit 0 ;;
+  *send-keys*'treehouse get'*)
+    n=\$(( \$(cat '$CASE_DIR/get-count') + 1 ))
+    echo "\$n" > '$CASE_DIR/get-count'
+    sed -n "\${n}p" '$CASE_DIR/slots' > '$CASE_DIR/panepath'
+    exit 0 ;;
+esac
+exec '$real_tmux' "\$@"
+SH
+  chmod +x "$FAKEBIN_DIR/tmux"
+  cat > "$FAKEBIN_DIR/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> '$SKIP_LOG'
+case "\${1:-}" in lease) exit "\${FM_TEST_LEASE_RC:-0}" ;; esac
+exit 0
+SH
+  chmod +x "$FAKEBIN_DIR/treehouse"
+}
+
+slot_digest() { # <slot>: HEAD, its branch, the index and a sha256 of every file outside .git
+  # (the refs are shared by every pool slot, so a later copy's own branch must not count as a change here)
+  {
+    git -C "$1" rev-parse HEAD
+    git -C "$1" symbolic-ref -q HEAD || echo detached
+    git -C "$1" ls-files -s --debug
+    (cd "$1" && find . -path ./.git -prune -o \( -type f -o -type l \) -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256)
+  } 2>&1
+}
+
+test_a_skipped_dirty_copy_is_left_as_found_and_another_is_taken() {
+  local id out status before sync
+  id='pool-skip-dirty-take-next'
+  make_skip_case skip-dirty "$id" 2
+  printf 'keep this local work\n' > "${SKIP_SLOTS[0]}/uncommitted.txt"
+  before=$(slot_digest "${SKIP_SLOTS[0]}")
+
+  out=$(run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  expect_code 0 "$status" "a dirty first copy should be skipped and the second used"$'\n'"$out"
+  assert_contains "$out" "skipped: copy ${SKIP_SLOTS[0]}" "the skip was not reported"
+  assert_contains "$out" "(dirty_tree)" "the skip did not name its reason"
+  assert_grep "worktree=${SKIP_SLOTS[1]}" "$HOME_DIR/state/$id.meta" "the task was not recorded on the second copy"
+  [ "$(slot_digest "${SKIP_SLOTS[0]}")" = "$before" ] || fail "the skipped copy changed"
+  assert_grep "lease --path ${SKIP_SLOTS[0]}" "$SKIP_LOG" "the skipped copy was not leased durably before it was left"
+  [ "$(git -C "${SKIP_SLOTS[1]}" rev-parse HEAD)" = "$(git -C "${SKIP_SLOTS[1]}" rev-parse origin/main)" ] \
+    || fail "the second copy was not moved to origin's tip"
+  [ "$(cat "$CASE_DIR/get-count")" = 2 ] || fail "treehouse get was not typed exactly twice"
+  sync=$(grep -c . "$SKIP_LOG")
+  [ "$sync" -ge 1 ] || fail "the treehouse stub saw no call"
+  pass "a dirty copy is leased in place, left byte-identical, and a second copy is taken and launched from"
+}
+
+test_a_skipped_copy_with_an_unlanded_commit_keeps_it_and_another_is_taken() {
+  local id out status before extra
+  id='pool-skip-unlanded-take-next'
+  make_skip_case skip-unlanded "$id" 2
+  printf 'unlanded\n' > "${SKIP_SLOTS[0]}/mine.txt"
+  git -C "${SKIP_SLOTS[0]}" add mine.txt
+  git -C "${SKIP_SLOTS[0]}" -c user.name=T -c user.email=t@example.invalid commit -qm unlanded
+  extra=$(git -C "${SKIP_SLOTS[0]}" rev-parse HEAD)
+  before=$(slot_digest "${SKIP_SLOTS[0]}")
+
+  out=$(run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  expect_code 0 "$status" "a copy holding an unlanded commit should be skipped"$'\n'"$out"
+  assert_contains "$out" "(not_fast_forward)" "the skip did not name its reason"
+  [ "$(git -C "${SKIP_SLOTS[0]}" rev-parse HEAD)" = "$extra" ] || fail "the unlanded commit is no longer HEAD of the skipped copy"
+  [ "$(slot_digest "${SKIP_SLOTS[0]}")" = "$before" ] || fail "the skipped copy changed"
+  assert_grep "worktree=${SKIP_SLOTS[1]}" "$HOME_DIR/state/$id.meta" "the task was not recorded on the second copy"
+  pass "a copy holding an unlanded commit is skipped with the commit kept, and the task runs on another copy"
+}
+
+test_no_other_copy_refuses_and_names_the_skipped_one() {
+  local id out status before
+  id='pool-skip-no-other-copy'
+  make_skip_case skip-none "$id" 1
+  printf 'keep this local work\n' > "$POOL_DIR/uncommitted.txt"
+  before=$(slot_digest "$POOL_DIR")
+
+  out=$(run_spawn_skipping "$id" --mode no-mistakes --yolo off)
+  status=$?
+  [ "$status" -ne 0 ] || fail "spawn launched although its only copy was skipped"
+  assert_contains "$out" "copies skipped by this spawn: $POOL_DIR" "the refusal did not name the skipped copy"
+  assert_contains "$out" "(dirty_tree)" "the refusal did not carry the skip reason"
+  [ ! -f "$HOME_DIR/state/$id.meta" ] || fail "a refused spawn published task metadata"
+  [ "$(slot_digest "$POOL_DIR")" = "$before" ] || fail "the only copy changed"
+  pass "with no other copy the spawn refuses, names the skipped copy and its reason, and launches nothing"
+}
+
+test_a_skip_that_cannot_lease_the_copy_stops_without_asking_for_another() {
+  local id out status before
+  id='pool-skip-lease-fails'
+  make_skip_case skip-lease-fails "$id" 2
+  printf 'keep this local work\n' > "$POOL_DIR/uncommitted.txt"
+  before=$(slot_digest "$POOL_DIR")
+
+  out=$(FM_TEST_LEASE_RC=1 run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  [ "$status" -ne 0 ] || fail "spawn went on although the skipped copy could not be leased"
+  assert_contains "$out" "could not lease skipped copy $POOL_DIR durably" "the lease failure was not reported"
+  assert_contains "$out" "stays open on it, untouched" "the endpoint was not kept open on the copy"
+  [ "$(cat "$CASE_DIR/get-count")" = 1 ] || fail "a second copy was requested although the first could not be protected"
+  [ "$(slot_digest "$POOL_DIR")" = "$before" ] || fail "the copy changed"
+  pass "a copy that cannot be leased is not abandoned: no second copy is requested and the copy is untouched"
+}
+
 # Explicit selection keeps focused acquisition regressions independently runnable.
 if [ "$#" -gt 0 ]; then
   for selected_test in "$@"; do
     case "$selected_test" in
       test_freshness_introduces_slot_owner|test_freshness_introduces_scout_slot_owner|test_freshness_slot_owner_requires_scope|test_freshness_present_slot_owner_refuses|test_freshness_absent_slot_owner_launches|test_freshness_removed_slot_owner_refuses|test_local_only_source_selection|test_local_only_source_binding|test_local_only_unprepared_retry|test_local_only_origin_early|test_local_only_origin_late|test_local_only_origin_freshness|test_local_only_origin_copy_missing|test_local_only_origin_primary_missing|test_local_only_equal_retry_selects_local|test_local_only_equal_retry_divergence|test_local_only_adopted_scope_retry|test_local_only_equal_retry_invalid_ref|test_legacy_relaunch_scope_adoption) "$selected_test" ;;
+      test_*) if declare -F "$selected_test" >/dev/null 2>&1; then "$selected_test"; else fail "unknown selected test: $selected_test"; fi ;;
       *) fail "unknown selected acquisition test: $selected_test" ;;
     esac
   done
@@ -1594,5 +1749,9 @@ test_unpushed_submodule_commit_is_still_uncommitted_work
 test_work_inside_submodule_is_still_uncommitted_work
 test_stale_pin_carrying_real_work_is_not_called_stale
 test_stale_pin_beside_other_dirt_reports_one_verdict
+test_a_skipped_dirty_copy_is_left_as_found_and_another_is_taken
+test_a_skipped_copy_with_an_unlanded_commit_keeps_it_and_another_is_taken
+test_no_other_copy_refuses_and_names_the_skipped_one
+test_a_skip_that_cannot_lease_the_copy_stops_without_asking_for_another
 
 echo "# all fm-spawn-pool-base-freshen tests passed"

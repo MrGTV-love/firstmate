@@ -850,10 +850,10 @@
       "id": "pooled-copy-no-discard",
       "version": "1",
       "owner": "bin/fm-spawn.sh",
-      "invariant": "Refreshing a pooled launch base never discards dirty or stale-submodule content.",
+      "invariant": "Refreshing a pooled launch base never discards dirty, unlanded or ignored work: the copy moves only by a fast-forward that git itself refuses to complete over lost work, and any doubt skips the copy untouched.",
       "layer": "runtime-block",
       "source": "git status --porcelain and the checked-out submodule pins of the pooled copy; existing decision points: site:bin/fm-spawn.sh:6eceab4636",
-      "trigger": "refreshing a pooled worktree's base when it is dirty or has a stale submodule checkout; leaves it untouched",
+      "trigger": "refreshing a pooled worktree's base when it is dirty, holds commits the target lacks, has ignored work at a path the move writes, has a live holder, or has a stale submodule checkout; leaves it untouched",
       "decision": "deny",
       "fail_direction": "closed",
       "remedy": "Preserve the task's current copy and endpoint; repair the named prerequisite with its owner, then retry bash bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on-or-off> without forcing or discarding work.",
@@ -875,8 +875,12 @@
           "match": "echo \"error: pooled worktree '$worktree' has a stale submodule checkout, not uncommitted work; refusing to launch and leaving it untouched\" >&2"
         },
         {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_skip \"$slot\" not_fast_forward \"git refused the move to $target ($(printf '%s' \"$merge_out\" | sed -n '1p'))\""
+        },
+        {
           "file": "bin/fm-spawn.sh",
-          "match": "echo \"error: pooled worktree '$worktree' is not clean; refusing to discard uncommitted work while refreshing its base\" >&2"
+          "match": "echo \"error: could not release this spawn's claim on skipped copy $skipped; refusing to take another copy\" >&2"
         }
       ]
     },
@@ -1845,7 +1849,7 @@
         },
         {
           "file": "bin/fm-spawn.sh",
-          "match": "echo \"error: could not reset pooled worktree '$worktree' to '$target'; refusing to launch from a potentially stale base\" >&2"
+          "match": "echo \"error: could not move pooled worktree '$worktree' to '$target'; refusing to launch from a potentially stale base\" >&2"
         },
         {
           "file": "bin/fm-spawn.sh",
