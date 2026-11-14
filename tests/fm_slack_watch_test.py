@@ -5857,17 +5857,33 @@ def call(self, method, **fields):
             clock[0] += float(os.environ['INV4_DELAY'])      # a call of theirs that is slow and still succeeds
     return real(self, method, **fields)
 Replay.call = call
+order = os.environ.get('INV4_ORDER')
+if order:
+    real_call, real_line = Replay.call, plane.Out.line
+    def ordered_call(self, method, **fields):
+        if fields.get('channel') == os.environ['INV4_SECOND_DM'] or fields.get('users') == os.environ['INV4_SECOND']:
+            with open(order, 'a') as log:
+                log.write('call %s\n' % method)
+        return real_call(self, method, **fields)
+    def ordered_line(self, stream, text):
+        if stream == 'out':
+            with open(order, 'a') as log:
+                for line in text.splitlines():
+                    log.write('write %s\n' % ('second' if ' from ' + os.environ['INV4_SECOND'] in line else 'owner' if 'check: slack request' in line else 'other'))
+        return real_line(self, stream, text)
+    Replay.call, plane.Out.line = ordered_call, ordered_line
 plane.Watch.bound = lambda self: True
 plane.Watch.backlog = lambda self: []
 plane.run = lambda script, *args, text=None: subprocess.CompletedProcess([], 0, stdout='x\n', stderr='')
 sys.exit(plane.main(sys.argv[1:]))
 """
 
-    def run_check(self, home, mode, name, command='poll', delay='0'):
+    def run_check(self, home, mode, name, command='poll', delay='0', order=None):
         """One run of the poll (or of the standing check, command='check') as the watcher runs a check: output to a private file, read after the process has
         ended. Returns (rc, captured output, Scott calls)."""
         log, captured = home.dir / (name + '.calls'), home.dir / (name + '.out')
         env = {**os.environ, 'INV4_MODE': mode, 'INV4_LOG': str(log), 'INV4_SECOND_DM': INV_SECOND_DM, 'INV4_SECOND': INV_SECOND, 'INV4_DELAY': delay,
+               'INV4_ORDER': str(order) if order else '',
                'INV4_BIN': str(Path(plane.__file__).resolve().parent), 'FM_SLACK_CHECK_ACTION': 'check' if command == 'check' else ''}
         with open(captured, 'w') as out:
             done = subprocess.run([sys.executable, '-c', self.DRIVER, command, '--replay', str(home.transcript)], stdout=out, stderr=subprocess.PIPE,
@@ -6017,6 +6033,90 @@ sys.exit(plane.main(sys.argv[1:]))
             self.assertEqual([re.search(r'slack request (\S+) from (\S+?)[: ]', l).groups() for r in polls for l in r.wakes()], [('200.000300', other)])
             self.assertEqual(home.posts().count((other_dm, '200.000300')), 1)
             self.assertNotIn((other_dm, '200.000100'), home.posts())
+
+
+    # ---- Round 6 (the outside review of fca2a73d): findings 3, 5, 6 and 7 through the public entry point ----
+
+    def test_r6_f6_the_owner_wake_is_written_before_any_call_of_theirs_in_the_same_poll(self):
+        with self.home() as home:
+            self.owner_and_second_waiting(home)
+            order = home.dir / 'order.log'
+            rc, captured, calls = self.run_check(home, 'slow', 'ordered', delay='7.0', order=order)
+            events = order.read_text().split('\n')
+            first_call = next(n for n, e in enumerate(events) if e.startswith('call '))
+            first_owner = next(n for n, e in enumerate(events) if e == 'write owner')
+            self.assertLess(first_owner, first_call, events)
+            self.assertEqual(len(self.wakes_of(captured, INV_OWNER)), 1, captured)
+
+    def test_r6_f6_one_shared_cap_with_the_owner_first(self):
+        with self.home(cap='1') as home:
+            self.owner_and_second_waiting(home)
+            first = home.cli('poll')
+            self.assertEqual((len(self.requests_woken(first, INV_OWNER)), len(self.requests_woken(first, INV_SECOND))), (1, 0), first.out)
+            self.assertEqual((home.posts().count((INV_OWNER_DM, '200.000100')), home.posts().count((INV_SECOND_DM, '200.000200'))), (1, 0))
+            second = home.cli('poll')
+            self.assertEqual(len(self.requests_woken(second, INV_SECOND)), 1, second.out)
+
+    def test_r6_f5_a_previously_attempted_acknowledgement_with_a_long_thread_is_delivered_once_while_every_call_of_theirs_stays_slow(self):
+        with self.home() as home:
+            home.cli('poll')
+            home.say('200.000200', 'second person request', user=INV_SECOND, dm=INV_SECOND_DM)
+            home.edit_replay(lambda data: data['failures'].update({'chat.postMessage:200.000200': {'status': 503, 'times': 1}}))
+            self.run_check(home, 'normal', 'attempt')
+            for n in range(101):
+                home.say('200.%06d' % (300 + n), 'a reply in their thread', user=INV_SECOND, dm=INV_SECOND_DM, thread_ts='200.000200')
+            captured = [self.run_check(home, 'slow', 'slow%d' % n, delay='7.0')[1] for n in range(4)]
+            self.assertEqual(sum(len(self.wakes_of(c, INV_SECOND)) for c in captured), 1, captured)
+            self.assertEqual(home.posts().count((INV_SECOND_DM, '200.000200')), 1)
+
+    def test_r6_f3_a_resumed_owner_row_that_uses_the_cap_never_moves_the_first_activation_past_their_request(self):
+        with self.home(scott=None, cap='1', history=False) as home:
+            home.set_clock(100.0)
+            home.cli('poll')
+            home.say('102.000000', 'an owner request', user=INV_OWNER, dm=INV_OWNER_DM)
+            self.assertEqual(home.cli('poll', extra={'FM_SLACK_FAULT': 'after-stage'}).rc, 75)
+            with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': INV_SECOND}):
+                home.say('102.000000', 'their request at the same timestamp')
+                home.set_clock(103.0)
+                polls = [home.cli('poll') for _ in range(3)]
+            self.assertEqual((sum(len(self.requests_woken(r, INV_OWNER)) for r in polls), sum(len(self.requests_woken(r, INV_SECOND)) for r in polls)), (1, 1),
+                             [r.out for r in polls])
+            self.assertEqual((home.posts().count((INV_OWNER_DM, '102.000000')), home.posts().count((INV_SECOND_DM, '102.000000'))), (1, 1))
+
+    def test_r6_f7_a_held_window_of_a_former_id_never_strands_the_request_of_the_id_named_now(self):
+        other, other_dm = 'U0SYNTHSEC2', 'D0SECONDDM2'
+        with self.home(history=False, arm=False) as home:
+            home.add_member(other, other_dm)
+            home.set_clock(None)
+            real = Replay.call
+            def failing(replay, method, **fields):
+                if method == 'conversations.history' and fields.get('channel') == INV_SECOND_DM:
+                    raise SlackError('unreachable')
+                return real(replay, method, **fields)
+            with patch.object(Replay, 'call', failing), patch.object(plane, 'host_now', lambda: 200.0, create=True):
+                self.assertEqual(home.cli('check', action='arm').rc, 0)           # A's window is held: no Slack Date at the arm
+            with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': other}):
+                home.say('210.000100', 'a request of B', user=other, dm=other_dm)
+                with patch.object(plane, 'host_now', lambda: 300.0, create=True):
+                    results = [home.cli('poll'), home.cli('poll')]
+                home.set_clock(310.0)
+                results.append(home.cli('poll'))
+            self.assertEqual(sum(len(self.requests_woken(r, other)) for r in results), 1, [r.out for r in results])
+            self.assertEqual(home.posts().count((other_dm, '210.000100')), 1)
+
+    def test_r6_f7_their_queued_wake_reaches_main_while_long_owner_requests_keep_arriving_in_check_event_mode(self):
+        event = {'FM_CHECK_EVENT_OUTPUT': '1'}
+        with self.home() as home:
+            home.trust_check()
+            home.cli('poll')
+            home.say('200.000100', 'owner request one ' + 'o' * 300, user=INV_OWNER, dm=INV_OWNER_DM)
+            home.say('200.000200', 'second person request ' + 's' * 300, user=INV_SECOND, dm=INV_SECOND_DM)
+            results = [home.cli('check', action='check', extra=event)]
+            for n in range(3):
+                home.say('20%d.000300' % (n + 1), 'owner request again ' + 'p' * 300, user=INV_OWNER, dm=INV_OWNER_DM)
+                results.append(home.cli('check', action='check', extra=event))
+            self.assertEqual(sum(len(self.requests_woken(r, INV_SECOND)) for r in results), 1, [r.out for r in results])
+            self.assertEqual(sum(len(self.requests_woken(r, INV_OWNER)) for r in results), 4)
 
 class Invariant5Reactions(InvariantScenario):
     """F5 (SC3): one durable refusal row for each observable reaction attempt of Scott's on a held card, and none for a reaction that only persists."""
@@ -6681,6 +6781,161 @@ class Round5OwnerStateAndResume(InvariantScenario):
                 self.assertEqual(sum(len(self.requests_woken(r, INV_OWNER)) for r in results), 1)
                 self.assertNotIn(value, ''.join(r.out + r.err for r in [arm] + results))
 
+class Round6Findings(InvariantScenario):
+    """Round 6 (the outside review of fca2a73d): findings 1, 2, 4, 8 and 9 through the public entry point, one process per run."""
+
+    OTHER_AUTHOR = 'U0THIRDAUTH1'
+    CARD = [{'id': 'card-a', 'title': 'Card A', 'hold_kind': 'captain', 'hold_reason': 'Pick one',
+             'body_lines': ['Option 1: Ship (ship) - now', 'Option 2: Wait (wait) - later']}]
+
+    @contextlib.contextmanager
+    def held_card(self):
+        calls = []
+        def fake_run(script, *args, text=None):
+            calls.append(args)
+            out = 'answers: 1\nclosed: card-a\n' if args[:1] == ('answers',) else '0\n' if args[:1] == ('open',) else 'x\n'
+            return subprocess.CompletedProcess([], 0, stdout=out, stderr='')
+        rows = self.CARD
+        with patch.object(Watch, 'backlog', lambda self: rows), patch.object(Watch, 'board', lambda self: (None, {})), \
+                patch.object(Watch, 'probe', lambda self, key: (0, 'live')), patch.object(plane, 'run', fake_run):
+            yield lambda: [c for c in calls if c[:1] == ('answers',)]
+
+    def decisions(self, home):
+        return [(r['reason'], r.get('author')) for r in home.refusals() if r['reason'].startswith('decision_held')]
+
+    @staticmethod
+    def card_ts(home):
+        return next(iter(home.state()['threads'].values()))['ts']
+
+    def reply_after_unset(self, home, answers, user=INV_SECOND):
+        ts = self.card_ts(home)
+        with patch.dict(os.environ):
+            os.environ.pop('FM_SLACK_SECOND_USER', None)
+            home.say('900.000100', '1', user=user, dm=INV_OWNER_DM, thread_ts=ts)
+            home.cli('poll')
+            home.cli('poll')
+        return answers()
+
+    # ---- finding 1: every entry point that reads the id keeps it out of the answering authors, also when recording fails ----
+
+    def test_r6_f1_an_id_whose_recording_fails_during_a_mirror_never_answers_after_the_setting_is_unset(self):
+        with self.home(scott=None, authors=','.join([INV_OWNER, INV_SECOND])) as home, self.held_card() as answers:
+            home.cli('poll')
+            real = plane.save
+            def failing(path, value):
+                if Path(path).name == 'second.json':
+                    raise OSError('synthetic write failure of their journal')
+                return real(path, value)
+            with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': INV_SECOND}), patch.object(plane, 'save', failing):
+                home.cli('mirror')
+            self.assertEqual(self.reply_after_unset(home, answers), [])
+            self.assertEqual(self.decisions(home), [('decision_held_for_captain_reply', INV_SECOND)])
+
+    def test_r6_f1_an_id_whose_recording_a_protected_value_refuses_never_answers_after_the_setting_is_unset(self):
+        with self.home(scott=None, authors=','.join([INV_OWNER, INV_SECOND])) as home, self.held_card() as answers:
+            home.cli('poll')
+            with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': INV_SECOND}):
+                home.cli('mirror', extra={'SLACK_SIGNING_SECRET': INV_SECOND})   # a synthetic protected value equal to the id
+            self.assertEqual(self.reply_after_unset(home, answers), [])
+
+    def test_r6_f1_an_id_read_only_by_a_resolve_never_answers_after_the_setting_is_unset(self):
+        with self.home(scott=None, authors=','.join([INV_OWNER, INV_SECOND]), failures={'chat.postMessage:9100.000100': {'status': 400}}) as home, \
+                self.held_card() as answers:
+            home.cli('poll')                                               # the card is mirrored (its ts, from the replay, is above 900)
+            home.say('9100.000100', 'an owner request whose acknowledgement is refused', user=INV_OWNER, dm=INV_OWNER_DM)
+            for _ in range(3):
+                home.cli('poll')
+            with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': INV_SECOND}):
+                self.assertEqual(home.cli('check', '9100.000100', action='resolve').rc, 0)
+            self.assertEqual(self.reply_after_unset(home, answers), [])
+
+    def test_r6_f1_control_a_never_known_allowlisted_id_and_the_owner_keep_their_answers(self):
+        with self.home(scott=None, authors=','.join([INV_OWNER, self.OTHER_AUTHOR])) as home, self.held_card() as answers:
+            home.cli('poll')
+            self.assertEqual(len(self.reply_after_unset(home, answers, user=self.OTHER_AUTHOR)), 1)
+
+    # ---- finding 2: a reaction read by a retarget is refused durably ----
+
+    def test_r6_f2_a_reaction_of_a_recorded_id_read_by_a_retarget_is_logged(self):
+        new_owner, new_dm = 'U0NEWOWNER01', 'D0NEWOWNER01'
+        with self.home(authors=','.join([INV_OWNER, new_owner])) as home, self.held_card() as answers:
+            home.add_member(new_owner, new_dm)
+            home.cli('poll')
+            ts = self.card_ts(home)
+            home.edit_replay(lambda data: data['reactions'].setdefault(ts, []).append({'name': 'one', 'users': [INV_SECOND]}))
+            with patch.dict(os.environ, {'FM_SLACK_DM_USER': new_owner}):
+                result = home.cli('check', action='retarget')
+            self.assertEqual(result.rc, 0, (result.out, result.err))
+            self.assertEqual(self.decisions(home), [('decision_held_for_captain_reaction', INV_SECOND)])
+            self.assertEqual(answers(), [])
+
+    # ---- finding 4: a post-arm request is delivered; an incompletely read span is kept ----
+
+    def failed_arm(self, home):
+        real = Replay.call
+        def failing(replay, method, **fields):
+            if method == 'conversations.history' and fields.get('channel') == INV_SECOND_DM:
+                raise SlackError('unreachable')
+            return real(replay, method, **fields)
+        with patch.object(Replay, 'call', failing):
+            self.assertEqual(home.cli('check', action='arm').rc, 0)
+
+    def test_r6_f4_a_request_typed_after_a_failed_arm_with_a_frozen_clock_is_delivered(self):
+        with self.home(history=False, arm=False) as home:
+            home.set_clock(150.0)
+            home.say('150.100000', 'typed before the arm')
+            self.failed_arm(home)
+            home.say('150.900000', 'typed after the arm')
+            polls = [home.cli('poll'), home.cli('poll')]
+            woken = [re.search(r'slack request (\S+) from', l).group(1) for r in polls for l in self.requests_woken(r)]
+            self.assertEqual(woken.count('150.900000'), 1, woken)
+            self.assertEqual(home.posts().count((INV_SECOND_DM, '150.900000')), 1)
+
+    def test_r6_f4_a_span_read_incompletely_is_kept_with_an_unplaced_row(self):
+        with self.home(history=False, arm=False) as home:
+            home.set_clock(150.0)
+            self.failed_arm(home)
+            home.say('150.900000', 'typed after the arm')
+            real = Replay.call
+            def incomplete(replay, method, **fields):
+                result = real(replay, method, **fields)
+                if method == 'conversations.history' and fields.get('channel') == INV_SECOND_DM and fields.get('latest'):
+                    return dict(result, messages=[], has_more=True, response_metadata={})   # more is said to exist, with no cursor to it
+                return result
+            with patch.object(Replay, 'call', incomplete):
+                home.cli('poll')
+            self.assertTrue([r for r in home.refusals() if r['reason'] == 'second_intake_unplaced'], home.refusals())
+            self.assertIn('unplaced', home.theirs().get('second', {}), home.theirs().get('second'))
+
+    # ---- finding 8: a value spanning the owner's wake and theirs never changes the owner's wake ----
+
+    def test_r6_f8_a_value_spanning_the_owner_wake_and_their_wake_leaves_the_owner_wake_as_it_is_without_them(self):
+        owner_text = 'owner text abc'
+        line = plane.request_line('200.000100', INV_OWNER, owner_text)
+        value = line[-10:] + '\ncheck: slack request 200.000200 from ' + INV_SECOND
+        found = {}
+        for scott in (None, INV_SECOND):
+            with self.subTest(scott=scott), self.home(scott=scott) as home:
+                home.cli('poll')
+                home.say('200.000100', owner_text, user=INV_OWNER, dm=INV_OWNER_DM)
+                home.say('200.000200', 'their request')
+                result = home.cli('poll', extra={'SLACK_SIGNING_SECRET': value})
+                self.assertNotIn(value, result.out)
+                found[scott] = [l for l in result.out.splitlines() if 'from ' + INV_OWNER in l]
+        self.assertEqual(found[INV_SECOND], found[None])
+        self.assertEqual(found[None], [line])
+
+    # ---- finding 9: an invalid setting is refused whole ----
+
+    def test_r6_f9_an_invalid_setting_saves_no_id_and_changes_no_answer_authority(self):
+        with self.home(scott=None, authors=','.join([INV_OWNER, self.OTHER_AUTHOR])) as home, self.held_card() as answers:
+            home.cli('poll')
+            with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': self.OTHER_AUTHOR + ',U0OTHER00001'}):
+                home.cli('mirror')
+            self.assertEqual(len(self.reply_after_unset(home, answers, user=self.OTHER_AUTHOR)), 1)
+            self.assertEqual(self.decisions(home), [])
+
+
 class ScottPassModelTest(InvariantScenario):
     """The executable transition model of the second person's pass (Main addendum 97f259d9 to order 1307). States: off (never configured), enabled-unarmed
     (named after the arm), armed, failed-arm (their arm read failed, Slack's clock moving), resumed (a request of theirs staged by a run that crashed), unset
@@ -6689,7 +6944,8 @@ class ScottPassModelTest(InvariantScenario):
     compares the two for every state and event. The setting change, failed read and frozen clock falsifiers have their own replays (test_r5_f1/f2/f4)."""
 
     STATES = ('off', 'enabled-unarmed', 'armed', 'failed-arm', 'resumed', 'unset')
-    EVENTS = ('owner line', 'their line', 'card reply', 'reaction')
+    EVENTS = ('owner line', 'their line', 'card reply', 'reaction', 'setting change', 'failed read', 'frozen clock')
+    OTHER, OTHER_DM = 'U0SYNTHSEC2', 'D0SECONDDM2'
     CONFIGURED = ('enabled-unarmed', 'armed', 'failed-arm', 'resumed')
     CARD = [{'id': 'card-a', 'title': 'Card A', 'hold_kind': 'captain', 'hold_reason': 'Pick one',
              'body_lines': ['Option 1: Ship (ship) - now', 'Option 2: Wait (wait) - later']}]
@@ -6699,7 +6955,14 @@ class ScottPassModelTest(InvariantScenario):
         """What the contract requires: the owner's line is woken once in every state; a line of theirs is woken once only while the setting names them (and a
         resumed request drains once in any event); their card reply or reaction is never an answer and leaves one refusal row in every state in which the plane
         has read their id (all but off), none where it never has."""
-        second = (1 if state in self.CONFIGURED and event == 'their line' else 0) + (1 if state == 'resumed' else 0)
+        # setting change: the setting names another id B, who types a line: B is taken in from every state, and a resumed row of the former id stays held.
+        # failed read: every read of their DM history fails while they type: nothing of theirs is taken in, but a resumed row (a post, no read) still drains.
+        # frozen clock: Slack's Date stops moving while they type: a window already started takes their line in.
+        if event == 'setting change':
+            second = 1
+        else:
+            typed = 1 if state in self.CONFIGURED and event in ('their line', 'frozen clock') else 0
+            second = typed + (1 if state == 'resumed' else 0)
         rows = 1 if event in ('card reply', 'reaction') and state != 'off' else 0
         return {'owner wakes': 1 if event == 'owner line' else 0, 'their wakes': second, 'refusal rows': rows, 'answers': 0}
 
@@ -6746,20 +7009,37 @@ class ScottPassModelTest(InvariantScenario):
                 if card is None:
                     home.cli('poll')
                     card = next(iter(home.state()['threads'].values()))['ts']
+                failing = contextlib.nullcontext()
                 if event == 'owner line':
                     home.say(self.TS, 'an owner request', user=INV_OWNER, dm=INV_OWNER_DM)
-                elif event == 'their line':
+                elif event in ('their line', 'failed read', 'frozen clock'):
                     home.say(self.TS, 'their request')
+                    if event == 'frozen clock':
+                        data = json.loads(home.transcript.read_text())
+                        data.update(slack_clock=9950.0, slack_clock_step=0)
+                        home.transcript.write_text(json.dumps(data))
+                    if event == 'failed read':
+                        real = Replay.call
+                        def refuse(replay, method, **fields):
+                            if method == 'conversations.history' and fields.get('channel') == INV_SECOND_DM:
+                                raise SlackError('unreachable')
+                            return real(replay, method, **fields)
+                        failing = patch.object(Replay, 'call', refuse)
+                elif event == 'setting change':
+                    home.add_member(self.OTHER, self.OTHER_DM)
+                    os.environ['FM_SLACK_SECOND_USER'] = self.OTHER
+                    home.say(self.TS, 'a request of the newly named id', user=self.OTHER, dm=self.OTHER_DM)
                 elif event == 'card reply':
                     home.say(self.TS, '1', user=INV_SECOND, dm=INV_OWNER_DM, thread_ts=card)
                 else:
                     def add(data):
                         data['reactions'].setdefault(card, []).append({'name': 'one', 'users': [INV_SECOND]})
                     home.edit_replay(add)
-                results = [home.cli('poll') for _ in range(3)]
+                with failing:
+                    results = [home.cli('poll') for _ in range(3)]
             refusals = [r for r in home.refusals() if r['reason'].startswith('decision_held_for_captain')]
             return {'owner wakes': sum(len(self.requests_woken(r, INV_OWNER)) for r in results),
-                    'their wakes': sum(len(self.requests_woken(r, INV_SECOND)) for r in results),
+                    'their wakes': sum(len(self.requests_woken(r, INV_SECOND)) + len(self.requests_woken(r, self.OTHER)) for r in results),
                     'refusal rows': len(refusals), 'answers': len([c for c in calls if c[:1] == ('answers',)])}
 
     def test_r5_model_every_state_and_event_through_the_real_entry_point(self):
