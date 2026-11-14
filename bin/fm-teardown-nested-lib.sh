@@ -1388,18 +1388,19 @@ teardown_dead_launcher_release() {  # <slot> <copy> <head> <foreign|own nested>
     TEARDOWN_RELEASE_WHY=${TEARDOWN_FOREIGN_WHY:-its ownership cannot be proved}
     return 1
   fi
+  teardown_landed "$copy" HEAD "" >/dev/null 2>&1 || { TEARDOWN_RELEASE_WHY='its landed-work proof no longer holds'; return 1; }
+  if teardown_copy_git_protects "$copy"; then
+    TEARDOWN_RELEASE_WHY='it holds content Git would not remove without force'
+    return 1
+  fi
   # The retire phase has already ended this teardown's own processes, so any
   # process found running in the copy or holding a file in it open now, even one
-  # of this teardown's own, appeared since: none may be there at the unlock.
+  # of this teardown's own, appeared since: none may be there at the unlock, so
+  # this scan runs after the landed and Git proofs, next to the unlock.
   procs=$(pids_with_open_file_under "$copy") || { TEARDOWN_RELEASE_WHY='a scan for processes holding its files open failed'; return 1; }
   if [ -n "$procs" ]; then
     procs=${procs%%$'\n'*}
     TEARDOWN_RELEASE_WHY="process ${procs%%$'\t'*} runs in it or holds $(fm_refuse_text "${procs#*$'\t'}") open since the retire phase"
-    return 1
-  fi
-  teardown_landed "$copy" HEAD "" >/dev/null 2>&1 || { TEARDOWN_RELEASE_WHY='its landed-work proof no longer holds'; return 1; }
-  if teardown_copy_git_protects "$copy"; then
-    TEARDOWN_RELEASE_WHY='it holds content Git would not remove without force'
     return 1
   fi
   # The lock and the launcher are read once more, immediately before the unlock.

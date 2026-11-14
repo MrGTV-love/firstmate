@@ -6464,6 +6464,49 @@ SH
   pass 'a process that appears in the copy after the driver refused keeps the copy locked, named by pid'
 }
 
+# The last process scan sits next to the unlock: a process that opens a file in
+# the copy while the landed and Git-protection proofs run (after the earlier
+# scans) keeps the copy locked. The fake lsof reports the holder only once
+# teardown_copy_git_protects has listed the copy's index.
+test_direct_release_scans_for_processes_after_the_landed_and_git_proofs() {
+  local rc pid=999992 marker
+  dead_launcher_pid
+  make_own_locked_copy_case direct-late-holder enclosing "$FOREIGN_DEAD_PID"
+  rm -f "$FOREIGN_CASE/vernant-python"
+  marker="$FOREIGN_CASE/git-protects-ran"
+  cat > "$FOREIGN_CASE/fakebin/git" <<SH
+#!/usr/bin/env bash
+args=("\$@")
+for argument in "\$@"; do
+  if [ "\$argument" = worktree ]; then printf '%s\n' "\$*" >> "$FOREIGN_CASE/git-worktree.log"; break; fi
+done
+case " \$* " in *" ls-files --stage -z "*) : > "$marker" ;; esac
+exec "\${REAL_GIT_FOR_TEST:?}" "\${args[@]}"
+SH
+  cat > "$FOREIGN_CASE/fakebin/lsof" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" -Fpfn "*)
+    if [ -e "$marker" ]; then printf 'p%s\nf7\nn%s\n' $pid '$FOREIGN_COPY/late.log'; fi
+    exit 0 ;;
+  *" -d cwd "*) exit 0 ;;
+esac
+exit 1
+SH
+  chmod +x "$FOREIGN_CASE/fakebin/git" "$FOREIGN_CASE/fakebin/lsof"
+  run_foreign_teardown rc
+  assert_present "$marker" "direct-late-holder: the Git-protection proof did not run"
+  expect_code 1 "$rc" "direct-late-holder: a process that opened a file during the proofs must keep the copy: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+  assert_grep "process $pid runs in it or holds $FOREIGN_COPY/late.log open since the retire phase" "$FOREIGN_CASE/stderr" \
+    "direct-late-holder: the refusal did not name the process"
+  assert_present "$FOREIGN_COPY/.git" "direct-late-holder: the copy was removed"
+  git -C "$FOREIGN_CASE/project" worktree list --porcelain | grep -A4 -F "worktree $FOREIGN_COPY" | grep -q '^locked' \
+    || fail 'direct-late-holder: the copy is no longer locked'
+  if grep -q 'worktree unlock' "$FOREIGN_CASE/git-worktree.log" 2>/dev/null; then fail 'direct-late-holder: the script unlocked the copy'; fi
+  assert_present "$FOREIGN_CASE/state/task-x1.meta" 'direct-late-holder: the task record was removed'
+  pass 'a process that opens a file in the copy while the landed and Git proofs run keeps a dead launcher'"'"'s lock in place'
+}
+
 # A dead launcher's lock is released only when no process holds a file in the
 # copy open, whatever its working directory. A real process whose cwd is outside
 # the copy holds <copy>/.git open; the real lsof's open-file listing finds it on
@@ -6967,6 +7010,7 @@ test_dead_launcher_lock_is_released_directly_when_no_credit_is_satisfiable
 test_dead_launcher_lock_is_released_when_the_driver_is_unavailable
 test_locked_landed_copy_with_a_record_but_no_unlanded_commit_reaches_the_driver
 test_direct_release_refuses_a_process_that_appears_before_the_unlock
+test_direct_release_scans_for_processes_after_the_landed_and_git_proofs
 test_direct_release_refuses_a_process_holding_a_file_in_the_copy_open
 test_task_own_descendant_holding_a_file_open_refuses_and_is_not_signalled
 test_direct_release_refuses_an_unreadable_process_table
