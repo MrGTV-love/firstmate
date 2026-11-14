@@ -21,6 +21,7 @@
 # recorded pid is reclaimed and rewritten to this session's anchor.
 #
 # Usage: fm-lock.sh           acquire; exit 1 unless ownership is verified
+#        fm-lock.sh release   release only this exact owned native Web lock
 #        fm-lock.sh status    print holder and liveness; always exits 0.
 #                             A held lock is not proof the holder is consuming
 #                             wakes. Machine-readable lock fields live on
@@ -166,7 +167,7 @@ confirm_own_lock() {  # <recorded-pid>
     waited=1
   fi
   recorded=$(cat "$LOCK" 2>/dev/null || true)
-  if [ "$recorded" = "$me" ] || fm_session_lock_owned_by_self "$STATE"; then
+  if fm_session_lock_owned_by_self "$STATE"; then
     publish_lock_session_or_die
     commit_lock_session
     release_claim_lock
@@ -189,9 +190,27 @@ refuse_live_owner() {  # <recorded-pid>
   exit 1
 }
 
+if [ "${1:-}" = release ]; then
+  fm_session_lock_is_native_web || {
+    echo 'error: native Web ownership is required to release this lock' >&2
+    exit 1
+  }
+  fm_lock_acquire_wait "$CLAIM_LOCK" || exit 1
+  CLAIM_LOCK_HELD=1
+  if [ ! -f "$LOCK" ] || [ -L "$LOCK" ] || ! fm_session_lock_owned_by_self "$STATE"; then
+    echo 'error: cannot release another or unverified native session lock' >&2
+    exit 1
+  fi
+  # Only this canonical writer removes the verified pair, under its claim lock.
+  rm -f "$LOCK" "$LOCK_SESSION" || exit 1
+  release_claim_lock
+  echo 'lock released: exact native Web owner'
+  exit 0
+fi
+
 if [ -f "$LOCK" ] && [ ! -L "$LOCK" ]; then
   old=$(cat "$LOCK" 2>/dev/null || true)
-  if [ "$old" = "$me" ] || fm_session_lock_owned_by_self "$STATE"; then
+  if fm_session_lock_owned_by_self "$STATE"; then
     confirm_own_lock "$old"
     old=$(cat "$LOCK" 2>/dev/null || true)
   fi
@@ -219,10 +238,10 @@ if [ -e "$LOCK" ] || [ -L "$LOCK" ]; then
     echo "error: session lock is unreadable; operate read-only until resolved" >&2
     exit 1
   }
-  if [ "$old" != "$me" ] && fm_harness_pid_alive "$old"; then
+  if fm_harness_pid_alive "$old"; then
     fm_session_lock_owned_by_self "$STATE" && confirm_own_lock "$old"
     old=$(cat "$LOCK" 2>/dev/null || true)
-    if [ "$old" != "$me" ] && fm_harness_pid_alive "$old"; then
+    if fm_harness_pid_alive "$old"; then
       refuse_live_owner "$old"
     fi
   fi
