@@ -740,6 +740,55 @@ out=$(run_pass)
 [ "$shifted_reg" = "$(shasum -a 256 "$CASE/home/state/shifted.pr-poll-registration")" ] || fail 'the reconciler rewrote a device-shifted registration'
 pass 'a poll whose only fault is a moved device number is left for the watcher to re-record'
 
+B_URL=https://github.com/example/project/pull/44
+# A registered custom check in the task's check.sh is another check, not a lost
+# merge poll: the pass leaves it byte for byte and says the poll is not re-armed.
+make_case custom-check
+write_ship custom ship direct-PR
+printf 'pr=%s\n' "$URL" >> "$CASE/home/state/custom.meta"
+printf '#!/usr/bin/env bash\necho custom check output\n' > "$CASE/home/state/custom.check.sh"
+chmod 700 "$CASE/home/state/custom.check.sh"
+FM_STATE_OVERRIDE="$CASE/home/state" bash "$ROOT/bin/fm-check-register.sh" custom > "$CASE/register.out" 2>&1 \
+  || fail "could not register the custom check: $(cat "$CASE/register.out")"
+custom_before=$(shasum -a 256 "$CASE/home/state/custom.check.sh" "$CASE/home/state/custom.check-trust")
+out=$(run_pass)
+[ "$custom_before" = "$(shasum -a 256 "$CASE/home/state/custom.check.sh" "$CASE/home/state/custom.check-trust")" ] \
+  || fail "the pass replaced a registered custom check: $out"
+! grep -q -- '--json isDraft$' "$CASE/gh.calls" || fail "the pass re-armed a merge poll over a custom check: $out"
+printf '%s\n' "$out" | grep -q 'custom: state/custom.check.sh is another check' || fail "the pass did not name the conflict: $out"
+pass 'a registered custom check is never overwritten by a merge-poll re-arm; the conflict is named'
+
+# The stale-re-arm guard also holds at publication: when another registration
+# records a different PR after this re-arm committed but before it publishes, the
+# re-arm publishes nothing and reports no refusal.
+make_case stale-publish
+write_ship late ship direct-PR
+printf 'pr=%s\n' "$URL" >> "$CASE/home/state/late.meta"
+# The re-arm's own commit writes pr_head=; when it then releases the metadata
+# lock, a competing registration records the newer PR before the re-arm publishes.
+cat > "$FAKEBIN/rm" <<SH
+#!/usr/bin/env bash
+/bin/rm "\$@"
+rc=\$?
+case " \$* " in
+  *"/.meta-late.lock "*)
+    if [ -e "$CASE/swap-after-commit" ] && grep -q '^pr_head=' "$CASE/home/state/late.meta"; then
+      /bin/rm -f "$CASE/swap-after-commit"
+      sed -i.bak 's#^pr=.*#pr=$B_URL#' "$CASE/home/state/late.meta" && /bin/rm -f "$CASE/home/state/late.meta.bak"
+    fi ;;
+esac
+exit "\$rc"
+SH
+chmod +x "$FAKEBIN/rm"
+: > "$CASE/swap-after-commit"
+out=$(run_pass)
+[ ! -e "$CASE/swap-after-commit" ] || fail 'the late registration was never simulated'
+grep -qxF "pr=$B_URL" "$CASE/home/state/late.meta" || fail "the newer recorded PR was replaced: $out"
+printf '%s\n' "$out" | grep -q 'late: the recorded PR changed during this pass' || fail "the late re-arm did not stand down: $out"
+[ "$(refusal_wakes late)" -eq 0 ] || fail "the late re-arm raised a refusal wake: $out"
+[ ! -e "$CASE/home/state/late.check.sh" ] || fail 'the late re-arm published a poll for the old PR'
+pass 'a re-arm whose recorded PR changes between its commit and its publication publishes nothing'
+
 # A merge-notified marker counts only for the PR it names: a record whose pr= is
 # a newer PR than the marker's is re-armed, a marker naming the recorded PR is not.
 B_URL=https://github.com/example/project/pull/44
