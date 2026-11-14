@@ -122,3 +122,16 @@ admission_event() {  # <rule> <decision>
   [ -f "$FM_GUARD_EVENT_LOG" ] || return 0
   jq -c --arg rule "$1" --arg decision "$2" 'select(.guard == "successor-branch-admission" and .rule == $rule and .decision == $decision)' "$FM_GUARD_EVENT_LOG" | tail -n 1
 }
+
+# True when this user cannot read a mode 000 file (an unreadable record can only be
+# staged for a user that the mode binds; root reads it, so those cases skip there).
+mode_zero_binds() {  # <scratch-file>
+  : > "$1"
+  chmod 000 "$1"
+  if cat "$1" >/dev/null 2>&1; then
+    chmod 600 "$1"
+    return 1
+  fi
+  chmod 600 "$1"
+  return 0
+}

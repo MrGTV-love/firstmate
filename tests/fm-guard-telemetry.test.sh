@@ -106,6 +106,27 @@ printf '%s' "$plain" | jq -e 'has("route") or has("successor") | not' >/dev/null
 [ "$(printf '%s' "$routed" | jq -r .successor)" = fm/task-v2 ] || fail "successor not recorded: $routed"
 pass "route and successor appear only on rows that pass them"
 
+# --- strict writes and the resolved log path (a required event is not best-effort) ---
+strict_dir="$TMP/strict-sink-dir"
+mkdir -p "$strict_dir"
+if "$EVENT" gstrict allow --log "$strict_dir" --session s1 --strict 2>/dev/null; then
+  fail "--strict must exit nonzero when the log cannot take the row"
+fi
+"$EVENT" gstrict allow --log "$strict_dir" --session s1 2>/dev/null || fail "without --strict an unwritable log must still exit 0"
+strict_log="$TMP/strict-events.jsonl"
+"$EVENT" gstrict allow --log "$strict_log" --session s1 --strict || fail "--strict must exit 0 when the row is written"
+[ "$(wc -l <"$strict_log" | tr -d ' ')" = 1 ] || fail "--strict must write exactly one row"
+if env -u FM_GUARD_EVENT_LOG FM_HOME="$TMP/no-such-home" "$EVENT" gstrict allow --session s1 --strict 2>/dev/null; then
+  fail "--strict must exit nonzero when the home has no state directory to take the row"
+fi
+[ "$(FM_GUARD_EVENT_LOG="$TMP/named.jsonl" "$EVENT" gstrict allow --log-path)" = "$TMP/named.jsonl" ] \
+  || fail "--log-path must print the log the writer would append to"
+[ ! -e "$TMP/named.jsonl" ] || fail "--log-path must write no row and create no file"
+mkdir -p "$TMP/path-home/state"
+[ "$(env -u FM_GUARD_EVENT_LOG FM_HOME="$TMP/path-home" "$EVENT" gstrict allow --log-path)" = "$(cd "$TMP/path-home" && pwd -P)/state/guard-events.jsonl" ] \
+  || fail "--log-path must print the home's default log"
+pass "--strict fails when the row cannot be written, and --log-path names the log without writing"
+
 # --- writer never fails the caller -----------------------------------------
 mkdir -p "$TMP/readonly"
 chmod 500 "$TMP/readonly"
