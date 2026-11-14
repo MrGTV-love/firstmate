@@ -5277,6 +5277,10 @@ SH
   pass "an ordinary close whose slot gains a copy holding unique ignored files during the project-lock wait refuses with nothing removed"
 }
 
+# A foreign copy that appears in the slot while its stale lock blocks the return
+# (here on the first failed return, since a retry waits while the lock is there)
+# must stop the return at the reproof after the stale-lock cleanup: the route
+# changed, so neither an ordinary return nor a held close may follow.
 test_a_stale_lock_cleanup_never_turns_an_ordinary_close_into_a_held_close() {
   local case_dir rc lock late
   make_nested_slot_case route-flip-stale-lock enclosing .claude/worktrees/x
@@ -5290,7 +5294,7 @@ lock=\$(git -C "\$wt" rev-parse --path-format=absolute --git-path index.lock 2>/
 if [ -n "\$lock" ] && [ -e "\$lock" ]; then
   calls=\$(( \$(cat "$case_dir/return-calls" 2>/dev/null || echo 0) + 1 ))
   printf '%s' "\$calls" > "$case_dir/return-calls"
-  if [ "\$calls" = 2 ]; then
+  if [ "\$calls" = 1 ]; then
     git -C "$case_dir/project" worktree add -q -b fm/late-lane "$late" main
     exclude=\$(git -C "$late" rev-parse --path-format=absolute --git-path info/exclude)
     printf 'unique.dat\n' >> "\$exclude"
