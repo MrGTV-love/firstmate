@@ -1469,8 +1469,14 @@ class HoldBound(Exception):
     """A launch reached its hold bound without a fit."""
 
 
+def decision_context(directory: str, repo_id, branch) -> str:
+    """Words every decision line carries: the deciding checkout (the admission owner), the pool, and the start's run."""
+    return "checkout=%s pool=%s start_repo=%s start_branch=%s" % (
+        Path(__file__).resolve().parent.parent, directory, repo_id or "unknown", branch or "unknown")
+
+
 def wait_for_admission(directory: str, priority: str, self_run: Optional[str] = None,
-                       bound: Optional[float] = None, on_wait=None):
+                       bound: Optional[float] = None, on_wait=None, context: str = ""):
     """Queue one locked waiter entry in class order until admitted; return (start lock fd, before, reason, waited).
 
     The start lock is held on return. A bound in seconds raises HoldBound with the
@@ -1541,7 +1547,7 @@ def wait_for_admission(directory: str, priority: str, self_run: Optional[str] = 
             if bound is not None and now - started >= bound and (bound > 0 or decided):
                 raise HoldBound(reason)
             if now >= next_notice:
-                log(2, "%s waiting: %s" % ("launch-gate" if self_run else "pipeline-start", reason))
+                log(2, "%s waiting: %s%s" % ("launch-gate" if self_run else "pipeline-start", reason, " " + context if context else ""))
                 next_notice = now + NOTICE_EVERY_SECS
             waited = True
             time.sleep(delay)
@@ -1588,15 +1594,25 @@ def claim_pending(directory: str, args: List[str]) -> Optional[int]:
     """The pid of the enclosing admitted start whose pending reservation is this very start, or None.
 
     An admitted start publishes a locked pending-*.lock naming its own pid and the
-    no-mistakes arguments of the start it admitted. A later start with the same
-    arguments is that start, reached through a nested route or the exec
-    interception, only when that pid is one of its ancestors and either nobody
-    claimed the record before (an exclusive .claimed file then names this
-    process) or the process that claimed it is this one or one of its ancestors
-    (the same start passing one more route). Every other start, a sibling, a
-    second client with other arguments or the same arguments run again, is
-    decided on its own, with that pending start counted.
+    no-mistakes arguments of the start it admitted. A later start is that start, reached
+    through a nested route or the exec interception, only when that pid is one of its
+    ancestors and either nobody claimed the record before (an exclusive .claimed file
+    then names this process) or the process that claimed it is this one or one of its
+    ancestors (the same start passing one more route). A record with the same
+    arguments is claimed first; otherwise the first fresh client inside the admitted
+    command claims its unclaimed record whatever its arguments (P5.lock: it makes
+    progress on that reservation, and the command's own client after it is decided as
+    another start with it counted), unless a process in the holder's tree runs the
+    admitted client (admitted_client_running, true when the table cannot be read).
+    Every other start is decided on its own, with that pending start counted.
     """
+    found = claim_round(directory, args, same_args=True)
+    return found if found is not None else claim_round(directory, args, same_args=False)
+
+
+def claim_round(directory: str, args: List[str], same_args: bool) -> Optional[int]:
+    """One claim_pending pass: records with the same arguments, or any unclaimed one of an ancestor."""
+
     mine = None
     seen: List[str] = []
     try:
@@ -1624,12 +1640,17 @@ def claim_pending(directory: str, args: List[str]) -> Optional[int]:
             continue
         finally:
             os.close(fd)
-        if not same_start_args(admitted, list(args)):
+        if same_args != same_start_args(admitted, list(args)):
             continue
+        if not same_args and os.path.exists(str(path) + ".claimed") and claim_record(str(path)) is not None \
+                and claim_record(str(path))["pid"] != os.getpid():
+            continue  # another client already makes progress on that reservation
         if mine is None:
             mine = ancestors(os.getpid())
         if holder not in mine:
             continue
+        if not same_args and admitted_client_running(holder, admitted):
+            continue  # the admitted client itself runs on that reservation: one client, one reservation
         claim = str(path) + ".claimed"
         temporary = "%s.%d" % (claim, os.getpid())
         try:
@@ -1740,12 +1761,22 @@ def without_intercept(env: dict) -> dict:
 def intercept_dir() -> str:
     """This checkout's private directory holding one symlink named no-mistakes to fm-cpu-pass.sh.
 
-    It lives in the user's temporary directory, never in the pool, is created
-    0700 and used only when it is a real directory this user owns.
+    It lives in the user's temporary directory, never in the pool and never inside
+    a git work tree (a TMPDIR inside a project copy is passed over for the user's
+    default temporary directory, then /tmp), is created 0700 and used only when it
+    is a real directory this user owns.
     """
     import hashlib
     digest = hashlib.sha256(INTERCEPT_TARGET.encode()).hexdigest()[:12]
-    directory = os.path.join(tempfile.gettempdir(), "fm-exec-intercept-%d-%s" % (os.getuid(), digest))
+    candidates = [tempfile.gettempdir()]
+    with contextlib.suppress(ValueError, OSError, AttributeError):
+        candidates.append(os.confstr("CS_DARWIN_USER_TEMP_DIR") or "")
+    candidates.append("/tmp")
+    outside = [path for path in candidates if path and not any(
+        os.path.exists(os.path.join(parent, ".git")) for parent in [os.path.realpath(path)] + list(map(str, Path(os.path.realpath(path)).parents)))]
+    if not outside:
+        raise OSError("every temporary directory is inside a git work tree")
+    directory = os.path.join(outside[0], "fm-exec-intercept-%d-%s" % (os.getuid(), digest))
     with contextlib.suppress(FileExistsError):
         os.mkdir(directory, 0o700)
     info = os.lstat(directory)
@@ -1768,15 +1799,19 @@ def with_intercept(env: dict, priority: str) -> Optional[dict]:
     (xargs, env -S, a shell variable, a script), then runs fm-cpu-pass.py
     exec-intercept, which judges the client's own argv by the fresh-run facts
     and admits a new run once, in this route's class. None when the
-    interception cannot be placed (the reason is printed): the caller then
-    holds the command as a start (intercept_unavailable_passes).
+    interception cannot be placed: the reason is printed and recorded in the root
+    home's wake queue, so the degraded state is visible, and the caller holds a
+    command naming no-mistakes as a start (intercept_unavailable_passes).
     """
     out = without_intercept(env)
     try:
         directory = intercept_dir()
     except OSError as exc:
-        log(2, "pipeline-start: cannot place the no-mistakes exec interception (%s); the command is admitted as a "
-               "fresh start, because a start inside it could not otherwise be judged" % exc)
+        text = ("the no-mistakes exec interception is unavailable in this home (%s): a command naming no-mistakes is "
+                "admitted as one fresh start; any other command runs at once, and a fresh start inside it is admitted "
+                "only by run-creation admission (nm-run-creation-admission)" % exc)
+        log(2, "pipeline-start: " + text)
+        record_check("exec-interception-unavailable", "pipeline-start: " + text)
         return None
     out["PATH"] = directory + (os.pathsep + out["PATH"] if out.get("PATH") else "")
     out[INTERCEPT_PRIORITY_ENV] = priority
@@ -1784,12 +1819,17 @@ def with_intercept(env: dict, priority: str) -> Optional[dict]:
 
 
 def intercept_unavailable_passes(command: List[str]) -> bool:
-    """Whether a command may still run unadmitted when the interception cannot be placed.
+    """Whether a command runs at once, unadmitted, when the interception cannot be placed (Main 4938).
 
-    Only the no-mistakes client itself, judged no new run by its own argv (a
-    reattachment, response or status read), passes: whatever else a command
-    runs could hide a fresh start that nothing can judge, so it is held.
+    A command no word of which names no-mistakes runs as on the base; so does the
+    no-mistakes client itself when its own argv is no new run (a reattachment,
+    response or status read). Any other command naming no-mistakes is held as one
+    fresh start. A script with no such word that starts a fresh run is the
+    disclosed residual of an unplaceable interception, owned by run-creation
+    admission.
     """
+    if not any("no-mistakes" in word for word in command):
+        return True
     return bool(command) and os.path.basename(command[0]) == "no-mistakes" and not fresh_pipeline_start(command)
 
 
@@ -1868,8 +1908,9 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
         # the interception binds it again from its own directory when it claims (claim_pending). A COMMAND that
         # changes directory first gives a binding no row matches: it then ends by its claim or its return.
         binding = start_binding(os.getcwd(), list(route[0])) if route is not None else None
-        admission_fd, before, reason, _ = wait_for_admission(directory, args.priority)
-        log(2, "pipeline-start admitted: " + reason)
+        context = decision_context(directory, (binding or {}).get("repo"), (binding or {}).get("branch"))
+        admission_fd, before, reason, _ = wait_for_admission(directory, args.priority, context=context)
+        log(2, "pipeline-start admitted: %s %s" % (reason, context))
         # In the same locked step as the admit, publish this start's pending reservation: every later decision
         # counts it at the full R until its own run's row appears, its client exits (K7) or COMMAND returns.
         pending_fd, pending_path = publish_locked(directory, "pending-", {
@@ -1891,6 +1932,7 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
                             # is spent so it ends no other reservation once this record is gone.
                             if own is not None:
                                 spend_row(directory, own)
+                                log(2, "pipeline-start registered: run %s (its own row ended this start's reservation) %s" % (own, context))
                             release_pending()
                             return True
                         return False
@@ -2100,6 +2142,26 @@ def map_worktree(cwd: str) -> Tuple[str, str, str, bool]:
     return run, repo, branch, bool(counted)
 
 
+def record_check(key: str, text: str) -> bool:
+    """Append one check wake to the root home's queue without waiting for its lock; False when it is not recorded.
+
+    When the queue lock is busy the wake is spilled to state/.wake-spill.<seq>,
+    which the next append to that queue, or the watcher's next start, replays;
+    a spill never replaces another producer's spill (fm_wake_pending_settle).
+    """
+    try:
+        home = root_home()
+        subprocess.run(["bash", "-c", '. "$1" && FM_WAKE_PENDING_KIND=check FM_WAKE_PENDING_KEY=$2 FM_WAKE_PENDING_PAYLOAD=$3'
+                        ' && fm_wake_pending_settle', "bash",
+                        str(Path(__file__).with_name("fm-wake-lib.sh")), key, "check: " + text],
+                       env=dict(os.environ, FM_HOME=str(home)), stdin=subprocess.DEVNULL,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=True)
+        return True
+    except (OSError, ValueError, subprocess.SubprocessError) as exc:
+        log(2, "check not recorded (%s): %s" % (exc, text))
+        return False
+
+
 def durable_line(text: str, key: str) -> None:
     """Append one check wake to the root home's queue without waiting for its lock.
 
@@ -2239,7 +2301,8 @@ def cmd_launch_gate(args: argparse.Namespace) -> int:
                 run, branch, waited, reason, bound_text), "launch-gate-" + run)
 
         try:
-            admission_fd, _, reason, waited = wait_for_admission(directory, "other", run, bound, on_wait)
+            admission_fd, _, reason, waited = wait_for_admission(directory, "other", run, bound, on_wait,
+                                                                 context=decision_context(directory, repo, branch))
         except HoldBound as reached:
             raise LaunchRefused("hold bound reached", "%s; held %ds; last reading: %s" % (
                 bound_text, time.monotonic() - started, reached),
@@ -2262,8 +2325,8 @@ def cmd_launch_gate(args: argparse.Namespace) -> int:
         finally:
             os.close(admission_fd)
         unlocked_ns = time.time_ns()
-        log(2, "launch-gate admitted: %s %s admitted_ns=%d published_ns=%d agent_started_ns=%d unlocked_ns=%d" % (
-            reason, bound_text, admitted_ns, published_ns, started_ns, unlocked_ns))
+        log(2, "launch-gate admitted: %s %s %s admitted_ns=%d published_ns=%d agent_started_ns=%d unlocked_ns=%d" % (
+            reason, decision_context(directory, repo, branch), bound_text, admitted_ns, published_ns, started_ns, unlocked_ns))
         if held:
             durable_line("run %s (%s) admitted after %.2fs held: %s" % (run, branch, waited, reason), "launch-gate-" + run)
         return wait_agent(child, watch_fd, reservation_fd)

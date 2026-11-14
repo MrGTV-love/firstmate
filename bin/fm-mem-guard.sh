@@ -47,7 +47,11 @@ else
   [ "$#" -eq 0 ] || { echo 'unexpected memory guard arguments' >&2; exit 2; }
 fi
 if [ "$(uname -s)" != Darwin ] && [ -z "${FM_MEMORY_FIXTURE_DIR:-}" ]; then
-  if [ "$mode" = run ]; then exec python3 "$SCRIPT_DIR/fm-cpu-pass.py" pipeline-start --only-fresh -- "$@"; fi
+  if [ "$mode" = run ]; then
+    # Without python3 the base's direct exec stands (Main 4938): no reading and no pipeline-start admission here.
+    command -v python3 >/dev/null 2>&1 || exec "$@"
+    exec python3 "$SCRIPT_DIR/fm-cpu-pass.py" pipeline-start --only-fresh -- "$@"
+  fi
   exit 0
 fi
 # shellcheck source=bin/fm-wake-lib.sh

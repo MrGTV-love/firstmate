@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import signal
 import socket
 import sqlite3
@@ -1020,7 +1021,7 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
                 time.sleep(0.3)
                 assert child.poll() is None and not (folder / 'order').exists(), (label, (folder / 'x.stderr').read_text())
                 if mode == 0o777:
-                    assert 'cannot place the no-mistakes exec interception' in (folder / 'x.stderr').read_text(), (folder / 'x.stderr').read_text()
+                    assert 'exec interception is unavailable in this home' in (folder / 'x.stderr').read_text(), (folder / 'x.stderr').read_text()
                 change(db, "UPDATE runs SET status='completed' WHERE id='baseline-0'")
                 finish(child)
                 assert (folder / 'order').read_text().splitlines() == ['xargs-' + label], label
@@ -1197,14 +1198,15 @@ if intent.startswith('reg'):
         # A second fresh client inside an admitted command is admitted on its own, whether the first client went
         # through the interception or by its absolute path, registered a run or not; nothing hangs.
         # With 3 cores the count fallback admits one run: a first client called by its absolute path that ends
-        # without a run must not leave its enclosing start counted against the second (no hang); a first that did
-        # create a run releases its pending start, so a second with the same arguments is admitted on its own.
-        # A first client with the same arguments that created no run leaves its admission to the second: one
-        # admission for the one start that ran.
+        # without a run leaves the command's reservation unused, so the second client makes progress on it (P5.lock:
+        # one client, one reservation; no client waits on its own command's unused reservation): one admission, no
+        # hang; a first that did create a run releases its pending start, so a second with the same arguments is
+        # admitted on its own. A first client with the same arguments that created no run leaves its admission to the
+        # second: one admission for the one start that ran.
         for label, cores, line, admissions in (
                 ('path-unregistered', 18, 'no-mistakes axi run --intent a; no-mistakes axi run --intent b', 2),
-                ('abs-first-unregistered', 18, '{abs} axi run --intent a; no-mistakes axi run --intent b', 2),
-                ('tight-abs-first-unregistered', 3, '{abs} axi run --intent a; no-mistakes axi run --intent b', 2),
+                ('abs-first-unregistered', 18, '{abs} axi run --intent a; no-mistakes axi run --intent b', 1),
+                ('tight-abs-first-unregistered', 3, '{abs} axi run --intent a; no-mistakes axi run --intent b', 1),
                 ('abs-first-same-args-registered', 18, '{abs} axi run --intent reg-x; no-mistakes axi run --intent reg-x', 2),
                 ('abs-first-same-args-unregistered', 18, '{abs} axi run --intent x; no-mistakes axi run --intent x', 1),
                 ('both-register', 18, 'no-mistakes axi run --intent reg-a; no-mistakes axi run --intent reg-b', 2),
@@ -1264,13 +1266,15 @@ if intent.startswith('reg'):
 
     def nested_class_order():
         # A higher-class start queued elsewhere while a nested second client waits: no hang, and class order holds.
+        # The first client registers its run, so the command's reservation ends by its own row and the second client
+        # needs an admission of its own (P5.lock).
         import fcntl
         folder, db, env = case('nested-class-order', cores=18)
         client = nest_client(folder, env)
         go = folder / 'go'
-        line = '{abs} axi run --intent first; while [ ! -e {go} ]; do sleep 0.05; done; no-mistakes axi run --intent second'
-        outer = launch(mem_guard + ['bash', '-c', line.format(abs=client, go=go)], env, folder / 'outer')
-        wait_for(lambda: calls(folder) == ['first'], 'the first client ran')
+        line = '{abs} axi run --intent reg-first; while [ ! -e {go} ]; do sleep 0.05; done; no-mistakes axi run --intent second'
+        outer = launch(mem_guard + ['bash', '-c', line.format(abs=client, go=go)], env, folder / 'outer', cwd=registered_checkout(folder, db))
+        wait_for(lambda: calls(folder) == ['reg-first'], 'the first client ran')
         lock = os.open(str(folder / 'pool' / 'pipeline-start.lock'), os.O_RDWR | os.O_CREAT, 0o600)
         until = time.monotonic() + 15
         while True:
@@ -1292,7 +1296,7 @@ if intent.startswith('reg'):
             fcntl.flock(lock, fcntl.LOCK_UN); os.close(lock)
         assert ended(elsewhere, folder, 'the elsewhere start') == 0
         assert ended(outer, folder, 'the outer command') == 0
-        assert calls(folder) == ['first', 'elsewhere', 'second'], calls(folder)
+        assert calls(folder) == ['reg-first', 'elsewhere', 'second'], calls(folder)
 
     def nested_parallel_counted():
         # Two nested clients started together: the second is decided with the first, admitted and not registered,
@@ -1301,7 +1305,9 @@ if intent.startswith('reg'):
         for available, admitted in ((10 * GIB, False), (12 * GIB, True)):
             folder, db, env = case('nested-parallel-%d' % (available // GIB), cores=3, measured=True, available=available)
             nest_client(folder, env)
-            line = 'no-mistakes axi run --intent hold-a & no-mistakes axi run --intent b; wait'
+            # The first client claims the command's reservation and runs; the second, started a moment later, is decided
+            # as another start with the first counted (whichever reaches its route first claims it, P5.lock).
+            line = 'no-mistakes axi run --intent hold-a & sleep 0.5; no-mistakes axi run --intent b; wait'
             child = launch(mem_guard + ['bash', '-c', line], env, folder / 'x')
             wait_for(lambda: 'hold-a' in calls(folder), 'the first client runs')
             if admitted:
@@ -1329,7 +1335,7 @@ if intent.startswith('reg'):
         child = launch(mem_guard + ['bash', '-c', 'no-mistakes axi run --intent a; no-mistakes axi run --intent b'], env, folder / 'x')
         pending(folder, 1)
         assert calls(folder) == [] and child.poll() is None, 'a shell ran past a full pool with no interception'
-        assert 'cannot place the no-mistakes exec interception' in (folder / 'x.stderr').read_text()
+        assert 'exec interception is unavailable in this home' in (folder / 'x.stderr').read_text()
         change(db, "UPDATE runs SET status='completed' WHERE id='baseline-0'")
         assert ended(child, folder, 'the held shell') == 0
         assert calls(folder) == ['a', 'b'], calls(folder)
@@ -1632,11 +1638,142 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
         named = re.search(r'counted_runs=\[([^\]]*)\]', text).group(1).split(',')
         assert 'ci-361:0' in named and 'lint:%d' % int(2.22 * GIB) in named and len(named) == 11, text
 
+    def checkout_copy(folder):
+        """A second checkout of this tree's bin/ (its own invoking checkout), as another home would run it."""
+        import shutil
+        other = folder / 'other-checkout'
+        shutil.copytree(repo / 'bin', other / 'bin', symlinks=True)
+        return other
+
+    def lines_name_checkout_pool_and_start():
+        # P6(a): every admission and waiting line names the invoking checkout (the root of the deciding fm-cpu-pass.py),
+        # the pool directory, and the start's repository and branch; two checkouts starting the same repository and
+        # branch record different invoking checkouts; the start's own row is named when it ends its reservation.
+        folder, db, env = case('p6-lines', cores=3)
+        command, checkout = client_start(folder, db, env, 'p6-a')
+        other = checkout_copy(folder)
+        change(db, "INSERT INTO runs (id, status) VALUES ('held', 'running')")
+        first = launch(['bash', str(other / 'bin/fm-cpu-pass.sh'), 'pipeline-start', '--'] + command, env, folder / 'first', cwd=checkout)
+        wait_for(lambda: 'waiting:' in (folder / 'first.stderr').read_text(), 'the first waits')
+        change(db, "UPDATE runs SET status = 'completed' WHERE id = 'held'")
+        wait_for(lambda: (folder / 'p6-a.started').exists(), 'the first starts')
+        text = (folder / 'first.stderr').read_text()
+        for word in ('checkout=%s' % os.path.realpath(other), 'pool=%s' % (folder / 'pool'), 'start_repo=repo', 'start_branch=main'):
+            assert word in text.split('waiting:')[1].splitlines()[0] and word in text.split('admitted:')[1].splitlines()[0], (word, text)
+        wait_for(lambda: 'registered: run p6-a' in (folder / 'first.stderr').read_text(), 'its own row is named')
+        (folder / 'p6-a.release').touch()
+        finish(first)
+        second = launch(cli + ['pipeline-start', '--'] + client_start(folder, db, env, 'p6-b')[0], env, folder / 'second', cwd=checkout)
+        wait_for(lambda: (folder / 'p6-b.started').exists(), 'the second starts')
+        assert 'checkout=%s' % os.path.realpath(repo) in (folder / 'second.stderr').read_text(), (folder / 'second.stderr').read_text()
+        (folder / 'p6-b.release').touch()
+        finish(second)
+
+    def pool_from_home():
+        # P6(a): with no override the pool is <HOME>/.cache/fm-cpu-pool; two homes of one HOME share it (one queue, in
+        # class order); a start with a different HOME, or with the override, queues in its own pool.
+        folder, db, env = case('p6-pool-home', cores=3)
+        change(db, "INSERT INTO runs (id, status) VALUES ('held', 'running')")
+        shared = dict(env, HOME=str(folder / 'user'))
+        shared.pop('FM_CPU_POOL_DIR')
+        (folder / 'home-a').mkdir(); (folder / 'home-b').mkdir()
+        low = launch(cli + ['pipeline-start', '--priority', 'other', '--', 'touch', str(folder / 'low')], dict(shared, FM_HOME=str(folder / 'home-a')), folder / 'low')
+        wait_for(lambda: len(list((folder / 'user/.cache/fm-cpu-pool').glob('pipeline-waiter-*.lock'))) == 1, 'the pool under HOME')
+        high = launch(cli + ['pipeline-start', '--priority', 'machinery', '--', 'touch', str(folder / 'high')], dict(shared, FM_HOME=str(folder / 'home-b')), folder / 'high')
+        wait_for(lambda: len(list((folder / 'user/.cache/fm-cpu-pool').glob('pipeline-waiter-*.lock'))) == 2, 'one queue for both homes')
+        apart = dict(shared, HOME=str(folder / 'elsewhere'))
+        separate = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'apart')], apart, folder / 'apart')
+        wait_for(lambda: (folder / 'elsewhere/.cache/fm-cpu-pool').is_dir() and 'waiting:' in (folder / 'apart.stderr').read_text(), 'a separate pool')
+        assert 'pool=%s' % (folder / 'elsewhere/.cache/fm-cpu-pool') in (folder / 'apart.stderr').read_text()
+        override = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'override')], dict(shared, FM_CPU_POOL_DIR=str(folder / 'own-pool')), folder / 'override')
+        wait_for(lambda: 'waiting:' in (folder / 'override.stderr').read_text(), 'the override pool')
+        assert 'pool=%s' % (folder / 'own-pool') in (folder / 'override.stderr').read_text()
+        change(db, "UPDATE runs SET status = 'completed' WHERE id = 'held'")
+        finish(high)
+        assert not (folder / 'low').exists() or (folder / 'high').stat().st_mtime_ns <= (folder / 'low').stat().st_mtime_ns
+        finish(low); finish(separate); finish(override)
+
+    def nested_first_uses_reservation():
+        # P5.lock case (i), room for one (3 cores: limit 1): inside an admitted command a nested client the parser cannot
+        # see (through xargs) starts first and the command's own client after it. The nested client makes progress on the
+        # command's reservation; the command's own client is decided as another start with the first counted, so it
+        # waits until the first one's run has ended, and is then admitted by itself.
+        folder, db, env = case('lock-case-i', cores=3)
+        nest_client(folder, env)
+        checkout = registered_checkout(folder, db)
+        line = "printf 'n\\n' | xargs -n1 -I{} no-mistakes axi run --intent reg-nested; no-mistakes axi run --intent reg-own"
+        child = launch(cli + ['pipeline-start', '--', 'bash', '-c', line], env, folder / 'x', cwd=checkout)
+        wait_for(lambda: any('reg-nested' in c for c in calls(folder)), 'the nested client ran')
+        time.sleep(2.5)
+        assert not any('reg-own' in c for c in calls(folder)), ('the own client did not wait', calls(folder), (folder / 'x.stderr').read_text())
+        change(db, "UPDATE runs SET status = 'completed' WHERE intent = 'reg-nested'")
+        code = ended(child, folder, 'lock-case-i')
+        text = (folder / 'x.stderr').read_text()
+        assert code == 0 and any('reg-own' in c for c in calls(folder)), (code, calls(folder), text)
+        assert text.count('pipeline-start admitted') == 2, text
+
+    def script_under_any_key():
+        # Main 4938 B2Q1: a script that starts a fresh run through PATH, under a measurement key outside no-mistakes. and
+        # with no word naming no-mistakes in the command, meets the interception: it waits behind a full pool and is
+        # admitted once; an ordinary command under that key is not queued.
+        task_run = measured_run[:-2] + ['task.x', '--']
+        folder, db, env = case('b2q1-script-key', cores=3, running=1)
+        env.update(PATH=str(nm_bin) + os.pathsep + env['PATH'], FM_DURATION_FILE='off', CASE_NAME='script-task-key')
+        (folder / 'start.sh').write_text('no-mistakes axi run --intent goal\n')
+        child = launch(task_run + ['bash', str(folder / 'start.sh')], env, folder / 'x')
+        pending(folder, 1)
+        assert not (folder / 'order').exists() and child.poll() is None, 'a script start under task.x ran past a full pool'
+        change(db, "UPDATE runs SET status='completed' WHERE id='baseline-0'")
+        finish(child)
+        assert (folder / 'order').read_text().splitlines() == ['script-task-key'], (folder / 'order').read_text()
+        assert (folder / 'x.stderr').read_text().count('pipeline-start admitted') == 1, (folder / 'x.stderr').read_text()
+
+    def unplaceable_other_command():
+        # Main 4938 B2Q2: with the interception unplaceable (its directory 0777), a COMMAND with no word naming
+        # no-mistakes runs at once through both routes, as on base, and the home records loudly that the interception
+        # is unavailable; a COMMAND naming no-mistakes is still held (the F4 case above).
+        import hashlib
+        target = os.path.realpath(str(repo / 'bin' / 'fm-cpu-pass.sh'))
+        name = 'fm-exec-intercept-%d-%s' % (os.getuid(), hashlib.sha256(target.encode()).hexdigest()[:12])
+        for route_name, route in (('mem-guard', mem_guard), ('measured', measured_run[:-2] + ['task.y', '--'])):
+            folder, db, env = case('b2q2-unplaceable-' + route_name, cores=3, running=1)
+            (folder / 'tmp' / name).mkdir(parents=True)
+            os.chmod(folder / 'tmp' / name, 0o777)
+            env.update(TMPDIR=str(folder / 'tmp'), FM_DURATION_FILE='off')
+            child = launch(route + ['touch', str(folder / 'ran')], env, folder / 'x')
+            finish(child)
+            text = (folder / 'x.stderr').read_text()
+            assert (folder / 'ran').exists() and 'pipeline-start admitted' not in text, (route_name, text)
+            assert 'exec interception is unavailable in this home' in text, (route_name, text)
+            assert 'exec-interception-unavailable' in wakes(folder), (route_name, wakes(folder))
+
+    def mem_guard_without_python_off_macos():
+        # Main 4938 B2Q2: off macOS, with no python3 on PATH, fm-mem-guard.sh run execs its COMMAND directly, as base does.
+        folder, db, env = case('b2q2-no-python', cores=3)
+        tools = folder / 'tools'
+        tools.mkdir()
+        (tools / 'uname').write_text('#!/bin/sh\necho Linux\n'); (tools / 'uname').chmod(0o755)
+        for tool in ('bash', 'sh', 'dirname', 'touch', 'cat'):
+            found = shutil.which(tool)
+            if found:
+                os.symlink(found, tools / tool)
+        lean = dict(env, PATH=str(tools))
+        lean.pop('FM_MEMORY_FIXTURE_DIR', None)
+        out = subprocess.run([str(tools / 'bash'), str(repo / 'bin/fm-mem-guard.sh'), 'run', '--', 'touch', str(folder / 'ran')],
+                             env=lean, capture_output=True, text=True, timeout=30)
+        assert out.returncode == 0 and (folder / 'ran').exists(), (out.returncode, out.stderr)
+
     for name, body in (('P5.errors.fallback no A counts visible runs at R', no_term_counts_r),
                        ('P5.preempt.cancel a cancel before COMMAND begins', cancel_before_command),
                        ('P5.lock a reservation ends by its own row only', own_row_binding),
                        ('P5.lock the named collision', named_collision),
-                       ('P1 the line recomputes the base rule', p1_old_rule_recomputed)):
+                       ('P1 the line recomputes the base rule', p1_old_rule_recomputed),
+                       ('P6(a) lines name the checkout, the pool and the start', lines_name_checkout_pool_and_start),
+                       ('P6(a) the pool follows HOME and the override', pool_from_home),
+                       ('P5.lock case (i): a nested first client uses the reservation', nested_first_uses_reservation),
+                       ('B2Q1 a script start under any key is admitted', script_under_any_key),
+                       ('B2Q2 an unplaceable interception runs other commands and says so', unplaceable_other_command),
+                       ('B2Q2 mem-guard off macOS without python3 execs directly', mem_guard_without_python_off_macos)):
         r28_case(name, body)
     (root / 'r28-admission.json').write_text(json.dumps(r28, indent=2))
     print(json.dumps(dict(r28=r28)), flush=True)

@@ -1422,6 +1422,29 @@ class Parser(argparse.ArgumentParser):
         self.exit(2)
 
 
+def pipeline_route(args, command):
+    """Whether COMMAND is a fresh pipeline start to admit first; places the exec interception otherwise."""
+    # The admission owner decides what begins a new run, so every route shares one test.
+    engine = importlib.util.spec_from_file_location('fm_cpu_pass', ROOT / 'bin/fm-cpu-pass.py')
+    cpu_pass = importlib.util.module_from_spec(engine)
+    engine.loader.exec_module(cpu_pass)
+    fresh_pipeline = cpu_pass.fresh_pipeline_start(command)
+    if args.pipeline_admitted:
+        # Admitted once already: the admitting pipeline-start chose this command's PATH (with the exec
+        # interception unless the command runs the client directly); its client claims that admission.
+        pass
+    elif not fresh_pipeline:
+        # A command the parser finds no start in (xargs, a script, a variable), whatever its key: a fresh
+        # no-mistakes it reaches through PATH is admitted by the exec interception, in this class.
+        intercepted = cpu_pass.with_intercept(dict(os.environ), args.pipeline_priority)
+        if intercepted is not None:
+            os.environ.clear(); os.environ.update(intercepted)
+        elif not cpu_pass.intercept_unavailable_passes(command):
+            # The interception cannot be placed: a command naming no-mistakes is held as a fresh start.
+            fresh_pipeline = True
+    return fresh_pipeline
+
+
 def main():
     if len(sys.argv) == 2 and sys.argv[1] in ('-v', '-V', '--version'):
         print('1.0.0')
@@ -1509,27 +1532,11 @@ def main():
         if not command:
             parser.error('run requires -- COMMAND')
         fresh_pipeline = False
-        pipeline_key = args.key.startswith('no-mistakes.')
-        if pipeline_key or args.pipeline_admitted or any('no-mistakes' in part for part in command):
-            # The admission owner decides what begins a new run, so every route shares one test.
-            engine = importlib.util.spec_from_file_location('fm_cpu_pass', ROOT / 'bin/fm-cpu-pass.py')
-            cpu_pass = importlib.util.module_from_spec(engine)
-            engine.loader.exec_module(cpu_pass)
-            fresh_pipeline = cpu_pass.fresh_pipeline_start(command)
-            if args.pipeline_admitted:
-                # Admitted once already: the admitting pipeline-start chose this command's PATH (with the exec
-                # interception unless the command runs the client directly); its client claims that admission.
-                pass
-            elif not fresh_pipeline:
-                # A pipeline-key command, or any command whose words name no-mistakes, that the parser finds no
-                # start in (xargs, a script, a variable), whatever its key: a fresh no-mistakes it reaches through
-                # PATH is admitted by the exec interception, in this class.
-                intercepted = cpu_pass.with_intercept(dict(os.environ), args.pipeline_priority)
-                if intercepted is not None:
-                    os.environ.clear(); os.environ.update(intercepted)
-                elif not cpu_pass.intercept_unavailable_passes(command):
-                    # The interception cannot be placed: hold the command as a fresh start rather than run it unjudged.
-                    fresh_pipeline = True
+        # Every measured command meets the admission owner's test (Main 4938): a fresh start reached through PATH
+        # (a script, xargs, a variable) under any key is admitted by the exec interception. A copy of this tool with
+        # no admission owner beside it (a bare bin/fm-duration.py) runs its command as the base did.
+        if (ROOT / 'bin/fm-cpu-pass.py').exists() or args.pipeline_admitted or any('no-mistakes' in part for part in command):
+            fresh_pipeline = pipeline_route(args, command)
         if fresh_pipeline and not args.pipeline_admitted:
             # Admission precedes run(), its absolute/progress clocks and samples.
             # The existing pool owns priority, native observations and the short
