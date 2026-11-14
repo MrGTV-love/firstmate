@@ -2211,7 +2211,7 @@
       "invariant": "A proved held-close or slot-return route cannot silently change before removal.",
       "layer": "runtime-block",
       "source": "the task's current metadata, ownership/copy/process inventory, pending outcomes and lock-bound cleanup proofs; existing decision points: site:bin/fm-teardown.sh:feccb8ae4f",
-      "trigger": "refuses when the held-close vs slot-return route changed between proof and removal, or a peer left the slot so the peer route no longer applies, or the slot-return route has no resolved pool slot or its durable lease is lost under custody",
+      "trigger": "refuses when the held-close vs slot-return route changed between proof and removal, or a peer left the slot so the peer route no longer applies, or the slot-return route has no resolved pool slot or its durable lease is lost under custody, or the return-pending record path cannot take the slot's return record (refused at entry, before any lease or marker write)",
       "decision": "deny",
       "fail_direction": "closed",
       "remedy": "Preserve the task and its records; have the owner satisfy the named custody or completion prerequisite, then retry FM_HOME=<home> bash bin/fm-teardown.sh <task> without force.",
@@ -2247,6 +2247,10 @@
         {
           "file": "bin/fm-teardown.sh",
           "match": "echo \"REFUSED: no pool slot was resolved for task $ID's return, so no durable lease can be proved; retaining the task record and contents\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: task $ID's return-pending record path $STATE/$ID.teardown-return-pending is not a regular file, so the pool slot's return could not be recorded; nothing was changed. Remove what is there and re-run.\" >&2"
         }
       ]
     },

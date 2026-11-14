@@ -1018,28 +1018,53 @@ fm_backlog_record_remove() {
 }
 
 # Whether fm_backlog_record_remove would remove <path> now, decided without
-# removing it, so a caller can refuse before its first mutation. An absent path
-# passes. A present one must pass the same authorized-parent and regular-file
-# checks, and then a second name for the same file, .<name>.removal-probe beside
-# it, is linked and unlinked again: that meets the directory permissions,
-# sticky-bit ownership, file and directory flags and access-control entries that
-# removing <path> meets, so a file rm -f cannot remove fails here. When the
-# second name is linked but cannot be unlinked (an append-only directory or an
-# entry that denies delete) it stays, as unremovable as <path>, and the next call
-# retries its removal first. A filesystem without hard links, or a Linux
-# protected_hardlinks refusal for a file another user owns, also fails here
-# although rm -f could remove the file.
+# writing or removing anything, so a caller can refuse before its first
+# mutation. An absent path passes. A present one must pass the same
+# authorized-parent and regular-file checks, and then the operating system is
+# asked whether it may be deleted: on macOS, access(2) with _DELETE_OK, which
+# applies the directory permissions, sticky-bit ownership, file and directory
+# flags and access-control entries that rm -f meets; elsewhere, the directory's
+# write and search permission, the sticky-bit ownership rule, and the Linux
+# immutable and append-only attributes of the file and its directory where they
+# can be read. A cause neither covers, or a host without python3, passes here,
+# and the later remove still refuses it.
 fm_backlog_record_removable() {  # <path> <label> <root>
-  local path=$1 label=$2 root=$3 probe
+  local path=$1 label=$2 root=$3 rc=0
   fm_backlog_record_parent_authorized "$path" "$label" "$root" || return 1
   { [ -e "$path" ] || [ -L "$path" ]; } || return 0
   fm_backlog_record_present "$path" "$label" "$root" || return 1
-  probe="${path%/*}/.${path##*/}.removal-probe"
-  rm -f "$probe" 2>/dev/null
-  if [ ! -e "$probe" ] && [ ! -L "$probe" ] && ln "$path" "$probe" 2>/dev/null \
-      && rm -f "$probe" 2>/dev/null && [ ! -e "$probe" ] && [ ! -L "$probe" ]; then
-    return 0
-  fi
+  command -v python3 >/dev/null 2>&1 || return 0
+  python3 -I -c '
+import ctypes, ctypes.util, os, stat, sys
+path = sys.argv[1]
+parent = os.path.dirname(path) or "."
+if sys.platform == "darwin":
+    libc = ctypes.CDLL(ctypes.util.find_library("c"), use_errno=True)
+    sys.exit(0 if libc.access(os.fsencode(path), 1 << 12) == 0 else 3)
+if not os.access(parent, os.W_OK | os.X_OK):
+    sys.exit(3)
+info, pinfo, euid = os.lstat(path), os.stat(parent), os.geteuid()
+if pinfo.st_mode & stat.S_ISVTX and euid not in (0, info.st_uid, pinfo.st_uid):
+    sys.exit(3)
+if sys.platform.startswith("linux"):
+    import fcntl
+    for target, nofollow in ((path, getattr(os, "O_NOFOLLOW", 0)), (parent, 0)):
+        try:
+            fd = os.open(target, os.O_RDONLY | os.O_NONBLOCK | nofollow)
+        except OSError:
+            continue
+        flags = ctypes.c_long(0)
+        try:
+            fcntl.ioctl(fd, 0x80086601, flags)
+        except OSError:
+            continue
+        finally:
+            os.close(fd)
+        if flags.value & (0x10 | 0x20):
+            sys.exit(3)
+sys.exit(0)
+' "$path" >/dev/null 2>&1 || rc=$?
+  [ "$rc" = 3 ] || return 0
   FM_BACKLOG_TRANSITION_ERROR="$label could not be removed at $path"
   return 1
 }

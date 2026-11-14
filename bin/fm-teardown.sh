@@ -588,7 +588,9 @@
 #      FM_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS name when the new one is unset) between
 #      attempts. Retries key off the error text, not whether the lock file still
 #      exists after the failed attempt - a lock that self-clears mid-check still
-#      deserves a retry of the return.
+#      deserves a retry of the return. Before each retry the caller's post-lock
+#      safety check runs, as after step 3's cleanup: the process that held the
+#      lock may have left work the forced return would reset.
 #   2. Other treehouse return failures still abort immediately and loudly (no retry).
 #   3. If every retry still hits the lock signature and the lock remains, it is removed
 #      and the return tried once more ONLY when the lock is provably stale per
@@ -814,7 +816,8 @@ for _teardown_source in \
   fm-refuse-lib.sh \
   fm-teardown-nested-lib.sh \
   fm-hold-reason-lib.sh \
-  fm-lease-lib.sh
+  fm-lease-lib.sh \
+  fm-busy-lib.sh
 do
   teardown_require_source "$SCRIPT_DIR/$_teardown_source"
 done
@@ -889,6 +892,8 @@ fm_backlog_directory_present "$STATE" "state directory" || {
 . "$SCRIPT_DIR/fm-teardown-nested-lib.sh"
 # shellcheck source=bin/fm-hold-reason-lib.sh
 . "$SCRIPT_DIR/fm-hold-reason-lib.sh"
+# shellcheck source=bin/fm-busy-lib.sh
+. "$SCRIPT_DIR/fm-busy-lib.sh"
 # Supervision lease guard: post-landing cleanup is overlap territory between
 # the two Pi supervision actors; refuse while the OTHER actor holds this
 # task's live lease (contract: bin/fm-lease-lib.sh; no-op in homes without
@@ -1185,6 +1190,17 @@ teardown_reserve_pool_slot() {  # <slot> [project] [task-id]
   TEARDOWN_SLOT_CUSTODY=lease
 }
 
+# Whether this task's return-pending record path can take a new record: absent,
+# or a regular file that is not a link, which teardown_mark_return_pending
+# replaces. Anything else there would take the record, so the close refuses at
+# entry instead.
+teardown_return_pending_target_ok() {
+  local marker="$STATE/$ID.teardown-return-pending"
+  if [ -e "$marker" ] || [ -L "$marker" ]; then
+    [ -f "$marker" ] && [ ! -L "$marker" ]
+  fi
+}
+
 # Record, once this task's slot is reserved (or, for a slot shared with another
 # task, once this task's claim beside it awaits release) and before any
 # cleanup that can fail, that the slot is still held for it
@@ -1193,7 +1209,7 @@ teardown_reserve_pool_slot() {  # <slot> [project] [task-id]
 teardown_mark_return_pending() {  # <slot> [child-id]
   local marker="$STATE/$ID.teardown-return-pending" tmp gen
   tmp="$STATE/.$ID.teardown-return-pending.${BASHPID:-$$}"
-  if gen=$(fm_teardown_return_pending_gen "$META") \
+  if teardown_return_pending_target_ok && gen=$(fm_teardown_return_pending_gen "$META") \
       && { printf 'spawn_gen=%s\n' "$gen" && printf 'slot=%s\n' "$1" \
            && { [ -z "${2:-}" ] || printf 'child=%s\n' "$2"; }; } > "$tmp" \
       && mv -f "$tmp" "$marker" && [ -f "$marker" ] && [ ! -L "$marker" ]; then
@@ -2272,6 +2288,28 @@ remove_kimi_turnend_auth() {
   rm -f -- "$path"
 }
 
+# Whether retire_busy_state will accept this task's busy generation, read at
+# entry without the busy lock so its refusal comes before any endpoint close or
+# removal. bin/fm-busy-event.sh retire owns the rule and still decides at
+# retirement; a generation that changes during the run is refused there. Sets
+# TEARDOWN_BUSY_ERROR on a refusal.
+TEARDOWN_BUSY_ERROR=
+teardown_busy_retire_ready() {  # <state-dir> <id> <gen>
+  local gen_file="$1/$2.busy-gen" current
+  if [ -n "$3" ]; then
+    fm_busy_token_valid "$3" || { TEARDOWN_BUSY_ERROR="invalid busy-state gen for $2"; return 1; }
+    if current=$(fm_busy_current_gen "$1" "$2"); then
+      [ "$current" = "$3" ] || { TEARDOWN_BUSY_ERROR="stale busy-state gen for $2"; return 1; }
+    elif [ -e "$gen_file" ] || [ -L "$gen_file" ]; then
+      TEARDOWN_BUSY_ERROR="no armed busy-state gen for $2"
+      return 1
+    fi
+  elif [ -f "$gen_file" ]; then
+    fm_busy_current_gen "$1" "$2" >/dev/null || { TEARDOWN_BUSY_ERROR="no armed busy-state gen for $2"; return 1; }
+  fi
+  return 0
+}
+
 retire_busy_state() {
   local state_dir=$1 id=$2 gen=${3:-}
   if [ -n "$gen" ]; then
@@ -3202,6 +3240,13 @@ teardown_treehouse_return() {  # <dir> <cd-dir> <label> <owner-task> [<post-clea
     echo "teardown: $label return failed with transient git lock ($lock_desc); waiting ${TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS}s and retrying ($attempt/${max_retries})" >&2
     sleep "$TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS"
 
+    # A lock that cleared on its own was held by a process writing here, so
+    # the work it may have left is proved again before the forced return can
+    # reset it, as after a stale-lock cleanup below.
+    if [ -n "$post_cleanup_check" ] && ! "$post_cleanup_check"; then
+      echo "teardown: $label return aborted on its lock retry because safety checks failed" >&2
+      return 1
+    fi
     [ "$check_custody" = 0 ] || require_registered_slot_copies "$owner" "$dir" \
       || return "$TEARDOWN_TREEHOUSE_CUSTODY_REFUSED"
     if out=$( ( cd "$cd_dir" && treehouse return --force "$dir" ) 2>&1 ); then
@@ -4085,6 +4130,34 @@ fm_task_docker_path_excluded() {  # <root> <path>
   [ -n "$lane" ]
 }
 
+# The shared Supabase stack's project_id from <project>/supabase/config.toml,
+# printed, or nothing when the project has no such file; refuses, naming
+# <task-id>, when the file is there but its project_id cannot be read.
+teardown_supabase_project_id() {  # <task-id> <project>
+  [ -n "$2" ] && { [ -e "$2/supabase/config.toml" ] || [ -L "$2/supabase/config.toml" ]; } || return 0
+  python3 - "$2/supabase/config.toml" <<'PY' || {
+import sys
+import tomllib
+with open(sys.argv[1], "rb") as config:
+    project = tomllib.load(config).get("project_id")
+if not isinstance(project, str) or not project or any(c.isspace() for c in project):
+    raise SystemExit("invalid Supabase project_id")
+print(project)
+PY
+    echo "error: cannot identify the shared Supabase stack for $1; retaining task records" >&2
+    return 1
+  }
+}
+
+# The Supabase refusal of teardown_docker_stacks below, which the project's
+# config at entry already decides, checked read-only before the first lease,
+# marker or endpoint close. Docker cleanup itself still runs, and still
+# refuses, in its place.
+teardown_docker_stacks_preflight() {  # <task-id> <meta>
+  command -v docker >/dev/null 2>&1 || return 0
+  teardown_supabase_project_id "$1" "$(meta_value "$2" project)" >/dev/null
+}
+
 # Gathers what bin/fm-task-docker-lib.sh needs from this home and every local
 # home - the other live task ids (a longer one claims its own prefixed names,
 # the same id elsewhere makes the id ambiguous) and the task's path roots - then
@@ -4123,21 +4196,7 @@ teardown_docker_stacks() {
       return 1
     fi
   fi
-  if [ -n "$PROJ" ] && { [ -e "$PROJ/supabase/config.toml" ] || [ -L "$PROJ/supabase/config.toml" ]; }; then
-    protected=$(python3 - "$PROJ/supabase/config.toml" <<'PY'
-import sys
-import tomllib
-with open(sys.argv[1], "rb") as config:
-    project = tomllib.load(config).get("project_id")
-if not isinstance(project, str) or not project or any(c.isspace() for c in project):
-    raise SystemExit("invalid Supabase project_id")
-print(project)
-PY
-    ) || {
-      echo "error: cannot identify the shared Supabase stack for $ID; retaining task records" >&2
-      return 1
-    }
-  fi
+  protected=$(teardown_supabase_project_id "$ID" "$PROJ") || return 1
   fm_task_docker_cleanup "$ID" "$siblings" "$ambiguous" "$protected" "$META" ${roots[@]+"${roots[@]}"}
 }
 
@@ -6399,13 +6458,6 @@ teardown_release_herdr_locks
 if teardown_is_dropping; then
   TEARDOWN_DROPPING=1
 fi
-if [ "$FORCE" = "--force" ] && [ -n "$DROP_FILE" ] && [ "$KIND" != secondmate ]; then
-  fm_backlog_drop_record "$DATA" "$ID" "$DROP_FILE" || {
-    echo "REFUSED: cannot retain the captain's words for $ID; nothing was discarded." >&2
-    exit 1
-  }
-fi
-
 BACKLOG_CLOSED=0
 BACKLOG_TRANSITION=$TEARDOWN_BACKLOG_TRANSITION
 BACKLOG_TRANSITION_FLAGS=()
@@ -6463,6 +6515,28 @@ if [ "$TEARDOWN_BACKLOG_APPLIES" != 1 ] \
   exit 1
 fi
 [ "$KIND" = secondmate ] || teardown_held_copies_record_or_refuse check || exit 1
+# The other refusals the state at entry decides, made here before any lease,
+# marker, endpoint close or record write: a return-pending record path that
+# cannot take the reservation's record, a busy generation the retirement would
+# reject, and the Docker cleanup's own entry refusals.
+if [ "$KIND" != secondmate ] && { [ "$TREEHOUSE_SLOT_LOCK_REQUIRED" = 1 ] || [ "$TEARDOWN_SLOT_SHARED" = 1 ]; } \
+   && ! teardown_return_pending_target_ok; then
+  echo "REFUSED: task $ID's return-pending record path $STATE/$ID.teardown-return-pending is not a regular file, so the pool slot's return could not be recorded; nothing was changed. Remove what is there and re-run." >&2
+  exit 1
+fi
+if ! teardown_busy_retire_ready "$STATE" "$ID" "$BUSY_GEN"; then
+  echo "error: $TEARDOWN_BUSY_ERROR (event rejected); nothing was changed and every task record is retained" >&2
+  exit 1
+fi
+[ "$KIND" = secondmate ] || teardown_docker_stacks_preflight "$ID" "$META" || exit 1
+# The captain's words are retained only now, after every entry refusal and
+# before the first step that can discard anything.
+if [ "$FORCE" = "--force" ] && [ -n "$DROP_FILE" ] && [ "$KIND" != secondmate ]; then
+  fm_backlog_drop_record "$DATA" "$ID" "$DROP_FILE" || {
+    echo "REFUSED: cannot retain the captain's words for $ID; nothing was discarded." >&2
+    exit 1
+  }
+fi
 if [ "$TREEHOUSE_SLOT_LOCK_REQUIRED" = 1 ] && teardown_owns_worktree && [ -z "$TEARDOWN_PEER_SLOT" ]; then
   teardown_acquire_project_lock || exit $?
   if ! TEARDOWN_RESERVED_SLOT=$(teardown_live_slot_path); then
