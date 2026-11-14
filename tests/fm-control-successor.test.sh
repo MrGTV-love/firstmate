@@ -361,6 +361,7 @@ test_successor_refuses_other_tasks_and_records() {
 test_successor_refuses_inadmissible_names() {
   local id=suc-names dir name
   dir=$(new_successor_case names "$id")
+  # shellcheck disable=SC2016 # 'a$b' must reach the verb as a literal name, not expand.
   for name in 'bad..name' 'with space' 'wild*card' 'qu?stion' 'br[acket' '-leading' 'back\slash' '@{-1}' 'trailing.lock' 'trailing/' 'tab	name' 'qu"ote' "a'b" 'with#hash' 'a@b' 'a=b' 'a;b' 'a$b'; do
     expect_successor_refusal "$dir" "$id" "name-$name" "is not admissible" 1 --branch "$name" --note why
   done

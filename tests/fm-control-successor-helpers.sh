@@ -61,7 +61,7 @@ SH
 # command substitution that builds the case does not wait for it; its pid is in
 # <case-dir>/sentinel-pid, and the suite's cleanup stops exactly that pid.
 successor_start_sentinel() {  # <case-dir>
-  /bin/sleep 3000 >/dev/null 2>&1 </dev/null &
+  /bin/sleep 3000 >/dev/null 2>&1 &
   printf '%s\n' "$!" > "$1/sentinel-pid"
 }
 
