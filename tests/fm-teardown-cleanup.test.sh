@@ -6366,6 +6366,24 @@ test_locked_copy_landed_by_a_merged_pr_gets_one_pr_credit() {
   pass 'a locked copy whose whole head a merged pull request holds is passed --pr and never a bundle record beside it'
 }
 
+# The closeout driver reads --pr with gh pr view, so only a GitHub pull request
+# can be its credit. A merged Forgejo pull request that holds the copy head is
+# named as the reason no --pr is passed, and the bundle reason does not hide it.
+test_locked_copy_landed_by_a_merged_forgejo_pr_names_the_driver_bound() {
+  local rc head
+  make_locked_bundle_case forgejo-credit own single
+  head=$(git -C "$FOREIGN_COPY" rev-parse HEAD)
+  printf '%s\n' 'pr=https://git.example.org/team/repo/pulls/7' "pr_head=$head" >> "$FOREIGN_CASE/state/task-x1.meta"
+  add_gh_axi_error "$FOREIGN_CASE"
+  add_tea_pull_for_head "$FOREIGN_CASE" true "$head"
+  run_foreign_teardown rc FM_STUB_REQUIRE_CREDIT=1
+  assert_grep 'api --login fj --repo team/repo /repos/{owner}/{repo}/pulls/7' "$FOREIGN_CASE/tea.log" "forgejo-credit: the Forgejo pull request was not read"
+  assert_no_grep ' --pr ' "$FOREIGN_CASE/closeout.log" "forgejo-credit: a Forgejo number reached the GitHub-only driver as --pr"
+  assert_grep "merged pull request https://git.example.org/team/repo/pulls/7 holds HEAD ${head:0:12}, but the closeout driver reads --pr from GitHub only" \
+    "$FOREIGN_CASE/stderr" "forgejo-credit: the driver bound was not named: $(grep -h 'closeout credit' "$FOREIGN_CASE/stderr")"
+  pass 'a merged Forgejo pull request is not passed as --pr to the GitHub-only driver, and the credit line names that bound'
+}
+
 # A bundle whose branch tip restores an interior commit is accepted by teardown's
 # maximal-tip proof but not credited by the driver. For a dead launcher the copy
 # is released by the script itself, without force and without an owner command.
@@ -7293,6 +7311,7 @@ test_locked_own_nested_copy_with_a_recycled_launcher_pid_is_released
 test_live_launcher_outside_the_task_keeps_its_locked_own_copy
 test_locked_copy_held_by_a_bundle_gets_one_bundle_record_credit
 test_locked_copy_landed_by_a_merged_pr_gets_one_pr_credit
+test_locked_copy_landed_by_a_merged_forgejo_pr_names_the_driver_bound
 test_dead_launcher_lock_is_released_directly_when_no_credit_is_satisfiable
 test_dead_launcher_lock_is_released_when_the_driver_is_unavailable
 test_locked_landed_copy_with_a_record_but_no_unlanded_commit_reaches_the_driver

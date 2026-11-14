@@ -1296,7 +1296,10 @@ teardown_closeout_refusal() {  # <foreign|own nested> <copy> <driver-exit>
 
 # The merged-PR number whose merged head holds the whole HEAD of <copy>, or
 # failure. bin/fm-teardown.sh's merged-PR proof runs in a subshell, so the task's
-# own PR_URL is never overwritten by a lookup made for another copy.
+# own PR_URL is never overwritten by a lookup made for another copy. The closeout
+# driver reads --pr with gh pr view (Vernant scripts/git-stability/closeout_pr.py
+# load_pr_info), so only a GitHub pull request can be its credit: for a merged
+# pull request on another forge this prints its URL and returns 2.
 teardown_credit_pr() {  # <copy> <head>
   local copy=$1 head=$2 branch url
   declare -F pr_is_merged >/dev/null 2>&1 || return 1
@@ -1305,7 +1308,10 @@ teardown_credit_pr() {  # <copy> <head>
     TEARDOWN_LANDED_DIR=$copy TEARDOWN_LANDED_REF=$head
     pr_is_merged "$branch" >/dev/null 2>&1 && printf '%s' "$PR_URL"
   ) || return 1
-  [[ "$url" =~ ^https://github[.]com/[^/]+/[^/]+/pull/([0-9]+)$ ]] || return 1
+  if ! [[ "$url" =~ ^https://github[.]com/[^/]+/[^/]+/pull/([0-9]+)$ ]]; then
+    [ -z "$url" ] || { printf '%s' "$url"; return 2; }
+    return 1
+  fi
   printf '%s' "${BASH_REMATCH[1]}"
 }
 
@@ -1362,16 +1368,20 @@ teardown_credit_bundle() {  # <copy> <head>
 # driver's claim rule, else none. Never both: the driver rejects the pair.
 TEARDOWN_CLOSEOUT_PROOF=
 teardown_closeout_credit() {  # <copy>
-  local copy=$1 head pr
+  local copy=$1 head pr pr_rc=0 note=
   TEARDOWN_CLOSEOUT_CREDIT=()
   TEARDOWN_CLOSEOUT_CREDIT_FILE=
   TEARDOWN_CREDIT_WHY=
   TEARDOWN_CREDIT_BUNDLE=
   TEARDOWN_CLOSEOUT_PROOF='the landed-work rule'
   head=$(git -C "$copy" rev-parse --verify 'HEAD^{commit}' 2>/dev/null) || head=
+  [ -z "$head" ] || pr=$(teardown_credit_pr "$copy" "$head") || pr_rc=$?
+  if [ -n "$head" ] && [ "$pr_rc" = 2 ]; then
+    note="merged pull request $pr holds HEAD ${head:0:12}, but the closeout driver reads --pr from GitHub only (gh pr view)"
+  fi
   if [ -z "$head" ]; then
     echo "teardown: closeout credit for $copy: none (HEAD cannot be resolved)" >&2
-  elif pr=$(teardown_credit_pr "$copy" "$head"); then
+  elif [ "$pr_rc" = 0 ]; then
     TEARDOWN_CLOSEOUT_CREDIT=(--pr "$pr")
     TEARDOWN_CLOSEOUT_PROOF="merged pull request $pr"
     echo "teardown: closeout credit for $copy: --pr $pr (the merged pull request holds HEAD ${head:0:12})" >&2
@@ -1379,9 +1389,10 @@ teardown_closeout_credit() {  # <copy>
     TEARDOWN_CLOSEOUT_CREDIT=(--bundle-record "$TEARDOWN_CREDIT_RECORD")
     TEARDOWN_CLOSEOUT_CREDIT_FILE=$TEARDOWN_CREDIT_RECORD
     TEARDOWN_CLOSEOUT_PROOF="recorded bundle $TEARDOWN_CREDIT_BUNDLE"
-    echo "teardown: closeout credit for $copy: --bundle-record $TEARDOWN_CREDIT_RECORD (bundle $TEARDOWN_CREDIT_BUNDLE holds every locally-only commit)" >&2
+    echo "teardown: closeout credit for $copy: --bundle-record $TEARDOWN_CREDIT_RECORD (bundle $TEARDOWN_CREDIT_BUNDLE holds every locally-only commit${note:+; $note})" >&2
   else
     [ -z "$TEARDOWN_CREDIT_BUNDLE" ] || TEARDOWN_CLOSEOUT_PROOF="recorded bundle $TEARDOWN_CREDIT_BUNDLE"
+    [ -z "$note" ] || TEARDOWN_CREDIT_WHY="$note${TEARDOWN_CREDIT_WHY:+; $TEARDOWN_CREDIT_WHY}"
     echo "teardown: closeout credit for $copy: none${TEARDOWN_CREDIT_WHY:+ ($TEARDOWN_CREDIT_WHY)}" >&2
   fi
 }
