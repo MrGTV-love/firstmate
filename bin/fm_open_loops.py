@@ -725,6 +725,31 @@ class Collector:
     def deliverable_landed(self, task):
         return self.captain_dropped(task) or self.copy_landed(task)
 
+    def delivered(self, task):
+        """deliverable_landed with positive evidence that something was delivered.
+
+        A clean copy whose HEAD is still on the default branch shows no pending commits whether its work
+        fast-forward landed or it never committed. Without a merged PR, a ruling or a report, its own work is
+        on record only when its HEAD is not on the default branch (its content landed another way, such as a
+        squash) or its HEAD moved off the recorded slot base (slot_base_sha=).
+        """
+        if not self.deliverable_landed(task):
+            return False
+        if self.captain_dropped(task) or task["kind"] == "scout":
+            return True
+        pr = self.pr_state(task["pr"]["url"]) if task["pr"].get("url") else None
+        if pr and pr.get("merged_at"):
+            return True
+        worktree = self.task_worktree(task)
+        if not worktree:
+            return False
+        base = self.default_ref(worktree, task.get("mode"))
+        head = self.git(worktree, "rev-parse", "HEAD").strip()
+        if self.git(worktree, "rev-list", "--count", f"{base}..{head}").strip() != "0":
+            return True
+        slot_base = self.read_fields(self.state / (task["id"] + ".meta")).get("slot_base_sha", "")
+        return bool(slot_base) and head != slot_base
+
     def copy_landed(self, task):
         """The task's own report or copy carries its deliverable, whatever a recorded ruling says."""
         if task["kind"] == "scout":
@@ -1121,7 +1146,8 @@ class Collector:
     def teardown_refusal(self, task_id):
         """The newest refusal of this task's plain teardown on record, or empty.
 
-        Two owners record one: bin/fm-merge-prune.sh keeps it in state/<id>.merge-prune (state=retained), and
+        Two owners record one: bin/fm-merge-prune.sh keeps it in state/<id>.merge-prune (state=retained, or
+        state=pending for a refusal it will retry), and
         bin/fm-idle-session-reap.sh in state/.idle-reap/<id>.refused (fm-idle-reap-refused-v1: epoch, status line,
         reason). A manual teardown records nothing.
         """
@@ -1129,7 +1155,7 @@ class Collector:
         prune = self.state / (task_id + ".merge-prune")
         try:
             fields = dict(line.split("=", 1) for line in prune.read_text().splitlines() if "=" in line)
-            if fields.get("state") == "retained" and fields.get("reason"):
+            if fields.get("state") in ("retained", "pending") and fields.get("reason"):
                 found.append((mtime(prune) or 0, fields["reason"]))
         except OSError:
             pass
@@ -1185,25 +1211,41 @@ class Collector:
         backlog_closed = any(r["id"] == ident and r.get("state") == "done" for r in self.backlog)
         closed = backlog_closed or self.captain_dropped(task)
         done_refused = verb == "done" and state == "blocked" and not closed and NM_DAEMON_DOWN not in detail
-        if not (closed or verb == "done" or state == "done") or open_decision or pause_limit \
-                or (state in ("working", "paused", "blocked", "parked") and not closed and not done_refused):
+        landed = None
+        if not (closed or verb == "done" or state == "done") or open_decision or pause_limit:
             self.attach_refusal(ident, pr_url, refusal, refused)
             return
-        since = mtime(self.state / (ident + ".status")) or mtime(self.state / (ident + ".meta"))
-        if done_refused:
-            if self.covering_rows(ident, pr_url):
+        if state in ("working", "paused", "blocked", "parked") and not closed and not done_refused:
+            # A worker still reading working after its done report may be running its pipeline: that is
+            # progress, not a stranded task. Once its deliverable is delivered, the cleanup is owed anyway.
+            if state == "working" and verb == "done":
+                landed = self.source("finished deliverable " + ident, self.delivered, task)
+            if not landed:
                 self.attach_refusal(ident, pr_url, refusal, refused)
                 return
-            self.add("pending_acceptance", ident, f"resolve the ship-done gate's refusal of the done claim of {ident}: {detail}"
-                     + (f"; {refused}" if refused else ""), since, "firstmate",
+        since = mtime(self.state / (ident + ".status")) or mtime(self.state / (ident + ".meta"))
+        gate = f"resolve the ship-done gate's refusal of the done claim of {ident}: {detail}"
+        if done_refused:
+            covering = self.covering_rows(ident, pr_url)
+            if covering:
+                # The row that already owns the task also names the gate's reason.
+                for row in covering:
+                    row["next_action"] = f"{row['next_action']}; {gate}"
+                    row["evidence"] = f"the ship-done gate did not accept the done claim: {detail}; {row['evidence']}"[:400]
+                self.attach_refusal(ident, pr_url, refusal, refused)
+                return
+            self.add("pending_acceptance", ident, gate + (f"; {refused}" if refused else ""), since, "firstmate",
                      evidence=(f"last teardown refusal: {refusal}; " if refusal else "")
                               + "the last report was done and the ship-done gate did not accept it")
             return
-        landed = self.source("finished deliverable " + ident, self.deliverable_landed, task)
-        handoff = [r for r in self.covering_rows(ident, pr_url) if r["category"] == "completed_task"] if landed else []
-        if handoff:
+        if landed is None:
+            landed = self.source("finished deliverable " + ident, self.delivered, task)
+        covering = self.covering_rows(ident, pr_url) if landed else []
+        handoff = [r for r in covering if r["category"] == "completed_task"]
+        if handoff or any(r["category"] == "interrupted_teardown" for r in covering):
             # A delivered scout report still awaits its owner handoff, which completed_task already owns;
-            # that one row also names the cleanup that ends it.
+            # that one row also names the cleanup that ends it. An interrupted slot return already owns the
+            # teardown that ends a landed task. Either row then carries the recorded refusal.
             for row in handoff:
                 row["next_action"] = (f"{row['next_action']}; once it is accepted, run plain bin/fm-teardown.sh {ident}; "
                                       "the record stays open until it succeeds")
