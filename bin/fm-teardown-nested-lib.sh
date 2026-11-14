@@ -653,12 +653,59 @@ teardown_bundle_store() {  # <copy> <source> <sha256>
   [ -z "$TEARDOWN_BUNDLE_REASON" ]
 }
 
+# The byte checks every bundle read shares: <file> is a regular nonsymlink file
+# whose SHA-256 is <sha256> and that git bundle verify accepts in <copy>'s
+# repository. Sets TEARDOWN_BUNDLE_REASON on failure.
+teardown_bundle_file_ok() {  # <copy> <file> <sha256>
+  local digest
+  if [ ! -f "$2" ] || [ -L "$2" ]; then
+    TEARDOWN_BUNDLE_REASON='bundle is not a regular nonsymlink file'
+  elif ! digest=$(teardown_ignored_sha256 "$2"); then
+    TEARDOWN_BUNDLE_REASON='bundle sha256 cannot be read'
+  elif [ "$digest" != "$3" ]; then
+    TEARDOWN_BUNDLE_REASON='bundle sha256 does not match record'
+  elif ! git -C "$1" bundle verify "$2" >/dev/null 2>&1; then
+    TEARDOWN_BUNDLE_REASON='git bundle verify failed'
+  else
+    return 0
+  fi
+  return 1
+}
+
+# Does the bundle that teardown_bundle_preserved stored at <stored> still hold
+# <copy>, with no forge or fetch work? The record still names it (same SHA-256),
+# the stored copy and any recorded source that still exists pass the byte checks,
+# and the stored copy still advertises every recorded tip. Sets
+# TEARDOWN_BUNDLE_REASON on failure.
+teardown_bundle_proof_current() {  # <copy> <stored>
+  local copy=$1 stored=$2 source heads tip
+  teardown_bundle_record || return 1
+  if [ "$DATA/$ID/preserved-bundles/$TEARDOWN_BUNDLE_RECORD_HASH.bundle" != "$stored" ]; then
+    TEARDOWN_BUNDLE_REASON='the preservation record names another bundle'
+    return 1
+  fi
+  teardown_bundle_file_ok "$copy" "$stored" "$TEARDOWN_BUNDLE_RECORD_HASH" \
+    || { TEARDOWN_BUNDLE_REASON="stored $TEARDOWN_BUNDLE_REASON"; return 1; }
+  source=$TEARDOWN_BUNDLE_RECORD_PATH
+  if [ -e "$source" ] || [ -L "$source" ]; then
+    teardown_bundle_file_ok "$copy" "$source" "$TEARDOWN_BUNDLE_RECORD_HASH" \
+      || { TEARDOWN_BUNDLE_REASON="recorded source $TEARDOWN_BUNDLE_REASON"; return 1; }
+  fi
+  heads=$(git -C "$copy" bundle list-heads "$stored" 2>/dev/null | awk '{print $1}' | tr '\n' ' ') \
+    || { TEARDOWN_BUNDLE_REASON='stored bundle advertised tips cannot be read'; return 1; }
+  for tip in $TEARDOWN_BUNDLE_RECORD_TIPS; do
+    case " $heads " in *" $tip "*) ;; *)
+      TEARDOWN_BUNDLE_REASON="recorded tip $tip is not advertised by the stored bundle"; return 1 ;;
+    esac
+  done
+}
+
 # <ref> itself must carry a locally-only commit, or delivery proof is still
 # required. Coverage includes only this cleanup's HEADs and deleted branch refs,
 # never unrelated unheld branches in the shared repository.
 teardown_bundle_preserved() {  # <copy> <ref> [hint]
   local copy=$1 ref=$2 hint=${3:-} record="$DATA/$ID/preservation-bundles.tsv"
-  local bundle source hash tips tip own required side heads advertised digest stored
+  local bundle source hash tips tip own required side heads advertised stored
   TEARDOWN_BUNDLE_ACCEPTED=
   if ! teardown_bundle_attended; then
     if [ -f "$record" ] && [ ! -L "$record" ] \
@@ -698,14 +745,8 @@ teardown_bundle_preserved() {  # <copy> <ref> [hint]
   fi
   if [[ "$bundle" != /* ]]; then
     TEARDOWN_BUNDLE_REASON='bundle path is not absolute'
-  elif [ ! -f "$bundle" ] || [ -L "$bundle" ]; then
-    TEARDOWN_BUNDLE_REASON='bundle is not a regular nonsymlink file'
-  elif ! digest=$(teardown_ignored_sha256 "$bundle"); then
-    TEARDOWN_BUNDLE_REASON='bundle sha256 cannot be read'
-  elif [ "$digest" != "$hash" ]; then
-    TEARDOWN_BUNDLE_REASON='bundle sha256 does not match record'
-  elif ! git -C "$copy" bundle verify "$bundle" >/dev/null 2>&1; then
-    TEARDOWN_BUNDLE_REASON='git bundle verify failed'
+  elif ! teardown_bundle_file_ok "$copy" "$bundle" "$hash"; then
+    :
   elif ! heads=$(git -C "$copy" bundle list-heads "$bundle" 2>/dev/null); then
     TEARDOWN_BUNDLE_REASON='bundle advertised tips cannot be read'
   else
@@ -725,7 +766,7 @@ teardown_bundle_preserved() {  # <copy> <ref> [hint]
         esac
       done
     fi
-    if [ -z "$TEARDOWN_BUNDLE_REASON" ] && ! teardown_bundle_restorable "$copy" "$bundle" "$digest" "$tips"; then
+    if [ -z "$TEARDOWN_BUNDLE_REASON" ] && ! teardown_bundle_restorable "$copy" "$bundle" "$hash" "$tips"; then
       TEARDOWN_BUNDLE_REASON='bundle cannot be restored in an isolated repository'
     fi
   fi
@@ -1362,7 +1403,7 @@ teardown_launcher_gone() {  # <pid> <lock-file>
 # Returns 1 with TEARDOWN_RELEASE_WHY naming the fact that kept the copy.
 TEARDOWN_RELEASE_WHY=
 teardown_dead_launcher_release() {  # <slot> <copy> <head> <foreign|own nested>
-  local slot=$1 copy=$2 head=$3 kind=$4 lock pid lock_file rc=0 now gone procs
+  local slot=$1 copy=$2 head=$3 kind=$4 lock pid lock_file rc=0 now gone procs stored
   TEARDOWN_RELEASE_WHY=
   teardown_copy_lock_file "$copy" || { TEARDOWN_RELEASE_WHY='its lock state cannot be read'; return 1; }
   lock=$TEARDOWN_FOREIGN_LOCK
@@ -1388,7 +1429,9 @@ teardown_dead_launcher_release() {  # <slot> <copy> <head> <foreign|own nested>
     TEARDOWN_RELEASE_WHY=${TEARDOWN_FOREIGN_WHY:-its ownership cannot be proved}
     return 1
   fi
+  TEARDOWN_BUNDLE_ACCEPTED=
   teardown_landed "$copy" HEAD "" >/dev/null 2>&1 || { TEARDOWN_RELEASE_WHY='its landed-work proof no longer holds'; return 1; }
+  stored=$TEARDOWN_BUNDLE_ACCEPTED
   if teardown_copy_git_protects "$copy"; then
     TEARDOWN_RELEASE_WHY='it holds content Git would not remove without force'
     return 1
@@ -1401,6 +1444,14 @@ teardown_dead_launcher_release() {  # <slot> <copy> <head> <foreign|own nested>
   if [ -n "$procs" ]; then
     procs=${procs%%$'\n'*}
     TEARDOWN_RELEASE_WHY="process ${procs%%$'\t'*} runs in it or holds $(fm_refuse_text "${procs#*$'\t'}") open since the retire phase"
+    return 1
+  fi
+  # What the proofs above held must still hold at the unlock: the HEAD, and the
+  # stored bundle when a bundle proved the copy (cheap reads, no forge or fetch).
+  now=$(git -C "$copy" rev-parse --verify 'HEAD^{commit}' 2>/dev/null) || now=
+  [ -n "$now" ] && [ "$now" = "$head" ] || { TEARDOWN_RELEASE_WHY='its HEAD changed after the landing proof'; return 1; }
+  if [ -n "$stored" ] && ! teardown_bundle_proof_current "$copy" "$stored"; then
+    TEARDOWN_RELEASE_WHY="its recorded bundle no longer holds it ($TEARDOWN_BUNDLE_REASON)"
     return 1
   fi
   # The lock and the launcher are read once more, immediately before the unlock.

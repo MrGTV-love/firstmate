@@ -6503,6 +6503,69 @@ test_history_landed_copy_keeps_its_unique_ignored_file() {
   pass 'a copy landed only through default-branch history, recorded as the worktree or as a prior copy, keeps a unique ignored file; without one it closes'
 }
 
+# The bundle that proves a dead launcher's copy must still hold it at the unlock:
+# the fake lsof truncates the recorded source and the stored bundle, or commits a
+# new HEAD in the copy, during the last holder scan (after the landed and Git
+# proofs). Teardown keeps the copy locked and the record; with nothing changed
+# the same copy closes and its stored bundle restores the commits.
+test_direct_release_rechecks_the_bundle_and_head_at_the_unlock() {
+  local rc change marker head first hash stored
+  for change in none truncate head; do
+    make_locked_bundle_case "late-$change" own interior
+    rm -f "$FOREIGN_CASE/vernant-python"
+    head=$(git -C "$FOREIGN_COPY" rev-parse HEAD)
+    first=$(git -C "$FOREIGN_COPY" rev-parse HEAD^)
+    hash=$(cut -f2 "$FOREIGN_CASE/data/task-x1/preservation-bundles.tsv")
+    stored="$FOREIGN_CASE/data/task-x1/preserved-bundles/$hash.bundle"
+    marker="$FOREIGN_CASE/git-protects-ran"
+    cat > "$FOREIGN_CASE/fakebin/git" <<SH
+#!/usr/bin/env bash
+args=("\$@")
+for argument in "\$@"; do
+  if [ "\$argument" = worktree ]; then printf '%s\n' "\$*" >> "$FOREIGN_CASE/git-worktree.log"; break; fi
+done
+case " \$* " in *" ls-files --stage -z "*) : > "$marker" ;; esac
+exec "\${REAL_GIT_FOR_TEST:?}" "\${args[@]}"
+SH
+    cat > "$FOREIGN_CASE/fakebin/lsof" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" -Fpfn "*)
+    if [ -e "$marker" ] && [ ! -e "$marker.done" ]; then
+      : > "$marker.done"
+      case $change in
+        truncate) : > "$BUNDLE_PATH"; : > "$stored" ;;
+        head) "\${REAL_GIT_FOR_TEST:?}" -C "$FOREIGN_COPY" -c user.email=t@t -c user.name=t commit -q --allow-empty -m late ;;
+      esac
+    fi
+    exit 0 ;;
+  *" -d cwd "*) exit 0 ;;
+esac
+exit 1
+SH
+    chmod +x "$FOREIGN_CASE/fakebin/git" "$FOREIGN_CASE/fakebin/lsof"
+    run_foreign_teardown rc
+    assert_present "$marker.done" "late-$change: the last holder scan did not run after the Git proof"
+    if [ "$change" = none ]; then
+      expect_code 0 "$rc" "late-$change: an unchanged bundle-held copy must close: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+      assert_absent "$FOREIGN_COPY" "late-$change: the copy survived"
+      assert_bundle_restores_copy_commits "late-$change" "$head" "$first"
+    else
+      expect_code 1 "$rc" "late-$change: a change after the last proof must keep the copy: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+      assert_present "$FOREIGN_COPY/.git" "late-$change: the copy was removed"
+      git -C "$FOREIGN_CASE/project" worktree list --porcelain | grep -A4 -F "worktree $FOREIGN_COPY" | grep -q '^locked' \
+        || fail "late-$change: the copy is no longer locked"
+      if grep -q 'worktree unlock' "$FOREIGN_CASE/git-worktree.log" 2>/dev/null; then fail "late-$change: the script unlocked the copy"; fi
+      assert_present "$FOREIGN_CASE/state/task-x1.meta" "late-$change: the task record was removed"
+    fi
+    case $change in
+      truncate) assert_grep 'The copy was not released directly: its recorded bundle no longer holds it' "$FOREIGN_CASE/stderr" "late-$change: the refusal did not name the bundle" ;;
+      head) assert_grep 'The copy was not released directly: its HEAD changed after the landing proof' "$FOREIGN_CASE/stderr" "late-$change: the refusal did not name the HEAD change" ;;
+    esac
+  done
+  pass 'a bundle truncated or a HEAD committed during the last holder scan keeps a dead launcher'"'"'s copy locked; unchanged, it closes and restores'
+}
+
 # The open-file listing is filtered in one pass, and a listing line of a shape
 # the filter does not know still fails the scan, so the copy stays locked.
 test_direct_release_refuses_a_malformed_open_file_listing() {
@@ -7079,6 +7142,7 @@ test_direct_release_refuses_a_process_that_appears_before_the_unlock
 test_direct_release_scans_for_processes_after_the_landed_and_git_proofs
 test_direct_release_refuses_a_malformed_open_file_listing
 test_history_landed_copy_keeps_its_unique_ignored_file
+test_direct_release_rechecks_the_bundle_and_head_at_the_unlock
 test_direct_release_refuses_a_process_holding_a_file_in_the_copy_open
 test_task_own_descendant_holding_a_file_open_refuses_and_is_not_signalled
 test_direct_release_refuses_an_unreadable_process_table
