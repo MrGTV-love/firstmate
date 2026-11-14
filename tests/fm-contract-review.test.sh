@@ -1391,6 +1391,24 @@ test_rubric_revision_is_pinned_with_a_root() {
   pass "with a root, a revision path to the rubric is allowed only at the pinned revision"
 }
 
+test_policy_is_named_only_by_the_policy_argument() {
+  local src="$TMP_ROOT/s-one-way.md" pack policy2="$TMP_ROOT/policy-env.md"
+  write_fixture_contract "$src"
+  awk '{ print } $0 == "<!-- reviewer-block:begin -->" { print "Probe line that only the environment copy holds." }' "$POLICY" >"$policy2"
+  # Noncompliant: a policy named in the environment is a second way to pick the policy.
+  pack=''
+  FM_CONTRACT_REVIEW_POLICY="$policy2" build_pack pack --contract "$src" || fail "build with a policy variable set failed: $(cat "$TMP_ROOT/build.err")"
+  assert_no_grep "Probe line that only the environment copy holds." "$pack/contract.md" "the builder took the policy from the environment"
+  policy_block "$POLICY" "$TMP_ROOT/block.one-way.expected"
+  pack_block "$pack/contract.md" "$TMP_ROOT/block.one-way.actual"
+  cmp -s "$TMP_ROOT/block.one-way.expected" "$TMP_ROOT/block.one-way.actual" || fail "with no --policy the pack does not hold the default policy block"
+  # Compliant: --policy still names it.
+  pack=''
+  build_pack pack --contract "$src" --policy "$policy2" || fail "build with --policy failed: $(cat "$TMP_ROOT/build.err")"
+  assert_grep "Probe line that only the environment copy holds." "$pack/contract.md" "--policy no longer names the policy"
+  pass "--policy is the one way to name the policy"
+}
+
 test_leak_check_splits_candidates_at_any_non_path_character() {
   local rep="$TMP_ROOT/report-z3.md" row want line n=0
   make_leak_world
@@ -1511,4 +1529,5 @@ fm_test_run_cases \
   test_rubric_revision_is_pinned_with_a_root \
   test_unopened_file_named_under_inputs_read_voids_and_the_reviewer_is_told \
   test_leak_check_splits_candidates_at_any_non_path_character \
+  test_policy_is_named_only_by_the_policy_argument \
   -- "$@"

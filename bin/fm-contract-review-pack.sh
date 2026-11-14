@@ -43,8 +43,7 @@
 #   The manifest of excluded paths is <out-root>.excluded-paths, outside the pack.
 #   It always holds the real path of every input file (the contract, the request,
 #   each context file), the register and history paths when given, and every
-#   --exclude path. The policy is --policy, else $FM_CONTRACT_REVIEW_POLICY, else
-#   the skill next to this script.
+#   --exclude path. The policy is --policy, else the skill next to this script.
 # check: reads the report's `Inputs read` list and, when given, the run log, and
 #   prints INPUT LEAK lines plus ROUND VOID (exit 3) when the list is missing or a
 #   listed path is not an authorized input; prints INPUT CLEAN (exit 0) otherwise.
@@ -308,7 +307,7 @@ cmd_build() {
     [ -f "$f" ] && [ -r "$f" ] || die "context file not readable: $f"
   done
   [ -d "$root" ] || die "root is not a directory: $root"
-  [ -n "$policy" ] || policy=${FM_CONTRACT_REVIEW_POLICY:-$FM_ROOT/.agents/skills/contract-review/SKILL.md}
+  [ -n "$policy" ] || policy=$FM_ROOT/.agents/skills/contract-review/SKILL.md
   [ -f "$policy" ] && [ -r "$policy" ] || die "policy file not readable: $policy"
 
   local scratch
