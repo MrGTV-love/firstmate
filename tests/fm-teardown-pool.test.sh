@@ -1185,6 +1185,270 @@ test_pool_slot_root_unremovable_pending_close_refuses_before_lease() {
   pass "a pool-slot-root close with an unremovable previous pending-close record ($forms) refuses before any lease or marker write, and the fixed retry closes"
 }
 
+# nested_slot_landed_tracked_file <case-dir>: the slot root gains a tracked
+# tracked.txt in a commit that is on origin's main, so the slot stays landed.
+nested_slot_landed_tracked_file() {  # <case-dir>
+  local case_dir=$1
+  printf 'tracked\n' > "$NESTED_SLOT/tracked.txt"
+  git -C "$NESTED_SLOT" add tracked.txt
+  git -C "$NESTED_SLOT" -c user.email=t@t -c user.name=t commit -qm "tracked file"
+  git -C "$NESTED_SLOT" push -q origin HEAD:main
+  git -C "$case_dir/project" fetch -q origin
+}
+
+# nested_self_clearing_lock_treehouse <case-dir> <dirty|clean>: a Treehouse
+# stand-in whose first return of any path fails with Git's index.lock signature
+# while the lock clears on its own; when dirty it first appends new bytes to a
+# tracked file of the slot root, as a process finishing in the slot would. A
+# later return records whether those bytes are still there in late-at-return,
+# then resets the slot with Git, as the provider's forced return does, and logs
+# the return. The slot root must hold a landed tracked.txt
+# (nested_slot_landed_tracked_file).
+nested_self_clearing_lock_treehouse() {  # <case-dir> <dirty|clean>
+  local case_dir=$1 mode=$2
+  cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+[ "\${1:-}" = return ] || exit 0
+wt=\${@: -1}
+count=\$(cat "$case_dir/return-attempts" 2>/dev/null || echo 0)
+count=\$((count + 1))
+printf '%s\n' "\$count" > "$case_dir/return-attempts"
+if [ "\$count" = 1 ]; then
+  if [ "$mode" = dirty ] && [ "\$wt" = "$NESTED_SLOT" ]; then
+    printf 'late unlanded bytes\n' >> "$NESTED_SLOT/tracked.txt"
+  fi
+  echo "fatal: Unable to create '\$wt/.git/index.lock': File exists." >&2
+  exit 128
+fi
+if [ "\$wt" = "$NESTED_SLOT" ]; then
+  if grep -qs 'late unlanded bytes' "$NESTED_SLOT/tracked.txt"; then echo present; else echo absent; fi > "$case_dir/late-at-return"
+  git -C "$NESTED_SLOT" reset -q --hard
+fi
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/treehouse"
+}
+
+# A return that fails on an index lock that then clears on its own is retried,
+# but a lock means a process was writing in the slot: work that appeared while it
+# held the lock must be proved before the slot is returned. Dirty: new bytes in a
+# tracked file of the slot root refuse the return, so the provider never resets
+# them, and the record and claim stay. Clean: the retry returns the slot once.
+test_nested_self_clearing_lock_retry_reproves_the_slot() {
+  local shape mode case_dir rc label tracked
+  for shape in plain enclosing; do
+    for mode in dirty clean; do
+      label="nested-self-clearing-lock-$mode-$shape"
+      nested_fixture "$label" "$shape" mine landed
+      case_dir=$NESTED_CASE
+      nested_slot_landed_tracked_file "$case_dir"
+      tracked=tracked.txt
+      nested_self_clearing_lock_treehouse "$case_dir" "$mode"
+      rc=0
+      FM_TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS=0 nested_run "$case_dir" || rc=$?
+      if [ "$mode" = dirty ]; then
+        expect_code 1 "$rc" "$label: the retry must refuse the slot's new unproved work: $(tail -3 "$case_dir/stderr")"
+        ! grep -qxF "return --force $NESTED_SLOT" "$case_dir/treehouse.log" 2>/dev/null \
+          || fail "$label: the slot was returned with new unproved work"
+        grep -qF 'late unlanded bytes' "$NESTED_SLOT/$tracked" || fail "$label: the slot's new work was lost"
+        assert_present "$case_dir/state/task-x1.meta" "$label: the task record was retired"
+        assert_present "$case_dir/pool/1/.fm-slot-owner" "$label: the slot claim was dropped"
+      else
+        expect_code 0 "$rc" "$label: a clean self-clearing lock must let the return finish: $(tail -3 "$case_dir/stderr")"
+        assert_nested_closed "$case_dir" "$label"
+      fi
+    done
+  done
+  pass "a self-clearing index-lock retry re-proves the slot: new unproved work refuses the return and is kept, a clean slot is returned once, for a plain and a prior-shape record"
+}
+
+# The busy-state retirement refuses a record whose busy generation is stale
+# (bin/fm-busy-event.sh retire), and that is decidable at entry: the refusal
+# must come before the endpoint close and every removal. Matching generations
+# close.
+test_nested_stale_busy_generation_refuses_at_entry() {
+  local shape gen case_dir rc label
+  for shape in plain enclosing; do
+    for gen in stale matching; do
+      label="nested-busy-gen-$gen-$shape"
+      nested_fixture "$label" "$shape" mine landed
+      case_dir=$NESTED_CASE
+      printf 'busy_gen=old-1\n' >> "$case_dir/state/task-x1.meta"
+      if [ "$gen" = stale ]; then printf 'new-2\n' > "$case_dir/state/task-x1.busy-gen"; else printf 'old-1\n' > "$case_dir/state/task-x1.busy-gen"; fi
+      nested_snapshot "$case_dir" "$case_dir/snapshot.before"
+      rc=0
+      nested_run "$case_dir" || rc=$?
+      if [ "$gen" = stale ]; then
+        assert_nested_refused_untouched "$case_dir" "$rc" "$label" "stale busy-state gen for task-x1"
+        assert_absent "$case_dir/endpoint.log" "$label: the refusal closed the endpoint"
+      else
+        expect_code 0 "$rc" "$label: matching busy generations must close: $(tail -3 "$case_dir/stderr")"
+        assert_nested_closed "$case_dir" "$label"
+      fi
+    done
+  done
+  pass "a stale busy generation refuses a plain and a prior-shape nested close before the endpoint close and any removal; matching generations close"
+}
+
+# The shared Supabase stack is identified from the project's
+# supabase/config.toml before Docker cleanup; a project_id that cannot be read
+# is decidable at entry and must refuse before any lease, marker or record
+# change. A valid project_id closes.
+test_nested_invalid_supabase_config_refuses_at_entry() {
+  local shape config case_dir rc label
+  for shape in plain enclosing; do
+    for config in invalid valid; do
+      label="nested-supabase-$config-$shape"
+      nested_fixture "$label" "$shape" mine landed
+      case_dir=$NESTED_CASE
+      held_plain_get_slot "$case_dir" "$NESTED_SLOT"
+      nested_place_leftovers "$case_dir"
+      mkdir -p "$case_dir/project/supabase"
+      if [ "$config" = invalid ]; then
+        printf 'project_id = ""\n' > "$case_dir/project/supabase/config.toml"
+      else
+        printf 'project_id = "vernant"\n' > "$case_dir/project/supabase/config.toml"
+      fi
+      nested_snapshot "$case_dir" "$case_dir/snapshot.before"
+      rc=0
+      nested_run "$case_dir" || rc=$?
+      if [ "$config" = invalid ]; then
+        assert_nested_refused_untouched "$case_dir" "$rc" "$label" "cannot identify the shared Supabase stack for task-x1"
+        assert_absent "$case_dir/lease.log" "$label: the refused close took a lease"
+      else
+        expect_code 0 "$rc" "$label: a valid Supabase project_id must close: $(tail -3 "$case_dir/stderr")"
+        assert_nested_closed "$case_dir" "$label"
+      fi
+    done
+  done
+  pass "an unreadable Supabase project_id refuses a plain and a prior-shape nested close before any lease, marker or record change; a valid one closes"
+}
+
+# The return-pending record is written at the reservation; a path it cannot be
+# written to (a directory there) is decidable at entry and must refuse before the
+# lease and before any file is moved into that directory. Once it is removed the
+# same teardown closes.
+test_nested_unwritable_return_pending_path_refuses_at_entry() {
+  local shape case_dir rc label
+  for shape in plain enclosing; do
+    label="nested-return-pending-directory-$shape"
+    nested_fixture "$label" "$shape" mine landed
+    case_dir=$NESTED_CASE
+    held_plain_get_slot "$case_dir" "$NESTED_SLOT"
+    mkdir "$case_dir/state/task-x1.teardown-return-pending"
+    nested_snapshot "$case_dir" "$case_dir/snapshot.before"
+    rc=0
+    nested_run "$case_dir" || rc=$?
+    assert_nested_refused_untouched "$case_dir" "$rc" "$label" "return-pending record"
+    assert_absent "$case_dir/lease.log" "$label: the refused close took a lease"
+    rmdir "$case_dir/state/task-x1.teardown-return-pending"
+    rc=0
+    nested_run "$case_dir" || rc=$?
+    expect_code 0 "$rc" "$label: the retry after the directory is removed must close: $(tail -3 "$case_dir/stderr")"
+    assert_nested_closed "$case_dir" "$label"
+  done
+  pass "a return-pending path that is a directory refuses a plain and a prior-shape nested close before any lease or write, and the retry closes"
+}
+
+# The removability check of the previous pending-close record writes and removes
+# nothing: a record whose delete is denied by an access-control entry refuses
+# with the state directory unchanged, whether or not a file already sits at a
+# name such a check could use; once the entry is removed the close finishes.
+test_nested_delete_denied_pending_close_refuses_without_writing() {
+  local shape occupant case_dir rc label record
+  if [ "$(uname -s)" != Darwin ] || [ "$(id -u)" = 0 ]; then
+    pass "a delete-denied pending-close record refuses without writing (skipped: needs macOS access-control entries and a non-root user)"
+    return 0
+  fi
+  for shape in plain enclosing; do
+    for occupant in absent present; do
+      label="nested-pending-close-acl-$occupant-$shape"
+      nested_fixture "$label" "$shape" mine landed
+      case_dir=$NESTED_CASE
+      held_plain_get_slot "$case_dir" "$NESTED_SLOT"
+      nested_place_leftovers "$case_dir"
+      record=$case_dir/state/task-x1.backlog-close
+      [ "$occupant" = absent ] || printf 'sentinel bytes\n' > "$case_dir/state/.task-x1.backlog-close.removal-probe"
+      chmod +a "$(id -un) deny delete" "$record"
+      nested_snapshot "$case_dir" "$case_dir/snapshot.before"
+      rc=0
+      nested_run "$case_dir" || rc=$?
+      chmod -N "$record"
+      assert_nested_refused_untouched "$case_dir" "$rc" "$label" "pending-close record could not be removed at $record"
+      assert_absent "$case_dir/lease.log" "$label: the refused close took a lease"
+      rm -f "$case_dir/state/.task-x1.backlog-close.removal-probe"
+      rc=0
+      nested_run "$case_dir" || rc=$?
+      expect_code 0 "$rc" "$label: the retry after the entry is removed must close: $(tail -3 "$case_dir/stderr")"
+      assert_nested_closed "$case_dir" "$label"
+    done
+  done
+  pass "a delete-denied pending-close record refuses a plain and a prior-shape nested close with the state unchanged, and the retry closes"
+}
+
+# A forced drop that refuses at entry must not create or replace the captain's
+# drop record: with the previous pending-close record unremovable, data/<id>/
+# captain-drop.md stays absent, or keeps its earlier bytes. An authorized drop
+# that closes still retains the words (test_gate_409_recorded_case_tears_down).
+test_nested_forced_entry_refusal_keeps_the_drop_record() {
+  local shape prior case_dir rc label record
+  if ! pending_close_immutable_supported "$TMP_ROOT"; then
+    pass "a forced entry refusal keeps the drop record (skipped: this host cannot make an unremovable file with chflags uchg)"
+    return 0
+  fi
+  for shape in plain enclosing; do
+    for prior in absent present; do
+      label="nested-forced-refusal-drop-record-$prior-$shape"
+      nested_fixture "$label" "$shape" mine landed
+      case_dir=$NESTED_CASE
+      nested_place_leftovers "$case_dir"
+      if [ "$prior" = present ]; then
+        mkdir -p "$case_dir/data/task-x1"
+        printf 'earlier words\n' > "$case_dir/data/task-x1/captain-drop.md"
+      fi
+      record=$case_dir/state/task-x1.backlog-close
+      chflags uchg "$record"
+      nested_snapshot "$case_dir" "$case_dir/snapshot.before"
+      rc=0
+      nested_run "$case_dir" --force || rc=$?
+      chflags nouchg "$record"
+      assert_nested_refused_untouched "$case_dir" "$rc" "$label" "pending-close record could not be removed at $record"
+      if [ "$prior" = present ]; then
+        assert_equals 'earlier words' "$(cat "$case_dir/data/task-x1/captain-drop.md")" "$label: the refusal replaced the drop record"
+      else
+        assert_absent "$case_dir/data/task-x1/captain-drop.md" "$label: the refusal created a drop record"
+      fi
+    done
+  done
+  pass "a forced plain or prior-shape nested close that refuses at entry neither creates nor replaces the captain's drop record"
+}
+
+# The removability check needs no hard links: where linking the record fails
+# (a filesystem without hard links, or a Linux protected_hardlinks refusal), a
+# record rm -f can remove still lets the close finish.
+test_nested_pending_close_check_needs_no_hard_link() {
+  local shape case_dir rc label
+  for shape in plain enclosing; do
+    label="nested-pending-close-no-hard-link-$shape"
+    nested_fixture "$label" "$shape" mine landed
+    case_dir=$NESTED_CASE
+    nested_place_leftovers "$case_dir"
+    cat > "$case_dir/fakebin/ln" <<'SH'
+#!/usr/bin/env bash
+case " $* " in *" -s "*) exec /bin/ln "$@" ;; esac
+echo "ln: hard links are not supported here" >&2
+exit 1
+SH
+    chmod +x "$case_dir/fakebin/ln"
+    rc=0
+    nested_run "$case_dir" || rc=$?
+    expect_code 0 "$rc" "$label: a removable record must not refuse where hard links fail: $(tail -3 "$case_dir/stderr")"
+    assert_nested_closed "$case_dir" "$label"
+  done
+  pass "a removable pending-close record lets a plain and a prior-shape nested close finish where hard links fail"
+}
+
 # The plain shape gets the prior shape's disposition for every claim state and
 # fixture: the same exit class, the same removals, the same number of slot
 # returns and the same markers.
@@ -3924,6 +4188,13 @@ test_nested_pending_close_immutable_refuses_at_entry_enclosing_marker_absent
 test_nested_pending_close_immutable_refuses_at_entry_enclosing_marker_present
 test_nested_read_only_pending_close_still_closes
 test_pool_slot_root_unremovable_pending_close_refuses_before_lease
+test_nested_self_clearing_lock_retry_reproves_the_slot
+test_nested_stale_busy_generation_refuses_at_entry
+test_nested_invalid_supabase_config_refuses_at_entry
+test_nested_unwritable_return_pending_path_refuses_at_entry
+test_nested_delete_denied_pending_close_refuses_without_writing
+test_nested_forced_entry_refusal_keeps_the_drop_record
+test_nested_pending_close_check_needs_no_hard_link
 test_plain_nested_disposition_equals_the_prior_shape
 test_scout_with_a_plain_nested_copy_keeps_its_own_route
 test_gate_409_recorded_case_tears_down
