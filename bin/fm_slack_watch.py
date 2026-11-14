@@ -975,6 +975,8 @@ class Watch:
         self.second_deferred = False
         # The end of the second person's time budget while one is in force (second_budget), else None.
         self.budget_deadline = None
+        # Whether a plane value is part of a fixed text of theirs in this run (block_second_on_collision): their work pauses and their lines are withheld.
+        self.second_blocked = False
         self.hold_depth = 0
         self.hold_bound = False
         self.read_mark = None
@@ -1051,6 +1053,9 @@ class Watch:
         unbound: it is neither printed nor removed, and the rebind delivers it once. (A line of any other kind
         is printed as it always was, bound or not.)"""
         lines = list(self.output) if bound else [line for line in self.output if not line.startswith(OWNER_PREFIXES)]
+        if self.second_blocked:
+            # A plane value is part of their label: their wake lines stay journaled, unprinted, until it is gone (finding 6). Their notice lines carry no label.
+            lines = [line for line in lines if not SECOND_WAKE.match(line)]
         # The owner's lines go first, in their own order, then the second person's: a queued line of theirs never takes an owner line's turn (finding 4).
         return [line for line in lines if not is_second_line(line)] + [line for line in lines if is_second_line(line)]
 
@@ -1299,6 +1304,55 @@ class Watch:
         if opened.get('id') != channel:
             raise SlackError('stored_channel_not_owner_dm')
         return channel
+
+    def block_second_on_collision(self):
+        """Whether a plane value is part of a fixed text of the second person's that this run could print (their label, and the label of every line of theirs
+        still in the outbox): if so, their work is paused for this run (second_blocked), their lines stay journaled unprinted, and one notice per episode names it.
+        The owner's arm, wakes and answers go on (finding 6 of the review of d0b0c216)."""
+        try:
+            refuse_a_value_that_the_marker_holds(self.second_fixed_texts())
+        except SecretCollision:
+            self.second_blocked = True
+            self.park_second_lines()
+
+    def park_second_lines(self):
+        """While a plane value is part of their label, an unprinted wake line of theirs in the outbox would put that value into every journal write and stop the
+        owner's work too. Each such line leaves the outbox in memory and is kept instead as its key alone (state['second_rewake']: the request's ts, their id and
+        the note), which holds no label; the next commit writes the journal without it, and unpark_second_lines rebuilds the line from the request's record once
+        the value is gone (finding 6 of the review of d0b0c216)."""
+        parked = [line for line in self.output if SECOND_WAKE.match(line)]
+        if not parked:
+            return
+        keep = list(self.state.get('second_rewake') or [])
+        for line in parked:
+            match = REQUEST_SEGMENT.match(line)
+            if match:
+                entry = {'ts': match.group(1), 'author': match.group(2), 'note': match.group(3) or ''}
+                if entry not in keep:
+                    keep.append(entry)
+        self.output = [line for line in self.output if line not in parked]
+        self.state['outbox'] = list(self.output)
+        self.state['second_rewake'] = keep
+
+    def unpark_second_lines(self):
+        """Put the parked wake lines of theirs back in the outbox, each rebuilt from its request's record with the label of the id that typed it, once no plane
+        value is part of their label. A key whose record cannot be read stays parked."""
+        if self.second_blocked or not self.state.get('second_rewake'):
+            return
+        left = []
+        for entry in self.state['second_rewake']:
+            record = self.record(entry.get('ts'), entry.get('author')) if isinstance(entry, dict) else None
+            if not record:
+                left.append(entry)
+                continue
+            row = {'thread': entry['ts'], 'author': entry['author'], 'text': record.get('text', ''), 'shown': record.get('shown'),
+                   'replaced': record.get('replaced'), 'person': 'second'}
+            self.say(self.request_wake_line(row, entry.get('note') or ''))
+        if left:
+            self.state['second_rewake'] = left
+        else:
+            self.state.pop('second_rewake')
+        self.commit()
 
     def second_fixed_texts(self):
         """Their fixed text, when it can reach a sink in this run: their label for the id the setting names, when it is on, and the label of every wake line of
@@ -2625,7 +2679,8 @@ class Watch:
         # The second person's work comes after all of the owner's, and takes only what the cap leaves of it. The watcher reads a check's output only once the run
         # has ended, so a run with an owner line to print does none of their work: it ends at once, and the next run does it (finding 4 of the review of
         # d0b0c216: the owner's wake never waits for a call of theirs).
-        if any(not is_second_line(line) for line in self.output):
+        self.unpark_second_lines()
+        if any(not is_second_line(line) for line in self.deliverable(True)):
             self.second_deferred = True
         else:
             self.second_poll(left)
@@ -2779,8 +2834,13 @@ class Watch:
                 self.state.pop('second_failure')
                 self.commit()
             return
+        if self.second_blocked:
+            # A plane value is part of their label: nothing of theirs is read, taken in or printed in this run; the owner's work is not touched (finding 6).
+            self.second_episode('secret_collides_with_their_label')
+            return
         try:
             with self.second_budget(start=monotonic()):
+                self.retry_unlogged()
                 self.start_second()
                 remaining = self.resume_second(remaining)
                 if self.second_window().get('hold'):
@@ -2793,19 +2853,50 @@ class Watch:
                 self.take_requests(remaining, second=True)
                 self.observe_second_cards()
         except SecretCollision:
-            raise
+            # A plane value collides with something of theirs only (their request text, a refusal row, their journal state): the sink was refused before any
+            # byte of it was written. Memory returns to the journal, their work waits, and one notice per episode names it; the owner's run goes on (finding 6).
+            self.restore()
+            self.second_episode('secret_collides_with_marker')
         except SecondBudgetSpent:
             # The time for their I/O is used up: what is journaled waits for the next run. This is a deferral, not a failure, so no episode is logged.
             return
         except SlackError as error:
-            name = redact_sink(str(error))
-            if self.state.get('second_failure') != name and self.second_log('second_window_failed', error=name):
-                self.say(redact_sink('slack: second person window failure: ' + name))
-                self.state['second_failure'] = name
-                self.commit()
+            self.second_episode(redact_sink(str(error)))
         else:
             if self.state.get('second_failure'):
                 self.state.pop('second_failure')
+                self.commit()
+
+    def second_episode(self, name):
+        """One failure episode of the second person's work: one durable log row and one notice line naming only the error, the first time it is seen in a row of
+        runs. A log or notice that a plane value would collide with is left out; the next run tries again."""
+        if self.state.get('second_failure') == name:
+            return
+        try:
+            if self.second_log('second_window_failed', error=name):
+                self.say('slack: second person window failure: ' + name)
+                self.state['second_failure'] = name
+                self.commit()
+        except SecretCollision:
+            self.restore()
+
+    def retry_unlogged(self):
+        """Write the refusal rows that a plane value kept out of the log when the attempt was refused (state['second_unlogged']); each stays until its row is
+        written. The attempt itself was never an answer."""
+        for entry in list(self.state.get('second_unlogged') or []):
+            reason = {'reply': 'decision_held_for_captain_reply', 'reaction': 'decision_held_for_captain_reaction'}.get(entry.get('kind'))
+            if reason is None:
+                continue
+            fields = {k: entry[k] for k in ('attempt',) if entry.get(k) is not None}
+            try:
+                logged = self.refusal_logged(entry['event']) or self.second_log(reason, detail=HELD_FOR_CAPTAIN, author=entry.get('author'), channel=entry.get('channel'),
+                                                                             thread=entry.get('thread'), item=entry.get('item'), event=entry['event'], **fields)
+            except SecretCollision:
+                continue
+            if logged:
+                self.state['second_unlogged'] = [e for e in self.state.get('second_unlogged') or [] if e is not entry and e != entry]
+                if not self.state['second_unlogged']:
+                    self.state.pop('second_unlogged')
                 self.commit()
 
     def second_config(self):
@@ -2872,8 +2963,17 @@ class Watch:
             return True
         extra = {} if attempt is None else {'attempt': attempt}
         # The row names its event, so that a run that died between the append and the commit below does not append a second row for the same attempt.
-        if self.refusal_logged(event) or self.second_log(reason, detail=HELD_FOR_CAPTAIN, author=author, channel=self.state.get('channel'), thread=record['ts'],
-                                                       item=item, event=event, **extra):
+        try:
+            logged = self.refusal_logged(event) or self.second_log(reason, detail=HELD_FOR_CAPTAIN, author=author, channel=self.state.get('channel'), thread=record['ts'],
+                                                                 item=item, event=event, **extra)
+        except SecretCollision:
+            # A plane value would be in the row (its reason, for example): the row is held back, never the owner's work in the same thread. The attempt is still
+            # refused (it is never an answer) and is kept, without its reason text, until a later run of theirs writes the row (finding 6 of the review of d0b0c216).
+            kind = 'reaction' if attempt is not None else 'reply'
+            self.state.setdefault('second_unlogged', []).append({'event': event, 'kind': kind, 'author': author, 'channel': self.state.get('channel'),
+                                                                 'thread': record['ts'], 'item': item, 'attempt': attempt})
+            logged = True
+        if logged:
             self.mark_seen(event, record['key'])
             self.commit()
             return True
@@ -3373,7 +3473,8 @@ def plane_watch(name, options, out):
                     token_present=bool(env_value('SLACK_BOT_TOKEN'))) if options.get('replay') else None
     watch = Watch(replay=replay, token=env_value('SLACK_BOT_TOKEN').strip())
     watch.out = out
-    if name == 'read':
+    if name == 'read' and '@' in (options.get('thread') or ''):
+        # Only the read of the second person's request prints their label; the owner's reads never depend on it (finding 6).
         refuse_a_value_that_the_marker_holds(watch.second_fixed_texts())
     watch.verify_target()
     return watch
@@ -3510,7 +3611,10 @@ def main(argv, out=None):
             watch.api.on_reply = lambda: note_progress(out)
         # A plane value that is part of a fixed text this command prints could never be replaced for good: refuse (the wake text for the runs that
         # print wake lines, the wake text and arm's own constants for arm (the adopted I4a), the command's own constants for retarget).
-        refuse_a_value_that_the_marker_holds(COMMAND_FIXED_TEXT.get(action, WAKE_FIXED_TEXT) + (() if action == 'retarget' else watch.second_fixed_texts()))
+        refuse_a_value_that_the_marker_holds(COMMAND_FIXED_TEXT.get(action, WAKE_FIXED_TEXT))
+        # A plane value inside the second person's label touches only their lines: it pauses their work and withholds their lines, and never stops the owner's
+        # arm, wake or answer (finding 6 of the review of d0b0c216).
+        watch.block_second_on_collision()
         if action == 'arm':
             # Only an explicit retarget may move the plane to a changed owner DM. The poll and the mirror look at the owner
             # after they have found the source bound: an unbound run makes no call, no state change and no output (I2 (h)).
