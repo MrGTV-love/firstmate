@@ -225,19 +225,24 @@ fm_pending_reply_summarize() {  # <text>
 }
 
 # The sha256 of a request body, byte for byte (no cleaning, no cut), as stored
-# at create time in request_body_sha256. It identifies the exact request a
-# correlation carried: bin/fm-send.sh exempts the printed correlation resend
-# from the decision-choice rule only when its body has this digest. Prints
-# nothing (and returns 1) when no sha256 tool is available, so a caller that
-# needs the match fails closed.
+# at create time in request_body_sha256: the record of exactly which request a
+# correlation carried. Uses sha256sum or shasum, whichever works; prints
+# nothing and returns 1 when neither yields a 64-hex digest, so create refuses
+# rather than writing a record without one.
 fm_pending_reply_body_digest() {  # <text>
-  local digest
-  digest=$(printf '%s' "$1" | shasum -a 256 2>/dev/null | awk '{print $1}') || return 1
-  case "$digest" in
-    *[!0-9a-f]* | '') return 1 ;;
-  esac
-  [ "${#digest}" -eq 64 ] || return 1
-  printf '%s' "$digest"
+  local digest tool
+  for tool in sha256sum 'shasum -a 256'; do
+    command -v "${tool%% *}" >/dev/null 2>&1 || continue
+    # shellcheck disable=SC2086 # $tool is a fixed command plus its options.
+    digest=$(printf '%s' "$1" | $tool 2>/dev/null | awk '{print $1}') || continue
+    case "$digest" in
+      *[!0-9a-f]* | '') continue ;;
+    esac
+    [ "${#digest}" -eq 64 ] || continue
+    printf '%s' "$digest"
+    return 0
+  done
+  return 1
 }
 
 fm_pending_reply_get() {  # <record-path> <key>
@@ -354,7 +359,10 @@ fm_pending_reply_create() {  # <parent-home> <state-dir> <task_id> <request-text
   fi
   now=$(fm_pending_reply_now)
   summary=$(fm_pending_reply_summarize "$request_text")
-  body_digest=$(fm_pending_reply_body_digest "$request_text") || body_digest=
+  body_digest=$(fm_pending_reply_body_digest "$request_text") || {
+    echo "error: pending-reply: cannot compute the sha256 of the request body (neither sha256sum nor shasum works on this host), so no reply expectation is created; install one of them and resend." >&2
+    return 1
+  }
   status_path="$state/${task_id}.status"
   # Prefer absolute parent_status when parent_home/state resolve.
   case "$status_path" in

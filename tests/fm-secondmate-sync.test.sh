@@ -1343,6 +1343,18 @@ test_bootstrap_syncs_remote_home_to_primary_commit() {
 
 # The remote bootstrap nudge answers no decision, so it states --answers-none
 # (fm-send header, "Decision closure"); this is R8 with an open keyed decision.
+# assert_one_remote_nudge_record <remote-home> <label>: the remote secondmate's
+# parent-route steering inbox holds exactly one record carrying the re-read
+# nudge text, so a caller's success line is backed by a delivered record.
+assert_one_remote_nudge_record() {
+  local rhome=$1 label=$2 recs msg
+  recs=$(find "$rhome/state/parent-route/sm.inbox" -maxdepth 1 -name '*.msg' 2>/dev/null)
+  [ "$(printf '%s\n' "$recs" | grep -c .)" = 1 ] \
+    || fail "$label: the remote inbox must hold exactly one nudge record, found: ${recs:-none}"
+  msg=$(bash -c '. "$1"; printf "%s" "$FM_REMOTE_SECOND_MATE_NUDGE_MESSAGE"' _ "$ROOT/bin/fm-secondmate-nudge-lib.sh")
+  grep -F "$msg" "$recs" >/dev/null || fail "$label: the remote record does not carry the re-read nudge: $(cat "$recs")"
+}
+
 test_bootstrap_remote_nudge_is_delivered_to_a_mate_with_an_open_keyed_decision() {
   local w c1 c2 home fakebin out coderoot_before
   w=$(new_remote_world remote-bootstrap-open-key)
@@ -1386,6 +1398,7 @@ test_bootstrap_remote_nudge_is_delivered_to_a_mate_with_an_open_keyed_decision()
   assert_contains "$out" "BOOTSTRAP_INFO: nudged remote fm-sm after convergence" \
     "the remote re-read nudge was refused by the open keyed decision (out: $out)"
   assert_not_contains "$out" "NUDGE_SECONDMATES:" "a delivered remote nudge leaves no action item"
+  assert_one_remote_nudge_record "$w/sm" "bootstrap remote nudge"
   assert_equals "needs-decision [key=shard-plan]: shard by team or by repo" "$(cat "$home/state/sm.status")" \
     "the remote nudge closed or appended something in the mate's status log"
   pass "R8b the remote re-read nudge reaches a mate that has an open keyed decision and leaves it open"
@@ -1433,6 +1446,7 @@ test_config_push_remote_nudge_is_delivered_to_a_mate_with_an_open_keyed_decision
   assert_contains "$out" "config-reread: sent" \
     "the remote re-read nudge was refused by the open keyed decision (out: $out)"
   assert_not_contains "$out" "send failed" "a delivered remote nudge leaves no failure line"
+  assert_one_remote_nudge_record "$w/sm" "config-push remote nudge"
   assert_equals "needs-decision [key=shard-plan]: shard by team or by repo" "$(cat "$home/state/sm.status")" \
     "the remote nudge closed or appended something in the mate's status log"
   pass "R8c the config-push remote re-read nudge reaches a mate that has an open keyed decision and leaves it open"

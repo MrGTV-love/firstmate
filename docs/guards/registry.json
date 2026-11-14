@@ -1267,13 +1267,7 @@
       "proxy": false,
       "proxy_reason": "",
       "precheck_gap": "",
-      "exemptions": [
-        {
-          "case": "the printed FM_PENDING_REPLY_EXISTING_CORR=<corr> resend of an unconfirmed secondmate request, for its own reserved blocker pending-reply-<corr> only, while that correlation is still reusable for the task, the send is not fire-and-forget, and the sha256 of its message equals the request_body_sha256 the pending-reply record stored at first send (a record without that digest earns no exemption)",
-          "derivation": "the resend re-delivers the same request under the same correlation and answers nothing; that blocker is the pending-reply library's to close, so neither stated choice is true for it, and every other open key still refuses",
-          "demotion": "none: removing it refuses the documented safe recovery resend (docs/remote-secondmates.md, Retries and safe resends)"
-        }
-      ],
+      "exemptions": [],
       "instrumented": false,
       "status": "active",
       "sites": [

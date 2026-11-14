@@ -171,14 +171,9 @@
 # a send to an explicit backend target cannot answer a decision, so the rule
 # does not apply to them. The printed FM_PENDING_REPLY_EXISTING_CORR=<corr>
 # resend of an unconfirmed secondmate request re-delivers that same request and
-# answers nothing: while the correlation is still reusable for that task, the
-# send is not fire-and-forget, and its message has the sha256 the pending-reply
-# record stored for the request body at first send (request_body_sha256), its
-# own reserved blocker pending-reply-<corr> (the pending-reply library's to
-# close) does not count. A different message, a fire-and-forget send, or a
-# record with no body digest (written before the digest existed) with that
-# correlation, and every other open key, still need a choice, and the refusal
-# says why the correlation earned nothing. A lone
+# carries the same choice the original send made (its --resolve-key keys or
+# --answers-none, or --answers-none for a send that stated neither), so it
+# meets this rule like any other send; the rule has no exception for it. A lone
 # -- ends the options, so a literal message that starts with -- is sent as
 # text; before this rule a leading --answers-none or -- was itself text.
 # This is the one statement of the rule; every other file points here.
@@ -575,43 +570,6 @@ if [ -z "$RESOLVE_KEYS" ] && [ "$ANSWERS_NONE" = 0 ] && [ -n "$TARGET_SELECTOR" 
     echo "error: cannot tell whether $CHOICE_TASK_ID has open decisions: $CHOICE_STATUS_FILE is past the status read limits (bin/fm-status-cap-lib.sh), so a send that states no choice would be a guess. Refusing it; resend with --resolve-key <key> or --answers-none; nothing was sent." >&2
     exit 1
   }
-  # The printed correlation resend of an unconfirmed secondmate request
-  # (FM_PENDING_REPLY_EXISTING_CORR, still reusable for this task, not
-  # fire-and-forget, and carrying the exact request the correlation recorded:
-  # the sha256 of this message equals the record's request_body_sha256)
-  # re-delivers that same request; it answers nothing. Its own reserved
-  # blocker, pending-reply-<corr>, is the pending-reply library's to close, so
-  # it does not count here. A different message, a fire-and-forget send, a
-  # record with no body digest (written before the digest existed), and every
-  # other open key still need a stated choice; the refusal says why the
-  # correlation earned nothing.
-  choice_corr_note=
-  choice_record_digest=
-  if [ -n "${FM_PENDING_REPLY_EXISTING_CORR:-}" ] && [ -n "$choice_open_set" ] &&
-    [ -z "$FIRE_AND_FORGET_ID" ] &&
-    [ "$(fm_meta_get "$TARGET_META" kind)" = secondmate ] &&
-    fm_pending_reply_corr_reusable "$STATE" "$FM_PENDING_REPLY_EXISTING_CORR" "$CHOICE_TASK_ID"; then
-    choice_record_digest=$(fm_pending_reply_get "$(fm_pending_reply_path "$STATE" "$FM_PENDING_REPLY_EXISTING_CORR")" request_body_sha256)
-    choice_body_digest=$(fm_pending_reply_body_digest "$*") || choice_body_digest=
-    if [ -z "$choice_record_digest" ]; then
-      choice_corr_note="FM_PENDING_REPLY_EXISTING_CORR=$FM_PENDING_REPLY_EXISTING_CORR earns no exemption: its pending-reply record has no request body digest (it was written before the digest existed), so this send takes the normal path."
-    elif [ -z "$choice_body_digest" ] || [ "$choice_body_digest" != "$choice_record_digest" ]; then
-      choice_corr_note="FM_PENDING_REPLY_EXISTING_CORR=$FM_PENDING_REPLY_EXISTING_CORR earns no exemption: this message is not the request correlation $FM_PENDING_REPLY_EXISTING_CORR recorded (its body digest differs), so this send takes the normal path."
-    fi
-  fi
-  if [ -n "${FM_PENDING_REPLY_EXISTING_CORR:-}" ] && [ -n "$choice_open_set" ] &&
-    [ -z "$choice_corr_note" ] && [ -n "${choice_record_digest:-}" ]; then
-    choice_own_key=$(fm_pending_reply_escalation_key "$FM_PENDING_REPLY_EXISTING_CORR")
-    choice_kept=
-    while IFS= read -r choice_line; do
-      [ -n "$choice_line" ] || continue
-      [ "${choice_line%%$'\t'*}" != "$choice_own_key" ] || continue
-      choice_kept="${choice_kept}${choice_kept:+$'\n'}$choice_line"
-    done <<CHOICE_OPEN_SET
-$choice_open_set
-CHOICE_OPEN_SET
-    choice_open_set=$choice_kept
-  fi
   if [ -n "$choice_open_set" ]; then
     {
       echo "error: $CHOICE_TASK_ID has open keyed decisions in $CHOICE_STATUS_FILE, and this send states no choice. Refusing it; nothing was sent. Open keys:"
@@ -623,7 +581,6 @@ CHOICE_OPEN_SET
 $choice_open_set
 CHOICE_OPEN_SET
       echo "Resend with --resolve-key <key> before the message (one key per flag; repeat the flag for each key this send answers and closes), or with --answers-none (this send answers none of them and every key stays open). Rule: the bin/fm-send.sh header, \"Decision closure\"."
-      [ -z "$choice_corr_note" ] || echo "$choice_corr_note"
     } >&2
     exit 1
   fi
@@ -1119,8 +1076,19 @@ else
         printf 'FM_STATE_OVERRIDE=%q ' "$resend_state" >&2
       fi
       printf 'FM_PENDING_REPLY_EXISTING_CORR=%q %q' "$PENDING_REPLY_CORR" "$SCRIPT_DIR/fm-send.sh" >&2
+      # The resend carries the same decision choice this send made, so it
+      # meets the ordinary choice rule like any send (header: "Decision
+      # closure"): its --resolve-key keys or --answers-none as given, and a
+      # send that stated neither (it met no open keyed decision) gets
+      # --answers-none, because it answered none. By then this request's own
+      # reserved blocker pending-reply-<corr> may be open.
+      resend_index=0
       for resend_arg in "${FM_SEND_ORIGINAL_ARGS[@]}"; do
         printf ' %q' "$resend_arg" >&2
+        if [ "$resend_index" = 0 ] && [ -z "$RESOLVE_KEYS" ] && [ "$ANSWERS_NONE" = 0 ]; then
+          printf ' %q' --answers-none >&2
+        fi
+        resend_index=$((resend_index + 1))
       done
       printf '\n' >&2
       exit 1

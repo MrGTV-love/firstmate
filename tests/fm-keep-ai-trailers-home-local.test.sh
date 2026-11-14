@@ -293,7 +293,8 @@ make_retry_boundary() {
   cat > "$bin/fm-send.sh" <<'SH'
 #!/usr/bin/env bash
 set -eu
-[ "$1" = fm-sm ] && [ "$2" = --answers-none ]
+[ "$1" = fm-sm ]
+[ "$2" = --answers-none ]
 case "$3" in 'CONFIG_REREAD: '*) instruction=${3#'CONFIG_REREAD: '} ;; *) exit 2 ;; esac
 [ -f "$instruction" ] && [ ! -L "$instruction" ]
 count=0
