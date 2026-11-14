@@ -248,26 +248,36 @@ teardown_pid_age_secs() {  # <pid>
   printf '%s\n' "$(( ((10#$days * 24 + 10#$hours) * 60 + 10#$minutes) * 60 + 10#$seconds ))"
 }
 
-# Is the pid in a creation lock a launcher that may still be alive? A pid that
-# started after the lock file was written cannot be the process that wrote it:
-# pids are recycled. A start time that cannot be read counts as live. Returns 0
-# when it may be alive, 1 when it is gone or a recycled pid, and 2 when the
-# process table cannot be read (fm_task_copy_launcher_state), which is never
-# taken for absence.
+# When <pid> started, in seconds since the epoch: ps lstart, or, where ps cannot
+# run (a confined worker), the confined table's (bin/fm-proc-info.py lstart). An
+# absolute start time, so a slow reading never moves it.
+teardown_pid_start_epoch() {  # <pid>
+  local start
+  start=$(LC_ALL=C ps -p "$1" -o lstart= 2>/dev/null) \
+    || start=$(python3 "$FM_TASK_COPY_LIB_DIR/fm-proc-info.py" lstart "$1" 2>/dev/null) || return 1
+  LC_ALL=C python3 -c 'import sys, time; print(int(time.mktime(time.strptime(" ".join(sys.argv[1].split()), "%a %b %d %H:%M:%S %Y"))))' "$start" 2>/dev/null
+}
+
+# Is the pid in a creation lock a launcher that may still be alive? The lock
+# records only the launcher's pid, so the lock file's own time is the record of
+# when it was written: a process that started later than that (an absolute
+# start time, never an age read against the clock) cannot be the one that wrote
+# it, because pids are recycled. A start time or lock time that cannot be read,
+# or one in the same second, counts as live. Returns 0 when it may be alive, 1
+# when it is gone or a recycled pid, and 2 when the process table cannot be
+# read (fm_task_copy_launcher_state), which is never taken for absence.
 teardown_lock_launcher_may_be_live() {  # <pid> <lock-file>
-  local pid=$1 lock=$2 age mtime now rc=0
+  local pid=$1 lock=$2 started mtime rc=0
   fm_task_copy_launcher_state "$pid" || rc=$?
   case "$rc" in
     0) ;;
     1) return 1 ;;
     *) return 2 ;;
   esac
-  age=$(teardown_pid_age_secs "$pid") || return 0
+  started=$(teardown_pid_start_epoch "$pid") || return 0
   mtime=$(fm_lock_path_mtime "$lock") || return 0
-  case "$mtime" in ''|*[!0-9]*) return 0 ;; esac
-  now=$(date +%s)
-  # ps etime counts whole seconds, so allow two for rounding.
-  [ "$age" -ge $(( now - mtime - 2 )) ]
+  case "$started$mtime" in ''|*[!0-9]*) return 0 ;; esac
+  [ "$started" -le "$mtime" ]
 }
 
 # Reads into TEARDOWN_OWN_SCAN the "pid<TAB>cwd" lines of the processes whose cwd
