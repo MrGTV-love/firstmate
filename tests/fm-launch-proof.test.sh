@@ -374,6 +374,13 @@ test_launch_proof_claude_adoption() (
       '-axo pid=,ppid=') awk -F'\t' '{print $1, $2}' "$T/procs" ;;
       '-p '*' -o comm='*) [ ! -e "$T/gone-$2" ] || return 1; awk -F'\t' -v p="$2" '$1 == p {print $4; found=1} END {exit !found}' "$T/procs" ;;
       '-p '*' -o args='*) [ ! -e "$T/gone-$2" ] || return 1; awk -F'\t' -v p="$2" '$1 == p {print $6; found=1} END {exit !found}' "$T/procs" ;;
+      # live-ppid-<pid> overrides the live parent; lstart-<pid> (then lstart-next-<pid>
+      # after its first read) overrides the birth time.
+      '-p '*' -o ppid='*) [ ! -e "$T/gone-$2" ] || return 1
+        if [ -f "$T/live-ppid-$2" ]; then cat "$T/live-ppid-$2"; else awk -F'\t' -v p="$2" '$1 == p {print $2; found=1} END {exit !found}' "$T/procs"; fi ;;
+      '-p '*' -o lstart='*) [ ! -e "$T/gone-$2" ] || return 1
+        if [ -f "$T/lstart-$2" ]; then cat "$T/lstart-$2"; [ ! -f "$T/lstart-next-$2" ] || mv "$T/lstart-next-$2" "$T/lstart-$2"
+        else awk -F'\t' -v p="$2" '$1 == p {print "Sat Nov 14 10:00:00 2026"; found=1} END {exit !found}' "$T/procs"; fi ;;
       *) fail "unexpected ps query: $*" ;;
     esac
   }
@@ -413,7 +420,7 @@ test_launch_proof_claude_adoption() (
     } > "$(transcript_dir)/${3:-$UUID}.jsonl"
   }
   fresh_case() {
-    rm -rf "$T/lane" "$T/main" "$T/sib" "$T/nested" "$T/operator" "$T"/env-* "$T"/cwd-* "$T/pane-missing" "$T/table-omit" "$T"/gone-*
+    rm -rf "$T/lane" "$T/main" "$T/sib" "$T/nested" "$T/operator" "$T"/env-* "$T"/cwd-* "$T/pane-missing" "$T/table-omit" "$T"/gone-* "$T"/live-ppid-* "$T"/lstart-*
     mkdir -p "$LANE/state" "$STATE" "$OPERATOR"
     default_procs
     write_meta
@@ -672,10 +679,23 @@ test_launch_proof_claude_adoption() (
   accepts 'N2 control: readable sibling and nested homes without a conflicting claim'
 
   # N3: every member of the harness's process group is read, and the table must list the anchor.
-  fresh_case; rm -f "$T/env-56557"
-  refuses 'cannot be read' '(e) N3 a live group member whose environment cannot be read'
-  fresh_case; printf 'ONLY=1\n' > "$T/env-56557"
-  refuses 'cannot be read' '(e) N3 a live group member whose environment carries neither PATH nor HOME'
+  # Main 022: an unreadable member the live table shows descending from the proven
+  # harness (live parent chain, same birth across the read) is ours; any other refuses.
+  fresh_case; proc 56559 1 53733 helper helper 'helper'
+  refuses 'cannot be read' '(e) N3 a live group member outside the harness descent whose environment cannot be read'
+  fresh_case; proc 56559 1 53733 helper helper 'helper'; printf 'ONLY=1\n' > "$T/env-56559"
+  refuses 'cannot be read' '(e) N3 a live group member outside the harness descent whose environment carries neither PATH nor HOME'
+  fresh_case; proc 56561 56557 53733 sh sh 'sh -c tool'; printf 1 > "$T/live-ppid-56557"
+  refuses 'cannot be read' '(e) N3 an unreadable grandchild whose parent was reparented (chain broken)'
+  fresh_case; proc 56558 53733 53733 caffeinate caffeinate 'caffeinate -i'; printf 1 > "$T/live-ppid-56558"
+  refuses 'cannot be read' '(e) N3 a member whose live parent no longer matches the table'
+  fresh_case; proc 56558 53733 53733 caffeinate caffeinate 'caffeinate -i'
+  printf 'Sat Nov 14 10:00:00 2026\n' > "$T/lstart-56558"; printf 'Sat Nov 14 10:05:00 2026\n' > "$T/lstart-next-56558"
+  refuses 'cannot be read' '(e) N3 a member whose birth identity changed during the read'
+  fresh_case; proc 56558 53733 53733 caffeinate caffeinate 'caffeinate -i'
+  accepts 'N3 the d7/d1 shape: a live caffeinate child of the harness whose environment cannot be read'
+  fresh_case; proc 56561 56557 53733 sh sh 'sh -c tool'
+  accepts 'N3 a grandchild of the harness through a readable member, whose environment cannot be read'
   fresh_case; printf 53733 > "$T/table-omit"; env_of 56557 'FM_SPAWN_GEN=s9.9.9
 '
   refuses 'process table' '(e) N3 the process table omits the anchor while a foreign-pinned member is listed'
@@ -723,17 +743,23 @@ test_launch_proof_claude_verdict_and_refusal() (
   PIN_GEN=s1793120312.10459.5003
   ps() {
     case "$*" in
-      '-axo pid=,ppid=,pgid=') [ -f "$T/table-empty" ] && return 0; printf '%s\n' '53733 1 53733'; [ ! -f "$T/env-56557" ] || printf '%s\n' '56557 53733 53733' ;;
+      '-axo pid=,ppid=,pgid=') [ -f "$T/table-empty" ] && return 0; printf '%s\n' '53733 1 53733'; [ ! -f "$T/env-56557" ] || printf '%s\n' '56557 53733 53733'; [ ! -f "$T/unrelated" ] || printf '%s\n' '56560 1 53733' ;;
       '-axo pid=,ppid=') printf '%s\n' '53733 1' ;;
       '-p 53733 -o comm=') echo 2.1.316 ;;
       '-p 53733 -o args=') if [ -f "$T/args" ]; then cat "$T/args"; else echo "claude --resume $UUID"; fi ;;
       '-p 56557 -o args=') [ -f "$T/env-56557" ] && echo 'railway mcp' ;;
+      '-p 56557 -o ppid=') [ -f "$T/env-56557" ] && echo 53733 ;;
+      '-p 56557 -o lstart=') [ -f "$T/env-56557" ] && echo 'Sat Nov 14 10:00:00 2026' ;;
+      '-p 56560 -o args=') [ -f "$T/unrelated" ] && echo helper ;;
+      '-p 56560 -o ppid=') [ -f "$T/unrelated" ] && echo 1 ;;
+      '-p 56560 -o lstart=') [ -f "$T/unrelated" ] && echo 'Sat Nov 14 10:00:00 2026' ;;
       *) fail "unexpected ps query: $*" ;;
     esac
   }
   lsof() { printf 'p%s\0\nfcwd\0n%s\0\n' "$4" "$LANE"; }
   fm_remote_herdr_process_env() {
     [ "$1" != 56557 ] || { cat "$T/env-56557"; return; }
+    [ "$1" != 56560 ] || return 1
     [ -f "$T/env-unreadable" ] && return 1; printf 'PATH=/usr/bin\nHOME=%s\n%s' "$OPERATOR" "$(cat "$T/env-extra" 2>/dev/null)"; }
   fm_backend_herdr_cli() {
     case "$*" in
@@ -920,11 +946,15 @@ for root in sys.argv[1:]:
   { printf 'not json\n'; cat "$T/task-transcript"; } > "$TRANSCRIPT"
   assert_equals unmanaged "$(fm_launch_proof_herdr "$META")" 'N6 an unclassifiable line before the doorbell voids the adoption at use'
   cp "$T/task-transcript" "$TRANSCRIPT"
-  # N3 at use: a live group member whose environment cannot be read.
+  # N3 at use: an unreadable live member outside the harness descent voids the adoption;
+  # one descending from the harness (the caffeinate shape, Main 022) does not.
+  : > "$T/unrelated"
+  assert_equals unmanaged "$(fm_launch_proof_herdr "$META")" 'N3 an unreadable live member outside the harness descent voids the adoption at use'
+  rm -f "$T/unrelated"
   : > "$T/env-56557"
-  assert_equals unmanaged "$(fm_launch_proof_herdr "$META")" 'N3 an unreadable live group member voids the adoption at use'
+  assert_equals managed "$(fm_launch_proof_herdr "$META")" 'N3 an unreadable live child of the harness keeps the adoption at use'
   rm -f "$T/env-56557"
-  assert_equals managed "$(fm_launch_proof_herdr "$META")" 'N3 control: managed again once the member is gone'
+  assert_equals managed "$(fm_launch_proof_herdr "$META")" 'N3 control: managed with no extra member'
   rm -f "$STATE/vernant-t1.claude-adoption.json"
   pass 'claude verdicts: unpinned is unmanaged, adoption is rechecked at use, legacy and other harnesses are unchanged'
 )
