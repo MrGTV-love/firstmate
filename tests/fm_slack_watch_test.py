@@ -4636,6 +4636,7 @@ class SecondPersonTest(unittest.TestCase):
             with patch.object(plane, 'run', fake), patch.object(watch, 'probe', return_value=(0, 'live')):
                 ts = self.card(watch, replay)
                 watch.second = ''
+                watch.no_authority = set()                       # the mutation: their id is not kept out of the answering authors
                 watch.authors.add(self.SECOND)
                 replay.state['messages'].append({'ts': '300.000200', 'thread_ts': ts, 'user': self.SECOND, 'text': '1'})
                 self.again(watch)

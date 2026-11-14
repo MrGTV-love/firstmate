@@ -800,6 +800,16 @@ def second_user():
     return raw, ''
 
 
+def second_named_ids():
+    """Every member id the second-person setting names as it stands, whatever its shape: the one id of a valid setting, and each id-shaped part of a list, of a
+    lower-case copy (read in upper case, as Slack writes ids) or of any other value that is not exactly one id. The owner's own id is never one of them. Used only
+    to keep those ids out of the answering authors, so that an invalid setting fails closed (Main's ruling on SC3: the second person never answers a decision,
+    in any setting state)."""
+    raw = env_value(SECOND_SETTING)
+    owner = env_value('FM_SLACK_DM_USER').strip()
+    return {part.upper() for part in re.findall(r'[A-Za-z0-9]+', raw) if USER_ID.fullmatch(part.upper()) and part.upper() != owner}
+
+
 def request_key(row):
     """How a request row is named to a person: the Slack timestamp of its thread for the owner's, `<ts>@<member id>` for the second person's (a timestamp is unique
     in one DM only, so two DMs can hold the same one)."""
@@ -920,9 +930,13 @@ class Watch:
         if not replay and self.state.get('scopes'):
             self.api.scopes = set(self.state['scopes'])
         self.authors = set(a for a in re.split(r'[\s,]+', env_value('FM_SLACK_ALLOWED_AUTHORS').strip()) if a)
-        # The second person holds no authority: whatever the allowlist says, their id is never an author whose reply or reaction is an answer.
+        # The second person holds no authority in any setting state (Main's ruling on SC3): whatever the allowlist says, no id that the setting names now (valid or
+        # not) and no id it has ever named on this plane (state['second_ids']) is an author whose reply or reaction is an answer. Fail closed.
         self.second, self.second_reason = second_user()
-        self.authors.discard(self.second)
+        known = self.state.get('second_ids')
+        self.no_authority = (second_named_ids() | {self.second} | {i for i in (known if isinstance(known, list) else []) if isinstance(i, str)}) - {''}
+        self.no_authority.discard(env_value('FM_SLACK_DM_USER').strip())
+        self.authors -= self.no_authority
         self.cap = answer_cap()
         self.changed = False
         # Wake lines are journaled with the state change that earned them and cleared only
@@ -1498,6 +1512,7 @@ class Watch:
             raise SlackError('source_not_bound')
         self.state.update(self.dm_boundary())
         self.state.pop('intake_bounds', None)
+        self.remember_second()
         self.commit()
         self.dm_proven = True
         self.arm_second()
@@ -2351,6 +2366,10 @@ class Watch:
                 deferred = deferred or error
                 continue
             record['retired'] = True
+            if self.second:
+                # The second person's phase takes one last look at this card's reactions, so that a reaction of theirs that came with the owner's closing answer is
+                # still refused (finding 5 of the review of d0b0c216); the look clears this mark.
+                record['second_look'] = True
             self.commit()
         return deferred
 
@@ -2367,7 +2386,8 @@ class Watch:
         needs, reactions:read; without it nothing is observable. A card that cannot be read (deleted) is skipped, as the owner's own thread reads skip it."""
         if not self.second or self.staging_only or 'reactions:read' not in set(self.state.get('scopes') or []):
             return
-        for occurrence, record in self.tracked():
+        closed = [(occurrence, record) for occurrence, record in self.state['threads'].items() if record.get('retired') and record.get('second_look')]
+        for occurrence, record in self.tracked() + closed:
             reactions = self.reaction_cache.get(record['ts'])
             if reactions is None:
                 try:
@@ -2377,27 +2397,44 @@ class Watch:
                         raise
                     continue
             self.observe_second_taps(record, reactions)
+            if record.get('retired') and record.pop('second_look', None):
+                self.commit()
 
     def observe_second_taps(self, record, reactions):
         """The second person's reactions on a held card, whatever the emoji: each one that is new since the last poll is one attempt to answer a decision held for
         the captain, and gets one durable refusal row (reason, their id, the card, the emoji and the attempt number). A reaction that only persists across polls is
-        not a new attempt; one that was seen removed and is added again is. The card's record keeps which of their emoji were present at the last poll and how many
-        attempts each has had. No answer is made. A log that cannot be written leaves that attempt unrecorded, so the next poll writes it."""
+        not a new attempt; one that was seen removed and is added again is. The card's record keeps, for each member id, which of their emoji were present at the
+        last poll and how many attempts each has had, so that another configured id's reaction with the same emoji is its own attempt. The plane's log is the
+        durable record of the attempts: an attempt it holds that the record does not (a commit interrupted after the row) is taken as that attempt, never as a new
+        one, and once the emoji is seen absent the next addition is the attempt after it. No answer is made. A log that cannot be written leaves that attempt
+        unrecorded, so the next poll writes it."""
         if not self.second or self.staging_only:
             return
-        now = {r.get('name') for r in reactions if isinstance(r, dict) and self.second in r.get('users', []) and isinstance(r.get('name'), str)}
-        before = set(record.get('second_taps', []))
-        counts = dict(record.get('second_attempts', {}))
+        member = self.second
+        taps, attempts = record.get('second_taps'), record.get('second_attempts')
+        taps = dict(taps) if isinstance(taps, dict) else ({member: list(taps)} if isinstance(taps, list) else {})
+        attempts = dict(attempts) if isinstance(attempts, dict) and all(isinstance(v, dict) for v in attempts.values()) else (
+            {member: dict(attempts)} if isinstance(attempts, dict) else {})
+        now = {r.get('name') for r in reactions if isinstance(r, dict) and member in r.get('users', []) and isinstance(r.get('name'), str)}
+        before = {e for e in taps.get(member, []) if isinstance(e, str)}
+        counts = {e: n for e, n in attempts.get(member, {}).items() if isinstance(n, int) and not isinstance(n, bool)}
         kept = before & now
-        for emoji in sorted(now - before):
+        for emoji, logged in self.logged_reaction_attempts(record['ts'], member).items():
+            if logged > counts.get(emoji, 0):
+                counts[emoji] = logged
+                if emoji in now:
+                    kept.add(emoji)
+        for emoji in sorted(now - kept):
             attempt = counts.get(emoji, 0) + 1
             if not self.refuse_second('decision_held_for_captain_reaction', record, emoji, attempt):
                 break
             counts[emoji] = attempt
             kept.add(emoji)
-        if sorted(kept) != sorted(before) or counts != record.get('second_attempts', {}):
-            record['second_taps'] = sorted(kept)
-            record['second_attempts'] = counts
+        if sorted(kept) != sorted(before) or counts != attempts.get(member, {}):
+            taps[member] = sorted(kept)
+            attempts[member] = counts
+            record['second_taps'] = taps
+            record['second_attempts'] = attempts
             self.commit()
 
     def reaction_choices(self, record):
@@ -2433,8 +2470,9 @@ class Watch:
         for message in self.messages(record['ts']):
             if message.get('ts') == record['ts']:
                 continue
-            if self.second and message.get('user') == self.second:
-                self.refuse_second('decision_held_for_captain_reply', record, message.get('ts', ''))
+            if message.get('user') in self.no_authority:
+                # The configured person, or an id the setting has named or names in an invalid value: never an answer, and the attempt is refused once.
+                self.refuse_second('decision_held_for_captain_reply', record, message.get('ts', ''), author=message.get('user'))
                 continue
             if not self.allowed(message):
                 continue
@@ -2485,6 +2523,14 @@ class Watch:
             self.notices_handled = handled
         return progress
 
+    def remember_second(self):
+        """Record the id the setting names in the journal (state['second_ids']), so that it stays without answer authority after the setting is turned off or made
+        invalid. Committed with the run's first commit; an id is never removed."""
+        known = self.state.get('second_ids')
+        known = [i for i in known if isinstance(i, str)] if isinstance(known, list) else []
+        if self.second and self.second not in known:
+            self.state['second_ids'] = sorted(known + [self.second])
+
     def poll(self):
         self.started = monotonic()
         self.reaction_cache = {}
@@ -2497,6 +2543,7 @@ class Watch:
             self.ran_unbound = True
             return
         self.verify_target()
+        self.remember_second()
         try:
             self.poll_work()
         except SourceUnbound:
@@ -2779,7 +2826,7 @@ class Watch:
             return False
         return True
 
-    def refuse_second(self, reason, record, item, attempt=None):
+    def refuse_second(self, reason, record, item, attempt=None, author=None):
         """The second person tried to answer a held decision: a reply in a card thread or a tap on an option of its card. No answer is made (their id is never an
         answering author); the attempt is refused once, with a row in the plane's log naming the reason (the decision is held for the captain, the role word of the
         plane's own decision text) and their id. A log that cannot be written leaves the
@@ -2787,17 +2834,38 @@ class Watch:
         row and of the event, so that a second attempt is its own row. Returns whether the attempt is on record."""
         if self.staging_only:
             return True
-        event = '/'.join([self.state.get('team', ''), self.state.get('channel', ''), record['ts'], item if attempt is None else '%s#%d' % (item, attempt), 'second-refused'])
+        author = author or self.second
+        # The event names the member, so that the same emoji or reply slot of another configured id is its own attempt (finding 5 of the review of d0b0c216).
+        event = '/'.join([self.state.get('team', ''), self.state.get('channel', ''), record['ts'], item if attempt is None else '%s#%d' % (item, attempt), author,
+                          'second-refused'])
         if event in self.state['seen']:
             return True
         extra = {} if attempt is None else {'attempt': attempt}
         # The row names its event, so that a run that died between the append and the commit below does not append a second row for the same attempt.
-        if self.refusal_logged(event) or self.second_log(reason, detail=HELD_FOR_CAPTAIN, author=self.second, channel=self.state.get('channel'), thread=record['ts'],
+        if self.refusal_logged(event) or self.second_log(reason, detail=HELD_FOR_CAPTAIN, author=author, channel=self.state.get('channel'), thread=record['ts'],
                                                        item=item, event=event, **extra):
             self.mark_seen(event, record['key'])
             self.commit()
             return True
         return False
+
+    def logged_reaction_attempts(self, thread, member):
+        """{emoji: the highest attempt number} of the reaction refusals the plane's log holds for one card and one member: the durable record that a poll whose
+        commit was interrupted after the row was written could not leave in the card's record."""
+        found = {}
+        try:
+            lines = (self.root / REFUSAL_FILE).read_text().split('\n')
+        except OSError:
+            return found
+        for line in lines:
+            try:
+                row = json.loads(line)
+            except ValueError:
+                continue
+            if (isinstance(row, dict) and row.get('reason') == 'decision_held_for_captain_reaction' and row.get('thread') == thread and row.get('author') == member
+                    and isinstance(row.get('item'), str) and isinstance(row.get('attempt'), int) and not isinstance(row.get('attempt'), bool)):
+                found[row['item']] = max(found.get(row['item'], 0), row['attempt'])
+        return found
 
     def refusal_logged(self, event):
         """Whether the plane's log already holds a row for this event (a whole line that names it)."""
