@@ -142,9 +142,13 @@
 # An unnested --check-coverage takes one pass for its whole scan.
 # A runner already inside a pass (FM_CPU_PASS_HELD set) takes no additional pass
 # and runs at most that many concurrent scripts, reporting a reduced --jobs on stderr.
-# Each script it runs beside others receives its share of the inherited count as its own
-# marker (the count divided by --jobs, rounded down), and a script it runs alone receives
-# the whole count, so scripts that run runners of their own stay within the count together.
+# When the holder's reservation has tokens (FM_CPU_PASS_TOKENS, bin/fm-cpu-pass.py), each
+# script leases its share of them (the count divided by --jobs, rounded down; the whole
+# count for a script it runs alone) before it waits for a slot and waits while sibling
+# runners hold them, so runners that are siblings of this one draw on the same reservation
+# and workers alive together never exceed the passes held. The script's own tree then has
+# exactly the leased count. A holder that only exports the marker has no tokens: each script
+# runs with its share of the count as its marker instead and the marker is trusted.
 # The marker must be a nonnegative decimal integer (001 means 1) or every execution mode,
 # --check-coverage included, exits 125; 0 denotes degraded work with no CPU-pass
 # concurrency limit and is passed on unchanged.
@@ -157,13 +161,15 @@
 # its CPU pass in the same acquisition (gate --cpu-pass), so a waiter holds neither and
 # no slot holder waits for a pass. A waiter prints which key it waits on and who holds
 # the slots on the CPU-pass log descriptor and waits until a holder ends, never admitted
-# by elapsed time; a nested run of a key already held (FM_TEST_SLOT_HELD) takes none, a
-# key asked for from inside another key's slot is counted at its own nesting level, and
-# FM_CPU_PASS_HELD never skips a slot (bin/fm-duration.py's header owns the rule). The time a script
-# queued for its slot is left out of its recorded duration, its FM_TEST_END
-# duration_ms and its test.<script> sample, and that sample records no start load
+# by elapsed time; a nested run of a key already held by its own ancestry
+# (FM_TEST_SLOT_HELD) takes none, every other key counts all of its holders at any depth,
+# FM_CPU_PASS_HELD never skips a slot, and only a detected wait cycle admits a waiter
+# early (bin/fm-duration.py's header owns the rule). The time a script queued for its
+# slot is left out of its recorded duration and its FM_TEST_END duration_ms; the time it
+# queued for a pass or a token lease is part of them (as it was before the gate took the
+# pass), and both are left out of its test.<script> sample, which records no start load
 # (the load was read before the queue); the run's own wall time (--max-wall-ms,
-# FM_TEST_SUMMARY) still counts it. bin/fm-duration.py's header owns the protocol.
+# FM_TEST_SUMMARY) counts both. bin/fm-duration.py's header owns the protocol.
 # FM_TEST_KEY_SLOTS=0, no python3 or helper beside this script, or a native
 # Windows bash (uname MINGW, MSYS or CYGWIN) runs scripts without a slot.
 #
@@ -2957,6 +2963,7 @@ exec 8>&2
 # The scripts of a runner inside passes get their share of the inherited count; see run_script_bounded.
 RUN_PASS_SHARE=
 CONCURRENT_PASS_SHARE=
+NESTED_LEASE=0
 if [ -n "${FM_CPU_PASS_HELD+x}" ]; then
   # Validated above, before any execution mode ran; only a positive count is normalized here.
   inherited_passes=$FM_CPU_PASS_HELD
@@ -2974,6 +2981,12 @@ if [ -n "${FM_CPU_PASS_HELD+x}" ]; then
     CONCURRENT_PASS_SHARE=$inherited_passes
     if [ "${#inherited_passes}" -le 6 ] && [ "${#JOBS}" -le 6 ]; then
       CONCURRENT_PASS_SHARE=$((inherited_passes / JOBS))
+      # The holder's reservation has tokens (bin/fm-cpu-pass.py): each script leases its share of them, so runners
+      # that are siblings of this one draw on the same reservation and the passes held stay one worker each.
+      if [ -n "${FM_CPU_PASS_TOKENS:-}" ] && [ -d "$FM_CPU_PASS_TOKENS" ] \
+        && [ -x "$ROOT/bin/fm-cpu-pass.sh" ] && [ -r "$ROOT/bin/fm-cpu-pass.py" ] && command -v python3 >/dev/null 2>&1; then
+        NESTED_LEASE=1
+      fi
     fi
   fi
   CPU_PASS_ACTIVE=0
@@ -3232,12 +3245,18 @@ run_script_bounded() {  # <script> <out> <stream> <id>
   # shellcheck source=tests/git-config-helpers.sh
   . "$ROOT/tests/git-config-helpers.sh" || return
   local rc script_seconds=$PER_SCRIPT_TIMEOUT_SECS
+  local lease=
   if [ -n "${RUN_PASS_SHARE:-}" ]; then
-    # A runner inside passes lets this script's own nested runners use only its share of them,
-    # so scripts running together never each spend the whole inherited count. Declared local so
-    # the runner's own marker is left as the caller had it.
-    local FM_CPU_PASS_HELD
-    export FM_CPU_PASS_HELD=$RUN_PASS_SHARE
+    if [ "$NESTED_LEASE" -eq 1 ]; then
+      # The script leases its share of the holder's tokens below and its tree gets exactly that reservation.
+      lease=$RUN_PASS_SHARE
+    else
+      # No tokens (a holder that only exports the marker): lets this script's own nested runners use only its
+      # share of the count, so scripts running together never each spend the whole inherited count. Declared
+      # local so the runner's own marker is left as the caller had it.
+      local FM_CPU_PASS_HELD
+      export FM_CPU_PASS_HELD=$RUN_PASS_SHARE
+    fi
   fi
   if [ "$script_seconds" -gt 0 ] && declare -F fm_duration_limit >/dev/null 2>&1; then
     script_seconds=$(fm_duration_limit "test.$script" "$script_seconds" 99) || return $?
@@ -3290,6 +3309,11 @@ run_script_bounded() {  # <script> <out> <stream> <id>
       "test.$script" -- "${cmd[@]}")
   elif [ "$CPU_PASS_ACTIVE" -eq 1 ]; then
     cmd=("$ROOT/bin/fm-cpu-pass.sh" run --label "fm-test-run $script" \
+      --log-fd "$CPU_PASS_LOG_FD" -- "${cmd[@]}")
+  fi
+  if [ -n "$lease" ]; then
+    # Outermost, so a script holds its leased tokens before it waits for a slot: no slot holder waits for a token.
+    cmd=("$ROOT/bin/fm-cpu-pass.sh" run --passes "$lease" --label "fm-test-run $script" \
       --log-fd "$CPU_PASS_LOG_FD" -- "${cmd[@]}")
   fi
   set +e

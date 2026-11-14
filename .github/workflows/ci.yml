@@ -114,12 +114,12 @@ jobs:
       - name: Prove guard wiring and retirement references
         run: bin/fm-guard-refcheck.sh
       - name: Enforce the guard registry contract and its ratchet
-        run: bin/fm-guard-lint.sh --mode enforce --counts
+        run: bin/fm-cpu-pass.sh run --label ci-guard-lint-enforce -- bin/fm-guard-lint.sh --mode enforce --counts
       # New work cannot add debt: a refusal site on a changed line must map to a
       # guard, and the burn-down allowlist may not grow against the PR base.
       - name: Enforce the guard ratchet against the pull request base
         if: github.event_name == 'pull_request'
-        run: bin/fm-guard-lint.sh --mode new-or-touched --base HEAD^1
+        run: bin/fm-cpu-pass.sh run --label ci-guard-lint-new-or-touched -- bin/fm-guard-lint.sh --mode new-or-touched --base HEAD^1
 
   # Two duration-balanced portable parallel shards of the Phase 2 proven-isolated
   # set only. Composition owner: bin/fm-test-run.sh (docs/fm-test-portable-shards.md).
@@ -495,10 +495,12 @@ jobs:
           export PATH
           command -v tasks-axi >/dev/null || { echo "::error::tasks-axi is required for the stock Bash regressions"; exit 1; }
 
-          snapshot_output=$(/bin/bash tests/fm-fleet-snapshot-view.test.sh)
+          # The two long single-worker scripts take a pass of the runner's CPU pass pool like any heavy test burst
+          # (docs/cpu-pass-pool.md); the pass tool is stock-bash safe, and without python3 it runs the command unpooled.
+          snapshot_output=$(bin/fm-cpu-pass.sh run --label ci-stock-bash-fleet-snapshot-view -- /bin/bash tests/fm-fleet-snapshot-view.test.sh)
           printf '%s\n' "$snapshot_output"
 
-          bearings_output=$(/bin/bash tests/fm-bearings-snapshot.test.sh)
+          bearings_output=$(bin/fm-cpu-pass.sh run --label ci-stock-bash-bearings-snapshot -- /bin/bash tests/fm-bearings-snapshot.test.sh)
           printf '%s\n' "$bearings_output"
 
           # The full public-followup suite is not a stock-bash snapshot; run only

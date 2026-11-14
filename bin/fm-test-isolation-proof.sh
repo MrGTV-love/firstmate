@@ -34,10 +34,11 @@
 #                relative to the scout-proposed parallel pool, then exit 0
 #   -h, --help   print this header
 #
-# Before it starts, the proof takes min(--jobs, pool size) passes of the host-wide CPU
+# Before it starts, the proof takes min(--jobs, candidates, pool size) passes of the host-wide CPU
 # pool (docs/cpu-pass-pool.md) for its whole run and runs that many workers; a proof
 # already inside a pass takes none and runs at most that many. The concurrency it
-# prints and records is the number of workers it ran. Each worker inherits the proof's
+# prints and records is the number of workers it ran, which is never more than the number of
+# candidates, so a one-candidate proof records one. Each worker inherits the proof's
 # own marker divided among the workers (1 when the proof holds one pass per worker), so a
 # candidate's nested runner does not fan out; a proof that holds no pass leaves its workers
 # FM_CPU_PASS_HELD=0 (degraded) or unset, and never invents a reservation.
@@ -418,6 +419,11 @@ done
 # already inside a pass takes none and runs at most that many workers; without the
 # pool tool or python3 it runs without a pass.
 REQUESTED_JOBS=$JOBS
+# The proof never claims more concurrency than it can run: with fewer candidates than --jobs it runs, takes passes for,
+# prints and records one worker per candidate.
+if [ "${#JOBS}" -le 6 ] && [ "$JOBS" -gt "${#CANDIDATES[@]}" ]; then
+  JOBS=${#CANDIDATES[@]}
+fi
 CANDIDATE_MARKER=
 if [ -n "${FM_CPU_PASS_HELD+x}" ]; then
   case "$FM_CPU_PASS_HELD" in

@@ -46,7 +46,9 @@ if len(sys.argv) > 1 and os.path.basename(sys.argv[1]) in ('fm-cpu-pass.py', 'fm
     if os.environ.get('CASE_CORES'): os.cpu_count = lambda: int(os.environ['CASE_CORES'])
     if os.environ.get('CASE_LOAD'): os.getloadavg = lambda: tuple(json.load(open(os.environ['CASE_LOAD'])))
     import importlib.util, pathlib, sqlite3
-    if os.environ.get('CASE_PROCS'):
+    # Process-count, run-database and admission-log injection serves the pipeline-start path, which lives in fm-cpu-pass.py only.
+    start_path = os.path.basename(sys.argv[1]) == 'fm-cpu-pass.py' and sys.argv[2:3] == ['pipeline-start']
+    if start_path and os.environ.get('CASE_PROCS'):
         spec = importlib.util.spec_from_file_location('fm_proc_guard', os.path.join(os.path.dirname(os.path.abspath(sys.argv[1])), 'fm-proc-guard.py'))
         guard = importlib.util.module_from_spec(spec)
         sys.modules['fm_proc_guard'] = guard
@@ -57,7 +59,7 @@ if len(sys.argv) > 1 and os.path.basename(sys.argv[1]) in ('fm-cpu-pass.py', 'fm
             def limit(self): return self.reading()['limit'], 'case'
             def count(self): return self.reading()['count']
         guard.open_source = lambda: Fake()
-    if os.environ.get('CASE_ADMISSION_LOG'):
+    if start_path and os.environ.get('CASE_ADMISSION_LOG'):
         import time as _time
         _sleep = _time.sleep
         def _logged(seconds):
@@ -67,7 +69,7 @@ if len(sys.argv) > 1 and os.path.basename(sys.argv[1]) in ('fm-cpu-pass.py', 'fm
                     log.write(str(frame.f_locals.get('reason', '?')) + '\\n')
             _sleep(seconds)
         _time.sleep = _logged
-    if os.environ.get('CASE_DB'):
+    if start_path and os.environ.get('CASE_DB'):
         connect = sqlite3.connect
         host = pathlib.Path('~/.no-mistakes/state.sqlite').expanduser().resolve().as_uri()
         def isolated(database, *args, **kwargs):
@@ -282,7 +284,7 @@ def runner_repo(world, scripts, seconds, group_env=None):
     path = world.folder / 'repo'
     (path / 'bin').mkdir(parents=True, exist_ok=True)
     (path / 'tests').mkdir(exist_ok=True)
-    for name in ('fm-test-run.sh', 'fm-cpu-pass.sh', 'fm-cpu-pass.py', 'fm-timeout-lib.sh'):
+    for name in ('fm-test-run.sh', 'fm-cpu-pass.sh', 'fm-cpu-pass.py', 'fm-timeout-lib.sh', 'fm-duration.py'):
         shutil.copy(repo / 'bin' / name, path / 'bin' / name)
     shutil.copy(repo / 'tests' / 'git-config-helpers.sh', path / 'tests')
     for name in scripts:
@@ -300,7 +302,6 @@ def isolated_scripts(count):
 def nested_repo(world, outer, inner, seconds):
     """A fixture repository whose OUTER scripts each run the real runner over the INNER worker scripts: two levels of runner."""
     path = runner_repo(world, inner, seconds)
-    shutil.copy(repo / 'bin' / 'fm-duration.py', path / 'bin' / 'fm-duration.py')
     for name in outer:
         (path / 'tests' / name).write_text('#!/usr/bin/env bash\ncd "$(dirname "$0")/.." || exit 1\n'
                                            'exec bin/fm-test-run.sh --jobs 2 %s\n' % ' '.join('tests/' + item for item in inner))
@@ -553,6 +554,9 @@ def case_runner_holder():
     case.measure(sampled_max_workers_total=seen['peak_total'], sampled_max_passes_held=seen['peak_held'], holder_labels=seen['labels'])
     case.check(codes == [0], 'runner failed: %s' % world.text('runner'))
     case.check(any(label.startswith('fm-test-run tests/') for label in seen['labels']), 'holder list never named fm-test-run: %s' % seen['labels'])
+    slot_dirs = sorted(path_.name for path_ in world.slots.iterdir())
+    case.measure(per_key_slot_directories_created=len(slot_dirs))
+    case.check(len(slot_dirs) == len(names), 'the runner did not take its passes through the joint gate --cpu-pass route (per-key slot directories: %s)' % slot_dirs)
     return case
 
 
@@ -882,7 +886,8 @@ def case_soak():
                     if done.returncode == 0:
                         completed[kind] += 1
                     else:
-                        failures.append((kind, index, round_, done.returncode, (done.stderr + done.stdout)[-300:]))
+                        ends = [line[line.find('tests/'):][:60] for line in done.stdout.splitlines() if line.startswith('FM_TEST_END') and 'exit=0' not in line]
+                        failures.append((kind, index, round_, done.returncode, done.stderr[-500:], ends[:3]))
                 decisions.append(((index, round_), light.stderr.strip()))
 
     world.sample_start()
@@ -1000,7 +1005,130 @@ def case_same_class_order():
     return case
 
 
-CASES = [case_nested, case_nested_two_level, case_padded_marker, case_key_guard, case_cross_key, case_malformed, case_brief_route, case_runner_holder, case_lint, case_isolation_proof, case_waiting, case_drain, case_wait_cause_control, case_same_class_order, case_sampler_control, case_soak]
+def case_nested_other_key():
+    """F1: a key requested under another key's slot still waits for an unnested holder of that key; only its own holder's chain is exempt."""
+    case = Case('F1 nested key', 'gate test.K under fm-duration.py run test.other waits for an unnested test.K holder; under its own holder it runs at once')
+    world = World('nested-other-key')
+    only_one = dict(FM_TEST_KEY_SLOTS='1')
+    ready = world.folder / 'holder.ready'
+    holder = world.launch('holder', [pyshim, tool('fm-duration.py'), 'gate', 'test.K', '--', 'bash', '-c', 'touch "$1"; sleep 4', '_', str(ready)], extra=only_one)
+    for _ in range(300):
+        if ready.exists():
+            break
+        time.sleep(0.05)
+    marker = world.folder / 'nested.ran'
+    probe = world.launch('probe', [pyshim, tool('fm-duration.py'), 'run', 'test.other', '--', pyshim, tool('fm-duration.py'), 'gate', 'test.K', '--', 'touch', str(marker)], extra=only_one)
+    holder.wait(timeout=60)
+    ended = time.time()
+    codes = wait_all([probe], timeout=60)
+    ran = marker.stat().st_mtime if marker.exists() else None
+    case.measure(probe_exit=codes, nested_ran_after_holder_end_s=None if ran is None else round(ran - ended, 2))
+    case.check(codes == [0], 'the nested request never completed: %s' % world.text('probe')[-200:])
+    case.check(ran is not None and ran >= ended - 0.05, 'a key requested under another key ran %.2f s before the unnested holder of that key ended' % (ended - (ran or 0)))
+    # Control: the same key nested under its own holder takes no second slot and runs at once.
+    own = world.folder / 'own.ran'
+    began = time.monotonic()
+    own_run = world.launch('own', [pyshim, tool('fm-duration.py'), 'gate', 'test.own', '--', pyshim, tool('fm-duration.py'), 'gate', 'test.own', '--', 'touch', str(own)], extra=only_one)
+    own_code = wait_all([own_run], timeout=30)
+    case.measure(own_ancestry_exit=own_code, own_ancestry_seconds=round(time.monotonic() - began, 1))
+    case.check(own_code == [0] and own.exists() and time.monotonic() - began < 10, 'a key nested under its own holder did not run at once')
+    return case
+
+
+def case_sibling_runners():
+    """F2: independent sibling runners that inherit one reservation together run no more workers than the passes held."""
+    case = Case('F2 siblings', 'an outer suite under p passes starts several nested fm-test-run.sh at once; workers alive together never exceed p')
+    rows = {}
+    for label, cores, p, siblings in (('one-pass-two-siblings', 1, 1, 2), ('two-passes-three-siblings', 2, 2, 3)):
+        world = World('siblings-' + label, cores=cores)
+        names = isolated_scripts(siblings)
+        path = runner_repo(world, names, 0.8)
+        world.sample_start()
+        script = 'cd "$1" || exit 1; shift; for s in "$@"; do bin/fm-test-run.sh --jobs %d "tests/$s" & done; wait' % p
+        outer = world.launch('outer', ['bash', tool('fm-cpu-pass.sh'), 'run', '--passes', str(p), '--label', 'outer', '--', 'bash', '-c', script, '_', str(path)] + names,
+                             extra=dict(FM_CONC_GROUP='outer'))
+        codes = wait_all([outer])
+        seen = world.sample_stop()
+        began = len(starts(world))
+        rows[label] = dict(passes=p, sibling_runners=siblings, workers_started=began, sampled_max_workers_total=seen['peak_total'], sampled_max_passes_held=seen['peak_held'])
+        sampling_valid(case, seen, label)
+        case.check(codes == [0], '%s: the outer suite failed: %s' % (label, world.text('outer')[-300:]))
+        case.check(began == siblings, '%s: %d of %d sibling workers started' % (label, began, siblings))
+        case.check(seen['peak_total'] <= p, '%s: %d workers alive together under %d pass(es)' % (label, seen['peak_total'], p))
+    case.measure(**rows)
+    return case
+
+
+def case_mixed_cycle():
+    """F3: a plain gate holder that calls run test.B and a pass holder that calls gate test.A both finish."""
+    case = Case('F3 mixed cycle', 'gate test.A (holder) -> run test.B, while a pass holder calls gate test.A, pool of 1')
+    world = World('mixed-cycle', cores=1)
+    only_one = dict(FM_TEST_KEY_SLOTS='1')
+    b_ready, a_done, b_done = (world.folder / name for name in ('b.ready', 'a.done', 'b.done'))
+    pass_holder = world.launch('b', ['bash', tool('fm-cpu-pass.sh'), 'run', '--label', 'pass-holder', '--', 'bash', '-c',
+                                     'touch "$1"; sleep 2; exec "$2" "$3" gate test.A -- touch "$4"', '_', str(b_ready), pyshim, tool('fm-duration.py'), str(b_done)], extra=only_one)
+    for _ in range(300):
+        if b_ready.exists():
+            break
+        time.sleep(0.05)
+    plain = world.launch('a', [pyshim, tool('fm-duration.py'), 'gate', 'test.A', '--', pyshim, tool('fm-duration.py'), 'run', 'test.B', '--', 'touch', str(a_done)], extra=only_one)
+    began = time.monotonic()
+    codes = wait_all([pass_holder, plain], timeout=40)
+    case.measure(exit_codes=codes, seconds=round(time.monotonic() - began, 1))
+    case.check(codes == [0, 0] and a_done.exists() and b_done.exists(), 'the plain slot holder and the pass holder did not both finish: %s a=%s b=%s' % (codes, world.text('a')[-200:], world.text('b')[-200:]))
+    return case
+
+
+def case_holder_killed():
+    """F6: a pass stays held until its command ends, so killing only the holder frees nothing for a second worker."""
+    case = Case('F6 holder kill', 'SIGKILL of only the gate / pass-holder process: a queued request does not start until the worker ends')
+    rows = {}
+    for label, make in (('gate --cpu-pass', lambda w: [pyshim, tool('fm-duration.py'), 'gate', '--cpu-pass', 'killed-gate', 'test.killed'] + ['--'] + w.work('first', 5)),
+                        ('fm-cpu-pass.sh run', lambda w: ['bash', tool('fm-cpu-pass.sh'), 'run', '--label', 'killed-run', '--'] + w.work('first', 5))):
+        world = World('holder-killed-' + label.split()[0].replace('.', ''), cores=1)
+        world.sample_start()
+        first = world.launch('first', make(world), extra=dict(FM_TEST_KEY_SLOTS='1'))
+        for _ in range(300):
+            if any(group == 'first' for group, _, _ in starts(world)):
+                break
+            time.sleep(0.05)
+        queued = world.launch('queued', ['bash', tool('fm-cpu-pass.sh'), 'run', '--label', 'queued', '--'] + world.work('queued', 0.3))
+        time.sleep(0.6)
+        try:
+            os.kill(first.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        time.sleep(1.5)
+        queued_early = any(group == 'queued' for group, _, _ in starts(world))
+        codes = wait_all([queued], timeout=40)
+        seen = world.sample_stop()
+        queued_start = [stamp for group, _, stamp in starts(world) if group == 'queued']
+        first_start = [stamp for group, _, stamp in starts(world) if group == 'first']
+        rows[label] = dict(queued_started_before_the_worker_ended=queued_early, sampled_max_workers_total=seen['peak_total'], queued_exit=codes)
+        case.check(codes == [0], '%s: the queued request never ran: %s' % (label, world.text('queued')[-200:]))
+        case.check(not queued_early and seen['peak_total'] <= 1, '%s: killing only the holder let %d workers run under one pass (queued started early: %s)' % (label, seen['peak_total'], queued_early))
+        case.check(queued_start and first_start and queued_start[0] >= first_start[0] + 4.5, '%s: the queued worker started before the first worker could have ended' % label)
+    case.measure(**rows)
+    return case
+
+
+def case_one_candidate_proof():
+    """F7: a proof of one candidate records the one worker it ran, not the --jobs it was asked for."""
+    case = Case('F7 one candidate', 'bin/fm-test-isolation-proof.sh --pool fam --jobs 2 over a single candidate, pool of 2')
+    world = World('one-candidate', cores=2)
+    family = proof_family_repo(world, ['fm-fam-0.test.sh'])
+    artifact = world.folder / 'proof.json'
+    run = world.launch('proof', ['bash', str(family / 'bin' / 'fm-test-isolation-proof.sh'), '--pool', 'fam', '--jobs', '2', '--json', str(artifact)])
+    code = wait_all([run])
+    recorded = json.loads(artifact.read_text()) if artifact.exists() else {}
+    case.measure(markers=proof_markers(world.text('proof', 'out')), recorded_concurrency=recorded.get('concurrency'), jobs_enabled=recorded.get('fm_test_run_jobs_enabled'))
+    case.check(code == [0], 'the proof failed: %s' % world.text('proof')[-300:])
+    case.check(proof_markers(world.text('proof', 'out')) == ['FM_ISOLATION_BEGIN concurrency=1', 'FM_ISOLATION_SUMMARY concurrency=1'], 'the proof did not record the one worker it ran: %s' % proof_markers(world.text('proof', 'out')))
+    case.check(recorded.get('concurrency') == 1 and recorded.get('fm_test_run_jobs_enabled') is False, 'the artifact overstated what ran: %s' % recorded)
+    return case
+
+
+CASES = [case_nested, case_nested_two_level, case_nested_other_key, case_sibling_runners, case_mixed_cycle, case_holder_killed, case_one_candidate_proof, case_padded_marker, case_key_guard, case_cross_key, case_malformed, case_brief_route, case_runner_holder, case_lint, case_isolation_proof, case_waiting, case_drain, case_wait_cause_control, case_same_class_order, case_sampler_control, case_soak]
 
 
 def main():

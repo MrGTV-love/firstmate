@@ -1516,13 +1516,16 @@ A presentation manifest larger than one tail window, and the legacy open-decisio
 
 The same heavy test suite is often started in several worktrees at once, and each copy forks thousands of short-lived processes.
 The CPU pass pool ([`cpu-pass-pool.md`](cpu-pass-pool.md)) bounds how many CPU-bound workers run in total; this gate bounds how many copies of one `test.<script>` key run, host-wide, so the copies take turns instead of multiplying.
-`python3 bin/fm-duration.py run test.<script> -- <command>` takes a slot and one pool pass, together, before it starts its clock, and `bin/fm-test-run.sh` takes the same slot and a pass around every script it runs through `python3 bin/fm-duration.py gate --cpu-pass`, so a wait is never part of a recorded sample, a run's stop or slower-than-usual clock, or a per-script bound: `gate --wait-file` reports the milliseconds it queued behind busy slots, and 0 when a slot was free at once, and the runner subtracts them from the script's duration (its `FM_TEST_END` line, its timing record and its `test.<script>` sample).
-The slot and the pass are one acquisition: a waiter holds neither while it queues, so a process that holds a slot never waits for a pass.
-A claim in `FM_CPU_PASS_HELD` never skips a slot; only a slot already held for the same key (`FM_TEST_SLOT_HELD`) does.
-A key requested from inside another key's slot is counted at its own nesting level (how many keys `FM_TEST_SLOT_HELD` names), so two suites that each hold one key and nest the other both run instead of waiting for each other.
-`--max-wall-ms` and the run's `FM_TEST_SUMMARY` duration are real elapsed time and still count the wait.
+`python3 bin/fm-duration.py run test.<script> -- <command>` takes a slot and one pool pass, together, before it starts its clock, and `bin/fm-test-run.sh` takes the same slot and a pass around every script it runs through `python3 bin/fm-duration.py gate`, which takes the pass by default.
+The wait for the slot is never part of a recorded sample, a run's stop or slower-than-usual clock, or a per-script bound: `gate --wait-file` reports the milliseconds it queued behind busy slots, and 0 when a slot was free at once, and the runner subtracts them from the script's duration (its `FM_TEST_END` line and its timing record).
+The wait for the pass (or, inside a pass, for a lease of its tokens) is outside the `test.<script>` sample, the stop clocks and the per-script bound as well, because those start after the pass is held, but it stays in the runner's `FM_TEST_END` duration and timing record, as it did before the gate took the pass.
+`--max-wall-ms` and the run's `FM_TEST_SUMMARY` duration are real elapsed time and still count both waits.
+The slot and the pass are one acquisition: a waiter holds neither while it queues, so a process that took its slot through `gate` or `run` never waits for a pass while it holds that slot; a command nested under it takes no pass and waits only for slots or for a lease of its holder's tokens.
+A claim in `FM_CPU_PASS_HELD` never skips a slot; only the same key already held by the command's own ancestry (`FM_TEST_SLOT_HELD`) does.
+Every other nested key counts all holders of that key, so `gate test.K` under another key waits for an unnested `test.K` holder exactly as it does when nothing is nested.
+The one other way out of a wait is a wait cycle: two gates that each hold one key and nest the other would wait for each other for good, so the earliest queued waiter that closes such a cycle, seen on two polls in a row, runs beside the limit and says so (the [`fm-duration.py` header](../bin/fm-duration.py) owns the detection and what it can and cannot see).
 A script that queued records its `test.<script>` sample with no start load, because the runner read the load before the queue, while `fm-duration.py run` reads it after taking its slot.
-The [`fm-duration.py` header](../bin/fm-duration.py) owns the protocol: the slot files, the holder record, the waiter notice, the wait until a holder ends, the nested-run and pass-holder rules and the exit codes.
+The [`fm-duration.py` header](../bin/fm-duration.py) owns the protocol: the slot files, the holder record, the waiter notice, the wait until a holder ends, the nested-run and wait-cycle rules and the exit codes.
 
 | Setting | Default | Range | Purpose |
 | --- | --- | --- | --- |
@@ -1534,6 +1537,10 @@ The [`fm-duration.py` header](../bin/fm-duration.py) owns the protocol: the slot
 
 A day of the host's own timings (`data/command-durations.jsonl`, 2026-10-17) shows `tests/fm-teardown.test.sh` run 6 times for 13,276 seconds in total, with a median of 2,175 seconds and a longest run of 6,884, and three copies alive at once in three worktrees.
 One slot would queue those six runs behind each other for about 3.7 hours of waiting between them; two slots cap the overlap at two copies while the third waits for the first of the two to finish, typically one median run.
+Two is also the largest count that cannot oversubscribe the CPUs when the fleet's peak mix of suites all runs at the cap.
+Each copy is one worker of at most 0.67 of a CPU (the largest cpu/wall ratio of six measured heavy scripts), the host has 18 logical CPUs (`sysctl -n hw.logicalcpu`), and the most distinct `test.*` keys the host's own ledger shows running together is 12 (a sweep of the intervals `recorded_at` minus `duration_ms` in `data/command-durations.jsonl` since 2026-10-14).
+If each of those 12 keys ran K copies at once the demand would be 12 x K x 0.67 CPUs, which fits 18 CPUs only for K up to floor(18 / (12 x 0.67)) = 2 (16.2 CPUs); K = 3 would need 24.3.
+Re-derive the default from the same three measurements when the host or the suite mix changes.
 A waiter used to give up after 7,200 seconds and run beside the limit, so a day of slow holders let every copy through together, which is the harm the gate exists to prevent.
 Waiting is now by capacity alone: a waiter starts when a holder ends, whatever time has passed, and a holder that never ends is bounded only by the stop rules of its own runner.
 The gate shapes throughput and is not a safety boundary: a slot directory or slot file that cannot be used, or a Python without POSIX file locks, runs the suite without a slot and says so, and never blocks it.

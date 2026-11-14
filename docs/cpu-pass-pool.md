@@ -15,8 +15,8 @@ This page owns the cross-repository protocol.
 
 The pool uses Python's standard-library `fcntl.flock` over one lock file per pass, not GNU parallel's `sem`.
 A kernel file lock is released when its last owning descriptor closes, including on `SIGKILL`.
-Only the pool owner retains slot descriptors; commands and their exec children never inherit them, so surviving worker children cannot hold a master's reservation after its command ends.
-Ordinary termination signals keep that owner until its command exits; killing the owner with `SIGKILL` releases its passes even if descendants survive.
+Only the pool owner and a guard process it forks retain slot descriptors; commands and their exec children never inherit them, so surviving worker descendants cannot hold a master's reservation after its command ends.
+Ordinary termination signals keep that owner until its command exits, and the guard keeps the passes until the command process itself is gone even if the owner is killed with `SIGKILL`, so killing only the owner never frees a pass for a second worker; descendants that outlive the command hold nothing.
 The pool has no stale slot state to repair; `sem` keeps its own bookkeeping that must notice dead holders.
 `python3` is already a runtime dependency of Firstmate's runner and of the Python projects that will join the pool, so the pool adds no new install, while `sem` would add Perl-based GNU parallel and its citation prompt to every host and CI image.
 Any language with `flock` can join the protocol below without calling a Firstmate script.
@@ -41,7 +41,9 @@ Every participant on a host follows these rules, so one pool is shared by every 
 6. **Nested work:** a holder exports `FM_CPU_PASS_HELD=<k>` to the work it runs.
    A participant that finds `FM_CPU_PASS_HELD` set runs without taking another pass, because taking another could deadlock a full pool.
    With a positive inherited count, nested work never runs more concurrent CPU-bound workers than that count; a caller needing parallel nested work reserves enough passes before starting the outer work.
-   A participant that runs several nested workers at once gives each of them its share of the count, the count divided by the workers and rounded down, never the whole count, so every level of nesting together stays within what the outermost holder took.
+   Firstmate's reference holder also exports `FM_CPU_PASS_TOKENS`, a private directory that is a mini pool of that many tokens: a participant that starts a CPU-bound worker under a positive count leases the worker's passes from those tokens and waits while sibling work holds them, so workers started by independent descendants, such as two runners started by one test script, together never exceed the count.
+   The leased worker gets a token directory of exactly the leased count, so every level of nesting stays within what the outermost holder took.
+   A holder that exports only the marker (an outside participant, or a hand-set marker) cannot be leased from and is trusted; a participant that runs several nested workers at once then gives each its share of the count, the count divided by the workers and rounded down, never the whole count.
    An explicit pass request above a positive inherited count is a usage error; the [`fm-test-run.sh` header](../bin/fm-test-run.sh) owns the runner's concurrency-reduction behavior.
    The marker must be a nonnegative decimal integer in both Python and no-Python execution; a malformed marker is a usage error, while `0` denotes degraded work with no reservation or concurrency limit.
 7. **Degrade, never block:** a participant that cannot use the pool (no `flock`, no pool directory, a foreign-owned directory) runs its work without a pass and says so once.
@@ -72,7 +74,7 @@ Firstmate's own heavy entry points take passes outside their timing and bounds; 
 - `bin/fm-lint.sh` takes one per cold ShellCheck root and one for the changed-root dependency scan.
 - `bin/fm-test-isolation-proof.sh` takes min(`--jobs`, pool size) for its whole run; its header owns how it counts and records concurrency.
 
-A command that needs both a pass and a per-key slot takes them as one acquisition and waits holding neither ([configuration.md](configuration.md#test-slots-per-key-fm_test_key_slots)), so a slot holder and a pass holder cannot wait on each other.
+A command that takes a per-key slot through `fm-duration.py gate` or `run` takes its pass in the same acquisition and waits holding neither ([configuration.md](configuration.md#test-slots-per-key-fm_test_key_slots)); a command nested under it takes no pass and waits only for slots or for a lease of its holder's tokens, so a process that holds a slot never waits for a pass.
 Waiting for a pass or a slot is by capacity alone: no elapsed time admits a waiter.
 
 ## Fresh pipeline starts

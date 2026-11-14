@@ -39,14 +39,27 @@ Running:
     reaches it directly. The holder ignores SIGTERM, SIGINT and SIGHUP while
     the child runs and keeps the passes until the child exits: passes stay with
     running work and are never forwarded or doubled.
-  - The child's environment gains FM_CPU_PASS_HELD=<K> (0 when degraded).
+  - The child's environment gains FM_CPU_PASS_HELD=<K> (0 when degraded) and
+    FM_CPU_PASS_TOKENS, a private directory that is the mini pool of K tokens of
+    this reservation, removed when COMMAND ends.
   - Nested work takes no new passes and may request at most the inherited count.
     FM_CPU_PASS_HELD must be a nonnegative decimal integer or run exits 125,
     including without Python; 0 denotes degraded work and imposes no budget.
+    When FM_CPU_PASS_TOKENS names a live directory, a nested run LEASES its
+    --passes (default 1) tokens from it, waiting while sibling work holds them,
+    so every descendant draws on the one reservation and workers alive together
+    never exceed the passes held. COMMAND then sees FM_CPU_PASS_HELD=<leased
+    count> and a token directory of its own with exactly that many tokens. With
+    no token directory (a holder that only exports the marker, or a hand-set
+    marker) a nested run executes COMMAND unchanged and the marker is trusted.
   - Only this owner retains slot descriptors; close-on-exec/close_fds prevents
-    COMMAND and its descendants retaining passes after COMMAND exits.
-    Killing this owner with SIGKILL releases its slots even if work survives;
-    ordinary TERM/INT/HUP still keep the owner until COMMAND ends.
+    COMMAND and its descendants retaining passes after COMMAND exits. The passes
+    (and leased tokens) stay held until COMMAND itself ends: a guard process
+    forked after COMMAND starts keeps the descriptors open, ignores TERM, INT and
+    HUP, polls COMMAND's pid at the waiters' own poll cap, and exits when it is
+    gone, so killing only this owner does not free a pass for a second worker.
+    COMMAND's other descendants hold nothing; a reused pid keeps the pass a
+    little longer. ordinary TERM/INT/HUP still keep the owner until COMMAND ends.
     The log fd is closed; stdout and stderr carry only COMMAND's own output.
   - A degraded run (the protocol's rule 7) writes one notice to the log fd.
 
@@ -107,6 +120,7 @@ import math
 import os
 from pathlib import Path
 import random
+import shutil
 import signal
 import sqlite3
 import stat
@@ -122,6 +136,7 @@ except ImportError:  # pragma: no cover - platform without POSIX locks
     fcntl = None  # type: ignore
 
 HELD_ENV = "FM_CPU_PASS_HELD"
+TOKENS_ENV = "FM_CPU_PASS_TOKENS"
 FIRST_NOTICE_SECS = 2.0
 NOTICE_EVERY_SECS = 60.0
 POLL_MIN_SECS = 0.05
@@ -282,14 +297,84 @@ def acquire(directory: str, size: int, passes: int, label: str, log_fd: int) -> 
     return held
 
 
+def make_tokens() -> str:
+    """A private directory that is the mini pool of one holder's reservation (docs/cpu-pass-pool.md rule 6)."""
+    return tempfile.mkdtemp(prefix="fm-cpu-tokens-")
+
+
+def drop_tokens(path: str) -> None:
+    if path:
+        shutil.rmtree(path, ignore_errors=True)
+
+
+def start_guard(fds: List[int], pid: int, tokens: str = "") -> int:
+    """Fork a process that keeps the descriptors FDS open until process PID ends, even if this process is killed.
+
+    The passes follow the command that uses them, not the process that started it. The guard has no other
+    open descriptor, ignores TERM, INT and HUP, and is stopped by stop_guard when the command ends normally.
+    When it outlives its starter it also removes TOKENS, the reservation's token directory, once the command is gone.
+    """
+    if not fds:
+        return 0
+    try:
+        guard = os.fork()
+    except OSError:
+        return 0
+    if guard:
+        return guard
+    try:  # pragma: no cover - runs in the forked guard
+        for signum in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+            signal.signal(signum, signal.SIG_IGN)
+        keep = set(fds)
+        try:
+            open_fds = [int(name) for name in os.listdir("/dev/fd")]
+        except OSError:
+            open_fds = list(range(3, 256))
+        null = os.open(os.devnull, os.O_RDWR)
+        for stream in (0, 1, 2):
+            os.dup2(null, stream)
+        for fd in open_fds:
+            if fd > 2 and fd not in keep and fd != null:
+                try:
+                    os.close(fd)
+                except OSError:
+                    pass
+        os.close(null)
+        while True:
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                break
+            except PermissionError:
+                pass
+            time.sleep(POLL_MAX_SECS)  # no faster than the waiters it releases the pass to poll for it
+        drop_tokens(tokens)
+    finally:
+        os._exit(0)
+    return 0  # pragma: no cover
+
+
+def stop_guard(guard: int) -> None:
+    if guard:
+        try:
+            os.kill(guard, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        try:
+            os.waitpid(guard, 0)
+        except ChildProcessError:
+            pass
+
+
 def exit_code_for(returncode: int) -> int:
     if returncode < 0:
         return 128 + (-returncode)
     return returncode
 
 
-def run_child(command: List[str], env: dict, log_fd: int, on_poll=None) -> int:
+def run_child(command: List[str], env: dict, log_fd: int, on_poll=None, keep: Optional[List[int]] = None, tokens: str = "") -> int:
     previous = {}
+    guard = 0
     for signum in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
         previous[signum] = signal.signal(signum, signal.SIG_IGN)
     try:
@@ -303,6 +388,7 @@ def run_child(command: List[str], env: dict, log_fd: int, on_poll=None) -> int:
         except PermissionError:
             log(log_fd, "command not executable: %s" % command[0])
             return 126
+        guard = start_guard(list(keep or ()), child.pid, tokens)
         while True:
             if on_poll is not None and on_poll():
                 on_poll = None
@@ -313,6 +399,7 @@ def run_child(command: List[str], env: dict, log_fd: int, on_poll=None) -> int:
             except InterruptedError:  # pragma: no cover - PEP 475 retries
                 continue
     finally:
+        stop_guard(guard)
         for signum, handler in previous.items():
             signal.signal(signum, handler)
 
@@ -372,6 +459,9 @@ def cmd_run(args: argparse.Namespace) -> int:
         if held_count and passes > held_count:
             log(log_fd, "--passes must not exceed %s (%d)" % (HELD_ENV, held_count))
             return 125
+        tokens = env.get(TOKENS_ENV, "")
+        if held_count and tokens and os.path.isdir(tokens):
+            return lease_tokens(command, env, log_fd, tokens, held_count, passes, args.label or os.path.basename(command[0]), args.wait_file)
         write_wait(args.wait_file, time.monotonic())
         return exec_direct(command, env, log_fd)
     label = args.label or os.path.basename(command[0])
@@ -397,10 +487,45 @@ def cmd_run(args: argparse.Namespace) -> int:
         return exec_direct(command, env, log_fd)
     write_wait(args.wait_file, queued_at)
     env[HELD_ENV] = str(passes)
+    tokens = make_tokens()
+    env[TOKENS_ENV] = tokens
     try:
-        return run_child(command, env, log_fd)
+        return run_child(command, env, log_fd, keep=held, tokens=tokens)
     finally:
+        drop_tokens(tokens)
         for fd in held:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+
+
+def lease_tokens(command: List[str], env: dict, log_fd: int, tokens: str, held_count: int, passes: int, label: str, wait_file: str) -> int:
+    """Nested work under a holder's reservation: lease PASSES of its tokens for COMMAND, waiting for them if siblings hold them.
+
+    The holder's passes are one reservation; every descendant that starts a CPU-bound worker leases from the same
+    tokens, so sibling runners cannot each spend all of it. COMMAND gets the leased count as its own reservation.
+    """
+    for signum in (signal.SIGTERM, signal.SIGHUP):
+        signal.signal(signum, signal.SIG_DFL)
+    queued_at = time.monotonic()
+    try:
+        leased = acquire(tokens, held_count, passes, label, log_fd)
+    except KeyboardInterrupt:
+        return 130
+    except OSError as exc:
+        log(log_fd, "running %s without leasing from its reservation: %s" % (label, exc))
+        write_wait(wait_file, queued_at)
+        return exec_direct(command, env, log_fd)
+    write_wait(wait_file, queued_at)
+    sub = make_tokens()
+    env[HELD_ENV] = str(passes)
+    env[TOKENS_ENV] = sub
+    try:
+        return run_child(command, env, log_fd, keep=leased, tokens=sub)
+    finally:
+        drop_tokens(sub)
+        for fd in leased:
             try:
                 os.close(fd)
             except OSError:
