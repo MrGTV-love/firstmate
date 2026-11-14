@@ -6414,6 +6414,28 @@ test_dead_launcher_lock_is_released_when_the_driver_is_unavailable() {
   pass 'a landed copy under a dead launcher'"'"'s lock is released by the script when the closeout driver cannot run'
 }
 
+# A preservation record left beside a copy that has no locally-only commit (its
+# work landed) is not a credit: the bundle proof returns before it reads the
+# record, and the locked copy still reaches the driver with no credit and closes.
+test_locked_landed_copy_with_a_record_but_no_unlanded_commit_reaches_the_driver() {
+  local rc
+  dead_launcher_pid
+  make_own_locked_copy_case landed-with-record enclosing "$FOREIGN_DEAD_PID"
+  mkdir -p "$FOREIGN_CASE/data/task-x1"
+  printf '%s\t%s\t%s\n' "$FOREIGN_CASE/left.bundle" 0000000000000000000000000000000000000000000000000000000000000000 \
+    0000000000000000000000000000000000000000 > "$FOREIGN_CASE/data/task-x1/preservation-bundles.tsv"
+  run_foreign_teardown rc
+  assert_no_grep 'unbound variable' "$FOREIGN_CASE/stderr" "landed-with-record: teardown stopped on an unset variable: $(grep -m1 'unbound variable' "$FOREIGN_CASE/stderr")"
+  expect_code 0 "$rc" "landed-with-record: a landed locked copy must close: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+  assert_equals "$FOREIGN_SLOT|--cleanup-worktree $FOREIGN_COPY --execute-cleanup" "$(cat "$FOREIGN_CASE/closeout.log" 2>/dev/null)" \
+    "landed-with-record: the driver was not run once with no credit"
+  assert_grep "closeout credit for $FOREIGN_COPY: none (no verified bundle holds this copy)" "$FOREIGN_CASE/stderr" \
+    "landed-with-record: the unmet credit was not named"
+  assert_absent "$FOREIGN_COPY" "landed-with-record: the copy survived"
+  assert_absent "$FOREIGN_CASE/state/task-x1.meta" "landed-with-record: the task record survived"
+  pass 'a landed locked copy with a leftover preservation record and no unlanded commit reaches the driver with no credit and closes'
+}
+
 # Every check is made again before the unlock: a process that starts running in
 # the copy after the driver refused keeps the copy locked and registered.
 test_direct_release_refuses_a_process_that_appears_before_the_unlock() {
@@ -6943,6 +6965,7 @@ test_locked_copy_held_by_a_bundle_gets_one_bundle_record_credit
 test_locked_copy_landed_by_a_merged_pr_gets_one_pr_credit
 test_dead_launcher_lock_is_released_directly_when_no_credit_is_satisfiable
 test_dead_launcher_lock_is_released_when_the_driver_is_unavailable
+test_locked_landed_copy_with_a_record_but_no_unlanded_commit_reaches_the_driver
 test_direct_release_refuses_a_process_that_appears_before_the_unlock
 test_direct_release_refuses_a_process_holding_a_file_in_the_copy_open
 test_task_own_descendant_holding_a_file_open_refuses_and_is_not_signalled

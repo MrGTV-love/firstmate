@@ -115,6 +115,11 @@ TEARDOWN_CLOSEOUT_OUT=
 TEARDOWN_CLOSEOUT_STDOUT=
 TEARDOWN_FOREIGN_RULE=
 TEARDOWN_FOREIGN_PID=
+# The last record teardown_bundle_record read; empty until a read, so a reader
+# on a path that returned before the read sees no record instead of an unset name.
+TEARDOWN_BUNDLE_RECORD_PATH=
+TEARDOWN_BUNDLE_RECORD_HASH=
+TEARDOWN_BUNDLE_RECORD_TIPS=
 TEARDOWN_REFUSED_COPIES=()
 TEARDOWN_FRICTION_GUARD=FM-TEARDOWN-PRESERVATION
 
