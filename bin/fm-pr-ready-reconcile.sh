@@ -109,7 +109,9 @@ crew_state_ready_url() {  # <id>
 # return exists, when the merge-notified marker names this PR (a marker naming
 # another PR does not count), or when an armed prune record names this PR or
 # cannot be read. A registrar still publishing holds the task's poll publication
-# lock, so its partly published poll is left to it.
+# lock, so its partly published poll is left to it. A check.sh that is not the poll
+# template, or that has a custom-check trust record, is another check and is never
+# replaced; the pass names that conflict instead.
 pr_poll_lost() {  # <id> <recorded pr>
   local id=$1 pr=$2 suffix canonical lost=0 lock
   for suffix in pr-poll-retirement teardown-return-pending; do
@@ -134,6 +136,13 @@ pr_poll_lost() {  # <id> <recorded pr>
   elif fm_pr_poll_registration_device_shifted "$STATE" "$id" "$SCRIPT_DIR/fm-pr-poll.sh" \
     && [ "$FM_PR_DATA_URL" = "$canonical" ]; then
     lost=1  # only the volume's device number moved: the watcher re-records it, so it is not lost
+  elif { [ -e "$STATE/$id.check.sh" ] || [ -L "$STATE/$id.check.sh" ]; } \
+    && { [ -e "$STATE/$id.check-trust" ] || [ -L "$STATE/$id.check-trust" ] \
+      || ! cmp -s "$SCRIPT_DIR/fm-pr-poll.sh" "$STATE/$id.check.sh"; }; then
+    # A registered custom check (bin/fm-check-register.sh), or any check.sh that is not
+    # this poll's template, is another check: the registrar would replace it.
+    printf 'pr-ready: %s: state/%s.check.sh is another check, not the merge poll for %s; the poll is not re-armed over it\n' "$id" "$id" "$pr"
+    lost=1
   fi
   fm_lock_release "$lock" || true
   return "$lost"

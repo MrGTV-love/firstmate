@@ -26,7 +26,8 @@
 #     the record is not called again, so nothing registers twice. That call sets
 #     FM_PR_CHECK_EXPECT_PR to the pr= it read; when the record names another PR
 #     by the time this registrar holds the metadata lock to commit, it changes
-#     nothing and exits 3, so a stale re-arm never replaces a newer registration.
+#     nothing and exits 3, so a stale re-arm never replaces a newer registration;
+#     it checks again under the poll publication lock before it publishes.
 # (d) bin/fm-teardown.sh's lookup for a detached copy (the record's branch=, else
 #     fm/<id>) only finds the PR; pr_is_merged's containment proofs are unchanged
 #     and still refuse a copy whose work the PR's head does not carry.
@@ -315,6 +316,17 @@ META_LOCK_HELD=0
 PR_POLL_PUBLISH_LOCK="$STATE/.pr-poll-publish-$ID.lock"
 fm_lock_acquire_wait "$PR_POLL_PUBLISH_LOCK"
 PR_POLL_PUBLISH_LOCK_HELD=1
+# A re-arm checks again under the publication lock: another registration may have
+# recorded a newer PR after this one committed, and its poll must not be replaced.
+if [ -n "${FM_PR_CHECK_EXPECT_PR:-}" ]; then
+  CURRENT_PR=$(grep '^pr=' "$META" | tail -1 | cut -d= -f2- || true)
+  if [ "$CURRENT_PR" != "$URL" ]; then
+    fm_lock_release "$PR_POLL_PUBLISH_LOCK" || exit 1
+    PR_POLL_PUBLISH_LOCK_HELD=0
+    echo "pr-check: $ID now records ${CURRENT_PR:-no PR}, not $URL; this re-arm is stale and publishes nothing" >&2
+    exit 3
+  fi
+fi
 if fm_pr_poll_publish_prepared; then
   fm_lock_release "$PR_POLL_PUBLISH_LOCK" || exit 1
   PR_POLL_PUBLISH_LOCK_HELD=0
