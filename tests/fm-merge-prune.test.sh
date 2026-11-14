@@ -4101,6 +4101,7 @@ test_xlane_same_lane_path_completes_as_before() {
   [ -e "$STATE/t1.check.sh" ] || fail "fm-pr-check.sh armed no merge poll"
   xl_merge_case samelane
   # The merge arms the prune itself (fm-pr-merge.sh's own `fm-merge-prune.sh arm --run`); the test arms nothing.
+  # shellcheck disable=SC2030 # the subshell keeps these exports to the merge by design
   ( xl_env_list; export "${XL_ENV[@]}"; export FM_TEST_HOME="$HOME_DIR" FM_TEST_STATE="$STATE"; unset FM_MERGE_PRUNE
     run_pr_merge "$XL_MC" t1 "$XL_PR" > "$XL_MC/stdout" 2> "$XL_MC/stderr" ) || rc=$?
   [ "$rc" -eq 0 ] || fail "the task's own home could not merge its PR: $(cat "$XL_MC/stderr")"
@@ -4625,6 +4626,7 @@ esac
 exit \$rc
 SH
   chmod +x "$mc/fakebin/gh"
+  # shellcheck disable=SC2030,SC2031 # the subshell keeps these exports to the reconciler by design
   ( export FM_TEST_HOME="$HOME_DIR" FM_TEST_STATE="$STATE" FM_TEST_CODE_ROOT="$ROOT" FM_PR_AUTO_REVIEW_INTERVAL=0 "${V5_GIT_ENV[@]}"
     PR_MERGE="$ROOT/bin/fm-pr-ready-reconcile.sh" run_pr_merge "$mc" > "$W/reconcile.out" 2>&1 ) || fail "reconcile failed: $(cat "$W/reconcile.out")"
   step_state=$(v5_e_review_state)
