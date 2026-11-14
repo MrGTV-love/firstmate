@@ -187,7 +187,7 @@ WATCH = '''
     trap "fm_active_check_stop; fm_check_output_cleanup" EXIT
     watcher_beat force
     [ -z "$3" ] || CHECK_TIMEOUT=$3
-    run_check_capture slack "$2" || exit 21
+    run_check_capture "$5" "$2" || exit 21
     printf '%s' "$FM_CHECK_RESULT" > "$4"
     printf 'status=%s stopped=%s notice=%s\\n' "$FM_CHECK_STATUS" "$FM_CHECK_STOPPED" "$FM_CHECK_STOP_NOTICE"
 '''
@@ -197,11 +197,11 @@ def second_person_watcher():
     """The receiving watcher's real capture and stop (bin/fm-watch.sh run_check_capture and fm_active_check_stop) around the standing Slack check, with the
     second person's Slack calls held by the fake transport. CI-only (the fixture home holds a synthetic .env; Ruling D). Each case uses a fresh home; the
     watcher stops only the check process group it starts itself.
-    A: a no-progress stop during their held call discards the check's output; the owner's acknowledgement was posted once, and the next run prints the
-       owner's wake once, with no second acknowledgement, and takes their request in.
-    B: under the default no-progress bound their held calls cannot get the owner's check stopped: the same run prints the owner's wake, and their calls
-       begin only inside their time budget.
-    C: with the second person off, the owner's wake is printed by the same run and none of their calls is made."""
+    A: the owner's check delivers its wake with no call of theirs; a no-progress stop of their check during their held call discards only its output, and the
+       next pass takes their request in, with the owner's wake never repeated.
+    B: under the default no-progress bound their held calls get no check stopped: the owner's check delivers its wake, their calls begin only inside their
+       time budget, and the next pass takes their request in.
+    C: with the second person off, the owner's check wakes the owner and their check makes no call of theirs."""
     def home_for(tmp, second):
         home = Path(tmp)
         env = dict(os.environ, FM_HOME=tmp, FM_STATE_OVERRIDE=str(home / 'state'), FM_DATA_OVERRIDE=str(home / 'data'),
@@ -229,11 +229,11 @@ def second_person_watcher():
         data['messages'].append(message)
         state[0].write_text(json.dumps(data))
 
-    def watch(home, env, scenario, stall=0, timeout=''):
+    def watch(home, env, scenario, stall=0, timeout='', check='slack'):
         (home / 'timings.jsonl').write_text('')
         result = home / 'result.txt'
         started = time.monotonic()
-        run = subprocess.run(['bash', '-c', WATCH, '_', str(ROOT / 'bin/fm-watch.sh'), str(home / 'state/slack.check.sh'), str(timeout), str(result)],
+        run = subprocess.run(['bash', '-c', WATCH, '_', str(ROOT / 'bin/fm-watch.sh'), str(home / ('state/%s.check.sh' % check)), str(timeout), str(result), check],
                              env=dict(env, FM_TEST_SLACK_SCENARIO=scenario, FM_TEST_SLACK_STALL=str(stall)), capture_output=True, text=True)
         elapsed = time.monotonic() - started
         assert run.returncode == 0, run
@@ -248,28 +248,32 @@ def second_person_watcher():
         rows = [json.loads(l) for l in (home / 'state/slack-watch/outbound.jsonl').read_text().splitlines()]
         return [r for r in rows if r.get('method') == 'chat.postMessage' and r.get('channel') == channel and r.get('thread_ts') == ts and 'error' not in r]
 
-    # A: stopped during their held call, recovered by the next run.
+    # Each watcher pass runs the owner's check (slack) and then the second person's (slacksecond), as the watcher runs registered checks one after another,
+    # delivering each one's output when it exits (Main 1553): the owner's wake is delivered before any call of theirs begins.
+
+    # A: their check is stopped during their held call; the owner's wake was already delivered by the owner's check, and the next pass takes their request in.
     with tempfile.TemporaryDirectory(prefix='fm-slack-second-stop-') as tmp:
         home, env = home_for(tmp, True)
         say(home, '2000.000100', 'U0TESTOWNER', 'an owner request')
         say(home, '2000.000200', SECOND, 'a second person request', SECOND_DM)
         line, result, rows, elapsed = watch(home, env, 'second-stall', stall=60, timeout=NO_PROGRESS_SECONDS)
-        assert line.startswith('status=124 stopped=no progress notice=check slack stopped after '), line
-        assert result == '', result                                   # the watcher discards a stopped check's output
-        assert elapsed < 40, elapsed                                  # stopped by the no-progress bound, long before the held call would end
-        assert len(acks(home, OWNER_DM, '2000.000100')) == 1           # the owner's acknowledgement was posted before their call
-        assert (home / 'state/slack.check-stopped').exists()
-        line, result, rows, elapsed = watch(home, env, '')
-        assert line == 'status=0 stopped= notice=', line
+        assert line == 'status=0 stopped= notice=', line                 # the owner's check ends without any call of theirs
         assert len(wakes(result, '2000.000100', 'U0TESTOWNER')) == 1, result
-        assert len(acks(home, OWNER_DM, '2000.000100')) == 1           # recovery posts no second acknowledgement
-        assert len(wakes(result, '2000.000200', SECOND)) == 1, result
-        assert not (home / 'state/slack.check-stopped').exists()       # the completed run ends the stop episode
+        assert not any(r['second'] for r in rows), rows
+        line, result, rows, elapsed = watch(home, env, 'second-stall', stall=60, timeout=NO_PROGRESS_SECONDS, check='slacksecond')
+        assert line.startswith('status=124 stopped=no progress notice=check slacksecond stopped after '), line
+        assert result == '', result                                   # the watcher discards a stopped check's output
+        assert elapsed < 40, elapsed
         line, result, rows, elapsed = watch(home, env, '')
-        assert wakes(result, '2000.000100', 'U0TESTOWNER') == [] and wakes(result, '2000.000200', SECOND) == [], result
-    print('ok - a check the real watcher stops during a held call of the second person leaves the owner wake to the next run, once, with one acknowledgement', flush=True)
+        assert wakes(result, '2000.000100', 'U0TESTOWNER') == [], result  # delivered once, never again
+        line, result, rows, elapsed = watch(home, env, '', check='slacksecond')
+        assert line == 'status=0 stopped= notice=', line
+        assert len(wakes(result, '2000.000200', SECOND)) == 1, result
+        assert len(acks(home, OWNER_DM, '2000.000100')) == 1
+    print('ok - the owner check delivers its wake before any call of theirs, and a stopped second-person check is recovered by the next pass', flush=True)
 
-    # B: under the default bound, their held calls cannot get the owner's check stopped.
+    # B: under the default bound their held calls get no check stopped: the owner's check delivers its wake, and their check's calls begin only inside their
+    # time budget; the next pass takes their request in.
     with tempfile.TemporaryDirectory(prefix='fm-slack-second-budget-') as tmp:
         home, env = home_for(tmp, True)
         say(home, '2000.000100', 'U0TESTOWNER', 'an owner request')
@@ -277,17 +281,17 @@ def second_person_watcher():
         line, result, rows, elapsed = watch(home, env, 'second-stall', stall=9)
         assert line == 'status=0 stopped= notice=', line
         assert len(wakes(result, '2000.000100', 'U0TESTOWNER')) == 1, result
+        line, result, rows, elapsed = watch(home, env, 'second-stall', stall=9, check='slacksecond')
+        assert line == 'status=0 stopped= notice=', line
         theirs = [r for r in rows if r['second']]
-        # A call of theirs begins only inside the 12 s budget: two held 9 s calls fit (the third would begin at about 18 s). Without the budget all three of
-        # history, open and the acknowledgement post would be made in this run.
+        # A call of theirs begins only inside the 12 s budget of their pass: two held 9 s calls fit (the third would begin at about 18 s).
         assert 1 <= len(theirs) <= 2, rows
-        line, result, rows, elapsed = watch(home, env, '')
-        assert wakes(result, '2000.000100', 'U0TESTOWNER') == [], result
-        assert len(wakes(result, '2000.000200', SECOND)) == 1, result    # their request, deferred by the budget, is taken in by the next run
+        line, result, rows, elapsed = watch(home, env, '', check='slacksecond')
+        assert len(wakes(result, '2000.000200', SECOND)) == 1, result
         assert len(acks(home, OWNER_DM, '2000.000100')) == 1
-    print('ok - under the default bound the real watcher is never made to stop the owner check by held calls of the second person', flush=True)
+    print('ok - under the default bound the real watcher is never made to stop a check by held calls of the second person', flush=True)
 
-    # C: control, the second person off.
+    # C: control, the second person off: the owner's check wakes the owner and their check makes no call of theirs.
     with tempfile.TemporaryDirectory(prefix='fm-slack-second-off-') as tmp:
         home, env = home_for(tmp, False)
         say(home, '2000.000100', 'U0TESTOWNER', 'an owner request')
@@ -295,8 +299,9 @@ def second_person_watcher():
         line, result, rows, elapsed = watch(home, env, 'second-stall', stall=60)
         assert line == 'status=0 stopped= notice=', line
         assert len(wakes(result, '2000.000100', 'U0TESTOWNER')) == 1, result
+        line, result, rows, elapsed = watch(home, env, 'second-stall', stall=60, check='slacksecond')
         assert wakes(result, '2000.000200', SECOND) == [] and not any(r['second'] for r in rows), (result, rows)
-    print('ok - with the second person off the real watcher prints the owner wake in the same run and no call of theirs is made', flush=True)
+    print('ok - with the second person off the owner check wakes the owner and no call of theirs is made', flush=True)
 
 
 if __name__ == '__main__':

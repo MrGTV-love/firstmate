@@ -4670,7 +4670,7 @@ class SecondPersonTest(unittest.TestCase):
             with patch.object(plane, 'run', fake), patch.object(watch, 'probe', return_value=(0, 'live')):
                 ts = self.card(watch, replay)
                 watch.second = ''
-                watch.no_authority = set()                       # the mutation: their id is not kept out of the answering authors
+                watch.without_authority = lambda user: False     # the mutation: their id is not kept out of the answering authors
                 watch.authors.add(self.SECOND)
                 replay.state['messages'].append({'ts': '300.000200', 'thread_ts': ts, 'user': self.SECOND, 'text': '1'})
                 self.again(watch)
@@ -4846,9 +4846,9 @@ class SecondPersonTest(unittest.TestCase):
                 self.assertGreater(len(self.posts(replay)) + len(self.theirs(watch).get('second', {}).get('intake_bounds', [])), before)
             self.assertEqual(len([p for p in self.posts(replay) if p[0] == self.SECOND_DM]), 450)
 
-    def test_sc4_they_have_their_own_cap_and_never_take_the_turn_of_an_owner_request(self):
-        # Their pass has its own per-poll cap (Main's design ruling of order 1307): with a cap of 1, each poll takes one owner request and then one of theirs, and
-        # in every poll the owner's line comes first.
+    def test_sc4_they_share_the_cap_and_never_take_the_turn_of_an_owner_request(self):
+        # One shared cap (SC4; Main 1547 withdrew the separate cap of order 1307): with a cap of 1 the owner's requests go first, one per poll, and theirs
+        # takes the cap the owner leaves.
         with self.second(cap='1') as (watch, replay):
             self.says(replay, '200.000100')
             self.owner_says(replay, '200.000200')
@@ -4857,7 +4857,7 @@ class SecondPersonTest(unittest.TestCase):
             for _ in range(3):
                 self.again(watch)
                 polls.append([plane.REQUEST_SEGMENT.match(line).group(1, 2) for line in self.wakes(watch)])
-            self.assertEqual(polls, [[('200.000200', self.OWNER), ('200.000100', self.SECOND)], [('200.000300', self.OWNER)], []])
+            self.assertEqual(polls, [[('200.000200', self.OWNER)], [('200.000300', self.OWNER)], [('200.000100', self.SECOND)]])
 
     def test_sc4_an_unacknowledged_request_of_theirs_never_holds_back_the_owner_and_the_owner_retarget(self):
         with self.second() as (watch, replay):
@@ -5169,8 +5169,19 @@ class InvariantHome:
         self.transcript.write_text(json.dumps(data))
 
     def trust_check(self):
-        """The watcher's trust mark for the armed check (a synthetic, empty marker file in this disposable home), so that the check action runs a poll."""
-        (self.dir / (plane.CHECK_ID + '.check-trust')).write_text('')
+        """The watcher's trust marks for the two armed checks, the owner's and the second person's (synthetic, empty marker files in this disposable home), so
+        that each check action runs its poll."""
+        for check_id in (plane.CHECK_ID, getattr(plane, 'SECOND_CHECK_ID', 'slacksecond')):
+            (self.dir / (check_id + '.check-trust')).write_text('')
+            shim = self.dir / (check_id + '.check.sh')
+            if not shim.exists():
+                shim.write_text('')
+
+    def check_pass(self, extra=None):
+        """One watcher pass over the two standing checks, as the watcher runs them: the owner's check, then the second person's, each its own run."""
+        first = self.cli('check', action='check', extra=extra)
+        second = self.cli('check', action='check-second', extra=extra)
+        return InvariantResult(max(first.rc, second.rc), first.out + second.out, first.err + second.err)
 
     def moving_clock(self, start, step):
         """Slack's clock moves on by step seconds with every successful call and is reported in whole seconds, as an HTTP Date is."""
@@ -5388,7 +5399,9 @@ class Invariant1Boundary(InvariantScenario):
             self.assertEqual(home.cli('check', action='arm').rc, 0)          # a new arm re-dates it, and their intake runs again
             home.say('300.000300', 'typed after the new arm')
             after = [home.cli('poll'), home.cli('poll')]
-            self.assertEqual([re.search(r'slack request (\S+) from', l).group(1) for r in after for l in self.requests_woken(r)], ['300.000300'])
+            # Main 1553 option A: what they typed while their intake was held is taken in as data, under their label, with the span named; nothing is lost.
+            woken = [re.search(r'slack request (\S+) from', l).group(1) for r in after for l in self.requests_woken(r)]
+            self.assertEqual((woken.count('300.000200'), woken.count('300.000300')), (1, 1), woken)
 
     def test_inv1_an_arm_whose_second_person_calls_run_out_of_their_time_budget_still_keeps_only_what_is_typed_after_it(self):
         with self.home(history=False) as home:
@@ -5441,11 +5454,11 @@ class Invariant1Boundary(InvariantScenario):
                 home.say('150.900000', 'typed after the arm')
                 polls = [home.cli('poll'), home.cli('poll')]
                 woken = self.placed(polls)
-                self.assertNotIn('150.100000', woken, woken)
-                self.assertLessEqual(woken.count('150.900000'), 1, woken)
-                if '150.900000' not in woken:
-                    self.assertTrue(self.covered(home, '150.900000'), home.refusals())
-                    self.assertEqual(len(self.unplaced_lines(polls)), 1, [r.out for r in polls])
+                # Main 1553 option A: the post-arm request is delivered once; the span the plane cannot place (the pre-arm one may be in it) is taken in as data
+                # and named once in a row and a notice.
+                self.assertEqual(woken.count('150.900000'), 1, woken)
+                self.assertTrue(self.covered(home, '150.900000'), home.refusals())
+                self.assertEqual(len(self.unplaced_lines(polls)), 1, [r.out for r in polls])
 
     def test_r3_f2_control_with_a_moving_coarse_clock_a_failed_arm_read_keeps_exactly_what_is_typed_after_the_arm(self):
         for fresh in (False, True):
@@ -5479,7 +5492,9 @@ class Invariant1Boundary(InvariantScenario):
             home.say('312.000000', 'typed after Slack clock is known again')
             home.set_clock(313.0)
             results += [home.cli('poll'), home.cli('poll')]
-            self.assertEqual(self.placed(results), ['312.000000'])
+            woken = self.placed(results)
+            # Main 1553 option A: the request typed while no reply carried Slack's clock is taken in as data, once, and the span is named once.
+            self.assertEqual((woken.count('300.000200'), woken.count('312.000000')), (1, 1), woken)
             self.assertTrue(self.covered(home, '300.000200'), home.refusals())
             self.assertEqual(len(self.unplaced_lines(results)), 1, [r.out for r in results])
 
@@ -5884,9 +5899,10 @@ sys.exit(plane.main(sys.argv[1:]))
         log, captured = home.dir / (name + '.calls'), home.dir / (name + '.out')
         env = {**os.environ, 'INV4_MODE': mode, 'INV4_LOG': str(log), 'INV4_SECOND_DM': INV_SECOND_DM, 'INV4_SECOND': INV_SECOND, 'INV4_DELAY': delay,
                'INV4_ORDER': str(order) if order else '',
-               'INV4_BIN': str(Path(plane.__file__).resolve().parent), 'FM_SLACK_CHECK_ACTION': 'check' if command == 'check' else ''}
+               'INV4_BIN': str(Path(plane.__file__).resolve().parent), 'FM_SLACK_CHECK_ACTION': command if command.startswith('check') else ''}
         with open(captured, 'w') as out:
-            done = subprocess.run([sys.executable, '-c', self.DRIVER, command, '--replay', str(home.transcript)], stdout=out, stderr=subprocess.PIPE,
+            done = subprocess.run([sys.executable, '-c', self.DRIVER, 'check' if command.startswith('check') else command, '--replay', str(home.transcript)],
+                                  stdout=out, stderr=subprocess.PIPE,
                                   env=env, text=True, timeout=120)
         calls = log.read_text().split() if log.exists() else []
         return done.returncode, captured.read_text(), calls
@@ -5965,6 +5981,9 @@ sys.exit(plane.main(sys.argv[1:]))
                 home.trust_check()
                 self.owner_and_second_waiting(home)
                 rc, captured, calls = self.run_check(home, 'normal', 'both-' + command, command=command)
+                if command == 'check':                                   # the second person's own check runs after the owner's, as the watcher runs them
+                    rc2, more, _ = self.run_check(home, 'normal', 'both-second', command='check-second')
+                    captured += more
                 self.assertEqual(rc, 0)
                 owner_at = captured.find('from ' + INV_OWNER)
                 theirs_at = captured.find('from ' + INV_SECOND)
@@ -5978,12 +5997,12 @@ sys.exit(plane.main(sys.argv[1:]))
             home.cli('poll')
             home.say('200.000100', 'owner request one ' + 'o' * 300, user=INV_OWNER, dm=INV_OWNER_DM)
             home.say('200.000200', 'second person request ' + 's' * 300, user=INV_SECOND, dm=INV_SECOND_DM)
-            first = home.cli('check', action='check', extra=event)
+            first = home.check_pass(event)
             self.assertEqual(len(self.requests_woken(first, INV_OWNER)), 1, first.out)
             home.say('200.000300', 'owner request two ' + 'p' * 300, user=INV_OWNER, dm=INV_OWNER_DM)
             for n in range(220):
                 home.say('201.%06d' % (n + 1), 'flood %d' % n, user=INV_SECOND, dm=INV_SECOND_DM)
-            second = home.cli('check', action='check', extra=event)
+            second = home.check_pass(event)
             self.assertIn('slack request 200.000300 from ' + INV_OWNER, ' '.join(self.requests_woken(second, INV_OWNER)), second.out)
             self.assertEqual(home.posts().count((INV_OWNER_DM, '200.000300')), 1)
 
@@ -6037,16 +6056,23 @@ sys.exit(plane.main(sys.argv[1:]))
 
     # ---- Round 6 (the outside review of fca2a73d): findings 3, 5, 6 and 7 through the public entry point ----
 
-    def test_r6_f6_the_owner_wake_is_written_before_any_call_of_theirs_in_the_same_poll(self):
+    def test_r6_f6_the_owner_check_delivers_its_wake_before_any_call_of_theirs_begins(self):
+        # At the transport boundary the watcher sees: the owner's check runs, exits and its output is delivered; only then does the second person's check run.
+        # Every call of theirs is slow (7 fake s): the owner's run makes none, so its delivery cannot wait on one (Main 1553 on SC4). Their check then wakes them.
         with self.home() as home:
+            home.trust_check()
             self.owner_and_second_waiting(home)
             order = home.dir / 'order.log'
-            rc, captured, calls = self.run_check(home, 'slow', 'ordered', delay='7.0', order=order)
-            events = order.read_text().split('\n')
-            first_call = next(n for n, e in enumerate(events) if e.startswith('call '))
-            first_owner = next(n for n, e in enumerate(events) if e == 'write owner')
-            self.assertLess(first_owner, first_call, events)
-            self.assertEqual(len(self.wakes_of(captured, INV_OWNER)), 1, captured)
+            rc, owner_run, calls = self.run_check(home, 'slow', 'owner-check', delay='7.0', command='check', order=order)
+            self.assertEqual((rc, calls), (0, []), order.read_text() if order.exists() else '')
+            self.assertEqual(len(self.wakes_of(owner_run, INV_OWNER)), 1, owner_run)
+            self.assertEqual(self.wakes_of(owner_run, INV_SECOND), [])
+            rc, second_run, calls = self.run_check(home, 'slow', 'second-check', delay='7.0', command='check-second')
+            self.assertEqual(rc, 0)
+            self.assertTrue(calls, 'their check makes their calls')
+            self.assertEqual(self.wakes_of(second_run, INV_OWNER), [])
+            later = [self.run_check(home, 'normal', 'second-check-%d' % n, command='check-second')[1] for n in range(2)]
+            self.assertEqual(sum(len(self.wakes_of(c, INV_SECOND)) for c in [second_run] + later), 1, [second_run] + later)
 
     def test_r6_f6_one_shared_cap_with_the_owner_first(self):
         with self.home(cap='1') as home:
@@ -6111,10 +6137,10 @@ sys.exit(plane.main(sys.argv[1:]))
             home.cli('poll')
             home.say('200.000100', 'owner request one ' + 'o' * 300, user=INV_OWNER, dm=INV_OWNER_DM)
             home.say('200.000200', 'second person request ' + 's' * 300, user=INV_SECOND, dm=INV_SECOND_DM)
-            results = [home.cli('check', action='check', extra=event)]
+            results = [home.check_pass(event)]
             for n in range(3):
                 home.say('20%d.000300' % (n + 1), 'owner request again ' + 'p' * 300, user=INV_OWNER, dm=INV_OWNER_DM)
-                results.append(home.cli('check', action='check', extra=event))
+                results.append(home.check_pass(event))
             self.assertEqual(sum(len(self.requests_woken(r, INV_SECOND)) for r in results), 1, [r.out for r in results])
             self.assertEqual(sum(len(self.requests_woken(r, INV_OWNER)) for r in results), 4)
 
@@ -6944,7 +6970,7 @@ class ScottPassModelTest(InvariantScenario):
     compares the two for every state and event. The setting change, failed read and frozen clock falsifiers have their own replays (test_r5_f1/f2/f4)."""
 
     STATES = ('off', 'enabled-unarmed', 'armed', 'failed-arm', 'resumed', 'unset')
-    EVENTS = ('owner line', 'their line', 'card reply', 'reaction', 'setting change', 'failed read', 'frozen clock')
+    EVENTS = ('owner line', 'their line', 'card reply', 'reaction', 'setting change', 'failed read', 'frozen clock', 'storage failure')
     OTHER, OTHER_DM = 'U0SYNTHSEC2', 'D0SECONDDM2'
     CONFIGURED = ('enabled-unarmed', 'armed', 'failed-arm', 'resumed')
     CARD = [{'id': 'card-a', 'title': 'Card A', 'hold_kind': 'captain', 'hold_reason': 'Pick one',
@@ -6961,7 +6987,8 @@ class ScottPassModelTest(InvariantScenario):
         if event == 'setting change':
             second = 1
         else:
-            typed = 1 if state in self.CONFIGURED and event in ('their line', 'frozen clock') else 0
+            # storage failure: their journal cannot be written in the first pass; a later pass, written again, takes their line in once.
+            typed = 1 if state in self.CONFIGURED and event in ('their line', 'frozen clock', 'storage failure') else 0
             second = typed + (1 if state == 'resumed' else 0)
         rows = 1 if event in ('card reply', 'reaction') and state != 'off' else 0
         return {'owner wakes': 1 if event == 'owner line' else 0, 'their wakes': second, 'refusal rows': rows, 'answers': 0}
@@ -7007,12 +7034,12 @@ class ScottPassModelTest(InvariantScenario):
                 os.environ.update(env)
                 card = next(iter(home.state()['threads'].values()))['ts'] if home.state().get('threads') else None
                 if card is None:
-                    home.cli('poll')
+                    home.cli('mirror')                                   # mirrors the card and touches no journaled request
                     card = next(iter(home.state()['threads'].values()))['ts']
                 failing = contextlib.nullcontext()
                 if event == 'owner line':
                     home.say(self.TS, 'an owner request', user=INV_OWNER, dm=INV_OWNER_DM)
-                elif event in ('their line', 'failed read', 'frozen clock'):
+                elif event in ('their line', 'failed read', 'frozen clock', 'storage failure'):
                     home.say(self.TS, 'their request')
                     if event == 'frozen clock':
                         data = json.loads(home.transcript.read_text())
@@ -7035,11 +7062,26 @@ class ScottPassModelTest(InvariantScenario):
                     def add(data):
                         data['reactions'].setdefault(card, []).append({'name': 'one', 'users': [INV_SECOND]})
                     home.edit_replay(add)
-                with failing:
-                    results = [home.cli('poll') for _ in range(3)]
+                # Each pass is the watcher's: the owner's check, then the second person's, each its own run (a restart every time).
+                home.trust_check()
+                if event == 'storage failure':
+                    real_save, failed = plane.save, []
+                    def broken(path, value):
+                        if Path(path).name == 'second.json' and not failed:
+                            failed.append(path)
+                            raise OSError('synthetic write failure of their journal')
+                        return real_save(path, value)
+                    with patch.object(plane, 'save', broken):
+                        results = [home.check_pass()]
+                    results += [home.check_pass() for _ in range(3)]
+                else:
+                    with failing:
+                        results = [home.check_pass() for _ in range(3)]
             refusals = [r for r in home.refusals() if r['reason'].startswith('decision_held_for_captain')]
-            return {'owner wakes': sum(len(self.requests_woken(r, INV_OWNER)) for r in results),
-                    'their wakes': sum(len(self.requests_woken(r, INV_SECOND)) + len(self.requests_woken(r, self.OTHER)) for r in results),
+            # Count request segments, not lines: a plain check joins the lines of one run into one wake line.
+            authors = [who for r in results for who in re.findall(r'slack request \S+ from (\S+?)[: (]', r.out)]
+            return {'owner wakes': authors.count(INV_OWNER),
+                    'their wakes': authors.count(INV_SECOND) + authors.count(self.OTHER),
                     'refusal rows': len(refusals), 'answers': len([c for c in calls if c[:1] == ('answers',)])}
 
     def test_r5_model_every_state_and_event_through_the_real_entry_point(self):

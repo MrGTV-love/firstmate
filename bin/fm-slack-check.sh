@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Standing Slack poll on the existing custom-check cadence.
 # Usage:
-#   fm-slack-check.sh [check] [--replay <transcript.json>]   run the check
+#   fm-slack-check.sh [check] [--replay <transcript.json>]   run the check (the owner's work)
+#   fm-slack-check.sh check-second [--replay <transcript.json>]   run the second person's check, registered by arm after the owner's
 #   fm-slack-check.sh arm [--replay <transcript.json>]
 #   fm-slack-check.sh disarm [--replay <transcript.json>]
 #   fm-slack-check.sh retarget [--replay <transcript.json>]   after FM_SLACK_DM_USER changed
@@ -72,7 +73,7 @@ case "${1:-}" in
       | python3 "$FM_SLACK_SCRIPT_DIR/fm_slack_watch.py" --print-help-text
     exit 0
     ;;
-  arm|check|disarm|retarget|resolve)
+  arm|check|check-second|disarm|retarget|resolve)
     export FM_SLACK_CHECK_ACTION=$1
     shift
     ;;
