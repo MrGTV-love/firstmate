@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Slack Web API transport only. Shell entry points own environment resolution."""
+import datetime
 import email.utils
 import json
 import os
@@ -138,11 +139,15 @@ class Slack:
         return data
 
     def _note_date(self, value):
-        """Record Slack's clock from a reply's Date header; a header that is missing or cannot be read leaves the last value as it was."""
+        """Record Slack's clock from a reply's Date header; a header that is missing or cannot be read leaves the last value as it was. A date with no zone
+        (`-0000`) is read as UTC, as an HTTP date always is, and never as this host's local time."""
         try:
-            self.server_time = email.utils.parsedate_to_datetime(value).timestamp()
+            moment = email.utils.parsedate_to_datetime(value)
         except (TypeError, ValueError, IndexError):
-            pass
+            return
+        if moment.tzinfo is None:
+            moment = moment.replace(tzinfo=datetime.timezone.utc)
+        self.server_time = moment.timestamp()
 
     def pages(self, method, field, **fields):
         cursor = ''

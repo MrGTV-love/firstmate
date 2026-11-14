@@ -5164,6 +5164,46 @@ class Invariant1Boundary(InvariantScenario):
                     rc, woken, posts = self.failed_arm_case(clock, pre, post, fresh, fail=False)
                     self.assertEqual((rc, woken), (0, [post]))
 
+    def test_inv1_the_real_transport_takes_slack_clock_from_the_date_of_each_reply_and_never_from_this_host(self):
+        """The arm's starting point comes from the real transport's record of Slack's clock (the Date of a reply). Synthetic token; no socket is opened."""
+        class Reply:
+            def __init__(self, date):
+                self.headers = {} if date is None else {'Date': date}
+            def __enter__(self):
+                return self
+            def __exit__(self, *exc):
+                return False
+            def read(self, size=-1):
+                return b'{"ok": true}'
+        dates = []
+        def fake(request, timeout=10):
+            date = dates.pop(0)
+            if isinstance(date, Exception):
+                raise date
+            return Reply(date)
+        zone = os.environ.get('TZ')
+        os.environ['TZ'] = 'Asia/Tokyo'                       # a host zone that is not UTC, so a date read as local time would be nine hours off
+        time.tzset()
+        try:
+            slack = plane.Slack('fixture-token-not-a-secret-5150')
+            with patch('fm_slack.urllib.request.urlopen', fake), patch('socket.socket', side_effect=OSError('no sockets in this test')):
+                steps = [('Thu, 01 Jan 1970 00:02:30 GMT', 150.0),     # an HTTP date
+                         ('Thu, 01 Jan 1970 00:02:40 -0000', 160.0),   # a date with no zone is UTC, never this host's time
+                         (None, 160.0),                                # no Date: the last value stays
+                         ('not a date', 160.0),                        # an unreadable Date: the last value stays
+                         (OSError('down'), 160.0)]                     # a failed call: the last value stays
+                for date, expected in steps:
+                    dates.append(date)
+                    with contextlib.suppress(SlackError):
+                        slack.call('auth.test')
+                    self.assertEqual(slack.server_time, expected, date)
+        finally:
+            if zone is None:
+                os.environ.pop('TZ', None)
+            else:
+                os.environ['TZ'] = zone
+            time.tzset()
+
     def test_inv1_control_a_failed_arm_time_read_with_nothing_typed_wakes_nothing(self):
         with self.home() as home:
             home.set_clock(150.0)
@@ -5211,11 +5251,6 @@ class Invariant1Boundary(InvariantScenario):
 
 class Invariant2Identity(InvariantScenario):
     """INVARIANT 2: an admitted request has an identity that does not depend on its acknowledgement (F2): it is readable and answerable before `resolve`."""
-
-    def run_flow(self, home, failing):
-        home.say('200.000100', 'a request from Scott')
-        home.cli('poll')                                 # starts their window... the message is older than the start only if said before; so say it after
-        return None
 
     def test_inv2_a_failed_ack_request_can_be_read_and_answered_once_before_resolve(self):
         key = '200.000100@' + INV_SECOND
