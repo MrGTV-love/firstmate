@@ -199,6 +199,7 @@ When this task works on Firstmate itself, the repository root `AGENTS.md` (also 
 Project instructions still govern the work wherever they do not conflict with this worker identity, including `CONTRIBUTING.md` and `firstmate-coding-guidelines` for Firstmate changes.
 EOF
   printf "If the \`firstmate-coding-guidelines\` skill name does not resolve in this session, read \`%s/.agents/skills/firstmate-coding-guidelines/SKILL.md\` instead.\n" "$root"
+  printf '%s\n' "For work that adds or changes tests, hooks or validators, use the existing Intent-to-test alignment criteria in the shared review rubric below during implementation and verification; it does not change the task's scope or delivery contract."
   printf '%s\n\n' "When assigned an independent review, apply the shared review rubric below, rendered from \`$root/docs/review-rubric.md\`, against the reviewed task's DoD and exclusions; obtain that task's brief or verification plan from firstmate if it was not supplied."
   cat "$root/docs/review-rubric.md"
 }

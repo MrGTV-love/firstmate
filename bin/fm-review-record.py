@@ -10,6 +10,7 @@ Usage (FM_HOME must name the absolute home holding the PR task record):
   fm-review-record.py captain-word --pr URL --head SHA --words 'Exact captain merge instruction'
   fm-review-record.py latest --pr URL
   fm-review-record.py verify --pr URL --head SHA --task TASK --base BASE_SHA [--review-only] [--json]
+  fm-review-record.py plan --pr URL --head SHA --task TASK --base BASE_SHA
 
 The relay lane stages the reader report on the receiving host before recording
 into the receiving home by setting FM_HOME explicitly.
@@ -37,14 +38,15 @@ groups. Attribution is conservative; a rebase or later clean replay never
 drops an earlier run's author family. Runs and agent_invocations are read from
 <NM_HOME>/state.sqlite (default ~/.no-mistakes), opened with SQLite mode=ro. A
 database that exists but cannot be opened or queried, or a relative NM_HOME,
-adds family unknown and never clears evidence already read. A proven-absent database
-adds unknown when any subject starts exactly no-mistakes( or the task's
+adds an unreadable family unknown and never clears evidence already read. A
+proven-absent database adds an absent family unknown when any subject starts exactly no-mistakes( or the task's
 recorded delivery mode is no-mistakes (an unrecorded mode counts as
 no-mistakes); a direct-PR or local-only task without either has no pipeline
 group. When a subject starts no-mistakes( but no matching run recorded any
-invocation, the pipeline group is unknown.
+invocation, the pipeline group is absent unknown.
 A recorded provider can resolve an otherwise unknown model alias; conflicting
-provider/model families are unknown. Every invocation counts, including
+provider/model families are unreadable unknown. An invocation that records no
+model and no provider is absent unknown unless its agent is exactly claude. Every invocation counts, including
 cancelled and errored ones. An invocation with an empty model takes a family
 from its agent only when the agent is exactly claude (anthropic); any other
 agent, such as acp:omp, stays unknown. It never creates a database.
@@ -62,16 +64,40 @@ the groups the reader actually read, or ["all"]; omitted, author-groups keys nam
 the covered groups. Historical records use those same keys. A PASS covers one
 author family of a group only when it names that group or all, declares its
 derived authors, and its known reader family differs from that author family.
-Every author family of every group, ship and no-mistakes alike, needs at least
-one such exact-head PASS. An unknown author family is covered only when
-exact-head PASS reads of its group come from at least two different known
-reader families: whatever the unknown family really is, at least one of those
-readers differs from it. One known reader, or several of one family, never
-covers unknown. Multiple reads can collectively cover a group; one reader
-outside every family is not required. This tests the harm directly: every
-author's blind spots must receive an independent read, without forcing a third
-family for mixed-family work and without a captain word that only restates
-two independent passes.
+Every known author family of every group needs at least one such exact-head
+PASS. Unknown ship authors and other unknown constraints require exact-head
+PASS reads of their group from at least two different known reader families:
+whatever that unknown family really is, at least one reader differs from it.
+Only the derived no-mistakes:unknown group may instead use one such PASS whose
+known reader family differs from EVERY ship family, provided every derived
+item of that group is absent evidence (no state database, no matching run or
+invocation, or an invocation with no model and no provider), the ship group
+has at least one derived family and every ship family, derived or typed, is
+known. A ship group with no derived family or with any unknown family gives
+the pipeline group no relief, so it keeps the two-reader rule. Unreadable,
+corrupt or schema-changed databases, a relative NM_HOME, conflicting
+provider/model families and recorded models of unknown family are evidence
+present but unusable: they give no relief and keep the two-reader rule, so a
+read fault is never easier than a successful read. Unknown ship
+constraints still need two different known reader families. Multiple reads may
+collectively cover known author families; a third family is not required for mixed-family work.
+An accepted verify, independent review or captain-word, prints 'pipeline
+author family not recorded' when the single-reader rule above was needed to cover the derived
+no-mistakes:unknown group in any window verify checks: the PASS reads after an
+exact-head FAIL that read the group, or all exact-head PASS reads. In that
+window the rule applies and fewer than two different known reader families read
+the group, so a second family read before the FAIL never suppresses the fact; --json includes that string in optional
+facts. fm-pr-merge.sh writes it into its merge-authority record from the same
+verification read. That record is short-lived: the merge poll in fm-watch.sh
+deletes it when it records the merge outcome, whose ledger does not keep the
+fact, and fm-teardown.sh deletes any record left at teardown.
+An unknown pipeline group read by two different known reader families in every
+window that checks it, and every known pipeline group, emit no fact.
+This preserves known-builder independence but not the former guarantee for
+all possible pipeline authors: the unrecorded pipeline family may actually
+match the sole reader. Local invocation evidence and ship launch history
+narrow, but do not eliminate, that risk. See docs/configuration.md's
+'Unrecorded pipeline author families' harm-model reassessment.
 Exact-head binding, report validation, captain-word/away rules and every live
 forge/hold check remain mandatory.
 Model families are rederived from ids into anthropic, openai, google, deepseek,
@@ -83,8 +109,10 @@ never decide independence. Uncovered-group refusals name each uncovered family,
 reporting any group with an unknown author family before known-family groups.
 For known families they print a review recording command; substitute the actual
 reader, local report and trigger answers. An unknown-family refusal prints
-that command with the same substitutions and asks for reads until two different
-known reader families count. It also offers repaired author evidence or the
+that command with the same substitutions and asks for two different known
+reader families; when the pipeline-only rule above applies to the group, it
+names the ship families and says one PASS from a known reader family outside
+all of them is enough instead. It also offers repaired author evidence or the
 exact-head captain-word command, whose words must be the captain's actual fresh
 instruction. When every group is covered but the newest reader is unknown, the
 refusal names that reader and prints a known-family reread command.
@@ -113,16 +141,27 @@ lock-held read that decides the result: success carries ok true, and either basi
 independent-review (pr, exact head, review epoch at, reader_model, both families
 re-derived from the recorded model ids, the recorded author groups with families
 re-derived, report, and report_sha256 when the record carries that digest) or
-basis captain-word (pr, head, at, words). Failures carry ok false and
+basis captain-word (pr, head, at, words), each with optional facts. Failures carry ok false and
 error {kind, message}, where kind not-qualified means no recorded evidence
 satisfies the request, unavailable means stored history, task metadata or author
 commit evidence cannot be read,
 and invalid-input means a caller field, URL or path is invalid. Missing review
 history is not-qualified; corrupt or unreadable history is unavailable. Failure
 JSON keeps the existing exit status (1 evidence/unavailable, 2 input) and never
-looks like a success object. Without --json, a successful verify prints exactly
-review: PASS or review: captain-word; a refusal prints an error: line and exits
-1.
+looks like a success object. Without --json, a successful verify prints
+review: PASS (plus review: pipeline author family not recorded when applicable)
+or review: captain-word (plus the same fact line when applicable); a refusal prints an error: line and exits 1.
+plan prints one fm-review-plan.v1 object and decides nothing: the derived author groups of the exact head
+with each model's family, and every group family that the recorded exact-head PASS reads leave uncovered under
+the same coverage rule verify applies, including its one-reader relief for an unrecorded pipeline author family,
+whether or not any review or captain-word exists. An uncovered item whose families include unknown
+also names reader_outside, the families a known reader must lie outside for its exact-head PASS of that
+group to count toward that rule: the known readers already counted, or with none counted every ship family
+under the one-reader relief and no family under the two-reader rule. An unknown item without reader_outside
+is one no known reader can count toward. It ignores a
+captain-word and a FAIL, so a caller that asks which reads are still owed (bin/fm-pr-auto-review.py) gets the
+families without parsing a refusal message, and it writes nothing. Failures carry the failure object and exit
+status verify uses.
 latest emits the complete newest review and captain-word as JSON for relay reads.
 Missing/invalid input exits 2; missing/mismatched evidence or unreadable history
 exits 1. Corrupt/partial history is preserved for reconciliation, never repaired.
@@ -393,6 +432,7 @@ def derived_authors(home, pr, head, task, base):
     prefixed = any(subject.startswith("no-mistakes(") for _, subject in commits)
     root = Path(os.environ.get("NM_HOME") or Path.home() / ".no-mistakes")
     unknown = modelled("unknown", "pipeline model")
+    absent = {**unknown, "origin": "absent"}
     models = []
     try:
         if not root.is_absolute():
@@ -401,7 +441,7 @@ def derived_authors(home, pr, head, task, base):
             os.lstat(root / "state.sqlite")
         except FileNotFoundError:
             if prefixed or (meta.get("mode") or "no-mistakes") == "no-mistakes":
-                models.append(unknown)
+                models.append(absent)
         else:
             with contextlib.closing(sqlite3.connect(root.resolve().as_uri() + "/state.sqlite?mode=ro", uri=True)) as db:
                 runs = db.execute("SELECT id FROM runs WHERE pr_url = ? "
@@ -409,6 +449,9 @@ def derived_authors(home, pr, head, task, base):
                                   (pr, meta.get("branch", ""), str(worktree), meta.get("project", ""))).fetchall()
                 for (run_id,) in runs:
                     for agent, exact_model, provider in db.execute("SELECT agent, model, model_provider FROM agent_invocations WHERE run_id = ?", (run_id,)).fetchall():
+                        if not exact_model and not provider and agent != "claude":
+                            models.append(absent)
+                            continue
                         item = modelled(exact_model or ("claude" if agent == "claude" else "unknown"), "pipeline model")
                         # Only fresh database evidence supplies a provider; typed
                         # declarations and historical family fields never do.
@@ -421,22 +464,22 @@ def derived_authors(home, pr, head, task, base):
     except (sqlite3.Error, OSError):
         models.append(unknown)
     if prefixed and not models:
-        models.append(unknown)
-    for item in {(item["model"], item["family"]): item for item in models}.values():
+        models.append(absent)
+    for item in {(item["model"], item["family"], item.get("origin")): item for item in models}.values():
         groups.setdefault(f"no-mistakes:{item['family']}", []).append(item)
     return task, groups
 
 
-def verify(records, rows, head, home, pr, task, base, review_only=False):
+def verify(records, rows, head, home, pr, task, base, review_only=False, plan=False):
     word = records["captain-word"]
     review = records["review"]
-    at_word = not review_only and word is not None and word["head"] == head
+    at_word = not (review_only or plan) and word is not None and word["head"] == head
     start = max(i for i, row in enumerate(rows) if row["kind"] == "captain-word") + 1 if at_word else 0
     fails = [i for i in range(start, len(rows)) if rows[i]["kind"] == "review"
              and rows[i]["head"] == head and rows[i]["verdict"] == "FAIL"]
     if at_word and not fails:
         return "captain-word", word
-    if not at_word:
+    if not at_word and not plan:
         if review is None and review_only:
             raise VerificationError(f"no independent review record at live head {head}; --review-only requires a PASS recorded with fm-review-record.py review, and a captain-word is not a substitute")
         if review is None:
@@ -485,6 +528,26 @@ def verify(records, rows, head, home, pr, task, base, review_only=False):
                            "--loosens-deny-allow-list", "no", "--widens-guard", "no",
                            "--customer-data-billing-spend", "no", "--report", "LOCAL_READER_REPORT"])
 
+    ship_families = {a["family"] for a in groups.get("ship", [])}
+    pipeline_relief = (derived.get("no-mistakes:unknown") and derived.get("ship") and "unknown" not in ship_families
+                       and all(a.get("origin") == "absent" for a in derived["no-mistakes:unknown"]))
+
+    def unknown_need(group, later):
+        two = f"{later}exact-head PASS reads of {'that' if later else 'this'} group from two different known reader families"
+        if group == "no-mistakes:unknown" and pipeline_relief:
+            return (f"model family unknown needs one {later}exact-head PASS of {'that' if later else 'this'} group from a known reader family "
+                    f"outside every ship family ({','.join(sorted(ship_families))}), or {two}; obtain the reads one of those rules needs")
+        return f"model family unknown needs {two}; obtain reads until both families count"
+
+    def unknown_reader_placeholder(group):
+        return "OUTSIDE_SHIP_FAMILY_MODEL" if group == "no-mistakes:unknown" and pipeline_relief else "SECOND_KNOWN_FAMILY_MODEL"
+
+    relief_used = []
+    unknown_outside = {}
+
+    def with_facts(row):
+        return {**row, "facts": ["pipeline author family not recorded"] if relief_used else []}
+
     def uncovered(group, authors, reads):
         families = {a["family"] for a in authors}
         readers = set()
@@ -498,12 +561,21 @@ def verify(records, rows, head, home, pr, task, base, review_only=False):
             required = derived_families if "all" in row["author_groups"] else families
             if (group in named or "all" in named) and required <= declared_families and reader != "unknown":
                 readers.add(reader)
-        # Every author family needs some reading PASS from a different family.
-        # An unknown family needs two known reader families: one of them must differ from it.
-        return sorted(f for f in families if (len(readers) < 2 if f == "unknown" else not readers - {f}))
+        # Known authors retain different-family coverage. Unknown builders and
+        # other unknown groups retain the two-reader guarantee; only a derived
+        # unknown pipeline group whose ship families are all known may use
+        # builder-independent single coverage.
+        pipeline_read = group == "no-mistakes:unknown" and pipeline_relief and readers - ship_families
+        if "unknown" in families and pipeline_read and len(readers) < 2:
+            relief_used.append(group)
+        missing = sorted(f for f in families if (len(readers) < 2 and not pipeline_read
+                                                 if f == "unknown" else not readers - {f}))
+        if "unknown" in missing:
+            unknown_outside[group] = readers or (ship_families if group == "no-mistakes:unknown" and pipeline_relief else set())
+        return missing
 
     # A FAIL stands until later exact-head PASS reads cover every group it read.
-    for index in fails:
+    for index in ([] if plan else fails):
         failed = rows[index]
         named = failed.get("covered_groups", list(failed["author_groups"]))
         for group in sorted(groups) if "all" in named else named:
@@ -514,10 +586,22 @@ def verify(records, rows, head, home, pr, task, base, review_only=False):
             reason = (f"verdict is FAIL at live head {head} (reader {failed['reader_model']}, report {failed['report']}); "
                       f"no later exact-head PASS covers group {group}, family {','.join(missing)}, that this FAIL read; ")
             if "unknown" in missing:
-                raise VerificationError(f"{reason}model family unknown needs later exact-head PASS reads of that group from two different known reader families; obtain reads until both families count, set each read's actual trigger answers and local report, then record each with: {env} {review_command('SECOND_KNOWN_FAMILY_MODEL', [group], {**groups, group: authors})}; or {captain_help}")
+                raise VerificationError(f"{reason}{unknown_need(group, 'later ')}, set each read's actual trigger answers and local report, then record each with: {env} {review_command(unknown_reader_placeholder(group), [group], {**groups, group: authors})}; or {captain_help}")
             raise VerificationError(f"{reason}record later exact-head PASS reads of that group from readers outside each of its families with: {env} {review_command('OUTSIDE_FAMILY_MODEL', [group], {**groups, group: authors})}; or {captain_help}")
     if at_word:
-        return "captain-word", word
+        return "captain-word", with_facts(word)
+    if plan:
+        owed = []
+        for group, authors in sorted(groups.items(), key=lambda item: ("unknown" not in {a["family"] for a in item[1]}, item[0])):
+            missing = uncovered(group, authors, passes)
+            if not missing:
+                continue
+            item = {"group": group, "families": missing}
+            if "unknown" in missing and RECORDED_FAMILIES - {"unknown"} - unknown_outside[group]:
+                item["reader_outside"] = sorted(unknown_outside[group])
+            owed.append(item)
+        return "plan", {"groups": {group: [{"model": a["model"], "family": a["family"]} for a in authors]
+                                  for group, authors in groups.items()}, "uncovered": owed}
     unknown_reader = model(review["reader_model"], "reader_model") == "unknown"
     for group, authors in sorted(groups.items(), key=lambda item: ("unknown" not in {a["family"] for a in item[1]}, item[0])):
         missing = uncovered(group, authors, passes)
@@ -525,14 +609,14 @@ def verify(records, rows, head, home, pr, task, base, review_only=False):
             continue
         reason = f"model family unknown for newest reader {review['reader_model']}; " if unknown_reader else ""
         if "unknown" in missing:
-            raise VerificationError(f"{reason}uncovered commit group {group}, family {','.join(missing)}; model family unknown needs exact-head PASS reads of this group from two different known reader families; obtain reads until both families count, set each read's actual trigger answers and local report, then record each with: {env} {review_command('SECOND_KNOWN_FAMILY_MODEL', [group], groups)}; or repair the author evidence so every author model has a known family, or {captain_help}")
-        raise VerificationError(f"{reason}uncovered commit group {group}, family {','.join(missing)}; each author family needs an exact-head PASS reading this group whose reader_family is known and different from it (model family unknown needs two known reader families); obtain the named read, set its actual trigger answers and local report, then record it with: {env} {review_command('OUTSIDE_FAMILY_MODEL', [group], groups)}")
+            raise VerificationError(f"{reason}uncovered commit group {group}, family {','.join(missing)}; {unknown_need(group, '')}, set each read's actual trigger answers and local report, then record each with: {env} {review_command(unknown_reader_placeholder(group), [group], groups)}; or repair the author evidence so every author model has a known family, or {captain_help}")
+        raise VerificationError(f"{reason}uncovered commit group {group}, family {','.join(missing)}; each author family needs an exact-head PASS reading this group whose reader_family is known and different from it (see --help for unknown-pipeline coverage); obtain the named read, set its actual trigger answers and local report, then record it with: {env} {review_command('OUTSIDE_FAMILY_MODEL', [group], groups)}")
     if unknown_reader:
         raise VerificationError(f"model family unknown for newest reader {review['reader_model']}; every group is covered by known-family reads, but the newest review must name a known reader family; obtain a reread from a known-family reader, set its actual trigger answers and local report, then record it with: {env} {review_command('KNOWN_FAMILY_MODEL', sorted(groups), groups)}")
     yes = [trigger for trigger in TRIGGERS if review[trigger] == "yes"]
     if yes and review_only:
         raise VerificationError(f"{', '.join(yes)} is yes at live head {head}; --review-only requires an independent PASS with no escalation trigger, and a captain-word is not a substitute")
-    return "independent-review", review
+    return "independent-review", with_facts(review)
 
 
 def verification_json(pr, head, basis, row):
@@ -540,17 +624,19 @@ def verification_json(pr, head, basis, row):
                 "pr": pr, "head": head, "at": row["at"]}
     if basis == "captain-word":
         evidence["words"] = row["words"]
-        return evidence
-    evidence.update(
-        reader_model=row["reader_model"],
-        reader_family=model(row["reader_model"], "reader_model"),
-        author_groups={group: [{"model": author["model"],
-                                "family": model(author["model"], "author_groups model")}
-                               for author in authors]
-                       for group, authors in row["author_groups"].items()},
-        report=row["report"])
-    if isinstance(row.get("report_sha256"), str) and row["report_sha256"]:
-        evidence["report_sha256"] = row["report_sha256"]
+    else:
+        evidence.update(
+            reader_model=row["reader_model"],
+            reader_family=model(row["reader_model"], "reader_model"),
+            author_groups={group: [{"model": author["model"],
+                                    "family": model(author["model"], "author_groups model")}
+                                   for author in authors]
+                           for group, authors in row["author_groups"].items()},
+            report=row["report"])
+        if isinstance(row.get("report_sha256"), str) and row["report_sha256"]:
+            evidence["report_sha256"] = row["report_sha256"]
+    if row.get("facts"):
+        evidence["facts"] = row["facts"]
     return evidence
 
 
@@ -562,12 +648,12 @@ def failure_json(kind, message):
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     commands = parser.add_subparsers(dest="command", required=True)
-    for name in ("review", "captain-word", "latest", "verify"):
+    for name in ("review", "captain-word", "latest", "verify", "plan"):
         command = commands.add_parser(name, description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
         command.add_argument("--pr", required=True)
         if name != "latest":
             command.add_argument("--head", required=True)
-        if name == "verify":
+        if name in ("verify", "plan"):
             command.add_argument("--task", required=True)
             command.add_argument("--base", required=True)
         if name == "review":
@@ -580,10 +666,10 @@ def main():
             command.add_argument("--review-only", action="store_true", help="require the recorded independent PASS itself; a captain-word is not a substitute")
             command.add_argument("--json", action="store_true", help="print one fm-review-verification.v1 object built from the same locked read")
     args = parser.parse_args()
-    emit_json = getattr(args, "json", False)
+    emit_json = getattr(args, "json", False) or args.command == "plan"
     try:
         home = task_home()
-        if args.command == "verify" and not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", args.base):
+        if args.command in ("verify", "plan") and not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", args.base):
             raise RecordError("author evidence requires --base with the forge's exact full base commit SHA (40 or 64 hex)")
         pr = canonical_pr(args.pr)
         row = {"schema": "fm-review-record.v1", "kind": args.command, "pr": pr, "at": int(time.time())}
@@ -631,12 +717,18 @@ def main():
                 print(f"recorded: {args.command}")
             elif args.command == "latest":
                 print(json.dumps(records, separators=(",", ":")))
+            elif args.command == "plan":
+                _, evidence = verify(records, rows, args.head, home, pr, args.task, args.base, plan=True)
+                print(json.dumps({"schema": "fm-review-plan.v1", "ok": True, "pr": pr, "head": args.head, **evidence},
+                                 separators=(",", ":")))
             else:
                 basis, evidence = verify(records, rows, args.head, home, pr, args.task, args.base, args.review_only)
                 if emit_json:
                     print(json.dumps(verification_json(pr, args.head, basis, evidence), separators=(",", ":")))
                 else:
                     print(f"review: {'PASS' if basis == 'independent-review' else basis}")
+                    for fact in evidence.get("facts", []):
+                        print(f"review: {fact}")
     except VerificationError as exc:
         if emit_json:
             print(json.dumps(failure_json("not-qualified", str(exc)), separators=(",", ":")))

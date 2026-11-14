@@ -39,6 +39,13 @@ make_case() {
 printf '%s\n' "$*" >> "$FM_READY_CASE/gh.calls"
 [ ! -f "$FM_READY_CASE/unreadable-forge" ] || exit 1
 case "$*" in
+  *mergeStateStatus*)
+    # The automatic review step's one forge read of a registered PR.
+    if [ -f "$FM_READY_CASE/hang-review" ]; then
+      printf '%s\n' "$$" >> "$FM_READY_CASE/review-hung.pids"
+      exec sleep 600
+    fi
+    printf '[]\n' ;;
   *'--json isDraft'*)
     if [ -f "$FM_READY_CASE/hang-always" ] && [[ "$*" = *'/pull/42 '* ]]; then
       printf '%s\n' "$$" >> "$FM_READY_CASE/persistent-hung.pids"
@@ -426,10 +433,11 @@ assert_registered ready
 after=$(occupancy)
 [ "$before" -eq "$((after + 1))" ] || fail "capacity did not fall by exactly one"
 meta_before=$(shasum -a 256 "$CASE/home/state/ready.meta" "$CASE/home/state/ready.check.sh")
-calls_before=$(wc -l < "$CASE/gh.calls")
+calls_before=$(grep -vc mergeStateStatus "$CASE/gh.calls" || true)
 [ -z "$(run_pass)" ] || fail 'second pass was not silent'
 [ "$meta_before" = "$(shasum -a 256 "$CASE/home/state/ready.meta" "$CASE/home/state/ready.check.sh")" ] || fail 'second pass changed registration'
-[ "$calls_before" -eq "$(wc -l < "$CASE/gh.calls")" ] || fail 'already registered PR queried again'
+# The automatic review step reads a registered PR (its mergeStateStatus read); registration must not.
+[ "$calls_before" -eq "$(grep -vc mergeStateStatus "$CASE/gh.calls" || true)" ] || fail 'already registered PR queried again for registration'
 pass 'ready PR records pr/head, arms merge poll, releases exactly one place; second pass changes nothing'
 
 make_case eligibility
@@ -639,12 +647,13 @@ printf '%s\n' "$out" | grep -qxF "pr-ready: lost: re-armed the merge poll for $U
 assert_registered lost
 [ "$(pr_ready_events)" -eq 1 ] || fail "the re-arm did not write exactly one pr_ready event"
 poll_before=$(shasum -a 256 "$CASE/home/state/lost.check.sh" "$CASE/home/state/lost.pr-poll" "$CASE/home/state/lost.pr-poll-registration")
-calls_before=$(wc -l < "$CASE/gh.calls")
+calls_before=$(grep -c -- '--json isDraft$' "$CASE/gh.calls" || true)
 for again in 1 2; do
   out=$(run_pass)
   [ -z "$out" ] || fail "pass $again after the re-arm reported again: $out"
 done
-[ "$calls_before" -eq "$(wc -l < "$CASE/gh.calls")" ] || fail 'a record with a published poll reached the registrar again'
+# The review step may read the registered PR; only the registrar's own draft read proves a re-registration.
+[ "$calls_before" -eq "$(grep -c -- '--json isDraft$' "$CASE/gh.calls" || true)" ] || fail 'a record with a published poll reached the registrar again'
 [ "$poll_before" = "$(shasum -a 256 "$CASE/home/state/lost.check.sh" "$CASE/home/state/lost.pr-poll" "$CASE/home/state/lost.pr-poll-registration")" ] \
   || fail 'a later pass replaced the published poll'
 [ "$(pr_ready_events)" -eq 1 ] || fail 'a later pass wrote a second pr_ready event'
@@ -655,6 +664,41 @@ write_ship partial ship direct-PR
 printf 'pr=%s\n' "$URL" >> "$CASE/home/state/partial.meta"
 printf 'fm-pr-poll-registration-v2\n' > "$CASE/home/state/partial.pr-poll-registration"
 out=$(run_pass)
-[ -z "$out" ] && [ ! -s "$CASE/gh.calls" ] || fail "a partly published poll was re-armed: $out"
+! grep -q -- '--json isDraft$' "$CASE/gh.calls" && [ -z "$out" ] || fail "a partly published poll was re-armed: $out"
 [ ! -e "$CASE/home/state/partial.check.sh" ] || fail 'a partly published poll gained a second check'
 pass 'a lost poll is re-armed once with one pr_ready event; a published or partly published poll is never registered again'
+
+# A registered ship is stepped through the automatic review sequence by the same
+# bounded pass: one forge read per eligible registered PR, none for a local-only
+# task, and a hung read is stopped at the pass limit without starving the ship that
+# still needs registering.
+make_case registered-step
+write_ship reg
+printf 'pr=%s\npr_head=%s\n' "$URL" "$HEAD" >> "$CASE/home/state/reg.meta"
+write_ship loc ship local-only
+printf 'pr=%s\n' "$URL" >> "$CASE/home/state/loc.meta"
+write_ship zz-new
+printf 'done: PR https://github.com/example/project/pull/44 checks green\n' > "$CASE/home/state/zz-new.status"
+out=$(run_pass)
+[ "$(grep -c 'pr view .* --json state,isDraft,mergeable,mergeStateStatus' "$CASE/gh.calls")" -eq 1 ] \
+  || fail "the pass must read the registered PR once and skip the local-only task: $(cat "$CASE/gh.calls")"
+assert_registered zz-new https://github.com/example/project/pull/44
+out=$(run_pass)
+[ "$(grep -c 'pull/42 --json state,isDraft,mergeable,mergeStateStatus' "$CASE/gh.calls")" -eq 1 ] \
+  || fail "a task not yet due was read again by the next pass (its sidecar names the next due time): $(cat "$CASE/gh.calls")"
+pass 'a registered ship gets one review-step forge read per pass, a local-only task none, and a ship still to register is registered in the same pass'
+
+make_case registered-hang
+write_ship aa-reg
+printf 'pr=%s\npr_head=%s\n' "$URL" "$HEAD" >> "$CASE/home/state/aa-reg.meta"
+write_ship zz-new
+printf 'done: PR https://github.com/example/project/pull/44 checks green\n' > "$CASE/home/state/zz-new.status"
+: > "$CASE/hang-review"
+rc=0
+out=$(FM_PR_READY_RECONCILE_TIMEOUT=2 run_pass) || rc=$?
+printf '%s\n' "$out" | grep -q 'aa-reg: the review step made no progress for 2s' || fail "a hung review step was not stopped and named: $out"
+while IFS= read -r hung_pid; do
+  ! kill -0 "$hung_pid" 2>/dev/null || fail 'a hung review-step forge read survived the pass limit'
+done < "$CASE/review-hung.pids"
+assert_registered zz-new https://github.com/example/project/pull/44
+pass 'a hung review-step read is stopped at the pass limit and cannot starve a later ship'
