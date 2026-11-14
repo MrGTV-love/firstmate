@@ -4364,6 +4364,44 @@ double = dict(pulls=[pull(7, pr7, head, 'fm/t1'), pull(9, pr9, e_head, 'fm/t-e')
               single={'7': pull(7, pr7, head, 'fm/t1'), '9': pull(9, pr9, e_head, 'fm/t-e')})
 json.dump(double, open(w + '/rest.json', 'w'))
 PYJ
+  v5_install_review_reads "$head" "$e_head" "$base"
+}
+
+# v5_install_review_reads <a-head> <e-head> <base>: the forge double also answers every read the
+# reconciler's review step (bin/fm-pr-auto-review.py) makes; a read with no answer is a test defect,
+# not a hold. Checks are green; each PR's forge merge state comes from $W/merge-state.<number>, and
+# BEHIND (the base moved, the head needs an update before it can merge) is the named hold.
+v5_install_review_reads() {
+  printf 'BEHIND\n' > "$W/merge-state.7"
+  printf 'BEHIND\n' > "$W/merge-state.9"
+  mv "$W/bin/gh" "$W/bin/gh.rest"
+  cat > "$W/bin/gh" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-} \${2:-}" = "pr view" ] && [[ " \$* " = *mergeStateStatus* ]]; then
+  number=\${3##*/}
+  case "\$number" in
+    7) state=\$(cat "$W/forge.state"); head=$1 ;;
+    9) state=OPEN; head=$2 ;;
+    *) echo "error: pull request not found" >&2; exit 1 ;;
+  esac
+  printf '{"state":"%s","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"%s","headRefOid":"%s","baseRefName":"main","baseRefOid":"%s","statusCheckRollup":[{"__typename":"CheckRun","name":"ci","status":"COMPLETED","conclusion":"SUCCESS","startedAt":"2026-11-03T00:00:00Z"}]}\n' \
+    "\$state" "\$(cat "$W/merge-state.\$number")" "\$head" "$3"
+  exit 0
+fi
+if [ "\${1:-}" = api ] && [ "\${2:-}" != -i ]; then
+  case " \$* " in
+    *" repos/acme/widget/branches/main "*) printf '{"protected":false}\n'; exit 0 ;;
+    *" repos/acme/widget/rules/branches/main "*) printf '[]\n'; exit 0 ;;
+  esac
+fi
+exec "$W/bin/gh.rest" "\$@"
+SH
+  chmod +x "$W/bin/gh"
+}
+
+# The review step's recorded state for E, read from its sidecar.
+v5_e_review_state() {
+  xl_env "$ROOT/bin/fm-pr-auto-review.py" state t-e
 }
 
 v5_ledger() {  # <epoch> [--heartbeat]: the ledger process, run fresh from disk at that time
@@ -4408,7 +4446,7 @@ v5_table() {  # <ledger-json>: acceptance and cleanup per task, read from the re
     "idle secondmate, silent $(( (V5_NOW + 21600 - $(sed -n 's/.*\[at=\([0-9]*\)\].*/\1/p' "$STATE/mate1.status")) / 3600 ))h" "none: record $([ -e "$STATE/mate1.meta" ] && echo kept || echo gone)" \
     "$(v5_rows "$ledger" '^mate1$' | tr '\t' '|' | paste -sd ';' - | sed 's/^$/none/')"
   printf '%-4s %-46s %-46s %s\n' 'E t-e' \
-    "review ${review:-none} at head ${V5_E_HEAD:0:8}; PR 9 open at the forge" "none: record $([ -e "$STATE/t-e.meta" ] && echo kept || echo gone), pending merge" \
+    "review ${review:-none} at head ${V5_E_HEAD:0:8}; PR 9 open at the forge, merge state $(cat "$W/merge-state.9"); review step: $(v5_e_review_state)" "none: record $([ -e "$STATE/t-e.meta" ] && echo kept || echo gone), pending merge" \
     "$(v5_rows "$ledger" "pull/9" | tr '\t' '|' | paste -sd ';' -)"
 }
 
@@ -4463,8 +4501,45 @@ test_v5_missing_updates_restart_and_completed_review_cannot_strand_work() {
   v5_rows "$W/l3.json" 'pull/9' | awk -F'\t' '$1 == "review_pass_not_merged" && $3 != "" && $6 != "" {ok=1} END {exit !ok}' \
     || fail "E: no review_pass_not_merged row with an owner and a next action: $(v5_rows "$W/l3.json" 'pull/9')"
   [ "$(jq -r '.rows[] | select(.subject | test("pull/9")) | .category' "$l1" | head -1)" = open_pr ] || fail "E: before its review the PR row was not the ordinary open_pr row"
+  # E stays open for its named hold, which the review step read from the forge and recorded.
+  [ "$(v5_e_review_state)" = "waiting: forge merge state is BEHIND, not green" ] \
+    || fail "E: the review step did not record the forge's named hold: $(v5_e_review_state)"
   assert_nothing_forced "v5"
   pass "five records survive silence, a restart and a completed review: A closed from the other lane's merge, B/C/D untouched and not stranded, E pending its merge with the review on record"
+}
+
+# The control for V5's E: the same world with the hold removed (checks green, merge state CLEAN)
+# and an exact-head PASS that answers every review fact. The reconciler's review step then passes
+# every gate it owns and calls bin/fm-pr-merge.sh for E, so the hold is what keeps E open in V5.
+# Limit: this world's forge double does not land a merge, so the proof stops at the merge call
+# (a recorded merge attempt with fm-pr-merge.sh's own result); landing on PASS is
+# test_auto_review_green_uncovered_pr_is_read_recorded_and_merged in tests/fm-pr-merge.test.sh.
+test_v5_e_without_its_hold_reaches_the_merge() {
+  local step_state
+  make_v5_world
+  printf 'CLEAN\n' > "$W/merge-state.9"
+  {
+    printf 'VERDICT: PASS head=%s\n' "$V5_E_HEAD"
+    printf 'Independent reader evidence.\n'
+    printf -- '- Loosens a deny or allow list: no - fixture\n'
+    printf -- '- Widens what a guard permits: no - fixture\n'
+    printf -- '- Touches customer data, billing or spend: no - fixture\n'
+    printf 'Protected class: no - fixture\n'
+    printf 'VERDICT: PASS\n'
+  } > "$W/review-e.md"
+  xl_env "${V5_GIT_ENV[@]}" "$ROOT/bin/fm-review-record.py" review --pr "$V5_E_PR" --head "$V5_E_HEAD" --verdict PASS \
+    --reader-model openai-codex/gpt-6.1-sol --author-groups '{"all":["anthropic/claude-sonnet-5"]}' \
+    --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report "$W/review-e.md" > "$W/review-record.out" 2>&1 \
+    || fail "the review PASS could not be recorded: $(cat "$W/review-record.out")"
+  xl_env "${V5_GIT_ENV[@]}" bash "$ROOT/bin/fm-pr-ready-reconcile.sh" > "$W/reconcile.out" 2>&1 || fail "reconcile failed: $(cat "$W/reconcile.out")"
+  step_state=$(v5_e_review_state)
+  printf 'E without its hold: review step state: %s\n' "$step_state"
+  xl_env "$ROOT/bin/fm-pr-auto-review.py" events t-e | sed 's/^/  event: /'
+  case "$step_state" in
+    "merged "*|"queued "*|"held: merge not landed: "*) ;;
+    *) fail "E without its hold did not reach the merge call: $step_state" ;;
+  esac
+  pass "with E's hold removed and an exact-head PASS on record, the review step passes its gates and calls fm-pr-merge.sh for E"
 }
 
 # --- run ----------------------------------------------------------------------
@@ -4631,6 +4706,7 @@ ALL_TESTS=(
   test_xlane_protections_still_refuse
   test_xlane_refused_prune_keeps_its_reason_on_the_ledger_row
   test_v5_missing_updates_restart_and_completed_review_cannot_strand_work
+  test_v5_e_without_its_hold_reaches_the_merge
 )
 if [ "$#" -gt 0 ]; then
   fm_test_run_cases -- "$@"

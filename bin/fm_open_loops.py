@@ -1200,8 +1200,13 @@ class Collector:
                               + "the last report was done and the ship-done gate did not accept it")
             return
         landed = self.source("finished deliverable " + ident, self.deliverable_landed, task)
-        if landed and any(r["category"] == "completed_task" for r in self.covering_rows(ident, pr_url)):
-            # A delivered scout report still awaits its owner handoff, which completed_task already owns.
+        handoff = [r for r in self.covering_rows(ident, pr_url) if r["category"] == "completed_task"] if landed else []
+        if handoff:
+            # A delivered scout report still awaits its owner handoff, which completed_task already owns;
+            # that one row also names the cleanup that ends it.
+            for row in handoff:
+                row["next_action"] = (f"{row['next_action']}; once it is accepted, run plain bin/fm-teardown.sh {ident}; "
+                                      "the record stays open until it succeeds")
             self.attach_refusal(ident, pr_url, refusal, refused)
             return
         if landed:

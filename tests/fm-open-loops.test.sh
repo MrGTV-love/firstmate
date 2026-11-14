@@ -2083,6 +2083,10 @@ v4_task('fin-content', copy=fin_content, note='landed on main by squash')
 (v4 / 'data/fin-scout').mkdir()
 (v4 / 'data/fin-scout/report.md').write_text('Delivered investigation report.\n')
 v4_task('fin-scout', kind='scout', copy=None, note='report delivered')
+(v4 / 'data/fin-scout-refused').mkdir()
+(v4 / 'data/fin-scout-refused/report.md').write_text('Delivered investigation report.\n')
+v4_task('fin-scout-refused', kind='scout', copy=None, note='report delivered')
+scout_refusal = 'REFUSED: fin-scout-refused has an unresolved captain decision in its report'
 fin_moot = v4_copy('fin-moot')
 v4_task('fin-moot', copy=fin_moot, note='ruled moot by Main')
 (v4 / 'data/fin-moot').mkdir()
@@ -2109,6 +2113,8 @@ v4_task('unl-refused', copy=unl_refused, pr=14, note=f'{V4_PR}14 merged by anoth
 reap_refusal = 'REFUSED: t1 has commits the merged PR head does not contain; the ship deliverable is not landed'
 (v4 / 'state/.idle-reap').mkdir()
 (v4 / 'state/.idle-reap/unl-refused.refused').write_text(f'fm-idle-reap-refused-v1\n{now - 600}\ndone [at={now}]: merged\n{reap_refusal}\n')
+(v4 / 'state/.idle-reap/fin-scout-refused.refused').write_text(
+    f'fm-idle-reap-refused-v1\n{now - 600}\ndone [at={now}]: report delivered\n{scout_refusal}\n')
 gate_refusal = 'named head 0123abc is unreachable outside the worker copy'
 v4_task('gate-refused', copy=v4_copy('gate-refused', work=False), note='delivered, branch pushed', state='blocked', live=True,
         detail=gate_refusal)
@@ -2193,10 +2199,16 @@ for name in ('fin-merged', 'fin-content', 'fin-moot-clean'):
 assert 'pending_cleanup' not in DEFAULT_AGES_FOR_TEST and 'pending_acceptance' not in DEFAULT_AGES_FOR_TEST, 'a new age class was added'
 # A delivered scout report still awaits its owner handoff: the completed_task row owns it, once, until teardown.
 handoff = by_cat('completed_task')
-assert 'fin-scout' in handoff and 'consume the report' in handoff['fin-scout']['next_action'] \
-    and 'tear the task down' in handoff['fin-scout']['next_action'] and handoff['fin-scout']['overdue'], handoff.get('fin-scout')
-assert [r['category'] for r in mine('fin-scout') if r['category'] in ('completed_task', 'pending_acceptance', 'pending_cleanup')] \
-    == ['completed_task'], ('one obligation, one row', mine('fin-scout'))
+obligations = lambda sub: [r for r in mine(sub) if r['category'] in ('completed_task', 'pending_acceptance', 'pending_cleanup')]
+scout_row = handoff.get('fin-scout')
+assert scout_row and scout_row['owner'] == 'firstmate' and scout_row['overdue'] and 'consume the report' in scout_row['next_action'], scout_row
+assert 'run plain bin/fm-teardown.sh fin-scout' in scout_row['next_action'] and '--force' not in scout_row['next_action'], \
+    ('the accepted report leads to plain teardown', scout_row)
+assert [r['category'] for r in obligations('fin-scout')] == ['completed_task'], ('one obligation, one row', mine('fin-scout'))
+# A refused teardown keeps its exact refusal text on that one row.
+scout_refused = handoff.get('fin-scout-refused')
+assert [r['category'] for r in obligations('fin-scout-refused')] == ['completed_task'], mine('fin-scout-refused')
+assert scout_refusal in scout_refused['next_action'] and scout_refusal in scout_refused['evidence'], ('the refusal text must stay on the row', scout_refused)
 # A drop ruling over a copy that still holds unlanded work names the attended drop path with the recorded words.
 moot = cleanup['fin-moot']
 assert moot['owner'] == 'firstmate' and 'Main' in moot['next_action'], ('the drop path belongs to Main', moot)
@@ -2258,7 +2270,10 @@ key = lambda rep: sorted((r['category'], r['subject'], r['owner'], r['next_actio
 assert key(report4) == key(again) and key(again), 'a restart changed or lost a pending row'
 # The row lives until the record is gone: removing a record removes only its own row.
 (v4 / 'state/fin-merged.meta').unlink()
+(v4 / 'state/fin-scout.meta').unlink()
 after = ledger4()
+assert not [r for r in after['rows'] if r['subject'] == 'fin-scout' and r['category'] in ('completed_task', 'pending_cleanup', 'pending_acceptance')]
+assert 'fin-scout-refused' in {r['subject'] for r in after['rows'] if r['category'] == 'completed_task'}, 'removing one record removed another row'
 assert not [r for r in after['rows'] if r['subject'] == 'fin-merged' and r['category'] in ('pending_cleanup', 'pending_acceptance')]
 assert 'fin-content' in {r['subject'] for r in after['rows'] if r['category'] == 'pending_cleanup'}
 # One task whose status log cannot be read degrades only its own row: every later task keeps its row.
