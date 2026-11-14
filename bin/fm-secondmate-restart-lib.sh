@@ -108,14 +108,28 @@ fm_secondmate_restart_capable() {  # <meta-file>
 # control plane's exemption: a pane whose agent is positively dead or missing is
 # governed by fm-control's own stopped-agent proofs, unchanged. Any other state,
 # an endpoint that does not validate, or a backend that does not load is
-# unproven and refuses. Remote placement is not covered here: the host's
-# fm-control decides it before the agent is stopped, but after the persistence
-# request, which stays open for the remote lanes.
+# unproven and refuses. A remote Herdr mate is decided on its host by the same
+# owner, through the read-only `fm-remote-secondmate-control.sh attribution`
+# verb over bin/fm-on.sh: only its exact proceed line lets the restart go on,
+# and a transport failure, any other output, or a host whose code lacks the
+# verb refuses.
 # Returns 1 with FM_SECONDMATE_RESTART_REASON set when the agent is unproven.
 fm_secondmate_restart_attribution() {  # <meta-file>
-  local meta=$1 id cause state
-  [ "$FM_SECONDMATE_RESTART_PLACEMENT" = local ] && [ "$FM_SECONDMATE_RESTART_BACKEND" = herdr ] || return 0
+  local meta=$1 id cause state out
+  [ "$FM_SECONDMATE_RESTART_BACKEND" = herdr ] || return 0
   id=${meta##*/}; id=${id%.meta}
+  if [ "$FM_SECONDMATE_RESTART_PLACEMENT" = remote ]; then
+    out=$(FM_HOME="$FM_HOME" "$_FM_SECONDMATE_RESTART_LIB_DIR/fm-on.sh" "$id" \
+      fm-remote-secondmate-control.sh attribution "$id" < /dev/null 2>/dev/null) || out=''
+    [ "$out" != attribution=proceed ] || return 0
+    case "$out" in
+      'attribution=refuse: '*) cause=${out#attribution=refuse: }; cause=${cause%%$'\n'*} ;;
+      *) cause="its host returned no attribution decision (unreachable, or its code lacks the attribution verb until it is synced)" ;;
+    esac
+    FM_SECONDMATE_RESTART_REASON="its remote agent on ${FM_SECONDMATE_RESTART_HOST:-its host} was not attributed to this task, so no request, record or nudge was sent to it: $cause"
+    return 1
+  fi
+  [ "$FM_SECONDMATE_RESTART_PLACEMENT" = local ] || return 0
   # shellcheck source=bin/fm-launch-proof-lib.sh disable=SC1091
   . "$_FM_SECONDMATE_RESTART_LIB_DIR/fm-launch-proof-lib.sh"
   if ! fm_backend_source herdr; then
@@ -140,4 +154,12 @@ fm_secondmate_restart_attribution() {  # <meta-file>
   fi
   FM_SECONDMATE_RESTART_REASON="its live Herdr agent cannot be positively attributed to this task, so no request or nudge was sent to it${cause:+: $cause}"
   return 1
+}
+
+# The same decision, re-derived from <meta-file> alone at the moment of a later
+# effect (a fallback nudge after the persistence wait), so it never rests on
+# another mate's placement or on an attribution read before the wait.
+fm_secondmate_restart_attribution_now() {  # <meta-file>
+  fm_secondmate_restart_capable "$1" || true
+  fm_secondmate_restart_attribution "$1"
 }

@@ -7203,7 +7203,7 @@
       "owner": "bin/fm-launch-proof-lib.sh",
       "invariant": "Claude adoption authorizes lifecycle input only to a restored process proven to be this task's own conversation, and rechecks every proof at each use.",
       "layer": "runtime-block",
-      "source": "the recorded task endpoint, the unique attributed foreground process (the claude harness or a listed forwarding launcher whose direct child is the harness), the harness kernel working directory, the absence of any foreign launch pin, an exclusive pane and home claim, and the task-specific session tie (a recorded session id equal to the live one, a transcript whose first user message is the launch-brief doorbell of a record in the task's own home, or, once that launch-brief record is gone, the lock owner's own --session-id statement equal to the live one while the transcript still opens with that doorbell); every recheck rereads the transcript doorbell, never only the adoption record",
+      "source": "the recorded task endpoint, the unique attributed foreground process (the claude harness or a listed forwarding launcher whose direct child is the harness), the harness kernel working directory (lsof escapes decoded, ambiguous ones refused), the absence of any foreign launch pin with the attributed process listed in the process table and every other live member of its process group read, an exclusive pane and home claim across every local home the root inventory reaches with no unreadable peer record, and the task-specific session tie of a harness that does not fork, continue or rename its resumed session, read from a transcript whose lines before the first user record are all classifiable (a recorded session id equal to the live one, a transcript whose first user message is the launch-brief doorbell of a record in the task's own home, or, once that launch-brief record is gone, the lock owner's own --session-id statement equal to the live one while the transcript still opens with that doorbell); every recheck rereads the transcript doorbell, never only the adoption record",
       "trigger": "fm-control adopt of a restored claude agent as a task's agent unless all proofs hold, and any lifecycle reader that would authorize it from the adoption record without rechecking them",
       "decision": "deny",
       "fail_direction": "closed",
@@ -7228,6 +7228,18 @@
         {
           "file": "bin/fm-launch-proof-lib.sh",
           "match": "fm_launch_proof_adopt_refuse \"no task-specific session tie: $1; next action: a person or Main supplies the task's recorded claude_session_id, or decides the lane by hand\""
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "fm_launch_proof_adopt_refuse \"generation proof needs every live process of the harness's process group to be read; $member; next action: retry once it has exited, or Main decides the lane by hand\"; return 1"
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "|| { fm_launch_proof_adopt_refuse \"unique-claim proof needs a complete inventory of local homes; $peer_states; next action: repair the named home or registry, or Main decides the lane by hand\"; return 1; }"
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "fm_launch_proof_adopt_refuse \"no task-specific session tie: the harness runs a conversation other than the one it resumes ($forked); next action: Main decides the lane by hand\"; return 1"
         },
         {
           "file": "bin/fm-launch-proof-lib.sh",
@@ -7350,11 +7362,11 @@
       "owner": "bin/fm-secondmate-restart.sh",
       "invariant": "The secondmate restart sends no request, record or nudge to a live Herdr agent that is not positively attributed to the task.",
       "layer": "runtime-block",
-      "source": "the one launch-proof verdict owner (fm_launch_proof_herdr_refusal) read before the restart's pending-reply record, persistence request and fallback nudge; a pane whose agent is positively dead or missing stays with the control plane's own stopped-agent proofs",
-      "trigger": "restart of a local Herdr secondmate whose live agent is unmanaged or unreadable by the launch-proof owner, or whose Herdr backend does not load, endpoint does not validate, or agent state is neither alive nor positively dead or missing",
+      "source": "the one launch-proof verdict owner (fm_launch_proof_herdr_refusal) read before the restart's pending-reply record, persistence request and fallback nudge, and read again on the mate's own record right before a fallback nudge; for a remote Herdr mate the same owner read on its host by the read-only fm-remote-secondmate-control.sh attribution verb, whose exact attribution=proceed line is the only accepted answer; a pane whose agent is positively dead or missing stays with the control plane's own stopped-agent proofs",
+      "trigger": "restart of a local Herdr secondmate whose live agent is unmanaged or unreadable by the launch-proof owner, or whose Herdr backend does not load, endpoint does not validate, or agent state is neither alive nor positively dead or missing, at the first effect or at a later fallback nudge; and restart of a remote Herdr secondmate whose host answers anything but attribution=proceed (a refusal, no answer, an unreachable host, or a code root without the verb)",
       "decision": "deny",
       "fail_direction": "closed",
-      "remedy": "Leave the agent running; authorize it with FM_HOME=<home> bash bin/fm-control.sh <task> adopt when it is the task's own restored claude, or decide the lane by hand, then rerun the restart.",
+      "remedy": "Leave the agent running; authorize it with FM_HOME=<home> bash bin/fm-control.sh <task> adopt when it is the task's own restored claude, or decide the lane by hand, then rerun the restart; for a remote mate, sync its host so its code has the attribution verb, read the printed host cause, and decide the lane on its host.",
       "budget": 1,
       "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
       "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
@@ -7372,6 +7384,22 @@
           "file": "bin/fm-secondmate-restart.sh",
           "match": "PLAN[i]=\"refused\"",
           "count": 2
+        },
+        {
+          "file": "bin/fm-remote-secondmate-control.sh",
+          "match": "printf 'attribution=refuse: no endpoint record for %s on this host\\n' \"$id\""
+        },
+        {
+          "file": "bin/fm-remote-secondmate-control.sh",
+          "match": "printf 'attribution=refuse: %s\\n' \"$REMOTE_ENDPOINT_ERROR\""
+        },
+        {
+          "file": "bin/fm-remote-secondmate-control.sh",
+          "match": "*) printf \"attribution=refuse: its Herdr agent state reads '%s' rather than a positively classified state\\n\" \"$state\"; return 0 ;;"
+        },
+        {
+          "file": "bin/fm-remote-secondmate-control.sh",
+          "match": "printf 'attribution=refuse: its live Herdr agent cannot be positively attributed to this task%s\\n' \"${cause:+: $cause}\""
         }
       ]
     }

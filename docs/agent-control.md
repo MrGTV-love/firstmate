@@ -224,11 +224,16 @@ It sends no input and starts or stops nothing.
   An entry needs Main's recorded confirmation before it is added; for a listed launcher the harness must be its only claude child, a direct child in its process group, and run exactly the forwarded arguments.
   An interpreter, shell, editor, or unlisted wrapper that merely has a harness-shaped descendant is not proven.
 - The harness's kernel working directory is exactly the task's recorded home or worktree; a subdirectory of either is refused.
+  The `lsof` name is decoded the way the omp proof decodes it, so a home whose name holds a backslash is compared by its real path; an ambiguous escape or a decoded control character is refused.
 - Neither the attributed process nor the harness carries a launch pin, and no process in the harness's process group carries one for another generation.
-- No other task record in this home or in a secondmate home it can read claims the pane, the home, or the worktree.
+  The process table must list the attributed process, and every other live process of the group must have a readable environment; a process that exited after the table was read is not a member.
+- No other task record claims the pane, the home, or the worktree, in any local home the root inventory reaches (the root home, every registered local secondmate home below it, nested ones included) or in a secondmate home a record here names.
+  An inventory that cannot be completed, or a peer record that cannot be read, refuses: it is unknown, never "no conflict".
 - A task-specific session tie exists.
   The harness argv names one `--resume` session id, and either the task's recorded `claude_session_id` equals it, or the first user message of that session's transcript is the launch-brief doorbell of a record that sits in the task's own `state/operational-inbox/`, that `bin/fm-operational-input.sh` identifies as kind `launch-brief`, and that is not newer than the message.
   A recorded `claude_session_id` that differs from the live id vetoes the adoption even when the doorbell holds.
+  A harness started with `--fork-session`, `--session-id`, or `--continue` runs a conversation other than the one its `--resume` id names, so no tie of that session counts, whichever tie is offered.
+  The first user message is the first user record of the transcript; any line before it that cannot be classified (not JSON, or not an object) refuses, because it may be the real first message.
   A first message that merely names the inbox, and anything the agent does later in the session, never counts, because a personal session in the same directory can produce both.
   The operational inbox deletes records older than seven days, so a launch brief can be gone before the lane is adopted.
   The lock-owning main Firstmate may then run `adopt --session-id <live-session-id>`: the id must equal the live `--resume` id, a differing recorded `claude_session_id` still vetoes it, and every other proof still holds.
@@ -243,7 +248,8 @@ The session tie is rechecked the same way: a `recorded` tie needs the task's `cl
 Once a published adoption's launch-brief record is gone, that doorbell alone keeps the tie, so the inbox's seven-day retention never ends an adoption.
 The record is bound to the task's `spawn_gen`, so a relaunch makes it inert, and `fm-control.sh` removes it once the replacement is confirmed.
 A teardown does not yet remove a leftover record, which stays inert.
-A genuinely unproven agent, including a personal session in the same pane, home, and directory, keeps its refusal on every consumer, and the secondmate restart decides that before its pending-reply record, persistence request, or fallback nudge.
+A genuinely unproven agent, including a personal session in the same pane, home, and directory, keeps its refusal on every consumer, and the secondmate restart decides that before its pending-reply record, persistence request, or fallback nudge, and decides it again on the mate's own record right before a fallback nudge, since the persistence wait can last minutes.
+For a remote Herdr mate the restart reads the same decision on its host through the read-only `fm-remote-secondmate-control.sh attribution` verb and goes on only on its exact `attribution=proceed` line; a refusal, no answer, or a host whose code lacks the verb leaves the mate unreached with nothing sent.
 
 **Residual risk:** nothing watches which conversation an adopted process runs.
 An adopted process has no pin, so a switch to a personal conversation after the adoption is not seen, exactly as for an adopted omp process.

@@ -52,8 +52,10 @@
 # computed here in the primary and are identical for both.
 #
 # Before any effect (pending-reply record, persistence request, fallback nudge),
-# a local Herdr mate whose agent is not positively stopped and not attributed to
-# its task by the launch-proof owner is reported unreached and receives none.
+# a Herdr mate whose agent is not positively stopped and not attributed to its
+# task by the launch-proof owner (read on the host for a remote mate) is
+# reported unreached and receives none; the decision is made again right before
+# a fallback nudge.
 # Nothing here forces, stashes, or discards anything. bin/fm-control.sh owns the
 # restart transaction, its checkpoint, its journal, and its rollback; a refusal
 # before the agent is stopped leaves the mate running exactly as it was.
@@ -75,7 +77,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 
 usage() {
-  sed -n '2,68{s/^# \{0,1\}//;p;}' "$0"
+  sed -n '2,70{s/^# \{0,1\}//;p;}' "$0"
 }
 
 case "${1:-}" in
@@ -149,6 +151,12 @@ first_reported_line() {  # <text>
 # plainly which it was. A nudge is a partial reload and is never reported as more.
 fall_back_to_nudge() {  # <id> <reason>
   local id=$1 reason=$2 out
+  # The pane may have changed hands since the first decision (the persistence
+  # wait can last minutes): decide again on this mate's own record right now.
+  if ! fm_secondmate_restart_attribution_now "$STATE/$id.meta"; then
+    report_unreached "$id" "$reason; at the fallback nudge, $FM_SECONDMATE_RESTART_REASON"
+    return
+  fi
   if out=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
     "$SCRIPT_DIR/fm-send.sh" "$id" "$FM_SECOND_MATE_NUDGE_MESSAGE" 2>&1); then
     nudged_count=$((nudged_count + 1))
