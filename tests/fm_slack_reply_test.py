@@ -206,6 +206,10 @@ class Plane:
     def journal(self):
         return json.loads((self.root / 'state.json').read_text())
 
+    def their_journal(self):
+        """The second person's own journal (second.json), kept apart from the owner's state.json."""
+        return json.loads((self.root / 'second.json').read_text())
+
     def tree(self):
         """Path and sha256 of every file under the home outside state/slack-watch/ (the disposable home only)."""
         found = []
@@ -1278,7 +1282,8 @@ class SafetyTest(unittest.TestCase):
             f = home.reply_in(r, 'a follow-up')
             home.poll(); home.check(); home.reply(r, r, 'a'); home.read(r, f)
             names = {n for n in home.watch_files()}
-            self.assertEqual({n for n in names if not n.startswith('replay-state-')}, {'state.json', 'lock', 'requests.jsonl', 'outbound.jsonl', 'attempts.jsonl'})
+            # second.json: the time of each completed run, kept on every plane for a later first enable of the second person (Main's ruling e59cdb79).
+            self.assertEqual({n for n in names if not n.startswith('replay-state-')}, {'state.json', 'lock', 'requests.jsonl', 'outbound.jsonl', 'attempts.jsonl', 'second.json'})
             self.assertEqual({item[0] for item in home.children.scripts()}, {'fm-captain-hold.sh'})   # no other process starts
 
 
@@ -1362,7 +1367,7 @@ class SecondPersonReplyTest(unittest.TestCase):
 
     @contextlib.contextmanager
     def scott(self):
-        with case(extra={'dms': {OWNER: OWNER_DM, SCOTT: SCOTT_DM}}, env={'FM_SLACK_SECOND_USER': SCOTT, 'FM_SLACK_SECOND_SINCE': '100.000500'}) as home:
+        with case(extra={'dms': {OWNER: OWNER_DM, SCOTT: SCOTT_DM}}, env={'FM_SLACK_SECOND_USER': SCOTT}) as home:
             self.assertEqual(home.poll()[0], 0)
             yield home
 
@@ -1371,10 +1376,6 @@ class SecondPersonReplyTest(unittest.TestCase):
         home.add({'ts': ts, 'user': SCOTT, 'text': text, 'channel': SCOTT_DM})
         rc, out, _ = home.poll()
         self.assertEqual(rc, 0)
-        if 'from %s:' % OWNER in out:
-            # A run with an owner wake to print leaves the second person's work to the next run (finding 4 of the review of d0b0c216).
-            rc, out, _ = home.poll()
-            self.assertEqual(rc, 0)
         self.assertIn('check: slack request %s from %s: %s %s' % (ts, SCOTT, SCOTT_LABEL, json.dumps(text)), out)
         return ts
 
@@ -1433,11 +1434,11 @@ class SecondPersonReplyTest(unittest.TestCase):
 
     def tamper_their_window(self, home, channel):
         """The journal as a damaged or hand-edited one would hold it: their window names `channel`, and the event of their request names it too."""
-        state = home.journal()
+        state = home.their_journal()
         old = state['second']['channel']
         state['second']['channel'] = channel
         state['seen'] = {event.replace('/%s/' % old, '/%s/' % channel): value for event, value in state['seen'].items()}
-        (home.root / 'state.json').write_text(json.dumps(state))
+        (home.root / 'second.json').write_text(json.dumps(state))
 
     def refused_by_both_commands(self, home, key, reason, text):
         Traced.TRACE.clear()
@@ -1481,9 +1482,9 @@ class SecondPersonReplyTest(unittest.TestCase):
         with self.scott() as home:
             request = self.take_in_scott(home, 'a request whose window is gone')
             key = request + '@' + SCOTT
-            state = home.journal()
+            state = home.their_journal()
             state['second'] = {}
-            (home.root / 'state.json').write_text(json.dumps(state))
+            (home.root / 'second.json').write_text(json.dumps(state))
             self.refused_by_both_commands(home, key, 'unknown_request_thread', 'a request whose window is gone')
 
     def test_the_read_prints_their_request_with_their_label_and_other_names_of_it_are_refused(self):

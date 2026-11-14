@@ -276,6 +276,11 @@ def ts_key(ts):
 SECRET_MARKER = '[secret removed]'
 SECRET_FLAG = 'secret removed'
 RECORD_FILE = 'requests.jsonl'
+# The second person's pass keeps its own journal and its own record store in the plane's state folder, apart from the owner's state.json and requests.jsonl, so
+# that the owner's pass reads and writes exactly the base state bytes (Main's design ruling of order 1307).
+SECOND_FILE = 'second.json'
+SECOND_RECORD_FILE = 'second-requests.jsonl'
+SECOND_SCHEMA = 'fm-slack-second.v1'
 RECORD_PLACE = 'state/slack-watch/' + RECORD_FILE
 ENTITIES = (('&lt;', '<'), ('&gt;', '>'), ('&amp;', '&'))
 
@@ -823,6 +828,18 @@ def second_user():
     return raw, ''
 
 
+def host_now():
+    """This host's clock, used only to date a completed run that no Slack reply dated (Main's ruling e59cdb79 on the enable anchor)."""
+    return time.time()
+
+
+def just_before(ts):
+    """The Slack timestamp one microsecond before ts: a cursor that takes in ts itself and everything after it (Slack orders timestamps to the microsecond)."""
+    whole, _, part = ts.partition('.')
+    micro = int(whole) * 1000000 + int((part + '000000')[:6]) - 1
+    return '%d.%06d' % (micro // 1000000, micro % 1000000)
+
+
 def second_named_ids():
     """Every member id the second-person setting names as it stands, whatever its shape: the one id of a valid setting, and each id-shaped part of a list, of a
     lower-case copy (read in upper case, as Slack writes ids) or of any other value that is not exactly one id. The owner's own id is never one of them. Used only
@@ -956,8 +973,11 @@ class Watch:
         # The second person holds no authority in any setting state (Main's ruling on SC3): whatever the allowlist says, no id that the setting names now (valid or
         # not) and no id it has ever named on this plane (state['second_ids']) is an author whose reply or reaction is an answer. Fail closed.
         self.second, self.second_reason = second_user()
-        known = self.state.get('second_ids')
-        self.no_authority = (second_named_ids() | {self.second} | {i for i in (known if isinstance(known, list) else []) if isinstance(i, str)}) - {''}
+        self.record_file = RECORD_FILE
+        self.is_second = False
+        self.owner = self
+        self.second_journal = None
+        self.no_authority = (second_named_ids() | {self.second} | self.known_second_ids()) - {''}
         self.no_authority.discard(env_value('FM_SLACK_DM_USER').strip())
         self.authors -= self.no_authority
         # Slack's clock as this run's replies report it (the first and the latest), and the newest Slack instant known from earlier runs: the Date this plane
@@ -965,7 +985,6 @@ class Watch:
         self.clock_first = None
         self.clock_last = None
         self.arming = False
-        self.clock_before = self.known_instant()
         if hasattr(self.api, 'on_date'):
             # A weak reference: the transport must not keep this Watch (and its open lock) alive after the run lets it go (Main 1304: a reference cycle here
             # left the lock held, and the next Watch of the same process waited for ever on it).
@@ -995,8 +1014,6 @@ class Watch:
         self.window_reads = 0
         self.second_reads = 0
         self.ran_unbound = False
-        # Whether this run left the second person's work to the next run because an owner line was waiting to be printed.
-        self.second_deferred = False
         # The end of the second person's time budget while one is in force (second_budget), else None.
         self.budget_deadline = None
         # Whether a plane value is part of a fixed text of theirs in this run (block_second_on_collision): their work pauses and their lines are withheld.
@@ -1062,8 +1079,8 @@ class Watch:
         self.changed = True
 
     def restore(self):
-        """Memory equals the journal again."""
-        self.state = self.start_state()
+        """Memory equals the journal again (the second person's own journal for their pass)."""
+        self.state = self.load_second() if self.is_second else self.start_state()
         self.output = list(self.state['outbox'])
 
     def say(self, line):
@@ -1076,15 +1093,16 @@ class Watch:
         """The wake lines that may be printed now. A request line waits in the journal while the source is
         unbound: it is neither printed nor removed, and the rebind delivers it once. (A line of any other kind
         is printed as it always was, bound or not.)"""
-        lines = list(self.output) if bound else [line for line in self.output if not line.startswith(OWNER_PREFIXES)]
-        if self.second_blocked:
-            # A plane value is part of their label: their wake lines stay journaled, unprinted, until it is gone (finding 6). Their notice lines carry no label.
-            lines = [line for line in lines if not SECOND_WAKE.match(line)]
-        # The owner's lines go first, in their own order, then the second person's: a queued line of theirs never takes an owner line's turn (finding 4).
+        theirs = [] if self.is_second else [line for line in self.second_lines() if not (self.second_blocked and SECOND_WAKE.match(line))]
+        lines = list(self.output) + theirs
+        if not bound:
+            lines = [line for line in lines if not line.startswith(OWNER_PREFIXES)]
+        # The owner's lines go first, in their own order, then the second person's (their own journal's outbox): a queued line of theirs never takes an owner
+        # line's turn; while a plane value is part of their label their wake lines stay journaled, unprinted (finding 6 of the review of d0b0c216).
         return [line for line in lines if not is_second_line(line)] + [line for line in lines if is_second_line(line)]
 
     def has_request_line(self):
-        return any(line.startswith(OWNER_PREFIXES) for line in self.output)
+        return any(line.startswith(OWNER_PREFIXES) for line in self.output + ([] if self.is_second else self.second_lines()))
 
     @contextlib.contextmanager
     def binding_held(self):
@@ -1125,7 +1143,16 @@ class Watch:
                 self.hold_depth = 0
 
     def printed(self, lines):
-        """Drop the wake lines that have been printed from the journal; every other line stays."""
+        """Drop the wake lines that have been printed from the journal that held them (the owner's, or the second person's own); every other line stays."""
+        lines = list(lines)
+        if not self.is_second and self.second_lines():
+            theirs = [line for line in lines if line in self.second_journal.output]
+            for line in theirs:
+                lines.remove(line)
+            try:
+                self.second_journal.printed(theirs)
+            except (SecretCollision, SlackError, OSError):
+                pass
         kept = list(self.output)
         for line in lines:
             if line in kept:
@@ -1331,58 +1358,18 @@ class Watch:
 
     def block_second_on_collision(self):
         """Whether a plane value is part of a fixed text of the second person's that this run could print (their label, and the label of every line of theirs
-        still in the outbox): if so, their work is paused for this run (second_blocked), their lines stay journaled unprinted, and one notice per episode names it.
-        The owner's arm, wakes and answers go on (finding 6 of the review of d0b0c216)."""
+        still in their outbox): if so, their pass is paused for this run (second_blocked) and their wake lines stay in their own journal, unprinted, with one notice
+        per episode. The owner's arm, wakes and answers go on, and the owner's journal never holds a line of theirs (finding 6 of the review of d0b0c216)."""
         try:
             refuse_a_value_that_the_marker_holds(self.second_fixed_texts())
         except SecretCollision:
             self.second_blocked = True
-            self.park_second_lines()
-
-    def park_second_lines(self):
-        """While a plane value is part of their label, an unprinted wake line of theirs in the outbox would put that value into every journal write and stop the
-        owner's work too. Each such line leaves the outbox in memory and is kept instead as its key alone (state['second_rewake']: the request's ts, their id and
-        the note), which holds no label; the next commit writes the journal without it, and unpark_second_lines rebuilds the line from the request's record once
-        the value is gone (finding 6 of the review of d0b0c216)."""
-        parked = [line for line in self.output if SECOND_WAKE.match(line)]
-        if not parked:
-            return
-        keep = list(self.state.get('second_rewake') or [])
-        for line in parked:
-            match = REQUEST_SEGMENT.match(line)
-            if match:
-                entry = {'ts': match.group(1), 'author': match.group(2), 'note': match.group(3) or ''}
-                if entry not in keep:
-                    keep.append(entry)
-        self.output = [line for line in self.output if line not in parked]
-        self.state['outbox'] = list(self.output)
-        self.state['second_rewake'] = keep
-
-    def unpark_second_lines(self):
-        """Put the parked wake lines of theirs back in the outbox, each rebuilt from its request's record with the label of the id that typed it, once no plane
-        value is part of their label. A key whose record cannot be read stays parked."""
-        if self.second_blocked or not self.state.get('second_rewake'):
-            return
-        left = []
-        for entry in self.state['second_rewake']:
-            record = self.record(entry.get('ts'), entry.get('author')) if isinstance(entry, dict) else None
-            if not record:
-                left.append(entry)
-                continue
-            row = {'thread': entry['ts'], 'author': entry['author'], 'text': record.get('text', ''), 'shown': record.get('shown'),
-                   'replaced': record.get('replaced'), 'person': 'second'}
-            self.say(self.request_wake_line(row, entry.get('note') or ''))
-        if left:
-            self.state['second_rewake'] = left
-        else:
-            self.state.pop('second_rewake')
-        self.commit()
 
     def second_fixed_texts(self):
         """Their fixed text, when it can reach a sink in this run: their label for the id the setting names, when it is on, and the label of every wake line of
         theirs still in the outbox (it is printed whatever the setting is now), each with the parts that every such label holds. Otherwise nothing of theirs can be
         printed and the owner's checks are the base's."""
-        labels = ((second_label(self.second),) if self.second else ()) + tuple(label for line in self.output for label in second_labels_in(line))
+        labels = ((second_label(self.second),) if self.second else ()) + tuple(label for line in self.output + self.second_lines() for label in second_labels_in(line))
         return SECOND_FIXED_TEXT + tuple(dict.fromkeys(labels)) if labels else ()
 
     @contextlib.contextmanager
@@ -1412,31 +1399,6 @@ class Watch:
                 del api.call
             else:
                 api.call = earlier
-
-    def note_date(self, value):
-        if isinstance(value, (int, float)) and not isinstance(value, bool):
-            self.clock_first = value if self.clock_first is None else self.clock_first
-            self.clock_last = value if self.clock_last is None else max(self.clock_last, value)
-
-    def known_instant(self):
-        """The newest Slack instant this plane knew before this run began, or None: the Slack clock it recorded at the end of a run (state['slack_seen']), and the
-        timestamps its owner and second-person cursors have passed (each a message that already existed). Everything typed after it is newer."""
-        found = []
-        window = self.second_window()
-        for value in (self.state.get('slack_seen'), self.state.get('intake_cursor'), window.get('intake_cursor')):
-            if isinstance(value, str) and SLACK_TS.fullmatch(value):
-                found.append(float(value))
-        return max(found) if found else None
-
-    def record_clock(self):
-        """Keep the latest Slack clock of this run in the journal (state['slack_seen']), the starting point that a window started by a later run (the setting turned
-        on, or naming another id, on an armed plane) takes (finding 1 of the review of d0b0c216)."""
-        if self.clock_last is None:
-            return
-        known = self.state.get('slack_seen')
-        if not (isinstance(known, str) and SLACK_TS.fullmatch(known) and float(known) >= self.clock_last):
-            self.state['slack_seen'] = slack_ts(self.clock_last)
-            self.commit()
 
     def slack_now(self):
         """Slack's own clock as of the last answer this run received (the transport records the Date of each reply), or None when no reply carried one. It is the
@@ -1486,7 +1448,9 @@ class Watch:
             try:
                 # The second person's acknowledgement with no attempt mark has never been posted (the mark is committed before the post): there is nothing to
                 # find, so no lookup is made, and a run whose calls of theirs are slow spends its budget on the post itself (finding 3 of the review of d0b0c216).
-                earlier = [] if row is not None and row.get('person') == 'second' and not row.get('attempted') else self.recent(thread, channel)
+                # A previously attempted one is looked up once after that attempt: a lookup that found nothing is kept (clear), so the next run posts without
+                # repeating it, and a new attempt clears it again (finding 3 of the review of 4e0b1bd4); the marker lookup still guards every attempt.
+                earlier = [] if row is not None and row.get('person') == 'second' and (not row.get('attempted') or row.get('clear')) else self.recent(thread, channel)
             except SlackError as error:
                 if row is None:
                     raise
@@ -1498,16 +1462,20 @@ class Watch:
             for message in earlier:
                 if message.get('metadata', {}).get('event_payload', {}).get('id') == marker:
                     return message['ts']
+            if row is not None and row.get('person') == 'second' and row.get('attempted') and not row.get('clear'):
+                row['clear'] = True
+                self.commit()
             args = self.post_fields(event, text, thread, channel)
             # The body is checked BEFORE the attempt mark: a post that a plane value refuses is not an attempt (it counts for none of the three tries and
             # leaves no "state unknown"), and the transport checks the same fields again.
             refuse_outbound(args, wire=True)
-            if row is not None and not row.get('attempted'):
+            if row is not None and (not row.get('attempted') or row.get('clear')):
                 # Inside the second person's budget, a post that could not begin is no attempt: the budget is checked before the mark, so a deferral never leaves
                 # a mark that would make every later run look the acknowledgement up again (finding 3 of the review of d0b0c216).
                 if self.budget_deadline is not None and monotonic() >= self.budget_deadline:
                     raise SecondBudgetSpent()
                 row['attempted'] = True
+                row.pop('clear', None)
                 self.commit()
             ts = self.api.call('chat.postMessage', **args)['ts']
             self.posted_fresh = True
@@ -1641,11 +1609,14 @@ class Watch:
             raise SlackError('source_not_bound')
         self.state.update(self.dm_boundary())
         self.state.pop('intake_bounds', None)
-        self.remember_second()
         self.commit()
         self.dm_proven = True
-        self.arm_second()
-        self.record_clock()
+        # The second person's arm is their own pass's: it writes only their journal, and nothing in it can fail or change the owner's arm.
+        try:
+            self.second_view().arm_second()
+        except (SecretCollision, SlackError, OSError, ValueError, KeyError, TypeError):
+            pass
+        self.record_run_safely()
 
     def arm_second(self):
         """Arm's durable starting point for the second person (invariant 1), after the owner's own state is committed and isolated from it: whatever the
@@ -1670,19 +1641,35 @@ class Watch:
             if win:
                 self.commit()
             return
-        if win.get('user') != self.second and any(row.get('person') == 'second' for row in self.state['pending']):
-            # Rows taken in from the person the setting no longer names drain first, under the old setting (start_second); their window is left as it is.
-            self.commit()
-            return
+        self.remember_second()
         if win.get('user') != self.second:
             carried = None
         self.arming = True
+        failed = False
         try:
             with self.second_budget():
-                self.start_second()
-        except SecretCollision:
-            raise
-        except (SlackError, SecondBudgetSpent):
+                try:
+                    self.start_second()
+                except SecretCollision:
+                    raise
+                except (SlackError, SecondBudgetSpent):
+                    failed = True
+                if failed:
+                    # The fallback, its clock probes included, runs inside their time budget (finding 2 of the review of 4e0b1bd4).
+                    self.arm_fallback(carried)
+        except SecondBudgetSpent:
+            pass
+        finally:
+            self.arming = False
+        if not failed and carried is not None:
+            cursor = self.second_window().get('intake_cursor')
+            if isinstance(cursor, str) and SLACK_TS.fullmatch(cursor):
+                self.second_window()['unplaced'] = {'after': slack_ts(carried), 'before': slack_ts(float(cursor) + 0.000001)}
+        self.commit()
+
+    def arm_fallback(self, carried):
+        """Their starting point from Slack's clock when the arm's read of their DM failed (see arm_second)."""
+        if True:
             kept = self.second_window()
             if kept.get('user') != self.second:
                 kept = self.state['second'] = {'user': self.second}
@@ -1697,14 +1684,6 @@ class Watch:
                     carried = lower if carried is None else min(lower, carried)
                 if carried is not None:
                     kept['unplaced'] = {'after': slack_ts(carried), 'before': slack_ts(boundary)}
-        else:
-            if carried is not None:
-                cursor = self.second_window().get('intake_cursor')
-                if isinstance(cursor, str) and SLACK_TS.fullmatch(cursor):
-                    self.second_window()['unplaced'] = {'after': slack_ts(carried), 'before': slack_ts(float(cursor) + 0.000001)}
-        finally:
-            self.arming = False
-        self.commit()
 
     @staticmethod
     def unplaced_after(win):
@@ -1715,12 +1694,9 @@ class Watch:
         return None
 
     def arm_lower(self):
-        """The newest Slack instant known to precede this arm: the instant known before this run, and the owner DM's newest message that the arm just read (it
-        existed before the arm read it). A message with a ts before it was typed before the arm, or during it."""
-        found = [value for value in (self.clock_before,) if value is not None]
-        cursor = self.state.get('intake_cursor')
-        if isinstance(cursor, str) and SLACK_TS.fullmatch(cursor):
-            found.append(float(cursor))
+        """The newest Slack instant known to precede this arm: the plane's previous completed run (last_run) and the owner DM's newest message that the arm just
+        read (it existed before the arm read it). A message with a ts before it was typed before the arm."""
+        found = [float(value) for value in (self.state.get('last_run'), self.owner.state.get('intake_cursor')) if isinstance(value, str) and SLACK_TS.fullmatch(value)]
         return max(found) if found else 0.0
 
     def clock_reaches(self, boundary):
@@ -1732,7 +1708,7 @@ class Watch:
             pause(ARM_CLOCK_PAUSE)
             try:
                 self.api.call('auth.test')
-            except SlackError:
+            except (SlackError, SecondBudgetSpent):
                 return False
         return self.clock_last is not None and self.clock_last >= boundary
 
@@ -2042,7 +2018,7 @@ class Watch:
         wake line, or, for the owner's request (author None), a line that names no author."""
         found = None
         try:
-            lines = (self.root / RECORD_FILE).read_text().split('\n')
+            lines = (self.root / self.record_file).read_text().split('\n')
         except OSError:
             return None
         for line in lines:
@@ -2069,7 +2045,7 @@ class Watch:
         """The complete record store as it will stand after one more entry, and where that entry starts in it. A half line that an earlier write
         left makes the new entry start on a line of its own."""
         try:
-            existing = (self.root / RECORD_FILE).read_bytes().decode('utf-8', 'replace')
+            existing = (self.root / self.record_file).read_bytes().decode('utf-8', 'replace')
         except OSError:
             existing = ''
         lead = '' if not existing or existing.endswith('\n') else '\n'
@@ -2081,7 +2057,7 @@ class Watch:
         append is checked before the append (value_hits); nothing is rewritten here."""
         if pending.get('recorded'):
             return
-        path = self.root / RECORD_FILE
+        path = self.root / self.record_file
         if path.is_symlink():
             raise SlackError('unsafe_state_path')
         # ASCII-escaped, so that no character of the text (U+2028 included) can end the record's line early.
@@ -2125,7 +2101,7 @@ class Watch:
         """Where the store of whole texts is, for the pointer of a cut line, in the order the line tries them: its path from the
         firstmate home when it lies under the home (the default is `state/slack-watch/requests.jsonl`), the absolute path
         otherwise; then the path relative to the home; the key alone is the last resort and is added by request_line."""
-        path = (self.root / RECORD_FILE).resolve()
+        path = (self.root / self.record_file).resolve()
         try:
             first = str(path.relative_to(self.home))
         except ValueError:
@@ -2169,8 +2145,11 @@ class Watch:
             # The cursor that intake really moves (take_in_requests): the owner's at the top of the state, the second person's in their own window; the
             # model never writes a cursor that the intake leaves as it is, so it can neither miss a value the real journal forms nor refuse one it never forms.
             if row.get('person') == 'second':
-                window = state.get('second') if isinstance(state.get('second'), dict) else {}
-                state['second'] = dict(window, intake_cursor=row['thread'])
+                # Intake moves their cursor in the commit that stages the row; a row already staged (resumed after a crash or an arm) is published without moving
+                # it, so the model leaves it as it is (finding 8 of the review of 4e0b1bd4).
+                if not any(held.get('event') == row['event'] for held in state['pending']):
+                    window = state.get('second') if isinstance(state.get('second'), dict) else {}
+                    state['second'] = dict(window, intake_cursor=row['thread'])
             else:
                 state['intake_cursor'] = row['thread']
             mine.update(tail or {})
@@ -2260,6 +2239,8 @@ class Watch:
             return line
         match = REQUEST_SEGMENT.match(line)
         second = bool(match) and line.startswith(match.group(0) + second_label(match.group(2)) + ' ')
+        if second and not self.is_second:
+            return self.second_view().fit(line, room)
         row = self.record(match.group(1), match.group(2) if second else None) if match else None
         if not row:
             return line
@@ -2547,10 +2528,6 @@ class Watch:
                 deferred = deferred or error
                 continue
             record['retired'] = True
-            if self.second:
-                # The second person's phase takes one last look at this card's reactions, so that a reaction of theirs that came with the owner's closing answer is
-                # still refused (finding 5 of the review of d0b0c216); the look clears this mark.
-                record['second_look'] = True
             self.commit()
         return deferred
 
@@ -2560,15 +2537,24 @@ class Watch:
         self.reaction_cache[ts] = found
         return found
 
+    def card_key(self, record):
+        return '%s/%s' % (self.state.get('channel', ''), record['ts'])
+
     def observe_second_cards(self):
-        """The second person's reactions on every card still tracked, whatever the card's own reaction capability: the owner's answer path reads a card's reactions
-        only for a card with options (as on base), and never for them. Here, in their own phase and isolated like all of theirs, each card's reactions are read
-        (unless the owner's path read them in this run) and each new reaction of theirs is one refused attempt. It needs only the scope that reactions.get itself
-        needs, reactions:read; without it nothing is observable. A card that cannot be read (deleted) is skipped, as the owner's own thread reads skip it."""
-        if not self.second or self.staging_only or 'reactions:read' not in set(self.state.get('scopes') or []):
+        """The reactions of every id without answer authority (the configured one, and each id the setting has named) on every card the owner's DM holds, still tracked
+        or closed but not yet looked at since it closed, whatever the setting is now: each new reaction is one refused attempt. A card the owner's path read in this
+        run is not read again (the reaction cache), so a reaction that came with the owner's closing answer is seen even if it is removed before the next poll; a
+        closed card is marked looked-at only once every attempt on it is on record. It needs only reactions:read. A card that cannot be read is skipped."""
+        members = sorted(self.owner.no_authority)
+        if not members or 'reactions:read' not in set(self.state.get('scopes') or []):
             return
-        closed = [(occurrence, record) for occurrence, record in self.state['threads'].items() if record.get('retired') and record.get('second_look')]
-        for occurrence, record in self.tracked() + closed:
+        cards = self.state.setdefault('cards', {})
+        for occurrence, record in list(self.owner.state.get('threads', {}).items()):
+            if not isinstance(record, dict) or not isinstance(record.get('ts'), str):
+                continue
+            entry = cards.get(self.card_key(record), {})
+            if record.get('retired') and entry.get('final'):
+                continue
             reactions = self.reaction_cache.get(record['ts'])
             if reactions is None:
                 try:
@@ -2576,47 +2562,51 @@ class Watch:
                 except SlackError as error:
                     if str(error) not in THREAD_ERRORS:
                         raise
+                    if record.get('retired'):
+                        cards.setdefault(self.card_key(record), {})['final'] = True
+                        self.commit()
                     continue
-            self.observe_second_taps(record, reactions)
-            if record.get('retired') and record.pop('second_look', None):
+            recorded = [self.observe_second_taps(record, reactions, member) for member in members]
+            if record.get('retired') and all(recorded):
+                cards.setdefault(self.card_key(record), {})['final'] = True
                 self.commit()
 
-    def observe_second_taps(self, record, reactions):
-        """The second person's reactions on a held card, whatever the emoji: each one that is new since the last poll is one attempt to answer a decision held for
-        the captain, and gets one durable refusal row (reason, their id, the card, the emoji and the attempt number). A reaction that only persists across polls is
-        not a new attempt; one that was seen removed and is added again is. The card's record keeps, for each member id, which of their emoji were present at the
-        last poll and how many attempts each has had, so that another configured id's reaction with the same emoji is its own attempt. The plane's log is the
-        durable record of the attempts: an attempt it holds that the record does not (a commit interrupted after the row) is taken as that attempt, never as a new
-        one, and once the emoji is seen absent the next addition is the attempt after it. No answer is made. A log that cannot be written leaves that attempt
-        unrecorded, so the next poll writes it."""
-        if not self.second or self.staging_only:
-            return
-        member = self.second
-        taps, attempts = record.get('second_taps'), record.get('second_attempts')
-        taps = dict(taps) if isinstance(taps, dict) else ({member: list(taps)} if isinstance(taps, list) else {})
-        attempts = dict(attempts) if isinstance(attempts, dict) and all(isinstance(v, dict) for v in attempts.values()) else (
-            {member: dict(attempts)} if isinstance(attempts, dict) else {})
+    def observe_second_taps(self, record, reactions, member=None):
+        """One member's reactions on a card, whatever the emoji: each one that is new since the last poll is one attempt to answer a decision held for the captain,
+        and gets one durable refusal row (reason, their id, the card's channel and ts, the emoji and the attempt number). A reaction that only persists across polls
+        is not a new attempt; one that was seen removed and is added again is. Their journal keeps, per card (its channel and ts) and per member, which emoji were
+        present at the last poll and how many attempts each has had. The plane's log is the durable record of the attempts: an attempt it holds for this card and
+        member that the journal does not (a commit interrupted after the row) is taken as that attempt, never as a new one, and once the emoji is seen absent the
+        next addition is the attempt after it. No answer is made. Returns whether every attempt is on record (a log that cannot be written returns False, and the
+        next poll writes it)."""
+        member = member or self.second
+        if not member:
+            return True
+        entry = self.state.setdefault('cards', {}).setdefault(self.card_key(record), {})
+        taps = entry.setdefault('taps', {})
+        attempts = entry.setdefault('attempts', {})
         now = {r.get('name') for r in reactions if isinstance(r, dict) and member in r.get('users', []) and isinstance(r.get('name'), str)}
         before = {e for e in taps.get(member, []) if isinstance(e, str)}
-        counts = {e: n for e, n in attempts.get(member, {}).items() if isinstance(n, int) and not isinstance(n, bool)}
+        counts = {e: n for e, n in (attempts.get(member) or {}).items() if isinstance(n, int) and not isinstance(n, bool)}
         kept = before & now
         for emoji, logged in self.logged_reaction_attempts(record['ts'], member).items():
             if logged > counts.get(emoji, 0):
                 counts[emoji] = logged
                 if emoji in now:
                     kept.add(emoji)
+        complete = True
         for emoji in sorted(now - kept):
             attempt = counts.get(emoji, 0) + 1
-            if not self.refuse_second('decision_held_for_captain_reaction', record, emoji, attempt):
+            if not self.refuse_second('decision_held_for_captain_reaction', record, emoji, attempt, author=member):
+                complete = False
                 break
             counts[emoji] = attempt
             kept.add(emoji)
-        if sorted(kept) != sorted(before) or counts != attempts.get(member, {}):
+        if sorted(kept) != sorted(before) or counts != (attempts.get(member) or {}):
             taps[member] = sorted(kept)
             attempts[member] = counts
-            record['second_taps'] = taps
-            record['second_attempts'] = attempts
             self.commit()
+        return complete
 
     def reaction_choices(self, record):
         """One signal per option reaction tapped by an allowlisted human."""
@@ -2652,8 +2642,12 @@ class Watch:
             if message.get('ts') == record['ts']:
                 continue
             if message.get('user') in self.no_authority:
-                # The configured person, or an id the setting has named or names in an invalid value: never an answer, and the attempt is refused once.
-                self.refuse_second('decision_held_for_captain_reply', record, message.get('ts', ''), author=message.get('user'))
+                # The configured person, or an id the setting has named or names in an invalid value: never an answer, and the attempt is refused once, in their
+                # own journal and log (also during a retarget's read); a failure there never touches the owner's work.
+                try:
+                    self.second_view().refuse_second('decision_held_for_captain_reply', record, message.get('ts', ''), author=message.get('user'))
+                except (SecretCollision, SlackError, OSError, ValueError):
+                    pass
                 continue
             if not self.allowed(message):
                 continue
@@ -2705,17 +2699,101 @@ class Watch:
         return progress
 
     def remember_second(self):
-        """Record the id the setting names in the journal (state['second_ids']), so that it stays without answer authority after the setting is turned off or made
-        invalid. Committed with the run's first commit; an id is never removed."""
-        known = self.state.get('second_ids')
-        known = [i for i in known if isinstance(i, str)] if isinstance(known, list) else []
-        if self.second and self.second not in known:
-            self.state['second_ids'] = sorted(known + [self.second])
+        """Record every id the setting names (the configured one, and each id-shaped part of an invalid value) in the second person's journal ('ids'), so that it
+        stays without answer authority after the setting is turned off, made invalid or changed. An id is never removed."""
+        known = [i for i in self.state.get('ids') or [] if isinstance(i, str)]
+        named = (second_named_ids() | {self.second}) - {''}
+        if named - set(known):
+            self.state['ids'] = sorted(set(known) | named)
+            self.commit()
 
     def begin_clock(self):
-        """Each poll and each arm is one run: its Slack clock starts unknown, and the instant known before it is read from the journal as it stands now."""
+        """Each poll and each arm is one run: its Slack clock starts unknown, and its second-person journal is read afresh."""
         self.clock_first = self.clock_last = None
-        self.clock_before = self.known_instant()
+        self.second_journal = None
+
+    def known_second_ids(self):
+        """Every member id the second-person setting has named on this plane, from their own journal (second.json): none of them is ever an answering author."""
+        try:
+            path = self.root / SECOND_FILE
+            if path.is_symlink() or not path.exists():
+                return set()
+            ids = json.loads(path.read_text()).get('ids')
+            return {i for i in ids if isinstance(i, str)} if isinstance(ids, list) else set()
+        except (OSError, ValueError, AttributeError):
+            return set()
+
+    def second_view(self):
+        """The second person's pass: the same plane, with its own journal (second.json: their window, cursor, pending rows, seen events, outbox, the ids the setting
+        has named, the per-card refusal record) and its own record store (second-requests.jsonl). Every write of theirs goes there; the owner's state.json is never
+        written by their work. It shares this run's transport, lock, reaction cache and writer, and reads the owner's DM, team and cards without changing them."""
+        if self.is_second:
+            return self
+        if self.second_journal is None:
+            view = object.__new__(Watch)
+            view.__dict__.update(self.__dict__)
+            view.owner, view.is_second, view.second_journal = self, True, None
+            view.path = self.root / SECOND_FILE
+            view.record_file = SECOND_RECORD_FILE
+            view.state = view.load_second()
+            view.output = list(view.state['outbox'])
+            self.second_journal = view
+        return self.second_journal
+
+    def load_second(self):
+        if self.path.is_symlink():
+            raise SlackError('unsafe_state_path')
+        if self.path.exists():
+            state = json.loads(self.path.read_text())
+            if not isinstance(state, dict) or state.get('schema') != SECOND_SCHEMA:
+                raise SlackError('invalid_second_state')
+        else:
+            state = {'schema': SECOND_SCHEMA}
+        for key, empty in (('pending', []), ('seen', {}), ('outbox', []), ('ids', []), ('cards', {})):
+            if not isinstance(state.get(key), type(empty)):
+                state[key] = type(empty)()
+        state['threads'] = {}
+        # The owner's team and DM, read (never written back) so that their events and checks name the same conversation as the owner's.
+        for key in ('team', 'channel', 'user', 'scopes'):
+            if key in self.owner.state:
+                state[key] = self.owner.state[key]
+        return state
+
+    def second_lines(self):
+        """The lines of the second person's pass waiting to be printed, or none when their journal cannot be read."""
+        try:
+            return list(self.second_view().output)
+        except (SlackError, OSError, ValueError):
+            return []
+
+    def note_date(self, value):
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            self.clock_first = value if self.clock_first is None else self.clock_first
+            self.clock_last = value if self.clock_last is None else max(self.clock_last, value)
+            if self.second_journal is not None:
+                self.second_journal.note_date(value)
+
+    def record_run(self):
+        """The time of this completed run, in the second person's own journal (last_run): the latest Slack clock its replies reported, or this host's clock when
+        none did. A later run that first reads a new id starts that person's intake there (start_second). Kept on every plane, so that the first enable has it."""
+        value = slack_ts(self.clock_last if self.clock_last is not None else host_now())
+        if self.state.get('last_run') != value:
+            self.state['last_run'] = value
+            self.commit()
+
+    def record_run_safely(self):
+        try:
+            self.second_view().record_run()
+        except (SecretCollision, SlackError, OSError, ValueError):
+            pass
+
+    def remember_safely(self):
+        """Record the ids the setting names in their own journal, from any run that read the setting (poll, arm, mirror); a failure here never touches the owner."""
+        try:
+            view = self.second_view()
+            view.remember_second()
+        except (SecretCollision, SlackError, OSError, ValueError):
+            pass
 
     def poll(self):
         self.started = monotonic()
@@ -2730,13 +2808,13 @@ class Watch:
             self.ran_unbound = True
             return
         self.verify_target()
-        self.remember_second()
         try:
             self.poll_work()
         except SourceUnbound:
             # Unbound at the moment of a post (an unbind returned in between): nothing was posted, the staged row stays journaled.
             self.ran_unbound = True
-        self.record_clock()
+            return
+        self.record_run_safely()
 
     def poll_work(self):
         # The starting point of requests is set before anything uses the per-poll cap, so that a busy first
@@ -2788,11 +2866,12 @@ class Watch:
         # The second person's work comes after all of the owner's, and takes only what the cap leaves of it. The watcher reads a check's output only once the run
         # has ended, so a run with an owner line to print does none of their work: it ends at once, and the next run does it (finding 4 of the review of
         # d0b0c216: the owner's wake never waits for a call of theirs).
-        self.unpark_second_lines()
-        if any(not is_second_line(line) for line in self.deliverable(True)):
-            self.second_deferred = True
-        else:
-            self.second_poll(left)
+        # The second person's pass runs after all of the owner's, in the same poll, with its own journal and its own cap (Main's design ruling of order 1307):
+        # their work never changes the owner's state, and repeated owner activity can never starve it. A failure of theirs is isolated inside it.
+        try:
+            self.second_view().second_poll(self.cap)
+        except (SlackError, OSError, ValueError, KeyError, TypeError):
+            pass
         if deferred:
             raise deferred
 
@@ -2822,8 +2901,10 @@ class Watch:
             return None
         # An older request that is journaled and not yet delivered (its acknowledgement failed, or the source is
         # unbound) goes first: no newer request is taken in while it is retryable, so order never changes. A failed
-        # request is no longer retried; it waits in the journal for `fm-slack-check.sh resolve`. Each person's rows hold only their own window.
-        if any(row.get('kind') == 'request' and not failed(row) and (row.get('person') == 'second') == second for row in self.state['pending']):
+        # request is no longer retried; it waits in the journal for `fm-slack-check.sh resolve`. Each person's rows hold only their own window: a held row of an id
+        # the setting no longer names never holds back the id it names now (finding 4 of the review of 4e0b1bd4), and never goes to that id (request_held).
+        if any(row.get('kind') == 'request' and not failed(row) and (row.get('person') == 'second') == second
+               and (not second or row.get('author') == self.second) for row in self.state['pending']):
             return None
         if second:
             self.second_channel()
@@ -2893,11 +2974,12 @@ class Watch:
         return remaining
 
     def start_second(self):
-        """The second person's starting point, as the owner's is set: the poll opens their DM and records its newest message, never its history, and takes
-        nothing in on that read. Their window is kept apart in state['second']; a person the setting no longer names is replaced by a fresh window unless
-        rows taken in from them are still pending (those drain first, under the old setting). Their DM is never the owner's. A starting point that an arm
-        recorded as the time of the arm (its read of their DM failed, so the window may hold no DM yet) is kept: the DM is opened and the window is completed
-        around that starting point instead of the newest message, which could be one typed after the arm."""
+        """The second person's starting point. Their window (their id, DM, starting point and page bounds) is kept in their own journal under 'second'. When the
+        setting starts naming an id, the window starts at the plane's own previous completed run (last_run, inclusive): a request typed after the enable is
+        taken in (finding 1 of the review of 4e0b1bd4; Main's ruling e59cdb79); it is committed at once, so a failed open keeps it. A
+        window of an id the setting no longer names is replaced at once; that id's journaled rows stay held (request_held) and never go to the new id. An arm's
+        window (arming) starts at the newest message of their DM, the arm's own boundary. Their DM is never the owner's. A starting point an arm recorded from
+        Slack's clock (its read of their DM failed, so the window may hold no DM yet) is kept: the DM is opened and the window completed around it."""
         if not self.second or not self.state.get('channel'):
             return
         win = self.second_window()
@@ -2906,13 +2988,12 @@ class Watch:
         same = win.get('user') == self.second
         if same and win.get('channel') and win.get('intake_cursor') is not None:
             return
-        if not same and any(row.get('person') == 'second' for row in self.state['pending']):
-            return
-        if not same and not self.arming and self.clock_before is not None:
-            # The setting named them after this plane was armed (turned on, or changed to their id): the setting took effect after the plane's last run, so the
-            # newest Slack instant known before this run is their starting point. A request they typed after the setting changed is taken in, and the history
-            # of their DM before that run is not (finding 1 of the review of d0b0c216). It is committed at once, so a failed open keeps it for the next run.
-            self.state['second'] = {'user': self.second, 'intake_cursor': slack_ts(self.clock_before)}
+        mark = self.state.get('last_run')
+        if not same and not self.arming and isinstance(mark, str) and SLACK_TS.fullmatch(mark):
+            # The plane reads this id for the first time: the setting changed after its previous completed run, so that run's time (its Slack clock, or this
+            # host's clock when Slack gave none) is the start, inclusive, compared as Slack orders timestamps. Nothing typed after the enable is lost; at most one
+            # poll interval of earlier messages of theirs is also taken in, as data under their label (Main's ruling e59cdb79 on the enable anchor).
+            self.state['second'] = {'user': self.second, 'intake_cursor': just_before(mark)}
             self.commit()
             win, same = self.second_window(), True
         opened = self.api.call('conversations.open', users=self.second, return_im=True).get('channel', {})
@@ -2923,6 +3004,8 @@ class Watch:
         if same and win.get('intake_cursor') is not None:
             cursor = win['intake_cursor']
         else:
+            # No completed run is on record (or an arm sets the boundary): the owner path's own first-run rule, start_requests (bin/fm_slack_watch.py:1307-1317
+            # at the PR base 9d516486), applies to them too: start at the DM's newest message, never its history, and take nothing in on that read.
             cursor = self.newest(self.read_window(opened['id'], second=True, limit=1).get('messages'))
         self.state['second'] = {'user': self.second, 'channel': opened['id'], 'intake_cursor': cursor}
         if same and isinstance(win.get('unplaced'), dict):
@@ -2944,39 +3027,41 @@ class Watch:
         return remaining
 
     def second_poll(self, remaining):
-        """Everything of the second person's, last, so that nothing of the owner's waits for it: it starts after the owner's requests are taken in, uses only what
-        the per-poll cap leaves, and a failure of any Slack call of it (the read of their window, an acknowledgement) is isolated: logged once per episode in the
-        plane's log with one notice line naming only the error, never raised, so the owner's poll, its failure state and its exit status are what they are without them. An unbind and a plane value still end the run."""
-        self.second_config()
-        if not self.second:
-            if 'second_failure' in self.state:
-                self.state.pop('second_failure')
-                self.commit()
+        """The second person's pass, after all of the owner's work in the same poll, with its own journal and its own cap (remaining): it reads and writes only
+        their journal, record store and refusal log, so the owner's state is what it is without them. A failure of any Slack call of it is logged once per episode
+        with one notice line naming only the error, never raised; a plane value that collides with something of theirs ends only this pass. With the setting off or
+        invalid it still refuses, durably, every observable reaction of an id the setting has named; it takes nothing in."""
+        if not self.second and not self.owner.no_authority and not self.state['pending'] and not self.state.get('second_failure') \
+                and not self.state.get('second_note') and self.second_reason in ('', 'unset'):
+            return                                             # never configured: nothing of theirs exists, and no file is written
+        try:
+            self.second_config()
+            self.remember_second()
+        except SecretCollision:
+            self.restore()
             return
         if self.second_blocked:
-            # A plane value is part of their label: nothing of theirs is read, taken in or printed in this run; the owner's work is not touched (finding 6).
+            # A plane value is part of their label: nothing of theirs is read, taken in or printed in this run (finding 6 of the review of d0b0c216).
             self.second_episode('secret_collides_with_their_label')
             return
+        held = False
         try:
             with self.second_budget(start=monotonic()):
                 self.retry_unlogged()
-                self.resolve_hold()
-                self.start_second()
-                remaining = self.resume_second(remaining)
-                if self.second_window().get('hold'):
-                    # An arm that could not date its starting point left their intake held, and no reply of this run carried Slack's clock: nothing of theirs is
-                    # read or taken in until a run reads it (resolve_hold).
-                    if self.state.get('second_failure') != 'boundary_unknown' and self.second_log('second_window_failed', error='boundary_unknown'):
-                        self.say('slack: second person window failure: boundary_unknown')
-                        self.state['second_failure'] = 'boundary_unknown'
-                        self.commit()
-                    return
-                self.report_unplaced()
-                self.take_requests(remaining, second=True)
+                if self.second:
+                    self.resolve_hold()
+                    self.start_second()
+                    remaining = self.resume_second(remaining)
+                    if self.second_window().get('hold'):
+                        # An arm that could not date its starting point left their intake held, and no reply of this run carried Slack's clock: one episode,
+                        # named once, until a run resolves it.
+                        held = True
+                        self.second_episode('boundary_unknown')
+                    else:
+                        self.report_unplaced()
+                        self.take_requests(remaining, second=True)
                 self.observe_second_cards()
         except SecretCollision:
-            # A plane value collides with something of theirs only (their request text, a refusal row, their journal state): the sink was refused before any
-            # byte of it was written. Memory returns to the journal, their work waits, and one notice per episode names it; the owner's run goes on (finding 6).
             self.restore()
             self.second_episode('secret_collides_with_marker')
         except SecondBudgetSpent:
@@ -2985,7 +3070,7 @@ class Watch:
         except SlackError as error:
             self.second_episode(redact_sink(str(error)))
         else:
-            if self.state.get('second_failure'):
+            if self.state.get('second_failure') and not held:
                 self.state.pop('second_failure')
                 self.commit()
 
@@ -3015,10 +3100,20 @@ class Watch:
         count = 0
         if isinstance(after, str) and isinstance(before, str) and SLACK_TS.fullmatch(after) and SLACK_TS.fullmatch(before):
             channel = self.second_channel()
-            messages = self.read_window(channel, second=True, oldest=after, latest=before, limit=200).get('messages')
-            count = sum(1 for m in messages if isinstance(m, dict) and m.get('user') == self.second and self.human(m) and self.top_level(m)
-                        and isinstance(m.get('ts'), str) and SLACK_TS.fullmatch(m['ts']) and ts_key(after) <= ts_key(m['ts']) < ts_key(before)) \
-                if isinstance(messages, list) else 0
+            cursor = ''
+            while True:
+                # Every page of the span, until Slack says there is no more: a span is named and cleared only once it has been read in full (finding 2 of the
+                # review of 4e0b1bd4); a failed read leaves it for the next run.
+                fields = dict(oldest=after, latest=before, limit=200, **({'cursor': cursor} if cursor else {}))
+                data = self.read_window(channel, second=True, **fields)
+                messages = data.get('messages')
+                if not isinstance(messages, list):
+                    raise SlackError('unreadable_dm_history')
+                count += sum(1 for m in messages if isinstance(m, dict) and m.get('user') == self.second and self.human(m) and self.top_level(m)
+                             and isinstance(m.get('ts'), str) and SLACK_TS.fullmatch(m['ts']) and ts_key(after) <= ts_key(m['ts']) < ts_key(before))
+                cursor = (data.get('response_metadata') or {}).get('next_cursor') if data.get('has_more') else ''
+                if not cursor:
+                    break
         if count and not self.second_log('second_intake_unplaced', count=count, after=after, before=before):
             return
         if count:
@@ -3112,8 +3207,6 @@ class Watch:
         plane's own decision text) and their id. A log that cannot be written leaves the
         attempt unmarked, so the next poll writes it. A retarget's own read (staging_only) logs nothing. attempt (a reaction's number of tries) is part of the
         row and of the event, so that a second attempt is its own row. Returns whether the attempt is on record."""
-        if self.staging_only:
-            return True
         author = author or self.second
         # The event names the member, so that the same emoji or reply slot of another configured id is its own attempt (finding 5 of the review of d0b0c216).
         event = '/'.join([self.state.get('team', ''), self.state.get('channel', ''), record['ts'], item if attempt is None else '%s#%d' % (item, attempt), author,
@@ -3138,7 +3231,7 @@ class Watch:
             return True
         return False
 
-    def logged_reaction_attempts(self, thread, member):
+    def logged_reaction_attempts(self, thread, member, channel=None):
         """{emoji: the highest attempt number} of the reaction refusals the plane's log holds for one card and one member: the durable record that a poll whose
         commit was interrupted after the row was written could not leave in the card's record."""
         found = {}
@@ -3152,6 +3245,7 @@ class Watch:
             except ValueError:
                 continue
             if (isinstance(row, dict) and row.get('reason') == 'decision_held_for_captain_reaction' and row.get('thread') == thread and row.get('author') == member
+                    and row.get('channel') == (channel or self.state.get('channel'))
                     and isinstance(row.get('item'), str) and isinstance(row.get('attempt'), int) and not isinstance(row.get('attempt'), bool)):
                 found[row['item']] = max(found.get(row['item'], 0), row['attempt'])
         return found
@@ -3289,13 +3383,21 @@ class Watch:
         return '/'.join([self.state.get('team', ''), self.state.get('channel', ''), record['ts'], *parts])
 
     def failed_requests(self):
-        """The open failed request rows, oldest first: each waits in the journal for Main to resolve it."""
-        return [request_key(row) for row in self.state['pending'] if row.get('kind') == 'request' and failed(row)]
+        """The open failed request rows, oldest first: each waits in the journal for Main to resolve it (the owner's, then the second person's own journal)."""
+        found = [request_key(row) for row in self.state['pending'] if row.get('kind') == 'request' and failed(row)]
+        if not self.is_second:
+            try:
+                found += self.second_view().failed_requests()
+            except (SlackError, OSError, ValueError):
+                pass
+        return found
 
     def close_request(self, key):
         """Remove the one failed request row named by key and record it resolved; no Slack call. The key is the Slack timestamp of the owner's request, or
         `<ts>@<member id>` for the second person's: the same timestamp may be in both DMs, and the bare one names the owner's row only."""
         ts, _, author = key.partition('@')
+        if author and not self.is_second:
+            return self.second_view().close_request(key)
         rows = [row for row in self.state['pending'] if row.get('kind') == 'request' and row.get('thread') == ts
                 and ((row.get('person') == 'second' and row.get('author') == author) if author else row.get('person') != 'second')]
         if not rows:
@@ -3416,14 +3518,17 @@ def list_failed_requests(command, threads, out=None):
 def open_failed_threads():
     """The threads of the open failed request rows, read from the journal with no watcher: no lock, no Slack call and no write, so that a
     run of a plane that is off still lists them (F4 of the outcome review of b0f37a54; I2 (h) allows this listing and nothing else)."""
-    path = state_home() / STATE_KEY / 'state.json'
-    try:
-        if path.is_symlink():
-            return []
-        rows = json.loads(path.read_text()).get('pending', [])
-        return [request_key(row) for row in rows if isinstance(row, dict) and row.get('kind') == 'request' and failed(row)]
-    except (OSError, ValueError, KeyError, TypeError, AttributeError):
-        return []
+    found = []
+    for name in ('state.json', SECOND_FILE):
+        path = state_home() / STATE_KEY / name
+        try:
+            if path.is_symlink() or not path.exists():
+                continue
+            rows = json.loads(path.read_text()).get('pending', [])
+            found += [request_key(row) for row in rows if isinstance(row, dict) and row.get('kind') == 'request' and failed(row)]
+        except (OSError, ValueError, KeyError, TypeError, AttributeError):
+            continue
+    return found
 
 
 def segment_units(text):
@@ -3494,7 +3599,7 @@ def settle_lines(watch, texts):
             pieces.append(content[cursor:])
             presented = json.loads('"' + ''.join(pieces) + '"')
             outside = len(lines[n]) - (match.end() - match.start())
-            places = watch.record_places()
+            places = (watch.second_view() if is_second_label(segment_label(match.group(1))) else watch).record_places()
             segment = request_line(match.group(2), match.group(3), presented, match.group(4) or '', True, max(0, WAKE_LIMIT - outside), places[0], places[1:],
                                    segment_label(match.group(1)))
             items[n] = (items[n][0], lines[n][:match.start()] + segment + lines[n][match.end():])
@@ -3633,6 +3738,7 @@ def plane_watch(name, options, out):
     watch = Watch(replay=replay, token=env_value('SLACK_BOT_TOKEN').strip())
     try:
         watch.out = out
+        watch.remember_safely()
         if name == 'read' and '@' in (options.get('thread') or ''):
             # Only the read of the second person's request prints their label; the owner's reads never depend on it (finding 6).
             refuse_a_value_that_the_marker_holds(watch.second_fixed_texts())
@@ -3667,7 +3773,8 @@ def reply_command(argv, out):
             return 2
         text = sys.stdin.read()
         watch = plane_watch('reply', options, out)
-        ts, fresh = watch.reply_to(options['thread'], options['to'], int(part), text)
+        target = watch.second_view() if '@' in options['thread'] else watch
+        ts, fresh = target.reply_to(options['thread'], options['to'], int(part), text)
         out.diagnostic('out', '%s: thread %s to %s part %s message %s' % (
             'replied' if fresh else 'already replied, nothing posted', options['thread'], options['to'], int(part), ts))
         return 0
@@ -3698,7 +3805,8 @@ def read_command(argv, out):
         watch = plane_watch('read', options, out)
         thread = options['thread']
         ts = options.get('message') or thread
-        kind, user, text, read = watch.read_message(thread, ts)
+        target = watch.second_view() if '@' in thread else watch
+        kind, user, text, read = target.read_message(thread, ts)
         label = (second_label(thread.split('@', 1)[1]) if '@' in thread else REQUEST_LABEL) if kind == 'request' else FOLLOWUP_LABEL
         lines = ['%s%s in request %s from %s: %s' % (READ_HEADER, ts, thread, user, label)]
         context = [] if ts == thread or options.get('no_context') else watch.thread_context(thread, ts, read)
@@ -3780,6 +3888,8 @@ def main(argv, out=None):
         # A plane value inside the second person's label touches only their lines: it pauses their work and withholds their lines, and never stops the owner's
         # arm, wake or answer (finding 6 of the review of d0b0c216).
         watch.block_second_on_collision()
+        # Every run that reads the setting records the ids it names in their own journal (Main's ruling e59cdb79): none of them is ever an answering author.
+        watch.remember_safely()
         if action == 'arm':
             # Only an explicit retarget may move the plane to a changed owner DM. The poll and the mirror look at the owner
             # after they have found the source bound: an unbound run makes no call, no state change and no output (I2 (h)).
@@ -3788,6 +3898,8 @@ def main(argv, out=None):
             if not watch.bound():
                 return 0
             watch.verify_target()
+            # A mirror reads the setting too: the ids it names are remembered, so none of them can answer once the setting changes (finding 5 of 4e0b1bd4).
+            watch.remember_safely()
             try:
                 watch.mirror()
             except SourceUnbound:

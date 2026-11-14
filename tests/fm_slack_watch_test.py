@@ -4343,7 +4343,6 @@ class SecondPersonTest(unittest.TestCase):
         environment = dict(env or {})
         if value is not self.UNSET:
             environment['FM_SLACK_SECOND_USER'] = value
-            environment.setdefault('FM_SLACK_SECOND_SINCE', INV_SINCE)     # the owner-written enable time, after the fixture's history
         messages = [{'ts': '100.000100', 'user': self.OWNER, 'text': 'already there'}]
         if history:
             messages.append({'ts': '100.000200', 'user': self.SECOND, 'text': 'older than the starting point', 'channel': self.SECOND_DM})
@@ -4353,7 +4352,10 @@ class SecondPersonTest(unittest.TestCase):
         with patch.dict(os.environ):
             if value is self.UNSET:
                 os.environ.pop('FM_SLACK_SECOND_USER', None)
-            with self.fixture(cap=cap, authors=authors, env=environment, transcript_extra=extra) as (watch, replay):
+            # A completed run with no Slack Date is dated by this host's clock: here a time just after the fixture's history, so that the synthetic timestamps of
+            # these replays order against it as real ones would.
+            with patch.object(plane, 'host_now', lambda: 100.0005, create=True), \
+                    self.fixture(cap=cap, authors=authors, env=environment, transcript_extra=extra) as (watch, replay):
                 if started:
                     watch.poll()
                 yield watch, replay
@@ -4365,12 +4367,32 @@ class SecondPersonTest(unittest.TestCase):
         replay.state['messages'].append({'ts': ts, 'user': user or self.SECOND, 'text': text, 'channel': self.SECOND_DM, **more})
 
     def again(self, watch):
+        # As a run that printed everything before it: both journals' outboxes are empty (the owner's state.json and the second person's own second.json).
         watch.output, watch.state['outbox'] = [], []
+        own = watch.root / plane.SECOND_FILE
+        if own.is_file():
+            data = json.loads(own.read_text())
+            data['outbox'] = []
+            own.write_text(json.dumps(data, ensure_ascii=False))
         watch.advanced = 0
         watch.poll()
 
     def wakes(self, watch):
-        return [line for line in watch.output if line.startswith('check: slack request ')]
+        theirs = watch.second_journal.output if watch.second_journal is not None else []
+        return [line for line in list(watch.output) + list(theirs) if line.startswith('check: slack request ')]
+
+    @staticmethod
+    def edit_theirs(watch, change):
+        own = watch.root / plane.SECOND_FILE
+        data = json.loads(own.read_text())
+        change(data)
+        own.write_text(json.dumps(data, ensure_ascii=False))
+
+    @staticmethod
+    def theirs(watch):
+        """The second person's own journal (second.json in the plane's state folder), as it stands on disk."""
+        own = watch.root / plane.SECOND_FILE
+        return json.loads(own.read_text()) if own.is_file() else {}
 
     def both(self, watch):
         """Two polls, as two runs of the check: a run with an owner line to print leaves the second person's work to the next run (finding 4 of the review of
@@ -4420,8 +4442,9 @@ class SecondPersonTest(unittest.TestCase):
         with self.second() as (watch, replay):
             self.says(replay, '200.000100', 'their request with "quotes", a backslash \\ and   spaces')
             message = [m for m in replay.state['messages'] if m['ts'] == '200.000100'][0]
-            row = watch.request_from(message, second=True)
-            artifacts = watch.request_artifacts(row)
+            view = watch.second_view()                             # their own pass: the model of their own journal
+            row = view.request_from(message, second=True)
+            artifacts = view.request_artifacts(row)
             written, real = [], plane.save
 
             def spy(path, value):
@@ -4515,7 +4538,7 @@ class SecondPersonTest(unittest.TestCase):
 
     def test_sc2_a_stored_channel_that_is_not_their_dm_is_refused_and_nothing_is_posted_or_read_there(self):
         with self.second() as (watch, replay):
-            watch.state['second']['channel'] = 'D0WRONGDM01'
+            self.edit_theirs(watch, lambda data: data['second'].update(channel='D0WRONGDM01'))
             watch.second_proven = False  # every real poll is a new process: the DM is proven again
             self.says(replay, '200.000100')
             self.owner_says(replay, '200.000200')
@@ -4528,9 +4551,9 @@ class SecondPersonTest(unittest.TestCase):
     def test_sc2_their_dm_is_never_the_owner_dm(self):
         with self.second(dms={'U0TESTOWNER': 'D0123456789', 'U0SYNTHSEC1': 'D0123456789'}, clock=200.0) as (watch, replay):
             # The arm could not open their DM (it is the owner's): their window holds their id and the starting point of the arm (Slack's clock), never a DM.
-            self.assertEqual(watch.state['second']['user'], self.SECOND)
-            self.assertIn('intake_cursor', watch.state['second'])
-            self.assertNotIn('channel', watch.state['second'])
+            self.assertEqual(self.theirs(watch)['second']['user'], self.SECOND)
+            self.assertIn('intake_cursor', self.theirs(watch)['second'])
+            self.assertNotIn('channel', self.theirs(watch)['second'])
             self.assertEqual([(r['reason'], r['error']) for r in self.refusals(watch)], [('second_window_failed', 'second_dm_is_owner_dm')])
             self.assertEqual(self.posts(replay), [])
 
@@ -4547,18 +4570,19 @@ class SecondPersonTest(unittest.TestCase):
             lines = self.both(watch)
             room = len(lines[1]) - 3
             original = Watch.record
-            with patch.object(Watch, 'record', (lambda self, ts, author=None: original(self, ts)) if mutated else original):
+            # The mutation: a lookup that reads the owner's store and ignores the author (the two stores and the author-aware key are what keep them apart).
+            with patch.object(Watch, 'record', (lambda self, ts, author=None: original(self.owner, ts)) if mutated else original):
                 cut = watch.fit(lines[1], room)
             yield watch, replay, lines, room, cut
 
     def test_sc2_two_messages_with_the_same_ts_in_the_two_dms_stay_apart(self):
         with self.same_ts_in_both_dms() as (watch, replay, lines, room, cut):
-            rows = [json.loads(line) for line in (watch.root / 'requests.jsonl').read_text().splitlines()]
-            records = (watch.record('200.000100')['text'], watch.record('200.000100', self.SECOND)['text'])
-            posts, seen = sorted(self.posts(replay)), len(watch.state['seen'])
+            rows = [json.loads(line) for name in ('requests.jsonl', plane.SECOND_RECORD_FILE) for line in (watch.root / name).read_text().splitlines()]
+            records = (watch.record('200.000100')['text'], watch.second_view().record('200.000100', self.SECOND)['text'])
+            posts, seen = sorted(self.posts(replay)), (len(watch.state['seen']), len(self.theirs(watch)['seen']))
         self.assertEqual(posts, [(self.OWNER_DM, '200.000100'), (self.SECOND_DM, '200.000100')])
         self.assertEqual([plane.REQUEST_SEGMENT.match(line).group(2) for line in lines], [self.OWNER, self.SECOND])
-        self.assertEqual(seen, 2)
+        self.assertEqual(seen, (1, 1))                                  # one event in the owner's journal, one in theirs
         self.assertEqual(sorted((row['text'], row.get('author')) for row in rows), [(self.OWNER_TEXT, None), (self.SECOND_TEXT, self.SECOND)])
         self.assertEqual(records, (self.OWNER_TEXT, self.SECOND_TEXT))
         self.assertEqual(plane.segment_label(lines[1][:lines[1].index('"')]), self.expected_label(self.SECOND))
@@ -4732,7 +4756,7 @@ class SecondPersonTest(unittest.TestCase):
             self.assertEqual(watch.state['failure'], '')
             self.again(watch)
             self.assertEqual(self.posts(replay)[-1], (self.SECOND_DM, '200.000200'))
-            self.assertNotIn('second_failure', watch.state)
+            self.assertNotIn('second_failure', self.theirs(watch))
 
     def test_sc4_a_lasting_channel_not_found_on_their_dm_prints_one_notice_per_episode_and_the_exit_stays_zero(self):
         notice = 'slack: second person window failure: channel_not_found'
@@ -4758,8 +4782,8 @@ class SecondPersonTest(unittest.TestCase):
                         code = plane.main(['poll', '--replay', transcript])
                     runs.append((code, out.getvalue().splitlines()))
             self.assertEqual([code for code, _ in runs], [0, 0, 0])
-            # The first run has the owner's wake to print, so their work, and with it the notice of its failure, comes in the second (finding 4).
-            self.assertEqual([lines.count(notice) for _, lines in runs], [0, 1, 0])
+            # Their pass runs after the owner's in the same poll (Main's design ruling of order 1307): the notice comes in the first run, once.
+            self.assertEqual([lines.count(notice) for _, lines in runs], [1, 0, 0])
             self.assertEqual([line for line in runs[0][1] if line.startswith('check: slack request ')],
                              [plane.request_line('200.000100', self.OWNER, 'owner words')])
             printed = '\n'.join(line for _, lines in runs for line in lines)
@@ -4792,7 +4816,7 @@ class SecondPersonTest(unittest.TestCase):
                 with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': value}), contextlib.redirect_stdout(out), \
                      contextlib.redirect_stderr(io.StringIO()):
                     code = plane.main(['poll', '--replay', transcript])
-                return code, out.getvalue().splitlines().count(notice), sorted(json.loads(watch.path.read_text()))
+                return code, out.getvalue().splitlines().count(notice), sorted(self.theirs(watch))
             with patch.object(Replay, 'replayed', missing), patch.object(Watch, 'bound', return_value=True), \
                  patch.object(Watch, 'backlog', return_value=[]):
                 first = run(self.SECOND)
@@ -4814,24 +4838,26 @@ class SecondPersonTest(unittest.TestCase):
             self.again(watch)
             self.assertEqual([plane.REQUEST_SEGMENT.match(line).group(2) for line in self.wakes(watch)], [self.OWNER])
             reads = [json.loads(line) for line in (watch.root / 'attempts.jsonl').read_text().splitlines()][seen:]
-            # The run that wakes the owner reads nothing of their flooded window (finding 4): that waits for the next run.
-            self.assertEqual(len([r for r in reads if r['method'] == 'conversations.history' and r['channel'] == self.SECOND_DM]), 0)
+            # Their pass reads their flooded window once, after the owner's request is woken (Main's design ruling of order 1307).
+            self.assertEqual(len([r for r in reads if r['method'] == 'conversations.history' and r['channel'] == self.SECOND_DM]), 1)
             while len(self.posts(replay)) < 451:
                 before = len(self.posts(replay))
                 self.again(watch)
-                self.assertGreater(len(self.posts(replay)) + len(watch.state.get('second', {}).get('intake_bounds', [])), before)
+                self.assertGreater(len(self.posts(replay)) + len(self.theirs(watch).get('second', {}).get('intake_bounds', [])), before)
             self.assertEqual(len([p for p in self.posts(replay) if p[0] == self.SECOND_DM]), 450)
 
-    def test_sc4_they_share_the_cap_and_never_take_the_turn_of_an_owner_request(self):
+    def test_sc4_they_have_their_own_cap_and_never_take_the_turn_of_an_owner_request(self):
+        # Their pass has its own per-poll cap (Main's design ruling of order 1307): with a cap of 1, each poll takes one owner request and then one of theirs, and
+        # in every poll the owner's line comes first.
         with self.second(cap='1') as (watch, replay):
             self.says(replay, '200.000100')
             self.owner_says(replay, '200.000200')
             self.owner_says(replay, '200.000300')
-            order = []
+            polls = []
             for _ in range(3):
                 self.again(watch)
-                order += [plane.REQUEST_SEGMENT.match(line).group(1, 2) for line in self.wakes(watch)]
-            self.assertEqual(order, [('200.000200', self.OWNER), ('200.000300', self.OWNER), ('200.000100', self.SECOND)])
+                polls.append([plane.REQUEST_SEGMENT.match(line).group(1, 2) for line in self.wakes(watch)])
+            self.assertEqual(polls, [[('200.000200', self.OWNER), ('200.000100', self.SECOND)], [('200.000300', self.OWNER)], []])
 
     def test_sc4_an_unacknowledged_request_of_theirs_never_holds_back_the_owner_and_the_owner_retarget(self):
         with self.second() as (watch, replay):
@@ -4840,12 +4866,13 @@ class SecondPersonTest(unittest.TestCase):
             self.owner_says(replay, '200.000200')
             self.both(watch)
             self.assertEqual(self.posts(replay), [(self.OWNER_DM, '200.000200')])
-            self.assertEqual(len([row for row in watch.state['pending'] if row.get('person') == 'second']), 1)
+            self.assertEqual(len([row for row in self.theirs(watch).get('pending', []) if row.get('person') == 'second']), 1)
             # Their row is journaled and still retryable (it is not failed) when a NEW owner request arrives: the owner is taken in at once, in that poll.
             self.owner_says(replay, '200.000300')
             self.again(watch)
             self.assertEqual(self.posts(replay), [(self.OWNER_DM, '200.000200'), (self.OWNER_DM, '200.000300')])
-            self.assertEqual([plane.REQUEST_SEGMENT.match(line).group(2) for line in self.wakes(watch)], [self.OWNER])
+            # The owner's request is woken in that poll, first; their row, after its third refused acknowledgement, may be woken after it as not acknowledged.
+            self.assertEqual([plane.REQUEST_SEGMENT.match(line).group(2) for line in self.wakes(watch)][:1], [self.OWNER])
             with patch.dict(os.environ, {'FM_SLACK_DM_USER': 'U0OTHEROWNER1'}):
                 self.assertTrue(watch.retarget())
 
@@ -4877,8 +4904,8 @@ class SecondPersonTest(unittest.TestCase):
             self.says(replay, '200.000100', 'typed while disarmed')
             self.says(replay, '200.000200', 'also typed while disarmed')
             watch.prepare()
-            self.assertEqual(watch.state['second'], {'user': self.SECOND, 'channel': self.SECOND_DM, 'intake_cursor': '200.000200'})
-            self.assertEqual(watch.request_target('150.000100@' + self.SECOND), ('150.000100', self.SECOND_DM, 'second'))
+            self.assertEqual(self.theirs(watch)['second'], {'user': self.SECOND, 'channel': self.SECOND_DM, 'intake_cursor': '200.000200'})
+            self.assertEqual(watch.second_view().request_target('150.000100@' + self.SECOND), ('150.000100', self.SECOND_DM, 'second'))
             for _ in range(2):
                 self.again(watch)
                 self.assertEqual(self.wakes(watch), [])
@@ -4906,7 +4933,7 @@ class SecondPersonTest(unittest.TestCase):
             self.says(replay, '200.000100', 'typed while disarmed')
             self.says(replay, '200.000200', 'also typed while disarmed')
             watch.prepare()
-            self.assertEqual(watch.state['second'], {'user': self.SECOND, 'channel': self.SECOND_DM, 'intake_cursor': '200.000200'})
+            self.assertEqual(self.theirs(watch)['second'], {'user': self.SECOND, 'channel': self.SECOND_DM, 'intake_cursor': '200.000200'})
             for _ in range(2):
                 self.again(watch)
                 self.assertEqual(self.wakes(watch), [])
@@ -4923,15 +4950,15 @@ class SecondPersonTest(unittest.TestCase):
             replay.state['failures']['chat.postMessage:200.000100'] = {'status': 400}
             self.says(replay, '200.000100')
             self.again(watch)
-            self.assertEqual(len([row for row in watch.state['pending'] if row.get('person') == 'second']), 1)
+            self.assertEqual(len([row for row in self.theirs(watch).get('pending', []) if row.get('person') == 'second']), 1)
             self.says(replay, '200.000200', 'typed while disarmed')
             watch.prepare()
-            self.assertEqual(watch.state['second'], {'user': self.SECOND, 'channel': self.SECOND_DM, 'intake_cursor': '200.000200'})
+            self.assertEqual(self.theirs(watch)['second'], {'user': self.SECOND, 'channel': self.SECOND_DM, 'intake_cursor': '200.000200'})
             replay.state['failures'].pop('chat.postMessage:200.000100')
             for _ in range(2):
                 self.again(watch)
             self.assertEqual(self.posts(replay), [(self.SECOND_DM, '200.000100')])
-            self.assertEqual([row for row in watch.state['pending'] if row.get('person') == 'second'], [])
+            self.assertEqual([row for row in self.theirs(watch).get('pending', []) if row.get('person') == 'second'], [])
 
     def test_sc4_a_failed_read_of_their_dm_never_fails_the_owner_arm_and_the_arm_time_is_their_starting_point(self):
         with self.second() as (watch, replay):
@@ -4949,7 +4976,7 @@ class SecondPersonTest(unittest.TestCase):
                 watch.prepare()
             self.assertEqual(watch.state['intake_cursor'], '200.000200')
             # The arm's first Date says 200; it then saw 201, so 201 is exact: everything typed after the arm is at 201 or later.
-            self.assertEqual(watch.state['second'], {'user': self.SECOND, 'channel': self.SECOND_DM, 'intake_cursor': '200.999999'})
+            self.assertEqual(self.theirs(watch)['second'], {'user': self.SECOND, 'channel': self.SECOND_DM, 'intake_cursor': '200.999999'})
             after = '%.6f' % (200.3 + 0.4 * replay.state['clock_calls'] + 0.05)
             self.says(replay, after, 'typed after the arm whose read of their DM failed')
             self.again(watch)
@@ -5036,7 +5063,7 @@ class SecondPersonTest(unittest.TestCase):
             self.assertEqual(len(self.wakes(watch)), len(hostile))
             self.assertEqual({(tuple(c[0][2:]), c[1], tuple(c[2])) for c in children}, {(('binding', plane.SOURCE), None, ())})
             self.assertTrue(all(c[0][0] == 'bash' and c[0][1].endswith('fm-captain-hold.sh') for c in children))
-            self.assertEqual(sorted(path.name for path in watch.root.iterdir()), sorted(set(files_before) | {'requests.jsonl'}))
+            self.assertEqual(sorted(path.name for path in watch.root.iterdir()), sorted(set(files_before) | {plane.SECOND_RECORD_FILE}))
             self.assertFalse(Path('/tmp/pwned').exists())
 
     def test_sc6_a_plane_value_in_their_text_is_replaced_in_the_wake_the_record_and_the_journal(self):
@@ -5048,10 +5075,10 @@ class SecondPersonTest(unittest.TestCase):
             self.assertIn('[secret removed]', line)
             self.assertTrue(line.endswith('; secret removed'))
             # The replay's own files stand in for Slack and keep what was typed; the plane's own files must not.
-            for name in ('state.json', 'requests.jsonl', 'refusals.jsonl'):
+            for name in ('state.json', plane.SECOND_FILE, plane.SECOND_RECORD_FILE, 'refusals.jsonl'):
                 if (watch.root / name).is_file():
                     self.assertNotIn(self.TOKEN, (watch.root / name).read_text(), name)
-            self.assertIn('[secret removed]', (watch.root / 'requests.jsonl').read_text())
+            self.assertIn('[secret removed]', (watch.root / plane.SECOND_RECORD_FILE).read_text())
 
     def test_sc6_the_owner_only_callers_never_prove_or_write_their_dm_and_the_scott_aware_ones_pick_the_dm_by_row(self):
         # The owner-only callers of owner_channel (the mirror's card writes, the owner's starting point) never touch their DM; the Scott-aware callers
@@ -5080,7 +5107,6 @@ class SecondPersonTest(unittest.TestCase):
 INV_OWNER, INV_SECOND, INV_WRONG = 'U0TESTOWNER', 'U0SYNTHSEC1', 'U0WRONGUSER1'
 INV_OWNER_DM, INV_SECOND_DM = 'D0123456789', 'D0SECONDDM1'
 INV_TOKEN = 'fixture-token-not-a-secret'
-INV_SINCE = '100.000500'                  # the enable time the owner writes beside the id: after every fixture's pre-existing history
 INV_SCOPES = ['chat:write', 'im:write', 'im:history', 'reactions:read', 'reactions:write', 'users:read']
 INV_POPULATION = ['auth.test', 'chat.postMessage', 'chat.update', 'conversations.open', 'conversations.history', 'conversations.replies',
                   'reactions.get', 'reactions.add', 'users.info']
@@ -5180,6 +5206,14 @@ class InvariantHome:
     def state(self):
         return json.loads((self.state_dir / 'state.json').read_text())
 
+    def theirs(self):
+        """The second person's own journal (second.json in the plane's state folder), or {} before it exists."""
+        path = self.state_dir / plane.SECOND_FILE
+        return json.loads(path.read_text()) if path.is_file() else {}
+
+    def all_pending(self):
+        return self.state().get('pending', []) + self.theirs().get('pending', [])
+
     def refusals(self):
         path = self.state_dir / 'refusals.jsonl'
         return [json.loads(l) for l in path.read_text().splitlines()] if path.is_file() else []
@@ -5203,10 +5237,9 @@ class InvariantScenario(unittest.TestCase):
                    'FM_SLACK_POLL_MAX_ANSWERS': cap, 'SLACK_BOT_TOKEN': INV_TOKEN, 'FM_SLACK_NO_NETWORK': '1', **(extra_env or {})}
             if scott:
                 env['FM_SLACK_SECOND_USER'] = scott
-                env.setdefault('FM_SLACK_SECOND_SINCE', INV_SINCE)
             fake = lambda script, *args, text=None: __import__('subprocess').CompletedProcess([], 0, stdout='x\n', stderr='')
             with patch.dict(os.environ, env), patch.object(Watch, 'bound', lambda self: True), patch.object(Watch, 'backlog', lambda self: []), \
-                    patch.object(plane, 'run', fake):
+                    patch.object(plane, 'run', fake), patch.object(plane, 'host_now', lambda: 100.0005, create=True):
                 if not scott:
                     os.environ.pop('FM_SLACK_SECOND_USER', None)
                 home = InvariantHome(d, transcript)
@@ -5510,39 +5543,86 @@ class Invariant1Boundary(InvariantScenario):
 
     # ---- Round 5 (the outside review of 4e0b1bd4), finding 1: activation starts at the owner-written enable time ----
 
-    def test_r5_f1_activation_takes_in_what_is_typed_after_the_owner_written_enable_time_and_none_of_what_came_before(self):
-        with self.home(scott=None, history=False) as home:
-            home.set_clock(100.0)
-            home.cli('poll')                                                # the last Slack clock the plane saw is 100
-            home.say('105.000100', 'typed before the owner enabled them')
-            home.set_clock(112.0)
-            with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': INV_SECOND, 'FM_SLACK_SECOND_SINCE': '110'}):
-                home.say('111.000100', 'typed after the owner enabled them')
-                polls = [home.cli('poll'), home.cli('poll')]
-            self.assertEqual(self.placed(polls), ['111.000100'])
-            self.assertEqual(home.posts().count((INV_SECOND_DM, '111.000100')), 1)
-            self.assertNotIn((INV_SECOND_DM, '105.000100'), home.posts())
-
     def test_r5_f1_activation_with_an_empty_owner_history_and_no_slack_date_keeps_the_first_request(self):
-        with self.home(scott=None, history=False, owner_history=False) as home:
+        # No reply carries Slack's clock, and the owner's DM is empty: the previous completed run is dated by this host's clock (105.5 here), and a request typed
+        # after the enable (111) is taken in (Main's ruling e59cdb79 on the enable anchor).
+        with self.home(scott=None, history=False, owner_history=False) as home, patch.object(plane, 'host_now', lambda: 105.5, create=True):
             home.set_clock(None)
             home.cli('poll')
-            with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': INV_SECOND, 'FM_SLACK_SECOND_SINCE': '110'}):
+            with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': INV_SECOND}):
                 home.say('111.000100', 'their first request')
                 polls = [home.cli('poll'), home.cli('poll')]
             self.assertEqual(self.placed(polls), ['111.000100'])
             self.assertEqual(home.posts().count((INV_SECOND_DM, '111.000100')), 1)
 
     def test_r5_f1_first_activation_with_the_owner_active_keeps_both_requests_at_the_same_timestamp(self):
-        with self.home(scott=None, history=False) as home:
+        with self.home(scott=None, history=False) as home, patch.object(plane, 'host_now', lambda: 105.5, create=True):
             home.cli('poll')
-            with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': INV_SECOND, 'FM_SLACK_SECOND_SINCE': '110'}):
+            with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': INV_SECOND}):
                 home.say('111.000100', 'the owner request', user=INV_OWNER, dm=INV_OWNER_DM)
                 home.say('111.000100', 'their request at the same timestamp')
                 polls = [home.cli('poll') for _ in range(3)]
             woken = [(re.search(r'slack request (\S+) from (\S+?)[: ]', l).groups()) for r in polls for l in r.wakes()]
-            self.assertEqual(sorted(woken), [('111.000100', INV_OWNER), ('111.000100', INV_SECOND)])
+            self.assertEqual(sorted(woken), sorted([('111.000100', INV_OWNER), ('111.000100', INV_SECOND)]))
             self.assertEqual((home.posts().count((INV_OWNER_DM, '111.000100')), home.posts().count((INV_SECOND_DM, '111.000100'))), (1, 1))
+
+    def test_r5_f1_the_start_is_the_previous_completed_run_inclusive_and_ordered_to_the_microsecond(self):
+        # The previous completed run ended at 105.5 (this host's clock; no Slack Date). Their message typed before it is history; the one typed at it and the one
+        # after it are taken in, ordered as Slack orders timestamps, never by rounded seconds.
+        with self.home(scott=None, history=False) as home:
+            home.set_clock(None)
+            with patch.object(plane, 'host_now', lambda: 105.5, create=True):
+                home.cli('poll')
+            home.say('105.499999', 'typed before the previous run ended')
+            home.say('105.500000', 'typed as it ended')
+            home.say('105.600000', 'typed after the enable')
+            with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': INV_SECOND}), patch.object(plane, 'host_now', lambda: 106.0, create=True):
+                polls = [home.cli('poll') for _ in range(3)]
+            self.assertEqual(self.placed(polls), ['105.500000', '105.600000'])
+            self.assertNotIn((INV_SECOND_DM, '105.499999'), home.posts())
+
+    def test_r5_f1_with_no_completed_run_on_record_their_start_is_the_owner_paths_first_run_rule(self):
+        # A plane with no completed run on record for the second person (a plane upgraded from the base, whose state folder holds no run time): their window
+        # follows the owner path's own first-run rule (start_requests): it starts at their DM's newest message, takes nothing of their history in, and a
+        # request typed after it is taken in (Main 1310 addendum d02e84e1).
+        with self.home(scott=None) as home:
+            home.cli('poll')
+            for name in ('second.json',):                             # the second person's own journal, where the run time is kept
+                path = home.state_dir / name
+                if path.exists():
+                    path.unlink()                                          # no completed run on record
+            with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': INV_SECOND}):
+                first = home.cli('poll')                                   # their history (100.000200) is newer than the owner's newest message
+                home.say('300.000100', 'typed after their window started')
+                later = [home.cli('poll'), home.cli('poll')]
+            self.assertEqual(self.placed([first] + later), ['300.000100'])
+            self.assertNotIn((INV_SECOND_DM, '100.000200'), home.posts())
+
+    def test_r5_f1_control_with_a_frozen_slack_clock_the_first_request_after_the_enable_is_taken_in(self):
+        with self.home(scott=None, history=False) as home:
+            home.set_clock(100.0)                                           # every reply says 100
+            home.cli('poll')
+            home.say('99.000100', 'typed before the previous run')
+            with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': INV_SECOND}):
+                home.say('100.500000', 'their request after the enable, in the same second')
+                polls = [home.cli('poll'), home.cli('poll')]
+            self.assertEqual(self.placed(polls), ['100.500000'])
+
+    def test_r5_f1_control_an_outage_across_the_enable_loses_nothing_typed_after_it(self):
+        with self.home(scott=None, history=False) as home:
+            home.set_clock(100.0)
+            home.cli('poll')                                                # the last completed run before the outage
+            home.edit_replay(lambda data: data['failures'].update({'conversations.history': {'status': 503, 'times': 3}}))
+            home.set_clock(130.0)
+            for _ in range(2):
+                home.cli('poll')                                            # failed runs: not completed
+            home.say('120.000100', 'typed during the outage, before the enable')
+            with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': INV_SECOND}):
+                home.say('160.000100', 'typed after the enable')
+                home.set_clock(170.0)
+                polls = [home.cli('poll') for _ in range(3)]
+            self.assertIn('160.000100', self.placed(polls))
+            self.assertEqual(self.placed(polls).count('160.000100'), 1)
 
     # ---- Round 5, finding 2: the unplaced span is paged in full and never cleared unread; the clock probe stays inside their budget ----
 
@@ -5638,7 +5718,7 @@ class Invariant2Identity(InvariantScenario):
             home.say('200.000100', 'a request of theirs with the same timestamp')
             for _ in range(6):                              # their work runs only in the runs that have no owner line to print (finding 4)
                 home.cli('poll')
-            rows = lambda: sorted(row.get('person') or 'owner' for row in home.state()['pending'])
+            rows = lambda: sorted(row.get('person') or 'owner' for row in home.all_pending())
             self.assertEqual(rows(), ['owner', 'second'])
             self.assertEqual(home.cli('check', '200.000100', action='resolve').rc, 0)         # the bare timestamp names the owner's request only
             self.assertEqual(rows(), ['second'])
@@ -5667,7 +5747,7 @@ class Invariant2Identity(InvariantScenario):
             home.say('200.000100', 'typed while the setting names them')
             first = home.cli('poll')
             self.assertEqual(self.requests_woken(first), [], first.out)
-            self.assertEqual([row['author'] for row in home.state()['pending'] if row.get('person') == 'second'], [INV_SECOND])
+            self.assertEqual([row['author'] for row in home.all_pending() if row.get('person') == 'second'], [INV_SECOND])
             with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': other}):
                 held = home.cli('poll')
             self.assertEqual((held.rc, held.wakes(), home.posts()), (0, [], []), (held.out, held.err))
@@ -5711,16 +5791,26 @@ class Invariant3Consumers(InvariantScenario):
             result = home.cli('poll')
             for l in result.wakes():
                 lines[who] = l
-        return lines, (home.state_dir / 'requests.jsonl').read_text().splitlines()
+        return lines
+
+    @staticmethod
+    def store_named(home, place, key):
+        """The store a pointer names: its place relative to the firstmate home (or absolute); with the key alone, the default store of that key's person
+        (requests.jsonl for a bare ts, second-requests.jsonl for `<ts>@<member id>`)."""
+        if place:
+            path = Path(place) if place.startswith('/') else home.dir / place
+        else:
+            path = home.state_dir / (plane.SECOND_RECORD_FILE if '@' in key else 'requests.jsonl')
+        return path.read_text().splitlines()
 
     def check_order(self, owner_first):
         with self.home() as home:
-            lines, store = self.cut_line_and_store(home, owner_first)
+            lines = self.cut_line_and_store(home, owner_first)
             self.assertEqual(set(lines), {'owner', 'second'}, lines)
             for who, prefix in (('owner', 'INV_OWNER-'), ('second', 'SECOND-')):
-                pointer = re.search(r'; full: [^;#]*#(\S+)$', lines[who])
+                pointer = re.search(r'; full: ([^;#]*)#(\S+)$', lines[who])
                 self.assertTrue(pointer, 'the wake line of %s is cut and names its record: %r' % (who, lines[who][-120:]))
-                row = self.consumer_lookup(store, pointer.group(1))
+                row = self.consumer_lookup(self.store_named(home, pointer.group(1), pointer.group(2)), pointer.group(2))
                 self.assertIsNotNone(row, who)
                 self.assertTrue(row['text'].startswith(prefix), (who, row['text'][:12]))
 
@@ -5806,34 +5896,30 @@ sys.exit(plane.main(sys.argv[1:]))
             self.assertEqual(len(self.wakes_of(again, INV_SECOND)), 1, again)              # their request, deferred by the budget, is taken in by the next run
             self.assertEqual(home.posts().count((INV_OWNER_DM, '200.000100')), 1)
 
-    def test_inv4_control_an_unblocked_second_person_is_taken_in_by_the_next_run(self):
-        # A run with the owner's wake to print does none of their work (finding 4 of the review of d0b0c216); the next run takes their request in.
+    def test_inv4_control_an_unblocked_second_person_is_taken_in_by_the_same_run(self):
+        # Their pass runs after the owner's in the same poll (Main's design ruling of order 1307): one run takes both requests in.
         with self.home() as home:
             self.owner_and_second_waiting(home)
             rc, captured, calls = self.run_check(home, 'normal', 'unblocked')
             self.assertEqual(rc, 0)
-            self.assertEqual((len(self.wakes_of(captured, INV_OWNER)), len(self.wakes_of(captured, INV_SECOND)), calls), (1, 0, []), captured)
-            rc, captured, calls = self.run_check(home, 'normal', 'next')
-            self.assertEqual((len(self.wakes_of(captured, INV_OWNER)), len(self.wakes_of(captured, INV_SECOND))), (0, 1), captured)
+            self.assertEqual((len(self.wakes_of(captured, INV_OWNER)), len(self.wakes_of(captured, INV_SECOND))), (1, 1), captured)
             self.assertGreater(len(calls), 2, calls)
 
-    def test_inv4_a_check_stopped_during_a_second_person_call_loses_nothing_of_the_owner_and_their_request_is_taken_in_once_later(self):
-        # The run with the owner's wake to print makes no call of theirs (finding 4 of the review of d0b0c216), so it prints the owner wake. The next run, which
-        # does their work, is stopped inside their first call (a hard exit: no flush, no cleanup; the watcher discards its output). The run after it takes their
-        # request in once; the owner's wake and acknowledgement are never repeated.
+    def test_inv4_a_check_stopped_during_a_second_person_call_leaves_the_owner_wake_to_the_next_run(self):
+        # The owner's acknowledgement is posted and its wake line is journaled before their pass begins; the run is then stopped inside their first call (a hard
+        # exit: no flush, no cleanup; the watcher discards its output). The next run prints the owner wake once, with no second acknowledgement, and takes their
+        # request in.
         with self.home() as home:
             self.owner_and_second_waiting(home)
-            rc, captured, calls = self.run_check(home, 'normal', 'owner')
-            self.assertEqual((rc, len(self.wakes_of(captured, INV_OWNER)), calls), (0, 1, []), captured)
             rc, captured, calls = self.run_check(home, 'die', 'stopped')
             self.assertEqual(rc, 137)
-            self.assertEqual(len(calls), 1, calls)                                        # the check was stopped inside their first call
+            self.assertEqual(len(calls), 1, calls)
+            self.assertEqual(home.posts().count((INV_OWNER_DM, '200.000100')), 1)
             rc, recovered, _ = self.run_check(home, 'normal', 'next')
             self.assertEqual(rc, 0)
-            self.assertEqual(self.wakes_of(recovered, INV_OWNER), [])
+            self.assertEqual(len(self.wakes_of(recovered, INV_OWNER)), 1, recovered)
+            self.assertEqual(home.posts().count((INV_OWNER_DM, '200.000100')), 1)
             self.assertEqual(len(self.wakes_of(recovered, INV_SECOND)), 1, recovered)
-            self.assertEqual(home.posts().count((INV_OWNER_DM, '200.000100')), 1)          # no second acknowledgement
-            self.assertEqual(home.posts().count((INV_SECOND_DM, '200.000200')), 1)
 
     def test_inv4_control_with_the_second_person_off_the_owner_wake_is_printed(self):
         with self.home(scott=None) as home:
@@ -5857,18 +5943,16 @@ sys.exit(plane.main(sys.argv[1:]))
                 self.assertEqual(sum(len(self.wakes_of(c, INV_SECOND)) for c in captured), 1, captured)
                 self.assertEqual(home.posts().count((INV_SECOND_DM, '200.000200')), 1)
 
-    def test_r3_f4_a_run_with_an_owner_wake_to_print_makes_no_call_of_theirs_and_the_next_run_takes_their_request_in(self):
+    def test_r3_f4_in_a_run_with_both_people_the_owner_wake_is_printed_first_and_theirs_follows_in_the_same_run(self):
         for command in ('poll', 'check'):
             with self.subTest(command=command), self.home() as home:
                 home.trust_check()
                 self.owner_and_second_waiting(home)
-                rc, captured, calls = self.run_check(home, 'normal', 'first-' + command, command=command)
+                rc, captured, calls = self.run_check(home, 'normal', 'both-' + command, command=command)
                 self.assertEqual(rc, 0)
-                self.assertEqual(len(self.wakes_of(captured, INV_OWNER)), 1, captured)
-                self.assertEqual(calls, [])                                 # nothing of theirs ran before the owner wake left the run
-                rc, again, _ = self.run_check(home, 'normal', 'next-' + command, command=command)
-                self.assertEqual(self.wakes_of(again, INV_OWNER), [])
-                self.assertEqual(len(self.wakes_of(again, INV_SECOND)), 1, again)
+                owner_at = captured.find('from ' + INV_OWNER)
+                theirs_at = captured.find('from ' + INV_SECOND)
+                self.assertTrue(0 <= owner_at < theirs_at, captured)
                 self.assertEqual(home.posts().count((INV_OWNER_DM, '200.000100')), 1)
 
     def test_r3_f4_a_queued_wake_of_theirs_never_takes_the_turn_of_a_new_owner_request_in_check_event_mode(self):
@@ -5927,7 +6011,7 @@ sys.exit(plane.main(sys.argv[1:]))
             home.cli('poll')
             home.say('200.000100', 'a request of A whose acknowledgement is refused')
             home.cli('poll')
-            with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': other, 'FM_SLACK_SECOND_SINCE': '150'}):
+            with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': other}):
                 home.say('200.000300', 'a request of B', user=other, dm=other_dm)
                 polls = [home.cli('poll'), home.cli('poll')]
             self.assertEqual([re.search(r'slack request (\S+) from (\S+?)[: ]', l).groups() for r in polls for l in r.wakes()], [('200.000300', other)])
@@ -6261,7 +6345,7 @@ class Invariant5Reactions(InvariantScenario):
     def test_r5_f5_an_id_configured_only_during_a_mirror_never_answers_after_the_setting_is_unset(self):
         for attempt in ('reply', 'reaction'):
             with self.subTest(attempt=attempt), self.home(scott=None, authors=','.join([INV_OWNER, INV_SECOND])) as home, self.held_card(home) as answers:
-                with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': INV_SECOND, 'FM_SLACK_SECOND_SINCE': INV_SINCE}):
+                with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': INV_SECOND}):
                     home.cli('mirror')                                     # the only run that sees the setting naming them
                 ts = next(iter(home.state()['threads'].values()))['ts']
                 if attempt == 'reply':
@@ -6405,9 +6489,9 @@ class Invariant6Collision(InvariantScenario):
         home.cli('poll')
         home.say('200.000100', 'second person request journaled while on', user=INV_SECOND, dm=INV_SECOND_DM)
         line = self.requests_woken(home.cli('poll'))[0]
-        state = home.state()
-        state['outbox'] = [line]
-        (home.state_dir / 'state.json').write_text(json.dumps(state))
+        theirs = home.theirs()
+        theirs['outbox'] = [line]                          # their lines live in their own journal, never in the owner's
+        (home.state_dir / plane.SECOND_FILE).write_text(json.dumps(theirs))
 
     def test_inv6_a_scott_wake_line_that_is_still_unprinted_when_the_setting_is_turned_off_keeps_the_protection(self):
         with self.home() as home:
@@ -6436,7 +6520,7 @@ class Invariant6Collision(InvariantScenario):
             home.say('200.000100', 'a request whose acknowledgement keeps failing')
             for _ in range(3):
                 home.cli('poll')                             # three failed acknowledgements: their not-acknowledged wake is printed, the row stays for resolve
-            self.assertTrue(any(row.get('person') == 'second' for row in home.state()['pending']), home.state()['pending'])
+            self.assertTrue(any(row.get('person') == 'second' for row in home.all_pending()), home.all_pending())
             self.assertEqual(home.state()['outbox'], [])
             home.say('200.000200', 'an owner request', user=INV_OWNER, dm=INV_OWNER_DM)
             with patch.dict(os.environ):
@@ -6501,10 +6585,11 @@ class Invariant6Collision(InvariantScenario):
             home.cli('poll')
             text = (home.state_dir / 'state.json').read_text()
             owner = home.state()['intake_cursor']
-            found = re.search(r'"intake_cursor": "%s", "' % re.escape(owner), text)
+            found = re.search(r'(.{12})"intake_cursor": "%s"' % re.escape(owner), text)
             self.assertIsNotNone(found, text)
-            follow = re.match(r'(\w+)"', text[found.end():]).group(1)
-            value = '"intake_cursor": "200.000200", "%s"' % follow       # the owner cursor as the preflight models it; intake never writes it
+            # The owner's cursor, with the text that precedes it in the owner's journal, as a model of their intake that moved it could write it; their intake
+            # never moves it, and their own journal holds their cursor in their window, after other text.
+            value = '%s"intake_cursor": "200.000200"' % found.group(1)
             home.say('200.000200', 'their request', user=INV_SECOND, dm=INV_SECOND_DM)
             result = home.cli('poll', extra={'SLACK_SIGNING_SECRET': value})
             self.assertEqual(result.rc, 0, (result.out, result.err))
@@ -6620,7 +6705,7 @@ class ScottPassModelTest(InvariantScenario):
 
     def enter(self, home, state):
         """Bring a fresh home into the state through the real entry point; returns the environment the later runs use."""
-        on = {'FM_SLACK_SECOND_USER': INV_SECOND, 'FM_SLACK_SECOND_SINCE': INV_SINCE}
+        on = {'FM_SLACK_SECOND_USER': INV_SECOND}
         if state == 'off':
             home.cli('poll')
             return {}
