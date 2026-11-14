@@ -5878,6 +5878,8 @@ def call(self, method, **fields):
             wire.call(method, **fields)
         if mode == 'die':
             os._exit(137)                                    # the check is stopped while its call of theirs is blocked: no flush, no cleanup
+        if mode == 'fail':
+            raise plane.SlackError('unreachable')            # every call of theirs fails in this run
         if mode == 'stall':
             clock[0] += 10.0                                 # a call of theirs that blocks until the 10 s socket ceiling
         if mode == 'slow':
@@ -7162,74 +7164,95 @@ class Round6TotalBound(InvariantScenario):
 
 
 class Round6CapOne(InvariantScenario):
-    """Main 1596 (1), option (ii): at answer cap 1 the second person's pass is paused with one named notice; nothing of theirs is read, taken in or posted, their
-    cursor is not advanced and the activation point does not move, so raising the cap later reads them from where they stopped. The owner path is unchanged."""
+    """Main 1597 (option (i) for key main1327-scott-cap1): at answer cap 1 the one slot of a sweep goes at once to the side that alone has work; when both have
+    work it alternates by pass, the owner's check still running first in each sweep. The turn lives in the second person's journal and survives a restart.
+    Failed reads, total-deadline cutoffs and a restart lose nothing, wake nothing twice, never exceed the cap, and no side is passed over in favour of the
+    other in two contested passes in a row (each side waits at most one extra pass)."""
 
-    PAUSED = 'slack: second person paused: answer cap is 1; raise FM_SLACK_POLL_MAX_ANSWERS to 2 or more'
+    DRIVER = Invariant4OwnerFirst.DRIVER
+    run_check = Invariant4OwnerFirst.run_check
+    REQ = re.compile(r'slack request (\S+) from (U[A-Z0-9]+)')
 
-    def journal(self, home):
-        path = home.state_dir / 'second.json'
-        return json.loads(path.read_text()) if path.is_file() else {}
+    def sweeps(self, home, plan):
+        """plan: one (owner requests, their requests, mode of their check) per pass, the requests sent before that pass's owner check. Returns per pass the
+        waiting work of each side at its start and the side(s) woken in it, with every request's wakes."""
+        sent, got, rows, n = {}, {}, [], 0
+        for k, (owners, theirs, mode) in enumerate(plan):
+            for who, count in ((INV_OWNER, owners), (INV_SECOND, theirs)):
+                for _ in range(count):
+                    n += 1
+                    ts = '%d.%06d' % (5000 + n, 100 if who == INV_OWNER else 200)
+                    sent[ts] = (who, k)
+                    home.say(ts, 'request %d' % n, user=who, dm=INV_OWNER_DM if who == INV_OWNER else INV_SECOND_DM)
+            waiting = {who: any(w == who and ts not in got for ts, (w, _) in sent.items()) for who in (INV_OWNER, INV_SECOND)}
+            rc1, out1, calls1 = self.run_check(home, 'normal', 'owner-%d' % k, command='check')
+            rc2, out2, _ = self.run_check(home, mode, 'second-%d' % k, command='check-second', delay='13.0')
+            self.assertEqual(rc1, 0)
+            self.assertEqual(calls1, [], 'the owner check made a call of theirs')
+            found = self.REQ.findall(out1 + '\n' + out2)
+            for ts, who in found:
+                got.setdefault(ts, []).append(k)
+            rows.append({'pass': k, 'waiting': waiting, 'woken': [who for _, who in found], 'mode': mode, 'rc': rc2})
+        return sent, got, rows
 
-    def their_calls(self, home):
-        return [e for e in home.log() if e.get('channel') == INV_SECOND_DM]
+    def check_fair(self, sent, got, rows):
+        self.assertEqual(sorted(ts for ts in sent if ts not in got), [], 'lost: %s' % rows)
+        self.assertEqual(sorted(ts for ts, ks in got.items() if len(ks) > 1), [], 'woken twice')
+        self.assertEqual([r['pass'] for r in rows if len(r['woken']) > 1], [], 'over the cap of 1: %s' % rows)
+        passed_over = lambda r, who: r['waiting'][who] and r['woken'] and who not in r['woken']
+        for a, b in zip(rows, rows[1:]):
+            for who in (INV_OWNER, INV_SECOND):
+                self.assertFalse(passed_over(a, who) and passed_over(b, who), 'passed over twice in a row at passes %d and %d: %s' % (a['pass'], b['pass'], rows))
 
-    def test_r6_c1_at_cap_1_their_pass_is_paused_with_one_named_notice_and_the_owner_is_served(self):
+    def test_r6_d1_at_cap_1_with_both_busy_the_slot_alternates_and_nothing_is_lost(self):
         with self.home(cap='1') as home:
-            home.cli('poll', extra={'FM_SLACK_POLL_MAX_ANSWERS': '20'})       # their window is started at a cap that serves them
-            home.say('200.000100', 'owner request', user=INV_OWNER, dm=INV_OWNER_DM)
-            home.say('200.000200', 'second person request', user=INV_SECOND, dm=INV_SECOND_DM)
-            before = len(self.their_calls(home))
-            first, second = home.cli('poll'), home.cli('poll')
-            self.assertEqual((first.out + second.out).count(self.PAUSED), 1, first.out + second.out)
-            self.assertEqual(len(self.requests_woken(first, INV_OWNER)), 1, first.out)
-            self.assertEqual(self.requests_woken(first, INV_SECOND) + self.requests_woken(second, INV_SECOND), [])
-            self.assertEqual(len(self.their_calls(home)), before, 'a call of theirs was made while paused')
-            self.assertEqual(home.posts().count((INV_OWNER_DM, '200.000100')), 1)
+            home.trust_check()
+            home.cli('poll')
+            plan = [(3, 3, 'normal')] + [(1, 1, 'normal')] * 3 + [(0, 0, 'normal')] * 9
+            self.check_fair(*self.sweeps(home, plan))
 
-    def test_r6_c2_while_paused_their_cursor_and_activation_point_do_not_move(self):
+    def test_r6_d2_at_cap_1_a_side_alone_with_work_gets_the_slot_in_the_same_sweep(self):
         with self.home(cap='1') as home:
-            home.cli('poll', extra={'FM_SLACK_POLL_MAX_ANSWERS': '20'})
-            home.say('200.000200', 'second person request', user=INV_SECOND, dm=INV_SECOND_DM)
-            kept = self.journal(home)
-            for _ in range(3):
-                home.cli('poll')
-            now = self.journal(home)
-            self.assertEqual(now.get('second', {}).get('intake_cursor'), kept.get('second', {}).get('intake_cursor'))
-            self.assertEqual(now.get('last_run'), kept.get('last_run'))
+            home.trust_check()
+            home.cli('poll')
+            sent, got, rows = self.sweeps(home, [(0, 1, 'normal'), (0, 1, 'normal'), (1, 0, 'normal'), (1, 0, 'normal'), (0, 1, 'normal')])
+            self.assertEqual({ts: got.get(ts, [None])[0] - k for ts, (_, k) in sent.items()}, {ts: 0 for ts in sent}, rows)
 
-    def test_r6_c3_after_the_cap_is_raised_their_waiting_requests_are_read_from_where_they_stopped(self):
+    def test_r6_d3_at_cap_1_failed_reads_and_deadline_cutoffs_of_theirs_lose_nothing_and_pass_no_side_over_twice(self):
         with self.home(cap='1') as home:
-            home.cli('poll', extra={'FM_SLACK_POLL_MAX_ANSWERS': '20'})
-            home.say('200.000200', 'second person request', user=INV_SECOND, dm=INV_SECOND_DM)
+            home.trust_check()
             home.cli('poll')
-            home.say('200.000300', 'second person request while paused', user=INV_SECOND, dm=INV_SECOND_DM)
-            home.cli('poll')
-            raised = home.cli('poll', extra={'FM_SLACK_POLL_MAX_ANSWERS': '2'})
-            again = home.cli('poll', extra={'FM_SLACK_POLL_MAX_ANSWERS': '2'})
-            woken = [l for r in (raised, again) for l in self.requests_woken(r, INV_SECOND)]
-            self.assertEqual(sorted(re.search(r'slack request (\S+) ', l).group(1) for l in woken), ['200.000200', '200.000300'], raised.out + again.out)
-            self.assertEqual((home.posts().count((INV_SECOND_DM, '200.000200')), home.posts().count((INV_SECOND_DM, '200.000300'))), (1, 1))
+            plan = [(3, 3, 'normal'), (1, 1, 'fail'), (0, 0, 'fail'), (1, 0, 'slow'), (0, 1, 'slow'), (0, 0, 'normal')] + [(0, 0, 'normal')] * 10
+            self.check_fair(*self.sweeps(home, plan))
 
-    def test_r6_c3_a_person_first_enabled_while_paused_is_read_from_the_enable_once_the_cap_is_raised(self):
-        with self.home(cap='1', scott=None) as home:
-            home.cli('poll')                                                 # a completed run before the enable
-            with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': INV_SECOND}):
-                home.cli('poll')                                             # enabled at cap 1: paused, nothing of theirs started
-                home.say('300.000200', 'second person request after the enable', user=INV_SECOND, dm=INV_SECOND_DM)
-                home.cli('poll')
-                raised = home.cli('poll', extra={'FM_SLACK_POLL_MAX_ANSWERS': '2'})
-                again = home.cli('poll', extra={'FM_SLACK_POLL_MAX_ANSWERS': '2'})
-            woken = [l for r in (raised, again) for l in self.requests_woken(r, INV_SECOND)]
-            self.assertEqual(len([l for l in woken if '300.000200' in l]), 1, raised.out + again.out)
-
-    def test_r6_c4_control_at_cap_2_their_pass_runs_and_no_pause_notice_is_printed(self):
-        with self.home(cap='2') as home:
+    def test_r6_d4_at_cap_1_a_check_of_theirs_stopped_mid_call_and_restarted_loses_nothing(self):
+        with self.home(cap='1') as home:
+            home.trust_check()
             home.cli('poll')
-            home.say('200.000200', 'second person request', user=INV_SECOND, dm=INV_SECOND_DM)
-            result = home.cli('poll')
-            self.assertNotIn('paused', result.out)
-            self.assertEqual(len(self.requests_woken(result, INV_SECOND)), 1, result.out)
+            plan = [(2, 2, 'normal'), (1, 1, 'die'), (0, 0, 'normal'), (0, 0, 'die'), (0, 0, 'normal')] + [(0, 0, 'normal')] * 8
+            sent, got, rows = self.sweeps(home, plan)
+            self.check_fair(sent, got, rows)
+            self.assertEqual([home.posts().count((INV_SECOND_DM, ts)) for ts, (who, _) in sent.items() if who == INV_SECOND],
+                             [1] * sum(1 for who, _ in sent.values() if who == INV_SECOND))
+
+    def test_r6_d5_at_cap_1_their_cursor_does_not_move_in_a_pass_whose_slot_goes_to_the_owner(self):
+        with self.home(cap='1') as home:
+            home.trust_check()
+            home.cli('poll')
+            home.say('5001.000100', 'owner request', user=INV_OWNER, dm=INV_OWNER_DM)
+            home.say('5002.000200', 'second person request', user=INV_SECOND, dm=INV_SECOND_DM)
+            journal = lambda: json.loads((home.state_dir / 'second.json').read_text()).get('second', {}).get('intake_cursor')
+            before = journal()
+            _, owner_run, _ = self.run_check(home, 'normal', 'owner-0', command='check')
+            _, second_run, _ = self.run_check(home, 'normal', 'second-0', command='check-second')
+            self.assertEqual([who for _, who in self.REQ.findall(owner_run + second_run)], [INV_OWNER])
+            self.assertEqual(journal(), before)
+            self.assertEqual(home.posts().count((INV_SECOND_DM, '5002.000200')), 0)
+            _, owner_run, _ = self.run_check(home, 'normal', 'owner-1', command='check')
+            _, second_run, _ = self.run_check(home, 'normal', 'second-1', command='check-second')
+            self.assertEqual([who for _, who in self.REQ.findall(owner_run + second_run)], [INV_SECOND])
+            self.assertEqual(home.posts().count((INV_SECOND_DM, '5002.000200')), 1)
+
 
 class ScottPassModelTest(InvariantScenario):
     """The executable transition model of the second person's pass (Main addendum 97f259d9 to order 1307). States: off (never configured), enabled-unarmed
