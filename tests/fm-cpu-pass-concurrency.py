@@ -182,7 +182,7 @@ class World:
         self.env = dict(os.environ, PATH=str(shim) + os.pathsep + os.environ['PATH'], CASE_CORES=str(cores),
                         FM_CPU_POOL_DIR=str(self.pool), FM_TEST_SLOT_DIR=str(self.slots), FM_DURATION_FILE='off',
                         FM_CONC_PYTHON=python, FM_CONC_WORKER=str(worker), FM_CONC_ALIVE=str(self.alive))
-        for name_ in ('FM_CPU_PASS_HELD', 'FM_TEST_SLOT_WAIT_SECONDS', 'FM_TEST_KEY_SLOTS', 'FM_TEST_SLOT_HELD',
+        for name_ in ('FM_CPU_PASS_HELD', 'FM_CPU_PASS_TOKENS', 'FM_TEST_SLOT_WAIT_SECONDS', 'FM_TEST_KEY_SLOTS', 'FM_TEST_SLOT_HELD', 'FM_TEST_SLOT_PIDS',
                       'FM_DURATION_HOME', 'FM_HOME', 'FM_DATA_OVERRIDE'):
             self.env.pop(name_, None)
         self.env.update(extra or {})
@@ -733,13 +733,22 @@ def case_waiting():
         case.check(run.returncode == 0 and 'held=0' in run.stdout and (run.stderr + run.stdout).count('without a CPU pass') == 1,
                    '%s with an unusable pool: rc=%d out=%r notices=%d' % (name, run.returncode, run.stdout.strip(), (run.stderr + run.stdout).count('without a CPU pass')))
     case.measure(unusable_pool=notices)
-    # (d) The off switch keeps its meaning: three copies of one key run together.
-    world.sample_start()
-    copies = [world.launch('off%d' % i, [pyshim, tool('fm-duration.py'), 'gate', 'test.off', '--'] + world.work('off', 1.0), extra=dict(FM_TEST_KEY_SLOTS='0')) for i in range(3)]
+    # (d) The off switch keeps its meaning: it turns the per-key slots off, and the pool (here of 4 passes, so three copies fit)
+    # still bounds the workers; with one slot the same three copies take turns.
+    off_world = World('waiting-off', cores=4)
+    off_world.sample_start()
+    copies = [off_world.launch('off%d' % i, [pyshim, tool('fm-duration.py'), 'gate', 'test.off', '--'] + off_world.work('off', 1.0), extra=dict(FM_TEST_KEY_SLOTS='0')) for i in range(3)]
     wait_all(copies)
-    off_seen = world.sample_stop()
+    off_seen = off_world.sample_stop()
     case.measure(off_switch_copies_alive_together=off_seen['peak_group'].get('off'))
     case.check(off_seen['peak_group'].get('off') == 3, 'FM_TEST_KEY_SLOTS=0 must leave the key ungated: %s' % off_seen)
+    on_world = World('waiting-on', cores=4)
+    on_world.sample_start()
+    taking_turns = [on_world.launch('on%d' % i, [pyshim, tool('fm-duration.py'), 'gate', 'test.on', '--'] + on_world.work('on', 0.6), extra=dict(FM_TEST_KEY_SLOTS='1')) for i in range(3)]
+    wait_all(taking_turns)
+    on_seen = on_world.sample_stop()
+    case.measure(one_slot_copies_alive_together=on_seen['peak_group'].get('on'))
+    case.check(on_seen['peak_group'].get('on') == 1, 'one slot must keep three copies of the key to one at a time (the control for the off switch): %s' % on_seen)
     # (e) A pass holder never waits behind a slot whose holder waits for the pass: no timeout is needed to break the cycle.
     cycle = World('waiting-cycle', cores=1)
     flag = cycle.folder / 'go'

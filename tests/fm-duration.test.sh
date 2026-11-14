@@ -32,6 +32,8 @@ env = dict(os.environ, FM_DURATION_FILE=str(ledger), FM_HOME=str(tmp), FM_DATA_O
 env.pop('FM_CPU_PASS_HELD', None)
 # Nor may it inherit the slots an outer runner holds: a gate that finds one counts as nested, at a deeper level.
 env.pop('FM_TEST_SLOT_HELD', None)
+env.pop('FM_TEST_SLOT_PIDS', None)
+env.pop('FM_CPU_PASS_TOKENS', None)
 for name in ('data', 'config', 'state'):
     (tmp / name).mkdir()
 (tmp / 'data/backlog.md').write_text('## In flight\n\n## Queued\n\n## Done\n')
