@@ -1023,7 +1023,9 @@ def project(available: int, rss: dict, counted: dict, steps: Optional[dict], lau
     budget = available + held
     others = [run for run, _, _, _ in entries if run != self_run]
     return dict(admit=projected <= budget or not others, projected=projected, budget=budget, held=held,
-                available=available, entries=entries, counted=len(counted))
+                available=available, entries=entries, counted=len(counted),
+                counted_rss={run: (rss.get("no-mistakes:%s/%s" % (repo, run)) or {}).get("rss_bytes") or 0
+                             for run, repo in sorted(counted.items())})
 
 
 def projection_text(fit: dict, reservation: int, slack: int, term: int, runs_measured: int, readings: int) -> str:
@@ -1032,10 +1034,13 @@ def projection_text(fit: dict, reservation: int, slack: int, term: int, runs_mea
                         for run, kind, demand, visible in fit["entries"] if selected(kind)) or "none"
     reserved = items(lambda kind: kind not in ("ci-waiting", "waiter"))
     unreserved = items(lambda kind: kind in ("ci-waiting", "waiter"))
+    # counted_runs names each counted run with its resident memory in this reading, so the base rule's decision,
+    # (counted + 1) x R + S against available + the sum of min(R, resident memory), is recomputable from the line.
+    counted_runs = ",".join("%s:%d" % item for item in fit.get("counted_rss", {}).items()) or "none"
     return ("counted=%d projected=%d budget=%d available=%d held=%d reservation=%d active_term=%d slack=%d"
-            " runs_measured=%d readings_measured=%d reserved=[%s] holding_only=[%s]"
+            " runs_measured=%d readings_measured=%d reserved=[%s] holding_only=[%s] counted_runs=[%s]"
             % (fit["counted"], fit["projected"], fit["budget"], fit["available"], fit["held"], reservation,
-               term, slack, runs_measured, readings, reserved, unreserved))
+               term, slack, runs_measured, readings, reserved, unreserved, counted_runs))
 
 
 _observed: dict = {}

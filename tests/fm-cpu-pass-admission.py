@@ -1605,10 +1605,38 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
         finish(probe)
         os.killpg(b.pid, signal.SIGKILL); b.wait()
 
+    def base_rule_from_line(text):
+        """The base rule's decision recomputed from one admission or waiting line alone (P1, LIVE(a)).
+
+        Base 012b72f34: need = (counted + 1) x R + S against budget = available + the sum of min(R, resident
+        memory) over the counted runs; admitted when need fits or nothing is counted.
+        """
+        line = [l for l in text.splitlines() if 'counted_runs=[' in l][-1]
+        value = lambda key: int(re.search(r'\b%s=(\d+)' % key, line).group(1))  # noqa: E731
+        runs = re.search(r'counted_runs=\[([^\]]*)\]', line).group(1)
+        rss = [] if runs == 'none' else [int(item.rsplit(':', 1)[1]) for item in runs.split(',')]
+        reservation, slack, available = value('reservation'), value('slack'), value('available')
+        need = (len(rss) + 1) * reservation + slack
+        budget = available + sum(min(reservation, size) for size in rss)
+        return dict(counted=len(rss), need=need, budget=budget, admit=need <= budget or not rss)
+
+    def p1_old_rule_recomputed():
+        # P1: the line names each counted run and its resident memory, so the old rule's decision is recomputable from
+        # it alone; on case (a) it waits (the base's own decision on that fixture), while the new rule admits.
+        folder, db, env = counted_case('p1-recompute', 32.82 * GIB // 16384 * 16384, live,
+                                       waiting_ci=['ci-361', 'ci-367', 'ci-369', 'ci-3609'])
+        finish(launch(cli + ['pipeline-start', '--priority', 'machinery', '--', 'sh', '-c', 'exit 3'], env, folder / 'p1a'), 3)
+        text = (folder / 'p1a.stderr').read_text()
+        old = base_rule_from_line(text)
+        assert 'admitted: counted=11 ' in text and old['counted'] == 11 and not old['admit'], (old, text)
+        named = re.search(r'counted_runs=\[([^\]]*)\]', text).group(1).split(',')
+        assert 'ci-361:0' in named and 'lint:%d' % int(2.22 * GIB) in named and len(named) == 11, text
+
     for name, body in (('P5.errors.fallback no A counts visible runs at R', no_term_counts_r),
                        ('P5.preempt.cancel a cancel before COMMAND begins', cancel_before_command),
                        ('P5.lock a reservation ends by its own row only', own_row_binding),
-                       ('P5.lock the named collision', named_collision)):
+                       ('P5.lock the named collision', named_collision),
+                       ('P1 the line recomputes the base rule', p1_old_rule_recomputed)):
         r28_case(name, body)
     (root / 'r28-admission.json').write_text(json.dumps(r28, indent=2))
     print(json.dumps(dict(r28=r28)), flush=True)
