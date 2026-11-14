@@ -106,11 +106,15 @@
 # by one of two routes: it is checked out in the task's recorded copy and contains
 # the recorded branch's tip (route=checked-out), or its tip is the tip of one of
 # the task's own custody archive branches archive/<id>-(submitted|pipeline)-<8
-# hex> (route=archive-tip). The whole admission runs again for a successor the
-# record already names (which is then a no-op that says so) and under --check,
-# which writes nothing, and fm-spawn.sh runs it again at the launch that applies
-# the grant. The receipt names the route, and so does the
-# successor-branch-admission guard event written at record time and at launch.
+# hex> (route=archive-tip); it also needs every other task record to be readable
+# and the recorded copy to share the project's ref store. The whole admission runs
+# again for a successor the record already names (which is then a no-op that says
+# so) and under --check, which writes nothing, and fm-spawn.sh runs it again at the
+# launch that applies the grant. The receipt names the route and the event log it
+# wrote, and so does the successor-branch-admission guard event written strictly at
+# record time (a sink that cannot take it rolls the record back) and at launch.
+# A refusal changes no file and writes no event; a note file is read only after
+# admission, and a note with a 'Ship branch:' line is refused.
 # It never reads or writes a work tree, runs no command that changes a
 # ref or the index, signals no process, writes no profile and touches no run
 # record: a running worker keeps the profile it was launched with, and the
@@ -429,6 +433,7 @@ SU_BRIEF_TMP=
 SU_META_BACKUP=
 SU_BRIEF_BACKUP=
 SU_META_PUBLISHED=0
+SU_NOTE_FILE=
 SU_BRIEF_PUBLISHED=0
 # The extra locks reassociate --also holds for its other tasks.
 RA_CONTROL_LOCKS=()
@@ -559,9 +564,15 @@ for control_arg in "$@"; do
       also) parse_also "$control_arg" ;;
       branch) SUCC_BRANCH=$control_arg; SUCC_BRANCH_SET=1 ;;
       note_file)
-        [ -f "$control_arg" ] || die "--note-file '$control_arg' is not a readable file"
-        NOTE=$(cat "$control_arg")
-        NOTE_SET=1
+        if [ "$VERB" = successor ]; then
+          # Read only after admission, and only when a record is made: a refusal or a
+          # check never opens a file the caller named, which may sit in a work tree.
+          SU_NOTE_FILE=$control_arg
+        else
+          [ -f "$control_arg" ] || die "--note-file '$control_arg' is not a readable file"
+          NOTE=$(cat "$control_arg")
+          NOTE_SET=1
+        fi
         ;;
     esac
     control_want_value=
@@ -599,9 +610,13 @@ for control_arg in "$@"; do
     --note=*) NOTE=${control_arg#--note=}; NOTE_SET=1 ;;
     --note-file) control_want_value=note_file ;;
     --note-file=*)
-      [ -f "${control_arg#--note-file=}" ] || die "--note-file '${control_arg#--note-file=}' is not a readable file"
-      NOTE=$(cat "${control_arg#--note-file=}")
-      NOTE_SET=1
+      if [ "$VERB" = successor ]; then
+        SU_NOTE_FILE=${control_arg#--note-file=}
+      else
+        [ -f "${control_arg#--note-file=}" ] || die "--note-file '${control_arg#--note-file=}' is not a readable file"
+        NOTE=$(cat "${control_arg#--note-file=}")
+        NOTE_SET=1
+      fi
       ;;
     --claude-debug) CLAUDE_DEBUG=1 ;;
     --recover-launch) RECOVER_LAUNCH=1 ;;
@@ -668,7 +683,9 @@ CONTROL_LOCK_HELD=1
 # EXIT trap, so the parent has to hold the path the trap removes. Set it
 # only once the lock is held: a process that loses the lock runs the same
 # trap, and would remove the file the lock holder is reading.
-FM_COMPOSER_DIALOG_SINK=$STATE/$ID.composer-dialog
+# The successor verb touches no endpoint and writes no dialog, so it must not remove one
+# that is there: a refusal or a no-op changes nothing.
+[ "$VERB" = successor ] || FM_COMPOSER_DIALOG_SINK=$STATE/$ID.composer-dialog
 META="$STATE/$ID.meta"
 if [ ! -f "$META" ]; then
   case "$RAW_ID" in
@@ -731,13 +748,29 @@ fi
 # files: the task's record (one added line) and the task's instructions (one
 # added section), both restored if either write fails.
 
+# Put a record back from the copy made before it was replaced. A publication that
+# failed its check after the rename can leave the record absent, or a symbolic link to
+# the replaced bytes; neither is a state the restore may depend on, so the record is
+# cleared first when it is a link, the restore goes through the same atomic
+# publication, and a plain rename is the last resort.
+control_restore_record() {  # <prior-copy> <record>
+  local backup=$1 record=$2
+  if [ -L "$record" ]; then
+    rm -f -- "$record"
+  fi
+  if fm_backlog_atomic_transition publish "$backup" "$record" "task record" "$STATE"; then
+    return 0
+  fi
+  mv -f -- "$backup" "$record" 2>/dev/null
+}
+
 # Undo whatever this attempt published before it failed. The record is
 # published last, so a failure before it never leaves a half-recorded successor.
 successor_rollback() {
   [ -z "$SU_META_TMP" ] || rm -f -- "$SU_META_TMP"
   [ -z "$SU_BRIEF_TMP" ] || rm -f -- "$SU_BRIEF_TMP"
   if [ "$SU_META_PUBLISHED" = 1 ] && [ -n "$SU_META_BACKUP" ]; then
-    if fm_backlog_atomic_transition publish "$SU_META_BACKUP" "$META" "task record" "$STATE"; then
+    if control_restore_record "$SU_META_BACKUP" "$META"; then
       SU_META_BACKUP=
     else
       echo "error: task $ID's record could not be restored after the failed successor recording; the prior record is at $SU_META_BACKUP" >&2
@@ -756,20 +789,26 @@ successor_rollback() {
   fi
 }
 
-# The admission guard's refusal: one deny event naming the rule and the branch,
-# then the refusal. Every refusal that names a missing proof goes through here;
+# The admission guard's refusal. A refusal writes no file, so it writes no event
+# either: the refusal text on stderr and the exit status are its whole outcome.
+# Every refusal that names a missing proof goes through here;
 # docs/guards/registry.json maps these sites to successor-branch-admission.
 successor_refuse() {  # <rule> <message>
-  local rule=$1
   shift
-  "$SCRIPT_DIR/fm-guard-event.sh" successor-branch-admission deny --rule "$rule" --task "$ID" \
-    --source-ok true --successor "$SUCC_BRANCH" 2>/dev/null || true
   die "$*"
+}
+
+# The note is appended to the instructions, which must keep exactly one Ship branch
+# line (the recorded branch's); a note carrying such a line would leave two.
+successor_note_check() {  # <note-text>
+  if printf '%s\n' "$1" | grep -q '^Ship branch:'; then
+    die "the note may not contain a line that starts with 'Ship branch:' (the instructions keep exactly one, the recorded branch's); nothing was changed"
+  fi
 }
 
 do_successor() {
   local project wt kind kind_count branch_count succ_count old_branch recorded_succ base_branch reason
-  local proof su_route su_archive route_text proof_text
+  local proof su_route su_archive route_text proof_text event_log next_cmd effect_text harness_now
   local line brief_branch_other=0 succ_sha prior_sha="" stamp brief_text meta_text next_note su_outcome action
   local inserted=0
   local -a homes=()
@@ -777,8 +816,9 @@ do_successor() {
   [ "$SUCC_BRANCH_SET" = 1 ] && [ -n "$SUCC_BRANCH" ] \
     || die "successor requires --branch <successor-branch>"
   if [ "$SUCC_CHECK" = 0 ]; then
-    [ "$NOTE_SET" = 1 ] && [ -n "$NOTE" ] \
+    { [ "$NOTE_SET" = 1 ] && [ -n "$NOTE" ]; } || [ -n "$SU_NOTE_FILE" ] \
       || die "successor requires --note (or --note-file) saying why the successor is needed; it is recorded in the task's instructions"
+    successor_note_check "$NOTE"
   fi
 
   CONTROL_META_LOCK=$(fm_meta_lock_path "$META") || exit 1
@@ -866,6 +906,14 @@ do_successor() {
   fi
 
   next_note="apply recorded successor branch $SUCC_BRANCH"
+  event_log=
+  if [ "$SUCC_CHECK" = 0 ] && [ "$su_outcome" = successor-recorded ] && [ -n "$SU_NOTE_FILE" ]; then
+    # Admission has passed and a record is about to be made: only now is the note file read.
+    [ -f "$SU_NOTE_FILE" ] || die "--note-file '$SU_NOTE_FILE' is not a readable file; nothing was changed"
+    NOTE=$(cat -- "$SU_NOTE_FILE") || die "could not read --note-file '$SU_NOTE_FILE'; nothing was changed"
+    [ -n "$NOTE" ] || die "the note file '$SU_NOTE_FILE' is empty; nothing was changed"
+    successor_note_check "$NOTE"
+  fi
   if [ "$SUCC_CHECK" = 1 ]; then
     su_outcome="successor-check"
     if [ -n "$recorded_succ" ]; then action="none: already recorded; would write nothing"; else action="would record"; fi
@@ -932,18 +980,26 @@ do_successor() {
       || die "could not publish task $ID's instructions"
     SU_BRIEF_TMP=
     SU_BRIEF_PUBLISHED=1
+    # Flagged before the call: the publication can fail its own check after the
+    # rename has already replaced the record, and the rollback must restore it then.
+    SU_META_PUBLISHED=1
     fm_backlog_atomic_transition publish "$SU_META_TMP" "$META" "task record" "$STATE" \
       || die "$FM_BACKLOG_TRANSITION_ERROR"
     SU_META_TMP=
-    SU_META_PUBLISHED=1
+    # The event this record owes is part of the record: written after both files are
+    # in place and before the commit, so a sink that cannot take it rolls both files
+    # back instead of leaving a record without its event.
+    event_log=$("$SCRIPT_DIR/fm-guard-event.sh" successor-branch-admission allow --log-path) \
+      || die "could not resolve the guard event log, so the record cannot be made; nothing was changed"
+    "$SCRIPT_DIR/fm-guard-event.sh" successor-branch-admission allow --strict --rule record --task "$ID" \
+      --source-ok true --cleared-by proceed --route "$su_route" --successor "$SUCC_BRANCH" 2>/dev/null \
+      || die "could not write the successor-branch-admission event to $event_log; the record and the instructions were restored"
     # Committed: nothing below may roll anything back.
     SUCCESSOR_ACTIVE=0
     rm -f -- "$SU_META_BACKUP" "$SU_BRIEF_BACKUP"
     SU_META_BACKUP=
     SU_BRIEF_BACKUP=
-    action="recorded; wrote $META and $DATA/$ID/brief.md"
-    "$SCRIPT_DIR/fm-guard-event.sh" successor-branch-admission allow --rule record --task "$ID" \
-      --source-ok true --cleared-by proceed --route "$su_route" --successor "$SUCC_BRANCH" 2>/dev/null || true
+    action="recorded; wrote $META, $DATA/$ID/brief.md and the event log $event_log"
   fi
 
   printf '%s %s branch=%s successor_branch=%s\n' "$su_outcome" "$ID" "$old_branch" "$SUCC_BRANCH"
@@ -951,9 +1007,23 @@ do_successor() {
   printf 'action: task=%s prior_branch=%s successor_branch=%s; %s; proof: %s; no work tree, ref, index, process, run record or profile file was touched\n' \
     "$ID" "$old_branch" "$SUCC_BRANCH" "$action" "$proof_text"
   printf 'route: %s successor=%s successor_sha=%s\n' "$route_text" "$SUCC_BRANCH" "$succ_sha"
-  printf 'next: FM_HOME=%q bash %q %q relaunch --note %q\n' "$FM_HOME" "$SCRIPT_DIR/fm-control.sh" "$ID" "$next_note"
-  printf 'effect: a running worker keeps the profile it was launched with; that relaunch exits it and starts a replacement in the same copy and endpoint, and the replacement'"'"'s write profile is generated from the record to allow exactly branch %s and successor %s (each with its lock and reflog) and the task'"'"'s archive recovery branches. It touches no ref, no run record and no task file except the worker wiring files every relaunch rewrites.\n' \
-    "$old_branch" "$SUCC_BRANCH"
+  harness_now=$(fm_meta_get "$META" harness)
+  if [ "$SUCC_CHECK" = 1 ]; then
+    next_cmd=$(printf 'FM_HOME=%q bash %q %q successor --branch %q --note %q' "$FM_HOME" "$SCRIPT_DIR/fm-control.sh" "$ID" "$SUCC_BRANCH" '<why>')
+    effect_text="check only: every proof ran and nothing was written, so no launch follows from this call; the next command records the successor, and the receipt of that record says what the launch will do."
+  else
+    next_cmd=$(printf 'FM_HOME=%q bash %q %q relaunch --note %q' "$FM_HOME" "$SCRIPT_DIR/fm-control.sh" "$ID" "$next_note")
+    case "$(uname -s):$harness_now" in
+      Darwin:claude | Darwin:omp)
+        effect_text="a running worker keeps the profile it was launched with; that relaunch exits it and starts a replacement in the same copy and endpoint, and the replacement's write profile is generated from the record to allow exactly branch $old_branch and successor $SUCC_BRANCH (each with its lock and reflog) and the task's archive recovery branches. It touches no ref, no run record and no task file except the worker wiring files every relaunch rewrites."
+        ;;
+      *)
+        effect_text="this task's launches are not write-confined ($(uname -s) with harness '${harness_now:-unknown}'): a relaunch generates no write profile, so the recorded successor changes no write permission here; the record is kept for a launch a profile governs."
+        ;;
+    esac
+  fi
+  printf 'next: %s\n' "$next_cmd"
+  printf 'effect: %s\n' "$effect_text"
 }
 
 if [ "$VERB" = successor ]; then
@@ -1029,7 +1099,7 @@ reassociate_rollback() {
         || echo "error: task ${RA_IDS[i]}'s relaunch journal could not be restored; its archive is at ${RA_JOURNAL_ARCHIVES[i]}" >&2
     fi
     if [ "${RA_META_PUBLISHED[i]:-0}" = 1 ]; then
-      if fm_backlog_atomic_transition publish "${RA_META_BACKUPS[i]}" "${RA_METAS[i]}" "task record" "$STATE"; then
+      if control_restore_record "${RA_META_BACKUPS[i]}" "${RA_METAS[i]}"; then
         RA_META_BACKUPS[i]=
       else
         echo "error: task ${RA_IDS[i]}'s record could not be restored after the failed reassociation; the prior record is at ${RA_META_BACKUPS[i]}" >&2
@@ -1727,10 +1797,12 @@ do_reassociate() {
   done
   for ((m=0; m<${#RA_IDS[@]}; m++)); do
     reassociate_select "$m"
+    # Flagged before the call: the publication can fail its own check after the
+    # rename has already replaced the record, and the rollback must restore it then.
+    RA_META_PUBLISHED[m]=1
     fm_backlog_atomic_transition publish "${RA_META_TMPS[m]}" "$META" "task record" "$STATE" \
       || die "$FM_BACKLOG_TRANSITION_ERROR"
     RA_META_TMPS[m]=
-    RA_META_PUBLISHED[m]=1
   done
   # Only now retire the active journal names, by rename rather than deletion.
   # Each destination is this attempt's exclusively reserved, byte-exact copy.
