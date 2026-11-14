@@ -224,6 +224,22 @@ fm_pending_reply_summarize() {  # <text>
   printf '%s' "$cleaned"
 }
 
+# The sha256 of a request body, byte for byte (no cleaning, no cut), as stored
+# at create time in request_body_sha256. It identifies the exact request a
+# correlation carried: bin/fm-send.sh exempts the printed correlation resend
+# from the decision-choice rule only when its body has this digest. Prints
+# nothing (and returns 1) when no sha256 tool is available, so a caller that
+# needs the match fails closed.
+fm_pending_reply_body_digest() {  # <text>
+  local digest
+  digest=$(printf '%s' "$1" | shasum -a 256 2>/dev/null | awk '{print $1}') || return 1
+  case "$digest" in
+    *[!0-9a-f]* | '') return 1 ;;
+  esac
+  [ "${#digest}" -eq 64 ] || return 1
+  printf '%s' "$digest"
+}
+
 fm_pending_reply_get() {  # <record-path> <key>
   local rec=$1 key=$2
   [ -f "$rec" ] || return 0
@@ -322,7 +338,7 @@ fm_pending_reply_embed_corr() {  # <message> <corr_id> <result-var>
 # Does not deliver anything. Fails if parent paths cannot be prepared.
 fm_pending_reply_create() {  # <parent-home> <state-dir> <task_id> <request-text>
   local parent_home=$1 state=$2 task_id=$3 request_text=$4
-  local dir rec corr now summary status_path tmp
+  local dir rec corr now summary body_digest status_path tmp
   [ -n "$parent_home" ] && [ -n "$state" ] && [ -n "$task_id" ] || return 2
   dir=$(fm_pending_reply_dir "$state")
   mkdir -p "$dir" || return 1
@@ -338,6 +354,7 @@ fm_pending_reply_create() {  # <parent-home> <state-dir> <task_id> <request-text
   fi
   now=$(fm_pending_reply_now)
   summary=$(fm_pending_reply_summarize "$request_text")
+  body_digest=$(fm_pending_reply_body_digest "$request_text") || body_digest=
   status_path="$state/${task_id}.status"
   # Prefer absolute parent_status when parent_home/state resolve.
   case "$status_path" in
@@ -357,6 +374,7 @@ parent_home=$parent_home
 parent_status=$status_path
 parent_status_scan_signature=
 request_summary=$summary
+request_body_sha256=$body_digest
 created_epoch=$now
 delivered_epoch=
 phase=awaiting_report

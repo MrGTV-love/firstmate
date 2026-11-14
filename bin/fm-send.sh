@@ -172,11 +172,13 @@
 # does not apply to them. The printed FM_PENDING_REPLY_EXISTING_CORR=<corr>
 # resend of an unconfirmed secondmate request re-delivers that same request and
 # answers nothing: while the correlation is still reusable for that task, the
-# send is not fire-and-forget, and its message has the request summary the
-# pending-reply record holds, its own reserved blocker pending-reply-<corr>
-# (the pending-reply library's to close) does not count. A different message or
-# a fire-and-forget send with that correlation, and every other open key,
-# still need a choice. A lone
+# send is not fire-and-forget, and its message has the sha256 the pending-reply
+# record stored for the request body at first send (request_body_sha256), its
+# own reserved blocker pending-reply-<corr> (the pending-reply library's to
+# close) does not count. A different message, a fire-and-forget send, or a
+# record with no body digest (written before the digest existed) with that
+# correlation, and every other open key, still need a choice, and the refusal
+# says why the correlation earned nothing. A lone
 # -- ends the options, so a literal message that starts with -- is sent as
 # text; before this rule a leading --answers-none or -- was itself text.
 # This is the one statement of the rule; every other file points here.
@@ -575,17 +577,30 @@ if [ -z "$RESOLVE_KEYS" ] && [ "$ANSWERS_NONE" = 0 ] && [ -n "$TARGET_SELECTOR" 
   }
   # The printed correlation resend of an unconfirmed secondmate request
   # (FM_PENDING_REPLY_EXISTING_CORR, still reusable for this task, not
-  # fire-and-forget, and carrying the same request the record holds: its
-  # stored request_summary equals this message's summary) re-delivers that
-  # same request; it answers nothing. Its own reserved blocker,
-  # pending-reply-<corr>, is the pending-reply library's to close, so it does
-  # not count here. A different message, or a fire-and-forget send, with that
-  # correlation, and every other open key, still need a stated choice.
+  # fire-and-forget, and carrying the exact request the correlation recorded:
+  # the sha256 of this message equals the record's request_body_sha256)
+  # re-delivers that same request; it answers nothing. Its own reserved
+  # blocker, pending-reply-<corr>, is the pending-reply library's to close, so
+  # it does not count here. A different message, a fire-and-forget send, a
+  # record with no body digest (written before the digest existed), and every
+  # other open key still need a stated choice; the refusal says why the
+  # correlation earned nothing.
+  choice_corr_note=
+  choice_record_digest=
   if [ -n "${FM_PENDING_REPLY_EXISTING_CORR:-}" ] && [ -n "$choice_open_set" ] &&
     [ -z "$FIRE_AND_FORGET_ID" ] &&
     [ "$(fm_meta_get "$TARGET_META" kind)" = secondmate ] &&
-    fm_pending_reply_corr_reusable "$STATE" "$FM_PENDING_REPLY_EXISTING_CORR" "$CHOICE_TASK_ID" &&
-    [ "$(fm_pending_reply_get "$(fm_pending_reply_path "$STATE" "$FM_PENDING_REPLY_EXISTING_CORR")" request_summary)" = "$(fm_pending_reply_summarize "$*")" ]; then
+    fm_pending_reply_corr_reusable "$STATE" "$FM_PENDING_REPLY_EXISTING_CORR" "$CHOICE_TASK_ID"; then
+    choice_record_digest=$(fm_pending_reply_get "$(fm_pending_reply_path "$STATE" "$FM_PENDING_REPLY_EXISTING_CORR")" request_body_sha256)
+    choice_body_digest=$(fm_pending_reply_body_digest "$*") || choice_body_digest=
+    if [ -z "$choice_record_digest" ]; then
+      choice_corr_note="FM_PENDING_REPLY_EXISTING_CORR=$FM_PENDING_REPLY_EXISTING_CORR earns no exemption: its pending-reply record has no request body digest (it was written before the digest existed), so this send takes the normal path."
+    elif [ -z "$choice_body_digest" ] || [ "$choice_body_digest" != "$choice_record_digest" ]; then
+      choice_corr_note="FM_PENDING_REPLY_EXISTING_CORR=$FM_PENDING_REPLY_EXISTING_CORR earns no exemption: this message is not the request correlation $FM_PENDING_REPLY_EXISTING_CORR recorded (its body digest differs), so this send takes the normal path."
+    fi
+  fi
+  if [ -n "${FM_PENDING_REPLY_EXISTING_CORR:-}" ] && [ -n "$choice_open_set" ] &&
+    [ -z "$choice_corr_note" ] && [ -n "${choice_record_digest:-}" ]; then
     choice_own_key=$(fm_pending_reply_escalation_key "$FM_PENDING_REPLY_EXISTING_CORR")
     choice_kept=
     while IFS= read -r choice_line; do
@@ -608,6 +623,7 @@ CHOICE_OPEN_SET
 $choice_open_set
 CHOICE_OPEN_SET
       echo "Resend with --resolve-key <key> before the message (one key per flag; repeat the flag for each key this send answers and closes), or with --answers-none (this send answers none of them and every key stays open). Rule: the bin/fm-send.sh header, \"Decision closure\"."
+      [ -z "$choice_corr_note" ] || echo "$choice_corr_note"
     } >&2
     exit 1
   fi

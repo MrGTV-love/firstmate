@@ -456,6 +456,80 @@ test_remote_printed_resend_survives_real_escalation() {
   pass "fm-send remote: only the exact printed correlation resend is accepted after the real escalation opens its own blocker; a different or fire-and-forget send with that correlation still refuses"
 }
 
+# The resend exemption needs the same full request body, not only the same
+# summary: the pending-reply record stores a sha256 of the whole request body
+# at first send, and only the printed resend whose body has that digest skips
+# its own blocker. A different body with the same 120-character summary, and a
+# record written before the digest existed, take the normal path and refuse
+# with a line that says why (fm-send header, "Decision closure").
+test_remote_resend_exemption_needs_the_full_body_digest() {
+  local dir fb ssh_log home rhome rc corr key pend resend_cmd body other saved
+  dir="$TMP_ROOT/remote-resend-digest"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
+  rhome=$(setup_remote_secondmate_home remote-resend-digest)
+  home=$(setup_remote_parent_home remote-resend-digest "$rhome")
+  printf 'working: watching the remote domain\n' > "$home/state/rsm.status"
+  body="please rename the metric in the weekly revenue dashboard to net_revenue_v2 and keep the old name as a deprecated alias for one release cycle, then report back"
+  other="please rename the metric in the weekly revenue dashboard to net_revenue_v2 and keep the old name as a deprecated alias for one release cycle, then DROP the old table"
+  [ "${#body}" -gt 120 ] || fail "setup: the body must be longer than the 120-character summary"
+  [ "${body:0:117}" = "${other:0:117}" ] || fail "setup: both bodies must share the first 117 characters"
+
+  rc=0
+  send_env "$fb" "$home" "$ssh_log" FM_FAKE_SSH_RC=255 \
+    "$SEND" rsm "$body" >"$dir/out" 2>"$dir/err" || rc=$?
+  [ "$rc" -ne 0 ] || fail "a twice-lost transport must not claim delivery"
+  resend_cmd=$(tail -1 "$dir/err")
+  pend=$(pending_record "$home")
+  corr=$(fm_pending_reply_get "$pend" corr_id)
+  key=pending-reply-$corr
+  send_env "$fb" "$home" "$ssh_log" FM_FAKE_SSH_RC=255 \
+    bash -c '. "$1/bin/fm-pending-reply-lib.sh"; fm_pending_reply_maybe_escalate "$2" "$3"' _ "$ROOT" "$home/state" "$corr" \
+    >/dev/null 2>&1 || true
+  assert_contains "$(drain_out "$home")" "[key=$key]" "precondition: the real escalation opens $key"
+  [ "$(fm_pending_reply_summarize "$body")" = "$(fm_pending_reply_summarize "$other")" ] \
+    || fail "setup: the two bodies must have the same stored summary"
+
+  # (a) a different body with the same summary and the same correlation refuses.
+  rc=0
+  send_env "$fb" "$home" "$ssh_log" FM_PENDING_REPLY_EXISTING_CORR="$corr" \
+    "$SEND" rsm "$other" >"$dir/other.out" 2>"$dir/other.err" || rc=$?
+  expect_code 1 "$rc" "a different body with the same summary and correlation must refuse: $(cat "$dir/other.err")"
+  assert_contains "$(cat "$dir/other.err")" "[key=$key] blocked" "the refusal lists the blocker"
+  assert_contains "$(cat "$dir/other.err")" "is not the request correlation $corr recorded" "the refusal says the body differs"
+  [ -z "$(remote_inbox_records "$rhome")" ] || fail "the different body reached the remote inbox"
+
+  # (c) a record written before the digest existed: no exemption, normal path.
+  saved="$dir/record.saved"; cp "$pend" "$saved"
+  grep -v '^request_body_sha256=' "$saved" > "$pend"
+  rc=0
+  (
+    unset FM_HOME
+    env PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_SEND_SETTLE=0 \
+      FM_SSH_BIN="$fb/fake-ssh" FM_SSH_LOG="$ssh_log" \
+      FM_SSH_COUNT="$ssh_log.count" FM_REMOTE_CODE_ROOT="$ROOT" \
+      bash -c "$resend_cmd"
+  ) >"$dir/old.out" 2>"$dir/old.err" || rc=$?
+  expect_code 1 "$rc" "a record with no body digest earns no exemption: $(cat "$dir/old.err")"
+  assert_contains "$(cat "$dir/old.err")" "[key=$key] blocked" "the no-digest refusal lists the blocker"
+  assert_contains "$(cat "$dir/old.err")" "has no request body digest" "the no-digest refusal says why"
+  [ -z "$(remote_inbox_records "$rhome")" ] || fail "the no-digest resend reached the remote inbox"
+  cp "$saved" "$pend"
+
+  # (b) control: the exact printed resend, with its digest, is accepted once.
+  rc=0
+  (
+    unset FM_HOME
+    env PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_SEND_SETTLE=0 \
+      FM_SSH_BIN="$fb/fake-ssh" FM_SSH_LOG="$ssh_log" \
+      FM_SSH_COUNT="$ssh_log.count" FM_REMOTE_CODE_ROOT="$ROOT" \
+      bash -c "$resend_cmd"
+  ) >"$dir/exact.out" 2>"$dir/exact.err" || rc=$?
+  expect_code 0 "$rc" "the exact printed resend is accepted: $(cat "$dir/exact.err")"
+  [ "$(remote_inbox_records "$rhome" | grep -c .)" = 1 ] || fail "the exact resend must land exactly one remote record"
+  grep -F "$body" "$(remote_inbox_records "$rhome" | head -1)" >/dev/null || fail "the exact resend did not carry the original body"
+  pass "fm-send remote: the resend exemption needs the full body digest; a same-summary body and a digest-less record refuse, the exact resend lands"
+}
+
 test_remote_retry_failure_preserves_ambiguous_expectation() {
   local dir fb ssh_log home rhome rc err pend
   dir="$TMP_ROOT/remote-ambiguous-then-fail"; mkdir -p "$dir"
@@ -944,6 +1018,7 @@ test_local_pending_does_not_close_resolve_key() {
 test_remote_steer_lands_in_remote_inbox
 test_remote_rerun_is_idempotent
 test_remote_printed_resend_survives_real_escalation
+test_remote_resend_exemption_needs_the_full_body_digest
 test_remote_retry_failure_preserves_ambiguous_expectation
 test_remote_fire_and_forget_never_arms_reply_recovery
 test_remote_send_revalidates_after_retirement_lock
