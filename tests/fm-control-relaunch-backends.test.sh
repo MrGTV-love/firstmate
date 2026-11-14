@@ -2369,13 +2369,14 @@ test_claude_restore_restart_decides_attribution_before_its_first_effect() {
 # N4 host leg: the real fm-remote-secondmate-control.sh attribution verb, run as
 # the host runs it (FM_HOME is the seeded secondmate home, the endpoint record is
 # its private parent-route record in the fm-remote session), on the fake Herdr.
-remote_attribution() { # <case-dir> <id>; sets REMOTE_ATTRIBUTION_OUT and _RC
-  local dir=$1 id=$2
-  REMOTE_ATTRIBUTION_RC=0
+remote_attribution() { # <case-dir> <id>; sets REMOTE_ATTRIBUTION_OUT, failing unless the verb exits 0
+  local dir=$1 id=$2 rc=0
+  # shellcheck disable=SC2031 # PATH is read here, not modified
   REMOTE_ATTRIBUTION_OUT=$(env -u HERDR_ENV -u HERDR_PANE_ID -u HERDR_SESSION -u HERDR_SOCKET_PATH \
     PATH="$dir/fakebin:$PATH" FM_HOME="$dir/wt" FM_FAKE_DIR="$dir/fake" \
     HOME="$dir/user-home" CLAUDE_CONFIG_DIR='' \
-    "$ROOT/bin/fm-remote-secondmate-control.sh" attribution "$id" 2>/dev/null) || REMOTE_ATTRIBUTION_RC=$?
+    "$ROOT/bin/fm-remote-secondmate-control.sh" attribution "$id" 2>/dev/null) || rc=$?
+  [ "$rc" = 0 ] || fail "the attribution verb exited $rc: $REMOTE_ATTRIBUTION_OUT"
 }
 
 test_remote_attribution_verb_reads_the_host_verdict() {
