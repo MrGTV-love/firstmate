@@ -6888,7 +6888,7 @@
       "sites": [
         {
           "file": "bin/fm_slack_watch.py",
-          "match": "refuse_a_value_that_the_marker_holds()",
+          "match": "refuse_a_value_that_the_marker_holds(WAKE_FIXED_TEXT + tuple(extra_fixed))",
           "count": 1
         },
         {
@@ -6898,7 +6898,12 @@
         },
         {
           "file": "bin/fm_slack_watch.py",
-          "match": "refuse_a_value_that_the_marker_holds(COMMAND_FIXED_TEXT.get(action, WAKE_FIXED_TEXT))",
+          "match": "refuse_a_value_that_the_marker_holds(COMMAND_FIXED_TEXT.get(action, WAKE_FIXED_TEXT) + (() if action == 'retarget' else watch.scott_fixed_texts()))",
+          "count": 1
+        },
+        {
+          "file": "bin/fm_slack_watch.py",
+          "match": "refuse_a_value_that_the_marker_holds(watch.scott_fixed_texts())",
           "count": 1
         },
         {
@@ -7093,16 +7098,16 @@
           "match": "refuse_a_value_that_the_marker_holds(COMMAND_FIXED_TEXT[name])"
         }
       ],
-      "invariant": "Firstmate's Slack answer and full-text read touch only an allowlisted human's messages in a request thread the plane took in, in the owner DM Slack itself opens, and the second person's request itself, in the DM Slack itself opens for them",
+      "invariant": "Firstmate's Slack answer and full-text read touch only an allowlisted human's messages in a request thread the plane took in, in the owner DM Slack itself opens, and the second person's request itself, in the DM Slack itself opens for them; the only other acts of the plane in or from the second person's DM are the fixed acknowledgement of one of their requests, posted into that request's own thread (REQUEST_ACK), and the intake read of their top-level messages (start_second, arm_second and take_requests with second=True), and never a card, notice, resolution, answer or follow-up",
       "layer": "runtime-block",
-      "source": "the request and follow-up events in state/slack-watch/state.json (seen), the conversations.open proof of the owner DM (of the second person's DM for a <ts>@<member id> key), and the thread read through the plane's existing conversations.replies call by Watch.reply_to() and Watch.read_message() in bin/fm_slack_watch.py, against FM_SLACK_DM_USER, FM_SLACK_ALLOWED_AUTHORS and FM_SLACK_SECOND_USER",
-      "trigger": "bin/fm-slack-reply.sh or bin/fm-slack-read.sh runs with a thread the plane never took in as a request, a --to or --message that is not that request or an allowlisted human's follow-up in it (a stranger's, a bot's or app's message, or the plane's own), an empty or over-long answer, a malformed ts, the plane off, the slack-dm source unbound, a changed FM_SLACK_DM_USER, a <ts>@<member id> key whose id is not the one FM_SLACK_SECOND_USER names now, or a stored channel that is not the owner's or the second person's proven DM",
-      "remedy": "name the request's ts from its `check: slack request <ts>` wake (<ts>@<member id> in both --thread and --to for the second person's request) and a message of that same thread from its `check: slack follow-up <reply ts> to request <ts>` wake, then run bin/fm-slack-reply.sh --thread <request ts> --to <message ts> with the answer on standard input, or bin/fm-slack-read.sh --thread <request ts> --message <message ts>; for source_not_bound run bin/fm-captain-hold.sh bind slack-dm; for dm_user_changed or stored_channel_not_owner_dm follow the retarget order in bin/fm-slack-check.sh --help",
+      "source": "the request and follow-up events in state/slack-watch/state.json (seen, and the pending rows of a request woken as not acknowledged), the conversations.open proof of the owner DM (of the second person's DM for a <ts>@<member id> key, for their acknowledgement and for the intake read of their DM), and the thread read through the plane's existing conversations.replies call by Watch.reply_to() and Watch.read_message(), and the history read through the plane's existing conversations.history call by Watch.start_second(), Watch.arm_second() and Watch.take_requests(second=True), all in bin/fm_slack_watch.py, against FM_SLACK_DM_USER, FM_SLACK_ALLOWED_AUTHORS and FM_SLACK_SECOND_USER",
+      "trigger": "bin/fm-slack-reply.sh or bin/fm-slack-read.sh runs with a thread the plane never took in as a request, a --to or --message that is not that request or an allowlisted human's follow-up in it (a stranger's, a bot's or app's message, or the plane's own), an empty or over-long answer, a malformed ts, the plane off, the slack-dm source unbound, a changed FM_SLACK_DM_USER, a <ts>@<member id> key whose id is not the one FM_SLACK_SECOND_USER names now, or a stored channel that is not the owner's or the second person's proven DM; and the poll's acknowledgement into the second person's DM, or its intake read of that DM, whose stored channel is not their proven DM, or that is the owner's DM",
+      "remedy": "name the request's ts from its `check: slack request <ts>` wake (<ts>@<member id> in both --thread and --to for the second person's request, also when its acknowledgement failed and it waits for `bin/fm-slack-check.sh resolve`) and a message of that same thread from its `check: slack follow-up <reply ts> to request <ts>` wake, then run bin/fm-slack-reply.sh --thread <request ts> --to <message ts> with the answer on standard input, or bin/fm-slack-read.sh --thread <request ts> --message <message ts>; for source_not_bound run bin/fm-captain-hold.sh bind slack-dm; for dm_user_changed or stored_channel_not_owner_dm follow the retarget order in bin/fm-slack-check.sh --help",
       "budget": 1,
       "test": "tests/fm-slack-reply.test.sh",
       "tier": "C",
       "harm": "irreversible",
-      "layer_note": "added by the Slack thread-reply change; deny without a guard event: the command exits non-zero with slack: refused: <reason> (unknown_request_thread, unknown_reply_target, not_an_owner_message, message_not_found, invalid_message_ts, empty_answer, answer_too_long, invalid_arguments, source_not_bound, dm_not_prepared, stored_channel_not_owner_dm, second_dm_not_prepared, stored_channel_not_second_dm, target_is_not_a_DM, dm_user_changed or a configuration refusal) and posts or prints nothing; without the guard an answer could land outside the request's thread or in a conversation that is not the owner's DM, and a stranger's or bot's text could reach Firstmate as if it were the owner's; tests/fm_slack_reply_test.py ReplyPostTest, ReadTest, SafetyTest and SecondPersonReplyTest and tests/fm-slack-reply.test.sh REPLY-2 and REPLY-9 prove each refusal and the legitimate control beside it"
+      "layer_note": "added by the Slack thread-reply change; deny without a guard event: the command exits non-zero with slack: refused: <reason> (unknown_request_thread, unknown_reply_target, not_an_owner_message, message_not_found, invalid_message_ts, empty_answer, answer_too_long, invalid_arguments, source_not_bound, dm_not_prepared, stored_channel_not_owner_dm, stored_channel_not_second_dm, target_is_not_a_DM, dm_user_changed or a configuration refusal) and posts or prints nothing, and the poll's acknowledgement and intake read of the second person's DM fail the same proof as one second_window_failed row per episode, never raised, with nothing posted or read there; second_dm_not_prepared is second_channel's own defence in depth, because a key with no window is refused first as unknown_request_thread; without the guard an answer could land outside the request's thread or in a conversation that is not the owner's DM, and a stranger's or bot's text could reach Firstmate as if it were the owner's; tests/fm_slack_reply_test.py ReplyPostTest, ReadTest, SafetyTest and SecondPersonReplyTest, tests/fm_slack_watch_test.py SecondPersonTest, Invariant1Boundary and Invariant2Identity, and tests/fm-slack-reply.test.sh REPLY-2 and REPLY-9 prove each refusal and the legitimate control beside it"
     },
     {
       "id": "pipeline-start-unreadable-source",
