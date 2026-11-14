@@ -527,12 +527,12 @@ test_scott_launch_requires_its_event_to_be_written() {
   expect_code 0 "$rc" "recording should succeed"$'\n'"$out"
   mkdir -p "$dir/event-sink-dir"
   rm -f "$sb"
-  rc=0; out=$( export FM_GUARD_EVENT_LOG="$dir/event-sink-dir"; run_control "$dir" "$TASK" relaunch --note "sink broken" ) || rc=$?
+  rc=0; out=$(FM_GUARD_EVENT_LOG="$dir/event-sink-dir" run_control "$dir" "$TASK" relaunch --note "sink broken") || rc=$?
   [ "$rc" != 0 ] || fail "a launch whose grant event cannot be written must refuse"$'\n'"$out"
   assert_contains "$out" "event" "the launch refusal must name the event"
   [ ! -f "$sb" ] || ! grep -qF "$SUCC\"" "$sb" || fail "the profile kept the successor although its event was not written"
   log=$dir/launch-events.jsonl
-  rc=0; out=$( export FM_GUARD_EVENT_LOG="$log"; run_control "$dir" "$TASK" relaunch --note "sink fine" ) || rc=$?
+  rc=0; out=$(FM_GUARD_EVENT_LOG="$log" run_control "$dir" "$TASK" relaunch --note "sink fine") || rc=$?
   expect_code 0 "$rc" "a writable sink must let the launch through"$'\n'"$out"
   jq -e 'select(.guard == "successor-branch-admission" and .rule == "launch" and .decision == "allow")' "$log" >/dev/null \
     || fail "the launch event was not written to the sink"
