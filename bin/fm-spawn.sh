@@ -6730,6 +6730,15 @@ confinement_refuse() {
   "$SCRIPT_DIR/fm-guard-event.sh" spawn-write-confinement deny --source-ok "$source_ok" \
     --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --task "$ID" 2>/dev/null || true
 }
+# The launch-time half of the successor-branch-admission guard: one deny event
+# naming the rule and the recorded successor, then the confinement refusal.
+confinement_successor_refuse() {  # <source-ok> <message>
+  local source_ok=$1
+  shift
+  "$SCRIPT_DIR/fm-guard-event.sh" successor-branch-admission deny --rule launch --source-ok "$source_ok" \
+    --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --task "$ID" --successor "${SUCCESSOR_BRANCH:-}" 2>/dev/null || true
+  confinement_refuse "$source_ok" "$@"
+}
 if [ "$KIND" != secondmate ]; then
   confinement_os=$(uname -s) || { confinement_refuse false "cannot identify worker OS"; exit 1; }
   case "$confinement_os:$HARNESS" in
@@ -6774,18 +6783,26 @@ if [ "$KIND" != secondmate ]; then
       confinement_args=()
       [ -z "$confinement_agent" ] || confinement_args=(--agent-dir "$confinement_agent")
       [ -z "${BRANCH:-}" ] || confinement_args+=(--branch "$BRANCH")
+      confinement_successor_route=
       if [ -n "${SUCCESSOR_BRANCH:-}" ]; then
-        # The same name rule fm-control.sh successor applied at admission, so a
-        # record edited by hand to name a branch it would have refused never
-        # widens a launch; the generator re-checks that the name is one exact literal.
+        # The whole admission fm-control.sh successor applied runs again at every
+        # launch that would apply the grant: the name rule, then the proof. A
+        # record edited by hand, or a branch that moved since it was recorded,
+        # that fails either never reaches the profile; the generator then
+        # re-checks that the name is one exact literal in the task's name family.
         if ! fm_local_firstmate_state_dirs "$STATE"; then
-          confinement_refuse false "cannot list the local Firstmate homes to check the recorded successor branch against: $FM_LOCAL_FIRSTMATE_ERROR"
+          confinement_successor_refuse false "cannot list the local Firstmate homes to check the recorded successor branch against: $FM_LOCAL_FIRSTMATE_ERROR"
           exit 1
         fi
         if ! confinement_successor_reason=$(fm_successor_name_refusal "$SUCCESSOR_BRANCH" "$BRANCH" "$BASE_BRANCH" "$STATE/$ID.meta" "$PROJ_ABS" "${FM_LOCAL_FIRSTMATE_STATES[@]}"); then
-          confinement_refuse false "task $ID records successor branch '$SUCCESSOR_BRANCH', which is not admissible: $confinement_successor_reason"
+          confinement_successor_refuse true "task $ID records successor branch '$SUCCESSOR_BRANCH', which is not admissible: $confinement_successor_reason"
           exit 1
         fi
+        if ! confinement_successor_proof=$(fm_successor_proof "$PROJ_ABS" "$ID" "$BRANCH" "$SUCCESSOR_BRANCH" "$WT"); then
+          confinement_successor_refuse true "task $ID records successor branch '$SUCCESSOR_BRANCH', which is no longer proved to be this task's: $confinement_successor_proof"
+          exit 1
+        fi
+        confinement_successor_route=$(printf '%s\n' "$confinement_successor_proof" | sed -n 's/^route=//p')
         confinement_args+=(--successor-branch "$SUCCESSOR_BRANCH")
       fi
       # Each Claude launch gets a fresh session id: Claude refuses to start a
@@ -6828,6 +6845,11 @@ if [ "$KIND" != secondmate ]; then
       fi
       "$SCRIPT_DIR/fm-guard-event.sh" spawn-write-confinement allow --source-ok true \
         --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --task "$ID" --cleared-by proceed 2>/dev/null || true
+      if [ -n "${SUCCESSOR_BRANCH:-}" ]; then
+        "$SCRIPT_DIR/fm-guard-event.sh" successor-branch-admission allow --rule launch --source-ok true \
+          --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --task "$ID" --cleared-by proceed \
+          --route "$confinement_successor_route" --successor "$SUCCESSOR_BRANCH" 2>/dev/null || true
+      fi
       "$SCRIPT_DIR/fm-guard-event.sh" spawn-shell-startup-confinement allow --source-ok true \
         --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --task "$ID" --cleared-by proceed 2>/dev/null || true
       ;;

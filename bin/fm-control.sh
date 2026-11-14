@@ -89,15 +89,22 @@
 # task is a local ship with a regular record and brief, no relaunch transaction
 # or backlog close is pending, the name passes bin/fm-successor-branch-lib.sh
 # (valid, plain, not archive/, not the task's branch, base branch or the
-# project's default branch, not another task's branch or successor), the task
-# records no different successor, the ref exists in the project's ref store, it
-# is not checked out in any worktree but the task's own recorded copy (read from the
-# project's worktree list, never from a copy), and it is proved to be this task's:
-# either it is checked out in the task's recorded copy and contains the recorded
-# branch's tip, or its tip is the tip of one of the task's own custody archive
-# branches archive/<id>-(submitted|pipeline)-<8 hex>. The same
-# successor again is a no-op that says so. --check runs every proof and writes
-# nothing. It never reads or writes a work tree, runs no command that changes a
+# project's default branch, not another task's branch or successor, all
+# compared without regard to case, and inside the task's own name family: the
+# recorded branch name, then '-', then letters, digits, '.', '_' or '-'), the task
+# records no different successor, and bin/fm-successor-branch-lib.sh
+# fm_successor_proof proves it: the ref exists in the project's ref store, it is
+# not checked out in any worktree but the task's own recorded copy (read from the
+# project's worktree list, never from a copy), and it is proved to be this task's
+# by one of two routes: it is checked out in the task's recorded copy and contains
+# the recorded branch's tip (route=checked-out), or its tip is the tip of one of
+# the task's own custody archive branches archive/<id>-(submitted|pipeline)-<8
+# hex> (route=archive-tip). The whole admission runs again for a successor the
+# record already names (which is then a no-op that says so) and under --check,
+# which writes nothing, and fm-spawn.sh runs it again at the launch that applies
+# the grant. The receipt names the route, and so does the
+# successor-branch-admission guard event written at record time and at launch.
+# It never reads or writes a work tree, runs no command that changes a
 # ref or the index, signals no process, writes no profile and touches no run
 # record: a running worker keeps the profile it was launched with, and the
 # receipt's next line is the relaunch that applies the new one. A failed write
@@ -742,50 +749,20 @@ successor_rollback() {
   fi
 }
 
-# The worktree that has refs/heads/<successor> attached, read from the project's
-# worktree list so no work tree is opened. Prints its path (nothing when no
-# worktree has it); fails only when the list cannot be read.
-successor_checkout_path() {  # <project> <successor>
-  local project=$1 successor=$2 line path="" attached="" listed
-  listed=$(git -C "$project" worktree list --porcelain 2>/dev/null) || return 1
-  while IFS= read -r line; do
-    case "$line" in
-      'worktree '*) path=${line#worktree }; attached= ;;
-      'branch '*) attached=${line#branch } ;;
-      '')
-        if [ -n "$path" ] && [ "$attached" = "refs/heads/$successor" ]; then
-          printf '%s\n' "$path"
-          return 0
-        fi
-        path=
-        attached=
-        ;;
-    esac
-  done <<< "$listed"$'\n\n'
-  return 0
-}
-
-# Route 2 of the successor proof: the successor's tip is the tip of one of this
-# task's own custody archive branches, archive/<id>-(submitted|pipeline)-<8 hex>
-# whose hex is the first eight digits of its own tip. Prints the matching
-# archive name; fails when none matches.
-successor_archive_match() {  # <project> <task-id> <successor-sha>
-  local project=$1 id=$2 sha=$3 name tip rest
-  while read -r name tip; do
-    rest=${name#"archive/$id-"}
-    [ "$rest" != "$name" ] || continue
-    [[ $rest =~ ^(submitted|pipeline)-([0-9a-f]{8})$ ]] || continue
-    [ "${tip:0:8}" = "${BASH_REMATCH[2]}" ] || continue
-    [ "$tip" = "$sha" ] || continue
-    printf '%s\n' "$name"
-    return 0
-  done < <(git -C "$project" for-each-ref --format='%(refname:short) %(objectname)' "refs/heads/archive/$id-submitted-*" "refs/heads/archive/$id-pipeline-*" 2>/dev/null)
-  return 1
+# The admission guard's refusal: one deny event naming the rule and the branch,
+# then the refusal. Every refusal that names a missing proof goes through here;
+# docs/guards/registry.json maps these sites to successor-branch-admission.
+successor_refuse() {  # <rule> <message>
+  local rule=$1
+  shift
+  "$SCRIPT_DIR/fm-guard-event.sh" successor-branch-admission deny --rule "$rule" --task "$ID" \
+    --source-ok true --successor "$SUCC_BRANCH" 2>/dev/null || true
+  die "$*"
 }
 
 do_successor() {
-  local project wt copy kind kind_count branch_count succ_count old_branch recorded_succ base_branch reason
-  local other_path why1 archive_name proof_text="recorded earlier"
+  local project wt kind kind_count branch_count succ_count old_branch recorded_succ base_branch reason
+  local proof su_route su_archive route_text proof_text
   local line brief_branch_other=0 succ_sha prior_sha="" stamp brief_text meta_text next_note su_outcome action
   local inserted=0
   local -a homes=()
@@ -851,42 +828,34 @@ do_successor() {
   action="recorded"
   if [ -n "$recorded_succ" ]; then
     [ "$recorded_succ" = "$SUCC_BRANCH" ] \
-      || die "task $ID already records successor branch $recorded_succ; one successor per task, so nothing was changed"
+      || successor_refuse one-successor "task $ID already records successor branch $recorded_succ; one successor per task, so nothing was changed"
     su_outcome="successor-already-recorded"
+  fi
+  # The whole admission runs on every path, also for a successor the record
+  # already names and also under --check: the name rule, then the proof. A
+  # recorded successor that is no longer proved is refused here, as the next
+  # launch would refuse it.
+  fm_local_firstmate_state_dirs "$STATE" \
+    || die "cannot list the local Firstmate homes to compare successor names against: $FM_LOCAL_FIRSTMATE_ERROR; nothing was changed"
+  homes=("${FM_LOCAL_FIRSTMATE_STATES[@]}")
+  reason=$(fm_successor_name_refusal "$SUCC_BRANCH" "$old_branch" "$base_branch" "$META" "$project" "${homes[@]}") \
+    || successor_refuse name "successor branch '$SUCC_BRANCH' is not admissible: $reason; nothing was changed"
+  if ! proof=$(fm_successor_proof "$project" "$ID" "$old_branch" "$SUCC_BRANCH" "$wt"); then
+    if [ "$su_outcome" = successor-already-recorded ]; then
+      successor_refuse proof "task $ID's recorded successor branch '$SUCC_BRANCH' is no longer proved: $proof; its next launch refuses it; nothing was changed"
+    fi
+    successor_refuse proof "$proof; nothing was changed"
+  fi
+  su_route=$(printf '%s\n' "$proof" | sed -n 's/^route=//p')
+  su_archive=$(printf '%s\n' "$proof" | sed -n 's/^archive=//p')
+  succ_sha=$(printf '%s\n' "$proof" | sed -n 's/^successor_sha=//p')
+  prior_sha=$(printf '%s\n' "$proof" | sed -n 's/^prior_sha=//p')
+  if [ "$su_route" = archive-tip ]; then
+    proof_text="route=archive-tip archive=$su_archive: its tip $succ_sha is the tip of the task's own archive branch $su_archive"
+    route_text="route=archive-tip archive=$su_archive"
   else
-    fm_local_firstmate_state_dirs "$STATE" \
-      || die "cannot list the local Firstmate homes to compare successor names against: $FM_LOCAL_FIRSTMATE_ERROR; nothing was changed"
-    homes=("${FM_LOCAL_FIRSTMATE_STATES[@]}")
-    reason=$(fm_successor_name_refusal "$SUCC_BRANCH" "$old_branch" "$base_branch" "$META" "$project" "${homes[@]}") \
-      || die "successor branch '$SUCC_BRANCH' is not admissible: $reason; nothing was changed"
-    succ_sha=$(git -C "$project" rev-parse --verify --quiet "refs/heads/$SUCC_BRANCH^{commit}" 2>/dev/null) \
-      || die "successor branch '$SUCC_BRANCH' does not exist in the project's ref store ($project); create it first; nothing was changed"
-    copy=$(fm_task_copy_canonical_dir "$wt") \
-      || die "task $ID's recorded copy $wt is not a directory, so the successor cannot be proved to be this task's; nothing was changed"
-    other_path=$(successor_checkout_path "$project" "$SUCC_BRANCH") \
-      || die "cannot read $project's worktree list, so the successor cannot be proved to be this task's; nothing was changed"
-    if [ -n "$other_path" ] && [ "$other_path" != "$copy" ] && [ "$(fm_task_copy_canonical_dir "$other_path" 2>/dev/null || true)" != "$copy" ]; then
-      die "successor branch '$SUCC_BRANCH' is checked out in $other_path, which is not this task's recorded copy $wt; nothing was changed"
-    fi
-    # The branch must be proved to be this task's. Route 1: it is the branch
-    # checked out in the task's own recorded copy and contains the recorded
-    # branch's tip. Route 2: its tip is the tip of one of the task's own custody
-    # archive branches. Either route is enough.
-    why1=
-    if [ -z "$other_path" ]; then
-      why1="it is not checked out in the recorded copy $wt"
-    elif ! prior_sha=$(git -C "$project" rev-parse --verify --quiet "refs/heads/$old_branch^{commit}" 2>/dev/null); then
-      why1="the recorded branch '$old_branch' does not exist in the project's ref store"
-    elif ! git -C "$project" merge-base --is-ancestor "$prior_sha" "$succ_sha" 2>/dev/null; then
-      why1="the recorded tip $prior_sha is not an ancestor of the successor tip $succ_sha"
-    fi
-    if [ -n "$why1" ]; then
-      archive_name=$(successor_archive_match "$project" "$ID" "$succ_sha") \
-        || die "successor branch '$SUCC_BRANCH' is not proved to be this task's successor; route 1 (checked out in the recorded copy and containing the recorded branch's tip) fails because $why1; route 2 (its tip $succ_sha is the tip of one of the task's own archive/$ID-(submitted|pipeline)-<8 hex> branches) fails because none points there; nothing was changed"
-      proof_text="route 2: its tip $succ_sha is the tip of the task's own archive branch $archive_name"
-    else
-      proof_text="route 1: it is checked out in the recorded copy and contains the recorded branch's tip $prior_sha"
-    fi
+    proof_text="route=checked-out: it is checked out in the recorded copy and contains the recorded branch's tip $prior_sha"
+    route_text="route=checked-out"
   fi
 
   next_note="apply recorded successor branch $SUCC_BRANCH"
@@ -966,12 +935,15 @@ do_successor() {
     SU_META_BACKUP=
     SU_BRIEF_BACKUP=
     action="recorded; wrote $META and $DATA/$ID/brief.md"
+    "$SCRIPT_DIR/fm-guard-event.sh" successor-branch-admission allow --rule record --task "$ID" \
+      --source-ok true --cleared-by proceed --route "$su_route" --successor "$SUCC_BRANCH" 2>/dev/null || true
   fi
 
   printf '%s %s branch=%s successor_branch=%s\n' "$su_outcome" "$ID" "$old_branch" "$SUCC_BRANCH"
   printf 'owner: the lock-owning main Firstmate of %s\n' "$FM_HOME"
   printf 'action: task=%s prior_branch=%s successor_branch=%s; %s; proof: %s; no work tree, ref, index, process, run record or profile file was touched\n' \
     "$ID" "$old_branch" "$SUCC_BRANCH" "$action" "$proof_text"
+  printf 'route: %s successor=%s successor_sha=%s\n' "$route_text" "$SUCC_BRANCH" "$succ_sha"
   printf 'next: FM_HOME=%q bash %q %q relaunch --note %q\n' "$FM_HOME" "$SCRIPT_DIR/fm-control.sh" "$ID" "$next_note"
   printf 'effect: a running worker keeps the profile it was launched with; that relaunch exits it and starts a replacement in the same copy and endpoint, and the replacement'"'"'s write profile is generated from the record to allow exactly branch %s and successor %s (each with its lock and reflog) and the task'"'"'s archive recovery branches. It touches no ref, no run record and no task file except the worker wiring files every relaunch rewrites.\n' \
     "$old_branch" "$SUCC_BRANCH"

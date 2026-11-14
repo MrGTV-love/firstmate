@@ -157,7 +157,8 @@
     "secondmate-sync",
     "check-event-output-integrity",
     "slack-call-fields-hold-a-plane-value",
-    "slack-command-refusal-line"
+    "slack-command-refusal-line",
+    "successor-branch-admission"
   ],
   "guards": [
     {
@@ -5300,6 +5301,58 @@
       "status": "active"
     },
     {
+      "id": "successor-branch-admission",
+      "version": "1",
+      "owner": "bin/fm-successor-branch-lib.sh",
+      "emitters": [
+        "bin/fm-control.sh",
+        "bin/fm-spawn.sh"
+      ],
+      "invariant": "a task's next launch gets write access to one recorded successor branch only when that branch is proved to be the task's own",
+      "layer": "runtime-block",
+      "source": "the task record's branch= and successor_branch= lines, the project's ref store and worktree list, the task's own archive/<task>-(submitted|pipeline)-<8 hex> branches and every local home's task records, read by fm_successor_name_refusal and fm_successor_proof in bin/fm-successor-branch-lib.sh",
+      "trigger": "bin/fm-control.sh successor (recording, --check, or repeating a recorded successor) or bin/fm-spawn.sh relaunching a ship whose record names successor_branch= finds the name outside the task's name family (the recorded branch name, '-', then letters, digits, '.', '_' or '-'), not a plain valid branch name, equal to the recorded, base or default branch (case ignored), another task's branch or successor (case ignored), missing, checked out in another work tree, or proved by neither the checked-out route nor the archive-tip route",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "preserve the task's worktree and record; run bash bin/fm-control.sh <task-id> successor --branch <successor> --check to see which proof fails, repair the branch or remove successor_branch= from the task record, then run bash bin/fm-control.sh <task-id> relaunch --note <why>",
+      "budget": 1,
+      "budget_reason": "one refusal per invocation; no retry loop and no fallback to an unproved or unconfined launch; Main owns repairing the branch or the record",
+      "telemetry": "state/guard-events.jsonl; one event at record time and one at the launch that applies the grant, each with guard, rule, task, decision, successor and route; a refusal writes a deny event naming the rule (name, proof, one-successor or launch) and the successor; the kernel's enforcement of the profile text is not instrumented per decision",
+      "test": "tests/fm-control-successor.test.sh",
+      "tier": "C",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": true,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-control.sh",
+          "match": "successor-branch-admission deny --rule \"$rule\""
+        },
+        {
+          "file": "bin/fm-control.sh",
+          "match": "successor_refuse ",
+          "count": 4
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "successor-branch-admission deny --rule launch"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "confinement_refuse \"$source_ok\" \"$@\""
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "confinement_successor_refuse ",
+          "count": 3
+        }
+      ]
+    },
+    {
       "id": "spawn-write-confinement",
       "version": "1",
       "owner": "bin/fm-write-confinement.py",
@@ -5343,14 +5396,6 @@
         },
         {
           "file": "bin/fm-spawn.sh",
-          "match": "confinement_refuse false \"cannot list the local Firstmate homes to check the recorded successor branch against: $FM_LOCAL_FIRSTMATE_ERROR\""
-        },
-        {
-          "file": "bin/fm-spawn.sh",
-          "match": "confinement_refuse false \"task $ID records successor branch '$SUCCESSOR_BRANCH', which is not admissible: $confinement_successor_reason\""
-        },
-        {
-          "file": "bin/fm-spawn.sh",
           "match": "confinement_refuse false \"this raw $HARNESS launch command sets $confinement_raw_var to a value that needs shell expansion or is not one leading assignment, so its write profile cannot follow it; pass the resolved absolute path as a leading literal $confinement_raw_var= assignment instead\""
         },
         {
@@ -5374,6 +5419,7 @@
       "emitters": ["bin/fm-spawn.sh"],
       "invariant": "a macOS omp or Claude task worker launches with writes to every named protected asset denied",
       "layer": "impossible-by-construction",
+      "layer_note": "The profile is impossible-by-construction only for the refs a launch does not name. One task-recorded successor branch is granted as four literal paths. That grant is a runtime-block decision made by bin/fm-control.sh successor and made again at every launch that applies it (guard successor-branch-admission); the kernel enforces the profile text, not the admission.",
       "source": "uname -s, resolved home/config/projects/data/state paths, git worktree lists of every project and of the home, local Firstmate homes from strict fm_local_firstmate_state_dirs, task ids from every local home's state/<id>.meta, /tmp/fm-<id>, /private/tmp/claude-<uid> and ~/tmp entries, $NM_HOME/repos gate names, harness config homes and measured runtime state, the minted Claude session id, omp project-scope hash, the raw launch command's root selectors, final launch-bound FM_WRITE_CONFINEMENT and task audit routing in bin/ten-levels/extensions/report.ts",
       "trigger": "fm-spawn launches or relaunches an omp or claude ship/scout on Darwin",
       "decision": "deny",
