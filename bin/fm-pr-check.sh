@@ -310,12 +310,15 @@ fm_pr_metadata_identity_parse "$META" || exit 1
 [ "$FM_PR_META_PROVIDER" = "$PROVIDER" ] && [ "$FM_PR_META_URL" = "$URL" ] \
   && [ "$FM_PR_META_HOST" = "$HOST" ] && [ "$FM_PR_META_PATH" = "$PROJECT_PATH" ] \
   && [ "$FM_PR_META_NUMBER" = "$NUMBER" ] || exit 1
-fm_lock_release "$META_LOCK"
-META_LOCK_HELD=0
-
+# Take the poll publication lock before the metadata lock is released, so pr= is
+# never durable without a publisher holding it: bin/fm-pr-ready-reconcile.sh leaves
+# a poll alone while that lock is held, and would otherwise re-arm a live first
+# registration in the gap. Nothing takes these two locks in the other order.
 PR_POLL_PUBLISH_LOCK="$STATE/.pr-poll-publish-$ID.lock"
 fm_lock_acquire_wait "$PR_POLL_PUBLISH_LOCK"
 PR_POLL_PUBLISH_LOCK_HELD=1
+fm_lock_release "$META_LOCK"
+META_LOCK_HELD=0
 # A re-arm checks again under the publication lock: another registration may have
 # recorded a newer PR after this one committed, and its poll must not be replaced.
 if [ -n "${FM_PR_CHECK_EXPECT_PR:-}" ]; then
