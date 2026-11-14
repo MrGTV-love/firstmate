@@ -424,11 +424,17 @@ test_launch_proof_claude_adoption() (
   # FM_TEST_ROWS=1 prints one line per row (exit status and the printed cause) for the evidence record.
   row() { [ -z "${FM_TEST_ROWS:-}" ] || printf 'ROW %-96s | exit %s | %s\n' "$1" "$rc" "$2"; }
   accepts() { adopt; [ "$rc" = 0 ] || fail "$1: refused: $err"; row "$1" "authorized: $(printf '%s' "$out" | jq -c '{pid,harness_pid,tie}')"; }
+  # Every missing-tie refusal names what lets Main go on (plan row E2(b)).
+  no_tie_next() { # <cause-substring> <description>
+    [ "$1" = 'no task-specific session tie' ] || return 0
+    assert_contains "$err" 'the lane by hand' "$2: names its next action"
+  }
   refuses() { # <cause-substring> <description>
     adopt
     [ "$rc" != 0 ] || fail "$2: authorized: $out"
     [ -z "$out" ] || fail "$2: printed a record while refusing"
     assert_contains "$err" "$1" "$2"
+    no_tie_next "$1" "$2"
     row "$2" "$err"
   }
 
@@ -596,6 +602,7 @@ test_launch_proof_claude_adoption() (
     [ "$rc" != 0 ] || fail "$2: authorized: $out"
     [ -z "$out" ] || fail "$2: printed a record while refusing"
     assert_contains "$err" "$1" "$2"
+    no_tie_next "$1" "$2"
     row "$2" "$err"
   }
   fresh_case
