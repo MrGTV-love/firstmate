@@ -772,6 +772,265 @@ test_registry_owns_the_successor_admission_and_the_reader_attributes_it() {
   pass "successor: the registry holds the admission guard, the reader attributes the record and the refusal to it, and spawn-write-confinement names the permit"
 }
 
+# --- Round 2 (outside review of 71d56288f): one failing-first test per finding ---
+
+# F1: an ownership record that cannot be read must refuse, not pass. Another task's
+# record names the candidate; unreadable, it must stop the admission, and readable
+# it refuses the same name for the ownership it states.
+test_successor_refuses_when_another_task_record_cannot_be_read() {
+  local id=suc-unreadable dir other out rc=0 before_meta before_brief
+  dir=$(new_successor_case unreadable "$id")
+  mode_zero_binds "$dir/probe" || { printf 'skip: this user reads mode 000 files, so an unreadable record cannot be staged\n'; return 0; }
+  other=$dir/home/state/other-$id.meta
+  printf 'successor_branch=fm/%s-v2\n' "$id" >> "$other"
+  before_meta=$dir/before.meta
+  before_brief=$dir/before.brief
+  cp -p "$dir/home/state/$id.meta" "$before_meta"
+  cp -p "$dir/home/data/$id/brief.md" "$before_brief"
+  chmod 000 "$other"
+  out=$(sc "$dir" "$id" --branch "fm/$id-v2" --note why) || rc=$?
+  chmod 600 "$other"
+  expect_code 1 "$rc" "an unreadable other task record must refuse the admission"$'\n'"$out"
+  assert_contains "$out" "cannot read task other-$id's record" "the refusal must name the unreadable record"
+  cmp -s "$before_meta" "$dir/home/state/$id.meta" || fail "the refusal changed the task record"
+  cmp -s "$before_brief" "$dir/home/data/$id/brief.md" || fail "the refusal changed the instructions"
+  chmod 000 "$other"
+  rc=0
+  out=$(sc "$dir" "$id" --branch "fm/$id-v2" --check) || rc=$?
+  chmod 600 "$other"
+  expect_code 1 "$rc" "--check must refuse while another task record cannot be read"$'\n'"$out"
+  # Readable, the same record refuses the name for the ownership it states.
+  rc=0
+  out=$(sc "$dir" "$id" --branch "fm/$id-v2" --note why) || rc=$?
+  expect_code 1 "$rc" "a readable record that owns the name must refuse it"$'\n'"$out"
+  assert_contains "$out" "already records it as its successor branch" "the readable control refuses for the stated ownership"
+  # Matched control: with no other record naming it, the name is admitted.
+  sed -i.bak '/^successor_branch=/d' "$other" && rm -f "$other.bak"
+  rc=0
+  out=$(sc "$dir" "$id" --branch "fm/$id-v2" --check) || rc=$?
+  expect_code 0 "$rc" "a readable inventory with no owner of the name must admit it"$'\n'"$out"
+  pass "successor: an unreadable other task record refuses the admission, a readable owner refuses the name, and a readable inventory without an owner admits it"
+}
+
+# F2 (1): every work tree on the branch is checked, not the first one listed.
+test_successor_refuses_a_branch_also_checked_out_in_another_work_tree() {
+  local id=suc-twice dir where out rc
+  dir=$(new_successor_case twice "$id")
+  for where in a-extra z-extra; do
+    git -C "$dir/proj" worktree add -q -f "$dir/$where" "fm/$id-v2"
+    rc=0
+    out=$(sc "$dir" "$id" --branch "fm/$id-v2" --check) || rc=$?
+    expect_code 1 "$rc" "a branch checked out in the recorded copy and also in $where must refuse"$'\n'"$out"
+    assert_contains "$out" "$where" "the refusal must name the other work tree"
+    assert_contains "$out" "which is not this task's recorded copy" "the refusal must name the missing proof"
+    git -C "$dir/proj" worktree remove --force "$dir/$where"
+  done
+  rc=0
+  out=$(sc "$dir" "$id" --branch "fm/$id-v2" --check) || rc=$?
+  expect_code 0 "$rc" "the single-copy control must be admitted"$'\n'"$out"
+  assert_contains "$out" "route=checked-out" "the single-copy control is proved by the checked-out route"
+  pass "successor: a branch also checked out in a second work tree is refused whichever is listed first, and the single-copy control is admitted"
+}
+
+# F2 (2): the ref store the proof reads is the ref store the profile grants.
+test_successor_refuses_a_copy_outside_the_projects_ref_store() {
+  local id=suc-store dir tree tip hex out rc quarantine
+  dir=$(new_successor_case store "$id")
+  tree=$(git -C "$dir/proj" rev-parse "fm/$id-v2^{tree}")
+  tip=$(git -C "$dir/proj" -c user.name=fmtest -c user.email=fmtest@example.invalid commit-tree -m "successor" -p "fm/$id-v2" "$tree")
+  hex=$(printf '%s' "$tip" | cut -c1-8)
+  git -C "$dir/proj" branch "fm/$id-v2b" "$tip"
+  git -C "$dir/proj" branch "archive/$id-submitted-$hex" "$tip"
+  # A second repository holds a linked copy; the task record is pointed at that copy.
+  git init -q -b main "$dir/other-repo"
+  git -C "$dir/other-repo" -c user.name=fmtest -c user.email=fmtest@example.invalid commit -q --allow-empty -m init
+  git -C "$dir/other-repo" worktree add -q -b "fm/$id-v2b" "$dir/other-copy"
+  quarantine=$dir/home/state/$id.meta
+  cp -p "$quarantine" "$dir/meta.good"
+  sed -i.bak "s#^worktree=.*#worktree=$dir/other-copy#" "$quarantine" && rm -f "$quarantine.bak"
+  rc=0
+  out=$(sc "$dir" "$id" --branch "fm/$id-v2b" --check) || rc=$?
+  expect_code 1 "$rc" "a recorded copy in another repository must refuse, though the project's archive matches"$'\n'"$out"
+  assert_contains "$out" "does not share the project's ref store" "the refusal must name the missing proof"
+  # Matched control: the same record with the copy that shares the project's ref store is admitted.
+  cp -p "$dir/meta.good" "$quarantine"
+  rc=0
+  out=$(sc "$dir" "$id" --branch "fm/$id-v2b" --check) || rc=$?
+  expect_code 0 "$rc" "a copy that shares the project's ref store must be admitted by the archive route"$'\n'"$out"
+  assert_contains "$out" "route=archive-tip" "the matching control is proved by the archive-tip route"
+  pass "successor: a recorded copy in another repository is refused, and the copy that shares the project's ref store is admitted"
+}
+
+# F3: a publication that fails after the rename has replaced the record must still
+# leave the record, the brief and the profile as before, with no backup behind.
+test_successor_post_rename_publication_failure_restores_everything() {
+  local id=suc-late dir mode real_mv out rc leftovers
+  real_mv=$(command -v mv)
+  for mode in lost diverted; do
+    dir=$(new_successor_case "late-$mode" "$id")
+    cat > "$dir/fakebin/mv" <<SH
+#!/usr/bin/env bash
+"$real_mv" "\$@" || exit \$?
+for arg in "\$@"; do
+  case "\$arg" in
+    */.$id.meta.successor.*)
+      target=\${!#}
+      if [ '$mode' = lost ]; then
+        rm -f "\$target"
+      else
+        "$real_mv" "\$target" "\$target.injected" && ln -s "\$target.injected" "\$target"
+      fi
+      ;;
+  esac
+done
+exit 0
+SH
+    chmod +x "$dir/fakebin/mv"
+    cp -p "$dir/home/state/$id.meta" "$dir/before.meta"
+    cp -p "$dir/home/data/$id/brief.md" "$dir/before.brief"
+    cp -p "$dir/home/state/$id.write-confinement.sb" "$dir/before.sb"
+    rc=0
+    out=$(sc "$dir" "$id" --branch "fm/$id-v2" --note why) || rc=$?
+    expect_code 1 "$rc" "a post-rename validation failure ($mode) must refuse"$'\n'"$out"
+    rm -f "$dir/home/state/$id.meta.injected"
+    [ ! -L "$dir/home/state/$id.meta" ] || fail "the record is still a symbolic link after the failed call ($mode)"
+    cmp -s "$dir/before.meta" "$dir/home/state/$id.meta" || fail "the record is not back to its prior bytes after a post-rename failure ($mode): $(cat "$dir/home/state/$id.meta" 2>&1 | tail -3)"
+    cmp -s "$dir/before.brief" "$dir/home/data/$id/brief.md" || fail "the instructions are not back to their prior bytes ($mode)"
+    cmp -s "$dir/before.sb" "$dir/home/state/$id.write-confinement.sb" || fail "the profile changed ($mode)"
+    leftovers=$(ls -A "$dir/home/state" "$dir/home/data/$id" | grep -E '\.(meta|brief)\.(prior|successor)\.' || true)
+    [ -z "$leftovers" ] || fail "the failed call left staging or backup files behind ($mode): $leftovers"
+    [ ! -e "$dir/home/state/.control-$id.lock" ] || fail "the failed call left the lifecycle lock behind ($mode)"
+    rm -f "$dir/fakebin/mv"
+    rc=0
+    out=$(sc "$dir" "$id" --branch "fm/$id-v2" --note why) || rc=$?
+    expect_code 0 "$rc" "after a post-rename failure ($mode) the same call must still succeed"$'\n'"$out"
+  done
+  pass "successor: a publication that fails after the rename restores the record, the instructions and the profile, with no backup or lock left"
+}
+
+# F5 (a): a refusal writes no file, the default event log included.
+test_successor_refusals_write_no_file_under_the_default_event_log() {
+  local id=suc-nofile dir
+  dir=$(new_successor_case nofile "$id")
+  git -C "$dir/proj" branch "fm/$id-v2b" "fm/$id-v2"
+  (
+    unset FM_GUARD_EVENT_LOG
+    expect_successor_refusal "$dir" "$id" no-file-nonexistent "does not exist in the project's ref store" 1 --branch "fm/$id-v3" --note why
+    expect_successor_refusal "$dir" "$id" no-file-name "is not admissible" 1 --branch "develop" --note why
+    expect_successor_refusal "$dir" "$id" no-file-unproved "is not proved to be this task's successor" 1 --branch "fm/$id-v2b" --note why
+  ) || exit 1
+  [ ! -e "$dir/home/state/guard-events.jsonl" ] || fail "a refusal created the home's event log"
+  pass "successor: a refusal changes no file, and the home's default event log is not created"
+}
+
+# F5 (b): the event the record owes is not best-effort. A sink that cannot take it
+# refuses the record, and the receipt names the event file when the record succeeds.
+test_successor_requires_its_event_to_be_written() {
+  local id=suc-sink dir out rc log
+  dir=$(new_successor_case sink "$id")
+  mkdir -p "$dir/event-sink-dir"
+  cp -p "$dir/home/state/$id.meta" "$dir/before.meta"
+  cp -p "$dir/home/data/$id/brief.md" "$dir/before.brief"
+  rc=0
+  out=$( export FM_GUARD_EVENT_LOG="$dir/event-sink-dir"; sc "$dir" "$id" --branch "fm/$id-v2" --note why ) || rc=$?
+  expect_code 1 "$rc" "a record whose event cannot be written must refuse"$'\n'"$out"
+  assert_contains "$out" "event" "the refusal must name the event"
+  cmp -s "$dir/before.meta" "$dir/home/state/$id.meta" || fail "the record was kept although its event was not written"
+  cmp -s "$dir/before.brief" "$dir/home/data/$id/brief.md" || fail "the instructions were kept although the event was not written"
+  log=$dir/event-log.jsonl
+  rc=0
+  out=$( export FM_GUARD_EVENT_LOG="$log"; sc "$dir" "$id" --branch "fm/$id-v2" --note why ) || rc=$?
+  expect_code 0 "$rc" "a writable sink must let the record succeed"$'\n'"$out"
+  assert_contains "$out" "$log" "the receipt must list the event file it wrote"
+  jq -e 'select(.guard == "successor-branch-admission" and .rule == "record" and .decision == "allow")' "$log" >/dev/null \
+    || fail "the event was not written to the sink the receipt names"
+  pass "successor: an event that cannot be written refuses the record and leaves everything as before, and the receipt names the event file"
+}
+
+# F6 (a): a note file is read after admission and never for a refusal or a check.
+test_successor_reads_the_note_file_only_after_admission() {
+  local id=suc-notefile dir out rc note
+  dir=$(new_successor_case notefile "$id")
+  note=$dir/wt/note.txt
+  mode_zero_binds "$dir/probe" || { printf 'skip: this user reads mode 000 files, so an unreadable note file cannot be staged\n'; return 0; }
+  printf 'why from a file\n' > "$note"
+  chmod 000 "$note"
+  rc=0
+  out=$(sc "$dir" "$id" --branch "fm/$id-v3" --note-file "$note") || rc=$?
+  expect_code 1 "$rc" "an admission refusal must come first"$'\n'"$out"
+  assert_contains "$out" "does not exist in the project's ref store" "the refusal must be the admission's, not a note-file error"
+  rc=0
+  out=$(sc "$dir" "$id" --branch "fm/$id-v2" --check --note-file "$note") || rc=$?
+  expect_code 0 "$rc" "--check must not read the note file"$'\n'"$out"
+  chmod 600 "$note"
+  rc=0
+  out=$(sc "$dir" "$id" --branch "fm/$id-v2" --note-file "$note") || rc=$?
+  expect_code 0 "$rc" "after admission the readable note file must be used"$'\n'"$out"
+  assert_contains "$(cat "$dir/home/data/$id/brief.md")" "why from a file" "the note file's text must be recorded in the instructions"
+  pass "successor: the note file is read only after admission, never for a refusal or a check"
+}
+
+# F6 (b): a lifecycle command that changes nothing keeps the composer-dialog file.
+test_successor_keeps_the_composer_dialog_file() {
+  local id=suc-dialog dir out rc dialog
+  dir=$(new_successor_case dialog "$id")
+  dialog=$dir/home/state/$id.composer-dialog
+  printf 'dialog text that must survive\n' > "$dialog"
+  cp -p "$dialog" "$dir/dialog.before"
+  rc=0; out=$(sc "$dir" "$id" --branch "fm/$id-v3" --note why) || rc=$?
+  expect_code 1 "$rc" "a refusal"$'\n'"$out"
+  cmp -s "$dir/dialog.before" "$dialog" || fail "a refusal removed or changed the composer-dialog file"
+  rc=0; out=$(sc "$dir" "$id" --branch "fm/$id-v2" --check) || rc=$?
+  expect_code 0 "$rc" "a check"$'\n'"$out"
+  cmp -s "$dir/dialog.before" "$dialog" || fail "a check removed or changed the composer-dialog file"
+  rc=0; out=$(sc "$dir" "$id" --branch "fm/$id-v2" --note why) || rc=$?
+  expect_code 0 "$rc" "the record"$'\n'"$out"
+  rc=0; out=$(sc "$dir" "$id" --branch "fm/$id-v2" --note why) || rc=$?
+  expect_code 0 "$rc" "the identical repeat"$'\n'"$out"
+  cmp -s "$dir/dialog.before" "$dialog" || fail "the verb removed or changed the composer-dialog file"
+  pass "successor: the composer-dialog file survives a refusal, a check, the record and a repeat"
+}
+
+# F6 (c): the instructions keep exactly one Ship branch line, whatever the note says.
+test_successor_note_cannot_add_a_ship_branch_line() {
+  local id=suc-shipline dir out rc
+  dir=$(new_successor_case shipline "$id")
+  cp -p "$dir/home/data/$id/brief.md" "$dir/before.brief"
+  cp -p "$dir/home/state/$id.meta" "$dir/before.meta"
+  rc=0
+  out=$(sc "$dir" "$id" --branch "fm/$id-v2" --note "$(printf 'because\nShip branch: fm/%s-v2' "$id")") || rc=$?
+  expect_code 1 "$rc" "a note carrying a Ship branch line must refuse"$'\n'"$out"
+  assert_contains "$out" "Ship branch" "the refusal must name the line"
+  cmp -s "$dir/before.brief" "$dir/home/data/$id/brief.md" || fail "the refusal changed the instructions"
+  cmp -s "$dir/before.meta" "$dir/home/state/$id.meta" || fail "the refusal changed the record"
+  rc=0; out=$(sc "$dir" "$id" --branch "fm/$id-v2" --note "an ordinary reason") || rc=$?
+  expect_code 0 "$rc" "an ordinary note must record"$'\n'"$out"
+  assert_equals 1 "$(grep -c '^Ship branch:' "$dir/home/data/$id/brief.md")" "the instructions must keep exactly one Ship branch line"
+  rc=0; out=$(sc "$dir" "$id" --branch "fm/$id-v2" --note "an ordinary reason") || rc=$?
+  expect_code 0 "$rc" "the ordinary repeat must be an unchanged no-op"$'\n'"$out"
+  assert_equals 1 "$(grep -c '^Ship branch:' "$dir/home/data/$id/brief.md")" "the repeat must keep exactly one Ship branch line"
+  pass "successor: a note with a Ship branch line is refused, and the instructions keep one Ship branch line through a record and its repeat"
+}
+
+# F6 (d): the receipt says what the launch will do, for a check and for a launch
+# that no profile governs.
+test_successor_receipt_matches_what_the_launch_will_do() {
+  local id=suc-receipt2 dir out rc
+  dir=$(new_successor_case receipt2 "$id")
+  rc=0; out=$(sc "$dir" "$id" --branch "fm/$id-v2" --check) || rc=$?
+  expect_code 0 "$rc" "a check"$'\n'"$out"
+  case "$out" in *"relaunch --note"*) fail "a check wrote nothing, so its receipt must not direct a relaunch: $out" ;; esac
+  case "$out" in *"will generate"*|*"replacement's write profile is generated"*) fail "a check receipt must not promise a generated profile: $out" ;; esac
+  assert_contains "$out" "successor --branch fm/$id-v2" "a check receipt names the command that records"
+  # A harness that no write profile governs: the receipt must say the launch is not confined.
+  sed -i.bak 's/^harness=.*/harness=codex/' "$dir/home/state/$id.meta" && rm -f "$dir/home/state/$id.meta.bak"
+  rc=0; out=$(sc "$dir" "$id" --branch "fm/$id-v2" --note why) || rc=$?
+  expect_code 0 "$rc" "recording for a harness no profile governs"$'\n'"$out"
+  assert_contains "$out" "not write-confined" "the receipt must say that launch is not write-confined"
+  case "$out" in *"replacement's write profile is generated"*) fail "the receipt promised a profile for an ungoverned launch: $out" ;; esac
+  pass "successor: a check receipt directs no relaunch, and a launch no profile governs is said to be unconfined"
+}
+
 control_relaunch_test_cases=(
 test_successor_records_the_branch_and_is_idempotent
 test_successor_goes_before_a_recorded_pr
@@ -787,6 +1046,16 @@ test_successor_archive_route_admits_only_the_task_own_archive_names
 test_successor_receipt_and_events_name_the_checked_out_route
 test_successor_names_compare_without_regard_to_case
 test_registry_owns_the_successor_admission_and_the_reader_attributes_it
+test_successor_refuses_when_another_task_record_cannot_be_read
+test_successor_refuses_a_branch_also_checked_out_in_another_work_tree
+test_successor_refuses_a_copy_outside_the_projects_ref_store
+test_successor_post_rename_publication_failure_restores_everything
+test_successor_refusals_write_no_file_under_the_default_event_log
+test_successor_requires_its_event_to_be_written
+test_successor_reads_the_note_file_only_after_admission
+test_successor_keeps_the_composer_dialog_file
+test_successor_note_cannot_add_a_ship_branch_line
+test_successor_receipt_matches_what_the_launch_will_do
 test_successor_failure_at_each_write_step_changes_nothing
 test_successor_serializes_on_the_lifecycle_and_metadata_locks
 test_relaunch_profile_covers_exactly_the_recorded_successor

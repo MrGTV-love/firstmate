@@ -20,6 +20,13 @@ out=$(python3 -I "$ROOT/tests/fm-write-confinement-successor.py" "$ROOT" "$TMP_R
 printf '%s\n' "$out"
 [ "$rc" = 0 ] || fail "the successor profile unit cases failed (exit $rc)"
 pass "PROFILE-COVERS (profile text): the generated profile gains exactly the successor's literal allow lines and nothing else under refs/heads"
+for validator in validators oracle; do
+  rc=0
+  out=$(python3 -I "$ROOT/tests/fm-write-confinement-successor-$validator.py" "$ROOT" "$TMP_ROOT/$validator" 2>&1) || rc=$?
+  printf '%s\n' "$out"
+  [ "$rc" = 0 ] || fail "the successor $validator checks failed (exit $rc)"
+done
+pass "PROFILE-COVERS (validators): the profile comparison sees a removed deny line, and the kernel judgment tells a confinement refusal from an unrelated git failure"
 rc=0
 out=$(python3 -I "$ROOT/tests/fm-write-confinement-successor.py" "$ROOT" "$TMP_ROOT/kernel" kernel 2>&1) || rc=$?
 printf '%s\n' "$out"

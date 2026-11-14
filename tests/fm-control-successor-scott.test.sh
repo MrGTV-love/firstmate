@@ -206,7 +206,7 @@ test_scott_name_family_bounds_the_archive_route() {
 }
 
 test_scott_operation_then_relaunch_keeps_every_custody_relationship() {
-  local dir out rc fx diff_copy changed pid
+  local dir out rc fx pid
   dir=$(new_scott_case custody)
   fx=$dir/fx
   pid=$(cat "$dir/sentinel-pid")
@@ -235,11 +235,8 @@ test_scott_operation_then_relaunch_keeps_every_custody_relationship() {
   same "$dir" op relaunch "the relaunch" custody gate binding
   successor_relaunch_git_changes "$dir/snap/op/project-git" "$dir/snap/relaunch/project-git" "the relaunch"
   no_custody_calls "$dir" "the relaunch"
-  # The copy: only the worker wiring files a relaunch always rewrites may differ.
-  diff_copy=$(diff "$dir/snap/op/copy" "$dir/snap/relaunch/copy" || true)
-  changed=$(printf '%s\n' "$diff_copy" | sed -n 's/^[<>] \(dir \)\{0,1\}\([^ ]*\) .*/\2/p' | LC_ALL=C sort -u | grep -v -e '^\.claude/settings\.local\.json$' -e '^\.fm-busy-stop$' -e '^\.claude$' || true)
-  [ -z "$changed" ] || fail "the relaunch changed task files beyond its worker wiring: $changed"
-  printf 'note: relaunch rewrote only the worker wiring in the copy: %s\n' "$(printf '%s\n' "$diff_copy" | sed -n 's/^[<>] \(dir \)\{0,1\}\([^ ]*\) .*/\2/p' | LC_ALL=C sort -u | tr '\n' ' ')"
+  # What the relaunch changes in the copy is compared, without a filter list, by
+  # test_scott_relaunch_changes_the_copy_only_as_a_relaunch_without_the_successor_does.
   assert_equals "successor_branch=$SUCC" "$(grep '^successor_branch=' "$dir/home/state/$TASK.meta")" "the relaunch lost the recorded successor"
   assert_equals "branch=$OLD" "$(grep '^branch=' "$dir/home/state/$TASK.meta")" "the relaunch changed the old branch"
   assert_equals "refs/heads/$OLD" "$(git -C "$fx/slots/22/project" symbolic-ref HEAD)" "the copy must stay on the old branch until Main's custody step"
@@ -402,6 +399,138 @@ test_scott_check_proves_a_recorded_successor_again() {
   pass "Scott shape: --check on a recorded successor proves it again and refuses once it is no longer proved"
 }
 
+# --- Round 2 (outside review of 71d56288f): failing-first tests on the Scott shape ---
+
+# The changed paths between two copy fingerprints, one per line, sorted.
+copy_delta() {  # <fingerprint-before> <fingerprint-after>
+  diff "$1" "$2" | sed -n 's/^[<>] \(dir \)\{0,1\}\([^ ]*\) .*/\2/p' | LC_ALL=C sort -u
+}
+
+# The copy's wiring text with the one per-launch value neutralised: every relaunch
+# mints a fresh generation id into its hooks (fm-spawn.sh, so an event from an
+# earlier incarnation is rejected), which no relaunch can leave byte-identical.
+wiring_without_generation() {  # <file>
+  sed -E "s/--gen 'g[0-9]+\.[0-9]+\.[0-9]+'/--gen 'GEN'/g" "$1"
+}
+
+# F4: no filter list and no rewritten expectation. The operation leaves the copy
+# byte-identical; the relaunch that follows changes exactly what a relaunch without
+# a recorded successor changes (the same paths, and the same wiring text apart from
+# the generation id it mints), so the successor adds nothing to the copy.
+test_scott_relaunch_changes_the_copy_only_as_a_relaunch_without_the_successor_does() {
+  local dir out rc copy delta_control delta_successor
+  dir=$(new_scott_case twin)
+  copy=$dir/fx/slots/22/project
+  rc=0; out=$(run_control "$dir" "$TASK" relaunch --note "control one") || rc=$?
+  expect_code 0 "$rc" "the first control relaunch should succeed"$'\n'"$out"
+  snap_scott "$dir" c1
+  rc=0; out=$(run_control "$dir" "$TASK" relaunch --note "control two") || rc=$?
+  expect_code 0 "$rc" "the second control relaunch should succeed"$'\n'"$out"
+  snap_scott "$dir" c2
+  cp "$copy/.claude/settings.local.json" "$dir/wiring.c2"
+  delta_control=$(copy_delta "$dir/snap/c1/copy" "$dir/snap/c2/copy")
+  rc=0; out=$(sc "$dir" --branch "$SUCC" --note "twin check") || rc=$?
+  expect_code 0 "$rc" "recording the Scott successor should succeed"$'\n'"$out"
+  snap_scott "$dir" op
+  same "$dir" c2 op "the operation" copy gate project-git binding custody
+  rc=0; out=$(run_control "$dir" "$TASK" relaunch --note "apply the successor") || rc=$?
+  expect_code 0 "$rc" "the relaunch with the successor should succeed"$'\n'"$out"
+  snap_scott "$dir" r
+  cp "$copy/.claude/settings.local.json" "$dir/wiring.r"
+  delta_successor=$(copy_delta "$dir/snap/op/copy" "$dir/snap/r/copy")
+  printf 'note: a relaunch without the successor changed in the copy: %s\n' "$(printf '%s' "$delta_control" | tr '\n' ' ')"
+  printf 'note: the relaunch with the successor changed in the copy:  %s\n' "$(printf '%s' "$delta_successor" | tr '\n' ' ')"
+  assert_equals "$delta_control" "$delta_successor" "the relaunch with the successor must change the same copy paths as a relaunch without it"
+  [ -n "$delta_successor" ] || fail "the oracle saw no relaunch rewrite at all; it can no longer tell the two relaunches apart"
+  [ "$(wiring_without_generation "$dir/wiring.c2")" = "$(wiring_without_generation "$dir/wiring.r")" ] \
+    || fail "the relaunch with the successor wrote wiring that a relaunch without it does not write: $(diff <(wiring_without_generation "$dir/wiring.c2") <(wiring_without_generation "$dir/wiring.r") | head -5)"
+  pass "Scott shape: the operation leaves the copy byte-identical, and the relaunch changes only what a relaunch without the successor changes"
+}
+
+# F1 at the launch: another task's record that cannot be read refuses the grant.
+test_scott_launch_refuses_when_another_task_record_cannot_be_read() {
+  local dir out rc sb other
+  if [ "$(uname -s)" != Darwin ]; then
+    printf 'skip: the write profile is generated on macOS only; Linux remains unconfined\n'
+    return 0
+  fi
+  dir=$(new_scott_case unreadable)
+  mode_zero_binds "$dir/probe" || { printf 'skip: this user reads mode 000 files, so an unreadable record cannot be staged\n'; return 0; }
+  sb=$dir/home/state/$TASK.write-confinement.sb
+  other=$dir/home/state/other-owner.meta
+  printf 'kind=ship\nbranch=%s\n' "$SUCC" > "$other"
+  printf 'successor_branch=%s\n' "$SUCC" >> "$dir/home/state/$TASK.meta"
+  chmod 000 "$other"
+  rm -f "$sb"
+  rc=0; out=$(run_control "$dir" "$TASK" relaunch --note "owner unreadable") || rc=$?
+  chmod 600 "$other"
+  [ "$rc" != 0 ] || fail "a launch that cannot read another task's record must refuse the grant"$'\n'"$out"
+  assert_contains "$out" "cannot read task other-owner's record" "the launch refusal must name the unreadable record"
+  [ ! -f "$sb" ] || ! grep -qF "$SUCC\"" "$sb" || fail "a line for the successor reached the profile although the inventory was unreadable"
+  # Matched control: a readable record that does not own the name lets the launch through.
+  printf 'kind=ship\nbranch=fm/other-owner\n' > "$other"
+  rc=0; out=$(run_control "$dir" "$TASK" relaunch --note "owner readable") || rc=$?
+  expect_code 0 "$rc" "a readable inventory with no owner of the name must let the launch through"$'\n'"$out"
+  grep -qF "refs/heads/$SUCC\"" "$sb" || fail "the control launch must carry the successor"
+  pass "Scott shape: a launch refuses the grant while another task's record cannot be read, and carries it once the inventory is readable"
+}
+
+# F2 (2) at the launch: the profile is derived from the copy's repository, so a copy
+# in another repository must refuse the grant the project's archive would prove.
+test_scott_launch_refuses_a_copy_outside_the_projects_ref_store() {
+  local dir out rc sb fx
+  if [ "$(uname -s)" != Darwin ]; then
+    printf 'skip: the write profile is generated on macOS only; Linux remains unconfined\n'
+    return 0
+  fi
+  dir=$(new_scott_case store)
+  fx=$dir/fx
+  sb=$dir/home/state/$TASK.write-confinement.sb
+  git init -q -b main "$dir/other-repo"
+  git -C "$dir/other-repo" -c user.name=fmtest -c user.email=fmtest@example.invalid commit -q --allow-empty -m init
+  git -C "$dir/other-repo" worktree add -q -b "$SUCC" "$dir/other-copy"
+  cp -p "$dir/home/state/$TASK.meta" "$dir/meta.good"
+  sed -i.bak "s#^worktree=.*#worktree=$dir/other-copy#" "$dir/home/state/$TASK.meta" && rm -f "$dir/home/state/$TASK.meta.bak"
+  printf 'successor_branch=%s\n' "$SUCC" >> "$dir/home/state/$TASK.meta"
+  rm -f "$sb"
+  rc=0; out=$(run_control "$dir" "$TASK" relaunch --note "mismatched repositories") || rc=$?
+  [ "$rc" != 0 ] || fail "a launch whose copy is in another repository must refuse the grant"$'\n'"$out"
+  assert_contains "$out" "does not share the project's ref store" "the launch refusal must name the missing proof"
+  [ ! -f "$sb" ] || ! grep -qF "$SUCC\"" "$sb" || fail "a line for the successor reached the profile for a copy in another repository"
+  # Matched control: the copy that shares the project's ref store, with the same record, launches.
+  cp -p "$dir/meta.good" "$dir/home/state/$TASK.meta"
+  printf 'successor_branch=%s\n' "$SUCC" >> "$dir/home/state/$TASK.meta"
+  rc=0; out=$(run_control "$dir" "$TASK" relaunch --note "matching repositories") || rc=$?
+  expect_code 0 "$rc" "the copy that shares the project's ref store must launch"$'\n'"$out"
+  grep -qF "refs/heads/$SUCC\"" "$sb" || fail "the matching control launch must carry the successor"
+  pass "Scott shape: a launch refuses the grant for a copy outside the project's ref store, and carries it for the matching copy"
+}
+
+# F5 at the launch: the event that applies the grant is not best-effort.
+test_scott_launch_requires_its_event_to_be_written() {
+  local dir out rc sb log
+  if [ "$(uname -s)" != Darwin ]; then
+    printf 'skip: the write profile is generated on macOS only; Linux remains unconfined\n'
+    return 0
+  fi
+  dir=$(new_scott_case launch-sink)
+  sb=$dir/home/state/$TASK.write-confinement.sb
+  rc=0; out=$(sc "$dir" --branch "$SUCC" --note "event sink") || rc=$?
+  expect_code 0 "$rc" "recording should succeed"$'\n'"$out"
+  mkdir -p "$dir/event-sink-dir"
+  rm -f "$sb"
+  rc=0; out=$( export FM_GUARD_EVENT_LOG="$dir/event-sink-dir"; run_control "$dir" "$TASK" relaunch --note "sink broken" ) || rc=$?
+  [ "$rc" != 0 ] || fail "a launch whose grant event cannot be written must refuse"$'\n'"$out"
+  assert_contains "$out" "event" "the launch refusal must name the event"
+  [ ! -f "$sb" ] || ! grep -qF "$SUCC\"" "$sb" || fail "the profile kept the successor although its event was not written"
+  log=$dir/launch-events.jsonl
+  rc=0; out=$( export FM_GUARD_EVENT_LOG="$log"; run_control "$dir" "$TASK" relaunch --note "sink fine" ) || rc=$?
+  expect_code 0 "$rc" "a writable sink must let the launch through"$'\n'"$out"
+  jq -e 'select(.guard == "successor-branch-admission" and .rule == "launch" and .decision == "allow")' "$log" >/dev/null \
+    || fail "the launch event was not written to the sink"
+  pass "Scott shape: a launch whose grant event cannot be written refuses and keeps no profile line, and a writable sink lets it through with the event"
+}
+
 control_relaunch_test_cases=(
 test_scott_fixture_has_the_shape_the_amendment_names
 test_scott_admission_proves_the_successor_by_the_task_own_archive_branch
@@ -409,6 +538,10 @@ test_scott_name_family_bounds_the_archive_route
 test_scott_receipt_and_events_name_the_archive_tip_route
 test_scott_launch_re_proves_the_whole_admission
 test_scott_check_proves_a_recorded_successor_again
+test_scott_relaunch_changes_the_copy_only_as_a_relaunch_without_the_successor_does
+test_scott_launch_refuses_when_another_task_record_cannot_be_read
+test_scott_launch_refuses_a_copy_outside_the_projects_ref_store
+test_scott_launch_requires_its_event_to_be_written
 test_scott_operation_then_relaunch_keeps_every_custody_relationship
 test_scott_record_revocation_restores_the_launch_profile
 test_scott_hand_edited_record_cannot_widen_a_launch

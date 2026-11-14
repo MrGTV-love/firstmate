@@ -46,6 +46,8 @@ set -u
 
 # shellcheck source=tests/fixtures.sh disable=SC1091
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
+# shellcheck source=tests/fm-control-successor-helpers.sh disable=SC1091
+. "$(dirname "${BASH_SOURCE[0]}")/fm-control-successor-helpers.sh"
 
 CONTROL="$ROOT/bin/fm-control.sh"
 CREW_STATE="$ROOT/bin/fm-crew-state.sh"
@@ -73,6 +75,9 @@ primary=$(cat "$FM_FAKE_DIR/primary-pid")
 case "$*" in
   "-o comm= -p $primary"|"-o args= -p $primary") printf 'omp\n'; exit 0 ;;
 esac
+# A host whose process table is refused to the test installs ps-runtime
+# (successor_ps_fallback); every other host reaches the real ps.
+[ ! -x "${0%/*}/ps-runtime" ] || exec "${0%/*}/ps-runtime" "$@"
 exec /bin/ps "$@"
 SH
   cat > "$fb/tmux" <<'SH'
@@ -109,6 +114,7 @@ new_case() {  # <name> <id>
   local dir="$TMP_ROOT/$1" id=$2
   mkdir -p "$dir/home/state" "$dir/home/data/$id" "$dir/fake"
   make_fakebin "$dir"
+  successor_ps_fallback "$dir"
   printf '%s\n' "$$" > "$dir/fake/primary-pid"
   printf '%s\n' "$$" > "$dir/home/state/.lock"
   : > "$dir/fake/endpoint-calls"
@@ -2573,7 +2579,41 @@ test_record_containment_refusals_preserve_both_copies
 test_slot_claim_containment_refusals_preserve_both_copies
 test_refusals_change_nothing
 test_finished_relaunch_journal_does_not_block_reassociation
+# A publication that fails after the rename has already replaced the record must
+# still restore it: the rollback cannot rely on a flag that is set only once the
+# publication reports success.
+test_failed_publication_after_the_rename_restores_the_record() {
+  local id=reassoc-late dir new out rc real_mv leftovers
+  real_mv=$(command -v mv)
+  dir=$(new_case "late" "$id")
+  new="$dir/new"
+  add_copy "$dir" "$new" "fm/$id-v2"
+  snapshot_case "$dir"
+  cat > "$dir/fakebin/mv" <<SH
+#!/usr/bin/env bash
+"$real_mv" "\$@" || exit \$?
+for arg in "\$@"; do
+  case "\$arg" in
+    */.$id.meta.reassociate.*) rm -f "\${!#}" ;;
+  esac
+done
+exit 0
+SH
+  chmod +x "$dir/fakebin/mv"
+  rc=0
+  out=$(run_control "$dir" "$id" reassociate --worktree "$new" --note moved) || rc=$?
+  expect_code 1 "$rc" "a publication that fails after the rename must refuse"$'\n'"$out"
+  cmp -s "$dir/before/state/$id.meta" "$dir/home/state/$id.meta" \
+    || fail "the task record is not back to its prior bytes after a post-rename failure: $(cat "$dir/home/state/$id.meta" 2>&1 | head -3)"
+  cmp -s "$dir/before/data/$id/brief.md" "$dir/home/data/$id/brief.md" \
+    || fail "the instructions are not back to their prior bytes after a post-rename failure"
+  leftovers=$(ls -A "$dir/home/state" "$dir/home/data/$id" | grep -E '\.(meta|brief)\.(prior|reassociate)\.' || true)
+  [ -z "$leftovers" ] || fail "the failed reassociation left staging or backup files behind: $leftovers"
+  copy_fingerprint "$dir/old" | cmp -s - "$dir/before/old.fp" || fail "the failed reassociation changed the original copy"
+  pass "a publication that fails after the rename restores the record and the instructions and leaves no backup"
+}
 test_failed_publication_keeps_brief_recovery_until_restored
+test_failed_publication_after_the_rename_restores_the_record
 test_unchanged_ship_branch_requires_consistent_brief
 test_dirty_current_copy_refuses_without_publication
 test_provider_reset_preserves_spawned_copy_commits_via_anchor
