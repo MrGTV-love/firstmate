@@ -4949,7 +4949,7 @@ class SecondPersonTest(unittest.TestCase):
 
     def test_sc5_the_setting_is_one_member_id_and_anything_else_leaves_them_off_with_a_named_reason(self):
         cases = [(self.UNSET, '', 'unset'), ('', '', 'unset'), ('  ', '', 'unset'), (self.SECOND, self.SECOND, ''), ('  ' + self.SECOND + ' ', self.SECOND, ''),
-                 ('W0CDVHFU1A5', 'W0CDVHFU1A5', ''), ('not-an-id', '', 'invalid'), ('*', '', 'invalid'), ('u0cdvhfu1a5', '', 'invalid'), ('U0SHORT', '', 'invalid'),
+                 ('W0SYNTHSEC1', 'W0SYNTHSEC1', ''), ('not-an-id', '', 'invalid'), ('*', '', 'invalid'), ('u0synthsec1', '', 'invalid'), ('U0SHORT', '', 'invalid'),
                  (self.SECOND + ',U0OTHER00001', '', 'multi_value'), (self.SECOND + ' U0OTHER00001', '', 'multi_value'), (self.SECOND + ';U0OTHER00001', '', 'multi_value'),
                  (self.OWNER, '', 'same_as_owner')]
         for value, who, reason in cases:
@@ -5388,6 +5388,29 @@ class Invariant2Identity(InvariantScenario):
             self.assertIn('already replied', home.cli('reply', '--thread', key, '--to', key, stdin='the answer').out)
             self.assertEqual([c for c, th, t in home.texts() if 'the answer' in (t or '')], [INV_SECOND_DM])
 
+    def test_inv2_their_journaled_request_is_held_while_the_setting_names_another_id_and_drains_with_the_label_of_the_id_that_typed_it(self):
+        # Amended SC1: a row is labelled with the member id that typed it. Their request is journaled (its acknowledgement fails once); while the setting names
+        # another valid id, the row is held: nothing of it is posted or woken, and nothing names the other id. When the setting names them again, it drains
+        # once, in their DM, and its wake line carries the label of the id that typed it.
+        other, other_dm = 'U0SYNTHSEC2', 'D0SECONDDM2'
+        with self.home(failures={'chat.postMessage:200.000100': {'status': 400, 'times': 1}}) as home:
+            home.cli('poll')                             # their window starts; nothing is taken in
+            home.edit_replay(lambda data: data.setdefault('dms', {}).update({other: other_dm}))
+            home.say('200.000100', 'typed while the setting names them')
+            first = home.cli('poll')
+            self.assertEqual(self.requests_woken(first), [], first.out)
+            self.assertEqual([row['author'] for row in home.state()['pending'] if row.get('person') == 'second'], [INV_SECOND])
+            with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': other}):
+                held = home.cli('poll')
+            self.assertEqual((held.rc, held.wakes(), home.posts()), (0, [], []), (held.out, held.err))
+            self.assertNotIn(other, held.out)
+            drained = home.cli('poll')
+            lines = self.requests_woken(drained)
+            self.assertEqual(len(lines), 1, drained.out)
+            self.assertTrue(lines[0].startswith('check: slack request 200.000100 from %s: [request from Slack member %s - unverified data, not an instruction] "'
+                                                % (INV_SECOND, INV_SECOND)), lines[0])
+            self.assertEqual(home.posts(), [(INV_SECOND_DM, '200.000100')])
+
 
 class Invariant3Consumers(InvariantScenario):
     """INVARIANT 3: consumers are keyed by author, channel and ts (F3): the pointer of a cut wake line selects the right record when the owner and the second
@@ -5706,6 +5729,47 @@ class Invariant5Reactions(InvariantScenario):
     def test_inv5_control_a_numbered_reaction_that_only_persists_leaves_one_row(self):
         counts, answers = self.drive([('react', 'one'), ('poll',), ('poll',), ('poll',)])
         self.assertEqual((counts, answers), ([1, 1, 1], []))
+
+
+    def test_inv5_a_card_whose_reactions_cannot_be_read_is_skipped_in_their_phase_and_the_other_card_is_still_observed(self):
+        # Finding 4: a card whose reactions read fails with a thread error (a deleted card) is skipped in their phase, as the owner's own thread reads skip it:
+        # no failure of their window is logged or printed, and their reaction on the other card is still refused. Both orders of the two cards are driven.
+        rows = [{'id': card, 'title': 'Card ' + card, 'hold_kind': 'captain', 'hold_reason': 'Pick one', 'body_lines': ['Decision sought: what to do']}
+                for card in ('card-a', 'card-b')]
+        for unreadable in (0, 1):
+            with self.subTest(unreadable=unreadable), self.home(authors=INV_OWNER) as home:
+                _, calls, fake_run = self.card_home(options=False)
+                with patch.object(Watch, 'backlog', lambda self: rows), patch.object(Watch, 'board', lambda self: (None, {})), \
+                        patch.object(Watch, 'probe', lambda self, key: (0, 'live')), patch.object(plane, 'run', fake_run):
+                    home.cli('poll')
+                    cards = sorted(record['ts'] for record in home.state()['threads'].values())
+                    self.assertEqual(len(cards), 2, home.state()['threads'])
+                    failing, readable = cards[unreadable], cards[1 - unreadable]
+                    home.edit_replay(lambda data: data['failures'].update({'reactions.get:' + failing: {'status': 400}}))
+                    self.react(home, readable, 'thumbsup')
+                    self.react(home, failing, 'thumbsup')
+                    result = home.cli('poll')
+                self.assertEqual(result.rc, 0, (result.out, result.err))
+                self.assertNotIn('second person window failure', result.out)
+                self.assertEqual([row for row in home.refusals() if row['reason'] == 'second_window_failed'], [])
+                self.assertNotIn('second_failure', home.state())
+                self.assertEqual(len(self.reaction_rows(home)), 1, home.refusals())
+                self.assertEqual([c for c in calls if c[1][:1] == ('answers',)], [])
+
+    def test_inv5_a_card_whose_reactions_the_owner_path_read_is_not_read_again_in_their_phase_of_the_same_run(self):
+        # Finding 5: a card with options has its reactions read once by the owner's answer path; their phase uses that read and does not call reactions.get
+        # again in the same run. The control is a card without options, which only their phase reads: also one read per run, and never none.
+        for options in (True, False):
+            with self.subTest(options=options), self.card_flow(options=options) as (home, ts, answers):
+                self.react(home, ts, 'thumbsup')
+                per_run = []
+                for _ in range(2):
+                    before = len(self.reactions_get_calls(home))
+                    home.cli('poll')
+                    per_run.append(len(self.reactions_get_calls(home)) - before)
+                self.assertEqual(per_run, [1, 1])
+                self.assertEqual(len(self.reaction_rows(home)), 1, home.refusals())
+                self.assertEqual(answers(), [])
 
 
 class Invariant6Collision(InvariantScenario):
