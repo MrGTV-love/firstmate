@@ -286,6 +286,7 @@ Every home is judged against its own `config/startup-memory-budget` allowance, s
 Act on each home by its reported `transport`:
 
 - `agent` - send the marked request with `bin/fm-send.sh fm-<id> --answers-none "<request>"` so the live secondmate performs its own `/stow`, including the uncaptured knowledge that exists only in its session.
+  The request answers none of the mate's open keyed decisions, so it states `--answers-none` (rule: the `bin/fm-send.sh` header, "Decision closure").
   Ask it for the same completion receipt this skill defines, and read its reply from its status file or the document it points to, never from its chat.
 - `direct` - curate that local home's editable memory files yourself under the same retention plan, then re-run the cascade to confirm the after totals.
   `data/captain-shared.md` stays a read-only counted input there, exactly as it is in any secondmate home.

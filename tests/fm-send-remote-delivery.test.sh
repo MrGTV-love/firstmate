@@ -358,6 +358,80 @@ test_remote_rerun_is_idempotent() {
   pass "fm-send remote: the printed correlation-reusing resend deduplicates onto the same record"
 }
 
+# The printed correlation resend after an unconfirmed remote delivery is
+# re-delivery of the same request, not an answer. When the real pending-reply
+# escalation has meanwhile opened that request's reserved blocker
+# pending-reply-<corr>, the printed command must still be accepted as printed
+# (fm-send header, "Decision closure"); any other open key still needs a
+# stated choice, and a correlation that is not this task's earns no exemption.
+test_remote_printed_resend_survives_real_escalation() {
+  local dir fb ssh_log home rhome rc corr key pend resend_cmd count rec
+  dir="$TMP_ROOT/remote-escalated-resend"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
+  rhome=$(setup_remote_secondmate_home remote-escalated-resend)
+  home=$(setup_remote_parent_home remote-escalated-resend "$rhome")
+  printf 'working: watching the remote domain\n' > "$home/state/rsm.status"
+
+  # Lost transport twice before the leg ran: completion unknown, nothing landed.
+  rc=0
+  send_env "$fb" "$home" "$ssh_log" FM_FAKE_SSH_RC=255 \
+    "$SEND" rsm "please rename the metric" >"$dir/out" 2>"$dir/err" || rc=$?
+  [ "$rc" -ne 0 ] || fail "a twice-lost transport must not claim delivery"
+  resend_cmd=$(tail -1 "$dir/err")
+  case "$resend_cmd" in
+    *FM_PENDING_REPLY_EXISTING_CORR=*) : ;;
+    *) fail "the lost delivery must print the correlation resend: $(cat "$dir/err")" ;;
+  esac
+  pend=$(pending_record "$home")
+  corr=$(fm_pending_reply_get "$pend" corr_id)
+  key=pending-reply-$corr
+
+  # The real escalation path opens the request's reserved blocker.
+  send_env "$fb" "$home" "$ssh_log" FM_FAKE_SSH_RC=255 \
+    bash -c '. "$1/bin/fm-pending-reply-lib.sh"; fm_pending_reply_maybe_escalate "$2" "$3"' _ "$ROOT" "$home/state" "$corr" \
+    >"$dir/esc.out" 2>"$dir/esc.err" || true
+  assert_contains "$(drain_out "$home")" "[key=$key]" \
+    "precondition: the real escalation must open $key: $(cat "$home/state/rsm.status")"
+
+  run_printed_resend() {  # <out-prefix>
+    (
+      unset FM_HOME
+      env PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_SEND_SETTLE=0 \
+        FM_SSH_BIN="$fb/fake-ssh" FM_SSH_LOG="$ssh_log" \
+        FM_SSH_COUNT="$ssh_log.count" FM_REMOTE_CODE_ROOT="$ROOT" \
+        bash -c "$resend_cmd"
+    ) >"$dir/$1.out" 2>"$dir/$1.err"
+  }
+
+  # Control: another open key still needs a stated choice.
+  printf 'needs-decision [key=other-call]: pick a metric name\n' >> "$home/state/rsm.status"
+  rc=0; run_printed_resend other || rc=$?
+  expect_code 1 "$rc" "with an unrelated open key the printed resend still refuses"
+  assert_contains "$(cat "$dir/other.err")" "[key=other-call] needs-decision" "the refusal lists the unrelated key"
+  [ -z "$(remote_inbox_records "$rhome")" ] || fail "the refused resend reached the remote inbox"
+  printf 'resolved [key=other-call]: answered: settled elsewhere\n' >> "$home/state/rsm.status"
+
+  # Control: a correlation that is not this task's earns no exemption.
+  rc=0
+  send_env "$fb" "$home" "$ssh_log" FM_PENDING_REPLY_EXISTING_CORR=0123456789abcdef \
+    "$SEND" rsm "please rename the metric" >"$dir/foreign.out" 2>"$dir/foreign.err" || rc=$?
+  expect_code 1 "$rc" "a correlation with no record for this task gets no exemption"
+  assert_contains "$(cat "$dir/foreign.err")" "[key=$key] blocked" "the blocker is listed for the foreign correlation"
+
+  # The printed command, as printed, is accepted and lands once.
+  rc=0; run_printed_resend resend || rc=$?
+  expect_code 0 "$rc" "the printed correlation resend must be accepted after the real escalation: $(cat "$dir/resend.err")"
+  count=$(remote_inbox_records "$rhome" | grep -c . || true)
+  [ "$count" = 1 ] || fail "the printed resend must land exactly one remote record, found $count"
+  rec=$(remote_inbox_records "$rhome" | head -1)
+  grep -F "corr=$corr" "$rec" >/dev/null || fail "the resend did not preserve correlation $corr: $(cat "$rec")"
+  grep -F "please rename the metric" "$rec" >/dev/null || fail "the resend did not preserve the body: $(cat "$rec")"
+  if grep -F "resolved [key=$key]: answered:" "$home/state/rsm.status" >/dev/null; then
+    fail "fm-send closed the library-owned blocker as an answer: $(cat "$home/state/rsm.status")"
+  fi
+  pass "fm-send remote: the printed correlation resend is accepted after the real escalation opens its own blocker"
+}
+
 test_remote_retry_failure_preserves_ambiguous_expectation() {
   local dir fb ssh_log home rhome rc err pend
   dir="$TMP_ROOT/remote-ambiguous-then-fail"; mkdir -p "$dir"
@@ -845,6 +919,7 @@ test_local_pending_does_not_close_resolve_key() {
 
 test_remote_steer_lands_in_remote_inbox
 test_remote_rerun_is_idempotent
+test_remote_printed_resend_survives_real_escalation
 test_remote_retry_failure_preserves_ambiguous_expectation
 test_remote_fire_and_forget_never_arms_reply_recovery
 test_remote_send_revalidates_after_retirement_lock

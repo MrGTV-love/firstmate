@@ -1073,6 +1073,110 @@ test_bare_send_with_open_keys_refuses() {
   pass "fm-send: a send that states no choice refuses before anything durable and lists every open key"
 }
 
+# full_state <home>: every file and directory under the home, dot files and
+# guard markers included, with content checksums, so a refusal that appends
+# telemetry, creates the watcher-banner marker, or removes a stale lease shows.
+full_state() {
+  (cd "$1" && find . -print | LC_ALL=C sort | while IFS= read -r p; do
+    if [ -f "$p" ]; then printf 'f %s %s\n' "$p" "$(cksum < "$p")"; else printf 'd %s\n' "$p"; fi
+  done)
+}
+
+# refusal_env_send <fakebin> <home> <log> <err> <args...>: the real fm-send with
+# the default home guard-event log (FM_GUARD_EVENT_LOG unset) and the supervision
+# guard live, so pre-refusal telemetry and banner writes land in the home.
+refusal_env_send() {
+  local fb=$1 home=$2 log=$3 err=$4; shift 4
+  : > "$log"
+  env -u FM_GUARD_EVENT_LOG PATH="$fb:$PATH" \
+    FM_ROOT_OVERRIDE="$home" FM_HOME="$home" FM_SEND_LOG="$log" FM_SEND_SETTLE=0 \
+    "$SEND" "$@" 2>"$err"
+}
+
+# The no-choice refusal (and the contradictory-pair and unknown-open-set
+# refusals beside it) comes before guard telemetry, the watcher-banner marker
+# and the supervision lease guard: a refused send records, creates and removes
+# nothing, and takes no lease lock (header: "Decision closure").
+test_no_choice_refusal_precedes_telemetry_banner_and_lease() {
+  local dir fb log home err rc before lease_before
+  dir="$TMP_ROOT/choice-first"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); log="$dir/send.log"; err="$dir/send.err"
+  home=$(setup_two_key_home choice-first)
+  # A stale lease: well formed, but its pid is not alive and holds no session lock.
+  printf 'branch\t999999\t1\n' > "$home/state/.lease-t1"
+  lease_before=$(cksum < "$home/state/.lease-t1")
+  before=$(full_state "$home")
+
+  refusal_env_send "$fb" "$home" "$log" "$err" t1 "go with REST"; rc=$?
+  expect_code 1 "$rc" "a bare send to a task with open keys refuses"
+  assert_contains "$(cat "$err")" "[key=k1] needs-decision" "the refusal lists k1"
+  assert_equals "$before" "$(full_state "$home")" \
+    "a no-choice refusal must record, create or remove nothing (guard telemetry, watcher-banner marker, stale lease)"
+  [ ! -e "$home/state/guard-events.jsonl" ] || fail "a no-choice refusal appended guard telemetry: $(cat "$home/state/guard-events.jsonl")"
+  [ -e "$home/state/.lease-t1" ] || fail "a no-choice refusal removed the stale lease"
+  assert_equals "$lease_before" "$(cksum < "$home/state/.lease-t1")" "the stale lease is byte-identical after the refusal"
+
+  refusal_env_send "$fb" "$home" "$log" "$err" t1 --answers-none --resolve-key k1 "go"; rc=$?
+  expect_code 1 "$rc" "the contradictory pair refuses"
+  assert_equals "$before" "$(full_state "$home")" "the contradictory-pair refusal must change nothing durable"
+
+  { printf 'needs-decision [key=real-key]: choose\n'; perl -e 'print "text\n" x 40000'; } > "$home/state/t1.status"
+  before=$(full_state "$home")
+  : > "$log"
+  env -u FM_GUARD_EVENT_LOG PATH="$fb:$PATH" FM_STATUS_CAP_BYTES=4000 FM_STATUS_CAP_RESERVE_BYTES=1000 \
+    FM_ROOT_OVERRIDE="$home" FM_HOME="$home" FM_SEND_LOG="$log" FM_SEND_SETTLE=0 \
+    "$SEND" t1 "a bare steer" >/dev/null 2>"$err"; rc=$?
+  expect_code 1 "$rc" "a bare send whose open set cannot be read refuses"
+  assert_equals "$before" "$(full_state "$home")" "the unknown-open-set refusal must change nothing durable"
+
+  # A live lease held by the other supervision actor: the choice refusal comes
+  # first, so the sender learns the choice rule and no lease lock is taken.
+  home=$(setup_two_key_home choice-first-live)
+  printf '%s\n' "$$" > "$home/state/.lock"
+  printf 'branch\t%s\t1\n' "$$" > "$home/state/.lease-t1"
+  before=$(full_state "$home")
+  refusal_env_send "$fb" "$home" "$log" "$err" t1 "go with REST"; rc=$?
+  expect_code 1 "$rc" "under another actor's live lease the no-choice refusal still comes first (exit 1, not the lease refusal)"
+  assert_contains "$(cat "$err")" "[key=k2] blocked" "the choice refusal lists the open keys"
+  assert_not_contains "$(cat "$err")" "leased to the branch" "the lease guard did not run before the choice refusal"
+  assert_equals "$before" "$(full_state "$home")" "the refusal under a live lease changes nothing"
+  pass "fm-send: the no-choice, contradictory and unknown-open-set refusals come before telemetry, the watcher banner and the lease guard"
+}
+
+# -- ends the options, so a literal body that starts with -- can be sent, and
+# --key after it is text, not the key path. The contradictory pair before --
+# still refuses.
+test_double_dash_ends_options() {
+  local dir fb log home err rc body
+  dir="$TMP_ROOT/choice-dashdash"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); log="$dir/send.log"; err="$dir/send.err"
+  home=$(setup_home choice-dashdash)
+  fm_write_meta "$home/state/t1.meta" "window=sess:fm-t1" "kind=ship"
+  printf 'working: busy\n' > "$home/state/t1.status"
+  send_capture "$fb" "$home" "$log" "$err" t1 -- --answers-none deploy; rc=$?
+  expect_code 0 "$rc" "a literal body after -- is delivered"
+  body=$(sed '1,/^--$/d' "$home/state/t1.inbox/001.msg")
+  assert_equals "--answers-none deploy" "$body" "the literal body after -- is delivered unchanged"
+  send_capture "$fb" "$home" "$log" "$err" t1 -- --key Enter; rc=$?
+  expect_code 0 "$rc" "--key after -- is text"
+  body=$(sed '1,/^--$/d' "$home/state/t1.inbox/002.msg")
+  assert_equals "--key Enter" "$body" "--key after -- is delivered as a text record, not sent as a key"
+
+  home=$(setup_two_key_home choice-dashdash-open)
+  send_capture "$fb" "$home" "$log" "$err" t1 --resolve-key k1 -- --answers-none; rc=$?
+  expect_code 0 "$rc" "a keyed answer whose literal body is --answers-none is delivered"
+  body=$(sed '1,/^--$/d' "$home/state/t1.inbox/001.msg")
+  assert_equals "--answers-none" "$body" "the literal keyed answer is delivered unchanged"
+  assert_not_contains "$(drain_out "$home")" "[key=k1]" "the keyed answer closed k1"
+  assert_contains "$(drain_out "$home")" "[key=k2]" "k2 stays open"
+  send_capture "$fb" "$home" "$log" "$err" t1 -- "plain words"; rc=$?
+  expect_code 1 "$rc" "-- states no choice: a bare body after -- still refuses while k2 is open"
+  send_capture "$fb" "$home" "$log" "$err" t1 --answers-none --resolve-key k2 -- go; rc=$?
+  expect_code 1 "$rc" "the genuinely contradictory pair still refuses"
+  assert_contains "$(cat "$err")" "contradict each other" "the contradictory refusal names both flags"
+  pass "fm-send: -- ends the options, so a literal body starting with -- is sent and the contradictory pair still refuses"
+}
+
 test_bare_send_refuses_before_marking_a_secondmate() {
   local dir fb log home err rc before after
   dir="$TMP_ROOT/choice-sm"; mkdir -p "$dir"
@@ -1388,6 +1492,8 @@ test_resolve_key_records_task_answered
 test_unwritable_ledger_leaves_the_send_alone
 test_bare_send_with_open_keys_refuses
 test_bare_send_refuses_before_marking_a_secondmate
+test_no_choice_refusal_precedes_telemetry_banner_and_lease
+test_double_dash_ends_options
 test_bare_send_unchanged_without_open_decisions
 test_answers_none_delivers_a_routine_steer
 test_answers_none_with_resolve_key_is_contradictory

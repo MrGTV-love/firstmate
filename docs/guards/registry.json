@@ -1254,10 +1254,10 @@
       "invariant": "A text send to a task with open keyed decisions states whether it answers one or answers none.",
       "layer": "runtime-block",
       "source": "the target task's status log folded by status_open_decisions (bin/fm-status-decision-lib.sh), the --resolve-key keys and the --answers-none flag on the command line",
-      "trigger": "a text send to a task selector whose open decision set is nonempty or unreadable, carrying neither --resolve-key nor --answers-none / --answers-none together with --resolve-key",
+      "trigger": "a text send to a task selector whose open decision set (what status_open_decisions returns) is nonempty, or whose status log is past the status read limits so the fold returns no set, carrying neither --resolve-key nor --answers-none / --answers-none together with --resolve-key. A status file that is absent, unreadable, or a symlink folds to the empty set and is not refused.",
       "decision": "deny",
       "fail_direction": "closed",
-      "remedy": "Resend with FM_HOME=<home> bash bin/fm-send.sh <task> --resolve-key <key> <message> to answer and close a listed key, or with FM_HOME=<home> bash bin/fm-send.sh <task> --answers-none <message> to answer none of them.",
+      "remedy": "Resend with FM_HOME=<home> bash bin/fm-send.sh <task> --resolve-key <key> <message> to answer and close a listed key (one key per flag; repeat the flag per key), or with FM_HOME=<home> bash bin/fm-send.sh <task> --answers-none <message> to answer none of them.",
       "budget": 1,
       "budget_reason": "One refused invocation before the sender chooses a flag; no per-family cross-invocation counter is implemented, so repeated bare invocations refuse again. Do not turn that into an automatic retry loop.",
       "telemetry": "Not instrumented under this family id; the refusal diagnostic names every open key and both flags on stderr. This registration adds no event emitter to state/guard-events.jsonl.",
@@ -1267,7 +1267,13 @@
       "proxy": false,
       "proxy_reason": "",
       "precheck_gap": "",
-      "exemptions": [],
+      "exemptions": [
+        {
+          "case": "the printed FM_PENDING_REPLY_EXISTING_CORR=<corr> resend of an unconfirmed secondmate request, for its own reserved blocker pending-reply-<corr> only, while that correlation is still reusable for the task",
+          "derivation": "the resend re-delivers the same request under the same correlation and answers nothing; that blocker is the pending-reply library's to close, so neither stated choice is true for it, and every other open key still refuses",
+          "demotion": "none: removing it refuses the documented safe recovery resend (docs/remote-secondmates.md, Retries and safe resends)"
+        }
+      ],
       "instrumented": false,
       "status": "active",
       "sites": [
@@ -5732,7 +5738,8 @@
         },
         {
           "file": "bin/fm-send.sh",
-          "match": "fm_refuse_if_gate_agent"
+          "match": "fm_refuse_if_gate_agent",
+          "count": 2
         },
         {
           "file": "bin/fm-spawn.sh",
