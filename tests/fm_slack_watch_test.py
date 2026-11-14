@@ -65,8 +65,10 @@ import random
 import re
 import runpy
 import shutil
+import socket
 import subprocess
 import sys
+import threading
 import time
 import unicodedata
 import unittest
@@ -5858,12 +5860,22 @@ import fm_slack_watch as plane
 from fm_slack_replay import Replay
 mode = os.environ['INV4_MODE']
 clock = [0.0]
-plane.monotonic = lambda: clock[0]
+if mode != 'trickle':
+    plane.monotonic = lambda: clock[0]
+else:
+    # The real transport (urllib, a real socket) carries every call of theirs to the local server of the test, on the real clock, with the time left that the
+    # plane gave the transport; the reply the plane uses still comes from the replay.
+    import fm_slack
+    wire = fm_slack.Slack('fixture-token-not-a-secret-r6-wire')
+    wire.base = os.environ['INV4_SERVER']
 real = Replay.call
 def call(self, method, **fields):
     if fields.get('channel') == os.environ['INV4_SECOND_DM'] or fields.get('users') == os.environ['INV4_SECOND']:
         with open(os.environ['INV4_LOG'], 'a') as log:
             log.write(method + '\n')
+        if mode == 'trickle':
+            wire.time_left = self.__dict__.get('time_left')
+            wire.call(method, **fields)
         if mode == 'die':
             os._exit(137)                                    # the check is stopped while its call of theirs is blocked: no flush, no cleanup
         if mode == 'stall':
@@ -5893,12 +5905,12 @@ plane.run = lambda script, *args, text=None: subprocess.CompletedProcess([], 0, 
 sys.exit(plane.main(sys.argv[1:]))
 """
 
-    def run_check(self, home, mode, name, command='poll', delay='0', order=None):
+    def run_check(self, home, mode, name, command='poll', delay='0', order=None, server=''):
         """One run of the poll (or of the standing check, command='check') as the watcher runs a check: output to a private file, read after the process has
         ended. Returns (rc, captured output, Scott calls)."""
         log, captured = home.dir / (name + '.calls'), home.dir / (name + '.out')
         env = {**os.environ, 'INV4_MODE': mode, 'INV4_LOG': str(log), 'INV4_SECOND_DM': INV_SECOND_DM, 'INV4_SECOND': INV_SECOND, 'INV4_DELAY': delay,
-               'INV4_ORDER': str(order) if order else '',
+               'INV4_ORDER': str(order) if order else '', 'INV4_SERVER': server,
                'INV4_BIN': str(Path(plane.__file__).resolve().parent), 'FM_SLACK_CHECK_ACTION': command if command.startswith('check') else ''}
         with open(captured, 'w') as out:
             done = subprocess.run([sys.executable, '-c', self.DRIVER, 'check' if command.startswith('check') else command, '--replay', str(home.transcript)],
@@ -6961,6 +6973,263 @@ class Round6Findings(InvariantScenario):
             self.assertEqual(len(self.reply_after_unset(home, answers, user=self.OTHER_AUTHOR)), 1)
             self.assertEqual(self.decisions(home), [])
 
+
+class TrickleServer:
+    """A local HTTP server on 127.0.0.1 for the real transport (Main 1593 (3)): every request gets {"ok": true} padded to `size` bytes; the head is sent at once
+    and then one body byte every `step` seconds, so no single socket wait comes near the transport's 10 s socket timeout while the whole reply takes about
+    size * step seconds. mode 'fast' sends the reply at once. It runs only threads of this test process and starts no process; close() ends every answer."""
+
+    def __init__(self, step=0.3, size=80):
+        self.step, self.size, self.mode, self.requests = step, size, 'trickle', 0
+        self.stop = threading.Event()
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock.bind(('127.0.0.1', 0))
+        self.sock.listen(16)
+        self.sock.settimeout(0.2)
+        self.url = 'http://127.0.0.1:%d/' % self.sock.getsockname()[1]
+        threading.Thread(target=self.serve, daemon=True).start()
+
+    def serve(self):
+        while not self.stop.is_set():
+            try:
+                conn, _ = self.sock.accept()
+            except socket.timeout:
+                continue
+            except OSError:
+                return
+            threading.Thread(target=self.answer, args=(conn,), daemon=True).start()
+
+    def answer(self, conn):
+        with conn:
+            conn.settimeout(5)
+            data = b''
+            try:
+                while b'\r\n\r\n' not in data:
+                    chunk = conn.recv(65536)
+                    if not chunk:
+                        return
+                    data += chunk
+                head, _, body = data.partition(b'\r\n\r\n')
+                length = re.search(rb'(?i)content-length:\s*(\d+)', head)
+                while length and len(body) < int(length.group(1)):
+                    chunk = conn.recv(65536)
+                    if not chunk:
+                        break
+                    body += chunk
+                self.requests += 1
+                payload = b'{"ok": true}'.ljust(self.size)
+                conn.sendall(b'HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: %d\r\nConnection: close\r\n\r\n' % len(payload))
+                if self.mode == 'fast':
+                    conn.sendall(payload)
+                    return
+                for i in range(len(payload)):
+                    if self.stop.is_set():
+                        return
+                    conn.sendall(payload[i:i + 1])
+                    time.sleep(self.step)
+            except OSError:
+                return
+
+    def close(self):
+        self.stop.set()
+        self.sock.close()
+
+
+class Round6TotalBound(InvariantScenario):
+    """Main 1593: the second person's Slack I/O in one sweep has a real total deadline (SECOND_BUDGET), passed to every call of theirs as the time left and
+    enforced inside the real transport, so a reply that trickles in is cut off although no single socket wait times out; what the deadline cuts off is read
+    again by a later run, never lost. The owner's check reserves one request of the shared cap for the second person's check whenever the setting names them,
+    so under sustained owner load at the cap they wait at most one pass. Controls: the same trickle with no deadline completes (no socket wait timed out), and
+    with the setting unset the owner keeps the whole cap."""
+
+    DRIVER = Invariant4OwnerFirst.DRIVER
+    run_check = Invariant4OwnerFirst.run_check
+    owner_and_second_waiting = Invariant4OwnerFirst.owner_and_second_waiting
+    wakes_of = staticmethod(Invariant4OwnerFirst.wakes_of)
+    MARGIN = 2.0          # stated margin over SECOND_BUDGET for a whole check run: interpreter start, imports, and the replay's own file work
+    TRANSPORT_MARGIN = 0.75
+    REQ = re.compile(r'slack request (\S+) from (U[A-Z0-9]+)')
+
+    def server(self, **kw):
+        server = TrickleServer(**kw)
+        self.addCleanup(server.close)
+        return server
+
+    def wire(self, server, left=None):
+        slack = plane.Slack('fixture-token-not-a-secret-r6-wire')
+        slack.base = server.url
+        if left is not None:
+            deadline = time.monotonic() + left
+            slack.time_left = lambda: deadline - time.monotonic()
+        return slack
+
+    def test_r6_b1_control_with_no_deadline_the_same_trickle_completes_so_no_single_socket_wait_timed_out(self):
+        server = self.server(step=0.3, size=12)
+        started = time.monotonic()
+        self.assertEqual(self.wire(server).call('conversations.history', channel=INV_SECOND_DM), {'ok': True})
+        self.assertGreaterEqual(time.monotonic() - started, 12 * 0.3 * 0.9)
+
+    def test_r6_b1_a_reply_that_trickles_in_is_cut_off_at_the_total_deadline_of_the_call(self):
+        server = self.server(step=0.3, size=40)              # about 12 s in all, never more than 0.3 s between bytes
+        started, outcome = time.monotonic(), 'completed'
+        try:
+            self.wire(server, left=2.0).call('conversations.history', channel=INV_SECOND_DM)
+        except Exception as error:                            # the class of the outcome is asserted below, so the old code fails here and does not error
+            outcome = type(error).__name__
+        elapsed = time.monotonic() - started
+        self.assertLessEqual(elapsed, 2.0 + self.TRANSPORT_MARGIN, 'the call ran %.1f s past a 2 s deadline' % elapsed)
+        self.assertEqual(outcome, 'DeadlineSpent')
+        self.assertEqual(server.requests, 1)
+
+    def test_r6_b1_a_call_with_no_time_left_is_not_begun(self):
+        server = self.server()
+        outcome = 'completed'
+        try:
+            self.wire(server, left=-1.0).call('conversations.history', channel=INV_SECOND_DM)
+        except Exception as error:
+            outcome = type(error).__name__
+        self.assertEqual(outcome, 'DeadlineSpent')
+        time.sleep(0.3)
+        self.assertEqual(server.requests, 0)
+
+    def test_r6_b2_the_owner_wake_is_queued_within_the_budget_and_their_cut_off_request_is_taken_in_by_a_later_run(self):
+        server = self.server(step=0.3, size=80)              # about 24 s per call of theirs, never more than 0.3 s between bytes
+        with self.home() as home:
+            home.trust_check()
+            self.owner_and_second_waiting(home)
+            rc, owner_run, calls = self.run_check(home, 'trickle', 'owner-check', command='check', server=server.url)
+            self.assertEqual((rc, calls), (0, []))
+            self.assertEqual(len(self.wakes_of(owner_run, INV_OWNER)), 1, owner_run)
+            owner_done = time.monotonic()
+            rc, second_run, calls = self.run_check(home, 'trickle', 'second-check', command='check-second', server=server.url)
+            sweep_end = time.monotonic()                     # the watcher raises the sweep's one wake when this, its last check, has exited
+            self.assertEqual(rc, 0)
+            self.assertTrue(calls, 'their check made a call of theirs on the real transport')
+            self.assertLessEqual(sweep_end - owner_done, plane.SECOND_BUDGET + self.MARGIN,
+                                 'the owner wake waited %.1f s for their check' % (sweep_end - owner_done))
+            self.assertEqual(self.wakes_of(second_run, INV_SECOND), [])
+            server.mode = 'fast'
+            later = [self.run_check(home, 'trickle', 'second-check-%d' % n, command='check-second', server=server.url)[1] for n in range(2)]
+            self.assertEqual(sum(len(self.wakes_of(c, INV_SECOND)) for c in later), 1, later)
+            self.assertEqual(home.posts().count((INV_SECOND_DM, '200.000200')), 1)
+            self.assertEqual(home.posts().count((INV_OWNER_DM, '200.000100')), 1)
+
+    def sweeps(self, home, passes, owner_per_pass, second_per_pass, drain=0):
+        sent, got, n, over, owner_calls = {}, {}, 0, 0, 0
+        for k in range(passes + drain):
+            load = k < passes
+            for _ in range(owner_per_pass if load else 0):
+                n += 1
+                ts = '%d.000100' % (4000 + n)
+                sent[ts] = k
+                home.say(ts, 'owner %d' % n, user=INV_OWNER, dm=INV_OWNER_DM)
+            for _ in range(second_per_pass if load else 0):
+                n += 1
+                ts = '%d.000200' % (4000 + n)
+                sent[ts] = k
+                home.say(ts, 'second %d' % n, user=INV_SECOND, dm=INV_SECOND_DM)
+            rc1, out1, calls1 = self.run_check(home, 'normal', 'owner-%d' % k, command='check')
+            rc2, out2, _ = self.run_check(home, 'normal', 'second-%d' % k, command='check-second')
+            self.assertEqual((rc1, rc2), (0, 0))
+            owner_calls += len(calls1) + len([g for g in self.REQ.findall(out1) if g[1] == INV_SECOND])
+            found = self.REQ.findall(out1 + '\n' + out2)        # a plain check joins its lines with '; ': count the requests, not the lines
+            over += len(found) > 3
+            for ts, who in found:
+                got.setdefault(ts, []).append(k)
+        return sent, got, over, owner_calls
+
+    def test_r6_b3_under_sustained_owner_load_at_the_cap_each_request_of_theirs_waits_at_most_one_pass(self):
+        with self.home(cap='3') as home:
+            home.trust_check()
+            home.cli('poll')
+            sent, got, over, owner_calls = self.sweeps(home, passes=6, owner_per_pass=3, second_per_pass=1, drain=3)
+            theirs = [ts for ts in sent if ts.endswith('.000200')]
+            self.assertEqual(sorted(ts for ts in theirs if ts not in got), [], 'never delivered')
+            self.assertLessEqual(max(got[ts][0] - sent[ts] for ts in theirs), 1, {ts: (sent[ts], got[ts]) for ts in theirs})
+            self.assertEqual(sorted(ts for ts in sent if ts not in got), [], 'an owner request was lost')
+            self.assertEqual([ts for ts, ks in got.items() if len(ks) > 1], [], 'woken twice')
+            self.assertEqual((over, owner_calls), (0, 0))
+
+    def test_r6_b3_control_with_the_setting_unset_the_owner_keeps_the_whole_cap(self):
+        with self.home(cap='3', scott=None) as home:
+            home.trust_check()
+            home.cli('poll')
+            sent, got, over, _ = self.sweeps(home, passes=3, owner_per_pass=3, second_per_pass=0)
+            self.assertEqual(sorted(got), sorted(sent))
+            self.assertEqual({ts: ks[0] - sent[ts] for ts, ks in got.items()}, {ts: 0 for ts in sent})
+            self.assertEqual(over, 0)
+
+
+
+class Round6CapOne(InvariantScenario):
+    """Main 1596 (1), option (ii): at answer cap 1 the second person's pass is paused with one named notice; nothing of theirs is read, taken in or posted, their
+    cursor is not advanced and the activation point does not move, so raising the cap later reads them from where they stopped. The owner path is unchanged."""
+
+    PAUSED = 'slack: second person paused: answer cap is 1; raise FM_SLACK_POLL_MAX_ANSWERS to 2 or more'
+
+    def journal(self, home):
+        path = home.state_dir / 'second.json'
+        return json.loads(path.read_text()) if path.is_file() else {}
+
+    def their_calls(self, home):
+        return [e for e in home.log() if e.get('channel') == INV_SECOND_DM]
+
+    def test_r6_c1_at_cap_1_their_pass_is_paused_with_one_named_notice_and_the_owner_is_served(self):
+        with self.home(cap='1') as home:
+            home.cli('poll', extra={'FM_SLACK_POLL_MAX_ANSWERS': '20'})       # their window is started at a cap that serves them
+            home.say('200.000100', 'owner request', user=INV_OWNER, dm=INV_OWNER_DM)
+            home.say('200.000200', 'second person request', user=INV_SECOND, dm=INV_SECOND_DM)
+            before = len(self.their_calls(home))
+            first, second = home.cli('poll'), home.cli('poll')
+            self.assertEqual((first.out + second.out).count(self.PAUSED), 1, first.out + second.out)
+            self.assertEqual(len(self.requests_woken(first, INV_OWNER)), 1, first.out)
+            self.assertEqual(self.requests_woken(first, INV_SECOND) + self.requests_woken(second, INV_SECOND), [])
+            self.assertEqual(len(self.their_calls(home)), before, 'a call of theirs was made while paused')
+            self.assertEqual(home.posts().count((INV_OWNER_DM, '200.000100')), 1)
+
+    def test_r6_c2_while_paused_their_cursor_and_activation_point_do_not_move(self):
+        with self.home(cap='1') as home:
+            home.cli('poll', extra={'FM_SLACK_POLL_MAX_ANSWERS': '20'})
+            home.say('200.000200', 'second person request', user=INV_SECOND, dm=INV_SECOND_DM)
+            kept = self.journal(home)
+            for _ in range(3):
+                home.cli('poll')
+            now = self.journal(home)
+            self.assertEqual(now.get('second', {}).get('intake_cursor'), kept.get('second', {}).get('intake_cursor'))
+            self.assertEqual(now.get('last_run'), kept.get('last_run'))
+
+    def test_r6_c3_after_the_cap_is_raised_their_waiting_requests_are_read_from_where_they_stopped(self):
+        with self.home(cap='1') as home:
+            home.cli('poll', extra={'FM_SLACK_POLL_MAX_ANSWERS': '20'})
+            home.say('200.000200', 'second person request', user=INV_SECOND, dm=INV_SECOND_DM)
+            home.cli('poll')
+            home.say('200.000300', 'second person request while paused', user=INV_SECOND, dm=INV_SECOND_DM)
+            home.cli('poll')
+            raised = home.cli('poll', extra={'FM_SLACK_POLL_MAX_ANSWERS': '2'})
+            again = home.cli('poll', extra={'FM_SLACK_POLL_MAX_ANSWERS': '2'})
+            woken = [l for r in (raised, again) for l in self.requests_woken(r, INV_SECOND)]
+            self.assertEqual(sorted(re.search(r'slack request (\S+) ', l).group(1) for l in woken), ['200.000200', '200.000300'], raised.out + again.out)
+            self.assertEqual((home.posts().count((INV_SECOND_DM, '200.000200')), home.posts().count((INV_SECOND_DM, '200.000300'))), (1, 1))
+
+    def test_r6_c3_a_person_first_enabled_while_paused_is_read_from_the_enable_once_the_cap_is_raised(self):
+        with self.home(cap='1', scott=None) as home:
+            home.cli('poll')                                                 # a completed run before the enable
+            with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': INV_SECOND}):
+                home.cli('poll')                                             # enabled at cap 1: paused, nothing of theirs started
+                home.say('300.000200', 'second person request after the enable', user=INV_SECOND, dm=INV_SECOND_DM)
+                home.cli('poll')
+                raised = home.cli('poll', extra={'FM_SLACK_POLL_MAX_ANSWERS': '2'})
+                again = home.cli('poll', extra={'FM_SLACK_POLL_MAX_ANSWERS': '2'})
+            woken = [l for r in (raised, again) for l in self.requests_woken(r, INV_SECOND)]
+            self.assertEqual(len([l for l in woken if '300.000200' in l]), 1, raised.out + again.out)
+
+    def test_r6_c4_control_at_cap_2_their_pass_runs_and_no_pause_notice_is_printed(self):
+        with self.home(cap='2') as home:
+            home.cli('poll')
+            home.say('200.000200', 'second person request', user=INV_SECOND, dm=INV_SECOND_DM)
+            result = home.cli('poll')
+            self.assertNotIn('paused', result.out)
+            self.assertEqual(len(self.requests_woken(result, INV_SECOND)), 1, result.out)
 
 class ScottPassModelTest(InvariantScenario):
     """The executable transition model of the second person's pass (Main addendum 97f259d9 to order 1307). States: off (never configured), enabled-unarmed
