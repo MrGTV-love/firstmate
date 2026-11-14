@@ -162,16 +162,21 @@
 # or reminder; accepted on a task with no open decision, so a caller may pass
 # it unconditionally). A send with neither refuses with exit 1 and lists each
 # open key with its verb and both flags; the two flags together are refused as
-# contradictory. Both refusals, and the refusal when the open set cannot be
-# read (a log past the status read limits), come before guard telemetry, the
-# supervision warning (bin/fm-guard.sh), the lease guard, and anything marked,
-# locked, recorded, or typed, so a refused send changes nothing. A --key send
-# and a send to an explicit backend target cannot answer a decision, so the
-# rule does not apply to them. The printed FM_PENDING_REPLY_EXISTING_CORR=<corr>
+# contradictory. Gate-agent containment (bin/fm-gate-refuse-lib.sh) runs first,
+# as a security guard, and may write its one guard event. After it, both
+# refusals, and the refusal when the open set cannot be read (a log past the
+# status read limits), come before any other guard telemetry, the supervision
+# warning (bin/fm-guard.sh), the lease guard, and anything marked, locked,
+# recorded, or typed, so a refused send changes nothing else. A --key send and
+# a send to an explicit backend target cannot answer a decision, so the rule
+# does not apply to them. The printed FM_PENDING_REPLY_EXISTING_CORR=<corr>
 # resend of an unconfirmed secondmate request re-delivers that same request and
-# answers nothing: while the correlation is still reusable for that task, its
-# own reserved blocker pending-reply-<corr> (the pending-reply library's to
-# close) does not count, and every other open key still needs a choice. A lone
+# answers nothing: while the correlation is still reusable for that task, the
+# send is not fire-and-forget, and its message has the request summary the
+# pending-reply record holds, its own reserved blocker pending-reply-<corr>
+# (the pending-reply library's to close) does not count. A different message or
+# a fire-and-forget send with that correlation, and every other open key,
+# still need a choice. A lone
 # -- ends the options, so a literal message that starts with -- is sent as
 # text; before this rule a leading --answers-none or -- was itself text.
 # This is the one statement of the rule; every other file points here.
@@ -250,18 +255,9 @@ FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 # shellcheck source=bin/fm-gate-refuse-lib.sh
 . "$SCRIPT_DIR/fm-gate-refuse-lib.sh"
 # Fail closed before any fleet mutation: a no-mistakes gate agent must never steer
-# a crewmate (see bin/fm-gate-refuse-lib.sh). A gate agent is refused (or, in a
-# permitted lab home, admitted) here, first. For an ordinary sender the same
-# check runs again after the decision-choice refusal below and writes its
-# telemetry there, so a refused send records nothing (header: "Decision
-# closure"). Under the test-harness bypass the check can never find a gate
-# agent, so it runs only there.
+# a crewmate (see bin/fm-gate-refuse-lib.sh).
 FM_GATE_EVENT_TASK=${1:-}
-FM_SEND_GATE_AGENT=0
-if [ "${FM_GATE_REFUSE_BYPASS:-}" != 1 ] && fm_is_gate_agent; then
-  FM_SEND_GATE_AGENT=1
-  fm_refuse_if_gate_agent
-fi
+fm_refuse_if_gate_agent
 
 if [ -z "${FM_HOME+x}" ] || [ -z "${FM_HOME:-}" ]; then
   echo "error: FM_HOME is not set; fm-send refuses to resolve targets without an explicit firstmate home" >&2
@@ -565,9 +561,9 @@ fi
 # A text send to a task selector must state its choice when that task has open
 # keyed decisions (header: "Decision closure"). The open set is the one the
 # --resolve-key check below also reads (status_open_decisions). This check and
-# the contradictory-pair refusal above run before guard telemetry, the
-# supervision warning, and the lease guard, so a refused send records, creates,
-# removes, and locks nothing.
+# the contradictory-pair refusal above run after gate-agent containment only,
+# and before any other guard telemetry, the supervision warning, and the lease
+# guard, so a refused send records, creates, removes, and locks nothing else.
 CHOICE_IS_KEY_SEND=0
 [ "${1:-}" != "--key" ] || [ "$END_OF_OPTIONS" = 1 ] || CHOICE_IS_KEY_SEND=1
 if [ -z "$RESOLVE_KEYS" ] && [ "$ANSWERS_NONE" = 0 ] && [ -n "$TARGET_SELECTOR" ] && [ -n "$TARGET_META" ] && [ "$CHOICE_IS_KEY_SEND" = 0 ]; then
@@ -578,13 +574,18 @@ if [ -z "$RESOLVE_KEYS" ] && [ "$ANSWERS_NONE" = 0 ] && [ -n "$TARGET_SELECTOR" 
     exit 1
   }
   # The printed correlation resend of an unconfirmed secondmate request
-  # (FM_PENDING_REPLY_EXISTING_CORR, still reusable for this task) re-delivers
-  # that same request; it answers nothing. Its own reserved blocker,
+  # (FM_PENDING_REPLY_EXISTING_CORR, still reusable for this task, not
+  # fire-and-forget, and carrying the same request the record holds: its
+  # stored request_summary equals this message's summary) re-delivers that
+  # same request; it answers nothing. Its own reserved blocker,
   # pending-reply-<corr>, is the pending-reply library's to close, so it does
-  # not count here. Every other open key still needs a stated choice.
+  # not count here. A different message, or a fire-and-forget send, with that
+  # correlation, and every other open key, still need a stated choice.
   if [ -n "${FM_PENDING_REPLY_EXISTING_CORR:-}" ] && [ -n "$choice_open_set" ] &&
+    [ -z "$FIRE_AND_FORGET_ID" ] &&
     [ "$(fm_meta_get "$TARGET_META" kind)" = secondmate ] &&
-    fm_pending_reply_corr_reusable "$STATE" "$FM_PENDING_REPLY_EXISTING_CORR" "$CHOICE_TASK_ID"; then
+    fm_pending_reply_corr_reusable "$STATE" "$FM_PENDING_REPLY_EXISTING_CORR" "$CHOICE_TASK_ID" &&
+    [ "$(fm_pending_reply_get "$(fm_pending_reply_path "$STATE" "$FM_PENDING_REPLY_EXISTING_CORR")" request_summary)" = "$(fm_pending_reply_summarize "$*")" ]; then
     choice_own_key=$(fm_pending_reply_escalation_key "$FM_PENDING_REPLY_EXISTING_CORR")
     choice_kept=
     while IFS= read -r choice_line; do
@@ -612,10 +613,6 @@ CHOICE_OPEN_SET
   fi
 fi
 
-# The ordinary sender's gate-containment check, deferred from the top so its
-# telemetry (allow, or the test-harness bypass record) follows the refusals
-# above; bin/fm-gate-refuse-lib.sh owns what it records.
-[ "$FM_SEND_GATE_AGENT" = 1 ] || fm_refuse_if_gate_agent
 "$SCRIPT_DIR/fm-guard-event.sh" send-home-fail-closed allow --rule explicit-home --task "$RAW_TARGET" 2>/dev/null || true
 
 FM_GUARD_CONTINUE_LINE='This is a supervision warning only; the requested message WILL still be sent.' "$SCRIPT_DIR/fm-guard.sh" || true

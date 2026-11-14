@@ -418,6 +418,24 @@ test_remote_printed_resend_survives_real_escalation() {
   expect_code 1 "$rc" "a correlation with no record for this task gets no exemption"
   assert_contains "$(cat "$dir/foreign.err")" "[key=$key] blocked" "the blocker is listed for the foreign correlation"
 
+  # The reviewer's counterexamples: the correlation alone earns nothing. A
+  # different message with that correlation, and a fire-and-forget send with it
+  # (different or same text), still need a stated choice while the blocker is open.
+  rc=0
+  send_env "$fb" "$home" "$ssh_log" FM_PENDING_REPLY_EXISTING_CORR="$corr" \
+    "$SEND" rsm "use metric_v2 instead" >"$dir/diff.out" 2>"$dir/diff.err" || rc=$?
+  expect_code 1 "$rc" "a different message with the reusable correlation must refuse: $(cat "$dir/diff.err")"
+  assert_contains "$(cat "$dir/diff.err")" "[key=$key] blocked" "the different message's refusal lists the blocker"
+  for faf_text in "use metric_v2 instead" "please rename the metric"; do
+    rc=0
+    send_env "$fb" "$home" "$ssh_log" FM_PENDING_REPLY_EXISTING_CORR="$corr" \
+      "$SEND" rsm --fire-and-forget 0123456789abcdef "$faf_text" >"$dir/faf.out" 2>"$dir/faf.err" || rc=$?
+    expect_code 1 "$rc" "a fire-and-forget send with the correlation must refuse ('$faf_text'): $(cat "$dir/faf.err")"
+    assert_contains "$(cat "$dir/faf.err")" "[key=$key] blocked" "the fire-and-forget refusal lists the blocker"
+  done
+  [ -z "$(remote_inbox_records "$rhome")" ] || fail "a refused counterexample reached the remote inbox: $(remote_inbox_records "$rhome")"
+  assert_contains "$(drain_out "$home")" "[key=$key]" "the blocker stays open after the refused counterexamples"
+
   # The printed command, as printed, is accepted and lands once.
   rc=0; run_printed_resend resend || rc=$?
   expect_code 0 "$rc" "the printed correlation resend must be accepted after the real escalation: $(cat "$dir/resend.err")"
@@ -426,10 +444,16 @@ test_remote_printed_resend_survives_real_escalation() {
   rec=$(remote_inbox_records "$rhome" | head -1)
   grep -F "corr=$corr" "$rec" >/dev/null || fail "the resend did not preserve correlation $corr: $(cat "$rec")"
   grep -F "please rename the metric" "$rec" >/dev/null || fail "the resend did not preserve the body: $(cat "$rec")"
-  if grep -F "resolved [key=$key]: answered:" "$home/state/rsm.status" >/dev/null; then
-    fail "fm-send closed the library-owned blocker as an answer: $(cat "$home/state/rsm.status")"
+  # fm-send closes nothing for the library-owned blocker: no resolved line at
+  # all for that key, and the fold still holds it open after the resend.
+  if grep -F "resolved [key=$key]" "$home/state/rsm.status" >/dev/null; then
+    fail "fm-send closed the library-owned blocker: $(cat "$home/state/rsm.status")"
   fi
-  pass "fm-send remote: the printed correlation resend is accepted after the real escalation opens its own blocker"
+  case $'\n'"$(bash -c '. "$1/bin/fm-status-decision-lib.sh"; status_open_decisions "$2"' _ "$ROOT" "$home/state/rsm.status")" in
+    *$'\n'"$key"$'\t'*) : ;;
+    *) fail "the blocker is not open in the fold after the resend: $(cat "$home/state/rsm.status")" ;;
+  esac
+  pass "fm-send remote: only the exact printed correlation resend is accepted after the real escalation opens its own blocker; a different or fire-and-forget send with that correlation still refuses"
 }
 
 test_remote_retry_failure_preserves_ambiguous_expectation() {

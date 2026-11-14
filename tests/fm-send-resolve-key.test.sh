@@ -1082,23 +1082,43 @@ full_state() {
   done)
 }
 
-# refusal_env_send <fakebin> <home> <log> <err> <args...>: the real fm-send with
-# the default home guard-event log (FM_GUARD_EVENT_LOG unset) and the supervision
-# guard live, so pre-refusal telemetry and banner writes land in the home.
+# refusal_env_send <fakebin> <home> <log> <err> <args...>: the real fm-send
+# through REAL gate-agent containment (not the tests/lib.sh bypass; run from the
+# fixture home, which is not a git checkout, with NO_MISTAKES_GATE unset), the
+# default home guard-event log (FM_GUARD_EVENT_LOG unset) and the supervision
+# guard live, so every pre-refusal write lands in the home.
 refusal_env_send() {
   local fb=$1 home=$2 log=$3 err=$4; shift 4
   : > "$log"
-  env -u FM_GUARD_EVENT_LOG PATH="$fb:$PATH" \
+  (cd "$home" && env -u FM_GUARD_EVENT_LOG -u FM_GATE_REFUSE_BYPASS -u NO_MISTAKES_GATE PATH="$fb:$PATH" \
     FM_ROOT_OVERRIDE="$home" FM_HOME="$home" FM_SEND_LOG="$log" FM_SEND_SETTLE=0 \
-    "$SEND" "$@" 2>"$err"
+    "$SEND" "$@" 2>"$err")
+}
+
+# assert_only_gate_event <before-state> <home> <expected-gate-line-jq> <label>:
+# the home changed in exactly one way - state/guard-events.jsonl now exists and
+# holds exactly one gate-agent-containment event matching the jq filter - and
+# nothing else was recorded, created or removed (Main 2026-11-14 D1 ruling).
+assert_only_gate_event() {
+  local before=$1 home=$2 filter=$3 label=$4 after
+  [ -f "$home/state/guard-events.jsonl" ] || fail "$label: real containment wrote no guard event"
+  assert_equals 1 "$(grep -c . "$home/state/guard-events.jsonl")" \
+    "$label: exactly one guard event before the refusal: $(cat "$home/state/guard-events.jsonl")"
+  jq -e "$filter" "$home/state/guard-events.jsonl" >/dev/null \
+    || fail "$label: the one event is not the expected gate-agent-containment event: $(cat "$home/state/guard-events.jsonl")"
+  after=$(full_state "$home" | grep -v ' \./state/guard-events\.jsonl ')
+  assert_equals "$before" "$after" "$label: nothing but the gate event was recorded, created or removed"
+  rm -f "$home/state/guard-events.jsonl"
 }
 
 # The no-choice refusal (and the contradictory-pair and unknown-open-set
-# refusals beside it) comes before guard telemetry, the watcher-banner marker
-# and the supervision lease guard: a refused send records, creates and removes
-# nothing, and takes no lease lock (header: "Decision closure").
+# refusals beside it) comes right after gate-agent containment, which stays
+# first as a security guard and may write its one guard event; before guard
+# telemetry, the watcher-banner marker and the supervision lease guard. So a
+# refused send records, creates and removes nothing else, and takes no lease
+# lock (header: "Decision closure"; Main 2026-11-14 ruling on D1).
 test_no_choice_refusal_precedes_telemetry_banner_and_lease() {
-  local dir fb log home err rc before lease_before
+  local dir fb log home err rc before lease_before lab
   dir="$TMP_ROOT/choice-first"; mkdir -p "$dir"
   fb=$(make_stubs "$dir"); log="$dir/send.log"; err="$dir/send.err"
   home=$(setup_two_key_home choice-first)
@@ -1108,26 +1128,25 @@ test_no_choice_refusal_precedes_telemetry_banner_and_lease() {
   before=$(full_state "$home")
 
   refusal_env_send "$fb" "$home" "$log" "$err" t1 "go with REST"; rc=$?
-  expect_code 1 "$rc" "a bare send to a task with open keys refuses"
+  expect_code 1 "$rc" "a bare send to a task with open keys refuses: $(cat "$err")"
   assert_contains "$(cat "$err")" "[key=k1] needs-decision" "the refusal lists k1"
-  assert_equals "$before" "$(full_state "$home")" \
-    "a no-choice refusal must record, create or remove nothing (guard telemetry, watcher-banner marker, stale lease)"
-  [ ! -e "$home/state/guard-events.jsonl" ] || fail "a no-choice refusal appended guard telemetry: $(cat "$home/state/guard-events.jsonl")"
+  assert_only_gate_event "$before" "$home" '.guard == "gate-agent-containment" and .decision == "allow"' "bare refusal"
   [ -e "$home/state/.lease-t1" ] || fail "a no-choice refusal removed the stale lease"
   assert_equals "$lease_before" "$(cksum < "$home/state/.lease-t1")" "the stale lease is byte-identical after the refusal"
 
   refusal_env_send "$fb" "$home" "$log" "$err" t1 --answers-none --resolve-key k1 "go"; rc=$?
   expect_code 1 "$rc" "the contradictory pair refuses"
-  assert_equals "$before" "$(full_state "$home")" "the contradictory-pair refusal must change nothing durable"
+  assert_only_gate_event "$before" "$home" '.guard == "gate-agent-containment"' "contradictory-pair refusal"
 
   { printf 'needs-decision [key=real-key]: choose\n'; perl -e 'print "text\n" x 40000'; } > "$home/state/t1.status"
   before=$(full_state "$home")
   : > "$log"
-  env -u FM_GUARD_EVENT_LOG PATH="$fb:$PATH" FM_STATUS_CAP_BYTES=4000 FM_STATUS_CAP_RESERVE_BYTES=1000 \
+  (cd "$home" && env -u FM_GUARD_EVENT_LOG -u FM_GATE_REFUSE_BYPASS -u NO_MISTAKES_GATE PATH="$fb:$PATH" \
+    FM_STATUS_CAP_BYTES=4000 FM_STATUS_CAP_RESERVE_BYTES=1000 \
     FM_ROOT_OVERRIDE="$home" FM_HOME="$home" FM_SEND_LOG="$log" FM_SEND_SETTLE=0 \
-    "$SEND" t1 "a bare steer" >/dev/null 2>"$err"; rc=$?
+    "$SEND" t1 "a bare steer" >/dev/null 2>"$err"); rc=$?
   expect_code 1 "$rc" "a bare send whose open set cannot be read refuses"
-  assert_equals "$before" "$(full_state "$home")" "the unknown-open-set refusal must change nothing durable"
+  assert_only_gate_event "$before" "$home" '.guard == "gate-agent-containment"' "unknown-open-set refusal"
 
   # A live lease held by the other supervision actor: the choice refusal comes
   # first, so the sender learns the choice rule and no lease lock is taken.
@@ -1139,8 +1158,36 @@ test_no_choice_refusal_precedes_telemetry_banner_and_lease() {
   expect_code 1 "$rc" "under another actor's live lease the no-choice refusal still comes first (exit 1, not the lease refusal)"
   assert_contains "$(cat "$err")" "[key=k2] blocked" "the choice refusal lists the open keys"
   assert_not_contains "$(cat "$err")" "leased to the branch" "the lease guard did not run before the choice refusal"
-  assert_equals "$before" "$(full_state "$home")" "the refusal under a live lease changes nothing"
-  pass "fm-send: the no-choice, contradictory and unknown-open-set refusals come before telemetry, the watcher banner and the lease guard"
+  assert_only_gate_event "$before" "$home" '.guard == "gate-agent-containment"' "refusal under a live lease"
+
+  # A gate agent admitted in a marked disposable lab home: containment admits it
+  # first and writes its one allow event; the choice refusal then changes nothing else.
+  lab="$TMP_ROOT/choice-first-lab"; mkdir -p "$lab"; lab=$(cd "$lab" && pwd -P)
+  # The marker bin/fm-lab-home.sh writes (token owned by bin/fm-gate-refuse-lib.sh).
+  printf 'fm-lab-home v1\n' > "$lab/.fm-lab-home"
+  mkdir -p "$lab/state" "$lab/config" "$lab/data" "$lab/projects"
+  fm_write_meta "$lab/state/t1.meta" "window=sess:fm-t1" "kind=ship"
+  printf 'needs-decision [key=k1]: pick REST or RPC\nblocked [key=k2]: need the staging token\n' > "$lab/state/t1.status"
+  before=$(full_state "$lab")
+  : > "$log"
+  (cd "$lab" && env -u FM_GUARD_EVENT_LOG -u FM_GATE_REFUSE_BYPASS -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_CONFIG_OVERRIDE \
+    NO_MISTAKES_GATE=1 PATH="$fb:$PATH" FM_HOME="$lab" FM_SEND_LOG="$log" FM_SEND_SETTLE=0 \
+    "$SEND" t1 "go with REST" >/dev/null 2>"$err"); rc=$?
+  expect_code 1 "$rc" "an admitted lab gate agent's no-choice send gets the choice refusal: $(cat "$err")"
+  assert_contains "$(cat "$err")" "[key=k1] needs-decision" "the lab refusal lists k1"
+  assert_only_gate_event "$before" "$lab" '.guard == "gate-agent-containment" and .decision == "allow" and .actor == "gate"' "admitted lab gate agent"
+
+  # Control: a gate agent outside a lab home is still refused by containment first.
+  home=$(setup_two_key_home choice-first-gate)
+  before=$(full_state "$home")
+  : > "$log"
+  (cd "$home" && env -u FM_GUARD_EVENT_LOG -u FM_GATE_REFUSE_BYPASS NO_MISTAKES_GATE=1 PATH="$fb:$PATH" \
+    FM_ROOT_OVERRIDE="$home" FM_HOME="$home" FM_SEND_LOG="$log" FM_SEND_SETTLE=0 \
+    "$SEND" t1 "go with REST" >/dev/null 2>"$err"); rc=$?
+  expect_code 3 "$rc" "a gate agent outside a lab home is refused by containment first"
+  assert_contains "$(cat "$err")" "gate agent must not drive the fleet" "the containment refusal is the one shown"
+  assert_only_gate_event "$before" "$home" '.guard == "gate-agent-containment" and .decision == "deny"' "denied gate agent"
+  pass "fm-send: through real containment, only its one gate event precedes the no-choice, contradictory and unknown-open-set refusals; telemetry, banner and lease come after"
 }
 
 # -- ends the options, so a literal body that starts with -- can be sent, and

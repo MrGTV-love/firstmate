@@ -1269,7 +1269,7 @@
       "precheck_gap": "",
       "exemptions": [
         {
-          "case": "the printed FM_PENDING_REPLY_EXISTING_CORR=<corr> resend of an unconfirmed secondmate request, for its own reserved blocker pending-reply-<corr> only, while that correlation is still reusable for the task",
+          "case": "the printed FM_PENDING_REPLY_EXISTING_CORR=<corr> resend of an unconfirmed secondmate request, for its own reserved blocker pending-reply-<corr> only, while that correlation is still reusable for the task, the send is not fire-and-forget, and its message has the request_summary the pending-reply record holds",
           "derivation": "the resend re-delivers the same request under the same correlation and answers nothing; that blocker is the pending-reply library's to close, so neither stated choice is true for it, and every other open key still refuses",
           "demotion": "none: removing it refuses the documented safe recovery resend (docs/remote-secondmates.md, Retries and safe resends)"
         }
@@ -5738,8 +5738,7 @@
         },
         {
           "file": "bin/fm-send.sh",
-          "match": "fm_refuse_if_gate_agent",
-          "count": 2
+          "match": "fm_refuse_if_gate_agent"
         },
         {
           "file": "bin/fm-spawn.sh",
