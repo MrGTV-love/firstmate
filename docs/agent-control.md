@@ -232,7 +232,7 @@ It sends no input and starts or stops nothing.
 - A task-specific session tie exists.
   The harness argv names one `--resume` session id, and either the task's recorded `claude_session_id` equals it, or the first user message of that session's transcript is the launch-brief doorbell of a record that sits in the task's own `state/operational-inbox/`, that `bin/fm-operational-input.sh` identifies as kind `launch-brief`, and that is not newer than the message.
   A recorded `claude_session_id` that differs from the live id vetoes the adoption even when the doorbell holds.
-  A harness started with `--fork-session`, `--session-id`, or `--continue` runs a conversation other than the one its `--resume` id names, so no tie of that session counts, whichever tie is offered.
+  A harness started with `--fork-session`, `--continue`, or a `--session-id` other than its `--resume` id runs a conversation other than the one its `--resume` id names, so no tie of that session counts, whichever tie is offered; a `--session-id` equal to the `--resume` id names the same conversation.
   The first user message is the first user record of the transcript; any line before it that cannot be classified (not JSON, or not an object) refuses, because it may be the real first message.
   A first message that merely names the inbox, and anything the agent does later in the session, never counts, because a personal session in the same directory can produce both.
   The operational inbox deletes records older than seven days, so a launch brief can be gone before the lane is adopted.

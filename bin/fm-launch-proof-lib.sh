@@ -500,7 +500,7 @@ fm_launch_proof_physical_path() { # <path>
 # The statement applies only once that doorbell's record is gone.
 fm_launch_proof_claude_adoption() { # <meta> [<session-id> <tie>] -> candidate adoption-record JSON
   local meta=$1 proven=${2:-} proven_tie=${3:-} target session pane home root gen pid harness_pid table kids kid args
-  local resume_count=0 session_id='' forked='' i recorded tie transcript config_dir claude_home env_text
+  local resume_count=0 session_id='' forked='' named='' named_id='' i recorded tie transcript config_dir claude_home env_text
   local first epoch message kind record mtime launcher_args harness_args claim peer_state cwd
   local peer_meta peer_home peer_states inbox member
   local -a argv hargv
@@ -604,10 +604,16 @@ fm_launch_proof_claude_adoption() { # <meta> [<session-id> <tie>] -> candidate a
       --resume|-r) resume_count=$((resume_count + 1)); session_id=${hargv[i+1]:-}; i=$((i + 1)) ;;
       --resume=*) resume_count=$((resume_count + 1)); session_id=${hargv[i]#--resume=} ;;
       # These start a conversation other than the resumed one, so no tie of the
-      # resumed session (recorded, launch-brief or stated) can name it.
-      --fork-session|--fork-session=*|--session-id|--session-id=*|-c|--continue|--continue=*) forked=${hargv[i]%%=*} ;;
+      # resumed session (recorded, launch-brief or stated) can name it. A
+      # --session-id is checked after the loop: naming the resumed id is no fork.
+      --fork-session|--fork-session=*|-c|--continue|--continue=*) forked=${hargv[i]%%=*} ;;
+      --session-id) named_id=${hargv[i+1]:-}; named=1; i=$((i + 1)) ;;
+      --session-id=*) named_id=${hargv[i]#--session-id=}; named=1 ;;
     esac
   done
+  if [ -n "$named" ] && { [ -z "$named_id" ] || [ "$named_id" != "$session_id" ]; }; then
+    forked=--session-id
+  fi
   if [ -n "$forked" ]; then
     fm_launch_proof_adopt_refuse "no task-specific session tie: the harness runs a conversation other than the one it resumes ($forked); next action: Main decides the lane by hand"; return 1
   fi
