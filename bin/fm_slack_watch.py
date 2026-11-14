@@ -973,6 +973,8 @@ class Watch:
         self.ran_unbound = False
         # Whether this run left the second person's work to the next run because an owner line was waiting to be printed.
         self.second_deferred = False
+        # The end of the second person's time budget while one is in force (second_budget), else None.
+        self.budget_deadline = None
         self.hold_depth = 0
         self.hold_bound = False
         self.read_mark = None
@@ -1306,13 +1308,16 @@ class Watch:
         return SECOND_FIXED_TEXT + tuple(dict.fromkeys(labels)) if labels else ()
 
     @contextlib.contextmanager
-    def second_budget(self):
-        """The second person's Slack I/O is allowed only the first SECOND_BUDGET seconds of a run: a call that would begin after that raises SecondBudgetSpent. It
-        wraps this run's one transport, so every call of theirs (a read, a page, an acknowledgement) is counted, and the owner's calls, made before them, are not."""
+    def second_budget(self, start=None):
+        """The second person's Slack I/O is allowed only SECOND_BUDGET seconds from start (the start of their own phase in a poll; the start of the run for an arm):
+        a call that would begin after that raises SecondBudgetSpent. It wraps this run's one transport, so every call of theirs (a read, a page, an
+        acknowledgement) is counted, and the owner's calls, made before them, are not. A poll's phase of theirs runs only when no owner line waits to be printed
+        (finding 4), so measuring from its own start costs the owner nothing, and every poll can begin the DM proof and one acknowledgement even when each call of
+        theirs is slow (finding 3 of the review of d0b0c216)."""
         api = self.api
         bound = api.call
         earlier = api.__dict__.get('call')
-        deadline = self.started + SECOND_BUDGET
+        deadline = (self.started if start is None else start) + SECOND_BUDGET
 
         def guarded(method, **fields):
             if monotonic() >= deadline:
@@ -1320,9 +1325,11 @@ class Watch:
             return bound(method, **fields)
 
         api.call = guarded
+        self.budget_deadline = deadline
         try:
             yield
         finally:
+            self.budget_deadline = None
             if earlier is None:
                 del api.call
             else:
@@ -1374,7 +1381,9 @@ class Watch:
             channel = self.second_channel() if person == 'second' else self.row_channel(row)
             marker = hashlib.sha256(event.encode()).hexdigest()
             try:
-                earlier = self.recent(thread, channel)
+                # The second person's acknowledgement with no attempt mark has never been posted (the mark is committed before the post): there is nothing to
+                # find, so no lookup is made, and a run whose calls of theirs are slow spends its budget on the post itself (finding 3 of the review of d0b0c216).
+                earlier = [] if row is not None and row.get('person') == 'second' and not row.get('attempted') else self.recent(thread, channel)
             except SlackError as error:
                 if row is None:
                     raise
@@ -1391,6 +1400,10 @@ class Watch:
             # leaves no "state unknown"), and the transport checks the same fields again.
             refuse_outbound(args, wire=True)
             if row is not None and not row.get('attempted'):
+                # Inside the second person's budget, a post that could not begin is no attempt: the budget is checked before the mark, so a deferral never leaves
+                # a mark that would make every later run look the acknowledgement up again (finding 3 of the review of d0b0c216).
+                if self.budget_deadline is not None and monotonic() >= self.budget_deadline:
+                    raise SecondBudgetSpent()
                 row['attempted'] = True
                 self.commit()
             ts = self.api.call('chat.postMessage', **args)['ts']
@@ -2767,7 +2780,7 @@ class Watch:
                 self.commit()
             return
         try:
-            with self.second_budget():
+            with self.second_budget(start=monotonic()):
                 self.start_second()
                 remaining = self.resume_second(remaining)
                 if self.second_window().get('hold'):
