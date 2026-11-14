@@ -6742,6 +6742,253 @@ SH
   pass 'a failed direct removal reports its lock restored only when it reads back, and says the copy is unlocked when the relock fails'
 }
 
+# Round 3 falsifiers. A fixture mutation runs once, after the Git-protection
+# proof, at one chosen call before the removal: the last holder scan (lsof), the
+# launcher read (the confined table, ps exits 126 here) or the git worktree
+# unlock. FM_LATE_POINT names the call; "none" runs nothing.
+add_late_mutation_hooks() {  # <point>  (mutation script: $FOREIGN_CASE/mutate.sh)
+  local point=$1 marker="$FOREIGN_CASE/git-protects-ran"
+  rm -f "$FOREIGN_CASE/vernant-python"
+  cat > "$FOREIGN_CASE/fakebin/git" <<SH
+#!/usr/bin/env bash
+args=("\$@")
+for argument in "\$@"; do
+  if [ "\$argument" = worktree ]; then printf '%s\n' "\$*" >> "$FOREIGN_CASE/git-worktree.log"; break; fi
+done
+case " \$* " in
+  *" ls-files --stage -z "*) : > "$marker" ;;
+  *" worktree unlock "*)
+    if [ "$point" = unlock ] && [ -e "$marker" ] && [ ! -e "$marker.done" ]; then : > "$marker.done"; bash "$FOREIGN_CASE/mutate.sh"; fi ;;
+esac
+exec "\${REAL_GIT_FOR_TEST:?}" "\${args[@]}"
+SH
+  cat > "$FOREIGN_CASE/fakebin/lsof" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" -Fpfn "*)
+    if [ "$point" = scan ] && [ -e "$marker" ] && [ ! -e "$marker.done" ]; then : > "$marker.done"; bash "$FOREIGN_CASE/mutate.sh"; fi
+    exit 0 ;;
+  *" -d cwd "*) exit 0 ;;
+esac
+exit 1
+SH
+  printf '#!/usr/bin/env bash\necho "ps: Operation not permitted" >&2\nexit 126\n' > "$FOREIGN_CASE/fakebin/ps"
+  cat > "$FOREIGN_CASE/fakebin/python3" <<SH
+#!/usr/bin/env bash
+case "\$*" in
+  *"fm-proc-info.py table pid"*)
+    if [ "$point" = launcher ] && [ -e "$marker" ] && [ ! -e "$marker.done" ]; then : > "$marker.done"; bash "$FOREIGN_CASE/mutate.sh"; fi ;;
+esac
+exec "$(command -v python3)" "\$@"
+SH
+  chmod +x "$FOREIGN_CASE/fakebin/git" "$FOREIGN_CASE/fakebin/lsof" "$FOREIGN_CASE/fakebin/ps" "$FOREIGN_CASE/fakebin/python3"
+}
+
+# A locked copy that the release keeps is still there, locked, with its record.
+assert_late_copy_kept() {  # <label>
+  assert_present "$FOREIGN_COPY/.git" "$1: the copy was removed"
+  git -C "$FOREIGN_CASE/project" worktree list --porcelain | grep -A4 -F "worktree $FOREIGN_COPY" | grep -q '^locked' \
+    || fail "$1: the copy is no longer locked"
+  assert_present "$FOREIGN_CASE/state/task-x1.meta" "$1: the task record was removed"
+}
+
+# F1: an ignored file outside the preserve allow-list that appears after the
+# ignored files were preserved is never lost: it is preserved again before the
+# removal, or the copy stays.
+test_late_unique_ignored_file_is_never_lost_at_the_removal() {
+  local rc point label exclude found
+  for point in none scan launcher unlock; do
+    label="late-ignored-$point"
+    make_locked_bundle_case "$label" own interior
+    add_late_mutation_hooks "$point"
+    exclude=$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)
+    printf '%s\n' unique-late.dat >> "$exclude"
+    printf 'printf %%s "late unique bytes" > %q\n' "$FOREIGN_COPY/unique-late.dat" > "$FOREIGN_CASE/mutate.sh"
+    run_foreign_teardown rc
+    if [ "$point" = none ]; then
+      expect_code 0 "$rc" "$label: a copy with no late file must close: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+      assert_absent "$FOREIGN_COPY" "$label: the copy survived"
+      continue
+    fi
+    assert_present "$FOREIGN_CASE/git-protects-ran.done" "$label: the mutation did not run"
+    found=
+    if [ -f "$FOREIGN_COPY/unique-late.dat" ]; then
+      found=copy
+    elif grep -rlqF 'late unique bytes' "$FOREIGN_CASE/data/task-x1/nested-copy-preserved" 2>/dev/null; then
+      found=preserved
+    fi
+    [ -n "$found" ] || fail "$label: the late unique ignored file was lost (rc=$rc): $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+    [ "$found" != copy ] || assert_late_copy_kept "$label"
+  done
+  pass 'a unique ignored file that appears after preservation, at the scan, the launcher read or the unlock, is preserved again or keeps the copy'
+}
+
+# F2: a bundle truncated after the last recheck, at the launcher read or the
+# unlock, still stops the removal; unchanged, the copy closes and restores.
+test_late_bundle_truncation_stops_the_removal_at_every_call() {
+  local rc point label head first hash stored
+  for point in none scan launcher unlock; do
+    label="late-bundle-$point"
+    make_locked_bundle_case "$label" own interior
+    add_late_mutation_hooks "$point"
+    head=$(git -C "$FOREIGN_COPY" rev-parse HEAD)
+    first=$(git -C "$FOREIGN_COPY" rev-parse HEAD^)
+    hash=$(cut -f2 "$FOREIGN_CASE/data/task-x1/preservation-bundles.tsv")
+    stored="$FOREIGN_CASE/data/task-x1/preserved-bundles/$hash.bundle"
+    printf ': > %q; : > %q\n' "$BUNDLE_PATH" "$stored" > "$FOREIGN_CASE/mutate.sh"
+    run_foreign_teardown rc
+    if [ "$point" = none ]; then
+      expect_code 0 "$rc" "$label: an unchanged bundle-held copy must close: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+      assert_bundle_restores_copy_commits "$label" "$head" "$first"
+      continue
+    fi
+    assert_present "$FOREIGN_CASE/git-protects-ran.done" "$label: the mutation did not run"
+    expect_code 1 "$rc" "$label: a bundle truncated before the removal must keep the copy: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+    assert_late_copy_kept "$label"
+  done
+  pass 'a bundle truncated at the scan, the launcher read or the unlock keeps the copy; unchanged, it closes and restores'
+}
+
+# F5: a preservation record rewritten to the same bundle path and hash but tips
+# that no longer cover the copy HEAD (only main's tip, which the bundle also
+# advertises) stops the removal; the unchanged record closes.
+test_late_record_that_stops_covering_head_stops_the_removal() {
+  local rc point label head line bundle hash others
+  for point in none scan launcher unlock; do
+    label="late-record-$point"
+    make_locked_bundle_case "$label" own single
+    add_late_mutation_hooks "$point"
+    head=$(git -C "$FOREIGN_COPY" rev-parse HEAD)
+    IFS=$'\t' read -r bundle hash _ < "$FOREIGN_CASE/data/task-x1/preservation-bundles.tsv"
+    others=$(git bundle list-heads "$bundle" | awk -v h="$head" '$1 != h {print $1}' | LC_ALL=C sort -u | paste -sd ' ' -)
+    [ -n "$others" ] || fail "$label: the fixture bundle advertises no tip besides HEAD"
+    line=$(printf '%s\t%s\t%s' "$bundle" "$hash" "$others")
+    printf 'printf %%s\\\\n %q > %q\n' "$line" "$FOREIGN_CASE/data/task-x1/preservation-bundles.tsv" > "$FOREIGN_CASE/mutate.sh"
+    run_foreign_teardown rc
+    if [ "$point" = none ]; then
+      expect_code 0 "$rc" "$label: an unchanged record must close: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+      continue
+    fi
+    assert_present "$FOREIGN_CASE/git-protects-ran.done" "$label: the mutation did not run"
+    grep -qF "$head" "$FOREIGN_CASE/data/task-x1/preservation-bundles.tsv" && fail "$label: the record still names HEAD after the rewrite"
+    expect_code 1 "$rc" "$label: a record that no longer covers HEAD must keep the copy: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+    assert_late_copy_kept "$label"
+  done
+  pass 'a record rewritten at the scan, the launcher read or the unlock so it no longer covers HEAD keeps the copy'
+}
+
+# F3: a launcher is gone only when the process table shows it absent, or shows a
+# process whose start time is later than the creation lock's own time (a recycled
+# pid). A fake ps reports a live launcher that started one second before the lock
+# was written; answering at once or four seconds late, it keeps the copy on both
+# direct-release routes. A pid that started ten seconds after the lock is
+# recycled and its copy closes; an unreadable table keeps the copy.
+test_launcher_start_time_not_observation_delay_decides_recycling() {
+  local rc route shape label live lockf locked_at start args
+  for route in unavailable uncovered; do
+    for shape in prompt-live delayed-live recycled unknown; do
+      label="start-$route-$shape"
+      args=()
+      if [ "$route" = unavailable ]; then
+        dead_launcher_pid
+        make_own_locked_copy_case "$label" enclosing "$FOREIGN_DEAD_PID"
+        add_git_worktree_log "$FOREIGN_CASE"
+        rm -f "$FOREIGN_CASE/vernant-python"
+      else
+        make_locked_bundle_case "$label" own interior
+        args=(FM_STUB_REQUIRE_CREDIT=1)
+      fi
+      sleep 600 &
+      live=$!
+      git -C "$FOREIGN_CASE/project" worktree unlock "$FOREIGN_COPY"
+      git -C "$FOREIGN_CASE/project" worktree lock --reason "vernant-session-active owner=launcher:$live launcher=$live" "$FOREIGN_COPY"
+      lockf="$(git -C "$FOREIGN_COPY" rev-parse --absolute-git-dir)/locked"
+      locked_at=$(( $(date +%s) - 120 ))
+      touch -t "$(date -r "$locked_at" +%Y%m%d%H%M.%S)" "$lockf"
+      start=$(( locked_at - 1 ))
+      [ "$shape" != recycled ] || start=$(( locked_at + 10 ))
+      cat > "$FOREIGN_CASE/fakebin/ps" <<SH
+#!/usr/bin/env bash
+case "\$*" in
+  *"-p $live -o pid="*|*"-o pid= -p $live"*)
+    [ "$shape" != unknown ] || { echo "ps: simulated unreadable process table" >&2; exit 2; }
+    echo " $live"; exit 0 ;;
+  *"-p $live -o etime="*|*"-o etime= -p $live"*)
+    age=\$(( \$(date +%s) - $start ))
+    [ "$shape" != delayed-live ] || sleep 4
+    printf '%02d:%02d:%02d\n' \$(( age / 3600 )) \$(( age % 3600 / 60 )) \$(( age % 60 )); exit 0 ;;
+  *"-p $live -o lstart="*|*"-o lstart= -p $live"*)
+    [ "$shape" != delayed-live ] || sleep 4
+    LC_ALL=C date -r $start '+%a %b %e %H:%M:%S %Y'; exit 0 ;;
+esac
+echo "ps: Operation not permitted" >&2
+exit 126
+SH
+      chmod +x "$FOREIGN_CASE/fakebin/ps"
+      run_foreign_teardown rc ${args[@]+"${args[@]}"}
+      if [ "$shape" = recycled ]; then
+        expect_code 0 "$rc" "$label: a recycled pid's copy must close: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+        assert_absent "$FOREIGN_COPY" "$label: the copy survived"
+      else
+        expect_code 1 "$rc" "$label: the copy must stay locked: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+        assert_present "$FOREIGN_COPY/.git" "$label: the copy was removed"
+        git -C "$FOREIGN_CASE/project" worktree list --porcelain | grep -A4 -F "worktree $FOREIGN_COPY" | grep -q '^locked' \
+          || fail "$label: the copy is no longer locked"
+        assert_present "$FOREIGN_CASE/state/task-x1.meta" "$label: the task record was removed"
+        assert_no_grep 'released creation lock' "$FOREIGN_CASE/stderr" "$label: a release was printed"
+      fi
+      kill "$live" 2>/dev/null || true
+      wait "$live" 2>/dev/null || true
+    done
+  done
+  pass 'a live launcher that started before its lock keeps the copy whether ps answers at once or late; a pid started after the lock is recycled; an unreadable table keeps the copy'
+}
+
+# F4: an own unlocked nested copy landed by a merged pull request, or whose tree
+# equals the default branch tip, never loses a unique ignored file at its
+# removal: the file is preserved first, or the copy stays. Without the file the
+# same copy closes.
+test_pr_and_tip_landed_copies_keep_a_unique_ignored_file() {
+  local rc proof shape label head exclude found
+  for proof in merged-pr tip-equal; do
+    for shape in unique-ignored clean; do
+      label="landed-$proof-$shape"
+      make_own_locked_copy_case "$label" enclosing
+      printf 'hello\n' > "$FOREIGN_COPY/feature.txt"
+      git -C "$FOREIGN_COPY" add -- feature.txt
+      git -C "$FOREIGN_COPY" -c user.email=t@t -c user.name=t commit -q -m 'add feature'
+      head=$(git -C "$FOREIGN_COPY" rev-parse HEAD)
+      if [ "$proof" = merged-pr ]; then
+        git -C "$FOREIGN_COPY" push -q origin "HEAD:refs/pull/7/head"
+        append_pr_meta_url "$FOREIGN_CASE"
+        add_gh_pr_merged_for_head "$FOREIGN_CASE" "$head"
+      else
+        git -C "$FOREIGN_COPY" push -q origin HEAD:main
+      fi
+      if [ "$shape" = unique-ignored ]; then
+        exclude=$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)
+        printf '%s\n' unique.dat >> "$exclude"
+        printf 'only here\n' > "$FOREIGN_COPY/unique.dat"
+      fi
+      run_foreign_teardown rc
+      if [ "$shape" = clean ]; then
+        expect_code 0 "$rc" "$label: a clean landed copy must close: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+        assert_absent "$FOREIGN_COPY" "$label: the copy survived"
+        continue
+      fi
+      found=
+      if [ -f "$FOREIGN_COPY/unique.dat" ]; then
+        found=copy
+        assert_present "$FOREIGN_CASE/state/task-x1.meta" "$label: the record went while the copy stayed"
+      elif grep -rlqF 'only here' "$FOREIGN_CASE/data/task-x1/nested-copy-preserved" 2>/dev/null; then
+        found=preserved
+      fi
+      [ -n "$found" ] || fail "$label: the unique ignored file was lost (rc=$rc): $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+    done
+  done
+  pass 'an own copy landed by a merged pull request or equal to the default branch tip keeps or preserves a unique ignored file; clean, it closes'
+}
+
 # The open-file listing is filtered in one pass, and a listing line of a shape
 # the filter does not know still fails the scan, so the copy stays locked.
 test_direct_release_refuses_a_malformed_open_file_listing() {
@@ -7323,6 +7570,11 @@ test_direct_release_rechecks_the_bundle_and_head_at_the_unlock
 test_confined_launcher_state_is_never_taken_for_absence
 test_direct_release_sees_a_holder_under_an_escaped_lsof_name
 test_direct_release_reports_a_failed_relock_truthfully
+test_late_unique_ignored_file_is_never_lost_at_the_removal
+test_late_bundle_truncation_stops_the_removal_at_every_call
+test_late_record_that_stops_covering_head_stops_the_removal
+test_launcher_start_time_not_observation_delay_decides_recycling
+test_pr_and_tip_landed_copies_keep_a_unique_ignored_file
 test_direct_release_refuses_a_process_holding_a_file_in_the_copy_open
 test_task_own_descendant_holding_a_file_open_refuses_and_is_not_signalled
 test_direct_release_refuses_an_unreadable_process_table
