@@ -3714,38 +3714,33 @@ pids_with_open_file_under() {  # <dir>
 }
 
 lsof_pids_under() {  # <dir> <lsof-arguments...>
-  local dir=$1 out pid path line printed=
+  local dir=$1 out
   shift
   [ -n "$dir" ] && [ -d "$dir" ] || return 0
   dir=$(cd "$dir" && pwd -P) || return 1
   out=$(lsof "$@" 2>/dev/null) || return 1
   [ -n "$out" ] || return 0
-  pid=
-  while IFS= read -r line; do
-    case "$line" in
-      p*)
-        pid=${line#p}
-        case "$pid" in ''|*[!0-9]*) return 1 ;; esac
-        ;;
-      f*) [ -n "$pid" ] || return 1 ;;
-      n*)
-        [ -n "$pid" ] || return 1
-        path=${line#n}
-        case "$path" in
-          "$dir"|"$dir"/*)
-            if [ "$pid" != "$$" ] && [ "$pid" != "$printed" ]; then
-              printf '%s\t%s\n' "$pid" "$path"
-              printed=$pid
-            fi
-            ;;
-        esac
-        ;;
-      '') ;;
-      *) return 1 ;;
-    esac
-  done <<EOF
-$out
-EOF
+  # One awk pass over the -F listing (a system-wide one holds tens of thousands
+  # of lines): the path prefix is compared as a literal string, the first
+  # matching path of each pid is printed, this shell is left out, and a line of
+  # any other shape, or a file or name line with no pid before it, fails.
+  FM_LSOF_DIR=$dir FM_LSOF_SELF=$$ LC_ALL=C awk '
+    BEGIN { dir = ENVIRON["FM_LSOF_DIR"]; self = ENVIRON["FM_LSOF_SELF"]; prefix = dir "/"; plen = length(prefix); pid = ""; printed = "" }
+    {
+      kind = substr($0, 1, 1); rest = substr($0, 2)
+      if (kind == "p") { if (rest !~ /^[0-9]+$/) exit 1; pid = rest; next }
+      if (kind == "f") { if (pid == "") exit 1; next }
+      if (kind == "n") {
+        if (pid == "") exit 1
+        if ((rest == dir || substr(rest, 1, plen) == prefix) && pid != self && pid != printed) {
+          printf "%s\t%s\n", pid, rest
+          printed = pid
+        }
+        next
+      }
+      if ($0 == "") next
+      exit 1
+    }' <<< "$out"
 }
 
 task_process_identity() {  # <pid>

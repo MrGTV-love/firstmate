@@ -6464,6 +6464,32 @@ SH
   pass 'a process that appears in the copy after the driver refused keeps the copy locked, named by pid'
 }
 
+# The open-file listing is filtered in one pass, and a listing line of a shape
+# the filter does not know still fails the scan, so the copy stays locked.
+test_direct_release_refuses_a_malformed_open_file_listing() {
+  local rc
+  dead_launcher_pid
+  make_own_locked_copy_case direct-malformed-listing enclosing "$FOREIGN_DEAD_PID"
+  add_git_worktree_log "$FOREIGN_CASE"
+  rm -f "$FOREIGN_CASE/vernant-python"
+  cat > "$FOREIGN_CASE/fakebin/lsof" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" -Fpfn "*) printf 'p%s\ntREG\nn%s\n' 999993 '/elsewhere/file'; exit 0 ;;
+  *" -d cwd "*) exit 0 ;;
+esac
+exit 1
+SH
+  chmod +x "$FOREIGN_CASE/fakebin/lsof"
+  run_foreign_teardown rc
+  expect_code 1 "$rc" "direct-malformed-listing: a malformed listing must keep the copy: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+  assert_grep 'a scan for processes holding its files open failed' "$FOREIGN_CASE/stderr" \
+    "direct-malformed-listing: the refusal did not name the failed scan"
+  assert_present "$FOREIGN_COPY/.git" "direct-malformed-listing: the copy was removed"
+  if grep -q 'worktree unlock' "$FOREIGN_CASE/git-worktree.log" 2>/dev/null; then fail 'direct-malformed-listing: the script unlocked the copy'; fi
+  pass 'an open-file listing line of an unknown shape fails the scan and keeps a dead launcher'"'"'s locked copy'
+}
+
 # The last process scan sits next to the unlock: a process that opens a file in
 # the copy while the landed and Git-protection proofs run (after the earlier
 # scans) keeps the copy locked. The fake lsof reports the holder only once
@@ -7011,6 +7037,7 @@ test_dead_launcher_lock_is_released_when_the_driver_is_unavailable
 test_locked_landed_copy_with_a_record_but_no_unlanded_commit_reaches_the_driver
 test_direct_release_refuses_a_process_that_appears_before_the_unlock
 test_direct_release_scans_for_processes_after_the_landed_and_git_proofs
+test_direct_release_refuses_a_malformed_open_file_listing
 test_direct_release_refuses_a_process_holding_a_file_in_the_copy_open
 test_task_own_descendant_holding_a_file_open_refuses_and_is_not_signalled
 test_direct_release_refuses_an_unreadable_process_table
