@@ -586,6 +586,38 @@ test_launch_proof_claude_adoption() (
   fresh_case; : > "$T/procs"; proc 53733 1 53733 2.1.316 claude 'claude'; printf 53733 > "$T/fg-group"
   refuses 'no task-specific session tie' '(h2) a bare personal claude in the same pane, home and cwd'
   pass 'every missing, foreign or contradicting fact refuses the adoption with its own cause'
+
+  # The owner's --session-id statement names the live id, which anyone can read from ps,
+  # so it ties only a session whose transcript still opens with this task's doorbell
+  # and whose launch-brief record is gone; the personal-session rows still refuse.
+  stated() { out=$(fm_launch_proof_claude_adoption "$META" "$UUID" operator 2>"$T/err") && rc=0 || rc=$?; err=$(cat "$T/err"); }
+  refuses_stated() { # <cause-substring> <description>
+    stated
+    [ "$rc" != 0 ] || fail "$2: authorized: $out"
+    [ -z "$out" ] || fail "$2: printed a record while refusing"
+    assert_contains "$err" "$1" "$2"
+    row "$2" "$err"
+  }
+  fresh_case
+  write_transcript "Where is the inbox? Is $LANE/state/operational-inbox the right place?" 30
+  { printf '{"type":"assistant","message":{"role":"assistant","content":"reading %s/state/operational-inbox"}}\n' "$LANE"
+    printf '{"type":"user","timestamp":"2099-01-01T00:00:00.000Z","message":{"role":"user","content":"archive the processed record into handled/"}}\n'; } >> "$(transcript_dir)/$UUID.jsonl"
+  refuses_stated 'no task-specific session tie' '(h3) with --session-id: a personal session reading and archiving the inbox is not the task'
+  fresh_case; write_transcript 'help me refactor this function' 30
+  refuses_stated 'no task-specific session tie' '(h2) with --session-id: a bare personal claude --resume in the same pane, home and cwd'
+  rm -f "$LANE"/state/operational-inbox/*.msg
+  refuses_stated 'no task-specific session tie' '(h2) with --session-id: a personal session stays refused once the brief is gone'
+  fresh_case; mkdir -p "$T/foreign/state"; fm_operational_record_write "$T/foreign/state" launch-brief 'foreign brief' FOREIGN
+  write_transcript "$FOREIGN" 30; rm -f "$T"/foreign/state/operational-inbox/*.msg
+  refuses_stated 'no task-specific session tie' 'with --session-id: a doorbell of another home is not this task'"'"'s'
+  fresh_case
+  refuses_stated 'launch-brief record still exists' 'with --session-id: a present launch brief is proven by plain adopt, not by the statement'
+  fresh_case; rm -f "$LANE"/state/operational-inbox/*.msg
+  stated
+  [ "$rc" = 0 ] || fail "with --session-id: the past-retention lane must adopt: $err"
+  assert_equals operator "$(printf '%s' "$out" | jq -r .tie)" 'the past-retention statement names the operator tie'
+  row 'with --session-id: a lane whose first message is its own doorbell and whose brief is gone' "authorized: $(printf '%s' "$out" | jq -c '{pid,harness_pid,tie}')"
+  pass 'the owner statement ties only a past-retention launch-brief session, never a personal one'
 )
 
 test_launch_proof_claude_verdict_and_refusal() (
@@ -721,7 +753,7 @@ test_launch_proof_claude_verdict_and_refusal() (
   printf 'FM_SPAWN_GEN=%s\n' "$PIN_GEN" > "$T/env-extra"
   assert_equals managed "$(fm_launch_proof_herdr "$META")" 'a matching pin is managed without any adoption'
   fm_launch_proof_herdr_authorizes "$META" || fail 'a pinned claude must authorize lifecycle input'
-  # Inbox retention never ends an adoption: the published tie stands while the live session is that one.
+  # Inbox retention never ends an adoption: the published tie stands while the transcript still opens with the doorbell.
   rm -f "$T/env-extra"
   meta_for claude env-v1
   fm_launch_proof_claude_adoption "$META" > "$STATE/vernant-t1.claude-adoption.json" 2>/dev/null \
@@ -754,6 +786,22 @@ test_launch_proof_claude_verdict_and_refusal() (
   meta_for claude env-v1
   printf '%s\n' "$out" > "$STATE/vernant-t1.claude-adoption.json"
   assert_equals managed "$(fm_launch_proof_herdr "$META")" 'an operator adoption is managed while the proofs hold'
+  # The recheck rereads the transcript doorbell at every use, never only the record file.
+  local TRANSCRIPT ADOPTION="$STATE/vernant-t1.claude-adoption.json" tie
+  TRANSCRIPT="$OPERATOR/.claude/projects/$(fm_launch_proof_claude_project_dir "$LANE")/$UUID.jsonl"
+  cp "$TRANSCRIPT" "$T/task-transcript"
+  jq -nc --arg ts 2026-01-01T00:00:00.000Z '{type:"user",timestamp:$ts,message:{role:"user",content:"help me with my own project"}}' > "$TRANSCRIPT"
+  assert_equals unmanaged "$(fm_launch_proof_herdr "$META")" 'an operator adoption whose transcript no longer opens with the task doorbell is inert'
+  rm -f "$TRANSCRIPT"
+  assert_equals unmanaged "$(fm_launch_proof_herdr "$META")" 'an operator adoption whose transcript is gone is inert'
+  # A hand-written record for a personal session licenses nothing, whatever tie it names.
+  jq -nc --arg ts 2026-01-01T00:00:00.000Z '{type:"user",timestamp:$ts,message:{role:"user",content:"help me with my own project"}}' > "$TRANSCRIPT"
+  for tie in operator launch-brief recorded; do
+    jq -nc --arg gen "$PIN_GEN" --arg uuid "$UUID" --arg tie "$tie" \
+      '{version:1, harness:"claude", spawn_gen:$gen, window:"lab:w1:p2", pid:53733, harness_pid:53733, session_id:$uuid, tie:$tie}' > "$ADOPTION"
+    assert_equals unmanaged "$(fm_launch_proof_herdr "$META")" "a hand-written $tie record does not tie a personal session"
+  done
+  cp "$T/task-transcript" "$TRANSCRIPT"
   rm -f "$STATE/vernant-t1.claude-adoption.json"
   pass 'claude verdicts: unpinned is unmanaged, adoption is rechecked at use, legacy and other harnesses are unchanged'
 )

@@ -2442,6 +2442,45 @@ test_claude_pruned_brief_adopts_only_on_the_owner_statement() {
   pass "claude restore: a lane whose brief is past retention adopts only on the owner's statement of the live session"
 }
 
+test_claude_owner_statement_never_ties_a_personal_session() {
+  prepare_claude_restore statement-personal
+  local CONTROL="$ROOT/bin/fm-control.sh"
+  local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID out rc meta_before first
+  meta_before=$(shasum -a 256 "$dir/home/state/$id.meta")
+  # (h3) and (h2) with the statement: a personal session whose live id anyone can read from ps.
+  for first in "Is $dir/wt/state/operational-inbox the right place for the inbox?" 'help me refactor this function'; do
+    write_claude_transcript "$dir" "$first"
+    rc=0; out=$(run_continuation_control "$dir" "$id" adopt --session-id "$CLAUDE_RESTORE_UUID") || rc=$?
+    [ "$rc" -ne 0 ] || fail "the owner statement adopted a personal session: $out"
+    assert_contains "$out" "no task-specific session tie" "the statement refusal names the missing tie"
+    assert_absent "$dir/home/state/$id.claude-adoption.json" "a refused statement writes no record"
+    assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "a refused statement sends no input"
+    [ "$meta_before" = "$(shasum -a 256 "$dir/home/state/$id.meta")" ] || fail "a refused statement changed the task record"
+    claude_lifecycle_refusal "$dir" "$id" interrupt
+  done
+  pass "claude restore: the owner statement never adopts a personal session in the task pane and home"
+}
+
+test_claude_stated_adoption_is_inert_once_its_doorbell_is_gone() {
+  prepare_claude_restore statement-recheck
+  local CONTROL="$ROOT/bin/fm-control.sh"
+  local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID out rc=0 state_before
+  prune_claude_launch_brief "$dir"
+  out=$(run_continuation_control "$dir" "$id" adopt --session-id "$CLAUDE_RESTORE_UUID") \
+    || fail "the owner statement of a past-retention lane must adopt: $out"
+  # The conversation no longer opens with the task's doorbell: the recheck at use refuses.
+  write_claude_transcript "$dir" 'help me with my own project'
+  claude_lifecycle_refusal "$dir" "$id" interrupt
+  state_before=$(cd "$dir/home/state" && find . -type f -exec shasum -a 256 {} + | sort)
+  out=$(CONTROL="$ROOT/bin/fm-secondmate-restart.sh" run_control "$dir" "$id") || rc=$?
+  expect_code 3 "$rc" "a stated adoption whose doorbell is gone leaves the agent unreached"$'\n'"$out"
+  assert_contains "$out" "unreached: $id" "the restart refuses the stale statement"
+  assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "no request, nudge or key reached the pane"
+  [ "$state_before" = "$(cd "$dir/home/state" && find . -type f -exec shasum -a 256 {} + | sort)" ] \
+    || fail "the refused restart created or changed a record"
+  pass "claude restore: a stated adoption is rechecked against the transcript doorbell at every use"
+}
+
 test_claude_pinned_elsewhere_names_its_own_cause() {
   prepare_claude_restore pinned-elsewhere
   local CONTROL="$ROOT/bin/fm-control.sh"
@@ -2556,6 +2595,8 @@ test_claude_restore_restart_decides_attribution_before_its_first_effect
 test_claude_restore_relaunch_after_adoption
 test_claude_adoption_outlives_the_inbox_prune
 test_claude_pruned_brief_adopts_only_on_the_owner_statement
+test_claude_owner_statement_never_ties_a_personal_session
+test_claude_stated_adoption_is_inert_once_its_doorbell_is_gone
 test_restart_refuses_an_unproven_agent_state
 test_restart_attributes_before_a_raw_command_fallback_nudge
 test_claude_pinned_elsewhere_names_its_own_cause
