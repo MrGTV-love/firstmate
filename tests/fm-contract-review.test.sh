@@ -1762,4 +1762,5 @@ fm_test_run_cases \
   test_headingless_list_of_an_extensionless_path_voids \
   test_transcript_reads_are_audited_and_the_log_is_required \
   test_authorized_spaced_path_is_clean \
+  test_reviewer_is_told_the_exit_for_a_conflict_with_an_unjudged_criterion \
   -- "$@"

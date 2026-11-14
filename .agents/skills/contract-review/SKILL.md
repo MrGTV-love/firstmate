@@ -88,6 +88,7 @@ You see one round, so you never report `stalled`.
 Verdict lines for the entrypoint: `EXIT: pass` is `VERDICT: PASS`.
 `EXIT: needs-revision` and `EXIT: conflicting` are `VERDICT: FAIL`.
 A criterion that cannot be judged from these inputs is `VERDICT: INCOMPLETE` with `EXIT: needs-revision`, and the report names the missing input.
+When a conflict stands and another criterion cannot be judged as well, the conflict decides: report `EXIT: conflicting` with `VERDICT: FAIL`, and name the unjudged criterion and its missing input under Checks not performed.
 Report exactly one `EXIT:` line.
 The meaning of each exit is in the define-done-and-grading skill, section "Review exits and draft use".
 
