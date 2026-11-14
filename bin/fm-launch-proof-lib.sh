@@ -68,13 +68,14 @@ fm_launch_proof_tree_pinned_elsewhere() { # <spawn-gen> <process-table> <anchor-
 }
 
 # Adoption proves the absence of a foreign pin only for processes it read.
-# Succeeds, printing why, when <anchor> is missing from <process-table> (pid
-# ppid pgid rows), or when a process of its group other than <anchor> and the
-# listed pids (whose environments adoption reads on its own) is still live but
-# its environment cannot be read. A member that exited after the table was read
-# is not a member. The lifecycle verdict keeps fm_launch_proof_tree_pinned_elsewhere.
+# Succeeds, printing why, when <anchor> (the proven harness) is missing from
+# <process-table> (pid ppid pgid rows), or when a process of its group other
+# than <anchor> and the listed pids (whose environments adoption reads on its
+# own) is still live, its environment cannot be read, and it is not proven to
+# descend from <anchor>. A member that exited after the table was read is not a
+# member. The lifecycle verdict keeps fm_launch_proof_tree_pinned_elsewhere.
 fm_launch_proof_tree_unread() { # <process-table> <anchor-pid> [<pid>...]
-  local table=$1 anchor=$2 group kid known environment
+  local table=$1 anchor=$2 group kid known environment birth
   shift 2
   group=$(awk -v p="$anchor" '$1 == p {print $3; exit}' <<< "$table")
   if [ -z "$group" ]; then
@@ -82,13 +83,38 @@ fm_launch_proof_tree_unread() { # <process-table> <anchor-pid> [<pid>...]
   fi
   while read -r kid <&3; do
     for known in "$anchor" "$@"; do [ "$kid" != "$known" ] || continue 2; done
+    birth=$(LC_ALL=C ps -p "$kid" -o lstart= 2>/dev/null) || birth=''
     if environment=$(fm_remote_herdr_process_env "$kid") \
       && printf '%s\n' "$environment" | grep -Eq '^(PATH|HOME)='; then
       continue
     fi
     LC_ALL=C ps -p "$kid" -o args= >/dev/null 2>&1 || continue
-    printf 'the environment of live group process %s cannot be read' "$kid"; return 0
+    # Spawned within our own proven conversation, it is ours whatever its
+    # environment reads (Main 022): the same process across the read (birth
+    # time), and a live parent chain that matches the table up to <anchor>.
+    if [ -n "$birth" ] && fm_launch_proof_descends "$table" "$kid" "$anchor" \
+      && [ "$(LC_ALL=C ps -p "$kid" -o lstart= 2>/dev/null)" = "$birth" ]; then
+      continue
+    fi
+    printf 'the environment of live group process %s cannot be read, and it is not proven to descend from the harness' "$kid"; return 0
   done 3< <(awk -v g="$group" '$3 == g {print $1}' <<< "$table")
+  return 1
+}
+
+# Succeeds when <pid>'s parent chain in <process-table> reaches <ancestor>, with
+# every link's live parent read now equal to the table's, so a reparented or
+# vanished link breaks it. Prints nothing.
+fm_launch_proof_descends() { # <process-table> <pid> <ancestor>
+  local table=$1 pid=$2 ancestor=$3 parent live depth=0
+  while [ "$depth" -lt 64 ]; do
+    parent=$(awk -v p="$pid" '$1 == p {print $2; exit}' <<< "$table")
+    [ -n "$parent" ] || return 1
+    live=$(LC_ALL=C ps -p "$pid" -o ppid= 2>/dev/null | tr -d ' ') || return 1
+    [ "$live" = "$parent" ] || return 1
+    [ "$parent" != "$ancestor" ] || return 0
+    pid=$parent
+    depth=$((depth + 1))
+  done
   return 1
 }
 

@@ -226,7 +226,7 @@ It sends no input and starts or stops nothing.
 - The harness's kernel working directory is exactly the task's recorded home or worktree; a subdirectory of either is refused.
   The `lsof` name is decoded the way the omp proof decodes it, so a home whose name holds a backslash is compared by its real path; an ambiguous escape or a decoded control character is refused.
 - Neither the attributed process nor the harness carries a launch pin, and no process in the harness's process group carries one for another generation.
-  The process table must list the attributed process, and every other live process of the group must have a readable environment; a process that exited after the table was read is not a member.
+  The process table must list the attributed process, and every other live process of the group must have a readable environment, or be proven to descend from the harness: its live parent chain matches the table up to the harness, and its birth time is the same across the read, so a helper the agent spawned (such as `caffeinate`) is the agent's own whatever its environment reads; a process that exited after the table was read is not a member.
 - No other task record claims the pane, the home, or the worktree, in any local home the root inventory reaches (the root home, every registered local secondmate home below it, nested ones included) or in a secondmate home a record here names.
   An inventory that cannot be completed, or a peer record that cannot be read, refuses: it is unknown, never "no conflict".
 - A task-specific session tie exists.
