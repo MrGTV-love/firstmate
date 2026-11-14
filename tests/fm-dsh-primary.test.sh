@@ -6,6 +6,12 @@ set -eu
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
+node "$ROOT/tests/fm-dsh-web-lock.mjs" "$ROOT" "$TMP" "$ROOT/bin/fm-dsh-lib.sh"
+if [ -n "${FM_DSH_SDK_ANCHOR:-}" ]; then
+  node "$ROOT/tests/fm-dsh-primary-web.mjs" "$ROOT" "$TMP" "$FM_DSH_SDK_ANCHOR"
+else
+  printf 'skip - native Web SDK fixtures require FM_DSH_SDK_ANCHOR pointing to an installed DSH package.json; portable tests are not native Web E2E\n'
+fi
 node --input-type=module - "$ROOT" "$TMP" <<'JS'
 import assert from 'node:assert/strict';
 import {mkdirSync, writeFileSync, readFileSync, existsSync, symlinkSync, readdirSync, rmSync} from 'node:fs';
@@ -300,7 +306,8 @@ try {
 // decides host or watch from the real config gate. Only the arm, the host, the
 // session start, the turn-end guard and the queue read are stubs.
 const stripped = ['CLAUDECODE', 'PI_CODING_AGENT', 'GROK_AGENT', 'FM_PI_HARNESS', 'FM_OMP_HARNESS', 'GEMINI_CLI',
-  'CURSOR_AGENT', 'CURSOR_INVOKED_AS', 'ATLASSIAN_AGENT_TYPE', 'ROVODEV_CLI', 'FM_TEST_SEAM', 'FM_TEST_HARNESS'];
+  'CURSOR_AGENT', 'CURSOR_INVOKED_AS', 'ATLASSIAN_AGENT_TYPE', 'ROVODEV_CLI', 'FM_TEST_SEAM', 'FM_TEST_HARNESS',
+  'DSH_PROFILE', 'DSH_SESSION_ID', 'DSH_SHELL'];
 function hostFixture(name, {config = [], lock = 'self'} = {}) {
   const dir = join(tmp, name);
   const bin = join(dir, 'bin');
