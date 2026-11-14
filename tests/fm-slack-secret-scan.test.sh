@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
-# DOD-16: the bot token never reaches a tracked file or home runtime state.
-# The plane runs with a known token (mirror, poll, arm, check, and a transport
-# failure), its stdout and stderr are captured inside the scanned home, and the
-# scan then looks for that token anywhere in tracked files, state, data, and
-# config. The scan prints paths and counts only; never the secret or contents.
+# DOD-16: the bot token and the signing secret never reach a tracked file or home runtime state.
+# The plane runs with a known token and signing secret (mirror, poll, arm, check, a transport
+# failure, the owner-request intake: arm, a poll, and a standing check that each take in
+# a typed request, and the thread conversation: a follow-up typed in a request thread and
+# Firstmate's answer posted into it, and the full-text read of them), its stdout and stderr are captured inside the scanned home, and the
+# scan then looks for either secret anywhere in tracked files, state, data, and
+# config. The scan prints paths and counts only; never a secret or contents.
 set -euo pipefail
+# Every plane run here is on a transcript; the real transport is closed so none can reach Slack.
+export FM_SLACK_NO_NETWORK=1
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -12,20 +16,24 @@ command -v tasks-axi >/dev/null || { printf 'skip: tasks-axi not found\n'; exit 
 cd "$ROOT"
 TMP=$(fm_test_tmproot fm-slack-secret-scan)
 FIX="$ROOT/tests/fixtures/slack"
-SECRET=${FM_SLACK_TEST_SECRET:-"fixture-secret-$(date +%s)-$$"}
+# The token holds an ampersand so that a request can deliver it as an entity the presentation decodes.
+SECRET=${FM_SLACK_TEST_SECRET:-"fixture&secret-$(date +%s)-$$"}
+SIGNING=${FM_SLACK_TEST_SIGNING:-"fixture-signing-$(date +%s)-$$"}
+HELPER="$ROOT/tests/fm_slack_watch_test.py"
 planted="$ROOT/tests/.fm-slack-secret-planted"
 cleanup() { rm -f "$planted"; }
 trap cleanup EXIT HUP INT TERM
-HOMES=("$TMP/ok" "$TMP/failing")
+HOMES=("$TMP/ok" "$TMP/failing" "$TMP/intake")
 bash "$FIX/make-home.sh" mirror "${HOMES[0]}" >/dev/null
 bash "$FIX/make-home.sh" unreachable "${HOMES[1]}" >/dev/null
+bash "$FIX/make-home.sh" intake "${HOMES[2]}" >/dev/null
 
 run_plane() {  # <home> <capture-name> <command> [args...]
   local h=$1 name=$2
   shift 2
   mkdir -p "$h/data/captured"
   FM_HOME="$h" FM_STATE_OVERRIDE="$h/state" FM_DATA_OVERRIDE="$h/data" FM_CONFIG_OVERRIDE="$h/config" \
-    SLACK_BOT_TOKEN="$SECRET" "$@" > "$h/data/captured/$name.out" 2> "$h/data/captured/$name.err" || true
+    SLACK_BOT_TOKEN="$SECRET" SLACK_SIGNING_SECRET="$SIGNING" "$@" > "$h/data/captured/$name.out" 2> "$h/data/captured/$name.err" || true
 }
 
 run_plane "${HOMES[0]}" mirror "$ROOT/bin/fm-slack-mirror.sh" --replay "$FIX/mirror/transcript.json"
@@ -34,17 +42,73 @@ run_plane "${HOMES[0]}" arm "$ROOT/bin/fm-slack-check.sh" arm --replay "$FIX/arm
 run_plane "${HOMES[0]}" check "$ROOT/bin/fm-slack-check.sh" check --replay "$FIX/mirror/transcript.json"
 run_plane "${HOMES[1]}" poll "$ROOT/bin/fm-slack-poll.sh" --replay "$FIX/unreachable/transcript.json"
 
+# The owner-request intake: arm, then two typed requests, one taken in by a poll and one by the standing check.
+INTAKE="$FIX/intake/transcript.json"
+run_plane "${HOMES[2]}" arm "$ROOT/bin/fm-slack-check.sh" arm --replay "$INTAKE"
+replay=$(python3 "$HELPER" replay-file "${HOMES[2]}/state/slack-watch")
+python3 "$HELPER" owner-message "$replay" 2000.000100 U0TESTOWNER 'a request typed while the plane is armed'
+run_plane "${HOMES[2]}" request-poll "$ROOT/bin/fm-slack-poll.sh" --replay "$INTAKE"
+python3 "$HELPER" owner-message "$replay" 2000.000200 U0TESTOWNER 'a second request, taken in by the standing check'
+run_plane "${HOMES[2]}" request-check "$ROOT/bin/fm-slack-check.sh" check --replay "$INTAKE"
+
+# Requests that hold the plane's own values: the token, the signing secret, and the token as an entity that the
+# presentation decodes. Slack keeps what the owner typed (the replay state stands in for Slack and is not scanned);
+# the plane's state, outputs and records must hold the marker instead.
+joined=$(python3 -c 'import sys; print(sys.argv[1].replace("&", "&amp;"))' "$SECRET")
+python3 "$HELPER" owner-message "$replay" 2000.000300 U0TESTOWNER "a request that holds $SECRET"
+python3 "$HELPER" owner-message "$replay" 2000.000400 U0TESTOWNER "a request that holds $SIGNING"
+python3 "$HELPER" owner-message "$replay" 2000.000500 U0TESTOWNER "a request whose entity joins it: $joined"
+run_plane "${HOMES[2]}" request-secrets "$ROOT/bin/fm-slack-poll.sh" --replay "$INTAKE"
+for ts in 2000.000300 2000.000400 2000.000500; do
+  grep -q "^check: slack request $ts .*secret removed" "${HOMES[2]}/data/captured/request-secrets.out" || fail "the request $ts did not carry the marker and its flag"
+done
+
 # The scan is only meaningful if the plane really ran with the token.
 [ -s "${HOMES[0]}/state/slack-watch/state.json" ] || fail "the plane left no state to scan"
 [ -s "${HOMES[0]}/state/slack-watch/outbound.jsonl" ] || fail "the mirror posted nothing"
 grep -q '^armed: ' "${HOMES[0]}/data/captured/arm.out" || fail "the arm did not run"
 grep -q 'transport failure' "${HOMES[1]}/data/captured/poll.out" || fail "the failure path did not run"
+grep -q '^check: slack request 2000.000100 ' "${HOMES[2]}/data/captured/request-poll.out" || fail "the intake poll did not take the request in"
+grep -q '^check: slack request 2000.000200 ' "${HOMES[2]}/data/captured/request-check.out" || fail "the intake check did not take the request in"
+[ "$(grep -c '"method": "chat.postMessage"' "${HOMES[2]}/state/slack-watch/outbound.jsonl")" = 5 ] || fail "the intake did not acknowledge all five requests"
+
+# The thread conversation: the owner replies inside the first request's thread, a poll wakes it as a follow-up,
+# and Firstmate's answer goes into the same thread through the reply command.
+python3 "$HELPER" reply "$replay" 2000.000100 2000.000300 U0TESTOWNER 'a follow-up typed in the first request thread'
+run_plane "${HOMES[2]}" followup-poll "$ROOT/bin/fm-slack-poll.sh" --replay "$INTAKE"
+printf '%s' 'an answer for the first request' \
+  | run_plane "${HOMES[2]}" reply "$ROOT/bin/fm-slack-reply.sh" --thread 2000.000100 --to 2000.000300 --replay "$INTAKE"
+grep -q '^check: slack follow-up 2000.000300 to request 2000.000100 ' "${HOMES[2]}/data/captured/followup-poll.out" || fail "the poll did not take the follow-up in"
+# A follow-up that holds the plane's own values, and an answer that Firstmate writes with them: the follow-up line carries the marker and its flag,
+# and the answer is refused before anything is sent (a value never leaves in a post).
+python3 "$HELPER" reply "$replay" 2000.000100 2000.000400 U0TESTOWNER "a follow-up that holds $SECRET and $SIGNING"
+run_plane "${HOMES[2]}" followup-secrets "$ROOT/bin/fm-slack-poll.sh" --replay "$INTAKE"
+grep -q '^check: slack follow-up 2000.000400 to request 2000.000100 .*secret removed' "${HOMES[2]}/data/captured/followup-secrets.out" || fail "the follow-up did not carry the marker and its flag"
+printf '%s' "an answer that holds $SECRET" | run_plane "${HOMES[2]}" reply-secret "$ROOT/bin/fm-slack-reply.sh" --thread 2000.000100 --to 2000.000400 --replay "$INTAKE"
+grep -q '^slack: refused: secret_collides_with_marker' "${HOMES[2]}/data/captured/reply-secret.err" || fail "an answer that holds the token was not refused"
+grep -q '^replied: ' "${HOMES[2]}/data/captured/reply.out" || fail "the reply command did not post the answer"
+[ "$(grep -c '"method": "chat.postMessage"' "${HOMES[2]}/state/slack-watch/outbound.jsonl")" = 6 ] || fail "the thread conversation did not add exactly the one answer (five acknowledgements and the answer)"
+
+# The full-text read: the requests that hold the plane's own values, and the follow-up that holds both, read in full; each value shows as the marker.
+run_plane "${HOMES[2]}" read-request-token "$ROOT/bin/fm-slack-read.sh" --thread 2000.000300 --replay "$INTAKE"
+run_plane "${HOMES[2]}" read-request-signing "$ROOT/bin/fm-slack-read.sh" --thread 2000.000400 --replay "$INTAKE"
+run_plane "${HOMES[2]}" read-request-entity "$ROOT/bin/fm-slack-read.sh" --thread 2000.000500 --replay "$INTAKE"
+run_plane "${HOMES[2]}" read-followup "$ROOT/bin/fm-slack-read.sh" --thread 2000.000100 --message 2000.000400 --replay "$INTAKE"
+for name in read-request-token:2000.000300:2000.000300 read-request-signing:2000.000400:2000.000400 read-request-entity:2000.000500:2000.000500 \
+    read-followup:2000.000400:2000.000100; do
+  IFS=: read -r capture message request <<<"$name"
+  head -n 1 "${HOMES[2]}/data/captured/$capture.out" | grep -q "^slack message $message in request $request from U0TESTOWNER: " \
+    || fail "the read $capture did not print the message"
+  tail -n 1 "${HOMES[2]}/data/captured/$capture.out" | grep -qF '[secret removed]' || fail "the read $capture did not carry the marker"
+done
+[ "$(tail -n 1 "${HOMES[2]}/data/captured/read-followup.out" | grep -oF '[secret removed]' | wc -l | tr -d ' ')" = 2 ] \
+  || fail "the follow-up read did not replace both values"
 
 scan() {  # <output-file>; prints matches=N
-  FM_SLACK_SCAN_SECRET="$SECRET" python3 - "$1" "${HOMES[@]}" <<'PY'
+  FM_SLACK_SCAN_SECRET="$SECRET" FM_SLACK_SCAN_SIGNING="$SIGNING" python3 - "$1" "${HOMES[@]}" <<'PY'
 import os, subprocess, sys
 out, homes = sys.argv[1], sys.argv[2:]
-needle = os.environ['FM_SLACK_SCAN_SECRET'].encode()
+needles = [os.environ['FM_SLACK_SCAN_SECRET'].encode(), os.environ['FM_SLACK_SCAN_SIGNING'].encode()]
 paths = subprocess.check_output(['git', 'ls-files', '-z']).split(b'\0')
 paths += [os.path.join(root, name).encode()
           for home in homes
@@ -56,7 +120,9 @@ for raw in paths:
     if not raw:
         continue
     path = raw.decode(errors='replace')
-    if os.path.isfile(path) and needle in open(path, 'rb').read():
+    if os.path.basename(path).startswith('replay-state-'):
+        continue  # the fixture stand-in for Slack, which keeps what the owner typed
+    if os.path.isfile(path) and any(needle in open(path, 'rb').read() for needle in needles):
         matches.append(path)
 with open(out, 'w') as handle:
     for path in matches:

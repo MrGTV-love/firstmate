@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
-# Register this home's unrecorded ready ship PRs through fm-pr-check.sh.
+# Register this home's unrecorded ready ship PRs through fm-pr-check.sh, and step
+# each registered one through the automatic review and merge sequence.
 # Usage: fm-pr-ready-reconcile.sh
 # Every pass admits at most eight task records, rotating after the last admitted
-# record. Only kind=ship with mode=no-mistakes or direct-PR and no pr= is eligible.
+# record. Only kind=ship with mode=no-mistakes or direct-PR is eligible: one with no
+# pr= is registered, and one with a recorded pr= is handed to bin/fm-pr-auto-review.py,
+# whose header owns the request, record and merge sequence (the merge poll, a static
+# program that prints only `merged`, cannot request a read). That step is stopped only
+# when it goes silent for this pass's stall interval, like every other read here.
 # Read at most the final 64 KiB / 200 lines of each eligible status log. The
 # window comes from fm-status-event-lib.sh and the ready gate from fm-dod-lib.sh,
 # not a second status grammar, and the PR is the one the ready note declares as
@@ -27,7 +32,8 @@
 # The watcher runs this single-flight pass detached under the same stall rule.
 # Persist the cursor before each admission, so even a permanently hung forge
 # call cannot keep later records behind it on the next pass. This script never
-# merges, steers, or writes a status log; fm-pr-check.sh is the only pr= writer.
+# merges, steers, or writes a status log itself; fm-pr-check.sh is the only pr= writer,
+# and bin/fm-pr-auto-review.py alone starts a read, records it and calls bin/fm-pr-merge.sh.
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -64,6 +70,7 @@ SCRATCH=$(mktemp "$CACHE/pass.XXXXXX")
 REFUSAL_RETRY_SECS=600
 
 CREW_STATE_BIN=${FM_CREW_STATE_BIN:-$SCRIPT_DIR/fm-crew-state.sh}
+AUTO_REVIEW_BIN=$SCRIPT_DIR/fm-pr-auto-review.py
 READY_DETAIL='checks green: PR ready for review'
 # Seconds the crew-state read of one ship may go silent before it is stopped. The
 # watcher hands down its own pass stall interval; a standalone run uses the
@@ -107,8 +114,15 @@ reconcile_one() {  # <meta> <id>
       pr=*) pr=${line#pr=} ;;
     esac
   done <<< "$output"
-  [ "$kind" = ship ] && [ -z "$pr" ] || return 0
+  [ "$kind" = ship ] || return 0
   case "$mode" in no-mistakes|direct-PR) ;; *) return 0 ;; esac
+  if [ -n "$pr" ]; then
+    rc=0
+    fm_run_progress "$CREW_STATE_STALL_SECS" env FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+      "$AUTO_REVIEW_BIN" step "$id" || rc=$?
+    ! fm_timed_out "$rc" || printf 'pr-ready: %s: the review step made no progress for %ss; stopped, read again next pass\n' "$id" "$CREW_STATE_STALL_SECS"
+    return 0
+  fi
   if [ -e "$refusal" ] || [ -L "$refusal" ]; then
     refused_at=$(_fm_status_file_mtime "$refusal") || refused_at=0
     age=$(($(date +%s) - ${refused_at:-0}))
