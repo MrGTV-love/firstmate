@@ -2378,7 +2378,10 @@ test_claude_restore_relaunch_after_adoption() {
   [ "$(journal_field "$dir" "$id" phase)" = complete ] || fail "the adopted relaunch did not complete"
   gen=$(meta_field "$dir" "$id" spawn_gen)
   [ -n "$gen" ] && [ "$gen" != old ] || fail "the adopted relaunch kept the old launch generation"
-  pin=$(FM_FAKE_DIR="$dir/fake" FM_HOME="$dir/home" "$dir/fakebin/python3" - 2000000000 </dev/null | sed -n 's/^FM_SPAWN_GEN=//p')
+  # Read the pin from the launch payload actually sent, not from a stub that echoes the record.
+  local pin_pattern='export FM_SPAWN_GEN=[^[:alnum:]]*([[:alnum:].]+)'
+  [[ "$(cat "$dir/fake/launched-command")" =~ $pin_pattern ]] || fail "the relaunch payload carries no launch pin"
+  pin=${BASH_REMATCH[1]}
   assert_equals "$gen" "$pin" "the replacement carries a pin for the new launch generation"
   assert_absent "$dir/home/state/$id.claude-adoption.json" "the relaunch removes the spent adoption record"
   rc=0
