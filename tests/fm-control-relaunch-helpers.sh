@@ -1093,7 +1093,9 @@ case "${1:-} ${2:-}" in
     exit 0 ;;
   'pane read')
     if [ -f "$D/recovery-case-id" ]; then
-      if [ -f "$D/exit-pending" ]; then
+      if [ -f "$D/exit-picker" ]; then
+        printf ' Background work is running\n\n ❯ 1. Exit and stop tasks\n   2. Keep working\n\n Enter to confirm · Esc to cancel\n'
+      elif [ -f "$D/exit-pending" ]; then
         printf '╭── π > recovery╮\n╰─ %s ─╯\n' "$(cat "$D/exit-pending")"
       elif [ -f "$D/recovery-pending" ]; then
         printf '╭── π > recovery╮\n╰─ %s ─╯\n' "$(cat "$D/recovery-pending")"
@@ -1109,9 +1111,20 @@ case "${1:-} ${2:-}" in
           '!'*|'$'*) : > "$D/recovery-pending" ;;
         esac
       fi
-      if [ "${4:-}" = ctrl+d ] \
-        || { [ "${4:-}" = enter ] && [ -f "$D/exit-pending" ]; }; then
-        rm -f "$D/herdr-agent-live" "$D/exit-pending"
+      # picker-on-exit: the Enter that submits /exit opens Claude's
+      # background-task picker instead of stopping the agent, and the pane's
+      # launch proof changes as it does (unpinned or unreadable), so the control
+      # plane's picker-time attribution recheck is what decides.
+      if [ "${4:-}" = enter ] && [ -f "$D/exit-pending" ] && [ -f "$D/picker-on-exit" ] && [ ! -f "$D/exit-picker" ]; then
+        : > "$D/exit-picker"
+        rm -f "$D/exit-pending"
+        case "$(cat "$D/picker-on-exit")" in
+          unreadable) : > "$D/recovery-env-unreadable" ;;
+          unpinned) rm -f "$D/recovery-spawn-gen" ;;
+        esac
+      elif [ "${4:-}" = ctrl+d ] \
+        || { [ "${4:-}" = enter ] && { [ -f "$D/exit-pending" ] || [ -f "$D/exit-picker" ]; }; }; then
+        rm -f "$D/herdr-agent-live" "$D/exit-pending" "$D/exit-picker"
       fi
     fi
     exit 0 ;;
