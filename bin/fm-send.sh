@@ -500,6 +500,18 @@ fm_send_expected_attribution() { # <meta>
   [ "${FM_SECONDMATE_RESTART_ROUTE_PLACEMENT:-}" = local ] \
     && [ "${FM_SECONDMATE_RESTART_ROUTE_TARGET:-}" = "${FM_SEND_EXPECTED_ENDPOINT:-}" ]
 }
+# The doorbell after the inbox write rings only while the endpoint snapshot the
+# delivery was checked on still holds (Main 1874 (i)): for a local compared
+# route, the attribution decision run again must proceed on the same record
+# bytes. Otherwise the steer stays in the inbox for the next agent that reads
+# it, and the ring is withheld and reported.
+FM_SEND_DECISION_BYTES=''
+fm_send_ring_snapshot_holds() { # <meta>
+  [ "${FM_SEND_EXPECTED_PLACEMENT:-}" = local ] || return 0
+  [ -n "$FM_SEND_DECISION_BYTES" ] || return 1
+  fm_send_expected_attribution "$1" || return 1
+  [ "${FM_SECONDMATE_RESTART_RECORD_BYTES:-}" = "$FM_SEND_DECISION_BYTES" ]
+}
 if ! fm_send_remote_route_expected "${TARGET_META:-}"; then
   echo "error: steer not sent to ${TARGET_REMOTE_ID:-$RAW_TARGET}: its resolved route is not the expected route (placement '${FM_SEND_EXPECTED_PLACEMENT:-}', endpoint '${FM_SEND_EXPECTED_ENDPOINT:-${FM_SEND_EXPECTED_REMOTE_TARGET:-}}', host '${FM_ON_EXPECTED_HOST:-}', root '${FM_ON_EXPECTED_ROOT:-}', home '${FM_ON_EXPECTED_HOME:-}'); refusing before anything is recorded or sent" >&2
   exit 1
@@ -1117,6 +1129,7 @@ else
       echo "error: steer not sent to $INBOX_TASK_ID: the task retired or changed endpoint during target resolution" >&2
       exit 1
     fi
+    [ "${FM_SEND_EXPECTED_PLACEMENT:-}" != local ] || FM_SEND_DECISION_BYTES=${FM_SECONDMATE_RESTART_RECORD_BYTES:-}
     if [ "${FM_SEND_IDEMPOTENT:-0}" = 1 ]; then
       INBOX_RECORD=$(fm_task_inbox_write_idempotent "$STATE" "$INBOX_TASK_ID" "$MESSAGE" \
         "${FIRE_AND_FORGET_ID:+fire-and-forget}") || inbox_write_rc=$?
@@ -1161,6 +1174,10 @@ else
     if [ -n "$RESOLVE_KEYS" ]; then
       fm_send_close_resolved_keys "$RESOLVE_ANSWER_TEXT" || exit 1
       fm_send_feed_resolved_holds "$RESOLVE_ANSWER_TEXT" || exit 1
+    fi
+    if ! fm_send_ring_snapshot_holds "$TARGET_META"; then
+      echo "fm-send: doorbell withheld: the record or the agent at $T is no longer the one this steer was checked against, so the pane was not rung; the steer stays durably recorded at $INBOX_RECORD for the next agent that reads its inbox" >&2
+      exit 0
     fi
     # Ring the doorbell, best-effort: no ring outcome changes the exit status,
     # because the watcher owns loss detection from here, either through its

@@ -126,15 +126,32 @@ fm_secondmate_restart_capable() {  # <meta-file>
 # passes it through (fm_secondmate_restart_route_env), so bin/fm-on.sh,
 # bin/fm-send.sh and the host verbs refuse a route or endpoint that changed
 # after the decision.
+# The whole decision rests on one read of the mate's record (Main 1874 rule S):
+# every field, the endpoint validation (on a private copy of those bytes) and
+# the launch proof (bound to the endpoint the route keeps, Main 1874 finding 2)
+# come from the same bytes, which a decision that proceeds leaves in
+# FM_SECONDMATE_RESTART_RECORD_BYTES. A record that cannot be read as one
+# record refuses.
 # Returns 1 with FM_SECONDMATE_RESTART_REASON set when the agent is unproven.
 fm_secondmate_restart_attribution() {  # <meta-file>
-  local meta=$1 id cause state out rc remote_host remote_backend remote_target remote_root remote_home
+  local meta=$1 id cause state out rc remote_host remote_backend remote_target remote_root remote_home backend copy valid
+  local FM_LAUNCH_PROOF_RECORD_PATH='' FM_LAUNCH_PROOF_RECORD_BYTES='' FM_LAUNCH_PROOF_RECORD_OK=''
   id=${meta##*/}; id=${id%.meta}
   FM_SECONDMATE_RESTART_ROUTE_PLACEMENT='' FM_SECONDMATE_RESTART_ROUTE_HOST=''
   FM_SECONDMATE_RESTART_ROUTE_ROOT='' FM_SECONDMATE_RESTART_ROUTE_HOME='' FM_SECONDMATE_RESTART_ROUTE_TARGET=''
-  remote_host=$(fm_meta_get "$meta" remote_host 2>/dev/null)
+  FM_SECONDMATE_RESTART_RECORD_BYTES=''
+  if ! declare -F fm_launch_proof_record_read >/dev/null 2>&1; then
+    # shellcheck source=bin/fm-launch-proof-lib.sh disable=SC1091
+    . "$_FM_SECONDMATE_RESTART_LIB_DIR/fm-launch-proof-lib.sh"
+  fi
+  fm_launch_proof_record_read "$meta"
+  if [ "$FM_LAUNCH_PROOF_RECORD_OK" != 1 ] || [ -L "$meta" ]; then
+    FM_SECONDMATE_RESTART_REASON="its record is not one readable regular record without NUL bytes, so nothing about its agent can be decided and no request, record or nudge was sent to it"
+    return 1
+  fi
+  remote_host=$(fm_launch_proof_field "$meta" remote_host)
   if [ -n "$remote_host" ]; then
-    remote_backend=$(fm_meta_get "$meta" remote_backend 2>/dev/null)
+    remote_backend=$(fm_launch_proof_field "$meta" remote_backend)
     case "$remote_backend" in
       ''|herdr) ;;
       *)
@@ -146,13 +163,13 @@ fm_secondmate_restart_attribution() {  # <meta-file>
     # bin/fm-on.sh selects the host from the registry by id, so the registry
     # route must name the recorded host, and the host compares its own endpoint
     # with the recorded target.
-    remote_target=$(fm_meta_get "$meta" remote_target 2>/dev/null)
+    remote_target=$(fm_launch_proof_field "$meta" remote_target)
     if [ -z "$remote_target" ]; then
       FM_SECONDMATE_RESTART_REASON="its record names no remote_target, so its host decision cannot be bound to its recorded route; its host was not asked and no request, record or nudge was sent to it"
       return 1
     fi
-    remote_root=$(fm_meta_get "$meta" remote_root 2>/dev/null)
-    remote_home=$(fm_meta_get "$meta" home 2>/dev/null)
+    remote_root=$(fm_launch_proof_field "$meta" remote_root)
+    remote_home=$(fm_launch_proof_field "$meta" home)
     if ! secondmate_registry_line_for_id "${FM_DATA_OVERRIDE:-$FM_HOME/data}/secondmates.md" "$id" \
       || [ "$SECONDMATE_REGISTRY_REMOTE" != 1 ] || [ "$SECONDMATE_REGISTRY_HOST" != "$remote_host" ] \
       || [ -z "$remote_root" ] || [ "$SECONDMATE_REGISTRY_ROOT" != "$remote_root" ] \
@@ -173,6 +190,7 @@ fm_secondmate_restart_attribution() {  # <meta-file>
       FM_SECONDMATE_RESTART_ROUTE_PLACEMENT=remote
       FM_SECONDMATE_RESTART_ROUTE_HOST=$remote_host FM_SECONDMATE_RESTART_ROUTE_ROOT=$remote_root
       FM_SECONDMATE_RESTART_ROUTE_HOME=$remote_home FM_SECONDMATE_RESTART_ROUTE_TARGET=$remote_target
+      FM_SECONDMATE_RESTART_RECORD_BYTES=$FM_LAUNCH_PROOF_RECORD_BYTES
       return 0
     fi
     case "$rc:$out" in
@@ -186,29 +204,49 @@ fm_secondmate_restart_attribution() {  # <meta-file>
   # globals: an early capability refusal leaves those empty, and the verdict
   # owner must still be asked (Main 1634 D3). A local decision keeps its
   # placement and the endpoint fm-send resolves for the mate (Main 1807 (4)).
+  # The backend, the endpoint and its validation all read a private copy of
+  # this decision's bytes, never the file again.
+  if ! copy=$(fm_launch_proof_record_copy "$meta"); then
+    FM_SECONDMATE_RESTART_REASON="its record could not be held for one decision, so no request or nudge was sent to it"
+    return 1
+  fi
+  backend=$(fm_backend_of_meta "$copy")
   FM_SECONDMATE_RESTART_ROUTE_PLACEMENT=local
-  FM_SECONDMATE_RESTART_ROUTE_TARGET=$(fm_backend_target_of_meta "$meta" 2>/dev/null)
-  [ "$(fm_backend_of_meta "$meta")" = herdr ] || return 0
-  # shellcheck source=bin/fm-launch-proof-lib.sh disable=SC1091
-  . "$_FM_SECONDMATE_RESTART_LIB_DIR/fm-launch-proof-lib.sh"
-  if ! fm_backend_source herdr; then
+  FM_SECONDMATE_RESTART_ROUTE_TARGET=$(fm_backend_target_of_meta "$copy" 2>/dev/null)
+  if [ "$backend" != herdr ]; then
+    rm -f -- "$copy"
+    FM_SECONDMATE_RESTART_RECORD_BYTES=$FM_LAUNCH_PROOF_RECORD_BYTES
+    return 0
+  fi
+  valid=0
+  if fm_backend_source herdr; then
+    fm_backend_validate_task_endpoint "$copy" "$id" >/dev/null 2>&1 || valid=1
+  else
+    valid=2
+  fi
+  rm -f -- "$copy"
+  if [ "$valid" = 2 ]; then
     FM_SECONDMATE_RESTART_REASON="the Herdr backend could not be loaded to attribute its agent, so no request or nudge was sent to it"
     return 1
   fi
-  if ! fm_backend_validate_task_endpoint "$meta" "$id" >/dev/null 2>&1; then
+  # The kept route, the validated endpoint and the proved endpoint are one
+  # endpoint (Main 1874 finding 2).
+  if [ "$valid" != 0 ] || [ -z "$FM_SECONDMATE_RESTART_ROUTE_TARGET" ] \
+    || [ "$FM_BACKEND_VALIDATED_TARGET" != "$FM_SECONDMATE_RESTART_ROUTE_TARGET" ]; then
     FM_SECONDMATE_RESTART_REASON="its recorded Herdr endpoint does not validate, so no request or nudge was sent to it"
     return 1
   fi
-  state=$(fm_backend_agent_state herdr "$FM_BACKEND_VALIDATED_TARGET")
+  state=$(fm_backend_agent_state herdr "$FM_SECONDMATE_RESTART_ROUTE_TARGET")
   case "$state" in
-    dead|missing) return 0 ;;
+    dead|missing) FM_SECONDMATE_RESTART_RECORD_BYTES=$FM_LAUNCH_PROOF_RECORD_BYTES; return 0 ;;
     alive) ;;
     *)
       FM_SECONDMATE_RESTART_REASON="its Herdr agent state reads '$state' rather than a positively classified state, so no request or nudge was sent to it"
       return 1
       ;;
   esac
-  if cause=$(fm_launch_proof_herdr_refusal "$meta"); then
+  if cause=$(fm_launch_proof_herdr_refusal "$meta" "$FM_SECONDMATE_RESTART_ROUTE_TARGET"); then
+    FM_SECONDMATE_RESTART_RECORD_BYTES=$FM_LAUNCH_PROOF_RECORD_BYTES
     return 0
   fi
   FM_SECONDMATE_RESTART_REASON="its live Herdr agent cannot be positively attributed to this task, so no request or nudge was sent to it${cause:+: $cause}"

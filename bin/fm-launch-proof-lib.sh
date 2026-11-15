@@ -143,9 +143,13 @@ fm_launch_proof_herdr_pid() { # <meta> [with-listed] -> the attributed live fore
     map(select(.pid as $pid | $ids | contains(" \($pid) ")))')
   if [ "$(printf '%s' "$info" | jq '.result.process_info.foreground_processes | length')" -gt 1 ]; then
     group=$(printf '%s' "$info" | jq '.result.process_info.foreground_process_group_id')
-    # A failed or partial table read refuses (Main 1709 ruling 1): pipefail keeps
-    # the reader's status, and every process Herdr listed must be in the table.
-    parents=$(set -o pipefail; LC_ALL=C ps -axo pid=,ppid= 2>/dev/null | jq -Rnc '
+    # A failed or partial table read refuses (Main 1709 ruling 1, Main 1874):
+    # pipefail keeps the reader's status, every row must be two numbers (a short
+    # or malformed row may hide a process), and every process Herdr listed must
+    # be in the table.
+    parents=$(set -o pipefail; LC_ALL=C ps -axo pid=,ppid= 2>/dev/null) && [ -n "$parents" ] || return 1
+    awk 'NF != 2 || $1 !~ /^[0-9]+$/ || $2 !~ /^[0-9]+$/ {bad = 1} END {exit bad}' <<< "$parents" || return 1
+    parents=$(printf '%s\n' "$parents" | jq -Rnc '
       [inputs | capture("^\\s*(?<pid>[0-9]+)\\s+(?<ppid>[0-9]+)\\s*$")
         | {key:.pid,value:(.ppid | tonumber)}] | from_entries') \
       || return 1
@@ -177,10 +181,24 @@ fm_launch_proof_herdr_pid() { # <meta> [with-listed] -> the attributed live fore
 # Rebuild candidate proof only from this home's recorded endpoint. The native
 # session reference supplies a file candidate, never authority on its own.
 # All five adoption checks live here so lifecycle readers can recheck them too.
+# One record read (Main 1874 rule S): the window, the generation and the
+# Python proof all rest on this decision's bytes of <meta> (a caller's when it
+# holds them), and the Python proof refuses any other bytes. A caller that read
+# the session record passes the sha256 of those bytes in
+# FM_LAUNCH_PROOF_EXPECTED_SESSION_SHA256, and the proof refuses any other.
 fm_launch_proof_omp_adoption() { # <meta> -> candidate session-record JSON
-  local meta=$1 target session pane pid reference
-  target=$(fm_backend_meta_exact_value "$meta" window) || {
+  local FM_LAUNCH_PROOF_RECORD_PATH=${FM_LAUNCH_PROOF_RECORD_PATH-} FM_LAUNCH_PROOF_RECORD_BYTES=${FM_LAUNCH_PROOF_RECORD_BYTES-} FM_LAUNCH_PROOF_RECORD_OK=${FM_LAUNCH_PROOF_RECORD_OK-}
+  local meta=$1 target session pane pid reference gen sha
+  fm_launch_proof_record_ensure "$meta"
+  [ "$FM_LAUNCH_PROOF_RECORD_OK" = 1 ] || {
+    echo 'adopt refused: record proof needs one readable task record without NUL bytes' >&2; return 1;
+  }
+  target=$(fm_launch_proof_bytes_exact_value "$FM_LAUNCH_PROOF_RECORD_BYTES" window) || {
     echo 'adopt refused: endpoint proof needs one recorded window' >&2; return 1;
+  }
+  gen=$(fm_launch_proof_field "$meta" spawn_gen)
+  sha=$(set -o pipefail; printf '%s' "$FM_LAUNCH_PROOF_RECORD_BYTES" | shasum -a 256 | cut -d' ' -f1) && [ -n "$sha" ] || {
+    echo 'adopt refused: record proof needs the digest of the task record it read' >&2; return 1;
   }
   session=${target%%:*}; pane=${target#*:}
   if ! fm_backend_herdr_cli "$session" pane get "$pane" 2>/dev/null \
@@ -195,7 +213,7 @@ fm_launch_proof_omp_adoption() { # <meta> -> candidate session-record JSON
   fm_launch_proof_pid_is_omp "$pid" || {
     echo 'adopt refused: process proof needs the resolved foreground process to be a readable omp process' >&2; return 1;
   }
-  if fm_launch_proof_pid_pinned_elsewhere "$pid" "$(fm_meta_get "$meta" spawn_gen)"; then
+  if fm_launch_proof_pid_pinned_elsewhere "$pid" "$gen"; then
     echo 'adopt refused: generation proof needs the live process not to be pinned to another launch generation' >&2; return 1
   fi
   reference=$(fm_backend_herdr_pane_agent_session_ref "$session" "$pane") || {
@@ -205,7 +223,7 @@ fm_launch_proof_omp_adoption() { # <meta> -> candidate session-record JSON
     omp$'\t'/*) reference=${reference#*$'\t'} ;;
     *) echo 'adopt refused: session proof needs an absolute omp session-file registration' >&2; return 1 ;;
   esac
-  python3 - "$meta" "$pid" "$reference" <<'PY'
+  FM_LAUNCH_PROOF_EXPECTED_RECORD_SHA256=$sha python3 - "$meta" "$pid" "$reference" <<'PY'
 import json
 import os
 from pathlib import Path
@@ -223,13 +241,16 @@ def metadata(path, expected_sha256=None):
     require(path.is_file() and not path.is_symlink(),
             f"record proof needs a readable regular metadata file: {path.name}")
     raw = path.read_bytes()
-    # A caller that already read the record passes its sha256: the proof must
-    # rest on those same bytes, so an A-to-B-to-A rewrite cannot slip a B proof
-    # past a final A comparison (Main 1856 (a)).
-    if expected_sha256:
+    # The proof rests on the bytes the shell decision read, so an A-to-B-to-A
+    # rewrite cannot slip a B proof past an A read (Main 1856 (a), Main 1874).
+    if expected_sha256 is not None:
         import hashlib
         require(hashlib.sha256(raw).hexdigest() == expected_sha256,
                 "record proof needs the same record bytes the caller read")
+    # A NUL (or the \001 the shell reader maps it to) makes a record unknown,
+    # never a record without a claim (Main 1856 F6/F7, Main 1874).
+    require(b"\0" not in raw and b"\x01" not in raw,
+            f"record proof needs task records without NUL bytes: {path.name}")
     fields = {}
     for line in raw.decode().splitlines():
         key, sep, value = line.partition("=")
@@ -259,7 +280,9 @@ try:
     meta = Path(sys.argv[1])
     pid = int(sys.argv[2])
     live = Path(sys.argv[3])
-    fields = metadata(meta, os.environ.get("FM_LAUNCH_PROOF_EXPECTED_RECORD_SHA256"))
+    expected_record = os.environ.get("FM_LAUNCH_PROOF_EXPECTED_RECORD_SHA256", "")
+    require(expected_record != "", "record proof needs the digest of the task record the shell read")
+    fields = metadata(meta, expected_record)
     require(single(fields, "backend") == "herdr" and single(fields, "harness") == "omp"
             and not remote(fields), "endpoint proof needs a local Herdr omp task")
     session = single(fields, "herdr_session")
@@ -273,7 +296,13 @@ try:
     record_path = meta.with_suffix(".omp-session.json")
     require(record_path.is_file() and not record_path.is_symlink(),
             "generation proof needs an existing regular session record")
-    old = json.loads(record_path.read_text())
+    session_raw = record_path.read_bytes()
+    expected_session = os.environ.get("FM_LAUNCH_PROOF_EXPECTED_SESSION_SHA256", "")
+    if expected_session:
+        import hashlib
+        require(hashlib.sha256(session_raw).hexdigest() == expected_session,
+                "generation proof needs the same session record bytes the caller read")
+    old = json.loads(session_raw.decode())
     require(isinstance(old, dict) and old.get("version") == 1 and old.get("spawn_gen") == gen,
             "generation proof needs the existing record spawn_gen to equal metadata spawn_gen")
 
@@ -387,6 +416,17 @@ fm_launch_proof_bytes_field() { # <bytes> <key>
   printf '%s' "$value"
 }
 
+# The one nonempty value of <key> in <bytes>, as fm_backend_meta_exact_value
+# reads a file: fails unless exactly one <key>= line carries a value.
+fm_launch_proof_bytes_exact_value() { # <bytes> <key>
+  local line value='' count=0
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in "$2="*) count=$((count + 1)); value=${line#*=} ;; esac
+  done <<< "$1"
+  [ "$count" = 1 ] && [ -n "$value" ] || return 1
+  printf '%s' "$value"
+}
+
 fm_launch_proof_record_read() { # <meta>: sets FM_LAUNCH_PROOF_RECORD_PATH, _BYTES, _OK in scope
   local raw
   FM_LAUNCH_PROOF_RECORD_PATH=$1 FM_LAUNCH_PROOF_RECORD_BYTES='' FM_LAUNCH_PROOF_RECORD_OK=0
@@ -409,6 +449,17 @@ fm_launch_proof_field() { # <meta> <key>
     return 0
   fi
   fm_meta_get "$1" "$2"
+}
+
+# A private copy of this decision's bytes of <meta>, for a validator that reads
+# a file, so that validation rests on the same bytes as the rest of the
+# decision (Main 1874 rule S). Prints the copy's path; the caller removes it.
+fm_launch_proof_record_copy() { # <meta>
+  local copy
+  [ "${FM_LAUNCH_PROOF_RECORD_OK-}" = 1 ] && [ "${FM_LAUNCH_PROOF_RECORD_PATH-}" = "$1" ] || return 1
+  copy=$(umask 077; mktemp "${TMPDIR:-/tmp}/fm-launch-record.XXXXXX") || return 1
+  printf '%s' "$FM_LAUNCH_PROOF_RECORD_BYTES" > "$copy" || { rm -f -- "$copy"; return 1; }
+  printf '%s' "$copy"
 }
 
 # Whether <meta> still holds exactly this decision's bytes. Prints nothing.
@@ -543,22 +594,36 @@ fm_launch_proof_claim_states() { # <meta>
 # Whether <state-dir> holds a local task record other than <self-meta> that
 # claims this pane (by window, or by Herdr session and pane id), this home or
 # worktree, or a worktree at least as deep around <cwd>. Paths compare
-# physically. Returns 0 with no claim, 1 printing the claiming record, 2
+# physically. Returns 0 with no claim, printing the state directory of each
+# local secondmate home a record there names (one per line, from the same read
+# that judged the record, Main 1874 rule S); 1 printing the claiming record; 2
 # printing what could not be read: an unreadable directory or record is never
 # "no claim".
 fm_launch_proof_state_claimed() { # <self-meta> <state-dir> <cwd> <home> <root>
-  local self=$1 dir=$2 cwd=$3 home=$4 root=$5 target session pane peer path bytes
+  local self=$1 dir=$2 cwd=$3 home=$4 root=$5 target session pane peer path bytes named homes=''
   target=$(fm_launch_proof_field "$self" window)
   session=${target%%:*}; pane=${target#*:}
   { [ -d "$dir" ] && [ -r "$dir" ] && [ -x "$dir" ]; } || { printf 'the task records at %s' "$dir"; return 2; }
   for peer in "$dir"/*.meta; do
     [ -e "$peer" ] || [ -L "$peer" ] || continue
-    [ ! "$peer" -ef "$self" ] || continue
+    if [ "$peer" -ef "$self" ]; then
+      # The record under judgment names its own home from this decision's bytes.
+      if [ "$(fm_launch_proof_field "$self" kind)" = secondmate ] && [ -z "$(fm_launch_proof_field "$self" remote_host)" ]; then
+        named=$(fm_launch_proof_field "$self" home)
+        [ -z "$named" ] || homes+="$named/state"$'\n'
+      fi
+      continue
+    fi
     # One strict read of each peer (Main 1856 F7): a failed, empty or
-    # NUL-bearing read is unknown, never "no claim".
+    # NUL-bearing read is unknown, never "no claim". The homes it names come
+    # from the same read, so no second read can disagree (Main 1874 rule S).
     bytes=$(fm_launch_proof_bytes "$peer") || { printf 'the task record %s' "$peer"; return 2; }
     bytes=${bytes%x}
     [ -z "$(fm_launch_proof_bytes_field "$bytes" remote_host)" ] || continue
+    if [ "$(fm_launch_proof_bytes_field "$bytes" kind)" = secondmate ]; then
+      named=$(fm_launch_proof_bytes_field "$bytes" home)
+      [ -z "$named" ] || homes+="$named/state"$'\n'
+    fi
     if [ -n "$target" ] && [ "$(fm_launch_proof_bytes_field "$bytes" window)" = "$target" ]; then
       printf '%s' "${peer##*/}"; return 1
     fi
@@ -581,6 +646,7 @@ fm_launch_proof_state_claimed() { # <self-meta> <state-dir> <cwd> <home> <root>
         ;;
     esac
   done
+  printf '%s' "$homes"
   return 0
 }
 
@@ -593,7 +659,7 @@ fm_launch_proof_state_claimed() { # <self-meta> <state-dir> <cwd> <home> <root>
 # with no root walk and no bin/fm-wake-lib.sh. Returns as
 # fm_launch_proof_state_claimed does.
 fm_launch_proof_claims() { # <meta> <cwd> <home> <root>
-  local meta=$1 cwd=$2 home=$3 root=$4 state named inventory dir key peer seen_dir known i=0 rc out bytes
+  local meta=$1 cwd=$2 home=$3 root=$4 state named inventory dir key seen_dir known i=0 rc out
   local -a queue=() seen=()
   state=$(dirname -- "$meta")
   queue=("$state")
@@ -621,17 +687,11 @@ fm_launch_proof_claims() { # <meta> <cwd> <home> <root>
     out=$(fm_launch_proof_state_claimed "$meta" "$dir" "$cwd" "$home" "$root") || rc=$?
     [ "$rc" = 0 ] || { printf '%s' "$out"; return "$rc"; }
     [ -z "${FM_LAUNCH_PROOF_VERB_PATH:-}" ] || continue
-    for peer in "$dir"/*.meta; do
-      [ -f "$peer" ] || continue
-      # The claim scan above already read each peer strictly; a peer that
-      # cannot be read again here is unknown.
-      bytes=$(fm_launch_proof_bytes "$peer") || { printf 'the task record %s' "$peer"; return 2; }
-      bytes=${bytes%x}
-      [ "$(fm_launch_proof_bytes_field "$bytes" kind)" = secondmate ] || continue
-      [ -z "$(fm_launch_proof_bytes_field "$bytes" remote_host)" ] || continue
-      named=$(fm_launch_proof_bytes_field "$bytes" home)
-      [ -z "$named" ] || queue+=("$named/state")
-    done
+    # The secondmate homes come from the claim scan's own read of each record;
+    # no record is read a second time.
+    while IFS= read -r named; do
+      [ -z "$named" ] || queue+=("$named")
+    done <<< "$out"
   done
   return 0
 }
@@ -741,11 +801,18 @@ fm_launch_proof_herdr_judge() { # <meta>
 
 # One recovery inspection from one record read: <legacy 0|1><TAB><pid or
 # empty><TAB><verdict><TAB><cause>, so the caller's legacy branch, its
-# identity and the verdict all rest on the same bytes (Main 1807 (2)).
-fm_launch_proof_recovery_judge() { # <meta>
+# identity and the verdict all rest on the same bytes (Main 1807 (2)). The
+# record must name <expected-endpoint>, the endpoint the caller inspected and
+# will act on (Main 1874 finding 2); otherwise, or with no endpoint named, the
+# inspection is unknown with that cause and never legacy.
+fm_launch_proof_recovery_judge() { # <meta> <expected-endpoint>
   local FM_LAUNCH_PROOF_RECORD_PATH=${FM_LAUNCH_PROOF_RECORD_PATH-} FM_LAUNCH_PROOF_RECORD_BYTES=${FM_LAUNCH_PROOF_RECORD_BYTES-} FM_LAUNCH_PROOF_RECORD_OK=${FM_LAUNCH_PROOF_RECORD_OK-}
   local out pid='' legacy=0 judged FM_LAUNCH_PROOF_LISTED=''
   fm_launch_proof_record_ensure "$1"
+  if [ -z "${2:-}" ] || [ "$(fm_launch_proof_field "$1" window)" != "$2" ]; then
+    printf '0\t\tunknown\tits launch record does not name the endpoint this inspection read (%s)' "${2:-none named}"
+    return
+  fi
   ! fm_launch_proof_record_legacy "$1" || legacy=1
   if out=$(fm_launch_proof_herdr_pid "$1" with-listed); then
     pid=${out%%$'\n'*}
@@ -766,7 +833,7 @@ fm_launch_proof_herdr_verdict() { # <meta> <pid> -> managed|unmanaged|pinned-els
 
 fm_launch_proof_herdr_verdict_judge() { # <meta> <pid>
   local FM_LAUNCH_PROOF_RECORD_PATH=${FM_LAUNCH_PROOF_RECORD_PATH-} FM_LAUNCH_PROOF_RECORD_BYTES=${FM_LAUNCH_PROOF_RECORD_BYTES-} FM_LAUNCH_PROOF_RECORD_OK=${FM_LAUNCH_PROOF_RECORD_OK-}
-  local meta=$1 pid=$2 proof gen verdict record task_file current_file adopted refusal=unmanaged harness table token
+  local meta=$1 pid=$2 proof gen verdict record session_bytes session_sha task_file current_file adopted refusal=unmanaged harness table token
   fm_launch_proof_record_ensure "$meta"
   proof=$(fm_launch_proof_record_proof "$meta") \
     || { printf 'unknown\t%s' "$FM_LAUNCH_PROOF_RECORD_CAUSE"; return; }
@@ -803,11 +870,15 @@ fm_launch_proof_herdr_verdict_judge() { # <meta> <pid>
   [ "$verdict" != managed ] || [ "$proof" != env-v1 ] || token=1
   if [ "$harness" = omp ]; then
     # A current activation for this live PID is mandatory, even after adoption.
-    record=$(jq -ec --arg gen "$gen" --argjson pid "$pid" '
+    # The session record is read once (Main 1874 rule S): the adoption proof
+    # gets the digest of these bytes and refuses any other.
+    session_bytes=$(fm_launch_proof_bytes "${meta%.meta}.omp-session.json") \
+      || { printf '%s\t' "$refusal"; return; }
+    session_bytes=${session_bytes%x}
+    record=$(printf '%s' "$session_bytes" | jq -ec --arg gen "$gen" --argjson pid "$pid" '
       select(.version == 1 and .spawn_gen == $gen and .pid == $pid)
       | select(all(.task_session_file, .current_session_file;
-          type == "string" and startswith("/") and (explode | all(. >= 32))))' \
-      "${meta%.meta}.omp-session.json" 2>/dev/null) \
+          type == "string" and startswith("/") and (explode | all(. >= 32))))' 2>/dev/null) \
       || { printf '%s\t' "$refusal"; return; }
     task_file=$(printf '%s' "$record" | jq -r '.task_session_file')
     current_file=$(printf '%s' "$record" | jq -r '.current_session_file')
@@ -819,10 +890,13 @@ fm_launch_proof_herdr_verdict_judge() { # <meta> <pid>
     if [ "$verdict" = unmanaged ]; then
       # Adoption is a second authorization route, not a relaxed environment
       # comparison. A valid record alone still cannot license lifecycle input.
-      adopted=$(FM_LAUNCH_PROOF_EXPECTED_RECORD_SHA256=$(printf '%s' "$FM_LAUNCH_PROOF_RECORD_BYTES" | shasum -a 256 | cut -d' ' -f1) \
-        fm_launch_proof_omp_adoption "$meta" 2>/dev/null) \
+      # The adoption proof rests on this decision's task record bytes (in scope)
+      # and on the session record bytes read above; it refuses any other.
+      session_sha=$(set -o pipefail; printf '%s' "$session_bytes" | shasum -a 256 | cut -d' ' -f1) && [ -n "$session_sha" ] \
         || { printf '%s\t' "$refusal"; return; }
-      # The adoption proof reads the record again: it must be the same bytes.
+      adopted=$(FM_LAUNCH_PROOF_EXPECTED_SESSION_SHA256=$session_sha fm_launch_proof_omp_adoption "$meta" 2>/dev/null) \
+        || { printf '%s\t' "$refusal"; return; }
+      # The record must still hold those bytes after the proof.
       fm_launch_proof_record_unchanged "$meta" \
         || { printf 'unknown\t%s' "$FM_LAUNCH_PROOF_RECORD_CAUSE"; return; }
       [ "$(printf '%s' "$adopted" | jq -r '.pid')" = "$pid" ] \
@@ -882,15 +956,22 @@ fm_launch_proof_refusal_next() { # <unmanaged|pinned-elsewhere|contested|unknown
 # before launch proofs existed) has no pin to compare; any present value other
 # than a known proof, and a record that cannot be read as one record with at
 # most one launch_proof, refuses. The record and the verdict are each read
-# exactly once.
-fm_launch_proof_herdr_refusal() { # <meta> [<expected-endpoint>]
+# exactly once. <expected-endpoint> is mandatory (Main 1874 finding 2): it is
+# the endpoint the caller will act on, and the record this decision read must
+# name exactly it, so a proof is never of one endpoint while the caller keeps
+# another; a call without it refuses.
+fm_launch_proof_herdr_refusal() { # <meta> <expected-endpoint>
   local FM_LAUNCH_PROOF_RECORD_PATH=${FM_LAUNCH_PROOF_RECORD_PATH-} FM_LAUNCH_PROOF_RECORD_BYTES=${FM_LAUNCH_PROOF_RECORD_BYTES-} FM_LAUNCH_PROOF_RECORD_OK=${FM_LAUNCH_PROOF_RECORD_OK-}
   local proof judged verdict harness
+  if [ -z "${2:-}" ]; then
+    printf 'no endpoint was named to bind the launch proof to, so nothing proves the agent the action would reach; refusing'
+    return 1
+  fi
   fm_launch_proof_record_ensure "$1"
   harness=$(fm_launch_proof_field "$1" harness)
   # The proof is of the endpoint the action targets (Main 1856 F2): the record
   # this decision read must name exactly that endpoint.
-  if [ -n "${2:-}" ] && [ "$(fm_launch_proof_field "$1" window)" != "$2" ]; then
+  if [ "$(fm_launch_proof_field "$1" window)" != "$2" ]; then
     printf 'its launch record no longer names the endpoint this action targets (%s); refusing; retry once the record is settled, or decide the lane by hand' "$2"
     return 1
   fi
@@ -909,6 +990,6 @@ fm_launch_proof_herdr_refusal() { # <meta> [<expected-endpoint>]
   return 1
 }
 
-fm_launch_proof_herdr_authorizes() { # <meta> [<expected-endpoint>]
+fm_launch_proof_herdr_authorizes() { # <meta> <expected-endpoint>
   fm_launch_proof_herdr_refusal "$@" >/dev/null
 }

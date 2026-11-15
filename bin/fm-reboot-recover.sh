@@ -130,7 +130,7 @@ for ((offset=0; offset<count && (ONE == 0 || selected == 0); offset++)); do
   born=''
   # One record read decides the legacy branch, the attributed PID and the
   # verdict (Main 1807 (2)).
-  judged=$(fm_launch_proof_recovery_judge "$meta")
+  judged=$(fm_launch_proof_recovery_judge "$meta" "$target")
   legacy=${judged%%$'\t'*}; judged=${judged#*$'\t'}
   pid=${judged%%$'\t'*}; judged=${judged#*$'\t'}
   proof=${judged%%$'\t'*}

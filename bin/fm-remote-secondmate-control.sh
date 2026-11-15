@@ -397,8 +397,15 @@ cmd_stay() {
     "$SCRIPT_DIR/fm-control.sh" "$id" stay
 }
 
+# The exact bytes of a task record (bin/fm-launch-proof-lib.sh owns the reader:
+# a failed, empty or NUL-bearing read fails), read in a separate process.
+record_snapshot() { # <meta>
+  # shellcheck disable=SC2016 # the script expands in the child shell
+  bash -c '. "$1/fm-launch-proof-lib.sh" >/dev/null 2>&1 && fm_launch_proof_bytes "$2"' _ "$SCRIPT_DIR" "$1"
+}
+
 cmd_send() {
-  local id=$1 message=$2 delivery_mode='' expected='' arg rec ring_rc=0 meta meta_lock decision
+  local id=$1 message=$2 delivery_mode='' expected='' arg rec ring_rc=0 meta meta_lock decision snapshot=''
   shift 2
   validate_id "$id"
   # An expected target (Main 1714 (c)) binds this delivery to the endpoint the
@@ -428,9 +435,14 @@ cmd_send() {
   # The agent now at that endpoint must still be this task's own (Main 1856
   # F4): the same host decision the parent asked for, read again right before
   # the record is written, refuses a replaced agent at an unchanged address.
+  # One endpoint snapshot binds the check, the write and the doorbell (Main
+  # 1874 rule S and (i)): the record's bytes before and after the decision
+  # must be equal.
   if [ -n "$expected" ]; then
+    snapshot=$(record_snapshot "$meta") || snapshot=''
     decision=$(cmd_attribution "$id" "$expected")
-    if [ "$decision" != attribution=proceed ]; then
+    if [ -z "$snapshot" ] || [ "$decision" != attribution=proceed ] \
+      || [ "$(record_snapshot "$meta" || true)" != "$snapshot" ]; then
       fm_lock_release "$meta_lock"
       die "the agent at this host's endpoint for $id is no longer attributed to this task (${decision#attribution=refuse: }); refusing before the record is written"
       # shellcheck disable=SC2317 # die exits; this stops a stand-in die that returns
@@ -459,6 +471,17 @@ cmd_send() {
       return 0
       ;;
   esac
+  # The doorbell rings only while that snapshot holds: the same record bytes
+  # and the same decision, read again now. Otherwise the steer stays in the
+  # inbox for the next agent that reads it, and the ring is withheld.
+  if [ -n "$expected" ]; then
+    if [ "$(record_snapshot "$meta" || true)" != "$snapshot" ] \
+      || [ "$(cmd_attribution "$id" "$expected")" != attribution=proceed ] \
+      || [ "$(record_snapshot "$meta" || true)" != "$snapshot" ]; then
+      printf 'notice: doorbell withheld: the record or the agent at %s is no longer the one this steer was checked against, so the pane was not rung; the steer stays durably recorded at %s for the next agent that reads its inbox\n' "$REMOTE_ENDPOINT_TARGET" "$rec" >&2
+      return 0
+    fi
+  fi
   fm_task_inbox_ring "$REMOTE_ENDPOINT_BACKEND" "$REMOTE_ENDPOINT_TARGET" "$rec" "fm-$id" || ring_rc=$?
   case "$ring_rc" in
     1) printf 'notice: doorbell skipped (composer holds pending text or identified draft risk); the steer is durably recorded at %s\n' "$rec" >&2 ;;

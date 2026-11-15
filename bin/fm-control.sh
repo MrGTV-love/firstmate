@@ -2680,7 +2680,7 @@ do_relaunch() {
       *) die "launch recovery for $ID cannot attribute its endpoint (agent=$state)" ;;
     esac
     # One record read decides the legacy branch and the verdict (Main 1807 (2)).
-    judged=$(fm_launch_proof_recovery_judge "$META")
+    judged=$(fm_launch_proof_recovery_judge "$META" "$T")
     legacy=${judged%%$'\t'*}; judged=${judged#*$'\t'}; judged=${judged#*$'\t'}
     state=${judged%%$'\t'*}
     detail=${judged#*$'\t'}

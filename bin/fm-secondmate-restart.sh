@@ -378,8 +378,14 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
   if ! send_out=$(env "${route_env[@]+"${route_env[@]}"}" FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
     FM_PENDING_REPLY_EXISTING_CORR="$corr" \
     "$SCRIPT_DIR/fm-send.sh" "$id" "$FM_SECONDMATE_PERSIST_REQUEST" 2>&1); then
-    fm_pending_reply_discard_undelivered "$STATE" "$corr" >/dev/null 2>&1 || true
-    REASON[i]="the request to write down its open work could not be delivered: $(first_reported_line "$send_out")"
+    # A refused or failed send is this mate's final outcome for the pass (Main
+    # 1860, Main 1874 finding 6): it is refused, phase B sends it nothing, and a
+    # pending-reply record that cannot be discarded is reported, never hidden.
+    PLAN[i]="refused"
+    REASON[i]="the request to write down its open work was not delivered, so nothing else was sent to it: $(first_reported_line "$send_out")"
+    if ! discard_out=$(fm_pending_reply_discard_undelivered "$STATE" "$corr" 2>&1); then
+      REASON[i]="${REASON[i]}; its pending-reply record $corr could not be discarded (it is marked delivered or could not be removed${discard_out:+: $(first_reported_line "$discard_out")}), so Main inspects $(fm_pending_reply_path "$STATE" "$corr") by hand"
+    fi
     i=$((i + 1))
     continue
   fi
