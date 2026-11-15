@@ -745,7 +745,7 @@ fm_slot_hidden_work() { fm_slot_probe hidden "$1" 2>&1; }
 # that is a nonempty absolute string with no NUL. One row that fails means the holder of any copy is unknown (Main 1886 N7).
 fm_slot_pool_rows_valid() {
   jq -e 'type == "array" and all(.[]; type == "object" and ((.path // null | type) == "string") and (.path | length > 0)
-    and (.path | startswith("/")) and ((.path | contains(" ")) | not))' <<<"$1" >/dev/null 2>&1
+    and (.path | startswith("/")) and ((.path | contains("\u0000")) | not))' <<<"$1" >/dev/null 2>&1
 }
 
 # The one holder rule. A process with its working directory in the slot, or an lsof row that names a
