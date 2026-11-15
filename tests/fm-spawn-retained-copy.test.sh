@@ -601,16 +601,24 @@ assert_unproved_lease_refusal() {  # <name> <label> <proven|unproven>
   cmp -s "$CASE_DIR/before-state" "$CASE_DIR/pool/treehouse-state.json" || fail "$2: the refusal changed the pool state"
 }
 
+# The stated residual (Main 1790): protected-with-id, an entry on the protected
+# holder's text WITH a lease id and no recovery reason, admits on an unproven
+# provider too, because on an unproven provider nothing in the entry tells a
+# protected holder from an ordinary one (the protected literal is learned only from
+# a proven probe). It needs a proven provider's write followed by a downgrade or a
+# mixed install; the live pools hold 0 of 74 such entries. Its id-less twin
+# (idless-protected) refuses on an unproven provider, and the ordinary control admits.
 test_unproven_provider_admits_only_ordinary_leases() {
   local shape provider name entry out rc expect id=0123456789abcdef0123456789abcdef
   for provider in unproven proven; do
-    for shape in ordinary idless-protected idless-ordinary-holder reason-with-id reason-protected recovered-prefix-with-id \
+    for shape in ordinary protected-with-id idless-protected idless-ordinary-holder reason-with-id reason-protected recovered-prefix-with-id \
         holderless-with-id duplicate-idless duplicate-reason-with-id; do
       name="shape-$provider-$shape"
       make_retained_case "$name"
       add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$SLOT_DIR" "nested-$name"
       case "$shape" in
         ordinary) entry=$(printf ',"leased":true,"lease_holder":"holder","lease_id":"%s"' "$id") ;;
+        protected-with-id) entry=$(printf ',"leased":true,"lease_holder":"%s","lease_id":"%s"' "$PROTECTED_HOLDER" "$id") ;;
         idless-protected|duplicate-idless) entry=$(printf ',"leased":true,"lease_holder":"%s"' "$PROTECTED_HOLDER") ;;
         idless-ordinary-holder) entry=',"leased":true,"lease_holder":"holder"' ;;
         reason-with-id|duplicate-reason-with-id) entry=$(printf ',"leased":true,"lease_holder":"holder","lease_id":"%s","recovery_reason":"state file was corrupt or truncated"' "$id") ;;
@@ -631,7 +639,7 @@ test_unproven_provider_admits_only_ordinary_leases() {
       # the published protected holder; nothing else.
       expect=refuse
       case "$provider/$shape" in
-        */ordinary|proven/idless-protected|proven/reason-protected) expect=admit ;;
+        */ordinary|*/protected-with-id|proven/idless-protected|proven/reason-protected) expect=admit ;;
       esac
       if [ "$expect" = refuse ]; then
         assert_unproved_lease_refusal "$name" "$provider/$shape" "$provider"
