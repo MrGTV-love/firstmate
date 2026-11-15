@@ -484,15 +484,26 @@ test_a_refusal_revert_does_not_check_out_a_branch_that_moved() {
   pass "a revert after a refusal does not check out an owner branch a writer moved onto ignored work"
 }
 
-test_a_refusal_revert_returns_to_an_unchanged_owner_branch() {
+# Main 1823 D-A: a refusal does nothing. The provision step put the copy on the task branch; a refusal leaves it
+# there, with the owner branch where it was, and nothing is switched back.
+test_a_quiet_promotion_refusal_switches_nothing_back() {
   make_branch_slot f2-unchanged
-  printf 'private bytes\n' >"$W_SLOT/notes.local"
   local rc=0 out
   out=$(fm_slot_provision quiet_runner "$W_PROJ" "$W_SLOT" tid fm/tid "$W_DIR/report.json" '' '' scripts 2>&1) || rc=$?
   [ "$rc" != 0 ] || fail "the refused provisioning reported success: $out"
-  [ "$(git -C "$W_SLOT" symbolic-ref -q HEAD)" = refs/heads/old-owner ] || fail "the control revert did not return to the owner branch: $out"
-  grep -q 'private bytes' "$W_SLOT/notes.local" || fail "the ignored bytes changed"
-  pass "a revert after a refusal returns to the owner branch when nothing moved it"
+  [ "$(git -C "$W_SLOT" symbolic-ref -q HEAD)" = refs/heads/fm/tid ] || fail "a refusal switched the copy off the branch the provision step set: $out"
+  pass "a refused provisioning leaves the copy on the branch the provision step set"
+}
+
+test_a_quiet_promotion_refusal_orphans_no_commit() {
+  make_branch_slot f2-orphan
+  local rc=0 base
+  base=$(git -C "$W_SLOT" rev-parse HEAD)
+  fm_slot_provision quiet_runner "$W_PROJ" "$W_SLOT" tid fm/tid "$W_DIR/report.json" '' '' scripts >/dev/null 2>&1 || rc=$?
+  [ "$rc" != 0 ] || fail "the refused provisioning reported success"
+  [ "$(git -C "$W_SLOT" rev-parse refs/heads/old-owner)" = "$base" ] || fail "the owner branch moved"
+  [ "$(git -C "$W_SLOT" rev-parse HEAD)" = "$base" ] || fail "HEAD moved"
+  pass "a refused provisioning leaves the owner branch and the commit where they were"
 }
 
 test_restore_does_not_orphan_a_commit_made_after_preparation() {
@@ -911,24 +922,39 @@ test_a_promotion_refusal_after_a_late_commit_keeps_the_commit() {
 }
 
 # 2. A move refused after the preparation detached a governed copy never calls the changed copy untouched.
-test_a_refused_move_after_preparation_never_calls_a_changed_copy_untouched() {
-  make_branch_slot m2-refused
+# refuse_after_preparation: the copy is proven, prepared (detached from its branch), and git then refuses the move.
+# Sets REFUSE_OUT and REFUSE_RC.
+refuse_after_preparation() {
+  make_branch_slot "$1"
   advance_origin advanced.txt
-  local bin="$W_DIR/refuse" real_git out rc=0 after
+  local bin="$W_DIR/refuse" real_git
   real_git=$(command -v git)
   fm_slot_prove_idle "$W_SLOT" "$W_TARGET" "$W_PROJ" || fail "the proof did not pass"
   fm_slot_prepare_base "$W_PROJ" "$W_SLOT" tid || fail "the preparation failed"
   mkdir -p "$bin"
   printf '#!/bin/sh\ncase " $* " in *" merge --ff-only "*) exit 1 ;; esac\nexec %s "$@"\n' "'$real_git'" >"$bin/git"
   chmod +x "$bin/git"
-  out=$(PATH="$bin:$PATH" fm_slot_apply_move "$W_SLOT" "$W_TARGET" 2>&1) || rc=$?
-  after=$(git -C "$W_SLOT" symbolic-ref -q HEAD || echo detached)
-  if [ "$after" != refs/heads/old-owner ]; then
-    [ "$rc" != 20 ] || fail "a copy this spawn detached was reported as an untouched skip: $out"
-    assert_not_contains "$out" "left untouched" "a detached copy was called untouched"
-    assert_contains "$out" "detached" "the output did not say the copy was detached"
-  fi
-  pass "a refused move after preparation either leaves the branch as found or says plainly that the copy was detached"
+  REFUSE_RC=0
+  REFUSE_OUT=$(PATH="$bin:$PATH" fm_slot_apply_move "$W_SLOT" "$W_TARGET" 2>&1) || REFUSE_RC=$?
+}
+
+# Main 1823 D-A: a refusal runs no recovery checkout and switches no HEAD. The copy stays as the preparation left it.
+test_a_refused_move_after_preparation_leaves_the_copy_as_found() {
+  refuse_after_preparation m2-refused
+  ! git -C "$W_SLOT" symbolic-ref -q HEAD >/dev/null || fail "a refusal switched HEAD back onto a branch: $REFUSE_OUT"
+  pass "a refused move after preparation leaves the copy detached, as the preparation left it"
+}
+
+test_a_refused_move_after_preparation_says_the_copy_stays_detached() {
+  refuse_after_preparation m2-refused-says
+  assert_contains "$REFUSE_OUT" "stays detached" "the output did not say the copy stays detached"
+  pass "a refused move after preparation says the copy stays detached"
+}
+
+test_a_refused_move_after_preparation_never_calls_a_changed_copy_untouched() {
+  refuse_after_preparation m2-refused-untouched
+  assert_not_contains "$REFUSE_OUT" "left untouched" "a copy the preparation detached was called untouched"
+  pass "a copy the preparation detached is never called untouched"
 }
 
 # 3. Tracked work hidden by an index flag, and a late edit inside a submodule, are work.
@@ -945,12 +971,18 @@ test_tracked_work_hidden_by_an_index_flag_skips_the_copy() {
   done
 }
 
-make_submodule_world() { # <name>: a world whose slot has an initialised submodule `sub`; sets W_SUB (its source)
-  local name=$1 subsha
-  W_DIR="$TMP_ROOT/$name"; W_PROJ="$W_DIR/project"; W_SLOT="$W_DIR/slot"; W_SUB="$W_DIR/sub-source"
+make_submodule_world() { # <name> [nested]: a world whose slot has an initialised submodule `sub` (and, with `nested`, an initialised `sub/deep`); sets W_SUB (its source) and W_INNER
+  local name=$1 nested=${2:-} subsha innersha
+  W_DIR="$TMP_ROOT/$name"; W_PROJ="$W_DIR/project"; W_SLOT="$W_DIR/slot"; W_SUB="$W_DIR/sub-source"; W_INNER="$W_DIR/inner-source"
   FM_SLOT_LEFT_HEAD='' FM_SLOT_PREPARE_DETACHED=0 FM_SLOT_PREVIOUS_BRANCH='' FM_SLOT_PREVIOUS_HEAD=''
   mkdir -p "$W_DIR"
-  git init -q -b main "$W_SUB"; printf 'sub base\n' >"$W_SUB/file"; git -C "$W_SUB" add file; git -C "$W_SUB" "${GITID[@]}" commit -qm sub
+  git init -q -b main "$W_SUB"; printf 'sub base\n' >"$W_SUB/file"; git -C "$W_SUB" add file
+  if [ "$nested" = nested ]; then
+    git init -q -b main "$W_INNER"; printf 'inner\n' >"$W_INNER/f"; git -C "$W_INNER" add f; git -C "$W_INNER" "${GITID[@]}" commit -qm inner
+    innersha=$(git -C "$W_INNER" rev-parse HEAD)
+    git -C "$W_SUB" update-index --add --cacheinfo "160000,$innersha,deep"
+  fi
+  git -C "$W_SUB" "${GITID[@]}" commit -qm sub
   subsha=$(git -C "$W_SUB" rev-parse HEAD)
   git init -q -b main "$W_PROJ"; printf 'base\n' >"$W_PROJ/README.md"; git -C "$W_PROJ" add README.md
   git -C "$W_PROJ" update-index --add --cacheinfo "160000,$subsha,sub"
@@ -959,6 +991,11 @@ make_submodule_world() { # <name>: a world whose slot has an initialised submodu
   git -C "$W_PROJ" worktree add -q --detach "$W_SLOT" "$W_BASE"
   mkdir -p "$W_SLOT/sub"; git init -q -b main "$W_SLOT/sub"
   git -C "$W_SLOT/sub" remote add source "$W_SUB"; git -C "$W_SLOT/sub" fetch -q source main; git -C "$W_SLOT/sub" checkout -q --detach "$subsha"
+  if [ "$nested" = nested ]; then
+    mkdir -p "$W_SLOT/sub/deep"; git init -q -b main "$W_SLOT/sub/deep"
+    git -C "$W_SLOT/sub/deep" remote add source "$W_INNER"; git -C "$W_SLOT/sub/deep" fetch -q source main
+    git -C "$W_SLOT/sub/deep" checkout -q --detach "$innersha"
+  fi
   printf 'advance\n' >"$W_PROJ/advanced.txt"; git -C "$W_PROJ" add advanced.txt; git -C "$W_PROJ" "${GITID[@]}" commit -qm advance
   W_TARGET=$(git -C "$W_PROJ" rev-parse HEAD)
 }
@@ -1064,6 +1101,187 @@ test_the_git_call_oracle_flags_every_forced_form() {
   pass "the git-call oracle flags every forced form and none of the safe calls"
 }
 
+# --- Main 1823 (review of eec8922c): D-A a refusal does nothing, D-B every ref exactly, D-E submodule flags -------
+
+# make_attach_world <name>: the slot is detached at S, which dropped notes.local (ignored) that its parent T tracked.
+# Sets A_OLD (T) and A_HEAD (S).
+make_attach_world() {
+  make_world "$1"
+  printf 'tracked bytes\n' >"$W_SLOT/notes.local"
+  git -C "$W_SLOT" add -f notes.local
+  git -C "$W_SLOT" "${GITID[@]}" commit -qm 'track notes.local'
+  A_OLD=$(git -C "$W_SLOT" rev-parse HEAD)
+  git -C "$W_SLOT" rm -q --cached notes.local
+  rm -f "$W_SLOT/notes.local"
+  git -C "$W_SLOT" "${GITID[@]}" commit -qm 'untrack notes.local'
+  A_HEAD=$(git -C "$W_SLOT" rev-parse HEAD)
+}
+
+# attach_with_late_file: a writer drops private bytes at notes.local just before any checkout runs.
+# Sets ATTACH_RC and ATTACH_OUT.
+attach_with_late_file() {
+  local bin="$W_DIR/late-attach" real_git
+  real_git=$(command -v git)
+  mkdir -p "$bin"
+  printf '#!/bin/sh\ncase " $* " in *" checkout "*) printf "private late work\\n" >%s ;; esac\nexec %s "$@"\n' "'$W_SLOT/notes.local'" "'$real_git'" >"$bin/git"
+  chmod +x "$bin/git"
+  ATTACH_RC=0
+  ATTACH_OUT=$(FM_SLOT_LEFT_HEAD=$A_HEAD PATH="$bin:$PATH" fm_slot_attach "$W_SLOT" '' "$A_OLD" 2>&1) || ATTACH_RC=$?
+}
+
+test_attach_never_rewrites_a_late_ignored_file() {
+  make_attach_world a1-bytes
+  attach_with_late_file
+  [ ! -e "$W_SLOT/notes.local" ] || grep -q 'private late work' "$W_SLOT/notes.local" || fail "a checkout replaced the late private bytes: $ATTACH_OUT"
+  pass "a switch back never rewrites a file a writer created after the proof"
+}
+
+test_attach_leaves_head_where_it_was() {
+  make_attach_world a1-head
+  attach_with_late_file
+  [ "$(git -C "$W_SLOT" rev-parse HEAD)" = "$A_HEAD" ] || fail "a switch back moved HEAD off the commit it found: $ATTACH_OUT"
+  pass "a switch back leaves HEAD on the commit it found"
+}
+
+test_attach_reports_failure_instead_of_switching() {
+  make_attach_world a1-rc
+  attach_with_late_file
+  [ "$ATTACH_RC" != 0 ] || fail "a switch back from a commit that is not the target reported success"
+  pass "a switch back from a commit that is not the target fails"
+}
+
+# F5: another actor moved the symbolic HEAD (same commit) between the provision step and the refusal.
+switch_runner() { git -C "$W_SLOT" branch other-owner; git -C "$W_SLOT" symbolic-ref HEAD refs/heads/other-owner; printf '{}\n' >"$2"; return 3; }
+
+test_a_promotion_refusal_leaves_a_moved_symbolic_head_as_found() {
+  make_branch_slot a2-symref
+  fm_slot_provision switch_runner "$W_PROJ" "$W_SLOT" tid fm/tid "$W_DIR/report.json" '' '' scripts >/dev/null 2>&1 || true
+  [ "$(git -C "$W_SLOT" symbolic-ref -q HEAD)" = refs/heads/other-owner ] || fail "a refusal changed the symbolic HEAD another actor had set"
+  pass "a refusal leaves a symbolic HEAD another actor set as it found it"
+}
+
+test_a_promotion_refusal_returns_the_provisioners_code() {
+  make_branch_slot a2-rc
+  local rc=0
+  fm_slot_provision switch_runner "$W_PROJ" "$W_SLOT" tid fm/tid "$W_DIR/report.json" '' '' scripts >/dev/null 2>&1 || rc=$?
+  [ "$rc" = 3 ] || fail "the refusal returned $rc, not the provisioner's 3"
+  pass "a refusal returns the provisioner's code"
+}
+
+# D-B: every ref is compared exactly. The old allow list is set the way the spawn used to set it; it must not matter.
+OLD_ALLOW='refs/remotes/origin/HEAD refs/remotes/origin/main refs/fm/anchor/tid-*'
+
+test_a_rewound_origin_tracking_ref_fails_the_move() {
+  make_world b1-rewind
+  advance_origin advanced.txt
+  local bin="$W_DIR/rewind" real_git out rc=0
+  real_git=$(command -v git)
+  mkdir -p "$bin"
+  printf '#!/bin/sh\ncase " $* " in *" merge --ff-only "*) %s -C %s update-ref refs/remotes/origin/main %s ;; esac\nexec %s "$@"\n' "'$real_git'" "'$W_SLOT'" "$W_BASE" "'$real_git'" >"$bin/git"
+  chmod +x "$bin/git"
+  out=$(FM_SLOT_REF_ALLOW=$OLD_ALLOW PATH="$bin:$PATH" fm_slot_move_forward "$W_SLOT" "$W_TARGET" "$W_PROJ" 2>&1) || rc=$?
+  [ "$rc" != 0 ] || fail "a rewind of origin's tracking ref was admitted: $out"
+  pass "a rewind of an origin tracking ref fails the move"
+}
+
+test_the_failure_for_a_changed_ref_names_the_ref() {
+  make_world b1-names
+  advance_origin advanced.txt
+  local bin="$W_DIR/names" real_git out rc=0
+  real_git=$(command -v git)
+  mkdir -p "$bin"
+  printf '#!/bin/sh\ncase " $* " in *" merge --ff-only "*) %s -C %s update-ref refs/remotes/origin/main %s ;; esac\nexec %s "$@"\n' "'$real_git'" "'$W_SLOT'" "$W_BASE" "'$real_git'" >"$bin/git"
+  chmod +x "$bin/git"
+  out=$(FM_SLOT_REF_ALLOW=$OLD_ALLOW PATH="$bin:$PATH" fm_slot_move_forward "$W_SLOT" "$W_TARGET" "$W_PROJ" 2>&1) || rc=$?
+  assert_contains "$out" "refs/remotes/origin/main" "the failure did not say which ref changed"
+  pass "the failure names the ref that changed"
+}
+
+test_an_origin_ref_advanced_before_a_refused_move_is_not_called_untouched() {
+  make_world b2-skipref
+  advance_origin advanced.txt
+  git -C "$W_PROJ" update-ref refs/remotes/origin/main "$W_BASE"
+  local bin="$W_DIR/refuse-ref" real_git out rc=0
+  real_git=$(command -v git)
+  fm_slot_prove_idle "$W_SLOT" "$W_TARGET" "$W_PROJ" || fail "the proof did not pass"
+  git -C "$W_SLOT" update-ref refs/remotes/origin/main "$W_TARGET"
+  mkdir -p "$bin"
+  printf '#!/bin/sh\ncase " $* " in *" merge --ff-only "*) exit 1 ;; esac\nexec %s "$@"\n' "'$real_git'" >"$bin/git"
+  chmod +x "$bin/git"
+  out=$(FM_SLOT_REF_ALLOW=$OLD_ALLOW PATH="$bin:$PATH" fm_slot_apply_move "$W_SLOT" "$W_TARGET" 2>&1) || rc=$?
+  [ "$rc" = 1 ] || fail "a refused move after a ref changed was not reported as a failure (rc $rc): $out"
+  pass "a refused move after an origin ref changed is a failure, not a skip"
+}
+
+test_an_origin_ref_advanced_before_a_refused_move_does_not_say_untouched() {
+  make_world b2-says
+  advance_origin advanced.txt
+  git -C "$W_PROJ" update-ref refs/remotes/origin/main "$W_BASE"
+  local bin="$W_DIR/refuse-says" real_git out rc=0
+  real_git=$(command -v git)
+  fm_slot_prove_idle "$W_SLOT" "$W_TARGET" "$W_PROJ" || fail "the proof did not pass"
+  git -C "$W_SLOT" update-ref refs/remotes/origin/main "$W_TARGET"
+  mkdir -p "$bin"
+  printf '#!/bin/sh\ncase " $* " in *" merge --ff-only "*) exit 1 ;; esac\nexec %s "$@"\n' "'$real_git'" >"$bin/git"
+  chmod +x "$bin/git"
+  out=$(FM_SLOT_REF_ALLOW=$OLD_ALLOW PATH="$bin:$PATH" fm_slot_apply_move "$W_SLOT" "$W_TARGET" 2>&1) || rc=$?
+  assert_not_contains "$out" "left untouched" "a copy whose refs changed was called untouched"
+  pass "a copy whose refs changed is never called untouched"
+}
+
+# The one ref change a move admits is the exact anchor its own preparation wrote (absent -> the commit it found).
+anchor_world() { # <name>: a governed detached copy, proven and prepared; sets W_TARGET
+  make_world "$1" 1
+  advance_origin advanced.txt
+  fm_slot_prove_idle "$W_SLOT" "$W_TARGET" "$W_PROJ" || fail "the proof did not pass"
+  fm_slot_prepare_base "$W_PROJ" "$W_SLOT" tid || fail "the preparation failed"
+}
+
+test_the_anchor_the_preparation_wrote_is_admitted() {
+  anchor_world b3-anchor-ok
+  local out rc=0
+  out=$(FM_SLOT_REF_ALLOW='refs/fm/anchor/tid-*' fm_slot_apply_move "$W_SLOT" "$W_TARGET" 2>&1) || rc=$?
+  [ "$rc" = 0 ] || fail "the move failed on the anchor its own preparation wrote (rc $rc): $out"
+  pass "a move admits the anchor its own preparation wrote"
+}
+
+test_an_anchor_the_preparation_did_not_write_fails_the_move() {
+  anchor_world b3-anchor-extra
+  local bin="$W_DIR/anchor-extra" real_git out rc=0
+  real_git=$(command -v git)
+  mkdir -p "$bin"
+  printf '#!/bin/sh\ncase " $* " in *" merge --ff-only "*) %s -C %s update-ref refs/fm/anchor/tid-0000000 %s ;; esac\nexec %s "$@"\n' "'$real_git'" "'$W_SLOT'" "$W_BASE" "'$real_git'" >"$bin/git"
+  chmod +x "$bin/git"
+  out=$(FM_SLOT_REF_ALLOW='refs/fm/anchor/tid-*' PATH="$bin:$PATH" fm_slot_apply_move "$W_SLOT" "$W_TARGET" 2>&1) || rc=$?
+  [ "$rc" != 0 ] || fail "an anchor ref other than the one the preparation wrote was admitted: $out"
+  pass "an anchor ref the preparation did not write fails the move"
+}
+
+# D-E: any initialized submodule with an index flag (assume-unchanged, skip-worktree) is doubt, whatever its files hold.
+test_an_assume_unchanged_flag_inside_a_submodule_skips_the_copy() {
+  make_submodule_world e1-assume
+  git -C "$W_SLOT/sub" update-index --assume-unchanged file
+  expect_skip "an assume-unchanged flag inside a submodule skips the copy" dirty_tree
+}
+
+test_a_skip_worktree_flag_inside_a_submodule_skips_the_copy() {
+  make_submodule_world e1-skipwt
+  git -C "$W_SLOT/sub" update-index --skip-worktree file
+  expect_skip "a skip-worktree flag inside a submodule skips the copy" dirty_tree
+}
+
+test_an_index_flag_on_the_submodule_entry_of_the_parent_skips_the_copy() {
+  make_submodule_world e1-gitlink
+  git -C "$W_SLOT" update-index --assume-unchanged sub
+  expect_skip "an index flag on a submodule entry skips the copy" dirty_tree
+}
+
+test_an_index_flag_inside_a_nested_submodule_skips_the_copy() {
+  make_submodule_world e1-nested nested
+  git -C "$W_SLOT/sub/deep" update-index --assume-unchanged f
+  expect_skip "an index flag inside a nested submodule skips the copy" dirty_tree
+}
+
 CASES=(
   test_control_clean_slot_behind_the_target_moves
   test_detached_extra_commit_is_skipped
@@ -1093,7 +1311,8 @@ CASES=(
   test_an_ignored_directory_keeps_its_classifier_context
   test_an_archive_that_is_an_alias_of_the_ignored_file_does_not_excuse_the_collision
   test_a_refusal_revert_does_not_check_out_a_branch_that_moved
-  test_a_refusal_revert_returns_to_an_unchanged_owner_branch
+  test_a_quiet_promotion_refusal_switches_nothing_back
+  test_a_quiet_promotion_refusal_orphans_no_commit
   test_restore_does_not_orphan_a_commit_made_after_preparation
   test_a_checkout_hook_cannot_change_a_slot_during_preparation
   test_a_merge_hook_does_not_run_during_the_move
@@ -1118,10 +1337,27 @@ CASES=(
   test_a_refusal_revert_with_no_recorded_left_commit_keeps_a_detached_commit
   test_a_refusal_revert_leaves_head_alone_when_the_branch_moved
   test_a_promotion_refusal_ignores_a_stale_left_commit
+  test_a_refused_move_after_preparation_leaves_the_copy_as_found
+  test_a_refused_move_after_preparation_says_the_copy_stays_detached
   test_a_refused_move_after_preparation_never_calls_a_changed_copy_untouched
   test_tracked_work_hidden_by_an_index_flag_skips_the_copy
   test_a_late_edit_inside_a_submodule_fails_the_move
   test_a_move_that_changes_a_submodule_pin_is_not_called_dirty
+  test_attach_never_rewrites_a_late_ignored_file
+  test_attach_leaves_head_where_it_was
+  test_attach_reports_failure_instead_of_switching
+  test_a_promotion_refusal_leaves_a_moved_symbolic_head_as_found
+  test_a_promotion_refusal_returns_the_provisioners_code
+  test_a_rewound_origin_tracking_ref_fails_the_move
+  test_the_failure_for_a_changed_ref_names_the_ref
+  test_an_origin_ref_advanced_before_a_refused_move_is_not_called_untouched
+  test_an_origin_ref_advanced_before_a_refused_move_does_not_say_untouched
+  test_the_anchor_the_preparation_wrote_is_admitted
+  test_an_anchor_the_preparation_did_not_write_fails_the_move
+  test_an_assume_unchanged_flag_inside_a_submodule_skips_the_copy
+  test_a_skip_worktree_flag_inside_a_submodule_skips_the_copy
+  test_an_index_flag_on_the_submodule_entry_of_the_parent_skips_the_copy
+  test_an_index_flag_inside_a_nested_submodule_skips_the_copy
   test_a_ref_that_changes_after_the_proof_fails_the_move
   test_a_move_that_ends_elsewhere_than_the_target_fails
   test_the_changed_bytes_witness_fails_when_a_snapshot_cannot_be_taken

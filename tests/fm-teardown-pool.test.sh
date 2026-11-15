@@ -3651,6 +3651,72 @@ SH
   pass "teardown keeps a skipped copy that is only anchored, and one holding ignored work"
 }
 
+# Main 1823 D-C: unknown is never "none". A holder inventory that is missing, null or not a list, or a pool listing
+# with a row that cannot be read, leaves every skipped copy leased and its record in place.
+# skipped_unknown_custody_case <label> <processes-json | OMIT> [<extra-row-json>]: one clean, landed copy whose pool
+# row carries the given processes field. Sets CASE_DIR_X, LOG_X, REC_X and CANON_X; teardown has run.
+skipped_unknown_custody_case() {
+  local label=$1 processes=$2 extra=${3:-} rc=0 row
+  CASE_DIR_X=$(make_case "$label")
+  write_meta "$CASE_DIR_X" no-mistakes ship
+  mkdir -p "$CASE_DIR_X/data/task-x1"
+  git -C "$CASE_DIR_X/project" worktree add -q --detach "$CASE_DIR_X/skip-copy" main
+  CANON_X=$(cd "$CASE_DIR_X/skip-copy" && pwd -P)
+  LOG_X="$CASE_DIR_X/treehouse.log"
+  REC_X="$CASE_DIR_X/data/task-x1/skipped-copies.tsv"
+  : > "$LOG_X"
+  printf '%s\tskipped\tfirstmate-skipped:task-x1\t1\n' "$CASE_DIR_X/skip-copy" > "$REC_X"
+  row="{\"path\": \"$CANON_X\", \"lease_holder\": \"firstmate-skipped:task-x1\""
+  [ "$processes" = OMIT ] || row="$row, \"processes\": $processes"
+  row="$row}"
+  printf '[%s%s]\n' "$row" "${extra:+,$extra}" > "$CASE_DIR_X/pool.json"
+  cat > "$CASE_DIR_X/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> '$LOG_X'
+case "\${1:-}" in status) cat '$CASE_DIR_X/pool.json' ;; esac
+exit 0
+SH
+  chmod +x "$CASE_DIR_X/fakebin/treehouse"
+  run_teardown "$CASE_DIR_X" > "$CASE_DIR_X/stdout" 2> "$CASE_DIR_X/stderr" || rc=$?
+  expect_code 0 "$rc" "$label: teardown should complete"$'\n'"$(cat "$CASE_DIR_X/stderr")"
+}
+
+assert_skipped_copy_kept() { # <label>: not returned, record still there
+  ! grep -Fq "return $CANON_X" "$LOG_X" || fail "$1: the copy was released on an inventory that does not say nobody is in it"
+  grep -Fq "$CASE_DIR_X/skip-copy" "$REC_X" 2>/dev/null || fail "$1: the copy's record was dropped"
+}
+
+test_a_skipped_copy_whose_pool_row_has_no_process_list_stays_leased() {
+  skipped_unknown_custody_case unknown-missing OMIT
+  assert_skipped_copy_kept unknown-missing
+  pass "a pool row with no processes field keeps the skipped copy leased and recorded"
+}
+
+test_a_skipped_copy_whose_process_list_is_null_stays_leased() {
+  skipped_unknown_custody_case unknown-null null
+  assert_skipped_copy_kept unknown-null
+  pass "a null processes field keeps the skipped copy leased and recorded"
+}
+
+test_a_skipped_copy_whose_process_list_is_an_object_stays_leased() {
+  skipped_unknown_custody_case unknown-object '{}'
+  assert_skipped_copy_kept unknown-object
+  pass "a processes field that is not a list keeps the skipped copy leased and recorded"
+}
+
+test_a_skipped_copy_stays_leased_when_another_pool_row_has_no_path() {
+  skipped_unknown_custody_case unknown-pathless '[]' '{"lease_holder": "someone"}'
+  assert_skipped_copy_kept unknown-pathless
+  pass "a pool listing with a row that has no path keeps every skipped copy leased and recorded"
+}
+
+# The control for the four cases above: an explicit empty list is the one thing that says nobody is in the copy.
+test_a_skipped_copy_with_an_explicit_empty_process_list_is_released() {
+  skipped_unknown_custody_case unknown-control '[]'
+  grep -Fq "return $CANON_X --if-lease-holder firstmate-skipped:task-x1" "$LOG_X" || fail "unknown-control: a clean, landed copy with an explicit empty process list was not released"$'\n'"$(cat "$CASE_DIR_X/stderr")"
+  pass "an explicit empty process list still releases a clean, landed skipped copy"
+}
+
 teardown_test_cases=(
 test_vernant_slot_manifest_retirement
 test_shared_project_lock_path_ignores_unresolvable_git_directory_in_cwd
@@ -3719,6 +3785,11 @@ test_tasktmp_preserves_reassociated_copy_git_storage
 test_subordinate_slot_cleanup_preserves_ancestor_custody
 test_skipped_copies_are_released_only_when_clean_and_landed
 test_skipped_copies_with_an_anchor_or_ignored_work_are_kept
+test_a_skipped_copy_whose_pool_row_has_no_process_list_stays_leased
+test_a_skipped_copy_whose_process_list_is_null_stays_leased
+test_a_skipped_copy_whose_process_list_is_an_object_stays_leased
+test_a_skipped_copy_stays_leased_when_another_pool_row_has_no_path
+test_a_skipped_copy_with_an_explicit_empty_process_list_is_released
 )
 
 # In the combined tests/fm-teardown.test.sh run,

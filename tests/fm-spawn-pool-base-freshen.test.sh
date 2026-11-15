@@ -80,6 +80,24 @@ mkdir() {
   fi
   command mkdir "$@"
 }
+# A clock jump at the moment a copy is about to be accepted: the spawn's own DEBUG hook sets SECONDS to
+# <spawn start> + FM_TEST_JUMP_AT_ACCEPT on the second pass over the line that reads the accepted copy's real path
+# (the pass that would accept it). Nothing in the spawn is changed to make this possible.
+__fm_accept_seen=0
+__fm_clock_jump() {
+  case "$BASH_COMMAND" in
+    'p_real=$(real_path_or_raw "$p")')
+      __fm_accept_seen=$((__fm_accept_seen + 1))
+      if [ "$__fm_accept_seen" = 2 ] && [ -n "${SPAWN_ACQUIRE_T0:-}" ]; then
+        SECONDS=$((SPAWN_ACQUIRE_T0 + FM_TEST_JUMP_AT_ACCEPT))
+      fi ;;
+  esac
+  return 0
+}
+if [ -n "${FM_TEST_JUMP_AT_ACCEPT:-}" ]; then
+  set -T
+  trap '__fm_clock_jump' DEBUG
+fi
 SH
 
 run_spawn_skipping() {
@@ -1666,25 +1684,43 @@ slot_digest() {
 
 # The refs a spawn may change while it works in ANOTHER copy: origin's default tracking ref and origin/HEAD (Main 003).
 # New refs (the task's own branch, anchors) may appear. Nothing else that existed before may differ or vanish.
-DIGEST_REF_ALLOWED='^refs/remotes/origin/(HEAD|main) '
 
 # assert_digest_unchanged <slot> <before-digest> <message>: the copy reads back as it did, and every ref that existed
 # still has the same value, but for the two allowed ones.
+# assert_digest_unchanged <slot> <before-digest> <label> [<ref>=<sha>...]: the digest now equals <before-digest> in HEAD,
+# the branch, the index and every file, and the SET of refs is identical in both directions (a ref that is new, gone or
+# moved fails). The only exception is a ref named as <ref>=<sha>, which may be created or moved, and only to exactly <sha>.
 assert_digest_unchanged() {
-  local after b_plain a_plain b_refs a_refs line
-  after=$(slot_digest "$1") || fail "$3 (the slot could not be read)"
-  b_plain=$(printf '%s\n' "$2" | awk '/^REFS$/{skip=1} !skip{print} /^ENDREFS$/{skip=0}')
+  local slot=$1 before=$2 label=$3 after b_plain a_plain b_refs a_refs why
+  shift 3
+  after=$(slot_digest "$slot") || fail "$label (the slot could not be read)"
+  b_plain=$(printf '%s\n' "$before" | awk '/^REFS$/{skip=1} !skip{print} /^ENDREFS$/{skip=0}')
   a_plain=$(printf '%s\n' "$after" | awk '/^REFS$/{skip=1} !skip{print} /^ENDREFS$/{skip=0}')
-  [ "$b_plain" = "$a_plain" ] || fail "$3"
-  b_refs=$(printf '%s\n' "$2" | awk '/^REFS$/{on=1;next} /^ENDREFS$/{on=0} on')
+  [ "$b_plain" = "$a_plain" ] || fail "$label"
+  b_refs=$(printf '%s\n' "$before" | awk '/^REFS$/{on=1;next} /^ENDREFS$/{on=0} on')
   a_refs=$(printf '%s\n' "$after" | awk '/^REFS$/{on=1;next} /^ENDREFS$/{on=0} on')
-  while IFS= read -r line; do
-    [ -n "$line" ] || continue
-    if printf '%s\n' "$line" | grep -Eq "$DIGEST_REF_ALLOWED"; then continue; fi
-    printf '%s\n' "$a_refs" | grep -Fxq -- "$line" || fail "$3 (ref changed or removed: ${line% *})"
-  done <<EOF
-$b_refs
-EOF
+  why=$(python3 - "$b_refs" "$a_refs" "$@" <<'PY'
+import sys
+def parse(text):
+    out = {}
+    for line in text.splitlines():
+        if line.strip():
+            name, _, sha = line.rpartition(" ")
+            out[name] = sha
+    return out
+before, after = parse(sys.argv[1]), parse(sys.argv[2])
+allowed = dict(spec.split("=", 1) for spec in sys.argv[3:])
+bad = []
+for name in sorted(set(before) | set(after)):
+    if before.get(name) == after.get(name):
+        continue
+    if name in allowed and after.get(name) == allowed[name]:
+        continue
+    bad.append("%s: %s -> %s" % (name, before.get(name, "absent"), after.get(name, "absent")))
+print("; ".join(bad))
+sys.exit(1 if bad else 0)
+PY
+  ) || fail "$label (the ref set changed: $why)"
 }
 
 # assert_no_launch <launch-log>: no harness was launched (the fake launcher logs each launch).
@@ -1947,14 +1983,53 @@ test_slot_digest_sees_another_tasks_branch_move() {
   next=$(git -C "$POOL_DIR" rev-parse origin/main)
   git -C "$POOL_DIR" branch -q fm/other "$first"
   before=$(slot_digest "$POOL_DIR") || fail "the slot could not be read"
-  # control: a new ref and a move of origin's default tracking ref are allowed
-  git -C "$POOL_DIR" branch -q fm/new "$first"
-  git -C "$POOL_DIR" update-ref refs/remotes/origin/main "$first"
-  (assert_digest_unchanged "$POOL_DIR" "$before" "control") >/dev/null 2>&1 || fail "a new branch or the allowed tracking-ref move was refused"
   git -C "$POOL_DIR" update-ref refs/heads/fm/other "$next"
   (assert_digest_unchanged "$POOL_DIR" "$before" "foreign branch moved") >/dev/null 2>&1 || rc=$?
   [ "$rc" != 0 ] || fail "a move of another task's fm/ branch was accepted"
-  pass "the slot check sees another task's fm/ branch move and allows a new ref and the origin default moving"
+  pass "the slot check sees another task's fm/ branch move"
+}
+
+# Main 1823 D-B / F8: the digest compares the ref SET in both directions.
+test_slot_digest_sees_a_new_foreign_ref() {
+  local id first before rc=0
+  id='pool-digest-new-ref'
+  make_skip_case digest-new-ref "$id" 1
+  first=$(git -C "$POOL_DIR" rev-parse HEAD)
+  before=$(slot_digest "$POOL_DIR") || fail "the slot could not be read"
+  git -C "$POOL_DIR" update-ref refs/review/foreign "$first"
+  (assert_digest_unchanged "$POOL_DIR" "$before" "new foreign ref") >/dev/null 2>&1 || rc=$?
+  [ "$rc" != 0 ] || fail "a ref that did not exist before was accepted"
+  pass "the slot check sees a ref that is new"
+}
+
+test_slot_digest_sees_a_removed_ref() {
+  local id first before rc=0
+  id='pool-digest-gone-ref'
+  make_skip_case digest-gone-ref "$id" 1
+  first=$(git -C "$POOL_DIR" rev-parse HEAD)
+  git -C "$POOL_DIR" update-ref refs/review/foreign "$first"
+  before=$(slot_digest "$POOL_DIR") || fail "the slot could not be read"
+  git -C "$POOL_DIR" update-ref -d refs/review/foreign
+  (assert_digest_unchanged "$POOL_DIR" "$before" "removed ref") >/dev/null 2>&1 || rc=$?
+  [ "$rc" != 0 ] || fail "a ref that was removed was accepted"
+  pass "the slot check sees a ref that is gone"
+}
+
+# The control for the two tests above: a ref named with its exact new value is the one change that is allowed.
+test_slot_digest_accepts_only_the_named_ref_change() {
+  local id first next before rc=0
+  id='pool-digest-named-ref'
+  make_skip_case digest-named-ref "$id" 1
+  git -C "$POOL_DIR" fetch --quiet origin
+  first=$(git -C "$POOL_DIR" rev-parse HEAD)
+  next=$(git -C "$POOL_DIR" rev-parse origin/main)
+  before=$(slot_digest "$POOL_DIR") || fail "the slot could not be read"
+  git -C "$POOL_DIR" update-ref refs/review/named "$first"
+  (assert_digest_unchanged "$POOL_DIR" "$before" "named ref" "refs/review/named=$first") >/dev/null 2>&1 || fail "the named ref change was refused"
+  git -C "$POOL_DIR" update-ref refs/review/named "$next"
+  (assert_digest_unchanged "$POOL_DIR" "$before" "named ref, other value" "refs/review/named=$first") >/dev/null 2>&1 || rc=$?
+  [ "$rc" != 0 ] || fail "the named ref was accepted at a value other than the one named"
+  pass "the slot check accepts a named ref only at its named value"
 }
 
 test_slot_digest_sees_a_symlink_retarget() {
@@ -2039,12 +2114,66 @@ test_the_bound_is_checked_before_a_copy_is_accepted() {
   pass "the absolute bound is enforced before a copy is accepted"
 }
 
+# Main 1823 D-D / F6: the bound is read again immediately before the copy is accepted. The clock jumps to the very
+# second the bound ends (1800 of 1800) at the moment the second agreeing read would accept the copy.
+test_the_bound_is_rechecked_just_before_a_copy_is_accepted() {
+  local rec id out status
+  id='pool-bound-at-accept'
+  rec=$(make_case bound-at-accept "$id")
+  read_case_record "$rec"
+  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_JUMP_AT_ACCEPT=1800 BASH_ENV="$SKIP_CLOCK" run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  [ "$status" -ne 0 ] || fail "spawn accepted a copy at the second the absolute bound ended"$'\n'"$out"
+  pass "the absolute bound is enforced at the moment a copy would be accepted"
+}
+
+test_the_bound_refusal_at_accept_launches_nothing() {
+  local rec id out
+  id='pool-bound-at-accept-none'
+  rec=$(make_case bound-at-accept-none "$id")
+  read_case_record "$rec"
+  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_JUMP_AT_ACCEPT=1800 BASH_ENV="$SKIP_CLOCK" run_spawn "$id" --mode no-mistakes --yolo off) || true
+  assert_no_launch "$CASE_DIR/launch.log"
+  pass "no harness is launched when the bound ends as a copy would be accepted"
+}
+
+# The control: ten seconds inside the bound, the same copy is accepted and launched.
+test_a_copy_accepted_inside_the_bound_is_launched() {
+  local rec id out
+  id='pool-bound-inside'
+  rec=$(make_case bound-inside "$id")
+  read_case_record "$rec"
+  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_JUMP_AT_ACCEPT=1790 BASH_ENV="$SKIP_CLOCK" run_spawn "$id" --mode no-mistakes --yolo off) || fail "the spawn failed inside the bound"$'\n'"$out"
+  [ -s "$CASE_DIR/launch.log" ] || fail "no harness was launched for a copy accepted inside the bound"$'\n'"$out"
+  pass "a copy accepted inside the bound is launched"
+}
+
+# Main 1823 D-B / F3: git refuses the move. A refused move writes no ref anywhere: the origin tracking refs this spawn
+# resolved are recorded only after a move that succeeded.
+test_a_refused_move_leaves_every_ref_unchanged() {
+  local id real_git before
+  id='pool-refused-refs'
+  make_skip_case refused-refs "$id" 1
+  real_git=$(command -v git)
+  cat > "$FAKEBIN_DIR/git" <<SH
+#!/usr/bin/env bash
+case " \$* " in *' merge --ff-only '*) exit 1 ;; esac
+exec '$real_git' "\$@"
+SH
+  chmod +x "$FAKEBIN_DIR/git"
+  before=$(slot_digest "$POOL_DIR") || fail "the slot could not be read before the spawn"
+  FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" run_spawn_skipping "$id" --mode no-mistakes --yolo off >/dev/null 2>&1 || true
+  assert_digest_unchanged "$POOL_DIR" "$before" "a refused move changed a ref"
+  pass "a refused move leaves every ref as it found it"
+}
+
 # 2 (spawn level). A governed copy that git refuses to move after the preparation detached it is not reported as
 # untouched: its branch is as found, or the output says it was detached.
-test_a_governed_refusal_after_preparation_keeps_the_branch_or_says_it_was_detached() {
-  local id out status real_git after
-  id='pool-governed-refused-after-prep'
-  make_governed_skip_case governed-refused-prep "$id"
+# Main 1823 D-A: git refuses the move after the preparation detached a governed copy. The refusal runs no checkout and
+# switches no HEAD: the copy stays detached, its branch is where it was, and the output says so instead of "untouched".
+refuse_governed_after_preparation() { # <name> <id>; sets GOV_OUT
+  local name=$1 id=$2 real_git
+  make_governed_skip_case "$name" "$id"
   git -C "${SKIP_SLOTS[0]}" checkout --quiet -b previous-owner
   real_git=$(command -v git)
   cat > "$FAKEBIN_DIR/git" <<SH
@@ -2053,14 +2182,33 @@ case " \$* " in *' merge --ff-only '*) exit 1 ;; esac
 exec '$real_git' "\$@"
 SH
   chmod +x "$FAKEBIN_DIR/git"
-  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_PROVISION_CALLED="$CASE_DIR/provisioner.called" run_spawn "$id" --mode no-mistakes --yolo off --owned-path scripts) || true
-  assert_no_launch "$CASE_DIR/launch.log"
-  after=$(git -C "${SKIP_SLOTS[0]}" symbolic-ref -q HEAD || echo detached)
-  if [ "$after" != refs/heads/previous-owner ]; then
-    assert_not_contains "$out" "left untouched" "a copy this spawn detached was called untouched"
-    assert_contains "$out" "detached" "the output did not say the copy was detached"
-  fi
-  pass "a governed copy refused after preparation keeps its branch or the output says it was detached"
+  GOV_OUT=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_PROVISION_CALLED="$CASE_DIR/provisioner.called" run_spawn "$id" --mode no-mistakes --yolo off --owned-path scripts) || true
+}
+
+test_a_governed_refusal_after_preparation_leaves_the_copy_detached() {
+  refuse_governed_after_preparation governed-refused-prep pool-governed-refused-after-prep
+  ! git -C "${SKIP_SLOTS[0]}" symbolic-ref -q HEAD >/dev/null || fail "a refusal switched the copy back onto a branch"$'\n'"$GOV_OUT"
+  pass "a governed copy refused after preparation stays detached"
+}
+
+test_a_governed_refusal_after_preparation_says_the_copy_stays_detached() {
+  refuse_governed_after_preparation governed-refused-says pool-governed-refused-says
+  assert_contains "$GOV_OUT" "stays detached" "the output did not say the copy stays detached"
+  pass "the output says a governed copy refused after preparation stays detached"
+}
+
+test_a_governed_refusal_after_preparation_never_says_untouched() {
+  refuse_governed_after_preparation governed-refused-untouched pool-governed-refused-untouched
+  assert_not_contains "$GOV_OUT" "left untouched" "a copy this spawn detached was called untouched"
+  pass "a governed copy this spawn detached is never called untouched"
+}
+
+test_a_governed_refusal_after_preparation_keeps_its_branch_where_it_was() {
+  local before after
+  refuse_governed_after_preparation governed-refused-branch pool-governed-refused-branch
+  after=$(git -C "${SKIP_SLOTS[0]}" rev-parse refs/heads/previous-owner)
+  [ "$after" = "$INITIAL_SHA" ] || fail "the previous owner's branch moved to $after"$'\n'"$GOV_OUT"
+  pass "the branch the preparation detached from is where it was"
 }
 
 # Explicit selection keeps focused acquisition regressions independently runnable.
@@ -2132,11 +2280,21 @@ test_the_loop_budget_is_one_bound_across_all_gets
   test_no_get_is_typed_once_the_bound_was_spent_between_two_gets
 test_skipped_copies_are_recorded_and_listed
 test_slot_digest_sees_another_tasks_branch_move
+test_slot_digest_sees_a_new_foreign_ref
+test_slot_digest_sees_a_removed_ref
+test_slot_digest_accepts_only_the_named_ref_change
 test_slot_digest_sees_a_symlink_retarget
 test_slot_digest_fails_when_git_cannot_be_read
 test_the_no_launch_check_fails_when_a_launch_was_logged
 test_a_stale_submodule_copy_with_an_unlanded_commit_is_leased_and_another_is_taken
 test_the_bound_is_checked_before_a_copy_is_accepted
-test_a_governed_refusal_after_preparation_keeps_the_branch_or_says_it_was_detached
+test_the_bound_is_rechecked_just_before_a_copy_is_accepted
+test_the_bound_refusal_at_accept_launches_nothing
+test_a_copy_accepted_inside_the_bound_is_launched
+test_a_refused_move_leaves_every_ref_unchanged
+test_a_governed_refusal_after_preparation_leaves_the_copy_detached
+test_a_governed_refusal_after_preparation_says_the_copy_stays_detached
+test_a_governed_refusal_after_preparation_never_says_untouched
+test_a_governed_refusal_after_preparation_keeps_its_branch_where_it_was
 
 echo "# all fm-spawn-pool-base-freshen tests passed"
