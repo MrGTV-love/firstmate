@@ -876,6 +876,7 @@ teardown_preserve_ignored() {  # <copy> [all|releasable]
       printf '%s  %s\n' "$hash" "${file#"$stage/"}" >> "$stage/SHA256SUMS" || return 1
     done < <(find "$stage" -type f ! -path "$stage/copy-path" ! -path "$stage/SHA256SUMS" -print0)
     rm -rf "$dest" || return 1
+    mkdir -p "$root" || return 1
     mv "$stage" "$dest" || return 1
   ) || {
     rm -rf "$stage"
