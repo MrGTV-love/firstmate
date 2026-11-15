@@ -835,7 +835,7 @@ SH
     cat > "$tb/gh-axi" <<'SH'
 #!/usr/bin/env bash
 case "${1:-} ${2:-}" in
-  "pr list") printf '%s\n' "count: 0 (showing first 0)" "pull_requests[]: []" ; exit 0 ;;
+  "pr list") printf '%s\n' "count: 0" "pull_requests: []" ; exit 0 ;;
   "pr view") echo "error: pull request not found" >&2 ; exit 1 ;;
 esac
 exit 0

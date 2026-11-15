@@ -828,14 +828,15 @@ test_multi_pr_task_registration_still_refuses_a_local_only_head() {
   pass "fm-pr-check registration refuses a multi-PR task's local-only head; only a merge call judges the PR's head"
 }
 
-# The named-head gate is skipped only when the forge reports this copy's exact
-# HEAD as the PR's head, because the forge then holds that commit. A head only in
-# the copy is refused when the forge reports another head, when the forge read
-# fails or yields no valid head, and when the forge's head is a commit neither the
-# copy nor any remote ref knows; the exact match registers with no remote ref.
-test_named_head_gate_skips_only_an_exact_forge_head() {
+# Exact forge/copy HEAD equality never stands in for the named-head gate (Main 1688
+# Q1): a head held only in the copy is refused when the forge reports another head,
+# when the forge read fails or yields no valid head, when the forge's head is a
+# commit neither the copy nor any remote ref knows, and also when the forge reports
+# exactly the copy's HEAD. The same exact head registers once origin's default
+# branch holds it, through the gate's own reachability proof.
+test_named_head_gate_is_never_bypassed_by_an_exact_forge_head() {
   local dir pushed later case rc
-  for case in differs read-fails unreadable neither exact; do
+  for case in differs read-fails unreadable neither exact exact-on-default; do
     dir=$(make_case "named-head-gate-$case")
     fm_write_meta "$dir/home/state/task-a.meta" \
       "window=firstmate:fm-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
@@ -845,19 +846,20 @@ test_named_head_gate_skips_only_an_exact_forge_head() {
     later=$(git -C "$dir/wt" rev-parse HEAD)
     [ -z "$(git -C "$dir/wt" for-each-ref --contains "$later" refs/remotes)" ] \
       || fail "$case: a remote ref already holds the copy's HEAD"
+    [ "$case" != exact-on-default ] || git -C "$dir/wt" update-ref refs/remotes/origin/main "$later"
     rc=0
     case "$case" in
       differs) FM_TEST_GH_HEAD=$pushed run_check_entry "$dir" task-a https://github.com/o/r/pull/4 ;;
       read-fails) FM_TEST_GH_HEAD_FAIL=1 run_check_entry "$dir" task-a https://github.com/o/r/pull/4 ;;
       unreadable) FM_TEST_GH_HEAD=not-a-head run_check_entry "$dir" task-a https://github.com/o/r/pull/4 ;;
       neither) FM_TEST_GH_HEAD=0123456789abcdef0123456789abcdef01234567 run_check_entry "$dir" task-a https://github.com/o/r/pull/4 ;;
-      exact) FM_TEST_GH_HEAD=$later run_check_entry "$dir" task-a https://github.com/o/r/pull/4 ;;
+      exact|exact-on-default) FM_TEST_GH_HEAD=$later run_check_entry "$dir" task-a https://github.com/o/r/pull/4 ;;
     esac > "$dir/stdout" 2> "$dir/stderr" || rc=$?
-    if [ "$case" = exact ]; then
-      [ "$rc" -eq 0 ] || fail "exact: the forge's exact copy HEAD was refused: $(cat "$dir/stderr")"
-      grep -qxF 'pr=https://github.com/o/r/pull/4' "$dir/home/state/task-a.meta" || fail "exact: pr= was not recorded"
-      grep -qxF "pr_head=$later" "$dir/home/state/task-a.meta" || fail "exact: pr_head is not the forge's head"
-      [ -f "$dir/home/state/task-a.check.sh" ] || fail "exact: no merge poll was armed"
+    if [ "$case" = exact-on-default ]; then
+      [ "$rc" -eq 0 ] || fail "exact-on-default: a head origin's default branch holds was refused: $(cat "$dir/stderr")"
+      grep -qxF 'pr=https://github.com/o/r/pull/4' "$dir/home/state/task-a.meta" || fail "exact-on-default: pr= was not recorded"
+      grep -qxF "pr_head=$later" "$dir/home/state/task-a.meta" || fail "exact-on-default: pr_head is not the forge's head"
+      [ -f "$dir/home/state/task-a.check.sh" ] || fail "exact-on-default: no merge poll was armed"
       continue
     fi
     [ "$rc" -ne 0 ] || fail "$case: a head held only by the copy was registered"
@@ -866,7 +868,7 @@ test_named_head_gate_skips_only_an_exact_forge_head() {
     ! grep -q '^pr=' "$dir/home/state/task-a.meta" || fail "$case: the refusal still recorded pr="
     [ ! -e "$dir/home/state/task-a.check.sh" ] || fail "$case: the refusal still armed a poll"
   done
-  pass "fm-pr-check skips the named-head gate only for the forge's exact copy HEAD; a differing, failed, unreadable or unknown forge head still refuses"
+  pass "fm-pr-check never lets an exact forge head stand in for the named-head gate; a copy-only head refuses in every case, and registers once the default branch holds it"
 }
 
 # A done note that leads with the PR URL names that PR to the completion gate.
@@ -3963,7 +3965,7 @@ test_secondmate_record_refuses_a_pr_watch
 test_unpushed_named_head_refuses_registration
 test_direct_pr_unpushed_commit_refuses_registration
 test_multi_pr_task_registration_still_refuses_a_local_only_head
-test_named_head_gate_skips_only_an_exact_forge_head
+test_named_head_gate_is_never_bypassed_by_an_exact_forge_head
 test_bare_url_done_note_with_missing_copy_needs_a_merge_proof
 test_registration_identity_revalidation
 test_valid_recording_and_merge_derivation

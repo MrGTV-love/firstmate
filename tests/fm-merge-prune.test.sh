@@ -3509,7 +3509,7 @@ SH
   cat > "$W/bin/gh-axi" <<'SH'
 #!/usr/bin/env bash
 case "${1:-} ${2:-}" in
-  "pr list") printf '%s\n' "count: 1 (showing first 1)" "pull_requests[1]{number,state}:" "  7,merged"; exit 0 ;;
+  "pr list") printf '%s\n' "count: 1" "pull_requests[1]{number,state}:" "  7,merged"; exit 0 ;;
   "pr view") printf '%s\n' "pull_request:" "  number: 7" "  state: merged" '  merged: "2026-06-26T00:00:00Z"'; exit 0 ;;
 esac
 exit 0
@@ -3555,6 +3555,15 @@ wake_count_real() { wake_count; }
 # fallback's treehouse calls never carry a force or an include-unlanded flag.
 # (Teardown's own `treehouse return --force` is the landed-work-guarded return
 # of the slot it has just proved safe; it is not a forced teardown.)
+# assert_closed_by_plain_teardown <label> <task>: a closeout that removed the record
+# must show the teardown it ran: exactly one call, naming the task and nothing else.
+# An empty call log is not proof of a plain teardown (Main 1686 F6), so it fails.
+assert_closed_by_plain_teardown() {  # <label> <task>
+  [ -s "$W/stub.log" ] || fail "$1: the record closed with no teardown call on record"
+  [ "$(cat "$W/stub.log")" = "$2" ] || fail "$1: teardown was not called exactly once, plainly, for $2: $(cat "$W/stub.log")"
+  assert_nothing_forced "$1"
+}
+
 assert_nothing_forced() {  # <label>
   if [ -s "$W/stub.log" ] && grep -qvxE '[A-Za-z0-9][A-Za-z0-9._-]*' "$W/stub.log"; then
     fail "$1: teardown was asked with extra arguments: $(cat "$W/stub.log")"
@@ -3879,12 +3888,25 @@ SH
 #!/usr/bin/env bash
 state=\$(tr 'A-Z' 'a-z' < "$W/forge.state")
 case "\${1:-} \${2:-}" in
-  "pr list") printf '%s\\n' "count: 1 (showing first 1)" "pull_requests[1]{number,state}:" "  7,\$state"; exit 0 ;;
+  "pr list") printf '%s\\n' "count: 1" "pull_requests[1]{number,state}:" "  7,\$state"; exit 0 ;;
   "pr view") printf '%s\\n' "pull_request:" "  number: 7" "  state: \$state"; exit 0 ;;
 esac
 exit 0
 SH
-  chmod +x "$W/bin/gh" "$W/bin/gh-axi"
+  # The forge's merge: like GitHub's squash merge, the PR head's change lands on
+  # origin's default branch as one new commit, then the PR reads MERGED. A merged
+  # PR whose content never reaches the default branch is not something a forge does.
+  cat > "$W/bin/forge-merge" <<SH
+#!/usr/bin/env bash
+set -e
+git -C "$COPY" fetch -q origin
+tree=\$(git -C "$COPY" merge-tree --write-tree refs/remotes/origin/main '$head' | head -1)
+squash=\$(git -C "$COPY" commit-tree "\$tree" -p "\$(git -C "$COPY" rev-parse refs/remotes/origin/main)" -m "task work (#7)")
+git -C "$COPY" push -q origin "\$squash:refs/heads/main"
+git -C "$COPY" fetch -q origin
+printf 'MERGED\n' > "$W/forge.state"
+SH
+  chmod +x "$W/bin/gh" "$W/bin/gh-axi" "$W/bin/forge-merge"
 }
 
 # xl_merge_case <label>: a merge fixture whose gh double flips the shared forge
@@ -3903,7 +3925,7 @@ xl_merge_case() {
 "$mc/fakebin/gh.real" "\$@"
 rc=\$?
 case "\${1:-} \${2:-}" in
-  "pr merge") case " \$* " in *" --disable-auto "*) ;; *) [ "\$rc" -ne 0 ] || printf 'MERGED\n' > "$W/forge.state" ;; esac ;;
+  "pr merge") case " \$* " in *" --disable-auto "*) ;; *) [ "\$rc" -ne 0 ] || "$W/bin/forge-merge" ;; esac ;;
 esac
 exit \$rc
 SH
@@ -3998,7 +4020,7 @@ xl_print_state() {  # <label>
   printf '%s: record=%s pr=%s poll=%s prune-record=%s copy=%s ledger=[%s]\n' "$1" \
     "$([ -e "$STATE/t1.meta" ] && echo open || echo gone)" \
     "$(sed -n 's/^pr=//p' "$STATE/t1.meta" 2>/dev/null | tail -1 | grep . || echo none)" \
-    "$([ -e "$STATE/t1.check.sh" ] && echo armed || echo none)" \
+    "$({ [ -e "$STATE/t1.check.sh" ] || [ -e "$STATE/t1.pr-poll" ]; } && echo "armed($(cd "$STATE" && ls t1.check.sh t1.pr-poll 2>/dev/null | tr '\n' ' '))" || echo none)" \
     "$([ -e "$STATE/t1.merge-prune" ] && echo armed || echo none)" \
     "$([ -e "$COPY" ] && echo present || echo gone)" "$(xl_ledger_events)"
 }
@@ -4046,6 +4068,9 @@ test_xlane_merge_by_another_lane_reaches_safe_closeout() {
     xl_print_state "$variant before housekeeping"
     [ ! -e "$STATE/t1.check.sh" ] || fail "$variant: a poll existed before housekeeping"
     [ ! -e "$STATE/t1.merge-prune" ] || fail "$variant: a prune record existed before housekeeping"
+    # No wake or signal names A before discovery, and none is needed for it (Main 1686 F6):
+    # every wake the watcher queues stays in .wake-queue in this test, since nothing drains it.
+    ! grep -qsE 't1|pull/7' "$STATE/.wake-queue" || fail "$variant: a wake named A before discovery: $(cat "$STATE/.wake-queue")"
     xl_supervise_until xl_closed \
       || { xl_observe_stranded "$variant after supervision"; fail "$variant: t1 stayed open after the other lane merged its PR: $(tail -5 "$W/watch.out")"; }
     xl_print_state "$variant after supervision"
@@ -4056,7 +4081,12 @@ test_xlane_merge_by_another_lane_reaches_safe_closeout() {
     [ ! -e "$COPY" ] || fail "$variant: the copy is still on disk"
     [ ! -e "$STATE/t1.check.sh" ] && [ ! -e "$STATE/t1.pr-poll" ] || fail "$variant: the poll file outlived the record"
     xl_events_in_order task.merged task.cleaned_up || fail "$variant: O's ledger lacks task.merged then task.cleaned_up for t1: $(xl_ledger_events)"
-    assert_nothing_forced "xlane $variant"
+    assert_closed_by_plain_teardown "xlane $variant" t1
+    # Discovery needed no wake or signal: nothing in this test drains the queue, so a wake that fired stays
+    # in it. The only wake that may name A is its own merge poll's report, which exists only after the
+    # pass registered the PR; a status signal for the done note, or any other wake naming A, fails.
+    stray=$(grep -E 't1|pull/7' "$STATE/.wake-queue" 2>/dev/null | grep -v 'contributions' | grep -v 'check: merge landed: t1 ' || true)
+    [ -z "$stray" ] || fail "$variant: a wake or signal named A outside its own merge report: $stray"
     [ ! -e "$XL_MC/state/t1.meta" ] || fail "$variant: lane M holds a record for t1"
     cleanup_workers
   done
@@ -4221,11 +4251,11 @@ xl_protection_case() {  # <dirty|unlanded-commit|conflicting-owner>
 }
 
 # The protected state, by content: the copy's tracked and untracked bytes and its
-# HEAD commit, t1's record, and (when present) the claimant's record and slot marker.
+# HEAD commit, t1's record, and (when present) the claimant's record, status file and slot marker.
 xl_claimant_fingerprint() {
   { git -C "$COPY" rev-parse HEAD; git -C "$COPY" status --porcelain=v1 --untracked-files=all
     (cd "$COPY" && git ls-files -z --cached --others --exclude-standard | xargs -0 shasum 2>/dev/null)
-    for f in "$STATE/other-live.meta" "$POOL/pool1/1/.fm-slot-owner"; do [ ! -e "$f" ] || shasum < "$f"; done
+    for f in "$STATE/other-live.meta" "$STATE/other-live.status" "$POOL/pool1/1/.fm-slot-owner"; do [ ! -e "$f" ] || shasum < "$f"; done
   } | shasum | awk '{print $1}'
 }
 xl_v7_fingerprint() {
@@ -4569,7 +4599,7 @@ test_v5_missing_updates_restart_and_completed_review_cannot_strand_work() {
   # (3) E's review PASS is recorded and A's PR is merged by the other lane, through the forge double.
   v5_record_review
   xl_merge_in_lane_m
-  xl_supervise_until xl_closed || { xl_print_state "A after supervision"; fail "A (the finished task) was not closed after the other lane merged its PR: $(tail -5 "$W/watch.out"); forge=$(cat "$W/forge.state")"; }
+  xl_supervise_until xl_closed || { xl_observe_stranded "A after supervision"; fail "A (the finished task) was not closed after the other lane merged its PR: $(tail -5 "$W/watch.out"); forge=$(cat "$W/forge.state")"; }
   v5_ledger "$t6" > "$W/l3.json"
   v5_table "$W/l3.json" | tee "$W/v5-table.txt"
   # A is closed: record, copy, poll and prune record are gone and the ledger shows merged and cleaned_up.

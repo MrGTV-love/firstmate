@@ -2068,9 +2068,21 @@ def v4_task(name, kind='ship', copy=None, verb='done', note='delivered', pr=None
         v4_details[name] = detail
     if live:
         v4_live.append(name)
+def v4_merge_into_main(copy, label):
+    """Merge the copy's HEAD into origin's default branch, as the forge does when the PR merges."""
+    head = git_('-C', copy, 'rev-parse', 'HEAD').strip()
+    git_('-C', copy, 'push', '-q', 'origin', head + ':refs/heads/pr-' + label)
+    merger = world / ('v4-merge-' + label)
+    git_('clone', '-q', v4_origin, merger)
+    git_('-C', merger, '-c', 'user.email=t@t', '-c', 'user.name=t', 'merge', '-q', '--no-ff', '-m', 'merge ' + label, 'origin/pr-' + label)
+    git_('-C', merger, 'push', '-q', 'origin', 'HEAD:main')
+    git_('-C', copy, 'fetch', '-q', 'origin')
+    return head
 def v4_merged_pr(number, copy):
+    # A merged PR's content is on the default branch: the copy's HEAD is merged there.
+    head = v4_merge_into_main(copy, str(number))
     v4_prs[str(number)] = dict(number=number, html_url=V4_PR + str(number), state='closed', merged_at=iso(now - 3600),
-                               head=dict(sha=git_('-C', copy, 'rev-parse', 'HEAD')))
+                               head=dict(sha=head))
 fin_merged = v4_copy('fin-merged'); v4_merged_pr(11, fin_merged)
 v4_task('fin-merged', copy=fin_merged, pr=11, note=f'{V4_PR}11 merged by another lane')
 fin_content = v4_copy('fin-content')
@@ -2116,9 +2128,6 @@ reap_refusal = 'REFUSED: t1 has commits the merged PR head does not contain; the
 return_refusal = 'REFUSED: fin-return slot return could not reach the pool lease'
 (v4 / 'state/.idle-reap/fin-return.refused').write_text(
     f'fm-idle-reap-refused-v1\n{now - 600}\ndone [at={now}]: merged\n{return_refusal}\n')
-(v4 / 'state/.idle-reap/fin-order.refused').write_text(
-    f'fm-idle-reap-refused-v1\n{now - 100}\ndone [at={now}]: merged\nREFUSED: the newer reaper teardown refusal\n')
-os.utime(v4 / 'state/.idle-reap/fin-order.refused', (now - 90, now - 90))
 (v4 / 'state/.idle-reap/fin-pending.refused').write_text(
     f'fm-idle-reap-refused-v1\n{now - 7000}\ndone [at={now}]: merged\nREFUSED: an older idle-reaper refusal\n')
 (v4 / 'state/.idle-reap/fin-scout-refused.refused').write_text(
@@ -2181,6 +2190,27 @@ v4_task('fin-order', copy=fin_order, pr=20, note=f'{V4_PR}20 merged by another l
     f'version=fm-merge-prune-v1\npr={V4_PR}20\nattempts=1\nnext_at={now + 600}\nstate=retained\n'
     f'reason=REFUSED: the older prune refusal\nwake_sent=1\ncopy={fin_order}\narmed_at={now - 3600}\nproject=\nreturned=0\n')
 os.utime(v4 / 'state/fin-order.merge-prune', (now - 95, now - 95))
+time.sleep(0.05)
+# Published after the prune record, with an older stamp and an older write time.
+(v4 / 'state/.idle-reap/fin-order.refused').write_text(
+    f'fm-idle-reap-refused-v1\n{now - 100}\ndone [at={now}]: merged\nREFUSED: the newer reaper teardown refusal\n')
+os.utime(v4 / 'state/.idle-reap/fin-order.refused', (now - 100, now - 100))
+# Round-4 F5.3: both producers write a temporary file and rename it into place. The memo is written first, the
+# prune record is published next, and the memo is renamed into place last: the memo was recorded last and wins,
+# although its file's write time is the oldest.
+fin_publish = v4_copy('fin-publish'); v4_merged_pr(23, fin_publish)
+v4_task('fin-publish', copy=fin_publish, pr=23, note=f'{V4_PR}23 merged by another lane')
+memo_tmp = v4 / 'state/.idle-reap/.fin-publish.refused.tmp'
+memo_tmp.write_text(f'fm-idle-reap-refused-v1\n{now - 300}\ndone [at={now}]: merged\nREFUSED: the memo renamed into place last\n')
+os.utime(memo_tmp, (now - 300, now - 300))
+time.sleep(0.05)
+prune_tmp = v4 / 'state/.fin-publish.merge-prune.tmp'
+prune_tmp.write_text(
+    f'version=fm-merge-prune-v1\npr={V4_PR}23\nattempts=1\nnext_at={now + 600}\nstate=retained\n'
+    f'reason=REFUSED: the prune record published before the memo\nwake_sent=1\ncopy={fin_publish}\narmed_at={now - 3600}\nproject=\nreturned=0\n')
+os.rename(prune_tmp, v4 / 'state/fin-publish.merge-prune')
+time.sleep(0.05)
+os.rename(memo_tmp, v4 / 'state/.idle-reap/fin-publish.refused')
 # F5 as ruled: the newest recorded refusal wins, a prune attempt it will retry (state=pending) included.
 fin_pending = v4_copy('fin-pending'); v4_merged_pr(18, fin_pending)
 v4_task('fin-pending', copy=fin_pending, pr=18, note=f'{V4_PR}18 merged by another lane')
@@ -2190,6 +2220,42 @@ pending_refusal = 'REFUSED: fin-pending copy is busy: a process still runs insid
     f'wake_sent=0\ncopy={fin_pending}\narmed_at={now - 3600}\nproject=\nreturned=0\n')
 v4_task('gate-covered', copy=v4_copy('gate-covered'), note='delivered, branch pushed', state='blocked', live=True,
         detail=gate_covered_reason)
+# Round-4 F5.1: a working task with no PR whose content already is on the default branch owes its cleanup,
+# done report or not. Control: a working task with no commits of its own is unfinished work, not landed work.
+work_landed = v4_copy('work-landed')
+land_wl = world / 'v4-land-work-landed'
+git_('clone', '-q', v4_origin, land_wl)
+(land_wl / 'work-landed.txt').write_text('work-landed\n')
+git_('-C', land_wl, 'add', '.'); git_('-C', land_wl, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'squash work-landed')
+git_('-C', land_wl, 'push', '-q', 'origin', 'main')
+git_('-C', work_landed, 'fetch', '-q', 'origin')
+v4_task('work-landed', copy=work_landed, verb='working', note='building', state='working', live=True)
+v4_task('work-empty', copy=v4_copy('work-empty', work=False), verb='working', note='starting', state='working', live=True)
+# Round-4 F5.2: two PR-carried parents merged locally, with an extra change committed in the merge itself that
+# the merged PR never carried, is not landed. Control: the same local merge with no extra change is landed.
+def v4_local_merge(name, extra):
+    copy = v4_copy(name, work=False)
+    for side in ('a', 'b'):
+        git_('-C', copy, 'checkout', '-q', '-b', f'{name}-{side}', 'origin/main')
+        (copy / f'{name}-{side}.txt').write_text(side + '\n')
+        git_('-C', copy, 'add', '.'); git_('-C', copy, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', f'{name} {side}')
+    # The PR: a clean merge of both sides, merged into origin's default branch.
+    git_('-C', copy, 'checkout', '-q', '-b', f'{name}-pr', f'{name}-a')
+    git_('-C', copy, '-c', 'user.email=t@t', '-c', 'user.name=t', 'merge', '-q', '--no-ff', '-m', f'{name} PR merge', f'{name}-b')
+    pr_head = v4_merge_into_main(copy, name)
+    # The copy: its own merge of the same two sides, with or without an extra committed change.
+    git_('-C', copy, 'checkout', '-q', '-b', f'{name}-local', f'{name}-a')
+    git_('-C', copy, '-c', 'user.email=t@t', '-c', 'user.name=t', 'merge', '-q', '--no-ff', '--no-commit', f'{name}-b')
+    if extra:
+        (copy / f'{name}-resolution.txt').write_text('a change only this merge carries\n')
+        git_('-C', copy, 'add', '.')
+    git_('-C', copy, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', f'{name} local merge')
+    return copy, pr_head
+for name, extra, number in (('merge-extra', True, 24), ('merge-clean', False, 25)):
+    copy, pr_head = v4_local_merge(name, extra)
+    v4_prs[str(number)] = dict(number=number, html_url=V4_PR + str(number), state='closed', merged_at=iso(now - 3600),
+                               head=dict(sha=pr_head))
+    v4_task(name, copy=copy, pr=number, note=f'{V4_PR}{number} merged by another lane')
 mate_home = world / 'v4-mate'
 for name in ('state', 'data', 'config', 'projects'):
     (mate_home / name).mkdir(parents=True)
@@ -2314,6 +2380,18 @@ f4 = [
     # Round-3 F4: a prune record's reason is labeled as the prune's, not as a plain teardown's.
     ('prune-reason-labeled', 'fin-pending' in cleanup and 'merge-prune' in cleanup['fin-pending']['next_action']
      and 'plain bin/fm-teardown.sh fin-pending ended' not in cleanup['fin-pending']['next_action'], mine('fin-pending')),
+    # Round-4 F5.1: landed content with no PR and no done report, worker still working: the cleanup row exists.
+    ('content-landed-working-no-pr', 'work-landed' in cleanup and 'bin/fm-teardown.sh work-landed' in cleanup['work-landed']['next_action'],
+     mine('work-landed')),
+    ('working-with-no-commits-no-cleanup', 'work-empty' not in cleanup and 'work-empty' not in by_cat('pending_acceptance'),
+     mine('work-empty')),
+    # Round-4 F5.2: a local merge with an extra change is not landed and keeps an unlanded row naming that merge.
+    ('merge-with-extra-change-not-landed', 'merge-extra' not in cleanup and 'merge-extra' in by_cat('unlanded_commit')
+     and 'merge-extra local merge' in by_cat('unlanded_commit')['merge-extra']['evidence'], mine('merge-extra')),
+    ('clean-local-merge-landed', 'merge-clean' in cleanup, mine('merge-clean')),
+    # Round-4 F5.3: the record published last wins, by publication, not by its file's write time.
+    ('published-last-refusal', 'fin-publish' in cleanup and 'the memo renamed into place last' in cleanup['fin-publish']['next_action']
+     and 'the prune record published before the memo' not in cleanup['fin-publish']['next_action'], mine('fin-publish')),
 ]
 for name, ok, got in f4:
     print('F4', name, 'ok' if ok else 'FAILED', '' if ok else [(r['category'], r['next_action'][:160]) for r in got], flush=True)

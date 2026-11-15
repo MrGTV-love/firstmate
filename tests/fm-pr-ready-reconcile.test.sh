@@ -758,6 +758,34 @@ out=$(run_pass)
 printf '%s\n' "$out" | grep -q 'custom: state/custom.check.sh is another check' || fail "the pass did not name the conflict: $out"
 pass 'a registered custom check is never overwritten by a merge-poll re-arm; the conflict is named'
 
+# The same holds for a first registration (no pr= yet), from a done note in either
+# form (Main 1686 F3): the registrar records nothing, the custom check and its trust
+# record stay byte for byte, and the refusal names the conflict. Control: a
+# check.sh that is the merge poll template itself, with no trust record, is an old
+# poll and is replaced by the new registration.
+for form in prefixed bare; do
+  make_case "custom-first-$form"
+  write_ship first ship direct-PR
+  [ "$form" = prefixed ] || printf 'done [at=1792479210]: %s checks green at %s\n' "$URL" "$HEAD" > "$CASE/home/state/first.status"
+  printf '#!/usr/bin/env bash\necho custom check output\n' > "$CASE/home/state/first.check.sh"
+  chmod 700 "$CASE/home/state/first.check.sh"
+  FM_STATE_OVERRIDE="$CASE/home/state" bash "$ROOT/bin/fm-check-register.sh" first > "$CASE/register.out" 2>&1 \
+    || fail "$form: could not register the custom check: $(cat "$CASE/register.out")"
+  custom_before=$(shasum -a 256 "$CASE/home/state/first.check.sh" "$CASE/home/state/first.check-trust")
+  out=$(run_pass)
+  [ "$custom_before" = "$(shasum -a 256 "$CASE/home/state/first.check.sh" "$CASE/home/state/first.check-trust")" ] \
+    || fail "$form: a first registration replaced a registered custom check: $out"
+  ! grep -q '^pr=' "$CASE/home/state/first.meta" || fail "$form: the refused first registration still recorded pr=: $out"
+  printf '%s\n' "$out" | grep -q 'state/first.check.sh is another check' || fail "$form: the refusal did not name the conflict: $out"
+done
+make_case template-first
+write_ship oldpoll ship direct-PR
+cp "$ROOT/bin/fm-pr-poll.sh" "$CASE/home/state/oldpoll.check.sh"
+chmod 600 "$CASE/home/state/oldpoll.check.sh"
+out=$(run_pass)
+assert_registered oldpoll
+pass 'a first registration from either done-note form never replaces a registered custom check and names the conflict; an old template poll is replaced'
+
 # The stale-re-arm guard also holds at publication: when another registration
 # records a different PR after this re-arm committed but before it publishes, the
 # re-arm publishes nothing and reports no refusal.
@@ -788,6 +816,36 @@ printf '%s\n' "$out" | grep -q 'late: the recorded PR changed during this pass' 
 [ "$(refusal_wakes late)" -eq 0 ] || fail "the late re-arm raised a refusal wake: $out"
 [ ! -e "$CASE/home/state/late.check.sh" ] || fail 'the late re-arm published a poll for the old PR'
 pass 'a re-arm whose recorded PR changes between its commit and its publication publishes nothing'
+
+# A first registration reads no pr= without the lock; when another registration
+# records a different PR before this one commits, this one is stale and changes
+# nothing: the newer PR stays recorded, no poll is armed for the older URL and no
+# refusal is raised (the review's empty-snapshot interleaving).
+make_case empty-snapshot
+write_ship snap ship direct-PR
+cat > "$FAKEBIN/rm" <<SH
+#!/usr/bin/env bash
+/bin/rm "\$@"
+rc=\$?
+case " \$* " in
+  *"/.meta-snap.lock "*)
+    if [ -e "$CASE/record-newer" ] && ! grep -q '^pr=' "$CASE/home/state/snap.meta"; then
+      /bin/rm -f "$CASE/record-newer"
+      printf 'pr=%s\n' "$B_URL" >> "$CASE/home/state/snap.meta"
+    fi ;;
+esac
+exit "\$rc"
+SH
+chmod +x "$FAKEBIN/rm"
+: > "$CASE/record-newer"
+out=$(run_pass)
+rm -f "$FAKEBIN/rm"
+[ ! -e "$CASE/record-newer" ] || fail 'the newer registration was never simulated'
+grep -qxF "pr=$B_URL" "$CASE/home/state/snap.meta" || fail "a first registration from an empty snapshot replaced the newer recorded PR: $out"
+! grep -qxF "pr=$URL" "$CASE/home/state/snap.meta" || fail "the stale first registration recorded its PR: $out"
+printf '%s\n' "$out" | grep -q 'snap: the recorded PR changed during this pass' || fail "the stale first registration did not stand down: $out"
+[ "$(refusal_wakes snap)" -eq 0 ] || fail "the stale first registration raised a refusal wake: $out"
+pass 'a first registration from an empty pr= snapshot never replaces a PR another registration recorded meanwhile'
 
 # A first registration is never re-armed by a pass that runs while it is between
 # committing pr= and publishing its poll: the registrar holds the poll publication

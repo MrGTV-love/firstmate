@@ -1037,10 +1037,10 @@ test_nested_rerun_gone_copy_needs_its_branch_landed() {
   pass "a removed nested copy is judged by its own branch ref: unlanded refuses, content landed by squash passes"
 }
 
-# The run record proves the nested current copy, not the slot around it. A
-# slot holding a later commit of its own is measured at its own HEAD: it is
+# The nested current copy's landed content proves that copy, not the slot around
+# it. A slot holding a later commit of its own is measured at its own HEAD: it is
 # refused until that commit is anchored or landed, and returned once it is.
-test_nested_slot_is_not_proven_by_the_current_copys_pipeline_input() {
+test_nested_slot_is_not_proven_by_the_current_copys_landed_content() {
   local case_dir rc slot_head label=nested-slot-pipeline-input
   nested_pipeline_input_case "$label"
   case_dir=$NESTED_CASE
@@ -1053,7 +1053,7 @@ test_nested_slot_is_not_proven_by_the_current_copys_pipeline_input() {
   expect_code 1 "$rc" "$label: the slot's own unanchored commit must stop the return: $(cat "$case_dir/stderr")"
   assert_grep "claimed pool slot $NESTED_SLOT" "$case_dir/stderr" "$label: the refusal did not name the slot"
   assert_grep "neither landed nor held" "$case_dir/stderr" "$label: the refusal did not name the reason"
-  assert_no_grep "the ship deliverable is not landed" "$case_dir/stderr" "$label: the current copy's own run record did not prove it"
+  assert_no_grep "the ship deliverable is not landed" "$case_dir/stderr" "$label: the current copy's landed content did not prove it"
   assert_absent "$case_dir/treehouse.log" "$label: the unproved slot was returned"
   assert_present "$NESTED_COPY" "$label: the refusal removed the nested copy"
   [ "$(git -C "$NESTED_SLOT" rev-parse HEAD)" = "$slot_head" ] || fail "$label: the slot lost its commit"
@@ -1063,16 +1063,16 @@ test_nested_slot_is_not_proven_by_the_current_copys_pipeline_input() {
     "refs/fm/anchor/task-x1-$(git -C "$NESTED_SLOT" rev-parse --short HEAD)" "$slot_head"
   rc=0
   FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout2" 2> "$case_dir/stderr2" || rc=$?
-  expect_code 0 "$rc" "$label: an anchored slot around a copy its run record proves must tear down: $(cat "$case_dir/stderr2")"
+  expect_code 0 "$rc" "$label: an anchored slot around a copy whose content landed must tear down: $(cat "$case_dir/stderr2")"
   assert_grep "return --force $NESTED_SLOT" "$case_dir/treehouse.log" "$label: the anchored slot was not returned"
   assert_absent "$case_dir/state/task-x1.meta" "$label: the task record was not removed"
-  pass "the enclosing slot is measured at its own HEAD, not proven by the nested copy's pipeline-input record"
+  pass "the enclosing slot is measured at its own HEAD, not proven by the nested copy's landed content"
 }
 
 # A nested copy an earlier teardown already removed is judged by its branch ref
-# under every landed-work proof, the run record included: a plain re-run
-# finishes without --force or captain words.
-test_nested_rerun_gone_copy_is_proven_by_its_pipeline_input() {
+# under every landed-work proof: when its content is in the default branch, a
+# plain re-run finishes without --force or captain words.
+test_nested_rerun_gone_copy_is_proven_by_its_landed_content() {
   local case_dir rc label=nested-gone-pipeline-input
   nested_pipeline_input_case "$label"
   case_dir=$NESTED_CASE
@@ -1080,11 +1080,11 @@ test_nested_rerun_gone_copy_is_proven_by_its_pipeline_input() {
   assert_absent "$NESTED_COPY" "$label: setup did not remove the nested copy"
   rc=0
   FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-  expect_code 0 "$rc" "$label: a removed copy whose branch was the merged run's input must finish with a plain re-run: $(cat "$case_dir/stderr")"
+  expect_code 0 "$rc" "$label: a removed copy whose branch content landed must finish with a plain re-run: $(cat "$case_dir/stderr")"
   assert_grep "return --force $NESTED_SLOT" "$case_dir/treehouse.log" "$label: the slot was not returned"
   assert_absent "$case_dir/pool/1/.fm-slot-owner" "$label: the slot claim survived the task"
   assert_absent "$case_dir/state/task-x1.meta" "$label: the task record was not removed"
-  pass "a removed nested copy whose branch was the merged run's input is proven by the run record"
+  pass "a removed nested copy whose branch content landed is proven by the content check"
 }
 
 # Endpoint closure refuses before the reserved slot or nested copy is removed.
@@ -3597,8 +3597,8 @@ test_nested_rerun_local_only_ship_is_recorded_landed
 test_nested_rerun_matrix_refusal_at_each_phase
 test_nested_rerun_gone_copy_needs_its_branch_landed
 test_nested_rerun_gone_copy_and_branch_uses_recorded_merged_pr
-test_nested_slot_is_not_proven_by_the_current_copys_pipeline_input
-test_nested_rerun_gone_copy_is_proven_by_its_pipeline_input
+test_nested_slot_is_not_proven_by_the_current_copys_landed_content
+test_nested_rerun_gone_copy_is_proven_by_its_landed_content
 test_nested_rerun_after_endpoint_refusal_records_landed
 test_nested_post_lock_reprove_skips_removed_nested_priors
 test_other_record_copy_overlap_is_component_aware
