@@ -978,6 +978,32 @@ fm_test_bash_only_dir() {
   printf '%s\n' "$dir"
 }
 
+# fm_fake_other_device <fakebin> <prefix>
+# Drops a `stat` stub that reports a different device number for <prefix> and
+# every path under it when asked for the device alone (`stat -f %d <path>` or
+# `stat -c %d <path>`), and runs the real stat for everything else, so a test
+# can place a folder on "another filesystem".
+fm_fake_other_device() {
+  local fakebin=$1 prefix=$2 real
+  real=$(command -v stat)
+  cat > "$fakebin/stat" <<SH
+#!/usr/bin/env bash
+if [ "\$#" = 3 ] && [ "\$2" = %d ]; then
+  case "\$3" in "$prefix"|"$prefix"/*) echo 424242; exit 0 ;; esac
+fi
+exec "$real" "\$@"
+SH
+  chmod +x "$fakebin/stat"
+}
+
+# fm_file_mode <path>: the permission bits of <path>, in octal (for example 600).
+fm_file_mode() {
+  case "$(uname -s)" in
+    Darwin|*BSD) /usr/bin/stat -f %Lp "$1" ;;
+    *) stat -c %a "$1" ;;
+  esac
+}
+
 fm_fake_exit0() {
   local fakebin=$1 tool
   shift

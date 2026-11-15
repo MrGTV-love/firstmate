@@ -2518,10 +2518,13 @@ teardown_device_of() {  # <path>
 # temporary files in (mode 700, a unique name under the state directory), and
 # proves it can be written and that each rename out of it stays on one
 # filesystem: to the state directory (the return-pending, pending-close and
-# status records), to the data directory (the captain's drop record) and to the
-# peer slot's claim (its handoff). Refuses, writing nothing that stays, on doubt.
+# status records), to the task's data directory when a writer will rename into
+# it (the captain's drop record, preserved ignored bytes of a nested copy, a
+# stored bundle) and to the peer slot's claim when this task's claim will be
+# handed over. Refuses, writing nothing that stays, on doubt.
 teardown_run_dir_prepare() {
   local dir device target
+  local -a targets=("$STATE")
   if ! dir=$(umask 077; mktemp -d "$STATE/.teardown-run.$ID.XXXXXX" 2>/dev/null) \
      || [ ! -d "$dir" ] || [ -L "$dir" ] || [ ! -w "$dir" ] || [ ! -x "$dir" ] \
      || ! : > "$dir/.write-check" 2>/dev/null || ! rm -f "$dir/.write-check"; then
@@ -2530,8 +2533,17 @@ teardown_run_dir_prepare() {
     return 1
   fi
   device=$(teardown_device_of "$dir")
-  for target in "$STATE" "$DATA/$ID" \
-      ${TEARDOWN_PEER_SLOT:+"$(dirname "$(fm_task_copy_canonical_dir "$TEARDOWN_PEER_SLOT" 2>/dev/null || printf '%s' "$TEARDOWN_PEER_SLOT")")"}; do
+  if { [ "$FORCE" = --force ] && [ -n "$DROP_FILE" ] && [ "$KIND" != secondmate ]; } \
+     || { [ -n "${TEARDOWN_RETURN_SLOT:-$TEARDOWN_PEER_SLOT}" ] \
+          && { [ "${#TEARDOWN_FOREIGN_COPIES[@]}" -gt 0 ] || [ "${#TEARDOWN_NESTED_COPIES[@]}" -gt 0 ]; }; } \
+     || [ -e "$DATA/$ID/preservation-bundles.tsv" ] || [ -L "$DATA/$ID/preservation-bundles.tsv" ]; then
+    targets+=("$DATA/$ID")
+  fi
+  if [ -n "$TEARDOWN_PEER_SLOT" ] \
+     && ( fm_treehouse_slot_owner_state "$TEARDOWN_PEER_SLOT" "$ID"; [ "$FM_TREEHOUSE_SLOT_OWNER" = mine ] ); then
+    targets+=("$(dirname "$(fm_task_copy_canonical_dir "$TEARDOWN_PEER_SLOT" 2>/dev/null || printf '%s' "$TEARDOWN_PEER_SLOT")")")
+  fi
+  for target in "${targets[@]}"; do
     if [ -z "$device" ] || [ "$(teardown_device_of "$target")" != "$device" ]; then
       rm -rf "${dir:?}"
       TEARDOWN_PREFLIGHT_ERROR="task $ID's private teardown directory and $target are not on one filesystem, so a rename between them would not be atomic"

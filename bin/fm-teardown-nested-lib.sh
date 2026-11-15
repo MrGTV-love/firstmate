@@ -734,7 +734,7 @@ teardown_bundle_store() {  # <copy> <source> <sha256>
       TEARDOWN_BUNDLE_REASON='stored bundle staging file cannot be created'; return 1;
     }
   fi
-  if ! cp "$source" "$stage"; then
+  if ! (umask 077; cp "$source" "$stage"); then
     TEARDOWN_BUNDLE_REASON='bundle cannot be copied into task data'
   elif ! teardown_bundle_external "$copy" "$stage"; then
     :

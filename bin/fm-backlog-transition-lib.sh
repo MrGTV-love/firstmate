@@ -176,7 +176,7 @@ fm_backlog_drop_record() {  # <data> <id> <words-file> [private-dir]
   else
     tmp=$(umask 077; mktemp "$dir/.captain-drop.XXXXXXXX") || return 1
   fi
-  cp -- "$3" "$tmp" && mv -f -- "$tmp" "$target" && [ -f "$target" ] && [ ! -L "$target" ] \
+  (umask 077; cp -- "$3" "$tmp") && mv -f -- "$tmp" "$target" && [ -f "$target" ] && [ ! -L "$target" ] \
     || { rm -f -- "$tmp"; return 1; }
 }
 

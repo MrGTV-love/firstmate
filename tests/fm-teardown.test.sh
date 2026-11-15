@@ -392,9 +392,10 @@ test_no_mistakes_pushed_branch_without_merge_refuses() {
   words="$case_dir/words.txt"
   printf 'Drop it; the premise is gone.\n' > "$words"
   rc=0
-  run_teardown "$case_dir" --force --drop-file "$words" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  (umask 022; run_teardown "$case_dir" --force --drop-file "$words") > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 0 "$rc" "nm-origin: a drop with the captain's words must complete: $(cat "$case_dir/stderr")"
   cmp -s "$words" "$case_dir/data/task-x1/captain-drop.md" || fail "nm-origin: the captain's exact words were not retained"
+  assert_equals 600 "$(fm_file_mode "$case_dir/data/task-x1/captain-drop.md")" "nm-origin: the captain's words are readable by other users"
   grep -F "[x] task-x1" "$case_dir/data/backlog.md" >/dev/null || fail "nm-origin: the dropped row was not closed"
   grep -E '^[[:space:]]+dropped$' "$case_dir/data/backlog.md" >/dev/null || fail "nm-origin: the row does not record the fixed drop note"
   pass "a pushed but unmerged ship refuses, and only the captain's own words discard it"
@@ -412,6 +413,43 @@ test_drop_file_without_force_is_a_usage_error() {
   expect_code 1 "$rc" "drop-no-force: an unreadable words file must refuse"
   [ -e "$case_dir/state/task-x1.meta" ] || fail "drop-no-force: a refusal removed the task record"
   pass "--drop-file needs --force and a readable words file"
+}
+
+# The private run directory must share a filesystem with the data folder only
+# when a writer renames into it: a captain's drop record on a data folder that
+# reports another device refuses at entry and changes nothing, and a plain
+# landed close with no such writer completes there.
+test_cross_device_data_folder_refuses_only_a_rename_into_it() {
+  local case_dir rc words before after
+  case_dir=$(make_case xdev-data-drop)
+  write_meta "$case_dir" no-mistakes ship
+  seed_backlog_in_flight "$case_dir"
+  wt_commit_file "$case_dir" feature.txt hello "shippable work"
+  git -C "$case_dir/wt" push -q origin fm/task-x1
+  git -C "$case_dir/project" fetch -q origin
+  words="$case_dir/words.txt"
+  printf 'Drop it; the premise is gone.\n' > "$words"
+  fm_fake_other_device "$case_dir/fakebin" "$case_dir/data"
+  before=$(cd "$case_dir" && find state data wt -name .git -prune -o -type f ! -name '*.lock' ! -name '.guard-watcher-stale-banner' -print | LC_ALL=C sort | xargs shasum -a 256)
+  rc=0
+  run_teardown "$case_dir" --force --drop-file "$words" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "xdev-data-drop: a drop record on another filesystem must refuse"
+  assert_grep "are not on one filesystem" "$case_dir/stderr" "xdev-data-drop: the refusal did not name the filesystem split"
+  assert_absent "$case_dir/data/task-x1/captain-drop.md" "xdev-data-drop: the refusal wrote the drop record"
+  after=$(cd "$case_dir" && find state data wt -name .git -prune -o -type f ! -name '*.lock' ! -name '.guard-watcher-stale-banner' -print | LC_ALL=C sort | xargs shasum -a 256)
+  assert_equals "$before" "$after" "xdev-data-drop: the refusal changed the world"
+  [ -z "$(find "$case_dir/state" -maxdepth 1 -name '.teardown-run.*')" ] || fail "xdev-data-drop: the refusal left its private run directory"
+
+  case_dir=$(make_case xdev-data-plain)
+  write_meta "$case_dir" local-only ship
+  wt_commit_file "$case_dir" feature.txt landed "merged work"
+  git -C "$case_dir/project" update-ref refs/heads/main "$(git -C "$case_dir/wt" rev-parse HEAD)"
+  fm_fake_other_device "$case_dir/fakebin" "$case_dir/data"
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "xdev-data-plain: a close with no rename into the data folder must complete: $(cat "$case_dir/stderr")"
+  assert_absent "$case_dir/state/task-x1.meta" "xdev-data-plain: the task was not retired"
+  pass "a data folder on another filesystem refuses a drop record at entry and lets a plain landed close through"
 }
 
 test_forced_dirty_landed_deliverables_retain_captain_words() {
@@ -2835,7 +2873,7 @@ test_verified_bundle_preserves_unlanded_copy() {
     fi
     digest=$(shasum -a 256 "$BUNDLE_PATH" | awk '{print $1}')
     rc=0
-    FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    (umask 022; FM_HOME="$case_dir/home" run_teardown "$case_dir") > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     expect_code 0 "$rc" "bundle-$mode: verified preservation must allow ordinary teardown: $(cat "$case_dir/stderr")"
     assert_absent "$NESTED_COPY" "bundle-$mode: preserved copy was not removed"
     assert_absent "$case_dir/state/task-x1.meta" "bundle-$mode: task was not retired"
@@ -2848,6 +2886,7 @@ test_verified_bundle_preserves_unlanded_copy() {
     stored="$case_dir/data/task-x1/preserved-bundles/$(cut -f2 "$case_dir/data/task-x1/preservation-bundles.tsv").bundle"
     assert_grep "$stored" "$case_dir/stderr" 'stored recovery path not reported'
     assert_equals "$digest" "$(shasum -a 256 "$stored" | awk '{print $1}')" 'stored bundle digest changed'
+    assert_equals 600 "$(fm_file_mode "$stored")" "bundle-$mode: the stored bundle is readable by other users"
     rm "$BUNDLE_PATH"
     git -C "$restored" bundle unbundle "$stored" >/dev/null || fail 'stored bundle cannot restore commits after source deletion'
     assert_equals 'recoverable work' "$(git -C "$restored" show "$head:work.txt")" 'preserved work cannot be recovered'
@@ -3986,6 +4025,7 @@ test_teardown_manual_backend_leaves_the_backlog_to_the_operator
 test_local_only_truly_unpushed_refuses
 test_local_only_merged_to_local_main_allows
 test_no_mistakes_pushed_branch_without_merge_refuses
+test_cross_device_data_folder_refuses_only_a_rename_into_it
 test_drop_file_without_force_is_a_usage_error
 test_forced_dirty_landed_deliverables_retain_captain_words
 test_scout_report_must_be_a_regular_nonempty_file
