@@ -257,6 +257,22 @@ def mem_tree(root):
     return f"{resident // 1024} {footprint // 1024}"
 
 
+PROC_PIDCOALITIONINFO = 20
+
+
+def coalition(pid):
+    """The process's resource coalition id (proc_pidinfo PROC_PIDCOALITIONINFO), or None when it cannot be read.
+
+    A process inherits its coalition from its parent and cannot leave it without
+    privilege, so it bounds every fork descendant of a launch (bin/fm-cpu-pass.py
+    attempt attribution).
+    """
+    buffer = ctypes.create_string_buffer(64)
+    if libc.proc_pidinfo(pid, PROC_PIDCOALITIONINFO, ctypes.c_uint64(0), buffer, 64) <= 0:
+        return None
+    return struct.unpack_from("Q", buffer.raw, 0)[0]
+
+
 def process_identity(record):
     return struct.unpack_from("qq", record, P_START)
 

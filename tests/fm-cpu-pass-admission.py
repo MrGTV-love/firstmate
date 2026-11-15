@@ -869,7 +869,7 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
             if alive(pid):
                 os.kill(pid, signal.SIGKILL)
                 raise AssertionError('agent %d kept running after the gate died at the handoff' % pid)
-        assert live_entries(folder, 'launch-*.lock') == 0
+        wait_for(lambda: reserving_held(folder, ['x']) == 0, 'nothing reserved after a death at the handoff')
 
     def late_grant():
         # F6: a fit reached only after a wait past the hold bound (budget 3 s - p99 0.8 s = 2.2 s) refuses;

@@ -969,7 +969,8 @@ def proven_agentless(step, now: float) -> bool:
 
 def project(available: int, rss: dict, counted: dict, steps: Optional[dict], launches: dict,
             reservation: int, slack: int, term: int, self_run: Optional[str] = None,
-            waiting: frozenset = frozenset(), now: Optional[float] = None, pending: int = 0) -> dict:
+            waiting: frozenset = frozenset(), now: Optional[float] = None, pending: int = 0,
+            held_runs: frozenset = frozenset(), bound: Optional[set] = None) -> dict:
     """The reservation fit for one more active run; a pure function of its facts.
 
     counted maps each counted run ID to its repo ID; rss is the reading's run map
@@ -1005,14 +1006,26 @@ def project(available: int, rss: dict, counted: dict, steps: Optional[dict], lau
         step = None if steps is None else steps.get(run)
         held += size
         if run in launches:
+            # Per attempt (P3): an attempt none of whose own processes the reading shows is counted at R; one
+            # that is seen counts the larger of its own resident memory and A; the run's other processes add theirs.
             kind = "launched"
-            attempts = launches[run].get("attempts", 1)
-            demand = max(size, attempts * term) if visible else attempts * reservation
+            attempts = launches[run].get("attempts", [])
+            demand = sum(max(a["own"], term) if a["seen"] else reservation for a in attempts)
+            demand += max(0, size - sum(a["own"] for a in attempts))
+            visible = visible or any(a["seen"] for a in attempts)  # the line's seen mark follows its attempts
         elif run == self_run or run in waiting:
             kind, demand = "waiter", size
         elif (steps is not None and step is not None and step[0] == CI_STEP and step[1] == "running"
-              and not visible and (step[2] is None or proven_agentless(step, clock))):
+              and not visible and (step[2] is None or proven_agentless(step, clock))
+              and run not in held_runs and bound is not None and run in bound):
+            # Released only on proof (Main 1656): every launch of the run bound to an ended attempt by its own
+            # session key, no attempt of the run held, nothing of it visible.
             kind, demand = "ci-waiting", size
+        elif (steps is not None and step is not None and step[0] == CI_STEP and step[1] == "running" and not visible
+              and (step[2] is None or proven_agentless(step, clock))):
+            # Waiting on CI, but a launch of the run cannot be shown ended (no own session key, a shared key, a record
+            # missing or still held): kept at its full reservation, named so on the line (P1(f), Main 1656).
+            kind, demand = "ci-unproven", reservation
         else:
             kind = "step-unreadable" if steps is None else ("no-open-step" if step is None else "active")
             demand = max(size, term) if visible else reservation
@@ -1086,7 +1099,8 @@ def host_observation(fresh: bool = False) -> dict:
 def admission(reasons: List[str], report: Optional[dict], running: dict, counted: dict, steps: Optional[dict],
               launches: dict, cores: int, priority: str, self_run: Optional[str] = None,
               measured: Optional[Tuple[Tuple[int, int, int], Tuple[int, int]]] = None,
-              waiting: frozenset = frozenset(), pending: int = 0) -> Tuple[bool, str]:
+              waiting: frozenset = frozenset(), pending: int = 0, held_runs: frozenset = frozenset(),
+              bound: Optional[set] = None) -> Tuple[bool, str]:
     """The complete admission rule over one reading's facts: holds first, then the fit or the count fallback.
 
     measured, when given, supplies ((R, S, runs measured), (A, readings measured))
@@ -1110,7 +1124,7 @@ def admission(reasons: List[str], report: Optional[dict], running: dict, counted
             len([run for run in counted if run != self_run]), limit, launched, pending, priority)
     (reservation, slack, qualifying), (term, readings) = measured
     fit = project(report["available_bytes"], report["runs"], counted, steps, launches, reservation, slack, term, self_run,
-                  waiting, pending=pending)
+                  waiting, pending=pending, held_runs=held_runs, bound=bound)
     return fit["admit"], projection_text(fit, reservation, slack, term, qualifying, readings) + " priority=%s" % priority
 
 
@@ -1119,11 +1133,13 @@ def decide(running: dict, counted: dict, cores: int, priority: str, fresh: bool 
            waiting: frozenset = frozenset()) -> Tuple[bool, str]:
     """(admit, one-line reason) for the first waiter, from the running and counted runs and the host reading."""
     seen = host_observation(fresh)
-    launches = live_launches(directory) if directory else {}
+    states = judge_attempts(directory, set(running)) if directory else {}
+    launches, held_runs = attempt_reservations(states, seen["memory"])
     pending = counted_pending(directory, set(running)) if directory else 0
     steps = open_steps() if seen["memory"] is not None else None
+    ci_runs = {run for run in counted if steps and steps.get(run) and steps[run][0] == CI_STEP}
     return admission(seen["reasons"], seen["memory"], running, counted, steps, launches, cores, priority, self_run,
-                     waiting=waiting, pending=pending)
+                     waiting=waiting, pending=pending, held_runs=held_runs, bound=bound_runs(states, ci_runs))
 
 
 def pipeline_observation() -> Tuple[dict, int]:
@@ -1133,34 +1149,268 @@ def pipeline_observation() -> Tuple[dict, int]:
     return running_runs(), cores
 
 
-def live_launches(directory: str) -> dict:
-    """Run ID -> entry for each run with a launch-gate reservation whose gate still holds its lock.
+ATTEMPT_PREFIX = "attempt-"
+# How long the gate keeps relaying the agent's output after the agent exits, for a descendant that holds it open:
+# the daemon's own pipe backstop (no-mistakes fork internal/shellenv/shell_command_unix.go:20, defaultWaitDelay).
+# measured: value=5 date=2026-11-15 host=Mac-Studio.local margin=1
+RELAY_AFTER_EXIT_SECS = 5.0
+# Reads of one process's coalition before it counts as unreadable (and so holds every attempt it could belong to);
+# a process caught mid-creation answers on a later read. Not a measured limit: three reads, 0, 10 and 20 ms apart.
+COALITION_READ_TRIES = 3
 
-    An unlocked file belongs to a gate that no longer exists: it reserves nothing
-    and is removed. The entry's "attempts" is the number of live attempts of that
-    run: each live launch is its own agent and carries its own reservation, so
-    two attempts that both start an agent never share one.
+
+def kernel_snapshot() -> Dict[int, Tuple[int, int, Optional[int]]]:
+    """pid -> (parent pid, exact start time in microseconds, resource coalition or None) for every process.
+
+    One read of the kernel process table (KERN_PROC_ALL) and each process's resource
+    coalition (PROC_PIDCOALITIONINFO). OSError when the table cannot be read; a process
+    whose coalition cannot be read carries None. On a platform without these facts the
+    table is unreadable, so every attempt stays held (Main 1656).
     """
-    found: dict = {}
-    for path in Path(directory).glob("launch-*.lock"):
-        try:
-            fd = os.open(str(path), os.O_RDWR | getattr(os, "O_CLOEXEC", 0))
-        except FileNotFoundError:
-            continue
-        try:
-            if try_lock(fd):
-                path.unlink(missing_ok=True)
+    if sys.platform != "darwin":
+        raise OSError("no kernel process identity and coalition facts on %s" % sys.platform)
+    info = sibling("fm_proc_info", "fm-proc-info.py")
+    import struct
+    found = {}
+    for record in info.kinfos():
+        pid = struct.unpack_from("i", record, info.P_PID)[0]
+        if pid <= 0 or record[info.P_STAT] == info.SZOMB:
+            continue  # a zombie has ended; only its exit status remains
+        seconds, micros = info.process_identity(record)
+        found[pid] = [struct.unpack_from("i", record, info.E_PPID)[0], seconds * 1000000 + micros, info.coalition(pid)]
+    for retry in range(1, COALITION_READ_TRIES):
+        missing = [pid for pid, entry in found.items() if entry[2] is None]
+        if not missing:
+            break
+        time.sleep(0.01)  # a process in the middle of its own creation or exec is briefly unreadable
+        for pid in missing:
+            found[pid][2] = info.coalition(pid)
+    table = {}
+    for pid, (parent, start, coalition) in found.items():
+        if coalition is None:
+            # Still unreadable: the process ended (or became a zombie) after the table read, or it really cannot be read.
+            try:
+                again = info.kinfo(pid)
+            except (OSError, LookupError):
                 continue
-            entry = json.loads(os.pread(fd, 65536, 0))
-            if entry["run"] in found:
-                found[entry["run"]]["attempts"] += 1
-            else:
-                found[entry["run"]] = dict(entry, attempts=1)
-        except (ValueError, KeyError, TypeError):
+            seconds, micros = info.process_identity(again)
+            if seconds * 1000000 + micros != start or again[info.P_STAT] == info.SZOMB:
+                continue
+        table[pid] = (parent, start, coalition)
+    if not table:
+        raise OSError("empty kernel process table")
+    return table
+
+
+def process_identity_of(pid: int) -> Optional[Tuple[int, Optional[int]]]:
+    """(exact start time in microseconds, resource coalition) of one live process, or None when it cannot be read."""
+    try:
+        table = kernel_snapshot()
+    except (OSError, ValueError, AttributeError):
+        return None
+    entry = table.get(pid)
+    return None if entry is None else (entry[1], entry[2])
+
+
+def attempt_paths(directory: str) -> List[str]:
+    return sorted(str(path) for path in Path(directory).glob(ATTEMPT_PREFIX + "*.json"))
+
+
+def read_attempt(path: str) -> Optional[dict]:
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_SH)
+            return json.loads(handle.read())
+    except (OSError, ValueError):
+        return None
+
+
+def update_attempt(path: str, change) -> Optional[dict]:
+    """Apply change(record) to the record at PATH under its lock; returns the new record, None when unreadable."""
+    try:
+        with open(path, "r+", encoding="utf-8") as handle:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            record = json.loads(handle.read())
+            change(record)
+            handle.seek(0)
+            handle.truncate()
+            handle.write(json.dumps(record, sort_keys=True))
+            handle.flush()
+            return record
+    except (OSError, ValueError):
+        return None
+
+
+def write_attempt(directory: str, record: dict) -> str:
+    """Publish a new attempt record atomically (written whole, then renamed into place)."""
+    fd, temporary = tempfile.mkstemp(prefix="." + ATTEMPT_PREFIX, dir=directory)
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        handle.write(json.dumps(record, sort_keys=True))
+    final = os.path.join(directory, "%s%s.json" % (ATTEMPT_PREFIX, record["id"]))
+    os.rename(temporary, final)
+    return final
+
+
+def judge_attempts(directory: str, running: set, snapshot=None) -> Dict[str, dict]:
+    """Each attempt record's state under Main 1656's rule: hold on anything short of proof.
+
+    Returns id -> dict(record, path, state in held|ended, reason, processes) for every
+    record of a running run; records of runs no longer running are removed. An attempt
+    is held while one of its proven processes lives (its root, a recorded member, or a
+    live process whose parent chain reaches one, matched by pid and exact start time;
+    each newly reached one is recorded), or while any live process could be its: in its
+    launch coalition, started at or after its t0, and neither reaching another attempt's
+    proven process nor a live process started before its t0 (launchd aside) through its
+    parent chain; an unreadable snapshot or coalition holds too. It is ended only at a
+    complete snapshot with neither; that time is recorded. A marker, a missing marker or a
+    lost lineage never ends an attempt.
+    """
+    records = {}
+    for path in attempt_paths(directory):
+        record = read_attempt(path)
+        if record is None:
+            records[path] = None
             continue
-        finally:
-            os.close(fd)
-    return found
+        if record.get("run") not in running:
+            with contextlib.suppress(FileNotFoundError):
+                os.unlink(path)
+            continue
+        records[path] = record
+    if not records:
+        return {}
+    if snapshot is None:
+        try:
+            snapshot = kernel_snapshot()
+        except (OSError, ValueError, AttributeError) as exc:
+            snapshot = exc
+    states = {}
+    unreadable = isinstance(snapshot, Exception)
+    for path, record in records.items():
+        if record is None:
+            states[path] = dict(record=None, path=path, state="held", reason="attempt record unreadable", processes=[])
+    alive = lambda ident: (not unreadable and ident and snapshot.get(ident[0]) is not None  # noqa: E731
+                           and snapshot[ident[0]][1] == ident[1])
+    own: Dict[int, str] = {}
+    pending = [(path, record) for path, record in records.items() if record is not None and record.get("ended_us") is None]
+    for path, record in pending:
+        for ident in [record.get("root")] + list(record.get("members", [])):
+            if ident and alive(ident):
+                own[ident[0]] = path
+    gates = set()
+    for path, record in records.items():
+        for key in ("gate", "watcher"):
+            if record and record.get(key):
+                gates.add(tuple(record[key]))
+    if not unreadable:
+        changed = True
+        while changed:
+            changed = False
+            for pid, (parent, _, _) in snapshot.items():
+                if pid not in own and parent in own and (pid, snapshot[pid][1]) not in gates:
+                    own[pid] = own[parent]
+                    changed = True
+    now_us = int(time.time() * 1000000)
+    for path, record in pending:
+        if unreadable:
+            states[path] = dict(record=record, path=path, state="held", reason="process table unreadable: %s" % snapshot,
+                                processes=[])
+            continue
+        mine = sorted((pid, snapshot[pid][1]) for pid, owner in own.items() if owner == path)
+        reason = None
+        if mine:
+            reason = "its process %d lives" % mine[0][0]
+        else:
+            t0, coalition = record.get("t0_us", 0), record.get("coalition")
+            for pid, (parent, start, where) in snapshot.items():
+                if pid in own or start < t0 or (pid, start) in gates or pid == 1:
+                    continue
+                if where is not None and where != coalition:
+                    continue  # outside the launch coalition: proven not its
+                cursor, steps, anchored = parent, 0, False
+                while cursor not in (0, 1) and steps < 4096:
+                    entry = snapshot.get(cursor)
+                    if entry is None:
+                        break
+                    if cursor in own or entry[1] < t0:
+                        anchored = True  # its line reaches another owner, or a process older than the attempt
+                        break
+                    cursor, steps = entry[0], steps + 1
+                if anchored:
+                    continue
+                if where is None:
+                    reason = "process %d could be its (coalition unreadable)" % pid
+                    break
+                words = process_argv(pid) or ["unreadable"]
+                reason = "process %d (%s; parent %d) could be its (launch coalition, started after it, no other owner)" % (
+                    pid, " ".join(words[:3])[:120], parent)
+                break
+        if mine:
+            new = [list(item) for item in mine if list(item) not in record.get("members", []) and list(item) != record.get("root")]
+            if new:
+                record = update_attempt(path, lambda r: r.setdefault("members", []).extend(new)) or record
+        if reason is None:
+            record = update_attempt(path, lambda r: r.__setitem__("ended_us", r.get("ended_us") or now_us)) or record
+            states[path] = dict(record=record, path=path, state="ended", reason="no process of it, none could be",
+                                processes=[])
+        else:
+            states[path] = dict(record=record, path=path, state="held", reason=reason, processes=mine)
+    for path, record in records.items():
+        if record is not None and record.get("ended_us") is not None and path not in states:
+            states[path] = dict(record=record, path=path, state="ended", reason="ended", processes=[])
+    return states
+
+
+def attempt_reservations(states: Dict[str, dict], report: Optional[dict]) -> Tuple[dict, set]:
+    """(run -> {repo, attempts: [{seen, own}]} for held attempts that reserve, every run with a held attempt).
+
+    An attempt's own resident memory joins the reading by pid and exact start time, from a
+    figure of that same read only (rss_source task); any other row leaves the process
+    unseen (Main 1656, P3).
+    """
+    rows = {}
+    for row in (report or {}).get("processes", []) or []:
+        if isinstance(row, dict) and type(row.get("start_us")) is int and row.get("rss_source") == "task" \
+                and type(row.get("rss_bytes")) is int:
+            rows[(row["pid"], row["start_us"])] = row["rss_bytes"]
+    launches: dict = {}
+    held_runs = set()
+    for state in states.values():
+        record = state["record"]
+        if state["state"] != "held" or record is None:
+            continue
+        held_runs.add(record.get("run"))
+        if not record.get("reserves", True):
+            continue
+        joined = [rows[tuple(ident)] for ident in state["processes"] if tuple(ident) in rows]
+        entry = launches.setdefault(record["run"], dict(repo=record.get("repo"), attempts=[]))
+        entry["attempts"].append(dict(seen=bool(joined), own=sum(joined)))
+    return launches, held_runs
+
+
+def bound_runs(states: Dict[str, dict], runs: set) -> set:
+    """The runs every invocation row of which is bound to an ended attempt record by the row's own session key.
+
+    A row binds only when its session_key is nonempty, appears in no other row of the run,
+    and an ended record of that run carries it (Main 1656, P2's outcome rule); a run with an
+    unbound row, or whose rows cannot be read, is not in the set.
+    """
+    if not runs:
+        return set()
+    try:
+        rows = read_host_db("SELECT run_id, session_key FROM agent_invocations WHERE run_id IN (%s)"
+                            % ",".join("?" * len(runs)), tuple(sorted(runs)))
+    except (OSError, sqlite3.Error, ValueError):
+        return set()
+    ended: Dict[str, set] = {}
+    for state in states.values():
+        record = state["record"]
+        if record is not None and state["state"] == "ended" and record.get("session_key"):
+            ended.setdefault(record.get("run"), set()).add(record["session_key"])
+    keys: Dict[str, list] = {run: [] for run in runs}
+    for run, key in rows:
+        keys.setdefault(run, []).append(key)
+    return {run for run, found in keys.items()
+            if all(isinstance(key, str) and key and found.count(key) == 1 and key in ended.get(run, ()) for key in found)}
 
 
 def intent_of(args) -> Optional[str]:
@@ -1427,6 +1677,17 @@ def admitted_client_running(holder: int, admitted) -> bool:
             if words and os.path.basename(words[0]) == "no-mistakes" and same_start_args(admitted, words[1:]):
                 return True
     return False
+
+
+@contextlib.contextmanager
+def start_lock(directory: str):
+    """Hold the pool's start lock (the lock every admission decision holds) for one short step."""
+    fd = open_lock(os.path.join(directory, "pipeline-start.lock"))
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        yield
+    finally:
+        os.close(fd)
 
 
 def publish_locked(directory: str, prefix: str, entry: dict) -> Tuple[int, str]:
@@ -1882,16 +2143,20 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
     admission_fd = pending_fd = None
     pending_path = None
 
-    def release_pending() -> None:
+    def release_pending(spend: Optional[str] = None, at_return: bool = True) -> None:
         nonlocal pending_fd, pending_path
-        if pending_path is not None and pending_fd is not None:
-            # At COMMAND's return, a row this start's own run made is spent before the record goes.
-            with contextlib.suppress(OSError, sqlite3.Error, ValueError):
-                spend_at_return(directory, pending_path)
         if pending_path is not None:
-            for path in (pending_path, pending_path + ".claimed"):
-                with contextlib.suppress(FileNotFoundError):
-                    os.unlink(path)
+            # Under the start lock, so no decision sees the row spent while this record still counts (or the reverse).
+            with start_lock(directory):
+                with contextlib.suppress(OSError, sqlite3.Error, ValueError):
+                    if spend is not None:
+                        spend_row(directory, spend)
+                    elif at_return and pending_fd is not None:
+                        # At COMMAND's return, a row this start's own run made is spent before the record goes.
+                        spend_at_return(directory, pending_path)
+                for path in (pending_path, pending_path + ".claimed"):
+                    with contextlib.suppress(FileNotFoundError):
+                        os.unlink(path)
             pending_path = None
         if pending_fd is not None:
             os.close(pending_fd)
@@ -1931,11 +2196,10 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
                     if path == pending_path:
                         if done:
                             # This start's own run registered: the daemon's row now carries it, and that row
-                            # is spent so it ends no other reservation once this record is gone.
+                            # is spent, with this record removed in the same locked step, so it ends no other.
                             if own is not None:
-                                spend_row(directory, own)
                                 log(2, "pipeline-start registered: run %s (its own row ended this start's reservation) %s" % (own, context))
-                            release_pending()
+                            release_pending(spend=own, at_return=False)
                             return True
                         return False
                 return False
@@ -2205,21 +2469,34 @@ def refuse_visibly(text: str, key: str, branch) -> None:
     status_log_line(branch, key, text)
 
 
-def start_watched(command: List[str]) -> Tuple[int, int]:
-    """Start the agent as this gate's child in its process group, with a watcher that kills it if the gate dies.
+def resume_session_key(command: List[str]) -> Optional[str]:
+    """The invocation's own session key when the launch resumes a session (--resume <id>), as the daemon writes it."""
+    import hashlib
+    for index, word in enumerate(command):
+        if word == "--resume" and index + 1 < len(command) and command[index + 1]:
+            return hashlib.sha256(command[index + 1].encode()).hexdigest()[:16]
+        if word.startswith("--resume="):
+            return hashlib.sha256(word.split("=", 1)[1].encode()).hexdigest()[:16]
+    return None
 
-    macOS has no parent-death signal: a forked watcher blocks on a pipe only this
-    gate can write. The agent's child process waits for a go byte before it
-    execs, and the gate sends go only after the watcher holds the agent's pid, so
-    there is no moment when an agent runs that the watcher cannot name: a gate
-    that dies before go leaves a child that exits without starting the agent. A
-    normal gate exit writes one byte to the watcher first; end-of-file without it
-    means the gate died, and the watcher kills the agent at once, and the whole
-    process group when the gate leads it, as the daemon's launch does.
-    Returns (agent pid, watcher pipe); FileNotFoundError or PermissionError when
-    the agent cannot be executed.
+
+def start_watched(command: List[str], directory: str, base: dict) -> Tuple[int, int, str, int, int]:
+    """Start the agent as this gate's child, its attempt record published before it can run.
+
+    The agent's child process waits for a go byte before it execs. Before go the gate
+    records the attempt (P9.sequence(5), Main 1656): its root (the child, by pid and exact
+    kernel start time), the gate and its watcher (never counted), the launch coalition and
+    t0; so an agent can never run unrecorded, and a gate that dies before go leaves a child
+    that exits without starting the agent. The agent's standard output goes to a pipe the
+    gate relays byte for byte, so the invocation's own session key can be read (P2).
+    A forked watcher, holding only a pipe the gate writes, kills the agent and the group the
+    gate leads if the gate dies without finishing.
+    Returns (agent pid, watcher pipe, record path, relay read end, published_ns);
+    FileNotFoundError or PermissionError when the agent cannot be executed, LaunchRefused
+    when the process facts cannot be read (the agent never starts).
     """
     gate = os.getpid()
+    t0_us = int(time.time() * 1000000)
     read_end, write_end = os.pipe()
     watcher = os.fork()
     if watcher == 0:  # pragma: no cover - exercised through the executable
@@ -2243,6 +2520,7 @@ def start_watched(command: List[str]) -> Tuple[int, int]:
         finally:
             os._exit(0)
     os.close(read_end)
+    relay_read, relay_write = os.pipe()
     go_read, go_write = os.pipe()
     error_read, error_write = os.pipe()
     child = os.fork()
@@ -2251,6 +2529,9 @@ def start_watched(command: List[str]) -> Tuple[int, int]:
             os.close(go_write)
             os.close(error_read)
             os.close(write_end)
+            os.close(relay_read)
+            os.dup2(relay_write, 1)
+            os.close(relay_write)
             _restore_default_signals()
             _restore_exec_signals()
             if os.read(go_read, 1) != b"g":
@@ -2260,8 +2541,23 @@ def start_watched(command: List[str]) -> Tuple[int, int]:
             os.write(error_write, str(exc.errno).encode())
         finally:
             os._exit(127)
-    for fd in (go_read, error_write):
+    for fd in (go_read, error_write, relay_write):
         os.close(fd)
+    try:
+        snapshot = kernel_snapshot()
+        root, gate_entry, watcher_entry = snapshot[child], snapshot[gate], snapshot.get(watcher)
+    except (OSError, ValueError, KeyError, AttributeError) as exc:
+        os.close(go_write)
+        os.waitpid(child, 0)
+        os.write(write_end, b"d")
+        os.close(write_end)
+        raise LaunchRefused("process facts unreadable", "the attempt cannot be recorded before its agent runs: %s" % exc,
+                            "restore read access to the kernel process table; the next launch enters the gate again")
+    record = dict(base, id=os.urandom(16).hex(), t0_us=t0_us, root=[child, root[1]], gate=[gate, gate_entry[1]],
+                  watcher=[watcher, watcher_entry[1]] if watcher_entry else None, coalition=gate_entry[2],
+                  session_key=resume_session_key(command), members=[], ended_us=None)
+    path = write_attempt(directory, record)
+    published_ns = time.time_ns()
     os.write(write_end, str(child).encode().ljust(32))
     os.write(go_write, b"g")
     os.close(go_write)
@@ -2271,9 +2567,52 @@ def start_watched(command: List[str]) -> Tuple[int, int]:
         os.waitpid(child, 0)
         os.write(write_end, b"d")
         os.close(write_end)
+        os.close(relay_read)
         code = int(failure)
         raise (FileNotFoundError if code == errno.ENOENT else PermissionError)(code, os.strerror(code), command[0])
-    return child, write_end
+    return child, write_end, path, relay_read, published_ns
+
+
+def relay_output(relay_fd: int, record_path: str, known: bool) -> None:
+    """Copy the agent's standard output to the gate's own, unchanged, until end of file.
+
+    Until the session key is known, the first stream-json lines are read for a system
+    line's session_id, and its key (sha256, 16 hex digits, as the daemon writes it) is put
+    in the attempt record.
+    """
+    import hashlib
+    pending = b""
+    while True:
+        try:
+            chunk = os.read(relay_fd, 65536)
+        except InterruptedError:  # pragma: no cover - PEP 475 retries
+            continue
+        except OSError:
+            break
+        if not chunk:
+            break
+        view = memoryview(chunk)
+        while view:
+            try:
+                written = os.write(1, view)
+            except OSError:
+                written = len(view)  # the caller stopped reading: drain the agent as a closed pipe would not block it
+            view = view[written:]
+        if not known:
+            pending += chunk
+            while b"\n" in pending and not known:
+                line, pending = pending.split(b"\n", 1)
+                try:
+                    message = json.loads(line)
+                except ValueError:
+                    continue
+                if isinstance(message, dict) and message.get("type") == "system" and isinstance(message.get("session_id"), str):
+                    key = hashlib.sha256(message["session_id"].encode()).hexdigest()[:16]
+                    update_attempt(record_path, lambda record: record.__setitem__("session_key", key))
+                    known = True
+            if len(pending) > 1048576:
+                known = True  # no session line in the first MiB: the key stays unknown, the run stays held
+    os.close(relay_fd)
 
 
 def cmd_launch_gate(args: argparse.Namespace) -> int:
@@ -2307,14 +2646,20 @@ def cmd_launch_gate(args: argparse.Namespace) -> int:
         if not recognized_step(step[0]):
             raise LaunchRefused("step not established: unrecognized step %r" % step[0], "run %s" % run,
                                 "update the gate's step list to the daemon's; a launch whose step cannot be established is never started")
-        if counted and step[0] != CI_STEP:
-            # Another step of a run already counted as active: unchanged, at once, with no output of the gate's own.
-            _restore_exec_signals()
-            return exec_direct(command, dict(os.environ), 2)
-        log(2, "launch-gate run=%s branch=%s step=%s:%s counted=%s agent_pid=%s attempt=%s" % (
-            run, branch, step[0], step[1], "yes" if counted else "no", step[2], attempt))
         directory = pool_dir()
         ensure_pool_dir(directory)
+        base = dict(run=run, repo=repo, step=step[0], round_started=step[3])
+        if counted and step[0] != CI_STEP:
+            # Another step of a run already counted as active: at once, unheld and unreserved, with no output of the
+            # gate's own; its attempt is recorded so the run's release can be shown later (P2, Main 1656).
+            try:
+                child, watch_fd, path, relay_fd, _ = start_watched(command, directory, dict(base, reserves=False))
+            except (FileNotFoundError, PermissionError, NotADirectoryError) as exc:
+                log(2, "command %s: %s" % ("not found" if isinstance(exc, FileNotFoundError) else "not executable", command[0]))
+                return 127 if isinstance(exc, FileNotFoundError) else 126
+            return wait_agent(child, watch_fd, relay_fd, path, resume_session_key(command) is not None)
+        log(2, "launch-gate run=%s branch=%s step=%s:%s counted=%s agent_pid=%s attempt=%s" % (
+            run, branch, step[0], step[1], "yes" if counted else "no", step[2], attempt))
         bound, bound_text = hold_bound(directory, step[0], step[3])
         gate_started = time.time()
         held = []
@@ -2340,16 +2685,12 @@ def cmd_launch_gate(args: argparse.Namespace) -> int:
                 "this launch fails and its run fails with it (Main 1838: the run is outside the counted set, so it is "
                 "never started without capacity); restart the run once capacity has returned")
         admitted_ns = time.time_ns()
-        reservation_fd = None
         try:
-            reservation_fd, _ = publish_locked(directory, "launch-", {
-                "run": run, "repo": repo, "pid": os.getpid(), "started_ns": admitted_ns})
-            published_ns = time.time_ns()
+            # In the same locked step as the admit, the attempt's record is published before the agent can run.
             try:
-                child, watch_fd = start_watched(command)
+                child, watch_fd, path, relay_fd, published_ns = start_watched(command, directory, dict(base, reserves=True))
             except (FileNotFoundError, PermissionError, NotADirectoryError) as exc:
                 # The shell's statuses for an agent that cannot be launched, reported unchanged.
-                os.close(reservation_fd)
                 log(2, "launch-gate: agent %s: %s" % ("not found" if isinstance(exc, FileNotFoundError) else "not executable", command[0]))
                 return 127 if isinstance(exc, FileNotFoundError) else 126
             started_ns = time.time_ns()
@@ -2360,7 +2701,7 @@ def cmd_launch_gate(args: argparse.Namespace) -> int:
             reason, decision_context(directory, repo, branch), bound_text, admitted_ns, published_ns, started_ns, unlocked_ns))
         if held:
             durable_line("run %s (%s) admitted after %.2fs held: %s" % (run, branch, waited, reason), "launch-gate-" + run)
-        return wait_agent(child, watch_fd, reservation_fd)
+        return wait_agent(child, watch_fd, relay_fd, path, resume_session_key(command) is not None)
     except LaunchRefused as refused:
         # With no run identified (unmapped, ambiguous, unreadable database) the line names the worktree and attempt.
         text = "launch-gate refused: %s: %s; %s; next action: %s" % (
@@ -2386,8 +2727,17 @@ def wait_child(pid: int) -> int:
             return -os.WTERMSIG(status)
 
 
-def wait_agent(child: int, watch_fd: int, reservation_fd: int) -> int:
-    """Forward signals to the agent, keep its reservation while it lives, and return or re-raise its own ending."""
+def wait_agent(child: int, watch_fd: int, relay_fd: int, record_path: str, session_known: bool) -> int:
+    """Forward signals to the agent, relay its output, and return or re-raise its own ending.
+
+    The attempt record outlives this gate: the agent's reservation follows the attempt's
+    processes (judge_attempts), never this gate's life. The gate returns after the agent
+    exits and its standard output reaches end of file, or at most RELAY_AFTER_EXIT_SECS after
+    the agent exits.
+    """
+    import threading
+    relay = threading.Thread(target=relay_output, args=(relay_fd, record_path, session_known), daemon=True)
+    relay.start()
     # The agent runs in the gate's process group (the daemon gives the launcher its own group). A signal sent to the
     # gate goes to that whole group, so it reaches the agent below a dispatcher (tc run's spawnSync child), not only
     # the gate's direct child; the gate ignores its own copy, and the watcher ignores these three. A gate that does not
@@ -2409,6 +2759,11 @@ def wait_agent(child: int, watch_fd: int, reservation_fd: int) -> int:
         signal.signal(signum, forward)
     try:
         code = wait_child(child)
+        # A descendant that kept the agent's output open would hold this relay without end; the daemon closes such
+        # pipes RELAY_AFTER_EXIT_SECS after its launcher exits, so the gate drains for at most that long and returns.
+        ends = time.monotonic() + RELAY_AFTER_EXIT_SECS
+        while relay.is_alive() and time.monotonic() < ends:
+            relay.join(0.2)
     except BaseException:
         with contextlib.suppress(OSError):
             os.kill(child, signal.SIGKILL)
@@ -2416,7 +2771,6 @@ def wait_agent(child: int, watch_fd: int, reservation_fd: int) -> int:
             os.waitpid(child, 0)
         raise
     finally:
-        os.close(reservation_fd)
         with contextlib.suppress(OSError):
             os.write(watch_fd, b"d")
         os.close(watch_fd)

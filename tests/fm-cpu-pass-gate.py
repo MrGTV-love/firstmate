@@ -96,14 +96,15 @@ try:
         child, log = gate(folder, env, run, mode='exit-0')
         finish(child)
         assert log.with_suffix('.stderr').read_text() == '' and log.with_suffix('.stdout').read_text() == '', run
-        assert (folder / (run + '.agent')).exists() and not live_entries(folder, 'launch-*.lock'), run
+        assert (folder / (run + '.agent')).exists() and reserving_held(folder, ['x', 'g']) == 0, run
 
     # Exit codes and signal deaths pass through; a signal sent to the gate reaches the agent.
     for mode, code in (('exit-0', 0), ('exit-1', 1), ('exit-75', 75), ('self-term', -signal.SIGTERM)):
         folder, db, env = gate_case('gate-exit-' + mode)
         child, log = gate(folder, env, 'x', mode=mode)
         finish(child, code)
-        assert not live_entries(folder, 'launch-*.lock')
+        held = reserving_held(folder, ['x'])
+        assert held == 0, (mode, repr(held))
     folder, db, env = gate_case('gate-forward')
     child, log = gate(folder, env, 'x', mode='trap')
     wait_for(lambda: (folder / 'x.agent').exists(), 'agent started')
@@ -115,7 +116,7 @@ try:
     for missing, code in ((str(folder / 'no-such-agent'), 127), (str(folder / 'wt-x'), 126)):
         out = subprocess.run(['bash', str(repo / 'bin/fm-cpu-pass.sh'), 'launch-gate', '--', missing], env=env, cwd=str(folder / 'wt-x'),
                              stdin=subprocess.DEVNULL, capture_output=True, text=True)
-        assert out.returncode == code and not live_entries(folder, 'launch-*.lock'), (out.returncode, out.stderr)
+        assert out.returncode == code and reserving_held(folder, ['x']) == 0, (out.returncode, out.stderr)
 
     # Admission-to-launch order: the reservation is published under the start lock before the agent
     # starts and the lock is released after both; the agent's start waits on no observation.
@@ -127,10 +128,10 @@ try:
     started = json.loads((folder / 'x.agent').read_text())['started_ns']
     assert int(stamps['admitted_ns']) <= int(stamps['published_ns']) <= int(stamps['agent_started_ns']) <= int(stamps['unlocked_ns']), stamps
     assert int(stamps['published_ns']) <= started, (stamps, started)
-    assert live_entries(folder, 'launch-*.lock') == 1
+    assert reserving_held(folder, ['x']) == 1
     (folder / 'x.release').touch()
     finish(child)
-    assert live_entries(folder, 'launch-*.lock') == 0
+    wait_for(lambda: reserving_held(folder, ['x']) == 0, 'the attempt ends with its agent')
 
     # Simultaneous resumes with a lagging reading: room for exactly two (S = 8, R = 3, 12 GiB).
     # The first agent is never visible; the second is decided counting it at R, the third waits
@@ -177,7 +178,9 @@ try:
     folder, db, env = gate_case('gate-after-visible', available=int(8.5 * GIB), runs=[('x', 'ci', 'running', None)])
     child, log = gate(folder, env, 'x')
     wait_for(lambda: (folder / 'x.agent').exists(), 'agent started')
-    facts(folder, available=int(8.5 * GIB), runs=[('repo', 'x', GIB // 5)])
+    # The reading shows the agent's own process (pid and exact start time, as the census reports it).
+    agent_pid = json.loads((folder / 'x.agent').read_text())['pid']
+    facts(folder, available=int(8.5 * GIB), runs=[('repo', 'x', GIB // 5, agent_pid, start_us(agent_pid))])
     later = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'later')], env, folder / 'later')
     wait_for(lambda: 'waiting: counted=1 projected=%d ' % (9 * GIB) in (folder / 'later.stderr').read_text(), 'A, not startup memory')
     assert 'x:launched:%d' % GIB in (folder / 'later.stderr').read_text()
@@ -209,18 +212,22 @@ try:
         change(db, "UPDATE step_results SET status = 'running', agent_pid = NULL WHERE run_id = ?", (run,))
         facts(folder, available=int(8.5 * GIB), runs=[('repo', r, tenth) for r in names[index + 1:]])
 
-    # Dead holders and retries: an unlocked launch record reserves nothing and is removed; two live
-    # attempts of one run hold one reservation.
+    # Ended attempts and retries: an attempt record whose root no longer lives, and no process of which could
+    # remain, reserves nothing; each live attempt of one run reserves its own R.
     folder, db, env = gate_case('gate-holders', available=12 * GIB, runs=[('x', 'ci', 'running', None)])
     (folder / 'pool').mkdir(exist_ok=True)
-    (folder / 'pool' / 'launch-dead.lock').write_text(json.dumps(dict(run='x', repo='repo', pid=999999, started_ns=1)))
+    gone = subprocess.Popen(['true']); gone.wait()
+    me = engine().kernel_snapshot()[os.getpid()]
+    (folder / 'pool' / 'attempt-dead.json').write_text(json.dumps(dict(
+        id='dead', run='x', repo='repo', step='ci', reserves=True, t0_us=int(time.time() * 1000000), root=[gone.pid, 1],
+        gate=None, watcher=None, coalition=me[2], session_key=None, members=[], ended_us=None)))
     finish(launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'm1')], env, folder / 'dead'))
-    assert 'holding_only=[x:ci-waiting:0:unseen]' in (folder / 'dead.stderr').read_text() and not (folder / 'pool/launch-dead.lock').exists()
+    assert 'holding_only=[x:ci-waiting:0:unseen]' in (folder / 'dead.stderr').read_text(), (folder / 'dead.stderr').read_text()
     first, _ = gate(folder, env, 'x', log='attempt-1')
-    wait_for(lambda: live_entries(folder, 'launch-*.lock') == 1, 'first attempt reserved')
+    wait_for(lambda: reserving_held(folder, ['x']) == 1, 'first attempt reserved')
     (folder / 'x.agent').unlink(missing_ok=True)
     second, _ = gate(folder, env, 'x', log='attempt-2')
-    wait_for(lambda: live_entries(folder, 'launch-*.lock') == 2, 'second attempt reserved')
+    wait_for(lambda: reserving_held(folder, ['x']) == 2, 'second attempt reserved')
     # Two live attempts, both started and not yet visible, reserve 2 x R = 6 GiB: a start that would fit beside one
     # (3 + 8 = 11 of 12 GiB) waits beside two (6 + 8 = 14), and starts once one attempt ends.
     two = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'm2')], env, folder / 'two')
@@ -245,7 +252,7 @@ try:
     assert 'next action: ' in text and 'auto_fix.ci' in text and 'ask-user decision' in text, text
     no_retry_phrase(text)
     assert 'refused: hold bound reached' in wakes(folder) and 'held for capacity' in wakes(folder)
-    assert not live_entries(folder) and not live_entries(folder, 'launch-*.lock')
+    assert not live_entries(folder) and reserving_held(folder, ['x', 'y']) == 0
     # The real bound, driven by the clock: the host's 240-minute budget with a completed CI-fix p99 of 152.45 min
     # (9147000 ms) gives 14400 - 9147 = 5253 s; the omitted budget (30 min default) with a p99 of 10 min gives 1200 s.
     # Five seconds before the bound the gate still holds; a fit then is admitted; at the bound it refuses.
@@ -301,14 +308,15 @@ try:
         kill(child)
         finish(child, -signal.SIGKILL)
         wait_for(lambda: not alive(agent_pid), label + ': no agent left')
-        assert live_entries(folder, 'launch-*.lock') == 0 and live_entries(folder, 'pipeline-start.lock') == 0
+        wait_for(lambda: reserving_held(folder, ['x']) == 0, label + ': the attempt ends')
+        assert live_entries(folder, 'pipeline-start.lock') == 0
     folder, db, env = gate_case('gate-raise')
     child, log = gate(folder, dict(env, CASE_GATE_RAISE='1'), 'x')
     wait_for(lambda: (folder / 'x.agent').exists(), 'agent started')
     agent_pid = json.loads((folder / 'x.agent').read_text())['pid']
     finish(child, 1)
     wait_for(lambda: not alive(agent_pid), 'no agent after an internal error')
-    assert live_entries(folder, 'launch-*.lock') == 0
+    wait_for(lambda: reserving_held(folder, ['x']) == 0, 'the attempt ends after an internal error')
     # Contract revision 28 cases. Every case runs; failures are collected and reported together.
     r28 = {}
 
@@ -357,7 +365,7 @@ try:
             assert not (folder / 'x.agent').exists() and child.poll() is None, (label, stderr_of(log))
             facts(folder, available=40 * GIB)
             wait_for(lambda: (folder / 'x.agent').exists(), label + ': admitted by itself')
-            assert 'launch-gate admitted: ' in stderr_of(log) and live_entries(folder, 'launch-*.lock') == 1, label
+            assert 'launch-gate admitted: ' in stderr_of(log) and reserving_held(folder, ['x']) == 1, label
             (folder / 'x.release').touch()
             finish(child)
 
@@ -369,7 +377,7 @@ try:
         change(db, 'INSERT INTO repos (id, working_path) VALUES (?, ?)', ('repo', str(folder / 'checkout')))
         child, log = gate(folder, env, 'wizard', mode='exit-0', cwd=folder / 'checkout')
         finish(child)
-        assert (folder / 'wizard.agent').exists() and stderr_of(log) == '' and not live_entries(folder, 'launch-*.lock')
+        assert (folder / 'wizard.agent').exists() and stderr_of(log) == '' and not list((folder / 'pool').glob('attempt-*.json'))
         for label, where in (('inside-run', folder / 'wt-x' / 'sub'), ('inside-checkout', folder / 'checkout' / 'sub'),
                              ('outside', folder / 'nowhere')):
             where.mkdir(parents=True)
@@ -422,7 +430,7 @@ try:
         folder, db, env = gate_case('gate-held-' + label, available=GIB, ci_ms=(), runs=[('x', 'ci', 'running', None), ('y', 'review', 'running', None)])
         with sqlite3.connect(db) as connection:
             connection.execute('DELETE FROM agent_invocations')
-            connection.executemany('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            connection.executemany('INSERT INTO agent_invocations (id, run_id, step_name, purpose, started_at, completed_at, duration_ms, exit_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
                                    [(str(i), run, 'ci', 'ci', start, end, ms, status) for i, (run, start, end, ms, status) in enumerate(rows)])
         (folder / 'pool').mkdir(exist_ok=True)
         (folder / 'pool' / 'launch-holds.jsonl').write_text(''.join(json.dumps(dict(run=run, step='ci', gate_started=at, attempt='a%d' % i)) + '\n'
@@ -583,6 +591,96 @@ os.waitpid(child, 0)
             wait_for(lambda: (folder / ('below.got-%d' % number)).exists(), 'signal %d reached the agent below the dispatcher' % number)
             child.wait(timeout=30)
 
+    # Main 1656 (hold on anything short of proof): the outside review's counterexamples as failing-first cases.
+    def escaped_descendant_holds():
+        # F1 / the review's escape: X's agent leaves an orphaned descendant (own session, descriptors closed, an empty
+        # environment) and exits. The descendant keeps X held, so a start that fits only without X's R waits; once it
+        # exits, X ends and the start is admitted by itself. R = 3, S = 8: 10 GiB fits 8 and not 11.
+        folder, db, env = gate_case('m1656-escape', available=10 * GIB, runs=[('x', 'ci', 'running', None)])
+        child, log = gate(folder, env, 'x', mode='escape')
+        finish(child)
+        held = reserving_held(folder, ['x'])
+        assert held == 1 and 'could be its' in held.reasons[0], repr(held)
+        later = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'later')], env, folder / 'later')
+        wait_for(lambda: 'x:launched:%d:unseen' % (3 * GIB) in (folder / 'later.stderr').read_text(), 'X counted while its escapee lives')
+        assert not (folder / 'later').exists()
+        (folder / 'x.escapee-release').touch()
+        finish(later)
+        wait_for(lambda: reserving_held(folder, ['x']) == 0, 'X ends once its escapee exits')
+
+    def foreign_orphan_in_coalition_holds():
+        # F2 (the amended r28 x/y outcome): Y's orphaned descendant, inside the launch coalition, outlives X; it keeps X
+        # held too (foreign in-coalition work may delay admission, never advance it), until it exits.
+        folder, db, env = gate_case('m1656-foreign-in', available=40 * GIB, runs=[('x', 'ci', 'running', None), ('y', 'ci', 'running', None)])
+        gate_x, _ = gate(folder, env, 'x')
+        wait_for(lambda: (folder / 'x.agent').exists(), 'x runs')
+        gate_y, _ = gate(folder, env, 'y', mode='escape')
+        finish(gate_y)
+        (folder / 'x.release').touch()
+        finish(gate_x)
+        held = reserving_held(folder, ['x', 'y'])
+        assert held == 2, repr(held)
+        (folder / 'y.escapee-release').touch()
+        wait_for(lambda: reserving_held(folder, ['x', 'y']) == 0, 'both end once the orphan exits')
+
+    def foreign_orphan_outside_coalition():
+        # Control: an orphan outside the launch coalition, started after X, does not hold X.
+        folder, db, env = gate_case('m1656-foreign-out', runs=[('x', 'ci', 'running', None)])
+        gate_x, _ = gate(folder, env, 'x')
+        wait_for(lambda: (folder / 'x.agent').exists(), 'x runs')
+        outside = subprocess.Popen(['/bin/sh', '-c', '(sleep 30 &) ; exit 0'], start_new_session=True)
+        outside.wait()
+        (folder / 'x.release').touch()
+        finish(gate_x)
+        held = reserving_held(folder, ['x'])
+        assert held == 0, repr(held)
+
+    def invocation_binding():
+        # F2/F3 of the review, A3: rows A [10,40] and B [20,40] of run x with no session keys and two ended records: the
+        # run is not released (it stays counted at R); the same rows with their own keys carried by ended records
+        # release it; a key shared by two rows does not bind.
+        for label, keys, records, released in (('no-keys', (None, None), (None, None), False),
+                                               ('own-keys', ('aaaa', 'bbbb'), ('aaaa', 'bbbb'), True),
+                                               ('shared-key', ('aaaa', 'aaaa'), ('aaaa', 'aaaa'), False),
+                                               ('missing-record', ('aaaa', 'bbbb'), ('aaaa', None), False)):
+            folder, db, env = gate_case('m1656-binding-' + label, available=10 * GIB, runs=[('x', 'ci', 'running', None)])
+            with sqlite3.connect(db) as connection:
+                connection.executemany('INSERT INTO agent_invocations (id, run_id, step_name, purpose, started_at, completed_at,'
+                                       ' duration_ms, exit_status, session_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                                       [('A', 'x', 'ci', 'ci', 10, 40, 30000, 'ok', keys[0]), ('B', 'x', 'ci', 'ci', 20, 40, 20000, 'ok', keys[1])])
+            (folder / 'pool').mkdir(exist_ok=True)
+            gone = subprocess.Popen(['true']); gone.wait()
+            for index, key in enumerate(records):
+                (folder / 'pool' / ('attempt-r%d.json' % index)).write_text(json.dumps(dict(
+                    id='r%d' % index, run='x', repo='repo', step='ci', reserves=True, t0_us=15000000 + index * 10000000,
+                    root=[gone.pid, 1], gate=None, watcher=None, coalition=0, session_key=key, members=[], ended_us=1)))
+            finish(launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'm')], env, folder / 'm'), 0) if released else None
+            if released:
+                assert 'x:ci-waiting:0' in (folder / 'm.stderr').read_text(), (label, (folder / 'm.stderr').read_text())
+            else:
+                child = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'm')], env, folder / 'm')
+                wait_for(lambda: 'x:ci-unproven:%d' % (3 * GIB) in (folder / 'm.stderr').read_text(), label + ': x stays counted at R')
+                assert not (folder / 'm').exists(), (label, (folder / 'm.stderr').read_text())
+                os.killpg(child.pid, signal.SIGKILL); child.wait()
+
+    def same_second_reuse_join():
+        # F4: the reading names the attempt's pid with another generation's start time in the same second (its row is
+        # another run's memory): the join refuses, so the attempt is unseen and counted at R; with the exact start time
+        # the same row joins and the attempt counts its 10 GiB. A second-rounded join would credit the foreign 10 GiB.
+        for label, offset, expected in (('reused', 500000, 'x:launched:%d:unseen' % (3 * GIB)), ('same-generation', 0, 'x:launched:%d,' % (10 * GIB))):
+            folder, db, env = gate_case('m1656-join-' + label, available=GIB, runs=[('x', 'ci', 'running', None)])
+            child, log = gate(folder, env, 'x')
+            wait_for(lambda: (folder / 'x.agent').exists(), 'x runs')
+            agent_pid = json.loads((folder / 'x.agent').read_text())['pid']
+            exact = start_us(agent_pid)
+            started = exact - exact % 1000000 + (exact % 1000000 + offset) % 1000000  # same second, another microsecond
+            facts(folder, available=GIB, runs=[('repo', 'z', 10 * GIB, agent_pid, started)])
+            later = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'later')], env, folder / 'later')
+            wait_for(lambda: expected in (folder / 'later.stderr').read_text().replace(']', ','), label + ': ' + expected)
+            os.killpg(later.pid, signal.SIGKILL); later.wait()
+            (folder / 'x.release').touch()
+            finish(child)
+
     for name, body in (('P9.scope unknown steps refuse', unknown_steps), ('P9.scope uncounted runs are gated', uncounted_gated),
                        ('P9.map identified shape', identified_shape), ('P9.bound round start and zero hold', bound_from_round_start),
                        ('P9.bound held rows', held_row_cases), ('P9.bound hold record', hold_record_written),
@@ -590,7 +688,12 @@ os.waitpid(child, 0)
                        ('P9.visible a hold with no first record refuses visibly', hold_without_first_record),
                        ('P9.visible hold and admission-after-hold lines', hold_then_admit_lines),
                        ('P9.disposition outside-counted refusal names the run failing', outside_counted_refusal_text),
-                       ('P9.hygiene a signal reaches the agent below a dispatcher', dispatcher_forwarding)):
+                       ('P9.hygiene a signal reaches the agent below a dispatcher', dispatcher_forwarding),
+                       ('Main 1656 an escaped descendant holds its attempt', escaped_descendant_holds),
+                       ('Main 1656 a foreign orphan in the coalition holds (amended x/y)', foreign_orphan_in_coalition_holds),
+                       ('Main 1656 an orphan outside the coalition does not hold', foreign_orphan_outside_coalition),
+                       ('Main 1656 only a row\'s own session key binds it', invocation_binding),
+                       ('Main 1656 the memory join needs the exact start time', same_second_reuse_join)):
         r28_case(name, body)
     (root / 'r28-gate.json').write_text(json.dumps(r28, indent=2))
     print(json.dumps(dict(r28=r28)), flush=True)

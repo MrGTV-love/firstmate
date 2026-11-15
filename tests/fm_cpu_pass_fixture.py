@@ -27,6 +27,28 @@ shim.mkdir()
 proxy = shim / 'python3'
 proxy.write_text('#!' + python + '\n' + '''import json, os, runpy, sys
 real = sys.executable
+def scope_coalition(info, registry, root):
+    import time as _time
+    real_coalition = info.coalition
+    cache = {}
+    def scoped(pid):
+        value = real_coalition(pid)
+        if value is None:
+            return None
+        if _time.monotonic() - cache.get('at', -1.0) > 0.2:  # one table and registry read per snapshot, not per pid
+            try:
+                cache['registered'] = {int(word) for word in open(registry).read().split()}
+            except (OSError, ValueError):
+                cache['registered'] = set()
+            cache['table'], cache['at'] = dict(info.processes()), _time.monotonic()
+        registered, table = cache['registered'], cache['table']
+        cursor, steps = pid, 0
+        while cursor not in (0, 1) and steps < 4096:
+            if cursor == root or cursor in registered:
+                return value
+            cursor, steps = table.get(cursor, 1), steps + 1
+        return value + 1000000
+    info.coalition = scoped
 if len(sys.argv) > 1 and os.path.basename(sys.argv[1]) in ('fm-cpu-pass.py', 'fm-duration.py'):
     if os.environ.get('CASE_CORES'): os.cpu_count = lambda: int(os.environ['CASE_CORES'])
     if os.environ.get('CASE_LOAD'): os.getloadavg = lambda: tuple(json.load(open(os.environ['CASE_LOAD'])))
@@ -113,6 +135,15 @@ if len(sys.argv) > 1 and os.path.basename(sys.argv[1]) in ('fm-cpu-pass.py', 'fm
                 os.kill(os.getpid(), number)
             return pid
         os.fork = signalled_fork
+    if os.environ.get('CASE_COALITION_FILE'):
+        # Test-only coalition scope at the observation boundary: the case's own processes (descendants of the test
+        # process, or pids the case registered in CASE_COALITION_FILE, which its escaped fixtures do) keep their real
+        # coalition; every other process of the host is reported in another coalition, so other sessions sharing this
+        # terminal's coalition cannot hold the case's attempts. The real kernel facts are shown by the coalition probes.
+        import importlib.util as _u
+        _spec = _u.spec_from_file_location('fm_proc_info', os.path.join(os.path.dirname(os.path.abspath(sys.argv[1])), 'fm-proc-info.py'))
+        _info = _u.module_from_spec(_spec); sys.modules['fm_proc_info'] = _info; _spec.loader.exec_module(_info)
+        scope_coalition(_info, os.environ['CASE_COALITION_FILE'], int(os.environ['CASE_COALITION_ROOT']))
     if os.environ.get('CASE_CLOCK_FILE'):
         # The engine's monotonic clock runs ahead by the seconds in this file, so a test drives a real constant
         # (the production hold bound) to its boundary without shortening it.
@@ -169,7 +200,10 @@ else:
 ''')
 proxy.chmod(0o700)
 cli = ['bash', str(repo / 'bin/fm-cpu-pass.sh')]
-base = dict(os.environ, PATH=str(shim) + os.pathsep + os.environ['PATH'], FM_DURATION_FILE='off')
+coalition_registry = root / 'coalition.pids'
+coalition_registry.write_text('')
+base = dict(os.environ, PATH=str(shim) + os.pathsep + os.environ['PATH'], FM_DURATION_FILE='off',
+            CASE_COALITION_FILE=str(coalition_registry), CASE_COALITION_ROOT=str(os.getpid()))
 base.pop('FM_CPU_PASS_HELD', None)
 children = []
 records = []
@@ -214,6 +248,10 @@ def facts(folder, available=40 * GIB, pressure=1, runs=(), total=128 * GIB, brok
             dict(pid=50, ppid=1, comm='no-mistakes', started='s50', rss_bytes=GIB // 8, fleet=False, run=None)]
     for index, entry in enumerate(runs):
         repo, run, rss = entry[:3]
+        if len(entry) == 5:  # a real process: (repo, run, rss, pid, start_us), joined by pid and exact start time
+            rows.append(dict(pid=entry[3], ppid=1, comm='node', started='s%d' % index, start_us=entry[4], rss_bytes=rss,
+                             rss_source='task', fleet=True, run='no-mistakes:%s/%s' % (repo, run)))
+            continue
         rows.append(dict(pid=200 + index, ppid=50 if entry[3:] == (True,) else 1, comm='2.1.318' if entry[3:] == (True,) else 'node',
                          started='s%d' % index, rss_bytes=rss, fleet=True, run='no-mistakes:%s/%s' % (repo, run)))
     (fixture / 'processes.json').write_text(json.dumps(rows))
@@ -276,6 +314,9 @@ def case(name, cores=18, running=0, load=0, measured=False, available=40 * GIB):
         # The daemon's step_results columns this owner reads (PRAGMA table_info of the host database).
         connection.execute('CREATE TABLE step_results (id TEXT PRIMARY KEY, run_id TEXT NOT NULL, step_name TEXT NOT NULL, step_order INTEGER NOT NULL, status TEXT NOT NULL, agent_pid INTEGER, round_started_at INTEGER)')
         connection.execute('CREATE TABLE repos (id TEXT PRIMARY KEY, working_path TEXT NOT NULL)')
+        # The daemon's agent_invocations columns this owner reads (PRAGMA table_info of the host database).
+        connection.execute('CREATE TABLE agent_invocations (id TEXT PRIMARY KEY, run_id TEXT, step_name TEXT, purpose TEXT,'
+                           ' started_at INTEGER, completed_at INTEGER, duration_ms INTEGER, exit_status TEXT, session_key TEXT)')
         connection.executemany('INSERT INTO runs (id, status) VALUES (?, ?)', [('baseline-' + str(i), 'running') for i in range(running)])
     load_file = folder / 'load.json'
     write_json(load_file, [0, load, 0])
@@ -419,15 +460,34 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
 agent = root / 'agent.py'
 agent.write_text("""import json, os, pathlib, signal, sys, time
 folder, run = pathlib.Path(os.environ['CASE_FOLDER']), sys.argv[1]
+with open(os.environ['CASE_COALITION_FILE'], 'a') as registry: registry.write(str(os.getpid()) + ' ')
 mode = os.environ.get('CASE_AGENT', 'wait')
 if mode == 'trap':  # installed before the marker that tells the test to signal
     signal.signal(signal.SIGTERM, lambda *a: (folder / (run + '.got-term')).touch() or sys.exit(0))
 (folder / (run + '.agent')).write_text(json.dumps(dict(pid=os.getpid(), pgid=os.getpgid(0), started_ns=time.time_ns(),
     cwd=os.getcwd(), argv=sys.argv[2:], stdin=sys.stdin.read() if mode not in ('wait', 'trap') else '')))
+if mode == 'escape':  # an orphaned descendant: own session, every descriptor closed, an empty environment, then the agent exits
+    if os.fork() == 0:
+        os.setsid()
+        os.closerange(3, 65536)
+        os.chdir('/')
+        os.execve(sys.executable, [sys.executable, '-I', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'escapee.py'),
+                                   str(folder), run, os.environ['CASE_COALITION_FILE']], {})
+    while not (folder / (run + '.escapee')).exists(): time.sleep(0.02)
+    sys.exit(0)
 if mode.startswith('exit-'): sys.exit(int(mode[5:]))
 if mode == 'self-term': os.kill(os.getpid(), signal.SIGTERM)
 while not (folder / (run + '.release')).exists(): time.sleep(0.025)
 """)
+
+escapee = root / 'escapee.py'
+escapee.write_text("""import os, pathlib, sys, time
+folder, run, registry = pathlib.Path(sys.argv[1]), sys.argv[2], sys.argv[3]
+with open(registry, 'a') as handle: handle.write(str(os.getpid()) + ' ')
+(folder / (run + '.escapee')).write_text(str(os.getpid()))
+while not (folder / (run + '.escapee-release')).exists(): time.sleep(0.05)
+""")
+
 
 def gate_case(name, available=40 * GIB, runs=(('x', 'ci', 'running', None),), timeout='240m', ci_ms=(60000,), round_age=0):
     """One launch-gate host: runs are (id, open step or None, step status, recorded agent pid).
@@ -442,9 +502,8 @@ def gate_case(name, available=40 * GIB, runs=(('x', 'ci', 'running', None),), ti
     if timeout is not None:
         (home / '.no-mistakes' / 'config.yaml').write_text('agent: [claude]\nagent_timeout: "%s"\n' % timeout)
     with sqlite3.connect(db) as connection:
-        connection.execute('CREATE TABLE agent_invocations (id TEXT PRIMARY KEY, run_id TEXT, step_name TEXT, purpose TEXT,'
-                           ' started_at INTEGER, completed_at INTEGER, duration_ms INTEGER, exit_status TEXT)')
-        connection.executemany('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        connection.executemany('INSERT INTO agent_invocations (id, run_id, step_name, purpose, started_at, completed_at,'
+                               ' duration_ms, exit_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
                                [('i%d' % i, 'old', 'ci', 'ci', 1000, 1000 + ms // 1000, ms, 'ok') for i, ms in enumerate(ci_ms)] +
                                # A refused or timed-out invocation is recorded too, and never counts toward the bound.
                                [('refused', 'old', 'ci', 'ci', 1000, 2000, 10 ** 9, 'error'),
@@ -495,6 +554,54 @@ def no_retry_phrase(text):
     import re
     lowered = text.lower()
     assert not [n for n in retry_needles if n in lowered] and not re.search(r'\b(429|503|529)\b', lowered), text
+
+_engine_module = []
+
+
+def engine():
+    """The tree's own engine, loaded in this test process for read-only kernel facts and attempt judgments.
+
+    It sees the same coalition scope as the engine under test (the proxy's scope_coalition).
+    """
+    if not _engine_module:
+        import importlib.util
+        info_spec = importlib.util.spec_from_file_location('fm_proc_info', str(repo / 'bin' / 'fm-proc-info.py'))
+        info = importlib.util.module_from_spec(info_spec)
+        sys.modules['fm_proc_info'] = info
+        info_spec.loader.exec_module(info)
+        namespace = {}
+        exec(proxy.read_text().split('\nif len(sys.argv) > 1', 1)[0].split('\n', 1)[1], namespace)  # the proxy's own scope_coalition
+        namespace['scope_coalition'](info, str(coalition_registry), os.getpid())
+        spec = importlib.util.spec_from_file_location('fm_cpu_pass_engine', str(repo / 'bin' / 'fm-cpu-pass.py'))
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _engine_module.append(module)
+    return _engine_module[0]
+
+
+class Held(int):
+    """A count of held attempts that also carries their reasons, so a failed assertion names why each is held."""
+    reasons: list = []
+
+    def __repr__(self):
+        return '%d held: %s' % (int(self), self.reasons)
+
+
+def reserving_held(folder, runs):
+    """How many attempt records of these runs reserve and are held (a decision's own judgment, P9.sequence(5))."""
+    states = engine().judge_attempts(str(folder / 'pool'), set(runs)) if (folder / 'pool').is_dir() else {}
+    held = [state['reason'] for state in states.values()
+            if state['state'] == 'held' and state['record'] and state['record'].get('reserves', True)]
+    count = Held(len(held))
+    count.reasons = held
+    return count
+
+
+def start_us(pid):
+    """A live process's exact kernel start time in microseconds, as the memory reading reports it."""
+    entry = engine().kernel_snapshot().get(pid)
+    return None if entry is None else entry[1]
+
 
 def cleanup():
     """Release and reap every fixture process this script started, and keep the command record."""
