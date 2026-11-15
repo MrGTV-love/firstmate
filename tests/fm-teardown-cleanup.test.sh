@@ -8352,6 +8352,45 @@ BODY
   pass "the own nested removal refuses an untracked managed hook file at the final proof before Git is asked; clean or excluded, the copy is removed without force"
 }
 
+# Item 8 on teardown's own cleanup-target custody scan (Main 1774 item 8):
+# require_cleanup_copy_clearance is taken out of bin/fm-teardown.sh and run
+# alone, with the state-directory walk a stub, so nothing reaches fm_run_timed,
+# a kill or a backend. Another task's record that cannot be read leaves its
+# custody unknown and refuses; readable and naming another path, or absent, it
+# does not.
+test_r5_cleanup_clearance_refuses_an_unreadable_task_record() {
+  local body=$TMP_ROOT/r5-body-clearance.sh
+  cat > "$body" <<'BODY'
+eval "$(awk '/^require_cleanup_copy_clearance\(\) \{/{on=1} on{print} on && /^}/{exit}' "$R5_BIN/fm-teardown.sh")"
+fm_local_firstmate_state_dirs() { FM_LOCAL_FIRSTMATE_STATES=("$1"); FM_LOCAL_FIRSTMATE_SKIPPED=(); }
+KIND=ship DESCENDANT_TASK_STATES=() DESCENDANT_TASK_IDS=() META="$R5_BASE/state/task-x1.meta" WT="$R5_BASE/target"
+STATE="$R5_BASE/state"
+mkdir -p "$STATE" "$R5_BASE/target" "$R5_BASE/elsewhere"
+printf 'kind=ship\nworktree=%s\n' "$R5_BASE/target" > "$META"
+other="$STATE/other.meta"
+for shape in readable unreadable absent; do
+  case "$shape" in
+    readable) printf 'kind=ship\nworktree=%s\n' "$R5_BASE/elsewhere" > "$other" ;;
+    unreadable) chmod 000 "$other"; [ ! -r "$other" ] || echo 'fixture-wrong' ;;
+    absent) chmod 600 "$other"; rm -f "$other" ;;
+  esac
+  rc=0
+  # allow_current 1, as the retiring task's own call passes: its own record
+  # naming the target is the retiring one.
+  require_cleanup_copy_clearance "$META" task-x1 "$STATE" "$R5_BASE/target" 1 2> "$R5_BASE/$shape.err" || rc=$?
+  [ "$rc" = 0 ] || sed "s/^/$shape err: /" "$R5_BASE/$shape.err"
+  named=no
+  grep -q 'cannot be read, so the custody it records' "$R5_BASE/$shape.err" && named=yes
+  echo "$shape rc=$rc named=$named"
+done
+BODY
+  R5_BACKEND=1 r5_harness clearance "$body"
+  r5_expect 'readable rc=0 named=no' 'r5-clearance: a readable record naming another path refused the cleanup'
+  r5_expect 'unreadable rc=1 named=yes' 'r5-clearance: an unreadable task record was read as no custody'
+  r5_expect 'absent rc=0 named=no' 'r5-clearance: no other record refused the cleanup'
+  pass "teardown's cleanup-target custody scan refuses when another task's record cannot be read; readable and elsewhere, or absent, it clears"
+}
+
 teardown_test_cases=(
 test_fixture_cleanup_leaves_no_home_summary_refresh_worker
 test_teardown_never_holds_up_a_steer_to_another_task
@@ -8556,6 +8595,7 @@ test_r5_unreadable_task_record_is_owner_unknown
 test_r5_untracked_managed_hook_file_refuses_like_git
 test_r5_landing_cache_reuse_keeps_the_proofs_default_ref
 test_r5_own_nested_removal_refuses_an_untracked_hook_before_git
+test_r5_cleanup_clearance_refuses_an_unreadable_task_record
 test_direct_release_refuses_a_process_holding_a_file_in_the_copy_open
 test_task_own_descendant_holding_a_file_open_refuses_and_is_not_signalled
 test_direct_release_refuses_an_unreadable_process_table

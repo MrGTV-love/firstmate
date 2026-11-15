@@ -852,18 +852,21 @@ teardown_admit() {  # <copy> <anchor|landed|bundle> <head> [<stored-bundle>|<sna
   TEARDOWN_ADMIT_RECORD+=("$record")
 }
 
-# "<ref> <commit>" of the default branch <copy> reads landed history from: the
-# origin copy when <copy> has an origin remote, else the local branch, as
+# "<ref> <commit>" of <ref> when given (the ref the landing proof read), else of
+# the default branch <copy> reads landed history from: the origin copy when
+# <copy> has an origin remote, else the local branch, as
 # fm_task_copy_content_in_default and bin/fm-teardown.sh's landed_default_ref
 # resolve it, without fetching. Fails when that ref cannot be read.
-teardown_default_ref_snapshot() {  # <copy>
-  local copy=$1 name ref commit
-  name=${BASE_BRANCH:-}
-  [ -n "$name" ] || name=$(fm_task_copy_default_branch "$PROJ") || return 1
-  if git -C "$copy" remote get-url origin >/dev/null 2>&1; then
-    ref="refs/remotes/origin/$name"
-  else
-    ref="refs/heads/$name"
+teardown_default_ref_snapshot() {  # <copy> [<ref>]
+  local copy=$1 ref=${2:-} name commit
+  if [ -z "$ref" ]; then
+    name=${BASE_BRANCH:-}
+    [ -n "$name" ] || name=$(fm_task_copy_default_branch "$PROJ") || return 1
+    if git -C "$copy" remote get-url origin >/dev/null 2>&1; then
+      ref="refs/remotes/origin/$name"
+    else
+      ref="refs/heads/$name"
+    fi
   fi
   commit=$(git -C "$copy" rev-parse --quiet --verify "$ref^{commit}" 2>/dev/null) || return 1
   [ -n "$commit" ] || return 1

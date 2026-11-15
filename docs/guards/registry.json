@@ -3409,6 +3409,10 @@
         },
         {
           "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: task record $other_meta cannot be read, so the custody it records over task $record_id's cleanup target $canonical is unknown; nothing was changed - not even with --force.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
           "match": "echo \"REFUSED: task $record_id's cleanup target $canonical overlaps Git common-dir storage $copy_common for task $(basename \"$other_meta\" .meta)'s recorded $field ($copy_real); preserved $field custody overlaps it, so nothing was changed - not even with --force.\" >&2"
         }
       ]

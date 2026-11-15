@@ -2770,7 +2770,7 @@ work_is_landed() {
   local TEARDOWN_LANDED_DIR=$dir TEARDOWN_LANDED_REF=$head
   TEARDOWN_NM_RECORD_SILENT=0
   if work_is_landed_proof "$branch"; then
-    snap=$(teardown_default_ref_snapshot "$dir") || snap=''
+    snap=$(teardown_default_ref_snapshot "$dir" "$TEARDOWN_LANDED_PROOF_REF") || snap=''
     TEARDOWN_LANDED_DIRS+=("$dir")
     TEARDOWN_LANDED_HEADS+=("$head")
     TEARDOWN_LANDED_SNAPS+=("$snap")
@@ -2786,26 +2786,34 @@ work_is_landed() {
 
 # A pushed branch proves recoverability, not delivery: require the landing
 # proofs documented in this script's header even when every commit is pushed.
+# The default-branch ref the last successful landing proof read (empty for a
+# merged pull request, which the forge answers): work_is_landed snapshots that
+# ref, so the final proof watches the ref the proof actually read.
+TEARDOWN_LANDED_PROOF_REF=
 work_is_landed_proof() {
   local branch=$1
   local dir=${TEARDOWN_LANDED_DIR:-$WT} ref=${TEARDOWN_LANDED_REF:-HEAD}
   # Each call reports on its own directory and ref, never on an earlier call's.
   TEARDOWN_UNPROVEN_COMMITS=
   TEARDOWN_PIPELINE_INPUT_REASON=
+  TEARDOWN_LANDED_PROOF_REF=
   if [ "$MODE" = local-only ]; then
     local name
     name=$(fm_task_copy_default_branch "$PROJ") || name=
     if [ -n "$name" ] && git -C "$dir" merge-base --is-ancestor "$ref" "refs/heads/$name" 2>/dev/null; then
+      TEARDOWN_LANDED_PROOF_REF="refs/heads/$name"
       return 0
     fi
   fi
   pr_is_merged "$branch" && return 0
   if fm_task_copy_content_in_default "$dir" "$PROJ" "${BASE_BRANCH:-}" "$ref"; then
     echo "teardown: landed by content: every change of $dir at ${ref:0:12} is already in ${FM_TASK_COPY_COMPARED%% *} (${FM_TASK_COPY_COMPARED##* })" >&2
+    TEARDOWN_LANDED_PROOF_REF="refs/${FM_TASK_COPY_COMPARED%% *}"
     return 0
   fi
   if [ -z "$FM_TASK_COPY_UNASKED" ] && fm_task_copy_content_in_default_history "$dir" "$ref"; then
     echo "teardown: landed by content: every change of $dir at ${ref:0:12} is in a commit of ${FM_TASK_COPY_COMPARED%% *} after merge base ${FM_TASK_COPY_COMPARED##* }" >&2
+    TEARDOWN_LANDED_PROOF_REF="refs/${FM_TASK_COPY_COMPARED%% *}"
     teardown_history_admit "$dir"
     return 0
   fi
@@ -4384,6 +4392,13 @@ require_cleanup_copy_clearance() {
   for state_dir in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
     for other_meta in "$state_dir"/*.meta; do
       [ -f "$other_meta" ] && [ ! -L "$other_meta" ] || continue
+      # A record that cannot be read leaves the custody it records unknown,
+      # never absent; one that vanished since the listing records nothing.
+      if ! { : < "$other_meta"; } 2>/dev/null; then
+        [ -e "$other_meta" ] || continue
+        echo "REFUSED: task record $other_meta cannot be read, so the custody it records over task $record_id's cleanup target $canonical is unknown; nothing was changed - not even with --force." >&2
+        return 1
+      fi
       retiring=0
       own=0
       if [ "${other_meta##*/}" = "${record_meta##*/}" ] && [ "$other_meta" -ef "$record_meta" ]; then
