@@ -753,8 +753,9 @@ teardown_bundle_tips_cover() {  # <required> <tips> <advertised>
 # proof held, and for a bundle the stored bundle and the SHA-256 of the
 # preservation record file it read), as parallel arrays (bash 3.2). Kinds:
 # anchor (an own copy's preservation anchor), landed (the landed-work rule) and
-# bundle (a verified recorded bundle). The final removal proof rechecks every
-# admission recorded for the copy, never a different proof in its place.
+# bundle (a verified recorded bundle). The final removal proof rechecks the
+# latest admission of every kind recorded for the copy, never a different proof
+# in its place.
 TEARDOWN_ADMIT_DIRS=()
 TEARDOWN_ADMIT_KINDS=()
 TEARDOWN_ADMIT_HEADS=()
@@ -822,12 +823,13 @@ teardown_bundle_final_current() {  # <copy> <head> <stored> <record-sha256>
 # Every bundle admission recorded for <copy> still holds <head>
 # (teardown_bundle_final_current). Fails with TEARDOWN_BUNDLE_REASON.
 teardown_admitted_bundles_current() {  # <copy> <head>
-  local canonical i
+  local canonical i last=''
   canonical=$(fm_task_copy_canonical_dir "$1") || canonical=$1
   for i in ${TEARDOWN_ADMIT_DIRS[@]+"${!TEARDOWN_ADMIT_DIRS[@]}"}; do
-    [ "${TEARDOWN_ADMIT_DIRS[$i]}" = "$canonical" ] && [ "${TEARDOWN_ADMIT_KINDS[$i]}" = bundle ] || continue
-    teardown_bundle_final_current "$1" "$2" "${TEARDOWN_ADMIT_STORED[$i]}" "${TEARDOWN_ADMIT_RECORD[$i]}" || return 1
+    [ "${TEARDOWN_ADMIT_DIRS[$i]}" = "$canonical" ] && [ "${TEARDOWN_ADMIT_KINDS[$i]}" = bundle ] && last=$i
   done
+  [ -n "$last" ] || return 0
+  teardown_bundle_final_current "$1" "$2" "${TEARDOWN_ADMIT_STORED[$last]}" "${TEARDOWN_ADMIT_RECORD[$last]}"
 }
 
 # The removal dirt rule: every status line counts except the exact managed
@@ -892,8 +894,8 @@ teardown_preserve_dest_outside() {  # <copy> <dest>
 # no fast path and no proof stands in for another:
 #   - HEAD and status: the HEAD resolves and the status is clean under the
 #     removal dirt rule (teardown_removal_dirty_status);
-#   - admission: at least one proof admitted this copy in this run, and every
-#     admission recorded for it still holds the same HEAD (an anchor still points
+#   - admission: at least one proof admitted this copy in this run, and the
+#     latest admission of each kind recorded for it still holds the same HEAD (an anchor still points
 #     at it; a landing proof held that HEAD; a bundle's record file, stored and
 #     source bytes are unchanged and still cover HEAD's unlanded tips);
 #   - the bundle that admitted the whole cleanup, when one did, is unchanged;
@@ -908,7 +910,7 @@ teardown_preserve_dest_outside() {  # <copy> <dest>
 TEARDOWN_FINAL_WHY=
 TEARDOWN_FINAL_STABLE=
 teardown_removal_final_proof() {  # <copy> <preserve|refuse> <locked|unlocked> [<launcher-pid> <lock-mtime>]
-  local copy=$1 ignored=$2 locked=$3 pid=${4:-} mtime=${5:-} head status unique canonical i found=0 rc=0
+  local copy=$1 ignored=$2 locked=$3 pid=${4:-} mtime=${5:-} head status unique canonical i latest found=0 rc=0
   TEARDOWN_FINAL_WHY=
   TEARDOWN_FINAL_STABLE=
   head=$(git -C "$copy" rev-parse --verify 'HEAD^{commit}' 2>/dev/null) \
@@ -922,8 +924,15 @@ teardown_removal_final_proof() {  # <copy> <preserve|refuse> <locked|unlocked> [
     return 1
   fi
   canonical=$(fm_task_copy_canonical_dir "$copy") || canonical=$copy
+  # The latest admission of each kind is the one in force: a later proof of the
+  # same kind (a re-proof after a change) supersedes an earlier one.
+  latest=' '
   for i in ${TEARDOWN_ADMIT_DIRS[@]+"${!TEARDOWN_ADMIT_DIRS[@]}"}; do
     [ "${TEARDOWN_ADMIT_DIRS[$i]}" = "$canonical" ] || continue
+    latest=$(printf '%s' "$latest" | sed "s/ ${TEARDOWN_ADMIT_KINDS[$i]}:[0-9]* / /")"${TEARDOWN_ADMIT_KINDS[$i]}:$i "
+  done
+  for i in ${TEARDOWN_ADMIT_DIRS[@]+"${!TEARDOWN_ADMIT_DIRS[@]}"}; do
+    case "$latest" in *" ${TEARDOWN_ADMIT_KINDS[$i]}:$i "*) ;; *) continue ;; esac
     found=1
     if [ "${TEARDOWN_ADMIT_HEADS[$i]}" != "$head" ]; then
       TEARDOWN_FINAL_WHY="its HEAD ${head:0:12} is not the ${TEARDOWN_ADMIT_HEADS[$i]:0:12} its ${TEARDOWN_ADMIT_KINDS[$i]} proof admitted"

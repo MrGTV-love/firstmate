@@ -2722,9 +2722,8 @@ TEARDOWN_BUNDLE_SWEEP_PROOF=
 work_is_landed_bundle() {  # <branch> <dir> <head> [hint]
   teardown_bundle_preserved "$2" "$3" "${4:-}" || return 1
   teardown_admit "$2" bundle "$3" "$TEARDOWN_BUNDLE_ACCEPTED"
-  if [ -z "$TEARDOWN_BUNDLE_SWEEP_PROOF" ]; then
-    TEARDOWN_SWEEP_RECORD=$(teardown_ignored_sha256 "$DATA/$ID/preservation-bundles.tsv") || TEARDOWN_SWEEP_RECORD=''
-  fi
+  # The latest bundle proof is the one in force for the cleanup.
+  TEARDOWN_SWEEP_RECORD=$(teardown_ignored_sha256 "$DATA/$ID/preservation-bundles.tsv") || TEARDOWN_SWEEP_RECORD=''
   TEARDOWN_BUNDLE_SWEEP_PROOF=$TEARDOWN_BUNDLE_ACCEPTED
   [ -z "$1" ] || TEARDOWN_BUNDLE_PROOF=$TEARDOWN_BUNDLE_ACCEPTED
 }
