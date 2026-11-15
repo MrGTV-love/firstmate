@@ -85,7 +85,7 @@ FM_PR_CLOSES_MARKER='firstmate-backlog-closes:'
 # one space and nothing after the id; `Train-member: <url>` with one space and one value with no
 # space after it, the value being a pull request URL by fm_pr_url_parse.
 fm_pr_closes_parse() {  # <body-file> <merged-pr-url>
-  local merged=${2:-} snap result member why='' size kept rc=0
+  local merged=${2:-} snap result member members why='' size kept rc=0
   # A failure of the parse itself (Main 1785 F3) prints `status failed` and its reason, with the
   # ids the same pass can read from the original file under a forced refusal, and returns 1.
   if ! snap=$(mktemp "${TMPDIR:-/tmp}/fm-pr-closes.XXXXXX" 2>/dev/null); then
@@ -102,7 +102,7 @@ fm_pr_closes_parse() {  # <body-file> <merged-pr-url>
   # NUL shown as `?`, only for the report.
   size=$(LC_ALL=C wc -c < "$snap" | tr -d ' ') && kept=$(LC_ALL=C tr -d '\000' < "$snap" | LC_ALL=C wc -c | tr -d ' ') || rc=1
   if [ "$rc" -eq 0 ] && [ "$size" != "$kept" ]; then
-    LC_ALL=C tr '\000' '?' < "$snap" > "$snap.nul" && result=$(fm_pr_closes_pass "$snap.nul" "$merged" "the body holds a NUL byte, which no line of a closes block may hold") || rc=1
+    LC_ALL=C tr '\000' '?' < "$snap" > "$snap.nul" && result=$(fm_pr_closes_pass "$snap.nul" "$merged" "the body contains a NUL byte, so nothing in it is read as a closes block") || rc=1
     rm -f -- "$snap" "$snap.nul"
     [ "$rc" -eq 0 ] || { fm_pr_closes_failed "$1" "$merged" "the parse could not read its snapshot"; return 1; }
     printf '%s\n' "$result"
@@ -110,6 +110,12 @@ fm_pr_closes_parse() {  # <body-file> <merged-pr-url>
   fi
   [ "$rc" -eq 0 ] && result=$(fm_pr_closes_pass "$snap" "$merged" '') || rc=1
   if [ "$rc" -eq 0 ] && [ "${result%%$'\n'*}" = "$(printf 'status\tblock')" ]; then
+    # Main 1851 F1: the member list is read into a variable and its status checked; when it
+    # cannot be read, the whole block is refused before any item in it can act.
+    if ! members=$(fm_pr_closes_values "$result" member); then
+      why="its Train-member values could not be read for validation"
+      members=''
+    fi
     while IFS= read -r member; do
       [ -n "$member" ] || continue
       if ! fm_pr_url_parse "$member" || [ "$FM_PR_URL" != "$member" ]; then
@@ -121,7 +127,7 @@ fm_pr_closes_parse() {  # <body-file> <merged-pr-url>
         esac
       fi
       [ -z "$why" ] || break
-    done <<< "$(printf '%s\n' "$result" | LC_ALL=C awk -F '\t' '$1 == "member" { print substr($0, 8) }')"
+    done <<< "$members"
     [ -z "$why" ] || result=$(fm_pr_closes_pass "$snap" "$merged" "$why") || rc=1
   fi
   rm -f -- "$snap"
@@ -234,7 +240,9 @@ fm_pr_closes_pass() {
         }
       }
       if (F != "" && reason == "") reason = F
-      status = (nm == 0) ? "none" : (reason == "") ? "block" : "refused"
+      # A forced reason (a NUL byte, an invalid member) refuses the body even when it has no
+      # marker line (Main 1851 F5).
+      status = (reason != "") ? "refused" : (nm == 0) ? "none" : "block"
       print "status\t" status
       if (reason != "") print "reason\t" reason
       for (i = 1; i <= NR; i++) {
@@ -261,4 +269,24 @@ fm_pr_closes_pass() {
 # in order. It reads the result, never a body.
 fm_pr_closes_get() {  # <parse-result-file> <type>
   LC_ALL=C awk -v t="$2" '{ i = index($0, "\t"); if (substr($0, 1, i - 1) == t) print substr($0, i + 1) }' "$1"
+}
+
+# fm_pr_closes_values <parse-result-text> <type>: the same, from a result held in a variable.
+fm_pr_closes_values() {  # <parse-result-text> <type>
+  printf '%s\n' "$1" | LC_ALL=C awk -v t="$2" '{ i = index($0, "\t"); if (substr($0, 1, i - 1) == t) print substr($0, i + 1) }'
+}
+
+# fm_pr_closes_load <parse-result-file>: reads the status, ids and members of a parse result
+# whole, each with its reader's status checked (Main 1851 F2), into FM_PR_CLOSES_STATUS,
+# FM_PR_CLOSES_IDS and FM_PR_CLOSES_MEMBERS (newline lists). Returns 1, with all three empty,
+# when any of them cannot be read, so a caller acts on all of a body's items or on none.
+fm_pr_closes_load() {  # <parse-result-file>
+  local status ids members
+  FM_PR_CLOSES_STATUS= FM_PR_CLOSES_IDS= FM_PR_CLOSES_MEMBERS=
+  status=$(fm_pr_closes_get "$1" status) || return 1
+  ids=$(fm_pr_closes_get "$1" id) || return 1
+  members=$(fm_pr_closes_get "$1" member) || return 1
+  case "$status" in block|refused|none|failed) ;; *) return 1 ;; esac
+  FM_PR_CLOSES_STATUS=$status FM_PR_CLOSES_IDS=$ids FM_PR_CLOSES_MEMBERS=$members
+  return 0
 }

@@ -97,8 +97,9 @@
 # left open, a body was refused, a malformed or outside directive line or a `Train-member:`
 # value that is no pull request URL was ignored, or a train member's body could not be read; exit 1 when the merged pull
 # request's own body cannot be read (the line names the pull request URL and the read
-# error); exit 2 on a bad request. bin/fm-pr-merge.sh ignores the exit status:
-# no close outcome ever changes the merge result.
+# error); exit 2 on a bad request. A refused body, a cut read, a NUL byte, a failed parse or an
+# unreadable parse result counts as left open. bin/fm-pr-merge.sh reports any status other than
+# 0 and 3 with the retry command, and no close outcome ever changes the merge result.
 set -u
 
 SCRIPT_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)"
@@ -328,12 +329,33 @@ report_old_form() {  # <body-file> <where>: queue the old `Closes:` lines, repor
     "$FM_PR_CLOSES_BEGIN" "$FM_PR_CLOSES_END" "$2" "$0" "$TASK_ID" "$URL" >&2
 }
 
+# load_body <body-file> <where>: Main 1851 F2. The parse result's status, ids and members are
+# read whole, each reader's status checked, before any of that body's items acts. When that read
+# fails, nothing in the body closes, and every item id it names gets its own not-closed line.
+load_body() {
+  local id ids
+  fm_pr_closes_load "$1.parse" && return 0
+  ids=$(got "$1" seenid 2>/dev/null) || ids=''
+  LEFT=$((LEFT + 1))
+  printf 'actionable: close-at-merge: could not read the parse result of %s, so nothing named by it was closed and no blocked-by edge changed; retry: %s %s %s\n' \
+    "$2" "$0" "$TASK_ID" "$URL" >&2
+  while IFS= read -r id; do
+    [ -n "$id" ] || continue
+    left_open "$id" "the parse result of $2 could not be read, so it was not closed; retry: $0 $TASK_ID $URL"
+  done <<< "$ids"
+  return 1
+}
+
 parse_body "$WORK/body" "the body of $URL" || true
 report_refusal "$WORK/body" "the body of $URL"
-if [ "$(got "$WORK/body" status)" = block ]; then
+BODY_STATUS=failed BODY_IDS='' BODY_MEMBERS=''
+if load_body "$WORK/body" "the body of $URL"; then
+  BODY_STATUS=$FM_PR_CLOSES_STATUS BODY_IDS=$FM_PR_CLOSES_IDS BODY_MEMBERS=$FM_PR_CLOSES_MEMBERS
+fi
+if [ "$BODY_STATUS" = block ]; then
   while IFS= read -r id; do
     [ -z "$id" ] || consider "$id" "$URL" "the body of $URL"
-  done < <(got "$WORK/body" id)
+  done <<< "$BODY_IDS"
 fi
 report_old_form "$WORK/body" "the body of $URL"
 
@@ -342,8 +364,9 @@ MEMBER_URLS=()
 MEMBER_SEEN=$'\n'
 while IFS= read -r candidate; do
   [ -n "$candidate" ] || continue
-  # The parse proved each member is a pull request URL of the merged one's repository, and not
-  # the merged one itself; fm_pr_url_parse only sets the provider fields read_body needs.
+  # The parse proved each member is a canonical GitHub, GitLab or Forgejo pull request URL of any
+  # repository, and not the merged one itself; fm_pr_url_parse only sets the provider fields
+  # read_body needs.
   if ! fm_pr_url_parse "$candidate"; then
     LEFT=$((LEFT + 1))
     printf 'actionable: close-at-merge: could not use Train-member %s, so nothing was closed for it; retry: %s %s %s\n' "$candidate" "$0" "$TASK_ID" "$URL" >&2
@@ -357,10 +380,10 @@ while IFS= read -r candidate; do
   if read_body "$member" "$WORK/member-$n"; then
     parse_body "$WORK/member-$n" "the body of train member $member" || true
     report_refusal "$WORK/member-$n" "the body of train member $member"
-    if [ "$(got "$WORK/member-$n" status)" = block ]; then
+    if load_body "$WORK/member-$n" "the body of train member $member" && [ "$FM_PR_CLOSES_STATUS" = block ]; then
       while IFS= read -r id; do
         [ -z "$id" ] || consider "$id" "$URL" "the body of train member $member"
-      done < <(got "$WORK/member-$n" id)
+      done <<< "$FM_PR_CLOSES_IDS"
     fi
     report_old_form "$WORK/member-$n" "the body of train member $member"
   else
@@ -372,7 +395,7 @@ while IFS= read -r candidate; do
     [ -n "$task" ] || continue
     consider "$task" "$URL" "the task record that holds train member $member"
   done < <(tasks_recording_pr "$member")
-done < <([ "$(got "$WORK/body" status)" != block ] || got "$WORK/body" member)
+done <<< "$([ "$BODY_STATUS" != block ] || printf '%s\n' "$BODY_MEMBERS")"
 
 while IFS=$'\t' read -r old where; do
   [ -n "$old" ] || continue

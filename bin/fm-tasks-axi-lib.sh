@@ -198,3 +198,82 @@ fm_tasks_axi_backend_available() {
   fm_backlog_backend_manual "$config_dir" && return 1
   fm_tasks_axi_compatible
 }
+
+# Typed public-followup completions (Main 1851 F4, Main 1853). bin/fm-tasks-axi.sh clears a
+# finished obligation's blocked-by edges after `public-followup waive` or `record-delivery`, so
+# it must name the same id tasks-axi completed, in every form tasks-axi 0.2.6 accepts.
+#
+# fm_typed_completion_resolve <tasks-axi args...>: reads the arguments with tasks-axi's own
+# grammar: an optional leading `task` noun (dist/src/cli.js:80-82); then for the handler,
+# takeBoolFlag --json, then takeFlag for each value flag in the handler's order (waive: --reason,
+# --approved-by; record-delivery: --receipt-file), each as `--flag value` (a value may not start
+# with `--`) or `--flag=value` (dist/src/args.js:7-15, 52-80; commands/public-followup.js:589-594,
+# 709-718); then exactly one positional, the id. Sets FM_TYPED_COMPLETION (waive or
+# record-delivery) and FM_TYPED_COMPLETION_ID. Returns 0 for a resolved id, 1 when the arguments
+# are not a typed completion, 2 when they are one but no single valid id can be resolved (the
+# caller clears nothing and warns), and 3 for a help call.
+fm_typed_completion_resolve() {
+  local -a a rest vflags
+  local flag i n tok found positional='' count=0
+  FM_TYPED_COMPLETION=
+  FM_TYPED_COMPLETION_ID=
+  a=("$@")
+  [ "${a[0]:-}" != task ] || a=("${a[@]:1}")
+  [ "${a[0]:-}" = public-followup ] || return 1
+  case "${a[1]:-}" in
+    waive) vflags=(--reason --approved-by) ;;
+    record-delivery) vflags=(--receipt-file) ;;
+    *) return 1 ;;
+  esac
+  FM_TYPED_COMPLETION=${a[1]}
+  a=("${a[@]:2}")
+  for tok in ${a[@]+"${a[@]}"}; do
+    case "$tok" in -h|--help) return 3 ;; esac
+  done
+  # takeBoolFlag: remove the first --json.
+  rest=() found=0
+  for tok in ${a[@]+"${a[@]}"}; do
+    if [ "$found" = 0 ] && [ "$tok" = --json ]; then found=1; continue; fi
+    rest+=("$tok")
+  done
+  a=(${rest[@]+"${rest[@]}"})
+  # takeFlag, in the handler's order: the first `--flag value` or `--flag=value`.
+  for flag in "${vflags[@]}"; do
+    n=${#a[@]}
+    for ((i = 0; i < n; i++)); do
+      if [ "${a[i]}" = "$flag" ]; then
+        [ $((i + 1)) -lt "$n" ] && [ "${a[i+1]#--}" = "${a[i+1]}" ] || return 2
+        a=("${a[@]:0:i}" "${a[@]:i+2}")
+        break
+      fi
+      case "${a[i]}" in
+        "$flag="*) a=("${a[@]:0:i}" "${a[@]:i+1}"); break ;;
+      esac
+    done
+  done
+  for tok in ${a[@]+"${a[@]}"}; do
+    case "$tok" in
+      -*) return 2 ;;
+      *) positional=$tok; count=$((count + 1)) ;;
+    esac
+  done
+  [ "$count" -eq 1 ] && [[ "$positional" =~ ^[A-Za-z0-9._][A-Za-z0-9._-]*$ ]] || return 2
+  FM_TYPED_COMPLETION_ID=$positional
+  return 0
+}
+
+# fm_typed_completion_store_verdict <id>: reads `<id>:<state>` lines of the active backlog (the
+# output of fm_backlog_row_states, a `tasks-axi list` of the same store tasks-axi writes) on
+# standard input and prints `clear` when no row has that id or every row with it is done, or
+# `keep <state>` for the first row with that id that is not done (Main 1853: any unfinished item
+# under that id keeps every edge and hold).
+fm_typed_completion_store_verdict() {
+  local want=$1 line
+  while IFS= read -r line; do
+    [ "${line%%:*}" = "$want" ] || continue
+    [ "${line#*:}" = "done" ] && continue
+    printf 'keep %s\n' "${line#*:}"
+    return 0
+  done
+  printf 'clear\n'
+}

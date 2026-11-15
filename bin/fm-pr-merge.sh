@@ -2447,13 +2447,21 @@ esac
 # `Closes-backlog-item: <item-id>` lines, and a merge train's members' items too, but only when its
 # outcome was recorded above. A merge that could not be recorded runs no close and lists
 # the items it names as not closed. A failure here never changes the merge result: the
-# close step reports each item it left open and its exit status is ignored
+# close step reports each item it left open, and its exit status is checked only to report a
+# failure (Main 1851 F2): 0 is all closed, 3 is items left open and already reported, and any
+# other status gets one actionable line with the retry command
 # (bin/fm-pr-close-items.sh header owns the contract). The explicit home and state keep
 # it on this merge's own backlog.
 close_mode=()
 [ "$outcome_rc" -eq 0 ] || close_mode=(--not-recorded)
+close_rc=0
 FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
-  "$SCRIPT_DIR/fm-pr-close-items.sh" ${close_mode[@]+"${close_mode[@]}"} "$ID" "$URL" </dev/null || true
+  "$SCRIPT_DIR/fm-pr-close-items.sh" ${close_mode[@]+"${close_mode[@]}"} "$ID" "$URL" </dev/null || close_rc=$?
+case "$close_rc" in
+  0|3) ;;
+  *) printf 'actionable: the merge of %s stands, but its close step failed with status %s, so the backlog items it names may be left open; retry: %s %s%s %s\n' \
+       "$URL" "$close_rc" "$SCRIPT_DIR/fm-pr-close-items.sh" "${close_mode[@]+"${close_mode[*]} "}" "$ID" "$URL" >&2 ;;
+esac
 
 # The merge is verified and its outcome recorded: arm the prune of the task's
 # pool copy and start one detached attempt. Teardown stays the authority and the
