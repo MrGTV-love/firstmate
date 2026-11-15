@@ -2972,7 +2972,7 @@
       "invariant": "A teardown refusal that the state at entry already decides changes nothing: no drop record, slot lease, return-pending record, endpoint close, or copy, tasktmp, record or slot removal comes before it.",
       "layer": "runtime-block",
       "source": "the task's state records (pending-close, return-pending, task, busy-state, PR-poll, turn-end and status records), their file kinds and the operating system's delete permission, and the busy generation, as teardown_entry_preflight reads them",
-      "trigger": "refuses before any mutation when a record teardown later removes or replaces cannot be removed or replaced (a directory, a link to the wrong kind or place, an immutable or delete-denied entry), the busy generation would be rejected, or the PR-poll records are not retirable",
+      "trigger": "refuses before any mutation when a record teardown later removes or replaces cannot be removed or replaced (a directory, a link to the wrong kind or place, an immutable or delete-denied entry), the busy generation would be rejected, or the PR-poll records are not retirable, or, before any protected step, a copy the release hands to Vernant's closeout driver has no driver or interpreter that can run, a copy to preserve cannot be listed or its preserve parent is unsafe, or a rename target's filesystem cannot be read or differs",
       "decision": "deny",
       "fail_direction": "closed",
       "remedy": "Fix the named record (remove the directory, clear the flag or access entry, or let the named owner finish), then retry FM_HOME=<home> bash bin/fm-teardown.sh <task>.",
@@ -2992,6 +2992,14 @@
         {
           "file": "bin/fm-teardown.sh",
           "match": "echo \"REFUSED: $TEARDOWN_PREFLIGHT_ERROR; nothing was changed and every task record is retained. Fix what is named and re-run.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "teardown_refuse_copy inspection-unavailable \"foreign copy $copy stays in pool slot $slot: $TEARDOWN_FOREIGN_WHY.\" \"$copy\""
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: foreign copy $(fm_refuse_text \"$copy\") in pool slot $(fm_refuse_text \"$slot\") cannot be released; nothing was removed.\" >&2"
         }
       ]
     },
