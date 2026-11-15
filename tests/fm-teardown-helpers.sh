@@ -919,6 +919,33 @@ SH
   chmod +x "$case_dir/fakebin/git"
 }
 
+# teardown_test_fake_other_device <fakebin> <prefix>: a `stat` stand-in that
+# reports a different device number for <prefix> and every path under it when
+# asked for the device alone (`stat -f %d <path>` or `stat -c %d <path>`), and
+# runs the real stat for everything else, so a test can place a folder on
+# "another filesystem".
+teardown_test_fake_other_device() {
+  local fakebin=$1 prefix=$2 real
+  real=$(command -v stat)
+  cat > "$fakebin/stat" <<SH
+#!/usr/bin/env bash
+if [ "\$#" = 3 ] && [ "\$2" = %d ]; then
+  case "\$3" in "$prefix"|"$prefix"/*) echo 424242; exit 0 ;; esac
+fi
+exec "$real" "\$@"
+SH
+  chmod +x "$fakebin/stat"
+}
+
+# teardown_test_file_mode <path>: the permission bits of <path> in octal (for
+# example 600).
+teardown_test_file_mode() {
+  case "$(uname -s)" in
+    Darwin|*BSD) /usr/bin/stat -f %Lp "$1" ;;
+    *) stat -c %a "$1" ;;
+  esac
+}
+
 # Run teardown with PATH mocking. Args: case_dir [extra args...]
 run_teardown() {
   local case_dir=$1; shift

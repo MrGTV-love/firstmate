@@ -2425,38 +2425,6 @@ test_teardown_after_a_joint_reassociation_refuses_what_it_cannot_prove() {
   pass "a joint-reassociated task's teardown still refuses unlanded work, dirt, a third live holder of the root and a foreign copy, and a refusal changes no record, lease, claim or copy"
 }
 
-# The private run directory must share a filesystem with the pool only when
-# this task's claim is handed to the peer: with the pool on another filesystem,
-# a teardown whose claim names the peer removes its own copy as before, and one
-# whose claim names itself refuses at entry and changes nothing.
-test_teardown_after_a_joint_reassociation_checks_a_cross_device_pool_only_for_its_handoff() {
-  local claimant ida idb dir slot na out rc
-  for claimant in b a; do
-    ida="xdev-a-$claimant"
-    idb="xdev-b-$claimant"
-    dir=$(new_reassociated_joint_case "teardown-xdev-$claimant" "$ida" "$idb" "$claimant")
-    slot=$(joint_slot "$dir")
-    na="$slot/.claude/worktrees/$ida"
-    joint_land "$na"
-    fm_fake_other_device "$dir/teardown-bin" "$(cd "$dir/pool" && pwd -P)"
-    joint_note_all "$dir" "$ida" "$idb"
-    rc=0
-    out=$(run_case_teardown "$dir" "$ida") || rc=$?
-    if [ "$claimant" = b ]; then
-      expect_code 0 "$rc" "xdev-$claimant: a claim naming the peer needs no rename into the pool"$'\n'"$out"
-      [ ! -e "$na" ] || fail "xdev-$claimant: the task's own copy survived"
-      [ ! -e "$dir/home/state/$ida.meta" ] || fail "xdev-$claimant: the task's record survived"
-      cmp -s "$dir/claim-before" "$dir/pool/139/.fm-slot-owner" || fail "xdev-$claimant: the peer's claim changed"
-    else
-      expect_code 1 "$rc" "xdev-$claimant: a claim handoff across filesystems must refuse"$'\n'"$out"
-      assert_contains "$out" "are not on one filesystem" "xdev-$claimant: the refusal did not name the filesystem split"
-      joint_assert_all_untouched "$dir" "$ida" "$idb" "xdev-$claimant"
-      [ -z "$(find "$dir/home/state" -maxdepth 1 -name '.teardown-run.*')" ] || fail "xdev-$claimant: the refusal left its private run directory"
-    fi
-  done
-  pass "with the pool on another filesystem, a teardown routes when the claim names the peer and refuses at entry when it must hand its own claim over"
-}
-
 test_teardown_after_a_joint_reassociation_releases_a_vernant_locked_copy_through_the_driver() {
   local shape id ida idb dir slot na nb out rc pid head
   for shape in released refused; do
@@ -2626,6 +2594,5 @@ test_joint_failure_rolls_both_records_back
 test_joint_reassociation_holds_every_records_meta_lock
 test_teardown_after_a_joint_reassociation_removes_only_the_tasks_own_copy
 test_teardown_after_a_joint_reassociation_refuses_what_it_cannot_prove
-test_teardown_after_a_joint_reassociation_checks_a_cross_device_pool_only_for_its_handoff
 test_teardown_after_a_joint_reassociation_releases_a_vernant_locked_copy_through_the_driver
 test_teardown_after_a_joint_reassociation_finishes_a_removed_copy_and_leaves_a_reassigned_slot

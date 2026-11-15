@@ -395,7 +395,7 @@ test_no_mistakes_pushed_branch_without_merge_refuses() {
   (umask 022; run_teardown "$case_dir" --force --drop-file "$words") > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 0 "$rc" "nm-origin: a drop with the captain's words must complete: $(cat "$case_dir/stderr")"
   cmp -s "$words" "$case_dir/data/task-x1/captain-drop.md" || fail "nm-origin: the captain's exact words were not retained"
-  assert_equals 600 "$(fm_file_mode "$case_dir/data/task-x1/captain-drop.md")" "nm-origin: the captain's words are readable by other users"
+  assert_equals 600 "$(teardown_test_file_mode "$case_dir/data/task-x1/captain-drop.md")" "nm-origin: the captain's words are readable by other users"
   grep -F "[x] task-x1" "$case_dir/data/backlog.md" >/dev/null || fail "nm-origin: the dropped row was not closed"
   grep -E '^[[:space:]]+dropped$' "$case_dir/data/backlog.md" >/dev/null || fail "nm-origin: the row does not record the fixed drop note"
   pass "a pushed but unmerged ship refuses, and only the captain's own words discard it"
@@ -429,7 +429,7 @@ test_cross_device_data_folder_refuses_only_a_rename_into_it() {
   git -C "$case_dir/project" fetch -q origin
   words="$case_dir/words.txt"
   printf 'Drop it; the premise is gone.\n' > "$words"
-  fm_fake_other_device "$case_dir/fakebin" "$case_dir/data"
+  teardown_test_fake_other_device "$case_dir/fakebin" "$case_dir/data"
   before=$(cd "$case_dir" && find state data wt -name .git -prune -o -type f ! -name '*.lock' ! -name '.guard-watcher-stale-banner' -print | LC_ALL=C sort | xargs shasum -a 256)
   rc=0
   run_teardown "$case_dir" --force --drop-file "$words" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
@@ -444,7 +444,7 @@ test_cross_device_data_folder_refuses_only_a_rename_into_it() {
   write_meta "$case_dir" local-only ship
   wt_commit_file "$case_dir" feature.txt landed "merged work"
   git -C "$case_dir/project" update-ref refs/heads/main "$(git -C "$case_dir/wt" rev-parse HEAD)"
-  fm_fake_other_device "$case_dir/fakebin" "$case_dir/data"
+  teardown_test_fake_other_device "$case_dir/fakebin" "$case_dir/data"
   rc=0
   run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 0 "$rc" "xdev-data-plain: a close with no rename into the data folder must complete: $(cat "$case_dir/stderr")"
@@ -2886,7 +2886,7 @@ test_verified_bundle_preserves_unlanded_copy() {
     stored="$case_dir/data/task-x1/preserved-bundles/$(cut -f2 "$case_dir/data/task-x1/preservation-bundles.tsv").bundle"
     assert_grep "$stored" "$case_dir/stderr" 'stored recovery path not reported'
     assert_equals "$digest" "$(shasum -a 256 "$stored" | awk '{print $1}')" 'stored bundle digest changed'
-    assert_equals 600 "$(fm_file_mode "$stored")" "bundle-$mode: the stored bundle is readable by other users"
+    assert_equals 600 "$(teardown_test_file_mode "$stored")" "bundle-$mode: the stored bundle is readable by other users"
     rm "$BUNDLE_PATH"
     git -C "$restored" bundle unbundle "$stored" >/dev/null || fail 'stored bundle cannot restore commits after source deletion'
     assert_equals 'recoverable work' "$(git -C "$restored" show "$head:work.txt")" 'preserved work cannot be recovered'
@@ -3106,6 +3106,38 @@ SH
   [ "$proofs" -ge 2 ] || fail "bundle-store-once: the fixture ran $proofs bundle proofs, fewer than two"
   assert_equals 1 "$(wc -l < "$case_dir/stored-copies.log" | tr -d ' ')" 'bundle-store-once: a later proof copied the bundle again'
   pass 'one teardown copies a preservation bundle into task data once and reuses it for later proofs'
+}
+
+# A bundle stored again after the entry preflight is staged in the private run
+# directory and published owner-only, as the first store is, under the usual
+# umask 022. The endpoint close stand-in drops the stored copy so a later proof
+# of the same teardown must store it again from the source.
+test_bundle_stored_after_entry_is_owner_only() {
+  local case_dir rc stored
+  make_bundle_copy_case bundle-store-after-entry
+  case_dir=$NESTED_CASE
+  : > "$case_dir/run-dir-stages.log"
+  cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in kill-*) rm -f '$case_dir/data/task-x1/preserved-bundles/'*.bundle ;; esac
+exit 0
+SH
+  cat > "$case_dir/fakebin/cp" <<SH
+#!/usr/bin/env bash
+case "\${2:-}" in
+  */.teardown-run.*/bundle-*) printf '%s\\n' "\$2" >> '$case_dir/run-dir-stages.log' ;;
+esac
+exec /bin/cp "\$@"
+SH
+  chmod +x "$case_dir/fakebin/tmux" "$case_dir/fakebin/cp"
+  rc=0
+  (umask 022; FM_HOME="$case_dir/home" run_teardown "$case_dir") > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "bundle-store-after-entry: verified preservation must allow ordinary teardown: $(cat "$case_dir/stderr")"
+  [ -s "$case_dir/run-dir-stages.log" ] || fail "bundle-store-after-entry: no proof after the entry preflight stored the bundle again"
+  stored="$case_dir/data/task-x1/preserved-bundles/$(cut -f2 "$case_dir/data/task-x1/preservation-bundles.tsv").bundle"
+  assert_present "$stored" "bundle-store-after-entry: the stored bundle is missing"
+  assert_equals 600 "$(teardown_test_file_mode "$stored")" "bundle-store-after-entry: the stored bundle is readable by other users"
+  pass 'a bundle stored again after the entry preflight is published owner-only'
 }
 
 test_bundle_sources_and_durable_home_locations() {
@@ -4120,6 +4152,7 @@ test_invalid_preservation_bundle_refuses
 test_bundle_storage_inside_removal_root_refuses
 test_bundle_storage_failure_keeps_copy
 test_bundle_admission_stores_once
+test_bundle_stored_after_entry_is_owner_only
 test_bundle_sources_and_durable_home_locations
 test_bundle_with_malformed_commit_refuses
 test_bundle_ignores_branches_other_worktrees_hold

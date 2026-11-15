@@ -1719,6 +1719,46 @@ test_nested_status_manifest_directory_refuses_at_entry() {
   pass "a shared status manifest that is a directory refuses a plain and a prior-shape nested close before any mutation, and the retry closes"
 }
 
+# The private run directory must share a filesystem with the pool only when
+# this task's claim is handed to a peer. With the pool on another filesystem, a
+# prior-shape task whose peer still works in the slot removes its own copy when
+# the claim names the peer, and refuses at entry, changing nothing, when the
+# claim names this task and would be handed over.
+test_cross_device_pool_is_checked_only_for_a_claim_handoff() {
+  local claim case_dir rc label peer
+  for claim in peer mine; do
+    label="xdev-pool-claim-$claim"
+    nested_fixture "$label" enclosing mine landed
+    case_dir=$NESTED_CASE
+    peer="$NESTED_SLOT/.claude/worktrees/peer"
+    git -C "$case_dir/project" worktree add -q -b fm/peer "$peer" main
+    fm_write_meta "$case_dir/state/peer.meta" \
+      "window=firstmate:fm-peer" "endpoint_task_id=peer" \
+      "worktree=$peer" "branch=fm/peer" "project=$case_dir/project" \
+      "kind=ship" "spawn_gen=peer-gen" "prior_worktree=$NESTED_SLOT"
+    [ "$claim" = mine ] || printf 'task=peer\nhome=%s\n' "$case_dir/home" > "$case_dir/pool/1/.fm-slot-owner"
+    teardown_test_fake_other_device "$case_dir/fakebin" "$(cd "$case_dir/pool" && pwd -P)"
+    nested_snapshot "$case_dir" "$case_dir/before"
+    rc=0
+    nested_run "$case_dir" || rc=$?
+    if [ "$claim" = peer ]; then
+      expect_code 0 "$rc" "$label: a claim naming the peer needs no rename into the pool: $(tail -3 "$case_dir/stderr")"
+      assert_absent "$NESTED_COPY" "$label: the task's own copy survived"
+      assert_absent "$case_dir/state/task-x1.meta" "$label: the task record survived"
+      assert_present "$peer/.git" "$label: the peer's copy was removed"
+      grep -Fxq "task=peer" "$case_dir/pool/1/.fm-slot-owner" || fail "$label: the peer's claim changed"
+    else
+      expect_code 1 "$rc" "$label: a claim handoff across filesystems must refuse"
+      assert_grep "are not on one filesystem" "$case_dir/stderr" "$label: the refusal did not name the filesystem split"
+      nested_snapshot "$case_dir" "$case_dir/after"
+      cmp -s "$case_dir/before" "$case_dir/after" \
+        || fail "$label: the refusal changed the world: $(diff "$case_dir/before" "$case_dir/after" | head -10)"
+      [ -z "$(find "$case_dir/state" -maxdepth 1 -name '.teardown-run.*')" ] || fail "$label: the refusal left its private run directory"
+    fi
+  done
+  pass "with the pool on another filesystem, a teardown routes when the claim names the peer and refuses at entry when it must hand its own claim over"
+}
+
 # With no busy generation recorded or armed, retire_busy_state removes nothing,
 # so a directory at the busy-state path does not stop a prior-shape ship or a
 # scout: both close, as on the base.
@@ -4554,6 +4594,7 @@ test_nested_forced_drop_record_follows_the_reservation
 test_nested_alias_worktree_recovers_like_its_physical_path
 test_nested_status_manifest_directory_refuses_at_entry
 test_inactive_busy_state_path_does_not_refuse
+test_cross_device_pool_is_checked_only_for_a_claim_handoff
 test_owed_return_pending_slot_is_never_retired
 test_plain_nested_disposition_equals_the_prior_shape
 test_scout_with_a_plain_nested_copy_keeps_its_own_route
