@@ -1245,6 +1245,11 @@ if [ "$mode" = async ]; then
   "$py" "$dur" gate "test.$peer" -- /bin/bash -c "$inner" _ "$d" "$self" "$peer" > "$d/$self.child.out" 2> "$d/$self.child.err" &
   sleep 6
   : > "$d/$self.end"
+elif [ "$mode" = timer ]; then
+  exec 9<> "$d/fifo.$self"
+  "$py" "$dur" gate "test.$peer" -- /bin/bash -c "$inner" _ "$d" "$self" "$peer" > "$d/$self.child.out" 2> "$d/$self.child.err" &
+  IFS= read -r -t 8 unused <&9 || :
+  : > "$d/$self.end"
 else
   "$py" "$dur" gate "test.$peer" -- /bin/bash -c "$inner" _ "$d" "$self" "$peer" > "$d/$self.child.out" 2> "$d/$self.child.err"
   : > "$d/$self.end"
@@ -1253,9 +1258,11 @@ fi"""
 
 def case_async_cycle():
     """R1: a request registered by a background descendant, while its holder keeps running, is not a wait cycle."""
-    case = Case('R1 async cycle', 'two outer gates each start the other key in the background and sleep: no extra copy while either outer runs')
-    for label, modes in (('both-async', ('async', 'async')), ('one-sync-one-async', ('sync', 'async'))):
+    case = Case('R1 async cycle', 'two outer gates each start the other key in the background and wait on a sleep or a builtin timer: no extra copy while either outer runs')
+    for label, modes in (('both-async', ('async', 'async')), ('one-sync-one-async', ('sync', 'async')), ('builtin-timer', ('timer', 'timer'))):
         world = World('async-cycle-' + label, cores=2)
+        for name in 'AB':
+            os.mkfifo(world.folder / ('fifo.' + name))
         procs = []
         for (name, peer), mode in zip((('A', 'B'), ('B', 'A')), modes):
             procs.append(world.launch(name, [pyshim, tool('fm-duration.py'), 'gate', 'test.' + name, '--', '/bin/bash', '-c', ASYNC_OUTER, '_',
@@ -1576,6 +1583,48 @@ def case_pass_count_bounds():
     return case
 
 
+def case_gate_chain_cycle():
+    """A-4 (Main 1723): a wait cycle whose every link is a gate, reached through exec, is proven from the gates' own registrations and drains."""
+    case = Case('A-4 gate chain cycle', 'gate A -> (exec) gate mid.A -> gate B while gate B -> (exec) gate mid.B -> gate A: both finish, each link being a gate that waits only for its command')
+    world = World('gate-chain-cycle', cores=4)
+    only_one = dict(FM_TEST_KEY_SLOTS='1')
+    script = 'touch "$1"; while [ ! -e "$2" ]; do sleep 0.05; done; exec "$3" "$4" gate "$5" -- "$3" "$4" gate "$6" -- touch "$7"'
+    a_ready, b_ready, a_done, b_done = (world.folder / name for name in ('a.ready', 'b.ready', 'a.done', 'b.done'))
+    gate_a = world.launch('a', [pyshim, tool('fm-duration.py'), 'gate', 'test.chain.a', '--', 'bash', '-c', script, '_', str(a_ready), str(b_ready), pyshim, tool('fm-duration.py'), 'test.chain.mid.a', 'test.chain.b', str(a_done)], extra=only_one)
+    gate_b = world.launch('b', [pyshim, tool('fm-duration.py'), 'gate', 'test.chain.b', '--', 'bash', '-c', script, '_', str(b_ready), str(a_ready), pyshim, tool('fm-duration.py'), 'test.chain.mid.b', 'test.chain.a', str(b_done)], extra=only_one)
+    began = time.monotonic()
+    codes = wait_all([gate_a, gate_b], timeout=90)
+    case.measure(exit_codes=codes, seconds=round(time.monotonic() - began, 1))
+    case.check(codes == [0, 0] and a_done.exists() and b_done.exists(), 'the two gate chains did not both finish: %s %s %s' % (codes, world.text('a')[-200:], world.text('b')[-200:]))
+    return case
+
+
+@ci_only
+def case_shell_between_waits():
+    """A-4 (Main 1723): a real cycle with a user shell between the gates gets no exception: it waits until a holder ends, which here nobody does."""
+    case = Case('A-4 shell between gates', 'two outer gates whose foreground gates run from a bash script that also has a live background helper: no inner starts while both outers are alive (cleanup kills the stuck outers)')
+    world = World('shell-between', cores=2)
+    outer = ('d=$1 self=$2 peer=$3 py=$4 dur=$5\n: > "$d/$self.ready"\nwhile [ ! -e "$d/$peer.ready" ]; do sleep 0.05; done\n'
+             '/bin/bash -c \'while [ ! -e "$1/release-helper" ]; do sleep 0.2; done\' _ "$d" &\n'
+             '"$py" "$dur" gate "test.$peer" -- /bin/bash -c \': > "$1/$2.inner"\' _ "$d" "$self"\n: > "$d/$self.end"\n')
+    procs = [world.launch(name, [pyshim, tool('fm-duration.py'), 'gate', 'test.' + name, '--', '/bin/bash', '-c', outer, '_', str(world.folder), name, peer, pyshim, tool('fm-duration.py')], extra=dict(FM_TEST_KEY_SLOTS='1'))
+             for name, peer in (('A', 'B'), ('B', 'A'))]
+    waiters = world.slots / 'waiters'
+    for _ in range(1200):
+        if waiters.exists() and len(list(waiters.glob('w-*.lock'))) >= 2:
+            break
+        time.sleep(0.05)
+    time.sleep(6)
+    alive = [process.poll() is None for process in procs]
+    started = {name: (world.folder / (name + '.inner')).exists() for name in 'AB'}
+    case.measure(outers_alive_after_6s=alive, inner_started=started)
+    case.check(all(alive) and not any(started.values()), 'a real cycle with a shell between the gates was given an exception: alive=%s started=%s' % (alive, started))
+    (world.folder / 'release-helper').touch()
+    for process in procs:
+        kill_group(process)
+    return case
+
+
 def sampling_valid_or_idle(case, seen, label, expected_started):
     """A run that is expected to start no worker has nothing to sample; every other run holds the sampler to the contract's 50 ms."""
     if expected_started == 0:
@@ -1617,7 +1666,7 @@ def case_proof_contention():
     return case
 
 
-CASES = [case_nested, case_nested_two_level, case_nested_other_key, case_sibling_runners, case_mixed_cycle, case_lease_slot_cycle, case_holder_killed, case_one_candidate_proof, case_unusable_modes, case_guard_unavailable, case_guard_pipe_window, case_degrade_nested, case_pass_count_bounds, case_proof_contention, case_async_cycle, case_one_reservation, case_jobs_clamp, case_duration_sample, case_padded_marker, case_key_guard, case_cross_key, case_malformed, case_brief_route, case_runner_holder, case_lint, case_isolation_proof, case_waiting, case_burst_drain, case_drain, case_wait_cause_control, case_same_class_order, case_sampler_control, case_soak]
+CASES = [case_nested, case_nested_two_level, case_nested_other_key, case_sibling_runners, case_mixed_cycle, case_lease_slot_cycle, case_holder_killed, case_one_candidate_proof, case_unusable_modes, case_guard_unavailable, case_guard_pipe_window, case_degrade_nested, case_pass_count_bounds, case_proof_contention, case_async_cycle, case_gate_chain_cycle, case_shell_between_waits, case_one_reservation, case_jobs_clamp, case_duration_sample, case_padded_marker, case_key_guard, case_cross_key, case_malformed, case_brief_route, case_runner_holder, case_lint, case_isolation_proof, case_waiting, case_burst_drain, case_drain, case_wait_cause_control, case_same_class_order, case_sampler_control, case_soak]
 
 
 def main():

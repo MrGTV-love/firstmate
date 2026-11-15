@@ -163,7 +163,7 @@
 # the slots on the CPU-pass log descriptor and waits until a holder ends, never admitted
 # by elapsed time; a nested run of a key already held by its own ancestry
 # (FM_TEST_SLOT_HELD) takes none, every other key counts all of its holders at any depth,
-# FM_CPU_PASS_HELD never skips a slot, and only a proven closed wait cycle admits a waiter
+# FM_CPU_PASS_HELD never skips a slot, and only a wait cycle proven from the gates' own registrations admits a waiter
 # early (bin/fm-duration.py's header owns the rule). The time a script queued for its
 # slot is left out of its recorded duration and its FM_TEST_END duration_ms; the time it
 # queued for a pass or a token lease stays in its FM_TEST_END duration_ms (as it did before

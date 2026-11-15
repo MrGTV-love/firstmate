@@ -186,28 +186,31 @@ Every other key counts all holders
 of that key at any nesting depth, so a gate test.K under another key waits for an
 unnested test.K holder as it does when nothing is nested. A nested waiter publishes
 a locked record naming its key and its chain of gate pids in FM_TEST_SLOT_DIR/waiters
-(the lock is its liveness; a dead waiter's record is removed by the next reader). A
-gate is stuck only when its command is blocked on that waiter alone: in the process
-table, every process between the gate and the waiter has exactly one child that is
-not a pass guard or a process-table reader (the next process toward the waiter) and
-is not running. A command that also sleeps, runs another job or has a second
-background job is doing something of its own, so a request that a background job of
-it registered is not taken for a cycle and waits for a holder to end. A waiter is
-stuck for good when every holder of its key is such a gate. A waiter that sees, on
-two polls in a row, that its own chain is among the holders it transitively waits for
-has closed a wait cycle; the earliest queued waiter that closes one runs beside the
-limit, says so and takes no slot, so two gates that each hold one key and block on a
-request for the other both finish. That is the one admission that is not a holder
-ending, and it is at most one extra copy of a key per cycle.
-THIS CHECK IS A PROXY, NOT A PROOF. The process table cannot show what a process
-waits on (macOS reports no wait channel for any process), so a shell that waits on a
-builtin timer beside its one background gate has the same single child and sleeping
-state as a shell blocked on that gate and is taken for blocked (one extra copy of one
-key can run), and a real cycle whose holders each also run an unrelated background job
-is not drained until that job ends. Which of these limits to accept is the owner's
-open choice for amendment A-4. Only gates that export FM_TEST_SLOT_PIDS can be seen.
-FM_CPU_PASS_HELD, which a caller can claim without holding any pass, never lets a
-command skip a slot.
+(the lock is its liveness; a dead waiter's record is removed by the next reader) and the
+(pid, key) of each gate above it. A gate takes a slot, starts its command and writes the
+command's pid into its own slot record (kind and command). The one exception to "a waiter
+starts only when a holder ends" is a PROVEN wait cycle, and the proof is constructive: a
+gate does nothing but wait for its one command (no timer, no other job), so it cannot end
+until that command ends. A waiter's chain is proven when every gate in it is a gate (not a
+run, whose progress rule can stop its command) whose slot record names, as its command, the
+next gate in the chain, and for the last gate the waiter itself (the same process when the
+command exec'd into the nested gate). A waiter is stuck for good when every holder of its
+key is a gate of a proven chain. A waiter that sees, on two polls in a row, that its own
+chain is among the holders it transitively waits for has closed a proven wait cycle; the
+earliest queued waiter that closes one runs beside the limit, says so and takes no slot,
+so gates that each hold a key and reach each other's key through gates alone (directly or
+through exec) both finish. That is the one admission that is not a holder ending, and it
+is at most one extra copy of a key per cycle.
+Anything else gets NO exception, because nothing available shows what another kind of
+process waits on (macOS reports no wait channel for any process): a user shell between
+two gates, a pass wrapper, a runner, a shell that waits on a builtin timer beside its
+background gate. Such a waiter starts only when a holder ends. The residual is stated
+plainly: a real cycle with a user shell between the gates waits until a holder ends,
+which in a true cycle nobody does; there is no timeout, reaper or other mechanism for it
+(the owner's choice for amendment A-4 stays open: no exception at all is the alternative
+that removes the constructive case too). Only gates that export FM_TEST_SLOT_PIDS and
+FM_TEST_SLOT_HELD can be seen. FM_CPU_PASS_HELD, which a caller can claim without holding
+any pass, never lets a command skip a slot.
 
 CPU pass for test.* keys. run, and gate (which takes the pass by default; --cpu-pass
 LABEL names the holder in the pool's holder list), take one pass of the host-wide CPU
@@ -1119,6 +1122,10 @@ class Admission:
             return ()
         return self.guard.inherit() if self.guard is not None else ()
 
+    def register_command(self, pid):
+        """Register the command's pid in the holder's slot record, for the wait-cycle proof."""
+        record_command(self.slot, pid)
+
     def announce_guard(self):
         """Runs in the command's own process before its exec: the guard learns the command's pid from the command itself."""
         if self.guard is not None:
@@ -1155,7 +1162,7 @@ class Admission:
         self.slot = None
 
 
-def admit(key, log_fd=2, queued=None, pass_label=None, passes=1, share=False):
+def admit(key, log_fd=2, queued=None, pass_label=None, passes=1, share=False, kind='gate'):
     """(slot fd, CPU pass fds, token directory) as an Admission for KEY; each is empty when this key takes none.
 
     With PASS_LABEL a test.* key also takes one pass of the host-wide pool, as one acquisition with the
@@ -1201,7 +1208,7 @@ def admit(key, log_fd=2, queued=None, pass_label=None, passes=1, share=False):
         slot_log(log_fd, f'running {key} without a slot: this Python has no POSIX file locks')
     else:
         try:
-            admission.slot, admission.passes = queue_for_slot(key, slot_directory(key), limit, log_fd, queued, take if wanted or leasing else None)
+            admission.slot, admission.passes = queue_for_slot(key, slot_directory(key), limit, log_fd, queued, take if wanted or leasing else None, kind)
         except (OSError, ValueError) as error:
             slot_log(log_fd, f'running {key} without a slot: {error}')
     if (wanted or leasing) and admission.slot is None and not admission.passes:
@@ -1240,8 +1247,12 @@ def slot_free(directory, limit):
     return False
 
 
-def try_slot(directory, limit):
-    """An open fd holding one of the directory's slots, or None when every slot is held; never waits."""
+def try_slot(directory, limit, kind='gate'):
+    """An open fd holding one of the directory's slots, or None when every slot is held; never waits.
+
+    The holder's record names its pid, when it took the slot and KIND (gate or run); the gate adds its command's pid once the command
+    exists (record_command), which is the registration a wait-cycle proof reads.
+    """
     for index in range(limit):
         fd = os.open(directory / f'slot-{index}.lock', os.O_RDWR | os.O_CREAT, 0o600)
         try:
@@ -1253,16 +1264,84 @@ def try_slot(directory, limit):
             continue
         try:
             os.ftruncate(fd, 0)
-            os.pwrite(fd, json.dumps(dict(pid=os.getpid(), since=int(time.time()))).encode(), 0)
+            os.pwrite(fd, json.dumps(dict(pid=os.getpid(), since=int(time.time()), kind=kind)).encode(), 0)
         except OSError:
             pass  # The record is for display only; the lock is the slot.
         return fd
     return None
 
 
+def record_command(fd, pid):
+    """Register the pid of the command a slot holder just started, in the holder's own slot record (the record grows, so no truncation)."""
+    if fd is None:
+        return
+    try:
+        current = json.loads(os.pread(fd, 4096, 0) or b'{}')
+        current['command'] = pid
+        os.pwrite(fd, json.dumps(current).encode(), 0)
+    except (OSError, ValueError):
+        pass  # an unregistered command only means no proof, and no proof means no exception
+
+
+def slot_record(key, pid):
+    """The record of the live holder PID of one of KEY's slots, or None; a record is read only while its lock is held."""
+    try:
+        directory = slot_directory(key)
+    except (OSError, ValueError):
+        return None
+    for path in directory.glob('slot-*.lock'):
+        try:
+            fd = os.open(path, os.O_RDWR)
+        except OSError:
+            continue
+        try:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                fcntl.flock(fd, fcntl.LOCK_UN)
+                continue  # nobody holds this slot
+            except BlockingIOError:
+                pass
+            try:
+                record = json.loads(os.pread(fd, 4096, 0) or b'{}')
+            except ValueError:
+                continue
+            if record.get('pid') == pid:
+                return record
+        finally:
+            os.close(fd)
+    return None
+
+
+def proven_chain(record):
+    """True only when every link from the outermost slot holder down to the waiter is a gate that is blocked by construction.
+
+    A gate does nothing but wait for its one command, so it cannot end until that command ends. The proof comes from the
+    gates' own registrations: each holder in the waiter's chain is a gate whose slot record names its command pid, and that
+    pid is the next holder in the chain (or, for the last one, the waiter itself, the same process when the command exec'd
+    into the nested gate). A process of anything else between two gates (a shell, a runner, a pass wrapper) breaks the proof,
+    whatever the process table shows of it, because nothing available shows what such a process waits on.
+    """
+    links = record.get('links') or []
+    if not links or [pid for pid, _ in links] != record['chain']:
+        return False
+    expected = [pid for pid, _ in links[1:]] + [record['pid']]
+    for (pid, key), command in zip(links, expected):
+        holder = slot_record(key, pid)
+        if not holder or holder.get('kind') != 'gate' or holder.get('command') != command:
+            return False
+    return True
+
+
 def slot_chain():
     """The pids of the gates above this process that hold slots (FM_TEST_SLOT_PIDS), unknown ones left out."""
     return [int(item) for item in os.environ.get(SLOT_PIDS_ENV, '').split('\t') if item.isdigit()]
+
+
+def slot_links():
+    """[(gate pid, key), ...] of the gates above this process that hold slots, outermost first; empty when the two lists disagree."""
+    pids = [int(item) for item in os.environ.get(SLOT_PIDS_ENV, '').split('\t') if item.isdigit()]
+    keys = [item for item in os.environ.get(SLOT_HELD_ENV, '').split('\t') if item]
+    return [[pid, key] for pid, key in zip(pids, keys)] if len(pids) == len(keys) else []
 
 
 def register_waiter(key, limit, chain):
@@ -1271,7 +1350,7 @@ def register_waiter(key, limit, chain):
     directory.mkdir(mode=0o700, parents=True, exist_ok=True)
     fd, temporary = tempfile.mkstemp(prefix='.w-', dir=directory)
     fcntl.flock(fd, fcntl.LOCK_EX)
-    record = dict(key=key, limit=limit, chain=chain, pid=os.getpid(), queued_ns=time.time_ns())
+    record = dict(key=key, limit=limit, chain=chain, links=slot_links(), pid=os.getpid(), queued_ns=time.time_ns())
     os.write(fd, json.dumps(record).encode())
     path = directory / f'w-{os.getpid()}-{record["queued_ns"]}.lock'
     os.rename(temporary, path)
@@ -1328,79 +1407,14 @@ def key_holders(key, limit):
     return pids
 
 
-def process_rows():
-    """{pid: (ppid, state, command)} for every process, or None when the table cannot be read."""
-    try:
-        result, _ = proc_read(['ps', '-axo', 'pid=,ppid=,stat=,command='], ['table', 'pid,ppid,stat,command'],
-                              env=dict(os.environ, LC_ALL='C', COLUMNS='10000'))
-    except OSError:
-        return None
-    if result.returncode:
-        return None
-    rows = {}
-    for line in result.stdout.splitlines():
-        words = line.split(None, 3)
-        if len(words) >= 3 and words[0].isdigit() and words[1].isdigit():
-            rows[int(words[0])] = (int(words[1]), words[2], words[3] if len(words) > 3 else '')
-    return rows
-
-
-def is_helper(command):
-    """True for a process the pool or this helper runs beside a command: the pass guard and a process-table reader."""
-    words = command.split()
-    if any(word.endswith('fm-proc-info.py') for word in words) or (words and os.path.basename(words[0]) == 'ps'):
-        return True
-    return any(word.endswith('fm-cpu-pass.py') and words[index + 1:index + 2] == ['guard'] for index, word in enumerate(words))
-
-
-def blocks_on(upper, lower, rows):
-    """True when process UPPER can only be waiting for process LOWER: the foreground chain between them is closed.
-
-    LOWER must be a descendant of UPPER. Every process strictly between them must have exactly one child that is
-    not a helper (the next process toward LOWER) and must not be running; a shell that also sleeps, runs another
-    command or has a second background job is doing something of its own and is not blocked on LOWER. UPPER itself
-    is the gate (or run) that holds the slot, whose only work is waiting for its command.
-    """
-    below = [lower]
-    pid = lower
-    while len(below) <= 256:
-        entry = rows.get(pid)
-        if entry is None or entry[0] <= 1:
-            return False
-        pid = entry[0]
-        if pid == upper:
-            break
-        below.append(pid)
-    else:
-        return False
-    below.reverse()  # outermost first: the command of UPPER ... LOWER
-    children = collections.defaultdict(set)
-    for child, (parent, _, command) in rows.items():
-        if not is_helper(command):
-            children[parent].add(child)
-    for index, member in enumerate(below[:-1]):
-        if rows[member][1].startswith('R') or children[member] != {below[index + 1]}:
-            return False
-    return True
-
-
-def foreground_blocked(record, rows):
-    """True when every gate in a waiter's chain is waiting on that waiter alone, so none of them can end first."""
-    lower = record['pid']
-    for upper in reversed(record['chain']):
-        if not blocks_on(upper, lower, rows):
-            return False
-        lower = upper
-    return True
-
-
 def cycle_victim(waiters, me):
     """True when this waiter closes a wait cycle and is the one the cycle admits.
 
-    A gate whose command is blocked on a waiter (foreground_blocked: nothing else runs under it) cannot end while
-    that waiter waits. A waiter is stuck for good when every holder of its key is such a gate. A waiter whose own
-    chain is among the holders it transitively waits for closes a cycle; of the waiters that close one, the
-    earliest queued is the victim. Callers pass only the waiters whose chains are foreground blocked.
+    Callers pass only the waiters whose chains are proven (proven_chain): every gate of such a chain is blocked by construction
+    on the next gate or on the waiter itself, so none of them can end while the waiter waits. A waiter is stuck for good when
+    every holder of its key is such a gate. A waiter whose own chain is among the holders it transitively waits for closes a
+    cycle; of the waiters that close one, the earliest queued is the victim. Any other shape is not a proven cycle and its
+    waiter starts only when a holder ends.
     """
     def closes(record):
         stuck = set(record['chain'])
@@ -1421,7 +1435,7 @@ def cycle_victim(waiters, me):
     return first['pid'] == me['pid'] and first['queued_ns'] == me['queued_ns']
 
 
-def queue_for_slot(key, directory, limit, log_fd, queued=None, take=None):
+def queue_for_slot(key, directory, limit, log_fd, queued=None, take=None, kind='gate'):
     """(slot fd, pass fds) once a slot is free; only a holder that ends admits the waiter, never elapsed time.
 
     With TAKE, a function returning the fds of one CPU pass, the waiter holds nothing while it waits: it
@@ -1443,7 +1457,7 @@ def queue_for_slot(key, directory, limit, log_fd, queued=None, take=None):
                 passes = take() if take is not None else []
                 passing += time.monotonic() - began
                 try:
-                    fd = try_slot(directory, limit)
+                    fd = try_slot(directory, limit, kind)
                 except BaseException:
                     for pass_fd in passes:
                         os.close(pass_fd)
@@ -1467,12 +1481,7 @@ def queue_for_slot(key, directory, limit, log_fd, queued=None, take=None):
                 if registered is None:
                     registered = register_waiter(key, limit, chain)
                 waiting = live_waiters()
-                closed = cycle_victim(waiting, registered[2])
-                if closed:
-                    # Only a chain that is blocked on its waiter is stuck: a holder whose command sleeps, or runs
-                    # another job, beside a background waiter ends by itself and admits nobody.
-                    rows = process_rows()
-                    closed = rows is not None and cycle_victim([record for record in waiting if foreground_blocked(record, rows)], registered[2])
+                closed = len(waiting) >= 2 and cycle_victim([record for record in waiting if proven_chain(record)], registered[2])
                 cycle_hits = cycle_hits + 1 if closed else 0
                 if cycle_hits >= CYCLE_CONFIRMATIONS:
                     slot_log(log_fd, f'running {key} beside its limit: every holder of its slots waits on a slot held above this command (a wait cycle), and this is the waiter it admits')
@@ -1610,6 +1619,7 @@ def gate(key, command, log_fd, wait_file=None, cpu_file=None, pass_label=None, p
             slot_log(log_fd, f'command not executable: {command[0]}')
             return 126
         admission.close_guard_write()
+        admission.register_command(child.pid)
         code = child.wait()
         if cpu_file:
             try:
@@ -1998,7 +2008,7 @@ def main():
                 'pipeline-start', '--priority', args.pipeline_priority, '--',
                 sys.executable, str(Path(__file__).resolve()), 'run', '--pipeline-admitted'] + sys.argv[2:])
         try:
-            admission = admit(args.key, 2, None, f'fm-duration run {args.key}', share=True)
+            admission = admit(args.key, 2, None, f'fm-duration run {args.key}', share=True, kind='run')
         except ValueError as error:
             scalar('error', str(error))
             return 125
