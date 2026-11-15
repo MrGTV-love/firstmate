@@ -4683,8 +4683,10 @@ teardown_unclaimed_pass() {  # <what follows>
 # the teardown refuses with the record kept; a retry plans again from what it then
 # reads, and compares it with the lease its marker recorded. An entry still on the old
 # recovered holder is adopted here, before any helper, and must then show the protected
-# holder. The pass (teardown_unclaimed_pass_checks) then runs once more, and again
-# before each helper.
+# holder. The gate checks the lease only; the marker follows it, and the full pass
+# (teardown_unclaimed_pass_checks: lease readable and unchanged, root landed, no live
+# process outside the own folders) runs before the first helper and again before each
+# one, so a refusal there keeps the marker the retry needs.
 teardown_unclaimed_retire_gate() {
   local now why=''
   # A route only the planning under project custody selected (the early proof did not)
@@ -4709,9 +4711,6 @@ teardown_unclaimed_retire_gate() {
       else
         why=$TEARDOWN_UNCLAIMED_WHY
       fi
-    fi
-    if [ -z "$why" ] && ! teardown_unclaimed_pass_checks; then
-      why=$TEARDOWN_UNCLAIMED_WHY
     fi
   fi
   [ -n "$why" ] || return 0
