@@ -245,13 +245,14 @@ EOF
 #   fm_slot_apply_move  moves a copy the proof passed, with hooks off, re-reads it, and compares.
 #                       It compares every ref exactly: the only change admitted besides the HEAD/branch
 #                       move is the anchor this spawn's own preparation created. A refusal writes no
-#                       file and runs no checkout; its undo is by ref only, on proof. Any other
-#                       difference is a failure (return 1), never a skip.
+#                       file, runs no checkout and undoes nothing. A git refusal after the preparation
+#                       wrote anything is a failure (return 1), never a skip, and so is any other
+#                       difference.
 # A copy is proven idle only when ONE snapshot shows: HEAD and its branch readable, the tree clean
 # (tracked, staged and untracked), no process with its working directory in it, no git worktree
 # lock, no live lease or recent contention row, no ignored file at a path the target tracks, and no index flag
 # (assume-unchanged, skip-worktree) on a tracked file or inside any initialized submodule, however deep.
-# Every unreadable input is a doubt, and a doubt skips the copy (return FM_SLOT_SKIP_RC).
+# Every unreadable input is a doubt. A known state skips the copy (FM_SLOT_SKIP_RC); an unknown refuses the spawn (FM_SLOT_REFUSE_RC).
 FM_SLOT_SKIP_RC=20
 # Returned for a doubt that is an UNKNOWN (could not tell): the whole spawn is refused, nothing is skipped past (rule Q).
 FM_SLOT_REFUSE_RC=21

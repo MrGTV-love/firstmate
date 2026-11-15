@@ -549,17 +549,20 @@
 #   contention row, no ignored file at a path the target tree tracks (git overwrites ignored
 #   files silently), no index flag (assume-unchanged, skip-worktree) on any tracked file or
 #   inside any initialized submodule, and HEAD an ancestor of the target. Any doubt, an
-#   unreadable input included, skips the copy: this spawn writes nothing to it (no checkout,
-#   ref, fetch ref or detach), and it is leased durably in place to this home (`treehouse lease --path`, holder
-#   firstmate-skipped:<task>, because Treehouse resets a slot when its shell exits), recorded in
-#   $DATA/<task>/skipped-copies.tsv, listed in the spawn output, and a second `treehouse get`
-#   in the same pane takes another copy. One absolute thirty-minute bound covers every get.
+#   unreadable input included, is a doubt. A doubt that is a KNOWN state (dirty, a holder, an ignored
+#   file in the way, HEAD not an ancestor, a stale submodule) skips the copy: this spawn writes nothing to it, and
+#   it is leased durably in place to this home (`treehouse lease --path`, holder firstmate-skipped:<task>,
+#   because Treehouse resets a slot when its shell exits), recorded in $DATA/<task>/skipped-copies.tsv with the
+#   row read back, listed in the spawn output, and a second `treehouse get` in the same pane takes another copy.
+#   A doubt that is an UNKNOWN (could not tell), a record that cannot be written and read back, or a path that
+#   cannot be resolved refuses the whole spawn: the copy is leased where it stands and nothing is launched.
+#   One absolute thirty-minute bound covers every get and is read before each get, after the custody scan.
 #   After the move a second snapshot is compared with the first, ref for ref: any difference
 #   beyond the expected HEAD/branch move and the one anchor ref this task's own preparation
 #   creates fails the spawn, never reports success. Origin's tracking refs are recorded only
-#   after a move that succeeded. A refusal does nothing to a file: it never writes, overwrites
-#   or deletes one and never runs a checkout that rewrites files; it undoes its own step by ref
-#   only, and only when HEAD, the branch and the commit are exactly what it left. No claim is
+#   after a move that succeeded. A refusal does nothing: no checkout, no switch of HEAD, no deletion
+#   and no undo. Once a move has begun, any failed check stops the spawn, leaves HEAD, refs and files
+#   as they are, holds the copy and refuses (a git refusal after the preparation is such a failure). No claim is
 #   made that a late ignored file is detected: one created after the proof and before the merge
 #   is in neither inventory, so it is not reported. A lease is released only
 #   by bin/fm-teardown.sh, after the copy passes its landed-work test. A relaunch keeps the
@@ -585,7 +588,7 @@
 #   The shell must start that helper within the same ten-minute no-progress
 #   budget as treehouse get, and the attempt ends at the thirty-minute absolute
 #   extreme. Either stop, or a vanished endpoint, ends only that attempt's own
-#   provisioner process group before any checkout restore or refusal record,
+#   provisioner process group before any lock release or refusal record,
 #   and a shell that starts late finds the attempt already claimed and runs nothing.
 #   It uses the assigned copy, never another worktree. Governed
 #   scouts start on fm/<id> so default promotion can adopt the same declaration.
