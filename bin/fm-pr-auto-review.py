@@ -14,7 +14,8 @@ head and never waits: a read runs detached and a later pass collects it.
 A pass for a kind=ship task in mode no-mistakes or direct-PR that records a GitHub pr=:
   1. reads the PR once through `gh pr view`; a closed or merged PR ends the work, an unreadable forge
      merges nothing and only records the step state `waiting: the forge did not answer the PR read`
-     (a queued, held, failed or merged state stands), and a new head starts a new sequence, so a PASS recorded for an older head is
+     (it replaces any state shown; a queued, held, failed or merged state is put back once the forge
+     answers), and a new head starts a new sequence, so a PASS recorded for an older head is
      never counted (bin/fm-review-record.py binds every record to its exact head);
   2. collects the reads it requested earlier for the live head: a finished report is recorded through
      `fm-review-record.py review`, an INCOMPLETE report is held, a FAIL that cannot be recorded still
@@ -208,15 +209,25 @@ UNANSWERED = "the forge did not answer the PR read"
 
 
 def unanswered(side):
-    """An unanswered `gh pr view` says so in the step state (Main 1849), with no merge and no wake.
+    """An unanswered `gh pr view` says so in the step state (Main 1849, Main 1871 F9), with no merge and no wake.
 
-    A queued, held, failed or merged phase stands: the next pass that the forge answers reads it.
+    It replaces whatever state was shown. A queued, held, failed or merged phase is kept aside as `standing`
+    and put back when the forge answers again (answered), so the queue is still checked and no merge is asked
+    twice; held, failed and merged heads also keep their own records.
     """
     current = side.data.get("phase") or {}
     if current.get("state") in ("queued", "held", "fail", "merged"):
-        return
+        side.data["standing"] = current
     phase(side, current.get("head"), "waiting", UNANSWERED)
     side.save()
+
+
+def answered(side):
+    """The forge answered: a phase kept aside by unanswered() is shown again."""
+    standing = side.data.pop("standing", None)
+    current = side.data.get("phase") or {}
+    if standing and current.get("state") == "waiting" and current.get("detail") == UNANSWERED:
+        side.data["phase"] = standing
 
 
 def emit(home, task, side, sha, key, text, wake=None):
@@ -828,6 +839,7 @@ def advance(home, task, url, meta, side):
     if view is None:
         unanswered(side)
         return
+    answered(side)
     sha, base = view["headRefOid"], view["baseRefOid"]
     side.data["base"] = base
     head = side.head(sha)

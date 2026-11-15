@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Helper-level test of one rule in bin/fm-pr-auto-review.py (Main 1849): a pass
 # whose `gh pr view` gets no answer records the step state "waiting: the forge did
-# not answer the PR read", merges nothing and emits no wake, while a queued, held,
-# failed or merged state stands. Only that file is imported; its forge read and
+# not answer the PR read", merges nothing and emits no wake, whatever state was
+# shown before (Main 1871 F9); a queued, held, failed or merged state is kept aside
+# and shown again once the forge answers. Only that file is imported; its forge read and
 # every subprocess runner are replaced in-process, so no process starts.
 set -u
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -53,9 +54,14 @@ ok &= check(line == "waiting: the forge did not answer the PR read", "no prior s
 line = case("t-waiting", {"head": "a" * 40, "state": "waiting", "detail": "forge merge state is BEHIND, not green"})
 ok &= check(line == "waiting: the forge did not answer the PR read", "an earlier waiting reason was kept over the unanswered read: " + line)
 for state, detail in (("queued", url), ("held", "left the merge queue and is still open"), ("fail", "review FAIL"), ("merged", url)):
-    line = case("t-" + state, {"head": "b" * 40, "state": state, "detail": detail})
-    ok &= check(not line.startswith("waiting: the forge did not answer"), f"a {state} state was replaced by the unanswered read: {line}")
+    prior = {"head": "b" * 40, "state": state, "detail": detail}
+    line = case("t-" + state, prior)
+    ok &= check(line == "waiting: the forge did not answer the PR read", f"a {state} state hid the unanswered read: {line}")
+    side = module.Sidecar(home, "t-" + state, url)
+    ok &= check(side.data.get("standing") == prior, f"the {state} state was not kept aside: {side.data.get('standing')}")
+    module.answered(side)
+    ok &= check(side.data.get("phase") == prior and "standing" not in side.data, f"the {state} state was not shown again once the forge answered")
 if ok:
-    print("ok - an unanswered PR read records 'waiting: the forge did not answer the PR read' with no merge, no wake and no process; a queued, held, failed or merged state stands")
+    print("ok - an unanswered PR read shows 'waiting: the forge did not answer the PR read' over any state, with no merge, no wake and no process; a queued, held, failed or merged state is kept aside and shown again once the forge answers")
 sys.exit(1 if failed else 0)
 PY
