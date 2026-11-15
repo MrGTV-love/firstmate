@@ -330,7 +330,7 @@ FM_TASKS_AXI_LOCKED_UNBLOCK="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[
 # holds why); a failure changes nothing.
 # shellcheck disable=SC2034  # FM_TYPED_COMPLETION_KEPT and _CLEAR_ERROR are read by bin/fm-tasks-axi.sh.
 fm_typed_completion_locked_clear() {  # <data-dir> <id>
-  local id=$2 pkg out status first line dep left
+  local id=$2 pkg out status first line dep left errf err
   FM_TYPED_COMPLETION_KEPT='' FM_TYPED_COMPLETION_CLEAR_ERROR=''
   if ! fm_backlog_tasks_axi_addressing "$1"; then
     FM_TYPED_COMPLETION_CLEAR_ERROR="the backlog could not be addressed${FM_BACKLOG_TRANSITION_ERROR:+: $FM_BACKLOG_TRANSITION_ERROR}"
@@ -344,11 +344,19 @@ fm_typed_completion_locked_clear() {  # <data-dir> <id>
     FM_TYPED_COMPLETION_CLEAR_ERROR="node is not on PATH"
     return 1
   fi
-  out=$(cd "$FM_BACKLOG_AXI_ROOT" 2>/dev/null && node "$FM_TASKS_AXI_LOCKED_UNBLOCK" "$pkg" "$FM_BACKLOG_AXI_ROOT" "$FM_BACKLOG_AXI_FILE" "$id" 2>&1)
+  # The answer is standard output alone; standard error (a node warning, or the reason for a
+  # failure) goes to its own file, so it can never be read as the answer.
+  if ! errf=$(mktemp "${TMPDIR:-/tmp}/fm-locked-clear.XXXXXX" 2>/dev/null); then
+    FM_TYPED_COMPLETION_CLEAR_ERROR="the locked clear could not make the file for its error output"
+    return 1
+  fi
+  out=$(cd "$FM_BACKLOG_AXI_ROOT" 2>/dev/null && node "$FM_TASKS_AXI_LOCKED_UNBLOCK" "$pkg" "$FM_BACKLOG_AXI_ROOT" "$FM_BACKLOG_AXI_FILE" "$id" 2>"$errf")
   status=$?
+  err=$(sed -n '1p' "$errf" 2>/dev/null) || err=''
+  rm -f -- "$errf"
   first=${out%%$'\n'*}
   if [ "$status" -ne 0 ]; then
-    FM_TYPED_COMPLETION_CLEAR_ERROR=${first:-the locked clear failed with status $status}
+    FM_TYPED_COMPLETION_CLEAR_ERROR=${err:-the locked clear failed with status $status}
     return 1
   fi
   case "$first" in
