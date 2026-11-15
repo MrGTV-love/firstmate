@@ -150,7 +150,7 @@ first_reported_line() {  # <text>
 # Send the ordinary re-read steer to a mate this pass will not restart, and say
 # plainly which it was. A nudge is a partial reload and is never reported as more.
 fall_back_to_nudge() {  # <id> <reason> [<array-index>]
-  local id=$1 reason=$2 i=${3:-} out line
+  local id=$1 reason=$2 i=${3:-} out line withheld
   local -a route_env=()
   # The pane may have changed hands since the first decision (the persistence
   # wait can last minutes): decide again on this mate's own record right now.
@@ -172,12 +172,19 @@ fall_back_to_nudge() {  # <id> <reason> [<array-index>]
   if out=$(env "${route_env[@]+"${route_env[@]}"}" FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
     "$SCRIPT_DIR/fm-send.sh" "$id" "$FM_SECOND_MATE_NUDGE_MESSAGE" 2>&1); then
     nudged_count=$((nudged_count + 1))
-    printf 'nudged: %s: %s\n' "$id" "$reason"
+    withheld=$(withheld_doorbell "$out")
+    printf 'nudged: %s: %s%s\n' "$id" "$reason" "${withheld:+; the re-read message is recorded, but $withheld}"
   else
     unreached_count=$((unreached_count + 1))
     printf 'unreached: %s: %s; the re-read message could not be delivered either: %s\n' \
       "$id" "$reason" "$(first_reported_line "$out")"
   fi
+}
+
+# The send's own "doorbell withheld" report (Main 1874 (i)), flattened to one
+# line, or nothing: the steer was recorded but its doorbell was not rung.
+withheld_doorbell() {  # <send-output>
+  printf '%s\n' "$1" | sed -n '/doorbell withheld/{s/^fm-send: //;s/^notice: //;s/[[:space:]]\{1,\}/ /g;p;q;}'
 }
 
 report_unreached() {  # <id> <reason>
@@ -399,6 +406,9 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
     i=$((i + 1))
     continue
   fi
+  # A request recorded without its doorbell is still delivered; say so now.
+  withheld=$(withheld_doorbell "$send_out")
+  [ -z "$withheld" ] || printf 'notice: %s: the request to write down its open work is recorded, but %s\n' "$id" "$withheld"
   CORR[i]=$corr
   DEADLINE[i]=$(($(date +%s) + PERSIST_WAIT))
   PLAN[i]="persisted-pending"
