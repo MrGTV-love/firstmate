@@ -5111,6 +5111,7 @@ TEARDOWN_CKO_OPEN=0
 TEARDOWN_CKO_WHY=
 teardown_route_checkout_open "$RL_REPO" copy || { printf 'check_rc=open-failed reads=%s reason=%s\n' "$(cat "$RL_COUNT")" "$TEARDOWN_CLOSEOUT_ROUTE_WHY"; exit 0; }
 if [ "$RL_SWITCH" = 1 ]; then command git -C "$RL_REPO" switch -q pr-head && command git -C "$RL_REPO" switch -q main; fi
+if [ "$RL_SWITCH" = 2 ]; then command git -C "$RL_REPO" switch -q other && command git -C "$RL_REPO" switch -q main; fi
 if [ "$RL_REWRITE" = 1 ]; then
   f=$RL_REPO/.git/logs/HEAD
   n=$(wc -l < "$f" | tr -d ' ')
@@ -5151,6 +5152,11 @@ test_the_checkout_check_reads_the_reflog_once_and_stops_on_a_read_error_an_inter
   [ "$ROUTE_RL_RC" = 1 ] || fail "a readable switch and restore was accepted: $ROUTE_RL_OUT"
   assert_contains "$ROUTE_RL_OUT" "pr-head" "a readable switch and restore is not named"
   switch_out=$ROUTE_RL_OUT
+  # Any checkout change in the window keeps every copy (Main 1887, Main 1900): a switch to an
+  # unrelated branch and back counts although the PR's head branch is known and not named.
+  route_reflog_scenario unrelated-switch 2 - - 0 0
+  [ "$ROUTE_RL_RC" = 1 ] || fail "a switch to an unrelated branch and back was accepted: $ROUTE_RL_OUT"
+  assert_contains "$ROUTE_RL_OUT" "gained" "an unrelated switch is not named as a change in the window: $ROUTE_RL_OUT"
   # The follow-up read of the check fails (the reviewer's first case). With one read there is no second one to lose.
   route_reflog_scenario failed-second-read 1 3 - 0 0
   [ "$ROUTE_RL_RC" = 1 ] || fail "a switch and restore was accepted when the follow-up reflog read failed: $ROUTE_RL_OUT"
@@ -5172,7 +5178,7 @@ test_the_checkout_check_reads_the_reflog_once_and_stops_on_a_read_error_an_inter
   [ "$ROUTE_RL_RC" = 1 ] || fail "an empty anchor was accepted: $ROUTE_RL_OUT"
   assert_contains "$switch_out" "reads=2" "the check did not read the reflog once (one read at the first step, one at the check): $switch_out"
   route_trip_check "checkout check"
-  pass "the checkout check reads the HEAD reflog once, finds a switch and restore even when a follow-up read fails or unrelated entries are appended, refuses on a read error, a rewritten newest entry and an empty anchor, and accepts the stable control"
+  pass "the checkout check reads the HEAD reflog once, finds a switch and restore (to the PR's head branch or to an unrelated one) even when a follow-up read fails or unrelated entries are appended, refuses on a read error, a rewritten newest entry and an empty anchor, and accepts the stable control"
 }
 
 # F2 through the route owner: the post-call check sets the stop flag. Unverified locally.
@@ -5358,6 +5364,9 @@ test_the_content_proof_refuses_git_output_it_cannot_parse_and_accepts_a_genuine_
   FAKE_GIT_DIFFTREE_FILE=$tmpf route_prove "$CR" "$CT" "$CM"; assert_unproved "an unterminated path" "cannot be parsed"
   printf ':100644 M\0f.txt\0' > "$tmpf"
   FAKE_GIT_DIFFTREE_FILE=$tmpf route_prove "$CR" "$CT" "$CM"; assert_unproved "metadata with missing fields" "cannot be parsed"
+  # The raw shape needs its leading colon (Main 1900): a complete record without it is unparsable.
+  printf '100644 100644 %s %s M\0f.txt\0' "$zero" "$sha" > "$tmpf"
+  FAKE_GIT_DIFFTREE_FILE=$tmpf route_prove "$CR" "$CT" "$CM"; assert_unproved "a metadata record without the leading colon" "cannot be parsed"
   printf ':100644 100644 %s %s M\0\0' "$zero" "$sha" > "$tmpf"
   FAKE_GIT_DIFFTREE_FILE=$tmpf route_prove "$CR" "$CT" "$CM"; assert_unproved "an empty path" "cannot be parsed"
   # The deletion branch: the merge commit's entry is read with ls-tree.
@@ -5369,7 +5378,7 @@ test_the_content_proof_refuses_git_output_it_cannot_parse_and_accepts_a_genuine_
   printf '100644 blob %s\tgone.txt\0' "$sha" > "$W/ls.canned"
   FAKE_GIT_DIFFTREE_FILE=$tmpf FAKE_GIT_LSTREE_FILE=$W/ls.canned route_prove "$CR" "$CT" "$CM"; assert_unproved "a deleted path the merge commit still has" "gone.txt"
   route_trip_check "malformed git output"
-  pass "metadata with no path, an unterminated record or path, missing fields, an empty path and an unterminated ls-tree entry keep the copy, while a genuine empty change, a replayed real diff and a deletion the merge commit also made are proved"
+  pass "metadata with no path, an unterminated record or path, missing fields, no leading colon, an empty path and an unterminated ls-tree entry keep the copy, while a genuine empty change, a replayed real diff and a deletion the merge commit also made are proved"
 }
 
 # F3 (Main 1887): the checkout window is published while the route is still proving, and a
