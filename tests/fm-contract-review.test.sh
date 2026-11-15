@@ -114,7 +114,7 @@ test_every_round_finding_section_is_dropped() {
   # allow-list must not admit, with author text below it, at the top level.
   for heading in "Author's all-green candidate" 'Contract Review' 'Contract review notes' 'Boundary dispositions notes' \
     'Revision history notes' 'Register notes' 'Suggested attack notes' 'Responses' 'Notes from the author' \
-    'Context and earlier findings' 'REQUEST (author notes)' 'Earlier findings and how I answered them' 'Owner background'; do
+    'Context and earlier findings' 'Earlier findings and how I answered them' 'Owner background'; do
     { write_known_sections /dev/stdout; printf '\n## %s\n\nZZ-AUTHOR-ZZ F1 answered: fixed, passes.\n' "$heading"; } >"$src"
     pack=''
     build_pack pack --contract "$src" || fail "build with '## $heading' failed: $(cat "$TMP_ROOT/build.err")"
@@ -160,13 +160,15 @@ test_qualifiers_are_allow_listed_words_only() {
     build_pack pack --contract "$src" || fail "build failed: $(cat "$TMP_ROOT/build.err")"
     assert_grep "ZZ-QUAL-ZZ" "$pack/target.md" "the known heading '$heading' was dropped"
   done
-  for heading in 'Context and earlier findings' 'Assumptions (author self-check)' 'Definition Of Done: author notes'; do
+  # A known name followed by free words, not by a parenthetical, a comma or a colon, is not
+  # that section (a parenthetical or comma or colon qualifier is, since Main 1947 item 2).
+  for heading in 'Context and earlier findings' 'Assumptions and author notes' 'Definition Of Done notes'; do
     printf '## Definition Of Done\n\n- **A1** (mandatory): x.\n\n## %s\n\nZZ-QUAL-ZZ\n' "$heading" >"$src"
     pack=''
     build_pack pack --contract "$src" || fail "build failed: $(cat "$TMP_ROOT/build.err")"
-    assert_no_grep "ZZ-QUAL-ZZ" "$pack/target.md" "the qualified heading '$heading' was admitted"
+    assert_no_grep "ZZ-QUAL-ZZ" "$pack/target.md" "the heading '$heading' was admitted"
   done
-  pass "a qualifier is admitted only when every word in it is on the allow-list"
+  pass "a known name with a qualifier is its section; one followed by free words is not"
 }
 
 test_title_and_text_outside_a_section() {
@@ -499,6 +501,29 @@ test_work_folder_follows_the_entrypoint_rule() {
   pass "the recorded work folder is the one the entrypoint names, and a session elsewhere voids the round"
 }
 
+test_known_section_with_any_qualifier_is_that_section() {
+  local src="$TMP_ROOT/kq.md" pack heading manifest n=0
+  # Main 1947 item 2: a known section name followed only by a qualifier (a parenthetical, or a
+  # comma or colon and text) is that section, and the excluded record lists what was matched.
+  for heading in '## CONTEXT (neutral facts, with sources; each re-read by the worker)' \
+    '## Known limits (recorded, not criteria)' "## Captain's intent (verbatim, 2026-11-03)" \
+    '### Out of scope, as the owner set it' '## Assumptions: neutral derivations'; do
+    n=$((n + 1))
+    printf '## Definition Of Done\n\n- **A1** (mandatory): x.\n\n%s\n\nZZ-QUALIFIED-%s-ZZ\n' "$heading" "$n" >"$src"
+    pack=''
+    build_pack pack --contract "$src" || fail "build with '$heading' failed: $(cat "$TMP_ROOT/build.err")"
+    assert_grep "ZZ-QUALIFIED-$n-ZZ" "$pack/target.md" "the section under '$heading' was dropped"
+    manifest="$(dirname "$pack").excluded-paths"
+    grep -q "^qualified	" "$manifest" || fail "the excluded record does not list the qualified heading '$heading'"
+  done
+  # Control: an unknown name with a qualifier stays out.
+  printf '## Definition Of Done\n\n- **A1** (mandatory): x.\n\n## Owner background (verbatim, from Main)\n\nZZ-UNKNOWN-QUAL-ZZ\n' >"$src"
+  pack=''
+  build_pack pack --contract "$src" || fail "build failed: $(cat "$TMP_ROOT/build.err")"
+  assert_no_grep "ZZ-UNKNOWN-QUAL-ZZ" "$pack/target.md" "an unknown heading with a qualifier was admitted"
+  pass "a known section name with any qualifier is that section and is listed; an unknown name with a qualifier stays out"
+}
+
 test_home_contract_title_form_is_the_title() {
   local src="$TMP_ROOT/hc.md" pack
   # Main 1942 M2: every contract in this home opens with "# Definition of done: <key>".
@@ -641,4 +666,5 @@ fm_test_run_cases \
   test_gitignore_true_search_is_clean \
   test_home_contract_title_form_is_the_title \
   test_work_folder_follows_the_entrypoint_rule \
+  test_known_section_with_any_qualifier_is_that_section \
   -- "$@"

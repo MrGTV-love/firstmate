@@ -24,7 +24,10 @@
 #   target.md is built only from the contract's known sections, each copied byte for byte.
 #   A heading is known when its name, after lower-casing, is on CONTRACT_SECTIONS, alone or
 #   followed by a qualifier made only of QUALIFIER_WORDS, numbers, short ids such as a2 or
-#   r19, corr=<hex> and the punctuation ( ) , ; : and dashes. Inside a known section a
+#   r19, corr=<hex> and the punctuation ( ) , ; : and dashes. After the first heading, a
+#   known name followed only by any parenthetical, or by a comma or colon and text, is that
+#   known section too (Main 1947), and the excluded record lists it as qualified; a known
+#   name followed by free words is not. Inside a known section a
 #   sub-heading must be on CONTRACT_SUBSECTIONS or, inside the Definition Of Done, have the
 #   one owned criterion-title form "<title> - mandatory" or "<title> - supporting" (any dash)
 #   with no CRITERION_TITLE_TERMS word in <title>; a known section name nested deeper starts
@@ -57,7 +60,9 @@
 #   63, its owner): <work-root>/<basename of the pack's parent>-<basename of the pack>, which
 #   for <out-root>/pack is <work-root>/<out-root basename>-pack; --work-root defaults to
 #   $REVIEW_WORK_ROOT, else /private/tmp/fm-review-work, the entrypoint's own default, so pass
-#   the same work root to both, and give the entrypoint the pack folder itself. The policy is
+#   the same work root to both, and give the entrypoint the pack folder itself. A pack runs
+#   in place, from <out-root>/pack: a pack copied or moved elsewhere is refused by the check,
+#   which is the intended fail-closed result. The policy is
 #   --policy, else the skill next to this script.
 # check: reads the run's session transcript (--log: the entrypoint's omp-session folder,
 #   or one of its .jsonl files) and judges every read it records. The report's own
@@ -162,6 +167,24 @@ function known(t, list,   n, i, parts, b, q) {
   }
   return ""
 }
+# known() for every heading after the first: a known name followed only by a qualifier (a
+# parenthetical, or a comma or colon and text) is that known section too (Main 1947).
+function known_q(t, list,   b, n, i, parts, q) {
+  b = known(t, list)
+  if (b != "") return b
+  t = norm(t)
+  n = split(list, parts, "|")
+  for (i = 1; i <= n; i++) {
+    if (parts[i] == "" || index(t, parts[i]) != 1) continue
+    q = substr(t, length(parts[i]) + 1)
+    if (q ~ /^[ \t]*(\(.*\)|[,:][ \t]*[^ \t].*)$/) return parts[i]
+  }
+  return ""
+}
+# List an admitted heading that carries a qualifier, so the excluded record shows the match.
+function note_qualified(t, b) {
+  if (norm(t) != b) print "qualified\t" t2 " (as: " b ")" > DROP_OUT
+}
 function criterion(t,   title, n, i, parts) {
   t = norm(t)
   gsub(/\342\200\224|\342\200\223/, "-", t)
@@ -246,22 +269,23 @@ END {
     if (dropto && lv <= dropto) dropto = 0
     if (dropto) { if (two) i++; continue }
     if (insec && lv > seclv) {
-      if (known(t, SUBS) != "" || (secname == "definition of done" && criterion(t))) {
+      if ((sb = known_q(t, SUBS)) != "" || (secname == "definition of done" && criterion(t))) {
+        if (sb != "") note_qualified(t, sb)
         print head > KEEP_OUT
         if (two) i++
         continue
       }
       # A known section name nested deeper starts that section; anything else is refused.
-      if (known(t, SECTIONS) == "") {
+      if (known_q(t, SECTIONS) == "") {
         print "unknown heading inside a known section: " t2 " (under: " sectitle ")" > REFUSE_OUT
         dropto = lv
         if (two) i++
         continue
       }
     }
-    b = known(t, SECTIONS)
+    b = known_q(t, SECTIONS)
     outside_flush("before \"" t2 "\"")
-    if (b == "" && known(t, SUBS) != "") {
+    if (b == "" && known_q(t, SUBS) != "") {
       # A criterion sub-section name outside a known section would drop its criteria (Main 1904 F3).
       print "a criterion sub-section name outside a known section: " t2 > REFUSE_OUT
       insec = 0; dropto = lv
@@ -269,6 +293,7 @@ END {
       continue
     }
     if (b != "") {
+      note_qualified(t, b)
       insec = 1; seclv = lv; secname = b; sectitle = t2
       if (b == "definition of done") dodseen = 1
       print b > NAMES_OUT
