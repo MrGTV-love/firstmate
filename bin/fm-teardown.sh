@@ -2770,7 +2770,7 @@ work_is_landed() {
   local TEARDOWN_LANDED_DIR=$dir TEARDOWN_LANDED_REF=$head
   TEARDOWN_NM_RECORD_SILENT=0
   if work_is_landed_proof "$branch"; then
-    snap=$(teardown_default_ref_snapshot "$dir" "$TEARDOWN_LANDED_PROOF_REF") || snap=''
+    snap=$(teardown_default_ref_snapshot "$dir" "${TEARDOWN_LANDED_PROOF_REF:-}") || snap=''
     TEARDOWN_LANDED_DIRS+=("$dir")
     TEARDOWN_LANDED_HEADS+=("$head")
     TEARDOWN_LANDED_SNAPS+=("$snap")
