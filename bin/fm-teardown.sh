@@ -2496,6 +2496,10 @@ teardown_preflight_removable() {  # <path> <label>
 TEARDOWN_PREFLIGHT_ERROR=
 teardown_entry_preflight() {
   TEARDOWN_PREFLIGHT_ERROR=
+  if ! teardown_preserve_plan; then
+    TEARDOWN_PREFLIGHT_ERROR=$TEARDOWN_PRESERVE_WHY
+    return 1
+  fi
   teardown_run_dir_prepare || return 1
   teardown_entry_checks && return 0
   rm -rf "${TEARDOWN_RUN_DIR:?}"
@@ -2503,28 +2507,53 @@ teardown_entry_preflight() {
   return 1
 }
 
-# The device number of <path>, or of its nearest existing ancestor.
+# Prints the device number of <path>, or of its nearest existing ancestor. Fails,
+# printing nothing, when stat fails or prints anything but digits.
 teardown_device_of() {  # <path>
-  local path=$1
+  local path=$1 device
   while [ -n "$path" ] && [ ! -e "$path" ]; do path=${path%/*}; done
   [ -n "$path" ] || path=/
   case "$(uname -s)" in
-    Darwin|*BSD) stat -f %d "$path" 2>/dev/null ;;
-    *) stat -c %d "$path" 2>/dev/null ;;
+    Darwin|*BSD) device=$(stat -f %d "$path" 2>/dev/null) || return 1 ;;
+    *) device=$(stat -c %d "$path" 2>/dev/null) || return 1 ;;
   esac
+  case "$device" in ''|*[!0-9]*) return 1 ;; esac
+  printf '%s\n' "$device"
+}
+
+# Will this teardown store a recorded bundle in $DATA/$ID/preserved-bundles?
+# Only when a preservation record exists and its bundle is not already stored
+# there with the recorded digest; a record that cannot be read counts as yes.
+teardown_bundle_store_pending() {
+  local stored digest reason=${TEARDOWN_BUNDLE_REASON:-} rc=0
+  [ -e "$DATA/$ID/preservation-bundles.tsv" ] || [ -L "$DATA/$ID/preservation-bundles.tsv" ] || return 1
+  if teardown_bundle_record 2>/dev/null; then
+    stored="$DATA/$ID/preserved-bundles/$TEARDOWN_BUNDLE_RECORD_HASH.bundle"
+    [ -f "$stored" ] && [ ! -L "$stored" ] && digest=$(teardown_ignored_sha256 "$stored") \
+      && [ "$digest" = "$TEARDOWN_BUNDLE_RECORD_HASH" ] && rc=1
+  fi
+  TEARDOWN_BUNDLE_REASON=$reason
+  return "$rc"
 }
 
 # Creates the private per-run directory every protected mutation stages its
 # temporary files in (mode 700, a unique name under the state directory), and
 # proves it can be written and that each rename out of it stays on one
-# filesystem: to the state directory (the return-pending, pending-close and
-# status records), to the task's data directory when a writer will rename into
-# it (the captain's drop record, preserved ignored bytes of a nested copy, a
-# stored bundle) and to the peer slot's claim when this task's claim will be
-# handed over. Refuses, writing nothing that stays, on doubt.
+# filesystem. The rename targets are the parents each writer publishes into,
+# taken only when that writer will run in this teardown: the state directory
+# (the return-pending, pending-close and status records) always; the task's data
+# directory for a captain's drop record (--force --drop-file); the preserve
+# parent (teardown_preserve_parent) when a copy the release will preserve holds
+# ignored files (TEARDOWN_PRESERVE_COPIES, from teardown_preserve_plan); the
+# stored-bundle directory when a recorded bundle is still to be stored; and the
+# peer slot's parent when this task's claim will be handed over. A device that
+# cannot be read refuses. Refuses, writing nothing that stays, on doubt.
+TEARDOWN_RUN_DEVICE=
+TEARDOWN_PEER_PARENT_CHECKED=0
 teardown_run_dir_prepare() {
-  local dir device target
+  local dir device target target_device
   local -a targets=("$STATE")
+  TEARDOWN_PEER_PARENT_CHECKED=0
   if ! dir=$(umask 077; mktemp -d "$STATE/.teardown-run.$ID.XXXXXX" 2>/dev/null) \
      || [ ! -d "$dir" ] || [ -L "$dir" ] || [ ! -w "$dir" ] || [ ! -x "$dir" ] \
      || ! : > "$dir/.write-check" 2>/dev/null || ! rm -f "$dir/.write-check"; then
@@ -2532,25 +2561,41 @@ teardown_run_dir_prepare() {
     TEARDOWN_PREFLIGHT_ERROR="task $ID's private teardown directory could not be created and written under $STATE"
     return 1
   fi
-  device=$(teardown_device_of "$dir")
-  if { [ "$FORCE" = --force ] && [ -n "$DROP_FILE" ] && [ "$KIND" != secondmate ]; } \
-     || { [ -n "${TEARDOWN_RETURN_SLOT:-$TEARDOWN_PEER_SLOT}" ] \
-          && { [ "${#TEARDOWN_FOREIGN_COPIES[@]}" -gt 0 ] || [ "${#TEARDOWN_NESTED_COPIES[@]}" -gt 0 ]; }; } \
-     || [ -e "$DATA/$ID/preservation-bundles.tsv" ] || [ -L "$DATA/$ID/preservation-bundles.tsv" ]; then
+  if ! device=$(teardown_device_of "$dir"); then
+    rm -rf "${dir:?}"
+    TEARDOWN_PREFLIGHT_ERROR="the filesystem of task $ID's private teardown directory under $STATE could not be read"
+    return 1
+  fi
+  if [ "$FORCE" = --force ] && [ -n "$DROP_FILE" ] && [ "$KIND" != secondmate ]; then
     targets+=("$DATA/$ID")
   fi
+  [ "${#TEARDOWN_PRESERVE_COPIES[@]}" -eq 0 ] || targets+=("$(teardown_preserve_parent)")
+  ! teardown_bundle_store_pending || targets+=("$DATA/$ID/preserved-bundles")
   if [ -n "$TEARDOWN_PEER_SLOT" ] \
      && ( fm_treehouse_slot_owner_state "$TEARDOWN_PEER_SLOT" "$ID"; [ "$FM_TREEHOUSE_SLOT_OWNER" = mine ] ); then
-    targets+=("$(dirname "$(fm_task_copy_canonical_dir "$TEARDOWN_PEER_SLOT" 2>/dev/null || printf '%s' "$TEARDOWN_PEER_SLOT")")")
+    targets+=("$(teardown_peer_claim_parent)")
+    TEARDOWN_PEER_PARENT_CHECKED=1
   fi
   for target in "${targets[@]}"; do
-    if [ -z "$device" ] || [ "$(teardown_device_of "$target")" != "$device" ]; then
+    if ! target_device=$(teardown_device_of "$target"); then
+      rm -rf "${dir:?}"
+      TEARDOWN_PREFLIGHT_ERROR="the filesystem of $target could not be read, so a rename from task $ID's private teardown directory into it cannot be proved atomic"
+      return 1
+    fi
+    if [ "$target_device" != "$device" ]; then
       rm -rf "${dir:?}"
       TEARDOWN_PREFLIGHT_ERROR="task $ID's private teardown directory and $target are not on one filesystem, so a rename between them would not be atomic"
       return 1
     fi
   done
   TEARDOWN_RUN_DIR=$dir
+  TEARDOWN_RUN_DEVICE=$device
+}
+
+# The directory the peer slot's claim file sits in, which the claim handoff
+# renames into.
+teardown_peer_claim_parent() {
+  dirname "$(fm_task_copy_canonical_dir "$TEARDOWN_PEER_SLOT" 2>/dev/null || printf '%s' "$TEARDOWN_PEER_SLOT")"
 }
 
 # The checks of the entry preflight, run once the private directory exists.
@@ -5180,8 +5225,18 @@ teardown_slot_peer_named() {  # <task-id>
 # copy is nested in it, so the peer's own teardown finds the slot its own. A
 # claim already naming a peer, or none, stays as it is.
 teardown_peer_claim_handoff() {
+  local parent device
   fm_treehouse_slot_owner_state "$TEARDOWN_PEER_SLOT" "$ID"
   [ "$FM_TREEHOUSE_SLOT_OWNER" = mine ] || return 0
+  # The entry preflight checked the claim's directory only when the claim was
+  # this task's then; a claim that became this task's since is checked now.
+  if [ "$TEARDOWN_PEER_PARENT_CHECKED" != 1 ]; then
+    parent=$(teardown_peer_claim_parent)
+    if ! device=$(teardown_device_of "$parent") || [ "$device" != "$TEARDOWN_RUN_DEVICE" ]; then
+      echo "error: could not pass pool slot $TEARDOWN_PEER_SLOT's claim to task ${TEARDOWN_PEER_IDS[0]}: $parent is not provably on the filesystem of task $ID's private teardown directory; retaining task $ID's record for a retry" >&2
+      exit 1
+    fi
+  fi
   fm_treehouse_slot_owner_claim "$TEARDOWN_PEER_SLOT" "${TEARDOWN_PEER_IDS[0]}" "${TEARDOWN_PEER_HOMES[0]}" "$TEARDOWN_RUN_DIR" || {
     echo "error: could not pass pool slot $TEARDOWN_PEER_SLOT's claim to task ${TEARDOWN_PEER_IDS[0]}; retaining task $ID's record for a retry" >&2
     exit 1

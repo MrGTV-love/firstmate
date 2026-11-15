@@ -444,7 +444,7 @@ teardown_bundle_refuse() {  # <predicate> [hint]
 # registered worktree or live below a pool; neither makes its data disposable.
 # Resolve parents physically so aliases into actual removal roots still refuse.
 teardown_bundle_external() {  # <copy> <stored-bundle>
-  local copy=$1 bundle=$2 parent path field root
+  local copy=$1 bundle=$2 parent path
   case "$bundle" in /*) ;; *) TEARDOWN_BUNDLE_REASON='bundle path is not absolute'; return 1 ;; esac
   if [ ! -f "$bundle" ] || [ -L "$bundle" ]; then
     TEARDOWN_BUNDLE_REASON='bundle is not a regular nonsymlink file'
@@ -456,9 +456,23 @@ teardown_bundle_external() {  # <copy> <stored-bundle>
     TEARDOWN_BUNDLE_REASON='bundle parent cannot be resolved'; return 1;
   }
   path="$parent/${bundle##*/}"
-  local roots=() labels=() label i
-  # A missing task copy is proved through its surviving project ref store.
-  # That project is not a removal target, even when it is the active home.
+  if teardown_removal_root_of "$copy" "$path"; then
+    TEARDOWN_BUNDLE_REASON="bundle is inside task $TEARDOWN_REMOVAL_LABEL $TEARDOWN_REMOVAL_ROOT"
+    return 1
+  fi
+}
+
+# Does canonical <path> lie inside a root this teardown of <copy> removes: the
+# copy, the task's worktree, its return and enclosing slots, its own nested and
+# foreign copies, its tasktmp and launch scratch, or its per-task state folders?
+# Sets TEARDOWN_REMOVAL_ROOT and TEARDOWN_REMOVAL_LABEL (copy, scratch or state)
+# for the first one found. A copy that is the project itself is not a removal
+# target: a missing task copy is proved through its surviving ref store.
+TEARDOWN_REMOVAL_ROOT=
+TEARDOWN_REMOVAL_LABEL=
+teardown_removal_root_of() {  # <copy> <canonical-path>
+  local copy=$1 path=$2 root field i
+  local roots=() labels=()
   if [ -z "${PROJ:-}" ] || ! [ "$copy" -ef "$PROJ" ]; then
     roots+=("$copy"); labels+=(copy)
   fi
@@ -469,22 +483,21 @@ teardown_bundle_external() {  # <copy> <stored-bundle>
   done
   [ -z "${TASK_TMP:-}" ] || { roots+=("$TASK_TMP"); labels+=(scratch); }
   [ -z "${LAUNCH_HOME_TOKEN:-}" ] || { roots+=("/tmp/fm-$ID+$LAUNCH_HOME_TOKEN"); labels+=(scratch); }
-  roots+=("$STATE/$ID.inbox" "$STATE/$ID.git-hooks" "$STATE/.nm-read-cache-$ID" "$STATE/$ID.dsh")
-  labels+=(state state state state)
+  if [ -n "${STATE:-}" ]; then
+    roots+=("$STATE/$ID.inbox" "$STATE/$ID.git-hooks" "$STATE/.nm-read-cache-$ID" "$STATE/$ID.dsh")
+    labels+=(state state state state)
+  fi
   for i in "${!roots[@]}"; do
     root=${roots[$i]%/}
-    label=${labels[$i]}
     [ -e "$root" ] || continue
     field=$(fm_task_copy_canonical_dir "$root") || field=$root
-    case "$path" in "$root"/*|"$field"/*)
-      case "$label" in
-        state) TEARDOWN_BUNDLE_REASON="bundle is inside task state $root" ;;
-        copy) TEARDOWN_BUNDLE_REASON="bundle is inside task copy $root" ;;
-        *) TEARDOWN_BUNDLE_REASON="bundle is inside task scratch $root" ;;
-      esac
-      return 1 ;;
+    case "$path" in "$root"/*|"$field"/*|"$root"|"$field")
+      TEARDOWN_REMOVAL_ROOT=$root
+      TEARDOWN_REMOVAL_LABEL=${labels[$i]}
+      return 0 ;;
     esac
   done
+  return 1
 }
 
 # A bundle must restore on its own: fetch every recorded tip into a fresh empty
@@ -724,9 +737,11 @@ teardown_bundle_store() {  # <copy> <source> <sha256>
       || { [ -e "$TEARDOWN_BUNDLE_STORED" ] && [ ! -f "$TEARDOWN_BUNDLE_STORED" ]; }; then
     TEARDOWN_BUNDLE_REASON='stored bundle is not a regular nonsymlink file'; return 1
   fi
+  # The stage is made 0600 before the copy, as mktemp makes it, so cp keeps that
+  # mode whatever the source's own mode is; the copy is then checked for it.
   if [ -n "${TEARDOWN_RUN_DIR:-}" ]; then
     stage="$TEARDOWN_RUN_DIR/bundle-$hash"
-    { [ ! -e "$stage" ] && [ ! -L "$stage" ]; } || {
+    (umask 077; set -C; : > "$stage") 2>/dev/null || {
       TEARDOWN_BUNDLE_REASON='stored bundle staging file cannot be created'; return 1;
     }
   else
@@ -734,8 +749,10 @@ teardown_bundle_store() {  # <copy> <source> <sha256>
       TEARDOWN_BUNDLE_REASON='stored bundle staging file cannot be created'; return 1;
     }
   fi
-  if ! (umask 077; cp "$source" "$stage"); then
+  if ! cp "$source" "$stage"; then
     TEARDOWN_BUNDLE_REASON='bundle cannot be copied into task data'
+  elif ! fm_backlog_file_mode_is_0600 "$stage"; then
+    TEARDOWN_BUNDLE_REASON='stored bundle staging file is not mode 0600'
   elif ! teardown_bundle_external "$copy" "$stage"; then
     :
   elif ! digest=$(teardown_ignored_sha256 "$stage") || [ "$digest" != "$hash" ]; then
@@ -836,53 +853,184 @@ teardown_bundle_preserved() {  # <copy> <ref> [hint]
   teardown_bundle_refuse "$bundle: $TEARDOWN_BUNDLE_REASON" "$hint"
 }
 
+# The directory teardown_preserve_ignored publishes preserved ignored files in.
+teardown_preserve_parent() {
+  printf '%s\n' "$DATA/$ID/nested-copy-preserved"
+}
+
+# Is the preserve parent safe to publish into for <copy>? It is not a symbolic
+# link and not anything but a directory, its physical location (resolved
+# through the nearest existing directory, for one mkdir -p will make, so a
+# linked data folder is judged where it really is) lies outside every removal
+# root of this teardown, and the directory the rename writes into can be
+# written. Sets TEARDOWN_PRESERVE_WHY on refusal; writes nothing.
+TEARDOWN_PRESERVE_WHY=
+teardown_preserve_parent_safe() {  # <copy>
+  local root probe rest='' resolved
+  root=$(teardown_preserve_parent)
+  TEARDOWN_PRESERVE_WHY=
+  if [ -L "$root" ] || { [ -e "$root" ] && [ ! -d "$root" ]; }; then
+    TEARDOWN_PRESERVE_WHY="preservation directory $root is not a real directory"
+    return 1
+  fi
+  probe=$root
+  while [ ! -e "$probe" ] && [ ! -L "$probe" ]; do
+    rest="/${probe##*/}$rest"
+    probe=${probe%/*}
+    [ -n "$probe" ] || probe=/
+  done
+  if [ ! -d "$probe" ] || [ ! -w "$probe" ] || [ ! -x "$probe" ] \
+      || ! resolved=$(fm_task_copy_canonical_dir "$probe" 2>/dev/null); then
+    TEARDOWN_PRESERVE_WHY="preservation directory $root cannot be written through $probe"
+    return 1
+  fi
+  if teardown_removal_root_of "$1" "${resolved%/}$rest"; then
+    TEARDOWN_PRESERVE_WHY="preservation directory $root resolves inside $TEARDOWN_REMOVAL_LABEL $TEARDOWN_REMOVAL_ROOT, which this teardown removes"
+    return 1
+  fi
+}
+
+# The copies this teardown's release will preserve ignored files from, decided
+# at entry so a preserve that would refuse is refused before any protected step:
+# every proved foreign copy, and every own nested copy Vernant's creation lock
+# holds, when a return or peer slot is released (as teardown_foreign_copy_dispose
+# and teardown_own_copy_dispose preserve them, in the same mode). Sets
+# TEARDOWN_PRESERVE_COPIES to those that hold ignored files to preserve, and
+# requires a safe preserve parent for each (teardown_preserve_parent_safe). A
+# clean copy, or one the plain removal takes, adds nothing. Returns 1 with
+# TEARDOWN_PRESERVE_WHY set when a listing cannot be made or the parent is not
+# safe; writes nothing.
+TEARDOWN_PRESERVE_COPIES=()
+teardown_preserve_plan() {
+  local copy rc entries
+  local -a candidates=()
+  TEARDOWN_PRESERVE_COPIES=()
+  TEARDOWN_PRESERVE_WHY=
+  [ -n "${TEARDOWN_RETURN_SLOT:-${TEARDOWN_PEER_SLOT:-}}" ] || return 0
+  if [ -n "${TEARDOWN_RETURN_SLOT:-}" ]; then
+    candidates+=(${TEARDOWN_FOREIGN_COPIES[@]+"${TEARDOWN_FOREIGN_COPIES[@]}"})
+  fi
+  for copy in ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}; do
+    [ -d "$copy" ] || continue
+    rc=0
+    teardown_copy_lock_file "$copy" || rc=$?
+    [ "$rc" != 0 ] || candidates+=("$copy")
+  done
+  for copy in ${candidates[@]+"${candidates[@]}"}; do
+    if ! entries=$(teardown_preservable_ignored "$copy"); then
+      TEARDOWN_PRESERVE_WHY="the ignored files of $copy could not be listed, so what its release must preserve is unknown"
+      return 1
+    fi
+    [ -n "$entries" ] || continue
+    teardown_preserve_parent_safe "$copy" || return 1
+    TEARDOWN_PRESERVE_COPIES+=("$copy")
+  done
+}
+
+# Prints, sorted, one line per entry under <dir>: its type, its SHA-256 or link
+# target, and its relative path. Two preserved trees are the same exactly when
+# these lines are.
+teardown_preserve_tree() {  # <dir>
+  local entry digest list out
+  list=$(mktemp "${TMPDIR:-/tmp}/fm-preserve-tree.XXXXXX") || return 1
+  if ! (cd "$1" && find . -mindepth 1 -print0) > "$list"; then
+    rm -f "$list"
+    return 1
+  fi
+  out=$(
+    while IFS= read -r -d '' entry; do
+      if [ -L "$1/$entry" ]; then
+        printf 'l %s %s\n' "$(readlink "$1/$entry")" "$entry" || exit 1
+      elif [ -d "$1/$entry" ]; then
+        printf 'd - %s\n' "$entry"
+      elif [ -f "$1/$entry" ]; then
+        digest=$(teardown_ignored_sha256 "$1/$entry") || exit 1
+        printf 'f %s %s\n' "$digest" "$entry"
+      else
+        printf 'o - %s\n' "$entry"
+      fi
+    done < "$list"
+  ) || { rm -f "$list"; return 1; }
+  rm -f "$list"
+  [ -z "$out" ] || printf '%s\n' "$out" | LC_ALL=C sort
+}
+
+# Does published preserve <dest> hold exactly what <stage> holds: the same
+# copy-path and the same tree of files?
+teardown_preserve_same() {  # <stage> <dest>
+  local want have
+  [ -d "$2" ] && [ ! -L "$2" ] && [ -d "$2/files" ] && [ ! -L "$2/files" ] \
+    && [ -f "$2/meta/copy-path" ] && [ ! -L "$2/meta/copy-path" ] || return 1
+  cmp -s "$1/meta/copy-path" "$2/meta/copy-path" || return 1
+  want=$(teardown_preserve_tree "$1/files") && have=$(teardown_preserve_tree "$2/files") || return 1
+  [ "$want" = "$have" ]
+}
+
 # Copies every entry teardown_preservable_ignored prints for <copy> in the given
-# mode into $DATA/$ID/nested-copy-preserved/<copy-path-sha256> and records each file's
-# SHA-256 in its SHA256SUMS. The new copy is built in a staging directory and
-# replaces an earlier preserve of the same copy only after every entry is copied
-# and hashed, so a failed run never costs the earlier one. Returns 1 when
-# anything cannot be listed, copied or hashed, after removing the one staging
-# directory it built, and the caller then refuses the copy rather than removing
-# unpreserved content.
+# mode into $DATA/$ID/nested-copy-preserved/<copy-path-sha256>: the bytes under
+# files/, and under meta/ the copy's path (copy-path) and each file's SHA-256
+# (SHA256SUMS), so a preserved file of any name never meets the metadata. The
+# copy is built in a staging directory and published by one rename. An earlier
+# preserve is never removed or overwritten: one that already holds the same
+# copy-path and files is kept as the preserve, and any other is kept beside a new
+# one published under <copy-path-sha256>.<unique suffix>. Returns 1 when
+# anything cannot be listed, copied, hashed or published, after removing the one
+# staging directory it built, or when the preserve parent is not safe
+# (teardown_preserve_parent_safe); the caller then refuses the copy rather than
+# removing unpreserved content.
 teardown_preserve_ignored() {  # <copy> [all|releasable]
-  local copy=$1 root dest stage entries entry file hash
+  local copy=$1 root dest stage entries suffix hash entry file digest
   entries=$(teardown_preservable_ignored "$copy" "${2:-}") || return 1
   [ -n "$entries" ] || return 0
+  if ! teardown_preserve_parent_safe "$copy"; then
+    printf 'error: %s\n' "$(fm_refuse_text "$TEARDOWN_PRESERVE_WHY")" >&2
+    return 1
+  fi
   hash=$(printf '%s' "$copy" | teardown_ignored_sha256) || return 1
-  root="$DATA/$ID/nested-copy-preserved"
+  root=$(teardown_preserve_parent)
   dest="$root/$hash"
   # A teardown stages in its private run directory (bin/fm-teardown.sh's
   # teardown_run_dir_prepare); other callers, such as bin/fm-copy-sweep.sh,
   # stage beside the preserved copies as before.
   if [ -n "${TEARDOWN_RUN_DIR:-}" ]; then
     stage="$TEARDOWN_RUN_DIR/ignored-$hash"
+    suffix=${TEARDOWN_RUN_DIR##*.}
   else
     stage="$root/.staging-$hash"
+    suffix=$(date -u +%Y%m%dT%H%M%SZ).$$
   fi
   rm -rf "$stage" || return 1
   (
-    mkdir -p "$stage" || return 1
-    printf '%s\n' "$copy" > "$stage/copy-path" || return 1
-    : > "$stage/SHA256SUMS" || return 1
+    mkdir -p "$stage/files" "$stage/meta" || exit 1
+    printf '%s\n' "$copy" > "$stage/meta/copy-path" || exit 1
+    : > "$stage/meta/SHA256SUMS" || exit 1
     while IFS= read -r entry; do
       [ -n "$entry" ] || continue
-      case "$entry" in /*|..|../*|*/..|*/../*) return 1 ;; esac
-      rm -rf "${stage:?}/$entry" || return 1
-      mkdir -p "$(dirname "$stage/$entry")" || return 1
-      cp -RPp "$copy/$entry" "$stage/$entry" || return 1
+      case "$entry" in /*|..|../*|*/..|*/../*) exit 1 ;; esac
+      rm -rf "${stage:?}/files/$entry" || exit 1
+      mkdir -p "$(dirname "$stage/files/$entry")" || exit 1
+      cp -RPp "$copy/$entry" "$stage/files/$entry" || exit 1
     done <<< "$entries"
     while IFS= read -r -d '' file; do
-      hash=$(teardown_ignored_sha256 "$file") || return 1
-      printf '%s  %s\n' "$hash" "${file#"$stage/"}" >> "$stage/SHA256SUMS" || return 1
-    done < <(find "$stage" -type f ! -path "$stage/copy-path" ! -path "$stage/SHA256SUMS" -print0)
-    rm -rf "$dest" || return 1
-    mkdir -p "$root" || return 1
-    mv "$stage" "$dest" || return 1
+      digest=$(teardown_ignored_sha256 "$file") || exit 1
+      printf '%s  %s\n' "$digest" "${file#"$stage/files/"}" >> "$stage/meta/SHA256SUMS" || exit 1
+    done < <(find "$stage/files" -type f -print0)
+    mkdir -p "$root" || exit 1
+    if [ -e "$dest" ] || [ -L "$dest" ]; then
+      if teardown_preserve_same "$stage" "$dest"; then
+        rm -rf "${stage:?}" || exit 1
+        echo "teardown: the ignored files of $(fm_refuse_text "$copy") are already preserved in $dest" >&2
+        exit 0
+      fi
+      dest="$dest.$suffix"
+      { [ ! -e "$dest" ] && [ ! -L "$dest" ]; } || exit 1
+    fi
+    mv "$stage" "$dest" || exit 1
+    echo "teardown: preserved ignored files from $(fm_refuse_text "$copy") in $dest" >&2
   ) || {
     rm -rf "$stage"
     return 1
   }
-  echo "teardown: preserved ignored files from $(fm_refuse_text "$copy") in $dest" >&2
 }
 
 # Does an active record, a running process, or a live lock launcher outside this
@@ -1083,6 +1231,21 @@ teardown_foreign_copy_prove() {  # <copy>
   [ -z "$diag" ] || { [ ! -s "$diag" ] || cat "$diag" >&2; rm -f "$diag"; }
 }
 
+# Can the release teardown_foreign_copy_dispose runs for proved <copy> start?
+# teardown_foreign_copy_prove already refuses a lock that is not Vernant's and an
+# unreadable lock state; this adds, at entry, that a Vernant-locked copy's
+# closeout driver and interpreter are there, so a release that would refuse on
+# that is refused before any protected step.
+teardown_foreign_copy_release_ready() {  # <slot> <copy>
+  local rc=0
+  teardown_copy_lock_file "$2" || rc=$?
+  [ "$rc" = 0 ] || return 0
+  teardown_closeout_ready_in "$1" && return 0
+  TEARDOWN_FOREIGN_RULE=inspection-unavailable
+  TEARDOWN_FOREIGN_WHY="$TEARDOWN_CLOSEOUT_OUT, so it cannot be released"
+  return 1
+}
+
 # Prints the refusals teardown_foreign_copies_prove kept back, each with the
 # landed-work explanation that came with it, in the order the copies were proved.
 teardown_foreign_refusals_print() {
@@ -1124,7 +1287,7 @@ teardown_foreign_copies_prove() {  # <slot>
       [ "$copy" != "$allowed" ] || known=1
     done
     [ "$known" = 0 ] || continue
-    if teardown_foreign_copy_prove "$copy"; then
+    if teardown_foreign_copy_prove "$copy" && teardown_foreign_copy_release_ready "$slot" "$copy"; then
       TEARDOWN_FOREIGN_COPIES+=("$copy")
       ! teardown_copy_inside_own_nested "$copy" || swept=1
     else
@@ -1277,6 +1440,29 @@ teardown_foreign_procs_retire() {
 # TEARDOWN_CLOSEOUT_OUT retains stdout and stderr for display and refusal records.
 # An optional capture file belongs to the caller (so a killed plan can clean it).
 # Exit 0 means the driver allowed and, unless planning, ran the cleanup.
+# Is Vernant's closeout driver for <slot> there, with an interpreter that can
+# run it? The one owner of that rule: teardown proves it at entry for every copy
+# its release will hand to the driver, and teardown_run_closeout asks it again.
+# Sets TEARDOWN_CLOSEOUT_OUT to what is missing.
+teardown_closeout_available() {  # <slot>
+  local driver=$1/scripts/git-stability/closeout_pr.py py=${FM_TEARDOWN_VERNANT_PYTHON:-$1/.venv/bin/python}
+  [ -f "$driver" ] && [ -x "$py" ] && return 0
+  TEARDOWN_CLOSEOUT_OUT="Vernant's closeout driver $driver or its interpreter $py is not available"
+  return 1
+}
+
+# teardown_closeout_available for the canonical path of <slot>, which is the
+# directory the release runs the driver from; a slot that cannot be resolved
+# is doubt and fails.
+teardown_closeout_ready_in() {  # <slot>
+  local slot
+  if ! slot=$(fm_task_copy_canonical_dir "$1" 2>/dev/null); then
+    TEARDOWN_CLOSEOUT_OUT="pool slot $1 cannot be resolved to run Vernant's closeout driver"
+    return 1
+  fi
+  teardown_closeout_available "$slot"
+}
+
 teardown_run_closeout() {  # <slot> <copy> [plan] [stdout-capture-file]
   local slot=$1 copy=$2 execute=--execute-cleanup driver py rc=0 capture=${4:-} own_capture=0
   [ "${3:-}" != plan ] || execute=
@@ -1284,10 +1470,7 @@ teardown_run_closeout() {  # <slot> <copy> [plan] [stdout-capture-file]
   TEARDOWN_CLOSEOUT_OUT=
   driver=$slot/scripts/git-stability/closeout_pr.py
   py=${FM_TEARDOWN_VERNANT_PYTHON:-$slot/.venv/bin/python}
-  if [ ! -f "$driver" ] || [ ! -x "$py" ]; then
-    TEARDOWN_CLOSEOUT_OUT="Vernant's closeout driver $driver or its interpreter $py is not available"
-    return 127
-  fi
+  teardown_closeout_available "$slot" || return 127
   if [ -z "$capture" ]; then
     capture=$(mktemp "${TMPDIR:-/tmp}/fm-closeout-stdout.XXXXXX") || {
       TEARDOWN_CLOSEOUT_OUT="Vernant's closeout stdout could not be captured"
@@ -1444,7 +1627,8 @@ teardown_foreign_copies_release() {
 # Run it after teardown_foreign_copies_prove, which resets
 # TEARDOWN_FOREIGN_PROCS, so the live launchers it records reach the retire phase.
 teardown_own_locked_copies_prove() {
-  local copy rc
+  local copy rc slot
+  slot=${TEARDOWN_RETURN_SLOT:-${TEARDOWN_PEER_SLOT:-}}
   for copy in ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}; do
     [ -d "$copy" ] || continue
     rc=0
@@ -1460,6 +1644,12 @@ teardown_own_locked_copies_prove() {
       FM_TASK_COPY_RELEASED_PRIOR_RETIRING=$META
       teardown_foreign_copy_unowned "$copy" || true
       FM_TASK_COPY_RELEASED_PRIOR_RETIRING=
+    fi
+    # The release hands this copy to Vernant's closeout driver, run from the
+    # slot; one that cannot start refuses here, before any protected step.
+    if [ -z "$TEARDOWN_FOREIGN_WHY" ] && ! teardown_closeout_ready_in "$slot"; then
+      TEARDOWN_FOREIGN_RULE=inspection-unavailable
+      TEARDOWN_FOREIGN_WHY="$TEARDOWN_CLOSEOUT_OUT, so it cannot be released"
     fi
     if [ -n "$TEARDOWN_FOREIGN_WHY" ]; then
       teardown_refuse_copy "${TEARDOWN_FOREIGN_RULE:-creation-lock-owner}" "own nested copy $copy stays in pool slot ${TEARDOWN_RETURN_SLOT:-${TEARDOWN_PEER_SLOT:-}}: $TEARDOWN_FOREIGN_WHY." "$copy"

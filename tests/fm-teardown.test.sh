@@ -452,6 +452,58 @@ test_cross_device_data_folder_refuses_only_a_rename_into_it() {
   pass "a data folder on another filesystem refuses a drop record at entry and lets a plain landed close through"
 }
 
+# A device read that fails refuses at entry whatever stat printed, and says the
+# filesystem could not be read, rather than calling it a filesystem split.
+test_unreadable_device_refuses_at_entry() {
+  local case_dir rc real
+  case_dir=$(make_case xdev-unreadable)
+  write_meta "$case_dir" local-only ship
+  wt_commit_file "$case_dir" feature.txt landed "merged work"
+  git -C "$case_dir/project" update-ref refs/heads/main "$(git -C "$case_dir/wt" rev-parse HEAD)"
+  real=$(command -v stat)
+  cat > "$case_dir/fakebin/stat" <<SH
+#!/usr/bin/env bash
+if [ "\$#" = 3 ] && [ "\$2" = %d ]; then
+  case "\$3" in "$case_dir/state"|"$case_dir/state"/*) "$real" "\$@"; echo "$case_dir/stat-reached" > "$case_dir/stat-reached"; exit 1 ;; esac
+fi
+exec "$real" "\$@"
+SH
+  chmod +x "$case_dir/fakebin/stat"
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  assert_present "$case_dir/stat-reached" "xdev-unreadable: the failing device read was never made"
+  expect_code 1 "$rc" "xdev-unreadable: a failed device read must refuse: $(cat "$case_dir/stderr")"
+  assert_grep "could not be read" "$case_dir/stderr" "xdev-unreadable: the refusal did not say the filesystem could not be read"
+  assert_no_grep "not on one filesystem" "$case_dir/stderr" "xdev-unreadable: an unread device was reported as a filesystem split"
+  assert_present "$case_dir/state/task-x1.meta" "xdev-unreadable: the refusal removed the task record"
+  [ -z "$(find "$case_dir/state" -maxdepth 1 -name '.teardown-run.*')" ] || fail "xdev-unreadable: the refusal left its private run directory"
+  pass "a device read that fails refuses at entry and says the filesystem could not be read"
+}
+
+# The captain's words are published 0600 whatever the words file's own mode,
+# as the base staged them in a 0600 file before copying.
+test_drop_record_is_owner_only_whatever_the_words_mode() {
+  local case_dir rc words mode
+  for mode in 400 755; do
+    case_dir=$(make_case "drop-mode-$mode")
+    write_meta "$case_dir" no-mistakes ship
+    seed_backlog_in_flight "$case_dir"
+    wt_commit_file "$case_dir" feature.txt hello "shippable work"
+    git -C "$case_dir/wt" push -q origin fm/task-x1
+    git -C "$case_dir/project" fetch -q origin
+    words="$case_dir/words.txt"
+    printf 'Drop it; the premise is gone.\n' > "$words"
+    chmod "$mode" "$words"
+    rc=0
+    (umask 022; run_teardown "$case_dir" --force --drop-file "$words") > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "drop-mode-$mode: a drop with the captain's words must complete: $(cat "$case_dir/stderr")"
+    cmp -s "$words" "$case_dir/data/task-x1/captain-drop.md" || fail "drop-mode-$mode: the captain's exact words were not retained"
+    assert_equals 600 "$(teardown_test_file_mode "$case_dir/data/task-x1/captain-drop.md")" \
+      "drop-mode-$mode: the captain's words are not exactly owner read-write"
+  done
+  pass "the captain's words are published 0600 whatever the words file's own mode"
+}
+
 test_forced_dirty_landed_deliverables_retain_captain_words() {
   local case_dir kind delivery mode rc words
   for delivery in ship scout local-only; do
@@ -3109,13 +3161,15 @@ SH
 }
 
 # A bundle stored again after the entry preflight is staged in the private run
-# directory and published owner-only, as the first store is, under the usual
-# umask 022. The endpoint close stand-in drops the stored copy so a later proof
+# directory and published 0600, as the first store is, under the usual umask
+# 022 and whatever the source bundle's own mode (default, 0400, 0755). The endpoint close stand-in drops the stored copy so a later proof
 # of the same teardown must store it again from the source.
 test_bundle_stored_after_entry_is_owner_only() {
-  local case_dir rc stored
-  make_bundle_copy_case bundle-store-after-entry
+  local case_dir rc stored mode
+  for mode in default 400 755; do
+  make_bundle_copy_case "bundle-store-after-entry-$mode"
   case_dir=$NESTED_CASE
+  [ "$mode" = default ] || chmod "$mode" "$BUNDLE_PATH"
   : > "$case_dir/run-dir-stages.log"
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
@@ -3136,8 +3190,9 @@ SH
   [ -s "$case_dir/run-dir-stages.log" ] || fail "bundle-store-after-entry: no proof after the entry preflight stored the bundle again"
   stored="$case_dir/data/task-x1/preserved-bundles/$(cut -f2 "$case_dir/data/task-x1/preservation-bundles.tsv").bundle"
   assert_present "$stored" "bundle-store-after-entry: the stored bundle is missing"
-  assert_equals 600 "$(teardown_test_file_mode "$stored")" "bundle-store-after-entry: the stored bundle is readable by other users"
-  pass 'a bundle stored again after the entry preflight is published owner-only'
+  assert_equals 600 "$(teardown_test_file_mode "$stored")" "bundle-store-after-entry-$mode: the stored bundle is not exactly owner read-write"
+  done
+  pass 'a bundle stored again after the entry preflight is published 0600 whatever the source bundle mode'
 }
 
 test_bundle_sources_and_durable_home_locations() {
@@ -4058,6 +4113,8 @@ test_local_only_truly_unpushed_refuses
 test_local_only_merged_to_local_main_allows
 test_no_mistakes_pushed_branch_without_merge_refuses
 test_cross_device_data_folder_refuses_only_a_rename_into_it
+test_unreadable_device_refuses_at_entry
+test_drop_record_is_owner_only_whatever_the_words_mode
 test_drop_file_without_force_is_a_usage_error
 test_forced_dirty_landed_deliverables_retain_captain_words
 test_scout_report_must_be_a_regular_nonempty_file

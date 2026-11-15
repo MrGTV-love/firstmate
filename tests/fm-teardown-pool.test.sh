@@ -1724,6 +1724,24 @@ test_nested_status_manifest_directory_refuses_at_entry() {
 # prior-shape task whose peer still works in the slot removes its own copy when
 # the claim names the peer, and refuses at entry, changing nothing, when the
 # claim names this task and would be handed over.
+# A clean, landed, unlocked nested copy in the task's own slot has no writer
+# that renames into the task's data folder, so a data folder on another
+# filesystem does not stop its close, for the plain and the prior record shapes.
+test_cross_device_data_does_not_stop_a_clean_nested_close() {
+  local shape case_dir rc label
+  for shape in plain enclosing; do
+    label="xdev-clean-nested-$shape"
+    nested_fixture "$label" "$shape" mine landed
+    case_dir=$NESTED_CASE
+    teardown_test_fake_other_device "$case_dir/fakebin" "$case_dir/data"
+    rc=0
+    nested_run "$case_dir" || rc=$?
+    expect_code 0 "$rc" "$label: a clean nested close with no data writer must complete: $(tail -3 "$case_dir/stderr")"
+    assert_nested_closed "$case_dir" "$label"
+  done
+  pass "a data folder on another filesystem does not stop a clean nested close that writes nothing there"
+}
+
 test_cross_device_pool_is_checked_only_for_a_claim_handoff() {
   local claim case_dir rc label peer
   for claim in peer mine; do
@@ -4595,6 +4613,7 @@ test_nested_alias_worktree_recovers_like_its_physical_path
 test_nested_status_manifest_directory_refuses_at_entry
 test_inactive_busy_state_path_does_not_refuse
 test_cross_device_pool_is_checked_only_for_a_claim_handoff
+test_cross_device_data_does_not_stop_a_clean_nested_close
 test_owed_return_pending_slot_is_never_retired
 test_plain_nested_disposition_equals_the_prior_shape
 test_scout_with_a_plain_nested_copy_keeps_its_own_route

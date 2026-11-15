@@ -161,6 +161,12 @@ fm_backlog_drop_record_writable() {  # <data> <id> <words-file>
   fm_backlog_path_deletable "$target"
 }
 
+# Is <file> a regular file of exactly mode 0600? Read with find, so no stat
+# format differs between hosts.
+fm_backlog_file_mode_is_0600() {  # <file>
+  [ -f "$1" ] && [ ! -L "$1" ] && [ -n "$(find "$1" -prune -type f -perm 600 2>/dev/null)" ]
+}
+
 # A caller that passes a private directory of its own (on the data
 # directory's filesystem) has the words staged there first instead of in a new
 # temporary file beside the record.
@@ -171,12 +177,15 @@ fm_backlog_drop_record() {  # <data> <id> <words-file> [private-dir]
   [ ! -L "$dir" ] && [ ! -L "$target" ] && { [ ! -e "$target" ] || [ -f "$target" ]; } || return 1
   (umask 077; mkdir -p "$dir") || return 1
   if [ -n "$private" ]; then
+    # Made 0600 before the copy, as mktemp makes it, so cp keeps that mode
+    # whatever the words file's own mode is.
     tmp="$private/captain-drop"
-    [ ! -e "$tmp" ] && [ ! -L "$tmp" ] || return 1
+    (umask 077; set -C; : > "$tmp") 2>/dev/null || return 1
   else
     tmp=$(umask 077; mktemp "$dir/.captain-drop.XXXXXXXX") || return 1
   fi
-  (umask 077; cp -- "$3" "$tmp") && mv -f -- "$tmp" "$target" && [ -f "$target" ] && [ ! -L "$target" ] \
+  cp -- "$3" "$tmp" && fm_backlog_file_mode_is_0600 "$tmp" \
+    && mv -f -- "$tmp" "$target" && [ -f "$target" ] && [ ! -L "$target" ] \
     || { rm -f -- "$tmp"; return 1; }
 }
 
@@ -1049,10 +1058,14 @@ fm_backlog_record_remove() {
 # sticky-bit ownership, file and directory flags and access-control entries
 # that rm -f meets; elsewhere, the directory's write and search permission, the
 # sticky-bit ownership rule, and the Linux immutable and append-only attributes
-# of the entry and its directory where they can be read. An absent path passes.
-# It refuses on doubt: a host without python3, or a check that cannot complete,
-# fails, so the caller refuses before its first mutation. A cause the checks do
-# not cover passes, and the removal itself still refuses it.
+# of the entry and its directory. An absent path passes.
+# It refuses on doubt: a host without python3, a check that cannot complete, or
+# on Linux an entry or directory that cannot be opened or whose attributes
+# cannot be read fails, so the caller refuses before its first mutation. Two
+# answers are not doubt: a symbolic link carries no such attributes of its own
+# (only its directory's are read), and a filesystem that keeps no attributes
+# (ENOTTY, EOPNOTSUPP, ENOSYS) cannot hold either one. A cause the checks do not
+# cover passes, and the removal itself still refuses it.
 fm_backlog_path_deletable() {  # <path>
   local rc=0
   { [ -e "$1" ] || [ -L "$1" ]; } || return 0
@@ -1070,17 +1083,23 @@ info, pinfo, euid = os.lstat(path), os.stat(parent), os.geteuid()
 if pinfo.st_mode & stat.S_ISVTX and euid not in (0, info.st_uid, pinfo.st_uid):
     sys.exit(3)
 if sys.platform.startswith("linux"):
-    import fcntl
-    for target, nofollow in ((path, getattr(os, "O_NOFOLLOW", 0)), (parent, 0)):
+    import errno, fcntl
+    unsupported = {errno.ENOTTY, errno.EOPNOTSUPP, errno.ENOTSUP, errno.ENOSYS}
+    targets = [(parent, 0)]
+    if not stat.S_ISLNK(info.st_mode):
+        targets.insert(0, (path, getattr(os, "O_NOFOLLOW", 0)))
+    for target, nofollow in targets:
         try:
             fd = os.open(target, os.O_RDONLY | os.O_NONBLOCK | nofollow)
         except OSError:
-            continue
+            sys.exit(3)
         flags = ctypes.c_long(0)
         try:
             fcntl.ioctl(fd, 0x80086601, flags)
-        except OSError:
-            continue
+        except OSError as err:
+            if err.errno not in unsupported:
+                sys.exit(3)
+            flags.value = 0
         finally:
             os.close(fd)
         if flags.value & (0x10 | 0x20):

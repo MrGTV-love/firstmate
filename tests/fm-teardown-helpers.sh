@@ -873,14 +873,14 @@ SH
   chmod +x "$case_dir/fakebin/lsof"
 }
 
-# A fake stat that fails only for a git lock file's mtime; every other stat
-# (such as the entry preflight's device check) runs the real one.
+# A fake stat that fails only for a git index.lock file's mtime; every other
+# stat (such as the entry preflight's device check) runs the real one.
 add_stat_error() {
   local case_dir=$1
   cat > "$case_dir/fakebin/stat" <<SH
 #!/usr/bin/env bash
 case "\${*: -1}" in
-  *.lock) echo "stat: simulated failure" >&2; exit 1 ;;
+  */index.lock) echo "stat: simulated failure" >&2; exit 1 ;;
 esac
 exec $(command -v stat) "\$@"
 SH
@@ -2862,7 +2862,7 @@ assert_foreign_ignored_preserved_and_released() {
   preserved=$(find "$FOREIGN_CASE/data/task-x1/nested-copy-preserved" -name unique.dat -type f 2>/dev/null | head -n 1)
   [ -n "$preserved" ] || fail "$label: the ignored file was not preserved in the task data directory"
   assert_equals "only here" "$(cat "$preserved")" "$label: the preserved file changed"
-  sums="$(dirname "$preserved")/SHA256SUMS"
+  sums="$(dirname "$(dirname "$preserved")")/meta/SHA256SUMS"
   assert_present "$sums" "$label: no SHA-256 manifest was written"
   hash=$(shasum -a 256 "$preserved" | awk '{print $1}')
   assert_grep "$hash  unique.dat" "$sums" "$label: the manifest does not record the preserved content"

@@ -4924,44 +4924,215 @@ SH
   pass 'teardown usage and transient Git inspection errors retain exits without policy events'
 }
 
-test_earlier_preserved_copy_survives_until_its_replacement_is_verified() {
-  local shape rc exclude hash dest real_cp
-  real_cp=$(command -v cp)
-  for shape in failed-copy replaced; do
+# An own nested copy Vernant's creation lock holds is released through the
+# closeout driver; when its interpreter cannot run, that is known at entry, so
+# the teardown refuses before any protected step (the return-pending record,
+# the endpoint close, the inbox, status or tasktmp removal), for the plain and
+# the prior record shapes. With the interpreter there, the same case closes.
+test_own_locked_copy_with_no_closeout_interpreter_refuses_at_entry() {
+  local shape rc label
+  for shape in plain enclosing; do
+    label="own-closeout-$shape"
     dead_launcher_pid
-    make_own_locked_copy_case "own-backup-$shape" enclosing "$FOREIGN_DEAD_PID"
+    make_own_locked_copy_case "$label" "$shape" "$FOREIGN_DEAD_PID"
+    nested_seed_task_files "$FOREIGN_CASE"
+    nested_snapshot "$FOREIGN_CASE" "$FOREIGN_CASE/snapshot.before"
+    run_foreign_teardown rc FM_TEARDOWN_VERNANT_PYTHON="$FOREIGN_CASE/no-such-python"
+    assert_nested_refused_untouched "$FOREIGN_CASE" "$rc" "$label" "is not available, so it cannot be released"
+    assert_absent "$FOREIGN_CASE/closeout.log" "$label: the driver ran"
+    run_foreign_teardown rc
+    expect_code 0 "$rc" "$label: with the interpreter there the same copy must be released: $(cat "$FOREIGN_CASE/stderr")"
+    assert_absent "$FOREIGN_COPY" "$label: the copy survived the release"
+    assert_absent "$FOREIGN_CASE/state/task-x1.meta" "$label: the task record survived the release"
+  done
+  pass "an own Vernant-locked copy whose closeout interpreter cannot run refuses at entry for both record shapes, and closes once it can"
+}
+
+# On Linux the removability check reads each entry's and directory's immutable
+# and append-only attributes; an entry it cannot open is doubt and refuses,
+# while a readable regular file, a symbolic link (judged by its directory) and an
+# absent path pass. macOS asks faccessat instead, and root reads everything.
+test_linux_removability_refuses_an_entry_it_cannot_open() {
+  local dir rc item
+  if [ "$(uname -s)" != Linux ] || [ "$(id -u)" = 0 ]; then
+    pass "the Linux removability check refuses an unopenable entry (skipped: needs Linux and a non-root user)"
+    return 0
+  fi
+  dir=$(mktemp -d "$TMP_ROOT/linux-removable.XXXXXX")
+  printf 'x\n' > "$dir/unreadable"
+  chmod 000 "$dir/unreadable"
+  printf 'x\n' > "$dir/readable"
+  ln -s "$dir/readable" "$dir/link"
+  for item in unreadable:1 readable:0 link:0 absent:0; do
+    rc=0
+    bash -c '. "$1/bin/fm-backlog-transition-lib.sh"; fm_backlog_path_deletable "$2"' _ "$ROOT" "$dir/${item%%:*}" || rc=$?
+    case "${item#*:}" in
+      1) [ "$rc" != 0 ] || fail "linux-removable: an entry whose attributes cannot be read passed (${item%%:*})" ;;
+      *) expect_code 0 "$rc" "linux-removable: a removable entry was refused (${item%%:*})" ;;
+    esac
+  done
+  chmod 600 "$dir/unreadable"
+  pass "the Linux removability check refuses an entry it cannot open and passes readable files, links and absent paths"
+}
+
+# The archive of a copy's ignored files is never removed or overwritten: a
+# failed copy keeps the earlier one, an identical one is kept as is, a
+# different one is kept beside a new archive, and a preserve parent that cannot
+# be written refuses at entry with nothing changed.
+test_earlier_preserved_copy_survives_until_its_replacement_is_verified() {
+  local shape rc exclude hash dest real_cp root label new
+  real_cp=$(command -v cp)
+  for shape in failed-copy kept-beside same-content read-only-parent; do
+    label="own-backup-$shape"
+    dead_launcher_pid
+    make_own_locked_copy_case "$label" enclosing "$FOREIGN_DEAD_PID"
     exclude=$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)
     printf 'unique.dat\n' >> "$exclude"
     printf 'only here\n' > "$FOREIGN_COPY/unique.dat"
     hash=$(printf '%s' "$(cd "$FOREIGN_COPY" && pwd -P)" | shasum -a 256 | awk '{print $1}')
-    dest="$FOREIGN_CASE/data/task-x1/nested-copy-preserved/$hash"
-    mkdir -p "$dest"
-    printf 'earlier backup\n' > "$dest/unique.dat"
-    printf 'earlier manifest\n' > "$dest/SHA256SUMS"
-    if [ "$shape" = failed-copy ]; then
-      cat > "$FOREIGN_CASE/fakebin/cp" <<SH
+    root="$FOREIGN_CASE/data/task-x1/nested-copy-preserved"
+    dest="$root/$hash"
+    mkdir -p "$dest/files" "$dest/meta"
+    if [ "$shape" = same-content ]; then
+      printf 'only here\n' > "$dest/files/unique.dat"
+      printf '%s\n' "$(cd "$FOREIGN_COPY" && pwd -P)" > "$dest/meta/copy-path"
+      printf '%s  unique.dat\n' "$(shasum -a 256 "$dest/files/unique.dat" | awk '{print $1}')" > "$dest/meta/SHA256SUMS"
+    else
+      printf 'earlier backup\n' > "$dest/files/unique.dat"
+      printf 'earlier manifest\n' > "$dest/meta/SHA256SUMS"
+    fi
+    case "$shape" in
+      failed-copy)
+        cat > "$FOREIGN_CASE/fakebin/cp" <<SH
 #!/usr/bin/env bash
 case " \$* " in
-  *nested-copy-preserved*|*/.teardown-run.*/ignored-*) echo "cp: simulated copy failure" >&2; exit 1 ;;
+  *nested-copy-preserved*|*/.teardown-run.*/ignored-*) : > "$FOREIGN_CASE/cp-failure-injected"; echo "cp: simulated copy failure" >&2; exit 1 ;;
 esac
 exec "$real_cp" "\$@"
 SH
-      chmod +x "$FOREIGN_CASE/fakebin/cp"
-    fi
+        chmod +x "$FOREIGN_CASE/fakebin/cp"
+        ;;
+      read-only-parent)
+        nested_seed_task_files "$FOREIGN_CASE"
+        chmod 555 "$root"
+        nested_snapshot "$FOREIGN_CASE" "$FOREIGN_CASE/snapshot.before"
+        ;;
+    esac
     run_foreign_teardown rc
-    if [ "$shape" = failed-copy ]; then
-      expect_code 1 "$rc" "own-backup-$shape: a failed preserve must refuse: $(cat "$FOREIGN_CASE/stderr")"
-      assert_present "$FOREIGN_COPY/unique.dat" "own-backup-$shape: the own copy's ignored file was lost"
-      assert_equals "earlier backup" "$(cat "$dest/unique.dat")" "own-backup-$shape: the earlier preserved copy was destroyed by a failed replacement"
-      assert_equals "earlier manifest" "$(cat "$dest/SHA256SUMS")" "own-backup-$shape: the earlier manifest was destroyed by a failed replacement"
-    else
-      expect_code 0 "$rc" "own-backup-$shape: a verified replacement must release the copy: $(cat "$FOREIGN_CASE/stderr")"
-      assert_equals "only here" "$(cat "$dest/unique.dat")" "own-backup-$shape: the earlier preserved copy was not replaced"
-      assert_grep "$(shasum -a 256 "$dest/unique.dat" | awk '{print $1}')  unique.dat" "$dest/SHA256SUMS" \
-        "own-backup-$shape: the manifest does not describe the replacement"
-    fi
+    case "$shape" in
+      failed-copy)
+        expect_code 1 "$rc" "$label: a failed preserve must refuse: $(cat "$FOREIGN_CASE/stderr")"
+        assert_present "$FOREIGN_CASE/cp-failure-injected" "$label: the refusal came before the injected copy failure"
+        assert_present "$FOREIGN_COPY/unique.dat" "$label: the own copy's ignored file was lost"
+        assert_equals "earlier backup" "$(cat "$dest/files/unique.dat")" "$label: the earlier preserved copy was destroyed by a failed replacement"
+        assert_equals "earlier manifest" "$(cat "$dest/meta/SHA256SUMS")" "$label: the earlier manifest was destroyed by a failed replacement"
+        ;;
+      kept-beside)
+        expect_code 0 "$rc" "$label: a verified preserve must release the copy: $(cat "$FOREIGN_CASE/stderr")"
+        assert_equals "earlier backup" "$(cat "$dest/files/unique.dat")" "$label: the earlier preserved copy was replaced"
+        assert_equals "earlier manifest" "$(cat "$dest/meta/SHA256SUMS")" "$label: the earlier manifest was replaced"
+        new=$(find "$root" -mindepth 1 -maxdepth 1 -name "$hash.*" -type d)
+        [ "$(printf '%s\n' "$new" | grep -c .)" = 1 ] || fail "$label: no single new preserve was kept beside the earlier one: $new"
+        assert_equals "only here" "$(cat "$new/files/unique.dat")" "$label: the new preserve does not hold the copy's bytes"
+        assert_grep "$(shasum -a 256 "$new/files/unique.dat" | awk '{print $1}')  unique.dat" "$new/meta/SHA256SUMS" \
+          "$label: the new manifest does not describe the preserved bytes"
+        ;;
+      same-content)
+        expect_code 0 "$rc" "$label: an identical earlier preserve must let the copy go: $(cat "$FOREIGN_CASE/stderr")"
+        assert_equals "only here" "$(cat "$dest/files/unique.dat")" "$label: the identical preserve changed"
+        [ -z "$(find "$root" -mindepth 1 -maxdepth 1 -name "$hash.*")" ] || fail "$label: a duplicate preserve was written beside an identical one"
+        assert_absent "$FOREIGN_COPY" "$label: the copy survived"
+        ;;
+      read-only-parent)
+        chmod 755 "$root"
+        if [ "$(id -u)" = 0 ]; then
+          expect_code 0 "$rc" "$label: root writes any parent, so the copy is released: $(cat "$FOREIGN_CASE/stderr")"
+        else
+          assert_nested_refused_untouched "$FOREIGN_CASE" "$rc" "$label" "cannot be written through"
+          assert_equals "earlier backup" "$(cat "$dest/files/unique.dat")" "$label: the earlier preserved copy was lost"
+          assert_absent "$FOREIGN_CASE/closeout.log" "$label: the driver ran"
+        fi
+        ;;
+    esac
   done
-  pass "an earlier preserved copy of a locked own copy survives a failed replacement and is replaced only by a verified one"
+  pass "an earlier preserve of a locked own copy is never removed: a failed copy, an identical one, a different one and an unwritable parent all keep it"
+}
+
+# The preserve parent must be a real directory whose physical location is
+# outside the copies this teardown removes: a parent that is a link, or a data
+# folder that resolves into the copy, refuses at entry with nothing changed. A
+# user file named like the metadata never meets it: the bytes sit under files/
+# and the manifest under meta/.
+test_preserve_parent_and_metadata_boundaries() {
+  local shape rc exclude label root preserved name
+  for shape in parent-link data-in-copy metadata-names; do
+    label="preserve-boundary-$shape"
+    dead_launcher_pid
+    make_own_locked_copy_case "$label" enclosing "$FOREIGN_DEAD_PID"
+    exclude=$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)
+    printf 'unique.dat\nSHA256SUMS\ncopy-path\nkept/\n' >> "$exclude"
+    printf 'only here\n' > "$FOREIGN_COPY/unique.dat"
+    root="$FOREIGN_CASE/data/task-x1/nested-copy-preserved"
+    case "$shape" in
+      parent-link)
+        mkdir -p "$FOREIGN_COPY/kept" "$FOREIGN_CASE/data/task-x1"
+        ln -s "$FOREIGN_COPY/kept" "$root"
+        ;;
+      data-in-copy)
+        mkdir -p "$FOREIGN_COPY/kept"
+        rm -rf "$FOREIGN_CASE/data/task-x1"
+        ln -s "$FOREIGN_COPY/kept" "$FOREIGN_CASE/data/task-x1"
+        ;;
+      metadata-names)
+        printf 'user manifest\n' > "$FOREIGN_COPY/SHA256SUMS"
+        printf 'user path\n' > "$FOREIGN_COPY/copy-path"
+        ;;
+    esac
+    nested_seed_task_files "$FOREIGN_CASE"
+    nested_snapshot "$FOREIGN_CASE" "$FOREIGN_CASE/snapshot.before"
+    run_foreign_teardown rc
+    case "$shape" in
+      parent-link)
+        assert_nested_refused_untouched "$FOREIGN_CASE" "$rc" "$label" "is not a real directory"
+        ;;
+      data-in-copy)
+        assert_nested_refused_untouched "$FOREIGN_CASE" "$rc" "$label" "which this teardown removes"
+        ;;
+      metadata-names)
+        expect_code 0 "$rc" "$label: the copy must be released: $(cat "$FOREIGN_CASE/stderr")"
+        preserved=$(find "$root" -mindepth 1 -maxdepth 1 -type d | head -n 1)
+        assert_equals 'user manifest' "$(cat "$preserved/files/SHA256SUMS")" "$label: a user file named SHA256SUMS was not kept as is"
+        assert_equals 'user path' "$(cat "$preserved/files/copy-path")" "$label: a user file named copy-path was not kept as is"
+        assert_equals 'only here' "$(cat "$preserved/files/unique.dat")" "$label: the other ignored file was not kept"
+        for name in SHA256SUMS copy-path unique.dat; do
+          assert_grep "$(shasum -a 256 "$preserved/files/$name" | awk '{print $1}')  $name" "$preserved/meta/SHA256SUMS" \
+            "$label: the manifest does not hash the user file $name"
+        done
+        ;;
+    esac
+  done
+  pass "a preserve parent that is a link or resolves into the copy refuses at entry, and user files named like the metadata are kept apart from it"
+}
+
+# The same-device check reads the parent each rename really targets: a preserve
+# parent on another filesystem refuses at entry when the release will preserve
+# into it, though the task's data folder itself shares the run directory's.
+test_preserve_parent_on_another_filesystem_refuses_at_entry() {
+  local rc exclude label=preserve-parent-xdev root
+  dead_launcher_pid
+  make_own_locked_copy_case "$label" enclosing "$FOREIGN_DEAD_PID"
+  exclude=$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)
+  printf 'unique.dat\n' >> "$exclude"
+  printf 'only here\n' > "$FOREIGN_COPY/unique.dat"
+  root="$FOREIGN_CASE/data/task-x1/nested-copy-preserved"
+  mkdir -p "$root"
+  teardown_test_fake_other_device "$FOREIGN_CASE/fakebin" "$root"
+  nested_seed_task_files "$FOREIGN_CASE"
+  nested_snapshot "$FOREIGN_CASE" "$FOREIGN_CASE/snapshot.before"
+  run_foreign_teardown rc
+  assert_nested_refused_untouched "$FOREIGN_CASE" "$rc" "$label" "$root are not on one filesystem"
+  assert_absent "$FOREIGN_CASE/closeout.log" "$label: the driver ran"
+  pass "a preserve parent on another filesystem refuses at entry when a release will preserve into it"
 }
 
 test_a_held_copy_keeps_its_unique_ignored_files_and_none_are_preserved() {
@@ -6397,12 +6568,13 @@ test_missing_closeout_driver_or_interpreter_leaves_the_copy_in_place() {
       run_foreign_teardown rc FM_TEARDOWN_VERNANT_PYTHON="$FOREIGN_CASE/no-such-python"
     fi
     expect_code 1 "$rc" "missing-$shape: a locked copy with no driver to release it must refuse: $(cat "$FOREIGN_CASE/stderr")"
-    assert_grep "did not release foreign copy $FOREIGN_COPY (exit 127)" "$FOREIGN_CASE/stderr" \
-      "missing-$shape: the refusal did not report the unavailable driver"
-    assert_grep "is not available" "$FOREIGN_CASE/stderr" "missing-$shape: the refusal did not say what was missing"
+    assert_grep "foreign copy $FOREIGN_COPY stays in pool slot $FOREIGN_SLOT: Vernant's closeout driver" "$FOREIGN_CASE/stderr" \
+      "missing-$shape: the proof did not refuse the copy whose driver cannot start"
+    assert_grep "is not available, so it cannot be released" "$FOREIGN_CASE/stderr" "missing-$shape: the refusal did not say what was missing"
     assert_foreign_copy_untouched "missing-$shape"
+    assert_absent "$FOREIGN_CASE/state/task-x1.teardown-return-pending" "missing-$shape: a return-pending record was written before the refusal"
   done
-  pass "a Vernant-locked copy refuses and stays when its closeout driver or interpreter is missing"
+  pass "a Vernant-locked copy whose closeout driver or interpreter is missing is refused at entry and stays"
 }
 
 test_foreign_copy_nested_in_another_is_removed_first() {
@@ -6555,7 +6727,7 @@ test_locked_own_nested_copy_with_unique_ignored_file_is_preserved_and_released()
   preserved=$(find "$FOREIGN_CASE/data/task-x1/nested-copy-preserved" -name unique.dat -type f 2>/dev/null | head -n 1)
   [ -n "$preserved" ] || fail "own-locked-ignored: the ignored file was not preserved in the task data directory"
   assert_equals "only here" "$(cat "$preserved")" "own-locked-ignored: the preserved file changed"
-  sums="$(dirname "$preserved")/SHA256SUMS"
+  sums="$(dirname "$(dirname "$preserved")")/meta/SHA256SUMS"
   assert_present "$sums" "own-locked-ignored: no SHA-256 manifest was written"
   hash=$(shasum -a 256 "$preserved" | awk '{print $1}')
   assert_grep "$hash  unique.dat" "$sums" "own-locked-ignored: the manifest does not record the preserved content"
@@ -6878,6 +7050,10 @@ test_foreign_copy_nested_in_another_is_removed_first
 test_foreign_copy_is_released_before_the_project_lock_wait
 test_closeout_uses_the_slots_default_interpreter
 test_missing_closeout_driver_or_interpreter_leaves_the_copy_in_place
+test_own_locked_copy_with_no_closeout_interpreter_refuses_at_entry
+test_linux_removability_refuses_an_entry_it_cannot_open
+test_preserve_parent_and_metadata_boundaries
+test_preserve_parent_on_another_filesystem_refuses_at_entry
 test_closeout_refusal_and_foreign_locks_leave_the_copy_in_place
 test_locked_own_nested_copy_is_released_by_the_closeout_driver
 test_locked_own_nested_copy_with_a_recycled_launcher_pid_is_released

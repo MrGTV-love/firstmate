@@ -860,9 +860,10 @@ activity_fingerprint() {  # <copy> [all]
   entries_fingerprint "$1" "$entries"$'\n'"$dirs"
 }
 
-# The fingerprint of preserve <dir>, without the library's metadata.
+# The fingerprint of preserve <dir>: its files/ tree, which holds the preserved
+# bytes; the library's metadata sits beside it in meta/.
 preserve_fingerprint() {  # <dir>
-  tree_fingerprint "$1" . ! -path ./copy-path ! -path ./SHA256SUMS
+  tree_fingerprint "$1/files" .
 }
 
 record_waiting() {  # <copy> <identity> <fingerprint> <preserve-fingerprint>
@@ -1481,12 +1482,13 @@ copy_still_holds() {  # <copy> <identity> <lock-sha256>
   [ "$actual" = "$3" ]
 }
 
-# True when every directory, file, symlink and FIFO in preserve <dir> is still at
-# the same path in <copy>, with the same bytes or link target; a socket holds no
-# bytes and is skipped. An original that is missing, different or cannot be
-# compared returns 1.
+# True when every directory, file, symlink and FIFO in preserve <dir>'s files/
+# tree is still at the same path in <copy>, with the same bytes or link target; a
+# socket holds no bytes and is skipped. An original that is missing, different
+# or cannot be compared, or a preserve with no files/ tree, returns 1.
 preserve_still_in_copy() {  # <dir> <copy>
-  local rel status='' want have
+  local rel status='' want have tree=$1/files
+  set -- "$tree" "$2"
   while IFS= read -r -d '' rel; do
     case "$rel" in
       ./*|.) ;;
@@ -1505,7 +1507,7 @@ preserve_still_in_copy() {  # <dir> <copy>
     elif [ ! -S "$1/$rel" ]; then
       return 1
     fi
-  done < <(cd "$1" && find . ! -path ./copy-path ! -path ./SHA256SUMS -print0; printf '%s\0' "$?")
+  done < <(cd "$1" && find . -print0; printf '%s\0' "$?")
   [ "$status" = 0 ]
 }
 
