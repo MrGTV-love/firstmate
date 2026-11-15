@@ -165,7 +165,7 @@ test_f7_an_unreadable_task_record_is_reported() {
 }
 
 # The typed branch of bin/fm-tasks-axi.sh, run with every I/O and mutation stubbed: no
-# tasks-axi, no backlog, no runner.
+# tasks-axi, no backlog, no runner. Only the replay is varied here.
 typed_branch() {  # <probe: done|missing|unreadable> <replay: ok|cut> [args...]
   local probe=$1 replay=$2
   shift 2
@@ -186,23 +186,114 @@ typed_branch() {  # <probe: done|missing|unreadable> <replay: ok|cut> [args...]
     }
     fm_backlog_row_states() { builtin printf "pf-x:done\n"; }
     fm_backlog_unblock_dependents() { builtin printf "UNBLOCK %s\n" "$2"; }
+    fm_typed_completion_locked_clear() { builtin printf "UNBLOCK %s\n" "$2"; }
     eval "$branch"' _ "$ROOT" "$probe" "$replay" "$@"
 }
 
-# Main 1875: after exit 0 and an unreadable row, every edge and hold is kept and the item is
-# reported "closed, edges kept: row unreadable". Controls: a row that reads done, or that is no
-# longer in the backlog, clears.
-test_subtraction_an_unreadable_row_keeps_every_edge() {
-  local out
-  out=$(typed_branch unreadable ok public-followup waive pf-x --reason r --approved-by captain 2>&1)
-  case "$out" in *UNBLOCK*) not_ok "subtraction: an unreadable row cleared edges: $(tr '\n' '|' <<< "$out")" ;; *) ok "subtraction: an unreadable row clears no edge" ;; esac
-  case "$out" in *'pf-x: closed, edges kept: row unreadable'*) ok "subtraction: the item is reported as closed, edges kept: row unreadable" ;; *) not_ok "subtraction: the report is missing: $(tr '\n' '|' <<< "$out")" ;; esac
-  out=$(typed_branch "done" ok public-followup waive pf-x --reason r --approved-by captain 2>&1)
-  case "$out" in *'UNBLOCK pf-x'*) ok "subtraction control: a row that reads done clears" ;; *) not_ok "subtraction control: a done row did not clear" ;; esac
-  out=$(typed_branch missing ok public-followup waive pf-x --reason r --approved-by captain 2>&1)
-  case "$out" in *'UNBLOCK pf-x'*) ok "subtraction control: a row no longer in the backlog clears" ;; *) not_ok "subtraction control: an archived row did not clear" ;; esac
+# A real markdown store under $TMP, built and read with the installed tasks-axi library (no
+# tasks-axi command, no live backlog). HOME and the working directory are under $TMP, the
+# environment overrides are unset, and every store path is checked to be under its root.
+store_node() {  # <root> <mode> [args...]: setup | state <id> | edges <id> | complete <id> | recreate <id>
+  local root=$1
+  shift
+  (cd "$root" && env -u TASKS_AXI_FILE -u TASKS_AXI_BACKEND HOME="$TMP/home" node --input-type=module -e '
+    import { pathToFileURL } from "node:url";
+    const [pkg, root, mode, id] = process.argv.slice(1);
+    const { resolveTasksContext } = await import(pathToFileURL(pkg + "/dist/src/context.js").href);
+    const { store } = resolveTasksContext({ cwd: root, file: root + "/data/backlog.md" });
+    if (!store.path.startsWith(root + "/")) { console.error("store outside its root: " + store.path); process.exit(9); }
+    const edges = async (x) => { const t = await store.get(x); return t ? (t.deps.map((d) => d.id).join(",") || "-") + " " + (t.hold?.kind ?? "-") : "absent"; };
+    if (mode === "setup") {
+      for (const x of ["pf-x", "waits-pf-x", "held-pf-x", "other"]) await store.create({ id: x, title: x, kind: "docs" });
+      await store.addDep("waits-pf-x", { type: "blocked-by", id: "pf-x" });
+      await store.addDep("held-pf-x", { type: "blocked-by", id: "pf-x" });
+      await store.addDep("held-pf-x", { type: "blocked-by", id: "other" });
+      await store.update("held-pf-x", { hold: { kind: "future", reason: "fixture hold" } });
+    } else if (mode === "state") { const t = await store.get(id); console.log(t ? t.state : "absent"); }
+    else if (mode === "edges") { console.log(await edges(id)); }
+    else if (mode === "complete") { await store.transition(id, "done"); await store.prune({ state: "done", keep: 0 }); }
+    else if (mode === "recreate") { await store.create({ id, title: "new unfinished work under the same id", kind: "docs" }); }
+  ' "$(bash -c '. "$1/bin/fm-tasks-axi-lib.sh"; fm_tasks_axi_package_dir' _ "$ROOT")" "$root" "$@")
+}
+new_store() {  # <name>: a fresh store root with the fixture items
+  local root=$TMP/$1
+  mkdir -p "$root/data" "$TMP/home"
+  printf 'backend = "markdown"\n[markdown]\npath = "data/backlog.md"\narchive = "data/done-archive.md"\ndone_keep = 0\n' > "$root/.tasks.toml"
+  printf '%s\n' '## In flight' '' '## Queued' '' '## Done' > "$root/data/backlog.md"
+  store_node "$root" setup || return 1
+  printf '%s\n' "$root"
 }
 
+# The typed branch against a real store: the completion is simulated by archiving the row
+# through the store library; a controlled writer may then create a new unfinished item under the
+# same id (Main 1873). The row read after the completion fails, and at the reviewed head the
+# fallback list is stale (it saw the store before the writer). The branch's own clear runs for
+# real: tasks-axi's CLI at the reviewed head, the locked clear here.
+typed_branch_store() {  # <root> <writer: none|recreate> <lock: free|held>
+  bash -c 'branch=$(awk "/^pf_form=0\$/ {copy=1} /^exec tasks-axi / {exit} copy {print}" "$1/bin/fm-tasks-axi.sh")
+    . "$1/bin/fm-backlog-transition-lib.sh"; . "$1/bin/fm-tasks-axi-lib.sh"; set -u
+    ROOT=$1 STORE=$2 WRITER=$3 LOCK=$4 HELPERS=$5 TMP=$6/..
+    export HOME=$6; unset TASKS_AXI_FILE TASKS_AXI_BACKEND FM_TASKS_AXI_TIMEOUT
+    eval "$HELPERS"
+    ARGS=(public-followup waive pf-x --reason r --approved-by captain) DATA=$STORE/data
+    fm_backlog_tasks_axi_addressing() { FM_BACKLOG_AXI_ROOT=$STORE FM_BACKLOG_AXI_FILE=$STORE/data/backlog.md; }
+    tasks-axi() {
+      store_node "$STORE" complete pf-x
+      [ "$WRITER" != recreate ] || { store_node "$STORE" recreate pf-x; }
+      [ "$LOCK" != held ] || builtin printf "held by a fixture writer\n" > "$STORE/data/backlog.md.lock"
+      builtin printf "waived pf-x\n"
+    }
+    fm_backlog_row_probe() { FM_BACKLOG_ROW_RESULT=error FM_BACKLOG_ROW_ERROR="simulated read failure"; return 1; }
+    fm_backlog_row_states() { builtin printf "other:queued\nwaits-pf-x:queued\nheld-pf-x:queued\n"; }
+    cd "$STORE" && eval "$branch"' _ "$ROOT" "$1" "$2" "$3" "$(declare -f store_node)" "$TMP/home" 2>&1
+}
+
+# Main 1882 and 1873: the clear is decided and written under tasks-axi's own store lock. An
+# archived completion clears its finished edges in the same run and keeps the other blocker and
+# the hold; a new unfinished item created under the id before the clear keeps every edge and
+# hold; a lock held by another writer changes nothing and is reported.
+test_locked_clear_the_store_decides_under_its_lock() {
+  local root out
+  command -v node >/dev/null 2>&1 || { ok "skipped: node is not installed"; return 0; }
+  root=$(new_store lc-control) || { not_ok "locked clear: the fixture store could not be made"; return 0; }
+  out=$(typed_branch_store "$root" none free)
+  check "locked clear control: an archived completion clears the finished edge in the same run" "- - | other future" \
+    "$(store_node "$root" edges waits-pf-x) | $(store_node "$root" edges held-pf-x)"
+  case "$out" in *'unblocked: held-pf-x no longer waits on pf-x; it still waits on other'*) ok "locked clear control: the clear is reported with the edge that stays" ;; *) not_ok "locked clear control: the clear was not reported: $(tr '\n' '|' <<< "$out")" ;; esac
+  root=$(new_store lc-writer) || { not_ok "locked clear: the fixture store could not be made"; return 0; }
+  out=$(typed_branch_store "$root" recreate free)
+  check "locked clear: a new unfinished item under the id keeps every edge and hold" "queued | pf-x - | pf-x,other future" \
+    "$(store_node "$root" state pf-x) | $(store_node "$root" edges waits-pf-x) | $(store_node "$root" edges held-pf-x)"
+  root=$(new_store lc-locked) || { not_ok "locked clear: the fixture store could not be made"; return 0; }
+  out=$(typed_branch_store "$root" none held)
+  rm -f "$root/data/backlog.md.lock"
+  check "locked clear: a lock held by another writer changes no edge" "pf-x - | pf-x,other future" \
+    "$(store_node "$root" edges waits-pf-x) | $(store_node "$root" edges held-pf-x)"
+  case "$out" in *'pf-x: closed, edges kept: row unreadable'*) ok "locked clear: the held lock is reported as closed, edges kept: row unreadable" ;; *) not_ok "locked clear: the held lock was not reported: $(tr '\n' '|' <<< "$out")" ;; esac
+}
+
+# Main 1873: the lock the clear holds is the store's own: a tasks-axi store write attempted
+# while the clear holds it is refused as LOCKED, so no writer can act between the decision and
+# the edge removal.
+test_locked_clear_holds_the_store_lock_writers_take() {
+  local root pkg out
+  command -v node >/dev/null 2>&1 || { ok "skipped: node is not installed"; return 0; }
+  [ -f "$ROOT/bin/fm-tasks-axi-locked-unblock.mjs" ] || { not_ok "locked clear: bin/fm-tasks-axi-locked-unblock.mjs is missing"; return 0; }
+  root=$(new_store lc-inside) || { not_ok "locked clear: the fixture store could not be made"; return 0; }
+  pkg=$(bash -c '. "$1/bin/fm-tasks-axi-lib.sh"; fm_tasks_axi_package_dir' _ "$ROOT")
+  out=$(cd "$root" && env -u TASKS_AXI_FILE -u TASKS_AXI_BACKEND HOME="$TMP/home" node --input-type=module -e '
+    import { pathToFileURL } from "node:url";
+    const [helper, pkg, root] = process.argv.slice(1);
+    const { lockedUnblock } = await import(pathToFileURL(helper).href);
+    const { resolveTasksContext } = await import(pathToFileURL(pkg + "/dist/src/context.js").href);
+    const other = resolveTasksContext({ cwd: root, file: root + "/data/backlog.md" }).store;
+    let writer = "not tried";
+    const result = await lockedUnblock({ pkg, root, file: root + "/data/backlog.md", id: "pf-x",
+      inside: async () => { try { await other.create({ id: "late-writer", title: "late", kind: "docs" }); writer = "written"; } catch (e) { writer = e.code || String(e); } } });
+    console.log(writer + " " + result.verdict);
+  ' "$ROOT/bin/fm-tasks-axi-locked-unblock.mjs" "$pkg" "$root" 2>&1)
+  check "locked clear: a store write during the clear is refused by the same lock" "LOCKED keep" "$out"
+}
 # Main 1875 F8: a replay of the kept output that fails is reported and the wrapper exits 1, so a
 # JSON caller is not handed cut output as success. Control: an intact replay exits 0 with it.
 test_f8_a_failed_replay_is_not_success() {
@@ -280,7 +371,8 @@ test_p_a_cut_parse_result_does_not_load
 test_f5_an_unreadable_result_is_reported_never_silent
 test_f6_a_missing_body_field_is_a_failed_read
 test_f7_an_unreadable_task_record_is_reported
-test_subtraction_an_unreadable_row_keeps_every_edge
+test_locked_clear_the_store_decides_under_its_lock
+test_locked_clear_holds_the_store_lock_writers_take
 test_f8_a_failed_replay_is_not_success
 test_f4_a_call_with_no_arguments_runs
 test_f4_every_typed_form_resolves_its_id
