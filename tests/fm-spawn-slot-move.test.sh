@@ -1506,7 +1506,7 @@ test_a_proof_skip_after_a_detach_is_a_failure_that_names_the_detach() {
   local out rc=0
   out=$(fm_slot_prove_idle "$W_SLOT" "$W_TARGET" "$W_PROJ" 2>&1) || rc=$?
   [ "$rc" = 1 ] || fail "a proof skip after a detach returned $rc, not the failure code 1: $out"
-  assert_contains "$out" "detached" "the output did not name the detach"
+  assert_contains "$out" "detached from its branch" "the output did not name the detach this spawn made"
   assert_not_contains "$out" "was not moved" "the failure was reported as a plain skip"
   pass "a proof skip after a detach is a failure that names the detach"
 }
