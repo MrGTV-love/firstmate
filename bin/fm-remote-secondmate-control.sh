@@ -3,7 +3,7 @@
 #
 # Usage:
 #   fm-remote-secondmate-control.sh launch <id> <harness> <model|-> <effort|-> herdr [traceparent] [--captain-model-pin=<model-id>] [--compact-adviser-disable]
-#   fm-remote-secondmate-control.sh relaunch <id> <harness> <model|default|-> <effort|default|-> [--captain-model-pin=<model-id>] [--compact-adviser-disable]
+#   fm-remote-secondmate-control.sh relaunch <id> <harness> <model|default|-> <effort|default|-> [--captain-model-pin=<model-id>] [--compact-adviser-disable] [--expected-target=<target>]
 #   fm-remote-secondmate-control.sh state <id>
 #   fm-remote-secondmate-control.sh attribution <id> <recorded-target>
 #   fm-remote-secondmate-control.sh route <id>
@@ -323,10 +323,13 @@ cmd_launch() {
 # explicitly clears an absent parent pin; `-` remains its compatibility spelling.
 cmd_relaunch() {
   local id=$1 harness=$2 model=$3 effort=$4
-  local compact_disable=0 captain_model_pin='' arg
+  local compact_disable=0 captain_model_pin='' expected_target='' arg
   shift 4
   for arg in "$@"; do
     case "$arg" in
+    --expected-target=?*)
+      [ -z "$expected_target" ] || die "duplicate --expected-target"
+      expected_target=${arg#--expected-target=} ;;
     --compact-adviser-disable)
       [ "$compact_disable" = 0 ] || die "duplicate --compact-adviser-disable"
       compact_disable=1 ;;
@@ -351,6 +354,11 @@ cmd_relaunch() {
     "$SCRIPT_DIR/fm-harness.sh" validate-native-effort "$harness" "$model" "$effort" || return 1
   fi
   remote_endpoint_require "$id"
+  # An expected target binds this relaunch to the endpoint the parent compared
+  # (Main 1807 (5), Main 1809): any other live endpoint refuses before dispatch.
+  if [ -n "$expected_target" ] && [ "$REMOTE_ENDPOINT_TARGET" != "$expected_target" ]; then
+    die "this host's endpoint for $id is '$REMOTE_ENDPOINT_TARGET', not the expected target '$expected_target'; refusing before the relaunch is dispatched"
+  fi
   [ "$model" != - ] || model=default
   [ "$effort" != - ] || effort=default
   control_args=("$id" relaunch --harness "$harness" --model "$model" --effort "$effort")
@@ -563,7 +571,7 @@ cmd_retire() {
 
 case "${1:-}" in
   launch) shift; [ "$#" -ge 5 ] && [ "$#" -le 8 ] || usage; cmd_launch "$@" ;;
-  relaunch) shift; [ "$#" -ge 4 ] && [ "$#" -le 6 ] || usage; cmd_relaunch "$@" ;;
+  relaunch) shift; [ "$#" -ge 4 ] && [ "$#" -le 7 ] || usage; cmd_relaunch "$@" ;;
   state) shift; [ "$#" -eq 1 ] || usage; validate_id "$1"; validate_home "$1"; state_value "$1" ;;
   attribution) shift; [ "$#" -eq 2 ] || usage; cmd_attribution "$1" "$2" ;;
   route) shift; [ "$#" -eq 1 ] || usage; cmd_route "$1" ;;

@@ -158,13 +158,12 @@ fall_back_to_nudge() {  # <id> <reason> [<array-index>]
     report_unreached "$id" "$reason; at the fallback nudge, $FM_SECONDMATE_RESTART_REASON"
     return
   fi
-  # One compared route per mate (Main 1777 (2)): when the first decision kept a
-  # route, the fresh decision must name that same route.
-  if [ -n "$i" ] && [ -n "${ROUTE_HOST[i]:-}" ] \
-    && { [ "$FM_SECONDMATE_RESTART_ROUTE_HOST" != "${ROUTE_HOST[i]}" ] \
-      || [ "$FM_SECONDMATE_RESTART_ROUTE_ROOT" != "${ROUTE_ROOT[i]}" ] \
-      || [ "$FM_SECONDMATE_RESTART_ROUTE_HOME" != "${ROUTE_HOME[i]}" ] \
-      || [ "$FM_SECONDMATE_RESTART_ROUTE_TARGET" != "${ROUTE_TARGET[i]}" ]; }; then
+  # One compared route per mate (Main 1777 (2), Main 1807 (6)): the fresh
+  # decision must name the route the first decision compared, on every path.
+  # A mate whose first decision kept no route has nothing to compare: refuse.
+  if [ -z "$i" ] || [ -z "${ROUTE_PLACEMENT[i]:-}" ] \
+    || ! fm_secondmate_restart_route_is "${ROUTE_PLACEMENT[i]}" "${ROUTE_HOST[i]}" "${ROUTE_ROOT[i]}" \
+      "${ROUTE_HOME[i]}" "${ROUTE_TARGET[i]}"; then
     report_unreached "$id" "$reason; at the fallback nudge, its route is no longer the one its first decision compared"
     return
   fi
@@ -191,10 +190,11 @@ restart_mate() {  # <array-index>
   id=${IDS[$i]}
   if [ "${PLACEMENT[i]}" = remote ]; then
     # The relaunch crosses only the route this mate's decision compared: fm-on
-    # refuses before ssh when its resolved route differs (Main 1777 (2)).
+    # refuses before ssh when its resolved route differs (Main 1777 (2)), and
+    # the host refuses an endpoint other than the compared target (Main 1809).
     restart_out=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
       FM_ON_EXPECTED_HOST="${ROUTE_HOST[i]}" FM_ON_EXPECTED_ROOT="${ROUTE_ROOT[i]}" \
-      FM_ON_EXPECTED_HOME="${ROUTE_HOME[i]}" \
+      FM_ON_EXPECTED_HOME="${ROUTE_HOME[i]}" FM_REMOTE_RELAUNCH_EXPECTED_TARGET="${ROUTE_TARGET[i]}" \
       "$SCRIPT_DIR/fm-remote-secondmate-relaunch.sh" \
       "$id" "${HARNESS[i]}" "${MODEL[i]:-default}" "${EFFORT[i]:-default}" < /dev/null 2>&1)
     restart_rc=$?
@@ -287,12 +287,17 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
   HARNESS[i]=""
   MODEL[i]=""
   EFFORT[i]=""
-  ROUTE_HOST[i]="" ROUTE_ROOT[i]="" ROUTE_HOME[i]="" ROUTE_TARGET[i]=""
+  ROUTE_PLACEMENT[i]="" ROUTE_HOST[i]="" ROUTE_ROOT[i]="" ROUTE_HOME[i]="" ROUTE_TARGET[i]=""
   if ! fm_secondmate_restart_capable "$STATE/$id.meta"; then
     REASON[i]=$FM_SECONDMATE_RESTART_REASON
     if ! fm_secondmate_restart_attribution "$STATE/$id.meta"; then
       PLAN[i]="refused"
       REASON[i]=$FM_SECONDMATE_RESTART_REASON
+    else
+      # The fallback nudge must use this first compared route (Main 1807 (6)).
+      ROUTE_PLACEMENT[i]=$FM_SECONDMATE_RESTART_ROUTE_PLACEMENT ROUTE_HOST[i]=$FM_SECONDMATE_RESTART_ROUTE_HOST
+      ROUTE_ROOT[i]=$FM_SECONDMATE_RESTART_ROUTE_ROOT ROUTE_HOME[i]=$FM_SECONDMATE_RESTART_ROUTE_HOME
+      ROUTE_TARGET[i]=$FM_SECONDMATE_RESTART_ROUTE_TARGET
     fi
     i=$((i + 1))
     continue
@@ -309,6 +314,7 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
     continue
   fi
   # Keep the one route this decision compared for the request and the relaunch.
+  ROUTE_PLACEMENT[i]=$FM_SECONDMATE_RESTART_ROUTE_PLACEMENT
   ROUTE_HOST[i]=$FM_SECONDMATE_RESTART_ROUTE_HOST ROUTE_ROOT[i]=$FM_SECONDMATE_RESTART_ROUTE_ROOT
   ROUTE_HOME[i]=$FM_SECONDMATE_RESTART_ROUTE_HOME ROUTE_TARGET[i]=$FM_SECONDMATE_RESTART_ROUTE_TARGET
   if [ "${PLACEMENT[i]}" = remote ]; then
@@ -339,12 +345,20 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
     fi
   fi
 
-  # No pending-reply expectation exists before the route is rechecked: one that
-  # changed after the host decided refuses first (Main 1777 (3)).
-  if [ -n "${ROUTE_HOST[i]}" ] && ! fm_secondmate_restart_route_unchanged "$STATE/$id.meta" \
-    "${ROUTE_HOST[i]}" "${ROUTE_ROOT[i]}" "${ROUTE_HOME[i]}" "${ROUTE_TARGET[i]}"; then
+  # No pending-reply expectation exists before every check that can refuse
+  # (Main 1777 (3), Main 1807 (7)): a check-only decision runs now, asking a
+  # remote mate's host again (its endpoint and its agent), and must name the
+  # same compared route; only then is the expectation created.
+  if ! fm_secondmate_restart_attribution "$STATE/$id.meta"; then
     PLAN[i]="refused"
     REASON[i]=$FM_SECONDMATE_RESTART_REASON
+    i=$((i + 1))
+    continue
+  fi
+  if ! fm_secondmate_restart_route_is "${ROUTE_PLACEMENT[i]}" "${ROUTE_HOST[i]}" "${ROUTE_ROOT[i]}" \
+    "${ROUTE_HOME[i]}" "${ROUTE_TARGET[i]}"; then
+    PLAN[i]="refused"
+    REASON[i]="its route changed after its first decision, so no request, record or nudge was sent to it"
     i=$((i + 1))
     continue
   fi
@@ -357,7 +371,7 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
   # A remote request travels only over the route this mate's decision compared.
   route_env=()
   while IFS= read -r route_line; do route_env+=("$route_line"); done < <(fm_secondmate_restart_route_env \
-    "${ROUTE_HOST[i]}" "${ROUTE_ROOT[i]}" "${ROUTE_HOME[i]}" "${ROUTE_TARGET[i]}")
+    "${ROUTE_PLACEMENT[i]}" "${ROUTE_HOST[i]}" "${ROUTE_ROOT[i]}" "${ROUTE_HOME[i]}" "${ROUTE_TARGET[i]}")
   if ! send_out=$(env "${route_env[@]+"${route_env[@]}"}" FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
     FM_PENDING_REPLY_EXISTING_CORR="$corr" \
     "$SCRIPT_DIR/fm-send.sh" "$id" "$FM_SECONDMATE_PERSIST_REQUEST" 2>&1); then

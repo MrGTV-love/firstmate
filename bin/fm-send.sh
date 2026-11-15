@@ -146,7 +146,10 @@
 # semantic callers may set FM_SEND_EXPECTED_SPAWN_GEN or
 # FM_SEND_EXPECTED_REMOTE_HOST to require that sampled identity to still match
 # during the final locked remote-route validation; unset or empty guards do not
-# change ordinary sends. A caller that compared a remote route (Main 1714 (b))
+# change ordinary sends. A caller that compared a route sets
+# FM_SEND_EXPECTED_PLACEMENT (local or remote), and for a local one
+# FM_SEND_EXPECTED_ENDPOINT, so a send that resolves to another placement or
+# endpoint refuses (Main 1807 (4)). A caller that compared a remote route (Main 1714 (b))
 # also sets FM_ON_EXPECTED_HOST, FM_ON_EXPECTED_ROOT and FM_ON_EXPECTED_HOME,
 # which bin/fm-on.sh enforces, and FM_SEND_EXPECTED_REMOTE_TARGET: the send then
 # refuses before any pending-reply record, and again at the locked validation,
@@ -459,16 +462,33 @@ RAW_TARGET=$1
 fm_send_resolve_target "$RAW_TARGET" || exit 1
 T=$RESOLVED_TARGET
 
-# The record of an expected remote route (Main 1714 (b)) must be the compared
-# one before anything is recorded; the locked validation below repeats it.
+# A compared route (Main 1714 (b), Main 1807 (4)) binds the send for every
+# backend: when any expectation is set, the resolved placement must be the
+# expected one (FM_SEND_EXPECTED_PLACEMENT local or remote); a remote record
+# must name the expected host, root, home and remote target, and a local one
+# must resolve to the expected endpoint (FM_SEND_EXPECTED_ENDPOINT). Checked
+# before anything is recorded; the locked validations below repeat it.
 fm_send_remote_route_expected() { # <meta>
-  [ -n "${FM_ON_EXPECTED_HOST:-}${FM_ON_EXPECTED_ROOT:-}${FM_ON_EXPECTED_HOME:-}" ] || return 0
-  [ -f "$1" ] && [ "$(fm_meta_get "$1" remote_host)" = "${FM_ON_EXPECTED_HOST:-}" ] \
-    && [ "$(fm_meta_get "$1" remote_root)" = "${FM_ON_EXPECTED_ROOT:-}" ] \
-    && [ "$(fm_meta_get "$1" home)" = "${FM_ON_EXPECTED_HOME:-}" ]
+  local placement=local
+  [ -n "${FM_SEND_EXPECTED_PLACEMENT:-}${FM_SEND_EXPECTED_ENDPOINT:-}${FM_ON_EXPECTED_HOST:-}${FM_ON_EXPECTED_ROOT:-}${FM_ON_EXPECTED_HOME:-}${FM_SEND_EXPECTED_REMOTE_TARGET:-}" ] || return 0
+  [ "$TARGET_BACKEND" != remote ] || placement=remote
+  [ -z "${FM_SEND_EXPECTED_PLACEMENT:-}" ] || [ "$FM_SEND_EXPECTED_PLACEMENT" = "$placement" ] || return 1
+  [ -n "$1" ] && [ -f "$1" ] || return 1
+  if [ "$placement" = remote ]; then
+    [ -z "${FM_SEND_EXPECTED_ENDPOINT:-}" ] || return 1
+    [ "$(fm_meta_get "$1" remote_host)" = "${FM_ON_EXPECTED_HOST:-}" ] \
+      && [ "$(fm_meta_get "$1" remote_root)" = "${FM_ON_EXPECTED_ROOT:-}" ] \
+      && [ "$(fm_meta_get "$1" home)" = "${FM_ON_EXPECTED_HOME:-}" ] || return 1
+    [ -z "${FM_SEND_EXPECTED_REMOTE_TARGET:-}" ] \
+      || [ "$(fm_meta_get "$1" remote_target)" = "$FM_SEND_EXPECTED_REMOTE_TARGET" ]
+    return
+  fi
+  [ -z "${FM_ON_EXPECTED_HOST:-}${FM_ON_EXPECTED_ROOT:-}${FM_ON_EXPECTED_HOME:-}${FM_SEND_EXPECTED_REMOTE_TARGET:-}" ] || return 1
+  [ -n "${FM_SEND_EXPECTED_ENDPOINT:-}" ] && [ "$T" = "$FM_SEND_EXPECTED_ENDPOINT" ] \
+    && [ "$(fm_backend_target_of_meta "$1")" = "$FM_SEND_EXPECTED_ENDPOINT" ]
 }
-if [ "$TARGET_BACKEND" = remote ] && ! fm_send_remote_route_expected "$TARGET_META"; then
-  echo "error: steer not sent to remote secondmate $TARGET_REMOTE_ID: its record's remote route is not the expected route (host '${FM_ON_EXPECTED_HOST:-}', root '${FM_ON_EXPECTED_ROOT:-}', home '${FM_ON_EXPECTED_HOME:-}'); refusing before anything is recorded or sent" >&2
+if ! fm_send_remote_route_expected "${TARGET_META:-}"; then
+  echo "error: steer not sent to ${TARGET_REMOTE_ID:-$RAW_TARGET}: its resolved route is not the expected route (placement '${FM_SEND_EXPECTED_PLACEMENT:-}', endpoint '${FM_SEND_EXPECTED_ENDPOINT:-${FM_SEND_EXPECTED_REMOTE_TARGET:-}}', host '${FM_ON_EXPECTED_HOST:-}', root '${FM_ON_EXPECTED_ROOT:-}', home '${FM_ON_EXPECTED_HOME:-}'); refusing before anything is recorded or sent" >&2
   exit 1
 fi
 shift
@@ -1074,7 +1094,8 @@ else
       [ "$CURRENT_INBOX_BACKEND" != "$TARGET_BACKEND" ] ||
       { [ -n "${FM_SEND_EXPECTED_SPAWN_GEN:-}" ] &&
         [ "$CURRENT_INBOX_SPAWN_GEN" != "$FM_SEND_EXPECTED_SPAWN_GEN" ]; } ||
-      [ -n "$(fm_meta_get "$TARGET_META" remote_host)" ]; then
+      [ -n "$(fm_meta_get "$TARGET_META" remote_host)" ] ||
+      ! fm_send_remote_route_expected "$TARGET_META"; then
       fm_lock_release "$INBOX_META_LOCK"
       if [ "$PENDING_REPLY_CREATED" = 1 ] && [ -n "$PENDING_REPLY_CORR" ]; then
         fm_pending_reply_discard_undelivered "$STATE" "$PENDING_REPLY_CORR" || true
