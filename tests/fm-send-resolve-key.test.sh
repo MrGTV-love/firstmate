@@ -1158,11 +1158,12 @@ test_no_choice_refusal_precedes_telemetry_banner_and_lease() {
   refusal_env_send "$fb" "$home" "$log" "$err" t1 --answers-none --resolve-key k1 "go"; rc=$?
   expect_code 1 "$rc" "the contradictory pair refuses"
   assert_only_gate_event "$before" "$home" '.guard == "gate-agent-containment"' "contradictory-pair refusal"
-  # The pair wins over an option error: with --answers-none anywhere before a lone --
-  # and any --resolve-key form, nothing but the gate event is recorded, no supervision
-  # warning is printed and the stale lease is untouched. Each case is the whole argument
-  # list after the target, so the last one really leaves --resolve-key without a value,
-  # and --resolve-key --answers-none (the none flag in a key's place) is the pair too.
+  # The pair wins over an option error: with --answers-none and any --resolve-key form
+  # both standing as options (one grammar, fm_send_tokenize), nothing but the gate event
+  # is recorded, no supervision warning is printed and the stale lease is untouched. Each
+  # case is the whole argument list after the target, so the last one really leaves
+  # --resolve-key without a value; a key never starts with -, so in
+  # --resolve-key --answers-none the none flag stands as an option and it is the pair too.
   for pair in "--answers-none --resolve-key k1 --resolve-key k1 go" "--answers-none --resolve-key=bad@ go" \
     "--resolve-key=bad@ --answers-none go" "--resolve-key --answers-none answer" "--answers-none --resolve-key"; do
     # shellcheck disable=SC2086 # Word-split on purpose: each case is an argument list.
@@ -1172,6 +1173,19 @@ test_no_choice_refusal_precedes_telemetry_banner_and_lease() {
     assert_not_contains "$(cat "$err")" "WARNING" "no supervision warning ran before the pair refusal ($pair)"
     assert_only_gate_event "$before" "$home" '.guard == "gate-agent-containment"' "pair with an option error ($pair)"
     assert_equals "$lease_before" "$(cksum < "$home/state/.lease-t1")" "the stale lease is byte-identical after the pair refusal ($pair)"
+  done
+  # A key never starts with -: --resolve-key -- (Main 1866 G1) is refused as an invalid
+  # key at the same point, before any side effect; the -- is not taken as the key, and
+  # the --answers-none after it is message text, not the pair.
+  for dashkey in "--resolve-key -- --answers-none go" "--resolve-key=-x go" "--resolve-key -k1 go"; do
+    # shellcheck disable=SC2086 # Word-split on purpose: each case is an argument list.
+    refusal_env_send "$fb" "$home" "$log" "$err" t1 $dashkey; rc=$?
+    expect_code 1 "$rc" "a key that starts with - ($dashkey) is refused with exit 1: $(cat "$err")"
+    assert_contains "$(cat "$err")" "a key never starts with -" "the dash-key refusal is the one reported ($dashkey)"
+    assert_not_contains "$(cat "$err")" "contradict each other" "a dash key is not the pair ($dashkey)"
+    assert_not_contains "$(cat "$err")" "WARNING" "no supervision warning ran before the dash-key refusal ($dashkey)"
+    assert_only_gate_event "$before" "$home" '.guard == "gate-agent-containment"' "dash-key refusal ($dashkey)"
+    assert_equals "$lease_before" "$(cksum < "$home/state/.lease-t1")" "the stale lease is byte-identical after the dash-key refusal ($dashkey)"
   done
 
   { printf 'needs-decision [key=real-key]: choose\n'; perl -e 'print "text\n" x 40000'; } > "$home/state/t1.status"
@@ -1227,7 +1241,7 @@ test_no_choice_refusal_precedes_telemetry_banner_and_lease() {
   expect_code 3 "$rc" "a gate agent outside a lab home is refused by containment first"
   assert_contains "$(cat "$err")" "gate agent must not drive the fleet" "the containment refusal is the one shown"
   assert_only_gate_event "$before" "$home" '.guard == "gate-agent-containment" and .decision == "deny"' "denied gate agent"
-  pass "fm-send: through real containment, only its one gate event precedes the no-choice, contradictory (also beside an option error) and unknown-open-set refusals; telemetry, banner and lease come after"
+  pass "fm-send: through real containment, only its one gate event precedes the no-choice, contradictory (also beside an option error), dash-key and unknown-open-set refusals; telemetry, banner and lease come after"
 }
 
 # -- ends the options, so a literal body that starts with -- can be sent, and
