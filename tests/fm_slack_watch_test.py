@@ -7707,6 +7707,30 @@ class Round7Findings(InvariantScenario):
         self.assertLess(cutoff.get('closed_at', float('inf')), min(freed))   # the socket was closed before the fence was free
         self.assertEqual(server.received, [('chat.postMessage', 'r7-fence-id')])
 
+    # ---- Main 1650: their budget is derived so that one fresh DM proof and one useful step fit; slow calls still progress across fresh sweeps ----
+
+    def test_main1650_constant_slow_calls_deliver_and_acknowledge_their_request_once_over_fresh_sweeps_and_the_owner_is_woken_in_its_own_sweep(self):
+        for delay in ('7.0', '9.9'):
+            with self.subTest(delay=delay), self.home() as home:
+                home.trust_check()
+                home.cli('poll')
+                home.say('200.000200', 'their request')
+                home.say('200.000100', 'owner request', user=INV_OWNER, dm=INV_OWNER_DM)
+                sweeps = []
+                for n in range(4):                                       # fresh processes: the owner's check, then theirs with every call of theirs slow
+                    rc1, owner_out, owner_calls = self.run_check(home, 'normal', 'owner-%d' % n, command='check')
+                    rc2, second_out, _ = self.run_check(home, 'slow', 'second-%d' % n, command='check-second', delay=delay)
+                    self.assertEqual((rc1, rc2, owner_calls), (0, 0, []))
+                    sweeps.append((owner_out, second_out))
+                self.assertEqual([len(re.findall(r'slack request 200\.000100 from ' + INV_OWNER, o)) for o, _ in sweeps], [1, 0, 0, 0])   # owner: once, in its own sweep
+                self.assertEqual(sum(len(re.findall(r'slack request 200\.000200 from ' + INV_SECOND, s2)) for _, s2 in sweeps), 1, sweeps)
+                self.assertEqual(home.posts().count((INV_SECOND_DM, '200.000200')), 1)
+                self.assertEqual(home.posts().count((INV_OWNER_DM, '200.000100')), 1)
+
+    def test_main1650_their_budget_holds_one_proof_and_one_step_of_the_whole_call_bound_and_states_the_owner_wait(self):
+        self.assertGreaterEqual(plane.SECOND_BUDGET, 2 * plane.SECOND_CALL_BOUND)
+        self.assertEqual(plane.OWNER_WAKE_WAIT_BOUND, plane.SECOND_BUDGET + fm_slack_module().CUTOFF_JOIN + 2.0)
+
     # ---- finding 10: the journal lock is taken inside their 12 s budget ----
 
     def test_r7_f10_a_held_journal_lock_never_keeps_their_check_past_its_budget_and_their_request_is_kept(self):
