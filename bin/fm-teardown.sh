@@ -912,14 +912,33 @@ fi
 fm_lease_guard "$ID" "teardown (fm-teardown)"
 teardown_friction_outcome retried
 
+# The physical path <path> names, resolved through every link, including one
+# whose target is already gone (the link text still names it). The record's own
+# worktree= is resolved once, at entry and before teardown can remove the copy,
+# and that answer is reused, so a search that starts from the path after the
+# copy is gone finds the same pool slot whether the record names the copy or an
+# alias of it. Without python3 the path is used as it is.
+TEARDOWN_RECORD_WT_RAW=
+TEARDOWN_RECORD_WT_PHYSICAL=
+teardown_physical_path() {  # <path>
+  if [ -n "$TEARDOWN_RECORD_WT_PHYSICAL" ] && [ "$1" = "$TEARDOWN_RECORD_WT_RAW" ]; then
+    printf '%s' "$TEARDOWN_RECORD_WT_PHYSICAL"
+    return 0
+  fi
+  python3 -I -c 'import os, sys; sys.stdout.write(os.path.realpath(sys.argv[1]))' "$1" 2>/dev/null \
+    || printf '%s' "$1"
+}
+
 # The pool slot of <project> that encloses a record's current copy without
 # being it: the slot that strictly contains the copy or, once the copy is gone,
 # the record's own prior_worktree= pool slot that encloses its recorded path,
 # else, for a record that is not a scout, the pool slot that strictly contains
 # that absolute path through its nearest existing ancestor - what a nested
-# teardown leaves when it stops after removing that copy. No prior_worktree= line
-# is needed to find it; who the slot claim names is teardown_nested_slot's
-# question.
+# teardown leaves when it stops after removing that copy. That search starts
+# from the path's physical form (teardown_physical_path), so a record whose
+# worktree= is an alias of the copy finds the slot as the copy's own path would.
+# No prior_worktree= line is needed to find it; who the slot claim names is
+# teardown_nested_slot's question.
 teardown_record_enclosing_slot() {  # <meta> <project> <worktree>
   local meta=$1 project=$2 worktree=$3 copy line prior prior_real tail=
   if copy=$(fm_task_copy_canonical_dir "$worktree"); then
@@ -938,6 +957,7 @@ teardown_record_enclosing_slot() {  # <meta> <project> <worktree>
   done < "$meta"
   case "$worktree" in /*) ;; *) return 1 ;; esac
   [ "$(fm_meta_get "$meta" kind)" != scout ] || return 1
+  worktree=$(teardown_physical_path "$worktree")
   while [ -n "$worktree" ] && [ ! -d "$worktree" ]; do
     tail=/${worktree##*/}$tail
     worktree=${worktree%/*}
@@ -967,6 +987,8 @@ if [ -f "$META" ] && [ ! -L "$META" ]; then
   [ -n "$TEARDOWN_LOCK_BACKEND" ] || TEARDOWN_LOCK_BACKEND=tmux
   TEARDOWN_LOCK_WT=$(fm_meta_get "$META" worktree)
   TEARDOWN_LOCK_PROJECT=$(fm_meta_get "$META" project)
+  TEARDOWN_RECORD_WT_RAW=$TEARDOWN_LOCK_WT
+  case "$TEARDOWN_LOCK_WT" in /*) TEARDOWN_RECORD_WT_PHYSICAL=$(teardown_physical_path "$TEARDOWN_LOCK_WT") ;; esac
   if [ "$TEARDOWN_LOCK_KIND" != secondmate ] \
      && [ "$TEARDOWN_LOCK_BACKEND" != orca ] \
      && teardown_record_in_pool_slot "$META" "$TEARDOWN_LOCK_PROJECT" "$TEARDOWN_LOCK_WT"; then
@@ -2339,6 +2361,50 @@ teardown_busy_retire_ready() {  # <state-dir> <id> <gen>
   return 0
 }
 
+# The pool slot a return-pending record from an earlier run names when this task
+# still claims it, printed; fails when there is no such record, it names no
+# slot, or the slot's claim does not name this task. That slot still awaits its
+# return, so the task record and the return-pending record are retired only
+# after it is returned, or while this close holds it on purpose.
+teardown_return_pending_owed_slot() {
+  local marker="$STATE/$ID.teardown-return-pending" slot
+  [ -f "$marker" ] && [ ! -L "$marker" ] || return 1
+  slot=$(sed -n 's/^slot=//p' "$marker" 2>/dev/null | head -1)
+  [ -n "$slot" ] && [ -d "$slot" ] || return 1
+  fm_treehouse_slot_owner_state "$slot" "$ID"
+  [ "$FM_TREEHOUSE_SLOT_OWNER" = mine ] || return 1
+  fm_task_copy_canonical_dir "$slot"
+}
+
+# The backstop, just before the task record is retired, for a slot this run
+# meant to return but did not: while a return-pending record names a slot the
+# task still claims, and this close does not hold that slot on purpose (a held
+# or peer close), it refuses so the task record and that record are kept.
+teardown_owed_slot_settled() {
+  local owed candidate
+  [ "$KIND" != secondmate ] || return 0
+  owed=$(teardown_return_pending_owed_slot) || return 0
+  for candidate in "$TEARDOWN_HELD_SLOT" "$TEARDOWN_PEER_SLOT"; do
+    [ -n "$candidate" ] || continue
+    [ "$(fm_task_copy_canonical_dir "$candidate" 2>/dev/null)" != "$owed" ] || return 0
+  done
+  echo "REFUSED: pool slot $owed is still claimed by task $ID and its return-pending record says it awaits its return, which this run did not complete; the task record and the return-pending record are kept for a retry" >&2
+  return 1
+}
+
+# Whether <slot> is one this teardown returns or holds: its enclosing, return,
+# held, peer or shared slot, or its own copy when that copy is the pool slot.
+teardown_route_covers_slot() {  # <canonical-slot>
+  local candidate real
+  for candidate in "$TEARDOWN_ENCLOSING_SLOT" "$TEARDOWN_RETURN_SLOT" "$TEARDOWN_HELD_SLOT" \
+      "$TEARDOWN_PEER_SLOT" "$TEARDOWN_SHARED_SLOT" "$WT"; do
+    [ -n "$candidate" ] || continue
+    real=$(fm_task_copy_canonical_dir "$candidate") || continue
+    [ "$real" != "$1" ] || return 0
+  done
+  return 1
+}
+
 # One state record teardown removes later with rm -f, checked now: absent, or an
 # entry that is not a directory and that fm_backlog_path_deletable says can be
 # deleted. Sets TEARDOWN_PREFLIGHT_ERROR on a refusal.
@@ -2366,7 +2432,7 @@ teardown_preflight_removable() {  # <path> <label>
 # reports its own refusal leaves it empty.
 TEARDOWN_PREFLIGHT_ERROR=
 teardown_entry_preflight() {
-  local path harness token_path token
+  local path harness token_path token owed
   TEARDOWN_PREFLIGHT_ERROR=
   path=$(fm_backlog_close_marker_path "$STATE" "$ID") || return 1
   if ! fm_backlog_record_removable "$path" "pending-close record" "$STATE"; then
@@ -2387,9 +2453,12 @@ teardown_entry_preflight() {
     TEARDOWN_PREFLIGHT_ERROR="$TEARDOWN_BUSY_ERROR (event rejected)"
     return 1
   fi
-  for path in "$STATE/$ID.busy-gen" "$STATE/$ID.busy-state" "$STATE/$ID.progress"; do
-    teardown_preflight_removable "$path" "busy-state record" || return 1
-  done
+  # retire_busy_state removes these only when a generation is recorded or armed.
+  if [ -n "$BUSY_GEN" ] || [ -f "$STATE/$ID.busy-gen" ]; then
+    for path in "$STATE/$ID.busy-gen" "$STATE/$ID.busy-state" "$STATE/$ID.progress"; do
+      teardown_preflight_removable "$path" "busy-state record" || return 1
+    done
+  fi
   if ! validate_pr_poll_cleanup "$STATE" "$ID"; then
     TEARDOWN_PREFLIGHT_ERROR="task $ID's PR-poll records are not in a shape cleanup can retire"
     return 1
@@ -2421,6 +2490,18 @@ teardown_entry_preflight() {
       "$(status_daemon_seen_marker_path "$STATE" "$ID")"; do
     teardown_preflight_removable "$path" "status record" || return 1
   done
+  if ! status_retire_presentation_task_ready "$STATE" "$ID"; then
+    TEARDOWN_PREFLIGHT_ERROR="the shared status manifest $STATE/.status-presentation-cursor cannot be retired for task $ID (not a readable regular file, a row that does not parse, or a state directory that cannot be written)"
+    return 1
+  fi
+  if [ "$STATUS_RETIRE_REWRITES" = 1 ]; then
+    teardown_preflight_removable "$STATE/.status-presentation-cursor" "status manifest" || return 1
+  fi
+  if [ "$KIND" != secondmate ] && owed=$(teardown_return_pending_owed_slot) \
+     && ! teardown_route_covers_slot "$owed"; then
+    TEARDOWN_PREFLIGHT_ERROR="task $ID's return-pending record names pool slot $owed, which the task still claims, but this teardown found no route that returns or holds that slot, so neither record may be retired"
+    return 1
+  fi
   if [ "$FORCE" = "--force" ] && [ -n "$DROP_FILE" ] && [ "$KIND" != secondmate ] \
      && ! fm_backlog_drop_record_writable "$DATA" "$ID" "$DROP_FILE"; then
     TEARDOWN_PREFLIGHT_ERROR="the captain's words for $ID cannot be retained at $DATA/$ID/captain-drop.md"
@@ -7075,6 +7156,7 @@ if [ -n "$TEARDOWN_DEFERRED_POOL_CLEANUP" ]; then
       teardown_nested_slot return
     fi
   fi
+  teardown_owed_slot_settled || exit 1
   fm_backlog_atomic_transition remove "$META" "task record" "$STATE" || exit 1
   TEARDOWN_META_REMOVED=1
   teardown_release_project_lock || exit 1
@@ -7085,6 +7167,11 @@ fi
 # racing the same id stays serialized exactly as it was before. A captain-held
 # row takes the retain transition here instead of the close: same record, same
 # ordering, the row returns to Queued with its deliverable recorded.
+if ! teardown_owed_slot_settled; then
+  fm_lock_release "$META_LOCK"
+  META_LOCK_HELD=0
+  exit 1
+fi
 TEARDOWN_CLOSE_META=$META
 [ "$TEARDOWN_META_REMOVED" != 1 ] || TEARDOWN_CLOSE_META=
 if [ "$BACKLOG_CLOSED" = 1 ]; then
