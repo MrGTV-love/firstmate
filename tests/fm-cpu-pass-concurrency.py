@@ -87,6 +87,11 @@ if len(sys.argv) > 1 and os.path.basename(sys.argv[1]) in ('fm-cpu-pass.py', 'fm
                     raise OSError(35, 'injected: the guard cannot be started')
                 super().__init__(args, *a, **k)
         _sp.Popen = _Popen
+    if os.environ.get('CASE_NO_FCNTL'):
+        sys.modules['fcntl'] = None
+    if os.environ.get('CASE_FOREIGN_OWNER'):
+        _uid = os.getuid()
+        os.getuid = lambda: _uid + 1
     if os.environ.get('CASE_BIND_HOLD'):
         import time as _t
         _write = os.write
@@ -1426,7 +1431,43 @@ def case_holder_dies_at_guard_creation():
     return case
 
 
-CASES = [case_nested, case_nested_two_level, case_nested_other_key, case_sibling_runners, case_mixed_cycle, case_lease_slot_cycle, case_holder_killed, case_one_candidate_proof, case_guard_unavailable, case_holder_dies_at_guard_creation, case_async_cycle, case_one_reservation, case_jobs_clamp, case_duration_sample, case_padded_marker, case_key_guard, case_cross_key, case_malformed, case_brief_route, case_runner_holder, case_lint, case_isolation_proof, case_waiting, case_drain, case_wait_cause_control, case_same_class_order, case_sampler_control, case_soak]
+def case_unusable_modes():
+    """H4: a gate or pool that cannot be used (no POSIX locks, a foreign-owned directory, no python3) still runs the command, once-said."""
+    case = Case('H4 unusable modes', 'no POSIX locks, a foreign-owned slot and pool directory, and no python3: the command runs without a slot or pass and the cause is named')
+    show = 'printf "%s\\n" "${FM_CPU_PASS_HELD-unset}" > "$1"'
+    for label, extra, notices in (('no-flock', dict(CASE_NO_FCNTL='1'), ['POSIX file locks', 'without a CPU pass']),
+                                  ('foreign-owner', dict(CASE_FOREIGN_OWNER='1'), ['without a slot', 'without a CPU pass', 'owned by another user'])):
+        world = World('unusable-' + label, cores=1)
+        marker = world.folder / 'marker'
+        codes = wait_all([world.launch('probe', [pyshim, tool('fm-duration.py'), 'gate', 'test.unusable.' + label, '--', 'bash', '-c', show, '_', str(marker)], extra=extra)], timeout=120)
+        text = world.text('probe')
+        held = marker.read_text().strip() if marker.exists() else None
+        case.measure(**{label + '_exit': codes, label + '_marker': held})
+        case.check(codes == [0], '%s: the command did not run to the end: %s' % (label, text[-300:]))
+        case.check(held == '0', '%s: the command saw FM_CPU_PASS_HELD=%s, but it holds no pass' % (label, held))
+        for notice in notices:
+            case.check(notice in text, '%s: the notice %r is missing: %s' % (label, notice, text[-300:]))
+    world = World('unusable-no-python', cores=1)
+    nopython = world.folder / 'no-python-bin'
+    nopython.mkdir()
+    for directory in ('/usr/bin', '/bin', '/usr/sbin', '/sbin'):
+        for name in os.listdir(directory):
+            if not name.startswith(('python', 'pip')) and not (nopython / name).exists():
+                os.symlink(os.path.join(directory, name), nopython / name)
+    marker = world.folder / 'marker'
+    codes = wait_all([world.launch('pool', ['bash', tool('fm-cpu-pass.sh'), 'run', '--', 'bash', '-c', show, '_', str(marker)], extra=dict(PATH=str(nopython)))], timeout=120)
+    held = marker.read_text().strip() if marker.exists() else None
+    case.measure(no_python_run_exit=codes, no_python_run_marker=held)
+    case.check(codes == [0] and held == '0' and 'python3 not found' in world.text('pool'), 'no python3: the pass tool did not run the command once-said with no pass: %s %s' % (codes, world.text('pool')[-300:]))
+    sandbox = runner_repo(world, ['fm-arm-pretool-check.test.sh'], 0.2)
+    codes = wait_all([world.launch('runner', ['bash', '-c', 'cd "$1" && exec bin/fm-test-run.sh --jobs 1 tests/fm-arm-pretool-check.test.sh', '_', str(sandbox)], extra=dict(PATH=str(nopython), FM_CONC_GROUP='nopython'))], timeout=180)
+    ended = [line for line in world.text('runner', 'out').splitlines() if line.startswith('FM_TEST_END ')]
+    case.measure(no_python_runner_exit=codes, no_python_runner_end=ended[:1])
+    case.check(codes == [0] and len(ended) == 1 and ' exit=0 ' in ended[0], 'no python3: the runner did not run its script without a slot: %s %s' % (codes, world.text('runner')[-300:]))
+    return case
+
+
+CASES = [case_nested, case_nested_two_level, case_nested_other_key, case_sibling_runners, case_mixed_cycle, case_lease_slot_cycle, case_holder_killed, case_one_candidate_proof, case_unusable_modes, case_guard_unavailable, case_holder_dies_at_guard_creation, case_async_cycle, case_one_reservation, case_jobs_clamp, case_duration_sample, case_padded_marker, case_key_guard, case_cross_key, case_malformed, case_brief_route, case_runner_holder, case_lint, case_isolation_proof, case_waiting, case_drain, case_wait_cause_control, case_same_class_order, case_sampler_control, case_soak]
 
 
 def main():
