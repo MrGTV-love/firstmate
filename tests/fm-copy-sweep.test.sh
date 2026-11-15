@@ -5299,6 +5299,7 @@ test_the_forge_timeout_override_is_honoured_or_refused_and_never_silently_sixty(
 # an unset variable is one named skip line (never an "ok" line, so never a pass, and never
 # a failure, whatever CI is set to); a variable that is set but names a directory or a table
 # that cannot be read fails. The grader runs the table with the variable set (R5 Verify).
+# shellcheck disable=SC2030,SC2031 # each subshell sets its own CI and FM_SUPERSEDENCE_CASES on purpose
 test_the_r5_table_prints_one_named_skip_and_no_pass_when_the_staged_cases_variable_is_unset() {
   local out rc ci req lines
   make_world world-staged-unset
@@ -5321,6 +5322,7 @@ test_the_r5_table_prints_one_named_skip_and_no_pass_when_the_staged_cases_variab
   pass "with FM_SUPERSEDENCE_CASES unset the R5 table prints the one named skip line 'R5 table owed to the grader: FM_SUPERSEDENCE_CASES unset', prints no ok line and does not fail, with CI=true or the older required setting changing nothing"
 }
 
+# shellcheck disable=SC2030,SC2031 # each subshell sets its own CI and FM_SUPERSEDENCE_CASES on purpose
 test_the_r5_table_fails_when_the_staged_cases_variable_names_a_directory_or_table_that_cannot_be_read() {
   local dir rc out label
   make_world world-staged-unreadable
