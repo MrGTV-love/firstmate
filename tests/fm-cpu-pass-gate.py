@@ -663,7 +663,9 @@ os.waitpid(child, 0)
     def live_attempt_after_run_stops():
         # Main 1712 item 6 (review finding 6): X's launch leaves a live orphan, then X's run stops running. The orphan
         # still holds X: a start that fits only without X's R (8 of 10 GiB) waits, X's record stays, and the start is
-        # admitted by itself once the orphan exits (X's record is then removed).
+        # admitted by itself once the orphan exits (X's record is then removed). The orphan is a possible process of X
+        # whose memory the reading does not join, so the wait names it as unknown (Main 1876 J); the fact twin holds
+        # the numbers.
         folder, db, env = gate_case('m1712-run-stopped', available=40 * GIB, runs=[('x', 'ci', 'running', None)])
         child, _ = gate(folder, env, 'x', mode='escape')
         finish(child)
@@ -672,7 +674,7 @@ os.waitpid(child, 0)
         later = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'later')], env, folder / 'later')
         time.sleep(3)
         harm('m1712-run-stopped', not (folder / 'later').exists(), 'a live attempt was dropped when its run stopped', (folder / 'later.stderr').read_text())
-        wait_for(lambda: 'x:launched:%d:unseen' % (3 * GIB) in (folder / 'later.stderr').read_text(), 'X counted at R while its orphan lives')
+        wait_for(lambda: "could be run x's attempt and its memory is not joined" in (folder / 'later.stderr').read_text(), 'X held while its orphan lives')
         (folder / 'x.escapee-release').touch()
         finish(later)
         wait_for(lambda: not [p for p in (folder / 'pool').glob('attempt-*.json') if 'proof' not in p.name], 'the ended record is removed')
@@ -681,7 +683,8 @@ os.waitpid(child, 0)
     def escaped_descendant_holds():
         # F1 / the review's escape: X's agent leaves an orphaned descendant (own session, descriptors closed, an empty
         # environment) and exits. The descendant keeps X held, so a start that fits only without X's R waits; once it
-        # exits, X ends and the start is admitted by itself. R = 3, S = 8: 10 GiB fits 8 and not 11.
+        # exits, X ends and the start is admitted by itself. R = 3, S = 8: 10 GiB fits 8 and not 11. The escapee's
+        # memory is not in the reading, so the wait names it as unknown (Main 1876 J).
         folder, db, env = gate_case('m1656-escape', available=10 * GIB, runs=[('x', 'ci', 'running', None)])
         child, log = gate(folder, env, 'x', mode='escape')
         finish(child)
@@ -689,7 +692,7 @@ os.waitpid(child, 0)
         assert held == 1 and 'could be its' in held.reasons[0], repr(held)
         later = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'later')], env, folder / 'later')
         held_back('m1656-escape', folder / 'later', folder / 'later.stderr')
-        wait_for(lambda: 'x:launched:%d:unseen' % (3 * GIB) in (folder / 'later.stderr').read_text(), 'X counted while its escapee lives')
+        wait_for(lambda: "could be run x's attempt and its memory is not joined" in (folder / 'later.stderr').read_text(), 'X held while its escapee lives')
         (folder / 'x.escapee-release').touch()
         finish(later)
         wait_for(lambda: reserving_held(folder, ['x']) == 0, 'X ends once its escapee exits')
@@ -725,7 +728,8 @@ os.waitpid(child, 0)
     def copied_identity_holds():
         # Review F4 / r2 F1: X's orphan carries Y's attempt identity copied into its environment while Y is live; the
         # identity never moves it to Y: X stays held after Y ends, so a start that fits only without X's R waits
-        # (R 3 + S 8 = 11 against 10 GiB), and is admitted by itself once the orphan exits.
+        # (R 3 + S 8 = 11 against 10 GiB), and is admitted by itself once the orphan exits. The orphan's memory is not
+        # in the reading, so the wait names it as X's unknown (Main 1876 J).
         folder, db, env = gate_case('m1683-copied', available=40 * GIB, runs=[('x', 'ci', 'running', None), ('y', 'ci', 'running', None)])
         gate_y, _ = gate(folder, env, 'y')
         wait_for(lambda: (folder / 'y.agent').exists(), 'y runs')
@@ -737,14 +741,15 @@ os.waitpid(child, 0)
         facts(folder, available=10 * GIB)
         later = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'later')], env, folder / 'later')
         held_back('m1683-copied-identity', folder / 'later', folder / 'later.stderr')
-        wait_for(lambda: 'x:launched:%d:unseen' % (3 * GIB) in (folder / 'later.stderr').read_text(), 'X counted while its orphan lives')
+        wait_for(lambda: "could be run x's attempt and its memory is not joined" in (folder / 'later.stderr').read_text(), 'X held while its orphan lives')
         (folder / 'x.escapee-release').touch()
         finish(later)
 
     def foreign_orphan_in_coalition_by_admission():
         # Amended x/y (Main 1656): Y's orphan inside the launch coalition outlives X. The oracle is the admission alone:
         # with room for one new start beside nothing (8 of 12 GiB), the start waits while both X and Y are counted
-        # (3 + 3 + 8 = 14) and is admitted once the orphan exits.
+        # (3 + 3 + 8 = 14) and is admitted once the orphan exits. The orphan's memory is not in the reading: the wait
+        # names it as unknown for X and for Y, each owner on its own (Main 1876 J, E).
         folder, db, env = gate_case('m1683-foreign-in', available=40 * GIB, runs=[('x', 'ci', 'running', None), ('y', 'ci', 'running', None)])
         gate_x, _ = gate(folder, env, 'x')
         wait_for(lambda: (folder / 'x.agent').exists(), 'x runs')
@@ -754,10 +759,10 @@ os.waitpid(child, 0)
         finish(gate_x)
         facts(folder, available=12 * GIB)
         later = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'later')], env, folder / 'later')
-        wait_for(lambda: 'projected=%d ' % (14 * GIB) in (folder / 'later.stderr').read_text(), 'X and Y both counted')
+        wait_for(lambda: "could be run y's attempt and its memory is not joined" in (folder / 'later.stderr').read_text(), 'Y held')
         text = (folder / 'later.stderr').read_text()
-        harm('m1683-foreign-in', not (folder / 'later').exists() and 'x:launched:%d:unseen' % (3 * GIB) in text and 'y:launched:%d:unseen' % (3 * GIB) in text,
-             'each of X and Y holds its own R', text)
+        harm('m1683-foreign-in', not (folder / 'later').exists() and "could be run x's attempt and its memory is not joined" in text
+             and "could be run y's attempt and its memory is not joined" in text, 'each of X and Y holds', text)
         (folder / 'y.escapee-release').touch()
         finish(later)
 
@@ -821,7 +826,7 @@ os.waitpid(child, 0)
                 orphan_present(folder, orphan)
             else:
                 held_back('m1683-p1f-own-live', folder / 'later', folder / 'later.stderr')
-                wait_for(lambda: 'x:launched:%d:unseen' % (3 * GIB) in (folder / 'later.stderr').read_text(), 'x counted while its orphan lives')
+                wait_for(lambda: "could be run x's attempt and its memory is not joined" in (folder / 'later.stderr').read_text(), 'x held while its orphan lives')
                 (folder / 'x.escapee-release').touch()
                 finish(later)
 
