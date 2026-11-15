@@ -967,6 +967,10 @@ def proven_agentless(step, now: float) -> bool:
     return step[2] is not None and pid_dead(step[2]) is True
 
 
+# Projection entries whose run may still have a launch not shown ended (Main 1712, Main 1727).
+UNPROVEN_KINDS = ("launched", "ci-unproven", "step-unreadable")
+
+
 def project(available: int, rss: dict, counted: dict, steps: Optional[dict], launches: dict,
             reservation: int, slack: int, term: int, self_run: Optional[str] = None,
             waiting: frozenset = frozenset(), now: Optional[float] = None, pending: int = 0,
@@ -975,22 +979,27 @@ def project(available: int, rss: dict, counted: dict, steps: Optional[dict], lau
 
     counted maps each counted run ID to its repo ID; rss is the reading's run map
     (keyed no-mistakes:<repo>/<run>); steps is open_steps() or None; launches maps
-    run IDs to their live launch-gate reservations; now is the decision's wall
-    clock (time.time() when None). A run waiting on remote CI (open step ci,
-    status running, no live launch) reserves only the resident memory it holds
-    on positive proof that no agent lives: the reading sees no process of it,
-    and either no agent pid is recorded or its recorded agent pid is dead
-    (proven_agentless). Every other CI run keeps the active term: a visible
-    tree, whatever the recorded pid (a reparented agent can outlive its
-    launcher's pid), or a live or unjudgeable pid is not proof that no agent
-    lives, whatever the processes are named. Every other counted or launched run reserves its
-    resident memory or the active-run term A, whichever is larger, once its tree
-    is visible, and its full R while the reading cannot see it yet. The new run
-    reserves S. Each of the pending admitted starts that has not registered a run
-    yet (pending, see live_pending) reserves the full R. With no live launch, the waiting launch's own run (self_run) and
-    every run in waiting (a run whose launch gate is queued in the pool) are
-    waiters: each adds only what it holds. Budget is available memory plus what
-    the counted runs hold.
+    run IDs to their held launch attempts (attempt_reservations); held_runs is every
+    run with a held attempt; bound is bound_runs() or None; now is the decision's wall
+    clock (time.time() when None). In order, each run is:
+      launched - it has a held attempt that reserves, or a held passive one while the
+        run is not counted: each attempt unseen in the reading counts R, each seen one
+        the larger of its own resident memory and A, and the run's other processes add
+        what they hold;
+      step-unreadable - no step facts: R beside what it holds (at least A);
+      ci-unproven - at its CI step in any state, seen or not, whatever pid is recorded,
+        while a launch of it cannot be shown ended (held, not bound): R beside what it
+        holds (at least A), so a later launch queueing never erases it;
+      waiter - the waiting launch's own run (self_run) or a run whose gate is queued
+        (waiting): only what it holds;
+      ci-waiting - waiting on remote CI (status running) with every launch shown ended,
+        nothing of it visible and no live agent (proven_agentless): only what it holds;
+      otherwise the larger of its resident memory and A once seen, R while unseen.
+    The new run reserves S; each pending admitted start that has not registered a run
+    yet reserves R. Budget is available memory plus what the counted runs hold. The
+    one-start minimum admits when nothing else is counted; an earlier launch of the
+    requesting run itself that is not shown ended (launched, ci-unproven or
+    step-unreadable) counts as something else (Main 1712, Main 1727).
     """
     entries = []
     clock = time.time() if now is None else now
@@ -1005,21 +1014,27 @@ def project(available: int, rss: dict, counted: dict, steps: Optional[dict], lau
         visible = bool(seen) and seen.get("processes", 0) > 0
         step = None if steps is None else steps.get(run)
         held += size
-        if run in launches:
+        if run in launches and (run not in counted or any(not a.get("passive") for a in launches[run].get("attempts", []))):
             # Per attempt (P3): an attempt none of whose own processes the reading shows is counted at R; one
             # that is seen counts the larger of its own resident memory and A; the run's other processes add theirs.
+            # A passive attempt (a counted run's passed-through launch) is left to its run's own term while the run is
+            # counted, and counted here once it is not (Main 1712: a live recorded process counts whatever the status).
             kind = "launched"
             attempts = launches[run].get("attempts", [])
             demand = sum(max(a["own"], term) if a["seen"] else reservation for a in attempts)
             demand += max(0, size - sum(a["own"] for a in attempts))
             visible = visible or any(a["seen"] for a in attempts)  # the line's seen mark follows its attempts
-        elif (steps is not None and step is not None and step[0] == CI_STEP and step[1] == "running" and not visible
-              and (step[2] is None or proven_agentless(step, clock))
-              and (run in held_runs or bound is None or run not in bound)):
-            # Waiting on CI, but a launch of the run cannot be shown ended (no own session key, a shared key, a record
-            # missing or still held): kept at its full reservation, named so on the line (P1(f), Main 1656). Checked
-            # before the waiter case, so a later launch queueing never erases this earlier one's reservation.
-            kind, demand = "ci-unproven", reservation
+        elif steps is None:
+            # No step facts: no launch of any run can be shown ended, so every counted run is held at the most any
+            # one launch of it could need beside what it holds (Main 1712: less evidence never counts less).
+            kind, demand = "step-unreadable", max(reservation + size, term)
+        elif step is not None and step[0] == CI_STEP and (run in held_runs or bound is None or run not in bound):
+            # At its CI step, in any state (running, fixing or other), seen or not, whatever agent or gate pid is
+            # recorded, a launch of the run cannot be shown ended (no row, no own session key, a shared key, a record
+            # missing its row or still held): it keeps a full launch reservation beside what it holds, named so on
+            # the line (P1(f), Main 1656, Main 1712). Checked before the waiter case, so a later launch queueing
+            # never erases an earlier one's reservation.
+            kind, demand = "ci-unproven", max(reservation + size, term)
         elif run == self_run or run in waiting:
             kind, demand = "waiter", size
         elif (steps is not None and step is not None and step[0] == CI_STEP and step[1] == "running"
@@ -1029,14 +1044,16 @@ def project(available: int, rss: dict, counted: dict, steps: Optional[dict], lau
             # session key, no attempt of the run held, nothing of it visible.
             kind, demand = "ci-waiting", size
         else:
-            kind = "step-unreadable" if steps is None else ("no-open-step" if step is None else "active")
+            kind = "no-open-step" if step is None else "active"
             demand = max(size, term) if visible else reservation
         entries.append((run, kind, demand, visible))
     for index in range(pending):
         entries.append(("start-%d" % (index + 1), "pending", reservation, False))
     projected = sum(demand for _, _, demand, _ in entries) + slack
     budget = available + held
-    others = [run for run, _, _, _ in entries if run != self_run]
+    # The one-start minimum admits a genuine first start; an earlier launch of the requesting run itself that is not
+    # shown ended (held, ci-unproven, or no step facts) is another start it never passes (Main 1712, Main 1727).
+    others = [run for run, kind, _, _ in entries if run != self_run or kind in UNPROVEN_KINDS]
     return dict(admit=projected <= budget or not others, projected=projected, budget=budget, held=held,
                 available=available, entries=entries, counted=len(counted),
                 counted_rss={run: (rss.get("no-mistakes:%s/%s" % (repo, run)) or {}).get("rss_bytes") or 0
@@ -1111,7 +1128,12 @@ def admission(reasons: List[str], report: Optional[dict], running: dict, counted
     each counts as one run in the count fallback and the one-start minimum and
     reserves R in the fit.
     """
-    others = len([run for run in set(counted) | set(launches) if run != self_run]) + pending
+    def own_unproven(run) -> bool:
+        # The requesting run's own earlier launch not shown ended: held, or at CI unbound, or no step facts (Main 1727).
+        step = None if steps is None else steps.get(run)
+        return run in launches or run in held_runs or steps is None or (
+            step is not None and step[0] == CI_STEP and (bound is None or run not in bound))
+    others = len([run for run in set(counted) | set(launches) if run != self_run or own_unproven(run)]) + pending
     if reasons:
         return False, "overload: %s counted=%d priority=%s" % ("; ".join(reasons), len(counted), priority)
     if measured is None and report is not None:
@@ -1161,13 +1183,21 @@ RELAY_AFTER_EXIT_SECS = 5.0
 COALITION_READ_TRIES = 3
 
 
-def kernel_snapshot() -> Dict[int, Tuple[int, int, Optional[int]]]:
-    """pid -> (parent pid, exact start time in microseconds, resource coalition or None) for every process.
+def kernel_snapshot() -> Dict[int, Tuple[Optional[int], int, Optional[int]]]:
+    """pid -> (parent pid or None, exact start time in microseconds, resource coalition or None) for every live process.
 
-    One read of the kernel process table (KERN_PROC_ALL) and each process's resource
-    coalition (PROC_PIDCOALITIONINFO). OSError when the table cannot be read; a process
-    whose coalition cannot be read carries None. On a platform without these facts the
-    table is unreadable, so every attempt stays held (Main 1656).
+    One read of the kernel process table (KERN_PROC_ALL), then for each process its
+    resource coalition (PROC_PIDCOALITIONINFO) and a confirming read of that pid
+    (kinfo_exact). The coalition is the process's own only when the confirming read
+    shows the table's start time: the pid then held one process from the table read to
+    after the coalition read, so the coalition is that process's. Otherwise, or when the
+    coalition or the confirming read cannot be read, the coalition is None (unknown), so
+    the process holds every attempt it could belong to. A process leaves the table only
+    on proof it is gone: a zombie, or a confirming read the kernel answers with no record
+    at all; a short or malformed answer keeps it. A traced process (a debugger attached,
+    which can change the parent the kernel reports) carries parent None, so no lineage is
+    read through it. OSError when the table cannot be read; on a platform without these
+    facts the table is unreadable, so every attempt stays held (Main 1656, Main 1712).
     """
     if sys.platform != "darwin":
         raise OSError("no kernel process identity and coalition facts on %s" % sys.platform)
@@ -1179,7 +1209,9 @@ def kernel_snapshot() -> Dict[int, Tuple[int, int, Optional[int]]]:
         if pid <= 0 or record[info.P_STAT] == info.SZOMB:
             continue  # a zombie has ended; only its exit status remains
         seconds, micros = info.process_identity(record)
-        found[pid] = [struct.unpack_from("i", record, info.E_PPID)[0], seconds * 1000000 + micros, info.coalition(pid)]
+        traced = struct.unpack_from("i", record, info.P_FLAG)[0] & info.P_TRACED
+        parent = None if traced else struct.unpack_from("i", record, info.E_PPID)[0]
+        found[pid] = [parent, seconds * 1000000 + micros, info.coalition(pid)]
     for retry in range(1, COALITION_READ_TRIES):
         missing = [pid for pid, entry in found.items() if entry[2] is None]
         if not missing:
@@ -1189,18 +1221,19 @@ def kernel_snapshot() -> Dict[int, Tuple[int, int, Optional[int]]]:
             found[pid][2] = info.coalition(pid)
     table = {}
     for pid, (parent, start, coalition) in found.items():
-        if coalition is None:
-            # Still unreadable: the process ended (or became a zombie) after the table read, or it really cannot be read.
-            try:
-                again = info.kinfo(pid)
-            except LookupError:
-                continue  # proven gone: the kernel holds no process with this pid
-            except OSError:
-                again = None  # unreadable is not proof of exit: kept, with its coalition unknown
-            if again is not None:
-                seconds, micros = info.process_identity(again)
-                if seconds * 1000000 + micros != start or again[info.P_STAT] == info.SZOMB:
-                    continue
+        try:
+            again = info.kinfo_exact(pid)
+        except info.NoSuchProcess:
+            continue  # proven gone: the kernel holds no process with this pid
+        except (OSError, struct.error):
+            table[pid] = (parent, start, None)  # an unreadable answer is not proof of exit: kept, coalition unknown
+            continue
+        seconds, micros = info.process_identity(again)
+        if seconds * 1000000 + micros != start:
+            table[pid] = (parent, start, None)  # the pid holds another process now: the coalition read may be its
+            continue
+        if again[info.P_STAT] == info.SZOMB:
+            continue  # it ended after the table read
         table[pid] = (parent, start, coalition)
     if not table:
         raise OSError("empty kernel process table")
@@ -1256,31 +1289,43 @@ def write_attempt(directory: str, record: dict) -> str:
     return final
 
 
+def valid_attempt(record) -> bool:
+    """Whether a decoded attempt record has every field judge_attempts reads, of its own type."""
+    def ident(value):
+        return isinstance(value, list) and len(value) == 2 and all(type(part) is int for part in value)
+    return (isinstance(record, dict) and isinstance(record.get("id"), str) and isinstance(record.get("run"), str)
+            and type(record.get("t0_us")) is int and ident(record.get("root"))
+            and isinstance(record.get("members", []), list) and all(ident(m) for m in record.get("members", []))
+            and (record.get("coalition") is None or type(record.get("coalition")) is int)
+            and (record.get("ended_us") is None or type(record.get("ended_us")) is int)
+            and (record.get("session_key") is None or isinstance(record.get("session_key"), str))
+            and isinstance(record.get("reserves", True), bool))
+
+
 def judge_attempts(directory: str, running: set, snapshot=None) -> Dict[str, dict]:
     """Each attempt record's state under Main 1656's rule: hold on anything short of proof.
 
-    Returns id -> dict(record, path, state in held|ended, reason, processes) for every
-    record of a running run; records of runs no longer running are removed. An attempt
-    is held while one of its proven processes lives (its root, a recorded member, or a
-    live process whose parent chain reaches one, matched by pid and exact start time;
-    each newly reached one is recorded), or while any live process could be its: in its
-    launch coalition, started at or after its t0, and neither reaching another attempt's
-    proven process nor a live process started before its t0 (launchd aside) through its
-    parent chain; an unreadable snapshot or coalition holds too. It is ended only at a
-    complete snapshot with neither; that time is recorded. A marker, a missing marker or a
-    lost lineage never ends an attempt.
+    Returns path -> dict(record, path, state in held|ended, reason, processes) for every
+    record, whatever its run's status (Main 1712: a live attempt stays counted when its run
+    stops running). A record that cannot be read, or lacks a field of its type, is held with
+    record None. An attempt is held while one of its proven processes lives (its root, a
+    recorded member, or a live process whose parent chain reaches one, matched by pid and
+    exact start time; each newly reached one is recorded), or while any live process could be
+    its: started at or after its t0, not shown outside its launch coalition (an unknown
+    coalition on either side shows nothing), and whose parent chain does not reach a live
+    process started before t0. Being another attempt's process is no proof it is not this
+    one's too (Main 1712). The chain proof rests on Darwin's reparenting: an orphan's parent
+    becomes launchd (pid 1), never another process, so a live chain to a process older than
+    t0 never passes through this attempt; a traced process carries no parent (kernel_snapshot).
+    It is ended only at a complete snapshot with neither, when its end is written to its own
+    record under its lock; a record that cannot be reread to write it stays held. A marker, a
+    missing marker or a lost lineage never ends an attempt. An ended record of a run no longer
+    running is removed.
     """
     records = {}
     for path in attempt_paths(directory):
         record = read_attempt(path)
-        if record is None:
-            records[path] = None
-            continue
-        if record.get("run") not in running:
-            with contextlib.suppress(FileNotFoundError):
-                os.unlink(path)
-            continue
-        records[path] = record
+        records[path] = record if valid_attempt(record) else None
     if not records:
         return {}
     if snapshot is None:
@@ -1299,19 +1344,14 @@ def judge_attempts(directory: str, running: set, snapshot=None) -> Dict[str, dic
     pending = [(path, record) for path, record in records.items() if record is not None and record.get("ended_us") is None]
     for path, record in pending:
         for ident in [record.get("root")] + list(record.get("members", [])):
-            if ident and alive(ident):
+            if alive(ident):
                 own.setdefault(ident[0], set()).add(path)
-    gates = set()
-    for path, record in records.items():
-        for key in ("gate", "watcher"):
-            if record and record.get(key):
-                gates.add(tuple(record[key]))
     if not unreadable:
         changed = True
         while changed:
             changed = False
             for pid, (parent, _, _) in snapshot.items():
-                if parent in own and (pid, snapshot[pid][1]) not in gates and not own[parent] <= own.get(pid, set()):
+                if parent in own and not own[parent] <= own.get(pid, set()):
                     own.setdefault(pid, set()).update(own[parent])
                     changed = True
     now_us = int(time.time() * 1000000)
@@ -1325,28 +1365,28 @@ def judge_attempts(directory: str, running: set, snapshot=None) -> Dict[str, dic
         if mine:
             reason = "its process %d lives" % mine[0][0]
         else:
-            t0, coalition = record.get("t0_us", 0), record.get("coalition")
+            t0, coalition = record["t0_us"], record.get("coalition")
             for pid, (parent, start, where) in snapshot.items():
-                if pid in own or start < t0 or (pid, start) in gates or pid == 1:
-                    continue
+                if pid == 1 or start < t0:
+                    continue  # launchd, or started before the attempt: never its descendant
                 if where is not None and coalition is not None and where != coalition:
-                    continue  # outside the launch coalition: proven not its (an unknown launch coalition proves nothing)
+                    continue  # outside the launch coalition: proven not its (an unknown coalition proves nothing)
                 cursor, steps, anchored = parent, 0, False
-                while cursor not in (0, 1) and steps < 4096:
+                while cursor is not None and cursor not in (0, 1) and steps < 4096:
                     entry = snapshot.get(cursor)
                     if entry is None:
                         break
-                    if cursor in own or entry[1] < t0:
-                        anchored = True  # its line reaches another owner, or a process older than the attempt
+                    if entry[1] < t0:
+                        anchored = True  # its line reaches a live process older than the attempt
                         break
                     cursor, steps = entry[0], steps + 1
                 if anchored:
                     continue
                 if where is None or coalition is None:
-                    reason = "process %d could be its (%s coalition unreadable)" % (pid, "its" if where is None else "the launch")
+                    reason = "process %d could be its (%s coalition unknown)" % (pid, "its" if where is None else "the launch")
                     break
                 words = process_argv(pid) or ["unreadable"]
-                reason = "process %d (%s; parent %d) could be its (launch coalition, started after it, no other owner)" % (
+                reason = "process %d (%s; parent %s) could be its (launch coalition, started after it, no older ancestor)" % (
                     pid, " ".join(words[:3])[:120], parent)
                 break
         if mine:
@@ -1354,23 +1394,34 @@ def judge_attempts(directory: str, running: set, snapshot=None) -> Dict[str, dic
             if new:
                 record = update_attempt(path, lambda r: r.setdefault("members", []).extend(new)) or record
         if reason is None:
-            record = update_attempt(path, lambda r: r.__setitem__("ended_us", r.get("ended_us") or now_us)) or record
-            states[path] = dict(record=record, path=path, state="ended", reason="no process of it, none could be",
+            written = update_attempt(path, lambda r: r.__setitem__("ended_us", r.get("ended_us") or now_us))
+            if written is None or not valid_attempt(written):
+                states[path] = dict(record=record, path=path, state="held", processes=[],
+                                    reason="attempt record could not be reread to write its end")
+                continue
+            states[path] = dict(record=written, path=path, state="ended", reason="no process of it, none could be",
                                 processes=[])
         else:
             states[path] = dict(record=record, path=path, state="held", reason=reason, processes=mine)
     for path, record in records.items():
         if record is not None and record.get("ended_us") is not None and path not in states:
             states[path] = dict(record=record, path=path, state="ended", reason="ended", processes=[])
+    for path, state in list(states.items()):
+        if state["state"] == "ended" and state["record"].get("run") not in running:
+            with contextlib.suppress(FileNotFoundError):
+                os.unlink(path)
+            del states[path]
     return states
 
 
 def attempt_reservations(states: Dict[str, dict], report: Optional[dict]) -> Tuple[dict, set]:
-    """(run -> {repo, attempts: [{seen, own}]} for held attempts that reserve, every run with a held attempt).
+    """(run -> {repo, attempts: [{seen, own, passive}]} for held attempts, every run with a held attempt).
 
     An attempt's own resident memory joins the reading by pid and exact start time, from a
     figure of that same read only (rss_source task); any other row leaves the process
-    unseen (Main 1656, P3).
+    unseen (Main 1656, P3). An attempt that does not reserve (a counted run's non-CI launch,
+    passed through) is marked passive: project() counts it only when its run is not counted,
+    so a live recorded process is counted whatever its run's status (Main 1712).
     """
     rows = {}
     for row in (report or {}).get("processes", []) or []:
@@ -1383,25 +1434,28 @@ def attempt_reservations(states: Dict[str, dict], report: Optional[dict]) -> Tup
         record = state["record"]
         if state["state"] == "held" and record is None:
             # An unreadable attempt record could be any run's live attempt: it reserves the full R (Main 1656).
-            launches["unreadable-" + os.path.basename(state["path"])] = dict(repo=None, attempts=[dict(seen=False, own=0)])
+            launches["unreadable-" + os.path.basename(state["path"])] = dict(
+                repo=None, attempts=[dict(seen=False, own=0, passive=False)])
             continue
         if state["state"] != "held":
             continue
-        held_runs.add(record.get("run"))
-        if not record.get("reserves", True):
-            continue
+        held_runs.add(record["run"])
         joined = [rows[tuple(ident)] for ident in state["processes"] if tuple(ident) in rows]
         entry = launches.setdefault(record["run"], dict(repo=record.get("repo"), attempts=[]))
-        entry["attempts"].append(dict(seen=bool(joined), own=sum(joined)))
+        entry["attempts"].append(dict(seen=bool(joined), own=sum(joined), passive=not record.get("reserves", True)))
     return launches, held_runs
 
 
 def bound_runs(states: Dict[str, dict], runs: set) -> set:
-    """The runs every invocation row of which is bound to an ended attempt record by the row's own session key.
+    """The runs whose every launch is shown ended by its own session key (Main 1656, P2's outcome rule, Main 1712).
 
-    A row binds only when its session_key is nonempty, appears in no other row of the run,
-    and an ended record of that run carries it (Main 1656, P2's outcome rule); a run with an
-    unbound row, or whose rows cannot be read, is not in the set.
+    A run is bound only when it has at least one invocation row; every row's session_key is
+    nonempty, appears in no other row of the run, and is carried by an ended record of that
+    run; and every ended record of the run carries a key one of its rows has. The daemon
+    writes a row only after its invocation returns, best effort (no-mistakes fork
+    internal/pipeline/instrument.go:18-22,45-63), so a live invocation has no row yet and an
+    insert can fail: a run with no row, or with an ended record whose row is missing, is not
+    shown ended. A run whose rows cannot be read, or any unreadable record, binds nothing.
     """
     if not runs:
         return set()
@@ -1412,16 +1466,18 @@ def bound_runs(states: Dict[str, dict], runs: set) -> set:
         return set()
     if any(state["record"] is None for state in states.values()):
         return set()  # an unreadable attempt record could be any run's: no launch is shown ended
-    ended: Dict[str, set] = {}
+    ended: Dict[str, list] = {}
     for state in states.values():
         record = state["record"]
-        if record is not None and state["state"] == "ended" and record.get("session_key"):
-            ended.setdefault(record.get("run"), set()).add(record["session_key"])
+        if state["state"] == "ended":
+            ended.setdefault(record.get("run"), []).append(record.get("session_key"))
     keys: Dict[str, list] = {run: [] for run in runs}
     for run, key in rows:
         keys.setdefault(run, []).append(key)
-    return {run for run, found in keys.items()
-            if all(isinstance(key, str) and key and found.count(key) == 1 and key in ended.get(run, ()) for key in found)}
+    return {run for run in runs
+            if keys[run]
+            and all(isinstance(key, str) and key and keys[run].count(key) == 1 and key in ended.get(run, ()) for key in keys[run])
+            and all(isinstance(key, str) and key in keys[run] for key in ended.get(run, ()))}
 
 
 def intent_of(args) -> Optional[str]:
@@ -1505,16 +1561,53 @@ def launch_nonce_of(args) -> Optional[str]:
     return None
 
 
+def read_pending(fd: int) -> Optional[dict]:
+    """The pending entry held open at FD, read whole, or None when it cannot be decoded."""
+    try:
+        entry = json.loads(os.pread(fd, max(os.fstat(fd).st_size, 1), 0))
+    except (OSError, ValueError):
+        return None
+    return entry if isinstance(entry, dict) else None
+
+
+def claimant_nonce(path: str, entry: dict) -> Tuple[bool, Optional[str]]:
+    """(claimant known, its own launch nonce) for the pending start at PATH.
+
+    The claimant is the client the reservation is for: the claiming client when a claim
+    exists (its own --launch-nonce, written into the claim), otherwise the client the
+    start runs as its one program (client_nonce, set only for such a direct route). An
+    unreadable claim leaves the claimant unknown. The entry's own parsed arguments are
+    never the claimant's identity (Main 1712).
+    """
+    if os.path.lexists(path + ".claimed"):
+        claim = claim_record(path)
+        return (False, None) if claim is None else (True, claim.get("nonce") if isinstance(claim.get("nonce"), str) else None)
+    nonce = entry.get("client_nonce")
+    return True, nonce if isinstance(nonce, str) and nonce else None
+
+
+def run_nonces(running: set) -> Dict[str, Optional[str]]:
+    """run -> launch_nonce for every running run (runs.launch_nonce, written by the daemon from --launch-nonce)."""
+    if not running:
+        return {}
+    marks = ",".join("?" * len(running))
+    return {run: nonce for run, nonce in read_host_db(
+        "SELECT id, launch_nonce FROM runs WHERE id IN (%s)" % marks, tuple(sorted(running)))}
+
+
 def live_pending(directory: str, running: set) -> List[Tuple[str, dict, bool, Optional[str]]]:
     """(path, entry, released, own run) for each pending admitted start whose start still holds its record, oldest first.
 
-    A reservation ends by its own run's row only when that row is proven its own: the row
-    carries the launch nonce the start's own arguments pass (--launch-nonce, written by the
-    daemon into runs.launch_nonce). No other column ties a row to the client that made it,
-    so a row is never matched by repository, branch, intent or time (Main 1683): without a
-    nonce the reservation lasts until its COMMAND returns, or until the client that claimed
-    it through the interception exits (K7: a client that exited normally created its row
-    first). An unlocked file belongs to a start that no longer exists and is removed.
+    A reservation ends only on proof about that start (Main 1712): its own run's row, or
+    its claiming client's exit (K7: a client that exited normally created its row first).
+    A row is its own only when it carries the claimant's own launch nonce (claimant_nonce),
+    that nonce is carried by no other live pending start and by no other running run, and
+    the row is neither one that existed when the start was admitted nor one running when
+    the client claimed it. No other column ties a row to the client that made it, so a row
+    is never matched by repository, branch, intent or time: without such a nonce the
+    reservation lasts until its COMMAND returns or its claimant exits. A locked entry that
+    cannot be decoded is counted, never released. An unlocked file belongs to a start
+    that no longer exists and is removed.
     """
     found = []
     for path in Path(directory).glob("pending-*.lock"):
@@ -1528,27 +1621,26 @@ def live_pending(directory: str, running: set) -> List[Tuple[str, dict, bool, Op
                     with contextlib.suppress(FileNotFoundError):
                         os.unlink(stale)
                 continue
-            entry = json.loads(os.pread(fd, 65536, 0))
-            found.append((int(entry["created_ns"]), str(path), entry))
-        except (ValueError, KeyError, TypeError):
-            continue
+            entry = read_pending(fd)
+            if entry is None or type(entry.get("created_ns")) is not int:
+                entry = dict(unreadable=True, created_ns=0)  # a live start whose record cannot be read: counted
+            found.append((entry["created_ns"], str(path), entry))
         finally:
             os.close(fd)
     found.sort(key=lambda item: item[:2])
-    nonces = {}
-    wanted = {launch_nonce_of(entry.get("args")) for _, _, entry in found} - {None}
-    if wanted and running:
-        marks = ",".join("?" * len(running))
-        nonces = {nonce: run for run, nonce in read_host_db(
-            "SELECT id, launch_nonce FROM runs WHERE id IN (%s) AND launch_nonce IS NOT NULL" % marks, tuple(sorted(running)))
-            if nonce in wanted}
+    claimants = {path: claimant_nonce(path, entry) for _, path, entry in found}
+    carried = [nonce for known, nonce in claimants.values() if known and nonce]
+    nonces = run_nonces(running) if carried and running else {}
     result = []
     for _, path, entry in found:
         claim = claim_record(path)
         ended = claim is not None and pid_dead(claim["pid"]) is True
-        own = nonces.get(launch_nonce_of(entry.get("args")))
-        if own is not None and own in entry.get("before", ()):
-            own = None  # a row that existed when the start was admitted is not its new run
+        known, nonce = claimants[path]
+        own = None
+        if known and nonce and carried.count(nonce) == 1:
+            rows = [run for run, carries in nonces.items() if carries == nonce]
+            if len(rows) == 1 and rows[0] not in entry.get("before", ()) and rows[0] not in ((claim or {}).get("seen") or ()):
+                own = rows[0]
         result.append((path, entry, ended or own is not None, own))
     return result
 
@@ -1558,10 +1650,12 @@ def counted_pending(directory: str, running: set) -> int:
 
     Every unreleased pending start counts, except one that is this process's own
     enclosing start, has not been claimed, and whose admitted client no process
-    in the holder's tree is running (admitted_client_running): its client ended
-    without registering (it was called past the interception, by its absolute
-    path) or never ran, so counting it would make a later start in the same
-    command wait on capacity only that command's end frees.
+    in the holder's tree outside this process's own line is running
+    (admitted_client_running): its client ended (it was called past the
+    interception, by its absolute path) or never ran, so this start's own
+    reservation S, or the first client's own row, already counts what it
+    reserved, and counting it again would make this start wait on capacity only
+    its command's end frees.
     """
     mine = None
     count = 0
@@ -1571,7 +1665,8 @@ def counted_pending(directory: str, running: set) -> int:
         if not os.path.exists(path + ".claimed"):
             if mine is None:
                 mine = ancestors(os.getpid())
-            if entry.get("holder") in mine and not admitted_client_running(entry["holder"], entry.get("args")):
+            if entry.get("holder") in mine and not admitted_client_running(entry["holder"], entry.get("args"),
+                                                                           exclude=frozenset(mine) | {os.getpid()}):
                 continue
         count += 1
     return count
@@ -1608,12 +1703,13 @@ def process_argv(pid: int) -> Optional[List[str]]:
     return [word.decode("utf-8", "surrogateescape") for word in words]
 
 
-def admitted_client_running(holder: int, admitted) -> bool:
-    """Whether a process in HOLDER's tree runs the no-mistakes client with the ADMITTED arguments.
+def admitted_client_running(holder: int, admitted, exclude: frozenset = frozenset()) -> bool:
+    """Whether a process in HOLDER's tree, other than those in EXCLUDE, runs the no-mistakes client with the ADMITTED arguments.
 
     The client may be the binary itself or a script whose interpreter carries it
-    as its first argument. True when the process table cannot be read, so an
-    unreadable table never stops a start being counted.
+    as its first argument. True when the process table, or a live process's
+    arguments, cannot be read, so an unreadable fact never stops a start being
+    counted (Main 1712).
     """
     if not isinstance(admitted, list):
         return False
@@ -1632,7 +1728,13 @@ def admitted_client_running(holder: int, admitted) -> bool:
                 continue
             seen.add(child)
             pending.append(child)
-            words = process_argv(child) or []
+            if child in exclude:
+                continue
+            words = process_argv(child)
+            if words is None:
+                if pid_dead(child) is not True:
+                    return True  # a live process whose arguments cannot be read could be the client
+                continue
             if words and os.path.basename(words[0]) != "no-mistakes" and len(words) > 1 and os.path.basename(words[1]) == "no-mistakes":
                 words = words[1:]
             if words and os.path.basename(words[0]) == "no-mistakes" and same_start_args(admitted, words[1:]):
@@ -1826,25 +1928,41 @@ def claim_pending(directory: str, args: List[str]) -> Optional[int]:
     arguments is claimed first; otherwise the first fresh client inside the admitted
     command claims its unclaimed record whatever its arguments (P5.lock: it makes
     progress on that reservation, and the command's own client after it is decided as
-    another start with it counted), unless a process in the holder's tree runs the
-    admitted client (admitted_client_running, true when the table cannot be read).
-    Every other start is decided on its own, with that pending start counted.
+    another start with it counted). A new claim is refused when the reservation may
+    already be used (claim_round, Main 1712). Every other start is decided on its own,
+    with that pending start counted unless it is this start's own enclosing one
+    (counted_pending).
     """
     found = claim_round(directory, args, same_args=True)
     return found if found is not None else claim_round(directory, args, same_args=False)
 
 
 def claim_round(directory: str, args: List[str], same_args: bool) -> Optional[int]:
-    """One claim_pending pass: records with the same arguments, or any unclaimed one of an ancestor."""
+    """One claim_pending pass: records with the same arguments, or any unclaimed one of an ancestor.
+
+    A new claim is refused (this start is then decided on its own) when the reservation
+    may already have been used by another client (Main 1712): a process in the holder's
+    tree other than this one's own line runs the admitted client, or a run row appeared
+    since the start was admitted that is not proven another live start's own (by a launch
+    nonce no other live start or row carries). A registered client that left no nonce
+    cannot be told from a stranger, so its admission is never reused by a second client.
+    """
 
     mine = None
     seen: List[str] = []
     try:
         seen = sorted(running_runs())
-        released = {path for path, _, registered, _ in live_pending(directory, set(seen)) if registered}
+        live = live_pending(directory, set(seen))
+        released = {path for path, _, registered, _ in live if registered}
+        nonces = run_nonces(set(seen))
     except (OSError, sqlite3.Error, ValueError):
-        # Without the run database no release is known; the enclosing admission read it when it admitted.
-        released = set()
+        # Without the run database no release and no row is known: no reservation is claimed.
+        return None
+    carried = {}
+    for path, entry, _, _ in live:
+        known, nonce = claimant_nonce(path, entry)
+        if known and nonce:
+            carried.setdefault(nonce, []).append(path)
     for path in Path(directory).glob("pending-*.lock"):
         if str(path) in released:
             continue  # a new run already registered for that start: this one is another start
@@ -1858,9 +1976,11 @@ def claim_round(directory: str, args: List[str], same_args: bool) -> Optional[in
                     with contextlib.suppress(FileNotFoundError):
                         os.unlink(stale)
                 continue
-            entry = json.loads(os.pread(fd, 65536, 0))
+            entry = read_pending(fd)
+            if entry is None:
+                continue
             holder, admitted = entry["holder"], entry.get("args")
-        except (ValueError, KeyError, TypeError):
+        except (KeyError, TypeError):
             continue
         finally:
             os.close(fd)
@@ -1873,18 +1993,28 @@ def claim_round(directory: str, args: List[str], same_args: bool) -> Optional[in
             mine = ancestors(os.getpid())
         if holder not in mine:
             continue
-        if not same_args and admitted_client_running(holder, admitted):
+        claimed = claim_record(str(path))
+        if claimed is not None and (claimed["pid"] == os.getpid() or claimed["pid"] in mine):
+            return holder  # this start passing one more route
+        if os.path.lexists(str(path) + ".claimed"):
+            continue  # claimed by another client, or its claim cannot be read
+        if admitted_client_running(holder, admitted, exclude=set(mine) | {os.getpid()}):
             continue  # the admitted client itself runs on that reservation: one client, one reservation
+        before = set(entry.get("before") or ())
+        unexplained = [run for run in seen if run not in before
+                       and not (nonces.get(run) and len(carried.get(nonces[run], ())) == 1
+                                and carried[nonces[run]] != [str(path)]
+                                and [r for r, n in nonces.items() if n == nonces[run]] == [run])]
+        if unexplained:
+            continue  # a run that may be this reservation's own client's appeared: its admission may be used
         claim = str(path) + ".claimed"
         temporary = "%s.%d" % (claim, os.getpid())
         try:
-            # The claim binds the reservation to the run this client starts (P5.lock): only that run's row ends it.
-            # A run already running when the claim is made is never its own (seen).
+            # The claim names this client and its own launch nonce: only a row carrying that nonce ends the
+            # reservation (P5.lock, Main 1712). A run already running when the claim is made is never its own (seen).
             binding = start_binding(os.getcwd(), list(args))
-            if binding is not None:
-                binding["seen"] = seen
             with open(temporary, "w") as handle:
-                handle.write(json.dumps(dict(pid=os.getpid(), binding=binding)))
+                handle.write(json.dumps(dict(pid=os.getpid(), nonce=launch_nonce_of(list(args)), seen=seen, binding=binding)))
             os.link(temporary, claim)
             return holder
         except FileExistsError:
@@ -2137,6 +2267,8 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
         # counts it at the full R until its own run's row appears, its client exits (K7) or COMMAND returns.
         pending_fd, pending_path = publish_locked(directory, "pending-", {
             "holder": os.getpid(), "args": None if route is None else list(route[0]),
+            # The claimant's identity when COMMAND is the client itself (a direct route); otherwise only a claim names it.
+            "client_nonce": launch_nonce_of(list(route[0])) if route is not None and runs_client_directly(command) else None,
             "before": sorted(before), "created_ns": time.time_ns(), "binding": binding})
         fcntl.flock(admission_fd, fcntl.LOCK_UN)
         os.close(admission_fd)

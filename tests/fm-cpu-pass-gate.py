@@ -93,7 +93,7 @@ try:
     # with the same exit status and outputs as without the gate (the gate writes nothing of its own).
     folder, db, env = gate_case('gate-scope', available=GIB, runs=(('x', 'review', 'fixing', 77), ('g', 'gate.lint.check', 'running', None)))
     for run in ('x', 'g'):
-        child, log = gate(folder, env, run, mode='exit-0')
+        child, log = gate(folder, env, run, mode='exit-0', session=False)  # an agent that prints nothing
         finish(child)
         assert log.with_suffix('.stderr').read_text() == '' and log.with_suffix('.stdout').read_text() == '', run
         assert (folder / (run + '.agent')).exists() and reserving_held(folder, ['x', 'g']) == 0, run
@@ -220,7 +220,10 @@ try:
     me = engine().kernel_snapshot()[os.getpid()]
     (folder / 'pool' / 'attempt-dead.json').write_text(json.dumps(dict(
         id='dead', run='x', repo='repo', step='ci', reserves=True, t0_us=int(time.time() * 1000000), root=[gone.pid, 1],
-        gate=None, watcher=None, coalition=me[2], session_key=None, members=[], ended_us=None)))
+        gate=None, watcher=None, coalition=me[2], session_key='dead-key', members=[], ended_us=None)))
+    # The daemon's row for that launch, carrying its own key: once the record ends, the launch is shown ended.
+    change(db, "INSERT INTO agent_invocations (id, run_id, step_name, purpose, started_at, completed_at, duration_ms, exit_status,"
+               " session_key) VALUES ('dead', 'x', 'ci', 'ci', 1, 2, 1, 'launched', 'dead-key')")
     finish(launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'm1')], env, folder / 'dead'))
     assert 'holding_only=[x:ci-waiting:0:unseen]' in (folder / 'dead.stderr').read_text(), (folder / 'dead.stderr').read_text()
     first, _ = gate(folder, env, 'x', log='attempt-1')
@@ -377,7 +380,8 @@ try:
         change(db, 'INSERT INTO repos (id, working_path) VALUES (?, ?)', ('repo', str(folder / 'checkout')))
         child, log = gate(folder, env, 'wizard', mode='exit-0', cwd=folder / 'checkout')
         finish(child)
-        assert (folder / 'wizard.agent').exists() and stderr_of(log) == '' and not list((folder / 'pool').glob('attempt-*.json'))
+        assert (folder / 'wizard.agent').exists() and stderr_of(log) == '' and not [
+            path for path in (folder / 'pool').glob('attempt-*.json') if not path.name.startswith('attempt-proof-')]  # no record of its own
         for label, where in (('inside-run', folder / 'wt-x' / 'sub'), ('inside-checkout', folder / 'checkout' / 'sub'),
                              ('outside', folder / 'nowhere')):
             where.mkdir(parents=True)
@@ -591,6 +595,76 @@ os.waitpid(child, 0)
             wait_for(lambda: (folder / ('below.got-%d' % number)).exists(), 'signal %d reached the agent below the dispatcher' % number)
             child.wait(timeout=30)
 
+    def outside_orphan(folder):
+        # An unrelated orphan outside the launch coalition: started in its own session by a shell that exits, so its
+        # parent becomes launchd and it is neither the test root's descendant nor a registered case process.
+        marker = folder / 'outside.pid'
+        subprocess.Popen(['/bin/sh', '-c', '(sleep 60 & echo $! > %s) ; exit 0' % marker], start_new_session=True).wait()
+        wait_for(lambda: marker.exists() and marker.read_text().strip(), 'the outside orphan started')
+        pid = int(marker.read_text())
+        return pid, start_us(pid)
+
+    def orphan_present(folder, orphan):
+        # The control's own premise, checked after the decision: the orphan is alive, the same process, lineage lost and
+        # outside the case's coalition (not registered), so the admission happened beside it.
+        pid, started = orphan
+        snapshot = engine().kernel_snapshot()
+        registered = (folder.parent / 'coalition.pids').read_text().split() if (folder.parent / 'coalition.pids').exists() else []
+        assert pid in snapshot and snapshot[pid][1] == started and snapshot[pid][0] == 1 and str(pid) not in registered, (
+            'control premise: the outside orphan lives at the decision', pid, snapshot.get(pid))
+        os.kill(pid, signal.SIGKILL)
+
+    def same_run_never_passes_its_live_attempt():
+        # Main 1712 item 2 (review finding 2): X's first launch is live and unseen; a second launch of X decides with X as
+        # its own run, nothing else counted. It waits (3 + 8 = 11 against 8.5) while the first lives, and starts by
+        # itself once the first ends. Control: with no earlier attempt the same launch starts at once (8 against 8.5).
+        folder, db, env = gate_case('m1712-same-run', available=int(8.5 * GIB), runs=[('x', 'ci', 'running', None)])
+        facts(folder, available=int(8.5 * GIB))
+        first, _ = gate(folder, env, 'x', log='first')
+        wait_for(lambda: (folder / 'x.agent').exists(), 'the first launch runs')
+        (folder / 'x.agent').unlink()
+        second, _ = gate(folder, env, 'x', log='second')
+        wait_for(lambda: 'waiting' in (folder / 'second.stderr').read_text() or (folder / 'x.agent').exists(), 'the second decides')
+        time.sleep(1)
+        harm(not (folder / 'x.agent').exists(), 'the second launch passed its own live first attempt', (folder / 'second.stderr').read_text())
+        assert 'x:launched:%d:unseen' % (3 * GIB) in (folder / 'second.stderr').read_text(), (folder / 'second.stderr').read_text()
+        (folder / 'x.release').touch()
+        finish(first)
+        finish(second)
+        folder, db, env = gate_case('m1712-same-run-first', available=int(8.5 * GIB), runs=[('x', 'ci', 'running', None)])
+        facts(folder, available=int(8.5 * GIB))
+        (folder / 'x.release').touch()
+        finish(gate(folder, env, 'x')[0])
+        # Main 1727: an earlier launch of X that is not shown ended (no row binds it) is no genuine first start either:
+        # the launch waits (3 + 8 = 11 against 8.5), and starts once that launch is shown ended (8 against 8.5).
+        folder, db, env = gate_case('m1712-same-run-unproven', available=int(8.5 * GIB), runs=[('x', 'ci', 'running', None)], proven=False)
+        facts(folder, available=int(8.5 * GIB))
+        child, log = gate(folder, env, 'x')
+        wait_for(lambda: 'waiting' in log.with_suffix('.stderr').read_text() or (folder / 'x.agent').exists(), 'the launch decides')
+        time.sleep(1)
+        harm(not (folder / 'x.agent').exists(), 'the launch passed its own unproven earlier launch', log.with_suffix('.stderr').read_text())
+        assert 'x:ci-unproven:%d' % (3 * GIB) in log.with_suffix('.stderr').read_text(), log.with_suffix('.stderr').read_text()
+        prove(folder, db, 'x')
+        (folder / 'x.release').touch()
+        finish(child)
+
+    def live_attempt_after_run_stops():
+        # Main 1712 item 6 (review finding 6): X's launch leaves a live orphan, then X's run stops running. The orphan
+        # still holds X: a start that fits only without X's R (8 of 10 GiB) waits, X's record stays, and the start is
+        # admitted by itself once the orphan exits (X's record is then removed).
+        folder, db, env = gate_case('m1712-run-stopped', available=40 * GIB, runs=[('x', 'ci', 'running', None)])
+        child, _ = gate(folder, env, 'x', mode='escape')
+        finish(child)
+        change(db, "UPDATE runs SET status = 'completed' WHERE id = 'x'")
+        facts(folder, available=10 * GIB)
+        later = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'later')], env, folder / 'later')
+        time.sleep(3)
+        harm(not (folder / 'later').exists(), 'a live attempt was dropped when its run stopped', (folder / 'later.stderr').read_text())
+        assert 'x:launched:%d:unseen' % (3 * GIB) in (folder / 'later.stderr').read_text(), (folder / 'later.stderr').read_text()
+        (folder / 'x.escapee-release').touch()
+        finish(later)
+        wait_for(lambda: not [p for p in (folder / 'pool').glob('attempt-*.json') if 'proof' not in p.name], 'the ended record is removed')
+
     # Main 1656 (hold on anything short of proof): the outside review's counterexamples as failing-first cases.
     def escaped_descendant_holds():
         # F1 / the review's escape: X's agent leaves an orphaned descendant (own session, descriptors closed, an empty
@@ -669,7 +743,9 @@ os.waitpid(child, 0)
         facts(folder, available=12 * GIB)
         later = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'later')], env, folder / 'later')
         wait_for(lambda: 'projected=%d ' % (14 * GIB) in (folder / 'later.stderr').read_text(), 'X and Y both counted')
-        assert not (folder / 'later').exists(), (folder / 'later.stderr').read_text()
+        text = (folder / 'later.stderr').read_text()
+        harm(not (folder / 'later').exists() and 'x:launched:%d:unseen' % (3 * GIB) in text and 'y:launched:%d:unseen' % (3 * GIB) in text,
+             'each of X and Y holds its own R', text)
         (folder / 'y.escapee-release').touch()
         finish(later)
 
@@ -679,13 +755,13 @@ os.waitpid(child, 0)
         folder, db, env = gate_case('m1683-foreign-out', available=40 * GIB, runs=[('x', 'ci', 'running', None)])
         gate_x, _ = gate(folder, env, 'x')
         wait_for(lambda: (folder / 'x.agent').exists(), 'x runs')
-        outside = subprocess.Popen(['/bin/sh', '-c', '(sleep 30 &) ; exit 0'], start_new_session=True)
-        outside.wait()
+        orphan = outside_orphan(folder)
         (folder / 'x.release').touch()
         finish(gate_x)
         facts(folder, available=10 * GIB)
         finish(launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'later')], env, folder / 'later'))
         assert (folder / 'later').exists()
+        orphan_present(folder, orphan)
 
     def reuse_join_boundary():
         # Review F4b: X's run shows 10 GiB in the reading under X's own pid but another generation's start time (same
@@ -724,12 +800,13 @@ os.waitpid(child, 0)
             gate_x, _ = gate(folder, dict(env, CASE_SESSION_ID='session-' + label), 'x', mode=mode)
             finish(gate_x)
             if label == 'foreign':
-                subprocess.Popen(['/bin/sh', '-c', '(sleep 30 &) ; exit 0'], start_new_session=True).wait()
+                orphan = outside_orphan(folder)
             facts(folder, available=10 * GIB)
             later = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'later')], env, folder / 'later')
             if label == 'foreign':
                 finish(later)
                 assert 'x:ci-waiting:0' in (folder / 'later.stderr').read_text(), (folder / 'later.stderr').read_text()
+                orphan_present(folder, orphan)
             else:
                 wait_for(lambda: 'x:launched:%d:unseen' % (3 * GIB) in (folder / 'later.stderr').read_text(), 'x counted while its orphan lives')
                 assert not (folder / 'later').exists()
@@ -750,11 +827,13 @@ os.waitpid(child, 0)
                        ('Main 1683 an orphan outside the coalition leaves a fitting start admitted', outside_orphan_fitting_start),
                        ('Main 1656 only a row\'s own session key binds it', invocation_binding),
                        ('Main 1683 a reused pid never credits another generation', reuse_join_boundary),
-                       ('Main 1683 P1(f) own-live waits, foreign admits', p1f_own_live_versus_foreign)):
+                       ('Main 1683 P1(f) own-live waits, foreign admits', p1f_own_live_versus_foreign),
+                       ('Main 1712 a same-run launch never passes its live or unproven attempt', same_run_never_passes_its_live_attempt),
+                       ('Main 1712 a live attempt counts after its run stops running', live_attempt_after_run_stops)):
         r28_case(name, body)
     (root / 'r28-gate.json').write_text(json.dumps(r28, indent=2))
     print(json.dumps(dict(r28=r28)), flush=True)
-    assert all(value == 'pass' for value in r28.values()), r28
+    group_done(r28)
 
     print(json.dumps(dict(result='pass', artifacts=str(root), invocations=records)), flush=True)
 finally:

@@ -257,6 +257,8 @@ try:
             change(db, "INSERT INTO runs (id, status, repo_id) VALUES (?, 'running', 'repo')", (run,))
         steps(db, [(run, 'review', 'fixing', 4000 + i) for i, (run, _) in enumerate(active)] +
               [(run, 'ci', 'running', None) for run in waiting_ci])
+        for run in waiting_ci:
+            prove(folder, db, run)  # every earlier launch of each CI waiter shown ended by its own key (Main 1656, 1712)
         facts(folder, available=available, runs=[('repo', run, rss) for run, rss in active])
         return folder, db, env
 
@@ -305,6 +307,8 @@ try:
             change(db, 'DROP TABLE step_results')
         else:
             steps(db, rows)
+            if rows and rows[0][1] == 'ci':
+                prove(folder, db, 'x')  # every earlier launch shown ended: only the agent and visibility facts decide
         facts(folder, available=10 * GIB, runs=visible)
         log = folder / 'p2.stderr'
         child = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'p2')], env, folder / 'p2')
@@ -841,6 +845,7 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
             folder, db, env = case('fix-f4-' + label, measured=True, available=int(8.5 * GIB))
             change(db, "INSERT INTO runs (id, status, repo_id) VALUES ('x', 'running', 'repo')")
             change(db, "INSERT INTO step_results (id, run_id, step_name, step_order, status, agent_pid) VALUES ('x-ci', 'x', 'ci', 1, 'running', NULL)")
+            prove(folder, db, 'x')  # every earlier launch shown ended: only visibility decides here
             facts(folder, available=int(8.5 * GIB), runs=[('repo', 'x', GIB // 5, True)] if launched_by_daemon else [])
             child = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'm')], env, folder / 'f4')
             if admitted:
@@ -917,7 +922,7 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
         fix_case(name, body)
     (root / 'fixround.json').write_text(json.dumps(fixround, indent=2))
     print(json.dumps(dict(fixround=fixround)), flush=True)
-    assert all(value == 'pass' for value in fixround.values()), fixround
+    group_done(fixround)
 
     # Independent review of 5e36d93ab (R1-R4): each case fails on that head and passes on the fix.
     review = {}
@@ -949,6 +954,7 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
             change(db, "INSERT INTO runs (id, status, repo_id) VALUES ('x', 'running', 'repo')")
             change(db, "INSERT INTO step_results (id, run_id, step_name, step_order, status, agent_pid, round_started_at) "
                        "VALUES ('x-ci', 'x', 'ci', 1, 'running', ?, ?)", (pid, started))
+            prove(folder, db, 'x')  # every earlier launch shown ended: only the agent and visibility facts decide
             facts(folder, available=int(8.5 * GIB), runs=[('repo', 'x', held)] if comm else [])
             if comm:
                 rows = json.loads((folder / 'native' / 'processes.json').read_text())
@@ -1208,9 +1214,11 @@ if intent.startswith('reg'):
                 ('path-unregistered', 18, 'no-mistakes axi run --intent a; no-mistakes axi run --intent b', 2),
                 ('abs-first-unregistered', 18, '{abs} axi run --intent a; no-mistakes axi run --intent b', 1),
                 ('tight-abs-first-unregistered', 3, '{abs} axi run --intent a; no-mistakes axi run --intent b', 1),
-                # The first created a run proven its own by its launch nonce (Main 1683): its reservation ended, so the
-                # second, same arguments, is decided as another start.
-                ('abs-first-same-args-registered', 18, '{abs} axi run --intent reg-x --launch-nonce n-x; no-mistakes axi run --intent reg-x --launch-nonce n-x', 2),
+                # The first created a run: the second, same arguments, is decided as another start, with no nonce (the
+                # run may be the first's, so its admission is never reused: Main 1712) and with one (its own row ended
+                # the reservation: Main 1683).
+                ('abs-first-same-args-registered', 18, '{abs} axi run --intent reg-x; no-mistakes axi run --intent reg-x', 2),
+                ('abs-first-same-args-registered-nonce', 18, '{abs} axi run --intent reg-x --launch-nonce n-x; no-mistakes axi run --intent reg-x --launch-nonce n-x', 2),
                 ('abs-first-same-args-unregistered', 18, '{abs} axi run --intent x; no-mistakes axi run --intent x', 1),
                 ('both-register', 18, 'no-mistakes axi run --intent reg-a; no-mistakes axi run --intent reg-b', 2),
                 ('reviewer-two-repositories', 18, 'cd {r1} && no-mistakes axi run --intent first; cd {r2} && no-mistakes axi run --intent second', 2)):
@@ -1224,7 +1232,7 @@ if intent.startswith('reg'):
             code = ended(child, folder, label)
             text = (folder / 'x.stderr').read_text()
             assert code == 0 and len(calls(folder)) == 2, (label, code, calls(folder), text)
-            assert text.count('pipeline-start admitted') == admissions, (label, text)
+            harm(text.count('pipeline-start admitted') == admissions, label, 'admissions', text)
             assert not list((folder / 'pool').glob('pending-*.lock')), label
 
     def killed_client():
@@ -1479,7 +1487,7 @@ exec /bin/ln "$@"
         review_case(name, body)
     (root / 'review-5e36d93a.json').write_text(json.dumps(review, indent=2))
     print(json.dumps(dict(review=review)), flush=True)
-    assert all(value == 'pass' for value in review.values()), review
+    group_done(review)
 
 
     # Contract revision 28 admission cases. Every case runs; failures are collected and reported together.
@@ -1788,6 +1796,68 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
             for child in [probe] + list(starts.values()):
                 os.killpg(child.pid, signal.SIGKILL); child.wait()
 
+    def outer_nonce_never_releases_nested_claimant():
+        # Main 1712 item 3 (review finding 3): the command's parsed client carries nonce a; a nested client the parser
+        # cannot see (through xargs) claims the reservation and carries nonce b. A row carrying nonce a (another client's)
+        # never releases the claimant's reservation: with 6 cores (limit 2) a probe waits while that row and the
+        # reservation are counted. Once the row's run ends, the probe is admitted beside the reservation.
+        folder, db, env = case('m1712-outer-nonce', cores=6)
+        checkout = bound_repo(folder, db, env)
+        line = ("printf 'n\\n' | xargs -n1 -I{} no-mistakes axi run --intent hold-b --launch-nonce nonce-b; "
+                "no-mistakes axi run --intent own --launch-nonce nonce-a")
+        outer = launch_in(cli + ['pipeline-start', '--', 'bash', '-c', line], env, folder / 'outer', checkout)
+        wait_for(lambda: (folder / 'pid-hold-b').exists(), 'the nested client claims and runs')
+        row(db, 'run-a', 'another', nonce='nonce-a')
+        probe = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'probe')], env, folder / 'probe')
+        time.sleep(3)
+        harm(not (folder / 'probe').exists(), 'a row of the outer nonce released the nested claimant', (folder / 'probe.stderr').read_text())
+        change(db, "UPDATE runs SET status = 'completed' WHERE id = 'run-a'")
+        finish(probe)
+        (folder / 'release-hold-b').touch()
+        os.killpg(outer.pid, signal.SIGKILL); outer.wait()
+
+    def stranger_row_before_claim():
+        # Main 1712 item 3, legitimate progress: a stranger's row appears after the command is admitted and before its
+        # own client claims. The claim is refused (the row could be a first client's), the client is decided on its own
+        # without its own enclosing reservation counted (pending=0), and is admitted at once with room (18 cores) and
+        # once the stranger ends on a tight host (3 cores: limit 1); nothing hangs.
+        for label, cores in (('room', 18), ('tight', 3)):
+            folder, db, env = case('m1712-stranger-first-' + label, cores=cores)
+            checkout = bound_repo(folder, db, env)
+            go = folder / 'go'
+            line = 'while [ ! -e %s ]; do sleep 0.05; done; no-mistakes axi run --intent hold-own' % go
+            outer = launch_in(cli + ['pipeline-start', '--', 'bash', '-c', line], env, folder / 'outer', checkout)
+            wait_for(lambda: 'pipeline-start admitted' in (folder / 'outer.stderr').read_text(), label + ': the command is admitted')
+            row(db, 'stranger', 'something else')
+            go.touch()
+            if label == 'tight':
+                wait_for(lambda: ' pending=0 ' in (folder / 'outer.stderr').read_text() and 'waiting' in (folder / 'outer.stderr').read_text(),
+                         'the client waits on the stranger alone, not on its own reservation')
+                assert not (folder / 'pid-hold-own').exists()
+                change(db, "UPDATE runs SET status = 'completed' WHERE id = 'stranger'")
+            wait_for(lambda: (folder / 'pid-hold-own').exists(), label + ': the client is admitted')
+            text = (folder / 'outer.stderr').read_text()
+            assert text.count('pipeline-start admitted') == 2, (label, text)
+            (folder / 'release-hold-own').touch()
+            assert outer.wait(timeout=30) == 0, (label, (folder / 'outer.stderr').read_text())
+
+    def stranger_row_never_unlocks():
+        # Main 1712 item 3 (the base's stranger-row unlock, falsifier_base.py): start A is admitted and its client runs
+        # without registering; a stranger's row appears. The stranger's row is not A's, so A stays counted: with 6 cores
+        # (limit 2) a probe waits beside the stranger and A, and is admitted once the stranger ends.
+        folder, db, env = case('m1712-stranger-unlock', cores=6)
+        checkout = bound_repo(folder, db, env)
+        a = launch_in(cli + ['pipeline-start', '--', 'no-mistakes', 'axi', 'run', '--intent', 'hold-a'], env, folder / 'a', checkout)
+        wait_for(lambda: (folder / 'pid-hold-a').exists(), 'A runs')
+        row(db, 'stranger', 'something else')
+        probe = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'probe')], env, folder / 'probe')
+        time.sleep(3)
+        harm(not (folder / 'probe').exists(), 'a stranger row released A', (folder / 'probe.stderr').read_text())
+        change(db, "UPDATE runs SET status = 'completed' WHERE id = 'stranger'")
+        finish(probe)
+        (folder / 'release-hold-a').touch()
+        finish(a)
+
     for name, body in (('P5.errors.fallback no A counts visible runs at R', no_term_counts_r),
                        ('P5.preempt.cancel a cancel before COMMAND begins', cancel_before_command),
                        ('P5.lock a reservation ends by its own row only', own_row_binding),
@@ -1799,11 +1869,14 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
                        ('B2Q1 a script start under any key is admitted', script_under_any_key),
                        ('B2Q2 an unplaceable interception runs other commands and says so', unplaceable_other_command),
                        ('B2Q2 mem-guard off macOS without python3 execs directly', mem_guard_without_python_off_macos),
-                       ('Main 1683 a row never releases another start', row_never_releases_another)):
+                       ('Main 1683 a row never releases another start', row_never_releases_another),
+                       ('Main 1712 a row of the outer nonce never releases a nested claimant', outer_nonce_never_releases_nested_claimant),
+                       ('Main 1712 a stranger row before the claim leaves the client its own decision', stranger_row_before_claim),
+                       ('Main 1712 a stranger row never releases an admitted start', stranger_row_never_unlocks)):
         r28_case(name, body)
     (root / 'r28-admission.json').write_text(json.dumps(r28, indent=2))
     print(json.dumps(dict(r28=r28)), flush=True)
-    assert all(value == 'pass' for value in r28.values()), r28
+    group_done(r28)
 
     print(json.dumps(dict(result='pass', spacing=dict(limit=SPACING_LIMIT, burst_gaps=[round(g, 3) for g in burst_gaps], burst_median=round(statistics.median(burst_gaps), 3), injected_gaps=[round(g, 3) for g in injected_gaps], injected_median=round(statistics.median(injected_gaps), 3), injected_rejection=injected_rejection), artifacts=str(root), native_cpu_count=os.cpu_count(), invocations=records)), flush=True)
 finally:

@@ -215,6 +215,20 @@ def write_json(path, value):
     temp.replace(path)
 
 
+def harm(condition, *detail):
+    """The assertion that guards the harm a case names; its message starts with "harm:", so a run against an earlier
+    engine can tell a red case (this assertion failed) from an error (anything else failed)."""
+    if not condition:
+        raise AssertionError('harm: ' + repr(detail)[:1200])
+
+
+def group_done(results):
+    """End of a named case group: every case passed, or (CASE_KEEP_GOING, a run against an earlier engine recording
+    each case's outcome) go on to the next group."""
+    if not os.environ.get('CASE_KEEP_GOING'):
+        assert all(value == 'pass' for value in results.values()), results
+
+
 def wait_for(predicate, description):
     until = time.monotonic() + 30
     while not predicate():
@@ -459,9 +473,17 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
 # with the same owner for one more active run, publishes the run's reservation under the start
 # lock, then starts the agent as its child.
 agent = root / 'agent.py'
-agent.write_text("""import json, os, pathlib, signal, sys, time
+agent.write_text("""import atexit, hashlib, json, os, pathlib, signal, sqlite3, sys, time
 folder, run = pathlib.Path(os.environ['CASE_FOLDER']), sys.argv[1]
 with open(os.environ['CASE_COALITION_FILE'], 'a') as registry: registry.write(str(os.getpid()) + ' ')
+if os.environ.get('CASE_DAEMON_ROW') and os.environ.get('CASE_SESSION_ID'):
+    # The daemon's invocation row, written as the invocation returns (no-mistakes fork internal/pipeline/instrument.go).
+    def daemon_row(session=os.environ['CASE_SESSION_ID'], database=os.environ['CASE_DAEMON_ROWS']):
+        with sqlite3.connect(database) as db:
+            db.execute("INSERT INTO agent_invocations (id, run_id, step_name, purpose, started_at, completed_at, duration_ms,"
+                       " exit_status, session_key) VALUES (?, ?, 'ci', 'ci', 1, 2, 1, 'launched', ?)",
+                       (session, run, hashlib.sha256(session.encode()).hexdigest()[:16]))
+    atexit.register(daemon_row)
 mode = os.environ.get('CASE_AGENT', 'wait')
 if os.environ.get('CASE_SESSION_ID'):  # a Claude-shaped first stream-json line naming this launch's session
     sys.stdout.write(json.dumps(dict(type='system', subtype='init', session_id=os.environ['CASE_SESSION_ID'])) + chr(10))
@@ -495,12 +517,28 @@ while not (folder / (run + '.escapee-release')).exists(): time.sleep(0.05)
 """)
 
 
-def gate_case(name, available=40 * GIB, runs=(('x', 'ci', 'running', None),), timeout='240m', ci_ms=(60000,), round_age=0):
+def prove(folder, db, run, key=None):
+    """Record that every earlier launch of RUN is shown ended (Main 1656, Main 1712): one daemon invocation row with
+    its own session key and an ended attempt record carrying it. The row's exit status is not 'ok', so no hold bound
+    or percentile counts it."""
+    key = key or 'proof-' + run
+    change(db, "INSERT INTO agent_invocations (id, run_id, step_name, purpose, started_at, completed_at, duration_ms,"
+               " exit_status, session_key) VALUES (?, ?, 'ci', 'ci', 1, 2, 1, 'proof', ?)", ('proof-' + run, run, key))
+    (folder / 'pool').mkdir(exist_ok=True)
+    write_json(folder / 'pool' / ('attempt-proof-%s.json' % run), dict(
+        id='proof-' + run, run=run, repo='repo', step='ci', reserves=True, t0_us=1, root=[1, 0], gate=None, watcher=None,
+        coalition=None, session_key=key, members=[], ended_us=1))
+
+
+def gate_case(name, available=40 * GIB, runs=(('x', 'ci', 'running', None),), timeout='240m', ci_ms=(60000,), round_age=0,
+              proven=True):
     """One launch-gate host: runs are (id, open step or None, step status, recorded agent pid).
 
     The daemon's columns this gate reads (PRAGMA table_info of the host database): agent_invocations
     run_id, step_name, started_at, completed_at, duration_ms, exit_status; step_results round_started_at
     (epoch seconds, written at the step's or fix round's start, round_age seconds ago here); repos working_path.
+    With proven, every earlier launch of each CI-step run is shown ended (prove); each gate launch then names its own
+    session and the daemon's row for it is written (gate).
     """
     folder, db, env = case(name, measured=True, available=available)
     home = folder / 'home'
@@ -521,15 +559,24 @@ def gate_case(name, available=40 * GIB, runs=(('x', 'ci', 'running', None),), ti
         if step:
             change(db, 'INSERT INTO step_results (id, run_id, step_name, step_order, status, agent_pid, round_started_at)'
                    ' VALUES (?, ?, ?, 1, ?, ?, ?)', (run + '-s', run, step, status, pid, math.ceil(time.time()) - round_age))
+        if step == 'ci' and proven:
+            prove(folder, db, run)
     env.update(HOME=str(home))
+    if proven:
+        env['CASE_DAEMON_ROWS'] = str(db)
     return folder, db, env
 
 
-def gate(folder, env, run, mode='wait', stdin=b'', cwd=None, log=None):
+def gate(folder, env, run, mode='wait', stdin=b'', cwd=None, log=None, session=True):
     log = folder / (log or ('gate-' + run))
     out, err = open(str(log) + '.stdout', 'w'), open(str(log) + '.stderr', 'w')
+    env = dict(env, CASE_AGENT=mode)
+    if session and env.get('CASE_DAEMON_ROWS') and not env.get('CASE_SESSION_ID'):
+        # This launch names its own session, and the agent stand-in writes the daemon's invocation row carrying its
+        # key as it exits (the daemon writes it when the invocation returns).
+        env.update(CASE_SESSION_ID='session-%s-%d' % (os.path.basename(str(log)), len(records)), CASE_DAEMON_ROW='1')
     child = subprocess.Popen(['bash', str(repo / 'bin/fm-cpu-pass.sh'), 'launch-gate', '--', python, str(agent), run, '-p', '--flag'],
-                             env=dict(env, CASE_AGENT=mode), stdin=subprocess.PIPE, stdout=out, stderr=err,
+                             env=env, stdin=subprocess.PIPE, stdout=out, stderr=err,
                              cwd=str(cwd or folder / ('wt-' + run)), start_new_session=True)
     out.close(); err.close()
     child.stdin.write(stdin); child.stdin.close()

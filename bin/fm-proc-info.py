@@ -75,6 +75,8 @@ KINFO_SIZE, P_START, P_PID, P_COMM, P_FLAG, P_STAT, E_PPID, E_PGID = 648, 0, 40,
 E_UID = 420
 # sys/proc.h P_WEXIT and the p_stat values SSTOP and SZOMB.
 P_WEXIT, SSTOP, SZOMB = 0x2000, 4, 5
+# sys/proc.h P_TRACED: a debugger is attached, which can change the parent the kernel reports.
+P_TRACED = 0x800
 # proc_pidinfo PROC_PIDTASKINFO: struct proc_taskinfo and its pti_numrunning.
 PROC_PIDTASKINFO, TASKINFO_SIZE, PTI_NUMRUNNING = 4, 96, 88
 DAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
@@ -141,6 +143,25 @@ def kinfo(pid):
     data = sysctl(CTL_KERN, KERN_PROC, KERN_PROC_PID, pid)
     if len(data) < KINFO_SIZE or struct.unpack_from("i", data, P_PID)[0] != pid:
         raise LookupError(pid)
+    return data[:KINFO_SIZE]
+
+
+class NoSuchProcess(Exception):
+    """The kernel holds no process with this pid: it answered a pid query with no record at all."""
+
+
+def kinfo_exact(pid):
+    """PID's kinfo_proc record, telling a proven absence from a read that failed.
+
+    NoSuchProcess only when the kernel answers with no record (no process has the pid);
+    a short, malformed or other-pid answer raises OSError, because it is not proof the
+    process is gone (bin/fm-cpu-pass.py holds an attempt on it).
+    """
+    data = sysctl(CTL_KERN, KERN_PROC, KERN_PROC_PID, pid)
+    if not data:
+        raise NoSuchProcess(pid)
+    if len(data) < KINFO_SIZE or struct.unpack_from("i", data, P_PID)[0] != pid:
+        raise OSError("malformed process record for pid %d (%d bytes)" % (pid, len(data)))
     return data[:KINFO_SIZE]
 
 
