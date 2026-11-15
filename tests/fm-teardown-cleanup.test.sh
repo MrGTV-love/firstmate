@@ -8814,9 +8814,13 @@ teardown_admitted_bundles_current() { return 0; }
 fm_lock_path_mtime() { printf '1\n'; }
 teardown_removal_final_proof() { return 0; }
 TEARDOWN_CLOSEOUT_PROOF=fixture
+fm_task_copy_content_in_default() {
+  [ "$shape" = forgejo-and-content ] && [ "$4" = HEAD ] || { FM_TASK_COPY_UNASKED=; return 1; }
+  FM_TASK_COPY_UNASKED= FM_TASK_COPY_COMPARED='remotes/origin/main c0ffee'
+}
 teardown_landed() {
   case "$shape" in
-    forgejo|forgejo-and-bundle) snap='pr https://git.example.org/team/repo/pulls/7' ;;
+    forgejo|forgejo-and-bundle|forgejo-and-content) snap='pr https://git.example.org/team/repo/pulls/7' ;;
     github) snap='pr https://github.com/team/repo/pull/7' ;;
     content) snap='refs/remotes/origin/main abc' ;;
   esac
@@ -8824,7 +8828,7 @@ teardown_landed() {
   [ "$shape" != forgejo-and-bundle ] || teardown_admit "$1" bundle "$(git -C "$1" rev-parse HEAD)" "$R5_BASE/stored.bundle"
   return 0
 }
-for shape in forgejo github content forgejo-and-bundle; do
+for shape in forgejo github content forgejo-and-bundle forgejo-and-content; do
   r5_repo "$shape"
   printf 'tracked\n' > "$repo/tracked.txt"
   git -C "$repo" add tracked.txt && git -C "$repo" commit -qm initial
@@ -8834,16 +8838,17 @@ for shape in forgejo github content forgejo-and-bundle; do
   rc=0; teardown_dead_launcher_release "$repo" "$copy" "$(git -C "$copy" rev-parse HEAD)" foreign 2>/dev/null || rc=$?
   unset -f git
   case "$TEARDOWN_RELEASE_WHY" in *'Main 1843'*) why=forgejo-held ;; '') why=none ;; *) why=other ;; esac
-  echo "$shape release=$rc why=$why"
+  echo "$shape release=$rc why=$why landed=$(teardown_latest_admission "$copy" landed)"
 done
 BODY
   r5_harness forgejo "$body"
-  r5_expect 'forgejo release=1 why=forgejo-held' 'pr400-forgejo: a copy only a merged Forgejo PR admits was released directly'
-  r5_expect 'github release=0 why=none' 'pr400-forgejo: a GitHub-PR landing was held'
-  r5_expect 'content release=0 why=none' 'pr400-forgejo: a content landing was held'
-  r5_expect 'forgejo-and-bundle release=0 why=none' 'pr400-forgejo: a Forgejo landing that a bundle also holds was held'
+  r5_expect 'forgejo release=1 why=forgejo-held landed=pr https://git.example.org/team/repo/pulls/7' 'pr400-forgejo: a copy only a merged Forgejo PR admits was released directly'
+  r5_expect 'github release=0 why=none landed=pr https://github.com/team/repo/pull/7' 'pr400-forgejo: a GitHub-PR landing was held'
+  r5_expect 'content release=0 why=none landed=refs/remotes/origin/main abc' 'pr400-forgejo: a content landing was held'
+  r5_expect 'forgejo-and-bundle release=0 why=none landed=pr https://git.example.org/team/repo/pulls/7' 'pr400-forgejo: a Forgejo landing that a bundle also holds was held'
+  r5_expect 'forgejo-and-content release=0 why=none landed=refs/remotes/origin/main c0ffee' 'pr400-forgejo: a Forgejo-PR copy whose content is in the default branch was held, or its admission does not name the commit the content proof read'
   if grep -q '^forgejo unlocked' "$R5_OUT"; then fail 'pr400-forgejo: the Forgejo-only copy was unlocked'; fi
-  pass 'a copy that only a merged Forgejo pull request admits is held with a named reason; GitHub, content and bundle-held controls are released'
+  pass 'a copy that only a merged Forgejo pull request admits is held with a named reason unless the content proof holds it; GitHub, content, bundle-held and Forgejo-plus-content controls are released'
 }
 
 # Main 1843 (c): an Orca-backed task keeps base behaviour: the direct release, the
@@ -8859,8 +8864,13 @@ fm_task_copy_content_in_default() { FM_TASK_COPY_UNASKED=; FM_TASK_COPY_COMPARED
 fm_task_copy_content_in_default_history() { return 0; }
 teardown_history_admit() { :; }
 MODE=normal
-for backend in orca tmux; do
-  BACKEND=$backend
+for arm in orca tmux recovery; do
+  case "$arm" in
+    orca) BACKEND=orca TEARDOWN_CLEANUP_RECOVERY= ;;
+    tmux) BACKEND=tmux TEARDOWN_CLEANUP_RECOVERY= ;;
+    recovery) BACKEND=tmux TEARDOWN_CLEANUP_RECOVERY=orca ;;
+  esac
+  backend=$arm
   r5_repo "$backend"
   source_bundle="$R5_BASE/$backend-source.bundle"
   printf '/.claude/\n' > "$repo/.gitignore"
@@ -8873,7 +8883,7 @@ for backend in orca tmux; do
   printf '%s\t%s\t%s\n' "$source_bundle" "$(teardown_ignored_sha256 "$source_bundle")" "$tip" > "$DATA/$ID/preservation-bundles.tsv"
   r5_reset "$copy"
   brc=0; teardown_bundle_preserved "$copy" "$tip" 2> "$R5_BASE/$backend.bundle.err" || brc=$?
-  bw=none; grep -q 'Orca-backed task (Main 1843)' "$R5_BASE/$backend.bundle.err" && bw=orca
+  bw=none; grep -qF 'land the commits; the bundle route is not admitted for an Orca-backed task (Main 1843 (c))' "$R5_BASE/$backend.bundle.err" && bw=orca
   TEARDOWN_LANDED_DIR=$copy TEARDOWN_LANDED_REF=HEAD
   hrc=0; work_is_landed_proof task 2> "$R5_BASE/$backend.history.err" || hrc=$?
   hw=none; grep -q 'Orca-backed task (Main 1843)' "$R5_BASE/$backend.history.err" && hw=orca
@@ -8886,7 +8896,8 @@ BODY
   r5_harness orca "$body"
   r5_expect 'orca bundle=1/orca history=1/orca direct=1/orca' 'pr400-orca: an Orca-backed task was admitted by a route this change adds, or the refusal did not name Orca'
   r5_expect 'tmux bundle=0/none history=0/none direct=1/other' 'pr400-orca: another backend lost the bundle or history route, or was refused as Orca'
-  pass 'an Orca-backed task keeps base behaviour: the no-hold bundle route, the history landing and the direct release refuse it with a named reason; another backend keeps them'
+  r5_expect 'recovery bundle=1/orca history=1/orca direct=1/orca' 'pr400-orca: a task with an Orca cleanup-recovery record was admitted by a route this change adds, or the refusal did not name Orca'
+  pass 'an Orca-backed task, an Orca cleanup-recovery record included, keeps base behaviour: the no-hold bundle route, the history landing and the direct release refuse it with a named reason; another backend keeps them'
 }
 
 teardown_test_cases=(

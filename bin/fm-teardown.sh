@@ -2822,7 +2822,7 @@ work_is_landed_proof() {
   # The history rule reads the same commit the content check read; record it
   # before the history rule rewrites FM_TASK_COPY_COMPARED to name the merge base.
   content_snap="refs/${FM_TASK_COPY_COMPARED%% *} ${FM_TASK_COPY_COMPARED##* }"
-  if [ -z "$FM_TASK_COPY_UNASKED" ] && [ "${BACKEND:-}" = orca ]; then
+  if [ -z "$FM_TASK_COPY_UNASKED" ] && { [ "${BACKEND:-}" = orca ] || [ "${TEARDOWN_CLEANUP_RECOVERY:-}" = orca ]; }; then
     echo "teardown: landing by default-branch history is not admitted for an Orca-backed task (Main 1843); $dir needs a merged pull request or content equal to the default branch" >&2
   elif [ -z "$FM_TASK_COPY_UNASKED" ] && fm_task_copy_content_in_default_history "$dir" "$ref"; then
     echo "teardown: landed by content: every change of $dir at ${ref:0:12} is in a commit of ${FM_TASK_COPY_COMPARED%% *} after merge base ${FM_TASK_COPY_COMPARED##* }" >&2

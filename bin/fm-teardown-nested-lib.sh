@@ -1177,8 +1177,8 @@ teardown_bundle_preserved() {  # <copy> <ref> [hint]
   }
   # Main 1843: an Orca-backed task keeps base behaviour; the bundle route without
   # a captain hold that this change adds is not admitted for it.
-  if [ "${BACKEND:-}" = orca ] && [ -n "$own" ]; then
-    teardown_bundle_refuse "the bundle route without a captain hold is not admitted for an Orca-backed task (Main 1843); land the commits or hold the task for the captain"
+  if { [ "${BACKEND:-}" = orca ] || [ "${TEARDOWN_CLEANUP_RECOVERY:-}" = orca ]; } && [ -n "$own" ]; then
+    teardown_bundle_refuse "land the commits; the bundle route is not admitted for an Orca-backed task (Main 1843 (c))"
     return 1
   fi
   if [ -z "$own" ]; then
@@ -2108,7 +2108,7 @@ teardown_dead_launcher_release() {  # <slot> <copy> <head> <foreign|own nested>
   local slot=$1 copy=$2 head=$3 kind=$4 lock pid lock_file rc=0 now gone procs mtime landed_snap
   TEARDOWN_RELEASE_WHY=
   # Main 1843: an Orca-backed task keeps base behaviour, which has no direct release.
-  if [ "${BACKEND:-}" = orca ]; then
+  if [ "${BACKEND:-}" = orca ] || [ "${TEARDOWN_CLEANUP_RECOVERY:-}" = orca ]; then
     TEARDOWN_RELEASE_WHY='the direct release of a dead launcher'"'"'s lock is not admitted for an Orca-backed task (Main 1843)'
     return 1
   fi
@@ -2138,15 +2138,20 @@ teardown_dead_launcher_release() {  # <slot> <copy> <head> <foreign|own nested>
   fi
   teardown_landed "$copy" HEAD "" >/dev/null 2>&1 || { TEARDOWN_RELEASE_WHY='its landed-work proof no longer holds'; return 1; }
   # Main 1843: a merged pull request on a forge the driver cannot read (Forgejo)
-  # is no credit, so a copy that only such a pull request admits, with no content
-  # proof and no bundle, is held rather than released here.
+  # is no credit, so a copy that only such a pull request admits is closed only by
+  # the content proof, whose admission then names the default-branch commit it
+  # read; with no content proof and no bundle it is held rather than released here.
   landed_snap=$(teardown_latest_admission "$copy" landed)
   case "$landed_snap" in
     'pr https://'*)
       if ! [[ "${landed_snap#pr }" =~ ^https://github[.]com/[^/]+/[^/]+/pull/[0-9]+$ ]] \
           && [ -z "$(teardown_latest_admission "$copy" bundle)" ]; then
-        TEARDOWN_RELEASE_WHY="only merged pull request ${landed_snap#pr } admits it, which the closeout driver cannot credit (it reads --pr from GitHub only), and no content proof or bundle holds it (Main 1843)"
-        return 1
+        if fm_task_copy_content_in_default "$copy" "$PROJ" "${BASE_BRANCH:-}" HEAD; then
+          teardown_admit "$copy" landed "$head" "refs/${FM_TASK_COPY_COMPARED%% *} ${FM_TASK_COPY_COMPARED##* }"
+        else
+          TEARDOWN_RELEASE_WHY="only merged pull request ${landed_snap#pr } admits it, which the closeout driver cannot credit (it reads --pr from GitHub only), and no content proof or bundle holds it (Main 1843)"
+          return 1
+        fi
       fi
       ;;
   esac
