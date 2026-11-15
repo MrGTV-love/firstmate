@@ -52,6 +52,9 @@
 # explicitly clear recovery after ordinary automatic-backlog admission.
 # It neither launches an agent nor delivers instructions; then use fm-send for
 # a new continuation instruction, or ordinary relaunch for an exited owner.
+# That send states its choice when the task has open keyed decisions,
+# --resolve-key <key> or --answers-none (rule: bin/fm-send.sh header,
+# "Decision closure").
 # reassociate is metadata-only too: the lock-owning main Firstmate re-points a
 # local ship or scout's record at the replacement copy its work moved to
 # (worktree=, a ship's branch=, a Treehouse pool slot claim, and the brief's
