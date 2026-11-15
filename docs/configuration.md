@@ -1198,7 +1198,7 @@ Dropped work is never presented as recently landed.
 A retained captain-held row may record its finished deliverable as dropped while the unanswered question remains a separate open obligation.
 Explicit reopening or successful new-work start or dispatch retires the previous active dropped classification while preserving the exact captain words in `captain-drop.md`.
 The same transitions retire every earlier `Deliverable of the finished work:` line to `Historical deliverable of the finished work:`, keeping its text, so only the current cycle's deliverable stays active.
-A ship whose commits only a recorded verified bundle holds is removed by an attended teardown with no captain call filed first, as [`bin/fm-teardown.sh`](../bin/fm-teardown.sh)'s header describes, and teardown never creates, changes or releases a captain hold on that path.
+A ship whose commits only a recorded verified bundle holds is removed by an attended teardown with no captain call filed first, as [`bin/fm-teardown.sh`](../bin/fm-teardown.sh)'s header describes, and teardown never creates, changes or releases a captain hold on that path; an Orca-backed task, including one whose record says `cleanup_recovery=orca`, refuses the bundle route and must land its commits.
 A row already held for the captain keeps its hold and stays open; the captain's answer closes it with no note, and its captain hold kind keeps it out of Recently Landed.
 Any other row closes on the note `preserved in bundle <path>, not landed`; it is never presented as recently landed, and it is not marked as the captain's drop.
 The same transitions retire that line to `Historical preserved in bundle <path>, not landed`, so a row restarted after a bundle close and then closed again is judged on its new close.

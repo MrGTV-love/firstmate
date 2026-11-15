@@ -217,10 +217,14 @@ FM_TASK_COPY_MANAGED_FILES=(
 # from a status taken with --untracked-files=all: only an untracked entry that is
 # exactly one of FM_TASK_COPY_MANAGED_FILES does not count, and neither does the
 # untracked entry of each of the task's own <nested-copy> paths inside <copy>,
-# since each of those is preserved or proved on its own. Any other untracked
-# file, under .claude or anywhere else, is the copy's own work.
+# since each of those is preserved or proved on its own, nor the exact "?? <rel>/"
+# entry of a worktree that `git worktree list --porcelain -z`, read once, names
+# for <copy>'s repository strictly inside <copy> (canonical paths compared); an
+# unreadable list leaves every such entry counted. Any other untracked file,
+# under .claude or anywhere else, is the copy's own work.
 fm_task_copy_dirty_status() {  # <porcelain-status> [<copy> <nested-copy>...]
-  local status=$1 copy=${2:-} line nested managed
+  local status=$1 copy=${2:-} line nested managed rel inner token listed=
+  local -a registered=() entries=()
   shift
   [ "$#" -eq 0 ] || shift
   while IFS= read -r line || [ -n "$line" ]; do
@@ -233,6 +237,40 @@ fm_task_copy_dirty_status() {  # <porcelain-status> [<copy> <nested-copy>...]
         "$copy"/*) [ "$line" != "?? ${nested#"$copy"/}/" ] || continue 2 ;;
       esac
     done
+    case "$line" in
+      '?? '?*/)
+        if [ -n "$copy" ] && [ -z "$listed" ]; then
+          listed=bad
+          entries=()
+          while IFS= read -r -d '' token; do
+            entries+=("$token")
+          done < <(git -C "$copy" worktree list --porcelain -z 2>/dev/null && printf 'fm-worktree-list-complete\0')
+          if [ "${#entries[@]}" -gt 0 ] && [ "${entries[${#entries[@]}-1]}" = fm-worktree-list-complete ]; then
+            for token in "${entries[@]}"; do
+              case "$token" in
+                'worktree '?*)
+                  listed=ok
+                  inner=$(fm_task_copy_canonical_dir "${token#worktree }") && registered+=("$inner")
+                  ;;
+              esac
+            done
+          fi
+        fi
+        if [ "$listed" = ok ]; then
+          rel=${line#'?? '}
+          rel=${rel%/}
+          if inner=$(fm_task_copy_canonical_dir "$copy/$rel"); then
+            case "$inner" in
+              "$copy"/?*)
+                for token in ${registered[@]+"${registered[@]}"}; do
+                  [ "$token" != "$inner" ] || continue 2
+                done
+                ;;
+            esac
+          fi
+        fi
+        ;;
+    esac
     printf '%s\n' "$line"
   done <<< "$status"
 }

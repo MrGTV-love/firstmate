@@ -3614,25 +3614,34 @@ test_bundle_route_needs_no_captains_call() {
 
 # A home whose backlog transition does not apply has no row to close, and the
 # bundle route does not need one: the copy is preserved and removed there too.
+# An Orca cleanup recovery is an Orca-backed task, which the bundle route
+# refuses by name (Main 1843 (c)).
 test_bundle_route_passes_where_no_row_exists() {
-  local shape case_dir rc
-  for shape in manual orca; do
-    make_bundle_copy_case "bundle-no-row-$shape"
-    case_dir=$NESTED_CASE
-    case "$shape" in
-      manual) printf 'manual\n' > "$case_dir/config/backlog-backend" ;;
-      orca) printf 'cleanup_recovery=orca\n' >> "$case_dir/state/task-x1.meta" ;;
-    esac
-    rc=0
-    FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-    expect_code 0 "$rc" "bundle-no-row-$shape: the bundle route must pass without a backlog row: $(cat "$case_dir/stderr")"
-    assert_no_grep 'fm-captain-hold.sh hold' "$case_dir/stderr" "bundle-no-row-$shape: a hold command was printed"
-    assert_no_grep 'fm-tasks-axi.sh add' "$case_dir/stderr" "bundle-no-row-$shape: an add command was printed"
-    assert_absent "$NESTED_COPY" "bundle-no-row-$shape: the preserved copy was not removed"
-    assert_present "$case_dir/data/task-x1/preserved-bundles/$(cut -f2 "$case_dir/data/task-x1/preservation-bundles.tsv").bundle" \
-      "bundle-no-row-$shape: the stored bundle is missing after the close"
-  done
-  pass 'the bundle route passes in a manual-backlog home and an Orca cleanup recovery, which have no row to hold a call'
+  local case_dir rc
+  make_bundle_copy_case bundle-no-row-manual
+  case_dir=$NESTED_CASE
+  printf 'manual\n' > "$case_dir/config/backlog-backend"
+  rc=0
+  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "bundle-no-row-manual: the bundle route must pass without a backlog row: $(cat "$case_dir/stderr")"
+  assert_no_grep 'fm-captain-hold.sh hold' "$case_dir/stderr" "bundle-no-row-manual: a hold command was printed"
+  assert_no_grep 'fm-tasks-axi.sh add' "$case_dir/stderr" "bundle-no-row-manual: an add command was printed"
+  assert_absent "$NESTED_COPY" "bundle-no-row-manual: the preserved copy was not removed"
+  assert_present "$case_dir/data/task-x1/preserved-bundles/$(cut -f2 "$case_dir/data/task-x1/preservation-bundles.tsv").bundle" \
+    "bundle-no-row-manual: the stored bundle is missing after the close"
+
+  make_bundle_copy_case bundle-no-row-orca
+  case_dir=$NESTED_CASE
+  printf 'cleanup_recovery=orca\n' >> "$case_dir/state/task-x1.meta"
+  rc=0
+  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "bundle-no-row-orca: an Orca cleanup recovery must refuse the bundle route: $(cat "$case_dir/stderr")"
+  assert_grep 'land the commits; the bundle route is not admitted for an Orca-backed task (Main 1843 (c))' "$case_dir/stderr" \
+    'bundle-no-row-orca: the refusal does not name the Orca rule'
+  assert_present "$NESTED_COPY" 'bundle-no-row-orca: the copy was removed'
+  assert_present "$case_dir/state/task-x1.meta" 'bundle-no-row-orca: the task record was removed'
+  assert_present "$case_dir/data/task-x1/preservation-bundles.tsv" 'bundle-no-row-orca: the preservation record was removed'
+  pass 'the bundle route passes in a manual-backlog home, which has no row to hold a call; an Orca cleanup recovery refuses it by name and keeps the copy and the record'
 }
 
 # Work the ordinary landing proof accepts never needs the captain's call, even

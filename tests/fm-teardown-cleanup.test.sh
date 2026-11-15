@@ -8851,6 +8851,41 @@ BODY
   pass 'a copy that only a merged Forgejo pull request admits is held with a named reason unless the content proof holds it; GitHub, content, bundle-held and Forgejo-plus-content controls are released'
 }
 
+# Main 1881 (C2-1): the root dirt rule skips the untracked entry of a worktree
+# registered to the copy's own repository strictly inside the copy (the nested
+# copy Vernant makes at <slot>/.claude/worktrees/<x>); an unregistered directory
+# or repository of that name, or an unreadable worktree list, is still dirt.
+test_pr400_registered_nested_worktree_is_not_root_dirt() {
+  local body=$TMP_ROOT/pr400-body-nested-worktree.sh
+  cat > "$body" <<'BODY'
+for shape in registered unregistered-file unregistered-repo unreadable; do
+  r5_repo "$shape"
+  printf 'tracked\n' > "$repo/tracked.txt"
+  git -C "$repo" add tracked.txt && git -C "$repo" commit -qm initial
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  inner="$copy/.claude/worktrees/x"
+  case "$shape" in
+    registered|unreadable) git -C "$repo" worktree add -q -b "n-$shape" "$inner" main ;;
+    unregistered-file) mkdir -p "$inner" && printf 'work\n' > "$inner/work.txt" ;;
+    unregistered-repo) git init -q "$inner" && printf 'work\n' > "$inner/work.txt" ;;
+  esac
+  real=$(fm_task_copy_canonical_dir "$copy")
+  status=$(git -C "$copy" status --porcelain --untracked-files=all --ignore-submodules=none)
+  [ "$shape" != unreadable ] || git() { case " $* " in *' worktree list '*) return 1 ;; esac; command git "$@"; }
+  dirt=$(fm_task_copy_dirty_status "$status" "$real")
+  unset -f git
+  n=0; [ -z "$dirt" ] || n=$(printf '%s\n' "$dirt" | wc -l | tr -d ' ')
+  echo "$shape dirt=$n"
+done
+BODY
+  r5_harness nested-worktree "$body"
+  r5_expect 'registered dirt=0' 'pr400-nested-worktree: a registered nested worktree of the same repository was counted as dirt'
+  r5_expect 'unregistered-file dirt=1' 'pr400-nested-worktree: an untracked file in an unregistered directory was not counted as dirt'
+  r5_expect 'unregistered-repo dirt=1' 'pr400-nested-worktree: an unregistered repository in the copy was not counted as dirt'
+  r5_expect 'unreadable dirt=1' 'pr400-nested-worktree: an unreadable worktree list let a nested entry pass'
+  pass 'the root dirt rule skips only a registered nested worktree of the same repository; an unregistered directory or repository, or an unreadable worktree list, is dirt'
+}
+
 # Main 1843 (c): an Orca-backed task keeps base behaviour: the direct release, the
 # history landing and the no-hold bundle route this change adds each refuse for
 # it with a named reason; the same copies on another backend are admitted.
@@ -9115,6 +9150,7 @@ test_pr400_nested_repository_under_a_newline_path_is_found
 test_pr400_newline_copy_path_reaches_disposal_whole
 test_pr400_root_return_retry_rechecks_safety
 test_pr400_forgejo_only_landing_is_held
+test_pr400_registered_nested_worktree_is_not_root_dirt
 test_pr400_orca_keeps_base_behaviour
 test_direct_release_refuses_a_process_holding_a_file_in_the_copy_open
 test_task_own_descendant_holding_a_file_open_refuses_and_is_not_signalled

@@ -129,8 +129,9 @@
 # released, closes on the note "preserved in bundle <bundle path>, not landed",
 # which bin/fm-landed-lib.sh keeps out of Recently Landed without marking it a
 # drop. A later proof that changes the close's links restages the pending close.
-# The route needs no backlog row, so it also passes in a manual-backlog home and
-# an Orca cleanup recovery. A Vernant-locked copy keeps its driver's independent
+# The route needs no backlog row, so it also passes in a manual-backlog home; an
+# Orca-backed task, a cleanup_recovery=orca record included, refuses it by name
+# (Main 1843 (c)). A Vernant-locked copy keeps its driver's independent
 # landing verdict whenever the driver can run, except its uncovered-content
 # verdict on a lock whose launcher is gone (see the creation-lock paragraph).
 # To create a self-contained bundle and its record (no creator is run by teardown),
