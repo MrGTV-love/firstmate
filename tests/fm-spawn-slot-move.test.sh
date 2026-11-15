@@ -629,6 +629,40 @@ SH
   cleanup_held
 }
 
+# The launcher's own child is the spawn's shell and is excused when lsof shows where it is. When lsof shows no
+# working directory for that same process, nothing proves it is in the slot or out of it, so it is a holder.
+test_an_lsof_row_with_no_directory_for_a_launcher_child_is_a_holder() {
+  make_world f4-launcher-child-row
+  advance_origin advanced.txt
+  start_marker
+  sleep 0.4
+  start_pane "$W_SLOT" 1 || { pass "SKIPPED: this host cannot run a renamed copy of bash"; return 0; }
+  local launcher child bin="$W_DIR/childrow"
+  launcher=$(pgrep -P "$PANE_PID" | head -n 1)
+  child=$(pgrep -P "${launcher:-0}" | head -n 1)
+  [ -n "$child" ] || fail "the pane's launcher tree has no child process to name"
+  mkdir -p "$bin"
+  cat >"$bin/lsof" <<SH
+#!/bin/sh
+printf 'p$child\ncsleep\n'
+SH
+  chmod +x "$bin/lsof"
+  MOVE_PATH="$bin:$PATH" FM_SLOT_PANE_PID=$PANE_PID FM_SLOT_SPAWN_PID=$MARKER_PID expect_skip "an lsof row with no working directory for a process under the spawn's own launcher is a holder" live_holder
+  cleanup_held
+}
+
+# The same tree is excused only under the pane's own shell. When the backend names another pid as the pane, a
+# launcher that runs elsewhere is not this spawn's acquisition.
+test_a_launcher_that_does_not_run_under_the_named_pane_is_a_holder() {
+  make_world f4-launcher-elsewhere
+  advance_origin advanced.txt
+  start_marker
+  sleep 0.4
+  start_pane "$W_SLOT" 1 || { pass "SKIPPED: this host cannot run a renamed copy of bash"; return 0; }
+  FM_SLOT_PANE_PID=$MARKER_PID FM_SLOT_SPAWN_PID=$MARKER_PID expect_skip "a launcher that is not under the pane the backend named is not the spawn's own" live_holder
+  cleanup_held
+}
+
 test_a_holder_row_without_a_working_directory_is_a_holder() {
   make_world f4-lsof-incomplete
   advance_origin advanced.txt
@@ -813,6 +847,58 @@ late_commit_runner() {
   printf '{}\n' >"$2"
   return 3
 }
+# dangling_commit <slot> <message>: a commit with the slot's tree that no ref holds. Prints its sha.
+dangling_commit() {
+  git -C "$1" "${GITID[@]}" commit-tree "HEAD^{tree}" -p HEAD -m "$2"
+}
+
+# The switch back is allowed only from the commit this spawn left. With no commit recorded, nothing proves that a
+# detached HEAD is the spawn's own, so the copy is not switched and the commit it holds is not orphaned.
+test_a_refusal_revert_with_no_recorded_left_commit_keeps_a_detached_commit() {
+  make_branch_slot m1-attach-unrecorded
+  local sha held rc=0
+  sha=$(git -C "$W_SLOT" rev-parse HEAD)
+  held=$(dangling_commit "$W_SLOT" unrecorded)
+  git -C "$W_SLOT" -c core.hooksPath=/dev/null checkout -q --detach "$held"
+  (FM_SLOT_LEFT_HEAD='' fm_slot_attach "$W_SLOT" old-owner "$sha") >/dev/null 2>&1 || rc=$?
+  [ "$rc" != 0 ] || fail "the switch back ran although no commit was recorded as the one this spawn left"
+  [ "$(git -C "$W_SLOT" rev-parse HEAD)" = "$held" ] || fail "HEAD left a commit no ref holds"
+  pass "a switch back with no recorded left commit keeps the detached commit"
+}
+
+# When the branch moved and HEAD is at a commit this spawn left (not the commit the branch held), the refusal
+# leaves HEAD where it is. It does not detach to the old commit first and refuse afterwards.
+test_a_refusal_revert_leaves_head_alone_when_the_branch_moved() {
+  make_branch_slot m1-attach-branch-moved
+  local sha left moved rc=0
+  sha=$(git -C "$W_SLOT" rev-parse HEAD)
+  left=$(dangling_commit "$W_SLOT" left)
+  moved=$(dangling_commit "$W_SLOT" moved)
+  git -C "$W_SLOT" -c core.hooksPath=/dev/null checkout -q --detach "$left"
+  git -C "$W_SLOT" update-ref refs/heads/old-owner "$moved"
+  (FM_SLOT_LEFT_HEAD=$left fm_slot_attach "$W_SLOT" old-owner "$sha") >/dev/null 2>&1 || rc=$?
+  [ "$rc" != 0 ] || fail "the switch back reported success although the branch moved"
+  [ "$(git -C "$W_SLOT" rev-parse HEAD)" = "$left" ] || fail "HEAD was changed although the branch moved"
+  [ "$(git -C "$W_SLOT" rev-parse refs/heads/old-owner)" = "$moved" ] || fail "the moved branch was changed"
+  pass "a refused switch back leaves HEAD where it was when the branch moved"
+}
+
+# A left commit recorded by an earlier step must not excuse a HEAD the promotion step did not leave.
+test_a_promotion_refusal_ignores_a_stale_left_commit() {
+  make_branch_slot m1-promotion-stale
+  local held
+  held=$(dangling_commit "$W_SLOT" stale)
+  printf '%s\n' "$held" >"$W_DIR/held-sha"
+  (FM_SLOT_LEFT_HEAD=$held; fm_slot_provision held_commit_runner "$W_PROJ" "$W_SLOT" tid fm/tid "$W_DIR/report.json" '' '' scripts) >/dev/null 2>&1 || true
+  [ "$(git -C "$W_SLOT" rev-parse HEAD)" = "$held" ] || fail "the refusal switched away from a commit that no ref holds"
+  pass "a stale left commit does not excuse the refusal's switch back"
+}
+held_commit_runner() {
+  git -C "$W_SLOT" -c core.hooksPath=/dev/null checkout -q --detach "$(cat "$W_DIR/held-sha")"
+  printf '{}\n' >"$2"
+  return 3
+}
+
 test_a_promotion_refusal_after_a_late_commit_keeps_the_commit() {
   make_branch_slot m1-promotion
   local rc=0 late
@@ -1017,6 +1103,8 @@ CASES=(
   test_a_process_under_the_pane_but_not_under_the_launcher_is_a_holder
   test_a_process_under_the_pane_that_predates_the_spawn_is_a_holder
   test_a_lsof_row_without_a_working_directory_for_the_pane_is_a_holder
+  test_an_lsof_row_with_no_directory_for_a_launcher_child_is_a_holder
+  test_a_launcher_that_does_not_run_under_the_named_pane_is_a_holder
   test_a_holder_row_without_a_working_directory_is_a_holder
   test_a_malformed_contention_row_counts_as_held
   test_a_treehouse_launcher_started_after_the_spawn_owns_its_shell
@@ -1027,6 +1115,9 @@ CASES=(
   test_the_snapshot_fails_when_git_cannot_be_read
   test_no_destroying_git_command_runs_on_any_move_path
   test_a_promotion_refusal_after_a_late_commit_keeps_the_commit
+  test_a_refusal_revert_with_no_recorded_left_commit_keeps_a_detached_commit
+  test_a_refusal_revert_leaves_head_alone_when_the_branch_moved
+  test_a_promotion_refusal_ignores_a_stale_left_commit
   test_a_refused_move_after_preparation_never_calls_a_changed_copy_untouched
   test_tracked_work_hidden_by_an_index_flag_skips_the_copy
   test_a_late_edit_inside_a_submodule_fails_the_move

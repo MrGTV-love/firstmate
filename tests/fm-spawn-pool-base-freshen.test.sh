@@ -72,6 +72,14 @@ sleep() {
   fi
   command sleep "$@"
 }
+# The spawn creates its task data folder while it records a skipped copy, between two gets. A jump there spends the
+# bound after one copy was accepted and before the next get is typed.
+mkdir() {
+  if [ -n "${FM_TEST_MKDIR_JUMP_PATH:-}" ] && [ "${2:-}" = "$FM_TEST_MKDIR_JUMP_PATH" ]; then
+    SECONDS=$((SECONDS + ${FM_TEST_MKDIR_JUMP:-0}))
+  fi
+  command mkdir "$@"
+}
 SH
 
 run_spawn_skipping() {
@@ -1901,6 +1909,20 @@ test_the_loop_budget_is_one_bound_across_all_gets() {
   pass "one absolute bound covers every get in the skip loop"
 }
 
+# The bound is also read before a get is typed: when the time is spent between two gets (here, while the first
+# skipped copy is recorded), no second get is typed at all.
+test_no_get_is_typed_once_the_bound_was_spent_between_two_gets() {
+  local id out
+  id='pool-bound-between-gets'
+  make_skip_case skip-bound-between "$id" 3
+  printf 'work\n' > "${SKIP_SLOTS[0]}/uncommitted.txt"
+  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_MKDIR_JUMP=2000 FM_TEST_MKDIR_JUMP_PATH="$HOME_DIR/data/$id" BASH_ENV="$SKIP_CLOCK" run_spawn "$id" --mode no-mistakes --yolo off) || true
+  assert_no_launch "$CASE_DIR/launch.log"
+  [ "$(cat "$CASE_DIR/get-count")" = 1 ] || fail "a get was typed after the absolute bound was spent: $(cat "$CASE_DIR/get-count") gets"$'\n'"$out"
+  assert_contains "$out" "absolute extreme" "the refusal did not name the absolute bound"
+  pass "no get is typed once the bound was spent between two gets"
+}
+
 test_skipped_copies_are_recorded_and_listed() {
   local id out
   id='pool-skip-listed'
@@ -2107,6 +2129,7 @@ test_a_nondefault_base_ref_does_not_move_before_a_skip
 test_a_governed_attached_copy_keeps_its_branch_when_skipped
 test_a_dirty_governed_copy_is_skipped_and_another_is_taken
 test_the_loop_budget_is_one_bound_across_all_gets
+  test_no_get_is_typed_once_the_bound_was_spent_between_two_gets
 test_skipped_copies_are_recorded_and_listed
 test_slot_digest_sees_another_tasks_branch_move
 test_slot_digest_sees_a_symlink_retarget
