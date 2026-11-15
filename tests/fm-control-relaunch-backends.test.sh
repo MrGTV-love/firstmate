@@ -929,12 +929,12 @@ test_reboot_recovery_inspects_without_native_attribution() {
           [ "$proof" != legacy ] || [ "$verdict" = managed ] || verdict=legacy-$verdict
           case "$mode/$verdict" in
             direct/managed) expected_out="recovery-skipped $id launch=managed" ;;
-            direct/unmanaged) expected_out="recovery-skipped $id launch=unmanaged; no lifecycle action taken" ;;
+            direct/unmanaged) expected_out="recovery-skipped $id launch=unmanaged: live omp agent carries" ;;
             direct/unknown) expected_out="launch recovery for $id cannot prove its live launch settings; no lifecycle action taken" ;;
             direct/unmanaged-claude) expected_out="launch recovery for $id found live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken" ;;
             direct/legacy-unmanaged) expected_out="recovery-skipped $id launch=legacy record; exit and relaunch are allowed" ;;
             direct/legacy-unknown) expected_out="recovery-skipped $id launch=legacy-unproven" ;;
-            sweep/unmanaged) expected_out="REBOOT_RECOVERY: $id: live launch is unmanaged; no lifecycle action taken" ;;
+            sweep/unmanaged) expected_out="REBOOT_RECOVERY: $id: live omp agent carries" ;;
             sweep/unknown) expected_out="REBOOT_RECOVERY: $id: live launch settings are unreadable; no lifecycle action taken" ;;
             sweep/unmanaged-claude) expected_out="REBOOT_RECOVERY: $id: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken" ;;
             sweep/legacy-unmanaged) expected_out="REBOOT_RECOVERY: $id: legacy record; exit and relaunch are allowed" ;;
@@ -1004,10 +1004,10 @@ test_reboot_recovery_skips_busy_native_drafts_without_mutation() {
         fi
         expect_code 0 "$rc" "$kind/$mode/$draft inspection must skip a retained busy native draft"$'\n'"$out"
         if [ "$mode" = direct ]; then
-          assert_contains "$out" "recovery-skipped $id launch=unmanaged; no lifecycle action taken" \
+          assert_contains "$out" "recovery-skipped $id launch=unmanaged: live omp agent carries" \
             "$kind/$mode/$draft direct inspection must report the unmanaged launch"
         else
-          assert_contains "$out" "REBOOT_RECOVERY: $id: live launch is unmanaged; no lifecycle action taken" \
+          assert_contains "$out" "REBOOT_RECOVERY: $id: live omp agent carries" \
             "$kind/$mode/$draft sweep must report the unmanaged launch"
         fi
         [ "$before" = "$(shasum -a 256 "${preserved[@]}")" ] \
@@ -1054,7 +1054,7 @@ test_reboot_recovery_skips_unpinned_foreground_without_mutation() {
       if [ "$mode" = direct ]; then
         assert_contains "$out" "launch=unmanaged" "readable unpinned foreground must be unmanaged for recorded omp"
       else
-        assert_contains "$out" "REBOOT_RECOVERY: $id: live launch is unmanaged; no lifecycle action taken" \
+        assert_contains "$out" "REBOOT_RECOVERY: $id: live omp agent carries" \
           "readable unpinned foreground sweep must report the unmanaged launch for recorded omp"
       fi
       [ "$before" = "$(shasum -a 256 "$dir/home/state/$id.meta" "$dir/home/data/$id/brief.md" "$dir/wt/unlanded.txt")" ] \
@@ -1194,7 +1194,7 @@ test_bootstrap_inspects_the_derived_home_when_fm_home_is_unset() {
     FM_BOOTSTRAP_NETWORK=only FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05 \
     FM_CONTROL_LAUNCH_WAIT=0.05 "$ROOT/bin/fm-bootstrap.sh" 2>&1) || rc=$?
   expect_code 0 "$rc" "network bootstrap must inspect its resolved home"$'\n'"$out"
-  assert_contains "$out" "REBOOT_RECOVERY: $id: live launch is unmanaged; no lifecycle action taken" \
+  assert_contains "$out" "REBOOT_RECOVERY: $id: live omp agent carries" \
     "network bootstrap must report the unmanaged launch recorded in its derived home"
   assert_absent "$dir/home/state/$id.control-relaunch" "bootstrap must not checkpoint unmanaged native launch"
   assert_absent "$dir/fake/launched-command" "bootstrap must not replace unmanaged native launch"
@@ -1228,7 +1228,7 @@ test_secondmate_reboot_recovery_preserves_profile_and_child_work() {
   [ "$(meta_field "$dir" "$id" window)" = "$HERDR_CASE_SESSION:%7" ] || fail 'recovery moved the secondmate pane'
   [ "$before" = "$(shasum -a 256 "$dir/wt/unlanded.txt" "$dir/wt/data/charter.md" "$dir/wt/state/child.meta")" ] \
     || fail 'recovery changed secondmate child work or its charter'
-  assert_contains "$out" "recovery-skipped $id launch=unmanaged; no lifecycle action taken" \
+  assert_contains "$out" "recovery-skipped $id launch=unmanaged: live omp agent carries" \
     "secondmate inspection must report its unmanaged launch"
   assert_absent "$dir/home/state/$id.control-relaunch" "secondmate inspection must not reconcile or checkpoint child work"
   assert_absent "$dir/fake/launched-command" "secondmate inspection must not launch a replacement"
@@ -1261,7 +1261,7 @@ test_bounded_reboot_recovery_rotates_unmanaged_inspections_without_mutation() {
   rc=0
   out=$(run_control "$b" recover --one) || rc=$?
   expect_code 0 "$rc" "first tick must inspect unmanaged a"$'\n'"$out"
-  assert_contains "$out" "REBOOT_RECOVERY: $id_a: live launch is unmanaged; no lifecycle action taken" \
+  assert_contains "$out" "REBOOT_RECOVERY: $id_a: live omp agent carries" \
     "first tick must report unmanaged a"
   [ "$(cat "$b/home/state/.reboot-recovery-cursor")" = "$id_a" ] || fail 'first tick did not stop after a'
   [ ! -s "$b/fake/herdr-log" ] || fail 'one tick inspected a second recorded task'
@@ -1270,7 +1270,7 @@ test_bounded_reboot_recovery_rotates_unmanaged_inspections_without_mutation() {
   rc=0
   out=$(run_control "$b" recover --one) || rc=$?
   expect_code 0 "$rc" "next tick must inspect b despite pending a"$'\n'"$out"
-  assert_contains "$out" "REBOOT_RECOVERY: $id_b: live launch is unmanaged; no lifecycle action taken" \
+  assert_contains "$out" "REBOOT_RECOVERY: $id_b: live omp agent carries" \
     "second tick must report unmanaged b"
   gen_b=$(meta_field "$b" "$id_b" spawn_gen)
   [ "$gen_b" = old ] || fail 'inspection replaced unmanaged b'
@@ -1323,7 +1323,7 @@ test_bounded_reboot_recovery_notifies_each_unmanaged_identity_once() {
     expect_code 0 "$rc" "tick $tick must inspect without failing"$'\n'"$out"
     [ -n "$out" ] || continue
     notices=$((notices + 1))
-    assert_contains "$out" "live launch is unmanaged" "tick $tick must report an unmanaged launch"
+    assert_contains "$out" "live omp agent carries" "tick $tick must report an unmanaged launch"
     [ "$tick" -le 5 ] || fail "tick $tick repeated an unchanged unmanaged notice: $out"
     noticed=$(cat "$home/home/state/.reboot-recovery-cursor")
     case "$seen" in *" $noticed "*) fail "unmanaged $noticed woke twice" ;; esac
@@ -1340,11 +1340,11 @@ test_bounded_reboot_recovery_notifies_each_unmanaged_identity_once() {
     expect_code 0 "$rc" "restored identity tick $tick must inspect without failing"$'\n'"$out"
     [ -n "$out" ] || continue
     notices=$((notices + 1))
-    assert_contains "$out" "$id: live launch is unmanaged" "only the restored identity may notify again"
+    assert_contains "$out" "$id: live omp agent carries" "only the restored identity may notify again"
   done
   [ "$notices" = 1 ] || fail "a changed restored-agent identity must notify exactly once, got $notices"
   out=$(run_control "$home" recover) || true
-  [ "$(printf '%s\n' "$out" | grep -c 'live launch is unmanaged')" = 5 ] \
+  [ "$(printf '%s\n' "$out" | grep -c 'live omp agent carries')" = 5 ] \
     || fail "unbounded recover must still report every unmanaged launch: $out"
   pass 'bounded recovery wakes once per unmanaged restored-agent identity and again only when it changes'
 }
@@ -1400,7 +1400,7 @@ SH
   rc=0
   out=$(run_control "$b" recover --one) || rc=$?
   expect_code 0 "$rc" "next bounded tick must inspect b without reentering a"$'\n'"$out"
-  assert_contains "$out" "REBOOT_RECOVERY: $id_b: live launch is unmanaged; no lifecycle action taken" \
+  assert_contains "$out" "REBOOT_RECOVERY: $id_b: live omp agent carries" \
     "next bounded tick must report unmanaged b"
   assert_absent "$b/home/state/$id_b.control-relaunch" "unmanaged b inspection must not checkpoint"
   assert_absent "$b/fake/launched-command" "unmanaged b inspection must not replace"
