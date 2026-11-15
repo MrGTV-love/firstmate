@@ -7023,8 +7023,10 @@ class TrickleServer:
     and then one body byte every `step` seconds, so no single socket wait comes near the transport's 10 s socket timeout while the whole reply takes about
     size * step seconds. mode 'fast' sends the reply at once. It runs only threads of this test process and starts no process; close() ends every answer."""
 
-    def __init__(self, step=0.3, size=80):
-        self.step, self.size, self.mode, self.requests = step, size, 'trickle', 0
+    def __init__(self, step=0.3, size=80, duration=None):
+        # duration: spread the answer over exactly that many seconds of the wall clock (each byte sent on its own schedule), whatever the host's load does
+        # to a fixed sleep per byte.
+        self.step, self.size, self.mode, self.requests, self.duration = step, size, 'trickle', 0, duration
         self.stop = threading.Event()
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.bind(('127.0.0.1', 0))
@@ -7066,11 +7068,15 @@ class TrickleServer:
                 if self.mode == 'fast':
                     conn.sendall(payload)
                     return
+                begun = time.monotonic()
                 for i in range(len(payload)):
                     if self.stop.is_set():
                         return
                     conn.sendall(payload[i:i + 1])
-                    time.sleep(self.step)
+                    if self.duration:
+                        time.sleep(max(0.0, begun + (i + 1) * self.duration / len(payload) - time.monotonic()))
+                    else:
+                        time.sleep(self.step)
             except OSError:
                 return
 
@@ -7786,11 +7792,11 @@ class Round8Findings(InvariantScenario):
         with self.home(scott=None, authors=','.join([INV_OWNER, INV_SECOND])) as home, self.held_card() as answers:
             home.trust_check()
             home.cli('poll')
-            home.say('200.000100', 'owner request', user=INV_OWNER, dm=INV_OWNER_DM)
+            home.say('9100.000100', 'owner request', user=INV_OWNER, dm=INV_OWNER_DM)   # after the card the replay posted (its timestamps start at 900)
             with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': INV_SECOND}), self.failing_open('second-ids'):
                 result = home.cli('check', action='check')
             self.assertEqual(result.rc, 0, (result.out, result.err))
-            self.assertEqual(self.woken([result], INV_OWNER), ['200.000100'])
+            self.assertEqual(self.woken([result], INV_OWNER), ['9100.000100'])
             self.assertEqual(self.reply_after_unset(home, answers), [])
             self.assertEqual(self.decisions(home), [('decision_held_for_captain_reply', INV_SECOND)])
 
@@ -7810,12 +7816,18 @@ class Round8Findings(InvariantScenario):
             home.cli('poll')                                                     # the id is recorded; the card is mirrored
             ts = self.card_ts(home)
             home.edit_replay(lambda data: data['reactions'].setdefault(ts, []).append({'name': 'two', 'users': [INV_SECOND]}))
-            with patch.dict(os.environ, {'FM_SLACK_DM_USER': new_owner, 'SLACK_SIGNING_SECRET': INV_SECOND}):
+            # The replay keeps its own call log and checks it as a sink; its earlier lines name this member id (their conversations.open), so with the id as a
+            # protected value that test-only log would refuse every later call. Real Slack keeps no such log: here the replay writes it unchecked, and the
+            # plane's own files are still checked below.
+            def unchecked(replay, path, line):
+                with open(path, 'a') as out:
+                    out.write(line)
+            with patch.dict(os.environ, {'FM_SLACK_DM_USER': new_owner, 'SLACK_SIGNING_SECRET': INV_SECOND}), patch.object(Replay, 'append_line', unchecked):
                 os.environ.pop('FM_SLACK_SECOND_USER', None)
                 result = home.cli('check', action='retarget')
             rows = [r for r in home.refusals() if r['reason'] == 'decision_held_for_captain_reaction']
             self.assertEqual(len(rows), 1, (result.out, result.err, home.refusals()))
-            self.assertEqual(rows[0].get('author'), plane.safe_author(INV_SECOND))
+            self.assertEqual(rows[0].get('author'), 'sha256-id:' + plane.id_hash(INV_SECOND))       # attributed by the id's one-way hash
             self.assertNotIn(INV_SECOND, (home.state_dir / 'refusals.jsonl').read_text())
             self.assertEqual(answers(), [])
 
@@ -7900,7 +7912,7 @@ class Round8Findings(InvariantScenario):
     def test_r8_r6_seven_second_calls_after_a_seven_second_lock_wait_still_deliver_once(self):
         # Real time: in every sweep another run holds the journal lock for 7.1 s when their check starts, and every call of theirs takes about 7 s on the real
         # transport (a loopback server sending its answer slowly). Their check proves their DM while it waits for the lock, so one more call still fits.
-        server = TrickleServer(step=0.1, size=70)
+        server = TrickleServer(size=70, duration=7.0)                           # every call of theirs takes 7 s of the wall clock
         self.addCleanup(server.close)
         with self.home() as home:
             home.trust_check()
