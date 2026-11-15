@@ -121,6 +121,26 @@ jobs:
         if: github.event_name == 'pull_request'
         run: bin/fm-cpu-pass.sh run --label ci-guard-lint-new-or-touched -- bin/fm-guard-lint.sh --mode new-or-touched --base HEAD^1
 
+  # The CPU pass pool's concurrency proofs (tests/fm-cpu-pass-concurrency.py), including the CI-only kill and
+  # fault cases. They run up to three CPU-bound processes at once (FM_CONC_N=2 pooled workers plus
+  # FM_CONC_BURNERS=1 pass-less burner in the soak, or three ungated copies in the off-switch check), so they
+  # take three passes of the runner's pool (docs/cpu-pass-pool.md rule 5) instead of running inside the one
+  # pass of tests/fm-cpu-pass.test.sh; the fixture refuses a smaller held reservation.
+  cpu-pass-concurrency:
+    name: CPU pass concurrency proofs
+    runs-on: ubuntu-latest
+    # Normal tier (see the timeout policy above).
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+      - name: Run the concurrency proofs under their own passes
+        run: |
+          set -eu
+          mkdir -p "$RUNNER_TEMP/fm-conc"
+          FM_CONC_N=2 FM_CONC_LANES=4 FM_CONC_ROUNDS=5 FM_CONC_WORK=0.15 FM_CONC_BURNERS=1 \
+            bin/fm-cpu-pass.sh run --passes 3 --label ci-cpu-pass-concurrency -- \
+            bin/fm-proc-budget.sh -- python3 tests/fm-cpu-pass-concurrency.py "$PWD" "$RUNNER_TEMP/fm-conc" "$(command -v python3)"
+
   # Two duration-balanced portable parallel shards of the Phase 2 proven-isolated
   # set only. Composition owner: bin/fm-test-run.sh (docs/fm-test-portable-shards.md).
   tests-portable-parallel-1:

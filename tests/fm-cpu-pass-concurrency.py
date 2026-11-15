@@ -12,6 +12,12 @@ marker file for as long as it lives; a sampler process counts the markers whose 
 printed per case. Settings: FM_CONC_N (pool size, default 4), FM_CONC_LANES and FM_CONC_ROUNDS
 (soak lanes, default 2 x N lanes and 5 rounds), FM_CONC_BURNERS (background burners, default 3), FM_CONC_WORK (CPU
 seconds of a soak worker, default 0.3).
+
+The fixture itself runs at most CPU_BOUND_MAX CPU-bound processes at once: FM_CONC_N pooled workers plus
+FM_CONC_BURNERS pass-less burners in the soak, or the OFF_SWITCH_COPIES ungated copies of the off-switch check.
+Its launcher takes that many passes (docs/cpu-pass-pool.md rule 5): CI runs it as its own job under
+bin/fm-cpu-pass.sh run --passes, not inside a one-pass test script. Started inside a held reservation smaller
+than that (FM_CPU_PASS_HELD), it refuses with exit 125 before any case runs.
 """
 import concurrent.futures
 import json
@@ -32,6 +38,14 @@ ROUNDS = int(os.environ.get('FM_CONC_ROUNDS', '5'))
 BURNERS = int(os.environ.get('FM_CONC_BURNERS', '3'))
 WORK = os.environ.get('FM_CONC_WORK', '0.3')  # CPU seconds of each soak worker
 assert N >= 2 and N % 2 == 0, 'FM_CONC_N must be an even number of at least 2'
+OFF_SWITCH_COPIES = 3  # ungated copies of one key in the off-switch check (case_waiting)
+CPU_BOUND_MAX = max(N + BURNERS, OFF_SWITCH_COPIES)
+_held = os.environ.get('FM_CPU_PASS_HELD')
+if _held is not None and _held.isdigit() and 0 < int(_held) < CPU_BOUND_MAX:
+    # Rule 5: the launcher must hold one pass per CPU-bound process this fixture runs (0 is degraded work, no limit).
+    sys.stderr.write('fm-cpu-pass-concurrency.py: runs up to %d CPU-bound processes at once but holds FM_CPU_PASS_HELD=%s; '
+                     'launch it with bin/fm-cpu-pass.sh run --passes %d\n' % (CPU_BOUND_MAX, _held, CPU_BOUND_MAX))
+    sys.exit(125)
 root = Path(tempfile.mkdtemp(prefix='concurrency-', dir=parent))
 shim = root / 'bin'
 shim.mkdir()
@@ -797,11 +811,11 @@ def case_waiting():
     # still bounds the workers; with one slot the same three copies take turns.
     off_world = World('waiting-off', cores=4)
     off_world.sample_start()
-    copies = [off_world.launch('off%d' % i, [pyshim, tool('fm-duration.py'), 'gate', 'test.off', '--'] + off_world.work('off', 1.0), extra=dict(FM_TEST_KEY_SLOTS='0')) for i in range(3)]
+    copies = [off_world.launch('off%d' % i, [pyshim, tool('fm-duration.py'), 'gate', 'test.off', '--'] + off_world.work('off', 1.0), extra=dict(FM_TEST_KEY_SLOTS='0')) for i in range(OFF_SWITCH_COPIES)]
     wait_all(copies)
     off_seen = off_world.sample_stop()
     case.measure(off_switch_copies_alive_together=off_seen['peak_group'].get('off'))
-    case.check(off_seen['peak_group'].get('off') == 3, 'FM_TEST_KEY_SLOTS=0 must leave the key ungated: %s' % off_seen)
+    case.check(off_seen['peak_group'].get('off') == OFF_SWITCH_COPIES, 'FM_TEST_KEY_SLOTS=0 must leave the key ungated: %s' % off_seen)
     on_world = World('waiting-on', cores=4)
     on_world.sample_start()
     taking_turns = [on_world.launch('on%d' % i, [pyshim, tool('fm-duration.py'), 'gate', 'test.on', '--'] + on_world.work('on', 0.6), extra=dict(FM_TEST_KEY_SLOTS='1')) for i in range(3)]

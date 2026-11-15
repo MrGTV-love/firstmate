@@ -604,13 +604,9 @@ python3 "$ROOT/tests/fm-cpu-pass-admission.py" "$ROOT" "$TMP_ROOT" "$REAL_PYTHON
   || fail "pipeline admission and child-descriptor regression failed"
 pass "pipeline admission follows measured reservations, the fallback count, the pause-only backstop, priority, start registration, timing and descriptor ownership"
 
-# Concurrency proofs: nested runners, different suites, lint roots, waiting by capacity, the drain of a burst
-# and a short soak, each sampled from synthetic busy-loop workers. The fixture owns the cases and prints the
-# sampled maxima; it builds its own private pools, so the host's real pool is never touched.
-FM_CONC_N=2 FM_CONC_LANES=4 FM_CONC_ROUNDS=5 FM_CONC_WORK=0.15 FM_CONC_BURNERS=1 \
-  "$ROOT/bin/fm-proc-budget.sh" -- python3 "$ROOT/tests/fm-cpu-pass-concurrency.py" "$ROOT" "$TMP_ROOT" "$REAL_PYTHON" \
-  || fail "concurrency, nesting, waiting and drain scenarios failed"
-pass "never more workers than passes across nested runners, different suites and lint roots; waiting is by capacity; bursts drain; killed holders free the queue; a soak under forced load admits every start"
+# The concurrency proofs (tests/fm-cpu-pass-concurrency.py) run up to three CPU-bound processes at once, more
+# than the one pass this script holds, so they are not launched here: CI runs them as their own job under
+# three passes (.github/workflows/ci.yml job cpu-pass-concurrency), and the fixture refuses a smaller reservation.
 
 test_size_follows_host
 test_run_passes_status_and_marks_child
