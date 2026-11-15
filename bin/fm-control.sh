@@ -5,7 +5,7 @@
 # Usage: fm-control.sh <task-id> interrupt
 #        fm-control.sh <task-id> exit
 #        fm-control.sh <task-id> stay
-#        fm-control.sh <task-id> adopt [--session-id <claude-session-id>]
+#        fm-control.sh <task-id> adopt
 #        fm-control.sh <task-id> authorize-continuation
 #        fm-control.sh <task-id> reassociate --worktree <replacement-copy>
 #                                            [--also <other-task>=<its-replacement-copy>]...
@@ -22,9 +22,9 @@
 # --recover-launch is Herdr-only inspection under the control lock.
 # Managed and stopped agents are left untouched. Unmanaged live agents are
 # reported without lifecycle input; native restoration does not prove ownership.
-# Unknown proof on a versioned launch refuses; an unadopted unpinned claude
-# refuses with its own cause, and a claude pinned to another launch generation
-# refuses with its own cause and never names adopt. A legacy record (no launch_proof)
+# Unknown proof on a versioned launch refuses; an unpinned claude refuses with
+# its own cause (nothing can authorize it), and a claude pinned to another launch
+# generation refuses with its own cause. A legacy record (no launch_proof)
 # keeps exit and relaunch: an unpinned legacy omp is reported as such, and other
 # legacy-unproven launches skip.
 # This mode cannot change a profile or create a relaunch transaction.
@@ -78,8 +78,7 @@
 # record, instructions file, and slot claim already published.
 # docs/agent-control.md "Reassociating a task with a replacement
 # copy" owns every refusal and what each reader of the record does after it.
-# adopt repairs a local Herdr omp task's state/<id>.omp-session.json (a claude
-# secondmate is authorized by its own record, below),
+# adopt repairs only a local Herdr omp task's state/<id>.omp-session.json,
 # under the task's control and metadata locks. The lock-owning main Firstmate
 # alone may run it: a worker, the supervision branch, or a session that does
 # not own the home lock is refused, as for authorize-continuation and
@@ -114,18 +113,6 @@
 # harnesses and backends keep their existing proof rules.
 # docs/agent-control.md "Repairing a restored omp session record" owns the
 # operator contract and the residual risk of an unpinned adopted process.
-# For a local Herdr claude secondmate, adopt instead writes only
-# state/<id>.claude-adoption.json (never launch_proof, spawn_gen or another
-# field), under the same lock-owner gate, after fm_launch_proof_claude_adoption
-# proves the restored process is the task's own conversation: the attributed
-# claude harness (or a listed forwarding launcher around exactly one), its
-# kernel cwd, no launch pin, an exclusive pane and home claim, and a
-# task-specific session tie. --session-id is the owner's own statement of that
-# tie for a claude lane whose launch-brief record is gone while its transcript
-# still opens with that record's doorbell. Lifecycle readers rerun those proofs,
-# the transcript doorbell included, at every use; a relaunch removes the spent
-# record. docs/agent-control.md "Adopting a restored claude agent" owns the
-# contract and its residual risk.
 # --worktree <path> is shared by two verbs and parsed once: relaunch accepts a
 # prepared absolute destination for a ship relaunch, and reassociate names the
 # replacement copy the record moves to.
@@ -480,8 +467,6 @@ RELOCATE_TO=
 RELOCATE_SET=0
 control_want_value=
 RECOVER_LAUNCH=0
-ADOPT_SESSION_ID=
-ADOPT_SESSION_ID_SET=0
 OWNED_PATHS=()
 ALSO_IDS=()
 ALSO_COPIES=()
@@ -517,7 +502,6 @@ for control_arg in "$@"; do
       worktree) RELOCATE_TO=$control_arg; RELOCATE_SET=1 ;;
       owned-path) OWNED_PATHS+=("$control_arg") ;;
       also) parse_also "$control_arg" ;;
-      session-id) ADOPT_SESSION_ID=$control_arg; ADOPT_SESSION_ID_SET=1 ;;
       note_file)
         [ -f "$control_arg" ] || die "--note-file '$control_arg' is not a readable file"
         NOTE=$(cat "$control_arg")
@@ -542,8 +526,6 @@ for control_arg in "$@"; do
     --owned-path=*) OWNED_PATHS+=("${control_arg#--owned-path=}") ;;
     --also) control_want_value=also ;;
     --also=*) parse_also "${control_arg#--also=}" ;;
-    --session-id) control_want_value=session-id ;;
-    --session-id=*) ADOPT_SESSION_ID=${control_arg#--session-id=}; ADOPT_SESSION_ID_SET=1 ;;
     --note) control_want_value=note ;;
     --note=*) NOTE=${control_arg#--note=}; NOTE_SET=1 ;;
     --note-file) control_want_value=note_file ;;
@@ -565,10 +547,6 @@ fi
 
 [ "${#ALSO_IDS[@]}" = 0 ] || [ "$VERB" = reassociate ] \
   || die "--also applies to 'reassociate' only"
-[ "$ADOPT_SESSION_ID_SET" = 0 ] || [ "$VERB" = adopt ] \
-  || die "--session-id applies to 'adopt' only"
-[ "$ADOPT_SESSION_ID_SET" = 0 ] || [[ $ADOPT_SESSION_ID =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]] \
-  || die "--session-id needs a lowercase claude session id (8-4-4-4-12 hexadecimal)"
 [ "${#OWNED_PATHS[@]}" = 0 ] || { [ "$VERB" = relaunch ] && [ "$RECOVER_LAUNCH" = 0 ]; } \
   || die "--owned-path applies to 'relaunch' only and cannot be combined with --recover-launch"
 if [ "$VERB" = reassociate ]; then
@@ -1464,33 +1442,8 @@ if [ "$VERB" = adopt ]; then
   . "$SCRIPT_DIR/fm-session-lock-lib.sh"
   fm_session_lock_owned_by_self "$STATE" \
     || die "session record adoption requires the actual lock-owning main Firstmate"
-  case "$BACKEND:$RECORDED_HARNESS" in
-    herdr:omp|herdr:claude) ;;
-    *) die "adopt needs a local Herdr omp or claude task; no record was changed" ;;
-  esac
-  [ "$ADOPT_SESSION_ID_SET" = 0 ] || [ "$RECORDED_HARNESS" = claude ] \
-    || die "--session-id applies only to a claude adoption; no record was changed"
-  if [ "$RECORDED_HARNESS" = claude ]; then
-    CONTROL_META_LOCK=$(fm_meta_lock_path "$META") || die "adopt needs the task metadata lock"
-    fm_lock_acquire_wait "$CONTROL_META_LOCK"
-    CONTROL_META_LOCK_HELD=1
-    fm_backend_validate_task_endpoint "$META" "$ID" || exit 1
-    adoption_record=$(fm_launch_proof_claude_adoption "$META" ${ADOPT_SESSION_ID:+"$ADOPT_SESSION_ID" operator}) || exit 1
-    CONTROL_META_TMP=$(mktemp "$STATE/.$ID.claude-adoption.adopt.XXXXXX") \
-      || die "adopt needs a writable state directory"
-    printf '%s\n' "$adoption_record" > "$CONTROL_META_TMP" \
-      || die "adopt could not stage the adoption record"
-    # Refuse a changing foreground, session, or generation rather than publish
-    # a proof gathered for a different activation.
-    adoption_recheck=$(fm_launch_proof_claude_adoption "$META" ${ADOPT_SESSION_ID:+"$ADOPT_SESSION_ID" operator}) || exit 1
-    [ "$adoption_record" = "$adoption_recheck" ] \
-      || die "adopt needs stable foreground, session, and generation proof; retry after they settle"
-    mv -f -- "$CONTROL_META_TMP" "$STATE/$ID.claude-adoption.json" \
-      || die "adopt could not publish the adoption record"
-    CONTROL_META_TMP=
-    printf 'adopted: %s\n' "$ID"
-    exit 0
-  fi
+  [ "$BACKEND" = herdr ] && [ "$RECORDED_HARNESS" = omp ] \
+    || die "adopt needs a local Herdr omp task; no session record was changed"
   CONTROL_META_LOCK=$(fm_meta_lock_path "$META") || die "adopt needs the task metadata lock"
   fm_lock_acquire_wait "$CONTROL_META_LOCK"
   CONTROL_META_LOCK_HELD=1
@@ -2717,7 +2670,7 @@ do_relaunch() {
           echo "recovery-skipped $ID launch=legacy record; exit and relaunch are allowed"
           return 0
         fi
-        # A claude lane has no skip: an unadopted native restore keeps the
+        # A claude lane has no skip: an unpinned native restore keeps the
         # nonzero exit an unproven versioned launch always had.
         [ "$RECORDED_HARNESS" != claude ] \
           || die "launch recovery for $ID found $(fm_launch_proof_refusal_cause unmanaged); no lifecycle action taken; $(fm_launch_proof_refusal_next unmanaged "$META")"
@@ -2904,8 +2857,6 @@ do_relaunch() {
     die "the replacement agent for $ID did not come up within ${LAUNCH_WAIT}s (endpoint reads '$state')"
   }
   RELAUNCH_AGENT_CONFIRMED=1
-  # The replacement carries its own pin; an adoption of the old agent is spent.
-  rm -f -- "$STATE/$ID.claude-adoption.json"
 
   journal_write complete "$note_line" "exit_result=$exit_result"
   RELAUNCH_ACTIVE=0

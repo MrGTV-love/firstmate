@@ -168,8 +168,8 @@ state_value() { # <id>; prints recovery-grade state
 cmd_attribution() { # <id> <recorded-target>
   local id=$1 target=$2 meta state cause
   validate_id "$id"
-  case "$target" in ''|*[![:print:]]*) printf 'attribution=refuse: the recorded target is empty or not printable\n'; return 0 ;; esac
   validate_home "$id"
+  case "$target" in ''|*[![:print:]]*) printf 'attribution=refuse: the recorded target is empty or not printable\n'; return 0 ;; esac
   meta=$(meta_path "$id")
   if [ ! -f "$meta" ] || [ -L "$meta" ]; then
     printf 'attribution=refuse: no endpoint record for %s on this host\n' "$id"

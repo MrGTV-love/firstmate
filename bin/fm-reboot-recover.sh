@@ -8,12 +8,11 @@
 # Remote secondmates and other backends keep their existing recovery owners.
 # Missing/stopped agents remain with their existing liveness recovery paths.
 # Herdr's session-wide auto-resume setting is deliberately not changed.
-# Unknown versioned launch proof is reported as unreadable. An unadopted claude
-# whose readable environment carries no launch pin is reported as an unpinned
-# native restore, with the explicit adopt route for a secondmate only, and keeps
-# the nonzero status.
+# Unknown versioned launch proof is reported as unreadable. A claude whose
+# readable environment carries no launch pin is reported as an unpinned native
+# restore, which nothing can authorize, and keeps the nonzero status.
 # A claude whose readable environment carries a pin for another launch generation
-# is reported as pinned elsewhere, never sent to adopt, and keeps the nonzero status.
+# is reported as pinned elsewhere and keeps the nonzero status.
 # A legacy record (no launch_proof)
 # keeps exit and relaunch: an unpinned legacy omp is reported as such, and other
 # legacy-unproven records skip.
@@ -154,7 +153,7 @@ for ((offset=0; offset<count && (ONE == 0 || selected == 0); offset++)); do
         continue
       fi
       if [ "$(fm_meta_get "$meta" harness)" = claude ]; then
-        # An unadopted native restore keeps the nonzero status an unproven
+        # An unpinned native restore keeps the nonzero status an unproven
         # versioned launch always had; only its wording follows the true cause.
         notice "$id" "unmanaged $identity" \
           "REBOOT_RECOVERY: $id: $(fm_launch_proof_refusal_cause unmanaged); no lifecycle action taken; $(fm_launch_proof_refusal_next unmanaged "$meta")" && result=1

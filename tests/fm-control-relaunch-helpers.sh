@@ -70,7 +70,6 @@ D=$FM_FAKE_DIR
 if [ -f "$D/claude-restore" ]; then
   uuid=$(cat "$D/claude-restore")
   claude_args="claude --resume $uuid"
-  [ ! -f "$D/claude-args" ] || claude_args=$(cat "$D/claude-args")
   if [ -f "$D/claude-wrapper" ]; then
     case "$*" in
       '-axo pid=,ppid=') printf '2000000000 1\n2000000001 2000000000\n'; exit 0 ;;
@@ -115,21 +114,6 @@ SH
   cat > "$1/fakebin/python3" <<'SH'
 #!/usr/bin/env bash
 D=$FM_FAKE_DIR
-# The structured argv reader (python3 -I - argv <pid>): a count, then each field, NUL-terminated.
-if [ "${1:-}" = -I ] && [ "${2:-}" = - ] && [ "${3:-}" = argv ] && [ -f "$D/claude-restore" ]; then
-  uuid=$(cat "$D/claude-restore")
-  claude_args="claude --resume $uuid"
-  [ ! -f "$D/claude-args" ] || claude_args=$(cat "$D/claude-args")
-  if [ -f "$D/claude-wrapper" ] && [ "${4:-}" = 2000000000 ]; then
-    read -r -a words <<< "node /host/nvm/bin/teamclaude run -- --resume $uuid"
-  elif [ "${4:-}" = 2000000000 ] || { [ -f "$D/claude-wrapper" ] && [ "${4:-}" = 2000000001 ]; }; then
-    read -r -a words <<< "$claude_args"
-  else
-    exit 1
-  fi
-  printf '%s\0' "${#words[@]}" "${words[@]}"
-  exit 0
-fi
 if [ "$#" = 2 ] && [ "$1" = - ]; then
   pid=$2
   if [ -f "$D/herdr-pids/$pid" ]; then D=$(cat "$D/herdr-pids/$pid"); fi
@@ -139,7 +123,6 @@ if [ "$#" = 2 ] && [ "$1" = - ]; then
     && { [ "$pid" = "$expected" ] || { [ -f "$D/claude-wrapper" ] && [ "$pid" = "$((expected + 1))" ]; }; }; then
     [ ! -f "$D/recovery-env-unreadable" ] || exit 1
     printf 'PATH=/test\n'
-    [ ! -f "$D/claude-home" ] || printf 'HOME=%s\n' "$(cat "$D/claude-home")"
     if [ -f "$D/launched-command" ]; then
       case "$(cat "$D/replacement-env" 2>/dev/null)" in
         missing) exit 0 ;;
@@ -172,7 +155,7 @@ SH
 D=$FM_FAKE_DIR
 if [ -f "$D/adoption-cwd" ] && [ "${*: -1}" = pn0 ]; then
   [ ! -f "$D/adoption-cwd-unreadable" ] || exit 1
-  printf 'p%s\0\nn%s\0\n' "${4:-$(cat "$D/recovery-pid")}" "$(cat "$D/adoption-cwd")"
+  printf 'p%s\0\nn%s\0\n' "$(cat "$D/recovery-pid")" "$(cat "$D/adoption-cwd")"
   exit 0
 fi
 encode_cwd() {
