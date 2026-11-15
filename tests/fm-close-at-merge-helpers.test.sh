@@ -166,6 +166,11 @@ test_the_callers_use_the_checked_helpers() {
   grep -q 'fm_pr_closes_load "\$1.parse"' "$ROOT/bin/fm-pr-close-items.sh" \
     && ! grep -q 'done < <(got "\$WORK/body" id)' "$ROOT/bin/fm-pr-close-items.sh" \
     && ok "f2: the close step loads each parse result whole" || not_ok "f2: the close step still reads ids through a process substitution"
+  if grep -nE '< <\(got |\$\(got [^)]*\) *\||got [^|]*\| *(grep|sed|paste)' "$ROOT/bin/fm-pr-close-items.sh" | grep -v '^[0-9]*: *#' | grep -q .; then
+    not_ok "f2: a report in the close step still reads the parse result with its status unchecked: $(grep -nE '< <\(got |got [^|]*\| *(grep|sed|paste)' "$ROOT/bin/fm-pr-close-items.sh" | cut -d: -f1 | tr '\n' ' ')"
+  else
+    ok "f2: every report in the close step reads the parse result with its status checked"
+  fi
   grep -q '|| close_rc=\$?' "$ROOT/bin/fm-pr-merge.sh" \
     && ok "f2: the merge script checks the close step's status" || not_ok "f2: the merge script ignores the close step's status"
   grep -q 'fm_typed_completion_resolve \${ARGS\[@\]+"\${ARGS\[@\]}"}' "$ROOT/bin/fm-tasks-axi.sh" \

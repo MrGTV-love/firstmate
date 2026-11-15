@@ -2611,6 +2611,59 @@ SH
   pass "a typed completion with its flags first, with the task noun or with --flag=value clears its finished edge and keeps the rest, and the capture guard stops every form"
 }
 
+# Main 1851 F1 and F2, the reviewer's injections: a fake awk fails one reader of the parse or
+# of its result. A member-value read that fails during validation refuses the whole block; an id
+# read that gives the first id and then fails closes nothing from that body and names each item;
+# a report read that fails is reported, never dropped. Control: the same bodies close without
+# the fake.
+test_r7_f1_f2_a_failed_read_of_the_parse_or_its_result_closes_nothing() {
+  local case_dir real_awk mode
+  case_dir=$(gh_case r7-reads 192)
+  for id in r7-first r7-second r7-member r7-legacy-block; do
+    cx_add "$case_dir" "$id"
+    cx_add "$case_dir" "waits-$id"
+    cx "$case_dir" block "waits-$id" --by "$id" >/dev/null
+  done
+  cx_add "$case_dir" r7-legacy-named
+  real_awk=$(command -v awk)
+  cat > "$case_dir/fakebin/awk" <<SH
+#!/usr/bin/env bash
+# Each mode fails one reader: \$1 -v, \$2 t=<record type>; a parse-result read also names the file.
+case "\${R7_FAIL:-}:\${1:-}:\${2:-}:\$#:\${4:-}" in
+  id:-v:t=id:4:*.parse) "$real_awk" "\$@" | sed -n '1p'; echo 'simulated partial id read' >&2; exit 42 ;;
+  member:-v:t=member:3:*) echo 'simulated member read failure' >&2; exit 42 ;;
+  legacy:-v:t=legacy:4:*.parse) echo 'simulated report read failure' >&2; exit 42 ;;
+esac
+exec "$real_awk" "\$@"
+SH
+  chmod +x "$case_dir/fakebin/awk"
+  block 'Closes-backlog-item: r7-first' 'Closes-backlog-item: r7-second' > "$case_dir/bodies/192"
+  R7_FAIL=id run_close "$case_dir" task-x1 "$REPO_URL/192" > "$case_dir/id.out" 2> "$case_dir/id.err" || true
+  for id in r7-first r7-second; do
+    [ "$(cx_state "$case_dir" "$id")" = queued ] || fail "r7-reads: $id closed from a parse result read in part"
+    case "$(cx_deps "$case_dir" "waits-$id")" in *"$id"*) ;; *) fail "r7-reads: the edge on $id changed" ;; esac
+    assert_grep "not closed $id: the parse result of the body of $REPO_URL/192 could not be read" "$case_dir/id.err" "r7-reads: $id was not named"
+  done
+  assert_grep "could not read the parse result of the body of $REPO_URL/192" "$case_dir/id.err" "r7-reads: the failed result read was not reported"
+  block 'Closes-backlog-item: r7-member' "Train-member: $REPO_URL/71" > "$case_dir/bodies/192"
+  R7_FAIL=member run_close "$case_dir" task-x1 "$REPO_URL/192" > "$case_dir/member.out" 2> "$case_dir/member.err" || true
+  [ "$(cx_state "$case_dir" r7-member)" = queued ] || fail "r7-reads: a block closed though its member values could not be read"
+  assert_grep 'Train-member values could not be read' "$case_dir/member.err" "r7-reads: the member read failure was not the refusal reason"
+  { block 'Closes-backlog-item: r7-legacy-block'; printf '%s\n' '' 'Closes: r7-legacy-named'; } > "$case_dir/bodies/192"
+  R7_FAIL=legacy run_close "$case_dir" task-x1 "$REPO_URL/192" > "$case_dir/legacy.out" 2> "$case_dir/legacy.err" || true
+  [ "$(cx_state "$case_dir" r7-legacy-block)" = "done" ] || fail "r7-reads: a report read failure stopped the valid block"
+  [ "$(cx_state "$case_dir" r7-legacy-named)" = queued ] || fail "r7-reads: the old line closed its item"
+  assert_grep "could not read the old Closes: lines of the body of $REPO_URL/192" "$case_dir/legacy.err" "r7-reads: a failed report read was dropped without a word"
+  # Control: the two-item body closes both without the fake.
+  rm -f "$case_dir/fakebin/awk"
+  block 'Closes-backlog-item: r7-first' 'Closes-backlog-item: r7-second' > "$case_dir/bodies/192"
+  run_close "$case_dir" task-x1 "$REPO_URL/192" > "$case_dir/ctl.out" 2> "$case_dir/ctl.err" || true
+  for mode in r7-first r7-second; do
+    [ "$(cx_state "$case_dir" "$mode")" = "done" ] || fail "r7-reads control: $mode did not close"
+  done
+  pass "a failed member read refuses the block; a parse result read in part closes nothing and names each item; a failed report read is reported; the control closes"
+}
+
 pr_close_test_cases=(
 test_closes_lines_close_each_eligible_item_and_report_the_rest
 test_a_merge_naming_its_own_task_reports_the_live_record
@@ -2700,5 +2753,6 @@ test_r6_f5_a_waive_whose_capture_file_cannot_be_made_does_not_run
 test_r6_f5_a_completion_whose_output_is_lost_still_clears_in_the_same_run
 test_r7_f3_an_unfinished_item_under_the_id_keeps_every_edge
 test_r7_f4_every_typed_form_clears_and_is_guarded
+test_r7_f1_f2_a_failed_read_of_the_parse_or_its_result_closes_nothing
 )
 fm_test_run_cases "${pr_close_test_cases[@]}" -- "$@"
