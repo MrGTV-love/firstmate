@@ -2662,13 +2662,15 @@ do_relaunch() {
       alive) ;;
       *) die "launch recovery for $ID cannot attribute its endpoint (agent=$state)" ;;
     esac
-    judged=$(fm_launch_proof_herdr_judge "$META")
+    # One record read decides the legacy branch and the verdict (Main 1807 (2)).
+    judged=$(fm_launch_proof_recovery_judge "$META")
+    legacy=${judged%%$'\t'*}; judged=${judged#*$'\t'}; judged=${judged#*$'\t'}
     state=${judged%%$'\t'*}
     detail=${judged#*$'\t'}
     case "$state" in
       managed) echo "recovery-skipped $ID launch=managed"; return 0 ;;
       unmanaged)
-        if fm_launch_proof_record_legacy "$META"; then
+        if [ "$legacy" = 1 ]; then
           echo "recovery-skipped $ID launch=legacy record; exit and relaunch are allowed"
           return 0
         fi
@@ -2683,7 +2685,7 @@ do_relaunch() {
         die "launch recovery for $ID found $(fm_launch_proof_refusal_cause "$state" "$detail"); no lifecycle action taken; $(fm_launch_proof_refusal_next "$state" "$META")"
         ;;
       unknown)
-        if fm_launch_proof_record_legacy "$META"; then
+        if [ "$legacy" = 1 ]; then
           echo "recovery-skipped $ID launch=legacy-unproven"
           return 0
         fi

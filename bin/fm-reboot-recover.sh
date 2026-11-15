@@ -128,19 +128,19 @@ for ((offset=0; offset<count && (ONE == 0 || selected == 0); offset++)); do
     *) result=1; continue ;;
   esac
   born=''
-  if pid=$(fm_launch_proof_herdr_pid "$meta"); then
-    judged=$(fm_launch_proof_herdr_verdict_judge "$meta" "$pid")
-    proof=${judged%%$'\t'*}
-    detail=${judged#*$'\t'}
-    born=$(LC_ALL=C ps -p "$pid" -o lstart= 2>/dev/null | awk '{$1=$1; print}') || born=''
-  else
-    pid='' proof=unknown detail=''
-  fi
+  # One record read decides the legacy branch, the attributed PID and the
+  # verdict (Main 1807 (2)).
+  judged=$(fm_launch_proof_recovery_judge "$meta")
+  legacy=${judged%%$'\t'*}; judged=${judged#*$'\t'}
+  pid=${judged%%$'\t'*}; judged=${judged#*$'\t'}
+  proof=${judged%%$'\t'*}
+  detail=${judged#*$'\t'}
+  [ -z "$pid" ] || born=$(LC_ALL=C ps -p "$pid" -o lstart= 2>/dev/null | awk '{$1=$1; print}') || born=''
   identity="$target $pid $born"
   case "$proof" in
     managed) forget "$id"; continue ;;
     unknown)
-      if fm_launch_proof_record_legacy "$meta"; then
+      if [ "$legacy" = 1 ]; then
         forget "$id"
         continue
       fi
@@ -149,7 +149,7 @@ for ((offset=0; offset<count && (ONE == 0 || selected == 0); offset++)); do
       continue
       ;;
     unmanaged)
-      if fm_launch_proof_record_legacy "$meta"; then
+      if [ "$legacy" = 1 ]; then
         notice "$id" "legacy $identity" \
           "REBOOT_RECOVERY: $id: legacy record; exit and relaunch are allowed" || true
         continue

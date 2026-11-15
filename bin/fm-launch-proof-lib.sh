@@ -113,10 +113,14 @@ fm_launch_proof_pid_is_omp() { # <pid>
   return 1
 }
 
-fm_launch_proof_herdr_pid() { # <meta> -> the attributed live foreground PID
+# With <with-listed>, a second line names every process Herdr listed in the
+# pane's foreground, so the refusal checks judge each one (Main 1807 (3)).
+fm_launch_proof_herdr_pid() { # <meta> [with-listed] -> the attributed live foreground PID
+  local FM_LAUNCH_PROOF_RECORD_PATH=${FM_LAUNCH_PROOF_RECORD_PATH-} FM_LAUNCH_PROOF_RECORD_BYTES=${FM_LAUNCH_PROOF_RECORD_BYTES-} FM_LAUNCH_PROOF_RECORD_OK=${FM_LAUNCH_PROOF_RECORD_OK-}
   local meta=$1 target session pane info foreground pid
   local candidates ids='' name argv0 parents group
-  target=$(fm_meta_get "$meta" window)
+  fm_launch_proof_record_ensure "$meta"
+  target=$(fm_launch_proof_field "$meta" window)
   session=${target%%:*}; pane=${target#*:}
   info=$(fm_backend_herdr_cli "$session" pane process-info --pane "$pane" 2>/dev/null) \
     || return 1
@@ -164,7 +168,10 @@ fm_launch_proof_herdr_pid() { # <meta> -> the attributed live foreground PID
       || return 1
   fi
   foreground=$(printf '%s' "$candidates" | jq -ec 'select(length == 1) | .[0]') || return 1
-  printf '%s' "$foreground" | jq -er '.pid | select(type == "number" and . > 1) | floor' 2>/dev/null
+  pid=$(printf '%s' "$foreground" | jq -er '.pid | select(type == "number" and . > 1) | floor' 2>/dev/null) || return 1
+  printf '%s' "$pid"
+  [ "${2:-}" = with-listed ] || return 0
+  printf '\n%s' "$(printf '%s' "$info" | jq -r '[.result.process_info.foreground_processes[].pid | tostring] | join(" ")')"
 }
 
 # Rebuild candidate proof only from this home's recorded endpoint. The native
@@ -342,33 +349,78 @@ except (OSError, ValueError, TypeError, subprocess.SubprocessError):
 PY
 }
 
-# The one read of a task record's launch_proof (Main 1709 ruling 2, Main 1716
-# (B)). Prints legacy for a positively read, nonempty regular record with no
-# launch_proof line at all, else its one nonempty value. Fails for a missing,
-# unreadable or empty record, an empty value, or two or more launch_proof
-# lines: nothing then proves the live agent, and no legacy rule applies.
-FM_LAUNCH_PROOF_RECORD_CAUSE='its launch record is not one readable record with at most one nonempty launch_proof line (it is missing, unreadable, empty, duplicated or of an unknown proof), so nothing proves the live agent'
+# The one read of a task record (Main 1634 D1, Main 1807 (2)). One decision
+# reads the record's bytes once, and every field it uses comes from those same
+# bytes; a nested call in the same decision reuses them. Each entry point
+# below declares the three FM_LAUNCH_PROOF_RECORD_* variables local, so the
+# bytes live only as long as that decision. A read that needs the file again
+# (the omp adoption proof) compares it byte for byte and refuses on a change.
+FM_LAUNCH_PROOF_RECORD_CAUSE='its launch record is not one readable record with at most one launch_proof line naming a known proof (it is missing, unreadable, empty, duplicated, changed while read, or names an unknown proof), so nothing proves the live agent'
+fm_launch_proof_record_read() { # <meta>: sets FM_LAUNCH_PROOF_RECORD_PATH, _BYTES, _OK in scope
+  local raw
+  FM_LAUNCH_PROOF_RECORD_PATH=$1 FM_LAUNCH_PROOF_RECORD_BYTES='' FM_LAUNCH_PROOF_RECORD_OK=0
+  { [ -f "$1" ] && [ -r "$1" ]; } || return 0
+  raw=$(cat -- "$1" 2>/dev/null && printf x) || return 0
+  raw=${raw%x}
+  [ -n "$raw" ] || return 0
+  FM_LAUNCH_PROOF_RECORD_BYTES=$raw FM_LAUNCH_PROOF_RECORD_OK=1
+}
+
+# Reads <meta> unless this decision already holds its bytes. Callers declare the
+# three variables local first (see fm_launch_proof_record_read).
+fm_launch_proof_record_ensure() { # <meta>
+  [ "${FM_LAUNCH_PROOF_RECORD_PATH-}" = "$1" ] || fm_launch_proof_record_read "$1"
+}
+
+# One field of <meta>, from this decision's bytes when it holds them (the last
+# line for <key> wins, as fm_meta_get reads it), else from the file.
+fm_launch_proof_field() { # <meta> <key>
+  local line value=''
+  if [ "${FM_LAUNCH_PROOF_RECORD_PATH-}" = "$1" ]; then
+    [ "${FM_LAUNCH_PROOF_RECORD_OK-}" = 1 ] || return 0
+    while IFS= read -r line || [ -n "$line" ]; do
+      case "$line" in "$2="*) value=${line#*=} ;; esac
+    done <<< "$FM_LAUNCH_PROOF_RECORD_BYTES"
+    printf '%s' "$value"
+    return 0
+  fi
+  fm_meta_get "$1" "$2"
+}
+
+# Whether <meta> still holds exactly this decision's bytes. Prints nothing.
+fm_launch_proof_record_unchanged() { # <meta>
+  local raw
+  [ "${FM_LAUNCH_PROOF_RECORD_OK-}" = 1 ] && [ "${FM_LAUNCH_PROOF_RECORD_PATH-}" = "$1" ] || return 1
+  raw=$(cat -- "$1" 2>/dev/null && printf x) || return 1
+  [ "${raw%x}" = "$FM_LAUNCH_PROOF_RECORD_BYTES" ]
+}
+
+# The record's launch proof, from this decision's bytes (Main 1709 ruling 2,
+# Main 1716 (B), Main 1807 (1)). Prints absent only when the record has no
+# launch_proof line at all, and proof=<value> for its one line otherwise, so no
+# value (the literal "legacy" included) can read as absent. Fails for a
+# missing, unreadable or empty record, an empty value, or two or more lines.
 fm_launch_proof_record_proof() { # <meta>
-  local meta=$1 content line value='' count=0
-  { [ -f "$meta" ] && [ -r "$meta" ]; } || return 1
-  content=$(cat -- "$meta" 2>/dev/null) || return 1
-  [ -n "$content" ] || return 1
-  while IFS= read -r line; do
+  local FM_LAUNCH_PROOF_RECORD_PATH=${FM_LAUNCH_PROOF_RECORD_PATH-} FM_LAUNCH_PROOF_RECORD_BYTES=${FM_LAUNCH_PROOF_RECORD_BYTES-} FM_LAUNCH_PROOF_RECORD_OK=${FM_LAUNCH_PROOF_RECORD_OK-}
+  local line value='' count=0
+  fm_launch_proof_record_ensure "$1"
+  [ "$FM_LAUNCH_PROOF_RECORD_OK" = 1 ] || return 1
+  while IFS= read -r line || [ -n "$line" ]; do
     case "$line" in
       launch_proof=*) count=$((count + 1)); value=${line#launch_proof=} ;;
     esac
-  done <<< "$content"
+  done <<< "$FM_LAUNCH_PROOF_RECORD_BYTES"
   case "$count" in
-    0) printf legacy ;;
-    1) [ -n "$value" ] || return 1; printf '%s' "$value" ;;
+    0) printf absent ;;
+    1) [ -n "$value" ] || return 1; printf 'proof=%s' "$value" ;;
     *) return 1 ;;
   esac
 }
 
-# Succeeds only for a record that fm_launch_proof_record_proof reads as legacy.
+# Succeeds only for a record with no launch_proof line at all (a legacy record).
 fm_launch_proof_record_legacy() { # <meta>
   local proof
-  proof=$(fm_launch_proof_record_proof "$1") && [ "$proof" = legacy ]
+  proof=$(fm_launch_proof_record_proof "$1") && [ "$proof" = absent ]
 }
 
 # Whether <from>'s parent chain in <process-table> (pid ppid [pgid] rows) reaches
@@ -470,7 +522,7 @@ fm_launch_proof_claim_states() { # <meta>
 # "no claim".
 fm_launch_proof_state_claimed() { # <self-meta> <state-dir> <cwd> <home> <root>
   local self=$1 dir=$2 cwd=$3 home=$4 root=$5 target session pane peer path
-  target=$(fm_meta_get "$self" window)
+  target=$(fm_launch_proof_field "$self" window)
   session=${target%%:*}; pane=${target#*:}
   { [ -d "$dir" ] && [ -r "$dir" ] && [ -x "$dir" ]; } || { printf 'the task records at %s' "$dir"; return 2; }
   for peer in "$dir"/*.meta; do
@@ -517,7 +569,7 @@ fm_launch_proof_claims() { # <meta> <cwd> <home> <root>
   state=$(dirname -- "$meta")
   queue=("$state")
   if [ -n "${FM_LAUNCH_PROOF_VERB_PATH:-}" ]; then
-    named=$(fm_meta_get "$meta" home)
+    named=$(fm_launch_proof_field "$meta" home)
     [ -z "$named" ] || queue+=("$named/state")
   else
     inventory=$(fm_launch_proof_claim_states "$meta") || { printf 'the local home inventory (%s)' "$inventory"; return 2; }
@@ -562,7 +614,7 @@ fm_launch_proof_claims() { # <meta> <cwd> <home> <root>
 # (k), a matching pin keeping its base outcome, applies only after all pass.
 # Prints <verdict><TAB><cause>, the cause empty when the verdict's own applies.
 fm_launch_proof_token_checks() { # <meta> <pid> <spawn-gen>
-  local meta=$1 pid=$2 gen=$3 table group kid environment pinned foreign='' unread='' rc cwd home root claim
+  local meta=$1 pid=$2 gen=$3 table group kid environment pinned foreign='' unread='' rc cwd home root claim seen
   local -a members=()
   table=$(set -o pipefail; LC_ALL=C ps -axo pid=,ppid=,pgid= 2>/dev/null) && [ -n "$table" ] || {
     printf 'unknown\tthe process table could not be read completely, so the agent'"'"'s process group cannot be judged'
@@ -573,6 +625,19 @@ fm_launch_proof_token_checks() { # <meta> <pid> <spawn-gen>
   while IFS= read -r kid; do
     [ -z "$kid" ] || members+=("$kid")
   done < <(awk -v g="$group" -v p="$pid" '$3 == g && $1 != p {print $1}' <<< "$table")
+  # Every process Herdr listed in the foreground is a member too, judged from
+  # this one table: one the table lacks is unaccounted for, never exited
+  # (Main 1807 (3)).
+  for kid in ${FM_LAUNCH_PROOF_LISTED:-}; do
+    [ "$kid" != "$pid" ] || continue
+    awk -v p="$kid" '$1 == p {found=1} END {exit !found}' <<< "$table" || {
+      printf 'unknown\tthe listed foreground process %s is missing from the process-group table, so the agent'"'"'s process group cannot be judged' "$kid"
+      return
+    }
+    seen=0
+    for rc in "${members[@]+"${members[@]}"}"; do [ "$rc" != "$kid" ] || seen=1; done
+    [ "$seen" = 1 ] || members+=("$kid")
+  done
   for kid in "${members[@]+"${members[@]}"}"; do
     if environment=$(fm_remote_herdr_process_env "$kid") \
       && printf '%s\n' "$environment" | grep -Eq '^(PATH|HOME)='; then
@@ -600,8 +665,8 @@ fm_launch_proof_token_checks() { # <meta> <pid> <spawn-gen>
     printf 'unknown\tthe agent'"'"'s kernel working directory cannot be read'
     return
   }
-  home=$(fm_launch_proof_physical_dir "$(fm_meta_get "$meta" home)")
-  root=$(fm_launch_proof_physical_dir "$(fm_meta_get "$meta" worktree)")
+  home=$(fm_launch_proof_physical_dir "$(fm_launch_proof_field "$meta" home)")
+  root=$(fm_launch_proof_physical_dir "$(fm_launch_proof_field "$meta" worktree)")
   { [ -n "$root" ] && [ "$cwd" = "$root" ]; } || { [ -n "$home" ] && [ "$cwd" = "$home" ]; } || {
     printf 'contested\tthe agent'"'"'s working directory is not this task'"'"'s recorded home or worktree'
     return
@@ -616,6 +681,7 @@ fm_launch_proof_token_checks() { # <meta> <pid> <spawn-gen>
 }
 
 fm_launch_proof_herdr() { # <meta> -> managed|unmanaged|pinned-elsewhere|contested|unknown
+  local FM_LAUNCH_PROOF_RECORD_PATH=${FM_LAUNCH_PROOF_RECORD_PATH-} FM_LAUNCH_PROOF_RECORD_BYTES=${FM_LAUNCH_PROOF_RECORD_BYTES-} FM_LAUNCH_PROOF_RECORD_OK=${FM_LAUNCH_PROOF_RECORD_OK-}
   local judged
   judged=$(fm_launch_proof_herdr_judge "$1")
   printf '%s' "${judged%%$'\t'*}"
@@ -624,28 +690,54 @@ fm_launch_proof_herdr() { # <meta> -> managed|unmanaged|pinned-elsewhere|contest
 # The verdict with its cause: <verdict><TAB><cause>, the cause empty when the
 # verdict's own wording (fm_launch_proof_refusal_cause) applies.
 fm_launch_proof_herdr_judge() { # <meta>
-  local pid
-  pid=$(fm_launch_proof_herdr_pid "$1") || { printf 'unknown\t'; return; }
+  local FM_LAUNCH_PROOF_RECORD_PATH=${FM_LAUNCH_PROOF_RECORD_PATH-} FM_LAUNCH_PROOF_RECORD_BYTES=${FM_LAUNCH_PROOF_RECORD_BYTES-} FM_LAUNCH_PROOF_RECORD_OK=${FM_LAUNCH_PROOF_RECORD_OK-}
+  local out pid FM_LAUNCH_PROOF_LISTED
+  fm_launch_proof_record_ensure "$1"
+  out=$(fm_launch_proof_herdr_pid "$1" with-listed) || { printf 'unknown\t'; return; }
+  pid=${out%%$'\n'*}
+  FM_LAUNCH_PROOF_LISTED=''
+  [ "$out" = "$pid" ] || FM_LAUNCH_PROOF_LISTED=${out#*$'\n'}
   fm_launch_proof_herdr_verdict_judge "$1" "$pid"
 }
 
+# One recovery inspection from one record read: <legacy 0|1><TAB><pid or
+# empty><TAB><verdict><TAB><cause>, so the caller's legacy branch, its
+# identity and the verdict all rest on the same bytes (Main 1807 (2)).
+fm_launch_proof_recovery_judge() { # <meta>
+  local FM_LAUNCH_PROOF_RECORD_PATH=${FM_LAUNCH_PROOF_RECORD_PATH-} FM_LAUNCH_PROOF_RECORD_BYTES=${FM_LAUNCH_PROOF_RECORD_BYTES-} FM_LAUNCH_PROOF_RECORD_OK=${FM_LAUNCH_PROOF_RECORD_OK-}
+  local out pid='' legacy=0 judged FM_LAUNCH_PROOF_LISTED=''
+  fm_launch_proof_record_ensure "$1"
+  ! fm_launch_proof_record_legacy "$1" || legacy=1
+  if out=$(fm_launch_proof_herdr_pid "$1" with-listed); then
+    pid=${out%%$'\n'*}
+    [ "$out" = "$pid" ] || FM_LAUNCH_PROOF_LISTED=${out#*$'\n'}
+    judged=$(fm_launch_proof_herdr_verdict_judge "$1" "$pid")
+  else
+    judged=$(printf 'unknown\t')
+  fi
+  printf '%s\t%s\t%s' "$legacy" "$pid" "$judged"
+}
+
 fm_launch_proof_herdr_verdict() { # <meta> <pid> -> managed|unmanaged|pinned-elsewhere|contested|unknown
+  local FM_LAUNCH_PROOF_RECORD_PATH=${FM_LAUNCH_PROOF_RECORD_PATH-} FM_LAUNCH_PROOF_RECORD_BYTES=${FM_LAUNCH_PROOF_RECORD_BYTES-} FM_LAUNCH_PROOF_RECORD_OK=${FM_LAUNCH_PROOF_RECORD_OK-}
   local judged
   judged=$(fm_launch_proof_herdr_verdict_judge "$1" "$2")
   printf '%s' "${judged%%$'\t'*}"
 }
 
 fm_launch_proof_herdr_verdict_judge() { # <meta> <pid>
+  local FM_LAUNCH_PROOF_RECORD_PATH=${FM_LAUNCH_PROOF_RECORD_PATH-} FM_LAUNCH_PROOF_RECORD_BYTES=${FM_LAUNCH_PROOF_RECORD_BYTES-} FM_LAUNCH_PROOF_RECORD_OK=${FM_LAUNCH_PROOF_RECORD_OK-}
   local meta=$1 pid=$2 proof gen verdict record task_file current_file adopted refusal=unmanaged harness table token
+  fm_launch_proof_record_ensure "$meta"
   proof=$(fm_launch_proof_record_proof "$meta") \
     || { printf 'unknown\t%s' "$FM_LAUNCH_PROOF_RECORD_CAUSE"; return; }
   case "$proof" in
-    legacy) proof='' ;;
-    env-v1) ;;
+    absent) proof='' ;;
+    'proof=env-v1') proof='env-v1' ;;
     *) printf 'unknown\t%s' "$FM_LAUNCH_PROOF_RECORD_CAUSE"; return ;;
   esac
-  gen=$(fm_meta_get "$meta" spawn_gen)
-  harness=$(fm_meta_get "$meta" harness)
+  gen=$(fm_launch_proof_field "$meta" spawn_gen)
+  harness=$(fm_launch_proof_field "$meta" harness)
   if [ "$harness" = claude ] && [ "$proof" = env-v1 ]; then
     # The launch record and its token are the only proof: one read of the agent;
     # an unpinned agent then gets one read of each other group member, and a
@@ -690,6 +782,9 @@ fm_launch_proof_herdr_verdict_judge() { # <meta> <pid>
       # comparison. A valid record alone still cannot license lifecycle input.
       adopted=$(fm_launch_proof_omp_adoption "$meta" 2>/dev/null) \
         || { printf '%s\t' "$refusal"; return; }
+      # The adoption proof reads the record again: it must be the same bytes.
+      fm_launch_proof_record_unchanged "$meta" \
+        || { printf 'unknown\t%s' "$FM_LAUNCH_PROOF_RECORD_CAUSE"; return; }
       [ "$(printf '%s' "$adopted" | jq -r '.pid')" = "$pid" ] \
         && [ "$current_file" -ef "$(printf '%s' "$adopted" | jq -r '.current_session_file')" ] \
         || { printf '%s\t' "$refusal"; return; }
@@ -743,19 +838,22 @@ fm_launch_proof_refusal_next() { # <unmanaged|pinned-elsewhere|contested|unknown
 # Lifecycle authorization for a live recorded Herdr agent, with the refusal
 # cause on stdout when it fails for a claude record (omp's unmanaged verdict
 # also covers a matching pin whose session proof failed, so it keeps its
-# existing wording). A legacy record (fm_launch_proof_record_legacy: published
-# before launch proofs existed) has no pin to compare; a record that cannot be
-# read as one record with at most one launch_proof refuses. The verdict is
-# read exactly once.
+# existing wording). A legacy record (no launch_proof line at all: published
+# before launch proofs existed) has no pin to compare; any present value other
+# than a known proof, and a record that cannot be read as one record with at
+# most one launch_proof, refuses. The record and the verdict are each read
+# exactly once.
 fm_launch_proof_herdr_refusal() { # <meta>
+  local FM_LAUNCH_PROOF_RECORD_PATH=${FM_LAUNCH_PROOF_RECORD_PATH-} FM_LAUNCH_PROOF_RECORD_BYTES=${FM_LAUNCH_PROOF_RECORD_BYTES-} FM_LAUNCH_PROOF_RECORD_OK=${FM_LAUNCH_PROOF_RECORD_OK-}
   local proof judged verdict harness
-  harness=$(fm_meta_get "$1" harness)
-  if ! proof=$(fm_launch_proof_record_proof "$1"); then
+  fm_launch_proof_record_ensure "$1"
+  harness=$(fm_launch_proof_field "$1" harness)
+  if ! proof=$(fm_launch_proof_record_proof "$1") || { [ "$proof" != absent ] && [ "$proof" != proof=env-v1 ]; }; then
     [ "$harness" != claude ] \
       || printf '%s; %s' "$FM_LAUNCH_PROOF_RECORD_CAUSE" "$(fm_launch_proof_refusal_next unknown "$1")"
     return 1
   fi
-  [ "$proof" != legacy ] || return 0
+  [ "$proof" != absent ] || return 0
   judged=$(fm_launch_proof_herdr_judge "$1")
   verdict=${judged%%$'\t'*}
   [ "$verdict" != managed ] || return 0
