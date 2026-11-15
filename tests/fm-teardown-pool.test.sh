@@ -4835,8 +4835,16 @@ test_return_pending_marker_records_the_proved_lease() {
     teardown_mark_return_pending "$SLOT" || echo MARK_FAILED
     got=$(teardown_marker_lease "$SLOT")
     [ "$got" = "ordinary|$holder|id-1|1" ] && echo unleased_keeps=exact || echo "unleased_keeps=BAD[$got]"
-    # another slot's marker carries nothing
+    # a tuple that was never bindable (legacy, conflicting, unreadable) records no lease, so a
+    # retry after the pool state is repaired is not refused for good
+    for tuple in 'legacy|task-x1||1' 'conflicting|||' 'unreadable|||'; do
+      rm -f "$STATE/task-x1.teardown-return-pending"
+      TEARDOWN_UNCLAIMED_SLOT=$SLOT TEARDOWN_UNCLAIMED_EARLY=$tuple
+      teardown_mark_return_pending "$SLOT" || echo MARK_FAILED
+      [ "$(grep -c '^lease=' "$STATE/task-x1.teardown-return-pending")" = 0 ] || echo "unbindable_recorded=$tuple"
+    done
     TEARDOWN_UNCLAIMED_SLOT='' TEARDOWN_UNCLAIMED_EARLY=''
+    # another slot's marker carries nothing
     teardown_mark_return_pending "$dir/pool/2/other" || echo MARK_FAILED
     got=$(teardown_marker_lease "$dir/pool/2/other")
     [ -z "$got" ] && echo other_slot=none || echo "other_slot=BAD[$got]"
@@ -4850,8 +4858,9 @@ test_return_pending_marker_records_the_proved_lease() {
   assert_contains "$out" 'unleased_keeps=exact' "an unleased tuple overwrote the lease the interrupted attempt proved"
   assert_contains "$out" 'other_slot=none' "a marker for another slot carried a lease"
   assert_not_contains "$out" 'MARK_FAILED' "the marker could not be written"
+  assert_not_contains "$out" 'unbindable_recorded=' "a lease that was never bindable (legacy, conflicting, unreadable) was recorded in the marker, so a repaired retry would refuse for good"
   assert_not_contains "$out" 'hex_accepts=' "the hex decoder accepted text that is not whole hex bytes"
-  pass 'the return-pending marker records the lease the gate proved (any characters, exactly), carries it across later writes of the same slot, never overwrites it with an unleased tuple, and records none for another slot'
+  pass 'the return-pending marker records the lease the gate proved (any characters, exactly), carries it across later writes of the same slot, never overwrites it with an unleased tuple, records none for another slot or for a tuple that was never bindable'
 }
 
 # The functions eval'd from bin/fm-teardown.sh read these variables and call these stubs.
@@ -4866,6 +4875,9 @@ test_retry_compares_the_slot_with_the_marker_lease_and_never_rebinds() {
       'unreadable|ordinary|task-x1|id-1|unreadable|||1' \
       'already-returned|ordinary|task-x1|id-1|unleased|||0' \
       'no-recorded-lease|none|||ordinary|successor|id-9|0' \
+      'repaired-after-legacy|legacy|task-x1||ordinary|task-x1|id-1|0' \
+      'repaired-after-conflicting|conflicting|||ordinary|task-x1|id-1|0' \
+      'repaired-after-unreadable|unreadable|||ordinary|task-x1|id-1|0' \
       'undecodable-recorded-lease|garbage|||ordinary|task-x1|id-1|1'; do
     IFS='|' read -r name marker mh mi pstate ph pi want <<<"$scenario"
     dir=$(unc6_marker_env "retry-$name")

@@ -1253,9 +1253,12 @@ teardown_mark_return_pending() {  # <slot> [child-id]
   tmp="$STATE/.$ID.teardown-return-pending.${BASHPID:-$$}"
   if [ -n "$TEARDOWN_UNCLAIMED_SLOT" ] && [ "$1" = "$TEARDOWN_UNCLAIMED_SLOT" ] \
       && [ -n "$TEARDOWN_UNCLAIMED_EARLY" ]; then
+    # Only a lease a return can be bound to is recorded (ordinary, or recovered): a legacy,
+    # conflicting, unreadable or unleased tuple was never proved bindable, so recording it
+    # would make every retry after the pool state is repaired refuse for good. A retry
+    # whose marker records none binds to the lease its own early proof reads.
     case "$TEARDOWN_UNCLAIMED_EARLY" in
-      unleased\|*) ;;
-      *) lease=$(teardown_hex_encode "$TEARDOWN_UNCLAIMED_EARLY") ;;
+      ordinary\|*|recovered\|*) lease=$(teardown_hex_encode "$TEARDOWN_UNCLAIMED_EARLY") ;;
     esac
   fi
   if [ -z "$lease" ]; then

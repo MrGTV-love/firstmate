@@ -1665,14 +1665,17 @@ real_provider_recovered_slot_cases() {
     retained_fingerprint | cmp -s - "$CASE_DIR/before-copy" || fail "$start/$order: an old session's exit changed the recovered slot"
     ! compgen -G "$pool/../treehouse-recovered-backup-*" >/dev/null || fail "$order: a recovered backup appeared"
     # A further get, run for real as an extra check (not a substitute for the spawn's own get
-    # above). The spawn's own get still holds B, so no later get is assumed to return B or any
-    # particular slot: it may hand out another slot or fail at capacity, but it never hands out
-    # the recovered slot A and never the slot B the live get holds.
+    # above). No assumption is made about which free slot it returns: this case runs the
+    # spawn's get in a command substitution, so that get has already exited and a later get
+    # may hand out B (earlier records show it does) or another slot or fail at capacity. It
+    # must never hand out the recovered slot A. The live-get lifecycle (the spawn's get
+    # staying alive and holding its allocation) is exercised for the FAKE provider only, in
+    # test_spawn_runs_its_own_get_and_takes_the_slot_that_command_chose: the live mode needs
+    # the beat file the fake writes, which a real provider never does.
     entry=$(cd "$PROJECT_DIR" && "$FM_TEST_TREEHOUSE_PROVIDER" get --root "$CASE_DIR/real-root" --no-fetch --lease --lease-holder next </dev/null 2>/dev/null) || entry=
     if [ -n "$entry" ]; then
       entry=$(cd "$entry" && pwd -P)
       [ "$entry" != "$a" ] || fail "$order: a further get handed out the recovered slot $a"
-      [ "$entry" != "$b" ] || fail "$order: a further get handed out the slot $b that the spawn's own get holds"
     fi
     retained_fingerprint | cmp -s - "$CASE_DIR/before-copy" || fail "$order: the real get changed the recovered slot"
     jq -e --arg a "$a" --arg r "$recovered" '.worktrees[] | select(.path == $a) | .lease_holder == $r and (.lease_id // "") == ""' "$state" >/dev/null \
