@@ -227,23 +227,31 @@ test_a_real_pool_slot_keeps_its_lease_and_the_unique_files_are_preserved_and_the
   assert_equals 0 "$(real_returns)" "a-kept: the real slot was returned"
   real_assert_slot_unchanged "a-kept"
   assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "a-kept: the driver was not asked exactly once"
-  # The unique .claude files are saved in the driver's verified archive, which the recorded
-  # answer names (the stand-in's archive is a placeholder); the task's preserve holds the
-  # selected file, restored here into a scratch path.
   assert_equals '[".claude/channel-outbox/a.jsonl",".claude/channel-outbox/b.jsonl"]' "$(sed -n 's/^answer-base64=//p' "$(retained_record_path)" | perl -MMIME::Base64 -0777 -ne 'print decode_base64($_)' | jq -c .unique_ignored_paths)" "a-kept: the record does not carry the driver's unique paths"
-  preserve=$FOREIGN_CASE/data/task-x1/nested-copy-preserved/$(printf '%s' "$FOREIGN_COPY" | shasum -a 256 | awk '{print $1}')
+  # Every unique file restores to the builder's own bytes from the task's preserve (the
+  # selected file and the two .claude files), and the .claude files also from the real archive
+  # the driver wrote and the record names, each restored into its own scratch path.
+  preserve=$(sed -n 's/^preserve=//p' "$(retained_record_path)")
   scratch=$FOREIGN_CASE/scratch-restore
-  mkdir -p "$scratch"
-  (cd "$preserve" && tar -cf - .) | (cd "$scratch" && tar -xf -)
+  mkdir -p "$scratch/preserve" "$scratch/archive"
+  (cd "$preserve" && tar -cf - .) | (cd "$scratch/preserve" && tar -xf -)
+  tar -xf "$(sed -n 's/^answer-base64=//p' "$(retained_record_path)" | perl -MMIME::Base64 -0777 -ne 'print decode_base64($_)' | jq -r '.ignored_payload_preservation[-1].archive_path')" -C "$scratch/archive"
   want=$(printf 'only here\n' | shasum -a 256 | awk '{print $1}')
-  have=$(shasum -a 256 "$scratch/notes/unique.dat" | awk '{print $1}')
+  have=$(shasum -a 256 "$scratch/preserve/notes/unique.dat" | awk '{print $1}')
   assert_equals "$want" "$have" "a-kept: notes/unique.dat does not restore to the builder's hash"
+  assert_equals "$(printf 'one\n' | shasum -a 256 | awk '{print $1}') $(printf 'two\n' | shasum -a 256 | awk '{print $1}')" \
+    "$(shasum -a 256 "$scratch/preserve/.claude/channel-outbox/a.jsonl" | awk '{print $1}') $(shasum -a 256 "$scratch/preserve/.claude/channel-outbox/b.jsonl" | awk '{print $1}')" \
+    "a-kept: the unique .claude files do not restore from the task's preserve to the builder's hashes"
+  assert_equals "$(printf 'one\n' | shasum -a 256 | awk '{print $1}') $(printf 'two\n' | shasum -a 256 | awk '{print $1}')" \
+    "$(shasum -a 256 "$scratch/archive/.claude/channel-outbox/a.jsonl" | awk '{print $1}') $(shasum -a 256 "$scratch/archive/.claude/channel-outbox/b.jsonl" | awk '{print $1}')" \
+    "a-kept: the unique .claude files do not restore from the driver's archive to the builder's hashes"
   [ ! -e "$preserve/.venv" ] && [ ! -e "$preserve/node_modules" ] || fail "a-kept: the regenerable control was preserved"
   assert_present "$FOREIGN_COPY/.venv/bin/python" "a-kept: the kept copy lost its control"
   assert_present "$FOREIGN_COPY/node_modules/dep/index.js" "a-kept: the kept copy lost its control"
   if [ -n "$REAL_DIR" ]; then
-    diff -r "$preserve" "$scratch" > "$REAL_DIR/restore.diff" 2>&1 && echo "restore: identical" >> "$REAL_DIR/restore.diff"
+    diff -r "$preserve" "$scratch/preserve" > "$REAL_DIR/restore.diff" 2>&1 && echo "restore: identical" >> "$REAL_DIR/restore.diff"
     printf 'notes/unique.dat  builder:%s restored:%s\n' "$want" "$have" >> "$REAL_DIR/restore.hashes"
+    (cd "$scratch" && shasum -a 256 preserve/.claude/channel-outbox/*.jsonl archive/.claude/channel-outbox/*.jsonl) >> "$REAL_DIR/restore.hashes"
   fi
   pass "a-kept: on a real pool slot the close keeps the copy and the lease, the unique files restore to the builder's hashes and the control is left out"
 }

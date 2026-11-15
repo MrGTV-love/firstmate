@@ -6455,6 +6455,15 @@ test_closeout_driver_refusal_leaves_a_locked_own_copy_and_its_records() {
 # driver, the creation lock and the landed-work test as controlled stand-ins; the cases after
 # them run bin/fm-teardown.sh on the teardown fixture.
 
+# kept_assert_lacks <text> <file> <message>: <file> is a readable regular file that does not
+# hold <text>. Unlike the shared assert_no_grep (tests/lib.sh), a missing or unreadable file
+# fails here instead of passing as "no match"; the shared helper is left as it is because 63
+# suites call it and some pass a file that may rightly be absent.
+kept_assert_lacks() {
+  { [ -f "$2" ] && [ -r "$2" ]; } || fail "$3 (the file $2 to search is missing or unreadable)"
+  ! grep -F -- "$1" "$2" >/dev/null || fail "$3"
+}
+
 # kept_helper_env: the shell text a helper-level case evals in its subshell: the libraries
 # bin/fm-teardown.sh sources for this route, then stand-ins for the creation lock (a file in
 # the case directory), the landed-work test and the telemetry, and a closeout driver stand-in
@@ -6495,6 +6504,16 @@ teardown_run_closeout() {
   TEARDOWN_CLOSEOUT_OUT=$TEARDOWN_CLOSEOUT_STDOUT
   return "$(cat "$KC/exit" 2>/dev/null || echo 3)"
 }
+# $KC/after-preserve, when present, runs right after the product's own preserve writer
+# (whichever name it has), to change the copy or the preserve at that boundary.
+if [ -e "$KC/after-preserve" ]; then
+  for kept_fn in teardown_own_preserve teardown_preserve_ignored; do
+    declare -F "$kept_fn" >/dev/null || continue
+    eval "kept_orig_$(declare -f "$kept_fn")"
+    eval "$kept_fn() { kept_orig_$kept_fn \"\$@\"; local r=\$?; . \"\$KC/after-preserve\"; return \$r; }"
+    break
+  done
+fi
 SH
 }
 
@@ -6540,8 +6559,17 @@ rc=$?
 kept=no
 ! teardown_copy_retained "$COPY" || kept=yes
 printf "rc=%s kept=%s calls=%s\n" "$rc" "$kept" "$(cat "$KC/calls" 2>/dev/null || echo 0)"
-'
+' | tee -a "$kc/runs"
   done
+  # VC: each run's observation, written by the run itself, when FM_RETAINED_EVIDENCE names a file.
+  if [ -n "${FM_RETAINED_EVIDENCE:-}" ]; then
+    printf '%s | case=%s | runs: %s | tars=%s | preserves=%s | refusal-records=%s | causes: %s\n' \
+      "${FUNCNAME[1]:-?}" "${kc##*/}" "$(tail -n "$runs" "$kc/runs" | paste -sd ';' -)" \
+      "$(find "$kc/tars" -name '*.tar' 2>/dev/null | wc -l | tr -d ' ')" \
+      "$(find "$kc/data/task-x1/nested-copy-preserved" -mindepth 1 -maxdepth 1 -type d ! -name '.*' 2>/dev/null | wc -l | tr -d ' ')" \
+      "$(find "$kc/data/task-x1/closeout-refused" -type f ! -name '.*' 2>/dev/null | wc -l | tr -d ' ')" \
+      "$(grep -o 'REFUSED: .\{0,160\}' "$kc/stderr" 2>/dev/null | tail -n 2 | paste -sd '|' -)" >> "$FM_RETAINED_EVIDENCE"
+  fi
 }
 
 # (c) and (d) helper level, the controls of every case below: a valid kept answer closes around
@@ -6652,7 +6680,7 @@ test_kept_copy_helper_a_refused_kept_copy_is_judged_again_from_its_record() {
   printf 'rm -f "$DATA/$ID/nested-copy-preserved/"*/notes/unique.dat\n' > "$kc/after"
   out=$(kept_helper_dispose "$kc" 1)
   assert_equals 'rc=1 kept=no calls=1' "$out" "kept-helper-rejudge-preserve: a preserve without a selected file must refuse: $(cat "$kc/stderr")"
-  assert_grep 'does not hold every selected ignored file' "$kc/stderr" "kept-helper-rejudge-preserve: the refusal did not name the preserve"
+  assert_grep 'does not hold every ignored file' "$kc/stderr" "kept-helper-rejudge-preserve: the refusal did not name the preserve"
   out=$(kept_helper_dispose "$kc" 1)
   assert_equals 'rc=0 kept=yes calls=1' "$out" "kept-helper-rejudge-preserve: the rebuilt preserve did not close from the record: $(cat "$kc/stderr")"
   rm -rf "$tmp"
@@ -6685,7 +6713,7 @@ teardown_retained_copy_held() { [ "$1" = "$KC/slot/kept" ]; }
 teardown_retained_matches() { [ "$1" = "$KC/slot/kept" ]; }
 teardown_nested_slot retire
 ' 2>"$tmp/stderr"
-  assert_no_grep "$tmp/slot/kept" "$log" "kept-helper-retire: the retire step reached the matching kept copy: $(cat "$log")"
+  kept_assert_lacks "$tmp/slot/kept" "$log" "kept-helper-retire: the retire step reached the matching kept copy: $(cat "$log")"
   assert_grep "conclude $tmp/slot/other" "$log" "kept-helper-retire: another nested copy was not swept: $(cat "$log" "$tmp/stderr")"
   assert_grep "conclude $tmp/wt" "$log" "kept-helper-retire: the task's worktree was not swept"
   assert_grep "reap $tmp/wt $tmp/slot $tmp/slot/other $tmp/tasktmp" "$log" "kept-helper-retire: the reaper's roots are not the other roots"
@@ -6755,6 +6783,347 @@ receipt_is_stale "$KC/gone-receipt"; printf "gone-stale=%s\n" "$?"
   pass "a retained receipt that is not a regular readable file is never stale and another home's such receipt holds the copy, while a matching receipt holds and a gone copy's receipt is stale"
 }
 
+# kept_tree <dir>: one line per file, symlink and FIFO under <dir> (type, path, SHA-256 or the
+# link target's bytes in hex), sorted, read independently of the product.
+kept_tree() {
+  [ -d "$1" ] || { echo "absent"; return 0; }
+  (cd "$1" && perl -MFile::Find -MDigest::SHA -e '
+    my @l;
+    find({ no_chdir => 1, wanted => sub {
+      my $p = $File::Find::name; return if $p eq ".";
+      if (-l $p) { push @l, "L $p " . unpack("H*", readlink $p) }
+      elsif (-f $p) { open(my $f, "<:raw", $p) or die; push @l, "F $p " . Digest::SHA->new(256)->addfile($f)->hexdigest }
+      elsif (-p $p) { push @l, "P $p" }
+    } }, ".");
+    print "$_\n" for sort @l;')
+}
+
+# kept_preserve_base <dir>: the first preserve directory of the case's copy.
+kept_preserve_base() {
+  printf '%s/data/task-x1/nested-copy-preserved/%s\n' "$1" "$(printf '%s' "$(cd "$1/copy" && pwd -P)" | shasum -a 256 | awk '{print $1}')"
+}
+
+# Item 1 (C2 unchanged, closed end state): a retry of a task whose close completed around a kept
+# copy is told it is already closed, naming the record, before any copy lookup; a task record
+# that is damaged rather than gone, a task record still present, a pending backlog close, or a
+# kept copy's record without the mark of a completed close is not a completed close.
+test_kept_copy_helper_a_retry_of_a_closed_task_says_it_is_already_closed() {
+  local tmp kc out shape
+  tmp=$(fm_test_tmproot kept-helper-closed)
+  for shape in closed meta-damaged meta-present close-pending not-marked; do
+    kc=$tmp/$shape
+    kept_helper_case "$kc"
+    out=$(kept_helper_dispose "$kc" 1)
+    assert_equals 'rc=0 kept=yes calls=1' "$out" "kept-helper-closed-$shape: the kept copy did not close: $(cat "$kc/stderr")"
+    mkdir -p "$kc/state"
+    case "$shape" in
+      meta-damaged) mkdir "$kc/state/task-x1.meta" ;;
+      meta-present) printf 'kind=ship\n' > "$kc/state/task-x1.meta" ;;
+      close-pending) printf 'id=task-x1\n' > "$kc/state/task-x1.backlog-close" ;;
+    esac
+    out=$(KC=$kc ROOT=$ROOT COPY="$(cd "$kc/copy" && pwd -P)" SHAPE=$shape bash -c "$(kept_helper_env)"'
+. "$ROOT/bin/fm-backlog-transition-lib.sh" 2>/dev/null || true
+TEARDOWN_RETAINED=("$COPY")
+[ "$SHAPE" = not-marked ] || teardown_retained_mark_closed 2>>"$KC/stderr"
+teardown_lookups=0
+teardown_copy_lock_file() { teardown_lookups=$((teardown_lookups + 1)); return 1; }
+TEARDOWN_RETAINED=()
+if teardown_retained_closed_note "$KC/state/task-x1.meta" "$KC/state" 2>>"$KC/stderr"; then printf "closed lookups=%s\n" "$teardown_lookups"; else printf "refused rc=%s\n" "$?"; fi
+' 2>&1)
+    case "$shape" in
+      closed)
+        assert_contains "$out" "teardown task-x1: already closed" "kept-helper-closed: a retry of a closed task did not say it is already closed: $out"
+        assert_contains "$out" "$(find "$kc/data/copy-sweep/retained" -type f | head -n 1)" "kept-helper-closed: the message does not name the record: $out"
+        assert_contains "$out" "closed lookups=0" "kept-helper-closed: a copy was looked up: $out"
+        ;;
+      *)
+        assert_contains "$out" "refused rc=" "kept-helper-closed-$shape: a task that is not proved closed was reported closed: $out"
+        case "$out" in *"already closed"*) fail "kept-helper-closed-$shape: printed already closed: $out" ;; esac
+        ;;
+    esac
+    assert_equals 1 "$(cat "$kc/calls")" "kept-helper-closed-$shape: the driver was asked again"
+  done
+  rm -rf "$tmp"
+  pass "a retry of a task closed around a kept copy says it is already closed, names the record and looks up no copy, and a damaged or present task record, a pending backlog close or an unmarked record does not"
+}
+
+# Item 2 (C2 changed, A-8): no earlier preserved byte is overwritten or removed, and a new ignored
+# entry under .claude or .opencode, a name differing only after a tab and a symlink whose target
+# ends in a newline are copied into teardown's own preserve. A changed payload asks the driver
+# once (P3) and is preserved beside the earlier preserve, which stays byte for byte as it was;
+# the same payload again asks nothing, and a return to the earlier payload asks once and reuses
+# the earlier preserve. Also: a pre-existing preserve of the copy, a preserve that did not hold,
+# and a refusal after the driver's answer each leave every earlier preserved byte in place.
+test_kept_copy_helper_a_changed_copy_is_preserved_beside_its_earlier_preserve_which_is_never_replaced() {
+  local tmp kc out base first second dirs
+  tmp=$(fm_test_tmproot kept-helper-beside)
+  kc=$tmp/change
+  kept_helper_case "$kc"
+  printf '%s\n' '.opencode/' >> "$kc/copy/.git/info/exclude"
+  out=$(kept_helper_dispose "$kc" 1)
+  assert_equals 'rc=0 kept=yes calls=1' "$out" "kept-helper-beside: the first run did not close: $(cat "$kc/stderr")"
+  base=$(kept_preserve_base "$kc")
+  assert_equals 'only here' "$(cat "$base/notes/unique.dat" 2>/dev/null)" "kept-helper-beside: the first preserve is not at the base path in the base layout"
+  assert_equals 'one' "$(cat "$base/.claude/channel-outbox/a.jsonl" 2>/dev/null)" "kept-helper-beside: the .claude entry is not in teardown's own preserve"
+  first=$(kept_tree "$base")
+  # The new population: a new .opencode entry, a new .claude entry, two names that differ only
+  # after a tab, a symlink whose target ends in a newline, and changed bytes of a selected file.
+  mkdir -p "$kc/copy/.opencode"
+  printf 'oc\n' > "$kc/copy/.opencode/new.json"
+  printf 'two\n' > "$kc/copy/.claude/channel-outbox/b.jsonl"
+  printf 'tab-a\n' > "$kc/copy/notes/x	a"
+  printf 'tab-b\n' > "$kc/copy/notes/x	b"
+  perl -e 'symlink("target\n", $ARGV[0]) or die' "$kc/copy/notes/link"
+  printf 'changed\n' > "$kc/copy/notes/unique.dat"
+  out=$(kept_helper_dispose "$kc" 2)
+  assert_equals $'rc=0 kept=yes calls=2\nrc=0 kept=yes calls=2' "$out" "kept-helper-beside: a changed payload must ask once and then nothing: $(cat "$kc/stderr")"
+  assert_equals "$first" "$(kept_tree "$base")" "kept-helper-beside: the earlier preserve changed"
+  dirs=$(find "$kc/data/task-x1/nested-copy-preserved" -mindepth 1 -maxdepth 1 -type d ! -name '.*' | LC_ALL=C sort)
+  assert_equals 2 "$(printf '%s\n' "$dirs" | wc -l | tr -d ' ')" "kept-helper-beside: the changed payload was not preserved in one directory beside the first: $dirs"
+  second=$(printf '%s\n' "$dirs" | grep -v -x -F "$base")
+  case "$second" in "$base".????????????????) ;; *) fail "kept-helper-beside: the beside directory is not named by 16 characters of the payload fingerprint: $second" ;; esac
+  assert_equals 'oc' "$(cat "$second/.opencode/new.json" 2>/dev/null)" "kept-helper-beside: the new .opencode entry is not preserved"
+  assert_equals 'two' "$(cat "$second/.claude/channel-outbox/b.jsonl" 2>/dev/null)" "kept-helper-beside: the new .claude entry is not preserved"
+  assert_equals 'tab-a tab-b' "$(cat "$second/notes/x	a" 2>/dev/null) $(cat "$second/notes/x	b" 2>/dev/null)" "kept-helper-beside: the tab names are not preserved apart"
+  assert_equals "$(printf 'target\n' | od -An -tx1 | tr -d ' \n')" "$(perl -e 'print unpack("H*", readlink($ARGV[0]) // "")' "$second/notes/link")" "kept-helper-beside: the symlink's trailing newline was not preserved"
+  assert_equals 'changed' "$(cat "$second/notes/unique.dat")" "kept-helper-beside: the changed bytes are not preserved"
+  assert_equals "$(sed -n 's/^preserve=//p' "$(find "$kc/data/copy-sweep/retained" -type f | head -n 1)")" "$second" "kept-helper-beside: the record does not name the preserve that holds the copy"
+  # A return to the earlier payload is a change (P3): it asks once and reuses the first preserve.
+  rm -rf "$kc/copy/.opencode" "$kc/copy/.claude/channel-outbox/b.jsonl" "$kc/copy/notes/x	a" "$kc/copy/notes/x	b" "$kc/copy/notes/link"
+  printf 'only here\n' > "$kc/copy/notes/unique.dat"
+  out=$(kept_helper_dispose "$kc" 1)
+  assert_equals 'rc=0 kept=yes calls=3' "$out" "kept-helper-beside: a return to the earlier payload must ask once: $(cat "$kc/stderr")"
+  assert_equals 2 "$(find "$kc/data/task-x1/nested-copy-preserved" -mindepth 1 -maxdepth 1 -type d ! -name '.*' | wc -l | tr -d ' ')" "kept-helper-beside: the earlier payload made a third preserve"
+  assert_equals "$first" "$(kept_tree "$base")" "kept-helper-beside: the earlier preserve changed on the return"
+  # A pre-existing preserve of the copy (an earlier teardown's) is kept as it is.
+  kc=$tmp/existing
+  kept_helper_case "$kc"
+  base=$(kept_preserve_base "$kc")
+  mkdir -p "$base/notes"
+  printf 'earlier bytes\n' > "$base/notes/unique.dat"
+  printf 'earlier only\n' > "$base/notes/gone.dat"
+  first=$(kept_tree "$base")
+  out=$(kept_helper_dispose "$kc" 1)
+  assert_equals 'rc=0 kept=yes calls=1' "$out" "kept-helper-beside-existing: the close failed: $(cat "$kc/stderr")"
+  assert_equals "$first" "$(kept_tree "$base")" "kept-helper-beside-existing: the pre-existing preserve changed"
+  # A preserve that did not hold (a selected file lost from it during the driver call): the run
+  # refuses, the unchanged retry asks nothing and preserves beside it, and the damaged
+  # preserve keeps every byte it still had.
+  kc=$tmp/unheld
+  kept_helper_case "$kc"
+  # shellcheck disable=SC2016 # expanded by the stand-in driver's shell.
+  printf 'rm -f "$DATA/$ID/nested-copy-preserved/"*/notes/unique.dat\n' > "$kc/after"
+  out=$(kept_helper_dispose "$kc" 1)
+  assert_equals 'rc=1 kept=no calls=1' "$out" "kept-helper-beside-unheld: a preserve that does not hold must refuse: $(cat "$kc/stderr")"
+  rm -f "$kc/after"
+  base=$(kept_preserve_base "$kc")
+  first=$(kept_tree "$base")
+  out=$(kept_helper_dispose "$kc" 1)
+  assert_equals 'rc=0 kept=yes calls=1' "$out" "kept-helper-beside-unheld: the unchanged retry must close beside it without the driver: $(cat "$kc/stderr")"
+  assert_equals "$first" "$(kept_tree "$base")" "kept-helper-beside-unheld: the earlier preserve changed"
+  # A refusal after the driver's answer (not landed), then a changed payload: asked once more,
+  # and the earlier preserve stays.
+  kc=$tmp/refused
+  kept_helper_case "$kc"
+  : > "$kc/unlanded"
+  out=$(kept_helper_dispose "$kc" 1)
+  assert_equals 'rc=1 kept=no calls=1' "$out" "kept-helper-beside-refused: an unlanded kept copy must refuse: $(cat "$kc/stderr")"
+  base=$(kept_preserve_base "$kc")
+  first=$(kept_tree "$base")
+  rm -f "$kc/unlanded"
+  printf 'changed\n' > "$kc/copy/notes/unique.dat"
+  out=$(kept_helper_dispose "$kc" 1)
+  assert_equals 'rc=0 kept=yes calls=2' "$out" "kept-helper-beside-refused: the changed copy must ask once and close: $(cat "$kc/stderr")"
+  assert_equals "$first" "$(kept_tree "$base")" "kept-helper-beside-refused: the earlier preserve changed"
+  rm -rf "$tmp"
+  pass "a changed kept copy is preserved beside its earlier preserve, with new .claude and .opencode entries, tab names and a newline-ended link target, and no earlier preserved byte is ever overwritten or removed"
+}
+
+# Item 3 (C2 post-driver, Main 006): when the copy's record cannot be written, the close refuses
+# and a refusal record names the copy, its state and the cause in data/<task>/closeout-refused/;
+# every unchanged retry adds no driver call; once the record can be written the next run asks
+# once (P2), closes and deletes the refusal record. Before the driver the record folder is probed
+# first, so that run asks nothing; after the driver, a failed write keeps the answer in the
+# refusal record.
+test_kept_copy_helper_a_record_that_cannot_be_written_leaves_a_refusal_record() {
+  local tmp kc out shape rdir refused
+  [ "$(id -u)" != 0 ] || { pass "skipped as root: a permission bit does not stop root"; return 0; }
+  tmp=$(fm_test_tmproot kept-helper-refused)
+  for shape in before-driver after-driver; do
+    kc=$tmp/$shape
+    kept_helper_case "$kc"
+    rdir=$kc/data/copy-sweep/retained
+    mkdir -p "$rdir"
+    refused=$kc/data/task-x1/closeout-refused/$(printf '%s' "$(cd "$kc/copy" && pwd -P)" | shasum -a 256 | awk '{print $1}')
+    case "$shape" in
+      before-driver)
+        chmod 555 "$rdir"
+        out=$(kept_helper_dispose "$kc" 2)
+        assert_equals $'rc=1 kept=no calls=0\nrc=1 kept=no calls=0' "$out" "kept-helper-refused-$shape: the driver was asked while the record could not be written: $(cat "$kc/stderr")"
+        ;;
+      after-driver)
+        # The stand-in takes the folder's write bit away after its answer, as a disk that fills does.
+        printf 'chmod 555 "%s"\n' "$rdir" > "$kc/after"
+        out=$(kept_helper_dispose "$kc" 1)
+        rm -f "$kc/after"
+        out=$out$'\n'$(kept_helper_dispose "$kc" 1)
+        assert_equals $'rc=1 kept=no calls=1\nrc=1 kept=no calls=1' "$out" "kept-helper-refused-$shape: an unchanged retry asked the driver again: $(cat "$kc/stderr")"
+        assert_grep 'answer-base64=' "$refused" "kept-helper-refused-$shape: the refusal record does not hold the driver's answer"
+        ;;
+    esac
+    assert_present "$refused" "kept-helper-refused-$shape: no refusal record was written"
+    assert_grep "copy=$(cd "$kc/copy" && pwd -P)" "$refused" "kept-helper-refused-$shape: the refusal record does not name the copy"
+    assert_grep 'cause=' "$refused" "kept-helper-refused-$shape: the refusal record names no cause"
+    assert_grep 'payload-sha256=' "$refused" "kept-helper-refused-$shape: the refusal record holds no payload fingerprint"
+    assert_grep 'REFUSED' "$kc/stderr" "kept-helper-refused-$shape: the refusal printed no cause line"
+    chmod 755 "$rdir"
+    out=$(kept_helper_dispose "$kc" 2)
+    case "$shape" in
+      before-driver) assert_equals $'rc=0 kept=yes calls=1\nrc=0 kept=yes calls=1' "$out" "kept-helper-refused-$shape: once writable the next run must ask once and close: $(cat "$kc/stderr")" ;;
+      after-driver) assert_equals $'rc=0 kept=yes calls=2\nrc=0 kept=yes calls=2' "$out" "kept-helper-refused-$shape: once writable the next run must ask once more (P2) and close: $(cat "$kc/stderr")" ;;
+    esac
+    assert_absent "$refused" "kept-helper-refused-$shape: the refusal record outlived its cause"
+  done
+  rm -rf "$tmp"
+  pass "a kept copy whose record cannot be written refuses with a durable refusal record, unchanged retries ask the driver nothing, and once writable the next run asks once, closes and deletes the refusal record"
+}
+
+# Item 4 (C3 (c), C2 post-driver): every path the driver names is judged as it wrote it and its
+# bytes are checked against the copy in the task's preserve. The first or the second of two
+# named paths differing in the preserve, a selected-only file changed after it was preserved,
+# and a preserved selected file removed after it was verified each refuse with the task kept;
+# a named path the preserve lacks is copied in, checked and closes. Each name that is not an
+# object inside the copy refuses, recorded (unchanged retries ask nothing); an in-copy link, a
+# link to the copy's root and a real directory named with a trailing slash close.
+test_kept_copy_helper_every_driver_named_path_is_judged_as_written_and_checked_against_the_copy() {
+  local tmp kc out shape json count want base
+  tmp=$(fm_test_tmproot kept-helper-named)
+  for shape in first-differs second-differs selected-changed selected-removed lacking \
+      absolute dotdot empty-component dot dir-symlink link-outside link-dangling link-slash file-slash only-slashes \
+      in-copy-link root-link dir-slash; do
+    kc=$tmp/$shape
+    kept_helper_case "$kc"
+    printf 'two\n' > "$kc/copy/.claude/channel-outbox/b.jsonl"
+    base=$(kept_preserve_base "$kc")
+    json='[".claude/channel-outbox/a.jsonl", ".claude/channel-outbox/b.jsonl"]' count=2 want=refuse
+    case "$shape" in
+      first-differs) printf 'printf "different\\n" > "%s/.claude/channel-outbox/a.jsonl"\n' "$base" > "$kc/after" ;;
+      second-differs) printf 'printf "different\\n" > "%s/.claude/channel-outbox/b.jsonl"\n' "$base" > "$kc/after" ;;
+      selected-changed) printf 'printf "changed\\n" > "%s/notes/unique.dat"\n' "$kc/copy" > "$kc/after-preserve" ;;
+      selected-removed) printf 'rm -f "%s/notes/unique.dat"\n' "$base" > "$kc/after" ;;
+      lacking)
+        # .cache is in the regenerable class, so the preserve does not select it before the
+        # driver names it; the named file is copied in and checked.
+        mkdir -p "$kc/copy/.cache"; printf 'blob\n' > "$kc/copy/.cache/blob"
+        printf '%s\n' '.cache/' >> "$kc/copy/.git/info/exclude"
+        json='[".claude/channel-outbox/a.jsonl", ".cache/blob"]' want=close
+        ;;
+      absolute) json='["/etc/hosts", ".claude/channel-outbox/b.jsonl"]' ;;
+      dotdot) json='[".claude/channel-outbox/a.jsonl", ".claude/../outside.dat"]' ;;
+      empty-component) json='[".claude//channel-outbox/a.jsonl", ".claude/channel-outbox/b.jsonl"]' ;;
+      dot) json='["./.claude/channel-outbox/a.jsonl", ".claude/channel-outbox/b.jsonl"]' ;;
+      dir-symlink) ln -s channel-outbox "$kc/copy/.claude/via"; json='[".claude/via/a.jsonl", ".claude/channel-outbox/b.jsonl"]' ;;
+      link-outside) ln -s /etc "$kc/copy/.claude/out"; json='[".claude/out", ".claude/channel-outbox/b.jsonl"]' ;;
+      link-dangling) ln -s missing.jsonl "$kc/copy/.claude/dang"; json='[".claude/dang", ".claude/channel-outbox/b.jsonl"]' ;;
+      link-slash) ln -s channel-outbox "$kc/copy/.claude/dl"; json='[".claude/dl/", ".claude/channel-outbox/b.jsonl"]' ;;
+      file-slash) json='[".claude/channel-outbox/a.jsonl/", ".claude/channel-outbox/b.jsonl"]' ;;
+      only-slashes) json='["///", ".claude/channel-outbox/b.jsonl"]' ;;
+      in-copy-link) ln -s channel-outbox/a.jsonl "$kc/copy/.claude/inl"; json='[".claude/inl", ".claude/channel-outbox/b.jsonl"]' want=close ;;
+      root-link) ln -s .. "$kc/copy/.claude/root"; json='[".claude/root", ".claude/channel-outbox/b.jsonl"]' want=close ;;
+      dir-slash) json='[".claude/channel-outbox/"]' count=1 want=close ;;
+    esac
+    kept_helper_answer "$kc" "$json" "$count"
+    out=$(kept_helper_dispose "$kc" 2)
+    case "$want" in
+      close)
+        assert_equals $'rc=0 kept=yes calls=1\nrc=0 kept=yes calls=1' "$out" "kept-helper-named-$shape: the case must close: $(cat "$kc/stderr")"
+        [ "$shape" != lacking ] || assert_equals 'blob' "$(cat "$base/.cache/blob" 2>/dev/null)" "kept-helper-named-lacking: the named file the preserve lacked was not copied in"
+        ;;
+      refuse)
+        case "$shape" in
+          selected-changed) assert_equals 'rc=1 kept=no calls=0' "$(printf '%s\n' "$out" | head -n 1)" "kept-helper-named-$shape: a file changed after it was preserved must refuse before the driver: $(cat "$kc/stderr")" ;;
+          first-differs|second-differs|selected-removed) assert_equals 'rc=1 kept=no calls=1' "$(printf '%s\n' "$out" | head -n 1)" "kept-helper-named-$shape: the case must refuse after the driver: $(cat "$kc/stderr")" ;;
+          *) assert_equals $'rc=1 kept=no calls=1\nrc=1 kept=no calls=1' "$out" "kept-helper-named-$shape: the name must refuse, recorded, and the retry ask nothing: $(cat "$kc/stderr")" ;;
+        esac
+        assert_grep 'REFUSED' "$kc/stderr" "kept-helper-named-$shape: the refusal printed no cause"
+        assert_present "$kc/copy/.claude/channel-outbox/a.jsonl" "kept-helper-named-$shape: the copy lost a file"
+        ;;
+    esac
+  done
+  rm -rf "$tmp"
+  pass "every driver-named path is judged as written and checked against the copy: mismatches, late changes, lost preserved files and names that are not objects inside the copy refuse, a lacking named file is copied in, and in-copy links and a trailing-slash directory close"
+}
+
+# Item 5 (C9 (a), F2): on the released route, a file changed after it was preserved refuses
+# before the driver (no call, the copy stays) and the next run preserves it again; the unchanged
+# control is released with the preserve holding its bytes; and a preserve that loses bytes while
+# the driver releases the copy is caught after the release, the task not closed.
+test_kept_copy_helper_a_file_changed_after_it_was_preserved_is_never_released_unpreserved() {
+  local tmp kc out shape base
+  tmp=$(fm_test_tmproot kept-helper-release)
+  for shape in changed unchanged preserve-lost; do
+    kc=$tmp/$shape
+    kept_helper_case "$kc"
+    printf '0\n' > "$kc/exit"
+    base=$(kept_preserve_base "$kc")
+    case "$shape" in
+      changed) printf 'printf "new source\\n" > "%s/notes/unique.dat"\n' "$kc/copy" > "$kc/after-preserve" ;;
+      preserve-lost) printf 'printf "lost\\n" > "%s/notes/unique.dat"\n' "$base" > "$kc/after" ;;
+    esac
+    out=$(kept_helper_dispose "$kc" 1)
+    case "$shape" in
+      changed)
+        assert_equals 'rc=1 kept=no calls=0' "$out" "kept-helper-release-changed: a file changed after it was preserved reached the driver: $(cat "$kc/stderr")"
+        assert_equals 'new source' "$(cat "$kc/copy/notes/unique.dat")" "kept-helper-release-changed: the copy's current bytes are gone"
+        rm -f "$kc/after-preserve"
+        out=$(kept_helper_dispose "$kc" 1)
+        assert_equals 'rc=0 kept=no calls=1' "$out" "kept-helper-release-changed: the next run did not preserve and release: $(cat "$kc/stderr")"
+        grep -R -q -F 'new source' "$kc/data/task-x1/nested-copy-preserved" || fail "kept-helper-release-changed: the current bytes were not preserved before the release"
+        ;;
+      unchanged)
+        assert_equals 'rc=0 kept=no calls=1' "$out" "kept-helper-release-unchanged: the control was not released: $(cat "$kc/stderr")"
+        assert_equals 'only here' "$(cat "$base/notes/unique.dat")" "kept-helper-release-unchanged: the preserve does not hold the released bytes"
+        ;;
+      preserve-lost)
+        assert_equals 'rc=1 kept=no calls=1' "$out" "kept-helper-release-preserve-lost: a release whose preserve lost bytes closed: $(cat "$kc/stderr")"
+        assert_grep 'no longer holds' "$kc/stderr" "kept-helper-release-preserve-lost: the refusal does not name the preserve"
+        ;;
+    esac
+  done
+  rm -rf "$tmp"
+  pass "a file changed after it was preserved is never released unpreserved: it refuses before the driver and is preserved by the next run, the unchanged copy is released with its bytes held, and a preserve that loses bytes during the release is caught"
+}
+
+# F10: a root ignored file named like one of the preserve's own files (copy-path, SHA256SUMS) is
+# preserved byte for byte and the kept copy closes; its preserve holds the payload in files/ and
+# its SHA256SUMS lists every payload file there. The ordinary copy keeps the base layout.
+test_kept_copy_helper_root_files_named_like_the_preserves_own_files_are_preserved() {
+  local tmp kc out base
+  tmp=$(fm_test_tmproot kept-helper-reserved)
+  kc=$tmp/reserved
+  kept_helper_case "$kc"
+  printf '%s\n' '/SHA256SUMS' '/copy-path' >> "$kc/copy/.git/info/exclude"
+  printf 'the project'"'"'s own sums\n' > "$kc/copy/SHA256SUMS"
+  printf 'the project'"'"'s own copy-path\n' > "$kc/copy/copy-path"
+  out=$(kept_helper_dispose "$kc" 2)
+  assert_equals $'rc=0 kept=yes calls=1\nrc=0 kept=yes calls=1' "$out" "kept-helper-reserved: root files named like the preserve's own files must close: $(cat "$kc/stderr")"
+  base=$(kept_preserve_base "$kc")
+  assert_equals "the project's own sums" "$(cat "$base/files/SHA256SUMS" 2>/dev/null)" "kept-helper-reserved: SHA256SUMS of the copy is not preserved byte for byte"
+  assert_equals "the project's own copy-path" "$(cat "$base/files/copy-path" 2>/dev/null)" "kept-helper-reserved: copy-path of the copy is not preserved byte for byte"
+  assert_equals "$(cd "$kc/copy" && pwd -P)" "$(cat "$base/copy-path")" "kept-helper-reserved: the preserve's own copy-path does not name the copy"
+  (cd "$base" && shasum -a 256 -c SHA256SUMS >/dev/null 2>&1) || fail "kept-helper-reserved: the preserve's SHA256SUMS does not check: $(cat "$base/SHA256SUMS")"
+  assert_grep '  files/SHA256SUMS' "$base/SHA256SUMS" "kept-helper-reserved: SHA256SUMS does not list the payload's SHA256SUMS"
+  kc=$tmp/ordinary
+  kept_helper_case "$kc"
+  out=$(kept_helper_dispose "$kc" 1)
+  assert_equals 'rc=0 kept=yes calls=1' "$out" "kept-helper-reserved-ordinary: the control did not close: $(cat "$kc/stderr")"
+  base=$(kept_preserve_base "$kc")
+  assert_absent "$base/files" "kept-helper-reserved-ordinary: an ordinary copy's preserve left the base layout"
+  assert_grep '  notes/unique.dat' "$base/SHA256SUMS" "kept-helper-reserved-ordinary: the base layout's SHA256SUMS line is missing"
+  rm -rf "$tmp"
+  pass "root files named copy-path and SHA256SUMS are preserved byte for byte in files/ and the kept copy closes, while an ordinary copy keeps the base layout"
+}
+
 retained_field() {  # <record> <key>
   sed -n "s/^$2=//p" "$1" | head -n 1; sed -n "s/^$2=//p" "$1" | sed -n '2,$p'
 }
@@ -6763,7 +7132,9 @@ retained_field() {  # <record> <key>
 # <relative-file>, compared with hashes of the copy itself, and its SHA256SUMS lists it.
 retained_preserved_is() {
   local want have preserve
-  preserve=$FOREIGN_CASE/data/task-x1/nested-copy-preserved/$(printf '%s' "$FOREIGN_COPY" | shasum -a 256 | awk '{print $1}')
+  # The preserve the record names, or the first preserve when there is no record yet.
+  preserve=$(sed -n 's/^preserve=//p' "$(retained_record_path)" 2>/dev/null | head -n 1)
+  [ -n "$preserve" ] || preserve=$FOREIGN_CASE/data/task-x1/nested-copy-preserved/$(printf '%s' "$FOREIGN_COPY" | shasum -a 256 | awk '{print $1}')
   want=$(shasum -a 256 "$FOREIGN_COPY/$2" | awk '{print $1}')
   have=$(shasum -a 256 "$preserve/$2" 2>/dev/null | awk '{print $1}')
   assert_equals "$want" "$have" "$1: the preserved $2 is not the copy's bytes"
@@ -6799,13 +7170,15 @@ test_a_landed_task_closes_around_an_own_copy_the_driver_keeps() {
     assert_equals cleanup_ignored_payload_archived_tree_retained "$(retained_field "$record" reason)" "retained-close-$shape: the record does not carry the driver's reason"
     case "$(retained_field "$record" recorded-at)" in 20*Z) ;; *) fail "retained-close-$shape: the record carries no time" ;; esac
     case "$(sed -n 3p "$record")" in identity=[0-9]*:[0-9]*) ;; *) fail "retained-close-$shape: the record carries no identity" ;; esac
-    assert_equals "task slot preserve reason recorded-at head status-sha256 payload-sha256 answer-base64" "$(sed -n '5,$p' "$record" | sed 's/=.*//' | paste -sd ' ' -)" "retained-close-$shape: the record does not hold exactly its fields"
+    assert_equals "task slot preserve reason recorded-at head status-sha256 payload-sha256 answer-base64 task-closed" "$(sed -n '5,$p' "$record" | sed 's/=.*//' | paste -sd ' ' -)" "retained-close-$shape: the record does not hold exactly its fields"
+    assert_equals task-x1 "$(retained_field "$record" task-closed)" "retained-close-$shape: the completed close did not mark the record"
+    retained_preserved_is "retained-close-$shape" .claude/channel-outbox/a.jsonl
     answer=$(retained_recorded_answer)
     assert_equals '[".claude/channel-outbox/a.jsonl",".claude/channel-outbox/b.jsonl"]' "$(printf '%s' "$answer" | jq -c .unique_ignored_paths)" "retained-close-$shape: the record does not carry the driver's unique paths"
     # Both paths are compared physically (on macOS /tmp is /private/tmp).
     assert_equals "$(retained_physical "$(retained_tar_listing | awk '{print $2}')")" "$(retained_physical "$(printf '%s' "$answer" | jq -r '.ignored_payload_preservation[-1].archive_path')")" "retained-close-$shape: the recorded archive is not the tar the driver wrote"
     assert_equals "$FOREIGN_CASE/data/task-x1/nested-copy-preserved/$(printf '%s' "$FOREIGN_COPY" | shasum -a 256 | awk '{print $1}')" "$(retained_field "$record" preserve)" "retained-close-$shape: the record does not name the preserve"
-    assert_no_grep 'REFUSED' "$FOREIGN_CASE/stderr" "retained-close-$shape: a close that succeeded printed a refusal"
+    kept_assert_lacks 'REFUSED' "$FOREIGN_CASE/stderr" "retained-close-$shape: a close that succeeded printed a refusal"
     assert_equals 1 "$(cat "$FOREIGN_CASE/stdout" "$FOREIGN_CASE/stderr" | grep -c "notice: own nested copy $FOREIGN_COPY was kept")" "retained-close-$shape: the kept copy was not reported exactly once"
     assert_absent "$FOREIGN_CASE/data/task-x1/vernant-closeout."* "retained-close-$shape: a close saved a refusal output"
   done
@@ -6841,7 +7214,8 @@ test_a_retry_of_an_unchanged_kept_copy_asks_the_driver_nothing() {
 
 test_a_changed_kept_copy_is_assessed_afresh() {
   local rc record change
-  for change in more-ignored dirty-tracked unlanded; do
+  local base first
+  for change in more-ignored opencode-entry tab-name link-newline dirty-tracked unlanded; do
     make_retained_case "retained-changed-$change" enclosing
     held_plain_get_slot "$FOREIGN_CASE"
     : > "$FOREIGN_CASE/no-lease-command"
@@ -6849,19 +7223,36 @@ test_a_changed_kept_copy_is_assessed_afresh() {
     expect_code 1 "$rc" "retained-changed-$change: run 1 must refuse for the lease: $(cat "$FOREIGN_CASE/stderr")"
     record=$(retained_record_path)
     cp "$record" "$FOREIGN_CASE/record.run1"
+    base=$FOREIGN_CASE/data/task-x1/nested-copy-preserved/$(printf '%s' "$FOREIGN_COPY" | shasum -a 256 | awk '{print $1}')
+    first=$(kept_tree "$base")
     case "$change" in
       more-ignored) printf 'more\n' > "$FOREIGN_COPY/notes/unique.dat" ;;
+      opencode-entry)
+        printf '%s\n' '.opencode/' >> "$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)"
+        mkdir -p "$FOREIGN_COPY/.opencode"; printf 'oc\n' > "$FOREIGN_COPY/.opencode/new.json"
+        ;;
+      tab-name) printf 'tab\n' > "$FOREIGN_COPY/.claude/channel-outbox/a	b.jsonl" ;;
+      link-newline) perl -e 'symlink("a.jsonl\n", $ARGV[0]) or die' "$FOREIGN_COPY/.claude/channel-outbox/link" ;;
       dirty-tracked) printf 'edit\n' > "$FOREIGN_COPY/untracked.txt" ;;
       unlanded) held_foreign_unlanded "$FOREIGN_COPY" ;;
     esac
     run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
     expect_code 1 "$rc" "retained-changed-$change: run 2 must refuse: $(cat "$FOREIGN_CASE/stderr")"
     case "$change" in
-      more-ignored)
+      more-ignored|opencode-entry|tab-name|link-newline)
         assert_equals "2 2" "$(retained_call_count) $(retained_tar_count)" "retained-changed-$change: a changed copy that passes every proof was not evaluated again"
         assert_grep 'could not be durably leased' "$FOREIGN_CASE/stderr" "retained-changed-$change: run 2 did not reach the lease check"
         cmp -s "$FOREIGN_CASE/record.run1" "$record" && fail "retained-changed-$change: the stale record was not replaced"
-        retained_preserved_is "retained-changed-$change" notes/unique.dat
+        # No earlier preserved byte is overwritten or removed; the new payload is beside it.
+        assert_equals "$first" "$(kept_tree "$base")" "retained-changed-$change: the earlier preserve changed"
+        case "$change" in
+          more-ignored) retained_preserved_is "retained-changed-$change" notes/unique.dat ;;
+          opencode-entry) retained_preserved_is "retained-changed-$change" .opencode/new.json ;;
+          tab-name) retained_preserved_is "retained-changed-$change" ".claude/channel-outbox/a	b.jsonl" ;;
+          link-newline)
+            assert_equals "$(printf 'a.jsonl\n' | od -An -tx1 | tr -d ' \n')" "$(perl -e 'print unpack("H*", readlink($ARGV[0]) // "")' "$(sed -n 's/^preserve=//p' "$record")/.claude/channel-outbox/link")" "retained-changed-$change: the link target's trailing newline was not preserved"
+            ;;
+        esac
         ;;
       *)
         assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-changed-$change: a changed copy that fails a proof reached the driver"
@@ -6922,6 +7313,10 @@ retained_variant() {
     changed-during-driver) driver_env+=("FM_STUB_AFTER=printf 'changed\\n' > '$FOREIGN_COPY/notes/unique.dat'") ;;
     removed-from-preserve) driver_env+=("FM_STUB_AFTER=rm -f '$preserve/notes/unique.dat'") ;;
     driver-path-directory) driver_env+=("FM_STUB_UNIQUE=.claude/channel-outbox/") ;;
+    driver-path-differs) driver_env+=("FM_STUB_AFTER=printf 'different\\n' > '$preserve/.claude/channel-outbox/a.jsonl'") ;;
+    driver-path-differs-second) driver_env+=("FM_STUB_AFTER=printf 'different\\n' > '$preserve/.claude/channel-outbox/b.jsonl'") ;;
+    driver-path-gone) driver_env+=("FM_STUB_UNIQUE=.claude/channel-outbox/a.jsonl .claude/channel-outbox/missing.jsonl") ;;
+    driver-path-escapes) driver_env+=("FM_STUB_UNIQUE=.claude/channel-outbox/a.jsonl ../outside.dat") ;;
     empty-path) driver_env+=('FM_STUB_UNIQUE_JSON=[""]') ;;
     archive-sha-differs) driver_env+=(FM_STUB_ARCHIVE_SHA=0000000000000000000000000000000000000000000000000000000000000000) ;;
     lease-conflict) driver_env+=(FM_STUB_REASON=cleanup_lease_conflict) ;;
@@ -6972,13 +7367,13 @@ retained_variant_run() {
 # recorded whatever else it holds; any other driver answer refuses as before, unrecorded.
 test_every_other_state_of_an_own_copy_the_driver_keeps_still_refuses() {
   local variant plain force want
-  for variant in c1-input same-repo-worktree driver-path-directory unlanded dirty changed-during-driver removed-from-preserve empty-path archive-sha-differs json-no-unique json-unique-string other-repo lease-conflict live-or-unknown policy-not-allowed other-exit json-broken json-two reason-invented; do
+  for variant in c1-input same-repo-worktree driver-path-directory unlanded dirty changed-during-driver removed-from-preserve driver-path-differs driver-path-differs-second driver-path-gone driver-path-escapes empty-path archive-sha-differs json-no-unique json-unique-string other-repo lease-conflict live-or-unknown policy-not-allowed other-exit json-broken json-two reason-invented; do
     retained_variant "$variant" plain
     plain=$RV_DISPOSITION
     case "$variant" in
       c1-input|same-repo-worktree|driver-path-directory) want="exit=0 task-record=removed backlog=done copy=kept slot-returned=no record=written driver-calls=1 tars=1" ;;
       unlanded|dirty) want="exit=nonzero task-record=kept backlog=in_flight copy=kept slot-returned=no record=none driver-calls=0 tars=0" ;;
-      changed-during-driver|removed-from-preserve|empty-path|archive-sha-differs|json-no-unique|json-unique-string|other-repo)
+      changed-during-driver|removed-from-preserve|driver-path-differs|driver-path-differs-second|driver-path-gone|driver-path-escapes|empty-path|archive-sha-differs|json-no-unique|json-unique-string|other-repo)
         want="exit=nonzero task-record=kept backlog=in_flight copy=kept slot-returned=no record=written driver-calls=1 tars=1" ;;
       *) want="exit=nonzero task-record=kept backlog=in_flight copy=kept slot-returned=no record=none driver-calls=1 tars=1" ;;
     esac
@@ -6987,7 +7382,8 @@ test_every_other_state_of_an_own_copy_the_driver_keeps_still_refuses() {
       c1-input|same-repo-worktree|driver-path-directory) ;;
       unlanded) assert_grep 'not landed' "$FOREIGN_CASE/stderr" "$variant: the refusal named no cause" ;;
       changed-during-driver) assert_grep 'changed while Vernant' "$FOREIGN_CASE/stderr" "$variant: the refusal named no cause" ;;
-      removed-from-preserve) assert_grep 'does not hold every selected ignored file' "$FOREIGN_CASE/stderr" "$variant: the refusal named no cause" ;;
+      removed-from-preserve|driver-path-differs|driver-path-differs-second) assert_grep 'does not hold every ignored file' "$FOREIGN_CASE/stderr" "$variant: the refusal named no cause" ;;
+      driver-path-gone|driver-path-escapes) assert_grep 'which is not a plain path inside the copy' "$FOREIGN_CASE/stderr" "$variant: the refusal named no cause" ;;
       archive-sha-differs) assert_grep 'does not have the SHA-256 it recorded' "$FOREIGN_CASE/stderr" "$variant: the refusal named no cause" ;;
       empty-path|json-no-unique|json-unique-string) assert_grep 'its recorded answer does not name a restore-verified archive' "$FOREIGN_CASE/stderr" "$variant: the refusal named no cause" ;;
       dirty|other-repo) assert_grep 'REFUSED' "$FOREIGN_CASE/stderr" "$variant: the refusal named no cause" ;;
@@ -7107,7 +7503,7 @@ test_the_default_driver_interpreter_and_the_override_close_the_same_way() {
       assert_equals "0 0" "$(retained_call_count) $(retained_tar_count)" "retained-config-$mode: the driver ran without an interpreter"
       assert_present "$FOREIGN_CASE/state/task-x1.meta" "retained-config-$mode: the refusal removed the task record"
       assert_present "$FOREIGN_COPY/.git" "retained-config-$mode: the copy was removed"
-      assert_no_grep 'complete' "$FOREIGN_CASE/stdout" "retained-config-$mode: the task closed"
+      kept_assert_lacks 'complete' "$FOREIGN_CASE/stdout" "retained-config-$mode: the task closed"
     else
       expect_code 0 "$rc" "retained-config-$mode: the close must succeed: $(cat "$FOREIGN_CASE/stderr")"
       assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-config-$mode: the driver was not asked exactly once"
@@ -7275,7 +7671,7 @@ test_an_anchor_only_prior_copy_passes_the_ordinary_proof_and_is_refused_by_the_k
       run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
       expect_code 1 "$rc" "anchor-after-driver-$mode run $run: an anchor-only prior copy must not be closed over: $(cat "$FOREIGN_CASE/stderr")"
       assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "anchor-after-driver-$mode run $run: the driver must have been asked once and written one tar, and never again"
-      assert_no_grep 'ship deliverable is not landed' "$FOREIGN_CASE/stderr" "anchor-after-driver-$mode run $run: the ordinary proof refused before the driver, so this is not the kept route's refusal"
+      kept_assert_lacks 'ship deliverable is not landed' "$FOREIGN_CASE/stderr" "anchor-after-driver-$mode run $run: the ordinary proof refused before the driver, so this is not the kept route's refusal"
       assert_grep 'a refs/fm/anchor ref alone does not land it' "$FOREIGN_CASE/stderr" "anchor-after-driver-$mode run $run: the kept route's cause was not printed"
       assert_present "$(retained_record_path)" "anchor-after-driver-$mode run $run: the driver's answer was not recorded"
       assert_present "$FOREIGN_CASE/state/task-x1.meta" "anchor-after-driver-$mode run $run: the task record was removed"
@@ -7310,6 +7706,82 @@ test_the_retained_record_states_the_disposition_facts() {
 # written. No wait here has a cut-off: a wait that runs long prints one slow-alarm line and
 # keeps waiting (the first run dying ends the wait for `entered`, the second returning writes
 # `release`).
+# C2 (unchanged), closed end state: a retry of a task that closed around a kept copy says it is
+# already closed, names the record, exits 0 and asks the driver nothing.
+test_a_retry_of_a_closed_kept_copy_task_says_it_is_already_closed() {
+  local rc
+  make_retained_case retained-closed-retry enclosing
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  expect_code 0 "$rc" "retained-closed-retry: the close must succeed: $(cat "$FOREIGN_CASE/stderr")"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  expect_code 0 "$rc" "retained-closed-retry: a retry of a closed task must say so and succeed: $(cat "$FOREIGN_CASE/stderr")"
+  assert_grep 'already closed' "$FOREIGN_CASE/stdout" "retained-closed-retry: the retry did not say the task is already closed"
+  assert_grep "$(retained_record_path)" "$FOREIGN_CASE/stdout" "retained-closed-retry: the retry did not name the record"
+  assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-closed-retry: the retry asked the driver"
+  pass "a retry of a closed kept-copy task says it is already closed, names the record and asks the driver nothing"
+}
+
+# F8: a task record that is damaged rather than gone, one removed by hand after a refused close,
+# and a pending backlog close are never reported as already closed; a completed close is.
+test_a_damaged_or_unclosed_task_record_is_never_reported_as_already_closed() {
+  local rc
+  make_retained_case retained-closed-shape enclosing
+  held_plain_get_slot "$FOREIGN_CASE"
+  held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY"
+  : > "$FOREIGN_CASE/no-lease-command"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  expect_code 1 "$rc" "closed-shape: the close without a durable lease must refuse"
+  assert_present "$(retained_record_path)" "closed-shape: the refused close wrote no retained record, so the case tests nothing"
+  mv "$FOREIGN_CASE/state/task-x1.meta" "$FOREIGN_CASE/meta.saved"
+  mkdir "$FOREIGN_CASE/state/task-x1.meta"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  expect_code 1 "$rc" "closed-shape: a task record that is a directory must refuse"
+  kept_assert_lacks 'already closed' "$FOREIGN_CASE/stdout" "closed-shape: a damaged task record was reported as already closed"
+  rmdir "$FOREIGN_CASE/state/task-x1.meta"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  expect_code 1 "$rc" "closed-shape: a record removed by hand after a refused close must refuse"
+  kept_assert_lacks 'already closed' "$FOREIGN_CASE/stdout" "closed-shape: a refused close was reported as already closed once its record went"
+  assert_equals in_flight "$(backlog_row_state "$FOREIGN_CASE")" "closed-shape: the backlog item moved"
+  make_retained_case retained-closed-control enclosing
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  expect_code 0 "$rc" "closed control: the close must succeed: $(grep -m 3 -E 'REFUSED|error' "$FOREIGN_CASE/stderr")"
+  printf 'id=task-x1\n' > "$FOREIGN_CASE/state/task-x1.backlog-close"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  kept_assert_lacks 'already closed' "$FOREIGN_CASE/stdout" "closed control: a pending backlog close was reported as already closed"
+  rm -f "$FOREIGN_CASE/state/task-x1.backlog-close"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  expect_code 0 "$rc" "closed control: the retry of a closed task must succeed"
+  assert_grep 'already closed' "$FOREIGN_CASE/stdout" "closed control: the retry of a closed task did not say it is already closed"
+  assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "closed control: the retry asked the driver"
+  pass "a damaged task record, one removed after a refused close and a pending backlog close are never reported as already closed; a completed close is"
+}
+
+# C2 (post-driver): the copy's record cannot be written (its folder takes no new file): every
+# run refuses before the driver with a refusal record in data/<task>/closeout-refused/, and once
+# the folder can be written the next run asks once, closes and deletes the refusal record.
+test_an_unwritable_retained_record_never_makes_an_unchanged_retry_ask_the_driver() {
+  local rc dir run refused
+  make_retained_case retained-unwritable-retry enclosing
+  dir=$FOREIGN_CASE/data/copy-sweep/retained
+  mkdir -p "$dir"
+  chmod a-w "$dir"
+  if [ "$(id -u)" = 0 ]; then chmod u+w "$dir"; pass "skipped as root"; return 0; fi
+  refused=$FOREIGN_CASE/data/task-x1/closeout-refused/$(printf '%s' "$FOREIGN_COPY" | shasum -a 256 | awk '{print $1}')
+  for run in 1 2 3; do
+    run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+    expect_code 1 "$rc" "retained-unwritable-retry: run $run must refuse: $(cat "$FOREIGN_CASE/stderr")"
+    assert_equals "0 0" "$(retained_call_count) $(retained_tar_count)" "retained-unwritable-retry: run $run asked the driver"
+    assert_present "$FOREIGN_CASE/state/task-x1.meta" "retained-unwritable-retry: run $run removed the task record"
+    assert_grep 'cause=' "$refused" "retained-unwritable-retry: run $run left no refusal record with its cause"
+  done
+  chmod u+w "$dir"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  expect_code 0 "$rc" "retained-unwritable-retry: once the record can be written the close must succeed: $(cat "$FOREIGN_CASE/stderr")"
+  assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-unwritable-retry: the close after the cause went asked more than once"
+  assert_absent "$refused" "retained-unwritable-retry: the refusal record outlived its cause"
+  pass "an unwritable retained record refuses every unchanged retry before the driver with a refusal record, and the close follows with one call once it is writable"
+}
+
 retained_overlap_run() {  # <label> <second-command...>: first run in the background
   local label=$1 first_pid releaser_pid n after
   shift
@@ -7644,6 +8116,15 @@ test_kept_copy_helper_a_refused_kept_copy_is_judged_again_from_its_record
 test_kept_copy_helper_the_retire_step_leaves_a_matching_kept_copy_out
 test_kept_copy_helper_the_proof_queues_no_signal_for_a_matching_kept_copy
 test_kept_copy_helper_a_receipt_that_is_not_a_regular_file_still_holds_the_copy
+test_a_retry_of_a_closed_kept_copy_task_says_it_is_already_closed
+test_a_damaged_or_unclosed_task_record_is_never_reported_as_already_closed
+test_an_unwritable_retained_record_never_makes_an_unchanged_retry_ask_the_driver
+test_kept_copy_helper_a_retry_of_a_closed_task_says_it_is_already_closed
+test_kept_copy_helper_a_changed_copy_is_preserved_beside_its_earlier_preserve_which_is_never_replaced
+test_kept_copy_helper_a_record_that_cannot_be_written_leaves_a_refusal_record
+test_kept_copy_helper_every_driver_named_path_is_judged_as_written_and_checked_against_the_copy
+test_kept_copy_helper_a_file_changed_after_it_was_preserved_is_never_released_unpreserved
+test_kept_copy_helper_root_files_named_like_the_preserves_own_files_are_preserved
 test_a_landed_task_closes_around_an_own_copy_the_driver_keeps
 test_a_retry_of_an_unchanged_kept_copy_asks_the_driver_nothing
 test_a_changed_kept_copy_is_assessed_afresh

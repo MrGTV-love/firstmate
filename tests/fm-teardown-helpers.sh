@@ -2663,16 +2663,25 @@ tardir=$SLOT/.claude/bug-evidence/worktree-preservation
 mkdir -p "$tardir"
 n=$(find "$tardir" -name '*.tar' | wc -l | tr -d ' ')
 tar=$tardir/stub-ordinary_cleanup-$((n + 1)).tar
-printf 'archive %s\n' "$n" > "$tar"
+unique=$(printf '%s\n' ${FM_STUB_UNIQUE-.claude/channel-outbox/a.jsonl .claude/channel-outbox/b.jsonl} | jq -R . | jq -s -c .)
+# FM_STUB_UNIQUE_JSON: the driver's array as JSON text, for a name no space-separated list
+# can carry (a newline, a space); it replaces FM_STUB_UNIQUE.
+[ -z "${FM_STUB_UNIQUE_JSON:-}" ] || unique=$FM_STUB_UNIQUE_JSON
+# The tar holds the named files themselves, as the real driver's archive does, so a case can
+# restore from it. Only a plain relative name of something present in the copy is archived
+# (an absolute name, an empty, "." or ".." component never reaches outside the copy).
+printf '%s' "$unique" | jq -j '.[] | select(type == "string") | rtrimstr("/") | select(length > 0 and (startswith("/") | not) and (split("/") | map(select(. == "" or . == "." or . == "..")) | length) == 0) | ., "\u0000"' > "$tar.names" 2>/dev/null || : > "$tar.names"
+: > "$tar.present"
+while IFS= read -r -d '' name; do
+  { [ -e "$2/$name" ] || [ -L "$2/$name" ]; } && printf '%s\0' "$name" >> "$tar.present"
+done < "$tar.names"
+(cd "$2" && COPYFILE_DISABLE=1 tar -cf "$tar" --null -T "$tar.present") 2>/dev/null || printf 'archive %s\n' "$n" > "$tar"
+rm -f "$tar.names" "$tar.present"
 # The answer names the tar it wrote and that tar's SHA-256, as the real driver does;
 # FM_STUB_ARCHIVE_SHA replaces the recorded hash, to name an archive that does not match.
 sha=$(perl -MDigest::SHA -e 'open(my $f, "<:raw", $ARGV[0]) or exit 1; print Digest::SHA->new(256)->addfile($f)->hexdigest' "$tar")
 [ -z "${FM_STUB_ARCHIVE_SHA:-}" ] || sha=$FM_STUB_ARCHIVE_SHA
 [ -z "${FM_STUB_AFTER:-}" ] || eval "$FM_STUB_AFTER"
-unique=$(printf '%s\n' ${FM_STUB_UNIQUE-.claude/channel-outbox/a.jsonl .claude/channel-outbox/b.jsonl} | jq -R . | jq -s -c .)
-# FM_STUB_UNIQUE_JSON: the driver's array as JSON text, for a name no space-separated list
-# can carry (a newline, a space); it replaces FM_STUB_UNIQUE.
-[ -z "${FM_STUB_UNIQUE_JSON:-}" ] || unique=$FM_STUB_UNIQUE_JSON
 reason=${FM_STUB_REASON:-cleanup_ignored_payload_archived_tree_retained}
 case "${FM_STUB_JSON:-one}" in
   broken) printf '{"allowed": false, "reason": "%s"\n' "$reason" ;;
