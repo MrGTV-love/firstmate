@@ -2123,8 +2123,9 @@ test_restart_attributes_before_a_raw_command_fallback_nudge() {
   dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
   grep -v '^harness=' "$dir/home/state/$id.meta" > "$dir/meta.new" && mv "$dir/meta.new" "$dir/home/state/$id.meta"
   printf 'harness=mytool\n' >> "$dir/home/state/$id.meta"
+  # The refusal keeps the capability cause and adds the attribution cause.
   claude_restart_unreached "$dir" "$id" "$ROOT/bin/fm-secondmate-restart.sh" \
-    "its live Herdr agent cannot be positively attributed to this task, so no request or nudge was sent to it" \
+    "its worker runtime 'mytool' has no verified restart mechanics for a second mate; its live Herdr agent cannot be positively attributed to this task, so no request or nudge was sent to it" \
     "a raw-command mate with an unattributed live pane"
   # A positively stopped mate keeps the existing fallback outcome.
   prepare_claude_restore raw-command-stopped
