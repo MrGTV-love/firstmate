@@ -584,6 +584,7 @@ wait_one_completed_slot() {
   done
 }
 
+# shellcheck disable=SC2016 # The stamp shell is single-quoted on purpose: the inner bash, not this script, expands it.
 STAMP_SHELL="$(declare -f now_ms)"'
 start_ms=$(now_ms)
 bash "$1"
