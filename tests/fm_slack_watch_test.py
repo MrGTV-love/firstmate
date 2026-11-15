@@ -7841,11 +7841,35 @@ class Round8Findings(InvariantScenario):
             with patch.dict(os.environ, {'FM_SLACK_DM_USER': new_owner, 'SLACK_SIGNING_SECRET': INV_SECOND}), patch.object(Replay, 'append_line', unchecked):
                 os.environ.pop('FM_SLACK_SECOND_USER', None)
                 result = home.cli('check', action='retarget')
+                later = [home.cli('poll') for _ in range(2)]                    # the owner's notice is printed by the next owner run, once
+            self.assertEqual(sum(r.out.count(plane.AUTHOR_COLLISION_NOTICE) for r in later), 1, [r.out for r in later])
+            self.assertNotIn(INV_SECOND, ''.join(r.out + r.err for r in later))
             rows = [r for r in home.refusals() if r['reason'] == 'decision_held_for_captain_reaction']
             self.assertEqual(len(rows), 1, (result.out, result.err, home.refusals()))
-            self.assertEqual(rows[0].get('author'), 'sha256-id:' + plane.id_hash(INV_SECOND))       # attributed by the id's one-way hash
+            self.assertEqual(rows[0].get('author'), 'sha256-id:' + plane.id_hash(INV_SECOND))       # attributed by the id's one-way hash (Main 1719)
+            self.assertEqual(rows[0].get('withheld'), plane.AUTHOR_WITHHELD)
             self.assertNotIn(INV_SECOND, (home.state_dir / 'refusals.jsonl').read_text())
+            for name in ('refusals.jsonl', 'refusal-queue.jsonl'):
+                path = home.state_dir / name
+                if path.is_file():
+                    self.assertNotIn(INV_SECOND, path.read_text(), name)
+            self.assertNotIn(INV_SECOND, result.out + result.err)
             self.assertEqual(answers(), [])
+
+    def test_r9_main1719_a_normal_refusal_row_names_the_literal_id_and_an_id_one_character_from_the_secret_is_not_withheld(self):
+        new_owner, new_dm = 'U0NEWOWNER01', 'D0NEWOWNER01'
+        near = INV_SECOND[:-1] + ('2' if INV_SECOND[-1] != '2' else '3')        # differs from their id by one character
+        with self.home(authors=','.join([INV_OWNER, new_owner])) as home, self.held_card() as answers:
+            home.add_member(new_owner, new_dm)
+            home.cli('poll')
+            ts = self.card_ts(home)
+            home.edit_replay(lambda data: data['reactions'].setdefault(ts, []).append({'name': 'two', 'users': [INV_SECOND]}))
+            with patch.dict(os.environ, {'FM_SLACK_DM_USER': new_owner, 'SLACK_SIGNING_SECRET': near}):
+                os.environ.pop('FM_SLACK_SECOND_USER', None)
+                result = home.cli('check', action='retarget')
+            rows = [r for r in home.refusals() if r['reason'] == 'decision_held_for_captain_reaction']
+            self.assertEqual([(r.get('author'), r.get('withheld')) for r in rows], [(INV_SECOND, None)], (result.out, result.err))
+            self.assertNotIn(plane.AUTHOR_COLLISION_NOTICE, result.out + result.err)
 
     # ---- R3: arming B keeps A's unread window ----
 
