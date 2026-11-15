@@ -138,9 +138,13 @@ for raw in paths:
     if not raw:
         continue
     path = raw.decode(errors='replace')
-    if os.path.basename(path).startswith('replay-state-'):
-        continue  # the fixture stand-in for Slack, which keeps what the owner typed
-    if os.path.isfile(path) and any(needle in open(path, 'rb').read() for needle in needles):
+    if not os.path.isfile(path):
+        continue
+    data = open(path, 'rb').read()
+    # Only the replay's own stand-in for Slack is set aside, by its provenance, not by its name: a file in a fixture home's state/slack-watch folder that
+    # declares the replay's schema (it keeps what the people typed into the stand-in DMs). Every other tracked or state file is scanned, whatever its name.
+    standin = any(os.path.dirname(path) == os.path.join(home, 'state', 'slack-watch') for home in homes) and b'"schema": "fm-slack-replay-state.v1"' in data
+    if not standin and any(needle in data for needle in needles):
         matches.append(path)
 with open(out, 'w') as handle:
     for path in matches:
