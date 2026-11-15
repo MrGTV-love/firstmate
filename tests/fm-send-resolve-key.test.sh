@@ -392,9 +392,7 @@ test_failed_ring_still_closes_at_enqueue() {
   sed -E 's/ \[at=[0-9]+\]//' "$home/state/t5.status" | grep -qF 'resolved [key=creds]: answered: token is in the vault now' \
     || fail "the enqueued answer must close the decision at answer time: $(cat "$home/state/t5.status")"
   fm_test_fold_proven "$home/state" t5
-  if fm_test_fold_key_open creds; then
-    fail "the answered blocker still lists as open after an enqueue-time close: $FM_TEST_FOLD_OPEN"
-  fi
+  fm_test_fold_key_closed creds "the answered blocker still lists as open after an enqueue-time close"
   pass "fm-send --resolve-key: the close happens at enqueue, surviving a failed doorbell"
 }
 
@@ -440,10 +438,9 @@ test_multiple_keys_close_together() {
     "one answer covering both"; rc=$?
   expect_code 0 "$rc" "an answer resolving two keys should succeed"
   fm_test_fold_proven "$home/state" t6
-  fm_test_fold_key_open k3 || fail "the unanswered third decision must stay open: $FM_TEST_FOLD_OPEN"
-  if fm_test_fold_key_open k1 || fm_test_fold_key_open k2; then
-    fail "an answered key is still open after a multi-key answer: $FM_TEST_FOLD_OPEN"
-  fi
+  fm_test_fold_key_still_open k3 "the unanswered third decision must stay open"
+  fm_test_fold_key_closed k1 "an answered key is still open after a multi-key answer"
+  fm_test_fold_key_closed k2 "an answered key is still open after a multi-key answer"
   pass "fm-send --resolve-key: one answer closes each named key and only those"
 }
 
@@ -914,9 +911,7 @@ test_decision_answer_partition_relocates_under_the_record() {
   grep -qF "go with REST" "$home/state/t1.inbox/002.msg" \
     || fail "the relocated answer did not reach the worker's inbox"
   fm_test_fold_proven "$home/state" t1
-  if fm_test_fold_key_open api-shape; then
-    fail "the relocated answer left the decision open: $FM_TEST_FOLD_OPEN"
-  fi
+  fm_test_fold_key_closed api-shape "the relocated answer left the decision open"
 
   # Main never meets the partition, attended or not.
   FM_HOME="$home" "$ROOT/bin/fm-afk-contract.sh" archive >/dev/null || fail "away archive failed"
@@ -1214,7 +1209,7 @@ test_double_dash_ends_options() {
   body=$(sed '1,/^--$/d' "$home/state/t1.inbox/001.msg")
   assert_equals "--answers-none" "$body" "the literal keyed answer is delivered unchanged"
   fm_test_fold_proven "$home/state" t1
-  ! fm_test_fold_key_open k1 || fail "the keyed answer closed k1 (still open: $FM_TEST_FOLD_OPEN)"
+  fm_test_fold_key_closed k1 "the keyed answer closed k1"
   assert_contains "$(drain_out "$home")" "[key=k2]" "k2 stays open"
   send_capture "$fb" "$home" "$log" "$err" t1 -- "plain words"; rc=$?
   expect_code 1 "$rc" "-- states no choice: a bare body after -- still refuses while k2 is open"
@@ -1289,8 +1284,8 @@ test_answers_none_delivers_a_routine_steer() {
   send_capture "$fb" "$home" "$log" "$err" t1 --resolve-key k1 "REST"; rc=$?
   expect_code 0 "$rc" "--resolve-key for one of two open keys needs no further flag"
   fm_test_fold_proven "$home/state" t1
-  ! fm_test_fold_key_open k1 || fail "k1 should be closed: $FM_TEST_FOLD_OPEN"
-  fm_test_fold_key_open k2 || fail "k2 stays open after answering k1: $FM_TEST_FOLD_OPEN"
+  fm_test_fold_key_closed k1 "k1 should be closed"
+  fm_test_fold_key_still_open k2 "k2 stays open after answering k1"
   pass "fm-send --answers-none: delivers a routine steer, appends nothing, and leaves every key open"
 }
 
@@ -1478,8 +1473,8 @@ recorded_case_check() {  # <case-name> <task> <key> <status-log-file> <lane-line
   # before this send, whose body (after the record's -- line) carries this send's answer, which
   # names the key; the none-send's record must still be there, unchanged in name and still
   # carrying its own answer, so the inbox holds exactly those two records. The send must also
-  # append its own resolution: a status line whose whole value is "resolved [key=<key>]:
-  # answered: <this answer>" (the [at=...] stamp aside).
+  # append its own resolution: a status line that is exactly "resolved [key=<key>]: answered:
+  # <this answer>", with an optional [at=<digits>] stamp only before the colon.
   before=$(fm_test_inbox_records "$home/state/$task.inbox")
   status_lines=$(wc -l < "$home/state/$task.status" | tr -d ' ')
   send_capture "$fb" "$home" "$log" "$err" "$task" --resolve-key "$key" "$keyed_text"; rc=$?
@@ -1498,11 +1493,13 @@ recorded_case_check() {  # <case-name> <task> <key> <status-log-file> <lane-line
     *"stand-in answer text"*) ;;
     *) fail "$name: after the keyed answer the none-send's record $none_rec no longer carries its answer" ;;
   esac
-  sed -n "$((status_lines + 1)),\$p" "$home/state/$task.status" | sed -E 's/ \[at=[0-9]+\]//' \
-    | awk -v want="resolved [key=$key]: answered: $keyed_text" '$0 == want { found = 1 } END { exit !found }' \
+  # One anchored pattern over the unmodified line: the optional [at=<digits>] stamp is allowed
+  # only in the prefix, before the colon; the note after "answered: " must be exactly the answer.
+  sed -n "$((status_lines + 1)),\$p" "$home/state/$task.status" \
+    | grep -Eq "^resolved \[key=$(fm_test_ere_quote "$key")\]( \[at=[0-9]+\])?: answered: $(fm_test_ere_quote "$keyed_text")\$" \
     || fail "$name: the keyed answer did not append its own resolved [key=$key] line: $(cat "$home/state/$task.status")"
   fm_test_fold_proven "$home/state" "$task"
-  ! fm_test_fold_key_open "$key" || fail "$name: the key is still open after the keyed answer: $FM_TEST_FOLD_OPEN"
+  fm_test_fold_key_closed "$key" "$name: the key is still open after the keyed answer"
 }
 
 test_recorded_cases_of_2026_11_03() {

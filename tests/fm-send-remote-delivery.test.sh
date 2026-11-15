@@ -492,7 +492,7 @@ test_remote_printed_resend_carries_the_original_choice() {
   expect_code 0 "$rc" "the printed keyed resend is accepted: $(cat "$dir/keyed.err")"
   [ "$(remote_inbox_records "$rhome" | grep -c .)" = 1 ] || fail "the keyed resend must land one record"
   fm_test_fold_proven "$home/state" rsm
-  ! fm_test_fold_key_open metric-name || fail "the keyed resend closed metric-name once delivered (still open: $FM_TEST_FOLD_OPEN)"
+  fm_test_fold_key_closed metric-name "the keyed resend closed metric-name once delivered"
   assert_contains "$(drain_out "$home")" "[key=$LOST_KEY]" "the request's own blocker stays the library's to close"
 
   dir="$TMP_ROOT/remote-resend-none"; mkdir -p "$dir"
