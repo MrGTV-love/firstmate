@@ -3566,7 +3566,18 @@ assert_closed_by_plain_teardown() {  # <label> <task>
   assert_nothing_forced "$1"
 }
 
-assert_nothing_forced() {  # <label>
+# assert_nothing_forced <label> [called|not-called|any]: no teardown call carried an
+# extra argument and treehouse was never forced. By default the case must have asked
+# teardown at least once, so an empty call log fails (Main 1686 F6, Main 1820 F9);
+# "not-called" requires the log to be empty, for a case whose own verdict keeps the
+# copy before any teardown; "any" is only for a case whose variants differ.
+assert_nothing_forced() {  # <label> [called|not-called|any]
+  case "${2:-called}" in
+    called) [ -s "$W/stub.log" ] || fail "$1: no teardown call is on record, so nothing proves it was plain" ;;
+    not-called) [ ! -s "$W/stub.log" ] || fail "$1: teardown was asked although this case keeps the copy before it: $(cat "$W/stub.log")" ;;
+    any) ;;
+    *) fail "$1: assert_nothing_forced was given an unknown mode ${2:-}" ;;
+  esac
   if [ -s "$W/stub.log" ] && grep -qvxE '[A-Za-z0-9][A-Za-z0-9._-]*' "$W/stub.log"; then
     fail "$1: teardown was asked with extra arguments: $(cat "$W/stub.log")"
   fi
@@ -3786,7 +3797,8 @@ test_e2e_pushed_follow_up_commit_after_the_merge_keeps_the_copy() {
   assert_not_destroyed "e2e unmerged"
   [ "$(wake_count_real)" = 1 ] || fail "want exactly one wake, got $(wake_count_real): $(cat "$STATE/.wake-queue" 2>/dev/null)"
   grep -F "$COPY" "$STATE/.wake-queue" | grep -q 'not in the merged pull request' || fail "the wake does not name the copy and that its commit is not in the merged pull request: $(cat "$STATE/.wake-queue")"
-  assert_nothing_forced "e2e unmerged"
+  # The prune's own verdict keeps the copy (bin/fm-merge-prune-lib.sh), before any teardown.
+  assert_nothing_forced "e2e unmerged" not-called
   prune_real run t1 --now >/dev/null 2>&1; prune_real run t1 --now >/dev/null 2>&1
   [ "$(wake_count_real)" = 1 ] || fail "repeat attempts raised more wakes"
   pass "end to end: a copy with a pushed follow-up commit that is not merged stays before anything is stopped, forces nothing and raises exactly one wake"
@@ -3811,7 +3823,8 @@ test_e2e_unsafe_copies_are_never_removed() {
     prune_real run t1 --now >/dev/null 2>&1
     [ -e "$COPY" ] || fail "$what: an unsafe copy was removed"
     [ -e "$STATE/t1.meta" ] || fail "$what: the task record was closed over an unsafe copy"
-    assert_nothing_forced "e2e $what"
+    # Some variants are kept by the prune's own checks and one reaches a refusing teardown.
+    assert_nothing_forced "e2e $what" any
     assert_not_destroyed "e2e $what"
     [ "$(wake_count_real)" = 1 ] || fail "$what: want exactly one wake, got $(wake_count_real): $(cat "$STATE/.wake-queue" 2>/dev/null)"
     grep -F "$COPY" "$STATE/.wake-queue" | grep -q 'merge-prune kept' || fail "$what: the wake does not name the copy"
@@ -4041,10 +4054,11 @@ xl_plain_teardown() {  # <stderr file>
 # in these tests drains the queue, so a wake that fired stays in it. The only wake
 # that may name A is its own merge poll's report, which exists only after the pass
 # registered the PR; a status signal for the done note, or any other wake naming A,
-# fails (Main 1686 F6). The contributions observer's unrelated wake is not A's.
+# fails (Main 1686 F6). No line is exempt by its wording, a contributions wake
+# included (Main 1820 F9): only A's own merge report may name A.
 xl_assert_no_stray_wake_for_a() {  # <label>
   local stray
-  stray=$(grep -E 't1|pull/7' "$STATE/.wake-queue" 2>/dev/null | grep -v 'contributions' | grep -v 'check: merge landed: t1 ' || true)
+  stray=$(grep -E 't1|pull/7' "$STATE/.wake-queue" 2>/dev/null | grep -v 'check: merge landed: t1 ' || true)
   [ -z "$stray" ] || fail "$1: a wake or signal named A outside its own merge report: $stray"
 }
 
@@ -4070,6 +4084,45 @@ xl_observe_stranded() {
 
 # The validators themselves can fail (Main 1686 F6): each is fed a state that
 # breaks its contract and must reject it, and a compliant state it must accept.
+# The validators' own falsifiers, on files only: no world, no worker, no teardown
+# and no process (Main 1827: provable here). Each validator rejects the state its
+# contract rejects and accepts a compliant one (Main 1820 F9).
+test_validators_reject_their_falsifiers_on_files() {
+  local saved_w=${W-} saved_state=${STATE-}
+  W=$(mktemp -d "$TMP_ROOT/validators.XXXXXX")
+  STATE="$W/state"
+  mkdir -p "$STATE"
+  : > "$W/th.log"
+  # assert_nothing_forced: an empty call log fails by default; a plain call passes.
+  : > "$W/stub.log"
+  ! ( assert_nothing_forced "unit empty" ) 2>/dev/null || fail "an empty teardown call log passed assert_nothing_forced"
+  ( assert_nothing_forced "unit empty, not called" not-called ) || fail "an empty call log failed the not-called mode"
+  printf 't1\n' > "$W/stub.log"
+  ( assert_nothing_forced "unit plain" ) || fail "one plain teardown call failed assert_nothing_forced"
+  ! ( assert_nothing_forced "unit called, not-called" not-called ) 2>/dev/null || fail "a teardown call passed the not-called mode"
+  printf 't1 --force\n' > "$W/stub.log"
+  ! ( assert_nothing_forced "unit forced" any ) 2>/dev/null || fail "a forced teardown call passed assert_nothing_forced"
+  : > "$W/stub.log"
+  printf 'destroy --force /pool/1\n' > "$W/th.log"
+  ! ( assert_nothing_forced "unit treehouse forced" any ) 2>/dev/null || fail "a forced treehouse call passed assert_nothing_forced"
+  : > "$W/th.log"
+  # xl_assert_no_stray_wake_for_a: a contributions wake naming A is a stray wake.
+  printf '1\t1\tcheck\tmerged-t1-x\tcheck: merge landed: t1 %s external\n' "$XL_PR" > "$STATE/.wake-queue"
+  ( xl_assert_no_stray_wake_for_a "unit merge report" ) || fail "A's own merge report was taken for a stray wake"
+  printf '2\t2\tcheck\tcontributions\tcheck: contributions %s\n' "$XL_PR" >> "$STATE/.wake-queue"
+  ! ( xl_assert_no_stray_wake_for_a "unit contributions" ) 2>/dev/null || fail "a contributions wake naming A passed as no wake"
+  # v5_c_rows_ok: only C's inherited check-in may stand; a non-overdue failed_task row fails.
+  printf '{"rows":[{"category":"silent_report","subject":"t-c","owner":"firstmate","overdue":true,"informational":false,"next_action":"check in"}]}\n' > "$W/c.json"
+  v5_c_rows_ok "$W/c.json" || fail "C's inherited check-in was rejected"
+  printf '{"rows":[]}\n' > "$W/c-none.json"
+  v5_c_rows_ok "$W/c-none.json" || fail "C with no row was rejected"
+  printf '{"rows":[{"category":"failed_task","subject":"t-c","owner":"firstmate","overdue":false,"informational":false,"next_action":"recover the failed work"}]}\n' > "$W/c-bad.json"
+  ! v5_c_rows_ok "$W/c-bad.json" || fail "a non-overdue failed_task row for C passed the C oracle"
+  W=$saved_w
+  STATE=$saved_state
+  pass "the validators reject an empty or forced teardown log, a contributions wake naming A and any C row but its check-in, on files alone"
+}
+
 test_xlane_validators_reject_what_their_contracts_reject() {
   local before
   make_xlane_world
@@ -4131,8 +4184,9 @@ test_xlane_merge_by_another_lane_reaches_safe_closeout() {
   # its ref, so the copy's HEAD is held only in the copy. Exact forge/copy HEAD
   # equality no longer stands in for the named-head gate (Main 1688 Q1), so the
   # registrar refuses to record the PR. The finished task still has its owner and a
-  # concrete next action: its content landed, so the ledger's cleanup row names plain
-  # teardown, and that teardown succeeds.
+  # concrete next action: its content landed, so the ledger holds an owned
+  # pending_cleanup row naming plain teardown (Main 1827 Q3, the dated V3 amendment).
+  # The case runs no teardown by hand; the row is the outcome.
   make_xlane_world
   xl_merge_in_lane_m
   xl_write_done_note
@@ -4146,16 +4200,13 @@ test_xlane_merge_by_another_lane_reaches_safe_closeout() {
   rows=$(xl_t1_rows)
   printf '%s\n' "$rows" | grep -q '^pending_cleanup | home:firstmate | false | run plain bin/fm-teardown.sh t1' \
     || fail "branch-pruned: the landed, unregistered task has no owned cleanup row naming plain teardown: $rows"
-  xl_plain_teardown "$W/pruned-teardown.err" || fail "branch-pruned: the plain teardown the row names refused: $(cat "$W/pruned-teardown.err")"
-  # Plain teardown closes the record and returns the pool slot to treehouse (whose stand-in keeps the directory).
-  [ ! -e "$STATE/t1.meta" ] || fail "branch-pruned: plain teardown left the record"
-  xl_has_event task.cleaned_up || fail "branch-pruned: O's ledger lacks task.cleaned_up for t1: $(xl_ledger_events)"
-  grep -q "^return .*$COPY" "$W/th.log" || fail "branch-pruned: plain teardown did not return the slot: $(cat "$W/th.log")"
-  assert_closed_by_plain_teardown "xlane branch-pruned" t1
+  [ "$(printf '%s\n' "$rows" | grep -c .)" = 1 ] || fail "branch-pruned: t1 has more than its one cleanup row: $rows"
+  [ -e "$COPY" ] || fail "branch-pruned: the copy was removed without a teardown"
+  [ ! -s "$W/stub.log" ] || fail "branch-pruned: a teardown ran although nothing in O runs it here: $(cat "$W/stub.log")"
   [ "$XL_M_AFTER_MERGE" = "$(xl_digest_dir "$XL_MC/state" task-x1)" ] \
     || fail "branch-pruned: O changed lane M's records beyond its own task: $(cd "$XL_MC/state" && ls -A)"
   cleanup_workers
-  pass "a PR merged by another lane reaches its owning record: pr= from the done note (or the lost poll re-armed), the merge found at the forge, plain teardown, record, copy and poll gone, ledger shows merged and cleaned_up; with the PR branch pruned the copy-only head is not registered, and the owned cleanup row's plain teardown closes it"
+  pass "a PR merged by another lane reaches its owning record: pr= from the done note (or the lost poll re-armed), the merge found at the forge, plain teardown, record, copy and poll gone, ledger shows merged and cleaned_up; with the PR branch pruned the copy-only head is not registered, and the task keeps one owned cleanup row naming plain teardown"
 }
 
 
@@ -4178,7 +4229,8 @@ test_xlane_open_or_closed_pr_keeps_the_record() {
     if xl_has_event task.merged || xl_has_event task.cleaned_up; then
       fail "$state: the ledger claims a merge or a cleanup: $(xl_ledger_events)"
     fi
-    assert_nothing_forced "xlane $state"
+    # An open or unmerged PR never reaches teardown.
+    assert_nothing_forced "xlane $state" not-called
     cleanup_workers
   done
   pass "a PR that is open, or closed unmerged, leaves the record, the copy and the ledger as they were"
@@ -4405,7 +4457,8 @@ PYJ
     jq -e --arg c "$category" --arg r "$reason" \
       'any(.rows[]; .subject == "t1" and .category == $c and (.next_action | contains($r)) and (.evidence | contains($r[0:120])))' \
       "$ledger" > /dev/null || fail "$what: the $category row for t1 does not carry the kept refusal: $(jq -c '[.rows[] | select(.subject == "t1")]' "$ledger")"
-    assert_nothing_forced "xlane refused prune $what"
+    # The refusal can come from the prune's own proof or from teardown.
+    assert_nothing_forced "xlane refused prune $what" any
     cleanup_workers
   done
   pass "a merged cross-lane PR whose copy still holds unlanded or changed work keeps the prune's refusal text on the task's ledger row"
@@ -4607,6 +4660,13 @@ v5_rows() {
   jq -r --arg s "$2" '.rows[] | select(.subject | test($s)) | [.category, .subject, .owner, (.overdue|tostring), ((.informational // false)|tostring), .next_action] | @tsv' "$1"
 }
 
+# v5_c_rows_ok <ledger-json>: C's live declared wait has no row, or only its inherited
+# long-wait check-in (silent_report, Main 038 ruling (b)); any other category, overdue
+# or not, fails (Main 1820 F9).
+v5_c_rows_ok() {
+  ! v5_rows "$1" '^t-c' | awk -F'\t' '$1 != "silent_report" {bad=1} END {exit !bad}'
+}
+
 v5_table() {  # <ledger-json>: acceptance and cleanup per task, read from the records, copies, ledger and forge double
   local ledger=$1 forge a_merged a_cleaned review
   forge=$(cat "$W/forge.state")
@@ -4684,8 +4744,8 @@ test_v5_missing_updates_restart_and_completed_review_cannot_strand_work() {
   # C's worker is live and waiting on a named decision: it is never stranded, missing or owed
   # cleanup. The inherited long-wait check-in (silent_report after FM_PAUSE_RESURFACE_SECS; Main
   # 038 ruling (b), a stated limit) may resurface it, and only that row may be overdue.
-  ! v5_rows "$W/l3.json" '^t-c' | awk -F'\t' '$1 ~ /^pending_/ || $1 == "stalled_worker" || $1 == "missing_worker" || ($4 == "true" && $1 != "silent_report") {bad=1} END {exit !bad}' \
-    || fail "C: a live declared wait reported as stranded, missing, owed cleanup or overdue: $(v5_rows "$W/l3.json" '^t-c')"
+  v5_c_rows_ok "$W/l3.json" \
+    || fail "C: a live declared wait has a row other than its inherited check-in: $(v5_rows "$W/l3.json" '^t-c')"
   # D is untouched and never stranded, actionable or overdue because it is quiet.
   [ -e "$STATE/mate1.meta" ] || fail "D: the secondmate record was removed"
   ! v5_rows "$W/l3.json" '^mate1$' | awk -F'\t' '$4 == "true" || $5 != "true" {bad=1} END {exit !bad}' \
@@ -4756,7 +4816,8 @@ SH
     *) fail "E without its hold did not merge (a held or queued state is not a merge): $step_state" ;;
   esac
   [ "$(cat "$W/forge9.state")" = MERGED ] || fail "E's merge did not reach the forge"
-  assert_nothing_forced "v5 control"
+  # E's merge runs in the merge harness; its own prune may or may not reach teardown here.
+  assert_nothing_forced "v5 control" any
   pass "with only the forge's merge state changed from BEHIND to CLEAN and the same exact-head PASS, E waits and then merges"
 }
 
@@ -4917,6 +4978,7 @@ ALL_TESTS=(
   test_unsafe_mutations_are_caught
   test_over_strict_mutations_are_caught
   test_xlane_validators_reject_what_their_contracts_reject
+  test_validators_reject_their_falsifiers_on_files
   test_xlane_merge_by_another_lane_reaches_safe_closeout
   test_xlane_open_or_closed_pr_keeps_the_record
   test_xlane_same_lane_path_completes_as_before
