@@ -108,12 +108,14 @@ crew_state_ready_url() {  # <id>
 # one. The poll ended on purpose when a pending retirement or a pending slot
 # return exists, when the merge-notified marker names this PR (a marker naming
 # another PR does not count), or when an armed prune record names this PR or
-# cannot be read. A registrar still publishing holds the task's poll publication
-# lock, so its partly published poll is left to it. A check.sh that is not the poll
-# template, or that has a custom-check trust record, is another check and is never
-# replaced; the pass names that conflict instead.
+# cannot be read. A registration in progress holds the task's metadata lock from
+# writing pr= until it holds the poll publication lock, and that lock until its poll
+# is published (bin/fm-pr-check.sh); this pass tries both, in that order, and reads
+# pr= again under the first, so a registration in progress is left to it. A
+# check.sh that is not the poll template, or that has a custom-check trust record,
+# is another check and is never replaced; the pass names that conflict instead.
 pr_poll_lost() {  # <id> <recorded pr>
-  local id=$1 pr=$2 suffix canonical lost=0 lock
+  local id=$1 pr=$2 suffix canonical lost=0 lock meta_lock current
   for suffix in pr-poll-retirement teardown-return-pending; do
     [ ! -e "$STATE/$id.$suffix" ] && [ ! -L "$STATE/$id.$suffix" ] || return 1
   done
@@ -128,8 +130,18 @@ pr_poll_lost() {  # <id> <recorded pr>
     ! grep -qxF -e "pr=$pr" -e "pr=$canonical" "$STATE/$id.merge-prune" 2>/dev/null || return 1
     grep -q '^pr=' "$STATE/$id.merge-prune" 2>/dev/null || return 1
   fi
+  meta_lock=$(fm_meta_lock_path "$STATE/$id.meta") || return 1
+  fm_lock_try_acquire "$meta_lock" || return 1
+  current=$(grep '^pr=' "$STATE/$id.meta" 2>/dev/null | tail -1 | cut -d= -f2- || true)
+  if [ "$current" != "$pr" ]; then
+    fm_lock_release "$meta_lock" || true
+    return 1
+  fi
   lock="$STATE/.pr-poll-publish-$id.lock"
-  fm_lock_try_acquire "$lock" || return 1
+  if ! fm_lock_try_acquire "$lock"; then
+    fm_lock_release "$meta_lock" || true
+    return 1
+  fi
   if fm_pr_poll_snapshot_capture "$STATE" "$id" "$SCRIPT_DIR/fm-pr-poll.sh" \
     && [ "$FM_PR_POLL_SNAPSHOT_URL" = "$canonical" ]; then
     lost=1
@@ -145,6 +157,7 @@ pr_poll_lost() {  # <id> <recorded pr>
     lost=1
   fi
   fm_lock_release "$lock" || true
+  fm_lock_release "$meta_lock" || true
   return "$lost"
 }
 

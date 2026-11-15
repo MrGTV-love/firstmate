@@ -27,9 +27,10 @@
 #     FM_PR_CHECK_EXPECT_PR to the pr= it read; when the record names another PR
 #     by the time this registrar holds the metadata lock to commit, it changes
 #     nothing and exits 3, so a stale re-arm never replaces a newer registration;
-#     it checks again under the poll publication lock before it publishes. Every
-#     registration holds that lock from before it writes pr= until its poll is
-#     published, so a pass never reads pr= while no publisher holds the lock.
+#     it checks again under the poll publication lock before it publishes.
+#     From writing pr= until its poll is published a registration holds the
+#     metadata lock or the poll publication lock, and the pass tries both before
+#     it re-arms, so a registration in progress is never re-armed.
 # (d) bin/fm-teardown.sh's lookup for a detached copy (the record's branch=, else
 #     fm/<id>) only finds the PR; pr_is_merged's containment proofs are unchanged
 #     and still refuse a copy whose work the PR's head does not carry.
@@ -271,14 +272,6 @@ fm_pr_poll_prepare "$STATE" "$ID" "$PROVIDER" "$URL" "$HOST" "$PROJECT_PATH" "$N
 META_LOCK=$(fm_meta_lock_path "$META") || exit 1
 fm_lock_acquire_wait "$META_LOCK"
 META_LOCK_HELD=1
-# Take the poll publication lock before pr= is written, and keep it until the poll
-# is published, so pr= is never readable without a publisher holding that lock:
-# bin/fm-pr-ready-reconcile.sh reads the record without the metadata lock, leaves a
-# poll alone while this lock is held, and would otherwise re-arm a live first
-# registration in that gap. Nothing takes these two locks in the other order.
-PR_POLL_PUBLISH_LOCK="$STATE/.pr-poll-publish-$ID.lock"
-fm_lock_acquire_wait "$PR_POLL_PUBLISH_LOCK"
-PR_POLL_PUBLISH_LOCK_HELD=1
 [ -f "$META" ] && [ ! -L "$META" ] && [ "$(fm_pr_file_link_count "$META")" = 1 ] \
   || { echo "error: task metadata is unavailable" >&2; exit 1; }
 CURRENT_WT=$(grep '^worktree=' "$META" | tail -1 | cut -d= -f2- || true)
@@ -320,6 +313,15 @@ fm_pr_metadata_identity_parse "$META" || exit 1
 [ "$FM_PR_META_PROVIDER" = "$PROVIDER" ] && [ "$FM_PR_META_URL" = "$URL" ] \
   && [ "$FM_PR_META_HOST" = "$HOST" ] && [ "$FM_PR_META_PATH" = "$PROJECT_PATH" ] \
   && [ "$FM_PR_META_NUMBER" = "$NUMBER" ] || exit 1
+# Take the poll publication lock before the metadata lock is released, so from the
+# moment pr= is written until the poll is published this registrar holds one of the
+# two: bin/fm-pr-ready-reconcile.sh tries both, in this order, before it judges a
+# poll lost, and would otherwise re-arm a live first registration. pr= is written
+# before the publication wait, so a registration blocked behind another publisher
+# is already recorded. Nothing takes these two locks in the other order.
+PR_POLL_PUBLISH_LOCK="$STATE/.pr-poll-publish-$ID.lock"
+fm_lock_acquire_wait "$PR_POLL_PUBLISH_LOCK"
+PR_POLL_PUBLISH_LOCK_HELD=1
 fm_lock_release "$META_LOCK"
 META_LOCK_HELD=0
 # A re-arm checks again under the publication lock: another registration may have
