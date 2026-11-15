@@ -988,7 +988,10 @@ def record_setting_id():
 
 
 class Watch:
-    def __init__(self, replay=None, token=None, lock_wait=None):
+    # The longest wait for the journal lock, counted from the start of the run, or None to wait as long as it takes (main sets it for their check only).
+    lock_wait = None
+
+    def __init__(self, replay=None, token=None):
         # The monotonic time this run began, before its journal lock: the second person's check counts the wait for the lock inside its own time budget.
         self.run_started = monotonic()
         self.home = home_dir().resolve()
@@ -1001,7 +1004,7 @@ class Watch:
         if self.path.is_symlink() or self.lock_path.is_symlink():
             raise SlackError('unsafe_state_path')
         self.lock = open(self.lock_path, 'a')
-        self.take_lock(lock_wait)
+        self.take_lock(self.lock_wait)
         self.replay = replay
         self.state = self.start_state()
         self.token = token or ''
@@ -4279,12 +4282,16 @@ def main(argv, out=None):
         record_setting_id()
         replay = Replay(replay_path, state_home() / STATE_KEY,
                         token_present=bool(env_value('SLACK_BOT_TOKEN'))) if replay_path else None
+        # Their check waits for the journal lock only inside its budget (take_lock); the token read below is the base's, unchanged (SC6).
+        Watch.lock_wait = SECOND_BUDGET if action == 'check-second' else None
         try:
-            watch = Watch(replay=replay, token=env_value('SLACK_BOT_TOKEN').strip(), lock_wait=SECOND_BUDGET if action == 'check-second' else None)
+            watch = Watch(replay=replay, token=env_value('SLACK_BOT_TOKEN').strip())
         except SecondBudgetSpent:
             # Their check could not take the journal lock inside its budget (finding 10 of the review of d9861b24): nothing was read or written; the next sweep
             # takes their work.
             return 0
+        finally:
+            Watch.lock_wait = None
         watch.out = out
         if action in ('check', 'check-second'):
             watch.api.on_reply = lambda: note_progress(out)
